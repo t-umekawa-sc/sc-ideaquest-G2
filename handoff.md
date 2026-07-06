@@ -72,12 +72,12 @@ sc-ideaquest-G2/
 - **XP・コインの具体的な付与量とレベル設計**（投票/評価/チャットで付与するかも含む）。
 - 添付ファイルの上限サイズ・形式・保管先。
 - アイデアの公開範囲（社内全体 / 部署単位 / 投稿者と管理者のみ）。
-- **会社DBのプロビジョニング/オーケストレーション方式**（docker compose / k8s 等）、コンテナ数上限。
-- **管理DB↔会社DBのUser情報の同期方式**。
+- テナント（会社DBコンテナ）数の上限・リソース設計。
+- **管理DB↔会社DBのUser／クエストグループ所属の同期・配置**。
 - 装備アイテムの種類・入手方法、3Dアバターのモデル形式（glTF/VRM）・着せ替え方式。
 - 技術スタックの確定（フロント3Dは Three.js / React Three Fiber を想定中）、マネタイズの有無。
 
-（済）提供形態=Docker簡易SaaS / 構成=Web1+フロント1+バックエンド1+管理DB1+会社DB N（バックエンドがログイン時に会社DBへ動的ルーティング）/ DB=会社ごと物理分離＋管理DBでアカウント一元管理 / クエストグループ=会社DB内グルーピング（複数所属可・パーティー候補は同一グループ・表示は参加クエストのみ）/ 管理画面=システム管理者＋クエストグループ管理者の2階層 / 認証=独自＋将来SSO / カテゴリー=事前定義＋自由入力 / コスト観点=低コストほど高得点。
+（済）提供形態=Docker簡易SaaS / 構成=Web1+フロント1+バックエンド1+管理DB1+会社DB N（バックエンドがログイン時に会社DBへ動的ルーティング）/ DB=会社ごと物理分離＋管理DBでアカウント一元管理 / クエストグループ=会社DB内グルーピング（複数所属可・パーティー候補は同一グループ・表示は参加クエストのみ）/ 管理画面=システム管理者＋クエストグループ管理者の2階層 / プロビジョニング=compose単一ファイル手編集＋.env管理（MVP）/ 認証=独自＋将来SSO / カテゴリー=事前定義＋自由入力 / コスト観点=低コストほど高得点。
 
 ## 5. 次にやること
 
@@ -90,4 +90,5 @@ sc-ideaquest-G2/
 **2層のDBに分かれる**。
 - 管理DB（システム共通）: Company（会社/テナント）, Account（ログインID/認証/所属Company/システムロール）, AccountQuestGroup（アカウント×クエストグループ所属）, 運用監査ログ。
 - 会社DB（会社ごと物理分離）: User / QuestGroup（クエストグループ）/ QuestGroupMember（User×QuestGroup 多対多）/ Quest（quest_group_id・owner_id 保持）/ QuestMember（パーティー、候補は同一グループ所属者）/ QuestMemberPermission（権限）/ Idea / Attachment / Vote / ChatGroup / ChatMessage / Evaluation / EvaluationScore / Item(Equipment) / UserItem / Transaction(Activity)。
-- 未決: 会社DBのプロビジョニング方式（docker compose / k8s 等）、管理DB↔会社DBのUser/クエストグループ所属の同期・配置。
+- プロビジョニング（確定）: MVPは **docker compose 単一ファイルを手編集**して会社DBを追記（運用コスト最小）。**DB接続情報は .env で管理**。将来は自動化/k8s＋Operatorを検討。
+- 未決: テナント数上限・リソース設計、管理DB↔会社DBのUser/クエストグループ所属の同期・配置。
