@@ -4,18 +4,21 @@
 > 詳細な仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）を参照すること。
 
 - 最終更新: 2026-07-13
-- プロジェクト: ideaquest（これから作る WEB アプリ。**現在は要件定義フェーズ。コード実装は未着手**）
+- プロジェクト: ideaquest（これから作る WEB アプリ）
+- **現在のフェーズ = 画面設計フェーズ**。要件定義は主要項目が確定済み（残TBDは第4節）。技術スタックも確定。**アプリのコード実装・compose 等のインフラ定義はまだ未着手**（リポジトリは doc と handoff のみ）。
 
 ## 0. リポジトリ状態
 
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順）:
-  - `4831b14` Fix per-company DB provisioning: compose single-file + .env (MVP)
-  - `066735d` Adopt Docker light multi-tenant with quest groups; refine category/cost specs
-  - `ffec113` Refresh handoff to a self-contained resume point
-  - `d1dcac3` Define voting spec (self-vote, named, avatar display, XP)
-  - `c7371ef` Define quest permission model and evaluator scope
+  - `319e4cd` 画面遷移図を確定（アイデア一覧内包・クエスト直行・実績/ランキング追加）
+  - `333a60e` 画面遷移図ドラフトを追加し、アカウントは管理者発行のみに決定
+  - `b3b8b03` Decide idea visibility, chat attach/mention/notify, MinIO attachments
+  - `1015ec2` Default vote anonymization ON; add manager-visibility toggle
+  - `3f3a095` Fix tech stack: Next.js front, FastAPI backend, PostgreSQL
+  - `1797ff1` Adopt VRM avatars with part-swap dressing for 5 slots
+  - （以前: 装備仕様/評価重み/XP・コイン/権限モデル/投票/マルチテナント構成 等）
 - 作業ツリーはクリーン（未コミットの変更なし。この handoff 更新を除く）。
 - 運用ルール: 要件を1つ決めるごとに `doc/要件定義/README.md`＋この handoff を更新し、**ユーザー承認のうえコミット＆プッシュ**する。README が唯一の要件定義書。
 - 要件定義ドキュメントは日本語で記述。
@@ -28,7 +31,7 @@ sc-ideaquest-G2/
 │   ├── 要件定義/
 │   │   └── README.md      ← 要件定義書（唯一の仕様本体。かなり書き込み済み）
 │   └── 画面設計/
-│       └── 画面遷移図.md   ← 画面遷移図＋画面一覧（ドラフト。設計フェーズの起点）
+│       └── 画面遷移図.md   ← 画面遷移図＋画面一覧（**遷移レベルは合意済み**。設計フェーズの起点）
 │       （今後: mocks/SC-xx_*.html〔HTML/CSSモック〕・screens/SC-xx_*.md〔画面設計〕を追加予定）
 └── handoff.md             ← このファイル
 ```
@@ -47,7 +50,7 @@ sc-ideaquest-G2/
 
 - **ターゲット = 企業**（簡易マルチテナント。ロール: 一般 / クエストグループ管理者 / システム管理者）。
 - **クエスト**の入力項目: カテゴリー / 目的・テーマ / 期限日 / 参加メンバー（パーティー）。
-- **アイデア**の入力項目: 件名 / タイムリミット / 利害関係者 / アイデア本文 / 価値 / 備考・特記事項 / 関連資料ファイル添付。
+- **アイデア**の入力項目: 件名 / タイムリミット / 利害関係者 / アイデア本文 / 価値 / 備考・特記事項 / 関連資料ファイル添付。**必須は 件名・アイデア本文・価値**（他は任意）。
 - **アイデアごとにチャットグループ**を自動作成し、メンバーが議論。
 - **評価**: 評価者がアイデアを5観点（新規性・影響度・実現度・適合性・コスト）で各5点満点採点＋観点別コメント。
 - **評価者の定義**: クエスト作成者＋作成者が評価者権限を付与した参加メンバー（クエスト単位の権限、複数可）。付与対象は参加メンバー限定。
@@ -81,7 +84,7 @@ sc-ideaquest-G2/
 - **認証方式 = 独自アカウントで開始**、SSO（SAML/OIDC）連携は将来対応（Could）。**アカウントは管理者発行のみ（自己新規登録なし）／初回ログイン時にパスワード設定**。
 - **画面設計の進め方（決定）**: ①`doc/画面設計/画面遷移図.md` で全体フロー合意 → ②画面ごとにワイヤーフレーム → ③**HTML/CSSモック**（`doc/画面設計/mocks/SC-xx_*.html`）→ ④画面設計＝機能詳細（`doc/画面設計/screens/SC-xx_*.md`）。画面IDは SC-00〜SC-91 を採番済み（遷移図参照）。
 - **クエストのカテゴリー = 事前定義リストからの選択＋自由入力の併用**。
-- **評価「コスト」観点 = 低コストほど高得点**（5点＝非常に低コスト）。※5観点の重み付け有無は未決（現状は均等）。
+- **評価「コスト」観点 = 低コストほど高得点**（5点＝非常に低コスト）。5観点の重み付けは**均等（重みなし）で確定**。
 
 ## 4. まだ決まっていない主な TBD（次に検討する候補）
 
@@ -106,7 +109,7 @@ sc-ideaquest-G2/
   1. **XP日次上限の具体値**・コイン付与の確定タイミング（評価締切一括 or 都度再計算）・レベル上限の要否。
   2. 添付ファイルの**上限サイズ・許可形式の具体値**。
   3. テナント数上限・リソース設計、管理DB↔会社DBの同期・配置。
-- **その後**: ある程度固まったら画面設計・データモデルを別ファイル（`画面設計.md` / `データモデル.md`）に分割して詳細化 → 技術スタック確定 → 実装フェーズへ。
+- **その後**: 全画面のモック＋画面設計が固まったら、データモデルの詳細（`doc/データモデル.md` 等）と API 設計を詰め、**実装フェーズ**（Next.js フロント＋FastAPI バックエンド＋PostgreSQL＋MinIO の compose/スキャフォールド作成）へ。技術スタックは確定済み。
 
 ## 6. データモデル案（現時点、詳細は README 第9節）
 
