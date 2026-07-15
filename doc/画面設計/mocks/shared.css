@@ -272,6 +272,39 @@ img { max-width: 100%; display: block; }
   border: 1px solid var(--color-border-strong); border-radius: var(--radius);
   background: var(--color-surface); color: var(--color-text);
 }
+/* コンボボックス（選択式）はクリック可能なので指ポインター。
+   ※ ネイティブ select の候補(option)には cursor が効かない（OS描画のため）。
+     候補までポインター/ハイライトを制御したい場合は下の .combobox を使う。 */
+.select { cursor: pointer; }
+.select option { cursor: pointer; } /* 一部ブラウザのみ有効 */
+
+/* --- カスタムコンボボックス（候補までフル制御・候補ホバーで指ポインター） ---
+   マークアップは style-guide 参照。挙動は mocks/shared.js が [data-combobox] を初期化。 */
+.combobox { position: relative; }
+.combobox__button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-family: var(--font-base); font-size: var(--text-base); text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius);
+  background: var(--color-surface); color: var(--color-text); cursor: pointer;
+}
+.combobox__button:hover { border-color: var(--color-primary); }
+.combobox__button:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+.combobox__arrow { color: var(--color-text-muted); transition: transform .15s; }
+.combobox__button[aria-expanded="true"] .combobox__arrow { transform: rotate(180deg); }
+.combobox__list {
+  position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
+  margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow: auto;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.combobox__option {
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  font-size: var(--text-base); cursor: pointer; /* 候補ホバーで指ポインター */
+}
+.combobox__option:hover, .combobox__option.is-active { background: var(--color-primary-soft); }
+.combobox__option[aria-selected="true"] { font-weight: 600; color: var(--color-primary-active); }
+.combobox__option[aria-selected="true"]::after { content: "✓"; float: right; }
 .input:focus, .textarea:focus, .select:focus {
   outline: none; border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);

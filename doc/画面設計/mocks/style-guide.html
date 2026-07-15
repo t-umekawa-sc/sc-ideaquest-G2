@@ -117,8 +117,25 @@
         <input class="input" placeholder="アイデアの件名を入力">
       </div>
       <div class="field">
-        <label>カテゴリー</label>
+        <label>カテゴリー（ネイティブ select）</label>
         <select class="select"><option>業務改善</option><option>新規事業</option><option>自由入力…</option></select>
+        <div class="hint">select 本体は指ポインター。候補(option)はOS描画のため cursor 制御不可。</div>
+      </div>
+      <div class="field">
+        <label>カテゴリー（カスタム .combobox）</label>
+        <div class="combobox" data-combobox>
+          <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="combobox__value">業務改善</span><span class="combobox__arrow">▾</span>
+          </button>
+          <ul class="combobox__list" role="listbox" hidden>
+            <li class="combobox__option" role="option" aria-selected="true">業務改善</li>
+            <li class="combobox__option" role="option">新規事業</li>
+            <li class="combobox__option" role="option">コスト削減</li>
+            <li class="combobox__option" role="option">顧客体験</li>
+            <li class="combobox__option" role="option">自由入力…</li>
+          </ul>
+        </div>
+        <div class="hint">候補にホバーで指ポインター＋ハイライト。↑↓/Enter/Escで操作可。</div>
       </div>
       <div class="field">
         <label>アイデア本文<span class="req">*</span></label>
@@ -261,6 +278,9 @@
 
 <!-- ページに1体だけ置くマスコット -->
 <div class="mascot" id="mascot"><img src="assets/mascot-hero.png" alt=""></div>
+
+<!-- モック共通スクリプト（コンボボックス等の挙動） -->
+<script src="shared.js"></script>
 
 <footer class="container" style="padding-block:var(--space-10);color:var(--color-text-muted);font-size:var(--text-sm)">
   ideaquest — デザイン標準 目視確認用スタイルガイド
