@@ -230,7 +230,25 @@
     </div>
     <p class="hint">※ 送り速度・効果音・自動/クリック送りは実装時に調整。ここでは見せ方の確認用。</p>
   </div>
+
+  <!-- マスコット（カードホバーで飛ぶ） -->
+  <div class="section">
+    <h2>8. マスコット（カードホバー演出）</h2>
+    <p class="muted text-sm">カードにマウスを乗せると右上にマスコットが出現。別カードにホバーを移すと、
+       マスコットがカードからカードへ飛んで移動する。</p>
+    <div class="grid" id="mascotGrid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      <div class="card mascot-card"><div class="card-title">配送ルート最適化</div><p class="muted text-sm">価値: 配送コスト削減。</p></div>
+      <div class="card mascot-card"><div class="card-title">社内ナレッジ検索AI</div><p class="muted text-sm">価値: 工数を半減。</p></div>
+      <div class="card mascot-card"><div class="card-title">経費精算の自動化</div><p class="muted text-sm">価値: 締め作業を短縮。</p></div>
+      <div class="card mascot-card"><div class="card-title">会議室予約の最適化</div><p class="muted text-sm">価値: 空き枠を可視化。</p></div>
+    </div>
+    <p class="hint">※ このデモは vanilla JS で位置を更新する簡易版。本番(Next.js)はカード間の共有要素移動を
+       framer-motion 等で実装（画面作成フェーズ）。</p>
+  </div>
 </main>
+
+<!-- ページに1体だけ置くマスコット -->
+<div class="mascot" id="mascot"><img src="assets/mascot-hero.png" alt=""></div>
 
 <footer class="container" style="padding-block:var(--space-10);color:var(--color-text-muted);font-size:var(--text-sm)">
   ideaquest — デザイン標準 目視確認用スタイルガイド
@@ -276,6 +294,20 @@
 
   // 初期表示
   document.getElementById('demoLv').click();
+
+  // --- マスコット：ホバー中カードの右上へ移動（カード間を飛ぶ簡易デモ） ---
+  const mascot = document.getElementById('mascot');
+  const mascotGrid = document.getElementById('mascotGrid');
+  function placeMascot(card) {
+    const r = card.getBoundingClientRect();
+    mascot.style.left = (r.right - 6) + 'px'; // 右上角に半分かぶせて“ちょこん”
+    mascot.style.top  = (r.top + 4) + 'px';
+    mascot.classList.add('is-visible');
+  }
+  mascotGrid.querySelectorAll('.mascot-card').forEach(card => {
+    card.addEventListener('mouseenter', () => placeMascot(card));
+  });
+  mascotGrid.addEventListener('mouseleave', () => mascot.classList.remove('is-visible'));
 </script>
 
 </body>

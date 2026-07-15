@@ -405,6 +405,31 @@ img { max-width: 100%; display: block; }
   .pixel-caret::after, .pixel-dialog__cont { animation: none; }
 }
 
+/* --- マスコット（カードにホバーすると右上に出現し、カード間を飛んで移動） ---
+   ページに1体だけ置く。位置はJSでホバー中カードの右上へ更新し、
+   left/top のトランジションで「飛ぶ」演出になる。
+   ※ 本番(Next.js)はカード間の共有要素移動を framer-motion(layoutId) で実装＝画面作成フェーズ。 */
+.mascot {
+  position: fixed; left: 0; top: 0; z-index: 50;
+  width: 84px; pointer-events: none; opacity: 0;
+  transform: translate(-50%, -50%);
+  /* 少しオーバーシュートするイージングでピョコンと飛ぶ */
+  transition: left .5s cubic-bezier(.34, 1.4, .64, 1),
+              top  .5s cubic-bezier(.34, 1.4, .64, 1),
+              opacity .25s ease;
+}
+.mascot.is-visible { opacity: 1; }
+.mascot img {
+  width: 100%; display: block; image-rendering: pixelated;
+  filter: drop-shadow(0 5px 4px rgba(15, 23, 42, .35));
+  animation: mascot-bob 1.6s ease-in-out infinite; /* ふわふわ待機 */
+}
+@keyframes mascot-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .mascot { transition: opacity .25s ease; }
+  .mascot img { animation: none; }
+}
+
 /* =============================================================
  * 10. レスポンシブ
  * ============================================================= */
