@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ideaquest スタイルガイド</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* このページ専用の見本レイアウト（共通CSSには入れない） */
+  .section { margin: var(--space-10) 0; }
+  .swatches { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .swatch { width: 140px; }
+  .swatch .chip { height: 56px; border-radius: var(--radius); border: 1px solid var(--color-border); }
+  .swatch .name { font-size: var(--text-xs); margin-top: 6px; }
+  .swatch .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: var(--space-4); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="container between">
+    <span class="brand"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></span>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="section">
+    <h1>ideaquest スタイルガイド</h1>
+    <p class="muted">業務SaaSはクリーンなブルー基調 / ゲーム要素だけレトロ・ピクセルアート。<br>
+       各モックは <code>shared.css</code> のトークンを参照する。詳細は <code>デザイン標準.md</code>。</p>
+  </div>
+
+  <!-- ブランドロゴ -->
+  <div class="section">
+    <h2>0. ブランドロゴ</h2>
+    <div class="card row" style="align-items:center; gap:var(--space-8); flex-wrap:wrap">
+      <div>
+        <img class="brand-logo lg" src="assets/logo-ideaquest.png" alt="IDEAQUEST">
+        <div class="hint">大サイズ（ログイン画面など）</div>
+      </div>
+      <div>
+        <img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST">
+        <div class="hint">ヘッダーサイズ（40px）</div>
+      </div>
+    </div>
+    <p class="hint">assets/logo-ideaquest.png（透過PNG・剣と盾の紋章＋ワードマーク）。※ 小サイズ用の紋章のみアイコン（ファビコン等）は今後用意。</p>
+  </div>
+
+  <!-- カラー -->
+  <div class="section">
+    <h2>1. カラー</h2>
+    <h3>ブランド / ニュートラル</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:var(--color-primary)"></div><div class="name">primary</div><div class="val">#2563EB</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-primary-hover)"></div><div class="name">primary-hover</div><div class="val">#1D4ED8</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-primary-soft)"></div><div class="name">primary-soft</div><div class="val">#EFF6FF</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-bg)"></div><div class="name">bg</div><div class="val">#F8FAFC</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-border)"></div><div class="name">border</div><div class="val">#E2E8F0</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-text)"></div><div class="name">text</div><div class="val">#0F172A</div></div>
+    </div>
+    <h3 style="margin-top:var(--space-6)">意味色 / 投票</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:var(--color-success)"></div><div class="name">success</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-warning)"></div><div class="name">warning</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-danger)"></div><div class="name">danger</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-agree)"></div><div class="name">agree 賛成</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--color-disagree)"></div><div class="name">disagree 反対</div></div>
+    </div>
+    <h3 style="margin-top:var(--space-6)">レアリティ / ゲーム</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:var(--rarity-common)"></div><div class="name">common</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--rarity-standard)"></div><div class="name">standard</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--rarity-rare)"></div><div class="name">rare</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--pixel-xp)"></div><div class="name">xp</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--pixel-coin)"></div><div class="name">coin</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--pixel-level)"></div><div class="name">level</div></div>
+    </div>
+  </div>
+
+  <!-- タイポグラフィ -->
+  <div class="section">
+    <h2>2. タイポグラフィ</h2>
+    <div class="card">
+      <p style="font-size:var(--text-3xl)">見出し 3xl / Heading</p>
+      <p style="font-size:var(--text-xl)">見出し xl / Heading</p>
+      <p style="font-size:var(--text-base)">本文 base — アイデアを出して仲間と議論しよう。The quick brown fox.</p>
+      <p class="muted text-sm">補足 sm muted — 期限や権限などの補助情報に使う。</p>
+      <p class="pixel" style="font-size:var(--text-xl)">レトロ見出し（DotGothic16）★ LEVEL UP! ★</p>
+    </div>
+  </div>
+
+  <!-- ボタン -->
+  <div class="section">
+    <h2>3. ボタン</h2>
+    <div class="card row-center" style="flex-wrap:wrap">
+      <button class="btn btn-primary">主要アクション</button>
+      <button class="btn">標準</button>
+      <button class="btn btn-outline">アウトライン</button>
+      <button class="btn btn-danger">削除</button>
+      <button class="btn btn-primary btn-sm">小</button>
+      <button class="btn-pixel">▶ ゲーム風ボタン</button>
+    </div>
+  </div>
+
+  <!-- フォーム -->
+  <div class="section">
+    <h2>4. フォーム</h2>
+    <div class="card" style="max-width:520px">
+      <div class="field">
+        <label>件名<span class="req">*</span></label>
+        <input class="input" placeholder="アイデアの件名を入力">
+      </div>
+      <div class="field">
+        <label>カテゴリー</label>
+        <select class="select"><option>業務改善</option><option>新規事業</option><option>自由入力…</option></select>
+      </div>
+      <div class="field">
+        <label>アイデア本文<span class="req">*</span></label>
+        <textarea class="textarea" placeholder="どんなアイデア？"></textarea>
+        <div class="hint">必須項目：件名・本文・価値</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード / バッジ -->
+  <div class="section">
+    <h2>5. カード / バッジ（アイデア一覧の見本）</h2>
+    <div class="demo-grid">
+      <div class="card">
+        <div class="between"><span class="card-title">配送ルート最適化</span><span class="badge">評価中</span></div>
+        <p class="muted text-sm">価値: 配送コスト削減とCO2削減の両立。</p>
+        <div class="row-center">
+          <span class="vote-agree">▲ 12</span>
+          <span class="vote-disagree">▼ 3</span>
+          <span class="badge badge-muted">💬 8</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="between"><span class="card-title">社内ナレッジ検索AI</span><span class="badge badge-success">選定</span></div>
+        <p class="muted text-sm">価値: 問い合わせ対応の工数を半減。</p>
+        <div class="row-center">
+          <span class="vote-agree">▲ 20</span>
+          <span class="vote-disagree">▼ 1</span>
+          <span class="badge badge-muted">💬 15</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ゲーミフィケーション -->
+  <div class="section">
+    <h2>6. ゲーミフィケーション（レトロ・ピクセルゾーン）</h2>
+    <div class="pixel-panel" style="max-width:520px">
+      <h3>★ STATUS ★</h3>
+      <p>LEVEL 7 &nbsp; NEXT 120 XP</p>
+      <div class="xp-bar"><span style="width:65%"></span></div>
+      <p style="margin-top:var(--space-4)">COIN ◆ 320</p>
+      <button class="btn-pixel" style="margin-top:var(--space-2)">▶ SHOP へ</button>
+    </div>
+    <p class="hint">※ ゲーム要素（ダッシュボードのステータス・ショップ・アバター・実績/バッジ）のみこのゾーンを使う。フォームや管理画面など業務部分は使わない。</p>
+  </div>
+
+  <!-- ユーザアバター -->
+  <div class="section">
+    <h2>7b. ユーザアバター（レベル表示＋ホバーでユーザ名）</h2>
+    <p class="muted text-sm">アバターの下部にレベルを表示。ホバー（またはフォーカス）でユーザ名をツールチップ表示。
+       投票の記名モード・パーティー一覧・チャットなどで使用。</p>
+    <div class="card">
+      <div class="row-center" style="gap:var(--space-8); flex-wrap:wrap">
+        <span class="avatar" data-name="山田 太郎" tabindex="0">
+          <span class="avatar__img placeholder">山</span>
+          <span class="avatar__level">Lv.7</span>
+        </span>
+        <span class="avatar" data-name="鈴木 花子" tabindex="0">
+          <span class="avatar__img placeholder">鈴</span>
+          <span class="avatar__level">Lv.12</span>
+        </span>
+        <span class="avatar lg" data-name="佐藤 大輔（大きいサイズ）" tabindex="0">
+          <span class="avatar__img placeholder">佐</span>
+          <span class="avatar__level">Lv.3</span>
+        </span>
+        <span class="avatar sm" data-name="田中 一郎（小さいサイズ）" tabindex="0">
+          <span class="avatar__img placeholder">田</span>
+          <span class="avatar__level">Lv.9</span>
+        </span>
+      </div>
+
+      <h3 style="margin-top:var(--space-8)">記名モードの投票表示（例）</h3>
+      <div class="row-center" style="gap:var(--space-6); flex-wrap:wrap">
+        <div class="row-center">
+          <span class="vote-agree">▲ 賛成</span>
+          <span class="avatar-group">
+            <span class="avatar sm" data-name="山田 太郎" tabindex="0"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+            <span class="avatar sm" data-name="鈴木 花子" tabindex="0"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.12</span></span>
+            <span class="avatar sm" data-name="佐藤 大輔" tabindex="0"><span class="avatar__img placeholder">佐</span><span class="avatar__level">Lv.3</span></span>
+          </span>
+        </div>
+        <div class="row-center">
+          <span class="vote-disagree">▼ 反対</span>
+          <span class="avatar-group">
+            <span class="avatar sm" data-name="田中 一郎" tabindex="0"><span class="avatar__img placeholder">田</span><span class="avatar__level">Lv.9</span></span>
+          </span>
+        </div>
+      </div>
+      <p class="hint">※ 匿名モードではアバターを出さず賛成数／反対数のみ表示（会社ごと設定・既定は匿名）。</p>
+    </div>
+  </div>
+
+  <!-- RPG風メッセージウィンドウ（文字送り） -->
+  <div class="section">
+    <h2>7. メッセージウィンドウ / 文字送り（XP獲得・レベルアップ通知）</h2>
+    <p class="muted text-sm">RPG風に1文字ずつ表示。XP獲得・レベルアップ時に画面下部などへ出す想定。
+       文字送りは実装ではJSで1文字ずつ流し込む（この見本もJSで実演）。</p>
+
+    <div class="pixel-dialog levelup" id="demoDialog" style="max-width:560px">
+      <div class="pixel-dialog__title">★ LEVEL UP! ★</div>
+      <div id="demoText" class="pixel-caret"></div>
+      <span class="pixel-dialog__cont">▼</span>
+    </div>
+
+    <div class="row-center" style="margin-top:var(--space-4)">
+      <button class="btn-pixel" id="demoXp">▶ XP獲得メッセージ</button>
+      <button class="btn-pixel" id="demoLv">▶ レベルアップメッセージ</button>
+    </div>
+    <p class="hint">※ 送り速度・効果音・自動/クリック送りは実装時に調整。ここでは見せ方の確認用。</p>
+  </div>
+</main>
+
+<footer class="container" style="padding-block:var(--space-10);color:var(--color-text-muted);font-size:var(--text-sm)">
+  ideaquest — デザイン標準 目視確認用スタイルガイド
+</footer>
+
+<script>
+  // 文字送り（タイプライター）デモ。実装では通知データを受けてJSで1文字ずつ表示する。
+  const dialog = document.getElementById('demoDialog');
+  const title  = dialog.querySelector('.pixel-dialog__title');
+  const textEl = document.getElementById('demoText');
+  const cont   = dialog.querySelector('.pixel-dialog__cont');
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timer = null;
+
+  function typeMessage(msg, headline, isLevelUp, speed = 55) {
+    clearInterval(timer);
+    dialog.classList.toggle('levelup', isLevelUp);
+    title.textContent = headline;
+    cont.style.visibility = 'hidden';
+    textEl.classList.add('pixel-caret');
+    if (prefersReduced) {           // モーション控えめ設定なら即時表示
+      textEl.textContent = msg;
+      textEl.classList.remove('pixel-caret');
+      cont.style.visibility = 'visible';
+      return;
+    }
+    let i = 0;
+    textEl.textContent = '';
+    timer = setInterval(() => {
+      textEl.textContent += msg[i++];
+      if (i >= msg.length) {        // 送り終わりでキャレットを消し「続き ▼」を点滅
+        clearInterval(timer);
+        textEl.classList.remove('pixel-caret');
+        cont.style.visibility = 'visible';
+      }
+    }, speed);
+  }
+
+  document.getElementById('demoXp').onclick = () =>
+    typeMessage('けいけんち を 50 かくとく した！ アイデアの とうこう おつかれさま。', '＋EXP', false);
+  document.getElementById('demoLv').onclick = () =>
+    typeMessage('レベルが 7 に あがった！ つよさが みなぎってくる…！ あたらしい そうびが かえるように なった。', '★ LEVEL UP! ★', true);
+
+  // 初期表示
+  document.getElementById('demoLv').click();
+</script>
+
+</body>
+</html>

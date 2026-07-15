@@ -1,0 +1,414 @@
+/* =============================================================
+ * ideaquest 共通スタイル（デザイントークン）
+ * 全モック（doc/画面設計/mocks/SC-xx_*.html）はこのファイルを読み込む。
+ * 方針: 業務SaaSはクリーンなブルー基調 / ゲーム要素だけレトロ・ピクセルアート。
+ * 詳細は doc/画面設計/デザイン標準.md を参照。
+ * ============================================================= */
+
+/* ---- 外部フォント（レトロ用に DotGothic16＝日本語対応ドットフォント）----
+   モックはCDNで読み込む。実装（Next.js）では next/font に置換する。 */
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+/* =============================================================
+ * 1. デザイントークン（CSS変数）
+ * ============================================================= */
+:root {
+  /* --- ブランド（ブルー基調・信頼/定番） --- */
+  --color-primary:        #2563EB; /* blue-600 */
+  --color-primary-hover:  #1D4ED8; /* blue-700 */
+  --color-primary-active: #1E40AF; /* blue-800 */
+  --color-primary-soft:   #EFF6FF; /* blue-50  背景ハイライト */
+  --color-primary-border: #BFDBFE; /* blue-200 */
+  --color-on-primary:     #FFFFFF;
+
+  /* --- ニュートラル（面/文字/境界） --- */
+  --color-bg:           #F8FAFC; /* slate-50  ページ背景 */
+  --color-surface:      #FFFFFF; /* カード/パネル面 */
+  --color-surface-alt:  #F1F5F9; /* slate-100 ゼブラ/薄い面 */
+  --color-border:       #E2E8F0; /* slate-200 */
+  --color-border-strong:#CBD5E1; /* slate-300 */
+  --color-text:         #0F172A; /* slate-900 本文 */
+  --color-text-muted:   #64748B; /* slate-500 補足 */
+  --color-text-subtle:  #94A3B8; /* slate-400 プレースホルダ等 */
+
+  /* --- 意味色（状態） --- */
+  --color-success: #16A34A;
+  --color-warning: #D97706;
+  --color-danger:  #DC2626;
+  --color-info:    #0EA5E9;
+
+  /* --- 投票（賛成/反対） --- */
+  --color-agree:    #16A34A; /* 賛成=グリーン */
+  --color-agree-bg: #DCFCE7;
+  --color-disagree: #DC2626; /* 反対=レッド */
+  --color-disagree-bg: #FEE2E2;
+
+  /* --- レアリティ（ショップ装備・3段階） --- */
+  --rarity-common:   #94A3B8; /* コモン=グレー */
+  --rarity-standard: #3B82F6; /* 標準=ブルー */
+  --rarity-rare:     #A855F7; /* レア=パープル */
+
+  /* --- ゲーミフィケーション（レトロ・ピクセルアクセント） --- */
+  --pixel-xp:     #FBBF24; /* XP=ゴールド */
+  --pixel-coin:   #F59E0B; /* コイン=アンバー */
+  --pixel-level:  #8B5CF6; /* レベル=パープル */
+  --pixel-cyan:   #22D3EE; /* レトロ・シアン */
+  --pixel-magenta:#EC4899; /* レトロ・マゼンタ */
+  --pixel-bg:     #1E293B; /* ゲームパネルの暗い背景（slate-800） */
+  --pixel-ink:    #F8FAFC; /* ゲームパネル上の明るい文字 */
+
+  /* --- タイポグラフィ --- */
+  --font-base:  "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-pixel: "DotGothic16", "Noto Sans JP", monospace; /* ゲーム要素専用 */
+  --text-xs:  0.75rem;  /* 12 */
+  --text-sm:  0.875rem; /* 14 */
+  --text-base:1rem;     /* 16 */
+  --text-lg:  1.125rem; /* 18 */
+  --text-xl:  1.25rem;  /* 20 */
+  --text-2xl: 1.5rem;   /* 24 */
+  --text-3xl: 1.875rem; /* 30 */
+  --leading:  1.6;
+
+  /* --- 余白スケール（4px 基準） --- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* --- 角丸 --- */
+  --radius-sm: 6px;  --radius: 8px;  --radius-lg: 12px;  --radius-full: 9999px;
+  --radius-pixel: 0; /* ゲーム要素は角丸なし（ドット感） */
+
+  /* --- 影 --- */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.06);
+  --shadow:    0 1px 3px rgba(15,23,42,.10), 0 1px 2px rgba(15,23,42,.06);
+  --shadow-lg: 0 10px 25px rgba(15,23,42,.10), 0 4px 6px rgba(15,23,42,.05);
+  --shadow-pixel: 4px 4px 0 rgba(15,23,42,.85); /* ハードシャドウ（8bit風） */
+
+  /* --- レイアウト --- */
+  --container: 1120px;
+  --header-h: 56px;
+}
+
+/* =============================================================
+ * 2. リセット & ベース
+ * ============================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+h1, h2, h3, h4 { margin: 0 0 var(--space-3); line-height: 1.3; font-weight: 700; }
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl); }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; display: block; }
+
+/* =============================================================
+ * 3. レイアウトユーティリティ
+ * ============================================================= */
+.container { max-width: var(--container); margin: 0 auto; padding: 0 var(--space-6); }
+.stack > * + * { margin-top: var(--space-4); }
+.row { display: flex; gap: var(--space-4); }
+.row-center { display: flex; align-items: center; gap: var(--space-3); }
+.between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.grid { display: grid; gap: var(--space-4); }
+.muted { color: var(--color-text-muted); }
+.text-sm { font-size: var(--text-sm); }
+.text-xs { font-size: var(--text-xs); }
+
+/* =============================================================
+ * 4. アプリシェル（ヘッダー）
+ * ============================================================= */
+.app-header {
+  height: var(--header-h);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex; align-items: center;
+  position: sticky; top: 0; z-index: 10;
+}
+.app-header .brand { display: inline-flex; align-items: center; }
+/* ブランドロゴ（剣と盾の紋章＋IDEAQUESTワードマーク） */
+.brand-logo { height: 40px; width: auto; display: block; }
+.brand-logo.lg { height: 96px; }   /* ログイン画面など大きく見せる場面用 */
+
+/* =============================================================
+ * 5. ボタン
+ * ============================================================= */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  font-family: var(--font-base); font-size: var(--text-sm); font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius); border: 1px solid transparent;
+  background: var(--color-surface-alt); color: var(--color-text);
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.btn:hover { background: var(--color-border); text-decoration: none; }
+.btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-outline { background: transparent; border-color: var(--color-border-strong); color: var(--color-text); }
+.btn-outline:hover { background: var(--color-surface-alt); }
+.btn-danger { background: var(--color-danger); color: #fff; }
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
+
+/* =============================================================
+ * 6. カード / パネル
+ * ============================================================= */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-6);
+}
+.card-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-3); }
+
+/* =============================================================
+ * 7. バッジ / ピル
+ * ============================================================= */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--text-xs); font-weight: 500;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--color-primary-soft); color: var(--color-primary-active);
+  white-space: nowrap; /* バッジ内は折り返さない */
+  flex-shrink: 0;      /* 隣のテキストに押し潰されないように */
+}
+.badge-success { background: var(--color-agree-bg); color: var(--color-success); }
+.badge-danger  { background: var(--color-disagree-bg); color: var(--color-danger); }
+.badge-muted   { background: var(--color-surface-alt); color: var(--color-text-muted); }
+
+/* 投票カウント */
+.vote-agree    { color: var(--color-agree); font-weight: 700; }
+.vote-disagree { color: var(--color-disagree); font-weight: 700; }
+
+/* レアリティ枠 */
+.rarity-common   { border-color: var(--rarity-common); }
+.rarity-standard { border-color: var(--rarity-standard); }
+.rarity-rare     { border-color: var(--rarity-rare); box-shadow: 0 0 0 2px var(--rarity-rare) inset; }
+
+/* =============================================================
+ * 7b. ユーザアバター（下部にレベル表示・ホバーでユーザ名ツールチップ）
+ *   使い方:
+ *   <span class="avatar" data-name="山田 太郎" tabindex="0">
+ *     <img class="avatar__img" src="..." alt="">
+ *     <span class="avatar__level">Lv.7</span>
+ *   </span>
+ *   画像がない場合は <span class="avatar__img placeholder">山</span>
+ * ============================================================= */
+.avatar {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--avatar-size, 48px); height: var(--avatar-size, 48px);
+  vertical-align: top;
+}
+.avatar.sm { --avatar-size: 32px; }
+.avatar.lg { --avatar-size: 72px; }
+
+.avatar__img {
+  width: 100%; height: 100%;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  background: var(--color-primary-soft);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+/* 画像なし時のイニシャル表示 */
+.avatar__img.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-primary); font-weight: 700; font-size: .9em;
+}
+
+/* レベル表示（下部中央・ドット風ピル） */
+.avatar__level {
+  position: absolute;
+  bottom: -6px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-pixel); font-size: 10px; line-height: 1;
+  padding: 2px 5px; white-space: nowrap;
+  color: #fff; background: var(--pixel-level);
+  border: 1px solid var(--color-surface);
+  border-radius: var(--radius-full);
+}
+
+/* ホバー/フォーカスでユーザ名ツールチップ（data-name を表示） */
+.avatar[data-name]:hover::after,
+.avatar[data-name]:focus-visible::after {
+  content: attr(data-name);
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px; border-radius: var(--radius);
+  font-family: var(--font-base); font-size: var(--text-xs); white-space: nowrap;
+  color: #fff; background: var(--color-text);
+  box-shadow: var(--shadow); z-index: 20;
+}
+.avatar[data-name]:hover::before,
+.avatar[data-name]:focus-visible::before {
+  content: ""; position: absolute; bottom: calc(100% + 3px); left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--color-text);
+  z-index: 20;
+}
+
+/* 投票の記名モードなどで複数を少し重ねて並べる場合 */
+.avatar-group { display: inline-flex; }
+.avatar-group .avatar + .avatar { margin-left: -10px; }
+
+/* =============================================================
+ * 8. フォーム
+ * ============================================================= */
+.field { display: block; margin-bottom: var(--space-4); }
+.field > label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-2); }
+.field .req { color: var(--color-danger); margin-left: 2px; }
+.input, .textarea, .select {
+  width: 100%; font-family: var(--font-base); font-size: var(--text-base);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius);
+  background: var(--color-surface); color: var(--color-text);
+}
+.input:focus, .textarea:focus, .select:focus {
+  outline: none; border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+.textarea { min-height: 120px; resize: vertical; }
+.hint { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+
+/* =============================================================
+ * 9. ゲーミフィケーション（レトロ・ピクセルゾーン）
+ *    .pixel を付けた領域だけドット絵ゲーム風に切り替える。
+ * ============================================================= */
+.pixel {
+  font-family: var(--font-pixel);
+  image-rendering: pixelated; /* 画像/スプライトをドット感のまま拡大 */
+}
+.pixel-panel {
+  font-family: var(--font-pixel);
+  background: var(--pixel-bg);
+  color: var(--pixel-ink);
+  border: 3px solid var(--pixel-ink);
+  border-radius: var(--radius-pixel);
+  box-shadow: var(--shadow-pixel);
+  padding: var(--space-5);
+  image-rendering: pixelated;
+}
+.pixel-panel h1, .pixel-panel h2, .pixel-panel h3 { font-family: var(--font-pixel); }
+
+/* ピクセル風ボタン（角丸なし・ハードシャドウ・押し込み）
+   ホバー時にレトロRPGのメニュー選択カーソル ▶ が左に出現して点滅＋バウンド。 */
+.btn-pixel {
+  position: relative;
+  font-family: var(--font-pixel);
+  border-radius: var(--radius-pixel);
+  border: 2px solid var(--color-text);
+  background: var(--pixel-cyan); color: var(--color-text);
+  box-shadow: var(--shadow-pixel);
+  padding: var(--space-2) var(--space-4);
+  /* カーソル分の左余白をあらかじめ確保（ホバーでガタつかせない） */
+  padding-left: calc(var(--space-4) + 1.1em);
+  transition: transform .08s steps(2);
+  cursor: pointer; /* OS標準の指差しポインター */
+}
+/* 選択カーソル（既定は非表示） */
+.btn-pixel::before {
+  content: "▶";
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  color: var(--color-text);
+  image-rendering: pixelated;
+}
+/* ホバー/フォーカスでカーソル出現＝点滅＋ボタンが1ドット持ち上がる */
+.btn-pixel:hover, .btn-pixel:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 4px 6px 0 rgba(15,23,42,.85);
+  outline: none;
+}
+.btn-pixel:hover::before, .btn-pixel:focus-visible::before {
+  animation: pixel-cursor-blink .6s steps(1) infinite;
+}
+/* カーソルはドット感を出すため steps() でカクッと点滅＋左右に1ドット揺れる */
+@keyframes pixel-cursor-blink {
+  0%   { opacity: 1; left: var(--space-3); }
+  50%  { opacity: 1; left: calc(var(--space-3) - 3px); }
+  51%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+.btn-pixel:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(15,23,42,.85); }
+/* 動きを控えたいユーザーには点滅/移動を止める */
+@media (prefers-reduced-motion: reduce) {
+  .btn-pixel:hover::before, .btn-pixel:focus-visible::before { animation: none; opacity: 1; }
+}
+
+/* XP バー */
+.xp-bar {
+  height: 16px; background: #334155; border: 2px solid var(--pixel-ink);
+  border-radius: var(--radius-pixel); overflow: hidden;
+}
+.xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); }
+
+/* コイン/レベルのピル（ドット風） */
+.pixel-stat {
+  font-family: var(--font-pixel); font-size: var(--text-sm);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 2px solid var(--color-text);
+  border-radius: var(--radius-pixel); background: var(--color-surface);
+}
+.pixel-stat.coin  { color: var(--pixel-coin); }
+.pixel-stat.level { color: var(--pixel-level); }
+
+/* --- RPG風メッセージウィンドウ（XP獲得・レベルアップ等の通知演出） ---
+   文字送り（タイプライター）は実装ではJSで1文字ずつ .pixel-dialog__text に
+   流し込む。モックの見本用に .is-typing で幅アニメーションのCSS版も用意。 */
+.pixel-dialog {
+  position: relative;
+  font-family: var(--font-pixel);
+  background: var(--pixel-bg);
+  color: var(--pixel-ink);
+  border: 3px solid var(--pixel-ink);
+  border-radius: var(--radius-pixel);
+  box-shadow: var(--shadow-pixel);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  line-height: 1.9;
+  image-rendering: pixelated;
+}
+.pixel-dialog__title {
+  font-family: var(--font-pixel);
+  color: var(--pixel-xp);
+  margin-bottom: var(--space-2);
+}
+/* レベルアップ時などの強調色バリエーション */
+.pixel-dialog.levelup .pixel-dialog__title { color: var(--pixel-level); }
+/* 文字送り中の末尾キャレット（点滅） */
+.pixel-caret::after {
+  content: "▮";
+  margin-left: 2px;
+  animation: pixel-blink .8s steps(1) infinite;
+}
+/* 「続き」インジケーター（RPGの ▼）。読み終わり合図として右下で点滅 */
+.pixel-dialog__cont {
+  position: absolute;
+  right: var(--space-3); bottom: var(--space-2);
+  color: var(--pixel-cyan);
+  animation: pixel-bounce .8s steps(2) infinite;
+}
+@keyframes pixel-blink  { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+@keyframes pixel-bounce { 0% { transform: translateY(0); } 100% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .pixel-caret::after, .pixel-dialog__cont { animation: none; }
+}
+
+/* =============================================================
+ * 10. レスポンシブ
+ * ============================================================= */
+@media (max-width: 768px) {
+  .container { padding: 0 var(--space-4); }
+  .row { flex-direction: column; }
+}
