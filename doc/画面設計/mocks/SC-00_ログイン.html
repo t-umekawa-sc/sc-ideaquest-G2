@@ -49,6 +49,18 @@
   .login-foot { text-align: center; color: #fff; margin-top: var(--space-5); font-size: var(--text-xs); opacity: .85; }
   .login-foot a { color: #fff; text-decoration: underline; }
 
+  /* パスワード入力＋表示切替アイコン */
+  .pw-wrap { position: relative; }
+  .pw-wrap .input { padding-right: 40px; }
+  .pw-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; padding: 4px;
+    color: var(--color-text-muted); font-size: 16px; line-height: 1;
+  }
+  /* ログイン状態を保持する */
+  .remember { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); margin-bottom: var(--space-4); }
+  .remember input { width: 16px; height: 16px; }
+
   /* パスワード要件リスト */
   .pw-req { list-style: none; margin: 0 0 var(--space-4); padding: 0; font-size: var(--text-xs); color: var(--color-text-muted); }
   .pw-req li { padding-left: 16px; position: relative; }
@@ -82,8 +94,12 @@
         </div>
         <div class="field">
           <label for="loginPw">パスワード<span class="req">*</span></label>
-          <input class="input" id="loginPw" type="password" autocomplete="current-password" placeholder="パスワードを入力" required>
+          <div class="pw-wrap">
+            <input class="input" id="loginPw" type="password" autocomplete="current-password" placeholder="パスワードを入力" required>
+            <button type="button" class="pw-toggle" aria-label="パスワードを表示" onclick="togglePw('loginPw', this)">👁</button>
+          </div>
         </div>
+        <label class="remember"><input type="checkbox" id="remember"> ログイン状態を保持する</label>
         <button class="btn btn-primary" type="submit" style="width:100%">ログイン</button>
       </form>
 
@@ -105,7 +121,10 @@
       <form onsubmit="return false">
         <div class="field">
           <label for="newPw">新しいパスワード<span class="req">*</span></label>
-          <input class="input" id="newPw" type="password" autocomplete="new-password" placeholder="新しいパスワード" required>
+          <div class="pw-wrap">
+            <input class="input" id="newPw" type="password" autocomplete="new-password" placeholder="新しいパスワード" required>
+            <button type="button" class="pw-toggle" aria-label="パスワードを表示" onclick="togglePw('newPw', this)">👁</button>
+          </div>
         </div>
         <ul class="pw-req">
           <li>8文字以上</li>
@@ -141,6 +160,14 @@
   function toggleError() {
     showView('login');
     document.getElementById('loginError').classList.toggle('show');
+  }
+  // パスワード表示切替
+  function togglePw(id, btn) {
+    const el = document.getElementById(id);
+    const show = el.type === 'password';
+    el.type = show ? 'text' : 'password';
+    btn.textContent = show ? '🙈' : '👁';
+    btn.setAttribute('aria-label', show ? 'パスワードを隠す' : 'パスワードを表示');
   }
 </script>
 </body>
