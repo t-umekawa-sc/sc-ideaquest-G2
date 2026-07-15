@@ -57,7 +57,7 @@
     background: none; border: none; cursor: pointer; padding: 4px;
     color: var(--color-text-muted); font-size: 16px; line-height: 1;
   }
-  /* ログイン状態を保持する */
+  /* チェックボックス行（このデバイスを信頼する 等） */
   .remember { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); margin-bottom: var(--space-4); }
   .remember input { width: 16px; height: 16px; }
 
@@ -99,7 +99,6 @@
             <button type="button" class="pw-toggle" aria-label="パスワードを表示" onclick="togglePw('loginPw', this)">👁</button>
           </div>
         </div>
-        <label class="remember"><input type="checkbox" id="remember"> ログイン状態を保持する</label>
         <button class="btn btn-primary" type="submit" style="width:100%">ログイン</button>
       </form>
 
@@ -107,6 +106,34 @@
         アカウントは管理者が発行します（自己新規登録はできません）。<br>
         <strong>初回ログインの方</strong>は、管理者から発行された<strong>仮パスワード</strong>でログインすると、続けてパスワード設定を行います。<br>
         ログインできない場合は、所属組織の管理者にお問い合わせください。
+      </p>
+    </div>
+
+    <!-- ============ 状態C: 認証コード入力（MFA） ============ -->
+    <div class="login-card" id="viewOtp" hidden>
+      <div class="login-logo"><img src="assets/logo-ideaquest.png" alt="IDEAQUEST"></div>
+      <h1>認証コードの入力</h1>
+      <p class="muted text-sm" style="text-align:center;margin-top:calc(-1*var(--space-4));margin-bottom:var(--space-6)">
+        <strong>y***@example.com</strong> 宛に認証コードを送信しました。<br>コードを入力してください（10分間有効）。
+      </p>
+
+      <div class="form-error" id="otpError">認証コードが正しくありません。</div>
+
+      <form onsubmit="return false">
+        <div class="field">
+          <label for="otpCode">認証コード（6桁）<span class="req">*</span></label>
+          <input class="input" id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" placeholder="000000" style="letter-spacing:.4em;text-align:center;font-size:var(--text-xl)" required>
+        </div>
+        <label class="remember"><input type="checkbox" id="trustDevice"> このデバイスを信頼する（次回からコード入力を省略・30日間）</label>
+        <button class="btn btn-primary" type="submit" style="width:100%">認証してログイン</button>
+      </form>
+
+      <p class="login-note">
+        メールが届かない場合は迷惑メールをご確認ください。<br>
+        <a href="#" onclick="return false">コードを再送信</a>（60秒お待ちください）　/
+        <a href="#" onclick="showView('login')">別のIDでログイン</a><br>
+        共有端末では「このデバイスを信頼する」をONにしないでください。
       </p>
     </div>
 
@@ -147,6 +174,7 @@
 <div class="demo-switch">
   表示状態:
   <button class="btn btn-sm" onclick="showView('login')">ログイン</button>
+  <button class="btn btn-sm" onclick="showView('otp')">認証コード(MFA)</button>
   <button class="btn btn-sm" onclick="showView('pwset')">初回パスワード設定</button>
   <button class="btn btn-sm" onclick="toggleError()">エラー例</button>
 </div>
@@ -155,6 +183,7 @@
   // モック確認用：状態切替とエラー表示のトグル（実装ロジックではない）
   function showView(v) {
     document.getElementById('viewLogin').hidden = (v !== 'login');
+    document.getElementById('viewOtp').hidden   = (v !== 'otp');
     document.getElementById('viewPwSet').hidden = (v !== 'pwset');
   }
   function toggleError() {
