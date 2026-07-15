@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-00 ログイン — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-00 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .login-page {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-6);
+    /* 背景=ドット絵の夕焼け（帆船）。暗めのスクリムを重ねて可読性を確保 */
+    background:
+      linear-gradient(180deg, rgba(15,23,42,.55), rgba(15,23,42,.35)),
+      url('assets/login-bg.jpg') center/cover no-repeat fixed;
+    image-rendering: pixelated;
+  }
+  .login-card {
+    width: 100%; max-width: 400px;
+    /* 半透明＋背後ぼかし（フロステッドガラス）。透過を強めた分、ぼかしで可読性を確保。 */
+    background: rgba(255, 255, 255, 0.66);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-8) var(--space-8) var(--space-6);
+  }
+  .login-logo { text-align: center; margin-bottom: var(--space-4); }
+  .login-logo img { height: 84px; width: auto; display: inline-block; }
+  .login-card h1 { font-size: var(--text-xl); text-align: center; margin-bottom: var(--space-6); }
+
+  /* エラー表示（デモ用・既定は非表示） */
+  .form-error {
+    display: none;
+    background: var(--color-disagree-bg); color: var(--color-danger);
+    font-size: var(--text-sm); border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3); margin-bottom: var(--space-4);
+  }
+  .form-error.show { display: block; }
+
+  .login-note {
+    margin-top: var(--space-5); padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7;
+  }
+  .login-foot { text-align: center; color: #fff; margin-top: var(--space-5); font-size: var(--text-xs); opacity: .85; }
+  .login-foot a { color: #fff; text-decoration: underline; }
+
+  /* パスワード要件リスト */
+  .pw-req { list-style: none; margin: 0 0 var(--space-4); padding: 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .pw-req li { padding-left: 16px; position: relative; }
+  .pw-req li::before { content: "・"; position: absolute; left: 0; }
+
+  /* デモ用の状態切替バー（モックのみ・実画面には無い） */
+  .demo-switch {
+    position: fixed; left: 12px; bottom: 12px; z-index: 100;
+    background: rgba(15,23,42,.85); color: #fff; border-radius: var(--radius);
+    padding: 8px 10px; font-size: var(--text-xs);
+  }
+  .demo-switch button { margin-left: 6px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="login-page">
+  <div>
+    <!-- ============ 状態A: ログイン ============ -->
+    <div class="login-card" id="viewLogin">
+      <div class="login-logo"><img src="assets/logo-ideaquest.png" alt="IDEAQUEST"></div>
+      <h1>ログイン</h1>
+
+      <div class="form-error" id="loginError">ログインIDまたはパスワードが正しくありません。</div>
+
+      <form onsubmit="return false">
+        <div class="field">
+          <label for="loginId">ログインID（メールアドレス）<span class="req">*</span></label>
+          <input class="input" id="loginId" type="email" autocomplete="username" placeholder="you@example.com" required>
+        </div>
+        <div class="field">
+          <label for="loginPw">パスワード<span class="req">*</span></label>
+          <input class="input" id="loginPw" type="password" autocomplete="current-password" placeholder="パスワードを入力" required>
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%">ログイン</button>
+      </form>
+
+      <p class="login-note">
+        アカウントは管理者が発行します（自己新規登録はできません）。<br>
+        <strong>初回ログインの方</strong>は、管理者から発行された<strong>仮パスワード</strong>でログインすると、続けてパスワード設定を行います。<br>
+        ログインできない場合は、所属組織の管理者にお問い合わせください。
+      </p>
+    </div>
+
+    <!-- ============ 状態B: 初回パスワード設定 ============ -->
+    <div class="login-card" id="viewPwSet" hidden>
+      <div class="login-logo"><img src="assets/logo-ideaquest.png" alt="IDEAQUEST"></div>
+      <h1>初回パスワード設定</h1>
+      <p class="muted text-sm" style="text-align:center;margin-top:calc(-1*var(--space-4));margin-bottom:var(--space-6)">
+        続けて利用するために、新しいパスワードを設定してください。
+      </p>
+
+      <form onsubmit="return false">
+        <div class="field">
+          <label for="newPw">新しいパスワード<span class="req">*</span></label>
+          <input class="input" id="newPw" type="password" autocomplete="new-password" placeholder="新しいパスワード" required>
+        </div>
+        <ul class="pw-req">
+          <li>8文字以上</li>
+          <li>英字・数字を含む</li>
+          <li>（具体的なポリシーは要件TBD）</li>
+        </ul>
+        <div class="field">
+          <label for="newPw2">新しいパスワード（確認）<span class="req">*</span></label>
+          <input class="input" id="newPw2" type="password" autocomplete="new-password" placeholder="もう一度入力" required>
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%">パスワードを設定してはじめる</button>
+      </form>
+    </div>
+
+    <p class="login-foot">© ideaquest</p>
+  </div>
+</div>
+
+<!-- モック確認用の状態切替（実画面には存在しない） -->
+<div class="demo-switch">
+  表示状態:
+  <button class="btn btn-sm" onclick="showView('login')">ログイン</button>
+  <button class="btn btn-sm" onclick="showView('pwset')">初回パスワード設定</button>
+  <button class="btn btn-sm" onclick="toggleError()">エラー例</button>
+</div>
+
+<script>
+  // モック確認用：状態切替とエラー表示のトグル（実装ロジックではない）
+  function showView(v) {
+    document.getElementById('viewLogin').hidden = (v !== 'login');
+    document.getElementById('viewPwSet').hidden = (v !== 'pwset');
+  }
+  function toggleError() {
+    showView('login');
+    document.getElementById('loginError').classList.toggle('show');
+  }
+</script>
+</body>
+</html>
