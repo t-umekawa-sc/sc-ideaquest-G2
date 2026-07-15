@@ -125,6 +125,18 @@
         <textarea class="textarea" placeholder="どんなアイデア？"></textarea>
         <div class="hint">必須項目：件名・本文・価値</div>
       </div>
+
+      <div class="field">
+        <label>チェックボックス（.checkbox）</label>
+        <div class="stack">
+          <label class="checkbox"><input type="checkbox"> 通常（未チェック）</label>
+          <label class="checkbox"><input type="checkbox" checked> チェック済み</label>
+          <label class="checkbox"><input type="checkbox" id="cbIndet"> 部分選択（indeterminate）</label>
+          <label class="checkbox"><input type="checkbox" checked disabled> 無効（disabled）</label>
+          <label class="checkbox"><input type="checkbox"> 折り返しても崩れない長いラベル：このデバイスを信頼する（次回からコード入力を省略・30日間）— ラベル全体クリック可・ホバーで指ポインター</label>
+        </div>
+        <div class="hint">ラベル・ボックス両方が指ポインター。Tabで移動しSpaceで切替（フォーカスリング表示）。</div>
+      </div>
     </div>
   </div>
 
@@ -294,6 +306,9 @@
 
   // 初期表示
   document.getElementById('demoLv').click();
+
+  // 部分選択(indeterminate)はJSでのみ設定できる
+  document.getElementById('cbIndet').indeterminate = true;
 
   // --- マスコット：ホバー中カードの右上へ移動（カード間を飛ぶ簡易デモ） ---
   const mascot = document.getElementById('mascot');

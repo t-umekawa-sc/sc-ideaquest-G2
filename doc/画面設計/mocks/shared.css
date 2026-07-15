@@ -279,6 +279,40 @@ img { max-width: 100%; display: block; }
 .textarea { min-height: 120px; resize: vertical; }
 .hint { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
 
+/* --- チェックボックス（ネイティブ input を装飾。ラベル＋ボックス両方 pointer） ---
+   使い方: <label class="checkbox"><input type="checkbox"> ラベル文</label>
+   ・実体は input のままでキーボード/スクリーンリーダー対応
+   ・ボックスはラベル1行目に揃え、複数行でも崩れない
+   ・状態: hover / focus-visible / checked / indeterminate / disabled */
+.checkbox {
+  display: inline-flex; align-items: flex-start; gap: 10px;
+  font-size: var(--text-sm); line-height: 1.5;
+  cursor: pointer; user-select: none;
+}
+.checkbox > input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  flex: 0 0 auto; width: 18px; height: 18px; margin: 1px 0 0; /* 1行目に揃える */
+  border: 2px solid var(--color-border-strong); border-radius: 5px;
+  background: var(--color-surface) center / 13px no-repeat;
+  cursor: pointer;
+  transition: background-color .12s, border-color .12s, box-shadow .12s;
+}
+.checkbox > input[type="checkbox"]:hover { border-color: var(--color-primary); }
+.checkbox > input[type="checkbox"]:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+.checkbox > input[type="checkbox"]:checked {
+  background-color: var(--color-primary); border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5 6.5 12 13 4.5'/%3E%3C/svg%3E");
+}
+.checkbox > input[type="checkbox"]:indeterminate {
+  background-color: var(--color-primary); border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M4 8h8'/%3E%3C/svg%3E");
+}
+.checkbox > input[type="checkbox"]:disabled { background-color: var(--color-surface-alt); border-color: var(--color-border); cursor: not-allowed; }
+.checkbox:has(input:disabled) { color: var(--color-text-subtle); cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .checkbox > input[type="checkbox"] { transition: none; } }
+
 /* =============================================================
  * 9. ゲーミフィケーション（レトロ・ピクセルゾーン）
  *    .pixel を付けた領域だけドット絵ゲーム風に切り替える。

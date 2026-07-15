@@ -57,9 +57,8 @@
     background: none; border: none; cursor: pointer; padding: 4px;
     color: var(--color-text-muted); font-size: 16px; line-height: 1;
   }
-  /* チェックボックス行（このデバイスを信頼する 等） */
-  .remember { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); margin-bottom: var(--space-4); }
-  .remember input { width: 16px; height: 16px; }
+  /* チェックボックス行の下余白（チェックボックス自体は共通CSS .checkbox） */
+  .checkbox { margin-bottom: var(--space-4); }
 
   /* パスワード要件リスト */
   .pw-req { list-style: none; margin: 0 0 var(--space-4); padding: 0; font-size: var(--text-xs); color: var(--color-text-muted); }
@@ -125,7 +124,7 @@
           <input class="input" id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code"
                  maxlength="6" placeholder="000000" style="letter-spacing:.4em;text-align:center;font-size:var(--text-xl)" required>
         </div>
-        <label class="remember"><input type="checkbox" id="trustDevice"> このデバイスを信頼する（次回からコード入力を省略・30日間）</label>
+        <label class="checkbox"><input type="checkbox" id="trustDevice"> このデバイスを信頼する（次回からコード入力を省略・30日間）</label>
         <button class="btn btn-primary" type="submit" style="width:100%">認証してログイン</button>
       </form>
 
