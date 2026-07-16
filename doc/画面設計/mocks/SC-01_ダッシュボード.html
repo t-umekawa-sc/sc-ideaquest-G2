@@ -125,6 +125,39 @@
   .draft-card__cta { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; color: var(--color-primary); }
 
   /* =========================================================
+   * 未投票のアイデア（投票ショートカット・クリックで投票モーダル）
+   * ========================================================= */
+  .vote-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+  .vote-card { position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+    transition: box-shadow .15s, transform .05s, border-color .15s, opacity .3s ease; }
+  .vote-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
+  .vote-card:active { transform: translateY(1px); }
+  .vote-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .vote-card__quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+  .vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* カード内クイック投票（賛成/反対）。クリックはモーダルを開かず即投票 */
+  .vote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+  .vote-quick { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: var(--space-2); border-radius: var(--radius); border: 1px solid; cursor: pointer;
+    font: inherit; font-weight: 600; font-size: var(--text-sm); transition: background .12s, transform .05s; }
+  .vote-quick:active { transform: translateY(1px); }
+  .vote-quick.agree { color: var(--color-agree); border-color: var(--color-agree); background: var(--color-agree-bg); }
+  .vote-quick.agree:hover { background: #BBF7D0; }
+  .vote-quick.disagree { color: var(--color-disagree); border-color: var(--color-disagree); background: var(--color-disagree-bg); }
+  .vote-quick.disagree:hover { background: #FECACA; }
+  .vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
+  .vote-card.is-voted { opacity: .6; }
+  /* モーダル内の大きめ投票ボタン */
+  .vote-big { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: var(--space-3); border-radius: var(--radius); border: 2px solid; cursor: pointer;
+    font: inherit; font-weight: 700; font-size: var(--text-base); transition: background .12s, transform .05s; }
+  .vote-big:active { transform: translateY(1px); }
+  .vote-big.agree { color: var(--color-agree); border-color: var(--color-agree); background: var(--color-agree-bg); }
+  .vote-big.agree:hover { background: #BBF7D0; }
+  .vote-big.disagree { color: var(--color-disagree); border-color: var(--color-disagree); background: var(--color-disagree-bg); }
+  .vote-big.disagree:hover { background: #FECACA; }
+
+  /* =========================================================
    * フォロー中のアイデア（業務層カード・クリックで拡大モーダル）
    * ========================================================= */
   .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
@@ -315,6 +348,57 @@
         <div class="draft-card__title">社内イベントの出欠をLINEで管理</div>
         <div class="draft-card__meta"><span>社内コミュニケーション活性化</span><span>最終更新: 3日前</span></div>
         <div class="draft-card__cta">続きを書く ✎</div>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 未投票のアイデア（投票ショートカット・クリックで投票モーダル） ============ -->
+  <section aria-label="未投票のアイデア" id="voteSection" style="margin-top:var(--space-10)">
+    <div class="section-head">
+      <h2>未投票のアイデア</h2>
+      <span class="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
+    </div>
+    <div class="vote-grid" id="voteGrid">
+      <button class="card vote-card" type="button"
+        data-title="AI議事録の自動要約" data-quest="社内ナレッジ検索AI" data-cat="新規事業"
+        data-value="会議音声から議事録と決定事項を自動生成し、共有の手間をなくす。"
+        data-body="Web会議の録音をアップロードすると、文字起こし→要約→ToDo抽出まで自動化。参加者に自動配信する。"
+        data-agree="9" data-disagree="2">
+        <div class="between"><span class="card-title">AI議事録の自動要約</span><span class="badge badge-muted">未投票</span></div>
+        <div class="vote-card__quest">社内ナレッジ検索AI ・ 新規事業</div>
+        <div class="vote-card__value">会議音声から議事録と決定事項を自動生成し、共有の手間をなくす。</div>
+        <div class="vote-actions">
+          <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
+          <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
+        </div>
+      </button>
+
+      <button class="card vote-card" type="button"
+        data-title="置き配の写真通知" data-quest="配送ルート最適化" data-cat="顧客体験"
+        data-value="置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。"
+        data-body="配達員が置き配位置を撮影し、受取人にアプリ通知。盗難時の証跡にもなり、再配達コストを削減。"
+        data-agree="15" data-disagree="5">
+        <div class="between"><span class="card-title">置き配の写真通知</span><span class="badge badge-muted">未投票</span></div>
+        <div class="vote-card__quest">配送ルート最適化 ・ 顧客体験</div>
+        <div class="vote-card__value">置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。</div>
+        <div class="vote-actions">
+          <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
+          <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
+        </div>
+      </button>
+
+      <button class="card vote-card" type="button"
+        data-title="有給の取得を可視化" data-quest="経費精算の自動化" data-cat="業務改善"
+        data-value="チームの有給取得状況を可視化し、取りやすい雰囲気をつくる。"
+        data-body="部署ごとの有給取得率をダッシュボード化し、取得目標に対する進捗を見える化する。"
+        data-agree="6" data-disagree="1">
+        <div class="between"><span class="card-title">有給の取得を可視化</span><span class="badge badge-muted">未投票</span></div>
+        <div class="vote-card__quest">経費精算の自動化 ・ 業務改善</div>
+        <div class="vote-card__value">チームの有給取得状況を可視化し、取りやすい雰囲気をつくる。</div>
+        <div class="vote-actions">
+          <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
+          <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
+        </div>
       </button>
     </div>
   </section>
@@ -574,6 +658,40 @@
   </div>
 </div>
 
+<!-- ============ アイデア投票モーダル（未投票パネルから拡大） ============ -->
+<!-- 本番は投票=SC-22内のアクション（インライン/モーダル）。ここは投票ショートカット用の
+     軽量モーダル（アイデア要約＋賛成/反対）を FLIP 拡大で見せる。 -->
+<div class="modal" id="voteModal" hidden role="dialog" aria-modal="true" aria-labelledby="voteModalTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" style="max-width:560px">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <div class="muted text-sm" id="voteModalQuest">配送ルート最適化</div>
+    <h2 id="voteModalTitle" style="margin-bottom:0">アイデア件名</h2>
+    <div class="modal__badge-row">
+      <span class="badge badge-muted" id="voteModalCat">カテゴリー</span>
+      <span class="badge badge-draft">未投票</span>
+    </div>
+
+    <div class="modal__section-label">価値</div>
+    <p id="voteModalValue" style="margin:0"></p>
+
+    <div class="modal__section-label">アイデア本文</div>
+    <p id="voteModalBody" style="margin:0"></p>
+
+    <div class="modal__section-label">現在の投票</div>
+    <div class="modal__votes">
+      <span class="vote-agree" id="voteModalAgree">▲ 賛成 12</span>
+      <span class="vote-disagree" id="voteModalDisagree">▼ 反対 3</span>
+    </div>
+
+    <div class="modal__foot">
+      <button class="vote-big agree" type="button" data-vote="agree">▲ 賛成する</button>
+      <button class="vote-big disagree" type="button" data-vote="disagree">▼ 反対する</button>
+    </div>
+    <p class="hint" style="margin-top:var(--space-4)">1人1票・締切まで変更できます。投票すると XP を獲得（自分のアイデアにも投票可）。※匿名モード（既定）は集計数のみ表示。本番の詳細は SC-22。</p>
+  </div>
+</div>
+
 <!-- ============ ログインボーナス トースト（画面下部・自動送り） ============ -->
 <div class="xp-toast" id="xpToast" role="status" aria-live="polite">
   <div class="pixel-dialog">
@@ -700,6 +818,53 @@
   });
   draftModal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) flipClose(draftOpener, draftModal); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !draftModal.hidden) flipClose(draftOpener, draftModal); });
+
+  // --- 未投票アイデア → 投票（カード内クイック投票／クリックで投票モーダル・FLIP拡大） ---
+  const voteSection = document.getElementById('voteSection');
+  const voteGrid = document.getElementById('voteGrid');
+  const voteModal = document.getElementById('voteModal');
+  let voteOpener = null;
+
+  function fillVoteModal(card) {
+    const d = card.dataset;
+    document.getElementById('voteModalQuest').textContent = d.quest;
+    document.getElementById('voteModalTitle').textContent = d.title;
+    document.getElementById('voteModalCat').textContent = d.cat;
+    document.getElementById('voteModalValue').textContent = d.value;
+    document.getElementById('voteModalBody').textContent = d.body;
+    document.getElementById('voteModalAgree').textContent = '▲ 賛成 ' + d.agree;
+    document.getElementById('voteModalDisagree').textContent = '▼ 反対 ' + d.disagree;
+  }
+
+  // 投票確定：カードを投票済み表示にして一覧から外す（未投票リストなので消える）
+  function castVote(card, dir) {
+    if (card.classList.contains('is-voted')) return;
+    card.classList.add('is-voted');
+    const label = dir === 'agree' ? '賛成' : '反対';
+    const actions = card.querySelector('.vote-actions');
+    if (actions) actions.outerHTML = '<div class="vote-voted-note">✓ ' + label + ' で投票しました（＋5 XP）</div>';
+    setTimeout(() => {
+      card.style.opacity = '0';
+      setTimeout(() => {
+        card.remove();
+        if (voteGrid.querySelectorAll('.vote-card').length === 0) voteSection.hidden = true;
+      }, 320);
+    }, 900);
+  }
+
+  voteGrid.addEventListener('click', (e) => {
+    // カード内のクイック投票（賛成/反対）はモーダルを開かず即投票
+    const quick = e.target.closest('.vote-quick');
+    if (quick) { e.stopPropagation(); castVote(e.target.closest('.vote-card'), quick.dataset.vote); return; }
+    const card = e.target.closest('.vote-card');
+    if (card && !card.classList.contains('is-voted')) { voteOpener = card; fillVoteModal(card); flipOpen(card, voteModal); }
+  });
+  voteModal.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) { flipClose(voteOpener, voteModal); return; }
+    const vb = e.target.closest('[data-vote]');
+    if (vb && voteOpener) { const card = voteOpener; flipClose(card, voteModal); castVote(card, vb.dataset.vote); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !voteModal.hidden) flipClose(voteOpener, voteModal); });
 
   // --- ログインボーナス トースト（画面下部・自動送り→数秒でフェードアウト） ---
   // 実装ではログイン直後にサーバーからの付与XPを受けて表示する。ここはデモ。
