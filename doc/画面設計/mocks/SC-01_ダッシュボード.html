@@ -77,24 +77,7 @@
   .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
   @media (prefers-reduced-motion: reduce) { .hero__avatar img { animation: none; } }
 
-  /* --- 右：週間ランキング TOP3（獲得XP＋コインのウィークリースコアで決定） --- */
-  .rank-panel { display: flex; flex-direction: column; }
-  .rank-panel h3 { font-family: var(--font-pixel); color: var(--pixel-xp); margin: 0 0 2px; }
-  .rank-panel__sub { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--pixel-cyan); margin-bottom: var(--space-3); }
-  .rank-list { list-style: none; margin: 0; padding: 0; flex: 1; }
-  .rank-list li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 6px; border-top: 1px solid rgba(248,250,252,.15); }
-  .rank-list li:first-child { border-top: 0; }
-  .rank-list li.is-me { background: rgba(34,211,238,.14); border-radius: var(--radius-pixel); }
-  .rank-medal { flex: 0 0 auto; width: 26px; text-align: center; font-size: 20px; }
-  .rank-name { flex: 1; min-width: 0; font-family: var(--font-pixel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rank-name .rank-you { color: var(--pixel-cyan); font-size: var(--text-xs); }
-  .rank-score { flex: 0 0 auto; text-align: right; font-family: var(--font-pixel); line-height: 1.25; }
-  .rank-score .total { font-size: var(--text-base); }
-  .rank-score .brk { display: block; font-size: 11px; }
-  .rank-score .exp { color: var(--pixel-xp); }
-  .rank-score .coin { color: var(--pixel-coin); }
-  .rank-panel__foot { margin-top: var(--space-3); text-align: right; }
-  .rank-panel__foot a { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
+  /* 週間ランキングパネル .rank-panel は shared.css（複数画面で共用）へ昇格。 */
 
   /* =========================================================
    * 参加中クエスト（業務層カード・クリックで SC-12 直行）

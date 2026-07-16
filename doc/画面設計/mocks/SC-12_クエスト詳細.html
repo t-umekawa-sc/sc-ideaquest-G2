@@ -11,8 +11,10 @@
   .backlink { display: inline-block; margin-bottom: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
   .backlink:hover { color: var(--color-text); }
 
-  /* --- クエストヘッダー --- */
+  /* --- クエストヘッダー＋クエスト内ランキングの2カラム --- */
+  .quest-top { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: var(--space-4); align-items: stretch; }
   .quest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  @media (max-width: 860px) { .quest-top { grid-template-columns: 1fr; } }
   .quest-head h1 { font-size: var(--text-2xl); margin: var(--space-1) 0 var(--space-2); }
   .quest-head__theme { color: var(--color-text); margin: 0; }
   .quest-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-4); }
@@ -76,28 +78,56 @@
 <main class="container detail-main">
   <a class="backlink" href="#">← クエスト一覧へ戻る</a>
 
-  <!-- ============ クエストヘッダー ============ -->
-  <section class="card quest-head" aria-label="クエスト情報">
-    <div class="quest-head__top">
-      <div>
-        <span class="badge badge-muted">業務改善</span>
-        <span class="badge badge-success" style="margin-left:6px">評価中</span>
-        <h1>配送ルート最適化</h1>
-        <p class="quest-head__theme">配送コストと CO2 削減の両立を実現するアイデアを集める。</p>
-        <div class="quest-meta">
-          <span class="soon">⏳ 締切 2026/12/20（あと3日）</span>
-          <span>👥 パーティー 6人</span>
-          <span>💡 アイデア 6件</span>
-          <span>👑 所有者: 山田 太郎</span>
-          <span>🗂 グループ: プロダクト開発部</span>
+  <!-- ============ クエストヘッダー ＋ クエスト内週間ランキング（2カラム） ============ -->
+  <div class="quest-top">
+    <section class="card quest-head" aria-label="クエスト情報">
+      <div class="quest-head__top">
+        <div>
+          <span class="badge badge-muted">業務改善</span>
+          <span class="badge badge-success" style="margin-left:6px">評価中</span>
+          <h1>配送ルート最適化</h1>
+          <p class="quest-head__theme">配送コストと CO2 削減の両立を実現するアイデアを集める。</p>
+          <div class="quest-meta">
+            <span class="soon">⏳ 締切 2026/12/20（あと3日）</span>
+            <span>👥 パーティー 6人</span>
+            <span>💡 アイデア 6件</span>
+            <span>👑 所有者: 山田 太郎</span>
+            <span>🗂 グループ: プロダクト開発部</span>
+          </div>
+        </div>
+        <div class="quest-actions">
+          <button class="btn btn-primary" type="button" id="addIdeaBtn">＋ アイデアを追加</button>
+          <button class="btn btn-outline" type="button" id="editQuestBtn">クエスト編集</button>
         </div>
       </div>
-      <div class="quest-actions">
-        <button class="btn btn-primary" type="button" id="addIdeaBtn">＋ アイデアを追加</button>
-        <button class="btn btn-outline" type="button" id="editQuestBtn">クエスト編集</button>
-      </div>
-    </div>
-  </section>
+    </section>
+
+    <!-- クエスト内 週間ランキング（このクエストの活動で得たXP＋コイン） -->
+    <section class="pixel-panel rank-panel" aria-label="クエスト内 週間ランキング">
+      <h3>★ クエスト内ランキング ★</h3>
+      <div class="rank-panel__sub">このクエストの活動で獲得（今週・EXP＋コイン）</div>
+      <ol class="rank-list">
+        <li>
+          <span class="rank-medal" aria-label="1位">🥇</span>
+          <span class="avatar sm" data-name="鈴木 花子"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.12</span></span>
+          <span class="rank-name">鈴木 花子</span>
+          <span class="rank-score"><span class="total">310</span><span class="brk"><span class="exp">EXP280</span> <span class="coin">◆30</span></span></span>
+        </li>
+        <li class="is-me">
+          <span class="rank-medal" aria-label="2位">🥈</span>
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+          <span class="rank-name">山田 太郎 <span class="rank-you">（あなた）</span></span>
+          <span class="rank-score"><span class="total">235</span><span class="brk"><span class="exp">EXP210</span> <span class="coin">◆25</span></span></span>
+        </li>
+        <li>
+          <span class="rank-medal" aria-label="3位">🥉</span>
+          <span class="avatar sm" data-name="田中 一郎"><span class="avatar__img placeholder">田</span><span class="avatar__level">Lv.9</span></span>
+          <span class="rank-name">田中 一郎</span>
+          <span class="rank-score"><span class="total">200</span><span class="brk"><span class="exp">EXP180</span> <span class="coin">◆20</span></span></span>
+        </li>
+      </ol>
+    </section>
+  </div>
 
   <!-- ============ タブ ============ -->
   <div class="tabs" role="tablist" aria-label="クエスト詳細のセクション">
