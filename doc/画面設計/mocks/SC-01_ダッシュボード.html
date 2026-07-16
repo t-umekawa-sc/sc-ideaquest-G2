@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-01 ダッシュボード — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-01 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .dash-main { padding-block: var(--space-8) var(--space-16); }
+  .greeting { margin-bottom: var(--space-5); }
+  .greeting h1 { font-size: var(--text-2xl); margin-bottom: 2px; }
+
+  /* --- ヘッダー右側のステータス／通知／メニュー --- */
+  .header-actions { display: flex; align-items: center; gap: var(--space-3); }
+  /* 通知ベル（未読バッジ付き） */
+  .bell {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--color-border);
+    background: var(--color-surface); color: var(--color-text); cursor: pointer; font-size: 18px;
+    transition: background .15s, border-color .15s;
+  }
+  .bell:hover { background: var(--color-surface-alt); }
+  .bell__badge {
+    position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; line-height: 1; color: #fff;
+    background: var(--color-danger); border: 2px solid var(--color-surface); border-radius: var(--radius-full);
+  }
+  /* アバターメニュー（クリックでドロップダウン） */
+  .usermenu { position: relative; }
+  .usermenu__trigger {
+    display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer;
+    background: none; border: none; padding: 2px; border-radius: var(--radius-full);
+  }
+  .usermenu__trigger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .usermenu__list {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 200px;
+    margin: 0; padding: 6px; list-style: none;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  }
+  .usermenu__list[hidden] { display: none; }
+  .usermenu__list li > * {
+    display: block; width: 100%; text-align: left; box-sizing: border-box;
+    padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+    font-size: var(--text-sm); color: var(--color-text); background: none; border: none; cursor: pointer;
+  }
+  .usermenu__list li > *:hover { background: var(--color-primary-soft); text-decoration: none; }
+  .usermenu__sep { height: 1px; margin: 6px 4px; background: var(--color-border); }
+
+  /* =========================================================
+   * 上部2カラム（ゲーム層）：左＝ヒーロー(ステータス) / 右＝週間ランキングTOP3
+   * ========================================================= */
+  .dash-top { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8); align-items: stretch; }
+
+  /* --- 左：ヒーロー（.pixel-panel を土台にする） --- */
+  .hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-6); }
+  /* アバター（3Dは実装フェーズ。モックは仮画像＝マスコットで代用） */
+  .hero__avatar {
+    display: grid; place-items: center; width: 120px; height: 120px;
+    background: #0f172a; border: 3px solid var(--pixel-ink); box-shadow: var(--shadow-pixel);
+    image-rendering: pixelated;
+  }
+  .hero__avatar img { width: 88px; height: auto; image-rendering: pixelated;
+    filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); animation: mascot-bob 1.8s ease-in-out infinite; }
+  .hero__status { min-width: 0; }
+  .hero__name { font-family: var(--font-pixel); font-size: var(--text-lg); margin-bottom: 2px; }
+  .hero__lvline { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level); }
+  .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
+  .hero .xp-bar { max-width: 420px; }
+  .hero__coin { margin-top: var(--space-3); }
+  .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
+  @media (prefers-reduced-motion: reduce) { .hero__avatar img { animation: none; } }
+
+  /* --- 右：週間ランキング TOP3（獲得XP＋コインのウィークリースコアで決定） --- */
+  .rank-panel { display: flex; flex-direction: column; }
+  .rank-panel h3 { font-family: var(--font-pixel); color: var(--pixel-xp); margin: 0 0 2px; }
+  .rank-panel__sub { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--pixel-cyan); margin-bottom: var(--space-3); }
+  .rank-list { list-style: none; margin: 0; padding: 0; flex: 1; }
+  .rank-list li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 6px; border-top: 1px solid rgba(248,250,252,.15); }
+  .rank-list li:first-child { border-top: 0; }
+  .rank-list li.is-me { background: rgba(34,211,238,.14); border-radius: var(--radius-pixel); }
+  .rank-medal { flex: 0 0 auto; width: 26px; text-align: center; font-size: 20px; }
+  .rank-name { flex: 1; min-width: 0; font-family: var(--font-pixel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-name .rank-you { color: var(--pixel-cyan); font-size: var(--text-xs); }
+  .rank-score { flex: 0 0 auto; text-align: right; font-family: var(--font-pixel); line-height: 1.25; }
+  .rank-score .total { font-size: var(--text-base); }
+  .rank-score .brk { display: block; font-size: 11px; }
+  .rank-score .exp { color: var(--pixel-xp); }
+  .rank-score .coin { color: var(--pixel-coin); }
+  .rank-panel__foot { margin-top: var(--space-3); text-align: right; }
+  .rank-panel__foot a { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
+
+  /* =========================================================
+   * 参加中クエスト（業務層カード・クリックで SC-12 直行）
+   * ========================================================= */
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-4); }
+  .section-head h2 { font-size: var(--text-xl); margin: 0; }
+  .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+  /* カード全体をリンク化（詳細へ直行） */
+  a.quest-card { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, transform .05s, border-color .15s; }
+  a.quest-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+  a.quest-card:active { transform: translateY(1px); }
+  .quest-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .quest-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+  .deadline { font-size: var(--text-xs); font-weight: 500; }
+  .deadline.soon { color: var(--color-danger); }
+
+  /* 下段：通知＋ショートカット */
+  .dash-bottom { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
+  @media (max-width: 860px) {
+    .dash-top { grid-template-columns: 1fr; }
+    .dash-bottom { grid-template-columns: 1fr; }
+    .hero { grid-template-columns: auto 1fr; }
+  }
+
+  /* 最近の通知リスト */
+  .notif-list { list-style: none; margin: 0; padding: 0; }
+  .notif-list li { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
+  .notif-list li:first-child { border-top: 0; }
+  .notif-ico { flex: 0 0 auto; width: 28px; height: 28px; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 14px; background: var(--color-primary-soft); }
+  .notif-list .unread { position: relative; }
+  .notif-list .unread .notif-ico::after { content: ""; position: absolute; left: 20px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); border: 2px solid var(--color-surface); }
+  .notif-body { min-width: 0; font-size: var(--text-sm); }
+  .notif-time { color: var(--color-text-subtle); font-size: var(--text-xs); }
+
+  /* ショートカットタイル */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+  .tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    padding: var(--space-4) var(--space-2); text-align: center; color: var(--color-text);
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
+    text-decoration: none; transition: background .15s, border-color .15s, transform .05s;
+  }
+  .tile:hover { background: var(--color-primary-soft); border-color: var(--color-primary-border); text-decoration: none; }
+  .tile:active { transform: translateY(1px); }
+  .tile__ico { font-size: 22px; line-height: 1; }
+  .tile__label { font-size: var(--text-sm); font-weight: 500; }
+
+  /* ロール条件付き管理導線 */
+  .admin-links { margin-top: var(--space-10); display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+  .admin-links .role-note { font-size: var(--text-xs); color: var(--color-text-subtle); }
+
+  /* =========================================================
+   * ログインボーナス トースト（画面下部・自動送り＝ユーザー確定）
+   * .pixel-dialog を土台にした下部固定トースト。数秒後フェードアウト。
+   * ========================================================= */
+  .xp-toast {
+    position: fixed; left: 50%; bottom: var(--space-8); z-index: 60;
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    min-width: 320px; max-width: 90vw;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .xp-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .xp-toast .pixel-dialog { padding: var(--space-3) var(--space-5) var(--space-4); }
+  @media (prefers-reduced-motion: reduce) { .xp-toast { transition: opacity .3s ease; } }
+</style>
+</head>
+<body>
+
+<!-- ============ アプリヘッダー（業務層・共通 .app-header） ============ -->
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="#"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" id="userTrigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎">
+            <span class="avatar__img placeholder">山</span>
+            <span class="avatar__level">Lv.7</span>
+          </span>
+        </button>
+        <ul class="usermenu__list" id="userMenu" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container dash-main">
+
+  <!-- あいさつ -->
+  <div class="greeting">
+    <h1>おかえりなさい、山田 太郎 さん</h1>
+    <p class="muted">今日も新しいアイデアで冒険に出かけましょう。</p>
+  </div>
+
+  <!-- ============ 上部2カラム：左ヒーロー ＋ 右 週間ランキング ============ -->
+  <div class="dash-top">
+    <!-- 左：ヒーロー（ゲーム層ステータス） -->
+    <section class="pixel-panel hero" aria-label="あなたのステータス">
+      <div class="hero__avatar">
+        <img src="assets/mascot-hero.png" alt="あなたのアバター">
+      </div>
+      <div class="hero__status">
+        <div class="hero__name">山田 太郎</div>
+        <div class="hero__lvline">
+          <span class="hero__lv">Lv.7</span>
+          <span class="hero__next">NEXT 120 XP</span>
+        </div>
+        <div class="xp-bar"><span style="width:65%"></span></div>
+        <div class="hero__coin"><span class="pixel-stat coin">◆ 320 コイン</span></div>
+        <div class="hero__actions">
+          <a class="btn-pixel" href="#">▶ SHOP へ</a>
+          <a class="btn-pixel" href="#">▶ きせかえ</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右：週間ランキング TOP3（今週の獲得XP＋コインで決定） -->
+    <section class="pixel-panel rank-panel" aria-label="週間ランキング">
+      <h3>★ 週間ランキング ★</h3>
+      <div class="rank-panel__sub">今週の獲得EXP＋コイン</div>
+      <ol class="rank-list">
+        <li>
+          <span class="rank-medal" aria-label="1位">🥇</span>
+          <span class="avatar sm" data-name="鈴木 花子"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.12</span></span>
+          <span class="rank-name">鈴木 花子</span>
+          <span class="rank-score"><span class="total">530</span><span class="brk"><span class="exp">EXP480</span> <span class="coin">◆50</span></span></span>
+        </li>
+        <li class="is-me">
+          <span class="rank-medal" aria-label="2位">🥈</span>
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+          <span class="rank-name">山田 太郎 <span class="rank-you">（あなた）</span></span>
+          <span class="rank-score"><span class="total">405</span><span class="brk"><span class="exp">EXP360</span> <span class="coin">◆45</span></span></span>
+        </li>
+        <li>
+          <span class="rank-medal" aria-label="3位">🥉</span>
+          <span class="avatar sm" data-name="佐藤 大輔"><span class="avatar__img placeholder">佐</span><span class="avatar__level">Lv.3</span></span>
+          <span class="rank-name">佐藤 大輔</span>
+          <span class="rank-score"><span class="total">340</span><span class="brk"><span class="exp">EXP300</span> <span class="coin">◆40</span></span></span>
+        </li>
+      </ol>
+      <div class="rank-panel__foot"><a href="#">ランキングをすべて見る →</a></div>
+    </section>
+  </div>
+
+  <!-- ============ 参加中クエスト（クリックで SC-12 直行） ============ -->
+  <section aria-label="参加中クエスト">
+    <div class="section-head">
+      <h2>参加中クエスト</h2>
+      <a href="#">すべて見る →</a>
+    </div>
+    <div class="quest-grid">
+      <a class="card quest-card" href="#">
+        <div class="between">
+          <span class="card-title">配送ルート最適化</span>
+          <span class="badge">評価中</span>
+        </div>
+        <div class="quest-card__meta">
+          <span class="badge badge-muted">業務改善</span>
+          <span class="deadline soon">⏳ 締切まで3日</span>
+        </div>
+        <div class="quest-card__stats">
+          <span>👥 パーティー6</span>
+          <span>💡 アイデア8</span>
+          <span class="badge badge-danger">未投稿</span>
+        </div>
+      </a>
+
+      <a class="card quest-card" href="#">
+        <div class="between">
+          <span class="card-title">社内ナレッジ検索AI</span>
+          <span class="badge badge-success">選定</span>
+        </div>
+        <div class="quest-card__meta">
+          <span class="badge badge-muted">新規事業</span>
+          <span class="deadline">⏳ 締切まで7日</span>
+        </div>
+        <div class="quest-card__stats">
+          <span>👥 パーティー4</span>
+          <span>💡 アイデア12</span>
+          <span class="badge">評価待ち2</span>
+        </div>
+      </a>
+
+      <a class="card quest-card" href="#">
+        <div class="between">
+          <span class="card-title">経費精算の自動化</span>
+          <span class="badge">募集中</span>
+        </div>
+        <div class="quest-card__meta">
+          <span class="badge badge-muted">コスト削減</span>
+          <span class="deadline">⏳ 締切まで14日</span>
+        </div>
+        <div class="quest-card__stats">
+          <span>👥 パーティー5</span>
+          <span>💡 アイデア3</span>
+          <span class="badge badge-success">投稿済み</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ============ 下段：最近の通知 ＋ ショートカット ============ -->
+  <div class="dash-bottom">
+    <section class="card" aria-label="最近の通知">
+      <div class="section-head">
+        <h2 style="font-size:var(--text-lg)">最近の通知</h2>
+        <a href="#">すべての通知 →</a>
+      </div>
+      <ul class="notif-list">
+        <li class="unread">
+          <span class="notif-ico">@</span>
+          <div class="notif-body">
+            <div><strong>鈴木 花子</strong> さんがチャットであなたをメンションしました</div>
+            <div class="muted">配送ルート最適化 / アイデア「夜間配送の集約」</div>
+            <div class="notif-time">5分前</div>
+          </div>
+        </li>
+        <li class="unread">
+          <span class="notif-ico">💬</span>
+          <div class="notif-body">
+            <div>あなたのアイデアに <strong>3件</strong> の新しいコメント</div>
+            <div class="muted">社内ナレッジ検索AI / アイデア「FAQ自動生成」</div>
+            <div class="notif-time">1時間前</div>
+          </div>
+        </li>
+        <li>
+          <span class="notif-ico">⭐</span>
+          <div class="notif-body">
+            <div>あなたのアイデアが <strong>選定</strong> されました（＋200 XP・コイン獲得）</div>
+            <div class="muted">社内ナレッジ検索AI</div>
+            <div class="notif-time">昨日</div>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section aria-label="ショートカット">
+      <div class="section-head"><h2 style="font-size:var(--text-lg)">ショートカット</h2></div>
+      <div class="tiles">
+        <a class="tile" href="#"><span class="tile__ico">🗺️</span><span class="tile__label">クエスト一覧</span></a>
+        <a class="tile" href="#"><span class="tile__ico">🛒</span><span class="tile__label">ショップ</span></a>
+        <a class="tile" href="#"><span class="tile__ico">🧍</span><span class="tile__label">アバター</span></a>
+        <a class="tile" href="#"><span class="tile__ico">🏆</span><span class="tile__label">実績 / バッジ</span></a>
+        <a class="tile" href="#"><span class="tile__ico">📊</span><span class="tile__label">ランキング</span></a>
+        <a class="tile" href="#"><span class="tile__ico">🔔</span><span class="tile__label">通知</span></a>
+      </div>
+    </section>
+  </div>
+
+  <!-- ロール条件付き：管理者のみ表示（モックでは常時表示＋注記） -->
+  <div class="admin-links">
+    <span class="role-note">▼ ロールに応じて表示（一般ユーザーには非表示）</span>
+    <a class="btn btn-outline btn-sm" href="#">クエストグループ管理（SC-90）</a>
+    <a class="btn btn-outline btn-sm" href="#">システム管理（SC-91）</a>
+  </div>
+</main>
+
+<!-- ============ ログインボーナス トースト（画面下部・自動送り） ============ -->
+<div class="xp-toast" id="xpToast" role="status" aria-live="polite">
+  <div class="pixel-dialog">
+    <div class="pixel-dialog__title">＋EXP</div>
+    <div id="xpToastText" class="pixel-caret"></div>
+  </div>
+</div>
+
+<!-- モック共通スクリプト（コンボボックス等） -->
+<script src="shared.js"></script>
+<script>
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- アバターメニュー（開閉） ---
+  const trigger = document.getElementById('userTrigger');
+  const menu = document.getElementById('userMenu');
+  function closeMenu() { menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open; trigger.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', closeMenu);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+  menu.addEventListener('click', (e) => e.stopPropagation());
+
+  // --- ログインボーナス トースト（画面下部・自動送り→数秒でフェードアウト） ---
+  // 実装ではログイン直後にサーバーからの付与XPを受けて表示する。ここはデモ。
+  const toast = document.getElementById('xpToast');
+  const toastText = document.getElementById('xpToastText');
+  const MSG = 'ログインボーナス！ けいけんち を 10 かくとく した。';
+  function showXpToast() {
+    toast.classList.add('show');
+    if (prefersReduced) {
+      toastText.textContent = MSG; toastText.classList.remove('pixel-caret');
+      setTimeout(hideXpToast, 3500); return;
+    }
+    let i = 0; toastText.textContent = '';
+    const timer = setInterval(() => {
+      toastText.textContent += MSG[i++];
+      if (i >= MSG.length) {
+        clearInterval(timer);
+        toastText.classList.remove('pixel-caret');
+        setTimeout(hideXpToast, 2500); // 読み終えてから消える
+      }
+    }, 55);
+  }
+  function hideXpToast() { toast.classList.remove('show'); }
+  // ログイン直後を想定して少し遅らせて表示
+  setTimeout(showXpToast, 600);
+</script>
+
+</body>
+</html>
