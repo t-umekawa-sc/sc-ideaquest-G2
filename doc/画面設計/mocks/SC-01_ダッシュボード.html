@@ -408,7 +408,10 @@
     <div class="quest-grid">
       <a class="card quest-card" href="#">
         <div class="between">
-          <span class="card-title">配送ルート最適化</span>
+          <span class="row-center" style="gap:var(--space-2); min-width:0">
+            <span class="quest-icon sm"><span class="quest-icon__char">配</span><span class="quest-icon__owner placeholder">山</span></span>
+            <span class="card-title">配送ルート最適化</span>
+          </span>
           <span class="badge">評価中</span>
         </div>
         <div class="quest-card__meta">
@@ -424,7 +427,10 @@
 
       <a class="card quest-card" href="#">
         <div class="between">
-          <span class="card-title">社内ナレッジ検索AI</span>
+          <span class="row-center" style="gap:var(--space-2); min-width:0">
+            <span class="quest-icon sm"><span class="quest-icon__char">社</span><span class="quest-icon__owner placeholder">鈴</span></span>
+            <span class="card-title">社内ナレッジ検索AI</span>
+          </span>
           <span class="badge badge-success">選定</span>
         </div>
         <div class="quest-card__meta">
@@ -440,7 +446,10 @@
 
       <a class="card quest-card" href="#">
         <div class="between">
-          <span class="card-title">経費精算の自動化</span>
+          <span class="row-center" style="gap:var(--space-2); min-width:0">
+            <span class="quest-icon sm"><span class="quest-icon__char">経</span><span class="quest-icon__owner placeholder">田</span></span>
+            <span class="card-title">経費精算の自動化</span>
+          </span>
           <span class="badge">募集中</span>
         </div>
         <div class="quest-card__meta">
@@ -614,6 +623,16 @@
 
     <!-- クエスト編集フォーム（SC-11 相当） -->
     <div id="draftFormQuest" hidden>
+      <div class="field">
+        <label>クエストアイコン</label>
+        <div class="row-center" style="gap:var(--space-4)">
+          <span class="quest-icon lg"><span class="quest-icon__char">新</span><span class="quest-icon__owner placeholder">山</span></span>
+          <div>
+            <button class="btn btn-outline btn-sm" type="button">画像をアップロード</button>
+            <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。</div>
+          </div>
+        </div>
+      </div>
       <div class="field">
         <label>カテゴリー</label>
         <div class="combobox" data-combobox>

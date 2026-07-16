@@ -14,6 +14,7 @@
   /* --- クエストヘッダー＋クエスト内ランキングの2カラム --- */
   .quest-top { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: var(--space-4); align-items: stretch; }
   .quest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .quest-head__main { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
   @media (max-width: 860px) { .quest-top { grid-template-columns: 1fr; } }
   .quest-head h1 { font-size: var(--text-2xl); margin: var(--space-1) 0 var(--space-2); }
   .quest-head__theme { color: var(--color-text); margin: 0; }
@@ -80,7 +81,13 @@
   <div class="quest-top">
     <section class="card quest-head" aria-label="クエスト情報">
       <div class="quest-head__top">
-        <div>
+        <div class="quest-head__main">
+          <!-- クエストアイコン（未設定＝件名頭文字「配」＋所有者アバター「山」を重ねる） -->
+          <span class="quest-icon lg" id="questIconPreviewHead">
+            <span class="quest-icon__char">配</span>
+            <span class="quest-icon__owner placeholder">山</span>
+          </span>
+          <div>
           <span class="badge badge-muted">業務改善</span>
           <span class="badge badge-success" style="margin-left:6px">評価中</span>
           <h1>配送ルート最適化</h1>
@@ -92,6 +99,7 @@
             <span>👑 所有者: 山田 太郎</span>
             <span>🗂 グループ: プロダクト開発部</span>
           </div>
+        </div>
         </div>
         <div class="quest-actions">
           <button class="btn btn-primary" type="button" id="addIdeaBtn">＋ アイデアを追加</button>
@@ -303,6 +311,21 @@
     <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
     <h2 id="questModalTitle" style="margin-bottom:var(--space-4)">クエストを編集</h2>
     <div class="field">
+      <label>クエストアイコン</label>
+      <div class="row-center" style="gap:var(--space-4)">
+        <span class="quest-icon lg" id="questIconPreview">
+          <span class="quest-icon__char">配</span>
+          <span class="quest-icon__owner placeholder">山</span>
+        </span>
+        <div>
+          <input type="file" id="questIconInput" accept="image/*" hidden>
+          <button class="btn btn-outline btn-sm" type="button" id="questIconUpload">画像をアップロード</button>
+          <button class="btn btn-sm" type="button" id="questIconClear" hidden>未設定に戻す</button>
+          <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。推奨: 正方形の画像。</div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
       <label>カテゴリー</label>
       <div class="combobox" data-combobox>
         <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
@@ -449,6 +472,25 @@
   document.getElementById('editQuestBtn').addEventListener('click', () => openModal(questModal));
   document.getElementById('editPartyBtn').addEventListener('click', () => openModal(questModal));
   document.getElementById('addIdeaBtn').addEventListener('click', () => openModal(ideaModal));
+
+  // --- クエストアイコン設定（アップロード or 未設定=頭文字＋所有者アバター） ---
+  const qiInput = document.getElementById('questIconInput');
+  const qiUpload = document.getElementById('questIconUpload');
+  const qiClear = document.getElementById('questIconClear');
+  const qiPreview = document.getElementById('questIconPreview');
+  const qiHead = document.getElementById('questIconPreviewHead');
+  const qiFallback = qiPreview.innerHTML; // 頭文字タイル＋所有者アバター
+  function setQuestIcon(url) {
+    const inner = url ? '<img class="quest-icon__img" src="' + url + '" alt="">' : qiFallback;
+    qiPreview.innerHTML = inner; qiHead.innerHTML = inner; // モーダルプレビューとヘッダー両方に反映
+    qiClear.hidden = !url;
+  }
+  qiUpload.addEventListener('click', () => qiInput.click());
+  qiInput.addEventListener('change', () => {
+    const f = qiInput.files && qiInput.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => setQuestIcon(r.result); r.readAsDataURL(f); qiInput.value = '';
+  });
+  qiClear.addEventListener('click', () => setQuestIcon(null));
 </script>
 
 </body>
