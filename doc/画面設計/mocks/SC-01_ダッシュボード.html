@@ -109,6 +109,22 @@
   .deadline.soon { color: var(--color-danger); }
 
   /* =========================================================
+   * 下書き中のクエスト/アイデア（最上段・クリックで作成/編集モーダル）
+   * ========================================================= */
+  .draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+  .draft-card { position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+    border-style: dashed; border-color: var(--color-border-strong); background: var(--color-surface-alt);
+    transition: box-shadow .15s, transform .05s, border-color .15s; }
+  .draft-card:hover { box-shadow: var(--shadow); border-color: var(--color-warning); }
+  .draft-card:active { transform: translateY(1px); }
+  .draft-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .draft-card__head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+  .badge-draft { background: #FEF3C7; color: var(--color-warning); }
+  .draft-card__title { font-weight: 700; }
+  .draft-card__meta { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+  .draft-card__cta { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; color: var(--color-primary); }
+
+  /* =========================================================
    * フォロー中のアイデア（業務層カード・クリックで拡大モーダル）
    * ========================================================= */
   .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
@@ -270,8 +286,41 @@
     </section>
   </div>
 
+  <!-- ============ 下書き中のクエスト/アイデア（最上段・クリックで作成/編集モーダル） ============ -->
+  <section aria-label="下書き" id="draftSection">
+    <div class="section-head">
+      <h2>下書き</h2>
+      <span class="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
+    </div>
+    <div class="draft-grid" id="draftGrid">
+      <button class="card draft-card" type="button"
+        data-kind="クエスト" data-title="新オフィスのレイアウト改善" data-sub="カテゴリー: 業務改善 / 期限: 未設定"
+        data-edit="SC-11 クエスト作成・編集">
+        <div class="draft-card__head">
+          <span class="badge badge-draft">下書き</span>
+          <span class="badge badge-muted">クエスト</span>
+        </div>
+        <div class="draft-card__title">新オフィスのレイアウト改善</div>
+        <div class="draft-card__meta"><span>カテゴリー未確定</span><span>最終更新: 昨日</span></div>
+        <div class="draft-card__cta">続きを書く ✎</div>
+      </button>
+
+      <button class="card draft-card" type="button"
+        data-kind="アイデア" data-title="社内イベントの出欠をLINEで管理" data-sub="クエスト: 社内コミュニケーション活性化"
+        data-edit="SC-21 アイデア登録・編集">
+        <div class="draft-card__head">
+          <span class="badge badge-draft">下書き</span>
+          <span class="badge badge-muted">アイデア</span>
+        </div>
+        <div class="draft-card__title">社内イベントの出欠をLINEで管理</div>
+        <div class="draft-card__meta"><span>社内コミュニケーション活性化</span><span>最終更新: 3日前</span></div>
+        <div class="draft-card__cta">続きを書く ✎</div>
+      </button>
+    </div>
+  </section>
+
   <!-- ============ 参加中クエスト（クリックで SC-12 直行） ============ -->
-  <section aria-label="参加中クエスト">
+  <section aria-label="参加中クエスト" style="margin-top:var(--space-10)">
     <div class="section-head">
       <h2>参加中クエスト</h2>
       <a href="#">すべて見る →</a>
@@ -475,6 +524,22 @@
   </div>
 </div>
 
+<!-- ============ 下書きの続きを編集（本番は SC-11/SC-21 の作成/編集モーダル） ============ -->
+<div class="modal" id="draftModal" hidden role="dialog" aria-modal="true" aria-labelledby="draftModalTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" style="max-width:520px">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <div class="muted text-sm" id="draftModalKind">クエストの下書き</div>
+    <h2 id="draftModalTitle" style="margin-bottom:var(--space-2)">下書きタイトル</h2>
+    <p class="hint" id="draftModalNote" style="margin-top:0"></p>
+    <div class="modal__foot">
+      <a class="btn btn-primary" href="#">続きを書く（編集モーダルを開く）</a>
+      <button class="btn btn-outline" type="button" data-close>閉じる</button>
+    </div>
+    <p class="hint" style="margin-top:var(--space-4)">※ 本番は下書きクリックで <strong>SC-11/SC-21 の作成/編集モーダル</strong>（Parallel/Intercept Routes）を開いて続きを編集。公開/投稿時に XP・コインを付与。</p>
+  </div>
+</div>
+
 <!-- ============ ログインボーナス トースト（画面下部・自動送り） ============ -->
 <div class="xp-toast" id="xpToast" role="status" aria-live="polite">
   <div class="pixel-dialog">
@@ -577,6 +642,39 @@
   });
   ideaModal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !ideaModal.hidden) closeModal(); });
+
+  // --- 下書きパネル → 作成/編集モーダル（本番は SC-11/SC-21） ---
+  const draftGrid = document.getElementById('draftGrid');
+  const draftModal = document.getElementById('draftModal');
+  let draftOpener = null;
+  draftGrid.addEventListener('click', (e) => {
+    const card = e.target.closest('.draft-card');
+    if (!card) return;
+    draftOpener = card;
+    const d = card.dataset;
+    document.getElementById('draftModalKind').textContent = d.kind + 'の下書き';
+    document.getElementById('draftModalTitle').textContent = d.title;
+    document.getElementById('draftModalNote').textContent = d.sub + '（' + d.edit + '）';
+    const panel = draftModal.querySelector('.modal__panel');
+    draftModal.hidden = false;
+    if (!prefersReduced) { panel.style.opacity = '0'; panel.style.transform = 'scale(.96)'; }
+    requestAnimationFrame(() => {
+      draftModal.classList.add('show');
+      if (!prefersReduced) {
+        panel.style.transition = 'opacity .2s ease, transform .2s ease';
+        panel.style.opacity = '1'; panel.style.transform = '';
+      }
+    });
+  });
+  function closeDraftModal() {
+    draftModal.classList.remove('show');
+    draftModal.hidden = true;
+    const panel = draftModal.querySelector('.modal__panel');
+    panel.style.transition = ''; panel.style.opacity = ''; panel.style.transform = '';
+    if (draftOpener) draftOpener.focus();
+  }
+  draftModal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeDraftModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !draftModal.hidden) closeDraftModal(); });
 
   // --- ログインボーナス トースト（画面下部・自動送り→数秒でフェードアウト） ---
   // 実装ではログイン直後にサーバーからの付与XPを受けて表示する。ここはデモ。
