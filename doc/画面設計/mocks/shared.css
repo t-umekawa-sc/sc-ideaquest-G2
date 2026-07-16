@@ -236,6 +236,17 @@ img { max-width: 100%; display: block; }
 .table tbody tr.row-link:hover { background: var(--color-primary-soft); }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* --- 一覧ツールバー（標準）: 検索＋フィルター＋並び替え ---
+   一覧（テーブル/カード）の上に置く。左＝検索・絞り込み、右＝並び替え。
+   件数表示 .list-count、絞り込み解除は各画面で用意。 */
+.list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.list-toolbar .filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.list-toolbar .tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.list-toolbar .input, .list-toolbar .select { width: auto; }        /* フォーム既定の幅100%を打ち消す */
+.list-toolbar .input[type="search"] { min-width: 200px; }
+.list-count { font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
+.list-empty { padding: var(--space-8); text-align: center; color: var(--color-text-muted); }
+
 /* =============================================================
  * 7. バッジ / ピル
  * ============================================================= */

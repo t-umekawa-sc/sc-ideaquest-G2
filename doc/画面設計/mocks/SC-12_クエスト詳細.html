@@ -33,9 +33,7 @@
   .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
   .tab-panel[hidden] { display: none; }
 
-  /* --- アイデア一覧ツールバー --- */
-  .list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
-  .list-toolbar .tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* --- アイデア一覧（ツールバー .list-toolbar は shared.css の一覧標準） --- */
   .list-toolbar .sort { min-width: 160px; }
   .poster { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
   .idea-title { font-weight: 600; color: var(--color-text); }
@@ -139,14 +137,29 @@
   <!-- ===== アイデア一覧（既定タブ・テーブル） ===== -->
   <section class="tab-panel" id="tab-ideas" role="tabpanel">
     <div class="list-toolbar">
-      <div class="muted text-sm">アイデアをクリックすると詳細（SC-22）を開きます</div>
+      <div class="filters">
+        <input class="input" type="search" id="q" placeholder="件名・投稿者で検索" aria-label="アイデアを検索">
+        <select class="select" id="fState" aria-label="状態で絞り込み">
+          <option value="">状態: すべて</option>
+          <option value="unvoted">未投票</option>
+          <option value="voted">投票済</option>
+          <option value="mine">自分の投稿</option>
+        </select>
+        <select class="select" id="fEval" aria-label="評価で絞り込み">
+          <option value="">評価: すべて</option>
+          <option value="pending">評価待ち</option>
+          <option value="done">評価済</option>
+        </select>
+        <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
+      </div>
       <div class="tools">
+        <span class="list-count" id="listCount">6件</span>
         <label class="text-sm muted" for="sortSel">並び替え</label>
         <select class="select sort" id="sortSel">
-          <option>投票が多い順</option>
-          <option>新着順</option>
-          <option>評価が高い順</option>
-          <option>コメントが多い順</option>
+          <option value="votes">投票が多い順</option>
+          <option value="new">新着順</option>
+          <option value="eval">評価が高い順</option>
+          <option value="comments">コメントが多い順</option>
         </select>
       </div>
     </div>
@@ -162,8 +175,9 @@
             <th>あなた</th>
           </tr>
         </thead>
-        <tbody>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+        <tbody id="ideaBody">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="夜間配送の集約" data-poster="鈴木 花子" data-agree="12" data-disagree="3" data-comments="8" data-eval="3" data-evalstate="done" data-mystate="unvoted" data-created="3">
             <td><span class="idea-title">夜間配送の集約</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>鈴木 花子</span></td>
             <td class="num"><span class="vote-agree">▲12</span> / <span class="vote-disagree">▼3</span></td>
@@ -171,7 +185,8 @@
             <td><span class="badge badge-muted">3/5 評価</span></td>
             <td><span class="badge badge-danger">未投票</span></td>
           </tr>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="置き配の写真通知" data-poster="佐藤 大輔" data-agree="15" data-disagree="5" data-comments="4" data-eval="-1" data-evalstate="pending" data-mystate="voted" data-created="5">
             <td><span class="idea-title">置き配の写真通知</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">佐</span></span>佐藤 大輔</span></td>
             <td class="num"><span class="vote-agree">▲15</span> / <span class="vote-disagree">▼5</span></td>
@@ -179,7 +194,8 @@
             <td><span class="badge">評価待ち</span></td>
             <td><span class="badge badge-success">投票済</span></td>
           </tr>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="再配達の予測AI" data-poster="田中 一郎" data-agree="9" data-disagree="2" data-comments="6" data-eval="5" data-evalstate="done" data-mystate="voted" data-created="1">
             <td><span class="idea-title">再配達の予測AI</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">田</span></span>田中 一郎</span></td>
             <td class="num"><span class="vote-agree">▲9</span> / <span class="vote-disagree">▼2</span></td>
@@ -187,7 +203,8 @@
             <td><span class="badge badge-success">5/5 評価</span></td>
             <td><span class="badge badge-success">投票済</span></td>
           </tr>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="配送ルートの動的最適化" data-poster="山田 太郎" data-agree="7" data-disagree="1" data-comments="3" data-eval="-1" data-evalstate="pending" data-mystate="mine" data-created="6">
             <td><span class="idea-title">配送ルートの動的最適化</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">山</span></span>山田 太郎</span></td>
             <td class="num"><span class="vote-agree">▲7</span> / <span class="vote-disagree">▼1</span></td>
@@ -195,7 +212,8 @@
             <td><span class="badge">評価待ち</span></td>
             <td><span class="badge badge-muted">自分の投稿</span></td>
           </tr>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="ドローン配送の実証" data-poster="高橋 実" data-agree="5" data-disagree="8" data-comments="12" data-eval="2" data-evalstate="done" data-mystate="unvoted" data-created="4">
             <td><span class="idea-title">ドローン配送の実証</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">高</span></span>高橋 実</span></td>
             <td class="num"><span class="vote-agree">▲5</span> / <span class="vote-disagree">▼8</span></td>
@@ -203,7 +221,8 @@
             <td><span class="badge badge-muted">2/5 評価</span></td>
             <td><span class="badge badge-danger">未投票</span></td>
           </tr>
-          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html"
+            data-title="梱包資材の削減" data-poster="伊藤 彩" data-agree="11" data-disagree="0" data-comments="2" data-eval="-1" data-evalstate="pending" data-mystate="voted" data-created="2">
             <td><span class="idea-title">梱包資材の削減</span></td>
             <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">伊</span></span>伊藤 彩</span></td>
             <td class="num"><span class="vote-agree">▲11</span> / <span class="vote-disagree">▼0</span></td>
@@ -214,6 +233,7 @@
         </tbody>
       </table>
     </div>
+    <div class="list-empty" id="ideaEmpty" hidden>該当するアイデアがありません。条件を変えてお試しください。</div>
   </section>
 
   <!-- ===== パーティー ===== -->
@@ -358,6 +378,51 @@
   document.querySelectorAll('tr.row-link').forEach(tr => {
     tr.addEventListener('click', () => { /* location.href = tr.dataset.href; */ });
   });
+
+  // --- 一覧の標準機能: 検索 ＋ フィルター ＋ 並び替え（クライアント側デモ） ---
+  // 本番は件数に応じてサーバー側フィルター/ソート/ページングにする。
+  const ideaBody = document.getElementById('ideaBody');
+  const ideaEmpty = document.getElementById('ideaEmpty');
+  const listCount = document.getElementById('listCount');
+  const qInput = document.getElementById('q');
+  const fState = document.getElementById('fState');
+  const fEval = document.getElementById('fEval');
+  const sortSel = document.getElementById('sortSel');
+  const clearBtn = document.getElementById('clearFilters');
+  const allRows = Array.from(ideaBody.querySelectorAll('tr'));
+  const num = (tr, k) => parseInt(tr.dataset[k], 10) || 0;
+
+  function applyList() {
+    const q = qInput.value.trim().toLowerCase();
+    const st = fState.value, ev = fEval.value;
+    // フィルター
+    let visible = allRows.filter(tr => {
+      if (q && !((tr.dataset.title + ' ' + tr.dataset.poster).toLowerCase().includes(q))) return false;
+      if (st && tr.dataset.mystate !== st) return false;
+      if (ev && tr.dataset.evalstate !== ev) return false;
+      return true;
+    });
+    // 並び替え
+    const key = sortSel.value;
+    const cmp = {
+      votes: (a, b) => num(b, 'agree') - num(a, 'agree'),
+      new:   (a, b) => num(b, 'created') - num(a, 'created'),
+      eval:  (a, b) => num(b, 'eval') - num(a, 'eval'),
+      comments: (a, b) => num(b, 'comments') - num(a, 'comments'),
+    }[key];
+    visible.sort(cmp);
+    // 反映（非表示行も末尾に戻して DOM を保つ）
+    allRows.forEach(tr => tr.hidden = true);
+    visible.forEach(tr => { tr.hidden = false; ideaBody.appendChild(tr); });
+    allRows.filter(tr => !visible.includes(tr)).forEach(tr => ideaBody.appendChild(tr));
+    // 件数・空表示・クリア表示
+    listCount.textContent = visible.length + '件';
+    ideaEmpty.hidden = visible.length !== 0;
+    clearBtn.hidden = !(q || st || ev);
+  }
+  [qInput, fState, fEval, sortSel].forEach(el => el.addEventListener('input', applyList));
+  clearBtn.addEventListener('click', () => { qInput.value = ''; fState.value = ''; fEval.value = ''; applyList(); });
+  applyList();
 
   // --- モーダル開閉（登録・編集はモーダル標準：フェード＋わずかにスケール） ---
   function openModal(modal) {
