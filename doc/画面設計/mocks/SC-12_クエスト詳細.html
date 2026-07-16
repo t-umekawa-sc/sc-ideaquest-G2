@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-12 クエスト詳細 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-12 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .detail-main { padding-block: var(--space-6) var(--space-16); }
+  .backlink { display: inline-block; margin-bottom: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+  .backlink:hover { color: var(--color-text); }
+
+  /* --- クエストヘッダー --- */
+  .quest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .quest-head h1 { font-size: var(--text-2xl); margin: var(--space-1) 0 var(--space-2); }
+  .quest-head__theme { color: var(--color-text); margin: 0; }
+  .quest-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-4); }
+  .quest-meta .soon { color: var(--color-danger); font-weight: 600; }
+  .quest-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+  /* --- タブ --- */
+  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
+    padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    display: inline-flex; align-items: center; gap: 6px; }
+  .tab:hover { color: var(--color-text); }
+  .tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
+  .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); border-radius: var(--radius-sm); }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+  .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
+  .tab-panel[hidden] { display: none; }
+
+  /* --- アイデア一覧ツールバー --- */
+  .list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+  .list-toolbar .tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .list-toolbar .sort { min-width: 160px; }
+  .poster { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+  .idea-title { font-weight: 600; color: var(--color-text); }
+  .row-link:hover .idea-title { color: var(--color-primary); }
+
+  /* --- パーティー一覧 --- */
+  .member-list { list-style: none; margin: 0; padding: 0; }
+  .member-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+  .member-row:last-child { border-bottom: 0; }
+  .member-name { font-weight: 500; }
+  .member-perms { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; justify-content: flex-end; }
+
+  /* --- 概要（定義リスト） --- */
+  .def-list { display: grid; grid-template-columns: 160px 1fr; gap: var(--space-3) var(--space-4); margin: 0; }
+  .def-list dt { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .def-list dd { margin: 0; }
+
+  /* モーダル内フォームの補助 */
+  .modal__foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+  @media (max-width: 640px) { .def-list { grid-template-columns: 1fr; gap: 2px var(--space-4); } .def-list dd { margin-bottom: var(--space-2); } }
+</style>
+</head>
+<body>
+
+<!-- 背景画像レイヤー（全認証画面共通・ダッシュボードで設定した背景をここでも反映） -->
+<div class="app-bg" id="appBg"></div>
+
+<!-- ============ アプリヘッダー（共通 .app-header） ============ -->
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<main class="container detail-main">
+  <a class="backlink" href="#">← クエスト一覧へ戻る</a>
+
+  <!-- ============ クエストヘッダー ============ -->
+  <section class="card quest-head" aria-label="クエスト情報">
+    <div class="quest-head__top">
+      <div>
+        <span class="badge badge-muted">業務改善</span>
+        <span class="badge badge-success" style="margin-left:6px">評価中</span>
+        <h1>配送ルート最適化</h1>
+        <p class="quest-head__theme">配送コストと CO2 削減の両立を実現するアイデアを集める。</p>
+        <div class="quest-meta">
+          <span class="soon">⏳ 締切 2026/12/20（あと3日）</span>
+          <span>👥 パーティー 6人</span>
+          <span>💡 アイデア 6件</span>
+          <span>👑 所有者: 山田 太郎</span>
+          <span>🗂 グループ: プロダクト開発部</span>
+        </div>
+      </div>
+      <div class="quest-actions">
+        <button class="btn btn-primary" type="button" id="addIdeaBtn">＋ アイデアを追加</button>
+        <button class="btn btn-outline" type="button" id="editQuestBtn">クエスト編集</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ タブ ============ -->
+  <div class="tabs" role="tablist" aria-label="クエスト詳細のセクション">
+    <button class="tab is-active" role="tab" aria-selected="true" aria-controls="tab-ideas" data-tab="ideas">アイデア <span class="tab-count">6</span></button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="tab-party" data-tab="party">パーティー <span class="tab-count">6</span></button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="tab-about" data-tab="about">概要</button>
+  </div>
+
+  <!-- ===== アイデア一覧（既定タブ・テーブル） ===== -->
+  <section class="tab-panel" id="tab-ideas" role="tabpanel">
+    <div class="list-toolbar">
+      <div class="muted text-sm">アイデアをクリックすると詳細（SC-22）を開きます</div>
+      <div class="tools">
+        <label class="text-sm muted" for="sortSel">並び替え</label>
+        <select class="select sort" id="sortSel">
+          <option>投票が多い順</option>
+          <option>新着順</option>
+          <option>評価が高い順</option>
+          <option>コメントが多い順</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>件名</th>
+            <th>投稿者</th>
+            <th class="num">賛成 / 反対</th>
+            <th class="num">💬</th>
+            <th>評価</th>
+            <th>あなた</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">夜間配送の集約</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>鈴木 花子</span></td>
+            <td class="num"><span class="vote-agree">▲12</span> / <span class="vote-disagree">▼3</span></td>
+            <td class="num">8</td>
+            <td><span class="badge badge-muted">3/5 評価</span></td>
+            <td><span class="badge badge-danger">未投票</span></td>
+          </tr>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">置き配の写真通知</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">佐</span></span>佐藤 大輔</span></td>
+            <td class="num"><span class="vote-agree">▲15</span> / <span class="vote-disagree">▼5</span></td>
+            <td class="num">4</td>
+            <td><span class="badge">評価待ち</span></td>
+            <td><span class="badge badge-success">投票済</span></td>
+          </tr>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">再配達の予測AI</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">田</span></span>田中 一郎</span></td>
+            <td class="num"><span class="vote-agree">▲9</span> / <span class="vote-disagree">▼2</span></td>
+            <td class="num">6</td>
+            <td><span class="badge badge-success">5/5 評価</span></td>
+            <td><span class="badge badge-success">投票済</span></td>
+          </tr>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">配送ルートの動的最適化</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">山</span></span>山田 太郎</span></td>
+            <td class="num"><span class="vote-agree">▲7</span> / <span class="vote-disagree">▼1</span></td>
+            <td class="num">3</td>
+            <td><span class="badge">評価待ち</span></td>
+            <td><span class="badge badge-muted">自分の投稿</span></td>
+          </tr>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">ドローン配送の実証</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">高</span></span>高橋 実</span></td>
+            <td class="num"><span class="vote-agree">▲5</span> / <span class="vote-disagree">▼8</span></td>
+            <td class="num">12</td>
+            <td><span class="badge badge-muted">2/5 評価</span></td>
+            <td><span class="badge badge-danger">未投票</span></td>
+          </tr>
+          <tr class="row-link" data-href="SC-22_アイデア詳細.html">
+            <td><span class="idea-title">梱包資材の削減</span></td>
+            <td><span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">伊</span></span>伊藤 彩</span></td>
+            <td class="num"><span class="vote-agree">▲11</span> / <span class="vote-disagree">▼0</span></td>
+            <td class="num">2</td>
+            <td><span class="badge">評価待ち</span></td>
+            <td><span class="badge badge-success">投票済</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== パーティー ===== -->
+  <section class="tab-panel" id="tab-party" role="tabpanel" hidden>
+    <div class="list-toolbar">
+      <div class="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
+      <button class="btn btn-outline btn-sm" type="button" id="editPartyBtn">パーティー・権限を編集</button>
+    </div>
+    <div class="card" style="padding:0">
+      <ul class="member-list">
+        <li class="member-row">
+          <span class="avatar" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+          <span class="member-name">山田 太郎</span>
+          <span class="member-perms"><span class="badge">👑 所有者</span></span>
+        </li>
+        <li class="member-row">
+          <span class="avatar" data-name="鈴木 花子"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.12</span></span>
+          <span class="member-name">鈴木 花子</span>
+          <span class="member-perms"><span class="badge badge-muted">評価者</span><span class="badge badge-muted">投票</span><span class="badge badge-muted">作成</span><span class="badge badge-muted">コメント</span></span>
+        </li>
+        <li class="member-row">
+          <span class="avatar" data-name="佐藤 大輔"><span class="avatar__img placeholder">佐</span><span class="avatar__level">Lv.3</span></span>
+          <span class="member-name">佐藤 大輔</span>
+          <span class="member-perms"><span class="badge badge-muted">評価者</span><span class="badge badge-muted">投票</span><span class="badge badge-muted">作成</span><span class="badge badge-muted">コメント</span></span>
+        </li>
+        <li class="member-row">
+          <span class="avatar" data-name="田中 一郎"><span class="avatar__img placeholder">田</span><span class="avatar__level">Lv.9</span></span>
+          <span class="member-name">田中 一郎</span>
+          <span class="member-perms"><span class="badge badge-muted">クエスト管理</span><span class="badge badge-muted">投票</span><span class="badge badge-muted">作成</span><span class="badge badge-muted">コメント</span></span>
+        </li>
+        <li class="member-row">
+          <span class="avatar" data-name="高橋 実"><span class="avatar__img placeholder">高</span><span class="avatar__level">Lv.5</span></span>
+          <span class="member-name">高橋 実</span>
+          <span class="member-perms"><span class="badge badge-muted">投票</span><span class="badge badge-muted">作成</span><span class="badge badge-muted">コメント</span></span>
+        </li>
+        <li class="member-row">
+          <span class="avatar" data-name="伊藤 彩"><span class="avatar__img placeholder">伊</span><span class="avatar__level">Lv.8</span></span>
+          <span class="member-name">伊藤 彩</span>
+          <span class="member-perms"><span class="badge badge-muted">投票</span><span class="badge badge-muted">作成</span><span class="badge badge-muted">コメント</span></span>
+        </li>
+      </ul>
+    </div>
+    <p class="hint" style="margin-top:var(--space-3)">※ 新規参加メンバーの既定権限＝投票＋アイデア作成＋コメント。評価者/クエスト管理などは所有者/管理権限者が付与。</p>
+  </section>
+
+  <!-- ===== 概要 ===== -->
+  <section class="tab-panel" id="tab-about" role="tabpanel" hidden>
+    <div class="card">
+      <dl class="def-list">
+        <dt>ステータス</dt><dd><span class="badge badge-success">評価中</span></dd>
+        <dt>カテゴリー</dt><dd>業務改善</dd>
+        <dt>目的・テーマ</dt><dd>配送コストと CO2 削減の両立を実現するアイデアを集める。現状は拠点ごとの小口配送で積載率が低く、コスト・環境負荷ともに課題がある。</dd>
+        <dt>期限日</dt><dd>2026/12/20（あと3日）</dd>
+        <dt>クエストグループ</dt><dd>プロダクト開発部</dd>
+        <dt>所有者</dt><dd>山田 太郎</dd>
+        <dt>作成日</dt><dd>2026/11/15</dd>
+        <dt>アイデア数</dt><dd>6件</dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<!-- ============ クエスト編集モーダル（SC-11 相当・所有者/管理権限） ============ -->
+<div class="modal" id="questModal" hidden role="dialog" aria-modal="true" aria-labelledby="questModalTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" style="max-width:560px">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="questModalTitle" style="margin-bottom:var(--space-4)">クエストを編集</h2>
+    <div class="field">
+      <label>カテゴリー</label>
+      <div class="combobox" data-combobox>
+        <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
+          <span class="combobox__value">業務改善</span><span class="combobox__arrow">▾</span>
+        </button>
+        <ul class="combobox__list" role="listbox" hidden>
+          <li class="combobox__option" role="option" aria-selected="true">業務改善</li>
+          <li class="combobox__option" role="option">新規事業</li>
+          <li class="combobox__option" role="option">コスト削減</li>
+          <li class="combobox__option" role="option">顧客体験</li>
+          <li class="combobox__option" role="option">自由入力…</li>
+        </ul>
+      </div>
+    </div>
+    <div class="field"><label>目的・テーマ</label><textarea class="textarea" id="qTheme">配送コストと CO2 削減の両立を実現するアイデアを集める。</textarea></div>
+    <div class="field"><label>期限日</label><input class="input" type="date" value="2026-12-20"></div>
+    <div class="field"><label>クエストグループ</label>
+      <select class="select"><option>プロダクト開発部</option><option>全社改善プロジェクト</option></select></div>
+    <div class="field"><label>パーティー・権限</label>
+      <div class="hint">同一クエストグループの所属者から追加/削除、メンバーごとの権限（評価者/クエスト管理 等）を付与/剥奪（本番は SC-11 のメンバー・権限UI）。</div></div>
+    <div class="modal__foot">
+      <button class="btn btn-primary" type="button" data-close>保存する</button>
+      <button class="btn btn-outline" type="button" data-close>閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ アイデア作成モーダル（SC-21 相当・アイデア作成権限） ============ -->
+<div class="modal" id="ideaModal" hidden role="dialog" aria-modal="true" aria-labelledby="ideaModalTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" style="max-width:560px">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="ideaModalTitle" style="margin-bottom:var(--space-1)">アイデアを追加</h2>
+    <p class="muted text-sm" style="margin-top:0">クエスト「配送ルート最適化」に投稿します。投稿すると XP・コインを獲得します。</p>
+    <div class="field"><label>件名<span class="req">*</span></label><input class="input" placeholder="アイデアの件名"></div>
+    <div class="field"><label>価値<span class="req">*</span></label><input class="input" placeholder="このアイデアがもたらす価値"></div>
+    <div class="field"><label>アイデア本文<span class="req">*</span></label><textarea class="textarea" placeholder="どんなアイデア？"></textarea></div>
+    <div class="field"><label>タイムリミット（任意）</label><input class="input" type="date"></div>
+    <div class="field"><label>関連資料</label><div class="hint">ファイル添付は任意（本番は SC-21 の添付UI）。</div></div>
+    <div class="modal__foot">
+      <button class="btn btn-primary" type="button" data-close>投稿する</button>
+      <button class="btn btn-outline" type="button" data-close>下書き保存して閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // --- 背景画像（ダッシュボードで設定した個人背景を全画面へ反映） ---
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) {
+    const appBg = document.getElementById('appBg');
+    appBg.style.backgroundImage = 'url("' + savedBg + '")';
+    appBg.classList.add('is-set');
+  }
+
+  // --- タブ切替 ---
+  const tabs = Array.from(document.querySelectorAll('.tab'));
+  const panels = { ideas: 'tab-ideas', party: 'tab-party', about: 'tab-about' };
+  function activateTab(name) {
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', String(on));
+    });
+    Object.entries(panels).forEach(([k, id]) => { document.getElementById(id).hidden = (k !== name); });
+  }
+  tabs.forEach(t => t.addEventListener('click', () => activateTab(t.dataset.tab)));
+
+  // --- テーブル行クリックで詳細へ（本番は Intercept Route でモーダル差し込み） ---
+  document.querySelectorAll('tr.row-link').forEach(tr => {
+    tr.addEventListener('click', () => { /* location.href = tr.dataset.href; */ });
+  });
+
+  // --- モーダル開閉（登録・編集はモーダル標準：フェード＋わずかにスケール） ---
+  function openModal(modal) {
+    const panel = modal.querySelector('.modal__panel');
+    modal.hidden = false;
+    if (!prefersReduced) { panel.style.opacity = '0'; panel.style.transform = 'scale(.96)'; }
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+      if (!prefersReduced) { panel.style.transition = 'opacity .2s ease, transform .2s ease'; panel.style.opacity = '1'; panel.style.transform = ''; }
+    });
+  }
+  function closeModal(modal) {
+    modal.classList.remove('show'); modal.hidden = true;
+    const panel = modal.querySelector('.modal__panel');
+    panel.style.transition = ''; panel.style.opacity = ''; panel.style.transform = '';
+  }
+  function wireModal(modal) {
+    modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(modal); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(modal); });
+  }
+  const questModal = document.getElementById('questModal');
+  const ideaModal = document.getElementById('ideaModal');
+  wireModal(questModal); wireModal(ideaModal);
+  document.getElementById('editQuestBtn').addEventListener('click', () => openModal(questModal));
+  document.getElementById('editPartyBtn').addEventListener('click', () => openModal(questModal));
+  document.getElementById('addIdeaBtn').addEventListener('click', () => openModal(ideaModal));
+</script>
+
+</body>
+</html>
