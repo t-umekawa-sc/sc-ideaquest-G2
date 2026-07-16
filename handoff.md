@@ -11,15 +11,18 @@
 
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
-- 直近コミット（新しい順）:
-  - `319e4cd` 画面遷移図を確定（アイデア一覧内包・クエスト直行・実績/ランキング追加）
-  - `333a60e` 画面遷移図ドラフトを追加し、アカウントは管理者発行のみに決定
-  - `b3b8b03` Decide idea visibility, chat attach/mention/notify, MinIO attachments
-  - `1015ec2` Default vote anonymization ON; add manager-visibility toggle
-  - `3f3a095` Fix tech stack: Next.js front, FastAPI backend, PostgreSQL
-  - `1797ff1` Adopt VRM avatars with part-swap dressing for 5 slots
-  - （以前: 装備仕様/評価重み/XP・コイン/権限モデル/投票/マルチテナント構成 等）
-- 作業ツリーはクリーン（未コミットの変更なし。この handoff 更新を除く）。
+- 直近コミット（新しい順・2026-07-16 時点。全履歴は `git log`）:
+  - `9583d79` SC-12: タブに左アイコン追加、所有者名の左にアバター表示
+  - `2a183eb` SC-12にクエスト内の日本語全文検索タブを追加
+  - `f5512f5` ダッシュボードの未投票・フォロー中パネルに投稿者情報を追加
+  - `1a323ab` クエストアイコン機能を追加(未設定は件名頭文字+所有者アバター)
+  - `f96b61e` 一覧標準(検索+フィルター+並び替え)を定義しアイデア一覧に実装
+  - `4842624` SC-12にクエスト内週間ランキングを追加
+  - `4750ef8` SC-12 クエスト詳細のモック＋画面設計を追加
+  - `c467d22` コンテンツ背景画像のパーソナライズ機能を追加
+  - `64f8029` 未投票アイデアの投票ショートカット / `ff857db` `994026c` 下書き / `7df5b95` フォロー・モーダルUI標準
+  - （以前: SC-00/SC-01 モック・デザイン標準・MFA・要件確定 等）
+- **今日（2026-07-16）は SC-12 まで完了して終了。作業ツリーはクリーン（この handoff 更新を push すれば同期）。**
 - 運用ルール: 要件を1つ決めるごとに `doc/要件定義/README.md`＋この handoff を更新し、**ユーザー承認のうえコミット＆プッシュ**する。README が唯一の要件定義書。
 - 要件定義ドキュメントは日本語で記述。
 
@@ -39,7 +42,7 @@ sc-ideaquest-G2/
 │       │   ├── style-guide.html ← 目視確認用スタイルガイド（ブラウザで直接開く）
 │       │   ├── SC-00_ログイン.html ← SC-00 ログイン画面モック（背景画像＋2状態）
 │       │   ├── SC-01_ダッシュボード.html ← SC-01 ダッシュボードモック（上部2カラム=左ヒーロー＋右週間ランキング／下段）
-│       │   ├── SC-12_クエスト詳細.html ← SC-12 クエスト詳細モック（ヘッダー＋タブ〔アイデア/パーティー/概要〕・アイデア一覧テーブル）
+│       │   ├── SC-12_クエスト詳細.html ← SC-12 クエスト詳細モック（ヘッダー＋クエスト内週間ランキング／タブ〔💡アイデア/👥パーティー/🔍全文検索/📋概要〕・アイデア一覧テーブル）
 │       │   └── assets/
 │       │       ├── logo-ideaquest.png ← 正式ロゴ（紋章＋ワードマーク・**白背景を透過加工済み**）
 │       │       ├── mascot-hero.png    ← マスコット（青マントの剣士ドット絵・背景透過済み）
@@ -141,8 +144,10 @@ sc-ideaquest-G2/
   - **UI標準: 登録・編集・（一覧/ダッシュボードから開く）詳細はモーダルダイアログを確定（2026-07-16）**: SC-11・SC-21 は個別画面でなく**モーダル**。本番は **Next.js Parallel Routes（@modal）＋ Intercept Routes（(.)）** で URL を持つモーダル（リロード/直アクセスはフルページ）。パネル/カード→モーダルの拡大は **framer-motion `layoutId`**（共有要素アニメーション）。デザイン標準.md に `.modal` 標準を追記。モックは vanilla JS の FLIP 簡易版で実演。
   - **クエストアイコンを確定（2026-07-16）**: クエストごとに**アイコン画像を任意設定**でき、**未設定時は「件名の頭文字タイル＋所有者アバターを右下に重ねた」フォールバック**を自動描画。共通コンポーネント `.quest-icon`（`.sm/.lg`・`__img`/`__char`/`__owner`）を shared.css に追加。設定は作成/編集モーダル（SC-11）。表示は SC-12ヘッダー・SC-01参加中クエストカード（＋今後のクエスト一覧）。実体は MinIO・`Quest.icon_image_path`。README（FR-20・Quest）／デザイン標準／SC-12・SC-01 に反映。
   - **全文検索タブ（クエスト内・日本語）を追加（2026-07-16）**: SC-12 に **`🔍 全文検索` タブ**。**アイデアの件名/本文/価値/備考＋チャット本文**を日本語全文検索し、**種別バッジ＋所属アイデア＋ハイライト付きスニペット**で表示、クリックで SC-22/SC-24 へ。対象フィルタ（すべて/アイデア/チャット）・件数・空表示あり。**エンジンは PGroonga 推奨（分かち書き不要・DB内完結・要ユーザー確認）／代替 pg_bigm／将来 Meilisearch・OpenSearch**。モックはクライアント側の部分一致＋ハイライトで再現。FR-31・技術スタック・第12節／画面遷移図／SC-12（4.2b・API）に反映。**残：エンジン確定・索引/更新方式・添付名を対象に含めるか**。
-  - **SC-12 クエスト詳細 = 完了（2026-07-16）**（モック `mocks/SC-12_クエスト詳細.html` ＋画面設計 `screens/SC-12_クエスト詳細.md`）。**上部2カラム＝左クエストヘッダー（カテゴリー/ステータス/件名/目的テーマ/メタ＋アクション）＋右クエスト内週間ランキング**（`.rank-panel` を shared.css に昇格し全社ランキングと共用。スコア＝当該クエストの活動で得たXP＋コインの合算・週次・Activity.quest_id で集計）。下に**タブ切替〔アイデア/パーティー/概要〕**。**アイデア一覧に一覧標準（検索＋フィルター〔状態/評価〕＋並び替え＋件数/空表示）を実装**（`.list-toolbar`/`.list-count`/`.list-empty` を shared.css に昇格＝全一覧の標準）。**アイデア一覧＝テーブル（行リスト：件名/投稿者/賛成反対/コメント/評価/自分の状態）**、行クリックで SC-22。**アイデア追加＝SC-21モーダル／クエスト編集・パーティー権限編集＝SC-11モーダル**（登録編集はモーダル標準）。テーブル標準 `.table`/`.table-wrap` を shared.css に追加（タブ `.tabs` はSC-12ローカル）。背景画像(.app-bg)も反映。残TBD（ページング/絞り込み・タブURL保持・SC-22モーダル差し込み範囲・締切後の可否ルール）は画面設計md 第9節。
-  - **次回の着手候補: SC-22 アイデア詳細**（本文・投票・評価結果・添付・チャット導線／投票はインライン・SC-12からモーダル差し込み想定）。以降 SC-24チャット → SC-25評価 …。
+  - **SC-12 クエスト詳細 = 完了（2026-07-16）**（モック `mocks/SC-12_クエスト詳細.html` ＋画面設計 `screens/SC-12_クエスト詳細.md`）。**上部2カラム＝左クエストヘッダー（カテゴリー/ステータス/件名/目的テーマ/メタ＋アクション）＋右クエスト内週間ランキング**（`.rank-panel` を shared.css に昇格し全社ランキングと共用。スコア＝当該クエストの活動で得たXP＋コインの合算・週次・Activity.quest_id で集計）。**ヘッダーにクエストアイコン（未設定=件名頭文字＋所有者アバター）・所有者名の左にアバター**。下に**タブ切替〔💡アイデア/👥パーティー/🔍全文検索/📋概要〕（各タブ左にアイコン）**。**アイデア一覧に一覧標準（検索＋フィルター〔状態/評価〕＋並び替え＋件数/空表示）を実装**（`.list-toolbar`/`.list-count`/`.list-empty` を shared.css に昇格＝全一覧の標準）。**アイデア一覧＝テーブル（行リスト：件名/投稿者/賛成反対/コメント/評価/自分の状態）**、行クリックで SC-22。**アイデア追加＝SC-21モーダル／クエスト編集・パーティー権限編集＝SC-11モーダル**（登録編集はモーダル標準）。テーブル標準 `.table`/`.table-wrap` を shared.css に追加（タブ `.tabs` はSC-12ローカル）。背景画像(.app-bg)も反映。残TBD（ページング/絞り込み・タブURL保持・SC-22モーダル差し込み範囲・締切後の可否ルール）は画面設計md 第9節。
+  - **▶ 次回すぐやること: SC-22 アイデア詳細** のモック＋画面設計（本文・投票・評価結果・添付・チャット導線／投票はインライン・SC-12からモーダル差し込み想定）。情報密度が高いので軽ワイヤー→モック→設計の順。以降 SC-24チャット → SC-25評価 → SC-10クエスト一覧 → SC-11/SC-21（モーダルだがフルページ版も）…。
+  - **▶ 未確定でユーザー確認待ち（次回冒頭で確認推奨）**: ①**全文検索エンジン**＝PGroonga 推奨で記載済み（代替 pg_bigm／将来 Meilisearch・OpenSearch）だが最終確定していない。②全文検索で**添付ファイル名も対象に含めるか**。③各画面の残TBD（下記＆各画面設計md 最終節）。
+  - **モックの作り方メモ（重要）**: 新規モックは必ず `shared.css`（＋必要なら `shared.js`）を読み込む。共通コンポーネントは shared.css に昇格済み＝`.btn`系/`.card`/`.badge`/`.avatar`/`.quest-icon`/`.poster`/`.table`(+`.table-wrap`)/`.list-toolbar`(+`.list-count`/`.list-empty`)/`.modal`系/`.rank-panel`/`.app-bg`/`.checkbox`/`.combobox`/`.pixel-*`/`.mascot` 等。**登録・編集・詳細はモーダル標準**（本番=Next.js Parallel/Intercept Routes、パネル→モーダル拡大は framer-motion `layoutId`。モックは vanilla JS の FLIP＝SC-01の `flipOpen/flipClose` を参考）。背景画像 `.app-bg` は全認証画面で `localStorage('ideaquest_content_bg')` を復元して反映する（SC-12 のスクリプト参照）。
   - **デザイン標準で今後決める小items**: トグルスイッチ `.switch`（管理画面のON/OFF設定向け・優先度高）／ダークモード要否／ドット絵スプライト素材規格／アイコンセット／コントラスト最終チェック。
 - **並行して残る要件TBD（優先順）**:
   1. **XP日次上限の具体値**・コイン付与の確定タイミング（評価締切一括 or 都度再計算）・レベル上限の要否。
@@ -154,7 +159,8 @@ sc-ideaquest-G2/
 
 **2層のDBに分かれる**。
 - 管理DB（システム共通）: Company（会社/テナント）, Account（ログインID/認証/所属Company/システムロール）, AccountQuestGroup（アカウント×クエストグループ所属）, 運用監査ログ。
-- 会社DB（会社ごと物理分離）: User / QuestGroup（クエストグループ）/ QuestGroupMember（User×QuestGroup 多対多）/ Quest（quest_group_id・owner_id・status〔下書き含む〕保持）/ QuestMember（パーティー、候補は同一グループ所属者）/ QuestMemberPermission（権限）/ Idea（status〔下書き/公開〕）/ Attachment（パス＋元名・MinIO実体）/ Vote / **Follow（User×Idea アイデアフォロー＝ウォッチ）** / ChatGroup / ChatMessage（添付・メンション）/ Notification（アプリ内通知・フォロー中アイデアの動きも通知）/ Evaluation / EvaluationScore / Item(Equipment) / UserItem / Transaction(Activity)。
-- 添付実体は MinIO（S3互換オブジェクトストレージ・Dockerコンテナ）に保管。
+- 会社DB（会社ごと物理分離）: User（＋`background_image_path`＝コンテンツ背景画像・任意）/ QuestGroup（クエストグループ）/ QuestGroupMember（User×QuestGroup 多対多）/ Quest（quest_group_id・owner_id・status〔下書き含む〕・`icon_image_path`〔アイコン・任意〕保持）/ QuestMember（パーティー、候補は同一グループ所属者）/ QuestMemberPermission（権限）/ Idea（status〔下書き/公開〕）/ Attachment（パス＋元名・MinIO実体）/ Vote / **Follow（User×Idea アイデアフォロー＝ウォッチ）** / ChatGroup / ChatMessage（添付・メンション）/ Notification（アプリ内通知・フォロー中アイデアの動きも通知）/ Evaluation / EvaluationScore / Item(Equipment) / UserItem / Transaction(Activity)（`quest_id`＝クエスト内ランキング集計用）。
+- 添付・各種アップロード画像（背景/クエストアイコン）の実体は MinIO（S3互換オブジェクトストレージ・Dockerコンテナ）に保管。
+- **全文検索（FR-31）**: 会社DBの Idea（件名/本文/価値/備考）＋ChatMessage（本文）に日本語全文索引。エンジンは **PGroonga 推奨（要確認）** ／代替 pg_bigm。
 - プロビジョニング（確定）: MVPは **docker compose 単一ファイルを手編集**して会社DBを追記（運用コスト最小）。**DB接続情報は .env で管理**。将来は自動化/k8s＋Operatorを検討。
 - 未決: テナント数上限・リソース設計、管理DB↔会社DBのUser/クエストグループ所属の同期・配置。
