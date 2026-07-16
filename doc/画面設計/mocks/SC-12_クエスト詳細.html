@@ -39,6 +39,18 @@
   .idea-title { font-weight: 600; color: var(--color-text); }
   .row-link:hover .idea-title { color: var(--color-primary); }
 
+  /* 全文検索の入力欄はプレースホルダーが収まる幅に（狭い画面では 100% まで） */
+  #ftq { width: 360px; max-width: 100%; }
+  /* --- 全文検索の結果 --- */
+  .ft-result { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, border-color .15s, transform .05s; }
+  .ft-result:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+  .ft-result:active { transform: translateY(1px); }
+  .ft-result__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .ft-result__ctx { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .ft-result__snippet { margin: 0; font-size: var(--text-sm); line-height: 1.7; }
+  .ft-result__link { display: inline-block; margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-primary); }
+  mark { background: #FEF08A; color: inherit; padding: 0 1px; border-radius: 2px; }
+
   /* --- パーティー一覧 --- */
   .member-list { list-style: none; margin: 0; padding: 0; }
   .member-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
@@ -138,6 +150,7 @@
   <div class="tabs" role="tablist" aria-label="クエスト詳細のセクション">
     <button class="tab is-active" role="tab" aria-selected="true" aria-controls="tab-ideas" data-tab="ideas">アイデア <span class="tab-count">6</span></button>
     <button class="tab" role="tab" aria-selected="false" aria-controls="tab-party" data-tab="party">パーティー <span class="tab-count">6</span></button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="tab-search" data-tab="search">🔍 全文検索</button>
     <button class="tab" role="tab" aria-selected="false" aria-controls="tab-about" data-tab="about">概要</button>
   </div>
 
@@ -241,6 +254,24 @@
       </table>
     </div>
     <div class="list-empty" id="ideaEmpty" hidden>該当するアイデアがありません。条件を変えてお試しください。</div>
+  </section>
+
+  <!-- ===== 全文検索（件名・アイデア・価値・備考・チャットを日本語全文検索） ===== -->
+  <section class="tab-panel" id="tab-search" role="tabpanel" hidden>
+    <div class="list-toolbar">
+      <div class="filters">
+        <input class="input" type="search" id="ftq" placeholder="キーワードで全文検索" aria-label="全文検索（件名・アイデア・価値・備考・チャット）">
+        <select class="select" id="ftScope" aria-label="検索対象">
+          <option value="">対象: すべて</option>
+          <option value="idea">アイデア（件名/本文/価値/備考）</option>
+          <option value="chat">チャット</option>
+        </select>
+      </div>
+      <span class="list-count" id="ftCount"></span>
+    </div>
+    <div id="ftResults" class="stack"></div>
+    <div class="list-empty" id="ftEmpty">キーワードを入力してください（このクエスト内のアイデアとチャットを検索）。</div>
+    <p class="hint" style="margin-top:var(--space-3)">※ 検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>（このクエスト内）。日本語全文検索の実装は PostgreSQL の <strong>PGroonga（推奨）</strong> 等で分かち書き不要・ランキング・ハイライトに対応（詳細は画面設計 SC-12）。</p>
   </section>
 
   <!-- ===== パーティー ===== -->
@@ -385,7 +416,7 @@
 
   // --- タブ切替 ---
   const tabs = Array.from(document.querySelectorAll('.tab'));
-  const panels = { ideas: 'tab-ideas', party: 'tab-party', about: 'tab-about' };
+  const panels = { ideas: 'tab-ideas', party: 'tab-party', search: 'tab-search', about: 'tab-about' };
   function activateTab(name) {
     tabs.forEach(t => {
       const on = t.dataset.tab === name;
@@ -490,6 +521,57 @@
     const r = new FileReader(); r.onload = () => setQuestIcon(r.result); r.readAsDataURL(f); qiInput.value = '';
   });
   qiClear.addEventListener('click', () => setQuestIcon(null));
+
+  // --- 全文検索（件名・アイデア本文・価値・備考・チャットを日本語で検索） ---
+  // モックはクライアント側の部分一致＋ハイライトで挙動を再現。
+  // 本番は会社DBの全文索引（PGroonga 推奨）でランキング・スニペットを取得する。
+  const ftq = document.getElementById('ftq');
+  const ftScope = document.getElementById('ftScope');
+  const ftResults = document.getElementById('ftResults');
+  const ftEmpty = document.getElementById('ftEmpty');
+  const ftCount = document.getElementById('ftCount');
+  // このクエスト内の検索対象（種別・フィールド・所属アイデア・本文・遷移先）
+  const FT_DATA = [
+    { type: 'idea', field: '件名', idea: '夜間配送の集約', text: '夜間配送の集約', target: 'アイデア詳細 (SC-22)' },
+    { type: 'idea', field: 'アイデア本文', idea: '夜間配送の集約', text: '現状は拠点ごとに小口配送しており積載率が低い。夜間の集約便を設定し、翌朝に各拠点へ再配分することで台数を削減できる。試算では月間15%の配送コスト削減。', target: 'アイデア詳細 (SC-22)' },
+    { type: 'idea', field: '価値', idea: '夜間配送の集約', text: '夜間帯の配送を1拠点に集約し、積載率を上げて配送コストとCO2を同時に削減する。', target: 'アイデア詳細 (SC-22)' },
+    { type: 'idea', field: '備考・特記事項', idea: '夜間配送の集約', text: '倉庫の夜間稼働には労務面の調整が必要。試験導入は東京拠点から段階的に。', target: 'アイデア詳細 (SC-22)' },
+    { type: 'idea', field: '価値', idea: '置き配の写真通知', text: '置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。', target: 'アイデア詳細 (SC-22)' },
+    { type: 'idea', field: 'アイデア本文', idea: '再配達の予測AI', text: '過去の配達実績から不在になりやすい時間帯を予測し、配送前に受取人へリマインドして再配達を減らす。', target: 'アイデア詳細 (SC-22)' },
+    { type: 'chat', field: 'チャット', idea: '夜間配送の集約', text: '鈴木: 夜間の集約なら積載率がかなり上がりそうですね。倉庫の稼働時間だけ要調整です。', target: 'チャット (SC-24)' },
+    { type: 'chat', field: 'チャット', idea: '置き配の写真通知', text: '佐藤: 写真通知は再配達の削減に効きそう。プライバシーの配慮だけ検討しましょう。', target: 'チャット (SC-24)' },
+    { type: 'chat', field: 'チャット', idea: '再配達の予測AI', text: '田中: 予測モデルの学習データは配送ログから。まずデータ整備が必要かもしれません。', target: 'チャット (SC-24)' },
+  ];
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  function snippet(text, q) {
+    const pos = text.indexOf(q), W = 36;
+    let start = 0, prefix = '', suffix = '';
+    if (pos > W) { start = pos - W; prefix = '…'; }
+    const end = Math.min(text.length, pos + q.length + W);
+    if (end < text.length) suffix = '…';
+    const html = esc(text.slice(start, end)).split(esc(q)).join('<mark>' + esc(q) + '</mark>');
+    return prefix + html + suffix;
+  }
+  function runSearch() {
+    const q = ftq.value.trim(), scope = ftScope.value;
+    if (!q) { ftResults.innerHTML = ''; ftCount.textContent = ''; ftEmpty.hidden = false;
+      ftEmpty.textContent = 'キーワードを入力してください（このクエスト内のアイデアとチャットを検索）。'; return; }
+    const hits = FT_DATA.filter((r) => (!scope || r.type === scope) && r.text.includes(q));
+    ftCount.textContent = hits.length + '件';
+    if (!hits.length) { ftResults.innerHTML = ''; ftEmpty.hidden = false;
+      ftEmpty.textContent = '「' + q + '」に一致する結果がありません。'; return; }
+    ftEmpty.hidden = true;
+    ftResults.innerHTML = hits.map((r) => {
+      const cls = r.type === 'chat' ? 'badge badge-muted' : 'badge';
+      const ctx = r.type === 'chat' ? ('アイデア: ' + r.idea + ' のチャット') : ('アイデア: ' + r.idea);
+      return '<a class="card ft-result" href="#">'
+        + '<div class="ft-result__head"><span class="' + cls + '">' + r.field + '</span><span class="ft-result__ctx">' + esc(ctx) + '</span></div>'
+        + '<p class="ft-result__snippet">' + snippet(r.text, q) + '</p>'
+        + '<span class="ft-result__link">→ ' + r.target + '</span></a>';
+    }).join('');
+  }
+  ftq.addEventListener('input', runSearch);
+  ftScope.addEventListener('change', runSearch);
 </script>
 
 </body>
