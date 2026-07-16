@@ -141,6 +141,13 @@ img { max-width: 100%; display: block; }
 .brand-logo { height: 40px; width: auto; display: block; }
 .brand-logo.lg { height: 96px; }   /* ログイン画面など大きく見せる場面用 */
 
+/* コンテンツ領域の背景画像（ユーザー個人設定・全認証画面に反映）
+   本文の背後(z-index:-1)に固定レイヤーを敷き、可読性のため薄い明色スクリムを重ねる。
+   設定UI（アップロードボタン）はダッシュボード、実体は MinIO・User.background_image_path。
+   本番は認証済みレイアウトに配置し全画面共通で適用する。 */
+.app-bg { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.app-bg.is-set::after { content: ""; position: absolute; inset: 0; background: rgba(248, 250, 252, .82); }
+
 /* =============================================================
  * 5. ボタン
  * ============================================================= */
