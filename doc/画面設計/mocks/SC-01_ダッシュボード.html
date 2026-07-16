@@ -155,6 +155,8 @@
   .follow-card .card-title { padding-right: 28px; } /* ★ボタンと重ならない */
   .follow-quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
   .follow-value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* 投稿者行（未投票／フォロー中カード共通） */
+  .vote-card__poster, .follow-card__poster { margin-top: var(--space-3); }
   .follow-stats { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
   /* フォロー★（ON=ゴールド）。クリックはカードを開かずトグル */
   .follow-star { position: absolute; top: var(--space-4); right: var(--space-4); background: none; border: none; cursor: pointer;
@@ -359,10 +361,11 @@
         data-title="AI議事録の自動要約" data-quest="社内ナレッジ検索AI" data-cat="新規事業"
         data-value="会議音声から議事録と決定事項を自動生成し、共有の手間をなくす。"
         data-body="Web会議の録音をアップロードすると、文字起こし→要約→ToDo抽出まで自動化。参加者に自動配信する。"
-        data-agree="9" data-disagree="2">
+        data-agree="9" data-disagree="2" data-poster="田中 一郎" data-initial="田">
         <div class="between"><span class="card-title">AI議事録の自動要約</span><span class="badge badge-muted">未投票</span></div>
         <div class="vote-card__quest">社内ナレッジ検索AI ・ 新規事業</div>
         <div class="vote-card__value">会議音声から議事録と決定事項を自動生成し、共有の手間をなくす。</div>
+        <div class="vote-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">田</span></span><span class="name text-sm muted">投稿: 田中 一郎</span></div>
         <div class="vote-actions">
           <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
           <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
@@ -373,10 +376,11 @@
         data-title="置き配の写真通知" data-quest="配送ルート最適化" data-cat="顧客体験"
         data-value="置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。"
         data-body="配達員が置き配位置を撮影し、受取人にアプリ通知。盗難時の証跡にもなり、再配達コストを削減。"
-        data-agree="15" data-disagree="5">
+        data-agree="15" data-disagree="5" data-poster="佐藤 大輔" data-initial="佐">
         <div class="between"><span class="card-title">置き配の写真通知</span><span class="badge badge-muted">未投票</span></div>
         <div class="vote-card__quest">配送ルート最適化 ・ 顧客体験</div>
         <div class="vote-card__value">置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。</div>
+        <div class="vote-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">佐</span></span><span class="name text-sm muted">投稿: 佐藤 大輔</span></div>
         <div class="vote-actions">
           <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
           <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
@@ -387,10 +391,11 @@
         data-title="有給の取得を可視化" data-quest="経費精算の自動化" data-cat="業務改善"
         data-value="チームの有給取得状況を可視化し、取りやすい雰囲気をつくる。"
         data-body="部署ごとの有給取得率をダッシュボード化し、取得目標に対する進捗を見える化する。"
-        data-agree="6" data-disagree="1">
+        data-agree="6" data-disagree="1" data-poster="伊藤 彩" data-initial="伊">
         <div class="between"><span class="card-title">有給の取得を可視化</span><span class="badge badge-muted">未投票</span></div>
         <div class="vote-card__quest">経費精算の自動化 ・ 業務改善</div>
         <div class="vote-card__value">チームの有給取得状況を可視化し、取りやすい雰囲気をつくる。</div>
+        <div class="vote-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">伊</span></span><span class="name text-sm muted">投稿: 伊藤 彩</span></div>
         <div class="vote-actions">
           <span class="vote-quick agree" role="button" data-vote="agree" aria-label="賛成する">▲ 賛成</span>
           <span class="vote-quick disagree" role="button" data-vote="disagree" aria-label="反対する">▼ 反対</span>
@@ -476,11 +481,12 @@
         data-title="夜間配送の集約" data-quest="配送ルート最適化" data-cat="業務改善"
         data-value="夜間帯の配送を1拠点に集約し、積載率を上げて配送コストとCO2を同時に削減する。"
         data-body="現状は拠点ごとに小口配送しており積載率が低い。夜間の集約便を設定し、翌朝に各拠点へ再配分することで台数を削減できる。試算では月間15%のコスト削減。"
-        data-agree="12" data-disagree="3" data-comments="8">
+        data-agree="12" data-disagree="3" data-comments="8" data-poster="鈴木 花子" data-initial="鈴">
         <span class="follow-star" role="button" aria-label="フォロー解除" aria-pressed="true">★</span>
         <div class="card-title">夜間配送の集約</div>
         <div class="follow-quest">配送ルート最適化</div>
         <div class="follow-value">夜間帯の配送を1拠点に集約し、積載率を上げてコストとCO2を同時に削減。</div>
+        <div class="follow-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span><span class="name text-sm muted">投稿: 鈴木 花子</span></div>
         <div class="follow-stats">
           <span class="vote-agree">▲ 12</span>
           <span class="vote-disagree">▼ 3</span>
@@ -492,11 +498,12 @@
         data-title="FAQ自動生成" data-quest="社内ナレッジ検索AI" data-cat="新規事業"
         data-value="問い合わせ履歴からFAQを自動生成し、サポート工数を半減する。"
         data-body="過去の問い合わせとその回答をLLMで要約し、FAQ候補を自動生成。担当者は公開可否をレビューするだけで済む。"
-        data-agree="20" data-disagree="1" data-comments="15">
+        data-agree="20" data-disagree="1" data-comments="15" data-poster="佐藤 大輔" data-initial="佐">
         <span class="follow-star" role="button" aria-label="フォロー解除" aria-pressed="true">★</span>
         <div class="card-title">FAQ自動生成</div>
         <div class="follow-quest">社内ナレッジ検索AI</div>
         <div class="follow-value">問い合わせ履歴からFAQを自動生成し、サポート工数を半減。</div>
+        <div class="follow-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">佐</span></span><span class="name text-sm muted">投稿: 佐藤 大輔</span></div>
         <div class="follow-stats">
           <span class="vote-agree">▲ 20</span>
           <span class="vote-disagree">▼ 1</span>
@@ -508,11 +515,12 @@
         data-title="経費レシートOCR" data-quest="経費精算の自動化" data-cat="コスト削減"
         data-value="レシート撮影だけで経費入力が完了し、申請の手間をなくす。"
         data-body="スマホでレシートを撮影するとOCRで金額・日付・店舗を抽出し、経費申請フォームに自動入力する。"
-        data-agree="7" data-disagree="0" data-comments="4">
+        data-agree="7" data-disagree="0" data-comments="4" data-poster="田中 一郎" data-initial="田">
         <span class="follow-star" role="button" aria-label="フォロー解除" aria-pressed="true">★</span>
         <div class="card-title">経費レシートOCR</div>
         <div class="follow-quest">経費精算の自動化</div>
         <div class="follow-value">レシート撮影だけで経費入力が完了し、申請の手間をなくす。</div>
+        <div class="follow-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">田</span></span><span class="name text-sm muted">投稿: 田中 一郎</span></div>
         <div class="follow-stats">
           <span class="vote-agree">▲ 7</span>
           <span class="vote-disagree">▼ 0</span>
@@ -591,6 +599,7 @@
       <span class="badge badge-muted" id="modalCat">業務改善</span>
       <span class="badge" id="modalFollow">★ フォロー中</span>
     </div>
+    <div class="poster" style="margin-bottom:var(--space-2)"><span class="avatar sm"><span class="avatar__img placeholder" id="modalInitial">鈴</span></span><span class="name muted text-sm" id="modalPoster">投稿: —</span></div>
 
     <div class="modal__section-label">価値</div>
     <p id="modalValue" style="margin:0"></p>
@@ -686,6 +695,7 @@
       <span class="badge badge-muted" id="voteModalCat">カテゴリー</span>
       <span class="badge badge-draft">未投票</span>
     </div>
+    <div class="poster" style="margin-bottom:var(--space-2)"><span class="avatar sm"><span class="avatar__img placeholder" id="voteModalInitial">佐</span></span><span class="name muted text-sm" id="voteModalPoster">投稿: —</span></div>
 
     <div class="modal__section-label">価値</div>
     <p id="voteModalValue" style="margin:0"></p>
@@ -815,6 +825,8 @@
     document.getElementById('modalQuest').textContent = d.quest;
     document.getElementById('modalTitle').textContent = d.title;
     document.getElementById('modalCat').textContent = d.cat;
+    document.getElementById('modalInitial').textContent = d.initial || '';
+    document.getElementById('modalPoster').textContent = '投稿: ' + (d.poster || '');
     document.getElementById('modalValue').textContent = d.value;
     document.getElementById('modalBody').textContent = d.body;
     document.getElementById('modalAgree').textContent = '▲ 賛成 ' + d.agree;
@@ -876,6 +888,8 @@
     document.getElementById('voteModalQuest').textContent = d.quest;
     document.getElementById('voteModalTitle').textContent = d.title;
     document.getElementById('voteModalCat').textContent = d.cat;
+    document.getElementById('voteModalInitial').textContent = d.initial || '';
+    document.getElementById('voteModalPoster').textContent = '投稿: ' + (d.poster || '');
     document.getElementById('voteModalValue').textContent = d.value;
     document.getElementById('voteModalBody').textContent = d.body;
     document.getElementById('voteModalAgree').textContent = '▲ 賛成 ' + d.agree;

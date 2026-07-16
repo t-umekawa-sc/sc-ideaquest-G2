@@ -337,6 +337,10 @@ img { max-width: 100%; display: block; }
 .avatar-group { display: inline-flex; }
 .avatar-group .avatar + .avatar { margin-left: -10px; }
 
+/* 投稿者などの「アバター＋氏名」インライン表示（一覧・カード・モーダルで共用） */
+.poster { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.poster .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* =============================================================
  * 7c. クエストアイコン
  *   カスタム画像を設定できる。未設定時のフォールバックは
