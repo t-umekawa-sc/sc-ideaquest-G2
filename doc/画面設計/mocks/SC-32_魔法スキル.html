@@ -22,8 +22,16 @@
   /* 使い方の注記 */
   .how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
 
-  /* 魔法カタログ */
+  /* 魔法カタログ（系統ごとの段階解放＝スキルツリー） */
+  .spell-line { margin-bottom: var(--space-6); }
+  .spell-line__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin: 0 0 var(--space-3); }
+  .spell-line__name { font-family: var(--font-pixel); font-size: var(--text-lg); }
+  .spell-line__sub { font-size: var(--text-xs); color: var(--color-text-muted); }
   .spell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+  /* 前提条件（下位の同系統） */
+  .spell-req { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .spell-req.met { color: var(--color-success); }
+  .spell-req.unmet { color: var(--color-warning); font-weight: 600; }
   .spell-card { display: flex; flex-direction: column; gap: var(--space-3); }
   .spell-card__head { display: flex; align-items: center; gap: var(--space-2); }
   .spell-card__icon { font-size: 26px; line-height: 1; }
@@ -93,7 +101,7 @@
         <span>▶ 解放した魔法は<strong>チャットの魔法リアクション</strong>で発動</span>
       </div>
       <div class="sp-hero__progress">
-        <div class="sp-hero__unlocked">解放 <span id="unlockedCount">4</span> / 6</div>
+        <div class="sp-hero__unlocked">解放 <span id="unlockedCount">3</span> / 6</div>
         <div class="sp-hero__label" style="opacity:.7">MAGIC UNLOCKED</div>
       </div>
     </div>
@@ -102,106 +110,77 @@
   <p class="how">
     魔法は<strong>装飾/社交演出のみ</strong>で、XP・評価・投票には影響しません。各魔法は
     <strong>1つのアイデアチャットにつき1回</strong>だけ発動でき、通常リアクション同様に<strong>取り消して別メッセージへ付け替え</strong>できます。
+    <strong>系統ごとに下位から順に解放</strong>（上位の解放には<strong>同系統の下位魔法が解放済み</strong>である必要があります）。
     発動は <a href="SC-24_アイデアチャット.html">アイデアチャット（SC-24）</a> のメッセージのリアクションから。
   </p>
 
   <h2 class="page-title" style="font-size:var(--text-xl)">魔法カタログ</h2>
-  <div class="spell-grid" id="spellGrid">
+  <div id="spellGrid">
 
-    <!-- 炎（コモン・解放済み） -->
-    <article class="card spell-card" data-spell="fire" data-unlocked="1" data-cost="1">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">🔥</span>
-        <span class="spell-card__name">炎</span>
-        <span class="badge rarity-common spell-card__rarity">コモン</span>
-      </div>
-      <div class="spell-preview spell-fx spell-fx--fire">メッセージ枠が燃え上がる 🔥</div>
-      <p class="spell-desc">対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 1 <span class="muted">SP</span></span>
-        <span class="spell-state">✓ 解放済み</span>
-      </div>
-    </article>
+    <!-- 烈火系（コモン→標準→レア） -->
+    <section class="spell-line" aria-label="烈火系">
+      <div class="spell-line__head"><span class="spell-line__name">🔥 烈火系</span><span class="spell-line__sub">下位から順に解放（コモン → 標準 → レア）</span></div>
+      <div class="spell-grid">
+        <article class="card spell-card" data-spell="fire" data-line="blaze" data-requires="" data-unlocked="1" data-cost="1">
+          <div class="spell-card__head"><span class="spell-card__icon">🔥</span><span class="spell-card__name">炎</span><span class="badge rarity-common spell-card__rarity">コモン</span></div>
+          <div class="spell-preview spell-fx spell-fx--fire">メッセージ枠が燃え上がる 🔥</div>
+          <p class="spell-desc">対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。</p>
+          <div class="spell-req">前提なし（烈火系の起点）</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 1 <span class="muted">SP</span></span><span class="spell-state">✓ 解放済み</span></div>
+        </article>
 
-    <!-- 氷（コモン・解放済み） -->
-    <article class="card spell-card" data-spell="ice" data-unlocked="1" data-cost="1">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">❄️</span>
-        <span class="spell-card__name">氷</span>
-        <span class="badge rarity-common spell-card__rarity">コモン</span>
-      </div>
-      <div class="spell-preview spell-fx spell-fx--ice">冷静に、と伝える青い光 ❄️</div>
-      <p class="spell-desc">冷たく澄んだ青のグロー。落ち着いた指摘・冷静な視点に。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 1 <span class="muted">SP</span></span>
-        <span class="spell-state">✓ 解放済み</span>
-      </div>
-    </article>
+        <article class="card spell-card" data-spell="thunder" data-line="blaze" data-requires="fire" data-unlocked="1" data-cost="2">
+          <div class="spell-card__head"><span class="spell-card__icon">⚡</span><span class="spell-card__name">雷</span><span class="badge rarity-standard spell-card__rarity">標準</span></div>
+          <div class="spell-preview spell-fx spell-fx--thunder">鋭い気づきに稲妻が走る ⚡</div>
+          <p class="spell-desc">黄色い閃光が明滅。鋭い指摘・ハッとする気づきに。</p>
+          <div class="spell-req" data-requires="fire">前提: 🔥 炎</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 2 <span class="muted">SP</span></span><span class="spell-state">✓ 解放済み</span></div>
+        </article>
 
-    <!-- 雷（標準・解放済み） -->
-    <article class="card spell-card" data-spell="thunder" data-unlocked="1" data-cost="2">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">⚡</span>
-        <span class="spell-card__name">雷</span>
-        <span class="badge rarity-standard spell-card__rarity">標準</span>
+        <article class="card spell-card" data-spell="rainbow" data-line="blaze" data-requires="thunder" data-unlocked="0" data-cost="3">
+          <div class="spell-card__head"><span class="spell-card__icon">🌈</span><span class="spell-card__name">虹</span><span class="badge rarity-rare spell-card__rarity">レア</span></div>
+          <div class="spell-preview spell-fx spell-fx--rainbow">多彩な視点をたたえる虹 🌈</div>
+          <p class="spell-desc">色相が回る多色グロー。斬新・多面的なアイデアへの最上級の賛辞。</p>
+          <div class="spell-req" data-requires="thunder">前提: ⚡ 雷</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 3 <span class="muted">SP</span></span><button class="btn-pixel btn-pixel--sm" type="button" data-unlock>解放する</button></div>
+        </article>
       </div>
-      <div class="spell-preview spell-fx spell-fx--thunder">鋭い気づきに稲妻が走る ⚡</div>
-      <p class="spell-desc">黄色い閃光が明滅。鋭い指摘・ハッとする気づきに。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 2 <span class="muted">SP</span></span>
-        <span class="spell-state">✓ 解放済み</span>
-      </div>
-    </article>
+    </section>
 
-    <!-- キラキラ（標準・解放済み） -->
-    <article class="card spell-card" data-spell="sparkle" data-unlocked="1" data-cost="2">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">✨</span>
-        <span class="spell-card__name">キラキラ</span>
-        <span class="badge rarity-standard spell-card__rarity">標準</span>
-      </div>
-      <div class="spell-preview spell-fx spell-fx--sparkle">素敵なアイデアに祝福を ✨</div>
-      <p class="spell-desc">紫の柔らかな輝き。称賛・応援のニュアンスに。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 2 <span class="muted">SP</span></span>
-        <span class="spell-state">✓ 解放済み</span>
-      </div>
-    </article>
+    <!-- 静輝系（コモン→標準→レア） -->
+    <section class="spell-line" aria-label="静輝系">
+      <div class="spell-line__head"><span class="spell-line__name">🌟 静輝系</span><span class="spell-line__sub">下位から順に解放（コモン → 標準 → レア）</span></div>
+      <div class="spell-grid">
+        <article class="card spell-card" data-spell="ice" data-line="glow" data-requires="" data-unlocked="1" data-cost="1">
+          <div class="spell-card__head"><span class="spell-card__icon">❄️</span><span class="spell-card__name">氷</span><span class="badge rarity-common spell-card__rarity">コモン</span></div>
+          <div class="spell-preview spell-fx spell-fx--ice">冷静に、と伝える青い光 ❄️</div>
+          <p class="spell-desc">冷たく澄んだ青のグロー。落ち着いた指摘・冷静な視点に。</p>
+          <div class="spell-req">前提なし（静輝系の起点）</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 1 <span class="muted">SP</span></span><span class="spell-state">✓ 解放済み</span></div>
+        </article>
 
-    <!-- 虹（レア・未解放） -->
-    <article class="card spell-card" data-spell="rainbow" data-unlocked="0" data-cost="3">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">🌈</span>
-        <span class="spell-card__name">虹</span>
-        <span class="badge rarity-rare spell-card__rarity">レア</span>
-      </div>
-      <div class="spell-preview spell-fx spell-fx--rainbow">多彩な視点をたたえる虹 🌈</div>
-      <p class="spell-desc">色相が回る多色グロー。斬新・多面的なアイデアへの最上級の賛辞。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 3 <span class="muted">SP</span></span>
-        <button class="btn-pixel btn-pixel--sm" type="button" data-unlock>解放する</button>
-      </div>
-    </article>
+        <article class="card spell-card" data-spell="sparkle" data-line="glow" data-requires="ice" data-unlocked="0" data-cost="2">
+          <div class="spell-card__head"><span class="spell-card__icon">✨</span><span class="spell-card__name">キラキラ</span><span class="badge rarity-standard spell-card__rarity">標準</span></div>
+          <div class="spell-preview spell-fx spell-fx--sparkle">素敵なアイデアに祝福を ✨</div>
+          <p class="spell-desc">紫の柔らかな輝き。称賛・応援のニュアンスに。</p>
+          <div class="spell-req" data-requires="ice">前提: ❄️ 氷</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 2 <span class="muted">SP</span></span><button class="btn-pixel btn-pixel--sm" type="button" data-unlock>解放する</button></div>
+        </article>
 
-    <!-- オーラ（レア・未解放） -->
-    <article class="card spell-card" data-spell="aura" data-unlocked="0" data-cost="3">
-      <div class="spell-card__head">
-        <span class="spell-card__icon">🌟</span>
-        <span class="spell-card__name">オーラ</span>
-        <span class="badge rarity-rare spell-card__rarity">レア</span>
+        <article class="card spell-card" data-spell="aura" data-line="glow" data-requires="sparkle" data-unlocked="0" data-cost="3">
+          <div class="spell-card__head"><span class="spell-card__icon">🌟</span><span class="spell-card__name">オーラ</span><span class="badge rarity-rare spell-card__rarity">レア</span></div>
+          <div class="spell-preview spell-fx spell-fx--aura">神々しい光をまとう 🌟</div>
+          <p class="spell-desc">エメラルドの光輪が脈動。特別なアイデアに、荘厳なオーラを。</p>
+          <div class="spell-req" data-requires="sparkle">前提: ✨ キラキラ</div>
+          <div class="spell-card__foot"><span class="spell-cost">✦ 3 <span class="muted">SP</span></span><button class="btn-pixel btn-pixel--sm" type="button" data-unlock>解放する</button></div>
+        </article>
       </div>
-      <div class="spell-preview spell-fx spell-fx--aura">神々しい光をまとう 🌟</div>
-      <p class="spell-desc">エメラルドの光輪が脈動。特別なアイデアに、荘厳なオーラを。</p>
-      <div class="spell-card__foot">
-        <span class="spell-cost">✦ 3 <span class="muted">SP</span></span>
-        <button class="btn-pixel btn-pixel--sm" type="button" data-unlock>解放する</button>
-      </div>
-    </article>
+    </section>
 
   </div>
 
   <p class="role-note" style="margin-top:var(--space-6); color:var(--color-text-muted); font-size:var(--text-xs)">
-    ※ 魔法カタログ・SPコスト・レアリティは<strong>初期値（調整可）</strong>。解放は SP を消費し恒久所有（`UserSpell`）。本番はサーバーで SP 残高・コストを検証。エフェクトは <code>spell-fx--*</code>（shared.css・SC-24 と共通）。
+    ※ 魔法カタログ・系統・SPコスト・レアリティは<strong>初期値（調整可）</strong>。解放は <strong>同系統の下位魔法が解放済み</strong>＋SP消費で恒久所有（`UserSpell`）。本番はサーバーで前提・SP残高・コストを検証。エフェクトは <code>spell-fx--*</code>（shared.css・SC-24 と共通）。
   </p>
 </main>
 
@@ -211,31 +190,48 @@
   const savedBg = localStorage.getItem('ideaquest_content_bg');
   if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
-  // --- 魔法の解放（SP 消費・デモ） ---
+  // --- 魔法の解放（SP 消費＋同系統の下位が前提・デモ） ---
   let sp = 3;
   const spBalance = document.getElementById('spBalance');
   const spStatNum = document.getElementById('spStatNum');
   const unlockedCountEl = document.getElementById('unlockedCount');
   const grid = document.getElementById('spellGrid');
 
+  const cardOf = id => grid.querySelector('.spell-card[data-spell="' + id + '"]');
+  const isUnlocked = id => { const c = cardOf(id); return !!c && c.dataset.unlocked === '1'; };
+  const labelOf = id => { const c = cardOf(id); return c ? c.querySelector('.spell-card__icon').textContent + ' ' + c.querySelector('.spell-card__name').textContent : id; };
+
   function refresh() {
     spBalance.textContent = sp;
     spStatNum.textContent = sp;
     unlockedCountEl.textContent = grid.querySelectorAll('.spell-card[data-unlocked="1"]').length;
-    // 未解放カードのボタン: SP不足なら無効化＋不足表示
-    grid.querySelectorAll('.spell-card[data-unlocked="0"]').forEach(card => {
+    grid.querySelectorAll('.spell-card').forEach(card => {
+      const req = card.dataset.requires;
+      // 前提ライン（下位の同系統）の達成表示
+      const reqEl = card.querySelector('.spell-req[data-requires]');
+      if (reqEl) {
+        const met = isUnlocked(req);
+        reqEl.classList.toggle('met', met);
+        reqEl.classList.toggle('unmet', !met);
+        reqEl.textContent = (met ? '✓ 前提: ' : '🔒 前提: ') + labelOf(req);
+      }
+      // 未解放カードのボタン: 前提未達 → SP不足 → 解放可
+      if (card.dataset.unlocked === '1') return;
       const btn = card.querySelector('[data-unlock]'); if (!btn) return;
       const cost = Number(card.dataset.cost);
-      if (sp < cost) { btn.disabled = true; btn.textContent = 'SP不足（あと ' + (cost - sp) + '）'; }
+      if (req && !isUnlocked(req)) { btn.disabled = true; btn.textContent = '前提: ' + labelOf(req) + ' が必要'; }
+      else if (sp < cost) { btn.disabled = true; btn.textContent = 'SP不足（あと ' + (cost - sp) + '）'; }
       else { btn.disabled = false; btn.textContent = '解放する'; }
     });
   }
 
   grid.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-unlock]'); if (!btn) return;
+    const btn = e.target.closest('[data-unlock]'); if (!btn || btn.disabled) return;
     const card = btn.closest('.spell-card');
     const cost = Number(card.dataset.cost);
+    const req = card.dataset.requires;
     const name = card.querySelector('.spell-card__name').textContent;
+    if (req && !isUnlocked(req)) return;   // 前提未達（保険）
     if (sp < cost) return;
     if (!confirm('「' + name + '」を ✦' + cost + ' SP で解放しますか？（恒久・取り消し不可）')) return;
     sp -= cost;
