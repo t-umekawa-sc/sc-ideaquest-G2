@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-22 アイデア詳細 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-22 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .detail-main { padding-block: var(--space-6) var(--space-16); }
+  .backlink { display: inline-block; margin-bottom: var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+  .backlink:hover { color: var(--color-text); }
+
+  /* --- アイデアヘッダー --- */
+  .idea-head { position: relative; }
+  .idea-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .idea-head__badges { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .idea-head h1 { font-size: var(--text-2xl); margin: var(--space-2) 0 var(--space-2); }
+  .idea-head .poster { margin-bottom: var(--space-3); }
+  .idea-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .idea-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-2); }
+  .idea-meta .soon { color: var(--color-danger); font-weight: 600; }
+
+  /* フォロー★（ON=ゴールド）。SC-01と同挙動 */
+  .follow-star { background: none; border: 1px solid var(--color-border); cursor: pointer; border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3); font: inherit; font-weight: 600; color: var(--pixel-xp); display: inline-flex; align-items: center; gap: 6px; }
+  .follow-star:hover { background: var(--color-surface-alt); }
+  .follow-star[aria-pressed="false"] { color: var(--color-text-muted); }
+
+  /* --- 2カラム（メイン＋右レール）。狭い/モーダルでは1カラム縦積み --- */
+  .idea-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: var(--space-5); align-items: start; margin-top: var(--space-5); }
+  @media (max-width: 920px) { .idea-layout { grid-template-columns: 1fr; } }
+  .idea-main, .idea-rail { display: flex; flex-direction: column; gap: var(--space-5); }
+
+  /* セクション内の小見出し */
+  .sub-label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-1); }
+  .sub-block + .sub-block { margin-top: var(--space-5); }
+  .sub-block p { margin: 0; line-height: 1.8; }
+
+  /* --- 添付ファイル --- */
+  .file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .file-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); }
+  .file-icon { font-size: 20px; flex: 0 0 auto; }
+  .file-info { min-width: 0; flex: 1; }
+  .file-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  /* --- チャット（直近プレビュー＋導線） --- */
+  .chat-preview { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+  .chat-msg { display: flex; gap: var(--space-3); }
+  .chat-msg__body { min-width: 0; }
+  .chat-msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
+  .chat-msg__name { font-weight: 600; font-size: var(--text-sm); }
+  .chat-msg__time { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .chat-msg__text { margin: 2px 0 0; font-size: var(--text-sm); line-height: 1.7; }
+  .chat-msg__text .mention { color: var(--color-primary); font-weight: 600; }
+
+  /* --- 投票パネル（右レール） --- */
+  .vote-summary { display: flex; gap: var(--space-5); align-items: baseline; margin-bottom: var(--space-3); }
+  .vote-summary .vote-agree, .vote-summary .vote-disagree { font-size: var(--text-lg); }
+  .vote-btns { display: flex; gap: var(--space-2); }
+  .vote-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: var(--space-3); border-radius: var(--radius); border: 2px solid var(--color-border-strong); background: var(--color-surface);
+    cursor: pointer; font: inherit; font-weight: 700; font-size: var(--text-base); color: var(--color-text);
+    transition: background .12s, border-color .12s, transform .05s; }
+  .vote-btn:hover { background: var(--color-surface-alt); }
+  .vote-btn:active { transform: translateY(1px); }
+  .vote-btn.agree.is-on { color: #fff; background: var(--color-agree); border-color: var(--color-agree); }
+  .vote-btn.disagree.is-on { color: #fff; background: var(--color-disagree); border-color: var(--color-disagree); }
+  .vote-note { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; }
+  .vote-note .xp { color: var(--color-warning); font-weight: 600; }
+
+  /* --- 評価結果パネル --- */
+  .eval-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+  .eval-avg { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); }
+  .eval-avg__num { font-size: var(--text-3xl); font-weight: 800; color: var(--color-primary); line-height: 1; }
+  .eval-avg__max { color: var(--color-text-muted); }
+  .eval-avg__coin { margin-left: auto; font-size: var(--text-sm); }
+  .score-row { display: grid; grid-template-columns: 84px 1fr 34px; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+  .score-row__label { font-size: var(--text-sm); }
+  .score-bar { height: 8px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
+  .score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+  .score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
+  .eval-comments { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-comment { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+  .eval-comment:first-child { border-top: 0; padding-top: 0; }
+  .eval-comment__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+  .eval-comment__aspect { margin-left: auto; }
+  .eval-comment__text { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: 1.7; }
+  .eval-waiting { color: var(--color-text-muted); font-size: var(--text-sm); }
+
+  /* 情報リスト（定義リスト） */
+  .info-list { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); margin: 0; font-size: var(--text-sm); }
+  .info-list dt { color: var(--color-text-muted); }
+  .info-list dd { margin: 0; }
+
+  .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .modal__foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- 背景画像レイヤー（全認証画面共通・ダッシュボードで設定した背景をここでも反映） -->
+<div class="app-bg" id="appBg"></div>
+
+<!-- ============ アプリヘッダー（共通 .app-header） ============ -->
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<main class="container detail-main">
+  <a class="backlink" href="SC-12_クエスト詳細.html">← クエスト「配送ルート最適化」へ戻る</a>
+
+  <!-- ============ アイデアヘッダー ============ -->
+  <section class="card idea-head" aria-label="アイデア情報">
+    <div class="idea-head__top">
+      <div style="min-width:0">
+        <div class="idea-head__badges">
+          <span class="badge badge-muted">業務改善</span>
+          <span class="badge badge-success">選定候補</span>
+        </div>
+        <h1>夜間配送の集約による積載率改善</h1>
+        <div class="poster">
+          <span class="avatar sm"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.12</span></span>
+          <span class="name">投稿: 鈴木 花子</span>
+        </div>
+      </div>
+      <div class="idea-actions">
+        <button class="follow-star" type="button" id="followBtn" aria-pressed="true">★ フォロー中</button>
+        <!-- ▼ 権限（作成者本人／クエスト管理）に応じて表示 -->
+        <button class="btn btn-outline" type="button" id="editBtn">編集</button>
+      </div>
+    </div>
+    <div class="idea-meta">
+      <span>🗓 投稿 2026/07/10</span>
+      <span>🔄 更新 2026/07/16</span>
+      <span class="soon">⏳ タイムリミット 2026/07/25（あと7日）</span>
+      <span>🤝 利害関係者: 物流部・配送委託先</span>
+    </div>
+  </section>
+
+  <!-- ============ メイン＋右レール ============ -->
+  <div class="idea-layout">
+    <!-- ---------- メイン（左） ---------- -->
+    <div class="idea-main">
+      <!-- アイデア内容 -->
+      <section class="card" aria-label="アイデア内容">
+        <h2 class="card-title">アイデア内容</h2>
+        <div class="sub-block">
+          <p class="sub-label">価値<span class="req" title="必須項目">*</span></p>
+          <p>配送コストを約15%削減しつつ、CO2排出も同時に削減できる。ドライバーの日中拘束を減らし労務環境も改善。</p>
+        </div>
+        <div class="sub-block">
+          <p class="sub-label">アイデア本文<span class="req" title="必須項目">*</span></p>
+          <p>複数拠点で個別に走らせている夜間配送を1本のルートに集約し、積載率を高める。AIで需要予測しながら翌日ルートを自動生成、繁忙期は臨時便を差し込む。まずは首都圏3拠点でパイロット運用し、効果を検証してから全国展開する。</p>
+        </div>
+        <div class="sub-block">
+          <p class="sub-label">利害関係者</p>
+          <p>物流部（運用）／配送委託先（実働）／情報システム部（ルート生成基盤）。</p>
+        </div>
+      </section>
+
+      <!-- 関連資料（添付） -->
+      <section class="card" aria-label="関連資料">
+        <h2 class="card-title">関連資料 <span class="badge badge-muted">2</span></h2>
+        <ul class="file-list">
+          <li class="file-item">
+            <span class="file-icon">📄</span>
+            <span class="file-info">
+              <span class="file-name">夜間配送_試算シート.xlsx</span>
+              <span class="file-sub">248 KB ・ 鈴木 花子 ・ 2026/07/10</span>
+            </span>
+            <button class="btn btn-outline btn-sm" type="button">⬇ ダウンロード</button>
+          </li>
+          <li class="file-item">
+            <span class="file-icon">🖼️</span>
+            <span class="file-info">
+              <span class="file-name">ルート集約イメージ.png</span>
+              <span class="file-sub">1.2 MB ・ 鈴木 花子 ・ 2026/07/10</span>
+            </span>
+            <button class="btn btn-outline btn-sm" type="button">⬇ ダウンロード</button>
+          </li>
+        </ul>
+        <p class="role-note" style="margin-top:var(--space-3)">※ 実体は MinIO 保管・物理名はハッシュ化。ダウンロードは権限検証のうえ署名付きURL。</p>
+      </section>
+
+      <!-- チャット（導線＋直近プレビュー） -->
+      <section class="card" aria-label="チャット">
+        <div class="between" style="margin-bottom:var(--space-3)">
+          <h2 class="card-title" style="margin:0">チャット <span class="badge badge-muted">💬 8</span></h2>
+          <span class="role-note">パーティー全員が閲覧・投稿できます</span>
+        </div>
+        <div class="chat-preview">
+          <div class="chat-msg">
+            <span class="avatar sm"><span class="avatar__img placeholder">田</span></span>
+            <div class="chat-msg__body">
+              <div class="chat-msg__head"><span class="chat-msg__name">田中 一郎</span><span class="chat-msg__time">7/15 14:20</span></div>
+              <p class="chat-msg__text">積載率の現状値ってどれくらいですか？試算の前提が知りたいです。</p>
+            </div>
+          </div>
+          <div class="chat-msg">
+            <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
+            <div class="chat-msg__body">
+              <div class="chat-msg__head"><span class="chat-msg__name">鈴木 花子</span><span class="chat-msg__time">7/15 15:02</span></div>
+              <p class="chat-msg__text"><span class="mention">@田中一郎</span> 平均62%です。集約後は80%超を見込んでいます（添付の試算シート参照）。</p>
+            </div>
+          </div>
+        </div>
+        <a class="btn btn-primary" href="SC-24_アイデアチャット.html">チャットを開く（SC-24）→</a>
+      </section>
+    </div>
+
+    <!-- ---------- 右レール ---------- -->
+    <div class="idea-rail">
+      <!-- 投票 -->
+      <section class="card" aria-label="投票">
+        <h2 class="card-title">投票</h2>
+        <div class="vote-summary">
+          <span class="vote-agree" id="agreeCount">▲ 賛成 12</span>
+          <span class="vote-disagree" id="disagreeCount">▼ 反対 3</span>
+        </div>
+        <div class="vote-btns">
+          <button class="vote-btn agree is-on" type="button" id="agreeBtn" aria-pressed="true">▲ 賛成</button>
+          <button class="vote-btn disagree" type="button" id="disagreeBtn" aria-pressed="false">▼ 反対</button>
+        </div>
+        <p class="vote-note">
+          1人1票・<strong>締切まで変更できます</strong>。投票すると <span class="xp">+5 XP</span>（自分のアイデアにも投票可）。<br>
+          🔒 この会社は<strong>匿名モード</strong>（賛成/反対の集計数のみ表示）。記名モードでは投票者のアバターを表示します。
+        </p>
+      </section>
+
+      <!-- 評価結果 -->
+      <section class="card" aria-label="評価結果">
+        <div class="eval-head">
+          <h2 class="card-title" style="margin:0">評価結果</h2>
+          <span class="badge badge-muted" title="評価者が指定した公開範囲">🔓 公開: パーティー全員</span>
+        </div>
+
+        <!-- 評価済みの表示 -->
+        <div id="evalDone">
+          <div class="eval-avg">
+            <span class="eval-avg__num">4.2</span><span class="eval-avg__max">/ 5.0（平均・評価者2名）</span>
+            <span class="eval-avg__coin"><span class="pixel-stat coin">◆ +42</span></span>
+          </div>
+          <div class="score-row"><span class="score-row__label">新規性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+          <div class="score-row"><span class="score-row__label">影響度</span><span class="score-bar"><i style="width:80%"></i></span><span class="score-row__val">4.0</span></div>
+          <div class="score-row"><span class="score-row__label">実現度</span><span class="score-bar"><i style="width:70%"></i></span><span class="score-row__val">3.5</span></div>
+          <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+          <div class="score-row"><span class="score-row__label" title="低コストほど高得点">コスト<span class="muted">ⓘ</span></span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
+
+          <div class="eval-comments">
+            <div class="eval-comment">
+              <div class="eval-comment__head">
+                <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">山</span></span>
+                <span class="chat-msg__name">山田 太郎</span>
+                <span class="badge badge-muted eval-comment__aspect">実現度</span>
+              </div>
+              <p class="eval-comment__text">拠点間の調整が鍵。パイロットの3拠点選定を早めに。</p>
+            </div>
+            <div class="eval-comment">
+              <div class="eval-comment__head">
+                <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">田</span></span>
+                <span class="chat-msg__name">田中 一郎</span>
+                <span class="badge badge-muted eval-comment__aspect">コスト</span>
+              </div>
+              <p class="eval-comment__text">削減幅が大きく、初期投資も小さい。費用対効果は高い。</p>
+            </div>
+          </div>
+          <p class="role-note" style="margin-top:var(--space-3)">5観点は<strong>均等平均</strong>。コインは <code>round(平均×10)</code>（最大50）を投稿者に付与。コスト観点は<strong>低コストほど高得点</strong>。</p>
+        </div>
+
+        <!-- 評価者向けアクション（▼ 評価者権限がある場合のみ表示） -->
+        <div class="modal__foot" style="margin-top:var(--space-4)">
+          <a class="btn btn-primary" href="SC-25_評価画面.html">評価する / 編集（SC-25）</a>
+        </div>
+        <p class="role-note" style="margin-top:var(--space-2)">▲ 評価ボタンは<strong>評価者権限</strong>がある場合のみ表示。公開範囲（既定＝パーティー全員／限定）は評価時に指定。</p>
+      </section>
+
+      <!-- 情報（メタ） -->
+      <section class="card" aria-label="情報">
+        <h2 class="card-title">情報</h2>
+        <dl class="info-list">
+          <dt>ステータス</dt><dd><span class="badge badge-success">選定候補</span></dd>
+          <dt>カテゴリー</dt><dd>業務改善</dd>
+          <dt>公開範囲</dt><dd>このクエストのパーティー内</dd>
+          <dt>クエスト</dt><dd><a href="SC-12_クエスト詳細.html">配送ルート最適化</a></dd>
+          <dt>投稿日</dt><dd>2026/07/10</dd>
+          <dt>最終更新</dt><dd>2026/07/16</dd>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <p class="role-note" style="margin-top:var(--space-8)">※ 本番は SC-12 のアイデア一覧行／ダッシュボードのフォロー・未投票パネルから <strong>Intercept Route でモーダル差し込み</strong>（URL は <code>/idea/xx</code>・リロード/直アクセスはこのフルページ）。パネル→モーダルの拡大は framer-motion の <code>layoutId</code>。</p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // --- 背景画像（ダッシュボードで設定した個人背景を全画面へ反映） ---
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) {
+    const appBg = document.getElementById('appBg');
+    appBg.style.backgroundImage = 'url("' + savedBg + '")';
+    appBg.classList.add('is-set');
+  }
+
+  // --- フォロー★トグル ---
+  const followBtn = document.getElementById('followBtn');
+  followBtn.addEventListener('click', () => {
+    const on = followBtn.getAttribute('aria-pressed') === 'true';
+    followBtn.setAttribute('aria-pressed', String(!on));
+    followBtn.textContent = on ? '☆ フォロー' : '★ フォロー中';
+  });
+
+  // --- 投票（賛成/反対・1人1票・締切まで変更可）。集計数はデモ用に増減 ---
+  const agreeBtn = document.getElementById('agreeBtn');
+  const disagreeBtn = document.getElementById('disagreeBtn');
+  const agreeCount = document.getElementById('agreeCount');
+  const disagreeCount = document.getElementById('disagreeCount');
+  let base = { agree: 11, disagree: 3 }; // 自分の1票を除いた基礎値
+  let myVote = 'agree'; // 'agree' | 'disagree' | null
+  function renderVote() {
+    agreeBtn.classList.toggle('is-on', myVote === 'agree');
+    disagreeBtn.classList.toggle('is-on', myVote === 'disagree');
+    agreeBtn.setAttribute('aria-pressed', String(myVote === 'agree'));
+    disagreeBtn.setAttribute('aria-pressed', String(myVote === 'disagree'));
+    const a = base.agree + (myVote === 'agree' ? 1 : 0);
+    const d = base.disagree + (myVote === 'disagree' ? 1 : 0);
+    agreeCount.textContent = '▲ 賛成 ' + a;
+    disagreeCount.textContent = '▼ 反対 ' + d;
+  }
+  function setVote(choice) { myVote = (myVote === choice) ? null : choice; renderVote(); }
+  agreeBtn.addEventListener('click', () => setVote('agree'));
+  disagreeBtn.addEventListener('click', () => setVote('disagree'));
+  renderVote();
+</script>
+</body>
+</html>
