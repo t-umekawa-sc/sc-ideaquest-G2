@@ -77,10 +77,23 @@
 <header class="app-header">
   <div class="container between">
     <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
-    <div class="row-center">
+    <div class="header-actions">
       <span class="pixel-stat level">Lv.7</span>
       <span class="pixel-stat coin">◆ 320</span>
-      <button class="btn btn-outline btn-sm">通知</button>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
     </div>
   </div>
 </header>

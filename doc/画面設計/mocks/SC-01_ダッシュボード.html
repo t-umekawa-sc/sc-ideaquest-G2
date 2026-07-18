@@ -14,43 +14,7 @@
   /* コンテンツ背景画像レイヤー .app-bg は shared.css（全認証画面共通）。ここは設定UIのみ。 */
   .bg-control { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 
-  /* --- ヘッダー右側のステータス／通知／メニュー --- */
-  .header-actions { display: flex; align-items: center; gap: var(--space-3); }
-  /* 通知ベル（未読バッジ付き） */
-  .bell {
-    position: relative; display: inline-flex; align-items: center; justify-content: center;
-    width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--color-border);
-    background: var(--color-surface); color: var(--color-text); cursor: pointer; font-size: 18px;
-    transition: background .15s, border-color .15s;
-  }
-  .bell:hover { background: var(--color-surface-alt); }
-  .bell__badge {
-    position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; line-height: 1; color: #fff;
-    background: var(--color-danger); border: 2px solid var(--color-surface); border-radius: var(--radius-full);
-  }
-  /* アバターメニュー（クリックでドロップダウン） */
-  .usermenu { position: relative; }
-  .usermenu__trigger {
-    display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer;
-    background: none; border: none; padding: 2px; border-radius: var(--radius-full);
-  }
-  .usermenu__trigger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
-  .usermenu__list {
-    position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 200px;
-    margin: 0; padding: 6px; list-style: none;
-    background: var(--color-surface); border: 1px solid var(--color-border);
-    border-radius: var(--radius); box-shadow: var(--shadow-lg);
-  }
-  .usermenu__list[hidden] { display: none; }
-  .usermenu__list li > * {
-    display: block; width: 100%; text-align: left; box-sizing: border-box;
-    padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
-    font-size: var(--text-sm); color: var(--color-text); background: none; border: none; cursor: pointer;
-  }
-  .usermenu__list li > *:hover { background: var(--color-primary-soft); text-decoration: none; }
-  .usermenu__sep { height: 1px; margin: 6px 4px; background: var(--color-border); }
+  /* ヘッダー右側のステータス／通知ベル／アバターメニューは shared.css へ昇格（全画面共通） */
 
   /* =========================================================
    * 上部2カラム（ゲーム層）：左＝ヒーロー(ステータス) / 右＝週間ランキングTOP3
@@ -235,6 +199,7 @@
     <div class="header-actions">
       <span class="pixel-stat level">Lv.7</span>
       <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）">✦ SP 3</a>
       <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
       <div class="usermenu">
         <button class="usermenu__trigger" id="userTrigger" aria-haspopup="menu" aria-expanded="false">
@@ -764,18 +729,7 @@
   });
   bgResetBtn.addEventListener('click', () => { applyBg(null); localStorage.removeItem(BG_KEY); });
 
-  // --- アバターメニュー（開閉） ---
-  const trigger = document.getElementById('userTrigger');
-  const menu = document.getElementById('userMenu');
-  function closeMenu() { menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = menu.hidden;
-    menu.hidden = !open; trigger.setAttribute('aria-expanded', String(open));
-  });
-  document.addEventListener('click', closeMenu);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
-  menu.addEventListener('click', (e) => e.stopPropagation());
+  // アバターメニュー（開閉）は shared.js が .usermenu を初期化（全画面共通）
 
   // --- カード/パネル → 拡大モーダル（FLIP・共有要素アニメーションの簡易版） ---
   // 本番は Next.js の Intercept Route ＋ framer-motion(layoutId) で実装。

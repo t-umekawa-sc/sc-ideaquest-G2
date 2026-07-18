@@ -151,6 +151,45 @@ img { max-width: 100%; display: block; }
 .brand-logo { height: 40px; width: auto; display: block; }
 .brand-logo.lg { height: 96px; }   /* ログイン画面など大きく見せる場面用 */
 
+/* --- ヘッダー右側の共通アクション（ステータス／通知ベル／アバターメニュー） ---
+   全画面のヘッダーで共用（ダッシュボードと同一）。挙動は shared.js が .usermenu を初期化。 */
+.header-actions { display: flex; align-items: center; gap: var(--space-3); }
+/* 通知ベル（未読バッジ付き） */
+.bell {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); cursor: pointer; font-size: 18px;
+  transition: background .15s, border-color .15s;
+}
+.bell:hover { background: var(--color-surface-alt); }
+.bell__badge {
+  position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; line-height: 1; color: #fff;
+  background: var(--color-danger); border: 2px solid var(--color-surface); border-radius: var(--radius-full);
+}
+/* アバターメニュー（クリックでドロップダウン・shared.js が開閉） */
+.usermenu { position: relative; }
+.usermenu__trigger {
+  display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer;
+  background: none; border: none; padding: 2px; border-radius: var(--radius-full);
+}
+.usermenu__trigger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+.usermenu__list {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 200px;
+  margin: 0; padding: 6px; list-style: none;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.usermenu__list[hidden] { display: none; }
+.usermenu__list li > * {
+  display: block; width: 100%; text-align: left; box-sizing: border-box;
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-text); background: none; border: none; cursor: pointer;
+}
+.usermenu__list li > *:hover { background: var(--color-primary-soft); text-decoration: none; }
+.usermenu__sep { height: 1px; margin: 6px 4px; background: var(--color-border); }
+
 /* コンテンツ領域の背景画像（ユーザー個人設定・全認証画面に反映）
    本文の背後(z-index:-1)に固定レイヤーを敷き、可読性のため薄い明色スクリムを重ねる。
    設定UI（アップロードボタン）はダッシュボード、実体は MinIO・User.background_image_path。
@@ -587,6 +626,7 @@ img { max-width: 100%; display: block; }
 .pixel-stat.coin  { color: var(--pixel-coin); }
 .pixel-stat.level { color: var(--pixel-level); }
 .pixel-stat.skill { color: var(--pixel-skill); } /* スキルポイント(SP) */
+a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の下線消し */
 
 /* 週間ランキングパネル（ゲーム層・.pixel-panel の中で使う）
    ダッシュボードの全社ランキング／クエスト詳細のクエスト内ランキング等で共用。

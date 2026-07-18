@@ -58,3 +58,30 @@
     document.querySelectorAll('[data-combobox]').forEach(initCombobox);
   });
 })();
+
+/* --- ヘッダーのアバターメニュー（.usermenu を初期化・全画面共通） ---
+   マークアップ:
+   <div class="usermenu">
+     <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false"> …avatar… </button>
+     <ul class="usermenu__list" role="menu" hidden> …items… </ul>
+   </div>
+*/
+(function () {
+  function initUserMenu(root) {
+    const trigger = root.querySelector('.usermenu__trigger');
+    const menu = root.querySelector('.usermenu__list');
+    if (!trigger || !menu) return;
+    function close() { menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = menu.hidden;
+      menu.hidden = !open; trigger.setAttribute('aria-expanded', String(open));
+    });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.usermenu').forEach(initUserMenu);
+  });
+})();
