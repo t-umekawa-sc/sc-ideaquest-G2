@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-25 評価画面 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-25 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  /* このモックはモーダルを開いた状態で表示（本番は SC-22 から差し込み・URL直/リロードはフルページ） */
+  .modal { position: static; display: block; }            /* デモ用: 常時表示 */
+  /* 背後（本番は SC-22）を確認しやすいよう薄めのバックドロップ */
+  .modal__backdrop { position: fixed; background: rgba(15,23,42,.25); }
+  .modal__panel { max-width: 640px; margin: var(--space-8) auto; max-height: none; }
+
+  /* ドラッグ用ヘッダー（つかんで移動＝背後のアイデアを確認できる） */
+  .modal__drag { display: flex; align-items: center; gap: var(--space-2); cursor: move; padding-right: 28px; margin-bottom: var(--space-1); touch-action: none; }
+  .modal__drag h2 { margin: 0; }
+  .modal__grip { color: var(--color-text-subtle); font-size: 18px; line-height: 1; }
+  .modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+
+  /* 折りたたみのアイデア要約（評価しながら内容を確認） */
+  .eval-idea { border: 1px solid var(--color-border); border-radius: var(--radius); margin: var(--space-3) 0; background: var(--color-surface); }
+  .eval-idea > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
+  .eval-idea > summary::-webkit-details-marker { display: none; }
+  .eval-idea > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
+  .eval-idea[open] > summary::before { transform: rotate(90deg); }
+  .eval-idea__body { padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--color-border); }
+  .eval-idea__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: var(--space-3) 0 var(--space-1); }
+  .eval-idea__body p { margin: 0; line-height: 1.75; }
+
+  .eval-context { margin-bottom: var(--space-4); }
+  .eval-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .eval-context__title { font-weight: 700; font-size: var(--text-lg); }
+  .eval-context__link { font-size: var(--text-sm); }
+
+  /* 5観点の採点行 */
+  .eval-row { padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+  .eval-row__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+  .eval-aspect { font-weight: 700; }
+  .eval-desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+  .eval-rate { display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
+  .stars { display: inline-flex; }
+  .star { font-size: 26px; line-height: 1; background: none; border: none; cursor: pointer; color: var(--color-border-strong); padding: 0 1px; }
+  .star.is-on { color: var(--pixel-coin); }
+  .star:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); border-radius: var(--radius-sm); }
+  .eval-score-num { min-width: 2.6em; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .eval-score-num .muted { font-weight: 400; }
+  .eval-comment { margin-top: var(--space-3); }
+  .eval-cost-note { color: var(--color-info); }
+
+  /* 集計プレビュー */
+  .eval-summary { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+    background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; }
+  .eval-summary__avg { font-size: var(--text-2xl); font-weight: 800; color: var(--color-primary); }
+  .eval-summary__note { font-size: var(--text-xs); color: var(--color-text-muted); flex: 1; min-width: 180px; }
+
+  /* 公開範囲 */
+  .visibility { display: flex; flex-direction: column; gap: var(--space-2); }
+  .vis-opt { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); cursor: pointer; }
+  .vis-opt:hover { background: var(--color-surface-alt); }
+  .vis-opt input { margin-top: 3px; accent-color: var(--color-primary); cursor: pointer; }
+  .vis-opt.is-sel { border-color: var(--color-primary); background: var(--color-primary-soft); }
+  .vis-opt__title { font-weight: 600; }
+  .vis-opt__desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+
+  .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 評価モーダル（本番は SC-22 から Intercept で差し込み） ============ -->
+<div class="modal" id="evalModal" role="dialog" aria-modal="true" aria-labelledby="evalTitle">
+  <div class="modal__backdrop"></div>
+  <div class="modal__panel" id="panel">
+    <button class="modal__close" type="button" aria-label="閉じる">✕</button>
+    <!-- つかんで移動できるヘッダー（背後のアイデアを確認するため） -->
+    <div class="modal__drag" id="dragHandle" title="ドラッグで移動">
+      <span class="modal__grip" aria-hidden="true">⠿</span>
+      <h2 id="evalTitle">アイデアを評価</h2>
+    </div>
+    <p class="role-note" style="margin-top:0">▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。ヘッダーを<strong>ドラッグで移動</strong>できます。</p>
+
+    <!-- 対象アイデアの文脈 -->
+    <div class="eval-context card" style="padding:var(--space-3) var(--space-4)">
+      <div class="eval-context__quest">配送ルート最適化 ・ 業務改善</div>
+      <div class="eval-context__title">夜間配送の集約による積載率改善</div>
+      <div class="eval-context__link"><a href="SC-22_アイデア詳細.html">アイデア詳細を見る（SC-22）→</a></div>
+    </div>
+
+    <!-- 折りたたみ: アイデアを確認（移動しなくても内容を確認できる） -->
+    <details class="eval-idea" open>
+      <summary>アイデアを確認</summary>
+      <div class="eval-idea__body">
+        <div class="eval-idea__label">価値</div>
+        <p>配送コストを約15%削減しつつ、CO2排出も同時に削減できる。ドライバーの日中拘束を減らし労務環境も改善。</p>
+        <div class="eval-idea__label">アイデア本文</div>
+        <p>複数拠点で個別に走らせている夜間配送を1本のルートに集約し、積載率を高める。AIで需要予測しながら翌日ルートを自動生成、繁忙期は臨時便を差し込む。まずは首都圏3拠点でパイロット運用し、効果を検証してから全国展開する。</p>
+        <div class="eval-idea__label">関連資料</div>
+        <p><span class="badge badge-muted">📄 夜間配送_試算シート.xlsx</span> <span class="badge badge-muted">🖼️ ルート集約イメージ.png</span></p>
+      </div>
+    </details>
+
+    <!-- 5観点の採点（各1〜5点・スター） -->
+    <div id="evalRows">
+      <div class="eval-row" data-aspect="novelty" data-seed="4">
+        <div class="eval-row__head">
+          <div><span class="eval-aspect">新規性</span><div class="eval-desc">アイデアの目新しさ・独自性</div></div>
+          <div class="eval-rate">
+            <span class="stars" role="radiogroup" aria-label="新規性の点数">
+              <button class="star" type="button" data-v="1" aria-label="1点">★</button><button class="star" type="button" data-v="2" aria-label="2点">★</button><button class="star" type="button" data-v="3" aria-label="3点">★</button><button class="star" type="button" data-v="4" aria-label="4点">★</button><button class="star" type="button" data-v="5" aria-label="5点">★</button>
+            </span>
+            <span class="eval-score-num">–<span class="muted"> /5</span></span>
+          </div>
+        </div>
+        <textarea class="textarea eval-comment" placeholder="観点別コメント（任意）"></textarea>
+      </div>
+
+      <div class="eval-row" data-aspect="impact" data-seed="4">
+        <div class="eval-row__head">
+          <div><span class="eval-aspect">影響度</span><div class="eval-desc">実現した場合のインパクトの大きさ</div></div>
+          <div class="eval-rate">
+            <span class="stars" role="radiogroup" aria-label="影響度の点数">
+              <button class="star" type="button" data-v="1" aria-label="1点">★</button><button class="star" type="button" data-v="2" aria-label="2点">★</button><button class="star" type="button" data-v="3" aria-label="3点">★</button><button class="star" type="button" data-v="4" aria-label="4点">★</button><button class="star" type="button" data-v="5" aria-label="5点">★</button>
+            </span>
+            <span class="eval-score-num">–<span class="muted"> /5</span></span>
+          </div>
+        </div>
+        <textarea class="textarea eval-comment" placeholder="観点別コメント（任意）"></textarea>
+      </div>
+
+      <div class="eval-row" data-aspect="feasibility" data-seed="3">
+        <div class="eval-row__head">
+          <div><span class="eval-aspect">実現度</span><div class="eval-desc">実現可能性の高さ</div></div>
+          <div class="eval-rate">
+            <span class="stars" role="radiogroup" aria-label="実現度の点数">
+              <button class="star" type="button" data-v="1" aria-label="1点">★</button><button class="star" type="button" data-v="2" aria-label="2点">★</button><button class="star" type="button" data-v="3" aria-label="3点">★</button><button class="star" type="button" data-v="4" aria-label="4点">★</button><button class="star" type="button" data-v="5" aria-label="5点">★</button>
+            </span>
+            <span class="eval-score-num">–<span class="muted"> /5</span></span>
+          </div>
+        </div>
+        <textarea class="textarea eval-comment" placeholder="観点別コメント（任意）"></textarea>
+      </div>
+
+      <div class="eval-row" data-aspect="fit" data-seed="4">
+        <div class="eval-row__head">
+          <div><span class="eval-aspect">適合性</span><div class="eval-desc">クエストのテーマ・目的への合致度</div></div>
+          <div class="eval-rate">
+            <span class="stars" role="radiogroup" aria-label="適合性の点数">
+              <button class="star" type="button" data-v="1" aria-label="1点">★</button><button class="star" type="button" data-v="2" aria-label="2点">★</button><button class="star" type="button" data-v="3" aria-label="3点">★</button><button class="star" type="button" data-v="4" aria-label="4点">★</button><button class="star" type="button" data-v="5" aria-label="5点">★</button>
+            </span>
+            <span class="eval-score-num">–<span class="muted"> /5</span></span>
+          </div>
+        </div>
+        <textarea class="textarea eval-comment" placeholder="観点別コメント（任意）"></textarea>
+      </div>
+
+      <div class="eval-row" data-aspect="cost" data-seed="5">
+        <div class="eval-row__head">
+          <div><span class="eval-aspect">コスト</span><div class="eval-desc eval-cost-note">💡 低コストほど高得点（★5＝非常に低コスト）</div></div>
+          <div class="eval-rate">
+            <span class="stars" role="radiogroup" aria-label="コストの点数">
+              <button class="star" type="button" data-v="1" aria-label="1点">★</button><button class="star" type="button" data-v="2" aria-label="2点">★</button><button class="star" type="button" data-v="3" aria-label="3点">★</button><button class="star" type="button" data-v="4" aria-label="4点">★</button><button class="star" type="button" data-v="5" aria-label="5点">★</button>
+            </span>
+            <span class="eval-score-num">–<span class="muted"> /5</span></span>
+          </div>
+        </div>
+        <textarea class="textarea eval-comment" placeholder="観点別コメント（任意）"></textarea>
+      </div>
+    </div>
+
+    <!-- 集計プレビュー -->
+    <div class="eval-summary">
+      <div><span class="eval-summary__avg" id="avgVal">–</span> <span class="muted">/ 5.0（<span id="ratedCount">0</span>/5 観点）</span></div>
+      <div class="eval-summary__note">5観点は<strong>均等平均</strong>。投稿者へのコインは<strong>全評価者の平均</strong>から <code>round(平均×10)</code>（最大50）で付与されます（本評価の平均は上記）。</div>
+    </div>
+
+    <!-- 公開範囲 -->
+    <div class="field">
+      <label>評価結果の公開範囲</label>
+      <div class="visibility" id="visibility">
+        <label class="vis-opt is-sel">
+          <input type="radio" name="vis" value="party" checked>
+          <span><span class="vis-opt__title">🔓 パーティー全員に公開（既定）</span><span class="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・観点別コメントを閲覧できます。フィードバックを全員で共有。</span></span>
+        </label>
+        <label class="vis-opt">
+          <input type="radio" name="vis" value="limited">
+          <span><span class="vis-opt__title">🔒 限定公開</span><span class="vis-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーへの見せ方（集計のみ/非表示）は今後確定（TBD）。</span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="modal__foot">
+      <button class="btn btn-primary" id="submitBtn">評価を確定</button>
+      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
+      <button class="btn btn-outline" type="button">キャンセル</button>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝一時保存（本人のみ表示・全観点そろっていなくても可）。<strong>確定</strong>で他の評価者/パーティーに反映し、評価実施の XP＋投稿者コインを付与（下書きでは付与しない）。本番は SC-22 から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。既存の自分の評価/下書きは読み込み。締切後の可否はステータス連動（TBD）。</p>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ダッシュボードで設定した個人背景を全画面へ反映）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  const ASPECTS = ['novelty','impact','feasibility','fit','cost'];
+  const scores = {};
+
+  document.querySelectorAll('.eval-row').forEach(row => {
+    const aspect = row.dataset.aspect;
+    const stars = [...row.querySelectorAll('.star')];
+    const num = row.querySelector('.eval-score-num');
+    function paint(n) {
+      stars.forEach((s, i) => s.classList.toggle('is-on', i < n));
+      num.innerHTML = (n ? n : '–') + '<span class="muted"> /5</span>';
+    }
+    stars.forEach((s, i) => {
+      s.addEventListener('mouseover', () => stars.forEach((x, j) => x.classList.toggle('is-on', j <= i)));
+      s.addEventListener('click', () => { scores[aspect] = i + 1; paint(i + 1); updateSummary(); });
+    });
+    row.querySelector('.stars').addEventListener('mouseleave', () => paint(scores[aspect] || 0));
+    // 初期値（既存評価の編集を想定したシード）
+    if (row.dataset.seed) { scores[aspect] = Number(row.dataset.seed); paint(scores[aspect]); }
+  });
+
+  function updateSummary() {
+    const vals = ASPECTS.map(a => scores[a]).filter(Boolean);
+    const rated = vals.length;
+    const avg = rated ? vals.reduce((a, b) => a + b, 0) / rated : 0;
+    document.getElementById('ratedCount').textContent = rated;
+    document.getElementById('avgVal').textContent = rated ? avg.toFixed(1) : '–';
+  }
+  updateSummary();
+
+  // 公開範囲の選択ハイライト
+  const visOpts = [...document.querySelectorAll('.vis-opt')];
+  document.getElementById('visibility').addEventListener('change', () => {
+    visOpts.forEach(o => o.classList.toggle('is-sel', o.querySelector('input').checked));
+  });
+
+  // 確定（デモ）: 未採点があれば警告
+  document.getElementById('submitBtn').addEventListener('click', () => {
+    const missing = ASPECTS.filter(a => !scores[a]);
+    if (missing.length) { alert('すべての観点（5つ）を採点してください。未採点: ' + missing.length + '件'); return; }
+    const vis = document.querySelector('input[name="vis"]:checked').value;
+    alert('評価を確定しました（デモ）\n平均: ' + document.getElementById('avgVal').textContent + ' / 5.0\n公開範囲: ' + (vis === 'party' ? 'パーティー全員' : '限定'));
+  });
+
+  // 下書き保存（デモ）: 全観点そろっていなくても保存可・本人のみ表示
+  document.getElementById('draftBtn').addEventListener('click', () => {
+    const rated = ASPECTS.filter(a => scores[a]).length;
+    alert('下書きを保存しました（デモ）\n採点: ' + rated + '/5 観点\n※ あなただけに表示。確定するまで XP・コインは付与されません。');
+  });
+
+  // ===== モーダルをドラッグで移動（背後のアイデアを確認する用途） =====
+  const panel = document.getElementById('panel');
+  const handle = document.getElementById('dragHandle');
+  let drag = null;
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('.modal__close')) return;
+    const r = panel.getBoundingClientRect();
+    panel.style.position = 'fixed';
+    panel.style.margin = '0';
+    panel.style.width = r.width + 'px';
+    panel.style.left = r.left + 'px';
+    panel.style.top = r.top + 'px';
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    panel.classList.add('is-dragging');
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!drag) return;
+    // 画面内に収める
+    const maxX = window.innerWidth - panel.offsetWidth, maxY = window.innerHeight - panel.offsetHeight;
+    panel.style.left = Math.max(0, Math.min(maxX, e.clientX - drag.dx)) + 'px';
+    panel.style.top = Math.max(0, Math.min(maxY, e.clientY - drag.dy)) + 'px';
+  });
+  function endDrag() { drag = null; panel.classList.remove('is-dragging'); }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+</script>
+</body>
+</html>
