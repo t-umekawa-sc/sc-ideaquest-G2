@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-10 クエスト一覧 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-10 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .list-main { padding-block: var(--space-6) var(--space-16); }
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
+  .page-head h1 { font-size: var(--text-2xl); margin: 0; }
+
+  /* 表示切替（カード / リスト） */
+  .viewtoggle { display: inline-flex; border: 1px solid var(--color-border-strong); border-radius: var(--radius); overflow: hidden; }
+  .viewtoggle button { border: none; background: var(--color-surface); padding: 6px var(--space-3); font: inherit; font-size: var(--text-sm); cursor: pointer; color: var(--color-text-muted); }
+  .viewtoggle button + button { border-left: 1px solid var(--color-border-strong); }
+  .viewtoggle button.is-on { background: var(--color-primary-soft); color: var(--color-primary-active); font-weight: 600; }
+
+  /* カードビュー（SC-01 の参加中クエストカードと一貫） */
+  .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+  /* display:grid が [hidden] を上書きするため、非表示を明示（id 指定で確実に） */
+  #cardView[hidden], #tableView[hidden] { display: none; }
+  a.quest-card { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, transform .05s, border-color .15s; }
+  a.quest-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+  a.quest-card:active { transform: translateY(1px); }
+  .quest-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .quest-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+  .deadline { font-size: var(--text-xs); font-weight: 500; }
+  .deadline.soon { color: var(--color-danger); }
+
+  /* リスト（テーブル）ビュー */
+  .idea-title { font-weight: 600; }
+  tr.row-link { cursor: pointer; }
+  tr.row-link:hover .idea-title { color: var(--color-primary); }
+
+  .list-toolbar .sort { min-width: 170px; }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<main class="container list-main">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-3);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+
+  <div class="page-head">
+    <h1>クエスト一覧</h1>
+    <button class="btn btn-primary" type="button" id="createBtn">＋ クエストを作成</button>
+  </div>
+  <p class="muted text-sm" style="margin-top:calc(-1*var(--space-3));margin-bottom:var(--space-4)">「所属グループ内で作られ、かつ自分がパーティー参加中」のクエストを表示します。</p>
+
+  <!-- 一覧標準ツールバー（検索＋フィルター＋件数＋並び替え＋表示切替） -->
+  <div class="list-toolbar">
+    <div class="filters">
+      <input class="input" type="search" id="q" placeholder="件名・テーマ・カテゴリで検索" aria-label="クエストを検索">
+      <select class="select" id="fState" aria-label="状態で絞り込み">
+        <option value="">状態: すべて</option>
+        <option value="募集中">募集中</option>
+        <option value="進行中">進行中</option>
+        <option value="評価中">評価中</option>
+        <option value="選定">選定</option>
+        <option value="完了">完了</option>
+      </select>
+      <select class="select" id="fGroup" aria-label="クエストグループで絞り込み">
+        <option value="">グループ: すべて</option>
+        <option value="プロダクト開発部">プロダクト開発部</option>
+        <option value="全社改善プロジェクト">全社改善プロジェクト</option>
+      </select>
+      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
+    </div>
+    <div class="tools">
+      <span class="list-count" id="listCount">0件</span>
+      <label class="text-sm muted" for="sortSel">並び替え</label>
+      <select class="select sort" id="sortSel">
+        <option value="new">新着順</option>
+        <option value="deadline">締切が近い順</option>
+        <option value="ideas">アイデアが多い順</option>
+        <option value="party">参加人数が多い順</option>
+      </select>
+      <div class="viewtoggle" role="group" aria-label="表示切替">
+        <button type="button" id="viewCard" class="is-on" aria-pressed="true">🔲 カード</button>
+        <button type="button" id="viewList" aria-pressed="false">☰ リスト</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- カードビュー -->
+  <div class="quest-grid" id="cardView"></div>
+
+  <!-- リスト（テーブル）ビュー -->
+  <div class="table-wrap" id="tableView" hidden>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>クエスト</th>
+          <th>カテゴリ</th>
+          <th>ステータス</th>
+          <th>締切</th>
+          <th class="num">👥</th>
+          <th class="num">💡</th>
+          <th>あなた</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="list-empty" id="emptyState" hidden>該当するクエストがありません。条件を変えてお試しください。</div>
+
+  <p class="muted text-xs" style="margin-top:var(--space-6)">※ 「＋ クエストを作成」は本番で <strong>SC-11 作成モーダル</strong>（Parallel/Intercept Routes）を開く。カード/行クリックで <strong>SC-12 クエスト詳細</strong>へ。下書き中のクエストは本人のみダッシュボード（SC-01）に表示。</p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ダッシュボードで設定した個人背景を全画面へ反映）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // 参加中クエストのデータ（デモ）。accent=クエスト色（カード帯＋アイコンタイル）
+  const QUESTS = [
+    { id:1, title:'配送ルート最適化', theme:'配送コストとCO2削減の両立', cat:'業務改善', status:'評価中', group:'プロダクト開発部', owner:'山', char:'配', accent:'#0D9488', deadline:'2026/12/20', dl:20261220, soon:true, party:6, ideas:8, my:'未投稿', order:6 },
+    { id:2, title:'社内ナレッジ検索AI', theme:'問い合わせ対応の工数を半減', cat:'新規事業', status:'選定', group:'プロダクト開発部', owner:'鈴', char:'社', accent:'#7C3AED', deadline:'2026/12/24', dl:20261224, soon:false, party:4, ideas:12, my:'投稿済み', order:5 },
+    { id:3, title:'経費精算の自動化', theme:'締め作業のムダをなくす', cat:'コスト削減', status:'募集中', group:'全社改善プロジェクト', owner:'田', char:'経', accent:'#EA580C', deadline:'2027/01/10', dl:20270110, soon:false, party:5, ideas:3, my:'投稿済み', order:4 },
+    { id:4, title:'顧客サポートの品質向上', theme:'一次回答の速度と満足度を上げる', cat:'顧客体験', status:'進行中', group:'全社改善プロジェクト', owner:'伊', char:'顧', accent:'#2563EB', deadline:'2026/12/28', dl:20261228, soon:false, party:7, ideas:15, my:'未投稿', order:3 },
+    { id:5, title:'社内イベント活性化', theme:'部署横断の交流を増やす', cat:'業務改善', status:'完了', group:'プロダクト開発部', owner:'佐', char:'社', accent:'#DB2777', deadline:'2026/11/30', dl:20261130, soon:false, party:5, ideas:9, my:'投稿済み', order:2 },
+    { id:6, title:'オフィス省エネ', theme:'電力コストと環境負荷を下げる', cat:'コスト削減', status:'募集中', group:'全社改善プロジェクト', owner:'山', char:'オ', accent:'#059669', deadline:'2027/01/20', dl:20270120, soon:false, party:3, ideas:1, my:'未投稿', order:1 },
+  ];
+
+  const statusBadge = s => s === '完了' ? 'badge badge-muted' : (s === '選定' ? 'badge badge-success' : 'badge');
+  const myBadge = m => m === '未投稿' ? 'badge badge-danger' : (m === '投稿済み' ? 'badge badge-success' : 'badge');
+  const questIcon = q => '<span class="quest-icon sm" style="--accent:' + q.accent + '"><span class="quest-icon__char">' + q.char + '</span><span class="quest-icon__owner placeholder">' + q.owner + '</span></span>';
+
+  const cardView = document.getElementById('cardView');
+  const tableView = document.getElementById('tableView');
+  const tableBody = document.getElementById('tableBody');
+  const emptyState = document.getElementById('emptyState');
+  const listCount = document.getElementById('listCount');
+  const q = document.getElementById('q'), fState = document.getElementById('fState'), fGroup = document.getElementById('fGroup');
+  const sortSel = document.getElementById('sortSel'), clearBtn = document.getElementById('clearFilters');
+  let view = 'card';
+
+  function currentList() {
+    const kw = q.value.trim().toLowerCase();
+    let list = QUESTS.filter(x => {
+      if (fState.value && x.status !== fState.value) return false;
+      if (fGroup.value && x.group !== fGroup.value) return false;
+      if (kw && !(x.title + x.theme + x.cat).toLowerCase().includes(kw)) return false;
+      return true;
+    });
+    const s = sortSel.value;
+    list.sort((a, b) =>
+      s === 'deadline' ? a.dl - b.dl :
+      s === 'ideas' ? b.ideas - a.ideas :
+      s === 'party' ? b.party - a.party :
+      b.order - a.order); // new
+    return list;
+  }
+
+  function render() {
+    const list = currentList();
+    listCount.textContent = list.length + '件';
+    clearBtn.hidden = !(q.value || fState.value || fGroup.value);
+
+    // カード
+    cardView.innerHTML = list.map(x =>
+      '<a class="card card-accent quest-card" href="SC-12_クエスト詳細.html" style="--accent:' + x.accent + '">' +
+        '<div class="between"><span class="row-center" style="gap:var(--space-2);min-width:0">' + questIcon(x) +
+          '<span class="card-title">' + x.title + '</span></span>' +
+          '<span class="' + statusBadge(x.status) + '">' + x.status + '</span></div>' +
+        '<div class="quest-card__meta"><span class="badge badge-muted">' + x.cat + '</span>' +
+          '<span class="deadline' + (x.soon ? ' soon' : '') + '">⏳ 締切 ' + x.deadline + '</span></div>' +
+        '<div class="quest-card__stats"><span>👥 ' + x.party + '</span><span>💡 ' + x.ideas + '</span>' +
+          '<span class="' + myBadge(x.my) + '">' + x.my + '</span></div>' +
+      '</a>'
+    ).join('');
+
+    // テーブル
+    tableBody.innerHTML = list.map(x =>
+      '<tr class="row-link" data-href="SC-12_クエスト詳細.html">' +
+        '<td><span class="row-center" style="gap:var(--space-2)">' + questIcon(x) + '<span class="idea-title">' + x.title + '</span></span></td>' +
+        '<td><span class="badge badge-muted">' + x.cat + '</span></td>' +
+        '<td><span class="' + statusBadge(x.status) + '">' + x.status + '</span></td>' +
+        '<td class="' + (x.soon ? 'deadline soon' : '') + '">' + x.deadline + '</td>' +
+        '<td class="num">' + x.party + '</td>' +
+        '<td class="num">' + x.ideas + '</td>' +
+        '<td><span class="' + myBadge(x.my) + '">' + x.my + '</span></td>' +
+      '</tr>'
+    ).join('');
+    tableBody.querySelectorAll('tr.row-link').forEach(tr => tr.addEventListener('click', () => { location.href = tr.dataset.href; }));
+
+    const empty = list.length === 0;
+    emptyState.hidden = !empty;
+    cardView.hidden = empty || view !== 'card';
+    tableView.hidden = empty || view !== 'list';
+  }
+
+  [q, fState, fGroup, sortSel].forEach(el => el.addEventListener('input', render));
+  clearBtn.addEventListener('click', () => { q.value = ''; fState.value = ''; fGroup.value = ''; render(); });
+
+  const viewCard = document.getElementById('viewCard'), viewList = document.getElementById('viewList');
+  function setView(v) {
+    view = v;
+    viewCard.classList.toggle('is-on', v === 'card'); viewCard.setAttribute('aria-pressed', String(v === 'card'));
+    viewList.classList.toggle('is-on', v === 'list'); viewList.setAttribute('aria-pressed', String(v === 'list'));
+    render();
+  }
+  viewCard.addEventListener('click', () => setView('card'));
+  viewList.addEventListener('click', () => setView('list'));
+
+  document.getElementById('createBtn').addEventListener('click', () => alert('クエスト作成モーダル（SC-11）を開きます（デモ）'));
+
+  render();
+</script>
+</body>
+</html>
