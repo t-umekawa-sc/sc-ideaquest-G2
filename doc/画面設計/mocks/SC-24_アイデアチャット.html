@@ -277,7 +277,7 @@
       <p class="composer__hint" id="composerHint" hidden>
         <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span class="xp">+5 XP</span>（日次上限あり）。<br>
         ツールバー: 📎添付 ・ <code>@</code>メンション ・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。<br>
-        各メッセージにホバーで <strong>アクション</strong>（🙂リアクション/💬引用/自分の投稿は✏️編集・🗑削除）。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）・クールダウンあり。
+        各メッセージにホバーで <strong>アクション</strong>（🙂リアクション/💬引用/自分の投稿は✏️編集・🗑削除）。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）。<strong>各魔法は1チャットにつき1回</strong>（チップをクリックで取消＝別メッセージへ付け替え可）。
       </p>
     </div>
   </div>
@@ -293,7 +293,7 @@
 <div class="reaction-picker" id="reactionPicker" hidden role="menu" aria-label="リアクションを選ぶ">
   <p class="rp__label">リアクション</p>
   <div class="rp__row" id="rpEmojis"></div>
-  <p class="rp__label">魔法 <span class="muted">（解放済み・クールダウンあり）</span></p>
+  <p class="rp__label">魔法 <span class="muted">（各魔法このチャットで1回・チップをクリックで取消して付け替え可）</span></p>
   <div class="rp__row" id="rpSpells"></div>
 </div>
 
@@ -490,14 +490,15 @@
 
   // ===== リアクション（通常＋魔法） =====
   const NORMAL_EMOJIS = ['👍','❤️','😄','🎉','🙏','👀'];
-  // 解放済み魔法（本来は SC-32 で SP 解放したもの）。cd=クールダウン秒（デモは短め）
+  // 解放済み魔法（本来は SC-32 で SP 解放したもの）
   const SPELLS = [
-    { id:'fire',    label:'炎',       icon:'🔥', fx:'spell-fx--fire',    cd:8 },
-    { id:'ice',     label:'氷',       icon:'❄️', fx:'spell-fx--ice',     cd:8 },
-    { id:'thunder', label:'雷',       icon:'⚡', fx:'spell-fx--thunder', cd:8 },
-    { id:'sparkle', label:'キラキラ', icon:'✨', fx:'spell-fx--sparkle', cd:8 },
+    { id:'fire',    label:'炎',       icon:'🔥', fx:'spell-fx--fire' },
+    { id:'ice',     label:'氷',       icon:'❄️', fx:'spell-fx--ice' },
+    { id:'thunder', label:'雷',       icon:'⚡', fx:'spell-fx--thunder' },
+    { id:'sparkle', label:'キラキラ', icon:'✨', fx:'spell-fx--sparkle' },
   ];
-  const spellCooldown = {}; // id -> 解除タイムスタンプ(ms)
+  // このアイデアチャットで発動中の魔法（各魔法ごとに1回のみ）。spellId -> { msg, chip }
+  const spellPlacement = {};
 
   const picker = document.getElementById('reactionPicker');
   const rpEmojis = document.getElementById('rpEmojis');
@@ -551,31 +552,40 @@
     chip.dataset.count = n; chip.dataset.names = JSON.stringify(names);
     chip.querySelector('.reaction__count').textContent = n; updateReactionTitle(chip);
   }
-  // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ＋クールダウン開始
+  // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ（クリックで取消）。各魔法1チャット1回
   function castSpell(msg, bar, spell) {
+    if (spellPlacement[spell.id]) return; // その魔法はこのチャットで既に使用中
     msg.classList.add('spell-fx', spell.fx);
-    let chip = [...bar.querySelectorAll('.reaction.magic')].find(c => c.dataset.spell === spell.id);
-    if (!chip) {
-      chip = document.createElement('span');
-      chip.className = 'reaction magic is-me'; chip.dataset.spell = spell.id; chip.dataset.count = '1';
-      chip.title = spell.label + '魔法 ・ あなた が発動';
-      chip.innerHTML = spell.icon + ' <span class="reaction__count">1</span>';
-      bar.insertBefore(chip, bar.querySelector('.reaction-add'));
-    } else {
-      const n = Number(chip.dataset.count) + 1; chip.dataset.count = n; chip.querySelector('.reaction__count').textContent = n;
-    }
-    spellCooldown[spell.id] = Date.now() + spell.cd * 1000;
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'reaction magic is-me'; chip.dataset.spell = spell.id;
+    chip.title = spell.label + '魔法（あなた）・クリックで取消';
+    chip.innerHTML = spell.icon + ' <span class="reaction__count">1</span>';
+    chip.addEventListener('click', () => cancelSpell(spell.id));
+    bar.insertBefore(chip, bar.querySelector('.reaction-add'));
+    spellPlacement[spell.id] = { msg, chip };
+  }
+  // 魔法の取消（通常リアクション同様にキャンセル可）→ エフェクト・チップ除去、別メッセージへ付け替え可
+  function cancelSpell(spellId) {
+    const p = spellPlacement[spellId]; if (!p) return;
+    const spell = SPELLS.find(s => s.id === spellId);
+    p.msg.classList.remove(spell.fx);
+    // そのメッセージに他の魔法エフェクトが無ければ土台クラスも外す
+    if (![...p.msg.classList].some(c => c.startsWith('spell-fx--'))) p.msg.classList.remove('spell-fx');
+    p.chip.remove();
+    delete spellPlacement[spellId];
+    if (!picker.hidden) renderSpells();
   }
 
   function buildEmojis() {
     rpEmojis.innerHTML = NORMAL_EMOJIS.map(e => '<button type="button" class="rp__emoji" data-emoji="' + e + '">' + e + '</button>').join('');
   }
   function renderSpells() {
-    const now = Date.now();
     rpSpells.innerHTML = SPELLS.map(s => {
-      const left = Math.ceil(((spellCooldown[s.id] || 0) - now) / 1000);
-      const cd = left > 0 ? ' <span class="cd">' + left + 's</span>' : '';
-      return '<button type="button" class="rp__spell" data-spell="' + s.id + '"' + (left > 0 ? ' disabled' : '') + '>' + s.icon + ' ' + s.label + cd + '</button>';
+      const used = !!spellPlacement[s.id];
+      const tag = used ? ' <span class="cd">使用中</span>' : '';
+      // 各魔法1回＝使用中の魔法だけ選べない（取消で再び選べる）
+      return '<button type="button" class="rp__spell" data-spell="' + s.id + '"' + (used ? ' disabled' : '') + '>' + s.icon + ' ' + s.label + tag + '</button>';
     }).join('');
   }
   function openPicker(msg, anchor) {
@@ -709,8 +719,6 @@
     hintToggle.setAttribute('aria-expanded', String(show));
   });
 
-  // ===== クールダウンの残秒をライブ更新（ピッカーが開いている間） =====
-  setInterval(() => { if (!picker.hidden) renderSpells(); }, 1000);
 </script>
 </body>
 </html>
