@@ -186,6 +186,33 @@
         </div>
       </div>
     </div>
+
+    <h3 style="margin-top:var(--space-6)">用途別カラーアクセント（<code>.card-accent</code>）</h3>
+    <p class="hint" style="margin-top:0">業務カードは<strong>材質でなく色</strong>で用途を区別（1レイヤー1マテリアル）。左端の色帯は <code>--accent</code> で指定。</p>
+    <div class="demo-grid">
+      <div class="card card-accent" style="--accent:var(--color-text-subtle)">
+        <div class="between"><span class="card-title">下書き</span><span class="badge badge-muted">グレー</span></div>
+        <p class="muted text-sm">未完・作成者のみ表示。</p>
+      </div>
+      <div class="card card-accent" style="--accent:var(--color-primary)">
+        <div class="between"><span class="card-title">未投票</span><span class="badge">青</span></div>
+        <p class="muted text-sm">要アクション（投票ショートカット）。</p>
+      </div>
+      <div class="card card-accent" style="--accent:var(--color-info)">
+        <div class="between"><span class="card-title">フォロー中</span><span class="badge badge-muted">水色</span></div>
+        <p class="muted text-sm">ウォッチ中のアイデア。</p>
+      </div>
+      <div class="card card-accent" style="--accent:#7C3AED">
+        <div class="between">
+          <span class="row-center" style="gap:var(--space-2)">
+            <span class="quest-icon sm"><span class="quest-icon__char">社</span><span class="quest-icon__owner placeholder">鈴</span></span>
+            <span class="card-title">参加中クエスト</span>
+          </span>
+          <span class="badge">クエスト色</span>
+        </div>
+        <p class="muted text-sm">帯とアイコンタイルが <code>--accent</code> で連動。</p>
+      </div>
+    </div>
   </div>
 
   <!-- ゲーミフィケーション -->

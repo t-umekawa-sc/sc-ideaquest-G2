@@ -98,10 +98,11 @@
    * 下書き中のクエスト/アイデア（最上段・クリックで作成/編集モーダル）
    * ========================================================= */
   .draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
-  .draft-card { position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+  /* 用途別アクセント色（下書き=グレー）。左帯は .card-accent（shared.css）が描画。 */
+  .draft-card { --accent: var(--color-text-subtle); position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
     border-style: dashed; border-color: var(--color-border-strong); background: var(--color-surface-alt);
     transition: box-shadow .15s, transform .05s, border-color .15s; }
-  .draft-card:hover { box-shadow: var(--shadow); border-color: var(--color-warning); }
+  .draft-card:hover { box-shadow: var(--shadow); border-color: var(--color-text-subtle); }
   .draft-card:active { transform: translateY(1px); }
   .draft-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
   .draft-card__head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
@@ -114,7 +115,8 @@
    * 未投票のアイデア（投票ショートカット・クリックで投票モーダル）
    * ========================================================= */
   .vote-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
-  .vote-card { position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+  /* 用途別アクセント色（未投票=プライマリ青＝要アクション） */
+  .vote-card { --accent: var(--color-primary); position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
     transition: box-shadow .15s, transform .05s, border-color .15s, opacity .3s ease; }
   .vote-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
   .vote-card:active { transform: translateY(1px); }
@@ -147,7 +149,8 @@
    * フォロー中のアイデア（業務層カード・クリックで拡大モーダル）
    * ========================================================= */
   .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
-  .follow-card { position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+  /* 用途別アクセント色（フォロー中=インフォ水色） */
+  .follow-card { --accent: var(--color-info); position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
     transition: box-shadow .15s, transform .05s, border-color .15s; }
   .follow-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
   .follow-card:active { transform: translateY(1px); }
@@ -324,7 +327,7 @@
       <span class="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
     </div>
     <div class="draft-grid" id="draftGrid">
-      <button class="card draft-card" type="button"
+      <button class="card card-accent draft-card" type="button"
         data-kind="クエスト" data-title="新オフィスのレイアウト改善" data-sub="カテゴリー: 業務改善 / 期限: 未設定"
         data-edit="SC-11 クエスト作成・編集">
         <div class="draft-card__head">
@@ -336,7 +339,7 @@
         <div class="draft-card__cta">続きを書く ✎</div>
       </button>
 
-      <button class="card draft-card" type="button"
+      <button class="card card-accent draft-card" type="button"
         data-kind="アイデア" data-title="社内イベントの出欠をLINEで管理" data-sub="クエスト: 社内コミュニケーション活性化"
         data-edit="SC-21 アイデア登録・編集">
         <div class="draft-card__head">
@@ -357,7 +360,7 @@
       <span class="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
     </div>
     <div class="vote-grid" id="voteGrid">
-      <button class="card vote-card" type="button"
+      <button class="card card-accent vote-card" type="button"
         data-title="AI議事録の自動要約" data-quest="社内ナレッジ検索AI" data-cat="新規事業"
         data-value="会議音声から議事録と決定事項を自動生成し、共有の手間をなくす。"
         data-body="Web会議の録音をアップロードすると、文字起こし→要約→ToDo抽出まで自動化。参加者に自動配信する。"
@@ -372,7 +375,7 @@
         </div>
       </button>
 
-      <button class="card vote-card" type="button"
+      <button class="card card-accent vote-card" type="button"
         data-title="置き配の写真通知" data-quest="配送ルート最適化" data-cat="顧客体験"
         data-value="置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。"
         data-body="配達員が置き配位置を撮影し、受取人にアプリ通知。盗難時の証跡にもなり、再配達コストを削減。"
@@ -387,7 +390,7 @@
         </div>
       </button>
 
-      <button class="card vote-card" type="button"
+      <button class="card card-accent vote-card" type="button"
         data-title="有給の取得を可視化" data-quest="経費精算の自動化" data-cat="業務改善"
         data-value="チームの有給取得状況を可視化し、取りやすい雰囲気をつくる。"
         data-body="部署ごとの有給取得率をダッシュボード化し、取得目標に対する進捗を見える化する。"
@@ -411,7 +414,7 @@
       <a href="#">すべて見る →</a>
     </div>
     <div class="quest-grid">
-      <a class="card quest-card" href="#">
+      <a class="card card-accent quest-card" href="#" style="--accent:#0D9488">
         <div class="between">
           <span class="row-center" style="gap:var(--space-2); min-width:0">
             <span class="quest-icon sm"><span class="quest-icon__char">配</span><span class="quest-icon__owner placeholder">山</span></span>
@@ -430,7 +433,7 @@
         </div>
       </a>
 
-      <a class="card quest-card" href="#">
+      <a class="card card-accent quest-card" href="#" style="--accent:#7C3AED">
         <div class="between">
           <span class="row-center" style="gap:var(--space-2); min-width:0">
             <span class="quest-icon sm"><span class="quest-icon__char">社</span><span class="quest-icon__owner placeholder">鈴</span></span>
@@ -449,7 +452,7 @@
         </div>
       </a>
 
-      <a class="card quest-card" href="#">
+      <a class="card card-accent quest-card" href="#" style="--accent:#EA580C">
         <div class="between">
           <span class="row-center" style="gap:var(--space-2); min-width:0">
             <span class="quest-icon sm"><span class="quest-icon__char">経</span><span class="quest-icon__owner placeholder">田</span></span>
@@ -477,7 +480,7 @@
       <span class="muted text-sm">動きがあると通知でお知らせ</span>
     </div>
     <div class="follow-grid" id="followGrid">
-      <button class="card follow-card" type="button"
+      <button class="card card-accent follow-card" type="button"
         data-title="夜間配送の集約" data-quest="配送ルート最適化" data-cat="業務改善"
         data-value="夜間帯の配送を1拠点に集約し、積載率を上げて配送コストとCO2を同時に削減する。"
         data-body="現状は拠点ごとに小口配送しており積載率が低い。夜間の集約便を設定し、翌朝に各拠点へ再配分することで台数を削減できる。試算では月間15%のコスト削減。"
@@ -494,7 +497,7 @@
         </div>
       </button>
 
-      <button class="card follow-card" type="button"
+      <button class="card card-accent follow-card" type="button"
         data-title="FAQ自動生成" data-quest="社内ナレッジ検索AI" data-cat="新規事業"
         data-value="問い合わせ履歴からFAQを自動生成し、サポート工数を半減する。"
         data-body="過去の問い合わせとその回答をLLMで要約し、FAQ候補を自動生成。担当者は公開可否をレビューするだけで済む。"
@@ -511,7 +514,7 @@
         </div>
       </button>
 
-      <button class="card follow-card" type="button"
+      <button class="card card-accent follow-card" type="button"
         data-title="経費レシートOCR" data-quest="経費精算の自動化" data-cat="コスト削減"
         data-value="レシート撮影だけで経費入力が完了し、申請の手間をなくす。"
         data-body="スマホでレシートを撮影するとOCRで金額・日付・店舗を抽出し、経費申請フォームに自動入力する。"

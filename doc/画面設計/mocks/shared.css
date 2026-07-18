@@ -201,6 +201,16 @@ img { max-width: 100%; display: block; }
   padding: var(--space-6);
 }
 .card-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-3); }
+/* 用途別カラーアクセント（業務カードを“材質”でなく“色”で区別＝1レイヤー1マテリアル方針）。
+   左端に色帯を出す。擬似要素なのでホバーの影/枠線色の変化に影響されない。色は --accent で指定。
+   例: 下書き=グレー / 未投票=プライマリ青 / フォロー中=インフォ水色 / 参加中クエスト=クエスト色。 */
+.card-accent { position: relative; }
+.card-accent::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--accent, var(--color-border-strong));
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  pointer-events: none;
+}
 
 /* =============================================================
  * 6b. モーダルダイアログ（標準）
@@ -380,7 +390,8 @@ img { max-width: 100%; display: block; }
 .quest-icon__char {
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: calc(var(--qicon-size, 56px) * .5); line-height: 1; color: #fff;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-active));
+  /* クエスト色（--accent。カード側と共有）＋斜めの陰影でタイル感を出す。未指定はプライマリ。 */
+  background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(0,0,0,.28)), var(--accent, var(--color-primary));
   border-color: transparent;
 }
 /* フォールバック：右下に所有者アバターを重ねる */
