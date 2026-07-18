@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-24 アイデアチャット — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-24 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  .chat-main { padding-block: var(--space-5) 0; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-h)); }
+
+  /* --- 上部の文脈バー（アイデアの件名・クエスト・戻る） --- */
+  .chat-context { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+  .chat-context__body { min-width: 0; flex: 1; }
+  .chat-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .chat-context__title { font-weight: 700; font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-context__meta { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+  .backlink { color: var(--color-text-muted); font-size: var(--text-sm); white-space: nowrap; }
+  .backlink:hover { color: var(--color-text); }
+
+  /* --- メッセージスレッド（フラットリスト） --- */
+  .chat-thread { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4) 0; }
+  .chat-day { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0 var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+  .chat-day::before, .chat-day::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+  .unread-sep { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0; color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; }
+  .unread-sep::before, .unread-sep::after { content: ""; flex: 1; height: 1px; background: var(--color-danger); opacity: .5; }
+
+  .msg { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); }
+  .msg:hover { background: var(--color-surface-alt); }
+  .msg__body { min-width: 0; flex: 1; }
+  .msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
+  .msg__name { font-weight: 700; font-size: var(--text-sm); }
+  .msg__me { font-size: var(--text-xs); color: var(--color-primary); font-weight: 600; }
+  .msg__time { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .msg__text { margin: 2px 0 0; font-size: var(--text-base); line-height: 1.75; word-break: break-word; }
+  .msg__text .mention { color: var(--color-primary); font-weight: 600; background: var(--color-primary-soft); border-radius: var(--radius-sm); padding: 0 3px; }
+  /* 自分宛メンションの強調 */
+  .msg__text .mention.is-me { color: var(--color-warning); background: #FEF3C7; }
+
+  /* 添付チップ */
+  .msg__files { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  .file-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--text-sm); background: var(--color-surface); }
+  .file-chip .file-icon { font-size: 16px; }
+  .file-chip a { color: var(--color-primary); }
+
+  /* --- 入力欄（下部固定） --- */
+  .composer { position: sticky; bottom: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 -6px 16px rgba(15,23,42,.06); padding: var(--space-3) var(--space-4) var(--space-4); margin-top: var(--space-3); }
+  .composer__row { display: flex; align-items: flex-end; gap: var(--space-3); }
+  .composer__field { flex: 1; position: relative; }
+  .composer__box { width: 100%; min-height: 44px; max-height: 180px; resize: none; overflow-y: auto;
+    border: 1px solid var(--color-border-strong); border-radius: var(--radius); padding: var(--space-3); font: inherit; line-height: 1.6; background: var(--color-surface); }
+  .composer__box:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .composer__tools { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+  .tool-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--color-border); border-radius: var(--radius);
+    padding: 6px var(--space-3); font: inherit; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; }
+  .tool-btn:hover { background: var(--color-surface-alt); color: var(--color-text); }
+  .composer__send { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .composer__hint { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-2); }
+  .composer__hint .xp { color: var(--color-warning); font-weight: 600; }
+  /* 添付予定のプレビュー */
+  .composer__attachments { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  .composer__attachments:empty { display: none; }
+  .att-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); font-size: var(--text-xs); background: var(--color-surface-alt); }
+  .att-chip button { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 14px; line-height: 1; padding: 0; }
+
+  /* --- @メンション候補ポップアップ --- */
+  .mention-pop { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 20; min-width: 220px;
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-1); }
+  .mention-pop[hidden] { display: none; }
+  .mention-opt { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); cursor: pointer; }
+  .mention-opt:hover, .mention-opt.is-active { background: var(--color-primary-soft); }
+  .mention-opt__name { font-size: var(--text-sm); font-weight: 500; }
+
+  @media (max-width: 640px) { .composer__row { flex-direction: column; align-items: stretch; } .composer__send { flex-direction: row; } }
+
+  /* --- リアクション選択ポップアップ（通常絵文字＋魔法） --- */
+  .reaction-picker { position: absolute; z-index: 40; min-width: 240px; background: var(--color-surface);
+    border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-3); }
+  .reaction-picker[hidden] { display: none; }
+  .rp__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-1); }
+  .rp__label + .rp__row { margin-bottom: var(--space-3); }
+  .rp__row { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .rp__emoji { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: none; border-radius: var(--radius-sm); font-size: 18px; cursor: pointer; }
+  .rp__emoji:hover { background: var(--color-surface-alt); }
+  .rp__spell { display: inline-flex; align-items: center; gap: 6px; padding: 4px var(--space-2); border: 1px solid var(--rarity-rare);
+    border-radius: var(--radius-full); background: #F5F3FF; font: inherit; font-size: var(--text-sm); cursor: pointer; }
+  .rp__spell:hover { filter: brightness(.97); }
+  .rp__spell:disabled { opacity: .5; cursor: not-allowed; border-color: var(--color-border); background: var(--color-surface-alt); }
+  .rp__spell .cd { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- 背景画像レイヤー（全認証画面共通・ダッシュボードで設定した背景をここでも反映） -->
+<div class="app-bg" id="appBg"></div>
+
+<!-- ============ アプリヘッダー（共通 .app-header） ============ -->
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="row-center">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）" style="text-decoration:none">✦ SP 3</a>
+      <button class="btn btn-outline btn-sm">通知</button>
+    </div>
+  </div>
+</header>
+
+<main class="container chat-main">
+  <!-- ============ 文脈バー（アイデアの件名・クエスト・戻る） ============ -->
+  <section class="card chat-context" aria-label="対象アイデア">
+    <div class="chat-context__body">
+      <div class="chat-context__quest">配送ルート最適化 ・ 業務改善</div>
+      <div class="chat-context__title">💬 夜間配送の集約による積載率改善</div>
+      <div class="chat-context__meta">👥 パーティー6人が参加 ・ 💬 8件</div>
+    </div>
+    <a class="btn btn-outline btn-sm" href="SC-22_アイデア詳細.html">アイデア詳細を開く（SC-22）</a>
+    <a class="backlink" href="SC-22_アイデア詳細.html">← 戻る</a>
+  </section>
+
+  <!-- ============ メッセージスレッド ============ -->
+  <div class="chat-thread" id="thread">
+    <div class="chat-day">2026/07/15</div>
+
+    <div class="msg">
+      <span class="avatar sm"><span class="avatar__img placeholder">田</span></span>
+      <div class="msg__body">
+        <div class="msg__head"><span class="msg__name">田中 一郎</span><span class="msg__time">14:20</span></div>
+        <p class="msg__text">積載率の現状値ってどれくらいですか？試算の前提が知りたいです。</p>
+      </div>
+    </div>
+
+    <div class="msg">
+      <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
+      <div class="msg__body">
+        <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">15:02</span></div>
+        <p class="msg__text"><span class="mention">@田中一郎</span> 平均62%です。集約後は80%超を見込んでいます。根拠は添付の試算シート参照。</p>
+        <div class="msg__files">
+          <span class="file-chip"><span class="file-icon">📄</span><a href="#">夜間配送_試算シート.xlsx</a><span class="muted">248KB</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg">
+      <span class="avatar sm"><span class="avatar__img placeholder">山</span></span>
+      <div class="msg__body">
+        <div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">15:20</span></div>
+        <p class="msg__text">80%はかなり効きますね。パイロットの3拠点はどこを想定していますか？</p>
+      </div>
+    </div>
+
+    <div class="chat-day">2026/07/16</div>
+
+    <div class="unread-sep">ここから未読</div>
+
+    <div class="msg">
+      <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
+      <div class="msg__body">
+        <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">09:12</span></div>
+        <p class="msg__text"><span class="mention is-me">@山田太郎</span> 首都圏の東京・川崎・さいたまの3拠点です。距離が近く効果検証しやすいので。</p>
+      </div>
+    </div>
+
+    <div class="msg">
+      <span class="avatar sm"><span class="avatar__img placeholder">佐</span></span>
+      <div class="msg__body">
+        <div class="msg__head"><span class="msg__name">佐藤 大輔</span><span class="msg__time">10:05</span></div>
+        <p class="msg__text">委託先の稼働シフトとの整合だけ確認しておきたいです。ルート生成は情シスに相談済みですか？</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 入力欄（下部固定・添付/メンション/送信） ============ -->
+  <div class="composer" aria-label="メッセージ入力">
+    <div class="composer__attachments" id="attList"></div>
+    <div class="composer__row">
+      <div class="composer__field">
+        <textarea class="composer__box" id="box" rows="1" placeholder="メッセージを入力…（@ でメンション）"></textarea>
+        <!-- @メンション候補（デモ） -->
+        <div class="mention-pop" id="mentionPop" hidden role="listbox" aria-label="メンション候補"></div>
+      </div>
+      <div class="composer__send">
+        <button class="tool-btn" type="button" id="attachBtn" title="ファイルを添付">📎 添付</button>
+        <button class="btn btn-primary" type="button" id="sendBtn">送信</button>
+      </div>
+    </div>
+    <p class="composer__hint">
+      <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span class="xp">+5 XP</span>（日次上限あり）。添付・<code>@</code>メンション・通知に対応。<br>
+      各メッセージの <strong>＋</strong> からリアクション。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）・クールダウンあり。
+    </p>
+  </div>
+</main>
+
+<!-- リアクション選択ポップアップ（通常絵文字＋魔法・単一要素を使い回し） -->
+<div class="reaction-picker" id="reactionPicker" hidden role="menu" aria-label="リアクションを選ぶ">
+  <p class="rp__label">リアクション</p>
+  <div class="rp__row" id="rpEmojis"></div>
+  <p class="rp__label">魔法 <span class="muted">（解放済み・クールダウンあり）</span></p>
+  <div class="rp__row" id="rpSpells"></div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  // --- 背景画像（ダッシュボードで設定した個人背景を全画面へ反映） ---
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) {
+    const appBg = document.getElementById('appBg');
+    appBg.style.backgroundImage = 'url("' + savedBg + '")';
+    appBg.classList.add('is-set');
+  }
+
+  // パーティーメンバー（@メンション候補）。自分＝山田 太郎
+  const MEMBERS = ['山田 太郎', '鈴木 花子', '田中 一郎', '佐藤 大輔', '伊藤 彩'];
+  const ME = '山田 太郎';
+
+  const thread = document.getElementById('thread');
+  const box = document.getElementById('box');
+  const sendBtn = document.getElementById('sendBtn');
+  const attachBtn = document.getElementById('attachBtn');
+  const attList = document.getElementById('attList');
+  const pop = document.getElementById('mentionPop');
+  let pendingAtts = [];
+  let sampleFileIdx = 0;
+  const SAMPLE_FILES = ['補足メモ.pdf', '比較表.xlsx', '現地写真.png'];
+
+  // textarea 自動リサイズ
+  function autoGrow() { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 180) + 'px'; }
+
+  // 本文中の @氏名（空白除去表記）をハイライト。自分宛は is-me。
+  function renderText(raw) {
+    const esc = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const names = MEMBERS.map(n => n.replace(/\s/g,''));
+    return esc.replace(/@([^\s@]+)/g, (m, name) => {
+      if (!names.includes(name)) return m;
+      const isMe = name === ME.replace(/\s/g,'');
+      return '<span class="mention' + (isMe ? ' is-me' : '') + '">@' + name + '</span>';
+    });
+  }
+
+  function nowTime() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function send() {
+    const val = box.value.trim();
+    if (!val && pendingAtts.length === 0) return;
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    const files = pendingAtts.map(f => '<span class="file-chip"><span class="file-icon">📎</span><a href="#">' + f + '</a></span>').join('');
+    msg.innerHTML =
+      '<span class="avatar sm"><span class="avatar__img placeholder">山</span></span>' +
+      '<div class="msg__body">' +
+        '<div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">' + nowTime() + '</span></div>' +
+        (val ? '<p class="msg__text">' + renderText(val) + '</p>' : '') +
+        (files ? '<div class="msg__files">' + files + '</div>' : '') +
+      '</div>';
+    thread.appendChild(msg);
+    ensureBar(msg);
+    box.value = ''; pendingAtts = []; renderAtts(); autoGrow(); hidePop();
+    msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+
+  function renderAtts() {
+    attList.innerHTML = pendingAtts.map((f, i) =>
+      '<span class="att-chip">📎 ' + f + ' <button type="button" data-i="' + i + '" aria-label="削除">✕</button></span>'
+    ).join('');
+  }
+  attList.addEventListener('click', e => {
+    const b = e.target.closest('button[data-i]'); if (!b) return;
+    pendingAtts.splice(Number(b.dataset.i), 1); renderAtts();
+  });
+  attachBtn.addEventListener('click', () => {
+    pendingAtts.push(SAMPLE_FILES[sampleFileIdx % SAMPLE_FILES.length]); sampleFileIdx++; renderAtts();
+  });
+
+  // --- @メンション候補 ---
+  let activeIdx = 0, matches = [];
+  function updatePop() {
+    const upto = box.value.slice(0, box.selectionStart);
+    const m = upto.match(/@([^\s@]*)$/);
+    if (!m) { hidePop(); return; }
+    const q = m[1];
+    matches = MEMBERS.filter(n => n.replace(/\s/g,'').includes(q));
+    if (matches.length === 0) { hidePop(); return; }
+    activeIdx = 0;
+    pop.innerHTML = matches.map((n, i) =>
+      '<div class="mention-opt' + (i===0?' is-active':'') + '" data-name="' + n + '" role="option">' +
+        '<span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">' + n.charAt(0) + '</span></span>' +
+        '<span class="mention-opt__name">' + n + '</span>' +
+      '</div>').join('');
+    pop.hidden = false;
+  }
+  function hidePop() { pop.hidden = true; matches = []; }
+  function choose(name) {
+    const start = box.selectionStart;
+    const upto = box.value.slice(0, start);
+    const rest = box.value.slice(start);
+    const replaced = upto.replace(/@([^\s@]*)$/, '@' + name.replace(/\s/g,'') + ' ');
+    box.value = replaced + rest;
+    box.focus(); hidePop(); autoGrow();
+  }
+  pop.addEventListener('click', e => {
+    const opt = e.target.closest('.mention-opt'); if (opt) choose(opt.dataset.name);
+  });
+
+  box.addEventListener('input', () => { autoGrow(); updatePop(); });
+  box.addEventListener('keydown', e => {
+    if (!pop.hidden && matches.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx+1)%matches.length; }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx-1+matches.length)%matches.length; }
+      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); choose(matches[activeIdx]); return; }
+      else if (e.key === 'Escape') { hidePop(); return; }
+      pop.querySelectorAll('.mention-opt').forEach((el,i) => el.classList.toggle('is-active', i===activeIdx));
+      return;
+    }
+    // Enter 送信 / Shift+Enter 改行
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  sendBtn.addEventListener('click', send);
+  autoGrow();
+
+  // ===== リアクション（通常＋魔法） =====
+  const NORMAL_EMOJIS = ['👍','❤️','😄','🎉','🙏','👀'];
+  // 解放済み魔法（本来は SC-32 で SP 解放したもの）。cd=クールダウン秒（デモは短め）
+  const SPELLS = [
+    { id:'fire',    label:'炎',       icon:'🔥', fx:'spell-fx--fire',    cd:8 },
+    { id:'ice',     label:'氷',       icon:'❄️', fx:'spell-fx--ice',     cd:8 },
+    { id:'thunder', label:'雷',       icon:'⚡', fx:'spell-fx--thunder', cd:8 },
+    { id:'sparkle', label:'キラキラ', icon:'✨', fx:'spell-fx--sparkle', cd:8 },
+  ];
+  const spellCooldown = {}; // id -> 解除タイムスタンプ(ms)
+
+  const picker = document.getElementById('reactionPicker');
+  const rpEmojis = document.getElementById('rpEmojis');
+  const rpSpells = document.getElementById('rpSpells');
+  let pickerTarget = null; // 対象 .msg
+
+  // 各メッセージにリアクションバー（＋ボタン）を用意
+  function ensureBar(msg) {
+    const body = msg.querySelector('.msg__body');
+    let bar = body.querySelector('.reaction-bar');
+    if (!bar) { bar = document.createElement('div'); bar.className = 'reaction-bar'; body.appendChild(bar); }
+    if (!bar.querySelector('.reaction-add')) {
+      const add = document.createElement('button');
+      add.type = 'button'; add.className = 'reaction-add'; add.textContent = '＋'; add.title = 'リアクション';
+      add.setAttribute('aria-label', 'リアクションを追加');
+      add.addEventListener('click', e => { e.stopPropagation(); openPicker(msg, add); });
+      bar.appendChild(add);
+    }
+    return bar;
+  }
+  // 既存/初期の通常リアクションを配置
+  function seedReaction(bar, emoji, count, mine) {
+    const chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'reaction' + (mine ? ' is-me' : '');
+    chip.dataset.emoji = emoji; chip.dataset.count = String(count);
+    chip.innerHTML = emoji + ' <span class="reaction__count">' + count + '</span>';
+    chip.addEventListener('click', () => flipReaction(chip));
+    bar.insertBefore(chip, bar.querySelector('.reaction-add'));
+    return chip;
+  }
+  // 通常リアクションをトグル（自分の分を増減）
+  function toggleReaction(bar, emoji) {
+    let chip = [...bar.querySelectorAll('.reaction:not(.magic)')].find(c => c.dataset.emoji === emoji);
+    if (!chip) { seedReaction(bar, emoji, 1, true); return; }
+    flipReaction(chip);
+  }
+  function flipReaction(chip) {
+    const me = chip.classList.contains('is-me');
+    let n = Number(chip.dataset.count);
+    if (me) { n--; chip.classList.remove('is-me'); } else { n++; chip.classList.add('is-me'); }
+    if (n <= 0) { chip.remove(); return; }
+    chip.dataset.count = n; chip.querySelector('.reaction__count').textContent = n;
+  }
+  // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ＋クールダウン開始
+  function castSpell(msg, bar, spell) {
+    msg.classList.add('spell-fx', spell.fx);
+    let chip = [...bar.querySelectorAll('.reaction.magic')].find(c => c.dataset.spell === spell.id);
+    if (!chip) {
+      chip = document.createElement('span');
+      chip.className = 'reaction magic is-me'; chip.dataset.spell = spell.id; chip.dataset.count = '1';
+      chip.title = spell.label + '魔法';
+      chip.innerHTML = spell.icon + ' <span class="reaction__count">1</span>';
+      bar.insertBefore(chip, bar.querySelector('.reaction-add'));
+    } else {
+      const n = Number(chip.dataset.count) + 1; chip.dataset.count = n; chip.querySelector('.reaction__count').textContent = n;
+    }
+    spellCooldown[spell.id] = Date.now() + spell.cd * 1000;
+  }
+
+  function buildEmojis() {
+    rpEmojis.innerHTML = NORMAL_EMOJIS.map(e => '<button type="button" class="rp__emoji" data-emoji="' + e + '">' + e + '</button>').join('');
+  }
+  function renderSpells() {
+    const now = Date.now();
+    rpSpells.innerHTML = SPELLS.map(s => {
+      const left = Math.ceil(((spellCooldown[s.id] || 0) - now) / 1000);
+      const cd = left > 0 ? ' <span class="cd">' + left + 's</span>' : '';
+      return '<button type="button" class="rp__spell" data-spell="' + s.id + '"' + (left > 0 ? ' disabled' : '') + '>' + s.icon + ' ' + s.label + cd + '</button>';
+    }).join('');
+  }
+  function openPicker(msg, anchor) {
+    pickerTarget = msg; renderSpells(); picker.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    picker.style.top = (window.scrollY + r.bottom + 6) + 'px';
+    picker.style.left = (window.scrollX + Math.min(r.left, window.innerWidth - 260)) + 'px';
+  }
+  function closePicker() { picker.hidden = true; pickerTarget = null; }
+  rpEmojis.addEventListener('click', e => {
+    const b = e.target.closest('.rp__emoji'); if (!b || !pickerTarget) return;
+    toggleReaction(ensureBar(pickerTarget), b.dataset.emoji); closePicker();
+  });
+  rpSpells.addEventListener('click', e => {
+    const b = e.target.closest('.rp__spell'); if (!b || b.disabled || !pickerTarget) return;
+    castSpell(pickerTarget, ensureBar(pickerTarget), SPELLS.find(s => s.id === b.dataset.spell)); closePicker();
+  });
+  document.addEventListener('click', e => {
+    if (!picker.hidden && !picker.contains(e.target) && !e.target.closest('.reaction-add')) closePicker();
+  });
+
+  // 初期化：全メッセージにバー、いくつか初期リアクション＋炎エフェクトのデモ
+  buildEmojis();
+  const seedMsgs = [...thread.querySelectorAll('.msg')];
+  seedMsgs.forEach(ensureBar);
+  if (seedMsgs[1]) { const b = ensureBar(seedMsgs[1]); seedReaction(b, '👍', 2, false); seedReaction(b, '🎉', 1, false); }
+  if (seedMsgs[4]) castSpell(seedMsgs[4], ensureBar(seedMsgs[4]), SPELLS[0]); // 佐藤のメッセージに炎（枠が燃える）
+</script>
+</body>
+</html>

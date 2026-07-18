@@ -58,6 +58,7 @@
   --pixel-level-on-dark: #C4B5FD; /* レベル=明るいバイオレット（CRTガラス等の暗面上で読ませる用） */
   --pixel-cyan:   #22D3EE; /* レトロ・シアン */
   --pixel-magenta:#EC4899; /* レトロ・マゼンタ */
+  --pixel-skill:  #34D399; /* スキルポイント(SP)=エメラルド（XP/コイン/レベルと区別） */
   --pixel-bg:     #1E293B; /* ゲームパネルの暗い背景（slate-800）※不透明が必要な場面用に残置 */
   --pixel-ink:    #F8FAFC; /* ゲームパネル上の明るい文字 */
   /* ゲーム層マテリアル＝「CRTガラス」（決定・2026-07-18）。半透明の暗ガラス＋走査線＋
@@ -585,6 +586,7 @@ img { max-width: 100%; display: block; }
 }
 .pixel-stat.coin  { color: var(--pixel-coin); }
 .pixel-stat.level { color: var(--pixel-level); }
+.pixel-stat.skill { color: var(--pixel-skill); } /* スキルポイント(SP) */
 
 /* 週間ランキングパネル（ゲーム層・.pixel-panel の中で使う）
    ダッシュボードの全社ランキング／クエスト詳細のクエスト内ランキング等で共用。
@@ -676,6 +678,69 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) {
   .mascot { transition: opacity .25s ease; }
   .mascot img { animation: none; }
+}
+
+/* =============================================================
+ * 9c. チャットリアクション & 魔法エフェクト
+ *   通常リアクション（絵文字・無料）＋魔法リアクション（SP解放・エフェクト）。
+ *   炎などの魔法エフェクトは「業務層チャットに遊びを差し込む」意図的な例外演出。
+ *   prefers-reduced-motion では動きを止め、静的な色味だけ残す。
+ * ============================================================= */
+.reaction-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
+.reaction {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px var(--space-2); min-height: 26px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  background: var(--color-surface); font: inherit; font-size: var(--text-sm); color: var(--color-text);
+  cursor: pointer; transition: background .12s, border-color .12s, transform .05s;
+}
+.reaction:hover { background: var(--color-surface-alt); }
+.reaction:active { transform: translateY(1px); }
+.reaction__count { font-variant-numeric: tabular-nums; color: var(--color-text-muted); font-size: var(--text-xs); }
+/* 自分が押したリアクション */
+.reaction.is-me { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.reaction.is-me .reaction__count { color: var(--color-primary-active); }
+/* 魔法リアクション（アクセント＝レア寄りの光る縁） */
+.reaction.magic { border-color: var(--rarity-rare); box-shadow: 0 0 0 1px var(--rarity-rare) inset; }
+.reaction.magic.is-me { background: #F5F3FF; }
+/* リアクション追加ボタン */
+.reaction-add {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border: 1px dashed var(--color-border-strong); border-radius: var(--radius-full);
+  background: none; color: var(--color-text-muted); cursor: pointer; font-size: var(--text-sm);
+}
+.reaction-add:hover { background: var(--color-surface-alt); color: var(--color-text); }
+
+/* --- 魔法エフェクト（メッセージ枠に付与・永続） --- */
+.spell-fx { position: relative; border-radius: var(--radius); }
+/* 炎: 枠が燃える。ちらつく暖色グロー＋上端に揺れる炎。 */
+.spell-fx--fire {
+  border: 1px solid rgba(249,115,22,.75);
+  box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22);
+  animation: fire-flicker 1.3s ease-in-out infinite;
+}
+.spell-fx--fire::before {
+  content: "🔥🔥🔥🔥🔥"; position: absolute; left: 8px; right: 8px; top: -12px;
+  display: flex; justify-content: space-between; font-size: 15px; line-height: 1;
+  pointer-events: none; filter: drop-shadow(0 0 4px rgba(249,115,22,.8));
+  animation: fire-rise 1.1s ease-in-out infinite; transform-origin: bottom;
+}
+@keyframes fire-flicker {
+  0%,100% { box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22); }
+  50%     { box-shadow: 0 0 16px 4px rgba(249,115,22,.8),  inset 0 0 18px rgba(220,38,38,.32); }
+}
+@keyframes fire-rise { 0%,100% { transform: translateY(0) scaleY(1); opacity:.9; } 50% { transform: translateY(-2px) scaleY(1.12); opacity:1; } }
+/* 氷: 冷たい青グロー */
+.spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
+/* 雷: 黄の明滅 */
+.spell-fx--thunder { border: 1px solid rgba(251,191,36,.8); animation: thunder-flash 2.4s steps(1) infinite; }
+@keyframes thunder-flash { 0%,92%,100% { box-shadow: 0 0 8px 1px rgba(251,191,36,.4); } 94%,98% { box-shadow: 0 0 20px 6px rgba(251,191,36,.95); } }
+/* キラキラ: 紫の柔らかい光 */
+.spell-fx--sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
+
+@media (prefers-reduced-motion: reduce) {
+  .spell-fx--fire, .spell-fx--thunder { animation: none; }
+  .spell-fx--fire::before { animation: none; }
 }
 
 /* =============================================================
