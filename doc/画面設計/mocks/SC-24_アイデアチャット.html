@@ -108,6 +108,8 @@
   .rp__spell:hover { filter: brightness(.97); }
   .rp__spell:disabled { opacity: .5; cursor: not-allowed; border-color: var(--color-border); background: var(--color-surface-alt); }
   .rp__spell .cd { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  /* 1メッセージ1魔法: 既に魔法が付いている場合の注記 */
+  .rp__occupied { margin: 0; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; background: var(--color-surface-alt); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
 
   /* --- メッセージのホバーアクション（編集/削除/引用/リアクション） --- */
   .msg { position: relative; }
@@ -297,7 +299,7 @@
       <p class="composer__hint" id="composerHint" hidden>
         <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span class="xp">+5 XP</span>（日次上限あり）。<br>
         ツールバー: 📎添付 ・ <code>@</code>メンション ・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。<br>
-        各メッセージにホバーで <strong>アクション</strong>（🙂リアクション/💬引用/自分の投稿は✏️編集・🗑削除）。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）。<strong>各魔法は1チャットにつき1回</strong>（チップをクリックで取消＝別メッセージへ付け替え可）。
+        各メッセージにホバーで <strong>アクション</strong>（🙂リアクション/💬引用/自分の投稿は✏️編集・🗑削除）。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）。<strong>各魔法は1チャットにつき1回</strong>（チップをクリックで取消＝別メッセージへ付け替え可）。<strong>1メッセージに付けられる魔法は1個まで</strong>（他の人が付けていると付けられません）。
       </p>
     </div>
   </div>
@@ -313,7 +315,7 @@
 <div class="reaction-picker" id="reactionPicker" hidden role="menu" aria-label="リアクションを選ぶ">
   <p class="rp__label">リアクション</p>
   <div class="rp__row" id="rpEmojis"></div>
-  <p class="rp__label">魔法 <span class="muted">（各魔法このチャットで1回・チップをクリックで取消して付け替え可）</span></p>
+  <p class="rp__label">魔法 <span class="muted">（各魔法このチャットで1回・1メッセージ1魔法・チップをクリックで取消して付け替え可）</span></p>
   <div class="rp__row" id="rpSpells"></div>
 </div>
 
@@ -604,9 +606,16 @@
     chip.dataset.count = n; chip.dataset.names = JSON.stringify(names);
     chip.querySelector('.reaction__count').textContent = n; updateReactionTitle(chip);
   }
-  // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ（クリックで取消）。各魔法1チャット1回
+  // メッセージに付いている魔法チップ（あれば）。1メッセージ＝魔法1個まで。
+  function messageMagicChip(msg) {
+    const bar = msg.querySelector('.reaction-bar');
+    return bar ? bar.querySelector('.reaction.magic') : null;
+  }
+  // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ（クリックで取消）。
+  // ルール: 各魔法は1チャット1回（自分）／かつ 1メッセージには魔法1個まで（他人が付けていれば付けられない）。
   function castSpell(msg, bar, spell) {
-    if (spellPlacement[spell.id]) return; // その魔法はこのチャットで既に使用中
+    if (spellPlacement[spell.id]) return;      // その魔法はこのチャットで既に使用中（自分）
+    if (messageMagicChip(msg)) return;         // このメッセージには既に魔法あり（1メッセージ1魔法）
     msg.classList.add('spell-fx', spell.fx);
     const chip = document.createElement('button');
     chip.type = 'button';
@@ -616,6 +625,19 @@
     chip.addEventListener('click', () => cancelSpell(spell.id));
     bar.insertBefore(chip, bar.querySelector('.reaction-add'));
     spellPlacement[spell.id] = { msg, chip };
+  }
+  // 他ユーザーが付けた魔法（デモ用の初期配置）。自分のものではないので取消不可・そのメッセージは魔法で占有。
+  function seedForeignSpell(msg, spell, byName) {
+    const bar = ensureBar(msg);
+    if (messageMagicChip(msg)) return;
+    msg.classList.add('spell-fx', spell.fx);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'reaction magic'; chip.dataset.spell = spell.id;
+    chip.title = spell.label + '魔法（' + byName + '）';
+    chip.innerHTML = spell.icon + ' <span class="reaction__count">1</span>';
+    chip.addEventListener('click', () => alert('他の人が付けた魔法は取り消せません。\n1メッセージに付けられる魔法は1個までです。'));
+    bar.insertBefore(chip, bar.querySelector('.reaction-add'));
   }
   // 魔法の取消（通常リアクション同様にキャンセル可）→ エフェクト・チップ除去、別メッセージへ付け替え可
   function cancelSpell(spellId) {
@@ -633,6 +655,15 @@
     rpEmojis.innerHTML = NORMAL_EMOJIS.map(e => '<button type="button" class="rp__emoji" data-emoji="' + e + '">' + e + '</button>').join('');
   }
   function renderSpells() {
+    // 1メッセージ1魔法: 対象メッセージに既に魔法があれば魔法は付けられない
+    const occ = pickerTarget ? messageMagicChip(pickerTarget) : null;
+    if (occ) {
+      const mine = occ.classList.contains('is-me');
+      rpSpells.innerHTML = '<p class="rp__occupied">' + (mine
+        ? '✦ このメッセージには既に<strong>あなたの魔法</strong>が付いています。チップをクリックで取消できます（1メッセージ＝魔法1個）。'
+        : '✦ このメッセージには既に<strong>他の人の魔法</strong>が付いています。1メッセージに付けられる魔法は1個までです。') + '</p>';
+      return;
+    }
     rpSpells.innerHTML = SPELLS.map(s => {
       const used = !!spellPlacement[s.id];
       const tag = used ? ' <span class="cd">使用中</span>' : '';
@@ -664,7 +695,8 @@
   const seedMsgs = [...thread.querySelectorAll('.msg')];
   seedMsgs.forEach(m => { ensureBar(m); ensureActions(m); });
   if (seedMsgs[1]) { const b = ensureBar(seedMsgs[1]); seedReaction(b, '👍', 2, false, ['田中 一郎','佐藤 大輔']); seedReaction(b, '🎉', 1, false, ['伊藤 彩']); }
-  if (seedMsgs[4]) castSpell(seedMsgs[4], ensureBar(seedMsgs[4]), SPELLS[0]); // 佐藤のメッセージに炎（枠が燃える）
+  if (seedMsgs[4]) castSpell(seedMsgs[4], ensureBar(seedMsgs[4]), SPELLS[0]); // 佐藤のメッセージに炎（あなたの魔法）
+  if (seedMsgs[2]) seedForeignSpell(seedMsgs[2], SPELLS[2], '田中 一郎'); // 他ユーザーが雷を付与→このメッセージは魔法で占有（あなたは付けられない）
 
   // ===== メッセージのホバーアクション（リアクション/引用/編集/削除） =====
   // 自分の投稿かは head 内の .msg__me の有無で判定
