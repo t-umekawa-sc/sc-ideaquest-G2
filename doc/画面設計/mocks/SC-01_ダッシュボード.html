@@ -10,9 +10,8 @@
   .dash-main { padding-block: var(--space-8) var(--space-16); }
   .greeting { margin-bottom: var(--space-5); gap: var(--space-4); }
   .greeting h1 { font-size: var(--text-2xl); margin-bottom: 2px; }
-
-  /* コンテンツ背景画像レイヤー .app-bg は shared.css（全認証画面共通）。ここは設定UIのみ。 */
-  .bg-control { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+  /* コンテンツ背景画像レイヤー .app-bg は shared.css（全認証画面共通）。
+     設定（変更/リセット）はヘッダーのユーザーメニュー（shared.js が [data-bg-set]/[data-bg-reset] を初期化）。 */
 
   /* ヘッダー右側のステータス／通知ベル／アバターメニューは shared.css へ昇格（全画面共通） */
 
@@ -213,6 +212,9 @@
           <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
         </ul>
       </div>
@@ -222,16 +224,11 @@
 
 <main class="container dash-main">
 
-  <!-- あいさつ ＋ 背景画像アップロード（右上） -->
-  <div class="greeting between">
+  <!-- あいさつ（背景画像の設定はヘッダーのユーザーメニューへ移動） -->
+  <div class="greeting">
     <div>
       <h1>おかえりなさい、山田 太郎 さん</h1>
       <p class="muted">今日も新しいアイデアで冒険に出かけましょう。</p>
-    </div>
-    <div class="bg-control">
-      <input type="file" id="bgInput" accept="image/*" hidden>
-      <button class="btn btn-outline btn-sm" id="bgUploadBtn" type="button">🖼️ 背景画像</button>
-      <button class="btn btn-sm" id="bgResetBtn" type="button" hidden>リセット</button>
     </div>
   </div>
 
@@ -642,36 +639,9 @@
 <script>
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // --- コンテンツ領域の背景画像（ユーザー個人設定・全認証画面に反映） ---
-  // 本番はユーザー設定APIに保存し、認証済みレイアウトへ共通適用（実体は MinIO）。
-  // モックでは localStorage に保存して「別画面へ移動しても残る＝全画面反映」を簡易再現。
-  const appBg = document.getElementById('appBg');
-  const bgInput = document.getElementById('bgInput');
-  const bgUploadBtn = document.getElementById('bgUploadBtn');
-  const bgResetBtn = document.getElementById('bgResetBtn');
-  const BG_KEY = 'ideaquest_content_bg';
-  function applyBg(url) {
-    if (url) {
-      appBg.style.backgroundImage = 'url("' + url + '")';
-      appBg.classList.add('is-set'); bgResetBtn.hidden = false;
-    } else {
-      appBg.style.backgroundImage = ''; appBg.classList.remove('is-set'); bgResetBtn.hidden = true;
-    }
-  }
-  applyBg(localStorage.getItem(BG_KEY)); // 保存済み背景を復元
-  bgUploadBtn.addEventListener('click', () => bgInput.click());
-  bgInput.addEventListener('change', () => {
-    const file = bgInput.files && bgInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      applyBg(reader.result);
-      try { localStorage.setItem(BG_KEY, reader.result); } catch (e) { /* 容量超過時は保存のみ失敗（表示は継続） */ }
-    };
-    reader.readAsDataURL(file);
-    bgInput.value = '';
-  });
-  bgResetBtn.addEventListener('click', () => { applyBg(null); localStorage.removeItem(BG_KEY); });
+  // --- コンテンツ領域の背景画像：保存済み背景を復元（設定操作は shared.js のユーザーメニュー） ---
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
   // アバターメニュー（開閉）は shared.js が .usermenu を初期化（全画面共通）
 

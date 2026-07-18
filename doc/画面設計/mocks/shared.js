@@ -220,3 +220,45 @@
     document.querySelectorAll('.usermenu').forEach(initUserMenu);
   });
 })();
+
+/* --- コンテンツ背景画像（ユーザーメニューから設定・全認証画面共通） ---
+   ユーザーメニュー内の [data-bg-set]（変更）／[data-bg-reset]（リセット）を初期化。
+   保存は localStorage('ideaquest_content_bg')、表示は #appBg（.app-bg）。
+   ※各画面の「保存済み背景の復元」はページ側の初期化スクリプトが担当（このモジュールは設定操作のみ）。
+   本番はユーザー設定APIに保存し認証済みレイアウトへ共通適用（実体は MinIO）。 */
+(function () {
+  const BG_KEY = 'ideaquest_content_bg';
+  function applyBg(url) {
+    const el = document.getElementById('appBg');
+    if (!el) return;
+    if (url) { el.style.backgroundImage = 'url("' + url + '")'; el.classList.add('is-set'); }
+    else { el.style.backgroundImage = ''; el.classList.remove('is-set'); }
+  }
+  function closeMenuFrom(el) {
+    const um = el.closest('.usermenu'); if (!um) return;
+    const list = um.querySelector('.usermenu__list'); const trg = um.querySelector('.usermenu__trigger');
+    if (list) list.hidden = true; if (trg) trg.setAttribute('aria-expanded', 'false');
+  }
+  function initBg() {
+    const setters = document.querySelectorAll('[data-bg-set]');
+    if (!setters.length) return;
+    // 単一の隠しファイル入力を用意
+    let input = document.getElementById('ideaquestBgInput');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*'; input.id = 'ideaquestBgInput'; input.hidden = true;
+      document.body.appendChild(input);
+    }
+    input.addEventListener('change', () => {
+      const f = input.files && input.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { applyBg(r.result); try { localStorage.setItem(BG_KEY, r.result); } catch (e) { /* 容量超過時は表示のみ */ } };
+      r.readAsDataURL(f); input.value = '';
+    });
+    setters.forEach(b => b.addEventListener('click', () => { closeMenuFrom(b); input.click(); }));
+    document.querySelectorAll('[data-bg-reset]').forEach(b => b.addEventListener('click', () => {
+      closeMenuFrom(b); applyBg(null); localStorage.removeItem(BG_KEY);
+    }));
+  }
+  document.addEventListener('DOMContentLoaded', initBg);
+})();
