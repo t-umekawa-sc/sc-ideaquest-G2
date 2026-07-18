@@ -312,6 +312,18 @@
         <div class="draft-card__meta"><span>社内コミュニケーション活性化</span><span>最終更新: 3日前</span></div>
         <div class="draft-card__cta">続きを書く ✎</div>
       </button>
+
+      <button class="card card-accent draft-card" type="button"
+        data-kind="評価" data-title="夜間配送の集約による積載率改善" data-sub="クエスト: 配送ルート最適化"
+        data-edit="SC-25 評価画面">
+        <div class="draft-card__head">
+          <span class="badge badge-draft">下書き</span>
+          <span class="badge badge-muted">⭐ 評価</span>
+        </div>
+        <div class="draft-card__title">夜間配送の集約による積載率改善</div>
+        <div class="draft-card__meta"><span>配送ルート最適化</span><span>採点 3/5 観点</span><span>最終更新: 今日</span></div>
+        <div class="draft-card__cta">採点を続ける ✎</div>
+      </button>
     </div>
   </section>
 
@@ -724,13 +736,14 @@
 
   // --- 下書きパネル → 作成/編集モーダル（フォローと同じ FLIP で拡大） ---
   // 本番は SC-11/SC-21 の作成/編集モーダル（Intercept Routes）を差し込む。
-  // 下書きの続きを編集 → クエストは SC-11 / アイデアは SC-21 の作成・編集モーダルへ接続。
-  // 本番はパネル→モーダルの拡大（framer-motion layoutId）で SC-11/SC-21 を差し込む（URL直/リロードはフルページ）。
+  // 下書きの続きを編集 → クエスト=SC-11 / アイデア=SC-21 / 評価=SC-25 のモーダルへ接続。
+  // 本番はパネル→モーダルの拡大（framer-motion layoutId）で該当画面を差し込む（URL直/リロードはフルページ）。
   const draftGrid = document.getElementById('draftGrid');
+  const DRAFT_ROUTE = { 'クエスト': 'SC-11_クエスト作成編集.html', 'アイデア': 'SC-21_アイデア登録編集.html', '評価': 'SC-25_評価画面.html' };
   draftGrid.addEventListener('click', (e) => {
     const card = e.target.closest('.draft-card');
     if (!card) return;
-    location.href = card.dataset.kind === 'クエスト' ? 'SC-11_クエスト作成編集.html' : 'SC-21_アイデア登録編集.html';
+    location.href = DRAFT_ROUTE[card.dataset.kind] || 'SC-21_アイデア登録編集.html';
   });
 
   // --- 未投票アイデア → 投票（カード内クイック投票／クリックで投票モーダル・FLIP拡大） ---
