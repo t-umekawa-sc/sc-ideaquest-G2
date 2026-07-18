@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-21 アイデア登録・編集 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-21 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     このモックはモーダルを開いた状態で表示（本番は SC-12/SC-01 等から Parallel/Intercept で差し込み・URL直/リロードはフルページ） */
+  .modal { position: static; display: block; }
+  .modal__backdrop { position: fixed; background: rgba(15,23,42,.25); }
+  .modal__panel { max-width: 640px; margin: var(--space-8) auto; max-height: none; }
+
+  .modal__drag { display: flex; align-items: center; gap: var(--space-2); cursor: move; padding-right: 28px; margin-bottom: var(--space-1); touch-action: none; }
+  .modal__drag h2 { margin: 0; }
+  .modal__grip { color: var(--color-text-subtle); font-size: 18px; line-height: 1; }
+  .modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+
+  .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+  /* 任意項目の折りたたみ（投稿ハードルを下げる: 必須3項目を上に、任意はまとめて開閉） */
+  .optional { border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-4); background: var(--color-surface); }
+  .optional > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
+  .optional > summary::-webkit-details-marker { display: none; }
+  .optional > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
+  .optional[open] > summary::before { transform: rotate(90deg); }
+  .optional__body { padding: 0 var(--space-4) var(--space-2); border-top: 1px solid var(--color-border); }
+
+  /* 添付ドロップゾーン＋チップ（SC-24 のチャット添付と将来共通化候補） */
+  .dropzone { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
+    color: var(--color-text-muted); cursor: pointer; background: var(--color-surface-alt); transition: border-color .15s, background .15s; }
+  .dropzone:hover, .dropzone.is-over { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+  .dropzone__hint { font-size: var(--text-xs); margin-top: 4px; }
+  .attach-list { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }
+  .attach { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+  .attach__icon { font-size: 18px; }
+  .attach__meta { flex: 1; min-width: 0; }
+  .attach__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-sm); }
+  .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ アイデア登録・編集モーダル（本番は SC-12/SC-01 から Intercept で差し込み） ============ -->
+<div class="modal" id="ideaModal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
+  <div class="modal__backdrop"></div>
+  <div class="modal__panel" id="panel">
+    <button class="modal__close" type="button" aria-label="閉じる">✕</button>
+    <div class="modal__drag" id="dragHandle" title="ドラッグで移動">
+      <span class="modal__grip" aria-hidden="true">⠿</span>
+      <h2 id="iTitle">アイデアを登録</h2>
+    </div>
+
+    <!-- 対象クエストの文脈 -->
+    <div class="card" style="padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4)">
+      <div class="text-xs muted">投稿先クエスト</div>
+      <div style="font-weight:700"><span class="quest-icon sm" style="vertical-align:middle;margin-right:6px"><span class="quest-icon__char">配</span><span class="quest-icon__owner placeholder">山</span></span>配送ルート最適化 <span class="badge badge-muted">業務改善</span></div>
+    </div>
+    <p class="role-note" style="margin-top:0"><strong>アイデア作成権限</strong>を持つパーティーメンバーが投稿できます。必須は <strong>件名・アイデア本文・価値</strong> の 3 項目。ヘッダーを<strong>ドラッグで移動</strong>できます。</p>
+
+    <!-- 必須 3 項目 -->
+    <div class="field">
+      <label>件名<span class="req">*</span></label>
+      <input class="input" id="iSubject" placeholder="アイデアのタイトル">
+    </div>
+    <div class="field">
+      <label>価値<span class="req">*</span></label>
+      <textarea class="textarea" id="iValue" style="min-height:80px" placeholder="このアイデアがもたらす価値・メリット（評価の要になります）"></textarea>
+    </div>
+    <div class="field">
+      <label>アイデア本文<span class="req">*</span></label>
+      <textarea class="textarea" id="iBody" placeholder="どんなアイデアか、内容を説明してください"></textarea>
+    </div>
+
+    <!-- 任意項目（折りたたみ・投稿ハードルを下げる） -->
+    <details class="optional">
+      <summary>任意項目（タイムリミット・利害関係者・備考）</summary>
+      <div class="optional__body">
+        <div class="field-row">
+          <div class="field">
+            <label>タイムリミット</label>
+            <input class="input" type="date" id="iLimit">
+            <div class="hint">実施/検討の想定期限。</div>
+          </div>
+          <div class="field">
+            <label>利害関係者</label>
+            <input class="input" id="iStakeholder" placeholder="関係する人・部署">
+          </div>
+        </div>
+        <div class="field">
+          <label>備考 / 特記事項</label>
+          <textarea class="textarea" id="iNote" style="min-height:80px" placeholder="補足事項があれば"></textarea>
+        </div>
+      </div>
+    </details>
+
+    <!-- 関連資料 添付（任意・複数可） -->
+    <div class="field">
+      <label>関連資料（任意・複数可）</label>
+      <input type="file" id="fileInput" multiple hidden>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ファイルを添付">
+        📎 クリックまたはドラッグ＆ドロップで添付
+        <div class="dropzone__hint">実体は MinIO に保管・物理名はハッシュ化。上限サイズ/許可形式は今後確定（TBD）。</div>
+      </div>
+      <div class="attach-list" id="attachList"></div>
+    </div>
+
+    <div class="modal__foot">
+      <button class="btn btn-primary" type="button" id="postBtn" disabled>投稿する</button>
+      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
+      <button class="btn btn-outline" type="button">キャンセル</button>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-3)">※ 必須3項目がそろうと「投稿する」が有効。<strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>投稿</strong>でパーティーに公開し、アイデアごとのチャットグループを自動作成、投稿 XP を付与。本番は SC-12「アイデア追加/編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。</p>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ダッシュボードで設定した個人背景を全画面へ反映）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // 必須3項目がそろったら「投稿する」を有効化
+  const req = ['iSubject','iValue','iBody'].map(id => document.getElementById(id));
+  const postBtn = document.getElementById('postBtn');
+  function validate() { postBtn.disabled = !req.every(el => el.value.trim()); }
+  req.forEach(el => el.addEventListener('input', validate));
+  validate();
+
+  // 添付: クリック / ドラッグ＆ドロップ / 削除
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const attachList = document.getElementById('attachList');
+  function iconFor(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) return '🖼️';
+    if (['xls','xlsx','csv'].includes(ext)) return '📊';
+    if (['pdf'].includes(ext)) return '📕';
+    if (['doc','docx'].includes(ext)) return '📄';
+    return '📎';
+  }
+  function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(0) + ' KB' : (b/1048576).toFixed(1) + ' MB'; }
+  function addFiles(files) {
+    [...files].forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'attach';
+      row.innerHTML = '<span class="attach__icon">' + iconFor(f.name) + '</span>' +
+        '<div class="attach__meta"><div class="attach__name">' + f.name + '</div><div class="attach__size">' + fmtSize(f.size) + '</div></div>' +
+        '<button class="attach__remove" type="button" aria-label="削除">✕</button>';
+      row.querySelector('.attach__remove').addEventListener('click', () => row.remove());
+      attachList.appendChild(row);
+    });
+  }
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+  ['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('is-over'); }));
+  ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('is-over'); }));
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+  // 投稿 / 下書き（デモ）
+  postBtn.addEventListener('click', () => {
+    alert('アイデアを投稿しました（デモ）\nチャットグループを自動作成し、投稿 XP を付与します。');
+  });
+  document.getElementById('draftBtn').addEventListener('click', () => {
+    alert('下書きを保存しました（デモ）\n※ あなただけに表示。投稿するまで XP・コインは付与されません。');
+  });
+
+  // ===== モーダルをドラッグで移動（SC-25 と同標準） =====
+  const panel = document.getElementById('panel'), handle = document.getElementById('dragHandle');
+  let drag = null;
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('.modal__close')) return;
+    const r = panel.getBoundingClientRect();
+    panel.style.position = 'fixed'; panel.style.margin = '0'; panel.style.width = r.width + 'px';
+    panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    panel.classList.add('is-dragging'); handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const maxX = window.innerWidth - panel.offsetWidth, maxY = window.innerHeight - panel.offsetHeight;
+    panel.style.left = Math.max(0, Math.min(maxX, e.clientX - drag.dx)) + 'px';
+    panel.style.top = Math.max(0, Math.min(maxY, e.clientY - drag.dy)) + 'px';
+  });
+  function endDrag() { drag = null; panel.classList.remove('is-dragging'); }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+</script>
+</body>
+</html>

@@ -590,65 +590,9 @@
   </div>
 </div>
 
-<!-- ============ 下書きの続きを編集（本番は SC-11/SC-21 の作成/編集モーダル） ============ -->
-<div class="modal" id="draftModal" hidden role="dialog" aria-modal="true" aria-labelledby="draftModalKind">
-  <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel" style="max-width:560px">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="draftModalKind" style="margin-bottom:var(--space-1)">下書きを編集</h2>
-    <p class="muted text-sm" style="margin-top:0">下書きはあなただけに表示されます。公開/投稿すると XP・コインを獲得します。</p>
-
-    <!-- クエスト編集フォーム（SC-11 相当） -->
-    <div id="draftFormQuest" hidden>
-      <div class="field">
-        <label>クエストアイコン</label>
-        <div class="row-center" style="gap:var(--space-4)">
-          <span class="quest-icon lg"><span class="quest-icon__char">新</span><span class="quest-icon__owner placeholder">山</span></span>
-          <div>
-            <button class="btn btn-outline btn-sm" type="button">画像をアップロード</button>
-            <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。</div>
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label>カテゴリー</label>
-        <div class="combobox" data-combobox>
-          <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
-            <span class="combobox__value">業務改善</span><span class="combobox__arrow">▾</span>
-          </button>
-          <ul class="combobox__list" role="listbox" hidden>
-            <li class="combobox__option" role="option" aria-selected="true">業務改善</li>
-            <li class="combobox__option" role="option">新規事業</li>
-            <li class="combobox__option" role="option">コスト削減</li>
-            <li class="combobox__option" role="option">顧客体験</li>
-            <li class="combobox__option" role="option">自由入力…</li>
-          </ul>
-        </div>
-      </div>
-      <div class="field"><label>目的・テーマ</label><textarea class="textarea" id="qTheme" placeholder="このクエストで解決したいこと"></textarea></div>
-      <div class="field"><label>期限日</label><input class="input" type="date" id="qDeadline"></div>
-      <div class="field"><label>クエストグループ</label>
-        <select class="select" id="qGroup"><option>プロダクト開発部</option><option>全社改善プロジェクト</option></select></div>
-      <div class="field"><label>パーティー（参加メンバー）</label>
-        <div class="hint">同一クエストグループの所属者から選択（本番は SC-11 のメンバー選択UI）。</div></div>
-    </div>
-
-    <!-- アイデア編集フォーム（SC-21 相当） -->
-    <div id="draftFormIdea" hidden>
-      <div class="field"><label>件名<span class="req">*</span></label><input class="input" id="iTitle" placeholder="アイデアの件名"></div>
-      <div class="field"><label>価値<span class="req">*</span></label><input class="input" id="iValue" placeholder="このアイデアがもたらす価値"></div>
-      <div class="field"><label>アイデア本文<span class="req">*</span></label><textarea class="textarea" id="iBody" placeholder="どんなアイデア？"></textarea></div>
-      <div class="field"><label>タイムリミット（任意）</label><input class="input" type="date" id="iLimit"></div>
-      <div class="field"><label>関連資料</label><div class="hint">ファイル添付は任意（本番は SC-21 の添付UI）。</div></div>
-    </div>
-
-    <div class="modal__foot">
-      <button class="btn btn-primary" type="button" id="draftSubmitBtn">公開する</button>
-      <button class="btn btn-outline" type="button" data-close>下書き保存して閉じる</button>
-    </div>
-    <p class="hint" style="margin-top:var(--space-4)">※ 本番は <strong>SC-11/SC-21 の作成/編集モーダル</strong>（Parallel/Intercept Routes）。公開/投稿時に status を遷移し XP・コインを付与。</p>
-  </div>
-</div>
+<!-- 下書きの続きを編集(SC-11/SC-21)は専用モーダル画面へ接続。
+     本番は Parallel/Intercept Routes で差し込み、パネル→モーダルの拡大は framer-motion layoutId。
+     モックでは draft-card クリックで kind に応じて SC-11/SC-21 へ遷移（上部スクリプト参照）。 -->
 
 <!-- ============ アイデア投票モーダル（未投票パネルから拡大） ============ -->
 <!-- 本番は投票=SC-22内のアクション（インライン/モーダル）。ここは投票ショートカット用の
@@ -810,29 +754,14 @@
 
   // --- 下書きパネル → 作成/編集モーダル（フォローと同じ FLIP で拡大） ---
   // 本番は SC-11/SC-21 の作成/編集モーダル（Intercept Routes）を差し込む。
+  // 下書きの続きを編集 → クエストは SC-11 / アイデアは SC-21 の作成・編集モーダルへ接続。
+  // 本番はパネル→モーダルの拡大（framer-motion layoutId）で SC-11/SC-21 を差し込む（URL直/リロードはフルページ）。
   const draftGrid = document.getElementById('draftGrid');
-  const draftModal = document.getElementById('draftModal');
-  let draftOpener = null;
-
-  function fillDraftModal(card) {
-    const d = card.dataset;
-    const isQuest = d.kind === 'クエスト';
-    document.getElementById('draftModalKind').textContent = (isQuest ? 'クエスト' : 'アイデア') + 'の下書きを編集';
-    document.getElementById('draftFormQuest').hidden = !isQuest;
-    document.getElementById('draftFormIdea').hidden = isQuest;
-    document.getElementById('draftSubmitBtn').textContent = isQuest ? '公開する' : '投稿する';
-    // 入力途中のタイトルをプリフィル
-    if (isQuest) { document.getElementById('qTheme').value = d.title; }
-    else { document.getElementById('iTitle').value = d.title; }
-  }
-
   draftGrid.addEventListener('click', (e) => {
     const card = e.target.closest('.draft-card');
     if (!card) return;
-    draftOpener = card; fillDraftModal(card); flipOpen(card, draftModal);
+    location.href = card.dataset.kind === 'クエスト' ? 'SC-11_クエスト作成編集.html' : 'SC-21_アイデア登録編集.html';
   });
-  draftModal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) flipClose(draftOpener, draftModal); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !draftModal.hidden) flipClose(draftOpener, draftModal); });
 
   // --- 未投票アイデア → 投票（カード内クイック投票／クリックで投票モーダル・FLIP拡大） ---
   const voteSection = document.getElementById('voteSection');

@@ -350,73 +350,9 @@
   </section>
 </main>
 
-<!-- ============ クエスト編集モーダル（SC-11 相当・所有者/管理権限） ============ -->
-<div class="modal" id="questModal" hidden role="dialog" aria-modal="true" aria-labelledby="questModalTitle">
-  <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel" style="max-width:560px">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="questModalTitle" style="margin-bottom:var(--space-4)">クエストを編集</h2>
-    <div class="field">
-      <label>クエストアイコン</label>
-      <div class="row-center" style="gap:var(--space-4)">
-        <span class="quest-icon lg" id="questIconPreview">
-          <span class="quest-icon__char">配</span>
-          <span class="quest-icon__owner placeholder">山</span>
-        </span>
-        <div>
-          <input type="file" id="questIconInput" accept="image/*" hidden>
-          <button class="btn btn-outline btn-sm" type="button" id="questIconUpload">画像をアップロード</button>
-          <button class="btn btn-sm" type="button" id="questIconClear" hidden>未設定に戻す</button>
-          <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。推奨: 正方形の画像。</div>
-        </div>
-      </div>
-    </div>
-    <div class="field">
-      <label>カテゴリー</label>
-      <div class="combobox" data-combobox>
-        <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
-          <span class="combobox__value">業務改善</span><span class="combobox__arrow">▾</span>
-        </button>
-        <ul class="combobox__list" role="listbox" hidden>
-          <li class="combobox__option" role="option" aria-selected="true">業務改善</li>
-          <li class="combobox__option" role="option">新規事業</li>
-          <li class="combobox__option" role="option">コスト削減</li>
-          <li class="combobox__option" role="option">顧客体験</li>
-          <li class="combobox__option" role="option">自由入力…</li>
-        </ul>
-      </div>
-    </div>
-    <div class="field"><label>目的・テーマ</label><textarea class="textarea" id="qTheme">配送コストと CO2 削減の両立を実現するアイデアを集める。</textarea></div>
-    <div class="field"><label>期限日</label><input class="input" type="date" value="2026-12-20"></div>
-    <div class="field"><label>クエストグループ</label>
-      <select class="select"><option>プロダクト開発部</option><option>全社改善プロジェクト</option></select></div>
-    <div class="field"><label>パーティー・権限</label>
-      <div class="hint">同一クエストグループの所属者から追加/削除、メンバーごとの権限（評価者/クエスト管理 等）を付与/剥奪（本番は SC-11 のメンバー・権限UI）。</div></div>
-    <div class="modal__foot">
-      <button class="btn btn-primary" type="button" data-close>保存する</button>
-      <button class="btn btn-outline" type="button" data-close>閉じる</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============ アイデア作成モーダル（SC-21 相当・アイデア作成権限） ============ -->
-<div class="modal" id="ideaModal" hidden role="dialog" aria-modal="true" aria-labelledby="ideaModalTitle">
-  <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel" style="max-width:560px">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="ideaModalTitle" style="margin-bottom:var(--space-1)">アイデアを追加</h2>
-    <p class="muted text-sm" style="margin-top:0">クエスト「配送ルート最適化」に投稿します。投稿すると XP・コインを獲得します。</p>
-    <div class="field"><label>件名<span class="req">*</span></label><input class="input" placeholder="アイデアの件名"></div>
-    <div class="field"><label>価値<span class="req">*</span></label><input class="input" placeholder="このアイデアがもたらす価値"></div>
-    <div class="field"><label>アイデア本文<span class="req">*</span></label><textarea class="textarea" placeholder="どんなアイデア？"></textarea></div>
-    <div class="field"><label>タイムリミット（任意）</label><input class="input" type="date"></div>
-    <div class="field"><label>関連資料</label><div class="hint">ファイル添付は任意（本番は SC-21 の添付UI）。</div></div>
-    <div class="modal__foot">
-      <button class="btn btn-primary" type="button" data-close>投稿する</button>
-      <button class="btn btn-outline" type="button" data-close>下書き保存して閉じる</button>
-    </div>
-  </div>
-</div>
+<!-- クエスト編集(SC-11)・アイデア追加(SC-21)は専用モーダル画面へ。
+     本番は Parallel/Intercept Routes で差し込み（URL直/リロードはフルページ）。
+     モックでは editQuestBtn/editPartyBtn→SC-11、addIdeaBtn→SC-21 へ遷移して導線を接続。 -->
 
 <script src="shared.js"></script>
 <script>
@@ -493,50 +429,11 @@
   clearBtn.addEventListener('click', () => { qInput.value = ''; fState.value = ''; fEval.value = ''; applyList(); });
   applyList();
 
-  // --- モーダル開閉（登録・編集はモーダル標準：フェード＋わずかにスケール） ---
-  function openModal(modal) {
-    const panel = modal.querySelector('.modal__panel');
-    modal.hidden = false;
-    if (!prefersReduced) { panel.style.opacity = '0'; panel.style.transform = 'scale(.96)'; }
-    requestAnimationFrame(() => {
-      modal.classList.add('show');
-      if (!prefersReduced) { panel.style.transition = 'opacity .2s ease, transform .2s ease'; panel.style.opacity = '1'; panel.style.transform = ''; }
-    });
-  }
-  function closeModal(modal) {
-    modal.classList.remove('show'); modal.hidden = true;
-    const panel = modal.querySelector('.modal__panel');
-    panel.style.transition = ''; panel.style.opacity = ''; panel.style.transform = '';
-  }
-  function wireModal(modal) {
-    modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(modal); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(modal); });
-  }
-  const questModal = document.getElementById('questModal');
-  const ideaModal = document.getElementById('ideaModal');
-  wireModal(questModal); wireModal(ideaModal);
-  document.getElementById('editQuestBtn').addEventListener('click', () => openModal(questModal));
-  document.getElementById('editPartyBtn').addEventListener('click', () => openModal(questModal));
-  document.getElementById('addIdeaBtn').addEventListener('click', () => openModal(ideaModal));
-
-  // --- クエストアイコン設定（アップロード or 未設定=頭文字＋所有者アバター） ---
-  const qiInput = document.getElementById('questIconInput');
-  const qiUpload = document.getElementById('questIconUpload');
-  const qiClear = document.getElementById('questIconClear');
-  const qiPreview = document.getElementById('questIconPreview');
-  const qiHead = document.getElementById('questIconPreviewHead');
-  const qiFallback = qiPreview.innerHTML; // 頭文字タイル＋所有者アバター
-  function setQuestIcon(url) {
-    const inner = url ? '<img class="quest-icon__img" src="' + url + '" alt="">' : qiFallback;
-    qiPreview.innerHTML = inner; qiHead.innerHTML = inner; // モーダルプレビューとヘッダー両方に反映
-    qiClear.hidden = !url;
-  }
-  qiUpload.addEventListener('click', () => qiInput.click());
-  qiInput.addEventListener('change', () => {
-    const f = qiInput.files && qiInput.files[0]; if (!f) return;
-    const r = new FileReader(); r.onload = () => setQuestIcon(r.result); r.readAsDataURL(f); qiInput.value = '';
-  });
-  qiClear.addEventListener('click', () => setQuestIcon(null));
+  // --- 作成・編集・アイデア追加は SC-11/SC-21 モーダル（本番は Parallel/Intercept Routes・URL直/リロードはフルページ） ---
+  // モックは専用ページへ遷移して導線を接続する（実装では URL を持つモーダルを差し込み、パネル→モーダルの拡大は framer-motion layoutId）。
+  document.getElementById('editQuestBtn').addEventListener('click', () => { location.href = 'SC-11_クエスト作成編集.html'; });
+  document.getElementById('editPartyBtn').addEventListener('click', () => { location.href = 'SC-11_クエスト作成編集.html'; });
+  document.getElementById('addIdeaBtn').addEventListener('click', () => { location.href = 'SC-21_アイデア登録編集.html'; });
 
   // --- 全文検索（件名・アイデア本文・価値・備考・チャットを日本語で検索） ---
   // モックはクライアント側の部分一致＋ハイライトで挙動を再現。

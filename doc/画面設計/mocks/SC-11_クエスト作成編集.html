@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-11 クエスト作成・編集 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-11 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     このモックはモーダルを開いた状態で表示（本番は SC-10/SC-01 等から Parallel/Intercept で差し込み・URL直/リロードはフルページ） */
+  .modal { position: static; display: block; }
+  .modal__backdrop { position: fixed; background: rgba(15,23,42,.25); }
+  .modal__panel { max-width: 680px; margin: var(--space-8) auto; max-height: none; }
+
+  /* ドラッグ用ヘッダー（SC-25 と同標準） */
+  .modal__drag { display: flex; align-items: center; gap: var(--space-2); cursor: move; padding-right: 28px; margin-bottom: var(--space-1); touch-action: none; }
+  .modal__drag h2 { margin: 0; }
+  .modal__grip { color: var(--color-text-subtle); font-size: 18px; line-height: 1; }
+  .modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+
+  .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+  /* パーティー・権限セクション */
+  .party { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .party__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: var(--space-3) var(--space-4); background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
+  .party__count { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .party__list { display: flex; flex-direction: column; }
+  .pmember { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); }
+  .pmember:first-child { border-top: none; }
+  .pmember__main { flex: 1; min-width: 0; }
+  .pmember__top { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .pmember__name { font-weight: 600; }
+  .pmember__perms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+  .pmember__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; border-radius: var(--radius-sm); }
+  .pmember__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+
+  /* 権限トグルチップ（オン=塗り／オフ=枠線） */
+  .perm { font-size: var(--text-xs); font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--color-border-strong);
+    background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; user-select: none; }
+  .perm:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .perm.is-on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .perm.is-on:hover { background: var(--color-primary-active); }
+  .perm[aria-disabled="true"] { cursor: not-allowed; opacity: .8; }
+  .perm.perm-owner.is-on { background: var(--pixel-coin); border-color: var(--pixel-coin); color: var(--color-text); }
+
+  /* 追加ピッカー */
+  .party__add { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); background: var(--color-surface); }
+  .candlist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+  .cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
+  .cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
+  .cand[hidden] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ クエスト作成・編集モーダル（本番は SC-10/SC-01/SC-12 から Intercept で差し込み） ============ -->
+<div class="modal" id="questModal" role="dialog" aria-modal="true" aria-labelledby="qTitle">
+  <div class="modal__backdrop"></div>
+  <div class="modal__panel" id="panel">
+    <button class="modal__close" type="button" aria-label="閉じる">✕</button>
+    <div class="modal__drag" id="dragHandle" title="ドラッグで移動">
+      <span class="modal__grip" aria-hidden="true">⠿</span>
+      <h2 id="qTitle">クエストを作成</h2>
+    </div>
+    <p class="role-note" style="margin-top:0"><strong>作成</strong>は認証済みなら誰でも（作成者＝所有者になる）。<strong>編集</strong>は所有者・クエスト管理権限者のみ。ヘッダーを<strong>ドラッグで移動</strong>できます。</p>
+
+    <!-- クエストアイコン -->
+    <div class="field">
+      <label>クエストアイコン（任意）</label>
+      <div class="row-center" style="gap:var(--space-4)">
+        <span class="quest-icon lg" id="iconPreview">
+          <span class="quest-icon__char" id="iconChar">新</span>
+          <span class="quest-icon__owner placeholder">山</span>
+        </span>
+        <div>
+          <input type="file" id="iconInput" accept="image/*" hidden>
+          <button class="btn btn-outline btn-sm" type="button" id="iconUpload">画像をアップロード</button>
+          <button class="btn btn-sm" type="button" id="iconClear" hidden>未設定に戻す</button>
+          <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。推奨: 正方形の画像。実体は MinIO 保管。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 件名 -->
+    <div class="field">
+      <label>件名<span class="req">*</span></label>
+      <input class="input" id="qName" placeholder="例: 配送ルート最適化" value="">
+      <div class="hint">クエストの名前。一覧・詳細・アイコンの頭文字に使われます。</div>
+    </div>
+
+    <div class="field-row">
+      <!-- カテゴリー: 事前定義＋自由入力 -->
+      <div class="field">
+        <label>カテゴリー<span class="req">*</span></label>
+        <div class="combobox" data-combobox>
+          <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="combobox__value" data-placeholder>選択または入力…</span><span class="combobox__arrow">▾</span>
+          </button>
+          <ul class="combobox__list" role="listbox" hidden>
+            <li class="combobox__option" role="option">業務改善</li>
+            <li class="combobox__option" role="option">新規事業</li>
+            <li class="combobox__option" role="option">コスト削減</li>
+            <li class="combobox__option" role="option">顧客体験</li>
+            <li class="combobox__option" role="option">働き方</li>
+            <li class="combobox__option" role="option" data-freeinput>＋ 自由入力で追加…</li>
+          </ul>
+        </div>
+        <div class="hint">定義済みから選択、なければ「自由入力で追加」。</div>
+      </div>
+
+      <!-- 期限日 -->
+      <div class="field">
+        <label>期限日<span class="req">*</span></label>
+        <input class="input" type="date" id="qDeadline">
+        <div class="hint">アイデア募集/クエストの締切日。</div>
+      </div>
+    </div>
+
+    <!-- 目的・テーマ -->
+    <div class="field">
+      <label>目的・テーマ<span class="req">*</span></label>
+      <textarea class="textarea" id="qTheme" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか"></textarea>
+    </div>
+
+    <!-- クエストグループ -->
+    <div class="field">
+      <label>クエストグループ<span class="req">*</span></label>
+      <select class="select" id="qGroup">
+        <option value="prod">プロダクト開発部</option>
+        <option value="all">全社改善プロジェクト</option>
+        <option value="cs">カスタマーサクセス</option>
+      </select>
+      <div class="hint">クエストは 1 つのグループに属します。<strong>パーティー候補は同一グループの所属者に限定</strong>されます（変更すると下の候補が入れ替わります）。</div>
+    </div>
+
+    <!-- パーティー・権限 -->
+    <div class="field">
+      <label>参加メンバー（パーティー）・権限<span class="req">*</span></label>
+      <div class="party">
+        <div class="party__head">
+          <strong>メンバーと権限</strong>
+          <span class="party__count"><span id="pcount">1</span> 名</span>
+        </div>
+        <div class="party__list" id="plist">
+          <!-- 作成者（所有者・剥奪不可・削除不可） -->
+          <div class="pmember" data-owner="1">
+            <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span>
+            <div class="pmember__main">
+              <div class="pmember__top">
+                <span class="pmember__name">山田 太郎</span>
+                <span class="badge badge-muted">あなた・作成者</span>
+              </div>
+              <div class="pmember__perms" data-perms>
+                <span class="perm perm-owner is-on" aria-disabled="true" title="作成者は既定で所有者・剥奪不可">所有者</span>
+                <span class="perm" data-perm="manage" aria-disabled="true">管理</span>
+                <span class="perm" data-perm="eval" aria-disabled="true">評価者</span>
+                <span class="perm" data-perm="vote" aria-disabled="true">投票</span>
+                <span class="perm" data-perm="idea" aria-disabled="true">作成</span>
+                <span class="perm" data-perm="comment" aria-disabled="true">コメント</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 候補からメンバー追加 -->
+        <div class="party__add">
+          <label class="text-sm" style="font-weight:600">メンバーを追加（同一グループの所属者）</label>
+          <div class="candlist" id="candlist">
+            <button class="cand" type="button" data-name="佐藤 花子" data-ini="佐"><span class="avatar sm" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤 花子 ＋</button>
+            <button class="cand" type="button" data-name="鈴木 一郎" data-ini="鈴"><span class="avatar sm" data-name="鈴木 一郎"><span class="avatar__img placeholder">鈴</span></span>鈴木 一郎 ＋</button>
+            <button class="cand" type="button" data-name="田中 みゆき" data-ini="田"><span class="avatar sm" data-name="田中 みゆき"><span class="avatar__img placeholder">田</span></span>田中 みゆき ＋</button>
+            <button class="cand" type="button" data-name="高橋 健" data-ini="高"><span class="avatar sm" data-name="高橋 健"><span class="avatar__img placeholder">高</span></span>高橋 健 ＋</button>
+          </div>
+          <div class="hint">追加すると既定権限（<strong>投票・作成・コメント</strong>）が付与されます。評価者/管理は個別にオン。所有者の付与は作成者のみ可。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal__foot">
+      <button class="btn btn-primary" type="button" id="createBtn">クエストを作成</button>
+      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
+      <button class="btn btn-outline" type="button">キャンセル</button>
+    </div>
+    <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>作成</strong>で公開しパーティーに通知、作成 XP を付与。本番は SC-10「＋作成」/SC-12「編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。パネル→モーダルの拡大は framer-motion <code>layoutId</code>。</p>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ダッシュボードで設定した個人背景を全画面へ反映）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  const DEFAULT_PERMS = ['vote','idea','comment'];   // 新規参加メンバーの既定権限
+  const PERM_LABEL = { manage:'管理', eval:'評価者', vote:'投票', idea:'作成', comment:'コメント' };
+
+  // 件名 → アイコン頭文字を連動
+  const qName = document.getElementById('qName');
+  const iconChar = document.getElementById('iconChar');
+  qName.addEventListener('input', () => { iconChar.textContent = (qName.value.trim()[0] || '新'); });
+
+  // アイコンのアップロード / 解除（プレビューのみ）
+  const iconInput = document.getElementById('iconInput'), iconPreview = document.getElementById('iconPreview');
+  const iconClear = document.getElementById('iconClear');
+  document.getElementById('iconUpload').addEventListener('click', () => iconInput.click());
+  iconInput.addEventListener('change', () => {
+    const f = iconInput.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    iconPreview.innerHTML = '<img class="quest-icon__img" src="' + url + '" alt="">';
+    iconClear.hidden = false;
+  });
+  iconClear.addEventListener('click', () => {
+    iconPreview.innerHTML = '<span class="quest-icon__char" id="iconChar">' + (qName.value.trim()[0] || '新') + '</span><span class="quest-icon__owner placeholder">山</span>';
+    iconClear.hidden = true; iconInput.value = '';
+  });
+
+  // カテゴリー: 自由入力（combobox の「自由入力で追加」を選んだら prompt）
+  document.querySelector('[data-combobox]').addEventListener('click', e => {
+    const free = e.target.closest('[data-freeinput]');
+    if (!free) return;
+    const v = prompt('新しいカテゴリー名を入力');
+    if (v && v.trim()) {
+      const val = document.querySelector('.combobox__value');
+      val.textContent = v.trim(); val.removeAttribute('data-placeholder');
+    }
+  });
+
+  // パーティー: メンバー追加 / 削除 / 権限トグル / 人数
+  const plist = document.getElementById('plist');
+  const candlist = document.getElementById('candlist');
+  const pcount = document.getElementById('pcount');
+  function recount() { pcount.textContent = plist.querySelectorAll('.pmember').length; }
+
+  function permChip(perm, on) {
+    return '<span class="perm' + (on ? ' is-on' : '') + '" data-perm="' + perm + '" role="button" tabindex="0" aria-pressed="' + (on?'true':'false') + '">' + PERM_LABEL[perm] + '</span>';
+  }
+  function addMember(name, ini) {
+    const perms = ['manage','eval','vote','idea','comment']
+      .map(p => permChip(p, DEFAULT_PERMS.includes(p))).join('');
+    const row = document.createElement('div');
+    row.className = 'pmember';
+    row.innerHTML =
+      '<span class="avatar sm" data-name="' + name + '"><span class="avatar__img placeholder">' + ini + '</span></span>' +
+      '<div class="pmember__main"><div class="pmember__top">' +
+        '<span class="pmember__name">' + name + '</span>' +
+        '<span class="perm perm-owner" data-perm="owner" role="button" tabindex="0" aria-pressed="false" title="所有者の付与は作成者のみ可">所有者</span>' +
+      '</div><div class="pmember__perms" data-perms>' + perms + '</div></div>' +
+      '<button class="pmember__remove" type="button" aria-label="パーティーから外す" title="パーティーから外す">✕</button>';
+    plist.appendChild(row);
+    recount();
+  }
+
+  candlist.addEventListener('click', e => {
+    const c = e.target.closest('.cand'); if (!c) return;
+    addMember(c.dataset.name, c.dataset.ini);
+    c.hidden = true;   // 追加済みは候補から消す
+  });
+
+  // 権限チップのトグル（作成者行は aria-disabled で不可） / 削除
+  plist.addEventListener('click', e => {
+    const rm = e.target.closest('.pmember__remove');
+    if (rm) {
+      const row = rm.closest('.pmember');
+      const name = row.querySelector('.pmember__name').textContent;
+      // 候補リストに戻す
+      [...candlist.querySelectorAll('.cand')].forEach(c => { if (c.dataset.name === name) c.hidden = false; });
+      row.remove(); recount(); return;
+    }
+    const chip = e.target.closest('.perm');
+    if (!chip || chip.getAttribute('aria-disabled') === 'true') return;
+    const on = chip.classList.toggle('is-on');
+    chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  plist.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('perm')) { e.preventDefault(); e.target.click(); }
+  });
+
+  // 作成（デモ）: 必須チェック
+  document.getElementById('createBtn').addEventListener('click', () => {
+    const missing = [];
+    if (!qName.value.trim()) missing.push('件名');
+    if (document.querySelector('.combobox__value[data-placeholder]')) missing.push('カテゴリー');
+    if (!document.getElementById('qDeadline').value) missing.push('期限日');
+    if (!document.getElementById('qTheme').value.trim()) missing.push('目的・テーマ');
+    if (plist.querySelectorAll('.pmember').length < 1) missing.push('参加メンバー');
+    if (missing.length) { alert('必須項目が未入力です: ' + missing.join('、')); return; }
+    alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\n作成 XP を付与します。');
+  });
+  document.getElementById('draftBtn').addEventListener('click', () => {
+    alert('下書きを保存しました（デモ）\n※ あなただけに表示。公開するまで XP・コインは付与されません。');
+  });
+
+  // ===== モーダルをドラッグで移動（SC-25 と同標準） =====
+  const panel = document.getElementById('panel'), handle = document.getElementById('dragHandle');
+  let drag = null;
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('.modal__close')) return;
+    const r = panel.getBoundingClientRect();
+    panel.style.position = 'fixed'; panel.style.margin = '0'; panel.style.width = r.width + 'px';
+    panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    panel.classList.add('is-dragging'); handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const maxX = window.innerWidth - panel.offsetWidth, maxY = window.innerHeight - panel.offsetHeight;
+    panel.style.left = Math.max(0, Math.min(maxX, e.clientX - drag.dx)) + 'px';
+    panel.style.top = Math.max(0, Math.min(maxY, e.clientY - drag.dy)) + 'px';
+  });
+  function endDrag() { drag = null; panel.classList.remove('is-dragging'); }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+</script>
+</body>
+</html>
