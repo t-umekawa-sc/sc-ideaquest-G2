@@ -85,7 +85,7 @@
   .att-chip button { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 14px; line-height: 1; padding: 0; }
 
   /* --- @メンション候補ポップアップ --- */
-  .mention-pop { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 20; min-width: 220px;
+  .mention-pop { position: absolute; z-index: 46; min-width: 220px;
     background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-1); }
   .mention-pop[hidden] { display: none; }
   .mention-opt { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); cursor: pointer; }
@@ -119,10 +119,12 @@
   .msg__act:hover { background: var(--color-surface-alt); color: var(--color-text); }
   .msg__edited { font-size: var(--text-xs); color: var(--color-text-muted); margin-left: 6px; }
 
-  /* インライン編集 */
-  .msg__editbox { width: 100%; min-height: 40px; max-height: 160px; resize: none; border: 1px solid var(--color-primary);
-    border-radius: var(--radius); padding: var(--space-2) var(--space-3); font: inherit; line-height: 1.6; box-shadow: 0 0 0 3px var(--color-primary-soft); }
-  .msg__editacts { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+  /* インライン編集（下部コンポーザーと同じ見た目＋ツールバー） */
+  .msg__editbox { width: 100%; min-height: 56px; max-height: 200px; resize: none; overflow-y: auto;
+    border: 1px solid var(--color-border-strong); border-radius: var(--radius); padding: var(--space-3); font: inherit; line-height: 1.7; background: var(--color-surface); }
+  .msg__editbox:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .msg__editacts { display: flex; gap: var(--space-2); }
+  .msg__edittoolbar { margin-top: var(--space-2); }
 
   /* 削除済みトゥームストーン */
   .msg.is-deleted .msg__text { color: var(--color-text-muted); font-style: italic; }
@@ -263,8 +265,6 @@
       <div class="composer__attachments" id="attList"></div>
       <div class="composer__field">
         <textarea class="composer__box" id="box" rows="1" placeholder="メッセージを入力…（@ でメンション、書式は下のツールバー）"></textarea>
-        <!-- @メンション候補（デモ） -->
-        <div class="mention-pop" id="mentionPop" hidden role="listbox" aria-label="メンション候補"></div>
       </div>
       <!-- ツールバー: 左＝書式/アクション、右＝送信 -->
       <div class="composer__toolbar">
@@ -304,6 +304,9 @@
 
 <!-- 絵文字ピッカー（本文へ挿入） -->
 <div class="emoji-pop" id="emojiPop" hidden role="menu" aria-label="絵文字を挿入"></div>
+
+<!-- @メンション候補（body直下・下部コンポーザーと編集エディタで共用。位置はJSで対象欄の上に） -->
+<div class="mention-pop" id="mentionPop" hidden role="listbox" aria-label="メンション候補"></div>
 
 <script src="shared.js"></script>
 <script>
@@ -396,10 +399,16 @@
     pendingAtts.push(SAMPLE_FILES[sampleFileIdx % SAMPLE_FILES.length]); sampleFileIdx++; renderAtts(); updateSendState();
   });
 
-  // --- @メンション候補 ---
-  let activeIdx = 0, matches = [];
-  function updatePop() {
-    const upto = box.value.slice(0, box.selectionStart);
+  // --- @メンション候補（対象 textarea を引数に。下部コンポーザーと編集エディタで共用） ---
+  let activeIdx = 0, matches = [], mentionTarget = box;
+  function positionPop(ta) {
+    const r = ta.getBoundingClientRect();
+    pop.style.left = (window.scrollX + r.left) + 'px';
+    pop.style.top = (window.scrollY + r.top - pop.offsetHeight - 4) + 'px';
+  }
+  function updateMention(ta) {
+    mentionTarget = ta;
+    const upto = ta.value.slice(0, ta.selectionStart);
     const m = upto.match(/@([^\s@]*)$/);
     if (!m) { hidePop(); return; }
     const q = m[1];
@@ -412,30 +421,38 @@
         '<span class="mention-opt__name">' + n + '</span>' +
       '</div>').join('');
     pop.hidden = false;
+    positionPop(ta);
   }
   function hidePop() { pop.hidden = true; matches = []; }
-  function choose(name) {
-    const start = box.selectionStart;
-    const upto = box.value.slice(0, start);
-    const rest = box.value.slice(start);
-    const replaced = upto.replace(/@([^\s@]*)$/, '@' + name.replace(/\s/g,'') + ' ');
-    box.value = replaced + rest;
-    box.focus(); hidePop(); autoGrow();
+  function chooseMention(name) {
+    const ta = mentionTarget;
+    const start = ta.selectionStart;
+    const replaced = ta.value.slice(0, start).replace(/@([^\s@]*)$/, '@' + name.replace(/\s/g,'') + ' ');
+    ta.value = replaced + ta.value.slice(start);
+    ta.focus(); ta.setSelectionRange(replaced.length, replaced.length);
+    hidePop(); ta.dispatchEvent(new Event('input'));
+  }
+  // 候補が開いているときのキー操作（共用）。消費したら true
+  function handleMentionKeys(e) {
+    if (pop.hidden || !matches.length) return false;
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx+1)%matches.length; }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx-1+matches.length)%matches.length; }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chooseMention(matches[activeIdx]); return true; }
+    else if (e.key === 'Escape') { hidePop(); return true; }
+    else return false;
+    pop.querySelectorAll('.mention-opt').forEach((el,i) => el.classList.toggle('is-active', i===activeIdx));
+    return true;
   }
   pop.addEventListener('click', e => {
-    const opt = e.target.closest('.mention-opt'); if (opt) choose(opt.dataset.name);
+    const opt = e.target.closest('.mention-opt'); if (opt) chooseMention(opt.dataset.name);
+  });
+  document.addEventListener('click', e => {
+    if (!pop.hidden && !pop.contains(e.target) && e.target !== mentionTarget) hidePop();
   });
 
-  box.addEventListener('input', () => { autoGrow(); updatePop(); updateSendState(); });
+  box.addEventListener('input', () => { autoGrow(); updateMention(box); updateSendState(); });
   box.addEventListener('keydown', e => {
-    if (!pop.hidden && matches.length) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx+1)%matches.length; }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx-1+matches.length)%matches.length; }
-      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); choose(matches[activeIdx]); return; }
-      else if (e.key === 'Escape') { hidePop(); return; }
-      pop.querySelectorAll('.mention-opt').forEach((el,i) => el.classList.toggle('is-active', i===activeIdx));
-      return;
-    }
+    if (handleMentionKeys(e)) return;
     // Enter 送信 / Shift+Enter 改行
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
@@ -448,57 +465,65 @@
   }
   updateSendState();
 
-  // ===== ツールバー: 書式（太字/コード/リンク）・メンション挿入 =====
-  // 選択範囲を before/after で囲む（未選択なら placeholder を挿入）
-  function wrapSelection(before, after, placeholder) {
-    const s = box.selectionStart, e = box.selectionEnd;
-    const sel = box.value.slice(s, e) || placeholder || '';
-    box.value = box.value.slice(0, s) + before + sel + after + box.value.slice(e);
-    box.focus(); box.setSelectionRange(s + before.length, s + before.length + sel.length);
-    autoGrow(); updateSendState();
+  // ===== 書式ヘルパー（対象 textarea に作用。下部コンポーザーと編集エディタで共用） =====
+  // textarea の高さを内容に合わせる（汎用）
+  function autoGrowEl(ta, max) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, max || 200) + 'px'; }
+  // 選択範囲を before/after で囲む（未選択なら placeholder を挿入）。input を発火して各リスナーに任せる
+  function fmtWrap(ta, before, after, placeholder) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const sel = ta.value.slice(s, e) || placeholder || '';
+    ta.value = ta.value.slice(0, s) + before + sel + after + ta.value.slice(e);
+    ta.focus(); ta.setSelectionRange(s + before.length, s + before.length + sel.length);
+    ta.dispatchEvent(new Event('input'));
   }
-  document.getElementById('boldBtn').addEventListener('click', () => wrapSelection('**', '**', '太字'));
-  document.getElementById('codeBtn').addEventListener('click', () => wrapSelection('`', '`', 'code'));
-  document.getElementById('linkBtn').addEventListener('click', () => {
-    const s = box.selectionStart, e = box.selectionEnd;
-    const sel = box.value.slice(s, e) || 'リンク';
+  function fmtLink(ta) {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const sel = ta.value.slice(s, e) || 'リンク';
     const ins = '[' + sel + '](https://)';
-    box.value = box.value.slice(0, s) + ins + box.value.slice(e);
+    ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e);
     const urlPos = s + ('[' + sel + '](').length;
-    box.focus(); box.setSelectionRange(urlPos, urlPos + 'https://'.length);
-    autoGrow(); updateSendState();
-  });
-  document.getElementById('mentionBtn').addEventListener('click', () => {
-    const s = box.selectionStart;
-    box.value = box.value.slice(0, s) + '@' + box.value.slice(s);
-    box.focus(); box.setSelectionRange(s + 1, s + 1);
-    autoGrow(); updatePop(); updateSendState();
-  });
+    ta.focus(); ta.setSelectionRange(urlPos, urlPos + 'https://'.length);
+    ta.dispatchEvent(new Event('input'));
+  }
+  function fmtInsert(ta, text) {
+    const s = ta.selectionStart;
+    ta.value = ta.value.slice(0, s) + text + ta.value.slice(s);
+    ta.focus(); ta.setSelectionRange(s + text.length, s + text.length);
+    ta.dispatchEvent(new Event('input'));
+  }
 
-  // ===== 絵文字ピッカー（本文へ挿入） =====
+  // ===== 絵文字ピッカー（対象 textarea へ挿入・共用） =====
   const EMOJIS = ['👍','❤️','😄','🎉','🙏','👀','🔥','✨','😅','🙌','💡','👏','🤔','🚀','✅','⚠️','📌','🎯','😊','😢','🥳','💪','🙇','👌'];
-  const emojiBtn = document.getElementById('emojiBtn');
   const emojiPop = document.getElementById('emojiPop');
   emojiPop.innerHTML = EMOJIS.map(e => '<button type="button">' + e + '</button>').join('');
-  function closeEmojiPop() { emojiPop.hidden = true; emojiBtn.setAttribute('aria-expanded', 'false'); }
-  function toggleEmojiPop() {
-    if (!emojiPop.hidden) { closeEmojiPop(); return; }
-    emojiPop.hidden = false; emojiBtn.setAttribute('aria-expanded', 'true');
-    const r = emojiBtn.getBoundingClientRect();
+  let emojiTarget = box, emojiAnchor = null;
+  function closeEmojiPop() { emojiPop.hidden = true; if (emojiAnchor) emojiAnchor.setAttribute('aria-expanded', 'false'); }
+  function openEmojiPop(anchor, target) {
+    emojiTarget = target; emojiAnchor = anchor;
+    emojiPop.hidden = false; anchor.setAttribute('aria-expanded', 'true');
+    const r = anchor.getBoundingClientRect();
     emojiPop.style.left = (window.scrollX + r.left) + 'px';
     emojiPop.style.top = (window.scrollY + r.top - emojiPop.offsetHeight - 6) + 'px';
   }
-  emojiBtn.addEventListener('click', e => { e.stopPropagation(); toggleEmojiPop(); });
+  function toggleEmojiPop(anchor, target) {
+    if (!emojiPop.hidden && emojiAnchor === anchor) { closeEmojiPop(); return; }
+    openEmojiPop(anchor, target);
+  }
   emojiPop.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    const s = box.selectionStart;
-    box.value = box.value.slice(0, s) + b.textContent + box.value.slice(s);
-    box.focus(); box.setSelectionRange(s + b.textContent.length, s + b.textContent.length);
-    autoGrow(); updateSendState(); closeEmojiPop();
+    fmtInsert(emojiTarget, b.textContent); closeEmojiPop();
   });
   document.addEventListener('click', e => {
-    if (!emojiPop.hidden && !emojiPop.contains(e.target) && !emojiBtn.contains(e.target)) closeEmojiPop();
+    if (!emojiPop.hidden && !emojiPop.contains(e.target) && !(emojiAnchor && emojiAnchor.contains(e.target))) closeEmojiPop();
   });
+
+  // ===== 下部コンポーザーのツールバー配線（対象＝box） =====
+  document.getElementById('boldBtn').addEventListener('click', () => fmtWrap(box, '**', '**', '太字'));
+  document.getElementById('codeBtn').addEventListener('click', () => fmtWrap(box, '`', '`', 'code'));
+  document.getElementById('linkBtn').addEventListener('click', () => fmtLink(box));
+  document.getElementById('mentionBtn').addEventListener('click', e => { e.stopPropagation(); fmtInsert(box, '@'); });
+  const emojiBtn = document.getElementById('emojiBtn');
+  emojiBtn.addEventListener('click', e => { e.stopPropagation(); toggleEmojiPop(emojiBtn, box); });
 
   // ===== リアクション（通常＋魔法） =====
   const NORMAL_EMOJIS = ['👍','❤️','😄','🎉','🙏','👀'];
@@ -651,21 +676,57 @@
     msg.appendChild(bar);
   }
 
-  // --- インライン編集 ---
+  // --- インライン編集（下部コンポーザーと同じ＝書式/メンション補完/絵文字/📎添付を利用） ---
   function startEdit(msg) {
-    const textEl = msg.querySelector('.msg__text'); if (!textEl || msg.querySelector('.msg__editbox')) return;
+    const textEl = msg.querySelector('.msg__text'); if (!textEl || msg.querySelector('.msg__editwrap')) return;
     const original = textEl.textContent;
     textEl.style.display = 'none';
     const wrap = document.createElement('div'); wrap.className = 'msg__editwrap';
-    wrap.innerHTML = '<textarea class="msg__editbox"></textarea>' +
-      '<div class="msg__editacts"><button class="btn btn-primary btn-sm" type="button" data-e="save">保存</button>' +
-      '<button class="btn btn-outline btn-sm" type="button" data-e="cancel">キャンセル</button></div>';
+    wrap.innerHTML =
+      '<div class="composer__attachments msg__editatts"></div>' +
+      '<div class="composer__field" style="position:relative"><textarea class="msg__editbox"></textarea></div>' +
+      '<div class="composer__toolbar msg__edittoolbar">' +
+        '<div class="composer__tools">' +
+          '<button class="tbtn" type="button" data-e="attach" title="ファイルを添付" aria-label="ファイルを添付">📎</button>' +
+          '<button class="tbtn" type="button" data-e="mention" title="メンション（@）" aria-label="メンション">@</button>' +
+          '<button class="tbtn" type="button" data-e="emoji" title="絵文字" aria-label="絵文字" aria-expanded="false">😀</button>' +
+          '<span class="tbar-sep" aria-hidden="true"></span>' +
+          '<button class="tbtn" type="button" data-e="bold" title="太字（**）" aria-label="太字"><b>B</b></button>' +
+          '<button class="tbtn" type="button" data-e="code" title="コード（``）" aria-label="コード">&lt;/&gt;</button>' +
+          '<button class="tbtn" type="button" data-e="link" title="リンク（[text](url)）" aria-label="リンク">🔗</button>' +
+        '</div>' +
+        '<div class="msg__editacts">' +
+          '<button class="btn btn-primary btn-sm" type="button" data-e="save">保存</button>' +
+          '<button class="btn btn-outline btn-sm" type="button" data-e="cancel">キャンセル</button>' +
+        '</div>' +
+      '</div>';
     textEl.after(wrap);
-    const ta = wrap.querySelector('.msg__editbox'); ta.value = original; ta.focus();
-    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+    const ta = wrap.querySelector('.msg__editbox');
+    const attsEl = wrap.querySelector('.msg__editatts');
+    ta.value = original;
+    // 編集中に追加する添付（保存時にメッセージへ反映）
+    const editAtts = [];
+    function renderEditAtts() {
+      attsEl.innerHTML = editAtts.map((f, i) =>
+        '<span class="att-chip">📎 ' + f + ' <button type="button" data-ei="' + i + '" aria-label="削除">✕</button></span>'
+      ).join('');
+    }
+    // 入力で自動リサイズ＋メンション候補（下部コンポーザーと同じ）
+    ta.addEventListener('input', () => { autoGrowEl(ta, 200); updateMention(ta); });
+    ta.addEventListener('keydown', e => { handleMentionKeys(e); });
+    ta.focus(); autoGrowEl(ta, 200);
     wrap.addEventListener('click', e => {
+      const rm = e.target.closest('button[data-ei]');
+      if (rm) { editAtts.splice(Number(rm.dataset.ei), 1); renderEditAtts(); return; }
       const b = e.target.closest('button[data-e]'); if (!b) return;
-      if (b.dataset.e === 'save') {
+      const act = b.dataset.e;
+      if (act === 'bold') fmtWrap(ta, '**', '**', '太字');
+      else if (act === 'code') fmtWrap(ta, '`', '`', 'code');
+      else if (act === 'link') fmtLink(ta);
+      else if (act === 'mention') { e.stopPropagation(); fmtInsert(ta, '@'); }
+      else if (act === 'emoji') { e.stopPropagation(); toggleEmojiPop(b, ta); }
+      else if (act === 'attach') { editAtts.push(SAMPLE_FILES[sampleFileIdx % SAMPLE_FILES.length]); sampleFileIdx++; renderEditAtts(); }
+      else if (act === 'save') {
         const v = ta.value.trim();
         if (v) {
           textEl.innerHTML = renderText(v);
@@ -674,8 +735,24 @@
             msg.querySelector('.msg__head').appendChild(tag);
           }
         }
+        // 追加した添付をメッセージへ反映
+        if (editAtts.length) {
+          let filesEl = msg.querySelector('.msg__files');
+          if (!filesEl) {
+            filesEl = document.createElement('div'); filesEl.className = 'msg__files';
+            const refBar = msg.querySelector('.reaction-bar');
+            if (refBar) msg.querySelector('.msg__body').insertBefore(filesEl, refBar);
+            else msg.querySelector('.msg__body').appendChild(filesEl);
+          }
+          editAtts.forEach(f => {
+            const chip = document.createElement('span'); chip.className = 'file-chip';
+            chip.innerHTML = '<span class="file-icon">📎</span><a href="#">' + f + '</a>';
+            filesEl.appendChild(chip);
+          });
+        }
+        textEl.style.display = ''; wrap.remove();
       }
-      textEl.style.display = ''; wrap.remove();
+      else if (act === 'cancel') { textEl.style.display = ''; wrap.remove(); }
     });
   }
 
