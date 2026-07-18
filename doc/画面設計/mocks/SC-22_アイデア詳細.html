@@ -100,6 +100,54 @@
 
   .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
   .modal__foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+
+  /* --- 議論アクティビティ・グラフ（活発度） --- */
+  .activity { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); background: var(--color-surface-alt); }
+  .activity__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .activity__label { font-weight: 700; font-size: var(--text-sm); }
+  .activity__state { font-size: var(--text-xs); font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .activity__state.hot { background: var(--color-disagree-bg); color: var(--color-danger); }
+  .activity__state.calm { background: var(--color-primary-soft); color: var(--color-primary-active); }
+  .activity__state.idle { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+  /* 棒グラフ（日次メッセージ数） */
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 48px; margin: var(--space-3) 0 var(--space-1); }
+  .spark__bar { position: relative; flex: 1; min-width: 5px; background: var(--color-primary); border-radius: 2px 2px 0 0; opacity: .55; }
+  .spark__bar:hover { opacity: 1; }
+  .spark__bar.is-recent { opacity: .9; }
+  /* アイデア更新マーカー（棒の上に縦線＋点） */
+  .spark__bar.has-update::after { content: "◆"; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--color-warning); }
+  .spark__bar.has-update::before { content: ""; position: absolute; top: -2px; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--color-warning); opacity: .5; }
+  .activity__axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-subtle); }
+  .activity__summary { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .activity__summary b { color: var(--color-text); }
+  .activity__legend { font-size: 10px; color: var(--color-text-subtle); margin-top: 2px; }
+
+  /* --- 投票見直し（更新後の差分導線） --- */
+  .vote-updated { display: flex; flex-direction: column; gap: var(--space-2); background: #FFFBEB; border: 1px solid var(--color-warning); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); font-size: var(--text-sm); }
+  .vote-updated__title { font-weight: 700; color: var(--color-warning); }
+  .vote-stale-badge { font-size: var(--text-xs); font-weight: 700; color: var(--color-warning); background: #FEF3C7; border-radius: 999px; padding: 1px 8px; }
+
+  /* --- 更新履歴モーダル：版タイムライン＋差分 --- */
+  .rev { border-left: 2px solid var(--color-border); padding: 0 0 var(--space-4) var(--space-4); margin-left: 6px; position: relative; }
+  .rev::before { content: ""; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-primary); border: 2px solid var(--color-surface); }
+  .rev.is-current::before { background: var(--color-warning); }
+  .rev:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .rev__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); }
+  .rev__time { font-weight: 700; }
+  .rev__fields { display: flex; gap: 4px; flex-wrap: wrap; margin: var(--space-1) 0; }
+  .rev__note { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .rev__diff { margin-top: var(--space-2); }
+  .diff-field { margin-bottom: var(--space-3); }
+  .diff-field__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin-bottom: 2px; }
+  .diff-text { font-size: var(--text-sm); line-height: 1.8; background: var(--color-surface-alt); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+  .diff-add { background: var(--color-agree-bg); color: var(--color-success); border-radius: 3px; padding: 0 2px; }
+  .diff-del { background: var(--color-disagree-bg); color: var(--color-danger); border-radius: 3px; padding: 0 2px; text-decoration: line-through; }
+  .diff-oldnew { font-size: var(--text-sm); }
+  .diff-oldnew .old { color: var(--color-danger); text-decoration: line-through; }
+  .diff-oldnew .new { color: var(--color-success); font-weight: 600; }
+  .rev-since { text-align: center; font-size: var(--text-xs); font-weight: 700; color: var(--color-warning); background: #FEF3C7; border-radius: 999px; padding: 2px 10px; margin: var(--space-2) 0; }
+  .meta-history { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary); cursor: pointer; }
+  .meta-history:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -157,7 +205,7 @@
     </div>
     <div class="idea-meta">
       <span>🗓 投稿 2026/07/10</span>
-      <span>🔄 更新 2026/07/16</span>
+      <span>🔄 更新 2026/07/16・<button class="meta-history" type="button" id="historyBtn" aria-haspopup="dialog">3回更新（履歴を見る）</button></span>
       <span class="soon">⏳ タイムリミット 2026/07/25（あと7日）</span>
       <span>🤝 利害関係者: 物流部・配送委託先</span>
     </div>
@@ -214,6 +262,39 @@
           <h2 class="card-title" style="margin:0">チャット <span class="badge badge-muted">💬 8</span></h2>
           <span class="role-note">パーティー全員が閲覧・投稿できます</span>
         </div>
+
+        <!-- 議論アクティビティ・グラフ（活発度の可視化） -->
+        <div class="activity" aria-label="議論の活発度">
+          <div class="activity__head">
+            <span class="activity__label">議論の活発度</span>
+            <span class="activity__state hot">🔥 活発</span>
+          </div>
+          <!-- 直近14日の日次メッセージ数（◆=アイデア更新日） -->
+          <div class="spark" role="img" aria-label="直近14日の日次メッセージ数の棒グラフ。7/16に更新、直近3日が活発。">
+            <span class="spark__bar" style="height:12%"></span>
+            <span class="spark__bar" style="height:28%"></span>
+            <span class="spark__bar" style="height:20%"></span>
+            <span class="spark__bar has-update" style="height:45%" title="7/10 投稿"></span>
+            <span class="spark__bar" style="height:60%"></span>
+            <span class="spark__bar" style="height:35%"></span>
+            <span class="spark__bar" style="height:18%"></span>
+            <span class="spark__bar" style="height:8%"></span>
+            <span class="spark__bar has-update" style="height:70%" title="7/16 更新（本文・添付）"></span>
+            <span class="spark__bar" style="height:85%"></span>
+            <span class="spark__bar is-recent" style="height:55%"></span>
+            <span class="spark__bar is-recent" style="height:95%"></span>
+            <span class="spark__bar is-recent" style="height:75%"></span>
+            <span class="spark__bar is-recent" style="height:40%"></span>
+          </div>
+          <div class="activity__axis"><span>7/05</span><span>7/12</span><span>今日</span></div>
+          <div class="activity__summary">
+            <span>今週 <b>18件</b>（先週比 <b>↑ +7</b>）</span>
+            <span>参加 <b>5人</b></span>
+            <span>最終投稿 <b>3時間前</b></span>
+          </div>
+          <div class="activity__legend">◆ = アイデア更新（更新後に議論が再燃）。まだ活発に議論中のため、評価は落ち着いてからが目安。</div>
+        </div>
+
         <div class="chat-preview">
           <div class="chat-msg">
             <span class="avatar sm"><span class="avatar__img placeholder">田</span></span>
@@ -239,6 +320,14 @@
       <!-- 投票 -->
       <section class="card" aria-label="投票">
         <h2 class="card-title">投票</h2>
+
+        <!-- 自分の投票後にアイデアが更新された場合の見直し導線（更新前に投票していると表示） -->
+        <div class="vote-updated" id="voteUpdated">
+          <span class="vote-updated__title">⚠ あなたの投票後にアイデアが更新されました</span>
+          <span class="role-note" style="color:var(--color-text)">7/16 に <strong>本文・添付</strong> が更新されました。差分を確認して、賛成/反対を見直せます。</span>
+          <button class="btn btn-outline btn-sm" type="button" id="voteDiffBtn">投票時点からの差分を見る</button>
+        </div>
+
         <div class="vote-summary">
           <span class="vote-agree" id="agreeCount">▲ 賛成 12</span>
           <span class="vote-disagree" id="disagreeCount">▼ 反対 3</span>
@@ -247,6 +336,7 @@
           <button class="vote-btn agree is-on" type="button" id="agreeBtn" aria-pressed="true">▲ 賛成</button>
           <button class="vote-btn disagree" type="button" id="disagreeBtn" aria-pressed="false">▼ 反対</button>
         </div>
+        <p class="role-note" id="voteStaleNote" style="margin-top:var(--space-2)"><span class="vote-stale-badge">更新前に投票</span> あなたの賛成は 7/16 の更新より前のものです。</p>
         <p class="vote-note">
           1人1票・<strong>締切まで変更できます</strong>。投票すると <span class="xp">+5 XP</span>（自分のアイデアにも投票可）。<br>
           🔒 この会社は<strong>匿名モード</strong>（賛成/反対の集計数のみ表示）。記名モードでは投票者のアバターを表示します。
@@ -338,6 +428,78 @@
   <p class="role-note" style="margin-top:var(--space-8)">※ 本番は SC-12 のアイデア一覧行／ダッシュボードのフォロー・未投票パネルから <strong>Intercept Route でモーダル差し込み</strong>（URL は <code>/idea/xx</code>・リロード/直アクセスはこのフルページ）。パネル→モーダルの拡大は framer-motion の <code>layoutId</code>。</p>
 </main>
 
+<!-- ============ 更新履歴モーダル（版タイムライン＋差分） ============ -->
+<div class="modal" id="historyModal" hidden role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" style="max-width:640px">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="historyTitle" style="margin-bottom:var(--space-1)">更新履歴</h2>
+    <p class="role-note" style="margin-top:0">アイデアの変更を新しい順に表示。各版を開くと差分（<span class="diff-add">追加</span>／<span class="diff-del">削除</span>）が見られます。更新時は<strong>投票者とフォロワーに通知</strong>されます。</p>
+
+    <div style="margin-top:var(--space-4)">
+      <!-- v3（現在） -->
+      <div class="rev is-current">
+        <div class="rev__head">
+          <span class="rev__time">2026/07/16 14:30</span>
+          <span class="badge badge-muted">現在</span>
+          <span class="poster"><span class="avatar sm" style="--avatar-size:20px"><span class="avatar__img placeholder">鈴</span></span><span class="name">鈴木 花子</span></span>
+        </div>
+        <div class="rev__fields"><span class="badge badge-muted">本文</span><span class="badge badge-muted">添付</span></div>
+        <div class="rev__note">📝 試算の前提を明確化し、根拠シートを最新版へ差し替え。</div>
+        <details class="rev__diff" open>
+          <summary class="role-note" style="cursor:pointer">差分を表示</summary>
+          <div class="diff-field">
+            <div class="diff-field__label">アイデア本文</div>
+            <div class="diff-text">複数拠点の夜間配送を1本のルートに集約し、積載率を高める。<span class="diff-del">需要予測は担当者が手動で行う。</span><span class="diff-add">AIで需要予測して翌日ルートを自動生成し、繁忙期は臨時便を差し込む。</span>まず首都圏3拠点でパイロット運用し、効果を検証してから全国へ展開する。</div>
+          </div>
+          <div class="diff-field">
+            <div class="diff-field__label">関連資料</div>
+            <div class="diff-text"><span class="diff-del">📊 夜間配送_試算.xlsx</span> → <span class="diff-add">📊 夜間配送_試算シートv2.xlsx</span></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- あなたの投票時点の区切り -->
+      <div class="rev-since">↑ ここから上が「あなたの投票（7/12）より後」の変更です</div>
+
+      <!-- v2 -->
+      <div class="rev">
+        <div class="rev__head">
+          <span class="rev__time">2026/07/12 10:05</span>
+          <span class="poster"><span class="avatar sm" style="--avatar-size:20px"><span class="avatar__img placeholder">鈴</span></span><span class="name">鈴木 花子</span></span>
+        </div>
+        <div class="rev__fields"><span class="badge badge-muted">価値</span><span class="badge badge-muted">タイムリミット</span></div>
+        <div class="rev__note">📝 レビューコメントを反映。</div>
+        <details class="rev__diff">
+          <summary class="role-note" style="cursor:pointer">差分を表示</summary>
+          <div class="diff-field">
+            <div class="diff-field__label">価値</div>
+            <div class="diff-text">配送コストを約<span class="diff-del">10%</span><span class="diff-add">15%</span>削減しつつ、CO2排出も同時に削減できる。</div>
+          </div>
+          <div class="diff-field">
+            <div class="diff-field__label">タイムリミット</div>
+            <div class="diff-oldnew"><span class="old">2026/07/20</span> → <span class="new">2026/07/25</span></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- v1（初版） -->
+      <div class="rev">
+        <div class="rev__head">
+          <span class="rev__time">2026/07/10 09:00</span>
+          <span class="badge badge-muted">初版</span>
+          <span class="poster"><span class="avatar sm" style="--avatar-size:20px"><span class="avatar__img placeholder">鈴</span></span><span class="name">鈴木 花子</span></span>
+        </div>
+        <div class="rev__note">アイデアを投稿。</div>
+      </div>
+    </div>
+
+    <div class="modal__foot">
+      <button class="btn btn-outline" type="button" data-close>閉じる</button>
+    </div>
+  </div>
+</div>
+
 <script src="shared.js"></script>
 <script>
   // --- 背景画像（ダッシュボードで設定した個人背景を全画面へ反映） ---
@@ -373,10 +535,25 @@
     agreeCount.textContent = '▲ 賛成 ' + a;
     disagreeCount.textContent = '▼ 反対 ' + d;
   }
-  function setVote(choice) { myVote = (myVote === choice) ? null : choice; renderVote(); }
+  function setVote(choice) { myVote = (myVote === choice) ? null : choice; renderVote(); acknowledgeUpdate(); }
   agreeBtn.addEventListener('click', () => setVote('agree'));
   disagreeBtn.addEventListener('click', () => setVote('disagree'));
   renderVote();
+
+  // --- 更新履歴モーダル（版タイムライン＋差分） ---
+  const historyModal = document.getElementById('historyModal');
+  function openHistory() { historyModal.hidden = false; }
+  function closeHistory() { historyModal.hidden = true; }
+  document.getElementById('historyBtn').addEventListener('click', openHistory);
+  historyModal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeHistory(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !historyModal.hidden) closeHistory(); });
+
+  // --- 投票の見直し：更新後に投票し直すと「投票後に更新」導線・「更新前に投票」バッジを消す ---
+  const voteUpdated = document.getElementById('voteUpdated');
+  const voteStaleNote = document.getElementById('voteStaleNote');
+  function acknowledgeUpdate() { voteUpdated.hidden = true; voteStaleNote.hidden = true; }
+  // 投票時点からの差分を見る → 更新履歴モーダル（投票時点の区切りつき）
+  document.getElementById('voteDiffBtn').addEventListener('click', openHistory);
 </script>
 </body>
 </html>
