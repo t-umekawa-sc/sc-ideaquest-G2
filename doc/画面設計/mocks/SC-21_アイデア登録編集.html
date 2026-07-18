@@ -115,7 +115,20 @@
           </div>
           <div class="field">
             <label>利害関係者</label>
-            <input class="input" id="iStakeholder" placeholder="関係する人・部署">
+            <div class="multiselect" data-multiselect data-free="true" id="stakeSelect">
+              <div class="multiselect__control">
+                <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="関係する人・部署を選択または入力…">
+              </div>
+              <ul class="multiselect__list" role="listbox" hidden>
+                <li class="multiselect__option" role="option" data-value="物流部">物流部</li>
+                <li class="multiselect__option" role="option" data-value="経営企画部">経営企画部</li>
+                <li class="multiselect__option" role="option" data-value="情報システム部">情報システム部</li>
+                <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+                <li class="multiselect__option" role="option" data-value="現場ドライバー">現場ドライバー</li>
+                <li class="multiselect__empty" role="presentation" hidden></li>
+              </ul>
+            </div>
+            <div class="hint">複数選択可。候補に無ければ入力して Enter で追加。</div>
           </div>
         </div>
         <div class="field">

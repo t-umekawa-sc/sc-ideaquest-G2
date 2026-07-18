@@ -118,23 +118,23 @@
     </div>
 
     <div class="field-row">
-      <!-- カテゴリー: 事前定義＋自由入力 -->
+      <!-- カテゴリー: 複数選択（事前定義＋自由入力） -->
       <div class="field">
         <label>カテゴリー<span class="req">*</span></label>
-        <div class="combobox" data-combobox>
-          <button type="button" class="combobox__button" aria-haspopup="listbox" aria-expanded="false">
-            <span class="combobox__value" data-placeholder>選択または入力…</span><span class="combobox__arrow">▾</span>
-          </button>
-          <ul class="combobox__list" role="listbox" hidden>
-            <li class="combobox__option" role="option">業務改善</li>
-            <li class="combobox__option" role="option">新規事業</li>
-            <li class="combobox__option" role="option">コスト削減</li>
-            <li class="combobox__option" role="option">顧客体験</li>
-            <li class="combobox__option" role="option">働き方</li>
-            <li class="combobox__option" role="option" data-freeinput>＋ 自由入力で追加…</li>
+        <div class="multiselect" data-multiselect data-free="true" id="catSelect">
+          <div class="multiselect__control">
+            <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="選択または入力…">
+          </div>
+          <ul class="multiselect__list" role="listbox" hidden>
+            <li class="multiselect__option" role="option" data-value="業務改善">業務改善</li>
+            <li class="multiselect__option" role="option" data-value="新規事業">新規事業</li>
+            <li class="multiselect__option" role="option" data-value="コスト削減">コスト削減</li>
+            <li class="multiselect__option" role="option" data-value="顧客体験">顧客体験</li>
+            <li class="multiselect__option" role="option" data-value="働き方">働き方</li>
+            <li class="multiselect__empty" role="presentation" hidden></li>
           </ul>
         </div>
-        <div class="hint">定義済みから選択、なければ「自由入力で追加」。</div>
+        <div class="hint">複数選択可。定義済みから選択、なければ入力して Enter で追加。</div>
       </div>
 
       <!-- 期限日 -->
@@ -151,15 +151,21 @@
       <textarea class="textarea" id="qTheme" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか"></textarea>
     </div>
 
-    <!-- クエストグループ -->
+    <!-- クエストグループ: 単一選択（オートコンプリート付き） -->
     <div class="field">
       <label>クエストグループ<span class="req">*</span></label>
-      <select class="select" id="qGroup">
-        <option value="prod">プロダクト開発部</option>
-        <option value="all">全社改善プロジェクト</option>
-        <option value="cs">カスタマーサクセス</option>
-      </select>
-      <div class="hint">クエストは 1 つのグループに属します。<strong>パーティー候補は同一グループの所属者に限定</strong>されます（変更すると下の候補が入れ替わります）。</div>
+      <div class="multiselect" data-multiselect data-single="true" id="groupSelect">
+        <div class="multiselect__control">
+          <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループを検索…">
+        </div>
+        <ul class="multiselect__list" role="listbox" hidden>
+          <li class="multiselect__option" role="option" data-value="プロダクト開発部" aria-selected="true">プロダクト開発部</li>
+          <li class="multiselect__option" role="option" data-value="全社改善プロジェクト">全社改善プロジェクト</li>
+          <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+          <li class="multiselect__empty" role="presentation" hidden></li>
+        </ul>
+      </div>
+      <div class="hint">クエストは <strong>1 つのグループに属します</strong>（単一選択）。<strong>パーティー候補は同一グループの所属者に限定</strong>されます（変更すると下の候補が入れ替わります）。</div>
     </div>
 
     <!-- パーティー・権限 -->
@@ -242,16 +248,7 @@
     iconClear.hidden = true; iconInput.value = '';
   });
 
-  // カテゴリー: 自由入力（combobox の「自由入力で追加」を選んだら prompt）
-  document.querySelector('[data-combobox]').addEventListener('click', e => {
-    const free = e.target.closest('[data-freeinput]');
-    if (!free) return;
-    const v = prompt('新しいカテゴリー名を入力');
-    if (v && v.trim()) {
-      const val = document.querySelector('.combobox__value');
-      val.textContent = v.trim(); val.removeAttribute('data-placeholder');
-    }
-  });
+  // カテゴリー（複数・自由入力）／クエストグループ（単一）は shared.js の [data-multiselect] が初期化。
 
   // パーティー: メンバー追加 / 削除 / 権限トグル / 人数
   const plist = document.getElementById('plist');
@@ -307,9 +304,10 @@
   document.getElementById('createBtn').addEventListener('click', () => {
     const missing = [];
     if (!qName.value.trim()) missing.push('件名');
-    if (document.querySelector('.combobox__value[data-placeholder]')) missing.push('カテゴリー');
+    if (!document.querySelectorAll('#catSelect .multiselect__chip').length) missing.push('カテゴリー');
     if (!document.getElementById('qDeadline').value) missing.push('期限日');
     if (!document.getElementById('qTheme').value.trim()) missing.push('目的・テーマ');
+    if (!document.querySelector('#groupSelect .multiselect__input').value.trim()) missing.push('クエストグループ');
     if (plist.querySelectorAll('.pmember').length < 1) missing.push('参加メンバー');
     if (missing.length) { alert('必須項目が未入力です: ' + missing.join('、')); return; }
     alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\n作成 XP を付与します。');

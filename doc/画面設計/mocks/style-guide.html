@@ -143,6 +143,58 @@
         </div>
         <div class="hint">候補にホバーで指ポインター＋ハイライト。↑↓/Enter/Escで操作可。</div>
       </div>
+
+      <div class="field">
+        <label>複数選択（.multiselect・<strong>自由入力あり</strong>）</label>
+        <div class="multiselect" data-multiselect data-free="true">
+          <div class="multiselect__control">
+            <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="選択または入力…">
+          </div>
+          <ul class="multiselect__list" role="listbox" hidden>
+            <li class="multiselect__option" role="option" data-value="業務改善" aria-selected="true">業務改善</li>
+            <li class="multiselect__option" role="option" data-value="新規事業">新規事業</li>
+            <li class="multiselect__option" role="option" data-value="コスト削減">コスト削減</li>
+            <li class="multiselect__option" role="option" data-value="顧客体験">顧客体験</li>
+            <li class="multiselect__option" role="option" data-value="働き方">働き方</li>
+            <li class="multiselect__empty" role="presentation" hidden></li>
+          </ul>
+        </div>
+        <div class="hint">入力で絞り込み → <strong>↑↓/Enter</strong> で選択。候補に無い語は <strong>Enter で追加</strong>（グレーのタグ）。チップの <strong>×</strong> で解除・空欄で <strong>Backspace</strong> でも直前を解除。クエストのカテゴリー／アイデアの利害関係者向け。</div>
+      </div>
+
+      <div class="field">
+        <label>複数選択（.multiselect・<strong>候補のみ／自由入力なし</strong>）</label>
+        <div class="multiselect" data-multiselect>
+          <div class="multiselect__control">
+            <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="メンバーを検索…">
+          </div>
+          <ul class="multiselect__list" role="listbox" hidden>
+            <li class="multiselect__option" role="option" data-value="佐藤 花子">佐藤 花子</li>
+            <li class="multiselect__option" role="option" data-value="鈴木 一郎">鈴木 一郎</li>
+            <li class="multiselect__option" role="option" data-value="田中 みゆき">田中 みゆき</li>
+            <li class="multiselect__option" role="option" data-value="高橋 健">高橋 健</li>
+            <li class="multiselect__empty" role="presentation" hidden></li>
+          </ul>
+        </div>
+        <div class="hint">こちらは<strong>定義済み候補のみ</strong>（自由入力不可）。既存マスタから複数選択する用途（例: パーティー候補）。</div>
+      </div>
+
+      <div class="field">
+        <label>単一選択（.multiselect・<strong>data-single／オートコンプリート付き</strong>）</label>
+        <div class="multiselect" data-multiselect data-single="true">
+          <div class="multiselect__control">
+            <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループを検索…">
+          </div>
+          <ul class="multiselect__list" role="listbox" hidden>
+            <li class="multiselect__option" role="option" data-value="プロダクト開発部" aria-selected="true">プロダクト開発部</li>
+            <li class="multiselect__option" role="option" data-value="全社改善プロジェクト">全社改善プロジェクト</li>
+            <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+            <li class="multiselect__empty" role="presentation" hidden></li>
+          </ul>
+        </div>
+        <div class="hint"><strong>単一選択</strong>＝チップにせず入力欄に確定値を表示。フォーカスで全件、入力で絞り込み、選択で確定（1つだけ）。<strong>クエストグループ</strong>（1クエスト＝1グループ）向け。</div>
+      </div>
+
       <div class="field">
         <label>アイデア本文<span class="req">*</span></label>
         <textarea class="textarea" placeholder="どんなアイデア？"></textarea>
