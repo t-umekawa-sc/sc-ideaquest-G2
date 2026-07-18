@@ -373,7 +373,14 @@
     thread.appendChild(msg);
     ensureBar(msg); ensureActions(msg);
     box.value = ''; pendingAtts = []; renderAtts(); autoGrow(); hidePop(); clearReply(); updateSendState();
-    msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    scrollToBottom();
+  }
+
+  // 投稿後などにスレッド最下部（最新メッセージ）まで自動スクロール。
+  // 下部固定コンポーザーに隠れないようページ最下部へ。reduced-motion では瞬間移動。
+  function scrollToBottom() {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
   }
 
   function renderAtts() {
