@@ -197,9 +197,9 @@
 
     <!-- 総評（アイデア全体への総括コメント） -->
     <div class="field" style="margin-top:var(--space-4)">
-      <label for="evalOverall">総評（全体コメント・任意）</label>
+      <label for="evalOverall">総評（全体コメント）<span class="req">*</span></label>
       <textarea class="textarea" id="evalOverall" style="min-height:96px" placeholder="このアイデア全体への評価・総括コメント（強み/懸念/次の一手 など）"></textarea>
-      <div class="hint">観点別コメントとは別に、アイデア全体への総評を残せます。アイデア詳細（SC-22）の評価結果に表示されます。</div>
+      <div class="hint">観点別コメントとは別に、アイデア全体への総評を必須入力。アイデア詳細（SC-22）の評価結果に表示されます。</div>
     </div>
 
     <!-- 集計プレビュー -->
@@ -277,6 +277,7 @@
   document.getElementById('submitBtn').addEventListener('click', () => {
     const missing = ASPECTS.filter(a => !scores[a]);
     if (missing.length) { alert('すべての観点（5つ）を採点してください。未採点: ' + missing.length + '件'); return; }
+    if (!document.getElementById('evalOverall').value.trim()) { alert('総評（全体コメント）は必須です。'); document.getElementById('evalOverall').focus(); return; }
     const vis = document.querySelector('input[name="vis"]:checked').value;
     alert('評価を確定しました（デモ）\n平均: ' + document.getElementById('avgVal').textContent + ' / 5.0\n公開範囲: ' + (vis === 'party' ? 'パーティー全員' : '限定'));
   });
