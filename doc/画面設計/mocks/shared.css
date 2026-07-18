@@ -48,16 +48,25 @@
   /* --- レアリティ（ショップ装備・3段階） --- */
   --rarity-common:   #94A3B8; /* コモン=グレー */
   --rarity-standard: #3B82F6; /* 標準=ブルー */
-  --rarity-rare:     #A855F7; /* レア=パープル */
+  --rarity-rare:     #A855F7; /* レア=パープル（明面用） */
+  --rarity-rare-on-dark: #D8B4FE; /* レア=明るいパープル（CRTガラス等の暗面上で使う。レベルと同方針） */
 
   /* --- ゲーミフィケーション（レトロ・ピクセルアクセント） --- */
   --pixel-xp:     #FBBF24; /* XP=ゴールド */
   --pixel-coin:   #F59E0B; /* コイン=アンバー */
-  --pixel-level:  #8B5CF6; /* レベル=パープル */
+  --pixel-level:  #8B5CF6; /* レベル=パープル（白ピル .pixel-stat.level 等の明面用） */
+  --pixel-level-on-dark: #C4B5FD; /* レベル=明るいバイオレット（CRTガラス等の暗面上で読ませる用） */
   --pixel-cyan:   #22D3EE; /* レトロ・シアン */
   --pixel-magenta:#EC4899; /* レトロ・マゼンタ */
-  --pixel-bg:     #1E293B; /* ゲームパネルの暗い背景（slate-800） */
+  --pixel-bg:     #1E293B; /* ゲームパネルの暗い背景（slate-800）※不透明が必要な場面用に残置 */
   --pixel-ink:    #F8FAFC; /* ゲームパネル上の明るい文字 */
+  /* ゲーム層マテリアル＝「CRTガラス」（決定・2026-07-18）。半透明の暗ガラス＋走査線＋
+     上端の反射で“古いゲーム機の画面ガラス”を表現。ドット感（角丸なし・ハード枠/影・
+     ピクセルフォント）は維持。業務層には使わない＝1レイヤー1マテリアル。 */
+  --pixel-glass-fill:   rgba(15,23,42,.62); /* 半透明の暗い充填（背景を透かす） */
+  --pixel-glass-border: rgba(203,213,225,.65); /* すりガラスの縁 */
+  --pixel-glass-scan:   rgba(0,0,0,.14); /* 走査線（scanline） */
+  --pixel-glass-gloss:  rgba(255,255,255,.22); /* 上端の反射（テカリ） */
 
   /* --- タイポグラフィ --- */
   --font-base:  "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -270,6 +279,13 @@ img { max-width: 100%; display: block; }
 .rarity-common   { border-color: var(--rarity-common); }
 .rarity-standard { border-color: var(--rarity-standard); }
 .rarity-rare     { border-color: var(--rarity-rare); box-shadow: 0 0 0 2px var(--rarity-rare) inset; }
+/* CRTガラス（ゲーム層）の上ではレアの紫が暗く沈むため、暗面用の明るいパープルに切替
+   （レベルと同方針）。装備アイテムはショップ/きせかえ＝ゲーム層で使うのが基本。 */
+.pixel-panel .rarity-rare,
+.rarity-rare.on-dark {
+  border-color: var(--rarity-rare-on-dark);
+  box-shadow: 0 0 0 2px var(--rarity-rare-on-dark) inset;
+}
 
 /* =============================================================
  * 7b. ユーザアバター（下部にレベル表示・ホバーでユーザ名ツールチップ）
@@ -474,13 +490,21 @@ img { max-width: 100%; display: block; }
   font-family: var(--font-pixel);
   image-rendering: pixelated; /* 画像/スプライトをドット感のまま拡大 */
 }
+/* CRTガラス（ゲーム層マテリアル）。背景を透かす半透明＋走査線＋上端反射。
+   背景レイヤーの積み順: ①上端の反射(gloss) ②走査線(scan) ③半透明の暗い充填(fill)。
+   backdrop-filter で背後をぼかし“すりガラス”に。inset の内影で画面ガラスの湾曲感。 */
 .pixel-panel {
   font-family: var(--font-pixel);
-  background: var(--pixel-bg);
   color: var(--pixel-ink);
-  border: 3px solid var(--pixel-ink);
+  background:
+    linear-gradient(180deg, var(--pixel-glass-gloss), rgba(255,255,255,0) 45%),
+    repeating-linear-gradient(0deg, var(--pixel-glass-scan) 0 2px, rgba(0,0,0,0) 2px 4px),
+    var(--pixel-glass-fill);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border: 3px solid var(--pixel-glass-border);
   border-radius: var(--radius-pixel);
-  box-shadow: var(--shadow-pixel);
+  box-shadow: var(--shadow-pixel), inset 0 0 40px rgba(0,0,0,.4);
   padding: var(--space-5);
   image-rendering: pixelated;
 }
@@ -578,11 +602,16 @@ img { max-width: 100%; display: block; }
 .pixel-dialog {
   position: relative;
   font-family: var(--font-pixel);
-  background: var(--pixel-bg);
   color: var(--pixel-ink);
-  border: 3px solid var(--pixel-ink);
+  background:
+    linear-gradient(180deg, var(--pixel-glass-gloss), rgba(255,255,255,0) 45%),
+    repeating-linear-gradient(0deg, var(--pixel-glass-scan) 0 2px, rgba(0,0,0,0) 2px 4px),
+    var(--pixel-glass-fill);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border: 3px solid var(--pixel-glass-border);
   border-radius: var(--radius-pixel);
-  box-shadow: var(--shadow-pixel);
+  box-shadow: var(--shadow-pixel), inset 0 0 40px rgba(0,0,0,.4);
   padding: var(--space-4) var(--space-5) var(--space-5);
   line-height: 1.9;
   image-rendering: pixelated;
@@ -593,7 +622,7 @@ img { max-width: 100%; display: block; }
   margin-bottom: var(--space-2);
 }
 /* レベルアップ時などの強調色バリエーション */
-.pixel-dialog.levelup .pixel-dialog__title { color: var(--pixel-level); }
+.pixel-dialog.levelup .pixel-dialog__title { color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
 /* 文字送り中の末尾キャレット（点滅） */
 .pixel-caret::after {
   content: "▮";

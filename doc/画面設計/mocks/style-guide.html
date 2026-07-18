@@ -77,10 +77,13 @@
       <div class="swatch"><div class="chip" style="background:var(--rarity-common)"></div><div class="name">common</div></div>
       <div class="swatch"><div class="chip" style="background:var(--rarity-standard)"></div><div class="name">standard</div></div>
       <div class="swatch"><div class="chip" style="background:var(--rarity-rare)"></div><div class="name">rare</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--rarity-rare-on-dark)"></div><div class="name">rare on-dark</div></div>
       <div class="swatch"><div class="chip" style="background:var(--pixel-xp)"></div><div class="name">xp</div></div>
       <div class="swatch"><div class="chip" style="background:var(--pixel-coin)"></div><div class="name">coin</div></div>
       <div class="swatch"><div class="chip" style="background:var(--pixel-level)"></div><div class="name">level</div></div>
+      <div class="swatch"><div class="chip" style="background:var(--pixel-level-on-dark)"></div><div class="name">level on-dark</div></div>
     </div>
+    <p class="hint">レア/レベルの紫は <strong>CRTガラス（暗面）の上だと沈む</strong>ため、暗面用の <code>on-dark</code>（明るいパープル/バイオレット）を用意。<code>.pixel-panel</code> 内の <code>.rarity-rare</code> は自動で on-dark に切替。レベル文字は暗面で <code>--pixel-level-on-dark</code> を使う。</p>
   </div>
 
   <!-- タイポグラフィ -->
@@ -188,14 +191,20 @@
   <!-- ゲーミフィケーション -->
   <div class="section">
     <h2>6. ゲーミフィケーション（レトロ・ピクセルゾーン）</h2>
-    <div class="pixel-panel" style="max-width:520px">
-      <h3>★ STATUS ★</h3>
-      <p>LEVEL 7 &nbsp; NEXT 120 XP</p>
-      <div class="xp-bar"><span style="width:65%"></span></div>
-      <p style="margin-top:var(--space-4)">COIN ◆ 320</p>
-      <button class="btn-pixel" style="margin-top:var(--space-2)">▶ SHOP へ</button>
+    <p class="hint" style="margin-top:0">マテリアル＝<strong>CRTガラス</strong>（半透明の暗ガラス＋走査線＋上端の反射＝“古いゲーム機の画面ガラス”）。ドット感（角丸なし・ハード枠/影・ピクセルフォント）は維持。<strong>背景を透かす</strong>ので下に画像/柄を敷いて確認する↓</p>
+    <div style="max-width:560px; padding:var(--space-6); border-radius:var(--radius-lg);
+                background:
+                  radial-gradient(600px 300px at 20% 0%, rgba(139,92,246,.5), transparent 60%),
+                  url('assets/login-bg.jpg') center/cover no-repeat, #0b1220;">
+      <div class="pixel-panel">
+        <h3>★ STATUS ★</h3>
+        <p>LEVEL 7 &nbsp; NEXT 120 XP</p>
+        <div class="xp-bar"><span style="width:65%"></span></div>
+        <p style="margin-top:var(--space-4)">COIN ◆ 320</p>
+        <button class="btn-pixel" style="margin-top:var(--space-2)">▶ SHOP へ</button>
+      </div>
     </div>
-    <p class="hint">※ ゲーム要素（ダッシュボードのステータス・ショップ・アバター・実績/バッジ）のみこのゾーンを使う。フォームや管理画面など業務部分は使わない。</p>
+    <p class="hint"><strong>1レイヤー＝1マテリアル</strong>: このCRTガラスは<strong>ゲーム層のみ</strong>（ダッシュボードのステータス/ランキング・XP/レベルアップ演出・ショップ・アバター・実績/バッジ）。<strong>業務層（クエスト・アイデア・評価・チャット・フォーム・管理画面、ダッシュボードの下書き/未投票/参加中/フォロー中パネル）はクリーン不透明のまま</strong>。業務パネルの区別は材質でなく色アクセントで行う。</p>
   </div>
 
   <!-- ユーザアバター -->
