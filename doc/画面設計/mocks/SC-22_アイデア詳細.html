@@ -82,6 +82,10 @@
   .score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
   .score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
   .eval-comments { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-section-label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: var(--space-4) 0 var(--space-2); }
+  /* 総評（全体コメント）は左アクセント帯付きで観点別コメントと差別化 */
+  .eval-overall { display: flex; flex-direction: column; gap: var(--space-3); }
+  .eval-overall__item { border-left: 3px solid var(--color-primary-border); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3); }
   .eval-comment { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
   .eval-comment:first-child { border-top: 0; padding-top: 0; }
   .eval-comment__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
@@ -268,6 +272,26 @@
           <div class="score-row"><span class="score-row__label">適合性</span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
           <div class="score-row"><span class="score-row__label" title="低コストほど高得点">コスト<span class="muted">ⓘ</span></span><span class="score-bar"><i style="width:90%"></i></span><span class="score-row__val">4.5</span></div>
 
+          <!-- 総評（評価者ごとの全体コメント。SC-25 の総評入力欄の内容） -->
+          <div class="eval-section-label">総評</div>
+          <div class="eval-overall">
+            <div class="eval-overall__item">
+              <div class="eval-comment__head">
+                <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">山</span></span>
+                <span class="chat-msg__name">山田 太郎</span>
+              </div>
+              <p class="eval-comment__text">全体として実現性の担保が課題だが、コスト効果と環境貢献を両立できる点は非常に魅力的。まず首都圏3拠点のパイロットで数字を出せれば、全社展開の説得力が一気に高まる。</p>
+            </div>
+            <div class="eval-overall__item">
+              <div class="eval-comment__head">
+                <span class="avatar sm" style="--avatar-size:22px"><span class="avatar__img placeholder">田</span></span>
+                <span class="chat-msg__name">田中 一郎</span>
+              </div>
+              <p class="eval-comment__text">費用対効果が明確で優先度は高い。実行に移すなら早期に物流部と合意形成を進めたい。</p>
+            </div>
+          </div>
+
+          <div class="eval-section-label">観点別コメント</div>
           <div class="eval-comments">
             <div class="eval-comment">
               <div class="eval-comment__head">
