@@ -110,6 +110,24 @@
       </div>
     </div>
 
+    <!-- クエストカラー（プリセットパレット・カード左帯＋アイコンタイル色を駆動） -->
+    <div class="field">
+      <label>クエストカラー<span class="req">*</span></label>
+      <div class="swatches" id="colorSwatches" role="radiogroup" aria-label="クエストカラー">
+        <button type="button" class="swatch" role="radio" aria-checked="true" style="--sw:#0D9488" data-color="#0D9488" aria-label="ティール"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#2563EB" data-color="#2563EB" aria-label="ブルー"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#7C3AED" data-color="#7C3AED" aria-label="バイオレット"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#4F46E5" data-color="#4F46E5" aria-label="インディゴ"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#059669" data-color="#059669" aria-label="グリーン"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#D97706" data-color="#D97706" aria-label="アンバー"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#E11D48" data-color="#E11D48" aria-label="ローズ"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#0891B2" data-color="#0891B2" aria-label="シアン"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#EA580C" data-color="#EA580C" aria-label="オレンジ"></button>
+        <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#475569" data-color="#475569" aria-label="スレート"></button>
+      </div>
+      <div class="hint">一覧/ダッシュボードのカード左帯と、未設定アイコンのタイル色に使われます。</div>
+    </div>
+
     <!-- 件名 -->
     <div class="field">
       <label>件名<span class="req">*</span></label>
@@ -246,6 +264,16 @@
   iconClear.addEventListener('click', () => {
     iconPreview.innerHTML = '<span class="quest-icon__char" id="iconChar">' + (qName.value.trim()[0] || '新') + '</span><span class="quest-icon__owner placeholder">山</span>';
     iconClear.hidden = true; iconInput.value = '';
+  });
+
+  // クエストカラー（プリセット）: アイコンタイル色（--accent）に連動
+  const swatches = document.getElementById('colorSwatches');
+  function applyColor(color) { iconPreview.style.setProperty('--accent', color); }
+  applyColor(swatches.querySelector('.swatch[aria-checked="true"]').dataset.color); // 初期色
+  swatches.addEventListener('click', e => {
+    const sw = e.target.closest('.swatch'); if (!sw) return;
+    swatches.querySelectorAll('.swatch').forEach(s => s.setAttribute('aria-checked', String(s === sw)));
+    applyColor(sw.dataset.color);
   });
 
   // カテゴリー（複数・自由入力）／クエストグループ（単一）は shared.js の [data-multiselect] が初期化。

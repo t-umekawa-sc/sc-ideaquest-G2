@@ -196,6 +196,23 @@
       </div>
 
       <div class="field">
+        <label>カラースウォッチ（.swatch・プリセットパレット）</label>
+        <div class="swatches" role="radiogroup" aria-label="クエストカラー">
+          <button type="button" class="swatch" role="radio" aria-checked="true" style="--sw:#0D9488" data-color="#0D9488" aria-label="ティール"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#2563EB" data-color="#2563EB" aria-label="ブルー"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#7C3AED" data-color="#7C3AED" aria-label="バイオレット"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#4F46E5" data-color="#4F46E5" aria-label="インディゴ"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#059669" data-color="#059669" aria-label="グリーン"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#D97706" data-color="#D97706" aria-label="アンバー"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#E11D48" data-color="#E11D48" aria-label="ローズ"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#0891B2" data-color="#0891B2" aria-label="シアン"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#EA580C" data-color="#EA580C" aria-label="オレンジ"></button>
+          <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#475569" data-color="#475569" aria-label="スレート"></button>
+        </div>
+        <div class="hint">プリセットから1色選択（チェック表示）。<strong>クエストカラー</strong>に使用（カード左帯 `.card-accent` ＋ 未設定アイコンのタイル `--accent` を駆動）。選択の連動はモック側 JS（SC-11）で実装。</div>
+      </div>
+
+      <div class="field">
         <label>アイデア本文<span class="req">*</span></label>
         <textarea class="textarea" placeholder="どんなアイデア？"></textarea>
         <div class="hint">必須項目：件名・本文・価値</div>

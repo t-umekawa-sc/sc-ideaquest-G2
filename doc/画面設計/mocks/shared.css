@@ -540,6 +540,25 @@ img { max-width: 100%; display: block; }
 /* 候補なし / 自由入力での追加を促すメッセージ */
 .multiselect__empty { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); cursor: default; }
 .multiselect[data-free="true"] .multiselect__empty { color: var(--color-primary-active); cursor: pointer; }
+
+/* --- カラースウォッチ（プリセットパレット選択・単一選択のラジオ相当） ---
+   用途: クエストカラー（カード左帯＋クエストアイコンのタイル色 `--accent` を駆動）など。
+   マークアップ: <div class="swatches" role="radiogroup">
+     <button class="swatch" role="radio" aria-checked="true" style="--sw:#0D9488" data-color="#0D9488" aria-label="ティール"></button> … */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch {
+  position: relative; width: 28px; height: 28px; padding: 0; border-radius: 50%;
+  border: 2px solid var(--color-surface); background: var(--sw); cursor: pointer;
+  box-shadow: 0 0 0 1px var(--color-border); transition: transform .1s;
+}
+.swatch:hover { transform: scale(1.08); }
+.swatch:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--color-border), 0 0 0 3px var(--color-primary-soft); }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--sw); }
+.swatch[aria-checked="true"]::after {
+  content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 14px; font-weight: 700; line-height: 1;
+}
+@media (prefers-reduced-motion: reduce) { .swatch { transition: none; } }
 .input:focus, .textarea:focus, .select:focus {
   outline: none; border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
