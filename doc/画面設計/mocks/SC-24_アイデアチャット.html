@@ -27,6 +27,11 @@
 
   .msg { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); }
   .msg:hover { background: var(--color-surface-alt); }
+  /* 自分の投稿を分かりやすく: 淡い色地＋左アクセント帯＋名前を強調（フラットリストは維持）。
+     魔法エフェクト(box-shadow)と競合しないよう帯は border-left で表現（padding で位置補正）。 */
+  .msg.is-me { background: var(--color-primary-soft); border-left: 3px solid var(--color-primary); padding-left: calc(var(--space-3) - 3px); }
+  .msg.is-me:hover { background: #DCE8FE; }
+  .msg.is-me .msg__name { color: var(--color-primary-active); }
   .msg__body { min-width: 0; flex: 1; }
   .msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
   .msg__name { font-weight: 700; font-size: var(--text-sm); }
@@ -208,7 +213,7 @@
       </div>
     </div>
 
-    <div class="msg">
+    <div class="msg is-me">
       <span class="avatar sm"><span class="avatar__img placeholder">山</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">15:20</span></div>
@@ -353,7 +358,7 @@
     const val = box.value.trim();
     if (!val && pendingAtts.length === 0) return;
     const msg = document.createElement('div');
-    msg.className = 'msg';
+    msg.className = 'msg is-me';
     const files = pendingAtts.map(f => '<span class="file-chip"><span class="file-icon">📎</span><a href="#">' + f + '</a></span>').join('');
     const quote = replyTarget
       ? '<div class="msg__quote"><b>' + replyTarget.name + '</b> ' + replyTarget.text + '</div>' : '';
