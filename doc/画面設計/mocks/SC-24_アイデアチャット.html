@@ -46,16 +46,18 @@
   /* --- 入力欄（下部固定） --- */
   .composer { position: sticky; bottom: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: 0 -6px 16px rgba(15,23,42,.06); padding: var(--space-3) var(--space-4) var(--space-4); margin-top: var(--space-3); }
-  .composer__row { display: flex; align-items: flex-end; gap: var(--space-3); }
+  /* 入力欄・添付・送信を横一列に */
+  .composer__row { display: flex; align-items: flex-end; gap: var(--space-2); }
   .composer__field { flex: 1; position: relative; }
+  /* 添付＝アイコンボタン（入力欄の左） */
+  .composer__iconbtn { width: 44px; height: 44px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--color-border-strong); border-radius: var(--radius); background: var(--color-surface); font-size: 18px; cursor: pointer; color: var(--color-text-muted); }
+  .composer__iconbtn:hover { background: var(--color-surface-alt); color: var(--color-text); }
+  /* 最小化ボタンを載せる上部バー（右寄せ・入力欄とは別行で重ならない） */
+  .composer__bar { display: flex; justify-content: flex-end; margin-bottom: var(--space-1); }
   .composer__box { width: 100%; min-height: 44px; max-height: 180px; resize: none; overflow-y: auto;
     border: 1px solid var(--color-border-strong); border-radius: var(--radius); padding: var(--space-3); font: inherit; line-height: 1.6; background: var(--color-surface); }
   .composer__box:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
-  .composer__tools { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
-  .tool-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--color-border); border-radius: var(--radius);
-    padding: 6px var(--space-3); font: inherit; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; }
-  .tool-btn:hover { background: var(--color-surface-alt); color: var(--color-text); }
-  .composer__send { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); }
   .composer__hint { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-2); }
   .composer__hint .xp { color: var(--color-warning); font-weight: 600; }
   /* 添付予定のプレビュー */
@@ -72,7 +74,8 @@
   .mention-opt:hover, .mention-opt.is-active { background: var(--color-primary-soft); }
   .mention-opt__name { font-size: var(--text-sm); font-weight: 500; }
 
-  @media (max-width: 640px) { .composer__row { flex-direction: column; align-items: stretch; } .composer__send { flex-direction: row; } }
+  /* 横一列を維持（入力欄が伸縮）。極端に狭い場合も 📎 と 送信 はコンパクトなまま */
+  @media (max-width: 480px) { .composer__iconbtn { width: 40px; height: 40px; } }
 
   /* --- リアクション選択ポップアップ（通常絵文字＋魔法） --- */
   .reaction-picker { position: absolute; z-index: 40; min-width: 240px; background: var(--color-surface);
@@ -89,6 +92,56 @@
   .rp__spell:hover { filter: brightness(.97); }
   .rp__spell:disabled { opacity: .5; cursor: not-allowed; border-color: var(--color-border); background: var(--color-surface-alt); }
   .rp__spell .cd { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+  /* --- メッセージのホバーアクション（編集/削除/引用/リアクション） --- */
+  .msg { position: relative; }
+  .msg__actions { position: absolute; top: -12px; right: 8px; display: none; gap: 2px;
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); box-shadow: var(--shadow); padding: 2px; }
+  .msg:hover .msg__actions, .msg:focus-within .msg__actions { display: inline-flex; }
+  .msg__act { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: none; border-radius: var(--radius-full); cursor: pointer; font-size: 14px; color: var(--color-text-muted); }
+  .msg__act:hover { background: var(--color-surface-alt); color: var(--color-text); }
+  .msg__edited { font-size: var(--text-xs); color: var(--color-text-muted); margin-left: 6px; }
+
+  /* インライン編集 */
+  .msg__editbox { width: 100%; min-height: 40px; max-height: 160px; resize: none; border: 1px solid var(--color-primary);
+    border-radius: var(--radius); padding: var(--space-2) var(--space-3); font: inherit; line-height: 1.6; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .msg__editacts { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+
+  /* 削除済みトゥームストーン */
+  .msg.is-deleted .msg__text { color: var(--color-text-muted); font-style: italic; }
+
+  /* 引用返信ブロック（メッセージ内） */
+  .msg__quote { border-left: 3px solid var(--color-border-strong); background: var(--color-surface-alt);
+    border-radius: var(--radius-sm); padding: 4px var(--space-3); margin: 2px 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .msg__quote b { color: var(--color-text); font-weight: 600; }
+
+  /* 添付：画像のインラインプレビュー（ギャラリー＋ライトボックス） */
+  .msg__gallery { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  .msg__thumb { width: 170px; height: 116px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--color-border); cursor: zoom-in; display: block; }
+  .lightbox { position: fixed; inset: 0; background: rgba(15,23,42,.82); display: none; align-items: center; justify-content: center; z-index: 60; padding: var(--space-6); }
+  .lightbox.is-open { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 90vh; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+  .lightbox__close { position: absolute; top: var(--space-4); right: var(--space-5); background: none; border: none; color: #fff; font-size: 28px; cursor: pointer; line-height: 1; }
+
+  /* 引用返信の入力コンテキスト（入力欄の上） */
+  .reply-ctx { display: none; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+    border-left: 3px solid var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-sm); margin-bottom: var(--space-2); font-size: var(--text-sm); }
+  .reply-ctx.is-on { display: flex; }
+  .reply-ctx__body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reply-ctx__cancel { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 16px; }
+
+  /* --- 入力欄の最小化（折りたたみ） --- */
+  .composer__toggle, .composer__info { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm); }
+  .composer__toggle:hover, .composer__info:hover { background: var(--color-surface-alt); color: var(--color-text); }
+  /* 使い方が開いているときは情報アイコンを強調 */
+  .composer__info[aria-expanded="true"] { color: var(--color-primary); background: var(--color-primary-soft); }
+  .composer__bar { gap: var(--space-1); }
+  .composer__mini { display: none; width: 100%; text-align: left; background: var(--color-surface-alt); border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius); padding: var(--space-3); color: var(--color-text-muted); cursor: text; font: inherit; }
+  .composer.is-collapsed .composer__full { display: none; }
+  .composer.is-collapsed .composer__toggle { display: none; }
+  .composer.is-collapsed .composer__mini { display: block; }
 </style>
 </head>
 <body>
@@ -160,7 +213,10 @@
       <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">09:12</span></div>
-        <p class="msg__text"><span class="mention is-me">@山田太郎</span> 首都圏の東京・川崎・さいたまの3拠点です。距離が近く効果検証しやすいので。</p>
+        <p class="msg__text"><span class="mention is-me">@山田太郎</span> 首都圏の東京・川崎・さいたまの3拠点です。距離が近く効果検証しやすいので。イメージ図も貼っておきます。</p>
+        <div class="msg__gallery">
+          <img class="msg__thumb" src="assets/login-bg.jpg" alt="ルート集約イメージ図" data-full="assets/login-bg.jpg">
+        </div>
       </div>
     </div>
 
@@ -173,26 +229,44 @@
     </div>
   </div>
 
-  <!-- ============ 入力欄（下部固定・添付/メンション/送信） ============ -->
-  <div class="composer" aria-label="メッセージ入力">
-    <div class="composer__attachments" id="attList"></div>
-    <div class="composer__row">
-      <div class="composer__field">
-        <textarea class="composer__box" id="box" rows="1" placeholder="メッセージを入力…（@ でメンション）"></textarea>
-        <!-- @メンション候補（デモ） -->
-        <div class="mention-pop" id="mentionPop" hidden role="listbox" aria-label="メンション候補"></div>
+  <!-- ============ 入力欄（下部固定・添付/メンション/送信・最小化可） ============ -->
+  <div class="composer" id="composer" aria-label="メッセージ入力">
+    <!-- 最小化時のスリムバー（クリックで展開） -->
+    <button class="composer__mini" id="composerMini" type="button">＋ メッセージを入力…</button>
+
+    <div class="composer__full">
+      <div class="composer__bar">
+        <button class="composer__info" id="hintToggle" type="button" title="使い方を表示" aria-label="使い方を表示" aria-expanded="false" aria-controls="composerHint">ⓘ 使い方</button>
+        <button class="composer__toggle" id="composerToggle" type="button" title="入力欄を最小化" aria-label="入力欄を最小化">⌄ 最小化</button>
       </div>
-      <div class="composer__send">
-        <button class="tool-btn" type="button" id="attachBtn" title="ファイルを添付">📎 添付</button>
+      <!-- 引用返信のコンテキスト -->
+      <div class="reply-ctx" id="replyCtx">
+        <div class="reply-ctx__body"><span id="replyCtxText"></span></div>
+        <button class="reply-ctx__cancel" type="button" id="replyCancel" aria-label="引用をやめる">✕</button>
+      </div>
+      <div class="composer__attachments" id="attList"></div>
+      <div class="composer__row">
+        <button class="composer__iconbtn" type="button" id="attachBtn" title="ファイルを添付" aria-label="ファイルを添付">📎</button>
+        <div class="composer__field">
+          <textarea class="composer__box" id="box" rows="1" placeholder="メッセージを入力…（@ でメンション）"></textarea>
+          <!-- @メンション候補（デモ） -->
+          <div class="mention-pop" id="mentionPop" hidden role="listbox" aria-label="メンション候補"></div>
+        </div>
         <button class="btn btn-primary" type="button" id="sendBtn">送信</button>
       </div>
+      <p class="composer__hint" id="composerHint" hidden>
+        <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span class="xp">+5 XP</span>（日次上限あり）。添付・<code>@</code>メンション・通知に対応。<br>
+        各メッセージにホバーで <strong>アクション</strong>（🙂リアクション/💬引用/自分の投稿は✏️編集・🗑削除）。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）・クールダウンあり。
+      </p>
     </div>
-    <p class="composer__hint">
-      <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span class="xp">+5 XP</span>（日次上限あり）。添付・<code>@</code>メンション・通知に対応。<br>
-      各メッセージの <strong>＋</strong> からリアクション。<strong>魔法リアクション</strong>（SPで解放）はエフェクト付き（例: 🔥炎＝枠が燃える）・クールダウンあり。
-    </p>
   </div>
 </main>
+
+<!-- 画像ライトボックス（添付画像の拡大） -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="画像プレビュー">
+  <button class="lightbox__close" type="button" aria-label="閉じる">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
 
 <!-- リアクション選択ポップアップ（通常絵文字＋魔法・単一要素を使い回し） -->
 <div class="reaction-picker" id="reactionPicker" hidden role="menu" aria-label="リアクションを選ぶ">
@@ -251,16 +325,19 @@
     const msg = document.createElement('div');
     msg.className = 'msg';
     const files = pendingAtts.map(f => '<span class="file-chip"><span class="file-icon">📎</span><a href="#">' + f + '</a></span>').join('');
+    const quote = replyTarget
+      ? '<div class="msg__quote"><b>' + replyTarget.name + '</b> ' + replyTarget.text + '</div>' : '';
     msg.innerHTML =
       '<span class="avatar sm"><span class="avatar__img placeholder">山</span></span>' +
       '<div class="msg__body">' +
         '<div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">' + nowTime() + '</span></div>' +
+        quote +
         (val ? '<p class="msg__text">' + renderText(val) + '</p>' : '') +
         (files ? '<div class="msg__files">' + files + '</div>' : '') +
       '</div>';
     thread.appendChild(msg);
-    ensureBar(msg);
-    box.value = ''; pendingAtts = []; renderAtts(); autoGrow(); hidePop();
+    ensureBar(msg); ensureActions(msg);
+    box.value = ''; pendingAtts = []; renderAtts(); autoGrow(); hidePop(); clearReply();
     msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
@@ -353,28 +430,38 @@
     }
     return bar;
   }
-  // 既存/初期の通常リアクションを配置
-  function seedReaction(bar, emoji, count, mine) {
+  // 既存/初期の通常リアクションを配置（names=押した人。ホバーでツールチップ）
+  function seedReaction(bar, emoji, count, mine, names) {
     const chip = document.createElement('button');
     chip.type = 'button'; chip.className = 'reaction' + (mine ? ' is-me' : '');
     chip.dataset.emoji = emoji; chip.dataset.count = String(count);
+    chip.dataset.names = JSON.stringify(names || (mine ? ['あなた'] : []));
     chip.innerHTML = emoji + ' <span class="reaction__count">' + count + '</span>';
+    updateReactionTitle(chip);
     chip.addEventListener('click', () => flipReaction(chip));
     bar.insertBefore(chip, bar.querySelector('.reaction-add'));
     return chip;
   }
+  // ホバー時に「誰が押したか」を表示（本番はポップオーバー、モックは title 属性）
+  function updateReactionTitle(chip) {
+    const names = JSON.parse(chip.dataset.names || '[]');
+    chip.title = names.length ? names.join('、') + ' がリアクション' : 'リアクションする';
+  }
   // 通常リアクションをトグル（自分の分を増減）
   function toggleReaction(bar, emoji) {
     let chip = [...bar.querySelectorAll('.reaction:not(.magic)')].find(c => c.dataset.emoji === emoji);
-    if (!chip) { seedReaction(bar, emoji, 1, true); return; }
+    if (!chip) { seedReaction(bar, emoji, 1, true, ['あなた']); return; }
     flipReaction(chip);
   }
   function flipReaction(chip) {
     const me = chip.classList.contains('is-me');
     let n = Number(chip.dataset.count);
-    if (me) { n--; chip.classList.remove('is-me'); } else { n++; chip.classList.add('is-me'); }
+    let names = JSON.parse(chip.dataset.names || '[]');
+    if (me) { n--; chip.classList.remove('is-me'); names = names.filter(x => x !== 'あなた'); }
+    else { n++; chip.classList.add('is-me'); names = ['あなた', ...names]; }
     if (n <= 0) { chip.remove(); return; }
-    chip.dataset.count = n; chip.querySelector('.reaction__count').textContent = n;
+    chip.dataset.count = n; chip.dataset.names = JSON.stringify(names);
+    chip.querySelector('.reaction__count').textContent = n; updateReactionTitle(chip);
   }
   // 魔法リアクション＝メッセージ枠にエフェクト付与＋チップ＋クールダウン開始
   function castSpell(msg, bar, spell) {
@@ -383,7 +470,7 @@
     if (!chip) {
       chip = document.createElement('span');
       chip.className = 'reaction magic is-me'; chip.dataset.spell = spell.id; chip.dataset.count = '1';
-      chip.title = spell.label + '魔法';
+      chip.title = spell.label + '魔法 ・ あなた が発動';
       chip.innerHTML = spell.icon + ' <span class="reaction__count">1</span>';
       bar.insertBefore(chip, bar.querySelector('.reaction-add'));
     } else {
@@ -422,12 +509,120 @@
     if (!picker.hidden && !picker.contains(e.target) && !e.target.closest('.reaction-add')) closePicker();
   });
 
-  // 初期化：全メッセージにバー、いくつか初期リアクション＋炎エフェクトのデモ
+  // 初期化：全メッセージにバー＋アクション、いくつか初期リアクション＋炎エフェクトのデモ
   buildEmojis();
   const seedMsgs = [...thread.querySelectorAll('.msg')];
-  seedMsgs.forEach(ensureBar);
-  if (seedMsgs[1]) { const b = ensureBar(seedMsgs[1]); seedReaction(b, '👍', 2, false); seedReaction(b, '🎉', 1, false); }
+  seedMsgs.forEach(m => { ensureBar(m); ensureActions(m); });
+  if (seedMsgs[1]) { const b = ensureBar(seedMsgs[1]); seedReaction(b, '👍', 2, false, ['田中 一郎','佐藤 大輔']); seedReaction(b, '🎉', 1, false, ['伊藤 彩']); }
   if (seedMsgs[4]) castSpell(seedMsgs[4], ensureBar(seedMsgs[4]), SPELLS[0]); // 佐藤のメッセージに炎（枠が燃える）
+
+  // ===== メッセージのホバーアクション（リアクション/引用/編集/削除） =====
+  // 自分の投稿かは head 内の .msg__me の有無で判定
+  function isOwn(msg) { return !!msg.querySelector('.msg__me'); }
+  function msgPlainText(msg) { const t = msg.querySelector('.msg__text'); return t ? t.textContent.trim() : ''; }
+  function ensureActions(msg) {
+    if (msg.querySelector('.msg__actions') || msg.classList.contains('is-deleted')) return;
+    const bar = document.createElement('div');
+    bar.className = 'msg__actions';
+    const acts = [
+      { key:'react', icon:'🙂', title:'リアクション' },
+      { key:'quote', icon:'💬', title:'引用返信' },
+    ];
+    if (isOwn(msg)) { acts.push({ key:'edit', icon:'✏️', title:'編集' }, { key:'delete', icon:'🗑', title:'削除' }); }
+    bar.innerHTML = acts.map(a => '<button class="msg__act" type="button" data-act="' + a.key + '" title="' + a.title + '" aria-label="' + a.title + '">' + a.icon + '</button>').join('');
+    bar.addEventListener('click', e => {
+      const b = e.target.closest('.msg__act'); if (!b) return; e.stopPropagation();
+      const act = b.dataset.act;
+      if (act === 'react') openPicker(msg, b);
+      else if (act === 'quote') startReply(msg);
+      else if (act === 'edit') startEdit(msg);
+      else if (act === 'delete') deleteMsg(msg);
+    });
+    msg.appendChild(bar);
+  }
+
+  // --- インライン編集 ---
+  function startEdit(msg) {
+    const textEl = msg.querySelector('.msg__text'); if (!textEl || msg.querySelector('.msg__editbox')) return;
+    const original = textEl.textContent;
+    textEl.style.display = 'none';
+    const wrap = document.createElement('div'); wrap.className = 'msg__editwrap';
+    wrap.innerHTML = '<textarea class="msg__editbox"></textarea>' +
+      '<div class="msg__editacts"><button class="btn btn-primary btn-sm" type="button" data-e="save">保存</button>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-e="cancel">キャンセル</button></div>';
+    textEl.after(wrap);
+    const ta = wrap.querySelector('.msg__editbox'); ta.value = original; ta.focus();
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+    wrap.addEventListener('click', e => {
+      const b = e.target.closest('button[data-e]'); if (!b) return;
+      if (b.dataset.e === 'save') {
+        const v = ta.value.trim();
+        if (v) {
+          textEl.innerHTML = renderText(v);
+          if (!msg.querySelector('.msg__head .msg__edited')) {
+            const tag = document.createElement('span'); tag.className = 'msg__edited'; tag.textContent = '（編集済み）';
+            msg.querySelector('.msg__head').appendChild(tag);
+          }
+        }
+      }
+      textEl.style.display = ''; wrap.remove();
+    });
+  }
+
+  // --- 削除（トゥームストーン） ---
+  function deleteMsg(msg) {
+    if (!confirm('このメッセージを削除しますか？')) return;
+    msg.classList.add('is-deleted');
+    msg.querySelectorAll('.msg__files, .msg__gallery, .reaction-bar, .msg__actions, .msg__quote').forEach(el => el.remove());
+    const body = msg.querySelector('.msg__body');
+    let textEl = body.querySelector('.msg__text');
+    if (!textEl) { textEl = document.createElement('p'); textEl.className = 'msg__text'; body.appendChild(textEl); }
+    textEl.textContent = '🗑 このメッセージは削除されました';
+  }
+
+  // --- 引用返信 ---
+  let replyTarget = null;
+  const replyCtx = document.getElementById('replyCtx');
+  const replyCtxText = document.getElementById('replyCtxText');
+  function startReply(msg) {
+    const name = msg.querySelector('.msg__name').textContent;
+    let text = msgPlainText(msg); if (text.length > 60) text = text.slice(0, 60) + '…';
+    replyTarget = { name, text };
+    replyCtxText.innerHTML = '<b>' + name + '</b> に返信：' + text;
+    replyCtx.classList.add('is-on');
+    if (composer.classList.contains('is-collapsed')) expandComposer();
+    box.focus();
+  }
+  function clearReply() { replyTarget = null; replyCtx.classList.remove('is-on'); }
+  document.getElementById('replyCancel').addEventListener('click', clearReply);
+
+  // ===== 画像ライトボックス =====
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  thread.addEventListener('click', e => {
+    const t = e.target.closest('.msg__thumb'); if (!t) return;
+    lightboxImg.src = t.dataset.full || t.src; lightboxImg.alt = t.alt || '';
+    lightbox.classList.add('is-open');
+  });
+  lightbox.addEventListener('click', () => lightbox.classList.remove('is-open'));
+
+  // ===== 入力欄の最小化 =====
+  const composer = document.getElementById('composer');
+  function expandComposer() { composer.classList.remove('is-collapsed'); box.focus(); }
+  document.getElementById('composerToggle').addEventListener('click', () => composer.classList.add('is-collapsed'));
+  document.getElementById('composerMini').addEventListener('click', expandComposer);
+
+  // ===== 使い方（説明文）の開閉：ⓘアイコンで表示/非表示 =====
+  const hintToggle = document.getElementById('hintToggle');
+  const composerHint = document.getElementById('composerHint');
+  hintToggle.addEventListener('click', () => {
+    const show = composerHint.hidden;
+    composerHint.hidden = !show;
+    hintToggle.setAttribute('aria-expanded', String(show));
+  });
+
+  // ===== クールダウンの残秒をライブ更新（ピッカーが開いている間） =====
+  setInterval(() => { if (!picker.hidden) renderSpells(); }, 1000);
 </script>
 </body>
 </html>
