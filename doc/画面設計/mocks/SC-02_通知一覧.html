@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-02 通知 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-02 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     業務層の画面: 通知は「読ませる一覧」なのでクリーン不透明（ゲーム層のガラスは使わない）。
+     各通知はクリックで参照先（SC-24チャット / SC-22アイデア / SC-40実績 等）へ遷移。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+  .notif-group { margin-bottom: var(--space-5); }
+  .notif-group__label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-2); }
+
+  /* 通知カード（行・クリックで参照先へ） */
+  .n { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: var(--space-3);
+       padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius);
+       background: var(--color-surface); text-decoration: none; color: var(--color-text); margin-bottom: 8px; }
+  .n:hover { background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+  .n.is-unread { background: var(--color-primary-soft); border-color: var(--color-primary); }
+  .n.is-unread:hover { background: #E4EEFE; }
+  .n__ico { width: 34px; height: 34px; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 16px; background: var(--color-surface); border: 1px solid var(--color-border); }
+  .n.is-unread .n__ico { background: #fff; }
+  .n__body { min-width: 0; font-size: var(--text-sm); line-height: 1.5; }
+  .n__ctx { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 2px; }
+  .n__gain { display: inline-block; margin-top: 4px; font-family: var(--font-pixel); font-size: var(--text-xs); }
+  .n__gain .xp { color: var(--pixel-xp); } .n__gain .coin { color: var(--pixel-coin); } .n__gain .sp { color: var(--pixel-skill); }
+  .n__right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; white-space: nowrap; }
+  .n__time { color: var(--color-text-subtle); font-size: var(--text-xs); }
+  /* 未読ドット＋既読トグル */
+  .n__read { border: none; background: none; cursor: pointer; font-size: 12px; color: var(--color-text-subtle); padding: 2px 6px; border-radius: var(--radius); }
+  .n__read:hover { background: var(--color-surface); color: var(--color-text); }
+  .n.is-unread .n__dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--color-danger); }
+  .n:not(.is-unread) .n__dot { display: none; }
+
+  .list-empty { border: 1px dashed var(--color-border); border-radius: var(--radius); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキルへ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（現在のページ）" aria-current="page">🔔<span class="bell__badge" id="bellBadge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16); max-width: 820px">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">通知</h1>
+
+  <!-- 絞り込み・一括操作 -->
+  <div class="list-toolbar">
+    <div class="filters">
+      <label>状態
+        <select class="select" id="fState">
+          <option value="">すべて</option>
+          <option value="unread">未読のみ</option>
+        </select>
+      </label>
+      <label>種別
+        <select class="select" id="fType">
+          <option value="">すべて</option>
+          <option value="mention">メンション</option>
+          <option value="comment">コメント</option>
+          <option value="eval">評価</option>
+          <option value="select">選定</option>
+          <option value="update">アイデア更新</option>
+          <option value="achievement">実績</option>
+          <option value="magic">魔法</option>
+        </select>
+      </label>
+    </div>
+    <div class="tools">
+      <span class="list-count"><span id="unreadCount">0</span> 件の未読</span>
+      <button class="btn btn-outline" type="button" id="markAll">すべて既読にする</button>
+    </div>
+  </div>
+
+  <div id="groups"><!-- JSでグループ描画 --></div>
+  <div class="list-empty" id="empty" hidden>該当する通知はありません。</div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ MVP は<strong>アプリ内通知</strong>（ベル/未読）。メール等の外部通知は将来対応。通知は参照先（アイデア/チャット/実績 等）へのクリックで<strong>既読</strong>化。
+    種別＝メンション／自アイデアへのコメント／フォロー中アイデアの新規コメント・評価・選定／投票済み・フォロー中アイデアの<strong>更新（差分）</strong>／実績獲得／魔法リアクション（`Notification` 第9節）。
+  </p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ユーザーメニューから設定・全画面共通の復元）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- 通知データ（モック・初期値） ----
+  // type→ico/cat/href（参照先画面）。group: today/yesterday/earlier。gain=獲得表示（任意）。
+  const ICO = { mention:'@', comment:'💬', eval:'⭐', select:'🏆', update:'🔄', achievement:'🎖️', magic:'✨' };
+  const HREF = {
+    mention:'SC-24_アイデアチャット.html', comment:'SC-22_アイデア詳細.html', eval:'SC-22_アイデア詳細.html',
+    select:'SC-22_アイデア詳細.html', update:'SC-22_アイデア詳細.html', achievement:'SC-40_実績バッジ.html', magic:'SC-24_アイデアチャット.html',
+  };
+  const GROUP_LABEL = { today:'今日', yesterday:'昨日', earlier:'それ以前' };
+
+  const N = [
+    { id:1, type:'mention', unread:true, group:'today', time:'5分前',
+      html:'<strong>鈴木 花子</strong> さんがチャットであなたをメンションしました', ctx:'配送ルート最適化 / アイデア「夜間配送の集約」' },
+    { id:2, type:'comment', unread:true, group:'today', time:'1時間前',
+      html:'あなたのアイデアに <strong>3件</strong> の新しいコメントがつきました', ctx:'社内ナレッジ検索AI / アイデア「FAQ自動生成」' },
+    { id:3, type:'update', unread:true, group:'today', time:'2時間前',
+      html:'投票したアイデアが <strong>更新</strong>されました。差分を確認して投票を見直せます', ctx:'配送ルート最適化 / アイデア「置き配の写真通知」', tag:'投票の見直し' },
+    { id:4, type:'achievement', unread:false, group:'today', time:'3時間前',
+      html:'実績 <strong>「目利き」</strong>（シルバー）を獲得しました', ctx:'評価を10件実施', gain:'<span class="coin">◆50</span>' },
+    { id:5, type:'magic', unread:false, group:'today', time:'4時間前',
+      html:'<strong>田中 美咲</strong> さんがあなたのメッセージに 🔥炎 の魔法を付けました', ctx:'新オフィスのレイアウト改善 / アイデア「集中ブース設置」' },
+
+    { id:6, type:'eval', unread:false, group:'yesterday', time:'昨日 18:20',
+      html:'フォロー中のアイデアに <strong>新しい評価</strong>がつきました', ctx:'社内ナレッジ検索AI / アイデア「社内用語の自動リンク」' },
+    { id:7, type:'select', unread:false, group:'yesterday', time:'昨日 14:05',
+      html:'あなたのアイデアが <strong>選定</strong>されました', ctx:'社内ナレッジ検索AI / アイデア「FAQ自動生成」', gain:'<span class="xp">＋200 XP</span> <span class="coin">◆42</span>' },
+    { id:8, type:'comment', unread:false, group:'yesterday', time:'昨日 11:30',
+      html:'フォロー中のアイデアに <strong>新しいコメント</strong>がつきました', ctx:'配送ルート最適化 / アイデア「夜間配送の集約」' },
+
+    { id:9, type:'achievement', unread:false, group:'earlier', time:'7/16',
+      html:'実績 <strong>「レベル5」</strong>（シルバー）を獲得しました', ctx:'Lv5 到達', gain:'<span class="coin">◆50</span>' },
+    { id:10, type:'mention', unread:false, group:'earlier', time:'7/15',
+      html:'<strong>佐藤 大輔</strong> さんがチャットであなたをメンションしました', ctx:'配送ルート最適化 / アイデア「置き配の写真通知」' },
+    { id:11, type:'eval', unread:false, group:'earlier', time:'7/14',
+      html:'フォロー中のアイデアが <strong>評価中</strong>になりました', ctx:'新オフィスのレイアウト改善 / アイデア「集中ブース設置」' },
+  ];
+  // type→カテゴリ（種別フィルタ用。comment は自/フォロー両方を含む）
+  const CAT = { mention:'mention', comment:'comment', eval:'eval', select:'select', update:'update', achievement:'achievement', magic:'magic' };
+
+  const groupsEl = document.getElementById('groups');
+  const emptyEl = document.getElementById('empty');
+  const fState = document.getElementById('fState');
+  const fType = document.getElementById('fType');
+
+  function itemHTML(n) {
+    const gain = n.gain ? `<div class="n__gain">${n.gain}</div>` : '';
+    const tag = n.tag ? ` <span class="badge" style="font-size:10px;background:#FEF3C7;color:var(--color-warning)">${n.tag}</span>` : '';
+    return `
+      <a class="n ${n.unread ? 'is-unread' : ''}" href="${HREF[n.type]}" data-id="${n.id}">
+        <span class="n__ico">${ICO[n.type]}</span>
+        <div class="n__body">
+          <div>${n.html}${tag}</div>
+          <div class="n__ctx">${n.ctx}</div>
+          ${gain}
+        </div>
+        <div class="n__right">
+          <span class="n__time">${n.time}</span>
+          <span class="n__dot" aria-hidden="true"></span>
+          <button class="n__read" type="button" data-read="${n.id}" title="${n.unread ? '既読にする' : '未読に戻す'}">${n.unread ? '既読にする' : '未読に戻す'}</button>
+        </div>
+      </a>`;
+  }
+
+  function render() {
+    const st = fState.value, ty = fType.value;
+    const list = N.filter(n => {
+      if (st === 'unread' && !n.unread) return false;
+      if (ty && CAT[n.type] !== ty) return false;
+      return true;
+    });
+    // グループ順に描画
+    const order = ['today', 'yesterday', 'earlier'];
+    groupsEl.innerHTML = order.map(g => {
+      const items = list.filter(n => n.group === g);
+      if (!items.length) return '';
+      return `<section class="notif-group"><h2 class="notif-group__label">${GROUP_LABEL[g]}</h2>${items.map(itemHTML).join('')}</section>`;
+    }).join('');
+    emptyEl.hidden = list.length !== 0;
+
+    const unread = N.filter(n => n.unread).length;
+    document.getElementById('unreadCount').textContent = unread;
+    const badge = document.getElementById('bellBadge');
+    if (unread > 0) { badge.textContent = unread; badge.style.display = ''; }
+    else { badge.style.display = 'none'; }
+  }
+
+  // 既読トグル（行遷移はさせない）
+  groupsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-read]');
+    if (btn) {
+      e.preventDefault(); e.stopPropagation();
+      const n = N.find(x => x.id === Number(btn.dataset.read));
+      n.unread = !n.unread;
+      render();
+      return;
+    }
+    // 行クリック＝参照先へ遷移する前に既読化（本番はサーバー。モックは遷移するのでvisualのみ）
+    const row = e.target.closest('.n');
+    if (row) { const n = N.find(x => x.id === Number(row.dataset.id)); if (n) n.unread = false; }
+  });
+
+  document.getElementById('markAll').addEventListener('click', () => { N.forEach(n => n.unread = false); render(); });
+  fState.addEventListener('change', render);
+  fType.addEventListener('change', render);
+
+  render();
+</script>
+</body>
+</html>
