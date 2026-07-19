@@ -12,6 +12,8 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順・2026-07-19 時点。全履歴は `git log`）:
+  - `a7cbaf7` ベル(<a>)のホバー時リンク下線を除去（.bell / .bell:hover text-decoration:none）
+  - `a53ca70` handoff を最新化（初期スコープ全画面SC-00〜92完成 ほか）
   - `a417658` SC-92 文脈バナーをヘッダー直下で固定しz-indexを下げてメニュー操作を確保
   - `0b0660c` ログインIDとメールアドレスを別項目に分離（Account login_id/email・SC-00/90/92）
   - `e210f23` style-guide のカラー見本を .tokens/.token へ改名し .swatch 名前衝突を解消（レイアウト崩れ修正）
@@ -222,6 +224,7 @@ sc-ideaquest-G2/
   - **SC-92 の所属クエストグループを `.multiselect`（候補のみ・自由入力なし）に修正（2026-07-19）**: 誤った `<select multiple>` マークアップを正しい `.multiselect`（`__control`/`__input`/`__list`＋`.multiselect__option`）へ。候補は shared.js の DOMContentLoaded 初期化より前に同期生成。
   - **style-guide のレイアウト崩れを修正（2026-07-19）**: カラートークン見本のローカル `.swatch`/`.swatches` が、後から shared.css に追加した色選択部品 `.swatch`（28px 円形・`border-radius:50%`）と**名前衝突**して崩れていた（トークン見本の重なり／スウォッチの楕円化）。style-guide の見本クラスを **`.tokens`/`.token`** に改名し衝突解消（4節の色選択デモは shared の `.swatch` をそのまま使用）。
   - **SC-92 文脈バナーの固定位置を修正（2026-07-19）**: バナー `.ctx` が `top:0; z-index:30` で共通ヘッダー（sticky・`--header-h`=56px・z-index:10）と最上部で重なり、ヘッダー内アバターメニューがバナーに被って押せなかった。**`top: var(--header-h)`（ヘッダー直下で固定）＋ z-index を 5（ヘッダーより下）** に変更。SC-92 doc にも反映。
+  - **ヘッダーのベル（`<a>`化）のホバー下線を除去（2026-07-19）**: SC-02 対応でベルを `button`→`a` にした際、`a:hover{text-decoration:underline}`（詳細度0,1,1）が効いて 🔔 の下に黒い下線が出ていた。base の `.bell{text-decoration:none}`（0,1,0）では消せないため **`.bell:hover` に `text-decoration:none`（0,2,0）** を追加して打ち消し（shared.css・全画面共通）。
   - **▶ 画面設計フェーズ＝完了（初期スコープ全画面 SC-00〜SC-92）。次フェーズの候補**: ①**データモデル詳細**（`doc/データモデル.md` 等に ER 図・テーブル定義を起こす）→ ②**API設計**（エンドポイント一覧・リクエスト/レスポンス）→ ③**実装フェーズ**（Next.js フロント＋FastAPI＋PostgreSQL＋MinIO の compose/スキャフォールド作成）。**並行して残要件TBD（下記＆各画面設計md 第9/10節）をユーザーと確認**。技術スタックは確定済み。**注: 全画面の相互リンクは実体化済み**（評価=SC-25／SP=SC-32／ベル=SC-02／ショップ⇄きせかえ=SC-30⇄SC-31／ランキング=SC-41／管理=SC-90/91／ダッシュボードのタイル・管理導線）。
   - **▶ 未確定でユーザー確認待ち（次回冒頭で確認推奨）**: ①**全文検索エンジン**＝PGroonga 推奨で記載済み（代替 pg_bigm／将来 Meilisearch・OpenSearch）だが最終確定していない。②全文検索で**添付ファイル名も対象に含めるか**。③各画面の残TBD（下記＆各画面設計md 最終節）。
   - **モックの作り方メモ（重要）**: 新規モックは必ず `shared.css`＋`shared.js` を読み込む。共通コンポーネント（shared.css 昇格済み）＝`.btn`系/`.card`(+`.card-accent`)/`.badge`/`.avatar`/`.quest-icon`/`.poster`/`.table`(+`.table-wrap`)/`.list-toolbar`(+`.list-count`/`.list-empty`)/`.modal`系/`.rank-panel`/`.app-bg`/`.checkbox`/`.combobox`/**`.multiselect`**（複数選択・`[data-multiselect]`／`data-free`自由入力・`data-single`単一選択）/**`.swatches`/`.swatch`**（カラーパレット選択）/**`.switch`**（トグルスイッチ・ON/OFF設定向け）/`.pixel-*`(CRTガラス)/**`.spell-fx--*`**（魔法エフェクト: fire/ice/thunder/sparkle/rainbow/aura）/`.reaction`系/`.mascot` 等。**共通ヘッダー**（`.app-header`＋`.header-actions`〔Lv/コイン/SP＋ベル＋`.usermenu`〕）は全認証画面で同一＝shared.js が `.usermenu` を自動初期化。**背景画像**: 設定（変更/リセット）は**ユーザーメニュー内 `[data-bg-set]`/`[data-bg-reset]`**＝shared.js が集約処理（全画面共通）。各ページは読み込み時に `localStorage('ideaquest_content_bg')` を `#appBg` へ**復元するスクリプトのみ**を持つ（例: 各モック冒頭の savedBg 復元）。**登録・編集・詳細はモーダル標準**（本番=Next.js Parallel/Intercept Routes、パネル→モーダル拡大は framer-motion `layoutId`。モックは遷移 or vanilla JS の FLIP＝SC-01 `flipOpen/flipClose` を参考。ドラッグ移動モーダルは SC-25 参照）。
