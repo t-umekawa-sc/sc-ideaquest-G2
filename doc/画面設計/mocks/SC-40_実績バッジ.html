@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-40 実績 / バッジ — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-40 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     ゲーム層の画面: 収集サマリーは CRTガラス（.pixel-panel）。バッジ一覧は
+     可読性優先のクリーンカード＋ゲーム要素（ティア色リング・進捗バー）。
+     実績獲得時にティア連動コイン（銅◆20/銀◆50/金◆150・初期値）を付与＝第6節。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+  /* ティア色（実績のブロンズ/シルバー/ゴールド） */
+  :root { --tier-bronze: #B45309; --tier-silver: #64748B; --tier-gold: #D97706; }
+
+  /* 収集サマリー（ヒーロー・CRTガラス） */
+  .col-hero { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+  .col-hero__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-xp); }
+  .col-hero__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
+  .col-hero__bar { flex: 1; min-width: 220px; }
+  .col-hero__bar .xp-bar { max-width: 480px; }
+  .col-hero__pct { font-family: var(--font-pixel); color: var(--pixel-cyan); font-size: var(--text-sm); margin-top: 4px; }
+
+  .how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
+
+  /* バッジグリッド */
+  .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+  .ach { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
+  .ach__medal {
+    width: 68px; height: 68px; margin: var(--space-2) auto 0; display: grid; place-items: center;
+    font-size: 34px; border-radius: 50%; background: var(--color-surface-alt); border: 3px solid var(--color-border);
+  }
+  .ach.tier-bronze .ach__medal { border-color: var(--tier-bronze); }
+  .ach.tier-silver .ach__medal { border-color: var(--tier-silver); }
+  .ach.tier-gold   .ach__medal { border-color: var(--tier-gold); }
+  .ach__tier { font-size: var(--text-xs); font-weight: 700; letter-spacing: .04em; }
+  .ach.tier-bronze .ach__tier { color: var(--tier-bronze); }
+  .ach.tier-silver .ach__tier { color: var(--tier-silver); }
+  .ach.tier-gold   .ach__tier { color: var(--tier-gold); }
+  .ach__name { font-size: var(--text-base); font-weight: 700; }
+  .ach__desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.6; min-height: 2.9em; }
+  .ach__cond { font-size: var(--text-xs); color: var(--color-text-muted); }
+  /* 報酬（ティア連動コイン） */
+  .ach__reward { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-sm); }
+  .ach__reward .lbl { font-family: var(--font-base); color: var(--color-text-muted); font-size: var(--text-xs); }
+  .ach.is-locked .ach__reward { opacity: .8; }
+  /* 進捗バー（未獲得の数値系） */
+  .ach__prog { height: 8px; background: var(--color-surface-alt); border-radius: 99px; overflow: hidden; }
+  .ach__prog > span { display: block; height: 100%; background: var(--color-primary); }
+  .ach__prognum { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  /* フッター状態 */
+  .ach__foot { margin-top: auto; padding-top: var(--space-2); font-size: var(--text-sm); }
+  .ach__earned { color: var(--color-success); font-weight: 700; }
+  .ach__date { color: var(--color-text-muted); font-size: var(--text-xs); font-weight: 400; }
+  .ach__locked { color: var(--color-text-muted); font-weight: 700; }
+
+  /* 未獲得は淡く */
+  .ach.is-locked .ach__medal { filter: grayscale(1); opacity: .55; }
+  .ach.is-locked .ach__name { color: var(--color-text-muted); }
+  /* シークレット（未獲得） */
+  .ach.is-secret .ach__medal { color: var(--color-text-muted); }
+  .ach__secret-badge { position: absolute; top: 8px; right: 8px; }
+
+  @media (max-width: 640px) { .ach-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキルへ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">実績 / バッジ</h1>
+
+  <!-- 収集サマリー（ゲーム層・CRTガラス） -->
+  <section class="pixel-panel" aria-label="収集状況">
+    <div class="col-hero">
+      <div>
+        <div class="col-hero__num"><span id="earnedNum">0</span> / <span id="totalNum">0</span></div>
+        <div class="col-hero__label">ACHIEVEMENTS</div>
+      </div>
+      <div class="col-hero__bar">
+        <div class="xp-bar"><span id="colBar" style="width:0%"></span></div>
+        <div class="col-hero__pct" id="colPct">達成率 0%</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:var(--font-pixel);color:var(--pixel-coin);font-size:var(--text-lg)">◆ <span id="coinEarned">0</span></div>
+        <div class="col-hero__label" style="opacity:.7">実績で獲得したコイン</div>
+      </div>
+    </div>
+  </section>
+
+  <p class="how">
+    アイデアを出す・議論する・評価する・続けて使う…といった<strong>活動に応じてバッジを獲得</strong>できます。
+    実績を獲得すると<strong>難易度（ティア）に応じてコインを獲得</strong>できます（<span style="color:var(--tier-bronze);font-weight:700">ブロンズ ◆20</span> / <span style="color:var(--tier-silver);font-weight:700">シルバー ◆50</span> / <span style="color:var(--tier-gold);font-weight:700">ゴールド ◆150</span>・初期値）。
+    <strong>🔒 シークレット</strong>実績は達成するまで内容が伏せられます。
+  </p>
+
+  <!-- 絞り込み（一覧標準） -->
+  <div class="list-toolbar">
+    <div class="filters">
+      <label>カテゴリ
+        <select class="select" id="fCat">
+          <option value="">すべて</option>
+        </select>
+      </label>
+      <label>状態
+        <select class="select" id="fState">
+          <option value="">すべて</option>
+          <option value="earned">獲得済み</option>
+          <option value="locked">未獲得</option>
+        </select>
+      </label>
+    </div>
+    <div class="tools">
+      <span class="list-count" id="count">— 件</span>
+    </div>
+  </div>
+
+  <div class="ach-grid" id="grid"><!-- JSで描画 --></div>
+  <div class="list-empty" id="empty" hidden>条件に合う実績がありません。</div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ 実績カタログ・条件・ティア・報酬額は<strong>初期値（調整可）</strong>。付与は<strong>サーバーで活動（`Transaction/Activity` 等）を判定</strong>し `UserAchievement` を作成（恒久・冪等）。
+    獲得時に<strong>ティア連動コイン（ブロンズ◆20/シルバー◆50/ゴールド◆150）を付与</strong>し `Transaction/Activity` に記録（サーバーで一度きり検証）。シークレットは達成まで名称/条件/報酬を伏せる。
+  </p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ユーザーメニューから設定・全画面共通の復元）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- 実績カタログ（モック・初期値） ----
+  // tier: bronze/silver/gold。earned=獲得済み(+date)。prog=数値系の進捗{cur,max}。secret=シークレット。
+  const CATS = {
+    post:  'アイデア投稿', adopt: '採用', eval: '評価', vote: '投票',
+    chat:  '議論', streak:'継続', level:'成長', spell:'魔法', gear:'装備', secret:'シークレット',
+  };
+  const ACH = [
+    // 投稿
+    { id:'first_idea', cat:'post', tier:'bronze', icon:'🌱', name:'初めの一歩', desc:'初めてアイデアを投稿した', cond:'アイデアを1件投稿', earned:'2026/05/08' },
+    { id:'ideaman',    cat:'post', tier:'silver', icon:'💡', name:'アイデアマン', desc:'アイデアを10件投稿した', cond:'アイデアを10件投稿', prog:{cur:7,max:10} },
+    { id:'inventor',   cat:'post', tier:'gold',   icon:'🏭', name:'発明家', desc:'アイデアを50件投稿した', cond:'アイデアを50件投稿', prog:{cur:7,max:50} },
+    // 採用
+    { id:'first_adopt',cat:'adopt', tier:'silver', icon:'🎉', name:'初採用', desc:'自分のアイデアが初めて選定された', cond:'アイデアが1件選定', earned:'2026/06/20' },
+    { id:'hitmaker',   cat:'adopt', tier:'gold',   icon:'🏆', name:'ヒットメーカー', desc:'アイデアが5件選定された', cond:'アイデアが5件選定', prog:{cur:1,max:5} },
+    // 評価
+    { id:'sharp_eye',  cat:'eval', tier:'bronze', icon:'👀', name:'目利き', desc:'評価を10件実施した', cond:'評価を10件実施', earned:'2026/06/28' },
+    { id:'sage',       cat:'eval', tier:'gold',   icon:'🧙', name:'賢者の評', desc:'評価を50件実施した', cond:'評価を50件実施', prog:{cur:12,max:50} },
+    // 投票
+    { id:'first_vote', cat:'vote', tier:'bronze', icon:'🗳️', name:'一票の力', desc:'初めて投票した', cond:'投票を1回', earned:'2026/05/09' },
+    { id:'returning',  cat:'vote', tier:'silver', icon:'📊', name:'選挙管理人', desc:'投票を50回した', cond:'投票を50回', prog:{cur:33,max:50} },
+    // 議論
+    { id:'chatty',     cat:'chat', tier:'bronze', icon:'💬', name:'おしゃべり', desc:'コメントを10件した', cond:'コメントを10件', earned:'2026/05/22' },
+    { id:'debater',    cat:'chat', tier:'gold',   icon:'🔥', name:'議論の達人', desc:'コメントを100件した', cond:'コメントを100件', prog:{cur:48,max:100} },
+    // 継続
+    { id:'sprout7',    cat:'streak', tier:'bronze', icon:'📅', name:'皆勤の芽', desc:'7日連続でログインした', cond:'7日連続ログイン', earned:'2026/06/02' },
+    { id:'perfect30',  cat:'streak', tier:'gold',   icon:'🗓️', name:'皆勤賞', desc:'30日連続でログインした', cond:'30日連続ログイン', prog:{cur:12,max:30} },
+    // 成長
+    { id:'lv5',        cat:'level', tier:'silver', icon:'⭐', name:'レベル5', desc:'レベル5に到達した', cond:'Lv5 到達', earned:'2026/06/10' },
+    { id:'lv10',       cat:'level', tier:'gold',   icon:'🌟', name:'レベル10', desc:'レベル10に到達した', cond:'Lv10 到達', prog:{cur:7,max:10} },
+    // 魔法
+    { id:'apprentice', cat:'spell', tier:'bronze', icon:'✨', name:'見習い魔導士', desc:'魔法を初めて解放した', cond:'魔法を1つ解放', earned:'2026/07/03' },
+    { id:'archmage',   cat:'spell', tier:'gold',   icon:'🪄', name:'大魔道士', desc:'すべての魔法を解放した', cond:'全6種の魔法を解放', prog:{cur:3,max:6} },
+    // 装備
+    { id:'stylish',    cat:'gear', tier:'bronze', icon:'👕', name:'おしゃれさん', desc:'装備を初めて購入した', cond:'装備を1点購入', earned:'2026/06/15' },
+    { id:'collector',  cat:'gear', tier:'gold',   icon:'👑', name:'コレクター', desc:'すべての装備を購入した', cond:'全装備を購入', prog:{cur:15,max:19} },
+    // シークレット
+    { id:'nightowl',   cat:'secret', tier:'silver', icon:'🦉', name:'夜更かしフクロウ', desc:'深夜（0〜4時）にアイデアを投稿した', cond:'深夜にアイデア投稿', earned:'2026/06/25', secret:true },
+    { id:'secret_x',   cat:'secret', tier:'gold',   icon:'🕵️', name:'？？？', desc:'達成すると内容が明らかになる隠し実績。', cond:'？？？', secret:true },
+  ];
+  const TIER_LABEL = { bronze:'ブロンズ', silver:'シルバー', gold:'ゴールド' };
+  const TIER_REWARD = { bronze:20, silver:50, gold:150 }; // 難易度に応じたコイン付与（初期値）
+
+  // カテゴリ select を生成
+  const fCat = document.getElementById('fCat');
+  Object.entries(CATS).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; fCat.appendChild(o); });
+
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const countEl = document.getElementById('count');
+  const fState = document.getElementById('fState');
+
+  function cardHTML(a) {
+    const earned = !!a.earned;
+    const locked = !earned;
+    const secretLocked = a.secret && locked; // シークレットかつ未獲得＝内容を伏せる
+    const icon = secretLocked ? '🔒' : a.icon;
+    const name = secretLocked ? '？？？' : a.name;
+    const desc = secretLocked ? 'これはシークレット実績です。達成すると内容が明らかになります。' : a.desc;
+    const cond = secretLocked ? '条件: ？？？' : ('条件: ' + a.cond);
+
+    let progress = '';
+    if (locked && a.prog && !secretLocked) {
+      const pct = Math.round(a.prog.cur / a.prog.max * 100);
+      progress = `
+        <div class="ach__prog"><span style="width:${pct}%"></span></div>
+        <div class="ach__prognum">${a.prog.cur} / ${a.prog.max}</div>`;
+    }
+    // 報酬（ティア連動コイン）。シークレット未獲得は伏せる
+    const reward = secretLocked
+      ? `<div class="ach__reward"><span class="lbl">報酬</span> ◆?</div>`
+      : `<div class="ach__reward"><span class="lbl">${earned ? '獲得コイン' : '報酬'}</span> ◆${TIER_REWARD[a.tier]}</div>`;
+    const foot = earned
+      ? `<div class="ach__foot"><span class="ach__earned">✓ 獲得</span> <span class="ach__date">${a.earned}</span></div>`
+      : `<div class="ach__foot"><span class="ach__locked">🔒 未獲得</span></div>`;
+
+    // シークレット未獲得はティア（色/名称）も伏せる
+    const tierClass = secretLocked ? '' : 'tier-' + a.tier;
+    const tierLabel = secretLocked ? '？？？' : TIER_LABEL[a.tier];
+    return `
+      <article class="card ach ${tierClass} ${locked ? 'is-locked' : ''} ${secretLocked ? 'is-secret' : ''}"
+               data-cat="${a.cat}" data-state="${earned ? 'earned' : 'locked'}">
+        ${a.secret ? '<span class="badge badge-muted ach__secret-badge">シークレット</span>' : ''}
+        <div class="ach__medal">${icon}</div>
+        <div class="ach__tier">${tierLabel}</div>
+        <div class="ach__name">${name}</div>
+        <div class="ach__desc">${desc}</div>
+        <div class="ach__cond">${cond}</div>
+        ${reward}
+        ${progress}
+        ${foot}
+      </article>`;
+  }
+
+  function render() {
+    const cat = fCat.value, state = fState.value;
+    const list = ACH.filter(a => {
+      if (cat && a.cat !== cat) return false;
+      const earned = !!a.earned;
+      if (state === 'earned' && !earned) return false;
+      if (state === 'locked' && earned) return false;
+      return true;
+    });
+    grid.innerHTML = list.map(cardHTML).join('');
+    countEl.textContent = list.length + ' 件';
+    empty.hidden = list.length !== 0;
+  }
+
+  // サマリー（全体・フィルタに依らない）
+  function summary() {
+    const total = ACH.length;
+    const earnedList = ACH.filter(a => a.earned);
+    const earned = earnedList.length;
+    const pct = Math.round(earned / total * 100);
+    const coinEarned = earnedList.reduce((s, a) => s + TIER_REWARD[a.tier], 0);
+    document.getElementById('earnedNum').textContent = earned;
+    document.getElementById('totalNum').textContent = total;
+    document.getElementById('colBar').style.width = pct + '%';
+    document.getElementById('colPct').textContent = '達成率 ' + pct + '%';
+    document.getElementById('coinEarned').textContent = coinEarned;
+  }
+
+  fCat.addEventListener('change', render);
+  fState.addEventListener('change', render);
+  summary();
+  render();
+</script>
+</body>
+</html>
