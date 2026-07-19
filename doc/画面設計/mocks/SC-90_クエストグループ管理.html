@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-90 クエストグループ管理 — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-90 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     業務層の管理画面: クエストグループ管理者が「自分の管理グループ内のアカウント」を
+     登録・編集・論理削除する。所属の割当（他グループへの移動）はシステム管理者の領分（SC-91）。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+  .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+
+  .group-bar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+  .group-bar__label { font-weight: 600; }
+
+  .table .db-id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .table td .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  tr.is-suspended td { color: var(--color-text-muted); }
+
+  .st-active { background: var(--color-agree-bg); color: var(--color-success); }
+  .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
+
+  .modal__panel { max-width: 520px; }
+  .form-row { margin-bottom: var(--space-4); }
+  .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
+  .req::after { content: " *"; color: var(--color-danger); }
+  .form-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+  .fixed-field { padding: 10px 12px; background: var(--color-surface-alt); border-radius: var(--radius); font-size: var(--text-sm); color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.9</span>
+      <span class="pixel-stat coin">◆ 210</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキルへ）">✦ SP 4</a>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="鈴木 花子"><span class="avatar__img placeholder">鈴</span><span class="avatar__level">Lv.9</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">クエストグループ管理</h1>
+  <p class="admin-sub">あなたが管理するクエストグループ内のアカウントを<strong>登録・編集・論理削除</strong>できます。（他グループへの所属割当はシステム管理者の領分）</p>
+
+  <!-- 管理グループの選択 -->
+  <div class="group-bar">
+    <span class="group-bar__label">管理グループ:</span>
+    <select class="select" id="groupSel" style="width:auto"></select>
+    <span class="list-count" id="memberCount">— 名</span>
+  </div>
+
+  <!-- ツールバー -->
+  <div class="list-toolbar">
+    <div class="filters">
+      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインIDで検索">
+      <label>状態
+        <select class="select" id="fState">
+          <option value="">すべて</option>
+          <option value="active">有効</option>
+          <option value="suspended">無効（論理削除）</option>
+        </select>
+      </label>
+    </div>
+    <div class="tools">
+      <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>氏名</th><th>ログインID</th><th>グループ内ロール</th><th>状態</th><th>最終ログイン</th><th></th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="list-empty" id="empty" hidden>該当するアカウントがありません。</div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。<strong>論理削除</strong>＝無効化（ログイン不可）で、それまでの入力（アイデア/投票/評価/コメント）は削除せず表示継続。物理削除は行わない。所属の割当（グループ間移動）はシステム管理者（SC-91）。
+  </p>
+</main>
+
+<!-- ===== アカウント発行/編集モーダル ===== -->
+<div class="modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="amTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
+    <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
+    <div class="form-row"><label class="req" for="amId">ログインID（メール）</label><input class="input" id="amId" placeholder="例: taro@across.co.jp"></div>
+    <div class="form-row"><label>所属クエストグループ</label><div class="fixed-field" id="amGroup">製品企画（この管理グループに追加されます）</div></div>
+    <div class="form-row"><label for="amRole">グループ内ロール</label>
+      <select class="select" id="amRole">
+        <option value="member">一般メンバー</option>
+        <option value="qg_admin">クエストグループ管理者</option>
+      </select>
+    </div>
+    <div class="form-note" id="amNote">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>を行います（招待リンク/初回パスワード設定フロー）。</div>
+    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="amSave">発行する</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- データ（モック・初期値。この管理者は「製品企画」「業務改善」を管理） ----
+  const GROUPS = ['製品企画', '業務改善'];
+  const ROLE_LABEL = { member:'一般メンバー', qg_admin:'クエストグループ管理者' };
+  const ST = { active:['有効','st-active'], suspended:['無効','st-disabled'] };
+  let MEMBERS = [
+    { name:'山田 太郎', id:'taro@across.co.jp',  group:'製品企画', role:'member',   state:'active', last:'今日 09:12' },
+    { name:'鈴木 花子', id:'hanako@across.co.jp',group:'製品企画', role:'qg_admin',  state:'active', last:'今日 08:40' },
+    { name:'佐藤 大輔', id:'daisuke@across.co.jp',group:'製品企画', role:'member',   state:'active', last:'昨日 17:55' },
+    { name:'高橋 健',   id:'ken@across.co.jp',   group:'製品企画', role:'member',   state:'suspended', last:'2026-06-30' },
+    { name:'田中 美咲', id:'misaki@across.co.jp',group:'業務改善', role:'member',   state:'active', last:'今日 10:05' },
+    { name:'伊藤 彩',   id:'aya@across.co.jp',   group:'業務改善', role:'qg_admin',  state:'active', last:'昨日 14:20' },
+    { name:'渡辺 剛',   id:'go@across.co.jp',    group:'業務改善', role:'member',   state:'active', last:'3日前' },
+  ];
+  let currentGroup = GROUPS[0];
+
+  // グループ選択肢
+  const groupSel = document.getElementById('groupSel');
+  GROUPS.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; groupSel.appendChild(o); });
+
+  const rows = document.getElementById('rows');
+  const empty = document.getElementById('empty');
+  const fSearch = document.getElementById('fSearch');
+  const fState = document.getElementById('fState');
+
+  function currentList() {
+    const q = fSearch.value.trim().toLowerCase(), st = fState.value;
+    return MEMBERS.filter(m => m.group === currentGroup
+      && (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+      && (!st || m.state === st));
+  }
+
+  function render() {
+    const list = currentList();
+    rows.innerHTML = list.map((m, i) => {
+      const [label, cls] = ST[m.state];
+      const idx = MEMBERS.indexOf(m);
+      const toggle = m.state === 'active'
+        ? `<button class="btn btn-outline" type="button" data-suspend="${idx}">無効化</button>`
+        : `<button class="btn btn-outline" type="button" data-activate="${idx}">再有効化</button>`;
+      return `<tr class="${m.state === 'suspended' ? 'is-suspended' : ''}">
+        <td><strong>${m.name}</strong></td>
+        <td class="db-id">${m.id}</td>
+        <td>${ROLE_LABEL[m.role]}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td>${m.last}</td>
+        <td><div class="row-actions">
+          <button class="btn btn-outline" type="button" data-edit="${idx}">編集</button>
+          <button class="btn btn-outline" type="button" data-reset="${idx}">パスワード再設定</button>
+          ${toggle}
+        </div></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('memberCount').textContent = list.length + ' 名';
+    empty.hidden = list.length !== 0;
+  }
+
+  groupSel.addEventListener('change', () => { currentGroup = groupSel.value; document.getElementById('amGroup').textContent = currentGroup + '（この管理グループに追加されます）'; render(); });
+  fSearch.addEventListener('input', render);
+  fState.addEventListener('change', render);
+
+  // 行アクション
+  rows.addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    if (btn.dataset.edit != null) { openAccount('edit', MEMBERS[btn.dataset.edit]); }
+    else if (btn.dataset.reset != null) { const m = MEMBERS[btn.dataset.reset]; if (confirm('「' + m.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フローに戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
+    else if (btn.dataset.suspend != null) { const m = MEMBERS[btn.dataset.suspend]; if (confirm('「' + m.name + '」を無効化（論理削除）しますか？\nログイン不可になりますが、これまでの入力は残ります。')) { m.state = 'suspended'; render(); } }
+    else if (btn.dataset.activate != null) { const m = MEMBERS[btn.dataset.activate]; m.state = 'active'; render(); }
+  });
+
+  // モーダル
+  const accountModal = document.getElementById('accountModal');
+  function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
+  function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
+
+  let editTarget = null;
+  function openAccount(mode, m) {
+    editTarget = mode === 'edit' ? m : null;
+    document.getElementById('amTitle').textContent = mode === 'edit' ? 'アカウントを編集' : 'アカウントを発行';
+    document.getElementById('amName').value = m ? m.name : '';
+    document.getElementById('amId').value = m ? m.id : '';
+    document.getElementById('amRole').value = m ? m.role : 'member';
+    document.getElementById('amGroup').textContent = (m ? m.group : currentGroup) + '（この管理グループに追加されます）';
+    document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
+    document.getElementById('amNote').style.display = mode === 'edit' ? 'none' : '';
+    openModal('accountModal');
+  }
+  document.getElementById('newAccount').addEventListener('click', () => openAccount('new', null));
+  document.getElementById('amSave').addEventListener('click', () => {
+    const name = document.getElementById('amName').value.trim();
+    const id = document.getElementById('amId').value.trim();
+    const role = document.getElementById('amRole').value;
+    if (!name || !id) { alert('氏名とログインIDは必須です'); return; }
+    if (editTarget) { editTarget.name = name; editTarget.id = id; editTarget.role = role; }
+    else { MEMBERS.push({ name, id, group: currentGroup, role, state:'active', last:'—（未ログイン）' }); }
+    closeModal(accountModal); render();
+  });
+
+  render();
+</script>
+</body>
+</html>

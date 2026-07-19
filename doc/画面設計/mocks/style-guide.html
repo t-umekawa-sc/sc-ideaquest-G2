@@ -229,6 +229,16 @@
         </div>
         <div class="hint">ラベル・ボックス両方が指ポインター。Tabで移動しSpaceで切替（フォーカスリング表示）。</div>
       </div>
+
+      <div class="field">
+        <label>トグルスイッチ（.switch）</label>
+        <div class="stack">
+          <label class="switch"><input type="checkbox" checked><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__text">MFA を必須にする</span><span class="switch__state">ON</span></label>
+          <label class="switch"><input type="checkbox"><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__text">投票の匿名化</span><span class="switch__state">OFF</span></label>
+          <label class="switch"><input type="checkbox" checked disabled><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__text">無効（disabled）</span></label>
+        </div>
+        <div class="hint">管理画面のON/OFF設定（会社設定＝MFA必須・投票匿名化 等）向け。ネイティブ checkbox を装飾。ラベル/トラック両方 pointer・focus-visible リング。状態語（ON/OFF）は任意で併記。</div>
+      </div>
     </div>
   </div>
 

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-91 システム管理（運営） — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-91 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     業務層の運用画面: 会社（テナント）管理・会社設定（トグル）・全アカウント/所属のフル操作。
+     設定トグルは新設の .switch を使用。ゲーム層の要素は使わない。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+  .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: var(--space-6) 0 var(--space-3); flex-wrap: wrap; }
+  .section-head h2 { font-size: var(--text-lg); margin: 0; }
+
+  .table tr.is-selected td { background: var(--color-primary-soft); }
+  .table .db-id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .table .clickable { cursor: pointer; }
+
+  /* 会社設定カード */
+  .settings-card h3 { margin: 0 0 var(--space-1); }
+  .setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
+  .setting-row:first-of-type { border-top: 0; }
+  .setting-row__info { min-width: 0; }
+  .setting-row__name { font-weight: 600; }
+  .setting-row__desc { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 2px; }
+  .setting-row.is-disabled { opacity: .55; }
+  .provision-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; margin-top: var(--space-3); }
+  .provision-note code { font-family: ui-monospace, monospace; }
+
+  /* 状態バッジ */
+  .st-active { background: var(--color-agree-bg); color: var(--color-success); }
+  .st-suspended { background: var(--color-surface-alt); color: var(--color-text-muted); }
+  .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
+
+  .modal__panel { max-width: 560px; }
+  .form-row { margin-bottom: var(--space-4); }
+  .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
+  .req::after { content: " *"; color: var(--color-danger); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted" title="システム管理者（運営）">🛠 システム管理者</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="運営 太郎"><span class="avatar__img placeholder">運</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">システム管理（運営）</h1>
+  <p class="admin-sub">会社（テナント）の作成・管理、会社ごとの設定、全アカウントとクエストグループ所属のフル操作。<strong>システム管理者のみ</strong>。</p>
+
+  <!-- ===== 会社（テナント）一覧 ===== -->
+  <div class="section-head">
+    <h2>会社（テナント）</h2>
+    <button class="btn btn-primary" type="button" id="newCompany">＋ 会社を作成</button>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>会社名</th><th>DB識別子</th><th>状態</th><th>アカウント</th><th>グループ</th><th>作成日</th><th></th></tr>
+      </thead>
+      <tbody id="companyRows"></tbody>
+    </table>
+  </div>
+
+  <!-- ===== 会社設定（選択中） ===== -->
+  <div class="section-head"><h2>会社設定 <span id="selCompanyName" style="color:var(--color-text-muted);font-weight:400;font-size:var(--text-base)"></span></h2></div>
+  <section class="card settings-card" aria-label="会社設定">
+    <div class="setting-row">
+      <div class="setting-row__info">
+        <div class="setting-row__name">投票の匿名化</div>
+        <div class="setting-row__desc">ON=集計数のみ表示（匿名モード・既定）／OFF=賛成・反対したユーザーのアバターを表示（記名モード）。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="swVoteAnon"><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__state" id="stVoteAnon">OFF</span></label>
+    </div>
+    <div class="setting-row" id="rowHideVoters">
+      <div class="setting-row__info">
+        <div class="setting-row__name">匿名時に所有者/管理者へ投票者を隠す</div>
+        <div class="setting-row__desc">ON=管理者にも投票者を開示しない（既定）／OFF=所有者・クエスト管理者だけは投票者を確認できる。<span id="hideVotersDep" style="color:var(--color-warning)"></span></div>
+      </div>
+      <label class="switch"><input type="checkbox" id="swHideVoters"><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__state" id="stHideVoters">OFF</span></label>
+    </div>
+    <div class="setting-row">
+      <div class="setting-row__info">
+        <div class="setting-row__name">MFA（多要素認証）を必須にする</div>
+        <div class="setting-row__desc">ON=ログイン時にメールOTPを要求（信頼済み端末はスキップ・既定）／OFF=ID＋パスワードのみ。</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="swMfa"><span class="switch__track"><span class="switch__thumb"></span></span><span class="switch__state" id="stMfa">OFF</span></label>
+    </div>
+
+    <div class="provision-note">
+      <strong>DB接続識別子:</strong> <code id="dbId">—</code>（接続情報の実体は <code>.env</code> で管理・ここでは参照キーのみ表示）<br>
+      <strong>プロビジョニング（MVP）:</strong> 会社追加は「<code>docker compose</code> に会社DBサービスを追記 → <code>up</code> → 管理DBに接続先を登録」の手動運用。将来は自動化/k8s＋Operator を検討。
+    </div>
+  </section>
+
+  <!-- ===== アカウント & クエストグループ所属 ===== -->
+  <div class="section-head">
+    <h2>アカウント & 所属（全社フル操作）</h2>
+    <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
+  </div>
+  <div class="list-toolbar">
+    <div class="filters">
+      <label>会社
+        <select class="select" id="fAccCompany"><option value="">すべて</option></select>
+      </label>
+      <input class="input" type="search" id="fAccSearch" placeholder="氏名・ログインIDで検索">
+    </div>
+    <div class="tools"><span class="list-count" id="accCount">— 件</span></div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>氏名</th><th>ログインID</th><th>会社</th><th>システムロール</th><th>所属クエストグループ</th><th>状態</th><th></th></tr>
+      </thead>
+      <tbody id="accountRows"></tbody>
+    </table>
+  </div>
+  <div class="list-empty" id="accEmpty" hidden>該当するアカウントがありません。</div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。会社設定（投票匿名化 `vote_anonymized`／匿名時の管理者開示 `hide_voters_from_managers`／MFA `mfa_required`）は Company の各フラグ（第9節）。クエストグループ所属の割当は<strong>システム管理者のフル操作</strong>（クエストグループ管理者は自グループ範囲のみ＝SC-90）。
+  </p>
+</main>
+
+<!-- ===== 会社作成モーダル ===== -->
+<div class="modal" id="companyModal" role="dialog" aria-modal="true" aria-labelledby="cmTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="cmTitle" style="margin-top:0">会社（テナント）を作成</h2>
+    <div class="form-row"><label class="req" for="cmName">会社名</label><input class="input" id="cmName" placeholder="例: アクロス株式会社"></div>
+    <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div class="setting-row__desc">会社DBの参照キー。接続情報の実体は <code>.env</code>。</div></div>
+    <div class="provision-note">作成すると管理DBに会社を登録します。<strong>会社DBの実体は別途プロビジョニング</strong>（MVP: compose にサービス追記 → <code>up</code>）が必要です。作成直後は「準備中」で、DB接続確認後に「有効」化。</div>
+    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="cmCreate">作成する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== アカウント発行/編集モーダル ===== -->
+<div class="modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="amTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel">
+    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
+    <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
+    <div class="form-row"><label class="req" for="amId">ログインID（メール）</label><input class="input" id="amId" placeholder="例: taro@across.co.jp"></div>
+    <div class="form-row"><label for="amCompany">会社</label>
+      <select class="select" id="amCompany"></select>
+    </div>
+    <div class="form-row"><label for="amRole">システムロール</label>
+      <select class="select" id="amRole">
+        <option value="member">一般</option>
+        <option value="qg_admin">クエストグループ管理者</option>
+        <option value="sys_admin">システム管理者</option>
+      </select>
+    </div>
+    <div class="form-row"><label for="amGroups">所属クエストグループ</label>
+      <div data-multiselect data-placeholder="グループを追加…" id="amGroupsWrap">
+        <select id="amGroups" multiple>
+          <option value="製品企画">製品企画</option>
+          <option value="業務改善">業務改善</option>
+          <option value="カスタマーサクセス">カスタマーサクセス</option>
+          <option value="R&D">R&D</option>
+          <option value="営業推進">営業推進</option>
+        </select>
+      </div>
+    </div>
+    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>（招待リンク/初回パスワード設定フロー）。ロール「システム管理者」は運営のみに付与。</div>
+    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="amSave">発行する</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- データ（モック・初期値） ----
+  const ST = { active:['有効','st-active'], provisioning:['準備中','st-suspended'], suspended:['停止','st-disabled'] };
+  const COMPANIES = [
+    { id:'across', name:'アクロス株式会社', db:'db_across', state:'active', accounts:42, groups:5, created:'2026-01-10', voteAnon:true,  hideVoters:true,  mfa:true },
+    { id:'beyond', name:'ビヨンド工業',     db:'db_beyond', state:'active', accounts:18, groups:2, created:'2026-03-22', voteAnon:false, hideVoters:true,  mfa:true },
+    { id:'sample', name:'サンプル商事',     db:'db_sample', state:'suspended', accounts:7, groups:1, created:'2026-05-30', voteAnon:true,  hideVoters:false, mfa:false },
+  ];
+  const ROLE_LABEL = { member:'一般', qg_admin:'クエストグループ管理者', sys_admin:'システム管理者' };
+  const ACCOUNTS = [
+    { name:'山田 太郎', id:'taro@across.co.jp',  company:'across', role:'member',   groups:['製品企画','業務改善'], state:'active' },
+    { name:'鈴木 花子', id:'hanako@across.co.jp',company:'across', role:'qg_admin',  groups:['製品企画'], state:'active' },
+    { name:'運営 太郎', id:'admin@ideaquest',    company:'across', role:'sys_admin', groups:[], state:'active' },
+    { name:'田中 一郎', id:'ichiro@beyond.co.jp',company:'beyond', role:'member',   groups:['R&D'], state:'active' },
+    { name:'退職 花', id:'hana@sample.co.jp',    company:'sample', role:'member',   groups:['営業推進'], state:'suspended' },
+  ];
+
+  let selectedCompany = COMPANIES[0].id;
+
+  // 会社一覧
+  const companyRows = document.getElementById('companyRows');
+  function renderCompanies() {
+    companyRows.innerHTML = COMPANIES.map(c => {
+      const [label, cls] = ST[c.state];
+      return `<tr class="clickable ${c.id === selectedCompany ? 'is-selected' : ''}" data-company="${c.id}">
+        <td><strong>${c.name}</strong></td>
+        <td class="db-id">${c.db}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td>${c.accounts}</td><td>${c.groups}</td><td>${c.created}</td>
+        <td><button class="btn btn-outline" type="button" data-settings="${c.id}">設定</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // 会社設定パネル
+  function loadSettings() {
+    const c = COMPANIES.find(x => x.id === selectedCompany);
+    document.getElementById('selCompanyName').textContent = '（' + c.name + '）';
+    document.getElementById('dbId').textContent = c.db;
+    setSwitch('swVoteAnon', 'stVoteAnon', c.voteAnon);
+    setSwitch('swHideVoters', 'stHideVoters', c.hideVoters);
+    setSwitch('swMfa', 'stMfa', c.mfa);
+    refreshHideVotersDep();
+  }
+  function setSwitch(inputId, stateId, on) {
+    const i = document.getElementById(inputId); i.checked = on;
+    document.getElementById(stateId).textContent = on ? 'ON' : 'OFF';
+  }
+  // 匿名化OFFのとき「管理者へ隠す」は無効（記名モードでは全員に見える）
+  function refreshHideVotersDep() {
+    const anon = document.getElementById('swVoteAnon').checked;
+    const row = document.getElementById('rowHideVoters');
+    const sw = document.getElementById('swHideVoters');
+    sw.disabled = !anon;
+    row.classList.toggle('is-disabled', !anon);
+    document.getElementById('hideVotersDep').textContent = anon ? '' : '（記名モードのため無効。投票者は全員に表示されます）';
+  }
+
+  companyRows.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-company]'); if (!row) return;
+    selectedCompany = row.dataset.company;
+    renderCompanies(); loadSettings();
+    document.querySelector('.settings-card').scrollIntoView({ behavior:'smooth', block:'center' });
+  });
+
+  // 設定トグル → データへ反映（モックは即時保存の想定）
+  document.getElementById('swVoteAnon').addEventListener('change', (e) => {
+    const c = COMPANIES.find(x => x.id === selectedCompany); c.voteAnon = e.target.checked;
+    document.getElementById('stVoteAnon').textContent = c.voteAnon ? 'ON' : 'OFF';
+    refreshHideVotersDep();
+  });
+  document.getElementById('swHideVoters').addEventListener('change', (e) => {
+    const c = COMPANIES.find(x => x.id === selectedCompany); c.hideVoters = e.target.checked;
+    document.getElementById('stHideVoters').textContent = c.hideVoters ? 'ON' : 'OFF';
+  });
+  document.getElementById('swMfa').addEventListener('change', (e) => {
+    const c = COMPANIES.find(x => x.id === selectedCompany); c.mfa = e.target.checked;
+    document.getElementById('stMfa').textContent = c.mfa ? 'ON' : 'OFF';
+  });
+
+  // アカウント一覧
+  const accountRows = document.getElementById('accountRows');
+  const fAccCompany = document.getElementById('fAccCompany');
+  const fAccSearch = document.getElementById('fAccSearch');
+  // 会社フィルタ/選択肢を会社データから生成
+  [fAccCompany, document.getElementById('amCompany')].forEach(sel => {
+    COMPANIES.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+  });
+  const companyName = id => (COMPANIES.find(c => c.id === id) || {}).name || id;
+  function renderAccounts() {
+    const cf = fAccCompany.value, q = fAccSearch.value.trim().toLowerCase();
+    const list = ACCOUNTS.filter(a => (!cf || a.company === cf) && (!q || a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q)));
+    accountRows.innerHTML = list.map(a => {
+      const [label, cls] = ST[a.state];
+      const groups = a.groups.length ? a.groups.map(g => `<span class="badge badge-muted">${g}</span>`).join(' ') : '<span class="muted">—</span>';
+      return `<tr>
+        <td><strong>${a.name}</strong></td>
+        <td class="db-id">${a.id}</td>
+        <td>${companyName(a.company)}</td>
+        <td>${ROLE_LABEL[a.role]}</td>
+        <td>${groups}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td><button class="btn btn-outline" type="button">所属・編集</button></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('accCount').textContent = list.length + ' 件';
+    document.getElementById('accEmpty').hidden = list.length !== 0;
+  }
+  fAccCompany.addEventListener('change', renderAccounts);
+  fAccSearch.addEventListener('input', renderAccounts);
+
+  // モーダル開閉（共通）
+  function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
+  function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
+  document.getElementById('newCompany').addEventListener('click', () => openModal('companyModal'));
+  document.getElementById('newAccount').addEventListener('click', () => openModal('accountModal'));
+  document.getElementById('cmCreate').addEventListener('click', () => {
+    const name = document.getElementById('cmName').value.trim();
+    if (!name) { alert('会社名を入力してください'); return; }
+    alert('「' + name + '」を作成しました（デモ）。会社DBのプロビジョニング後に有効化されます。');
+    closeModal(document.getElementById('companyModal'));
+  });
+  document.getElementById('amSave').addEventListener('click', () => {
+    const name = document.getElementById('amName').value.trim();
+    const id = document.getElementById('amId').value.trim();
+    if (!name || !id) { alert('氏名とログインIDは必須です'); return; }
+    alert('「' + name + '」を発行しました（デモ）。初回ログイン時にパスワード設定を行います。');
+    closeModal(document.getElementById('accountModal'));
+  });
+
+  renderCompanies(); loadSettings(); renderAccounts();
+</script>
+</body>
+</html>
