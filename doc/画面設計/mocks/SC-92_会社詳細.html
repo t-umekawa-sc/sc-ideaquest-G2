@@ -15,9 +15,11 @@
   .crumbs a { color: var(--color-text-muted); }
   .crumbs b { color: var(--color-text); }
 
-  /* 文脈バナー（メンテ中の会社を明示・スクロールしても固定） */
+  /* 文脈バナー（メンテ中の会社を明示・スクロールしても固定）
+     共通ヘッダー（sticky・高さ --header-h・z-index:10）の直下で止める。
+     z-index はヘッダーより低くし、アバターメニュー等ヘッダー内UIを常に手前にする。 */
   .ctx {
-    position: sticky; top: 0; z-index: 30;
+    position: sticky; top: var(--header-h); z-index: 5;
     display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
     padding: var(--space-3) var(--space-4); border-radius: var(--radius);
     background: var(--color-surface); border: 1px solid var(--color-border);
