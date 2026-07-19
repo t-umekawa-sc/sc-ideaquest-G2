@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-30 ショップ — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-30 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     ゲーム層の画面: コイン残高ヒーローは CRTガラス（.pixel-panel）。装備一覧は
+     可読性優先のクリーンカード＋ゲーム要素（レアリティ色・.btn-pixel）。SC-31 と同じ装備セット。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+  /* コイン残高ヒーロー（CRTガラス） */
+  .wallet { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+  .wallet__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-coin); }
+  .wallet__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
+  .wallet__meta { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); color: var(--pixel-ink); }
+  .wallet__actions { margin-left: auto; }
+
+  .how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
+  .how .rarity-common   { color: var(--rarity-common);   font-weight: 700; }
+  .how .rarity-standard { color: var(--rarity-standard); font-weight: 700; }
+  .how .rarity-rare     { color: var(--rarity-rare);     font-weight: 700; }
+
+  /* 装備グリッド */
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-4); }
+  .buy { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
+  .buy__thumb { font-size: 46px; line-height: 1; padding: var(--space-4) 0; background: var(--color-surface-alt); border-radius: var(--radius); border: 2px solid transparent; }
+  .buy.rarity-common   .buy__thumb { border-color: var(--rarity-common); }
+  .buy.rarity-standard .buy__thumb { border-color: var(--rarity-standard); }
+  .buy.rarity-rare     .buy__thumb { border-color: var(--rarity-rare); }
+  .buy__meta { display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
+  .buy__slot { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .buy__rarity { font-size: var(--text-xs); font-weight: 700; }
+  .buy.rarity-common   .buy__rarity { color: var(--rarity-common); }
+  .buy.rarity-standard .buy__rarity { color: var(--rarity-standard); }
+  .buy.rarity-rare     .buy__rarity { color: var(--rarity-rare); }
+  .buy__name { font-size: var(--text-base); font-weight: 700; }
+  .buy__price { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); }
+  .buy__price.short { color: var(--color-danger); }
+  .buy__foot { margin-top: auto; padding-top: var(--space-2); }
+  .buy__owned { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-success); font-size: var(--text-sm); }
+  .buy__equip { display: block; margin-top: 4px; font-size: var(--text-xs); }
+  .btn-pixel.btn-pixel--sm { padding: 6px 12px; font-size: var(--text-sm); }
+  .btn-pixel:disabled { opacity: .5; cursor: not-allowed; box-shadow: var(--shadow-pixel); }
+  .btn-pixel:disabled::before { content: none; }
+  .buy__hint { font-size: var(--text-xs); color: var(--color-danger); margin-top: 4px; }
+
+  /* 購入フラッシュ（購入直後の演出） */
+  .buy.just-bought { animation: pop .5s ease; }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.04)} 100%{transform:scale(1)} }
+  @media (prefers-reduced-motion: reduce) { .buy.just-bought { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin" id="coinStat">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキルへ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">ショップ</h1>
+
+  <!-- コイン残高（ゲーム層・CRTガラス） -->
+  <section class="pixel-panel" aria-label="コイン残高">
+    <div class="wallet">
+      <div>
+        <div class="wallet__num">◆ <span id="coinBalance">320</span></div>
+        <div class="wallet__label">COIN</div>
+      </div>
+      <div class="wallet__meta">
+        <span>▶ コインは<strong>アイデアの評価点に連動</strong>して貯まる希少通貨</span>
+        <span>▶ 装備は<strong>コイン購入のみ</strong>で入手（各スロット付け替えは<strong>きせかえ</strong>で）</span>
+      </div>
+      <div class="wallet__actions">
+        <a class="btn-pixel" href="SC-31_アバター着せ替え.html">▶ きせかえへ</a>
+      </div>
+    </div>
+  </section>
+
+  <p class="how">
+    アバターは <strong>5スロット（頭 / 顔 / 体 / 手持ち / 背景）</strong>。装備には
+    <span class="rarity-common">コモン（◆10〜30）</span>・<span class="rarity-standard">標準（◆50〜150）</span>・<span class="rarity-rare">レア（◆300〜800）</span>
+    のレアリティがあります。購入した装備は <a href="SC-31_アバター着せ替え.html">きせかえ（SC-31）</a> で着せ替えできます。
+  </p>
+
+  <!-- 絞り込み・並び替え（一覧標準） -->
+  <div class="list-toolbar">
+    <div class="filters">
+      <label>スロット
+        <select class="select" id="fSlot">
+          <option value="">すべて</option>
+          <option value="head">頭</option>
+          <option value="face">顔</option>
+          <option value="body">体</option>
+          <option value="hand">手持ち</option>
+          <option value="bg">背景</option>
+        </select>
+      </label>
+      <label>レアリティ
+        <select class="select" id="fRarity">
+          <option value="">すべて</option>
+          <option value="common">コモン</option>
+          <option value="standard">標準</option>
+          <option value="rare">レア</option>
+        </select>
+      </label>
+      <label class="checkbox"><input type="checkbox" id="fAfford"><span>買えるものだけ</span></label>
+      <label class="checkbox"><input type="checkbox" id="fUnowned"><span>未所有だけ</span></label>
+    </div>
+    <div class="tools">
+      <label>並び替え
+        <select class="select" id="fSort">
+          <option value="rarity">レアリティ順</option>
+          <option value="price-asc">価格が安い順</option>
+          <option value="price-desc">価格が高い順</option>
+          <option value="slot">スロット順</option>
+        </select>
+      </label>
+      <span class="list-count" id="count">— 件</span>
+    </div>
+  </div>
+
+  <div class="shop-grid" id="grid"><!-- JSで装備を描画 --></div>
+  <div class="list-empty" id="empty" hidden>条件に合う装備がありません。絞り込みを見直してください。</div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ ラインナップ・価格・レアリティは<strong>初期値（調整可）</strong>。**購入時はサーバーでコイン残高・価格・所有を検証**し、不正入手を防止（第7節）。
+    購入は恒久（`UserItem` を作成）。着せ替え（スロット反映）は SC-31。装備の実体は VRM パーツ（three-vrm）。
+  </p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ユーザーメニューから設定・全画面共通の復元）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- 装備データ（モック・初期値。SC-31 と同一セット） ----
+  const SLOT_LABEL = { head: '頭', face: '顔', body: '体', hand: '手持ち', bg: '背景' };
+  const RARITY_LABEL = { common: 'コモン', standard: '標準', rare: 'レア' };
+  const RARITY_ORDER = { common: 0, standard: 1, rare: 2 };
+  const SLOT_ORDER = { head: 0, face: 1, body: 2, hand: 3, bg: 4 };
+
+  // owned=所有済み（SC-31 の初期所有と一致）。price はレアリティ帯（コモン10〜30/標準50〜150/レア300〜800）に沿う初期値。
+  const ITEMS = [
+    // 頭
+    { id: 'crown',  slot: 'head', name: '王冠',        icon: '👑', rarity: 'rare',     price: 600, owned: true  },
+    { id: 'tophat', slot: 'head', name: 'シルクハット', icon: '🎩', rarity: 'standard', price: 120, owned: true  },
+    { id: 'cap',    slot: 'head', name: 'キャップ',     icon: '🧢', rarity: 'common',   price: 20,  owned: true  },
+    { id: 'straw',  slot: 'head', name: '麦わら帽',     icon: '👒', rarity: 'common',   price: 20,  owned: false },
+    // 顔
+    { id: 'shades', slot: 'face', name: 'サングラス',   icon: '🕶️', rarity: 'standard', price: 90,  owned: true  },
+    { id: 'glasses',slot: 'face', name: 'メガネ',       icon: '👓', rarity: 'common',   price: 15,  owned: true  },
+    { id: 'mask',   slot: 'face', name: 'マスク',       icon: '😷', rarity: 'common',   price: 15,  owned: false },
+    // 体
+    { id: 'armor',  slot: 'body', name: 'アーマー',     icon: '🛡️', rarity: 'rare',     price: 700, owned: true  },
+    { id: 'suit',   slot: 'body', name: 'スーツ',       icon: '👔', rarity: 'standard', price: 150, owned: true  },
+    { id: 'gi',     slot: 'body', name: '道着',         icon: '🥋', rarity: 'common',   price: 30,  owned: true  },
+    { id: 'coat',   slot: 'body', name: 'ロングコート', icon: '🧥', rarity: 'standard', price: 120, owned: false },
+    // 手持ち
+    { id: 'sword',  slot: 'hand', name: '剣',           icon: '⚔️', rarity: 'rare',     price: 500, owned: true  },
+    { id: 'wand',   slot: 'hand', name: '魔法の杖',     icon: '🪄', rarity: 'standard', price: 120, owned: true  },
+    { id: 'book',   slot: 'hand', name: '本',           icon: '📖', rarity: 'common',   price: 25,  owned: true  },
+    { id: 'hammer', slot: 'hand', name: '大槌',         icon: '🔨', rarity: 'standard', price: 90,  owned: false },
+    // 背景
+    { id: 'sunset', slot: 'bg',   name: '夕焼けの海',   icon: '🌅', rarity: 'standard', price: 100, owned: true  },
+    { id: 'galaxy', slot: 'bg',   name: '星空',         icon: '🌌', rarity: 'rare',     price: 400, owned: true  },
+    { id: 'forest', slot: 'bg',   name: '森',           icon: '🌲', rarity: 'common',   price: 25,  owned: true  },
+    { id: 'castle', slot: 'bg',   name: '古城',         icon: '🏰', rarity: 'rare',     price: 500, owned: false },
+  ];
+  let coins = 320;
+
+  const grid   = document.getElementById('grid');
+  const empty  = document.getElementById('empty');
+  const countEl= document.getElementById('count');
+  const F = { slot: document.getElementById('fSlot'), rarity: document.getElementById('fRarity'),
+              afford: document.getElementById('fAfford'), unowned: document.getElementById('fUnowned'),
+              sort: document.getElementById('fSort') };
+
+  function syncCoin() {
+    document.getElementById('coinBalance').textContent = coins;
+    document.getElementById('coinStat').textContent = '◆ ' + coins;
+  }
+
+  function currentList() {
+    let list = ITEMS.slice();
+    if (F.slot.value)   list = list.filter(i => i.slot === F.slot.value);
+    if (F.rarity.value) list = list.filter(i => i.rarity === F.rarity.value);
+    if (F.unowned.checked) list = list.filter(i => !i.owned);
+    if (F.afford.checked)  list = list.filter(i => i.owned || i.price <= coins);
+    const s = F.sort.value;
+    list.sort((a, b) => {
+      if (s === 'price-asc')  return a.price - b.price;
+      if (s === 'price-desc') return b.price - a.price;
+      if (s === 'slot')       return SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || a.price - b.price;
+      return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || a.price - b.price; // rarity（既定）
+    });
+    return list;
+  }
+
+  function cardHTML(it) {
+    const canAfford = it.price <= coins;
+    const foot = it.owned
+      ? `<div class="buy__foot"><span class="buy__owned">✓ 所有済み</span>
+           <a class="buy__equip" href="SC-31_アバター着せ替え.html">▶ きせかえで装備</a></div>`
+      : `<div class="buy__foot">
+           <button class="btn-pixel btn-pixel--sm" type="button" data-buy="${it.id}" ${canAfford ? '' : 'disabled'}>購入する</button>
+           ${canAfford ? '' : '<div class="buy__hint">コイン不足（あと ◆' + (it.price - coins) + '）</div>'}
+         </div>`;
+    return `
+      <article class="card buy rarity-${it.rarity}" data-id="${it.id}">
+        <div class="buy__thumb">${it.icon}</div>
+        <div class="buy__meta"><span class="buy__slot">${SLOT_LABEL[it.slot]}</span>・<span class="buy__rarity">${RARITY_LABEL[it.rarity]}</span></div>
+        <div class="buy__name">${it.name}</div>
+        <div class="buy__price ${(!it.owned && !canAfford) ? 'short' : ''}">◆ ${it.price}</div>
+        ${foot}
+      </article>`;
+  }
+
+  function render() {
+    syncCoin();
+    const list = currentList();
+    grid.innerHTML = list.map(cardHTML).join('');
+    countEl.textContent = list.length + ' 件';
+    empty.hidden = list.length !== 0;
+  }
+
+  function buy(id) {
+    const it = ITEMS.find(i => i.id === id);
+    if (!it || it.owned || it.price > coins) return;
+    if (!confirm('「' + it.name + '」を ◆' + it.price + ' で購入しますか？\n（残高 ◆' + coins + ' → ◆' + (coins - it.price) + '）')) return;
+    coins -= it.price;
+    it.owned = true;
+    render();
+    // 購入直後の軽い演出
+    const card = grid.querySelector('.buy[data-id="' + id + '"]');
+    if (card) { card.classList.add('just-bought'); card.addEventListener('animationend', () => card.classList.remove('just-bought'), { once: true }); }
+    alert('「' + it.name + '」を購入しました！\nきせかえ（SC-31）で装備できます。');
+  }
+
+  grid.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-buy]'); if (btn && !btn.disabled) buy(btn.dataset.buy);
+  });
+  Object.values(F).forEach(el => el.addEventListener('change', render));
+
+  render();
+</script>
+</body>
+</html>
