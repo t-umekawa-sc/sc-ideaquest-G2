@@ -12,7 +12,8 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順・2026-07-19 時点。全履歴は `git log`）:
-  - `ebef6b3` データモデル.md companies に会社コード `company_code`(text NOT NULL UNIQUE・対人向け識別子、db_identifierとは別)を追加（定義表・UNIQUE索引・ER図UK）。※SC-91/92画面・READMEへの反映は未
+  - `(未取得)` 会社コード `company_code` を README(Company/FR-16)・SC-91(一覧列/検索/作成モーダル/API/mock)・SC-92(バナー/mock)へ反映＋フォーマット規約確定（英大文字/数字/ハイフン・4〜20字・大文字正規化・全社一意・作成時確定で以後不変。データモデル.md §4.1にも注記）
+  - `ebef6b3` データモデル.md companies に会社コード `company_code`(text NOT NULL UNIQUE・対人向け識別子、db_identifierとは別)を追加（定義表・UNIQUE索引・ER図UK）
   - `a285c7f` データモデル.md 全テーブル定義・ER図から共通監査カラム(created_at/updated_at)行を削除し §2.1 の共通装備へ完全省略統一（意味的タイムスタンプ last_login_at/expires_at 等とindex参照は保持）
   - `cf0a986` データモデル.md §2 に共通監査カラム §2.1 を新設（全テーブルに登録3点 created_at/created_by_id/created_program＋更新3点 updated_at/updated_by_id/updated_program を共通装備。各表・ER図では列挙省略）。FK規則は §2.1→§2.2 に繰り下げ・参照修正
   - `54124fe` データモデル.md §4 管理DBのER図に論理名を併記（テーブル=mermaidエイリアス `name["物理名（論理名）"]`／全カラム=属性コメント。会社DB §5.1/5.2 は関係のみ形式のため未対応）

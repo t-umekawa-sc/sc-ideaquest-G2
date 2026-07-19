@@ -97,6 +97,7 @@
       <div class="ctx__name" id="ctxName">—</div>
       <div class="ctx__meta">
         <span class="badge" id="ctxState">—</span>
+        <span class="ctx__db" id="ctxCode">—</span>
         <span class="ctx__db" id="ctxDb">—</span>
         <span id="ctxCounts">—</span>
       </div>
@@ -251,11 +252,11 @@
   // ---- データ（モック・初期値。SC-91 と同じ会社を参照） ----
   const ST_CO = { active:['有効','st-active'], provisioning:['準備中','badge-muted'], suspended:['停止','st-suspended'] };
   const COMPANIES = {
-    across: { name:'アクロス株式会社', color:'#2563EB', icon:null, db:'db_across', state:'active', accounts:42, groups:5,
+    across: { name:'アクロス株式会社', code:'ACROSS', color:'#2563EB', icon:null, db:'db_across', state:'active', accounts:42, groups:5,
       flags:{ voteAnon:true, hideVoters:true, mfa:true }, questGroups:['製品企画','業務改善','カスタマーサクセス','R&D','営業推進'] },
-    beyond: { name:'ビヨンド工業', color:'#059669', icon:null, db:'db_beyond', state:'active', accounts:18, groups:2,
+    beyond: { name:'ビヨンド工業', code:'BEYOND', color:'#059669', icon:null, db:'db_beyond', state:'active', accounts:18, groups:2,
       flags:{ voteAnon:false, hideVoters:true, mfa:true }, questGroups:['R&D','品質保証'] },
-    sample: { name:'サンプル商事', color:'#D97706', icon:null, db:'db_sample', state:'suspended', accounts:7, groups:1,
+    sample: { name:'サンプル商事', code:'SAMPLE', color:'#D97706', icon:null, db:'db_sample', state:'suspended', accounts:7, groups:1,
       flags:{ voteAnon:true, hideVoters:false, mfa:false }, questGroups:['営業推進'] },
   };
   const ROLE_LABEL = { member:'一般', qg_admin:'クエストグループ管理者', sys_admin:'システム管理者' };
@@ -298,6 +299,7 @@
   document.title = 'SC-92 ' + CO.name + ' の管理 — ideaquest';
   const [stLabel, stCls] = ST_CO[CO.state];
   const ctxState = document.getElementById('ctxState'); ctxState.textContent = stLabel; ctxState.className = 'badge ' + stCls;
+  document.getElementById('ctxCode').textContent = 'コード: ' + CO.code;
   document.getElementById('ctxDb').textContent = 'DB: ' + CO.db;
   document.getElementById('ctxCounts').textContent = 'アカウント ' + CO.accounts + ' / グループ ' + CO.groups;
   document.getElementById('dbId').textContent = CO.db;

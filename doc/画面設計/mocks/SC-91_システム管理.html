@@ -75,7 +75,7 @@
   </div>
   <div class="list-toolbar">
     <div class="filters">
-      <input class="input" type="search" id="fSearch" placeholder="会社名・DB識別子で検索">
+      <input class="input" type="search" id="fSearch" placeholder="会社名・会社コード・DB識別子で検索">
       <label>状態
         <select class="select" id="fState">
           <option value="">すべて</option>
@@ -91,7 +91,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>会社名</th><th>DB識別子</th><th>状態</th><th>アカウント</th><th>グループ</th><th>作成日</th><th></th></tr>
+        <tr><th>会社名</th><th>会社コード</th><th>DB識別子</th><th>状態</th><th>アカウント</th><th>グループ</th><th>作成日</th><th></th></tr>
       </thead>
       <tbody id="companyRows"></tbody>
     </table>
@@ -110,6 +110,7 @@
     <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
     <h2 id="cmTitle" style="margin-top:0">会社（テナント）を作成</h2>
     <div class="form-row"><label class="req" for="cmName">会社名</label><input class="input" id="cmName" placeholder="例: アクロス株式会社"></div>
+    <div class="form-row"><label class="req" for="cmCode">会社コード</label><input class="input db-id" id="cmCode" placeholder="例: ACROSS" maxlength="20" style="text-transform:uppercase"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・<strong>全社で一意</strong>（大文字に正規化）。作成後は変更不可。</div></div>
     <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。接続情報の実体は <code>.env</code>。</div></div>
 
     <div class="form-row">
@@ -155,9 +156,9 @@
   // ---- データ（モック・初期値。会社詳細 SC-92 と共有する想定のキー） ----
   const ST = { active:['有効','st-active'], provisioning:['準備中','st-provisioning'], suspended:['停止','st-suspended'] };
   const COMPANIES = [
-    { id:'across', name:'アクロス株式会社', color:'#2563EB', db:'db_across', state:'active', accounts:42, groups:5, created:'2026-01-10' },
-    { id:'beyond', name:'ビヨンド工業',     color:'#059669', db:'db_beyond', state:'active', accounts:18, groups:2, created:'2026-03-22' },
-    { id:'sample', name:'サンプル商事',     color:'#D97706', db:'db_sample', state:'suspended', accounts:7, groups:1, created:'2026-05-30' },
+    { id:'across', name:'アクロス株式会社', code:'ACROSS', color:'#2563EB', db:'db_across', state:'active', accounts:42, groups:5, created:'2026-01-10' },
+    { id:'beyond', name:'ビヨンド工業',     code:'BEYOND', color:'#059669', db:'db_beyond', state:'active', accounts:18, groups:2, created:'2026-03-22' },
+    { id:'sample', name:'サンプル商事',     code:'SAMPLE', color:'#D97706', db:'db_sample', state:'suspended', accounts:7, groups:1, created:'2026-05-30' },
   ];
 
   const rows = document.getElementById('companyRows');
@@ -168,7 +169,7 @@
   function render() {
     const q = fSearch.value.trim().toLowerCase(), st = fState.value;
     const list = COMPANIES.filter(c =>
-      (!q || c.name.toLowerCase().includes(q) || c.db.toLowerCase().includes(q)) &&
+      (!q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.db.toLowerCase().includes(q)) &&
       (!st || c.state === st));
     rows.innerHTML = list.map(c => {
       const [label, cls] = ST[c.state];
@@ -177,6 +178,7 @@
         : `<span class="quest-icon__char">${c.name.slice(0,1)}</span>`;
       return `<tr data-company="${c.id}">
         <td><div class="co"><span class="quest-icon sm" style="--accent:${c.color}">${icon}</span><strong>${c.name}</strong></div></td>
+        <td class="db-id">${c.code}</td>
         <td class="db-id">${c.db}</td>
         <td><span class="badge ${cls}">${label}</span></td>
         <td>${c.accounts}</td><td>${c.groups}</td><td>${c.created}</td>
@@ -225,10 +227,14 @@
     cmIconPreview.style.setProperty('--accent', sw.dataset.color);
   });
 
+  const cmCode = document.getElementById('cmCode');
   document.getElementById('cmCreate').addEventListener('click', () => {
     const name = cmName.value.trim();
+    const code = cmCode.value.trim().toUpperCase();
     if (!name) { alert('会社名を入力してください'); return; }
-    alert('「' + name + '」を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
+    if (!/^[A-Z][A-Z0-9-]{3,19}$/.test(code)) { alert('会社コードは英大文字/数字/ハイフン・先頭は英字・4〜20文字で入力してください'); return; }
+    if (COMPANIES.some(c => c.code === code)) { alert('会社コード「' + code + '」は既に使われています（全社で一意）'); return; }
+    alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
     closeModal(document.getElementById('companyModal'));
   });
 
