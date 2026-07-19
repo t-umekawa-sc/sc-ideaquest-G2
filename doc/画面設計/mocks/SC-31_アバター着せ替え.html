@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC-31 アバター / 着せ替え — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-31 固有スタイル（共通化する見た目は shared.css へ昇格する）
+     ゲーム層の画面: 3Dアバタービューアは CRTガラス（.pixel-panel）。
+     ワードローブ（装備一覧）は可読性優先のクリーンカード＋ゲーム要素
+     （レアリティ色・.btn-pixel・ピクセル見出し）。本番の3Dは three-vrm/R3F。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+  /* 2カラム: 左=アバタービューア（sticky）／右=ワードローブ */
+  .dressup { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: var(--space-6); align-items: start; }
+  @media (max-width: 900px) { .dressup { grid-template-columns: 1fr; } .viewer { position: static; } }
+
+  /* --- アバタービューア（CRTガラス） --- */
+  .viewer { position: sticky; top: var(--space-4); }
+  .viewer__stage {
+    position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius);
+    overflow: hidden; display: grid; place-items: center;
+    /* 背景装備が無いときの既定ステージ（暗い space） */
+    background:
+      radial-gradient(120% 90% at 50% 15%, rgba(148,163,184,.20), rgba(2,6,23,0) 60%),
+      linear-gradient(180deg, #0b1220, #020617);
+  }
+  /* 背景装備（stage 全面・大きな絵文字を敷く） */
+  .viewer__bg { position: absolute; inset: 0; display: grid; place-items: center; font-size: 220px; opacity: .5; filter: saturate(1.1); }
+  /* アバター本体（モックはマスコットで代用） */
+  .viewer__avatar { position: relative; z-index: 1; width: 60%; image-rendering: pixelated; filter: drop-shadow(0 8px 12px rgba(0,0,0,.5)); }
+  /* 装備の重ね（頭/顔/手持ちを絵文字でオーバレイ＝モック用の見立て） */
+  .viewer__slot { position: absolute; z-index: 2; line-height: 1; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+  .viewer__slot[data-slot="head"] { top: 8%;  left: 50%; transform: translateX(-50%); font-size: 40px; }
+  .viewer__slot[data-slot="face"] { top: 27%; left: 50%; transform: translateX(-50%); font-size: 30px; }
+  .viewer__slot[data-slot="hand"] { top: 46%; right: 14%; font-size: 40px; }
+  .viewer__empty { color: var(--pixel-ink); opacity: .5; font-size: var(--text-xs); }
+
+  .viewer__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+  .viewer__name { font-family: var(--font-pixel); font-size: var(--text-lg); color: var(--pixel-ink); }
+  .viewer__lv { font-family: var(--font-pixel); color: var(--pixel-level-on-dark); }
+  .viewer__hint { margin-top: var(--space-2); font-size: var(--text-xs); color: var(--pixel-ink); opacity: .7; text-align: center; }
+
+  /* --- ワードローブ（右） --- */
+  .wardrobe__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); flex-wrap: wrap; }
+  .coin-line { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); }
+
+  .slot { margin-bottom: var(--space-6); }
+  .slot__head { display: flex; align-items: baseline; gap: var(--space-3); margin: 0 0 var(--space-3); flex-wrap: wrap; }
+  .slot__name { font-family: var(--font-pixel); font-size: var(--text-lg); }
+  .slot__equipped { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .slot__equipped strong { color: var(--color-text); }
+  .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); }
+
+  /* 装備カード（クリーンカード＋レアリティ） */
+  .item { display: flex; flex-direction: column; gap: var(--space-2); cursor: pointer; align-items: stretch; text-align: center; padding: var(--space-3); position: relative; }
+  .item[aria-disabled="true"] { cursor: default; }
+  .item__thumb { font-size: 40px; line-height: 1; padding: var(--space-3) 0; background: var(--color-surface-alt); border-radius: var(--radius); }
+  .item__name { font-size: var(--text-sm); font-weight: 600; }
+  .item__rarity { font-size: var(--text-xs); font-weight: 700; }
+  .item__rarity.rarity-common   { color: var(--rarity-common); }
+  .item__rarity.rarity-standard { color: var(--rarity-standard); }
+  .item__rarity.rarity-rare     { color: var(--rarity-rare); }
+  /* 装備中 */
+  .item.is-equipped { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary) inset; }
+  .item__equipped-badge { position: absolute; top: 6px; right: 6px; }
+  /* 未所有（ショップ導線） */
+  .item.is-locked .item__thumb { filter: grayscale(1); opacity: .55; }
+  .item__price { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-sm); }
+  .item__buy { font-size: var(--text-xs); }
+
+  /* 「外す」ピル */
+  .item--none .item__thumb { color: var(--color-text-muted); font-size: 28px; }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin" id="coinStat">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキルへ）">✦ SP 3</a>
+      <button class="bell" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></button>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html" aria-current="page">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">アバター / 着せ替え</h1>
+
+  <div class="dressup">
+
+    <!-- 左: 3Dアバタービューア（ゲーム層・CRTガラス） -->
+    <section class="pixel-panel viewer" aria-label="アバタープレビュー">
+      <div class="viewer__stage" id="stage">
+        <div class="viewer__bg"   id="pvBg"></div>
+        <img class="viewer__avatar" src="assets/mascot-hero.png" alt="あなたのアバター">
+        <span class="viewer__slot" data-slot="head" id="pvHead"></span>
+        <span class="viewer__slot" data-slot="face" id="pvFace"></span>
+        <span class="viewer__slot" data-slot="hand" id="pvHand"></span>
+      </div>
+      <div class="viewer__foot">
+        <span class="viewer__name">山田 太郎</span>
+        <span class="viewer__lv">Lv.7</span>
+      </div>
+      <p class="viewer__hint">本番は 3D（VRM）で表示・回転。ここはモックの見立て。</p>
+    </section>
+
+    <!-- 右: ワードローブ（スロットごと） -->
+    <section class="wardrobe" aria-label="装備一覧">
+      <div class="wardrobe__top">
+        <span class="coin-line" title="コイン残高">◆ <span id="coinNum">320</span> コイン</span>
+        <a class="btn btn-primary" href="SC-30_ショップ.html">🛒 ショップへ（装備を買う）</a>
+      </div>
+      <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:var(--space-5);line-height:1.7">
+        アバターは <strong>5スロット（頭 / 顔 / 体 / 手持ち / 背景）</strong>・各スロット1点まで装備できます。
+        所有済みの装備をクリックで<strong>着せ替え</strong>（即反映）。未所有はショップでコイン購入。
+      </p>
+
+      <div id="slots"><!-- JSでスロット×装備を描画 --></div>
+
+      <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+        ※ 装備ラインナップ・価格・レアリティは<strong>初期値（調整可）</strong>。入手は<strong>コイン購入のみ</strong>（レベル解放・実績報酬なし）。
+        購入・装備はサーバーで残高/所有を検証。3Dは three-vrm（R3F）＋パーツ差し替え方式。
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  // 背景画像（ユーザーメニューから設定・全画面共通の復元）
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- 装備データ（モック・初期値） ----
+  const SLOTS = [
+    { key: 'head', label: '頭',    preview: 'pvHead' },
+    { key: 'face', label: '顔',    preview: 'pvFace' },
+    { key: 'body', label: '体',    preview: null     }, // 体はアバター画像そのもの（モックでは重ねない）
+    { key: 'hand', label: '手持ち', preview: 'pvHand' },
+    { key: 'bg',   label: '背景',   preview: 'pvBg'   },
+  ];
+  const RARITY = { common: 'コモン', standard: '標準', rare: 'レア' };
+
+  // owned=所有済み, price=未所有時の購入価格
+  const ITEMS = {
+    head: [
+      { id: 'crown',  name: '王冠',       icon: '👑', rarity: 'rare',     owned: true },
+      { id: 'tophat', name: 'シルクハット', icon: '🎩', rarity: 'standard', owned: true },
+      { id: 'cap',    name: 'キャップ',    icon: '🧢', rarity: 'common',   owned: true },
+      { id: 'straw',  name: '麦わら帽',    icon: '👒', rarity: 'common',   owned: false, price: 20 },
+    ],
+    face: [
+      { id: 'shades', name: 'サングラス',  icon: '🕶️', rarity: 'standard', owned: true },
+      { id: 'glasses',name: 'メガネ',      icon: '👓', rarity: 'common',   owned: true },
+      { id: 'mask',   name: 'マスク',      icon: '😷', rarity: 'common',   owned: false, price: 15 },
+    ],
+    body: [
+      { id: 'armor',  name: 'アーマー',    icon: '🛡️', rarity: 'rare',     owned: true },
+      { id: 'suit',   name: 'スーツ',      icon: '👔', rarity: 'standard', owned: true },
+      { id: 'gi',     name: '道着',        icon: '🥋', rarity: 'common',   owned: true },
+      { id: 'coat',   name: 'ロングコート', icon: '🧥', rarity: 'standard', owned: false, price: 120 },
+    ],
+    hand: [
+      { id: 'sword',  name: '剣',          icon: '⚔️', rarity: 'rare',     owned: true },
+      { id: 'wand',   name: '魔法の杖',    icon: '🪄', rarity: 'standard', owned: true },
+      { id: 'book',   name: '本',          icon: '📖', rarity: 'common',   owned: true },
+      { id: 'hammer', name: '大槌',        icon: '🔨', rarity: 'standard', owned: false, price: 90 },
+    ],
+    bg: [
+      { id: 'sunset', name: '夕焼けの海',  icon: '🌅', rarity: 'standard', owned: true },
+      { id: 'galaxy', name: '星空',        icon: '🌌', rarity: 'rare',     owned: true },
+      { id: 'forest', name: '森',          icon: '🌲', rarity: 'common',   owned: true },
+      { id: 'castle', name: '古城',        icon: '🏰', rarity: 'rare',     owned: false, price: 500 },
+    ],
+  };
+  // 初期装備（各スロット1点・null=未装備）
+  const equipped = { head: 'crown', face: 'shades', body: 'armor', hand: 'sword', bg: 'galaxy' };
+  let coins = 320;
+
+  const slotsEl = document.getElementById('slots');
+  const itemOf = (slot, id) => ITEMS[slot].find(i => i.id === id);
+
+  function render() {
+    slotsEl.innerHTML = SLOTS.map(slot => {
+      const eqId = equipped[slot.key];
+      const eqItem = eqId ? itemOf(slot.key, eqId) : null;
+      const eqLabel = eqItem ? (eqItem.icon + ' ' + eqItem.name) : 'なし';
+      // 「外す」カード＋各装備カード
+      const noneCard = `
+        <article class="card item item--none ${eqId ? '' : 'is-equipped'}" role="button" tabindex="0"
+                 data-slot="${slot.key}" data-id="">
+          <div class="item__thumb">✕</div>
+          <div class="item__name">外す</div>
+          <div class="item__rarity">&nbsp;</div>
+          ${eqId ? '' : '<span class="badge item__equipped-badge">装備中</span>'}
+        </article>`;
+      const cards = ITEMS[slot.key].map(it => {
+        const isEq = eqId === it.id;
+        if (!it.owned) {
+          return `
+          <article class="card item is-locked" data-slot="${slot.key}" data-id="${it.id}" data-buy="1" role="button" tabindex="0">
+            <div class="item__thumb">${it.icon}</div>
+            <div class="item__name">${it.name}</div>
+            <div class="item__rarity rarity-${it.rarity}">${RARITY[it.rarity]}</div>
+            <div class="item__price">◆ ${it.price}</div>
+            <div class="item__buy" style="color:var(--color-text-muted)">🔒 ショップで購入</div>
+          </article>`;
+        }
+        return `
+          <article class="card item ${isEq ? 'is-equipped' : ''}" role="button" tabindex="0"
+                   data-slot="${slot.key}" data-id="${it.id}">
+            <div class="item__thumb">${it.icon}</div>
+            <div class="item__name">${it.name}</div>
+            <div class="item__rarity rarity-${it.rarity}">${RARITY[it.rarity]}</div>
+            ${isEq ? '<span class="badge item__equipped-badge">装備中</span>' : ''}
+          </article>`;
+      }).join('');
+      return `
+        <section class="slot" aria-label="${slot.label}スロット">
+          <div class="slot__head">
+            <span class="slot__name">${slot.label}</span>
+            <span class="slot__equipped">装備中: <strong>${eqLabel}</strong></span>
+          </div>
+          <div class="item-grid">${noneCard}${cards}</div>
+        </section>`;
+    }).join('');
+
+    // プレビュー更新
+    SLOTS.forEach(slot => {
+      if (!slot.preview) return;
+      const el = document.getElementById(slot.preview);
+      const it = equipped[slot.key] ? itemOf(slot.key, equipped[slot.key]) : null;
+      el.textContent = it ? it.icon : '';
+    });
+    // コイン
+    document.getElementById('coinNum').textContent = coins;
+    document.getElementById('coinStat').textContent = '◆ ' + coins;
+  }
+
+  function activate(card) {
+    const slot = card.dataset.slot;
+    const id = card.dataset.id;
+    if (card.dataset.buy) {   // 未所有 → ショップへ
+      const it = itemOf(slot, id);
+      if (confirm('「' + it.name + '」はショップで購入できます（◆' + it.price + '）。\nショップ（SC-30）へ移動しますか？')) {
+        location.href = 'SC-30_ショップ.html';
+      }
+      return;
+    }
+    // 所有済み or 「外す」→ 装備切替（同スロットは1点）
+    equipped[slot] = id || null;
+    render();
+  }
+
+  slotsEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.item'); if (card) activate(card);
+  });
+  slotsEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('.item'); if (card) { e.preventDefault(); activate(card); }
+  });
+
+  render();
+</script>
+</body>
+</html>
