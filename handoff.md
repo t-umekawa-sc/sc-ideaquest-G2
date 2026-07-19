@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順・2026-07-19 時点。全履歴は `git log`）:
-  - `c6a15ba` データモデル.md に FK命名規則 §2.1 を新設＋既存4カラムを規則に統一（granted_by→granted_by_id / uploaded_by→uploaded_by_id / reply_to_id→reply_to_message_id / ref_revision_id→ref_idea_revision_id）
+  - `4fd7599` データモデル.md に FK命名規則 §2.1 を新設＋既存4カラムを規則に統一（granted_by→granted_by_id / uploaded_by→uploaded_by_id / reply_to_id→reply_to_message_id / ref_revision_id→ref_idea_revision_id）
   - `c594075` データモデル.md を物理テーブル名=複数形snake_caseに統一＋テーブル/カラムに日本語論理名を併記
   - `b81694a` データモデル詳細 doc/データモデル.md を新規作成（管理DB6＋会社DB27テーブルのER図・定義・Enum・全文検索・集計方針・TBD）
   - `a7cbaf7` ベル(<a>)のホバー時リンク下線を除去（.bell / .bell:hover text-decoration:none）
