@@ -159,9 +159,10 @@ img { max-width: 100%; display: block; }
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--color-border);
   background: var(--color-surface); color: var(--color-text); cursor: pointer; font-size: 18px;
+  text-decoration: none; /* <a> 化した際のリンク下線を消す */
   transition: background .15s, border-color .15s;
 }
-.bell:hover { background: var(--color-surface-alt); }
+.bell:hover { background: var(--color-surface-alt); text-decoration: none; } /* a:hover の下線を打ち消す（.bell は <a>） */
 .bell__badge {
   position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
   display: inline-flex; align-items: center; justify-content: center;
