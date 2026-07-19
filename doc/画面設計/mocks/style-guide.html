@@ -6,13 +6,15 @@
 <title>ideaquest スタイルガイド</title>
 <link rel="stylesheet" href="shared.css">
 <style>
-  /* このページ専用の見本レイアウト（共通CSSには入れない） */
+  /* このページ専用の見本レイアウト（共通CSSには入れない）
+     ※ カラートークン見本は .tokens/.token を使う（shared.css の色選択部品 .swatches/.swatch と
+        クラス名が衝突しないようにするため。.swatch/.swatches は shared 部品の実演〔4節〕でのみ使用）。 */
   .section { margin: var(--space-10) 0; }
-  .swatches { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-  .swatch { width: 140px; }
-  .swatch .chip { height: 56px; border-radius: var(--radius); border: 1px solid var(--color-border); }
-  .swatch .name { font-size: var(--text-xs); margin-top: 6px; }
-  .swatch .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .tokens { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .token { width: 140px; }
+  .token .chip { height: 56px; border-radius: var(--radius); border: 1px solid var(--color-border); }
+  .token .name { font-size: var(--text-xs); margin-top: 6px; }
+  .token .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
   .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: var(--space-4); }
 </style>
 </head>
@@ -56,32 +58,32 @@
   <div class="section">
     <h2>1. カラー</h2>
     <h3>ブランド / ニュートラル</h3>
-    <div class="swatches">
-      <div class="swatch"><div class="chip" style="background:var(--color-primary)"></div><div class="name">primary</div><div class="val">#2563EB</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-primary-hover)"></div><div class="name">primary-hover</div><div class="val">#1D4ED8</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-primary-soft)"></div><div class="name">primary-soft</div><div class="val">#EFF6FF</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-bg)"></div><div class="name">bg</div><div class="val">#F8FAFC</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-border)"></div><div class="name">border</div><div class="val">#E2E8F0</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-text)"></div><div class="name">text</div><div class="val">#0F172A</div></div>
+    <div class="tokens">
+      <div class="token"><div class="chip" style="background:var(--color-primary)"></div><div class="name">primary</div><div class="val">#2563EB</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-primary-hover)"></div><div class="name">primary-hover</div><div class="val">#1D4ED8</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-primary-soft)"></div><div class="name">primary-soft</div><div class="val">#EFF6FF</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-bg)"></div><div class="name">bg</div><div class="val">#F8FAFC</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-border)"></div><div class="name">border</div><div class="val">#E2E8F0</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-text)"></div><div class="name">text</div><div class="val">#0F172A</div></div>
     </div>
     <h3 style="margin-top:var(--space-6)">意味色 / 投票</h3>
-    <div class="swatches">
-      <div class="swatch"><div class="chip" style="background:var(--color-success)"></div><div class="name">success</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-warning)"></div><div class="name">warning</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-danger)"></div><div class="name">danger</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-agree)"></div><div class="name">agree 賛成</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--color-disagree)"></div><div class="name">disagree 反対</div></div>
+    <div class="tokens">
+      <div class="token"><div class="chip" style="background:var(--color-success)"></div><div class="name">success</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-warning)"></div><div class="name">warning</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-danger)"></div><div class="name">danger</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-agree)"></div><div class="name">agree 賛成</div></div>
+      <div class="token"><div class="chip" style="background:var(--color-disagree)"></div><div class="name">disagree 反対</div></div>
     </div>
     <h3 style="margin-top:var(--space-6)">レアリティ / ゲーム</h3>
-    <div class="swatches">
-      <div class="swatch"><div class="chip" style="background:var(--rarity-common)"></div><div class="name">common</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--rarity-standard)"></div><div class="name">standard</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--rarity-rare)"></div><div class="name">rare</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--rarity-rare-on-dark)"></div><div class="name">rare on-dark</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--pixel-xp)"></div><div class="name">xp</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--pixel-coin)"></div><div class="name">coin</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--pixel-level)"></div><div class="name">level</div></div>
-      <div class="swatch"><div class="chip" style="background:var(--pixel-level-on-dark)"></div><div class="name">level on-dark</div></div>
+    <div class="tokens">
+      <div class="token"><div class="chip" style="background:var(--rarity-common)"></div><div class="name">common</div></div>
+      <div class="token"><div class="chip" style="background:var(--rarity-standard)"></div><div class="name">standard</div></div>
+      <div class="token"><div class="chip" style="background:var(--rarity-rare)"></div><div class="name">rare</div></div>
+      <div class="token"><div class="chip" style="background:var(--rarity-rare-on-dark)"></div><div class="name">rare on-dark</div></div>
+      <div class="token"><div class="chip" style="background:var(--pixel-xp)"></div><div class="name">xp</div></div>
+      <div class="token"><div class="chip" style="background:var(--pixel-coin)"></div><div class="name">coin</div></div>
+      <div class="token"><div class="chip" style="background:var(--pixel-level)"></div><div class="name">level</div></div>
+      <div class="token"><div class="chip" style="background:var(--pixel-level-on-dark)"></div><div class="name">level on-dark</div></div>
     </div>
     <p class="hint">レア/レベルの紫は <strong>CRTガラス（暗面）の上だと沈む</strong>ため、暗面用の <code>on-dark</code>（明るいパープル/バイオレット）を用意。<code>.pixel-panel</code> 内の <code>.rarity-rare</code> は自動で on-dark に切替。レベル文字は暗面で <code>--pixel-level-on-dark</code> を使う。</p>
   </div>
