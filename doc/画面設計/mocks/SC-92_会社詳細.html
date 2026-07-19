@@ -179,7 +179,7 @@
   </div>
   <div class="list-toolbar">
     <div class="filters">
-      <input class="input" type="search" id="fAccSearch" placeholder="氏名・ログインIDで検索">
+      <input class="input" type="search" id="fAccSearch" placeholder="氏名・ログインID・メールで検索">
       <label>状態
         <select class="select" id="fAccState">
           <option value="">すべて</option>
@@ -193,7 +193,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>氏名</th><th>ログインID</th><th>システムロール</th><th>所属クエストグループ</th><th>状態</th><th></th></tr>
+        <tr><th>氏名</th><th>ログインID</th><th>メールアドレス</th><th>システムロール</th><th>所属クエストグループ</th><th>状態</th><th></th></tr>
       </thead>
       <tbody id="accountRows"></tbody>
     </table>
@@ -213,7 +213,8 @@
     <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
     <div class="form-row"><label>対象の会社</label><div class="fixed-field" id="amCompany">—</div></div>
     <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
-    <div class="form-row"><label class="req" for="amId">ログインID（メール）</label><input class="input" id="amId" placeholder="例: taro@across.co.jp"></div>
+    <div class="form-row"><label class="req" for="amLoginId">ログインID</label><input class="input" id="amLoginId" placeholder="例: taro.yamada"><div class="hint">ログイン用の識別子（メールとは別）。</div></div>
+    <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
     <div class="form-row"><label for="amRole">システムロール</label>
       <select class="select" id="amRole">
         <option value="member">一般</option>
@@ -259,17 +260,17 @@
   const ST_ACC = { active:['有効','st-active'], suspended:['無効','st-suspended'] };
   const ACCOUNTS = {
     across: [
-      { name:'山田 太郎', id:'taro@across.co.jp',  role:'member',   groups:['製品企画','業務改善'], state:'active' },
-      { name:'鈴木 花子', id:'hanako@across.co.jp',role:'qg_admin',  groups:['製品企画'], state:'active' },
-      { name:'運営 太郎', id:'admin@ideaquest',    role:'sys_admin', groups:[], state:'active' },
-      { name:'高橋 健',   id:'ken@across.co.jp',   role:'member',   groups:['R&D'], state:'suspended' },
+      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  role:'member',   groups:['製品企画','業務改善'], state:'active' },
+      { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',role:'qg_admin',  groups:['製品企画'], state:'active' },
+      { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', role:'sys_admin', groups:[], state:'active' },
+      { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   role:'member',   groups:['R&D'], state:'suspended' },
     ],
     beyond: [
-      { name:'田中 一郎', id:'ichiro@beyond.co.jp',role:'member',   groups:['R&D'], state:'active' },
-      { name:'伊藤 彩',   id:'aya@beyond.co.jp',   role:'qg_admin', groups:['R&D','品質保証'], state:'active' },
+      { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',role:'member',   groups:['R&D'], state:'active' },
+      { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@beyond.co.jp',   role:'qg_admin', groups:['R&D','品質保証'], state:'active' },
     ],
     sample: [
-      { name:'退職 花', id:'hana@sample.co.jp', role:'member', groups:['営業推進'], state:'suspended' },
+      { name:'退職 花', loginId:'hana.tai', email:'hana@sample.co.jp', role:'member', groups:['営業推進'], state:'suspended' },
     ],
   };
 
@@ -367,13 +368,14 @@
   const list0 = ACCOUNTS[companyId] || [];
   function renderAccounts() {
     const q = fAccSearch.value.trim().toLowerCase(), st = fAccState.value;
-    const list = list0.filter(a => (!q || a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q)) && (!st || a.state === st));
+    const list = list0.filter(a => (!q || a.name.toLowerCase().includes(q) || a.loginId.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)) && (!st || a.state === st));
     accountRows.innerHTML = list.map(a => {
       const [label, cls] = ST_ACC[a.state];
       const groups = a.groups.length ? a.groups.map(g => `<span class="badge badge-muted">${g}</span>`).join(' ') : '<span class="muted">—</span>';
       return `<tr>
         <td><strong>${a.name}</strong></td>
-        <td class="db-id">${a.id}</td>
+        <td class="db-id">${a.loginId}</td>
+        <td class="db-id">${a.email}</td>
         <td>${ROLE_LABEL[a.role]}</td>
         <td>${groups}</td>
         <td><span class="badge ${cls}">${label}</span></td>
@@ -393,8 +395,9 @@
   document.getElementById('newAccount').addEventListener('click', () => openModal('accountModal'));
   document.getElementById('amSave').addEventListener('click', () => {
     const name = document.getElementById('amName').value.trim();
-    const id = document.getElementById('amId').value.trim();
-    if (!name || !id) { alert('氏名とログインIDは必須です'); return; }
+    const loginId = document.getElementById('amLoginId').value.trim();
+    const email = document.getElementById('amEmail').value.trim();
+    if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
     alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。初回ログイン時にパスワード設定を行います。');
     closeModal(document.getElementById('accountModal'));
   });

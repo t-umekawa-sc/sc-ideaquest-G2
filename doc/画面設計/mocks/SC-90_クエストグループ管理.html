@@ -76,7 +76,7 @@
   <!-- ツールバー -->
   <div class="list-toolbar">
     <div class="filters">
-      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインIDで検索">
+      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインID・メールで検索">
       <label>状態
         <select class="select" id="fState">
           <option value="">すべて</option>
@@ -93,7 +93,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>氏名</th><th>ログインID</th><th>グループ内ロール</th><th>状態</th><th>最終ログイン</th><th></th></tr>
+        <tr><th>氏名</th><th>ログインID</th><th>メールアドレス</th><th>グループ内ロール</th><th>状態</th><th>最終ログイン</th><th></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
@@ -112,7 +112,8 @@
     <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
     <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
     <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
-    <div class="form-row"><label class="req" for="amId">ログインID（メール）</label><input class="input" id="amId" placeholder="例: taro@across.co.jp"></div>
+    <div class="form-row"><label class="req" for="amLoginId">ログインID</label><input class="input" id="amLoginId" placeholder="例: taro.yamada"><div class="hint">ログイン用の識別子（メールとは別）。</div></div>
+    <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
     <div class="form-row"><label>所属クエストグループ</label><div class="fixed-field" id="amGroup">製品企画（この管理グループに追加されます）</div></div>
     <div class="form-row"><label for="amRole">グループ内ロール</label>
       <select class="select" id="amRole">
@@ -138,13 +139,13 @@
   const ROLE_LABEL = { member:'一般メンバー', qg_admin:'クエストグループ管理者' };
   const ST = { active:['有効','st-active'], suspended:['無効','st-disabled'] };
   let MEMBERS = [
-    { name:'山田 太郎', id:'taro@across.co.jp',  group:'製品企画', role:'member',   state:'active', last:'今日 09:12' },
-    { name:'鈴木 花子', id:'hanako@across.co.jp',group:'製品企画', role:'qg_admin',  state:'active', last:'今日 08:40' },
-    { name:'佐藤 大輔', id:'daisuke@across.co.jp',group:'製品企画', role:'member',   state:'active', last:'昨日 17:55' },
-    { name:'高橋 健',   id:'ken@across.co.jp',   group:'製品企画', role:'member',   state:'suspended', last:'2026-06-30' },
-    { name:'田中 美咲', id:'misaki@across.co.jp',group:'業務改善', role:'member',   state:'active', last:'今日 10:05' },
-    { name:'伊藤 彩',   id:'aya@across.co.jp',   group:'業務改善', role:'qg_admin',  state:'active', last:'昨日 14:20' },
-    { name:'渡辺 剛',   id:'go@across.co.jp',    group:'業務改善', role:'member',   state:'active', last:'3日前' },
+    { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  group:'製品企画', role:'member',   state:'active', last:'今日 09:12' },
+    { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',group:'製品企画', role:'qg_admin',  state:'active', last:'今日 08:40' },
+    { name:'佐藤 大輔', loginId:'daisuke.sato', email:'daisuke@across.co.jp',group:'製品企画', role:'member',   state:'active', last:'昨日 17:55' },
+    { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   group:'製品企画', role:'member',   state:'suspended', last:'2026-06-30' },
+    { name:'田中 美咲', loginId:'misaki.tanaka',email:'misaki@across.co.jp',group:'業務改善', role:'member',   state:'active', last:'今日 10:05' },
+    { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@across.co.jp',   group:'業務改善', role:'qg_admin',  state:'active', last:'昨日 14:20' },
+    { name:'渡辺 剛',   loginId:'go.watanabe',  email:'go@across.co.jp',    group:'業務改善', role:'member',   state:'active', last:'3日前' },
   ];
   let currentGroup = GROUPS[0];
 
@@ -160,7 +161,7 @@
   function currentList() {
     const q = fSearch.value.trim().toLowerCase(), st = fState.value;
     return MEMBERS.filter(m => m.group === currentGroup
-      && (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+      && (!q || m.name.toLowerCase().includes(q) || m.loginId.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
       && (!st || m.state === st));
   }
 
@@ -174,7 +175,8 @@
         : `<button class="btn btn-outline" type="button" data-activate="${idx}">再有効化</button>`;
       return `<tr class="${m.state === 'suspended' ? 'is-suspended' : ''}">
         <td><strong>${m.name}</strong></td>
-        <td class="db-id">${m.id}</td>
+        <td class="db-id">${m.loginId}</td>
+        <td class="db-id">${m.email}</td>
         <td>${ROLE_LABEL[m.role]}</td>
         <td><span class="badge ${cls}">${label}</span></td>
         <td>${m.last}</td>
@@ -213,7 +215,8 @@
     editTarget = mode === 'edit' ? m : null;
     document.getElementById('amTitle').textContent = mode === 'edit' ? 'アカウントを編集' : 'アカウントを発行';
     document.getElementById('amName').value = m ? m.name : '';
-    document.getElementById('amId').value = m ? m.id : '';
+    document.getElementById('amLoginId').value = m ? m.loginId : '';
+    document.getElementById('amEmail').value = m ? m.email : '';
     document.getElementById('amRole').value = m ? m.role : 'member';
     document.getElementById('amGroup').textContent = (m ? m.group : currentGroup) + '（この管理グループに追加されます）';
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
@@ -223,11 +226,12 @@
   document.getElementById('newAccount').addEventListener('click', () => openAccount('new', null));
   document.getElementById('amSave').addEventListener('click', () => {
     const name = document.getElementById('amName').value.trim();
-    const id = document.getElementById('amId').value.trim();
+    const loginId = document.getElementById('amLoginId').value.trim();
+    const email = document.getElementById('amEmail').value.trim();
     const role = document.getElementById('amRole').value;
-    if (!name || !id) { alert('氏名とログインIDは必須です'); return; }
-    if (editTarget) { editTarget.name = name; editTarget.id = id; editTarget.role = role; }
-    else { MEMBERS.push({ name, id, group: currentGroup, role, state:'active', last:'—（未ログイン）' }); }
+    if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
+    if (editTarget) { editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email; editTarget.role = role; }
+    else { MEMBERS.push({ name, loginId, email, group: currentGroup, role, state:'active', last:'—（未ログイン）' }); }
     closeModal(accountModal); render();
   });
 
