@@ -12,6 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `(未取得)` §8-⑤⑦⑧⑨⑩ 一括決定: ⑤idea_revisions=版スナップショット(表示時差分)／⑦attachments=20MB/10件・許可MIME allowlist・size CHECK／⑧カテゴリ/利害関係者=別テーブル確定(配列不採用・正規化)／⑨otp_challenges=Redis TTL基本(DB化は代替)／⑩user_items=slot非正規化＋部分ユニークUNIQUE(user_id,slot)WHERE is_equipped。各テーブル注記＋§8を決定に更新（データモデルのみ・画面/README波及なし）
   - `7724d41` §8-③ 決定: ゲーム系マスタ(spells/items/achievements)は各会社DBに同一シード配布（管理DB共通マスタ＋DB跨ぎ参照/中央マスタ複製は不採用）。3マスタに安定コード `code`(text UNIQUE) を追加＝シードupsertキー・全社同一カタログ。配置注記/インデックス/§8-③ を確定
   - `717871f` §8-① 残TBD 決定: クエストグループ所属を会社DB `quest_group_members` に一本化＝管理DB `account_quest_groups` 廃止（機密性重視・二重管理回避）。管理DB 7→6テーブル。§4.5削除＆節番号繰上げ(§4.6=sync_outbox)、ER図/§1構成図/§2 DB跨ぎ記述/§5.5注記・index、README(一元管理項目/データモデル)・SC-90/92(所属割当先) を会社DB基準に修正
   - `e67de4e` §8-② 決定: ログイン時の会社特定＝全社同一URL＋会社コード手入力（サブドメイン/グローバル一意login_idは不採用）。accounts一意制約は現状維持。SC-00に会社コード欄追加(doc/mock・端末記憶プリフィル・列挙耐性エラー)、/api/auth/login inにcompany_code追加、データモデル§8-②・README(FR-03)反映
