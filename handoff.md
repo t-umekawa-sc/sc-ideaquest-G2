@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(未取得)` §8-⑫ 決定: テナント数/リソース設計（インフラ方針・初期目安）＝MVP単一ホストDocker Composeで〜10社ソフト上限・会社DBごとにコネクションプール(or PgBouncer)・監視で水平分割/K8s+CloudNativePG移行。データモデル§8-⑫・README(スケーラビリティ/チェックリスト)反映。テーブル変更なし＝§8全項目①〜⑫決着
+  - `032f36e` §8-⑫ 決定: テナント数/リソース設計（インフラ方針・初期目安）＝MVP単一ホストDocker Composeで〜10社ソフト上限・会社DBごとにコネクションプール(or PgBouncer)・監視で水平分割/K8s+CloudNativePG移行。データモデル§8-⑫・README(スケーラビリティ/チェックリスト)反映。テーブル変更なし＝§8全項目①〜⑫決着
   - `41415d3` §8-⑪ 決定: チャット編集は本人のみ履歴なし／削除は論理(トゥームストーン)＝本人＋管理権限者(owner/quest_admin/QG管理/システム管理)可(chat_messagesに deleted_by_id/deleted_at 追加)／クエスト完了後は投稿編集削除リアクション凍結／通常リアクション絵文字は固定セット=reaction_emojisマスタ新設(会社DBシード配布・§8-③方式・初期6種)＝同一ユーザー×同一絵文字不可。会社DB27→28。データモデル(chat_messages/reactions/§5.30/§8-⑪)・SC-24(doc)・READMEを反映
   - `5ed93dc` §8-⑥ 決定: XP日次上限=投票5/チャット10/ログイン1（初期値）。投票XPは各アイデア初回のみ（切替/取消/再投票で追加なし・冪等判定=activities reason=vote,ref_id=idea_id）。コインは評価締切一括確定（付与後取消なし・都度再計算不採用）。レベル上限なし。データモデル§7/§8-⑥/votes/activities注記、README第6節(XP表/乱獲対策/レベル/コイン確定/未決) を反映
   - `a320bf9` §8-④ 決定: 全文検索エンジン=PGroonga（会社DBのみ拡張導入・カスタムPostgresイメージ）。検索対象に添付ファイル名(attachments.original_name)を追加＝結果種別「アイデア/チャット/添付」3種（添付ヒットは親SC-22/SC-24へ）。データモデル§6/§8-④・attachments索引、README(FR-31/技術スタック/チェックリスト)、SC-12(doc:検索対象/API/mock:対象フィルタ+添付データ+レンダリング) を反映
