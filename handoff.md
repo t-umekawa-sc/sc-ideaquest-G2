@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(未取得)` §8-② 決定: ログイン時の会社特定＝全社同一URL＋会社コード手入力（サブドメイン/グローバル一意login_idは不採用）。accounts一意制約は現状維持。SC-00に会社コード欄追加(doc/mock・端末記憶プリフィル・列挙耐性エラー)、/api/auth/login inにcompany_code追加、データモデル§8-②・README(FR-03)反映
+  - `e67de4e` §8-② 決定: ログイン時の会社特定＝全社同一URL＋会社コード手入力（サブドメイン/グローバル一意login_idは不採用）。accounts一意制約は現状維持。SC-00に会社コード欄追加(doc/mock・端末記憶プリフィル・列挙耐性エラー)、/api/auth/login inにcompany_code追加、データモデル§8-②・README(FR-03)反映
   - `8003bb2` §8-① 決定: 管理DB↔会社DB のユーザ同期＝accounts の login_id/email/status を会社DB users へ一方向ミラー（源泉=accounts・一覧は会社DB単独＝API往復なし）。account_sync_outbox(管理DB・§4.7)＋enum sync_op/sync_status 新設、email を会社内UNIQUEに、users にミラー3列追加、login_id/email はプロフィール編集可。README(Account)も更新
   - `65016e8` 会社コード `company_code` を README(Company/FR-16)・SC-91(一覧列/検索/作成モーダル/API/mock)・SC-92(バナー/mock)へ反映＋フォーマット規約確定（英大文字/数字/ハイフン・4〜20字・大文字正規化・全社一意・作成時確定で以後不変。データモデル.md §4.1にも注記）
   - `ebef6b3` データモデル.md companies に会社コード `company_code`(text NOT NULL UNIQUE・対人向け識別子、db_identifierとは別)を追加（定義表・UNIQUE索引・ER図UK）
