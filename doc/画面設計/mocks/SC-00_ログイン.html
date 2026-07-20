@@ -84,9 +84,13 @@
       <div class="login-logo"><img src="assets/logo-ideaquest.png" alt="IDEAQUEST"></div>
       <h1>ログイン</h1>
 
-      <div class="form-error" id="loginError">ログインIDまたはパスワードが正しくありません。</div>
+      <div class="form-error" id="loginError">会社コード・ログインID・パスワードのいずれかが正しくありません。</div>
 
       <form onsubmit="return false">
+        <div class="field">
+          <label for="companyCode">会社コード<span class="req">*</span></label>
+          <input class="input" id="companyCode" type="text" autocomplete="organization" placeholder="例: ACROSS" style="text-transform:uppercase" required>
+        </div>
         <div class="field">
           <label for="loginId">ログインID<span class="req">*</span></label>
           <input class="input" id="loginId" type="text" autocomplete="username" placeholder="例: taro.yamada" required>
@@ -197,6 +201,16 @@
     btn.textContent = show ? '🙈' : '👁';
     btn.setAttribute('aria-label', show ? 'パスワードを隠す' : 'パスワードを表示');
   }
+
+  // 会社コード：端末記憶でプリフィル＋大文字正規化（デモ）
+  const companyCode = document.getElementById('companyCode');
+  const remembered = localStorage.getItem('ideaquest_company_code');
+  if (remembered) companyCode.value = remembered;
+  companyCode.addEventListener('input', () => { companyCode.value = companyCode.value.toUpperCase(); });
+  // ログイン送信時に会社コードを端末記憶（デモ・実際は認証成功時に保存）
+  companyCode.form.addEventListener('submit', () => {
+    if (companyCode.value.trim()) localStorage.setItem('ideaquest_company_code', companyCode.value.trim().toUpperCase());
+  });
 </script>
 </body>
 </html>
