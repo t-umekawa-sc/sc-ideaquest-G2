@@ -5,13 +5,14 @@
 
 - 最終更新: 2026-07-19
 - プロジェクト: ideaquest（これから作る WEB アプリ）
-- **現在のフェーズ = データモデル詳細フェーズをレビュー中（画面設計フェーズ＝完了・SC-00〜SC-92）**。**`doc/データモデル.md` を新規作成**（管理DB6＋会社DB27テーブルの ER 図・カラム/型/制約/インデックス・Enum一覧・全文検索索引・集計方針・TBD集約）。**FK命名規則 §2.1 を新設して全FKカラム（約60箇所）を統一・検証済み**（詳細は第5節末尾）。要件定義は主要項目が確定済み（残TBDは第4節＋データモデル.md §8）。技術スタックも確定。**アプリのコード実装・compose 等のインフラ定義はまだ未着手**（リポジトリは doc と handoff のみ）。**次＝データモデル.md §8 の配置系TBDをユーザー確認→API設計→実装**（第5節末尾参照）。
+- **現在のフェーズ = データモデル詳細フェーズをレビュー中（画面設計フェーズ＝完了・SC-00〜SC-92）**。**`doc/データモデル.md` を新規作成**（管理DB7＋会社DB27テーブルの ER 図・カラム/型/制約/インデックス・Enum一覧・全文検索索引・集計方針・TBD集約。※§8-① 決定で管理DBに account_sync_outbox を追加し7テーブル）。**FK命名規則 §2.2／共通監査カラム §2.1／会社コード／管理DB↔会社DBのユーザ同期方針を確定**（詳細は第5節末尾）。要件定義は主要項目が確定済み（残TBDは第4節＋データモデル.md §8）。技術スタックも確定。**アプリのコード実装・compose 等のインフラ定義はまだ未着手**（リポジトリは doc と handoff のみ）。**次＝データモデル.md §8 の残TBD（QG所属の配置ほか）をユーザー確認→API設計→実装**（第5節末尾参照）。
 
 ## 0. リポジトリ状態
 
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
-- 直近コミット（新しい順・2026-07-19 時点。全履歴は `git log`）:
+- 直近コミット（新しい順。全履歴は `git log`）:
+  - `(未取得)` §8-① 決定: 管理DB↔会社DB のユーザ同期＝accounts の login_id/email/status を会社DB users へ一方向ミラー（源泉=accounts・一覧は会社DB単独＝API往復なし）。account_sync_outbox(管理DB・§4.7)＋enum sync_op/sync_status 新設、email を会社内UNIQUEに、users にミラー3列追加、login_id/email はプロフィール編集可。README(Account)も更新
   - `65016e8` 会社コード `company_code` を README(Company/FR-16)・SC-91(一覧列/検索/作成モーダル/API/mock)・SC-92(バナー/mock)へ反映＋フォーマット規約確定（英大文字/数字/ハイフン・4〜20字・大文字正規化・全社一意・作成時確定で以後不変。データモデル.md §4.1にも注記）
   - `ebef6b3` データモデル.md companies に会社コード `company_code`(text NOT NULL UNIQUE・対人向け識別子、db_identifierとは別)を追加（定義表・UNIQUE索引・ER図UK）
   - `a285c7f` データモデル.md 全テーブル定義・ER図から共通監査カラム(created_at/updated_at)行を削除し §2.1 の共通装備へ完全省略統一（意味的タイムスタンプ last_login_at/expires_at 等とindex参照は保持）
