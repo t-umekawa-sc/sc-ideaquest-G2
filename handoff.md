@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(次コミット)` SC-90 残TBD 2件を決定: ①QGロール `admin` 付与/剥奪=システム管理者のみ（QG管理者は不可）②QG所属解除=論理削除 `removed_at`(トゥームストーン)・アカウント無効化と独立。データモデル§5.5に `removed_at` 列＋部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL` 追加、SC-90§9・README(データモデル節)反映
+  - `8800fae` SC-90 残TBD 2件を決定: ①QGロール `admin` 付与/剥奪=システム管理者のみ（QG管理者は不可）②QG所属解除=論理削除 `removed_at`(トゥームストーン)・アカウント無効化と独立。データモデル§5.5に `removed_at` 列＋部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL` 追加、SC-90§9・README(データモデル節)反映
   - `87abb51` データモデル.md `quest_group_members.role` を enum `quest_group_role`(admin/member) 化＝NOT NULL default `member`（従来 text/NULL可 から厳密化）。Enum一覧に `quest_group_role` を追加＋列定義を更新。SC-90画面の「一般メンバー/クエストグループ管理者」表記と整合（画面/README波及なし）。※SC-90 のQGロール付与権限範囲TBD(誰がadmin付与可)は別論点で未決
   - `c3f7df0` データモデル.md quest_groups に `quest_group_code`(text NOT NULL UNIQUE・クエストグループコード) を追加＝会社内一意の対人向け識別子(company_code同方式)。UNIQUE索引＋フォーマット規約(英大文字/数字/ハイフン・2〜20字・大文字正規化)。※SC-90等画面・READMEへの反映は未
   - `af2b4b3` データモデル.md 全体最終レビュー: 構造整合を機械チェック（節番号/Enum/相互参照/ER図↔テーブル/FK・DB境界＝問題なし）。宙に浮いたランキング週起点/TZ/タイブレークTBDを確定（月曜00:00 JST・タイブレーク=XP→コイン→到達順）＝§7、§8見出しを「決定事項」に・§9次アクションをAPI設計へ更新
