@@ -275,22 +275,23 @@
     <div class="list-empty" id="ideaEmpty" hidden>該当するアイデアがありません。条件を変えてお試しください。</div>
   </section>
 
-  <!-- ===== 全文検索（件名・アイデア・価値・備考・チャットを日本語全文検索） ===== -->
+  <!-- ===== 全文検索（件名・アイデア・価値・備考・チャット・添付ファイル名を日本語全文検索） ===== -->
   <section class="tab-panel" id="tab-search" role="tabpanel" hidden>
     <div class="list-toolbar">
       <div class="filters">
-        <input class="input" type="search" id="ftq" placeholder="キーワードで全文検索" aria-label="全文検索（件名・アイデア・価値・備考・チャット）">
+        <input class="input" type="search" id="ftq" placeholder="キーワードで全文検索" aria-label="全文検索（件名・アイデア・価値・備考・チャット・添付ファイル名）">
         <select class="select" id="ftScope" aria-label="検索対象">
           <option value="">対象: すべて</option>
           <option value="idea">アイデア（件名/本文/価値/備考）</option>
           <option value="chat">チャット</option>
+          <option value="attachment">添付ファイル名</option>
         </select>
       </div>
       <span class="list-count" id="ftCount"></span>
     </div>
     <div id="ftResults" class="stack"></div>
-    <div class="list-empty" id="ftEmpty">キーワードを入力してください（このクエスト内のアイデアとチャットを検索）。</div>
-    <p class="hint" style="margin-top:var(--space-3)">※ 検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>（このクエスト内）。日本語全文検索の実装は PostgreSQL の <strong>PGroonga（推奨）</strong> 等で分かち書き不要・ランキング・ハイライトに対応（詳細は画面設計 SC-12）。</p>
+    <div class="list-empty" id="ftEmpty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。</div>
+    <p class="hint" style="margin-top:var(--space-3)">※ 検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>＋<strong>添付ファイル名</strong>（このクエスト内）。日本語全文検索の実装は PostgreSQL の <strong>PGroonga（決定）</strong> で分かち書き不要・ランキング・ハイライトに対応。<strong>添付ヒットは紐づくアイデア/チャットへ遷移</strong>（詳細は画面設計 SC-12）。</p>
   </section>
 
   <!-- ===== パーティー ===== -->
@@ -457,6 +458,9 @@
     { type: 'chat', field: 'チャット', idea: '夜間配送の集約', text: '鈴木: 夜間の集約なら積載率がかなり上がりそうですね。倉庫の稼働時間だけ要調整です。', target: 'チャット (SC-24)' },
     { type: 'chat', field: 'チャット', idea: '置き配の写真通知', text: '佐藤: 写真通知は再配達の削減に効きそう。プライバシーの配慮だけ検討しましょう。', target: 'チャット (SC-24)' },
     { type: 'chat', field: 'チャット', idea: '再配達の予測AI', text: '田中: 予測モデルの学習データは配送ログから。まずデータ整備が必要かもしれません。', target: 'チャット (SC-24)' },
+    { type: 'attachment', field: '添付ファイル名', idea: '夜間配送の集約', text: '夜間集約便_コスト試算.xlsx', target: 'アイデア詳細 (SC-22)' },
+    { type: 'attachment', field: '添付ファイル名', idea: '置き配の写真通知', text: '置き配_写真通知_仕様書.pdf', target: 'アイデア詳細 (SC-22)' },
+    { type: 'attachment', field: '添付ファイル名', idea: '再配達の予測AI', text: '配送ログ_サンプル.csv', target: 'チャット (SC-24)' },
   ];
   const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   function snippet(text, q) {
@@ -471,7 +475,7 @@
   function runSearch() {
     const q = ftq.value.trim(), scope = ftScope.value;
     if (!q) { ftResults.innerHTML = ''; ftCount.textContent = ''; ftEmpty.hidden = false;
-      ftEmpty.textContent = 'キーワードを入力してください（このクエスト内のアイデアとチャットを検索）。'; return; }
+      ftEmpty.textContent = 'キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。'; return; }
     const hits = FT_DATA.filter((r) => (!scope || r.type === scope) && r.text.includes(q));
     ftCount.textContent = hits.length + '件';
     if (!hits.length) { ftResults.innerHTML = ''; ftEmpty.hidden = false;
@@ -479,7 +483,9 @@
     ftEmpty.hidden = true;
     ftResults.innerHTML = hits.map((r) => {
       const cls = r.type === 'chat' ? 'badge badge-muted' : 'badge';
-      const ctx = r.type === 'chat' ? ('アイデア: ' + r.idea + ' のチャット') : ('アイデア: ' + r.idea);
+      const ctx = r.type === 'chat' ? ('アイデア: ' + r.idea + ' のチャット')
+        : r.type === 'attachment' ? ('アイデア: ' + r.idea + ' の添付（→ ' + (r.target.includes('SC-24') ? 'チャット' : 'アイデア') + 'へ）')
+        : ('アイデア: ' + r.idea);
       return '<a class="card ft-result" href="#">'
         + '<div class="ft-result__head"><span class="' + cls + '">' + r.field + '</span><span class="ft-result__ctx">' + esc(ctx) + '</span></div>'
         + '<p class="ft-result__snippet">' + snippet(r.text, q) + '</p>'
