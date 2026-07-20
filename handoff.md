@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(次コミット)` データモデル.md `quests`/`ideas` に論理削除列 `deleted_at`＋`deleted_by_id`(トゥームストーン) 追加＝一覧/参照は `deleted_at IS NULL` で絞る・部分索引 `(…,status) WHERE deleted_at IS NULL`・従属(チャット/投票/評価/版/添付/activities元帳)は物理削除せず監査保持(ON DELETE RESTRICT)。削除可否＝ideas:投稿者本人+管理権限者/quests:所有者+管理権限者。§2論理削除方針・SC-21§9(削除可否TBD解消)・README(Quest/Idea)反映
+  - `9caf48a` データモデル.md `quests`/`ideas` に論理削除列 `deleted_at`＋`deleted_by_id`(トゥームストーン) 追加＝一覧/参照は `deleted_at IS NULL` で絞る・部分索引 `(…,status) WHERE deleted_at IS NULL`・従属(チャット/投票/評価/版/添付/activities元帳)は物理削除せず監査保持(ON DELETE RESTRICT)。削除可否＝ideas:投稿者本人+管理権限者/quests:所有者+管理権限者。§2論理削除方針・SC-21§9(削除可否TBD解消)・README(Quest/Idea)反映
   - `4442adb` データモデル.md `users` にミラー列3つ追加＝`password_set`(PW設定済)/`system_role`(システムロール・enum `system_role`・既存 `role`〔会社内ロールtext〕とは別概念で別カラム)/`last_login_at`(最終ログイン)。源泉=`accounts`(role→system_role)・一方向ミラー。ミラー対象列挙を全箇所で一貫更新(§2/§4.2/§4.6payload/§8-①/Enum一覧・README2箇所)、変更契機に認証イベント追記
   - `8c35441` SC-90 残TBD の残り3件を決定＝§9全件決着: ③初回PW設定リンク=メール・72h(`otp_challenges` password_setup 単回トークン・送信基盤 dev=MailHog/prod=SMTP)④CSV一括操作=MVP見送り⑤監査ログ専用UI=後回し(共通監査列で記録済)。データモデル§4.4(otp_challenges expires_at を用途別に=login10分/password_setup72h)・SC-90§9 反映
   - `8800fae` SC-90 残TBD 2件を決定: ①QGロール `admin` 付与/剥奪=システム管理者のみ（QG管理者は不可）②QG所属解除=論理削除 `removed_at`(トゥームストーン)・アカウント無効化と独立。データモデル§5.5に `removed_at` 列＋部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL` 追加、SC-90§9・README(データモデル節)反映
