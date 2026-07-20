@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(未取得)` データモデル.md quest_groups に `quest_group_code`(text NOT NULL UNIQUE・クエストグループコード) を追加＝会社内一意の対人向け識別子(company_code同方式)。UNIQUE索引＋フォーマット規約(英大文字/数字/ハイフン・2〜20字・大文字正規化)。※SC-90等画面・READMEへの反映は未
+  - `c3f7df0` データモデル.md quest_groups に `quest_group_code`(text NOT NULL UNIQUE・クエストグループコード) を追加＝会社内一意の対人向け識別子(company_code同方式)。UNIQUE索引＋フォーマット規約(英大文字/数字/ハイフン・2〜20字・大文字正規化)。※SC-90等画面・READMEへの反映は未
   - `af2b4b3` データモデル.md 全体最終レビュー: 構造整合を機械チェック（節番号/Enum/相互参照/ER図↔テーブル/FK・DB境界＝問題なし）。宙に浮いたランキング週起点/TZ/タイブレークTBDを確定（月曜00:00 JST・タイブレーク=XP→コイン→到達順）＝§7、§8見出しを「決定事項」に・§9次アクションをAPI設計へ更新
   - `032f36e` §8-⑫ 決定: テナント数/リソース設計（インフラ方針・初期目安）＝MVP単一ホストDocker Composeで〜10社ソフト上限・会社DBごとにコネクションプール(or PgBouncer)・監視で水平分割/K8s+CloudNativePG移行。データモデル§8-⑫・README(スケーラビリティ/チェックリスト)反映。テーブル変更なし＝§8全項目①〜⑫決着
   - `41415d3` §8-⑪ 決定: チャット編集は本人のみ履歴なし／削除は論理(トゥームストーン)＝本人＋管理権限者(owner/quest_admin/QG管理/システム管理)可(chat_messagesに deleted_by_id/deleted_at 追加)／クエスト完了後は投稿編集削除リアクション凍結／通常リアクション絵文字は固定セット=reaction_emojisマスタ新設(会社DBシード配布・§8-③方式・初期6種)＝同一ユーザー×同一絵文字不可。会社DB27→28。データモデル(chat_messages/reactions/§5.30/§8-⑪)・SC-24(doc)・READMEを反映
