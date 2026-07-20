@@ -12,7 +12,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `(未取得)` §8-① 決定: 管理DB↔会社DB のユーザ同期＝accounts の login_id/email/status を会社DB users へ一方向ミラー（源泉=accounts・一覧は会社DB単独＝API往復なし）。account_sync_outbox(管理DB・§4.7)＋enum sync_op/sync_status 新設、email を会社内UNIQUEに、users にミラー3列追加、login_id/email はプロフィール編集可。README(Account)も更新
+  - `8003bb2` §8-① 決定: 管理DB↔会社DB のユーザ同期＝accounts の login_id/email/status を会社DB users へ一方向ミラー（源泉=accounts・一覧は会社DB単独＝API往復なし）。account_sync_outbox(管理DB・§4.7)＋enum sync_op/sync_status 新設、email を会社内UNIQUEに、users にミラー3列追加、login_id/email はプロフィール編集可。README(Account)も更新
   - `65016e8` 会社コード `company_code` を README(Company/FR-16)・SC-91(一覧列/検索/作成モーダル/API/mock)・SC-92(バナー/mock)へ反映＋フォーマット規約確定（英大文字/数字/ハイフン・4〜20字・大文字正規化・全社一意・作成時確定で以後不変。データモデル.md §4.1にも注記）
   - `ebef6b3` データモデル.md companies に会社コード `company_code`(text NOT NULL UNIQUE・対人向け識別子、db_identifierとは別)を追加（定義表・UNIQUE索引・ER図UK）
   - `a285c7f` データモデル.md 全テーブル定義・ER図から共通監査カラム(created_at/updated_at)行を削除し §2.1 の共通装備へ完全省略統一（意味的タイムスタンプ last_login_at/expires_at 等とindex参照は保持）
