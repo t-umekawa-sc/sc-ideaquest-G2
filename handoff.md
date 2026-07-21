@@ -18,6 +18,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `2d45b15` API設計フェーズ開始: 全体設計を確定＋コーディング規約を新設。`doc/API設計.md` 新規（第1章 API全体規約＝確定〔REST/JSON＋OpenAPI3.1・`/api/v1`・JSON=snake_case・認証フロー・会社DB動的ルーティング・認可・RFC7807風エラー・カーソル/オフセット・冪等・MinIO添付・PGroonga検索・outbox同期〕／第2章 ドメイン別A〜K＝分割レビューの単位）。`doc/コーディング規約.md` 新規（最重要＝フロントにバックエンド処理を実装しない／FastAPI層構成・Next.js方針・Lint・Git2段運用）。README §10（API設計・レイヤ責務分離）／handoff（フェーズ更新）反映
   - `c5dcd35` handoff.md を全体最新化（2026-07-21）＝冒頭サマリを現行状態に再構成（データモデル §8全決着／SC-90§9全決着／今セッションのデータモデル追補 a〜d／次アクション=API設計→スキャフォールド）、§5先頭の「現在地」をデータモデル完了・実装前に修正、コミット運用の2段方式を明記
   - `21e130a` データモデル.md `activities` に多態参照の判別列 `ref_type`(enum `activity_ref_type`=ideas/evaluations/items/chat_messages/spells/achievements) を追加＝`ref_id` の参照先テーブルを自己記述(reasonからの暗黙導出に依存しない)。`ref_type`と`ref_id`は対でセット・NULL事由(login/levelup_sp)は両NULL。索引 `(ref_type,ref_id)` 逆引き追加、投票冪等判定を `ref_type='ideas',ref_id=idea_id` に更新。Enum一覧・§2.2FK命名(多態参照)・§8-⑥ 反映
   - `9caf48a` データモデル.md `quests`/`ideas` に論理削除列 `deleted_at`＋`deleted_by_id`(トゥームストーン) 追加＝一覧/参照は `deleted_at IS NULL` で絞る・部分索引 `(…,status) WHERE deleted_at IS NULL`・従属(チャット/投票/評価/版/添付/activities元帳)は物理削除せず監査保持(ON DELETE RESTRICT)。削除可否＝ideas:投稿者本人+管理権限者/quests:所有者+管理権限者。§2論理削除方針・SC-21§9(削除可否TBD解消)・README(Quest/Idea)反映
