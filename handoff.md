@@ -5,11 +5,13 @@
 
 - 最終更新: 2026-07-21
 - プロジェクト: ideaquest（これから作る WEB アプリ）
-- **現在のフェーズ = データモデル詳細フェーズ＝レビュー完了・実装前（画面設計フェーズ＝完了・SC-00〜SC-92）**。成果物 **`doc/データモデル.md`**（管理DB **6**＋会社DB **28** テーブルの ER図・カラム/型/制約/インデックス・Enum一覧・全文検索索引・集計方針。テーブル数はこの後の変更でも不変＝列追加のみ）。
+- **現在のフェーズ = API設計フェーズ＝開始（全体設計＝確定済み・ドメイン別分割レビュー未着手）。前段のデータモデル詳細フェーズ＝レビュー完了、画面設計フェーズ＝完了・SC-00〜SC-92**。成果物 **`doc/データモデル.md`**（管理DB **6**＋会社DB **28** テーブルの ER図・カラム/型/制約/インデックス・Enum一覧・全文検索索引・集計方針。テーブル数はこの後の変更でも不変＝列追加のみ）。
 - **データモデル §8 の TBD①〜⑫は全て決着**（①ユーザ同期=accounts→users一方向ミラー／QG所属は会社DB一本化②ログイン会社特定=会社コード③ゲーム系マスタ=会社DBシード配布+`code`④全文検索=PGroonga+添付名⑤idea_revisions=版スナップショット⑥XP日次上限〔投票5/チャット10/ログイン1〕/コイン締切一括/レベル上限なし/投票XP初回のみ⑦添付=20MB・10件・allowlist⑧カテゴリ/利害関係者=別テーブル⑨OTP=Redis TTL基本⑩装備=部分ユニーク⑪チャット編集削除/リアクション絵文字マスタ⑫テナント=MVP単一ホスト〜10社・監視でK8s移行）。FK命名=§2.2・共通監査列=§2.1・会社コード=確定。**全体最終レビュー完了**（節番号/Enum定義↔使用/相互参照/ER図↔テーブル/FK・DB境界を機械チェック済み・ランキング週起点=月曜0時JST/タイブレーク=XP→コイン→到達順=§7）。技術スタック確定。
 - **SC-90 §9 の残TBD 5件は全件決着（2026-07-20）**: ①QGロール `admin` 付与/剥奪=**システム管理者のみ**（QG管理者はメンバー発行/編集可だが admin 昇格不可）②QG所属の解除=**論理削除 `removed_at`**（トゥームストーン・アカウント無効化 `status` と独立・部分ユニーク `WHERE removed_at IS NULL`）③初回PW設定=**メールリンク72h**（`otp_challenges` purpose=password_setup 単回トークン・失効時は管理者再送・送信基盤 dev=MailHog/prod=SMTP）④CSV一括操作=**MVP見送り**⑤監査ログ専用UI=**後回し**（共通監査列で記録済み）。
 - **データモデル追補（2026-07-20〜21・列追加のみ）**: (a)`quest_group_members.role` を enum `quest_group_role`(admin/member) 化 (b)`users` にミラー列3つ追加 `password_set`/`system_role`(enum・既存の会社内ロール `role`〔text〕とは別概念)/`last_login_at`（源泉=管理DB `accounts`・一方向ミラー） (c)`quests`/`ideas` に論理削除 `deleted_at`+`deleted_by_id`（一覧/参照は `deleted_at IS NULL` で絞る・部分索引・従属は監査保持／削除可否=ideas:投稿者本人+管理権限者・quests:所有者+管理権限者／SC-21§9の削除可否TBDも解消） (d)`activities` に多態参照の判別列 `ref_type`(enum `activity_ref_type`)＝`ref_id` の参照先テーブルを自己記述。
-- **アプリのコード実装・compose 等インフラ定義は未着手**（リポジトリは doc と handoff のみ・作業ツリーはクリーン・`origin/main` と同期済み）。**次にやること＝① API設計**（エンドポイント一覧・リクエスト/レスポンス。データモデル §9 の次アクション）**→ ② 実装スキャフォールド**（Next.js フロント＋FastAPI＋PostgreSQL＋MinIO の compose）。残TBDは各画面§9の実装寄り項目のみ（添付上限の具体値/下書き保持期間/魔法エフェクトの他画面表示 等＝実装時に確定でも可）。
+- **API設計フェーズ＝開始（2026-07-21）**。方針＝**「全体設計→分割レビュー」＋「REST/JSON＋OpenAPI」**（ユーザー選択）。成果物 **`doc/API設計.md`** を新規作成＝**第1章 API全体規約（先に確定する全体設計）＋第2章 ドメイン別エンドポイント一覧 A〜K（分割レビューの単位・「詳細確定」チェック列付き）**。全体規約の要点＝スタイル(REST/JSON・OpenAPI3.1をSoT)／`/api/v1`／JSON=snake_case・パス=ケバブ複数形・Enum値はデータモデル§3／認証(会社コード→login_id+PW→信頼端末ならOTPスキップ→メールOTP→httpOnly Cookieセッション(Redis)・CSRF)／会社DB動的ルーティング(company_idはセッション由来・クロステナント禁止)／認可(system_role＋クエスト6権限をサーバー強制・パーティー外は404)／エラー=RFC7807風(`application/problem+json`・機械可読code＋errors[])／一覧=カーソル基本+オフセット併記／冪等(Idempotency-Key・投票冪等・XP日次上限サーバー判定)／添付=MinIO・20MB/10件・allowlist・DL署名URL／全文検索=PGroonga／ユーザ同期=accounts源泉+outbox。
+- **コーディング規約を新規作成 `doc/コーディング規約.md`（2026-07-21・ユーザー指示）**。**最重要原則＝「フロントにバックエンド処理（業務ロジック）を実装しない」**＝認可/業務バリデーション確定/ゲーム計算(XP日次上限・コイン算出・SP)/状態遷移・冪等/DBアクセス・MinIO署名・OTP/セッションは**バックエンド専任**、フロントは表示・UX出し分け・API呼び出しのみ(クライアント側検証は権威にしない)。連携面は`/api/v1/*`のみ。加えて命名一貫(snake_case JSON等)／FastAPI層構成(router→service→repository・Pydantic・Alembic・ruff/black/mypy)／Next.js(App Router・Parallel/Intercept Routesモーダル・ESLint/Prettier/TS)／Git2段コミット運用 を規定。API設計§1.6にも境界の相互参照を追記。
+- **アプリのコード実装・compose 等インフラ定義は未着手**（リポジトリは doc と handoff のみ・作業ツリーはクリーン・`origin/main` と同期済み）。**次にやること＝① API設計のドメイン別分割レビュー（A 認証→B 管理→…→K の順で req/res・権限・エラー・画面対応を詳細化・都度承認コミット）→ ② 実装スキャフォールド**（Next.js フロント＋FastAPI＋PostgreSQL＋MinIO の compose）。残TBDは各画面§9の実装寄り項目のみ（添付上限の具体値/下書き保持期間/魔法エフェクトの他画面表示 等＝実装時に確定でも可）。
 
 ## 0. リポジトリ状態
 
@@ -71,6 +73,8 @@
 sc-ideaquest-G2/
 ├── doc/
 │   ├── データモデル.md      ← **データモデル詳細**（ER図・テーブル定義・型/制約/index・Enum・全文検索・集計方針・TBD。README第9節の実装展開版）
+│   ├── API設計.md          ← **API設計**（第1章 全体規約＝確定／第2章 ドメイン別エンドポイント A〜K＝分割レビューで詳細化中。REST/JSON＋OpenAPI）
+│   ├── コーディング規約.md   ← **コーディング規約**（最重要=フロントにバック処理を実装しない／命名・FastAPI層構成・Next.js方針・Lint・Git運用）
 │   ├── 要件定義/
 │   │   └── README.md      ← 要件定義書（唯一の仕様本体。かなり書き込み済み）
 │   └── 画面設計/
