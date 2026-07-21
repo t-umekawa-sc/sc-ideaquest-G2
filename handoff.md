@@ -18,6 +18,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `581f0b5` コーディング規約 §4.1: フロント(Next.js)のフォルダ構成をfeatureベースに確定＝`app/`=ルーティングのみ／`features/<機能>/`(components/hooks/api.ts/types/index)=機能スコープ／`components/`(ui/pixel/layout/three)=機能横断の共有UI／`lib/`(api/session/date/constants)=非UI横断。依存は一方向 app→features→components/lib・features相互import禁止(共有はcomponents/libへ引上げ)。ゲーム層SC-30/31/32/40/41は機能分割。features api.tsは呼ぶだけ(業務計算なし)。§6未確定からフロント構成除外・handoff反映
   - `394f2a9` コーディング規約: FastAPI層構成を4層(Functional Core/Imperative Shell)に確定＝`router→application→(domain service / domain model)→repository`。トランザクション境界(UoW)とDBアクセスは application に集約、ドメイン層(domain service・domain model)は純粋(I/O・外部参照禁止・全入力を引数で受け取る)。application=エンドポイント1:1でDTO変換＋オーケストレーション、domain model=単一集約のルール、domain service=複数モデル横断ポリシー、repositoryはapplicationからのみ。薄いCRUDは直呼び可。§3.3テストを層別化(domain=DBなしユニット最重点)。handoff反映
   - `2d45b15` API設計フェーズ開始: 全体設計を確定＋コーディング規約を新設。`doc/API設計.md` 新規（第1章 API全体規約＝確定〔REST/JSON＋OpenAPI3.1・`/api/v1`・JSON=snake_case・認証フロー・会社DB動的ルーティング・認可・RFC7807風エラー・カーソル/オフセット・冪等・MinIO添付・PGroonga検索・outbox同期〕／第2章 ドメイン別A〜K＝分割レビューの単位）。`doc/コーディング規約.md` 新規（最重要＝フロントにバックエンド処理を実装しない／FastAPI層構成・Next.js方針・Lint・Git2段運用）。README §10（API設計・レイヤ責務分離）／handoff（フェーズ更新）反映
   - `c5dcd35` handoff.md を全体最新化（2026-07-21）＝冒頭サマリを現行状態に再構成（データモデル §8全決着／SC-90§9全決着／今セッションのデータモデル追補 a〜d／次アクション=API設計→スキャフォールド）、§5先頭の「現在地」をデータモデル完了・実装前に修正、コミット運用の2段方式を明記
