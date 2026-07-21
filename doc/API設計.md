@@ -122,9 +122,25 @@
 - 会社DB の **PGroonga** で `ideas`（件名/本文/価値/備考）＋`chat_messages`（本文）＋`attachments.original_name` を横断検索（データモデル §6・§8-④）。
 - **`GET /search`**（クエスト内スコープは `GET /quests/{id}/search`）: `?q=`・`?types=idea,chat,attachment`（既定 all）。**結果は種別バッジ＋所属アイデア＋ハイライトスニペット**（SC-12）。ヒットは親（アイデア=SC-22 / チャット・添付=SC-24）への導線 ID を含む。
 
-### 1.12 リアルタイム・通知配信
+### 1.12 リアルタイム配信（WebSocket・2026-07-21 決定）
 
-- MVP は**アプリ内通知のポーリング**（`GET /notifications`＋未読数 `GET /notifications/unread-count`＝ヘッダーベルのバッジ）。**外部通知（メール等）とリアルタイム（WS/SSE）は将来**（設計上ブロックしない）。
+**トランスポート＝WebSocket の単一多重接続**（クライアント1本の WS で複数トピックを多重化）。用途＝**チャット（新着メッセージ・リアクション・魔法エフェクト・編集/削除）と通知（新着・未読数）の即時反映**（SC-24・SC-02＋ヘッダーベル）。ダッシュボード等は対象外（表示時取得/再取得）。
+
+- **書き込みは REST 維持・WS は配信専用**（重要）: 全ての変更は通常の REST（router→application→domain→repository）を通し、権限・業務検証・冪等を経る（コーディング規約 §1/§3.1）。**WS を書き込み経路にしない**（ドメイン層の迂回禁止）。WS は receive-only（＋購読制御メッセージのみ）。
+  ```
+  書き込み: client ──REST──> application(検証/永続化/元帳) ──> Redis へ event 発行
+  配信:     application ─event→ Redis Pub/Sub ─> WS ハブが購読 ─(WS)→ 対象クライアント
+  ```
+- **fan-out backbone ＝ Redis Pub/Sub**（セッション/OTP と同じ Redis を流用）。API・outbox ワーカ・複数インスタンス跨ぎでも配信可（水平スケール時も WS ハブが Redis を購読して転送）。
+- **エンドポイント**: `GET /realtime`（WS ハンドシェイク）。**認証＝既存 httpOnly Cookie セッション**（§1.4）をハンドシェイクで検証（未認証は 401 でクローズ）。接続は**セッションの `company_id` にバインド**（クロステナント配信を物理的に遮断）。
+- **多重化とトピック購読**: 1 本の WS 上でメッセージにトピックを付与。
+  - **常時購読**: `notifications:{user_id}`（新着通知・未読数）。接続時に自動購読。
+  - **動的購読**: チャット部屋 `chat:{chat_group_id}` を、クライアントが `{ "op": "subscribe", "topic": "chat:{id}" }` / `unsubscribe` で開閉（SC-24 を開いた時に購読・離脱で解除）。**サーバーは購読要求時にそのユーザーの閲覧権限（パーティー内）を検証**してから購読を許可。
+- **メッセージ形（サーバー→クライアント）**: `{ "topic": "...", "type": "chat.message.created|chat.reaction.added|chat.message.updated|chat.message.deleted|notification.created|notification.unread_count", "data": {...}, "id": "<event_id>" }`。**`type` は機械可読**、`data` は該当リソースの表示用ペイロード。
+- **順序・再接続・取りこぼし対策**: 切断中の欠落は**REST を正**として補う（再接続時にチャットは `GET /ideas/{id}/chat?after=<cursor>`、通知は `GET /notifications` と未読数で再同期）。WS は「速報」・REST は「真実」。将来 `Last-Event-ID` 相当の再送を検討。
+- **プレゼンス/タイピング表示は将来**（同 WS 上で拡張可能な設計にしておく）。**外部通知（メール等）も将来**（i18n の通知テンプレは §1.13/コーディング規約 §2.1）。
+- **ポーリング併用（フォールバック）**: WS 未接続時やベルの初期表示は `GET /notifications/unread-count`／`GET /notifications` で取得（WS はあくまで push の上乗せ）。
+- **ops**: リバプロで WS Upgrade を許可（`Connection: upgrade`）。アイドル接続の ping/pong ハートビート。
 
 ### 1.13 ユーザ同期（accounts→users アウトボックス）との関係
 
@@ -150,6 +166,7 @@
 | I | ダッシュボード集約 | SC-01 | テナント | ⬜ |
 | J | 全文検索 | SC-12 | テナント | ⬜ |
 | K | プロフィール・背景画像 | 共通ヘッダー | テナント | ⬜ |
+| L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ⬜ |
 
 ### A. 認証・セッション（コントロールプレーン）
 `POST /auth/login`・`POST /auth/mfa/verify`・`POST /auth/mfa/resend`・`POST /auth/logout`・`POST /auth/logout-all`・`GET /auth/session`・`POST /auth/password-setup/verify`・`POST /auth/password-setup/complete`（詳細＝§1.4）。
@@ -184,12 +201,15 @@
 `GET /search`・`GET /quests/{id}/search`（§1.11）。
 
 ### K. プロフィール・背景画像
-`GET/PATCH /me`（プロフィール・`login_id`/`email` は accounts 源泉→outbox）・`PUT /me/background-image`・`DELETE /me/background-image`（MinIO）。
+`GET/PATCH /me`（プロフィール・`login_id`/`email`/`locale` は accounts 源泉→outbox）・`PUT /me/background-image`・`DELETE /me/background-image`（MinIO）。
+
+### L. リアルタイム配信（WebSocket）
+`GET /realtime`（WS ハンドシェイク・Cookie セッション認証・`company_id` バインド）。常時購読 `notifications:{user_id}`／動的購読 `chat:{chat_group_id}`（`subscribe`/`unsubscribe`・購読時に閲覧権限検証）。配信専用（書き込みは各ドメインの REST）。イベント種別・ペイロード・再接続再同期は §1.12。**書き込み側（D/E/H）の application が Redis へ event を発行する連携点**を各ドメイン詳細で規定。
 
 ---
 
 ## 3. 次アクション
 
 1. **ドメイン A（認証・セッション）から分割レビュー**で詳細化（req/res スキーマ・状態遷移・エラー・SC-00 対応）→ ユーザー承認 → コミット。
-2. 以降 B→C→…→K の順で詳細化（依存の少ない順に前倒し可）。
+2. 以降 B→C→…→L の順で詳細化（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
