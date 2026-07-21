@@ -20,6 +20,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `8607caf` handoff.md を最新化＝次セッションが読むだけで再開できる状態に（現在地をAPI設計フェーズに更新・ドメインA〜L整合・次アクション＝ドメインA着手＋A論点3件〔Redis前提/CSRF/未MFA中間状態〕明記・compose構成にRedis追加）
   - `b2671d2` リアルタイム配信をWebSocket(単一多重接続)で対応決定＝API設計§1.12。チャット/通知の即時反映(SC-24/SC-02)、書き込みREST維持・WS配信専用(ドメイン層を迂回しない)、fan-out backbone=Redis Pub/Sub。`GET /realtime`(Cookie認証・company_idバインド)、常時購読notifications+動的購読chat(購読時に権限検証)、切断中欠落はRESTで再同期。API設計§2にドメインL追加・書込側(D/E/H)applicationがRedisへevent発行。README(In Scope・§10にRedis追加・構成にWS Upgrade/Redis明記)反映＝Redisを1デプロイ構成に正式追加。presence/typing・外部通知は将来
   - `8b3db22` 多言語対応(i18n・JA/EN)を要件確定＝UI＋システム生成テキスト(メール/通知/APIエラー)＋マスタ表示名(フル)。ユーザー生成コンテンツは非翻訳。表示言語=ユーザー設定＋Accept-Languageフォールバック。データモデル: enum`locale`(ja/en)・`accounts.locale`(源泉NULL可)→`users.locale`ミラー(§4.2/§5.3/§4.6/§8-①)、マスタ表示名を`*_ja`/`*_en`対に(spells/items/achievements/reaction_emojis)、§8-⑬集約。コーディング規約§2.1(next-intl・ハードコード禁止・DBのja/en列をAPIが解決ロケールで返す・バックエンドはロケール対応メッセージ)。README(In Scope・§9 Account/User/Outbox/マスタ注記)反映
   - `3945fac` コーディング規約 §3.4: バックエンドのディレクトリ構成をプレーン分割×縦スライスに確定＝トップを`control_plane/`(管理DB=auth/admin)と`tenant/`(会社DB=quests/ideas/chat/evaluations/gamification/ranking/notifications/search/dashboard/profile)に2分割、各モジュールは縦スライスで4層内包(router/schemas/application/domain(model・service)/repository/orm)。DB境界をフォルダ強制・両プレーン跨ぎはoutboxワーカのみ。横断scoringはgamification/domainに集約し純粋import・元帳書込は同一UoW。エントリはmain.py/worker.pyの2つ。migrations control/company別・seeds/。§6解消・handoff反映
