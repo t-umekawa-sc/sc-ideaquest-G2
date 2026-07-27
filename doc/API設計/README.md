@@ -49,8 +49,9 @@
 - **セッション**: ログイン成功でサーバーがセッションを発行し、**httpOnly + Secure + SameSite=Lax の Cookie**（`iq_session`）に格納。セッション実体は **Redis の TTL ストア**（`company_id`・`account_id`・`system_role` 等を保持＝以降の会社DBルーティングと認可に使用。データモデル §8-⑨＝Redis 基本で確定・OTP チャレンジ／pre-auth トークンも同一 Redis）。
   - **CSRF＝ダブルサブミット Cookie ＋ Origin/Sec-Fetch 検証の両方併用（確定）**: 状態変更系（POST/PUT/PATCH/DELETE）は (a) 非 httpOnly Cookie `iq_csrf` とリクエストヘッダ `X-CSRF-Token` の一致、かつ (b) `Origin`/`Sec-Fetch-Site` が同一サイト、の**両方**を満たすことを要求。どちらか欠落・不一致は **403 `csrf_failed`**。
   - ※ ネイティブ/外部クライアント将来対応時は `Authorization: Bearer <token>` も受理できる設計にするが、MVP は Cookie セッションを基本とする。
-- **列挙耐性**: `login`/OTP 失敗はアカウント有無を区別しない一律メッセージ＋レート制限（SC-00 の方針）。会社コード不正・login_id 不在も同様に曖昧化。
-- **監査列の自動設定**: `created_by_id`/`updated_by_id`/`*_program` 等の共通監査列（データモデル §2.1）は**サーバーがセッションから設定**（クライアントは送らない・送っても無視）。
+- **列挙耐性**: `login`/OTP 失敗はアカウント有無を区別しない一律メッセージ＋レート制限（SC-00 の方針）。会社コード不正・login_id 不在も同様に曖昧化。`company_suspended` は資格情報照合成功後に判定（会社コードの存在を漏らさない）。
+- **セッション固定・失効ルール（横断）**: 認証成功時は常に新規セッションID を発行。**ロール（`system_role`）変更・アカウント無効化(disable)・PW 変更/再設定でサーバーが該当アカウントの全セッション破棄＋信頼端末失効を強制**（詳細＝`A_認証・セッション.md` §A.9。トリガはドメイン B／A）。無操作タイムアウト＋絶対有効期限を併用。
+- **監査列の自動設定**: `created_by_id`/`updated_by_id`/`*_program` 等の共通監査列（データモデル §2.1）は**サーバーがセッションから設定**（クライアントは送らない・送っても無視）。認証イベント（ログイン成功/失敗・MFA・logout・PW変更・ロール変更）は**セキュリティ監査ログ**に記録（PW/セッションID/OTP/トークンは出力しない・§A.9-⑥）。
 
 ### 1.5 会社DB 動的ルーティング（マルチテナント）
 
@@ -165,6 +166,7 @@
 - 会社（運営・SC-91/92）: `GET/POST /admin/companies`・`GET/PATCH /admin/companies/{id}`（設定フラグ `vote_anonymized`/`hide_voters_from_managers`/`mfa_required`・`color`/`icon`）・（プロビジョニング系は MVP 手動＝§8-⑫、API 化は将来）。
 - アカウント（SC-90/92）: `GET/POST /admin/companies/{id}/accounts`・`PATCH /admin/.../accounts/{id}`（編集・ロール）・`POST /.../accounts/{id}/disable`・`/enable`（論理削除⇄復活）・`POST /.../accounts/{id}/password-reset`（再設定リンク再送）。※すべて accounts 更新＋outbox（§1.13）。
 - 所属（クエストグループ割当）: 会社DB `quest_group_members` に対して実施（§8-①）。QG管理者は自グループのみ、admin 付与/剥奪は system_admin のみ（SC-90 §9）。
+- **セキュリティ（A.9 委譲分）**: ロール変更・disable は**該当アカウントの全セッション破棄＋信頼端末失効を発火**（`A_認証・セッション.md` §A.9-③）。**権限変更履歴を記録**（セキュリティ一覧 2-⑬）。
 
 ### C. クエスト・パーティー・権限
 `GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH /quests/{id}`・`DELETE /quests/{id}`（論理削除＝owner/quest_admin）・`POST /quests/{id}/publish`（下書き→公開）・カテゴリ/カラー/アイコン・パーティー `POST/DELETE /quests/{id}/members`・権限 `PUT /quests/{id}/members/{user_id}/permissions`・クエストグループ `GET /quest-groups`。
@@ -192,6 +194,7 @@
 
 ### K. プロフィール・背景画像
 `GET/PATCH /me`（プロフィール・`login_id`/`email`/`locale` は accounts 源泉→outbox）・`PUT /me/background-image`・`DELETE /me/background-image`（MinIO）。
+- **セキュリティ（A.9 委譲分）**: **認証済みユーザーの自己 PW 変更＝現在の PW 再確認**（セキュリティ一覧 1-㉒）／**email・MFA 設定変更時は再認証**（同 1-㉓）を設計する（`A_認証・セッション.md` §A.9-⑦）。
 
 ### L. リアルタイム配信（WebSocket）
 `GET /realtime`（WS ハンドシェイク・Cookie セッション認証・`company_id` バインド）。常時購読 `notifications:{user_id}`／動的購読 `chat:{chat_group_id}`（`subscribe`/`unsubscribe`・購読時に閲覧権限検証）。配信専用（書き込みは各ドメインの REST）。イベント種別・ペイロード・再接続再同期は §1.12。**書き込み側（D/E/H）の application が Redis へ event を発行する連携点**を各ドメイン詳細で規定。
