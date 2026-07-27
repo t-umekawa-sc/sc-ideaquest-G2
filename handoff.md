@@ -26,6 +26,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `e2c4a14` API設計ドメインA: 認証方式のADR(§A.10)を追加＝Cookie＋Redis不透明セッション vs JWT。決定＝ブラウザ向けは現行Cookie＋Redisセッション維持・JWTはMVP不採用(将来の外部/ネイティブにBearer余地のみ)。根拠＝単一FastAPI＋共有Redis＋同一オリジン＋即時失効の確定要件(§A.9-③)にJWTのステートレス性が矛盾・XSS露出・失効リストで複雑化。比較表＋再検討条件を明記
   - `09f4fd5` API設計ドメインB確定＋QG管理者の二重定義をB案で解消。決定4件〔①ロール別パス分離(system_admin=/admin/companies/{id}・QG=/admin/quest-groups/{group_id})②B案=system_roleからquest_group_admin削除・QG管理者はquest_group_members.role=adminのみ・SC-90アクセス=admin所属・admin付与はsystem_adminのみ③発行時の初期所属をoutboxに相乗(users→memberships順upsert・FK順序保証)④SC-92はSC-90上位互換〕。B_ファイルにB.0-B.7(認可スコープ/会社/アカウント/所属/QG管理者API/発行フロー/セキュリティ対策マッピング/未確定)。波及=データモデル(§3/§4.2/§5.3/§5.5/§8-⑭)・要件定義README・SC-90/91/92・SC-01・API README §1.6/§2/§3・A.6／モック=SC-92(ロール2値・per-groupロール表示・一覧操作列にPW再設定/無効化⇄再有効化・編集モーダル機能化)・SC-90(グループ内ロールmember固定・JS修正)。状態列と無効化ボタンは役割別で両保持(A案・SC-90と一貫)
   - `d212fb4` セキュリティ対策一覧を Markdown 化(.txt→.md)＝全28章＋開発工程＋優先項目を見出し/箇条書きに整形・参考URLリンク化・冒頭に位置づけ(コーディング規約§2.2で義務化・A=§A.9突合済)注記。内容は元txtと同一(整形のみ)。旧txt＋Zone.Identifier削除。参照元(コーディング規約§2.2・A_認証・セッション.md §A.9)のパスも.mdへ更新
   - `f259f4b` コーディング規約 §2.2「セキュリティ対策(必須遵守)」を新設＝doc/WEBアプリ開発時のセキュリティ対策一覧.txt(OWASP Top10/ASVS準拠)の対策を全工程で実施することを明記。各ドメイン/画面レビューで一覧の関連章を突合(A=§A.9済)・「該当なし」は理由明記。最優先10項目を既存規約箇所へマッピング＋横断原則(入力検証サーバー必須/Mass Assignment防止/全API認可/エラー秘匿/監査ログ機密非出力/業務ロジック不正対策)・脆弱性スキャンCI組込を再掲
