@@ -23,6 +23,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `f259f4b` コーディング規約 §2.2「セキュリティ対策(必須遵守)」を新設＝doc/WEBアプリ開発時のセキュリティ対策一覧.txt(OWASP Top10/ASVS準拠)の対策を全工程で実施することを明記。各ドメイン/画面レビューで一覧の関連章を突合(A=§A.9済)・「該当なし」は理由明記。最優先10項目を既存規約箇所へマッピング＋横断原則(入力検証サーバー必須/Mass Assignment防止/全API認可/エラー秘匿/監査ログ機密非出力/業務ロジック不正対策)・脆弱性スキャンCI組込を再掲
   - `4e72fe3` API設計ドメインA: セキュリティ対策一覧(doc/WEBアプリ開発時のセキュリティ対策一覧.txt・OWASP系)と突合し §A.9「セキュリティ対策マッピング／補強」を新設＝①PWハッシュ=Argon2id ②セッション固定対策(認証成功で常に新規発行・CSPRNG・Cookie Domain/Path最小) ③セッション失効ルール確定(logout/logout-all＋ロール変更・disable・PW変更/再設定でサーバーが全セッション破棄＋信頼端末失効を強制発火・無操作＋絶対有効期限併用) ④ブルートフォース(レート制限＋一時ロック)/PW品質(最低文字数＋漏えい済みPW拒否) ⑤company_suspendedは資格照合成功後判定(列挙耐性) ⑥認証イベントの監査ログ(機密は非出力) ⑦他ドメイン委譲(自己PW変更/email・MFA変更時再認証→K・権限変更履歴→B)。A.0/A.4/A.7/A.8＋README §1.4/§2-B/§2-K に反映・参照txt追跡
   - `e930d0f` API設計: ドメインA(認証・セッション)を詳細確定＋ドキュメントをディレクトリ分割。A論点3件決着〔(i)セッション/OTP/pre-authストア=Redis確定(ii)CSRF=ダブルサブミット＋Origin/Sec-Fetch両方併用・403 csrf_failed・loginのみトークン免除(iii)未MFA=短命pre-authトークン(iq_preauth・Redis10分・別実体最小権限)〕。A詳細=状態機械/Cookie・トークン一覧(iq_session/iq_preauth/iq_csrf/iq_trust)/8エンドポイントreq/res・エラーcode・SC-00の3状態対応・sessionスキーマ。§1.4/§1.7も反映。ドキュメント分割(ユーザー選択)=旧単一 doc/API設計.md→doc/API設計/(README.md=全体規約＋ドメイン一覧目次／A_認証・セッション.md=詳細)。全フィールド網羅はOpenAPI(SoT)側・本ディレクトリは設計/レビュー粒度。参照元(コーディング規約・要件定義README)パス更新
   - `8607caf` handoff.md を最新化＝次セッションが読むだけで再開できる状態に（現在地をAPI設計フェーズに更新・ドメインA〜L整合・次アクション＝ドメインA着手＋A論点3件〔Redis前提/CSRF/未MFA中間状態〕明記・compose構成にRedis追加）
