@@ -1,10 +1,10 @@
 # API 設計
 
-> ideaquest の HTTP API 設計。**本ファイルの第1章（API 全体規約）を「全体設計」として先に確定**し、第2章のドメイン別エンドポイントを**分割レビュー**で順に詳細化する方針（2026-07-21 合意）。
-> 仕様の本体は `doc/要件定義/README.md`（唯一の要件定義書）、データ構造は `doc/データモデル.md` を参照。本ファイルはその API 展開。
+> ideaquest の HTTP API 設計。**本 README の第1章（API 全体規約）を「全体設計」として先に確定**し、第2章のドメイン別エンドポイントを**分割レビュー**で順に詳細化する方針（2026-07-21 合意）。詳細確定したドメインは**このディレクトリ配下の個別ファイル**（`A_認証・セッション.md` 等）に切り出す（2026-07-27 ファイル分割方針・`screens/` と同じ発想）。
+> 仕様の本体は `doc/要件定義/README.md`（唯一の要件定義書）、データ構造は `doc/データモデル.md` を参照。本ファイルはその API 展開。**全フィールドを網羅する機械可読仕様は OpenAPI 3.1（SoT・§1.1）側**であり、本ディレクトリは*設計意図・req/res の形・エラー・画面対応をレビューするための人間向けドキュメント*。
 
-- 最終更新: 2026-07-21
-- 対象フェーズ: **API 設計フェーズ（開始）＝データモデル詳細フェーズ完了・実装前**
+- 最終更新: 2026-07-27
+- 対象フェーズ: **API 設計フェーズ＝ドメイン別分割レビュー進行中（全体設計＝確定・実装前）**
 - スタイル: **REST / JSON ＋ OpenAPI**（FastAPI 自動生成の OpenAPI をソースオブトゥルースに）
 - 関連: `doc/データモデル.md`（テーブル/Enum）・`doc/画面設計/screens/SC-*.md`（各画面の「API」節）・各 `mocks/SC-*.html`（mock API 注記）
 
@@ -12,7 +12,7 @@
 
 ## 0. 前提・アーキテクチャ
 
-- **1 デプロイ構成**: Web(リバプロ)1 ＋ フロント(Next.js)1 ＋ バックエンド(FastAPI)1 ＋ 管理DB(PostgreSQL)1 ＋ 会社DB N ＋ MinIO 1。
+- **1 デプロイ構成**: Web(リバプロ)1 ＋ フロント(Next.js)1 ＋ バックエンド(FastAPI)1 ＋ 管理DB(PostgreSQL)1 ＋ 会社DB N ＋ MinIO 1 ＋ Redis 1。
 - **2 層 DB**: ①管理DB（コントロールプレーン＝認証/アカウント/会社/接続情報）②会社DB（データプレーン＝会社ごと物理分離、クエスト等の機密データ）。
 - **動的ルーティング**: バックエンドは 1 つ。**ログイン時に管理DBで所属会社を判定し、以降のリクエストはセッションが持つ `company_id` からその会社DBへ動的に接続**（SQLAlchemy のエンジン/セッションを会社ごとに切替。§1.5）。
 - **API の 2 系統**:
@@ -26,7 +26,7 @@
 ### 1.1 スタイル・フォーマット
 
 - **REST / JSON**。リクエスト/レスポンスボディは `application/json`（添付アップロードのみ `multipart/form-data`、§1.10）。
-- **OpenAPI 3.1** を FastAPI が自動生成（`/api/v1/openapi.json`・`/api/v1/docs`）。**これを API 仕様のソースオブトゥルース**とし、本ファイルは設計意図・非自明な規約・画面との対応を残す（エンドポイントの網羅表は本ファイル第2章＋OpenAPI）。
+- **OpenAPI 3.1** を FastAPI が自動生成（`/api/v1/openapi.json`・`/api/v1/docs`）。**これを API 仕様のソースオブトゥルース**とし、本ディレクトリは設計意図・非自明な規約・画面との対応を残す（エンドポイントの網羅表は本ディレクトリのドメイン別ファイル＋OpenAPI）。
 - **文字コード**: UTF-8。**日時**: `timestamptz` を **ISO 8601・UTC（`Z` 付き）** で送受信し、**JST 表示・週起点（月曜0時JST）等の変換はフロント**で行う（集計の週境界はサーバーが JST で判定＝データモデル §7）。
 - **金額/ポイント**（XP/コイン/SP）は整数。ID は **UUID（文字列）**。
 
@@ -44,21 +44,11 @@
 
 ### 1.4 認証・セッション
 
-**フロー＝会社コードで会社特定 → login_id＋PW → （信頼端末なら OTP スキップ）→ メール OTP(MFA) → セッション発行**（データモデル §4.1〜4.4・SC-00・§8-②）。
+**フロー＝会社コードで会社特定 → login_id＋PW → （信頼端末なら OTP スキップ）→ メール OTP(MFA) → セッション発行**（データモデル §4.1〜4.4・SC-00・§8-②）。詳細は `A_認証・セッション.md`。
 
-- **セッション**: ログイン成功でサーバーがセッションを発行し、**httpOnly + Secure + SameSite=Lax の Cookie**（`iq_session`）に格納。セッション実体は **Redis 等の TTL ストア**（`company_id`・`account_id`・`system_role` 等を保持＝以降の会社DBルーティングと認可に使用）。**状態変更系（POST/PUT/PATCH/DELETE）は CSRF トークン**（ダブルサブミット or `Origin`/`Sec-Fetch` 検証）で保護。
+- **セッション**: ログイン成功でサーバーがセッションを発行し、**httpOnly + Secure + SameSite=Lax の Cookie**（`iq_session`）に格納。セッション実体は **Redis の TTL ストア**（`company_id`・`account_id`・`system_role` 等を保持＝以降の会社DBルーティングと認可に使用。データモデル §8-⑨＝Redis 基本で確定・OTP チャレンジ／pre-auth トークンも同一 Redis）。
+  - **CSRF＝ダブルサブミット Cookie ＋ Origin/Sec-Fetch 検証の両方併用（確定）**: 状態変更系（POST/PUT/PATCH/DELETE）は (a) 非 httpOnly Cookie `iq_csrf` とリクエストヘッダ `X-CSRF-Token` の一致、かつ (b) `Origin`/`Sec-Fetch-Site` が同一サイト、の**両方**を満たすことを要求。どちらか欠落・不一致は **403 `csrf_failed`**。
   - ※ ネイティブ/外部クライアント将来対応時は `Authorization: Bearer <token>` も受理できる設計にするが、MVP は Cookie セッションを基本とする。
-- **主要エンドポイント**（詳細は第2章 A で確定）:
-  | メソッド/パス | 説明 |
-  | --- | --- |
-  | `POST /auth/login` | in: `company_code`,`login_id`,`password`。PW 照合成功で **信頼端末 Cookie を検証**→有効なら即セッション発行、無効かつ `mfa_required` なら **OTP を発行してメール送信**し `mfa_required: true` を返す（セッション未発行） |
-  | `POST /auth/mfa/verify` | in: `code`（6桁）,`trust_device`(bool)。OTP 照合→セッション発行。`trust_device` 時は信頼端末（30日）Cookie 発行 |
-  | `POST /auth/mfa/resend` | OTP 再送（レート制限） |
-  | `POST /auth/logout` | 現端末のセッション破棄 |
-  | `POST /auth/logout-all` | 全端末サインアウト（trusted_devices を `revoked`・全セッション破棄） |
-  | `GET /auth/session` | 現在のセッション情報（`account_id`/`company_id`/`system_role`/`user`（会社DBの表示情報）） |
-  | `POST /auth/password-setup/verify` | in: `token`（メールリンク・`otp_purpose=password_setup`・72h）。トークン検証（初回PW設定/再設定画面の入口） |
-  | `POST /auth/password-setup/complete` | in: `token`,`new_password`。PW を設定し `password_set=true`・当該アカウントの信頼端末を失効。**accounts 更新と同一Txで account_sync_outbox に upsert** |
 - **列挙耐性**: `login`/OTP 失敗はアカウント有無を区別しない一律メッセージ＋レート制限（SC-00 の方針）。会社コード不正・login_id 不在も同様に曖昧化。
 - **監査列の自動設定**: `created_by_id`/`updated_by_id`/`*_program` 等の共通監査列（データモデル §2.1）は**サーバーがセッションから設定**（クライアントは送らない・送っても無視）。
 
@@ -92,7 +82,7 @@
   }
   ```
 - **`code`（機械可読・アプリ定義）で分岐**、`errors[]` はフィールド単位のバリデーション詳細（フォーム表示用）。
-- 代表 `code`: `unauthenticated`(401) / `forbidden`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed`。
+- 代表 `code`: `unauthenticated`(401) / `forbidden`(403) / `csrf_failed`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed`。
 
 ### 1.8 一覧: ページング・ソート・フィルタ
 
@@ -136,7 +126,7 @@
 - **多重化とトピック購読**: 1 本の WS 上でメッセージにトピックを付与。
   - **常時購読**: `notifications:{user_id}`（新着通知・未読数）。接続時に自動購読。
   - **動的購読**: チャット部屋 `chat:{chat_group_id}` を、クライアントが `{ "op": "subscribe", "topic": "chat:{id}" }` / `unsubscribe` で開閉（SC-24 を開いた時に購読・離脱で解除）。**サーバーは購読要求時にそのユーザーの閲覧権限（パーティー内）を検証**してから購読を許可。
-- **メッセージ形（サーバー→クライアント）**: `{ "topic": "...", "type": "chat.message.created|chat.reaction.added|chat.message.updated|chat.message.deleted|notification.created|notification.unread_count", "data": {...}, "id": "<event_id>" }`。**`type` は機械可読**、`data` は該当リソースの表示用ペイロード。
+  - メッセージ形（サーバー→クライアント）: `{ "topic": "...", "type": "chat.message.created|chat.reaction.added|chat.message.updated|chat.message.deleted|notification.created|notification.unread_count", "data": {...}, "id": "<event_id>" }`。**`type` は機械可読**、`data` は該当リソースの表示用ペイロード。
 - **順序・再接続・取りこぼし対策**: 切断中の欠落は**REST を正**として補う（再接続時にチャットは `GET /ideas/{id}/chat?after=<cursor>`、通知は `GET /notifications` と未読数で再同期）。WS は「速報」・REST は「真実」。将来 `Last-Event-ID` 相当の再送を検討。
 - **プレゼンス/タイピング表示は将来**（同 WS 上で拡張可能な設計にしておく）。**外部通知（メール等）も将来**（i18n の通知テンプレは §1.13/コーディング規約 §2.1）。
 - **ポーリング併用（フォールバック）**: WS 未接続時やベルの初期表示は `GET /notifications/unread-count`／`GET /notifications` で取得（WS はあくまで push の上乗せ）。
@@ -151,25 +141,25 @@
 
 ## 2. エンドポイント一覧（ドメイン別＝分割レビューの単位）
 
-> 以下は**分割レビューの割当と代表エンドポイントの目次**。各ドメインを 1 セッション（or 数ターン）で req/res・権限・エラー・画面対応まで詳細化し、都度ユーザー承認のうえコミットする（handoff の 2 段コミット運用）。「詳細確定」列が済んだドメインから OpenAPI に落とす。
+> 各ドメインを 1 セッション（or 数ターン）で req/res・権限・エラー・画面対応まで詳細化し、都度ユーザー承認のうえコミットする（handoff の 2 段コミット運用）。**詳細確定したドメインは個別ファイルへ切り出し**、下表からリンクする。未着手のドメインはここに代表エンドポイントの目次だけを置く。「詳細確定」列が済んだドメインから OpenAPI に落とす。
 
-| # | ドメイン | 主対象画面 | プレーン | 詳細確定 |
-| --- | --- | --- | --- | --- |
-| A | 認証・セッション | SC-00 | コントロール | ⬜ |
-| B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール | ⬜ |
-| C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ⬜ |
-| D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ⬜ |
-| E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ |
-| F | 評価 | SC-25/22 | テナント | ⬜ |
-| G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ⬜ |
-| H | 通知 | SC-02 | テナント | ⬜ |
-| I | ダッシュボード集約 | SC-01 | テナント | ⬜ |
-| J | 全文検索 | SC-12 | テナント | ⬜ |
-| K | プロフィール・背景画像 | 共通ヘッダー | テナント | ⬜ |
-| L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ⬜ |
+| # | ドメイン | 主対象画面 | プレーン | 詳細確定 | ファイル |
+| --- | --- | --- | --- | --- | --- |
+| A | 認証・セッション | SC-00 | コントロール | ✅ | [`A_認証・セッション.md`](./A_認証・セッション.md) |
+| B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール | ⬜ | （目次＝§2-B） |
+| C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ⬜ | （目次＝§2-C） |
+| D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ⬜ | （目次＝§2-D） |
+| E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ | （目次＝§2-E） |
+| F | 評価 | SC-25/22 | テナント | ⬜ | （目次＝§2-F） |
+| G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ⬜ | （目次＝§2-G） |
+| H | 通知 | SC-02 | テナント | ⬜ | （目次＝§2-H） |
+| I | ダッシュボード集約 | SC-01 | テナント | ⬜ | （目次＝§2-I） |
+| J | 全文検索 | SC-12 | テナント | ⬜ | （目次＝§2-J） |
+| K | プロフィール・背景画像 | 共通ヘッダー | テナント | ⬜ | （目次＝§2-K） |
+| L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ⬜ | （目次＝§2-L） |
 
-### A. 認証・セッション（コントロールプレーン）
-`POST /auth/login`・`POST /auth/mfa/verify`・`POST /auth/mfa/resend`・`POST /auth/logout`・`POST /auth/logout-all`・`GET /auth/session`・`POST /auth/password-setup/verify`・`POST /auth/password-setup/complete`（詳細＝§1.4）。
+### A. 認証・セッション（コントロールプレーン）＝詳細確定
+→ **[`A_認証・セッション.md`](./A_認証・セッション.md)**（状態機械・Cookie/トークン・8 エンドポイントの req/res・エラー・SC-00 対応）。
 
 ### B. 会社・アカウント・所属（system_admin／quest_group_admin）
 - 会社（運営・SC-91/92）: `GET/POST /admin/companies`・`GET/PATCH /admin/companies/{id}`（設定フラグ `vote_anonymized`/`hide_voters_from_managers`/`mfa_required`・`color`/`icon`）・（プロビジョニング系は MVP 手動＝§8-⑫、API 化は将来）。
@@ -210,6 +200,6 @@
 
 ## 3. 次アクション
 
-1. **ドメイン A（認証・セッション）から分割レビュー**で詳細化（req/res スキーマ・状態遷移・エラー・SC-00 対応）→ ユーザー承認 → コミット。
-2. 以降 B→C→…→L の順で詳細化（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。
+1. **B→C→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
+2. **次の着手＝ドメイン B（会社・アカウント・所属）**。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
