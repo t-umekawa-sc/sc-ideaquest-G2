@@ -101,7 +101,7 @@
   <div class="list-empty" id="empty" hidden>該当するアカウントがありません。</div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。<strong>論理削除</strong>＝無効化（ログイン不可）で、それまでの入力（アイデア/投票/評価/コメント）は削除せず表示継続。物理削除は行わない。所属の割当（グループ間移動）はシステム管理者（SC-91）。
+    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。<strong>論理削除</strong>＝無効化（ログイン不可）で、それまでの入力（アイデア/投票/評価/コメント）は削除せず表示継続。物理削除は行わない。所属の割当（グループ間移動）と<strong>クエストグループ管理者（グループ内ロール admin）の付与/剥奪はシステム管理者（SC-92）</strong>。この画面では自分が管理するグループのメンバーのみ運用（admin 付与不可）。
   </p>
 </main>
 
@@ -115,11 +115,9 @@
     <div class="form-row"><label class="req" for="amLoginId">ログインID</label><input class="input" id="amLoginId" placeholder="例: taro.yamada"><div class="hint">ログイン用の識別子（メールとは別）。</div></div>
     <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
     <div class="form-row"><label>所属クエストグループ</label><div class="fixed-field" id="amGroup">製品企画（この管理グループに追加されます）</div></div>
-    <div class="form-row"><label for="amRole">グループ内ロール</label>
-      <select class="select" id="amRole">
-        <option value="member">一般メンバー</option>
-        <option value="qg_admin">クエストグループ管理者</option>
-      </select>
+    <div class="form-row"><label>グループ内ロール</label>
+      <div class="fixed-field" id="amRoleFixed">一般メンバー（固定）</div>
+      <div class="hint"><strong>クエストグループ管理者（admin）の付与/変更はシステム管理者のみ</strong>（SC-92）。この画面ではメンバーの発行/編集のみ（ロールは変更不可）。</div>
     </div>
     <div class="form-note" id="amNote">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>を行います（招待リンク/初回パスワード設定フロー）。</div>
     <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
@@ -217,7 +215,9 @@
     document.getElementById('amName').value = m ? m.name : '';
     document.getElementById('amLoginId').value = m ? m.loginId : '';
     document.getElementById('amEmail').value = m ? m.email : '';
-    document.getElementById('amRole').value = m ? m.role : 'member';
+    document.getElementById('amRoleFixed').textContent = (m && m.role === 'qg_admin')
+      ? 'クエストグループ管理者（変更はシステム管理者・SC-92）'
+      : '一般メンバー（固定）';
     document.getElementById('amGroup').textContent = (m ? m.group : currentGroup) + '（この管理グループに追加されます）';
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
     document.getElementById('amNote').style.display = mode === 'edit' ? 'none' : '';
@@ -228,10 +228,10 @@
     const name = document.getElementById('amName').value.trim();
     const loginId = document.getElementById('amLoginId').value.trim();
     const email = document.getElementById('amEmail').value.trim();
-    const role = document.getElementById('amRole').value;
     if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
-    if (editTarget) { editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email; editTarget.role = role; }
-    else { MEMBERS.push({ name, loginId, email, group: currentGroup, role, state:'active', last:'—（未ログイン）' }); }
+    // グループ内ロールは SC-90 では変更不可（member 固定・admin 付与は system_admin=SC-92）
+    if (editTarget) { editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email; }
+    else { MEMBERS.push({ name, loginId, email, group: currentGroup, role: 'member', state:'active', last:'—（未ログイン）' }); }
     closeModal(accountModal); render();
   });
 

@@ -221,9 +221,9 @@
     <div class="form-row"><label for="amRole">システムロール</label>
       <select class="select" id="amRole">
         <option value="member">一般</option>
-        <option value="qg_admin">クエストグループ管理者</option>
         <option value="sys_admin">システム管理者</option>
       </select>
+      <div class="hint">運営（システム管理者）か否かの2値。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（system_role では持たない）。</div>
     </div>
     <div class="form-row"><label>所属クエストグループ</label>
       <div class="multiselect" data-multiselect id="amGroups">
@@ -234,9 +234,9 @@
           <li class="multiselect__empty" role="presentation" hidden></li>
         </ul>
       </div>
-      <div class="hint">複数選択可（この会社のクエストグループから選択）。</div>
+      <div class="hint">複数選択可（この会社のクエストグループから選択）。各グループでの役割は既定=メンバー。<strong>そのグループの管理者（＝クエストグループ管理者）に指定できるのはシステム管理者のみ</strong>（指定されたユーザーは当該グループを SC-90 で管理可）。</div>
     </div>
-    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。ロール「システム管理者」は運営のみに付与。</div>
+    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロール「システム管理者」は運営のみに付与。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>。</div>
     <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
       <button class="btn btn-primary" type="button" id="amSave">発行する</button>
@@ -259,21 +259,22 @@
     sample: { name:'サンプル商事', code:'SAMPLE', color:'#D97706', icon:null, db:'db_sample', state:'suspended', accounts:7, groups:1,
       flags:{ voteAnon:true, hideVoters:false, mfa:false }, questGroups:['営業推進'] },
   };
-  const ROLE_LABEL = { member:'一般', qg_admin:'クエストグループ管理者', sys_admin:'システム管理者' };
+  // システムロールは2値（B案）。QG管理者は所属グループの role:'admin' で表現。
+  const SYSROLE_LABEL = { member:'一般', sys_admin:'システム管理者' };
   const ST_ACC = { active:['有効','st-active'], suspended:['無効','st-suspended'] };
   const ACCOUNTS = {
     across: [
-      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  role:'member',   groups:['製品企画','業務改善'], state:'active' },
-      { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',role:'qg_admin',  groups:['製品企画'], state:'active' },
-      { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', role:'sys_admin', groups:[], state:'active' },
-      { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   role:'member',   groups:['R&D'], state:'suspended' },
+      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  system_role:'member',   groups:[{n:'製品企画',r:'member'},{n:'業務改善',r:'member'}], state:'active' },
+      { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',system_role:'member',   groups:[{n:'製品企画',r:'admin'}], state:'active' },
+      { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', system_role:'sys_admin', groups:[], state:'active' },
+      { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   system_role:'member',   groups:[{n:'R&D',r:'member'}], state:'suspended' },
     ],
     beyond: [
-      { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',role:'member',   groups:['R&D'], state:'active' },
-      { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@beyond.co.jp',   role:'qg_admin', groups:['R&D','品質保証'], state:'active' },
+      { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',system_role:'member',   groups:[{n:'R&D',r:'member'}], state:'active' },
+      { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@beyond.co.jp',   system_role:'member', groups:[{n:'R&D',r:'admin'},{n:'品質保証',r:'admin'}], state:'active' },
     ],
     sample: [
-      { name:'退職 花', loginId:'hana.tai', email:'hana@sample.co.jp', role:'member', groups:['営業推進'], state:'suspended' },
+      { name:'退職 花', loginId:'hana.tai', email:'hana@sample.co.jp', system_role:'member', groups:[{n:'営業推進',r:'member'}], state:'suspended' },
     ],
   };
 
@@ -375,15 +376,25 @@
     const list = list0.filter(a => (!q || a.name.toLowerCase().includes(q) || a.loginId.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)) && (!st || a.state === st));
     accountRows.innerHTML = list.map(a => {
       const [label, cls] = ST_ACC[a.state];
-      const groups = a.groups.length ? a.groups.map(g => `<span class="badge badge-muted">${g}</span>`).join(' ') : '<span class="muted">—</span>';
-      return `<tr>
+      const idx = list0.indexOf(a);
+      const groups = a.groups.length ? a.groups.map(g => g.r === 'admin'
+        ? `<span class="badge st-active" title="このグループの管理者（クエストグループ管理者）">${g.n} · 管理者</span>`
+        : `<span class="badge badge-muted">${g.n}</span>`).join(' ') : '<span class="muted">—</span>';
+      const toggle = a.state === 'active'
+        ? `<button class="btn btn-outline" type="button" data-suspend="${idx}">無効化</button>`
+        : `<button class="btn btn-outline" type="button" data-activate="${idx}">再有効化</button>`;
+      return `<tr class="${a.state === 'suspended' ? 'is-suspended' : ''}">
         <td><strong>${a.name}</strong></td>
         <td class="db-id">${a.loginId}</td>
         <td class="db-id">${a.email}</td>
-        <td>${ROLE_LABEL[a.role]}</td>
+        <td>${SYSROLE_LABEL[a.system_role]}</td>
         <td>${groups}</td>
         <td><span class="badge ${cls}">${label}</span></td>
-        <td><button class="btn btn-outline" type="button">所属・編集</button></td>
+        <td><div class="row-actions">
+          <button class="btn btn-outline" type="button" data-edit="${idx}">所属・編集</button>
+          <button class="btn btn-outline" type="button" data-reset="${idx}">パスワード再設定</button>
+          ${toggle}
+        </div></td>
       </tr>`;
     }).join('');
     document.getElementById('accCount').textContent = list.length + ' 件';
@@ -396,14 +407,41 @@
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
   function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
   document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
-  document.getElementById('newAccount').addEventListener('click', () => openModal('accountModal'));
+  // 発行/編集モーダル
+  let accEditTarget = null;
+  function openAccount(mode, a) {
+    accEditTarget = mode === 'edit' ? a : null;
+    document.getElementById('amTitle').textContent = mode === 'edit' ? 'アカウントを編集' : 'アカウントを発行';
+    document.getElementById('amName').value = a ? a.name : '';
+    document.getElementById('amLoginId').value = a ? a.loginId : '';
+    document.getElementById('amEmail').value = a ? a.email : '';
+    document.getElementById('amRole').value = a ? a.system_role : 'member';
+    document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
+    openModal('accountModal');
+  }
+  document.getElementById('newAccount').addEventListener('click', () => openAccount('new', null));
   document.getElementById('amSave').addEventListener('click', () => {
     const name = document.getElementById('amName').value.trim();
     const loginId = document.getElementById('amLoginId').value.trim();
     const email = document.getElementById('amEmail').value.trim();
+    const sysRole = document.getElementById('amRole').value;
     if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
-    alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。初回ログイン時にパスワード設定を行います。');
+    if (accEditTarget) {
+      accEditTarget.name = name; accEditTarget.loginId = loginId; accEditTarget.email = email; accEditTarget.system_role = sysRole;
+      renderAccounts();
+    } else {
+      alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。初回ログイン時にパスワード設定を行います。');
+    }
     closeModal(document.getElementById('accountModal'));
+  });
+
+  // 行アクション（編集 / パスワード再設定 / 無効化⇄再有効化）
+  accountRows.addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    if (btn.dataset.edit != null) { openAccount('edit', list0[btn.dataset.edit]); }
+    else if (btn.dataset.reset != null) { const a = list0[btn.dataset.reset]; if (confirm('「' + a.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フロー（リンク・72時間）に戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
+    else if (btn.dataset.suspend != null) { const a = list0[btn.dataset.suspend]; if (confirm('「' + a.name + '」を無効化（論理削除）しますか？\nログイン不可・全セッション破棄になりますが、これまでの入力は残ります。')) { a.state = 'suspended'; renderAccounts(); } }
+    else if (btn.dataset.activate != null) { const a = list0[btn.dataset.activate]; a.state = 'active'; renderAccounts(); }
   });
 
   renderAccounts();

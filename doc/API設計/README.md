@@ -61,7 +61,8 @@
 
 ### 1.6 認可（ロール・権限）
 
-- **システムロール（`system_role`）**: `system_admin`（運営＝会社/全アカウント操作）/ `quest_group_admin`（自グループ内アカウント発行・編集・論理削除）/ `general`。管理 API はロールで門番。
+- **システムロール（`system_role`）**: `system_admin`（運営＝会社/全アカウント操作）/ `general` の 2 値。コントロールプレーンの管理 API（`/admin/companies/*`）は `system_admin` で門番。
+- **クエストグループ管理者（QG管理者）**: `system_role` では表さず、**会社DB `quest_group_members.role=admin`（per-group）で表現**（B案・2026-07-27 決定＝二重定義の解消）。QG向け管理 API（`/admin/quest-groups/*`）は**セッションユーザーが対象グループに有効な `admin` 所属（`removed_at IS NULL`）を持つか**で門番（会社DB 判定）。`admin` の付与/剥奪は system_admin のみ（SC-92）。
 - **フロント/バック境界（`doc/コーディング規約.md` §1）**: 認可・業務バリデーション・ゲーム計算・状態遷移/冪等はすべて**バックエンド専任**。フロントは表示・UX 出し分け・API 呼び出しのみ（クライアント側検証は UX 便宜で権威にしない）。
 - **クエスト内 6 権限（`permission_type`）**: `owner`/`quest_admin`/`evaluator`/`vote`/`idea_create`/`comment`。**全アクションはサーバーが権限を強制**（フロントの出し分けは UX のみ）。代表マッピング:
   - アイデア作成 = `idea_create`、投票 = `vote`、コメント/チャット投稿 = `comment`、評価 = `evaluator`、クエスト編集/パーティー・権限変更 = `owner`/`quest_admin`、所有者権限の付与 = `owner`（作成者）のみ。
@@ -147,7 +148,7 @@
 | # | ドメイン | 主対象画面 | プレーン | 詳細確定 | ファイル |
 | --- | --- | --- | --- | --- | --- |
 | A | 認証・セッション | SC-00 | コントロール | ✅ | [`A_認証・セッション.md`](./A_認証・セッション.md) |
-| B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール | ⬜ | （目次＝§2-B） |
+| B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール＋テナント | ✅ | [`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md) |
 | C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ⬜ | （目次＝§2-C） |
 | D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ⬜ | （目次＝§2-D） |
 | E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ | （目次＝§2-E） |
@@ -162,11 +163,8 @@
 ### A. 認証・セッション（コントロールプレーン）＝詳細確定
 → **[`A_認証・セッション.md`](./A_認証・セッション.md)**（状態機械・Cookie/トークン・8 エンドポイントの req/res・エラー・SC-00 対応）。
 
-### B. 会社・アカウント・所属（system_admin／quest_group_admin）
-- 会社（運営・SC-91/92）: `GET/POST /admin/companies`・`GET/PATCH /admin/companies/{id}`（設定フラグ `vote_anonymized`/`hide_voters_from_managers`/`mfa_required`・`color`/`icon`）・（プロビジョニング系は MVP 手動＝§8-⑫、API 化は将来）。
-- アカウント（SC-90/92）: `GET/POST /admin/companies/{id}/accounts`・`PATCH /admin/.../accounts/{id}`（編集・ロール）・`POST /.../accounts/{id}/disable`・`/enable`（論理削除⇄復活）・`POST /.../accounts/{id}/password-reset`（再設定リンク再送）。※すべて accounts 更新＋outbox（§1.13）。
-- 所属（クエストグループ割当）: 会社DB `quest_group_members` に対して実施（§8-①）。QG管理者は自グループのみ、admin 付与/剥奪は system_admin のみ（SC-90 §9）。
-- **セキュリティ（A.9 委譲分）**: ロール変更・disable は**該当アカウントの全セッション破棄＋信頼端末失効を発火**（`A_認証・セッション.md` §A.9-③）。**権限変更履歴を記録**（セキュリティ一覧 2-⑬）。
+### B. 会社・アカウント・所属（system_admin＝全社／QG管理者＝自グループ）＝詳細確定
+→ **[`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md)**。決定＝**①ロール別パス分離**（system_admin=`/admin/companies/{company_id}/...`／QG管理者=`/admin/quest-groups/{group_id}/...`）**②B案ロールモデル**（QG管理者は `quest_group_members.role=admin` で表現・§1.6）**③発行時の初期所属を outbox に相乗**（会社DBでusers→memberships upsert・FK順序保証）**④SC-92 は SC-90 の上位互換**（無効化/PW再設定を全社範囲でも）。ロール変更・disable でセッション破棄＋信頼端末失効（§A.9-③）、権限変更履歴を `system_audit_logs` に記録（セキュリティ一覧 2-⑬）。
 
 ### C. クエスト・パーティー・権限
 `GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH /quests/{id}`・`DELETE /quests/{id}`（論理削除＝owner/quest_admin）・`POST /quests/{id}/publish`（下書き→公開）・カテゴリ/カラー/アイコン・パーティー `POST/DELETE /quests/{id}/members`・権限 `PUT /quests/{id}/members/{user_id}/permissions`・クエストグループ `GET /quest-groups`。
@@ -203,6 +201,6 @@
 
 ## 3. 次アクション
 
-1. **B→C→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン B（会社・アカウント・所属）**。
+1. **C→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
+2. **次の着手＝ドメイン C（クエスト・パーティー・権限）**。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
