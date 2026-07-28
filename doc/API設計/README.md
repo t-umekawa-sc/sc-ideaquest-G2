@@ -3,7 +3,7 @@
 > ideaquest の HTTP API 設計。**本 README の第1章（API 全体規約）を「全体設計」として先に確定**し、第2章のドメイン別エンドポイントを**分割レビュー**で順に詳細化する方針（2026-07-21 合意）。詳細確定したドメインは**このディレクトリ配下の個別ファイル**（`A_認証・セッション.md` 等）に切り出す（2026-07-27 ファイル分割方針・`screens/` と同じ発想）。
 > 仕様の本体は `doc/要件定義/README.md`（唯一の要件定義書）、データ構造は `doc/データモデル.md` を参照。本ファイルはその API 展開。**全フィールドを網羅する機械可読仕様は OpenAPI 3.1（SoT・§1.1）側**であり、本ディレクトリは*設計意図・req/res の形・エラー・画面対応をレビューするための人間向けドキュメント*。
 
-- 最終更新: 2026-07-27
+- 最終更新: 2026-07-29
 - 対象フェーズ: **API 設計フェーズ＝ドメイン別分割レビュー進行中（全体設計＝確定・実装前）**
 - スタイル: **REST / JSON ＋ OpenAPI**（FastAPI 自動生成の OpenAPI をソースオブトゥルースに）
 - 関連: `doc/データモデル.md`（テーブル/Enum）・`doc/画面設計/screens/SC-*.md`（各画面の「API」節）・各 `mocks/SC-*.html`（mock API 注記）
@@ -149,7 +149,7 @@
 | --- | --- | --- | --- | --- | --- |
 | A | 認証・セッション | SC-00 | コントロール | ✅ | [`A_認証・セッション.md`](./A_認証・セッション.md) |
 | B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール＋テナント | ✅ | [`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md) |
-| C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ⬜ | （目次＝§2-C） |
+| C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ✅ | [`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md) |
 | D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ⬜ | （目次＝§2-D） |
 | E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ | （目次＝§2-E） |
 | F | 評価 | SC-25/22 | テナント | ⬜ | （目次＝§2-F） |
@@ -166,8 +166,8 @@
 ### B. 会社・アカウント・所属（system_admin＝全社／QG管理者＝自グループ）＝詳細確定
 → **[`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md)**。決定＝**①ロール別パス分離**（system_admin=`/admin/companies/{company_id}/...`／QG管理者=`/admin/quest-groups/{group_id}/...`）**②B案ロールモデル**（QG管理者は `quest_group_members.role=admin` で表現・§1.6）**③発行時の初期所属を outbox に相乗**（会社DBでusers→memberships upsert・FK順序保証）**④SC-92 は SC-90 の上位互換**（無効化/PW再設定を全社範囲でも）。ロール変更・disable でセッション破棄＋信頼端末失効（§A.9-③）、権限変更履歴を `system_audit_logs` に記録（セキュリティ一覧 2-⑬）。
 
-### C. クエスト・パーティー・権限
-`GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH /quests/{id}`・`DELETE /quests/{id}`（論理削除＝owner/quest_admin）・`POST /quests/{id}/publish`（下書き→公開）・カテゴリ/カラー/アイコン・パーティー `POST/DELETE /quests/{id}/members`・権限 `PUT /quests/{id}/members/{user_id}/permissions`・クエストグループ `GET /quest-groups`。
+### C. クエスト・パーティー・権限（テナント）＝詳細確定
+→ **[`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md)**。決定＝**①パーティー所属を門番に**（非パーティーは 404・可視範囲＝パーティー内）**②クエスト内 6 権限をサーバー強制**（`owner` 付与は作成者のみ・作成者は剥奪不可・新規既定＝vote/idea_create/comment）**③パーティー編集は一括差分 `PUT /quests/{id}/party`＋増分 `POST/DELETE /members`・`PUT /members/{user_id}/permissions` を両立**（SC-11 モーダル保存に対応）**④`quest_group_id` は作成時のみ・以後不変**（参照範囲/既存アイデア整合の保護）**⑤状態機械を前進のみサーバー強制**（`draft→recruiting→in_progress→evaluating→completed`・完了で書き込み凍結）**⑥クエスト公開に XP は付与しない**（canonical XP 表に無い＝SC-11 の「作成 XP」表現は要修正）。主エンドポイント＝`GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH/DELETE /quests/{id}`（DELETE=論理削除 owner/quest_admin）・`POST /quests/{id}/publish`・`POST /quests/{id}/transition`・パーティー `PUT /quests/{id}/party`／`POST/DELETE /quests/{id}/members`／`PUT /quests/{id}/members/{user_id}/permissions`・候補 `GET /quest-groups`・`GET /quest-groups/{id}/members`。クエスト内ランキングは G、全文検索は J、通知発火は H を参照。
 
 ### D. アイデア・添付・版・投票・フォロー
 `GET /quests/{id}/ideas`・`POST /quests/{id}/ideas`・`GET/PATCH /ideas/{id}`・`DELETE /ideas/{id}`（論理削除＝投稿者本人＋管理）・`POST /ideas/{id}/publish`（下書き→公開＋投稿XP＋チャットグループ自動作成）・添付（§1.10）・版 `GET /ideas/{id}/revisions`＋差分（FR-34）・投票 `POST /ideas/{id}/vote`（賛成/反対/取消・冪等・+5XP・匿名/記名は表示制御）・フォロー `POST/DELETE /ideas/{id}/follow`。
@@ -201,6 +201,6 @@
 
 ## 3. 次アクション
 
-1. **C→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン C（クエスト・パーティー・権限）**。
+1. **D→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
+2. **次の着手＝ドメイン D（アイデア・添付・版・投票・フォロー）**。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
