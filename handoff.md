@@ -29,6 +29,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `9ed528a` SC-92 per-groupロール指定UIを実装＝モック↔仕様のギャップ解消（B案のQG管理者付与フローを現物で再現可能に）。発行/編集モーダルの所属グループを .multiselect→行形式エディタに置換＝選択済みグループを1行ずつ表示し各行にメンバー/管理者セグメント切替(.seg)＋削除、末尾に「＋グループを追加」プルダウン（未選択グループのみ）。役割既定=member・CSS .mrows/.mrow/.seg 追加。編集時は既存の所属・ロールを反映（従来未反映のバグも解消）。保存で memberships[{group_id,role}] 相当を更新し一覧の「·管理者」バッジに即反映。システムロール欄と所属ロールを別UIで明示（B案の切り分けを画面上で明確化）。SC-92_会社詳細.md §4.3 も行形式へ更新
   - `13a6d04` handoff: 次セッションの未解決論点を記録＝SC-92のグループ別ロール(member/admin)指定UI未実装（モック↔仕様のギャップ・QG管理者付与フローが現物で再現できない）。次セッションはこの解消を最初に行いドメインCへ。提案UI・再開手順を明記
   - `e2c4a14` API設計ドメインA: 認証方式のADR(§A.10)を追加＝Cookie＋Redis不透明セッション vs JWT。決定＝ブラウザ向けは現行Cookie＋Redisセッション維持・JWTはMVP不採用(将来の外部/ネイティブにBearer余地のみ)。根拠＝単一FastAPI＋共有Redis＋同一オリジン＋即時失効の確定要件(§A.9-③)にJWTのステートレス性が矛盾・XSS露出・失効リストで複雑化。比較表＋再検討条件を明記
   - `09f4fd5` API設計ドメインB確定＋QG管理者の二重定義をB案で解消。決定4件〔①ロール別パス分離(system_admin=/admin/companies/{id}・QG=/admin/quest-groups/{group_id})②B案=system_roleからquest_group_admin削除・QG管理者はquest_group_members.role=adminのみ・SC-90アクセス=admin所属・admin付与はsystem_adminのみ③発行時の初期所属をoutboxに相乗(users→memberships順upsert・FK順序保証)④SC-92はSC-90上位互換〕。B_ファイルにB.0-B.7(認可スコープ/会社/アカウント/所属/QG管理者API/発行フロー/セキュリティ対策マッピング/未確定)。波及=データモデル(§3/§4.2/§5.3/§5.5/§8-⑭)・要件定義README・SC-90/91/92・SC-01・API README §1.6/§2/§3・A.6／モック=SC-92(ロール2値・per-groupロール表示・一覧操作列にPW再設定/無効化⇄再有効化・編集モーダル機能化)・SC-90(グループ内ロールmember固定・JS修正)。状態列と無効化ボタンは役割別で両保持(A案・SC-90と一貫)
