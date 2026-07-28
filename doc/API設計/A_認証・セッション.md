@@ -6,13 +6,31 @@
 
 ## A.0 状態機械・Cookie/トークン一覧
 
+```mermaid
+stateDiagram-v2
+    [*] --> Unauth
+    Unauth: 未認証
+    PreAuth: pre-auth
+    Authed: 認証済み
+
+    Unauth --> Authed: login ①
+    Unauth --> PreAuth: login ②
+    PreAuth --> Authed: mfa/verify ③
+    PreAuth --> Unauth: 失効 ④
+    Authed --> Unauth: logout ⑤
 ```
-[未認証] --login(PW OK・信頼端末あり)------------------------> [認証済み(iq_session)]
-[未認証] --login(PW OK・要MFA)---> [pre-auth(iq_preauth・OTP発行済)] --mfa/verify(OK)--> [認証済み]
-[pre-auth] --mfa/resend--> [pre-auth(OTP再発行)]
-[pre-auth] --（10分TTL切れ / verify連続失敗上限）--> [未認証(要 login やり直し)]
-[認証済み] --logout--> [未認証] ／ logout-all--> 全端末[未認証]＋trusted_devices失効
-```
+
+**遷移の凡例**（エッジのラベルは短縮し、条件は下記に集約）:
+
+| # | 遷移 | 契機・条件 | 結果 |
+| --- | --- | --- | --- |
+| ① | 未認証 → 認証済み | `login`（PW OK **かつ信頼端末**＝`iq_trust` 有効） | MFA をスキップして本セッション発行（`iq_session`＋`iq_csrf`） |
+| ② | 未認証 → pre-auth | `login`（PW OK・**要MFA**） | OTP をメール送信・`iq_preauth`（既定10分）発行。最小権限＝`mfa/verify`・`mfa/resend` のみ受理 |
+| ③ | pre-auth → 認証済み | `mfa/verify`（OTP 一致） | pre-auth 消費→本セッション発行。**認証成功時は常に新規セッションID**（固定化対策） |
+| ④ | pre-auth → 未認証 | **10分TTL切れ** または **verify 連続失敗上限** | pre-auth 破棄＝`login` からやり直し |
+| ⑤ | 認証済み → 未認証 | `logout`（現端末のみ）／`logout-all`（全端末＋`trusted_devices` 失効） | セッション破棄・Cookie 失効 |
+
+- **`mfa/resend`（OTP再発行）は状態を変えない自己遷移**＝pre-auth に留まったまま OTP のみ再発行するため図では省略（レート制限は `resend_available_in` 経過後・§A.1）。
 
 | 名前 | 種別 | 属性 | 目的・TTL |
 | --- | --- | --- | --- |
