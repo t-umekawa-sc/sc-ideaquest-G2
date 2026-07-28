@@ -27,42 +27,27 @@
 - **トークン生成**：`iq_session`/`iq_preauth`/`iq_csrf`・OTP・password_setup トークンは**暗号学的に安全な乱数（CSPRNG）**で生成し、意味のある情報を埋め込まない（セキュリティ一覧 3・13）。
 - **Cookie スコープ最小化**：全 Cookie は `Path=/`・**Domain はホスト限定**（親ドメインへ広げない）。
 
-## A.1 `POST /auth/login`
+## A.1 エンドポイント一覧（`/auth`・コントロールプレーン）
 
-- 認証: 不要（未認証起点）。CSRF: 免除（Origin/Sec-Fetch のみ）。レート制限あり（IP＋login_id）。
-- req: `{ "company_code": "ACME-01", "login_id": "yamada", "password": "…" }`
-- res（分岐）:
-  - **信頼端末で MFA スキップ or `mfa_required=false`**＝本セッション発行 → `Set-Cookie: iq_session, iq_csrf` ＋ `200 { "status": "authenticated", "session": { …§A.6 } }`
-  - **要 MFA**＝OTP をメール送信＋pre-auth 発行 → `Set-Cookie: iq_preauth` ＋ `200 { "status": "mfa_required", "mfa": { "delivery": "email", "masked_to": "y****@acme.co.jp", "expires_in": 600, "resend_available_in": 30 } }`
-  - **要 初回パスワード設定**（`password_set=false`）＝PW 照合前に `200 { "status": "password_setup_required" }`（SC-00 は初回PW設定状態へ。実リンクはメール経由＝A.7）
-- 監査/秘匿: 会社コード不正・login_id 不在・PW 不一致は**一律** `401 { "code": "unauthenticated" }`（列挙耐性・SC-00 方針）。会社 `suspended` は `403 { "code": "company_suspended" }`（運営は別途 admin ログイン想定）。
-- SC-00 対応: 成功→ダッシュボード遷移／`mfa_required`→認証コード入力状態／`password_setup_required`→初回PW設定状態。
+| メソッド/パス | 概要 | リクエスト（ボディ/前提） | レスポンス（主なデータ・Set-Cookie） |
+| --- | --- | --- | --- |
+| `POST /auth/login` | 会社コード＋ID＋PW でログイン認証（未認証起点） | ボディ: `company_code`,`login_id`,`password`／前提: 認証不要・**CSRF免除（Origin/Sec-Fetch のみ）**・レート制限（IP＋login_id） | 3分岐（下記「レスポンス分岐」）＝`authenticated`／`mfa_required`／`password_setup_required`。成功時 `Set-Cookie: iq_session,iq_csrf`（要MFA時は `iq_preauth`） |
+| `POST /auth/mfa/verify` | pre-auth 中の OTP を検証し本セッション発行 | ボディ: `code`,`trust_device`／前提: **pre-auth（`iq_preauth`）必須**・CSRF＋Origin | `200 { status:"authenticated", session:{…§A.6} }`＋`Set-Cookie: iq_session,iq_csrf`（`trust_device=true` は `iq_trust` も）・`iq_preauth` 削除 |
+| `POST /auth/mfa/resend` | OTP を再送（旧OTP失効） | 前提: pre-auth 必須・CSRF＋Origin・**レート制限**（`resend_available_in` 経過前は 429＋`Retry-After`） | `200 { expires_in:600, resend_available_in:30 }` |
+| `POST /auth/logout` | 現在の端末をログアウト | 前提: 本セッション必須・CSRF＋Origin | `204`（現 `iq_session` を Redis 破棄・Cookie 失効） |
+| `POST /auth/logout-all` | 全端末をログアウト＋信頼端末失効 | 前提: 本セッション必須・CSRF＋Origin | `204`（当該 `account_id` の**全セッション破棄＋`trusted_devices` を `revoked`**＝全端末で次回 MFA 必須） |
+| `GET /auth/session` | 現在のセッション情報を取得（フロント初期化＝ロール別UI・言語） | 前提: 本セッション必須（pre-auth では 401）・CSRF不要（GET） | `200 { …§A.6 }`／未認証＝`401 { code:"unauthenticated" }` |
 
-## A.2 `POST /auth/mfa/verify`
-
-- 認証: **pre-auth（`iq_preauth`）必須**。CSRF＋Origin 検証あり。
-- req: `{ "code": "123456", "trust_device": true }`
-- res: 成功＝pre-auth 消費→本セッション発行 → `Set-Cookie: iq_session, iq_csrf`（`trust_device=true` なら `iq_trust` も）＋削除 `iq_preauth` ＋ `200 { "status": "authenticated", "session": { …§A.6 } }`
-- エラー: OTP 不一致＝`401 { "code": "otp_invalid", "attempts_left": n }`（連続失敗上限で pre-auth 失効＝`login` やり直し）。pre-auth 不在/期限切れ＝`401 { "code": "preauth_expired" }`。OTP 期限切れ＝`401 { "code": "otp_expired" }`（resend 案内）。
-- SC-00 対応: 認証コード入力→成功でダッシュボード／失敗は残回数表示・上限でログイン画面へ戻す。
-
-## A.3 `POST /auth/mfa/resend`
-
-- 認証: pre-auth 必須。CSRF＋Origin。**レート制限**（`resend_available_in` 経過前は `429 { "code": "rate_limited" }`＋`Retry-After`）。
-- res: 新 OTP 発行・旧 OTP 失効 → `200 { "expires_in": 600, "resend_available_in": 30 }`。
-
-## A.4 `POST /auth/logout` ／ `POST /auth/logout-all`
-
-- 認証: 本セッション必須。CSRF＋Origin。
-- `logout`＝現 `iq_session` を Redis から破棄・Cookie 失効 → `204`。
-- `logout-all`＝当該 `account_id` の**全セッション破棄＋`trusted_devices` を `revoked`**（全端末で次回 MFA 必須）→ `204`。
-- **同じ「全セッション破棄＋信頼端末失効」を、ユーザー操作なしでもサーバーが強制発火**する契機＝**ロール（`system_role`）変更・アカウント無効化(disable)・PW 変更/再設定**（詳細＝§A.9 セッション失効ルール。トリガはドメイン B／A.7）。
-- SC-00/共通ヘッダー対応: ユーザーメニューのログアウト導線。
-
-## A.5 `GET /auth/session`
-
-- 認証: 本セッション必須（pre-auth では 401）。CSRF 不要（GET）。
-- res: `200 { …§A.6 }`。未認証＝`401 { "code": "unauthenticated" }`。フロントの初期化（ロール別 UI 出し分け・言語）に使用。
+- **`POST /auth/login` のレスポンス分岐**:
+  - **信頼端末で MFA スキップ／`mfa_required=false`**＝本セッション発行 → `Set-Cookie: iq_session, iq_csrf` ＋ `200 { "status":"authenticated", "session": { …§A.6 } }`。
+  - **要 MFA**＝OTP をメール送信＋pre-auth 発行 → `Set-Cookie: iq_preauth` ＋ `200 { "status":"mfa_required", "mfa": { "delivery":"email", "masked_to":"y****@acme.co.jp", "expires_in":600, "resend_available_in":30 } }`。
+  - **要 初回パスワード設定**（`password_set=false`）＝PW 照合前に `200 { "status":"password_setup_required" }`（実リンクはメール経由＝A.7）。
+- **エラー・秘匿**:
+  - `login`＝会社コード不正・login_id 不在・PW 不一致は**一律** `401 { "code":"unauthenticated" }`（列挙耐性・SC-00 方針）。会社 `suspended`＝`403 { "code":"company_suspended" }`（運営は別途 admin ログイン想定）。
+  - `mfa/verify`＝OTP 不一致 `401 { "code":"otp_invalid", "attempts_left":n }`（連続失敗上限で pre-auth 失効＝`login` やり直し）／pre-auth 不在・期限切れ `401 { "code":"preauth_expired" }`／OTP 期限切れ `401 { "code":"otp_expired" }`（resend 案内）。
+  - `mfa/resend`＝クールダウン中 `429 { "code":"rate_limited" }`＋`Retry-After`。
+- **強制ログアウト（サーバー発火）**: 「全セッション破棄＋信頼端末失効」は logout-all 以外に、**ロール（`system_role`）変更・アカウント無効化(disable)・PW 変更/再設定**でもユーザー操作なしでサーバーが強制発火（トリガはドメイン B／A.7・詳細＝§A.9-③）。
+- **SC-00／共通ヘッダー対応**: `login` 成功→ダッシュボード遷移／`mfa_required`→認証コード入力状態／`password_setup_required`→初回PW設定状態。`mfa/verify` 成功→ダッシュボード・失敗は残回数表示（上限でログイン画面へ戻す）。ログアウト導線＝共通ヘッダーのユーザーメニュー。
 
 ## A.6 セッション情報スキーマ（`session`）
 
@@ -81,12 +66,17 @@
 }
 ```
 
-## A.7 `POST /auth/password-setup/verify` ／ `POST /auth/password-setup/complete`
+## A.7 初回パスワード設定／再設定（`/auth/password-setup`）
 
-- 用途: **初回PW設定／管理者によるPW再設定**。入口は**メールリンク**（`otp_challenges` purpose=`password_setup`・単回トークン・**72h**・データモデル §4.4）。認証不要（トークンが本人性）。CSRF＝Origin のみ（未ログイン起点）。
-- `verify` req: `{ "token": "…" }` → res `200 { "valid": true, "login_id": "yamada" }`（設定画面の表示用）。無効/期限切れ/使用済＝`410 { "code": "token_expired" }`（管理者再送を案内）。
-- `complete` req: `{ "token": "…", "new_password": "…" }` → PW 設定・`password_set=true`・**当該アカウントの全アクティブセッション破棄＋信頼端末を失効**（§A.9）・トークン消費。**accounts 更新と同一Tx で `account_sync_outbox` に upsert**（§1.13）→ `200 { "status": "ok" }`（ログイン画面へ）。PW ポリシー（§A.9）違反＝`422 { "code": "validation_error", "errors": […] }`。
-- SC-00 対応: 初回パスワード設定状態のフォーム（PW／確認・表示切替）。
+用途＝**初回PW設定／管理者によるPW再設定**。入口は**メールリンク**（`otp_challenges` purpose=`password_setup`・単回トークン・**72h**・データモデル §4.4）。認証不要（トークンが本人性）・CSRF＝Origin のみ（未ログイン起点）。
+
+| メソッド/パス | 概要 | リクエスト（ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `POST /auth/password-setup/verify` | リンクトークンの有効性を確認（設定画面の表示用） | ボディ: `token` | `200 { valid:true, login_id:"yamada" }`／無効・期限切れ・使用済＝`410 { code:"token_expired" }`（管理者再送を案内） |
+| `POST /auth/password-setup/complete` | 新パスワードを設定して完了 | ボディ: `token`,`new_password` | `200 { status:"ok" }`（ログイン画面へ）。PWポリシー（§A.9）違反＝`422 { code:"validation_error", errors:[…] }` |
+
+- `complete` 成功時＝PW 設定・`password_set=true`・**当該アカウントの全アクティブセッション破棄＋信頼端末を失効**（§A.9-③）・トークン消費。**accounts 更新と同一Tx で `account_sync_outbox` に upsert**（§1.13）。
+- **SC-00 対応**: 初回パスワード設定状態のフォーム（PW／確認・表示切替）。
 
 ## A.8 未確定（実装時に確定でも可）
 
@@ -103,7 +93,7 @@
 - **① PW ハッシュ**：`accounts.password_hash` は **Argon2id**（ソルト付き・コーディング規約 §3.4 `core/security.py`）。平文保存禁止・MD5/SHA-1 をパスワード用途に使わない（一覧 1・13）。
 - **② セッション固定対策**：認証成功時に常に新規セッションID を発行（§A.0）。セッションID は CSPRNG・URL に含めない・意味情報を埋め込まない（一覧 3）。
 - **③ セッション失効ルール（確定）**：以下でサーバーが**該当アカウントの全アクティブセッション破棄＋信頼端末失効**を強制する。
-  - `logout`（現端末のみ）／`logout-all`（全端末・ユーザー操作）＝§A.4。
+  - `logout`（現端末のみ）／`logout-all`（全端末・ユーザー操作）＝§A.1。
   - **`system_role` 変更・アカウント無効化(disable)・PW 変更/再設定**＝ユーザー操作なしで発火（トリガはドメイン B の admin 操作／A.7）。セッションは `system_role` を保持するため、ロール変更後の旧権限セッションを残さない（一覧 3-④、1・3-⑯）。
   - 併せて**無操作タイムアウト＋絶対有効期限を併用**（idle だけに頼らない・一覧 3-⑥）。
 - **④ ブルートフォース／PW 品質**：ログインは**レート制限（IP＋login_id）に加え、失敗連続でアカウント一時ロック（＋任意で漸増遅延）**（一覧 1-⑧⑨）。PW 設定/変更時に**最低文字数＋漏えい済み・よく使われる PW の拒否**を検証（一覧 1-⑤⑥・具体値は §A.8）。
