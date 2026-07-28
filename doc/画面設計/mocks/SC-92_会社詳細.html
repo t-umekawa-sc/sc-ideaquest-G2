@@ -56,6 +56,21 @@
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
   .req::after { content: " *"; color: var(--color-danger); }
   .fixed-field { padding: 10px 12px; background: var(--color-surface-alt); border-radius: var(--radius); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* 所属クエストグループ（per-group ロール member/admin を行ごとに指定） */
+  .mrows { display: flex; flex-direction: column; gap: 6px; }
+  .mrow { display: flex; align-items: center; gap: var(--space-3); padding: 8px 10px; background: var(--color-surface-alt); border-radius: var(--radius); }
+  .mrow__name { flex: 1; font-size: var(--text-sm); font-weight: 600; }
+  .mrow__remove { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1; padding: 4px; border-radius: var(--radius); }
+  .mrow__remove:hover { color: var(--color-danger); }
+  .mrow-empty { font-size: var(--text-sm); color: var(--color-text-muted); padding: 6px 2px; }
+  .mrow-add { margin-top: 8px; }
+  /* セグメント切替（メンバー / 管理者） */
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .seg button { border: 0; background: var(--color-surface); padding: 4px 10px; font-size: var(--text-xs); cursor: pointer; color: var(--color-text-muted); }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .seg button[aria-pressed="true"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  .seg button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 </style>
 </head>
 <body>
@@ -226,15 +241,12 @@
       <div class="hint">運営（システム管理者）か否かの2値。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（system_role では持たない）。</div>
     </div>
     <div class="form-row"><label>所属クエストグループ</label>
-      <div class="multiselect" data-multiselect id="amGroups">
-        <div class="multiselect__control">
-          <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループを選択…">
-        </div>
-        <ul class="multiselect__list" role="listbox" hidden>
-          <li class="multiselect__empty" role="presentation" hidden></li>
-        </ul>
+      <div class="mrows" id="amGroups"></div>
+      <div class="mrow-empty" id="amGroupsEmpty" hidden>所属グループはありません。下から追加してください。</div>
+      <div class="mrow-add">
+        <select class="select" id="amAddGroup" aria-label="所属グループを追加"><option value="">＋グループを追加…</option></select>
       </div>
-      <div class="hint">複数選択可（この会社のクエストグループから選択）。各グループでの役割は既定=メンバー。<strong>そのグループの管理者（＝クエストグループ管理者）に指定できるのはシステム管理者のみ</strong>（指定されたユーザーは当該グループを SC-90 で管理可）。</div>
+      <div class="hint">この会社のクエストグループから複数選択可。各グループの役割を <strong>メンバー / 管理者</strong> で指定（既定=メンバー）。<strong>「管理者」＝クエストグループ管理者の任命はシステム管理者のみ可</strong>（指定されたユーザーは当該グループを SC-90 で管理可）。</div>
     </div>
     <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロール「システム管理者」は運営のみに付与。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>。</div>
     <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
@@ -306,17 +318,44 @@
   document.getElementById('dbId').textContent = CO.db;
   document.getElementById('amCompany').textContent = CO.name + '（この会社にアカウントを発行します）';
 
-  // 発行モーダルの所属グループ候補（.multiselect・候補のみ）をこの会社のものに。
-  // shared.js の [data-multiselect] 初期化（DOMContentLoaded）より前に .multiselect__option を用意する。
-  (function populateGroupOptions() {
-    const list = document.querySelector('#amGroups .multiselect__list');
-    const empty = list.querySelector('.multiselect__empty');
-    CO.questGroups.forEach(g => {
-      const li = document.createElement('li');
-      li.className = 'multiselect__option'; li.setAttribute('role', 'option'); li.dataset.value = g; li.textContent = g;
-      list.insertBefore(li, empty);
-    });
-  })();
+  // 所属クエストグループ編集（per-group ロール member/admin を行ごとに指定）。
+  // SC-92 はシステム管理者画面のため admin（＝クエストグループ管理者の任命）指定が常に可能（§8-①）。
+  const amGroups = document.getElementById('amGroups');
+  const amGroupsEmpty = document.getElementById('amGroupsEmpty');
+  const amAddGroup = document.getElementById('amAddGroup');
+  let amMemberships = []; // [{ n: グループ名, r: 'member' | 'admin' }]
+  function renderAddOptions() {
+    const used = new Set(amMemberships.map(m => m.n));
+    const rest = CO.questGroups.filter(g => !used.has(g));
+    amAddGroup.innerHTML = '<option value="">＋グループを追加…</option>' + rest.map(g => `<option value="${g}">${g}</option>`).join('');
+    amAddGroup.disabled = rest.length === 0;
+  }
+  function renderMemberships() {
+    amGroups.innerHTML = amMemberships.map((m, i) => `
+      <div class="mrow" data-i="${i}">
+        <span class="mrow__name">${m.n}</span>
+        <span class="seg" role="group" aria-label="${m.n} の役割">
+          <button type="button" data-role="member" aria-pressed="${m.r === 'member'}">メンバー</button>
+          <button type="button" data-role="admin" aria-pressed="${m.r === 'admin'}">管理者</button>
+        </span>
+        <button type="button" class="mrow__remove" data-remove aria-label="${m.n} を削除">✕</button>
+      </div>`).join('');
+    amGroupsEmpty.hidden = amMemberships.length !== 0;
+    renderAddOptions();
+  }
+  amGroups.addEventListener('click', (e) => {
+    const row = e.target.closest('.mrow'); if (!row) return;
+    const i = Number(row.dataset.i);
+    if (e.target.closest('[data-remove]')) { amMemberships.splice(i, 1); renderMemberships(); return; }
+    const rb = e.target.closest('[data-role]');
+    if (rb) { amMemberships[i].r = rb.dataset.role; renderMemberships(); }
+  });
+  amAddGroup.addEventListener('change', () => {
+    const g = amAddGroup.value; if (!g) return;
+    amMemberships.push({ n: g, r: 'member' });
+    renderMemberships();
+  });
+  renderMemberships();
 
   // 設定トグル
   function setSwitch(inputId, stateId, on) { const i = document.getElementById(inputId); i.checked = on; document.getElementById(stateId).textContent = on ? 'ON' : 'OFF'; }
@@ -416,6 +455,8 @@
     document.getElementById('amLoginId').value = a ? a.loginId : '';
     document.getElementById('amEmail').value = a ? a.email : '';
     document.getElementById('amRole').value = a ? a.system_role : 'member';
+    amMemberships = a ? a.groups.map(m => ({ n: m.n, r: m.r })) : [];  // 既存の所属・ロールを反映（deep copy）
+    renderMemberships();
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
     openModal('accountModal');
   }
@@ -426,11 +467,14 @@
     const email = document.getElementById('amEmail').value.trim();
     const sysRole = document.getElementById('amRole').value;
     if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
+    const memberships = amMemberships.map(m => ({ n: m.n, r: m.r }));  // 保存対象＝memberships[{group_id, role}] 相当
     if (accEditTarget) {
       accEditTarget.name = name; accEditTarget.loginId = loginId; accEditTarget.email = email; accEditTarget.system_role = sysRole;
+      accEditTarget.groups = memberships;  // 所属・グループ内ロールを更新（一覧の「·管理者」バッジに反映）
       renderAccounts();
     } else {
-      alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。初回ログイン時にパスワード設定を行います。');
+      const summary = memberships.length ? '\n所属: ' + memberships.map(m => m.n + (m.r === 'admin' ? '（管理者）' : '')).join('、') : '';
+      alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。' + summary + '\n初回ログイン時にパスワード設定を行います。');
     }
     closeModal(document.getElementById('accountModal'));
   });
