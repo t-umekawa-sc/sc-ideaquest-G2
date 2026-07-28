@@ -105,6 +105,10 @@
         <button class="btn btn-primary" type="submit" style="width:100%">ログイン</button>
       </form>
 
+      <p style="text-align:center;margin-top:var(--space-3)">
+        <a href="#" onclick="showView('pwreq'); return false;">パスワードをお忘れですか？</a>
+      </p>
+
       <p class="login-note">
         アカウントは管理者が発行します（自己新規登録はできません）。<br>
         <strong>初回ログインの方</strong>は、管理者発行後にメールで届く<strong>初回パスワード設定リンク</strong>（72時間有効）からパスワードを設定してからログインしてください。<br>
@@ -169,6 +173,36 @@
       </form>
     </div>
 
+    <!-- ============ 状態D: パスワード再設定リクエスト（自己サービス） ============ -->
+    <div class="login-card" id="viewPwReq" hidden>
+      <div class="login-logo"><img src="assets/logo-ideaquest.png" alt="IDEAQUEST"></div>
+      <h1>パスワードの再設定</h1>
+      <p class="muted text-sm" style="text-align:center;margin-top:calc(-1*var(--space-4));margin-bottom:var(--space-6)">
+        会社コードとログインIDを入力してください。登録メールアドレス宛に再設定用リンク（72時間有効）を送信します。
+      </p>
+
+      <div class="form-error" id="pwreqDone" style="background:var(--color-success-bg,#e8f5e9);color:var(--color-success,#2e7d32);border-color:var(--color-success,#2e7d32)">
+        該当するアカウントがあれば、登録メールアドレスへ再設定用リンクを送信しました。メールをご確認ください。
+      </div>
+
+      <form onsubmit="pwreqSubmit(); return false">
+        <div class="field">
+          <label for="reqCompany">会社コード<span class="req">*</span></label>
+          <input class="input" id="reqCompany" type="text" autocomplete="organization" placeholder="例: ACME-01" required>
+        </div>
+        <div class="field">
+          <label for="reqLoginId">ログインID<span class="req">*</span></label>
+          <input class="input" id="reqLoginId" type="text" autocomplete="username" placeholder="例: taro.yamada" required>
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%">再設定リンクを送信</button>
+      </form>
+
+      <p class="login-note">
+        ※ セキュリティのため、アカウントの有無にかかわらず同じ案内を表示します。<br>
+        <a href="#" onclick="showView('login'); return false;">ログインへ戻る</a>
+      </p>
+    </div>
+
     <p class="login-foot">© ideaquest</p>
   </div>
 </div>
@@ -178,7 +212,8 @@
   表示状態:
   <button class="btn btn-sm" onclick="showView('login')">ログイン</button>
   <button class="btn btn-sm" onclick="showView('otp')">認証コード(MFA)</button>
-  <button class="btn btn-sm" onclick="showView('pwset')">初回パスワード設定</button>
+  <button class="btn btn-sm" onclick="showView('pwset')">初回/再設定パスワード設定</button>
+  <button class="btn btn-sm" onclick="showView('pwreq')">パスワード再設定リクエスト</button>
   <button class="btn btn-sm" onclick="toggleError()">エラー例</button>
 </div>
 
@@ -188,6 +223,13 @@
     document.getElementById('viewLogin').hidden = (v !== 'login');
     document.getElementById('viewOtp').hidden   = (v !== 'otp');
     document.getElementById('viewPwSet').hidden = (v !== 'pwset');
+    document.getElementById('viewPwReq').hidden = (v !== 'pwreq');
+    // 状態Dの確認メッセージは初期非表示（送信でのみ表示）
+    if (v !== 'pwreq') document.getElementById('pwreqDone').classList.remove('show');
+  }
+  // パスワード再設定リクエスト送信（デモ）＝常に同一の確認メッセージ（列挙耐性）
+  function pwreqSubmit() {
+    document.getElementById('pwreqDone').classList.add('show');
   }
   function toggleError() {
     showView('login');
