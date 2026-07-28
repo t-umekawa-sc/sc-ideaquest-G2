@@ -1,8 +1,8 @@
-# ドメイン A. 認証・セッション（コントロールプレーン）＝詳細確定（2026-07-27）
+# ドメイン A. 認証・セッション（コントロールプレーン）＝詳細確定（2026-07-27・再レビュー反映 2026-07-29）
 
 > API 全体規約は [`README.md`](./README.md) 第1章（特に §1.4 認証・セッション）を参照。本ファイルはドメイン A の分割レビュー成果＝各エンドポイントの req/res・状態遷移・エラー・画面対応。
 
-対象画面＝**SC-00 ログイン**（3状態＝ログイン／認証コード(MFA)／初回パスワード設定）。全エンドポイントは**コントロールプレーン**（管理DB `accounts`／`otp_challenges`／`trusted_devices`＋Redis）で完結し、会社DB へはルーティングしない。データモデル §4.1〜4.4・§8-①②⑨、コーディング規約 §1（フロントに認証ロジックを持たせない）準拠。
+対象画面＝**SC-00 ログイン**（3状態＝ログイン／認証コード(MFA)／初回パスワード設定。※初回パスワード設定状態は login 応答ではなく**メールリンク経由で開く**＝F3・A.1/A.7）。全エンドポイントは**コントロールプレーン**（管理DB `accounts`／`otp_challenges`／`trusted_devices`＋Redis）で完結し、会社DB へはルーティングしない。データモデル §4.1〜4.4・§8-①②⑨、コーディング規約 §1（フロントに認証ロジックを持たせない）準拠。
 
 ## A.0 状態機械・Cookie/トークン一覧
 
@@ -36,11 +36,11 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | `iq_session` | Cookie | httpOnly / Secure / SameSite=Lax | 本セッションID。実体は Redis（`account_id`/`company_id`/`system_role` 等）。TTL＝アイドル延長（既定＝実装時確定・SC-00 §10） |
 | `iq_preauth` | Cookie | httpOnly / Secure / SameSite=Lax | 未MFA中間状態の pre-auth トークンID。実体は Redis（`account_id`/`company_id`/`otp_challenge_id`・**既定10分**）。mfa/verify 成功で消費・削除 |
-| `iq_csrf` | Cookie | **非httpOnly** / Secure / SameSite=Lax | ダブルサブミット用トークン。状態変更系で `X-CSRF-Token` ヘッダと一致必須（§1.4） |
+| `iq_csrf` | Cookie | **非httpOnly** / Secure / SameSite=Lax | ダブルサブミット用トークン。状態変更系で `X-CSRF-Token` ヘッダと一致必須（§1.4）。**セッション発行時・pre-auth 発行時に発行し、その期間は同一値**（画面遷移ごとの再発行はしない） |
 | `iq_trust` | Cookie | httpOnly / Secure / SameSite=Lax | 信頼端末トークン（`trusted_devices`・**30日**）。login 時に照合、有効なら MFA スキップ |
 
 - **pre-auth トークンはセッションと別実体（最小権限）**＝pre-auth では `GET /auth/session` や業務 API を一切通さない（`mfa_verify`／`mfa_resend` のみ受理）。
-- **CSRF ／ Origin 検証は状態変更系の全 A エンドポイントに適用**。ただし `POST /auth/login` は未ログイン起点のため CSRF トークン検証は免除し **Origin/Sec-Fetch 検証のみ**（`iq_csrf` は login 成功時／セッション発行時に再発行）。
+- **CSRF ／ Origin 検証は状態変更系の全 A エンドポイントに適用**。ただし `POST /auth/login` は未ログイン起点のため CSRF トークン検証は免除し **Origin/Sec-Fetch 検証のみ**（`iq_csrf` は login 成功時／セッション発行時に再発行）。**要MFA分岐で pre-auth を発行する時も `iq_csrf` を同時発行**する＝pre-auth 中の `mfa/verify`／`mfa/resend`（CSRF＋Origin 必須）がダブルサブミットを満たせるようにするため。
 - **セッション固定対策**：**認証成功時は常に新しいセッションID を発行**（login 成功・mfa/verify 成功のいずれも。pre-auth は消費して破棄）。既存の未認証状態の値を昇格して使い回さない。
 - **トークン生成**：`iq_session`/`iq_preauth`/`iq_csrf`・OTP・password_setup トークンは**暗号学的に安全な乱数（CSPRNG）**で生成し、意味のある情報を埋め込まない（セキュリティ一覧 3・13）。
 - **Cookie スコープ最小化**：全 Cookie は `Path=/`・**Domain はホスト限定**（親ドメインへ広げない）。
@@ -62,23 +62,23 @@ stateDiagram-v2
 
 | メソッド/パス | 概要 | リクエスト（ボディ/前提） | レスポンス（主なデータ・Set-Cookie） |
 | --- | --- | --- | --- |
-| `POST /auth/login` | 会社コード＋ID＋PW でログイン認証（未認証起点） | ボディ: `company_code`,`login_id`,`password`／前提: 認証不要・**CSRF免除（Origin/Sec-Fetch のみ）**・レート制限（IP＋login_id） | 3分岐（下記「レスポンス分岐」）＝`authenticated`／`mfa_required`／`password_setup_required`。成功時 `Set-Cookie: iq_session,iq_csrf`（要MFA時は `iq_preauth`） |
+| `POST /auth/login` | 会社コード＋ID＋PW でログイン認証（未認証起点） | ボディ: `company_code`,`login_id`,`password`／前提: 認証不要・**CSRF免除（Origin/Sec-Fetch のみ）**・レート制限（IP＋login_id） | 2分岐（下記「レスポンス分岐」）＝`authenticated`／`mfa_required`。成功時 `Set-Cookie: iq_session,iq_csrf`（要MFA時は `iq_preauth`＋`iq_csrf`） |
 | `POST /auth/mfa/verify` | pre-auth 中の OTP を検証し本セッション発行 | ボディ: `code`,`trust_device`／前提: **pre-auth（`iq_preauth`）必須**・CSRF＋Origin | `200 { status:"authenticated", session:{…§A.6} }`＋`Set-Cookie: iq_session,iq_csrf`（`trust_device=true` は `iq_trust` も）・`iq_preauth` 削除 |
 | `POST /auth/mfa/resend` | OTP を再送（旧OTP失効） | 前提: pre-auth 必須・CSRF＋Origin・**レート制限**（`resend_available_in` 経過前は 429＋`Retry-After`） | `200 { expires_in:600, resend_available_in:30 }` |
 | `POST /auth/logout` | 現在の端末をログアウト | 前提: 本セッション必須・CSRF＋Origin | `204`（現 `iq_session` を Redis 破棄・Cookie 失効） |
 | `POST /auth/logout-all` | 全端末をログアウト＋信頼端末失効 | 前提: 本セッション必須・CSRF＋Origin | `204`（当該 `account_id` の**全セッション破棄＋`trusted_devices` を `revoked`**＝全端末で次回 MFA 必須） |
 | `GET /auth/session` | 現在のセッション情報を取得（フロント初期化＝ロール別UI・言語） | 前提: 本セッション必須（pre-auth では 401）・CSRF不要（GET） | `200 { …§A.6 }`／未認証＝`401 { code:"unauthenticated" }` |
 
-- **`POST /auth/login` のレスポンス分岐**:
+- **`POST /auth/login` のレスポンス分岐**（2分岐）:
   - **信頼端末で MFA スキップ／`mfa_required=false`**＝本セッション発行 → `Set-Cookie: iq_session, iq_csrf` ＋ `200 { "status":"authenticated", "session": { …§A.6 } }`。
-  - **要 MFA**＝OTP をメール送信＋pre-auth 発行 → `Set-Cookie: iq_preauth` ＋ `200 { "status":"mfa_required", "mfa": { "delivery":"email", "masked_to":"y****@acme.co.jp", "expires_in":600, "resend_available_in":30 } }`。
-  - **要 初回パスワード設定**（`password_set=false`）＝PW 照合前に `200 { "status":"password_setup_required" }`（実リンクはメール経由＝A.7）。
+  - **要 MFA**＝OTP をメール送信＋pre-auth 発行 → `Set-Cookie: iq_preauth, iq_csrf` ＋ `200 { "status":"mfa_required", "mfa": { "delivery":"email", "masked_to":"y****@acme.co.jp", "expires_in":600, "resend_available_in":30 } }`。
+  - **初回パスワード未設定（`password_set=false`）は login では分岐しない（列挙耐性・F3 ハードニング）**＝PW 照合は必ず実行され、PW を持たない当該アカウントは他の失敗と区別せず**一律 `401 { "code":"unauthenticated" }`**。初回パスワード設定は **login 応答では誘導せず、メールリンク（A.7）に一本化**する（`password_set` 状態を未認証者に漏らさない）。
 - **エラー・秘匿**:
-  - `login`＝会社コード不正・login_id 不在・PW 不一致は**一律** `401 { "code":"unauthenticated" }`（列挙耐性・SC-00 方針）。会社 `suspended`＝`403 { "code":"company_suspended" }`（運営は別途 admin ログイン想定）。
+  - `login`＝会社コード不正・login_id 不在・PW 不一致・**初回パスワード未設定（`password_set=false`）**はいずれも**一律** `401 { "code":"unauthenticated" }`（列挙耐性・SC-00 方針・F3）。会社 `suspended`＝**資格情報照合が成功した後に**`503 { "code":"company_suspended" }`（README §1.7 の code 表と統一・会社コードの有無を漏らさない・運営は別途 admin ログイン想定）。
   - `mfa/verify`＝OTP 不一致 `401 { "code":"otp_invalid", "attempts_left":n }`（連続失敗上限で pre-auth 失効＝`login` やり直し）／pre-auth 不在・期限切れ `401 { "code":"preauth_expired" }`／OTP 期限切れ `401 { "code":"otp_expired" }`（resend 案内）。
   - `mfa/resend`＝クールダウン中 `429 { "code":"rate_limited" }`＋`Retry-After`。
 - **強制ログアウト（サーバー発火）**: 「全セッション破棄＋信頼端末失効」は logout-all 以外に、**ロール（`system_role`）変更・アカウント無効化(disable)・PW 変更/再設定**でもユーザー操作なしでサーバーが強制発火（トリガはドメイン B／A.7・詳細＝§A.9-③）。
-- **SC-00／共通ヘッダー対応**: `login` 成功→ダッシュボード遷移／`mfa_required`→認証コード入力状態／`password_setup_required`→初回PW設定状態。`mfa/verify` 成功→ダッシュボード・失敗は残回数表示（上限でログイン画面へ戻す）。ログアウト導線＝共通ヘッダーのユーザーメニュー。
+- **SC-00／共通ヘッダー対応**: `login` 成功→ダッシュボード遷移／`mfa_required`→認証コード入力状態。`mfa/verify` 成功→ダッシュボード・失敗は残回数表示（上限でログイン画面へ戻す）。**初回PW設定状態は login からは遷移せず、メールリンク（A.7）で開く専用ルートで表示**（F3 ハードニング＝login 応答では `password_setup_required` を返さない）。ログアウト導線＝共通ヘッダーのユーザーメニュー。
 
 ## A.6 セッション情報スキーマ（`session`）
 
@@ -128,7 +128,7 @@ stateDiagram-v2
   - **`system_role` 変更・アカウント無効化(disable)・PW 変更/再設定**＝ユーザー操作なしで発火（トリガはドメイン B の admin 操作／A.7）。セッションは `system_role` を保持するため、ロール変更後の旧権限セッションを残さない（一覧 3-④、1・3-⑯）。
   - 併せて**無操作タイムアウト＋絶対有効期限を併用**（idle だけに頼らない・一覧 3-⑥）。
 - **④ ブルートフォース／PW 品質**：ログインは**レート制限（IP＋login_id）に加え、失敗連続でアカウント一時ロック（＋任意で漸増遅延）**（一覧 1-⑧⑨）。PW 設定/変更時に**最低文字数＋漏えい済み・よく使われる PW の拒否**を検証（一覧 1-⑤⑥・具体値は §A.8）。
-- **⑤ 秘匿・列挙耐性の徹底**：ログイン/OTP 失敗は一律メッセージ（本文）。**`company_suspended` は資格情報照合が成功した後に判定**して返し、未認証者に会社コードの有無を漏らさない（一覧 14・1-⑨）。認証・認可エラーの詳細を出しすぎない。
+- **⑤ 秘匿・列挙耐性の徹底**：ログイン/OTP 失敗は一律メッセージ（本文）。**初回パスワード未設定（`password_set=false`）も `login` では区別せず一律 `401 unauthenticated`**＝「その login_id が実在し未設定」という状態を未認証者に漏らさない（初回PW設定はメールリンク A.7 に一本化・F3 ハードニング）。**`company_suspended` は資格情報照合が成功した後に判定**して返し（`503`）、未認証者に会社コードの有無を漏らさない（一覧 14・1-⑨）。認証・認可エラーの詳細を出しすぎない。
 - **⑥ 認証イベントの監査ログ**：**ログイン成功/失敗・MFA 発行/検証結果・アカウント一時ロック・logout/logout-all・PW 設定/変更・ロール変更**を、操作者/日時/対象/結果/IP・UA とともに記録（一覧 15）。**PW・セッションID・OTP・各種トークンはログに出力しない**（一覧 3・15）。共通監査列（データモデル §2.1）とは別に、セキュリティ監査イベントの記録方針を実装時に具体化（保存先/期間＝§A.8）。
 - **⑦ 他ドメインへ委譲（A では未実装・該当ドメインのレビューで確定）**：
   - **認証済みユーザーの自己 PW 変更＝現在の PW 再確認**（一覧 1-㉒）／**email・MFA 設定変更時の再認証**（一覧 1-㉓）＝**ドメイン K（プロフィール）** で設計（現状 A のメールリンク経路のみ）。
