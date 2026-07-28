@@ -236,7 +236,7 @@
       <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
       <button class="btn btn-outline" type="button">キャンセル</button>
     </div>
-    <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>作成</strong>で公開しパーティーに通知、作成 XP を付与。本番は SC-10「＋作成」/SC-12「編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。パネル→モーダルの拡大は framer-motion <code>layoutId</code>。</p>
+    <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>作成</strong>で公開しパーティーに通知（クエスト作成/公開に XP は付与しない）。本番は SC-10「＋作成」/SC-12「編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。パネル→モーダルの拡大は framer-motion <code>layoutId</code>。</p>
   </div>
 </div>
 
@@ -341,7 +341,7 @@
     if (!document.querySelector('#groupSelect .multiselect__input').value.trim()) missing.push('クエストグループ');
     if (plist.querySelectorAll('.pmember').length < 1) missing.push('参加メンバー');
     if (missing.length) { alert('必須項目が未入力です: ' + missing.join('、')); return; }
-    alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\n作成 XP を付与します。');
+    alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\nパーティーに通知します（クエスト作成/公開に XP は付与しません）。');
   });
   document.getElementById('draftBtn').addEventListener('click', () => {
     alert('下書きを保存しました（デモ）\n※ あなただけに表示。公開するまで XP・コインは付与されません。');
