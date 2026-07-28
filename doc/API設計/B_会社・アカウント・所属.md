@@ -19,13 +19,13 @@
 
 ## B.1 会社（`/admin/companies`・system_admin 専用・SC-91/92）
 
-| メソッド/パス | 説明 |
-| --- | --- |
-| `GET /admin/companies` | 会社一覧（SC-91）。`?q=`（会社名/会社コード/db_identifier）・`?status=active\|suspended`・**オフセットページング**（総件数バッジ＝§1.8）。各行に `account_count`/`group_count`（集計） |
-| `POST /admin/companies` | 会社作成（SC-91）。in: `name`,`company_code`,`db_identifier`,`color`,`icon_image_path?`。作成時 **`status=suspended`（準備中）**・`company_code` は大文字正規化＋一意検証。DBプロビジョニングは MVP 手動（§8-⑫）で、完了後に `active` 化 |
-| `GET /admin/companies/{company_id}` | 会社詳細＋設定フラグ＋件数（SC-92 バナー/カード） |
-| `PATCH /admin/companies/{company_id}` | プロフィール（`color`/`icon_image_path`）更新（SC-92）。アイコンは MinIO（§1.10） |
-| `PATCH /admin/companies/{company_id}/settings` | 設定フラグ（`vote_anonymized`/`hide_voters_from_managers`/`mfa_required`）更新（SC-92）。**`vote_anonymized=false`（記名）時は `hide_voters_from_managers` を無効化して保存**（サーバーで整合） |
+| メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `GET /admin/companies` | 会社一覧を取得（SC-91） | クエリ: `q`（会社名/会社コード/db_identifier の部分一致）・`status`（`active\|suspended`）・`page`/`per_page`（オフセット・§1.8） | `data`=会社の配列。各行に基本情報＋`status`＋集計 `account_count`/`group_count`。`page_info.total`＝総件数（バッジ） |
+| `POST /admin/companies` | 会社を新規作成（SC-91） | ボディ: `name`,`company_code`,`db_identifier`,`color`,`icon_image_path?` | 作成された会社（**`status=suspended`＝準備中**で返す）。`company_code` は大文字正規化＋一意検証／DBプロビジョニングは MVP 手動（§8-⑫）・完了後に `active` 化 |
+| `GET /admin/companies/{company_id}` | 会社詳細を取得（SC-92 バナー/カード） | パス: `company_id` | 会社の詳細＋設定フラグ（`vote_anonymized` 等）＋件数（`account_count`/`group_count`） |
+| `PATCH /admin/companies/{company_id}` | 会社プロフィールを更新（SC-92） | パス: `company_id`／ボディ: `color`,`icon_image_path?`（アイコンは MinIO・§1.10） | 更新後の会社プロフィール |
+| `PATCH /admin/companies/{company_id}/settings` | 会社設定フラグを更新（SC-92） | パス: `company_id`／ボディ: `vote_anonymized`,`hide_voters_from_managers`,`mfa_required` | 更新後の設定フラグ。**`vote_anonymized=false`（記名）時は `hide_voters_from_managers` を無効化して保存**（サーバーで整合） |
 
 - **会社コード**: 半角英大文字/数字/ハイフン・4〜20字・先頭英字・大文字正規化・全社一意。重複＝**409 `conflict`**（`errors[].field=company_code`）。作成時確定・以後不変。
 - **`status` 遷移**: `suspended`（準備中/メンテ）⇄ `active`。`active` 化は会社DB接続確認が前提（プロビジョニング完了）。`suspended` 中は一般ユーザのテナント API が **503 `company_suspended`**（§1.5・admin 操作は可）。
@@ -35,14 +35,14 @@
 
 **アカウント本体は管理DB `accounts`。氏名・所属は会社DB `users`/`quest_group_members`。** すべての更新は §1.13 outbox で会社DB へミラー。
 
-| メソッド/パス | 説明 |
-| --- | --- |
-| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧。`?q=`（氏名/login_id/email）・`?status=active\|disabled`・`?group_id=`・オフセットページング。各行に所属グループ＋グループ内ロール |
-| `POST /admin/companies/{company_id}/accounts` | 発行。in: `display_name`,`login_id`,`email`,`system_role`(general\|system_admin),`memberships`(`[{group_id, role: member\|admin}]`)。→ B.5 の発行フロー |
-| `PATCH /admin/companies/{company_id}/accounts/{account_id}` | 編集。`display_name`/`login_id`/`email`/`system_role`/`memberships`（差分更新）。identity（login_id/email）は会社内一意検証 |
-| `POST /.../accounts/{account_id}/disable` | 無効化（`accounts.status=disabled`）。**全アクティブセッション破棄＋信頼端末失効**（A.9-③）。入力データは保持（監査） |
-| `POST /.../accounts/{account_id}/enable` | 再有効化（`status=active`） |
-| `POST /.../accounts/{account_id}/password-reset` | 初回/再設定リンク再送（`otp_challenges` purpose=`password_setup`・72h・A.7）。旧リンク失効 |
+| メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧を取得（SC-92） | パス: `company_id`／クエリ: `q`（氏名/login_id/email）・`status`（`active\|disabled`）・`group_id`・`page`/`per_page`（オフセット） | `data`=アカウントの配列。各行に氏名/`login_id`/`email`/`system_role`/`status`＋所属グループ＋グループ内ロール。`page_info.total` |
+| `POST /admin/companies/{company_id}/accounts` | アカウントを発行（→ B.5 発行フロー） | パス: `company_id`／ボディ: `display_name`,`login_id`,`email`,`system_role`(`general\|system_admin`),`memberships`(`[{group_id, role: member\|admin}]`) | 発行されたアカウント（`status=active`・`password_set=false`）。初回PW設定リンクを送信 |
+| `PATCH /admin/companies/{company_id}/accounts/{account_id}` | アカウントを編集 | パス: `company_id`,`account_id`／ボディ（差分）: `display_name`/`login_id`/`email`/`system_role`/`memberships` | 更新後のアカウント。identity（`login_id`/`email`）は会社内一意検証 |
+| `POST /.../accounts/{account_id}/disable` | アカウントを無効化 | パス: `account_id` | 無効化後の状態（`status=disabled`）。**全アクティブセッション破棄＋信頼端末失効**（A.9-③）。入力データは保持（監査） |
+| `POST /.../accounts/{account_id}/enable` | アカウントを再有効化 | パス: `account_id` | 再有効化後の状態（`status=active`） |
+| `POST /.../accounts/{account_id}/password-reset` | 初回/再設定PWリンクを再送 | パス: `account_id` | 送信結果（`otp_challenges` purpose=`password_setup`・72h・旧リンク失効・A.7） |
 
 - **`system_role` 変更**（general⇄system_admin）は **`admin` 権限操作**＝実施後に当該アカウントの全セッション破棄（新権限を確実に適用・A.9-③）。**自分自身の system_admin 剥奪は不可**（ロックアウト防止＝最低 1 名の system_admin を残す・422 `last_system_admin`）。
 - **`memberships` の `role=admin` 指定＝QG管理者任命**は system_admin のみ（§8-①）。member/admin を per-group に指定。
@@ -60,14 +60,14 @@
 
 セッションユーザーが `admin` 所属を持つグループに限定。`company_id` は**セッション会社固定**（受け取らない）。
 
-| メソッド/パス | 説明 |
-| --- | --- |
-| `GET /admin/quest-groups` | **自分が `admin` のグループ一覧**（SC-90 のグループ切替・メンバー数付き）。空なら SC-90 自体が 403 |
-| `GET /admin/quest-groups/{group_id}/accounts` | そのグループの**メンバー一覧**（会社DB `quest_group_members`×`users`＝`removed_at IS NULL`）。`?q=`・`?status=` |
-| `POST /admin/quest-groups/{group_id}/accounts` | メンバー発行。in: `display_name`,`login_id`,`email`。**`system_role=general` 固定・グループ内 `role=member` 固定**（admin 不可＝§8-①）。→ B.5 |
-| `PATCH /admin/quest-groups/{group_id}/accounts/{account_id}` | 氏名/login_id/email 更新（**system_role・グループ内ロールは変更不可**） |
-| `POST /.../accounts/{account_id}/disable` ／ `/enable` | 無効化⇄再有効化（B.2 と同挙動＝セッション破棄含む） |
-| `POST /.../accounts/{account_id}/password-reset` | 初回/再設定リンク再送（A.7） |
+| メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `GET /admin/quest-groups` | 自分が `admin` のグループ一覧を取得（SC-90 グループ切替） | （セッション会社固定・パラメータなし） | `data`=グループの配列（メンバー数付き）。空なら SC-90 自体が **403** |
+| `GET /admin/quest-groups/{group_id}/accounts` | そのグループのメンバー一覧を取得 | パス: `group_id`／クエリ: `q`・`status` | `data`=メンバーの配列（会社DB `quest_group_members`×`users`＝`removed_at IS NULL`） |
+| `POST /admin/quest-groups/{group_id}/accounts` | メンバーを発行（→ B.5） | パス: `group_id`／ボディ: `display_name`,`login_id`,`email` | 発行されたアカウント。**`system_role=general` 固定・グループ内 `role=member` 固定**（admin 不可＝§8-①） |
+| `PATCH /admin/quest-groups/{group_id}/accounts/{account_id}` | メンバーを編集 | パス: `group_id`,`account_id`／ボディ: `display_name`/`login_id`/`email` | 更新後のアカウント（**`system_role`・グループ内ロールは変更不可**） |
+| `POST /.../accounts/{account_id}/disable` ／ `/enable` | メンバーを無効化⇄再有効化 | パス: `account_id` | 状態更新（B.2 と同挙動＝セッション破棄含む） |
+| `POST /.../accounts/{account_id}/password-reset` | 初回/再設定PWリンクを再送 | パス: `account_id` | 送信結果（A.7） |
 
 - **門番**: `group_id` がセッション会社に属し、かつセッションユーザーがそのグループに有効 `admin` 所属を持つこと。満たさなければ **404**（存在秘匿）。
 - **対象アカウントの範囲**: そのグループに**有効な所属を持つアカウントのみ**操作可（他グループ専属のアカウントは 404）。
