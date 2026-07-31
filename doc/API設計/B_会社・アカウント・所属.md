@@ -12,6 +12,7 @@
 | **クエストグループ管理者** | セッションユーザーが**対象グループに有効な `admin` 所属**（`quest_group_members.role=admin` かつ `removed_at IS NULL`）を持つ（会社DB判定・B案） | **自分が `admin` のグループ**内のメンバー発行/編集/無効化/PW再設定（`admin` 付与は不可） | `/admin/quest-groups/{group_id}/...`（`group_id` は**セッション会社**内・所属で門番） |
 
 - **B案（2026-07-27）**: QG管理者は `system_role` では表さず `quest_group_members.role=admin`（per-group）で表現（データモデル §8-⑭）。**SC-92 は SC-90 の上位互換**＝SC-90 の全操作を全社範囲で実施でき、加えて会社設定・所属割当・`admin` 付与が可能。
+  - **なぜ（採用理由）**: **制御する対象（スコープ）が違う**から。`system_role`（`accounts.role`）は**全社横断の運営権限**（システム全体で誰が運営者か）を表すのに対し、QG管理者は**特定グループ内だけの管理権限**＝本来 per-group（グループごとに管理者が違う）。これを `system_role` に持たせると、同じ「QG管理者」という概念が**管理DB `accounts.role` と会社DB `quest_group_members.role` の 2 箇所に重複**し、(a) 二重管理・不整合、(b) 「どのグループの管理者か」を `system_role` では表せない粒度の不一致、(c) グループ管理者がシステム全体の運営権限に読み替えられる**権限昇格の矛盾**、が生じる。よって `system_role` は `{system_admin, general}` の 2 値に絞り（全社スコープのみ）、**グループスコープの権限は会社DB側の所属（per-group role）一本で表す**＝スコープと保管場所を一致させる。
 - **クロステナント原則（§1.5）**: 一般テナント API は `company_id` を受けないが、**system_admin の `/admin/companies/{company_id}/*` は対象会社を明示的に受ける**（唯一の例外）。QG管理者 API はセッション会社に固定（`company_id` を受けない）。
 - **system_admin アカウントの所在＝運営テナント（seed・データモデル §8-⑮）**: `accounts.company_id` は**運営テナント（プラットフォーム管理用の予約会社・例 `OPS`）**を指す（「会社レス＝どの会社にも属さないアカウント」は**非採用**＝案A）。認可は会社所属ではなく `session.system_role==system_admin` で判定するため、運営者は業務クエストに参加しない（テナントデータへの足跡ゼロは運用で担保）。**最初の system_admin は seed で作成**（B.5 ブートストラップ）。
 - 認可失敗＝**403 `forbidden`**／対象が範囲外（他会社・他グループ）は**404**（存在秘匿・§1.6）。
