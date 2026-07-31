@@ -150,7 +150,7 @@
 | A | 認証・セッション | SC-00 | コントロール | ✅ | [`A_認証・セッション.md`](./A_認証・セッション.md) |
 | B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール＋テナント | ✅ | [`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md) |
 | C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ✅ | [`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md) |
-| D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ⬜ | （目次＝§2-D） |
+| D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ✅ | [`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md) |
 | E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ | （目次＝§2-E） |
 | F | 評価 | SC-25/22 | テナント | ⬜ | （目次＝§2-F） |
 | G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ⬜ | （目次＝§2-G） |
@@ -169,8 +169,8 @@
 ### C. クエスト・パーティー・権限（テナント）＝詳細確定
 → **[`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md)**。決定＝**①パーティー所属を門番に**（非パーティーは 404・可視範囲＝パーティー内）**②クエスト内 6 権限をサーバー強制**（`owner` 付与は作成者のみ・作成者は剥奪不可・新規既定＝vote/idea_create/comment）**③パーティー編集は一括差分 `PUT /quests/{id}/party`＋増分 `POST/DELETE /members`・`PUT /members/{user_id}/permissions` を両立**（SC-11 モーダル保存に対応）**④`quest_group_id` は作成時のみ・以後不変**（参照範囲/既存アイデア整合の保護）**⑤状態機械を前進のみサーバー強制**（`draft→recruiting→in_progress→evaluating→completed`・完了で書き込み凍結）**⑥クエスト公開に XP は付与しない**（canonical XP 表に無い＝SC-11 の「作成 XP」表現は要修正）。主エンドポイント＝`GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH/DELETE /quests/{id}`（DELETE=論理削除 owner/quest_admin）・`POST /quests/{id}/publish`・`POST /quests/{id}/transition`・パーティー `PUT /quests/{id}/party`／`POST/DELETE /quests/{id}/members`／`PUT /quests/{id}/members/{user_id}/permissions`・候補 `GET /quest-groups`・`GET /quest-groups/{id}/members`。クエスト内ランキングは G、全文検索は J、通知発火は H を参照。
 
-### D. アイデア・添付・版・投票・フォロー
-`GET /quests/{id}/ideas`・`POST /quests/{id}/ideas`・`GET/PATCH /ideas/{id}`・`DELETE /ideas/{id}`（論理削除＝投稿者本人＋管理）・`POST /ideas/{id}/publish`（下書き→公開＋投稿XP＋チャットグループ自動作成）・添付（§1.10）・版 `GET /ideas/{id}/revisions`＋差分（FR-34）・投票 `POST /ideas/{id}/vote`（賛成/反対/取消・冪等・+5XP・匿名/記名は表示制御）・フォロー `POST/DELETE /ideas/{id}/follow`。
+### D. アイデア・添付・版・投票・フォロー（テナント）＝詳細確定
+→ **[`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md)**。決定＝**①門番＝パーティー所属**（非パーティー・下書き他人は 404・可視範囲＝パーティー内）**②公開処理は published になる瞬間に 1 回**（`chat_groups` 自動作成＋投稿 XP+50〔日次上限外〕・公開は一方向）**③投票は `POST /ideas/{id}/vote {type}`〔登録/切替〕＋`DELETE /ideas/{id}/vote`〔取消〕**（冪等 upsert・**XP+5 は各アイデア初回のみ・日次上限**・押し直しで陳腐化解消・匿名/記名は表示のみ制御）**④公開後の全保存で 1 版**（`idea_revisions` スナップショット・差分は表示時算出・投票者/フォロワーへ `idea_updated` 通知）**⑤削除は論理削除**（投稿者本人＋owner/quest_admin）**⑥添付は `POST /ideas/{id}/attachments`〔multipart・§1.10〕**（20MB/10件/allowlist をサーバー検証・物理名ハッシュ・DL は署名 URL）。主エンドポイント＝`GET /quests/{id}/ideas`・`GET /ideas/{id}`・`POST /quests/{id}/ideas`・`GET/PATCH/DELETE /ideas/{id}`・`POST /ideas/{id}/publish`・添付 `POST/DELETE /ideas/{id}/attachments`・`GET /attachments/{id}/download`・版 `GET /ideas/{id}/revisions`＋`/{revision}/diff`・投票 `POST/DELETE /ideas/{id}/vote`・フォロー `POST/DELETE /ideas/{id}/follow`。評価結果は F、議論アクティビティ・グラフとチャットプレビューは E、通知発火は H を参照。
 
 ### E. チャット・リアクション・魔法発動
 `GET /ideas/{id}/chat`（=chat_group メッセージ）・`POST /chat-messages`・`PATCH/DELETE /chat-messages/{id}`（本人編集/論理削除）・メンション・添付・通常リアクション `POST/DELETE /chat-messages/{id}/reactions`（絵文字・複数可）・魔法リアクション（1メッセージ1魔法・各魔法1チャット1回＝FR-33・reactions ユニーク制約）。
@@ -201,6 +201,6 @@
 
 ## 3. 次アクション
 
-1. **D→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン D（アイデア・添付・版・投票・フォロー）**。
+1. **E→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
+2. **次の着手＝ドメイン E（チャット・リアクション・魔法発動／SC-24）**。※ドメイン D が参照する議論アクティビティ・グラフ（`GET /ideas/{id}/chat-activity`）とチャットプレビューは E で確定する。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
