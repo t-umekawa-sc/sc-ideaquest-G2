@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ideaquest — 画面モック一覧</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* index 固有スタイル（共通化する見た目は shared.css へ昇格する） */
+  body { background: var(--color-bg); }
+  .index-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-6) var(--space-4);
+  }
+  .index-header__inner { max-width: 1120px; margin-inline: auto; display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+  .index-header img { height: 44px; width: auto; }
+  .index-header h1 { font-size: var(--text-2xl); margin: 0; }
+  .index-header p { margin: 2px 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+  .index-main { max-width: 1120px; margin-inline: auto; padding: var(--space-8) var(--space-4) var(--space-16); }
+
+  .index-section { margin-bottom: var(--space-10); }
+  .index-section > h2 {
+    font-size: var(--text-lg); margin: 0 0 var(--space-4);
+    display: flex; align-items: center; gap: var(--space-2);
+    padding-bottom: var(--space-2); border-bottom: 2px solid var(--color-border);
+  }
+  .index-section > h2 .tag {
+    font-size: var(--text-xs); font-weight: 500; color: var(--color-text-muted);
+    background: var(--color-surface-alt); border-radius: var(--radius-full); padding: 2px 10px;
+  }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+
+  a.screen-card {
+    display: block; color: inherit; text-decoration: none;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-4);
+    transition: box-shadow .15s, transform .05s, border-color .15s;
+  }
+  a.screen-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+  a.screen-card:active { transform: translateY(1px); }
+  .screen-card__code { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); letter-spacing: .04em; }
+  .screen-card__title { font-size: var(--text-base); font-weight: 600; margin: 2px 0 var(--space-2); }
+  .screen-card__desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.55; margin: 0; }
+
+  .index-footer { max-width: 1120px; margin-inline: auto; padding: 0 var(--space-4) var(--space-16); color: var(--color-text-subtle); font-size: var(--text-xs); }
+  .index-footer a { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+  <header class="index-header">
+    <div class="index-header__inner">
+      <img src="assets/logo-ideaquest.png" alt="ideaquest">
+      <div>
+        <h1>ideaquest — 画面モック一覧</h1>
+        <p>各カードをクリックすると画面モック（HTML）を開きます。画面設計（機能詳細）は <code>../screens/SC-xx_*.md</code> を参照。</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="index-main">
+
+    <section class="index-section">
+      <h2>認証 <span class="tag">1 画面</span></h2>
+      <div class="card-grid">
+        <a class="screen-card" href="SC-00_ログイン.html">
+          <div class="screen-card__code">SC-00</div>
+          <div class="screen-card__title">ログイン</div>
+          <p class="screen-card__desc">背景画像＋認証（会社コード＋ログインID＋パスワード／MFA／パスワード忘れ・初回設定の各状態）。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="index-section">
+      <h2>業務層（コア業務） <span class="tag">9 画面</span></h2>
+      <div class="card-grid">
+        <a class="screen-card" href="SC-01_ダッシュボード.html">
+          <div class="screen-card__code">SC-01</div>
+          <div class="screen-card__title">ダッシュボード</div>
+          <p class="screen-card__desc">上部2カラム（左ヒーロー＋右週間ランキング）＋下段パネル（下書き・未投票・参加中・フォロー中・最近の通知）。</p>
+        </a>
+        <a class="screen-card" href="SC-10_クエスト一覧.html">
+          <div class="screen-card__code">SC-10</div>
+          <div class="screen-card__title">クエスト一覧</div>
+          <p class="screen-card__desc">一覧標準＋カード/リスト切替。クエストアイコン・色アクセント・状態/締切/件数。</p>
+        </a>
+        <a class="screen-card" href="SC-11_クエスト作成編集.html">
+          <div class="screen-card__code">SC-11</div>
+          <div class="screen-card__title">クエスト作成・編集</div>
+          <p class="screen-card__desc">モーダル。アイコン/件名/カテゴリ/期限/グループ/パーティー＋6権限トグル・ドラッグ移動。</p>
+        </a>
+        <a class="screen-card" href="SC-12_クエスト詳細.html">
+          <div class="screen-card__code">SC-12</div>
+          <div class="screen-card__title">クエスト詳細</div>
+          <p class="screen-card__desc">クエスト内週間ランキング＋タブ（💡アイデア／👥パーティー／🔍全文検索／📋概要）。</p>
+        </a>
+        <a class="screen-card" href="SC-21_アイデア登録編集.html">
+          <div class="screen-card__code">SC-21</div>
+          <div class="screen-card__title">アイデア登録・編集</div>
+          <p class="screen-card__desc">モーダル。必須3項目（件名/価値/本文）＋任意折りたたみ＋添付ドラッグ＆ドロップ。</p>
+        </a>
+        <a class="screen-card" href="SC-22_アイデア詳細.html">
+          <div class="screen-card__code">SC-22</div>
+          <div class="screen-card__title">アイデア詳細</div>
+          <p class="screen-card__desc">本文・価値・添付・投票・評価結果・チャット導線＋変更履歴/差分・議論アクティビティ。</p>
+        </a>
+        <a class="screen-card" href="SC-24_アイデアチャット.html">
+          <div class="screen-card__code">SC-24</div>
+          <div class="screen-card__title">アイデアチャット</div>
+          <p class="screen-card__desc">文脈バー／フラットリスト（日付・未読・添付・メンション）／入力欄（@候補・添付・Enter送信）。</p>
+        </a>
+        <a class="screen-card" href="SC-25_評価画面.html">
+          <div class="screen-card__code">SC-25</div>
+          <div class="screen-card__title">評価</div>
+          <p class="screen-card__desc">モーダル。5観点★採点＋観点別コメント＋総評＋平均プレビュー＋公開範囲指定・下書き。</p>
+        </a>
+        <a class="screen-card" href="SC-02_通知一覧.html">
+          <div class="screen-card__code">SC-02</div>
+          <div class="screen-card__title">通知一覧</div>
+          <p class="screen-card__desc">状態/種別の絞り込み＋すべて既読＋日付グループ（今日/昨日/それ以前）。参照先へ遷移。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="index-section">
+      <h2>ゲーム層 <span class="tag">5 画面</span></h2>
+      <div class="card-grid">
+        <a class="screen-card" href="SC-30_ショップ.html">
+          <div class="screen-card__code">SC-30</div>
+          <div class="screen-card__title">ショップ</div>
+          <p class="screen-card__desc">コイン残高ヒーロー（CRTガラス）＋装備グリッド（レアリティ色・購入＝コイン消費）。</p>
+        </a>
+        <a class="screen-card" href="SC-31_アバター着せ替え.html">
+          <div class="screen-card__code">SC-31</div>
+          <div class="screen-card__title">アバター/着せ替え</div>
+          <p class="screen-card__desc">3Dアバタービューア（CRTガラス）＋ワードローブ（5スロット×装備・クリック着替え）。</p>
+        </a>
+        <a class="screen-card" href="SC-32_魔法スキル.html">
+          <div class="screen-card__code">SC-32</div>
+          <div class="screen-card__title">魔法/スキル</div>
+          <p class="screen-card__desc">SPステータス（CRTガラス）＋魔法カタログ6種（効果プレビュー付き・SP消費で解放）。</p>
+        </a>
+        <a class="screen-card" href="SC-40_実績バッジ.html">
+          <div class="screen-card__code">SC-40</div>
+          <div class="screen-card__title">実績/バッジ</div>
+          <p class="screen-card__desc">収集サマリー（達成率バー）＋バッジグリッド（ティア銅銀金・進捗・シークレット伏せ）。</p>
+        </a>
+        <a class="screen-card" href="SC-41_ランキング.html">
+          <div class="screen-card__code">SC-41</div>
+          <div class="screen-card__title">ランキング</div>
+          <p class="screen-card__desc">全社・期間切替（今週/先週/今月/通算）＋表彰台TOP3＋全件リスト＋自分の順位。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="index-section">
+      <h2>管理・運営 <span class="tag">3 画面</span></h2>
+      <div class="card-grid">
+        <a class="screen-card" href="SC-90_クエストグループ管理.html">
+          <div class="screen-card__code">SC-90</div>
+          <div class="screen-card__title">クエストグループ管理</div>
+          <p class="screen-card__desc">QG管理者が自グループ内アカウントを発行/編集/論理削除（無効化⇄再有効化）/パスワード再設定。</p>
+        </a>
+        <a class="screen-card" href="SC-91_システム管理.html">
+          <div class="screen-card__code">SC-91</div>
+          <div class="screen-card__title">システム管理（会社一覧）</div>
+          <p class="screen-card__desc">運営。会社（テナント）一覧＋検索/状態フィルタ＋会社作成モーダル。行から SC-92 へ。</p>
+        </a>
+        <a class="screen-card" href="SC-92_会社詳細.html">
+          <div class="screen-card__code">SC-92</div>
+          <div class="screen-card__title">会社詳細・設定</div>
+          <p class="screen-card__desc">運営。会社設定（トグル×3）＋その会社のアカウント/所属フル操作。<code>?company=id</code> で会社特定。</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="index-section">
+      <h2>参考 <span class="tag">スタイルガイド</span></h2>
+      <div class="card-grid">
+        <a class="screen-card" href="style-guide.html">
+          <div class="screen-card__code">STYLE</div>
+          <div class="screen-card__title">スタイルガイド</div>
+          <p class="screen-card__desc">デザイントークン（カラー/タイポ/コンポーネント）の目視確認用。<code>shared.css</code> の見本。</p>
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="index-footer">
+    ideaquest 画面モック（画面設計フェーズ・SC-00〜SC-92 完了）／デザイン標準: <a href="../デザイン標準.md">../デザイン標準.md</a>／画面遷移図: <a href="../画面遷移図.md">../画面遷移図.md</a>
+  </footer>
+</body>
+</html>
