@@ -61,7 +61,7 @@
 
 ### 1.6 認可（ロール・権限）
 
-- **システムロール（`system_role`）**: `system_admin`（運営＝会社/全アカウント操作）/ `general` の 2 値。コントロールプレーンの管理 API（`/admin/companies/*`）は `system_admin` で門番。
+- **システムロール（`system_role`）**: `system_admin`（運営＝全社・会社設定/プロビジョニング/ロール付与）/ **`company_account_admin`（会社アカウント管理者＝自社全アカウントの発行/無効化/identity/PW・会社設定は不可・§8-⑯）** / `general` の 3 値（会社/全社スコープの役割）。管理 API の門番＝`/admin/companies/*` は `system_admin`／`/admin/accounts/*` は `company_account_admin`（セッション会社固定）。ロール付与（`system_admin`/`company_account_admin`/`admin`）は system_admin のみ。
 - **クエストグループ管理者（QG管理者）**: `system_role` では表さず、**会社DB `quest_group_members.role=admin`（per-group）で表現**（B案・2026-07-27 決定＝二重定義の解消）。QG向け管理 API（`/admin/quest-groups/*`）は**セッションユーザーが対象グループに有効な `admin` 所属（`removed_at IS NULL`）を持つか**で門番（会社DB 判定）。`admin` の付与/剥奪は system_admin のみ（SC-92）。
 - **フロント/バック境界（`doc/コーディング規約.md` §1）**: 認可・業務バリデーション・ゲーム計算・状態遷移/冪等はすべて**バックエンド専任**。フロントは表示・UX 出し分け・API 呼び出しのみ（クライアント側検証は UX 便宜で権威にしない）。
 - **クエスト内 6 権限（`permission_type`）**: `owner`/`quest_admin`/`evaluator`/`vote`/`idea_create`/`comment`。**全アクションはサーバーが権限を強制**（フロントの出し分けは UX のみ）。代表マッピング:
@@ -181,8 +181,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### A. 認証・セッション（コントロールプレーン）＝詳細確定
 → **[`A_認証・セッション.md`](./A_認証・セッション.md)**（状態機械・Cookie/トークン・8 エンドポイントの req/res・エラー・SC-00 対応）。
 
-### B. 会社・アカウント・所属（system_admin＝全社／QG管理者＝自グループ）＝詳細確定
-→ **[`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md)**。決定＝**①ロール別パス分離**（system_admin=`/admin/companies/{company_id}/...`／QG管理者=`/admin/quest-groups/{group_id}/...`）**②B案ロールモデル**（QG管理者は `quest_group_members.role=admin` で表現・§1.6）**③発行時の初期所属を outbox に相乗**（会社DBでusers→memberships upsert・FK順序保証）**④SC-92 は SC-90 の上位互換**（無効化/PW再設定を全社範囲でも）**⑤ブートストラップ＝運営テナント seed＋最初の system_admin**（B.5.1・データモデル §8-⑮）＝「会社レス（どの会社にも属さない）アカウント」は非採用（案A・`accounts.company_id` は `NOT NULL` 維持）・system_admin は予約会社〔例 `OPS`〕に収容し認可は role で判定・運営テナントと最後の system_admin は削除/無効化不可。ロール変更・disable でセッション破棄＋信頼端末失効（§A.9-③）、権限変更履歴を `system_audit_logs` に記録（セキュリティ一覧 2-⑬）。
+### B. 会社・アカウント・所属（system_admin＝全社／会社アカウント管理者＝自社アカウント／QG管理者＝参加選択）＝詳細確定
+→ **[`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md)**。決定＝**①ロール別パス分離**（system_admin=`/admin/companies/{company_id}/...`／会社アカウント管理者=`/admin/accounts/...`〔セッション会社固定〕／QG管理者=`/admin/quest-groups/{group_id}/...`＋`/admin/company-directory`）**②B案ロールモデル**（QG管理者は `quest_group_members.role=admin` で表現・§1.6）**③発行時の初期所属を outbox に相乗**（会社DBでusers→memberships upsert・FK順序保証）**④SC-92 は SC-90 の上位互換**（無効化/PW再設定を全社範囲でも）**⑤ブートストラップ＝運営テナント seed＋最初の system_admin**（B.5.1・データモデル §8-⑮）＝「会社レス」アカウントは非採用（案A・`accounts.company_id` は `NOT NULL`）・system_admin は予約会社〔例 `OPS`〕に収容し認可は role で判定・運営テナントと最後の system_admin は削除/無効化不可**⑥職務分離（SoD・§8-⑯）＝会社アカウント管理者（`company_account_admin`）を新設**（自社全アカウントの発行/無効化/identity/PW・会社設定/ロール付与は不可）し、**QG管理者は「参加選択専任」に縮小**（自社ディレクトリ参照＋既存垢の per-group 参加追加/除外のみ・破壊系なし）＝会社DBアカウント参照の緩和と両立させても権限昇格を構造的に遮断。ロール付与（`system_admin`/`company_account_admin`/`admin`）は system_admin のみ。ロール変更・disable でセッション破棄＋信頼端末失効（§A.9-③）、権限変更履歴を `system_audit_logs` に記録（2-⑬）。
 
 ### C. クエスト・パーティー・権限（テナント）＝詳細確定
 → **[`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md)**。決定＝**①パーティー所属を門番に**（非パーティーは 404・可視範囲＝パーティー内）**②クエスト内 6 権限をサーバー強制**（`owner` 付与は作成者のみ・作成者は剥奪不可・新規既定＝vote/idea_create/comment）**③パーティー編集は一括差分 `PUT /quests/{id}/party`＋増分 `POST/DELETE /members`・`PUT /members/{user_id}/permissions` を両立**（SC-11 モーダル保存に対応）**④`quest_group_id` は作成時のみ・以後不変**（参照範囲/既存アイデア整合の保護）**⑤状態機械を前進のみサーバー強制**（`draft→recruiting→in_progress→evaluating→completed`・完了で書き込み凍結）**⑥クエスト公開に XP は付与しない**（canonical XP 表に無い＝SC-11 の「作成 XP」表現は要修正）。主エンドポイント＝`GET /quests`（所属グループ×参加中・FR-15）・`POST /quests`・`GET/PATCH/DELETE /quests/{id}`（DELETE=論理削除 owner/quest_admin）・`POST /quests/{id}/publish`・`POST /quests/{id}/transition`・パーティー `PUT /quests/{id}/party`／`POST/DELETE /quests/{id}/members`／`PUT /quests/{id}/members/{user_id}/permissions`・候補 `GET /quest-groups`・`GET /quest-groups/{id}/members`。クエスト内ランキングは G、全文検索は J、通知発火は H を参照。

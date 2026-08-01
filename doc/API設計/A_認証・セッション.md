@@ -87,7 +87,7 @@ stateDiagram-v2
   "account_id": "acc_…",
   "company_id": "co_…",
   "company_code": "ACME-01",
-  "system_role": "general",            // general | system_admin（QG管理者は system_role では表さず会社DB quest_group_members.role=admin で判定＝B案）
+  "system_role": "general",            // general | company_account_admin | system_admin（会社アカウント管理者=自社全アカウント管理・§8-⑯／QG管理者は system_role では表さず会社DB quest_group_members.role=admin で判定＝B案）
   "locale": "ja",                       // ja | en（accounts源泉ミラー・§8-⑬）
   "user": {                             // 会社DB users の表示情報（会社DB解決後にミラーから）
     "user_id": "usr_…",
