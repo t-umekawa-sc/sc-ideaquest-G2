@@ -139,6 +139,24 @@
 - **アカウントの発行/編集/無効化/PWリセット/本人プロフィール編集は管理DB `accounts` が源泉**。API は `accounts` を更新するのと**同一Tx で `account_sync_outbox` に 1 行 INSERT**（データモデル §4.6・§8-①）。会社DB `users` のミラー列はワーカが冪等反映するため、**API は会社DB の `users.login_id/email/status/...` を直接更新しない**。
 - 会社DB `users` の一覧・表示はミラー列で完結（管理DBへの往復なし）。
 
+### 1.14 Redis に保持するデータ一覧（用途・キー・TTL・更新/無効化するエンドポイント）
+
+Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**する。**目的＝(1) 何を Redis に持つかを明示、(2) その情報を書き込む/無効化するエンドポイントを対応づける**（分散した記述の一覧化）。**キー名は例**（実装時に接頭辞規約を確定）。
+
+| データ | Redis キー（例） | 保持内容 | TTL | 書き込み/無効化する契機（エンドポイント） |
+| --- | --- | --- | --- | --- |
+| 本セッション | `session:{sid}` | `account_id`/`company_id`/`company_code`/`system_role`/`locale`/`user`（A.6）＋認証メタ・CSRF 紐付け | アイドル延長＋絶対有効期限（§A.8） | 作成=`POST /auth/login`・`POST /auth/mfa/verify`／削除=`POST /auth/logout`・`logout-all`／**強制失効**=ロール変更・`disable`・PW 変更/再設定（A.9-③・B.2） |
+| pre-auth トークン | `preauth:{tid}` | `account_id`/`company_id`/`otp_challenge_id`（未MFA中間状態・最小権限） | 既定 10 分（§A.8） | 作成=`POST /auth/login`（要MFA分岐）／消費・削除=`POST /auth/mfa/verify`・期限切れ |
+| OTP チャレンジ | `otp:{cid}` | コードのハッシュ・試行回数・宛先マスク（データモデル §4.4・§8-⑨） | 10 分 | 作成=`login`（要MFA）・`POST /auth/mfa/resend`／消費=`mfa/verify` |
+| **会社コンフィグ（キャッシュ）** | `company_config:{company_id}` | `status`／`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`／`db_identifier`（管理DB `companies` のミラー） | 短 TTL（既定 60 秒目安・実装時確定）＋**明示無効化** | **充填**=会社解決時（§1.5・キャッシュミス時に `companies` から読む）／**更新・無効化**=`PATCH /admin/companies/{id}`・`PATCH /admin/companies/{id}/settings`・会社 `active`/`suspend` 化（B.1） |
+| レート制限カウンタ | `ratelimit:{scope}` | 失敗回数・ロック状態（§A.8） | 窓/ロック時間 | `POST /auth/login`・`POST /auth/password-setup/request` 等の失敗計上時 |
+| 冪等キー結果 | `idem:{key}` | `Idempotency-Key` 単位の最初の結果（再送で再生＝`idempotency_replayed`・§1.9） | 短期（実装時確定） | 非冪等 POST（アイデア投稿・クエスト作成・購入・評価確定・魔法解放・投票 等）の初回実行時に保存 |
+| リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行=書込側（D/E/H）の application が REST 処理内で publish |
+
+- **反映タイミングの原則（会社コンフィグ）**: 設定は**セッションに焼き込まない**（A.6 に含めない＝再ログイン不要）。`PATCH` 成功時に**同一処理で `company_config:{company_id}` を更新（または削除して次回充填）**するため、**ログイン中ユーザーにも次リクエストから即時反映**（例＝投票匿名化 ON/OFF の切替は、次に `GET /ideas/{id}` 等を取得した時点で表示が切り替わる・ドメイン D.1/D.5）。`mfa_required` はログインフロー時に参照＝**次回以降のログイン**に効く（既存セッションはゲート通過済みで影響なし）。
+- **`db_identifier` の同居**: 会社DB 動的ルーティング（§1.5）の解決も `company_config` から賄える（会社ごとに管理DBへ都度問い合わせない）。`company_code→company_id` の対応は不変寄りのため長 TTL 別キャッシュ可。
+- **キャッシュ無効化の責務**: 会社設定・状態を変える**すべての書き込み経路**（B.1）が、成功時に対象 `company_id` のキャッシュ更新/無効化を行う（コーディング規約 §3.4＝application が副作用の殻で実施）。取りこぼすと**古い設定で表示/判定される**ため、B.1 の各エンドポイントに反映義務を明記（下記相互参照）。
+
 ---
 
 ## 2. エンドポイント一覧（ドメイン別＝分割レビューの単位）

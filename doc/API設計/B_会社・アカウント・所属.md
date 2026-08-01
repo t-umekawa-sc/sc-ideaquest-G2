@@ -26,6 +26,7 @@
 - **P3 CSRF/Origin**: 変更系（POST/PATCH/DELETE）は §1.4（ダブルサブミット `iq_csrf`＋Origin/Sec-Fetch 検証）を満たす。不一致は **403 `csrf_failed`**。
 - **P4 会社スコープはサーバー由来**: system_admin の `/admin/companies/{company_id}/*` のみ `company_id` を明示的に受ける（§1.5 の唯一の例外）。QG系 `/admin/quest-groups/*` は `company_id` を受けず**セッション会社固定**（`session.company_id`）。
 - **P5 判定材料の源泉**: `session.system_role`（源泉＝管理DB `accounts.role`・ログイン時にセッションへ確定。変更時は全セッション破棄で再評価＝A.9-③）／会社DB `quest_group_members`（QG 所属・`removed_at IS NULL`）。
+  - **`session` とは**＝**サーバー側（Redis）に保持する不透明セッション**。ブラウザの `iq_session` Cookie は**意味を持たない不透明ID（引換券）のみ**で、`system_role` 等の権威データはサーバーが Redis から引いて判定する（クライアント申告は一切信用しない）。**Cookie/トークン一覧・属性＝A.0**、**`session` のスキーマ＝A.6**、**Cookie＋Redis 不透明セッションを採用した理由（JWT 不採用の ADR）＝A.10** を参照。`GET /auth/session`（A.5）でフロントに返す `session` は**UI 出し分け用の表示コピー**であり権威ではない（実アクションは各エンドポイントで再判定）。
 - **P6 失敗コードの使い分け（明確化）**: 認証前提の不成立＝上記 401/403(csrf)。**操作権限そのものが無い＝403 `forbidden`**。**権限の種類はあるが対象が権限範囲外（他会社・他グループ・非所属アカウント）＝404 `not_found`（存在秘匿・§1.6）**。原則＝*「見えてよい相手には 403 で拒否理由を示し、見えてはいけない相手には 404 で存在ごと隠す」*。
 
 **アクター判定の厳密定義**（B.0 表の形式化・この 2 条件だけが `/admin/*` の入口）:
@@ -47,7 +48,8 @@
 
 - **認可条件（B.1 全エンドポイント・共通）**: **system_admin 専用**＝B.0.1 の P1〜P6 を満たし、かつ `session.system_role == "system_admin"`。QG管理者・一般ユーザーは会社管理 API を呼べない＝**一律 403 `forbidden`**（会社そのものは system_admin には全社可視のため、個別会社の存在秘匿〔404〕は不要＝非 system_admin には 403 で拒否）。GET も同条件（会社の存在・件数を非 system_admin に開示しない）。
 - **会社コード**: 半角英大文字/数字/ハイフン・4〜20字・先頭英字・大文字正規化・全社一意。重複＝**409 `conflict`**（`errors[].field=company_code`）。作成時確定・以後不変。
-- **`status` 遷移**: `suspended`（準備中/メンテ）⇄ `active`。`active` 化は会社DB接続確認が前提（プロビジョニング完了）。`suspended` 中は一般ユーザのテナント API が **503 `company_suspended`**（§1.5・admin 操作は可）。
+- **設定変更の反映タイミング（`PATCH /{company_id}`・`/settings`・status 変更）**: 会社コンフィグは**セッションに焼き込まない**（A.6 に含めない＝再ログイン不要）。**`PATCH` 成功時に同一処理で Redis `company_config:{company_id}` を更新/無効化**（全体規約 §1.14）するため、**ログイン中ユーザーにも次リクエストから即時反映**。例＝`vote_anonymized` の ON/OFF 切替は、次に投票情報を取得した時点（`GET /ideas/{id}` 等・ドメイン D.1/D.5）で記名/匿名の表示が切り替わる。`mfa_required` はログイン時参照＝次回以降のログインに効く。**この無効化はサーバーの責務**（クライアントに依存しない）＝取りこぼすと古い設定で判定されるため必須。
+- **`status` 遷移**: `suspended`（準備中/メンテ）⇄ `active`。`active` 化は会社DB接続確認が前提（プロビジョニング完了）。`suspended` 中は一般ユーザのテナント API が **503 `company_suspended`**（§1.5・admin 操作は可）。status 変更も上記と同様に `company_config` を無効化（§1.14）。
 - **プロビジョニング/停止・削除・データ退避**は MVP 手動（§8-⑫）。API 化・退会フローは将来（SC-91/92 §9）。
 
 ## B.2 アカウント（`/admin/companies/{company_id}/accounts`・system_admin 専用・SC-92）
