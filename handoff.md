@@ -39,7 +39,8 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
-  - `f6bcc75` 職務分離＝会社アカウント管理者(company_account_admin)を新設・QG管理者を参加選択専任に縮小＝データモデル§8-⑯＋API設計B改訂（system_role 3値化・B.2.1新設・B.4改訂・B.7解消/B.7.2採用理由・README §1.6/§2-B・A.6・handoff）。画面反映は未了
+  - `68dc3aa` SoD画面反映＝会社アカウント管理者(SC-93)新設・SC-90を参加選択専任化・SC-92のsystem_role3値化（API設計B改訂の波及・下流キュー消化）。SC-90〔発行/無効化/PW撤去→会社ディレクトリ・ピッカーで参加追加/除外・member固定〕・SC-93新規〔/admin/accounts・自社アカウントのライフサイクル・general固定・system_admin行操作不可〕・SC-92〔system_role 3値表示＋モーダル選択〕。波及＝画面遷移図/SC-01管理導線/mocks/index.html/要件定義README(管理ロール3階層・FR-18新設・system_role3値)/データモデル.md(§8-⑯完了注記・画面帰属)/SC-00/API設計B.7(TBD解消)。テーブル/enum変更なし
+  - `f6bcc75` 職務分離＝会社アカウント管理者(company_account_admin)を新設・QG管理者を参加選択専任に縮小＝データモデル§8-⑯＋API設計B改訂（system_role 3値化・B.2.1新設・B.4改訂・B.7解消/B.7.2採用理由・README §1.6/§2-B・A.6・handoff）。画面反映は後続（→68dc3aaで反映済）
   - `01438ce` 会社コンフィグのRedisキャッシュ＋PATCH時無効化を明文化＝API設計§1.14新設（Redis保持データ一覧＝キー/TTL/更新EP対応・冪等キーもRedisと確定）。相互参照＝B.1／データモデル§4.1・要件README §Company（「ログイン時に参照」の誤読表現を修正）
   - `14a7334` API設計ドメインB: エンドポイントの認可条件を精密化＋見出し表記統一（B.0.1新設＝全 /admin/* 共通前提 P1〜P6・アクター判定の厳密定義・403/404使い分け／各EP群に認可条件明記／「system_admin 専用」統一）
   - `959f8f5` 設計判断に「なぜ」を併記する運用を規約化（コーディング規約 §2）＋B案に採用理由を追記（QG管理者を system_role で表さない理由＝スコープの違い）
