@@ -48,6 +48,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `a76cf05` SC-11/21/25 のモーダル構造を標準 sectioned へ統一＝旧「モーダル＝ページ」デモ（`.modal{position:static}`＋`.modal__drag`＋`.modal__foot`）を廃止し overlay＋`.modal__panel.sectioned`（header/body/footer）＋`.modal--lg/draggable/maximizable/show`へ。固有CSS撤去で共通部品に一本化。SC-25の覗き見は折りたたみ主に。md も更新。全モーダルが単一部品・同一挙動に統合完了
   - `e921251` モーダルを「1部品・挙動共通」へ集約＝ドラッグ移動を shared.js に共通化（`.modal--draggable`・旧SC-11/21/25の個別JS撤去・全入力モーダルで有効）＋最大化/復元 `.modal--maximizable`（⤢/⤡・`.is-max`・sectioned4画面）＋狭幅自動フルスクリーン（`.modal__panel.sectioned` ≤640px）。自由リサイズは不採用。デザイン標準 §4 に「1部品・挙動共通」節
   - `a49f596` 入力モーダルUI標準を策定（M1〜M8）＝`.modal__header/__body/__footer`＋`.modal--sm/md/lg`（sectioned・SC-90/91/92/93）／共通挙動を shared.js に集約（MutationObserverで Esc・初期/復帰フォーカス・フォーカストラップ・`body.modal-open` スクロールロック）／インラインエラー `setFieldError`/`clearFieldErrors`＋`.field__error`（alert 全廃）。ドラッグ変種 SC-11/21/25 は独自レイアウト維持＋共通挙動/エラー統一。デザイン標準.md §4 反映
   - `4c126a7` fix: ⋯メニューの下行潜りを根治（position:sticky 自体がスタッキングコンテキストを作るため、開いた行の操作セルだけ z-index:1001 に持ち上げ＝`.rowmenu-open`）＋狭幅に会社識別バー `.ctx-mini`（condensed sticky header・色帯/アイコン/会社名/状態・IntersectionObserverでバナーが隠れたら上部貼り付き）を SC-92 に追加
