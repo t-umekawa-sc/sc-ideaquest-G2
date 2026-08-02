@@ -55,6 +55,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `e2e62d6` 自分の下書きクエストを一覧(SC-10)にも表示＝GET /quests を (A)公開系 OR (B)自分の下書き に改定（C.1）・下書きクリックは SC-11 編集・他人の下書きは不可視。SC-10 md＋mock 反映。一覧作成→戻ると消える不便を解消
   - `745b669` outbox(ユーザ同期)の処理フローを設計書に明記（データモデル §4.6 に「処理フロー」新設・API §1.13/B.5 参照）＝①同一Tx INSERT②id昇順取得③company_id→db_identifier→.env で接続解決④account_id 冪等upsert(users→memberships)⑤done/retry/failed。順序=id順直列＋失敗時ヘッドオブライン・異account_idは並列可、を厳密化
   - `6df14c9` ブートストラップの初期PWをメール必須にしない方針へ修正＝(a)env直投入＋初回強制変更(既定)/(b)メールリンク/(c)OOBトークンの3択・デフォルトPW禁止。B.5.1・データモデル§8-⑮。＋API設計README §2-B⑥を per-group admin 解禁に合わせ精緻化
   - `196d5e3` 会社アカウント管理者に per-group admin(QG管理者)任命を解禁＝委譲運用「system_admin→会社アカ管理者→QG管理者→メンバー」に対応。system_role 付与は system_admin のみ維持（真の昇格は集約）。B.2.1/B.0.1/B.6/B.7.2・データモデル§5.5/§8-⑯・SC-93(md＋mock・member/adminセグメント)・SC-92 mock注記・README・画面遷移図
