@@ -205,18 +205,25 @@
           <option value="suspended">無効</option>
         </select>
       </label>
+      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
     </div>
     <div class="tools"><span class="list-count" id="accCount">— 件</span></div>
   </div>
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>氏名</th><th>ログインID</th><th>メールアドレス</th><th>システムロール</th><th>所属クエストグループ</th><th>状態</th><th></th></tr>
+        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" aria-label="操作"></th></tr>
       </thead>
       <tbody id="accountRows"></tbody>
     </table>
   </div>
   <div class="list-empty" id="accEmpty" hidden>該当するアカウントがありません。</div>
+  <!-- ページネーション（標準・オフセット方式） -->
+  <nav class="pagination" id="pager" aria-label="ページ送り" hidden>
+    <button class="btn btn-outline btn-sm" type="button" id="pgPrev">← 前へ</button>
+    <span class="pagination__info" id="pgInfo">1 / 1</span>
+    <button class="btn btn-outline btn-sm" type="button" id="pgNext">次へ →</button>
+  </nav>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）→初回ログイン時にパスワード設定。会社設定は Company の各フラグ（`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`）。<strong>クエストグループ所属の割当はシステム管理者のフル操作</strong>（クエストグループ管理者は自グループ範囲のみ＝SC-90）。この画面の操作は<strong>すべて上部バナーの会社に対して</strong>適用されます。
@@ -282,6 +289,8 @@
       { name:'管理 三郎', loginId:'saburo.kanri', email:'kanri@across.co.jp', system_role:'company_account_admin', groups:[], state:'active' },
       { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', system_role:'sys_admin', groups:[], state:'active' },
       { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   system_role:'general',   groups:[{n:'R&D',r:'member'}], state:'suspended' },
+      { name:'中村 優',   loginId:'yu.nakamura',  email:'yu@across.co.jp',    system_role:'general',   groups:[{n:'カスタマーサクセス',r:'member'}], state:'active' },
+      { name:'小林 大地', loginId:'daichi.kobayashi',email:'daichi@across.co.jp',system_role:'general', groups:[{n:'営業推進',r:'member'}], state:'active' },
     ],
     beyond: [
       { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',system_role:'general',   groups:[{n:'R&D',r:'member'}], state:'active' },
@@ -411,11 +420,18 @@
   const accountRows = document.getElementById('accountRows');
   const fAccSearch = document.getElementById('fAccSearch');
   const fAccState = document.getElementById('fAccState');
+  const accPager = document.getElementById('pager');
+  const accClearBtn = document.getElementById('clearFilters');
+  const ACC_PER_PAGE = 5;
+  let accPage = 1;
   const list0 = ACCOUNTS[companyId] || [];
   function renderAccounts() {
     const q = fAccSearch.value.trim().toLowerCase(), st = fAccState.value;
     const list = list0.filter(a => (!q || a.name.toLowerCase().includes(q) || a.loginId.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)) && (!st || a.state === st));
-    accountRows.innerHTML = list.map(a => {
+    accClearBtn.hidden = !(q || st);                                      // F1
+    const totalPages = Math.max(1, Math.ceil(list.length / ACC_PER_PAGE)); // F2
+    if (accPage > totalPages) accPage = totalPages;
+    accountRows.innerHTML = list.slice((accPage - 1) * ACC_PER_PAGE, accPage * ACC_PER_PAGE).map(a => {
       const [label, cls] = ST_ACC[a.state];
       const idx = list0.indexOf(a);
       const groups = a.groups.length ? a.groups.map(g => g.r === 'admin'
@@ -440,9 +456,16 @@
     }).join('');
     document.getElementById('accCount').textContent = list.length + ' 件';
     document.getElementById('accEmpty').hidden = list.length !== 0;
+    accPager.hidden = list.length === 0;
+    document.getElementById('pgInfo').textContent = accPage + ' / ' + totalPages;
+    document.getElementById('pgPrev').disabled = accPage <= 1;
+    document.getElementById('pgNext').disabled = accPage >= totalPages;
   }
-  fAccSearch.addEventListener('input', renderAccounts);
-  fAccState.addEventListener('change', renderAccounts);
+  fAccSearch.addEventListener('input', () => { accPage = 1; renderAccounts(); });
+  fAccState.addEventListener('change', () => { accPage = 1; renderAccounts(); });
+  accClearBtn.addEventListener('click', () => { fAccSearch.value = ''; fAccState.value = ''; accPage = 1; renderAccounts(); });
+  document.getElementById('pgPrev').addEventListener('click', () => { if (accPage > 1) { accPage--; renderAccounts(); } });
+  document.getElementById('pgNext').addEventListener('click', () => { accPage++; renderAccounts(); });
 
   // モーダル
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }

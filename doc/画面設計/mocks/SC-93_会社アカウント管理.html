@@ -94,8 +94,10 @@
           <option value="suspended">無効（論理削除）</option>
         </select>
       </label>
+      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
     </div>
     <div class="tools">
+      <span class="list-count" id="accCount">— 件</span>
       <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
     </div>
   </div>
@@ -103,12 +105,18 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>氏名</th><th>ログインID</th><th>メールアドレス</th><th>システムロール</th><th>所属クエストグループ</th><th>状態</th><th></th></tr>
+        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" aria-label="操作"></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
   <div class="list-empty" id="empty" hidden>該当するアカウントがありません。</div>
+  <!-- ページネーション（標準・オフセット方式） -->
+  <nav class="pagination" id="pager" aria-label="ページ送り" hidden>
+    <button class="btn btn-outline btn-sm" type="button" id="pgPrev">← 前へ</button>
+    <span class="pagination__info" id="pgInfo">1 / 1</span>
+    <button class="btn btn-outline btn-sm" type="button" id="pgNext">次へ →</button>
+  </nav>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>（メールリンク・72時間）。<strong>無効化</strong>＝論理削除（ログイン不可・全セッション破棄）で、それまでの入力（アイデア/投票/評価/コメント）は残ります。この画面で発行/編集できるのは<strong>一般アカウント</strong>のみ＝<strong>システムロールの付与（会社アカウント管理者/システム管理者）・クエストグループ管理者〔admin〕の任命はシステム管理者（SC-92）</strong>。<strong>システム管理者アカウントは操作できません</strong>（SC-92 で管理）。所属クエストグループへの参加はここでも設定できますが、参加ロールは<strong>メンバー固定</strong>です。
@@ -165,6 +173,10 @@
   const empty = document.getElementById('empty');
   const fSearch = document.getElementById('fSearch');
   const fState = document.getElementById('fState');
+  const pager = document.getElementById('pager');
+  const clearBtn = document.getElementById('clearFilters');
+  const PER_PAGE = 5;
+  let page = 1;
 
   function currentList() {
     const q = fSearch.value.trim().toLowerCase(), st = fState.value;
@@ -182,7 +194,12 @@
 
   function render() {
     const list = currentList();
-    rows.innerHTML = list.map((a) => {
+    const q = fSearch.value.trim(), st = fState.value;
+    clearBtn.hidden = !(q || st);                                   // F1
+    const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE)); // F2
+    if (page > totalPages) page = totalPages;
+    const slice = list.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+    rows.innerHTML = slice.map((a) => {
       const [label, cls] = ST[a.state];
       const idx = ACCOUNTS.indexOf(a);
       // system_admin は会社アカウント管理者から操作不可（SC-92 で管理）
@@ -209,11 +226,19 @@
         <td>${actions}</td>
       </tr>`;
     }).join('');
+    document.getElementById('accCount').textContent = list.length + ' 件';
     empty.hidden = list.length !== 0;
+    pager.hidden = list.length === 0;
+    document.getElementById('pgInfo').textContent = page + ' / ' + totalPages;
+    document.getElementById('pgPrev').disabled = page <= 1;
+    document.getElementById('pgNext').disabled = page >= totalPages;
   }
 
-  fSearch.addEventListener('input', render);
-  fState.addEventListener('change', render);
+  fSearch.addEventListener('input', () => { page = 1; render(); });
+  fState.addEventListener('change', () => { page = 1; render(); });
+  clearBtn.addEventListener('click', () => { fSearch.value = ''; fState.value = ''; page = 1; render(); });
+  document.getElementById('pgPrev').addEventListener('click', () => { if (page > 1) { page--; render(); } });
+  document.getElementById('pgNext').addEventListener('click', () => { page++; render(); });
 
   // 所属クエストグループ編集（member 固定・admin 任命は不可＝SC-92）
   const amGroups = document.getElementById('amGroups');
