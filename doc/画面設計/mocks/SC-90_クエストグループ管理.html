@@ -7,8 +7,9 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   /* SC-90 固有スタイル（共通化する見た目は shared.css へ昇格する）
-     業務層の管理画面: クエストグループ管理者が「自分の管理グループ内のアカウント」を
-     登録・編集・論理削除する。所属の割当（他グループへの移動）はシステム管理者の領分（SC-91）。 */
+     業務層の管理画面: クエストグループ管理者（QG管理者）＝「参加選択専任」（SoD・§8-⑯／B.4）。
+     自社ディレクトリから既存アカウントを選び、自分が admin のグループへ参加追加/除外する。
+     アカウント本体の発行/無効化/identity/PW は持たない（会社アカウント管理者=SC-93 / システム管理者=SC-92）。 */
   .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
   .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
 
@@ -17,17 +18,17 @@
 
   .table .db-id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
   .table td .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  tr.is-suspended td { color: var(--color-text-muted); }
-
-  .st-active { background: var(--color-agree-bg); color: var(--color-success); }
-  .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
 
   .modal__panel { max-width: 520px; }
   .form-row { margin-bottom: var(--space-4); }
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
-  .req::after { content: " *"; color: var(--color-danger); }
   .form-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
-  .fixed-field { padding: 10px 12px; background: var(--color-surface-alt); border-radius: var(--radius); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* ディレクトリ・ピッカー（最小射影＝氏名・アバターのみ） */
+  .dir-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; margin-top: var(--space-2); }
+  .dir-row { display: flex; align-items: center; gap: var(--space-3); padding: 8px 10px; background: var(--color-surface-alt); border-radius: var(--radius); }
+  .dir-row__name { flex: 1; font-size: var(--text-sm); font-weight: 600; }
+  .dir-row__id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
 </style>
 </head>
 <body>
@@ -64,9 +65,9 @@
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
   <h1 class="page-title">クエストグループ管理</h1>
-  <p class="admin-sub">あなたが管理するクエストグループ内のアカウントを<strong>登録・編集・論理削除</strong>できます。（他グループへの所属割当はシステム管理者の領分）</p>
+  <p class="admin-sub">あなたが管理するクエストグループの<strong>参加メンバーを追加・除外</strong>できます。（アカウントの発行・無効化・パスワード再設定は<strong>会社アカウント管理者（SC-93）</strong>の領分）</p>
 
-  <!-- 管理グループの選択 -->
+  <!-- 管理グループの選択（自分が admin のグループのみ） -->
   <div class="group-bar">
     <span class="group-bar__label">管理グループ:</span>
     <select class="select" id="groupSel" style="width:auto"></select>
@@ -76,53 +77,44 @@
   <!-- ツールバー -->
   <div class="list-toolbar">
     <div class="filters">
-      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインID・メールで検索">
-      <label>状態
-        <select class="select" id="fState">
-          <option value="">すべて</option>
-          <option value="active">有効</option>
-          <option value="suspended">無効（論理削除）</option>
-        </select>
-      </label>
+      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインIDで検索">
     </div>
     <div class="tools">
-      <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
+      <button class="btn btn-primary" type="button" id="addMember">＋ メンバーを追加</button>
     </div>
   </div>
 
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th>氏名</th><th>ログインID</th><th>メールアドレス</th><th>グループ内ロール</th><th>状態</th><th>最終ログイン</th><th></th></tr>
+        <tr><th>氏名</th><th>ログインID</th><th>参加日</th><th></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
-  <div class="list-empty" id="empty" hidden>該当するアカウントがありません。</div>
+  <div class="list-empty" id="empty" hidden>このグループの参加メンバーがいません。「＋ メンバーを追加」から追加してください。</div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。<strong>論理削除</strong>＝無効化（ログイン不可）で、それまでの入力（アイデア/投票/評価/コメント）は削除せず表示継続。物理削除は行わない。所属の割当（グループ間移動）と<strong>クエストグループ管理者（グループ内ロール admin）の付与/剥奪はシステム管理者（SC-92）</strong>。この画面では自分が管理するグループのメンバーのみ運用（admin 付与不可）。
+    ※ この画面は<strong>参加管理（メンバーシップ）専任</strong>です（職務分離・SoD）。<strong>会社ディレクトリ</strong>から既存アカウントを選んで、あなたが管理するグループに<strong>メンバーとして参加追加/除外</strong>します（参加ロールは<strong>メンバー固定</strong>＝管理者〔admin〕付与はシステム管理者 SC-92）。<strong>アカウントの発行・無効化・ログインID/メール編集・パスワード再設定は会社アカウント管理者（SC-93）またはシステム管理者（SC-92）</strong>が行います。除外は per-group の論理削除で、アカウント本体・他グループ所属・これまでの入力（アイデア/投票/評価/コメント）は残ります。
   </p>
 </main>
 
-<!-- ===== アカウント発行/編集モーダル ===== -->
-<div class="modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="amTitle" hidden>
+<!-- ===== メンバー追加モーダル（ディレクトリ・ピッカー） ===== -->
+<div class="modal" id="pickerModal" role="dialog" aria-modal="true" aria-labelledby="pkTitle" hidden>
   <div class="modal__backdrop" data-close></div>
   <div class="modal__panel">
     <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
-    <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
-    <div class="form-row"><label class="req" for="amLoginId">ログインID</label><input class="input" id="amLoginId" placeholder="例: taro.yamada"><div class="hint">ログイン用の識別子（メールとは別）。</div></div>
-    <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
-    <div class="form-row"><label>所属クエストグループ</label><div class="fixed-field" id="amGroup">製品企画（この管理グループに追加されます）</div></div>
-    <div class="form-row"><label>グループ内ロール</label>
-      <div class="fixed-field" id="amRoleFixed">一般メンバー（固定）</div>
-      <div class="hint"><strong>クエストグループ管理者（admin）の付与/変更はシステム管理者のみ</strong>（SC-92）。この画面ではメンバーの発行/編集のみ（ロールは変更不可）。</div>
+    <h2 id="pkTitle" style="margin-top:0">メンバーを追加</h2>
+    <div class="form-row"><label>追加先グループ</label><div class="form-note" id="pkGroup" style="padding:10px 12px">—</div></div>
+    <div class="form-row">
+      <label for="pkSearch">会社ディレクトリを検索</label>
+      <input class="input" id="pkSearch" type="search" placeholder="氏名・ログインIDで検索">
+      <div class="hint">自社の有効アカウントから選択。既にこのグループに参加中の人は表示されません。氏名・アバターのみ表示（メール・ロール・他グループ所属は非開示）。</div>
     </div>
-    <div class="form-note" id="amNote">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>を行います（招待リンク/初回パスワード設定フロー）。</div>
+    <div class="dir-list" id="pkList"></div>
+    <div class="list-empty" id="pkEmpty" hidden>候補がありません。未発行の場合は<strong>会社アカウント管理者（SC-93）</strong>へ発行を依頼してください。</div>
     <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
-      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
-      <button class="btn btn-primary" type="button" id="amSave">発行する</button>
+      <button class="btn btn-outline" type="button" data-close>閉じる</button>
     </div>
   </div>
 </div>
@@ -132,56 +124,54 @@
   const savedBg = localStorage.getItem('ideaquest_content_bg');
   if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
-  // ---- データ（モック・初期値。この管理者は「製品企画」「業務改善」を管理） ----
+  // ---- データ（モック・初期値。この管理者は「製品企画」「業務改善」を admin として管理） ----
   const GROUPS = ['製品企画', '業務改善'];
-  const ROLE_LABEL = { member:'一般メンバー', qg_admin:'クエストグループ管理者' };
-  const ST = { active:['有効','st-active'], suspended:['無効','st-disabled'] };
+  // 参加メンバー（会社DB quest_group_members × users・removed_at IS NULL）。ロールは member 固定（admin は SC-92）。
   let MEMBERS = [
-    { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  group:'製品企画', role:'member',   state:'active', last:'今日 09:12' },
-    { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',group:'製品企画', role:'qg_admin',  state:'active', last:'今日 08:40' },
-    { name:'佐藤 大輔', loginId:'daisuke.sato', email:'daisuke@across.co.jp',group:'製品企画', role:'member',   state:'active', last:'昨日 17:55' },
-    { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   group:'製品企画', role:'member',   state:'suspended', last:'2026-06-30' },
-    { name:'田中 美咲', loginId:'misaki.tanaka',email:'misaki@across.co.jp',group:'業務改善', role:'member',   state:'active', last:'今日 10:05' },
-    { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@across.co.jp',   group:'業務改善', role:'qg_admin',  state:'active', last:'昨日 14:20' },
-    { name:'渡辺 剛',   loginId:'go.watanabe',  email:'go@across.co.jp',    group:'業務改善', role:'member',   state:'active', last:'3日前' },
+    { name:'山田 太郎', loginId:'taro.yamada',  group:'製品企画', joined:'2026-05-12' },
+    { name:'佐藤 大輔', loginId:'daisuke.sato', group:'製品企画', joined:'2026-05-20' },
+    { name:'田中 美咲', loginId:'misaki.tanaka',group:'業務改善', joined:'2026-06-01' },
+    { name:'渡辺 剛',   loginId:'go.watanabe',  group:'業務改善', joined:'2026-06-15' },
+  ];
+  // 会社ディレクトリ（GET /admin/company-directory＝最小射影：氏名・ログインID・アバター頭文字のみ）。
+  // email・system_role・他グループ所属は返さない。status='active' のみ。
+  const DIRECTORY = [
+    { name:'山田 太郎', loginId:'taro.yamada' },
+    { name:'鈴木 花子', loginId:'hanako.suzuki' },
+    { name:'佐藤 大輔', loginId:'daisuke.sato' },
+    { name:'高橋 健',   loginId:'ken.takahashi' },
+    { name:'田中 美咲', loginId:'misaki.tanaka' },
+    { name:'伊藤 彩',   loginId:'aya.ito' },
+    { name:'渡辺 剛',   loginId:'go.watanabe' },
+    { name:'小林 大地', loginId:'daichi.kobayashi' },
+    { name:'加藤 遥',   loginId:'haruka.kato' },
   ];
   let currentGroup = GROUPS[0];
 
-  // グループ選択肢
+  // グループ選択肢（自分が admin のグループのみ）
   const groupSel = document.getElementById('groupSel');
   GROUPS.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; groupSel.appendChild(o); });
 
   const rows = document.getElementById('rows');
   const empty = document.getElementById('empty');
   const fSearch = document.getElementById('fSearch');
-  const fState = document.getElementById('fState');
 
   function currentList() {
-    const q = fSearch.value.trim().toLowerCase(), st = fState.value;
+    const q = fSearch.value.trim().toLowerCase();
     return MEMBERS.filter(m => m.group === currentGroup
-      && (!q || m.name.toLowerCase().includes(q) || m.loginId.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
-      && (!st || m.state === st));
+      && (!q || m.name.toLowerCase().includes(q) || m.loginId.toLowerCase().includes(q)));
   }
 
   function render() {
     const list = currentList();
-    rows.innerHTML = list.map((m, i) => {
-      const [label, cls] = ST[m.state];
+    rows.innerHTML = list.map((m) => {
       const idx = MEMBERS.indexOf(m);
-      const toggle = m.state === 'active'
-        ? `<button class="btn btn-outline" type="button" data-suspend="${idx}">無効化</button>`
-        : `<button class="btn btn-outline" type="button" data-activate="${idx}">再有効化</button>`;
-      return `<tr class="${m.state === 'suspended' ? 'is-suspended' : ''}">
+      return `<tr>
         <td><strong>${m.name}</strong></td>
         <td class="db-id">${m.loginId}</td>
-        <td class="db-id">${m.email}</td>
-        <td>${ROLE_LABEL[m.role]}</td>
-        <td><span class="badge ${cls}">${label}</span></td>
-        <td>${m.last}</td>
+        <td>${m.joined}</td>
         <td><div class="row-actions">
-          <button class="btn btn-outline" type="button" data-edit="${idx}">編集</button>
-          <button class="btn btn-outline" type="button" data-reset="${idx}">パスワード再設定</button>
-          ${toggle}
+          <button class="btn btn-outline" type="button" data-remove="${idx}">このグループから除外</button>
         </div></td>
       </tr>`;
     }).join('');
@@ -189,50 +179,54 @@
     empty.hidden = list.length !== 0;
   }
 
-  groupSel.addEventListener('change', () => { currentGroup = groupSel.value; document.getElementById('amGroup').textContent = currentGroup + '（この管理グループに追加されます）'; render(); });
+  groupSel.addEventListener('change', () => { currentGroup = groupSel.value; render(); });
   fSearch.addEventListener('input', render);
-  fState.addEventListener('change', render);
 
-  // 行アクション
+  // 行アクション（除外＝per-group トゥームストーン。アカウント本体には触れない）
   rows.addEventListener('click', (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
-    if (btn.dataset.edit != null) { openAccount('edit', MEMBERS[btn.dataset.edit]); }
-    else if (btn.dataset.reset != null) { const m = MEMBERS[btn.dataset.reset]; if (confirm('「' + m.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フローに戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
-    else if (btn.dataset.suspend != null) { const m = MEMBERS[btn.dataset.suspend]; if (confirm('「' + m.name + '」を無効化（論理削除）しますか？\nログイン不可になりますが、これまでの入力は残ります。')) { m.state = 'suspended'; render(); } }
-    else if (btn.dataset.activate != null) { const m = MEMBERS[btn.dataset.activate]; m.state = 'active'; render(); }
+    if (btn.dataset.remove != null) {
+      const m = MEMBERS[btn.dataset.remove];
+      if (confirm('「' + m.name + '」を「' + m.group + '」から除外しますか？\nこのグループの参加を解除します（アカウント本体・他グループ所属・これまでの入力は残ります）。')) {
+        MEMBERS = MEMBERS.filter(x => x !== m); render();
+      }
+    }
   });
 
-  // モーダル
-  const accountModal = document.getElementById('accountModal');
+  // ===== メンバー追加モーダル（ディレクトリ・ピッカー） =====
+  const pickerModal = document.getElementById('pickerModal');
+  const pkSearch = document.getElementById('pkSearch');
+  const pkList = document.getElementById('pkList');
+  const pkEmpty = document.getElementById('pkEmpty');
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
   function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
   document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
 
-  let editTarget = null;
-  function openAccount(mode, m) {
-    editTarget = mode === 'edit' ? m : null;
-    document.getElementById('amTitle').textContent = mode === 'edit' ? 'アカウントを編集' : 'アカウントを発行';
-    document.getElementById('amName').value = m ? m.name : '';
-    document.getElementById('amLoginId').value = m ? m.loginId : '';
-    document.getElementById('amEmail').value = m ? m.email : '';
-    document.getElementById('amRoleFixed').textContent = (m && m.role === 'qg_admin')
-      ? 'クエストグループ管理者（変更はシステム管理者・SC-92）'
-      : '一般メンバー（固定）';
-    document.getElementById('amGroup').textContent = (m ? m.group : currentGroup) + '（この管理グループに追加されます）';
-    document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
-    document.getElementById('amNote').style.display = mode === 'edit' ? 'none' : '';
-    openModal('accountModal');
+  function renderPicker() {
+    const q = pkSearch.value.trim().toLowerCase();
+    // 既にこのグループに参加中の人は候補から除外（重複所属不可）
+    const already = new Set(MEMBERS.filter(m => m.group === currentGroup).map(m => m.loginId));
+    const cands = DIRECTORY.filter(d => !already.has(d.loginId)
+      && (!q || d.name.toLowerCase().includes(q) || d.loginId.toLowerCase().includes(q)));
+    pkList.innerHTML = cands.map(d => `
+      <div class="dir-row">
+        <span class="avatar sm" data-name="${d.name}"><span class="avatar__img placeholder">${d.name.slice(0,1)}</span></span>
+        <span class="dir-row__name">${d.name} <span class="dir-row__id">${d.loginId}</span></span>
+        <button class="btn btn-primary btn-sm" type="button" data-add="${d.loginId}">追加</button>
+      </div>`).join('');
+    pkEmpty.hidden = cands.length !== 0;
   }
-  document.getElementById('newAccount').addEventListener('click', () => openAccount('new', null));
-  document.getElementById('amSave').addEventListener('click', () => {
-    const name = document.getElementById('amName').value.trim();
-    const loginId = document.getElementById('amLoginId').value.trim();
-    const email = document.getElementById('amEmail').value.trim();
-    if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
-    // グループ内ロールは SC-90 では変更不可（member 固定・admin 付与は system_admin=SC-92）
-    if (editTarget) { editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email; }
-    else { MEMBERS.push({ name, loginId, email, group: currentGroup, role: 'member', state:'active', last:'—（未ログイン）' }); }
-    closeModal(accountModal); render();
+  document.getElementById('addMember').addEventListener('click', () => {
+    document.getElementById('pkGroup').textContent = currentGroup + '（あなたが管理するグループ・参加ロールはメンバー固定）';
+    pkSearch.value = ''; renderPicker(); openModal('pickerModal');
+  });
+  pkSearch.addEventListener('input', renderPicker);
+  pkList.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-add]'); if (!btn) return;
+    const d = DIRECTORY.find(x => x.loginId === btn.dataset.add); if (!d) return;
+    const today = new Date().toISOString().slice(0,10);
+    MEMBERS.push({ name: d.name, loginId: d.loginId, group: currentGroup, joined: today });
+    render(); renderPicker();  // 追加済みは候補から消える
   });
 
   render();

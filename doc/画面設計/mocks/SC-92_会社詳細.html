@@ -235,10 +235,11 @@
     <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
     <div class="form-row"><label for="amRole">システムロール</label>
       <select class="select" id="amRole">
-        <option value="member">一般</option>
+        <option value="general">一般</option>
+        <option value="company_account_admin">会社アカウント管理者</option>
         <option value="sys_admin">システム管理者</option>
       </select>
-      <div class="hint">運営（システム管理者）か否かの2値。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（system_role では持たない）。</div>
+      <div class="hint">3値。<strong>一般</strong>＝業務利用者／<strong>会社アカウント管理者</strong>＝自社の全アカウントの発行・無効化・PW再設定（SC-93）／<strong>システム管理者</strong>＝運営。<strong>ロール付与はシステム管理者のみ</strong>。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（system_role では持たない）。</div>
     </div>
     <div class="form-row"><label>所属クエストグループ</label>
       <div class="mrows" id="amGroups"></div>
@@ -248,7 +249,7 @@
       </div>
       <div class="hint">この会社のクエストグループから複数選択可。各グループの役割を <strong>メンバー / 管理者</strong> で指定（既定=メンバー）。<strong>「管理者」＝クエストグループ管理者の任命はシステム管理者のみ可</strong>（指定されたユーザーは当該グループを SC-90 で管理可）。</div>
     </div>
-    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロール「システム管理者」は運営のみに付与。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>。</div>
+    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロールの付与（会社アカウント管理者/システム管理者）は<strong>システム管理者のみ</strong>。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>（system_role では持たない）。</div>
     <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
       <button class="btn btn-primary" type="button" id="amSave">発行する</button>
@@ -271,22 +272,23 @@
     sample: { name:'サンプル商事', code:'SAMPLE', color:'#D97706', icon:null, db:'db_sample', state:'suspended', accounts:7, groups:1,
       flags:{ voteAnon:true, hideVoters:false, mfa:false }, questGroups:['営業推進'] },
   };
-  // システムロールは2値（B案）。QG管理者は所属グループの role:'admin' で表現。
-  const SYSROLE_LABEL = { member:'一般', sys_admin:'システム管理者' };
+  // システムロールは3値（B案＋SoD §8-⑯）。QG管理者は所属グループの role:'admin' で表現（system_role には持たせない）。
+  const SYSROLE_LABEL = { general:'一般', company_account_admin:'会社アカウント管理者', sys_admin:'システム管理者' };
   const ST_ACC = { active:['有効','st-active'], suspended:['無効','st-suspended'] };
   const ACCOUNTS = {
     across: [
-      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  system_role:'member',   groups:[{n:'製品企画',r:'member'},{n:'業務改善',r:'member'}], state:'active' },
-      { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',system_role:'member',   groups:[{n:'製品企画',r:'admin'}], state:'active' },
+      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  system_role:'general',   groups:[{n:'製品企画',r:'member'},{n:'業務改善',r:'member'}], state:'active' },
+      { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',system_role:'general',   groups:[{n:'製品企画',r:'admin'}], state:'active' },
+      { name:'管理 三郎', loginId:'saburo.kanri', email:'kanri@across.co.jp', system_role:'company_account_admin', groups:[], state:'active' },
       { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', system_role:'sys_admin', groups:[], state:'active' },
-      { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   system_role:'member',   groups:[{n:'R&D',r:'member'}], state:'suspended' },
+      { name:'高橋 健',   loginId:'ken.takahashi',email:'ken@across.co.jp',   system_role:'general',   groups:[{n:'R&D',r:'member'}], state:'suspended' },
     ],
     beyond: [
-      { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',system_role:'member',   groups:[{n:'R&D',r:'member'}], state:'active' },
-      { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@beyond.co.jp',   system_role:'member', groups:[{n:'R&D',r:'admin'},{n:'品質保証',r:'admin'}], state:'active' },
+      { name:'田中 一郎', loginId:'ichiro.tanaka',email:'ichiro@beyond.co.jp',system_role:'general',   groups:[{n:'R&D',r:'member'}], state:'active' },
+      { name:'伊藤 彩',   loginId:'aya.ito',      email:'aya@beyond.co.jp',   system_role:'general', groups:[{n:'R&D',r:'admin'},{n:'品質保証',r:'admin'}], state:'active' },
     ],
     sample: [
-      { name:'退職 花', loginId:'hana.tai', email:'hana@sample.co.jp', system_role:'member', groups:[{n:'営業推進',r:'member'}], state:'suspended' },
+      { name:'退職 花', loginId:'hana.tai', email:'hana@sample.co.jp', system_role:'general', groups:[{n:'営業推進',r:'member'}], state:'suspended' },
     ],
   };
 
@@ -454,7 +456,7 @@
     document.getElementById('amName').value = a ? a.name : '';
     document.getElementById('amLoginId').value = a ? a.loginId : '';
     document.getElementById('amEmail').value = a ? a.email : '';
-    document.getElementById('amRole').value = a ? a.system_role : 'member';
+    document.getElementById('amRole').value = a ? a.system_role : 'general';
     amMemberships = a ? a.groups.map(m => ({ n: m.n, r: m.r })) : [];  // 既存の所属・ロールを反映（deep copy）
     renderMemberships();
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
