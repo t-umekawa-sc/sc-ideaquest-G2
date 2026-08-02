@@ -31,6 +31,24 @@
     .ctx { position: static; }
     .ctx .quest-icon.lg { width: 48px; height: 48px; }
   }
+
+  /* 細い会社識別バー（condensed sticky header）。
+     広幅では全バナーが sticky なので不要＝非表示。狭幅で、かつスクロールで全バナーが隠れた時だけ
+     （JS が .is-visible を付与）上部に貼り付いて「今どの会社か」を常に示す。 */
+  .ctx-mini { display: none; }
+  @media (max-width: 820px) {
+    .ctx-mini.is-visible {
+      display: flex; align-items: center; gap: var(--space-2);
+      position: sticky; top: var(--header-h); z-index: 6;
+      margin: 0 calc(-1 * var(--space-4)) var(--space-3);   /* container の左右パディングを打ち消して全幅 */
+      padding: 8px var(--space-4);
+      background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+      border-left: 6px solid var(--ctx-color, var(--color-primary));
+      box-shadow: 0 2px 6px rgba(15,23,42,.10);
+    }
+    .ctx-mini__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ctx-mini .badge { flex: 0 0 auto; }
+  }
   .ctx__label { font-size: var(--text-xs); color: var(--color-text-muted); letter-spacing: .04em; }
   .ctx__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
   .ctx__meta { display: flex; align-items: center; gap: var(--space-2); margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-muted); }
@@ -108,6 +126,13 @@
 
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <div class="crumbs"><a href="SC-91_システム管理.html">システム管理</a> › <a href="SC-91_システム管理.html">会社一覧</a> › <b id="crumbName">—</b></div>
+
+  <!-- 細い会社識別バー（狭幅＝バナーが sticky でない時に、スクロールでバナーが隠れたら上部へ貼り付く） -->
+  <div class="ctx-mini" id="ctxMini" aria-hidden="true">
+    <span class="quest-icon sm" id="ctxMiniIcon" style="--accent:var(--ctx-color)"><span class="quest-icon__char" id="ctxMiniChar">—</span></span>
+    <span class="ctx-mini__name" id="ctxMiniName">—</span>
+    <span class="badge" id="ctxMiniState">—</span>
+  </div>
 
   <!-- 文脈バナー（メンテ中の会社を明示） -->
   <section class="ctx" id="ctx" aria-label="メンテナンス中の会社">
@@ -334,6 +359,18 @@
   document.getElementById('dbId').textContent = CO.db;
   document.getElementById('amCompany').textContent = CO.name + '（この会社にアカウントを発行します）';
 
+  // 細い会社識別バー（狭幅・スクロールで全バナーが隠れたら上部へ貼り付く）
+  const ctxMini = document.getElementById('ctxMini');
+  renderIcon(document.getElementById('ctxMiniIcon'));
+  document.getElementById('ctxMiniName').textContent = CO.name;
+  const ctxMiniState = document.getElementById('ctxMiniState'); ctxMiniState.textContent = stLabel; ctxMiniState.className = 'badge ' + stCls;
+  if ('IntersectionObserver' in window) {
+    const headerH = (getComputedStyle(document.documentElement).getPropertyValue('--header-h').trim()) || '56px';
+    const io = new IntersectionObserver(([e]) => { ctxMini.classList.toggle('is-visible', !e.isIntersecting); },
+      { rootMargin: '-' + headerH + ' 0px 0px 0px', threshold: 0 });
+    io.observe(document.getElementById('ctx'));
+  }
+
   // 所属クエストグループ編集（per-group ロール member/admin を行ごとに指定）。
   // SC-92 はシステム管理者画面のため admin（＝クエストグループ管理者の任命）指定が常に可能（§8-①）。
   const amGroups = document.getElementById('amGroups');
@@ -399,11 +436,11 @@
   profIconInput.addEventListener('change', () => {
     const f = profIconInput.files[0]; if (!f) return;
     CO.icon = URL.createObjectURL(f); profIconClear.hidden = false;
-    renderIcon(profIconPreview); renderIcon(document.getElementById('ctxIcon'));
+    renderIcon(profIconPreview); renderIcon(document.getElementById('ctxIcon')); renderIcon(document.getElementById('ctxMiniIcon'));
   });
   profIconClear.addEventListener('click', () => {
     CO.icon = null; profIconInput.value = ''; profIconClear.hidden = true;
-    renderIcon(profIconPreview); renderIcon(document.getElementById('ctxIcon'));
+    renderIcon(profIconPreview); renderIcon(document.getElementById('ctxIcon')); renderIcon(document.getElementById('ctxMiniIcon'));
   });
   const profSwatches = document.getElementById('profSwatches');
   // 現在色を選択状態に（近い色が無ければ先頭）

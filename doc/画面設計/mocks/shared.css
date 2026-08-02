@@ -325,6 +325,9 @@ img { max-width: 100%; display: block; }
   box-shadow: -8px 0 8px -8px rgba(15,23,42,.18); text-align: right;
 }
 .table thead th.col-actions { background: var(--color-surface-alt); }
+/* ⋯ メニューを開いている行の操作セルだけ最前面へ（他行の sticky セル・会社バナー(.ctx=5)・ヘッダー(10)より上）。
+   position:sticky はそれ自体がスタッキングコンテキストを作るため、開いた行を持ち上げないと下行のセルが上に来る。 */
+.table td.col-actions.rowmenu-open { z-index: 1001; }
 
 /* --- 行アクション ⋯（ケバブ）メニュー: sticky 操作列に置く ---
    ドロップダウンは table-wrap の overflow に隠れないよう shared.js が fixed 配置する。 */

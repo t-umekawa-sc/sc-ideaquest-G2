@@ -287,6 +287,8 @@ window.addEventListener('resize', () => applyCellClips());
     const trg = openList.__trigger;
     openList.hidden = true;
     openList.style.position = openList.style.top = openList.style.left = '';
+    // 一時的に最前面へ持ち上げた操作セルを元に戻す
+    if (openList.__cell) openList.__cell.classList.remove('rowmenu-open');
     if (trg) trg.setAttribute('aria-expanded', 'false');
     openList = null;
   }
@@ -294,6 +296,10 @@ window.addEventListener('resize', () => applyCellClips());
     const list = trigger.parentElement.querySelector('.rowmenu__list');
     if (!list) return;
     close();
+    // sticky 操作セルは（モダンブラウザでは position:sticky 自体が）スタッキングコンテキストを作るため、
+    // 下の行の sticky セルが上の行のメニューを覆う。開いている行の操作セルだけ z-index を持ち上げて解消。
+    const cell = trigger.closest('.col-actions');
+    if (cell) cell.classList.add('rowmenu-open');
     list.hidden = false;
     list.style.position = 'fixed';
     const r = trigger.getBoundingClientRect();
@@ -302,7 +308,7 @@ window.addEventListener('resize', () => applyCellClips());
     list.style.top = top + 'px';
     list.style.left = Math.max(8, left) + 'px';
     trigger.setAttribute('aria-expanded', 'true');
-    list.__trigger = trigger; openList = list;
+    list.__trigger = trigger; list.__cell = cell; openList = list;
   }
   document.addEventListener('click', (e) => {
     const trigger = e.target.closest('.rowmenu__trigger');
