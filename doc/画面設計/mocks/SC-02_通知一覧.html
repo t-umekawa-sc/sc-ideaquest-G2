@@ -92,6 +92,7 @@
           <option value="update">アイデア更新</option>
           <option value="achievement">実績</option>
           <option value="magic">魔法</option>
+          <option value="security">セキュリティ</option>
         </select>
       </label>
     </div>
@@ -106,7 +107,7 @@
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ MVP は<strong>アプリ内通知</strong>（ベル/未読）。メール等の外部通知は将来対応。通知は参照先（アイデア/チャット/実績 等）へのクリックで<strong>既読</strong>化。
-    種別＝メンション／自アイデアへのコメント／フォロー中アイデアの新規コメント・評価・選定／投票済み・フォロー中アイデアの<strong>更新（差分）</strong>／実績獲得／魔法リアクション（`Notification` 第9節）。
+    種別＝メンション／自アイデアへのコメント／フォロー中アイデアの新規コメント・評価・選定／投票済み・フォロー中アイデアの<strong>更新（差分）</strong>／実績獲得／魔法リアクション／<strong>🛡️セキュリティ（新しい端末・パスワード変更）</strong>（`Notification` 第9節）。<strong>セキュリティ通知は本人宛・参照先なし・オプトアウト不可</strong>（A.9-⑧。PW変更はメールも送信）。
   </p>
 </main>
 
@@ -118,10 +119,11 @@
 
   // ---- 通知データ（モック・初期値） ----
   // type→ico/cat/href（参照先画面）。group: today/yesterday/earlier。gain=獲得表示（任意）。
-  const ICO = { mention:'@', comment:'💬', eval:'⭐', select:'🏆', update:'🔄', achievement:'🎖️', magic:'✨' };
+  const ICO = { mention:'@', comment:'💬', eval:'⭐', select:'🏆', update:'🔄', achievement:'🎖️', magic:'✨', secdev:'🛡️', secpw:'🔑' };
   const HREF = {
     mention:'SC-24_アイデアチャット.html', comment:'SC-22_アイデア詳細.html', eval:'SC-22_アイデア詳細.html',
     select:'SC-22_アイデア詳細.html', update:'SC-22_アイデア詳細.html', achievement:'SC-40_実績バッジ.html', magic:'SC-24_アイデアチャット.html',
+    secdev:'#', secpw:'#',   // セキュリティ通知は参照先なし（本文のみ・既読化のみ）
   };
   const GROUP_LABEL = { today:'今日', yesterday:'昨日', earlier:'それ以前' };
 
@@ -136,6 +138,10 @@
       html:'実績 <strong>「目利き」</strong>（シルバー）を獲得しました', ctx:'評価を10件実施', gain:'<span class="coin">◆50</span>' },
     { id:5, type:'magic', unread:false, group:'today', time:'4時間前',
       html:'<strong>田中 美咲</strong> さんがあなたのメッセージに 🔥炎 の魔法を付けました', ctx:'新オフィスのレイアウト改善 / アイデア「集中ブース設置」' },
+    { id:12, type:'secdev', unread:true, group:'today', time:'6時間前',
+      html:'<strong>新しい端末</strong>からログインがありました', ctx:'2026-08-02 08:12 ・ IP 203.0.113.42 ・ Chrome / Windows（東京）', tag:'セキュリティ' },
+    { id:13, type:'secpw', unread:false, group:'yesterday', time:'昨日 09:40',
+      html:'<strong>パスワードが変更されました</strong>。心当たりがなければ管理者に連絡してください', ctx:'メールでもお知らせしています', tag:'セキュリティ' },
 
     { id:6, type:'eval', unread:false, group:'yesterday', time:'昨日 18:20',
       html:'フォロー中のアイデアに <strong>新しい評価</strong>がつきました', ctx:'社内ナレッジ検索AI / アイデア「社内用語の自動リンク」' },
@@ -152,7 +158,7 @@
       html:'フォロー中のアイデアが <strong>評価中</strong>になりました', ctx:'新オフィスのレイアウト改善 / アイデア「集中ブース設置」' },
   ];
   // type→カテゴリ（種別フィルタ用。comment は自/フォロー両方を含む）
-  const CAT = { mention:'mention', comment:'comment', eval:'eval', select:'select', update:'update', achievement:'achievement', magic:'magic' };
+  const CAT = { mention:'mention', comment:'comment', eval:'eval', select:'select', update:'update', achievement:'achievement', magic:'magic', secdev:'security', secpw:'security' };
 
   const groupsEl = document.getElementById('groups');
   const emptyEl = document.getElementById('empty');
@@ -213,7 +219,14 @@
     }
     // 行クリック＝参照先へ遷移する前に既読化（本番はサーバー。モックは遷移するのでvisualのみ）
     const row = e.target.closest('.n');
-    if (row) { const n = N.find(x => x.id === Number(row.dataset.id)); if (n) n.unread = false; }
+    if (row) {
+      const n = N.find(x => x.id === Number(row.dataset.id));
+      if (n) {
+        n.unread = false;
+        // セキュリティ通知は参照先なし＝遷移せず既読化のみ
+        if (n.type === 'secdev' || n.type === 'secpw') { e.preventDefault(); render(); }
+      }
+    }
   });
 
   document.getElementById('markAll').addEventListener('click', () => { N.forEach(n => n.unread = false); render(); });
