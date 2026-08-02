@@ -42,6 +42,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `9471f9c` テーブル表示標準を追加＝nowrap既定/複数値セルの…省略＋ホバー全件(.cell-tags＋applyCellClips)/操作列sticky＋⋯メニュー(.col-actions＋.rowmenu)。デザイン標準.md §4・shared.css・shared.js＋SC-90/91/92/93。絶対座標フローティングは非採用(レビュー結論)
   - `8151fce` 一覧/テーブルUI標準(F1〜F7)を管理系モックに実装＝SC-90/91/92/93。F1 絞り込みをクリア（各.filters・アクティブ時のみ表示）／F2 ページネーション .pagination（オフセット・PER_PAGE=5・デモ増量でSC-91/92/93は2ページ）／F3 th scope="col"＋数値列 .num。row-link先頭セルの<a>化は将来
   - `9cecb2d` 一覧/テーブルUI標準をレビューしF1〜F7を標準に反映＋ページネーション部品を新設。デザイン標準.md §4拡充（F1絞り込みクリア必須化・F2 .pagination新設・F3テーブルa11y・F4ソートはselect統一・F5 row-linkと操作列併用禁止・F6件数単位・F7横スクロール）。shared.css に .pagination/.pagination__info/.pagination--more 追加
   - `68dc3aa` SoD画面反映＝会社アカウント管理者(SC-93)新設・SC-90を参加選択専任化・SC-92のsystem_role3値化（API設計B改訂の波及・下流キュー消化）。SC-90〔発行/無効化/PW撤去→会社ディレクトリ・ピッカーで参加追加/除外・member固定〕・SC-93新規〔/admin/accounts・自社アカウントのライフサイクル・general固定・system_admin行操作不可〕・SC-92〔system_role 3値表示＋モーダル選択〕。波及＝画面遷移図/SC-01管理導線/mocks/index.html/要件定義README(管理ロール3階層・FR-18新設・system_role3値)/データモデル.md(§8-⑯完了注記・画面帰属)/SC-00/API設計B.7(TBD解消)。テーブル/enum変更なし
