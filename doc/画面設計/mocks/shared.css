@@ -307,6 +307,15 @@ img { max-width: 100%; display: block; }
 .list-count { font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
 .list-empty { padding: var(--space-8); text-align: center; color: var(--color-text-muted); }
 
+/* --- ページネーション（標準）: 件数が増える一覧（特に管理系）に付ける ---
+   オフセット方式＝前へ / ページ表示 / 次へ（API ?page/per_page＋page_info.total と対応）。
+   カーソル方式（チャット等）は .pagination--more の「もっと見る」1ボタンで代替。
+   デザイン標準 §4「ページネーション」参照。 */
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
+.pagination__info { font-size: var(--text-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: center; }
+.pagination .btn[disabled], .pagination .btn:disabled { opacity: .5; cursor: not-allowed; }
+.pagination--more { justify-content: center; }   /* カーソル方式＝「もっと見る」1ボタン */
+
 /* =============================================================
  * 7. バッジ / ピル
  * ============================================================= */
