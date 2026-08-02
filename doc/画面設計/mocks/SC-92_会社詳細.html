@@ -212,7 +212,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" aria-label="操作"></th></tr>
+        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
       </thead>
       <tbody id="accountRows"></tbody>
     </table>
@@ -284,7 +284,7 @@
   const ST_ACC = { active:['有効','st-active'], suspended:['無効','st-suspended'] };
   const ACCOUNTS = {
     across: [
-      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  system_role:'general',   groups:[{n:'製品企画',r:'member'},{n:'業務改善',r:'member'}], state:'active' },
+      { name:'山田 太郎', loginId:'taro.yamada',  email:'taro@across.co.jp',  system_role:'general',   groups:[{n:'製品企画',r:'member'},{n:'業務改善',r:'member'},{n:'R&D',r:'member'},{n:'営業推進',r:'member'}], state:'active' },
       { name:'鈴木 花子', loginId:'hanako.suzuki',email:'hanako@across.co.jp',system_role:'general',   groups:[{n:'製品企画',r:'admin'}], state:'active' },
       { name:'管理 三郎', loginId:'saburo.kanri', email:'kanri@across.co.jp', system_role:'company_account_admin', groups:[], state:'active' },
       { name:'運営 太郎', loginId:'sysadmin',     email:'admin@ideaquest.example', system_role:'sys_admin', groups:[], state:'active' },
@@ -434,12 +434,16 @@
     accountRows.innerHTML = list.slice((accPage - 1) * ACC_PER_PAGE, accPage * ACC_PER_PAGE).map(a => {
       const [label, cls] = ST_ACC[a.state];
       const idx = list0.indexOf(a);
-      const groups = a.groups.length ? a.groups.map(g => g.r === 'admin'
-        ? `<span class="badge st-active" title="このグループの管理者（クエストグループ管理者）">${g.n} · 管理者</span>`
-        : `<span class="badge badge-muted">${g.n}</span>`).join(' ') : '<span class="muted">—</span>';
+      const groups = a.groups.length
+        ? `<span class="cell-tags" title="${a.groups.map(g => g.n + (g.r === 'admin' ? '（管理者）' : '')).join('、')}">`
+          + a.groups.map(g => g.r === 'admin'
+            ? `<span class="badge st-active">${g.n} · 管理者</span>`
+            : `<span class="badge badge-muted">${g.n}</span>`).join('')
+          + `</span>`
+        : '<span class="muted">—</span>';
       const toggle = a.state === 'active'
-        ? `<button class="btn btn-outline" type="button" data-suspend="${idx}">無効化</button>`
-        : `<button class="btn btn-outline" type="button" data-activate="${idx}">再有効化</button>`;
+        ? `<button role="menuitem" type="button" class="is-danger" data-suspend="${idx}">無効化</button>`
+        : `<button role="menuitem" type="button" data-activate="${idx}">再有効化</button>`;
       return `<tr class="${a.state === 'suspended' ? 'is-suspended' : ''}">
         <td><strong>${a.name}</strong></td>
         <td class="db-id">${a.loginId}</td>
@@ -447,10 +451,13 @@
         <td>${SYSROLE_LABEL[a.system_role]}</td>
         <td>${groups}</td>
         <td><span class="badge ${cls}">${label}</span></td>
-        <td><div class="row-actions">
-          <button class="btn btn-outline" type="button" data-edit="${idx}">所属・編集</button>
-          <button class="btn btn-outline" type="button" data-reset="${idx}">パスワード再設定</button>
-          ${toggle}
+        <td class="col-actions"><div class="rowmenu">
+          <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+          <ul class="rowmenu__list" role="menu" hidden>
+            <li role="none"><button role="menuitem" type="button" data-edit="${idx}">所属・編集</button></li>
+            <li role="none"><button role="menuitem" type="button" data-reset="${idx}">パスワード再設定</button></li>
+            <li role="none">${toggle}</li>
+          </ul>
         </div></td>
       </tr>`;
     }).join('');
@@ -460,6 +467,7 @@
     document.getElementById('pgInfo').textContent = accPage + ' / ' + totalPages;
     document.getElementById('pgPrev').disabled = accPage <= 1;
     document.getElementById('pgNext').disabled = accPage >= totalPages;
+    if (window.applyCellClips) applyCellClips(accountRows);
   }
   fAccSearch.addEventListener('input', () => { accPage = 1; renderAccounts(); });
   fAccState.addEventListener('change', () => { accPage = 1; renderAccounts(); });

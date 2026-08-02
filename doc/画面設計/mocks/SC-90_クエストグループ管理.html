@@ -88,7 +88,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">参加日</th><th scope="col" aria-label="操作"></th></tr>
+        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">参加日</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
@@ -185,9 +185,9 @@
         <td><strong>${m.name}</strong></td>
         <td class="db-id">${m.loginId}</td>
         <td>${m.joined}</td>
-        <td><div class="row-actions">
-          <button class="btn btn-outline" type="button" data-remove="${idx}">このグループから除外</button>
-        </div></td>
+        <td class="col-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-remove="${idx}">このグループから除外</button>
+        </td>
       </tr>`;
     }).join('');
     document.getElementById('memberCount').textContent = list.length + ' 名';

@@ -262,3 +262,55 @@
   }
   document.addEventListener('DOMContentLoaded', initBg);
 })();
+
+/* --- 複数値セルのクリップ（末尾「…」＋ホバーで全件） ---
+   .cell-tags のはみ出しを検出して .is-clipped を付与（CSS で「…」を表示）。
+   全件は title 属性でホバー表示（各画面が title を付ける／未設定なら子要素テキストを連結）。
+   テーブルは動的描画のため、各画面は render() の最後に window.applyCellClips() を呼ぶ。 */
+function applyCellClips(root) {
+  (root || document).querySelectorAll('.cell-tags').forEach(el => {
+    if (!el.title) el.title = Array.from(el.children).map(c => c.textContent.trim()).filter(Boolean).join('、');
+    el.classList.toggle('is-clipped', el.scrollWidth > el.clientWidth + 1);
+  });
+}
+window.applyCellClips = applyCellClips;
+window.addEventListener('resize', () => applyCellClips());
+
+/* --- 行アクション ⋯（ケバブ）メニュー（sticky 操作列） ---
+   .rowmenu__trigger クリックで隣接の .rowmenu__list をトグル。
+   table-wrap の overflow に隠れないよう list を position:fixed でトリガー直下（右寄せ）に配置。
+   実処理（編集/無効化 等）は各画面の委譲ハンドラ（menuitem に data-* を付ける）。ここでは開閉のみ担当。 */
+(function () {
+  let openList = null;
+  function close() {
+    if (!openList) return;
+    const trg = openList.__trigger;
+    openList.hidden = true;
+    openList.style.position = openList.style.top = openList.style.left = '';
+    if (trg) trg.setAttribute('aria-expanded', 'false');
+    openList = null;
+  }
+  function open(trigger) {
+    const list = trigger.parentElement.querySelector('.rowmenu__list');
+    if (!list) return;
+    close();
+    list.hidden = false;
+    list.style.position = 'fixed';
+    const r = trigger.getBoundingClientRect();
+    let top = r.bottom + 4, left = r.right - list.offsetWidth;
+    if (top + list.offsetHeight > window.innerHeight) top = Math.max(8, r.top - list.offsetHeight - 4); // 下がはみ出すなら上へ
+    list.style.top = top + 'px';
+    list.style.left = Math.max(8, left) + 'px';
+    trigger.setAttribute('aria-expanded', 'true');
+    list.__trigger = trigger; openList = list;
+  }
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('.rowmenu__trigger');
+    if (trigger) { e.stopPropagation(); (openList && openList.__trigger === trigger) ? close() : open(trigger); return; }
+    if (e.target.closest('.rowmenu__list [role="menuitem"]')) { close(); return; } // 実処理は委譲ハンドラが処理・ここは閉じるだけ
+    if (!e.target.closest('.rowmenu__list')) close();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  window.addEventListener('scroll', close, true);
+  window.addEventListener('resize', close);
+})();

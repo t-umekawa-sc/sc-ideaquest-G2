@@ -92,7 +92,7 @@
   <div class="table-wrap">
     <table class="table">
       <thead>
-        <tr><th scope="col">会社名</th><th scope="col">会社コード</th><th scope="col">DB識別子</th><th scope="col">状態</th><th scope="col" class="num">アカウント</th><th scope="col" class="num">グループ</th><th scope="col">作成日</th><th scope="col" aria-label="操作"></th></tr>
+        <tr><th scope="col">会社名</th><th scope="col">会社コード</th><th scope="col">DB識別子</th><th scope="col">状態</th><th scope="col" class="num">アカウント</th><th scope="col" class="num">グループ</th><th scope="col">作成日</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
       </thead>
       <tbody id="companyRows"></tbody>
     </table>
@@ -204,7 +204,7 @@
         <td class="db-id">${c.db}</td>
         <td><span class="badge ${cls}">${label}</span></td>
         <td class="num">${c.accounts}</td><td class="num">${c.groups}</td><td>${c.created}</td>
-        <td><a class="btn btn-outline" href="SC-92_会社詳細.html?company=${c.id}" onclick="event.stopPropagation()">管理する →</a></td>
+        <td class="col-actions"><a class="btn btn-outline btn-sm" href="SC-92_会社詳細.html?company=${c.id}" onclick="event.stopPropagation()">管理する →</a></td>
       </tr>`;
     }).join('');
     document.getElementById('count').textContent = list.length + ' 社';
