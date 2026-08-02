@@ -144,7 +144,7 @@
 4. 対象者が初回ログイン→PW設定（A.7 complete）で `password_set=true`＝再び outbox で会社DB へ反映。
 
 - **既存アカウントの所属変更**（B.3）は user ミラー存在済みのため会社DB へ直接 upsert/トゥームストーン（outbox を介さない）。
-- **順序**: 同一 `account_id` の outbox は `id` 順で直列適用（§4.6）。失敗はリトライ、上限超で `failed`＝要手動対応。
+- **順序・接続解決・失敗時の扱い（実装で固定・詳細＝データモデル §4.6「処理フロー」）**: ワーカは `pending` を `id` 昇順で取得 → 行の `company_id`→管理DB `companies.db_identifier`→`.env` で会社DB接続を解決（`get_tenant_session`）→ `account_id` キーで冪等適用。**同一 `account_id` は `id` 順に直列＋失敗時はヘッドオブライン・ブロッキング**（後続を先に進めない＝古い状態が新しい状態を上書きする退行を防ぐ）。**異なる `account_id` は独立（並列可）**。失敗はリトライ、上限超で `failed`＝要手動対応（監視対象）。
 - **会社DB は別インスタンス**＝2相コミットせず outbox＋再試行で結果整合（§1.13）。
 
 ### B.5.1 ブートストラップ（運営テナント seed＋最初の system_admin・データモデル §8-⑮）

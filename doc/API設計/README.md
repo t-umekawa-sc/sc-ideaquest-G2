@@ -138,6 +138,7 @@
 
 - **アカウントの発行/編集/無効化/PWリセット/本人プロフィール編集は管理DB `accounts` が源泉**。API は `accounts` を更新するのと**同一Tx で `account_sync_outbox` に 1 行 INSERT**（データモデル §4.6・§8-①）。会社DB `users` のミラー列はワーカが冪等反映するため、**API は会社DB の `users.login_id/email/status/...` を直接更新しない**。
 - 会社DB `users` の一覧・表示はミラー列で完結（管理DBへの往復なし）。
+- **ワーカの処理フロー（実装で固定する仕様・詳細＝データモデル §4.6「処理フロー」）**: ①書込側は accounts 更新と**同一Tx**で outbox INSERT（`pending`）→ ②ワーカが `pending` を **`id` 昇順**で取得 → ③行の `company_id`→管理DB `companies.db_identifier`→`.env` で会社DB接続を解決（`get_tenant_session`）→ ④`account_id` キーで `users` へ冪等 upsert（発行時は `users`→`quest_group_members` の順＝FK順序保証）→ ⑤成功で `done`／失敗はリトライ・上限超で `failed`。**同一 `account_id` は `id` 順に直列＋失敗時ヘッドオブライン・ブロッキング**（後続を先に進めない＝退行防止）、**異なる account_id は独立（並列可）**。**既存アカウントの所属変更（B.3）は outbox を介さず会社DBへ直接**。
 
 ### 1.14 Redis に保持するデータ一覧（用途・キー・TTL・更新/無効化するエンドポイント）
 
