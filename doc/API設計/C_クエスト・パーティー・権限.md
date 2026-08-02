@@ -28,12 +28,14 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quests` | 参加中クエスト一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属グループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
+| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属グループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
 | `GET /quests/{quest_id}` | クエスト詳細を取得（SC-12 ヘッダー/概要タブ） | パス: `quest_id` | クエスト詳細（上記＋`purpose`〔目的・テーマ全文〕/`created_at`）＋**`my_permissions`**（自分が持つ 6 権限の配列＝フロントの UX 出し分け用）＋集計 |
 | `GET /quests/{quest_id}/members` | パーティー＋各メンバーの権限を取得（SC-12 パーティータブ） | パス: `quest_id` | `data`=メンバーの配列（`user`〔アバター/氏名〕＋`permissions[]`＋`joined_at`＋`is_creator`）。権限バッジ描画に使用 |
 
-- **参照制限（サーバー強制・FR-15）**: `GET /quests` は「**所属グループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に行あり）」かつ `deleted_at IS NULL` かつ `status != draft` のクエストのみ返す。パス/クエリで `company_id` は受け取らない（セッション由来・§1.5）。
-- **下書き（`draft`）**: 一覧には出さない（作成者本人の下書きは**ダッシュボード**＝ドメイン I が集約）。`GET /quests/{id}` は `draft` の場合 `owner_id` 本人のみ 200・それ以外は 404。
+- **参照制限（サーバー強制・FR-15）**: `GET /quests` は次の **(A) OR (B)** を返す（いずれも `deleted_at IS NULL`・セッション会社内・`company_id` はクエリで受けない＝§1.5）:
+  - **(A) 公開系**: 「**所属グループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に行あり）」かつ `status != draft`。
+  - **(B) 自分の下書き（2026-08-02 追加）**: `owner_id = 自分` かつ `status = draft`（作成者本人のみ可視）。※下書きは公開前なのでパーティー門番の対象外＝**本人だけに見える**。
+- **下書き（`draft`）を一覧にも表示（決定 2026-08-02・UX 改善）**: 従来「下書きは一覧に出さない（ダッシュボード集約のみ）」だったが、**一覧から下書き作成 → 戻ると消える**という不便を解消するため、**作成者本人の下書きは `GET /quests` にも含める**（`my_state=draft` で下書きバッジ表示・クリックで SC-11 編集モーダル）。**ダッシュボード（ドメイン I）にも引き続き集約**＝両導線に出る。他人の下書きは一切見えない（`GET /quests/{id}` は `draft` の場合 `owner_id` 本人のみ 200・それ以外は 404）。
 - **`my_permissions`／`my_state`** はサーバーが算出して返す（フロントは権限判定を再実装しない・コーディング規約 §1）。UX 便宜であり、実アクションは各エンドポイントで再検証。
 - **クエスト内 週間ランキング**（SC-12 右カラム）は**ドメイン G** で提供＝`GET /rankings?scope=quest:{quest_id}&period=this_week`（当該クエスト活動〔`activities.quest_id`〕の XP＋コイン合算・TOP3＋自分）。本ドメインでは定義しない。
 - **クエスト内 全文検索**（SC-12 全文検索タブ）は**ドメイン J**＝`GET /quests/{quest_id}/search`（§1.11）。本ドメインでは定義しない。
