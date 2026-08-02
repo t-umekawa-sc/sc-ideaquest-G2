@@ -7,16 +7,8 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   /* SC-21 固有スタイル（共通化する見た目は shared.css へ昇格する）
-     このモックはモーダルを開いた状態で表示（本番は SC-12/SC-01 等から Parallel/Intercept で差し込み・URL直/リロードはフルページ） */
-  .modal { position: static; display: block; }
-  .modal__backdrop { position: fixed; background: rgba(15,23,42,.25); }
-  .modal__panel { max-width: 640px; margin: var(--space-8) auto; max-height: none; }
-
-  .modal__drag { display: flex; align-items: center; gap: var(--space-2); cursor: move; padding-right: 28px; margin-bottom: var(--space-1); touch-action: none; }
-  .modal__drag h2 { margin: 0; }
-  .modal__grip { color: var(--color-text-subtle); font-size: 18px; line-height: 1; }
-  .modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
-
+     このモックはモーダルを開いた状態（.show）で表示（本番は SC-12/SC-01 等から Parallel/Intercept で差し込み）。
+     モーダルの構造/挙動（sectioned・ドラッグ・最大化・Esc/フォーカス）は共通部品（shared.css/js）に集約。 */
   .role-note { font-size: var(--text-xs); color: var(--color-text-muted); }
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
   @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
@@ -76,21 +68,21 @@
 </header>
 
 <!-- ============ アイデア登録・編集モーダル（本番は SC-12/SC-01 から Intercept で差し込み） ============ -->
-<div class="modal modal--draggable" id="ideaModal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
+<div class="modal modal--lg modal--draggable modal--maximizable show" id="ideaModal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
   <div class="modal__backdrop"></div>
-  <div class="modal__panel" id="panel">
-    <button class="modal__close" type="button" aria-label="閉じる">✕</button>
-    <div class="modal__drag" id="dragHandle" title="ドラッグで移動">
-      <span class="modal__grip" aria-hidden="true">⠿</span>
+  <div class="modal__panel sectioned" id="panel">
+    <div class="modal__header">
       <h2 id="iTitle">アイデアを登録</h2>
+      <button class="modal__close" type="button" aria-label="閉じる">✕</button>
     </div>
+    <div class="modal__body">
 
     <!-- 対象クエストの文脈 -->
     <div class="card" style="padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4)">
       <div class="text-xs muted">投稿先クエスト</div>
       <div style="font-weight:700"><span class="quest-icon sm" style="vertical-align:middle;margin-right:6px"><span class="quest-icon__char">配</span><span class="quest-icon__owner placeholder">山</span></span>配送ルート最適化 <span class="badge badge-muted">業務改善</span></div>
     </div>
-    <p class="role-note" style="margin-top:0"><strong>アイデア作成権限</strong>を持つパーティーメンバーが投稿できます。必須は <strong>件名・アイデア本文・価値</strong> の 3 項目。ヘッダーを<strong>ドラッグで移動</strong>できます。</p>
+    <p class="role-note" style="margin-top:0"><strong>アイデア作成権限</strong>を持つパーティーメンバーが投稿できます。必須は <strong>件名・アイデア本文・価値</strong> の 3 項目。<strong>ヘッダーをドラッグで移動</strong>／右上の <strong>⤢ で最大化</strong>できます。</p>
 
     <!-- 必須 3 項目 -->
     <div class="field">
@@ -152,12 +144,13 @@
       <div class="attach-list" id="attachList"></div>
     </div>
 
-    <div class="modal__foot">
-      <button class="btn btn-primary" type="button" id="postBtn" disabled>投稿する</button>
-      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
-      <button class="btn btn-outline" type="button">キャンセル</button>
-    </div>
     <p class="role-note" style="margin-top:var(--space-3)">※ 必須3項目がそろうと「投稿する」が有効。<strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>投稿</strong>でパーティーに公開し、アイデアごとのチャットグループを自動作成、投稿 XP を付与。本番は SC-12「アイデア追加/編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。</p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button">キャンセル</button>
+      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
+      <button class="btn btn-primary" type="button" id="postBtn" disabled>投稿する</button>
+    </div>
   </div>
 </div>
 

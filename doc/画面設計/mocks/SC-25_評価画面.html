@@ -7,17 +7,8 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   /* SC-25 固有スタイル（共通化する見た目は shared.css へ昇格する） */
-  /* このモックはモーダルを開いた状態で表示（本番は SC-22 から差し込み・URL直/リロードはフルページ） */
-  .modal { position: static; display: block; }            /* デモ用: 常時表示 */
-  /* 背後（本番は SC-22）を確認しやすいよう薄めのバックドロップ */
-  .modal__backdrop { position: fixed; background: rgba(15,23,42,.25); }
-  .modal__panel { max-width: 640px; margin: var(--space-8) auto; max-height: none; }
-
-  /* ドラッグ用ヘッダー（つかんで移動＝背後のアイデアを確認できる） */
-  .modal__drag { display: flex; align-items: center; gap: var(--space-2); cursor: move; padding-right: 28px; margin-bottom: var(--space-1); touch-action: none; }
-  .modal__drag h2 { margin: 0; }
-  .modal__grip { color: var(--color-text-subtle); font-size: 18px; line-height: 1; }
-  .modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+  /* このモックはモーダルを開いた状態（.show）で表示（本番は SC-22 から差し込み）。
+     モーダルの構造/挙動（sectioned・ドラッグ・最大化・Esc/フォーカス）は共通部品（shared.css/js）に集約。 */
 
   /* 折りたたみのアイデア要約（評価しながら内容を確認） */
   .eval-idea { border: 1px solid var(--color-border); border-radius: var(--radius); margin: var(--space-3) 0; background: var(--color-surface); }
@@ -99,16 +90,15 @@
 </header>
 
 <!-- ============ 評価モーダル（本番は SC-22 から Intercept で差し込み） ============ -->
-<div class="modal modal--draggable" id="evalModal" role="dialog" aria-modal="true" aria-labelledby="evalTitle">
+<div class="modal modal--lg modal--draggable modal--maximizable show" id="evalModal" role="dialog" aria-modal="true" aria-labelledby="evalTitle">
   <div class="modal__backdrop"></div>
-  <div class="modal__panel" id="panel">
-    <button class="modal__close" type="button" aria-label="閉じる">✕</button>
-    <!-- つかんで移動できるヘッダー（背後のアイデアを確認するため） -->
-    <div class="modal__drag" id="dragHandle" title="ドラッグで移動">
-      <span class="modal__grip" aria-hidden="true">⠿</span>
+  <div class="modal__panel sectioned" id="panel">
+    <div class="modal__header">
       <h2 id="evalTitle">アイデアを評価</h2>
+      <button class="modal__close" type="button" aria-label="閉じる">✕</button>
     </div>
-    <p class="role-note" style="margin-top:0">▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。ヘッダーを<strong>ドラッグで移動</strong>できます。</p>
+    <div class="modal__body">
+    <p class="role-note" style="margin-top:0">▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。<strong>ヘッダーをドラッグで移動</strong>／右上の <strong>⤢ で最大化</strong>できます。</p>
 
     <!-- 対象アイデアの文脈 -->
     <div class="eval-context card" style="padding:var(--space-3) var(--space-4)">
@@ -226,12 +216,13 @@
       </div>
     </div>
 
-    <div class="modal__foot">
-      <button class="btn btn-primary" id="submitBtn">評価を確定</button>
-      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
-      <button class="btn btn-outline" type="button">キャンセル</button>
-    </div>
     <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝一時保存（本人のみ表示・全観点そろっていなくても可）。<strong>確定</strong>で他の評価者/パーティーに反映し、評価実施の XP＋投稿者コインを付与（下書きでは付与しない）。本番は SC-22 から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。既存の自分の評価/下書きは読み込み。締切後の可否はステータス連動（TBD）。</p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button">キャンセル</button>
+      <button class="btn btn-outline" type="button" id="draftBtn">下書き保存</button>
+      <button class="btn btn-primary" id="submitBtn">評価を確定</button>
+    </div>
   </div>
 </div>
 
