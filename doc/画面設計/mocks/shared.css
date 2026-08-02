@@ -316,11 +316,15 @@ img { max-width: 100%; display: block; }
 /* --- sticky 操作列（横スクロール時も行右端に常時表示） ---
    操作 th/td に .col-actions を付ける。左側に境界の影を出して本文と分離。
    ⋯（ケバブ）メニューと併用して列幅を最小化（.rowmenu）。デザイン標準 §4 参照。 */
+/* z-index は付けない: sticky セルに z-index を付けると新しいスタッキングコンテキストが生まれ、
+   中の position:fixed の ⋯ メニューが会社バナー(.ctx)等の下に閉じ込められてしまうため。
+   sticky セルは position:sticky（＝positioned）なので静的セルの上に描画され、z-index なしでも
+   横スクロール時に本文セルを覆える。 */
 .table th.col-actions, .table td.col-actions {
-  position: sticky; right: 0; z-index: 1; background: var(--color-surface);
+  position: sticky; right: 0; background: var(--color-surface);
   box-shadow: -8px 0 8px -8px rgba(15,23,42,.18); text-align: right;
 }
-.table thead th.col-actions { background: var(--color-surface-alt); z-index: 2; }
+.table thead th.col-actions { background: var(--color-surface-alt); }
 
 /* --- 行アクション ⋯（ケバブ）メニュー: sticky 操作列に置く ---
    ドロップダウンは table-wrap の overflow に隠れないよう shared.js が fixed 配置する。 */
@@ -329,7 +333,8 @@ img { max-width: 100%; display: block; }
 .rowmenu__list {
   list-style: none; margin: 0; padding: 4px; min-width: 176px;
   background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 60;
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  z-index: 1000;   /* ヘッダー(10)・会社バナー(.ctx=5)より前面に */
 }
 .rowmenu__list[hidden] { display: none; }
 .rowmenu__list [role="menuitem"] {
