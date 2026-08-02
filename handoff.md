@@ -43,6 +43,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `3c3b937` fix: ⋯操作メニューの重なり/バナー下潜りを解消＝sticky列(.col-actions)のz-index除去＋.rowmenu__listをz-index:1000へ＋SC-92の.ctxを狭幅(≤820px)でposition:static。根本原因＝sticky列のz-indexが行ごとにスタッキングコンテキストを作りfixedメニューを閉じ込めていた
   - `9471f9c` テーブル表示標準を追加＝nowrap既定/複数値セルの…省略＋ホバー全件(.cell-tags＋applyCellClips)/操作列sticky＋⋯メニュー(.col-actions＋.rowmenu)。デザイン標準.md §4・shared.css・shared.js＋SC-90/91/92/93。絶対座標フローティングは非採用(レビュー結論)
   - `8151fce` 一覧/テーブルUI標準(F1〜F7)を管理系モックに実装＝SC-90/91/92/93。F1 絞り込みをクリア（各.filters・アクティブ時のみ表示）／F2 ページネーション .pagination（オフセット・PER_PAGE=5・デモ増量でSC-91/92/93は2ページ）／F3 th scope="col"＋数値列 .num。row-link先頭セルの<a>化は将来
   - `9cecb2d` 一覧/テーブルUI標準をレビューしF1〜F7を標準に反映＋ページネーション部品を新設。デザイン標準.md §4拡充（F1絞り込みクリア必須化・F2 .pagination新設・F3テーブルa11y・F4ソートはselect統一・F5 row-linkと操作列併用禁止・F6件数単位・F7横スクロール）。shared.css に .pagination/.pagination__info/.pagination--more 追加
