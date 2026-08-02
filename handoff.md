@@ -51,6 +51,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `196d5e3` 会社アカウント管理者に per-group admin(QG管理者)任命を解禁＝委譲運用「system_admin→会社アカ管理者→QG管理者→メンバー」に対応。system_role 付与は system_admin のみ維持（真の昇格は集約）。B.2.1/B.0.1/B.6/B.7.2・データモデル§5.5/§8-⑯・SC-93(md＋mock・member/adminセグメント)・SC-92 mock注記・README・画面遷移図
   - `67fea5e` セキュリティ通知を追加＝新デバイスログイン（未登録端末の成功時・MVPアプリ内＋監査/メール将来・MFA=OFF前倒し）／パスワード変更完了（メール＋アプリ内・3経路＋プロフィール）。本人宛・オプトアウト不可。A.9-⑧新設・notification_type に security_new_device/security_password_changed 追加・§5.24注記・SC-02(md＋mock)・README通知節。発火=H・表示=SC-02
   - `a76cf05` SC-11/21/25 のモーダル構造を標準 sectioned へ統一＝旧「モーダル＝ページ」デモ（`.modal{position:static}`＋`.modal__drag`＋`.modal__foot`）を廃止し overlay＋`.modal__panel.sectioned`（header/body/footer）＋`.modal--lg/draggable/maximizable/show`へ。固有CSS撤去で共通部品に一本化。SC-25の覗き見は折りたたみ主に。md も更新。全モーダルが単一部品・同一挙動に統合完了
   - `e921251` モーダルを「1部品・挙動共通」へ集約＝ドラッグ移動を shared.js に共通化（`.modal--draggable`・旧SC-11/21/25の個別JS撤去・全入力モーダルで有効）＋最大化/復元 `.modal--maximizable`（⤢/⤡・`.is-max`・sectioned4画面）＋狭幅自動フルスクリーン（`.modal__panel.sectioned` ≤640px）。自由リサイズは不採用。デザイン標準 §4 に「1部品・挙動共通」節
