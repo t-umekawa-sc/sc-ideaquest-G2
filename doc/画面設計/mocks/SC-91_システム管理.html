@@ -28,7 +28,6 @@
   .st-provisioning { background: var(--color-surface-alt); color: var(--color-text-muted); }
   .st-suspended { background: var(--color-disagree-bg); color: var(--color-danger); }
 
-  .modal__panel { max-width: 560px; }
   .form-row { margin-bottom: var(--space-4); }
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
   .req::after { content: " *"; color: var(--color-danger); }
@@ -111,11 +110,14 @@
 </main>
 
 <!-- ===== 会社作成モーダル ===== -->
-<div class="modal" id="companyModal" role="dialog" aria-modal="true" aria-labelledby="cmTitle" hidden>
+<div class="modal modal--md" id="companyModal" role="dialog" aria-modal="true" aria-labelledby="cmTitle" hidden>
   <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="cmTitle" style="margin-top:0">会社（テナント）を作成</h2>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="cmTitle">会社（テナント）を作成</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
     <div class="form-row"><label class="req" for="cmName">会社名</label><input class="input" id="cmName" placeholder="例: アクロス株式会社"></div>
     <div class="form-row"><label class="req" for="cmCode">会社コード</label><input class="input db-id" id="cmCode" placeholder="例: ACROSS" maxlength="20" style="text-transform:uppercase"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・<strong>全社で一意</strong>（大文字に正規化）。作成後は変更不可。</div></div>
     <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。接続情報の実体は <code>.env</code>。</div></div>
@@ -148,7 +150,8 @@
       </div>
     </div>
     <div class="provision-note">作成すると管理DBに会社を登録します（状態=準備中）。<strong>会社DBの実体は別途プロビジョニング</strong>（MVP: compose にサービス追記 → <code>up</code>）が必要です。DB接続確認後に「有効」化。</div>
-    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+    </div>
+    <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
       <button class="btn btn-primary" type="button" id="cmCreate">作成する</button>
     </div>
@@ -230,7 +233,7 @@
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
   function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
   document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
-  document.getElementById('newCompany').addEventListener('click', () => openModal('companyModal'));
+  document.getElementById('newCompany').addEventListener('click', () => { clearFieldErrors(document.getElementById('companyModal')); openModal('companyModal'); });
 
   // 会社アイコン（アップロード/フォールバック頭文字）＋会社カラー（スウォッチ）
   const cmName = document.getElementById('cmName');
@@ -261,9 +264,12 @@
   document.getElementById('cmCreate').addEventListener('click', () => {
     const name = cmName.value.trim();
     const code = cmCode.value.trim().toUpperCase();
-    if (!name) { alert('会社名を入力してください'); return; }
-    if (!/^[A-Z][A-Z0-9-]{3,19}$/.test(code)) { alert('会社コードは英大文字/数字/ハイフン・先頭は英字・4〜20文字で入力してください'); return; }
-    if (COMPANIES.some(c => c.code === code)) { alert('会社コード「' + code + '」は既に使われています（全社で一意）'); return; }
+    clearFieldErrors(document.getElementById('companyModal'));
+    let firstBad = null;
+    if (!name) { setFieldError(cmName, '会社名を入力してください'); firstBad = firstBad || cmName; }
+    if (!/^[A-Z][A-Z0-9-]{3,19}$/.test(code)) { setFieldError(cmCode, '英大文字/数字/ハイフン・先頭は英字・4〜20文字で入力してください'); firstBad = firstBad || cmCode; }
+    else if (COMPANIES.some(c => c.code === code)) { setFieldError(cmCode, '会社コード「' + code + '」は既に使われています（全社で一意）'); firstBad = firstBad || cmCode; }
+    if (firstBad) { firstBad.focus(); return; }
     alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
     closeModal(document.getElementById('companyModal'));
   });

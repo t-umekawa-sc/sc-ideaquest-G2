@@ -320,3 +320,78 @@ window.addEventListener('resize', () => applyCellClips());
   window.addEventListener('scroll', close, true);
   window.addEventListener('resize', close);
 })();
+
+/* --- モーダル共通挙動（標準・非侵襲） ---
+   各モックは従来どおり .modal に .show を付け外し／hidden をトグルするだけ。
+   ここが MutationObserver で開閉を検知し、標準の a11y/UX を横断適用する:
+   ・開いたら背景スクロールロック＋先頭フィールドへ初期フォーカス（＋起動要素を記憶）
+   ・閉じたらスクロール解除＋起動要素へフォーカス復帰
+   ・Esc で閉じる（.show を外して 200ms 後に hidden＝各モックの closeModal と同挙動）
+   ・Tab のフォーカストラップ（モーダル外に出さない）
+   デザイン標準 §4「モーダルダイアログ」参照。 */
+(function () {
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  let lastFocused = null, activeModal = null;
+  const isOpen = (m) => m.classList.contains('show') && !m.hidden;
+  function focusables(m) {
+    const panel = m.querySelector('.modal__panel') || m;
+    return Array.from(panel.querySelectorAll(FOCUSABLE)).filter(el => el.offsetParent !== null);
+  }
+  function onOpen(m) {
+    if (activeModal === m) return;
+    lastFocused = document.activeElement;
+    activeModal = m;
+    document.body.classList.add('modal-open');
+    const panel = m.querySelector('.modal__panel') || m;
+    const field = panel.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled])');
+    const target = field || focusables(m)[0];
+    if (target) setTimeout(() => { try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); } }, 40);
+  }
+  function onClose(m) {
+    if (activeModal !== m) return;
+    activeModal = null;
+    if (!document.querySelector('.modal.show')) document.body.classList.remove('modal-open');
+    if (lastFocused && lastFocused.focus) { try { lastFocused.focus({ preventScroll: true }); } catch (e) { lastFocused.focus(); } }
+    lastFocused = null;
+  }
+  function watch(m) {
+    new MutationObserver(() => { isOpen(m) ? onOpen(m) : onClose(m); })
+      .observe(m, { attributes: true, attributeFilter: ['class', 'hidden'] });
+    if (isOpen(m)) onOpen(m);
+  }
+  document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.modal').forEach(watch); });
+  document.addEventListener('keydown', (e) => {
+    if (!activeModal) return;
+    if (e.key === 'Escape') {
+      const m = activeModal;
+      m.classList.remove('show');
+      setTimeout(() => { m.hidden = true; }, 200);   // 各モックの closeModal と同じ挙動
+      return;
+    }
+    if (e.key === 'Tab') {
+      const els = focusables(activeModal);
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+})();
+
+/* --- 入力バリデーションのインラインエラー（alert() の代替・標準ヘルパー） ---
+   使い方: clearFieldErrors(モーダルパネル) でリセット → 必須未入力等に setFieldError(input, '文言')。
+   最初のエラーフィールドへフォーカスする（呼び出し側で focusFirstError も可）。 */
+function clearFieldErrors(root) {
+  (root || document).querySelectorAll('.field__error').forEach(e => e.remove());
+  (root || document).querySelectorAll('[aria-invalid="true"]').forEach(e => e.removeAttribute('aria-invalid'));
+}
+function setFieldError(input, message) {
+  if (!input) return;
+  input.setAttribute('aria-invalid', 'true');
+  const host = input.closest('.form-row, .field') || input.parentElement;
+  let err = host.querySelector('.field__error');
+  if (!err) { err = document.createElement('div'); err.className = 'field__error'; host.appendChild(err); }
+  err.textContent = message;
+}
+window.clearFieldErrors = clearFieldErrors;
+window.setFieldError = setFieldError;

@@ -27,7 +27,6 @@
   .st-active { background: var(--color-agree-bg); color: var(--color-success); }
   .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
 
-  .modal__panel { max-width: 520px; }
   .form-row { margin-bottom: var(--space-4); }
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
   .req::after { content: " *"; color: var(--color-danger); }
@@ -124,11 +123,14 @@
 </main>
 
 <!-- ===== アカウント発行/編集モーダル ===== -->
-<div class="modal" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="amTitle" hidden>
+<div class="modal modal--md" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="amTitle" hidden>
   <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="amTitle" style="margin-top:0">アカウントを発行</h2>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="amTitle">アカウントを発行</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
     <div class="form-row"><label class="req" for="amName">氏名</label><input class="input" id="amName" placeholder="例: 山田 太郎"></div>
     <div class="form-row"><label class="req" for="amLoginId">ログインID</label><input class="input" id="amLoginId" placeholder="例: taro.yamada"><div class="hint">ログイン用の識別子（メールとは別）。</div></div>
     <div class="form-row"><label class="req" for="amEmail">メールアドレス</label><input class="input" id="amEmail" type="email" placeholder="例: taro@across.co.jp"><div class="hint">OTP・初回パスワード設定リンクの送付先。</div></div>
@@ -141,7 +143,8 @@
       <div class="hint">自社のクエストグループから複数選択可。参加ロールは<strong>メンバー固定</strong>（<strong>管理者〔admin〕の任命はシステム管理者・SC-92</strong>）。</div>
     </div>
     <div class="form-note" id="amNote">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>を行います（メールリンク・72時間）。このアカウントは<strong>一般（general）</strong>として作成されます。</div>
-    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+    </div>
+    <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
       <button class="btn btn-primary" type="button" id="amSave">発行する</button>
     </div>
@@ -302,6 +305,7 @@
     renderMemberships();
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
     document.getElementById('amNote').style.display = mode === 'edit' ? 'none' : '';
+    clearFieldErrors(document.getElementById('accountModal'));
     openModal('accountModal');
   }
   document.getElementById('newAccount').addEventListener('click', () => openAccount('new', null));
@@ -309,7 +313,12 @@
     const name = document.getElementById('amName').value.trim();
     const loginId = document.getElementById('amLoginId').value.trim();
     const email = document.getElementById('amEmail').value.trim();
-    if (!name || !loginId || !email) { alert('氏名・ログインID・メールアドレスは必須です'); return; }
+    clearFieldErrors(document.getElementById('accountModal'));
+    const invalid = [];
+    if (!name) invalid.push(['amName', '氏名を入力してください']);
+    if (!loginId) invalid.push(['amLoginId', 'ログインIDを入力してください']);
+    if (!email) invalid.push(['amEmail', 'メールアドレスを入力してください']);
+    if (invalid.length) { invalid.forEach(([id, msg]) => setFieldError(document.getElementById(id), msg)); document.getElementById(invalid[0][0]).focus(); return; }
     const memberships = amMemberships.map(m => ({ n: m.n, r: 'member' })); // member 固定
     if (editTarget) {
       editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email;

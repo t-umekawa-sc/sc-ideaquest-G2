@@ -279,6 +279,31 @@ img { max-width: 100%; display: block; }
 .modal__close:hover { background: var(--color-surface-alt); }
 @media (prefers-reduced-motion: reduce) { .modal__backdrop { transition: none; } }
 
+/* --- 入力モーダルの標準構造（ヘッダー/本文/フッター）＝パネルに .sectioned を付けて使う ---
+   本文(.modal__body)だけがスクロールし、フッター(保存/キャンセル)は下端に固定。閉じる×はヘッダー内。
+   デザイン標準 §4「モーダルダイアログ」参照。 */
+.modal__panel.sectioned { padding: 0; display: flex; flex-direction: column; }
+.modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--color-border); flex: 0 0 auto; }
+.modal__header h2 { margin: 0; font-size: var(--text-lg); }
+.modal__header .modal__close { position: static; flex: 0 0 auto; }   /* ヘッダー内では通常フロー（absolute を解除） */
+.modal__body { padding: var(--space-5) var(--space-6); overflow: auto; flex: 1 1 auto; }
+.modal__footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); flex: 0 0 auto;
+  background: var(--color-surface); }
+
+/* モーダルのサイズ（.modal 要素に付与） */
+.modal--sm .modal__panel { max-width: 480px; }
+.modal--md .modal__panel { max-width: 600px; }
+.modal--lg .modal__panel { max-width: 720px; }
+
+/* 入力バリデーションのインラインエラー（フィールド標準。alert() の代替） */
+.field__error { color: var(--color-danger); font-size: var(--text-xs); margin-top: 4px; }
+.input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--color-danger); }
+
+/* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
+body.modal-open { overflow: hidden; }
+
 /* =============================================================
  * 6c. テーブル（業務層・一覧表示の標準）
  *   .table-wrap で囲むと横スクロール＆カード見た目になる。

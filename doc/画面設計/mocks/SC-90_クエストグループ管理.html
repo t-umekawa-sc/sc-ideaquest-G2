@@ -19,7 +19,6 @@
   .table .db-id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
   .table td .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-  .modal__panel { max-width: 520px; }
   .form-row { margin-bottom: var(--space-4); }
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
   .form-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
@@ -107,11 +106,14 @@
 </main>
 
 <!-- ===== メンバー追加モーダル（ディレクトリ・ピッカー） ===== -->
-<div class="modal" id="pickerModal" role="dialog" aria-modal="true" aria-labelledby="pkTitle" hidden>
+<div class="modal modal--sm" id="pickerModal" role="dialog" aria-modal="true" aria-labelledby="pkTitle" hidden>
   <div class="modal__backdrop" data-close></div>
-  <div class="modal__panel">
-    <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
-    <h2 id="pkTitle" style="margin-top:0">メンバーを追加</h2>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="pkTitle">メンバーを追加</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
     <div class="form-row"><label>追加先グループ</label><div class="form-note" id="pkGroup" style="padding:10px 12px">—</div></div>
     <div class="form-row">
       <label for="pkSearch">会社ディレクトリを検索</label>
@@ -120,7 +122,8 @@
     </div>
     <div class="dir-list" id="pkList"></div>
     <div class="list-empty" id="pkEmpty" hidden>候補がありません。未発行の場合は<strong>会社アカウント管理者（SC-93）</strong>へ発行を依頼してください。</div>
-    <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)">
+    </div>
+    <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>閉じる</button>
     </div>
   </div>

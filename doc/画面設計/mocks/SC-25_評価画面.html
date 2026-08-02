@@ -278,9 +278,17 @@
 
   // 確定（デモ）: 未採点があれば警告
   document.getElementById('submitBtn').addEventListener('click', () => {
+    clearFieldErrors(document.getElementById('panel'));
+    let firstBad = null;
     const missing = ASPECTS.filter(a => !scores[a]);
-    if (missing.length) { alert('すべての観点（5つ）を採点してください。未採点: ' + missing.length + '件'); return; }
-    if (!document.getElementById('evalOverall').value.trim()) { alert('総評（全体コメント）は必須です。'); document.getElementById('evalOverall').focus(); return; }
+    if (missing.length) {
+      const host = document.querySelector('.eval-summary');
+      const err = document.createElement('div'); err.className = 'field__error';
+      err.textContent = 'すべての観点（5つ）を採点してください（未採点 ' + missing.length + ' 件）';
+      host.appendChild(err); firstBad = firstBad || host;
+    }
+    if (!document.getElementById('evalOverall').value.trim()) { setFieldError(document.getElementById('evalOverall'), '総評（全体コメント）は必須です'); firstBad = firstBad || document.getElementById('evalOverall'); }
+    if (firstBad) { const f = firstBad.matches('textarea,input,select') ? firstBad : firstBad.querySelector('textarea,input,select,button'); (f || firstBad).scrollIntoView({ block: 'center', behavior: 'smooth' }); if (f) f.focus(); return; }
     const vis = document.querySelector('input[name="vis"]:checked').value;
     alert('評価を確定しました（デモ）\n平均: ' + document.getElementById('avgVal').textContent + ' / 5.0\n公開範囲: ' + (vis === 'party' ? 'パーティー全員' : '限定'));
   });
