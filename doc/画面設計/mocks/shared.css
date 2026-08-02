@@ -304,6 +304,33 @@ img { max-width: 100%; display: block; }
 /* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
 body.modal-open { overflow: hidden; }
 
+/* --- ドラッグ移動（.modal--draggable：ヘッダーを掴んで移動。shared.js が処理・共通部品） ---
+   ハンドル＝.modal__header（または旧 .modal__drag）。中のボタン（×/最大化）はドラッグ起点にしない。 */
+.modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: move; touch-action: none; }
+.modal--draggable .modal__header button, .modal--draggable .modal__drag button { cursor: pointer; }
+.modal__panel.is-dragging { user-select: none; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+
+/* --- 最大化（.modal--maximizable：ヘッダーに ⤢/⤡ を shared.js が差し込む。.is-max で画面ほぼ全体） --- */
+.modal__header__tools { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.modal__maxbtn { width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; font-size: 15px; line-height: 1; }
+.modal__maxbtn:hover { background: var(--color-surface-alt); }
+.modal__panel.is-max {
+  position: fixed; left: var(--space-3) !important; top: var(--space-3) !important;
+  right: var(--space-3); bottom: var(--space-3);
+  width: auto; max-width: none; height: auto; max-height: none; margin: 0;
+}
+
+/* --- 狭幅は自動フルスクリーン（sectioned パネル・スマホの全画面ダイアログ相当） --- */
+@media (max-width: 640px) {
+  .modal { padding: 0; }
+  .modal__panel.sectioned {
+    position: relative; left: 0 !important; top: 0 !important;
+    width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
+  }
+  .modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: default; }  /* モバイルはドラッグ無効 */
+}
+
 /* =============================================================
  * 6c. テーブル（業務層・一覧表示の標準）
  *   .table-wrap で囲むと横スクロール＆カード見た目になる。

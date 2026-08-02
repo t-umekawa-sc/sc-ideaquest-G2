@@ -76,7 +76,7 @@
 </header>
 
 <!-- ============ アイデア登録・編集モーダル（本番は SC-12/SC-01 から Intercept で差し込み） ============ -->
-<div class="modal" id="ideaModal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
+<div class="modal modal--draggable" id="ideaModal" role="dialog" aria-modal="true" aria-labelledby="iTitle">
   <div class="modal__backdrop"></div>
   <div class="modal__panel" id="panel">
     <button class="modal__close" type="button" aria-label="閉じる">✕</button>
@@ -213,26 +213,7 @@
     alert('下書きを保存しました（デモ）\n※ あなただけに表示。投稿するまで XP・コインは付与されません。');
   });
 
-  // ===== モーダルをドラッグで移動（SC-25 と同標準） =====
-  const panel = document.getElementById('panel'), handle = document.getElementById('dragHandle');
-  let drag = null;
-  handle.addEventListener('pointerdown', e => {
-    if (e.target.closest('.modal__close')) return;
-    const r = panel.getBoundingClientRect();
-    panel.style.position = 'fixed'; panel.style.margin = '0'; panel.style.width = r.width + 'px';
-    panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
-    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
-    panel.classList.add('is-dragging'); handle.setPointerCapture(e.pointerId);
-  });
-  handle.addEventListener('pointermove', e => {
-    if (!drag) return;
-    const maxX = window.innerWidth - panel.offsetWidth, maxY = window.innerHeight - panel.offsetHeight;
-    panel.style.left = Math.max(0, Math.min(maxX, e.clientX - drag.dx)) + 'px';
-    panel.style.top = Math.max(0, Math.min(maxY, e.clientY - drag.dy)) + 'px';
-  });
-  function endDrag() { drag = null; panel.classList.remove('is-dragging'); }
-  handle.addEventListener('pointerup', endDrag);
-  handle.addEventListener('pointercancel', endDrag);
+  // ドラッグ移動は共通部品（shared.js の .modal--draggable）に集約＝ここでは個別実装しない。
 </script>
 </body>
 </html>

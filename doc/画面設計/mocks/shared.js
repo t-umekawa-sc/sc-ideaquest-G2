@@ -343,6 +343,13 @@ window.addEventListener('resize', () => applyCellClips());
     activeModal = m;
     document.body.classList.add('modal-open');
     const panel = m.querySelector('.modal__panel') || m;
+    // 開くたびに位置・最大化をリセット（中央から。ドラッグ/最大化の残りを消す）
+    if (panel.classList) {
+      panel.classList.remove('is-max', 'is-dragging');
+      panel.style.position = ''; panel.style.left = ''; panel.style.top = ''; panel.style.margin = ''; panel.style.width = '';
+      const mb = m.querySelector('.modal__maxbtn');
+      if (mb) { mb.textContent = '⤢'; mb.setAttribute('aria-label', '最大化'); }
+    }
     const field = panel.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled])');
     const target = field || focusables(m)[0];
     if (target) setTimeout(() => { try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); } }, 40);
@@ -395,3 +402,59 @@ function setFieldError(input, message) {
 }
 window.clearFieldErrors = clearFieldErrors;
 window.setFieldError = setFieldError;
+
+/* --- モーダルのドラッグ移動＋最大化（共通部品・.modal--draggable / .modal--maximizable で opt-in） ---
+   ・ドラッグ: .modal__header（または旧 .modal__drag）を掴んで .modal__panel を移動（position:fixed）。
+     中のボタン（×/最大化）や入力は起点にしない。最大化中・モバイル幅では無効。画面外へ出さない。
+   ・最大化: shared.js が ⤢/⤡ ボタンをヘッダーに差し込み、.is-max（画面ほぼ全体）をトグル。復元で中央へ。
+   各画面は挙動を持たず、フラグ（クラス）で使う/使わないを宣言するだけ＝1部品・挙動共通。 */
+(function () {
+  const HANDLE = '.modal--draggable .modal__header, .modal--draggable .modal__drag';
+  const panelOf = (m) => m.querySelector('.modal__panel');
+  const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
+
+  // 最大化ボタンの差し込み
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal--maximizable').forEach((m) => {
+      const header = m.querySelector('.modal__header, .modal__drag'); if (!header) return;
+      const close = header.querySelector('.modal__close');
+      let tools = header.querySelector('.modal__header__tools');
+      if (!tools) { tools = document.createElement('div'); tools.className = 'modal__header__tools'; header.appendChild(tools); }
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'modal__maxbtn'; btn.setAttribute('aria-label', '最大化'); btn.textContent = '⤢';
+      tools.appendChild(btn);
+      if (close) tools.appendChild(close);   // ×をツール群の末尾へ移動（⤢ の右）
+      btn.addEventListener('click', () => {
+        const p = panelOf(m); if (!p) return;
+        const max = p.classList.toggle('is-max');
+        p.style.position = ''; p.style.left = ''; p.style.top = ''; p.style.margin = ''; p.style.width = '';  // 位置・幅リセット
+        btn.textContent = max ? '⤡' : '⤢';
+        btn.setAttribute('aria-label', max ? '元のサイズに戻す' : '最大化');
+      });
+    });
+  });
+
+  // ドラッグ
+  let drag = null;
+  document.addEventListener('pointerdown', (e) => {
+    if (isMobile()) return;
+    if (e.target.closest('button, a, input, select, textarea, .modal__header__tools')) return;
+    const handle = e.target.closest(HANDLE); if (!handle) return;
+    const m = handle.closest('.modal'); const p = m && panelOf(m);
+    if (!p || p.classList.contains('is-max')) return;
+    const r = p.getBoundingClientRect();
+    drag = { p, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    p.classList.add('is-dragging');
+    p.style.position = 'fixed'; p.style.margin = '0'; p.style.width = r.width + 'px';  // fixed 化で幅が崩れないよう固定
+    p.style.left = r.left + 'px'; p.style.top = r.top + 'px';
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const { p, dx, dy } = drag;
+    const x = Math.max(0, Math.min(window.innerWidth - p.offsetWidth, e.clientX - dx));
+    const y = Math.max(0, Math.min(window.innerHeight - p.offsetHeight, e.clientY - dy));
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+  });
+  document.addEventListener('pointerup', () => { if (drag) { drag.p.classList.remove('is-dragging'); drag = null; } });
+})();
