@@ -53,6 +53,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `745b669` outbox(ユーザ同期)の処理フローを設計書に明記（データモデル §4.6 に「処理フロー」新設・API §1.13/B.5 参照）＝①同一Tx INSERT②id昇順取得③company_id→db_identifier→.env で接続解決④account_id 冪等upsert(users→memberships)⑤done/retry/failed。順序=id順直列＋失敗時ヘッドオブライン・異account_idは並列可、を厳密化
   - `6df14c9` ブートストラップの初期PWをメール必須にしない方針へ修正＝(a)env直投入＋初回強制変更(既定)/(b)メールリンク/(c)OOBトークンの3択・デフォルトPW禁止。B.5.1・データモデル§8-⑮。＋API設計README §2-B⑥を per-group admin 解禁に合わせ精緻化
   - `196d5e3` 会社アカウント管理者に per-group admin(QG管理者)任命を解禁＝委譲運用「system_admin→会社アカ管理者→QG管理者→メンバー」に対応。system_role 付与は system_admin のみ維持（真の昇格は集約）。B.2.1/B.0.1/B.6/B.7.2・データモデル§5.5/§8-⑯・SC-93(md＋mock・member/adminセグメント)・SC-92 mock注記・README・画面遷移図
   - `67fea5e` セキュリティ通知を追加＝新デバイスログイン（未登録端末の成功時・MVPアプリ内＋監査/メール将来・MFA=OFF前倒し）／パスワード変更完了（メール＋アプリ内・3経路＋プロフィール）。本人宛・オプトアウト不可。A.9-⑧新設・notification_type に security_new_device/security_password_changed 追加・§5.24注記・SC-02(md＋mock)・README通知節。発火=H・表示=SC-02
