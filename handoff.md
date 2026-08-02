@@ -45,6 +45,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `4c126a7` fix: ⋯メニューの下行潜りを根治（position:sticky 自体がスタッキングコンテキストを作るため、開いた行の操作セルだけ z-index:1001 に持ち上げ＝`.rowmenu-open`）＋狭幅に会社識別バー `.ctx-mini`（condensed sticky header・色帯/アイコン/会社名/状態・IntersectionObserverでバナーが隠れたら上部貼り付き）を SC-92 に追加
   - `3c3b937` fix: ⋯操作メニューの重なり/バナー下潜りを解消＝sticky列(.col-actions)のz-index除去＋.rowmenu__listをz-index:1000へ＋SC-92の.ctxを狭幅(≤820px)でposition:static。根本原因＝sticky列のz-indexが行ごとにスタッキングコンテキストを作りfixedメニューを閉じ込めていた
   - `9471f9c` テーブル表示標準を追加＝nowrap既定/複数値セルの…省略＋ホバー全件(.cell-tags＋applyCellClips)/操作列sticky＋⋯メニュー(.col-actions＋.rowmenu)。デザイン標準.md §4・shared.css・shared.js＋SC-90/91/92/93。絶対座標フローティングは非採用(レビュー結論)
   - `8151fce` 一覧/テーブルUI標準(F1〜F7)を管理系モックに実装＝SC-90/91/92/93。F1 絞り込みをクリア（各.filters・アクティブ時のみ表示）／F2 ページネーション .pagination（オフセット・PER_PAGE=5・デモ増量でSC-91/92/93は2ページ）／F3 th scope="col"＋数値列 .num。row-link先頭セルの<a>化は将来
