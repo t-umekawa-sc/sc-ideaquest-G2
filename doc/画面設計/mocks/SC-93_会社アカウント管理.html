@@ -32,15 +32,20 @@
   .req::after { content: " *"; color: var(--color-danger); }
   .form-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
 
-  /* 所属クエストグループ（member 固定・admin 任命は SC-92） */
+  /* 所属クエストグループ（per-group ロール member/admin を行ごとに指定・2026-08-02 改定＝会社アカウント管理者も admin 任命可） */
   .mrows { display: flex; flex-direction: column; gap: 6px; }
   .mrow { display: flex; align-items: center; gap: var(--space-3); padding: 8px 10px; background: var(--color-surface-alt); border-radius: var(--radius); }
   .mrow__name { flex: 1; font-size: var(--text-sm); font-weight: 600; }
-  .mrow__role { font-size: var(--text-xs); color: var(--color-text-muted); }
   .mrow__remove { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1; padding: 4px; border-radius: var(--radius); }
   .mrow__remove:hover { color: var(--color-danger); }
   .mrow-empty { font-size: var(--text-sm); color: var(--color-text-muted); padding: 6px 2px; }
   .mrow-add { margin-top: 8px; }
+  /* セグメント切替（メンバー / 管理者） */
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .seg button { border: 0; background: var(--color-surface); padding: 4px 10px; font-size: var(--text-xs); cursor: pointer; color: var(--color-text-muted); }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .seg button[aria-pressed="true"] { background: var(--color-primary); color: #fff; font-weight: 700; }
+  .seg button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 </style>
 </head>
 <body>
@@ -74,7 +79,7 @@
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
   <h1 class="page-title">会社アカウント管理</h1>
-  <p class="admin-sub">自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>ができます。（会社設定・システムロール付与・クエストグループ管理者〔admin〕の任命は<strong>システム管理者</strong>の領分）</p>
+  <p class="admin-sub">自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>＋<strong>クエストグループ管理者（QG管理者）の任命</strong>ができます。（会社設定・システムロール付与は<strong>システム管理者</strong>の領分）</p>
 
   <!-- 自社コンテキスト（会社選択は無い＝常に自社） -->
   <div class="company-ctx">
@@ -118,7 +123,7 @@
   </nav>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>（メールリンク・72時間）。<strong>無効化</strong>＝論理削除（ログイン不可・全セッション破棄）で、それまでの入力（アイデア/投票/評価/コメント）は残ります。この画面で発行/編集できるのは<strong>一般アカウント</strong>のみ＝<strong>システムロールの付与（会社アカウント管理者/システム管理者）・クエストグループ管理者〔admin〕の任命はシステム管理者（SC-92）</strong>。<strong>システム管理者アカウントは操作できません</strong>（SC-92 で管理）。所属クエストグループへの参加はここでも設定できますが、参加ロールは<strong>メンバー固定</strong>です。
+    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>（メールリンク・72時間）。<strong>無効化</strong>＝論理削除（ログイン不可・全セッション破棄）で、それまでの入力（アイデア/投票/評価/コメント）は残ります。この画面で発行/編集できるのは<strong>一般アカウント</strong>のみ＝<strong>システムロールの付与（会社アカウント管理者/システム管理者）はシステム管理者（SC-92）</strong>。<strong>システム管理者アカウントは操作できません</strong>（SC-92 で管理）。所属クエストグループは<strong>メンバー / 管理者（QG管理者）を per-group で指定可能</strong>（委譲運用・2026-08-02）。
   </p>
 </main>
 
@@ -140,7 +145,7 @@
       <div class="mrow-add">
         <select class="select" id="amAddGroup" aria-label="所属グループを追加"><option value="">＋グループを追加…</option></select>
       </div>
-      <div class="hint">自社のクエストグループから複数選択可。参加ロールは<strong>メンバー固定</strong>（<strong>管理者〔admin〕の任命はシステム管理者・SC-92</strong>）。</div>
+      <div class="hint">自社のクエストグループから複数選択可。各グループの役割を <strong>メンバー / 管理者</strong> で指定（既定=メンバー）。<strong>「管理者」＝クエストグループ管理者（QG管理者）の任命</strong>（会社アカウント管理者も可・2026-08-02）＝指定された人はそのグループを SC-90 で管理できる。</div>
     </div>
     <div class="form-note" id="amNote">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>を行います（メールリンク・72時間）。このアカウントは<strong>一般（general）</strong>として作成されます。</div>
     </div>
@@ -248,11 +253,11 @@
   document.getElementById('pgPrev').addEventListener('click', () => { if (page > 1) { page--; render(); } });
   document.getElementById('pgNext').addEventListener('click', () => { page++; render(); });
 
-  // 所属クエストグループ編集（member 固定・admin 任命は不可＝SC-92）
+  // 所属クエストグループ編集（per-group ロール member/admin を行ごとに指定・2026-08-02 改定＝会社アカウント管理者も admin 任命可）
   const amGroups = document.getElementById('amGroups');
   const amGroupsEmpty = document.getElementById('amGroupsEmpty');
   const amAddGroup = document.getElementById('amAddGroup');
-  let amMemberships = []; // [{ n: グループ名 }]（role は常に member）
+  let amMemberships = []; // [{ n: グループ名, r: 'member' | 'admin' }]
   function renderAddOptions() {
     const used = new Set(amMemberships.map(m => m.n));
     const rest = COMPANY.questGroups.filter(g => !used.has(g));
@@ -263,7 +268,10 @@
     amGroups.innerHTML = amMemberships.map((m, i) => `
       <div class="mrow" data-i="${i}">
         <span class="mrow__name">${m.n}</span>
-        <span class="mrow__role">メンバー</span>
+        <span class="seg" role="group" aria-label="${m.n} の役割">
+          <button type="button" data-role="member" aria-pressed="${m.r === 'member'}">メンバー</button>
+          <button type="button" data-role="admin" aria-pressed="${m.r === 'admin'}">管理者</button>
+        </span>
         <button type="button" class="mrow__remove" data-remove aria-label="${m.n} を削除">✕</button>
       </div>`).join('');
     amGroupsEmpty.hidden = amMemberships.length !== 0;
@@ -271,11 +279,14 @@
   }
   amGroups.addEventListener('click', (e) => {
     const row = e.target.closest('.mrow'); if (!row) return;
-    if (e.target.closest('[data-remove]')) { amMemberships.splice(Number(row.dataset.i), 1); renderMemberships(); }
+    const i = Number(row.dataset.i);
+    if (e.target.closest('[data-remove]')) { amMemberships.splice(i, 1); renderMemberships(); return; }
+    const rb = e.target.closest('[data-role]');
+    if (rb) { amMemberships[i].r = rb.dataset.role; renderMemberships(); }
   });
   amAddGroup.addEventListener('change', () => {
     const g = amAddGroup.value; if (!g) return;
-    amMemberships.push({ n: g }); renderMemberships();
+    amMemberships.push({ n: g, r: 'member' }); renderMemberships();
   });
 
   // 行アクション（system_admin 行はボタンを描画しないので該当しない）
@@ -300,8 +311,8 @@
     document.getElementById('amName').value = a ? a.name : '';
     document.getElementById('amLoginId').value = a ? a.loginId : '';
     document.getElementById('amEmail').value = a ? a.email : '';
-    // member のみを行に反映（admin バッジは表示のみ＝本画面では編集不可）
-    amMemberships = a ? a.groups.filter(g => g.r === 'member').map(g => ({ n: g.n })) : [];
+    // 既存の所属・グループ内ロール（member/admin）を反映（deep copy）
+    amMemberships = a ? a.groups.map(g => ({ n: g.n, r: g.r })) : [];
     renderMemberships();
     document.getElementById('amSave').textContent = mode === 'edit' ? '保存する' : '発行する';
     document.getElementById('amNote').style.display = mode === 'edit' ? 'none' : '';
@@ -319,15 +330,13 @@
     if (!loginId) invalid.push(['amLoginId', 'ログインIDを入力してください']);
     if (!email) invalid.push(['amEmail', 'メールアドレスを入力してください']);
     if (invalid.length) { invalid.forEach(([id, msg]) => setFieldError(document.getElementById(id), msg)); document.getElementById(invalid[0][0]).focus(); return; }
-    const memberships = amMemberships.map(m => ({ n: m.n, r: 'member' })); // member 固定
+    const memberships = amMemberships.map(m => ({ n: m.n, r: m.r })); // member/admin を per-group に指定（QG管理者任命可・2026-08-02）
     if (editTarget) {
       editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email;
-      // admin バッジ（表示のみ）は保持し、member 所属だけを差し替える
-      const keptAdmin = editTarget.groups.filter(g => g.r === 'admin');
-      editTarget.groups = memberships.concat(keptAdmin);
+      editTarget.groups = memberships;  // 所属・グループ内ロール（member/admin）を更新
       render();
     } else {
-      const summary = memberships.length ? '\n所属: ' + memberships.map(m => m.n).join('、') + '（メンバー）' : '';
+      const summary = memberships.length ? '\n所属: ' + memberships.map(m => m.n + (m.r === 'admin' ? '（管理者）' : '')).join('、') : '';
       ACCOUNTS.push({ name, loginId, email, system_role:'general', groups: memberships, state:'active', last:'—（未ログイン）' });
       render();
       alert('「' + name + '」を ' + COMPANY.name + ' に一般アカウントとして発行しました（デモ）。' + summary + '\n初回ログイン時にパスワード設定を行います。');

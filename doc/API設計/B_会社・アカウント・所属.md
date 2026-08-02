@@ -9,7 +9,7 @@
 | アクター | 判定 | 範囲 | パス接頭辞 |
 | --- | --- | --- | --- |
 | **システム管理者** | `session.system_role == system_admin` | **全会社・全アカウント・会社設定・所属/グループ内ロール・ロール付与** | `/admin/companies/...`（対象会社を `company_id` で明示＝クロステナント admin・§1.5） |
-| **会社アカウント管理者** | `session.system_role == company_account_admin` | **自社（セッション会社）全アカウント**の発行/無効化/identity 編集/PW 再設定。**会社設定・プロビジョニング・ロール付与は不可** | `/admin/accounts/...`（**セッション会社固定**・`company_id` を受けない） |
+| **会社アカウント管理者** | `session.system_role == company_account_admin` | **自社（セッション会社）全アカウント**の発行/無効化/identity 編集/PW 再設定＋**per-group `admin`（QG管理者）の任命/剥奪**（2026-08-02 改定）。**会社設定・プロビジョニング・`system_role` 付与は不可** | `/admin/accounts/...`（**セッション会社固定**・`company_id` を受けない） |
 | **クエストグループ管理者** | セッションユーザーが**対象グループに有効な `admin` 所属**（`quest_group_members.role=admin` かつ `removed_at IS NULL`）を持つ（会社DB判定・B案） | **参加選択専任**＝自社ディレクトリ参照＋**自分が `admin` のグループへ既存アカウントを参加追加/除外**（`quest_group_members` の per-group 操作のみ）。**発行/無効化/identity/PW・`admin` 付与は不可** | `/admin/quest-groups/{group_id}/...`・`/admin/company-directory`（`group_id` は**セッション会社**内・所属で門番） |
 
 - **職務分離（SoD・2026-08-01・データモデル §8-⑯）**: アカウントの**ライフサイクル管理（会社アカウント管理者）**と、QG への**参加管理（QG管理者）**を分離。**なぜ**＝QG管理者が会社DB内アカウントを参照可能（緩和）になると「任意の既存垢を自 QG に追加 → 無効化/identity 改変」で会社全体を破壊/乗っ取りできる権限昇格が生じるため、QG管理者から破壊系を取り上げる（B.7.2 も参照）。会社アカウント管理者は会社スコープ役割＝`system_role` に格納（B案の原則）。
@@ -35,7 +35,7 @@
 **アクター判定の厳密定義**（B.0 表の形式化・この 3 条件が `/admin/*` の入口）:
 
 - **system_admin（システム管理者）** ⟺ `session.system_role == "system_admin"`。**会社スコープの限定なし（全会社・全アカウント）**。対象会社は `company_id` パスで明示し、会社の実在を確認（存在しなければ 404）。
-- **company_account_admin（会社アカウント管理者）** ⟺ `session.system_role == "company_account_admin"`。**スコープ＝セッション会社（`session.company_id`）のアカウントのみ**（`/admin/accounts/*` はセッション会社固定・`company_id` を受けない）。**アカウントのライフサイクル操作に限定**（発行/無効化/identity/PW）＝会社設定・プロビジョニング・ロール付与（`system_admin`/`company_account_admin`/`admin` の付与）は**不可**（403）。※`system_admin` は上位互換で `company_account_admin` の操作も可能（ただし通常は `/admin/companies/{company_id}/accounts` を使う）。
+- **company_account_admin（会社アカウント管理者）** ⟺ `session.system_role == "company_account_admin"`。**スコープ＝セッション会社（`session.company_id`）のアカウントのみ**（`/admin/accounts/*` はセッション会社固定・`company_id` を受けない）。**アカウントのライフサイクル（発行/無効化/identity/PW）＋自社の per-group `admin`（QG管理者）任命/剥奪**が可能（2026-08-02 改定）。**`system_role` の付与（`company_account_admin`/`system_admin`）・会社設定・プロビジョニングは不可**（403）。※`system_admin` は上位互換で `company_account_admin` の操作も可能（ただし通常は `/admin/companies/{company_id}/accounts` を使う）。
 - **QG管理者（クエストグループ管理者）** ⟺ セッション会社の会社DBに `quest_group_members(user_id=session.user_id, quest_group_id={group_id}, role='admin', removed_at IS NULL)` の行が**存在**する。**`system_role` は判定に無関係**（`general` でも QG管理者たりうる／`system_admin`・`company_account_admin` でも当該グループに `admin` 所属が無ければ QG系パスでは 404）。**参加管理（メンバーシップ）と自社ディレクトリ参照のみ**＝アカウントの発行/無効化/identity/PW は**不可**（会社アカウント管理者の領分）。
 
 ---
@@ -74,7 +74,7 @@
 | エンドポイント | 追加の認可・不変条件 |
 | --- | --- |
 | `GET .../accounts` | 追加条件なし（system_admin） |
-| `POST .../accounts`（発行） | `system_role=system_admin` の付与・`memberships[].role=admin`（QG管理者任命）を含められるのは system_admin のみ＝本 API は満たす。`login_id`/`email` は会社内一意（重複=**409 `conflict`**） |
+| `POST .../accounts`（発行） | `system_role`（`company_account_admin`/`system_admin`）の付与を含められるのは **system_admin のみ**＝本 API は満たす。`memberships[].role=admin`（QG管理者任命）は system_admin＋会社アカウント管理者（B.2.1）が可。`login_id`/`email` は会社内一意（重複=**409 `conflict`**） |
 | `PATCH .../accounts/{id}`（編集） | `system_role` 変更は system_admin（満たす）。**自分自身の `system_admin→general` 降格は不可**（自己ロックアウト防止・422 `last_system_admin`）。**この降格で有効な system_admin が 0 名になる場合も拒否**（下記「最低 1 名」）。identity 変更は会社内一意（重複=409） |
 | `POST .../disable` | **この無効化で有効な system_admin が 0 名になる場合は拒否**（422 `last_system_admin`）。**運営テナントの最後の system_admin は無効化不可**（B.5.1）。成功時は対象の**全アクティブセッション破棄＋信頼端末失効**（A.9-③） |
 | `POST .../enable` | 追加条件なし（system_admin） |
@@ -82,12 +82,12 @@
 
 - **`system_role` 変更**（`general`⇄`company_account_admin`⇄`system_admin`）は **system_admin 専用のロール付与操作**＝実施後に当該アカウントの全セッション破棄（新権限を確実に適用・A.9-③）。**`company_account_admin`・`system_admin` の付与は system_admin のみ**（会社アカウント管理者・QG管理者は付与不可）。
 - **最低 1 名の有効な system_admin を常に残す（不変条件）**: 剥奪（降格）・無効化のいずれでも、**操作後にプラットフォーム全体で `system_role=system_admin` かつ `status=active` のアカウントが 0 名**になる操作は **422 `last_system_admin`** で拒否（ロックアウト防止）。加えて**自分自身の降格は常に不可**（UX 上の自己ロックアウト防止・上と独立のガード）。
-- **`memberships` の `role=admin` 指定＝QG管理者任命**は system_admin のみ（§8-①）。member/admin を per-group に指定。
+- **`memberships` の `role=admin` 指定＝QG管理者任命**は system_admin＋会社アカウント管理者（自社・B.2.1・2026-08-02 改定）。member/admin を per-group に指定。QG管理者自身は member 追加のみで `admin` 任命は不可。
 - **バリデーション**: `system_role` は enum（`general`/`company_account_admin`/`system_admin`・`quest_group_admin` は不受理）。`login_id`/`email` 会社内一意（重複=409）。件数上限（memberships）・想定外プロパティ拒否（Mass Assignment 防止・§2.2）。
 
 ### B.2.1 会社アカウント管理者による自社アカウント管理（`/admin/accounts`・`company_account_admin`・SoD）
 
-**会社アカウント管理者**（`system_role=company_account_admin`）は、**自社（セッション会社）の全アカウント**のライフサイクルを管理する。パスは**セッション会社固定**（`company_id` を受けない＝クロステナント不可）。操作の実体は B.2 と同じ（発行/編集/disable/enable/password-reset＝outbox で会社DB へミラー・B.5）だが、**会社設定・プロビジョニング・ロール付与を持たない**点が system_admin と異なる。
+**会社アカウント管理者**（`system_role=company_account_admin`）は、**自社（セッション会社）の全アカウント**のライフサイクルを管理する。パスは**セッション会社固定**（`company_id` を受けない＝クロステナント不可）。操作の実体は B.2 と同じ（発行/編集/disable/enable/password-reset＝outbox で会社DB へミラー・B.5）。**会社設定・プロビジョニング・`system_role` の付与は持たない**が、**per-group `admin`（QG管理者）の任命/剥奪は自社スコープで可能**（2026-08-02 改定・下記＋B.7.2）＝「system_admin が会社アカウント管理者を用意 → 会社アカウント管理者が QG管理者を任命 → QG管理者がメンバーを指定」という委譲運用に対応。
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
@@ -98,19 +98,20 @@
 | `POST /admin/accounts/{account_id}/password-reset` | 初回/再設定PWリンク再送 | — | 送信結果（A.7） |
 
 - **認可条件（B.2.1 全エンドポイント・共通）**: B.0.1 の P1〜P6＋`session.system_role == "company_account_admin"`（`system_admin` も上位互換で可）。対象は**セッション会社のアカウントのみ**（他会社は経路上そもそも不可＝`company_id` を受けない）。
-- **不可操作（＝system_admin との差・403/422）**: **`system_role` の変更（`company_account_admin`/`system_admin` の付与・降格）は不可**（`memberships` に `role=admin` を含める QG管理者任命も不可）＝ロール付与は system_admin 専用（§8-①）。よって発行/編集で作れるのは `system_role=general` のアカウントのみ。会社設定（`/settings`）・会社作成/プロビジョニング（B.1）も不可。
+- **できる操作＝per-group `admin` の任命/剥奪（自社・2026-08-02 改定）**: `memberships` に **`role=admin` を含めてよい**（自社の任意アカウントを QG管理者にする/解除する）。**なぜ許すか**＝per-group `admin` は「特定グループの参加追加/除外だけ」の**下位権限**で、会社アカ管理者が既に持つ破壊系（発行/無効化/PW）より弱く、自社スコープに閉じるため**新たな越権にならない**（B.7.2）。付与/剥奪は `system_audit_logs` に記録。
+- **不可操作（＝system_admin との差・403/422）**: **`system_role` の変更（`company_account_admin`/`system_admin` の付与・降格）は不可**（＝“同格/上位を増やす”真の権限昇格は system_admin に集約）。よって発行/編集で作れる/変更できるのは **`system_role=general` のアカウントのみ**（`admin` は per-group ロールなので `system_role` ではなく `memberships` 側＝可）。会社設定（`/settings`）・会社作成/プロビジョニング（B.1）も不可。
 - **`last_system_admin` 等の不変条件**：会社アカ管理者は system_admin を作れない/降格できないため、この経路で最後の system_admin を失う操作は発生しない（disable 対象が system_admin の場合は §8-⑯ の趣旨により**拒否**＝会社アカ管理者は system_admin アカウントを disable できない・**422/403**）。
 - **監査**：発行/編集/disable/PW は `system_audit_logs` に記録（B.6・操作者=会社アカウント管理者）。
 
 ## B.3 所属・グループ内ロール（system_admin 専用・SC-92）
 
-- **認可条件（B.3・共通）**: **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。所属候補の参照・`memberships` による所属/ロールの一括設定はすべて system_admin のみ。特に **`role=admin`（QG管理者）の付与/剥奪は system_admin のみ**（§8-①）。QG管理者はこの API を使えない（QG管理者が使えるのは B.4 のみ・admin 付与不可）。
+- **認可条件（B.3・共通）**: **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。この API（`/admin/companies/{company_id}/*`＝クロステナント）での所属/ロール一括設定は system_admin のみ。**per-group `admin`（QG管理者）の付与/剥奪自体は、自社スコープでは会社アカウント管理者も可**（B.2.1・2026-08-02 改定）＝ただし経路が違う（会社アカ管理者は `/admin/accounts`）。QG管理者はいずれの `admin` 付与もできない（使えるのは B.4 のみ・member 追加のみ）。
 
 
 - `GET /admin/companies/{company_id}/quest-groups` … 割当候補（この会社のクエストグループ一覧・会社DB `quest_groups`）。
 - アカウントの所属は **B.2 の `memberships`**（発行/編集の payload）で一括設定＝**会社DB `quest_group_members` を upsert/トゥームストーン**（差分適用）。
   - 追加＝行を作成（or `removed_at` を NULL に戻して再所属）。解除＝`removed_at` を設定（**論理削除・監査保持**・§5.5）。ロール変更＝`role` 更新。
-  - **`admin` の付与/剥奪は system_admin のみ**（§8-①）。**部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL`** を尊重（重複所属不可）。
+  - **`admin` の付与/剥奪は system_admin＋会社アカウント管理者（自社・2026-08-02 改定）**（QG管理者は不可）。**部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL`** を尊重（重複所属不可）。
 - 会社DB 書き込みのため対象会社の `get_tenant_session`（§1.5）で解決。**account 側（管理DB）更新とは別 DB のため単一 Tx にできない**＝発行時は B.5 の outbox に相乗、既存アカウントの所属変更は user ミラー存在済みのため会社DB へ直接適用（冪等）。
 
 ## B.4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・SC-90）＝参加選択専任（SoD）
@@ -161,7 +162,7 @@
 ## B.6 セキュリティ対策マッピング（`doc/WEBアプリ開発時のセキュリティ対策一覧.md` 突合・§2認可/4入力/9API/15ログ/18業務）
 
 - **認可（2）**: 全エンドポイントでサーバー強制。**IDOR 対策**＝`company_id`/`group_id`/`account_id` の書き換えで範囲外に触れないよう、system_admin=ロール＋対象会社、会社アカウント管理者=`system_role`＋セッション会社固定、QG管理者=対象グループの `admin` 所属を都度検証（範囲外は 404）。**クロステナント遮断**（会社アカ管理・QG API はセッション会社固定）。CRUD 個別権限（発行/編集/無効化/PW再設定）を分離。**退職・異動時の権限停止**＝disable＋所属トゥームストーン＋セッション破棄。
-- **職務分離（SoD・2-⑱／§8-⑯）**: **アカウントのライフサイクル管理（会社アカウント管理者・B.2.1）**と**参加管理（QG管理者・B.4）**を分離＝QG管理者はアカウント破壊系（disable/identity/PW）を持たない。これにより「QG管理者が任意垢を自グループに追加→無効化/改変で会社全体を破壊/乗っ取り」という**権限昇格を構造的に遮断**（B.7.1 の不死垢とは別の、最小権限による防御）。ロール付与（`system_admin`/`company_account_admin`/`admin`）は **system_admin のみ**。会社アカ管理者は system_admin を作成/降格/disable できない（`last_system_admin` 不変条件を迂回させない）。
+- **職務分離（SoD・2-⑱／§8-⑯）**: **アカウントのライフサイクル管理（会社アカウント管理者・B.2.1）**と**参加管理（QG管理者・B.4）**を分離＝QG管理者はアカウント破壊系（disable/identity/PW）を持たない。これにより「QG管理者が任意垢を自グループに追加→無効化/改変で会社全体を破壊/乗っ取り」という**権限昇格を構造的に遮断**（B.7.1 の不死垢とは別の、最小権限による防御）。**`system_role` の付与（`system_admin`/`company_account_admin`）は system_admin のみ**（真の昇格＝同格/上位を増やす操作を集約）。**per-group `admin`（QG管理者）の任命/剥奪は system_admin＋会社アカウント管理者（自社スコープ）**（2026-08-02 改定・B.2.1／B.7.2）＝下位権限の委譲で越権にならない。会社アカ管理者は system_admin を作成/降格/disable できない（`last_system_admin` 不変条件を迂回させない）。
 - **権限変更履歴（2-⑬）**: `system_role` 変更・グループ内 `role` 変更・disable/enable・会社設定変更を**監査記録**（`system_audit_logs`＝データモデル §4.5・操作者/対象/前後/日時/IP・UA）。PW・トークン等の機密は非出力（§15・A.9-⑥）。
 - **入力検証（4）**: enum 限定（`system_role`/`status`/`role`）、会社コード/コード形式、件数上限、想定外プロパティ拒否（**Mass Assignment 防止**・§9）。
 - **API（9）**: 一覧は最大件数＋ページング必須（§1.8）。レスポンスに不要項目を含めない（`password_hash` 等は絶対に返さない）。DBモデル直返し禁止（Pydantic DTO・§3.2）。
@@ -192,3 +193,4 @@
 
 - **【採用】会社内アカウント・ディレクトリを QG管理者に開示（緩和）＋既存アカウントの参加追加を可**: 従来 QG管理者に会社ロスターを隠していた方針を、**「会社内ディレクトリは QG管理者に開示してよい」という明示的な信頼判断**へ変更（社内アドレス帳相当・多くの社内ツールで許容）。**なぜ**＝QG管理者が「既に登録済みの login_id を自 QG に参加させる」導線を持てるようにするため（従来は発行=409 で不可・他グループ垢は 404 で選べなかった）。**懸念への対処**＝(1) 射影を最小化（`account_id`/氏名/アバターのみ・`email`/`system_role`/他グループ所属は非開示＝PII・組織構造・system_admin 標的化を防ぐ）、(2) テナント跨ぎ不可（セッション会社固定）、(3) 監査記録。**業務コンテンツ（クエスト/アイデア）は緩和対象外**＝パーティー門番で独立に閉じたまま（ドメイン C/D）。
 - **【採用】アカウント管理と参加管理の職務分離（会社アカウント管理者を新設）**: 上のディレクトリ緩和を安全に成立させる前提として、**QG管理者からアカウント破壊系（disable/identity/PW）を撤廃**し、会社スコープの**会社アカウント管理者**（`company_account_admin`）へ移管（§8-⑯・B.2.1/B.4）。**なぜ**＝緩和後に QG管理者が破壊系を持つと「任意垢を追加→無効化/改変で会社全体を破壊/乗っ取り」の権限昇格が生じるため。SoD＝最小権限でこれを構造的に遮断。会社スコープ役割は `system_role` に格納（B案の原則「スコープ↔保管場所を一致」・per-group には入れない）。
+- **【採用・2026-08-02 改定】会社アカウント管理者に per-group `admin`（QG管理者）任命/剥奪を許可**: 当初は「ロール付与は全部 system_admin に集約」（§8-①の保守的な一括ルール）で company_account_admin にも `admin` 任命を禁じていたが、**委譲運用**（system_admin が会社アカウント管理者を用意〔QG無し〕→ **会社アカウント管理者が QG管理者を任命** → QG管理者がメンバー指定）を可能にするため解禁。**なぜ安全か**＝(1) per-group `admin` は「特定グループの参加追加/除外だけ」の**下位権限**で、会社アカ管理者が既に持つ破壊系（発行/無効化/PW）より弱い＝**越権にならない**、(2) **自社スコープに閉じる**（クロステナント不可）、(3) 付与/剥奪を監査記録。**境界は維持**＝「同格/上位を増やす」`system_role` 付与（`company_account_admin`/`system_admin`）は引き続き **system_admin のみ**（真の権限昇格は集約）。QG管理者は従来どおり **member 追加のみ**（`admin` 任命不可）。**画面反映**＝SC-93 の所属エディタに member/admin セグメントを追加。
