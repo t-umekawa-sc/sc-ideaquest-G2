@@ -57,6 +57,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `9d5cb9d` パーティー候補から既存メンバー・作成者本人を除外＝`GET /quest-groups/{id}/members` に `exclude_user_ids` を追加しサーバー側除外＋ページング整合（C.4）。SC-11 md 明記・mock は既存実装で整合
   - `ca9c2ec` C.2に下書き編集・編集→公開の仕様を明記＝PATCHは内容編集専用でstatus不変・状態遷移はpublish/transitionのアクションEP／編集→公開はPATCH→publishの2ステップ／publishはボディなし・必須再検証。APIベストプラクティス（アクション・サブリソース方式）で現行維持を推奨・採用
   - `e2e62d6` 自分の下書きクエストを一覧(SC-10)にも表示＝GET /quests を (A)公開系 OR (B)自分の下書き に改定（C.1）・下書きクリックは SC-11 編集・他人の下書きは不可視。SC-10 md＋mock 反映。一覧作成→戻ると消える不便を解消
   - `745b669` outbox(ユーザ同期)の処理フローを設計書に明記（データモデル §4.6 に「処理フロー」新設・API §1.13/B.5 参照）＝①同一Tx INSERT②id昇順取得③company_id→db_identifier→.env で接続解決④account_id 冪等upsert(users→memberships)⑤done/retry/failed。順序=id順直列＋失敗時ヘッドオブライン・異account_idは並列可、を厳密化
