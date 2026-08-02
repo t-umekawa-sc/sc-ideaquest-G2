@@ -87,10 +87,11 @@
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `GET /quest-groups` | 自分が有効所属するグループ一覧（SC-10 フィルタ・SC-11 グループ選択） | クエリ: `q?`（名前部分一致） | `data`=グループの配列（`id`/`quest_group_code`/`name`）。`removed_at IS NULL` のみ |
-| `GET /quest-groups/{group_id}/members` | パーティー候補（同一グループの有効メンバー）を取得（SC-11） | パス: `group_id`／クエリ: `q?`・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター）。`quest_group_members.removed_at IS NULL`＋`users.status='active'` |
+| `GET /quest-groups/{group_id}/members` | パーティー候補（同一グループの有効メンバー）を取得（SC-11） | パス: `group_id`／クエリ: `q?`・`exclude_user_ids?`（**除外する user_id 群＝既にパーティーに入っている/追加中/作成者本人**・CSV or 反復）・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター）。`quest_group_members.removed_at IS NULL`＋`users.status='active'`＋**`exclude_user_ids` に含まれない者**のみ |
 
 - **これはテナントAPI（一般ユーザー向け）**で、**ドメイン B の `/admin/quest-groups/*`（QG管理者のメンバー管理）とは別系統**。門番＝**リクエスト者自身がそのグループに有効所属**していること。非所属グループは **404**（存在秘匿）。
 - `GET /quest-groups/{group_id}/members` は SC-11 の「候補から追加」用。大人数グループのための `q`/ページングを備える（SC-11 §9 の候補検索/ページングに対応）。
+- **既存メンバー等の除外（決定 2026-08-02）**: 候補から**既にパーティーに入っている人・モーダルで追加中の未保存分・作成者本人を出さない**。**サーバー側で `exclude_user_ids` を除外してからページング**する（クライアント側で取得後に間引くと、ページが既追加者で埋まり「候補が枯れたページ」になり得るため＝ページングと整合させるためサーバー除外を採用）。**モーダルは現在の選択済み全 user_id（サーバー保存分＋未保存の追加分＋owner=作成者本人）を `exclude_user_ids` に渡す**。作成時（クエスト未保存）も編集時も**同じ仕組み**で扱える（`quest_id` に依存しない）。クライアント側でも二重追加ガードを行う（サーバーが最終権威＝`PUT /party`/`POST /members` の候補制限 §C.3 で範囲外は 422）。
 - グループそのものの作成/改称は運営操作（将来・データモデル §5.4）＝本ドメインは参照のみ。
 
 ## C.5 クエスト状態遷移（ライフサイクル）
