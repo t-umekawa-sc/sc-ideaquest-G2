@@ -57,6 +57,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `e0ecd1a` C: 「クエスト管理者（QG管理者）」→「クエストグループ管理者（QG管理者）」に修正（C.0）＝QG=Quest Group の正式名称に合わせ誤記訂正・クエスト内6権限の「管理」権限との混同回避。意味変更なし（ユーザー自己チェック指摘の反映）
   - `d7fe36e` C: 「所属グループ」→「所属クエストグループ」に用語統一（4箇所・C.0/C.1/C.4）＝quest_groups の正式名称に合わせ略記を精確化。意味変更なし（ユーザー自己チェック指摘の反映）
   - `9d5cb9d` パーティー候補から既存メンバー・作成者本人を除外＝`GET /quest-groups/{id}/members` に `exclude_user_ids` を追加しサーバー側除外＋ページング整合（C.4）。SC-11 md 明記・mock は既存実装で整合
   - `ca9c2ec` C.2に下書き編集・編集→公開の仕様を明記＝PATCHは内容編集専用でstatus不変・状態遷移はpublish/transitionのアクションEP／編集→公開はPATCH→publishの2ステップ／publishはボディなし・必須再検証。APIベストプラクティス（アクション・サブリソース方式）で現行維持を推奨・採用
