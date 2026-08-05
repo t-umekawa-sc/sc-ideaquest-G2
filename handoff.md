@@ -57,6 +57,7 @@
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`
 - git 管理下。remote `origin` = https://github.com/t-umekawa-sc/sc-ideaquest-G2.git（ブランチ `main`）
 - 直近コミット（新しい順。全履歴は `git log`）:
+  - `32619f9` C.2: publish をアトミック化＝`POST /quests/{id}/publish` がボディ(content)を受け取り「内容適用＋strict検証＋draft→recruiting＋参加通知」を単一Txで実行・失敗は全ロールバック（当初の「publishはボディなし・PATCH→publishの2ステップ・非原子性は良性」を撤回＝部分コミット〔PATCHコミット後の別Tx publish失敗を巻き戻せない〕を回避）。下書き保存はPATCHのまま・strict検証はvalidate_publishable共有（ユーザー自己チェック指摘の反映＝publishアトミック性の保留を解消）。※SC-11 §7の想定APIは旧記法で表記差＝下流キュー〔実装時整理〕のまま
   - `d89df6e` C.2: PATCH の検証は「現在の status」で分岐する仕様を明記＝リクエストに status を含めない（サーバーが DB の現在値を権威として読む・偽装余地排除＝Mass Assignment 対策）。draft=緩い/公開中=strict(validate_publishable・422)/completed=凍結(409)・単一PATCHで足り strict は POST(recruiting)/publish と同一ドメイン関数共有（ユーザー自己チェック指摘の反映・publish のアトミック性〔部分コミット〕は別途保留中）
   - `e0ecd1a` C: 「クエスト管理者（QG管理者）」→「クエストグループ管理者（QG管理者）」に修正（C.0）＝QG=Quest Group の正式名称に合わせ誤記訂正・クエスト内6権限の「管理」権限との混同回避。意味変更なし（ユーザー自己チェック指摘の反映）
   - `d7fe36e` C: 「所属グループ」→「所属クエストグループ」に用語統一（4箇所・C.0/C.1/C.4）＝quest_groups の正式名称に合わせ略記を精確化。意味変更なし（ユーザー自己チェック指摘の反映）
