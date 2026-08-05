@@ -45,20 +45,20 @@
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `POST /quests` | クエストを作成（SC-11・作成者＝所有者） | ボディ: `title`（必須）,`color`（必須・既定色可）,`categories`（`[string]` 1件以上・事前定義＋自由入力）,`deadline`,`purpose`,`quest_group_id`（必須）,`icon_image_path?`,`members`（`[{user_id, permissions?}]`）,`status`（`draft\|recruiting`）。`Idempotency-Key` 推奨（§1.9） | 作成されたクエスト（`draft` は本人のみ表示・`recruiting` は公開）。作成者を `owner_id`＋`owner` 権限で保存。`quest_group_id` に自分が有効所属していることをサーバー検証 |
-| `PATCH /quests/{quest_id}` | クエストを編集（`owner`/`quest_admin`） | パス: `quest_id`／ボディ（差分）: `title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path` | 更新後のクエスト。`categories` は**置換セット**（送られた配列で `quest_categories` を全置換）。**`quest_group_id` は変更不可**（下記注記） |
+| `PATCH /quests/{quest_id}` | クエストを編集（`owner`/`quest_admin`） | パス: `quest_id`／ボディ（差分）: `title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`／**`members?`（任意・あるべき全体像＝送られたらパーティー差分を内容と同一 UoW で適用）** | 更新後のクエスト（`members` 同梱時はパーティーも反映）。`categories` は**置換セット**（送られた配列で `quest_categories` を全置換）。**`quest_group_id` は変更不可**（下記注記）。**`status` は受け付けない**（状態遷移は publish/transition） |
 | `DELETE /quests/{quest_id}` | クエストを論理削除（`owner`/`quest_admin`） | パス: `quest_id` | 204。`deleted_at`＋`deleted_by_id` を設定（トゥームストーン）。以後一覧/詳細/検索/集計から除外。子データ（カテゴリ/パーティー/アイデア/チャット/評価）は**物理削除せず監査保持**（§5.6・`ON DELETE RESTRICT`） |
-| `POST /quests/{quest_id}/publish` | 下書きを公開（`draft` → `recruiting`・**アトミック**） | パス: `quest_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`。省略可＝未送信分は現在値を使用） | 公開後のクエスト（`status=recruiting`）。**内容適用＋strict 検証（`validate_publishable`）＋`draft→recruiting`＋参加通知（ドメイン H）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・何も公開されない）**。`owner`（作成者）のみ |
+| `POST /quests/{quest_id}/publish` | 下書きを公開（`draft` → `recruiting`・**アトミック**） | パス: `quest_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`。省略可＝未送信分は現在値を使用）／**`members?`（任意・あるべき全体像＝送られたらパーティー差分も同一 UoW で適用）** | 公開後のクエスト（`status=recruiting`）。**内容適用＋パーティー適用＋strict 検証（`validate_publishable`）＋`draft→recruiting`＋参加通知（ドメイン H）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・何も公開されない）**。`owner`（作成者）のみ |
 
 - **必須充足**（サーバー検証・§2.2 入力検証）: `title`・`color`・`categories`（1件以上）・`quest_group_id`。未充足は **422 `validation_error`**（`errors[].field` で返却）。`deadline`/`purpose` は任意（データモデル §5.6 は NULL 可＝SC-11 の「必須」表示はフロント UX 上の推奨で、権威はサーバーのこの規約）。
 - **カテゴリー**: 配列で受け取り `quest_categories` に展開。**アプリでトリム＋大小文字/全半角を正規化**し `UNIQUE(quest_id, label)` で重複排除（§5.7）。事前定義候補に一致しないラベルは `is_custom=true`。
 - **クエストグループの不変性**: `quest_group_id` は**作成時に確定・以後不変**（`PATCH` で受けても無視＝パーティー候補/参照範囲/既存アイデアとの整合を壊さないため。SC-11 §9 の「原則作成時のみ」を本方針で確定）。グループを変えたい場合は作り直し（将来要件は C.7）。
 - **クエスト公開に XP は付与しない（確定）**: 公canonical な XP 付与表（README §6）に**クエスト作成/公開の行は無い**（付与＝選定200/投稿50/評価30/ログイン10/投票5/チャット5 のみ）。よって `publish` は通知のみで XP を発生させない。※SC-11 本文の「作成 XP を付与」は画面ドキュメントの表現ゆらぎ＝**要修正**（C.7 に記録）。
 - **`publish` の状態前提**: `draft` 以外に対する `publish` は **409 `conflict`**（`invalid_state`）。冪等化のため同一 `Idempotency-Key` 再送は最初の結果を返す。
-- **`PATCH` は内容編集専用＝`status` を変えない（決定・APIベストプラクティス）**: `PATCH /quests/{id}` は本文の内容（title/color/categories/deadline/purpose/icon）だけを更新し、**`status` は受け付けない/変更しない**（パーティー/権限は C.4 の専用EP、状態遷移は publish/transition）。状態遷移は**専用アクション**（`POST .../publish`＝draft→recruiting、以降は `POST .../transition`＝C.3）に限定する。**なぜ**＝前進のみ・副作用あり（通知/必須再検証）の状態機械（C.3）を PATCH のフィールド書き換えで迂回させないため（状態遷移は「アクション・サブリソース」で表すのが定石）。
+- **`PATCH` は内容および任意でパーティーを編集＝`status` は変えない（決定・APIベストプラクティス）**: `PATCH /quests/{id}` は本文の内容（title/color/categories/deadline/purpose/icon）と、**任意で `members`（パーティー・権限）** を更新する（`members` 同梱時は内容＋パーティーを**同一 UoW でアトミックに**適用＝SC-11 全体編集の保存が1リクエストで完結）。ただし**`status` は受け付けない/変更しない**（状態遷移は publish/transition）。状態遷移は**専用アクション**（`POST .../publish`＝draft→recruiting、以降は `POST .../transition`＝C.5）に限定する。**なぜ**＝前進のみ・副作用あり（通知/必須再検証）の状態機械（C.5）を PATCH のフィールド書き換えで迂回させないため（状態遷移は「アクション・サブリソース」で表すのが定石）。**パーティーのみを編集する導線**（パーティー編集専用ダイアログ / SC-12 パーティータブ）は **C.3 の専用EP**（`PUT /party`・増分 `POST/DELETE /members`・`PUT .../permissions`）を使う。
   - **`PATCH` の検証は「現在の `status`」で分岐（サーバー権威・`status` はリクエストに含めない）**：対象クエストの現在の `status` はサーバーが DB を読めば分かるため、クライアントに `status` を送らせない（送らせると `completed` を `draft` と偽って緩い検証を通す等の偽装余地＝§2.2 Mass Assignment 対策）。PATCH は分岐に現在値を使うだけで **`status` 自体は変えない**（遷移は publish/transition 専任）。
     - 現在 `draft` → **緩い検証**（必須未充足でも保存可＝下書き）。
     - 現在 `recruiting`/`in_progress`/`evaluating`（公開中）→ **strict 検証**（`validate_publishable`＝`title`/`color`/`categories`≥1/`quest_group_id`）。公開中のクエストを不正な状態へ落とせない＝未充足は **422**。
-    - 現在 `completed` → **書き込み凍結**（C.3）＝内容編集も **409 `invalid_state`**。
+    - 現在 `completed` → **書き込み凍結**（C.5）＝内容編集も **409 `invalid_state`**。
     - ＝**単一の PATCH で足りる**（内部状態で EP を割らない）。strict 検証は `POST /quests {status:recruiting}`・`publish` と**同一のドメイン関数 `validate_publishable` を共有**。
   - **下書きの内容を下書きのまま更新** ＝ `PATCH /quests/{id}`（`status=draft` のまま）。owner/quest_admin。
   - **下書きを編集してから公開** ＝ **`POST /quests/{id}/publish {content}` の1回でアトミック**（内容適用＋strict 検証＋遷移＋通知を単一 Tx）。SC-11 の「**公開**」ボタンはこの publish を1回呼ぶだけ（フロントで PATCH と分けて2回呼ばない）／「**下書き保存**」ボタンは `PATCH` のみ（内容のみ・遷移なし）。**`publish` はボディ（内容）を取る**＝「公開」を全か無かの1操作にするため（当初の「publish はボディを取らない・2ステップ」方針は、部分コミット〔`PATCH` コミット後に別 Tx の `publish` が失敗しても巻き戻せない〕を避けるため撤回・2026-08-05）。
@@ -68,6 +68,12 @@
 ## C.3 パーティー・権限（SC-11 パーティー編集 / SC-12 パーティータブ）
 
 パーティー編集は SC-11 モーダルで**まとめて保存**する UI。これに合わせ**一括差分適用**を主とし、増分操作の粒度エンドポイントも用意する（両立）。
+
+- **メンバー（パーティー）の更新経路（明示）**:
+  - **作成時** ＝ `POST /quests` のボディ `members` で**インライン設定**（作成と同一リクエスト＝アトミック）。
+  - **クエスト全体編集（内容＋パーティーを一緒に）** ＝ `PATCH /quests/{id}`（`members?` 同梱）／公開なら `POST /quests/{id}/publish`（`members?` 同梱）で**内容とパーティーを同一 UoW でアトミックに**適用（C.2）。＝SC-11 全体編集の保存が1リクエストで完結。
+  - **パーティーのみ編集** ＝ **本節（C.3）の専用EP**を使う＝一括は `PUT /party`（パーティー編集専用ダイアログ）、増分は `POST/DELETE /members`・`PUT .../permissions`（SC-12 パーティータブ）。
+  - どの経路も**パーティー適用ロジックは同一のドメイン関数 `apply_party_diff`**（候補制限・`owner` 付与は作成者のみ・作成者保護・既定権限）を共有＝サーバー強制ルール（下記）は全経路で等価。
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
