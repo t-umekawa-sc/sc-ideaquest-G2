@@ -47,7 +47,7 @@
 | `POST /quests` | クエストを作成（SC-11・作成者＝所有者） | ボディ: `title`（必須）,`color`（必須・既定色可）,`categories`（`[string]` 1件以上・事前定義＋自由入力）,`deadline`,`purpose`,`quest_group_id`（必須）,`icon_image_path?`,`members`（`[{user_id, permissions?}]`）,`status`（`draft\|recruiting`）。`Idempotency-Key` 推奨（§1.9） | 作成されたクエスト（`draft` は本人のみ表示・`recruiting` は公開）。作成者を `owner_id`＋`owner` 権限で保存。`quest_group_id` に自分が有効所属していることをサーバー検証 |
 | `PATCH /quests/{quest_id}` | クエストを編集（`owner`/`quest_admin`） | パス: `quest_id`／ボディ（差分）: `title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path` | 更新後のクエスト。`categories` は**置換セット**（送られた配列で `quest_categories` を全置換）。**`quest_group_id` は変更不可**（下記注記） |
 | `DELETE /quests/{quest_id}` | クエストを論理削除（`owner`/`quest_admin`） | パス: `quest_id` | 204。`deleted_at`＋`deleted_by_id` を設定（トゥームストーン）。以後一覧/詳細/検索/集計から除外。子データ（カテゴリ/パーティー/アイデア/チャット/評価）は**物理削除せず監査保持**（§5.6・`ON DELETE RESTRICT`） |
-| `POST /quests/{quest_id}/publish` | 下書きを公開（`draft` → `recruiting`） | パス: `quest_id` | 公開後のクエスト（`status=recruiting`）。パーティーへ**参加通知**を発火（ドメイン H）。`owner`（作成者）のみ |
+| `POST /quests/{quest_id}/publish` | 下書きを公開（`draft` → `recruiting`・**アトミック**） | パス: `quest_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`。省略可＝未送信分は現在値を使用） | 公開後のクエスト（`status=recruiting`）。**内容適用＋strict 検証（`validate_publishable`）＋`draft→recruiting`＋参加通知（ドメイン H）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・何も公開されない）**。`owner`（作成者）のみ |
 
 - **必須充足**（サーバー検証・§2.2 入力検証）: `title`・`color`・`categories`（1件以上）・`quest_group_id`。未充足は **422 `validation_error`**（`errors[].field` で返却）。`deadline`/`purpose` は任意（データモデル §5.6 は NULL 可＝SC-11 の「必須」表示はフロント UX 上の推奨で、権威はサーバーのこの規約）。
 - **カテゴリー**: 配列で受け取り `quest_categories` に展開。**アプリでトリム＋大小文字/全半角を正規化**し `UNIQUE(quest_id, label)` で重複排除（§5.7）。事前定義候補に一致しないラベルは `is_custom=true`。
@@ -61,9 +61,8 @@
     - 現在 `completed` → **書き込み凍結**（C.3）＝内容編集も **409 `invalid_state`**。
     - ＝**単一の PATCH で足りる**（内部状態で EP を割らない）。strict 検証は `POST /quests {status:recruiting}`・`publish` と**同一のドメイン関数 `validate_publishable` を共有**。
   - **下書きの内容を下書きのまま更新** ＝ `PATCH /quests/{id}`（`status=draft` のまま）。owner/quest_admin。
-  - **下書きを編集してから公開** ＝ **`PATCH`（内容保存）→ `POST /quests/{id}/publish`（遷移）の2ステップ**。SC-11 の「**公開**」ボタンがこの2つを連続して呼ぶ（フロントのオーケストレーション）／「**下書き保存**」ボタンは `PATCH` のみ。**`publish` はボディを取らない**（内容編集は `PATCH` に一元化＝責務分離）。
-  - **2ステップの非原子性は良性**＝`PATCH` 成功・`publish` 失敗でも「保存済みの draft」が残るだけ（破損なし・再度 publish 可）。
-- **`publish` 時の必須再検証**: 公開前に必須項目（`title`/`color`/`categories`≥1/`quest_group_id`・パーティー要否）を再検証し、未充足は **422 `validation_error`**（下書きは未充足でも保存できるため、公開の関門で担保）。draft で `members` 空を許すか（＝公開時にパーティー必須とするか）は C.7 の TBD。
+  - **下書きを編集してから公開** ＝ **`POST /quests/{id}/publish {content}` の1回でアトミック**（内容適用＋strict 検証＋遷移＋通知を単一 Tx）。SC-11 の「**公開**」ボタンはこの publish を1回呼ぶだけ（フロントで PATCH と分けて2回呼ばない）／「**下書き保存**」ボタンは `PATCH` のみ（内容のみ・遷移なし）。**`publish` はボディ（内容）を取る**＝「公開」を全か無かの1操作にするため（当初の「publish はボディを取らない・2ステップ」方針は、部分コミット〔`PATCH` コミット後に別 Tx の `publish` が失敗しても巻き戻せない〕を避けるため撤回・2026-08-05）。
+- **`publish` 時の必須再検証（アトミック）**: 公開時に必須項目（`title`/`color`/`categories`≥1/`quest_group_id`・パーティー要否）を**内容適用と同一 Tx 内で** strict 検証し、未充足は **422 `validation_error`**（＝この場合も内容は保存されない＝全ロールバック）。下書きは未充足でも `PATCH` で保存できるため、公開の関門で担保。draft で `members` 空を許すか（＝公開時にパーティー必須とするか）は C.7 の TBD。
 - **アイコン画像**: `icon_image_path` は MinIO キー（§1.10・別途アップロード API で取得したキーを渡す）。物理名ハッシュ化はアップロード側の責務。
 
 ## C.3 パーティー・権限（SC-11 パーティー編集 / SC-12 パーティータブ）
