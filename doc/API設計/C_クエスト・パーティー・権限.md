@@ -6,7 +6,7 @@
 
 ## C.0 アクター・認可スコープ（クエスト内6権限）
 
-**アクセスの門番＝パーティー所属**。当該クエストの `quest_members`（`quest_id`×`user_id`）に行が無いユーザーは、クエスト詳細・アイデア・チャット・全文検索いずれも **404**（存在秘匿・§1.6・可視範囲＝パーティー内のみ）。さらに「所属クエストグループ内」でしか作られないため、`quest_group_members`（`removed_at IS NULL`）に無いグループのクエストも当然 404。
+**アクセスの門番＝パーティー所属**。当該クエストの `quest_members`（`quest_id`×`user_id`）に**有効な行（`removed_at IS NULL`）が無い**ユーザーは、クエスト詳細・アイデア・チャット・全文検索いずれも **404**（存在秘匿・§1.6・可視範囲＝パーティー内のみ）。※パーティーから外れた人はトゥームストーン行（`removed_at` 設定済み）が残るが門番は `removed_at IS NULL` で判定するため 404（§5.8）。さらに「所属クエストグループ内」でしか作られないため、`quest_group_members`（`removed_at IS NULL`）に無いグループのクエストも当然 404。
 
 | 権限（`permission_type`） | 代表アクション（本ドメイン） | 付与/剥奪できる者 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@
 | `GET /quests/{quest_id}/members` | パーティー＋各メンバーの権限を取得（SC-12 パーティータブ） | パス: `quest_id` | `data`=メンバーの配列（`user`〔アバター/氏名〕＋`permissions[]`＋`joined_at`＋`is_creator`）。権限バッジ描画に使用 |
 
 - **参照制限（サーバー強制・FR-15）**: `GET /quests` は次の **(A) OR (B)** を返す（いずれも `deleted_at IS NULL`・セッション会社内・`company_id` はクエリで受けない＝§1.5）:
-  - **(A) 公開系**: 「**所属クエストグループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に行あり）」かつ `status != draft`。
+  - **(A) 公開系**: 「**所属クエストグループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に有効な行あり＝`removed_at IS NULL`）」かつ `status != draft`。
   - **(B) 自分の下書き（2026-08-02 追加）**: `owner_id = 自分` かつ `status = draft`（作成者本人のみ可視）。※下書きは公開前なのでパーティー門番の対象外＝**本人だけに見える**。
 - **下書き（`draft`）を一覧にも表示（決定 2026-08-02・UX 改善）**: 従来「下書きは一覧に出さない（ダッシュボード集約のみ）」だったが、**一覧から下書き作成 → 戻ると消える**という不便を解消するため、**作成者本人の下書きは `GET /quests` にも含める**（`my_state=draft` で下書きバッジ表示・クリックで SC-11 編集モーダル）。**ダッシュボード（ドメイン I）にも引き続き集約**＝両導線に出る。他人の下書きは一切見えない（`GET /quests/{id}` は `draft` の場合 `owner_id` 本人のみ 200・それ以外は 404）。
 - **`my_permissions`／`my_state`** はサーバーが算出して返す（フロントは権限判定を再実装しない・コーディング規約 §1）。UX 便宜であり、実アクションは各エンドポイントで再検証。
@@ -79,7 +79,7 @@
 | --- | --- | --- | --- |
 | `PUT /quests/{quest_id}/party` | パーティー＋権限を一括更新（SC-11 モーダル保存） | パス: `quest_id`／ボディ: `members`（`[{user_id, permissions[]}]`＝**あるべき全体像**）。サーバーが現状と差分（追加/削除/権限変更）を算出して適用 | 更新後のパーティー（C.1 `GET .../members` と同形） |
 | `POST /quests/{quest_id}/members` | メンバーを 1 名追加（増分 UI 用） | パス: `quest_id`／ボディ: `user_id`,`permissions?`（省略時は既定＝`vote`+`idea_create`+`comment`） | 追加されたメンバー行 |
-| `DELETE /quests/{quest_id}/members/{user_id}` | メンバーをパーティーから外す（増分 UI 用） | パス: `quest_id`,`user_id` | 204。権限は失うが**アイデア/投票/評価/コメントは削除せず表示継続**（§5.8） |
+| `DELETE /quests/{quest_id}/members/{user_id}` | メンバーをパーティーから外す（増分 UI 用・**論理削除**） | パス: `quest_id`,`user_id` | 204。**`quest_members.removed_at` を設定（トゥームストーン・行は物理削除しない）**＋権限行（`quest_member_permissions`）は削除して権限を失う。**アイデア/投票/評価/コメントは削除せず表示継続**（§5.8） |
 | `PUT /quests/{quest_id}/members/{user_id}/permissions` | あるメンバーの権限セットを置換 | パス: `quest_id`,`user_id`／ボディ: `permissions[]`（6 権限の部分集合） | 更新後の権限配列 |
 
 - **サーバー強制ルール**（全経路で再検証・コーディング規約 §1）:
@@ -88,7 +88,7 @@
   - **作成者の保護**: 作成者行の `owner` 剥奪・作成者のパーティー除外は不可（**422 `last_owner`/`forbidden`**）。作成者は常に全権限。
   - **編集権限**: `POST/DELETE/PUT` いずれも `owner` または `quest_admin` が必要（`owner` 付与のみさらに作成者限定）。
   - **既定権限の自動付与**: `POST /members` で `permissions` 省略時は `vote`+`idea_create`+`comment` を付与（§5.9）。
-  - **重複防止**: `quest_members` は `UNIQUE(quest_id, user_id)`、権限は `UNIQUE(quest_member_id, permission)`（§5.8/5.9）。再追加（過去に外した相手）は既存行を再利用/再作成。
+  - **重複防止・再追加は行を再利用**: `quest_members` は **`UNIQUE(quest_id, user_id) WHERE removed_at IS NULL`**（部分ユニーク＝有効行は1つ）、権限は `UNIQUE(quest_member_id, permission)`（§5.8/5.9）。**再追加（過去に外した相手）は既存のトゥームストーン行を再利用**＝`removed_at` を NULL に戻し、`joined_at = now()` に更新、既定権限を再付与（`id`＝`quest_member_id` は保持）。物理削除・新規行の作り直しはしない（§2 論理削除方針・監査/履歴保持）。
 - **`PUT /party` の原子性**: 差分適用は単一 UoW（トランザクション）で実行（コーディング規約 §3.1）。途中失敗は全ロールバック。`owner` を含む差分は作成者チェックを差分適用前に一括検証。
 - **可視性の連動**: パーティー変更は**参照範囲**に直結（外れたユーザーは以後 404）。ただし**過去の入力は保持**（§5.8）。
 
