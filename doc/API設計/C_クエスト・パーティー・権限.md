@@ -55,6 +55,11 @@
 - **クエスト公開に XP は付与しない（確定）**: 公canonical な XP 付与表（README §6）に**クエスト作成/公開の行は無い**（付与＝選定200/投稿50/評価30/ログイン10/投票5/チャット5 のみ）。よって `publish` は通知のみで XP を発生させない。※SC-11 本文の「作成 XP を付与」は画面ドキュメントの表現ゆらぎ＝**要修正**（C.7 に記録）。
 - **`publish` の状態前提**: `draft` 以外に対する `publish` は **409 `conflict`**（`invalid_state`）。冪等化のため同一 `Idempotency-Key` 再送は最初の結果を返す。
 - **`PATCH` は内容編集専用＝`status` を変えない（決定・APIベストプラクティス）**: `PATCH /quests/{id}` は本文の内容（title/color/categories/deadline/purpose/icon）だけを更新し、**`status` は受け付けない/変更しない**（パーティー/権限は C.4 の専用EP、状態遷移は publish/transition）。状態遷移は**専用アクション**（`POST .../publish`＝draft→recruiting、以降は `POST .../transition`＝C.3）に限定する。**なぜ**＝前進のみ・副作用あり（通知/必須再検証）の状態機械（C.3）を PATCH のフィールド書き換えで迂回させないため（状態遷移は「アクション・サブリソース」で表すのが定石）。
+  - **`PATCH` の検証は「現在の `status`」で分岐（サーバー権威・`status` はリクエストに含めない）**：対象クエストの現在の `status` はサーバーが DB を読めば分かるため、クライアントに `status` を送らせない（送らせると `completed` を `draft` と偽って緩い検証を通す等の偽装余地＝§2.2 Mass Assignment 対策）。PATCH は分岐に現在値を使うだけで **`status` 自体は変えない**（遷移は publish/transition 専任）。
+    - 現在 `draft` → **緩い検証**（必須未充足でも保存可＝下書き）。
+    - 現在 `recruiting`/`in_progress`/`evaluating`（公開中）→ **strict 検証**（`validate_publishable`＝`title`/`color`/`categories`≥1/`quest_group_id`）。公開中のクエストを不正な状態へ落とせない＝未充足は **422**。
+    - 現在 `completed` → **書き込み凍結**（C.3）＝内容編集も **409 `invalid_state`**。
+    - ＝**単一の PATCH で足りる**（内部状態で EP を割らない）。strict 検証は `POST /quests {status:recruiting}`・`publish` と**同一のドメイン関数 `validate_publishable` を共有**。
   - **下書きの内容を下書きのまま更新** ＝ `PATCH /quests/{id}`（`status=draft` のまま）。owner/quest_admin。
   - **下書きを編集してから公開** ＝ **`PATCH`（内容保存）→ `POST /quests/{id}/publish`（遷移）の2ステップ**。SC-11 の「**公開**」ボタンがこの2つを連続して呼ぶ（フロントのオーケストレーション）／「**下書き保存**」ボタンは `PATCH` のみ。**`publish` はボディを取らない**（内容編集は `PATCH` に一元化＝責務分離）。
   - **2ステップの非原子性は良性**＝`PATCH` 成功・`publish` 失敗でも「保存済みの draft」が残るだけ（破損なし・再度 publish 可）。
