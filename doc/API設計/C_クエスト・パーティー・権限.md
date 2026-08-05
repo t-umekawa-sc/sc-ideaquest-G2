@@ -6,7 +6,7 @@
 
 ## C.0 アクター・認可スコープ（クエスト内6権限）
 
-**アクセスの門番＝パーティー所属**。当該クエストの `quest_members`（`quest_id`×`user_id`）に行が無いユーザーは、クエスト詳細・アイデア・チャット・全文検索いずれも **404**（存在秘匿・§1.6・可視範囲＝パーティー内のみ）。さらに「所属グループ内」でしか作られないため、`quest_group_members`（`removed_at IS NULL`）に無いグループのクエストも当然 404。
+**アクセスの門番＝パーティー所属**。当該クエストの `quest_members`（`quest_id`×`user_id`）に行が無いユーザーは、クエスト詳細・アイデア・チャット・全文検索いずれも **404**（存在秘匿・§1.6・可視範囲＝パーティー内のみ）。さらに「所属クエストグループ内」でしか作られないため、`quest_group_members`（`removed_at IS NULL`）に無いグループのクエストも当然 404。
 
 | 権限（`permission_type`） | 代表アクション（本ドメイン） | 付与/剥奪できる者 |
 | --- | --- | --- |
@@ -28,12 +28,12 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属グループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
+| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属クエストグループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
 | `GET /quests/{quest_id}` | クエスト詳細を取得（SC-12 ヘッダー/概要タブ） | パス: `quest_id` | クエスト詳細（上記＋`purpose`〔目的・テーマ全文〕/`created_at`）＋**`my_permissions`**（自分が持つ 6 権限の配列＝フロントの UX 出し分け用）＋集計 |
 | `GET /quests/{quest_id}/members` | パーティー＋各メンバーの権限を取得（SC-12 パーティータブ） | パス: `quest_id` | `data`=メンバーの配列（`user`〔アバター/氏名〕＋`permissions[]`＋`joined_at`＋`is_creator`）。権限バッジ描画に使用 |
 
 - **参照制限（サーバー強制・FR-15）**: `GET /quests` は次の **(A) OR (B)** を返す（いずれも `deleted_at IS NULL`・セッション会社内・`company_id` はクエリで受けない＝§1.5）:
-  - **(A) 公開系**: 「**所属グループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に行あり）」かつ `status != draft`。
+  - **(A) 公開系**: 「**所属クエストグループ内**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に行あり）」かつ `status != draft`。
   - **(B) 自分の下書き（2026-08-02 追加）**: `owner_id = 自分` かつ `status = draft`（作成者本人のみ可視）。※下書きは公開前なのでパーティー門番の対象外＝**本人だけに見える**。
 - **下書き（`draft`）を一覧にも表示（決定 2026-08-02・UX 改善）**: 従来「下書きは一覧に出さない（ダッシュボード集約のみ）」だったが、**一覧から下書き作成 → 戻ると消える**という不便を解消するため、**作成者本人の下書きは `GET /quests` にも含める**（`my_state=draft` で下書きバッジ表示・クリックで SC-11 編集モーダル）。**ダッシュボード（ドメイン I）にも引き続き集約**＝両導線に出る。他人の下書きは一切見えない（`GET /quests/{id}` は `draft` の場合 `owner_id` 本人のみ 200・それ以外は 404）。
 - **`my_permissions`／`my_state`** はサーバーが算出して返す（フロントは権限判定を再実装しない・コーディング規約 §1）。UX 便宜であり、実アクションは各エンドポイントで再検証。
@@ -73,7 +73,7 @@
 | `PUT /quests/{quest_id}/members/{user_id}/permissions` | あるメンバーの権限セットを置換 | パス: `quest_id`,`user_id`／ボディ: `permissions[]`（6 権限の部分集合） | 更新後の権限配列 |
 
 - **サーバー強制ルール**（全経路で再検証・コーディング規約 §1）:
-  - **候補制限**: 追加できるのは**当該クエストの所属グループに有効所属**（`quest_group_members.removed_at IS NULL`）のユーザーのみ。範囲外は **422 `validation_error`**（`errors[].field=user_id`）。
+  - **候補制限**: 追加できるのは**当該クエストの所属クエストグループに有効所属**（`quest_group_members.removed_at IS NULL`）のユーザーのみ。範囲外は **422 `validation_error`**（`errors[].field=user_id`）。
   - **`owner` 付与は作成者のみ**: `permissions` に `owner` を含める操作は `quests.owner_id`＝リクエスト者本人のときのみ許可。他者による `owner` 付与は **403 `forbidden`**。
   - **作成者の保護**: 作成者行の `owner` 剥奪・作成者のパーティー除外は不可（**422 `last_owner`/`forbidden`**）。作成者は常に全権限。
   - **編集権限**: `POST/DELETE/PUT` いずれも `owner` または `quest_admin` が必要（`owner` 付与のみさらに作成者限定）。
@@ -89,7 +89,7 @@
 | `GET /quest-groups` | 自分が有効所属するグループ一覧（SC-10 フィルタ・SC-11 グループ選択） | クエリ: `q?`（名前部分一致） | `data`=グループの配列（`id`/`quest_group_code`/`name`）。`removed_at IS NULL` のみ |
 | `GET /quest-groups/{group_id}/members` | パーティー候補（同一グループの有効メンバー）を取得（SC-11） | パス: `group_id`／クエリ: `q?`・`exclude_user_ids?`（**除外する user_id 群＝既にパーティーに入っている/追加中/作成者本人**・CSV or 反復）・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター）。`quest_group_members.removed_at IS NULL`＋`users.status='active'`＋**`exclude_user_ids` に含まれない者**のみ |
 
-- **これはテナントAPI（一般ユーザー向け）**で、**ドメイン B の `/admin/quest-groups/*`（QG管理者のメンバー管理）とは別系統**。門番＝**リクエスト者自身がそのグループに有効所属**していること。非所属グループは **404**（存在秘匿）。
+- **これはテナントAPI（一般ユーザー向け）**で、**ドメイン B の `/admin/quest-groups/*`（QG管理者のメンバー管理）とは別系統**。門番＝**リクエスト者自身がそのグループに有効所属**していること。非所属クエストグループは **404**（存在秘匿）。
 - `GET /quest-groups/{group_id}/members` は SC-11 の「候補から追加」用。大人数グループのための `q`/ページングを備える（SC-11 §9 の候補検索/ページングに対応）。
 - **既存メンバー等の除外（決定 2026-08-02）**: 候補から**既にパーティーに入っている人・モーダルで追加中の未保存分・作成者本人を出さない**。**サーバー側で `exclude_user_ids` を除外してからページング**する（クライアント側で取得後に間引くと、ページが既追加者で埋まり「候補が枯れたページ」になり得るため＝ページングと整合させるためサーバー除外を採用）。**モーダルは現在の選択済み全 user_id（サーバー保存分＋未保存の追加分＋owner=作成者本人）を `exclude_user_ids` に渡す**。作成時（クエスト未保存）も編集時も**同じ仕組み**で扱える（`quest_id` に依存しない）。クライアント側でも二重追加ガードを行う（サーバーが最終権威＝`PUT /party`/`POST /members` の候補制限 §C.3 で範囲外は 422）。
 - グループそのものの作成/改称は運営操作（将来・データモデル §5.4）＝本ドメインは参照のみ。
