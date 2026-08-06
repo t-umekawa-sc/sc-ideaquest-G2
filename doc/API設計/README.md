@@ -106,7 +106,8 @@
 - **上限＝1ファイル 20MB・1リクエスト 10 件・許可 MIME は allowlist**（データモデル §5.12・§8-⑦）。実体は **MinIO**、**物理名はハッシュ化**、DB（`attachments`）はパス＋元名＋サイズ＋MIME＋uploader を保持。
 - **アップロード方式（MVP＝サーバー経由）**: `POST /ideas/{id}/attachments`・`POST /chat-messages/{id}/attachments` に `multipart/form-data`。サーバーが検証（サイズ/MIME/件数）→ MinIO へ put → `attachments` 行を作成。
   - 将来: MinIO 直 PUT の**署名付きアップロード URL 発行**（`POST /attachments/presign`）へ拡張可（設計余地を残す）。
-- **ダウンロード**: `GET /attachments/{id}/download` が**権限検証（パーティー内）後に署名付き GET URL へ 302**（or URL を JSON で返す）。TTL 短め。
+- **ダウンロード**: `GET /attachments/{id}/download` が**権限検証（パーティー内）後に署名付き GET URL へ 302**（or URL を JSON で返す）。
+  - **非公開バケット＋発行時サーバー認可＋短 TTL 署名 URL を用い、恒久公開 URL は作らない（なぜ）**: バケットは非公開でオブジェクトは直リンク不可（物理名もハッシュで推測・列挙不可）。ダウンロードのたびにサーバーが認可を確認してから、**数十〜数百秒だけ有効な署名 URL**（改ざん不可の HMAC 署名＋失効時刻付き）を発行する。TTL を短くする狙いは、**署名 URL がブラウザ履歴・アクセスログ・`Referer`・共有などで漏れても、被害の窓を数十〜数百秒に限定して自然失効させる（直リンク流出耐性）**こと。恒久公開 URL は一度漏れると永久アクセスになるため禁止。実装は §3.4 `infra/storage.py`（署名鍵はサーバー専任・コーディング規約 §2.2）。
 - **画像/アバター/背景/クエストアイコン/会社アイコン**も同様に MinIO（それぞれ `users.background_image_path`・`quests.icon_image_path`・`companies.icon_image_path`）。
 
 ### 1.11 全文検索（PGroonga）
