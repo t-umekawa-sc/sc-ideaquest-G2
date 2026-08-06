@@ -50,14 +50,16 @@
 | `POST /quests/{quest_id}/ideas` | アイデアを作成（SC-21・`idea_create` 権限） | パス: `quest_id`／ボディ: `title`（必須）,`value`（必須）,`body`（必須）,`time_limit?`,`stakeholders?`（`[{label, is_custom?}]`）,`note?`,`status`（`draft\|published`）。`Idempotency-Key` 推奨（§1.9） | 作成されたアイデア（`draft` は本人のみ表示・`published` は公開）。`author_id`＝セッション本人。`published` で公開処理（下記）を同一 UoW 実行 |
 | `PATCH /ideas/{idea_id}` | アイデアを編集（投稿者本人 or `owner`/`quest_admin`） | パス: `idea_id`／ボディ（差分）: `title`/`value`/`body`/`time_limit`/`stakeholders`/`note` | 更新後のアイデア。**公開済みなら 1 版を記録し通知発火**（D.4）。`stakeholders` は**置換セット**（送られた配列で `idea_stakeholders` を全置換） |
 | `DELETE /ideas/{idea_id}` | アイデアを論理削除（投稿者本人 or `owner`/`quest_admin`） | パス: `idea_id` | 204。`deleted_at`＋`deleted_by_id` を設定（トゥームストーン）。以後一覧/詳細/検索/集計から除外。子（チャット/投票/評価/版/添付/フォロー・`activities` 元帳）は**物理削除せず監査保持**（§5.10・`ON DELETE RESTRICT`） |
-| `POST /ideas/{idea_id}/publish` | 下書きを公開（`draft` → `published`） | パス: `idea_id`／`Idempotency-Key` 推奨 | 公開後のアイデア（`status=published`）。公開処理（下記）を実行。投稿者本人 or `owner`/`quest_admin` |
+| `POST /ideas/{idea_id}/publish` | 下書きを公開（`draft` → `published`・**アトミック**） | パス: `idea_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`value`/`body`/`time_limit`/`stakeholders`/`note`。省略可＝未送信分は現在値を使用）。`Idempotency-Key` 推奨（§1.9） | 公開後のアイデア（`status=published`）。**内容適用＋strict 検証（`validate_publishable`）＋`draft→published`＋公開処理（`chat_groups` 作成・投稿 XP+50・下記）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・公開されない）**。投稿者本人 or `owner`/`quest_admin` |
 
-- **必須充足**（サーバー検証・§2.2 入力検証）: `title`・`value`・`body`。未充足は **422 `validation_error`**（`errors[].field`）。`time_limit`/`stakeholders`/`note` は任意（§5.10 は NULL 可＝SC-21 の必須 3 項目表示はフロント UX、権威はサーバーの本規約）。
-- **公開処理（`published` になる瞬間に 1 回だけ・同一 UoW）**:
+- **必須充足＝strict 検証（`validate_publishable`）**（サーバー検証・§2.2 入力検証）: 公開状態のアイデアは `title`・`value`・`body` を満たすこと。未充足は **422 `validation_error`**（`errors[].field`）。`time_limit`/`stakeholders`/`note` は任意（§5.10 は NULL 可＝SC-21 の必須 3 項目表示はフロント UX、権威はサーバーの本規約）。**この strict 検証は `POST /ideas`（`status=published`）・`POST .../publish`・公開中アイデアの `PATCH` で同一ドメイン関数 `validate_publishable` を共有**（下書きの `PATCH` は緩い＝未充足でも保存可）。
+- **公開処理（`published` になる瞬間に 1 回だけ・publish/作成公開の同一 UoW 内）**:
   1. `chat_groups` を作成（`idea` と 1:1・`UNIQUE(idea_id)`・§5.15）。**冪等**＝既に存在すれば作らない。
   2. **投稿 XP+50 を投稿者に付与**（README §6 canonical＝アイデア投稿=50・`activities` に `reason=idea_post`,`ref_type=ideas`,`ref_id=idea_id` を同一 UoW で記帳＝ドメイン G の gamification repo を呼ぶ・コーディング規約 §3.4）。**日次上限の対象外**（投稿 XP は上限リストに無い＝投票5/チャット10/ログイン1 のみが上限対象・§8-⑥）。
   3. **公開は一方向**（`idea_status` は `draft`/`published` の 2 値・非公開への差し戻しは MVP 非対応）。よって XP+50・チャットグループ作成は**アイデアにつき 1 回**（再 `publish` は 409 `conflict`〔`invalid_state`〕・同一 `Idempotency-Key` 再送は最初の結果を返す）。
 - **`POST /ideas` の `status=published`** は「作成＋即公開」＝作成後に公開処理を同一 UoW で走らせる（`publish` を分けて呼ぶ必要なし）。`status=draft` なら公開処理はしない（付与なし・本人のみ表示）。
+- **`PATCH` は内容編集専用＝`status` は受け付けない/変えない（C.2 と同じ方針）**: 公開（`draft→published`）は**専用アクション** `POST .../publish` に限定し、`PATCH` のフィールド書き換えで状態機械を迂回させない（副作用〔公開処理・版・通知〕を伴う遷移をアクションで表す定石）。**`PATCH` の検証は「現在の `status`」で分岐（サーバー権威・`status` はリクエストに含めない＝§2.2 Mass Assignment 対策）**：現在 `draft`→緩い検証（下書き保存・未充足可）／現在 `published`→strict 検証（`validate_publishable`・未充足は 422）＋毎回 1 版記録・通知（下記）／`completed`→凍結（409・D.0）。
+  - **下書き編集→公開の一貫性**: SC-21 で下書きの内容を編集してそのまま公開する導線は、**内容を `publish` のボディ `content` に載せて 1 リクエストでアトミックに実行**できる（`PATCH`→`publish` の 2 ステップは不要＝C の publish アトミック化と同じ・部分コミットを回避）。下書きのまま保存は `PATCH` のみ。
 - **編集と版**: 公開済みアイデアの `PATCH` は毎回 `idea_revisions` に 1 版追加＋`ideas.current_revision++`＋投票者/フォロワーへ `idea_updated` 通知（D.4）。**下書き中の編集は版を作らない**（公開前は履歴不要・保存で上書き）。
 - **Mass Assignment 防止**: `author_id`/`status`（`publish` 以外での昇格）/`is_selected`/`current_revision`/`deleted_*`/監査列はクライアント入力を受けない（サーバー設定・§1.4）。`is_selected` の変更は評価・選定（ドメイン F/G）の責務でありここでは受けない。
 - **添付は別 API**（D.3）。新規アイデアはまず本文を `POST /ideas`（下書き可）で作って `idea_id` を得てから添付する（§1.10 が `POST /ideas/{id}/attachments` を要求＝id 先行）。SC-21 モーダルの「添付してから投稿」は、フロントが下書き作成→添付→公開の順に内部で呼ぶ（D.3 注記）。
