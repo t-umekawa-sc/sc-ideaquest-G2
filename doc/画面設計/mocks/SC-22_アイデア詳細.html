@@ -202,6 +202,7 @@
       </div>
       <div class="idea-actions">
         <button class="follow-star" type="button" id="followBtn" aria-pressed="true">★ フォロー中</button>
+        <!-- ▼ クエスト完了（凍結）時＝新規フォロー不可・解除のみ可。フォロー中なら「⏸ 完了（凍結）」を併記し解除を促す（本番は quest_status で出し分け・POST /follow は 409）。 -->
         <!-- ▼ 権限（作成者本人／クエスト管理）に応じて表示 -->
         <button class="btn btn-outline" type="button" id="editBtn">編集</button>
       </div>

@@ -129,6 +129,10 @@
     font-size: 18px; line-height: 1; color: var(--pixel-xp); padding: 2px; border-radius: var(--radius-sm); }
   .follow-star:hover { background: var(--color-surface-alt); }
   .follow-star[aria-pressed="false"] { color: var(--color-text-subtle); }
+  /* 凍結（完了クエスト）のフォロー＝視覚的に区別。解除のみ可を示す */
+  .follow-card.is-frozen { opacity: .92; }
+  .follow-card.is-frozen .card-title { color: var(--color-text-muted); }
+  .follow-frozen-note { margin-top: var(--space-2); }
 
   /* --- アイデア詳細モーダルの中身（.modal 基本形は shared.css・ここは固有部分） --- */
   .modal__badge-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0 var(--space-4); }
@@ -488,14 +492,14 @@
         </div>
       </button>
 
-      <button class="card card-accent follow-card" type="button"
-        data-title="経費レシートOCR" data-quest="経費精算の自動化" data-cat="コスト削減"
+      <button class="card card-accent follow-card is-frozen" type="button"
+        data-title="経費レシートOCR" data-quest="経費精算の自動化" data-cat="コスト削減" data-frozen="1"
         data-value="レシート撮影だけで経費入力が完了し、申請の手間をなくす。"
         data-body="スマホでレシートを撮影するとOCRで金額・日付・店舗を抽出し、経費申請フォームに自動入力する。"
         data-agree="7" data-disagree="0" data-comments="4" data-poster="田中 一郎" data-initial="田">
-        <span class="follow-star" role="button" aria-label="フォロー解除" aria-pressed="true">★</span>
+        <span class="follow-star" role="button" aria-label="フォロー解除（凍結クエスト・再フォロー不可）" aria-pressed="true">★</span>
         <div class="card-title">経費レシートOCR</div>
-        <div class="follow-quest">経費精算の自動化</div>
+        <div class="follow-quest">経費精算の自動化 <span class="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></div>
         <div class="follow-value">レシート撮影だけで経費入力が完了し、申請の手間をなくす。</div>
         <div class="follow-card__poster poster"><span class="avatar sm"><span class="avatar__img placeholder">田</span></span><span class="name text-sm muted">投稿: 田中 一郎</span></div>
         <div class="follow-stats">
@@ -503,6 +507,7 @@
           <span class="vote-disagree">▼ 0</span>
           <span class="badge badge-muted">💬 4</span>
         </div>
+        <div class="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>
       </button>
     </div>
   </section>
@@ -723,10 +728,16 @@
     const star = e.target.closest('.follow-star');
     if (star) {
       e.stopPropagation();
+      const card = star.closest('.follow-card');
       const pressed = star.getAttribute('aria-pressed') === 'true';
+      // 凍結（完了クエスト）は「解除のみ可」＝再フォロー不可。解除したら★は消灯のまま操作不可にする
+      const frozen = card && card.dataset.frozen === '1';
+      if (frozen && !pressed) { return; } // 解除済みの凍結カードは再フォロー不可（本番は POST /follow が 409）
       star.setAttribute('aria-pressed', String(!pressed));
       star.textContent = pressed ? '☆' : '★';
-      star.setAttribute('aria-label', pressed ? 'フォローする' : 'フォロー解除');
+      star.setAttribute('aria-label', pressed
+        ? (frozen ? 'フォロー解除済み（凍結クエスト・再フォロー不可）' : 'フォローする')
+        : 'フォロー解除');
       return;
     }
     const card = e.target.closest('.follow-card');
