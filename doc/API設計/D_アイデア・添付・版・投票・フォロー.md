@@ -21,7 +21,7 @@
 | 投票（賛成/反対/取消） | `vote`（**新規参加の既定権限**） | 自分のアイデアにも可 |
 | フォロー（ウォッチ） | **パーティー所属**（権限バッジ不問） | 閲覧できる＝フォローできる |
 
-- **`draft`（下書き）アイデアは投稿者本人のみ可視**（§5.10）。他パーティーメンバーにも 404 相当で見せない（一覧・詳細から除外）。本人の下書きは**ダッシュボード**（ドメイン I）が集約。
+- **`draft`（下書き）アイデアは投稿者本人のみ可視**（§5.10）。他パーティーメンバーには 404 相当で見せない（一覧・詳細から除外）。**本人の下書きは一覧にも表示する**（`GET /quests/{quest_id}/ideas` に本人の `draft` を含める＝クリックで SC-21 編集・D.1 の決定）＋**ダッシュボード**（ドメイン I）にも集約＝両導線に出る。
 - **クエスト完了（`quest_status=completed`）で書き込み凍結**（C.5）: アイデア作成/編集/削除・投票（登録/切替/取消）・フォローは維持可だが**投稿系は 409 `conflict`（`invalid_state`）**でサーバー拒否（読み取り専用）。フォローは通知購読なので凍結後も切替可とする（D.6 注記）。
 - 認可失敗＝**403 `forbidden`**／範囲外（非パーティー・他グループ・他テナント・下書き他人）は**404 `not_found`**／未認証は**401 `unauthenticated`**。
 
@@ -31,10 +31,13 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quests/{quest_id}/ideas` | クエスト内アイデア一覧を取得（SC-12 アイデアタブ） | パス: `quest_id`／クエリ: `q?`（件名/本文/価値 部分一致は検索＝J に委譲・ここは件名の簡易絞り）・`status?`（`published` 既定・本人は自分の `draft` を含めるか §D.8）・`sort`（`-created_at`〔新着〕/`-vote_count`/`-updated_at`）・`limit`/`cursor`（§1.8） | `data`=アイデア行の配列（`id`/`title`/`status`/`author`〔アバター/Lv/氏名〕/`vote_summary`〔`approve`/`oppose` 数・匿名化考慮〕/`comment_count`/`is_selected`/`current_revision`/`updated_at`/`my_vote`〔自分の投票・匿名でも本人には返す〕/`following`）。`page_info.{next_cursor,has_next}` |
+| `GET /quests/{quest_id}/ideas` | クエスト内アイデア一覧＋自分の下書きを取得（SC-12 アイデアタブ） | パス: `quest_id`／クエリ: `q?`（件名/本文/価値 部分一致は検索＝J に委譲・ここは件名の簡易絞り）・`status?`（`published`〔既定〕`\|draft`〔自分の下書きのみ〕）・`sort`（`-created_at`〔新着〕/`-vote_count`/`-updated_at`）・`limit`/`cursor`（§1.8） | `data`=アイデア行の配列（`id`/`title`/`status`/`author`〔アバター/Lv/氏名〕/`vote_summary`〔`approve`/`oppose` 数・匿名化考慮・下書きは 0〕/`comment_count`/`is_selected`/`current_revision`/`updated_at`/`my_vote`〔自分の投票・匿名でも本人には返す〕/`following`/`my_state`〔`draft`〔本人の下書き〕/未投票/投票済 等〕）。`page_info.{next_cursor,has_next}` |
 | `GET /ideas/{idea_id}` | アイデア詳細を取得（SC-22） | パス: `idea_id` | アイデア本体（`title`/`value`/`body`/`stakeholders[]`/`time_limit`/`note`/`status`/`is_selected`/`current_revision`/`author`/`created_at`/`updated_at`）＋`attachments[]`（D.3 メタ）＋`vote`（`summary`＋`my_vote`＋`voters?`〔記名時のみ・D.5〕＋`stale`〔投票後更新フラグ・D.5〕）＋`following`（bool）＋`chat_preview`（直近数件＝ドメイン E）＋`my_permissions`（UX 出し分け用） |
 
-- **参照制限（サーバー強制）**: アイデアの属するクエストに**自分がパーティー参加中**かつ `quest_group_members.removed_at IS NULL` かつ `ideas.deleted_at IS NULL`。パス/クエリで `company_id` は受け取らない（セッション由来・§1.5）。
+- **参照制限（サーバー強制・FR-15）**: `GET /quests/{quest_id}/ideas` は次の **(A) OR (B)** を返す（いずれも `ideas.deleted_at IS NULL`・セッション会社内・パス/クエリで `company_id` は受け取らない＝§1.5）。前提として、クエスト自体が可視であること（当該クエストの `quest_members.removed_at IS NULL` に自分の行があり、`quest_group_members.removed_at IS NULL`＝ドメイン C.0 と同一）を門番で満たすこと。
+  - **(A) 公開系**: `status = published`（パーティーメンバー全員に可視）。
+  - **(B) 自分の下書き**: `author_id = 自分` かつ `status = draft`（**投稿者本人のみ可視**）。
+- **下書き（`draft`）を一覧にも表示（決定 2026-08-06・UX 改善／C.1 の下書きクエスト表示と対称）**: 従来「下書きは一覧に出さない（本人の下書きはダッシュボード〔ドメイン I〕集約のみ）」だったが、**一覧から下書き作成 → 戻ると消える**という不便を解消するため、**投稿者本人の下書きは `GET /quests/{quest_id}/ideas` にも含める**（`my_state=draft` で下書きバッジ表示・**クリックで SC-21 編集モーダル**〔公開済みは SC-22〕・投票/コメントは公開後のみ＝一覧では表示のみ）。**ダッシュボード（ドメイン I）にも引き続き集約**＝両導線に出る。他パーティーメンバーには他人の下書きは一切見えない（一覧から除外・`GET /ideas/{id}` は `draft` の場合 `author_id` 本人のみ 200・それ以外は 404）。
 - **投票集計の匿名化**（§1.6/README 匿名化）: `vote_summary` は常に賛成/反対の**数**を返す。**投票者の身元（`voters[]`）は `companies.vote_anonymized` が記名モード（OFF）のときのみ**返す。匿名モードでも `my_vote`（本人の投票）はフロントのハイライト用に本人へ返す（自分の投票は隠さない）。匿名モード＋`hide_voters_from_managers=false` のときは `owner`/`quest_admin` に限り `voters[]` を返す（一般には非表示・README 匿名化仕様）。
 - **評価結果**（SC-22 §4.6 右レール）は**ドメイン F**＝`GET /ideas/{idea_id}/evaluation`（公開範囲 `visibility` 考慮の集計＋観点別コメント＋総評）。本ドメインの `GET /ideas/{id}` には評価集計を含めない（境界分離・フロントは 2 リクエストを合成）。
 - **議論アクティビティ・グラフ**（SC-22 §4.4・直近14日の日次メッセージ数＋更新マーカー）は**ドメイン E**（チャット集計）＝`GET /ideas/{idea_id}/chat-activity`。本ドメインは版の更新マーカー元データ（`idea_revisions` の日時）を D.4 で提供する。
@@ -119,7 +122,7 @@
 
 ## D.8 未確定（実装時に確定でも可）
 
-- **下書きアイデアの一覧露出**（`GET /quests/{id}/ideas?status=` に本人の `draft` を混ぜるか・ダッシュボード〔ドメイン I〕に寄せるか・SC-01/SC-21 §9）。
+- ~~**下書きアイデアの一覧露出**（`GET /quests/{id}/ideas?status=` に本人の `draft` を混ぜるか・ダッシュボード〔ドメイン I〕に寄せるか）~~ → **決定済み（2026-08-06）＝本人の `draft` を一覧に含める（両導線）**。D.0/D.1 参照。
 - **軽微編集の版/通知抑制**（誤字修正を版に含めるか・`notify:false` 保存を設けるか＝MVP は全保存で版＋通知・SC-21/22 §9）。**添付の追加/削除を版に連動**させるか（SC-22 §4.4c の ＋file/−file 表示・MVP は版化しない）。
 - **初版スナップショットの記録**（下書き→公開の初版〔`revision=1`〕を `idea_revisions` に残すか・差分の起点をどう扱うか・D.4）。
 - **テキスト差分の粒度**（語句/文字単位・サーバー算出アルゴリズム・大きな本文のパフォーマンス・SC-22 §9）。
