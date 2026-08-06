@@ -61,6 +61,11 @@
 - **`PATCH` は内容編集専用＝`status` は受け付けない/変えない（C.2 と同じ方針）**: 公開（`draft→published`）は**専用アクション** `POST .../publish` に限定し、`PATCH` のフィールド書き換えで状態機械を迂回させない（副作用〔公開処理・版・通知〕を伴う遷移をアクションで表す定石）。**`PATCH` の検証は「現在の `status`」で分岐（サーバー権威・`status` はリクエストに含めない＝§2.2 Mass Assignment 対策）**：現在 `draft`→緩い検証（下書き保存・未充足可）／現在 `published`→strict 検証（`validate_publishable`・未充足は 422）＋毎回 1 版記録・通知（下記）／`completed`→凍結（409・D.0）。
   - **下書き編集→公開の一貫性**: SC-21 で下書きの内容を編集してそのまま公開する導線は、**内容を `publish` のボディ `content` に載せて 1 リクエストでアトミックに実行**できる（`PATCH`→`publish` の 2 ステップは不要＝C の publish アトミック化と同じ・部分コミットを回避）。下書きのまま保存は `PATCH` のみ。
 - **編集と版**: 公開済みアイデアの `PATCH` は毎回 `idea_revisions` に 1 版追加＋`ideas.current_revision++`＋投票者/フォロワーへ `idea_updated` 通知（D.4）。**下書き中の編集は版を作らない**（公開前は履歴不要・保存で上書き）。
+- **並行編集の扱い（並行制御）＝悲観ロック/専用 version 列は用いない（過剰）**: 編集/削除は「投稿者本人 or `owner`/`quest_admin`」が触れるが、以下で必要十分とする。
+  - **公開アイデアの並行 `PATCH`**: 各保存が `idea_revisions(revision = current_revision + 1)` を INSERT するため、**既存の `UNIQUE(idea_id, revision)` が楽観ロックとして機能**する。同じ `current_revision` を基にした 2 つの保存が競合すると後着は一意制約違反となり、**サーバーは後着を `409 conflict`（`code=edit_conflict`）で拒否**する（＝**方針 A**・クライアントは最新を再取得＝リロードしてから編集し直す）。**なぜ A か**＝相手の最新を見てから上書きさせ、silent な lost update を避けるため（自動再試行での last-writer-wins は採らない）。※どの版も `idea_revisions` にスナップショットされるため、万一上書きされても内容は履歴から復元/差分可能（安全網）。
+  - **下書きの編集**: `draft` は投稿者本人のみ可視（D.0）＝**並行編集が起きない**ため制御不要。
+  - **論理削除（`DELETE`）**: `UPDATE ... WHERE id=? AND deleted_at IS NULL` の**冪等ガード**で足りる（version チェック不要）。二重削除は 0 行＝既削除として扱い（`404`／冪等 `204`）、編集と競合しても単一行 UPDATE が DB で直列化され、後続は `deleted_at IS NULL` に弾かれる（`404`/`409`）。
+  - ＝**単一行 UPDATE の原子性＋既存の一意制約＋版スナップショット**で担保し、**悲観行ロック（`SELECT FOR UPDATE`）を編集フロー（モーダル表示〜保存のユーザー思考時間）に持ち込まない**（ロック保持による競合・デッドロックを回避）。
 - **Mass Assignment 防止**: `author_id`/`status`（`publish` 以外での昇格）/`is_selected`/`current_revision`/`deleted_*`/監査列はクライアント入力を受けない（サーバー設定・§1.4）。`is_selected` の変更は評価・選定（ドメイン F/G）の責務でありここでは受けない。
 - **添付は別 API**（D.3）＝**添付の有無で「作成→公開」の呼び出しが分岐**する（上の「`status=published`＝1コール」は添付なしの経路）:
   - **添付なし**: `POST /ideas {status: published}` の**1コール**で作成＋即公開（`publish` を分けて呼ばない）。
