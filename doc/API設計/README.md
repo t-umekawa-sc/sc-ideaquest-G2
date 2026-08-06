@@ -84,7 +84,8 @@
   }
   ```
 - **`code`（機械可読・アプリ定義）で分岐**、`errors[]` はフィールド単位のバリデーション詳細（フォーム表示用）。
-- 代表 `code`: `unauthenticated`(401) / `forbidden`(403) / `csrf_failed`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed` / `idempotency_in_progress`(409) / `idempotency_key_reuse`(422)（冪等キー＝§1.9）。
+- **横断的な代表 `code`（非網羅）**: `unauthenticated`(401) / `forbidden`(403) / `csrf_failed`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed` / `idempotency_in_progress`(409) / `idempotency_key_reuse`(422)（冪等キー＝§1.9）。
+- **これは代表例であり網羅ではない**: 各ドメインは `conflict`(409) の**サブコード**（例: `invalid_state`〔状態機械違反・完了凍結・再publish＝C.5/D〕・`edit_conflict`〔並行編集の楽観制御＝D.2〕）や認証系コード（`otp_invalid`/`otp_expired`/`preauth_expired`/`token_expired`＝A）を**自ドメインの § で定義**する。**全コードの網羅は OpenAPI（SoT・§1.1）**に置き、README は代表と横断ルールのみを示す（二重管理＝drift を避けるため各ドメイン/OpenAPI をポインタとする）。
 
 ### 1.8 一覧: ページング・ソート・フィルタ
 
