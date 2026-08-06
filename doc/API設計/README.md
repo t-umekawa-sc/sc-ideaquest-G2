@@ -84,7 +84,7 @@
   }
   ```
 - **`code`（機械可読・アプリ定義）で分岐**、`errors[]` はフィールド単位のバリデーション詳細（フォーム表示用）。
-- 代表 `code`: `unauthenticated`(401) / `forbidden`(403) / `csrf_failed`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed`。
+- 代表 `code`: `unauthenticated`(401) / `forbidden`(403) / `csrf_failed`(403) / `not_found`(404) / `validation_error`(422) / `conflict`(409) / `rate_limited`(429) / `company_suspended`(503) / `mfa_required`(200相当のログイン継続) / `idempotency_replayed` / `idempotency_in_progress`(409) / `idempotency_key_reuse`(422)（冪等キー＝§1.9）。
 
 ### 1.8 一覧: ページング・ソート・フィルタ
 
@@ -96,7 +96,12 @@
 
 ### 1.9 冪等性・共通ヘッダ
 
-- **冪等キー**: 非冪等 POST のうち二重送信で不整合が出るもの（アイデア投稿・購入・評価確定・魔法解放）は `Idempotency-Key` ヘッダを受理し、同キーの再送は最初の結果を返す（`idempotency_replayed`）。
+- **冪等キー（`Idempotency-Key`）**: 非冪等 POST のうち二重送信で不整合が出るもの（アイデア投稿・クエスト作成・購入・評価確定・魔法解放 等）に付与。サーバーは同キーの再送に対し**最初の結果を再生**する（`idempotency_replayed`）。
+  - **クライアントでの発行方法**: **1 つのユーザー操作につき 1 個、クライアント（フロント）が UUIDv4（`crypto.randomUUID()`）で生成**する。**採番は操作開始時に 1 回**行い（リクエストオブジェクト/コンポーネント状態に保持）、**同じ論理リクエストの自動リトライ・ネットワーク再試行・ユーザーの連打では同一キーを使い回す**。別の操作（別アイデアの投稿など）は必ず**新しいキー**を採番。サーバーは値を**不透明文字列**として扱う（形式は問わないが UUIDv4 推奨・最大長 128 文字・空/超過は `422 validation_error`）。※キーは推測不要（当てても後述のスコープ＋指紋で他人の結果は再生できない）。
+  - **保存先・TTL**: **Redis**（キー例 `idem:{company_id}:{account_id}:{Idempotency-Key}`＝**会社 × アカウント × キーでスコープ**し、他テナント/他ユーザーへの誤再生を構造的に防ぐ）。**TTL＝既定 24 時間**（クライアントのリトライ猶予を賄い、無限保持しない・実装で調整可）。レコードは `state`（`in_flight`/`done`）・**確定レスポンス**（HTTP ステータス＋ボディ）・**リクエスト指紋**（`method`＋`path`＋正規化ボディのハッシュ）を保持。
+  - **まだレスポンスが無い場合（in-flight＝処理中の同時再送）**: 初回リクエストは Redis に **`SET NX` で `in_flight` マーカーを原子的に確保**してから業務処理に入る。**確保できない（先行が処理中の）同一キーの後続は実行せず `409 conflict`（`code=idempotency_in_progress`）** を返し、クライアントは短い間隔で再試行（`Retry-After` 目安を付与）。先行が完了して確定レスポンスを書けば、以後の同一キーはそれを**再生**（`idempotency_replayed`）。
+  - **同一キー・別内容の検知**: 同じキーで**指紋が異なる**（＝別の中身の）リクエストは誤用として **`422 validation_error`（`code=idempotency_key_reuse`）** で拒否（「別操作には別キー」の原則）。
+  - **成否とキャッシュ方針**: **確定した応答（2xx、および `422` 等の業務的に決定的な 4xx）だけを `done` として保存・再生**する。**想定外/一時的な 5xx はマーカーを解放**（キャッシュしない）し、再送で**再実行**できるようにする（＝失敗を固定化しない）。`done` の書き込みは**業務トランザクションのコミット後**に行い、部分的な「実行済みだが応答未保存」を避ける（万一 `done` 未書き込みで再送が来たら in-flight 扱い→上記フロー）。
 - **投票の冪等**は業務ルールで担保（1人1票・`ref_type='ideas',ref_id=idea_id` の初回のみ XP＝データモデル §7/votes）＝ `POST /ideas/{id}/vote` は現在値へ収束させる冪等アクション（賛成/反対/取消）。
 - **共通レスポンスヘッダ**: `X-Request-Id`（`request_id` と一致）。**レート制限**時は `Retry-After`。
 - **XP日次上限**（投票5/チャット10/ログイン1＝データモデル §8-⑥）は付与時にサーバーが判定し、超過分は付与しない（レスポンスの獲得量に反映）。
@@ -152,7 +157,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | OTP チャレンジ | `otp:{cid}` | コードのハッシュ・試行回数・宛先マスク（データモデル §4.4・§8-⑨） | 10 分 | 作成=`login`（要MFA）・`POST /auth/mfa/resend`／消費=`mfa/verify` |
 | **会社コンフィグ（キャッシュ）** | `company_config:{company_id}` | `status`／`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`／`db_identifier`（管理DB `companies` のミラー） | 短 TTL（既定 60 秒目安・実装時確定）＋**明示無効化** | **充填**=会社解決時（§1.5・キャッシュミス時に `companies` から読む）／**更新・無効化**=`PATCH /admin/companies/{id}`・`PATCH /admin/companies/{id}/settings`・会社 `active`/`suspend` 化（B.1） |
 | レート制限カウンタ | `ratelimit:{scope}` | 失敗回数・ロック状態（§A.8） | 窓/ロック時間 | `POST /auth/login`・`POST /auth/password-setup/request` 等の失敗計上時 |
-| 冪等キー結果 | `idem:{key}` | `Idempotency-Key` 単位の最初の結果（再送で再生＝`idempotency_replayed`・§1.9） | 短期（実装時確定） | 非冪等 POST（アイデア投稿・クエスト作成・購入・評価確定・魔法解放・投票 等）の初回実行時に保存 |
+| 冪等キー結果 | `idem:{company_id}:{account_id}:{key}` | `state`（`in_flight`/`done`）＋確定レスポンス（ステータス＋ボディ）＋リクエスト指紋（method＋path＋ボディhash）。再送で再生＝`idempotency_replayed`・処理中は `idempotency_in_progress`・別内容は `idempotency_key_reuse`（§1.9） | **既定 24 時間**（実装で調整可） | 非冪等 POST（アイデア投稿・クエスト作成・購入・評価確定・魔法解放 等）の初回に `SET NX` で確保→コミット後に `done` |
 | リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行=書込側（D/E/H）の application が REST 処理内で publish |
 
 - **反映タイミングの原則（会社コンフィグ）**: 設定は**セッションに焼き込まない**（A.6 に含めない＝再ログイン不要）。`PATCH` 成功時に**同一処理で `company_config:{company_id}` を更新（または削除して次回充填）**するため、**ログイン中ユーザーにも次リクエストから即時反映**（例＝投票匿名化 ON/OFF の切替は、次に `GET /ideas/{id}` 等を取得した時点で表示が切り替わる・ドメイン D.1/D.5）。`mfa_required` はログインフロー時に参照＝**次回以降のログイン**に効く（既存セッションはゲート通過済みで影響なし）。
