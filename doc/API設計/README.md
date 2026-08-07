@@ -177,7 +177,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | B | 会社・アカウント・所属（運営/QG管理） | SC-90/91/92 | コントロール＋テナント | ✅ | [`B_会社・アカウント・所属.md`](./B_会社・アカウント・所属.md) |
 | C | クエスト・パーティー・権限 | SC-10/11/12 | テナント | ✅ | [`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md) |
 | D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ✅ | [`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md) |
-| E | チャット・リアクション・魔法発動 | SC-24 | テナント | ⬜ | （目次＝§2-E） |
+| E | チャット・リアクション・魔法発動 | SC-24 | テナント | ✅ | [`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md) |
 | F | 評価 | SC-25/22 | テナント | ⬜ | （目次＝§2-F） |
 | G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ⬜ | （目次＝§2-G） |
 | H | 通知 | SC-02 | テナント | ⬜ | （目次＝§2-H） |
@@ -198,8 +198,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### D. アイデア・添付・版・投票・フォロー（テナント）＝詳細確定
 → **[`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md)**。決定＝**①門番＝パーティー所属**（`quest_members.removed_at IS NULL`・非パーティー/他人の下書きは 404・可視範囲＝パーティー内。**本人の下書きは一覧に含める**＝`GET /quests/{id}/ideas` に自分の `draft` を表示・クリックで SC-21 編集・ダッシュボードにも集約）**②公開は published になる瞬間に 1 回＝publish はアトミック**（`POST /ideas/{id}/publish` がボディ `content?`〔省略時は現在値〕を受け、内容適用＋strict 検証〔`validate_publishable`〕＋`draft→published`＋公開処理〔`chat_groups` 自動作成＋投稿 XP+50・日次上限外〕を単一 UoW・失敗は全ロールバック。公開は一方向・再 publish は 409）**③投票は `POST /ideas/{id}/vote {type}`〔登録/切替〕＋`DELETE /ideas/{id}/vote`〔取消〕**（冪等 upsert・**XP+5 は各アイデア初回のみ・日次上限**・押し直しで陳腐化解消・匿名/記名は表示のみ制御）**④公開後の全保存で 1 版**（`idea_revisions` スナップショット・差分は表示時算出・投票者/フォロワーへ `idea_updated` 通知。**並行編集は悲観ロックを使わず既存 `UNIQUE(idea_id,revision)` で楽観制御＝後着は 409 `edit_conflict`**）**⑤削除は論理削除**（投稿者本人＋owner/quest_admin）**⑥添付は `POST /ideas/{id}/attachments`〔multipart・§1.10〕**（20MB/10件/allowlist をサーバー検証・物理名ハッシュ・DL は署名 URL）**⑦完了（`completed`）で書き込み凍結**（作成/編集/削除・投票・添付は 409・**フォローは「解除のみ」可＝新規フォローは 409**）。`PATCH` は内容編集専用（`status` は受けず現在値で検証分岐）。主エンドポイント＝`GET /quests/{id}/ideas`・`GET /ideas/{id}`・`POST /quests/{id}/ideas`・`GET/PATCH/DELETE /ideas/{id}`・`POST /ideas/{id}/publish`・添付 `POST/DELETE /ideas/{id}/attachments`・`GET /attachments/{id}/download`・版 `GET /ideas/{id}/revisions`＋`/{revision}/diff`・投票 `POST/DELETE /ideas/{id}/vote`・フォロー `POST/DELETE /ideas/{id}/follow`。評価結果は F、議論アクティビティ・グラフとチャットプレビューは E、通知発火は H を参照。
 
-### E. チャット・リアクション・魔法発動
-`GET /ideas/{id}/chat`（=chat_group メッセージ）・`POST /chat-messages`・`PATCH/DELETE /chat-messages/{id}`（本人編集/論理削除）・メンション・添付・通常リアクション `POST/DELETE /chat-messages/{id}/reactions`（絵文字・複数可）・魔法リアクション（1メッセージ1魔法・各魔法1チャット1回＝FR-33・reactions ユニーク制約）。
+### E. チャット・リアクション・魔法発動（テナント）＝詳細確定
+→ **[`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md)**。決定＝**①門番＝パーティー所属（C.0/D.0 同一・非パーティー404・未公開アイデアはチャット無し404）・投稿は `comment` 権限****②取得 `GET /ideas/{id}/chat`（カーソル `before`/`after`・`unread` 同梱）＋活発度 `GET /ideas/{id}/chat-activity`（D 委譲・直近14日日次＋版マーカー）＋`chat_preview`（直近3件・E が形を定義し D が内包）****③投稿 `POST /chat-messages`＝単一 multipart（本文/メンション/添付を単一 UoW・Idempotency-Key 必須・空本文+添付のみ可）・XP+5 は日次初回のみ（上限=チャット10/日）****④編集=本人のみ履歴なし `PATCH`・削除=論理トゥームストーン `DELETE`（本人＋owner/quest_admin＋QG/システム管理者）**⑤添付=メッセージに同梱（DL は D と共通 `GET /attachments/{id}/download` 署名URL・§1.10）・**D と形が異なる理由＝添付のAPI形はエンティティのライフサイクルに従う（E.3 なぜ）**⑥リアクションは通常/魔法を `POST/DELETE /chat-messages/{id}/reactions` に `type` 判別で統合（通常=`reaction_emojis` マスタ・同一ユーザー×同一絵文字不可／魔法=1メッセージ1魔法・各魔法1チャット1回・早い者勝ち＝§5.18・解放は G・装飾のみ）**⑦既読 `POST /ideas/{id}/chat/read`＝`chat_reads` 新設（§5.31・完了後も許可）**⑧完了凍結は投稿/編集/削除/リアクション（canonical C.5）。通知発火（mention/idea_comment/follow_comment/magic_reaction）は H、WS 配信は L（§1.12）、全文検索は J。
 
 ### F. 評価
 `GET /ideas/{id}/evaluation`（自分の・結果集計）・`PUT /ideas/{id}/evaluation`（下書き保存/確定＝`status` draft/submitted・5観点＋観点別コメント＋総評必須〔確定時〕＋公開範囲 `visibility`）・確定でコイン確定（評価締切一括＝§8-⑥）。
@@ -228,5 +228,5 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ## 3. 次アクション
 
 1. **E→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン E（チャット・リアクション・魔法発動／SC-24）**。※ドメイン D が参照する議論アクティビティ・グラフ（`GET /ideas/{id}/chat-activity`）とチャットプレビューは E で確定する。
+2. **次の着手＝ドメイン F（評価／SC-25・SC-22）**。※ドメイン E（チャット・リアクション・魔法発動／SC-24）は詳細確定済み（2026-08-07）＝D 委譲の `GET /ideas/{id}/chat-activity`・`chat_preview` も E で確定・未読 `chat_reads` を新設（データモデル §5.31）。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
