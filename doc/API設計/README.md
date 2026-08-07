@@ -179,7 +179,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | D | アイデア・添付・版・投票・フォロー | SC-21/22 | テナント | ✅ | [`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md) |
 | E | チャット・リアクション・魔法発動 | SC-24 | テナント | ✅ | [`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md) |
 | F | 評価 | SC-25/22 | テナント | ✅ | [`F_評価.md`](./F_評価.md) |
-| G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ⬜ | （目次＝§2-G） |
+| G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ✅ | [`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md) |
 | H | 通知 | SC-02 | テナント | ⬜ | （目次＝§2-H） |
 | I | ダッシュボード集約 | SC-01 | テナント | ⬜ | （目次＝§2-I） |
 | J | 全文検索 | SC-12 | テナント | ⬜ | （目次＝§2-J） |
@@ -204,8 +204,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### F. 評価（テナント）＝詳細確定
 → **[`F_評価.md`](./F_評価.md)**。決定＝**①門番＝パーティー所属＋`evaluator` 権限（作成者は既定で評価者）****②取得＝`GET /ideas/{id}/evaluation/me`（自分の評価/下書き）＋`GET /ideas/{id}/evaluation`（集計・`visibility` を閲覧者ごとに適用）****③`PUT /ideas/{id}/evaluation`＝upsert（`status` draft/submitted・submitted で全5観点(1..5)＋総評必須をサーバー検証）・確定で評価者 XP+30 即時（`reason=evaluation`）****④選定は F 保有＝`POST/DELETE /ideas/{id}/select`（owner/quest_admin・複数可・投稿者 XP+200・取消でも剥奪しない）****⑤限定公開（`visibility=limited`）は範囲外へ完全非表示（集計の分母にも入れない）****⑥投稿者コインは評価連動のみ＝`round(全 submitted 評価の均等平均×10)`最大50・確定トリガは (a) evaluator 全員 submitted 済み or (b) `completed` 遷移の早い方でアイデア単位に1回・付与後再計算なし（`reason=evaluation_coin`・§7/§8-⑥/⑱）****⑦完了凍結は評価入力/選定（canonical C.5）。通知（follow_evaluation/follow_selection）は H、XP/コイン台帳は G、`completed` の確定フック起点は C。
 
-### G. ゲーミフィケーション
-ショップ `GET /items`・`POST /items/{id}/purchase`（残高/価格サーバー検証・コイン消費）／装備 `GET /me/items`・`PUT /me/equipment`（5スロット・部分ユニーク）／魔法 `GET /spells`・`GET /me/spells`・`POST /spells/{id}/unlock`（SP消費・系統前提チェック）／実績 `GET /achievements`・`GET /me/achievements`／ランキング `GET /rankings`（`?period=this_week|last_week|this_month|all`・`?scope=company|quest:{id}`・スコア=XP＋コイン）／XP・コイン・SP 履歴 `GET /me/activities`。
+### G. ゲーミフィケーション（テナント）＝詳細確定
+→ **[`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md)**。決定＝**①台帳(`activities`)canonical は G 保有**（`activities`=真実・`users.*` 残高キャッシュ・付与/消費は同一 UoW・付与規則の全一覧は G.6）**②ショップ `GET /items`・`POST /items/{id}/purchase`（残高/価格/重複をサーバー検証・`Idempotency-Key` 必須・`shop_purchase`）****③装備 `GET /me/items`・`PUT /me/equipment`（部分スロットマップ・所有検証・`UNIQUE(user_id,slot) WHERE is_equipped`）****④魔法 `GET /spells`・`GET /me/spells`・`POST /spells/{id}/unlock`（前提=同系統下位解放済み＋SP≥cost 検証・恒久・`Idempotency-Key` 必須・`spell_unlock`）****⑤実績 `GET /achievements`（シークレット伏せ）・`GET /me/achievements`＝付与は台帳書込の post-commit フックで即時判定（G 一元化・ティア連動コイン `achievement_reward` 20/50/150・通知 `achievement`・冪等）****⑥ランキング `GET /rankings`（`?period=this_week|last_week|this_month|all`・`?scope=company|quest:{id}`・スコア=獲得XP＋コイン・SP対象外・週起点月曜JST・`me` 常時同梱）****⑦履歴 `GET /me/activities`。通知配信は H、残高取得は K/I、魔法発動は E。
 
 ### H. 通知
 `GET /notifications`（種別/状態フィルタ）・`GET /notifications/unread-count`・`POST /notifications/{id}/read`・`POST /notifications/read-all`。
@@ -228,5 +228,5 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ## 3. 次アクション
 
 1. **E→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン G（ゲーミフィケーション／SC-30/31/32/40/41）**。※ドメイン E（SC-24）・F（評価／SC-25・SC-22）は詳細確定済み（2026-08-07）。F で確定した投稿者コイン一括確定（`reason=evaluation_coin`・トリガ (a) 全 evaluator submitted / (b) `completed` 遷移）と選定 XP+200 の台帳記帳は G の canonical に接続する。
+2. **次の着手＝ドメイン H（通知／SC-02）**。※ドメイン E（SC-24）・F（評価）・G（ゲーミフィケーション）は詳細確定済み（2026-08-07）。H は E/F/G/D が発火する通知（`mention`/`idea_comment`/`follow_*`/`idea_updated`/`achievement`/`magic_reaction`/`security_*`）の一覧取得・未読・既読・配信テンプレ/多言語を担う。台帳(`activities`)canonical は G.6。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
