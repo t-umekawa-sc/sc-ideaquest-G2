@@ -113,6 +113,7 @@
 | `POST /quests/{quest_id}/transition` | ステータスを前進（`owner`/`quest_admin`） | ボディ: `to`（`recruiting\|in_progress\|evaluating\|completed`） | 更新後のクエスト |
 
 - **許可遷移（前進のみ・サーバーで強制）**: `draft→recruiting`（＝publish と等価）／`recruiting→in_progress`／`in_progress→evaluating`／`evaluating→completed`。**逆行・飛び越えは 409 `invalid_state`**（MVP。運用戻しは C.7）。
+- **`→completed` の副作用＝投稿者コインの一括確定フックを起動**: `evaluating→completed` の遷移時に、**未確定の全 published アイデア**について評価連動コインを一括確定・付与する（**正は データモデル §7／API設計 F.4**・`reason=evaluation_coin`・アイデア単位に1回・冪等）。※本フックは完了遷移そのものの一部であり、C.5 の「完了後の書き込み凍結」対象（＝ユーザー操作）ではない。全員評価済みなら締切前でも F.4-(a) で早期確定済みの場合があり、その分は既確定として二重付与しない。
 - **`completed`（完了）で書き込み凍結（＝完了時の書き込み可否の canonical）**: 完了後は次を**サーバーが拒否**（`409 conflict`〔`invalid_state`〕・読み取り専用・データモデル §8-⑪/各ドメインで再掲）＝**アイデア投稿/編集/削除・アイデア添付の追加/削除・投票（登録/切替/取消）・チャット投稿/編集/削除/リアクション・評価**。
   - **唯一の例外＝フォロー（通知購読）は「解除のみ」可**（`DELETE /ideas/{id}/follow`＝残存購読の後片付け・状態を汚さない）。**新規フォロー（`POST`）は 409**（完了後は通知対象イベントが発生せず無意味・ドメイン D.6）。
   - 凍結の**具体的な EP 挙動は各ドメインが持つ**＝アイデア/添付/投票/フォロー＝D（D.0/D.2/D.3/D.5/D.6）、チャット/リアクション＝E、評価＝F。本節（C.5）が**全体像の単一正**、各ドメインは自 EP の 409 応答を再掲する。
