@@ -63,7 +63,7 @@
 
 - **システムロール（`system_role`）**: `system_admin`（運営＝全社・会社設定/プロビジョニング/ロール付与）/ **`company_account_admin`（会社アカウント管理者＝自社全アカウントの発行/無効化/identity/PW・会社設定は不可・§8-⑯）** / `general` の 3 値（会社/全社スコープの役割）。管理 API の門番＝`/admin/companies/*` は `system_admin`／`/admin/accounts/*` は `company_account_admin`（セッション会社固定）。ロール付与（`system_admin`/`company_account_admin`/`admin`）は system_admin のみ。
 - **クエストグループ管理者（QG管理者）**: `system_role` では表さず、**会社DB `quest_group_members.role=admin`（per-group）で表現**（B案・2026-07-27 決定＝二重定義の解消）。QG向け管理 API（`/admin/quest-groups/*`）は**セッションユーザーが対象グループに有効な `admin` 所属（`removed_at IS NULL`）を持つか**で門番（会社DB 判定）。`admin` の付与/剥奪は system_admin のみ（SC-92）。
-- **フロント/バック境界（`doc/コーディング規約.md` §1）**: 認可・業務バリデーション・ゲーム計算・状態遷移/冪等はすべて**バックエンド専任**。フロントは表示・UX 出し分け・API 呼び出しのみ（クライアント側検証は UX 便宜で権威にしない）。
+- **フロント/バック境界（`doc/規約/コーディング規約.md` §1）**: 認可・業務バリデーション・ゲーム計算・状態遷移/冪等はすべて**バックエンド専任**。フロントは表示・UX 出し分け・API 呼び出しのみ（クライアント側検証は UX 便宜で権威にしない）。
 - **クエスト内 6 権限（`permission_type`）**: `owner`/`quest_admin`/`evaluator`/`vote`/`idea_create`/`comment`。**全アクションはサーバーが権限を強制**（フロントの出し分けは UX のみ）。代表マッピング:
   - アイデア作成 = `idea_create`、投票 = `vote`、コメント/チャット投稿 = `comment`、評価 = `evaluator`、クエスト編集/パーティー・権限変更 = `owner`/`quest_admin`、所有者権限の付与 = `owner`（作成者）のみ。
   - **可視範囲**: アイデア/チャットは**そのクエストのパーティー内のみ**（会社全体・グループ全体には非公開）。一覧・全文検索・集計は `deleted_at IS NULL` / `status='active'` で絞る。

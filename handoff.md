@@ -62,7 +62,8 @@ Explore エージェント3体（A/B・C/D・README 分担）で洗い出し、�
   - `doc/要件定義/README.md`（唯一の要件定義書）
   - `doc/データモデル.md`（管理DB6＋会社DB28テーブル・`system_role` 3値〔system_admin/company_account_admin/general〕）＋`.pdf`（派生・追跡外）
   - `doc/API設計/`（`README.md`＝全体規約＋§2目次／`A_認証・セッション.md`／`B_会社・アカウント・所属.md`／`C_クエスト・パーティー・権限.md`／`D_アイデア・添付・版・投票・フォロー.md`）
-  - `doc/コーディング規約.md`（§2 セキュリティ/§3 FastAPI4層・ディレクトリ/§4 フロント構成）
+  - `doc/規約/コーディング規約.md`（§2 セキュリティ/§3 FastAPI4層・ディレクトリ/§4 フロント構成）
+  - `doc/規約/ドキュメント作成規約.md`（文書間参照の表記ルール・汎用／リポジトリ直下 `CLAUDE.md` から自動参照）
   - `doc/画面設計/`（`screens/` md 19本・`mocks/` html 21本〔一覧 `mocks/index.html` 存在確認済み〕・`デザイン標準.md`・`画面遷移図.md`）
   - `doc/WEBアプリ開発時のセキュリティ対策一覧.md`（OWASP系・規約 §2.2 で義務化）
 
@@ -104,7 +105,7 @@ Explore エージェント3体（A/B・C/D・README 分担）で洗い出し、�
    - `doc/画面設計/screens/SC-24_アイデアチャット.md` ＋ `doc/画面設計/mocks/SC-24_アイデアチャット.html`
    - `doc/API設計/README.md` の **§1.12（WebSocket 配信）** と **§2-E サマリ（201行付近）**、ドメイン一覧表 E 行（180行）
    - `doc/データモデル.md` の **§5.15 chat_groups・§5.16 chat_messages・§5.17 chat_mentions・§5.18 reactions**（絵文字マスタ `reaction_emojis` の節番号は要確認）。論理削除は `chat_messages.is_deleted`（§で確認済み）
-   - `doc/コーディング規約.md` §3.1/§3.4（FastAPI 4層・`tenant/chat` 縦スライス）
+   - `doc/規約/コーディング規約.md` §3.1/§3.4（FastAPI 4層・`tenant/chat` 縦スライス）
 2. **成果物**: `doc/API設計/E_チャット・リアクション・魔法発動.md` を**新規作成**（A〜D と同じ「メソッド/パス｜概要｜リクエスト｜レスポンス」4列＋直下注記の形式）。作成後 `README.md` §2 一覧表の **E 行を ✅・リンク化**、§2-E 目次サマリを記述。
 3. **詰める論点（当たり）**:
    - チャット取得 `GET /ideas/{id}/chat`（`chat_groups` は idea と 1:1）／投稿 `POST /chat-messages`／本人編集 `PATCH /chat-messages/{id}`・**論理削除** `DELETE`（`is_deleted`）／メンション `chat_mentions`／チャット添付（D.3 と同じ multipart 別API・`attachments.chat_message_id`）
