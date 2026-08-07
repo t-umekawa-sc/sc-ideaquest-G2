@@ -180,7 +180,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | E | チャット・リアクション・魔法発動 | SC-24 | テナント | ✅ | [`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md) |
 | F | 評価 | SC-25/22 | テナント | ✅ | [`F_評価.md`](./F_評価.md) |
 | G | ゲーミフィケーション（ショップ/装備/魔法/実績/ランキング/XP・コイン・SP） | SC-30/31/32/40/41 | テナント | ✅ | [`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md) |
-| H | 通知 | SC-02 | テナント | ⬜ | （目次＝§2-H） |
+| H | 通知 | SC-02 | テナント | ✅ | [`H_通知.md`](./H_通知.md) |
 | I | ダッシュボード集約 | SC-01 | テナント | ⬜ | （目次＝§2-I） |
 | J | 全文検索 | SC-12 | テナント | ⬜ | （目次＝§2-J） |
 | K | プロフィール・背景画像 | 共通ヘッダー | テナント | ⬜ | （目次＝§2-K） |
@@ -207,8 +207,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### G. ゲーミフィケーション（テナント）＝詳細確定
 → **[`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md)**。決定＝**①台帳(`activities`)canonical は G 保有**（`activities`=真実・`users.*` 残高キャッシュ・付与/消費は同一 UoW・付与規則の全一覧は G.6）**②ショップ `GET /items`・`POST /items/{id}/purchase`（残高/価格/重複をサーバー検証・`Idempotency-Key` 必須・`shop_purchase`）****③装備 `GET /me/items`・`PUT /me/equipment`（部分スロットマップ・所有検証・`UNIQUE(user_id,slot) WHERE is_equipped`）****④魔法 `GET /spells`・`GET /me/spells`・`POST /spells/{id}/unlock`（前提=同系統下位解放済み＋SP≥cost 検証・恒久・`Idempotency-Key` 必須・`spell_unlock`）****⑤実績 `GET /achievements`（シークレット伏せ）・`GET /me/achievements`＝付与は台帳書込の post-commit フックで即時判定（G 一元化・ティア連動コイン `achievement_reward` 20/50/150・通知 `achievement`・冪等）****⑥ランキング `GET /rankings`（`?period=this_week|last_week|this_month|all`・`?scope=company|quest:{id}`・スコア=獲得XP＋コイン・SP対象外・週起点月曜JST・`me` 常時同梱）****⑦履歴 `GET /me/activities`。通知配信は H、残高取得は K/I、魔法発動は E。
 
-### H. 通知
-`GET /notifications`（種別/状態フィルタ）・`GET /notifications/unread-count`・`POST /notifications/{id}/read`・`POST /notifications/read-all`。
+### H. 通知（テナント）＝詳細確定
+→ **[`H_通知.md`](./H_通知.md)**。決定＝**①責務境界＝生成は各発火ドメイン（D/E/F/G/A）が post-commit で H の通知サービス `notify()` を呼ぶ・H は取得/未読/既読 API＋テンプレ/多言語＋（将来）外部配信・WS 配信は L****②本文は取得時レンダリングで完全多言語化＝`notifications.params jsonb` 追加・`body` を NULL 可フォールバックへ（受信者ロケール切替に既存通知も追従・§5.24/§8-⑳）****③1 イベント×1 宛先は最も具体的な種別で1件に集約（重複排除・mention>idea_comment>follow_comment）****④取得 `GET /notifications`（`state`/`type`・カーソル・`unread_count` 同梱）・`GET /notifications/unread-count`（ベル）・既読 `POST /notifications/{id}/read`・`/unread`・`/read-all`****⑤自分宛のみ・`security_*` はオプトアウト不可（本文のみ＝`params` に端末/日時）。リアルタイムは WS `notifications:{user_id}`（§1.12・配信 L）。
 
 ### I. ダッシュボード集約（SC-01）
 `GET /dashboard`（下書き〔クエスト/アイデア/評価〕・未投票アイデア・参加中クエスト・フォロー中アイデア・週間ランキングTOP3＋自分・ヒーロー〔Lv/XP/コイン/SP〕・最近の通知を 1 レスポンスに集約 or 分割かは分割レビューで決定＝SC-01 §10 の未決）。
@@ -228,5 +228,5 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ## 3. 次アクション
 
 1. **E→…→L の順で分割レビュー**（依存の少ない順に前倒し可・L は D/E/H の event 発行点と併せて確定）。詳細化した各ドメインは `X_ドメイン名.md` に切り出し、上表からリンク＋「詳細確定」を ✅。
-2. **次の着手＝ドメイン H（通知／SC-02）**。※ドメイン E（SC-24）・F（評価）・G（ゲーミフィケーション）は詳細確定済み（2026-08-07）。H は E/F/G/D が発火する通知（`mention`/`idea_comment`/`follow_*`/`idea_updated`/`achievement`/`magic_reaction`/`security_*`）の一覧取得・未読・既読・配信テンプレ/多言語を担う。台帳(`activities`)canonical は G.6。
+2. **次の着手＝ドメイン I（ダッシュボード集約／SC-01）**。※ドメイン E/F/G/H は詳細確定済み（2026-08-07）。I は各ドメインの取得系（下書き/未投票/参加中クエスト/フォロー/週間ランキング TOP3＋自分/ヒーロー残高/最近の通知）を 1 レスポンスに集約 or 分割かを決める（SC-01 §10 未決）。通知本文の多言語は H（取得時レンダリング）、台帳(`activities`)は G.6。
 3. 詳細確定したドメインから **FastAPI + Pydantic スキーマ / OpenAPI** に落とし込み（実装スキャフォールドフェーズと接続）。
