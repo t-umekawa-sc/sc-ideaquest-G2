@@ -159,7 +159,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | **会社コンフィグ（キャッシュ）** | `company_config:{company_id}` | `status`／`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`／`db_identifier`（管理DB `companies` のミラー） | 短 TTL（既定 60 秒目安・実装時確定）＋**明示無効化** | **充填**=会社解決時（§1.5・キャッシュミス時に `companies` から読む）／**更新・無効化**=`PATCH /admin/companies/{id}`・`PATCH /admin/companies/{id}/settings`・会社 `active`/`suspend` 化（B.1） |
 | レート制限カウンタ | `ratelimit:{scope}` | 失敗回数・ロック状態（§A.8） | 窓/ロック時間 | `POST /auth/login`・`POST /auth/password-setup/request` 等の失敗計上時 |
 | 冪等キー結果 | `idem:{company_id}:{account_id}:{key}` | `state`（`in_flight`/`done`）＋確定レスポンス（ステータス＋ボディ）＋リクエスト指紋（method＋path＋ボディhash）。再送で再生＝`idempotency_replayed`・処理中は `idempotency_in_progress`・別内容は `idempotency_key_reuse`（§1.9） | **既定 24 時間**（実装で調整可） | 非冪等 POST（アイデア投稿・クエスト作成・購入・評価確定・魔法解放 等）の初回に `SET NX` で確保→コミット後に `done` |
-| リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行=書込側（D/E/H）の application が REST 処理内で publish |
+| リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行＝`notifications:{user_id}` は **H の `notify()`（post-commit・§3.5-(3)）**／`chat:{chat_group_id}` は D/E の application（REST 処理内）が publish |
 
 - **反映タイミングの原則（会社コンフィグ）**: 設定は**セッションに焼き込まない**（A.6 に含めない＝再ログイン不要）。`PATCH` 成功時に**同一処理で `company_config:{company_id}` を更新（または削除して次回充填）**するため、**ログイン中ユーザーにも次リクエストから即時反映**（例＝投票匿名化 ON/OFF の切替は、次に `GET /ideas/{id}` 等を取得した時点で表示が切り替わる・ドメイン D.1/D.5）。`mfa_required` はログインフロー時に参照＝**次回以降のログイン**に効く（既存セッションはゲート通過済みで影響なし）。
 - **`db_identifier` の同居**: 会社DB 動的ルーティング（§1.5）の解決も `company_config` から賄える（会社ごとに管理DBへ都度問い合わせない）。`company_code→company_id` の対応は不変寄りのため長 TTL 別キャッシュ可。
