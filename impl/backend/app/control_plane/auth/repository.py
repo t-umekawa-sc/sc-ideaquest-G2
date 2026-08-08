@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.control import Account, Company
+from app.control_plane.auth.orm import Account, Company
 
 
 def find_account_and_company(

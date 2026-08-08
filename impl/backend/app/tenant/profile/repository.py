@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.company import User
+from app.tenant.profile.orm import User
 
 
 def get_user_by_account(session: Session, account_id: uuid.UUID) -> User | None:

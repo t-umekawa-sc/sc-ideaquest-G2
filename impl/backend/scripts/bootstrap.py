@@ -12,11 +12,12 @@ import psycopg
 from alembic import command
 from alembic.config import Config
 
+from app.control_plane.auth.orm import Account, Company
 from app.core.config import get_settings
-from app.core.db import control_session, get_tenant_session
 from app.core.security import hash_password
-from app.models.company import User
-from app.models.control import Account, Company
+from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.profile.orm import User
 
 # 初回ログイン確認用シード（1社・1アカウント）。値は開発用の固定値。
 SEED_COMPANY = {

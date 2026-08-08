@@ -12,12 +12,13 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.db import control_session, get_tenant_session
-from app.core.redis import get_redis
+from app.control_plane.auth.orm import Account, Company
 from app.core.security import hash_password
+from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.infra.cache import get_redis
 from app.main import app
-from app.models.company import User
-from app.models.control import Account, Company
+from app.tenant.profile.orm import User
 
 # bootstrap のシード（開発用ログイン情報）
 SEED_COMPANY_CODE = "ACME-01"

@@ -8,11 +8,20 @@ from dataclasses import dataclass
 
 import redis
 
-from app.core.db import control_session, get_tenant_session
+from app.control_plane.auth import repository as account_repo
+from app.control_plane.auth.domain.service import LoginDecision, decide_login
 from app.core.errors import AppError
-from app.core.security import verify_password
-from app.domain.auth import LoginDecision, decide_login
-from app.repository import account_repo, rate_limit_repo, session_repo, user_repo
+from app.core.security import (
+    check_login_rate_limit,
+    create_session,
+    delete_session,
+    generate_token,
+    read_session,
+    verify_password,
+)
+from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.profile import repository as user_repo
 
 
 @dataclass
@@ -41,7 +50,7 @@ def _build_session_payload(account, company, user) -> dict:
 
 
 def login(r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str) -> LoginResult:
-    rate_limit_repo.check_login_rate_limit(r, client_ip, login_id)
+    check_login_rate_limit(r, client_ip, login_id)
 
     with control_session() as session:
         account, company = account_repo.find_account_and_company(session, company_code, login_id)
@@ -71,9 +80,7 @@ def login(r: redis.Redis, client_ip: str, company_code: str, login_id: str, pass
             user = user_repo.get_user_by_account(tsession, account.id)
 
         payload = _build_session_payload(account, company, user)
-        token = session_repo.create_session(r, payload)  # 毎回新トークン（固定化対策）
-        from app.core.security import generate_token
-
+        token = create_session(r, payload)  # 毎回新トークン（固定化対策）
         csrf = generate_token()
         return LoginResult(status="authenticated", session=payload, session_token=token, csrf_token=csrf)
 
@@ -83,7 +90,7 @@ _SESSION_PUBLIC_KEYS = ("account_id", "company_id", "company_code", "system_role
 
 
 def get_session(r: redis.Redis, token: str | None) -> dict:
-    session = session_repo.get_session(r, token) if token else None
+    session = read_session(r, token) if token else None
     if session is None:
         raise AppError(401, "unauthenticated")
     return {k: session[k] for k in _SESSION_PUBLIC_KEYS if k in session}
@@ -91,4 +98,4 @@ def get_session(r: redis.Redis, token: str | None) -> dict:
 
 def logout(r: redis.Redis, token: str | None) -> None:
     if token:
-        session_repo.delete_session(r, token)
+        delete_session(r, token)

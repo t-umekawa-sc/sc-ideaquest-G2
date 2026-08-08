@@ -4,11 +4,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.application import auth_service
+from app.control_plane.auth import application as auth_service
+from app.control_plane.auth.schemas import LoginRequest
 from app.core.config import get_settings
 from app.core.deps import require_session, verify_csrf, verify_origin
-from app.core.redis import get_redis
-from app.schemas.auth import LoginRequest
+from app.infra.cache import get_redis
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 

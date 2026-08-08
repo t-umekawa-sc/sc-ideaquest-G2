@@ -10,11 +10,9 @@ from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-
-class CompanyBase(DeclarativeBase):
-    pass
+from app.db.base import CompanyBase
 
 
 class User(CompanyBase):

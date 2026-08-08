@@ -4,8 +4,9 @@ from __future__ import annotations
 from alembic import context
 from sqlalchemy import create_engine
 
+from app.control_plane.auth import orm as _control_orm  # noqa: F401  (テーブルを metadata に登録)
 from app.core.config import get_settings
-from app.models.control import ControlBase
+from app.db.base import ControlBase
 
 target_metadata = ControlBase.metadata
 

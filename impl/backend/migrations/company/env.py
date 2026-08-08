@@ -4,7 +4,8 @@ from __future__ import annotations
 from alembic import context
 from sqlalchemy import create_engine
 
-from app.models.company import CompanyBase
+from app.db.base import CompanyBase
+from app.tenant.profile import orm as _company_orm  # noqa: F401  (テーブルを metadata に登録)
 
 target_metadata = CompanyBase.metadata
 

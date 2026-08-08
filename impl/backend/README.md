@@ -35,21 +35,25 @@ TC-ID（例 `A-TC-003`）でテスト関数と `doc/テスト/A_認証.md` の�
 ## 技術選定メモ
 
 - **同期スタック（sync SQLAlchemy＋psycopg3）を採用**。理由＝スライスの目的が「ログインが動く＋テストが緑＋読んで理解できる」であり、トランザクション・ロールバックによるテスト隔離が単純で堅牢。将来 async へ移行しても4層構造は不変（router/application/domain/repository の分離を保つ）。
-- **2プレーンは実データベースで再現**＝管理DBと会社DBを同一 Postgres サーバの別データベースにし、`companies.db_identifier` を DB 名として `app/core/db.get_tenant_session()` で解決（§1.5 動的ルーティングを最初から通す）。
+- **2プレーンは実データベースで再現**＝管理DBと会社DBを同一 Postgres サーバの別データベースにし、`companies.db_identifier` を DB 名として `app/db/tenant.get_tenant_session()` で解決（§1.5 動的ルーティングを最初から通す）。
 
-## ディレクトリ（縦スライス4層・随時追加）
+## ディレクトリ（コーディング規約 §3.4＝2プレーン × 縦スライス4層）
 
 ```
 app/
-  core/        config / db(control+tenant) / redis / security
-  models/      control(accounts,companies) / company(users)
-  routers/     （Chunk 2）auth ルータ
-  application/ （Chunk 2）ユースケース
-  domain/      （Chunk 2）純粋ロジック
-  repository/  （Chunk 2）DB アクセス
-migrations/
-  control/     管理DB マイグレーション
-  company/     会社DB マイグレーション
-scripts/
-  bootstrap.py 作成→マイグレーション→シード
+  main.py                 FastAPI 生成・ルータ登録・ミドルウェア
+  worker.py               outbox ワーカ起動点（別プロセス・現状プレースホルダ）
+  core/                   config / security(Argon2id・セッション・CSRF・レート制限) / errors(RFC7807) / deps(認可ガード)
+  db/                     base(Base別) / control(管理DB) / tenant(get_tenant_session)
+  infra/                  cache(Redis)   ※将来 storage(MinIO)/mail
+  control_plane/          ★管理DB系
+    auth/                 router / schemas / application / domain/service / repository / orm
+  tenant/                 ★会社DB系
+    profile/              orm(users ミラー) / repository   ※router は K スライスで
+migrations/{control,company}/   Alembic（プレーン別）
+scripts/bootstrap.py            DB作成→マイグレーション→シード（ops）
+tests/auth/                     A-TC-001〜019
 ```
+
+各モジュールは §3.1 の4層を内包＝`router.py`→`application.py`→`domain/`→`repository.py`（＋`orm.py`）。
+

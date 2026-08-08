@@ -10,11 +10,9 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
 
-
-class ControlBase(DeclarativeBase):
-    pass
+from app.db.base import ControlBase
 
 
 class Company(ControlBase):

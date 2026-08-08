@@ -11,15 +11,15 @@ from fastapi import Request
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.redis import get_redis
-from app.repository import session_repo
+from app.core.security import read_session
+from app.infra.cache import get_redis
 
 
 def resolve_session(request: Request) -> dict | None:
     token = request.cookies.get("iq_session")
     if not token:
         return None
-    return session_repo.get_session(get_redis(), token)
+    return read_session(get_redis(), token)
 
 
 def require_session(request: Request) -> dict:

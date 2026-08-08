@@ -12,10 +12,10 @@ import uuid
 from fastapi import FastAPI, Request
 from sqlalchemy import text
 
-from app.core.db import control_session
+from app.control_plane.auth.router import router as auth_router
 from app.core.errors import install_error_handlers
-from app.core.redis import get_redis
-from app.routers.auth import router as auth_router
+from app.db.control import control_session
+from app.infra.cache import get_redis
 
 app = FastAPI(title="ideaquest backend", version="0.0.1")
 
