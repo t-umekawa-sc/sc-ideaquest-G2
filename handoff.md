@@ -4,7 +4,7 @@
 > 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）と `doc/API設計/` を参照。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **次回の開始点＝(1) L 確認完了・(2) A〜L 横断再レビュー完了＝矛盾/drift を修正反映済み（本体=`6d72e5b`／重大0・中1・軽微7、設計セマンティクスの破綻なし）→ 次は (3) 以降の進め方＝実装スキャフォールドの範囲確認から**（§7 参照）。残る仕上げパス＝門番表記2系統の統一（設計確定後の最終パスで一括）。
+> **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針確定＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。docs 先行は完了（本体=`57e4f20`＝テスト規約／ADR-0001 認証パラメータ確定／A_認証テストパターン20件）。**次は scaffold 本体＝compose＋管理DBマイグレ/シード＋backend core＋`/api/v1/auth/{login,session,logout}`＋pytest 実装＋SC-00 配線**（§7-(3) の手順1〜6）。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -117,12 +117,23 @@
   - **クロスプレーン**: identity（`login_id`/`email`/`locale`/`display_name`）は accounts 源泉→`account_sync_outbox`（§1.13）。K/B/A で一貫しているか（`accounts.display_name` 追加を反映して B の発行フローが破綻しないか）。
   - **§1.x 全体規約 vs 各ドメイン**: §1.5 テナント解決・§1.6 認可・§1.7 エラー・§1.8 一覧・§1.9 冪等・§1.10 添付/署名URL・§1.12 WS・§1.13 outbox・§1.14 Redis と各ドメインの整合。
 
-### (3) 以降の進め方（実装スキャフォールド）の検討
-- (2) の再レビュー結果（矛盾の有無・要修正点）を踏まえて方針決定。**着手前にユーザーへ範囲確認**（大きな新フェーズのため）。選択肢の当たり:
-  - **A: リポジトリ雛形を一括**（`compose`＝Postgres〔PGroonga 同梱・会社DBのみ拡張〕/Redis/MinIO/backend/frontend/outbox worker/dev メール MailHog＋空アプリ起動確認）。
-  - **B: 基盤のみ先行**（`backend/app/core`＝config/security〔Argon2id・セッション・CSRF〕/errors〔RFC7807〕/deps〔認可ガード〕、`db`＝control/tenant 解決 `get_tenant_session`/uow、`infra`＝storage〔MinIO 署名URL〕/cache〔Redis〕/mail）。
-  - **C: 特定ドメインを縦に一本**（推奨開始＝ドメイン A 認証を router→application→domain→repository で通す）。
-- 骨格の正＝コーディング規約 **§3.4（バックエンド 2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga 索引 §6）＋`seeds`（spells/items/achievements/reaction_emojis の ja/en）。
+### (3) 実装スキャフォールド＝ログイン(状態A)を縦に通す（進行中）
+- **方針確定（2026-08-08 ユーザー決定）**＝「少しずつ／まずログインが動くまで」。手法＝**設計書→テストパターン→テストコード**の連鎖を作る（ユーザーの仕様把握にも資する）。スライス範囲＝**SC-00 状態A（PWログイン）＋`GET /auth/session`＋`logout`**のみ（MFA・初回/再設定PW は範囲外＝後続）。契約＝**OpenAPI を正＋つなぎ md は orchestration/state のみ**（スキーマ二重化しない）。
+
+- **完了（docs 先行・本体=`57e4f20`）**＝3ファイル新設:
+  - `doc/テスト/テスト規約.md`＝TC-ID（`A-TC-001`）で 設計節⇄パターン md⇄テスト関数 を3方向リンク／テスト階層（unit/int/api/e2e）・DB隔離・**§6 共通必須観点**（セッション必須EP→401・CSRF→403・門番→404・冪等→副作用1回）・失敗反復TCの隔離。
+  - `doc/ADR/ADR-0001_認証・セッション基本パラメータ.md`＝実装に要る具体値を**確定**（ユーザー承認）＝API `/api/v1/`／セッション（CSPRNG 32B・Redis `sess:{token}`・**idle30分/絶対12h**）／Cookie（A.0 準拠・dev は `COOKIE_SECURE` で切替）／CSRF（ダブルサブミット・login は CSRF 免除で Origin のみ）／**Argon2id `m=19MiB,t=2,p=1`**／**レート制限 (IP+login_id) 10回/5分→429**／エラーコードSoT=OpenAPI（別レジストリ作らない）。**アカウントロックは MFA スライスへ委譲**（決定先=A 設計）。
+  - `doc/テスト/A_認証.md`＝状態A のテストパターン**20件**（`A-TC-001〜020`・列挙耐性・停止会社の正/誤資格の対〔006/007〕・no-session→401〔012/015〕・CSRF→403〔014〕・Cookie属性・固定化・timing・e2e）。
+
+- **次にやること（未着手）＝scaffold 本体**:
+  1. `compose`（Postgres＋Redis＋backend＋frontend。MinIO/PGroonga/outbox/MailHog はこのスライスでは不要）。
+  2. 管理DBマイグレーション＋**初回ログイン用シード**（1社〔`mfa_required=false`・active〕＋1アカウント〔`password_set=true`〕＋会社DB users ミラー1件）。会社DB接続レジストリ（`companies.db_identifier`→DSN）。ツール選定（Alembic か raw SQL）も要決定。
+  3. `backend/app/core`（config／security〔Argon2id・セッション・CSRF・ADR-0001 準拠〕／errors〔RFC7807〕／deps〔認証ガード〕）＋テナント解決 `get_tenant_session`。
+  4. エンドポイント＝`POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（router→application→domain→repository）。
+  5. `A_認証.md` のTCを pytest 実装（api中心＋int2件）。
+  6. フロント SC-00 状態A を配線＋（採用済み）**SC-00 つなぎ md**（orchestration のみ）を作成。e2e 1本（A-TC-020）。
+- 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
+- **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
 
 ### 仕上げパス（設計確定に伴い実施可）
 - **ドキュメント作成規約の網羅適用（最終パス）**＝A〜L ほかの裸 `§x` を文書名接頭辞へ一括正規化（現状は「折衷」で新規のみ準拠）。再レビュー(2)と併せて実施検討。
