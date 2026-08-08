@@ -1,11 +1,14 @@
-"""認証ルータ（imperative shell）。HTTP・Cookie・検証順序のみ。業務判断は application/domain。"""
+"""認証ルータ（imperative shell）。HTTP・Cookie・検証順序のみ。業務判断は application/domain。
+
+レスポンスは型付きモデル（schemas）を返し OpenAPI に反映する。Cookie は注入した Response に設定
+（FastAPI がモデル本文＋Cookie ヘッダをまとめて返す）。
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Request, Response
-from fastapi.responses import JSONResponse
 
 from app.control_plane.auth import application as auth_service
-from app.control_plane.auth.schemas import LoginRequest
+from app.control_plane.auth.schemas import LoginRequest, LoginResponse, Session
 from app.core.config import get_settings
 from app.core.deps import require_session, verify_csrf, verify_origin
 from app.infra.cache import get_redis
@@ -25,24 +28,24 @@ def _set_auth_cookies(response: Response, session_token: str, csrf_token: str) -
     )
 
 
-@router.post("/login")
-def login(body: LoginRequest, request: Request) -> Response:
+@router.post("/login", response_model=LoginResponse, response_model_exclude_none=True)
+def login(body: LoginRequest, request: Request, response: Response) -> LoginResponse:
     verify_origin(request)  # login は CSRF 免除・Origin/Sec-Fetch のみ（A.1）
     client_ip = request.client.host if request.client else "unknown"
     result = auth_service.login(
         get_redis(), client_ip, body.company_code, body.login_id, body.password
     )
     if result.status == "mfa_required":
-        return JSONResponse({"status": "mfa_required", "mfa": result.mfa})
-    response = JSONResponse({"status": "authenticated", "session": result.session})
+        return LoginResponse(status="mfa_required", mfa=result.mfa)
     _set_auth_cookies(response, result.session_token, result.csrf_token)
-    return response
+    return LoginResponse(status="authenticated", session=Session(**result.session))
 
 
-@router.get("/session")
-def get_session(request: Request) -> dict:
+@router.get("/session", response_model=Session)
+def get_session(request: Request) -> Session:
     # セッション必須（無ければ 401）。GET は CSRF 不要（A.1）。応答は A.6 のみ（内部フィールドは返さない）
-    return auth_service.get_session(get_redis(), request.cookies.get("iq_session"))
+    payload = auth_service.get_session(get_redis(), request.cookies.get("iq_session"))
+    return Session(**payload)
 
 
 @router.post("/logout", status_code=204)

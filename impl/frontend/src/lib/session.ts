@@ -2,16 +2,12 @@
 // 受信リクエストの Cookie を backend の GET /auth/session へ転送して本人確認する。
 import { cookies } from "next/headers";
 
+import type { components } from "@/lib/api/schema";
+
 const backend = process.env.BACKEND_ORIGIN ?? "http://localhost:8000";
 
-export type Session = {
-  account_id: string;
-  company_id: string;
-  company_code: string;
-  system_role: string;
-  locale: string;
-  user: { user_id: string | null; display_name: string; avatar_url: string | null };
-};
+// 型はバックエンド OpenAPI から生成（手書きしない＝drift 防止）。
+export type Session = components["schemas"]["Session"];
 
 export async function getServerSession(): Promise<Session | null> {
   const cookie = (await cookies()).toString();

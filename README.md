@@ -63,6 +63,9 @@ docker compose exec frontend npx playwright test
 docker compose build backend
 docker compose restart backend
 
+# フロントの型生成（backend の OpenAPI → TypeScript 型。backend 起動中に）
+docker compose exec frontend npm run codegen      # src/lib/api/schema.d.ts を更新
+
 # 停止 / 完全初期化（DB ボリュームも消す）
 docker compose down
 docker compose down -v
