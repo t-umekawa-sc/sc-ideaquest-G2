@@ -145,7 +145,59 @@
   margin-top: var(--space-1);
 }
 
+/* --- アバター（デザイン標準 §4・shared.css 移植） --- */
+.avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size, 48px);
+  height: var(--avatar-size, 48px);
+  vertical-align: top;
+}
+.avatar.sm {
+  --avatar-size: 32px;
+}
+.avatar.lg {
+  --avatar-size: 72px;
+}
+.avatar__img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  background: var(--color-primary-soft);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+.avatar__img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.9em;
+}
+
+/* --- ブランドロゴ --- */
+.brand-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
 /* --- レイアウトユーティリティ（最小） --- */
 .muted {
   color: var(--color-text-muted);
+}
+.container {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+  width: 100%;
+}
+.between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
