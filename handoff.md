@@ -6,8 +6,8 @@
 >
 > **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。ツール＝Alembic＋SQLAlchemy(同期)。
 > **ログイン(状態A)スライス完成＝「ログインが動くまで」達成**。docs 先行（`57e4f20`）＋Chunk1 骨格（`f8f4db9`）＋Chunk2+3 認証EP＋pytest 全緑（`3301b4c`）＋§3.4 再編（`c500ea4`）＋**Chunk4 フロント SC-00＋e2e A-TC-020 全緑（`cb84de8`）**。実装は `impl/`（backend=§3.4／frontend=§4.1）。
-> フロント本格化(1)＝トークン移植＋components/ui＋SC-00（`1cc7bd1`）／(2)＝OpenAPI 型クライアント codegen（`c82ed2f`・pytest19/tsc0/e2e1 緑）完了。
-> **次は要相談**＝(1) フロント本格化(3)（共通ヘッダー app-shell／next/font／components/ui 拡充）(2) A の残り（MFA／PW設定＋ロック方針確定）(3) 次ドメイン縦スライス(B/C/D)。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
+> フロント本格化 (1)トークン+ui+SC-00(`1cc7bd1`)／(2)OpenAPI 型クライアント codegen(`c82ed2f`)／(3)共通ヘッダー app-shell(`bda86a5`・A-TC-020/021 緑) 完了。
+> **次は要相談**＝(1) フロント本格化(4)（next/font／components/ui 拡充／背景画像）(2) A の残り（MFA／PW設定＋ロック方針確定）(3) 次ドメイン縦スライス(B/C/D)。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -166,10 +166,16 @@
   - 検証＝pytest 19 passed／`tsc --noEmit` 0／Playwright A-TC-020 1 passed。
   - **再生成の運用**＝backend の API を変えたら `docker compose exec frontend npm run codegen` で `schema.d.ts` を更新（コミット対象）。
 
+- **フロント本格化(3) 完了＝共通ヘッダー app-shell（本体=`bda86a5`・検証済）**:
+  - `components/layout/AppHeader`（presentational・ドロップダウン開閉/クリック外/Esc）＋`components/ui/Avatar`。`styles/layout.css`（`.app-header`/`.usermenu`）＋`.avatar`/`.container`/`.between`。
+  - **一方向依存を厳守**＝`components` は `features` に依存しない。ログアウトは app 層（`(app)/layout`）が `features/auth` の `LogoutMenuItem` を children で差し込む。ヘッダーを認証後全画面に敷き logout を本文から移設。
+  - **通知ベル・残高 pixel-stat は未実装**（H/K のデータが無いため置かない＝偽データ回避。実装時に追加）。
+  - テスト＝A-TC-021（ヘッダーからログアウト→/login）追加。検証＝`tsc` 0／Playwright **A-TC-020,021 = 2 passed**。
+
 - **次にやること（候補・要相談）**:
-  1. **フロント本格化(3)**＝共通ヘッダー（app-shell）or `next/font` or `components/ui` 拡充。
+  1. **フロント本格化(4)**＝`next/font`（実フォント）／`components/ui` 拡充（Modal/Table/Badge）／背景画像（`.app-bg`・K）。
   2. **A の残り状態**＝MFA（状態C・OTP＋MailHog）／初回・再設定PW（状態B/D）＋**アカウントロック方針を A 設計＋ADR で確定**。
-  3. **次ドメインの縦スライス**（B アカウント管理／C・D クエスト・アイデア）を同じ「設計→テストパターン→テストコード」で。
+  3. **次ドメインの縦スライス**（B アカウント管理／C・D クエスト・アイデア）を同じ「設計→テストパターン→テストコード」で。ヘッダーの残高/ベルは K（`GET /me`）・H（通知）実装時に追加。
 - **テスト実行**＝backend: `cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`（19 passed）／e2e: フルスタック起動後 `docker compose exec frontend npx playwright install chromium && docker compose exec frontend npx playwright test`（1 passed）。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
 - **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・「画面API連携」md の他画面展開。
