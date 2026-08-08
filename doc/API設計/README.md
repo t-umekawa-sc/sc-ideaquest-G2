@@ -183,7 +183,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | H | 通知 | SC-02 | テナント | ✅ | [`H_通知.md`](./H_通知.md) |
 | I | ダッシュボード集約 | SC-01 | テナント | ✅ | [`I_ダッシュボード集約.md`](./I_ダッシュボード集約.md) |
 | J | 全文検索 | SC-12 | テナント | ✅ | [`J_全文検索.md`](./J_全文検索.md) |
-| K | プロフィール・背景画像 | 共通ヘッダー | テナント | ⬜ | （目次＝§2-K） |
+| K | プロフィール・背景画像 | 共通ヘッダー | テナント＋コントロール | ✅ | [`K_プロフィール・背景画像.md`](./K_プロフィール・背景画像.md) |
 | L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ⬜ | （目次＝§2-L） |
 
 ### A. 認証・セッション（コントロールプレーン）＝詳細確定
@@ -216,9 +216,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### J. 全文検索（SC-12）＝詳細確定
 → **[`J_全文検索.md`](./J_全文検索.md)**。決定＝**①対象＝`ideas`(title/body/value/note)＋`chat_messages`(body)＋`attachments`(original_name) を PGroonga で横断**（§1.11・データモデル §6）**②スコープ2種**＝`GET /quests/{id}/search`（クエスト内・門番＝**パーティー所属＋クエストグループ所属の AND** C.0＝どちらか欠けても404）／`GET /search`（テナント内・**両条件が共に有効なクエストの和集合**）**③可視範囲はサーバーが WHERE で強制**（`published`＋非削除アイデア／非トゥームストーン `chat_messages`／可視親の添付・**下書きは本人分も含め対象外**・`completed` は検索可・索引ヒットをそのまま返さない）**④結果＝3種 UNION を `pgroonga_score` 降順の単一リスト**（種別バッジ・所属アイデア・`snippet_html`・親導線＝idea→SC-22/chat・attachment→SC-24）**⑤ページング＝オフセット `page`/`per_page`**（関連度順 UNION・件数表示・§1.8 の例外）**⑥索引は同期更新（リアルタイム・PGroonga は通常の PG インデックス）**。パラメータ＝`q`（必須・パラメタ化）・`types=idea,chat,attachment`（既定 all）。セキュリティ＝スニペットは許可リストサニタイズ（生 `dangerouslySetInnerHTML` 禁止・§2.2④）／`q` はバインド（§2.2③）。
 
-### K. プロフィール・背景画像
-`GET/PATCH /me`（プロフィール・`login_id`/`email`/`locale` は accounts 源泉→outbox）・`PUT /me/background-image`・`DELETE /me/background-image`（MinIO）。
-- **セキュリティ（A.9 委譲分）**: **認証済みユーザーの自己 PW 変更＝現在の PW 再確認**（セキュリティ一覧 1-㉒）／**email・MFA 設定変更時は再認証**（同 1-㉓）を設計する（`A_認証・セッション.md` §A.9-⑦）。
+### K. プロフィール・背景画像（共通ヘッダー）＝詳細確定
+→ **[`K_プロフィール・背景画像.md`](./K_プロフィール・背景画像.md)**。決定＝**①`display_name` の源泉＝管理DB `accounts`**（1b・`accounts.display_name` 列追加・`users` はミラー）＝identity（login_id/email/locale/display_name）を accounts に源泉一元化**②`GET /me`＝プロフィール＋残高の正準**（I の hero と両立・同じ `users` 読取）**③`PATCH /me`＝`display_name`/`locale` のみ**（accounts+outbox の単一コントロールプレーン Tx・§1.13）**④自己PW変更 `POST /me/password`**＝現在PW再確認（1-㉒）→§A.9-③（全セッション破棄＋信頼端末失効）＋`security_password_changed` 通知（K→H）**⑤メール変更 `POST /me/email`**＝再認証（1-㉓）→accounts+outbox**⑥画像 `PUT/DELETE /me/avatar-image`・`/me/background-image`**＝MinIO・会社DB `users` 直接・読取は署名URL（§1.10・恒久公開URL禁止）。Mass Assignment 対策＝残高/`system_role`/`status`/`password_set`/`login_id` は編集不可（§2.2）。VRM 装備着せ替えは G（`/me/equipment`）＝別物。
 
 ### L. リアルタイム配信（WebSocket）
 `GET /realtime`（WS ハンドシェイク・Cookie セッション認証・`company_id` バインド）。常時購読 `notifications:{user_id}`／動的購読 `chat:{chat_group_id}`（`subscribe`/`unsubscribe`・購読時に閲覧権限検証）。配信専用（書き込みは各ドメインの REST）。イベント種別・ペイロード・再接続再同期は §1.12。**書き込み側（D/E/H）の application が Redis へ event を発行する連携点**を各ドメイン詳細で規定。
