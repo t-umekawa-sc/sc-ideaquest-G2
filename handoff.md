@@ -13,10 +13,11 @@
 ## 1. 最終更新日時 / ブランチ / 最新コミット
 
 - 最終更新: **2026-08-08 JST**（セッション終了時）
-- ブランチ: **main**（作業ツリー クリーン見込み・handoff コミット直前）
-- 最新コミット（本体）: **`dc5fdcd`**＝「実装 PW設定(B/D): password-setup を縦に通す(backend)」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目）。
-- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**プッシュはユーザー依頼時のみ**（本セッションでは未プッシュ＝要確認）。
+- ブランチ: **main**（作業ツリー クリーン＝確認済み）。
+- 最新コミット（本体）: **`dc5fdcd`**＝「実装 PW設定(B/D): password-setup を縦に通す(backend)」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。
+- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**本セッション終了時にユーザー依頼で `origin/main` へプッシュ済み**（`dc5fdcd`＋handoff コミットを反映）。次回開始時は `git status` がクリーン・`origin/main` と同期している想定。
 - 直近コミット（新しい順）:
+  - （本 handoff 単独コミット・本セッション末）
   - `dc5fdcd` 実装 PW設定(B/D) backend（本セッション）
   - `51ddbb7` docs: README に OpenAPI 確認方法追記
   - `bda86a5` frontend 本格化(3) 共通ヘッダー app-shell
