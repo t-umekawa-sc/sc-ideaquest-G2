@@ -1,0 +1,42 @@
+"""アプリ設定（環境変数から読む）。値の根拠は doc/ADR/ADR-0001。"""
+from __future__ import annotations
+
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_env: str = "dev"
+
+    # Postgres 接続（管理DB・会社DB は同一サーバの別データベース＝§1.5 動的ルーティング）
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_user: str = "ideaquest"
+    postgres_password: str = "ideaquest"
+    control_db_name: str = "ideaquest_control"
+
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Cookie / セッション（ADR-0001 §2.2/§2.3）
+    cookie_secure: bool = True
+    session_idle_ttl_seconds: int = 1800       # アイドル30分（スライディング）
+    session_absolute_ttl_seconds: int = 43200  # 絶対上限12時間
+
+    def server_dsn(self, db_name: str) -> str:
+        """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{db_name}"
+        )
+
+    @property
+    def control_dsn(self) -> str:
+        return self.server_dsn(self.control_db_name)
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

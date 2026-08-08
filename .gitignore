@@ -1,3 +1,21 @@
 # PDF は既定で追跡しない（Markdown がソース。書き出しPDFはコミットしない）
 # 特定PDFを追跡したい場合のみ「!path/to/file.pdf」で個別に除外を解除する
 *.pdf
+
+# 環境変数（実値）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+.next/
+playwright-report/
+test-results/
