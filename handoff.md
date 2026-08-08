@@ -4,7 +4,9 @@
 > 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）と `doc/API設計/` を参照。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針確定＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。docs 先行は完了（本体=`57e4f20`＝テスト規約／ADR-0001 認証パラメータ確定／A_認証テストパターン20件）。**次は scaffold 本体＝compose＋管理DBマイグレ/シード＋backend core＋`/api/v1/auth/{login,session,logout}`＋pytest 実装＋SC-00 配線**（§7-(3) の手順1〜6）。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
+> **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。ツール＝Alembic＋SQLAlchemy(同期)。
+> 完了＝docs 先行（`57e4f20`）＋**Chunk 1＝起動する骨格（`f8f4db9`・compose+2プレーンDB+マイグレ+シード+healthz、起動確認済み）**。
+> **次は Chunk 2＝認証エンドポイント**（`app/core` に session/CSRF/errors/deps 追加→4層で `/api/v1/auth/{login,session,logout}`）→ Chunk 3＝A_認証.md の pytest 実装 → Chunk 4＝フロント SC-00 配線＋つなぎ md＋e2e。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -125,13 +127,21 @@
   - `doc/ADR/ADR-0001_認証・セッション基本パラメータ.md`＝実装に要る具体値を**確定**（ユーザー承認）＝API `/api/v1/`／セッション（CSPRNG 32B・Redis `sess:{token}`・**idle30分/絶対12h**）／Cookie（A.0 準拠・dev は `COOKIE_SECURE` で切替）／CSRF（ダブルサブミット・login は CSRF 免除で Origin のみ）／**Argon2id `m=19MiB,t=2,p=1`**／**レート制限 (IP+login_id) 10回/5分→429**／エラーコードSoT=OpenAPI（別レジストリ作らない）。**アカウントロックは MFA スライスへ委譲**（決定先=A 設計）。
   - `doc/テスト/A_認証.md`＝状態A のテストパターン**20件**（`A-TC-001〜020`・列挙耐性・停止会社の正/誤資格の対〔006/007〕・no-session→401〔012/015〕・CSRF→403〔014〕・Cookie属性・固定化・timing・e2e）。
 
-- **次にやること（未着手）＝scaffold 本体**:
-  1. `compose`（Postgres＋Redis＋backend＋frontend。MinIO/PGroonga/outbox/MailHog はこのスライスでは不要）。
-  2. 管理DBマイグレーション＋**初回ログイン用シード**（1社〔`mfa_required=false`・active〕＋1アカウント〔`password_set=true`〕＋会社DB users ミラー1件）。会社DB接続レジストリ（`companies.db_identifier`→DSN）。ツール選定（Alembic か raw SQL）も要決定。
-  3. `backend/app/core`（config／security〔Argon2id・セッション・CSRF・ADR-0001 準拠〕／errors〔RFC7807〕／deps〔認証ガード〕）＋テナント解決 `get_tenant_session`。
-  4. エンドポイント＝`POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（router→application→domain→repository）。
-  5. `A_認証.md` のTCを pytest 実装（api中心＋int2件）。
-  6. フロント SC-00 状態A を配線＋（採用済み）**SC-00 つなぎ md**（orchestration のみ）を作成。e2e 1本（A-TC-020）。
+- **ツール選定（2026-08-08 ユーザー決定）**＝マイグレーション **Alembic**／DBアクセス **SQLAlchemy（同期・psycopg3）**。同期採用の理由は `backend/README.md`。
+
+- **Chunk 1 完了＝起動する骨格（本体=`f8f4db9`・起動確認済み）**:
+  - `compose.yaml`（db=postgres:16／redis:7／backend）。`backend/`（FastAPI＋SQLAlchemy 同期＋Alembic）。
+  - **2プレーンを実データベースで再現**＝管理DB `ideaquest_control`＋会社DB `ideaquest_company_acme`（`companies.db_identifier` を DB 名に）。`app/core/db.get_tenant_session()` で §1.5 動的ルーティング。
+  - `scripts/bootstrap.py`＝DB作成→Alembic（control/company 別環境）→シード（会社 ACME-01〔mfa_required=false〕＋アカウント `user@acme.example`/PW `Passw0rd!`＋会社DB users ミラー）。**冪等**。
+  - `GET /healthz`＝DB/Redis 疎通。**検証済**＝healthz ok・2DB作成・シード投入・bootstrap 再実行で重複なし。
+  - 実装＝`app/core`（config／db〔control+tenant〕／redis／security〔Argon2id・ADR-0001準拠〕）／`app/models`（control: companies/accounts・company: users）／`migrations/{control,company}`。
+
+- **次にやること＝Chunk 2（認証エンドポイント）**:
+  1. `app/core` 追加＝session（Redis `sess:{token}`・idle30分/絶対12h）／CSRF（ダブルサブミット）／errors（RFC7807 problem+json）／deps（認証ガード・CSRF・Origin）。
+  2. 4層で `POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（router→application→domain→repository）。login はコントロールプレーン完結＋session.user は会社DBミラーから解決（A.6）。
+  3. **Chunk 3**＝`doc/テスト/A_認証.md` の A-TC-001〜019 を pytest 実装（api中心＋int2件）。テストDBは隔離（テスト規約 §3）。
+  4. **Chunk 4**＝フロント SC-00 状態A 配線＋**SC-00 つなぎ md**（orchestration のみ）＋e2e（A-TC-020）。frontend サービスを compose に追加。
+- **起動手順**（`backend/README.md`）＝リポジトリ直下で `docker compose up --build` → `curl localhost:8000/healthz`。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
 - **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
 
