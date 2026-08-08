@@ -1,0 +1,29 @@
+/* デザイントークンは Chunk 後半で shared.css 相当を移植（§4.1）。ここでは最小のみ。 */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+main {
+  max-width: 420px;
+  margin: 3rem auto;
+  padding: 0 1rem;
+}
+form div {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+input {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}

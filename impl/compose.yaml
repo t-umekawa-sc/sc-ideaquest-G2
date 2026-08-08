@@ -1,5 +1,5 @@
 # ローカル開発用オーケストレーション（ログイン状態A スライス）
-# このスライスで必要なのは Postgres と Redis と backend のみ。
+# Postgres / Redis / backend / frontend。
 # MinIO / PGroonga / outbox worker / MailHog は後続スライスで追加する。
 services:
   db:
@@ -46,6 +46,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_ORIGIN: http://backend:8000   # /api/v1/* をここへプロキシ（next.config）
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
 
 volumes:
   db_data:
