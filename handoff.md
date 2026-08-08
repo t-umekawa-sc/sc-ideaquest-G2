@@ -5,8 +5,8 @@
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
 > **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。ツール＝Alembic＋SQLAlchemy(同期)。
-> 完了＝docs 先行（`57e4f20`）＋Chunk 1（`f8f4db9`・起動する骨格）＋**Chunk 2＋3（`3301b4c`・認証EP `login/session/logout` 4層実装＋pytest A-TC-001〜019 全緑・実DB/Redis で検証済）**。実装は `impl/`（`doc/`＝設計 と対）。
-> **次は Chunk 4＝フロント SC-00 状態A**（`impl/frontend/` Next.js を作り `/api/v1/auth/*` に配線＋SC-00 つなぎ md＋Playwright e2e=A-TC-020）。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
+> **ログイン(状態A)スライス完成＝「ログインが動くまで」達成**。docs 先行（`57e4f20`）＋Chunk1 骨格（`f8f4db9`）＋Chunk2+3 認証EP＋pytest 全緑（`3301b4c`）＋§3.4 再編（`c500ea4`）＋**Chunk4 フロント SC-00＋e2e A-TC-020 全緑（`cb84de8`）**。実装は `impl/`（backend=§3.4／frontend=§4.1）。
+> **次は要相談**＝(1) A の残り（MFA 状態C／初回・再設定PW 状態B/D＋ロック方針確定）(2) 次ドメイン縦スライス(B/C/D)（3) フロント本格化（デザイン標準移植・OpenAPI 型クライアント）。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -145,12 +145,19 @@
   - **テスト**＝`doc/テスト/A_認証.md` A-TC-001〜019 を pytest 実装（`impl/backend/tests/auth/`）。**19 passed**（`docker compose run --rm backend pytest`）＋live HTTP でも動作確認済。
   - MFA 分岐は会社 `mfa_required=true` 時のみ到達＝**契約形の stub のみ**（実装は MFA スライス）。
 
-- **次にやること＝Chunk 4（フロント SC-00 状態A）**:
-  1. `impl/frontend/`（Next.js・§4.1 feature ベース）を作成し compose に frontend サービス追加。
-  2. SC-00 状態A のログイン画面を `/api/v1/auth/login`→`/session` に配線（Cookie・CSRF ヘッダ・401 リダイレクト）。
-  3. **SC-00 つなぎ md**（orchestration のみ・スキーマは OpenAPI 参照）を作成。OpenAPI から型付きクライアント codegen 方針。
-  4. e2e（Playwright・**A-TC-020**）＝ログイン→SC-01 到達。
-- **テスト実行**（`impl/backend/README.md`）＝`cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`。**起動**＝`cd impl && docker compose up --build` → `curl localhost:8000/healthz`。
+- **Chunk 4 完了＝フロント SC-00 ログイン（状態A）＋e2e 全緑（本体=`cb84de8`・検証済）＝「ログインが動くまで」達成**:
+  - `impl/frontend/`（Next.js App Router）を **コーディング規約 §4.1（feature ベース）**で構築＝`app/`（ルーティングのみ）・`features/auth`（LoginForm/LogoutButton/api）・`lib/api`（fetch ラッパ・CSRF・RFC7807 整形）・`lib/session`（Server Component 用）。compose に `frontend` 追加。
+  - **同一オリジン方針**＝`next.config` rewrite で `/api/v1/*` を backend へプロキシ。**CORS 不要＋CSRF ダブルサブミット（`iq_csrf` を JS が読む）が成立**（:8000 直叩きだと :3000 の JS が Cookie を読めず CSRF 不成立＝この方針が必須）。
+  - SC-00 状態A：入力→`login`→`/`（SC-01 placeholder）。未認証は Server Component が `/login` へ redirect。logout は `X-CSRF-Token` 付与。
+  - `doc/画面設計/つなぎ/SC-00_ログイン.md` 新設（orchestration のみ・スキーマは OpenAPI/A が SoT）。
+  - **e2e（Playwright・A-TC-020）＝実ブラウザでログイン→保護ページ到達＝1 passed**。HTTP/SSR も curl 確認済（proxy login/session/redirect）。
+  - **起動**＝`cd impl && docker compose up --build` → `http://localhost:3000/login`（会社 `ACME-01`・ID `user@acme.example`・PW `Passw0rd!`）。
+
+- **次にやること（候補・要相談）**:
+  1. **A の残り状態**＝MFA（状態C・OTP＋MailHog）／初回・再設定PW（状態B/D）。あわせて**アカウントロック方針を A 設計＋ADR で確定**。
+  2. または **次ドメインの縦スライス**（例＝B アカウント管理、または C/D のクエスト/アイデア）を同じ「設計→テストパターン→テストコード」で。
+  3. フロントの本格化＝デザイン標準（`shared.css`/`shared.js`）移植・`components/ui`・共通ヘッダー・OpenAPI から型付きクライアント codegen。
+- **テスト実行**＝backend: `cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`（19 passed）／e2e: フルスタック起動後 `docker compose exec frontend npx playwright install chromium && docker compose exec frontend npx playwright test`（1 passed）。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
 - **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
 
