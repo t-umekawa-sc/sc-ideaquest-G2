@@ -52,7 +52,7 @@
 
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
 
-- **リポジトリは `doc/`・`CLAUDE.md`・`handoff.md` のみ**（確認済み）。アプリのコード・`compose`・テストは**未着手＝存在しない**（`doc/画面設計/mocks/shared.js` はモック用資産）。
+- **リポジトリ構成**＝`doc/`（設計）・`impl/`（実装＝backend＋compose＋env・Chunk 1 まで実在）・`CLAUDE.md`・`handoff.md`。frontend・テストコードは未着手（Chunk 3/4 で作成）。
 - **壊れているもの**: なし（作業ツリー クリーン＝確認済み）。
 - **テスト**: 自動テストは無い（コード未着手）。
 - **ドキュメント整合の状態（重要）**: 各ドメインは**単体レビューで確定**しているが、**A〜L を通した横断整合の再レビューは未実施**＝**矛盾/drift が残っていないかは未確認**（＝次回の最優先タスク §7-(2)）。今セッション中に見つけて直した整合の例＝H の post-commit/publish 責務・J の門番（パーティー＋グループ AND）・L の event 名 canonical 化。**それ以外に未検出の矛盾がある可能性は否定できない（未確認）**。
@@ -127,10 +127,11 @@
   - `doc/ADR/ADR-0001_認証・セッション基本パラメータ.md`＝実装に要る具体値を**確定**（ユーザー承認）＝API `/api/v1/`／セッション（CSPRNG 32B・Redis `sess:{token}`・**idle30分/絶対12h**）／Cookie（A.0 準拠・dev は `COOKIE_SECURE` で切替）／CSRF（ダブルサブミット・login は CSRF 免除で Origin のみ）／**Argon2id `m=19MiB,t=2,p=1`**／**レート制限 (IP+login_id) 10回/5分→429**／エラーコードSoT=OpenAPI（別レジストリ作らない）。**アカウントロックは MFA スライスへ委譲**（決定先=A 設計）。
   - `doc/テスト/A_認証.md`＝状態A のテストパターン**20件**（`A-TC-001〜020`・列挙耐性・停止会社の正/誤資格の対〔006/007〕・no-session→401〔012/015〕・CSRF→403〔014〕・Cookie属性・固定化・timing・e2e）。
 
-- **ツール選定（2026-08-08 ユーザー決定）**＝マイグレーション **Alembic**／DBアクセス **SQLAlchemy（同期・psycopg3）**。同期採用の理由は `backend/README.md`。
+- **実装成果物の置き場所（2026-08-08 ユーザー決定）**＝**ルート直下 `impl/` に集約**（`impl/backend/`・`impl/compose.yaml`・`impl/.env.example`。`doc/`＝設計 と対）。`impl` は implementation の一般的略語。`docker compose` は `impl/` で実行。
+- **ツール選定（2026-08-08 ユーザー決定）**＝マイグレーション **Alembic**／DBアクセス **SQLAlchemy（同期・psycopg3）**。同期採用の理由は `impl/backend/README.md`。
 
 - **Chunk 1 完了＝起動する骨格（本体=`f8f4db9`・起動確認済み）**:
-  - `compose.yaml`（db=postgres:16／redis:7／backend）。`backend/`（FastAPI＋SQLAlchemy 同期＋Alembic）。
+  - `impl/compose.yaml`（db=postgres:16／redis:7／backend）。`impl/backend/`（FastAPI＋SQLAlchemy 同期＋Alembic）。
   - **2プレーンを実データベースで再現**＝管理DB `ideaquest_control`＋会社DB `ideaquest_company_acme`（`companies.db_identifier` を DB 名に）。`app/core/db.get_tenant_session()` で §1.5 動的ルーティング。
   - `scripts/bootstrap.py`＝DB作成→Alembic（control/company 別環境）→シード（会社 ACME-01〔mfa_required=false〕＋アカウント `user@acme.example`/PW `Passw0rd!`＋会社DB users ミラー）。**冪等**。
   - `GET /healthz`＝DB/Redis 疎通。**検証済**＝healthz ok・2DB作成・シード投入・bootstrap 再実行で重複なし。
@@ -141,7 +142,7 @@
   2. 4層で `POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（router→application→domain→repository）。login はコントロールプレーン完結＋session.user は会社DBミラーから解決（A.6）。
   3. **Chunk 3**＝`doc/テスト/A_認証.md` の A-TC-001〜019 を pytest 実装（api中心＋int2件）。テストDBは隔離（テスト規約 §3）。
   4. **Chunk 4**＝フロント SC-00 状態A 配線＋**SC-00 つなぎ md**（orchestration のみ）＋e2e（A-TC-020）。frontend サービスを compose に追加。
-- **起動手順**（`backend/README.md`）＝リポジトリ直下で `docker compose up --build` → `curl localhost:8000/healthz`。
+- **起動手順**（`impl/backend/README.md`）＝`cd impl && docker compose up --build` → `curl localhost:8000/healthz`。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
 - **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
 
@@ -157,7 +158,7 @@
 
 ## 8. 再開に必要な環境情報
 
-- **アプリの起動/テストコマンドは無い**（コード未着手＝`compose`/`package.json`/`pyproject.toml` いずれも未作成・確認済み）。ポート・環境変数も**未定（未確認）**＝実装スキャフォールドで作成する。
+- **起動**＝`cd impl && docker compose up --build`（Chunk 1・backend `:8000`/db `:5432`/redis `:6379`・`impl/.env.example` 参照）。**テストコマンドは未整備**（Chunk 3 で pytest 追加）。frontend の `package.json` は未作成（Chunk 4）。
 - **今使う操作**:
   - `git`（履歴・差分・コミット/プッシュ）。ブランチ `main`・remote `origin`。
   - ドキュメント＝Markdown を読む。画面モック＝`doc/画面設計/mocks/*.html` をブラウザで開く（入口 `mocks/index.html`）。

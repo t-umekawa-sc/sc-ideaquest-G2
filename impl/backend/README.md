@@ -10,9 +10,10 @@ FastAPI＋SQLAlchemy（同期）＋Alembic＋Redis。骨格の正＝`doc/規約/
 - `GET /healthz` が DB・Redis 疎通を返す。
 - **認証エンドポイント（`/api/v1/auth/*`）とテストは Chunk 2 以降**。
 
-## 実行（リポジトリ直下で）
+## 実行（`impl/` ディレクトリで）
 
 ```bash
+cd impl
 docker compose up --build        # db + redis + backend が起動
 curl localhost:8000/healthz      # {"status":"ok","checks":{"db":true,"redis":true}}
 ```
