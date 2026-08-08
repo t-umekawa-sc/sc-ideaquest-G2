@@ -120,7 +120,7 @@
   - **§1.x 全体規約 vs 各ドメイン**: §1.5 テナント解決・§1.6 認可・§1.7 エラー・§1.8 一覧・§1.9 冪等・§1.10 添付/署名URL・§1.12 WS・§1.13 outbox・§1.14 Redis と各ドメインの整合。
 
 ### (3) 実装スキャフォールド＝ログイン(状態A)を縦に通す（進行中）
-- **方針確定（2026-08-08 ユーザー決定）**＝「少しずつ／まずログインが動くまで」。手法＝**設計書→テストパターン→テストコード**の連鎖を作る（ユーザーの仕様把握にも資する）。スライス範囲＝**SC-00 状態A（PWログイン）＋`GET /auth/session`＋`logout`**のみ（MFA・初回/再設定PW は範囲外＝後続）。契約＝**OpenAPI を正＋つなぎ md は orchestration/state のみ**（スキーマ二重化しない）。
+- **方針確定（2026-08-08 ユーザー決定）**＝「少しずつ／まずログインが動くまで」。手法＝**設計書→テストパターン→テストコード**の連鎖を作る（ユーザーの仕様把握にも資する）。スライス範囲＝**SC-00 状態A（PWログイン）＋`GET /auth/session`＋`logout`**のみ（MFA・初回/再設定PW は範囲外＝後続）。契約＝**OpenAPI を正＋「画面API連携」md は呼び出し順序/画面反映/Cookie・CSRF 配線のみ**（スキーマ二重化しない）。
 
 - **完了（docs 先行・本体=`57e4f20`）**＝3ファイル新設:
   - `doc/テスト/テスト規約.md`＝TC-ID（`A-TC-001`）で 設計節⇄パターン md⇄テスト関数 を3方向リンク／テスト階層（unit/int/api/e2e）・DB隔離・**§6 共通必須観点**（セッション必須EP→401・CSRF→403・門番→404・冪等→副作用1回）・失敗反復TCの隔離。
@@ -149,7 +149,7 @@
   - `impl/frontend/`（Next.js App Router）を **コーディング規約 §4.1（feature ベース）**で構築＝`app/`（ルーティングのみ）・`features/auth`（LoginForm/LogoutButton/api）・`lib/api`（fetch ラッパ・CSRF・RFC7807 整形）・`lib/session`（Server Component 用）。compose に `frontend` 追加。
   - **同一オリジン方針**＝`next.config` rewrite で `/api/v1/*` を backend へプロキシ。**CORS 不要＋CSRF ダブルサブミット（`iq_csrf` を JS が読む）が成立**（:8000 直叩きだと :3000 の JS が Cookie を読めず CSRF 不成立＝この方針が必須）。
   - SC-00 状態A：入力→`login`→`/`（SC-01 placeholder）。未認証は Server Component が `/login` へ redirect。logout は `X-CSRF-Token` 付与。
-  - `doc/画面設計/つなぎ/SC-00_ログイン.md` 新設（orchestration のみ・スキーマは OpenAPI/A が SoT）。
+  - `doc/画面設計/画面API連携/SC-00_ログイン.md` 新設（呼び出し順序/画面反映/Cookie・CSRF 配線のみ・スキーマは OpenAPI/A が SoT）。
   - **e2e（Playwright・A-TC-020）＝実ブラウザでログイン→保護ページ到達＝1 passed**。HTTP/SSR も curl 確認済（proxy login/session/redirect）。
   - **起動**＝`cd impl && docker compose up --build` → `http://localhost:3000/login`（会社 `ACME-01`・ID `user@acme.example`・PW `Passw0rd!`）。
 
@@ -159,7 +159,7 @@
   3. フロントの本格化＝デザイン標準（`shared.css`/`shared.js`）移植・`components/ui`・共通ヘッダー・OpenAPI から型付きクライアント codegen。
 - **テスト実行**＝backend: `cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`（19 passed）／e2e: フルスタック起動後 `docker compose exec frontend npx playwright install chromium && docker compose exec frontend npx playwright test`（1 passed）。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
-- **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
+- **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・「画面API連携」md の他画面展開。
 
 ### 仕上げパス（設計確定に伴い実施可）
 - **ドキュメント作成規約の網羅適用（最終パス）**＝A〜L ほかの裸 `§x` を文書名接頭辞へ一括正規化（現状は「折衷」で新規のみ準拠）。再レビュー(2)と併せて実施検討。
