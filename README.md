@@ -42,6 +42,23 @@ docker compose up --build
 
 ログイン成功でダッシュボード（SC-01 プレースホルダ）に遷移する。
 
+## API 仕様（OpenAPI）の確認
+
+backend（FastAPI）が**コードから自動生成**する API 仕様を、起動中（`docker compose up`）に以下で確認できる。
+
+| URL | 内容 |
+| --- | --- |
+| http://localhost:8000/docs | **Swagger UI**（対話的。ブラウザからリクエストを試せる） |
+| http://localhost:8000/redoc | **ReDoc**（読み物向けの整ったリファレンス表示） |
+| http://localhost:8000/openapi.json | **OpenAPI 定義そのもの**（機械可読 JSON。フロントの型生成 `npm run codegen` の入力） |
+
+```bash
+# JSON を手元で見る（パス一覧・スキーマ名を抜粋）
+curl -s localhost:8000/openapi.json | python3 -m json.tool | less
+```
+
+> この OpenAPI がフロントの型（`impl/frontend/src/lib/api/schema.d.ts`）の生成元。API を変えたら型を再生成する（下記コマンド）。
+
 ## よく使うコマンド（`impl/` で実行）
 
 ```bash
