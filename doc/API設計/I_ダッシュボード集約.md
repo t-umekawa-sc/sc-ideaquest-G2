@@ -28,7 +28,7 @@
 ### レスポンス構造（各キー）
 
 - **`hero`**（ヒーロー・ゲーム層／源泉＝`users` 残高・G が canonical）
-  `{id, display_name, avatar_image_path, locale, level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}`。
+  `{id, display_name, avatar_image_url?, locale, level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}`（`avatar_image_url` は**署名URL**・生パス非露出＝§1.10／K.1 と同形）。
   - `level`/`xp`/`coin_balance`/`skill_point_balance`＝`users` のキャッシュ残高（真実は `activities`・G.0）。`xp_to_next`＝次レベルまでの残り XP、`level_span`＝現レベルの必要総量（`100+(level-1)×50`・データモデル §7・**算出は G の純粋 level 関数**）。フロントは `level_span - xp_to_next` で XP バーを描く（SC-01 §4.2）。
 - **`drafts[]`**（作成者本人の下書き・最上段・SC-01 §4.4／種別混在）
   各要素＝`{kind:'quest'|'idea'|'evaluation', updated_at, ...種別固有}`。
@@ -81,7 +81,7 @@ SC-01 が要求する「全クエスト/全アイデア跨ぎの自分の〜」�
 
 ## I.4 他ドメイン境界・残 TBD
 
-- **委譲/連携**: 参加中/下書きクエスト＝**C**／下書き・未投票・フォロー中アイデア＝**D**（I.3 の横断 read）／下書き評価＝**F**（I.3）／週間ランキング・残高＝**G**（`GET /rankings`・`users` 残高）／最近の通知＝**H**（`GET /notifications`）／`login_bonus` の付与確定＝**A/G**（A のセッション解決依存性が「新しい JST 日の初回」を検知し G が `reason=login` を冪等付与・I はワンショット返却のみ・A.1／G.6）／背景画像・プロフィール（残高の別入口 `GET /me`）＝**K**（未着手・ヒーロー残高は当面 I が直接返す＝G.0 の「残高参照は I でも可」と整合）。
+- **委譲/連携**: 参加中/下書きクエスト＝**C**／下書き・未投票・フォロー中アイデア＝**D**（I.3 の横断 read）／下書き評価＝**F**（I.3）／週間ランキング・残高＝**G**（`GET /rankings`・`users` 残高）／最近の通知＝**H**（`GET /notifications`）／`login_bonus` の付与確定＝**A/G**（A のセッション解決依存性が「新しい JST 日の初回」を検知し G が `reason=login` を冪等付与・I はワンショット返却のみ・A.1／G.6）／背景画像・プロフィール（残高の別入口 `GET /me`）＝**K**（確定済み・`GET /me` が残高の正準。ヒーロー残高は I も `GET /dashboard` に同梱＝両立・重複ではなく別用途＝K.1／G.0 と整合）。
 - **セキュリティ突合（規約 §2.2）**: 主リスク＝**クロステナント/他人データ混入**。対策＝全 read はセッションの `company_id`（§1.5）と `recipient/author/user_id=自分` を強制し、可視範囲は各合成元の門番（パーティー所属・visibility・匿名化）をそのまま通す。I は新たな公開面を作らない（横断 read は内部 read で、他人スコープを受け取るクエリパラメータを持たない＝IDOR 面を増やさない）。roles の導線表示は UX 便宜で、実アクセスは各管理 API が再認可（§1.6）。
-- **確定済み（本レビュー）**: 集約1本 `GET /dashboard`／I は読取合成の殻（新業務ロジックなし）／横断 read は D/F の repository に置き別 EP を新設しない／ヒーロー残高は I が直接返す（K 未着手の当面）。
+- **確定済み（本レビュー）**: 集約1本 `GET /dashboard`／I は読取合成の殻（新業務ロジックなし）／横断 read は D/F の repository に置き別 EP を新設しない／ヒーロー残高は I も `GET /dashboard` に同梱（残高の正準は K の `GET /me`・両立＝K.1／G.0）。
 - **残 TBD（軽微・実装 or 運用で確定）**: 各パネルの**表示件数・並び順・「すべて見る」閾値**（SC-01 §10）／**部分失敗時の挙動**（パネル単位 `null`＋再取得 or 全体エラー）と各 read の**キャッシュ/タイムアウト**／`login_bonus` のワンショット保持（Redis フラグ or セッション・A と協調）と**レベルアップ演出**（SC-01 §10）／通知ベルの簡易ドロップダウン化（SC-01 §10）／実績サマリ（直近バッジ）を載せるか（SC-01 §10・現状は非搭載）／3D アバターの表示方法（静止画キャッシュ or 軽量3D・SC-01 §10）。

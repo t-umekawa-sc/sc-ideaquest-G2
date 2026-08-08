@@ -52,8 +52,8 @@
 | メソッド/パス | 概要 | リクエスト（パス/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `POST /chat-messages` | メッセージ投稿（**multipart**・本文/メンション/添付を単一 UoW） | **`multipart/form-data`**: `idea_id`（server が `chat_groups` を解決）・`body?`（Markdown ライト）・`reply_to_message_id?`・`mentions[]?`（`user_id` の配列）・`files[]?`（添付・§1.10）。**`Idempotency-Key` 必須**（§1.9・XP 副作用） | 201＋作成メッセージ表現（E.1）。副作用＝投稿 XP+5（下記）・メンション/フォロワー/投稿者通知（E.6）・Redis event（E.7） |
-| `PATCH /chat-messages/{message_id}` | 自分のメッセージを編集（本文/添付追加・multipart） | パス: `message_id`／`multipart/form-data`: `body?`・`mentions[]?`（置換）・`files[]?`（追加）・`remove_attachment_ids[]?`（除去） | 200＋更新後メッセージ表現（`is_edited=true`）。Redis event（`chat_message_updated`） |
-| `DELETE /chat-messages/{message_id}` | メッセージを論理削除（トゥームストーン） | パス: `message_id` | 200（`{id, is_deleted:true, deleted_at}`）。Redis event（`chat_message_deleted`） |
+| `PATCH /chat-messages/{message_id}` | 自分のメッセージを編集（本文/添付追加・multipart） | パス: `message_id`／`multipart/form-data`: `body?`・`mentions[]?`（置換）・`files[]?`（追加）・`remove_attachment_ids[]?`（除去） | 200＋更新後メッセージ表現（`is_edited=true`）。Redis event（`chat.message.updated`・canonical＝E.7/L.3） |
+| `DELETE /chat-messages/{message_id}` | メッセージを論理削除（トゥームストーン） | パス: `message_id` | 200（`{id, is_deleted:true, deleted_at}`）。Redis event（`chat.message.deleted`・canonical＝E.7/L.3） |
 
 - **空メッセージ不可**: `body` が空**かつ** `files[]` も無い場合は **422 `empty_message`**（SC-24 §4.3・添付のみ〔本文空〕は可）。
 - **投稿 XP+5（各ユーザー日次初回のみ・日次上限=チャット10/日）**: `activities` に `kind=xp_gain`,`reason=chat`,`ref_type=chat_messages`,`ref_id=message_id` を**同一 UoW で記帳**（ドメイン G の gamification repo を呼ぶ・コーディング規約 §3.4）。上限到達後の投稿は XP 付与なしで成功（投稿自体は可）。canonical XP 表・日次上限は README §6／データモデル §8-⑥。
@@ -82,8 +82,8 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/ボディ/クエリ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `POST /chat-messages/{message_id}/reactions` | リアクション付与（通常＝絵文字／魔法＝spell） | パス: `message_id`／ボディ: `{type:'normal', emoji}` または `{type:'magic', spell_id}` | 200＋当該メッセージの `reactions` 集計（E.1）。魔法は Redis event（`reaction_added`）＋魔法受領通知（E.6） |
-| `DELETE /chat-messages/{message_id}/reactions` | リアクション取消（自分の分） | パス: `message_id`／クエリ: `emoji`（通常の取消）または `type=magic`（自分の魔法を取消） | 200＋更新後の `reactions` 集計。Redis event（`reaction_removed`） |
+| `POST /chat-messages/{message_id}/reactions` | リアクション付与（通常＝絵文字／魔法＝spell） | パス: `message_id`／ボディ: `{type:'normal', emoji}` または `{type:'magic', spell_id}` | 200＋当該メッセージの `reactions` 集計（E.1）。魔法は Redis event（`chat.reaction.added`・canonical＝E.7/L.3）＋魔法受領通知（E.6） |
+| `DELETE /chat-messages/{message_id}/reactions` | リアクション取消（自分の分） | パス: `message_id`／クエリ: `emoji`（通常の取消）または `type=magic`（自分の魔法を取消） | 200＋更新後の `reactions` 集計。Redis event（`chat.reaction.removed`・canonical＝E.7/L.3） |
 
 - **通常リアクション**: `emoji` は **`reaction_emojis` マスタ（`is_active=true`）に存在するもののみ**（任意絵文字は不可＝422 `invalid_reaction_emoji`・§5.30）。**同一ユーザー×同一絵文字は不可**（`UNIQUE(chat_message_id, user_id, emoji) WHERE type='normal'`・§5.18）。同じ絵文字の再 POST は**冪等**（既存につき現状集計を 200 で返す）＝トグルは付与=POST／取消=DELETE で表現。1 ユーザーが 1 メッセージに付けられる通常リアクションは最大でセット種類数。**通常リアクションは通知を発火しない**（装飾のみ）。
 - **魔法リアクション**（FR-33・SC-24 §4.3b/§5）:
@@ -110,7 +110,7 @@
 
 ## E.6 メンション・通知連携（ドメイン H 連携点）
 
-書込側（E の application）が **通知レコード生成をトリガ**する（配信テンプレ/多言語/一覧は**ドメイン H**・§1.13）。E は「いつ・誰に・どの種別を」発火するかを規定：
+書込側（E の application）が**本体コミット後の post-commit で** H の `notify()` を呼ぶ（配信テンプレ/多言語/一覧は**ドメイン H**・多言語方針＝データモデル §8-⑬）。E は「いつ・誰に・どの種別を」発火するかを規定：
 
 | 契機 | 通知種別（`notification_type`・§3） | 宛先 |
 | --- | --- | --- |

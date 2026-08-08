@@ -71,7 +71,7 @@
 
 - **付与＝台帳（`activities`）書き込みの post-commit フックで即時判定（G が一元化・§8-⑲）**:
   - **全付与行動（投稿/選定/評価/投票/チャット/ログイン/レベルアップ/魔法解放/装備購入）は既に `activities` を書く**ため、その追記後フックで**当該ユーザーの関連実績のみ**（`reason`/種別でルーティング）を再判定する。各ドメインが実績 API を個別に呼ぶ必要はない。
-  - 達成なら **`user_achievements` 作成＋ティア連動コイン報酬＋通知を同一/直後 UoW で**: コイン＝`activities`（`kind=coin_gain`,`reason=achievement_reward`,`ref_type=achievements`,`ref_id=achievement_id`・**ブロンズ20/シルバー50/ゴールド150**）＋`coin_balance` 加算／通知＝`notification_type=achievement`（ドメイン H 配信）。
+  - 達成なら **`user_achievements` 作成＋ティア連動コイン報酬を UoW で記帳し、通知は post-commit で** `notify()` を呼ぶ（他ドメインと同じ post-commit 統一・§3.5-(3)）: コイン＝`activities`（`kind=coin_gain`,`reason=achievement_reward`,`ref_type=achievements`,`ref_id=achievement_id`・**ブロンズ20/シルバー50/ゴールド150**）＋`coin_balance` 加算／通知＝`notification_type=achievement`（ドメイン H 配信）。
   - **冪等（一度きり）**＝`UNIQUE(user_id, achievement_id)`＋コインは `activities` 存在チェック（多重付与なし）。
   - 判定条件は `achievements.condition`（jsonb）で表現（表示文言ではなくロジック定義）。**数値系**は `user_achievements.progress_current/target` を更新（`GET` で `cur/max` 表示）。**連続ログイン**は `activities(reason=login)` の日付連続で導出（新テーブル不要）。**「全◯種」系**（魔法全解放/全装備購入）は該当マスタ件数と所有/解放件数の一致で判定。
 

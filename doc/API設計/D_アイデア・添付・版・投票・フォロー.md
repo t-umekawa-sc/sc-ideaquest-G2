@@ -86,7 +86,7 @@
 
 - **検証（サーバー・§1.10・§5.12）**: **1ファイル 20MB 上限**（超過は **413** 相当＝`validation_error`〔`errors[].code=too_large`〕）／**1 アイデアあたり 10 件まで**（既存件数＋今回件数が 10 を超えたら **422 `validation_error`**〔`errors[].code=too_many`〕）／**許可 MIME allowlist**（画像 `png`/`jpeg`/`gif`/`webp`・`pdf`・Office `docx`/`xlsx`/`pptx`・テキスト `txt`/`csv`/`md`・`zip`／それ以外は **422 `validation_error`**〔`errors[].code=mime_not_allowed`〕）。判定は**MIME スニッフィング＋拡張子**の両面（申告 `Content-Type` を信用しない）。
 - **物理名ハッシュ化**（§1.10・§5.12）: `object_key` はサーバーが CSPRNG 由来のハッシュ名で採番（元名は保存しない・パストラバーサル/上書き対策）。`original_name` は表示・全文検索用に別カラム保持（PGroonga 索引・§6）。
-- **レスポンスの `uploaded_by` はユーザーオブジェクト**（`{id, display_name, avatar_image_path}` 等の表示用 DTO）で返す（他 EP の `author`/`owner` と統一）。内部の `uploaded_by_id`（データモデル §5.12）や `object_key` は露出しない（§3.2 DTO・D.7）。
+- **レスポンスの `uploaded_by` はユーザーオブジェクト**（`{id, display_name, avatar_image_url?}` 等の表示用 DTO・`avatar_image_url` は**署名URL**＝§1.10／生パス非露出）で返す（他 EP の `author`/`owner` と統一）。内部の `uploaded_by_id`（データモデル §5.12）や `object_key`／画像の生パス（`avatar_image_path`）は露出しない（§3.2 DTO・D.7）。
 - **アップロード権限**: 添付追加は**そのアイデアの編集権限と同じ**（投稿者本人 or `owner`/`quest_admin`）。ダウンロードは**パーティー所属**（閲覧できる＝落とせる）。範囲外は 404。
 - **添付は編集扱いだが版は生まない**: 添付の追加/削除は本文フィールドの変更ではないため `idea_revisions` を増やさない（SC-22 §4.4c の「添付＝＋file/−file」は将来の版連動で扱う＝D.8）。MVP は添付操作を版に含めない。
 - **削除凍結**: クエスト `completed` 後は添付の追加/削除も投稿系として 409（読み取り専用）。ダウンロードは可。
