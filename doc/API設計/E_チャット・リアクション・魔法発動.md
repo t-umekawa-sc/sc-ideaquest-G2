@@ -127,7 +127,7 @@
 ## E.7 リアルタイム配信連携（ドメイン L 連携点・§1.12）
 
 - **書き込みは REST・WS は配信専用**（§1.12・コーディング規約 §1/§3.1）。E の各書込 EP は成功時に application が **Redis Pub/Sub へ event を発行**する（ドメイン層の迂回禁止）。
-- **トピック `chat:{chat_group_id}`**（SC-24 を開いたクライアントが購読）へ発行するイベント: `chat_message_created`／`chat_message_updated`／`chat_message_deleted`／`reaction_added`／`reaction_removed`（魔法エフェクト含む）。ペイロードは E.1 のメッセージ/集計表現に準拠。
+- **トピック `chat:{chat_group_id}`**（SC-24 を開いたクライアントが購読）へ発行するイベント（**`type` の canonical＝L.3**・ドット記法）: `chat.message.created`／`chat.message.updated`／`chat.message.deleted`／`chat.reaction.added`／`chat.reaction.removed`（魔法エフェクト含む）。ペイロードは E.1 のメッセージ/集計表現に準拠。
 - **トピック `notifications:{user_id}`**（常時購読）への通知イベント（新着・未読数）の**発行は E ではなく H の `notify()`（post-commit）が担う**（E.6 で E の application が `notify()` をトリガ→H が行 INSERT＋当該 channel へ publish・H.0/H.1）。E が直接 publish するのは上記 `chat:{chat_group_id}` のみ。
 - 配信の詳細（購読権限検証・再接続再同期・ハートビート）は**ドメイン L**／§1.12。切断中の欠落は **REST を正**として補完（再接続時 `GET /ideas/{idea_id}/chat?after=<cursor>`）。
 

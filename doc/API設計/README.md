@@ -159,7 +159,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | **会社コンフィグ（キャッシュ）** | `company_config:{company_id}` | `status`／`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`／`db_identifier`（管理DB `companies` のミラー） | 短 TTL（既定 60 秒目安・実装時確定）＋**明示無効化** | **充填**=会社解決時（§1.5・キャッシュミス時に `companies` から読む）／**更新・無効化**=`PATCH /admin/companies/{id}`・`PATCH /admin/companies/{id}/settings`・会社 `active`/`suspend` 化（B.1） |
 | レート制限カウンタ | `ratelimit:{scope}` | 失敗回数・ロック状態（§A.8） | 窓/ロック時間 | `POST /auth/login`・`POST /auth/password-setup/request` 等の失敗計上時 |
 | 冪等キー結果 | `idem:{company_id}:{account_id}:{key}` | `state`（`in_flight`/`done`）＋確定レスポンス（ステータス＋ボディ）＋リクエスト指紋（method＋path＋ボディhash）。再送で再生＝`idempotency_replayed`・処理中は `idempotency_in_progress`・別内容は `idempotency_key_reuse`（§1.9） | **既定 24 時間**（実装で調整可） | 非冪等 POST（アイデア投稿・クエスト作成・購入・評価確定・魔法解放 等）の初回に `SET NX` で確保→コミット後に `done` |
-| リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行＝`notifications:{user_id}` は **H の `notify()`（post-commit・§3.5-(3)）**／`chat:{chat_group_id}` は D/E の application（REST 処理内）が publish |
+| リアルタイム配信（Pub/Sub・キャッシュではない） | ch `notifications:{user_id}`・`chat:{chat_group_id}` | イベント fan-out（§1.12） | —（購読中のみ） | 発行＝`notifications:{user_id}` は **H の `notify()`（post-commit・§3.5-(3)）**／`chat:{chat_group_id}` は **E** の application（REST 処理内）が publish。配信（購読→WS 転送）は L（§2-L） |
 
 - **反映タイミングの原則（会社コンフィグ）**: 設定は**セッションに焼き込まない**（A.6 に含めない＝再ログイン不要）。`PATCH` 成功時に**同一処理で `company_config:{company_id}` を更新（または削除して次回充填）**するため、**ログイン中ユーザーにも次リクエストから即時反映**（例＝投票匿名化 ON/OFF の切替は、次に `GET /ideas/{id}` 等を取得した時点で表示が切り替わる・ドメイン D.1/D.5）。`mfa_required` はログインフロー時に参照＝**次回以降のログイン**に効く（既存セッションはゲート通過済みで影響なし）。
 - **`db_identifier` の同居**: 会社DB 動的ルーティング（§1.5）の解決も `company_config` から賄える（会社ごとに管理DBへ都度問い合わせない）。`company_code→company_id` の対応は不変寄りのため長 TTL 別キャッシュ可。
@@ -184,7 +184,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | I | ダッシュボード集約 | SC-01 | テナント | ✅ | [`I_ダッシュボード集約.md`](./I_ダッシュボード集約.md) |
 | J | 全文検索 | SC-12 | テナント | ✅ | [`J_全文検索.md`](./J_全文検索.md) |
 | K | プロフィール・背景画像 | 共通ヘッダー | テナント＋コントロール | ✅ | [`K_プロフィール・背景画像.md`](./K_プロフィール・背景画像.md) |
-| L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ⬜ | （目次＝§2-L） |
+| L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ✅ | [`L_リアルタイム配信.md`](./L_リアルタイム配信.md) |
 
 ### A. 認証・セッション（コントロールプレーン）＝詳細確定
 → **[`A_認証・セッション.md`](./A_認証・セッション.md)**（状態機械・Cookie/トークン・8 エンドポイントの req/res・エラー・SC-00 対応）。
@@ -219,8 +219,8 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 ### K. プロフィール・背景画像（共通ヘッダー）＝詳細確定
 → **[`K_プロフィール・背景画像.md`](./K_プロフィール・背景画像.md)**。決定＝**①`display_name` の源泉＝管理DB `accounts`**（1b・`accounts.display_name` 列追加・`users` はミラー）＝identity（login_id/email/locale/display_name）を accounts に源泉一元化**②`GET /me`＝プロフィール＋残高の正準**（I の hero と両立・同じ `users` 読取）**③`PATCH /me`＝`display_name`/`locale` のみ**（accounts+outbox の単一コントロールプレーン Tx・§1.13）**④自己PW変更 `POST /me/password`**＝現在PW再確認（1-㉒）→§A.9-③（全セッション破棄＋信頼端末失効）＋`security_password_changed` 通知（K→H）**⑤メール変更 `POST /me/email`**＝再認証（1-㉓）→accounts+outbox**⑥画像 `PUT/DELETE /me/avatar-image`・`/me/background-image`**＝MinIO・会社DB `users` 直接・読取は署名URL（§1.10・恒久公開URL禁止）。Mass Assignment 対策＝残高/`system_role`/`status`/`password_set`/`login_id` は編集不可（§2.2）。VRM 装備着せ替えは G（`/me/equipment`）＝別物。
 
-### L. リアルタイム配信（WebSocket）
-`GET /realtime`（WS ハンドシェイク・Cookie セッション認証・`company_id` バインド）。常時購読 `notifications:{user_id}`／動的購読 `chat:{chat_group_id}`（`subscribe`/`unsubscribe`・購読時に閲覧権限検証）。配信専用（書き込みは各ドメインの REST）。イベント種別・ペイロード・再接続再同期は §1.12。**書き込み側（D/E/H）の application が Redis へ event を発行する連携点**を各ドメイン詳細で規定。
+### L. リアルタイム配信（WebSocket・SC-24/SC-02）＝詳細確定
+→ **[`L_リアルタイム配信.md`](./L_リアルタイム配信.md)**。決定＝**①`GET /realtime`**（WS ハンドシェイク・Cookie セッション認証・未認証は 401 クローズ・`company_id` バインドでクロステナント遮断）**②配信専用**（書き込みは各ドメインの REST・L は購読→WS 転送に徹する・publish もしない）**③トピック**＝常時 `notifications:{user_id}`（接続時自動）／動的 `chat:{chat_group_id}`（`subscribe`/`unsubscribe`・**購読時に C.0/E.0 門番＝パーティー＋クエストグループ所属の AND を検証**）**④イベントカタログを canonical 統一**（ドット記法・§1.12 準拠）＝`chat.message.created/updated/deleted`・`chat.reaction.added/removed`・`notification.created`・`notification.unread_count`（`data` は E.1／H.2 準拠）**⑤publisher**＝`chat:{group}` は **E のみ**・`notifications:{user_id}` は **H の `notify()`**（D の `idea_updated` 等も H 経由）**⑥購読中の認可失効**＝パーティー/グループ除去時に購読を強制ドロップ＋再接続時に再検証**⑦再同期の真実は REST**（`GET /ideas/{id}/chat?after=`／`GET /notifications`＋未読数）・WS は速報。fan-out＝Redis Pub/Sub（複数インスタンス跨ぎ）・ping/pong。
 
 ---
 
