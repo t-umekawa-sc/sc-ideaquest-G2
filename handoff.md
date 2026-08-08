@@ -138,8 +138,9 @@
   - 実装＝`app/core`（config／db〔control+tenant〕／redis／security〔Argon2id・ADR-0001準拠〕）／`app/models`（control: companies/accounts・company: users）／`migrations/{control,company}`。
 
 - **Chunk 2＋3 完了＝認証EP＋pytest 全緑（本体=`3301b4c`・検証済）**:
-  - `app/core`＝errors（RFC7807 problem+json）／deps（認証ガード・CSRF・Origin。**評価順序＝認証→CSRF**）／session_repo（Redis `sess:{token}`・idle30分スライディング/絶対12h）／rate_limit_repo（(IP+login_id) 10回/5分）。
-  - 4層＝`routers/auth`（Cookie・検証順序）→`application/auth_service`（login/get_session/logout）→`domain/auth`（`decide_login`＝列挙耐性の判定順）→`repository`（account/user/session）。login はコントロールプレーン完結、認証成立時のみ会社DBミラーから表示情報解決（A.6）。`GET /session` は A.6 のみ（内部 `created_at` を漏らさない）。
+  - `app/core`＝errors（RFC7807 problem+json）／deps（認証ガード・CSRF・Origin。**評価順序＝認証→CSRF**）／security（Argon2id＋セッション`sess:{token}`〔idle30分/絶対12h〕＋CSRF＋レート制限 (IP+login_id) 10回/5分）。
+  - 4層＝`router`（Cookie・検証順序）→`application`（login/get_session/logout）→`domain/service`（`decide_login`＝列挙耐性の判定順）→`repository`＋`orm`。login はコントロールプレーン完結、認証成立時のみ会社DBミラーから表示情報解決（A.6）。`GET /session` は A.6 のみ（内部 `created_at` を漏らさない）。
+  - **構成＝コーディング規約 §3.4（`c500ea4` で再編）**＝2プレーン（`control_plane/auth`・`tenant/profile`）× 縦スライス4層＋`core`/`db{base,control,tenant}`/`infra/cache`＋2エントリ（`main.py`/`worker.py`〔worker はプレースホルダ〕）。
   - `POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout` 実装。
   - **テスト**＝`doc/テスト/A_認証.md` A-TC-001〜019 を pytest 実装（`impl/backend/tests/auth/`）。**19 passed**（`docker compose run --rm backend pytest`）＋live HTTP でも動作確認済。
   - MFA 分岐は会社 `mfa_required=true` 時のみ到達＝**契約形の stub のみ**（実装は MFA スライス）。
