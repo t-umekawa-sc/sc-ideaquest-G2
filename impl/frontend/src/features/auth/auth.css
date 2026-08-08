@@ -1,0 +1,78 @@
+/* SC-00 ログイン固有スタイル（doc/画面設計/mocks/SC-00_ログイン.html から移植）。
+   再利用する見た目は将来 components/ へ昇格（デザイン標準 §6）。 */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.35)),
+    url("/assets/login-bg.jpg") center / cover no-repeat fixed;
+  image-rendering: pixelated;
+}
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  /* フロステッドガラス（半透明＋背後ぼかし） */
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+}
+.login-logo {
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+.login-logo img {
+  height: 84px;
+  width: auto;
+  display: inline-block;
+}
+.login-card h1 {
+  font-size: var(--text-xl);
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+.form-error {
+  background: var(--color-disagree-bg);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.pw-wrap {
+  position: relative;
+}
+.pw-wrap .input {
+  padding-right: 40px;
+}
+.pw-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.login-links {
+  text-align: center;
+  margin-top: var(--space-3);
+}
+.login-note {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui";
 import { logout } from "../api";
 
 export function LogoutButton() {
@@ -18,8 +19,8 @@ export function LogoutButton() {
     }
   }
   return (
-    <button onClick={onClick} disabled={pending}>
+    <Button variant="outline" onClick={onClick} disabled={pending}>
       ログアウト
-    </button>
+    </Button>
   );
 }

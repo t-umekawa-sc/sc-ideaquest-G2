@@ -1,29 +1,26 @@
-/* デザイントークンは Chunk 後半で shared.css 相当を移植（§4.1）。ここでは最小のみ。 */
+@import "../styles/tokens.css";
+@import "../styles/components.css";
+
+/* ベース（デザイン標準 §5・業務層のクリーンな土台） */
 * {
   box-sizing: border-box;
 }
+html,
 body {
+  padding: 0;
   margin: 0;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
 }
-main {
-  max-width: 420px;
-  margin: 3rem auto;
-  padding: 0 1rem;
+body {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+  color: var(--color-text);
+  background: var(--color-bg);
 }
-form div {
-  margin-bottom: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+a {
+  color: var(--color-primary);
 }
-input {
-  padding: 0.5rem;
-  font-size: 1rem;
-}
-button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  cursor: pointer;
+h1 {
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-4);
 }

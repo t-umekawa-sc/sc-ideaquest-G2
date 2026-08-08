@@ -1,0 +1,92 @@
+/* デザイントークン（doc/画面設計/mocks/shared.css の :root を移植）。
+   トークンは画面/コンポーネントに直書きせず、必ずこの変数を参照する（デザイン標準 §6）。
+   フォントは将来 next/font に置換（デザイン標準 §2）。現状は Noto フォールバック。 */
+:root {
+  /* ブランド（ブルー基調） */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-active: #1e40af;
+  --color-primary-soft: #eff6ff;
+  --color-primary-border: #bfdbfe;
+  --color-on-primary: #ffffff;
+
+  /* ニュートラル */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+
+  /* 意味色 */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-danger-active: #991b1b;
+  --color-info: #0ea5e9;
+
+  /* 投票 */
+  --color-agree: #16a34a;
+  --color-agree-bg: #dcfce7;
+  --color-disagree: #dc2626;
+  --color-disagree-bg: #fee2e2;
+
+  /* レアリティ */
+  --rarity-common: #94a3b8;
+  --rarity-standard: #3b82f6;
+  --rarity-rare: #a855f7;
+  --rarity-rare-on-dark: #d8b4fe;
+
+  /* ゲーミフィケーション（ゲーム層・現状は変数のみ移植） */
+  --pixel-xp: #fbbf24;
+  --pixel-coin: #f59e0b;
+  --pixel-level: #8b5cf6;
+  --pixel-level-on-dark: #c4b5fd;
+  --pixel-skill: #34d399;
+  --pixel-bg: #1e293b;
+  --pixel-ink: #f8fafc;
+
+  /* タイポグラフィ */
+  --font-base: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-pixel: "DotGothic16", "Noto Sans JP", monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --leading: 1.6;
+
+  /* 余白（4px 基準） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* 角丸 */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --radius-pixel: 0;
+
+  /* 影 */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.1), 0 4px 6px rgba(15, 23, 42, 0.05);
+  --shadow-pixel: 4px 4px 0 rgba(15, 23, 42, 0.85);
+
+  /* レイアウト */
+  --container: 1120px;
+  --header-h: 56px;
+}
