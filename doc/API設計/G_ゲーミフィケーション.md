@@ -97,7 +97,7 @@
 
 | 付与/消費 | 発火ドメイン（EP） | `kind` | 量 | `reason` | `ref_type`/`ref_id` | 上限・冪等 |
 | --- | --- | --- | --- | --- | --- | --- |
-| ログイン XP | A（ログイン成功） | xp_gain | 10 | `login` | —（NULL） | 1回/日 |
+| ログイン XP | A（新しい日〔JST〕の最初の認証済みリクエスト＝ログイン成功を含む） | xp_gain | 10 | `login` | —（NULL） | ユーザー×JST日で1回（台帳存在チェックで冪等・下記＋A.1） |
 | アイデア投稿 XP | D（publish） | xp_gain | 50 | `idea_post` | ideas/idea_id | アイデアにつき1回 |
 | 投票 XP | D（vote 初回） | xp_gain | 5 | `vote` | ideas/idea_id | 5回/日・各アイデア初回のみ |
 | チャット XP | E（投稿） | xp_gain | 5 | `chat` | chat_messages/msg_id | 10回/日 |
@@ -109,6 +109,7 @@
 | 魔法解放 SP消費 | G（unlock G.3） | sp_spend | sp_cost | `spell_unlock` | spells/spell_id | 解放につき1回（Idempotency-Key） |
 | ショップ購入 コイン消費 | G（purchase G.1） | coin_spend | price_coin | `shop_purchase` | items/item_id | 購入につき1回（Idempotency-Key） |
 
+- **ログイン XP の契機（詳細）**＝「**新しい暦日（JST）の最初の認証済みリクエスト**」（ログイン成功を含む・認証イベントに限らない＝持続セッションでも毎日成立）。判定は純粋関数（`daily_login_bonus_due`）、付与は `activities(reason=login)` を**ユーザー×JST日で1回**（台帳存在チェック＝冪等・投票 XP と同じ流儀）。契機の実装はセッション解決依存性（**A.1**）。**連続ログイン実績（7/30日）はこの日次 `reason=login` の連続で導出**＝日次エンゲージメントを正しく反映（認証イベントに縛らないため持続セッションの優良ユーザーもストリークが途切れない）。
 - **レベルアップ判定**は XP 付与のたびにサーバーが `level` を再計算し、上昇分だけ `levelup_sp` を発行（`users.level`/`skill_point_balance` 更新）。
 - `GET /me/activities`（履歴・SC-01/プロフィール）＝`kind?`/`period?` で絞り込み・カーソル（§1.8）。SP はランキング非対象だが履歴には出る。
 
