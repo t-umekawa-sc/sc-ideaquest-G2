@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     session_idle_ttl_seconds: int = 1800       # アイドル30分（スライディング）
     session_absolute_ttl_seconds: int = 43200  # 絶対上限12時間
 
+    # CSRF/Origin（A.0）。状態変更系の Origin 許可リスト（ローカル既定）
+    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+
+    # ログインのレート制限（ADR-0001 §2.6）。(IP+login_id) 単位
+    login_rate_limit_max: int = 10
+    login_rate_limit_window_seconds: int = 300
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

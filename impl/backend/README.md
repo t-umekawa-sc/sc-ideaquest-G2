@@ -3,12 +3,14 @@
 FastAPI＋SQLAlchemy（同期）＋Alembic＋Redis。骨格の正＝`doc/規約/コーディング規約.md` §3.4（2プレーン×縦スライス4層）。
 値の決定＝`doc/ADR/ADR-0001_認証・セッション基本パラメータ.md`。
 
-## 現在の到達点（Chunk 1＝起動骨格）
+## 現在の到達点（Chunk 1＋2＋3）
 
 - `compose.yaml` で **Postgres＋Redis＋backend** が起動する。
 - 起動時に `scripts/bootstrap.py` が **管理DB／会社DB を作成→Alembic マイグレーション→シード**（冪等）。
 - `GET /healthz` が DB・Redis 疎通を返す。
-- **認証エンドポイント（`/api/v1/auth/*`）とテストは Chunk 2 以降**。
+- **認証エンドポイント**＝`POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（4層＝router→application→domain→repository）。
+- **テスト**＝`doc/テスト/A_認証.md` の A-TC-001〜019 を pytest 実装（`tests/auth/`・全緑）。
+- フロント（SC-00）と e2e（A-TC-020）は Chunk 4。
 
 ## 実行（`impl/` ディレクトリで）
 
@@ -19,6 +21,16 @@ curl localhost:8000/healthz      # {"status":"ok","checks":{"db":true,"redis":tr
 ```
 
 シード（開発用ログイン情報）＝会社コード `ACME-01` / ログインID `user@acme.example` / PW `Passw0rd!`（会社は `mfa_required=false`）。
+
+## テスト
+
+```bash
+cd impl
+docker compose up -d db redis
+docker compose run --rm backend pytest -q     # bootstrap 後に pytest（A-TC-001〜019）
+```
+
+TC-ID（例 `A-TC-003`）でテスト関数と `doc/テスト/A_認証.md` の行が対で辿れる（トレーサビリティ＝テスト規約 §1）。
 
 ## 技術選定メモ
 
