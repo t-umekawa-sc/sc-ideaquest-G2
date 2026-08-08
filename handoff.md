@@ -6,8 +6,8 @@
 >
 > **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。ツール＝Alembic＋SQLAlchemy(同期)。
 > **ログイン(状態A)スライス完成＝「ログインが動くまで」達成**。docs 先行（`57e4f20`）＋Chunk1 骨格（`f8f4db9`）＋Chunk2+3 認証EP＋pytest 全緑（`3301b4c`）＋§3.4 再編（`c500ea4`）＋**Chunk4 フロント SC-00＋e2e A-TC-020 全緑（`cb84de8`）**。実装は `impl/`（backend=§3.4／frontend=§4.1）。
-> フロント本格化(1)＝デザイントークン移植＋components/ui＋SC-00 業務層クリーン化 完了（`1cc7bd1`・A-TC-020 緑）。
-> **次は要相談**＝(1) フロント本格化(2)（共通ヘッダー／OpenAPI 型クライアント／next/font）(2) A の残り（MFA／PW設定＋ロック方針確定）(3) 次ドメイン縦スライス(B/C/D)。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
+> フロント本格化(1)＝トークン移植＋components/ui＋SC-00（`1cc7bd1`）／(2)＝OpenAPI 型クライアント codegen（`c82ed2f`・pytest19/tsc0/e2e1 緑）完了。
+> **次は要相談**＝(1) フロント本格化(3)（共通ヘッダー app-shell／next/font／components/ui 拡充）(2) A の残り（MFA／PW設定＋ロック方針確定）(3) 次ドメイン縦スライス(B/C/D)。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -158,10 +158,16 @@
   - `styles/tokens.css`（`:root` トークン全移植）・`styles/components.css`（`.btn`/`.card`/`.field`/`.input` 移植）を `globals.css` で読込。
   - `components/ui`＝`Button`（variant/size/block）・`Card`/`CardTitle`・`Field`。SC-00 ログインをモック準拠（フロステッドカード・ロゴ・PW表示切替・エラー表示）。`public/assets` に logo/login-bg。SC-01 を Card 化。
   - 検証＝再ビルド後 login 描画・**Playwright A-TC-020 再び 1 passed**。
-  - **後続の本格化**＝フォント `next/font` 置換／共通ヘッダー（app-shell：`.app-header`/ベル/ユーザーメニュー/背景画像）／ゲーム層 `.pixel*`（CRTガラス）／**OpenAPI から型付きクライアント codegen**／`components/ui` 拡充（Modal/Table/Badge 等）。
+  - **後続の本格化**＝フォント `next/font` 置換／共通ヘッダー（app-shell：`.app-header`/ベル/ユーザーメニュー/背景画像）／ゲーム層 `.pixel*`（CRTガラス）／`components/ui` 拡充（Modal/Table/Badge 等）。
+
+- **フロント本格化(2) 完了＝OpenAPI 型クライアント codegen（本体=`c82ed2f`・検証済）**:
+  - backend＝auth に レスポンスモデル（`Session`/`SessionUser`/`LoginResponse`）を付与し OpenAPI に反映。router は型付きモデルを返しつつ Cookie は注入 `Response` に設定（login は `response_model_exclude_none` で従来の応答形を維持）。
+  - frontend＝`openapi-typescript` で `/openapi.json` から `src/lib/api/schema.d.ts` を生成。`features/auth/types.ts`・`lib/session.ts` の型を**生成物から導出**（手書き廃止＝drift 防止）。`npm run codegen` 追加（root README に手順）。
+  - 検証＝pytest 19 passed／`tsc --noEmit` 0／Playwright A-TC-020 1 passed。
+  - **再生成の運用**＝backend の API を変えたら `docker compose exec frontend npm run codegen` で `schema.d.ts` を更新（コミット対象）。
 
 - **次にやること（候補・要相談）**:
-  1. **フロント本格化(2)**＝共通ヘッダー（app-shell）or OpenAPI 型クライアント codegen or `next/font`。
+  1. **フロント本格化(3)**＝共通ヘッダー（app-shell）or `next/font` or `components/ui` 拡充。
   2. **A の残り状態**＝MFA（状態C・OTP＋MailHog）／初回・再設定PW（状態B/D）＋**アカウントロック方針を A 設計＋ADR で確定**。
   3. **次ドメインの縦スライス**（B アカウント管理／C・D クエスト・アイデア）を同じ「設計→テストパターン→テストコード」で。
 - **テスト実行**＝backend: `cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`（19 passed）／e2e: フルスタック起動後 `docker compose exec frontend npx playwright install chromium && docker compose exec frontend npx playwright test`（1 passed）。
