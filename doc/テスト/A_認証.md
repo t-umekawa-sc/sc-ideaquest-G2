@@ -1,7 +1,7 @@
-# テストパターン A. 認証（状態A＝パスワードログイン）
+# テストパターン A. 認証（状態A＝パスワードログイン／状態B・D＝初回・再設定PW）
 
-> 規約＝[`テスト規約.md`](./テスト規約.md)。仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md)（A.0/A.1/A.6）・[`../API設計/README.md`](../API設計/README.md) §1.4/§1.7・[`../画面設計/screens/SC-00_ログイン.md`](../画面設計/screens/SC-00_ログイン.md)。具体値＝[`../ADR/ADR-0001_認証・セッション基本パラメータ.md`](../ADR/ADR-0001_認証・セッション基本パラメータ.md)。
-> 本スライスの範囲＝**状態A（PWログイン）＋`GET /auth/session`＋`logout`**。MFA（状態C）・初回/再設定PW（状態B/D）は範囲外＝後続で TC 追加。
+> 規約＝[`テスト規約.md`](./テスト規約.md)。仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md)（A.0/A.1/A.6/A.7/A.9）・[`../API設計/README.md`](../API設計/README.md) §1.4/§1.7・[`../画面設計/screens/SC-00_ログイン.md`](../画面設計/screens/SC-00_ログイン.md)。具体値＝[`../ADR/ADR-0001_認証・セッション基本パラメータ.md`](../ADR/ADR-0001_認証・セッション基本パラメータ.md)（状態A）・[`../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md`](../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md)（状態B/D）。
+> 対象範囲＝**状態A（PWログイン）＋`GET /auth/session`＋`logout`**（§1・A-TC-001〜021）／**状態B・D（初回・再設定PW＝`password-setup` の request/verify/complete）**（§3・A-TC-030〜051）。MFA（状態C）は範囲外＝後続で TC 追加。
 > 期待する `code`・スキーマは上記設計/OpenAPI が SoT（本表は参照。値は出典併記）。
 
 ## 前提（共通フィクスチャ）
@@ -41,5 +41,60 @@
 ## 2. 補足・非対象
 
 - **ログインボーナス XP**（A.1・G）は付与契機が「新しい JST 日の最初の認証済みリクエスト」で**ドメイン G の台帳**が絡むため、A スライスでは**セッションに `last_login_bonus_date` を保持するところまで**を確認対象とし、XP 付与自体の TC は G のテストパターンで扱う（本表では非対象）。
-- レート制限（ADR §2.6）の TC は閾値確定後に追加（A-TC-050 以降で予約）。
-- MFA・初回/再設定PW の TC は状態C/B/D スライスで A-TC-030 以降に追加予定。
+- レート制限（ADR-0001 §2.6・**ログイン**の 429）の TC は閾値確定後に追加（A-TC-050 で予約＝未使用）。
+- 初回/再設定PW（状態B/D）の TC は §3（A-TC-030〜051）。MFA（状態C）は後続スライスで A-TC-052 以降に追加予定。
+
+---
+
+## 3. テストパターン（状態B・D＝初回・再設定パスワード）
+
+> 仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md) A.7／A.9-③⑤。具体値＝[`../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md`](../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md)。画面＝[`../画面設計/screens/SC-00_ログイン.md`](../画面設計/screens/SC-00_ログイン.md) §3〜§8（状態B/D）。
+> 3エンドポイント＝`POST /api/v1/auth/password-setup/{request,verify,complete}`。**初回設定・自己サービス再設定・管理者再設定は同一のメールリンク基盤**（`otp_challenges` purpose=`password_setup`・72h・単回）。
+> 前提フィクスチャ＝§1「前提」と共通。派生状態（`password_set=false`／`disabled` アカウント／`suspended` 会社／期限切れ・使用済トークン）は factory / 直接 DB 操作で作る。メール送信は**フェイク送信**で捕捉（ADR-0002 §2.5）。
+
+### 3.1 `request`（状態D＝再設定リクエスト・列挙耐性で常に 202）
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-030 | api | active 会社＋active アカウント | 正 `company_code/login_id` で `POST /password-setup/request` | `202 {status:"accepted"}`、**メール送信あり**（本文リンクに `token` を含む＝フェイク捕捉） | A.7／ADR-0002 §2.1/2.3 |
+| A-TC-031 | api | 同上 | **存在しない login_id** | `202 {status:"accepted"}`（A-TC-030 と**同一応答**）、**メール送信なし** | A.7（列挙耐性・A.9-⑤） |
+| A-TC-032 | api | 同上 | **存在しない company_code** | `202`（同一）、送信なし | A.7（列挙耐性） |
+| A-TC-033 | api | `password_set=false`（初回未設定）の active アカウント | 正 ID で request | `202`、**送信あり**（＝初回設定リンクも同じ基盤・状態Bへ） | A.7／SC-00 §3 |
+| A-TC-034 | api | `disabled` アカウント | 正 ID で request | `202`（同一）、**送信なし**（active のみ送信） | A.7（active のみ実送信） |
+| A-TC-035 | api | `suspended` 会社 | 正 ID で request | `202`（同一）、**送信なし** | A.7（会社 active のみ実送信） |
+| A-TC-036 | api | — | request を **`X-CSRF-Token` 無し**で | `202`（成功＝**CSRF 免除・Origin/Sec-Fetch のみ**） | A.7／A.0 |
+| A-TC-037 | api | — | request を**不正 Origin** で | `403 {code:"forbidden"}`（Origin/Sec-Fetch 検証） | A.0 |
+| A-TC-038 | api | 同一 (IP＋company_code＋login_id) | **6回連続** request（上限 5回/10分） | **すべて `202`**（超過を漏らさない）、6回目以降は**送信なし**（超過分は無送信で握る） | ADR-0002 §2.3（列挙耐性優先＝429 を返さない） |
+| A-TC-039 | api | — | `company_code`/`login_id` のいずれか欠落で request | `422 {code:"validation_error", errors:[…]}` | README §1.7 |
+| A-TC-040 | int | active アカウントに未使用 `password_setup` チャレンジが既存 | 再度 request | 旧トークンは**失効**（後続 verify で `410`）、新トークンのみ有効（最新のみ） | ADR-0002 §2.1 |
+
+### 3.2 `verify`（状態Bの表示可否＝リンクの有効性確認）
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-041 | api | 有効な `password_setup` トークン | `POST /password-setup/verify {token}` | `200 {valid:true, login_id:"…"}` | A.7 |
+| A-TC-042 | api | 未知/不正トークン | verify | `410 {code:"token_expired"}` | A.7 |
+| A-TC-043 | int | `expires_at` 超過（72h 経過）トークン | verify | `410 {code:"token_expired"}` | A.7／ADR-0002 §2.1 |
+| A-TC-044 | api | 使用済み（`used_at` あり）トークン | verify | `410 {code:"token_expired"}` | A.7（単回） |
+
+### 3.3 `complete`（新PW設定・状態B→ログイン画面A）
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-045 | api | 有効トークン | 適合PW（8文字以上＋英字＋数字）で `POST /password-setup/complete {token,new_password}` | `200 {status:"ok"}`、`password_set=true`、**その後その PW で `POST /auth/login` が成功**（＝新PWが有効） | A.7／ADR-0002 §2.2/2.4 |
+| A-TC-046 | api | 有効トークン | **ポリシー違反 PW**（短すぎ／数字なし／英字なし）で complete | `422 {code:"validation_error", errors:[…]}`、PW は変更されない | ADR-0002 §2.2 |
+| A-TC-047 | api | 無効/期限切れ/使用済トークン | 適合PWで complete | `410 {code:"token_expired"}`、PW は変更されない | A.7 |
+| A-TC-048 | api | complete 成功済みのトークン | 同一トークンで**再度** complete | `410 {code:"token_expired"}`（単回消費・トークンは消える） | ADR-0002 §2.1/2.4 |
+| A-TC-049 | api | 当該アカウントで**別途ログイン中**（有効 `iq_session`）→ 有効トークンで complete 成功 | complete 後、そのセッションで `GET /auth/session` | `401 {code:"unauthenticated"}`（**PW完了で全アクティブセッション破棄**） | A.9-③／ADR-0002 §2.4 |
+
+### 3.4 PW ポリシー（domain 純粋関数・DB 非依存）
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-051 | unit | — | PWポリシー判定関数に各種入力（7文字／数字なし／英字なし／適合）を与える | 適合＝エラー空、各違反＝対応する `errors[]`（最低8文字・英字必須・数字必須） | ADR-0002 §2.2 |
+
+### 3.5 補足・非対象（状態B/D）
+
+- **`account_sync_outbox`（会社DB `users` への `password_set` ミラー・データモデル §4.6）は本スライスでは非対象**＝outbox/worker スライスへ委譲（ADR-0002 §2.4）。complete は管理DB `accounts` の更新＋全セッション破棄までを確認対象とする。
+- **信頼端末（`trusted_devices`）失効**は MFA スライスで `trusted_devices` 導入後に TC 追加（本スライスは全セッション破棄まで）。
+- **セキュリティ通知**（`security_password_changed`・A.9-⑧）はドメイン H 実装時に TC 追加。

@@ -1,10 +1,13 @@
-"""管理DB（コントロールプレーン）のアカウント参照。"""
+"""管理DB（コントロールプレーン）のアカウント参照／OTP チャレンジの永続化。"""
 from __future__ import annotations
 
-from sqlalchemy import select
+import uuid
+from datetime import datetime
+
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.control_plane.auth.orm import Account, Company
+from app.control_plane.auth.orm import Account, Company, OtpChallenge
 
 
 def find_account_and_company(
@@ -24,3 +27,44 @@ def find_account_and_company(
         select(Account).where(Account.company_id == company.id, Account.login_id == login_id)
     ).scalar_one_or_none()
     return account, company
+
+
+# --- OTP チャレンジ（password_setup・データモデル §4.4／ADR-0002） -------------------------
+_PASSWORD_SETUP = "password_setup"
+
+
+def invalidate_password_setup_challenges(session: Session, account_id: uuid.UUID) -> None:
+    """当該アカウントの未使用 password_setup チャレンジを失効（削除）。最新リンクのみ有効に保つ（ADR-0002 §2.1）。"""
+    session.execute(
+        delete(OtpChallenge).where(
+            OtpChallenge.account_id == account_id,
+            OtpChallenge.purpose == _PASSWORD_SETUP,
+            OtpChallenge.used_at.is_(None),
+        )
+    )
+
+
+def create_password_setup_challenge(
+    session: Session, account_id: uuid.UUID, code_hash: str, expires_at: datetime
+) -> OtpChallenge:
+    challenge = OtpChallenge(
+        id=uuid.uuid4(),
+        account_id=account_id,
+        code_hash=code_hash,
+        purpose=_PASSWORD_SETUP,
+        expires_at=expires_at,
+    )
+    session.add(challenge)
+    return challenge
+
+
+def find_password_setup_challenge_by_hash(session: Session, code_hash: str) -> OtpChallenge | None:
+    return session.execute(
+        select(OtpChallenge).where(
+            OtpChallenge.code_hash == code_hash, OtpChallenge.purpose == _PASSWORD_SETUP
+        )
+    ).scalar_one_or_none()
+
+
+def get_account(session: Session, account_id: uuid.UUID) -> Account | None:
+    return session.get(Account, account_id)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,3 +51,26 @@ class Account(ControlBase):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class OtpChallenge(ControlBase):
+    """OTP チャレンジ（データモデル §4.4）。本スライスは purpose=`password_setup`（初回/再設定リンク）のみ。
+
+    - `code_hash`＝設定リンクトークンの SHA-256（平文は保存しない・ADR-0002 §2.1）。
+    - `expires_at`＝password_setup は発行から 72h（ADR-0002 §2.1）。
+    - `used_at`＝単回。complete 成功で打刻し以後は無効（verify/complete とも 410）。
+    - login（6桁 OTP・10分）は MFA スライスで同テーブルを purpose=`login` で利用する。
+    """
+
+    __tablename__ = "otp_challenges"
+    __table_args__ = (Index("ix_otp_challenges_account_purpose", "account_id", "purpose"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
+    )
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)  # SHA-256 hex（トークンのハッシュ）
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

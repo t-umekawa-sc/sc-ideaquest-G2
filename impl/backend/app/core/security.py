@@ -8,6 +8,7 @@ CSRF ヘッダ一致の検証は core/deps.py（リクエストガード）側�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import secrets
 import time
@@ -45,21 +46,55 @@ def generate_token(n_bytes: int = 32) -> str:
     return secrets.token_urlsafe(n_bytes)
 
 
+def hash_token(token: str) -> str:
+    """高エントロピー乱数トークンのハッシュ（SHA-256 hex・ADR-0002 §2.1）。
+
+    設定リンクトークン/OTP は 256bit 乱数で総当り不能なため、遅いハッシュ（Argon2）は不要。
+    保存・照合はハッシュのみで行い、平文は永続化しない（セキュリティ一覧 3）。
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 # --- セッションストア（Redis・ADR §2.2） -----------------------------------------------
 _SESS_PREFIX = "sess:"
+_ACCT_SESS_PREFIX = "acct_sess:"  # account_id -> そのアカウントの有効セッショントークン集合
 
 
 def _sess_key(token: str) -> str:
     return f"{_SESS_PREFIX}{token}"
 
 
+def _acct_sess_key(account_id: str) -> str:
+    return f"{_ACCT_SESS_PREFIX}{account_id}"
+
+
 def create_session(r: redis.Redis, payload: dict) -> str:
-    """新しいセッションを作成しトークンを返す。認証成功のたびに新トークン（固定化対策・A.0）。"""
+    """新しいセッションを作成しトークンを返す。認証成功のたびに新トークン（固定化対策・A.0）。
+
+    account_id ごとの逆引き集合（`acct_sess:{account_id}`）にもトークンを登録する。
+    PW再設定完了・logout-all 等の「全セッション破棄」（A.9-③）で列挙するため。
+    """
     s = get_settings()
     token = generate_token()
     data = {**payload, "created_at": int(time.time())}
     r.set(_sess_key(token), json.dumps(data), ex=s.session_idle_ttl_seconds)
+    account_id = payload.get("account_id")
+    if account_id:
+        akey = _acct_sess_key(account_id)
+        r.sadd(akey, token)
+        # 逆引き集合は絶対上限で失効（掃除しきれない残骸を溜めない）
+        r.expire(akey, s.session_absolute_ttl_seconds)
     return token
+
+
+def delete_account_sessions(r: redis.Redis, account_id: str) -> int:
+    """当該アカウントの全アクティブセッションを破棄（A.9-③）。破棄件数を返す。"""
+    akey = _acct_sess_key(account_id)
+    tokens = r.smembers(akey)
+    for token in tokens:
+        r.delete(_sess_key(token))
+    r.delete(akey)
+    return len(tokens)
 
 
 def read_session(r: redis.Redis, token: str) -> dict | None:
@@ -77,6 +112,11 @@ def read_session(r: redis.Redis, token: str) -> dict | None:
 
 
 def delete_session(r: redis.Redis, token: str) -> None:
+    raw = r.get(_sess_key(token))
+    if raw is not None:
+        account_id = json.loads(raw).get("account_id")
+        if account_id:
+            r.srem(_acct_sess_key(account_id), token)
     r.delete(_sess_key(token))
 
 
@@ -90,3 +130,17 @@ def check_login_rate_limit(r: redis.Redis, ip: str, login_id: str) -> None:
         r.expire(key, s.login_rate_limit_window_seconds)
     if count > s.login_rate_limit_max:
         raise AppError(429, "rate_limited", detail=f"retry after {r.ttl(key)}s")
+
+
+def within_pw_request_rate_limit(r: redis.Redis, ip: str, company_code: str, login_id: str) -> bool:
+    """PW再設定要求のレート制限（ADR-0002 §2.3）。超過なら False を返す（例外は投げない）。
+
+    列挙耐性のため、超過しても応答は 202 のまま（呼び出し側が送信だけをスキップする）。
+    ログインの 429（例外）とは扱いが異なる。
+    """
+    s = get_settings()
+    key = f"pw_req:{ip}:{company_code}:{login_id}"
+    count = r.incr(key)
+    if count == 1:
+        r.expire(key, s.pw_request_rate_limit_window_seconds)
+    return count <= s.pw_request_rate_limit_max

@@ -32,6 +32,19 @@ class Settings(BaseSettings):
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 300
 
+    # 初回・再設定パスワード（ADR-0002）
+    # 設定リンクトークン TTL（72時間・単回・A.7／データモデル §4.4）
+    password_setup_ttl_seconds: int = 259200
+    # request（自己サービス再設定要求）のレート制限（ADR-0002 §2.3・超過時も 202 維持）
+    pw_request_rate_limit_max: int = 5
+    pw_request_rate_limit_window_seconds: int = 600
+    # メール送信（dev=MailHog／prod=SMTP・ADR-0002 §2.5）
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    mail_from: str = "no-reply@ideaquest.example"
+    # メールリンクの基点（フロントのオリジン。password-setup ページを開く）
+    app_base_url: str = "http://localhost:3000"
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

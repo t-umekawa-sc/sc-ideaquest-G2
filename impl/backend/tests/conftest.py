@@ -7,15 +7,17 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.control_plane.auth.orm import Account, Company
-from app.core.security import hash_password
+from app.control_plane.auth.orm import Account, Company, OtpChallenge
+from app.core.security import generate_token, hash_password, hash_token
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.infra import mail as mail_infra
 from app.infra.cache import get_redis
 from app.main import app
 from app.tenant.profile.orm import User
@@ -40,6 +42,15 @@ def _flush_redis():
 
 
 @pytest.fixture
+def mail():
+    """メール送信をフェイクに差し替え、送信内容を捕捉する（ADR-0002 §2.5）。teardown で解除。"""
+    fake = mail_infra.FakeMailSender()
+    mail_infra.set_mail_sender(fake)
+    yield fake
+    mail_infra.set_mail_sender(None)
+
+
+@pytest.fixture
 def factory():
     """エッジ検証用の会社/アカウントを作る。teardown で削除。
 
@@ -48,6 +59,13 @@ def factory():
     """
     created_accounts: list[uuid.UUID] = []
     created_companies: list[uuid.UUID] = []
+    created_challenges: list[uuid.UUID] = []
+    # (db_identifier, account_id) 会社DB ミラーの掃除対象
+    created_users: list[tuple[str, uuid.UUID]] = []
+
+    def _seed_company() -> Company:
+        with control_session() as s:
+            return s.query(Company).filter_by(company_code=SEED_COMPANY_CODE).one()
 
     def make_company(status: str = "active", mfa_required: bool = False) -> dict:
         code = f"TST-{uuid.uuid4().hex[:8]}"
@@ -85,11 +103,77 @@ def factory():
             created_accounts.append(a.id)
             return {"id": a.id, "login_id": lid, "password": password}
 
-    yield SimpleNamespace(make_company=make_company, make_account=make_account)
+    def make_seed_company_account(password_set: bool = True, status: str = "active") -> dict:
+        """シード会社（実在の会社DBを持つ ACME-01）配下にアカウント＋users ミラーを作る。
+
+        complete→login の往復（A-TC-045）や、request の実送信（実在アカウント）に使う。
+        teardown で control の accounts と 会社DB の users を削除する。
+        """
+        company = _seed_company()
+        lid = f"pw-{uuid.uuid4().hex[:8]}@acme.example"
+        password = "Passw0rd!"
+        aid = uuid.uuid4()
+        with control_session() as s:
+            s.add(Account(
+                id=aid,
+                company_id=company.id,
+                login_id=lid,
+                email=lid,
+                display_name="PW Test",
+                password_hash=hash_password(password) if password_set else None,
+                locale="ja",
+                system_role="general",
+                status=status,
+            ))
+            s.commit()
+        created_accounts.append(aid)
+        with get_tenant_session(company.db_identifier) as ts:
+            ts.add(User(id=uuid.uuid4(), account_id=aid, display_name="PW Test", locale="ja", status="active"))
+            ts.commit()
+        created_users.append((company.db_identifier, aid))
+        return {"id": aid, "login_id": lid, "password": password,
+                "company_code": SEED_COMPANY_CODE, "email": lid}
+
+    def make_password_setup_challenge(
+        account_id: uuid.UUID, token: str | None = None,
+        expires_in_seconds: int = 3600, used: bool = False,
+    ) -> str:
+        """password_setup チャレンジを直接作成し、平文トークンを返す（expired/used ケース用）。"""
+        tok = token or generate_token()
+        cid = uuid.uuid4()
+        now = datetime.now(timezone.utc)
+        with control_session() as s:
+            s.add(OtpChallenge(
+                id=cid,
+                account_id=account_id,
+                code_hash=hash_token(tok),
+                purpose="password_setup",
+                expires_at=now + timedelta(seconds=expires_in_seconds),
+                used_at=now if used else None,
+            ))
+            s.commit()
+        created_challenges.append(cid)
+        return tok
+
+    yield SimpleNamespace(
+        make_company=make_company,
+        make_account=make_account,
+        make_seed_company_account=make_seed_company_account,
+        make_password_setup_challenge=make_password_setup_challenge,
+    )
 
     with control_session() as s:
+        for cid in created_challenges:
+            s.query(OtpChallenge).filter_by(id=cid).delete()
+        # テスト中に request/complete が作った未追跡のチャレンジも掃除（対象アカウント分）
+        for aid in created_accounts:
+            s.query(OtpChallenge).filter_by(account_id=aid).delete()
         for aid in created_accounts:
             s.query(Account).filter_by(id=aid).delete()
         for cid in created_companies:
             s.query(Company).filter_by(id=cid).delete()
         s.commit()
+    for db_identifier, aid in created_users:
+        with get_tenant_session(db_identifier) as ts:
+            ts.query(User).filter_by(account_id=aid).delete()
+            ts.commit()

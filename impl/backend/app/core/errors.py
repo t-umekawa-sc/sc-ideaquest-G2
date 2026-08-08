@@ -17,6 +17,7 @@ _TITLES = {
     "validation_error": "Validation failed",
     "rate_limited": "Too Many Requests",
     "company_suspended": "Company Suspended",
+    "token_expired": "Token Expired",
 }
 
 

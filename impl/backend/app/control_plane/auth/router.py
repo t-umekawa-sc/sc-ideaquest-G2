@@ -8,7 +8,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Request, Response
 
 from app.control_plane.auth import application as auth_service
-from app.control_plane.auth.schemas import LoginRequest, LoginResponse, Session
+from app.control_plane.auth.schemas import (
+    AcceptedResponse,
+    LoginRequest,
+    LoginResponse,
+    OkResponse,
+    PasswordSetupCompleteReq,
+    PasswordSetupRequestReq,
+    PasswordSetupVerifyReq,
+    PasswordSetupVerifyResponse,
+    Session,
+)
 from app.core.config import get_settings
 from app.core.deps import require_session, verify_csrf, verify_origin
 from app.infra.cache import get_redis
@@ -46,6 +56,31 @@ def get_session(request: Request) -> Session:
     # セッション必須（無ければ 401）。GET は CSRF 不要（A.1）。応答は A.6 のみ（内部フィールドは返さない）
     payload = auth_service.get_session(get_redis(), request.cookies.get("iq_session"))
     return Session(**payload)
+
+
+@router.post("/password-setup/request", response_model=AcceptedResponse, status_code=202)
+def password_setup_request(body: PasswordSetupRequestReq, request: Request) -> AcceptedResponse:
+    # 未認証起点＝CSRF 免除・Origin/Sec-Fetch のみ（A.7）。応答は常に 202（列挙耐性）
+    verify_origin(request)
+    client_ip = request.client.host if request.client else "unknown"
+    auth_service.request_password_setup(get_redis(), client_ip, body.company_code, body.login_id)
+    return AcceptedResponse()
+
+
+@router.post("/password-setup/verify", response_model=PasswordSetupVerifyResponse)
+def password_setup_verify(body: PasswordSetupVerifyReq, request: Request) -> PasswordSetupVerifyResponse:
+    # リンクの有効性確認（状態Bの表示可否）。未認証起点＝Origin のみ。無効/期限切れ/使用済は 410
+    verify_origin(request)
+    result = auth_service.verify_password_setup(body.token)
+    return PasswordSetupVerifyResponse(**result)
+
+
+@router.post("/password-setup/complete", response_model=OkResponse)
+def password_setup_complete(body: PasswordSetupCompleteReq, request: Request) -> OkResponse:
+    # 新PW設定。未認証起点＝Origin のみ。ポリシー違反 422／トークン無効 410／成功で全セッション破棄
+    verify_origin(request)
+    auth_service.complete_password_setup(get_redis(), body.token, body.new_password)
+    return OkResponse()
 
 
 @router.post("/logout", status_code=204)

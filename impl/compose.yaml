@@ -1,6 +1,6 @@
-# ローカル開発用オーケストレーション（ログイン状態A スライス）
-# Postgres / Redis / backend / frontend。
-# MinIO / PGroonga / outbox worker / MailHog は後続スライスで追加する。
+# ローカル開発用オーケストレーション（認証スライス）
+# Postgres / Redis / MailHog / backend / frontend。
+# MinIO / PGroonga / outbox worker は後続スライスで追加する。
 services:
   db:
     image: postgres:16
@@ -28,6 +28,12 @@ services:
       timeout: 3s
       retries: 20
 
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP（backend が送信）
+      - "${MAILHOG_UI_PORT:-8025}:8025"     # Web UI（受信メール確認）
+
   backend:
     build: ./backend
     environment:
@@ -39,6 +45,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       COOKIE_SECURE: "false"           # ローカルは HTTP のため false（本番は true）
       APP_ENV: dev
+      SMTP_HOST: mailhog               # PW設定リンクの送信先（ADR-0002 §2.5）
+      SMTP_PORT: "1025"
+      APP_BASE_URL: http://localhost:3000   # メールリンクの基点（フロントの password-setup ページ）
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -46,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailhog:
+        condition: service_started
 
   frontend:
     build: ./frontend

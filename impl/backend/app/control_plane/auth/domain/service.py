@@ -23,3 +23,32 @@ def decide_login(credentials_ok: bool, company_status: str) -> LoginDecision:
     if company_status == "suspended":
         return LoginDecision.COMPANY_SUSPENDED
     return LoginDecision.PROCEED
+
+
+# --- パスワードポリシー（ADR-0002 §2.2・MVP＝最低8文字＋英字1＋数字1） ---------------------
+PASSWORD_MIN_LENGTH = 8
+
+
+def password_policy_errors(password: str) -> list[dict]:
+    """新パスワードのポリシー違反を列挙（純粋関数・DB非依存・§3.3 でユニットテスト）。
+
+    返り値＝problem+json の `errors[]` 形（空なら適合）。漏えい済み/よく使われる PW の
+    拒否リストは後続スライスへ委譲（ADR-0002 §2.2）。ここは判定のみで、送出（422）は application。
+    """
+    errors: list[dict] = []
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(
+            {"field": "new_password", "code": "too_short",
+             "message": f"パスワードは{PASSWORD_MIN_LENGTH}文字以上にしてください"}
+        )
+    if not any(c.isalpha() for c in password):
+        errors.append(
+            {"field": "new_password", "code": "missing_letter",
+             "message": "パスワードには英字を1文字以上含めてください"}
+        )
+    if not any(c.isdigit() for c in password):
+        errors.append(
+            {"field": "new_password", "code": "missing_digit",
+             "message": "パスワードには数字を1文字以上含めてください"}
+        )
+    return errors
