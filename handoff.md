@@ -5,8 +5,8 @@
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
 > **次回の開始点＝実装スキャフォールド進行中（§7-(3)）**。方針＝「少しずつ／まずログイン(状態A)が動くまで」を **設計書→テストパターン→テストコード** の連鎖で。ツール＝Alembic＋SQLAlchemy(同期)。
-> 完了＝docs 先行（`57e4f20`）＋**Chunk 1＝起動する骨格（`f8f4db9`・compose+2プレーンDB+マイグレ+シード+healthz、起動確認済み）**。
-> **次は Chunk 2＝認証エンドポイント**（`app/core` に session/CSRF/errors/deps 追加→4層で `/api/v1/auth/{login,session,logout}`）→ Chunk 3＝A_認証.md の pytest 実装 → Chunk 4＝フロント SC-00 配線＋つなぎ md＋e2e。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
+> 完了＝docs 先行（`57e4f20`）＋Chunk 1（`f8f4db9`・起動する骨格）＋**Chunk 2＋3（`3301b4c`・認証EP `login/session/logout` 4層実装＋pytest A-TC-001〜019 全緑・実DB/Redis で検証済）**。実装は `impl/`（`doc/`＝設計 と対）。
+> **次は Chunk 4＝フロント SC-00 状態A**（`impl/frontend/` Next.js を作り `/api/v1/auth/*` に配線＋SC-00 つなぎ md＋Playwright e2e=A-TC-020）。過去フェーズ＝L 確認完了・A〜L 横断再レビュー完了（drift 修正=`6d72e5b`）。残る仕上げパス＝門番表記2系統の統一（最終パス）。
 
 ---
 
@@ -137,12 +137,19 @@
   - `GET /healthz`＝DB/Redis 疎通。**検証済**＝healthz ok・2DB作成・シード投入・bootstrap 再実行で重複なし。
   - 実装＝`app/core`（config／db〔control+tenant〕／redis／security〔Argon2id・ADR-0001準拠〕）／`app/models`（control: companies/accounts・company: users）／`migrations/{control,company}`。
 
-- **次にやること＝Chunk 2（認証エンドポイント）**:
-  1. `app/core` 追加＝session（Redis `sess:{token}`・idle30分/絶対12h）／CSRF（ダブルサブミット）／errors（RFC7807 problem+json）／deps（認証ガード・CSRF・Origin）。
-  2. 4層で `POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout`（router→application→domain→repository）。login はコントロールプレーン完結＋session.user は会社DBミラーから解決（A.6）。
-  3. **Chunk 3**＝`doc/テスト/A_認証.md` の A-TC-001〜019 を pytest 実装（api中心＋int2件）。テストDBは隔離（テスト規約 §3）。
-  4. **Chunk 4**＝フロント SC-00 状態A 配線＋**SC-00 つなぎ md**（orchestration のみ）＋e2e（A-TC-020）。frontend サービスを compose に追加。
-- **起動手順**（`impl/backend/README.md`）＝`cd impl && docker compose up --build` → `curl localhost:8000/healthz`。
+- **Chunk 2＋3 完了＝認証EP＋pytest 全緑（本体=`3301b4c`・検証済）**:
+  - `app/core`＝errors（RFC7807 problem+json）／deps（認証ガード・CSRF・Origin。**評価順序＝認証→CSRF**）／session_repo（Redis `sess:{token}`・idle30分スライディング/絶対12h）／rate_limit_repo（(IP+login_id) 10回/5分）。
+  - 4層＝`routers/auth`（Cookie・検証順序）→`application/auth_service`（login/get_session/logout）→`domain/auth`（`decide_login`＝列挙耐性の判定順）→`repository`（account/user/session）。login はコントロールプレーン完結、認証成立時のみ会社DBミラーから表示情報解決（A.6）。`GET /session` は A.6 のみ（内部 `created_at` を漏らさない）。
+  - `POST /api/v1/auth/login`・`GET /api/v1/auth/session`・`POST /api/v1/auth/logout` 実装。
+  - **テスト**＝`doc/テスト/A_認証.md` A-TC-001〜019 を pytest 実装（`impl/backend/tests/auth/`）。**19 passed**（`docker compose run --rm backend pytest`）＋live HTTP でも動作確認済。
+  - MFA 分岐は会社 `mfa_required=true` 時のみ到達＝**契約形の stub のみ**（実装は MFA スライス）。
+
+- **次にやること＝Chunk 4（フロント SC-00 状態A）**:
+  1. `impl/frontend/`（Next.js・§4.1 feature ベース）を作成し compose に frontend サービス追加。
+  2. SC-00 状態A のログイン画面を `/api/v1/auth/login`→`/session` に配線（Cookie・CSRF ヘッダ・401 リダイレクト）。
+  3. **SC-00 つなぎ md**（orchestration のみ・スキーマは OpenAPI 参照）を作成。OpenAPI から型付きクライアント codegen 方針。
+  4. e2e（Playwright・**A-TC-020**）＝ログイン→SC-01 到達。
+- **テスト実行**（`impl/backend/README.md`）＝`cd impl && docker compose up -d db redis && docker compose run --rm backend pytest -q`。**起動**＝`cd impl && docker compose up --build` → `curl localhost:8000/healthz`。
 - 骨格の正＝コーディング規約 **§3.4（2プレーン×縦スライス4層・`main.py`＋`worker.py`）**・**§4.1（フロント feature ベース）**。将来のフル DB＝`migrations/control`（管理DB6）＋`migrations/company`（会社DB29・PGroonga §6）＋`seeds`。
 - **残タスク（後続スライス）**＝MFA（状態C）・初回/再設定PW（B/D）・**アカウントロック方針の確定（A 設計＋後続 ADR）**・エラーコードの OpenAPI 整備・つなぎ md の他画面展開。
 
