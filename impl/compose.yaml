@@ -55,6 +55,7 @@ services:
       MAIL_ALERT_TO: ${MAIL_ALERT_TO:-alerts@ideaquest.example}   # 運用/システムアラート宛先
       APP_BASE_URL: http://localhost:3000   # メールリンクの基点（フロントの password-setup ページ）
       # MFA（メールOTP）・信頼端末のしきい値（ADR-0004・env で調整可）
+      OTP_LENGTH: ${OTP_LENGTH:-6}
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
       OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-600}
       OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-30}
