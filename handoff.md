@@ -14,12 +14,12 @@
 
 - 最終更新: **2026-08-09 JST**（セッション終了時）
 - ブランチ: **main**（作業ツリー クリーン＝確認済み）。
-- 最新コミット（本体）: **`3def11d`**＝「実装 メール設定: SMTP認証/STARTTLS・From・アラート宛先を env に配線(ADR-0003)」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。ADR-0003 本体は `6317a6e`。直前スライスの backend 本体は `dc5fdcd`（PW設定 B/D）。
-- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**本セッション分（`6317a6e` ADR-0003・`3def11d` メール設定配線・各 handoff）までユーザー依頼で `origin/main` へプッシュ済み**。次回開始時は `git status` がクリーン・`origin/main` と同期している想定。
+- 最新コミット（本体）: **`9ea486a`**＝「docs(README): 設定は .env.example と ADR-0003 を参照する案内を追記」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。ADR-0003 本体は `6317a6e`、メール設定 env 配線は `3def11d`。直前スライスの backend 本体は `dc5fdcd`（PW設定 B/D）。
+- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**本セッション分（ADR-0003・メール設定配線・README 参照案内）までユーザー依頼で `origin/main` へプッシュ済み**。次回開始時は `git status` がクリーン・`origin/main` と同期している想定。
 - 直近コミット（新しい順）:
   - （本 handoff 単独コミット・本セッション末）
-  - `3def11d` 実装 メール設定 env 配線（本セッション・未プッシュ）
-  - `37b33d4` handoff: push状況修正（プッシュ済み）
+  - `9ea486a` docs(README): 設定は .env.example と ADR-0003 を参照（本セッション）
+  - `3def11d` 実装 メール設定 env 配線
   - `6317a6e` docs(ADR): ADR-0003 設定と秘匿情報の置き場所
   - `dc5fdcd` 実装 PW設定(B/D) backend
   - `51ddbb7` docs: README に OpenAPI 確認方法追記
@@ -86,6 +86,7 @@
 
 - **（本セッション追記）SMTP 等の設定は `.env`（環境変数・本番はシークレットマネージャ経由）。DB 不採用**＝[`doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md`](doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md) で確定（ユーザー承認 2026-08-09）。原則＝「デプロイ環境軸→env／テナント軸→DB」。SMTP は単一基盤・秘匿値・ブートストラップ依存回避で env。`.env` 管理項目を秘匿/非秘匿で分類明記。会社別 BYO-SMTP は別 ADR へ委譲。ADR-0002 §2.5 から相互参照追記。
 - **（本セッション追記）メール設定7項目を env に配線（`3def11d`）**＝`SMTP_HOST/PORT/USER/PASSWORD/START_TLS`＋`MAIL_FROM`＋`MAIL_ALERT_TO`（アラート宛先の器）を `config.py`＋`.env.example`＋`compose.yaml` の三点に追加。TLS は参照システムに合わせ**真偽値 `SMTP_START_TLS`**。`SmtpMailSender` を STARTTLS/認証対応（dev の MailHog は空/False でそのまま動作）。pytest 40 緑。**アラートメールの実送信経路は未実装＝宛先の器のみ（ADR-0003 §4 TODO）**。
+- **（本セッション追記）設定項目の共有方針＝README にベタ書きしない**（`9ea486a`）。一覧の正は**追跡対象の `.env.example`（コメント付き）**、方針は ADR-0003。README は両者へのリンクのみ（DRY/drift回避）。※`.env.example` は git 追跡対象・`.env` は追跡外で Compose が自動ロードする実値置き場・コンテナ環境変数の設定箇所は `compose.yaml` の `environment:` ブロック（`.env.example` はどこからも読まれない雛形）。
 
 - **PWポリシー＝8文字＋英字＋数字**（ユーザー選択）。不採用＝NIST式(12文字・文字種不問)／拒否リスト同梱（後続へ）。
 - **outbox は本スライスで作らず延期**（ユーザー選択）。不採用＝table＋同一Tx INSERT を今入れる。理由＝worker 未存在・users 列未拡張・login は accounts 直参照で機能は通る。**同一Tx要件の設計は維持**（TODO 明記）。
