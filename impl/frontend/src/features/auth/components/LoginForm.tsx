@@ -3,6 +3,7 @@
 // SC-00 状態A（ログイン）。見た目はデザイン標準/モック準拠、業務層クリーン。
 // 入力→login→成功で / へ。失敗は code→文言にマップ（画面API連携 SC-00 参照）。
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -113,6 +114,10 @@ export function LoginForm() {
             {pending ? "送信中…" : "ログイン"}
           </Button>
         </form>
+
+        <div className="login-links">
+          <Link href="/password-reset">パスワードをお忘れですか？</Link>
+        </div>
 
         <p className="login-note">
           アカウントは管理者が発行します（自己新規登録はできません）。

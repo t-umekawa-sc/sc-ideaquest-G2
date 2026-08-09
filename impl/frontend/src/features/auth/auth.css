@@ -68,6 +68,29 @@
   text-align: center;
   margin-top: var(--space-3);
 }
+.login-links a {
+  font-size: var(--text-sm);
+  color: var(--color-primary, #2563eb);
+  text-decoration: none;
+}
+.login-links a:hover {
+  text-decoration: underline;
+}
+/* 状態B/D の説明文・確認メッセージ */
+.auth-lead {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  margin-bottom: var(--space-4);
+}
+.auth-confirm {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  background: var(--color-agree-bg, #ecfdf5);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+}
 .login-note {
   margin-top: var(--space-5);
   padding-top: var(--space-4);

@@ -2,5 +2,13 @@
 export { LoginForm } from "./components/LoginForm";
 export { LogoutButton } from "./components/LogoutButton";
 export { LogoutMenuItem } from "./components/LogoutMenuItem";
-export { login, logout } from "./api";
+export { PasswordResetRequestForm } from "./components/PasswordResetRequestForm";
+export { PasswordSetupForm } from "./components/PasswordSetupForm";
+export {
+  login,
+  logout,
+  requestPasswordSetup,
+  verifyPasswordSetup,
+  completePasswordSetup,
+} from "./api";
 export type { LoginResponse } from "./types";
