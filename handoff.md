@@ -5,8 +5,8 @@
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
 > **現在地＝実装スキャフォールド進行中。手法＝「設計書→テストパターン→テストコード」の連鎖で 1 スライスずつ縦に通す。**
-> 既済＝(a) ログイン状態A（PWログイン＋session＋logout・backend pytest＋frontend SC-00＋e2e）／(b) フロント本格化(1)〜(3)（トークン移植・OpenAPI 型クライアント codegen・共通ヘッダー app-shell）／**(c) 状態B/D＝初回・再設定パスワード（backend のみ・本セッション・`dc5fdcd`）**。
-> **次の最有力＝(1) 状態B/D の frontend（SC-00 状態B/D の画面＋`password-setup` ページ＋codegen 再生成＋e2e）**。以降＝(2) MFA（状態C）(3) アカウントロック方針確定(4) フロント本格化(4)。いずれも「少しずつ」。
+> 既済＝(a) ログイン状態A（PWログイン＋session＋logout・backend pytest＋frontend SC-00＋e2e）／(b) フロント本格化(1)〜(3)（トークン移植・OpenAPI 型クライアント codegen・共通ヘッダー app-shell）／**(c) 状態B/D＝初回・再設定パスワード（backend `dc5fdcd`＋frontend `dd4d8ce`＝縦に完了）**／(d) 設定/秘匿の置き場所 ADR-0003＋メール設定 env 配線。
+> **次の最有力＝(2) MFA（状態C）**（login の `mfa_required` 分岐・OTP メール・pre-auth・trusted_devices）。(3) アカウントロック方針確定（MFA と一緒に設計すると手戻り少）(4) フロント本格化(4)。いずれも「少しずつ」。
 
 ---
 
@@ -14,11 +14,12 @@
 
 - 最終更新: **2026-08-09 JST**（セッション終了時）
 - ブランチ: **main**（作業ツリー クリーン＝確認済み）。
-- 最新コミット（本体）: **`9ea486a`**＝「docs(README): 設定は .env.example と ADR-0003 を参照する案内を追記」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。ADR-0003 本体は `6317a6e`、メール設定 env 配線は `3def11d`。直前スライスの backend 本体は `dc5fdcd`（PW設定 B/D）。
-- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**本セッション分（ADR-0003・メール設定配線・README 参照案内）までユーザー依頼で `origin/main` へプッシュ済み**。次回開始時は `git status` がクリーン・`origin/main` と同期している想定。
+- 最新コミット（本体）: **`dd4d8ce`**＝「実装 状態B/D frontend: 初回・再設定パスワードの画面を縦に通す」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。関連の直近＝`9ea486a`(README参照案内)・`3def11d`(メール設定 env 配線)・`6317a6e`(ADR-0003)・`dc5fdcd`(PW設定 B/D backend)。
+- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**`9ea486a`(README) まではプッシュ済み**。本セッションの `dd4d8ce`（状態B/D frontend）＋本 handoff は**未プッシュ**（プッシュはユーザー依頼時のみ）。
 - 直近コミット（新しい順）:
   - （本 handoff 単独コミット・本セッション末）
-  - `9ea486a` docs(README): 設定は .env.example と ADR-0003 を参照（本セッション）
+  - `dd4d8ce` 実装 状態B/D frontend（本セッション・未プッシュ）
+  - `9ea486a` docs(README): 設定は .env.example と ADR-0003 を参照
   - `3def11d` 実装 メール設定 env 配線
   - `6317a6e` docs(ADR): ADR-0003 設定と秘匿情報の置き場所
   - `dc5fdcd` 実装 PW設定(B/D) backend
@@ -65,11 +66,12 @@
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
 
 - **backend**＝ドメイン A の状態A（login/session/logout）＋状態B/D（password-setup）が実装済み。MFA（状態C）は `application.login` に契約形 stub のみ（`mfa_required=true` で `{delivery:"email"}` を返すだけ）。
-- **frontend**＝SC-00 状態A（ログイン）＋共通ヘッダー app-shell のみ。**状態B/D の画面は未実装**（`password-setup` ページなし＝メールのリンク先はまだ 404）。
-- **壊れているもの**＝なし（pytest 40 緑・live 疎通確認済み）。
-- **要注意（本セッションの負債）**:
-  - **frontend の `schema.d.ts` は未再生成**（backend に3EP追加済みだが型クライアントは旧のまま）。frontend チャンクで `codegen` を回すこと（§7-(1)・手順は §8）。既存 frontend は新EPを呼ばないので tsc は通る想定。
+- **frontend**＝SC-00 状態A（ログイン）＋共通ヘッダー app-shell＋**状態D（`/password-reset` 再設定リクエスト）／状態B（`/password-setup?token=` PW設定）を実装済み（`dd4d8ce`）**。`schema.d.ts` は3EP反映で再生成済み。
+- **壊れているもの**＝なし（pytest 40 緑・frontend tsc/lint クリーン・**e2e 3 passed**＝A-TC-020/021＋新 sc-00-password-setup）。
+- **要注意（負債）**:
   - **outbox 未実装**（ADR-0002 §2.4・complete に TODO）。会社DB users の password_set ミラーは worker スライスまで反映されない（login は accounts 直参照なので認証は正しい）。
+  - **e2e の実行環境**＝frontend コンテナ（Debian）に Playwright のブラウザ依存が未同梱。初回は `docker compose exec -u root frontend npx playwright install-deps chromium` が必要（§8 に追記）。イメージに焼くのは後続。
+  - MFA（状態C）は `application.login` に契約形 stub のみ（`mfa_required=true` で `{delivery:"email"}` を返すだけ）。frontend の login は現状 `mfa_required` を「未対応」表示で握っている。
 - **DB のテストデータ**＝pytest の `factory` は作成行を teardown で削除（control の accounts/otp_challenges・会社DB users ミラーも）。seed（ACME-01 / `user@acme.example` / `Passw0rd!`）は不変。
 
 ---
@@ -99,7 +101,9 @@
 
 ## 7. 次にやること — 優先順に、具体的に
 
-### (1) 状態B/D の frontend（最有力・backend は完了済み）
+### (1) 状態B/D の frontend ＝ **完了（本セッション・`dd4d8ce`）**
+- ✅ 実装済み: `PasswordResetRequestForm`(状態D)／`PasswordSetupForm`(状態B)／`app/(auth)/password-reset`・`app/(auth)/password-setup`／login に導線リンク／`api.ts` に request/verify/complete／`schema.d.ts` 再生成／画面API連携 md 追記／e2e `sc-00-password-setup`（D→MailHog→B→complete→login・3 passed）。
+- 以下は当初計画（記録として保持）。
 - **SC-00 状態B（初回/再設定PW設定）と状態D（再設定リクエスト）の画面**を `impl/frontend/src/features/auth/` に実装（`app/` はルーティングのみ・§4.1）。
   - 状態D＝ログイン画面の「パスワードをお忘れですか？」→ company_code＋login_id フォーム→ `POST /password-setup/request`→ **常に同一の確認メッセージ**（列挙耐性・SC-00 §7）。
   - 状態B＝**メールリンク先の専用ページ**（例 `app/(auth)/password-setup/page.tsx`・`?token=`）。表示前に `POST /password-setup/verify`→ 有効なら新PW＋確認フォーム→ `POST /password-setup/complete`→ 成功でログイン画面へ。無効/期限切れ/使用済（410）は再要求案内。
@@ -127,8 +131,8 @@
 
 - **フル起動**＝`cd impl && docker compose up --build`（db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`）。seed＝会社 `ACME-01`（`mfa_required=false`）＋`user@acme.example`/`Passw0rd!`。
 - **backend テスト**＝`cd impl && docker compose up -d db redis && docker compose build backend && docker compose run --rm backend pytest -q`（**40 passed**。build を忘れると古いコードで走る＝§5）。entrypoint が bootstrap（DB作成→migrate head〔0001+0002〕→seed・冪等）してから pytest を exec する。
-- **codegen（frontend 型クライアント）**＝backend 起動中に `docker compose exec -e OPENAPI_URL=http://backend:8000/openapi.json frontend npm run codegen`。生成物 `impl/frontend/src/lib/api/schema.d.ts` は**コンテナ内に書かれる**（source の bind mount が無い）ため、**ホストへ反映するには `docker compose cp frontend:/app/src/lib/api/schema.d.ts impl/frontend/src/lib/api/schema.d.ts` で取り出す**（要確認・パスは frontend の WORKDIR 次第）。※本セッションでは未反映＝frontend チャンクで実施。
-- **e2e**＝フル起動後 `docker compose exec frontend npx playwright install chromium && docker compose exec frontend npx playwright test`（既存 A-TC-020/021）。
+- **codegen（frontend 型クライアント）**＝frontend コンテナは source を bind mount しないため、**ホストで直接生成するのが簡単**（host に node22+npx あり）。backend 起動中に `cd impl/frontend && npx --yes openapi-typescript@7.5.0 http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts`。生成物はホスト側 `impl/frontend/src/lib/api/schema.d.ts` に直接書かれる＝そのままコミット可（本セッションはこの方法で3EP反映済み）。
+- **e2e**＝フル起動後、初回のみブラウザ依存を入れる: `docker compose exec -u root frontend npx playwright install-deps chromium`（Debian・apt）→ `docker compose exec frontend npx playwright install chromium` → `docker compose exec frontend npx playwright test`。spec＝`sc-00-login`（A-TC-020/021）＋`sc-00-password-setup`（状態D→B→login）。**コンテナ内実行時 MailHog は `http://mailhog:8025`**（spec の既定・ホスト実行時は `MAILHOG_URL` で上書き）。※ブラウザ依存はイメージ未同梱＝毎回 install-deps が要る（イメージに焼くのは後続）。
 - **MailHog でメール確認**＝ブラウザ `http://localhost:8025`／API `GET http://localhost:8025/api/v2/messages`（本文は base64＝§5）。
 - **技術スタック**＝フロント Next.js(App Router)／バック FastAPI(4層 router→application→domain→repository・2プレーン control_plane/tenant)／DB PostgreSQL(管理DB1＋会社DB N・PGroonga 会社DBのみ)／Redis(セッション/OTP/pre-auth/冪等/PubSub)／MinIO(画像)／MailHog(dev メール)／全て Docker。
 - **リポジトリ運用**:
