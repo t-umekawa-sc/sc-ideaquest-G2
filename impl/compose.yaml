@@ -45,8 +45,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       COOKIE_SECURE: "false"           # ローカルは HTTP のため false（本番は true）
       APP_ENV: dev
-      SMTP_HOST: mailhog               # PW設定リンクの送信先（ADR-0002 §2.5）
-      SMTP_PORT: "1025"
+      # メール送信（置き場所は env=ADR-0003）。dev は MailHog（認証なし・平文）＝既定でそのまま動く
+      SMTP_HOST: ${SMTP_HOST:-mailhog}       # PW設定リンクの送信先（ADR-0002 §2.5）
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}              # 秘匿（本番はシークレットマネージャ供給・dev は空）
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}      # 秘匿（同上）
+      SMTP_START_TLS: ${SMTP_START_TLS:-false}   # 本番 587 送信で true・MailHog は false
+      MAIL_FROM: ${MAIL_FROM:-no-reply@ideaquest.example}
+      MAIL_ALERT_TO: ${MAIL_ALERT_TO:-alerts@ideaquest.example}   # 運用/システムアラート宛先
       APP_BASE_URL: http://localhost:3000   # メールリンクの基点（フロントの password-setup ページ）
     ports:
       - "${BACKEND_PORT:-8000}:8000"

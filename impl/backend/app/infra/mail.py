@@ -27,7 +27,11 @@ class MailSender(Protocol):
 
 
 class SmtpMailSender:
-    """SMTP 送信（dev=MailHog `mailhog:1025`／prod=SMTP）。認証なしの最小構成。"""
+    """SMTP 送信（dev=MailHog `mailhog:1025`／prod=SMTP）。
+
+    設定は env（ADR-0003）＝接続先/STARTTLS/認証。dev の MailHog は認証なし・平文なので
+    `smtp_start_tls=False`・`smtp_user=""` の既定でそのまま動く（STARTTLS もログインも行わない）。
+    """
 
     def send(self, to: str, subject: str, body: str) -> None:
         s = get_settings()
@@ -37,6 +41,10 @@ class SmtpMailSender:
         msg["Subject"] = subject
         msg.set_content(body)
         with smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=10) as smtp:
+            if s.smtp_start_tls:
+                smtp.starttls()
+            if s.smtp_user:
+                smtp.login(s.smtp_user, s.smtp_password)
             smtp.send_message(msg)
 
 

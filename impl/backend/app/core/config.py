@@ -38,10 +38,16 @@ class Settings(BaseSettings):
     # request（自己サービス再設定要求）のレート制限（ADR-0002 §2.3・超過時も 202 維持）
     pw_request_rate_limit_max: int = 5
     pw_request_rate_limit_window_seconds: int = 600
-    # メール送信（dev=MailHog／prod=SMTP・ADR-0002 §2.5）
+    # メール送信（dev=MailHog／prod=SMTP・ADR-0002 §2.5・置き場所は ADR-0003）
+    # 接続（dev=MailHog は認証なし・平文＝user/password 空・start_tls=False で無効化）
     smtp_host: str = "localhost"
     smtp_port: int = 1025
+    smtp_user: str = ""            # 秘匿（本番はシークレットマネージャ供給・空なら未ログイン）
+    smtp_password: str = ""        # 秘匿（同上）
+    smtp_start_tls: bool = False   # STARTTLS（本番の 587 送信で True。MailHog は False）
+    # 差出人・宛先
     mail_from: str = "no-reply@ideaquest.example"
+    mail_alert_to: str = "alerts@ideaquest.example"  # 運用/システムアラートの送信先
     # メールリンクの基点（フロントのオリジン。password-setup ページを開く）
     app_base_url: str = "http://localhost:3000"
 
