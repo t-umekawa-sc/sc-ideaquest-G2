@@ -15,7 +15,7 @@
 - 最終更新: **2026-08-09 JST**（セッション終了時）
 - ブランチ: **main**（作業ツリー クリーン＝確認済み）。
 - 最新コミット（本体）: **`dd4d8ce`**＝「実装 状態B/D frontend: 初回・再設定パスワードの画面を縦に通す」。**本 handoff 更新はこの直後の単独コミット**（2段方式の2段目・確定ハッシュは本コミット後に git log で確認）。関連の直近＝`9ea486a`(README参照案内)・`3def11d`(メール設定 env 配線)・`6317a6e`(ADR-0003)・`dc5fdcd`(PW設定 B/D backend)。
-- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**`9ea486a`(README) まではプッシュ済み**。本セッションの `dd4d8ce`（状態B/D frontend）＋本 handoff は**未プッシュ**（プッシュはユーザー依頼時のみ）。
+- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`（`origin/main`）。**本セッション分（`dd4d8ce` 状態B/D frontend＋各 handoff まで）ユーザー依頼で `origin/main` へプッシュ済み**。次回開始時は `git status` がクリーン・`origin/main` と同期している想定。
 - 直近コミット（新しい順）:
   - （本 handoff 単独コミット・本セッション末）
   - `dd4d8ce` 実装 状態B/D frontend（本セッション・未プッシュ）
