@@ -30,7 +30,7 @@ docker compose up --build
 | db（PostgreSQL 16） | localhost:5432 | 管理DB `ideaquest_control` ＋ 会社DB `ideaquest_company_acme` |
 | redis | localhost:6379 | セッション／レート制限 等 |
 
-ポートや資格情報は `impl/.env`（雛形＝`impl/.env.example`）で変更できる。
+ポートや資格情報は `impl/.env`（雛形＝`impl/.env.example`）で変更できる。設定項目の一覧・意味・dev 既定値は追跡対象の [`impl/.env.example`](impl/.env.example)（コメント付き）を正とする。**env に置くか DB に置くか・どれが秘匿か・本番でのシークレット供給方法**の方針は [`doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md`](doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md) を参照。
 
 ### 開発用ログイン情報（シード）
 
@@ -108,4 +108,4 @@ docker compose exec db psql -U ideaquest -d ideaquest_company_acme   # 会社DB(
 - API設計＝[`doc/API設計/`](doc/API設計/)（`README.md`＝全体規約＋A〜L）
 - 画面設計＝[`doc/画面設計/`](doc/画面設計/)（画面API連携＝`doc/画面設計/画面API連携/`）
 - テスト＝[`doc/テスト/`](doc/テスト/)（テスト規約＋ドメイン別テストパターン）
-- ADR＝[`doc/ADR/`](doc/ADR/)
+- ADR＝[`doc/ADR/`](doc/ADR/)（設定/秘匿情報の置き場所＝[`ADR-0003`](doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md)）
