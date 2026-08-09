@@ -107,5 +107,5 @@ docker compose exec db psql -U ideaquest -d ideaquest_company_acme   # 会社DB(
 - データモデル＝[`doc/データモデル.md`](doc/データモデル.md)
 - API設計＝[`doc/API設計/`](doc/API設計/)（`README.md`＝全体規約＋A〜L）
 - 画面設計＝[`doc/画面設計/`](doc/画面設計/)（画面API連携＝`doc/画面設計/画面API連携/`）
-- テスト＝[`doc/テスト/`](doc/テスト/)（テスト規約＋ドメイン別テストパターン）
+- テスト＝[`doc/テスト/`](doc/テスト/)（ドメイン別テストパターン）／テスト規約＝[`doc/規約/テスト規約.md`](doc/規約/テスト規約.md)
 - ADR＝[`doc/ADR/`](doc/ADR/)（設定/秘匿情報の置き場所＝[`ADR-0003`](doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md)）
