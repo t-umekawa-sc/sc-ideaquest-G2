@@ -11,7 +11,7 @@ from fastapi import Request
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import read_session
+from app.core.security import read_preauth, read_session
 from app.infra.cache import get_redis
 
 
@@ -27,6 +27,19 @@ def require_session(request: Request) -> dict:
     if session is None:
         raise AppError(401, "unauthenticated")
     return session
+
+
+def require_preauth(request: Request) -> tuple[str, dict]:
+    """pre-auth（`iq_preauth`）必須。最小権限＝mfa/verify・mfa/resend のみが使う（A.0）。
+
+    無い/期限切れは 401 preauth_expired（CSRF より先に評価＝A-TC-014/015 と同方針）。
+    トークンと Redis ペイロードを返す（呼び出し側が消費/更新する）。
+    """
+    token = request.cookies.get("iq_preauth")
+    payload = read_preauth(get_redis(), token) if token else None
+    if not token or payload is None:
+        raise AppError(401, "preauth_expired")
+    return token, payload
 
 
 def verify_origin(request: Request) -> None:

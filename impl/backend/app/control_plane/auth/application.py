@@ -4,6 +4,7 @@ login はコントロールプレーンで完結し、認証成立時のみ会�
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -13,19 +14,24 @@ from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.domain.service import (
     LoginDecision,
     decide_login,
+    mask_email,
     password_policy_errors,
 )
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import (
     check_login_rate_limit,
+    create_preauth,
     create_session,
     delete_account_sessions,
+    delete_preauth,
     delete_session,
+    generate_otp,
     generate_token,
     hash_password,
     hash_token,
     read_session,
+    save_preauth,
     verify_password,
     within_pw_request_rate_limit,
 )
@@ -42,6 +48,8 @@ class LoginResult:
     session_token: str | None = None
     csrf_token: str | None = None
     mfa: dict | None = None
+    preauth_token: str | None = None
+    trust_token: str | None = None   # verify で trust_device=true のとき発行（iq_trust）
 
 
 def _build_session_payload(account, company, user) -> dict:
@@ -60,7 +68,20 @@ def _build_session_payload(account, company, user) -> dict:
     }
 
 
-def login(r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str) -> LoginResult:
+def _issue_session(r: redis.Redis, account, company) -> LoginResult:
+    """認証成立→会社DBミラーから表示情報を解決し本セッション発行（A.6・毎回新トークン＝固定化対策）。"""
+    with get_tenant_session(company.db_identifier) as tsession:
+        user = user_repo.get_user_by_account(tsession, account.id)
+    payload = _build_session_payload(account, company, user)
+    token = create_session(r, payload)
+    csrf = generate_token()
+    return LoginResult(status="authenticated", session=payload, session_token=token, csrf_token=csrf)
+
+
+def login(
+    r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str,
+    trust_token: str | None = None,
+) -> LoginResult:
     check_login_rate_limit(r, client_ip, login_id)
 
     with control_session() as session:
@@ -81,19 +102,127 @@ def login(r: redis.Redis, client_ip: str, company_code: str, login_id: str, pass
         if decision is LoginDecision.COMPANY_SUSPENDED:
             raise AppError(503, "company_suspended")
 
-        # PROCEED。MFA 要否は会社設定で分岐（本スライスのシードは mfa_required=false）
-        if company.mfa_required:
-            # NOTE: MFA（pre-auth/OTP）は MFA スライスで実装。ここでは契約形のみ返す。
-            return LoginResult(status="mfa_required", mfa={"delivery": "email"})
+        # PROCEED。MFA 要否は会社設定で分岐。信頼端末（iq_trust）が有効なら MFA スキップ（A.0-①）
+        needs_mfa = company.mfa_required
+        if needs_mfa and trust_token:
+            td = account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
+            if td is not None:
+                td.last_used_at = datetime.now(timezone.utc)
+                session.commit()
+                needs_mfa = False
 
-        # 認証成立: 会社DBミラーから表示情報を解決（A.6）
-        with get_tenant_session(company.db_identifier) as tsession:
-            user = user_repo.get_user_by_account(tsession, account.id)
+        if not needs_mfa:
+            return _issue_session(r, account, company)  # 本セッション発行（ORM 接続中に解決）
 
-        payload = _build_session_payload(account, company, user)
-        token = create_session(r, payload)  # 毎回新トークン（固定化対策）
-        csrf = generate_token()
-        return LoginResult(status="authenticated", session=payload, session_token=token, csrf_token=csrf)
+        # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
+        mfa_account_id = str(account.id)
+        mfa_company_id = str(company.id)
+        mfa_email = account.email
+
+    # --- 要MFA（A.0-②）: OTP 発行＋pre-auth 発行＋メール送信 ---
+    s = get_settings()
+    otp = generate_otp(s.otp_length)
+    preauth_token = create_preauth(r, mfa_account_id, mfa_company_id, hash_token(otp))
+    csrf = generate_token()
+    _send_otp_email(mfa_email, otp)
+    mfa = {
+        "delivery": "email",
+        "masked_to": mask_email(mfa_email),
+        "expires_in": s.otp_ttl_seconds,
+        "resend_available_in": s.otp_resend_cooldown_seconds,
+    }
+    return LoginResult(status="mfa_required", mfa=mfa, preauth_token=preauth_token, csrf_token=csrf)
+
+
+def _send_otp_email(to_email: str, otp: str) -> None:
+    """MFA の OTP をメール送信。OTP は本文にのみ載せ、ログには出さない（セキュリティ一覧 3・15）。"""
+    s = get_settings()
+    minutes = s.otp_ttl_seconds // 60
+    subject = "【ideaquest】ログイン認証コード"
+    body = (
+        "ideaquest のログイン認証コードです。\n\n"
+        f"認証コード: {otp}\n"
+        f"（有効期限 {minutes} 分・1回限り）\n\n"
+        "このメールに心当たりがない場合は破棄してください。"
+    )
+    get_mail_sender().send(to_email, subject, body)
+
+
+def verify_mfa(
+    r: redis.Redis, preauth_token: str, preauth: dict, code: str, trust_device: bool
+) -> LoginResult:
+    """pre-auth 中の OTP を検証し本セッション発行（A.0-③）。失敗上限で pre-auth 失効（A.0-④）。"""
+    s = get_settings()
+    now = int(time.time())
+    if now > preauth["otp_expires_at"]:
+        raise AppError(401, "otp_expired")
+
+    if hash_token(code) != preauth["otp_hash"]:
+        preauth["attempts"] = preauth.get("attempts", 0) + 1
+        attempts_left = max(0, s.otp_max_attempts - preauth["attempts"])
+        if attempts_left == 0:
+            delete_preauth(r, preauth_token)  # 上限到達＝pre-auth 破棄（login やり直し）
+        else:
+            save_preauth(r, preauth_token, preauth)
+        raise AppError(401, "otp_invalid", extra={"attempts_left": attempts_left})
+
+    # OTP 一致: 本セッション発行。account/company を引き直す（pre-auth は id のみ保持）
+    account_id = preauth["account_id"]
+    with control_session() as session:
+        account = account_repo.get_account(session, account_id)
+        company = account_repo.get_company(session, account.company_id) if account else None
+        if account is None or company is None:
+            raise AppError(401, "preauth_expired")
+        result = _issue_session(r, account, company)
+
+        if trust_device:
+            trust_token = generate_token()
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.trusted_device_ttl_seconds)
+            account_repo.create_trusted_device(session, account.id, hash_token(trust_token), expires_at)
+            session.commit()
+            result.trust_token = trust_token
+
+    delete_preauth(r, preauth_token)  # pre-auth 消費（固定化対策・A.0-③）
+    return result
+
+
+def resend_mfa(r: redis.Redis, preauth_token: str, preauth: dict) -> dict:
+    """OTP を再送（旧OTP失効・新OTP発行）。クールダウン中は 429。pre-auth TTL は延ばさない（§2.2）。"""
+    s = get_settings()
+    now = int(time.time())
+    if now < preauth.get("resend_available_at", 0):
+        retry_after = preauth["resend_available_at"] - now
+        raise AppError(
+            429, "rate_limited", detail=f"retry after {retry_after}s",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    otp = generate_otp(s.otp_length)
+    preauth["otp_hash"] = hash_token(otp)
+    preauth["otp_expires_at"] = now + s.otp_ttl_seconds
+    preauth["attempts"] = 0  # 新コードなので失敗回数リセット（resend 自体がクールダウンで律速）
+    preauth["resend_available_at"] = now + s.otp_resend_cooldown_seconds
+    save_preauth(r, preauth_token, preauth)
+
+    account_id = preauth["account_id"]
+    with control_session() as session:
+        account = account_repo.get_account(session, account_id)
+        to_email = account.email if account else None
+    if to_email:
+        _send_otp_email(to_email, otp)
+    return {"expires_in": s.otp_ttl_seconds, "resend_available_in": s.otp_resend_cooldown_seconds}
+
+
+def logout_all(r: redis.Redis, token: str | None) -> None:
+    """全端末ログアウト＋信頼端末失効（A.0-⑤＝全端末で次回 MFA 必須）。"""
+    session_data = read_session(r, token) if token else None
+    if session_data is None:
+        raise AppError(401, "unauthenticated")
+    account_id = session_data["account_id"]
+    delete_account_sessions(r, account_id)
+    with control_session() as session:
+        account_repo.revoke_all_trusted_devices(session, account_id)
+        session.commit()
 
 
 # GET /auth/session で外部に返す A.6 のキー（内部管理フィールド created_at 等は返さない）

@@ -74,3 +74,25 @@ class OtpChallenge(ControlBase):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TrustedDevice(ControlBase):
+    """信頼端末（`iq_trust`・A.0/ADR-0004 §2.3）。MFA をスキップしてよい端末の登録。
+
+    - `token_hash`＝`iq_trust` トークンの SHA-256（平文は保存しない・ADR-0002 §2.1 と同様）。
+    - `expires_at`＝発行から 30日（`trusted_device_ttl_seconds`）。
+    - `revoked`＝`logout-all` で全端末を失効（A.0-⑤）。login 照合は「未失効かつ未期限切れ」のみ有効。
+    """
+
+    __tablename__ = "trusted_devices"
+    __table_args__ = (Index("ix_trusted_devices_account", "account_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.control_plane.auth.orm import Account, Company, OtpChallenge
+from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
 
 
 def find_account_and_company(
@@ -68,3 +68,42 @@ def find_password_setup_challenge_by_hash(session: Session, code_hash: str) -> O
 
 def get_account(session: Session, account_id: uuid.UUID) -> Account | None:
     return session.get(Account, account_id)
+
+
+def get_company(session: Session, company_id: uuid.UUID) -> Company | None:
+    return session.get(Company, company_id)
+
+
+# --- 信頼端末（trusted_devices・iq_trust・ADR-0004 §2.3） -----------------------------------
+def create_trusted_device(
+    session: Session, account_id: uuid.UUID, token_hash: str, expires_at: datetime
+) -> TrustedDevice:
+    td = TrustedDevice(
+        id=uuid.uuid4(), account_id=account_id, token_hash=token_hash, expires_at=expires_at
+    )
+    session.add(td)
+    return td
+
+
+def find_active_trusted_device(
+    session: Session, account_id: uuid.UUID, token_hash: str
+) -> TrustedDevice | None:
+    """未失効かつ未期限切れの信頼端末のみ有効（login の MFA スキップ判定・A.0-①）。"""
+    now = datetime.now(timezone.utc)
+    return session.execute(
+        select(TrustedDevice).where(
+            TrustedDevice.account_id == account_id,
+            TrustedDevice.token_hash == token_hash,
+            TrustedDevice.revoked.is_(False),
+            TrustedDevice.expires_at > now,
+        )
+    ).scalar_one_or_none()
+
+
+def revoke_all_trusted_devices(session: Session, account_id: uuid.UUID) -> None:
+    """当該アカウントの全信頼端末を失効（logout-all・A.0-⑤＝全端末で次回 MFA 必須）。"""
+    session.execute(
+        update(TrustedDevice)
+        .where(TrustedDevice.account_id == account_id, TrustedDevice.revoked.is_(False))
+        .values(revoked=True)
+    )

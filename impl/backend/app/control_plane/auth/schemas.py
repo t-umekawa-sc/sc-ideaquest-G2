@@ -30,10 +30,29 @@ class Session(BaseModel):
     user: SessionUser
 
 
+class MfaChallenge(BaseModel):
+    """login `mfa_required` 応答の mfa（A.1・ADR-0004 §2.4）。実在は本人に既知（PW照合後）。"""
+
+    delivery: str = "email"
+    masked_to: str          # 送信先メールの伏字（例 y****@acme.co.jp）
+    expires_in: int         # OTP 有効期限（秒）
+    resend_available_in: int  # 次に resend 可能になるまでの秒
+
+
 class LoginResponse(BaseModel):
     status: str  # "authenticated" | "mfa_required"
     session: Session | None = None
-    mfa: dict | None = None
+    mfa: MfaChallenge | None = None
+
+
+class MfaVerifyReq(BaseModel):
+    code: str = Field(min_length=1)
+    trust_device: bool = False
+
+
+class MfaResendResponse(BaseModel):
+    expires_in: int
+    resend_available_in: int
 
 
 # --- 初回・再設定パスワード（A.7・状態B/D） ---------------------------------------------

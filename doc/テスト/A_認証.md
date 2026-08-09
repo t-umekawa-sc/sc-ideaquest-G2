@@ -1,13 +1,13 @@
-# テストパターン A. 認証（状態A＝パスワードログイン／状態B・D＝初回・再設定PW）
+# テストパターン A. 認証（状態A＝PWログイン／状態B・D＝初回・再設定PW／状態C＝MFA）
 
-> 規約＝[`テスト規約.md`](./テスト規約.md)。仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md)（A.0/A.1/A.6/A.7/A.9）・[`../API設計/README.md`](../API設計/README.md) §1.4/§1.7・[`../画面設計/screens/SC-00_ログイン.md`](../画面設計/screens/SC-00_ログイン.md)。具体値＝[`../ADR/ADR-0001_認証・セッション基本パラメータ.md`](../ADR/ADR-0001_認証・セッション基本パラメータ.md)（状態A）・[`../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md`](../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md)（状態B/D）。
-> 対象範囲＝**状態A（PWログイン）＋`GET /auth/session`＋`logout`**（§1・A-TC-001〜021）／**状態B・D（初回・再設定PW＝`password-setup` の request/verify/complete）**（§3・A-TC-030〜051）。MFA（状態C）は範囲外＝後続で TC 追加。
+> 規約＝[`テスト規約.md`](./テスト規約.md)。仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md)（A.0/A.1/A.6/A.7/A.9）・[`../API設計/README.md`](../API設計/README.md) §1.4/§1.7・[`../画面設計/screens/SC-00_ログイン.md`](../画面設計/screens/SC-00_ログイン.md)。具体値＝[`../ADR/ADR-0001_認証・セッション基本パラメータ.md`](../ADR/ADR-0001_認証・セッション基本パラメータ.md)（状態A）・[`../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md`](../ADR/ADR-0002_初回・再設定パスワード基本パラメータ.md)（状態B/D）・[`../ADR/ADR-0004_MFA・信頼端末基本パラメータ.md`](../ADR/ADR-0004_MFA・信頼端末基本パラメータ.md)（状態C）。
+> 対象範囲＝**状態A（PWログイン）＋`GET /auth/session`＋`logout`**（§1・A-TC-001〜021）／**状態B・D（`password-setup` の request/verify/complete）**（§3・A-TC-030〜051）／**状態C（メールOTP MFA＝`mfa/verify`・`mfa/resend`・信頼端末・`logout-all`）**（§4・A-TC-060〜070）。
 > 期待する `code`・スキーマは上記設計/OpenAPI が SoT（本表は参照。値は出典併記）。
 
 ## 前提（共通フィクスチャ）
 
-- シード＝**会社1（`mfa_required=false`・`active`）**＋**アカウント1（`login_id=user@acme.example`・PW既知・`password_set=true`・`system_role=general`）**。会社DB users にミラー1件。
-- 別途、テスト内で作る派生状態＝`password_set=false` のアカウント／`suspended` の会社。
+- シード＝**会社1（`ACME-01`・`mfa_required=false`・`active`）**＋アカウント1（`user@acme.example`）。会社DB users にミラー1件。**MFA 用に会社2（`ACME-02`・`mfa_required=true`）**＋アカウント（`mfa@acme2.example`）も seed（会社DB `ideaquest_company_acme2` にミラー）。
+- 別途、テスト内で作る派生状態＝`password_set=false` のアカウント／`suspended` の会社／`mfa_required=true` の会社（`factory.make_company(mfa_required=True)`）。
 - エンドポイントは `/api/v1/auth/*`（ADR §2.1）。
 
 ---
@@ -96,5 +96,38 @@
 ### 3.5 補足・非対象（状態B/D）
 
 - **`account_sync_outbox`（会社DB `users` への `password_set` ミラー・データモデル §4.6）は本スライスでは非対象**＝outbox/worker スライスへ委譲（ADR-0002 §2.4）。complete は管理DB `accounts` の更新＋全セッション破棄までを確認対象とする。
-- **信頼端末（`trusted_devices`）失効**は MFA スライスで `trusted_devices` 導入後に TC 追加（本スライスは全セッション破棄まで）。
+- **信頼端末（`trusted_devices`）失効**は状態C（§4・A-TC-070）で確認する。
 - **セキュリティ通知**（`security_password_changed`・A.9-⑧）はドメイン H 実装時に TC 追加。
+
+---
+
+## 4. テストパターン（状態C＝メールOTP MFA・ADR-0004）
+
+pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `mail` フェイクの本文（`認証コード: NNNNNN`）から取り出す。しきい値は env（OTP 6桁・TTL 600s・失敗上限5・resend クールダウン30s・pre-auth 600s・信頼端末30日）。
+
+### 4.1 `login` の `mfa_required` 分岐・`mfa/verify`・`mfa/resend`
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-060 | api | MFA必須会社＋正資格 | `POST /login` | `200 { status:"mfa_required", mfa:{delivery,masked_to,expires_in:600,resend_available_in:30} }`＋`Set-Cookie: iq_preauth,iq_csrf`（`iq_session` 無し）・OTP メール送信 | A.1／ADR-0004 §2.4 |
+| A-TC-061 | api | pre-auth 有 | 誤 OTP で `mfa/verify` | `401 { code:"otp_invalid", attempts_left:4 }`（上限5） | A.1 |
+| A-TC-062 | api | pre-auth 有 | 誤 OTP を上限まで（5回）→ 6回目 | 5回目 `attempts_left:0`→pre-auth 失効、6回目 `401 preauth_expired` | A.0-④ |
+| A-TC-063 | api | pre-auth 有（seed MFA アカウント） | 正 OTP で `mfa/verify` | `200 authenticated`＋`iq_session` 発行・pre-auth 消費・`GET /session` 通る | A.0-③ |
+| A-TC-064 | api | 同上 | `mfa/verify`（`trust_device=true`）→ 同端末で再 `login` | verify で `iq_trust` 発行＋`trusted_devices` 登録、再 login は `authenticated`（MFA スキップ） | A.0-① |
+| A-TC-065 | api | pre-auth 無 | `mfa/verify` | `401 preauth_expired`（CSRF より先に評価） | A.0／A-TC-015 方針 |
+| A-TC-066 | api | pre-auth 有・CSRF ヘッダ無 | `mfa/verify` | `403 csrf_failed`（pre-auth 401 の後） | A.0 |
+| A-TC-067 | api | pre-auth 有（発行直後） | `mfa/resend` | `429 rate_limited`＋`Retry-After`（クールダウン中） | A.1／ADR-0004 §2.4 |
+| A-TC-068 | api | pre-auth 有・クールダウン経過（Redis で `resend_available_at` を過去へ） | `mfa/resend` | `200 { expires_in:600, resend_available_in:30 }`・新OTP送信・旧OTPは `otp_invalid` | A.1／ADR-0004 §2.2 |
+| A-TC-069 | api | pre-auth 有・OTP 期限切れ（Redis で `otp_expires_at` を過去へ） | 正 OTP で `mfa/verify` | `401 otp_expired` | A.1 |
+
+### 4.2 `logout-all`（信頼端末失効）
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-070 | api | verify（`trust_device=true`）で信頼端末登録済み | `POST /logout-all` → 再 `login` | `204`（全セッション破棄＋`trusted_devices` 全 revoked）→ 再 login は再び `mfa_required` | A.0-⑤ |
+
+### 4.3 補足・非対象（状態C）
+
+- **frontend 状態C（認証コード入力 UI）は非対象**＝backend を先に縦へ通す（ADR-0004 §2.6）。後続スライスで `mfa/verify`・`mfa/resend` に配線＋e2e。
+- **アカウント一時ロック**は非対象＝後続 ADR（ADR-0004 §2.5・ADR-0001 §2.6）。既存レート制限＋OTP 失敗上限で一次防御。
+- OTP を DB（`otp_challenges` purpose=`login`）に保持する案は非採用（Redis 一体保持・ADR-0004 §2.2）。将来 DB 化時に TC 追加。

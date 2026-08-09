@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     # request（自己サービス再設定要求）のレート制限（ADR-0002 §2.3・超過時も 202 維持）
     pw_request_rate_limit_max: int = 5
     pw_request_rate_limit_window_seconds: int = 600
+
+    # MFA（メールOTP）・信頼端末（ADR-0004・しきい値は env＝ADR-0003 §2.1）
+    otp_length: int = 6                          # OTP 桁数（数字）
+    otp_ttl_seconds: int = 600                   # OTP 有効期限（10分）
+    otp_max_attempts: int = 5                    # 連続失敗上限（超過で pre-auth 失効・A.0-④）
+    otp_resend_cooldown_seconds: int = 30        # resend クールダウン（経過前は 429）
+    preauth_ttl_seconds: int = 600               # pre-auth（iq_preauth）寿命＝MFA 完了までの猶予
+    trusted_device_ttl_seconds: int = 2592000    # 信頼端末（iq_trust）TTL（30日）
     # メール送信（dev=MailHog／prod=SMTP・ADR-0002 §2.5・置き場所は ADR-0003）
     # 接続（dev=MailHog は認証なし・平文＝user/password 空・start_tls=False で無効化）
     smtp_host: str = "localhost"

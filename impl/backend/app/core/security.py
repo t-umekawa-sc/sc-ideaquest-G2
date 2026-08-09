@@ -46,6 +46,11 @@ def generate_token(n_bytes: int = 32) -> str:
     return secrets.token_urlsafe(n_bytes)
 
 
+def generate_otp(length: int) -> str:
+    """CSPRNG による数字 OTP（先頭ゼロ許容・ADR-0004 §2.2）。低エントロピーは失敗上限＋TTL で守る。"""
+    return str(secrets.randbelow(10 ** length)).zfill(length)
+
+
 def hash_token(token: str) -> str:
     """高エントロピー乱数トークンのハッシュ（SHA-256 hex・ADR-0002 §2.1）。
 
@@ -118,6 +123,49 @@ def delete_session(r: redis.Redis, token: str) -> None:
         if account_id:
             r.srem(_acct_sess_key(account_id), token)
     r.delete(_sess_key(token))
+
+
+# --- pre-auth ／ OTP（Redis・ADR-0004 §2.2） -------------------------------------------
+# pre-auth は「未MFA中間状態」＝本セッションと別実体・最小権限（A.0）。login OTP も同レコードに
+# 一体で保持（10分の揮発値・自動失効・otp_challenges テーブルは password_setup 専用に留める）。
+_PREAUTH_PREFIX = "preauth:"
+
+
+def _preauth_key(token: str) -> str:
+    return f"{_PREAUTH_PREFIX}{token}"
+
+
+def create_preauth(r: redis.Redis, account_id: str, company_id: str, otp_hash: str) -> str:
+    """pre-auth を作成しトークンを返す。OTP ハッシュ・失敗回数・resend 可能時刻を内包する。"""
+    s = get_settings()
+    token = generate_token()
+    now = int(time.time())
+    data = {
+        "account_id": account_id,
+        "company_id": company_id,
+        "otp_hash": otp_hash,
+        "otp_expires_at": now + s.otp_ttl_seconds,
+        "attempts": 0,
+        "resend_available_at": now + s.otp_resend_cooldown_seconds,
+    }
+    r.set(_preauth_key(token), json.dumps(data), ex=s.preauth_ttl_seconds)
+    return token
+
+
+def read_preauth(r: redis.Redis, token: str | None) -> dict | None:
+    if not token:
+        return None
+    raw = r.get(_preauth_key(token))
+    return json.loads(raw) if raw is not None else None
+
+
+def save_preauth(r: redis.Redis, token: str, data: dict) -> None:
+    """更新を書き戻す。**TTL は据え置き**（pre-auth の 10分上限を resend 等で延ばさない・ADR-0004 §2.2）。"""
+    r.set(_preauth_key(token), json.dumps(data), keepttl=True)
+
+
+def delete_preauth(r: redis.Redis, token: str) -> None:
+    r.delete(_preauth_key(token))
 
 
 # --- ログインのレート制限（Redis 固定窓・ADR §2.6） -------------------------------------

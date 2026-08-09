@@ -52,3 +52,16 @@ def password_policy_errors(password: str) -> list[dict]:
              "message": "パスワードには数字を1文字以上含めてください"}
         )
     return errors
+
+
+# --- MFA（OTP 送信先の伏字表示・ADR-0004 §2.4） --------------------------------------------
+def mask_email(email: str) -> str:
+    """OTP 送信先メールを伏字化（`yamada@acme.co.jp` → `y****@acme.co.jp`）。
+
+    ローカル部の先頭1文字だけ残す。mfa_required 分岐は PW 照合後＝本人に既知のため列挙耐性は損なわない。
+    """
+    local, sep, domain = email.partition("@")
+    if not sep:
+        return "****"
+    head = local[0] if local else ""
+    return f"{head}****{sep}{domain}"

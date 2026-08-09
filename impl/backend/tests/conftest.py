@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from app.control_plane.auth.orm import Account, Company, OtpChallenge
+from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
 from app.core.security import generate_token, hash_password, hash_token
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -26,6 +26,9 @@ from app.tenant.profile.orm import User
 SEED_COMPANY_CODE = "ACME-01"
 SEED_LOGIN = "user@acme.example"
 SEED_PASSWORD = "Passw0rd!"
+# MFA 必須のシード会社（ADR-0004・状態C）
+SEED_MFA_COMPANY_CODE = "ACME-02"
+SEED_MFA_LOGIN = "mfa@acme2.example"
 
 
 @pytest.fixture
@@ -63,9 +66,12 @@ def factory():
     # (db_identifier, account_id) 会社DB ミラーの掃除対象
     created_users: list[tuple[str, uuid.UUID]] = []
 
-    def _seed_company() -> Company:
+    def _company_by_code(code: str) -> Company:
         with control_session() as s:
-            return s.query(Company).filter_by(company_code=SEED_COMPANY_CODE).one()
+            return s.query(Company).filter_by(company_code=code).one()
+
+    def _seed_company() -> Company:
+        return _company_by_code(SEED_COMPANY_CODE)
 
     def make_company(status: str = "active", mfa_required: bool = False) -> dict:
         code = f"TST-{uuid.uuid4().hex[:8]}"
@@ -103,14 +109,13 @@ def factory():
             created_accounts.append(a.id)
             return {"id": a.id, "login_id": lid, "password": password}
 
-    def make_seed_company_account(password_set: bool = True, status: str = "active") -> dict:
-        """シード会社（実在の会社DBを持つ ACME-01）配下にアカウント＋users ミラーを作る。
+    def _make_real_account(company: Company, prefix: str, password_set: bool, status: str) -> dict:
+        """実在の会社DBを持つシード会社配下にアカウント＋users ミラーを作る（成功認証パス用）。
 
-        complete→login の往復（A-TC-045）や、request の実送信（実在アカウント）に使う。
+        complete→login の往復や MFA verify 成功（会社DBミラー解決）に使う。
         teardown で control の accounts と 会社DB の users を削除する。
         """
-        company = _seed_company()
-        lid = f"pw-{uuid.uuid4().hex[:8]}@acme.example"
+        lid = f"{prefix}-{uuid.uuid4().hex[:8]}@{company.company_code.lower()}.example"
         password = "Passw0rd!"
         aid = uuid.uuid4()
         with control_session() as s:
@@ -119,7 +124,7 @@ def factory():
                 company_id=company.id,
                 login_id=lid,
                 email=lid,
-                display_name="PW Test",
+                display_name="Seed Test",
                 password_hash=hash_password(password) if password_set else None,
                 locale="ja",
                 system_role="general",
@@ -128,11 +133,19 @@ def factory():
             s.commit()
         created_accounts.append(aid)
         with get_tenant_session(company.db_identifier) as ts:
-            ts.add(User(id=uuid.uuid4(), account_id=aid, display_name="PW Test", locale="ja", status="active"))
+            ts.add(User(id=uuid.uuid4(), account_id=aid, display_name="Seed Test", locale="ja", status="active"))
             ts.commit()
         created_users.append((company.db_identifier, aid))
         return {"id": aid, "login_id": lid, "password": password,
-                "company_code": SEED_COMPANY_CODE, "email": lid}
+                "company_code": company.company_code, "email": lid}
+
+    def make_seed_company_account(password_set: bool = True, status: str = "active") -> dict:
+        """ACME-01（MFA OFF）配下の実アカウント。password-setup complete→login 等に使う。"""
+        return _make_real_account(_seed_company(), "pw", password_set, status)
+
+    def make_seed_mfa_account(status: str = "active") -> dict:
+        """ACME-02（MFA ON）配下の実アカウント。login→OTP→mfa/verify 成功パスに使う（ADR-0004）。"""
+        return _make_real_account(_company_by_code(SEED_MFA_COMPANY_CODE), "mfa", True, status)
 
     def make_password_setup_challenge(
         account_id: uuid.UUID, token: str | None = None,
@@ -159,6 +172,7 @@ def factory():
         make_company=make_company,
         make_account=make_account,
         make_seed_company_account=make_seed_company_account,
+        make_seed_mfa_account=make_seed_mfa_account,
         make_password_setup_challenge=make_password_setup_challenge,
     )
 
@@ -168,6 +182,9 @@ def factory():
         # テスト中に request/complete が作った未追跡のチャレンジも掃除（対象アカウント分）
         for aid in created_accounts:
             s.query(OtpChallenge).filter_by(account_id=aid).delete()
+        # MFA verify(trust_device) が作った信頼端末も掃除
+        for aid in created_accounts:
+            s.query(TrustedDevice).filter_by(account_id=aid).delete()
         for aid in created_accounts:
             s.query(Account).filter_by(id=aid).delete()
         for cid in created_companies:
