@@ -10,6 +10,8 @@ import { useState } from "react";
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { login } from "../api";
+import type { MfaChallenge } from "../types";
+import { MfaForm } from "./MfaForm";
 import "../auth.css";
 
 function messageFor(err: unknown): string {
@@ -36,6 +38,7 @@ export function LoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [mfa, setMfa] = useState<MfaChallenge | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,8 +49,11 @@ export function LoginForm() {
       if (res?.status === "authenticated") {
         router.push("/");
         router.refresh();
+      } else if (res?.status === "mfa_required" && res.mfa) {
+        setPassword("");        // pre-auth へ移行＝PW は保持しない
+        setMfa(res.mfa);        // 状態C（認証コード入力）へ
       } else {
-        setError("多要素認証が必要です（未対応）。");
+        setError("エラーが発生しました。時間をおいて再度お試しください。");
       }
     } catch (err) {
       setError(messageFor(err));
@@ -55,6 +61,19 @@ export function LoginForm() {
     } finally {
       setPending(false);
     }
+  }
+
+  // 状態C: login が mfa_required を返したら認証コード入力へ切替（onRestart で状態Aへ戻る）
+  if (mfa) {
+    return (
+      <MfaForm
+        challenge={mfa}
+        onRestart={(message) => {
+          setMfa(null);
+          setError(message ?? null);
+        }}
+      />
+    );
   }
 
   return (

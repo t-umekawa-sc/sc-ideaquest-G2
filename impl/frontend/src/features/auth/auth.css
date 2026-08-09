@@ -91,6 +91,37 @@
   padding: var(--space-3);
   margin-bottom: var(--space-4);
 }
+/* 状態C: 「このデバイスを信頼する」チェック */
+.auth-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-4);
+  cursor: pointer;
+}
+.auth-check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+/* リンク風ボタン（再送信・別IDでログイン）。無効時はグレーアウト */
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--color-primary, #2563eb);
+  cursor: pointer;
+}
+.linklike:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.linklike:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
 .login-note {
   margin-top: var(--space-5);
   padding-top: var(--space-4);

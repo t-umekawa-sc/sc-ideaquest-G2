@@ -4,6 +4,10 @@ import type { components } from "@/lib/api/schema";
 export type LoginRequest = components["schemas"]["LoginRequest"];
 export type LoginResponse = components["schemas"]["LoginResponse"];
 
+// MFA（状態C・A.1・ADR-0004）
+export type MfaChallenge = components["schemas"]["MfaChallenge"];
+export type MfaResendResponse = components["schemas"]["MfaResendResponse"];
+
 // 初回・再設定パスワード（A.7・状態B/D）
 export type PasswordSetupVerifyResponse = components["schemas"]["PasswordSetupVerifyResponse"];
 
