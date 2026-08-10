@@ -21,6 +21,8 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import (
     check_login_rate_limit,
+    clear_login_lock,
+    clear_login_locks_for_login_id,
     create_preauth,
     create_session,
     delete_account_sessions,
@@ -30,8 +32,11 @@ from app.core.security import (
     generate_token,
     hash_password,
     hash_token,
+    is_login_locked,
     read_session,
+    register_login_failure,
     save_preauth,
+    should_send_lock_notification,
     verify_password,
     within_pw_request_rate_limit,
 )
@@ -82,8 +87,15 @@ def login(
     r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str,
     trust_token: str | None = None,
 ) -> LoginResult:
-    check_login_rate_limit(r, client_ip, login_id)
+    check_login_rate_limit(r, client_ip, login_id)  # 第一層＝粗い (IP+login_id) レート制限（429）
 
+    # 第二層＝(IP+login_id) 一時ロック（ADR-0005 §2.3）。ロック中は資格照合に到達させないが、
+    # 応答は誤資格と同一の 401 とし、タイミング差を作らないためダミー照合だけ行う（列挙耐性・A.1）。
+    if is_login_locked(r, client_ip, login_id):
+        verify_password(password, None)
+        raise AppError(401, "unauthenticated")
+
+    lock_notify: tuple[str, str] | None = None  # ロック発火時に通知すべき (account_id, email)
     with control_session() as session:
         account, company = account_repo.find_account_and_company(session, company_code, login_id)
 
@@ -97,27 +109,43 @@ def login(
         company_status = company.status if company else "active"
 
         decision = decide_login(credentials_ok, company_status)
-        if decision is LoginDecision.INVALID:
-            raise AppError(401, "unauthenticated")
         if decision is LoginDecision.COMPANY_SUSPENDED:
             raise AppError(503, "company_suspended")
 
-        # PROCEED。MFA 要否は会社設定で分岐。信頼端末（iq_trust）が有効なら MFA スキップ（A.0-①）
-        needs_mfa = company.mfa_required
-        if needs_mfa and trust_token:
-            td = account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
-            if td is not None:
-                td.last_used_at = datetime.now(timezone.utc)
-                session.commit()
-                needs_mfa = False
+        if decision is LoginDecision.INVALID:
+            # 認証失敗を計数。閾値到達でロック発火＝実在 active のときだけ本人へ通知（§2.4）。
+            # メール送信は列挙耐性のため session を閉じてから（§2.4・下記）。
+            if register_login_failure(r, client_ip, login_id) and account is not None and account.status == "active":
+                lock_notify = (str(account.id), account.email)
+        else:
+            # PROCEED＝資格照合成功。失敗計数とロックを解除する（§2.2 成功で streak と lock 削除）。
+            clear_login_lock(r, client_ip, login_id)
 
-        if not needs_mfa:
-            return _issue_session(r, account, company)  # 本セッション発行（ORM 接続中に解決）
+            # MFA 要否は会社設定で分岐。信頼端末（iq_trust）が有効なら MFA スキップ（A.0-①）
+            needs_mfa = company.mfa_required
+            if needs_mfa and trust_token:
+                td = account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
+                if td is not None:
+                    td.last_used_at = datetime.now(timezone.utc)
+                    session.commit()
+                    needs_mfa = False
 
-        # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
-        mfa_account_id = str(account.id)
-        mfa_company_id = str(company.id)
-        mfa_email = account.email
+            if not needs_mfa:
+                return _issue_session(r, account, company)  # 本セッション発行（ORM 接続中に解決）
+
+            # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
+            mfa_account_id = str(account.id)
+            mfa_company_id = str(company.id)
+            mfa_email = account.email
+
+    # ここに到達するのは INVALID か 要MFA のいずれか
+    if decision is LoginDecision.INVALID:
+        # session を閉じてから通知（SMTP 中に DB 接続を保持しない）。宛先無し/クールダウン中は無送信
+        if lock_notify is not None:
+            account_id, email = lock_notify
+            if should_send_lock_notification(r, account_id):
+                _send_lock_notification(email)
+        raise AppError(401, "unauthenticated")
 
     # --- 要MFA（A.0-②）: OTP 発行＋pre-auth 発行＋メール送信 ---
     s = get_settings()
@@ -143,6 +171,21 @@ def _send_otp_email(to_email: str, otp: str) -> None:
         "ideaquest のログイン認証コードです。\n\n"
         f"認証コード: {otp}\n"
         f"（有効期限 {minutes} 分・1回限り）\n\n"
+        "このメールに心当たりがない場合は破棄してください。"
+    )
+    get_mail_sender().send(to_email, subject, body)
+
+
+def _send_lock_notification(to_email: str) -> None:
+    """アカウント一時ロックを本人へ out-of-band 通知（ADR-0005 §2.4）。
+
+    本文は汎用＝攻撃元 IP・失敗回数・MFA 有無などの詳細は載せない（列挙耐性・情報過多の回避）。
+    """
+    subject = "【ideaquest】ログインの一時制限のお知らせ"
+    body = (
+        "あなたのアカウントでログインの失敗が続いたため、一時的にログインを制限しました。\n\n"
+        "しばらく時間をおくと自動的に解除されます。\n"
+        "心当たりがない場合は、パスワードの再設定をおすすめします。\n\n"
         "このメールに心当たりがない場合は破棄してください。"
     )
     get_mail_sender().send(to_email, subject, body)
@@ -316,12 +359,15 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
         account.password_hash = hash_password(new_password)  # password_hash 非NULL＝password_set=true
         challenge.used_at = datetime.now(timezone.utc)  # 単回消費
         account_id = str(account.id)
+        login_id = account.login_id
         session.commit()
         # TODO(outbox): 同一Tx で account_sync_outbox に password_set ミラーを INSERT する
         # （データモデル §4.6・A.7）。worker/列拡張とまとめて outbox スライスで実装（ADR-0002 §2.4）。
 
     # PW 変更で当該アカウントの全セッションを破棄（A.9-③・ここでは新セッションは張らない）
     delete_account_sessions(r, account_id)
+    # 本人がメール経由で PW 再設定＝到達の証拠。当該 login_id のログインロックを即解除（ADR-0005 §2.5(b)）
+    clear_login_locks_for_login_id(r, login_id)
 
 
 def _challenge_is_valid(challenge) -> bool:

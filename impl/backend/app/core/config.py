@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 300
 
+    # アカウント一時ロック（ADR-0005・(IP+login_id) 単位の第二層防御・しきい値は env）
+    login_lock_max_attempts: int = 5                 # ロックまでの連続失敗回数（窓内）
+    login_lock_ttl_seconds: int = 900                # ロック期間＝連続失敗の計数窓（15分）
+    login_lock_notify_cooldown_seconds: int = 3600   # ロック通知メールの最小間隔（60分/account）
+
     # 初回・再設定パスワード（ADR-0002）
     # 設定リンクトークン TTL（72時間・単回・A.7／データモデル §4.4）
     password_setup_ttl_seconds: int = 259200

@@ -129,5 +129,30 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 ### 4.3 補足・非対象（状態C）
 
 - **frontend 状態C（認証コード入力 UI）は非対象**＝backend を先に縦へ通す（ADR-0004 §2.6）。後続スライスで `mfa/verify`・`mfa/resend` に配線＋e2e。
-- **アカウント一時ロック**は非対象＝後続 ADR（ADR-0004 §2.5・ADR-0001 §2.6）。既存レート制限＋OTP 失敗上限で一次防御。
+- **アカウント一時ロック**は §5（A-TC-071〜）で確定・実装（ADR-0005）。既存レート制限＋OTP 失敗上限の上に載る第二層。
 - OTP を DB（`otp_challenges` purpose=`login`）に保持する案は非採用（Redis 一体保持・ADR-0004 §2.2）。将来 DB 化時に TC 追加。
+
+---
+
+## 5. テストパターン（アカウント一時ロック＝ログインハードニング・ADR-0005）
+
+> 仕様の正＝[`../ADR/ADR-0005_アカウント一時ロック.md`](../ADR/ADR-0005_アカウント一時ロック.md)（§2.1 値・§2.2 (IP+login_id) 単位・§2.3 一律401・§2.4 通知・§2.5 解除・§2.6 OTP 非連動）。方針（列挙耐性＝一律 401）は [`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md) A.1 が正。
+> しきい値は env（`login_lock_max_attempts`=5・`login_lock_ttl_seconds`=900・`login_lock_notify_cooldown_seconds`=3600）。ロック/計数/通知クールダウンは Redis（`login_fail_streak:{ip}:{login_id}`／`login_lock:{ip}:{login_id}`／`lock_notified:{account_id}`）。IP はテスト側で差し替える（`TestClient(app, client=(ip, port))`）。既存の (IP+login_id) レート制限（10回/5分＝429・ADR-0001 §2.6）とは別キー・別層。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-071 | api | ACME-01 実アカウント・IP=A | 誤PWで **5回**連続失敗 → 以後 IP=A から**正PWでも** login | 1〜5回目は `401 unauthenticated`、6回目以降は**ロックにより一律 401**（正PWでも通らない） | ADR-0005 §2.2/§2.3 |
+| A-TC-072 | api | A-TC-071 でロック済み（IP=A） | **別 IP=B** から同一 login_id＋正PWで login | `200 authenticated`（ロックは **(IP+login_id) 単位**＝別 IP は非影響・可用性 DoS 回避） | ADR-0005 §2.2 |
+| A-TC-073 | api | ロック中（IP=A） | ロック中の login 応答を検査 | `401 {code:"unauthenticated"}`・**`Retry-After` ヘッダ無し・残時間を返さない**（誤資格と同一＝列挙耐性） | ADR-0005 §2.3 |
+| A-TC-074 | int | IP=A・login_id | 4回失敗 → **1回成功** → 再度失敗 | 成功で `login_fail_streak:{A}:{id}`／`login_lock:{A}:{id}` が消える（成功でカウンタ解除・以後は 1 から数え直し） | ADR-0005 §2.2 |
+| A-TC-075 | int | IP=A・5回失敗でロック発火 | ロック発火後にさらに失敗試行 | `login_lock:{A}:{id}` の **TTL が増えない**（追加試行で延長しない＝発火から固定期間で必ず解ける） | ADR-0005 §2.2/§2.5(a) |
+| A-TC-076 | api | ACME-01 実アカウントを IP=A でロック | 有効 `password_setup` トークンで complete（新PW）→ IP=A で新PW login | complete で**ロック即解除** → `200 authenticated`（PW 再設定で解除・§2.5(b)） | ADR-0005 §2.5 |
+| A-TC-077 | api | ACME-01 実アカウント（mail フェイク） | IP=A で 5回失敗（発火） → 続けて **別 IP=B** で 5回失敗（再発火） | ロック通知メールは**ちょうど1通**（本人宛）。IP=B の再発火はクールダウンで**追加送信なし** | ADR-0005 §2.4 |
+| A-TC-078 | api | **存在しない login_id**（mail フェイク） | IP=A で 5回失敗（発火） | ロックはされる（一律 401）が**通知メールは送られない**（実在 active のみ・列挙耐性） | ADR-0005 §2.4 |
+| A-TC-079 | api | ACME-02（MFA）＝login は成功し pre-auth 発行 | `mfa/verify` の OTP を 5回誤り → 改めて login | login ロックは**発火しない**（OTP 失敗は非連動）＝再 login は再び `mfa_required`（ロックの 401 にならない） | ADR-0005 §2.6 |
+
+### 5.1 補足・非対象（ロック）
+
+- **管理者による強制解除・ロック可視化は非対象**＝管理面が整うまで後続（ADR-0005 §2.5・§5）。本スライスは (a) 15分自動解除＋(b) PW 再設定解除まで。
+- **分散 IP 総当り**は (IP+login_id) 単位の原理的限界（ADR-0005 §2.2 トレードオフ）＝本 TC の対象外。
+- 通知メールの**非同期化**（outbox）は後続（ADR-0005 §5・ADR-0002 §2.4）。本スライスは同期送信。

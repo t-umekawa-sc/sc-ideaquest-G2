@@ -180,6 +180,67 @@ def check_login_rate_limit(r: redis.Redis, ip: str, login_id: str) -> None:
         raise AppError(429, "rate_limited", detail=f"retry after {r.ttl(key)}s")
 
 
+# --- アカウント一時ロック（Redis・第二層防御・ADR-0005） --------------------------------
+# 失敗計数・ロック・通知クールダウンはいずれも短命の揮発値で自動解除（TTL）が本質＝Redis に置く
+# （ADR-0005 §2.7）。ロックは (IP+login_id) 単位＝攻撃元 IP からの当該 ID への試行だけを止め、
+# 被害者本人（別 IP）のログインは妨げない＝可用性 DoS を回避（§2.2）。
+def _lock_streak_key(ip: str, login_id: str) -> str:
+    return f"login_fail_streak:{ip}:{login_id}"
+
+
+def _lock_key(ip: str, login_id: str) -> str:
+    return f"login_lock:{ip}:{login_id}"
+
+
+def is_login_locked(r: redis.Redis, ip: str, login_id: str) -> bool:
+    """(IP+login_id) がロック中か。ロック中は資格照合に到達させない（§2.3）。"""
+    return r.exists(_lock_key(ip, login_id)) == 1
+
+
+def register_login_failure(r: redis.Redis, ip: str, login_id: str) -> bool:
+    """認証失敗を (IP+login_id) 単位で計数。閾値到達でロックを張り True（新規発火）を返す。
+
+    ロック TTL は発火時に一度だけ設定＝以後の追加試行で延長しない（§2.2）。本関数は
+    `is_login_locked` が偽（未ロック）のときのみ呼ばれる前提（発火判定は count==max の一度きり）。
+    """
+    s = get_settings()
+    streak_key = _lock_streak_key(ip, login_id)
+    count = r.incr(streak_key)
+    if count == 1:
+        r.expire(streak_key, s.login_lock_ttl_seconds)  # 計数窓＝ロック期間と同じ
+    if count >= s.login_lock_max_attempts:
+        r.set(_lock_key(ip, login_id), "1", ex=s.login_lock_ttl_seconds)
+        r.delete(streak_key)  # 発火でリセット（§2.2）
+        return True
+    return False
+
+
+def clear_login_lock(r: redis.Redis, ip: str, login_id: str) -> None:
+    """認証成功で当該 (IP+login_id) の失敗計数とロックを解除（§2.2）。"""
+    r.delete(_lock_streak_key(ip, login_id), _lock_key(ip, login_id))
+
+
+def clear_login_locks_for_login_id(r: redis.Redis, login_id: str) -> None:
+    """PW 再設定成功時に当該 login_id のロック/計数を一掃（§2.5(b)）。
+
+    (IP+login_id) 単位ゆえ IP は不定なので SCAN で全 IP 分を削除する（PW 再設定は稀イベント）。
+    """
+    for pattern in (f"login_fail_streak:*:{login_id}", f"login_lock:*:{login_id}"):
+        for key in r.scan_iter(match=pattern):
+            r.delete(key)
+
+
+def should_send_lock_notification(r: redis.Redis, account_id: str) -> bool:
+    """ロック通知メールのスロットル（§2.4）。1通/`login_lock_notify_cooldown_seconds`/account。
+
+    送信可なら True を返し、同時にクールダウンキーを張る（NX+EX で原子的）。メール爆撃対策で、
+    IP を回されての再発火では 2 通目以降を送らない。
+    """
+    s = get_settings()
+    key = f"lock_notified:{account_id}"
+    return bool(r.set(key, "1", nx=True, ex=s.login_lock_notify_cooldown_seconds))
+
+
 def within_pw_request_rate_limit(r: redis.Redis, ip: str, company_code: str, login_id: str) -> bool:
     """PW再設定要求のレート制限（ADR-0002 §2.3）。超過なら False を返す（例外は投げない）。
 
