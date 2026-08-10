@@ -1,176 +1,173 @@
 # 作業引き継ぎ (handoff)
 
 > 次回セッション開始時に **このファイルだけ読めば作業を再開できる** ことを目的とした引き継ぎメモ。
-> 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）・`doc/API設計/`・`doc/ADR/` を参照。
+> 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）・`doc/API設計/`・`doc/ADR/`・`doc/データモデル.md` を参照。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **現在地＝実装スキャフォールド進行中。手法＝「設計書→（必要なら ADR で具体値確定）→テストパターン→テストコード→実装」で 1 スライスずつ縦に通す。**
-> **SC-00 ログインは全状態（A/B/C/D）が frontend＋backend とも縦に完了済み。「アカウント一時ロック（ADR-0005）」を backend 実装完了。さらに「クライアント IP の確定（ADR-0006・信頼プロキシ）」も実装完了し、(IP+login_id) 系がリバプロ配下でプロキシ IP に潰れる欠陥を解消（red-green 経由・backend 62 passed）。次スライス＝outbox/worker または logout-all の frontend 導線（§7）。**
+> **現在地＝実装スキャフォールド進行中。手法＝「設計書→（必要なら ADR で具体値確定）→テストパターン→テストコード→実装」で 1 スライスずつ縦に通す。red-green 必須（テスト規約 §5.1）。**
+> **直近スライス＝`account_sync_outbox`（管理DB→会社DB `users` ミラー・§4.6）を backend で縦通し完了。次スライス＝② メール非同期化（着手前に設計方針の相談が要る＝§7）。**
 
 ---
 
 ## 1. 最終更新日時 / ブランチ / 最新コミット
 
-- 最終更新: **2026-08-10 JST**（セッション終了時）。
-- ブランチ: **main**（作業ツリー クリーン・`origin/main` と同期）。
-- 最新の実装コミット: **`c18006d`**（本 handoff 更新はこの後の別コミット＝2段目・ハッシュは git 参照）。
-- 本セッションのコミット（新しい順・**すべて `origin/main` へプッシュ済み**）:
-  - `c18006d` 実装 クライアントIPの確定（ADR-0006・信頼プロキシ）＋本番デプロイ要件＝**本セッションの主成果その2**
-  - `89c9265` 実装 アカウント一時ロック（ADR-0005・ログイン第二層防御）＝**主成果その1**
-  - `a45e791` docs(ADR-0001) 状態A の定義正本(SC-00 §3 画面状態)への参照リンクを追記
-  - `198f7e6` docs(SC-00) otp_expired の文言・導線を追記＋再送クールダウンを30秒に統一
-- 前セッションの最終は `f0ac9b4`（handoff 全文更新）。remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。**未プッシュのコミットは無い**。
+- 最終更新: **2026-08-11 JST**（セッション終了時）。
+- ブランチ: **main**（作業ツリー クリーン・`origin/main` と同期＝`git status` で確認済み）。
+- 最新コミット: **`0fa2387`**（本 handoff 更新はこの後の別コミット＝2段目・ハッシュは git 参照）。
+- 前回 handoff（`87e19e3`）以降のコミット（新しい順・**すべて `origin/main` へプッシュ済み**）:
+  - `0fa2387` 実装 account_sync_outbox（管理DB→会社DB users ミラー・§4.6）＝**本セッションの成果**
+- remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。**未プッシュのコミットは無い**。
+- （参考）これ以前の主なコミット＝`c18006d` クライアントIP確定(ADR-0006)、`89c9265` アカウント一時ロック(ADR-0005)、それ以前に SC-00 ログイン全状態(A/B/C/D)。
 
 ---
 
 ## 2. このプロジェクトのゴール
 
 - **ideaquest**＝社内のアイデア創出をゲーミフィケーション（XP/コイン/レベル/魔法/ランキング）で促す **WEB アプリ**（マルチテナント SaaS・管理DB1＋会社DB N）。
-- スタック＝フロント Next.js(App Router)／バック FastAPI(4層)／PostgreSQL(全文検索 PGroonga・会社DBのみ)／Redis／MinIO／MailHog(dev メール)／Docker。
+- スタック＝フロント Next.js(App Router)／バック FastAPI(4層)／PostgreSQL(会社DBのみ PGroonga)／Redis／MinIO／MailHog(dev メール)／Docker。
 - 設計フェーズは **API設計 A〜L 全確定＋横断再レビュー済み**。現在は **実装スキャフォールドを 1 スライスずつ縦に通す段階**。
 
 ---
 
 ## 3. 今回やったこと — 変更ファイルと理由
 
-本セッションは (a) SC-00 の otp_expired 整備 → (b) ADR-0004 値の全文書整合確認 → (c) ADR-0001 参照リンク → (d) **ADR-0005 アカウント一時ロックの実装** → (e) **ADR-0006 クライアント IP の確定の実装**、の順。(a)〜(c) は軽微なドキュメント整備、(d)(e) が主成果。
+本セッションの成果＝**① `account_sync_outbox`（DBミラー）スライス**（`0fa2387`）。目的＝`complete_password_setup` に残っていた「outbox 未実装」TODO を解消し、**管理DB `accounts` → 会社DB `users` の一方向ミラー**（今回は `password_set`）を outbox＋常駐ワーカで結果整合に反映する機構を縦通しすること（データモデル §4.6・ADR-0002 §2.4）。
 
-### (a) SC-00 otp_expired の文言・導線＋クールダウン統一＝`198f7e6`
-- **`doc/画面設計/画面API連携/SC-00_ログイン.md`**＝§1c C1 に `otp_expired` の導線（`role="alert"` 表示＋コード欄クリア→「コードを再送信」へ誘導・状態Cに留まる）、§3 に `otp_expired` の文言行を追加。
-- **`doc/画面設計/screens/SC-00_ログイン.md`**＝再送クールダウンの表記を **60秒→30秒** に統一（ADR-0004 §2.1 が確定値＝30秒。画面設計側だけ 60秒 が残っていた**ドリフト解消**）＋出典リンク明記。
+> 重要な用語整理（会話で混同があったため明記）＝**`account_sync_outbox`（§4.6）は「DB→DB のコピー」であってメール送信ではない**。メール（OTP・設定リンク・ロック通知）は別機構で、その非同期化は **②（未着手・§7）**。
 
-### (b) ADR-0004 §2.1 値の全文書整合確認（コミット無し・確認のみ）
-- OTP 6桁/TTL600/失敗上限5/resend30s/pre-auth600/信頼端末30日(2592000) が **設計・テスト・実装（config.py/.env.example/compose.yaml）で一致**していることを横断 grep で確認。上記 (a) の 60秒 以外の不整合は無し。
+### 新規ファイル
+- `impl/backend/app/control_plane/account_sync/`＝新モジュール。
+  - `orm.py`＝`OutboxEntry`（テーブル `account_sync_outbox`）。**`seq`（BIGSERIAL/Identity）で挿入順＝因果順を担保**（理由＝§5/§6）。
+  - `repository.py`＝`enqueue(session, account_id, company_id, op, payload)`（呼び出し側 Tx に相乗）／`fetch_unfinished(session)`（`status!=done` を `seq` 昇順）。
+  - `application.py`＝`process_outbox_once()`（1巡処理・要約 dict 返す）／`_apply_one(entry_id)`（会社DB へ冪等 upsert→`done`、失敗は `attempts++`・上限超で `failed`）。**両プレーンを跨ぐ唯一の実行主体**。
+- `impl/backend/migrations/control/versions/0004_control_account_sync_outbox.py`＝`account_sync_outbox` 作成。
+- `impl/backend/migrations/company/versions/0002_company_users_password_set.py`＝会社DB `users.password_set` 列追加。
+- `doc/テスト/B_会社・アカウント.md`＝テストパターン B-TC-001〜005。
+- `impl/backend/tests/account_sync/test_outbox.py`＝上記の int テスト。
 
-### (c) ADR-0001 状態A の参照リンク＝`a45e791`
-- **`doc/ADR/ADR-0001_認証・セッション基本パラメータ.md`**＝「状態A＝パスワードログイン」の初出に、定義の正本 `screens/SC-00_ログイン.md §3 画面状態`（A/B/C/D）への相対リンクを追記（どの「状態A」かを一意化）。
-
-### (d) ADR-0005 アカウント一時ロックの実装＝`89c9265`（主成果・red-green 経由）
-既存の (IP+login_id) レート制限（10回/5分→429）と OTP 失敗上限（5）の上に載る**第二層**。正＝[`doc/ADR/ADR-0005_アカウント一時ロック.md`](doc/ADR/ADR-0005_アカウント一時ロック.md)。
-- **`impl/backend/app/core/config.py`**＝`login_lock_max_attempts=5` / `login_lock_ttl_seconds=900` / `login_lock_notify_cooldown_seconds=3600`（env）。
-- **`impl/backend/app/core/security.py`**＝`is_login_locked` / `register_login_failure`（閾値到達で lock を張り「新規発火」を bool 返し・streak リセット） / `clear_login_lock`（成功時） / `clear_login_locks_for_login_id`（PW 再設定・SCAN 削除） / `should_send_lock_notification`（NX+EX でクールダウン原子的判定）。キー＝`login_fail_streak:{ip}:{login_id}`（TTL 窓）・`login_lock:{ip}:{login_id}`（TTL 15分）・`lock_notified:{account_id}`（TTL 60分）。すべて Redis（自動失効）。
-- **`impl/backend/app/control_plane/auth/application.py`**＝`login()` を再構成: レート制限の後に `is_login_locked`→真なら**ダミー照合（`verify_password(password, None)`）してから一律 401**（タイミング差を作らない・列挙耐性）。資格照合 INVALID で `register_login_failure`→**新規発火かつ実在 active** なら通知対象として持ち出し、**session を閉じてから** `should_send_lock_notification`→`_send_lock_notification` 送信して 401。PROCEED（成功）で `clear_login_lock`。`complete_password_setup` の成功時に `clear_login_locks_for_login_id`。
-- **`impl/.env.example` / `impl/compose.yaml`**＝`LOGIN_LOCK_*` を `${VAR:-既定}` で配線（compose の backend `environment:` に列挙＝ドリフト再発防止）。`compose config` で `LOGIN_LOCK_*` 解決を確認済み。
-- **`doc/API設計/A_認証・セッション.md`**＝総当り対策節の「後続 ADR へ委譲」を **ADR-0005 への確定参照** に更新。
-- **テスト**＝`doc/テスト/A_認証.md` §5（A-TC-071〜079）追加、`impl/backend/tests/auth/test_auth_lock.py`（新規9件）。`doc/テスト/red確認台帳.md` にガード3件の反転証跡を追記。
-
-### (e) ADR-0006 クライアント IP の確定の実装＝`c18006d`（主成果その2・red-green 経由）
-リバプロ/BFF 配下で `request.client.host` がプロキシ IP に潰れ、**(IP+login_id) 系（ADR-0001 レート制限・ADR-0005 ロック）が実質 account 単位に縮退する欠陥**を解消。正＝[`doc/ADR/ADR-0006_クライアントIPの確定.md`](doc/ADR/ADR-0006_クライアントIPの確定.md)。
-- **`impl/backend/app/core/net.py`（新規）**＝純粋関数 `resolve_client_ip(peer_ip, forwarded_for, trusted_proxy_count)`。XFF を**右から `trusted_proxy_count` ホップ分だけ自陣**とみなし 1 つ外側を実クライアント IP に。**左端固定取得はしない**＝XFF 先頭の詐称値を無視できる。`count<=0`＝直近ピア。XFF 不足時は安全側で最外。
-- **`impl/backend/app/core/deps.py`**＝`get_client_ip(request)`（`resolve_client_ip`＋settings）。**`impl/backend/app/control_plane/auth/router.py`**＝login・password-setup/request の `request.client.host` 直参照を `get_client_ip` に置換（DRY）。
-- **`impl/backend/app/core/config.py`**＝`trusted_proxy_count: int = 0`（既定＝直アクセス）。**`impl/backend/app/main.py`**＝lifespan で `APP_ENV=prod` かつ `trusted_proxy_count=0` なら**警告ログ**（設定漏れ検知・ハードエラーにはしない）。
-- **`impl/.env.example` / `impl/compose.yaml`**＝`TRUSTED_PROXY_COUNT`（既定 0）を配線。
-- **`doc/本番デプロイ要件.md`（新規）**＝本番デプロイ環境が保証すべき事項のチェックリスト（**エッジで XFF 確定・ホップ数を `TRUSTED_PROXY_COUNT` に一致・`/api` 直結推奨・`COOKIE_SECURE`・秘匿供給・Redis/DB 前提**）。ファイル名は「コンテナ要件」より広い**本番デプロイ要件**を採用（守るべきはコンテナでなく前段の proxy/実行環境）。
-- **相互参照更新**＝ADR-0001 §2.6・ADR-0005 §2.2・`doc/API設計/A_認証・セッション.md`（IP は実クライアント IP＝ADR-0006 に従う）。
-- **テスト**＝`doc/テスト/A_認証.md` §6（A-TC-080 純粋関数 unit／A-TC-081 プロキシ経由でロックが実クライアント IP に効く int）、`impl/backend/tests/auth/test_client_ip.py`（新規2件）。int は `monkeypatch.setenv("TRUSTED_PROXY_COUNT","1")`＋`get_settings.cache_clear()` で env 上書き。
+### 変更ファイル
+- `impl/backend/app/control_plane/auth/application.py`＝`complete_password_setup` が accounts 更新と**同一Tx**で `account_sync_repo.enqueue(...)`（`op=upsert`・`payload={"password_set": True}`）を実行（TODO 解消）。import 追加。
+- `impl/backend/app/tenant/profile/orm.py`＝`User.password_set` 列（`Boolean`）追加。`Boolean` を import。
+- `impl/backend/app/tenant/profile/repository.py`＝`upsert_user_mirror(session, account_id, payload)`（`account_id` キーで upsert・`_MIRROR_FIELDS` のみ反映＝前方互換）。
+- `impl/backend/app/worker.py`＝プレースホルダ→常駐ループ（`process_outbox_once` を `outbox_poll_interval_seconds` 間隔で poll・SIGTERM/SIGINT で停止）。
+- `impl/backend/app/core/config.py`＝`outbox_max_attempts=5`／`outbox_poll_interval_seconds=1.0`。
+- `impl/backend/migrations/control/env.py`＝`account_sync.orm` を import（metadata 登録）。
+- `impl/backend/scripts/bootstrap.py`＝seed users 作成時に `password_set=(account.password_hash is not None)` を設定（新規作成時のみ・既存行は据え置き）。
+- `impl/backend/tests/conftest.py`＝factory teardown で `OutboxEntry`（FK→accounts）を accounts 削除前に掃除。
+- `impl/compose.yaml`＝`worker` サービス追加（backend 同一イメージ・env は YAML アンカー `&backend_env`/`*backend_env` で共有・`entrypoint` を `python -m app.worker` に上書き）。`OUTBOX_*` env を追加。
+- `impl/.env.example`＝`OUTBOX_MAX_ATTEMPTS`/`OUTBOX_POLL_INTERVAL_SECONDS`。
+- `doc/ADR/ADR-0002_…md` §2.4＝「委譲/TODO」→「実装済み（2026-08-11）」に更新。`doc/テスト/A_認証.md` §3.5＝outbox を B テスト参照に更新。
 
 ---
 
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
 
-- **backend / frontend の機能**＝SC-00 状態A/B/C/D は縦に完了済み。**アカウント一時ロック（ADR-0005）・クライアント IP 確定（ADR-0006）は backend で実装完了**（frontend は既存の一律 401 応答のまま変わらない＝ADR-0005 §2.3 の設計どおり）。
+- **動いているもの（backend で縦通し済み）**:
+  - ドメイン A ログイン：状態A（PWログイン）・B（初回/再設定PW）・C（MFA）・D（再設定要求）。**SC-00 は frontend も完了**。
+  - アカウント一時ロック（ADR-0005・(IP+login_id)・第二層）。
+  - クライアント IP 確定（ADR-0006・信頼プロキシ段数・env `TRUSTED_PROXY_COUNT`）。
+  - **account_sync_outbox（本セッション）**：complete で pending 生成 → `process_outbox_once`/`worker.py` が会社DB `users.password_set` へ冪等反映。
 - **テスト（本セッションで実測）**:
-  - **backend pytest = 62 passed**（従来 51＋ロック 9＋IP 2・回帰なし。ホストソースを `/app` にマウントして実行・§8）。
-  - **frontend tsc = クリーン**（`tsc --noEmit` exit 0）。
-  - **e2e = 本セッションでは再実行していない**（ユーザー判断＝backend+tsc の一致で十分）。**前回時点は 4 passed**。frontend に触っていないので緑のはず（再確認は §8 の手順で）。
-- **Docker（今回終了時点）**＝**db / redis のみ起動中（healthy）。backend / frontend は停止**（`docker compose run --rm` で都度使い捨てコンテナで pytest/tsc を実行したため）。**Playwright ブラウザ依存は未導入**（frontend コンテナが無い＝e2e 実行時は §8 の install が再度必要）。
-- **要注意（負債・未実装）**:
-  - **outbox 未実装**（ADR-0002 §2.4）＝`complete_password_setup`（`impl/backend/app/control_plane/auth/application.py`）にコード TODO。会社DB `users` の `password_set` ミラーは worker スライスまで反映されない（login は管理DB `accounts` 直参照なので認証は正しい）。
-  - **`MAIL_ALERT_TO` は宛先の器のみ**＝運用アラートの実送信経路は未実装（ADR-0003 §4 TODO）。
-  - **`logout-all` の frontend 導線は未実装**（backend EP は在る）。
-  - **（ロック実装は完了。以下は既知の限界＝ADR-0005 §5 と本 handoff §6 に記載）**。
-- **シード**（不変）＝**ACME-01（MFA OFF・`user@acme.example`）／ACME-02（MFA ON・`mfa@acme2.example`）**、PW いずれも `Passw0rd!`。テストは `impl/backend/tests/conftest.py` の `factory` が作成行を teardown。
+  - **backend pytest = 67 passed**（従来 62＋outbox 5・回帰なし。ホストソースを `/app` にマウントして実行・§8）。
+  - **worker 起動スモーク**＝`python -m app.worker` が起動→SIGTERM で停止することを確認（実処理はテスト側 `process_outbox_once` で担保）。
+  - **frontend tsc / e2e は本セッションでは未再実行**（frontend を変更していない）。**前回時点＝tsc クリーン・e2e 4 passed**。
+- **Docker（今回終了時点）**＝**db / redis のみ起動中（healthy）。backend / frontend / worker は停止**（テストは `docker compose run --rm` の使い捨てコンテナで実行したため）。**Playwright ブラウザ依存は未導入**（frontend コンテナが無い＝e2e 時は §8 の install 再実行が必要）。
+- **壊れているもの＝無し**（既知の未実装/負債は下記）。
+- **未実装 / 負債**:
+  - **② メール送信の非同期化**（OTP・設定リンク・ロック通知・`MAIL_ALERT_TO`）＝未着手（§7）。現状はすべて同期送信。
+  - **outbox の他 writer 未実装**＝`last_login_at`（login 成功時）・発行/編集/無効化（B ドメイン）・プロフィール編集（K）。今回は `password_set` writer 1 本のみ。`users` ミラー列も `login_id`/`email`/`system_role`/`last_login_at` は未追加。
+  - **outbox `failed` 行の可視化/手動対応・管理者によるロック解除**＝管理面が無いため後続。
+  - **`logout-all` の frontend 導線**＝未実装（backend EP は在る）。
+  - **本番デプロイ設定**（`TRUSTED_PROXY_COUNT` の実値・エッジの XFF 確定・Next の XFF 転送検証）＝`doc/本番デプロイ要件.md` §6 に集約・未確認。
 
 ---
 
 ## 5. 詰まっている点 — 失敗したアプローチと理由
 
 - **ブロッカーは無い**。
-- **ハマりどころ（記録・再発防止）**:
-  - **backend/e2e ともイメージにソースが焼かれている**（`COPY . .`・bind mount 無し）。**ホストの編集はそのままではコンテナに反映されない**。
-    - backend＝`docker compose build backend` で焼き直すか、テスト時のみ **`-v "$PWD/backend:/app"` でマウント**して走らせる（本セッションもマウント方式・§8）。マウント時も editable install なので `app.*`/`tests.*` は解決する。
-    - e2e＝spec も焼かれているため、編集した spec は **`docker compose cp`** でコンテナへ流し込む（§8）。
-  - **e2e は frontend コンテナにブラウザ依存が無い**と全 spec が失敗。初回のみ `install-deps chromium` → `install chromium`（§8）。**今回 frontend コンテナは起動していない＝次回 e2e 時は再導入が必要**。
-  - **ロックテストの IP 差し替え**＝`login` の IP は `request.client.host`。テストは **`TestClient(app, client=(ip, port))`** で IP を持たせて (IP+login_id) 単位を検証した（`tests/auth/test_auth_lock.py` の `_client(ip)`）。
-  - **ロック通知メールは `mail` フェイク必須**＝ロック発火するテストは通知送信が走るため、`mail` フィクスチャ（`conftest.py`）を付けないと実 SMTP へ出て `socket.gaierror` になる。発火する 071/072/073/075/076/077 は `mail` を引数に取る。
-  - **red-green（テスト規約 §5.1）の運用**＝test-first の自然 red（071/073/074/075/076/077）はコミットメッセージに記載。ガード（悪い挙動の不在を確認＝実装前も green）の 072/078/079 は**反転手技**で red 目視し `doc/テスト/red確認台帳.md` に証跡を追記した。
+- **本セッションで判明・対処した点**:
+  - **outbox の順序キーに uuid `id` は使えない**＝`id` は `uuid4`（ランダム）で挿入順を表さないため、データモデル §4.6 が言う「id（生成順）」を `ORDER BY id` では実現できない。→ **`seq`（BIGSERIAL/Identity）列を追加し `seq` 昇順で取り出す**ことで因果順を担保した（`account_sync/orm.py`・`repository.fetch_unfinished`）。**注意＝`doc/データモデル.md` §4.6 の本文は「id（生成順）」表記のままで seq に触れていない＝ドキュメントと実装に軽微な差**（未反映。§6 の判断を §4.6 に追記して正規化するのが望ましい）。
+  - **factory teardown で FK 順序**＝`account_sync_outbox` は `accounts` に FK。accounts 削除前に outbox 行を消さないと teardown が落ちる。→ `tests/conftest.py` の factory teardown に `OutboxEntry` 掃除を追加。
+  - **失敗系テストの作り方**＝ワーカ適用失敗は「会社DB が存在しない会社」（`factory.make_company()` の `db_identifier` は実DBを作らない）で `get_tenant_session` 接続失敗を起こして再現（B-TC-004/005）。PG サーバは起動しているので「DB 不在」は即 FATAL＝速い。
+- **一般のハマりどころ（継続・重要）**:
+  - **backend/e2e ともイメージにソースが焼かれている**（`COPY . .`・bind mount 無し）。ホスト編集を反映するには backend＝`-v "$PWD/backend:/app"` マウント（§8）、e2e＝`docker compose cp` で spec 流し込み。
+  - **env の上書きテスト**＝`monkeypatch.setenv(...)＋get_settings.cache_clear()`（`get_settings` は `lru_cache`）。finally で `cache_clear()` して後片付け（例＝`tests/account_sync/test_outbox.py` B-TC-004・`tests/auth/test_client_ip.py`）。
+  - **IP 差し替え**＝`TestClient(app, client=(ip, port))`（lock/IP テスト）。**メール送信が走るテストは `mail` フェイク必須**（無いと実 SMTP で `socket.gaierror`）。
 
 ---
 
 ## 6. 決定事項と根拠（採用しなかった案も）
 
-### 本セッションのロック実装で採った具体（ADR-0005 準拠・実装レベルの判断）
-正は [`doc/ADR/ADR-0005_アカウント一時ロック.md`](doc/ADR/ADR-0005_アカウント一時ロック.md)。実装で埋めた点:
-- **ロック中はダミー照合してから一律 401**＝資格照合に到達させない（§2.3）が、`verify_password(password, None)`（ダミー Argon2）を通してから 401 にし、誤資格失敗パスと時間差を作らない（列挙耐性・A.1）。
-- **通知は session を閉じてから送信**＝SMTP 中に DB 接続を保持しない。宛先無し（非実在/非 active）・クールダウン中は無送信（列挙耐性を壊さない・§2.4）。
-- **発火判定は `register_login_failure` が返す bool**＝`is_login_locked` が偽のときだけ計数するので count==max の一度だけ発火。ロック TTL は発火時に一度だけ設定＝追加試行で延長しない（§2.2）。
-
-### クライアント IP 確定の実装判断（ADR-0006・本セッションで対応済み）
-- **リバプロ配下の `client_ip` 縮退は ADR-0006 で解消**＝`trusted_proxy_count`（env）で XFF を右から数えて実クライアント IP を確定。左端固定取得は詐称可能なので不採用。uvicorn `--proxy-headers` も版依存/なりすまし耐性の曖昧さで不採用（アプリ層の明示解釈＝テスト可能を優先）。**本番はエッジで XFF 確定＋ホップ数一致が前提**（[`doc/本番デプロイ要件.md`](doc/本番デプロイ要件.md) §1）。
-- **未確定（本番構築時に決める・`本番デプロイ要件.md` §6）**＝本番トポロジのホップ数（エッジ直結=1 か Next 経由=2）→ `TRUSTED_PROXY_COUNT` の値／Next.js `rewrites()` の XFF 転送有無（未検証・エッジ直結にすれば非依存）。
-
-### 既知の限界（ADR-0005 §5 の残課題に関連）
-- **通知メールの同期送信**＝(a) ADR §5 既知の弱いタイミングオラクル、(b) SMTP 失敗時に 401 が 500 になり得る（列挙耐性の綻び）。best-effort 化は**していない**（既存 `_send_otp_email` と挙動を揃えた）。outbox 非同期化（後続）で両方解消可能。
+### 本セッション（outbox スライスの実装判断）
+正＝`doc/データモデル.md` §4.6・`doc/API設計/README.md` §1.13・`doc/API設計/B_会社・アカウント・所属.md` B.5。
+- **順序キー＝`seq`（単調増加）**。不採用＝`ORDER BY id`（uuid でランダム）／`created_at`（§4.6 が「壁時計ではない」と明記）。
+- **ワーカ本体は関数 `process_outbox_once()`**（`worker.py` はループするだけ）＝常駐プロセス無しで int テスト可能。
+- **クロスDB は 2 相コミットしない**＝会社DB へ冪等 upsert（`account_id` キー）→ その後 `status=done`。途中で落ちても **at-least-once＋冪等**で安全（§4.6）。
+- **ヘッドオブライン・ブロッキング**＝同一 account は `seq` 順で直列、失敗したら後続を今回進めない（退行防止）。**別 account は独立**に処理（1件の滞留が全体を止めない）。
+- **`outbox_max_attempts`（既定5・env）**＝§4.6 は「上限超で failed」と方針のみで数値未定＝運用しきい値として env に置く（ADR-0003 の env 原則に沿う・新規 ADR は起こさず config コメントに根拠）。
+- **スコープ＝`password_set` writer 1 本のみ**（ADR-0002 §2.4 の範囲）。`last_login_at`・発行/編集（B）・プロフィール（K）は該当エンドポイント実装時に writer を足す。
+- **メール非同期化（②）は §4.6 outbox に載せない**＝§4.6 は DB ミラー専用。メールは別機構（別スライス）。
 
 ### 過去の確定（正は各 `doc/API設計/*.md`・`doc/ADR/*.md`。ここは要約）
-- ログイン＝Cookie＋Redis 不透明セッション（ADR-0001/A.10）／状態A 具体値（ADR-0001・アイドル30分/絶対12時間・Argon2id・(IP+login_id)10回/5分の 429 レート制限）。
-- 初回・再設定PW（ADR-0002）＝設定リンク CSPRNG 32B・SHA-256 保存・72h・単回／PWポリシー 8文字＋英字＋数字／`request` は列挙耐性で常に 202。
-- MFA/信頼端末（ADR-0004）＝OTP 6桁/TTL600s/失敗上限5/resend30s・pre-auth600s は Redis 一体保持・信頼端末は DB（`trusted_devices`・30日）。
-- **アカウント一時ロック（ADR-0005・本セッションで実装）**＝(IP+login_id) 単位・5回→15分・ロック中も一律 401・発火時に本人へ通知メール（1通/60分/account）・PW 再設定成功で即解除・OTP 失敗は非連動・保持先 Redis。
-- **クライアント IP の確定（ADR-0006・本セッションで実装）**＝`trusted_proxy_count`（env・既定0）で XFF を右から数えて実クライアント IP を確定（(IP+login_id) 系の前提）。本番の保証は `doc/本番デプロイ要件.md`。
-- 設定の置き場所（ADR-0003）＝env（デプロイ環境軸）／DB（テナント軸）。SMTP・各しきい値は env。
-- 2プレーン×縦スライス4層（コーディング規約 §3.4 router→application→domain→repository）／フロント feature ベース（§4.1・`app/` はルーティングのみ）。
-- **テスト運用**＝red-green 全レベル必須（テスト規約 §5.1）。証跡＝test-first はコミットメッセージ／後追い（反転手技）は `doc/テスト/red確認台帳.md`。
+- ログイン＝Cookie＋Redis 不透明セッション（ADR-0001・アイドル30分/絶対12時間・Argon2id・(IP+login_id)10回/5分の429）。
+- 初回・再設定PW（ADR-0002）＝設定リンク CSPRNG32B・SHA-256・72h・単回／PWポリシー8文字＋英字＋数字／`request` は列挙耐性で常に202。
+- MFA/信頼端末（ADR-0004）＝OTP6桁/TTL600/失敗上限5/resend30s・pre-auth600s は Redis 一体・信頼端末は DB（`trusted_devices`・30日）。
+- アカウント一時ロック（ADR-0005）＝(IP+login_id)・5回→15分・ロック中も一律401・発火時に本人へ通知メール（1通/60分/account）・PW再設定成功で即解除・OTP失敗は非連動・Redis 保持。**失敗計数 `login_fail_streak` は固定窓15分（最初の失敗でTTL設定・延長しない）＝成功 or 15分経過で0**。
+- クライアントIP確定（ADR-0006）＝`trusted_proxy_count`（env・既定0）で XFF を右から数え実クライアントIPを確定。本番はエッジで XFF 確定（`doc/本番デプロイ要件.md`）。
+- 設定の置き場所（ADR-0003）＝env（環境軸）／DB（テナント軸）。
+- 2プレーン×縦スライス4層（コーディング規約 §3.4 router→application→domain→repository・エントリは `main.py`/`worker.py` の2つ）／フロント feature ベース（§4.1）。
+- テスト運用＝red-green 全レベル必須（テスト規約 §5.1）。証跡＝test-first はコミットメッセージ／後追い（反転手技）は `doc/テスト/red確認台帳.md`。
 
 ---
 
 ## 7. 次にやること — 優先順に、具体的に
 
-ADR-0005 ロックは実装完了。次スライスの候補（いずれも前セッションから継続の負債）:
+### (1) ② メール送信の非同期化＝最有力（着手前に設計方針の相談が必要）
+- **目的**＝現在同期送信のメールを「キューに積んで後で送る」に変え、(a) ADR-0005 §5 の弱いタイミングオラクル・(b) SMTP 失敗時に 401/202 が 500 になる列挙耐性の綻び・(c) ADR-0002 §2.3 の `request` 残余タイミング差を解消する。
+- **未決の設計判断（ユーザー相談事項）**＝機構の選択＝(A) `account_sync_outbox` と同型の**メール用 DB アウトボックス**（確実配送・§4.6 の資産流用）か、(B) **Redis キュー**か。→ **新 ADR（例 ADR-0007「メール送信の非同期化」）を起票**してから実装する。§4.6 とは別テーブル/別ワーカになる点に注意（`worker.py` に相乗させるか別プロセスかも決める）。
+- **対象コード**＝`impl/backend/app/control_plane/auth/application.py` の `_send_otp_email`／`_send_password_setup_email`／`_send_lock_notification`、`impl/backend/app/infra/mail.py`（`MailSender`/`FakeMailSender`）。
+- **テスト**＝新テストパターン（ドメイン記号は要検討＝メールは横断。暫定 A か新設）。red-green 必須。
 
-### (1) outbox / worker スライス＝最有力（複数の TODO を一気に解消できる）
-- `account_sync_outbox`（データモデル §4.6）を実装し、`complete_password_setup`（`impl/backend/app/control_plane/auth/application.py` の TODO）で **同一Tx に outbox INSERT** →会社DB `users` の `password_set` ミラーを worker が反映。
-- **ロック通知メールの非同期化**もこの基盤に載せられる（ADR-0005 §5 残課題＝同期送信のタイミングオラクル/500 化を解消）。
-- `MAIL_ALERT_TO` の実送信経路（ADR-0003 §4 TODO）もここで一緒に整えられる。
-- 手順＝データモデル §4.6・ADR-0002 §2.4 を正にテストパターン→red 経由テスト→実装（4層）。
+### (2) outbox の writer 追加（②と独立・B/K ドメイン実装時）
+- `last_login_at` ミラー＝`login` 成功時（`impl/backend/app/control_plane/auth/application.py` の `_issue_session` 近辺）に enqueue。会社DB `users.last_login_at` 列追加（company migration）＋`_MIRROR_FIELDS` 拡張（`impl/backend/app/tenant/profile/repository.py`）。
+- 発行/編集/無効化（B.2/B.5）＝B ドメイン API 実装時に enqueue（`op=upsert/disable/enable`・payload に `display_name`/`login_id`/`email`/`system_role`/`locale`＋初期所属 `memberships`）。
 
-### (2) `logout-all` の frontend 導線
+### (3) `logout-all` の frontend 導線
 - `impl/frontend/src/components/layout/AppHeader.tsx` のユーザーメニューに追加（backend EP `POST /api/v1/auth/logout-all` は実装済み）。e2e を薄く1本。
 
-### (3) ロック/IP のハードニング残（任意・小）
-- **リバプロ配下の実クライアント IP は ADR-0006 で実装済み**。残＝**本番トポロジのホップ数確定→`TRUSTED_PROXY_COUNT` 設定**、および Next `rewrites()` の XFF 転送検証（`doc/本番デプロイ要件.md` §1/§6）。実装作業ではなく**本番構築時の設定/検証タスク**。
-- **管理者による強制解除・ロック可視化**（ADR-0005 §2.5・§5＝後続）＝管理面が整ってから。
+### (4) 運用・本番系（実装ではなく設定/検証・`doc/本番デプロイ要件.md` §6）
+- 本番トポロジのホップ数確定→`TRUSTED_PROXY_COUNT` 設定／Next `rewrites()` の XFF 転送検証。
+- outbox `failed` 行の監視/アラート、管理者ロック解除の可視化（管理面が整ってから）。
 
-### (4) 次ドメイン（API設計は確定済み）
-- K（プロフィール `GET /me`）・H（通知）等。フロント本格化（`next/font`・`impl/frontend/src/components/ui/` 拡充・背景画像）。
-
-### 仕上げパス（設計確定に伴い実施可）
+### 仕上げパス
+- **`doc/データモデル.md` §4.6 に `seq`（順序キー）を明記**して実装と正規化（§5 の差分解消）。
 - ドキュメント作成規約の網羅適用（裸 `§x` の文書名接頭辞化・現状は折衷で新規のみ準拠）。
 
 ---
 
 ## 8. 再開に必要な環境情報
 
-- **フル起動**＝`cd impl && docker compose up -d --build`（or `up --build`）。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001/0002/0003〕→seed 2社・冪等）してから起動。**今回終了時点で起動中は db / redis のみ**。
+- **フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。**worker はポート無し**（常駐のみ）。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001-0004・company 0001-0002〕→seed 2社・冪等）してから uvicorn。**今回終了時点で起動中は db / redis のみ**。
 - **seed（開発用ログイン）**＝会社 `ACME-01`（`mfa_required=false`）/`user@acme.example`／会社 `ACME-02`（`mfa_required=true`）/`mfa@acme2.example`。PW いずれも `Passw0rd!`。
-- **backend テスト（イメージ焼き直し版）**＝`cd impl && docker compose up -d db redis && docker compose build backend && docker compose run --rm backend pytest -q`（**62 passed**）。
-- **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（build 不要でホストの変更が即反映）。
+- **backend テスト（イメージ焼き直し版）**＝`cd impl && docker compose up -d db redis && docker compose build backend && docker compose run --rm backend pytest -q`（**67 passed**）。
+- **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（build 不要でホスト変更が即反映）。
+- **worker 単体スモーク**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" -e OUTBOX_POLL_INTERVAL_SECONDS=0.2 backend timeout 2 python -m app.worker`（起動→停止ログを確認）。
 - **frontend 型チェック/lint**＝`docker compose run --rm --no-deps -T frontend npx tsc --noEmit` ／ `docker compose exec -T frontend npm run lint`（lint は frontend 起動中のみ）。
 - **codegen（型クライアント再生成）**＝backend 起動中に **ホストで** `cd impl/frontend && npx --yes openapi-typescript@7.5.0 http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts`。
-- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `docker compose exec frontend npx playwright install chromium`（**今回 frontend コンテナは無い＝再導入が必要**）→ `docker compose exec frontend npx playwright test`（**前回 4 passed**）。**コンテナ内実行時 MailHog は `http://mailhog:8025`**。編集した spec の反映は `docker compose cp`。
-- **MailHog でメール確認**＝ブラウザ `http://localhost:8025`／API `GET http://localhost:8025/api/v2/messages`（本文 encode は password_setup=base64／MFA OTP=quoted-printable と一定でない＝抽出は base64 デコード試行→ダメなら生テキスト）。
-- **主要 env（`impl/.env.example` が雛形・`.env` は追跡外で任意。無ければ Compose が `${VAR:-既定}` で既定にフォールバック＝現在 `.env` は不在）**＝`COOKIE_SECURE`（本番 true）／`SMTP_*`・`MAIL_FROM`・`MAIL_ALERT_TO`（ADR-0003）／`OTP_*`・`OTP_LENGTH`・`PREAUTH_TTL_SECONDS`・`TRUSTED_DEVICE_TTL_SECONDS`（ADR-0004）／**`LOGIN_LOCK_MAX_ATTEMPTS`・`LOGIN_LOCK_TTL_SECONDS`・`LOGIN_LOCK_NOTIFY_COOLDOWN_SECONDS`（ADR-0005）**／**`TRUSTED_PROXY_COUNT`（ADR-0006・既定0・本番はエッジ段数に一致＝`doc/本番デプロイ要件.md` §1）**。**実設定は `impl/compose.yaml` の backend `environment:` に列挙された変数のみコンテナへ届く**（`env_file:` 無し）。新規しきい値は必ず `environment:` に配線すること。
+- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `docker compose exec frontend npx playwright install chromium`（**今回 frontend コンテナは無い＝再導入が必要**）→ `docker compose exec frontend npx playwright test`（**前回 4 passed**）。コンテナ内 MailHog は `http://mailhog:8025`。編集 spec は `docker compose cp` で反映。
+- **MailHog**＝ブラウザ `http://localhost:8025`／API `GET http://localhost:8025/api/v2/messages`（本文 encode は password_setup=base64／MFA OTP=quoted-printable と一定でない＝base64 デコード試行→ダメなら生テキスト）。
+- **主要 env（`impl/.env.example` が雛形・`.env` は追跡外で任意。無ければ Compose が `${VAR:-既定}` で既定にフォールバック＝現在 `.env` は不在）**＝`COOKIE_SECURE`（本番true）／`SMTP_*`・`MAIL_FROM`・`MAIL_ALERT_TO`（ADR-0003）／`OTP_*`・`OTP_LENGTH`・`PREAUTH_TTL_SECONDS`・`TRUSTED_DEVICE_TTL_SECONDS`（ADR-0004）／`LOGIN_LOCK_*`（ADR-0005）／`TRUSTED_PROXY_COUNT`（ADR-0006・既定0）／**`OUTBOX_MAX_ATTEMPTS`・`OUTBOX_POLL_INTERVAL_SECONDS`（§4.6）**。**実設定は `impl/compose.yaml` の backend `environment:`（worker は YAML アンカーで同一）に列挙された変数のみコンテナへ届く**（`env_file:` 無し）。新規しきい値は必ず `environment:` に配線すること。
 - **リポジトリ運用**:
-  - `.gitignore` で `*.pdf` は追跡外（Markdown が正）・`.env` も追跡外（`.env.example` が雛形）。
+  - `.gitignore` で `*.pdf`・`.env` は追跡外（`.env.example` が雛形）。
   - コミットは **実装本体→handoff にハッシュ追記の2段**。末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`。**プッシュはユーザー依頼時のみ**。
-  - **テストは red-green 必須**（`doc/規約/テスト規約.md` §5.1）＝test-first の red はコミットメッセージに1行／後追い（反転手技）は `doc/テスト/red確認台帳.md` に追記。
-  - ドキュメント方針＝設計の正は1箇所・他は参照（drift 回避）／設計判断はなぜも併記／文書間参照は `doc/規約/ドキュメント作成規約.md`／意図的選択は `doc/規約/コーディング規約.md §3.5`・DRY は §2.3。`CLAUDE.md` が各規約への入口（ドキュメント作成/コーディング/リポジトリ構成/テスト）。
+  - **テストは red-green 必須**（`doc/規約/テスト規約.md` §5.1）。TC-ID＝`<ドメイン>-TC-<3桁>`（ドメイン記号は API設計の接頭辞 A〜L）。
+  - ドキュメント方針＝設計の正は1箇所・他は参照（drift 回避）／設計判断はなぜも併記／文書間参照は `doc/規約/ドキュメント作成規約.md`。`CLAUDE.md` が各規約への入口。
 
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**(1) outbox/worker スライス**（`complete_password_setup` の TODO＋ロック通知の非同期化＋`MAIL_ALERT_TO` 送信をまとめて解消）。次点＝logout-all frontend 導線。手順・対象ファイルを §7 に明記。
-- ✅ 本セッションの成果（SC-00 otp_expired＋クールダウン統一／ADR-0004 値整合確認／ADR-0001 参照リンク／**ADR-0005 ロック実装**／**ADR-0006 クライアント IP 確定の実装＋本番デプロイ要件.md**）と実装判断・既知の限界を §3/§6 に記録。全決定値は §6・正は `doc/ADR/ADR-0005_*.md`・`doc/ADR/ADR-0006_*.md`。
-- ✅ 状態＝backend 62 passed・tsc クリーン（本セッション実測）。e2e は未再実行（前回 4 passed）。起動中は db/redis のみ・Playwright 依存は未導入。未実装/負債（outbox・MAIL_ALERT_TO 送信・logout-all frontend 導線）は §4 に明記。
-- ✅ ハマりどころ（ソース焼き込み＝マウント/`docker compose cp`／playwright install／ロックテストの IP 差し替え＝TestClient client kwarg／通知は mail フェイク必須／red-green 運用）を §5・§8 に記録。
-- ⚠ 詳細な決定理由・具体値は各 `doc/API設計/*.md`・`doc/ADR/*.md`・`doc/テスト/A_認証.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
+- ✅ 再開点＝**(1) ② メール非同期化**（新 ADR 起票→設計相談→red-green 実装）。対象関数（`_send_otp_email`/`_send_password_setup_email`/`_send_lock_notification`・`infra/mail.py`）と未決の機構選択（DBアウトボックス vs Redisキュー）を §7 に明記。
+- ✅ 本セッションの成果（account_sync_outbox＝§4.6・password_set ミラー）と変更ファイル・実装判断・既知の差分（§4.6 の `seq` 未反映）を §3/§5/§6 に記録。
+- ✅ 状態＝backend 67 passed・worker スモーク OK（本セッション実測）。tsc/e2e は未再実行（前回 tsc クリーン・e2e 4 passed）。起動中は db/redis のみ・Playwright 依存未導入。未実装/負債（②メール非同期・他 writer・logout-all frontend・failed 可視化）は §4 に明記。
+- ✅ ハマりどころ（ソース焼き込み＝マウント/`cp`／env 上書き＝monkeypatch＋cache_clear／IP 差し替え＝TestClient client kwarg／mail フェイク必須／FK teardown 順序）を §5・§8 に記録。
+- ⚠ 詳細な決定理由・具体値は各 `doc/API設計/*.md`・`doc/ADR/*.md`・`doc/データモデル.md` §4.6・`doc/テスト/*.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
