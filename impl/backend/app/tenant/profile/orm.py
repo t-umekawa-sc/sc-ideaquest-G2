@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +25,8 @@ class User(CompanyBase):
     avatar_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)  # MinIO キー（生パス）
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    # accounts.password_set のミラー（源泉=accounts・§4.6 outbox で反映）
+    password_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     level: Mapped[int] = mapped_column(BigInteger, nullable=False, default=1)
     xp: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     coin_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

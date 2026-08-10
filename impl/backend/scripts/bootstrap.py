@@ -142,6 +142,7 @@ def seed_company_users() -> None:
                         display_name=account.display_name,
                         locale=account.locale,
                         status="active",
+                        password_set=account.password_hash is not None,  # accounts のミラー（§4.6）
                     )
                 )
                 tsession.commit()

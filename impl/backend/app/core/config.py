@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # 0＝直アクセス（request.client.host をそのまま使う）。本番はエッジ段数に一致させる。
     trusted_proxy_count: int = 0
 
+    # account_sync_outbox ワーカ（データモデル §4.6）。失敗リトライ上限（超で failed＝要手動対応）。
+    outbox_max_attempts: int = 5
+    outbox_poll_interval_seconds: float = 1.0  # 常駐ワーカのポーリング間隔（worker.py）
+
     # ログインのレート制限（ADR-0001 §2.6）。(IP+login_id) 単位
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 300

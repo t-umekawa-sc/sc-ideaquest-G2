@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from app.control_plane.account_sync.orm import OutboxEntry
 from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
 from app.core.security import generate_token, hash_password, hash_token
 from app.db.control import control_session
@@ -185,6 +186,9 @@ def factory():
         # MFA verify(trust_device) が作った信頼端末も掃除
         for aid in created_accounts:
             s.query(TrustedDevice).filter_by(account_id=aid).delete()
+        # outbox（FK→accounts）を accounts 削除前に掃除
+        for aid in created_accounts:
+            s.query(OutboxEntry).filter_by(account_id=aid).delete()
         for aid in created_accounts:
             s.query(Account).filter_by(id=aid).delete()
         for cid in created_companies:

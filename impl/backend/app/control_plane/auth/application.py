@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import redis
 
+from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.domain.service import (
     LoginDecision,
@@ -360,9 +361,11 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
         challenge.used_at = datetime.now(timezone.utc)  # 単回消費
         account_id = str(account.id)
         login_id = account.login_id
+        # accounts 更新と同一Tx で会社DB users への password_set ミラーを outbox へ積む（§4.6・A.7）
+        account_sync_repo.enqueue(
+            session, account.id, account.company_id, "upsert", {"password_set": True}
+        )
         session.commit()
-        # TODO(outbox): 同一Tx で account_sync_outbox に password_set ミラーを INSERT する
-        # （データモデル §4.6・A.7）。worker/列拡張とまとめて outbox スライスで実装（ADR-0002 §2.4）。
 
     # PW 変更で当該アカウントの全セッションを破棄（A.9-③・ここでは新セッションは張らない）
     delete_account_sessions(r, account_id)

@@ -95,7 +95,7 @@
 
 ### 3.5 補足・非対象（状態B/D）
 
-- **`account_sync_outbox`（会社DB `users` への `password_set` ミラー・データモデル §4.6）は本スライスでは非対象**＝outbox/worker スライスへ委譲（ADR-0002 §2.4）。complete は管理DB `accounts` の更新＋全セッション破棄までを確認対象とする。
+- **`account_sync_outbox`（会社DB `users` への `password_set` ミラー・データモデル §4.6）は実装済み**＝complete が accounts 更新と同一Tx で outbox に積み、常駐ワーカが会社DB へ反映する（TC は [`B_会社・アカウント.md`](B_会社・アカウント.md) B-TC-001〜005）。本 §3 の A-TC-045〜049 は管理DB `accounts` の更新＋全セッション破棄までを確認対象とする（ミラー反映は B の TC が担保）。
 - **信頼端末（`trusted_devices`）失効**は状態C（§4・A-TC-070）で確認する。
 - **セキュリティ通知**（`security_password_changed`・A.9-⑧）はドメイン H 実装時に TC 追加。
 

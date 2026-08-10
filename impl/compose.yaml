@@ -1,6 +1,6 @@
 # ローカル開発用オーケストレーション（認証スライス）
-# Postgres / Redis / MailHog / backend / frontend。
-# MinIO / PGroonga / outbox worker は後続スライスで追加する。
+# Postgres / Redis / MailHog / backend / worker / frontend。
+# MinIO / PGroonga は後続スライスで追加する。
 services:
   db:
     image: postgres:16
@@ -36,7 +36,7 @@ services:
 
   backend:
     build: ./backend
-    environment:
+    environment: &backend_env
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-ideaquest}
@@ -67,6 +67,9 @@ services:
       LOGIN_LOCK_NOTIFY_COOLDOWN_SECONDS: ${LOGIN_LOCK_NOTIFY_COOLDOWN_SECONDS:-3600}
       # クライアント IP の確定（ADR-0006・本番はエッジ段数に一致）
       TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-0}
+      # account_sync_outbox ワーカ（データモデル §4.6）
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-5}
+      OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-1.0}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -75,6 +78,18 @@ services:
       redis:
         condition: service_healthy
       mailhog:
+        condition: service_started
+
+  # account_sync_outbox 常駐ワーカ（管理DB→会社DB users ミラー・§4.6・両プレーンを跨ぐ唯一の実行主体）。
+  # backend と同一イメージ。bootstrap/uvicorn は起動せず worker ループのみ実行（entrypoint を上書き）。
+  worker:
+    build: ./backend
+    environment: *backend_env
+    entrypoint: ["python", "-m", "app.worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
         condition: service_started
 
   frontend:

@@ -13,3 +13,22 @@ def get_user_by_account(session: Session, account_id: uuid.UUID) -> User | None:
     return session.execute(
         select(User).where(User.account_id == account_id)
     ).scalar_one_or_none()
+
+
+# accounts → users にミラーしてよい列（源泉=accounts・§4.6）。存在しない列は無視（前方互換）。
+_MIRROR_FIELDS = ("display_name", "locale", "status", "password_set")
+
+
+def upsert_user_mirror(session: Session, account_id: uuid.UUID, payload: dict) -> None:
+    """会社DB `users` を `account_id` をキーに upsert（冪等・at-least-once 前提・§4.6）。
+
+    payload のうち `_MIRROR_FIELDS` に該当する列だけを反映（未知キーは無視＝前方互換）。
+    行が無ければ作成（B.5 発行時の初回ミラー。`display_name` を含まない payload では作成できない）。
+    """
+    fields = {k: payload[k] for k in _MIRROR_FIELDS if k in payload}
+    user = get_user_by_account(session, account_id)
+    if user is None:
+        session.add(User(id=uuid.uuid4(), account_id=account_id, **fields))
+    else:
+        for key, value in fields.items():
+            setattr(user, key, value)
