@@ -156,3 +156,20 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 - **管理者による強制解除・ロック可視化は非対象**＝管理面が整うまで後続（ADR-0005 §2.5・§5）。本スライスは (a) 15分自動解除＋(b) PW 再設定解除まで。
 - **分散 IP 総当り**は (IP+login_id) 単位の原理的限界（ADR-0005 §2.2 トレードオフ）＝本 TC の対象外。
 - 通知メールの**非同期化**（outbox）は後続（ADR-0005 §5・ADR-0002 §2.4）。本スライスは同期送信。
+
+---
+
+## 6. テストパターン（クライアント IP の確定＝信頼プロキシ・ADR-0006）
+
+> 仕様の正＝[`../ADR/ADR-0006_クライアントIPの確定.md`](../ADR/ADR-0006_クライアントIPの確定.md)。(IP+login_id) 系（レート制限・ロック）が**実クライアント IP**で成り立つための IP 確定ロジック。純粋関数 `resolve_client_ip(peer_ip, forwarded_for, trusted_proxy_count)`（`core/net.py`）＝XFF を右から `trusted_proxy_count` ホップ分だけ自陣とみなし 1 つ外側を採る（左端固定取得はしない＝詐称耐性）。
+> `trusted_proxy_count` は env（既定 0＝直アクセス/テストは `request.client.host`）。int テストは `TestClient` の `X-Forwarded-For` ヘッダと env 上書き（`monkeypatch`＋`get_settings.cache_clear()`）で確認。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-080 | unit | — | `resolve_client_ip` に各種入力（count=0／count=1 で XFF 追記／count=2／XFF 先頭に詐称値／XFF 空で count>0） | count=0→peer。count=Nは**右から N ホップ外側**の実クライアント IP。**先頭の詐称値は無視**。XFF 不足時は安全側で最外（chain[0]） | ADR-0006 §2.1/§3 |
+| A-TC-081 | int | `TRUSTED_PROXY_COUNT=1`（`monkeypatch`）・ACME-01 実アカウント | 同一プロキシ経由で **XFF が異なる2クライアント**（A=203.0.113.1／B=203.0.113.2）。A で 5回失敗→A・B それぞれ正PWで login | A（XFF .1）はロックで 401、**B（XFF .2）は 200**＝ロックが**実クライアント IP 単位**に効く（プロキシ IP に潰れない） | ADR-0006 §2.1・ADR-0005 §2.2 |
+
+### 6.1 補足・非対象（クライアント IP）
+
+- **dev の Next.js `rewrites()` が XFF を転送するか**は本 TC の対象外（ADR-0006 §5・未検証）。本番はエッジで XFF 確定を必須化（[`../本番デプロイ要件.md`](../本番デプロイ要件.md) §1）。
+- **起動時ガード**（`APP_ENV=prod`＋`TRUSTED_PROXY_COUNT=0` で警告ログ・ADR-0006 §2.2）はログ出力のみ＝本 TC では非対象。

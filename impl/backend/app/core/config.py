@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # CSRF/Origin（A.0）。状態変更系の Origin 許可リスト（ローカル既定）
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
 
+    # クライアント IP の確定（ADR-0006）。backend 手前の信頼プロキシ段数。
+    # 0＝直アクセス（request.client.host をそのまま使う）。本番はエッジ段数に一致させる。
+    trusted_proxy_count: int = 0
+
     # ログインのレート制限（ADR-0001 §2.6）。(IP+login_id) 単位
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 300

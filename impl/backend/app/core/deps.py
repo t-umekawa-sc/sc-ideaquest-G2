@@ -11,8 +11,15 @@ from fastapi import Request
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.net import resolve_client_ip
 from app.core.security import read_preauth, read_session
 from app.infra.cache import get_redis
+
+
+def get_client_ip(request: Request) -> str:
+    """実クライアント IP を確定（ADR-0006）。信頼プロキシ段数は env（`trusted_proxy_count`）。"""
+    peer = request.client.host if request.client else "unknown"
+    return resolve_client_ip(peer, request.headers.get("x-forwarded-for"), get_settings().trusted_proxy_count)
 
 
 def resolve_session(request: Request) -> dict | None:

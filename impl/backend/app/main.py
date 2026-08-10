@@ -7,17 +7,43 @@
 """
 from __future__ import annotations
 
+import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from sqlalchemy import text
 
 from app.control_plane.auth.router import router as auth_router
+from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.db.control import control_session
 from app.infra.cache import get_redis
 
-app = FastAPI(title="ideaquest backend", version="0.0.1")
+logger = logging.getLogger("app")
+
+
+def _warn_untrusted_proxy_config() -> None:
+    """本番で信頼プロキシ段数が未設定なら警告（ADR-0006 §2.2）。
+
+    prod かつ trusted_proxy_count=0 だと (IP+login_id) 制限が実クライアント IP でなく
+    プロキシ IP に潰れる恐れ（設定漏れの早期検知）。ハードエラーにはしない。
+    """
+    s = get_settings()
+    if s.app_env == "prod" and s.trusted_proxy_count == 0:
+        logger.warning(
+            "TRUSTED_PROXY_COUNT=0 in prod: レート制限/ロックがプロキシ IP に潰れる恐れ。"
+            "エッジの信頼プロキシ段数に一致させてください（ADR-0006・本番デプロイ要件.md §1）。"
+        )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ANN201
+    _warn_untrusted_proxy_config()
+    yield
+
+
+app = FastAPI(title="ideaquest backend", version="0.0.1", lifespan=lifespan)
 
 install_error_handlers(app)
 app.include_router(auth_router)

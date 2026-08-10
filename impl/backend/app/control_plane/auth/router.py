@@ -23,7 +23,7 @@ from app.control_plane.auth.schemas import (
     Session,
 )
 from app.core.config import get_settings
-from app.core.deps import require_preauth, require_session, verify_csrf, verify_origin
+from app.core.deps import get_client_ip, require_preauth, require_session, verify_csrf, verify_origin
 from app.infra.cache import get_redis
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -64,7 +64,7 @@ def _set_trust_cookie(response: Response, trust_token: str) -> None:
 @router.post("/login", response_model=LoginResponse, response_model_exclude_none=True)
 def login(body: LoginRequest, request: Request, response: Response) -> LoginResponse:
     verify_origin(request)  # login は CSRF 免除・Origin/Sec-Fetch のみ（A.1）
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)  # 実クライアント IP（信頼プロキシ・ADR-0006）
     result = auth_service.login(
         get_redis(), client_ip, body.company_code, body.login_id, body.password,
         trust_token=request.cookies.get("iq_trust"),
@@ -126,7 +126,7 @@ def get_session(request: Request) -> Session:
 def password_setup_request(body: PasswordSetupRequestReq, request: Request) -> AcceptedResponse:
     # 未認証起点＝CSRF 免除・Origin/Sec-Fetch のみ（A.7）。応答は常に 202（列挙耐性）
     verify_origin(request)
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)  # 実クライアント IP（信頼プロキシ・ADR-0006）
     auth_service.request_password_setup(get_redis(), client_ip, body.company_code, body.login_id)
     return AcceptedResponse()
 
