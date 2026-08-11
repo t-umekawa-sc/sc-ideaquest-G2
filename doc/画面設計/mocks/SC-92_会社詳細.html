@@ -219,6 +219,27 @@
     </div>
   </section>
 
+  <!-- ===== クエストグループ（この会社・CRUD） ===== -->
+  <div class="section-head">
+    <h2>クエストグループ</h2>
+    <button class="btn btn-primary" type="button" id="newGroup">＋ グループ作成</button>
+  </div>
+  <section class="card" aria-label="クエストグループ">
+    <div class="tools"><span class="list-count" id="grpCount">— 件</span></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th scope="col">グループ名</th><th scope="col">コード</th><th scope="col">メンバー数</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
+        </thead>
+        <tbody id="groupRows"></tbody>
+      </table>
+    </div>
+    <div class="list-empty" id="grpEmpty" hidden>クエストグループがありません。「＋ グループ作成」から追加してください。</div>
+    <p class="role-note" style="margin-top:var(--space-4);color:var(--color-text-muted);font-size:var(--text-xs)">
+      ※ グループの<strong>作成・リネーム・削除はシステム管理者のみ</strong>（会社構造の変更・B.3）。<strong>コードは作成時のみ（以後不変）</strong>／リネームは名称のみ。<strong>削除は空のグループのみ</strong>（所属メンバーがいる間は不可＝先に所属を外す）。ここで作ったグループが、下のアカウント編集「所属グループ」の候補になります。
+    </p>
+  </section>
+
   <!-- ===== アカウント & クエストグループ所属（この会社） ===== -->
   <div class="section-head">
     <h2>アカウント & 所属（この会社）</h2>
@@ -297,6 +318,33 @@
   </div>
 </div>
 
+<!-- ===== クエストグループ 作成/リネーム モーダル ===== -->
+<div class="modal modal--sm modal--draggable" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="gmTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="gmTitle">クエストグループを作成</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-row"><label>対象の会社</label><div class="fixed-field" id="gmCompany">—</div></div>
+      <div class="form-row"><label class="req" for="gmCode">クエストグループコード</label>
+        <input class="input" id="gmCode" placeholder="例: PLAN" maxlength="20">
+        <div class="hint">英大文字始まり・<code>A-Z / 0-9 / -</code>・2〜20字。会社内で一意。<strong>作成時のみ設定でき、以後は変更できません</strong>（小文字入力は大文字へ正規化）。</div>
+      </div>
+      <div class="form-row"><label class="req" for="gmName">グループ名</label>
+        <input class="input" id="gmName" placeholder="例: 製品企画">
+        <div class="hint">表示名。リネームで後から変更できます。</div>
+      </div>
+      <div class="provision-note">クエストグループはこの会社の<strong>クエスト作成時の区分</strong>／<strong>アカウントの所属（参加範囲）</strong>の単位になります。作成・リネーム・削除は<strong>システム管理者のみ</strong>。</div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="gmSave">作成する</button>
+    </div>
+  </div>
+</div>
+
 <script src="shared.js"></script>
 <script>
   const savedBg = localStorage.getItem('ideaquest_content_bg');
@@ -306,11 +354,14 @@
   const ST_CO = { active:['有効','st-active'], provisioning:['準備中','badge-muted'], suspended:['停止','st-suspended'] };
   const COMPANIES = {
     across: { name:'アクロス株式会社', code:'ACROSS', color:'#2563EB', icon:null, db:'db_across', state:'active', accounts:42, groups:5,
-      flags:{ voteAnon:true, hideVoters:true, mfa:true }, questGroups:['製品企画','業務改善','カスタマーサクセス','R&D','営業推進'] },
+      flags:{ voteAnon:true, hideVoters:true, mfa:true },
+      questGroups:[{code:'PLAN',name:'製品企画'},{code:'KAIZEN',name:'業務改善'},{code:'CS',name:'カスタマーサクセス'},{code:'RND',name:'R&D'},{code:'SALES',name:'営業推進'}] },
     beyond: { name:'ビヨンド工業', code:'BEYOND', color:'#059669', icon:null, db:'db_beyond', state:'active', accounts:18, groups:2,
-      flags:{ voteAnon:false, hideVoters:true, mfa:true }, questGroups:['R&D','品質保証'] },
+      flags:{ voteAnon:false, hideVoters:true, mfa:true },
+      questGroups:[{code:'RND',name:'R&D'},{code:'QA',name:'品質保証'}] },
     sample: { name:'サンプル商事', code:'SAMPLE', color:'#D97706', icon:null, db:'db_sample', state:'suspended', accounts:7, groups:1,
-      flags:{ voteAnon:true, hideVoters:false, mfa:false }, questGroups:['営業推進'] },
+      flags:{ voteAnon:true, hideVoters:false, mfa:false },
+      questGroups:[{code:'SALES',name:'営業推進'}] },
   };
   // システムロールは3値（B案＋SoD §8-⑯）。QG管理者は所属グループの role:'admin' で表現（system_role には持たせない）。
   const SYSROLE_LABEL = { general:'一般', company_account_admin:'会社アカウント管理者', sys_admin:'システム管理者' };
@@ -382,8 +433,8 @@
   let amMemberships = []; // [{ n: グループ名, r: 'member' | 'admin' }]
   function renderAddOptions() {
     const used = new Set(amMemberships.map(m => m.n));
-    const rest = CO.questGroups.filter(g => !used.has(g));
-    amAddGroup.innerHTML = '<option value="">＋グループを追加…</option>' + rest.map(g => `<option value="${g}">${g}</option>`).join('');
+    const rest = CO.questGroups.filter(g => !used.has(g.name));  // questGroups は {code,name}
+    amAddGroup.innerHTML = '<option value="">＋グループを追加…</option>' + rest.map(g => `<option value="${g.name}">${g.name}</option>`).join('');
     amAddGroup.disabled = rest.length === 0;
   }
   function renderMemberships() {
@@ -573,6 +624,89 @@
     else if (btn.dataset.activate != null) { const a = list0[btn.dataset.activate]; a.state = 'active'; renderAccounts(); }
   });
 
+  // ===== クエストグループ（CRUD・system_admin・B.3） =====
+  const groupRows = document.getElementById('groupRows');
+  const grpCount = document.getElementById('grpCount');
+  const grpEmpty = document.getElementById('grpEmpty');
+  const QG_CODE_RE = /^[A-Z][A-Z0-9-]{1,19}$/;   // 英大文字始まり・A-Z/0-9/- ・2〜20字（§5.4）
+  function groupMemberCount(name) {
+    return list0.filter(a => a.groups.some(g => g.n === name)).length;  // 有効所属数（モック）
+  }
+  function refreshGroupBannerCount() {
+    document.getElementById('ctxCounts').textContent = 'アカウント ' + CO.accounts + ' / グループ ' + CO.questGroups.length;
+  }
+  function renderGroups() {
+    groupRows.innerHTML = CO.questGroups.map((g, i) => `
+      <tr>
+        <td><strong>${g.name}</strong></td>
+        <td class="db-id">${g.code}</td>
+        <td>${groupMemberCount(g.name)} 名</td>
+        <td class="col-actions"><div class="rowmenu">
+          <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+          <ul class="rowmenu__list" role="menu" hidden>
+            <li role="none"><button role="menuitem" type="button" data-grename="${i}">リネーム</button></li>
+            <li role="none"><button role="menuitem" type="button" class="is-danger" data-gdelete="${i}">削除</button></li>
+          </ul>
+        </div></td>
+      </tr>`).join('');
+    grpCount.textContent = CO.questGroups.length + ' 件';
+    grpEmpty.hidden = CO.questGroups.length !== 0;
+    refreshGroupBannerCount();
+    renderAddOptions();  // 所属エディタの「＋グループを追加」候補も追随
+  }
+  // 作成 / リネーム モーダル（コードは作成時のみ・以後不変）
+  let grpEditTarget = null;
+  function openGroup(mode, g) {
+    grpEditTarget = mode === 'edit' ? g : null;
+    document.getElementById('gmTitle').textContent = mode === 'edit' ? 'クエストグループをリネーム' : 'クエストグループを作成';
+    document.getElementById('gmCompany').textContent = CO.name;
+    const codeInput = document.getElementById('gmCode');
+    codeInput.value = g ? g.code : '';
+    codeInput.disabled = mode === 'edit';   // 以後不変
+    document.getElementById('gmName').value = g ? g.name : '';
+    document.getElementById('gmSave').textContent = mode === 'edit' ? '保存する' : '作成する';
+    clearFieldErrors(document.getElementById('groupModal'));
+    openModal('groupModal');
+  }
+  document.getElementById('newGroup').addEventListener('click', () => openGroup('new', null));
+  document.getElementById('gmSave').addEventListener('click', () => {
+    const modal = document.getElementById('groupModal');
+    clearFieldErrors(modal);
+    const name = document.getElementById('gmName').value.trim();
+    const code = document.getElementById('gmCode').value.trim().toUpperCase();
+    const errs = [];
+    if (!grpEditTarget) {   // 作成時のみコード検証（リネームは不変）
+      if (!QG_CODE_RE.test(code)) errs.push(['gmCode', '英大文字始まり・A-Z/0-9/- ・2〜20字で入力してください']);
+      else if (CO.questGroups.some(g => g.code === code)) errs.push(['gmCode', 'このコードは既に使われています']);
+    }
+    if (!name) errs.push(['gmName', 'グループ名を入力してください']);
+    if (errs.length) { errs.forEach(([id, m]) => setFieldError(document.getElementById(id), m)); document.getElementById(errs[0][0]).focus(); return; }
+    if (grpEditTarget) {
+      const oldName = grpEditTarget.name;
+      grpEditTarget.name = name;
+      if (oldName !== name) list0.forEach(a => a.groups.forEach(m => { if (m.n === oldName) m.n = name; }));  // 所属の表示名も追随
+      renderGroups(); renderAccounts();
+    } else {
+      CO.questGroups.push({ code, name });   // 会社内一意（部分ユニーク・§5.4）
+      renderGroups();
+    }
+    closeModal(modal);
+  });
+  // 行アクション（リネーム / 削除＝空グループのみ）
+  groupRows.addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    if (btn.dataset.grename != null) { openGroup('edit', CO.questGroups[btn.dataset.grename]); }
+    else if (btn.dataset.gdelete != null) {
+      const idx = Number(btn.dataset.gdelete), g = CO.questGroups[idx], mc = groupMemberCount(g.name);
+      if (mc > 0) { alert('「' + g.name + '」には所属メンバーが ' + mc + ' 名います。\n削除は空のグループのみ可（B.3）。先に全員の所属を外してください。'); return; }
+      if (confirm('クエストグループ「' + g.name + '」を削除しますか？\n空のグループのみ削除でき、過去の所属履歴は保持されます（トゥームストーン・デモ）。')) {
+        CO.questGroups.splice(idx, 1);
+        renderGroups();
+      }
+    }
+  });
+
+  renderGroups();
   renderAccounts();
 </script>
 </body>
