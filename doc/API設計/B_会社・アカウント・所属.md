@@ -108,12 +108,21 @@
 - **認可条件（B.3・共通）**: **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。この API（`/admin/companies/{company_id}/*`＝クロステナント）での所属/ロール一括設定は system_admin のみ。**per-group `admin`（QG管理者）の付与/剥奪自体は、自社スコープでは会社アカウント管理者も可**（B.2.1・2026-08-02 改定）＝ただし経路が違う（会社アカ管理者は `/admin/accounts`）。QG管理者はいずれの `admin` 付与もできない（使えるのは B.4 のみ・member 追加のみ）。
 
 
-- `GET /admin/companies/{company_id}/quest-groups` … 割当候補（この会社のクエストグループ一覧・会社DB `quest_groups`）。各行に `member_count`（有効所属数）。
-- `POST /admin/companies/{company_id}/quest-groups` … **クエストグループを作成**（system_admin・会社DB `quest_groups` へ INSERT）。ボディ＝`quest_group_code`（会社内一意・大文字正規化＋形式検証・§5.4）・`name`。想定外プロパティ拒否（Mass Assignment 防止・§2.2）。`status=201`＋作成グループ（`member_count=0`）。code 重複＝**409 `conflict`**（field=`quest_group_code`）／形式違反＝`422`／不明会社＝`404`。
-  - **なぜ（追加理由・2026-08-11 決定）**: 従来 B は「グループは既存前提」で所属割当（B.2 `memberships`／B.4 参加追加）だけを定義していたが、**グループを新規作成する経路が API に無かった**（会社DBプロビジョニングが MVP 手動なのと同じ空白）。SC-92（会社詳細・system_admin）で所属エディタの「＋グループを追加」候補を用意するには、まず**この会社にグループを作れる**必要がある。所属割当は system_admin/会社アカ管理者に開いているが、**グループそのものの作成は会社構造の変更**なので会社設定と同格＝**system_admin 専用**（会社作成 B.1 と同じ権限帯）。会社アカ管理者・QG管理者は作成不可（SoD＝アカ管理者は「人」の管理、QG管理者は「参加」の管理に閉じる・§8-⑯）。
-- `PATCH /admin/companies/{company_id}/quest-groups/{group_id}` … **グループのリネーム**（system_admin・`name` のみ）。**`quest_group_code` は不変**（会社コード B.1 と同方針＝業務上の安定識別子。所属/クエストは `group_id` 参照なのでリネームは整合を壊さない・安全）。`status=200`＋更新後グループ。不明会社/グループ＝`404`。
-- `DELETE /admin/companies/{company_id}/quest-groups/{group_id}` … **グループの削除**（system_admin）。**削除できるのは空のグループのみ**＝**有効な所属（`quest_group_members.removed_at IS NULL`）または当該グループのクエストが 1 件でもあれば 409 `in_use`**（誤削除・孤児化を防ぐ）。方式＝**トゥームストーン**（`quest_groups.deleted_at`・§5.4）＝物理削除しない（過去に解除された所属〔`removed_at` 済〕の FK と監査を保持）。一覧/候補/所属追加は `deleted_at IS NULL` で除外。**同一 `quest_group_code` の再作成は可**（部分ユニーク `UNIQUE(quest_group_code) WHERE deleted_at IS NULL`）。`status=204`。
-  - **なぜ（U/D 追加理由・2026-08-11 決定）**: SC-92 でグループの CRUD 動線（作成/一覧/リネーム/削除）を提供するため。**リネームは `name` のみ**＝表示名は運用で変わりうるが、コード/ID は参照の安定性のため不変。**削除は空グループ限定＋トゥームストーン**＝(a) 稼働中グループ（有効所属・クエストあり）の削除は業務データを孤児化するので禁止（`in_use`）、(b) 物理削除ではなくトゥームストーンにするのは、解除済み所属（`quest_group_members.removed_at` 済）が FK で当該グループを参照し続けるため（監査保持・データモデル §5.1「原則物理削除しない」）。**リネーム/削除とも system_admin 専用**（会社構造の変更＝作成と同格）。
+### B.3.1 クエストグループの CRUD（`/admin/companies/{company_id}/quest-groups`・system_admin・会社DB `quest_groups`）
+
+| メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `GET /admin/companies/{company_id}/quest-groups` | 会社のクエストグループ候補一覧（SC-92・所属割当の候補） | パス: `company_id` | `data`=グループの配列（各行 `group_id`/`quest_group_code`/`name`/`member_count`〔有効所属数〕）。`deleted_at IS NULL` のみ |
+| `POST /admin/companies/{company_id}/quest-groups` | クエストグループを作成（SC-92） | パス: `company_id`／ボディ: `quest_group_code`（会社内一意・大文字正規化＋形式検証・§5.4）,`name` | `201`＋作成グループ（`member_count=0`）。code 重複=**409 `conflict`**（field=`quest_group_code`）／形式違反=`422`／不明会社=`404` |
+| `PATCH /admin/companies/{company_id}/quest-groups/{group_id}` | グループをリネーム | パス: `company_id`,`group_id`／ボディ（差分）: `name` | `200`＋更新後グループ。**`quest_group_code` は不変**（安定識別子）。不明会社/グループ=`404` |
+| `DELETE /admin/companies/{company_id}/quest-groups/{group_id}` | グループを削除（空グループのみ） | パス: `company_id`,`group_id` | `204`。有効所属（`quest_group_members.removed_at IS NULL`）や当該グループのクエストが 1 件でもあれば **409 `in_use`**。不明=`404` |
+
+- **権限（B.3.1・共通）**: 一覧/作成/リネーム/削除とも **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。**グループそのものの作成/変更/削除は会社構造の変更**なので会社設定・会社作成（B.1）と同じ権限帯＝会社アカ管理者・QG管理者は不可（SoD＝アカ管理者は「人」、QG管理者は「参加」の管理に閉じる・§8-⑯）。想定外プロパティは拒否（Mass Assignment 防止・§2.2）。
+- **なぜ作成/リネーム/削除を B に追加したか（2026-08-11 決定）**: 従来 B は「グループは既存前提」で所属割当（B.2 `memberships`／B.4 参加追加）だけを定義し、**グループを新規作成/管理する経路が API に無かった**（会社DBプロビジョニングが MVP 手動なのと同じ空白）。SC-92 でグループの CRUD 動線を提供するため追加。**リネームは `name` のみ**（表示名は運用で変わりうるが、コード/ID は参照の安定性のため不変＝所属/クエストは `group_id` 参照なので安全）。
+- **削除の方式＝トゥームストーン（`quest_groups.deleted_at`・§5.4）**: 物理削除しない。理由＝(a) 稼働中グループ（有効所属・クエストあり）の削除は業務データを孤児化するので禁止（`in_use`）、(b) 解除済み所属（`quest_group_members.removed_at` 済）が FK で当該グループを参照し続けるため（監査保持・データモデル §5.1「原則物理削除しない」）。一覧/候補/所属追加は `deleted_at IS NULL` で除外。**同一 `quest_group_code` の再作成は可**（部分ユニーク `UNIQUE(quest_group_code) WHERE deleted_at IS NULL`）。
+
+### B.3.2 アカウントの所属割当（会社DB `quest_group_members`）
+
 - アカウントの所属は **B.2 の `memberships`**（発行/編集の payload）で一括設定＝**会社DB `quest_group_members` を upsert/トゥームストーン**（差分適用）。
   - 追加＝行を作成（or `removed_at` を NULL に戻して再所属）。解除＝`removed_at` を設定（**論理削除・監査保持**・§5.5）。ロール変更＝`role` 更新。
   - **`admin` の付与/剥奪は system_admin＋会社アカウント管理者（自社・2026-08-02 改定）**（QG管理者は不可）。**部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL`** を尊重（重複所属不可）。
