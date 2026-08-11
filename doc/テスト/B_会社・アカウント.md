@@ -257,3 +257,12 @@
 | --- | --- | --- | --- | --- | --- |
 | B-TC-117 | e2e | OPS（system_admin 上位互換） | `/admin/accounts` で発行 | 発行したログインID が自社アカウント一覧に現れる | SC-93／B.2.1 |
 | B-TC-118 | e2e | 一般ユーザー（general） | `/admin/accounts` を開く | `/` へリダイレクト（サーバーガード） | B.0.1／B.2.1 |
+
+## 14. frontend e2e（SC-90 QG管理者・B.4）
+
+> 対象＝`frontend/e2e/sc-90-quest-group-admin.spec.ts`（Playwright・階層 e2e）。範囲＝SC-90（QG管理者＝参加選択専任）の縦通し＝自分が admin のグループのメンバーをディレクトリから参加追加。認可は per-group（`system_role` 非依存）。B-TC-120 は**編集（PATCH＝会社DB 直接適用・ワーカ非依存）で OPS を当該グループの admin にして**決定的に検証（QG管理者性はセッションから判定できないため画面は 403 を「管理グループなし」と graceful に扱う）。前提＝フルスタック＋OPS 管理者。UI 設計の正＝`doc/画面設計/screens/SC-90_クエストグループ管理.md`。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-119 | e2e | 一般ユーザー（admin 所属なし） | `/admin/quest-groups` を開く | 「あなたが管理するクエストグループはありません」（403 graceful） | B.4／B.0.1 §1.6 |
+| B-TC-120 | e2e | OPS を編集で当該グループの `admin` に＋候補アカウント発行 | SC-90 でグループ選択→ディレクトリ検索→参加追加 | 候補が当該グループのメンバー（`role=member`）として一覧に現れる | B.4（参加追加・member 固定） |
