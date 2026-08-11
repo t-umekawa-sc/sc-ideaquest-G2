@@ -10,6 +10,10 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, update
 
+# FK ターゲット（accounts/companies）を metadata に登録する。mail_worker は別プロセスで、これが無いと
+# MailOutboxEntry の FK 解決に失敗する（done 書込のフラッシュで NoReferencedTableError）。テストは
+# conftest が auth.orm を import 済みのため再現せず、別プロセスの worker でのみ露見する。
+from app.control_plane.auth import orm as _auth_orm  # noqa: F401
 from app.control_plane.mail_outbox import repository as mail_repo
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.control_plane.mail_outbox.templates import render

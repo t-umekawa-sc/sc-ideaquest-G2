@@ -195,6 +195,7 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-097 | int | `done` 行（`processed_at` が retention より過去）／`done`（retention 内）／`failed` を各 1 件 | メールワーカの掃除を実行 | retention 超の `done` 行のみ削除。**retention 内の `done`・`failed` 行は残す**（`failed` は要手動対応） | ADR-0007 §2.7 |
 | A-TC-098 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | `password-setup/request`（active 実在） | **`202` のまま**（`500` にならない）。SMTP は request 経路で走らない＝列挙耐性が SMTP 障害で崩れない | ADR-0007 §1(b)／§2.6 |
 | A-TC-099 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
+| A-TC-100 | int | まっさらな子プロセスで `mail_outbox.application` だけを import | `ControlBase.metadata` を検査 | FK ターゲット `accounts`/`companies` が登録済み（別プロセスの `mail_worker` で `done` 書込が `NoReferencedTableError` にならない・**import 隔離バグの回帰防止**） | ADR-0007 §2.3 |
 
 ### 7.1 補足・非対象（メール非同期化）
 

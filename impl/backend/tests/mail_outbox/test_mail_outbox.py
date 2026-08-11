@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -131,6 +133,25 @@ def test_a_tc_096_reclaim_stuck_sending(mail):
     assert _get(stale).status == "done"      # 滞留 → pending → 送信
     assert _get(fresh).status == "sending"   # 送信中（新しい）は横取りしない
     assert len(mail.sent) == 1
+
+
+def test_a_tc_100_worker_process_registers_fk_targets():
+    """A-TC-100 mail_worker は別プロセス＝application 単独 import で FK ターゲット(accounts/companies)が
+    metadata に登録される（登録漏れだと done 書込のフラッシュで NoReferencedTableError）。根拠 ADR-0007 §2.3。
+
+    本テストプロセスは conftest が auth.orm を import 済みで再現しないため、**まっさらな子プロセス**で
+    mail_outbox.application だけを import して検証する（worker の import 隔離バグの回帰防止）。
+    """
+    code = (
+        "import app.control_plane.mail_outbox.application\n"
+        "from app.db.base import ControlBase\n"
+        "t = ControlBase.metadata.tables\n"
+        "assert 'accounts' in t and 'companies' in t, sorted(t)\n"
+        "print('OK')\n"
+    )
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "OK" in r.stdout
 
 
 def test_a_tc_097_cleanup_done_retention(monkeypatch):
