@@ -108,6 +108,14 @@ def update_company_settings(
     ))
 
 
+@router.get("/companies/{company_id}/quest-groups", response_model=QuestGroupListResponse)
+def list_company_quest_groups(
+    company_id: uuid.UUID, request: Request, _session: dict = Depends(require_system_admin),
+) -> QuestGroupListResponse:
+    """会社のクエストグループ候補一覧（SC-92・B.3・system_admin 専用・所属割当の候補）。"""
+    return QuestGroupListResponse(**company_service.list_company_quest_groups(company_id))
+
+
 @router.get("/companies/{company_id}/accounts", response_model=AccountListResponse)
 def list_company_accounts(
     company_id: uuid.UUID,

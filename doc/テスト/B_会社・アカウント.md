@@ -158,6 +158,15 @@
 | B-TC-084 | api | G1 admin（当人ログイン）・別の既存アカウント target | `POST /admin/quest-groups/{G1}/members`（`{account_id: target}`） | `201`＋会社DB `quest_group_members` に target の有効所属（**`role=member` 固定**＝QG管理者は admin 任命不可）。**target の `accounts` は不変**（SoD）。CSRF 無しは `403 csrf_failed` | B.4（参加追加・member 固定・SoD） |
 | B-TC-085 | api | G1 に target が有効所属 | `DELETE /admin/quest-groups/{G1}/members/{target}` を2回 | 1回目 `204`＋`removed_at` 設定（有効所属から消える）・`accounts` は不変／2回目も `204`（冪等） | B.4（除外＝トゥームストーン・§5.5） |
 
+## 4.6 会社のクエストグループ候補一覧（B.3・system_admin・クロステナント）
+
+> 対象＝`GET /admin/companies/{company_id}/quest-groups`（system_admin 専用・所属割当の候補一覧・B.3）。`company_id` を明示（クロステナント admin・§1.5）→対象会社DB `quest_groups` を列挙（`member_count` 付き）。会社が無ければ 404。**グループ作成 EP は API 設計に未定義＝本スライス非対象**（プロビジョニングは設計判断待ち）。ACME-01 にグループを seed し teardown で物理削除。test-first。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-086 | api | system_admin・ACME-01 に quest_group を seed | `GET /admin/companies/{ACME-01}/quest-groups` | `200`＋`data` に seed したグループ（`group_id`/`quest_group_code`/`name`/`member_count`）。不明 `company_id` は `404`（存在秘匿・§1.6） | B.3／§1.8 |
+| B-TC-087 | api | 非 system_admin（`general`）／セッション無し | 同 GET | `general`＝`403 forbidden`／未認証＝`401 unauthenticated`（B.0.1 P1/P6） | B.0.1 |
+
 ## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。

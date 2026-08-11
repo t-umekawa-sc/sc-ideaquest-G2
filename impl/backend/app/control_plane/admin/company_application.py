@@ -13,6 +13,8 @@ from sqlalchemy import func, or_, select
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
 from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
 _MAX_PER_PAGE = 100
 _DEFAULT_PER_PAGE = 20
@@ -111,6 +113,34 @@ def update_company_profile(company_id: uuid.UUID, changes: dict) -> dict:
             select(func.count()).select_from(Account).where(Account.company_id == company_id)
         ).scalar_one()
         return _detail(company, count)
+
+
+def list_company_quest_groups(company_id: uuid.UUID) -> dict:
+    """会社のクエストグループ候補一覧（system_admin・所属割当の候補・B.3）。
+
+    会社が無ければ 404（存在秘匿）。対象会社DB `quest_groups` を列挙し、有効メンバー数を付す。
+    グループ作成 EP は API 設計に未定義＝ここでは一覧のみ（プロビジョニングは別途）。
+    """
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")  # 対象会社の実在（B.3・§1.6）
+        db_identifier = company.db_identifier
+    with get_tenant_session(db_identifier) as ts:
+        groups = ts.execute(
+            select(QuestGroup).order_by(QuestGroup.quest_group_code)
+        ).scalars().all()
+        counts = dict(ts.execute(
+            select(QuestGroupMember.quest_group_id, func.count())
+            .where(QuestGroupMember.removed_at.is_(None))
+            .group_by(QuestGroupMember.quest_group_id)
+        ).all())
+        data = [
+            {"group_id": str(g.id), "quest_group_code": g.quest_group_code,
+             "name": g.name, "member_count": counts.get(g.id, 0)}
+            for g in groups
+        ]
+    return {"data": data}
 
 
 def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
