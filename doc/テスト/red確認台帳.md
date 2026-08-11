@@ -152,3 +152,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- | --- |
 | B-TC-011 | router の `Depends(require_system_admin)` を無効化 | セッション無しでも 200（本来 401）＝ガードが P1 を担っている |
 | B-TC-012 | 同上 | general でも 200（本来 403）＝ガードが P6 を担っている |
+
+## 追記: アカウント発行 API（B-TC-020〜024）— 2026-08-11
+
+- 新規 EP（`POST /admin/companies/{id}/accounts`）。変更系の CSRF ガードが効いていることを一時無効化で目視（`verify_csrf` をコメントアウト→復元済み）。他（201/409/422）は Pydantic/DB＋app 検証で担保。
+
+| TC-ID | 反転/無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-023 | router の `verify_csrf(request)` を無効化 | CSRF トークン無しでも 201（本来 403 csrf_failed）＝CSRF ガードが効いている |

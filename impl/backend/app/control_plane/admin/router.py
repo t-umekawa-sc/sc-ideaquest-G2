@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.admin import application as admin_service
 from app.control_plane.admin.deps import require_system_admin
-from app.control_plane.admin.schemas import AccountListResponse
+from app.control_plane.admin.schemas import (
+    AccountCreateRequest,
+    AccountListResponse,
+    AccountResponse,
+)
+from app.core.deps import verify_csrf, verify_origin
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -31,3 +36,21 @@ def list_company_accounts(
         company_id, q=q, status=status, page=page, per_page=per_page
     )
     return AccountListResponse(**result)
+
+
+@router.post("/companies/{company_id}/accounts", response_model=AccountResponse, status_code=201)
+def issue_company_account(
+    company_id: uuid.UUID,
+    body: AccountCreateRequest,
+    request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> AccountResponse:
+    """アカウントを発行（SC-92・B.2・system_admin 専用）。変更系＝Origin/CSRF 必須（B.0.1 P3）。"""
+    verify_origin(request)      # 認可（Depends）の後に CSRF/Origin（P3）
+    verify_csrf(request)
+    result = admin_service.issue_account(
+        company_id,
+        display_name=body.display_name, login_id=body.login_id, email=body.email,
+        system_role=body.system_role, locale=body.locale,
+    )
+    return AccountResponse(**result)

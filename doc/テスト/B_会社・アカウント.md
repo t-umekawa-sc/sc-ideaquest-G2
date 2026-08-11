@@ -33,7 +33,17 @@
 | B-TC-013 | api | system_admin | 存在しない `company_id` で GET | `404 {code:"not_found"}`（存在秘匿・§1.6） | B.2／§1.6 |
 | B-TC-014 | api | system_admin | `?status=active&per_page=1&page=1`／`?q=…` | オフセットページング（`page_info.per_page/page/total`）＋`q`/`status` フィルタが効く | §1.8 |
 
-- **red 確認（後追い）**＝`Depends(require_system_admin)` を一時無効化すると B-TC-011/012 が 200 になり赤（ガードが認可の唯一の防御であることを実証）。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+**発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-020 | api | system_admin | 正しい `display_name/login_id/email` で `POST .../accounts` | `201`＋アカウント（`status=active`・`password_set=false`・機密非返却）。**accounts INSERT＋同一Tx で account_sync_outbox 1行（users ミラー）＋mail_outbox 1行（password_setup・secret 有）**→ `process_outbox_once()` で会社DB `users` 行が生成される | B.2／B.5／§4.6 |
+| B-TC-021 | api | system_admin | 会社内で `login_id`／`email` が既存と重複 | `409 {code:"conflict"}`＋`errors[].field`（`login_id`/`email`） | B.2（会社内一意・§4.2） |
+| B-TC-022 | api | 未認証／general | `POST .../accounts` | 未認証＝`401 unauthenticated`／general＝`403 forbidden`（B.0.1 P1/P6） | B.0.1 |
+| B-TC-023 | api | system_admin・CSRF トークン無し | `POST .../accounts` | `403 {code:"csrf_failed"}`（変更系＝CSRF 必須・B.0.1 P3） | B.0.1 P3 |
+| B-TC-024 | api | system_admin | 不明 `company_id`／不正 `system_role`（`quest_group_admin`）／想定外プロパティ | 不明会社＝`404 not_found`／enum 外・extra＝`422`（Mass Assignment 防止・§B.6） | B.2／§B.6 |
+
+- **red 確認（後追い）**＝`Depends(require_system_admin)` 無効化で B-TC-011/012 が 200・`verify_csrf` 無効化で B-TC-023 が 201（各ガードが効いている実証）。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
 ## 3. 補足・非対象
 

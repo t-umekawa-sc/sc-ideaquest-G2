@@ -33,7 +33,10 @@ class Company(ControlBase):
 
 class Account(ControlBase):
     __tablename__ = "accounts"
-    __table_args__ = (UniqueConstraint("company_id", "login_id", name="uq_accounts_company_login"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "login_id", name="uq_accounts_company_login"),
+        UniqueConstraint("company_id", "email", name="uq_accounts_company_email"),  # 会社内一意（§4.2）
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(
