@@ -80,8 +80,17 @@ def _build_session_payload(account, company, user) -> dict:
     }
 
 
-def _issue_session(r: redis.Redis, account, company) -> LoginResult:
-    """認証成立→会社DBミラーから表示情報を解決し本セッション発行（A.6・毎回新トークン＝固定化対策）。"""
+def _issue_session(r: redis.Redis, session, account, company) -> LoginResult:
+    """認証成立→会社DBミラーから表示情報を解決し本セッション発行（A.6・毎回新トークン＝固定化対策）。
+
+    ログイン成功の副作用として `accounts.last_login_at` を更新し、**同一Tx**で会社DB `users` へミラーする
+    outbox を積む（データモデル §4.6・§5.3 認証イベント③）。session の commit は呼び出し側が行う。
+    """
+    account.last_login_at = datetime.now(timezone.utc)
+    account_sync_repo.enqueue(
+        session, account.id, company.id, "upsert",
+        {"last_login_at": account.last_login_at.isoformat()},  # JSONB は ISO 文字列で運ぶ
+    )
     with get_tenant_session(company.db_identifier) as tsession:
         user = user_repo.get_user_by_account(tsession, account.id)
     payload = _build_session_payload(account, company, user)
@@ -138,7 +147,9 @@ def login(
                     needs_mfa = False
 
             if not needs_mfa:
-                return _issue_session(r, account, company)  # 本セッション発行（ORM 接続中に解決）
+                result = _issue_session(r, session, account, company)  # ORM 接続中に解決＋副作用
+                session.commit()  # last_login_at 更新＋outbox を確定（同一Tx）
+                return result
 
             # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
             mfa_account_id = str(account.id)
@@ -224,14 +235,14 @@ def verify_mfa(
         company = account_repo.get_company(session, account.company_id) if account else None
         if account is None or company is None:
             raise AppError(401, "preauth_expired")
-        result = _issue_session(r, account, company)
+        result = _issue_session(r, session, account, company)
 
         if trust_device:
             trust_token = generate_token()
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.trusted_device_ttl_seconds)
             account_repo.create_trusted_device(session, account.id, hash_token(trust_token), expires_at)
-            session.commit()
             result.trust_token = trust_token
+        session.commit()  # last_login_at 更新＋outbox（＋trusted_device）を確定（同一Tx）
 
     delete_preauth(r, preauth_token)  # pre-auth 消費（固定化対策・A.0-③）
     return result

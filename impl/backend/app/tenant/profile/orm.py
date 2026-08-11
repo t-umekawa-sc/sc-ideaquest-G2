@@ -27,6 +27,8 @@ class User(CompanyBase):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     # accounts.password_set のミラー（源泉=accounts・§4.6 outbox で反映）
     password_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # accounts.last_login_at のミラー（源泉=accounts・§4.6・ログイン成功時に反映）
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     level: Mapped[int] = mapped_column(BigInteger, nullable=False, default=1)
     xp: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     coin_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

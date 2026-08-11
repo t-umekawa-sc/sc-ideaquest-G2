@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,7 +17,9 @@ def get_user_by_account(session: Session, account_id: uuid.UUID) -> User | None:
 
 
 # accounts → users にミラーしてよい列（源泉=accounts・§4.6）。存在しない列は無視（前方互換）。
-_MIRROR_FIELDS = ("display_name", "locale", "status", "password_set")
+_MIRROR_FIELDS = ("display_name", "locale", "status", "password_set", "last_login_at")
+# JSONB payload では日時は ISO 文字列で運ぶため、適用前に datetime へ戻す列。
+_DATETIME_FIELDS = ("last_login_at",)
 
 
 def upsert_user_mirror(session: Session, account_id: uuid.UUID, payload: dict) -> None:
@@ -26,6 +29,9 @@ def upsert_user_mirror(session: Session, account_id: uuid.UUID, payload: dict) -
     行が無ければ作成（B.5 発行時の初回ミラー。`display_name` を含まない payload では作成できない）。
     """
     fields = {k: payload[k] for k in _MIRROR_FIELDS if k in payload}
+    for key in _DATETIME_FIELDS:  # JSONB の ISO 文字列 → datetime（timestamptz 列へ）
+        if isinstance(fields.get(key), str):
+            fields[key] = datetime.fromisoformat(fields[key])
     user = get_user_by_account(session, account_id)
     if user is None:
         session.add(User(id=uuid.uuid4(), account_id=account_id, **fields))

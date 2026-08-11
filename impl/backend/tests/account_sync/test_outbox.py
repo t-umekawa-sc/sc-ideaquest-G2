@@ -1,7 +1,8 @@
 """account_sync_outbox（管理DB→会社DB users ミラー）のテスト（doc/テスト/B_会社・アカウント.md・§4.6）。
 
 書込側の同一Tx INSERT（B-TC-001）と、常駐ワーカ本体 process_outbox_once の冪等適用/リトライ/順序
-（B-TC-002〜005）を int レベルで確認する。ワーカは常駐せず関数を直接呼ぶ。
+（B-TC-002〜005）、login 成功の last_login_at ミラー（B-TC-006）を int レベルで確認する。
+ワーカは常駐せず関数を直接呼ぶ。
 """
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ import uuid
 from app.control_plane.account_sync import repository as sync_repo
 from app.control_plane.account_sync.application import process_outbox_once
 from app.control_plane.account_sync.orm import OutboxEntry
-from app.control_plane.auth.orm import Company
+from app.control_plane.auth.orm import Account, Company
 from app.core.config import get_settings
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -38,6 +39,19 @@ def _user_password_set(db_identifier: str, account_id) -> bool | None:
             User.__table__.select().where(User.account_id == account_id)
         ).mappings().first()
         return None if u is None else u["password_set"]
+
+
+def _user_last_login(db_identifier: str, account_id):
+    with get_tenant_session(db_identifier) as ts:
+        u = ts.execute(
+            User.__table__.select().where(User.account_id == account_id)
+        ).mappings().first()
+        return None if u is None else u["last_login_at"]
+
+
+def _account_last_login(account_id):
+    with control_session() as s:
+        return s.query(Account).filter_by(id=account_id).one().last_login_at
 
 
 def _enqueue(account_id, company_id, payload=None) -> None:
@@ -137,3 +151,29 @@ def test_b_tc_005_head_of_line_blocking_and_cross_account_independence(client, f
 
     yrows = _outbox_for(y["id"])
     assert yrows[0].status == "done"                                 # 別 account は独立に完了
+
+
+# --- B-TC-006: last_login_at ミラー（ログイン成功時） ---------------------------------
+LOGIN = "/api/v1/auth/login"
+
+
+def test_b_tc_006_login_mirrors_last_login_at(client, factory):
+    """B-TC-006 ログイン成功で accounts.last_login_at 更新＋同一Tx で outbox enqueue→worker で
+    users.last_login_at へミラー。根拠 データモデル §4.6/§5.3（認証イベント③）。"""
+    acc = factory.make_seed_company_account()          # ACME-01（MFA OFF）＝直接ログイン
+    company = _seed_company_row()
+    assert _account_last_login(acc["id"]) is None                    # 初期は未ログイン
+    assert _user_last_login(company.db_identifier, acc["id"]) is None
+
+    r = client.post(LOGIN, json={
+        "company_code": acc["company_code"], "login_id": acc["login_id"], "password": acc["password"],
+    })
+    assert r.status_code == 200 and r.json()["status"] == "authenticated"
+
+    assert _account_last_login(acc["id"]) is not None               # 源泉（accounts）更新
+    rows = _outbox_for(acc["id"])
+    assert len(rows) == 1 and rows[0].op == "upsert"                # 同一Tx で 1 行
+    assert rows[0].payload.get("last_login_at")                     # payload に ISO 文字列
+
+    process_outbox_once()                                            # 会社DB へミラー
+    assert _user_last_login(company.db_identifier, acc["id"]) is not None

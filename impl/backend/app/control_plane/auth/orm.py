@@ -47,6 +47,8 @@ class Account(ControlBase):
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")  # ja | en
     system_role: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")  # active | disabled
+    # ログイン成功時に更新（源泉）→ 会社DB users.last_login_at へ §4.6 outbox でミラー
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
