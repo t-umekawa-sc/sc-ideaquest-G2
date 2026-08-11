@@ -224,6 +224,7 @@
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-113 | e2e | OPS system_admin | SC-91 で会社作成→会社名リンクで詳細へ→設定トグル（MFA）→リロード | 詳細に会社名/コード/状態＋設定が表示され、トグルした値が**リロード後も保持**（サーバー保存） | SC-92／B.1 |
+| B-TC-121 | e2e | 一般ユーザー（general） | `/admin/companies/{id}`（SC-92 詳細）を開く | `/` へリダイレクト＝サーバーガード。**`system_role!=="system_admin"` は一律 redirect＝company_account_admin も同分岐**（frontend で company_account_admin を別途検証しない理由。SoD の越権不可は backend B-TC-095 が担保）。SC-93 は system_admin を上位互換で許可＝リダイレクトしない（B-TC-117） | B.0.1 P6／§8-⑯ |
 
 ## 10. frontend e2e（SC-92B アカウント管理・B.2/B.5）
 
