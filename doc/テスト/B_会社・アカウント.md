@@ -269,3 +269,11 @@
 | --- | --- | --- | --- | --- | --- |
 | B-TC-119 | e2e | 一般ユーザー（admin 所属なし） | `/admin/quest-groups` を開く | 「あなたが管理するクエストグループはありません」（403 graceful） | B.4／B.0.1 §1.6 |
 | B-TC-120 | e2e | OPS を編集で当該グループの `admin` に＋候補アカウント発行 | SC-90 でグループ選択→ディレクトリ検索→参加追加 | 候補が当該グループのメンバー（`role=member`）として一覧に現れる | B.4（参加追加・member 固定） |
+
+## 15. session is_qg_admin ＝ SC-90 ナビ出し分け（B.4）
+
+> セッションに `is_qg_admin`（ログイン時点で会社DBに有効な `quest_group_members.role=admin` を1つ以上持つか）をスナップショットし、SC-90「クエストグループ管理」ナビを QG管理者にのみ出す。認可の実体は per-group（サーバー・§4.5）で、本フラグは**ナビ表示の出し分け**用（変更は再ログインで再評価）。backend＝A-TC-101/102（session.is_qg_admin true/false）。frontend e2e＝B-TC-123。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-123 | e2e | 一般ユーザー（admin 所属なし＝`is_qg_admin=false`） | ヘッダーのユーザーメニューを開く | 「クエストグループ管理」メニューが**出ない** | B.4／A.6（session.is_qg_admin） |

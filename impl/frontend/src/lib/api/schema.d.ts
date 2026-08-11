@@ -1147,6 +1147,11 @@ export interface components {
             /** Locale */
             locale: string;
             user: components["schemas"]["SessionUser"];
+            /**
+             * Is Qg Admin
+             * @default false
+             */
+            is_qg_admin: boolean;
         };
         /** SessionUser */
         SessionUser: {

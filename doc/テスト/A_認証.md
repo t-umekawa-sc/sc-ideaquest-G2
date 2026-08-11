@@ -28,6 +28,8 @@
 | A-TC-010 | api | — | login を**不正 Origin** で実行 | 拒否（`403`）＝Origin/Sec-Fetch 検証 | A.0 |
 | A-TC-011 | api | ログイン成功済み（有効 `iq_session`） | `GET /auth/session` | `200`＋A.6 スキーマ（`account_id/company_id/system_role/locale/user`） | A.1／A.6 |
 | A-TC-012 | api | セッション無し | `GET /auth/session` | `401 {code:"unauthenticated"}` | A.1 |
+| A-TC-101 | api | 会社DBに有効 `quest_group_members.role=admin` を持つユーザーでログイン | `GET /auth/session` | `is_qg_admin=true`（ログイン時点で会社DBの admin 所属を集計＝スナップショット・SC-90 ナビ出し分け・B.4） | A.6／B.4 |
+| A-TC-102 | api | admin 所属を持たないユーザーでログイン | `GET /auth/session` | `is_qg_admin=false` | A.6／B.4 |
 | A-TC-013 | api | ログイン成功済み | `POST /auth/logout`（`X-CSRF-Token`＋`iq_csrf` 一致） | `204`、`iq_session` 失効。直後の `GET /auth/session` が `401` | A.1 |
 | A-TC-014 | api | ログイン成功済み（有効セッション） | `POST /auth/logout` を **CSRF トークン無し**で | `403 {code:"csrf_failed"}`、セッションは維持 | A.0／README §1.7 |
 | A-TC-015 | api | **セッション無し**（Cookie 無し） | `POST /auth/logout` | `401 {code:"unauthenticated"}`（本セッション必須・**認証を CSRF より先に評価**＝A-TC-014 の 403 と対） | A.1（本セッション必須） |

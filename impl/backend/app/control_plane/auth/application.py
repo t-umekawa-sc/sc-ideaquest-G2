@@ -13,6 +13,7 @@ import redis
 
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.auth import repository as account_repo
+from app.tenant.quest_group import repository as qg_repo
 from app.control_plane.mail_outbox import repository as mail_repo
 from app.control_plane.mail_outbox.templates import (
     CATEGORY_LOCK_NOTIFICATION,
@@ -64,8 +65,8 @@ class LoginResult:
     trust_token: str | None = None   # verify で trust_device=true のとき発行（iq_trust）
 
 
-def _build_session_payload(account, company, user) -> dict:
-    """A.6 セッションスキーマ。user は会社DBミラー（表示用）。"""
+def _build_session_payload(account, company, user, is_qg_admin: bool = False) -> dict:
+    """A.6 セッションスキーマ。user は会社DBミラー（表示用）。`is_qg_admin` は QG管理者ナビ出し分け用（B.4）。"""
     return {
         "account_id": str(account.id),
         "company_id": str(company.id),
@@ -77,6 +78,7 @@ def _build_session_payload(account, company, user) -> dict:
             "display_name": (user.display_name if user else account.display_name),
             "avatar_url": None,  # 署名URL化は K/画像スライスで（§1.10）
         },
+        "is_qg_admin": is_qg_admin,
     }
 
 
@@ -93,7 +95,9 @@ def _issue_session(r: redis.Redis, session, account, company) -> LoginResult:
     )
     with get_tenant_session(company.db_identifier) as tsession:
         user = user_repo.get_user_by_account(tsession, account.id)
-    payload = _build_session_payload(account, company, user)
+        # QG管理者性（会社DBの有効 admin 所属を1つ以上持つか）をログイン時にスナップショット（B.4・ナビ出し分け）
+        is_qg_admin = bool(user and qg_repo.list_active_group_ids_for_user(tsession, user.id, role="admin"))
+    payload = _build_session_payload(account, company, user, is_qg_admin)
     token = create_session(r, payload)
     csrf = generate_token()
     return LoginResult(status="authenticated", session=payload, session_token=token, csrf_token=csrf)
@@ -289,7 +293,7 @@ def logout_all(r: redis.Redis, token: str | None) -> None:
 
 
 # GET /auth/session で外部に返す A.6 のキー（内部管理フィールド created_at 等は返さない）
-_SESSION_PUBLIC_KEYS = ("account_id", "company_id", "company_code", "system_role", "locale", "user")
+_SESSION_PUBLIC_KEYS = ("account_id", "company_id", "company_code", "system_role", "locale", "user", "is_qg_admin")
 
 
 def get_session(r: redis.Redis, token: str | None) -> dict:

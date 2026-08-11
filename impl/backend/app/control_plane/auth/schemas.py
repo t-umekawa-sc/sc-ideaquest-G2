@@ -28,6 +28,9 @@ class Session(BaseModel):
     system_role: str
     locale: str
     user: SessionUser
+    # ログイン時点で会社DBに有効な `quest_group_members.role=admin` を1つ以上持つか（QG管理者・B.4 ナビ出し分け）。
+    # per-group の集計をセッションにスナップショット（system_role と同様・変更は再ログインで再評価）。
+    is_qg_admin: bool = False
 
 
 class MfaChallenge(BaseModel):

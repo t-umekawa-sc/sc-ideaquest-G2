@@ -23,10 +23,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link role="menuitem" href="/admin/accounts">アカウント管理（自社）</Link>
           </li>
         )}
-        {/* QG管理者性は per-group（会社DB）でセッションから判定できない＝全員に出し、非該当は画面で「管理グループなし」 */}
-        <li>
-          <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
-        </li>
+        {/* QG管理者（会社DBの有効 admin 所属を1つ以上・ログイン時スナップショット is_qg_admin）にのみ出す */}
+        {session.is_qg_admin && (
+          <li>
+            <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
+          </li>
+        )}
         <li>
           <Link role="menuitem" href="/profile">プロフィール</Link>
         </li>
