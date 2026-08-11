@@ -95,7 +95,7 @@
   - **account_sync_outbox**（管理DB→会社DB `users` ミラー・§4.6・worker.py）＝writer は **`password_set`（complete）** と **`last_login_at`（login 成功・本セッション追加）** の 2 本。
   - **mail_outbox（本セッション）**：認証系メール（OTP・設定リンク・ロック通知）は同期送信せず enqueue → `mail_worker`/`process_mail_outbox_once` が SMTP 送信。**フルスタックで MailHog への非同期配信を目視確認済み**（request 202 直後は未送信→ワーカが配信・重複なし・行は done+secret NULL）。
 - **テスト（本セッションで実測・マウント版）**:
-  - **backend pytest = 85 passed**（＋ドメインB B0 の B-TC-010〜014・回帰なし）。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
+  - **backend pytest = 95 passed**（＋ドメインB B0/B2発行/B2状態管理・B-TC-010〜029・回帰なし）。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
   - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
 - **Docker（本 handoff 時点）**＝**db / redis のみ起動中**（他は停止）。フルスタックで試すなら backend の再ビルドが必要（§8 注意）。
