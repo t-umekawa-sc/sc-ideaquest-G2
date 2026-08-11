@@ -28,3 +28,22 @@ test("K-TC-006 edit own profile persists", async ({ page }) => {
   await page.reload();
   await expect(page.locator("#p_name")).toHaveValue(newName); // GET /me が更新値を返す
 });
+
+// K-TC-009: PW変更の error-path（確認不一致＝クライアント／現在PW不一致＝403 reauth_failed）。
+// 共有 OPS の資格情報を壊さないため成功パスは踏まない（happy path は backend K-TC-007 が担保）。
+test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
+  await login(page);
+  await page.goto("/profile");
+  // 確認用が不一致＝クライアント側で弾く（サーバーに送らない）
+  await page.locator("#cur_pw").fill("Passw0rd!");
+  await page.locator("#new_pw").fill("NewPassw0rd1");
+  await page.locator("#confirm_pw").fill("Different1");
+  await page.getByRole("button", { name: /パスワードを変更/ }).click();
+  await expect(page.getByText("新しいパスワードと確認用が一致しません。")).toBeVisible();
+  // 現在PW不一致＝403 reauth_failed（変更されない＝ログイン維持）
+  await page.locator("#confirm_pw").fill("NewPassw0rd1");
+  await page.locator("#cur_pw").fill("WRONGpw1");
+  await page.getByRole("button", { name: /パスワードを変更/ }).click();
+  await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "プロフィール" })).toBeVisible(); // 変更なし＝画面維持
+});

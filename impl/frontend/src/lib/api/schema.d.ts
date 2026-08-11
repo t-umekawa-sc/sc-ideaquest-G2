@@ -609,6 +609,46 @@ export interface paths {
         patch: operations["update_me_api_v1_me_patch"];
         trace?: never;
     };
+    "/api/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description 自己パスワード変更（K.3）。現在PW 再認証→ポリシー検証→更新→全セッション破棄（要再ログイン）。変更系＝Origin/CSRF 必須。
+         */
+        post: operations["change_password_api_v1_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Email
+         * @description 自己メール変更（K.3）。現在PW 再認証→会社内一意→accounts.email 更新＋users ミラー。変更系＝Origin/CSRF 必須。
+         */
+        post: operations["change_email_api_v1_me_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -891,6 +931,16 @@ export interface components {
             data: components["schemas"]["DirectoryItem"][];
             page_info: components["schemas"]["PageInfo"];
         };
+        /**
+         * EmailChangeRequest
+         * @description 自己メール変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。
+         */
+        EmailChangeRequest: {
+            /** New Email */
+            new_email: string;
+            /** Current Password */
+            current_password: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1057,6 +1107,16 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
+        };
+        /**
+         * PasswordChangeRequest
+         * @description 自己パスワード変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。
+         */
+        PasswordChangeRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
         };
         /**
          * PasswordResetResponse
@@ -2324,6 +2384,70 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MeUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_me_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_email_api_v1_me_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailChangeRequest"];
             };
         };
         responses: {

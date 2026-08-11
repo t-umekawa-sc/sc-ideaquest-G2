@@ -3,3 +3,5 @@ import type { components } from "@/lib/api/schema";
 
 export type MeProfile = components["schemas"]["MeProfileResponse"];
 export type MeUpdateInput = components["schemas"]["MeUpdateRequest"];
+export type PasswordChangeInput = components["schemas"]["PasswordChangeRequest"];
+export type EmailChangeInput = components["schemas"]["EmailChangeRequest"];

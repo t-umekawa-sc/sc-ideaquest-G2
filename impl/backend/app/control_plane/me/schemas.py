@@ -28,3 +28,19 @@ class MeProfileResponse(BaseModel):
     display_name: str
     locale: str
     system_role: str
+
+
+class PasswordChangeRequest(BaseModel):
+    """自己パスワード変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+
+
+class EmailChangeRequest(BaseModel):
+    """自己メール変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    new_email: str = Field(min_length=1, max_length=255)
+    current_password: str = Field(min_length=1)

@@ -92,7 +92,7 @@ export function ProfileForm() {
         </Button>
       </form>
 
-      <p className="admin-muted">※ メールアドレス・パスワードの変更は別画面（今後追加）。</p>
+      <p className="admin-muted">※ メールアドレス・パスワードの変更は下の「セキュリティ」で行えます（現在のパスワードで再認証）。</p>
     </section>
   );
 }

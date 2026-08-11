@@ -6,6 +6,8 @@ identity は管理DB `accounts` 源泉＝accounts 更新＋同一Tx で account_
 """
 from __future__ import annotations
 
+import uuid
+
 from app.control_plane.account_sync.application import process_outbox_once
 from app.control_plane.account_sync.orm import OutboxEntry
 from app.control_plane.auth.orm import Account, Company
@@ -97,3 +99,41 @@ def test_k_tc_004_get_me(client, factory):
 def test_k_tc_005_get_me_requires_session(client):
     """K-TC-005 GET /me はセッション必須＝未認証は 401（B.0.1 P1）。"""
     assert client.get(ME).status_code == 401
+
+
+def test_k_tc_007_change_password(client, factory):
+    """K-TC-007 PW変更＝現在PW再認証／ポリシー／成功で全セッション破棄＋新PWでログイン可（K.3・A.9-③）。"""
+    acc = _login_seed(client, factory)
+    # 現在PW不一致＝403 reauth_failed（セッションは有効＝401 と区別）
+    assert client.post(ME + "/password", json={"current_password": "WRONGpw1", "new_password": "NewPassw0rd1"},
+                       headers=_csrf(client)).status_code == 403
+    # 新PWがポリシー違反＝422
+    assert client.post(ME + "/password", json={"current_password": acc["password"], "new_password": "short"},
+                       headers=_csrf(client)).status_code == 422
+    # 成功＝204
+    r = client.post(ME + "/password", json={"current_password": acc["password"], "new_password": "NewPassw0rd1"},
+                    headers=_csrf(client))
+    assert r.status_code == 204, r.text
+    # 全セッション破棄＝当該セッションで GET /me が 401
+    assert client.get(ME).status_code == 401
+    # 新PWでログインできる
+    _login(client, acc["company_code"], acc["login_id"], "NewPassw0rd1")
+
+
+def test_k_tc_008_change_email(client, factory):
+    """K-TC-008 メール変更＝現在PW再認証／会社内一意（409）／成功で accounts.email 更新＋outbox（K.3）。"""
+    acc = _login_seed(client, factory)
+    # 現在PW不一致＝403
+    assert client.post(ME + "/email", json={"new_email": "x@acme.example", "current_password": "WRONGpw1"},
+                       headers=_csrf(client)).status_code == 403
+    # 会社内で既存（seed の user@acme.example）と重複＝409
+    r_dup = client.post(ME + "/email", json={"new_email": "user@acme.example", "current_password": acc["password"]},
+                        headers=_csrf(client))
+    assert r_dup.status_code == 409 and r_dup.json()["errors"][0]["field"] == "email"
+    # 成功＝200＋email 更新＋outbox（users ミラー）
+    newmail = f"changed-{uuid.uuid4().hex[:8]}@acme.example"
+    r = client.post(ME + "/email", json={"new_email": newmail, "current_password": acc["password"]},
+                    headers=_csrf(client))
+    assert r.status_code == 200 and r.json()["email"] == newmail
+    assert _account(acc["id"]).email == newmail
+    assert any(x.payload.get("email") == newmail for x in _outbox(acc["id"]))
