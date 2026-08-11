@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 
@@ -128,7 +129,9 @@ def list_company_quest_groups(company_id: uuid.UUID) -> dict:
         db_identifier = company.db_identifier
     with get_tenant_session(db_identifier) as ts:
         groups = ts.execute(
-            select(QuestGroup).order_by(QuestGroup.quest_group_code)
+            select(QuestGroup)
+            .where(QuestGroup.deleted_at.is_(None))  # 削除済み（トゥームストーン）は除外（§5.4）
+            .order_by(QuestGroup.quest_group_code)
         ).scalars().all()
         counts = dict(ts.execute(
             select(QuestGroupMember.quest_group_id, func.count())
@@ -156,7 +159,10 @@ def create_company_quest_group(company_id: uuid.UUID, *, quest_group_code: str, 
         db_identifier = company.db_identifier
     with get_tenant_session(db_identifier) as ts:
         clash = ts.execute(
-            select(QuestGroup).where(QuestGroup.quest_group_code == quest_group_code)
+            select(QuestGroup).where(
+                QuestGroup.quest_group_code == quest_group_code,
+                QuestGroup.deleted_at.is_(None),  # 有効行のみで一意（削除後の同コード再作成を許容・§5.4）
+            )
         ).scalars().first()
         if clash is not None:
             raise AppError(409, "conflict", extra={"errors": [{"field": "quest_group_code"}]})
@@ -165,6 +171,58 @@ def create_company_quest_group(company_id: uuid.UUID, *, quest_group_code: str, 
         ts.commit()
         return {"group_id": str(group.id), "quest_group_code": group.quest_group_code,
                 "name": group.name, "member_count": 0}
+
+
+def _active_member_count(ts, group_id: uuid.UUID) -> int:
+    return ts.execute(
+        select(func.count()).select_from(QuestGroupMember).where(
+            QuestGroupMember.quest_group_id == group_id, QuestGroupMember.removed_at.is_(None)
+        )
+    ).scalar_one()
+
+
+def _load_active_group(ts, group_id: uuid.UUID) -> QuestGroup:
+    group = ts.execute(
+        select(QuestGroup).where(QuestGroup.id == group_id, QuestGroup.deleted_at.is_(None))
+    ).scalars().first()
+    if group is None:
+        raise AppError(404, "not_found")  # 不明/削除済みグループ（存在秘匿）
+    return group
+
+
+def rename_company_quest_group(company_id: uuid.UUID, group_id: uuid.UUID, *, name: str) -> dict:
+    """クエストグループのリネーム（system_admin・`name` のみ・B.3.1）。`quest_group_code` は不変（安定識別子）。"""
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")
+        db_identifier = company.db_identifier
+    with get_tenant_session(db_identifier) as ts:
+        group = _load_active_group(ts, group_id)
+        group.name = name
+        count = _active_member_count(ts, group_id)
+        ts.commit()
+        return {"group_id": str(group.id), "quest_group_code": group.quest_group_code,
+                "name": group.name, "member_count": count}
+
+
+def delete_company_quest_group(company_id: uuid.UUID, group_id: uuid.UUID) -> None:
+    """クエストグループの削除（system_admin・B.3.1）。**空グループのみ**＝有効所属があれば 409 `in_use`。
+
+    方式＝トゥームストーン（`deleted_at` 設定・物理削除しない＝解除済み所属の FK と監査を保持・§5.4）。
+    ※クエスト（ドメインC）の参照チェックは quests テーブル実装時にここへ追加する。
+    """
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")
+        db_identifier = company.db_identifier
+    with get_tenant_session(db_identifier) as ts:
+        group = _load_active_group(ts, group_id)
+        if _active_member_count(ts, group_id) > 0:
+            raise AppError(409, "conflict", extra={"errors": [{"reason": "in_use"}]})  # 空グループのみ削除可
+        group.deleted_at = datetime.now(timezone.utc)  # トゥームストーン
+        ts.commit()
 
 
 def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:

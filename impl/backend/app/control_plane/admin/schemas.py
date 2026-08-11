@@ -226,6 +226,13 @@ class QuestGroupCreateRequest(BaseModel):
         return v
 
 
+class QuestGroupRenameRequest(BaseModel):
+    """クエストグループのリネーム入力（B.3.1・`name` のみ）。`quest_group_code` は不変（受け取らない）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=255)
+
+
 class MemberListItem(BaseModel):
     """グループの参加メンバー 1 行（`quest_group_members`×`users`）。機密は含めない（§B.6）。"""
     account_id: str

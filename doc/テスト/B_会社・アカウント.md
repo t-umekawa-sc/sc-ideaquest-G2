@@ -168,6 +168,10 @@
 | B-TC-087 | api | 非 system_admin（`general`）／セッション無し | 同 GET | `general`＝`403 forbidden`／未認証＝`401 unauthenticated`（B.0.1 P1/P6） | B.0.1 |
 | B-TC-088 | api | system_admin | `POST /admin/companies/{ACME-01}/quest-groups`（小文字 code＋name） | `201`＋`quest_group_code` は**大文字正規化**・一覧に現れる（`member_count=0`）。会社構造変更＝**system_admin 専用**（B.3・2026-08-11） | B.3／§5.4 |
 | B-TC-089 | api | system_admin | 既存 code で作成／不正形式 code（`ab`〔先頭数字/短すぎ〕）／不明会社／CSRF 無し／`general` | 既存＝`409 conflict`（field=`quest_group_code`）／形式違反＝`422`／不明会社＝`404`／CSRF 無し＝`403 csrf_failed`／`general`＝`403 forbidden` | B.3／§5.4／B.0.1 |
+| B-TC-090 | api | system_admin・ACME-01 にグループ seed | `PATCH /admin/companies/{ACME-01}/quest-groups/{group_id}`（`name` 変更） | `200`＋`name` 更新・**`quest_group_code` は不変**。不明 group は `404` | B.3.1／§5.4 |
+| B-TC-091 | api | system_admin・**空**グループ（有効所属なし） | `DELETE /admin/companies/{ACME-01}/quest-groups/{group_id}` | `204`＋一覧から消える（`deleted_at` トゥームストーン）。**同一 `quest_group_code` を再作成できる**（部分ユニーク） | B.3.1／§5.4 |
+| B-TC-092 | api | system_admin・**有効所属を持つ**グループ | 同 DELETE | `409 conflict`（`in_use`）＝空グループのみ削除可（孤児化防止） | B.3.1／§5.5 |
+| B-TC-093 | api | 非 system_admin／セッション無し／CSRF 無し | PATCH・DELETE | `general`＝`403`／未認証＝`401`／CSRF 無し＝`403 csrf_failed`（変更系・B.0.1 P1/P3/P6） | B.0.1 |
 
 ## 5. 補足・非対象
 

@@ -22,9 +22,12 @@ class QuestGroup(CompanyBase):
     __tablename__ = "quest_groups"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # 業務上のグループ識別コード（会社内で一意＝会社DB内で一意・大文字正規化して保存・§5.4）
-    quest_group_code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    # 業務上のグループ識別コード（会社内で一意・大文字正規化して保存・§5.4）。
+    # 一意は「有効（deleted_at IS NULL）行のみ」の部分ユニーク（migration 0006）＝削除後の再作成を許容。
+    quest_group_code: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # グループ削除の論理削除（トゥームストーン）。NULL＝有効。値あり＝削除済み（一覧/候補は deleted_at IS NULL で絞る・§5.4）。
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

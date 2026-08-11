@@ -37,6 +37,7 @@ from app.control_plane.admin.schemas import (
     QuestGroupCreateRequest,
     QuestGroupListItem,
     QuestGroupListResponse,
+    QuestGroupRenameRequest,
 )
 from app.core.deps import verify_csrf, verify_origin
 from app.infra.cache import get_redis
@@ -129,6 +130,30 @@ def create_company_quest_group(
     return QuestGroupListItem(**company_service.create_company_quest_group(
         company_id, quest_group_code=body.quest_group_code, name=body.name,
     ))
+
+
+@router.patch("/companies/{company_id}/quest-groups/{group_id}", response_model=QuestGroupListItem)
+def rename_company_quest_group(
+    company_id: uuid.UUID, group_id: uuid.UUID, body: QuestGroupRenameRequest, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> QuestGroupListItem:
+    """クエストグループをリネーム（SC-92・B.3.1・system_admin・`name` のみ）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return QuestGroupListItem(**company_service.rename_company_quest_group(
+        company_id, group_id, name=body.name,
+    ))
+
+
+@router.delete("/companies/{company_id}/quest-groups/{group_id}", status_code=204)
+def delete_company_quest_group(
+    company_id: uuid.UUID, group_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> None:
+    """クエストグループを削除（SC-92・B.3.1・空グループのみ・トゥームストーン）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    company_service.delete_company_quest_group(company_id, group_id)
 
 
 @router.get("/companies/{company_id}/accounts", response_model=AccountListResponse)
