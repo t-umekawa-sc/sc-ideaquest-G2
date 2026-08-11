@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from app.control_plane.account_sync.orm import OutboxEntry
 from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
+from app.control_plane.mail_outbox.application import process_mail_outbox_once
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.core.security import generate_token, hash_password, hash_token
 from app.db.control import control_session
@@ -62,12 +63,34 @@ def _clean_mail_outbox():
     _truncate()
 
 
+class _DrainingMail:
+    """`mail.sent` を読むたびに mail_outbox を配信してから返す薄い委譲（非同期化・ADR-0007）。
+
+    メール送信は非同期（enqueue→ワーカ）になったため、既存の同期送信前提テスト（`request→mail.sent`）を
+    そのまま通すために、`mail.sent` アクセス時に `process_mail_outbox_once()` で配信してから中身を返す。
+    配信は冪等（pending のみ送る）＝複数回参照しても二重送信しない。
+    新機構そのものの TC（配信タイミングを検証する A-TC-090/092/093/098/099）は本ラッパを使わず、
+    素の `FakeMailSender` を `set_mail_sender` で差し替えて配信を明示制御する。
+    """
+
+    def __init__(self, fake: "mail_infra.FakeMailSender") -> None:
+        self._fake = fake
+
+    @property
+    def sent(self):
+        process_mail_outbox_once()
+        return self._fake.sent
+
+
 @pytest.fixture
 def mail():
-    """メール送信をフェイクに差し替え、送信内容を捕捉する（ADR-0002 §2.5）。teardown で解除。"""
+    """メール送信をフェイクに差し替え、送信内容を捕捉する（ADR-0002 §2.5）。teardown で解除。
+
+    非同期化後は `mail.sent` 参照時に配信を挟む（_DrainingMail）＝既存テストは無改変で通る。
+    """
     fake = mail_infra.FakeMailSender()
     mail_infra.set_mail_sender(fake)
-    yield fake
+    yield _DrainingMail(fake)
     mail_infra.set_mail_sender(None)
 
 

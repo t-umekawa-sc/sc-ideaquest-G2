@@ -5,6 +5,7 @@ login はコントロールプレーンで完結し、認証成立時のみ会�
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +13,12 @@ import redis
 
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.auth import repository as account_repo
+from app.control_plane.mail_outbox import repository as mail_repo
+from app.control_plane.mail_outbox.templates import (
+    CATEGORY_LOCK_NOTIFICATION,
+    CATEGORY_OTP,
+    CATEGORY_PASSWORD_SETUP,
+)
 from app.control_plane.auth.domain.service import (
     LoginDecision,
     decide_login,
@@ -43,7 +50,6 @@ from app.core.security import (
 )
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.infra.mail import get_mail_sender
 from app.tenant.profile import repository as user_repo
 
 
@@ -96,7 +102,7 @@ def login(
         verify_password(password, None)
         raise AppError(401, "unauthenticated")
 
-    lock_notify: tuple[str, str] | None = None  # ロック発火時に通知すべき (account_id, email)
+    lock_notify: tuple[uuid.UUID, str] | None = None  # ロック発火時に通知すべき (account_id, email)
     with control_session() as session:
         account, company = account_repo.find_account_and_company(session, company_code, login_id)
 
@@ -117,7 +123,7 @@ def login(
             # 認証失敗を計数。閾値到達でロック発火＝実在 active のときだけ本人へ通知（§2.4）。
             # メール送信は列挙耐性のため session を閉じてから（§2.4・下記）。
             if register_login_failure(r, client_ip, login_id) and account is not None and account.status == "active":
-                lock_notify = (str(account.id), account.email)
+                lock_notify = (account.id, account.email)
         else:
             # PROCEED＝資格照合成功。失敗計数とロックを解除する（§2.2 成功で streak と lock 削除）。
             clear_login_lock(r, client_ip, login_id)
@@ -137,7 +143,10 @@ def login(
             # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
             mfa_account_id = str(account.id)
             mfa_company_id = str(company.id)
+            mfa_account_uuid = account.id
+            mfa_company_uuid = company.id
             mfa_email = account.email
+            mfa_locale = account.locale
 
     # ここに到達するのは INVALID か 要MFA のいずれか
     if decision is LoginDecision.INVALID:
@@ -145,7 +154,8 @@ def login(
         if lock_notify is not None:
             account_id, email = lock_notify
             if should_send_lock_notification(r, account_id):
-                _send_lock_notification(email)
+                # 非同期化（ADR-0007）: SMTP は叩かず enqueue のみ＝発火リクエストに送信遅延が乗らない。
+                _enqueue_mail(email, CATEGORY_LOCK_NOTIFICATION, account_id=account_id)
         raise AppError(401, "unauthenticated")
 
     # --- 要MFA（A.0-②）: OTP 発行＋pre-auth 発行＋メール送信 ---
@@ -153,7 +163,8 @@ def login(
     otp = generate_otp(s.otp_length)
     preauth_token = create_preauth(r, mfa_account_id, mfa_company_id, hash_token(otp))
     csrf = generate_token()
-    _send_otp_email(mfa_email, otp)
+    _enqueue_mail(mfa_email, CATEGORY_OTP, secret=otp, locale=mfa_locale,
+                  account_id=mfa_account_uuid, company_id=mfa_company_uuid)
     mfa = {
         "delivery": "email",
         "masked_to": mask_email(mfa_email),
@@ -163,33 +174,29 @@ def login(
     return LoginResult(status="mfa_required", mfa=mfa, preauth_token=preauth_token, csrf_token=csrf)
 
 
-def _send_otp_email(to_email: str, otp: str) -> None:
-    """MFA の OTP をメール送信。OTP は本文にのみ載せ、ログには出さない（セキュリティ一覧 3・15）。"""
-    s = get_settings()
-    minutes = s.otp_ttl_seconds // 60
-    subject = "【ideaquest】ログイン認証コード"
-    body = (
-        "ideaquest のログイン認証コードです。\n\n"
-        f"認証コード: {otp}\n"
-        f"（有効期限 {minutes} 分・1回限り）\n\n"
-        "このメールに心当たりがない場合は破棄してください。"
-    )
-    get_mail_sender().send(to_email, subject, body)
+def _enqueue_mail(
+    to_email: str,
+    category: str,
+    *,
+    secret: str | None = None,
+    locale: str | None = None,
+    account_id: uuid.UUID | None = None,
+    company_id: uuid.UUID | None = None,
+    session=None,
+) -> None:
+    """認証系メールを mail_outbox に積む（ADR-0007）。SMTP は叩かず送信はワーカに委ねる。
 
-
-def _send_lock_notification(to_email: str) -> None:
-    """アカウント一時ロックを本人へ out-of-band 通知（ADR-0005 §2.4）。
-
-    本文は汎用＝攻撃元 IP・失敗回数・MFA 有無などの詳細は載せない（列挙耐性・情報過多の回避）。
+    本文/秘匿値は保存せず `secret` に隔離し、ワーカが送信時にレンダリングする（§2.7）。
+    `session` を渡すとその Tx に相乗せて原子化（password-setup/request）。渡さなければ単独 INSERT。
     """
-    subject = "【ideaquest】ログインの一時制限のお知らせ"
-    body = (
-        "あなたのアカウントでログインの失敗が続いたため、一時的にログインを制限しました。\n\n"
-        "しばらく時間をおくと自動的に解除されます。\n"
-        "心当たりがない場合は、パスワードの再設定をおすすめします。\n\n"
-        "このメールに心当たりがない場合は破棄してください。"
-    )
-    get_mail_sender().send(to_email, subject, body)
+    if session is not None:
+        mail_repo.enqueue(session, to_email, category, secret=secret, locale=locale,
+                          account_id=account_id, company_id=company_id)
+        return
+    with control_session() as s:
+        mail_repo.enqueue(s, to_email, category, secret=secret, locale=locale,
+                          account_id=account_id, company_id=company_id)
+        s.commit()
 
 
 def verify_mfa(
@@ -251,9 +258,10 @@ def resend_mfa(r: redis.Redis, preauth_token: str, preauth: dict) -> dict:
     account_id = preauth["account_id"]
     with control_session() as session:
         account = account_repo.get_account(session, account_id)
-        to_email = account.email if account else None
-    if to_email:
-        _send_otp_email(to_email, otp)
+        if account is not None:
+            _enqueue_mail(account.email, CATEGORY_OTP, secret=otp, locale=account.locale,
+                          account_id=account.id, company_id=account.company_id, session=session)
+            session.commit()
     return {"expires_in": s.otp_ttl_seconds, "resend_available_in": s.otp_resend_cooldown_seconds}
 
 
@@ -286,20 +294,6 @@ def logout(r: redis.Redis, token: str | None) -> None:
 
 
 # --- 初回・再設定パスワード（A.7・状態B/D・ADR-0002） ------------------------------------
-def _send_password_setup_email(to_email: str, token: str) -> None:
-    """設定リンク（72h・単回）をメール送信。トークンはリンクにのみ載せログには出さない。"""
-    s = get_settings()
-    link = f"{s.app_base_url}/password-setup?token={token}"
-    subject = "【ideaquest】パスワード設定のご案内"
-    body = (
-        "ideaquest のパスワード設定/再設定のご案内です。\n\n"
-        "以下のリンクから新しいパスワードを設定してください（有効期限 72 時間・1回限り）。\n"
-        f"{link}\n\n"
-        "このメールに心当たりがない場合は破棄してください。"
-    )
-    get_mail_sender().send(to_email, subject, body)
-
-
 def request_password_setup(
     r: redis.Redis, client_ip: str, company_code: str, login_id: str
 ) -> None:
@@ -308,8 +302,8 @@ def request_password_setup(
     実メール送信は「会社 active かつアカウント active」かつレート制限内のときだけ。
     該当しなければ無送信で同一応答（A.7／ADR-0002 §2.3）。
     """
-    # NOTE(timing): eligible 経路は同期メール送信のぶん遅く、残余のタイミング差が残る
-    # （既知の MVP 限界・ADR-0002 §2.3）。完全な等時間化は非同期送信（worker）導入時に対応。
+    # 非同期化（ADR-0007）: eligible でも SMTP は叩かず、チャレンジ作成と同一 Tx で mail_outbox へ
+    # enqueue（原子化）。送信はワーカ。これで残余のタイミング差（ADR-0002 §2.3）と SMTP 失敗の 500 が消える。
     within_limit = within_pw_request_rate_limit(r, client_ip, company_code, login_id)
 
     with control_session() as session:
@@ -325,15 +319,13 @@ def request_password_setup(
             return  # 無送信・同一の 202（列挙耐性）
 
         token = generate_token()
-        to_email = account.email
         s = get_settings()
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.password_setup_ttl_seconds)
         account_repo.invalidate_password_setup_challenges(session, account.id)  # 最新のみ有効
         account_repo.create_password_setup_challenge(session, account.id, hash_token(token), expires_at)
+        _enqueue_mail(account.email, CATEGORY_PASSWORD_SETUP, secret=token, locale=account.locale,
+                      account_id=account.id, company_id=company.id, session=session)
         session.commit()
-
-    # DB コミット後に送信（未永続のトークンをメールしないため・post-commit）
-    _send_password_setup_email(to_email, token)
 
 
 def verify_password_setup(token: str) -> dict:
