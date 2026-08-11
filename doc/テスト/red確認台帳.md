@@ -206,3 +206,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- | --- |
 | B-TC-084 | `quest_group_application.add_member` を早期 return の stub 化（会社DB へ upsert しない） | POST は 201 を返すが `quest_group_members` に有効所属が作られず、members に target が現れない＝upsert 呼び出しが load-bearing。復元して green。 |
 | B-TC-085 | `quest_group_application.remove_member` を早期 return の stub 化（トゥームストーンしない） | DELETE は 204 を返すが `removed_at` が設定されず有効所属に残る（`assert not True`）＝remove_membership が load-bearing。復元して green。 |
+
+## 追記: プロフィール編集 writer（K-TC-001）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| K-TC-001 | `me/application.update_me` を早期 return の stub 化（accounts 更新も outbox enqueue もしない） | `PATCH /me` は 200 だが `display_name` が更新されず旧値 `Seed Test` が返る（本来 `新しい名前`）＝accounts 更新＋outbox enqueue が load-bearing。復元して green（3 passed）。 |
