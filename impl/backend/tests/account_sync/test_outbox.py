@@ -7,6 +7,10 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import select
 
 from app.control_plane.account_sync import repository as sync_repo
 from app.control_plane.account_sync.application import process_outbox_once
@@ -16,6 +20,8 @@ from app.core.config import get_settings
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.profile.orm import User
+from app.tenant.profile.repository import get_user_by_account
+from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from tests.conftest import SEED_COMPANY_CODE
 
 COMPLETE = "/api/v1/auth/password-setup/complete"
@@ -200,3 +206,84 @@ def test_b_tc_007_mirror_identity_columns(client, factory):
     assert row["login_id"] == "mir@acme.example"
     assert row["email"] == "mir@acme.example"
     assert row["system_role"] == "company_account_admin"
+
+
+# --- B-TC-069〜071: outbox worker の memberships 適用（発行相乗り・B.5 step3） ---------
+@pytest.fixture
+def qg():
+    """会社DB に quest_group を seed。作成した group と所属は teardown で物理削除（users より先）。"""
+    created: list[tuple[str, uuid.UUID]] = []  # (db_identifier, group_id)
+
+    def make_group(db_identifier: str) -> uuid.UUID:
+        gid = uuid.uuid4()
+        with get_tenant_session(db_identifier) as ts:
+            ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:8].upper()}", name="G"))
+            ts.commit()
+        created.append((db_identifier, gid))
+        return gid
+
+    yield SimpleNamespace(make_group=make_group)
+
+    for db_identifier, gid in created:
+        with get_tenant_session(db_identifier) as ts:
+            ts.query(QuestGroupMember).filter_by(quest_group_id=gid).delete()
+            ts.query(QuestGroup).filter_by(id=gid).delete()
+            ts.commit()
+
+
+def _active_members(db_identifier: str, group_id: uuid.UUID) -> list[QuestGroupMember]:
+    with get_tenant_session(db_identifier) as ts:
+        return list(ts.execute(
+            select(QuestGroupMember).where(
+                QuestGroupMember.quest_group_id == group_id,
+                QuestGroupMember.removed_at.is_(None),
+            )
+        ).scalars())
+
+
+def test_b_tc_069_worker_applies_memberships(client, factory, qg):
+    """B-TC-069 payload の memberships を users 生成の後に quest_group_members へ適用（FK順・B.5 step3）。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    gid = qg.make_group(company.db_identifier)
+    _enqueue(acc["id"], company.id, {
+        "display_name": "Seed Test",
+        "memberships": [{"group_id": str(gid), "role": "admin"}],
+    })
+
+    process_outbox_once()
+
+    members = _active_members(company.db_identifier, gid)
+    assert len(members) == 1
+    assert members[0].role == "admin"
+    with get_tenant_session(company.db_identifier) as ts:  # user が先に生成され、所属が張れている
+        user = get_user_by_account(ts, acc["id"])
+    assert user is not None and members[0].user_id == user.id
+    assert all(r.status == "done" for r in _outbox_for(acc["id"]))
+
+
+def test_b_tc_070_worker_memberships_idempotent(client, factory, qg):
+    """B-TC-070 同一 memberships payload を2回適用しても有効所属は1行（冪等）。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    gid = qg.make_group(company.db_identifier)
+    payload = {"display_name": "Seed Test", "memberships": [{"group_id": str(gid), "role": "member"}]}
+    _enqueue(acc["id"], company.id, payload)
+    _enqueue(acc["id"], company.id, payload)
+
+    process_outbox_once()
+
+    assert len(_active_members(company.db_identifier, gid)) == 1
+
+
+def test_b_tc_071_worker_without_memberships_noop(client, factory, qg):
+    """B-TC-071 memberships を含まない payload は quest_group_members に触れない（回帰保護・前方互換）。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    gid = qg.make_group(company.db_identifier)
+    _enqueue(acc["id"], company.id, {"password_set": True})
+
+    process_outbox_once()
+
+    assert _active_members(company.db_identifier, gid) == []
+    assert _user_password_set(company.db_identifier, acc["id"]) is True  # users ミラーは従来どおり

@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from app.control_plane.account_sync import repository as sync_repo
@@ -13,6 +14,7 @@ from app.core.config import get_settings
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.profile import repository as user_repo
+from app.tenant.quest_group import repository as qg_repo
 
 
 def process_outbox_once() -> dict:
@@ -63,6 +65,7 @@ def _apply_one(entry_id) -> bool:
                 raise RuntimeError(f"company {entry.company_id} not found")
             with get_tenant_session(company.db_identifier) as tsession:
                 user_repo.upsert_user_mirror(tsession, entry.account_id, entry.payload)
+                _apply_memberships(tsession, entry.account_id, entry.payload)  # users の後（FK順・B.5 step3）
                 tsession.commit()
             entry.status = "done"
             entry.processed_at = datetime.now(timezone.utc)
@@ -74,3 +77,22 @@ def _apply_one(entry_id) -> bool:
                 entry.status = "failed"  # 上限超＝要手動対応（監視/アラート対象）
             session.commit()
             return False
+
+
+def _apply_memberships(tsession, account_id, payload: dict) -> None:
+    """payload の初期所属 `memberships:[{group_id, role}]` を会社DB `quest_group_members` へ冪等 upsert（B.5 step3）。
+
+    `users` upsert の後に呼ぶ（FK 順序を保証）。`user_id` は会社DB `users.id`（`account_id` から解決）。
+    memberships が無ければ no-op（従来の発行/編集/last_login payload は非干渉＝前方互換）。
+    """
+    memberships = payload.get("memberships")
+    if not memberships:
+        return
+    user = user_repo.get_user_by_account(tsession, account_id)
+    if user is None:
+        # users ミラー未生成では所属を張れない（FK）。payload に display_name が無い異常系＝リトライさせる。
+        raise RuntimeError(f"user mirror for account {account_id} not found; cannot apply memberships")
+    for m in memberships:
+        qg_repo.upsert_membership(
+            tsession, uuid.UUID(str(m["group_id"])), user.id, m.get("role", "member")
+        )
