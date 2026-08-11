@@ -188,7 +188,10 @@
 
 ## 6. 補足・非対象
 
-- **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
-- **初期所属 `memberships` の相乗適用**（B.5＝`users`→`quest_group_members` の順）は B ドメイン実装時（本スライスの payload は `password_set` のみ）。
-- **メール送信の非同期化**は別機構（§4.6 outbox は DB ミラー専用）＝別スライス。
+- **account_sync_outbox の writer は主要が実装済み**＝`password_set`（A.7 complete）／`last_login_at`（login 成功）／発行・編集・無効化・再有効化（B.2）／初期所属 `memberships` の相乗（B.5＝`users`→`quest_group_members` の順・§4.2/§4.3）／プロフィール編集（K・`PATCH /me`＝`display_name`/`locale`）。
+- **本ドメインの非対象（別スライス/別ドメイン）**:
+  - K.3 メール変更（`POST /me/email`＝再認証）・PW 変更（`POST /me/password`）、`GET /me` 全体（残高・署名URL＝K.1）＝ドメイン K の別スライス。
+  - 監査ログ `system_audit_logs`（B.6・membership/発行/編集/グループ操作の記録）＝未実装。
+  - quest_groups 削除の「クエスト参照による `in_use`」チェック＝quests（ドメイン C）実装時に追加（現状は有効所属のみで判定・§4.6 の `DELETE`）。
+  - メール送信の非同期化（`mail_outbox`）は別機構（§4.6 account_sync outbox は会社DB ミラー専用）＝ドメイン A 相乗（[`A_認証.md`](A_認証.md) §7）。
 - ワーカの常駐ループ（`worker.py`）自体は疎通のみ＝TC 対象外（本体ロジックは `process_outbox_once` の int TC で担保）。
