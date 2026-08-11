@@ -150,6 +150,7 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-077 | api | ACME-01 実アカウント（mail フェイク） | IP=A で 5回失敗（発火） → 続けて **別 IP=B** で 5回失敗（再発火） | ロック通知メールは**ちょうど1通**（本人宛）。IP=B の再発火はクールダウンで**追加送信なし** | ADR-0005 §2.4 |
 | A-TC-078 | api | **存在しない login_id**（mail フェイク） | IP=A で 5回失敗（発火） | ロックはされる（一律 401）が**通知メールは送られない**（実在 active のみ・列挙耐性） | ADR-0005 §2.4 |
 | A-TC-079 | api | ACME-02（MFA）＝login は成功し pre-auth 発行 | `mfa/verify` の OTP を 5回誤り → 改めて login | login ロックは**発火しない**（OTP 失敗は非連動）＝再 login は再び `mfa_required`（ロックの 401 にならない） | ADR-0005 §2.6 |
+| A-TC-082 | int | IP=A・login_id | **4回失敗** → 失敗計数の**固定窓 TTL 経過**（Redis で `login_fail_streak` を消して再現）→ **1回失敗** | 窓経過後の失敗は `login_fail_streak:{A}:{id}` を **1 から数え直す**（4→5 の累積扱いにならない＝**固定窓・延長しない**）→ ロックは**発火しない** | ADR-0005 §2.2/§2.5(a) |
 
 ### 5.1 補足・非対象（ロック）
 

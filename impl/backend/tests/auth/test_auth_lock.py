@@ -151,6 +151,25 @@ def test_a_tc_078_no_notification_for_unknown_login_id(client, mail):
     assert a.post(LOGIN, json=ghost).status_code == 401  # ロック中も一律 401
 
 
+def test_a_tc_082_streak_resets_after_window_expiry(client, factory):
+    """A-TC-082 失敗計数の固定窓 TTL が経過（キー消滅）すると次の失敗は 1 から数え直す＝累積せずロックも発火しない。根拠 ADR-0005 §2.2/§2.5(a)。"""
+    acc = factory.make_seed_company_account()
+    ip = "10.0.0.1"
+    a = _client(ip)
+    r = get_redis()
+    streak_key = f"login_fail_streak:{ip}:{acc['login_id']}"
+    lock_key = f"login_lock:{ip}:{acc['login_id']}"
+
+    _fail_n(a, acc, MAX - 1)                 # ロック発火の1歩手前まで（4回）
+    assert r.get(streak_key) == str(MAX - 1)  # 計数が 4 まで積まれている
+
+    r.delete(streak_key)                     # 固定窓 TTL の経過を再現（延長しない＝発火から固定期間で必ず消える）
+
+    _fail_n(a, acc, 1)                        # 窓経過後の 1 回失敗
+    assert r.get(streak_key) == "1"          # 5 の累積ではなく 1 から数え直し
+    assert r.exists(lock_key) == 0           # ロックは発火しない（4+1 を 5 と扱わない）
+
+
 def test_a_tc_079_otp_failure_does_not_lock_login(client, factory, mail):
     """A-TC-079 mfa/verify の OTP 連続失敗は login ロックに非連動。根拠 ADR-0005 §2.6。"""
     acc = factory.make_seed_mfa_account()  # ACME-02（MFA ON）
