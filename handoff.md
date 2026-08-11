@@ -20,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション）: **`9e59947`**（ワーカ memberships 加算専用テスト・B-TC-096/097＋明記）。本セッションの主な流れ＝… K writer `432301b`→SoD 境界 `1c3cfdd`→handoff `d12d743`→ワーカ加算専用 `9e59947`。**`d12d743`（SoD 境界の handoff）までは `origin/main` へプッシュ済み、`9e59947`（加算専用テスト）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション）: **`1cc67f9`**（システム監査ログ system_audit_logs・B.6・B-TC-100〜103）。本セッションの主な流れ＝… K writer `432301b`→SoD 境界 `1c3cfdd`→ワーカ加算専用 `9e59947`→§6 正規化 `c7a7014`→監査ログ `1cc67f9`。**`c7a7014` までは `origin/main` へプッシュ済み、`1cc67f9`（監査ログ）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
 - 規約の追加（本セッション）: **テスト規約 §1.1**＝テストパターン md の TC 表を持つ各節に「テスト範囲の概要」（対象/範囲と非対象/前提/出典）を必須化。**API設計に新規 EP を追記する時は既存節と同じ表形式に揃える**（B.3 を表形式に統一・ユーザー指摘）。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
@@ -119,7 +119,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
   - **mail_outbox（本セッション）**：認証系メール（OTP・設定リンク・ロック通知）は同期送信せず enqueue → `mail_worker`/`process_mail_outbox_once` が SMTP 送信。**フルスタックで MailHog への非同期配信を目視確認済み**（request 202 直後は未送信→ワーカが配信・重複なし・行は done+secret NULL）。
   - **ドメイン B アカウント管理 API（本セッション）**＝`/admin/companies`（会社CRUD・system_admin）／`/admin/companies/{id}/accounts`（会社スコープのアカウント発行/編集/disable/enable/password-reset・system_admin）／`/admin/accounts`（company_account_admin・セッション会社固定・SoD）。bootstrap で OPS＋system_admin を seed。**発行/編集 EP は memberships を受け取り（発行=outbox 相乗・編集=会社DB 直接・B.3）。B.4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・参加追加/除外）も本セッション完了＝ドメイン B バックエンドの主要フローは概ね縦通し済み**。
 - **テスト（本セッションで実測・マウント版）**:
-  - **backend pytest = 150 passed**（既存111＋本セッション新規 B-TC-060〜097＝quest_group 一連・SoD 境界・ワーカ加算専用・K-TC-001〜003＝プロフィール編集 writer・回帰なし）。マウント版で実測。company migration head＝**0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
+  - **backend pytest = 154 passed**（既存111＋本セッション新規 B-TC-060〜103＝quest_group 一連・SoD 境界・ワーカ加算専用・監査ログ・K-TC-001〜003＝プロフィール編集 writer・回帰なし）。マウント版で実測。migration head＝**control 0009**（system_audit_logs）・**company 0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
   - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
 - **Docker（本 handoff 時点）**＝**db / redis のみ起動中**（他は停止）。フルスタックで試すなら backend の再ビルドが必要（§8 注意）。
@@ -187,8 +187,9 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - **実装済み**＝`password_set`（complete）／`last_login_at`（login）／発行・編集の identity＋memberships（B）／無効化・再有効化（disable/enable）／**プロフィール編集（K・`PATCH /me`＝display_name/locale・本セッション `432301b`）**。
 - **残り＝K.3 メール変更**（`POST /me/email`＝再認証＋会社内一意再検証→`accounts.email` 更新＋outbox）＝別スライス（再認証フローが要る）。`login_id` は不変（§4.2）。PW 変更（K.3 `POST /me/password`）＝A.9-③ 全セッション破棄＋H 通知も別スライス。
 
-### (3) 監査ログ（B.6・`system_audit_logs`）
-- membership 変更（参加追加/除外・admin 任命）・発行/編集/無効化を `system_audit_logs` に記録＝**未実装**（B.4/B.6 が要求）。テーブル未作成。管理面（failed 可視化）と併せて後続。
+### (3) 監査ログ（B.6・`system_audit_logs`）＝完了（本セッション `1cc67f9`）
+- 特権操作（アカウント発行/編集/disable/enable/PW再設定・会社 create/update/settings・グループ CRUD・所属 add/remove）を `system_audit_logs`（control migration 0009）へ記録。実行者/IP/UA は `AuditContextMiddleware`（contextvar）が供給。読み取り・認可失敗は非監査。B-TC-100〜103。
+- **残り（将来）**＝監査ログの**閲覧 UI/API**（管理者が履歴を見る）・保持/エクスポート方針＝未実装（B.6 は記録まで）。`failed` outbox 可視化と併せて管理面スライスで。
 
 ### (4) frontend で B ドメインを配線（SC-90/91/92/93）
 - backend が揃ったので、会社一覧/詳細・アカウント発行/編集・QG参加ピッカー（SC-90）を frontend feature として実装。
@@ -205,7 +206,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 
 ## 8. 再開に必要な環境情報
 
-- **フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。**worker / mail-worker はポート無し**（常駐のみ）。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001-**0008**・company 0001-**0006**（0005＝quest_groups/quest_group_members・0006＝quest_groups.deleted_at＋部分ユニーク）〕→seed＝2社＋**OPS 運営テナント＋初期 system_admin**〔`BOOTSTRAP_ADMIN_PASSWORD` 供給時〕・冪等）してから uvicorn。**今回終了時点で起動中は db / redis のみ**（他は停止）。**注意＝backend/mail-worker の実イメージは本セッションの変更を焼いていない＝フルスタックで試すなら `docker compose build backend frontend` 後に up する**。**dev system_admin ログイン＝会社コード `OPS`／`admin@ops.example`／`Passw0rd!`**。
+- **フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。**worker / mail-worker はポート無し**（常駐のみ）。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001-**0009**（0009＝system_audit_logs）・company 0001-**0006**（0005＝quest_groups/quest_group_members・0006＝quest_groups.deleted_at＋部分ユニーク）〕→seed＝2社＋**OPS 運営テナント＋初期 system_admin**〔`BOOTSTRAP_ADMIN_PASSWORD` 供給時〕・冪等）してから uvicorn。**今回終了時点で起動中は db / redis のみ**（他は停止）。**注意＝backend/mail-worker の実イメージは本セッションの変更を焼いていない＝フルスタックで試すなら `docker compose build backend frontend` 後に up する**。**dev system_admin ログイン＝会社コード `OPS`／`admin@ops.example`／`Passw0rd!`**。
 - **seed（開発用ログイン）**＝会社 `ACME-01`（`mfa_required=false`）/`user@acme.example`／会社 `ACME-02`（`mfa_required=true`）/`mfa@acme2.example`。PW いずれも `Passw0rd!`。
 - **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（**80 passed**・build 不要でホスト変更が即反映）。
 - **メールワーカ単体スモーク**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" -e MAIL_OUTBOX_POLL_INTERVAL_SECONDS=0.2 backend timeout 2 python -m app.mail_worker`（起動→停止ログを確認）。account_sync ワーカは `python -m app.worker`。
@@ -222,7 +223,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**次スライスはユーザーと相談**（候補＝(3) 監査ログ `system_audit_logs`（B.6・membership/発行/編集/グループ操作の記録＝未実装）／(4) frontend で B/K ドメイン配線（SC-90/91/92/93＋プロフィール）／(5) ドメイン C 着手〔quests〕／K.3 メール・PW 変更）。**本セッションで縦通し完了＝ドメイン B バックエンド（B0/B1/B2＋memberships＋B.4 QG管理者＋B.3 QGグループ CRUD）＋K プロフィール編集 writer（PATCH /me）**。
+- ✅ 再開点＝**次スライスはユーザーと相談**（候補＝(4) frontend で B/K ドメイン配線（SC-90/91/92/93＋プロフィール）／(5) ドメイン C 着手〔quests〕／K.3 メール・PW 変更／監査ログ閲覧 UI＋outbox failed 可視化の管理面）。**本セッションで縦通し完了＝ドメイン B バックエンド（B0/B1/B2＋memberships＋B.4 QG管理者＋B.3 QGグループ CRUD）＋K プロフィール編集 writer＋監査ログ system_audit_logs（B.6・全特権操作）**。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
 - ✅ 状態＝backend 111 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
