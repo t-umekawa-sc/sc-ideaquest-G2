@@ -20,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション）: **`cc5b80c`**（会社アカ管理者向け自社グループ一覧 EP＋SC-93 所属ピッカー・B-TC-044/122）。本セッションの主な流れ＝… K プロフィール `9172312`→handoff `855bc5e`→自社グループ EP `cc5b80c`。**`855bc5e`（K プロフィールの handoff）までは `origin/main` へプッシュ済み、`cc5b80c` は未プッシュ**。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション）: **`7a7cf6b`**（session is_qg_admin フラグ＝SC-90 ナビ出し分け・A-TC-101/102・B-TC-123）。本セッションの主な流れ＝… 自社グループ EP `cc5b80c`→handoff `fc8c516`→is_qg_admin `7a7cf6b`。**`fc8c516`（自社グループ EP の handoff）までは `origin/main` へプッシュ済み、`7a7cf6b` は未プッシュ**。※本 handoff 更新はこの後の別コミット。
 - 規約の追加（本セッション）: **テスト規約 §1.1**＝テストパターン md の TC 表を持つ各節に「テスト範囲の概要」（対象/範囲と非対象/前提/出典）を必須化。**API設計に新規 EP を追記する時は既存節と同じ表形式に揃える**（B.3 を表形式に統一・ユーザー指摘）。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
@@ -119,9 +119,9 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
   - **mail_outbox（本セッション）**：認証系メール（OTP・設定リンク・ロック通知）は同期送信せず enqueue → `mail_worker`/`process_mail_outbox_once` が SMTP 送信。**フルスタックで MailHog への非同期配信を目視確認済み**（request 202 直後は未送信→ワーカが配信・重複なし・行は done+secret NULL）。
   - **ドメイン B アカウント管理 API（本セッション）**＝`/admin/companies`（会社CRUD・system_admin）／`/admin/companies/{id}/accounts`（会社スコープのアカウント発行/編集/disable/enable/password-reset・system_admin）／`/admin/accounts`（company_account_admin・セッション会社固定・SoD）。bootstrap で OPS＋system_admin を seed。**発行/編集 EP は memberships を受け取り（発行=outbox 相乗・編集=会社DB 直接・B.3）。B.4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・参加追加/除外）も本セッション完了＝ドメイン B バックエンドの主要フローは概ね縦通し済み**。
 - **テスト（本セッションで実測・マウント版）**:
-  - **backend pytest = 157 passed**（既存111＋本セッション新規＝quest_group 一連・SoD 境界・ワーカ加算専用・監査ログ・B-TC-044〔自社グループ一覧〕／K-TC-001〜005・回帰なし。※B-TC-005 HOL・A-TC-077 ロック通知は稀に timing フレーク＝再実行で green）。migration head＝**control 0009**・**company 0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
+  - **backend pytest = 159 passed**（quest_group 一連・SoD 境界・ワーカ加算専用・監査ログ・B-TC-044〔自社グループ一覧〕・A-TC-101/102〔session is_qg_admin〕／K-TC-001〜005・回帰なし。※B-TC-005 HOL・A-TC-077 ロック通知・A-TC-096 mail reclaim は稀に timing フレーク＝再実行で green）。migration head＝**control 0009**・**company 0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
-  - **frontend＝SC-91＋SC-92 一式＋SC-93（所属ピッカー込み）＋SC-90＋K プロフィール編集を実装（本セッション）＝tsc/lint クリーン・e2e 19 passed**（sc-00 5＋sc-91 3＋sc-92 5＋sc-93 3〔117/118/122〕＋sc-90 2＋k-profile 1）。features に companies/accounts/questgroups/qgadmin/profile。route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`・`/profile`。ヘッダーナビ（会社／自社アカ／クエストグループ管理／プロフィール）。backend GET /me（identity）＋GET /admin/company-quest-groups（自社グループ一覧・B.2.1）追加。OpenAPI 型再生成済み。**口座一覧 UI は暫定 per_page=100（ページング/検索 UI 未実装＝蓄積で溢れる恐れ）**。**フルスタックで実測**。features/companies・accounts（AccountSection＝system_admin クロステナント／AccountSelfSection＝会社アカ管理者 自社）・questgroups・qgadmin＋route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`＋ヘッダーナビ（system_admin＝会社／company_account_admin＝自社／全員＝クエストグループ管理）。OpenAPI 型再生成済み。
+  - **frontend＝SC-91＋SC-92 一式＋SC-93（所属ピッカー込み）＋SC-90＋K プロフィール編集を実装（本セッション）＝tsc/lint クリーン・e2e 20 passed**（sc-00 5＋sc-91 3＋sc-92 5＋sc-93 3＋sc-90 3〔119/120/123〕＋k-profile 1）。features に companies/accounts/questgroups/qgadmin/profile。route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`・`/profile`。ヘッダーナビ（会社=system_admin／自社アカ=company_account_admin／クエストグループ管理=**is_qg_admin**／プロフィール=全員）。backend GET /me（identity）＋GET /admin/company-quest-groups（自社グループ一覧・B.2.1）＋session `is_qg_admin`（A.6・ナビ出し分け）追加。OpenAPI 型再生成済み。**口座一覧 UI は暫定 per_page=100（ページング/検索 UI 未実装）**。**フルスタックで実測**。features/companies・accounts（AccountSection＝system_admin クロステナント／AccountSelfSection＝会社アカ管理者 自社）・questgroups・qgadmin＋route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`＋ヘッダーナビ（system_admin＝会社／company_account_admin＝自社／全員＝クエストグループ管理）。OpenAPI 型再生成済み。
   - **e2e の注意（重要）**＝(a) メール依存 e2e（sc-00-mfa/password-setup）は `mail-worker` 起動が前提。(b) frontend 再ビルドで Playwright system deps が消える＝`install-deps chromium`（root）を都度再実行。(c) **login を多数繰り返すとログインのレート制限（ADR-0005・`(IP+login_id)` 固定窓）で 429 になり sc-00（user@acme.example）が落ちる＝`docker compose exec redis redis-cli flushall` でカウンタを消すか `--workers=1` で緩和**（コード起因ではない）。
 - **Docker（本 handoff 時点）**＝**フルスタック起動中**（db/redis/backend/frontend/mailhog/worker/mail-worker）。backend/frontend は本セッションの変更を焼いた最新イメージ。SC-91 は `http://localhost:3000`（OPS/`admin@ops.example`/`Passw0rd!` でログイン→ヘッダー「システム管理（会社）」）で目視可。
 - **壊れているもの＝無し**。
@@ -200,8 +200,9 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - **SC-92 一式＋SC-93＝完了**（SC-93＝`AccountSelfSection`・`(app)/admin/accounts`・company_account_admin＋system_admin 上位互換・B-TC-117/118）。**SC-93 の所属エディタは未実装＝会社アカウント管理者向けの自社グループ一覧 EP が未定義（設計ギャップ）**。B.4 の `/admin/quest-groups` は QG管理者用（自分が admin のグループのみ）で用途が違う＝会社アカ管理者が自社全グループを見る EP を設計するか要検討。
 - **SC-90 QG管理者＝完了（`2b26891`）**＝`features/qgadmin`（自分が admin のグループ・メンバー・ディレクトリから参加追加/除外・per-group 認可・403 graceful）。B-TC-119/120。
 - **K プロフィール編集 UI＝完了（`9172312`）**＝backend GET /me（identity）＋`features/profile`（表示名/ロケール編集・PATCH /me）＋`/profile`＋ナビ。K-TC-004〜006。GET /me は identity のみ（残高/画像は K.1 全体＝別スライス）。
-- **会社アカ管理者向け自社グループ一覧 EP＋SC-93 所属ピッカー＝完了（`cc5b80c`）**＝GET /admin/company-quest-groups（B.2.1・セッション会社固定）＋SC-93 の MembershipsEditor 配線（発行=常時／編集=置換オプトイン）。B-TC-044/122。
-- **次の候補＝session `is_qg_admin` フラグ（SC-90 ナビ出し分け）／K.3 メール・PW 変更 UI＋backend／GET /me の残高・画像（K.1 全体・MinIO 署名URL）／口座一覧のページング/検索 UI／ドメイン C／管理面（監査ログ閲覧・outbox failed）**。モック＝各 `doc/画面設計/mocks/`。
+- **会社アカ管理者向け自社グループ一覧 EP＋SC-93 所属ピッカー＝完了（`cc5b80c`）**＝GET /admin/company-quest-groups（B.2.1）＋SC-93 MembershipsEditor 配線。B-TC-044/122。
+- **session is_qg_admin＝完了（`7a7cf6b`）**＝ログイン時に会社DBの admin 所属を集計し session にスナップショット。SC-90 ナビを is_qg_admin でゲート。A-TC-101/102・B-TC-123。**get_session のホワイトリスト `_SESSION_PUBLIC_KEYS` に載せないと GET /session に出ない点に注意**（今回そこを修正）。
+- **次の候補＝K.3 メール・PW 変更 UI＋backend（再認証）／GET /me の残高・画像（K.1 全体・MinIO 署名URL）／口座一覧のページング・検索 UI／ドメイン C 着手／管理面（監査ログ閲覧・outbox failed 可視化）**。モック＝各 `doc/画面設計/mocks/`。
 - 以降＝SC-93（会社アカウント管理者・`/admin/accounts`）・SC-90（QG管理者・`/admin/quest-groups`・参加ピッカー）・プロフィール編集（K `PATCH /me`）。
 - **frontend 検証**＝tsc（`docker compose run --rm --no-deps -T -v "$PWD/frontend/src:/app/src" frontend node_modules/.bin/tsc --noEmit`）／lint／e2e（フルスタック＝`docker compose build backend frontend && up` 後、`docker compose exec -u root frontend npx playwright install-deps chromium`→`install chromium`→`exec frontend npx playwright test`。mail 依存 e2e は mail-worker 起動が前提）。**型は手書きせず `npm run codegen`（backend openapi.json から再生成）**。
 
@@ -234,7 +235,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**session is_qg_admin（SC-90 ナビ出し分け）／K.3 メール・PW 変更／GET /me の残高・画像（K.1 全体）／口座一覧のページング・検索 UI／ドメイン C／管理面**（§7-(4)・SC-91/SC-92/SC-93〔所属ピッカー込み〕/SC-90/K プロフィール編集＋自社グループ一覧 EP は本セッション完了）。**本セッションで縦通し完了＝ドメイン B バックエンド全般＋K プロフィール編集（GET/PATCH /me）＋自社グループ一覧 EP＋監査ログ（B.6）＋SC-91/SC-92/SC-93/SC-90/プロフィール frontend（e2e 19 passed 実測）**。
+- ✅ 再開点＝**K.3 メール・PW 変更／GET /me の残高・画像（K.1 全体）／口座一覧のページング・検索 UI／ドメイン C 着手／管理面（監査ログ閲覧・outbox failed）**（§7-(4)・SC-91/SC-92/SC-93/SC-90/K プロフィール編集＋自社グループ一覧 EP＋session is_qg_admin は本セッション完了）。**本セッションで縦通し完了＝ドメイン B バックエンド全般＋K プロフィール編集＋自社グループ一覧 EP＋session is_qg_admin＋監査ログ（B.6）＋SC-91/SC-92/SC-93/SC-90/プロフィール frontend（e2e 20 passed 実測）＝ドメイン B/K の管理系 UI が一通り縦通し**。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
 - ✅ 状態＝**backend 154 passed・frontend e2e 8 passed**（本セッション実測・フルスタック）。ドメイン B バックエンド全般＋K プロフィール編集 writer＋監査ログ（B.6）＋SC-91 会社一覧 frontend が縦通し完了。**フルスタック起動中**（最新イメージ）。未実装/負債（SC-92 以降の frontend・ドメイン C・K.3 メール/PW 変更・監査ログ閲覧UI・outbox failed 可視化・本番設定）は §4/§7 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
