@@ -70,6 +70,11 @@ services:
       # account_sync_outbox ワーカ（データモデル §4.6）
       OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-5}
       OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-1.0}
+      # mail_outbox ワーカ（認証系メール非同期・ADR-0007・mail_worker）
+      MAIL_OUTBOX_MAX_ATTEMPTS: ${MAIL_OUTBOX_MAX_ATTEMPTS:-5}
+      MAIL_OUTBOX_POLL_INTERVAL_SECONDS: ${MAIL_OUTBOX_POLL_INTERVAL_SECONDS:-1.0}
+      MAIL_OUTBOX_SENDING_RECLAIM_SECONDS: ${MAIL_OUTBOX_SENDING_RECLAIM_SECONDS:-60}
+      MAIL_OUTBOX_DONE_RETENTION_SECONDS: ${MAIL_OUTBOX_DONE_RETENTION_SECONDS:-604800}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -90,6 +95,20 @@ services:
       db:
         condition: service_healthy
       backend:
+        condition: service_started
+
+  # mail_outbox 常駐ワーカ（認証系メール非同期送信・ADR-0007・別プロセスで account_sync から障害隔離）。
+  # backend と同一イメージ。entrypoint を上書きして mail_worker ループのみ実行。
+  mail-worker:
+    build: ./backend
+    environment: *backend_env
+    entrypoint: ["python", "-m", "app.mail_worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      mailhog:
         condition: service_started
 
   frontend:

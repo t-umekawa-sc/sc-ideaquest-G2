@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     outbox_max_attempts: int = 5
     outbox_poll_interval_seconds: float = 1.0  # 常駐ワーカのポーリング間隔（worker.py）
 
+    # mail_outbox（認証系メールの非同期送信・ADR-0007・別プロセス mail_worker.py）
+    mail_outbox_max_attempts: int = 5                  # 送信リトライ上限（超で failed）
+    mail_outbox_poll_interval_seconds: float = 1.0     # メールワーカのポーリング間隔
+    mail_outbox_sending_reclaim_seconds: int = 60      # sending 滞留を再送へ戻す閾値（§2.5）
+    mail_outbox_done_retention_seconds: int = 604800   # done 行の保持（7日・掃除まで・§2.7）
+
     # ログインのレート制限（ADR-0001 §2.6）。(IP+login_id) 単位
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 300
