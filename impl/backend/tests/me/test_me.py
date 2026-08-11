@@ -81,3 +81,19 @@ def test_k_tc_003_auth_and_csrf(client, factory):
     assert client.patch(ME, json={"display_name": "x"}).status_code == 401
     _login_seed(client, factory)
     assert client.patch(ME, json={"display_name": "x"}).status_code == 403  # CSRF 無し
+
+
+def test_k_tc_004_get_me(client, factory):
+    """K-TC-004 GET /me＝ログイン中の identity を返す（機密は返さない）。K.1。"""
+    acc = _login_seed(client, factory)
+    r = client.get(ME)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["login_id"] == acc["login_id"]
+    assert set(body.keys()) == {"login_id", "email", "display_name", "locale", "system_role"}
+    assert "password_hash" not in body and "password" not in body
+
+
+def test_k_tc_005_get_me_requires_session(client):
+    """K-TC-005 GET /me はセッション必須＝未認証は 401（B.0.1 P1）。"""
+    assert client.get(ME).status_code == 401

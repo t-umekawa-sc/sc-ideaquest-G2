@@ -572,7 +572,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Me
+         * @description 自分のプロフィール（identity・K.1）。残高・画像（署名URL）は K.1 全体＝別スライス。
+         */
+        get: operations["get_me_api_v1_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2241,6 +2245,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_me_api_v1_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeProfileResponse"];
                 };
             };
         };

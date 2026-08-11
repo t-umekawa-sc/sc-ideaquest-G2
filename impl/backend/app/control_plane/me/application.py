@@ -26,6 +26,15 @@ def _me(account: Account) -> dict:
     }
 
 
+def get_me(account_id: uuid.UUID) -> dict:
+    """自分のプロフィール（identity サブセット）を返す（K.1）。残高・画像（K.1 全体）は別スライス。"""
+    with control_session() as session:
+        account = session.get(Account, account_id)
+        if account is None:
+            raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
+        return _me(account)
+
+
 def update_me(account_id: uuid.UUID, company_id: uuid.UUID, *, changes: dict) -> dict:
     """表示名・ロケールを編集（K.2）。accounts を更新し、同一Tx で会社DB `users` へのミラーを enqueue。
 

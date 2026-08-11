@@ -52,6 +52,15 @@ test("B-TC-120 qg admin adds member from directory", async ({ page }) => {
     headers, data: { display_name: candName, login_id: cand, email: cand, system_role: "general", memberships: [] },
   });
 
+  // 候補は会社DB users ミラー（＝ディレクトリの取得元）に worker が非同期反映する＝出るまで待つ
+  await expect
+    .poll(async () => {
+      const res = await page.request.get(`/api/v1/admin/company-directory?q=${encodeURIComponent(candName)}`);
+      const body = await res.json();
+      return (body.data ?? []).length;
+    }, { timeout: 20000, intervals: [500, 1000, 1000, 2000] })
+    .toBeGreaterThan(0);
+
   // SC-90: グループが見え、ディレクトリから候補を参加追加→メンバーに現れる
   await page.goto("/admin/quest-groups");
   await expect(page.getByRole("heading", { name: "クエストグループ管理" })).toBeVisible();

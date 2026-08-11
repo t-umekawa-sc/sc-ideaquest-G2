@@ -17,6 +17,12 @@ from app.core.deps import verify_csrf, verify_origin
 router = APIRouter(prefix="/api/v1", tags=["me"])
 
 
+@router.get("/me", response_model=MeProfileResponse)
+def get_me(request: Request, session: dict = Depends(require_me)) -> MeProfileResponse:
+    """自分のプロフィール（identity・K.1）。残高・画像（署名URL）は K.1 全体＝別スライス。"""
+    return MeProfileResponse(**me_service.get_me(uuid.UUID(session["account_id"])))
+
+
 @router.patch("/me", response_model=MeProfileResponse)
 def update_me(
     body: MeUpdateRequest, request: Request, session: dict = Depends(require_me),

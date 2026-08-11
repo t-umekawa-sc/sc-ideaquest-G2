@@ -28,6 +28,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
         </li>
         <li>
+          <Link role="menuitem" href="/profile">プロフィール</Link>
+        </li>
+        <li>
           <LogoutMenuItem />
         </li>
         <li>
