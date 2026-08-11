@@ -6,7 +6,7 @@
 >
 > **現在地＝実装スキャフォールド進行中。手法＝「設計書→（必要なら ADR で具体値確定）→テストパターン→テストコード→実装」で 1 スライスずつ縦に通す。red-green 必須（テスト規約 §5.1）。**
 >
-> **直近＝ドメイン B（アカウント管理 API）に着手。B0（ブートストラップ OPS＋初期 system_admin／`/admin` 認可基盤／`GET /admin/companies/{id}/accounts`）完了（`8edca78`・B-TC-010〜014）。次＝B2 アカウント発行（`POST .../accounts`）に着手予定。**
+> **直近＝ドメイン B（アカウント管理 API）着手中。B0（bootstrap＋/admin 認可＋アカウント一覧・`8edca78`）＋B2 発行（`POST .../accounts`・B.5 フロー＝outbox＋mail・`41ededc`・B-TC-020〜024）完了。次＝B2 の残り（disable/enable/password-reset／編集／company_account_admin 版）。**
 > **直近スライス＝(A) ② メール非同期化（`mail_outbox`・ADR-0007・FK バグ修正含む・§5）／(B) `logout-all` の frontend 導線（A.0-⑤・e2e A-TC-022）／(C) `last_login_at` ミラー writer（account_sync・§4.6・B-TC-006）をいずれも完了。次スライス＝未着手（§7 の優先順から選ぶ）。**
 
 ---
@@ -15,7 +15,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・`origin/main` と同期＝`git status` で確認済み・**未プッシュのコミットは無い**）。
-- 最新コミット: **`8edca78`**（ドメインB B0＝bootstrap＋/admin 認可基盤＋アカウント一覧）。※本 handoff 更新はこの後の別コミット。
+- 最新コミット: **`41ededc`**（ドメインB B2＝アカウント発行）。※本 handoff 更新はこの後の別コミット。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
   - `62ba95d` テスト追加 A-TC-082（失敗計数の固定窓TTL経過リセット・ADR-0005）
   - `449fc28` docs(ADR-0007) メール送信の非同期化を確定
@@ -36,6 +36,8 @@
   - `34aacb3` docs(データモデル §4.6) seq を明記＝実装との差分を正規化
   - `ffe1afb` handoff 更新（§4.6 正規化）
   - `8edca78` 実装 ドメインB B0＝bootstrap（OPS＋system_admin）＋/admin 認可基盤＋アカウント一覧（B-TC-010〜014）
+  - `63d9710` handoff 更新（B0）
+  - `41ededc` 実装 ドメインB B2＝アカウント発行 POST .../accounts（B.5・outbox＋mail・migration 0007 email 一意・B-TC-020〜024）
 - remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。
 
 ---
@@ -155,7 +157,8 @@
 
 ### (2) ドメイン B の続き（アカウント管理 API・着手中）
 - **B0 完了**＝bootstrap（OPS＋system_admin）＋`/admin` 認可基盤（`admin/deps.require_system_admin`）＋`GET /admin/companies/{id}/accounts`（`8edca78`）。
-- **B2（次）**＝アカウント発行 `POST /admin/companies/{id}/accounts`（system_admin）／`POST /admin/accounts`（company_account_admin）＝B.5 フロー（accounts INSERT＋同一Tx で outbox・password-setup リンク〔今は mail_outbox で非同期〕）。**memberships（会社DB `quest_group_members`＝ドメインC領域）は別スライスに分けるのが妥当**（identity＋PWリンクを先に通す）。編集/disable/enable/password-reset・`last_system_admin` 不変条件も B2 群。
+- **B2 発行 完了**（`POST /admin/companies/{id}/accounts`・system_admin・`41ededc`）。**残り**＝(i) disable/enable＋password-reset（`last_system_admin` 不変条件・全セッション破棄 A.9-③）、(ii) 編集 PATCH（identity 一意再検証・system_role 変更で全セッション破棄・自己降格/last_system_admin 拒否）、(iii) `POST /admin/accounts`（company_account_admin 版・同一 application・セッション会社固定）、(iv) memberships（会社DB `quest_group_members`＝ドメインC領域）。
+  - 再利用＝`admin/application.issue_account` と同型。session 破棄＝`core.security.delete_account_sessions`＋`account_repo.revoke_all_trusted_devices`（logout_all 参照）。
 - **B1**＝会社 CRUD（`GET/POST/PATCH /admin/companies`・`/settings`）。**B3**＝QG管理者・所属（quest_group_members）。
 - 認可ヘルパは `admin/deps.py` に追加（`require_company_account_admin`＝セッション会社固定・`require_qg_admin` 等）。
 
@@ -188,8 +191,8 @@
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**§7 (2) ドメイン B の続き＝B2 アカウント発行**（着手中）。memberships は別スライス分割を推奨。
+- ✅ 再開点＝**§7 (2) ドメイン B の続き＝B2 の残り（disable/enable/password-reset 等）**。memberships は別スライス推奨。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
-- ✅ 状態＝backend 85 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B1/B2/B3・failed 可視化・本番設定・テナント系メール別機構）は §4 に明記。
+- ✅ 状態＝backend 90 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B1/B2/B3・failed 可視化・本番設定・テナント系メール別機構）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
 - ⚠ 詳細な決定理由・具体値は各 `doc/ADR/*.md`・`doc/データモデル.md` §4.6/§4.7・`doc/テスト/*.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
