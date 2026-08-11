@@ -175,3 +175,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 反転した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-033 | 期待 `status_code == 422` → `== 599`（ガードは発火させたまま＝admin は降格されない） | 422（自己降格 `last_system_admin` ガードが発火している証拠） |
+
+## 追記: 会社アカウント管理者（B-TC-042）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-042 | `disable_account` の `forbid_system_admin_target` ガードを無効化 | 会社アカ管理者が system_admin を disable できて 200（本来 403）＝SoD ガードが load-bearing |

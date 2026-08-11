@@ -63,7 +63,16 @@
 | B-TC-033 | api | 自分（system_admin）を編集 | 自分の `system_role` を `general` に降格 | `422 last_system_admin`（自己降格は常に不可・自己ロックアウト防止） | B.2 |
 | B-TC-034 | api | system_admin | 不正 `system_role`／想定外プロパティ／不明 account | enum 外・extra＝`422`／不明＝`404` | B.2／§B.6 |
 
-- **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+**会社アカウント管理者（`/admin/accounts`・`company_account_admin`・セッション会社固定・B.2.1）**。system_admin は上位互換で可。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-040 | api | company_account_admin（ACME-01） | `GET /admin/accounts` | `200`＋**セッション会社（ACME-01）スコープ**の一覧（`company_id` を受けない） | B.2.1 |
+| B-TC-041 | api | company_account_admin | `POST /admin/accounts` | `201`＋`system_role=general` 固定・セッション会社配下に作成 | B.2.1 |
+| B-TC-042 | api | company_account_admin | ボディに `system_role`／system_admin を `disable` | `system_role` は受け取らない＝`422`（付与不可）／system_admin の disable は `403`（B.2.1・§8-⑯） | B.2.1 |
+| B-TC-043 | api | general／system_admin | `GET /admin/accounts` | general＝`403`／system_admin＝`200`（上位互換） | B.2.1／B.0.1 |
+
+- **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火・`forbid_system_admin_target` 無効化で B-TC-042 が 200（system_admin を disable できてしまう）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
 ## 3. 補足・非対象
 

@@ -60,6 +60,27 @@ class AccountUpdateRequest(BaseModel):
     system_role: Literal["general", "company_account_admin", "system_admin"] | None = None
 
 
+class AccountCreateSelfRequest(BaseModel):
+    """会社アカウント管理者の発行入力（B.2.1）。**`system_role` は受け取らない**＝作れるのは
+    `general` のみ（ロール付与は system_admin に集約・§8-⑯）。想定外プロパティは拒否（§B.6）。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str = Field(min_length=1, max_length=255)
+    login_id: str = Field(min_length=1, max_length=255)
+    email: str = Field(min_length=1, max_length=255)
+    locale: Literal["ja", "en"] = "ja"
+
+
+class AccountUpdateSelfRequest(BaseModel):
+    """会社アカウント管理者の編集入力（B.2.1・差分）。**`system_role` は変更不可**（受け取らない）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    login_id: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, min_length=1, max_length=255)
+
+
 class AccountResponse(BaseModel):
     """発行/編集/状態変更結果のアカウント（機密は含めない・§B.6）。"""
     account_id: str

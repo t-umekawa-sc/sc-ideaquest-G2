@@ -150,10 +150,12 @@ def factory():
             created_accounts.append(a.id)
             return {"id": a.id, "login_id": lid, "password": password}
 
-    def _make_real_account(company: Company, prefix: str, password_set: bool, status: str) -> dict:
+    def _make_real_account(company: Company, prefix: str, password_set: bool, status: str,
+                           system_role: str = "general") -> dict:
         """実在の会社DBを持つシード会社配下にアカウント＋users ミラーを作る（成功認証パス用）。
 
-        complete→login の往復や MFA verify 成功（会社DBミラー解決）に使う。
+        complete→login の往復や MFA verify 成功（会社DBミラー解決）に使う。`system_role` で
+        会社アカウント管理者（`company_account_admin`）等も作れる（ドメイン B の /admin テスト）。
         teardown で control の accounts と 会社DB の users を削除する。
         """
         lid = f"{prefix}-{uuid.uuid4().hex[:8]}@{company.company_code.lower()}.example"
@@ -168,7 +170,7 @@ def factory():
                 display_name="Seed Test",
                 password_hash=hash_password(password) if password_set else None,
                 locale="ja",
-                system_role="general",
+                system_role=system_role,
                 status=status,
             ))
             s.commit()
@@ -180,9 +182,10 @@ def factory():
         return {"id": aid, "login_id": lid, "password": password,
                 "company_code": company.company_code, "email": lid}
 
-    def make_seed_company_account(password_set: bool = True, status: str = "active") -> dict:
+    def make_seed_company_account(password_set: bool = True, status: str = "active",
+                                  system_role: str = "general") -> dict:
         """ACME-01（MFA OFF）配下の実アカウント。password-setup complete→login 等に使う。"""
-        return _make_real_account(_seed_company(), "pw", password_set, status)
+        return _make_real_account(_seed_company(), "pw", password_set, status, system_role)
 
     def make_seed_mfa_account(status: str = "active") -> dict:
         """ACME-02（MFA ON）配下の実アカウント。login→OTP→mfa/verify 成功パスに使う（ADR-0004）。"""

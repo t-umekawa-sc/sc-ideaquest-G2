@@ -173,12 +173,19 @@ def edit_account(
     return result
 
 
-def disable_account(company_id: uuid.UUID, account_id: uuid.UUID, r: redis.Redis) -> dict:
+def disable_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, r: redis.Redis, *, forbid_system_admin_target: bool = False
+) -> dict:
     """アカウント無効化（B.2）。**有効な system_admin が 0 名になる操作は拒否**（`last_system_admin`・
     運営テナントの最後の system_admin 保護＝B.5.1）。成功時は全アクティブセッション破棄＋信頼端末失効（A.9-③）。
+
+    `forbid_system_admin_target`＝会社アカウント管理者経路（B.2.1）＝**system_admin アカウントは無効化不可**
+    （403・§8-⑯＝会社アカ管理者は last_system_admin 不変条件を迂回できない）。
     """
     with control_session() as session:
         account = _account_in_company(session, company_id, account_id)
+        if forbid_system_admin_target and account.system_role == "system_admin":
+            raise AppError(403, "forbidden")  # 会社アカ管理者は system_admin を disable 不可（B.2.1）
         if account.system_role == "system_admin" and account.status == "active":
             if _active_system_admin_count(session) <= 1:
                 raise AppError(422, "last_system_admin")  # ロックアウト防止（B.2/B.5.1）

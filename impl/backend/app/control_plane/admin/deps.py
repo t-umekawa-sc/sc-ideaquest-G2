@@ -24,12 +24,25 @@ def require_system_admin(request: Request) -> dict:
     - P5: 権威ロールは管理DB `accounts.role`（session はコピー・ロール変更は全セッション破棄で再評価）。
     - P6: system_admin でなければ 403 `forbidden`。
     """
+    return _require_role(request, {"system_admin"})
+
+
+def require_company_account_admin(request: Request) -> dict:
+    """会社アカウント管理者 EP のガード（B.2.1・B.0.1）。返り値＝セッション dict。
+
+    `company_account_admin`（自社スコープ）を許可。`system_admin` は**上位互換**で許可（B.2.1）。
+    スコープ＝セッション会社（`session.company_id`）固定＝`/admin/accounts` は `company_id` を受けない。
+    """
+    return _require_role(request, {"company_account_admin", "system_admin"})
+
+
+def _require_role(request: Request, allowed: set[str]) -> dict:
     session = require_session(request)  # P1
     with control_session() as s:
         account = s.get(Account, uuid.UUID(session["account_id"]))
         if account is None or account.status != "active":  # P2
             raise AppError(401, "unauthenticated")
         role = account.system_role  # P5: 権威データは DB から
-    if role != "system_admin":  # P6
+    if role not in allowed:  # P6
         raise AppError(403, "forbidden")
     return session
