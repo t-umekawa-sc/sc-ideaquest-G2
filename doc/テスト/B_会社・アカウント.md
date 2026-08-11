@@ -125,6 +125,16 @@
 | B-TC-070 | int | B-TC-069 と同じ payload の pending が 2行（再送） | `process_outbox_once()` | `quest_group_members` は**有効所属1行**（冪等＝再適用で増えない）・users も1行 | §4.6（冪等）／§5.5（部分ユニーク） |
 | B-TC-071 | int | `memberships` を**含まない** payload（従来の発行/編集/last_login）の pending 1行 | `process_outbox_once()` | `quest_group_members` に**触れない**（0行のまま）・users ミラーは従来どおり適用（回帰保護） | §4.6（前方互換） |
 
+### 4.3 発行 API の memberships 相乗（B.2/B.5・system_admin＋会社アカウント管理者）
+
+> 対象＝`POST /admin/companies/{company_id}/accounts`（system_admin）・`POST /admin/accounts`（会社アカウント管理者・B.2.1）。ボディに初期所属 `memberships:[{group_id, role}]` を受け取り、発行 Tx で `account_sync_outbox` の payload へ相乗（§4.2 の worker が会社DB へ適用）。**`role=admin`（QG管理者任命）は system_admin＋会社アカウント管理者の双方が可**（B.2.1・2026-08-02 改定）。想定外プロパティ・不正 role は 422（extra=forbid／Literal・§B.6）。end-to-end（発行→`process_outbox_once`→会社DB `quest_group_members`）で検証。ACME-01 にグループを seed し、発行アカウント・所属は teardown で物理削除。test-first。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-072 | api | system_admin・ACME-01 に quest_group を seed | `POST /admin/companies/{ACME-01}/accounts`（`memberships:[{group_id, role:'admin'}]`） | `201`＋`account_sync_outbox` payload に `memberships` が乗る→`process_outbox_once` で会社DB `quest_group_members` に **`role='admin'` の有効所属** | B.2／B.5 step3／§4.6 |
+| B-TC-073 | api | company_account_admin セッション（自社=ACME-01）・グループ seed | `POST /admin/accounts`（`memberships:[{group_id, role:'admin'}]`） | `201`＋発行成功。**会社アカウント管理者も `role=admin`（QG管理者任命）を含められる**（B.2.1・2026-08-02）＝payload に memberships が乗る | B.2.1 |
+| B-TC-074 | api | system_admin | 発行ボディの `memberships` に不正 role（`owner`）／想定外プロパティ | `422`（`role` は `member\|admin` の Literal・`extra=forbid`・Mass Assignment 防止・§B.6） | §B.6／B.2 |
+
 ## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。

@@ -2,11 +2,24 @@
 from __future__ import annotations
 
 import re
+import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 _COMPANY_CODE_RE = re.compile(r"[A-Z][A-Z0-9-]{3,19}")  # 英大文字始まり・A-Z/0-9/-・4〜20字（§4.1）
+_MAX_MEMBERSHIPS = 100  # 発行/編集で一度に指定できる所属の件数上限（Mass Assignment 抑止・B.2）
+
+
+class MembershipInput(BaseModel):
+    """初期所属/所属差分の 1 要素（会社DB `quest_group_members`・B.2/B.3/B.5）。
+
+    `role=admin`＝QG管理者任命（system_admin＋会社アカウント管理者が可・B.2.1）。想定外プロパティ拒否。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    group_id: uuid.UUID
+    role: Literal["member", "admin"] = "member"
 
 
 class PageInfo(BaseModel):
@@ -38,8 +51,8 @@ class AccountListResponse(BaseModel):
 class AccountCreateRequest(BaseModel):
     """アカウント発行の入力（B.2・SC-92）。想定外プロパティは拒否（Mass Assignment 防止・§B.6）。
 
-    `system_role` は enum 限定（`quest_group_admin` は不受理）。`memberships`（会社DB
-    `quest_group_members`＝ドメインC領域）は本スライス非対応＝別スライスで追加する。
+    `system_role` は enum 限定（`quest_group_admin` は不受理）。`memberships`＝初期所属（会社DB
+    `quest_group_members`）を発行 Tx で outbox payload へ相乗（B.5 step3）。`role=admin` 可（B.2）。
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -48,6 +61,7 @@ class AccountCreateRequest(BaseModel):
     email: str = Field(min_length=1, max_length=255)
     system_role: Literal["general", "company_account_admin", "system_admin"] = "general"
     locale: Literal["ja", "en"] = "ja"
+    memberships: list[MembershipInput] = Field(default_factory=list, max_length=_MAX_MEMBERSHIPS)
 
 
 class AccountUpdateRequest(BaseModel):
@@ -66,6 +80,7 @@ class AccountUpdateRequest(BaseModel):
 class AccountCreateSelfRequest(BaseModel):
     """会社アカウント管理者の発行入力（B.2.1）。**`system_role` は受け取らない**＝作れるのは
     `general` のみ（ロール付与は system_admin に集約・§8-⑯）。想定外プロパティは拒否（§B.6）。
+    ただし `memberships` の `role=admin`（QG管理者任命）は自社スコープで可（B.2.1・2026-08-02 改定）。
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +88,7 @@ class AccountCreateSelfRequest(BaseModel):
     login_id: str = Field(min_length=1, max_length=255)
     email: str = Field(min_length=1, max_length=255)
     locale: Literal["ja", "en"] = "ja"
+    memberships: list[MembershipInput] = Field(default_factory=list, max_length=_MAX_MEMBERSHIPS)
 
 
 class AccountUpdateSelfRequest(BaseModel):

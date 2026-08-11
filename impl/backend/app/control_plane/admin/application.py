@@ -63,13 +63,14 @@ def issue_account(
     email: str,
     system_role: str = "general",
     locale: str = "ja",
+    memberships: list[dict] | None = None,
 ) -> dict:
     """アカウントを発行（B.2/B.5 発行フロー・system_admin 経路）。
 
     管理DB Tx で accounts INSERT（`password_hash=NULL`・`password_set=false`・`status=active`）＋
-    同一Tx で (1) `account_sync_outbox`（会社DB `users` ミラー生成）と (2) `mail_outbox`
-    （password-setup リンクを非同期送信・ADR-0007）を積む。identity 重複は 409。
-    memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
+    同一Tx で (1) `account_sync_outbox`（会社DB `users` ミラー生成＋初期所属 `memberships` を相乗）と
+    (2) `mail_outbox`（password-setup リンクを非同期送信・ADR-0007）を積む。identity 重複は 409。
+    `memberships`＝`[{group_id, role}]`（会社DB `quest_group_members`）は worker が users の後に適用（B.5 step3）。
     """
     s = get_settings()
     with control_session() as session:
@@ -101,15 +102,15 @@ def issue_account(
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.password_setup_ttl_seconds)
         account_repo.create_password_setup_challenge(session, account.id, hash_token(token), expires_at)
 
-        # 会社DB users ミラー（初回生成）＝同一Tx で outbox（B.5・§4.6）
-        account_sync_repo.enqueue(
-            session, account.id, company_id, "upsert",
-            {
-                "display_name": display_name, "login_id": login_id, "email": email,
-                "status": "active", "password_set": False,
-                "system_role": system_role, "locale": locale,
-            },
-        )
+        # 会社DB users ミラー（初回生成）＝同一Tx で outbox（B.5・§4.6）。初期所属は payload に相乗（B.5 step3）
+        payload = {
+            "display_name": display_name, "login_id": login_id, "email": email,
+            "status": "active", "password_set": False,
+            "system_role": system_role, "locale": locale,
+        }
+        if memberships:
+            payload["memberships"] = memberships
+        account_sync_repo.enqueue(session, account.id, company_id, "upsert", payload)
         # PW設定リンクのメール（非同期・同一Tx で mail_outbox に積む・ADR-0007 §2.6）
         mail_repo.enqueue(
             session, email, CATEGORY_PASSWORD_SETUP, secret=token, locale=locale,

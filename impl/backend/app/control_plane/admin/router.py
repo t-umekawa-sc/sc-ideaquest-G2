@@ -129,6 +129,7 @@ def issue_company_account(
         company_id,
         display_name=body.display_name, login_id=body.login_id, email=body.email,
         system_role=body.system_role, locale=body.locale,
+        memberships=[{"group_id": str(m.group_id), "role": m.role} for m in body.memberships],
     )
     return AccountResponse(**result)
 
@@ -211,6 +212,7 @@ def issue_own_account(
         _company_id(session),
         display_name=body.display_name, login_id=body.login_id, email=body.email,
         system_role="general", locale=body.locale,   # 会社アカ管理者は general のみ（B.2.1）
+        memberships=[{"group_id": str(m.group_id), "role": m.role} for m in body.memberships],  # admin 任命可（B.2.1）
     )
     return AccountResponse(**result)
 
