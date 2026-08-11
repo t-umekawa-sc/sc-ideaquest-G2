@@ -67,7 +67,8 @@ class AccountCreateRequest(BaseModel):
 class AccountUpdateRequest(BaseModel):
     """アカウント編集の入力（差分・B.2）。未指定フィールドは変更しない（`model_dump(exclude_unset=True)`）。
 
-    想定外プロパティは拒否（Mass Assignment 防止・§B.6）。`memberships` は本スライス非対応。
+    想定外プロパティは拒否（Mass Assignment 防止・§B.6）。`memberships` を指定すると希望有効所属の
+    全集合として差分適用（会社DB `quest_group_members` を直接 upsert/トゥームストーン・B.3）。未指定は所属に触れない。
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -75,6 +76,7 @@ class AccountUpdateRequest(BaseModel):
     login_id: str | None = Field(default=None, min_length=1, max_length=255)
     email: str | None = Field(default=None, min_length=1, max_length=255)
     system_role: Literal["general", "company_account_admin", "system_admin"] | None = None
+    memberships: list[MembershipInput] | None = Field(default=None, max_length=_MAX_MEMBERSHIPS)
 
 
 class AccountCreateSelfRequest(BaseModel):
@@ -92,12 +94,15 @@ class AccountCreateSelfRequest(BaseModel):
 
 
 class AccountUpdateSelfRequest(BaseModel):
-    """会社アカウント管理者の編集入力（B.2.1・差分）。**`system_role` は変更不可**（受け取らない）。"""
+    """会社アカウント管理者の編集入力（B.2.1・差分）。**`system_role` は変更不可**（受け取らない）。
+    `memberships` は自社スコープで差分適用可（`role=admin` の任命/剥奪も可・B.2.1・2026-08-02）。
+    """
     model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = Field(default=None, min_length=1, max_length=255)
     login_id: str | None = Field(default=None, min_length=1, max_length=255)
     email: str | None = Field(default=None, min_length=1, max_length=255)
+    memberships: list[MembershipInput] | None = Field(default=None, max_length=_MAX_MEMBERSHIPS)
 
 
 class AccountResponse(BaseModel):

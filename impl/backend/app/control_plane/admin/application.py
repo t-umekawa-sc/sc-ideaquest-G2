@@ -21,6 +21,9 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import delete_account_sessions, generate_token, hash_token
 from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.profile import repository as user_repo
+from app.tenant.quest_group import repository as qg_repo
 
 _MAX_PER_PAGE = 100
 _DEFAULT_PER_PAGE = 20
@@ -128,9 +131,14 @@ def edit_account(
 ) -> dict:
     """アカウント編集（B.2・差分適用）。identity 一意再検証（重複 409）／`system_role` 変更は
     自己降格・0名化を拒否（`last_system_admin`）。system_role 変更時は当該アカウントの全セッション破棄（A.9-③）。
+
+    `changes["memberships"]` を指定した場合は、その値を希望有効所属の全集合として会社DB
+    `quest_group_members` へ直接差分適用（既存アカウントは mirror 済み＝outbox 非経由・B.3）。
     """
+    memberships = changes.get("memberships")  # None＝所属に触れない（差分・§B.3）
     with control_session() as session:
         account = _account_in_company(session, company_id, account_id)
+        db_identifier = session.get(Company, company_id).db_identifier
 
         new_role = changes.get("system_role")
         role_changed = new_role is not None and new_role != account.system_role
@@ -169,9 +177,32 @@ def edit_account(
         session.commit()
         result = _account_state(account)
 
+    if memberships is not None:  # 会社DB へ直接差分適用（別DB＝単一Txにできない・B.3）
+        _apply_membership_diff(db_identifier, account_id, memberships)
     if role_changed:
         delete_account_sessions(r, str(account_id))  # 新権限を確実に適用（全セッション破棄・A.9-③）
     return result
+
+
+def _apply_membership_diff(db_identifier: str, account_id: uuid.UUID, memberships: list[dict]) -> None:
+    """`memberships`＝希望有効所属の全集合として会社DB `quest_group_members` へ差分適用（B.3・§5.5）。
+
+    集合に無い現有効所属は解除（トゥームストーン）、集合内は upsert（role 反映）。冪等。
+    既存アカウントは users ミラー済みが前提（発行直後で未同期の稀ケースは 409＝リトライを促す）。
+    """
+    desired: dict[uuid.UUID, str] = {
+        uuid.UUID(str(m["group_id"])): m.get("role", "member") for m in memberships
+    }
+    with get_tenant_session(db_identifier) as tsession:
+        user = user_repo.get_user_by_account(tsession, account_id)
+        if user is None:
+            raise AppError(409, "conflict")  # ミラー未生成の編集（発行直後未同期・まれ）
+        for group_id in qg_repo.list_active_group_ids_for_user(tsession, user.id):
+            if group_id not in desired:
+                qg_repo.remove_membership(tsession, group_id, user.id)  # 集合外＝解除
+        for group_id, role in desired.items():
+            qg_repo.upsert_membership(tsession, group_id, user.id, role)
+        tsession.commit()
 
 
 def disable_account(

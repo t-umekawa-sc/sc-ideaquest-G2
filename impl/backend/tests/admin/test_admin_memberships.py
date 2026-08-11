@@ -150,3 +150,59 @@ def test_b_tc_074_membership_validation(client, mem_env):
 
     extra = {**_ident(), "memberships": [{"group_id": str(gid), "role": "member", "x": 1}]}
     assert _issue(client, url, extra).status_code == 422
+
+
+# --- B-TC-075〜077: 編集 API の memberships 差分適用（会社DB 直接・B.3） ---------------
+def _patch(client, account_id, body: dict):
+    return client.patch(
+        f"/api/v1/admin/companies/{_company()[0]}/accounts/{account_id}",
+        json=body, headers=_csrf(client),
+    )
+
+
+def _user_id(db_id: str, account_id) -> uuid.UUID:
+    with get_tenant_session(db_id) as ts:
+        return get_user_by_account(ts, account_id).id
+
+
+def test_b_tc_075_edit_adds_membership_direct(client, factory, mem_env):
+    """B-TC-075 編集で memberships を与えると会社DB quest_group_members に直接反映（outbox 非経由・B.3）。"""
+    _login_system_admin(client)
+    acc = factory.make_seed_company_account()  # ACME-01 実アカウント（mirror あり）
+    g1 = mem_env.make_group()
+
+    r = _patch(client, acc["id"], {"memberships": [{"group_id": str(g1), "role": "admin"}]})
+
+    assert r.status_code == 200, r.text
+    members = _active_members(mem_env.db_id, g1)
+    assert len(members) == 1
+    assert members[0].user_id == _user_id(mem_env.db_id, acc["id"]) and members[0].role == "admin"
+    with control_session() as s:  # 編集は memberships を outbox に積まない（直接適用）
+        assert s.query(OutboxEntry).filter_by(account_id=acc["id"]).count() == 0
+
+
+def test_b_tc_076_edit_replaces_set_tombstones_omitted(client, factory, mem_env):
+    """B-TC-076 一括設定＝集合に無い現有効所属は解除（tombstone）・集合内は有効化（B.3・§5.5）。"""
+    _login_system_admin(client)
+    acc = factory.make_seed_company_account()
+    g1, g2 = mem_env.make_group(), mem_env.make_group()
+    mem_env.seed_user_membership(g1, _user_id(mem_env.db_id, acc["id"]), role="member")  # 既存 G1 所属
+
+    r = _patch(client, acc["id"], {"memberships": [{"group_id": str(g2), "role": "member"}]})
+
+    assert r.status_code == 200, r.text
+    assert _active_members(mem_env.db_id, g1) == []          # G1 は集合外＝解除
+    assert len(_active_members(mem_env.db_id, g2)) == 1      # G2 は有効化
+
+
+def test_b_tc_077_edit_without_memberships_untouched(client, factory, mem_env):
+    """B-TC-077 memberships 未指定の編集は所属に触れない（差分・exclude_unset・B.3）。"""
+    _login_system_admin(client)
+    acc = factory.make_seed_company_account()
+    g1 = mem_env.make_group()
+    mem_env.seed_user_membership(g1, _user_id(mem_env.db_id, acc["id"]), role="member")
+
+    r = _patch(client, acc["id"], {"display_name": "Renamed"})
+
+    assert r.status_code == 200, r.text
+    assert len(_active_members(mem_env.db_id, g1)) == 1      # 所属は不変

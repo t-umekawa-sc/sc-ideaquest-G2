@@ -135,6 +135,16 @@
 | B-TC-073 | api | company_account_admin セッション（自社=ACME-01）・グループ seed | `POST /admin/accounts`（`memberships:[{group_id, role:'admin'}]`） | `201`＋発行成功。**会社アカウント管理者も `role=admin`（QG管理者任命）を含められる**（B.2.1・2026-08-02）＝payload に memberships が乗る | B.2.1 |
 | B-TC-074 | api | system_admin | 発行ボディの `memberships` に不正 role（`owner`）／想定外プロパティ | `422`（`role` は `member\|admin` の Literal・`extra=forbid`・Mass Assignment 防止・§B.6） | §B.6／B.2 |
 
+### 4.4 編集 API の memberships 差分適用（B.3・会社DB 直接・outbox 非経由）
+
+> 対象＝`PATCH /admin/companies/{company_id}/accounts/{account_id}`（system_admin）・`PATCH /admin/accounts/{account_id}`（会社アカウント管理者）。**既存アカウントは users ミラー存在済み**のため、`memberships` 差分は会社DB `quest_group_members` へ**直接** upsert/トゥームストーン（別DB＝単一Txにできないので outbox 非経由・B.3）。**`memberships` を指定したときは、その値をその account の希望有効所属の全集合として扱う（一括設定＝差分適用）**＝集合に無い現有効所属は解除（`removed_at` 設定）、集合内は upsert（role 反映）。`memberships` を**指定しない** PATCH は所属に触れない（差分・`exclude_unset`）。system_role 変更のセッション破棄（A.9-③）とは独立（per-group role はセッション判定に無関係）。ACME-01 実アカウント（`factory.make_seed_company_account`＝mirror あり）を使い、グループ/所属は teardown で物理削除。test-first。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-075 | api | system_admin・ACME-01 実アカウント（mirror あり）・グループ G1 seed | `PATCH .../accounts/{id}`（`memberships:[{G1, role:'admin'}]`） | `200`＋会社DB `quest_group_members` に **G1 の有効所属（role=admin）**が直接作成される（outbox を介さず即時） | B.3／§5.5 |
+| B-TC-076 | api | 実アカウントが G1 に有効所属（member）・G2 seed | `PATCH .../accounts/{id}`（`memberships:[{G2, role:'member'}]`＝G1 を含めない） | **G1 は解除（`removed_at` 設定・有効所属から消える）**・**G2 は有効所属に**＝一括設定の差分適用（集合外は tombstone） | B.3（一括設定・トゥームストーン）／§5.5 |
+| B-TC-077 | api | 実アカウントが G1 に有効所属 | `PATCH .../accounts/{id}`（`display_name` のみ・`memberships` 未指定） | `200`＋**G1 の有効所属は不変**（`memberships` 未指定は所属に触れない・差分） | B.3（差分・`exclude_unset`） |
+
 ## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
