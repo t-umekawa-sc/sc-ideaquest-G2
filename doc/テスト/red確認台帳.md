@@ -212,3 +212,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | K-TC-001 | `me/application.update_me` を早期 return の stub 化（accounts 更新も outbox enqueue もしない） | `PATCH /me` は 200 だが `display_name` が更新されず旧値 `Seed Test` が返る（本来 `新しい名前`）＝accounts 更新＋outbox enqueue が load-bearing。復元して green（3 passed）。 |
+
+## 追記: SoD 境界（B-TC-094/095）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-094/095 | `admin/deps.require_system_admin` の許可集合を `{system_admin}`→`{system_admin, company_account_admin, general}` に一時拡大 | system_admin 専用 EP 群が general/company_account_admin でも通過し 200 等を返す（本来 403）＝`require_system_admin` の role ガードが SoD の load-bearing。復元して green（148 passed）。 |

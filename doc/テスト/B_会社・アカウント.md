@@ -175,7 +175,16 @@
 | B-TC-092 | api | system_admin・**有効所属を持つ**グループ | 同 DELETE | `409 conflict`（`in_use`）＝空グループのみ削除可（孤児化防止） | B.3.1／§5.5 |
 | B-TC-093 | api | 非 system_admin／セッション無し／CSRF 無し | PATCH・DELETE | `general`＝`403`／未認証＝`401`／CSRF 無し＝`403 csrf_failed`（変更系・B.0.1 P1/P3/P6） | B.0.1 |
 
-## 5. 補足・非対象
+## 5. 認可の SoD 境界（system_admin 専用 EP の一括 403・B.0.1 P6・§8-⑯）
+
+> 対象＝**`require_system_admin` を課す全 EP**（B.1 会社 CRUD／B.2 クロステナント `/admin/companies/{id}/accounts` 系〔一覧/発行/編集/disable/enable/password-reset〕／B.3 `/admin/companies/{id}/quest-groups` CRUD）。範囲＝**職務分離（SoD・§8-⑯）の境界**＝「特権ロールである**会社アカウント管理者でも** system_admin 専用操作（会社設定・会社/グループ構造・クロステナント）には到達できない」ことを一括で保証する（`general` も同様に 403）。個別節（B-TC-012/055/087/089/093 等）は代表 EP の 403 を確認するが、本節は**全 system_admin 専用 EP × {general, company_account_admin}** を横断で塞ぐ（権限昇格のリグレッションガード）。認可 dep は CSRF/Origin より先に評価されるため、正当な CSRF を付けても 403 `forbidden` が返る。前提＝各ロールで seed アカウントを作りログイン。出典＝B.0.1 P6／§8-⑯。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-094 | api | `general` でログイン | 上記 system_admin 専用 EP 群を順に叩く | すべて `403 forbidden`（B.0.1 P6） | B.0.1 P6 |
+| B-TC-095 | api | `company_account_admin` でログイン | 同上（自社の `/admin/accounts` 系は別権限＝対象外） | すべて `403 forbidden`＝**会社アカ管理者は会社/グループ構造・クロステナントに越権できない**（SoD・§8-⑯） | §8-⑯／B.0.1 P6 |
+
+## 6. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
 - **初期所属 `memberships` の相乗適用**（B.5＝`users`→`quest_group_members` の順）は B ドメイン実装時（本スライスの payload は `password_set` のみ）。
