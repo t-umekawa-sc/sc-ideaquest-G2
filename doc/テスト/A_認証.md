@@ -156,7 +156,7 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 
 - **管理者による強制解除・ロック可視化は非対象**＝管理面が整うまで後続（ADR-0005 §2.5・§5）。本スライスは (a) 15分自動解除＋(b) PW 再設定解除まで。
 - **分散 IP 総当り**は (IP+login_id) 単位の原理的限界（ADR-0005 §2.2 トレードオフ）＝本 TC の対象外。
-- 通知メールの**非同期化**（outbox）は後続（ADR-0005 §5・ADR-0002 §2.4）。本スライスは同期送信。
+- 通知メールの**非同期化**は [`../ADR/ADR-0007_メール送信の非同期化.md`](../ADR/ADR-0007_メール送信の非同期化.md) で確定＝§7（`mail_outbox`）に TC を定義。本 §5 の A-TC-077/078 は実装スライスで「enqueue→ワーカ適用」に調整する（発火時点では同期送信しない）。
 
 ---
 
@@ -174,3 +174,30 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 
 - **dev の Next.js `rewrites()` が XFF を転送するか**は本 TC の対象外（ADR-0006 §5・未検証）。本番はエッジで XFF 確定を必須化（[`../本番デプロイ要件.md`](../本番デプロイ要件.md) §1）。
 - **起動時ガード**（`APP_ENV=prod`＋`TRUSTED_PROXY_COUNT=0` で警告ログ・ADR-0006 §2.2）はログ出力のみ＝本 TC では非対象。
+
+---
+
+## 7. テストパターン（メール送信の非同期化＝メールアウトボックス・ADR-0007）
+
+> 仕様の正＝[`../ADR/ADR-0007_メール送信の非同期化.md`](../ADR/ADR-0007_メール送信の非同期化.md)（§2.4 独立処理・§2.5 sending 緩和/at-least-once・§2.6 enqueue で応答・§2.7 秘匿値の隔離/破棄）。テーブル＝[`../データモデル.md`](../データモデル.md) §4.7 `mail_outbox`。
+> **非同期化の要点**＝`login`/`password-setup/request` の**処理中に SMTP は走らない**（`mail_outbox` へ enqueue するだけで即応答）。実送信は**メールワーカ `process_mail_outbox_once()` を直接呼ぶ**（§4.6 account_sync と同じくテストは常駐不要）。`mail` フェイク（`FakeMailSender`）はワーカ適用時に捕捉する。秘匿値（OTP コード／設定リンクのトークン）は `secret` 列に隔離し、**送信成功／端末失敗で NULL 化**（完成本文は保存しない）。
+> **既存の同期送信前提 TC（A-TC-030/033/034/035/038/060/068/077/078 等）は実装スライスで「enqueue→ワーカ適用」に調整する**（本節は新機構そのものの TC を定義）。ドメイン記号は横断範囲が狭いため **A に相乗り**（ADR-0007 §4）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| A-TC-090 | int | active 会社＋active アカウント | 正 ID で `password-setup/request` 実行後、`mail_outbox` を検査 | `category=password_setup` の行が 1 件 `pending`（`secret`＝設定リンクのトークン）。**request 時点で `mail.sent` は空**（同期送信しない）。`otp_challenges` 作成と**同一 Tx**（チャレンジが無ければ enqueue も無い） | ADR-0007 §2.6／§4.7 |
+| A-TC-091 | int | A-TC-090 の後（`pending` 1 件） | `process_mail_outbox_once()` を呼ぶ | `mail.sent` に 1 通（本文リンクに token）。行は `status=done`・`processed_at` 記録・**`secret` が NULL 化** | ADR-0007 §2.5／§2.7 |
+| A-TC-092 | int | MFA 必須会社＋正資格（要 OTP） | `login` 実行後に `mail_outbox` 検査 → `process_mail_outbox_once()` | login 応答は `mfa_required`（送信を待たない）。`category=otp` 行が積まれ（`secret`＝OTP コード）、ワーカで送信・`done`・`secret` NULL | ADR-0007 §2.6／§4.7 |
+| A-TC-093 | int | ロック発火（誤 PW を上限回連続）・`mail` フェイク | 発火後に `mail_outbox` 検査 → `process_mail_outbox_once()` | `category=lock_notification` 行が 1 件（`secret` は NULL＝秘匿なし）。**発火リクエスト時点で `mail.sent` は空**（同期送信しない＝タイミングオラクル解消）。クールダウン内の再発火は enqueue しない → ワーカで 1 通 | ADR-0007 §1(a)／§2.6 |
+| A-TC-094 | int | `pending` 1 件・送信が必ず例外を投げる sender | `process_mail_outbox_once()`（上限未満／上限超の2ケース） | 上限未満＝`attempts++`・`status=pending` 維持（次巡で再送）。**上限超（`mail_outbox_max_attempts`）で `status=failed`＋`secret` NULL** | ADR-0007 §2.5／§2.7 |
+| A-TC-095 | int | 別宛先の `pending` が複数・先頭行のみ送信失敗 | `process_mail_outbox_once()` | 失敗行は `attempts++`、**後続の別行は送信される**（各メール独立・HOL ブロッキング無し＝§4.6 の直列適用と対照的） | ADR-0007 §2.4 |
+| A-TC-096 | int | 1 行を `status=sending`・`claimed_at` を `mail_outbox_sending_reclaim_seconds` より過去に設定 | `process_mail_outbox_once()` | 滞留 `sending` 行が `pending` へ戻され再送される。**reclaim 未満の `sending` 行は触らない**（送信中を横取りしない） | ADR-0007 §2.5 |
+| A-TC-097 | int | `done` 行（`processed_at` が retention より過去）／`done`（retention 内）／`failed` を各 1 件 | メールワーカの掃除を実行 | retention 超の `done` 行のみ削除。**retention 内の `done`・`failed` 行は残す**（`failed` は要手動対応） | ADR-0007 §2.7 |
+| A-TC-098 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | `password-setup/request`（active 実在） | **`202` のまま**（`500` にならない）。SMTP は request 経路で走らない＝列挙耐性が SMTP 障害で崩れない | ADR-0007 §1(b)／§2.6 |
+| A-TC-099 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
+
+### 7.1 補足・非対象（メール非同期化）
+
+- **`failed` 行の監視/アラート・手動再送 UI** は管理面が整うまで後続（ADR-0007 §5）。手動再送は新規 enqueue でやり直す（`secret` は破棄済み）。
+- **クラッシュ窓の重複送信**（SMTP 成功〜`done` 書込の間・at-least-once）は無害として許容＝**重複しないことのテストは置かない**（原理的に排除しない・ADR-0007 §2.5）。
+- **他ドメインの送信系メール**（`security_password_changed` 等・データモデル §8-⑳）は本基盤に将来載せる＝該当ドメイン実装時に TC 追加。
