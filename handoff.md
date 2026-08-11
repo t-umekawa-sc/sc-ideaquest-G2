@@ -5,7 +5,7 @@
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
 > **現在地＝実装スキャフォールド進行中。手法＝「設計書→（必要なら ADR で具体値確定）→テストパターン→テストコード→実装」で 1 スライスずつ縦に通す。red-green 必須（テスト規約 §5.1）。**
-> **直近スライス＝② メール送信の非同期化（`mail_outbox`・ADR-0007）を backend で縦通し＋フルスタック目視まで完了（MailHog に非同期配信を確認）。過程で worker の FK 解決バグを発見・修正済み（§5）。次スライス＝未着手（§7 の優先順から選ぶ・着手前に相談推奨）。**
+> **直近スライス＝(A) ② メール送信の非同期化（`mail_outbox`・ADR-0007）を backend 縦通し＋フルスタック目視まで完了（過程で worker の FK 解決バグを発見・修正・§5）。(B) `logout-all` の frontend 導線（A.0-⑤）も完了（e2e A-TC-022）。次スライス＝未着手（§7 の優先順から選ぶ）。**
 
 ---
 
@@ -13,7 +13,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・`origin/main` と同期＝`git status` で確認済み・**未プッシュのコミットは無い**）。
-- 最新コミット: **`4170627`**（mail_worker FK 修正＋回帰ガード）。※本 handoff 更新はこの後の別コミット。
+- 最新コミット: **`df45148`**（logout-all の frontend 導線）。※本 handoff 更新はこの後の別コミット。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
   - `62ba95d` テスト追加 A-TC-082（失敗計数の固定窓TTL経過リセット・ADR-0005）
   - `449fc28` docs(ADR-0007) メール送信の非同期化を確定
@@ -26,6 +26,8 @@
   - `8b58d53` docs 相互参照更新（ADR-0002/0005 の「MVP許容」を解消済みに）
   - `55bba89` handoff 全文更新
   - `4170627` 修正 mail_worker の FK 解決失敗（別プロセスの import 隔離バグ）＋回帰ガード A-TC-100
+  - `e638ab2` handoff 更新（フルスタック目視＋FK バグ修正）
+  - `df45148` 実装 logout-all の frontend 導線（A.0-⑤・e2e A-TC-022）
 - remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。
 
 ---
@@ -60,6 +62,11 @@
 - テスト: `impl/backend/tests/mail_outbox/test_mail_outbox.py`(機構 091/094/095/096/097)／`impl/backend/tests/auth/test_mail_async.py`(統合 090/092/093/098/099)。`impl/backend/tests/conftest.py`＝**`_DrainingMail`**（`mail.sent` 参照時に `process_mail_outbox_once()` で配信する薄い委譲＝既存の同期送信前提TCを無改変で通す）＋`mail_outbox` の autouse truncate（トランスポート隔離）＋factory teardown で FK 掃除。
 - docs 相互参照＝ADR-0002 §2.3・ADR-0005 §5 の「MVP許容/将来対応」を **ADR-0007 で解消済み**に更新。
 
+### (2) `logout-all` の frontend 導線（A.0-⑤・`df45148`）
+- 共通ヘッダーのユーザーメニューに「全端末からログアウト」を追加（既存「ログアウト」の直下）。backend EP `POST /auth/logout-all`（204・全セッション破棄＋信頼端末失効）は実装済み。
+- `impl/frontend/src/features/auth/api.ts`＝`logoutAll()`／`components/LogoutAllMenuItem.tsx`（新規・確認ダイアログ無し＝既存 logout とパリティ）／`index.ts` export／`src/app/(app)/layout.tsx` に `<li>` 追加。
+- e2e `impl/frontend/e2e/sc-00-login.spec.ts`＝A-TC-022。**既存 A-TC-021 が `getByRole` name の部分一致で「全端末からログアウト」にも一致して strict 違反 red になったのを検知→`exact: true` に修正**（導線追加が既存を壊さないことを担保）。
+
 ---
 
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
@@ -72,13 +79,12 @@
 - **テスト（本セッションで実測・マウント版）**:
   - **backend pytest = 79 passed**（従来67＋A-TC-082＋機構5＋統合5＋回帰ガード A-TC-100・回帰なし）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
-  - **frontend tsc / e2e は本セッション未再実行**（frontend 未変更）。前回＝tsc クリーン・e2e 4 passed。
-- **Docker（今回終了時点）**＝db / redis に加え **backend / mailhog / mail-worker も起動中**（フルスタック目視のため `docker compose up -d --build backend mail-worker mailhog` で起動した）。frontend / worker(account_sync) は停止。不要なら `docker compose stop backend mail-worker mailhog` で db/redis のみに戻せる。
+  - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
+- **Docker（本 handoff 時点）**＝**db / redis / backend / frontend / mailhog / mail-worker が起動中**（e2e 実行のためフルスタック起動した）。**account_sync worker（`app.worker`）のみ停止**。不要なら `docker compose stop backend frontend mailhog mail-worker` で db/redis のみに戻せる。
 - **壊れているもの＝無し**。
 - **未実装 / 負債**:
   - **account_sync_outbox の他 writer 未実装**＝`last_login_at`（login成功時）・発行/編集/無効化（B）・プロフィール編集（K）。
   - **outbox 系の `failed` 可視化/手動再送・管理者ロック解除**＝管理面が無く後続（両 outbox 共通）。
-  - **`logout-all` の frontend 導線**＝未（backend EP は在る）。
   - **本番デプロイ設定**（`TRUSTED_PROXY_COUNT` 実値・エッジ XFF 確定）＝`doc/本番デプロイ要件.md` §6・未確認。
   - **テナント/データプレーン由来のメール**（クエスト参加者通知・アイデア作成通知等）＝`mail_outbox` には載せない（ADR-0007 §2.9）。会社DB側の別機構＝**最初の該当機能実装時に別ADR**。
 
@@ -128,10 +134,7 @@
 - `last_login_at` ミラー＝`login` 成功時（`_issue_session` 近辺）に enqueue。会社DB `users.last_login_at` 列追加（company migration）＋`_MIRROR_FIELDS` 拡張。
 - 発行/編集/無効化（B.2/B.5）＝B ドメイン API 実装時に enqueue。
 
-### (2) `logout-all` の frontend 導線
-- `impl/frontend/src/components/layout/AppHeader.tsx` のユーザーメニューに追加（backend EP `POST /api/v1/auth/logout-all` は実装済み）。e2e を薄く1本。
-
-### (3) 運用・本番系（設定/検証・`doc/本番デプロイ要件.md` §6）
+### (2) 運用・本番系（設定/検証・`doc/本番デプロイ要件.md` §6）
 - 本番トポロジのホップ数確定→`TRUSTED_PROXY_COUNT`／Next `rewrites()` の XFF 転送検証。
 - 両 outbox（account_sync/mail）の `failed` 行の監視/アラート・手動対応、管理者ロック解除の可視化（管理面が整ってから）。
 
@@ -148,7 +151,7 @@
 - **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（**79 passed**・build 不要でホスト変更が即反映）。
 - **メールワーカ単体スモーク**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" -e MAIL_OUTBOX_POLL_INTERVAL_SECONDS=0.2 backend timeout 2 python -m app.mail_worker`（起動→停止ログを確認）。account_sync ワーカは `python -m app.worker`。
 - **frontend 型チェック/lint**＝`docker compose run --rm --no-deps -T frontend npx tsc --noEmit` ／ `docker compose exec -T frontend npm run lint`。
-- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `... install chromium` → `docker compose exec frontend npx playwright test`（**前回 4 passed**・今回 frontend コンテナ無し＝再導入要）。コンテナ内 MailHog は `http://mailhog:8025`。
+- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `... install chromium` → `docker compose exec frontend npx playwright test`（**本セッション 5 passed**・chromium は本セッションで frontend コンテナに導入済み。コンテナ停止/削除で再導入要）。コンテナ内 MailHog は `http://mailhog:8025`。編集 spec は `docker compose cp frontend/e2e/<spec> frontend:/app/e2e/<spec>` で反映。**メール依存 e2e（mfa/password-setup）は `mail-worker` 起動が前提**（非同期配信・§4）。
 - **MailHog**＝ブラウザ `http://localhost:8025`／API `GET http://localhost:8025/api/v2/messages`（本文 encode は password_setup=base64／MFA OTP=quoted-printable と一定でない＝base64 デコード試行→ダメなら生テキスト）。
 - **主要 env**＝`impl/.env.example` が雛形（`.env` は追跡外・無ければ Compose が `${VAR:-既定}`）。**実設定は `impl/compose.yaml` の backend `environment:`（worker/mail-worker は `&backend_env` アンカーで同一）に列挙された変数のみコンテナへ届く**（`env_file:` 無し）。新規しきい値は必ず `environment:` に配線。今回追加＝**`MAIL_OUTBOX_MAX_ATTEMPTS`/`_POLL_INTERVAL_SECONDS`/`_SENDING_RECLAIM_SECONDS`/`_DONE_RETENTION_SECONDS`**。
 - **リポジトリ運用**:
@@ -160,8 +163,8 @@
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**(1) メール非同期化のフルスタック目視**（軽い）→ その後は §7 (2)〜(4) から選ぶ（着手前に相談推奨）。
+- ✅ 再開点＝**§7 (1) account_sync_outbox の writer 追加**（`last_login_at` ミラー等）or **(2) 運用・本番系**。着手前に相談推奨。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
-- ✅ 状態＝backend 79 passed・mail_worker スモーク OK・**フルスタックで MailHog 配信を目視確認**（本セッション実測）。起動中は db/redis/backend/mailhog/mail-worker。未実装/負債（他 writer・logout-all frontend・failed 可視化・本番設定・テナント系メール別機構）は §4 に明記。
+- ✅ 状態＝backend 79 passed・**e2e 5 passed**・mail_worker スモーク OK・**フルスタックで MailHog 配信を目視確認**（本セッション実測）。起動中は db/redis/backend/frontend/mailhog/mail-worker。未実装/負債（account_sync 他 writer・failed 可視化・本番設定・テナント系メール別機構）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
 - ⚠ 詳細な決定理由・具体値は各 `doc/ADR/*.md`・`doc/データモデル.md` §4.6/§4.7・`doc/テスト/*.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
