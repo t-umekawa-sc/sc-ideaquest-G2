@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import redis
 from sqlalchemy import func, or_, select
 
 from app.control_plane.account_sync import repository as account_sync_repo
@@ -18,11 +19,40 @@ from app.control_plane.mail_outbox import repository as mail_repo
 from app.control_plane.mail_outbox.templates import CATEGORY_PASSWORD_SETUP
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import generate_token, hash_token
+from app.core.security import delete_account_sessions, generate_token, hash_token
 from app.db.control import control_session
 
 _MAX_PER_PAGE = 100
 _DEFAULT_PER_PAGE = 20
+
+
+def _account_state(a: Account) -> dict:
+    """発行/編集/状態変更のレスポンス（機密は含めない・§B.6）。"""
+    return {
+        "account_id": str(a.id),
+        "display_name": a.display_name,
+        "login_id": a.login_id,
+        "email": a.email,
+        "system_role": a.system_role,
+        "status": a.status,
+        "password_set": a.password_hash is not None,
+    }
+
+
+def _account_in_company(session, company_id: uuid.UUID, account_id: uuid.UUID) -> Account:
+    """対象アカウントを取得（他会社/不明は 404＝存在秘匿・B.2/§1.6）。"""
+    account = session.get(Account, account_id)
+    if account is None or account.company_id != company_id:
+        raise AppError(404, "not_found")
+    return account
+
+
+def _active_system_admin_count(session) -> int:
+    return session.execute(
+        select(func.count()).select_from(Account).where(
+            Account.system_role == "system_admin", Account.status == "active"
+        )
+    ).scalar_one()
 
 
 def issue_account(
@@ -86,16 +116,52 @@ def issue_account(
             account_id=account.id, company_id=company_id,
         )
         session.commit()
+        return _account_state(account)
 
-        return {
-            "account_id": str(account.id),
-            "display_name": account.display_name,
-            "login_id": account.login_id,
-            "email": account.email,
-            "system_role": account.system_role,
-            "status": account.status,
-            "password_set": account.password_hash is not None,
-        }
+
+def disable_account(company_id: uuid.UUID, account_id: uuid.UUID, r: redis.Redis) -> dict:
+    """アカウント無効化（B.2）。**有効な system_admin が 0 名になる操作は拒否**（`last_system_admin`・
+    運営テナントの最後の system_admin 保護＝B.5.1）。成功時は全アクティブセッション破棄＋信頼端末失効（A.9-③）。
+    """
+    with control_session() as session:
+        account = _account_in_company(session, company_id, account_id)
+        if account.system_role == "system_admin" and account.status == "active":
+            if _active_system_admin_count(session) <= 1:
+                raise AppError(422, "last_system_admin")  # ロックアウト防止（B.2/B.5.1）
+        account.status = "disabled"
+        account_sync_repo.enqueue(session, account_id, company_id, "disable", {"status": "disabled"})
+        account_repo.revoke_all_trusted_devices(session, account_id)  # 信頼端末失効（A.9-③）
+        session.commit()
+        result = _account_state(account)
+    delete_account_sessions(r, str(account_id))  # 全アクティブセッション破棄（Redis・A.9-③）
+    return result
+
+
+def enable_account(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
+    """アカウント再有効化（B.2）。"""
+    with control_session() as session:
+        account = _account_in_company(session, company_id, account_id)
+        account.status = "active"
+        account_sync_repo.enqueue(session, account_id, company_id, "enable", {"status": "active"})
+        session.commit()
+        return _account_state(account)
+
+
+def reset_password(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
+    """初回/再設定PWリンクを再送（B.2・A.7）。旧リンクを失効し新リンクを mail_outbox で非同期送信。"""
+    s = get_settings()
+    with control_session() as session:
+        account = _account_in_company(session, company_id, account_id)
+        token = generate_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.password_setup_ttl_seconds)
+        account_repo.invalidate_password_setup_challenges(session, account_id)  # 旧リンク失効（A.7）
+        account_repo.create_password_setup_challenge(session, account_id, hash_token(token), expires_at)
+        mail_repo.enqueue(
+            session, account.email, CATEGORY_PASSWORD_SETUP, secret=token, locale=account.locale,
+            account_id=account_id, company_id=company_id,
+        )
+        session.commit()
+    return {"status": "sent"}
 
 
 def list_company_accounts(

@@ -48,7 +48,7 @@ class AccountCreateRequest(BaseModel):
 
 
 class AccountResponse(BaseModel):
-    """発行/編集結果のアカウント（機密は含めない・§B.6）。"""
+    """発行/編集/状態変更結果のアカウント（機密は含めない・§B.6）。"""
     account_id: str
     display_name: str
     login_id: str
@@ -56,3 +56,8 @@ class AccountResponse(BaseModel):
     system_role: str
     status: str
     password_set: bool
+
+
+class PasswordResetResponse(BaseModel):
+    """PWリンク再送の結果（A.7）。"""
+    status: str  # "sent"

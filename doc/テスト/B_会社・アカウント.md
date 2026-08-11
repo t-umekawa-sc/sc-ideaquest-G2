@@ -43,7 +43,17 @@
 | B-TC-023 | api | system_admin・CSRF トークン無し | `POST .../accounts` | `403 {code:"csrf_failed"}`（変更系＝CSRF 必須・B.0.1 P3） | B.0.1 P3 |
 | B-TC-024 | api | system_admin | 不明 `company_id`／不正 `system_role`（`quest_group_admin`）／想定外プロパティ | 不明会社＝`404 not_found`／enum 外・extra＝`422`（Mass Assignment 防止・§B.6） | B.2／§B.6 |
 
-- **red 確認（後追い）**＝`Depends(require_system_admin)` 無効化で B-TC-011/012 が 200・`verify_csrf` 無効化で B-TC-023 が 201（各ガードが効いている実証）。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+**状態管理（disable/enable/password-reset・`POST .../accounts/{id}/{op}`・system_admin・B.2）**。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-025 | api | 対象アカウントがログイン中（有効セッション） | `POST .../disable` | `200`＋`status=disabled`＋outbox（disable）。**対象の全アクティブセッション破棄＋信頼端末失効**＝対象の `GET /session` が 401（A.9-③） | B.2／A.9-③ |
+| B-TC-026 | api | `disabled` のアカウント | `POST .../enable` | `200`＋`status=active`（outbox enable） | B.2 |
+| B-TC-027 | api | 実アカウント | `POST .../password-reset` | `200 {status:"sent"}`＋**新 `password_setup` チャレンジ＋mail_outbox 1行**（旧リンク失効・A.7・非同期送信） | B.2／A.7 |
+| B-TC-028 | api | 有効な system_admin が 1 名だけ（seed OPS 管理者） | その system_admin を `POST .../disable` | `422 {code:"last_system_admin"}`（0 名化の拒否・運営テナント保護・B.5.1） | B.2／B.5.1 |
+| B-TC-029 | api | system_admin | 不明/他会社の `account_id` で `POST .../disable` | `404 not_found`（存在秘匿・§1.6） | B.2 |
+
+- **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session が 401 にならない）・B-TC-028 は反転で 422 発火を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
 ## 3. 補足・非対象
 

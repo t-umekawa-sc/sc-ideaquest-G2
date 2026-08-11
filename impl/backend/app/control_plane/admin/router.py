@@ -15,8 +15,10 @@ from app.control_plane.admin.schemas import (
     AccountCreateRequest,
     AccountListResponse,
     AccountResponse,
+    PasswordResetResponse,
 )
 from app.core.deps import verify_csrf, verify_origin
+from app.infra.cache import get_redis
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -54,3 +56,36 @@ def issue_company_account(
         system_role=body.system_role, locale=body.locale,
     )
     return AccountResponse(**result)
+
+
+@router.post("/companies/{company_id}/accounts/{account_id}/disable", response_model=AccountResponse)
+def disable_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> AccountResponse:
+    """アカウント無効化（B.2・全セッション破棄＋信頼端末失効・`last_system_admin` 拒否）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return AccountResponse(**admin_service.disable_account(company_id, account_id, get_redis()))
+
+
+@router.post("/companies/{company_id}/accounts/{account_id}/enable", response_model=AccountResponse)
+def enable_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> AccountResponse:
+    """アカウント再有効化（B.2）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return AccountResponse(**admin_service.enable_account(company_id, account_id))
+
+
+@router.post("/companies/{company_id}/accounts/{account_id}/password-reset", response_model=PasswordResetResponse)
+def password_reset(
+    company_id: uuid.UUID, account_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> PasswordResetResponse:
+    """初回/再設定PWリンクを再送（B.2・A.7・旧リンク失効・非同期送信）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return PasswordResetResponse(**admin_service.reset_password(company_id, account_id))

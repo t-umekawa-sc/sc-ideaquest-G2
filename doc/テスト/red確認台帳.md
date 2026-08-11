@@ -160,3 +160,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 反転/無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-023 | router の `verify_csrf(request)` を無効化 | CSRF トークン無しでも 201（本来 403 csrf_failed）＝CSRF ガードが効いている |
+
+## 追記: アカウント状態管理（B-TC-025/028）— 2026-08-11
+
+- disable/enable/password-reset。強い red は非破壊的に確認（seed system_admin を壊さないよう B-TC-028 は反転手技）。
+
+| TC-ID | 反転/無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-025 | `disable_account` の `delete_account_sessions(...)` を無効化 | 無効化後も対象の `GET /session` が 200（本来 401）＝セッション破棄が load-bearing |
+| B-TC-028 | 期待 `status_code == 422` → `== 599`（ガードは発火させたまま＝admin は無効化されない） | 422（`last_system_admin` ガードが発火している証拠） |
