@@ -1,0 +1,42 @@
+// accounts 機能の API 呼び出し（§4.1・lib/api 経由）。正＝doc/API設計/B_会社・アカウント・所属.md B.2/B.3/B.5。
+// system_admin のクロステナント経路（/admin/companies/{company_id}/accounts）を使う（SC-92）。
+import { apiFetch } from "@/lib/api/client";
+import type { AccountCreateInput, AccountListResponse, AccountResponse, Membership } from "./types";
+import type { components } from "@/lib/api/schema";
+
+type QuestGroupListResponse = components["schemas"]["QuestGroupListResponse"];
+
+export function listAccounts(companyId: string, params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<AccountListResponse>(`/admin/companies/${companyId}/accounts${suffix}`);
+}
+
+export function issueAccount(
+  companyId: string,
+  body: { display_name: string; login_id: string; email: string; system_role: AccountCreateInput["system_role"]; memberships: Membership[] },
+): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/companies/${companyId}/accounts`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function disableAccount(companyId: string, accountId: string): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/companies/${companyId}/accounts/${accountId}/disable`, { method: "POST" });
+}
+
+export function enableAccount(companyId: string, accountId: string): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/companies/${companyId}/accounts/${accountId}/enable`, { method: "POST" });
+}
+
+export function resetPassword(companyId: string, accountId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/admin/companies/${companyId}/accounts/${accountId}/password-reset`, { method: "POST" });
+}
+
+// 所属エディタの候補＝この会社のクエストグループ一覧（B.3）。
+export function listQuestGroups(companyId: string): Promise<QuestGroupListResponse | null> {
+  return apiFetch<QuestGroupListResponse>(`/admin/companies/${companyId}/quest-groups`);
+}

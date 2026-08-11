@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { Button, Field } from "@/components/ui";
+import { AccountSection } from "@/features/accounts";
 import { ApiError } from "@/lib/api/client";
 import { getCompany, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
@@ -114,6 +115,8 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           />{" "}MFA を必須にする
         </label>
       </div>
+
+      <AccountSection companyId={company.company_id} />
     </section>
   );
 }
