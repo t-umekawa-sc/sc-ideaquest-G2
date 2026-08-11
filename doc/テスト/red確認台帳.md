@@ -193,3 +193,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 撤回した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-007 | `_MIRROR_FIELDS` から `login_id`/`email`/`system_role` を一時撤回 | ミラー後も `users.login_id` が None（本来 'mir@acme.example'）＝mirror 列拡張が load-bearing |
+
+## 追記: quest_group スキーマ（B-TC-061）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-061 | company 0005 の部分ユニーク `uq_quest_group_members_active` を ACME-01 会社DB で一時 DROP | 同一 `(quest_group_id, user_id)` の有効所属を2行 INSERT できて `DID NOT RAISE IntegrityError`（本来は IntegrityError）＝部分ユニーク index が重複所属禁止の load-bearing。復元して green（4 passed）。 |

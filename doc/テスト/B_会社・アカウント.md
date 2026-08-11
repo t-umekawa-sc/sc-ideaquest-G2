@@ -90,7 +90,20 @@
 
 - **red 確認（後追い）**＝記名時整合行の無効化で B-TC-054 が `hide_voters_from_managers=true` のまま（本来 false）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
-## 4. 補足・非対象
+## 4. クエストグループ・所属スキーマ（会社DB `quest_groups`/`quest_group_members`・§5.4/§5.5・C テーブル）
+
+> B と C の境界＝所属（`quest_group_members`）は会社DB（テナントプレーン）に置く（データモデル §8-①）。本スライスは**テーブルとスキーマ制約のみ**を縦通し（データ層）。所属の割当操作（発行相乗り・B.5／編集差分・B.3）と QG 管理者 API（B.4/B.7）は後続スライス。仕様の正＝[`../データモデル.md`](../データモデル.md) §5.4/§5.5・[`../API設計/B_会社・アカウント・所属.md`](../API設計/B_会社・アカウント・所属.md) B.3。会社DB は seed 会社（ACME-01）を使い、作成した行は teardown で物理削除する。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-060 | int | ACME-01 会社DB | `quest_groups` に行を追加／同一 `quest_group_code` で2行目 | 1行目は作成できる／2行目は **UNIQUE 違反**（`quest_group_code` は会社内一意・§5.4） | データモデル §5.4 |
+| B-TC-061 | int | 同一グループ・同一ユーザーに**有効な**所属（`removed_at IS NULL`）が1行 | 同一 `(quest_group_id, user_id)` で2行目（`removed_at IS NULL`）を追加 | **部分ユニーク違反**＝`UNIQUE(quest_group_id, user_id) WHERE removed_at IS NULL`（重複する有効所属は不可・§5.5） | データモデル §5.5 |
+| B-TC-062 | int | 既存所属を `removed_at` 設定で解除済み | 同一 `(quest_group_id, user_id)` で新規に有効所属を追加 | **作成できる**（部分ユニークは `removed_at` 有りの行を無視＝解除後の再所属を許容・§5.5） | データモデル §5.5 |
+| B-TC-063 | int | ACME-01 会社DB・グループ+ユーザーあり | `role` を指定せず `quest_group_members` に所属を追加 | `role` の既定が **`member`**（§5.5・`quest_group_role` default） | データモデル §5.5 |
+
+- **red 確認（後追い）**＝部分ユニーク index を張らずに migration すると B-TC-061 が重複有効所属を許容（IntegrityError にならない）ことを目視→index 追加で green。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+
+## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
 - **初期所属 `memberships` の相乗適用**（B.5＝`users`→`quest_group_members` の順）は B ドメイン実装時（本スライスの payload は `password_set` のみ）。
