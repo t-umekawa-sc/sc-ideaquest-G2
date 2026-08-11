@@ -13,6 +13,11 @@ export function logout(): Promise<null> {
   return apiFetch<null>("/auth/logout", { method: "POST" }) as Promise<null>;
 }
 
+// 全端末ログアウト＋信頼端末失効（A.0-⑤＝全端末で次回 MFA 必須）。204→null。CSRF は apiFetch が付与。
+export function logoutAll(): Promise<null> {
+  return apiFetch<null>("/auth/logout-all", { method: "POST" }) as Promise<null>;
+}
+
 // 状態C: pre-auth 中の OTP 検証（CSRF＋Origin 必須＝iq_csrf を X-CSRF-Token に載せる・apiFetch が付与）。
 // 成功で authenticated（本セッション発行）。otp_invalid は attempts_left、410/401 は再送/再ログイン案内。
 export function verifyMfa(code: string, trustDevice: boolean): Promise<LoginResponse | null> {

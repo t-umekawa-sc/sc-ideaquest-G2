@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/layout";
-import { LogoutMenuItem } from "@/features/auth";
+import { LogoutAllMenuItem, LogoutMenuItem } from "@/features/auth";
 import { getServerSession } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +14,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {/* メニュー項目は app 層が features から差し込む（プロフィール/設定等は今後追加） */}
         <li>
           <LogoutMenuItem />
+        </li>
+        <li>
+          <LogoutAllMenuItem />
         </li>
       </AppHeader>
       <main className="container" style={{ paddingBlock: "var(--space-8)" }}>

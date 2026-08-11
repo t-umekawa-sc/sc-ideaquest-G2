@@ -2,12 +2,14 @@
 export { LoginForm } from "./components/LoginForm";
 export { LogoutButton } from "./components/LogoutButton";
 export { LogoutMenuItem } from "./components/LogoutMenuItem";
+export { LogoutAllMenuItem } from "./components/LogoutAllMenuItem";
 export { PasswordResetRequestForm } from "./components/PasswordResetRequestForm";
 export { PasswordSetupForm } from "./components/PasswordSetupForm";
 export { MfaForm } from "./components/MfaForm";
 export {
   login,
   logout,
+  logoutAll,
   requestPasswordSetup,
   verifyPasswordSetup,
   completePasswordSetup,

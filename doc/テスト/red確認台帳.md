@@ -134,3 +134,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 反転した主アサーション | 観測 red（actual） |
 | --- | --- | --- |
 | A-TC-082 | 窓経過後の `r.get(streak_key) == "1"` → `== "999"` | '1'（窓 TTL 経過後の失敗は 1 から数え直し） |
+
+## 追記: logout-all の frontend 導線（A-TC-022・e2e）— 2026-08-11
+
+- 後追い e2e（backend EP は既存・frontend 導線を追加）。反転手技で red を目視（反転は container 内 spec を `docker compose cp` で復元済み）。
+- 初回実行で既存 A-TC-021 が `getByRole('menuitem',{name:'ログアウト'})` の**部分一致で「全端末からログアウト」にも一致**して strict 違反 red になったのを検知＝A-TC-021 を `exact: true` に修正（導線追加が既存導線を壊さないことを担保）。
+
+| TC-ID | 反転した主アサーション | 観測 red |
+| --- | --- | --- |
+| A-TC-022（sc-00-login） | menuitem `全端末からログアウト` → `全端末からログアウト_REDAUDIT` | 当該 menuitem に到達せずタイムアウト（導線に確かに到達している証拠） |

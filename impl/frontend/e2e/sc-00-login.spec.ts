@@ -21,7 +21,17 @@ test("A-TC-021 logout from header returns to login", async ({ page }) => {
   await login(page);
   // ユーザーメニューを開く（トリガーは display_name を含むボタン）
   await page.getByRole("button", { name: /テスト 太郎/ }).click();
-  await page.getByRole("menuitem", { name: "ログアウト" }).click();
+  // 「全端末からログアウト」も「ログアウト」を部分一致で含むため exact で現端末のみを選ぶ。
+  await page.getByRole("menuitem", { name: "ログアウト", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.locator("#company_code")).toBeVisible();
+});
+
+// A-TC-022: ユーザーメニュー→「全端末からログアウト」→/login へ戻る（A.0-⑤ の導線）。
+test("A-TC-022 logout-all from header returns to login", async ({ page }) => {
+  await login(page);
+  await page.getByRole("button", { name: /テスト 太郎/ }).click();
+  await page.getByRole("menuitem", { name: "全端末からログアウト" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.locator("#company_code")).toBeVisible();
 });
