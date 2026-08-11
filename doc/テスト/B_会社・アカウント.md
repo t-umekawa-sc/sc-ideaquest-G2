@@ -10,7 +10,9 @@
 - 実 DB を持つ会社＝`factory.make_seed_company_account()`（ACME-01・会社DB あり）。**DB を持たない会社**＝`factory.make_company()`＋`make_account()`（`db_identifier` は実在しない＝ワーカの会社DB 接続が失敗する＝失敗系の検証に使う）。
 - outbox 行は seq（挿入順の単調増加）昇順で取り出す。`op=upsert`・`payload={"password_set": true}`。
 
-## 1. テストパターン一覧
+## 1. account_sync_outbox（管理DB→会社DB `users` ミラー・§4.6）
+
+> 対象＝**account_sync_outbox 機構の縦通し**（テーブル＋書込側の同一Tx INSERT＋常駐ワーカ `process_outbox_once` の冪等適用/リトライ/順序）。書込側 writer＝A.7 `complete`（`password_set`）／login 成功（`last_login_at`）／identity・role のミラー（§5.3）。前提＝seed 会社 ACME-01/02・factory（§前提）。仕様の正＝データモデル §4.6／§5.3。memberships の worker 適用は §4.2、発行/編集の enqueue 側は §4.3/§4.4。
 
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
