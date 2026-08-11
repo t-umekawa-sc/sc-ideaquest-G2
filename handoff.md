@@ -20,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション）: **`1cc67f9`**（システム監査ログ system_audit_logs・B.6・B-TC-100〜103）。本セッションの主な流れ＝… K writer `432301b`→SoD 境界 `1c3cfdd`→ワーカ加算専用 `9e59947`→§6 正規化 `c7a7014`→監査ログ `1cc67f9`。**`c7a7014` までは `origin/main` へプッシュ済み、`1cc67f9`（監査ログ）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション）: **`5e9fe05`**（SC-91 会社一覧 frontend・B-TC-110〜112）。本セッションの主な流れ＝… 監査ログ `1cc67f9`→handoff `e83a107`→SC-91 frontend `5e9fe05`。**`e83a107` までは `origin/main` へプッシュ済み、`1cc67f9`〜`5e9fe05` のうち `e83a107` までpush済＝`5e9fe05`（SC-91）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
 - 規約の追加（本セッション）: **テスト規約 §1.1**＝テストパターン md の TC 表を持つ各節に「テスト範囲の概要」（対象/範囲と非対象/前提/出典）を必須化。**API設計に新規 EP を追記する時は既存節と同じ表形式に揃える**（B.3 を表形式に統一・ユーザー指摘）。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
@@ -121,8 +121,8 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - **テスト（本セッションで実測・マウント版）**:
   - **backend pytest = 154 passed**（既存111＋本セッション新規 B-TC-060〜103＝quest_group 一連・SoD 境界・ワーカ加算専用・監査ログ・K-TC-001〜003＝プロフィール編集 writer・回帰なし）。マウント版で実測。migration head＝**control 0009**（system_audit_logs）・**company 0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
-  - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
-- **Docker（本 handoff 時点）**＝**db / redis のみ起動中**（他は停止）。フルスタックで試すなら backend の再ビルドが必要（§8 注意）。
+  - **frontend＝SC-91 会社一覧を実装（本セッション）＝tsc/lint クリーン・e2e 8 passed**（sc-00 系5＋新規 sc-91 系3＝B-TC-110/111/112）。**フルスタック（backend/frontend 再ビルド＋db/redis/mailhog/worker/mail-worker）で実測**。features/companies＋route `(app)/admin/companies`＋ヘッダーに system_admin ナビ。OpenAPI 型を再生成（schema.d.ts に admin/me 反映）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は `mail-worker` 起動が前提**（未起動だと当該2本 red）。
+- **Docker（本 handoff 時点）**＝**フルスタック起動中**（db/redis/backend/frontend/mailhog/worker/mail-worker）。backend/frontend は本セッションの変更を焼いた最新イメージ。SC-91 は `http://localhost:3000`（OPS/`admin@ops.example`/`Passw0rd!` でログイン→ヘッダー「システム管理（会社）」）で目視可。
 - **壊れているもの＝無し**。
 - **未実装 / 負債**:
   - **ドメイン B 残り**＝B4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・`require_qg_admin`）。**前提テーブル（migration 0005）・repository・memberships 割当 application（発行相乗り／編集差分）は本セッションで作成済み**。account/company の CRUD は完了（B0/B1/B2）。**quest_groups の作成/一覧（プロビジョニング）EP は未実装**＝QG API 実装時にグループ生成経路を用意するか、seed 前提で進めるか要検討。
@@ -191,8 +191,11 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - 特権操作（アカウント発行/編集/disable/enable/PW再設定・会社 create/update/settings・グループ CRUD・所属 add/remove）を `system_audit_logs`（control migration 0009）へ記録。実行者/IP/UA は `AuditContextMiddleware`（contextvar）が供給。読み取り・認可失敗は非監査。B-TC-100〜103。
 - **残り（将来）**＝監査ログの**閲覧 UI/API**（管理者が履歴を見る）・保持/エクスポート方針＝未実装（B.6 は記録まで）。`failed` outbox 可視化と併せて管理面スライスで。
 
-### (4) frontend で B ドメインを配線（SC-90/91/92/93）
-- backend が揃ったので、会社一覧/詳細・アカウント発行/編集・QG参加ピッカー（SC-90）を frontend feature として実装。
+### (4) frontend で B/K ドメインを配線（SC-90/91/92/93）＝着手中
+- **SC-91 会社一覧＝完了（本セッション `5e9fe05`）**＝`features/companies`＋route `(app)/admin/companies`＋system_admin ナビ。一覧/作成・e2e 3件（B-TC-110〜112）。OpenAPI 型再生成済み。
+- **次＝SC-92 会社詳細**（`(app)/admin/companies/[id]`）＝会社設定トグル（`PATCH /settings`）・会社プロフィール（`PATCH`）・アカウント一覧/発行/編集/disable/enable/PW再設定（`/admin/companies/{id}/accounts`）・所属エディタ（memberships）・クエストグループ CRUD（`/quest-groups`）。SC-91 の各行から遷移。モック＝`doc/画面設計/mocks/SC-92_会社詳細.html` が実装リファレンス。
+- 以降＝SC-93（会社アカウント管理者・`/admin/accounts`）・SC-90（QG管理者・`/admin/quest-groups`・参加ピッカー）・プロフィール編集（K `PATCH /me`）。
+- **frontend 検証**＝tsc（`docker compose run --rm --no-deps -T -v "$PWD/frontend/src:/app/src" frontend node_modules/.bin/tsc --noEmit`）／lint／e2e（フルスタック＝`docker compose build backend frontend && up` 後、`docker compose exec -u root frontend npx playwright install-deps chromium`→`install chromium`→`exec frontend npx playwright test`。mail 依存 e2e は mail-worker 起動が前提）。**型は手書きせず `npm run codegen`（backend openapi.json から再生成）**。
 
 ### (3) 運用・本番系（設定/検証・`doc/本番デプロイ要件.md` §6）
 - 本番トポロジのホップ数確定→`TRUSTED_PROXY_COUNT`／Next `rewrites()` の XFF 転送検証。
@@ -211,7 +214,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（**80 passed**・build 不要でホスト変更が即反映）。
 - **メールワーカ単体スモーク**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" -e MAIL_OUTBOX_POLL_INTERVAL_SECONDS=0.2 backend timeout 2 python -m app.mail_worker`（起動→停止ログを確認）。account_sync ワーカは `python -m app.worker`。
 - **frontend 型チェック/lint**＝`docker compose run --rm --no-deps -T frontend npx tsc --noEmit` ／ `docker compose exec -T frontend npm run lint`。
-- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `... install chromium` → `docker compose exec frontend npx playwright test`（**本セッション 5 passed**・chromium は本セッションで frontend コンテナに導入済み。コンテナ停止/削除で再導入要）。コンテナ内 MailHog は `http://mailhog:8025`。編集 spec は `docker compose cp frontend/e2e/<spec> frontend:/app/e2e/<spec>` で反映。**メール依存 e2e（mfa/password-setup）は `mail-worker` 起動が前提**（非同期配信・§4）。
+- **e2e**＝フル起動後、**初回のみ** `docker compose exec -u root frontend npx playwright install-deps chromium` → `... install chromium` → `docker compose exec frontend npx playwright test`（**本セッション 8 passed**＝sc-00 系5＋sc-91 系3・chromium は本セッションで frontend コンテナに導入済み。コンテナ停止/削除で再導入要）。コンテナ内 MailHog は `http://mailhog:8025`。編集 spec は `docker compose cp frontend/e2e/<spec> frontend:/app/e2e/<spec>` で反映。**メール依存 e2e（mfa/password-setup）は `mail-worker` 起動が前提**（非同期配信・§4）。
 - **MailHog**＝ブラウザ `http://localhost:8025`／API `GET http://localhost:8025/api/v2/messages`（本文 encode は password_setup=base64／MFA OTP=quoted-printable と一定でない＝base64 デコード試行→ダメなら生テキスト）。
 - **主要 env**＝`impl/.env.example` が雛形（`.env` は追跡外・無ければ Compose が `${VAR:-既定}`）。**実設定は `impl/compose.yaml` の backend `environment:`（worker/mail-worker は `&backend_env` アンカーで同一）に列挙された変数のみコンテナへ届く**（`env_file:` 無し）。新規しきい値は必ず `environment:` に配線。今回追加＝**`MAIL_OUTBOX_*`（4種）** と **`OPS_COMPANY_CODE`/`BOOTSTRAP_ADMIN_LOGIN`/`BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`**（B.5.1・本番は強い秘密を供給／空なら system_admin を seed しない）。
 - **リポジトリ運用**:
@@ -223,8 +226,8 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**次スライスはユーザーと相談**（候補＝(4) frontend で B/K ドメイン配線（SC-90/91/92/93＋プロフィール）／(5) ドメイン C 着手〔quests〕／K.3 メール・PW 変更／監査ログ閲覧 UI＋outbox failed 可視化の管理面）。**本セッションで縦通し完了＝ドメイン B バックエンド（B0/B1/B2＋memberships＋B.4 QG管理者＋B.3 QGグループ CRUD）＋K プロフィール編集 writer＋監査ログ system_audit_logs（B.6・全特権操作）**。
+- ✅ 再開点＝**frontend 配線の続き＝SC-92 会社詳細**（§7-(4)・SC-91 は本セッション完了）。他候補＝SC-93/SC-90・K プロフィール編集 UI／ドメイン C 着手〔quests〕／管理面（監査ログ閲覧・outbox failed 可視化）。**本セッションで縦通し完了＝ドメイン B バックエンド全般＋K プロフィール編集 writer＋監査ログ（B.6）＋SC-91 会社一覧 frontend（e2e 実測）**。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
-- ✅ 状態＝backend 111 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
+- ✅ 状態＝**backend 154 passed・frontend e2e 8 passed**（本セッション実測・フルスタック）。ドメイン B バックエンド全般＋K プロフィール編集 writer＋監査ログ（B.6）＋SC-91 会社一覧 frontend が縦通し完了。**フルスタック起動中**（最新イメージ）。未実装/負債（SC-92 以降の frontend・ドメイン C・K.3 メール/PW 変更・監査ログ閲覧UI・outbox failed 可視化・本番設定）は §4/§7 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
 - ⚠ 詳細な決定理由・具体値は各 `doc/ADR/*.md`・`doc/データモデル.md` §4.6/§4.7・`doc/テスト/*.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
