@@ -143,3 +143,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 反転した主アサーション | 観測 red |
 | --- | --- | --- |
 | A-TC-022（sc-00-login） | menuitem `全端末からログアウト` → `全端末からログアウト_REDAUDIT` | 当該 menuitem に到達せずタイムアウト（導線に確かに到達している証拠） |
+
+## 追記: アカウント管理 API 認可基盤（B-TC-010〜014）— 2026-08-11
+
+- 新規 EP（`GET /admin/companies/{id}/accounts`）。認可ガードが効いていることを、**ガードの一時無効化**で目視（`Depends(require_system_admin)` をコメントアウト→復元済み）。
+
+| TC-ID | 反転/無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-011 | router の `Depends(require_system_admin)` を無効化 | セッション無しでも 200（本来 401）＝ガードが P1 を担っている |
+| B-TC-012 | 同上 | general でも 200（本来 403）＝ガードが P6 を担っている |

@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     # メールリンクの基点（フロントのオリジン。password-setup ページを開く）
     app_base_url: str = "http://localhost:3000"
 
+    # ブートストラップ（運営テナント＋初期 system_admin・API設計 B.5.1・案a＝シークレット直投入）
+    ops_company_code: str = "OPS"             # 運営テナントの予約会社コード
+    ops_db_identifier: str = "ideaquest_ops"  # 運営テナントの会社DB識別子
+    bootstrap_admin_login: str = "admin@ops.example"
+    bootstrap_admin_email: str = "admin@ops.example"
+    # 初期 system_admin のパスワード（秘匿・env 供給）。空なら system_admin を seed しない
+    # （既知/デフォルトPW の埋め込み禁止・B.5.1）。本番は必ず強い秘密を供給する。
+    bootstrap_admin_password: str = ""
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

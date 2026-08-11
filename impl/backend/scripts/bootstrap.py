@@ -89,8 +89,44 @@ def migrate_company(db_identifier: str) -> None:
     command.upgrade(_alembic_cfg("alembic_company.ini", s.server_dsn(db_identifier)), "head")
 
 
+def _seed_ops_admin(session) -> None:
+    """運営テナント（OPS）＋初期 system_admin を seed（B.5.1・案a＝シークレット直投入・冪等）。
+
+    パスワードは env `BOOTSTRAP_ADMIN_PASSWORD`（秘匿）。**空なら system_admin を作らない**
+    （既知/デフォルトPW の埋め込み禁止・B.5.1）。OPS は外部依存ゼロ起動のため `mfa_required=False`。
+    """
+    s = get_settings()
+    ops = session.query(Company).filter_by(company_code=s.ops_company_code).one_or_none()
+    if ops is None:
+        ops = Company(
+            id=uuid.uuid4(), company_code=s.ops_company_code, name="Platform Ops",
+            db_identifier=s.ops_db_identifier, status="active", mfa_required=False,
+        )
+        session.add(ops)
+        session.flush()
+        print(f"[bootstrap] seeded ops tenant {ops.company_code}")
+    if not s.bootstrap_admin_password:
+        print("[bootstrap] BOOTSTRAP_ADMIN_PASSWORD 未設定 → system_admin は seed しない")
+        return
+    admin = (
+        session.query(Account)
+        .filter_by(company_id=ops.id, login_id=s.bootstrap_admin_login)
+        .one_or_none()
+    )
+    if admin is None:
+        session.add(Account(
+            id=uuid.uuid4(), company_id=ops.id,
+            login_id=s.bootstrap_admin_login, email=s.bootstrap_admin_email,
+            display_name="Platform Admin",
+            password_hash=hash_password(s.bootstrap_admin_password),  # password_set=true 相当
+            locale="ja", system_role="system_admin", status="active",
+        ))
+        print(f"[bootstrap] seeded system_admin {s.bootstrap_admin_login}")
+
+
 def seed_control() -> None:
     with control_session() as session:
+        _seed_ops_admin(session)
         for company_def, account_def in _SEEDS:
             company = (
                 session.query(Company)

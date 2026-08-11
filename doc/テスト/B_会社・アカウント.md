@@ -1,6 +1,6 @@
-# テストパターン B. 会社・アカウント（account_sync_outbox＝管理DB→会社DB ミラー）
+# テストパターン B. 会社・アカウント（account_sync_outbox ミラー＋アカウント管理 API）
 
-> 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../データモデル.md`](../データモデル.md) §4.6（`account_sync_outbox`）・[`../API設計/README.md`](../API設計/README.md) §1.13・[`../API設計/B_会社・アカウント・所属.md`](../API設計/B_会社・アカウント・所属.md) B.5。
+> 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../データモデル.md`](../データモデル.md) §4.6（`account_sync_outbox`）・[`../API設計/README.md`](../API設計/README.md) §1.8/§1.13・[`../API設計/B_会社・アカウント・所属.md`](../API設計/B_会社・アカウント・所属.md) B.0.1/B.2/B.5。
 > 本スライスの対象＝**outbox 機構の縦通し**（テーブル＋書込側の同一Tx INSERT＋常駐ワーカの冪等適用）。書込側＝A.7 `complete_password_setup`（`password_set` ミラー）と **login 成功（`last_login_at` ミラー・B-TC-006・2026-08-11 追加）**。発行/編集/無効化（B.2）・プロフィール編集（K）の writer は該当エンドポイント実装時に追加する。
 > ワーカ本体＝`app/control_plane/account_sync/application.py` の `process_outbox_once()`（worker.py がループで呼ぶ）。テストは本関数を直接呼ぶ（常駐プロセス不要）。
 
@@ -21,7 +21,21 @@
 | B-TC-005 | int | 会社DB 無し会社の account X に pending 2行（X1,X2）＋ ACME-01 の account Y に pending 1行（Y1） | `process_outbox_once()` | Y1 は **done**（別 account は独立に進む）／X1 は `attempts=1・pending`／**X2 は未処理（`attempts=0・pending`）**＝同一 account はヘッドオブライン・ブロッキング | §4.6（順序・HOL） |
 | B-TC-006 | int | ACME-01 実アカウント（未ログイン＝`last_login_at` NULL） | `POST /auth/login` 成功 → `process_outbox_once()` | ログイン成功で **`accounts.last_login_at` 更新＋同一Tx で outbox pending 1行**（`op=upsert`・`payload.last_login_at`＝ISO 文字列）→ ワーカ適用で **会社DB `users.last_login_at` がミラー**される | データモデル §4.6／§5.3（認証イベント③） |
 
-## 2. 補足・非対象
+## 2. アカウント管理 API（B0＝認可基盤＋一覧・B.2/B.0.1）
+
+> 対象＝`GET /admin/companies/{company_id}/accounts`（system_admin 専用・SC-92）。認可基盤（`/admin/*` の P1〜P6）とブートストラップ（B.5.1＝運営テナント OPS＋初期 system_admin を seed）の実証。**system_admin セッションは bootstrap が seed する OPS 管理者でログインして得る**（`ops_company_code`/`bootstrap_admin_login`/`bootstrap_admin_password`）。所属グループ（会社DB `quest_group_members`）付与・発行/編集/disable/enable/password-reset は後続スライス。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-010 | api | system_admin（OPS 管理者）でログイン | `GET /admin/companies/{ACME-01}/accounts` | `200`＋`{data, page_info}`。`page_info.total≥1`・ACME-01 の seed アカウントを含む・**`password_hash` 等の機密を返さない** | B.2／§1.8／§B.6 |
+| B-TC-011 | api | セッション無し | 同 GET | `401 {code:"unauthenticated"}`（B.0.1 P1） | B.0.1 P1 |
+| B-TC-012 | api | 非 system_admin（`general`）でログイン | 同 GET | `403 {code:"forbidden"}`（B.0.1 P6＝権限なしは 403） | B.0.1 P6 |
+| B-TC-013 | api | system_admin | 存在しない `company_id` で GET | `404 {code:"not_found"}`（存在秘匿・§1.6） | B.2／§1.6 |
+| B-TC-014 | api | system_admin | `?status=active&per_page=1&page=1`／`?q=…` | オフセットページング（`page_info.per_page/page/total`）＋`q`/`status` フィルタが効く | §1.8 |
+
+- **red 確認（後追い）**＝`Depends(require_system_admin)` を一時無効化すると B-TC-011/012 が 200 になり赤（ガードが認可の唯一の防御であることを実証）。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+
+## 3. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
 - **初期所属 `memberships` の相乗適用**（B.5＝`users`→`quest_group_members` の順）は B ドメイン実装時（本スライスの payload は `password_set` のみ）。
