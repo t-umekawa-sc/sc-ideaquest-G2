@@ -9,9 +9,10 @@
 > **本セッションで完了＝「C のテーブルを先に作る」判断（ユーザー承認）に沿って memberships を縦通し（4スライス）:**
 > **(1) 会社DB `quest_groups`/`quest_group_members` データ層（§5.4/§5.5・B/C境界）＝ORM＋company migration 0005＋部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL`＋B-TC-060〜063。**
 > **(2) `quest_group` repository＝所属永続化プリミティブ〔`upsert_membership`（作成/再有効化/role更新）・`remove_membership`（トゥームストーン・冪等）・`get_active_membership`・`list_active_group_ids_for_user`（role フィルタ）〕＋B-TC-064〜068。**
-> **(3) memberships 割当 application＝1A worker が outbox payload の `memberships` を会社DB へ適用（B.5 step3・users→members の FK 順・B-TC-069〜071）／1B 発行 EP（system_admin＋会社アカ管理者）が `memberships` を payload に相乗（B.2/B.2.1・B-TC-072〜074）／1C 編集 EP が `memberships` 差分を会社DBへ直接適用（B.3・一括設定＝集合外は tombstone・B-TC-075〜077）。**
+> **(3) memberships 割当 application（スライス1）＝1A worker が outbox payload の `memberships` を会社DB へ適用（B.5 step3・users→members の FK 順・B-TC-069〜071）／1B 発行 EP（system_admin＋会社アカ管理者）が `memberships` を payload に相乗（B.2/B.2.1・B-TC-072〜074）／1C 編集 EP が `memberships` 差分を会社DBへ直接適用（B.3・一括設定＝集合外は tombstone・B-TC-075〜077）。**
+> **(4) スライス2＝B.4 QG管理者 API＝`app/control_plane/admin/quest_group_application.py`＋`deps.require_qg_admin_actor`。`GET /admin/quest-groups`（自分が admin のグループ一覧・member_count・0 admin は403）／`GET /admin/quest-groups/{id}/members`／`GET /admin/company-directory`（最小射影・0 admin は403）／`POST /admin/quest-groups/{id}/members`（参加追加・role=member 固定）／`DELETE .../members/{account_id}`（除外・204・冪等）。認可は per-group（system_role 非依存・general でも admin 所属で QG管理者・非 admin/不明/他会社は404 存在秘匿）。参加追加/除外はアカウント本体に触れない（SoD）。B-TC-080〜085。**
 > **前セッションまでで完了＝(A) ② メール非同期化（`mail_outbox`・ADR-0007）／(B) `logout-all` frontend 導線／(C) `last_login_at` ミラー writer／(D) §4.6 seq 正規化／(E) ドメイン B アカウント管理 API を大きく縦通し（B0 基盤・B1 会社CRUD・B2 アカウント CRUD 両経路）。**
-> **次＝スライス2＝B4 QG管理者 API〔`/admin/quest-groups`（自分が `admin` のグループ一覧・メンバー一覧・参加追加/除外）・`/admin/company-directory`（最小射影ディレクトリ）・`require_qg_admin`＝セッション会社固定・per-group `admin` 所属で門番〕。deps は repository の `list_active_group_ids_for_user(role='admin')`/`get_active_membership` を組合せ。加えて quest_groups 自体の作成/一覧（プロビジョニング・B.3 GET 候補）は未実装＝QG API のテスト前提として要検討（現状グループは seed/直接 INSERT のみ）。**
+> **次の候補＝(あ) quest_groups のプロビジョニング（会社DB `quest_groups` の作成/一覧 EP・B.3 `GET /admin/companies/{id}/quest-groups` 候補一覧＝現状グループは seed/直接 INSERT のみ・管理経路が無い）、(い) account_sync の残り writer＝プロフィール編集（K・`PATCH /me`）、(う) `system_audit_logs`（B.6・membership/発行/編集の監査ログ＝未実装）、(え) frontend で B ドメイン（SC-90/91/92/93）を配線。ドメイン B バックエンドの主要フローは概ね縦通し済み。次スライスの選択はユーザーと相談。**
 
 ---
 
@@ -19,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション・実装本体）: **`1bdbef2`**（1C 編集 EP の memberships 差分適用・B-TC-075〜077）。本セッションの実装＝`c9d79ff`（データ層）→`0ae09f5`（repository）→`4bb63e0`（1A worker）→`a71ea52`（1B 発行）→`1bdbef2`（1C 編集）。`7d2fdeb` までは `origin/main` へプッシュ済み、`4bb63e0` 以降は未プッシュ。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション・実装本体）: **`3420317`**（スライス2 B.4 QG管理者 API・B-TC-080〜085）。本セッションの実装＝`c9d79ff`（データ層）→`0ae09f5`（repository）→`4bb63e0`（1A worker）→`a71ea52`（1B 発行）→`1bdbef2`（1C 編集）→`3420317`（B.4 QG API）。`7d2fdeb` までは `origin/main` へプッシュ済み、`4bb63e0` 以降は未プッシュ。※本 handoff 更新はこの後の別コミット。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
   - `62ba95d` テスト追加 A-TC-082（失敗計数の固定窓TTL経過リセット・ADR-0005）
@@ -115,9 +116,9 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
   - アカウント一時ロック（ADR-0005）＋クライアント IP 確定（ADR-0006）。
   - **account_sync_outbox**（管理DB→会社DB `users` ミラー・§4.6・worker.py）＝writer は `password_set`（complete）・`last_login_at`（login 成功）・発行/編集/無効化（B2）。**本セッションで worker が payload の `memberships` を `users` の後に会社DB `quest_group_members` へ適用するよう拡張（B.5 step3・FK 順）**。
   - **mail_outbox（本セッション）**：認証系メール（OTP・設定リンク・ロック通知）は同期送信せず enqueue → `mail_worker`/`process_mail_outbox_once` が SMTP 送信。**フルスタックで MailHog への非同期配信を目視確認済み**（request 202 直後は未送信→ワーカが配信・重複なし・行は done+secret NULL）。
-  - **ドメイン B アカウント管理 API（本セッション）**＝`/admin/companies`（会社CRUD・system_admin）／`/admin/companies/{id}/accounts`（会社スコープのアカウント発行/編集/disable/enable/password-reset・system_admin）／`/admin/accounts`（company_account_admin・セッション会社固定・SoD）。bootstrap で OPS＋system_admin を seed。**発行/編集 EP は初期所属/所属差分 `memberships` を受け取り、発行は outbox 相乗（worker 適用）・編集は会社DB 直接適用（B.3）＝本セッション完了。残り＝B4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`）**。
+  - **ドメイン B アカウント管理 API（本セッション）**＝`/admin/companies`（会社CRUD・system_admin）／`/admin/companies/{id}/accounts`（会社スコープのアカウント発行/編集/disable/enable/password-reset・system_admin）／`/admin/accounts`（company_account_admin・セッション会社固定・SoD）。bootstrap で OPS＋system_admin を seed。**発行/編集 EP は memberships を受け取り（発行=outbox 相乗・編集=会社DB 直接・B.3）。B.4 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・参加追加/除外）も本セッション完了＝ドメイン B バックエンドの主要フローは概ね縦通し済み**。
 - **テスト（本セッションで実測・マウント版）**:
-  - **backend pytest = 129 passed**（既存111＋本セッション新規 B-TC-060〜077＝quest_group スキーマ/repository/memberships 割当 application・回帰なし）。マウント版で実測。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
+  - **backend pytest = 135 passed**（既存111＋本セッション新規 B-TC-060〜085＝quest_group スキーマ/repository/memberships 割当 application/QG管理者 API・回帰なし）。マウント版で実測。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
   - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
 - **Docker（本 handoff 時点）**＝**db / redis のみ起動中**（他は停止）。フルスタックで試すなら backend の再ビルドが必要（§8 注意）。
@@ -174,15 +175,21 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 
 ## 7. 次にやること — 優先順に、具体的に
 
-### (1) スライス2＝B4 QG管理者 API（次の再開点・`/admin/quest-groups`・SC-90）
-- **deps＝`require_qg_admin`**（`admin/deps.py` に追加）＝B.0.1 P1〜P6＋**`group_id` がセッション会社に属し・呼び出し元が当該グループに有効 `admin` 所属を持つ**（満たさなければ 404 存在秘匿）。判定は**所属ベース**＝`system_admin`/`company_account_admin` でも当該グループに `admin` 所属が無ければ QG系は 404。材料＝repository `get_active_membership(session_user, group)` の role=='admin'。`/admin/company-directory` は「1グループ以上で有効 `admin`」＝`list_active_group_ids_for_user(role='admin')` が非空。
-- **EP（B.4）**＝`GET /admin/quest-groups`（自分が admin のグループ一覧・メンバー数付き・空なら 403）／`GET /admin/quest-groups/{group_id}/members`（`removed_at IS NULL`・`users` と join）／`POST /admin/quest-groups/{group_id}/members`（既存アカウントを参加追加＝会社DB 直接 upsert・**role=member 固定**＝QG管理者は admin 任命不可）／`DELETE /admin/quest-groups/{group_id}/members/{account_id}`（除外＝トゥームストーン・204）／`GET /admin/company-directory`（最小射影＝`account_id`/`display_name`/`avatar_url` のみ・`status='active'`・email/role/所属は出さない）。**`company_id` は受けない＝セッション会社固定**。会社DB 直接操作は repository を組合せ（`upsert_membership`/`remove_membership`/`get_active_membership`）。
-- **前提の悩みどころ**＝`quest_groups` の**作成/一覧 EP が未実装**（現状グループは seed か直接 INSERT のみ）。B.4 の GET/members テストにはグループが要る＝(a) テストで会社DB へ直接 seed（既存 memberships テストと同じ手）／(b) 先に quest_groups プロビジョニング EP（B.3 GET 候補＝`GET /admin/companies/{id}/quest-groups`＋作成）を作る、のどちらか。着手時に選ぶ。
-- 再利用＝session 破棄は不要（per-group role はセッション判定に無関係）。会社DB 解決＝`get_tenant_session(session会社の db_identifier)`。
+> ドメイン B バックエンドの主要フローは概ね縦通し済み（B0/B1/B2＋memberships＋B.4 QG管理者 API）。次スライスの選択はユーザーと相談。以下は候補。
+
+### (1) quest_groups のプロビジョニング（B.3・グループ作成/一覧 EP）
+- 現状グループは seed/直接 INSERT のみ＝管理経路が無い。**`GET /admin/companies/{company_id}/quest-groups`（system_admin・割当候補一覧・B.3）**＋グループ作成 EP（会社DB `quest_groups` へ INSERT・`quest_group_code` 大文字正規化＋会社内一意・§5.4）。会社DB プロビジョニングが MVP 手動（§8-⑫）なので、優先度は運用要件次第。
+- B.4 の追加＝`GET /admin/quest-groups/{group_id}/members` の `q`/`status` フィルタ・ページングは最小実装（`q` のみ）＝必要に応じ拡充。
 
 ### (2) account_sync_outbox の他 writer（§4.6・残り）
-- **`last_login_at`／発行・編集の identity＋memberships＝実装済み（本セッション）**。
-- 無効化/再有効化＝`op=disable/enable`（実装済み・B2）。**プロフィール編集（K・`PATCH /me`）＝`login_id`/`email`/`locale`/`display_name` の enqueue が残り**。
+- **`last_login_at`／発行・編集の identity＋memberships＝実装済み（本セッション）**。無効化/再有効化＝`op=disable/enable`（実装済み・B2）。
+- **残り＝プロフィール編集（K・`PATCH /me`）＝`login_id`/`email`/`locale`/`display_name` の enqueue**（本人操作・§5.3 変更契機②）。
+
+### (3) 監査ログ（B.6・`system_audit_logs`）
+- membership 変更（参加追加/除外・admin 任命）・発行/編集/無効化を `system_audit_logs` に記録＝**未実装**（B.4/B.6 が要求）。テーブル未作成。管理面（failed 可視化）と併せて後続。
+
+### (4) frontend で B ドメインを配線（SC-90/91/92/93）
+- backend が揃ったので、会社一覧/詳細・アカウント発行/編集・QG参加ピッカー（SC-90）を frontend feature として実装。
 
 ### (3) 運用・本番系（設定/検証・`doc/本番デプロイ要件.md` §6）
 - 本番トポロジのホップ数確定→`TRUSTED_PROXY_COUNT`／Next `rewrites()` の XFF 転送検証。
@@ -213,7 +220,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**スライス2＝B4 QG管理者 API**（`/admin/quest-groups`・`/admin/company-directory`・`require_qg_admin`）。memberships のデータ層・repository・割当 application（発行相乗り 1A/1B・編集差分 1C）は本セッションで完了。deps/EP は既存 repository を組み合わせて test-first で起こす。着手時に quest_groups の seed 前提 or プロビジョニング EP 先行を選ぶ（§7-(1)）。
+- ✅ 再開点＝**次スライスはユーザーと相談**（候補＝§7＝(1) quest_groups プロビジョニング／(2) プロフィール編集 writer（K）／(3) 監査ログ `system_audit_logs`／(4) frontend で B ドメイン配線）。ドメイン B バックエンドの主要フロー（B0/B1/B2＋memberships 割当＋B.4 QG管理者 API）は本セッションで概ね縦通し済み。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
 - ✅ 状態＝backend 111 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
