@@ -169,3 +169,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- | --- |
 | B-TC-025 | `disable_account` の `delete_account_sessions(...)` を無効化 | 無効化後も対象の `GET /session` が 200（本来 401）＝セッション破棄が load-bearing |
 | B-TC-028 | 期待 `status_code == 422` → `== 599`（ガードは発火させたまま＝admin は無効化されない） | 422（`last_system_admin` ガードが発火している証拠） |
+
+## 追記: アカウント編集（B-TC-033）— 2026-08-11
+
+| TC-ID | 反転した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-033 | 期待 `status_code == 422` → `== 599`（ガードは発火させたまま＝admin は降格されない） | 422（自己降格 `last_system_admin` ガードが発火している証拠） |

@@ -15,6 +15,7 @@ from app.control_plane.admin.schemas import (
     AccountCreateRequest,
     AccountListResponse,
     AccountResponse,
+    AccountUpdateRequest,
     PasswordResetResponse,
 )
 from app.core.deps import verify_csrf, verify_origin
@@ -54,6 +55,22 @@ def issue_company_account(
         company_id,
         display_name=body.display_name, login_id=body.login_id, email=body.email,
         system_role=body.system_role, locale=body.locale,
+    )
+    return AccountResponse(**result)
+
+
+@router.patch("/companies/{company_id}/accounts/{account_id}", response_model=AccountResponse)
+def edit_company_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, body: AccountUpdateRequest, request: Request,
+    session: dict = Depends(require_system_admin),
+) -> AccountResponse:
+    """アカウント編集（SC-92・B.2・差分・system_admin 専用）。変更系＝Origin/CSRF 必須（B.0.1 P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = admin_service.edit_account(
+        company_id, account_id,
+        changes=body.model_dump(exclude_unset=True),   # 指定フィールドのみ差分適用
+        acting_account_id=session["account_id"], r=get_redis(),
     )
     return AccountResponse(**result)
 

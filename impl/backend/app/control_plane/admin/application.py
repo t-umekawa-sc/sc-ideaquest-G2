@@ -119,6 +119,60 @@ def issue_account(
         return _account_state(account)
 
 
+_EDITABLE_FIELDS = ("display_name", "login_id", "email", "system_role")
+
+
+def edit_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, *, changes: dict, acting_account_id: str, r: redis.Redis
+) -> dict:
+    """アカウント編集（B.2・差分適用）。identity 一意再検証（重複 409）／`system_role` 変更は
+    自己降格・0名化を拒否（`last_system_admin`）。system_role 変更時は当該アカウントの全セッション破棄（A.9-③）。
+    """
+    with control_session() as session:
+        account = _account_in_company(session, company_id, account_id)
+
+        new_role = changes.get("system_role")
+        role_changed = new_role is not None and new_role != account.system_role
+        if role_changed and account.system_role == "system_admin" and new_role != "system_admin":
+            # 自己降格は常に不可（自己ロックアウト防止・B.2）
+            if str(account_id) == acting_account_id:
+                raise AppError(422, "last_system_admin")
+            # 0 名化する降格は拒否（B.2/B.5.1）
+            if account.status == "active" and _active_system_admin_count(session) <= 1:
+                raise AppError(422, "last_system_admin")
+
+        # identity 会社内一意（自分を除く）＝重複 409（B.2）
+        new_login, new_email = changes.get("login_id"), changes.get("email")
+        if new_login or new_email:
+            ident_conds = []
+            if new_login:
+                ident_conds.append(Account.login_id == new_login)
+            if new_email:
+                ident_conds.append(Account.email == new_email)
+            clashes = session.execute(
+                select(Account).where(
+                    Account.company_id == company_id, Account.id != account_id, or_(*ident_conds)
+                )
+            ).scalars().all()
+            for a in clashes:
+                if new_login and a.login_id == new_login:
+                    raise AppError(409, "conflict", extra={"errors": [{"field": "login_id"}]})
+                if new_email and a.email == new_email:
+                    raise AppError(409, "conflict", extra={"errors": [{"field": "email"}]})
+
+        payload = {f: changes[f] for f in _EDITABLE_FIELDS if f in changes}
+        for field, value in payload.items():
+            setattr(account, field, value)
+        if payload:
+            account_sync_repo.enqueue(session, account_id, company_id, "upsert", payload)  # users ミラー
+        session.commit()
+        result = _account_state(account)
+
+    if role_changed:
+        delete_account_sessions(r, str(account_id))  # 新権限を確実に適用（全セッション破棄・A.9-③）
+    return result
+
+
 def disable_account(company_id: uuid.UUID, account_id: uuid.UUID, r: redis.Redis) -> dict:
     """アカウント無効化（B.2）。**有効な system_admin が 0 名になる操作は拒否**（`last_system_admin`・
     運営テナントの最後の system_admin 保護＝B.5.1）。成功時は全アクティブセッション破棄＋信頼端末失効（A.9-③）。

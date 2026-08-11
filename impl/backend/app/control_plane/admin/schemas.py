@@ -47,6 +47,19 @@ class AccountCreateRequest(BaseModel):
     locale: Literal["ja", "en"] = "ja"
 
 
+class AccountUpdateRequest(BaseModel):
+    """アカウント編集の入力（差分・B.2）。未指定フィールドは変更しない（`model_dump(exclude_unset=True)`）。
+
+    想定外プロパティは拒否（Mass Assignment 防止・§B.6）。`memberships` は本スライス非対応。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    login_id: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, min_length=1, max_length=255)
+    system_role: Literal["general", "company_account_admin", "system_admin"] | None = None
+
+
 class AccountResponse(BaseModel):
     """発行/編集/状態変更結果のアカウント（機密は含めない・§B.6）。"""
     account_id: str

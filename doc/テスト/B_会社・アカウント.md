@@ -53,7 +53,17 @@
 | B-TC-028 | api | 有効な system_admin が 1 名だけ（seed OPS 管理者） | その system_admin を `POST .../disable` | `422 {code:"last_system_admin"}`（0 名化の拒否・運営テナント保護・B.5.1） | B.2／B.5.1 |
 | B-TC-029 | api | system_admin | 不明/他会社の `account_id` で `POST .../disable` | `404 not_found`（存在秘匿・§1.6） | B.2 |
 
-- **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session が 401 にならない）・B-TC-028 は反転で 422 発火を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+**編集（`PATCH .../accounts/{id}`・system_admin・差分・B.2）**。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-030 | api | system_admin | `display_name`/`login_id` を差分 PATCH | `200`＋accounts 更新＋outbox（upsert・payload に変更列）＝users ミラー | B.2 |
+| B-TC-031 | api | system_admin | 既存の別アカウントと `login_id`/`email` が重複する編集 | `409 conflict`＋`errors[].field`（自分は一意検証から除外） | B.2 |
+| B-TC-032 | api | 対象がログイン中 | `system_role` を変更（general→company_account_admin） | `200`＋**対象の全セッション破棄**（新権限適用・A.9-③）＝対象の `GET /session` が 401 | B.2／A.9-③ |
+| B-TC-033 | api | 自分（system_admin）を編集 | 自分の `system_role` を `general` に降格 | `422 last_system_admin`（自己降格は常に不可・自己ロックアウト防止） | B.2 |
+| B-TC-034 | api | system_admin | 不正 `system_role`／想定外プロパティ／不明 account | enum 外・extra＝`422`／不明＝`404` | B.2／§B.6 |
+
+- **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
 ## 3. 補足・非対象
 
