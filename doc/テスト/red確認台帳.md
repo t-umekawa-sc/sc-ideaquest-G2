@@ -218,3 +218,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-094/095 | `admin/deps.require_system_admin` の許可集合を `{system_admin}`→`{system_admin, company_account_admin, general}` に一時拡大 | system_admin 専用 EP 群が general/company_account_admin でも通過し 200 等を返す（本来 403）＝`require_system_admin` の role ガードが SoD の load-bearing。復元して green（148 passed）。 |
+
+## 追記: ワーカ memberships は加算専用（B-TC-096/097）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-096/097 | `account_sync/application._apply_memberships` を一時的にフルセット差分（payload に無い有効所属を remove）へ書き換え | 096＝memberships 無し payload で既存所属が削除される（本来は保持）／097＝payload に含めない G2 が削除される（本来は加算専用で保持）＝「加算専用・修正は編集経路」という不変条件が load-bearing。復元して green（150 passed）。 |

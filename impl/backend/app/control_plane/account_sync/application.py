@@ -83,7 +83,16 @@ def _apply_memberships(tsession, account_id, payload: dict) -> None:
     """payload の初期所属 `memberships:[{group_id, role}]` を会社DB `quest_group_members` へ冪等 upsert（B.5 step3）。
 
     `users` upsert の後に呼ぶ（FK 順序を保証）。`user_id` は会社DB `users.id`（`account_id` から解決）。
-    memberships が無ければ no-op（従来の発行/編集/last_login payload は非干渉＝前方互換）。
+
+    **加算専用（upsert のみ・削除しない）**＝この経路の入力は**発行時（新規アカウント＝既存所属ゼロ）に限る**
+    ため（`issue_account` のみが payload に memberships を積む・B.5 step3）。よって:
+    - memberships が無い payload（identity/last_login/disable 等）は **no-op**（既存所属は保持・B-TC-071/096）。
+    - memberships が現状の部分集合でも **omitted は削除しない**（加算のみ・B-TC-097）。
+    **所属の「修正」（差分適用＝omitted を解除/tombstone・role 変更・追加/除外）は本ワーカではなく、
+    会社DB を直接更新する編集経路が担う**＝`admin.application._apply_membership_diff`
+    （`PATCH /admin/companies/{id}/accounts/{account_id}`・B.3・outbox 非経由）／QG管理者 API
+    `admin.quest_group_application.add_member`/`remove_member`（B.4）。将来ここへ「修正」を載せると
+    加算専用ゆえ削除が効かない silent bug になるため、修正は必ず編集経路を使うこと。
     """
     memberships = payload.get("memberships")
     if not memberships:

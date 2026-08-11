@@ -287,3 +287,65 @@ def test_b_tc_071_worker_without_memberships_noop(client, factory, qg):
 
     assert _active_members(company.db_identifier, gid) == []
     assert _user_password_set(company.db_identifier, acc["id"]) is True  # users ミラーは従来どおり
+
+
+def get_user_by_account_id(db_identifier: str, account_id):
+    with get_tenant_session(db_identifier) as ts:
+        return get_user_by_account(ts, account_id).id
+
+
+def _seed_membership(db_identifier: str, group_id, user_id, role="member") -> None:
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(QuestGroupMember(id=uuid.uuid4(), quest_group_id=group_id, user_id=user_id, role=role))
+        ts.commit()
+
+
+def _active_for(db_identifier: str, group_id, user_id) -> QuestGroupMember | None:
+    with get_tenant_session(db_identifier) as ts:
+        return ts.execute(
+            select(QuestGroupMember).where(
+                QuestGroupMember.quest_group_id == group_id,
+                QuestGroupMember.user_id == user_id,
+                QuestGroupMember.removed_at.is_(None),
+            )
+        ).scalars().first()
+
+
+def test_b_tc_096_worker_preserves_existing_members_when_payload_omits(client, factory, qg):
+    """B-TC-096 既存の有効所属あり＋memberships 無し payload は既存を保持（削除ではない・加算専用）。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    gid = qg.make_group(company.db_identifier)
+    uid = get_user_by_account_id(company.db_identifier, acc["id"])
+    _seed_membership(company.db_identifier, gid, uid, "member")
+
+    _enqueue(acc["id"], company.id, {"display_name": "更新名"})  # memberships 無し
+    process_outbox_once()
+
+    assert _active_for(company.db_identifier, gid, uid) is not None  # 既存所属は保持（削除されない）
+
+
+def test_b_tc_097_worker_is_additive_no_removal(client, factory, qg):
+    """B-TC-097 ワーカは加算専用＝payload に無い所属は削除しない・一致は role 更新・新規は作成（§4.6）。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    g1 = qg.make_group(company.db_identifier)
+    g2 = qg.make_group(company.db_identifier)
+    g3 = qg.make_group(company.db_identifier)
+    uid = get_user_by_account_id(company.db_identifier, acc["id"])
+    _seed_membership(company.db_identifier, g1, uid, "member")
+    _seed_membership(company.db_identifier, g2, uid, "member")
+
+    # payload＝G1(admin)＋G3(member)。G2 は含めない（＝部分集合・修正のつもりでも削除されない）
+    _enqueue(acc["id"], company.id, {"display_name": "x", "memberships": [
+        {"group_id": str(g1), "role": "admin"}, {"group_id": str(g3), "role": "member"},
+    ]})
+    process_outbox_once()
+
+    m1 = _active_for(company.db_identifier, g1, uid)
+    m2 = _active_for(company.db_identifier, g2, uid)
+    m3 = _active_for(company.db_identifier, g3, uid)
+    assert m1 is not None and m1.role == "admin"   # 既存 G1 は role 更新（upsert）
+    assert m2 is not None                          # payload に無い G2 は削除されない（加算専用）
+    assert m3 is not None                          # 新規 G3 は作成
+

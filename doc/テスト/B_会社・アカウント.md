@@ -119,13 +119,15 @@
 
 ### 4.2 outbox worker の memberships 適用（発行相乗り・B.5 step3）
 
-> 対象＝`app/control_plane/account_sync/application.py` の `process_outbox_once`／`_apply_one`。発行時に `account_sync_outbox` の payload へ相乗した初期所属 `memberships:[{group_id, role}]` を、会社DB `users` upsert の**後**に `quest_group_members` へ upsert する（**`users`→`quest_group_members` の FK 順序**・B.5 step3）。所属適用は quest_group repository（§4.1）を使い冪等。テストは worker 関数を直接呼ぶ。ACME-01 会社DB に事前にグループを seed し、作成物は teardown で物理削除。test-first（red 証跡＝コミットメッセージ）。
+> 対象＝`app/control_plane/account_sync/application.py` の `process_outbox_once`／`_apply_one`／`_apply_memberships`。発行時に `account_sync_outbox` の payload へ相乗した初期所属 `memberships:[{group_id, role}]` を、会社DB `users` upsert の**後**に `quest_group_members` へ upsert する（**`users`→`quest_group_members` の FK 順序**・B.5 step3）。**このワーカ経路は加算専用（upsert のみ・削除しない）**＝入力は発行時（新規アカウント＝既存所属ゼロ）に限るため。**所属の「修正」（差分＝omitted を解除・追加/除外・role 変更）は本ワーカではなく、会社DB を直接更新する編集経路が担う**（`PATCH /admin/companies/{id}/accounts/{account_id}`＝§4.4／QG管理者 API＝§4.5・いずれも outbox 非経由）。所属適用は quest_group repository（§4.1）を使い冪等。テストは worker 関数を直接呼ぶ。ACME-01 会社DB に事前にグループを seed し、作成物は teardown で物理削除。test-first（red 証跡＝コミットメッセージ／後追いは台帳）。
 
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-069 | int | ACME-01 に quest_group を seed・発行相当の pending 1行（payload に `display_name`＋`memberships:[{group_id, role:'admin'}]`） | `process_outbox_once()` | 会社DB `users` 生成の後に `quest_group_members` に**有効所属を作成**（`role='admin'`・`removed_at IS NULL`）・行 done | B.5 step3／§4.6／§5.5 |
 | B-TC-070 | int | B-TC-069 と同じ payload の pending が 2行（再送） | `process_outbox_once()` | `quest_group_members` は**有効所属1行**（冪等＝再適用で増えない）・users も1行 | §4.6（冪等）／§5.5（部分ユニーク） |
 | B-TC-071 | int | `memberships` を**含まない** payload（従来の発行/編集/last_login）の pending 1行 | `process_outbox_once()` | `quest_group_members` に**触れない**（0行のまま）・users ミラーは従来どおり適用（回帰保護） | §4.6（前方互換） |
+| B-TC-096 | int | ユーザーに既存の有効所属が1行・`memberships` を**含まない** payload | `process_outbox_once()` | 既存の有効所属は**保持される（削除されない）**＝「payload に無い＝削除」ではない（加算専用・修正は編集経路） | §4.6（加算専用） |
+| B-TC-097 | int | ユーザーが G1・G2 に有効所属（2行）・payload に `memberships:[{G1, admin},{G3, member}]`（G2 は含めない） | `process_outbox_once()` | G1＝role を admin に更新／**G2＝含めていないが削除されない（加算専用）**／G3＝新規作成＝計3有効所属。omitted の解除は編集経路（§4.4）が担う | §4.6（加算専用）／§5.5 |
 
 ### 4.3 発行 API の memberships 相乗（B.2/B.5・system_admin＋会社アカウント管理者）
 
