@@ -34,6 +34,8 @@ from app.control_plane.admin.schemas import (
     MemberListResponse,
     MembershipResponse,
     PasswordResetResponse,
+    QuestGroupCreateRequest,
+    QuestGroupListItem,
     QuestGroupListResponse,
 )
 from app.core.deps import verify_csrf, verify_origin
@@ -114,6 +116,19 @@ def list_company_quest_groups(
 ) -> QuestGroupListResponse:
     """会社のクエストグループ候補一覧（SC-92・B.3・system_admin 専用・所属割当の候補）。"""
     return QuestGroupListResponse(**company_service.list_company_quest_groups(company_id))
+
+
+@router.post("/companies/{company_id}/quest-groups", response_model=QuestGroupListItem, status_code=201)
+def create_company_quest_group(
+    company_id: uuid.UUID, body: QuestGroupCreateRequest, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> QuestGroupListItem:
+    """クエストグループを作成（SC-92・B.3・system_admin 専用）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return QuestGroupListItem(**company_service.create_company_quest_group(
+        company_id, quest_group_code=body.quest_group_code, name=body.name,
+    ))
 
 
 @router.get("/companies/{company_id}/accounts", response_model=AccountListResponse)

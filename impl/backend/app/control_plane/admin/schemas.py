@@ -204,6 +204,28 @@ class QuestGroupListResponse(BaseModel):
     data: list[QuestGroupListItem]
 
 
+_QUEST_GROUP_CODE_RE = re.compile(r"[A-Z][A-Z0-9-]{1,19}")  # 英大文字始まり・A-Z/0-9/- ・2〜20字（§5.4）
+
+
+class QuestGroupCreateRequest(BaseModel):
+    """クエストグループ作成の入力（B.3・system_admin）。`quest_group_code` は大文字正規化＋形式検証（§5.4）。
+
+    想定外プロパティは拒否（Mass Assignment 防止・§B.6）。会社内一意は application で担保（重複=409）。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    quest_group_code: str
+    name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("quest_group_code")
+    @classmethod
+    def _normalize_code(cls, v: str) -> str:
+        v = v.strip().upper()  # 大小文字は区別しない＝大文字へ正規化（§5.4）
+        if not _QUEST_GROUP_CODE_RE.fullmatch(v):
+            raise ValueError("quest_group_code は英大文字始まり・A-Z/0-9/- ・2〜20字")
+        return v
+
+
 class MemberListItem(BaseModel):
     """グループの参加メンバー 1 行（`quest_group_members`×`users`）。機密は含めない（§B.6）。"""
     account_id: str

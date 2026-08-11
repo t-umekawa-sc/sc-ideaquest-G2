@@ -108,7 +108,9 @@
 - **認可条件（B.3・共通）**: **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。この API（`/admin/companies/{company_id}/*`＝クロステナント）での所属/ロール一括設定は system_admin のみ。**per-group `admin`（QG管理者）の付与/剥奪自体は、自社スコープでは会社アカウント管理者も可**（B.2.1・2026-08-02 改定）＝ただし経路が違う（会社アカ管理者は `/admin/accounts`）。QG管理者はいずれの `admin` 付与もできない（使えるのは B.4 のみ・member 追加のみ）。
 
 
-- `GET /admin/companies/{company_id}/quest-groups` … 割当候補（この会社のクエストグループ一覧・会社DB `quest_groups`）。
+- `GET /admin/companies/{company_id}/quest-groups` … 割当候補（この会社のクエストグループ一覧・会社DB `quest_groups`）。各行に `member_count`（有効所属数）。
+- `POST /admin/companies/{company_id}/quest-groups` … **クエストグループを作成**（system_admin・会社DB `quest_groups` へ INSERT）。ボディ＝`quest_group_code`（会社内一意・大文字正規化＋形式検証・§5.4）・`name`。想定外プロパティ拒否（Mass Assignment 防止・§2.2）。`status=201`＋作成グループ（`member_count=0`）。code 重複＝**409 `conflict`**（field=`quest_group_code`）／形式違反＝`422`／不明会社＝`404`。
+  - **なぜ（追加理由・2026-08-11 決定）**: 従来 B は「グループは既存前提」で所属割当（B.2 `memberships`／B.4 参加追加）だけを定義していたが、**グループを新規作成する経路が API に無かった**（会社DBプロビジョニングが MVP 手動なのと同じ空白）。SC-92（会社詳細・system_admin）で所属エディタの「＋グループを追加」候補を用意するには、まず**この会社にグループを作れる**必要がある。所属割当は system_admin/会社アカ管理者に開いているが、**グループそのものの作成は会社構造の変更**なので会社設定と同格＝**system_admin 専用**（会社作成 B.1 と同じ権限帯）。会社アカ管理者・QG管理者は作成不可（SoD＝アカ管理者は「人」の管理、QG管理者は「参加」の管理に閉じる・§8-⑯）。**削除/リネーム**は当面非対象（クエスト・所属との整合が絡む＝将来要件）。
 - アカウントの所属は **B.2 の `memberships`**（発行/編集の payload）で一括設定＝**会社DB `quest_group_members` を upsert/トゥームストーン**（差分適用）。
   - 追加＝行を作成（or `removed_at` を NULL に戻して再所属）。解除＝`removed_at` を設定（**論理削除・監査保持**・§5.5）。ロール変更＝`role` 更新。
   - **`admin` の付与/剥奪は system_admin＋会社アカウント管理者（自社・2026-08-02 改定）**（QG管理者は不可）。**部分ユニーク `UNIQUE(quest_group_id,user_id) WHERE removed_at IS NULL`** を尊重（重複所属不可）。

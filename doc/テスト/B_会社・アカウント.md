@@ -166,6 +166,8 @@
 | --- | --- | --- | --- | --- | --- |
 | B-TC-086 | api | system_admin・ACME-01 に quest_group を seed | `GET /admin/companies/{ACME-01}/quest-groups` | `200`＋`data` に seed したグループ（`group_id`/`quest_group_code`/`name`/`member_count`）。不明 `company_id` は `404`（存在秘匿・§1.6） | B.3／§1.8 |
 | B-TC-087 | api | 非 system_admin（`general`）／セッション無し | 同 GET | `general`＝`403 forbidden`／未認証＝`401 unauthenticated`（B.0.1 P1/P6） | B.0.1 |
+| B-TC-088 | api | system_admin | `POST /admin/companies/{ACME-01}/quest-groups`（小文字 code＋name） | `201`＋`quest_group_code` は**大文字正規化**・一覧に現れる（`member_count=0`）。会社構造変更＝**system_admin 専用**（B.3・2026-08-11） | B.3／§5.4 |
+| B-TC-089 | api | system_admin | 既存 code で作成／不正形式 code（`ab`〔先頭数字/短すぎ〕）／不明会社／CSRF 無し／`general` | 既存＝`409 conflict`（field=`quest_group_code`）／形式違反＝`422`／不明会社＝`404`／CSRF 無し＝`403 csrf_failed`／`general`＝`403 forbidden` | B.3／§5.4／B.0.1 |
 
 ## 5. 補足・非対象
 

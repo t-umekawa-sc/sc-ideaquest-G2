@@ -143,6 +143,30 @@ def list_company_quest_groups(company_id: uuid.UUID) -> dict:
     return {"data": data}
 
 
+def create_company_quest_group(company_id: uuid.UUID, *, quest_group_code: str, name: str) -> dict:
+    """クエストグループを作成（system_admin・B.3・§5.4）。会社構造の変更＝会社設定と同格の権限帯。
+
+    会社が無ければ 404。`quest_group_code` は会社内一意（会社DB 内で一意）＝重複は 409（DB 一意制約でも担保）。
+    code の大文字正規化/形式検証は schema 側（`QuestGroupCreateRequest`）で実施済み。
+    """
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")  # 対象会社の実在（B.3・§1.6）
+        db_identifier = company.db_identifier
+    with get_tenant_session(db_identifier) as ts:
+        clash = ts.execute(
+            select(QuestGroup).where(QuestGroup.quest_group_code == quest_group_code)
+        ).scalars().first()
+        if clash is not None:
+            raise AppError(409, "conflict", extra={"errors": [{"field": "quest_group_code"}]})
+        group = QuestGroup(id=uuid.uuid4(), quest_group_code=quest_group_code, name=name)
+        ts.add(group)
+        ts.commit()
+        return {"group_id": str(group.id), "quest_group_code": group.quest_group_code,
+                "name": group.name, "member_count": 0}
+
+
 def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
     """会社設定フラグ更新（SC-92）。**記名（`vote_anonymized=false`）時は `hide_voters_from_managers`
     を無効化して保存**（サーバー整合・B.1）。設定は login/表示時に DB を直参照＝キャッシュ未実装のため
