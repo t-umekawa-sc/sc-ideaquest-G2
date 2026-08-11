@@ -20,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション）: **`2b26891`**（SC-90 QG管理者 frontend・B-TC-119/120）。本セッションの主な流れ＝… SC-92C `d08fbe5`→SC-93 `710f304`→handoff `085d0dc`→SC-90 `2b26891`。**`085d0dc`（SC-93 の handoff）までは `origin/main` へプッシュ済み、`2b26891`（SC-90）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション）: **`3a32656`**（SC-92 詳細ルートの認可ガード e2e・B-TC-121）。本セッションの主な流れ＝… SC-93 `710f304`→SC-90 `2b26891`→handoff `2bcc79c`→SC-92 gating `3a32656`。**`2bcc79c`（SC-90 の handoff）までは `origin/main` へプッシュ済み、`3a32656`（B-TC-121）は未プッシュ**。※本 handoff 更新はこの後の別コミット。
 - 規約の追加（本セッション）: **テスト規約 §1.1**＝テストパターン md の TC 表を持つ各節に「テスト範囲の概要」（対象/範囲と非対象/前提/出典）を必須化。**API設計に新規 EP を追記する時は既存節と同じ表形式に揃える**（B.3 を表形式に統一・ユーザー指摘）。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
@@ -121,7 +121,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 - **テスト（本セッションで実測・マウント版）**:
   - **backend pytest = 154 passed**（既存111＋本セッション新規 B-TC-060〜103＝quest_group 一連・SoD 境界・ワーカ加算専用・監査ログ・K-TC-001〜003＝プロフィール編集 writer・回帰なし）。マウント版で実測。migration head＝**control 0009**（system_audit_logs）・**company 0006**。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
-  - **frontend＝SC-91＋SC-92 一式＋SC-93＋SC-90 を実装（本セッション）＝tsc/lint クリーン・e2e 16 passed**（sc-00 系5＋sc-91 系3〔110〜112〕＋sc-92 系4〔113〜116〕＋sc-93 系2〔117/118〕＋sc-90 系2〔119 非admin空/120 参加追加〕）。**フルスタックで実測**。features/companies・accounts（AccountSection＝system_admin クロステナント／AccountSelfSection＝会社アカ管理者 自社）・questgroups・qgadmin＋route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`＋ヘッダーナビ（system_admin＝会社／company_account_admin＝自社／全員＝クエストグループ管理）。OpenAPI 型再生成済み。
+  - **frontend＝SC-91＋SC-92 一式＋SC-93＋SC-90 を実装（本セッション）＝tsc/lint クリーン・e2e 17 passed**（sc-00 系5＋sc-91 系3〔110〜112〕＋sc-92 系5〔113 設定/121 general不可/114 発行/115 編集/116 グループ〕＋sc-93 系2〔117/118〕＋sc-90 系2〔119/120〕）。**フルスタックで実測**。features/companies・accounts（AccountSection＝system_admin クロステナント／AccountSelfSection＝会社アカ管理者 自社）・questgroups・qgadmin＋route `(app)/admin/companies[/[id]]`・`/admin/accounts`・`/admin/quest-groups`＋ヘッダーナビ（system_admin＝会社／company_account_admin＝自社／全員＝クエストグループ管理）。OpenAPI 型再生成済み。
   - **e2e の注意（重要）**＝(a) メール依存 e2e（sc-00-mfa/password-setup）は `mail-worker` 起動が前提。(b) frontend 再ビルドで Playwright system deps が消える＝`install-deps chromium`（root）を都度再実行。(c) **login を多数繰り返すとログインのレート制限（ADR-0005・`(IP+login_id)` 固定窓）で 429 になり sc-00（user@acme.example）が落ちる＝`docker compose exec redis redis-cli flushall` でカウンタを消すか `--workers=1` で緩和**（コード起因ではない）。
 - **Docker（本 handoff 時点）**＝**フルスタック起動中**（db/redis/backend/frontend/mailhog/worker/mail-worker）。backend/frontend は本セッションの変更を焼いた最新イメージ。SC-91 は `http://localhost:3000`（OPS/`admin@ops.example`/`Passw0rd!` でログイン→ヘッダー「システム管理（会社）」）で目視可。
 - **壊れているもの＝無し**。
