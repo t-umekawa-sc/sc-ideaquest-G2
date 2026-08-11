@@ -1,9 +1,12 @@
 """`/admin/*` の入出力 DTO（Pydantic・§3.2 DB モデル直返し禁止・§B.6 不要項目を返さない）。"""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_COMPANY_CODE_RE = re.compile(r"[A-Z][A-Z0-9-]{3,19}")  # 英大文字始まり・A-Z/0-9/-・4〜20字（§4.1）
 
 
 class PageInfo(BaseModel):
@@ -95,3 +98,73 @@ class AccountResponse(BaseModel):
 class PasswordResetResponse(BaseModel):
     """PWリンク再送の結果（A.7）。"""
     status: str  # "sent"
+
+
+# --- 会社 CRUD（B.1・SC-91/92） -------------------------------------------------------------
+class CompanyListItem(BaseModel):
+    """会社一覧の 1 行（SC-91）。group_count（会社DB `quest_groups`）はドメインC実装時に付与。"""
+    company_id: str
+    company_code: str
+    name: str
+    db_identifier: str
+    status: str
+    color: str
+    icon_image_path: str | None = None
+    account_count: int
+
+
+class CompanyListResponse(BaseModel):
+    data: list[CompanyListItem]
+    page_info: PageInfo
+
+
+class CompanyDetail(BaseModel):
+    """会社詳細＋設定フラグ＋件数（SC-92）。"""
+    company_id: str
+    company_code: str
+    name: str
+    db_identifier: str
+    status: str
+    color: str
+    icon_image_path: str | None = None
+    mfa_required: bool
+    vote_anonymized: bool
+    hide_voters_from_managers: bool
+    account_count: int
+
+
+class CompanyCreateRequest(BaseModel):
+    """会社作成の入力（SC-91）。`company_code` は大文字正規化＋形式検証（§4.1）。想定外プロパティ拒否。"""
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=255)
+    company_code: str
+    db_identifier: str = Field(min_length=1, max_length=128)
+    color: str | None = Field(default=None, max_length=16)
+    icon_image_path: str | None = Field(default=None, max_length=512)
+
+    @field_validator("company_code")
+    @classmethod
+    def _normalize_code(cls, v: str) -> str:
+        v = v.strip().upper()  # 大小文字は区別しない＝大文字へ正規化（§4.1）
+        if not _COMPANY_CODE_RE.fullmatch(v):
+            raise ValueError("company_code は英大文字始まり・A-Z/0-9/- ・4〜20字")
+        return v
+
+
+class CompanyProfileUpdateRequest(BaseModel):
+    """会社プロフィール更新（SC-92・差分）。company_code/db_identifier は不変（受け取らない）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    color: str | None = Field(default=None, max_length=16)
+    icon_image_path: str | None = Field(default=None, max_length=512)
+
+
+class CompanySettingsUpdateRequest(BaseModel):
+    """会社設定フラグ更新（SC-92・差分）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    vote_anonymized: bool | None = None
+    hide_voters_from_managers: bool | None = None
+    mfa_required: bool | None = None

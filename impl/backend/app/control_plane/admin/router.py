@@ -10,6 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.admin import application as admin_service
+from app.control_plane.admin import company_application as company_service
 from app.control_plane.admin.deps import require_company_account_admin, require_system_admin
 from app.control_plane.admin.schemas import (
     AccountCreateRequest,
@@ -18,6 +19,11 @@ from app.control_plane.admin.schemas import (
     AccountResponse,
     AccountUpdateRequest,
     AccountUpdateSelfRequest,
+    CompanyCreateRequest,
+    CompanyDetail,
+    CompanyListResponse,
+    CompanyProfileUpdateRequest,
+    CompanySettingsUpdateRequest,
     PasswordResetResponse,
 )
 from app.core.deps import verify_csrf, verify_origin
@@ -29,6 +35,67 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 def _company_id(session: dict) -> uuid.UUID:
     """会社アカウント管理者 EP のスコープ＝セッション会社固定（B.2.1・`company_id` を受けない）。"""
     return uuid.UUID(session["company_id"])
+
+
+# --- 会社 CRUD（`/admin/companies`・system_admin・B.1・SC-91/92） ----------------------------
+@router.get("/companies", response_model=CompanyListResponse)
+def list_companies(
+    request: Request,
+    q: str | None = None,
+    status: str | None = Query(default=None, pattern="^(active|suspended)$"),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    _session: dict = Depends(require_system_admin),
+) -> CompanyListResponse:
+    """会社一覧（SC-91・system_admin 専用）。"""
+    return CompanyListResponse(**company_service.list_companies(q=q, status=status, page=page, per_page=per_page))
+
+
+@router.post("/companies", response_model=CompanyDetail, status_code=201)
+def create_company(
+    body: CompanyCreateRequest, request: Request, _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社作成（SC-91・`status=suspended` で作成・code/db_identifier 一意）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return CompanyDetail(**company_service.create_company(
+        name=body.name, company_code=body.company_code, db_identifier=body.db_identifier,
+        color=body.color, icon_image_path=body.icon_image_path,
+    ))
+
+
+@router.get("/companies/{company_id}", response_model=CompanyDetail)
+def get_company(
+    company_id: uuid.UUID, request: Request, _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社詳細（SC-92）。"""
+    return CompanyDetail(**company_service.get_company_detail(company_id))
+
+
+@router.patch("/companies/{company_id}", response_model=CompanyDetail)
+def update_company(
+    company_id: uuid.UUID, body: CompanyProfileUpdateRequest, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社プロフィール更新（SC-92・name/color/icon）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return CompanyDetail(**company_service.update_company_profile(
+        company_id, body.model_dump(exclude_unset=True)
+    ))
+
+
+@router.patch("/companies/{company_id}/settings", response_model=CompanyDetail)
+def update_company_settings(
+    company_id: uuid.UUID, body: CompanySettingsUpdateRequest, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社設定フラグ更新（SC-92・記名時は非開示を無効化して整合）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return CompanyDetail(**company_service.update_company_settings(
+        company_id, body.model_dump(exclude_unset=True)
+    ))
 
 
 @router.get("/companies/{company_id}/accounts", response_model=AccountListResponse)

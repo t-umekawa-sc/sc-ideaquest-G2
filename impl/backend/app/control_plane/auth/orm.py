@@ -24,6 +24,11 @@ class Company(ControlBase):
     # 会社DB の物理データベース名（§1.5 動的ルーティングの解決キー）
     db_identifier: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")  # active | suspended
+    # 会社設定/プロフィール（B.1・SC-92・データモデル §4.1）
+    color: Mapped[str] = mapped_column(String(16), nullable=False, default="#6366F1")  # プリセット hex
+    icon_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)    # MinIO キー・任意
+    vote_anonymized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hide_voters_from_managers: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     mfa_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

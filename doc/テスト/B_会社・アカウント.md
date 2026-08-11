@@ -74,7 +74,22 @@
 
 - **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火・`forbid_system_admin_target` 無効化で B-TC-042 が 200（system_admin を disable できてしまう）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
-## 3. 補足・非対象
+## 3. 会社 CRUD API（B.1・system_admin・SC-91/92）
+
+> `/admin/companies`。作成は DBプロビジョニング MVP 手動＝`status=suspended` で管理DB 行を作るのみ。`group_count`（会社DB `quest_groups`）はドメインC実装時に付与（本スライスは `account_count` のみ）。設定の Redis `company_config` 無効化はキャッシュ未実装ゆえ現状 no-op（§1.14）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-050 | api | system_admin | `GET /admin/companies` | `200`＋`{data, page_info}`・各行に `account_count`・seed 会社を含む | B.1／§1.8 |
+| B-TC-051 | api | system_admin | `POST /admin/companies`（小文字 code） | `201`＋**`status=suspended`**＋`company_code` は**大文字正規化** | B.1／§4.1 |
+| B-TC-052 | api | system_admin | 既存 code で作成／不正形式 code | 既存＝`409 conflict`（field=company_code）／形式違反＝`422` | B.1／§4.1 |
+| B-TC-053 | api | system_admin | `GET /admin/companies/{id}`／不明 id | `200`＋設定フラグ＋`account_count`／不明＝`404` | B.1 |
+| B-TC-054 | api | system_admin | `PATCH .../settings`（`vote_anonymized=false`）／`PATCH .../{id}`（color） | 記名時は **`hide_voters_from_managers` を無効化して保存**（サーバー整合）／プロフィール更新 200 | B.1 |
+| B-TC-055 | api | general | `GET /admin/companies` | `403 forbidden`（system_admin 専用） | B.1／B.0.1 |
+
+- **red 確認（後追い）**＝記名時整合行の無効化で B-TC-054 が `hide_voters_from_managers=true` のまま（本来 false）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+
+## 4. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
 - **初期所属 `memberships` の相乗適用**（B.5＝`users`→`quest_group_members` の順）は B ドメイン実装時（本スライスの payload は `password_set` のみ）。
