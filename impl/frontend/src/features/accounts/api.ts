@@ -59,3 +59,32 @@ export function resetPassword(companyId: string, accountId: string): Promise<{ s
 export function listQuestGroups(companyId: string): Promise<QuestGroupListResponse | null> {
   return apiFetch<QuestGroupListResponse>(`/admin/companies/${companyId}/quest-groups`);
 }
+
+// --- SC-93 会社アカウント管理者（B.2.1・`/admin/accounts`＝セッション会社固定・system_role は受けない） ---
+export function listOwnAccounts(params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<AccountListResponse>(`/admin/accounts${suffix}`);
+}
+
+export function issueOwnAccount(body: { display_name: string; login_id: string; email: string }): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>("/admin/accounts", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function editOwnAccount(accountId: string, body: { display_name?: string; login_id?: string; email?: string }): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/accounts/${accountId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function disableOwnAccount(accountId: string): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/accounts/${accountId}/disable`, { method: "POST" });
+}
+
+export function enableOwnAccount(accountId: string): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/accounts/${accountId}/enable`, { method: "POST" });
+}
+
+export function resetOwnPassword(accountId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/admin/accounts/${accountId}/password-reset`, { method: "POST" });
+}

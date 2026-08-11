@@ -18,6 +18,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link role="menuitem" href="/admin/companies">システム管理（会社）</Link>
           </li>
         )}
+        {session.system_role === "company_account_admin" && (
+          <li>
+            <Link role="menuitem" href="/admin/accounts">アカウント管理（自社）</Link>
+          </li>
+        )}
         <li>
           <LogoutMenuItem />
         </li>

@@ -248,3 +248,12 @@
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-116 | e2e | OPS system_admin・ACME-01 詳細 | グループ作成→リネーム（prompt）→削除（confirm・空グループ） | 作成したコードが一覧に現れ、リネーム後の名称に更新、削除で一覧から消える | SC-92／B.3.1／§5.4 |
+
+## 13. frontend e2e（SC-93 会社アカウント管理者・B.2.1）
+
+> 対象＝`frontend/e2e/sc-93-own-accounts.spec.ts`（Playwright・階層 e2e）。範囲＝SC-93（会社アカウント管理者＝自社アカウント管理・`/admin/accounts`＝セッション会社固定）＝一覧＋発行/編集/lifecycle。**system_role 付与は不可（general 固定）**・**所属エディタは自社グループ一覧 EP 未定義のため本画面ではスコープ外**。認可＝company_account_admin＋system_admin 上位互換（e2e は OPS 上位互換で検証）。前提＝フルスタック＋OPS 管理者。UI 設計の正＝`doc/画面設計/screens/SC-93_*.md`（該当）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-117 | e2e | OPS（system_admin 上位互換） | `/admin/accounts` で発行 | 発行したログインID が自社アカウント一覧に現れる | SC-93／B.2.1 |
+| B-TC-118 | e2e | 一般ユーザー（general） | `/admin/accounts` を開く | `/` へリダイレクト（サーバーガード） | B.0.1／B.2.1 |
