@@ -103,6 +103,18 @@
 
 - **red 確認（後追い）**＝部分ユニーク index を張らずに migration すると B-TC-061 が重複有効所属を許容（IntegrityError にならない）ことを目視→index 追加で green。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
+### 4.1 quest_group repository（所属の永続化プリミティブ・B.3/B.4/B.5）
+
+> 対象＝`app/tenant/quest_group/repository.py`。所属の割当を支える会社DB 永続化プリミティブ（`upsert_membership`／`remove_membership`／`get_active_membership`／`list_active_group_ids_for_user`）。仕様＝API設計 B.3（編集差分＝upsert/トゥームストーン）・B.4（参加追加＝行作成 or `removed_at` を NULL に戻す／除外＝`removed_at` 設定）・B.5 step3（発行相乗り）・データモデル §5.5。**再有効化の意味論**＝解除済み（tombstone）行があれば `removed_at` を NULL に戻して再有効化（1 (group,user) 1行の不変条件・監査は別テーブル `system_audit_logs`＝B.6 に残す前提）。割当の差分適用（application）と QG 門番（deps）は後続スライス。ACME-01 会社DB を使い teardown で物理削除。test-first（red 証跡＝コミットメッセージ）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-064 | int | グループ+ユーザーあり・所属なし | `upsert_membership(group, user, role='member')` | 有効所属が **1行作成**（`removed_at IS NULL`・`role='member'`） | B.4／B.5 step3 |
+| B-TC-065 | int | 有効所属が1行（`role='member'`） | `upsert_membership(..., role='admin')` を実行（＋同値で再実行） | 同一行の **`role` が `admin` に更新**・**行数は不変**（冪等＝再適用で増えない） | B.3（ロール変更）／§5.5 |
+| B-TC-066 | int | 解除済み（`removed_at` 値あり）の行が1件・有効所属なし | `upsert_membership(group, user, role='member')` | **`removed_at` が NULL に戻り再有効化**・有効所属は **1件**（部分ユニークに抵触しない・新規行を増やさない） | B.4（`removed_at` を NULL に戻す）／§5.5 |
+| B-TC-067 | int | 有効所属が1行 | `remove_membership(group, user)` を2回 | 1回目で **`removed_at` 設定（トゥームストーン）**・有効所属0件／2回目は **no-op**（`None` を返す・既に解除済み） | B.4（除外）／§5.5 |
+| B-TC-068 | int | ユーザーが G1=`admin`（有効）・G2=`member`（有効）・G3=`member`（解除済み）に所属 | `list_active_group_ids_for_user(user)`／`(user, role='admin')` | 前者＝{G1,G2}（`removed_at IS NULL` のみ・G3 除外）／後者＝{G1}（role フィルタ） | §5.5（参照範囲）／B.0.1 P5（QG門番の材料） |
+
 ## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。
