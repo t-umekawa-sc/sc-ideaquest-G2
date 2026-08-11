@@ -20,7 +20,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン。**本セッションのコミットは未プッシュ**＝プッシュはユーザー依頼時のみ）。
-- 最新コミット（本セッション・実装本体）: **`22e85f0`**（B.3 POST quest-groups＝グループ作成・B-TC-088/089）。本セッションの実装＝データ層 `c9d79ff`→repository `0ae09f5`→1A `4bb63e0`→1B `a71ea52`→1C `1bdbef2`→B.4 `3420317`→B.3 候補一覧 `9aa22ba`→B.3 作成 `22e85f0`。`01c657c`（handoff）までは `origin/main` へプッシュ済み、`22e85f0` 以降は未プッシュ。※本 handoff 更新はこの後の別コミット。
+- 最新コミット（本セッション）: **`0b6f01b`**（設計+モック＝SC-92 クエストグループ CRUD 動線・B.3 に U/D 追加・§5.4 tombstone）。本セッションの実装＝データ層 `c9d79ff`→repository `0ae09f5`→1A `4bb63e0`→1B `a71ea52`→1C `1bdbef2`→B.4 `3420317`→B.3 候補一覧 `9aa22ba`→B.3 作成 `22e85f0`→設計+モック `0b6f01b`。`d31ed62`（handoff）までは `origin/main` へプッシュ済み、`0b6f01b` は未プッシュ。※本 handoff 更新はこの後の別コミット。
 - 直前セッションの最新＝`af41bf3`（users ミラー列補完 handoff）／`58b2af9`（users identity/role ミラー列補完 実装）。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
   - `62ba95d` テスト追加 A-TC-082（失敗計数の固定窓TTL経過リセット・ADR-0005）
@@ -177,10 +177,12 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 
 > ドメイン B バックエンドの主要フローは概ね縦通し済み（B0/B1/B2＋memberships＋B.4 QG管理者 API）。次スライスの選択はユーザーと相談。以下は候補。
 
-### (1) quest_groups のプロビジョニング＝完了（本セッション）
-- **一覧＝`9aa22ba`**＝`GET /admin/companies/{company_id}/quest-groups`（system_admin・割当候補・B.3）。
-- **作成＝`22e85f0`**＝`POST /admin/companies/{company_id}/quest-groups`（system_admin・B.3 を 2026-08-11 に追記して設計確定＝グループ作成は会社構造変更＝system_admin 専用・SoD）。`quest_group_code` 大文字正規化＋会社内一意（§5.4）。
-- **残り（将来）**＝グループの**削除/リネーム**（クエスト・所属整合が絡む＝要件化待ち・B.3 で当面非対象と明記）。B.4 `GET .../members` の `q`/`status` フィルタ・ページングは最小実装（`q` のみ）＝必要に応じ拡充。
+### (1) quest_groups の U(rename)/D(delete) バックエンド実装＝次スライス（設計は確定済み）
+- **一覧＝`9aa22ba`／作成＝`22e85f0`**（backend 実装済み）。**リネーム(PATCH)/削除(DELETE) は設計確定済み（`0b6f01b` で B.3＋§5.4 追記）だが backend 未実装**。
+- **設計（実装すべき仕様）**＝`PATCH /admin/companies/{id}/quest-groups/{group_id}`（`name` のみ・code 不変・200）／`DELETE .../{group_id}`（**空グループ限定**＝有効所属〔`removed_at IS NULL`〕やクエストがあれば **409 `in_use`**・トゥームストーン `quest_groups.deleted_at`・204）。
+- **要スキーマ変更（migration）**＝`quest_groups` に `deleted_at` 列追加＋`UNIQUE(quest_group_code)` を **部分ユニーク `WHERE deleted_at IS NULL`** に変更（company migration 0006）。既存の一覧/候補/作成の一意チェックも `deleted_at IS NULL` 絞りに更新（`list_company_quest_groups`／`create_company_quest_group`／worker の quest_group 参照は無いが確認）。B-TC-090 番台で test-first。
+- **SC-92 モックは CRUD 動線を実装済み（`0b6f01b`）**＝backend 実装のリファレンス（作成コード検証・リネーム name のみ・削除は空のみ）。
+- B.4 `GET .../members` の `q`/`status` フィルタ・ページングは最小実装（`q` のみ）＝必要に応じ拡充。
 
 ### (2) account_sync_outbox の他 writer（§4.6・残り）
 - **`last_login_at`／発行・編集の identity＋memberships＝実装済み（本セッション）**。無効化/再有効化＝`op=disable/enable`（実装済み・B2）。
@@ -221,7 +223,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝**次スライスはユーザーと相談**（候補＝§7＝(2) プロフィール編集 writer（K）／(3) 監査ログ `system_audit_logs`／(4) frontend で B ドメイン配線。(1) quest_groups プロビジョニング＝一覧/作成とも完了）。ドメイン B バックエンドの主要フロー（B0/B1/B2＋memberships 割当＋B.4 QG管理者 API＋B.3 QGグループ一覧/作成）は本セッションで縦通し済み。
+- ✅ 再開点＝**(1) quest_groups の リネーム/削除 backend 実装**（設計確定済み `0b6f01b`・SC-92 モックが動線リファレンス・要 migration 0006＝deleted_at＋部分ユニーク）。他候補＝(2) プロフィール編集 writer（K）／(3) 監査ログ `system_audit_logs`／(4) frontend で B ドメイン配線。ドメイン B バックエンド主要フロー（B0/B1/B2＋memberships 割当＋B.4 QG管理者 API＋B.3 QGグループ 一覧/作成）は縦通し済み。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
 - ✅ 状態＝backend 111 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
