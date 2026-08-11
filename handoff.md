@@ -6,7 +6,7 @@
 >
 > **現在地＝実装スキャフォールド進行中。手法＝「設計書→（必要なら ADR で具体値確定）→テストパターン→テストコード→実装」で 1 スライスずつ縦に通す。red-green 必須（テスト規約 §5.1）。**
 >
-> **本セッションで完了＝(A) ② メール非同期化（`mail_outbox`・ADR-0007・FK バグ修正含む）／(B) `logout-all` frontend 導線（A-TC-022）／(C) `last_login_at` ミラー writer（B-TC-006）／(D) §4.6 seq 正規化／(E) ドメイン B の B0（bootstrap＋/admin 認可＋アカウント一覧）＋B2 発行（`POST .../accounts`・B.5）。次＝B2 の残り（disable/enable/password-reset／編集 PATCH／company_account_admin 版・memberships）。**
+> **本セッションで完了＝(A) ② メール非同期化（`mail_outbox`・ADR-0007・FK バグ修正含む）／(B) `logout-all` frontend 導線（A-TC-022）／(C) `last_login_at` ミラー writer（B-TC-006）／(D) §4.6 seq 正規化／(E) ドメイン B の B0（bootstrap＋/admin 認可＋アカウント一覧）＋B2 発行＋状態管理（disable/enable/password-reset）。次＝B2 編集 PATCH（着手中）→ company_account_admin 版・memberships。**
 
 ---
 
