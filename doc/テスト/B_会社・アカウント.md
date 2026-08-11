@@ -186,7 +186,18 @@
 | B-TC-094 | api | `general` でログイン | 上記 system_admin 専用 EP 群を順に叩く | すべて `403 forbidden`（B.0.1 P6） | B.0.1 P6 |
 | B-TC-095 | api | `company_account_admin` でログイン | 同上（自社の `/admin/accounts` 系は別権限＝対象外） | すべて `403 forbidden`＝**会社アカ管理者は会社/グループ構造・クロステナントに越権できない**（SoD・§8-⑯） | §8-⑯／B.0.1 P6 |
 
-## 6. 補足・非対象
+## 6. システム監査ログ（system_audit_logs・B.6・§4.5）
+
+> 対象＝特権操作（アカウント発行/編集/disable/enable/PW再設定・会社作成/更新/設定・クエストグループ CRUD・所属追加/除外）が **管理DB `system_audit_logs` に監査行を残す**こと。範囲＝(a) 変更系操作が対応する `action` の行を1件書く（`actor_account_id`＝実行者・`ip`/`user_agent`＝middleware が確定・`detail`＝対象/前後）、(b) **読み取り系は監査しない**、(c) **失敗操作（403/422/409）は監査しない**（操作が起きていない）。実行者/IP/UA は `AuditContextMiddleware`（contextvar）が供給＝application は `action`/`detail` のみ。記録は control-plane 操作は同一Tx 相乗、テナントのみの操作（B.4 参加追加/除外・グループ CRUD）は独立記録。前提＝OPS system_admin または QG admin でログイン。機密（PW/token）は `detail` に入れない（§15）。出典＝B.6／§4.5。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-100 | api | system_admin（OPS）でログイン | アカウント disable／会社 `settings` 更新 | 各操作で `system_audit_logs` に **1 行**（`action=account.disable`/`company.settings_update`・`actor_account_id`＝OPS 管理者・`detail` に対象 ID・`ip` 記録） | B.6／§4.5 |
+| B-TC-101 | api | system_admin | 一覧 GET（会社/アカウント） | 監査行は**増えない**（読み取りは非監査） | B.6（変更系のみ） |
+| B-TC-102 | api | `general`（権限なし） | disable を試行（403） | 監査行は**作られない**（操作が起きていない＝認可失敗は非監査） | B.6／B.0.1 P6 |
+| B-TC-103 | api | QG管理者（`general`＋admin 所属）でログイン | 参加追加／除外（B.4） | `membership.add`/`membership.remove` の行（`actor_account_id`＝QG管理者・`detail` に group_id/account_id） | B.6／B.4 |
+
+## 7. 補足・非対象
 
 - **account_sync_outbox の writer は主要が実装済み**＝`password_set`（A.7 complete）／`last_login_at`（login 成功）／発行・編集・無効化・再有効化（B.2）／初期所属 `memberships` の相乗（B.5＝`users`→`quest_group_members` の順・§4.2/§4.3）／プロフィール編集（K・`PATCH /me`＝`display_name`/`locale`）。
 - **本ドメインの非対象（別スライス/別ドメイン）**:

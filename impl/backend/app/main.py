@@ -17,6 +17,7 @@ from sqlalchemy import text
 from app.control_plane.admin.router import router as admin_router
 from app.control_plane.auth.router import router as auth_router
 from app.control_plane.me.router import router as me_router
+from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.db.control import control_session
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
 
 app = FastAPI(title="ideaquest backend", version="0.0.1", lifespan=lifespan)
 
+app.add_middleware(AuditContextMiddleware)  # 監査ログの実行者/IP/UA を contextvar に載せる（B.6・§4.5）
 install_error_handlers(app)
 app.include_router(auth_router)
 app.include_router(admin_router)

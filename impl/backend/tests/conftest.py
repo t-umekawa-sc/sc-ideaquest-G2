@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.control_plane.account_sync.orm import OutboxEntry
+from app.control_plane.audit.orm import SystemAuditLog
 from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
 from app.control_plane.mail_outbox.application import process_mail_outbox_once
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
@@ -56,6 +57,19 @@ def _clean_mail_outbox():
     def _truncate() -> None:
         with control_session() as s:
             s.query(MailOutboxEntry).delete()
+            s.commit()
+
+    _truncate()
+    yield
+    _truncate()
+
+
+@pytest.fixture(autouse=True)
+def _clean_audit_logs():
+    """各テストの前後で system_audit_logs を空にする（監査行の隔離・FK は actor 側＝子テーブル）。"""
+    def _truncate() -> None:
+        with control_session() as s:
+            s.query(SystemAuditLog).delete()
             s.commit()
 
     _truncate()
@@ -235,6 +249,9 @@ def factory():
         # mail_outbox（FK→accounts・任意列）も accounts 削除前に掃除
         for aid in created_accounts:
             s.query(MailOutboxEntry).filter_by(account_id=aid).delete()
+        # system_audit_logs（FK→accounts＝actor）も accounts 削除前に掃除（factory 垢が actor の監査行）
+        for aid in created_accounts:
+            s.query(SystemAuditLog).filter_by(actor_account_id=aid).delete()
         for aid in created_accounts:
             s.query(Account).filter_by(id=aid).delete()
         for cid in created_companies:

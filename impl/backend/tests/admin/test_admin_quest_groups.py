@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.control_plane.audit.orm import SystemAuditLog
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -180,3 +181,28 @@ def test_b_tc_085_remove_member_idempotent(client, factory, qg):
 
     r2 = client.delete(f"{QG}/{g1}/members/{target['id']}", headers=_csrf(client))
     assert r2.status_code == 204  # 冪等
+
+
+def _audit(action: str):
+    with control_session() as s:
+        return list(s.query(SystemAuditLog).filter_by(action=action).all())
+
+
+def test_b_tc_103_membership_ops_audited(client, factory, qg):
+    """B-TC-103 参加追加/除外が監査行を残す（actor=QG管理者・detail に group/account）。B.6/B.4。"""
+    admin_acc = qg.new_account()
+    g1 = qg.make_group()
+    qg.seed_membership(g1, admin_acc["id"], "admin")
+    target = qg.new_account()
+    qg.login(admin_acc)
+
+    r = client.post(f"{QG}/{g1}/members", json={"account_id": str(target["id"])}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    add_rows = _audit("membership.add")
+    assert len(add_rows) == 1
+    assert str(add_rows[0].actor_account_id) == str(admin_acc["id"])   # 実行者＝QG管理者（general）
+    assert add_rows[0].detail["group_id"] == str(g1) and add_rows[0].detail["account_id"] == str(target["id"])
+
+    r2 = client.delete(f"{QG}/{g1}/members/{target['id']}", headers=_csrf(client))
+    assert r2.status_code == 204
+    assert len(_audit("membership.remove")) == 1

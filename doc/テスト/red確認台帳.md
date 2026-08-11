@@ -224,3 +224,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-096/097 | `account_sync/application._apply_memberships` を一時的にフルセット差分（payload に無い有効所属を remove）へ書き換え | 096＝memberships 無し payload で既存所属が削除される（本来は保持）／097＝payload に含めない G2 が削除される（本来は加算専用で保持）＝「加算専用・修正は編集経路」という不変条件が load-bearing。復元して green（150 passed）。 |
+
+## 追記: システム監査ログ（B-TC-100/103）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-100/103 | `audit/repository.record` を早期 return の no-op に一時変更（監査行を書かない） | 特権操作（disable/settings 更新・membership add/remove）後に `system_audit_logs` に行が無く、`len(rows)==1` の assert が落ちる＝各 application からの `audit.record` 呼び出しが load-bearing。復元して green（154 passed）。 |

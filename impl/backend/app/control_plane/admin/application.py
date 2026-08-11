@@ -13,6 +13,7 @@ import redis
 from sqlalchemy import func, or_, select
 
 from app.control_plane.account_sync import repository as account_sync_repo
+from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.orm import Account, Company
 from app.control_plane.mail_outbox import repository as mail_repo
@@ -119,6 +120,10 @@ def issue_account(
             session, email, CATEGORY_PASSWORD_SETUP, secret=token, locale=locale,
             account_id=account.id, company_id=company_id,
         )
+        audit.record("account.issue", {  # 監査（B.6・同一Tx）。機密（token）は入れない
+            "company_id": str(company_id), "account_id": str(account.id),
+            "system_role": system_role, "memberships": memberships or [],
+        }, session=session)
         session.commit()
         return _account_state(account)
 
@@ -169,11 +174,18 @@ def edit_account(
                 if new_email and a.email == new_email:
                     raise AppError(409, "conflict", extra={"errors": [{"field": "email"}]})
 
+        old_role = account.system_role  # 監査用に変更前を退避（§2-⑬ 権限変更履歴）
         payload = {f: changes[f] for f in _EDITABLE_FIELDS if f in changes}
         for field, value in payload.items():
             setattr(account, field, value)
         if payload:
             account_sync_repo.enqueue(session, account_id, company_id, "upsert", payload)  # users ミラー
+        audit.record("account.edit", {  # 監査（B.6・同一Tx）。system_role は前後、identity は変更キーのみ
+            "company_id": str(company_id), "account_id": str(account_id),
+            "changed_fields": sorted(payload.keys()),
+            "system_role": {"before": old_role, "after": account.system_role} if role_changed else None,
+            "memberships": memberships,
+        }, session=session)
         session.commit()
         result = _account_state(account)
 
@@ -224,6 +236,8 @@ def disable_account(
         account.status = "disabled"
         account_sync_repo.enqueue(session, account_id, company_id, "disable", {"status": "disabled"})
         account_repo.revoke_all_trusted_devices(session, account_id)  # 信頼端末失効（A.9-③）
+        audit.record("account.disable", {"company_id": str(company_id), "account_id": str(account_id)},
+                     session=session)  # 監査（B.6）
         session.commit()
         result = _account_state(account)
     delete_account_sessions(r, str(account_id))  # 全アクティブセッション破棄（Redis・A.9-③）
@@ -236,6 +250,8 @@ def enable_account(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
         account = _account_in_company(session, company_id, account_id)
         account.status = "active"
         account_sync_repo.enqueue(session, account_id, company_id, "enable", {"status": "active"})
+        audit.record("account.enable", {"company_id": str(company_id), "account_id": str(account_id)},
+                     session=session)  # 監査（B.6）
         session.commit()
         return _account_state(account)
 
@@ -253,6 +269,8 @@ def reset_password(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
             session, account.email, CATEGORY_PASSWORD_SETUP, secret=token, locale=account.locale,
             account_id=account_id, company_id=company_id,
         )
+        audit.record("account.password_reset",  # 監査（B.6）。token 等の機密は入れない（§15）
+                     {"company_id": str(company_id), "account_id": str(account_id)}, session=session)
         session.commit()
     return {"status": "sent"}
 

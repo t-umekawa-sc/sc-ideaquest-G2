@@ -12,6 +12,7 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
@@ -132,6 +133,8 @@ def add_member(session: dict, group_id: uuid.UUID, target_account_id: uuid.UUID)
         membership = qg_repo.upsert_membership(ts, group_id, target.id, "member")
         role = membership.role
         ts.commit()
+    audit.record("membership.add",  # 監査（B.6・独立記録＝会社DB 書込の後）
+                 {"group_id": str(group_id), "account_id": str(target_account_id), "role": role})
     return {"account_id": str(target_account_id), "group_id": str(group_id), "role": role}
 
 
@@ -145,3 +148,5 @@ def remove_member(session: dict, group_id: uuid.UUID, target_account_id: uuid.UU
             raise AppError(404, "not_found")
         qg_repo.remove_membership(ts, group_id, target.id)  # 有効所属をトゥームストーン（冪等）
         ts.commit()
+    audit.record("membership.remove",  # 監査（B.6・独立記録）
+                 {"group_id": str(group_id), "account_id": str(target_account_id)})

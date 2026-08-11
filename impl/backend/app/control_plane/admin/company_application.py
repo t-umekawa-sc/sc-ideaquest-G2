@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 
+from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
 from app.db.control import control_session
@@ -85,6 +86,8 @@ def create_company(*, name: str, company_code: str, db_identifier: str,
             status="suspended", color=color or "#6366F1", icon_image_path=icon_image_path,
         )
         session.add(company)
+        audit.record("company.create",  # 監査（B.6・同一Tx）
+                     {"company_id": str(company.id), "company_code": company_code}, session=session)
         session.commit()
         return _detail(company, 0)
 
@@ -106,9 +109,11 @@ def update_company_profile(company_id: uuid.UUID, changes: dict) -> dict:
         company = session.get(Company, company_id)
         if company is None:
             raise AppError(404, "not_found")
-        for field in _PROFILE_FIELDS:
-            if field in changes:
-                setattr(company, field, changes[field])
+        applied = [f for f in _PROFILE_FIELDS if f in changes]
+        for field in applied:
+            setattr(company, field, changes[field])
+        audit.record("company.update",  # 監査（B.6・同一Tx）
+                     {"company_id": str(company_id), "changed_fields": applied}, session=session)
         session.commit()
         count = session.execute(
             select(func.count()).select_from(Account).where(Account.company_id == company_id)
@@ -169,6 +174,10 @@ def create_company_quest_group(company_id: uuid.UUID, *, quest_group_code: str, 
         group = QuestGroup(id=uuid.uuid4(), quest_group_code=quest_group_code, name=name)
         ts.add(group)
         ts.commit()
+        # 監査（B.6）＝会社DB 書込のため独立記録（管理DB へ append・best-effort）
+        audit.record("quest_group.create", {
+            "company_id": str(company_id), "group_id": str(group.id), "quest_group_code": quest_group_code,
+        })
         return {"group_id": str(group.id), "quest_group_code": group.quest_group_code,
                 "name": group.name, "member_count": 0}
 
@@ -202,6 +211,8 @@ def rename_company_quest_group(company_id: uuid.UUID, group_id: uuid.UUID, *, na
         group.name = name
         count = _active_member_count(ts, group_id)
         ts.commit()
+        audit.record("quest_group.rename",  # 監査（B.6・独立記録）
+                     {"company_id": str(company_id), "group_id": str(group_id), "name": name})
         return {"group_id": str(group.id), "quest_group_code": group.quest_group_code,
                 "name": group.name, "member_count": count}
 
@@ -223,6 +234,8 @@ def delete_company_quest_group(company_id: uuid.UUID, group_id: uuid.UUID) -> No
             raise AppError(409, "conflict", extra={"errors": [{"reason": "in_use"}]})  # 空グループのみ削除可
         group.deleted_at = datetime.now(timezone.utc)  # トゥームストーン
         ts.commit()
+    audit.record("quest_group.delete",  # 監査（B.6・独立記録）
+                 {"company_id": str(company_id), "group_id": str(group_id)})
 
 
 def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
@@ -234,11 +247,13 @@ def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
         company = session.get(Company, company_id)
         if company is None:
             raise AppError(404, "not_found")
-        for field in _SETTINGS_FIELDS:
-            if field in changes:
-                setattr(company, field, changes[field])
+        applied = [f for f in _SETTINGS_FIELDS if f in changes]
+        for field in applied:
+            setattr(company, field, changes[field])
         if not company.vote_anonymized:  # 記名時は投票者非開示を無効化（整合）
             company.hide_voters_from_managers = False
+        audit.record("company.settings_update",  # 監査（B.6・同一Tx）
+                     {"company_id": str(company_id), "changed_fields": applied}, session=session)
         session.commit()
         count = session.execute(
             select(func.count()).select_from(Account).where(Account.company_id == company_id)
