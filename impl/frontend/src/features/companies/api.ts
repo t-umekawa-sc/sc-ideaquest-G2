@@ -1,6 +1,12 @@
 // companies 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/B_会社・アカウント・所属.md B.1。
 import { apiFetch } from "@/lib/api/client";
-import type { CompanyCreateInput, CompanyDetail, CompanyListResponse } from "./types";
+import type {
+  CompanyCreateInput,
+  CompanyDetail,
+  CompanyListResponse,
+  CompanyProfileInput,
+  CompanySettingsInput,
+} from "./types";
 
 export function listCompanies(params?: {
   q?: string;
@@ -21,6 +27,26 @@ export function listCompanies(params?: {
 export function createCompany(input: CompanyCreateInput): Promise<CompanyDetail | null> {
   return apiFetch<CompanyDetail>("/admin/companies", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getCompany(companyId: string): Promise<CompanyDetail | null> {
+  return apiFetch<CompanyDetail>(`/admin/companies/${companyId}`);
+}
+
+// 会社設定フラグ更新（B.1・記名時は hide_voters をサーバーが無効化して整合）。
+export function updateCompanySettings(companyId: string, input: CompanySettingsInput): Promise<CompanyDetail | null> {
+  return apiFetch<CompanyDetail>(`/admin/companies/${companyId}/settings`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+// 会社プロフィール更新（B.1・name/color/icon）。
+export function updateCompanyProfile(companyId: string, input: CompanyProfileInput): Promise<CompanyDetail | null> {
+  return apiFetch<CompanyDetail>(`/admin/companies/${companyId}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

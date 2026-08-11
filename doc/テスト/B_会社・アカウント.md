@@ -216,3 +216,11 @@
 | B-TC-110 | e2e | OPS system_admin でログイン | `/admin/companies` を開く | 見出し「会社一覧」＋seed 会社（ACME-01）が表示 | SC-91／B.1 |
 | B-TC-111 | e2e | 同上 | 「＋ 会社作成」→ name/code/db を入力し作成 | 作成した会社コードが一覧に現れる（`status=準備中`） | SC-91／B.1／§4.1 |
 | B-TC-112 | e2e | 一般ユーザー（general）でログイン | `/admin/companies` を開く | ダッシュボード（`/`）へリダイレクト＝サーバーガード（API も 403 で二重防御） | B.0.1 P6 |
+
+## 9. frontend e2e（SC-92 会社詳細・B.1）
+
+> 対象＝`frontend/e2e/sc-92-company-detail.spec.ts`（Playwright・階層 e2e）。範囲＝SC-92（会社詳細/設定）の縦通し＝SC-91 から遷移→会社設定トグル（`PATCH /settings`）が永続。アカウント管理・グループ CRUD・所属エディタは後続サブスライス（92B/92C）。前提＝フルスタック＋OPS 管理者 seed。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-113 | e2e | OPS system_admin | SC-91 で会社作成→会社名リンクで詳細へ→設定トグル（MFA）→リロード | 詳細に会社名/コード/状態＋設定が表示され、トグルした値が**リロード後も保持**（サーバー保存） | SC-92／B.1 |

@@ -5,3 +5,5 @@ export type Company = components["schemas"]["CompanyListItem"];
 export type CompanyListResponse = components["schemas"]["CompanyListResponse"];
 export type CompanyDetail = components["schemas"]["CompanyDetail"];
 export type CompanyCreateInput = components["schemas"]["CompanyCreateRequest"];
+export type CompanySettingsInput = components["schemas"]["CompanySettingsUpdateRequest"];
+export type CompanyProfileInput = components["schemas"]["CompanyProfileUpdateRequest"];

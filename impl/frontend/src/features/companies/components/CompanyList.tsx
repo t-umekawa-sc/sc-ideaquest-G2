@@ -3,6 +3,7 @@
 // SC-91 システム管理（会社一覧）。system_admin 専用（ページ側でガード）。
 // 一覧取得＋会社作成（B.1）。業務層クリーン＝表示/UX のみ、判定はサーバー（403/409/422 を文言化）。
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -136,7 +137,7 @@ export function CompanyList() {
             <tbody>
               {companies.map((c) => (
                 <tr key={c.company_id}>
-                  <td>{c.name}</td>
+                  <td><Link href={`/admin/companies/${c.company_id}`}>{c.name}</Link></td>
                   <td className="admin-code">{c.company_code}</td>
                   <td>{c.status === "active" ? "有効" : "準備中"}</td>
                   <td>{c.account_count}</td>

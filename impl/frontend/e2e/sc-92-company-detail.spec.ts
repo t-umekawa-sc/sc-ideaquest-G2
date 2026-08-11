@@ -1,0 +1,37 @@
+import { expect, test, type Page } from "@playwright/test";
+
+// SC-92 会社詳細/設定＝system_admin 専用（doc/テスト/B §8・API設計 B.1）。
+const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
+
+async function login(page: Page) {
+  await page.goto("/login");
+  await page.locator("#company_code").fill(OPS.company);
+  await page.locator("#login_id").fill(OPS.loginId);
+  await page.locator("#password").fill(OPS.password);
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await expect(page.getByText("ようこそ")).toBeVisible();
+}
+
+// B-TC-113: SC-91 から会社詳細へ遷移→設定トグル（MFA）が永続する（PATCH /settings）。
+test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
+  await login(page);
+  await page.goto("/admin/companies");
+
+  const stamp = Date.now().toString().slice(-8);
+  const code = `E2E-${stamp}`;
+  const cname = `E2E詳細_${stamp}`; // run ごとに一意＝リンクの strict 一致を担保
+  await page.getByRole("button", { name: "＋ 会社作成" }).click();
+  await page.locator("#c_name").fill(cname);
+  await page.locator("#c_code").fill(code);
+  await page.locator("#c_db").fill(`ideaquest_e2e_${stamp}`);
+  await page.getByRole("button", { name: /作成する/ }).click();
+  await expect(page.getByText(code)).toBeVisible();
+
+  await page.getByRole("link", { name: cname }).click();
+  await expect(page.getByRole("heading", { name: cname })).toBeVisible();
+
+  const before = await page.getByRole("checkbox", { name: /MFA/ }).isChecked();
+  await page.getByRole("checkbox", { name: /MFA/ }).click();
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: /MFA/ })).toBeChecked({ checked: !before });
+});
