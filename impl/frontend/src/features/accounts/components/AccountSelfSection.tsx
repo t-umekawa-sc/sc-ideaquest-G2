@@ -1,8 +1,8 @@
 "use client";
 
 // SC-93 会社アカウント管理者＝自社（セッション会社固定）のアカウント管理（B.2.1）。
-// 一覧＋発行/編集（identity のみ・system_role は付与不可＝general 固定）＋disable/enable/PW再設定。
-// 所属（memberships）の割当は、会社アカウント管理者向けの自社グループ一覧 EP が未定義のため本画面ではスコープ外。
+// 一覧＋発行/編集（identity＋所属 memberships・system_role は付与不可＝general 固定）＋disable/enable/PW再設定。
+// 所属の候補は自社グループ一覧（GET /admin/company-quest-groups・B.2.1）。編集時は「置き換える」オプトインで全置換（誤消去防止）。
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
@@ -13,9 +13,11 @@ import {
   enableOwnAccount,
   issueOwnAccount,
   listOwnAccounts,
+  listOwnCompanyQuestGroups,
   resetOwnPassword,
 } from "../api";
-import type { Account } from "../types";
+import type { Account, Membership, QuestGroup } from "../types";
+import { MembershipsEditor } from "./MembershipsEditor";
 import "@/features/companies/companies.css";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -40,6 +42,7 @@ function formErrorMessage(err: unknown): string {
 
 export function AccountSelfSection() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -49,14 +52,17 @@ export function AccountSelfSection() {
   const [displayName, setDisplayName] = useState("");
   const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const reload = useCallback(async () => {
     setLoadError(null);
     try {
-      const res = await listOwnAccounts();
-      setAccounts(res?.data ?? []);
+      const [accRes, grpRes] = await Promise.all([listOwnAccounts(), listOwnCompanyQuestGroups()]);
+      setAccounts(accRes?.data ?? []);
+      setGroups(grpRes?.data ?? []);
     } catch (err) {
       setLoadError(err instanceof ApiError && err.code === "forbidden"
         ? "アカウントを表示する権限がありません。"
@@ -74,6 +80,8 @@ export function AccountSelfSection() {
     setDisplayName("");
     setLoginId("");
     setEmail("");
+    setMemberships([]);
+    setReplaceMemberships(false);
     setFormError(null);
     setShowForm(true);
   }
@@ -84,6 +92,8 @@ export function AccountSelfSection() {
     setDisplayName(a.display_name);
     setLoginId(a.login_id);
     setEmail(a.email);
+    setMemberships([]); // 現在の所属は一覧に無い＝置き換え時のみ明示指定
+    setReplaceMemberships(false);
     setFormError(null);
     setShowForm(true);
   }
@@ -94,9 +104,14 @@ export function AccountSelfSection() {
     setPending(true);
     try {
       if (mode === "issue") {
-        await issueOwnAccount({ display_name: displayName, login_id: loginId, email });
+        await issueOwnAccount({ display_name: displayName, login_id: loginId, email, memberships });
       } else if (editingId) {
-        await editOwnAccount(editingId, { display_name: displayName, login_id: loginId, email });
+        await editOwnAccount(editingId, {
+          display_name: displayName,
+          login_id: loginId,
+          email,
+          ...(replaceMemberships ? { memberships } : {}),
+        });
       }
       setShowForm(false);
       await reload();
@@ -146,6 +161,17 @@ export function AccountSelfSection() {
           <Field id="s_email" label="メールアドレス" required>
             <input id="s_email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </Field>
+          {mode === "edit" && (
+            <label>
+              <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
+              所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
+            </label>
+          )}
+          {(mode === "issue" || replaceMemberships) && (
+            <Field id="s_groups" label="所属クエストグループ">
+              <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+            </Field>
+          )}
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
           </Button>

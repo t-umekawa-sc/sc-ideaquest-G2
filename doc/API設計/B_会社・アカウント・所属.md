@@ -96,7 +96,9 @@
 | `PATCH /admin/accounts/{account_id}` | アカウント編集 | ボディ（差分）: `display_name`/`login_id`/`email`/`memberships` | 更新後アカウント（identity は会社内一意） |
 | `POST /admin/accounts/{account_id}/disable` ／ `/enable` | 無効化⇄再有効化 | — | 状態更新（B.2 と同挙動＝全セッション破棄＋信頼端末失効） |
 | `POST /admin/accounts/{account_id}/password-reset` | 初回/再設定PWリンク再送 | — | 送信結果（A.7） |
+| `GET /admin/company-quest-groups` | 自社のクエストグループ一覧（**発行/編集の `memberships` 割当の候補**） | （セッション会社固定・パラメータなし） | `data`＝グループの配列（`group_id`/`quest_group_code`/`name`/`member_count`・`deleted_at IS NULL`） |
 
+- **`GET /admin/company-quest-groups` の位置づけ（2026-08-11 追加）**: 会社アカウント管理者が発行/編集で `memberships` を指定するには**自社の全グループを候補として見る**必要がある。B.3 `GET /admin/companies/{id}/quest-groups` は system_admin 専用（クロステナント＝`company_id` を明示）、B.4 `GET /admin/quest-groups` は QG管理者の「自分が `admin` のグループのみ」で用途が違う。よって**セッション会社固定・会社アカウント管理者（＋system_admin 上位互換）向けの自社全グループ一覧**を本 EP として追加する（読み取りのみ・作成/変更は B.3＝system_admin 専用のまま）。
 - **認可条件（B.2.1 全エンドポイント・共通）**: B.0.1 の P1〜P6＋`session.system_role == "company_account_admin"`（`system_admin` も上位互換で可）。対象は**セッション会社のアカウントのみ**（他会社は経路上そもそも不可＝`company_id` を受けない）。
 - **できる操作＝per-group `admin` の任命/剥奪（自社・2026-08-02 改定）**: `memberships` に **`role=admin` を含めてよい**（自社の任意アカウントを QG管理者にする/解除する）。**なぜ許すか**＝per-group `admin` は「特定グループの参加追加/除外だけ」の**下位権限**で、会社アカ管理者が既に持つ破壊系（発行/無効化/PW）より弱く、自社スコープに閉じるため**新たな越権にならない**（B.7.2）。付与/剥奪は `system_audit_logs` に記録。
 - **不可操作（＝system_admin との差・403/422）**: **`system_role` の変更（`company_account_admin`/`system_admin` の付与・降格）は不可**（＝“同格/上位を増やす”真の権限昇格は system_admin に集約）。よって発行/編集で作れる/変更できるのは **`system_role=general` のアカウントのみ**（`admin` は per-group ロールなので `system_role` ではなく `memberships` 側＝可）。会社設定（`/settings`）・会社作成/プロビジョニング（B.1）も不可。

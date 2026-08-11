@@ -7,11 +7,10 @@ import type { components } from "@/lib/api/schema";
 type QuestGroupListResponse = components["schemas"]["QuestGroupListResponse"];
 
 export function listAccounts(companyId: string, params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
-  const qs = new URLSearchParams();
+  const qs = new URLSearchParams({ per_page: "100" }); // 暫定＝ページング/検索 UI 実装まで最大件数を引き上げ
   if (params?.q) qs.set("q", params.q);
   if (params?.status) qs.set("status", params.status);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetch<AccountListResponse>(`/admin/companies/${companyId}/accounts${suffix}`);
+  return apiFetch<AccountListResponse>(`/admin/companies/${companyId}/accounts?${qs.toString()}`);
 }
 
 export function issueAccount(
@@ -62,19 +61,23 @@ export function listQuestGroups(companyId: string): Promise<QuestGroupListRespon
 
 // --- SC-93 会社アカウント管理者（B.2.1・`/admin/accounts`＝セッション会社固定・system_role は受けない） ---
 export function listOwnAccounts(params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
-  const qs = new URLSearchParams();
+  const qs = new URLSearchParams({ per_page: "100" }); // 暫定＝ページング/検索 UI 実装まで最大件数を引き上げ
   if (params?.q) qs.set("q", params.q);
   if (params?.status) qs.set("status", params.status);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetch<AccountListResponse>(`/admin/accounts${suffix}`);
+  return apiFetch<AccountListResponse>(`/admin/accounts?${qs.toString()}`);
 }
 
-export function issueOwnAccount(body: { display_name: string; login_id: string; email: string }): Promise<AccountResponse | null> {
+export function issueOwnAccount(body: { display_name: string; login_id: string; email: string; memberships?: Membership[] }): Promise<AccountResponse | null> {
   return apiFetch<AccountResponse>("/admin/accounts", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function editOwnAccount(accountId: string, body: { display_name?: string; login_id?: string; email?: string }): Promise<AccountResponse | null> {
+export function editOwnAccount(accountId: string, body: { display_name?: string; login_id?: string; email?: string; memberships?: Membership[] }): Promise<AccountResponse | null> {
   return apiFetch<AccountResponse>(`/admin/accounts/${accountId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// 自社のクエストグループ一覧（B.2.1・所属エディタの候補・セッション会社固定）。
+export function listOwnCompanyQuestGroups(): Promise<QuestGroupListResponse | null> {
+  return apiFetch<QuestGroupListResponse>("/admin/company-quest-groups");
 }
 
 export function disableOwnAccount(accountId: string): Promise<AccountResponse | null> {

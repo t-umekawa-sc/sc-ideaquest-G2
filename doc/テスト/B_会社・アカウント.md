@@ -74,6 +74,7 @@
 | B-TC-041 | api | company_account_admin | `POST /admin/accounts` | `201`＋`system_role=general` 固定・セッション会社配下に作成 | B.2.1 |
 | B-TC-042 | api | company_account_admin | ボディに `system_role`／system_admin を `disable` | `system_role` は受け取らない＝`422`（付与不可）／system_admin の disable は `403`（B.2.1・§8-⑯） | B.2.1 |
 | B-TC-043 | api | general／system_admin | `GET /admin/accounts` | general＝`403`／system_admin＝`200`（上位互換） | B.2.1／B.0.1 |
+| B-TC-044 | api | company_account_admin（ACME-01）・ACME-01 にグループ seed | `GET /admin/company-quest-groups` | `200`＋**セッション会社（ACME-01）の全グループ**（`group_id`/`quest_group_code`/`name`/`member_count`）。所属エディタの候補。general＝`403` | B.2.1（2026-08-11 追加） |
 
 - **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火・`forbid_system_admin_target` 無効化で B-TC-042 が 200（system_admin を disable できてしまう）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
@@ -258,6 +259,7 @@
 | --- | --- | --- | --- | --- | --- |
 | B-TC-117 | e2e | OPS（system_admin 上位互換） | `/admin/accounts` で発行 | 発行したログインID が自社アカウント一覧に現れる | SC-93／B.2.1 |
 | B-TC-118 | e2e | 一般ユーザー（general） | `/admin/accounts` を開く | `/` へリダイレクト（サーバーガード） | B.0.1／B.2.1 |
+| B-TC-122 | e2e | OPS（上位互換）・自社にグループ作成 | `/admin/accounts` 発行フォームの所属ピッカーでグループ選択→発行 | 自社グループ一覧 EP（`/admin/company-quest-groups`）が候補を返しピッカーが機能、所属付きで発行できる（一覧に反映） | B.2.1（2026-08-11 追加） |
 
 ## 14. frontend e2e（SC-90 QG管理者・B.4）
 

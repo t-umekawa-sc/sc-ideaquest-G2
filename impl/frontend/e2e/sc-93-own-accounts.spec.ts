@@ -14,6 +14,12 @@ async function login(page: Page, c: { company: string; loginId: string; password
   await expect(page.getByText("ようこそ")).toBeVisible();
 }
 
+async function csrfHeaders(page: Page): Promise<Record<string, string>> {
+  const cookies = await page.context().cookies();
+  const csrf = cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
+  return { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
+}
+
 // B-TC-117: /admin/accounts（自社固定）で発行→一覧に現れる。
 test("B-TC-117 own-company account issue appears", async ({ page }) => {
   await login(page, OPS);
@@ -34,4 +40,30 @@ test("B-TC-118 general user cannot access SC-93", async ({ page }) => {
   await login(page, GENERAL);
   await page.goto("/admin/accounts");
   await expect(page).toHaveURL(/\/$/);
+});
+
+// B-TC-122: 自社グループ一覧 EP（/admin/company-quest-groups）で所属ピッカーが機能し、所属付きで発行できる。
+test("B-TC-122 self issue with membership picker", async ({ page }) => {
+  await login(page, OPS);
+  const headers = await csrfHeaders(page);
+  const stamp = Date.now().toString().slice(-8);
+
+  // OPS 会社にグループを作成（ピッカーの候補になる）
+  const companies = await (await page.request.get(`/api/v1/admin/companies?q=OPS`)).json();
+  const ops = companies.data.find((c: { company_code: string }) => c.company_code === "OPS");
+  const gname = `自社G_${stamp}`;
+  await page.request.post(`/api/v1/admin/companies/${ops.company_id}/quest-groups`, {
+    headers, data: { quest_group_code: `SELFG${stamp}`, name: gname },
+  });
+
+  // SC-93: 発行フォームの所属ピッカーに当該グループが出る→選択→発行
+  await page.goto("/admin/accounts");
+  const loginId = `e2e-selfm-${stamp}@ops.example`;
+  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.locator("#s_name").fill("自社所属太郎");
+  await page.locator("#s_login").fill(loginId);
+  await page.locator("#s_email").fill(loginId);
+  await page.getByLabel("所属グループを追加").selectOption({ label: gname }); // EP が候補を返す＝ピッカー機能
+  await page.getByRole("button", { name: /発行する/ }).click();
+  await expect(page.getByText(loginId)).toBeVisible();
 });

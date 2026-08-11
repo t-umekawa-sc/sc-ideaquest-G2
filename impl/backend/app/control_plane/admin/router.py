@@ -326,6 +326,14 @@ def password_reset_own_account(
     return PasswordResetResponse(**admin_service.reset_password(_company_id(session), account_id))
 
 
+@router.get("/company-quest-groups", response_model=QuestGroupListResponse)
+def list_own_company_quest_groups(
+    request: Request, session: dict = Depends(require_company_account_admin),
+) -> QuestGroupListResponse:
+    """自社のクエストグループ一覧（B.2.1・所属エディタの候補・セッション会社固定）。読み取りのみ。"""
+    return QuestGroupListResponse(**company_service.list_company_quest_groups(_company_id(session)))
+
+
 # --- QG管理者（`/admin/quest-groups`・`/admin/company-directory`・セッション会社固定・B.4・SC-90） ---
 @router.get("/quest-groups", response_model=QuestGroupListResponse)
 def list_admin_quest_groups(

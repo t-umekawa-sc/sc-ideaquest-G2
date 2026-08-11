@@ -12,18 +12,45 @@ from fastapi.testclient import TestClient
 
 from app.control_plane.auth.orm import Account
 from app.db.control import control_session
+from app.db.tenant import get_tenant_session
 from app.main import app
+from app.tenant.quest_group.orm import QuestGroup
 from tests.admin.test_admin_accounts import _login, _login_system_admin
 from tests.admin.test_admin_issue import _company, _csrf, _ident, issued  # noqa: F401 (issued は fixture)
 from tests.conftest import SEED_COMPANY_CODE
 
 ACCOUNTS = "/api/v1/admin/accounts"
+COMPANY_QG = "/api/v1/admin/company-quest-groups"
 
 
 def _login_company_admin(client, factory) -> dict:
     admin = factory.make_seed_company_account(system_role="company_account_admin")
     _login(client, admin["company_code"], admin["login_id"], admin["password"])
     return admin
+
+
+def test_b_tc_044_company_admin_lists_own_quest_groups(client, factory):
+    """B-TC-044 会社アカ管理者が自社の全クエストグループ一覧を取得（所属エディタ候補）。general は 403。根拠 B.2.1。"""
+    _, db_id = _company(SEED_COMPANY_CODE)
+    gid = uuid.uuid4()
+    code = f"QGSELF-{uuid.uuid4().hex[:6].upper()}"
+    with get_tenant_session(db_id) as ts:
+        ts.add(QuestGroup(id=gid, quest_group_code=code, name="Self QG"))
+        ts.commit()
+    try:
+        _login_company_admin(client, factory)
+        r = client.get(COMPANY_QG)
+        assert r.status_code == 200, r.text
+        codes = [g["quest_group_code"] for g in r.json()["data"]]
+        assert code in codes
+
+        general = factory.make_seed_company_account(system_role="general")
+        _login(client, general["company_code"], general["login_id"], general["password"])
+        assert client.get(COMPANY_QG).status_code == 403
+    finally:
+        with get_tenant_session(db_id) as ts:
+            ts.query(QuestGroup).filter_by(id=gid).delete()
+            ts.commit()
 
 
 def test_b_tc_040_company_admin_lists_own(client, factory):
