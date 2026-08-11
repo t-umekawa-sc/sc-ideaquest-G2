@@ -206,3 +206,13 @@
   - quest_groups 削除の「クエスト参照による `in_use`」チェック＝quests（ドメイン C）実装時に追加（現状は有効所属のみで判定・§4.6 の `DELETE`）。
   - メール送信の非同期化（`mail_outbox`）は別機構（§4.6 account_sync outbox は会社DB ミラー専用）＝ドメイン A 相乗（[`A_認証.md`](A_認証.md) §7）。
 - ワーカの常駐ループ（`worker.py`）自体は疎通のみ＝TC 対象外（本体ロジックは `process_outbox_once` の int TC で担保）。
+
+## 8. frontend e2e（SC-91 会社一覧・B.1）
+
+> 対象＝`frontend/e2e/sc-91-companies.spec.ts`（Playwright・階層 e2e）。範囲＝SC-91（システム管理・会社一覧）の**実 UI 縦通し**＝OPS system_admin でログイン→一覧表示→会社作成が一覧に反映／非 system_admin は入れない（サーバーガード）。前提＝フルスタック起動（backend/frontend 再ビルド）＋OPS 管理者 seed（`BOOTSTRAP_ADMIN_PASSWORD`）。出典＝画面設計 SC-91／API設計 B.1。UI 設計の正＝`doc/画面設計/screens/SC-91_システム管理.md`。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-110 | e2e | OPS system_admin でログイン | `/admin/companies` を開く | 見出し「会社一覧」＋seed 会社（ACME-01）が表示 | SC-91／B.1 |
+| B-TC-111 | e2e | 同上 | 「＋ 会社作成」→ name/code/db を入力し作成 | 作成した会社コードが一覧に現れる（`status=準備中`） | SC-91／B.1／§4.1 |
+| B-TC-112 | e2e | 一般ユーザー（general）でログイン | `/admin/companies` を開く | ダッシュボード（`/`）へリダイレクト＝サーバーガード（API も 403 で二重防御） | B.0.1 P6 |

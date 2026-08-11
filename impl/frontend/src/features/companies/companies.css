@@ -1,0 +1,43 @@
+/* 会社一覧/詳細（システム管理・業務層）。デザイン標準トークンを使う最小スタイル。 */
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-block: var(--space-6) var(--space-4);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+.admin-table th {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted, #6b7280);
+  font-weight: 600;
+}
+.admin-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.admin-muted {
+  color: var(--color-text-muted, #6b7280);
+}
+.form-error {
+  color: var(--color-danger, #dc2626);
+  background: var(--color-danger-bg, #fef2f2);
+  border: 1px solid var(--color-danger, #dc2626);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-3) var(--space-4);
+  margin-block: var(--space-3);
+}
+.admin-create {
+  margin-block: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  max-width: 520px;
+}

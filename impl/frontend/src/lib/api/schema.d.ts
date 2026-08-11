@@ -157,6 +157,434 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Companies
+         * @description 会社一覧（SC-91・system_admin 専用）。
+         */
+        get: operations["list_companies_api_v1_admin_companies_get"];
+        put?: never;
+        /**
+         * Create Company
+         * @description 会社作成（SC-91・`status=suspended` で作成・code/db_identifier 一意）。
+         */
+        post: operations["create_company_api_v1_admin_companies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company
+         * @description 会社詳細（SC-92）。
+         */
+        get: operations["get_company_api_v1_admin_companies__company_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Company
+         * @description 会社プロフィール更新（SC-92・name/color/icon）。
+         */
+        patch: operations["update_company_api_v1_admin_companies__company_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Company Settings
+         * @description 会社設定フラグ更新（SC-92・記名時は非開示を無効化して整合）。
+         */
+        patch: operations["update_company_settings_api_v1_admin_companies__company_id__settings_patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/quest-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Company Quest Groups
+         * @description 会社のクエストグループ候補一覧（SC-92・B.3・system_admin 専用・所属割当の候補）。
+         */
+        get: operations["list_company_quest_groups_api_v1_admin_companies__company_id__quest_groups_get"];
+        put?: never;
+        /**
+         * Create Company Quest Group
+         * @description クエストグループを作成（SC-92・B.3・system_admin 専用）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        post: operations["create_company_quest_group_api_v1_admin_companies__company_id__quest_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/quest-groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Company Quest Group
+         * @description クエストグループを削除（SC-92・B.3.1・空グループのみ・トゥームストーン）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        delete: operations["delete_company_quest_group_api_v1_admin_companies__company_id__quest_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Company Quest Group
+         * @description クエストグループをリネーム（SC-92・B.3.1・system_admin・`name` のみ）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        patch: operations["rename_company_quest_group_api_v1_admin_companies__company_id__quest_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Company Accounts
+         * @description 会社のアカウント一覧（SC-92・B.2・system_admin 専用）。
+         */
+        get: operations["list_company_accounts_api_v1_admin_companies__company_id__accounts_get"];
+        put?: never;
+        /**
+         * Issue Company Account
+         * @description アカウントを発行（SC-92・B.2・system_admin 専用）。変更系＝Origin/CSRF 必須（B.0.1 P3）。
+         */
+        post: operations["issue_company_account_api_v1_admin_companies__company_id__accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Company Account
+         * @description アカウント編集（SC-92・B.2・差分・system_admin 専用）。変更系＝Origin/CSRF 必須（B.0.1 P3）。
+         */
+        patch: operations["edit_company_account_api_v1_admin_companies__company_id__accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/accounts/{account_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Account
+         * @description アカウント無効化（B.2・全セッション破棄＋信頼端末失効・`last_system_admin` 拒否）。
+         */
+        post: operations["disable_account_api_v1_admin_companies__company_id__accounts__account_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/accounts/{account_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable Account
+         * @description アカウント再有効化（B.2）。
+         */
+        post: operations["enable_account_api_v1_admin_companies__company_id__accounts__account_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{company_id}/accounts/{account_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Password Reset
+         * @description 初回/再設定PWリンクを再送（B.2・A.7・旧リンク失効・非同期送信）。
+         */
+        post: operations["password_reset_api_v1_admin_companies__company_id__accounts__account_id__password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Own Accounts
+         * @description 自社アカウント一覧（SC-93・B.2.1）。
+         */
+        get: operations["list_own_accounts_api_v1_admin_accounts_get"];
+        put?: never;
+        /**
+         * Issue Own Account
+         * @description 自社アカウント発行（B.2.1・`system_role=general` 固定＝ロール付与は不可）。
+         */
+        post: operations["issue_own_account_api_v1_admin_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Own Account
+         * @description 自社アカウント編集（B.2.1・`system_role` 変更不可＝DTO が受け取らない）。
+         */
+        patch: operations["edit_own_account_api_v1_admin_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{account_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Own Account
+         * @description 自社アカウント無効化（B.2.1・**system_admin は無効化不可**＝403）。
+         */
+        post: operations["disable_own_account_api_v1_admin_accounts__account_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{account_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable Own Account
+         * @description 自社アカウント再有効化（B.2.1）。
+         */
+        post: operations["enable_own_account_api_v1_admin_accounts__account_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{account_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Password Reset Own Account
+         * @description 自社アカウントのPWリンク再送（B.2.1・A.7）。
+         */
+        post: operations["password_reset_own_account_api_v1_admin_accounts__account_id__password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/quest-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Quest Groups
+         * @description 自分が `admin` のグループ一覧（SC-90・member_count 付き・admin 所属ゼロは 403）。
+         */
+        get: operations["list_admin_quest_groups_api_v1_admin_quest_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/quest-groups/{group_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quest Group Members
+         * @description グループの参加メンバー一覧（当該グループの admin のみ・非 admin/不明は 404 存在秘匿）。
+         */
+        get: operations["list_quest_group_members_api_v1_admin_quest_groups__group_id__members_get"];
+        put?: never;
+        /**
+         * Add Quest Group Member
+         * @description 既存アカウントを自グループに参加追加（`role=member` 固定・SoD）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        post: operations["add_quest_group_member_api_v1_admin_quest_groups__group_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/company-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Directory
+         * @description 自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。
+         */
+        get: operations["company_directory_api_v1_admin_company_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/quest-groups/{group_id}/members/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Quest Group Member
+         * @description 自グループから除外（per-group トゥームストーン・204・冪等・アカウント本体は不変・SoD）。
+         */
+        delete: operations["remove_quest_group_member_api_v1_admin_quest_groups__group_id__members__account_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Me
+         * @description 表示名・ロケールを編集（K.2）。accounts 更新＋会社DB users ミラー enqueue。変更系＝Origin/CSRF 必須。
+         */
+        patch: operations["update_me_api_v1_me_patch"];
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -192,6 +620,253 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * AccountCreateRequest
+         * @description アカウント発行の入力（B.2・SC-92）。想定外プロパティは拒否（Mass Assignment 防止・§B.6）。
+         *
+         *     `system_role` は enum 限定（`quest_group_admin` は不受理）。`memberships`＝初期所属（会社DB
+         *     `quest_group_members`）を発行 Tx で outbox payload へ相乗（B.5 step3）。`role=admin` 可（B.2）。
+         */
+        AccountCreateRequest: {
+            /** Display Name */
+            display_name: string;
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /**
+             * System Role
+             * @default general
+             * @enum {string}
+             */
+            system_role: "general" | "company_account_admin" | "system_admin";
+            /**
+             * Locale
+             * @default ja
+             * @enum {string}
+             */
+            locale: "ja" | "en";
+            /** Memberships */
+            memberships?: components["schemas"]["MembershipInput"][];
+        };
+        /**
+         * AccountCreateSelfRequest
+         * @description 会社アカウント管理者の発行入力（B.2.1）。**`system_role` は受け取らない**＝作れるのは
+         *     `general` のみ（ロール付与は system_admin に集約・§8-⑯）。想定外プロパティは拒否（§B.6）。
+         *     ただし `memberships` の `role=admin`（QG管理者任命）は自社スコープで可（B.2.1・2026-08-02 改定）。
+         */
+        AccountCreateSelfRequest: {
+            /** Display Name */
+            display_name: string;
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /**
+             * Locale
+             * @default ja
+             * @enum {string}
+             */
+            locale: "ja" | "en";
+            /** Memberships */
+            memberships?: components["schemas"]["MembershipInput"][];
+        };
+        /**
+         * AccountListItem
+         * @description アカウント一覧の 1 行（SC-92・B.2）。`password_hash` 等の機密は含めない（§B.6）。
+         *
+         *     所属グループ/グループ内ロール（会社DB `quest_group_members`）は後続スライスで付与する。
+         */
+        AccountListItem: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /** System Role */
+            system_role: string;
+            /** Status */
+            status: string;
+            /** Last Login At */
+            last_login_at?: string | null;
+        };
+        /** AccountListResponse */
+        AccountListResponse: {
+            /** Data */
+            data: components["schemas"]["AccountListItem"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
+        /**
+         * AccountResponse
+         * @description 発行/編集/状態変更結果のアカウント（機密は含めない・§B.6）。
+         */
+        AccountResponse: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /** System Role */
+            system_role: string;
+            /** Status */
+            status: string;
+            /** Password Set */
+            password_set: boolean;
+        };
+        /**
+         * AccountUpdateRequest
+         * @description アカウント編集の入力（差分・B.2）。未指定フィールドは変更しない（`model_dump(exclude_unset=True)`）。
+         *
+         *     想定外プロパティは拒否（Mass Assignment 防止・§B.6）。`memberships` を指定すると希望有効所属の
+         *     全集合として差分適用（会社DB `quest_group_members` を直接 upsert/トゥームストーン・B.3）。未指定は所属に触れない。
+         */
+        AccountUpdateRequest: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Login Id */
+            login_id?: string | null;
+            /** Email */
+            email?: string | null;
+            /** System Role */
+            system_role?: ("general" | "company_account_admin" | "system_admin") | null;
+            /** Memberships */
+            memberships?: components["schemas"]["MembershipInput"][] | null;
+        };
+        /**
+         * AccountUpdateSelfRequest
+         * @description 会社アカウント管理者の編集入力（B.2.1・差分）。**`system_role` は変更不可**（受け取らない）。
+         *     `memberships` は自社スコープで差分適用可（`role=admin` の任命/剥奪も可・B.2.1・2026-08-02）。
+         */
+        AccountUpdateSelfRequest: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Login Id */
+            login_id?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Memberships */
+            memberships?: components["schemas"]["MembershipInput"][] | null;
+        };
+        /**
+         * CompanyCreateRequest
+         * @description 会社作成の入力（SC-91）。`company_code` は大文字正規化＋形式検証（§4.1）。想定外プロパティ拒否。
+         */
+        CompanyCreateRequest: {
+            /** Name */
+            name: string;
+            /** Company Code */
+            company_code: string;
+            /** Db Identifier */
+            db_identifier: string;
+            /** Color */
+            color?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+        };
+        /**
+         * CompanyDetail
+         * @description 会社詳細＋設定フラグ＋件数（SC-92）。
+         */
+        CompanyDetail: {
+            /** Company Id */
+            company_id: string;
+            /** Company Code */
+            company_code: string;
+            /** Name */
+            name: string;
+            /** Db Identifier */
+            db_identifier: string;
+            /** Status */
+            status: string;
+            /** Color */
+            color: string;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Mfa Required */
+            mfa_required: boolean;
+            /** Vote Anonymized */
+            vote_anonymized: boolean;
+            /** Hide Voters From Managers */
+            hide_voters_from_managers: boolean;
+            /** Account Count */
+            account_count: number;
+        };
+        /**
+         * CompanyListItem
+         * @description 会社一覧の 1 行（SC-91）。group_count（会社DB `quest_groups`）はドメインC実装時に付与。
+         */
+        CompanyListItem: {
+            /** Company Id */
+            company_id: string;
+            /** Company Code */
+            company_code: string;
+            /** Name */
+            name: string;
+            /** Db Identifier */
+            db_identifier: string;
+            /** Status */
+            status: string;
+            /** Color */
+            color: string;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Account Count */
+            account_count: number;
+        };
+        /** CompanyListResponse */
+        CompanyListResponse: {
+            /** Data */
+            data: components["schemas"]["CompanyListItem"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
+        /**
+         * CompanyProfileUpdateRequest
+         * @description 会社プロフィール更新（SC-92・差分）。company_code/db_identifier は不変（受け取らない）。
+         */
+        CompanyProfileUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+        };
+        /**
+         * CompanySettingsUpdateRequest
+         * @description 会社設定フラグ更新（SC-92・差分）。
+         */
+        CompanySettingsUpdateRequest: {
+            /** Vote Anonymized */
+            vote_anonymized?: boolean | null;
+            /** Hide Voters From Managers */
+            hide_voters_from_managers?: boolean | null;
+            /** Mfa Required */
+            mfa_required?: boolean | null;
+        };
+        /**
+         * DirectoryItem
+         * @description 自社ディレクトリの 1 行（B.4・**最小射影**＝PII/role/組織構造は出さない）。
+         */
+        DirectoryItem: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Url */
+            avatar_url?: string | null;
+        };
+        /** DirectoryResponse */
+        DirectoryResponse: {
+            /** Data */
+            data: components["schemas"]["DirectoryItem"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -212,6 +887,98 @@ export interface components {
             status: string;
             session?: components["schemas"]["Session"] | null;
             mfa?: components["schemas"]["MfaChallenge"] | null;
+        };
+        /**
+         * MeProfileResponse
+         * @description 自己プロフィールの identity 部分（K.1 のうち accounts 源泉の項目）。
+         *
+         *     残高・画像（署名URL）は会社DB `users` 由来で `GET /me` 全体（K.1）＝別スライス。
+         */
+        MeProfileResponse: {
+            /** Login Id */
+            login_id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /** Locale */
+            locale: string;
+            /** System Role */
+            system_role: string;
+        };
+        /**
+         * MeUpdateRequest
+         * @description プロフィール編集の入力（K.2・allowlist）。**`display_name`/`locale` のみ**受理。
+         *
+         *     残高・`system_role`・`status`・`password_set`・`login_id`・`email` は編集不可＝想定外プロパティは
+         *     拒否（extra=forbid＝Mass Assignment 防止・§2.2）。email/PW は K.3 の専用 EP（再認証）。
+         */
+        MeUpdateRequest: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Locale */
+            locale?: ("ja" | "en") | null;
+        };
+        /**
+         * MemberAddRequest
+         * @description 参加追加の入力（B.4）。既存アカウントをディレクトリで選択。想定外プロパティ拒否（§B.6）。
+         *
+         *     **`role` は受け取らない**＝QG管理者の参加追加は `role=member` 固定（`admin` 任命は不可・§8-⑯）。
+         */
+        MemberAddRequest: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+        };
+        /**
+         * MemberListItem
+         * @description グループの参加メンバー 1 行（`quest_group_members`×`users`）。機密は含めない（§B.6）。
+         */
+        MemberListItem: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Role */
+            role: string;
+        };
+        /** MemberListResponse */
+        MemberListResponse: {
+            /** Data */
+            data: components["schemas"]["MemberListItem"][];
+        };
+        /**
+         * MembershipInput
+         * @description 初期所属/所属差分の 1 要素（会社DB `quest_group_members`・B.2/B.3/B.5）。
+         *
+         *     `role=admin`＝QG管理者任命（system_admin＋会社アカウント管理者が可・B.2.1）。想定外プロパティ拒否。
+         */
+        MembershipInput: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Role
+             * @default member
+             * @enum {string}
+             */
+            role: "member" | "admin";
+        };
+        /**
+         * MembershipResponse
+         * @description 参加追加の結果（会社DB `quest_group_members` の 1 行）。
+         */
+        MembershipResponse: {
+            /** Account Id */
+            account_id: string;
+            /** Group Id */
+            group_id: string;
+            /** Role */
+            role: string;
         };
         /**
          * MfaChallenge
@@ -255,6 +1022,26 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * PageInfo
+         * @description オフセットページングの page_info（README §1.8）。
+         */
+        PageInfo: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+        };
+        /**
+         * PasswordResetResponse
+         * @description PWリンク再送の結果（A.7）。
+         */
+        PasswordResetResponse: {
+            /** Status */
+            status: string;
+        };
         /** PasswordSetupCompleteReq */
         PasswordSetupCompleteReq: {
             /** Token */
@@ -280,6 +1067,45 @@ export interface components {
             valid: boolean;
             /** Login Id */
             login_id: string;
+        };
+        /**
+         * QuestGroupCreateRequest
+         * @description クエストグループ作成の入力（B.3・system_admin）。`quest_group_code` は大文字正規化＋形式検証（§5.4）。
+         *
+         *     想定外プロパティは拒否（Mass Assignment 防止・§B.6）。会社内一意は application で担保（重複=409）。
+         */
+        QuestGroupCreateRequest: {
+            /** Quest Group Code */
+            quest_group_code: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * QuestGroupListItem
+         * @description 自分が `admin` のグループ 1 行（SC-90 グループ切替）。
+         */
+        QuestGroupListItem: {
+            /** Group Id */
+            group_id: string;
+            /** Quest Group Code */
+            quest_group_code: string;
+            /** Name */
+            name: string;
+            /** Member Count */
+            member_count: number;
+        };
+        /** QuestGroupListResponse */
+        QuestGroupListResponse: {
+            /** Data */
+            data: components["schemas"]["QuestGroupListItem"][];
+        };
+        /**
+         * QuestGroupRenameRequest
+         * @description クエストグループのリネーム入力（B.3.1・`name` のみ）。`quest_group_code` は不変（受け取らない）。
+         */
+        QuestGroupRenameRequest: {
+            /** Name */
+            name: string;
         };
         /**
          * Session
@@ -567,6 +1393,888 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_companies_api_v1_admin_companies_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_company_api_v1_admin_companies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_api_v1_admin_companies__company_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_company_api_v1_admin_companies__company_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_company_settings_api_v1_admin_companies__company_id__settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanySettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_company_quest_groups_api_v1_admin_companies__company_id__quest_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_company_quest_group_api_v1_admin_companies__company_id__quest_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestGroupCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_company_quest_group_api_v1_admin_companies__company_id__quest_groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_company_quest_group_api_v1_admin_companies__company_id__quest_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestGroupRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_company_accounts_api_v1_admin_companies__company_id__accounts_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_company_account_api_v1_admin_companies__company_id__accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_company_account_api_v1_admin_companies__company_id__accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_account_api_v1_admin_companies__company_id__accounts__account_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_account_api_v1_admin_companies__company_id__accounts__account_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_api_v1_admin_companies__company_id__accounts__account_id__password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_accounts_api_v1_admin_accounts_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_own_account_api_v1_admin_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreateSelfRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_own_account_api_v1_admin_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdateSelfRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_own_account_api_v1_admin_accounts__account_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_own_account_api_v1_admin_accounts__account_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_own_account_api_v1_admin_accounts__account_id__password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_quest_groups_api_v1_admin_quest_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListResponse"];
+                };
+            };
+        };
+    };
+    list_quest_group_members_api_v1_admin_quest_groups__group_id__members_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_quest_group_member_api_v1_admin_quest_groups__group_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_directory_api_v1_admin_company_directory_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_quest_group_member_api_v1_admin_quest_groups__group_id__members__account_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_me_api_v1_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
