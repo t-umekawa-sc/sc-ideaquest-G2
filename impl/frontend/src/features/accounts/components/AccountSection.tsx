@@ -8,6 +8,7 @@ import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableAccount,
+  editAccount,
   enableAccount,
   issueAccount,
   listAccounts,
@@ -45,13 +46,42 @@ export function AccountSection({ companyId }: { companyId: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [mode, setMode] = useState<"issue" | "edit">("issue");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
   const [systemRole, setSystemRole] = useState<AccountCreateInput["system_role"]>("general");
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  function openIssue() {
+    setMode("issue");
+    setEditingId(null);
+    setDisplayName("");
+    setLoginId("");
+    setEmail("");
+    setSystemRole("general");
+    setMemberships([]);
+    setReplaceMemberships(false);
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  function openEdit(a: Account) {
+    setMode("edit");
+    setEditingId(a.account_id);
+    setDisplayName(a.display_name);
+    setLoginId(a.login_id);
+    setEmail(a.email);
+    setSystemRole(a.system_role as AccountCreateInput["system_role"]);
+    setMemberships([]); // 現在の所属は一覧に無い＝置き換え時のみ明示指定
+    setReplaceMemberships(false);
+    setFormError(null);
+    setShowForm(true);
+  }
 
   const reload = useCallback(async () => {
     setLoadError(null);
@@ -70,17 +100,23 @@ export function AccountSection({ companyId }: { companyId: string }) {
     void reload();
   }, [reload]);
 
-  async function onIssue(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     setPending(true);
     try {
-      await issueAccount(companyId, { display_name: displayName, login_id: loginId, email, system_role: systemRole, memberships });
-      setDisplayName("");
-      setLoginId("");
-      setEmail("");
-      setSystemRole("general");
-      setMemberships([]);
+      if (mode === "issue") {
+        await issueAccount(companyId, { display_name: displayName, login_id: loginId, email, system_role: systemRole, memberships });
+      } else if (editingId) {
+        // identity は差分。memberships は「置き換える」時のみ送る（未送信＝現状維持・B.3）
+        await editAccount(companyId, editingId, {
+          display_name: displayName,
+          login_id: loginId,
+          email,
+          system_role: systemRole,
+          ...(replaceMemberships ? { memberships } : {}),
+        });
+      }
       setShowForm(false);
       await reload();
     } catch (err) {
@@ -110,13 +146,14 @@ export function AccountSection({ companyId }: { companyId: string }) {
     <div className="card admin-create">
       <div className="admin-toolbar">
         <h2>アカウント &amp; 所属（この会社）</h2>
-        <Button type="button" variant="primary" onClick={() => setShowForm((v) => !v)}>
+        <Button type="button" variant="primary" onClick={() => (showForm ? setShowForm(false) : openIssue())}>
           {showForm ? "閉じる" : "＋ アカウント発行"}
         </Button>
       </div>
 
       {showForm && (
-        <form className="admin-create" onSubmit={onIssue} noValidate>
+        <form className="admin-create" onSubmit={onSubmit} noValidate>
+          <h3>{mode === "issue" ? "アカウントを発行" : "アカウントを編集"}</h3>
           {formError && <div className="form-error" role="alert">{formError}</div>}
           <Field id="a_name" label="氏名" required>
             <input id="a_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
@@ -134,11 +171,19 @@ export function AccountSection({ companyId }: { companyId: string }) {
               <option value="system_admin">システム管理者</option>
             </select>
           </Field>
-          <Field id="a_groups" label="所属クエストグループ">
-            <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
-          </Field>
+          {mode === "edit" && (
+            <label>
+              <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
+              所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
+            </label>
+          )}
+          {(mode === "issue" || replaceMemberships) && (
+            <Field id="a_groups" label="所属クエストグループ">
+              <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+            </Field>
+          )}
           <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "発行中…" : "発行する（初回PW設定リンク送信）"}
+            {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
           </Button>
         </form>
       )}
@@ -166,6 +211,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
               <td>
                 {a.status === "active" ? (
                   <>
+                    <button type="button" onClick={() => openEdit(a)}>編集</button>{" "}
                     <button type="button" onClick={() => runAction(() => resetPassword(companyId, a.account_id), undefined, "パスワード再設定リンクを送信しました。")}>PW再設定</button>{" "}
                     <button type="button" className="is-danger" onClick={() => runAction(() => disableAccount(companyId, a.account_id), `「${a.display_name}」を無効化しますか？`)}>無効化</button>
                   </>

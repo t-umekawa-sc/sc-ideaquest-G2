@@ -232,3 +232,11 @@
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-114 | e2e | OPS system_admin | ACME-01 の会社詳細で「＋ アカウント発行」→氏名/ログインID/メール入力→発行 | 発行したログインID が会社のアカウント一覧に現れる（`status=有効`・初回PW設定リンク送信） | SC-92／B.2／B.5 |
+
+## 11. frontend e2e（SC-92B-2 アカウント編集・B.2）
+
+> 対象＝`frontend/e2e/sc-92b2-account-edit.spec.ts`（Playwright・階層 e2e）。範囲＝SC-92 のアカウント編集（`PATCH .../accounts/{id}`）＝発行フォームを edit 兼用にし identity を差分更新。**所属（memberships）は一覧に現状が無いため「置き換える」オプトイン時のみ送信**（B.3 一括設定・誤消去防止）。前提＝フルスタック＋OPS 管理者。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-115 | e2e | OPS system_admin・ACME-01 詳細 | アカウント発行→当該行「編集」→氏名変更→保存 | 変更後の氏名が一覧に反映（PATCH・identity 差分） | SC-92／B.2 |

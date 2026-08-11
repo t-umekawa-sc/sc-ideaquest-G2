@@ -24,6 +24,25 @@ export function issueAccount(
   });
 }
 
+// アカウント編集（B.2・差分）。identity は会社内一意再検証（409）。memberships を含めると希望有効所属の
+// 全集合として差分適用（B.3・omitted は解除）＝呼び出し側は「置き換える」時のみ memberships を渡す。
+export function editAccount(
+  companyId: string,
+  accountId: string,
+  body: {
+    display_name?: string;
+    login_id?: string;
+    email?: string;
+    system_role?: AccountCreateInput["system_role"];
+    memberships?: Membership[];
+  },
+): Promise<AccountResponse | null> {
+  return apiFetch<AccountResponse>(`/admin/companies/${companyId}/accounts/${accountId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 export function disableAccount(companyId: string, accountId: string): Promise<AccountResponse | null> {
   return apiFetch<AccountResponse>(`/admin/companies/${companyId}/accounts/${accountId}/disable`, { method: "POST" });
 }
