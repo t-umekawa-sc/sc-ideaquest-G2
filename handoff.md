@@ -15,7 +15,7 @@
 
 - 最終更新: **2026-08-11 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・`origin/main` と同期＝`git status` で確認済み・**未プッシュのコミットは無い**）。
-- 最新コミット: **`fd9a1e4`**（ドメインB B1＝会社CRUD）。※本 handoff 更新はこの後の別コミット。
+- 最新コミット: **`58b2af9`**（会社DB users の identity/role ミラー列補完）。※本 handoff 更新はこの後の別コミット。
 - 本セッションのコミット（古い順・すべて `origin/main` へプッシュ済み）:
   - `62ba95d` テスト追加 A-TC-082（失敗計数の固定窓TTL経過リセット・ADR-0005）
   - `449fc28` docs(ADR-0007) メール送信の非同期化を確定
@@ -46,6 +46,8 @@
   - `9bdd5ad` 実装 ドメインB B2＝会社アカウント管理者 API /admin/accounts（B.2.1 SoD・B-TC-040〜043）
   - `dd4f67e` handoff 更新（company_account_admin 版）
   - `fd9a1e4` 実装 ドメインB B1＝会社CRUD /admin/companies（migration 0008・B-TC-050〜055）
+  - `808376c` handoff 更新（B0/B1/B2 完了・区切り）
+  - `58b2af9` 実装 会社DB users の identity/role ミラー列補完（company migration 0004・B-TC-007）
 - remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。
 
 ---
@@ -110,14 +112,13 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
   - **mail_outbox（本セッション）**：認証系メール（OTP・設定リンク・ロック通知）は同期送信せず enqueue → `mail_worker`/`process_mail_outbox_once` が SMTP 送信。**フルスタックで MailHog への非同期配信を目視確認済み**（request 202 直後は未送信→ワーカが配信・重複なし・行は done+secret NULL）。
   - **ドメイン B アカウント管理 API（本セッション）**＝`/admin/companies`（会社CRUD・system_admin）／`/admin/companies/{id}/accounts`（会社スコープのアカウント発行/編集/disable/enable/password-reset・system_admin）／`/admin/accounts`（company_account_admin・セッション会社固定・SoD）。bootstrap で OPS＋system_admin を seed。**未着手＝B3 QG管理者＋memberships（会社DB quest_groups/quest_group_members＝ドメインC依存）**。
 - **テスト（本セッションで実測・マウント版）**:
-  - **backend pytest = 110 passed**（＋ドメインB B0/B1/B2 の B-TC-010〜055・回帰なし）。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
+  - **backend pytest = 111 passed**（ドメインB B0/B1/B2 の B-TC-010〜055＋users ミラー列補完 B-TC-007・回帰なし）。**bootstrap は OPS 運営テナント＋初期 system_admin も seed する**（B.5.1・`BOOTSTRAP_ADMIN_PASSWORD` 供給時）。
   - **mail_worker 起動スモーク**＝`python -m app.mail_worker` が起動→SIGTERM 停止を確認。
   - **frontend tsc クリーン・e2e 5 passed**（既存4＋新規 A-TC-022・本セッション実測）。**重要＝メール依存 e2e（sc-00-mfa/password-setup）は非同期化により `mail-worker` の起動が前提**（specs は MailHog を最大20回ポーリングして待つ）。`mail-worker` を起動せず backend/frontend だけだと当該2本は red（enqueue されるが配信されない）。
 - **Docker（本 handoff 時点）**＝**db / redis のみ起動中**（他は停止）。フルスタックで試すなら backend の再ビルドが必要（§8 注意）。
 - **壊れているもの＝無し**。
 - **未実装 / 負債**:
   - **ドメイン B 残り**＝B3 QG管理者 API＋memberships（会社DB `quest_groups`/`quest_group_members`＝ドメインC依存）。account/company の CRUD は完了（B0/B1/B2）。
-  - **users ミラーの列不足**＝会社DB `users` は `login_id`/`email`/`system_role` 列が未追加（データモデル §5.3 は規定）。発行/編集の outbox payload にこれらを積んでも `upsert_user_mirror` は該当列が `_MIRROR_FIELDS` に無く無視（前方互換）＝会社DB単独のユーザ一覧で login_id 等は未反映。列追加＋`_MIRROR_FIELDS` 拡張は後続。
   - **account_sync_outbox の他 writer**＝プロフィール編集（K）。※`password_set`/`last_login_at`/発行/編集/無効化（B）は実装済み。
   - **outbox 系の `failed` 可視化/手動再送・管理者ロック解除**＝管理面が無く後続（両 outbox 共通）。
   - **本番デプロイ設定**（`TRUSTED_PROXY_COUNT` 実値・エッジ XFF 確定）＝`doc/本番デプロイ要件.md` §6・未確認。
@@ -193,7 +194,7 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 
 ## 8. 再開に必要な環境情報
 
-- **フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。**worker / mail-worker はポート無し**（常駐のみ）。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001-**0008**・company 0001-**0003**〕→seed＝2社＋**OPS 運営テナント＋初期 system_admin**〔`BOOTSTRAP_ADMIN_PASSWORD` 供給時〕・冪等）してから uvicorn。**今回終了時点で起動中は db / redis のみ**（他は停止）。**注意＝backend/mail-worker の実イメージは本セッションの変更を焼いていない＝フルスタックで試すなら `docker compose build backend frontend` 後に up する**。**dev system_admin ログイン＝会社コード `OPS`／`admin@ops.example`／`Passw0rd!`**。
+- **フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／**mailhog SMTP `:1025`・UI `:8025`**／backend `:8000`／frontend `:3000`。**worker / mail-worker はポート無し**（常駐のみ）。backend entrypoint が bootstrap（DB作成→`alembic` head〔control 0001-**0008**・company 0001-**0004**〕→seed＝2社＋**OPS 運営テナント＋初期 system_admin**〔`BOOTSTRAP_ADMIN_PASSWORD` 供給時〕・冪等）してから uvicorn。**今回終了時点で起動中は db / redis のみ**（他は停止）。**注意＝backend/mail-worker の実イメージは本セッションの変更を焼いていない＝フルスタックで試すなら `docker compose build backend frontend` 後に up する**。**dev system_admin ログイン＝会社コード `OPS`／`admin@ops.example`／`Passw0rd!`**。
 - **seed（開発用ログイン）**＝会社 `ACME-01`（`mfa_required=false`）/`user@acme.example`／会社 `ACME-02`（`mfa_required=true`）/`mfa@acme2.example`。PW いずれも `Passw0rd!`。
 - **backend テスト（ホスト編集を反映＝マウント版・編集中はこちら）**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest tests/ -q`（**80 passed**・build 不要でホスト変更が即反映）。
 - **メールワーカ単体スモーク**＝`cd impl && docker compose run --rm --no-deps -v "$PWD/backend:/app" -e MAIL_OUTBOX_POLL_INTERVAL_SECONDS=0.2 backend timeout 2 python -m app.mail_worker`（起動→停止ログを確認）。account_sync ワーカは `python -m app.worker`。
@@ -212,6 +213,6 @@ greenfield（`/admin` 無し・system_admin/OPS 未 seed）から縦通し。設
 ### 自己チェック（このファイルだけで再開できるか）
 - ✅ 再開点＝**ドメイン B の残り＝B3 QG管理者＋memberships（会社DB `quest_groups`/`quest_group_members`＝ドメインC領域が前提）**。着手前に「C のテーブルを先に作るか」を相談。
 - ✅ 本セッションの主成果（② メール非同期化＝`mail_outbox`・ADR-0007）と全変更ファイル・設計判断・スコープ境界（§2.9）を §3/§6 に記録。
-- ✅ 状態＝backend 110 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
+- ✅ 状態＝backend 111 passed・**e2e 5 passed**・mail_worker スモーク OK・MailHog 配信目視・**ドメインB B0/B1/B2 完了**（本セッション実測）。起動中は db/redis のみ（実イメージは本セッション変更未反映＝フルスタックは要再ビルド）。未実装/負債（ドメインB B3/memberships＝C依存・users ミラー列不足・failed 可視化・本番設定）は §4 に明記。
 - ✅ 再利用できる手法（新ワーカの stub test-first／auth 切替の red-green／`_DrainingMail` で既存TC温存／mail_outbox truncate 隔離）を §5 に記録。
 - ⚠ 詳細な決定理由・具体値は各 `doc/ADR/*.md`・`doc/データモデル.md` §4.6/§4.7・`doc/テスト/*.md`・`doc/規約/テスト規約.md` を正とすること（本 handoff は要約）。会話ログは参照不可。
