@@ -20,6 +20,7 @@
 | B-TC-004 | int | 会社DB が存在しない会社の pending 1行・`OUTBOX_MAX_ATTEMPTS=2` | `process_outbox_once()` を 2回 | 1回目 `attempts=1・status=pending`、2回目で **`status=failed`**（上限超＝要手動対応） | §4.6（リトライ/failed） |
 | B-TC-005 | int | 会社DB 無し会社の account X に pending 2行（X1,X2）＋ ACME-01 の account Y に pending 1行（Y1） | `process_outbox_once()` | Y1 は **done**（別 account は独立に進む）／X1 は `attempts=1・pending`／**X2 は未処理（`attempts=0・pending`）**＝同一 account はヘッドオブライン・ブロッキング | §4.6（順序・HOL） |
 | B-TC-006 | int | ACME-01 実アカウント（未ログイン＝`last_login_at` NULL） | `POST /auth/login` 成功 → `process_outbox_once()` | ログイン成功で **`accounts.last_login_at` 更新＋同一Tx で outbox pending 1行**（`op=upsert`・`payload.last_login_at`＝ISO 文字列）→ ワーカ適用で **会社DB `users.last_login_at` がミラー**される | データモデル §4.6／§5.3（認証イベント③） |
+| B-TC-007 | int | ACME-01 実アカウント（users ミラー行あり） | `login_id`/`email`/`system_role` を payload に upsert enqueue → `process_outbox_once()` | 会社DB `users.login_id`/`email`/`system_role` に**ミラー反映**（会社DB 単独でユーザ一覧を描画するための identity/role 列・§5.3） | データモデル §4.6／§5.3 |
 
 ## 2. アカウント管理 API（B0＝認可基盤＋一覧・B.2/B.0.1）
 

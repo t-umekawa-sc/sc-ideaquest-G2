@@ -177,3 +177,26 @@ def test_b_tc_006_login_mirrors_last_login_at(client, factory):
 
     process_outbox_once()                                            # 会社DB へミラー
     assert _user_last_login(company.db_identifier, acc["id"]) is not None
+
+
+# --- B-TC-007: identity/role 列のミラー（§5.3） --------------------------------------
+def _user_row(db_identifier: str, account_id):
+    with get_tenant_session(db_identifier) as ts:
+        return ts.execute(
+            User.__table__.select().where(User.account_id == account_id)
+        ).mappings().first()
+
+
+def test_b_tc_007_mirror_identity_columns(client, factory):
+    """B-TC-007 login_id/email/system_role が会社DB users へミラーされる（§5.3・会社DB単独一覧）。根拠 §4.6/§5.3。"""
+    acc = factory.make_seed_company_account()
+    company = _seed_company_row()
+    _enqueue(acc["id"], company.id, {
+        "login_id": "mir@acme.example", "email": "mir@acme.example",
+        "system_role": "company_account_admin",
+    })
+    process_outbox_once()
+    row = _user_row(company.db_identifier, acc["id"])
+    assert row["login_id"] == "mir@acme.example"
+    assert row["email"] == "mir@acme.example"
+    assert row["system_role"] == "company_account_admin"

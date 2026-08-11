@@ -179,6 +179,9 @@ def seed_company_users() -> None:
                         locale=account.locale,
                         status="active",
                         password_set=account.password_hash is not None,  # accounts のミラー（§4.6）
+                        login_id=account.login_id,        # identity/role のミラー（§5.3）
+                        email=account.email,
+                        system_role=account.system_role,
                     )
                 )
                 tsession.commit()

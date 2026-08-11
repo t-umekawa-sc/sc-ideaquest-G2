@@ -22,6 +22,11 @@ class User(CompanyBase):
     # 管理DB accounts.id への論理参照（会社を跨ぐため物理FKは張らない）
     account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)  # accounts のミラー
+    # accounts の identity/role のミラー（源泉=accounts・§4.6・一覧を会社DB単独で描画・§5.3）
+    # NULL 可＝ミラー未同期（列追加前の行）は NULL。以後 outbox/seed で埋まる。
+    login_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    system_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     avatar_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)  # MinIO キー（生パス）
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")

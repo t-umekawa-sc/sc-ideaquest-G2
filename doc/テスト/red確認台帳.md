@@ -187,3 +187,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-054 | `update_company_settings` の「記名時に hide_voters_from_managers を無効化」行を無効化 | `vote_anonymized=false` でも `hide_voters_from_managers=true` のまま（本来 false）＝サーバー整合が load-bearing |
+
+## 追記: users ミラー列補完（B-TC-007）— 2026-08-11
+
+| TC-ID | 撤回した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-007 | `_MIRROR_FIELDS` から `login_id`/`email`/`system_role` を一時撤回 | ミラー後も `users.login_id` が None（本来 'mir@acme.example'）＝mirror 列拡張が load-bearing |

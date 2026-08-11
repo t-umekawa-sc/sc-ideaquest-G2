@@ -17,7 +17,10 @@ def get_user_by_account(session: Session, account_id: uuid.UUID) -> User | None:
 
 
 # accounts → users にミラーしてよい列（源泉=accounts・§4.6）。存在しない列は無視（前方互換）。
-_MIRROR_FIELDS = ("display_name", "locale", "status", "password_set", "last_login_at")
+_MIRROR_FIELDS = (
+    "display_name", "locale", "status", "password_set", "last_login_at",
+    "login_id", "email", "system_role",  # identity/role のミラー（§5.3・会社DB単独一覧）
+)
 # JSONB payload では日時は ISO 文字列で運ぶため、適用前に datetime へ戻す列。
 _DATETIME_FIELDS = ("last_login_at",)
 
