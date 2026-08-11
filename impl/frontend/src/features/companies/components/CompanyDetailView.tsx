@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { Button, Field } from "@/components/ui";
 import { AccountSection } from "@/features/accounts";
+import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
 import { getCompany, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
@@ -116,6 +117,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
         </label>
       </div>
 
+      <QuestGroupSection companyId={company.company_id} />
       <AccountSection companyId={company.company_id} />
     </section>
   );

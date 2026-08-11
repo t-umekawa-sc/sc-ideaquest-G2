@@ -240,3 +240,11 @@
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-115 | e2e | OPS system_admin・ACME-01 詳細 | アカウント発行→当該行「編集」→氏名変更→保存 | 変更後の氏名が一覧に反映（PATCH・identity 差分） | SC-92／B.2 |
+
+## 12. frontend e2e（SC-92C クエストグループ CRUD・B.3.1）
+
+> 対象＝`frontend/e2e/sc-92c-quest-groups.spec.ts`（Playwright・階層 e2e）。範囲＝SC-92 のクエストグループ CRUD（`/admin/companies/{id}/quest-groups`）＝作成→リネーム→削除（空グループ）の縦通し。作成後は AccountSection の所属エディタ候補が埋まる。前提＝フルスタック＋OPS 管理者。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-116 | e2e | OPS system_admin・ACME-01 詳細 | グループ作成→リネーム（prompt）→削除（confirm・空グループ） | 作成したコードが一覧に現れ、リネーム後の名称に更新、削除で一覧から消える | SC-92／B.3.1／§5.4 |
