@@ -36,6 +36,21 @@ def require_company_account_admin(request: Request) -> dict:
     return _require_role(request, {"company_account_admin", "system_admin"})
 
 
+def require_qg_admin_actor(request: Request) -> dict:
+    """QG系 EP の基本ガード（B.4・B.0.1 P1/P2）。返り値＝セッション dict。
+
+    QG管理者は **per-group**（`quest_group_members.role=admin`）で表すため、**`system_role` は問わない**
+    （`general` でも QG管理者たりうる・B案）。ここでは有効な active セッション（P1/P2）だけを担保し、
+    「当該グループに有効 `admin` 所属を持つか」の判定は application 層で行う（`group_id` 依存・404 存在秘匿）。
+    """
+    session = require_session(request)  # P1
+    with control_session() as s:
+        account = s.get(Account, uuid.UUID(session["account_id"]))
+        if account is None or account.status != "active":  # P2
+            raise AppError(401, "unauthenticated")
+    return session
+
+
 def _require_role(request: Request, allowed: set[str]) -> dict:
     session = require_session(request)  # P1
     with control_session() as s:

@@ -145,6 +145,19 @@
 | B-TC-076 | api | 実アカウントが G1 に有効所属（member）・G2 seed | `PATCH .../accounts/{id}`（`memberships:[{G2, role:'member'}]`＝G1 を含めない） | **G1 は解除（`removed_at` 設定・有効所属から消える）**・**G2 は有効所属に**＝一括設定の差分適用（集合外は tombstone） | B.3（一括設定・トゥームストーン）／§5.5 |
 | B-TC-077 | api | 実アカウントが G1 に有効所属 | `PATCH .../accounts/{id}`（`display_name` のみ・`memberships` 未指定） | `200`＋**G1 の有効所属は不変**（`memberships` 未指定は所属に触れない・差分） | B.3（差分・`exclude_unset`） |
 
+## 4.5 QG管理者 API（`/admin/quest-groups`・`/admin/company-directory`・B.4・SC-90）
+
+> **QG管理者＝参加選択専任（SoD・§8-⑯）**。認可は per-group＝`system_role` 非依存（`general` でも当該グループに有効 `admin` 所属があれば QG管理者／`system_admin`・`company_account_admin` でも `admin` 所属が無ければ QG系は 404）。`company_id` は受けず**セッション会社固定**。deps＝`require_qg_admin_actor`（P1/P2＝有効な active セッション）＋application で group 単位の admin 所属を判定（404 存在秘匿）。会社DB 直接操作＝quest_group repository（§4.1）を組合せ。参加追加/除外は **`quest_group_members` の per-group 行のみ**＝アカウント本体（`accounts`）には触れない（SoD の肝）。グループは本スライスでは会社DB へ直接 seed（作成 EP は非対象＝プロビジョニング別途）。test-first。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-080 | api | ACME-01 の `general` アカウントが G1 に有効 `admin` 所属（seed）・当人でログイン | `GET /admin/quest-groups` | `200`＋`data` に G1（`member_count` 付き）。**`system_role=general` でも per-group admin で QG管理者**（B案） | B.4／B.0.1 §1.6 |
+| B-TC-081 | api | `admin` 所属を持たないアカウント／セッション無し | `GET /admin/quest-groups` | 所属ゼロ＝`403 forbidden`（QG管理者でない＝SC-90 到達不可）／未認証＝`401 unauthenticated` | B.4／B.0.1 P1/P6 |
+| B-TC-082 | api | G1 の admin（当人ログイン）・別会社 or 不明 group・admin でない group | `GET /admin/quest-groups/{group_id}/members` | G1＝`200`＋メンバー配列（`removed_at IS NULL`・`users` join・role 付き）／不明・非 admin・他会社＝`404 not_found`（存在秘匿・所属ベース＝system_admin でも admin 所属無しは 404） | B.4／B.0.1 P6/§1.6 |
+| B-TC-083 | api | G1 admin（当人ログイン）／`admin` 所属ゼロのアカウント | `GET /admin/company-directory` | admin＝`200`＋**最小射影**（`account_id`/`display_name`/`avatar_url` のみ＝`email`/`system_role`/所属は**返さない**・`status=active`）／ゼロ admin＝`403` | B.4（ディレクトリ緩和・最小射影）／§8-⑯ |
+| B-TC-084 | api | G1 admin（当人ログイン）・別の既存アカウント target | `POST /admin/quest-groups/{G1}/members`（`{account_id: target}`） | `201`＋会社DB `quest_group_members` に target の有効所属（**`role=member` 固定**＝QG管理者は admin 任命不可）。**target の `accounts` は不変**（SoD）。CSRF 無しは `403 csrf_failed` | B.4（参加追加・member 固定・SoD） |
+| B-TC-085 | api | G1 に target が有効所属 | `DELETE /admin/quest-groups/{G1}/members/{target}` を2回 | 1回目 `204`＋`removed_at` 設定（有効所属から消える）・`accounts` は不変／2回目も `204`（冪等） | B.4（除外＝トゥームストーン・§5.5） |
+
 ## 5. 補足・非対象
 
 - **発行/編集/無効化（B.2・B.5）・プロフィール編集（K）の writer** は該当エンドポイント実装時に追加（`password_set`＝complete／`last_login_at`＝login は実装済み）。

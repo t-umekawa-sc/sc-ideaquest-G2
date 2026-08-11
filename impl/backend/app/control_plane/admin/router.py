@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.admin import application as admin_service
 from app.control_plane.admin import company_application as company_service
-from app.control_plane.admin.deps import require_company_account_admin, require_system_admin
+from app.control_plane.admin import quest_group_application as qg_service
+from app.control_plane.admin.deps import (
+    require_company_account_admin,
+    require_qg_admin_actor,
+    require_system_admin,
+)
 from app.control_plane.admin.schemas import (
     AccountCreateRequest,
     AccountCreateSelfRequest,
@@ -24,7 +29,12 @@ from app.control_plane.admin.schemas import (
     CompanyListResponse,
     CompanyProfileUpdateRequest,
     CompanySettingsUpdateRequest,
+    DirectoryResponse,
+    MemberAddRequest,
+    MemberListResponse,
+    MembershipResponse,
     PasswordResetResponse,
+    QuestGroupListResponse,
 )
 from app.core.deps import verify_csrf, verify_origin
 from app.infra.cache import get_redis
@@ -266,3 +276,53 @@ def password_reset_own_account(
     verify_origin(request)
     verify_csrf(request)
     return PasswordResetResponse(**admin_service.reset_password(_company_id(session), account_id))
+
+
+# --- QG管理者（`/admin/quest-groups`・`/admin/company-directory`・セッション会社固定・B.4・SC-90） ---
+@router.get("/quest-groups", response_model=QuestGroupListResponse)
+def list_admin_quest_groups(
+    request: Request, session: dict = Depends(require_qg_admin_actor),
+) -> QuestGroupListResponse:
+    """自分が `admin` のグループ一覧（SC-90・member_count 付き・admin 所属ゼロは 403）。"""
+    return QuestGroupListResponse(**qg_service.list_admin_groups(session))
+
+
+@router.get("/quest-groups/{group_id}/members", response_model=MemberListResponse)
+def list_quest_group_members(
+    group_id: uuid.UUID, request: Request, q: str | None = None,
+    session: dict = Depends(require_qg_admin_actor),
+) -> MemberListResponse:
+    """グループの参加メンバー一覧（当該グループの admin のみ・非 admin/不明は 404 存在秘匿）。"""
+    return MemberListResponse(**qg_service.list_members(session, group_id, q=q))
+
+
+@router.get("/company-directory", response_model=DirectoryResponse)
+def company_directory(
+    request: Request, q: str | None = None,
+    page: int = Query(default=1, ge=1), per_page: int = Query(default=20, ge=1, le=100),
+    session: dict = Depends(require_qg_admin_actor),
+) -> DirectoryResponse:
+    """自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。"""
+    return DirectoryResponse(**qg_service.company_directory(session, q=q, page=page, per_page=per_page))
+
+
+@router.post("/quest-groups/{group_id}/members", response_model=MembershipResponse, status_code=201)
+def add_quest_group_member(
+    group_id: uuid.UUID, body: MemberAddRequest, request: Request,
+    session: dict = Depends(require_qg_admin_actor),
+) -> MembershipResponse:
+    """既存アカウントを自グループに参加追加（`role=member` 固定・SoD）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return MembershipResponse(**qg_service.add_member(session, group_id, body.account_id))
+
+
+@router.delete("/quest-groups/{group_id}/members/{account_id}", status_code=204)
+def remove_quest_group_member(
+    group_id: uuid.UUID, account_id: uuid.UUID, request: Request,
+    session: dict = Depends(require_qg_admin_actor),
+) -> None:
+    """自グループから除外（per-group トゥームストーン・204・冪等・アカウント本体は不変・SoD）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    qg_service.remove_member(session, group_id, account_id)

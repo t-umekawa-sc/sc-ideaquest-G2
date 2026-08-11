@@ -199,3 +199,10 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-061 | company 0005 の部分ユニーク `uq_quest_group_members_active` を ACME-01 会社DB で一時 DROP | 同一 `(quest_group_id, user_id)` の有効所属を2行 INSERT できて `DID NOT RAISE IntegrityError`（本来は IntegrityError）＝部分ユニーク index が重複所属禁止の load-bearing。復元して green（4 passed）。 |
+
+## 追記: QG管理者 mutation API（B-TC-084/085）— 2026-08-11
+
+| TC-ID | 無効化した箇所 | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-084 | `quest_group_application.add_member` を早期 return の stub 化（会社DB へ upsert しない） | POST は 201 を返すが `quest_group_members` に有効所属が作られず、members に target が現れない＝upsert 呼び出しが load-bearing。復元して green。 |
+| B-TC-085 | `quest_group_application.remove_member` を早期 return の stub 化（トゥームストーンしない） | DELETE は 204 を返すが `removed_at` が設定されず有効所属に残る（`assert not True`）＝remove_membership が load-bearing。復元して green。 |

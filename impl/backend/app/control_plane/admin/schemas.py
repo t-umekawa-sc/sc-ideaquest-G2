@@ -189,3 +189,56 @@ class CompanySettingsUpdateRequest(BaseModel):
     vote_anonymized: bool | None = None
     hide_voters_from_managers: bool | None = None
     mfa_required: bool | None = None
+
+
+# --- QG管理者 API（B.4・SC-90） ------------------------------------------------------------
+class QuestGroupListItem(BaseModel):
+    """自分が `admin` のグループ 1 行（SC-90 グループ切替）。"""
+    group_id: str
+    quest_group_code: str
+    name: str
+    member_count: int
+
+
+class QuestGroupListResponse(BaseModel):
+    data: list[QuestGroupListItem]
+
+
+class MemberListItem(BaseModel):
+    """グループの参加メンバー 1 行（`quest_group_members`×`users`）。機密は含めない（§B.6）。"""
+    account_id: str
+    display_name: str
+    role: str
+
+
+class MemberListResponse(BaseModel):
+    data: list[MemberListItem]
+
+
+class MemberAddRequest(BaseModel):
+    """参加追加の入力（B.4）。既存アカウントをディレクトリで選択。想定外プロパティ拒否（§B.6）。
+
+    **`role` は受け取らない**＝QG管理者の参加追加は `role=member` 固定（`admin` 任命は不可・§8-⑯）。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: uuid.UUID
+
+
+class MembershipResponse(BaseModel):
+    """参加追加の結果（会社DB `quest_group_members` の 1 行）。"""
+    account_id: str
+    group_id: str
+    role: str
+
+
+class DirectoryItem(BaseModel):
+    """自社ディレクトリの 1 行（B.4・**最小射影**＝PII/role/組織構造は出さない）。"""
+    account_id: str
+    display_name: str
+    avatar_url: str | None = None
+
+
+class DirectoryResponse(BaseModel):
+    data: list[DirectoryItem]
+    page_info: PageInfo
