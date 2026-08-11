@@ -1,0 +1,52 @@
+"""mail_outbox の送信時レンダリング（ADR-0007 §2.7・§4.7）。
+
+秘匿値（OTP コード／設定リンクのトークン）は DB に完成本文で持たず `secret` 列に隔離し、
+**送信時に本モジュールが件名/本文へ差し込む**。テンプレはここ 1 箇所に集約する（auth からは移設）。
+locale は i18n 拡張の受け皿（現状は JA のみ・システム生成メールは `accounts.locale` 由来）。
+"""
+from __future__ import annotations
+
+from app.core.config import get_settings
+
+# category 値（データモデル §3 mail_category・§4.7）
+CATEGORY_OTP = "otp"
+CATEGORY_PASSWORD_SETUP = "password_setup"
+CATEGORY_LOCK_NOTIFICATION = "lock_notification"
+
+
+def render(category: str, secret: str | None, locale: str | None = None) -> tuple[str, str]:
+    """`(subject, body)` を返す。`secret`＝OTP コード／設定リンクトークン（lock は None）。
+
+    本文・秘匿値はログに出さない（呼び出し側の責務・セキュリティ一覧 3・15）。
+    """
+    s = get_settings()
+    if category == CATEGORY_OTP:
+        minutes = s.otp_ttl_seconds // 60
+        subject = "【ideaquest】ログイン認証コード"
+        body = (
+            "ideaquest のログイン認証コードです。\n\n"
+            f"認証コード: {secret}\n"
+            f"（有効期限 {minutes} 分・1回限り）\n\n"
+            "このメールに心当たりがない場合は破棄してください。"
+        )
+        return subject, body
+    if category == CATEGORY_PASSWORD_SETUP:
+        link = f"{s.app_base_url}/password-setup?token={secret}"
+        subject = "【ideaquest】パスワード設定のご案内"
+        body = (
+            "ideaquest のパスワード設定/再設定のご案内です。\n\n"
+            "以下のリンクから新しいパスワードを設定してください（有効期限 72 時間・1回限り）。\n"
+            f"{link}\n\n"
+            "このメールに心当たりがない場合は破棄してください。"
+        )
+        return subject, body
+    if category == CATEGORY_LOCK_NOTIFICATION:
+        subject = "【ideaquest】ログインの一時制限のお知らせ"
+        body = (
+            "あなたのアカウントでログインの失敗が続いたため、一時的にログインを制限しました。\n\n"
+            "しばらく時間をおくと自動的に解除されます。\n"
+            "心当たりがない場合は、パスワードの再設定をおすすめします。\n\n"
+            "このメールに心当たりがない場合は破棄してください。"
+        )
+        return subject, body
+    raise ValueError(f"unknown mail category: {category}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
@@ -35,4 +36,15 @@ def enqueue(
             status="pending",
             attempts=0,
         )
+    )
+
+
+def fetch_pending_ids(session: Session) -> list[uuid.UUID]:
+    """`pending` を `seq` 昇順で id 列挙（取り出し順＝挿入順・§2.4）。各 id は個別に確保して送る。"""
+    return list(
+        session.execute(
+            select(MailOutboxEntry.id)
+            .where(MailOutboxEntry.status == "pending")
+            .order_by(MailOutboxEntry.seq)
+        ).scalars()
     )

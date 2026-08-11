@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from app.control_plane.account_sync.orm import OutboxEntry
 from app.control_plane.auth.orm import Account, Company, OtpChallenge, TrustedDevice
+from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.core.security import generate_token, hash_password, hash_token
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -43,6 +44,22 @@ def _flush_redis():
     get_redis().flushdb()
     yield
     get_redis().flushdb()
+
+
+@pytest.fixture(autouse=True)
+def _clean_mail_outbox():
+    """各テストの前後で mail_outbox を空にする（トランスポート状態＝Redis と同様に隔離）。
+
+    mail_outbox は accounts/companies への FK を持つ子テーブルなので、行削除は FK に抵触しない。
+    """
+    def _truncate() -> None:
+        with control_session() as s:
+            s.query(MailOutboxEntry).delete()
+            s.commit()
+
+    _truncate()
+    yield
+    _truncate()
 
 
 @pytest.fixture
@@ -189,6 +206,9 @@ def factory():
         # outbox（FK→accounts）を accounts 削除前に掃除
         for aid in created_accounts:
             s.query(OutboxEntry).filter_by(account_id=aid).delete()
+        # mail_outbox（FK→accounts・任意列）も accounts 削除前に掃除
+        for aid in created_accounts:
+            s.query(MailOutboxEntry).filter_by(account_id=aid).delete()
         for aid in created_accounts:
             s.query(Account).filter_by(id=aid).delete()
         for cid in created_companies:
