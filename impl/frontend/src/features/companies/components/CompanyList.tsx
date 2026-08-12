@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createCompany, listCompanies } from "../api";
 import type { Company } from "../types";
@@ -27,11 +27,19 @@ function createErrorMessage(err: unknown): string {
   return "エラーが発生しました。時間をおいて再度お試しください。";
 }
 
+const PER_PAGE = 20; // 一覧の1ページ件数（backend 既定と一致・最大 100）
+
 export function CompanyList() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState(""); // "" = 全件 / active / suspended
+  const [page, setPage] = useState(1);
+  const [qDraft, setQDraft] = useState("");
+  const [statusDraft, setStatusDraft] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -44,7 +52,7 @@ export function CompanyList() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await listCompanies({ per_page: 50 });
+      const res = await listCompanies({ q: q || undefined, status: status || undefined, page, per_page: PER_PAGE });
       setCompanies(res?.data ?? []);
       setTotal(res?.page_info.total ?? 0);
     } catch (err) {
@@ -54,11 +62,26 @@ export function CompanyList() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [q, status, page]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 検索/フィルタ適用時は先頭ページへ戻す（絞り込みで現在ページが範囲外になるのを防ぐ）。
+  function onSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setQ(qDraft.trim());
+    setStatus(statusDraft);
+    setPage(1);
+  }
+  function onClearSearch() {
+    setQDraft("");
+    setStatusDraft("");
+    setQ("");
+    setStatus("");
+    setPage(1);
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -82,49 +105,75 @@ export function CompanyList() {
     <section aria-label="会社一覧">
       <div className="admin-toolbar">
         <h1>システム管理 — 会社一覧</h1>
-        <Button type="button" variant="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "閉じる" : "＋ 会社作成"}
+        <Button type="button" variant="primary" onClick={() => setShowForm(true)}>
+          ＋ 会社作成
         </Button>
       </div>
 
-      {showForm && (
-        <form className="admin-create card" onSubmit={onCreate} noValidate>
-          {formError && <div className="form-error" role="alert">{formError}</div>}
-          <Field id="c_name" label="会社名" required>
-            <input id="c_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-          </Field>
-          <Field id="c_code" label="会社コード" required>
-            <input
-              id="c_code"
-              className="input"
-              placeholder="例: ACME-01"
-              value={companyCode}
-              onChange={(e) => setCompanyCode(e.target.value)}
-              required
-            />
-          </Field>
-          <Field id="c_db" label="DB 識別子" required>
-            <input
-              id="c_db"
-              className="input"
-              placeholder="例: ideaquest_company_acme"
-              value={dbIdentifier}
-              onChange={(e) => setDbIdentifier(e.target.value)}
-              required
-            />
-          </Field>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "作成中…" : "作成する（準備中で作成）"}
-          </Button>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="会社（テナント）を作成" size="md">
+        <form onSubmit={onCreate} noValidate>
+          <ModalBody>
+            {formError && <div className="form-error" role="alert">{formError}</div>}
+            <Field id="c_name" label="会社名" required>
+              <input id="c_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+            </Field>
+            <Field id="c_code" label="会社コード" required>
+              <input
+                id="c_code"
+                className="input"
+                placeholder="例: ACME-01"
+                value={companyCode}
+                onChange={(e) => setCompanyCode(e.target.value)}
+                required
+              />
+            </Field>
+            <Field id="c_db" label="DB 識別子" required>
+              <input
+                id="c_db"
+                className="input"
+                placeholder="例: ideaquest_company_acme"
+                value={dbIdentifier}
+                onChange={(e) => setDbIdentifier(e.target.value)}
+                required
+              />
+            </Field>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+              キャンセル
+            </Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "作成中…" : "作成する（準備中で作成）"}
+            </Button>
+          </ModalFooter>
         </form>
-      )}
+      </Modal>
+
+      <form className="list-toolbar" role="search" aria-label="会社検索" onSubmit={onSearch}>
+        <input
+          type="search"
+          className="input"
+          aria-label="検索（会社名・会社コード）"
+          placeholder="会社名・会社コードで検索"
+          value={qDraft}
+          onChange={(e) => setQDraft(e.target.value)}
+        />
+        <select className="input" aria-label="状態で絞り込み" value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
+          <option value="">すべての状態</option>
+          <option value="active">有効</option>
+          <option value="suspended">準備中</option>
+        </select>
+        <Button type="submit" variant="outline">検索</Button>
+        {(q || status) && (
+          <Button type="button" variant="default" onClick={onClearSearch}>クリア</Button>
+        )}
+      </form>
 
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {loading ? (
         <p className="admin-muted">読み込み中…</p>
       ) : (
         <>
-          <p className="admin-muted">{total} 件</p>
           <table className="admin-table">
             <thead>
               <tr>
@@ -146,6 +195,7 @@ export function CompanyList() {
             </tbody>
           </table>
           {companies.length === 0 && <p className="admin-muted">会社がありません。</p>}
+          <Pager page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
         </>
       )}
     </section>

@@ -25,14 +25,18 @@ test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
   const stamp = Date.now().toString().slice(-8);
   const code = `E2E-${stamp}`;
   const cname = `E2E詳細_${stamp}`; // run ごとに一意＝リンクの strict 一致を担保
-  await page.getByRole("button", { name: "＋ 会社作成" }).click();
+  await page.getByRole("button", { name: "＋ 会社作成" }).click(); // モーダルで会社作成
   await page.locator("#c_name").fill(cname);
   await page.locator("#c_code").fill(code);
   await page.locator("#c_db").fill(`ideaquest_e2e_${stamp}`);
-  await page.getByRole("button", { name: /作成する/ }).click();
-  await expect(page.getByText(code)).toBeVisible();
+  await page.getByRole("button", { name: /作成する/ }).click(); // 送信ボタンは modal（body 直下に portal）
 
-  await page.getByRole("link", { name: cname }).click();
+  // 詳細へ遷移。会社一覧はページャ/検索 UI 未実装（per_page=50 固定）で、蓄積により新規会社が
+  // 1ページ目に出ないことがあるため、作成会社の id を API で解決して詳細へ直接遷移する（SC-91 のページング/検索 UI は別スライスの負債）。
+  const created = await (await page.request.get(`/api/v1/admin/companies?q=${code}&per_page=100`)).json();
+  const co = (created.data ?? []).find((c: { company_code: string }) => c.company_code === code);
+  expect(co, "作成した会社が一覧APIに現れる").toBeTruthy();
+  await page.goto(`/admin/companies/${co.company_id}`);
   await expect(page.getByRole("heading", { name: cname })).toBeVisible();
 
   const before = await page.getByRole("checkbox", { name: /MFA/ }).isChecked();

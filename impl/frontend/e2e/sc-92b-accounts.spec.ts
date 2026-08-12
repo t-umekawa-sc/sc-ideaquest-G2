@@ -53,7 +53,7 @@ test("B-TC-125 company account list: search, email column, pager", async ({ page
   await page.locator("#a_name").fill(`検索対象_${stamp}`);
   await page.locator("#a_login").fill(loginId);
   await page.locator("#a_email").fill(emailAddr);
-  await region.getByRole("button", { name: /発行する/ }).click();
+  await page.getByRole("button", { name: /発行する/ }).click(); // 送信ボタンは modal（body 直下に portal）＝region 外
   await expect(page.getByText("アカウントを発行")).toHaveCount(0); // フォームが閉じる＝発行成功
 
   // 検索＝一意スタンプで絞ると当該行のみ（total=1）

@@ -5,7 +5,7 @@
 // 所属の候補は自社グループ一覧（GET /admin/company-quest-groups・B.2.1）。編集時は「置き換える」オプトインで全置換（誤消去防止）。
 import { useEffect, useState } from "react";
 
-import { Button, Field, Pager } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableOwnAccount,
@@ -134,41 +134,52 @@ export function AccountSelfSection() {
     <section aria-label="自社アカウント管理">
       <div className="admin-toolbar">
         <h1>アカウント管理（自社）</h1>
-        <Button type="button" variant="primary" onClick={() => (showForm ? setShowForm(false) : openIssue())}>
-          {showForm ? "閉じる" : "＋ アカウント発行"}
+        <Button type="button" variant="primary" onClick={openIssue}>
+          ＋ アカウント発行
         </Button>
       </div>
       <p className="admin-muted">自社のアカウントを管理します（発行・編集・無効化・PW再設定）。システムロールの付与はできません。</p>
 
-      {showForm && (
-        <form className="admin-create card" onSubmit={onSubmit} noValidate>
-          <h3>{mode === "issue" ? "アカウントを発行" : "アカウントを編集"}</h3>
-          {formError && <div className="form-error" role="alert">{formError}</div>}
-          <Field id="s_name" label="氏名" required>
-            <input id="s_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-          </Field>
-          <Field id="s_login" label="ログインID" required>
-            <input id="s_login" className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
-          </Field>
-          <Field id="s_email" label="メールアドレス" required>
-            <input id="s_email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </Field>
-          {mode === "edit" && (
-            <label>
-              <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
-              所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
-            </label>
-          )}
-          {(mode === "issue" || replaceMemberships) && (
-            <Field id="s_groups" label="所属クエストグループ">
-              <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={mode === "issue" ? "アカウントを発行" : "アカウントを編集"}
+        size="md"
+      >
+        <form onSubmit={onSubmit} noValidate>
+          <ModalBody>
+            {formError && <div className="form-error" role="alert">{formError}</div>}
+            <Field id="s_name" label="氏名" required>
+              <input id="s_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
             </Field>
-          )}
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
-          </Button>
+            <Field id="s_login" label="ログインID" required>
+              <input id="s_login" className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
+            </Field>
+            <Field id="s_email" label="メールアドレス" required>
+              <input id="s_email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </Field>
+            {mode === "edit" && (
+              <label>
+                <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
+                所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
+              </label>
+            )}
+            {(mode === "issue" || replaceMemberships) && (
+              <Field id="s_groups" label="所属クエストグループ">
+                <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+              </Field>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+              キャンセル
+            </Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
+            </Button>
+          </ModalFooter>
         </form>
-      )}
+      </Modal>
 
       <AccountsToolbar q={q} status={status} onApply={apply} />
 

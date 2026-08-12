@@ -4,7 +4,7 @@
 // 一覧（検索/状態フィルタ/ページング）＋発行（memberships 所属エディタ込み）＋編集(PATCH)＋disable/enable/PW再設定。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field, Pager } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableAccount,
@@ -144,47 +144,58 @@ export function AccountSection({ companyId }: { companyId: string }) {
     <section className="card admin-create" aria-label="この会社のアカウント管理">
       <div className="admin-toolbar">
         <h2>アカウント &amp; 所属（この会社）</h2>
-        <Button type="button" variant="primary" onClick={() => (showForm ? setShowForm(false) : openIssue())}>
-          {showForm ? "閉じる" : "＋ アカウント発行"}
+        <Button type="button" variant="primary" onClick={openIssue}>
+          ＋ アカウント発行
         </Button>
       </div>
 
-      {showForm && (
-        <form className="admin-create" onSubmit={onSubmit} noValidate>
-          <h3>{mode === "issue" ? "アカウントを発行" : "アカウントを編集"}</h3>
-          {formError && <div className="form-error" role="alert">{formError}</div>}
-          <Field id="a_name" label="氏名" required>
-            <input id="a_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-          </Field>
-          <Field id="a_login" label="ログインID" required>
-            <input id="a_login" className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
-          </Field>
-          <Field id="a_email" label="メールアドレス" required>
-            <input id="a_email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </Field>
-          <Field id="a_role" label="システムロール">
-            <select id="a_role" className="input" value={systemRole} onChange={(e) => setSystemRole(e.target.value as AccountCreateInput["system_role"])}>
-              <option value="general">一般</option>
-              <option value="company_account_admin">会社アカウント管理者</option>
-              <option value="system_admin">システム管理者</option>
-            </select>
-          </Field>
-          {mode === "edit" && (
-            <label>
-              <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
-              所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
-            </label>
-          )}
-          {(mode === "issue" || replaceMemberships) && (
-            <Field id="a_groups" label="所属クエストグループ">
-              <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={mode === "issue" ? "アカウントを発行" : "アカウントを編集"}
+        size="md"
+      >
+        <form onSubmit={onSubmit} noValidate>
+          <ModalBody>
+            {formError && <div className="form-error" role="alert">{formError}</div>}
+            <Field id="a_name" label="氏名" required>
+              <input id="a_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
             </Field>
-          )}
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
-          </Button>
+            <Field id="a_login" label="ログインID" required>
+              <input id="a_login" className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
+            </Field>
+            <Field id="a_email" label="メールアドレス" required>
+              <input id="a_email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </Field>
+            <Field id="a_role" label="システムロール">
+              <select id="a_role" className="input" value={systemRole} onChange={(e) => setSystemRole(e.target.value as AccountCreateInput["system_role"])}>
+                <option value="general">一般</option>
+                <option value="company_account_admin">会社アカウント管理者</option>
+                <option value="system_admin">システム管理者</option>
+              </select>
+            </Field>
+            {mode === "edit" && (
+              <label>
+                <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
+                所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
+              </label>
+            )}
+            {(mode === "issue" || replaceMemberships) && (
+              <Field id="a_groups" label="所属クエストグループ">
+                <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
+              </Field>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+              キャンセル
+            </Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
+            </Button>
+          </ModalFooter>
         </form>
-      )}
+      </Modal>
 
       <AccountsToolbar q={q} status={status} onApply={apply} />
 

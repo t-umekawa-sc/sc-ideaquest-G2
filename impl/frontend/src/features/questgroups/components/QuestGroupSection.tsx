@@ -4,7 +4,7 @@
 // 一覧＋作成＋リネーム＋削除（空グループのみ＝有効所属があれば 409 in_use）。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createQuestGroup, deleteQuestGroup, listQuestGroups, renameQuestGroup, type QuestGroup } from "../api";
 import "@/features/companies/companies.css";
@@ -91,25 +91,32 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     <div className="card admin-create">
       <div className="admin-toolbar">
         <h2>クエストグループ</h2>
-        <Button type="button" variant="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "閉じる" : "＋ グループ作成"}
+        <Button type="button" variant="primary" onClick={() => setShowForm(true)}>
+          ＋ グループ作成
         </Button>
       </div>
 
-      {showForm && (
-        <form className="admin-create" onSubmit={onCreate} noValidate>
-          {formError && <div className="form-error" role="alert">{formError}</div>}
-          <Field id="g_code" label="クエストグループコード" required>
-            <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} required />
-          </Field>
-          <Field id="g_name" label="グループ名" required>
-            <input id="g_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-          </Field>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "作成中…" : "作成する"}
-          </Button>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="クエストグループを作成" size="sm">
+        <form onSubmit={onCreate} noValidate>
+          <ModalBody>
+            {formError && <div className="form-error" role="alert">{formError}</div>}
+            <Field id="g_code" label="クエストグループコード" required>
+              <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} required />
+            </Field>
+            <Field id="g_name" label="グループ名" required>
+              <input id="g_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+            </Field>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+              キャンセル
+            </Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "作成中…" : "作成する"}
+            </Button>
+          </ModalFooter>
         </form>
-      )}
+      </Modal>
 
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {actionError && <div className="form-error" role="alert">{actionError}</div>}

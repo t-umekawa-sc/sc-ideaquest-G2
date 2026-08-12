@@ -210,7 +210,7 @@
 
 ## 8. frontend e2e（SC-91 会社一覧・B.1）
 
-> 対象＝`frontend/e2e/sc-91-companies.spec.ts`（Playwright・階層 e2e）。範囲＝SC-91（システム管理・会社一覧）の**実 UI 縦通し**＝OPS system_admin でログイン→一覧表示→会社作成が一覧に反映／非 system_admin は入れない（サーバーガード）。前提＝フルスタック起動（backend/frontend 再ビルド）＋OPS 管理者 seed（`BOOTSTRAP_ADMIN_PASSWORD`）。出典＝画面設計 SC-91／API設計 B.1。UI 設計の正＝`doc/画面設計/screens/SC-91_システム管理.md`。
+> 対象＝`frontend/e2e/sc-91-companies.spec.ts`（Playwright・階層 e2e）。範囲＝SC-91（システム管理・会社一覧）の**実 UI 縦通し**＝OPS system_admin でログイン→一覧表示→会社作成が一覧に反映／非 system_admin は入れない（サーバーガード）。**会社作成はモーダル**（デザイン標準§モーダルダイアログ・登録/編集は原則モーダル）で行い、**一覧は検索（q＝会社名/会社コード）＋状態フィルタ＋ページャ（per_page=20・`page_info`）付き**。B-TC-111 は蓄積で新規会社が先頭ページ外になり得るため**検索で絞って**一覧反映を確認する。前提＝フルスタック起動（backend/frontend 再ビルド）＋OPS 管理者 seed（`BOOTSTRAP_ADMIN_PASSWORD`）。出典＝画面設計 SC-91／API設計 B.1／§1.8。UI 設計の正＝`doc/画面設計/screens/SC-91_システム管理.md`。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -220,7 +220,7 @@
 
 ## 9. frontend e2e（SC-92 会社詳細・B.1）
 
-> 対象＝`frontend/e2e/sc-92-company-detail.spec.ts`（Playwright・階層 e2e）。範囲＝SC-92（会社詳細/設定）の縦通し＝SC-91 から遷移→会社設定トグル（`PATCH /settings`）が永続。アカウント管理・グループ CRUD・所属エディタは後続サブスライス（92B/92C）。前提＝フルスタック＋OPS 管理者 seed。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`。
+> 対象＝`frontend/e2e/sc-92-company-detail.spec.ts`（Playwright・階層 e2e）。範囲＝SC-92（会社詳細/設定）の縦通し＝会社作成（モーダル）→詳細へ遷移→会社設定トグル（`PATCH /settings`）が永続。**B-TC-113 は会社一覧がページャ付き（新規会社が先頭ページ外になり得る）ため、作成会社の id を一覧 API で解決して詳細 URL へ直接遷移**して検証する（設定永続が主眼）。アカウント管理・グループ CRUD・所属エディタは後続サブスライス（92B/92C）。前提＝フルスタック＋OPS 管理者 seed。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |

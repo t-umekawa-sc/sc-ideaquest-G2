@@ -4,7 +4,7 @@
 // 認可は per-group（サーバー）。管理グループが無い（403）は「管理グループなし」を表示。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, Modal, ModalBody, ModalFooter } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { addMember, companyDirectory, listGroupMembers, listMyGroups, removeMember, type DirectoryEntry, type Member, type QuestGroup } from "../api";
 import "@/features/companies/companies.css";
@@ -111,14 +111,13 @@ export function QuestGroupAdminView() {
             ))}
           </select>
         </label>
-        <Button type="button" variant="primary" onClick={() => { setShowAdd((v) => !v); if (!showAdd) void searchDirectory(); }}>
-          {showAdd ? "閉じる" : "＋ メンバー追加"}
+        <Button type="button" variant="primary" onClick={() => { setShowAdd(true); void searchDirectory(); }}>
+          ＋ メンバー追加
         </Button>
       </div>
 
-      {showAdd && (
-        <div className="card admin-create">
-          <h3>ディレクトリから参加追加</h3>
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="ディレクトリから参加追加" size="md">
+        <ModalBody>
           <div className="admin-toolbar">
             <input className="input" placeholder="氏名・ログインIDで検索" value={dirQuery} onChange={(e) => setDirQuery(e.target.value)} />
             <Button type="button" onClick={() => void searchDirectory()}>検索</Button>
@@ -134,8 +133,11 @@ export function QuestGroupAdminView() {
             </tbody>
           </table>
           {directory.length === 0 && <p className="admin-muted">候補がありません。</p>}
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="outline" onClick={() => setShowAdd(false)}>閉じる</Button>
+        </ModalFooter>
+      </Modal>
 
       <table className="admin-table">
         <thead>
