@@ -4,8 +4,10 @@
 // 一覧取得＋会社作成（B.1）。業務層クリーン＝表示/UX のみ、判定はサーバー（403/409/422 を文言化）。
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
+import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
 import { createCompany, listCompanies } from "../api";
 import type { Company } from "../types";
@@ -30,6 +32,7 @@ function createErrorMessage(err: unknown): string {
 const PER_PAGE = 20; // 一覧の1ページ件数（backend 既定と一致・最大 100）
 
 export function CompanyList() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -150,51 +153,90 @@ export function CompanyList() {
       </Modal>
 
       <form className="list-toolbar" role="search" aria-label="会社検索" onSubmit={onSearch}>
-        <input
-          type="search"
-          className="input"
-          aria-label="検索（会社名・会社コード）"
-          placeholder="会社名・会社コードで検索"
-          value={qDraft}
-          onChange={(e) => setQDraft(e.target.value)}
-        />
-        <select className="input" aria-label="状態で絞り込み" value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
-          <option value="">すべての状態</option>
-          <option value="active">有効</option>
-          <option value="suspended">準備中</option>
-        </select>
-        <Button type="submit" variant="outline">検索</Button>
-        {(q || status) && (
-          <Button type="button" variant="default" onClick={onClearSearch}>クリア</Button>
-        )}
+        <div className="filters">
+          <input
+            type="search"
+            className="input"
+            aria-label="検索（会社名・会社コード）"
+            placeholder="会社名・会社コード・DB識別子で検索"
+            value={qDraft}
+            onChange={(e) => setQDraft(e.target.value)}
+          />
+          <label>
+            状態{" "}
+            <select className="select" aria-label="状態で絞り込み" value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
+              <option value="">すべて</option>
+              <option value="active">有効</option>
+              <option value="suspended">準備中</option>
+            </select>
+          </label>
+          <Button type="submit" variant="outline" size="sm">検索</Button>
+          {(q || status) && (
+            <Button type="button" size="sm" onClick={onClearSearch}>絞り込みをクリア</Button>
+          )}
+        </div>
+        <div className="tools">
+          <span className="list-count">{total} 社</span>
+        </div>
       </form>
 
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {loading ? (
-        <p className="admin-muted">読み込み中…</p>
+        <p className="list-empty">読み込み中…</p>
+      ) : companies.length === 0 ? (
+        <p className="list-empty">該当する会社がありません。</p>
       ) : (
         <>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th scope="col">会社名</th>
-                <th scope="col">会社コード</th>
-                <th scope="col">状態</th>
-                <th scope="col">アカウント数</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((c) => (
-                <tr key={c.company_id}>
-                  <td><Link href={`/admin/companies/${c.company_id}`}>{c.name}</Link></td>
-                  <td className="admin-code">{c.company_code}</td>
-                  <td>{c.status === "active" ? "有効" : "準備中"}</td>
-                  <td>{c.account_count}</td>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">会社名</th>
+                  <th scope="col">会社コード</th>
+                  <th scope="col">DB識別子</th>
+                  <th scope="col">状態</th>
+                  <th scope="col" className="num">アカウント</th>
+                  <th scope="col" className="num">グループ</th>
+                  <th scope="col">作成日</th>
+                  <th scope="col" className="col-actions" aria-label="操作" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {companies.length === 0 && <p className="admin-muted">会社がありません。</p>}
+              </thead>
+              <tbody>
+                {companies.map((c) => (
+                  <tr key={c.company_id} className="row-link" onClick={() => router.push(`/admin/companies/${c.company_id}`)}>
+                    <td>
+                      <span className="poster">
+                        <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_path} size="sm" />
+                        <span className="name">{c.name}</span>
+                      </span>
+                    </td>
+                    <td className="admin-code">{c.company_code}</td>
+                    <td className="admin-code">{c.db_identifier}</td>
+                    <td>
+                      {c.status === "active" ? (
+                        <span className="badge badge-success">有効</span>
+                      ) : (
+                        <span className="badge badge-muted">準備中</span>
+                      )}
+                    </td>
+                    <td className="num">{c.account_count}</td>
+                    {/* グループ数・作成日は CompanyListItem 未提供（group_count＝ドメインC／created_at＝backend 拡張）＝暫定「—」 */}
+                    <td className="num">—</td>
+                    <td>—</td>
+                    <td className="col-actions">
+                      <Link
+                        href={`/admin/companies/${c.company_id}`}
+                        className="btn btn-outline btn-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        管理する →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pager page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
         </>
       )}
