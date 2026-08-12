@@ -1,3 +1,6 @@
+/* デザインシステムの正＝モック shared.css をそのまま採用（フロントエンド実装フロー規約）。
+   既存の tokens/components/layout は段階移行の legacy（重複は design-system が基底・ad-hoc クラスは順次移行して削除）。 */
+@import "../styles/design-system.css";
 @import "../styles/tokens.css";
 @import "../styles/components.css";
 @import "../styles/layout.css";

@@ -132,11 +132,11 @@ export function Modal({ open, onClose, title, size = "md", draggable = true, max
       <div className={`modal__panel sectioned${maximized ? " is-max" : ""}`} ref={panelRef} style={panelStyle}>
         <div className="modal__header" onPointerDown={onHeaderPointerDown}>
           <h2 id={titleId}>{title}</h2>
-          <span className="modal__header-actions">
+          <span className="modal__header__tools">
             {maximizable && window.innerWidth > NARROW && (
               <button
                 type="button"
-                className="modal__iconbtn"
+                className="modal__maxbtn"
                 aria-label={maximized ? "元のサイズに戻す" : "最大化"}
                 aria-pressed={maximized}
                 onClick={() => setMaximized((v) => !v)}
@@ -144,7 +144,7 @@ export function Modal({ open, onClose, title, size = "md", draggable = true, max
                 {maximized ? "⤡" : "⤢"}
               </button>
             )}
-            <button type="button" className="modal__iconbtn modal__close" aria-label="閉じる" onClick={onClose}>
+            <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>
               ✕
             </button>
           </span>
