@@ -92,6 +92,7 @@ stateDiagram-v2
   "company_code": "ACME-01",
   "system_role": "general",            // general | company_account_admin | system_admin（会社アカウント管理者=自社全アカウント管理・§8-⑯／QG管理者は system_role では表さず会社DB quest_group_members.role=admin で判定＝B案）
   "locale": "ja",                       // ja | en（accounts源泉ミラー・§8-⑬）
+  "is_qg_admin": false,                 // ログイン時点で会社DB quest_group_members.role=admin の有効所属（removed_at IS NULL）を1つ以上持つかを集計したスナップショット（QG管理者=B案・§1.6）。SC-90/SC-01 の QG 管理導線の出し分けに使用。所属変更の即時反映はせず次回ログインで更新（session に焼き込む最適化・認可の実体は per-group 判定＝§1.6）
   "user": {                             // 会社DB users の表示情報（会社DB解決後にミラーから）
     "user_id": "usr_…",
     "display_name": "山田 太郎",

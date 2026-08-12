@@ -14,32 +14,32 @@
 
 ## 1. テストパターン一覧
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-001 | api | シード会社(mfa=false)＋正アカウント | 正しい `company_code/login_id/password` で `POST /auth/login` | `200`＋body `{status:"authenticated", session:{…}}`、`Set-Cookie: iq_session, iq_csrf` の2本 | A.1（分岐1）／A.6 |
-| A-TC-002 | api | 同上 | 正 ID＋**誤 password** | `401 {code:"unauthenticated"}`、Set-Cookie 無し | A.1（列挙耐性） |
-| A-TC-003 | api | 同上 | **存在しない login_id** | `401 {code:"unauthenticated"}`（A-TC-002 と**同一レスポンス**＝区別不能） | A.1（列挙耐性） |
-| A-TC-004 | api | 同上 | **存在しない company_code** | `401 {code:"unauthenticated"}`（同上・同一） | A.1（列挙耐性） |
-| A-TC-005 | api | `password_set=false` のアカウント | 正 ID＋任意 password | `401 {code:"unauthenticated"}`、**`password_setup_required` を返さない**（F3 ハードニング） | A.1（分岐3）／SC-00 §5 |
-| A-TC-006 | api | 会社が `suspended` | **正しい資格情報**で login | `503 {code:"company_suspended"}`（＝**資格照合が成功した後に**返す・会社コード有無を漏らさない） | A.1／README §1.5/§1.7 |
-| A-TC-007 | api | 会社が `suspended` | **誤った資格情報**で login | `401 {code:"unauthenticated"}`（**503 を返さない**＝資格照合が先に落ちる。停止中会社の実在を非認証者に漏らさない・列挙耐性） | A.1（照合成功後に503） |
-| A-TC-008 | api | — | `company_code`/`login_id`/`password` のいずれか欠落で login | `422 {code:"validation_error", errors:[…]}` | README §1.7 |
-| A-TC-009 | api | — | login を **`X-CSRF-Token` 無し**で実行 | 成功する（login は CSRF 免除＝Origin/Sec-Fetch のみ） | A.0/A.1 |
-| A-TC-010 | api | — | login を**不正 Origin** で実行 | 拒否（`403`）＝Origin/Sec-Fetch 検証 | A.0 |
-| A-TC-011 | api | ログイン成功済み（有効 `iq_session`） | `GET /auth/session` | `200`＋A.6 スキーマ（`account_id/company_id/system_role/locale/user`） | A.1／A.6 |
-| A-TC-012 | api | セッション無し | `GET /auth/session` | `401 {code:"unauthenticated"}` | A.1 |
-| A-TC-101 | api | 会社DBに有効 `quest_group_members.role=admin` を持つユーザーでログイン | `GET /auth/session` | `is_qg_admin=true`（ログイン時点で会社DBの admin 所属を集計＝スナップショット・SC-90 ナビ出し分け・B.4） | A.6／B.4 |
-| A-TC-102 | api | admin 所属を持たないユーザーでログイン | `GET /auth/session` | `is_qg_admin=false` | A.6／B.4 |
-| A-TC-013 | api | ログイン成功済み | `POST /auth/logout`（`X-CSRF-Token`＋`iq_csrf` 一致） | `204`、`iq_session` 失効。直後の `GET /auth/session` が `401` | A.1 |
-| A-TC-014 | api | ログイン成功済み（有効セッション） | `POST /auth/logout` を **CSRF トークン無し**で | `403 {code:"csrf_failed"}`、セッションは維持 | A.0／README §1.7 |
-| A-TC-015 | api | **セッション無し**（Cookie 無し） | `POST /auth/logout` | `401 {code:"unauthenticated"}`（本セッション必須・**認証を CSRF より先に評価**＝A-TC-014 の 403 と対） | A.1（本セッション必須） |
-| A-TC-016 | api | — | login 成功時の Set-Cookie 属性を検査 | `iq_session`＝httpOnly・SameSite=Lax（本番 Secure）、`iq_csrf`＝**非httpOnly** | A.0（Cookie 表）／ADR §2.3 |
-| A-TC-017 | api | login→（再）login | 2回目 login 成功後のセッションID | 毎回**新しいセッションID**（固定化対策・前値の使い回し無し） | A.0（固定化対策） |
-| A-TC-018 | int | — | Redis セッションの保存/取得/TTL | `sess:{token}` に A.6 相当が入り、アイドルTTL が延長される | ADR §2.2 |
-| A-TC-019 | int | — | 存在しないアカウントの login | **ダミーハッシュ照合**が走り、実在時との応答時間差が有意に出ない | ADR §2.5 |
-| A-TC-020 | e2e | フルスタック起動 | SC-00 で正資格情報を入力しログイン | SC-01 に遷移し、保護ページが表示される（Cookie セッション確立） | SC-00 §5／A.1 |
-| A-TC-021 | e2e | ログイン済み | 共通ヘッダーのユーザーメニュー→「ログアウト」 | `/login` に戻り、ログイン画面が表示される（セッション破棄） | デザイン標準 §4／A.1（logout） |
-| A-TC-022 | e2e | ログイン済み | 共通ヘッダーのユーザーメニュー→「全端末からログアウト」 | `/login` に戻り、ログイン画面が表示される（全セッション破棄＋信頼端末失効の導線） | A.0-⑤／A.1（logout-all） |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-001 | api | 正常ログインでのセッション確立と二本の Cookie 発行の担保 | シード会社(mfa=false)＋正アカウント | 正しい `company_code/login_id/password` で `POST /auth/login` | `200`＋body `{status:"authenticated", session:{…}}`、`Set-Cookie: iq_session, iq_csrf` の2本 | A.1（分岐1）／A.6 |
+| A-TC-002 | api | 誤パスワードを一律 401 に倒す列挙耐性の担保 | 同上 | 正 ID＋**誤 password** | `401 {code:"unauthenticated"}`、Set-Cookie 無し | A.1（列挙耐性） |
+| A-TC-003 | api | login_id 不在を誤 PW と区別不能にする列挙耐性 | 同上 | **存在しない login_id** | `401 {code:"unauthenticated"}`（A-TC-002 と**同一レスポンス**＝区別不能） | A.1（列挙耐性） |
+| A-TC-004 | api | company_code 不在を誤 PW と区別不能にする列挙耐性 | 同上 | **存在しない company_code** | `401 {code:"unauthenticated"}`（同上・同一） | A.1（列挙耐性） |
+| A-TC-005 | api | 初回 PW 未設定を login 応答で漏らさない F3 ハードニング | `password_set=false` のアカウント | 正 ID＋任意 password | `401 {code:"unauthenticated"}`、**`password_setup_required` を返さない**（F3 ハードニング） | A.1（分岐3）／SC-00 §5 |
+| A-TC-006 | api | 資格照合成功後に 503 を返す評価順序の固定 | 会社が `suspended` | **正しい資格情報**で login | `503 {code:"company_suspended"}`（＝**資格照合が成功した後に**返す・会社コード有無を漏らさない） | A.1／README §1.5/§1.7 |
+| A-TC-007 | api | 停止中会社の実在を非認証者に漏らさない照合順序の担保 | 会社が `suspended` | **誤った資格情報**で login | `401 {code:"unauthenticated"}`（**503 を返さない**＝資格照合が先に落ちる。停止中会社の実在を非認証者に漏らさない・列挙耐性） | A.1（照合成功後に503） |
+| A-TC-008 | api | 必須項目欠落時のバリデーションエラー形式の担保 | — | `company_code`/`login_id`/`password` のいずれか欠落で login | `422 {code:"validation_error", errors:[…]}` | README §1.7 |
+| A-TC-009 | api | login の CSRF 免除（Origin/Sec-Fetch のみ）の担保 | — | login を **`X-CSRF-Token` 無し**で実行 | 成功する（login は CSRF 免除＝Origin/Sec-Fetch のみ） | A.0/A.1 |
+| A-TC-010 | api | 不正 Origin 拒否による同一サイト強制の担保 | — | login を**不正 Origin** で実行 | 拒否（`403`）＝Origin/Sec-Fetch 検証 | A.0 |
+| A-TC-011 | api | 認証済みセッション情報スキーマの契約担保 | ログイン成功済み（有効 `iq_session`） | `GET /auth/session` | `200`＋A.6 スキーマ（`account_id/company_id/system_role/locale/user`） | A.1／A.6 |
+| A-TC-012 | api | 未認証時のセッション取得 401 の担保 | セッション無し | `GET /auth/session` | `401 {code:"unauthenticated"}` | A.1 |
+| A-TC-101 | api | QG 管理導線出し分け用スナップショットの正当性担保 | 会社DBに有効 `quest_group_members.role=admin` を持つユーザーでログイン | `GET /auth/session` | `is_qg_admin=true`（ログイン時点で会社DBの admin 所属を集計＝スナップショット・SC-90 ナビ出し分け・B.4） | A.6（is_qg_admin）／§1.6 |
+| A-TC-102 | api | 非 admin ユーザーで QG フラグが立たないことの担保 | admin 所属を持たないユーザーでログイン | `GET /auth/session` | `is_qg_admin=false` | A.6（is_qg_admin）／§1.6 |
+| A-TC-013 | api | ログアウトによるセッション即時失効の担保 | ログイン成功済み | `POST /auth/logout`（`X-CSRF-Token`＋`iq_csrf` 一致） | `204`、`iq_session` 失効。直後の `GET /auth/session` が `401` | A.1 |
+| A-TC-014 | api | CSRF トークン欠如時の拒否とセッション維持の担保 | ログイン成功済み（有効セッション） | `POST /auth/logout` を **CSRF トークン無し**で | `403 {code:"csrf_failed"}`、セッションは維持 | A.0／README §1.7 |
+| A-TC-015 | api | 認証を CSRF より先に評価する順序の固定 | **セッション無し**（Cookie 無し） | `POST /auth/logout` | `401 {code:"unauthenticated"}`（本セッション必須・**認証を CSRF より先に評価**＝A-TC-014 の 403 と対） | A.1（本セッション必須） |
+| A-TC-016 | api | Cookie セキュリティ属性（httpOnly/Secure/SameSite）の担保 | — | login 成功時の Set-Cookie 属性を検査 | `iq_session`＝httpOnly・SameSite=Lax（本番 Secure）、`iq_csrf`＝**非httpOnly** | A.0（Cookie 表）／ADR §2.3 |
+| A-TC-017 | api | 再ログイン時の新セッション ID 発行＝固定化対策 | login→（再）login | 2回目 login 成功後のセッションID | 毎回**新しいセッションID**（固定化対策・前値の使い回し無し） | A.0（固定化対策） |
+| A-TC-018 | int | Redis セッションの保存とアイドル TTL 延長の担保 | — | Redis セッションの保存/取得/TTL | `sess:{token}` に A.6 相当が入り、アイドルTTL が延長される | ADR §2.2 |
+| A-TC-019 | int | ダミーハッシュ照合による存在推測タイミング差の抑止 | — | 存在しないアカウントの login | **ダミーハッシュ照合**が走り、実在時との応答時間差が有意に出ない | ADR-0001 §2.5 |
+| A-TC-020 | e2e | フルスタックでのログイン成功と保護ページ到達の担保 | フルスタック起動 | SC-00 で正資格情報を入力しログイン | SC-01 に遷移し、保護ページが表示される（Cookie セッション確立） | SC-00 §5／A.1 |
+| A-TC-021 | e2e | 共通ヘッダー導線からのログアウト動作の担保 | ログイン済み | 共通ヘッダーのユーザーメニュー→「ログアウト」 | `/login` に戻り、ログイン画面が表示される（セッション破棄） | デザイン標準 §4／A.1（logout） |
+| A-TC-022 | e2e | 全端末ログアウト導線とセッション破棄の担保 | ログイン済み | 共通ヘッダーのユーザーメニュー→「全端末からログアウト」 | `/login` に戻り、ログイン画面が表示される（全セッション破棄＋信頼端末失効の導線） | A.0-⑤／A.1（logout-all） |
 
 ## 2. 補足・非対象
 
@@ -57,44 +57,44 @@
 
 ### 3.1 `request`（状態D＝再設定リクエスト・列挙耐性で常に 202）
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-030 | api | active 会社＋active アカウント | 正 `company_code/login_id` で `POST /password-setup/request` | `202 {status:"accepted"}`、**メール送信あり**（本文リンクに `token` を含む＝フェイク捕捉） | A.7／ADR-0002 §2.1/2.3 |
-| A-TC-031 | api | 同上 | **存在しない login_id** | `202 {status:"accepted"}`（A-TC-030 と**同一応答**）、**メール送信なし** | A.7（列挙耐性・A.9-⑤） |
-| A-TC-032 | api | 同上 | **存在しない company_code** | `202`（同一）、送信なし | A.7（列挙耐性） |
-| A-TC-033 | api | `password_set=false`（初回未設定）の active アカウント | 正 ID で request | `202`、**送信あり**（＝初回設定リンクも同じ基盤・状態Bへ） | A.7／SC-00 §3 |
-| A-TC-034 | api | `disabled` アカウント | 正 ID で request | `202`（同一）、**送信なし**（active のみ送信） | A.7（active のみ実送信） |
-| A-TC-035 | api | `suspended` 会社 | 正 ID で request | `202`（同一）、**送信なし** | A.7（会社 active のみ実送信） |
-| A-TC-036 | api | — | request を **`X-CSRF-Token` 無し**で | `202`（成功＝**CSRF 免除・Origin/Sec-Fetch のみ**） | A.7／A.0 |
-| A-TC-037 | api | — | request を**不正 Origin** で | `403 {code:"forbidden"}`（Origin/Sec-Fetch 検証） | A.0 |
-| A-TC-038 | api | 同一 (IP＋company_code＋login_id) | **6回連続** request（上限 5回/10分） | **すべて `202`**（超過を漏らさない）、6回目以降は**送信なし**（超過分は無送信で握る） | ADR-0002 §2.3（列挙耐性優先＝429 を返さない） |
-| A-TC-039 | api | — | `company_code`/`login_id` のいずれか欠落で request | `422 {code:"validation_error", errors:[…]}` | README §1.7 |
-| A-TC-040 | int | active アカウントに未使用 `password_setup` チャレンジが既存 | 再度 request | 旧トークンは**失効**（後続 verify で `410`）、新トークンのみ有効（最新のみ） | ADR-0002 §2.1 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-030 | api | 再設定要求の 202 応答と有効アカウントへの実送信担保 | active 会社＋active アカウント | 正 `company_code/login_id` で `POST /password-setup/request` | `202 {status:"accepted"}`、**メール送信あり**（本文リンクに `token` を含む＝フェイク捕捉） | A.7／ADR-0002 §2.1/2.3 |
+| A-TC-031 | api | login_id 不在で同一応答かつ無送信の列挙耐性 | 同上 | **存在しない login_id** | `202 {status:"accepted"}`（A-TC-030 と**同一応答**）、**メール送信なし** | A.7（列挙耐性・A.9-⑤） |
+| A-TC-032 | api | company_code 不在で同一応答かつ無送信の列挙耐性 | 同上 | **存在しない company_code** | `202`（同一）、送信なし | A.7（列挙耐性） |
+| A-TC-033 | api | 初回未設定も同一基盤でリンク送信されることの担保 | `password_set=false`（初回未設定）の active アカウント | 正 ID で request | `202`、**送信あり**（＝初回設定リンクも同じ基盤・状態Bへ） | A.7／SC-00 §3 |
+| A-TC-034 | api | disabled アカウントへ無送信で同一応答の担保 | `disabled` アカウント | 正 ID で request | `202`（同一）、**送信なし**（active のみ送信） | A.7（active のみ実送信） |
+| A-TC-035 | api | suspended 会社へ無送信で同一応答の担保 | `suspended` 会社 | 正 ID で request | `202`（同一）、**送信なし** | A.7（会社 active のみ実送信） |
+| A-TC-036 | api | request の CSRF 免除（Origin のみ）の担保 | — | request を **`X-CSRF-Token` 無し**で | `202`（成功＝**CSRF 免除・Origin/Sec-Fetch のみ**） | A.7／A.0 |
+| A-TC-037 | api | 不正 Origin での request 拒否の担保 | — | request を**不正 Origin** で | `403 {code:"forbidden"}`（Origin/Sec-Fetch 検証） | A.0 |
+| A-TC-038 | api | レート超過時も 202 維持し無送信で握る列挙耐性 | 同一 (IP＋company_code＋login_id) | **6回連続** request（上限 5回/10分） | **すべて `202`**（超過を漏らさない）、6回目以降は**送信なし**（超過分は無送信で握る） | ADR-0002 §2.3（列挙耐性優先＝429 を返さない） |
+| A-TC-039 | api | 必須欠落時のバリデーションエラー形式の担保 | — | `company_code`/`login_id` のいずれか欠落で request | `422 {code:"validation_error", errors:[…]}` | README §1.7 |
+| A-TC-040 | int | 再要求で旧トークン失効＝最新リンクのみ有効の担保 | active アカウントに未使用 `password_setup` チャレンジが既存 | 再度 request | 旧トークンは**失効**（後続 verify で `410`）、新トークンのみ有効（最新のみ） | ADR-0002 §2.1 |
 
 ### 3.2 `verify`（状態Bの表示可否＝リンクの有効性確認）
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-041 | api | 有効な `password_setup` トークン | `POST /password-setup/verify {token}` | `200 {valid:true, login_id:"…"}` | A.7 |
-| A-TC-042 | api | 未知/不正トークン | verify | `410 {code:"token_expired"}` | A.7 |
-| A-TC-043 | int | `expires_at` 超過（72h 経過）トークン | verify | `410 {code:"token_expired"}` | A.7／ADR-0002 §2.1 |
-| A-TC-044 | api | 使用済み（`used_at` あり）トークン | verify | `410 {code:"token_expired"}` | A.7（単回） |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-041 | api | 有効トークンの verify 成功応答の契約担保 | 有効な `password_setup` トークン | `POST /password-setup/verify {token}` | `200 {valid:true, login_id:"…"}` | A.7 |
+| A-TC-042 | api | 不正トークンを token_expired に倒す秘匿の担保 | 未知/不正トークン | verify | `410 {code:"token_expired"}` | A.7 |
+| A-TC-043 | int | 期限切れトークンの 410 化＝72h TTL の担保 | `expires_at` 超過（72h 経過）トークン | verify | `410 {code:"token_expired"}` | A.7／ADR-0002 §2.1 |
+| A-TC-044 | api | 使用済みトークンの単回性の担保 | 使用済み（`used_at` あり）トークン | verify | `410 {code:"token_expired"}` | A.7（単回） |
 
 ### 3.3 `complete`（新PW設定・状態B→ログイン画面A）
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-045 | api | 有効トークン | 適合PW（8文字以上＋英字＋数字）で `POST /password-setup/complete {token,new_password}` | `200 {status:"ok"}`、`password_set=true`、**その後その PW で `POST /auth/login` が成功**（＝新PWが有効） | A.7／ADR-0002 §2.2/2.4 |
-| A-TC-046 | api | 有効トークン | **ポリシー違反 PW**（短すぎ／数字なし／英字なし）で complete | `422 {code:"validation_error", errors:[…]}`、PW は変更されない | ADR-0002 §2.2 |
-| A-TC-047 | api | 無効/期限切れ/使用済トークン | 適合PWで complete | `410 {code:"token_expired"}`、PW は変更されない | A.7 |
-| A-TC-048 | api | complete 成功済みのトークン | 同一トークンで**再度** complete | `410 {code:"token_expired"}`（単回消費・トークンは消える） | ADR-0002 §2.1/2.4 |
-| A-TC-049 | api | 当該アカウントで**別途ログイン中**（有効 `iq_session`）→ 有効トークンで complete 成功 | complete 後、そのセッションで `GET /auth/session` | `401 {code:"unauthenticated"}`（**PW完了で全アクティブセッション破棄**） | A.9-③／ADR-0002 §2.4 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-045 | api | complete での新 PW 有効化とログイン成立の担保 | 有効トークン | 適合PW（8文字以上＋英字＋数字）で `POST /password-setup/complete {token,new_password}` | `200 {status:"ok"}`、`password_set=true`、**その後その PW で `POST /auth/login` が成功**（＝新PWが有効） | A.7／ADR-0002 §2.2/2.4 |
+| A-TC-046 | api | ポリシー違反 PW の拒否と非変更の担保 | 有効トークン | **ポリシー違反 PW**（短すぎ／数字なし／英字なし）で complete | `422 {code:"validation_error", errors:[…]}`、PW は変更されない | ADR-0002 §2.2 |
+| A-TC-047 | api | 無効トークンでの complete 拒否と非変更の担保 | 無効/期限切れ/使用済トークン | 適合PWで complete | `410 {code:"token_expired"}`、PW は変更されない | A.7 |
+| A-TC-048 | api | complete 済みトークンの単回消費の担保 | complete 成功済みのトークン | 同一トークンで**再度** complete | `410 {code:"token_expired"}`（単回消費・トークンは消える） | ADR-0002 §2.1/2.4 |
+| A-TC-049 | api | PW 完了時の全アクティブセッション破棄の担保 | 当該アカウントで**別途ログイン中**（有効 `iq_session`）→ 有効トークンで complete 成功 | complete 後、そのセッションで `GET /auth/session` | `401 {code:"unauthenticated"}`（**PW完了で全アクティブセッション破棄**） | A.9-③／ADR-0002 §2.4 |
 
 ### 3.4 PW ポリシー（domain 純粋関数・DB 非依存）
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-051 | unit | — | PWポリシー判定関数に各種入力（7文字／数字なし／英字なし／適合）を与える | 適合＝エラー空、各違反＝対応する `errors[]`（最低8文字・英字必須・数字必須） | ADR-0002 §2.2 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-051 | unit | PW ポリシー純粋関数の判定網羅の担保 | — | PWポリシー判定関数に各種入力（7文字／数字なし／英字なし／適合）を与える | 適合＝エラー空、各違反＝対応する `errors[]`（最低8文字・英字必須・数字必須） | ADR-0002 §2.2 |
 
 ### 3.5 補足・非対象（状態B/D）
 
@@ -110,24 +110,24 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 
 ### 4.1 `login` の `mfa_required` 分岐・`mfa/verify`・`mfa/resend`
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-060 | api | MFA必須会社＋正資格 | `POST /login` | `200 { status:"mfa_required", mfa:{delivery,masked_to,expires_in:600,resend_available_in:30} }`＋`Set-Cookie: iq_preauth,iq_csrf`（`iq_session` 無し）・OTP メール送信 | A.1／ADR-0004 §2.4 |
-| A-TC-061 | api | pre-auth 有 | 誤 OTP で `mfa/verify` | `401 { code:"otp_invalid", attempts_left:4 }`（上限5） | A.1 |
-| A-TC-062 | api | pre-auth 有 | 誤 OTP を上限まで（5回）→ 6回目 | 5回目 `attempts_left:0`→pre-auth 失効、6回目 `401 preauth_expired` | A.0-④ |
-| A-TC-063 | api | pre-auth 有（seed MFA アカウント） | 正 OTP で `mfa/verify` | `200 authenticated`＋`iq_session` 発行・pre-auth 消費・`GET /session` 通る | A.0-③ |
-| A-TC-064 | api | 同上 | `mfa/verify`（`trust_device=true`）→ 同端末で再 `login` | verify で `iq_trust` 発行＋`trusted_devices` 登録、再 login は `authenticated`（MFA スキップ） | A.0-① |
-| A-TC-065 | api | pre-auth 無 | `mfa/verify` | `401 preauth_expired`（CSRF より先に評価） | A.0／A-TC-015 方針 |
-| A-TC-066 | api | pre-auth 有・CSRF ヘッダ無 | `mfa/verify` | `403 csrf_failed`（pre-auth 401 の後） | A.0 |
-| A-TC-067 | api | pre-auth 有（発行直後） | `mfa/resend` | `429 rate_limited`＋`Retry-After`（クールダウン中） | A.1／ADR-0004 §2.4 |
-| A-TC-068 | api | pre-auth 有・クールダウン経過（Redis で `resend_available_at` を過去へ） | `mfa/resend` | `200 { expires_in:600, resend_available_in:30 }`・新OTP送信・旧OTPは `otp_invalid` | A.1／ADR-0004 §2.2 |
-| A-TC-069 | api | pre-auth 有・OTP 期限切れ（Redis で `otp_expires_at` を過去へ） | 正 OTP で `mfa/verify` | `401 otp_expired` | A.1 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-060 | api | MFA 必須会社での pre-auth 分岐と OTP 送信の担保 | MFA必須会社＋正資格 | `POST /login` | `200 { status:"mfa_required", mfa:{delivery,masked_to,expires_in:600,resend_available_in:30} }`＋`Set-Cookie: iq_preauth,iq_csrf`（`iq_session` 無し）・OTP メール送信 | A.1／ADR-0004 §2.4 |
+| A-TC-061 | api | 誤 OTP の残回数表示と失敗計数の担保 | pre-auth 有 | 誤 OTP で `mfa/verify` | `401 { code:"otp_invalid", attempts_left:4 }`（上限5） | A.1 |
+| A-TC-062 | api | 失敗上限到達での pre-auth 失効の担保 | pre-auth 有 | 誤 OTP を上限まで（5回）→ 6回目 | 5回目 `attempts_left:0`→pre-auth 失効、6回目 `401 preauth_expired` | A.0-④ |
+| A-TC-063 | api | 正 OTP での本セッション発行と pre-auth 消費の担保 | pre-auth 有（seed MFA アカウント） | 正 OTP で `mfa/verify` | `200 authenticated`＋`iq_session` 発行・pre-auth 消費・`GET /session` 通る | A.0-③ |
+| A-TC-064 | api | 信頼端末登録による次回 MFA スキップの担保 | 同上 | `mfa/verify`（`trust_device=true`）→ 同端末で再 `login` | verify で `iq_trust` 発行＋`trusted_devices` 登録、再 login は `authenticated`（MFA スキップ） | A.0-① |
+| A-TC-065 | api | pre-auth 不在を CSRF より先に評価する順序の固定 | pre-auth 無 | `mfa/verify` | `401 preauth_expired`（CSRF より先に評価） | A.0／A-TC-015 方針 |
+| A-TC-066 | api | pre-auth 有効時の CSRF 検証順序の担保 | pre-auth 有・CSRF ヘッダ無 | `mfa/verify` | `403 csrf_failed`（pre-auth 401 の後） | A.0 |
+| A-TC-067 | api | resend クールダウン中の 429 とヘッダの担保 | pre-auth 有（発行直後） | `mfa/resend` | `429 rate_limited`＋`Retry-After`（クールダウン中） | A.1／ADR-0004 §2.4 |
+| A-TC-068 | api | クールダウン経過後の再送と旧 OTP 失効の担保 | pre-auth 有・クールダウン経過（Redis で `resend_available_at` を過去へ） | `mfa/resend` | `200 { expires_in:600, resend_available_in:30 }`・新OTP送信・旧OTPは `otp_invalid` | A.1／ADR-0004 §2.2 |
+| A-TC-069 | api | OTP 期限切れの otp_expired 判定の担保 | pre-auth 有・OTP 期限切れ（Redis で `otp_expires_at` を過去へ） | 正 OTP で `mfa/verify` | `401 otp_expired` | A.1 |
 
 ### 4.2 `logout-all`（信頼端末失効）
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-070 | api | verify（`trust_device=true`）で信頼端末登録済み | `POST /logout-all` → 再 `login` | `204`（全セッション破棄＋`trusted_devices` 全 revoked）→ 再 login は再び `mfa_required` | A.0-⑤ |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-070 | api | logout-all による全端末破棄と信頼端末失効の担保 | verify（`trust_device=true`）で信頼端末登録済み | `POST /logout-all` → 再 `login` | `204`（全セッション破棄＋`trusted_devices` 全 revoked）→ 再 login は再び `mfa_required` | A.0-⑤ |
 
 ### 4.3 補足・非対象（状態C）
 
@@ -142,18 +142,18 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 > 仕様の正＝[`../ADR/ADR-0005_アカウント一時ロック.md`](../ADR/ADR-0005_アカウント一時ロック.md)（§2.1 値・§2.2 (IP+login_id) 単位・§2.3 一律401・§2.4 通知・§2.5 解除・§2.6 OTP 非連動）。方針（列挙耐性＝一律 401）は [`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md) A.1 が正。
 > しきい値は env（`login_lock_max_attempts`=5・`login_lock_ttl_seconds`=900・`login_lock_notify_cooldown_seconds`=3600）。ロック/計数/通知クールダウンは Redis（`login_fail_streak:{ip}:{login_id}`／`login_lock:{ip}:{login_id}`／`lock_notified:{account_id}`）。IP はテスト側で差し替える（`TestClient(app, client=(ip, port))`）。既存の (IP+login_id) レート制限（10回/5分＝429・ADR-0001 §2.6）とは別キー・別層。
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-071 | api | ACME-01 実アカウント・IP=A | 誤PWで **5回**連続失敗 → 以後 IP=A から**正PWでも** login | 1〜5回目は `401 unauthenticated`、6回目以降は**ロックにより一律 401**（正PWでも通らない） | ADR-0005 §2.2/§2.3 |
-| A-TC-072 | api | A-TC-071 でロック済み（IP=A） | **別 IP=B** から同一 login_id＋正PWで login | `200 authenticated`（ロックは **(IP+login_id) 単位**＝別 IP は非影響・可用性 DoS 回避） | ADR-0005 §2.2 |
-| A-TC-073 | api | ロック中（IP=A） | ロック中の login 応答を検査 | `401 {code:"unauthenticated"}`・**`Retry-After` ヘッダ無し・残時間を返さない**（誤資格と同一＝列挙耐性） | ADR-0005 §2.3 |
-| A-TC-074 | int | IP=A・login_id | 4回失敗 → **1回成功** → 再度失敗 | 成功で `login_fail_streak:{A}:{id}`／`login_lock:{A}:{id}` が消える（成功でカウンタ解除・以後は 1 から数え直し） | ADR-0005 §2.2 |
-| A-TC-075 | int | IP=A・5回失敗でロック発火 | ロック発火後にさらに失敗試行 | `login_lock:{A}:{id}` の **TTL が増えない**（追加試行で延長しない＝発火から固定期間で必ず解ける） | ADR-0005 §2.2/§2.5(a) |
-| A-TC-076 | api | ACME-01 実アカウントを IP=A でロック | 有効 `password_setup` トークンで complete（新PW）→ IP=A で新PW login | complete で**ロック即解除** → `200 authenticated`（PW 再設定で解除・§2.5(b)） | ADR-0005 §2.5 |
-| A-TC-077 | api | ACME-01 実アカウント（mail フェイク） | IP=A で 5回失敗（発火） → 続けて **別 IP=B** で 5回失敗（再発火） | ロック通知メールは**ちょうど1通**（本人宛）。IP=B の再発火はクールダウンで**追加送信なし** | ADR-0005 §2.4 |
-| A-TC-078 | api | **存在しない login_id**（mail フェイク） | IP=A で 5回失敗（発火） | ロックはされる（一律 401）が**通知メールは送られない**（実在 active のみ・列挙耐性） | ADR-0005 §2.4 |
-| A-TC-079 | api | ACME-02（MFA）＝login は成功し pre-auth 発行 | `mfa/verify` の OTP を 5回誤り → 改めて login | login ロックは**発火しない**（OTP 失敗は非連動）＝再 login は再び `mfa_required`（ロックの 401 にならない） | ADR-0005 §2.6 |
-| A-TC-082 | int | IP=A・login_id | **4回失敗** → 失敗計数の**固定窓 TTL 経過**（Redis で `login_fail_streak` を消して再現）→ **1回失敗** | 窓経過後の失敗は `login_fail_streak:{A}:{id}` を **1 から数え直す**（4→5 の累積扱いにならない＝**固定窓・延長しない**）→ ロックは**発火しない** | ADR-0005 §2.2/§2.5(a) |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-071 | api | 連続失敗によるアカウント一時ロック発火の担保 | ACME-01 実アカウント・IP=A | 誤PWで **5回**連続失敗 → 以後 IP=A から**正PWでも** login | 1〜5回目は `401 unauthenticated`、6回目以降は**ロックにより一律 401**（正PWでも通らない） | ADR-0005 §2.2/§2.3 |
+| A-TC-072 | api | ロックが (IP+login_id) 単位で別 IP に及ばない担保 | A-TC-071 でロック済み（IP=A） | **別 IP=B** から同一 login_id＋正PWで login | `200 authenticated`（ロックは **(IP+login_id) 単位**＝別 IP は非影響・可用性 DoS 回避） | ADR-0005 §2.2 |
+| A-TC-073 | api | ロック中も残時間を返さず一律 401 の列挙耐性 | ロック中（IP=A） | ロック中の login 応答を検査 | `401 {code:"unauthenticated"}`・**`Retry-After` ヘッダ無し・残時間を返さない**（誤資格と同一＝列挙耐性） | ADR-0005 §2.3 |
+| A-TC-074 | int | 認証成功でロック計数が解除されることの担保 | IP=A・login_id | 4回失敗 → **1回成功** → 再度失敗 | 成功で `login_fail_streak:{A}:{id}`／`login_lock:{A}:{id}` が消える（成功でカウンタ解除・以後は 1 から数え直し） | ADR-0005 §2.2 |
+| A-TC-075 | int | ロック TTL が追加試行で延長しないことの担保 | IP=A・5回失敗でロック発火 | ロック発火後にさらに失敗試行 | `login_lock:{A}:{id}` の **TTL が増えない**（追加試行で延長しない＝発火から固定期間で必ず解ける） | ADR-0005 §2.2/§2.5(a) |
+| A-TC-076 | api | PW 再設定成功によるロック即時解除の担保 | ACME-01 実アカウントを IP=A でロック | 有効 `password_setup` トークンで complete（新PW）→ IP=A で新PW login | complete で**ロック即解除** → `200 authenticated`（PW 再設定で解除・§2.5(b)） | ADR-0005 §2.5 |
+| A-TC-077 | api | ロック通知メールのアカウント単位クールダウン抑制 | ACME-01 実アカウント（mail フェイク） | IP=A で 5回失敗（発火） → 続けて **別 IP=B** で 5回失敗（再発火） | ロック通知メールは**ちょうど1通**（本人宛）。IP=B の再発火はクールダウンで**追加送信なし** | ADR-0005 §2.4 |
+| A-TC-078 | api | 非実在 login_id でロック通知を送らない列挙耐性 | **存在しない login_id**（mail フェイク） | IP=A で 5回失敗（発火） | ロックはされる（一律 401）が**通知メールは送られない**（実在 active のみ・列挙耐性） | ADR-0005 §2.4 |
+| A-TC-079 | api | OTP 失敗をログインロックに連動させない分離の担保 | ACME-02（MFA）＝login は成功し pre-auth 発行 | `mfa/verify` の OTP を 5回誤り → 改めて login | login ロックは**発火しない**（OTP 失敗は非連動）＝再 login は再び `mfa_required`（ロックの 401 にならない） | ADR-0005 §2.6 |
+| A-TC-082 | int | 固定窓での失敗計数が延長せず数え直すことの担保 | IP=A・login_id | **4回失敗** → 失敗計数の**固定窓 TTL 経過**（Redis で `login_fail_streak` を消して再現）→ **1回失敗** | 窓経過後の失敗は `login_fail_streak:{A}:{id}` を **1 から数え直す**（4→5 の累積扱いにならない＝**固定窓・延長しない**）→ ロックは**発火しない** | ADR-0005 §2.2/§2.5(a) |
 
 ### 5.1 補足・非対象（ロック）
 
@@ -168,10 +168,10 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 > 仕様の正＝[`../ADR/ADR-0006_クライアントIPの確定.md`](../ADR/ADR-0006_クライアントIPの確定.md)。(IP+login_id) 系（レート制限・ロック）が**実クライアント IP**で成り立つための IP 確定ロジック。純粋関数 `resolve_client_ip(peer_ip, forwarded_for, trusted_proxy_count)`（`core/net.py`）＝XFF を右から `trusted_proxy_count` ホップ分だけ自陣とみなし 1 つ外側を採る（左端固定取得はしない＝詐称耐性）。
 > `trusted_proxy_count` は env（既定 0＝直アクセス/テストは `request.client.host`）。int テストは `TestClient` の `X-Forwarded-For` ヘッダと env 上書き（`monkeypatch`＋`get_settings.cache_clear()`）で確認。
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-080 | unit | — | `resolve_client_ip` に各種入力（count=0／count=1 で XFF 追記／count=2／XFF 先頭に詐称値／XFF 空で count>0） | count=0→peer。count=Nは**右から N ホップ外側**の実クライアント IP。**先頭の詐称値は無視**。XFF 不足時は安全側で最外（chain[0]） | ADR-0006 §2.1/§3 |
-| A-TC-081 | int | `TRUSTED_PROXY_COUNT=1`（`monkeypatch`）・ACME-01 実アカウント | 同一プロキシ経由で **XFF が異なる2クライアント**（A=203.0.113.1／B=203.0.113.2）。A で 5回失敗→A・B それぞれ正PWで login | A（XFF .1）はロックで 401、**B（XFF .2）は 200**＝ロックが**実クライアント IP 単位**に効く（プロキシ IP に潰れない） | ADR-0006 §2.1・ADR-0005 §2.2 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-080 | unit | クライアント IP 確定純粋関数の詐称耐性の担保 | — | `resolve_client_ip` に各種入力（count=0／count=1 で XFF 追記／count=2／XFF 先頭に詐称値／XFF 空で count>0） | count=0→peer。count=Nは**右から N ホップ外側**の実クライアント IP。**先頭の詐称値は無視**。XFF 不足時は安全側で最外（chain[0]） | ADR-0006 §2.1/§3 |
+| A-TC-081 | int | ロックが実クライアント IP 単位で効くことの担保 | `TRUSTED_PROXY_COUNT=1`（`monkeypatch`）・ACME-01 実アカウント | 同一プロキシ経由で **XFF が異なる2クライアント**（A=203.0.113.1／B=203.0.113.2）。A で 5回失敗→A・B それぞれ正PWで login | A（XFF .1）はロックで 401、**B（XFF .2）は 200**＝ロックが**実クライアント IP 単位**に効く（プロキシ IP に潰れない） | ADR-0006 §2.1・ADR-0005 §2.2 |
 
 ### 6.1 補足・非対象（クライアント IP）
 
@@ -186,19 +186,19 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 > **非同期化の要点**＝`login`/`password-setup/request` の**処理中に SMTP は走らない**（`mail_outbox` へ enqueue するだけで即応答）。実送信は**メールワーカ `process_mail_outbox_once()` を直接呼ぶ**（§4.6 account_sync と同じくテストは常駐不要）。`mail` フェイク（`FakeMailSender`）はワーカ適用時に捕捉する。秘匿値（OTP コード／設定リンクのトークン）は `secret` 列に隔離し、**送信成功／端末失敗で NULL 化**（完成本文は保存しない）。
 > **既存の同期送信前提 TC（A-TC-030/033/034/035/038/060/068/077/078 等）**＝テストハーネス側で吸収する。`mail` フィクスチャを **`.sent` 参照時に `process_mail_outbox_once()` で配信する薄い委譲**（`conftest._DrainingMail`）にしたため、既存 TC は**無改変で同じ期待（送信あり/なし・件数）**のまま通る（配信は冪等）。個別の **enqueue タイミング**（request で同期送信しない・秘匿値隔離）は本節 A-TC-090/092/093 が担う。ドメイン記号は横断範囲が狭いため **A に相乗り**（ADR-0007 §4）。
 
-| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
-| --- | --- | --- | --- | --- | --- |
-| A-TC-090 | int | active 会社＋active アカウント | 正 ID で `password-setup/request` 実行後、`mail_outbox` を検査 | `category=password_setup` の行が 1 件 `pending`（`secret`＝設定リンクのトークン）。**request 時点で `mail.sent` は空**（同期送信しない）。`otp_challenges` 作成と**同一 Tx**（チャレンジが無ければ enqueue も無い） | ADR-0007 §2.6／§4.7 |
-| A-TC-091 | int | A-TC-090 の後（`pending` 1 件） | `process_mail_outbox_once()` を呼ぶ | `mail.sent` に 1 通（本文リンクに token）。行は `status=done`・`processed_at` 記録・**`secret` が NULL 化** | ADR-0007 §2.5／§2.7 |
-| A-TC-092 | int | MFA 必須会社＋正資格（要 OTP） | `login` 実行後に `mail_outbox` 検査 → `process_mail_outbox_once()` | login 応答は `mfa_required`（送信を待たない）。`category=otp` 行が積まれ（`secret`＝OTP コード）、ワーカで送信・`done`・`secret` NULL | ADR-0007 §2.6／§4.7 |
-| A-TC-093 | int | ロック発火（誤 PW を上限回連続）・`mail` フェイク | 発火後に `mail_outbox` 検査 → `process_mail_outbox_once()` | `category=lock_notification` 行が 1 件（`secret` は NULL＝秘匿なし）。**発火リクエスト時点で `mail.sent` は空**（同期送信しない＝タイミングオラクル解消）。クールダウン内の再発火は enqueue しない → ワーカで 1 通 | ADR-0007 §1(a)／§2.6 |
-| A-TC-094 | int | `pending` 1 件・送信が必ず例外を投げる sender | `process_mail_outbox_once()`（上限未満／上限超の2ケース） | 上限未満＝`attempts++`・`status=pending` 維持（次巡で再送）。**上限超（`mail_outbox_max_attempts`）で `status=failed`＋`secret` NULL** | ADR-0007 §2.5／§2.7 |
-| A-TC-095 | int | 別宛先の `pending` が複数・先頭行のみ送信失敗 | `process_mail_outbox_once()` | 失敗行は `attempts++`、**後続の別行は送信される**（各メール独立・HOL ブロッキング無し＝§4.6 の直列適用と対照的） | ADR-0007 §2.4 |
-| A-TC-096 | int | 1 行を `status=sending`・`claimed_at` を `mail_outbox_sending_reclaim_seconds` より過去に設定 | `process_mail_outbox_once()` | 滞留 `sending` 行が `pending` へ戻され再送される。**reclaim 未満の `sending` 行は触らない**（送信中を横取りしない） | ADR-0007 §2.5 |
-| A-TC-097 | int | `done` 行（`processed_at` が retention より過去）／`done`（retention 内）／`failed` を各 1 件 | メールワーカの掃除を実行 | retention 超の `done` 行のみ削除。**retention 内の `done`・`failed` 行は残す**（`failed` は要手動対応） | ADR-0007 §2.7 |
-| A-TC-098 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | `password-setup/request`（active 実在） | **`202` のまま**（`500` にならない）。SMTP は request 経路で走らない＝列挙耐性が SMTP 障害で崩れない | ADR-0007 §1(b)／§2.6 |
-| A-TC-099 | api | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
-| A-TC-100 | int | まっさらな子プロセスで `mail_outbox.application` だけを import | `ControlBase.metadata` を検査 | FK ターゲット `accounts`/`companies` が登録済み（別プロセスの `mail_worker` で `done` 書込が `NoReferencedTableError` にならない・**import 隔離バグの回帰防止**） | ADR-0007 §2.3 |
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-090 | int | request が同期送信せず同一 Tx で enqueue する担保 | active 会社＋active アカウント | 正 ID で `password-setup/request` 実行後、`mail_outbox` を検査 | `category=password_setup` の行が 1 件 `pending`（`secret`＝設定リンクのトークン）。**request 時点で `mail.sent` は空**（同期送信しない）。`otp_challenges` 作成と**同一 Tx**（チャレンジが無ければ enqueue も無い） | ADR-0007 §2.6／§4.7 |
+| A-TC-091 | int | メールワーカ送信後の done 化と secret NULL 化の担保 | A-TC-090 の後（`pending` 1 件） | `process_mail_outbox_once()` を呼ぶ | `mail.sent` に 1 通（本文リンクに token）。行は `status=done`・`processed_at` 記録・**`secret` が NULL 化** | ADR-0007 §2.5／§2.7 |
+| A-TC-092 | int | MFA OTP の enqueue と送信を待たない応答の担保 | MFA 必須会社＋正資格（要 OTP） | `login` 実行後に `mail_outbox` 検査 → `process_mail_outbox_once()` | login 応答は `mfa_required`（送信を待たない）。`category=otp` 行が積まれ（`secret`＝OTP コード）、ワーカで送信・`done`・`secret` NULL | ADR-0007 §2.6／§4.7 |
+| A-TC-093 | int | ロック通知の非同期化＝タイミングオラクル解消の担保 | ロック発火（誤 PW を上限回連続）・`mail` フェイク | 発火後に `mail_outbox` 検査 → `process_mail_outbox_once()` | `category=lock_notification` 行が 1 件（`secret` は NULL＝秘匿なし）。**発火リクエスト時点で `mail.sent` は空**（同期送信しない＝タイミングオラクル解消）。クールダウン内の再発火は enqueue しない → ワーカで 1 通 | ADR-0007 §1(a)／§2.6 |
+| A-TC-094 | int | 送信失敗リトライと上限超 failed 化の担保 | `pending` 1 件・送信が必ず例外を投げる sender | `process_mail_outbox_once()`（上限未満／上限超の2ケース） | 上限未満＝`attempts++`・`status=pending` 維持（次巡で再送）。**上限超（`mail_outbox_max_attempts`）で `status=failed`＋`secret` NULL** | ADR-0007 §2.5／§2.7 |
+| A-TC-095 | int | メール独立処理＝HOL ブロッキング無しの担保 | 別宛先の `pending` が複数・先頭行のみ送信失敗 | `process_mail_outbox_once()` | 失敗行は `attempts++`、**後続の別行は送信される**（各メール独立・HOL ブロッキング無し＝§4.6 の直列適用と対照的） | ADR-0007 §2.4 |
+| A-TC-096 | int | 滞留 sending 行の reclaim 再送と横取り防止の担保 | 1 行を `status=sending`・`claimed_at` を `mail_outbox_sending_reclaim_seconds` より過去に設定 | `process_mail_outbox_once()` | 滞留 `sending` 行が `pending` へ戻され再送される。**reclaim 未満の `sending` 行は触らない**（送信中を横取りしない） | ADR-0007 §2.5 |
+| A-TC-097 | int | done 行の retention 掃除と failed 行保持の担保 | `done` 行（`processed_at` が retention より過去）／`done`（retention 内）／`failed` を各 1 件 | メールワーカの掃除を実行 | retention 超の `done` 行のみ削除。**retention 内の `done`・`failed` 行は残す**（`failed` は要手動対応） | ADR-0007 §2.7 |
+| A-TC-098 | api | SMTP 障害でも request が 202 維持する列挙耐性 | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | `password-setup/request`（active 実在） | **`202` のまま**（`500` にならない）。SMTP は request 経路で走らない＝列挙耐性が SMTP 障害で崩れない | ADR-0007 §1(b)／§2.6 |
+| A-TC-099 | api | SMTP 障害でもロック発火 login が 401 維持する担保 | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
+| A-TC-100 | int | import 隔離による FK 解決の回帰防止の担保 | まっさらな子プロセスで `mail_outbox.application` だけを import | `ControlBase.metadata` を検査 | FK ターゲット `accounts`/`companies` が登録済み（別プロセスの `mail_worker` で `done` 書込が `NoReferencedTableError` にならない・**import 隔離バグの回帰防止**） | ADR-0007 §2.3 |
 
 ### 7.1 補足・非対象（メール非同期化）
 

@@ -16,8 +16,8 @@
   - **残高（`level`/`xp`/`coin_balance`/`skill_point_balance`）＝会社DB `users`（読み取り専用・canonical は G の `activities`）**。
 - **アクター＝認証済みユーザー全員・自分のみ**（`/me`＝セッションの `account_id`/`company_id`・§1.5）。他人のプロフィール参照/編集は不可。未認証＝**401**。
 - **導線**＝共通ヘッダーのユーザーメニュー。※3D アバターの**装備着せ替え**（VRM スロット）は**ドメイン G**（`PUT /me/equipment`）＝本ドメインの**プロフィール画像**（`avatar_image_path`）とは別物。
-- **Mass Assignment 対策（§2.2）**＝各編集 EP は**受入フィールドを allowlist**。**残高・`system_role`・`status`・`password_set`・`login_id` は編集不可**（クライアント値は無視）。
-- 認可失敗＝**403**／未認証＝**401**／再認証・現在PW不一致＝**401/403**（K.3）。
+- **Mass Assignment 対策（§2.2）**＝各編集 EP は**受入フィールドを allowlist**。**残高・`system_role`・`status`・`password_set`・`login_id` は編集不可**＝これら allowlist 外のプロパティを含むリクエストは **`422 validation_error` で拒否**（想定外プロパティ拒否＝`extra=forbid`・黙って無視しない・コーディング規約 §2.2）。
+- 認可失敗＝**403**／未認証＝**401**／再認証（現在PW不一致）＝**`403 reauth_failed`**（セッションは有効なので 401 と区別・K.3・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) と同コード）。
 
 ## K.1 プロフィール取得
 
@@ -47,7 +47,7 @@
 | `POST /me/email` | 自己メールアドレス変更を**要求**（確認リンクを新メールへ送付） | `{new_email, current_password}`（再認証） | 202（**確定待ち＝この時点では未反映**・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md)） |
 | `POST /me/email/confirm` | 新メールの確認リンクで変更を**確定** | `{token}`（**未認証**＝トークンが認可） | 200（`{status:"confirmed"}`・確定でミラー enqueue） |
 
-- **パスワード変更（1-㉒）**：**現在の PW を再確認**（不一致は 401/403）→ **PW ポリシー検証**（最低文字数・漏えい/よく使われる PW 拒否＝§A.9-④）→ `accounts.password_hash`（Argon2id）更新。**完了で §A.9-③＝当該アカウントの全アクティブセッション破棄＋信頼端末失効**（本人操作でも「なぜログアウトされたか」は通知で補足）。**`security_password_changed` 通知＋メール**を **K が H の `notify()` を post-commit で呼んで発火**（A.9-⑧(b)・H.0/H.1 の B-5 契約・付与契機はセッション解決とは無関係な本操作）。監査記録（A.9-⑥）。
+- **パスワード変更（1-㉒）**：**現在の PW を再確認**（未認証＝`401 unauthenticated`／セッションは有効だが現在PW不一致＝`403 reauth_failed`）→ **PW ポリシー検証**（最低文字数・漏えい/よく使われる PW 拒否＝§A.9-④）→ `accounts.password_hash`（Argon2id）更新。**完了で §A.9-③＝当該アカウントの全アクティブセッション破棄＋信頼端末失効**（本人操作でも「なぜログアウトされたか」は通知で補足）。**`security_password_changed` 通知＋メール**を **K が H の `notify()` を post-commit で呼んで発火**（A.9-⑧(b)・H.0/H.1 の B-5 契約・付与契機はセッション解決とは無関係な本操作）。監査記録（A.9-⑥）。
 - **メール変更（1-㉓）＝ダブルオプトイン（[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) 確定・2026-08-12）**：
   - **要求（`POST /me/email`）**＝**再認証**（現在 PW）→ 新メールの**会社内一意**を検証（`UNIQUE(company_id, email)`・重複 409 field=email）→ `accounts.pending_email` に格納（`email` は**変えない**）＋ `otp_challenges`（`purpose=email_change`・単回・TTL `email_change_ttl_seconds`＝24h）発行 → **新メールへ確認リンク**（`mail_category=email_change_confirm`）＋**旧メールへ変更通知**（`email_change_notice`・乗っ取り検知）を `mail_outbox` へ enqueue → **202**（この時点で `account_sync_outbox` へは積まない）。
   - **確定（`POST /me/email/confirm`・未認証＝トークンが認可）**＝トークン照合（無効/期限切れ/使用済み一律 410）→ **会社内一意を再検証**（TOCTOU・衝突 409）→ `email=pending_email`・`pending_email=NULL`・チャレンジ単回消費 → **同一 Tx で `account_sync_outbox` へ `upsert{email}` enqueue**（会社 DB `users` ミラーは確定時）→ 監査記録。
