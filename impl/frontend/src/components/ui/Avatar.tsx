@@ -5,9 +5,10 @@ type Props = {
   name: string;
   imageUrl?: string | null;
   size?: "sm" | "md" | "lg";
+  level?: number; // 指定時は下部にレベルピル（.avatar__level）を表示
 };
 
-export function Avatar({ name, imageUrl, size = "md" }: Props) {
+export function Avatar({ name, imageUrl, size = "md", level }: Props) {
   const cls = ["avatar", size !== "md" ? size : ""].filter(Boolean).join(" ");
   const initial = name?.trim().charAt(0) || "?";
   return (
@@ -19,6 +20,7 @@ export function Avatar({ name, imageUrl, size = "md" }: Props) {
           {initial}
         </span>
       )}
+      {level != null && <span className="avatar__level">Lv.{level}</span>}
     </span>
   );
 }
