@@ -34,13 +34,15 @@ docker compose up --build
 
 ### 開発用ログイン情報（シード）
 
-| 項目 | 値 |
-| --- | --- |
-| 会社コード | `ACME-01` |
-| ログインID | `user@acme.example` |
-| パスワード | `Passw0rd!` |
+パスワードはいずれも `Passw0rd!`（dev 固定・本番シードには使わない）。
 
-ログイン成功でダッシュボード（SC-01 プレースホルダ）に遷移する。
+| 会社コード | ログインID | ロール | 用途・備考 |
+| --- | --- | --- | --- |
+| `OPS` | `admin@ops.example` | システム管理者（`system_role=system_admin`） | 運営テナント。会社・アカウント・クエストグループの管理（SC-91/92）。**管理導線は右上のアバターメニュー内**「システム管理（会社）」→ `/admin/companies`。`BOOTSTRAP_ADMIN_PASSWORD` を設定したときのみ seed（`impl/.env.example` の dev 既定で設定済み・空だと作らない） |
+| `ACME-01` | `user@acme.example` | 一般（`general`）・MFA OFF | 通常のパスワードログイン（状態A） |
+| `ACME-02` | `mfa@acme2.example` | 一般（`general`）・MFA ON | メールOTP MFA（状態C）。OTP は MailHog（`http://localhost:8025`）で確認 |
+
+ログイン成功でダッシュボード（SC-01 プレースホルダ）に遷移する。一般ユーザーには管理導線は表示されない（ロールで出し分け・サーバーが権限を強制）。
 
 ## API 仕様（OpenAPI）の確認
 
