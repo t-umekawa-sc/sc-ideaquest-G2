@@ -6,7 +6,13 @@ import { AppHeader } from "@/components/layout";
 import { LogoutAllMenuItem, LogoutMenuItem } from "@/features/auth";
 import { getServerSession } from "@/lib/session";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  modal: React.ReactNode; // Parallel Route スロット（@modal）＝URL 付きモーダル（Intercept Routes）の差し込み先
+}) {
   const session = await getServerSession();
   if (!session) redirect("/login");
   // 残高（Lv/コイン/SP）・通知未読数は K.1（GET /me 残高）・H（通知）接続までのデモ値。
@@ -53,6 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="container" style={{ paddingBlock: "var(--space-8)" }}>
         {children}
       </main>
+      {modal}
     </>
   );
 }
