@@ -12,6 +12,9 @@ from fastapi import APIRouter, Depends, Request
 from app.control_plane.me import application as me_service
 from app.control_plane.me.deps import require_me
 from app.control_plane.me.schemas import (
+    EmailChangeAcceptedResponse,
+    EmailChangeConfirmedResponse,
+    EmailChangeConfirmRequest,
     EmailChangeRequest,
     MeProfileResponse,
     MeUpdateRequest,
@@ -56,14 +59,32 @@ def change_password(
     )
 
 
-@router.post("/me/email", response_model=MeProfileResponse)
-def change_email(
+@router.post("/me/email", response_model=EmailChangeAcceptedResponse, status_code=202)
+def request_email_change(
     body: EmailChangeRequest, request: Request, session: dict = Depends(require_me),
-) -> MeProfileResponse:
-    """自己メール変更（K.3）。現在PW 再認証→会社内一意→accounts.email 更新＋users ミラー。変更系＝Origin/CSRF 必須。"""
+) -> EmailChangeAcceptedResponse:
+    """自己メール変更を**要求**（K.3・ダブルオプトイン ADR-0008）。現在PW 再認証→pending 化→新メールへ確認リンク。
+
+    202（確定待ち＝この時点では未反映）。変更系＝Origin/CSRF 必須。確定は `POST /me/email/confirm`。
+    """
     verify_origin(request)
     verify_csrf(request)
-    return MeProfileResponse(**me_service.change_email(
+    me_service.request_email_change(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         new_email=body.new_email, current_password=body.current_password,
-    ))
+    )
+    return EmailChangeAcceptedResponse()
+
+
+@router.post("/me/email/confirm", response_model=EmailChangeConfirmedResponse)
+def confirm_email_change(
+    body: EmailChangeConfirmRequest, request: Request,
+) -> EmailChangeConfirmedResponse:
+    """メール変更の**確定**（K.3・ADR-0008）。**未認証＝トークンが認可**（新メール受信＝到達確認）。
+
+    `password-setup/complete` と同型＝セッション不要・CSRF 免除（トークンが唯一の資格）・Origin のみ検証。
+    無効/期限切れ/使用済みトークンは 410。
+    """
+    verify_origin(request)  # 未認証だが状態変更＝Origin/Sec-Fetch は検証（password-setup/complete と同じ）
+    me_service.confirm_email_change(body.token)
+    return EmailChangeConfirmedResponse()

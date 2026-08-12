@@ -47,3 +47,21 @@ test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
   await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
   await expect(page.getByRole("heading", { name: "プロフィール" })).toBeVisible(); // 変更なし＝画面維持
 });
+
+// K-TC-009(email): メール変更の error-path＋要求成功の文言（ダブルオプトイン・ADR-0008）。
+// 要求成功（202）は OPS の email/PW を変えず pending_email を立てるだけ＝確定は踏まないので共有資格情報は壊れない。
+// 確定（confirm）の happy は backend K-TC-010 が担保。
+test("K-TC-009 email change request paths (double opt-in)", async ({ page }) => {
+  await login(page);
+  await page.goto("/profile");
+  // 現在PW不一致＝403 reauth_failed（未反映）
+  await page.locator("#new_email").fill(`e2e-${Date.now()}@ops.example`);
+  await page.locator("#email_cur_pw").fill("WRONGpw1");
+  await page.getByRole("button", { name: "確認メールを送信" }).click();
+  await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
+  // 正しいPW＝202＝「確認メールを送信しました」の文言（この時点では未反映＝確定は新メールのリンク）
+  await page.locator("#new_email").fill(`e2e-${Date.now()}@ops.example`);
+  await page.locator("#email_cur_pw").fill(OPS.password);
+  await page.getByRole("button", { name: "確認メールを送信" }).click();
+  await expect(page.getByText(/確認メールを .* に送信しました/)).toBeVisible();
+});

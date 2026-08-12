@@ -66,6 +66,43 @@ def find_password_setup_challenge_by_hash(session: Session, code_hash: str) -> O
     ).scalar_one_or_none()
 
 
+# --- メール変更の確認リンク（email_change・ADR-0008／データモデル §4.4） --------------------
+_EMAIL_CHANGE = "email_change"
+
+
+def invalidate_email_change_challenges(session: Session, account_id: uuid.UUID) -> None:
+    """当該アカウントの未使用 email_change チャレンジを失効（削除）。最新リンクのみ有効に保つ（ADR-0008 §2.1）。"""
+    session.execute(
+        delete(OtpChallenge).where(
+            OtpChallenge.account_id == account_id,
+            OtpChallenge.purpose == _EMAIL_CHANGE,
+            OtpChallenge.used_at.is_(None),
+        )
+    )
+
+
+def create_email_change_challenge(
+    session: Session, account_id: uuid.UUID, code_hash: str, expires_at: datetime
+) -> OtpChallenge:
+    challenge = OtpChallenge(
+        id=uuid.uuid4(),
+        account_id=account_id,
+        code_hash=code_hash,
+        purpose=_EMAIL_CHANGE,
+        expires_at=expires_at,
+    )
+    session.add(challenge)
+    return challenge
+
+
+def find_email_change_challenge_by_hash(session: Session, code_hash: str) -> OtpChallenge | None:
+    return session.execute(
+        select(OtpChallenge).where(
+            OtpChallenge.code_hash == code_hash, OtpChallenge.purpose == _EMAIL_CHANGE
+        )
+    ).scalar_one_or_none()
+
+
 def get_account(session: Session, account_id: uuid.UUID) -> Account | None:
     return session.get(Account, account_id)
 

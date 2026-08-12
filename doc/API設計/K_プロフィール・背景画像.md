@@ -44,10 +44,14 @@
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
 | `POST /me/password` | 自己パスワード変更 | `{current_password, new_password}` | 204（**完了後は全セッション無効＝要再ログイン**） |
-| `POST /me/email` | 自己メールアドレス変更 | `{new_email, current_password}`（再認証） | 200/202（新メール検証フローの要否は K.6 TBD） |
+| `POST /me/email` | 自己メールアドレス変更を**要求**（確認リンクを新メールへ送付） | `{new_email, current_password}`（再認証） | 202（**確定待ち＝この時点では未反映**・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md)） |
+| `POST /me/email/confirm` | 新メールの確認リンクで変更を**確定** | `{token}`（**未認証**＝トークンが認可） | 200（`{status:"confirmed"}`・確定でミラー enqueue） |
 
 - **パスワード変更（1-㉒）**：**現在の PW を再確認**（不一致は 401/403）→ **PW ポリシー検証**（最低文字数・漏えい/よく使われる PW 拒否＝§A.9-④）→ `accounts.password_hash`（Argon2id）更新。**完了で §A.9-③＝当該アカウントの全アクティブセッション破棄＋信頼端末失効**（本人操作でも「なぜログアウトされたか」は通知で補足）。**`security_password_changed` 通知＋メール**を **K が H の `notify()` を post-commit で呼んで発火**（A.9-⑧(b)・H.0/H.1 の B-5 契約・付与契機はセッション解決とは無関係な本操作）。監査記録（A.9-⑥）。
-- **メール変更（1-㉓）**：**再認証**（現在 PW 等）を要求 → 新メールの**会社内一意**を検証（`UNIQUE(company_id, email)`）→ `accounts.email` 更新＋outbox。**新メールの到達確認（確認リンク）を挟むか**は K.6 TBD。メール変更でのセッション破棄は必須化しない（§A.9-③ は PW 変更/再設定・ロール変更・disable が対象。メール変更は再認証で担保）。
+- **メール変更（1-㉓）＝ダブルオプトイン（[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) 確定・2026-08-12）**：
+  - **要求（`POST /me/email`）**＝**再認証**（現在 PW）→ 新メールの**会社内一意**を検証（`UNIQUE(company_id, email)`・重複 409 field=email）→ `accounts.pending_email` に格納（`email` は**変えない**）＋ `otp_challenges`（`purpose=email_change`・単回・TTL `email_change_ttl_seconds`＝24h）発行 → **新メールへ確認リンク**（`mail_category=email_change_confirm`）＋**旧メールへ変更通知**（`email_change_notice`・乗っ取り検知）を `mail_outbox` へ enqueue → **202**（この時点で `account_sync_outbox` へは積まない）。
+  - **確定（`POST /me/email/confirm`・未認証＝トークンが認可）**＝トークン照合（無効/期限切れ/使用済み一律 410）→ **会社内一意を再検証**（TOCTOU・衝突 409）→ `email=pending_email`・`pending_email=NULL`・チャレンジ単回消費 → **同一 Tx で `account_sync_outbox` へ `upsert{email}` enqueue**（会社 DB `users` ミラーは確定時）→ 監査記録。
+  - **セッション破棄は必須化しない**（§A.9-③ は PW 変更/再設定・ロール変更・disable が対象。メール変更は要求時の再認証で担保・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) §2.5）。
 - 列挙耐性＝本人操作（認証済み）なので実存漏洩の問題はない（A.9-⑧ と同じ整理）。
 
 ## K.4 プロフィール画像・背景画像（MinIO・§1.10）
@@ -66,7 +70,7 @@
 
 ## K.5 セキュリティ対策マッピング（§2.2 / A.9-⑦ 委譲・突合）
 
-- **自己 PW 変更＝現在 PW 再確認（1-㉒）／email・MFA 変更＝再認証（1-㉓）**（K.3）。PW 変更完了＝**§A.9-③（全セッション破棄＋信頼端末失効）＋ `security_password_changed` 通知（K→H）**（A.9-⑧(b)）。
+- **自己 PW 変更＝現在 PW 再確認（1-㉒）／email・MFA 変更＝再認証（1-㉓）**（K.3）。PW 変更完了＝**§A.9-③（全セッション破棄＋信頼端末失効）＋ `security_password_changed` 通知（K→H）**（A.9-⑧(b)）。**メール変更＝ダブルオプトイン**（新メールへ確認リンクで到達確認・確定まで pending・旧メールへ変更通知で乗っ取り検知・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md)）。
 - **Mass Assignment（§2.2）**＝編集 EP は受入フィールド allowlist。残高・`system_role`・`status`・`password_set`・`login_id` は不可。
 - **IDOR（②）**＝`/me` はセッション本人（`account_id`）のみ。他アカウントの参照/編集経路を持たない。
 - **画像（⑧）**＝allowlist/サイズ/ハッシュ名・**認可DL＝短TTL署名URL・恒久公開URL禁止**（§1.10）。
@@ -77,4 +81,5 @@
 
 - **委譲/連携**＝残高台帳 canonical＝**G**（`activities`・K は `users` の残高を読むのみ）／identity 同期ワーカ＝**§1.13/§4.6**（accounts→users）／PW ポリシー・セッション失効機構＝**A**（§A.9-③/④）／`security_password_changed` 配信＝**H**（K が `notify()` を post-commit 呼び出し）／背景画像の全画面適用＝フロント（認証済みレイアウト）／VRM 装備着せ替え＝**G**（`/me/equipment`）。
 - **確定済み（本レビュー）**＝`display_name` 源泉＝accounts（1b・`accounts.display_name` 追加・`users` はミラー）／`GET /me` 正準（I は集約で hero 同梱・両立）／`PATCH /me` は accounts+outbox 単一コントロールプレーン Tx／PW 変更＝現在PW再確認＋§A.9-③＋H 通知／画像は会社DB 直接＋署名URL。
-- **残 TBD（軽微・実装 or 運用で確定）**＝`display_name` 文字数上限・使用可能文字／メール変更の**新メール確認リンク**の要否とセッション破棄要否／画像の**サイズ上限・許可形式・推奨解像度**・アバター署名URL の発行/キャッシュ方針（一覧多数表示）／会社が背景変更を禁止/固定できる管理設定の要否（SC-01 §10）／**per-user MFA** の有無（現状は会社設定のみ）／`login_id` 変更可否（現状不可）／PW 変更後の再ログイン UX。
+- **確定済み（2026-08-12・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md)）**＝**メール変更＝ダブルオプトイン**（新メールへ確認リンク・確定まで `accounts.pending_email` で pending・確定 EP は未認証＝トークンが認可）／**旧メールへ変更通知**（乗っ取り検知）／**確定時のセッション破棄はしない**（再認証で担保）／確認リンク TTL＝24h（`email_change_ttl_seconds`）／ミラー enqueue は**確定時**。
+- **残 TBD（軽微・実装 or 運用で確定）**＝`display_name` 文字数上限・使用可能文字／画像の**サイズ上限・許可形式・推奨解像度**・アバター署名URL の発行/キャッシュ方針（一覧多数表示）／会社が背景変更を禁止/固定できる管理設定の要否（SC-01 §10）／**per-user MFA** の有無（現状は会社設定のみ）／`login_id` 変更可否（現状不可）／PW 変更後の再ログイン UX／メール変更 pending・期限切れトークンの物理掃除（現状は論理無効化のみ）。

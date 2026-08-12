@@ -7,13 +7,13 @@ import { useRouter } from "next/navigation";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { changeEmail, changePassword } from "../api";
+import { changePassword, requestEmailChange } from "../api";
 import "@/features/companies/companies.css";
 
 function reauthMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     if (err.code === "reauth_failed") return "現在のパスワードが正しくありません。";
-    if (err.code === "validation_error") return "新しいパスワードがポリシーを満たしません（長さ・種類をご確認ください）。";
+    if (err.code === "validation_error") return "入力内容をご確認ください（現在のメールアドレスと同じ等）。";
     if (err.code === "conflict") return "このメールアドレスは既に使われています。";
   }
   return fallback;
@@ -59,8 +59,9 @@ export function SecuritySection() {
     setEmailMsg(null);
     setEmailPending(true);
     try {
-      const updated = await changeEmail({ new_email: newEmail, current_password: emailCurPw });
-      setEmailMsg(`メールアドレスを ${updated?.email ?? newEmail} に変更しました。`);
+      await requestEmailChange({ new_email: newEmail, current_password: emailCurPw });
+      // ダブルオプトイン（ADR-0008）＝この時点では未反映。新メールの確認リンクで確定。
+      setEmailMsg(`確認メールを ${newEmail} に送信しました。メール内のリンクを開くと変更が確定します（未着の場合は迷惑メールもご確認ください）。`);
       setNewEmail("");
       setEmailCurPw("");
     } catch (err) {
@@ -93,6 +94,7 @@ export function SecuritySection() {
 
       <div className="card admin-create">
         <h2>メールアドレス変更</h2>
+        <p className="admin-muted">新しいメールアドレス宛に確認リンクを送ります。リンクを開くまで変更は確定しません。</p>
         {emailError && <div className="form-error" role="alert">{emailError}</div>}
         {emailMsg && <p className="admin-muted" role="status">{emailMsg}</p>}
         <form onSubmit={onChangeEmail} noValidate>
@@ -103,7 +105,7 @@ export function SecuritySection() {
             <input id="email_cur_pw" className="input" type="password" autoComplete="current-password" value={emailCurPw} onChange={(e) => setEmailCurPw(e.target.value)} required />
           </Field>
           <Button type="submit" variant="primary" disabled={emailPending}>
-            {emailPending ? "変更中…" : "メールアドレスを変更"}
+            {emailPending ? "送信中…" : "確認メールを送信"}
           </Button>
         </form>
       </div>

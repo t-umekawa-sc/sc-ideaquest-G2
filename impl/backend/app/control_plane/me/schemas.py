@@ -39,8 +39,25 @@ class PasswordChangeRequest(BaseModel):
 
 
 class EmailChangeRequest(BaseModel):
-    """自己メール変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。"""
+    """自己メール変更の**要求**（K.3・現在PW 再認証・ダブルオプトイン ADR-0008）。想定外プロパティ拒否（§2.2）。"""
     model_config = ConfigDict(extra="forbid")
 
     new_email: str = Field(min_length=1, max_length=255)
     current_password: str = Field(min_length=1)
+
+
+class EmailChangeAcceptedResponse(BaseModel):
+    """メール変更要求の受理応答（202・確定待ち・ADR-0008）。この時点では未反映。"""
+    status: str = "accepted"
+
+
+class EmailChangeConfirmRequest(BaseModel):
+    """メール変更の**確定**（K.3・未認証＝トークンが認可・ADR-0008 §2.3）。想定外プロパティ拒否（§2.2）。"""
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1)
+
+
+class EmailChangeConfirmedResponse(BaseModel):
+    """メール変更確定の応答（200・ADR-0008）。未認証 EP のため identity 全体は返さない。"""
+    status: str = "confirmed"

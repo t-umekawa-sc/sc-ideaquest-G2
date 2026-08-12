@@ -7,10 +7,12 @@ identity は管理DB `accounts` 源泉＝accounts 更新＋同一Tx で account_
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from app.control_plane.account_sync.application import process_outbox_once
 from app.control_plane.account_sync.orm import OutboxEntry
-from app.control_plane.auth.orm import Account, Company
+from app.control_plane.auth.orm import Account, Company, OtpChallenge
+from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.profile.repository import get_user_by_account
@@ -22,6 +24,25 @@ ME = "/api/v1/me"
 
 def _csrf(client) -> dict:
     return {"X-CSRF-Token": client.cookies.get("iq_csrf")}
+
+
+def _mail(account_id) -> list[MailOutboxEntry]:
+    with control_session() as s:
+        return list(s.query(MailOutboxEntry).filter_by(account_id=account_id).all())
+
+
+def _email_change_challenge(account_id) -> OtpChallenge | None:
+    with control_session() as s:
+        return (s.query(OtpChallenge)
+                .filter_by(account_id=account_id, purpose="email_change")
+                .order_by(OtpChallenge.created_at.desc()).first())
+
+
+def _email_change_token(account_id) -> str:
+    """要求で新メールへ積まれた確認リンクの平文トークン（mail_outbox.secret）を取り出す。"""
+    confirm = [m for m in _mail(account_id) if m.category == "email_change_confirm"]
+    assert len(confirm) == 1 and confirm[0].secret
+    return confirm[0].secret
 
 
 def _db_identifier() -> str:
@@ -120,20 +141,102 @@ def test_k_tc_007_change_password(client, factory):
     _login(client, acc["company_code"], acc["login_id"], "NewPassw0rd1")
 
 
-def test_k_tc_008_change_email(client, factory):
-    """K-TC-008 メール変更＝現在PW再認証／会社内一意（409）／成功で accounts.email 更新＋outbox（K.3）。"""
+def test_k_tc_008_change_email_request(client, factory):
+    """K-TC-008 メール変更要求（ダブルオプトイン）＝再認証／会社内重複409／成功で 202＋pending＋確認/通知メール2通。
+
+    正常でも accounts.email は不変・pending_email に格納・account_sync に email 行は積まれない（確定時まで）。
+    根拠 K.3／ADR-0008／§4.2。
+    """
     acc = _login_seed(client, factory)
-    # 現在PW不一致＝403
+    old_email = _account(acc["id"]).email
+    # 現在PW不一致＝403（再認証失敗）
     assert client.post(ME + "/email", json={"new_email": "x@acme.example", "current_password": "WRONGpw1"},
                        headers=_csrf(client)).status_code == 403
-    # 会社内で既存（seed の user@acme.example）と重複＝409
+    # 会社内で既存（seed の user@acme.example）と重複＝409（要求時に確定 email で検証）
     r_dup = client.post(ME + "/email", json={"new_email": "user@acme.example", "current_password": acc["password"]},
                         headers=_csrf(client))
     assert r_dup.status_code == 409 and r_dup.json()["errors"][0]["field"] == "email"
-    # 成功＝200＋email 更新＋outbox（users ミラー）
+    # 成功＝202（確定待ち）
     newmail = f"changed-{uuid.uuid4().hex[:8]}@acme.example"
     r = client.post(ME + "/email", json={"new_email": newmail, "current_password": acc["password"]},
                     headers=_csrf(client))
-    assert r.status_code == 200 and r.json()["email"] == newmail
-    assert _account(acc["id"]).email == newmail
-    assert any(x.payload.get("email") == newmail for x in _outbox(acc["id"]))
+    assert r.status_code == 202, r.text
+    # accounts.email は不変・pending_email に新メール
+    a = _account(acc["id"])
+    assert a.email == old_email and a.pending_email == newmail
+    # email_change チャレンジが1件（未使用）
+    ch = _email_change_challenge(acc["id"])
+    assert ch is not None and ch.used_at is None
+    # mail_outbox に確認（新宛・secret 有）＋通知（旧宛・secret 無）の2通
+    mails = _mail(acc["id"])
+    confirm = [m for m in mails if m.category == "email_change_confirm"]
+    notice = [m for m in mails if m.category == "email_change_notice"]
+    assert len(confirm) == 1 and confirm[0].to_email == newmail and confirm[0].secret
+    assert len(notice) == 1 and notice[0].to_email == old_email
+    # account_sync には email ミラー行が積まれていない（確定時まで）
+    assert not any(x.payload.get("email") == newmail for x in _outbox(acc["id"]))
+
+
+def test_k_tc_010_confirm_email_change(client, factory):
+    """K-TC-010 確定＝正常で email が pending へ確定・単回消費・mirror enqueue／無効・使用済みトークン 410（K.3／ADR-0008）。"""
+    acc = _login_seed(client, factory)
+    newmail = f"confirmed-{uuid.uuid4().hex[:8]}@acme.example"
+    assert client.post(ME + "/email", json={"new_email": newmail, "current_password": acc["password"]},
+                       headers=_csrf(client)).status_code == 202
+    token = _email_change_token(acc["id"])
+
+    # 無効トークン＝410
+    assert client.post(ME + "/email/confirm", json={"token": "bogus-" + uuid.uuid4().hex}).status_code == 410
+
+    # 正常確定＝200＋accounts.email 確定・pending クリア・チャレンジ単回消費・mirror enqueue
+    r = client.post(ME + "/email/confirm", json={"token": token})
+    assert r.status_code == 200, r.text
+    a = _account(acc["id"])
+    assert a.email == newmail and a.pending_email is None
+    assert _email_change_challenge(acc["id"]).used_at is not None
+    assert any(x.op == "upsert" and x.payload.get("email") == newmail for x in _outbox(acc["id"]))
+
+    # 会社DB users へミラー反映
+    process_outbox_once()
+    with get_tenant_session(_db_identifier()) as ts:
+        u = get_user_by_account(ts, acc["id"])
+    assert u.email == newmail
+
+    # 使用済みトークンの再確定＝410（単回）
+    assert client.post(ME + "/email/confirm", json={"token": token}).status_code == 410
+
+
+def test_k_tc_010_confirm_expired(client, factory):
+    """K-TC-010 期限切れトークンでの確定＝410（K.3／ADR-0008）。"""
+    acc = _login_seed(client, factory)
+    newmail = f"expired-{uuid.uuid4().hex[:8]}@acme.example"
+    assert client.post(ME + "/email", json={"new_email": newmail, "current_password": acc["password"]},
+                       headers=_csrf(client)).status_code == 202
+    token = _email_change_token(acc["id"])
+    # チャレンジを期限切れに直接改変
+    with control_session() as s:
+        ch = s.query(OtpChallenge).filter_by(account_id=acc["id"], purpose="email_change").one()
+        ch.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        s.commit()
+    assert client.post(ME + "/email/confirm", json={"token": token}).status_code == 410
+    # email は変わらず・pending は残る（別途やり直し）
+    assert _account(acc["id"]).email != newmail
+
+
+def test_k_tc_010_confirm_conflict(client, factory):
+    """K-TC-010 確定時の会社内衝突（TOCTOU）＝409／pending はクリア（K.3／ADR-0008）。"""
+    acc = _login_seed(client, factory)
+    clashmail = f"clash-{uuid.uuid4().hex[:8]}@acme.example"
+    assert client.post(ME + "/email", json={"new_email": clashmail, "current_password": acc["password"]},
+                       headers=_csrf(client)).status_code == 202
+    token = _email_change_token(acc["id"])
+    # 要求〜確定の間に別アカウントが同 email を確定（同一会社）
+    other = factory.make_seed_company_account()
+    with control_session() as s:
+        s.query(Account).filter_by(id=other["id"]).update({"email": clashmail})
+        s.commit()
+    r = client.post(ME + "/email/confirm", json={"token": token})
+    assert r.status_code == 409 and r.json()["errors"][0]["field"] == "email"
+    # pending はクリア（やり直しを促す）・email は不変
+    a = _account(acc["id"])
+    assert a.email != clashmail and a.pending_email is None

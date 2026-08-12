@@ -49,6 +49,8 @@ class Account(ControlBase):
     )
     login_id: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
+    # メール変更（K.3・ADR-0008）の確定待ち新メール。確認リンク到達で email へ確定しクリア。一意制約なし（確定時に再検証）
+    pending_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)  # identity 源泉（K/1b）
     # password_hash が NULL＝password_set=false（初回未設定）。列挙耐性のため照合は必ず実行（A.1）
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -80,7 +82,7 @@ class OtpChallenge(ControlBase):
         UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
     )
     code_hash: Mapped[str] = mapped_column(String(128), nullable=False)  # SHA-256 hex（トークンのハッシュ）
-    purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup | email_change
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

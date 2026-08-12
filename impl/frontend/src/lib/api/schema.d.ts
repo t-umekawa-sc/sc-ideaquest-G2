@@ -639,10 +639,35 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Change Email
-         * @description 自己メール変更（K.3）。現在PW 再認証→会社内一意→accounts.email 更新＋users ミラー。変更系＝Origin/CSRF 必須。
+         * Request Email Change
+         * @description 自己メール変更を**要求**（K.3・ダブルオプトイン ADR-0008）。現在PW 再認証→pending 化→新メールへ確認リンク。
+         *
+         *     202（確定待ち＝この時点では未反映）。変更系＝Origin/CSRF 必須。確定は `POST /me/email/confirm`。
          */
-        post: operations["change_email_api_v1_me_email_post"];
+        post: operations["request_email_change_api_v1_me_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/email/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Email Change
+         * @description メール変更の**確定**（K.3・ADR-0008）。**未認証＝トークンが認可**（新メール受信＝到達確認）。
+         *
+         *     `password-setup/complete` と同型＝セッション不要・CSRF 免除（トークンが唯一の資格）・Origin のみ検証。
+         *     無効/期限切れ/使用済みトークンは 410。
+         */
+        post: operations["confirm_email_change_api_v1_me_email_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -932,8 +957,38 @@ export interface components {
             page_info: components["schemas"]["PageInfo"];
         };
         /**
+         * EmailChangeAcceptedResponse
+         * @description メール変更要求の受理応答（202・確定待ち・ADR-0008）。この時点では未反映。
+         */
+        EmailChangeAcceptedResponse: {
+            /**
+             * Status
+             * @default accepted
+             */
+            status: string;
+        };
+        /**
+         * EmailChangeConfirmRequest
+         * @description メール変更の**確定**（K.3・未認証＝トークンが認可・ADR-0008 §2.3）。想定外プロパティ拒否（§2.2）。
+         */
+        EmailChangeConfirmRequest: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * EmailChangeConfirmedResponse
+         * @description メール変更確定の応答（200・ADR-0008）。未認証 EP のため identity 全体は返さない。
+         */
+        EmailChangeConfirmedResponse: {
+            /**
+             * Status
+             * @default confirmed
+             */
+            status: string;
+        };
+        /**
          * EmailChangeRequest
-         * @description 自己メール変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。
+         * @description 自己メール変更の**要求**（K.3・現在PW 再認証・ダブルオプトイン ADR-0008）。想定外プロパティ拒否（§2.2）。
          */
         EmailChangeRequest: {
             /** New Email */
@@ -2438,7 +2493,7 @@ export interface operations {
             };
         };
     };
-    change_email_api_v1_me_email_post: {
+    request_email_change_api_v1_me_email_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2452,12 +2507,45 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_email_change_api_v1_me_email_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailChangeConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeProfileResponse"];
+                    "application/json": components["schemas"]["EmailChangeConfirmedResponse"];
                 };
             };
             /** @description Validation Error */

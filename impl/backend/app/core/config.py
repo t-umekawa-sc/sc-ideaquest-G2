@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     pw_request_rate_limit_max: int = 5
     pw_request_rate_limit_window_seconds: int = 600
 
+    # メール変更のダブルオプトイン（ADR-0008）。確認リンクトークン TTL（24時間・単回・otp_challenges purpose=email_change）
+    email_change_ttl_seconds: int = 86400
+
     # MFA（メールOTP）・信頼端末（ADR-0004・しきい値は env＝ADR-0003 §2.1）
     otp_length: int = 6                          # OTP 桁数（数字）
     otp_ttl_seconds: int = 600                   # OTP 有効期限（10分）

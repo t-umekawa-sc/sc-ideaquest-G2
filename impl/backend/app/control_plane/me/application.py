@@ -7,16 +7,30 @@ identity（`display_name`/`locale`）の源泉は管理DB `accounts`（§4.2）�
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import redis
 from sqlalchemy import select
 
 from app.control_plane.account_sync import repository as account_sync_repo
+from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.domain.service import password_policy_errors
 from app.control_plane.auth.orm import Account
+from app.control_plane.mail_outbox import repository as mail_repo
+from app.control_plane.mail_outbox.templates import (
+    CATEGORY_EMAIL_CHANGE_CONFIRM,
+    CATEGORY_EMAIL_CHANGE_NOTICE,
+)
+from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import delete_account_sessions, hash_password, verify_password
+from app.core.security import (
+    delete_account_sessions,
+    generate_token,
+    hash_password,
+    hash_token,
+    verify_password,
+)
 from app.db.control import control_session
 
 _EDITABLE_FIELDS = ("display_name", "locale")  # allowlist（§2.2）
@@ -82,21 +96,80 @@ def change_password(r: "redis.Redis", account_id: uuid.UUID, *, current_password
     delete_account_sessions(r, str(account_id))  # 全アクティブセッション破棄（A.9-③）＝要再ログイン
 
 
-def change_email(account_id: uuid.UUID, company_id: uuid.UUID, *, new_email: str, current_password: str) -> dict:
-    """自己メール変更（K.3）。現在PW再認証→会社内一意検証→`accounts.email` 更新＋outbox（users ミラー）。
+def _assert_email_unique_in_company(session, company_id: uuid.UUID, account_id: uuid.UUID, email: str) -> None:
+    """会社内で他アカウントの確定 email と衝突しないことを検証（§4.2・重複は 409 field=email）。"""
+    clash = session.execute(
+        select(Account).where(
+            Account.company_id == company_id, Account.id != account_id, Account.email == email
+        )
+    ).scalars().first()
+    if clash is not None:
+        raise AppError(409, "conflict", extra={"errors": [{"field": "email"}]})
 
-    メール変更はセッション破棄を必須にしない（再認証で担保・§A.9-③ 対象外）。新メール到達確認は K.6 TBD（本実装は未挟み）。
+
+def request_email_change(
+    account_id: uuid.UUID, company_id: uuid.UUID, *, new_email: str, current_password: str
+) -> None:
+    """自己メール変更の**要求**（K.3・ダブルオプトイン・ADR-0008）。
+
+    現在PW再認証→会社内一意（確定 email で検証）→`accounts.pending_email` 格納＋`email_change` トークン発行→
+    **新メールへ確認リンク**・**旧メールへ変更通知**（乗っ取り検知）を同一Tx で enqueue。**`accounts.email` は変えず
+    `account_sync_outbox` も積まない**（会社DB ミラーは確定時）。メール変更はセッション破棄を必須にしない（§A.9-③ 対象外）。
     """
+    s = get_settings()
     with control_session() as session:
         account = _require_current_password(session.get(Account, account_id), current_password)
-        clash = session.execute(
-            select(Account).where(
-                Account.company_id == company_id, Account.id != account_id, Account.email == new_email
-            )
-        ).scalars().first()
-        if clash is not None:
-            raise AppError(409, "conflict", extra={"errors": [{"field": "email"}]})  # 会社内一意（§4.2）
-        account.email = new_email
-        account_sync_repo.enqueue(session, account_id, company_id, "upsert", {"email": new_email})
+        old_email = account.email
+        if new_email == old_email:  # no-op 抑止（誤操作）
+            raise AppError(422, "validation_error", detail="現在のメールアドレスと同じです",
+                           errors=[{"field": "new_email"}])
+        _assert_email_unique_in_company(session, company_id, account_id, new_email)
+        account.pending_email = new_email
+        token = generate_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.email_change_ttl_seconds)
+        account_repo.invalidate_email_change_challenges(session, account_id)  # 最新リンクのみ有効（§2.1）
+        account_repo.create_email_change_challenge(session, account_id, hash_token(token), expires_at)
+        # 新メールへ確認リンク（secret＝トークン）／旧メールへ変更通知（secret なし）＝同一Tx で enqueue
+        mail_repo.enqueue(session, new_email, CATEGORY_EMAIL_CHANGE_CONFIRM, secret=token,
+                          locale=account.locale, account_id=account_id, company_id=company_id)
+        mail_repo.enqueue(session, old_email, CATEGORY_EMAIL_CHANGE_NOTICE,
+                          locale=account.locale, account_id=account_id, company_id=company_id)
         session.commit()
-        return _me(account)
+
+
+def confirm_email_change(token: str) -> None:
+    """メール変更の**確定**（K.3・未認証＝トークンが認可・ADR-0008 §2.3）。
+
+    トークン照合（無効/期限切れ/使用済み一律 410）→ 会社内一意を**再検証**（TOCTOU・衝突 409＋pending クリア）→
+    `email=pending_email`・`pending_email=NULL`・チャレンジ単回消費 → **同一Tx で `account_sync_outbox` へ enqueue**
+    （会社DB `users` ミラーは確定時）→ 監査記録。セッション破棄はしない（§A.9-③ 対象外）。
+    """
+    with control_session() as session:
+        challenge = account_repo.find_email_change_challenge_by_hash(session, hash_token(token))
+        if not _challenge_is_valid(challenge):
+            raise AppError(410, "token_expired")
+        account = session.get(Account, challenge.account_id)
+        if account is None or not account.pending_email:
+            raise AppError(410, "token_expired")  # 確定対象なし（pending 消失）
+        new_email = account.pending_email
+        try:  # 要求〜確定の間に他アカウントが同 email を確定し得る（TOCTOU）
+            _assert_email_unique_in_company(session, account.company_id, account.id, new_email)
+        except AppError:
+            account.pending_email = None  # やり直しを促す（pending は残さない）
+            session.commit()
+            raise
+        account.email = new_email
+        account.pending_email = None
+        challenge.used_at = datetime.now(timezone.utc)  # 単回消費
+        account_sync_repo.enqueue(session, account.id, account.company_id, "upsert", {"email": new_email})
+        audit.record("email.change.confirm",  # 監査（B.6）。機密（token）は入れない（§15）
+                     {"company_id": str(account.company_id), "account_id": str(account.id)}, session=session)
+        session.commit()
+
+
+def _challenge_is_valid(challenge) -> bool:
+    return (
+        challenge is not None
+        and challenge.used_at is None
+        and challenge.expires_at > datetime.now(timezone.utc)
+    )
