@@ -5,3 +5,5 @@ export { Card, CardTitle } from "./Card";
 export { Field } from "./Field";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { Pager } from "./Pager";
+export { RowMenu } from "./RowMenu";
+export type { RowMenuItem } from "./RowMenu";

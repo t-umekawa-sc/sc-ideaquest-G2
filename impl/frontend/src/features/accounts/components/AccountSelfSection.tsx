@@ -5,7 +5,8 @@
 // 所属の候補は自社グループ一覧（GET /admin/company-quest-groups・B.2.1）。編集時は「置き換える」オプトインで全置換（誤消去防止）。
 import { useEffect, useState } from "react";
 
-import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter, Pager, RowMenu } from "@/components/ui";
+import type { RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableOwnAccount,
@@ -42,7 +43,7 @@ function formErrorMessage(err: unknown): string {
   return "エラーが発生しました。時間をおいて再度お試しください。";
 }
 
-export function AccountSelfSection() {
+export function AccountSelfSection({ companyCode }: { companyCode: string }) {
   const { accounts, total, page, perPage, q, status, loadError, setPage, apply, reload } =
     useAccountList(listOwnAccounts);
   const [groups, setGroups] = useState<QuestGroup[]>([]);
@@ -133,12 +134,18 @@ export function AccountSelfSection() {
   return (
     <section aria-label="自社アカウント管理">
       <div className="admin-toolbar">
-        <h1>アカウント管理（自社）</h1>
+        <h1>会社アカウント管理</h1>
         <Button type="button" variant="primary" onClick={openIssue}>
           ＋ アカウント発行
         </Button>
       </div>
-      <p className="admin-muted">自社のアカウントを管理します（発行・編集・無効化・PW再設定）。システムロールの付与はできません。</p>
+      <p className="admin-sub">
+        自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>＋<strong>クエストグループ管理者（QG管理者）の任命</strong>ができます。（会社設定・システムロール付与は<strong>システム管理者</strong>の領分）
+      </p>
+      <div className="company-ctx">
+        <span className="company-ctx__name">{companyCode}</span>
+        <span className="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
+      </div>
 
       <Modal
         open={showForm}
@@ -181,46 +188,74 @@ export function AccountSelfSection() {
         </form>
       </Modal>
 
-      <AccountsToolbar q={q} status={status} onApply={apply} />
+      <div className="list-toolbar">
+        <AccountsToolbar q={q} status={status} onApply={apply} />
+        <div className="tools"><span className="list-count">{total} 件</span></div>
+      </div>
 
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th scope="col">氏名</th>
-            <th scope="col">ログインID</th>
-            <th scope="col">メールアドレス</th>
-            <th scope="col">システムロール</th>
-            <th scope="col">状態</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {accounts.map((a) => (
-            <tr key={a.account_id}>
-              <td>{a.display_name}</td>
-              <td className="admin-code">{a.login_id}</td>
-              <td className="admin-code">{a.email}</td>
-              <td>{ROLE_LABEL[a.system_role] ?? a.system_role}</td>
-              <td>{a.status === "active" ? "有効" : "無効"}</td>
-              <td>
-                {a.status === "active" ? (
-                  <>
-                    <button type="button" onClick={() => openEdit(a)}>編集</button>{" "}
-                    <button type="button" onClick={() => runAction(() => resetOwnPassword(a.account_id), undefined, "パスワード再設定リンクを送信しました。")}>PW再設定</button>{" "}
-                    <button type="button" className="is-danger" onClick={() => runAction(() => disableOwnAccount(a.account_id), `「${a.display_name}」を無効化しますか？`)}>無効化</button>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => runAction(() => enableOwnAccount(a.account_id))}>再有効化</button>
-                )}
-              </td>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">氏名</th>
+              <th scope="col">ログインID</th>
+              <th scope="col">メールアドレス</th>
+              <th scope="col">システムロール</th>
+              <th scope="col">所属クエストグループ</th>
+              <th scope="col">状態</th>
+              <th scope="col" className="col-actions" aria-label="操作" />
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {accounts.length === 0 && !loadError && <p className="admin-muted">アカウントがありません。</p>}
+          </thead>
+          <tbody>
+            {accounts.map((a) => {
+              const isSysAdmin = a.system_role === "system_admin";
+              const menu: RowMenuItem[] =
+                a.status === "active"
+                  ? [
+                      { label: "編集", onClick: () => openEdit(a) },
+                      {
+                        label: "パスワード再設定",
+                        onClick: () => runAction(() => resetOwnPassword(a.account_id), undefined, "パスワード再設定リンクを送信しました。"),
+                      },
+                      {
+                        label: "無効化",
+                        danger: true,
+                        onClick: () => runAction(() => disableOwnAccount(a.account_id), `「${a.display_name}」を無効化しますか？`),
+                      },
+                    ]
+                  : [{ label: "再有効化", onClick: () => runAction(() => enableOwnAccount(a.account_id)) }];
+              return (
+                <tr key={a.account_id} className={a.status !== "active" ? "is-suspended" : undefined}>
+                  <td>{a.display_name}</td>
+                  <td className="admin-code">{a.login_id}</td>
+                  <td className="admin-code">{a.email}</td>
+                  <td>{ROLE_LABEL[a.system_role] ?? a.system_role}</td>
+                  {/* 所属クエストグループは AccountListItem 未提供（backend 一覧EPに memberships 追加が必要）＝暫定「—」 */}
+                  <td className="muted">—</td>
+                  <td>
+                    {a.status === "active" ? (
+                      <span className="badge badge-success">有効</span>
+                    ) : (
+                      <span className="badge badge-danger">無効</span>
+                    )}
+                  </td>
+                  <td className="col-actions">
+                    {isSysAdmin ? (
+                      <span className="row-locked">システム管理者は SC-92 で管理</span>
+                    ) : (
+                      <RowMenu items={menu} />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {accounts.length === 0 && !loadError && <p className="list-empty">該当するアカウントがありません。</p>}
       <Pager page={page} perPage={perPage} total={total} onPageChange={setPage} />
     </section>
   );

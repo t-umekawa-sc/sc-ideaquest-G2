@@ -1007,6 +1007,23 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 }
 
 /* =============================================================
+ * 9z. 管理画面の一覧補助（SC-90/91/92/93 で共用。旧モック <style> ローカルから昇格）
+ * ============================================================= */
+.admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+/* 自社コンテキスト行（SC-93＝常に自社であることを明示・左に強調ボーダー） */
+.company-ctx { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--color-surface);
+  border: 1px solid var(--color-border); border-left: 6px solid var(--color-primary); }
+.company-ctx__name { font-weight: 700; }
+.company-ctx__note { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 操作不可の説明（system_admin 行など） */
+.row-locked { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 無効（論理削除）行は淡色 */
+.table tr.is-suspended td { color: var(--color-text-muted); }
+/* 権限の補足注記（画面末尾） */
+.role-note { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-4); }
+
+/* =============================================================
  * 10. レスポンシブ
  * ============================================================= */
 @media (max-width: 768px) {

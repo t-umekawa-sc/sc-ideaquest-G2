@@ -24,7 +24,7 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
 test("B-TC-117 own-company account issue appears", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/accounts");
-  await expect(page.getByRole("heading", { name: "アカウント管理（自社）" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "会社アカウント管理" })).toBeVisible();
 
   const loginId = `e2e-self-${Date.now().toString().slice(-8)}@ops.example`;
   await page.getByRole("button", { name: "＋ アカウント発行" }).click();

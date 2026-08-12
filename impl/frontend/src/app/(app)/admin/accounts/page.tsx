@@ -9,5 +9,6 @@ export default async function OwnAccountsPage() {
   if (!session) redirect("/login");
   // 認可はサーバー強制（API も require_company_account_admin で二重防御）。system_admin は上位互換で許可。
   if (session.system_role !== "company_account_admin" && session.system_role !== "system_admin") redirect("/");
-  return <AccountSelfSection />;
+  // 自社コンテキスト表示用に会社コードを渡す（会社表示名は session 未提供＝将来拡張。当面はコード）。
+  return <AccountSelfSection companyCode={session.company_code} />;
 }
