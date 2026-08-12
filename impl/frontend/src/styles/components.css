@@ -236,6 +236,7 @@ body.modal-open {
 .modal--md .modal__panel { max-width: 600px; }
 .modal--lg .modal__panel { max-width: 720px; }
 .modal__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -247,7 +248,20 @@ body.modal-open {
   font-size: var(--text-lg, 1.125rem);
   margin: 0;
 }
-.modal__close {
+.modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+}
+/* ヘッダードラッグ（§105）＝掴めることを示すカーソル。ボタンは既定カーソルに戻す */
+.modal--draggable .modal__header {
+  cursor: move;
+  user-select: none;
+}
+.modal--draggable .modal__header button {
+  cursor: pointer;
+}
+.modal__iconbtn {
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -257,22 +271,33 @@ body.modal-open {
   border-radius: var(--radius-md, 8px);
   color: var(--color-text-muted, #6b7280);
 }
-.modal__close:hover {
+.modal__iconbtn:hover {
   background: var(--color-surface-muted, #f3f4f6);
 }
 .modal__body {
+  flex: 1 1 auto;
+  min-height: 0; /* flex 子が縮んで overflow-y が効くように（スクロールの肝） */
   padding: var(--space-5);
   overflow-y: auto; /* 本文だけスクロール */
   display: grid;
   gap: var(--space-3);
+  align-content: start;
 }
 .modal__footer {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border, #e5e7eb);
+}
+/* 最大化（§106）＝画面ほぼ全体。ドラッグ変位は component が無効化（transform なし） */
+.modal__panel.is-max {
+  max-width: none;
+  width: calc(100vw - var(--space-6));
+  height: calc(100vh - var(--space-6));
+  max-height: none;
 }
 /* 狭幅は自動フルスクリーン（ボトムシート相当） */
 @media (max-width: 640px) {
