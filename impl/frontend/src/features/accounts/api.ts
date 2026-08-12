@@ -6,8 +6,13 @@ import type { components } from "@/lib/api/schema";
 
 type QuestGroupListResponse = components["schemas"]["QuestGroupListResponse"];
 
-export function listAccounts(companyId: string, params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
-  const qs = new URLSearchParams({ per_page: "100" }); // 暫定＝ページング/検索 UI 実装まで最大件数を引き上げ
+export function listAccounts(
+  companyId: string,
+  params?: { q?: string; status?: string; page?: number; per_page?: number },
+): Promise<AccountListResponse | null> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.per_page) qs.set("per_page", String(params.per_page));
   if (params?.q) qs.set("q", params.q);
   if (params?.status) qs.set("status", params.status);
   return apiFetch<AccountListResponse>(`/admin/companies/${companyId}/accounts?${qs.toString()}`);
@@ -60,8 +65,12 @@ export function listQuestGroups(companyId: string): Promise<QuestGroupListRespon
 }
 
 // --- SC-93 会社アカウント管理者（B.2.1・`/admin/accounts`＝セッション会社固定・system_role は受けない） ---
-export function listOwnAccounts(params?: { q?: string; status?: string }): Promise<AccountListResponse | null> {
-  const qs = new URLSearchParams({ per_page: "100" }); // 暫定＝ページング/検索 UI 実装まで最大件数を引き上げ
+export function listOwnAccounts(
+  params?: { q?: string; status?: string; page?: number; per_page?: number },
+): Promise<AccountListResponse | null> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.per_page) qs.set("per_page", String(params.per_page));
   if (params?.q) qs.set("q", params.q);
   if (params?.status) qs.set("status", params.status);
   return apiFetch<AccountListResponse>(`/admin/accounts?${qs.toString()}`);

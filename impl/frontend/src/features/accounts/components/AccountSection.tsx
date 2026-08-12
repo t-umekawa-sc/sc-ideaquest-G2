@@ -1,10 +1,10 @@
 "use client";
 
 // SC-92 アカウント & 所属（この会社）。system_admin 経路（クロステナント）。
-// 一覧＋発行（memberships 所属エディタ込み）＋disable/enable/PW再設定。編集(PATCH)は後続（92B-2）。
+// 一覧（検索/状態フィルタ/ページング）＋発行（memberships 所属エディタ込み）＋編集(PATCH)＋disable/enable/PW再設定。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, Pager } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableAccount,
@@ -16,6 +16,9 @@ import {
   resetPassword,
 } from "../api";
 import type { Account, AccountCreateInput, Membership, QuestGroup } from "../types";
+import type { AccountListParams } from "../useAccountList";
+import { useAccountList } from "../useAccountList";
+import { AccountsToolbar } from "./AccountsToolbar";
 import { MembershipsEditor } from "./MembershipsEditor";
 import "@/features/companies/companies.css";
 
@@ -40,9 +43,14 @@ function issueErrorMessage(err: unknown): string {
 }
 
 export function AccountSection({ companyId }: { companyId: string }) {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  // fetcher は companyId に閉じたクロステナント経路（/admin/companies/{id}/accounts）。
+  const fetcher = useCallback(
+    (params: AccountListParams) => listAccounts(companyId, params),
+    [companyId],
+  );
+  const { accounts, total, page, perPage, q, status, loadError, setPage, apply, reload } =
+    useAccountList(fetcher);
   const [groups, setGroups] = useState<QuestGroup[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -56,6 +64,13 @@ export function AccountSection({ companyId }: { companyId: string }) {
   const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // 所属エディタの候補（この会社のグループ）は一覧の検索/ページングに依存しない＝会社が変わった時のみ取得。
+  useEffect(() => {
+    void listQuestGroups(companyId)
+      .then((res) => setGroups(res?.data ?? []))
+      .catch(() => {}); // 候補取得失敗は一覧表示を妨げない（発行フォームでのみ使用）
+  }, [companyId]);
 
   function openIssue() {
     setMode("issue");
@@ -82,23 +97,6 @@ export function AccountSection({ companyId }: { companyId: string }) {
     setFormError(null);
     setShowForm(true);
   }
-
-  const reload = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const [accRes, grpRes] = await Promise.all([listAccounts(companyId), listQuestGroups(companyId)]);
-      setAccounts(accRes?.data ?? []);
-      setGroups(grpRes?.data ?? []);
-    } catch (err) {
-      setLoadError(err instanceof ApiError && err.code === "forbidden"
-        ? "アカウントを表示する権限がありません。"
-        : "アカウント一覧の取得に失敗しました。");
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,7 +141,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="card admin-create">
+    <section className="card admin-create" aria-label="この会社のアカウント管理">
       <div className="admin-toolbar">
         <h2>アカウント &amp; 所属（この会社）</h2>
         <Button type="button" variant="primary" onClick={() => (showForm ? setShowForm(false) : openIssue())}>
@@ -188,6 +186,8 @@ export function AccountSection({ companyId }: { companyId: string }) {
         </form>
       )}
 
+      <AccountsToolbar q={q} status={status} onApply={apply} />
+
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
@@ -196,6 +196,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
           <tr>
             <th scope="col">氏名</th>
             <th scope="col">ログインID</th>
+            <th scope="col">メールアドレス</th>
             <th scope="col">システムロール</th>
             <th scope="col">状態</th>
             <th scope="col">操作</th>
@@ -206,6 +207,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
             <tr key={a.account_id}>
               <td>{a.display_name}</td>
               <td className="admin-code">{a.login_id}</td>
+              <td className="admin-code">{a.email}</td>
               <td>{ROLE_LABEL[a.system_role] ?? a.system_role}</td>
               <td>{a.status === "active" ? "有効" : "無効"}</td>
               <td>
@@ -224,6 +226,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
         </tbody>
       </table>
       {accounts.length === 0 && !loadError && <p className="admin-muted">アカウントがありません。</p>}
-    </div>
+      <Pager page={page} perPage={perPage} total={total} onPageChange={setPage} />
+    </section>
   );
 }

@@ -3,3 +3,4 @@ export { Avatar } from "./Avatar";
 export { Button } from "./Button";
 export { Card, CardTitle } from "./Card";
 export { Field } from "./Field";
+export { Pager } from "./Pager";

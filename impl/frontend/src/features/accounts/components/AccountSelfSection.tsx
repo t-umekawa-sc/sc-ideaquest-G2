@@ -1,11 +1,11 @@
 "use client";
 
 // SC-93 会社アカウント管理者＝自社（セッション会社固定）のアカウント管理（B.2.1）。
-// 一覧＋発行/編集（identity＋所属 memberships・system_role は付与不可＝general 固定）＋disable/enable/PW再設定。
+// 一覧（検索/状態フィルタ/ページング）＋発行/編集（identity＋所属 memberships・system_role は付与不可＝general 固定）＋disable/enable/PW再設定。
 // 所属の候補は自社グループ一覧（GET /admin/company-quest-groups・B.2.1）。編集時は「置き換える」オプトインで全置換（誤消去防止）。
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, Pager } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   disableOwnAccount,
@@ -17,6 +17,8 @@ import {
   resetOwnPassword,
 } from "../api";
 import type { Account, Membership, QuestGroup } from "../types";
+import { useAccountList } from "../useAccountList";
+import { AccountsToolbar } from "./AccountsToolbar";
 import { MembershipsEditor } from "./MembershipsEditor";
 import "@/features/companies/companies.css";
 
@@ -41,9 +43,9 @@ function formErrorMessage(err: unknown): string {
 }
 
 export function AccountSelfSection() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const { accounts, total, page, perPage, q, status, loadError, setPage, apply, reload } =
+    useAccountList(listOwnAccounts);
   const [groups, setGroups] = useState<QuestGroup[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -57,22 +59,12 @@ export function AccountSelfSection() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const reload = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const [accRes, grpRes] = await Promise.all([listOwnAccounts(), listOwnCompanyQuestGroups()]);
-      setAccounts(accRes?.data ?? []);
-      setGroups(grpRes?.data ?? []);
-    } catch (err) {
-      setLoadError(err instanceof ApiError && err.code === "forbidden"
-        ? "アカウントを表示する権限がありません。"
-        : "アカウント一覧の取得に失敗しました。");
-    }
-  }, []);
-
+  // 所属エディタの候補（自社グループ）は一覧の検索/ページングに依存しない＝マウント時に一度だけ取得。
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void listOwnCompanyQuestGroups()
+      .then((res) => setGroups(res?.data ?? []))
+      .catch(() => {}); // 候補取得失敗は一覧表示を妨げない（発行フォームでのみ使用）
+  }, []);
 
   function openIssue() {
     setMode("issue");
@@ -178,6 +170,8 @@ export function AccountSelfSection() {
         </form>
       )}
 
+      <AccountsToolbar q={q} status={status} onApply={apply} />
+
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
@@ -186,6 +180,7 @@ export function AccountSelfSection() {
           <tr>
             <th scope="col">氏名</th>
             <th scope="col">ログインID</th>
+            <th scope="col">メールアドレス</th>
             <th scope="col">システムロール</th>
             <th scope="col">状態</th>
             <th scope="col">操作</th>
@@ -196,6 +191,7 @@ export function AccountSelfSection() {
             <tr key={a.account_id}>
               <td>{a.display_name}</td>
               <td className="admin-code">{a.login_id}</td>
+              <td className="admin-code">{a.email}</td>
               <td>{ROLE_LABEL[a.system_role] ?? a.system_role}</td>
               <td>{a.status === "active" ? "有効" : "無効"}</td>
               <td>
@@ -214,6 +210,7 @@ export function AccountSelfSection() {
         </tbody>
       </table>
       {accounts.length === 0 && !loadError && <p className="admin-muted">アカウントがありません。</p>}
+      <Pager page={page} perPage={perPage} total={total} onPageChange={setPage} />
     </section>
   );
 }

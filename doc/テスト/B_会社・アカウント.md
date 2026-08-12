@@ -277,3 +277,12 @@
 | TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | B-TC-123 | e2e | 一般ユーザー（admin 所属なし＝`is_qg_admin=false`） | ヘッダーのユーザーメニューを開く | 「クエストグループ管理」メニューが**出ない** | B.4／A.6（session.is_qg_admin） |
+
+## 16. frontend e2e（SC-92/SC-93 アカウント一覧のページング・検索 UI・B.2/B.2.1）
+
+> 対象＝`frontend/e2e/sc-92b-accounts.spec.ts`（B-TC-125）・`frontend/e2e/sc-93-own-accounts.spec.ts`（B-TC-124）。範囲＝一覧の**検索（`q`＝氏名/ログインID/メール）・状態フィルタ（有効/無効）・オフセットページャ（前へ/次へ＝`page_info`）・メールアドレス列**の縦通し。backend の一覧 EP は `q`/`status`/`page`/`per_page`（既定20・最大100）と `page_info{total,page,per_page}` を実装済み（API層は B-TC-014 で検証済み）＝本節は **frontend UI が backend の絞り込み/ページングに配線され、`page_info` を反映する**ことを実 UI で確認する。**発行時は login と email を別値**にし、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠とする（従来の一覧は login==email で両者を判別できなかった）。所属クエストグループ列は会社DB 依存のため本スライス対象外（別スライス）。前提＝フルスタック＋OPS 管理者 seed。認可＝SC-93 は company_account_admin＋system_admin 上位互換（e2e は OPS 上位互換で検証）。UI 設計の正＝`doc/画面設計/screens/SC-92_会社詳細.md`・`doc/画面設計/screens/SC-93_会社アカウント管理.md`（ツールバー＝検索＋状態フィルタ＋発行）。
+
+| TC-ID | 階層 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| B-TC-124 | e2e | OPS（system_admin 上位互換）・`/admin/accounts`（SC-93） | メール列/ページャの表示を確認→一意スタンプで発行（login≠email）→検索ボックスにスタンプ入力→検索→クリア | 「メールアドレス」列ヘッダが出る・1ページ目は「前へ」不可／検索で当該行の login/email 両セルが出て seed 管理者行が消え「（1 件）」表示＋「次へ」不可／クリアで「（1 件）」表示が消える（全件に復帰） | SC-93／B.2.1／§1.8 |
+| B-TC-125 | e2e | OPS system_admin・ACME-01 会社詳細（SC-92） | 同上（会社スコープの一覧で） | 「メールアドレス」列ヘッダが出る・1ページ目は「前へ」不可／検索で当該行の login/email 両セルが出て「（1 件）」表示＋「次へ」不可／クリアで「（1 件）」表示が消える | SC-92／B.2／§1.8 |
