@@ -1,11 +1,12 @@
-// SC-02 通知一覧（プロトタイプ・スタブ）。実体は features/notifications へ（画面群移植フェーズ）。
-import { Card, CardTitle } from "@/components/ui";
+// SC-02 通知一覧（プロトタイプ・スタブ）。実体は features/notifications へ。
+import { ScreenStub } from "@/components/layout";
 
 export default function NotificationsPage() {
   return (
-    <Card>
-      <CardTitle>通知一覧（SC-02）</CardTitle>
-      <p className="muted">この画面はモック移植予定です（プロトタイプ・スタブ）。</p>
-    </Card>
+    <ScreenStub
+      code="SC-02"
+      title="通知一覧"
+      description="状態/種別の絞り込み＋すべて既読＋日付グループ。参照先（アイデア/チャット）へ遷移。モック移植予定。"
+    />
   );
 }
