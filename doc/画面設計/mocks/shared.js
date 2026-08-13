@@ -658,7 +658,8 @@ window.DataTable = (function () {
         }
         return `<td class="${cls}">${inner}</td>`;
       }).join('');
-      const trCls = [pinned ? 'is-pinned' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
+      // クリック可（onRowClick 定義時）の行は .dt-row--link＝ホバーで指カーソル（§4.5 ⑪ クリックの標準挙動）。
+      const trCls = [typeof cfg.onRowClick === 'function' ? 'dt-row--link' : '', pinned ? 'is-pinned' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
       return `<tr data-dt-row="${id}"${trCls ? ` class="${trCls}"` : ''}>${tds}</tr>`;
     }
 

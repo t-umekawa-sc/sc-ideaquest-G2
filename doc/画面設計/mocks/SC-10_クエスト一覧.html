@@ -22,9 +22,8 @@
   .deadline { font-size: var(--text-xs); font-weight: 500; }
   .deadline.soon { color: var(--color-danger); }
 
-  /* リスト（テーブル）ビュー＝行クリックで詳細へ */
+  /* リスト（テーブル）ビュー＝行クリックで詳細へ（指カーソル/ホバー背景は DataTable 標準 .dt-row--link＝§4.5 ⑪） */
   .idea-title { font-weight: 600; }
-  #questTable tbody tr[data-dt-row] { cursor: pointer; }
   #questTable tbody tr[data-dt-row]:hover .idea-title { color: var(--color-primary); }
 </style>
 </head>

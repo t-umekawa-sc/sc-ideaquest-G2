@@ -1171,6 +1171,9 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .table tr.is-pinned td { position: sticky; top: var(--dt-row-top, var(--dt-head-h, 41px)); z-index: 2; background: var(--color-primary-soft); }
 .table tr.is-pinned td.col-actions { z-index: 3; }
 .table tr.dt-pin-sep td { border-bottom: 2px solid var(--color-border-strong); }
+/* クリック可の行＝ホバーで指カーソル＋薄い背景（§4.5 ⑪ クリックの標準挙動）。固定行は自前背景を優先。 */
+.table tr.dt-row--link { cursor: pointer; }
+.table tr.dt-row--link:hover:not(.is-pinned) td { background: var(--color-surface-alt); }
 
 /* --- 表示密度 --- */
 .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
