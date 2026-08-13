@@ -162,7 +162,8 @@
 
   // 操作列：システム管理者は SC-92 で管理（この画面では操作不可）。それ以外は ⋯ メニュー。
   function actionsCell(r) {
-    if (r.system_role === 'sys_admin') return '<span class="row-locked">システム管理者は SC-92 で管理</span>';
+    // システム管理者アカウントはこの画面で操作不可（SC-92 で管理）。操作列は狭いので鍵アイコン＋ツールチップで示す。
+    if (r.system_role === 'sys_admin') return '<span class="row-locked" title="システム管理者アカウントはこの画面では操作できません（SC-92 で管理）">🔒</span>';
     const toggle = r.state === 'active'
       ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-suspend="${r.loginId}">無効化</button></li>`
       : `<li role="none"><button role="menuitem" type="button" data-activate="${r.loginId}">再有効化</button></li>`;
