@@ -14,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`becc385`**（一覧の操作標準 DataTable 新設）。
+- 最新コミット: 本 handoff コミット。直前＝**`75c4842`**（DataTable ユーザー確認フィードバック反映）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `75c4842` **DataTable の D-0 フィードバック反映**（mocks のみ）＝①詳細絞込の区分(enum)を**縦並び＋間隔**（`.filter-checks`）＝チェックと文字の被り解消／②横断検索＝**プレースホルダを短く（`検索…`）＋対象項目名を下の補足**（`.dt-search__hint`・config `searchFields`）＝見切れ解消／③**行固定の背景色バグ修正**＝区切り線を文字列 `replace` で入れて `class` 属性が二重化し最後のピン行が `is-pinned` を喪失（1行=背景消失/2行=2行目消失）→ `classList` 付与に修正＋段積み sticky（`--dt-row-top` 累積で複数ピンが重ならない）。ヘッドレス検証済み。
   - `becc385` **一覧の操作標準（DataTable）新設＋SC-91 適用＋`デザイン標準.md` §4.5 起こし**（**doc/mocks のみ・impl 未反映**）＝ユーザー要望のUI標準化。`shared.js` に `window.DataTable`（`DataTable.init(root, config)`＝列とデータを宣言するだけで全機能付与）。機能＝①単一列ソート(昇順→降順→解除・aria-sort)②詳細ソート(左右2ペイン transfer＋FLIP・複数キー・優先順位▲▼・詳細中は単一列無効＋バッジ＋要約チップ)③横断検索＋詳細絞込(テキスト/区分/数値/日付範囲)④番号ページャ(« ‹ 1 … [n] … › »)⑤列幅ドラッグ(Wクリックで既定)⑥列設定メニュー(表示/非表示＋▲▼並べ替え・名称先頭/操作末尾ロック・幅リセット/既定に戻す)⑦CSV(現在の絞込・ソート結果/表示列・UTF-8 BOM)⑧表示密度(標準/コンパクト)⑨行固定(行頭📌→上部sticky＋全ページ常時・固定ヘッダー前提・上限5件)。永続＝列順/表示/幅/密度/ピンを `localStorage`(画面×列)。`shared.css` に `9y` 部品＋**グローバル `[hidden]{display:none!important}` 修正**（`.btn`/`.pagination` の display が UA の `[hidden]` を上書きする不具合）。`デザイン標準.md` §4.5 新設＋F4/toolbar/pagination 改定（旧「列ヘッダソート MVP 非採用」撤回）。SC-91 は手書き table→`DataTable.init` に置換。`style-guide.html` に「9.」デモ。**検証＝ヘッドレスで SC-91/style-guide とも JS エラー無し・全機能描画確認・ユーザーがモック確認予定**。
   - `1094df1` **モーダル本文スクロール修正**＝本文＋フッターを `<form>` で包む標準パターン（`Modal.tsx` §159）で内容が高いと `<form>` がパネル（`max-height:88vh`・`overflow:hidden`）から溢れ、フッターが画面外・本文も未スクロール（SC-91 作成モーダルで表面化）。`.modal__panel.sectioned > form` を flex 列＋`flex:1/min-height:0/overflow:hidden` に（body 直下パターンには非適用で無害）。`design-system.css`／`mocks/shared.css` 同期。目視確認＋full e2e 26 passed。
   - `effe878` (A)SC-91 会社一覧＝**モック完全準拠へ再整合**＝`.backlink`/`.page-title`「システム管理（運営）」/`.admin-sub`/`.section-head`(h2「会社（テナント）」＋「＋ 会社を作成」)/末尾 `.role-note`・テーブル `.co`＋`QuestIcon`/`.db-id`/状態バッジ `.st-active`/`.st-provisioning`・作成モーダルに会社カラー `.swatches`(新 `components/ui/Swatches.tsx`・backend `color` 接続)＋会社アイコン `.icon-field`(objectURL プレビューのみの仮実装・MinIO 待ち)＋`.provision-note`。共有クラス 8種を design-system.css と mocks/shared.css へ昇格・SC-91 モック `<style>` の重複撤去。e2e＝sc-91(B-TC-110 見出し/B-TC-111 ボタン名)・sc-92(作成ボタン名)追随＝**full 26 passed**。
@@ -121,7 +122,7 @@
 > **現在の最優先＝(D) UI標準/モック精度の調整（ユーザー主導・doc/mocks で作業）**。(A)/(B) の impl 作業は保留中。
 
 ### (D) UI標準・モック精度（進行中・最優先）
-- **D-0（直近）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」）をブラウザ確認予定。指摘（見た目・文言・挙動）を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html` を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`）。`node --check` で syntax も確認。
+- **D-0（進行中）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」）をブラウザ確認中。**第1弾（`75c4842`）で 絞込チェック縦並び・検索補足・ピン背景バグ を対応済**。以降も指摘を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html`（Wインコード必要）を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`。要素 `.screenshot()` で部分撮り可）。`node --check` で syntax も確認。
 - **D-1＝ヘッダー usermenu の UI/アニメ**（要望）。現状 `shared.css` `.usermenu__list[hidden]{display:none}` の即時トグル＝**開閉アニメ無し**。フェード/スケール＋`prefers-reduced-motion` 対応を `shared.css`/`shared.js`（`initUserMenu`）に。
 - **D-2＝各画面のラベル横断見直し**（要望）。用語統一・命名を `mocks` 全体で点検（`デザイン標準.md` に方針節を設けるか検討）。
 - **D-3＝DataTable を他一覧へ展開**（SC-90/92/93・SC-10 等）。`columns`＋`data` 宣言のみ。
