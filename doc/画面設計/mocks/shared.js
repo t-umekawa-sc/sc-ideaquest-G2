@@ -622,7 +622,8 @@ window.DataTable = (function () {
         const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.cellClass || ''].filter(Boolean).join(' ');
         let inner = c.render ? c.render(r) : esc(c.sortVal ? c.sortVal(r) : '');
         if (i === 0) {
-          const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">📌</button>`;
+          // ピン中は 📌（固定済み）、未ピンは 📍（この行を固定できる）でアイコンを切替。
+          const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
           inner = `<span style="display:inline-flex;align-items:center;gap:6px;min-width:0">${pin}${inner}</span>`;
         }
         return `<td class="${cls}">${inner}</td>`;

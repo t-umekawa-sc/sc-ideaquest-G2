@@ -1106,9 +1106,11 @@ th.dt-sortable.is-locked-sort { cursor: default; }        /* 詳細ソート中�
 th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 
 /* --- 行固定（ピン）＋固定ヘッダー配下に貼り付き --- */
-.dt-pin-toggle { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); padding: 2px; border-radius: var(--radius); }
-.dt-pin-toggle:hover { background: var(--color-primary-soft); color: var(--color-primary); }
-.dt-pin-toggle[aria-pressed="true"] { color: var(--color-primary); }
+.dt-pin-toggle { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); padding: 2px; border-radius: var(--radius); line-height: 1; }
+/* 未ピン（📍）は控えめ・ホバー/ピン中（📌）ははっきり見せる */
+.dt-pin-toggle[aria-pressed="false"] { opacity: .4; }
+.dt-pin-toggle:hover { background: var(--color-primary-soft); opacity: 1; }
+.dt-pin-toggle[aria-pressed="true"] { opacity: 1; }
 .table tr.is-pinned td { position: sticky; top: var(--dt-row-top, var(--dt-head-h, 41px)); z-index: 2; background: var(--color-primary-soft); }
 .table tr.is-pinned td.col-actions { z-index: 3; }
 .table tr.dt-pin-sep td { border-bottom: 2px solid var(--color-border-strong); }
