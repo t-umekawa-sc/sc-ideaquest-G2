@@ -529,7 +529,24 @@
         { key: 'state', label: '状態', width: 100, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['provisioning', '準備中'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => badge(r.state) },
         { key: 'votes', label: '得票', width: 90, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.votes, filterVal: (r) => r.votes, render: (r) => r.votes },
         { key: 'created', label: '作成日', width: 120, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
+        // 操作列＝⋯（ケバブ）アクションメニュー（RowMenu・sticky 右固定。開閉は shared.js が委譲処理）
+        { key: '_actions', label: '', actions: true, locked: true, width: 80, render: (r) => `
+          <div class="rowmenu">
+            <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+            <ul class="rowmenu__list" role="menu" hidden>
+              <li role="none"><button role="menuitem" type="button" data-sg-act="edit" data-id="${r.id}">編集</button></li>
+              <li role="none"><button role="menuitem" type="button" data-sg-act="dup" data-id="${r.id}">複製</button></li>
+              <li role="none"><button role="menuitem" type="button" class="is-danger" data-sg-act="del" data-id="${r.id}">削除</button></li>
+            </ul>
+          </div>` },
       ],
+    });
+    // アクションメニューの実処理（デモ）。RowMenu の開閉自体は shared.js が担当。
+    document.getElementById('sgTable').addEventListener('click', (e) => {
+      const mi = e.target.closest('[data-sg-act]'); if (!mi) return;
+      const label = { edit: '編集', dup: '複製', del: '削除' }[mi.dataset.sgAct] || mi.dataset.sgAct;
+      const row = DATA.find((x) => x.id === mi.dataset.id);
+      alert(label + '：' + (row ? row.name : mi.dataset.id) + '（デモ）');
     });
   })();
 
