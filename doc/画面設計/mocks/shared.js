@@ -362,11 +362,22 @@ window.addEventListener('resize', () => applyCellClips());
     lastFocused = null;
   }
   function watch(m) {
+    if (m.__iqWatched) return; m.__iqWatched = true;   // 二重監視を防止
     new MutationObserver(() => { isOpen(m) ? onOpen(m) : onClose(m); })
       .observe(m, { attributes: true, attributeFilter: ['class', 'hidden'] });
     if (isOpen(m)) onOpen(m);
   }
-  document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.modal').forEach(watch); });
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal').forEach(watch);
+    // 動的に後から追加される .modal（例: DataTable の詳細ソート/絞込ダイアログ）も拾う
+    new MutationObserver((muts) => {
+      muts.forEach((mu) => mu.addedNodes.forEach((n) => {
+        if (n.nodeType !== 1) return;
+        if (n.matches && n.matches('.modal')) watch(n);
+        if (n.querySelectorAll) n.querySelectorAll('.modal').forEach(watch);
+      }));
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   document.addEventListener('keydown', (e) => {
     if (!activeModal) return;
     if (e.key === 'Escape') {
@@ -413,25 +424,36 @@ window.setFieldError = setFieldError;
   const panelOf = (m) => m.querySelector('.modal__panel');
   const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
 
-  // 最大化ボタンの差し込み
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.modal--maximizable').forEach((m) => {
-      const header = m.querySelector('.modal__header, .modal__drag'); if (!header) return;
-      const close = header.querySelector('.modal__close');
-      let tools = header.querySelector('.modal__header__tools');
-      if (!tools) { tools = document.createElement('div'); tools.className = 'modal__header__tools'; header.appendChild(tools); }
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'modal__maxbtn'; btn.setAttribute('aria-label', '最大化'); btn.textContent = '⤢';
-      tools.appendChild(btn);
-      if (close) tools.appendChild(close);   // ×をツール群の末尾へ移動（⤢ の右）
-      btn.addEventListener('click', () => {
-        const p = panelOf(m); if (!p) return;
-        const max = p.classList.toggle('is-max');
-        p.style.position = ''; p.style.left = ''; p.style.top = ''; p.style.margin = ''; p.style.width = '';  // 位置・幅リセット
-        btn.textContent = max ? '⤡' : '⤢';
-        btn.setAttribute('aria-label', max ? '元のサイズに戻す' : '最大化');
-      });
+  // 最大化ボタンの差し込み（冪等・動的モーダルにも対応）
+  function initMaximizable(m) {
+    if (!m.classList.contains('modal--maximizable') || m.__iqMaxInit) return;
+    const header = m.querySelector('.modal__header, .modal__drag'); if (!header) return;
+    m.__iqMaxInit = true;
+    const close = header.querySelector('.modal__close');
+    let tools = header.querySelector('.modal__header__tools');
+    if (!tools) { tools = document.createElement('div'); tools.className = 'modal__header__tools'; header.appendChild(tools); }
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'modal__maxbtn'; btn.setAttribute('aria-label', '最大化'); btn.textContent = '⤢';
+    tools.appendChild(btn);
+    if (close) tools.appendChild(close);   // ×をツール群の末尾へ移動（⤢ の右）
+    btn.addEventListener('click', () => {
+      const p = panelOf(m); if (!p) return;
+      const max = p.classList.toggle('is-max');
+      p.style.position = ''; p.style.left = ''; p.style.top = ''; p.style.margin = ''; p.style.width = '';  // 位置・幅リセット
+      btn.textContent = max ? '⤡' : '⤢';
+      btn.setAttribute('aria-label', max ? '元のサイズに戻す' : '最大化');
     });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.modal--maximizable').forEach(initMaximizable);
+    // 動的に追加される最大化可能モーダル（DataTable のダイアログ等）も拾う
+    new MutationObserver((muts) => {
+      muts.forEach((mu) => mu.addedNodes.forEach((n) => {
+        if (n.nodeType !== 1) return;
+        if (n.matches && n.matches('.modal--maximizable')) initMaximizable(n);
+        if (n.querySelectorAll) n.querySelectorAll('.modal--maximizable').forEach(initMaximizable);
+      }));
+    }).observe(document.body, { childList: true, subtree: true });
   });
 
   // ドラッグ
@@ -480,7 +502,7 @@ window.DataTable = (function () {
     const colByKey = Object.fromEntries(cols.map((c) => [c.key, c]));
     const rowId = cfg.rowId || ((r) => r.id);
     const unit = cfg.unit || '件';
-    const perPage = cfg.perPage || 20;
+    const perPageOptions = cfg.perPageOptions || [10, 20, 50, 100];
 
     // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
     const persisted = load(cfg.storageKey) || {};
@@ -489,13 +511,15 @@ window.DataTable = (function () {
     dataCols.forEach((c) => { if (!validOrder.includes(c.key)) validOrder.push(c.key); }); // 新列を末尾補完
     const st = {
       search: '', simpleSort: null, advSort: [], filters: {}, page: 1,
+      perPage: persisted.perPage || cfg.perPage || 20,
       density: persisted.density || 'normal',
       order: validOrder,
       hidden: (persisted.hidden || dataCols.filter((c) => c.hiddenDefault).map((c) => c.key)).filter((k) => colByKey[k]),
       widths: persisted.widths || {},
       pins: persisted.pins || [],
     };
-    function persist() { save(cfg.storageKey, { order: st.order, hidden: st.hidden, widths: st.widths, density: st.density, pins: st.pins }); }
+    function persist() { save(cfg.storageKey, { order: st.order, hidden: st.hidden, widths: st.widths, density: st.density, pins: st.pins, perPage: st.perPage }); }
+    if (!perPageOptions.includes(st.perPage)) { perPageOptions.push(st.perPage); perPageOptions.sort((a, b) => a - b); } // 現在値を必ず選択肢に
 
     function visibleDataCols() { return st.order.map((k) => colByKey[k]).filter((c) => c && !st.hidden.includes(c.key)); }
     function visibleCols() { return actionsCol ? visibleDataCols().concat([actionsCol]) : visibleDataCols(); }
@@ -554,6 +578,9 @@ window.DataTable = (function () {
         </div>
         <div class="tools">
           <span class="list-count" data-dt-count></span>
+          <label class="dt-perpage">表示
+            <select class="select" data-dt-perpage aria-label="1ページの表示件数">${perPageOptions.map((n) => `<option value="${n}">${n}</option>`).join('')}</select>
+            件</label>
           <span class="seg seg-density" role="group" aria-label="表示密度">
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
@@ -604,7 +631,7 @@ window.DataTable = (function () {
     }
 
     function renderPager(total) {
-      const pages = Math.max(1, Math.ceil(total / perPage));
+      const pages = Math.max(1, Math.ceil(total / st.perPage));
       if (st.page > pages) st.page = pages;
       if (pages <= 1) { pagerEl.hidden = true; return; }
       pagerEl.hidden = false;
@@ -645,12 +672,13 @@ window.DataTable = (function () {
 
     function render() {
       searchEl.value = st.search;
+      const ppEl = root.querySelector('[data-dt-perpage]'); if (ppEl) ppEl.value = String(st.perPage);
       root.querySelectorAll('[data-dt-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dtDensity === st.density)));
       tableEl.classList.toggle('table--compact', st.density === 'compact');
       const { pinned, filtered } = compute();
       renderHead();
-      const start = (st.page - 1) * perPage;
-      const pageRows = filtered.slice(start, start + perPage);
+      const start = (st.page - 1) * st.perPage;
+      const pageRows = filtered.slice(start, start + st.perPage);
       bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
       // 固定行：最後の1行に区切り線＋固定ヘッダー配下で段積み sticky（top を累積）
       const pinnedTrs = bodyEl.querySelectorAll('tr.is-pinned');
@@ -674,6 +702,7 @@ window.DataTable = (function () {
     function clearAll() { st.search = ''; st.simpleSort = null; st.advSort = []; st.filters = {}; st.page = 1; render(); }
     root.querySelector('[data-dt-clear]').addEventListener('click', clearAll);
     root.querySelectorAll('[data-dt-density]').forEach((b) => b.addEventListener('click', () => { st.density = b.dataset.dtDensity; persist(); render(); }));
+    { const pp = root.querySelector('[data-dt-perpage]'); if (pp) pp.addEventListener('change', () => { st.perPage = Number(pp.value); st.page = 1; persist(); render(); }); }
 
     headEl.addEventListener('click', (e) => {
       if (e.target.closest('.dt-resizer')) return;
@@ -731,7 +760,7 @@ window.DataTable = (function () {
 
     function dialog(title, bodyHtml, footerHtml, size) {
       const el = document.createElement('div');
-      el.className = 'modal modal--' + (size || 'md') + ' modal--draggable';
+      el.className = 'modal modal--' + (size || 'md') + ' modal--draggable modal--maximizable';
       el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
       el.innerHTML = `<div class="modal__backdrop" data-close></div><div class="modal__panel sectioned">
         <div class="modal__header"><h2>${esc(title)}</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>

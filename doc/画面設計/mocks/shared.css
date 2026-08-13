@@ -1052,6 +1052,9 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
  * ============================================================= */
 /* --- ツールバー拡張（左=filters / 右=tools） --- */
 .list-toolbar .tools .seg-density { margin-left: var(--space-1); }
+/* 1ページの表示件数セレクタ */
+.dt-perpage { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
+.dt-perpage .select { width: auto; }
 /* 横断検索＝短いプレースホルダ＋対象項目名は下に補足（hint）。ボタンは上端揃え。 */
 [data-dt-toolbar] .filters { align-items: flex-start; }
 .dt-search { display: flex; flex-direction: column; gap: 2px; }

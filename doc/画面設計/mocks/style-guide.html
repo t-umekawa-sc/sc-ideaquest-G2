@@ -401,10 +401,42 @@
       列幅調整・列の表示/非表示/並べ替え・CSVエクスポート・表示密度・行固定（ピン）</strong>を一括付与する共通部品
       （<code>DataTable.init(root, config)</code>）。<strong>列（columns）とデータ（data）を宣言するだけ</strong>で全機能が付く。
       正＝<code>デザイン標準.md §4.5 一覧の操作標準</code>／ライブ実例＝<code>SC-91</code>。</p>
-    <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定・「詳細ソート/詳細絞込/列設定/エクスポート」を上部で。</p>
+    <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定・「詳細ソート/詳細絞込/列設定/エクスポート」を上部で。<strong>表示件数セレクタ</strong>も右側に。</p>
     <div id="sgTable"></div>
   </div>
+
+  <div>
+    <h2>10. ダイアログ（モーダル）</h2>
+    <p class="muted text-sm">標準の入力モーダル（<code>.modal.sectioned</code>＝ヘッダー/本文/フッターの3部構成）。
+      <strong>ドラッグ移動</strong>（<code>.modal--draggable</code>＝ヘッダーを掴む）・<strong>最大化</strong>（<code>.modal--maximizable</code>＝ヘッダーの ⤢）・
+      <strong>Esc/バックドロップ/×で閉じる</strong>・背景スクロールロック・初期フォーカス・フォーカストラップは
+      <code>shared.js</code> が共通適用。各画面は <code>.show</code>/<code>hidden</code> をトグルするだけ。</p>
+    <div class="row" style="gap:var(--space-2)">
+      <button class="btn btn-primary" type="button" id="sgOpenDialog">サンプルダイアログを開く</button>
+      <button class="btn btn-outline" type="button" id="sgOpenDialogLg">大サイズ（.modal--lg）で開く</button>
+    </div>
+    <p class="hint">開いたら ⤢ で最大化・ヘッダーをドラッグで移動・Esc で閉じる を試せます。</p>
+  </div>
 </main>
+
+<!-- サンプルダイアログ（標準の入力モーダル・ドラッグ＋最大化。挙動は shared.js が共通適用） -->
+<div class="modal modal--md modal--draggable modal--maximizable" id="sgDialog" role="dialog" aria-modal="true" aria-labelledby="sgDlgTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header"><h2 id="sgDlgTitle">サンプルダイアログ</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>
+    <div class="modal__body">
+      <div class="field"><label for="sgDlgName">名称</label><input class="input" id="sgDlgName" placeholder="例: 新しい項目"></div>
+      <div class="field"><label for="sgDlgKind">種別</label>
+        <select class="select" id="sgDlgKind"><option>種別A</option><option>種別B</option><option>種別C</option></select></div>
+      <div class="field"><label for="sgDlgMemo">メモ</label><textarea class="textarea" id="sgDlgMemo" rows="3" placeholder="補足を入力"></textarea></div>
+      <p class="muted text-sm">※ 本文が長い場合はこの領域だけがスクロールし、フッターは下端に固定されます（最大化・小サイズでも確認できます）。</p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="sgDlgSave">保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- ページに1体だけ置くマスコット -->
 <div class="mascot" id="mascot"><img src="assets/mascot-hero.png" alt=""></div>
@@ -488,7 +520,7 @@
     ];
     const badge = (s) => { const [l, c] = ST[s] || ['—', 'badge-muted']; return `<span class="badge ${c}">${l}</span>`; };
     window.DataTable.init(document.getElementById('sgTable'), {
-      storageKey: 'styleguide-demo', data: DATA, rowId: (r) => r.id, unit: '件', perPage: 4, exportName: 'デモ一覧',
+      storageKey: 'styleguide-demo', data: DATA, rowId: (r) => r.id, unit: '件', perPage: 4, perPageOptions: [4, 8, 20], exportName: 'デモ一覧',
       searchPlaceholder: '検索…', searchFields: 'アイデア名・起票者・部署',
       columns: [
         { key: 'name', label: 'アイデア', locked: true, width: 220, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: (r) => `<strong>${r.name}</strong>` },
@@ -499,6 +531,17 @@
         { key: 'created', label: '作成日', width: 120, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
       ],
     });
+  })();
+
+  // --- 10. ダイアログ（モーダル）デモ。開閉は .show/hidden をトグルするだけ（ドラッグ/最大化/Esc は shared.js） ---
+  (function () {
+    const dlg = document.getElementById('sgDialog');
+    function open(size) { dlg.classList.remove('modal--sm', 'modal--md', 'modal--lg'); dlg.classList.add('modal--' + (size || 'md')); dlg.hidden = false; requestAnimationFrame(() => dlg.classList.add('show')); }
+    function close() { dlg.classList.remove('show'); setTimeout(() => { dlg.hidden = true; }, 200); }
+    dlg.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) close(); });
+    document.getElementById('sgOpenDialog').addEventListener('click', () => open('md'));
+    document.getElementById('sgOpenDialogLg').addEventListener('click', () => open('lg'));
+    document.getElementById('sgDlgSave').addEventListener('click', () => { alert('保存しました（デモ）'); close(); });
   })();
 </script>
 
