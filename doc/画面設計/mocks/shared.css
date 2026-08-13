@@ -1132,9 +1132,9 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .dt-chip--clear { background: transparent; border-color: var(--color-border); color: var(--color-text-muted); padding-left: 10px; cursor: pointer; }
 .dt-chip--clear:hover { background: var(--color-surface-alt); color: var(--color-text); }
 
-/* --- スクロールコンテナ＋固定ヘッダー --- */
-.table-wrap.dt-scroll { max-height: var(--dt-max-h, 62vh); overflow: auto; }
-.dt-scroll .table thead th { position: sticky; top: 0; z-index: 3; }
+/* --- 横スクロールのみのコンテナ（縦は制限しない＝テーブルは全行を縦に表示しきり、
+   長い時はページ側がスクロールする）。max-height を課さないので内側の縦スクロールは出ない。 --- */
+.table-wrap.dt-scroll { overflow-x: auto; overflow-y: visible; }
 .dt-scroll .table thead th.col-actions { z-index: 4; }
 
 /* --- 列幅手動調整（table-layout:fixed＋見出し右端ハンドル） --- */
