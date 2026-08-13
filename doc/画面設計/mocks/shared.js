@@ -544,7 +544,10 @@ window.DataTable = (function () {
     root.innerHTML = `
       <div class="list-toolbar" data-dt-toolbar>
         <div class="filters">
-          <input class="input" type="search" data-dt-search placeholder="${esc(cfg.searchPlaceholder || '検索')}">
+          <div class="dt-search">
+            <input class="input" type="search" data-dt-search placeholder="${esc(cfg.searchPlaceholder || '検索…')}">
+            ${cfg.searchFields ? `<span class="dt-search__hint">${esc(cfg.searchFields)} を検索</span>` : ''}
+          </div>
           <button class="btn btn-outline btn-sm" type="button" data-dt-filter>詳細絞込</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-sort>詳細ソート</button>
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
@@ -648,9 +651,14 @@ window.DataTable = (function () {
       renderHead();
       const start = (st.page - 1) * perPage;
       const pageRows = filtered.slice(start, start + perPage);
-      bodyEl.innerHTML = pinned.map((r, i) => rowHtml(r, true).replace('<tr ', i === pinned.length - 1 ? '<tr class="dt-pin-sep-mark" ' : '<tr ')).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
-      const lastPin = bodyEl.querySelector('.dt-pin-sep-mark');
-      if (lastPin) { lastPin.classList.remove('dt-pin-sep-mark'); lastPin.classList.add('dt-pin-sep'); }
+      bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
+      // 固定行：最後の1行に区切り線＋固定ヘッダー配下で段積み sticky（top を累積）
+      const pinnedTrs = bodyEl.querySelectorAll('tr.is-pinned');
+      if (pinnedTrs.length) {
+        pinnedTrs[pinnedTrs.length - 1].classList.add('dt-pin-sep');
+        let top = headEl.offsetHeight;
+        pinnedTrs.forEach((tr) => { tr.style.setProperty('--dt-row-top', top + 'px'); top += tr.offsetHeight; });
+      }
       const totalNonPin = filtered.length;
       countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
       emptyEl.hidden = (totalNonPin + pinned.length) !== 0;
@@ -785,7 +793,7 @@ window.DataTable = (function () {
       const rowHtmlF = (c) => {
         const cur = st.filters[c.key];
         if (c.filter.type === 'text') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><input class="input" data-f="text" value="${cur ? esc(cur.q) : ''}" placeholder="含む文字"></div>`;
-        if (c.filter.type === 'enum') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="stack">${c.filter.options.map((o) => `<label class="checkbox"><input type="checkbox" data-f="enum" value="${esc(o[0])}" ${cur && cur.values.includes(o[0]) ? 'checked' : ''}> ${esc(o[1])}</label>`).join('')}</div></div>`;
+        if (c.filter.type === 'enum') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="filter-checks">${c.filter.options.map((o) => `<label class="checkbox"><input type="checkbox" data-f="enum" value="${esc(o[0])}" ${cur && cur.values.includes(o[0]) ? 'checked' : ''}> ${esc(o[1])}</label>`).join('')}</div></div>`;
         if (c.filter.type === 'number') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="filter-range"><input class="input" type="number" data-f="min" value="${cur && cur.min != null ? cur.min : ''}" placeholder="最小"><span>〜</span><input class="input" type="number" data-f="max" value="${cur && cur.max != null ? cur.max : ''}" placeholder="最大"></div></div>`;
         if (c.filter.type === 'date') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="filter-range"><input class="input" type="date" data-f="from" value="${cur ? esc(cur.from || '') : ''}"><span>〜</span><input class="input" type="date" data-f="to" value="${cur ? esc(cur.to || '') : ''}"></div></div>`;
         return '';

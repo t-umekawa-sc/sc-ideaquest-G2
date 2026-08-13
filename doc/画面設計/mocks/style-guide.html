@@ -489,7 +489,7 @@
     const badge = (s) => { const [l, c] = ST[s] || ['—', 'badge-muted']; return `<span class="badge ${c}">${l}</span>`; };
     window.DataTable.init(document.getElementById('sgTable'), {
       storageKey: 'styleguide-demo', data: DATA, rowId: (r) => r.id, unit: '件', perPage: 4, exportName: 'デモ一覧',
-      searchPlaceholder: 'アイデア名・起票者・部署で検索',
+      searchPlaceholder: '検索…', searchFields: 'アイデア名・起票者・部署',
       columns: [
         { key: 'name', label: 'アイデア', locked: true, width: 220, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: (r) => `<strong>${r.name}</strong>` },
         { key: 'owner', label: '起票者', width: 130, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.owner, searchVal: (r) => r.owner, render: (r) => r.owner },
