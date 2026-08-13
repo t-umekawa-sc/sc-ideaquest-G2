@@ -148,6 +148,14 @@
     searchFields: '会社名・会社コード・DB識別子',
     exportName: '会社一覧',
     onRowClick: (r) => { location.href = 'SC-92_会社詳細.html?company=' + r.id; },
+    // カード表示（🔲カード/☰リスト の切替が付く）。会社アイコン＋名称を活かすため card(r)＝本文HTMLで組む。
+    // 操作（管理する →）は actions:true 列があるためカード右上に自動表示・ピンは左上フロート（DataTable 標準）。
+    card: (c) => {
+      const icon = c.icon ? `<img class="quest-icon__img" src="${c.icon}" alt="">` : `<span class="quest-icon__char">${c.name.slice(0,1)}</span>`;
+      return `<div class="dt-card__title co"><span class="quest-icon sm" style="--accent:${c.color}">${icon}</span><span>${c.name}</span></div>`
+        + `<div class="dt-card__meta">${stateBadge(c.state)}<span class="badge badge-muted">${c.code}</span><span class="db-id">${c.db}</span></div>`
+        + `<div class="dt-card__stats"><span>👥 ${c.accounts}</span><span>🗂️ ${c.groups}</span><span>作成 ${c.created}</span></div>`;
+    },
     columns: [
       { key: 'name', label: '会社名', locked: true, width: 240, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: coCell },
       { key: 'code', label: '会社コード', width: 130, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.code, searchVal: (r) => r.code, render: (r) => r.code },
