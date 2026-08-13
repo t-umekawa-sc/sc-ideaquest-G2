@@ -1203,13 +1203,21 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-card--link:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
 .dt-card--link:active { transform: translateY(1px); }
 .dt-card.is-pinned { border-color: var(--color-primary-border); background: var(--color-primary-soft); }
-/* 右上ツール（行固定＋⋯アクション）。z-index は付けない＝スタッキングコンテキストを作らず、
+/* 右上ツール（⋯アクション）。z-index は付けない＝スタッキングコンテキストを作らず、
    開いた RowMenu（position:fixed・z-index:1000）が他カードの上に出るようにする。 */
 .dt-card__tools { position: absolute; top: var(--space-2); right: var(--space-2); display: inline-flex; align-items: center; gap: 4px; }
-.dt-card__body > :first-child { padding-right: 30px; }               /* 右上ツール（ピン）を避ける余白 */
-.dt-card--has-actions .dt-card__body > :first-child { padding-right: 66px; }  /* ピン＋⋯アクションメニュー分 */
+.dt-card--has-actions .dt-card__body > :first-child { padding-right: 30px; }  /* 右上の⋯アクション分（ピンは左上フロートへ移動） */
 .dt-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .dt-card__title { font-weight: 700; }
+/* 行固定ピンは標準カード（.dt-card）・専用カード（cardRaw）とも共通で「左上角へ半分はみ出すフローティング小円」。
+   四隅に情報が詰まるカードでも本体レイアウトに干渉しにくい。はみ出しが切れないよう .dt-cards の左上に余白。 */
+.dt-cards:has(.dt-pin-float) { padding-top: 10px; padding-left: 10px; }
+.dt-cardraw { position: relative; }
+.dt-pin-float { position: absolute; top: -8px; left: -8px; z-index: 3; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); box-shadow: var(--shadow); font-size: var(--text-sm); }
+.dt-pin-float[aria-pressed="false"] { opacity: .9; }        /* 非固定＝やや控えめ（背景はほぼ不透明のまま・クリックで固定） */
+.dt-pin-float:hover { opacity: 1; border-color: var(--color-primary); background: var(--color-primary-soft); }
+.dt-pin-float[aria-pressed="true"] { opacity: 1; background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft), var(--shadow); }  /* 固定＝青塗り＋光輪でひと目で分かる */
+.dt-cardraw.is-pinned > :first-child { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }  /* 固定カード＝太い青リング */
 .dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 /* 表示密度=コンパクト（カード）＝間隔と余白を詰める。密度トグルはテーブル/カード共通。 */

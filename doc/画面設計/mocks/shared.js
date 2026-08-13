@@ -680,11 +680,22 @@ window.DataTable = (function () {
       const id = esc(String(rowId(r)));
       const clickable = typeof cfg.onRowClick === 'function';
       const cls = ['dt-card', pinned ? 'is-pinned' : '', clickable ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
-      const pin = pinsEnabled ? `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>` : '';
+      // ピンは左上へ半分はみ出すフローティング（.dt-pin-float）／⋯アクションは右上ツール（.dt-card__tools）に分離。
+      const pin = pinsEnabled ? `<button class="dt-pin-toggle dt-pin-float" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>` : '';
       const acts = actionsCol && actionsCol.render ? actionsCol.render(r) : '';
-      const tools = (pin || acts) ? `<div class="dt-card__tools">${pin}${acts}</div>` : '';
+      const tools = acts ? `<div class="dt-card__tools">${acts}</div>` : '';
       const a11y = ` role="listitem"${clickable ? ' tabindex="0"' : ''}`; // クリック可時はキーボード操作（Enter/Space）
-      return `<div class="${cls}" data-dt-row="${id}"${a11y}>${tools}<div class="dt-card__body">${buildCardBody(r)}</div></div>`;
+      return `<div class="${cls}" data-dt-row="${id}"${a11y}>${pin}${tools}<div class="dt-card__body">${buildCardBody(r)}</div></div>`;
+    }
+
+    // 専用カード（cardRaw）＝画面が本体HTMLを完全制御する。pins 有効時のみ本体は書き換えず、
+    // 外側に .dt-cardraw ラッパ＋フローティングのピンボタンだけを重ねる（ピンは本体<a>の外＝クリックで遷移しない）。
+    function rawCardHtml(r, pinned) {
+      const raw = cfg.cardRaw(r);
+      if (!pinsEnabled) return raw;
+      const id = esc(String(rowId(r)));
+      const pin = `<button class="dt-pin-toggle dt-pin-float" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
+      return `<div class="dt-cardraw${pinned ? ' is-pinned' : ''}">${raw}${pin}</div>`;
     }
 
     function renderPager(total) {
@@ -747,8 +758,9 @@ window.DataTable = (function () {
       if (useCard) {
         // カードビュー：ソート/絞込/ページング/ピンは共通パイプラインの結果をそのまま使う。
         // cardRaw があれば画面が返す完全HTMLをそのまま並べる（.dt-card ラッパを被せない＝専用カードモード）。
+        // pins 有効時のみ、本体HTMLは書き換えず「外側」に .dt-cardraw ラッパ＋フローティングのピンボタンだけを重ねる。
         cardsEl.innerHTML = cfg.cardRaw
-          ? (pinned.map((r) => cfg.cardRaw(r)).join('') + pageRows.map((r) => cfg.cardRaw(r)).join(''))
+          ? (pinned.map((r) => rawCardHtml(r, true)).join('') + pageRows.map((r) => rawCardHtml(r, false)).join(''))
           : (pinned.map((r) => cardHtml(r, true)).join('') + pageRows.map((r) => cardHtml(r, false)).join(''));
         cardsEl.hidden = isEmpty; wrapEl.hidden = true;
       } else {

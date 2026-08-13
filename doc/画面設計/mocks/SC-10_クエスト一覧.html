@@ -69,7 +69,8 @@
   <p class="muted text-sm" style="margin-top:calc(-1*var(--space-3));margin-bottom:var(--space-4)">「所属グループ内で作られ、かつ自分がパーティー参加中」のクエストを表示します。</p>
 
   <!-- 一覧操作標準（DataTable）。カードの見た目は cardRaw で専用クエストカードを維持しつつ、
-       検索/絞込（状態・カテゴリー・グループ）/ソート/表示切替/CSV 等は DataTable 標準。行固定は無効(pins:false)。 -->
+       検索/絞込（状態・カテゴリー・グループ）/ソート/表示切替/CSV/行固定（ピン）等は DataTable 標準。
+       専用カードでも本体HTMLは書き換えず、外側にフローティングのピンを重ねる。 -->
   <div id="questTable"></div>
 
   <p class="muted text-xs" style="margin-top:var(--space-6)">※ 「＋ クエストを作成」は本番で <strong>SC-11 作成モーダル</strong>（Parallel/Intercept Routes）を開く。カード/行クリックで <strong>SC-12 クエスト詳細</strong>へ（<strong>自分の下書きは SC-11 編集モーダル</strong>）。<strong>下書き中のクエストも本人には本一覧に表示</strong>（下書きバッジ・グレー）＝一覧から作成→戻っても消えない。ダッシュボード（SC-01）にも集約。</p>
@@ -121,7 +122,7 @@
     perPage: 12,
     perPageOptions: [12, 24, 48],
     defaultView: 'card',
-    pins: false,                                   // クエスト一覧は行固定なし
+    maxPins: 5,                                    // よく見るクエストを先頭に固定（list/card 共通・localStorage 永続）
     searchFields: '件名・テーマ・カテゴリー',
     exportName: 'クエスト一覧',
     emptyText: '該当するクエストがありません。条件を変えてお試しください。',
