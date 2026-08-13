@@ -25,7 +25,7 @@ test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
   const stamp = Date.now().toString().slice(-8);
   const code = `E2E-${stamp}`;
   const cname = `E2E詳細_${stamp}`; // run ごとに一意＝リンクの strict 一致を担保
-  await page.getByRole("button", { name: "＋ 会社作成" }).click(); // モーダルで会社作成
+  await page.getByRole("button", { name: "＋ 会社を作成" }).click(); // モーダルで会社作成（SC-91 モック準拠の文言）
   await page.locator("#c_name").fill(cname);
   await page.locator("#c_code").fill(code);
   await page.locator("#c_db").fill(`ideaquest_e2e_${stamp}`);

@@ -1018,6 +1018,27 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .row-locked { font-size: var(--text-xs); color: var(--color-text-muted); }
 .table tr.is-suspended td { color: var(--color-text-muted); }
 .role-note { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-4); }
+/* 画面タイトル（業務層・ピクセル見出し）とセクション見出し（SC-91/92） */
+.page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: var(--space-2) 0 var(--space-3); flex-wrap: wrap; }
+.section-head h2 { font-size: var(--text-lg); margin: 0; }
+/* 前画面へ戻るリンク（画面上部） */
+.backlink { display: inline-block; margin-bottom: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+.backlink:hover { color: var(--color-text); }
+/* 会社名セル（アイコン＋名称）と識別子の等幅表示（会社コード/DB識別子） */
+.co { display: flex; align-items: center; gap: var(--space-3); }
+.db-id { font-family: ui-monospace, monospace; }
+.table .db-id { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 会社状態バッジ（有効/準備中/停止） */
+.st-active { background: var(--color-agree-bg); color: var(--color-success); }
+.st-provisioning { background: var(--color-surface-alt); color: var(--color-text-muted); }
+.st-suspended { background: var(--color-disagree-bg); color: var(--color-danger); }
+/* 会社アイコン設定フィールド（作成/編集モーダル） */
+.icon-field { display: flex; align-items: center; gap: var(--space-4); }
+.icon-actions { display: flex; flex-direction: column; gap: 6px; }
+/* プロビジョニング注記（会社作成モーダル） */
+.provision-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+.provision-note code { font-family: ui-monospace, monospace; }
 
 /* =============================================================
  * 10. レスポンシブ

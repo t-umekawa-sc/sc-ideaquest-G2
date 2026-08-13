@@ -6,33 +6,16 @@
 <title>SC-91 システム管理（会社一覧） — ideaquest</title>
 <link rel="stylesheet" href="shared.css">
 <style>
-  /* SC-91 固有スタイル（共通化する見た目は shared.css へ昇格する）
+  /* SC-91 固有スタイル（共通の見た目は shared.css へ昇格済み＝.page-title/.section-head/
+     .backlink/.co/.db-id/.st-*/.icon-field/.provision-note）。ここは当画面ローカルのみ。
      業務層の運用画面: 会社（テナント）の一覧・作成のみ。会社ごとの設定/アカウントは
      SC-92（会社詳細）で行う（どの会社をメンテ中か明確にするため画面を分離）。 */
-  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
-  .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
-
-  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: var(--space-2) 0 var(--space-3); flex-wrap: wrap; }
-  .section-head h2 { font-size: var(--text-lg); margin: 0; }
-
-  .table .db-id { font-family: ui-monospace, monospace; font-size: var(--text-xs); color: var(--color-text-muted); }
   .table tbody tr { cursor: pointer; }
   .table tbody tr:hover td { background: var(--color-primary-soft); }
-  /* 会社名セル（識別しやすいよう会社アイコン〔画像 or 頭文字タイル・会社カラー〕＋名称） */
-  .co { display: flex; align-items: center; gap: var(--space-3); }
-  /* 会社アイコン・カラー設定（作成モーダル） */
-  .icon-field { display: flex; align-items: center; gap: var(--space-4); }
-  .icon-actions { display: flex; flex-direction: column; gap: 6px; }
-
-  .st-active { background: var(--color-agree-bg); color: var(--color-success); }
-  .st-provisioning { background: var(--color-surface-alt); color: var(--color-text-muted); }
-  .st-suspended { background: var(--color-disagree-bg); color: var(--color-danger); }
 
   .form-row { margin-bottom: var(--space-4); }
   .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
   .req::after { content: " *"; color: var(--color-danger); }
-  .provision-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
-  .provision-note code { font-family: ui-monospace, monospace; }
 </style>
 </head>
 <body>

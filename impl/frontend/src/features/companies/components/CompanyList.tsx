@@ -2,11 +2,12 @@
 
 // SC-91 システム管理（会社一覧）。system_admin 専用（ページ側でガード）。
 // 一覧取得＋会社作成（B.1）。業務層クリーン＝表示/UX のみ、判定はサーバー（403/409/422 を文言化）。
-import { useCallback, useEffect, useState } from "react";
+// レイアウト/クラスは正＝doc/画面設計/mocks/SC-91_システム管理.html（DoD＝モック一致）。
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Button, Field, Modal, ModalBody, ModalFooter, Pager } from "@/components/ui";
+import { Button, Field, Modal, ModalBody, ModalFooter, Pager, Swatches } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
 import { createCompany, listCompanies } from "../api";
@@ -30,6 +31,7 @@ function createErrorMessage(err: unknown): string {
 }
 
 const PER_PAGE = 20; // 一覧の1ページ件数（backend 既定と一致・最大 100）
+const DEFAULT_COLOR = "#2563EB"; // 会社カラー既定（swatches の先頭＝ブルー）
 
 export function CompanyList() {
   const router = useRouter();
@@ -48,6 +50,10 @@ export function CompanyList() {
   const [name, setName] = useState("");
   const [companyCode, setCompanyCode] = useState("");
   const [dbIdentifier, setDbIdentifier] = useState("");
+  const [color, setColor] = useState(DEFAULT_COLOR);
+  // アイコン画像は MinIO 基盤前提（別スライス）＝ここではローカルプレビューのみ（送信しない仮実装）。
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -86,16 +92,44 @@ export function CompanyList() {
     setPage(1);
   }
 
+  function resetForm() {
+    setName("");
+    setCompanyCode("");
+    setDbIdentifier("");
+    setColor(DEFAULT_COLOR);
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconPreview(null);
+    if (iconInputRef.current) iconInputRef.current.value = "";
+    setFormError(null);
+  }
+  function openForm() {
+    resetForm();
+    setShowForm(true);
+  }
+  function closeForm() {
+    setShowForm(false);
+    resetForm();
+  }
+  function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconPreview(URL.createObjectURL(file));
+  }
+  function onClearIcon() {
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconPreview(null);
+    if (iconInputRef.current) iconInputRef.current.value = "";
+  }
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     setPending(true);
     try {
-      await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier });
-      setName("");
-      setCompanyCode("");
-      setDbIdentifier("");
-      setShowForm(false);
+      // アイコン画像は未接続（MinIO 待ち）＝color のみ送信。
+      await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier, color });
+      closeForm();
       await reload();
     } catch (err) {
       setFormError(createErrorMessage(err));
@@ -106,47 +140,96 @@ export function CompanyList() {
 
   return (
     <section aria-label="会社一覧">
-      <div className="admin-toolbar">
-        <h1>システム管理 — 会社一覧</h1>
-        <Button type="button" variant="primary" onClick={() => setShowForm(true)}>
-          ＋ 会社作成
+      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <h1 className="page-title">システム管理（運営）</h1>
+      <p className="admin-sub">
+        会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント/所属の管理は、会社を選ぶと会社詳細（SC-92）で行います</strong>。
+        <strong>システム管理者のみ</strong>。
+      </p>
+
+      <div className="section-head">
+        <h2>会社（テナント）</h2>
+        <Button type="button" variant="primary" onClick={openForm}>
+          ＋ 会社を作成
         </Button>
       </div>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="会社（テナント）を作成" size="md">
+      <Modal open={showForm} onClose={closeForm} title="会社（テナント）を作成" size="md">
         <form onSubmit={onCreate} noValidate>
           <ModalBody>
             {formError && <div className="form-error" role="alert">{formError}</div>}
             <Field id="c_name" label="会社名" required>
               <input id="c_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
             </Field>
-            <Field id="c_code" label="会社コード" required>
+            <Field
+              id="c_code"
+              label="会社コード"
+              required
+              hint="対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・全社で一意（大文字に正規化）。作成後は変更不可。"
+            >
               <input
                 id="c_code"
-                className="input"
-                placeholder="例: ACME-01"
+                className="input db-id"
+                placeholder="例: ACROSS"
+                maxLength={20}
+                style={{ textTransform: "uppercase" }}
                 value={companyCode}
                 onChange={(e) => setCompanyCode(e.target.value)}
                 required
               />
             </Field>
-            <Field id="c_db" label="DB 識別子" required>
+            <Field id="c_db" label="DB 識別子" required hint="会社DBの参照キー。接続情報の実体は .env。">
               <input
                 id="c_db"
                 className="input"
-                placeholder="例: ideaquest_company_acme"
+                placeholder="例: db_across"
                 value={dbIdentifier}
                 onChange={(e) => setDbIdentifier(e.target.value)}
                 required
               />
             </Field>
+
+            <Field id="c_icon" label="会社アバター / アイコン">
+              <div className="icon-field">
+                <span className="quest-icon lg" style={{ ["--accent" as string]: color } as React.CSSProperties}>
+                  {iconPreview ? (
+                    // 送信しないローカルプレビュー（objectURL）＝next/image を通さず素の img で描画。
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="quest-icon__img" src={iconPreview} alt="" />
+                  ) : (
+                    <span className="quest-icon__char">{name.trim().charAt(0) || "会"}</span>
+                  )}
+                </span>
+                <div className="icon-actions">
+                  <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>
+                    画像を選ぶ
+                  </Button>
+                  {iconPreview && (
+                    <Button type="button" variant="outline" onClick={onClearIcon}>
+                      クリア
+                    </Button>
+                  )}
+                  <input ref={iconInputRef} id="c_icon" type="file" accept="image/*" hidden onChange={onPickIcon} />
+                  <span className="hint">未設定時は「頭文字＋会社カラー」で表示（画像アップロードは今後対応）</span>
+                </div>
+              </div>
+            </Field>
+
+            <Field id="c_color" label="会社カラー">
+              <Swatches value={color} onChange={setColor} ariaLabel="会社カラー" />
+            </Field>
+
+            <p className="provision-note">
+              作成すると管理DBに会社を登録します（状態=準備中）。<strong>会社DBの実体は別途プロビジョニング</strong>
+              （MVP: compose にサービス追記 → <code>up</code>）が必要です。DB接続確認後に「有効」化。
+            </p>
           </ModalBody>
           <ModalFooter>
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <Button type="button" variant="outline" onClick={closeForm}>
               キャンセル
             </Button>
             <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? "作成中…" : "作成する（準備中で作成）"}
+              {pending ? "作成中…" : "作成する"}
             </Button>
           </ModalFooter>
         </form>
@@ -205,18 +288,18 @@ export function CompanyList() {
                 {companies.map((c) => (
                   <tr key={c.company_id} className="row-link" onClick={() => router.push(`/admin/companies/${c.company_id}`)}>
                     <td>
-                      <span className="poster">
+                      <span className="co">
                         <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_path} size="sm" />
-                        <span className="name">{c.name}</span>
+                        <strong>{c.name}</strong>
                       </span>
                     </td>
-                    <td className="admin-code">{c.company_code}</td>
-                    <td className="admin-code">{c.db_identifier}</td>
+                    <td className="db-id">{c.company_code}</td>
+                    <td className="db-id">{c.db_identifier}</td>
                     <td>
                       {c.status === "active" ? (
-                        <span className="badge badge-success">有効</span>
+                        <span className="badge st-active">有効</span>
                       ) : (
-                        <span className="badge badge-muted">準備中</span>
+                        <span className="badge st-provisioning">準備中</span>
                       )}
                     </td>
                     <td className="num">{c.account_count}</td>
@@ -240,6 +323,12 @@ export function CompanyList() {
           <Pager page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
         </>
       )}
+
+      <p className="role-note">
+        ※ 会社DBは物理分離（別コンテナ）。接続情報の実体は <code>.env</code>・ここでは参照キー（DB識別子）のみ表示。
+        作成後、<strong>会社DBは別途プロビジョニング</strong>（MVP: compose 手編集 → <code>up</code> → 管理DBに登録）で有効化。
+        会社を選ぶと<strong>会社詳細（SC-92）</strong>で設定・アカウント/所属を管理。
+      </p>
     </section>
   );
 }

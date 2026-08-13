@@ -7,3 +7,4 @@ export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { Pager } from "./Pager";
 export { RowMenu } from "./RowMenu";
 export type { RowMenuItem } from "./RowMenu";
+export { Swatches, SWATCH_PRESETS } from "./Swatches";

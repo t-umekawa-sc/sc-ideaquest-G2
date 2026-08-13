@@ -18,7 +18,9 @@ async function login(page: Page, c: { company: string; loginId: string; password
 test("B-TC-110 system admin sees company list", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/companies");
-  await expect(page.getByRole("heading", { name: /会社一覧/ })).toBeVisible();
+  // 見出しはモック準拠＝page-title「システム管理（運営）」＋ section-head「会社（テナント）」。
+  await expect(page.getByRole("heading", { name: "システム管理（運営）" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "会社（テナント）" })).toBeVisible();
   await expect(page.getByText("ACME-01")).toBeVisible();
 });
 
@@ -27,7 +29,7 @@ test("B-TC-111 create company appears in list", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/companies");
   const code = `E2E-${Date.now().toString().slice(-8)}`;
-  await page.getByRole("button", { name: "＋ 会社作成" }).click();
+  await page.getByRole("button", { name: "＋ 会社を作成" }).click();
   await page.locator("#c_name").fill("E2E テスト社");
   await page.locator("#c_code").fill(code);
   await page.locator("#c_db").fill(`ideaquest_e2e_${Date.now().toString().slice(-8)}`);
