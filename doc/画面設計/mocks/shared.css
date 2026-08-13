@@ -1103,6 +1103,14 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 /* 1ページの表示件数セレクタ */
 .dt-perpage { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
 .dt-perpage .select { width: auto; }
+/* 絞込/ソートを指定して filters 側が増減しても、tools（密度/エクスポート/表示切替）が
+   次の行へ折り返さないよう、DataTable のツールバーを 2 カラムグリッドにする。
+   左=filters（可変・カラム内で折り返す）／右=tools（右端に固定＝位置が動かない）。
+   汎用 .list-toolbar には影響させない（[data-dt-toolbar] 限定）。 */
+[data-dt-toolbar] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+[data-dt-toolbar] .filters { min-width: 0; }
+[data-dt-toolbar] .tools { justify-content: flex-end; }
+[data-dt-toolbar] .dt-chips { grid-column: 1 / -1; }
 /* 横断検索＝短いプレースホルダ＋対象項目名は下に補足（hint）。ボタンは上端揃え。 */
 [data-dt-toolbar] .filters { align-items: flex-start; }
 .dt-search { display: flex; flex-direction: column; gap: 2px; }
@@ -1261,6 +1269,8 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 @media (max-width: 768px) {
   .sort-builder { flex-direction: column; }
   .list-toolbar .tools { width: 100%; justify-content: space-between; }
+  /* モバイルは縦積み（filters の上に tools）。1 カラムグリッドへ。 */
+  [data-dt-toolbar] { grid-template-columns: 1fr; }
 }
 
 /* =============================================================
