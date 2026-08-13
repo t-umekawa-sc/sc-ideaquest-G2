@@ -503,6 +503,8 @@ window.DataTable = (function () {
     const rowId = cfg.rowId || ((r) => r.id);
     const unit = cfg.unit || '件';
     const perPageOptions = cfg.perPageOptions || [10, 20, 50, 100];
+    // cfg.card(r)=カード1枚の中身HTMLを返す関数。与えると「テーブル/カード」表示切替が有効になる（未指定＝従来どおりテーブルのみ）。
+    const hasCard = typeof cfg.card === 'function';
 
     // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
     const persisted = load(cfg.storageKey) || {};
@@ -517,8 +519,9 @@ window.DataTable = (function () {
       hidden: (persisted.hidden || dataCols.filter((c) => c.hiddenDefault).map((c) => c.key)).filter((k) => colByKey[k]),
       widths: persisted.widths || {},
       pins: persisted.pins || [],
+      view: (hasCard && (persisted.view || cfg.defaultView)) || 'list', // 'list' | 'card'（card はカード指定時のみ）
     };
-    function persist() { save(cfg.storageKey, { order: st.order, hidden: st.hidden, widths: st.widths, density: st.density, pins: st.pins, perPage: st.perPage }); }
+    function persist() { save(cfg.storageKey, { order: st.order, hidden: st.hidden, widths: st.widths, density: st.density, pins: st.pins, perPage: st.perPage, view: st.view }); }
     if (!perPageOptions.includes(st.perPage)) { perPageOptions.push(st.perPage); perPageOptions.sort((a, b) => a - b); } // 現在値を必ず選択肢に
 
     function visibleDataCols() { return st.order.map((k) => colByKey[k]).filter((c) => c && !st.hidden.includes(c.key)); }
@@ -577,11 +580,15 @@ window.DataTable = (function () {
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
         </div>
         <div class="tools">
-          <span class="seg seg-density" role="group" aria-label="表示密度">
+          ${hasCard ? `<div class="viewtoggle" role="group" aria-label="表示切替">
+            <button type="button" data-dt-view="card">🔲 カード</button>
+            <button type="button" data-dt-view="list">☰ リスト</button>
+          </div>` : ''}
+          <span class="seg seg-density" role="group" aria-label="表示密度" data-dt-table-only>
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
           </span>
-          <button class="btn btn-outline btn-sm" type="button" data-dt-cols>列設定</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
         </div>
         <div class="dt-chips" data-dt-chips></div>
@@ -589,6 +596,7 @@ window.DataTable = (function () {
       <div class="table-wrap dt-scroll" data-dt-wrap>
         <table class="table dt-fixed"><thead data-dt-head></thead><tbody data-dt-body></tbody></table>
       </div>
+      ${hasCard ? '<div class="dt-cards" data-dt-cards hidden></div>' : ''}
       <div class="list-empty" data-dt-empty hidden>該当するデータがありません。</div>
       <div class="dt-footer" data-dt-footer>
         <span class="list-count" data-dt-count></span>
@@ -600,7 +608,8 @@ window.DataTable = (function () {
     const $ = (s) => root.querySelector(s);
     const searchEl = $('[data-dt-search]'), headEl = $('[data-dt-head]'), bodyEl = $('[data-dt-body]'),
       countEl = $('[data-dt-count]'), chipsEl = $('[data-dt-chips]'), pagerEl = $('[data-dt-pager]'),
-      emptyEl = $('[data-dt-empty]'), wrapEl = $('[data-dt-wrap]'), tableEl = wrapEl.querySelector('table');
+      emptyEl = $('[data-dt-empty]'), wrapEl = $('[data-dt-wrap]'), tableEl = wrapEl.querySelector('table'),
+      cardsEl = $('[data-dt-cards]');
 
     function renderHead() {
       const vc = visibleCols();
@@ -631,6 +640,14 @@ window.DataTable = (function () {
         return `<td class="${cls}">${inner}</td>`;
       }).join('');
       return `<tr data-dt-row="${id}"${pinned ? ' class="is-pinned"' : ''}>${tds}</tr>`;
+    }
+
+    // カード1枚（cfg.card(r) の中身に、行固定トグルと（onRowClick 時の）クリック領域を被せる）。
+    function cardHtml(r, pinned) {
+      const id = esc(String(rowId(r)));
+      const cls = ['dt-card', pinned ? 'is-pinned' : '', cfg.onRowClick ? 'dt-card--link' : ''].filter(Boolean).join(' ');
+      const pin = `<button class="dt-pin-toggle dt-card__pin" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
+      return `<div class="${cls}" data-dt-row="${id}">${pin}${cfg.card(r)}</div>`;
     }
 
     function renderPager(total) {
@@ -687,16 +704,30 @@ window.DataTable = (function () {
       st.page = Math.min(Math.max(1, st.page), pages);
       const start = (st.page - 1) * st.perPage;
       const pageRows = filtered.slice(start, start + st.perPage);
-      bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
-      // 固定行：最後の1行に区切り線＋固定ヘッダー配下で段積み sticky（top を累積）
-      const pinnedTrs = bodyEl.querySelectorAll('tr.is-pinned');
-      if (pinnedTrs.length) {
-        pinnedTrs[pinnedTrs.length - 1].classList.add('dt-pin-sep');
-        let top = headEl.offsetHeight;
-        pinnedTrs.forEach((tr) => { tr.style.setProperty('--dt-row-top', top + 'px'); top += tr.offsetHeight; });
+      const useCard = hasCard && st.view === 'card';
+      const isEmpty = (totalNonPin + pinned.length) === 0;
+      if (useCard) {
+        // カードビュー：ソート/絞込/ページング/ピンは共通パイプラインの結果をそのまま使う。
+        cardsEl.innerHTML = pinned.map((r) => cardHtml(r, true)).join('') + pageRows.map((r) => cardHtml(r, false)).join('');
+        cardsEl.hidden = isEmpty; wrapEl.hidden = true;
+      } else {
+        bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
+        // 固定行：最後の1行に区切り線＋固定ヘッダー配下で段積み sticky（top を累積）
+        const pinnedTrs = bodyEl.querySelectorAll('tr.is-pinned');
+        if (pinnedTrs.length) {
+          pinnedTrs[pinnedTrs.length - 1].classList.add('dt-pin-sep');
+          let top = headEl.offsetHeight;
+          pinnedTrs.forEach((tr) => { tr.style.setProperty('--dt-row-top', top + 'px'); top += tr.offsetHeight; });
+        }
+        wrapEl.hidden = isEmpty; if (cardsEl) cardsEl.hidden = true;
+      }
+      // 表示切替トグルの状態反映＋テーブル専用ツール（表示密度/列設定）はカード時は隠す。
+      if (hasCard) {
+        root.querySelectorAll('[data-dt-view]').forEach((b) => { const on = b.dataset.dtView === st.view; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); });
+        root.querySelectorAll('[data-dt-table-only]').forEach((el) => { el.hidden = useCard; });
       }
       countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
-      emptyEl.hidden = (totalNonPin + pinned.length) !== 0;
+      emptyEl.hidden = !isEmpty;
       renderPager(totalNonPin);
       renderChips();
       const anyFilter = st.search || Object.keys(st.filters).length || st.advSort.length || st.simpleSort;
@@ -731,14 +762,17 @@ window.DataTable = (function () {
     });
     headEl.addEventListener('dblclick', (e) => { const h = e.target.closest('[data-dt-resizer]'); if (!h) return; delete st.widths[h.dataset.dtResizer]; persist(); render(); });
 
-    bodyEl.addEventListener('click', (e) => {
+    function onListClick(e) {
       const pin = e.target.closest('[data-dt-pin]');
       if (pin) { e.stopPropagation(); const id = pin.dataset.dtPin; const i = st.pins.indexOf(id); if (i >= 0) st.pins.splice(i, 1); else { if (st.pins.length >= (cfg.maxPins || 5)) { alert('固定できる行は最大 ' + (cfg.maxPins || 5) + ' 件です。'); return; } st.pins.push(id); } persist(); render(); return; }
       if (e.target.closest('a,button,input,select,label')) return;
       if (!cfg.onRowClick) return;
-      const tr = e.target.closest('[data-dt-row]'); if (!tr) return;
-      const r = cfg.data.find((x) => String(rowId(x)) === tr.dataset.dtRow); if (r) cfg.onRowClick(r);
-    });
+      const el = e.target.closest('[data-dt-row]'); if (!el) return;
+      const r = cfg.data.find((x) => String(rowId(x)) === el.dataset.dtRow); if (r) cfg.onRowClick(r);
+    }
+    bodyEl.addEventListener('click', onListClick);
+    if (cardsEl) cardsEl.addEventListener('click', onListClick);
+    if (hasCard) root.querySelectorAll('[data-dt-view]').forEach((b) => b.addEventListener('click', () => { if (st.view === b.dataset.dtView) return; st.view = b.dataset.dtView; persist(); render(); }));
     pagerEl.addEventListener('click', (e) => { const b = e.target.closest('[data-dt-page]'); if (!b || b.disabled) return; st.page = Number(b.dataset.dtPage); render(); });
     chipsEl.addEventListener('click', (e) => {
       if (e.target.closest('[data-dt-clear2]')) return clearAll();

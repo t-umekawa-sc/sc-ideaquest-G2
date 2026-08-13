@@ -1181,6 +1181,23 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-footer .dt-perpage { flex: 1 1 auto; justify-content: flex-end; }
 @media (max-width: 768px) { .dt-footer { justify-content: space-between; } .dt-footer .pagination { order: 3; width: 100%; } }
 
+/* --- 表示切替（テーブル / カード）＋カードビュー --- */
+/* 表示切替トグル（SC-10 の .viewtoggle を共通部品として昇格） */
+.viewtoggle { display: inline-flex; border: 1px solid var(--color-border-strong); border-radius: var(--radius); overflow: hidden; }
+.viewtoggle button { border: 0; background: var(--color-surface); padding: 6px var(--space-3); font: inherit; font-size: var(--text-sm); cursor: pointer; color: var(--color-text-muted); }
+.viewtoggle button + button { border-left: 1px solid var(--color-border-strong); }
+.viewtoggle button.is-on { background: var(--color-primary-soft); color: var(--color-primary-active); font-weight: 600; }
+/* カードグリッド（SC-01/SC-10 のクエストカードと一貫した見た目） */
+.dt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+.dt-card { position: relative; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); }
+.dt-card--link { cursor: pointer; transition: box-shadow .15s, border-color .15s, transform .05s; }
+.dt-card--link:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
+.dt-card--link:active { transform: translateY(1px); }
+.dt-card.is-pinned { border-color: var(--color-primary-border); background: var(--color-primary-soft); }
+.dt-card__pin { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 1; }
+.dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+.dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+
 /* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
 .col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);
   border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-2); }
