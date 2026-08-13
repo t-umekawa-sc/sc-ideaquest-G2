@@ -577,10 +577,6 @@ window.DataTable = (function () {
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
         </div>
         <div class="tools">
-          <span class="list-count" data-dt-count></span>
-          <label class="dt-perpage">表示
-            <select class="select" data-dt-perpage aria-label="1ページの表示件数">${perPageOptions.map((n) => `<option value="${n}">${n}</option>`).join('')}</select>
-            件</label>
           <span class="seg seg-density" role="group" aria-label="表示密度">
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
@@ -594,7 +590,13 @@ window.DataTable = (function () {
         <table class="table dt-fixed"><thead data-dt-head></thead><tbody data-dt-body></tbody></table>
       </div>
       <div class="list-empty" data-dt-empty hidden>該当するデータがありません。</div>
-      <nav class="pagination" data-dt-pager aria-label="ページ送り" hidden></nav>`;
+      <div class="dt-footer" data-dt-footer>
+        <span class="list-count" data-dt-count></span>
+        <nav class="pagination" data-dt-pager aria-label="ページ送り" hidden></nav>
+        <label class="dt-perpage">表示
+          <select class="select" data-dt-perpage aria-label="1ページの表示件数">${perPageOptions.map((n) => `<option value="${n}">${n}</option>`).join('')}</select>
+          件</label>
+      </div>`;
     const $ = (s) => root.querySelector(s);
     const searchEl = $('[data-dt-search]'), headEl = $('[data-dt-head]'), bodyEl = $('[data-dt-body]'),
       countEl = $('[data-dt-count]'), chipsEl = $('[data-dt-chips]'), pagerEl = $('[data-dt-pager]'),

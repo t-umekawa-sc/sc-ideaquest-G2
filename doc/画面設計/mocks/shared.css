@@ -1126,6 +1126,12 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .pagination__page { min-width: 2.25em; }
 .pagination .btn.is-current, .pagination__page.is-current { background: var(--color-primary); color: #fff; border-color: var(--color-primary); pointer-events: none; }
 .pagination__ellipsis { padding: 0 4px; color: var(--color-text-muted); }
+/* --- 下部ページングバー（件数〔左〕・番号ページャ〔中央〕・表示件数〔右〕をまとめる） --- */
+.dt-footer { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4); }
+.dt-footer .list-count { flex: 1 1 auto; }
+.dt-footer .pagination { margin-top: 0; flex: 0 0 auto; }
+.dt-footer .dt-perpage { flex: 1 1 auto; justify-content: flex-end; }
+@media (max-width: 768px) { .dt-footer { justify-content: space-between; } .dt-footer .pagination { order: 3; width: 100%; } }
 
 /* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
 .col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);
