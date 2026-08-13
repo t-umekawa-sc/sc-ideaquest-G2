@@ -622,12 +622,14 @@ window.DataTable = (function () {
     function renderHead() {
       const vc = visibleCols();
       const advOn = st.advSort.length > 0;
-      // 列幅は px ではなく「宣言幅の比率」を % で与える＝テーブルは常に容器幅(100%)にフィットする。
-      // これにより横スクロールは原則出ない（幅を測って合わせる必要がなく、縦スクロールバーの
-      // 出現タイミングやサブピクセル、ウィンドウ幅に一切依存しない）。列の比率だけ保たれる。
-      // ユーザーがドラッグでリサイズした値（st.widths・px）も比率計算に含めるので、収まりは保たれる。
+      // 列幅は px ではなく「宣言幅の比率」を % で与え、テーブルに min-width（＝読める最小幅の合計）を課す。
+      //  ・容器幅 ≥ min-width: テーブルは容器幅(100%)にフィット＝比率どおりに全列が伸縮（横スクロール無し）。
+      //  ・容器幅 <  min-width: テーブルは min-width を保つ＝各列が読める最小幅で止まり、はみ出しは横スクロール。
+      // これで「広い時はフィット／狭い時は潰さず横スクロール」を両立（測定・タイミングに依存しない）。
+      // 最小幅は宣言幅の 80%（＝標準の容器 1120 では必ずフィットし、明らかに狭い時だけスクロール）。
       const widths = vc.map((c) => st.widths[c.key] || c.width || 0);
       const sumW = widths.reduce((a, b) => a + b, 0) || 1;
+      tableEl.style.minWidth = Math.round(sumW * 0.8) + 'px';
       headEl.innerHTML = '<tr>' + vc.map((c, idx) => {
         const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.sortable ? 'dt-sortable' : '', (c.sortable && advOn) ? 'is-locked-sort' : ''].filter(Boolean).join(' ');
         let aria = '';
