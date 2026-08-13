@@ -291,6 +291,9 @@ img { max-width: 100%; display: block; }
 .modal__footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
   padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); flex: 0 0 auto;
   background: var(--color-surface); }
+/* 本文＋フッターを <form> で包む実装パターンでも本文だけスクロール＋フッター固定にする
+   （form 自身を flex 列にしてパネル残り高を占有）。div 直下パターンには非適用（無害）。 */
+.modal__panel.sectioned > form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 /* モーダルのサイズ（.modal 要素に付与） */
 .modal--sm .modal__panel { max-width: 480px; }
