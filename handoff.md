@@ -14,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`d4cfb94`**（DataTable ページ範囲外バグ修正）。
+- 最新コミット: 本 handoff コミット。直前＝**`cd5dd40`**（D-1 usermenu 開閉アニメ＋UI）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `cd5dd40` **D-1 ヘッダー usermenu の開閉アニメ＋UI 磨き**（mocks のみ・`shared.js` 不変・CSS 中心）＝`.usermenu__list` をフェード＋右上基点のスライド/スケール(.15s)で開閉（閉時もアニメ・`prefers-reduced-motion` で無効）。UI＝吹き出し矢印(`::before`)・開時トリガーにリング(`aria-expanded=true`)・角丸/最小幅拡大・ホバー配色。要点＝`hidden` トグルは不変のまま CSS で `hidden` 時に `display:block`＋`opacity:0`+`visibility:hidden`+`pointer-events:none`（グローバル `[hidden]{display:none}` をこの要素だけ上書き）＝閉じアニメ両立＋a11y/非操作担保。`デザイン標準.md` 共通ヘッダー節に追記。
   - `d4cfb94` **修正 DataTable ページ範囲外バグ**（mocks のみ）＝2ページ目表示中に表示行を全ピン→非固定件数が減りカレントページが範囲外→空表示＋ページャ消失で戻れない不具合。原因＝`render()` が行スライスを先に計算しページ番号クランプを後段 `renderPager()` で行っていた（古い `st.page` で空スライス）。**クランプをスライスの前に移動**して解消。ヘッドレス再現→修正確認済み。
   - `f54dc7c` **DataTable 下部ページングバー**（mocks のみ）＝件数(`.list-count`)と表示件数(`.dt-perpage`)を上部ツールバーから**下部バー `.dt-footer`**へ移動し、**件数(左)・番号ページャ(中央)・表示件数(右)**をまとめて配置。上部ツールバー右は 密度/列設定/エクスポート のみに。1ページ時はページャ非表示でも件数/表示件数は残す。`デザイン標準.md` §4.5 ③ 改定。
   - `1dc94eb` **行ピンのアイコンを状態で切替**（mocks のみ）＝未ピン `📍`（淡色 opacity .4）／ピン中 `📌`（不透明）。`shared.js` でグリフ切替・`shared.css` で opacity 制御（emoji の `filter:grayscale` はレンダリング不安定のため opacity のみ）。
@@ -58,7 +59,7 @@
 - **仕様の詰め方**＝ユーザーが具体イメージを口頭描写→こちらが仕様化（選択肢提示は不可・[[design-spec-working-style]]）。決定①〜⑱を確定してから実装。
 - **成果物**＝`shared.js` の `DataTable`／`shared.css` の `9y`＋グローバル `[hidden]` 修正／`SC-91` 適用／`デザイン標準.md` §4.5／`style-guide.html` デモ（詳細は §1 のコミット説明）。
 - **重要**＝これは **doc/画面設計（mocks）だけ**の変更。**impl（`impl/frontend`）は未反映**。実装接続時に「Next.js 版 DataTable ＋ 一覧APIのクエリ契約（複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得）」として backend/impl に落とす（CSV／行固定のページ跨ぎは backend 依存）。
-- **残要望（未着手）**＝ヘッダー usermenu の UI/アニメ（現状 `.usermenu__list[hidden]` の即時トグル＝開閉アニメ無し）／各画面のラベル横断見直し。
+- **残要望**＝ヘッダー usermenu の UI/アニメ（**第1弾 `cd5dd40` 対応済**＝開閉アニメ＋UI 磨き）／各画面のラベル横断見直し（D-2・未着手）。
 
 ### ★方針転換＝フロントエンド先行プロトタイプ（2026-08-12・ユーザー選択）
 従来の「ドメイン縦スライスで backend まで一気」から、**全画面をモック先行で Next.js にクリッカブル移植（ナビ＋ダイアログ配線・デモデータ）→ 画面群ごとに backend 接続**へ変更。正＝**`doc/規約/フロントエンド実装フロー規約.md`（新設・`b90eced`）**（shared.css を単一デザインシステムに採用・段階移行／URL 付きモーダル標準／デモデータ seam＝fixtures は OpenAPI 型／画面遷移図＝ルートの正／既存接続画面は接続維持でモック整合／**DoD＝モック一致**）。CLAUDE.md・コーディング規約 §5・テスト規約 §7 にクロス参照済み。
@@ -128,7 +129,7 @@
 
 ### (D) UI標準・モック精度（進行中・最優先）
 - **D-0（進行中）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」「10.」）をブラウザ確認中。**第1弾（`75c4842`）＝絞込チェック縦並び・検索補足・ピン背景バグ／第2弾（`1efff4b`）＝動的モーダル最大化(⤢)・表示件数セレクタ・ダイアログサンプル／第3弾（`847dfb7`）＝⋯ アクションメニュー（RowMenu）＋操作列標準化／第4弾（`1dc94eb`）＝行ピンのアイコン状態切替／第5弾（`f54dc7c`）＝下部ページングバー／第6弾（`d4cfb94`）＝ページ範囲外バグ修正（ピン増加でカレントページが空になり戻れない）を対応済**。以降も指摘を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html`（Wインコード必要）を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`。要素 `.screenshot()` で部分撮り可）。`node --check` で syntax も確認。
-- **D-1＝ヘッダー usermenu の UI/アニメ**（要望）。現状 `shared.css` `.usermenu__list[hidden]{display:none}` の即時トグル＝**開閉アニメ無し**。フェード/スケール＋`prefers-reduced-motion` 対応を `shared.css`/`shared.js`（`initUserMenu`）に。
+- **D-1＝ヘッダー usermenu の UI/アニメ（第1弾 `cd5dd40` 対応済）**。フェード＋右上基点スライドの開閉アニメ・吹き出し矢印・トリガーリング・reduced-motion 対応を CSS で実装（`shared.js` 不変）。追加の磨き（速度感・配色・ユーザー名ヘッダー行の追加など）は要望次第。
 - **D-2＝各画面のラベル横断見直し**（要望）。用語統一・命名を `mocks` 全体で点検（`デザイン標準.md` に方針節を設けるか検討）。
 - **D-3＝DataTable を他一覧へ展開**（SC-90/92/93・SC-10 等）。`columns`＋`data` 宣言のみ。
 - **D-4（後）＝impl 反映**＝Next.js 版 DataTable＋一覧APIのクエリ契約（複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得）。統合作業再開時。
