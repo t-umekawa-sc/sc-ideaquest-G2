@@ -680,6 +680,11 @@ window.DataTable = (function () {
       tableEl.classList.toggle('table--compact', st.density === 'compact');
       const { pinned, filtered } = compute();
       renderHead();
+      const totalNonPin = filtered.length;
+      // カレントページのクランプは「スライスの前」に行う（ピン増加などで非固定件数が減って
+      // カレントページが範囲外になった時に、空ページ表示＋ページャ消失で戻れなくなるのを防ぐ）。
+      const pages = Math.max(1, Math.ceil(totalNonPin / st.perPage));
+      st.page = Math.min(Math.max(1, st.page), pages);
       const start = (st.page - 1) * st.perPage;
       const pageRows = filtered.slice(start, start + st.perPage);
       bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
@@ -690,7 +695,6 @@ window.DataTable = (function () {
         let top = headEl.offsetHeight;
         pinnedTrs.forEach((tr) => { tr.style.setProperty('--dt-row-top', top + 'px'); top += tr.offsetHeight; });
       }
-      const totalNonPin = filtered.length;
       countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
       emptyEl.hidden = (totalNonPin + pinned.length) !== 0;
       renderPager(totalNonPin);
