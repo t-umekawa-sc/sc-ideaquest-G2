@@ -605,7 +605,7 @@ window.DataTable = (function () {
         <table class="table dt-fixed"><thead data-dt-head></thead><tbody data-dt-body></tbody></table>
       </div>
       ${hasCard ? '<div class="dt-cards" data-dt-cards role="list" hidden></div>' : ''}
-      <div class="list-empty" data-dt-empty hidden>該当するデータがありません。</div>
+      <div class="list-empty" data-dt-empty hidden>${cfg.emptyText || '該当するデータがありません。'}</div>
       <div class="dt-footer" data-dt-footer>
         <span class="list-count" data-dt-count></span>
         <nav class="pagination" data-dt-pager aria-label="ページ送り" hidden></nav>
