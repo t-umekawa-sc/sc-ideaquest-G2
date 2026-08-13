@@ -759,8 +759,11 @@ window.DataTable = (function () {
       emptyEl.hidden = !isEmpty;
       renderPager(totalNonPin);
       renderChips();
-      const anyFilter = st.search || Object.keys(st.filters).length || st.advSort.length || st.simpleSort;
-      root.querySelector('[data-dt-clear]').hidden = !anyFilter;
+      // クリアの一本化: 詳細ソート/詳細絞込がある時は「要約チップ行の“すべてクリア”」に任せ、
+      // .filters の標準クリアボタンは隠す（重複防止）。チップにならない検索・単一並び替えだけの時に出す。
+      const hasChips = st.advSort.length > 0 || Object.keys(st.filters).length > 0;
+      const anyFilter = st.search || st.simpleSort || hasChips;
+      root.querySelector('[data-dt-clear]').hidden = !(anyFilter && !hasChips);
       requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
     }
 
