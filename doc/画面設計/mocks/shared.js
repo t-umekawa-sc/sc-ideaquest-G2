@@ -622,11 +622,18 @@ window.DataTable = (function () {
     function renderHead() {
       const vc = visibleCols();
       const advOn = st.advSort.length > 0;
-      headEl.innerHTML = '<tr>' + vc.map((c) => {
+      // 幅の自動フィット：宣言幅の合計が容器幅を「わずかに」超える時だけ全列を比例縮小して収める。
+      // ＝ぴったり収まって見えるのに数pxの横スクロールが出るのを防ぐ。大幅に広い一覧（合計が容器の
+      // 1.3倍超）は従来どおり横スクロール（列を潰しすぎない）。ユーザーのリサイズ値も比例対象。
+      const widths = vc.map((c) => st.widths[c.key] || c.width || 0);
+      const sumW = widths.reduce((a, b) => a + b, 0);
+      const avail = wrapEl.clientWidth || 0;
+      const fit = (avail > 0 && sumW > avail && sumW <= avail * 1.3) ? avail / sumW : 1;
+      headEl.innerHTML = '<tr>' + vc.map((c, idx) => {
         const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.sortable ? 'dt-sortable' : '', (c.sortable && advOn) ? 'is-locked-sort' : ''].filter(Boolean).join(' ');
         let aria = '';
         if (c.sortable) { const s = (!advOn && st.simpleSort && st.simpleSort.key === c.key) ? st.simpleSort.dir : 'none'; aria = ` aria-sort="${s === 'asc' ? 'ascending' : s === 'desc' ? 'descending' : 'none'}"`; }
-        const w = st.widths[c.key] || c.width;
+        const w = widths[idx] ? Math.round(widths[idx] * fit) : 0;
         const style = w ? ` style="width:${w}px"` : '';
         const ind = c.sortable ? '<span class="dt-sort-ind"></span>' : '';
         const resizer = c.resizable ? `<span class="dt-resizer" data-dt-resizer="${esc(c.key)}"></span>` : '';
