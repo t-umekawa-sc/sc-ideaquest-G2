@@ -24,6 +24,9 @@
   .row-locked { font-size: var(--text-xs); color: var(--color-text-muted); }
   tr.is-suspended td { color: var(--color-text-muted); }
   .dt-card.is-suspended { opacity: .65; }   /* カード表示の無効アカウント */
+  /* クリック標準(§4.5⑪): sys_admin 行は操作不可＝指カーソル/ホバー背景を出さない */
+  #accountTable tr.is-rowlocked, #accountTable .dt-card.is-rowlocked { cursor: default; }
+  #accountTable tr.is-rowlocked:hover td { background: transparent; }
 
   .st-active { background: var(--color-agree-bg); color: var(--color-success); }
   .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
@@ -191,7 +194,9 @@
     searchFields: '氏名・ログインID・メール',
     exportName: '会社アカウント',
     emptyText: '該当するアカウントがありません。',
-    rowClass: (r) => r.state === 'suspended' ? 'is-suspended' : '',   // 無効行はミュート表示
+    // クリックの標準挙動（§4.5 ⑪）: 複数操作あり＝既定でクリック=編集ダイアログ。system_admin 行は操作不可(no-op)。
+    onRowClick: (r) => { if (r.system_role === 'sys_admin') return; openAccount('edit', r); },
+    rowClass: (r) => [r.state === 'suspended' ? 'is-suspended' : '', r.system_role === 'sys_admin' ? 'is-rowlocked' : ''].filter(Boolean).join(' '),   // 無効行はミュート・sys_admin行はクリック不可
     cardLayout: (r) => ({
       title: r.name,
       badges: [{ label: ST[r.state][0], cls: ST[r.state][1] }, { label: SYSROLE_LABEL[r.system_role] }],

@@ -509,6 +509,7 @@
     searchFields: '氏名・ログインID・メール',
     exportName: CO.code + '-アカウント',
     emptyText: '該当するアカウントがありません。',
+    onRowClick: (r) => openAccount('edit', r),   // クリックの標準挙動（§4.5 ⑪）: 複数操作あり＝既定でクリック=編集ダイアログ（全アカウント操作可）
     rowClass: (r) => r.state === 'suspended' ? 'is-suspended' : '',
     cardLayout: (r) => ({ title: r.name, badges: [{ label: ST_ACC[r.state][0], cls: ST_ACC[r.state][1] }, { label: SYSROLE_LABEL[r.system_role] }], meta: [r.loginId, r.email], stats: [groupsText(r)] }),
     columns: [
@@ -594,6 +595,7 @@
     searchFields: 'グループ名・コード',
     exportName: CO.code + '-クエストグループ',
     emptyText: 'クエストグループがありません。「＋ グループ作成」から追加してください。',
+    onRowClick: (g) => openGroup('edit', g),   // クリックの標準挙動（§4.5 ⑪）: 複数操作(リネーム/削除)あり＝既定でクリック=リネーム(編集)ダイアログ
     cardLayout: (g) => ({ title: g.name, meta: ['コード: ' + g.code], stats: [groupMemberCount(g.name) + ' 名'] }),
     columns: [
       { key: 'name', label: 'グループ名', locked: true, width: 260, sortable: true, filter: { type: 'text' }, sortVal: (g) => g.name, searchVal: (g) => g.name, csvVal: (g) => g.name, render: (g) => `<strong>${g.name}</strong>` },
