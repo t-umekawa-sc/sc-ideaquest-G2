@@ -647,7 +647,8 @@ window.DataTable = (function () {
         }
         return `<td class="${cls}">${inner}</td>`;
       }).join('');
-      return `<tr data-dt-row="${id}"${pinned ? ' class="is-pinned"' : ''}>${tds}</tr>`;
+      const trCls = [pinned ? 'is-pinned' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
+      return `<tr data-dt-row="${id}"${trCls ? ` class="${trCls}"` : ''}>${tds}</tr>`;
     }
 
     // カード本文。cfg.card（自由HTML）優先。無ければ cfg.cardLayout（標準構造ヘルパ）で組み立てる。
@@ -667,7 +668,7 @@ window.DataTable = (function () {
     function cardHtml(r, pinned) {
       const id = esc(String(rowId(r)));
       const clickable = typeof cfg.onRowClick === 'function';
-      const cls = ['dt-card', pinned ? 'is-pinned' : '', clickable ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : ''].filter(Boolean).join(' ');
+      const cls = ['dt-card', pinned ? 'is-pinned' : '', clickable ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
       const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
       const acts = actionsCol && actionsCol.render ? actionsCol.render(r) : '';
       const a11y = ` role="listitem"${clickable ? ' tabindex="0"' : ''}`; // クリック可時はキーボード操作（Enter/Space）
@@ -764,6 +765,7 @@ window.DataTable = (function () {
       const hasChips = st.advSort.length > 0 || Object.keys(st.filters).length > 0;
       const anyFilter = st.search || st.simpleSort || hasChips;
       root.querySelector('[data-dt-clear]').hidden = !(anyFilter && !hasChips);
+      if (window.applyCellClips) window.applyCellClips(root); // .cell-tags のはみ出し「…」を再判定
       requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
     }
 

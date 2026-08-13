@@ -23,6 +23,7 @@
   .table td .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .row-locked { font-size: var(--text-xs); color: var(--color-text-muted); }
   tr.is-suspended td { color: var(--color-text-muted); }
+  .dt-card.is-suspended { opacity: .65; }   /* カード表示の無効アカウント */
 
   .st-active { background: var(--color-agree-bg); color: var(--color-success); }
   .st-disabled { background: var(--color-disagree-bg); color: var(--color-danger); }
@@ -87,40 +88,13 @@
     <span class="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
   </div>
 
-  <!-- ツールバー -->
-  <div class="list-toolbar">
-    <div class="filters">
-      <input class="input" type="search" id="fSearch" placeholder="氏名・ログインID・メールで検索">
-      <label>状態
-        <select class="select" id="fState">
-          <option value="">すべて</option>
-          <option value="active">有効</option>
-          <option value="suspended">無効（論理削除）</option>
-        </select>
-      </label>
-      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
-    </div>
-    <div class="tools">
-      <span class="list-count" id="accCount">— 件</span>
-      <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
-    </div>
+  <div class="section-head">
+    <h2>アカウント</h2>
+    <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
   </div>
-
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-  </div>
-  <div class="list-empty" id="empty" hidden>該当するアカウントがありません。</div>
-  <!-- ページネーション（標準・オフセット方式） -->
-  <nav class="pagination" id="pager" aria-label="ページ送り" hidden>
-    <button class="btn btn-outline btn-sm" type="button" id="pgPrev">← 前へ</button>
-    <span class="pagination__info" id="pgInfo">1 / 1</span>
-    <button class="btn btn-outline btn-sm" type="button" id="pgNext">次へ →</button>
-  </nav>
+  <!-- 一覧操作標準（DataTable＝検索/ソート/絞込/番号ページャ/列幅/表示・並べ替え/CSV/密度/行固定/カード表示）。
+       状態（有効/無効）は詳細絞込の区分フィルタ、システムロールも区分で絞れる。正＝デザイン標準.md「一覧の操作標準」。 -->
+  <div id="accountTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）。発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>（メールリンク・72時間）。<strong>無効化</strong>＝論理削除（ログイン不可・全セッション破棄）で、それまでの入力（アイデア/投票/評価/コメント）は残ります。この画面で発行/編集できるのは<strong>一般アカウント</strong>のみ＝<strong>システムロールの付与（会社アカウント管理者/システム管理者）はシステム管理者（SC-92）</strong>。<strong>システム管理者アカウントは操作できません</strong>（SC-92 で管理）。所属クエストグループは<strong>メンバー / 管理者（QG管理者）を per-group で指定可能</strong>（委譲運用・2026-08-02）。
@@ -177,81 +151,63 @@
 
   document.getElementById('coName').textContent = COMPANY.name;
 
-  const rows = document.getElementById('rows');
-  const empty = document.getElementById('empty');
-  const fSearch = document.getElementById('fSearch');
-  const fState = document.getElementById('fState');
-  const pager = document.getElementById('pager');
-  const clearBtn = document.getElementById('clearFilters');
-  const PER_PAGE = 5;
-  let page = 1;
-
-  function currentList() {
-    const q = fSearch.value.trim().toLowerCase(), st = fState.value;
-    return ACCOUNTS.filter(a =>
-      (!q || a.name.toLowerCase().includes(q) || a.loginId.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
-      && (!st || a.state === st));
-  }
-
+  // 所属クエストグループのセル（区分バッジ＋はみ出しは applyCellClips が「…」を表示）。
   function groupsHtml(a) {
     if (!a.groups.length) return '<span class="muted">—</span>';
-    const full = a.groups.map(g => g.n + (g.r === 'admin' ? '（管理者）' : '')).join('、');
-    return `<span class="cell-tags" title="${full}">` + a.groups.map(g => g.r === 'admin'
+    return `<span class="cell-tags">` + a.groups.map(g => g.r === 'admin'
       ? `<span class="badge st-active">${g.n} · 管理者</span>`
       : `<span class="badge badge-muted">${g.n}</span>`).join('') + `</span>`;
   }
+  const groupsText = (a) => a.groups.map(g => g.n + (g.r === 'admin' ? '（管理者）' : '')).join('、') || '—';
 
-  function render() {
-    const list = currentList();
-    const q = fSearch.value.trim(), st = fState.value;
-    clearBtn.hidden = !(q || st);                                   // F1
-    const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE)); // F2
-    if (page > totalPages) page = totalPages;
-    const slice = list.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    rows.innerHTML = slice.map((a) => {
-      const [label, cls] = ST[a.state];
-      const idx = ACCOUNTS.indexOf(a);
-      // system_admin は会社アカウント管理者から操作不可（SC-92 で管理）
-      let actions;
-      if (a.system_role === 'sys_admin') {
-        actions = '<span class="row-locked">システム管理者は SC-92 で管理</span>';
-      } else {
-        const toggle = a.state === 'active'
-          ? `<button role="menuitem" type="button" class="is-danger" data-suspend="${idx}">無効化</button>`
-          : `<button role="menuitem" type="button" data-activate="${idx}">再有効化</button>`;
-        actions = `<div class="rowmenu">
-          <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
-          <ul class="rowmenu__list" role="menu" hidden>
-            <li role="none"><button role="menuitem" type="button" data-edit="${idx}">編集</button></li>
-            <li role="none"><button role="menuitem" type="button" data-reset="${idx}">パスワード再設定</button></li>
-            <li role="none">${toggle}</li>
-          </ul>
-        </div>`;
-      }
-      return `<tr class="${a.state === 'suspended' ? 'is-suspended' : ''}">
-        <td><strong>${a.name}</strong></td>
-        <td class="db-id">${a.loginId}</td>
-        <td class="db-id">${a.email}</td>
-        <td>${SYSROLE_LABEL[a.system_role]}</td>
-        <td>${groupsHtml(a)}</td>
-        <td><span class="badge ${cls}">${label}</span></td>
-        <td class="col-actions">${actions}</td>
-      </tr>`;
-    }).join('');
-    document.getElementById('accCount').textContent = list.length + ' 件';
-    empty.hidden = list.length !== 0;
-    if (window.applyCellClips) applyCellClips(rows);
-    pager.hidden = list.length === 0;
-    document.getElementById('pgInfo').textContent = page + ' / ' + totalPages;
-    document.getElementById('pgPrev').disabled = page <= 1;
-    document.getElementById('pgNext').disabled = page >= totalPages;
+  // 操作列：システム管理者は SC-92 で管理（この画面では操作不可）。それ以外は ⋯ メニュー。
+  function actionsCell(r) {
+    if (r.system_role === 'sys_admin') return '<span class="row-locked">システム管理者は SC-92 で管理</span>';
+    const toggle = r.state === 'active'
+      ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-suspend="${r.loginId}">無効化</button></li>`
+      : `<li role="none"><button role="menuitem" type="button" data-activate="${r.loginId}">再有効化</button></li>`;
+    return `<div class="rowmenu">
+      <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+      <ul class="rowmenu__list" role="menu" hidden>
+        <li role="none"><button role="menuitem" type="button" data-edit="${r.loginId}">編集</button></li>
+        <li role="none"><button role="menuitem" type="button" data-reset="${r.loginId}">パスワード再設定</button></li>
+        ${toggle}
+      </ul>
+    </div>`;
   }
 
-  fSearch.addEventListener('input', () => { page = 1; render(); });
-  fState.addEventListener('change', () => { page = 1; render(); });
-  clearBtn.addEventListener('click', () => { fSearch.value = ''; fState.value = ''; page = 1; render(); });
-  document.getElementById('pgPrev').addEventListener('click', () => { if (page > 1) { page--; render(); } });
-  document.getElementById('pgNext').addEventListener('click', () => { page++; render(); });
+  const nameCell = (r) => `<span style="display:inline-flex;align-items:center;gap:var(--space-2);min-width:0"><span class="avatar sm" data-name="${r.name}"><span class="avatar__img placeholder">${r.name.slice(0, 1)}</span></span><strong>${r.name}</strong></span>`;
+
+  // ---- 一覧（DataTable）。data＝自社の全アカウント。編集/無効化/発行のたびに dt.render()。 ----
+  const accountTable = document.getElementById('accountTable');
+  const dt = window.DataTable.init(accountTable, {
+    storageKey: 'sc93-accounts',
+    data: ACCOUNTS,
+    rowId: (r) => r.loginId,
+    unit: '件',
+    perPage: 5,
+    perPageOptions: [5, 10, 20, 50],
+    searchFields: '氏名・ログインID・メール',
+    exportName: '会社アカウント',
+    emptyText: '該当するアカウントがありません。',
+    rowClass: (r) => r.state === 'suspended' ? 'is-suspended' : '',   // 無効行はミュート表示
+    cardLayout: (r) => ({
+      title: r.name,
+      badges: [{ label: ST[r.state][0], cls: ST[r.state][1] }, { label: SYSROLE_LABEL[r.system_role] }],
+      meta: [r.loginId, r.email],
+      stats: [groupsText(r)],
+    }),
+    columns: [
+      { key: 'name', label: '氏名', locked: true, width: 200, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, csvVal: (r) => r.name, render: nameCell },
+      { key: 'loginId', label: 'ログインID', width: 160, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.loginId, searchVal: (r) => r.loginId, render: (r) => r.loginId },
+      { key: 'email', label: 'メールアドレス', width: 200, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.email, searchVal: (r) => r.email, render: (r) => r.email },
+      { key: 'system_role', label: 'システムロール', width: 150, sortable: true, filter: { type: 'enum', options: [['general', '一般'], ['company_account_admin', '会社アカウント管理者'], ['sys_admin', 'システム管理者']] }, sortVal: (r) => SYSROLE_LABEL[r.system_role], filterVal: (r) => r.system_role, csvVal: (r) => SYSROLE_LABEL[r.system_role], render: (r) => SYSROLE_LABEL[r.system_role] },
+      { key: 'groups', label: '所属クエストグループ', width: 220, csvVal: groupsText, render: groupsHtml },
+      { key: 'state', label: '状態', width: 100, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['suspended', '無効']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => `<span class="badge ${ST[r.state][1]}">${ST[r.state][0]}</span>` },
+      { key: '_actions', label: '', actions: true, locked: true, width: 90, render: actionsCell },
+    ],
+  });
+  function refresh() { dt.render(); }
 
   // 所属クエストグループ編集（per-group ロール member/admin を行ごとに指定・2026-08-02 改定＝会社アカウント管理者も admin 任命可）
   const amGroups = document.getElementById('amGroups');
@@ -289,13 +245,14 @@
     amMemberships.push({ n: g, r: 'member' }); renderMemberships();
   });
 
-  // 行アクション（system_admin 行はボタンを描画しないので該当しない）
-  rows.addEventListener('click', (e) => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    if (btn.dataset.edit != null) { openAccount('edit', ACCOUNTS[btn.dataset.edit]); }
-    else if (btn.dataset.reset != null) { const a = ACCOUNTS[btn.dataset.reset]; if (confirm('「' + a.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フロー（メールリンク・72時間）に戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
-    else if (btn.dataset.suspend != null) { const a = ACCOUNTS[btn.dataset.suspend]; if (confirm('「' + a.name + '」を無効化（論理削除）しますか？\nログイン不可・全セッション破棄になりますが、これまでの入力は残ります。')) { a.state = 'suspended'; render(); } }
-    else if (btn.dataset.activate != null) { const a = ACCOUNTS[btn.dataset.activate]; a.state = 'active'; render(); }
+  // 行アクション（システム管理者行はメニューを描画しないので該当しない）
+  accountTable.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-edit],[data-reset],[data-suspend],[data-activate]'); if (!b) return;
+    const find = (id) => ACCOUNTS.find((x) => x.loginId === id);
+    if (b.dataset.edit != null) { openAccount('edit', find(b.dataset.edit)); }
+    else if (b.dataset.reset != null) { const a = find(b.dataset.reset); if (confirm('「' + a.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フロー（メールリンク・72時間）に戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
+    else if (b.dataset.suspend != null) { const a = find(b.dataset.suspend); if (confirm('「' + a.name + '」を無効化（論理削除）しますか？\nログイン不可・全セッション破棄になりますが、これまでの入力は残ります。')) { a.state = 'suspended'; refresh(); } }
+    else if (b.dataset.activate != null) { const a = find(b.dataset.activate); a.state = 'active'; refresh(); }
   });
 
   // モーダル
@@ -334,17 +291,15 @@
     if (editTarget) {
       editTarget.name = name; editTarget.loginId = loginId; editTarget.email = email;
       editTarget.groups = memberships;  // 所属・グループ内ロール（member/admin）を更新
-      render();
+      refresh();
     } else {
       const summary = memberships.length ? '\n所属: ' + memberships.map(m => m.n + (m.r === 'admin' ? '（管理者）' : '')).join('、') : '';
       ACCOUNTS.push({ name, loginId, email, system_role:'general', groups: memberships, state:'active', last:'—（未ログイン）' });
-      render();
+      refresh();
       alert('「' + name + '」を ' + COMPANY.name + ' に一般アカウントとして発行しました（デモ）。' + summary + '\n初回ログイン時にパスワード設定を行います。');
     }
     closeModal(accountModal);
   });
-
-  render();
 </script>
 </body>
 </html>
