@@ -14,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`cd5dd40`**（D-1 usermenu 開閉アニメ＋UI）。
+- 最新コミット: 本 handoff コミット。直前＝**`3729779`**（style-guide に usermenu 掲載）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `3729779` **style-guide に共通ヘッダーアクション（通知ベル＋usermenu）掲載**（mocks のみ）＝ヘッダー右を簡易版→標準 `.header-actions`（`.pixel-stat`＋`.bell`＋`.usermenu`）へ。`.app-bg`＋背景復元スニペット追加（メニューの背景変更/リセットが動く）。ドキュメント節「11. ヘッダー / ユーザーメニュー」追加。D-1 の開閉アニメを style-guide でも確認可能に。
   - `cd5dd40` **D-1 ヘッダー usermenu の開閉アニメ＋UI 磨き**（mocks のみ・`shared.js` 不変・CSS 中心）＝`.usermenu__list` をフェード＋右上基点のスライド/スケール(.15s)で開閉（閉時もアニメ・`prefers-reduced-motion` で無効）。UI＝吹き出し矢印(`::before`)・開時トリガーにリング(`aria-expanded=true`)・角丸/最小幅拡大・ホバー配色。要点＝`hidden` トグルは不変のまま CSS で `hidden` 時に `display:block`＋`opacity:0`+`visibility:hidden`+`pointer-events:none`（グローバル `[hidden]{display:none}` をこの要素だけ上書き）＝閉じアニメ両立＋a11y/非操作担保。`デザイン標準.md` 共通ヘッダー節に追記。
   - `d4cfb94` **修正 DataTable ページ範囲外バグ**（mocks のみ）＝2ページ目表示中に表示行を全ピン→非固定件数が減りカレントページが範囲外→空表示＋ページャ消失で戻れない不具合。原因＝`render()` が行スライスを先に計算しページ番号クランプを後段 `renderPager()` で行っていた（古い `st.page` で空スライス）。**クランプをスライスの前に移動**して解消。ヘッドレス再現→修正確認済み。
   - `f54dc7c` **DataTable 下部ページングバー**（mocks のみ）＝件数(`.list-count`)と表示件数(`.dt-perpage`)を上部ツールバーから**下部バー `.dt-footer`**へ移動し、**件数(左)・番号ページャ(中央)・表示件数(右)**をまとめて配置。上部ツールバー右は 密度/列設定/エクスポート のみに。1ページ時はページャ非表示でも件数/表示件数は残す。`デザイン標準.md` §4.5 ③ 改定。
