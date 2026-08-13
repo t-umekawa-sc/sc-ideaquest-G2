@@ -1194,7 +1194,11 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-card--link:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); }
 .dt-card--link:active { transform: translateY(1px); }
 .dt-card.is-pinned { border-color: var(--color-primary-border); background: var(--color-primary-soft); }
-.dt-card__pin { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 1; }
+/* 右上ツール（行固定＋⋯アクション）。z-index は付けない＝スタッキングコンテキストを作らず、
+   開いた RowMenu（position:fixed・z-index:1000）が他カードの上に出るようにする。 */
+.dt-card__tools { position: absolute; top: var(--space-2); right: var(--space-2); display: inline-flex; align-items: center; gap: 4px; }
+.dt-card__body > :first-child { padding-right: 30px; }               /* 右上ツール（ピン）を避ける余白 */
+.dt-card--has-actions .dt-card__body > :first-child { padding-right: 66px; }  /* ピン＋⋯アクションメニュー分 */
 .dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 

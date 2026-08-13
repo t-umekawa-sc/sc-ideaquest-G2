@@ -419,7 +419,7 @@
       （<code>DataTable.init(root, config)</code>）。<strong>列（columns）とデータ（data）を宣言するだけ</strong>で全機能が付く。
       正＝<code>デザイン標準.md §4.5 一覧の操作標準</code>／ライブ実例＝<code>SC-91</code>。</p>
     <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定・「詳細ソート/詳細絞込/列設定/エクスポート」を上部で。<strong>表示件数セレクタ</strong>も右側に。
-      <strong>右上の「🔲 カード / ☰ リスト」で表示切替</strong>（<code>config.card(r)</code> を与えた時のみ・SC-10 クエスト一覧と同じ操作感。検索・絞込・ソート・ページング・固定はカードでも共通）。カード右上の📌で固定。</p>
+      <strong>ツールバー最右の「🔲 カード / ☰ リスト」で表示切替</strong>（<code>config.card(r)</code> を与えた時のみ・SC-10 クエスト一覧と同じ操作感。検索・絞込・ソート・ページング・固定・<strong>⋯アクションメニュー</strong>はカードでも共通）。カード右上に <strong>📍固定＋⋯メニュー</strong>。切替コントロールは<strong>右端固定</strong>で、モード変更で位置が動かない（テーブル専用の密度/列設定はその左に格納）。</p>
     <div id="sgTable"></div>
   </div>
 
@@ -577,9 +577,10 @@
     window.DataTable.init(document.getElementById('sgTable'), {
       storageKey: 'styleguide-demo', data: DATA, rowId: (r) => r.id, unit: '件', perPage: 4, perPageOptions: [4, 8, 20], exportName: 'デモ一覧',
       searchPlaceholder: '検索…', searchFields: 'アイデア名・起票者・部署',
-      // card(r) を与えると「テーブル / カード」表示切替が有効になる（検索・絞込・ソート・ページング・行固定はカードでも共通）。
+      // card(r) を与えると「テーブル / カード」表示切替が有効になる（検索・絞込・ソート・ページング・行固定・⋯アクションはカードでも共通）。
+      // 右上のツール（📍固定＋⋯メニュー）分の余白は .dt-card__body の先頭要素に自動確保されるので、本文側での padding 指定は不要。
       card: (r) => `
-        <div style="padding-right:22px"><strong>${r.name}</strong></div>
+        <div><strong>${r.name}</strong></div>
         <div class="dt-card__meta">${badge(r.state)}<span class="badge badge-muted">${r.team}</span><span>起票: ${r.owner}</span></div>
         <div class="dt-card__stats"><span>👍 得票 ${r.votes}</span><span>📅 ${r.created}</span></div>`,
       columns: [

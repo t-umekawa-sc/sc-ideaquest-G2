@@ -580,16 +580,16 @@ window.DataTable = (function () {
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
         </div>
         <div class="tools">
-          ${hasCard ? `<div class="viewtoggle" role="group" aria-label="表示切替">
-            <button type="button" data-dt-view="card">🔲 カード</button>
-            <button type="button" data-dt-view="list">☰ リスト</button>
-          </div>` : ''}
           <span class="seg seg-density" role="group" aria-label="表示密度" data-dt-table-only>
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
           </span>
           <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
+          ${hasCard ? `<div class="viewtoggle" role="group" aria-label="表示切替">
+            <button type="button" data-dt-view="card" title="カード表示">🔲 カード</button>
+            <button type="button" data-dt-view="list" title="リスト表示">☰ リスト</button>
+          </div>` : ''}
         </div>
         <div class="dt-chips" data-dt-chips></div>
       </div>
@@ -642,12 +642,14 @@ window.DataTable = (function () {
       return `<tr data-dt-row="${id}"${pinned ? ' class="is-pinned"' : ''}>${tds}</tr>`;
     }
 
-    // カード1枚（cfg.card(r) の中身に、行固定トグルと（onRowClick 時の）クリック領域を被せる）。
+    // カード1枚。右上のツール（行固定トグル＋操作列の ⋯ アクションメニュー）を本文の上に重ねる。
+    // 操作列（actions:true）を定義していれば、テーブルと同じ RowMenu をカードにも自動表示する。
     function cardHtml(r, pinned) {
       const id = esc(String(rowId(r)));
-      const cls = ['dt-card', pinned ? 'is-pinned' : '', cfg.onRowClick ? 'dt-card--link' : ''].filter(Boolean).join(' ');
-      const pin = `<button class="dt-pin-toggle dt-card__pin" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
-      return `<div class="${cls}" data-dt-row="${id}">${pin}${cfg.card(r)}</div>`;
+      const cls = ['dt-card', pinned ? 'is-pinned' : '', cfg.onRowClick ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : ''].filter(Boolean).join(' ');
+      const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
+      const acts = actionsCol && actionsCol.render ? actionsCol.render(r) : '';
+      return `<div class="${cls}" data-dt-row="${id}"><div class="dt-card__tools">${pin}${acts}</div><div class="dt-card__body">${cfg.card(r)}</div></div>`;
     }
 
     function renderPager(total) {
