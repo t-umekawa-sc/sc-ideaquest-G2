@@ -14,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`847dfb7`**（一覧サンプルに ⋯ アクションメニュー追加）。
+- 最新コミット: 本 handoff コミット。直前＝**`1dc94eb`**（行ピンのアイコンを状態で切替）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `1dc94eb` **行ピンのアイコンを状態で切替**（mocks のみ）＝未ピン `📍`（淡色 opacity .4）／ピン中 `📌`（不透明）。`shared.js` でグリフ切替・`shared.css` で opacity 制御（emoji の `filter:grayscale` はレンダリング不安定のため opacity のみ）。
   - `847dfb7` **一覧サンプルに ⋯ アクションメニュー（RowMenu）追加＋操作列を標準化**（mocks のみ）＝`style-guide.html`「9.」の DataTable デモに操作列（`actions:true`・末尾固定・sticky）を追加し ⋯ ケバブ RowMenu（編集/複製/削除・削除は危険色）を描画。開閉は `shared.js` の**委譲 RowMenu**（動的行でも動作・`position:fixed`）。`デザイン標準.md` §4.5 に「操作列（アクション）＝単一リンク or ⋯ RowMenu」を明記。ヘッドレス検証済み。
   - `1efff4b` **DataTable の D-0 フィードバック第2弾**（mocks のみ）＝①**動的生成モーダルに最大化(⤢)/ドラッグ/a11y が効かない不具合を修正**＝`shared.js` の最大化差し込み・a11y `watch` が `DOMContentLoaded` 一回きり→**body の MutationObserver で後から追加された `.modal`/`.modal--maximizable` も初期化**（`initMaximizable`/`watch` を冪等化）。以降の動的モーダル全般に共通適用／②**「1ページの表示件数」セレクタ**追加（`表示 N 件`・`perPageOptions` 既定 `[10,20,50,100]`・現在値は必ず選択肢に含む・`localStorage` 保持。SC-91=`[5,10,20,50]`／style-guide=`[4,8,20]`）／③`style-guide.html` に**「10. ダイアログ」サンプル**追加／④`デザイン標準.md` §4.5 に表示件数・ダイアログ挙動を追記。ヘッドレス検証済み。
   - `75c4842` **DataTable の D-0 フィードバック反映**（mocks のみ）＝①詳細絞込の区分(enum)を**縦並び＋間隔**（`.filter-checks`）＝チェックと文字の被り解消／②横断検索＝**プレースホルダを短く（`検索…`）＋対象項目名を下の補足**（`.dt-search__hint`・config `searchFields`）＝見切れ解消／③**行固定の背景色バグ修正**＝区切り線を文字列 `replace` で入れて `class` 属性が二重化し最後のピン行が `is-pinned` を喪失（1行=背景消失/2行=2行目消失）→ `classList` 付与に修正＋段積み sticky（`--dt-row-top` 累積で複数ピンが重ならない）。ヘッドレス検証済み。
@@ -124,7 +125,7 @@
 > **現在の最優先＝(D) UI標準/モック精度の調整（ユーザー主導・doc/mocks で作業）**。(A)/(B) の impl 作業は保留中。
 
 ### (D) UI標準・モック精度（進行中・最優先）
-- **D-0（進行中）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」「10.」）をブラウザ確認中。**第1弾（`75c4842`）＝絞込チェック縦並び・検索補足・ピン背景バグ／第2弾（`1efff4b`）＝動的モーダル最大化(⤢)・表示件数セレクタ・ダイアログサンプル／第3弾（`847dfb7`）＝一覧サンプルに ⋯ アクションメニュー（RowMenu）＋操作列標準化 を対応済**。以降も指摘を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html`（Wインコード必要）を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`。要素 `.screenshot()` で部分撮り可）。`node --check` で syntax も確認。
+- **D-0（進行中）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」「10.」）をブラウザ確認中。**第1弾（`75c4842`）＝絞込チェック縦並び・検索補足・ピン背景バグ／第2弾（`1efff4b`）＝動的モーダル最大化(⤢)・表示件数セレクタ・ダイアログサンプル／第3弾（`847dfb7`）＝⋯ アクションメニュー（RowMenu）＋操作列標準化／第4弾（`1dc94eb`）＝行ピンのアイコン状態切替（未ピン 📍／ピン中 📌）を対応済**。以降も指摘を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html`（Wインコード必要）を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`。要素 `.screenshot()` で部分撮り可）。`node --check` で syntax も確認。
 - **D-1＝ヘッダー usermenu の UI/アニメ**（要望）。現状 `shared.css` `.usermenu__list[hidden]{display:none}` の即時トグル＝**開閉アニメ無し**。フェード/スケール＋`prefers-reduced-motion` 対応を `shared.css`/`shared.js`（`initUserMenu`）に。
 - **D-2＝各画面のラベル横断見直し**（要望）。用語統一・命名を `mocks` 全体で点検（`デザイン標準.md` に方針節を設けるか検討）。
 - **D-3＝DataTable を他一覧へ展開**（SC-90/92/93・SC-10 等）。`columns`＋`data` 宣言のみ。
