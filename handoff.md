@@ -4,16 +4,18 @@
 > 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）・`doc/API設計/`・`doc/ADR/`・`doc/データモデル.md`・`doc/テスト/`・`doc/規約/`・`doc/画面設計/` を正とすること（本 handoff は要約）。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **現在地＝方針転換（2026-08-12）で「画面モック先行のクリッカブル・プロトタイプ → 画面群ごとに backend 接続」へ移行（`doc/規約/フロントエンド実装フロー規約.md`）。Phase 0（デザインシステム/App シェル/全ルート雛形＋ハブ/URL モーダル基盤）完了。現在＝(A) 管理系画面のモック整合を実施中＝SC-91・SC-93 完了、次は SC-92・SC-90。**
+> **現在地＝方針転換（2026-08-12）で「画面モック先行のクリッカブル・プロトタイプ → 画面群ごとに backend 接続」へ移行（`doc/規約/フロントエンド実装フロー規約.md`）。Phase 0（デザインシステム/App シェル/全ルート雛形＋ハブ/URL モーダル基盤）完了。現在＝(A) 管理系画面のモック整合を実施中＝SC-91（モック完全準拠へ再整合）・SC-93 完了、次は SC-92・SC-90。**
 
 ---
 
 ## 1. 最終更新日時 / ブランチ / 最新コミット
 
-- 最終更新: **2026-08-12 JST**（セッション終了時）。
-- ブランチ: **main**（作業ツリー クリーン・`origin/main` へ push 済み）。
-- 最新コミット: 本 handoff コミット。直前＝**`c78aa2d`**（SC-93 会社アカウント管理 モック整合）。
-- 本セッションのコミット（新しい順・全て push 済み）:
+- 最終更新: **2026-08-13 JST**（セッション終了時）。
+- ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
+- 最新コミット: 本 handoff コミット。直前＝**`effe878`**（SC-91 会社一覧 モック完全準拠へ再整合）。
+- **本セッションのコミット（新しい順・未 push）**:
+  - `effe878` (A)SC-91 会社一覧＝**モック完全準拠へ再整合**＝`.backlink`/`.page-title`「システム管理（運営）」/`.admin-sub`/`.section-head`(h2「会社（テナント）」＋「＋ 会社を作成」)/末尾 `.role-note`・テーブル `.co`＋`QuestIcon`/`.db-id`/状態バッジ `.st-active`/`.st-provisioning`・作成モーダルに会社カラー `.swatches`(新 `components/ui/Swatches.tsx`・backend `color` 接続)＋会社アイコン `.icon-field`(objectURL プレビューのみの仮実装・MinIO 待ち)＋`.provision-note`。共有クラス 8種を design-system.css と mocks/shared.css へ昇格・SC-91 モック `<style>` の重複撤去。e2e＝sc-91(B-TC-110 見出し/B-TC-111 ボタン名)・sc-92(作成ボタン名)追随＝**full 26 passed**。
+- 前セッション以前のコミット（新しい順・push 済み）:
   - `c78aa2d` (A)SC-93 会社アカウント管理 モック整合＝`RowMenu`（⋯ケバブ）新設・`.table`化・状態バッジ・自社コンテキスト・system_admin 行ロック。
   - `ca2bbab` (A)SC-91 会社一覧 モック整合＝`QuestIcon` 新設・`.table-wrap`/`.table`・会社アイコン・DB識別子列・状態バッジ・sticky 操作列・行クリック遷移。
   - `faa2667` Phase 0-④ URL 付きモーダル基盤（Parallel `@modal`＋Intercept・SC-11 で実証）。
@@ -51,7 +53,8 @@
 - **④URL 付きモーダル基盤**（`faa2667`）＝`app/(app)/layout.tsx` に `@modal` パラレルスロット、`app/(app)/@modal/default.tsx`（null）、`app/(app)/@modal/(.)quests/new/page.tsx`（SC-11 作成モーダル）＋`app/(app)/quests/new/page.tsx`（フルページ・フォールバック）。e2e `frontend/e2e/sc-11-quest-create-modal.spec.ts`。
 
 ### (A) 管理系のモック整合（実施中）
-- **SC-91 会社一覧**（`ca2bbab`）＝`components/layout/QuestIcon.tsx` 新設。`features/companies/components/CompanyList.tsx` を `.table-wrap`/`.table`・会社アイコン・DB識別子列・状態バッジ・sticky 操作列（管理する→）・行クリック遷移・`.list-toolbar`(.filters/.tools)・`.list-count`・`.list-empty` に。
+- **SC-91 会社一覧 モック完全準拠へ再整合**（`effe878`・本セッション）＝`CompanyList.tsx` に `.backlink`「← ダッシュボードへ戻る」・`.page-title`「システム管理（運営）」・`.admin-sub` 説明・`.section-head`（`<h2>会社（テナント）</h2>`＋「＋ 会社を作成」）・末尾 `.role-note` 脚注を追加。テーブルを `.co`＋`QuestIcon`／`.db-id`（等幅）／状態バッジ `.st-active`・`.st-provisioning` へ。作成モーダルに **会社カラー `.swatches`**（新 `components/ui/Swatches.tsx`・`SWATCH_PRESETS` 10色・**backend `CompanyCreateRequest.color` へ接続**）＋**会社アイコン `.icon-field`**（頭文字フォールバック＋画像プレビュー＝**送信せず objectURL のみの仮実装**・MinIO 基盤待ち）＋`.provision-note`＋各 hint。**共有クラス 8種**（`.page-title`/`.section-head`/`.backlink`/`.co`/`.db-id`/`.st-*`/`.icon-field`/`.provision-note`）を `design-system.css` と `mocks/shared.css` へ昇格・同期し、SC-91 モック `<style>` の重複を撤去（正の一元化）。状態ラベルは **有効/準備中**（active/suspended・provisioning 不採用）を踏襲。グループ数/作成日は「—」（`CompanyListItem` 未提供）。
+- **SC-91 会社一覧（初回整合）**（`ca2bbab`）＝`components/layout/QuestIcon.tsx` 新設。`CompanyList.tsx` を `.table-wrap`/`.table`・会社アイコン・DB識別子列・状態バッジ・sticky 操作列（管理する→）・行クリック遷移・`.list-toolbar`(.filters/.tools)・`.list-count`・`.list-empty` に。
 - **SC-93 会社アカウント管理**（`c78aa2d`）＝`components/ui/RowMenu.tsx`（⋯ケバブ・`position:fixed`）新設。管理画面補助クラス（`.admin-sub`/`.company-ctx`/`.row-locked`/`tr.is-suspended`/`.role-note`）を design-system.css へ昇格＋mocks/shared.css 同期。`features/accounts/components/AccountSelfSection.tsx` を 見出し「会社アカウント管理」＋自社コンテキスト行＋`.table`＋状態バッジ＋無効行淡色＋⋯ケバブ操作＋system_admin 行ロックに。`app/(app)/admin/accounts/page.tsx` から `companyCode` を渡す。
 
 ---
@@ -59,12 +62,12 @@
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
 
 - **backend（縦通し済み・本セッションで変更なし）**: ドメイン A（ログイン/MFA/初回・再設定PW/ロック ADR-0005/IP確定 ADR-0006）・B（会社/アカウント/所属・`/admin/*`・SoD）・K.2/K.3（`GET/PATCH /me`・`POST /me/password`・メール変更 double opt-in ADR-0008）・account_sync_outbox・mail_outbox・監査ログ。**本セッションは backend を一切変更していない。**
-- **frontend**: Phase 0 完了で**全画面がクリッカブル**（未実装画面は `ScreenStub`）。ヘッダー/ハブ/URL モーダル動作。管理系は SC-91・SC-93 がモック整合済み（接続維持）。SC-92・SC-90 は**旧実装のまま（未整合）**。
+- **frontend**: Phase 0 完了で**全画面がクリッカブル**（未実装画面は `ScreenStub`）。ヘッダー/ハブ/URL モーダル動作。管理系は SC-91（**モック完全準拠**）・SC-93 がモック整合済み（接続維持）。SC-92・SC-90 は**旧実装のまま（未整合）**。
 - **テスト（本セッション実測）**:
-  - **frontend full e2e = 26 passed**（`cd impl && docker compose exec -T -e LOGIN_RATE_LIMIT_MAX=50 frontend npx playwright test --workers=1`）。内訳＝sc-00 系5＋sc-11 モーダル2＋sc-90〜93/91/92 系＋k-profile 等。**新規 sc-11-quest-create-modal.spec.ts** 含む。
+  - **frontend full e2e = 26 passed**（`cd impl && docker compose exec -T -e LOGIN_RATE_LIMIT_MAX=50 frontend npx playwright test --workers=1`）。SC-91 再整合後に再実測。内訳＝sc-00 系5＋sc-11 モーダル2＋sc-90〜93/91/92 系＋k-profile 等。
   - **backend pytest**＝**前セッション実測 164 passed のまま**。**本セッションでは backend 変更なし＝未再実行（未確認扱い）**。
-  - frontend **tsc EXIT=0**（マウント版で毎スライス実測）。
-- **Docker（本 handoff 時点で稼働確認済み）**＝db/redis/mailhog/backend/frontend/worker/mail-worker の 7 サービス **running**。**frontend イメージは SC-93 まで込みで再ビルド済み**。**backend イメージは K.3 期のまま**（本セッション backend 無変更）。
+  - frontend **tsc EXIT=0**（マウント版で実測）。
+- **Docker（本 handoff 時点で稼働確認済み）**＝db/redis/mailhog/backend/frontend/worker/mail-worker の 7 サービス **running**。**frontend イメージは SC-91 再整合込みで再ビルド済み**。**backend イメージは K.3 期のまま**（本セッション backend 無変更）。
 - **壊れているもの＝無し**（e2e 26 passed）。
 - migration head＝**control 0010・company 0006**（versions ファイルで確認）。
 
@@ -107,7 +110,7 @@
 
 ### (A-1) SC-92 会社詳細（最大・次にやる）
 - **会社設定トグル**＝`impl/frontend/src/features/companies/components/CompanyDetailView.tsx` の素の checkbox を **`.switch`（トグルスイッチ）**へ（shared.css `.switch` 定義済み）。新規 `components/ui/Switch.tsx` を作るのが良い。各設定に説明文を付す（デザイン標準 §98）。
-- **会社カラー**＝同ファイルに **`.swatches`（プリセット10色・shared.css 定義済み）**を追加＝新規 `components/ui/Swatches.tsx`。`updateCompanyProfile` が `color` を受ける（`features/companies/api.ts`）。**会社アイコンのアップロードは MinIO 基盤前提＝別スライス**。
+- **会社カラー**＝同ファイルに **`.swatches`（プリセット10色）**を追加＝**`components/ui/Swatches.tsx` は SC-91 で実装済み・再利用可**（`Swatches`／`SWATCH_PRESETS` を `@/components/ui` から import）。`updateCompanyProfile` が `color` を受ける（`features/companies/api.ts`）。**会社アイコンのアップロードは MinIO 基盤前提＝別スライス**（SC-91 と同じく objectURL プレビューのみの仮実装で先行可）。
 - **文脈バナー**＝会社アイコン＋名＋状態バッジ＋コード/DB/件数＋戻る（`.ctx` sticky・SC-92 モック参照）。`group_count` は `CompanyDetail` に無ければ暫定省略/「—」。
 - **アカウント表**＝`impl/frontend/src/features/accounts/components/AccountSection.tsx` を SC-93 と同様に `.table-wrap`/`.table`・状態バッジ・**⋯ケバブ `RowMenu`**・所属列（backend 未対応で「—」）に。※`RowMenu`・`QuestIcon` は実装済み・再利用可。
 - **クエストグループ表**＝`impl/frontend/src/features/questgroups/components/QuestGroupSection.tsx` を `.table` 化・操作を⋯ケバブ・**リネームを `window.prompt`→モーダル**（コード固定表示）に。
@@ -154,8 +157,8 @@
 
 ### 自己チェック（このファイルだけで再開できるか）
 - ✅ 再開点＝§7＝**(A-1) SC-92 会社詳細**（`CompanyDetailView`＝`.switch`/`.swatches`/文脈バナー・`AccountSection`＝`.table`+⋯ケバブ・`QuestGroupSection`＝`.table`+ケバブ+リネームモーダル）→ **(A-2) SC-90**（ロール列削除等の設計是正）→ **(A-3) 所属エディタのセグメント化**（`.seg` を design-system.css へ昇格）。その後 (B) 画面群移植→接続。
-- ✅ 状態＝**frontend full e2e 26 passed**（実測）・**tsc EXIT=0**。backend は本セッション無変更＝**164 passed は前セッション値（未再実行＝未確認扱い）**。migration head control 0010・company 0006。作業ツリー クリーン・push 済み。
-- ✅ 方針＝**画面モック先行→接続**（`doc/規約/フロントエンド実装フロー規約.md`）。shared.css 正・URL モーダル・DoD＝モック一致。再利用部品＝`components/ui/{Modal,Pager,RowMenu,Avatar,Button,Field,Card}`・`components/layout/{AppHeader,QuestIcon,ScreenStub}`。
-- ⚠ 未確認＝backend pytest の当セッション再実行（無変更のため省略）。SC-92/90 は未整合（旧実装）。`.seg`/`.mrow` は design-system.css 未昇格。
+- ✅ 状態＝**frontend full e2e 26 passed**（SC-91 再整合後に実測）・**tsc EXIT=0**。backend は本セッション無変更＝**164 passed は前セッション値（未再実行＝未確認扱い）**。migration head control 0010・company 0006。作業ツリー クリーン・**本セッション分は未 push**。
+- ✅ 方針＝**画面モック先行→接続**（`doc/規約/フロントエンド実装フロー規約.md`）。shared.css 正・URL モーダル・DoD＝モック一致。再利用部品＝`components/ui/{Modal,Pager,RowMenu,Avatar,Button,Field,Card,Swatches}`・`components/layout/{AppHeader,QuestIcon,ScreenStub}`。**`Swatches`（`SWATCH_PRESETS` 10色）は SC-92 会社カラーでそのまま再利用可**。
+- ⚠ 未確認＝backend pytest の当セッション再実行（無変更のため省略）。SC-92/90 は未整合（旧実装）。`.seg`/`.mrow` は design-system.css 未昇格。会社アイコン画像アップロードは MinIO 基盤待ち（SC-91 は objectURL プレビューのみの仮実装で送信なし）。
 - ⚠ 詳細の正は各 `doc/` 文書（本 handoff は要約）。会話ログは参照不可。
-- ⚠ Docker は本 handoff 時点で **7 サービス稼働中**（frontend は SC-93 込み・backend は K.3 期）。
+- ⚠ Docker は本 handoff 時点で **7 サービス稼働中**（frontend は SC-91 再整合込み・backend は K.3 期）。
