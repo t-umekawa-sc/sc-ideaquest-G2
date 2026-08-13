@@ -641,6 +641,19 @@ window.DataTable = (function () {
       }).join('') + '</tr>';
     }
 
+    // 自動フィットの測り直し（レイアウト確定後・リサイズ後に呼ぶ）。初回描画時は縦スクロールバーが
+    // 後から出て容器幅が縮むことがあり、その差でわずかな横スクロールが残るのを打ち消す。
+    // 基準は「未スケールの宣言幅」なので何度呼んでも増幅しない。
+    function refit() {
+      const ths = Array.from(headEl.querySelectorAll('th'));
+      if (!ths.length) return;
+      const base = visibleCols().map((c) => st.widths[c.key] || c.width || 0);
+      const sumW = base.reduce((a, b) => a + b, 0);
+      const avail = wrapEl.clientWidth || 0;
+      const fit = (avail > 0 && sumW > avail && sumW <= avail * 1.3) ? avail / sumW : 1;
+      ths.forEach((th, i) => { const w = base[i] ? Math.round(base[i] * fit) : 0; th.style.width = w ? w + 'px' : ''; });
+    }
+
     function rowHtml(r, pinned) {
       const vc = visibleCols();
       const id = esc(String(rowId(r)));
@@ -773,7 +786,7 @@ window.DataTable = (function () {
       const anyFilter = st.search || st.simpleSort || hasChips;
       root.querySelector('[data-dt-clear]').hidden = !(anyFilter && !hasChips);
       if (window.applyCellClips) window.applyCellClips(root); // .cell-tags のはみ出し「…」を再判定
-      requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
+      requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); refit(); });
     }
 
     // ===== イベント =====
@@ -989,6 +1002,9 @@ window.DataTable = (function () {
     }
 
     render();
+    // ウィンドウ幅（＝容器幅・スクロールバー有無）が変わったら列幅を測り直してフィットを維持。
+    let refitRaf = 0;
+    window.addEventListener('resize', () => { if (refitRaf) return; refitRaf = requestAnimationFrame(() => { refitRaf = 0; refit(); }); });
     return { render: render, state: st };
   }
   return { init: init };
