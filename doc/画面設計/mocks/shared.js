@@ -622,36 +622,22 @@ window.DataTable = (function () {
     function renderHead() {
       const vc = visibleCols();
       const advOn = st.advSort.length > 0;
-      // 幅の自動フィット：宣言幅の合計が容器幅を「わずかに」超える時だけ全列を比例縮小して収める。
-      // ＝ぴったり収まって見えるのに数pxの横スクロールが出るのを防ぐ。大幅に広い一覧（合計が容器の
-      // 1.3倍超）は従来どおり横スクロール（列を潰しすぎない）。ユーザーのリサイズ値も比例対象。
+      // 列幅は px ではなく「宣言幅の比率」を % で与える＝テーブルは常に容器幅(100%)にフィットする。
+      // これにより横スクロールは原則出ない（幅を測って合わせる必要がなく、縦スクロールバーの
+      // 出現タイミングやサブピクセル、ウィンドウ幅に一切依存しない）。列の比率だけ保たれる。
+      // ユーザーがドラッグでリサイズした値（st.widths・px）も比率計算に含めるので、収まりは保たれる。
       const widths = vc.map((c) => st.widths[c.key] || c.width || 0);
-      const sumW = widths.reduce((a, b) => a + b, 0);
-      const avail = wrapEl.clientWidth || 0;
-      const fit = (avail > 0 && sumW > avail && sumW <= avail * 1.3) ? avail / sumW : 1;
+      const sumW = widths.reduce((a, b) => a + b, 0) || 1;
       headEl.innerHTML = '<tr>' + vc.map((c, idx) => {
         const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.sortable ? 'dt-sortable' : '', (c.sortable && advOn) ? 'is-locked-sort' : ''].filter(Boolean).join(' ');
         let aria = '';
         if (c.sortable) { const s = (!advOn && st.simpleSort && st.simpleSort.key === c.key) ? st.simpleSort.dir : 'none'; aria = ` aria-sort="${s === 'asc' ? 'ascending' : s === 'desc' ? 'descending' : 'none'}"`; }
-        const w = widths[idx] ? Math.round(widths[idx] * fit) : 0;
-        const style = w ? ` style="width:${w}px"` : '';
+        const pct = widths[idx] ? (widths[idx] / sumW * 100) : 0;
+        const style = pct ? ` style="width:${pct.toFixed(4)}%"` : '';
         const ind = c.sortable ? '<span class="dt-sort-ind"></span>' : '';
         const resizer = c.resizable ? `<span class="dt-resizer" data-dt-resizer="${esc(c.key)}"></span>` : '';
         return `<th scope="col" class="${cls}"${aria}${style} data-key="${esc(c.key)}"><div class="dt-th"><span class="dt-th__label">${esc(c.label)}</span>${ind}</div>${resizer}</th>`;
       }).join('') + '</tr>';
-    }
-
-    // 自動フィットの測り直し（レイアウト確定後・リサイズ後に呼ぶ）。初回描画時は縦スクロールバーが
-    // 後から出て容器幅が縮むことがあり、その差でわずかな横スクロールが残るのを打ち消す。
-    // 基準は「未スケールの宣言幅」なので何度呼んでも増幅しない。
-    function refit() {
-      const ths = Array.from(headEl.querySelectorAll('th'));
-      if (!ths.length) return;
-      const base = visibleCols().map((c) => st.widths[c.key] || c.width || 0);
-      const sumW = base.reduce((a, b) => a + b, 0);
-      const avail = wrapEl.clientWidth || 0;
-      const fit = (avail > 0 && sumW > avail && sumW <= avail * 1.3) ? avail / sumW : 1;
-      ths.forEach((th, i) => { const w = base[i] ? Math.round(base[i] * fit) : 0; th.style.width = w ? w + 'px' : ''; });
     }
 
     function rowHtml(r, pinned) {
@@ -786,7 +772,7 @@ window.DataTable = (function () {
       const anyFilter = st.search || st.simpleSort || hasChips;
       root.querySelector('[data-dt-clear]').hidden = !(anyFilter && !hasChips);
       if (window.applyCellClips) window.applyCellClips(root); // .cell-tags のはみ出し「…」を再判定
-      requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); refit(); });
+      requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
     }
 
     // ===== イベント =====
@@ -811,7 +797,8 @@ window.DataTable = (function () {
       const startX = e.clientX, startW = th.getBoundingClientRect().width;
       document.body.classList.add('dt-resizing'); h.classList.add('dt-resizer--active');
       function move(ev) { const w = Math.max(64, startW + (ev.clientX - startX)); st.widths[key] = Math.round(w); th.style.width = w + 'px'; }
-      function up() { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('dt-resizing'); h.classList.remove('dt-resizer--active'); persist(); }
+      // ドラッグ中は px を直接当てて即時反映。離したら render() で全列を比率(%)へ組み直し容器にフィットさせる。
+      function up() { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('dt-resizing'); h.classList.remove('dt-resizer--active'); persist(); render(); }
       document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
     });
     headEl.addEventListener('dblclick', (e) => { const h = e.target.closest('[data-dt-resizer]'); if (!h) return; delete st.widths[h.dataset.dtResizer]; persist(); render(); });
@@ -1002,9 +989,6 @@ window.DataTable = (function () {
     }
 
     render();
-    // ウィンドウ幅（＝容器幅・スクロールバー有無）が変わったら列幅を測り直してフィットを維持。
-    let refitRaf = 0;
-    window.addEventListener('resize', () => { if (refitRaf) return; refitRaf = requestAnimationFrame(() => { refitRaf = 0; refit(); }); });
     return { render: render, state: st };
   }
   return { init: init };
