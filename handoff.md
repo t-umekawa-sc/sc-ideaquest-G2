@@ -12,8 +12,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`effe878`**（SC-91 会社一覧 モック完全準拠へ再整合）。
+- 最新コミット: 本 handoff コミット。直前＝**`1094df1`**（モーダル本文スクロール修正）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `1094df1` **モーダル本文スクロール修正**＝本文＋フッターを `<form>` で包む標準パターン（`Modal.tsx` §159）で内容が高いと `<form>` がパネル（`max-height:88vh`・`overflow:hidden`）から溢れ、フッターが画面外・本文も未スクロール（SC-91 作成モーダルで表面化）。`.modal__panel.sectioned > form` を flex 列＋`flex:1/min-height:0/overflow:hidden` に（body 直下パターンには非適用で無害）。`design-system.css`／`mocks/shared.css` 同期。目視確認＋full e2e 26 passed。
   - `effe878` (A)SC-91 会社一覧＝**モック完全準拠へ再整合**＝`.backlink`/`.page-title`「システム管理（運営）」/`.admin-sub`/`.section-head`(h2「会社（テナント）」＋「＋ 会社を作成」)/末尾 `.role-note`・テーブル `.co`＋`QuestIcon`/`.db-id`/状態バッジ `.st-active`/`.st-provisioning`・作成モーダルに会社カラー `.swatches`(新 `components/ui/Swatches.tsx`・backend `color` 接続)＋会社アイコン `.icon-field`(objectURL プレビューのみの仮実装・MinIO 待ち)＋`.provision-note`。共有クラス 8種を design-system.css と mocks/shared.css へ昇格・SC-91 モック `<style>` の重複撤去。e2e＝sc-91(B-TC-110 見出し/B-TC-111 ボタン名)・sc-92(作成ボタン名)追随＝**full 26 passed**。
 - 前セッション以前のコミット（新しい順・push 済み）:
   - `c78aa2d` (A)SC-93 会社アカウント管理 モック整合＝`RowMenu`（⋯ケバブ）新設・`.table`化・状態バッジ・自社コンテキスト・system_admin 行ロック。
@@ -77,7 +78,8 @@
 
 - **ブロッカーは無い**。
 - **本セッションのハマり（解消済み）**:
-  - **モーダル本文スクロールが効かない**＝flex 子の `min-height:0` 欠落（mock shared.css にも潜在）。`.modal__panel.sectioned{overflow:hidden}`＋`.modal__body{min-height:0}` で解消（design-system.css と正本 mocks/shared.css の両方）。
+  - **モーダル本文スクロールが効かない（第2波＝`<form>` 包み）**＝`.modal__panel.sectioned` は flex 縦積みで直下に header/body/footer を想定するが、標準の呼び出しは body+footer を **`<form>` で包む**（`Modal.tsx` §159）ため `<form>` が単一 flex 子になり body の `flex:1/min-height:0` が無効化。内容が高い SC-91 作成モーダルでフッター画面外＋未スクロールが表面化。**`.modal__panel.sectioned > form { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:hidden; }`** で解消（両 CSS 同期）。**入力モーダルは今後も内容が高くなり得る＝この form 規則が効いている前提で作る。**
+  - **モーダル本文スクロールが効かない（第1波・前セッション）**＝flex 子の `min-height:0` 欠落（mock shared.css にも潜在）。`.modal__panel.sectioned{overflow:hidden}`＋`.modal__body{min-height:0}` で解消（design-system.css と正本 mocks/shared.css の両方）。
   - **モーダルを body に portal → region 外**＝`getByRole("region").getByRole(...)` でモーダル内ボタンを拾えず e2e 失敗。モーダル内要素は **page スコープ**で取る（sc-92b B-TC-125 で対応）。
   - **一覧のページング未実装が data 増で表面化**＝会社/口座が閾値超で新規行が1ページ目に出ず e2e 失敗。**CompanyList にも検索＋ページャを追加**して解消（accounts と同型）。並びは backend で `created_at,id`（決定的）。
   - **見出し文言変更で e2e 破損**＝SC-93 見出しを「会社アカウント管理」に変更→ B-TC-117 の heading 参照を更新。**画面名を変えたら該当 e2e の getByRole heading を必ず追随。**
