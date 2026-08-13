@@ -20,13 +20,30 @@
 </head>
 <body>
 
+<div class="app-bg" id="appBg"></div>
+
 <header class="app-header">
   <div class="container between">
     <span class="brand"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></span>
-    <div class="row-center">
+    <!-- 共通ヘッダーアクション（ステータス／通知ベル／ユーザーメニュー）。挙動は shared.js が初期化。 -->
+    <div class="header-actions">
       <span class="pixel-stat level">Lv.7</span>
       <span class="pixel-stat coin">◆ 320</span>
-      <button class="btn btn-outline btn-sm">通知</button>
+      <a class="bell" href="#" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
+          <li role="none"><a role="menuitem" href="#">設定</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
     </div>
   </div>
 </header>
@@ -417,6 +434,15 @@
     </div>
     <p class="hint">開いたら ⤢ で最大化・ヘッダーをドラッグで移動・Esc で閉じる を試せます。</p>
   </div>
+
+  <div>
+    <h2>11. ヘッダー / ユーザーメニュー</h2>
+    <p class="muted text-sm">共通ヘッダー右側の <code>.header-actions</code>（ステータス <code>.pixel-stat</code>／通知ベル <code>.bell</code>／
+      アバターメニュー <code>.usermenu</code>）。<strong>ページ上部のアバター（山）をクリック</strong>すると、フェード＋右上基点のスライドで
+      開閉するメニューが出ます（吹き出し矢印・開いている間はトリガーにリング・<code>prefers-reduced-motion</code> で動きを無効化）。
+      開閉・Esc/外側クリックで閉じる・背景画像設定は <code>shared.js</code> が共通適用。</p>
+    <p class="hint">メニューの「🖼️ 背景画像を変更／リセット」でこのページの背景（<code>.app-bg</code>）も切り替わります（localStorage 保存）。</p>
+  </div>
 </main>
 
 <!-- サンプルダイアログ（標準の入力モーダル・ドラッグ＋最大化。挙動は shared.js が共通適用） -->
@@ -449,6 +475,12 @@
 </footer>
 
 <script>
+  // 保存済みのコンテンツ背景画像を復元（ユーザーメニューの「背景画像を変更」で設定・localStorage）。
+  (function () {
+    const saved = localStorage.getItem('ideaquest_content_bg');
+    if (saved) { const el = document.getElementById('appBg'); if (el) { el.style.backgroundImage = 'url("' + saved + '")'; el.classList.add('is-set'); } }
+  })();
+
   // 文字送り（タイプライター）デモ。実装では通知データを受けてJSで1文字ずつ表示する。
   const dialog = document.getElementById('demoDialog');
   const title  = dialog.querySelector('.pixel-dialog__title');
