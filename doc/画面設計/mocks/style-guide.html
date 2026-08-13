@@ -445,15 +445,16 @@
   </div>
 
   <div>
-    <h2>12. アクションメニュー（ゲーム風の選択カーソル）</h2>
-    <p class="muted text-sm">⋯ アクションメニュー（<code>.rowmenu</code>）の list に <code>.menu-pixel</code> を付けると、
-      項目ホバー/フォーカス時に<strong>ゲーム風ボタン（<code>.btn-pixel</code>）と同じ選択カーソル ▶</strong> が
-      <strong>同じアニメーション</strong>（点滅＋1ドット横揺れ・<code>pixel-cursor-blink</code> 流用）で出ます。
-      <code>prefers-reduced-motion</code> で静止。開閉は <code>shared.js</code> の RowMenu が共通処理。</p>
+    <h2>12. メニューの選択カーソル（標準）</h2>
+    <p class="muted text-sm"><strong>ドロップダウンメニューは標準で</strong>、項目ホバー/フォーカス時に
+      <strong>ゲーム風ボタン（<code>.btn-pixel</code>）と同じ選択カーソル ▶</strong> が<strong>同じアニメーション</strong>
+      （点滅＋1ドット横揺れ・<code>pixel-cursor-blink</code> 流用）で出ます。対象＝<strong>アクションメニュー（<code>.rowmenu__list</code>）</strong>と
+      <strong>ヘッダーのユーザーメニュー（<code>.usermenu__list</code>）</strong>。任意のメニューにも <code>.menu-pixel</code> で付与可。
+      <code>prefers-reduced-motion</code> で静止。開閉は <code>shared.js</code> が共通処理。</p>
     <div class="row" style="align-items:center; gap:var(--space-4)">
       <div class="rowmenu" id="sgPixelMenu">
         <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
-        <ul class="rowmenu__list menu-pixel" role="menu" hidden>
+        <ul class="rowmenu__list" role="menu" hidden>
           <li role="none"><button role="menuitem" type="button" data-sg-act2="edit">編集</button></li>
           <li role="none"><button role="menuitem" type="button" data-sg-act2="dup">複製</button></li>
           <li role="none"><button role="menuitem" type="button" data-sg-act2="move">別グループへ移動</button></li>
