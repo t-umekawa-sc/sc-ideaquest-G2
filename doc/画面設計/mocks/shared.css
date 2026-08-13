@@ -1217,8 +1217,10 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-cards--compact .dt-card { padding: var(--space-3); }
 .dt-cards--compact .dt-card__meta { margin-top: var(--space-1); }
 .dt-cards--compact .dt-card__stats { margin-top: var(--space-2); }
-/* カード表示中の単一並び替えセレクト（テーブルの見出しクリック相当をツールバーで代替） */
-.dt-cardsort { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
+/* カード表示中の単一並び替えセレクト（テーブルの見出しクリック相当をツールバーで代替）。
+   ラベルは持たず、コンボのプレースホルダー（未選択時の先頭 option「並び替え」）で示す。 */
+.dt-cardsort { display: inline-flex; align-items: center; font-size: var(--text-sm); white-space: nowrap; }
+.dt-cardsort select:has(option[value=""]:checked) { color: var(--color-text-muted); }  /* 未選択＝プレースホルダー風に淡色 */
 
 /* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
 .col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);

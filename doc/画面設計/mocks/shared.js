@@ -580,9 +580,9 @@ window.DataTable = (function () {
           </div>
           <button class="btn btn-outline btn-sm" type="button" data-dt-filter>詳細絞込</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-sort>詳細ソート</button>
-          ${hasCard && sortableCols.length ? `<label class="dt-cardsort" data-dt-card-only hidden>並び替え
+          ${hasCard && sortableCols.length ? `<label class="dt-cardsort" data-dt-card-only hidden>
             <select class="select" data-dt-cardsort aria-label="並び替え（カード表示）">
-              <option value="">なし</option>
+              <option value="">並び替え</option>
               ${sortableCols.map((c) => `<option value="${esc(c.key)}:asc">${esc(c.label)} ↑</option><option value="${esc(c.key)}:desc">${esc(c.label)} ↓</option>`).join('')}
             </select></label>` : ''}
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
