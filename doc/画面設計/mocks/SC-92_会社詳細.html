@@ -224,56 +224,20 @@
     <h2>クエストグループ</h2>
     <button class="btn btn-primary" type="button" id="newGroup">＋ グループ作成</button>
   </div>
-  <section class="card" aria-label="クエストグループ">
-    <div class="tools"><span class="list-count" id="grpCount">— 件</span></div>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th scope="col">グループ名</th><th scope="col">コード</th><th scope="col">メンバー数</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
-        </thead>
-        <tbody id="groupRows"></tbody>
-      </table>
-    </div>
-    <div class="list-empty" id="grpEmpty" hidden>クエストグループがありません。「＋ グループ作成」から追加してください。</div>
-    <p class="role-note" style="margin-top:var(--space-4);color:var(--color-text-muted);font-size:var(--text-xs)">
-      ※ グループの<strong>作成・リネーム・削除はシステム管理者のみ</strong>（会社構造の変更・B.3）。<strong>コードは作成時のみ（以後不変）</strong>／リネームは名称のみ。<strong>削除は空のグループのみ</strong>（所属メンバーがいる間は不可＝先に所属を外す）。ここで作ったグループが、下のアカウント編集「所属グループ」の候補になります。
-    </p>
-  </section>
+  <!-- 一覧操作標準（DataTable）。グループ名/コード/メンバー数＋⋯（リネーム/削除）。 -->
+  <div id="groupTable"></div>
+  <p class="role-note" style="margin-top:var(--space-4);color:var(--color-text-muted);font-size:var(--text-xs)">
+    ※ グループの<strong>作成・リネーム・削除はシステム管理者のみ</strong>（会社構造の変更・B.3）。<strong>コードは作成時のみ（以後不変）</strong>／リネームは名称のみ。<strong>削除は空のグループのみ</strong>（所属メンバーがいる間は不可＝先に所属を外す）。ここで作ったグループが、下のアカウント編集「所属グループ」の候補になります。
+  </p>
 
   <!-- ===== アカウント & クエストグループ所属（この会社） ===== -->
   <div class="section-head">
     <h2>アカウント & 所属（この会社）</h2>
     <button class="btn btn-primary" type="button" id="newAccount">＋ アカウント発行</button>
   </div>
-  <div class="list-toolbar">
-    <div class="filters">
-      <input class="input" type="search" id="fAccSearch" placeholder="氏名・ログインID・メールで検索">
-      <label>状態
-        <select class="select" id="fAccState">
-          <option value="">すべて</option>
-          <option value="active">有効</option>
-          <option value="suspended">無効</option>
-        </select>
-      </label>
-      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
-    </div>
-    <div class="tools"><span class="list-count" id="accCount">— 件</span></div>
-  </div>
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr><th scope="col">氏名</th><th scope="col">ログインID</th><th scope="col">メールアドレス</th><th scope="col">システムロール</th><th scope="col">所属クエストグループ</th><th scope="col">状態</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
-      </thead>
-      <tbody id="accountRows"></tbody>
-    </table>
-  </div>
-  <div class="list-empty" id="accEmpty" hidden>該当するアカウントがありません。</div>
-  <!-- ページネーション（標準・オフセット方式） -->
-  <nav class="pagination" id="pager" aria-label="ページ送り" hidden>
-    <button class="btn btn-outline btn-sm" type="button" id="pgPrev">← 前へ</button>
-    <span class="pagination__info" id="pgInfo">1 / 1</span>
-    <button class="btn btn-outline btn-sm" type="button" id="pgNext">次へ →</button>
-  </nav>
+  <!-- 一覧操作標準（DataTable）。状態・システムロールは詳細絞込の区分、無効行はミュート、
+       システム管理者含め全アカウントを操作可（この画面はシステム管理者）。 -->
+  <div id="accountTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）→初回ログイン時にパスワード設定。会社設定は Company の各フラグ（`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`）。<strong>クエストグループ所属の割当はシステム管理者のフル操作</strong>（クエストグループ管理者は自グループ範囲のみ＝SC-90）。この画面の操作は<strong>すべて上部バナーの会社に対して</strong>適用されます。
@@ -512,64 +476,52 @@
     applyColor(sw.dataset.color);   // バナー左帯＋アイコンタイル（--ctx-color）が即連動
   });
 
-  // アカウント一覧（この会社）
-  const accountRows = document.getElementById('accountRows');
-  const fAccSearch = document.getElementById('fAccSearch');
-  const fAccState = document.getElementById('fAccState');
-  const accPager = document.getElementById('pager');
-  const accClearBtn = document.getElementById('clearFilters');
-  const ACC_PER_PAGE = 5;
-  let accPage = 1;
+  // ---- アカウント一覧（この会社・DataTable） ----
   const list0 = ACCOUNTS[companyId] || [];
-  function renderAccounts() {
-    const q = fAccSearch.value.trim().toLowerCase(), st = fAccState.value;
-    const list = list0.filter(a => (!q || a.name.toLowerCase().includes(q) || a.loginId.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)) && (!st || a.state === st));
-    accClearBtn.hidden = !(q || st);                                      // F1
-    const totalPages = Math.max(1, Math.ceil(list.length / ACC_PER_PAGE)); // F2
-    if (accPage > totalPages) accPage = totalPages;
-    accountRows.innerHTML = list.slice((accPage - 1) * ACC_PER_PAGE, accPage * ACC_PER_PAGE).map(a => {
-      const [label, cls] = ST_ACC[a.state];
-      const idx = list0.indexOf(a);
-      const groups = a.groups.length
-        ? `<span class="cell-tags" title="${a.groups.map(g => g.n + (g.r === 'admin' ? '（管理者）' : '')).join('、')}">`
-          + a.groups.map(g => g.r === 'admin'
-            ? `<span class="badge st-active">${g.n} · 管理者</span>`
-            : `<span class="badge badge-muted">${g.n}</span>`).join('')
-          + `</span>`
-        : '<span class="muted">—</span>';
-      const toggle = a.state === 'active'
-        ? `<button role="menuitem" type="button" class="is-danger" data-suspend="${idx}">無効化</button>`
-        : `<button role="menuitem" type="button" data-activate="${idx}">再有効化</button>`;
-      return `<tr class="${a.state === 'suspended' ? 'is-suspended' : ''}">
-        <td><strong>${a.name}</strong></td>
-        <td class="db-id">${a.loginId}</td>
-        <td class="db-id">${a.email}</td>
-        <td>${SYSROLE_LABEL[a.system_role]}</td>
-        <td>${groups}</td>
-        <td><span class="badge ${cls}">${label}</span></td>
-        <td class="col-actions"><div class="rowmenu">
-          <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
-          <ul class="rowmenu__list" role="menu" hidden>
-            <li role="none"><button role="menuitem" type="button" data-edit="${idx}">所属・編集</button></li>
-            <li role="none"><button role="menuitem" type="button" data-reset="${idx}">パスワード再設定</button></li>
-            <li role="none">${toggle}</li>
-          </ul>
-        </div></td>
-      </tr>`;
-    }).join('');
-    document.getElementById('accCount').textContent = list.length + ' 件';
-    document.getElementById('accEmpty').hidden = list.length !== 0;
-    accPager.hidden = list.length === 0;
-    document.getElementById('pgInfo').textContent = accPage + ' / ' + totalPages;
-    document.getElementById('pgPrev').disabled = accPage <= 1;
-    document.getElementById('pgNext').disabled = accPage >= totalPages;
-    if (window.applyCellClips) applyCellClips(accountRows);
+  function groupsCell(a) {
+    if (!a.groups.length) return '<span class="muted">—</span>';
+    return `<span class="cell-tags">` + a.groups.map(g => g.r === 'admin'
+      ? `<span class="badge st-active">${g.n} · 管理者</span>`
+      : `<span class="badge badge-muted">${g.n}</span>`).join('') + `</span>`;
   }
-  fAccSearch.addEventListener('input', () => { accPage = 1; renderAccounts(); });
-  fAccState.addEventListener('change', () => { accPage = 1; renderAccounts(); });
-  accClearBtn.addEventListener('click', () => { fAccSearch.value = ''; fAccState.value = ''; accPage = 1; renderAccounts(); });
-  document.getElementById('pgPrev').addEventListener('click', () => { if (accPage > 1) { accPage--; renderAccounts(); } });
-  document.getElementById('pgNext').addEventListener('click', () => { accPage++; renderAccounts(); });
+  const groupsText = (a) => a.groups.map(g => g.n + (g.r === 'admin' ? '（管理者）' : '')).join('、') || '—';
+  const nameCell = (r) => `<span style="display:inline-flex;align-items:center;gap:var(--space-2);min-width:0"><span class="avatar sm" data-name="${r.name}"><span class="avatar__img placeholder">${r.name.slice(0, 1)}</span></span><strong>${r.name}</strong></span>`;
+  // SC-92 はシステム管理者画面＝全アカウントを操作可（SC-93 のような sys_admin ロックは無い）。
+  function accActions(r) {
+    const toggle = r.state === 'active'
+      ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-suspend="${r.loginId}">無効化</button></li>`
+      : `<li role="none"><button role="menuitem" type="button" data-activate="${r.loginId}">再有効化</button></li>`;
+    return `<div class="rowmenu">
+      <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+      <ul class="rowmenu__list" role="menu" hidden>
+        <li role="none"><button role="menuitem" type="button" data-edit="${r.loginId}">所属・編集</button></li>
+        <li role="none"><button role="menuitem" type="button" data-reset="${r.loginId}">パスワード再設定</button></li>
+        ${toggle}
+      </ul>
+    </div>`;
+  }
+  const accountTable = document.getElementById('accountTable');
+  const accountDt = window.DataTable.init(accountTable, {
+    storageKey: 'sc92-accounts-' + companyId,
+    data: list0,
+    rowId: (r) => r.loginId,
+    unit: '件', perPage: 5, perPageOptions: [5, 10, 20, 50],
+    searchFields: '氏名・ログインID・メール',
+    exportName: CO.code + '-アカウント',
+    emptyText: '該当するアカウントがありません。',
+    rowClass: (r) => r.state === 'suspended' ? 'is-suspended' : '',
+    cardLayout: (r) => ({ title: r.name, badges: [{ label: ST_ACC[r.state][0], cls: ST_ACC[r.state][1] }, { label: SYSROLE_LABEL[r.system_role] }], meta: [r.loginId, r.email], stats: [groupsText(r)] }),
+    columns: [
+      { key: 'name', label: '氏名', locked: true, width: 200, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, csvVal: (r) => r.name, render: nameCell },
+      { key: 'loginId', label: 'ログインID', width: 160, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.loginId, searchVal: (r) => r.loginId, render: (r) => r.loginId },
+      { key: 'email', label: 'メールアドレス', width: 200, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.email, searchVal: (r) => r.email, render: (r) => r.email },
+      { key: 'system_role', label: 'システムロール', width: 150, sortable: true, filter: { type: 'enum', options: [['general', '一般'], ['company_account_admin', '会社アカウント管理者'], ['sys_admin', 'システム管理者']] }, sortVal: (r) => SYSROLE_LABEL[r.system_role], filterVal: (r) => r.system_role, csvVal: (r) => SYSROLE_LABEL[r.system_role], render: (r) => SYSROLE_LABEL[r.system_role] },
+      { key: 'groups', label: '所属クエストグループ', width: 220, csvVal: groupsText, render: groupsCell },
+      { key: 'state', label: '状態', width: 100, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['suspended', '無効']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST_ACC[r.state] || ['—'])[0], render: (r) => `<span class="badge ${ST_ACC[r.state][1]}">${ST_ACC[r.state][0]}</span>` },
+      { key: '_actions', label: '', actions: true, locked: true, width: 90, render: accActions },
+    ],
+  });
+  function refreshAccounts() { accountDt.render(); }
 
   // モーダル
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
@@ -607,7 +559,7 @@
     if (accEditTarget) {
       accEditTarget.name = name; accEditTarget.loginId = loginId; accEditTarget.email = email; accEditTarget.system_role = sysRole;
       accEditTarget.groups = memberships;  // 所属・グループ内ロールを更新（一覧の「·管理者」バッジに反映）
-      renderAccounts();
+      refreshAccounts(); refreshGroups();  // 所属変更はグループのメンバー数にも波及
     } else {
       const summary = memberships.length ? '\n所属: ' + memberships.map(m => m.n + (m.r === 'admin' ? '（管理者）' : '')).join('、') : '';
       alert('「' + name + '」を ' + CO.name + ' に発行しました（デモ）。' + summary + '\n初回ログイン時にパスワード設定を行います。');
@@ -615,19 +567,17 @@
     closeModal(document.getElementById('accountModal'));
   });
 
-  // 行アクション（編集 / パスワード再設定 / 無効化⇄再有効化）
-  accountRows.addEventListener('click', (e) => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    if (btn.dataset.edit != null) { openAccount('edit', list0[btn.dataset.edit]); }
-    else if (btn.dataset.reset != null) { const a = list0[btn.dataset.reset]; if (confirm('「' + a.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フロー（リンク・72時間）に戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
-    else if (btn.dataset.suspend != null) { const a = list0[btn.dataset.suspend]; if (confirm('「' + a.name + '」を無効化（論理削除）しますか？\nログイン不可・全セッション破棄になりますが、これまでの入力は残ります。')) { a.state = 'suspended'; renderAccounts(); } }
-    else if (btn.dataset.activate != null) { const a = list0[btn.dataset.activate]; a.state = 'active'; renderAccounts(); }
+  // 行アクション（所属・編集 / パスワード再設定 / 無効化⇄再有効化）
+  accountTable.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-edit],[data-reset],[data-suspend],[data-activate]'); if (!b) return;
+    const find = (id) => list0.find((x) => x.loginId === id);
+    if (b.dataset.edit != null) { openAccount('edit', find(b.dataset.edit)); }
+    else if (b.dataset.reset != null) { const a = find(b.dataset.reset); if (confirm('「' + a.name + '」のパスワードを再設定しますか？\n初回ログイン時のパスワード設定フロー（リンク・72時間）に戻します（デモ）。')) alert('パスワード再設定リンクを送信しました（デモ）。'); }
+    else if (b.dataset.suspend != null) { const a = find(b.dataset.suspend); if (confirm('「' + a.name + '」を無効化（論理削除）しますか？\nログイン不可・全セッション破棄になりますが、これまでの入力は残ります。')) { a.state = 'suspended'; refreshAccounts(); } }
+    else if (b.dataset.activate != null) { const a = find(b.dataset.activate); a.state = 'active'; refreshAccounts(); }
   });
 
-  // ===== クエストグループ（CRUD・system_admin・B.3） =====
-  const groupRows = document.getElementById('groupRows');
-  const grpCount = document.getElementById('grpCount');
-  const grpEmpty = document.getElementById('grpEmpty');
+  // ===== クエストグループ（CRUD・system_admin・B.3・DataTable） =====
   const QG_CODE_RE = /^[A-Z][A-Z0-9-]{1,19}$/;   // 英大文字始まり・A-Z/0-9/- ・2〜20字（§5.4）
   function groupMemberCount(name) {
     return list0.filter(a => a.groups.some(g => g.n === name)).length;  // 有効所属数（モック）
@@ -635,25 +585,31 @@
   function refreshGroupBannerCount() {
     document.getElementById('ctxCounts').textContent = 'アカウント ' + CO.accounts + ' / グループ ' + CO.questGroups.length;
   }
-  function renderGroups() {
-    groupRows.innerHTML = CO.questGroups.map((g, i) => `
-      <tr>
-        <td><strong>${g.name}</strong></td>
-        <td class="db-id">${g.code}</td>
-        <td>${groupMemberCount(g.name)} 名</td>
-        <td class="col-actions"><div class="rowmenu">
+  const groupTable = document.getElementById('groupTable');
+  const groupDt = window.DataTable.init(groupTable, {
+    storageKey: 'sc92-groups-' + companyId,
+    data: CO.questGroups,
+    rowId: (g) => g.code,
+    unit: '件', perPage: 10, perPageOptions: [10, 20, 50],
+    searchFields: 'グループ名・コード',
+    exportName: CO.code + '-クエストグループ',
+    emptyText: 'クエストグループがありません。「＋ グループ作成」から追加してください。',
+    cardLayout: (g) => ({ title: g.name, meta: ['コード: ' + g.code], stats: [groupMemberCount(g.name) + ' 名'] }),
+    columns: [
+      { key: 'name', label: 'グループ名', locked: true, width: 260, sortable: true, filter: { type: 'text' }, sortVal: (g) => g.name, searchVal: (g) => g.name, csvVal: (g) => g.name, render: (g) => `<strong>${g.name}</strong>` },
+      { key: 'code', label: 'コード', width: 160, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (g) => g.code, searchVal: (g) => g.code, render: (g) => g.code },
+      { key: 'members', label: 'メンバー数', width: 130, align: 'num', sortable: true, sortVal: (g) => groupMemberCount(g.name), csvVal: (g) => groupMemberCount(g.name), render: (g) => groupMemberCount(g.name) + ' 名' },
+      { key: '_actions', label: '', actions: true, locked: true, width: 90, render: (g) => `
+        <div class="rowmenu">
           <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
           <ul class="rowmenu__list" role="menu" hidden>
-            <li role="none"><button role="menuitem" type="button" data-grename="${i}">リネーム</button></li>
-            <li role="none"><button role="menuitem" type="button" class="is-danger" data-gdelete="${i}">削除</button></li>
+            <li role="none"><button role="menuitem" type="button" data-grename="${g.code}">リネーム</button></li>
+            <li role="none"><button role="menuitem" type="button" class="is-danger" data-gdelete="${g.code}">削除</button></li>
           </ul>
-        </div></td>
-      </tr>`).join('');
-    grpCount.textContent = CO.questGroups.length + ' 件';
-    grpEmpty.hidden = CO.questGroups.length !== 0;
-    refreshGroupBannerCount();
-    renderAddOptions();  // 所属エディタの「＋グループを追加」候補も追随
-  }
+        </div>` },
+    ],
+  });
+  function refreshGroups() { groupDt.render(); refreshGroupBannerCount(); renderAddOptions(); }
   // 作成 / リネーム モーダル（コードは作成時のみ・以後不変）
   let grpEditTarget = null;
   function openGroup(mode, g) {
@@ -685,29 +641,29 @@
       const oldName = grpEditTarget.name;
       grpEditTarget.name = name;
       if (oldName !== name) list0.forEach(a => a.groups.forEach(m => { if (m.n === oldName) m.n = name; }));  // 所属の表示名も追随
-      renderGroups(); renderAccounts();
+      refreshGroups(); refreshAccounts();
     } else {
       CO.questGroups.push({ code, name });   // 会社内一意（部分ユニーク・§5.4）
-      renderGroups();
+      refreshGroups();
     }
     closeModal(modal);
   });
-  // 行アクション（リネーム / 削除＝空グループのみ）
-  groupRows.addEventListener('click', (e) => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    if (btn.dataset.grename != null) { openGroup('edit', CO.questGroups[btn.dataset.grename]); }
-    else if (btn.dataset.gdelete != null) {
-      const idx = Number(btn.dataset.gdelete), g = CO.questGroups[idx], mc = groupMemberCount(g.name);
+  // 行アクション（リネーム / 削除＝空グループのみ）。対象は code で解決。
+  groupTable.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-grename],[data-gdelete]'); if (!b) return;
+    if (b.dataset.grename != null) { openGroup('edit', CO.questGroups.find((g) => g.code === b.dataset.grename)); }
+    else if (b.dataset.gdelete != null) {
+      const g = CO.questGroups.find((x) => x.code === b.dataset.gdelete); if (!g) return;
+      const mc = groupMemberCount(g.name);
       if (mc > 0) { alert('「' + g.name + '」には所属メンバーが ' + mc + ' 名います。\n削除は空のグループのみ可（B.3）。先に全員の所属を外してください。'); return; }
       if (confirm('クエストグループ「' + g.name + '」を削除しますか？\n空のグループのみ削除でき、過去の所属履歴は保持されます（トゥームストーン・デモ）。')) {
-        CO.questGroups.splice(idx, 1);
-        renderGroups();
+        CO.questGroups.splice(CO.questGroups.indexOf(g), 1);
+        refreshGroups();
       }
     }
   });
 
-  renderGroups();
-  renderAccounts();
+  refreshGroupBannerCount();
 </script>
 </body>
 </html>
