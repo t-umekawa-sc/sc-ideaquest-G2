@@ -14,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`87865f2`**（usermenu 区切りを細罫線に修正）。
+- 最新コミット: 本 handoff コミット。直前＝**`a4834e0`**（`.menu-pixel` ＋ style-guide 12.）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `a4834e0` **ゲーム風選択カーソル付きメニュー `.menu-pixel`＋style-guide サンプル(12.)**（mocks のみ）＝メニュー list に `.menu-pixel` を付けると `[role="menuitem"]` ホバー/フォーカスで `.btn-pixel` と同じ ▶ カーソルを同アニメ（`pixel-cursor-blink`＝点滅＋1ドット横揺れ）で表示。`prefers-reduced-motion` で静止・`.is-danger` は ▶ も危険色。style-guide「12.」に `.rowmenu__list.menu-pixel` のサンプル。**業務層はクリーン維持のため実一覧への採用は別途判断（サンプル提示に留め）**。
   - `87865f2` **修正 usermenu の区切りを細い罫線に**（mocks のみ）＝グループ区切り `.usermenu__sep` が太い（ホバーで青い）バーになっていた不具合。原因＝区切りの `<div>` が `.usermenu__list li > *` に巻き込まれ項目 padding／ホバー背景が付いていた。項目スタイルを **`[role="menuitem"]` のみ**に限定し、`.usermenu__sep` を本来の細罫線に。
   - `3729779` **style-guide に共通ヘッダーアクション（通知ベル＋usermenu）掲載**（mocks のみ）＝ヘッダー右を簡易版→標準 `.header-actions`（`.pixel-stat`＋`.bell`＋`.usermenu`）へ。`.app-bg`＋背景復元スニペット追加（メニューの背景変更/リセットが動く）。ドキュメント節「11. ヘッダー / ユーザーメニュー」追加。D-1 の開閉アニメを style-guide でも確認可能に。
   - `cd5dd40` **D-1 ヘッダー usermenu の開閉アニメ＋UI 磨き**（mocks のみ・`shared.js` 不変・CSS 中心）＝`.usermenu__list` をフェード＋右上基点のスライド/スケール(.15s)で開閉（閉時もアニメ・`prefers-reduced-motion` で無効）。UI＝吹き出し矢印(`::before`)・開時トリガーにリング(`aria-expanded=true`)・角丸/最小幅拡大・ホバー配色。要点＝`hidden` トグルは不変のまま CSS で `hidden` 時に `display:block`＋`opacity:0`+`visibility:hidden`+`pointer-events:none`（グローバル `[hidden]{display:none}` をこの要素だけ上書き）＝閉じアニメ両立＋a11y/非操作担保。`デザイン標準.md` 共通ヘッダー節に追記。
