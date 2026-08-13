@@ -443,6 +443,27 @@
       開閉・Esc/外側クリックで閉じる・背景画像設定は <code>shared.js</code> が共通適用。</p>
     <p class="hint">メニューの「🖼️ 背景画像を変更／リセット」でこのページの背景（<code>.app-bg</code>）も切り替わります（localStorage 保存）。</p>
   </div>
+
+  <div>
+    <h2>12. アクションメニュー（ゲーム風の選択カーソル）</h2>
+    <p class="muted text-sm">⋯ アクションメニュー（<code>.rowmenu</code>）の list に <code>.menu-pixel</code> を付けると、
+      項目ホバー/フォーカス時に<strong>ゲーム風ボタン（<code>.btn-pixel</code>）と同じ選択カーソル ▶</strong> が
+      <strong>同じアニメーション</strong>（点滅＋1ドット横揺れ・<code>pixel-cursor-blink</code> 流用）で出ます。
+      <code>prefers-reduced-motion</code> で静止。開閉は <code>shared.js</code> の RowMenu が共通処理。</p>
+    <div class="row" style="align-items:center; gap:var(--space-4)">
+      <div class="rowmenu" id="sgPixelMenu">
+        <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+        <ul class="rowmenu__list menu-pixel" role="menu" hidden>
+          <li role="none"><button role="menuitem" type="button" data-sg-act2="edit">編集</button></li>
+          <li role="none"><button role="menuitem" type="button" data-sg-act2="dup">複製</button></li>
+          <li role="none"><button role="menuitem" type="button" data-sg-act2="move">別グループへ移動</button></li>
+          <li role="none"><button role="menuitem" type="button" class="is-danger" data-sg-act2="del">削除</button></li>
+        </ul>
+      </div>
+      <span class="muted text-sm">← ⋯ をクリックして開き、各項目にマウスを乗せると ▶ が点滅します。</span>
+    </div>
+    <p class="hint">通常のアクションメニュー（<code>.menu-pixel</code> 無し）は「9.」の一覧サンプルで確認できます。</p>
+  </div>
 </main>
 
 <!-- サンプルダイアログ（標準の入力モーダル・ドラッグ＋最大化。挙動は shared.js が共通適用） -->
@@ -581,6 +602,13 @@
       alert(label + '：' + (row ? row.name : mi.dataset.id) + '（デモ）');
     });
   })();
+
+  // --- 12. ゲーム風カーソル付きアクションメニュー デモ（開閉は shared.js の RowMenu が処理） ---
+  document.getElementById('sgPixelMenu').addEventListener('click', (e) => {
+    const mi = e.target.closest('[data-sg-act2]'); if (!mi) return;
+    const label = { edit: '編集', dup: '複製', move: '別グループへ移動', del: '削除' }[mi.dataset.sgAct2] || mi.dataset.sgAct2;
+    alert(label + '（デモ）');
+  });
 
   // --- 10. ダイアログ（モーダル）デモ。開閉は .show/hidden をトグルするだけ（ドラッグ/最大化/Esc は shared.js） ---
   (function () {
