@@ -104,7 +104,7 @@
         <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#475569" data-color="#475569" aria-label="スレート"></button>
       </div>
     </div>
-    <div class="provision-note">作成すると管理DBに会社を登録します（状態=準備中）。<strong>会社DBの実体は別途プロビジョニング</strong>（MVP: compose にサービス追記 → <code>up</code>）が必要です。DB接続確認後に「有効」化。</div>
+    <div class="provision-note">作成すると管理DBに会社を登録し、状態＝<strong>有効</strong>で始まります。<strong>会社DBの実体は別途プロビジョニング</strong>（MVP: compose にサービス追記 → <code>up</code>）が必要で、未整備の間は「停止」（メンテナンス）に切り替えて運用します。</div>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
@@ -119,14 +119,14 @@
   if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
   // ---- データ（モック・初期値。会社詳細 SC-92 と共有する想定のキー） ----
-  const ST = { active:['有効','st-active'], provisioning:['準備中','st-provisioning'], suspended:['停止','st-suspended'] };
+  const ST = { active:['有効','st-active'], suspended:['停止','st-suspended'] };
   const COMPANIES = [
     { id:'across', name:'アクロス株式会社', code:'ACROSS', color:'#2563EB', db:'db_across', state:'active', accounts:42, groups:5, created:'2026-01-10' },
     { id:'beyond', name:'ビヨンド工業',     code:'BEYOND', color:'#059669', db:'db_beyond', state:'active', accounts:18, groups:2, created:'2026-03-22' },
     { id:'sample', name:'サンプル商事',     code:'SAMPLE', color:'#D97706', db:'db_sample', state:'suspended', accounts:7, groups:1, created:'2026-05-30' },
     { id:'crest',  name:'クレスト製作所',   code:'CREST',  color:'#7C3AED', db:'db_crest',  state:'active', accounts:25, groups:3, created:'2026-04-08' },
     { id:'orion',  name:'オリオン食品',     code:'ORION',  color:'#0891B2', db:'db_orion',  state:'active', accounts:31, groups:4, created:'2026-04-19' },
-    { id:'nova',   name:'ノヴァ電機',       code:'NOVA',   color:'#E11D48', db:'db_nova',   state:'provisioning', accounts:0, groups:0, created:'2026-07-28' },
+    { id:'nova',   name:'ノヴァ電機',       code:'NOVA',   color:'#E11D48', db:'db_nova',   state:'active', accounts:0, groups:0, created:'2026-07-28' },
     { id:'zenith', name:'ゼニス商会',       code:'ZENITH', color:'#EA580C', db:'db_zenith', state:'active', accounts:12, groups:2, created:'2026-06-11' },
     { id:'lumen',  name:'ルーメン工業',     code:'LUMEN',  color:'#475569', db:'db_lumen',  state:'suspended', accounts:9, groups:1, created:'2026-02-15' },
   ];
@@ -152,7 +152,7 @@
       { key: 'name', label: '会社名', locked: true, width: 240, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: coCell },
       { key: 'code', label: '会社コード', width: 130, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.code, searchVal: (r) => r.code, render: (r) => r.code },
       { key: 'db', label: 'DB識別子', width: 150, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.db, searchVal: (r) => r.db, render: (r) => r.db },
-      { key: 'state', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['provisioning', '準備中'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => stateBadge(r.state) },
+      { key: 'state', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => stateBadge(r.state) },
       { key: 'accounts', label: 'アカウント', width: 110, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.accounts, filterVal: (r) => r.accounts, render: (r) => r.accounts },
       { key: 'groups', label: 'グループ', width: 100, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.groups, filterVal: (r) => r.groups, render: (r) => r.groups },
       { key: 'created', label: '作成日', width: 130, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
@@ -201,9 +201,9 @@
     if (!/^[A-Z][A-Z0-9-]{3,19}$/.test(code)) { setFieldError(cmCode, '英大文字/数字/ハイフン・先頭は英字・4〜20文字で入力してください'); firstBad = firstBad || cmCode; }
     else if (COMPANIES.some(c => c.code === code)) { setFieldError(cmCode, '会社コード「' + code + '」は既に使われています（全社で一意）'); firstBad = firstBad || cmCode; }
     if (firstBad) { firstBad.focus(); return; }
-    // デモ：一覧に即時追加（状態=準備中）。選択した会社カラーを反映。
+    // デモ：一覧に即時追加（状態=有効）。選択した会社カラーを反映。
     const selColor = (cmSwatches.querySelector('.swatch[aria-checked="true"]') || {}).dataset ? cmSwatches.querySelector('.swatch[aria-checked="true"]').dataset.color : '#2563EB';
-    COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'provisioning', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
+    COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'active', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
     companyTable.render();
     closeModal(document.getElementById('companyModal'));
     alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');

@@ -351,7 +351,7 @@
   if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
   // ---- データ（モック・初期値。SC-91 と同じ会社を参照） ----
-  const ST_CO = { active:['有効','st-active'], provisioning:['準備中','badge-muted'], suspended:['停止','st-suspended'] };
+  const ST_CO = { active:['有効','st-active'], suspended:['停止','st-suspended'] };
   const COMPANIES = {
     across: { name:'アクロス株式会社', code:'ACROSS', color:'#2563EB', icon:null, db:'db_across', state:'active', accounts:42, groups:5,
       flags:{ voteAnon:true, hideVoters:true, mfa:true },

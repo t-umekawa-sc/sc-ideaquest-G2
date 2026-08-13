@@ -1084,9 +1084,8 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .co { display: flex; align-items: center; gap: var(--space-3); }
 .db-id { font-family: ui-monospace, monospace; }
 .table .db-id { font-size: var(--text-xs); color: var(--color-text-muted); }
-/* 会社状態バッジ（有効/準備中/停止） */
+/* 会社状態バッジ（有効/停止＝company_status の2値） */
 .st-active { background: var(--color-agree-bg); color: var(--color-success); }
-.st-provisioning { background: var(--color-surface-alt); color: var(--color-text-muted); }
 .st-suspended { background: var(--color-disagree-bg); color: var(--color-danger); }
 /* 会社アイコン設定フィールド（作成/編集モーダル） */
 .icon-field { display: flex; align-items: center; gap: var(--space-4); }

@@ -199,7 +199,7 @@
               </div>
               <div class="pmember__perms" data-perms>
                 <span class="perm perm-owner is-on" aria-disabled="true" title="作成者は既定で所有者・剥奪不可">所有者</span>
-                <span class="perm" data-perm="manage" aria-disabled="true">管理</span>
+                <span class="perm" data-perm="manage" aria-disabled="true">クエスト管理</span>
                 <span class="perm" data-perm="eval" aria-disabled="true">評価者</span>
                 <span class="perm" data-perm="vote" aria-disabled="true">投票</span>
                 <span class="perm" data-perm="idea" aria-disabled="true">作成</span>
@@ -217,7 +217,7 @@
             <button class="cand" type="button" data-name="田中 みゆき" data-ini="田"><span class="avatar sm" data-name="田中 みゆき"><span class="avatar__img placeholder">田</span></span>田中 みゆき ＋</button>
             <button class="cand" type="button" data-name="高橋 健" data-ini="高"><span class="avatar sm" data-name="高橋 健"><span class="avatar__img placeholder">高</span></span>高橋 健 ＋</button>
           </div>
-          <div class="hint">追加すると既定権限（<strong>投票・作成・コメント</strong>）が付与されます。評価者/管理は個別にオン。所有者の付与は作成者のみ可。</div>
+          <div class="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。所有者の付与は作成者のみ可。</div>
         </div>
       </div>
     </div>
@@ -239,7 +239,7 @@
   if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
 
   const DEFAULT_PERMS = ['vote','idea','comment'];   // 新規参加メンバーの既定権限
-  const PERM_LABEL = { manage:'管理', eval:'評価者', vote:'投票', idea:'作成', comment:'コメント' };
+  const PERM_LABEL = { manage:'クエスト管理', eval:'評価者', vote:'投票', idea:'作成', comment:'コメント' };
 
   // 件名 → アイコン頭文字を連動
   const qName = document.getElementById('qName');
