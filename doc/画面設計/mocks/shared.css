@@ -1199,8 +1199,17 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-card__tools { position: absolute; top: var(--space-2); right: var(--space-2); display: inline-flex; align-items: center; gap: 4px; }
 .dt-card__body > :first-child { padding-right: 30px; }               /* 右上ツール（ピン）を避ける余白 */
 .dt-card--has-actions .dt-card__body > :first-child { padding-right: 66px; }  /* ピン＋⋯アクションメニュー分 */
+.dt-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.dt-card__title { font-weight: 700; }
 .dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+/* 表示密度=コンパクト（カード）＝間隔と余白を詰める。密度トグルはテーブル/カード共通。 */
+.dt-cards--compact { gap: var(--space-3); }
+.dt-cards--compact .dt-card { padding: var(--space-3); }
+.dt-cards--compact .dt-card__meta { margin-top: var(--space-1); }
+.dt-cards--compact .dt-card__stats { margin-top: var(--space-2); }
+/* カード表示中の単一並び替えセレクト（テーブルの見出しクリック相当をツールバーで代替） */
+.dt-cardsort { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
 
 /* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
 .col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);

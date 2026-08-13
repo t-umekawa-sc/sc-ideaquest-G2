@@ -503,8 +503,11 @@ window.DataTable = (function () {
     const rowId = cfg.rowId || ((r) => r.id);
     const unit = cfg.unit || '件';
     const perPageOptions = cfg.perPageOptions || [10, 20, 50, 100];
-    // cfg.card(r)=カード1枚の中身HTMLを返す関数。与えると「テーブル/カード」表示切替が有効になる（未指定＝従来どおりテーブルのみ）。
-    const hasCard = typeof cfg.card === 'function';
+    // カード表示の指定は2通り: cfg.card(r)=中身HTMLを返す関数（自由）／cfg.cardLayout(r)=
+    // {title,badges:[{label,cls}],meta:[..],stats:[..]} を返す（標準構造ヘルパ・記述量を削減）。
+    // どちらか与えると「テーブル/カード」表示切替が有効（未指定＝従来どおりテーブルのみ）。
+    const hasCard = typeof cfg.card === 'function' || typeof cfg.cardLayout === 'function';
+    const sortableCols = dataCols.filter((c) => c.sortable);
 
     // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
     const persisted = load(cfg.storageKey) || {};
@@ -577,18 +580,23 @@ window.DataTable = (function () {
           </div>
           <button class="btn btn-outline btn-sm" type="button" data-dt-filter>詳細絞込</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-sort>詳細ソート</button>
+          ${hasCard && sortableCols.length ? `<label class="dt-cardsort" data-dt-card-only hidden>並び替え
+            <select class="select" data-dt-cardsort aria-label="並び替え（カード表示）">
+              <option value="">なし</option>
+              ${sortableCols.map((c) => `<option value="${esc(c.key)}:asc">${esc(c.label)} ↑</option><option value="${esc(c.key)}:desc">${esc(c.label)} ↓</option>`).join('')}
+            </select></label>` : ''}
           <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
         </div>
         <div class="tools">
-          <span class="seg seg-density" role="group" aria-label="表示密度" data-dt-table-only>
+          <span class="seg seg-density" role="group" aria-label="表示密度">
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
           </span>
           <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
-          ${hasCard ? `<div class="viewtoggle" role="group" aria-label="表示切替">
-            <button type="button" data-dt-view="card" title="カード表示">🔲 カード</button>
-            <button type="button" data-dt-view="list" title="リスト表示">☰ リスト</button>
+          ${hasCard ? `<div class="viewtoggle" role="radiogroup" aria-label="表示切替">
+            <button type="button" role="radio" data-dt-view="card" title="カード表示">🔲 カード</button>
+            <button type="button" role="radio" data-dt-view="list" title="リスト表示">☰ リスト</button>
           </div>` : ''}
         </div>
         <div class="dt-chips" data-dt-chips></div>
@@ -596,7 +604,7 @@ window.DataTable = (function () {
       <div class="table-wrap dt-scroll" data-dt-wrap>
         <table class="table dt-fixed"><thead data-dt-head></thead><tbody data-dt-body></tbody></table>
       </div>
-      ${hasCard ? '<div class="dt-cards" data-dt-cards hidden></div>' : ''}
+      ${hasCard ? '<div class="dt-cards" data-dt-cards role="list" hidden></div>' : ''}
       <div class="list-empty" data-dt-empty hidden>該当するデータがありません。</div>
       <div class="dt-footer" data-dt-footer>
         <span class="list-count" data-dt-count></span>
@@ -642,14 +650,28 @@ window.DataTable = (function () {
       return `<tr data-dt-row="${id}"${pinned ? ' class="is-pinned"' : ''}>${tds}</tr>`;
     }
 
+    // カード本文。cfg.card（自由HTML）優先。無ければ cfg.cardLayout（標準構造ヘルパ）で組み立てる。
+    function buildCardBody(r) {
+      if (typeof cfg.card === 'function') return cfg.card(r);
+      const L = cfg.cardLayout(r) || {};
+      const badges = (L.badges || []).filter(Boolean).map((b) => `<span class="badge ${b.cls || 'badge-muted'}">${esc(b.label)}</span>`).join('');
+      const meta = (L.meta || []).filter((x) => x != null && x !== '').map((m) => `<span>${esc(m)}</span>`).join('');
+      const stats = (L.stats || []).filter((x) => x != null && x !== '').map((s) => `<span>${esc(s)}</span>`).join('');
+      return (L.title != null ? `<div class="dt-card__title">${esc(L.title)}</div>` : '')
+        + (badges || meta ? `<div class="dt-card__meta">${badges}${meta}</div>` : '')
+        + (stats ? `<div class="dt-card__stats">${stats}</div>` : '');
+    }
+
     // カード1枚。右上のツール（行固定トグル＋操作列の ⋯ アクションメニュー）を本文の上に重ねる。
     // 操作列（actions:true）を定義していれば、テーブルと同じ RowMenu をカードにも自動表示する。
     function cardHtml(r, pinned) {
       const id = esc(String(rowId(r)));
-      const cls = ['dt-card', pinned ? 'is-pinned' : '', cfg.onRowClick ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : ''].filter(Boolean).join(' ');
+      const clickable = typeof cfg.onRowClick === 'function';
+      const cls = ['dt-card', pinned ? 'is-pinned' : '', clickable ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : ''].filter(Boolean).join(' ');
       const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
       const acts = actionsCol && actionsCol.render ? actionsCol.render(r) : '';
-      return `<div class="${cls}" data-dt-row="${id}"><div class="dt-card__tools">${pin}${acts}</div><div class="dt-card__body">${cfg.card(r)}</div></div>`;
+      const a11y = ` role="listitem"${clickable ? ' tabindex="0"' : ''}`; // クリック可時はキーボード操作（Enter/Space）
+      return `<div class="${cls}" data-dt-row="${id}"${a11y}><div class="dt-card__tools">${pin}${acts}</div><div class="dt-card__body">${buildCardBody(r)}</div></div>`;
     }
 
     function renderPager(total) {
@@ -697,6 +719,7 @@ window.DataTable = (function () {
       const ppEl = root.querySelector('[data-dt-perpage]'); if (ppEl) ppEl.value = String(st.perPage);
       root.querySelectorAll('[data-dt-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dtDensity === st.density)));
       tableEl.classList.toggle('table--compact', st.density === 'compact');
+      if (cardsEl) cardsEl.classList.toggle('dt-cards--compact', st.density === 'compact'); // 密度はカードにも効かせる
       const { pinned, filtered } = compute();
       renderHead();
       const totalNonPin = filtered.length;
@@ -723,10 +746,14 @@ window.DataTable = (function () {
         }
         wrapEl.hidden = isEmpty; if (cardsEl) cardsEl.hidden = true;
       }
-      // 表示切替トグルの状態反映＋テーブル専用ツール（表示密度/列設定）はカード時は隠す。
+      // 表示切替トグルの状態反映（radiogroup）／テーブル専用ツール（列設定）はカード時隠す／
+      // カード専用（カード用並び替えセレクト）はテーブル時隠す。
       if (hasCard) {
-        root.querySelectorAll('[data-dt-view]').forEach((b) => { const on = b.dataset.dtView === st.view; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); });
+        root.querySelectorAll('[data-dt-view]').forEach((b) => { const on = b.dataset.dtView === st.view; b.classList.toggle('is-on', on); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
         root.querySelectorAll('[data-dt-table-only]').forEach((el) => { el.hidden = useCard; });
+        root.querySelectorAll('[data-dt-card-only]').forEach((el) => { el.hidden = !useCard; });
+        const cs = root.querySelector('[data-dt-cardsort]');
+        if (cs) { const adv = st.advSort.length > 0; cs.disabled = adv; cs.value = (!adv && st.simpleSort) ? (st.simpleSort.key + ':' + st.simpleSort.dir) : ''; cs.title = adv ? '詳細ソートが有効です（クリアで単一の並び替えに戻せます）' : ''; }
       }
       countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
       emptyEl.hidden = !isEmpty;
@@ -773,8 +800,31 @@ window.DataTable = (function () {
       const r = cfg.data.find((x) => String(rowId(x)) === el.dataset.dtRow); if (r) cfg.onRowClick(r);
     }
     bodyEl.addEventListener('click', onListClick);
-    if (cardsEl) cardsEl.addEventListener('click', onListClick);
-    if (hasCard) root.querySelectorAll('[data-dt-view]').forEach((b) => b.addEventListener('click', () => { if (st.view === b.dataset.dtView) return; st.view = b.dataset.dtView; persist(); render(); }));
+    if (cardsEl) {
+      cardsEl.addEventListener('click', onListClick);
+      // クリック可能カードはキーボード（Enter/Space）でも行クリックを発火（a11y）。
+      cardsEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest('a,button,input,select,label')) return;
+        const el = e.target.closest('.dt-card'); if (!el || !cfg.onRowClick) return;
+        e.preventDefault();
+        const r = cfg.data.find((x) => String(rowId(x)) === el.dataset.dtRow); if (r) cfg.onRowClick(r);
+      });
+    }
+    if (hasCard) {
+      root.querySelectorAll('[data-dt-view]').forEach((b) => b.addEventListener('click', () => { if (st.view === b.dataset.dtView) return; st.view = b.dataset.dtView; persist(); render(); }));
+      // 表示切替（radiogroup）の矢印キー操作。
+      const vg = root.querySelector('.viewtoggle');
+      if (vg) vg.addEventListener('keydown', (e) => {
+        if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].indexOf(e.key) < 0) return;
+        e.preventDefault();
+        st.view = st.view === 'card' ? 'list' : 'card'; persist(); render();
+        const cur = vg.querySelector('[data-dt-view="' + st.view + '"]'); if (cur) cur.focus();
+      });
+      // カード用の単一並び替えセレクト。詳細ソート適用中は無効（render で disabled）。
+      const cs = root.querySelector('[data-dt-cardsort]');
+      if (cs) cs.addEventListener('change', () => { const v = cs.value; if (!v) { st.simpleSort = null; } else { const p = v.split(':'); st.simpleSort = { key: p[0], dir: p[1] }; st.advSort = []; } st.page = 1; render(); });
+    }
     pagerEl.addEventListener('click', (e) => { const b = e.target.closest('[data-dt-page]'); if (!b || b.disabled) return; st.page = Number(b.dataset.dtPage); render(); });
     chipsEl.addEventListener('click', (e) => {
       if (e.target.closest('[data-dt-clear2]')) return clearAll();
@@ -831,11 +881,11 @@ window.DataTable = (function () {
       function paint() {
         keysEl.innerHTML = work.length ? work.map((s, i) => {
           const up = i === 0 ? 'disabled' : '', dn = i === work.length - 1 ? 'disabled' : '';
-          return `<li class="sort-key" data-k="${esc(s.key)}"><span class="sort-key__ord"><button type="button" data-up ${up} aria-label="上へ">▲</button><button type="button" data-dn ${dn} aria-label="下へ">▼</button></span><span class="sort-key__pri">${i + 1}</span><span class="sort-key__name">${esc(labelOf(s.key))}</span><span class="seg"><button type="button" class="seg__btn" data-dir="asc" aria-pressed="${s.dir === 'asc'}">昇順</button><button type="button" class="seg__btn" data-dir="desc" aria-pressed="${s.dir === 'desc'}">降順</button></span><button type="button" class="sort-key__x" data-remove aria-label="除外">✕</button></li>`;
+          return `<li class="sort-key" data-k="${esc(s.key)}"><span class="sort-key__ord"><button type="button" data-up ${up} aria-label="上へ">▲</button><button type="button" data-dn ${dn} aria-label="下へ">▼</button></span><span class="sort-key__pri">${i + 1}</span><span class="sort-key__name" title="${esc(labelOf(s.key))}">${esc(labelOf(s.key))}</span><span class="seg"><button type="button" class="seg__btn" data-dir="asc" aria-pressed="${s.dir === 'asc'}">昇順</button><button type="button" class="seg__btn" data-dir="desc" aria-pressed="${s.dir === 'desc'}">降順</button></span><button type="button" class="sort-key__x" data-remove aria-label="除外">✕</button></li>`;
         }).join('') : '<li class="sort-builder__empty">条件なし（右から追加）</li>';
         const used = work.map((s) => s.key);
         const avail = sortable.filter((c) => !used.includes(c.key));
-        availEl.innerHTML = avail.length ? avail.map((c) => `<li class="sort-avail" data-k="${esc(c.key)}" data-add="${esc(c.key)}"><span>${esc(c.label)}</span><span class="sort-avail__add">＋ 追加</span></li>`).join('') : '<li class="sort-builder__empty">すべて条件に追加済み</li>';
+        availEl.innerHTML = avail.length ? avail.map((c) => `<li class="sort-avail" data-k="${esc(c.key)}" data-add="${esc(c.key)}"><span title="${esc(c.label)}">${esc(c.label)}</span><span class="sort-avail__add">＋ 追加</span></li>`).join('') : '<li class="sort-builder__empty">すべて条件に追加済み</li>';
       }
       function flip(mutate) {
         const before = new Map(); builder.querySelectorAll('[data-k]').forEach((el) => before.set(el.dataset.k, el.getBoundingClientRect()));
