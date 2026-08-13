@@ -506,7 +506,10 @@ window.DataTable = (function () {
     // カード表示の指定は2通り: cfg.card(r)=中身HTMLを返す関数（自由）／cfg.cardLayout(r)=
     // {title,badges:[{label,cls}],meta:[..],stats:[..]} を返す（標準構造ヘルパ・記述量を削減）。
     // どちらか与えると「テーブル/カード」表示切替が有効（未指定＝従来どおりテーブルのみ）。
-    const hasCard = typeof cfg.card === 'function' || typeof cfg.cardLayout === 'function';
+    // カードは3通り: cardRaw(r)=カード外側まで含む完全HTML（.dt-card ラッパ・ピン/ツールを被せない＝
+    // 画面が見た目を完全制御）／card(r)=本文HTML／cardLayout(r)={title,badges,meta,stats}。
+    const hasCard = typeof cfg.card === 'function' || typeof cfg.cardLayout === 'function' || typeof cfg.cardRaw === 'function';
+    const pinsEnabled = cfg.pins !== false;   // pins:false で行固定（ピン）を無効化（ユーザー向け一覧など）
     const sortableCols = dataCols.filter((c) => c.sortable);
 
     // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
@@ -560,7 +563,7 @@ window.DataTable = (function () {
     }
     function compute() {
       const sorted = activeSort().length ? cfg.data.slice().sort(comparator) : cfg.data.slice();
-      const pinnedIds = st.pins;
+      const pinnedIds = pinsEnabled ? st.pins : [];
       const pinned = sorted.filter((r) => pinnedIds.includes(String(rowId(r))));
       const filtered = sorted.filter((r) => {
         if (pinnedIds.includes(String(rowId(r)))) return false;
@@ -648,7 +651,7 @@ window.DataTable = (function () {
       const tds = vc.map((c, i) => {
         const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.cellClass || ''].filter(Boolean).join(' ');
         let inner = c.render ? c.render(r) : esc(c.sortVal ? c.sortVal(r) : '');
-        if (i === 0) {
+        if (i === 0 && pinsEnabled) {
           // ピン中は 📌（固定済み）、未ピンは 📍（この行を固定できる）でアイコンを切替。
           const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
           inner = `<span style="display:inline-flex;align-items:center;gap:6px;min-width:0">${pin}${inner}</span>`;
@@ -677,10 +680,11 @@ window.DataTable = (function () {
       const id = esc(String(rowId(r)));
       const clickable = typeof cfg.onRowClick === 'function';
       const cls = ['dt-card', pinned ? 'is-pinned' : '', clickable ? 'dt-card--link' : '', actionsCol ? 'dt-card--has-actions' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
-      const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>`;
+      const pin = pinsEnabled ? `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">${pinned ? '📌' : '📍'}</button>` : '';
       const acts = actionsCol && actionsCol.render ? actionsCol.render(r) : '';
+      const tools = (pin || acts) ? `<div class="dt-card__tools">${pin}${acts}</div>` : '';
       const a11y = ` role="listitem"${clickable ? ' tabindex="0"' : ''}`; // クリック可時はキーボード操作（Enter/Space）
-      return `<div class="${cls}" data-dt-row="${id}"${a11y}><div class="dt-card__tools">${pin}${acts}</div><div class="dt-card__body">${buildCardBody(r)}</div></div>`;
+      return `<div class="${cls}" data-dt-row="${id}"${a11y}>${tools}<div class="dt-card__body">${buildCardBody(r)}</div></div>`;
     }
 
     function renderPager(total) {
@@ -742,7 +746,10 @@ window.DataTable = (function () {
       const isEmpty = (totalNonPin + pinned.length) === 0;
       if (useCard) {
         // カードビュー：ソート/絞込/ページング/ピンは共通パイプラインの結果をそのまま使う。
-        cardsEl.innerHTML = pinned.map((r) => cardHtml(r, true)).join('') + pageRows.map((r) => cardHtml(r, false)).join('');
+        // cardRaw があれば画面が返す完全HTMLをそのまま並べる（.dt-card ラッパを被せない＝専用カードモード）。
+        cardsEl.innerHTML = cfg.cardRaw
+          ? (pinned.map((r) => cfg.cardRaw(r)).join('') + pageRows.map((r) => cfg.cardRaw(r)).join(''))
+          : (pinned.map((r) => cardHtml(r, true)).join('') + pageRows.map((r) => cardHtml(r, false)).join(''));
         cardsEl.hidden = isEmpty; wrapEl.hidden = true;
       } else {
         bodyEl.innerHTML = pinned.map((r) => rowHtml(r, true)).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
