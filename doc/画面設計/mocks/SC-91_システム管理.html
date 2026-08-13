@@ -55,37 +55,9 @@
     <h2>会社（テナント）</h2>
     <button class="btn btn-primary" type="button" id="newCompany">＋ 会社を作成</button>
   </div>
-  <div class="list-toolbar">
-    <div class="filters">
-      <input class="input" type="search" id="fSearch" placeholder="会社名・会社コード・DB識別子で検索">
-      <label>状態
-        <select class="select" id="fState">
-          <option value="">すべて</option>
-          <option value="active">有効</option>
-          <option value="provisioning">準備中</option>
-          <option value="suspended">停止</option>
-        </select>
-      </label>
-      <button class="btn btn-sm" type="button" id="clearFilters" hidden>絞り込みをクリア</button>
-    </div>
-    <div class="tools"><span class="list-count" id="count">— 社</span></div>
-  </div>
-
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr><th scope="col">会社名</th><th scope="col">会社コード</th><th scope="col">DB識別子</th><th scope="col">状態</th><th scope="col" class="num">アカウント</th><th scope="col" class="num">グループ</th><th scope="col">作成日</th><th scope="col" class="col-actions" aria-label="操作"></th></tr>
-      </thead>
-      <tbody id="companyRows"></tbody>
-    </table>
-  </div>
-  <div class="list-empty" id="empty" hidden>該当する会社がありません。</div>
-  <!-- ページネーション（標準・オフセット方式） -->
-  <nav class="pagination" id="pager" aria-label="ページ送り" hidden>
-    <button class="btn btn-outline btn-sm" type="button" id="pgPrev">← 前へ</button>
-    <span class="pagination__info" id="pgInfo">1 / 1</span>
-    <button class="btn btn-outline btn-sm" type="button" id="pgNext">次へ →</button>
-  </nav>
+  <!-- 一覧操作標準（DataTable＝ソート/絞込/番号ページャ/列幅/表示・並べ替え/CSV/密度/行固定）。
+       正＝デザイン標準.md「一覧の操作標準」・挙動は shared.js の DataTable。 -->
+  <div id="companyTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     ※ 会社DBは物理分離（別コンテナ）。接続情報の実体は <code>.env</code>・ここでは参照キー（DB識別子）のみ表示。作成後、<strong>会社DBは別途プロビジョニング</strong>（MVP: compose 手編集 → <code>up</code> → 管理DBに登録）で有効化。会社を選ぶと<strong>会社詳細（SC-92）</strong>で設定・アカウント/所属を管理。
@@ -158,59 +130,33 @@
     { id:'zenith', name:'ゼニス商会',       code:'ZENITH', color:'#EA580C', db:'db_zenith', state:'active', accounts:12, groups:2, created:'2026-06-11' },
     { id:'lumen',  name:'ルーメン工業',     code:'LUMEN',  color:'#475569', db:'db_lumen',  state:'suspended', accounts:9, groups:1, created:'2026-02-15' },
   ];
-  const PER_PAGE = 5;
-  let page = 1;
-
-  const rows = document.getElementById('companyRows');
-  const empty = document.getElementById('empty');
-  const fSearch = document.getElementById('fSearch');
-  const fState = document.getElementById('fState');
-  const pager = document.getElementById('pager');
-  const clearBtn = document.getElementById('clearFilters');
-
-  function render() {
-    const q = fSearch.value.trim().toLowerCase(), st = fState.value;
-    const list = COMPANIES.filter(c =>
-      (!q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.db.toLowerCase().includes(q)) &&
-      (!st || c.state === st));
-    // フィルタがアクティブなら「絞り込みをクリア」を表示（F1）
-    clearBtn.hidden = !(q || st);
-    // ページング（F2・オフセット方式）
-    const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-    if (page > totalPages) page = totalPages;
-    const slice = list.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    rows.innerHTML = slice.map(c => {
-      const [label, cls] = ST[c.state];
-      const icon = c.icon
-        ? `<img class="quest-icon__img" src="${c.icon}" alt="">`
-        : `<span class="quest-icon__char">${c.name.slice(0,1)}</span>`;
-      return `<tr data-company="${c.id}">
-        <td><div class="co"><span class="quest-icon sm" style="--accent:${c.color}">${icon}</span><strong>${c.name}</strong></div></td>
-        <td class="db-id">${c.code}</td>
-        <td class="db-id">${c.db}</td>
-        <td><span class="badge ${cls}">${label}</span></td>
-        <td class="num">${c.accounts}</td><td class="num">${c.groups}</td><td>${c.created}</td>
-        <td class="col-actions"><a class="btn btn-outline btn-sm" href="SC-92_会社詳細.html?company=${c.id}" onclick="event.stopPropagation()">管理する →</a></td>
-      </tr>`;
-    }).join('');
-    document.getElementById('count').textContent = list.length + ' 社';
-    empty.hidden = list.length !== 0;
-    // ページャ表示（1件以上のときのみ）
-    pager.hidden = list.length === 0;
-    document.getElementById('pgInfo').textContent = page + ' / ' + totalPages;
-    document.getElementById('pgPrev').disabled = page <= 1;
-    document.getElementById('pgNext').disabled = page >= totalPages;
-  }
-  // 行クリックで会社詳細へ
-  rows.addEventListener('click', (e) => {
-    const tr = e.target.closest('[data-company]'); if (!tr) return;
-    location.href = 'SC-92_会社詳細.html?company=' + tr.dataset.company;
+  const stateBadge = (s) => { const [label, cls] = ST[s] || ['—', 'badge-muted']; return `<span class="badge ${cls}">${label}</span>`; };
+  const coCell = (c) => {
+    const icon = c.icon ? `<img class="quest-icon__img" src="${c.icon}" alt="">` : `<span class="quest-icon__char">${c.name.slice(0,1)}</span>`;
+    return `<div class="co"><span class="quest-icon sm" style="--accent:${c.color}">${icon}</span><strong>${c.name}</strong></div>`;
+  };
+  // 一覧操作標準（DataTable）＝列を宣言してデータを渡すだけ。挙動は shared.js。
+  const companyTable = DataTable.init(document.getElementById('companyTable'), {
+    storageKey: 'sc91-companies',
+    data: COMPANIES,
+    rowId: (r) => r.id,
+    unit: '社',
+    perPage: 5,
+    maxPins: 5,
+    searchPlaceholder: '会社名・会社コード・DB識別子で検索',
+    exportName: '会社一覧',
+    onRowClick: (r) => { location.href = 'SC-92_会社詳細.html?company=' + r.id; },
+    columns: [
+      { key: 'name', label: '会社名', locked: true, width: 240, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: coCell },
+      { key: 'code', label: '会社コード', width: 130, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.code, searchVal: (r) => r.code, render: (r) => r.code },
+      { key: 'db', label: 'DB識別子', width: 150, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.db, searchVal: (r) => r.db, render: (r) => r.db },
+      { key: 'state', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['provisioning', '準備中'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => stateBadge(r.state) },
+      { key: 'accounts', label: 'アカウント', width: 110, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.accounts, filterVal: (r) => r.accounts, render: (r) => r.accounts },
+      { key: 'groups', label: 'グループ', width: 100, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.groups, filterVal: (r) => r.groups, render: (r) => r.groups },
+      { key: 'created', label: '作成日', width: 130, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
+      { key: '_actions', label: '', actions: true, locked: true, width: 130, render: (r) => `<a class="btn btn-outline btn-sm" href="SC-92_会社詳細.html?company=${r.id}">管理する →</a>` },
+    ],
   });
-  fSearch.addEventListener('input', () => { page = 1; render(); });
-  fState.addEventListener('change', () => { page = 1; render(); });
-  clearBtn.addEventListener('click', () => { fSearch.value = ''; fState.value = ''; page = 1; render(); });
-  document.getElementById('pgPrev').addEventListener('click', () => { if (page > 1) { page--; render(); } });
-  document.getElementById('pgNext').addEventListener('click', () => { page++; render(); });
 
   // モーダル
   function openModal(id) { const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show')); }
@@ -253,11 +199,13 @@
     if (!/^[A-Z][A-Z0-9-]{3,19}$/.test(code)) { setFieldError(cmCode, '英大文字/数字/ハイフン・先頭は英字・4〜20文字で入力してください'); firstBad = firstBad || cmCode; }
     else if (COMPANIES.some(c => c.code === code)) { setFieldError(cmCode, '会社コード「' + code + '」は既に使われています（全社で一意）'); firstBad = firstBad || cmCode; }
     if (firstBad) { firstBad.focus(); return; }
-    alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
+    // デモ：一覧に即時追加（状態=準備中）。選択した会社カラーを反映。
+    const selColor = (cmSwatches.querySelector('.swatch[aria-checked="true"]') || {}).dataset ? cmSwatches.querySelector('.swatch[aria-checked="true"]').dataset.color : '#2563EB';
+    COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'provisioning', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
+    companyTable.render();
     closeModal(document.getElementById('companyModal'));
+    alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
   });
-
-  render();
 </script>
 </body>
 </html>

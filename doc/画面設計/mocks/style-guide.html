@@ -394,6 +394,16 @@
     <p class="hint">※ このデモは vanilla JS で位置を更新する簡易版。本番(Next.js)はカード間の共有要素移動を
        framer-motion 等で実装（画面作成フェーズ）。</p>
   </div>
+
+  <div>
+    <h2>9. 一覧の操作標準（DataTable）</h2>
+    <p class="muted text-sm">一覧に<strong>ソート（単一列/詳細=複数キー）・絞り込み（横断/詳細=項目別）・番号ページャ・
+      列幅調整・列の表示/非表示/並べ替え・CSVエクスポート・表示密度・行固定（ピン）</strong>を一括付与する共通部品
+      （<code>DataTable.init(root, config)</code>）。<strong>列（columns）とデータ（data）を宣言するだけ</strong>で全機能が付く。
+      正＝<code>デザイン標準.md §4.5 一覧の操作標準</code>／ライブ実例＝<code>SC-91</code>。</p>
+    <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定・「詳細ソート/詳細絞込/列設定/エクスポート」を上部で。</p>
+    <div id="sgTable"></div>
+  </div>
 </main>
 
 <!-- ページに1体だけ置くマスコット -->
@@ -463,6 +473,33 @@
     card.addEventListener('mouseenter', () => placeMascot(card));
   });
   mascotGrid.addEventListener('mouseleave', () => mascot.classList.remove('is-visible'));
+
+  // --- 9. 一覧の操作標準（DataTable）デモ ---
+  (function () {
+    const ST = { active: ['有効', 'st-active'], provisioning: ['準備中', 'st-provisioning'], suspended: ['停止', 'st-suspended'] };
+    const DATA = [
+      { id: 'a', name: '配送ルート最適化', owner: '田中 太郎', team: '物流', state: 'active', votes: 42, created: '2026-02-10' },
+      { id: 'b', name: '社内ナレッジ検索AI', owner: '佐藤 花子', team: '情シス', state: 'active', votes: 88, created: '2026-03-22' },
+      { id: 'c', name: '経費精算の自動化', owner: '鈴木 一郎', team: '経理', state: 'suspended', votes: 7, created: '2026-05-30' },
+      { id: 'd', name: '会議室予約の最適化', owner: '高橋 次郎', team: '総務', state: 'active', votes: 25, created: '2026-04-08' },
+      { id: 'e', name: '出張申請の簡素化', owner: '伊藤 三郎', team: '総務', state: 'provisioning', votes: 0, created: '2026-07-28' },
+      { id: 'f', name: '採用フロー可視化', owner: '渡辺 桜', team: '人事', state: 'active', votes: 31, created: '2026-04-19' },
+      { id: 'g', name: '在庫アラート', owner: '山本 蓮', team: '物流', state: 'active', votes: 12, created: '2026-06-11' },
+    ];
+    const badge = (s) => { const [l, c] = ST[s] || ['—', 'badge-muted']; return `<span class="badge ${c}">${l}</span>`; };
+    window.DataTable.init(document.getElementById('sgTable'), {
+      storageKey: 'styleguide-demo', data: DATA, rowId: (r) => r.id, unit: '件', perPage: 4, exportName: 'デモ一覧',
+      searchPlaceholder: 'アイデア名・起票者・部署で検索',
+      columns: [
+        { key: 'name', label: 'アイデア', locked: true, width: 220, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: (r) => `<strong>${r.name}</strong>` },
+        { key: 'owner', label: '起票者', width: 130, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.owner, searchVal: (r) => r.owner, render: (r) => r.owner },
+        { key: 'team', label: '部署', width: 100, sortable: true, filter: { type: 'enum', options: [['物流', '物流'], ['情シス', '情シス'], ['経理', '経理'], ['総務', '総務'], ['人事', '人事']] }, sortVal: (r) => r.team, filterVal: (r) => r.team, searchVal: (r) => r.team, render: (r) => r.team },
+        { key: 'state', label: '状態', width: 100, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['provisioning', '準備中'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => badge(r.state) },
+        { key: 'votes', label: '得票', width: 90, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.votes, filterVal: (r) => r.votes, render: (r) => r.votes },
+        { key: 'created', label: '作成日', width: 120, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
+      ],
+    });
+  })();
 </script>
 
 </body>

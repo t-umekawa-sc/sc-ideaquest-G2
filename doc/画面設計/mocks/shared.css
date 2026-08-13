@@ -105,6 +105,9 @@
  * 2. リセット & ベース
  * ============================================================= */
 *, *::before, *::after { box-sizing: border-box; }
+/* hidden 属性は常に非表示（.btn/.pagination 等の display 指定が UA の [hidden] を
+   上書きして「hidden なのに見える」不具合を防ぐ＝標準挙動に統一）。 */
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -1042,6 +1045,128 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 /* プロビジョニング注記（会社作成モーダル） */
 .provision-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
 .provision-note code { font-family: ui-monospace, monospace; }
+
+/* =============================================================
+ * 9y. 一覧の操作標準（DataTable＝ソート/絞り込み/ページング/列幅/表示・並べ替え/
+ *     CSV/密度/行固定）。挙動は shared.js の DataTable、正＝デザイン標準.md「一覧の操作標準」。
+ * ============================================================= */
+/* --- ツールバー拡張（左=filters / 右=tools） --- */
+.list-toolbar .tools .seg-density { margin-left: var(--space-1); }
+/* 適用中バッジ（詳細ソート/絞込ボタンに付く件数） */
+.dt-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25em; height: 1.25em;
+  padding: 0 .35em; margin-left: 6px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700;
+  background: var(--color-primary); color: #fff; }
+.btn-outline .dt-badge { background: var(--color-primary); color: #fff; }
+/* 適用中条件の要約チップ行 */
+.dt-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; margin-top: var(--space-2); }
+.dt-chips:empty { display: none; }
+.dt-chips__label { font-size: var(--text-xs); color: var(--color-text-muted); }
+.dt-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: var(--radius-full);
+  background: var(--color-primary-soft); color: var(--color-primary-active); font-size: var(--text-xs); border: 1px solid var(--color-border); }
+.dt-chip__x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 0;
+  border-radius: var(--radius-full); background: transparent; color: inherit; cursor: pointer; font-size: 12px; line-height: 1; }
+.dt-chip__x:hover { background: rgba(15,23,42,.12); }
+.dt-chip--clear { background: transparent; border-color: var(--color-border); color: var(--color-text-muted); padding-left: 10px; }
+
+/* --- スクロールコンテナ＋固定ヘッダー --- */
+.table-wrap.dt-scroll { max-height: var(--dt-max-h, 62vh); overflow: auto; }
+.dt-scroll .table thead th { position: sticky; top: 0; z-index: 3; }
+.dt-scroll .table thead th.col-actions { z-index: 4; }
+
+/* --- 列幅手動調整（table-layout:fixed＋見出し右端ハンドル） --- */
+.table.dt-fixed { table-layout: fixed; }
+.table.dt-fixed td, .table.dt-fixed th { overflow: hidden; text-overflow: ellipsis; }
+.dt-th { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dt-th__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+th.num .dt-th { justify-content: flex-end; }
+.dt-resizer { position: absolute; top: 0; right: -3px; width: 8px; height: 100%; cursor: col-resize; z-index: 5;
+  touch-action: none; user-select: none; }
+.dt-resizer::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 3px; width: 2px; border-radius: 1px; background: transparent; }
+.dt-resizer:hover::after, .dt-resizing .dt-resizer--active::after { background: var(--color-primary); }
+.table thead th { position: relative; }
+body.dt-resizing, body.dt-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+/* --- クリックソート見出し --- */
+th.dt-sortable { cursor: pointer; }
+th.dt-sortable .dt-th__label { text-decoration: underline dotted transparent; }
+th.dt-sortable:hover .dt-th__label { text-decoration-color: var(--color-text-muted); }
+.dt-sort-ind { flex: 0 0 auto; font-size: var(--text-xs); color: var(--color-text-subtle, var(--color-text-muted)); opacity: .5; }
+th[aria-sort="ascending"] .dt-sort-ind, th[aria-sort="descending"] .dt-sort-ind { opacity: 1; color: var(--color-primary); }
+th[aria-sort="ascending"] .dt-sort-ind::before { content: "▲"; }
+th[aria-sort="descending"] .dt-sort-ind::before { content: "▼"; }
+th.dt-sortable[aria-sort="none"] .dt-sort-ind::before { content: "⇅"; }
+th.dt-sortable.is-locked-sort { cursor: default; }        /* 詳細ソート中は単一列ソート無効 */
+th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
+
+/* --- 行固定（ピン）＋固定ヘッダー配下に貼り付き --- */
+.dt-pin-toggle { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); padding: 2px; border-radius: var(--radius); }
+.dt-pin-toggle:hover { background: var(--color-primary-soft); color: var(--color-primary); }
+.dt-pin-toggle[aria-pressed="true"] { color: var(--color-primary); }
+.table tr.is-pinned td { position: sticky; top: var(--dt-head-h, 41px); z-index: 2; background: var(--color-primary-soft); }
+.table tr.is-pinned td.col-actions { z-index: 3; }
+.table tr.dt-pin-sep td { border-bottom: 2px solid var(--color-border-strong); }
+
+/* --- 表示密度 --- */
+.seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+.seg__btn { border: 0; background: var(--color-surface); color: var(--color-text-muted); padding: 4px 10px; font-size: var(--text-sm); cursor: pointer; }
+.seg__btn + .seg__btn { border-left: 1px solid var(--color-border); }
+.seg__btn[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
+.table--compact th, .table--compact td { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+
+/* --- 番号ページャ --- */
+.pagination__page { min-width: 2.25em; }
+.pagination .btn.is-current, .pagination__page.is-current { background: var(--color-primary); color: #fff; border-color: var(--color-primary); pointer-events: none; }
+.pagination__ellipsis { padding: 0 4px; color: var(--color-text-muted); }
+
+/* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
+.col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-2); }
+.col-menu__title { font-size: var(--text-xs); color: var(--color-text-muted); padding: 4px 8px; }
+.col-menu__item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: var(--radius); }
+.col-menu__item:hover { background: var(--color-surface-alt); }
+.col-menu__grab { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.col-menu__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-menu__lock { font-size: var(--text-xs); color: var(--color-text-muted); }
+.col-menu__ord { display: flex; gap: 2px; }
+.col-menu__ord button { width: 22px; height: 22px; border: 1px solid var(--color-border); background: var(--color-surface);
+  border-radius: var(--radius); cursor: pointer; color: var(--color-text-muted); line-height: 1; }
+.col-menu__ord button:disabled { opacity: .35; cursor: default; }
+.col-menu__foot { display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--color-border); margin-top: var(--space-2); padding-top: var(--space-2); }
+
+/* --- 詳細ソート・ビルダー（2ペイン transfer） --- */
+.sort-builder { display: flex; gap: var(--space-4); }
+.sort-builder__pane { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-alt); display: flex; flex-direction: column; }
+.sort-builder__title { font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.sort-builder__list { list-style: none; margin: 0; padding: var(--space-2); display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
+.sort-builder__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: var(--space-3); text-align: center; }
+.sort-avail { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius); cursor: pointer; transition: transform .18s ease, opacity .18s ease; }
+.sort-avail:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.sort-avail__add { color: var(--color-primary); font-weight: 700; }
+.sort-key { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius); transition: transform .18s ease, opacity .18s ease; }
+.sort-key__ord { display: flex; flex-direction: column; gap: 1px; }
+.sort-key__ord button { width: 20px; height: 15px; border: 1px solid var(--color-border); background: var(--color-surface); cursor: pointer; line-height: 1; font-size: 9px; border-radius: 3px; color: var(--color-text-muted); }
+.sort-key__ord button:disabled { opacity: .35; cursor: default; }
+.sort-key__pri { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 1.4em; text-align: center; }
+.sort-key__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.sort-key__x { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: 14px; }
+.sort-key__x:hover { color: var(--color-danger); }
+.dt-flip { transition: transform .2s ease; }        /* FLIP 用 */
+@media (prefers-reduced-motion: reduce) {
+  .sort-avail, .sort-key, .dt-flip { transition: none; }
+}
+
+/* --- 詳細絞込ダイアログ --- */
+.filter-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.filter-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
+.filter-range { display: flex; align-items: center; gap: var(--space-2); }
+.filter-range .input { width: auto; flex: 1; }
+
+@media (max-width: 768px) {
+  .sort-builder { flex-direction: column; }
+  .list-toolbar .tools { width: 100%; justify-content: space-between; }
+}
 
 /* =============================================================
  * 10. レスポンシブ

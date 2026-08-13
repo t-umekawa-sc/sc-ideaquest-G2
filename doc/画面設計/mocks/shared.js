@@ -458,3 +458,396 @@ window.setFieldError = setFieldError;
   });
   document.addEventListener('pointerup', () => { if (drag) { drag.p.classList.remove('is-dragging'); drag = null; } });
 })();
+
+/* --- 一覧の操作標準（DataTable）---------------------------------------------
+   一覧に「ソート（単一列/詳細=複数キー）・絞り込み（横断/詳細=項目別）・番号ページャ・
+   列幅調整・列の表示/非表示/並べ替え・CSVエクスポート・表示密度・行の固定（ピン）」を
+   まとめて付与する共通部品。正＝doc/画面設計/デザイン標準.md「一覧の操作標準」。
+   使い方: DataTable.init(rootEl, config)。config は当該画面が列定義とデータを宣言する。
+   （モックは全件クライアント保持で挙動を再現。実装では複数ソートキー/項目別フィルタ/
+    CSV/ピンID取得を一覧APIのクエリ契約として backend に委譲する。） */
+window.DataTable = (function () {
+  const LS = 'ideaquest_dt_';
+  const load = (k) => { try { return JSON.parse(localStorage.getItem(LS + k) || 'null'); } catch (e) { return null; } };
+  const save = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch (e) {} };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stripTags = (h) => { const d = document.createElement('div'); d.innerHTML = h; return (d.textContent || '').trim(); };
+
+  function init(root, cfg) {
+    const cols = cfg.columns.map((c) => ({ resizable: !c.actions, sortable: false, ...c }));
+    const dataCols = cols.filter((c) => !c.actions);
+    const actionsCol = cols.find((c) => c.actions) || null;
+    const colByKey = Object.fromEntries(cols.map((c) => [c.key, c]));
+    const rowId = cfg.rowId || ((r) => r.id);
+    const unit = cfg.unit || '件';
+    const perPage = cfg.perPage || 20;
+
+    // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
+    const persisted = load(cfg.storageKey) || {};
+    const defaultOrder = dataCols.map((c) => c.key);
+    const validOrder = (persisted.order || defaultOrder).filter((k) => colByKey[k] && !colByKey[k].actions);
+    dataCols.forEach((c) => { if (!validOrder.includes(c.key)) validOrder.push(c.key); }); // 新列を末尾補完
+    const st = {
+      search: '', simpleSort: null, advSort: [], filters: {}, page: 1,
+      density: persisted.density || 'normal',
+      order: validOrder,
+      hidden: (persisted.hidden || dataCols.filter((c) => c.hiddenDefault).map((c) => c.key)).filter((k) => colByKey[k]),
+      widths: persisted.widths || {},
+      pins: persisted.pins || [],
+    };
+    function persist() { save(cfg.storageKey, { order: st.order, hidden: st.hidden, widths: st.widths, density: st.density, pins: st.pins }); }
+
+    function visibleDataCols() { return st.order.map((k) => colByKey[k]).filter((c) => c && !st.hidden.includes(c.key)); }
+    function visibleCols() { return actionsCol ? visibleDataCols().concat([actionsCol]) : visibleDataCols(); }
+
+    // ---- パイプライン：検索→絞込→ソート→ピン分離→ページ ----
+    function searchText(r) {
+      const sc = dataCols.filter((c) => c.searchVal);
+      const src = sc.length ? sc.map((c) => c.searchVal(r)) : dataCols.map((c) => (c.sortVal ? c.sortVal(r) : ''));
+      return src.join(' ').toLowerCase();
+    }
+    function matchFilters(r) {
+      return Object.keys(st.filters).every((key) => {
+        const col = colByKey[key]; if (!col) return true;
+        const cond = st.filters[key];
+        const v = col.filterVal ? col.filterVal(r) : (col.sortVal ? col.sortVal(r) : '');
+        if (cond.type === 'text') return String(v).toLowerCase().includes(String(cond.q).toLowerCase());
+        if (cond.type === 'enum') return cond.values.includes(String(v));
+        if (cond.type === 'number') { const n = Number(v); return (cond.min == null || n >= cond.min) && (cond.max == null || n <= cond.max); }
+        if (cond.type === 'date') return (!cond.from || String(v) >= cond.from) && (!cond.to || String(v) <= cond.to);
+        return true;
+      });
+    }
+    function activeSort() { return st.advSort.length ? st.advSort : (st.simpleSort ? [st.simpleSort] : []); }
+    function comparator(a, b) {
+      for (const s of activeSort()) {
+        const col = colByKey[s.key]; if (!col || !col.sortVal) continue;
+        const va = col.sortVal(a), vb = col.sortVal(b);
+        const d = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'ja');
+        if (d) return s.dir === 'desc' ? -d : d;
+      }
+      return 0;
+    }
+    function compute() {
+      const sorted = activeSort().length ? cfg.data.slice().sort(comparator) : cfg.data.slice();
+      const pinnedIds = st.pins;
+      const pinned = sorted.filter((r) => pinnedIds.includes(String(rowId(r))));
+      const filtered = sorted.filter((r) => {
+        if (pinnedIds.includes(String(rowId(r)))) return false;
+        if (st.search && !searchText(r).includes(st.search.toLowerCase())) return false;
+        return matchFilters(r);
+      });
+      return { pinned, filtered };
+    }
+
+    // ---- スケルトン構築 ----
+    root.innerHTML = `
+      <div class="list-toolbar" data-dt-toolbar>
+        <div class="filters">
+          <input class="input" type="search" data-dt-search placeholder="${esc(cfg.searchPlaceholder || '検索')}">
+          <button class="btn btn-outline btn-sm" type="button" data-dt-filter>詳細絞込</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-sort>詳細ソート</button>
+          <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
+        </div>
+        <div class="tools">
+          <span class="list-count" data-dt-count></span>
+          <span class="seg seg-density" role="group" aria-label="表示密度">
+            <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
+            <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
+          </span>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-cols>列設定</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
+        </div>
+        <div class="dt-chips" data-dt-chips></div>
+      </div>
+      <div class="table-wrap dt-scroll" data-dt-wrap>
+        <table class="table dt-fixed"><thead data-dt-head></thead><tbody data-dt-body></tbody></table>
+      </div>
+      <div class="list-empty" data-dt-empty hidden>該当するデータがありません。</div>
+      <nav class="pagination" data-dt-pager aria-label="ページ送り" hidden></nav>`;
+    const $ = (s) => root.querySelector(s);
+    const searchEl = $('[data-dt-search]'), headEl = $('[data-dt-head]'), bodyEl = $('[data-dt-body]'),
+      countEl = $('[data-dt-count]'), chipsEl = $('[data-dt-chips]'), pagerEl = $('[data-dt-pager]'),
+      emptyEl = $('[data-dt-empty]'), wrapEl = $('[data-dt-wrap]'), tableEl = wrapEl.querySelector('table');
+
+    function renderHead() {
+      const vc = visibleCols();
+      const advOn = st.advSort.length > 0;
+      headEl.innerHTML = '<tr>' + vc.map((c) => {
+        const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.sortable ? 'dt-sortable' : '', (c.sortable && advOn) ? 'is-locked-sort' : ''].filter(Boolean).join(' ');
+        let aria = '';
+        if (c.sortable) { const s = (!advOn && st.simpleSort && st.simpleSort.key === c.key) ? st.simpleSort.dir : 'none'; aria = ` aria-sort="${s === 'asc' ? 'ascending' : s === 'desc' ? 'descending' : 'none'}"`; }
+        const w = st.widths[c.key] || c.width;
+        const style = w ? ` style="width:${w}px"` : '';
+        const ind = c.sortable ? '<span class="dt-sort-ind"></span>' : '';
+        const resizer = c.resizable ? `<span class="dt-resizer" data-dt-resizer="${esc(c.key)}"></span>` : '';
+        return `<th scope="col" class="${cls}"${aria}${style} data-key="${esc(c.key)}"><div class="dt-th"><span class="dt-th__label">${esc(c.label)}</span>${ind}</div>${resizer}</th>`;
+      }).join('') + '</tr>';
+    }
+
+    function rowHtml(r, pinned) {
+      const vc = visibleCols();
+      const id = esc(String(rowId(r)));
+      const tds = vc.map((c, i) => {
+        const cls = [c.align === 'num' ? 'num' : '', c.actions ? 'col-actions' : '', c.cellClass || ''].filter(Boolean).join(' ');
+        let inner = c.render ? c.render(r) : esc(c.sortVal ? c.sortVal(r) : '');
+        if (i === 0) {
+          const pin = `<button class="dt-pin-toggle" type="button" data-dt-pin="${id}" aria-pressed="${pinned ? 'true' : 'false'}" title="${pinned ? '固定を解除' : 'この行を固定'}">📌</button>`;
+          inner = `<span style="display:inline-flex;align-items:center;gap:6px;min-width:0">${pin}${inner}</span>`;
+        }
+        return `<td class="${cls}">${inner}</td>`;
+      }).join('');
+      return `<tr data-dt-row="${id}"${pinned ? ' class="is-pinned"' : ''}>${tds}</tr>`;
+    }
+
+    function renderPager(total) {
+      const pages = Math.max(1, Math.ceil(total / perPage));
+      if (st.page > pages) st.page = pages;
+      if (pages <= 1) { pagerEl.hidden = true; return; }
+      pagerEl.hidden = false;
+      const cur = st.page, win = 2, nums = [];
+      for (let p = 1; p <= pages; p++) { if (p === 1 || p === pages || (p >= cur - win && p <= cur + win)) nums.push(p); else if (nums[nums.length - 1] !== '…') nums.push('…'); }
+      const btn = (label, page, opts) => { opts = opts || {}; return `<button class="btn btn-outline btn-sm ${opts.cls || ''}" type="button" ${opts.disabled ? 'disabled' : ''} data-dt-page="${page}" aria-label="${opts.aria || ''}">${label}</button>`; };
+      pagerEl.innerHTML =
+        btn('«', 1, { disabled: cur <= 1, aria: '最初のページ' }) +
+        btn('‹', cur - 1, { disabled: cur <= 1, aria: '前のページ' }) +
+        nums.map((n) => n === '…' ? '<span class="pagination__ellipsis">…</span>' : btn(n, n, { cls: 'pagination__page' + (n === cur ? ' is-current' : ''), aria: n + 'ページ目' })).join('') +
+        btn('›', cur + 1, { disabled: cur >= pages, aria: '次のページ' }) +
+        btn('»', pages, { disabled: cur >= pages, aria: '最後のページ' });
+    }
+
+    function labelOf(k) { return colByKey[k] ? colByKey[k].label : k; }
+    function enumLabel(key, v) { const col = colByKey[key]; const o = col && col.filter && col.filter.options && col.filter.options.find((x) => x[0] === v); return o ? o[1] : v; }
+    function filterSummary(c) {
+      if (c.type === 'text') return '「' + c.q + '」を含む';
+      if (c.type === 'enum') return c.values.map((v) => enumLabel(c.key, v)).join('・');
+      if (c.type === 'number') return (c.min != null ? c.min : '') + '〜' + (c.max != null ? c.max : '');
+      if (c.type === 'date') return (c.from || '') + '〜' + (c.to || '');
+      return '';
+    }
+    function setBadge(sel, n) {
+      const btn = root.querySelector(sel); if (!btn) return;
+      let b = btn.querySelector('.dt-badge');
+      if (n > 0) { if (!b) { b = document.createElement('span'); b.className = 'dt-badge'; btn.appendChild(b); } b.textContent = n; }
+      else if (b) b.remove();
+    }
+    function renderChips() {
+      const chips = [];
+      if (st.advSort.length) chips.push(`<span class="dt-chip">詳細ソート: ${st.advSort.map((s) => esc(labelOf(s.key)) + (s.dir === 'desc' ? '▼' : '▲')).join(' › ')}<button class="dt-chip__x" type="button" data-dt-chip="sort" aria-label="詳細ソートを解除">✕</button></span>`);
+      Object.keys(st.filters).forEach((k) => { chips.push(`<span class="dt-chip">${esc(labelOf(k))}: ${esc(filterSummary(st.filters[k]))}<button class="dt-chip__x" type="button" data-dt-chip="filter:${esc(k)}" aria-label="絞込を解除">✕</button></span>`); });
+      chipsEl.innerHTML = chips.length ? `<span class="dt-chips__label">適用中:</span>` + chips.join('') + `<button class="dt-chip dt-chip--clear" type="button" data-dt-clear2>すべてクリア</button>` : '';
+      setBadge('[data-dt-sort]', st.advSort.length);
+      setBadge('[data-dt-filter]', Object.keys(st.filters).length);
+    }
+
+    function render() {
+      searchEl.value = st.search;
+      root.querySelectorAll('[data-dt-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dtDensity === st.density)));
+      tableEl.classList.toggle('table--compact', st.density === 'compact');
+      const { pinned, filtered } = compute();
+      renderHead();
+      const start = (st.page - 1) * perPage;
+      const pageRows = filtered.slice(start, start + perPage);
+      bodyEl.innerHTML = pinned.map((r, i) => rowHtml(r, true).replace('<tr ', i === pinned.length - 1 ? '<tr class="dt-pin-sep-mark" ' : '<tr ')).join('') + pageRows.map((r) => rowHtml(r, false)).join('');
+      const lastPin = bodyEl.querySelector('.dt-pin-sep-mark');
+      if (lastPin) { lastPin.classList.remove('dt-pin-sep-mark'); lastPin.classList.add('dt-pin-sep'); }
+      const totalNonPin = filtered.length;
+      countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
+      emptyEl.hidden = (totalNonPin + pinned.length) !== 0;
+      renderPager(totalNonPin);
+      renderChips();
+      const anyFilter = st.search || Object.keys(st.filters).length || st.advSort.length || st.simpleSort;
+      root.querySelector('[data-dt-clear]').hidden = !anyFilter;
+      requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
+    }
+
+    // ===== イベント =====
+    searchEl.addEventListener('input', () => { st.search = searchEl.value.trim(); st.page = 1; render(); });
+    function clearAll() { st.search = ''; st.simpleSort = null; st.advSort = []; st.filters = {}; st.page = 1; render(); }
+    root.querySelector('[data-dt-clear]').addEventListener('click', clearAll);
+    root.querySelectorAll('[data-dt-density]').forEach((b) => b.addEventListener('click', () => { st.density = b.dataset.dtDensity; persist(); render(); }));
+
+    headEl.addEventListener('click', (e) => {
+      if (e.target.closest('.dt-resizer')) return;
+      const th = e.target.closest('th.dt-sortable'); if (!th || st.advSort.length) return;
+      const key = th.dataset.key;
+      const cur = st.simpleSort && st.simpleSort.key === key ? st.simpleSort.dir : null;
+      st.simpleSort = cur === 'asc' ? { key, dir: 'desc' } : cur === 'desc' ? null : { key, dir: 'asc' };
+      st.page = 1; render();
+    });
+    headEl.addEventListener('pointerdown', (e) => {
+      const h = e.target.closest('[data-dt-resizer]'); if (!h) return;
+      e.preventDefault();
+      const key = h.dataset.dtResizer, th = h.closest('th');
+      const startX = e.clientX, startW = th.getBoundingClientRect().width;
+      document.body.classList.add('dt-resizing'); h.classList.add('dt-resizer--active');
+      function move(ev) { const w = Math.max(64, startW + (ev.clientX - startX)); st.widths[key] = Math.round(w); th.style.width = w + 'px'; }
+      function up() { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.body.classList.remove('dt-resizing'); h.classList.remove('dt-resizer--active'); persist(); }
+      document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    });
+    headEl.addEventListener('dblclick', (e) => { const h = e.target.closest('[data-dt-resizer]'); if (!h) return; delete st.widths[h.dataset.dtResizer]; persist(); render(); });
+
+    bodyEl.addEventListener('click', (e) => {
+      const pin = e.target.closest('[data-dt-pin]');
+      if (pin) { e.stopPropagation(); const id = pin.dataset.dtPin; const i = st.pins.indexOf(id); if (i >= 0) st.pins.splice(i, 1); else { if (st.pins.length >= (cfg.maxPins || 5)) { alert('固定できる行は最大 ' + (cfg.maxPins || 5) + ' 件です。'); return; } st.pins.push(id); } persist(); render(); return; }
+      if (e.target.closest('a,button,input,select,label')) return;
+      if (!cfg.onRowClick) return;
+      const tr = e.target.closest('[data-dt-row]'); if (!tr) return;
+      const r = cfg.data.find((x) => String(rowId(x)) === tr.dataset.dtRow); if (r) cfg.onRowClick(r);
+    });
+    pagerEl.addEventListener('click', (e) => { const b = e.target.closest('[data-dt-page]'); if (!b || b.disabled) return; st.page = Number(b.dataset.dtPage); render(); });
+    chipsEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-dt-clear2]')) return clearAll();
+      const x = e.target.closest('[data-dt-chip]'); if (!x) return;
+      const t = x.dataset.dtChip;
+      if (t === 'sort') st.advSort = []; else if (t.indexOf('filter:') === 0) delete st.filters[t.slice(7)];
+      st.page = 1; render();
+    });
+
+    root.querySelector('[data-dt-sort]').addEventListener('click', openSortBuilder);
+    root.querySelector('[data-dt-filter]').addEventListener('click', openFilterDialog);
+    root.querySelector('[data-dt-cols]').addEventListener('click', openColMenu);
+    root.querySelector('[data-dt-export]').addEventListener('click', exportCsv);
+
+    function exportCsv() {
+      const { filtered } = compute();
+      const vc = visibleDataCols();
+      const head = vc.map((c) => c.label);
+      const cell = (c, r) => c.csvVal ? c.csvVal(r) : c.sortVal ? c.sortVal(r) : stripTags(c.render ? c.render(r) : '');
+      const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+      const csv = [head.map(q).join(',')].concat(filtered.map((r) => vc.map((c) => q(cell(c, r))).join(','))).join('\r\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = (cfg.exportName || 'export') + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    function dialog(title, bodyHtml, footerHtml, size) {
+      const el = document.createElement('div');
+      el.className = 'modal modal--' + (size || 'md') + ' modal--draggable';
+      el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+      el.innerHTML = `<div class="modal__backdrop" data-close></div><div class="modal__panel sectioned">
+        <div class="modal__header"><h2>${esc(title)}</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>
+        <div class="modal__body">${bodyHtml}</div><div class="modal__footer">${footerHtml}</div></div>`;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      function close() { el.classList.remove('show'); document.removeEventListener('keydown', onEsc); setTimeout(() => el.remove(), 200); }
+      function onEsc(ev) { if (ev.key === 'Escape') close(); }
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) close(); });
+      document.addEventListener('keydown', onEsc);
+      return { el, close };
+    }
+
+    function openSortBuilder() {
+      let work = st.advSort.length ? st.advSort.map((s) => ({ ...s })) : (st.simpleSort ? [{ ...st.simpleSort }] : []);
+      const sortable = dataCols.filter((c) => c.sortable);
+      const body = `<p class="admin-sub" style="margin:0 0 var(--space-3)">右の項目をクリックすると並び替え条件に追加されます。左は上ほど優先。</p>
+        <div class="sort-builder">
+          <div class="sort-builder__pane"><div class="sort-builder__title">並び替え条件（上ほど優先）</div><ul class="sort-builder__list" data-keys></ul></div>
+          <div class="sort-builder__pane"><div class="sort-builder__title">対象外の項目</div><ul class="sort-builder__list" data-avail></ul></div>
+        </div>`;
+      const foot = `<button class="btn btn-outline" type="button" data-clear>この条件をクリア</button><span style="flex:1"></span><button class="btn btn-outline" type="button" data-close>キャンセル</button><button class="btn btn-primary" type="button" data-apply>適用する</button>`;
+      const dlg = dialog('詳細ソート（複数項目）', body, foot, 'md');
+      const keysEl = dlg.el.querySelector('[data-keys]'), availEl = dlg.el.querySelector('[data-avail]'), builder = dlg.el.querySelector('.sort-builder');
+      function paint() {
+        keysEl.innerHTML = work.length ? work.map((s, i) => {
+          const up = i === 0 ? 'disabled' : '', dn = i === work.length - 1 ? 'disabled' : '';
+          return `<li class="sort-key" data-k="${esc(s.key)}"><span class="sort-key__ord"><button type="button" data-up ${up} aria-label="上へ">▲</button><button type="button" data-dn ${dn} aria-label="下へ">▼</button></span><span class="sort-key__pri">${i + 1}</span><span class="sort-key__name">${esc(labelOf(s.key))}</span><span class="seg"><button type="button" class="seg__btn" data-dir="asc" aria-pressed="${s.dir === 'asc'}">昇順</button><button type="button" class="seg__btn" data-dir="desc" aria-pressed="${s.dir === 'desc'}">降順</button></span><button type="button" class="sort-key__x" data-remove aria-label="除外">✕</button></li>`;
+        }).join('') : '<li class="sort-builder__empty">条件なし（右から追加）</li>';
+        const used = work.map((s) => s.key);
+        const avail = sortable.filter((c) => !used.includes(c.key));
+        availEl.innerHTML = avail.length ? avail.map((c) => `<li class="sort-avail" data-k="${esc(c.key)}" data-add="${esc(c.key)}"><span>${esc(c.label)}</span><span class="sort-avail__add">＋ 追加</span></li>`).join('') : '<li class="sort-builder__empty">すべて条件に追加済み</li>';
+      }
+      function flip(mutate) {
+        const before = new Map(); builder.querySelectorAll('[data-k]').forEach((el) => before.set(el.dataset.k, el.getBoundingClientRect()));
+        mutate(); paint();
+        builder.querySelectorAll('[data-k]').forEach((el) => {
+          const f = before.get(el.dataset.k), l = el.getBoundingClientRect();
+          if (!f) { el.style.opacity = '0'; requestAnimationFrame(() => { el.classList.add('dt-flip'); el.style.opacity = '1'; }); return; }
+          const dx = f.left - l.left, dy = f.top - l.top;
+          if (dx || dy) { el.style.transition = 'none'; el.style.transform = `translate(${dx}px,${dy}px)`; requestAnimationFrame(() => { el.classList.add('dt-flip'); el.style.transform = ''; el.style.transition = ''; }); }
+        });
+      }
+      paint();
+      dlg.el.addEventListener('click', (e) => {
+        const add = e.target.closest('[data-add]'), rm = e.target.closest('[data-remove]'), up = e.target.closest('[data-up]'), dn = e.target.closest('[data-dn]'), dir = e.target.closest('[data-dir]'), li = e.target.closest('.sort-key');
+        if (add) return flip(() => work.push({ key: add.dataset.add, dir: 'asc' }));
+        if (rm && li) return flip(() => { const i = work.findIndex((s) => s.key === li.dataset.k); if (i >= 0) work.splice(i, 1); });
+        if (up && li) { const i = work.findIndex((s) => s.key === li.dataset.k); if (i > 0) return flip(() => { const t = work[i - 1]; work[i - 1] = work[i]; work[i] = t; }); }
+        if (dn && li) { const i = work.findIndex((s) => s.key === li.dataset.k); if (i < work.length - 1) return flip(() => { const t = work[i + 1]; work[i + 1] = work[i]; work[i] = t; }); }
+        if (dir && li) { const s = work.find((x) => x.key === li.dataset.k); if (s) { s.dir = dir.dataset.dir; paint(); } }
+        if (e.target.closest('[data-clear]')) { work = []; paint(); }
+        if (e.target.closest('[data-apply]')) { st.advSort = work; if (work.length) st.simpleSort = null; st.page = 1; dlg.close(); render(); }
+      });
+    }
+
+    function openFilterDialog() {
+      const filterable = dataCols.filter((c) => c.filter);
+      const rowHtmlF = (c) => {
+        const cur = st.filters[c.key];
+        if (c.filter.type === 'text') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><input class="input" data-f="text" value="${cur ? esc(cur.q) : ''}" placeholder="含む文字"></div>`;
+        if (c.filter.type === 'enum') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="stack">${c.filter.options.map((o) => `<label class="checkbox"><input type="checkbox" data-f="enum" value="${esc(o[0])}" ${cur && cur.values.includes(o[0]) ? 'checked' : ''}> ${esc(o[1])}</label>`).join('')}</div></div>`;
+        if (c.filter.type === 'number') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="filter-range"><input class="input" type="number" data-f="min" value="${cur && cur.min != null ? cur.min : ''}" placeholder="最小"><span>〜</span><input class="input" type="number" data-f="max" value="${cur && cur.max != null ? cur.max : ''}" placeholder="最大"></div></div>`;
+        if (c.filter.type === 'date') return `<div class="filter-row" data-fk="${esc(c.key)}"><label>${esc(c.label)}</label><div class="filter-range"><input class="input" type="date" data-f="from" value="${cur ? esc(cur.from || '') : ''}"><span>〜</span><input class="input" type="date" data-f="to" value="${cur ? esc(cur.to || '') : ''}"></div></div>`;
+        return '';
+      };
+      const body = `<div class="filter-form">${filterable.map(rowHtmlF).join('')}</div>`;
+      const foot = `<button class="btn btn-outline" type="button" data-clear>クリア</button><span style="flex:1"></span><button class="btn btn-outline" type="button" data-close>キャンセル</button><button class="btn btn-primary" type="button" data-apply>適用する</button>`;
+      const dlg = dialog('詳細絞込', body, foot, 'md');
+      dlg.el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-clear]')) { dlg.el.querySelectorAll('input').forEach((i) => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; }); return; }
+        if (!e.target.closest('[data-apply]')) return;
+        const next = {};
+        dlg.el.querySelectorAll('.filter-row').forEach((row) => {
+          const key = row.dataset.fk, col = colByKey[key], type = col.filter.type;
+          if (type === 'text') { const v = row.querySelector('[data-f="text"]').value.trim(); if (v) next[key] = { type, key, q: v }; }
+          else if (type === 'enum') { const vals = Array.from(row.querySelectorAll('[data-f="enum"]:checked')).map((i) => i.value); if (vals.length) next[key] = { type, key, values: vals }; }
+          else if (type === 'number') { const mn = row.querySelector('[data-f="min"]').value, mx = row.querySelector('[data-f="max"]').value; if (mn !== '' || mx !== '') next[key] = { type, key, min: mn === '' ? null : Number(mn), max: mx === '' ? null : Number(mx) }; }
+          else if (type === 'date') { const fr = row.querySelector('[data-f="from"]').value, to = row.querySelector('[data-f="to"]').value; if (fr || to) next[key] = { type, key, from: fr, to: to }; }
+        });
+        st.filters = next; st.page = 1; dlg.close(); render();
+      });
+    }
+
+    let colMenuEl = null;
+    function closeColMenu() { if (colMenuEl) { colMenuEl.remove(); colMenuEl = null; document.removeEventListener('click', onDocClick, true); } }
+    function onDocClick(e) { if (colMenuEl && !colMenuEl.contains(e.target) && !e.target.closest('[data-dt-cols]')) closeColMenu(); }
+    function openColMenu() {
+      if (colMenuEl) return closeColMenu();
+      const btn = root.querySelector('[data-dt-cols]'), rect = btn.getBoundingClientRect();
+      colMenuEl = document.createElement('div'); colMenuEl.className = 'col-menu';
+      function paint() {
+        const items = st.order.map((k) => colByKey[k]).filter(Boolean);
+        colMenuEl.innerHTML = `<div class="col-menu__title">表示する列・並び順</div>` + items.map((c, i) => {
+          const shown = !st.hidden.includes(c.key);
+          const up = (i === 0 || c.locked) ? 'disabled' : '', dn = (i === items.length - 1 || c.locked) ? 'disabled' : '';
+          return `<div class="col-menu__item" data-ck="${esc(c.key)}"><label class="col-menu__grab checkbox"><input type="checkbox" data-vis ${shown ? 'checked' : ''} ${c.locked ? 'disabled' : ''}><span class="col-menu__name">${esc(c.label || '（操作）')}</span>${c.locked ? '<span class="col-menu__lock">必須</span>' : ''}</label><span class="col-menu__ord"><button type="button" data-up ${up}>▲</button><button type="button" data-dn ${dn}>▼</button></span></div>`;
+        }).join('') + `<div class="col-menu__foot"><button class="btn btn-sm btn-outline" type="button" data-wreset>列幅をリセット</button><button class="btn btn-sm btn-outline" type="button" data-reset>既定に戻す</button></div>`;
+      }
+      paint();
+      document.body.appendChild(colMenuEl);
+      colMenuEl.style.top = Math.min(rect.bottom + 4, window.innerHeight - colMenuEl.offsetHeight - 8) + 'px';
+      colMenuEl.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - colMenuEl.offsetWidth - 8)) + 'px';
+      colMenuEl.addEventListener('click', (e) => {
+        const item = e.target.closest('.col-menu__item'), key = item && item.dataset.ck;
+        if ((e.target.closest('[data-up]') || e.target.closest('[data-dn]')) && key) {
+          const dir = e.target.closest('[data-up]') ? -1 : 1, i = st.order.indexOf(key), j = i + dir;
+          if (j >= 0 && j < st.order.length && !colByKey[st.order[j]].locked && !colByKey[key].locked) { const t = st.order[i]; st.order[i] = st.order[j]; st.order[j] = t; persist(); paint(); render(); }
+          return;
+        }
+        if (e.target.closest('[data-wreset]')) { st.widths = {}; persist(); render(); return; }
+        if (e.target.closest('[data-reset]')) { st.order = defaultOrder.slice(); st.hidden = dataCols.filter((c) => c.hiddenDefault).map((c) => c.key); st.widths = {}; persist(); paint(); render(); return; }
+      });
+      colMenuEl.addEventListener('change', (e) => {
+        const cb = e.target.closest('[data-vis]'); if (!cb) return;
+        const key = cb.closest('.col-menu__item').dataset.ck;
+        if (cb.checked) st.hidden = st.hidden.filter((k) => k !== key); else if (!st.hidden.includes(key)) st.hidden.push(key);
+        persist(); render();
+      });
+      setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+    }
+
+    render();
+    return { render: render, state: st };
+  }
+  return { init: init };
+})();
