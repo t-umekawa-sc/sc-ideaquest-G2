@@ -4,7 +4,9 @@
 > 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）・`doc/API設計/`・`doc/ADR/`・`doc/データモデル.md`・`doc/テスト/`・`doc/規約/`・`doc/画面設計/` を正とすること（本 handoff は要約）。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **現在地＝方針転換（2026-08-12）で「画面モック先行のクリッカブル・プロトタイプ → 画面群ごとに backend 接続」へ移行（`doc/規約/フロントエンド実装フロー規約.md`）。Phase 0（デザインシステム/App シェル/全ルート雛形＋ハブ/URL モーダル基盤）完了。現在＝(A) 管理系画面のモック整合を実施中＝SC-91（モック完全準拠へ再整合）・SC-93 完了、次は SC-92・SC-90。**
+> **現在地（2026-08-13）＝(A) 管理系のモック整合（SC-91 完全準拠・SC-93 済）は一旦保留し、ユーザー要望で「画面モックの精度向上＋UI標準（`デザイン標準.md`/`shared.css`/`shared.js`）の調整」に着手。まず「一覧の操作標準（DataTable）」を新設し SC-91 モックに適用（`becc385`・doc/mocks のみ・impl 未反映）。次＝ユーザーのモック確認フィードバック反映 → 他要望（ヘッダー usermenu の UI/アニメ・各画面ラベル）→ 落ち着いたら (A) 管理系整合や (B) 画面群移植を再開。**
+>
+> ※ 元の再開点（保留中）＝(A-1) SC-92 会社詳細（§7）／(A-2) SC-90／(A-3) 所属エディタ `.seg` 化。方針転換（2026-08-12）＝「画面モック先行のクリッカブル → 画面群ごとに backend 接続」（`doc/規約/フロントエンド実装フロー規約.md`）。Phase 0 完了。
 
 ---
 
@@ -12,8 +14,9 @@
 
 - 最終更新: **2026-08-13 JST**（セッション終了時）。
 - ブランチ: **main**（作業ツリー クリーン・**push 未**＝本セッション分は未 push）。
-- 最新コミット: 本 handoff コミット。直前＝**`1094df1`**（モーダル本文スクロール修正）。
+- 最新コミット: 本 handoff コミット。直前＝**`becc385`**（一覧の操作標準 DataTable 新設）。
 - **本セッションのコミット（新しい順・未 push）**:
+  - `becc385` **一覧の操作標準（DataTable）新設＋SC-91 適用＋`デザイン標準.md` §4.5 起こし**（**doc/mocks のみ・impl 未反映**）＝ユーザー要望のUI標準化。`shared.js` に `window.DataTable`（`DataTable.init(root, config)`＝列とデータを宣言するだけで全機能付与）。機能＝①単一列ソート(昇順→降順→解除・aria-sort)②詳細ソート(左右2ペイン transfer＋FLIP・複数キー・優先順位▲▼・詳細中は単一列無効＋バッジ＋要約チップ)③横断検索＋詳細絞込(テキスト/区分/数値/日付範囲)④番号ページャ(« ‹ 1 … [n] … › »)⑤列幅ドラッグ(Wクリックで既定)⑥列設定メニュー(表示/非表示＋▲▼並べ替え・名称先頭/操作末尾ロック・幅リセット/既定に戻す)⑦CSV(現在の絞込・ソート結果/表示列・UTF-8 BOM)⑧表示密度(標準/コンパクト)⑨行固定(行頭📌→上部sticky＋全ページ常時・固定ヘッダー前提・上限5件)。永続＝列順/表示/幅/密度/ピンを `localStorage`(画面×列)。`shared.css` に `9y` 部品＋**グローバル `[hidden]{display:none!important}` 修正**（`.btn`/`.pagination` の display が UA の `[hidden]` を上書きする不具合）。`デザイン標準.md` §4.5 新設＋F4/toolbar/pagination 改定（旧「列ヘッダソート MVP 非採用」撤回）。SC-91 は手書き table→`DataTable.init` に置換。`style-guide.html` に「9.」デモ。**検証＝ヘッドレスで SC-91/style-guide とも JS エラー無し・全機能描画確認・ユーザーがモック確認予定**。
   - `1094df1` **モーダル本文スクロール修正**＝本文＋フッターを `<form>` で包む標準パターン（`Modal.tsx` §159）で内容が高いと `<form>` がパネル（`max-height:88vh`・`overflow:hidden`）から溢れ、フッターが画面外・本文も未スクロール（SC-91 作成モーダルで表面化）。`.modal__panel.sectioned > form` を flex 列＋`flex:1/min-height:0/overflow:hidden` に（body 直下パターンには非適用で無害）。`design-system.css`／`mocks/shared.css` 同期。目視確認＋full e2e 26 passed。
   - `effe878` (A)SC-91 会社一覧＝**モック完全準拠へ再整合**＝`.backlink`/`.page-title`「システム管理（運営）」/`.admin-sub`/`.section-head`(h2「会社（テナント）」＋「＋ 会社を作成」)/末尾 `.role-note`・テーブル `.co`＋`QuestIcon`/`.db-id`/状態バッジ `.st-active`/`.st-provisioning`・作成モーダルに会社カラー `.swatches`(新 `components/ui/Swatches.tsx`・backend `color` 接続)＋会社アイコン `.icon-field`(objectURL プレビューのみの仮実装・MinIO 待ち)＋`.provision-note`。共有クラス 8種を design-system.css と mocks/shared.css へ昇格・SC-91 モック `<style>` の重複撤去。e2e＝sc-91(B-TC-110 見出し/B-TC-111 ボタン名)・sc-92(作成ボタン名)追随＝**full 26 passed**。
 - 前セッション以前のコミット（新しい順・push 済み）:
@@ -43,6 +46,13 @@
 ---
 
 ## 3. 今回やったこと — 変更ファイルと理由
+
+### ★本セッションの主眼＝UI標準「一覧の操作標準（DataTable）」新設（2026-08-13・doc/mocks のみ）
+- ユーザーが (A) 管理系整合を**保留**し「モック精度向上＋UI標準調整」に舵。要望＝**各画面ラベル**・**一覧のページング/ソート/各項目絞り込み**・**ヘッダー usermenu の UI/アニメ**。まず一覧まわりを仕様化→実装（`becc385`）。
+- **仕様の詰め方**＝ユーザーが具体イメージを口頭描写→こちらが仕様化（選択肢提示は不可・[[design-spec-working-style]]）。決定①〜⑱を確定してから実装。
+- **成果物**＝`shared.js` の `DataTable`／`shared.css` の `9y`＋グローバル `[hidden]` 修正／`SC-91` 適用／`デザイン標準.md` §4.5／`style-guide.html` デモ（詳細は §1 のコミット説明）。
+- **重要**＝これは **doc/画面設計（mocks）だけ**の変更。**impl（`impl/frontend`）は未反映**。実装接続時に「Next.js 版 DataTable ＋ 一覧APIのクエリ契約（複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得）」として backend/impl に落とす（CSV／行固定のページ跨ぎは backend 依存）。
+- **残要望（未着手）**＝ヘッダー usermenu の UI/アニメ（現状 `.usermenu__list[hidden]` の即時トグル＝開閉アニメ無し）／各画面のラベル横断見直し。
 
 ### ★方針転換＝フロントエンド先行プロトタイプ（2026-08-12・ユーザー選択）
 従来の「ドメイン縦スライスで backend まで一気」から、**全画面をモック先行で Next.js にクリッカブル移植（ナビ＋ダイアログ配線・デモデータ）→ 画面群ごとに backend 接続**へ変更。正＝**`doc/規約/フロントエンド実装フロー規約.md`（新設・`b90eced`）**（shared.css を単一デザインシステムに採用・段階移行／URL 付きモーダル標準／デモデータ seam＝fixtures は OpenAPI 型／画面遷移図＝ルートの正／既存接続画面は接続維持でモック整合／**DoD＝モック一致**）。CLAUDE.md・コーディング規約 §5・テスト規約 §7 にクロス参照済み。
@@ -108,9 +118,16 @@
 
 ## 7. 次にやること — 優先順に、具体的に
 
-> **(A) 管理系モック整合の残り**を先に完了 → その後 **(B) 画面群の新規移植→接続**。DoD＝モック一致（`doc/画面設計/mocks/SC-xx_*.html` と `screens/SC-xx_*.md`）。各スライスで tsc→再ビルド→full e2e を緑に保つ。
+> **現在の最優先＝(D) UI標準/モック精度の調整（ユーザー主導・doc/mocks で作業）**。(A)/(B) の impl 作業は保留中。
 
-### (A-1) SC-92 会社詳細（最大・次にやる）
+### (D) UI標準・モック精度（進行中・最優先）
+- **D-0（直近）＝一覧の操作標準 DataTable のユーザー確認フィードバック反映**。ユーザーが `mocks/SC-91_システム管理.html`・`mocks/style-guide.html`（「9.」）をブラウザ確認予定。指摘（見た目・文言・挙動）を `shared.js`/`shared.css`/`デザイン標準.md` §4.5 に反映。**目視検証手法**＝mocks を frontend コンテナへ `docker compose cp ../doc/画面設計/mocks frontend:/tmp/mocks`（**既存 /tmp/mocks は先に `rm -rf`。cp はネスト增殖する**）→ `@playwright/test` の chromium で `file:///tmp/mocks/SC-91_...html` を開き pageerror/console を収集＋screenshot（node スクリプトを cp して `docker compose exec frontend node`）。`node --check` で syntax も確認。
+- **D-1＝ヘッダー usermenu の UI/アニメ**（要望）。現状 `shared.css` `.usermenu__list[hidden]{display:none}` の即時トグル＝**開閉アニメ無し**。フェード/スケール＋`prefers-reduced-motion` 対応を `shared.css`/`shared.js`（`initUserMenu`）に。
+- **D-2＝各画面のラベル横断見直し**（要望）。用語統一・命名を `mocks` 全体で点検（`デザイン標準.md` に方針節を設けるか検討）。
+- **D-3＝DataTable を他一覧へ展開**（SC-90/92/93・SC-10 等）。`columns`＋`data` 宣言のみ。
+- **D-4（後）＝impl 反映**＝Next.js 版 DataTable＋一覧APIのクエリ契約（複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得）。統合作業再開時。
+
+### 【保留】(A-1) SC-92 会社詳細（UI標準調整が落ち着いたら再開）
 - **会社設定トグル**＝`impl/frontend/src/features/companies/components/CompanyDetailView.tsx` の素の checkbox を **`.switch`（トグルスイッチ）**へ（shared.css `.switch` 定義済み）。新規 `components/ui/Switch.tsx` を作るのが良い。各設定に説明文を付す（デザイン標準 §98）。
 - **会社カラー**＝同ファイルに **`.swatches`（プリセット10色）**を追加＝**`components/ui/Swatches.tsx` は SC-91 で実装済み・再利用可**（`Swatches`／`SWATCH_PRESETS` を `@/components/ui` から import）。`updateCompanyProfile` が `color` を受ける（`features/companies/api.ts`）。**会社アイコンのアップロードは MinIO 基盤前提＝別スライス**（SC-91 と同じく objectURL プレビューのみの仮実装で先行可）。
 - **文脈バナー**＝会社アイコン＋名＋状態バッジ＋コード/DB/件数＋戻る（`.ctx` sticky・SC-92 モック参照）。`group_count` は `CompanyDetail` に無ければ暫定省略/「—」。
@@ -158,9 +175,10 @@
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝§7＝**(A-1) SC-92 会社詳細**（`CompanyDetailView`＝`.switch`/`.swatches`/文脈バナー・`AccountSection`＝`.table`+⋯ケバブ・`QuestGroupSection`＝`.table`+ケバブ+リネームモーダル）→ **(A-2) SC-90**（ロール列削除等の設計是正）→ **(A-3) 所属エディタのセグメント化**（`.seg` を design-system.css へ昇格）。その後 (B) 画面群移植→接続。
-- ✅ 状態＝**frontend full e2e 26 passed**（SC-91 再整合後に実測）・**tsc EXIT=0**。backend は本セッション無変更＝**164 passed は前セッション値（未再実行＝未確認扱い）**。migration head control 0010・company 0006。作業ツリー クリーン・**本セッション分は未 push**。
+- ✅ 再開点＝§7＝**(D) UI標準/モック精度（最優先）**：**D-0 一覧DataTableのユーザー確認フィードバック反映**（`mocks/SC-91`・`style-guide` の「9.」）→ D-1 usermenu の UI/アニメ → D-2 各画面ラベル横断見直し → D-3 DataTable を他一覧へ展開 → D-4 impl 反映。**（A-1〜A-3 SC-92/90/所属エディタ・(B) 画面群移植は保留）**。
+- ✅ 状態＝**本セッションは doc/画面設計（mocks）のみ変更＝impl 無変更**。frontend full e2e は前回 SC-91 再整合時 **26 passed**（本セッションでは impl 触らず未再実行）。DataTable は**ヘッドレスで JSエラー無し・全機能描画確認**。migration head control 0010・company 0006。作業ツリー クリーン・**本セッション分は未 push**。
 - ✅ 方針＝**画面モック先行→接続**（`doc/規約/フロントエンド実装フロー規約.md`）。shared.css 正・URL モーダル・DoD＝モック一致。再利用部品＝`components/ui/{Modal,Pager,RowMenu,Avatar,Button,Field,Card,Swatches}`・`components/layout/{AppHeader,QuestIcon,ScreenStub}`。**`Swatches`（`SWATCH_PRESETS` 10色）は SC-92 会社カラーでそのまま再利用可**。
-- ⚠ 未確認＝backend pytest の当セッション再実行（無変更のため省略）。SC-92/90 は未整合（旧実装）。`.seg`/`.mrow` は design-system.css 未昇格。会社アイコン画像アップロードは MinIO 基盤待ち（SC-91 は objectURL プレビューのみの仮実装で送信なし）。
+- ⚠ **DataTable は mocks 側のみ＝impl 未反映**（D-4 で対応）。`.seg` は `shared.css`（mocks）には新設したが **design-system.css（impl）未昇格**。会社アイコン画像は MinIO 基盤待ち。backend pytest 164 は前セッション値（未確認扱い・本セッション無変更）。SC-92/90 は未整合（旧実装・保留）。
+- ⚠ 仕様の詰め方＝**ユーザーの口頭イメージから仕様化する**（プレビュー付き選択肢での択一は不可）＝[[design-spec-working-style]]。
 - ⚠ 詳細の正は各 `doc/` 文書（本 handoff は要約）。会話ログは参照不可。
-- ⚠ Docker は本 handoff 時点で **7 サービス稼働中**（frontend は SC-91 再整合込み・backend は K.3 期）。
+- ⚠ Docker は本 handoff 時点で **7 サービス稼働中**（frontend は SC-91 再整合込み・backend は K.3 期。**本セッションの mocks 変更は impl イメージに無関係**）。
