@@ -245,3 +245,33 @@ def test_b_tc_133_csv_columns_whitelist_422(client):
     r = client.get(COMPANIES, params={"format": "csv", "columns": "name,bogus"})
     assert r.status_code == 422, r.text
     assert r.json()["errors"][0]["field"] == "columns"
+
+
+def test_b_tc_134_pins_resolved_across_filter(client, companies):
+    """B-TC-134 ピン行は絞込で母集合から外れても必ず解決して返す（data からは除外）。根拠 §1.8.1④。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    p = _mk(client, companies, f"{t} pinned", f"TP{t}P")
+    _mk(client, companies, f"{t} a", f"TP{t}A")
+    _mk(client, companies, f"{t} b", f"TP{t}B")
+    with control_session() as sess:  # ピン対象を active に（status=suspended 絞込から外す）
+        sess.query(Company).filter_by(id=uuid.UUID(p["company_id"])).update({"status": "active"})
+        sess.commit()
+
+    r = client.get(COMPANIES, params={"q": t, "status": "suspended", "pin_ids": p["company_id"]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "pinned" in body, body
+    assert [c["company_code"] for c in body["pinned"]] == [f"TP{t}P"]      # 絞込外でも解決
+    data_codes = [c["company_code"] for c in body["data"]]
+    assert f"TP{t}P" not in data_codes                                     # data からは除外
+    assert sorted(data_codes) == [f"TP{t}A", f"TP{t}B"]
+    assert body["page_info"]["total"] == 2                                 # 母集合＝非固定のみ
+
+
+def test_b_tc_135_pin_ids_malformed_422(client):
+    """B-TC-135 不正な pin_ids は 422。根拠 §1.8.1④。"""
+    _login_system_admin(client)
+    r = client.get(COMPANIES, params={"pin_ids": "not-a-uuid"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "pin_ids"

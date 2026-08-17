@@ -86,17 +86,55 @@ def _detail(c: Company, account_count: int) -> dict:
     }
 
 
-def _company_query(*, q, status, sort, account_count_min, account_count_max):
-    """会社一覧の検索/フィルタ/ソートを共通適用（一覧・CSV で共有・§1.8.1①②）。
+_MAX_PINS = 5  # 固定行（ピン）件数上限（デザイン標準 §4.5⑨ maxPins 既定・§1.8.1④）
 
-    戻り値＝(rows_stmt〔order 済み・offset/limit 未適用〕, count_stmt)。account_count は集計 subquery を
-    outerjoin してソート/範囲フィルタ可能にする。未知の sort キー/enum 値はここで 422（先に検証）。
-    """
+
+def _account_count_expr():
+    """会社あたりの有効アカウント数を SQL 集計する (subquery, coalesce 式)（ソート/範囲/表示で共用）。"""
     acc_sq = (
         select(Account.company_id.label("cid"), func.count().label("n"))
         .group_by(Account.company_id).subquery()
     )
-    account_count = func.coalesce(acc_sq.c.n, 0)
+    return acc_sq, func.coalesce(acc_sq.c.n, 0)
+
+
+def _parse_pin_ids(pin_ids: str | None) -> list[uuid.UUID]:
+    """`?pin_ids=<id>,<id>` を UUID リストへ（上限 _MAX_PINS・§1.8.1④）。不正形式は 422。"""
+    if not pin_ids:
+        return []
+    out: list[uuid.UUID] = []
+    for tok in pin_ids.split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            out.append(uuid.UUID(tok))
+        except ValueError:
+            raise AppError(422, "validation_error", extra={"errors": [{"field": "pin_ids", "value": tok}]})
+    return out[:_MAX_PINS]  # 上限超はクライアント側 maxPins で抑止・サーバーは防御的に切り詰め
+
+
+def _fetch_pinned(session, ids: list[uuid.UUID]) -> list[dict]:
+    """ピン ID の行を絞込/ページに関係なく解決（pin 順を保持・未解決 ID は除外・§1.8.1④）。"""
+    if not ids:
+        return []
+    acc_sq, account_count = _account_count_expr()
+    rows = session.execute(
+        select(Company, account_count.label("account_count"))
+        .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(Company.id.in_(ids))
+    ).all()
+    by_id = {c.id: (c, n) for c, n in rows}
+    return [_item(*by_id[i]) for i in ids if i in by_id]
+
+
+def _company_query(*, q, status, sort, account_count_min, account_count_max, exclude_ids=None):
+    """会社一覧の検索/フィルタ/ソートを共通適用（一覧・CSV で共有・§1.8.1①②）。
+
+    戻り値＝(rows_stmt〔order 済み・offset/limit 未適用〕, count_stmt)。account_count は集計 subquery を
+    outerjoin してソート/範囲フィルタ可能にする。未知の sort キー/enum 値はここで 422（先に検証）。
+    `exclude_ids`＝固定行（ピン）を非固定母集合から除外（§1.8.1④）。
+    """
+    acc_sq, account_count = _account_count_expr()
     order = _parse_sort(sort, extra={"account_count": account_count})
     statuses = _parse_enum(status, "status", _COMPANY_STATUSES)
 
@@ -111,6 +149,8 @@ def _company_query(*, q, status, sort, account_count_min, account_count_max):
         conds.append(account_count >= account_count_min)
     if account_count_max is not None:
         conds.append(account_count <= account_count_max)
+    if exclude_ids:  # 固定行は非固定母集合（data/total）から除外・§1.8.1④
+        conds.append(Company.id.notin_(exclude_ids))
 
     def _join(stmt):
         return stmt.outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
@@ -124,18 +164,22 @@ def _company_query(*, q, status, sort, account_count_min, account_count_max):
 
 def list_companies(*, q: str | None = None, status: str | None = None, sort: str | None = None,
                    account_count_min: int | None = None, account_count_max: int | None = None,
+                   pin_ids: str | None = None,
                    page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
-    """会社一覧（SC-91・オフセット・§1.8）＋複数ソート/項目別フィルタ契約（§1.8.1①②）。"""
+    """会社一覧（SC-91・オフセット・§1.8）＋複数ソート/項目別フィルタ/固定行契約（§1.8.1①②④）。"""
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
+    pins = _parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
     with control_session() as session:
+        pinned = _fetch_pinned(session, pins)  # 絞込/ページに関係なく解決・§1.8.1④
         rows_stmt, count_stmt = _company_query(
             q=q, status=status, sort=sort,
-            account_count_min=account_count_min, account_count_max=account_count_max)
+            account_count_min=account_count_min, account_count_max=account_count_max,
+            exclude_ids=pins)  # 固定行は非固定母集合から除外
         total = session.execute(count_stmt).scalar_one()
         rows = session.execute(rows_stmt.offset((page - 1) * per_page).limit(per_page)).all()
         data = [_item(c, n) for c, n in rows]
-    return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
+    return {"data": data, "pinned": pinned, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 
 # DataTable 契約（§1.8.1③）＝CSV エクスポートの表示可能列とラベル（列順は ?columns= が正）。

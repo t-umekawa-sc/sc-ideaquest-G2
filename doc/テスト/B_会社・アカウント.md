@@ -98,6 +98,8 @@
 | B-TC-131 | api | CSV エクスポート（同条件・全件・BOM・表示列） | 同一トークンの会社2件 | `?q=<t>&format=csv&columns=name,company_code&sort=name` | `200`＋`text/csv`＋`Content-Disposition: attachment`＋**UTF-8 BOM**。ヘッダ行＝表示列ラベル・列順／同じ絞込・ソートを適用した**全件**（ページング無視）＝§1.8.1③ | §1.8.1③／B.1 |
 | B-TC-132 | api | 管理系 CSV エクスポートの監査記録 | system_admin・トークンの会社1件 | `?q=<t>&format=csv` | `system_audit_logs` に `action=company.export` を**1件**（`detail.count`＝出力件数）＝管理系エクスポートは監査対象（§1.8.1③・B.6） | §1.8.1③／B.6 |
 | B-TC-133 | api | CSV 列のホワイトリスト検証 | system_admin | `?format=csv&columns=name,bogus` | `422 validation_error`（`errors[].field="columns"`）＝表示列ホワイトリスト外を拒否（§1.8.1③） | §1.8.1③／§2.2 |
+| B-TC-134 | api | ピン行のページ/絞込跨ぎ解決（DataTable 契約） | トークンの会社3件・1件を DB で active に | `?q=<t>&status=suspended&pin_ids=<active id>` | `pinned` に当該行（絞込外でも**必ず解決**）／`data` からは除外／`page_info.total`＝非固定母集合のみ（§1.8.1④） | §1.8.1④／B.1 |
+| B-TC-135 | api | pin_ids の形式検証 | system_admin | `?pin_ids=not-a-uuid` | `422 validation_error`（`errors[].field="pin_ids"`）＝不正な固定行 ID を拒否（§1.8.1④） | §1.8.1④／§2.2 |
 
 - **red 確認（後追い）**＝記名時整合行の無効化で B-TC-054 が `hide_voters_from_managers=true` のまま（本来 false）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 - **red 確認（test-first）**＝B-TC-126/127 は複数ソート実装前に確認（`sort` 未対応＝順序が作成順のまま／未知キーが無視され 200）。証跡＝コミットメッセージ。

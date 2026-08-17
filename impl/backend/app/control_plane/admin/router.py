@@ -61,11 +61,12 @@ def list_companies(
     account_count_max: int | None = Query(default=None, ge=0),
     format: str | None = None,   # `csv` で CSV エクスポート（§1.8.1③）
     columns: str | None = None,  # CSV の表示列・列順（§1.8.1③）
+    pin_ids: str | None = None,  # 固定行（ピン）ID＝ページ/絞込跨ぎで解決（§1.8.1④）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
 ):
-    """会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ/CSV 契約（§1.8.1①②③）。"""
+    """会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ/CSV/固定行 契約（§1.8.1①②③④）。"""
     if format == "csv":  # 同一フィルタ/ソートの全件を CSV で（監査対象・§1.8.1③）
         content, filename = company_service.export_companies_csv(
             q=q, status=status, sort=sort,
@@ -75,7 +76,7 @@ def list_companies(
     return CompanyListResponse(**company_service.list_companies(
         q=q, status=status, sort=sort,
         account_count_min=account_count_min, account_count_max=account_count_max,
-        page=page, per_page=per_page))
+        pin_ids=pin_ids, page=page, per_page=per_page))
 
 
 @router.post("/companies", response_model=CompanyDetail, status_code=201)
