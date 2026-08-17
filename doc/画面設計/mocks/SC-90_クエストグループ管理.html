@@ -116,12 +116,13 @@
 
   // ---- データ（モック・初期値。この管理者は「製品企画」「業務改善」を admin として管理） ----
   const GROUPS = ['製品企画', '業務改善'];
-  // 参加メンバー（会社DB quest_group_members × users・removed_at IS NULL）。ロールは member 固定（admin は SC-92）。
+  // 参加メンバー（会社DB quest_group_members × users・removed_at IS NULL）。
+  // 一覧は最小射影＝氏名＋グループ内ロールのみ（ログインID・参加日は B.4 で非提供）。ロール付与は SC-92。
   let MEMBERS = [
-    { name:'山田 太郎', loginId:'taro.yamada',  group:'製品企画', joined:'2026-05-12' },
-    { name:'佐藤 大輔', loginId:'daisuke.sato', group:'製品企画', joined:'2026-05-20' },
-    { name:'田中 美咲', loginId:'misaki.tanaka',group:'業務改善', joined:'2026-06-01' },
-    { name:'渡辺 剛',   loginId:'go.watanabe',  group:'業務改善', joined:'2026-06-15' },
+    { name:'山田 太郎', loginId:'taro.yamada',  group:'製品企画', role:'admin' },
+    { name:'佐藤 大輔', loginId:'daisuke.sato', group:'製品企画', role:'member' },
+    { name:'田中 美咲', loginId:'misaki.tanaka',group:'業務改善', role:'member' },
+    { name:'渡辺 剛',   loginId:'go.watanabe',  group:'業務改善', role:'member' },
   ];
   // 会社ディレクトリ（GET /admin/company-directory＝最小射影：氏名・ログインID・アバター頭文字のみ）。
   // email・system_role・他グループ所属は返さない。status='active' のみ。
@@ -140,7 +141,11 @@
 
   // グループ選択肢（自分が admin のグループのみ）
   const groupSel = document.getElementById('groupSel');
-  GROUPS.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; groupSel.appendChild(o); });
+  const groupCount = (g) => MEMBERS.filter((m) => m.group === g).length;
+  GROUPS.forEach(g => { const o = document.createElement('option'); o.value = g; groupSel.appendChild(o); });
+  // グループ選択は「名称（人数）」表示（実装＝member_count 付き。追加/除外で件数更新）。
+  function relabelGroups() { Array.from(groupSel.options).forEach((o) => { o.textContent = o.value + '（' + groupCount(o.value) + '）'; }); }
+  relabelGroups();
 
   // ---- 一覧（DataTable）。現在の管理グループのメンバーだけを viewData に載せて描画する。
   //      グループ切替・追加・除外のたびに viewData を作り直して dt.render()。 ----
@@ -158,15 +163,14 @@
     unit: '名',
     perPage: 5,
     perPageOptions: [5, 10, 20, 50],
-    searchFields: '氏名・ログインID',
+    searchFields: '氏名',
     exportName: 'グループメンバー',
     emptyText: 'このグループの参加メンバーがいません。「＋ メンバーを追加」から追加してください。',
     // カード表示（参加メンバーをカードでも見られる）。操作（除外）はカード右上に自動表示。
-    cardLayout: (r) => ({ title: r.name, meta: ['ログインID: ' + r.loginId, '参加日: ' + r.joined] }),
+    cardLayout: (r) => ({ title: r.name, meta: ['ロール: ' + (r.role === 'admin' ? '管理者' : 'メンバー')] }),
     columns: [
       { key: 'name', label: '氏名', locked: true, width: 260, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, csvVal: (r) => r.name, render: nameCell },
-      { key: 'loginId', label: 'ログインID', width: 200, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.loginId, searchVal: (r) => r.loginId, render: (r) => r.loginId },
-      { key: 'joined', label: '参加日', width: 150, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.joined, filterVal: (r) => r.joined, render: (r) => r.joined },
+      { key: 'role', label: 'グループ内ロール', width: 180, sortable: true, filter: { type: 'enum', options: [['admin','管理者'],['member','メンバー']] }, sortVal: (r) => r.role, filterVal: (r) => r.role, csvVal: (r) => (r.role === 'admin' ? '管理者' : 'メンバー'), render: (r) => (r.role === 'admin' ? '管理者' : 'メンバー') },
       { key: '_actions', label: '', actions: true, locked: true, width: 80, render: (r) => `
         <div class="rowmenu">
           <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
@@ -176,7 +180,7 @@
         </div>` },
     ],
   });
-  function refresh() { syncView(); dt.render(); }
+  function refresh() { syncView(); relabelGroups(); dt.render(); }
 
   groupSel.addEventListener('change', () => { currentGroup = groupSel.value; refresh(); });
 
@@ -207,7 +211,7 @@
     pkList.innerHTML = cands.map(d => `
       <div class="dir-row">
         <span class="avatar sm" data-name="${d.name}"><span class="avatar__img placeholder">${d.name.slice(0,1)}</span></span>
-        <span class="dir-row__name">${d.name} <span class="dir-row__id">${d.loginId}</span></span>
+        <span class="dir-row__name">${d.name}</span>
         <button class="btn btn-primary btn-sm" type="button" data-add="${d.loginId}">追加</button>
       </div>`).join('');
     pkEmpty.hidden = cands.length !== 0;
@@ -220,8 +224,7 @@
   pkList.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-add]'); if (!btn) return;
     const d = DIRECTORY.find(x => x.loginId === btn.dataset.add); if (!d) return;
-    const today = new Date().toISOString().slice(0,10);
-    MEMBERS.push({ name: d.name, loginId: d.loginId, group: currentGroup, joined: today });
+    MEMBERS.push({ name: d.name, loginId: d.loginId, group: currentGroup, role: 'member' });
     refresh(); renderPicker();  // 追加済みは候補から消える
   });
 </script>

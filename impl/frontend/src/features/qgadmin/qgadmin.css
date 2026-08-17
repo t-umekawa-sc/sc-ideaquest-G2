@@ -1,0 +1,62 @@
+/* SC-90 クエストグループ管理の固有スタイル（正＝doc/画面設計/mocks/SC-90_クエストグループ管理.html）。
+   将来 shared（design-system.css）へ昇格候補（フロントエンド実装フロー規約 §2 段階移行）。 */
+
+/* 管理グループ選択バー */
+.group-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.group-bar__label {
+  font-weight: 600;
+}
+
+/* モーダル内のフォーム行・補足ボックス */
+.form-row {
+  margin-bottom: var(--space-4);
+}
+.form-row > label {
+  display: block;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  margin-bottom: 6px;
+}
+.form-note {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+.hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+/* ディレクトリ・ピッカー（最小射影＝氏名・アバターのみ） */
+.dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+  margin-top: var(--space-2);
+}
+.dir-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius);
+}
+.dir-row__name {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

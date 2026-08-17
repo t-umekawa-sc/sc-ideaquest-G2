@@ -72,9 +72,9 @@ test("B-TC-120 qg admin adds member from directory", async ({ page }) => {
   await page.goto("/admin/quest-groups");
   await expect(page.getByRole("heading", { name: "クエストグループ管理" })).toBeVisible();
   await expect(page.locator("select").filter({ hasText: `QGA_${stamp}` })).toBeVisible();
-  await page.getByRole("button", { name: "＋ メンバー追加" }).click();
+  await page.getByRole("button", { name: "＋ メンバーを追加" }).click();
+  // ディレクトリはライブ検索（入力で即絞込・検索ボタンは無い）。候補は .dir-row（氏名＋アバター＋追加）。
   await page.getByPlaceholder("氏名・ログインIDで検索").fill(candName);
-  await page.getByRole("button", { name: "検索" }).click();
-  await page.getByRole("row", { name: new RegExp(candName) }).getByRole("button", { name: "追加" }).click();
+  await page.locator(".dir-row").filter({ hasText: candName }).getByRole("button", { name: "追加" }).click();
   await expect(page.getByRole("row", { name: new RegExp(candName) }).getByText("メンバー")).toBeVisible();
 });
