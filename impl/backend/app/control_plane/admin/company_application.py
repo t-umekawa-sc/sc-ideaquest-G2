@@ -71,7 +71,7 @@ def list_companies(*, q: str | None = None, status: str | None = None,
 
 def create_company(*, name: str, company_code: str, db_identifier: str,
                    color: str | None = None, icon_image_path: str | None = None) -> dict:
-    """会社作成（SC-91）。`status=suspended`（準備中）で作成。code/db_identifier は全社一意（409）。"""
+    """会社作成（SC-91）。`status=suspended`（停止＝作成時点は会社DB未整備）で作成。code/db_identifier は全社一意（409）。"""
     with control_session() as session:
         clash = session.execute(
             select(Company).where(

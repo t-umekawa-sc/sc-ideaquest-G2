@@ -24,7 +24,7 @@ test("B-TC-110 system admin sees company list", async ({ page }) => {
   await expect(page.getByText("ACME-01")).toBeVisible();
 });
 
-// B-TC-111: 会社作成＝一覧に現れる（status=準備中）。
+// B-TC-111: 会社作成＝一覧に現れる（status=suspended＝「停止」バッジ）。
 test("B-TC-111 create company appears in list", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/companies");
