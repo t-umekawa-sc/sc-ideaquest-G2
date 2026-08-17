@@ -191,3 +191,49 @@ def test_b_tc_148_pin_ids_invalid_format_422(client, factory):
     r = client.get(_url(co["id"], "?pin_ids=not-a-uuid"))
     assert r.status_code == 422, r.text
     assert r.json()["errors"][0]["field"] == "pin_ids"
+
+
+def _audit_rows(action: str):
+    from app.control_plane.audit.orm import SystemAuditLog
+    with control_session() as s:
+        return s.query(SystemAuditLog).filter_by(action=action).all()
+
+
+def test_b_tc_149_csv_export(client, factory):
+    """B-TC-149 CSV エクスポート（§1.8.1③）＝text/csv・UTF-8 BOM・表示列/列順・同条件の全件。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    factory.make_account(co, display_name="Zoe", status="disabled")
+    factory.make_account(co, display_name="Amy", status="active")
+
+    r = client.get(_url(co["id"], "?format=csv&columns=display_name,status&sort=display_name"))
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/csv")
+    assert "attachment" in r.headers["content-disposition"]
+    assert r.content.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM（Excel 互換）
+    lines = r.content.decode("utf-8-sig").splitlines()
+    assert lines[0] == "氏名,状態"                  # 表示列ラベル・列順
+    assert lines[1].split(",") == ["Amy", "active"]     # sort=display_name 昇順
+    assert lines[2].split(",") == ["Zoe", "disabled"]
+    assert len(lines) == 3                          # header + 全件（ページング無視）
+
+
+def test_b_tc_150_csv_export_audited(client, factory):
+    """B-TC-150 管理系 CSV エクスポートは監査記録（account.export・件数）（§1.8.1③／B.6）。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    factory.make_account(co, display_name="Solo")
+    r = client.get(_url(co["id"], "?format=csv"))
+    assert r.status_code == 200, r.text
+    rows = _audit_rows("account.export")
+    assert len(rows) == 1
+    assert rows[0].detail["count"] == 1
+
+
+def test_b_tc_151_csv_columns_whitelist_422(client, factory):
+    """B-TC-151 CSV 列のホワイトリスト外は 422 validation_error(field=columns)（§1.8.1③）。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    r = client.get(_url(co["id"], "?format=csv&columns=display_name,bogus"))
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "columns"

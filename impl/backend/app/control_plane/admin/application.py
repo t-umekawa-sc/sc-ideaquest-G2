@@ -374,3 +374,40 @@ def _account_item(a: Account) -> dict:
         "status": a.status,
         "last_login_at": a.last_login_at.isoformat() if a.last_login_at else None,
     }
+
+
+# DataTable 契約（§1.8.1③）＝アカウント CSV の表示可能列とラベル（列順は ?columns= が正）。
+_ACCOUNT_CSV_COLUMNS = {
+    "display_name": "氏名",
+    "login_id": "ログインID",
+    "email": "メールアドレス",
+    "system_role": "システムロール",
+    "status": "状態",
+    "last_login_at": "最終ログイン",
+}
+_ACCOUNT_CSV_DEFAULT_ORDER = ["display_name", "login_id", "email", "system_role", "status", "last_login_at"]
+
+
+def _account_csv_cell(key: str, a: Account) -> str:
+    if key == "last_login_at":
+        return a.last_login_at.isoformat() if a.last_login_at else ""
+    return str(getattr(a, key))
+
+
+def export_accounts_csv(company_id: uuid.UUID, *, q: str | None = None, status: str | None = None,
+                        system_role: str | None = None, sort: str | None = None,
+                        columns: str | None = None) -> tuple[bytes, str]:
+    """アカウント一覧を CSV で出力（同一フィルタ/ソートの全件・§1.8.1③）。管理系＝監査対象（B.6）。会社が無ければ 404。"""
+    keys = lq.parse_columns(columns, _ACCOUNT_CSV_COLUMNS, _ACCOUNT_CSV_DEFAULT_ORDER)
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")  # 対象会社の実在（B.2・§1.6）
+        rows_stmt, _ = _account_query(company_id, q=q, status=status, system_role=system_role, sort=sort)
+        rows = session.execute(rows_stmt).scalars().all()  # 全件（ページング無視・§1.8.1③）
+        audit.record("account.export",  # 管理系エクスポートは監査対象（§1.8.1③・B.6・同一Tx）
+                     {"company_id": str(company_id), "count": len(rows), "columns": keys}, session=session)
+        session.commit()
+    header = [_ACCOUNT_CSV_COLUMNS[k] for k in keys]  # ヘッダ＝表示列ラベル・列順
+    body = ([_account_csv_cell(k, a) for k in keys] for a in rows)
+    return lq.to_csv_bytes(header, body), "accounts.csv"  # UTF-8 BOM（Excel 互換・§1.8.1③）

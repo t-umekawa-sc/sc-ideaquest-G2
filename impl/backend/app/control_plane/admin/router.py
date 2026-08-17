@@ -180,16 +180,21 @@ def list_company_accounts(
     system_role: str | None = None,  # enum 多値（general/company_account_admin/system_admin）（§1.8.1②）
     sort: str | None = None,  # 複数ソート（§1.8.1①）
     pin_ids: str | None = None,  # 固定行（ピン）ID＝ページ/絞込跨ぎで解決（§1.8.1④）
+    format: str | None = None,   # `csv` で CSV エクスポート（§1.8.1③）
+    columns: str | None = None,  # CSV の表示列・列順（§1.8.1③）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
-) -> AccountListResponse:
-    """会社のアカウント一覧（SC-92・B.2・system_admin 専用）＋複数ソート/enum 多値フィルタ/固定行（§1.8.1①②④）。"""
-    result = admin_service.list_company_accounts(
+):
+    """会社のアカウント一覧（SC-92・B.2・system_admin 専用）＋複数ソート/enum 多値フィルタ/CSV/固定行（§1.8.1①②③④）。"""
+    if format == "csv":  # 同一フィルタ/ソートの全件を CSV で（監査対象・§1.8.1③）
+        content, filename = admin_service.export_accounts_csv(
+            company_id, q=q, status=status, system_role=system_role, sort=sort, columns=columns)
+        return Response(content=content, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return AccountListResponse(**admin_service.list_company_accounts(
         company_id, q=q, status=status, system_role=system_role, sort=sort, pin_ids=pin_ids,
-        page=page, per_page=per_page
-    )
-    return AccountListResponse(**result)
+        page=page, per_page=per_page))
 
 
 @router.post("/companies/{company_id}/accounts", response_model=AccountResponse, status_code=201)
@@ -269,16 +274,22 @@ def list_own_accounts(
     system_role: str | None = None,  # enum 多値（§1.8.1②）
     sort: str | None = None,  # 複数ソート（§1.8.1①）
     pin_ids: str | None = None,  # 固定行（ピン）ID（§1.8.1④）
+    format: str | None = None,   # `csv` で CSV エクスポート（§1.8.1③）
+    columns: str | None = None,  # CSV の表示列・列順（§1.8.1③）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     session: dict = Depends(require_company_account_admin),
-) -> AccountListResponse:
-    """自社アカウント一覧（SC-93・B.2.1）＝B.2 と同形の契約（複数ソート/enum 多値フィルタ/固定行・§1.8.1①②④）。"""
-    result = admin_service.list_company_accounts(
-        _company_id(session), q=q, status=status, system_role=system_role, sort=sort, pin_ids=pin_ids,
-        page=page, per_page=per_page
-    )
-    return AccountListResponse(**result)
+):
+    """自社アカウント一覧（SC-93・B.2.1）＝B.2 と同形の契約（複数ソート/enum 多値フィルタ/CSV/固定行・§1.8.1①②③④）。"""
+    company_id = _company_id(session)
+    if format == "csv":  # 監査対象・§1.8.1③
+        content, filename = admin_service.export_accounts_csv(
+            company_id, q=q, status=status, system_role=system_role, sort=sort, columns=columns)
+        return Response(content=content, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return AccountListResponse(**admin_service.list_company_accounts(
+        company_id, q=q, status=status, system_role=system_role, sort=sort, pin_ids=pin_ids,
+        page=page, per_page=per_page))
 
 
 @router.post("/accounts", response_model=AccountResponse, status_code=201)
