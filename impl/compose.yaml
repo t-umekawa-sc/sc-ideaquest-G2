@@ -1,6 +1,13 @@
 # ローカル開発用オーケストレーション（認証スライス）
 # Postgres / Redis / MailHog / backend / worker / frontend。
 # MinIO / PGroonga は後続スライスで追加する。
+#
+# 常駐ワーカ（worker / mail-worker）は profile `workers` に隔離する（既定の `docker compose up` では起動しない）。
+# 理由＝両ワーカは共有 control DB の *_outbox を real sender で drain するため、backend の pytest（プロセス内
+# FakeMailSender で同じ mail_outbox を drain する）と同時に走ると mail 行の取り合いになり mail 系 TC がフレーク化する
+# （mail_worker.py の docstring「テストは直接呼ぶ＝常駐不要」）。非同期パイプライン込みの手動起動や検証は
+# `docker compose --profile workers up -d` で明示起動する。backend pytest（`up -d db redis`）と frontend e2e
+# （`up -d frontend`＝依存グラフにワーカを含まない）はいずれもワーカ不要なので既定のままで動く。
 services:
   db:
     image: postgres:16
@@ -99,6 +106,7 @@ services:
   # backend と同一イメージ。bootstrap/uvicorn は起動せず worker ループのみ実行（entrypoint を上書き）。
   worker:
     build: ./backend
+    profiles: ["workers"]   # 既定 up からは除外（理由＝冒頭コメント）。`--profile workers up` で起動。
     environment: *backend_env
     entrypoint: ["python", "-m", "app.worker"]
     depends_on:
@@ -111,6 +119,7 @@ services:
   # backend と同一イメージ。entrypoint を上書きして mail_worker ループのみ実行。
   mail-worker:
     build: ./backend
+    profiles: ["workers"]   # 既定 up からは除外（理由＝冒頭コメント）。`--profile workers up` で起動。
     environment: *backend_env
     entrypoint: ["python", "-m", "app.mail_worker"]
     depends_on:
