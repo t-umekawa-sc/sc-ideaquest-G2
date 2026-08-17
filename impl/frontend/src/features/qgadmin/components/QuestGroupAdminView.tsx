@@ -2,9 +2,12 @@
 
 // SC-90 QG管理者＝参加選択専任（B.4・SoD）。自分が admin のグループのメンバーを参加追加/除外するだけ。
 // 認可は per-group（サーバー）。管理グループが無い（403）は「管理グループなし」を表示。
+// メンバー一覧は DataTable（client モード）。§4.5⑪＝SC-90 メンバー行はクリック割当なし（onRowClick を渡さない）。
+// ディレクトリ・ピッカー（メンバー追加モーダル）は最小射影の候補リスト＝簡易テーブルのまま（mock も同様）。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Modal, ModalBody, ModalFooter } from "@/components/ui";
+import { Avatar, Button, DataTable, Modal, ModalBody, ModalFooter, RowMenu } from "@/components/ui";
+import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { addMember, companyDirectory, listGroupMembers, listMyGroups, removeMember, type DirectoryEntry, type Member, type QuestGroup } from "../api";
 import "@/features/companies/companies.css";
@@ -88,6 +91,55 @@ export function QuestGroupAdminView() {
     }
   }
 
+  // 列定義（正＝mocks/SC-90 のメンバー DataTable columns）。backend の MemberListItem は最小射影
+  // （氏名・ロールのみ／ログインID・参加日は B.4 で非提供）＝実データの氏名＋グループ内ロールを表示。
+  const columns: DataTableColumn<Member>[] = [
+    {
+      key: "name",
+      label: "氏名",
+      locked: true,
+      width: 260,
+      sortable: true,
+      filter: { type: "text" },
+      sortVal: (m) => m.display_name,
+      searchVal: (m) => m.display_name,
+      csvVal: (m) => m.display_name,
+      render: (m) => (
+        <span className="co">
+          <Avatar name={m.display_name} size="sm" />
+          <strong>{m.display_name}</strong>
+        </span>
+      ),
+    },
+    {
+      key: "role",
+      label: "グループ内ロール",
+      width: 150,
+      sortable: true,
+      filter: {
+        type: "enum",
+        options: [
+          ["admin", "管理者"],
+          ["member", "メンバー"],
+        ],
+      },
+      sortVal: (m) => m.role,
+      filterVal: (m) => m.role,
+      csvVal: (m) => (m.role === "admin" ? "管理者" : "メンバー"),
+      render: (m) => (m.role === "admin" ? "管理者" : "メンバー"),
+    },
+    {
+      key: "_actions",
+      label: "",
+      actions: true,
+      locked: true,
+      width: 80,
+      render: (m) => (
+        <RowMenu items={[{ label: "このグループから除外", danger: true, onClick: () => onRemove(m.account_id, m.display_name) }]} />
+      ),
+    },
+  ];
+
   if (notAdmin) {
     return (
       <section aria-label="クエストグループ管理">
@@ -139,25 +191,22 @@ export function QuestGroupAdminView() {
         </ModalFooter>
       </Modal>
 
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th scope="col">氏名</th>
-            <th scope="col">グループ内ロール</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {members.map((m) => (
-            <tr key={m.account_id}>
-              <td>{m.display_name}</td>
-              <td>{m.role === "admin" ? "管理者" : "メンバー"}</td>
-              <td><button type="button" className="is-danger" onClick={() => onRemove(m.account_id, m.display_name)}>除外</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {members.length === 0 && <p className="admin-muted">メンバーがいません。</p>}
+      <DataTable<Member>
+        storageKey="sc90-members"
+        data={members}
+        columns={columns}
+        rowId={(m) => m.account_id}
+        unit="名"
+        perPage={5}
+        perPageOptions={[5, 10, 20, 50]}
+        searchFields="氏名"
+        exportName="グループメンバー"
+        emptyText="このグループの参加メンバーがいません。「＋ メンバー追加」から追加してください。"
+        cardLayout={(m) => ({
+          title: m.display_name,
+          badges: [{ label: m.role === "admin" ? "管理者" : "メンバー" }],
+        })}
+      />
     </section>
   );
 }
