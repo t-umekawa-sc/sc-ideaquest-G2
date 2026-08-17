@@ -584,6 +584,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
         className={`dt-pin-toggle${float ? " dt-pin-float" : ""}`}
         type="button"
         aria-pressed={pinnedNow}
+        aria-label={pinnedNow ? "固定を解除" : "この行を固定"}
         title={pinnedNow ? "固定を解除" : "この行を固定"}
         onClick={(e) => {
           e.stopPropagation();
