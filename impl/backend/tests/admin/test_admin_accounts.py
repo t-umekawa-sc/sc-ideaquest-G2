@@ -162,3 +162,32 @@ def test_b_tc_146_unknown_system_role_enum_422(client, factory):
     r = client.get(_url(co["id"], "?system_role=root"))
     assert r.status_code == 422, r.text
     assert r.json()["errors"][0]["field"] == "system_role"
+
+
+def test_b_tc_147_pin_resolves_across_filter(client, factory):
+    """B-TC-147 固定行のページ/絞込跨ぎ解決（§1.8.1④）＝pin_ids は絞込外でも pinned に必ず返る・data から除外。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    a_active = factory.make_account(co, status="active", display_name="PinnedActive")
+    factory.make_account(co, status="disabled", display_name="D1")
+    factory.make_account(co, status="disabled", display_name="D2")
+
+    r = client.get(_url(co["id"], f"?status=disabled&pin_ids={a_active['id']}"))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # 固定行は絞込（status=disabled）に関係なく解決される。
+    assert [a["display_name"] for a in body["pinned"]] == ["PinnedActive"]
+    # data は非固定母集合（絞込適用）＝固定した active は含めない。
+    data_names = [a["display_name"] for a in body["data"]]
+    assert "PinnedActive" not in data_names
+    assert set(data_names) == {"D1", "D2"}
+    assert body["page_info"]["total"] == 2  # 非固定母集合のみ
+
+
+def test_b_tc_148_pin_ids_invalid_format_422(client, factory):
+    """B-TC-148 pin_ids の形式検証（§1.8.1④）＝不正 UUID は 422 validation_error(field=pin_ids)。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    r = client.get(_url(co["id"], "?pin_ids=not-a-uuid"))
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "pin_ids"

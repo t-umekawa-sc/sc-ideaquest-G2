@@ -45,6 +45,8 @@ class AccountListItem(BaseModel):
 
 class AccountListResponse(BaseModel):
     data: list[AccountListItem]
+    # 固定行（ピン）＝絞込/ページに関係なく必ず解決して返す（先頭表示・§1.8.1④）。data とは重複しない。
+    pinned: list[AccountListItem] = []
     page_info: PageInfo
 
 

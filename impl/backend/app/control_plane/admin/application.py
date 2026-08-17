@@ -321,6 +321,20 @@ def _account_query(company_id: uuid.UUID, *, q, status, system_role, sort, exclu
     return rows_stmt, count_stmt
 
 
+def _fetch_pinned_accounts(session, company_id: uuid.UUID, ids: list[uuid.UUID]) -> list[dict]:
+    """ピン ID の行を絞込/ページに関係なく解決（pin 順を保持・未解決/他社 ID は除外・§1.8.1④）。
+
+    pin_ids は当該会社スコープで解決する（他社アカウントの漏洩を構造的に防ぐ）。
+    """
+    if not ids:
+        return []
+    rows = session.execute(
+        select(Account).where(Account.company_id == company_id, Account.id.in_(ids))
+    ).scalars().all()
+    by_id = {a.id: a for a in rows}
+    return [_account_item(by_id[i]) for i in ids if i in by_id]
+
+
 def list_company_accounts(
     company_id: uuid.UUID,
     *,
@@ -328,22 +342,26 @@ def list_company_accounts(
     status: str | None = None,
     system_role: str | None = None,
     sort: str | None = None,
+    pin_ids: str | None = None,
     page: int = 1,
     per_page: int = _DEFAULT_PER_PAGE,
 ) -> dict:
-    """会社のアカウント一覧（オフセット・§1.8）＋複数ソート/enum 多値フィルタ（§1.8.1①②）。会社が無ければ 404（存在秘匿・B.2）。"""
+    """会社のアカウント一覧（オフセット・§1.8）＋複数ソート/enum 多値フィルタ/固定行（§1.8.1①②④）。会社が無ければ 404（存在秘匿・B.2）。"""
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
+    pins = lq.parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
     with control_session() as session:
         company = session.get(Company, company_id)
         if company is None:
             raise AppError(404, "not_found")  # 対象会社の実在（B.2・§1.6）
+        pinned = _fetch_pinned_accounts(session, company_id, pins)  # 絞込/ページに関係なく解決・§1.8.1④
         rows_stmt, count_stmt = _account_query(
-            company_id, q=q, status=status, system_role=system_role, sort=sort)
+            company_id, q=q, status=status, system_role=system_role, sort=sort,
+            exclude_ids=pins)  # 固定行は非固定母集合から除外
         total = session.execute(count_stmt).scalar_one()
         rows = session.execute(rows_stmt.offset((page - 1) * per_page).limit(per_page)).scalars().all()
         data = [_account_item(a) for a in rows]
-    return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
+    return {"data": data, "pinned": pinned, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 
 def _account_item(a: Account) -> dict:

@@ -50,8 +50,10 @@
 | B-TC-144 | api | status enum 値のホワイトリスト検証 | 専用会社 | `?status=bogus` | `422 validation_error`（`errors[].field="status"`） | §1.8.1②／§2.2 |
 | B-TC-145 | api | system_role の enum 多値フィルタ | general/company_account_admin を各1件 | `?system_role=company_account_admin` | 該当ロールのみ（§1.8.1②） | §1.8.1②／B.2 |
 | B-TC-146 | api | system_role enum 値のホワイトリスト検証 | 専用会社 | `?system_role=root` | `422 validation_error`（`errors[].field="system_role"`） | §1.8.1②／§2.2 |
+| B-TC-147 | api | ピン行のページ/絞込跨ぎ解決 | 専用会社に active1件＋disabled2件 | `?status=disabled&pin_ids=<active id>` | `pinned` に当該行（絞込外でも必ず解決・当該会社スコープ）／`data` からは除外／`page_info.total`＝非固定母集合のみ（§1.8.1④） | §1.8.1④／B.2 |
+| B-TC-148 | api | pin_ids の形式検証 | 専用会社 | `?pin_ids=not-a-uuid` | `422 validation_error`（`errors[].field="pin_ids"`） | §1.8.1④／§2.2 |
 
-**red 確認（test-first）**＝B-TC-141〜146 は sort/system_role/多値 status 実装前に確認（未対応＝順序が作成順・未知キー/値が無視され 200）。証跡＝コミットメッセージ。
+**red 確認（test-first）**＝B-TC-141〜148 は各機能の実装前に確認（未対応＝順序が作成順・未知キー/値が無視され 200・pinned 非返却）。証跡＝コミットメッセージ。
 
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
 
