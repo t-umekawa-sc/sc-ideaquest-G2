@@ -5,7 +5,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -40,10 +40,18 @@ export function LoginForm() {
   const [pending, setPending] = useState(false);
   const [mfa, setMfa] = useState<MfaChallenge | null>(null);
 
+  // 会社コードは端末記憶（前回値）でプリフィル。SSR ハイドレーション不整合を避けるためマウント後に復元。
+  useEffect(() => {
+    const remembered = localStorage.getItem("ideaquest_company_code");
+    if (remembered) setCompanyCode(remembered);
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
+    const code = companyCode.trim();
+    if (code) localStorage.setItem("ideaquest_company_code", code); // 次回プリフィル用に端末記憶
     try {
       const res = await login(companyCode, loginId, password);
       if (res?.status === "authenticated") {
@@ -78,6 +86,7 @@ export function LoginForm() {
 
   return (
     <div className="login-page">
+      <div>
       <div className="login-card">
         <div className="login-logo">
           <Image src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={185} height={84} priority />
@@ -92,8 +101,10 @@ export function LoginForm() {
               id="company_code"
               className="input"
               autoComplete="organization"
+              placeholder="例: systemcon"
+              style={{ textTransform: "uppercase" }}
               value={companyCode}
-              onChange={(e) => setCompanyCode(e.target.value)}
+              onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
               required
             />
           </Field>
@@ -101,8 +112,9 @@ export function LoginForm() {
             <input
               id="login_id"
               className="input"
-              type="email"
+              type="text"
               autoComplete="username"
+              placeholder="例: system.concierge"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
               required
@@ -115,6 +127,7 @@ export function LoginForm() {
                 className="input"
                 type={showPw ? "text" : "password"}
                 autoComplete="current-password"
+                placeholder="パスワードを入力"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -142,8 +155,12 @@ export function LoginForm() {
           アカウントは管理者が発行します（自己新規登録はできません）。
           <br />
           <strong>初回ログインの方</strong>は、管理者発行後にメールで届く
-          <strong>初回パスワード設定リンク</strong>からパスワードを設定してからログインしてください。
+          <strong>初回パスワード設定リンク</strong>（72時間有効）からパスワードを設定してからログインしてください。
+          <br />
+          ログインできない場合は、所属組織の管理者にお問い合わせください。
         </p>
+      </div>
+        <p className="login-foot">© ideaquest</p>
       </div>
     </div>
   );
