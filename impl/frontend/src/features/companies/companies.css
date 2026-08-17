@@ -42,3 +42,9 @@
   max-width: 520px;
 }
 /* 一覧ツールバー（.list-toolbar）・ページャ（.pagination）は design-system.css（＝mock shared.css）が正。ここでは定義しない。 */
+
+/* DataTable: 操作不可行（sys_admin＝SC-93）はクリック割当なし＝指カーソル/ホバー背景を出さない（§4.5⑪ クリック標準）。
+   ※ shared.css §9y には未収録（SC-93 mock の inline 由来）＝feature スコープで補う。 */
+.table tr.dt-row--link.is-rowlocked { cursor: default; }
+.table tr.dt-row--link.is-rowlocked:hover:not(.is-pinned) td { background: transparent; }
+.dt-card--link.is-rowlocked { cursor: default; }

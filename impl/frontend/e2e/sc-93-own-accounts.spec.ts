@@ -32,11 +32,12 @@ test("B-TC-117 own-company account issue appears", async ({ page }) => {
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(loginId);
   await page.getByRole("button", { name: /発行する/ }).click();
-  // 発行後は先頭ページに戻る＝検索で当該行を絞って確認（per_page=20・ページング/検索 UI 導入）
+  // 一覧は DataTable（client モード・ライブ検索）。発行後 reload の再マウント競合は toPass で吸収。
   const region = page.getByRole("region", { name: "自社アカウント管理" });
-  await region.getByRole("searchbox", { name: "検索（氏名・ログインID・メール）" }).fill(loginId);
-  await region.getByRole("button", { name: "検索" }).click();
-  await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible();
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(loginId);
+    await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
 
 // B-TC-118: 一般ユーザーは SC-93 に入れない（サーバーガード）。
@@ -46,14 +47,13 @@ test("B-TC-118 general user cannot access SC-93", async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
 });
 
-// B-TC-124: SC-93 一覧の検索（q）・メール列・ページャ（本スライス＝ページング/検索 UI・doc/テスト/B §16）。
+// B-TC-124: SC-93 一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
-test("B-TC-124 own-account list: search, email column, pager", async ({ page }) => {
+test("B-TC-124 own-account list: search, email column, clear", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/accounts");
   const region = page.getByRole("region", { name: "自社アカウント管理" });
-  await expect(region.getByRole("columnheader", { name: "メールアドレス" })).toBeVisible();
-  await expect(region.getByRole("button", { name: "前へ" })).toBeDisabled(); // 1ページ目
+  await expect(region.getByRole("columnheader", { name: /メールアドレス/ })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);
   const loginId = `e2e-l-${stamp}@ops.example`;
@@ -65,18 +65,18 @@ test("B-TC-124 own-account list: search, email column, pager", async ({ page }) 
   await page.getByRole("button", { name: /発行する/ }).click();
   await expect(page.getByText("アカウントを発行")).toHaveCount(0); // フォームが閉じる＝発行成功
 
-  // 検索＝一意スタンプで絞ると当該行のみ（total=1）・seed 管理者は消える
-  await region.getByRole("searchbox", { name: "検索（氏名・ログインID・メール）" }).fill(stamp);
-  await region.getByRole("button", { name: "検索" }).click();
-  await expect(region.getByRole("cell", { name: loginId })).toBeVisible();
+  // DataTable ライブ検索＝一意スタンプで絞ると当該行のみ（1 件）・seed 管理者は消える
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(stamp);
+    await expect(region.getByRole("cell", { name: loginId })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(region.getByRole("cell", { name: emailAddr })).toBeVisible();
   await expect(region.getByRole("cell", { name: "admin@ops.example" })).toHaveCount(0);
-  await expect(region.getByText("（1 件）")).toBeVisible();
-  await expect(region.getByRole("button", { name: "次へ" })).toBeDisabled(); // 1ページに収まる
+  await expect(region.getByText("1 件", { exact: true })).toBeVisible();
 
-  // クリアで全件へ戻る（自社は seed 管理者＋発行分で 2 件以上＝「1 件」表示が消える）
-  await region.getByRole("button", { name: "クリア" }).click();
-  await expect(region.getByText("（1 件）")).toHaveCount(0);
+  // 「すべてクリア」で全件へ戻る（自社は seed 管理者＋発行分で 2 件以上＝「1 件」表示が消える）
+  await region.getByRole("button", { name: "すべてクリア" }).click();
+  await expect(region.getByText("1 件", { exact: true })).toHaveCount(0);
 });
 
 // B-TC-122: 自社グループ一覧 EP（/admin/company-quest-groups）で所属ピッカーが機能し、所属付きで発行できる。
@@ -102,9 +102,10 @@ test("B-TC-122 self issue with membership picker", async ({ page }) => {
   await page.locator("#s_email").fill(loginId);
   await page.getByLabel("所属グループを追加").selectOption({ label: gname }); // EP が候補を返す＝ピッカー機能
   await page.getByRole("button", { name: /発行する/ }).click();
-  // 発行後は先頭ページに戻る＝検索で当該行を絞って確認（per_page=20・ページング/検索 UI 導入）
+  // 一覧は DataTable（client モード・ライブ検索）。発行後 reload の再マウント競合は toPass で吸収。
   const region = page.getByRole("region", { name: "自社アカウント管理" });
-  await region.getByRole("searchbox", { name: "検索（氏名・ログインID・メール）" }).fill(loginId);
-  await region.getByRole("button", { name: "検索" }).click();
-  await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible();
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(loginId);
+    await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
