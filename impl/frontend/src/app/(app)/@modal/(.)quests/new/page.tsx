@@ -11,7 +11,7 @@ export default function QuestCreateInterceptModal() {
   const router = useRouter();
   const close = () => router.back();
   return (
-    <Modal open onClose={close} title="クエストを作成（SC-11）" size="lg">
+    <Modal open onClose={close} title="クエストを作成" size="lg">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -20,7 +20,7 @@ export default function QuestCreateInterceptModal() {
       >
         <ModalBody>
           <p className="muted">
-            URL 付きモーダル（Parallel Routes <code>@modal</code> ＋ Intercept Routes）。一覧から開くとモーダル・直アクセス/リロードはフルページ。フォーム項目はモック移植で実装します。
+            一覧から開くとこのウィンドウ、直接アクセスやリロード時はページ全体で表示されます。入力項目は今後実装します。
           </p>
           <Field id="q_title" label="件名" required>
             <input id="q_title" className="input" placeholder="例: 新しい社内制度のアイデア募集" />

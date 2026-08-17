@@ -71,7 +71,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
       <h1>{company.name}</h1>
       <p className="admin-muted">
         <span className="admin-code">{company.company_code}</span>
-        {" ・ "}{company.status === "active" ? "有効" : "準備中"}
+        {" ・ "}{company.status === "active" ? "有効" : "停止"}
         {" ・ DB: "}<span className="admin-code">{company.db_identifier}</span>
         {" ・ アカウント "}{company.account_count}
       </p>

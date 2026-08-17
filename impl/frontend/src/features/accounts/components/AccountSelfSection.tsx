@@ -244,7 +244,7 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
                   </td>
                   <td className="col-actions">
                     {isSysAdmin ? (
-                      <span className="row-locked">システム管理者は SC-92 で管理</span>
+                      <span className="row-locked">システム管理者は会社詳細で管理</span>
                     ) : (
                       <RowMenu items={menu} />
                     )}

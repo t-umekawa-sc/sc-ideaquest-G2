@@ -143,7 +143,7 @@ export function CompanyList() {
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="page-title">システム管理（運営）</h1>
       <p className="admin-sub">
-        会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント/所属の管理は、会社を選ぶと会社詳細（SC-92）で行います</strong>。
+        会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント/所属の管理は、会社を選ぶと会社詳細で行います</strong>。
         <strong>システム管理者のみ</strong>。
       </p>
 
@@ -220,8 +220,7 @@ export function CompanyList() {
             </Field>
 
             <p className="provision-note">
-              作成すると管理DBに会社を登録します（状態=準備中）。<strong>会社DBの実体は別途プロビジョニング</strong>
-              （MVP: compose にサービス追記 → <code>up</code>）が必要です。DB接続確認後に「有効」化。
+              作成すると会社が登録され、最初は「停止（メンテナンス）」の状態です。会社DBの準備が整うと「有効」になり、利用できるようになります。
             </p>
           </ModalBody>
           <ModalFooter>
@@ -250,7 +249,7 @@ export function CompanyList() {
             <select className="select" aria-label="状態で絞り込み" value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
               <option value="">すべて</option>
               <option value="active">有効</option>
-              <option value="suspended">準備中</option>
+              <option value="suspended">停止</option>
             </select>
           </label>
           <Button type="submit" variant="outline" size="sm">検索</Button>
@@ -299,7 +298,7 @@ export function CompanyList() {
                       {c.status === "active" ? (
                         <span className="badge st-active">有効</span>
                       ) : (
-                        <span className="badge st-provisioning">準備中</span>
+                        <span className="badge st-suspended">停止</span>
                       )}
                     </td>
                     <td className="num">{c.account_count}</td>
@@ -325,9 +324,8 @@ export function CompanyList() {
       )}
 
       <p className="role-note">
-        ※ 会社DBは物理分離（別コンテナ）。接続情報の実体は <code>.env</code>・ここでは参照キー（DB識別子）のみ表示。
-        作成後、<strong>会社DBは別途プロビジョニング</strong>（MVP: compose 手編集 → <code>up</code> → 管理DBに登録）で有効化。
-        会社を選ぶと<strong>会社詳細（SC-92）</strong>で設定・アカウント/所属を管理。
+        ※ 各会社のデータは会社ごとに分けて管理されます。一覧の「DB識別子」は会社を識別するための参照キーです。
+        会社を選ぶと<strong>会社詳細</strong>で設定・アカウント/所属を管理します。
       </p>
     </section>
   );
