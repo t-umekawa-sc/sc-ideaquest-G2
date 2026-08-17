@@ -19,3 +19,7 @@ node_modules/
 .next/
 playwright-report/
 test-results/
+# ローカル型チェック（npm install → tsc）の副産物。再現性は Docker に寄せる方針＝
+# Docker ビルドは package.json＋npm install だけを使い、これらを参照しないので追跡しない。
+package-lock.json
+*.tsbuildinfo
