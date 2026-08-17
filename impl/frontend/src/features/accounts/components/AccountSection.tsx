@@ -261,7 +261,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
   ];
 
   return (
-    <section className="card admin-create" aria-label="この会社のアカウント管理">
+    <section className="card admin-create admin-create--table" aria-label="この会社のアカウント管理">
       <div className="admin-toolbar">
         <h2>アカウント &amp; 所属（この会社）</h2>
         <Button type="button" variant="primary" onClick={openIssue}>

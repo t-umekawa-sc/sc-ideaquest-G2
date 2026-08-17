@@ -1,10 +1,13 @@
 "use client";
 
 // SC-92 クエストグループ（この会社・CRUD）。system_admin 専用（会社構造の変更・B.3.1）。
-// 一覧＋作成＋リネーム＋削除（空グループのみ＝有効所属があれば 409 in_use）。
+// 一覧（DataTable client モード）＋作成＋リネーム＋削除（空グループのみ＝有効所属があれば 409 in_use）。
+// レイアウト/クラスの正＝doc/画面設計/mocks/SC-92_会社詳細.html（DoD＝モック一致）。
+// 一覧の操作標準は DataTable に委譲＝検索/絞込/ソート/列設定/CSV/ピン/カード（§4.5）。listQuestGroups は全件返す。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Field, Modal, ModalBody, ModalFooter } from "@/components/ui";
+import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, RowMenu } from "@/components/ui";
+import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createQuestGroup, deleteQuestGroup, listQuestGroups, renameQuestGroup, type QuestGroup } from "../api";
 import "@/features/companies/companies.css";
@@ -20,6 +23,7 @@ function createErrorMessage(err: unknown): string {
 
 export function QuestGroupSection({ companyId }: { companyId: string }) {
   const [groups, setGroups] = useState<QuestGroup[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -30,12 +34,15 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
   const [pending, setPending] = useState(false);
 
   const reload = useCallback(async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       const res = await listQuestGroups(companyId);
       setGroups(res?.data ?? []);
     } catch {
       setLoadError("クエストグループ一覧の取得に失敗しました。");
+    } finally {
+      setLoading(false);
     }
   }, [companyId]);
 
@@ -87,8 +94,60 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     }
   }
 
+  // 列定義（正＝mocks/SC-92 のグループ DataTable columns）。操作は RowMenu（リネーム/削除）。
+  const columns: DataTableColumn<QuestGroup>[] = [
+    {
+      key: "name",
+      label: "グループ名",
+      locked: true,
+      width: 260,
+      sortable: true,
+      filter: { type: "text" },
+      sortVal: (g) => g.name,
+      searchVal: (g) => g.name,
+      csvVal: (g) => g.name,
+      render: (g) => <strong>{g.name}</strong>,
+    },
+    {
+      key: "quest_group_code",
+      label: "コード",
+      width: 160,
+      cellClass: "db-id",
+      sortable: true,
+      filter: { type: "text" },
+      sortVal: (g) => g.quest_group_code,
+      searchVal: (g) => g.quest_group_code,
+      render: (g) => g.quest_group_code,
+    },
+    {
+      key: "member_count",
+      label: "メンバー数",
+      width: 130,
+      align: "num",
+      sortable: true,
+      sortVal: (g) => g.member_count,
+      csvVal: (g) => `${g.member_count} 名`,
+      render: (g) => `${g.member_count} 名`,
+    },
+    {
+      key: "_actions",
+      label: "",
+      actions: true,
+      locked: true,
+      width: 90,
+      render: (g) => (
+        <RowMenu
+          items={[
+            { label: "リネーム", onClick: () => onRename(g) },
+            { label: "削除", danger: true, onClick: () => onDelete(g) },
+          ]}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div className="card admin-create">
+    <div className="card admin-create admin-create--table">
       <div className="admin-toolbar">
         <h2>クエストグループ</h2>
         <Button type="button" variant="primary" onClick={() => setShowForm(true)}>
@@ -118,33 +177,32 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         </form>
       </Modal>
 
-      {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th scope="col">グループ名</th>
-            <th scope="col">コード</th>
-            <th scope="col">メンバー数</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((g) => (
-            <tr key={g.group_id}>
-              <td>{g.name}</td>
-              <td className="admin-code">{g.quest_group_code}</td>
-              <td>{g.member_count}</td>
-              <td>
-                <button type="button" onClick={() => onRename(g)}>リネーム</button>{" "}
-                <button type="button" className="is-danger" onClick={() => onDelete(g)}>削除</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {groups.length === 0 && !loadError && <p className="admin-muted">クエストグループがありません。</p>}
+      {loadError ? (
+        <div className="form-error" role="alert">{loadError}</div>
+      ) : loading ? (
+        <p className="admin-muted">読み込み中…</p>
+      ) : (
+        <DataTable<QuestGroup>
+          storageKey={`sc92-groups-${companyId}`}
+          data={groups}
+          columns={columns}
+          rowId={(g) => g.group_id}
+          unit="件"
+          perPage={10}
+          perPageOptions={[10, 20, 50]}
+          searchFields="グループ名・コード"
+          exportName="クエストグループ"
+          emptyText="クエストグループがありません。「＋ グループ作成」から追加してください。"
+          onRowClick={(g) => onRename(g)} // §4.5⑪: 複数操作あり＝クリックは主アクション(リネーム)
+          cardLayout={(g) => ({
+            title: g.name,
+            meta: [`コード: ${g.quest_group_code}`],
+            stats: [`${g.member_count} 名`],
+          })}
+        />
+      )}
     </div>
   );
 }

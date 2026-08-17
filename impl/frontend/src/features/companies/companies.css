@@ -41,6 +41,10 @@
   gap: var(--space-3);
   max-width: 520px;
 }
+/* DataTable を含む管理セクションは全幅（max-width:520px は作成フォーム向け）。DoD＝mock は一覧を全幅描画。 */
+.admin-create.admin-create--table {
+  max-width: none;
+}
 /* 一覧ツールバー（.list-toolbar）・ページャ（.pagination）は design-system.css（＝mock shared.css）が正。ここでは定義しない。 */
 
 /* DataTable: 操作不可行（sys_admin＝SC-93）はクリック割当なし＝指カーソル/ホバー背景を出さない（§4.5⑪ クリック標準）。
