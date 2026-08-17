@@ -6,13 +6,12 @@
 """
 from __future__ import annotations
 
-import csv
-import io
 import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 
+from app.control_plane.admin import list_query as lq
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
@@ -20,53 +19,20 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-_MAX_PER_PAGE = 100
-_DEFAULT_PER_PAGE = 20
 _SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required")
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
 
 # DataTable 契約（§1.8.1①）＝ソート可能キーのホワイトリスト。直カラムはここ、集計 account_count は
 # list_companies 内で subquery カラムを渡す（`group_count` は会社DB `quest_groups` 依存＝ドメインC後）。
+# 汎用パーサ（複数ソート/enum/pin_ids/CSV 列）は list_query に集約（DRY・§2.3）。
 _SORT_COLUMNS = {
     "name": Company.name,
     "company_code": Company.company_code,
     "created_at": Company.created_at,
 }
 
-
-def _parse_sort(sort: str | None, *, extra: dict | None = None) -> list:
-    """`?sort=a,-b` を ORDER BY 式のリストへ（左が最優先・`-` で降順・§1.8.1①）。
-
-    ホワイトリスト外のキーは `422 validation_error`（列挙耐性・任意列ソート/注入の遮断・§2.2）。
-    """
-    allowed = {**_SORT_COLUMNS, **(extra or {})}
-    order: list = []
-    for token in (sort or "").split(","):
-        token = token.strip()
-        if not token:
-            continue
-        desc = token.startswith("-")
-        key = token[1:] if desc else token
-        col = allowed.get(key)
-        if col is None:
-            raise AppError(422, "validation_error", extra={"errors": [{"field": "sort", "value": key}]})
-        order.append(col.desc() if desc else col.asc())
-    return order
-
-
 _COMPANY_STATUSES = ("active", "suspended")
-
-
-def _parse_enum(value: str | None, field: str, allowed) -> list | None:
-    """`?field=a,b` を検証済みの値リストへ（enum 多値＝OR・§1.8.1②）。未知値は 422（ホワイトリスト・§2.2）。"""
-    if not value:
-        return None
-    vals = [v.strip() for v in value.split(",") if v.strip()]
-    for v in vals:
-        if v not in allowed:
-            raise AppError(422, "validation_error", extra={"errors": [{"field": field, "value": v}]})
-    return vals or None
 
 
 def _item(c: Company, account_count: int) -> dict:
@@ -86,9 +52,6 @@ def _detail(c: Company, account_count: int) -> dict:
     }
 
 
-_MAX_PINS = 5  # 固定行（ピン）件数上限（デザイン標準 §4.5⑨ maxPins 既定・§1.8.1④）
-
-
 def _account_count_expr():
     """会社あたりの有効アカウント数を SQL 集計する (subquery, coalesce 式)（ソート/範囲/表示で共用）。"""
     acc_sq = (
@@ -96,22 +59,6 @@ def _account_count_expr():
         .group_by(Account.company_id).subquery()
     )
     return acc_sq, func.coalesce(acc_sq.c.n, 0)
-
-
-def _parse_pin_ids(pin_ids: str | None) -> list[uuid.UUID]:
-    """`?pin_ids=<id>,<id>` を UUID リストへ（上限 _MAX_PINS・§1.8.1④）。不正形式は 422。"""
-    if not pin_ids:
-        return []
-    out: list[uuid.UUID] = []
-    for tok in pin_ids.split(","):
-        tok = tok.strip()
-        if not tok:
-            continue
-        try:
-            out.append(uuid.UUID(tok))
-        except ValueError:
-            raise AppError(422, "validation_error", extra={"errors": [{"field": "pin_ids", "value": tok}]})
-    return out[:_MAX_PINS]  # 上限超はクライアント側 maxPins で抑止・サーバーは防御的に切り詰め
 
 
 def _fetch_pinned(session, ids: list[uuid.UUID]) -> list[dict]:
@@ -135,8 +82,8 @@ def _company_query(*, q, status, sort, account_count_min, account_count_max, exc
     `exclude_ids`＝固定行（ピン）を非固定母集合から除外（§1.8.1④）。
     """
     acc_sq, account_count = _account_count_expr()
-    order = _parse_sort(sort, extra={"account_count": account_count})
-    statuses = _parse_enum(status, "status", _COMPANY_STATUSES)
+    order = lq.parse_sort(sort, {**_SORT_COLUMNS, "account_count": account_count})
+    statuses = lq.parse_enum(status, "status", _COMPANY_STATUSES)
 
     conds = []
     if statuses:  # enum 多値＝OR（IN）・§1.8.1②
@@ -165,11 +112,11 @@ def _company_query(*, q, status, sort, account_count_min, account_count_max, exc
 def list_companies(*, q: str | None = None, status: str | None = None, sort: str | None = None,
                    account_count_min: int | None = None, account_count_max: int | None = None,
                    pin_ids: str | None = None,
-                   page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
+                   page: int = 1, per_page: int = lq.DEFAULT_PER_PAGE) -> dict:
     """会社一覧（SC-91・オフセット・§1.8）＋複数ソート/項目別フィルタ/固定行契約（§1.8.1①②④）。"""
-    per_page = max(1, min(per_page, _MAX_PER_PAGE))
+    per_page = max(1, min(per_page, lq.MAX_PER_PAGE))
     page = max(1, page)
-    pins = _parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
+    pins = lq.parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
     with control_session() as session:
         pinned = _fetch_pinned(session, pins)  # 絞込/ページに関係なく解決・§1.8.1④
         rows_stmt, count_stmt = _company_query(
@@ -193,17 +140,6 @@ _CSV_COLUMNS = {
 _CSV_DEFAULT_ORDER = ["name", "company_code", "db_identifier", "status", "account_count"]
 
 
-def _parse_columns(columns: str | None) -> list[str]:
-    """`?columns=name,company_code` を表示列リストへ（ホワイトリスト・§1.8.1③）。未指定は既定列順。"""
-    if not columns:
-        return list(_CSV_DEFAULT_ORDER)
-    keys = [c.strip() for c in columns.split(",") if c.strip()]
-    for k in keys:
-        if k not in _CSV_COLUMNS:
-            raise AppError(422, "validation_error", extra={"errors": [{"field": "columns", "value": k}]})
-    return keys or list(_CSV_DEFAULT_ORDER)
-
-
 def _csv_cell(key: str, c: Company, n: int) -> str:
     return str(n) if key == "account_count" else str(getattr(c, key))
 
@@ -212,7 +148,7 @@ def export_companies_csv(*, q: str | None = None, status: str | None = None, sor
                          account_count_min: int | None = None, account_count_max: int | None = None,
                          columns: str | None = None) -> tuple[bytes, str]:
     """会社一覧を CSV で出力（同一フィルタ/ソートの全件・§1.8.1③）。管理系＝監査対象（B.6）。"""
-    keys = _parse_columns(columns)
+    keys = lq.parse_columns(columns, _CSV_COLUMNS, _CSV_DEFAULT_ORDER)
     with control_session() as session:
         rows_stmt, _ = _company_query(
             q=q, status=status, sort=sort,
@@ -221,12 +157,9 @@ def export_companies_csv(*, q: str | None = None, status: str | None = None, sor
         audit.record("company.export",  # 管理系エクスポートは監査対象（§1.8.1③・B.6・同一Tx）
                      {"count": len(rows), "columns": keys}, session=session)
         session.commit()
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow([_CSV_COLUMNS[k] for k in keys])  # ヘッダ＝表示列ラベル・列順
-    for c, n in rows:
-        writer.writerow([_csv_cell(k, c, n) for k in keys])
-    return buf.getvalue().encode("utf-8-sig"), "companies.csv"  # UTF-8 BOM（Excel 互換・§1.8.1③）
+    header = [_CSV_COLUMNS[k] for k in keys]  # ヘッダ＝表示列ラベル・列順
+    body = ([_csv_cell(k, c, n) for k in keys] for c, n in rows)
+    return lq.to_csv_bytes(header, body), "companies.csv"  # UTF-8 BOM（Excel 互換・§1.8.1③）
 
 
 def create_company(*, name: str, company_code: str, db_identifier: str,
