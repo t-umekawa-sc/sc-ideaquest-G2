@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 
+from app.control_plane.audit.orm import SystemAuditLog
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from tests.admin.test_admin_accounts import _login, _login_system_admin
@@ -199,3 +200,48 @@ def test_b_tc_130_number_range_filter(client, companies):
     r_max = client.get(COMPANIES, params={"q": t, "account_count_max": 0})
     assert r_max.status_code == 200, r_max.text
     assert r_max.json()["page_info"]["total"] == 3   # 全件
+
+
+def _audit_rows(action: str) -> list:
+    with control_session() as s:
+        return list(s.query(SystemAuditLog).filter_by(action=action).all())
+
+
+def test_b_tc_131_csv_export(client, companies):
+    """B-TC-131 CSV エクスポート＝text/csv・BOM・表示列/列順・同条件の全件。根拠 §1.8.1③。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    _mk(client, companies, f"{t} b", f"TF{t}B")   # 作成順 b,a（sort=name で並べ替わる）
+    _mk(client, companies, f"{t} a", f"TF{t}A")
+
+    r = client.get(COMPANIES, params={"q": t, "format": "csv",
+                                      "columns": "name,company_code", "sort": "name"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/csv")
+    assert "attachment" in r.headers["content-disposition"]
+    assert r.content.startswith(b"\xef\xbb\xbf")   # UTF-8 BOM（Excel 互換）
+    lines = r.content.decode("utf-8-sig").splitlines()
+    assert lines[0] == "会社名,会社コード"          # 表示列ラベル・列順
+    assert lines[1].split(",") == [f"{t} a", f"TF{t}A"]   # sort=name 昇順
+    assert lines[2].split(",") == [f"{t} b", f"TF{t}B"]
+    assert len(lines) == 3                          # header + 全件（ページング無視・q で isolate）
+
+
+def test_b_tc_132_csv_export_audited(client, companies):
+    """B-TC-132 管理系 CSV エクスポートは監査記録（company.export・件数）。根拠 §1.8.1③／B.6。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    _mk(client, companies, f"{t} x", f"TG{t}X")
+    r = client.get(COMPANIES, params={"q": t, "format": "csv"})
+    assert r.status_code == 200, r.text
+    rows = _audit_rows("company.export")
+    assert len(rows) == 1
+    assert rows[0].detail["count"] == 1
+
+
+def test_b_tc_133_csv_columns_whitelist_422(client):
+    """B-TC-133 CSV 列のホワイトリスト外は 422。根拠 §1.8.1③。"""
+    _login_system_admin(client)
+    r = client.get(COMPANIES, params={"format": "csv", "columns": "name,bogus"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "columns"

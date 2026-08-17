@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 
@@ -84,6 +86,42 @@ def _detail(c: Company, account_count: int) -> dict:
     }
 
 
+def _company_query(*, q, status, sort, account_count_min, account_count_max):
+    """会社一覧の検索/フィルタ/ソートを共通適用（一覧・CSV で共有・§1.8.1①②）。
+
+    戻り値＝(rows_stmt〔order 済み・offset/limit 未適用〕, count_stmt)。account_count は集計 subquery を
+    outerjoin してソート/範囲フィルタ可能にする。未知の sort キー/enum 値はここで 422（先に検証）。
+    """
+    acc_sq = (
+        select(Account.company_id.label("cid"), func.count().label("n"))
+        .group_by(Account.company_id).subquery()
+    )
+    account_count = func.coalesce(acc_sq.c.n, 0)
+    order = _parse_sort(sort, extra={"account_count": account_count})
+    statuses = _parse_enum(status, "status", _COMPANY_STATUSES)
+
+    conds = []
+    if statuses:  # enum 多値＝OR（IN）・§1.8.1②
+        conds.append(Company.status.in_(statuses))
+    if q:
+        like = f"%{q}%"
+        conds.append(or_(Company.name.ilike(like), Company.company_code.ilike(like),
+                         Company.db_identifier.ilike(like)))
+    if account_count_min is not None:  # number 範囲＝集計への WHERE・§1.8.1②
+        conds.append(account_count >= account_count_min)
+    if account_count_max is not None:
+        conds.append(account_count <= account_count_max)
+
+    def _join(stmt):
+        return stmt.outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
+
+    rows_stmt = _join(select(Company, account_count.label("account_count")))
+    # 明示ソートはキー順＋末尾 id で一意化／無指定は従来の created_at,id 決定的順序（§1.8.1①）。
+    rows_stmt = rows_stmt.order_by(*order, Company.id) if order else rows_stmt.order_by(Company.created_at, Company.id)
+    count_stmt = _join(select(func.count()).select_from(Company))
+    return rows_stmt, count_stmt
+
+
 def list_companies(*, q: str | None = None, status: str | None = None, sort: str | None = None,
                    account_count_min: int | None = None, account_count_max: int | None = None,
                    page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
@@ -91,41 +129,60 @@ def list_companies(*, q: str | None = None, status: str | None = None, sort: str
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
     with control_session() as session:
-        # account_count を SQL 集計（ソート/範囲フィルタ可能にするため subquery を outerjoin・§1.8.1①②）。
-        acc_sq = (
-            select(Account.company_id.label("cid"), func.count().label("n"))
-            .group_by(Account.company_id).subquery()
-        )
-        account_count = func.coalesce(acc_sq.c.n, 0)
-        order = _parse_sort(sort, extra={"account_count": account_count})  # 未知キーは 422（先に検証）
-        statuses = _parse_enum(status, "status", _COMPANY_STATUSES)        # 未知 enum 値は 422
-
-        conds = []
-        if statuses:  # enum 多値＝OR（IN）・§1.8.1②
-            conds.append(Company.status.in_(statuses))
-        if q:
-            like = f"%{q}%"
-            conds.append(or_(Company.name.ilike(like), Company.company_code.ilike(like),
-                             Company.db_identifier.ilike(like)))
-        if account_count_min is not None:  # number 範囲＝集計への WHERE・§1.8.1②
-            conds.append(account_count >= account_count_min)
-        if account_count_max is not None:
-            conds.append(account_count <= account_count_max)
-
-        # total も同じ join+conds で数える（範囲フィルタは集計依存＝join 必須）。
-        total = session.execute(
-            select(func.count()).select_from(Company)
-            .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
-        ).scalar_one()
-        stmt = (
-            select(Company, account_count.label("account_count"))
-            .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
-        )
-        # 明示ソートはキー順＋末尾 id で一意化／無指定は従来の created_at,id 決定的順序（§1.8.1①）。
-        stmt = stmt.order_by(*order, Company.id) if order else stmt.order_by(Company.created_at, Company.id)
-        rows = session.execute(stmt.offset((page - 1) * per_page).limit(per_page)).all()
+        rows_stmt, count_stmt = _company_query(
+            q=q, status=status, sort=sort,
+            account_count_min=account_count_min, account_count_max=account_count_max)
+        total = session.execute(count_stmt).scalar_one()
+        rows = session.execute(rows_stmt.offset((page - 1) * per_page).limit(per_page)).all()
         data = [_item(c, n) for c, n in rows]
     return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
+
+
+# DataTable 契約（§1.8.1③）＝CSV エクスポートの表示可能列とラベル（列順は ?columns= が正）。
+_CSV_COLUMNS = {
+    "name": "会社名",
+    "company_code": "会社コード",
+    "db_identifier": "DB識別子",
+    "status": "状態",
+    "account_count": "アカウント数",
+}
+_CSV_DEFAULT_ORDER = ["name", "company_code", "db_identifier", "status", "account_count"]
+
+
+def _parse_columns(columns: str | None) -> list[str]:
+    """`?columns=name,company_code` を表示列リストへ（ホワイトリスト・§1.8.1③）。未指定は既定列順。"""
+    if not columns:
+        return list(_CSV_DEFAULT_ORDER)
+    keys = [c.strip() for c in columns.split(",") if c.strip()]
+    for k in keys:
+        if k not in _CSV_COLUMNS:
+            raise AppError(422, "validation_error", extra={"errors": [{"field": "columns", "value": k}]})
+    return keys or list(_CSV_DEFAULT_ORDER)
+
+
+def _csv_cell(key: str, c: Company, n: int) -> str:
+    return str(n) if key == "account_count" else str(getattr(c, key))
+
+
+def export_companies_csv(*, q: str | None = None, status: str | None = None, sort: str | None = None,
+                         account_count_min: int | None = None, account_count_max: int | None = None,
+                         columns: str | None = None) -> tuple[bytes, str]:
+    """会社一覧を CSV で出力（同一フィルタ/ソートの全件・§1.8.1③）。管理系＝監査対象（B.6）。"""
+    keys = _parse_columns(columns)
+    with control_session() as session:
+        rows_stmt, _ = _company_query(
+            q=q, status=status, sort=sort,
+            account_count_min=account_count_min, account_count_max=account_count_max)
+        rows = session.execute(rows_stmt).all()  # 全件（ページング無視・§1.8.1③）
+        audit.record("company.export",  # 管理系エクスポートは監査対象（§1.8.1③・B.6・同一Tx）
+                     {"count": len(rows), "columns": keys}, session=session)
+        session.commit()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([_CSV_COLUMNS[k] for k in keys])  # ヘッダ＝表示列ラベル・列順
+    for c, n in rows:
+        writer.writerow([_csv_cell(k, c, n) for k in keys])
+    return buf.getvalue().encode("utf-8-sig"), "companies.csv"  # UTF-8 BOM（Excel 互換・§1.8.1③）
 
 
 def create_company(*, name: str, company_code: str, db_identifier: str,

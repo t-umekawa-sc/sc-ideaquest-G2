@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.control_plane.admin import application as admin_service
 from app.control_plane.admin import company_application as company_service
@@ -59,11 +59,19 @@ def list_companies(
     sort: str | None = None,
     account_count_min: int | None = Query(default=None, ge=0),
     account_count_max: int | None = Query(default=None, ge=0),
+    format: str | None = None,   # `csv` で CSV エクスポート（§1.8.1③）
+    columns: str | None = None,  # CSV の表示列・列順（§1.8.1③）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
-) -> CompanyListResponse:
-    """会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ契約（§1.8.1①②）。"""
+):
+    """会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ/CSV 契約（§1.8.1①②③）。"""
+    if format == "csv":  # 同一フィルタ/ソートの全件を CSV で（監査対象・§1.8.1③）
+        content, filename = company_service.export_companies_csv(
+            q=q, status=status, sort=sort,
+            account_count_min=account_count_min, account_count_max=account_count_max, columns=columns)
+        return Response(content=content, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
     return CompanyListResponse(**company_service.list_companies(
         q=q, status=status, sort=sort,
         account_count_min=account_count_min, account_count_max=account_count_max,
