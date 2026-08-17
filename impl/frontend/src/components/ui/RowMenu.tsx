@@ -14,6 +14,16 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // 開いている行の操作セル(td.col-actions)を最前面へ（design-system.css .rowmenu-open＝z-index:1001）。
+  // これをしないと、下行の sticky 操作セル（白背景）が fixed のドロップダウンを覆い、メニューが空に見える
+  // （sticky セルはそれ自体がスタッキングコンテキストで、後続行が前面に来るため）。shared.js 相当。
+  useEffect(() => {
+    const td = triggerRef.current?.closest("td.col-actions") as HTMLElement | null;
+    if (!td) return;
+    td.classList.toggle("rowmenu-open", open);
+    return () => td.classList.remove("rowmenu-open");
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const trigger = triggerRef.current;
@@ -42,6 +52,18 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
     };
   }, [open]);
 
+  // 開く前に座標を確定してから開く（先に pos を計算 → setOpen）。これをしないと最初の描画が
+  // pos 未確定（fixed だが top/left なし＝ボタン直下の静的位置）になり、直後に再配置してチラつく。
+  function toggleOpen() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, left: Math.max(8, r.right - LIST_MIN_W) });
+    setOpen(true);
+  }
+
   return (
     <div className="rowmenu">
       <button
@@ -51,12 +73,12 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
       >
         ⋯
       </button>
-      {open && (
-        <ul ref={listRef} className="rowmenu__list" role="menu" style={{ position: "fixed", top: pos?.top, left: pos?.left, right: "auto" }}>
+      {open && pos && (
+        <ul ref={listRef} className="rowmenu__list" role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}>
           {items.map((it, i) => (
             <li role="none" key={i}>
               <button
