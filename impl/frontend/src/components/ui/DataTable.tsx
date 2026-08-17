@@ -6,14 +6,18 @@
 //
 // モック（vanilla）との差分（意図的な React 化）:
 //  ・列/カードの render は HTML 文字列ではなく ReactNode を返す（innerHTML を使わない＝XSS 安全）。
-//  ・状態はイベント委譲＋再描画ではなく React state で保持。パイプライン（検索→絞込→ソート→
-//    ピン分離→ページ）は純関数 compute() に分離＝将来 backend 委譲へ差し替え可能にする。
+//    → 操作列（actions）は消費側が render で <RowMenu> 等を渡す（DataTable は RowMenu に非依存）。
+//  ・状態はイベント委譲＋再描画ではなく React state。パイプライン（検索→絞込→ソート→ピン分離→
+//    ページ）は純関数 computeRows() に分離＝将来 backend 委譲へ差し替え可能。
+//  ・CSV セルは render(ReactNode) から文字を抜けないため csvVal / sortVal を用いる（render のみの
+//    列は csvVal を渡す。未指定なら空セル）。
 //
-// 実装段階（本コミット＝②a 中核）: 型定義・compute()・テーブル描画・見出しクリック単一ソート・
-// 番号ページャ・表示件数・空表示・表示密度・検索。以降のコミットで 適用中チップ/絞込・複数キー
-// 並び替え（②b）・列設定/リサイズ/CSV/localStorage 永続（②c）・ピン/カード切替/クリック標準（②d）。
-import { useMemo, useState } from "react";
+// 永続（localStorage・キー接頭辞 ideaquest_dt_）＝列順/非表示/幅/密度/ピン/表示件数/ビュー。
+// 検索/ソート/絞込/ページはセッション（非永続）。SSR ハイドレーション不整合を避けるため、
+// 初期描画は既定値→マウント後に localStorage から復元（ready フラグで復元前の上書き保存を抑止）。
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Modal, ModalBody, ModalFooter } from "./Modal";
 
 export type SortDir = "asc" | "desc";
 export type SortKey = { key: string; dir: SortDir };
@@ -55,11 +59,11 @@ export type DataTableColumn<T> = {
   sortVal?: (r: T) => string | number; // ソート/既定表示/検索フォールバックに使う値
   searchVal?: (r: T) => string; // 横断検索の対象文字列（未指定＝sortVal）
   filterVal?: (r: T) => string | number; // 絞り込みの評価値（未指定＝sortVal）
-  csvVal?: (r: T) => string; // CSV セル（未指定＝sortVal / render のテキスト）
+  csvVal?: (r: T) => string; // CSV セル（未指定＝sortVal）
 };
 
 export type DataTableProps<T> = {
-  storageKey: string; // localStorage 永続キー（②c）。プレフィックス ideaquest_dt_ を付与。
+  storageKey: string;
   data: T[];
   columns: DataTableColumn<T>[];
   rowId?: (r: T) => string | number;
@@ -80,9 +84,21 @@ export type DataTableProps<T> = {
   cardRaw?: (r: T) => ReactNode; // カード外側まで含む完全制御
 };
 
+const LS = "ideaquest_dt_";
+type Density = "normal" | "compact";
+type View = "list" | "card";
+type Persisted = {
+  order?: string[];
+  hidden?: string[];
+  widths?: Record<string, number>;
+  density?: Density;
+  pins?: string[];
+  perPage?: number;
+  view?: View;
+};
+
 // ---- パイプライン（純関数） ------------------------------------------------
-// 検索→絞込→ソート→ピン分離。ページ分割は呼び出し側で行う（ピン件数に依存するため）。
-type ComputeState<T> = {
+type ComputeState = {
   search: string;
   simpleSort: SortKey | null;
   advSort: SortKey[];
@@ -91,7 +107,7 @@ type ComputeState<T> = {
   pinsEnabled: boolean;
 };
 
-export function activeSort(s: Pick<ComputeState<unknown>, "simpleSort" | "advSort">): SortKey[] {
+export function activeSort(s: Pick<ComputeState, "simpleSort" | "advSort">): SortKey[] {
   return s.advSort.length ? s.advSort : s.simpleSort ? [s.simpleSort] : [];
 }
 
@@ -115,7 +131,6 @@ function matchFilters<T>(r: T, filters: Record<string, FilterCond>, colByKey: Re
       const n = Number(raw);
       return (cond.min == null || n >= cond.min) && (cond.max == null || n <= cond.max);
     }
-    // date
     const v = String(raw);
     return (!cond.from || v >= cond.from) && (!cond.to || v <= cond.to);
   });
@@ -140,13 +155,13 @@ export function computeRows<T>(
   dataCols: DataTableColumn<T>[],
   colByKey: Record<string, DataTableColumn<T>>,
   rowId: (r: T) => string | number,
-  st: ComputeState<T>,
+  st: ComputeState,
 ): { pinned: T[]; filtered: T[] } {
   const sort = activeSort(st);
   const sorted = sort.length ? [...data].sort(makeComparator(sort, colByKey)) : [...data];
   const pinnedIds = st.pinsEnabled ? st.pins : [];
   const pinned = sorted.filter((r) => pinnedIds.includes(String(rowId(r))));
-  const search = st.search.toLowerCase();
+  const search = st.search.trim().toLowerCase();
   const filtered = sorted.filter((r) => {
     if (pinnedIds.includes(String(rowId(r)))) return false;
     if (search && !searchText(r, dataCols).includes(search)) return false;
@@ -168,31 +183,85 @@ function pageWindow(cur: number, pages: number): (number | "…")[] {
 
 // ---- コンポーネント --------------------------------------------------------
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { data, unit = "件", pins: pinsProp } = props;
+  const { data, unit = "件", pins: pinsProp, storageKey } = props;
   const rowId = props.rowId ?? ((r: T) => (r as { id: string | number }).id);
   const pinsEnabled = pinsProp !== false;
+  const maxPins = props.maxPins ?? 5;
   const perPageOptionsBase = props.perPageOptions ?? [10, 20, 50, 100];
+  const hasCard = Boolean(props.card || props.cardLayout || props.cardRaw);
 
-  // 列の正規化（resizable/sortable の既定）。
-  const cols = useMemo(
-    () => props.columns.map((c) => ({ resizable: !c.actions, sortable: false, ...c })),
-    [props.columns],
-  );
+  // 列の既定は falsy 判定（sortable 未指定＝不可）と !c.actions（リサイズ可）で扱う。
+  const cols = props.columns;
   const dataCols = useMemo(() => cols.filter((c) => !c.actions), [cols]);
+  const actionsCol = useMemo(() => cols.find((c) => c.actions) ?? null, [cols]);
   const colByKey = useMemo(() => Object.fromEntries(cols.map((c) => [c.key, c])) as Record<string, DataTableColumn<T>>, [cols]);
   const defaultOrder = useMemo(() => dataCols.map((c) => c.key), [dataCols]);
+  const defaultHidden = useMemo(() => dataCols.filter((c) => c.hiddenDefault).map((c) => c.key), [dataCols]);
+  const sortableCols = useMemo(() => dataCols.filter((c) => c.sortable), [dataCols]);
+  const filterableCols = useMemo(() => dataCols.filter((c) => c.filter), [dataCols]);
 
-  // ---- 状態（②a は in-memory。localStorage 永続は ②c で追加） ----
+  // ---- 状態 ----
+  // セッション（非永続）
   const [search, setSearch] = useState("");
   const [simpleSort, setSimpleSort] = useState<SortKey | null>(null);
-  const [advSort] = useState<SortKey[]>([]); // 複数キー並び替えは ②b
-  const [filters] = useState<Record<string, FilterCond>>({}); // 絞り込みは ②b
-  const [pins] = useState<string[]>([]); // ピンは ②d
+  const [advSort, setAdvSort] = useState<SortKey[]>([]);
+  const [filters, setFilters] = useState<Record<string, FilterCond>>({});
   const [page, setPage] = useState(1);
+  // 永続
   const [perPage, setPerPage] = useState(props.perPage ?? 20);
-  const [density, setDensity] = useState<"normal" | "compact">("normal");
-  const [order] = useState<string[]>(defaultOrder); // 列並べ替えは ②c
-  const [hidden] = useState<string[]>(dataCols.filter((c) => c.hiddenDefault).map((c) => c.key)); // 列表示切替は ②c
+  const [density, setDensity] = useState<Density>("normal");
+  const [order, setOrder] = useState<string[]>(defaultOrder);
+  const [hidden, setHidden] = useState<string[]>(defaultHidden);
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const [pins, setPins] = useState<string[]>([]);
+  const [view, setView] = useState<View>(hasCard ? props.defaultView ?? "list" : "list");
+  // UI
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [colMenuPos, setColMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [ready, setReady] = useState(false);
+
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const colBtnRef = useRef<HTMLButtonElement>(null);
+  const colMenuRef = useRef<HTMLDivElement>(null);
+
+  // 復元（マウント後・1回）。列/選択肢は現在の定義で検証してから適用。
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS + storageKey);
+      if (raw) {
+        const p = JSON.parse(raw) as Persisted;
+        if (Array.isArray(p.order)) {
+          const valid = p.order.filter((k) => colByKey[k] && !colByKey[k].actions);
+          defaultOrder.forEach((k) => { if (!valid.includes(k)) valid.push(k); });
+          setOrder(valid);
+        }
+        if (Array.isArray(p.hidden)) setHidden(p.hidden.filter((k) => colByKey[k]));
+        if (p.widths) setWidths(p.widths);
+        if (p.density === "compact" || p.density === "normal") setDensity(p.density);
+        if (Array.isArray(p.pins)) setPins(p.pins.map(String));
+        if (typeof p.perPage === "number") setPerPage(p.perPage);
+        if ((p.view === "card" || p.view === "list") && hasCard) setView(p.view);
+      }
+    } catch {
+      /* 破損時は既定のまま */
+    }
+    setReady(true);
+    // colByKey/defaultOrder は定義由来で安定。storageKey 変化時のみ再復元。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // 保存（復元後のみ）。
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      localStorage.setItem(LS + storageKey, JSON.stringify({ order, hidden, widths, density, pins, perPage, view } satisfies Persisted));
+    } catch {
+      /* 保存失敗は無視 */
+    }
+  }, [ready, storageKey, order, hidden, widths, density, pins, perPage, view]);
 
   const perPageOptions = useMemo(() => {
     const opts = [...perPageOptionsBase];
@@ -207,7 +276,6 @@ export function DataTable<T>(props: DataTableProps<T>) {
     () => order.map((k) => colByKey[k]).filter((c): c is DataTableColumn<T> => Boolean(c) && !hidden.includes(c.key)),
     [order, colByKey, hidden],
   );
-  const actionsCol = useMemo(() => cols.find((c) => c.actions) ?? null, [cols]);
   const visibleCols = useMemo(
     () => (actionsCol ? [...visibleDataCols, actionsCol] : visibleDataCols),
     [visibleDataCols, actionsCol],
@@ -223,25 +291,294 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const curPage = Math.min(Math.max(1, page), pages);
   const start = (curPage - 1) * perPage;
   const pageRows = filtered.slice(start, start + perPage);
+  const useCard = hasCard && view === "card";
   const isEmpty = totalNonPin + pinned.length === 0;
 
   const sort = activeSort({ simpleSort, advSort });
   const advOn = advSort.length > 0;
+  const searchActive = search.trim(); // チップの表示/判定はトリム値（入力欄は生値のまま＝内部空白を打てる）
 
   // 列幅（宣言幅の比率を % で。テーブルには min-width=合計*0.8 を課す）。
-  const widths = visibleCols.map((c) => c.width ?? 0);
-  const sumW = widths.reduce((a, b) => a + b, 0) || 1;
+  const colWidths = visibleCols.map((c) => widths[c.key] ?? c.width ?? 0);
+  const sumW = colWidths.reduce((a, b) => a + b, 0) || 1;
   const minWidthPx = Math.round(sumW * 0.8);
 
-  function onHeaderClick(col: DataTableColumn<T>) {
+  // 固定行の段積み sticky（ヘッダー配下に累積 top）。
+  useLayoutEffect(() => {
+    const tb = tbodyRef.current;
+    if (!tb) return;
+    const trs = Array.from(tb.querySelectorAll<HTMLTableRowElement>("tr.is-pinned"));
+    trs.forEach((tr) => tr.classList.remove("dt-pin-sep"));
+    if (!trs.length) return;
+    trs[trs.length - 1].classList.add("dt-pin-sep");
+    let top = theadRef.current?.offsetHeight ?? 0;
+    trs.forEach((tr) => {
+      tr.style.setProperty("--dt-row-top", `${top}px`);
+      top += tr.offsetHeight;
+    });
+  }, [pageRows, pinned, density, view, order, hidden, widths]);
+
+  // 列設定メニューの外側クリックで閉じる。
+  useEffect(() => {
+    if (!colMenuOpen) return;
+    function onDoc(e: MouseEvent) {
+      const t = e.target as Node;
+      if (colMenuRef.current?.contains(t) || colBtnRef.current?.contains(t)) return;
+      setColMenuOpen(false);
+    }
+    document.addEventListener("click", onDoc, true);
+    return () => document.removeEventListener("click", onDoc, true);
+  }, [colMenuOpen]);
+
+  // ---- ハンドラ ----
+  function onHeaderClick(col: DataTableColumn<T>, e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest(".dt-resizer")) return;
     if (!col.sortable || advOn) return;
     const cur = simpleSort && simpleSort.key === col.key ? simpleSort.dir : null;
     setSimpleSort(cur === "asc" ? { key: col.key, dir: "desc" } : cur === "desc" ? null : { key: col.key, dir: "asc" });
     setPage(1);
   }
 
+  function clearAll() {
+    setSearch("");
+    setSimpleSort(null);
+    setAdvSort([]);
+    setFilters({});
+    setPage(1);
+  }
+
+  function togglePin(id: string) {
+    setPins((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= maxPins) {
+        alert(`固定できる行は最大 ${maxPins} 件です。`);
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
+
+  // 行/カードのクリック標準（インタラクティブ要素上のクリックは主アクションにしない）。
+  function onRowActivate(r: T, e: React.MouseEvent | React.KeyboardEvent) {
+    if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
+    props.onRowClick?.(r);
+  }
+
+  function startResize(key: string, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).closest("th");
+    if (!th) return;
+    const startX = e.clientX;
+    const startW = th.getBoundingClientRect().width;
+    document.body.classList.add("dt-resizing");
+    (e.target as HTMLElement).classList.add("dt-resizer--active");
+    const move = (ev: PointerEvent) => {
+      const w = Math.max(64, startW + (ev.clientX - startX));
+      setWidths((prev) => ({ ...prev, [key]: Math.round(w) }));
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.body.classList.remove("dt-resizing");
+      (e.target as HTMLElement).classList.remove("dt-resizer--active");
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  }
+
+  function moveColumn(key: string, dir: -1 | 1) {
+    setOrder((prev) => {
+      const i = prev.indexOf(key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      if (colByKey[prev[j]]?.locked || colByKey[key]?.locked) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+
+  function toggleColumn(key: string, shown: boolean) {
+    setHidden((prev) => (shown ? prev.filter((k) => k !== key) : prev.includes(key) ? prev : [...prev, key]));
+  }
+
+  function openColMenu() {
+    if (colMenuOpen) {
+      setColMenuOpen(false);
+      return;
+    }
+    const rect = colBtnRef.current?.getBoundingClientRect();
+    if (rect) setColMenuPos({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 260)) });
+    setColMenuOpen(true);
+  }
+
+  function exportCsv() {
+    const vc = visibleDataCols;
+    const head = vc.map((c) => c.label);
+    const cell = (c: DataTableColumn<T>, r: T) => (c.csvVal ? c.csvVal(r) : c.sortVal ? String(c.sortVal(r)) : "");
+    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+    const rows = [head.map(q).join(",")].concat(filtered.map((r) => vc.map((c) => q(cell(c, r))).join(",")));
+    const csv = rows.join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${props.exportName ?? "export"}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ---- 表示ヘルパ ----
+  const labelOf = (k: string) => colByKey[k]?.label ?? k;
+  function enumLabel(key: string, v: string) {
+    const f = colByKey[key]?.filter;
+    if (f?.type === "enum") return f.options.find((o) => o[0] === v)?.[1] ?? v;
+    return v;
+  }
+  function filterSummary(c: FilterCond): string {
+    if (c.type === "text") return `「${c.q}」を含む`;
+    if (c.type === "enum") return c.values.map((v) => enumLabel(c.key, v)).join("・");
+    if (c.type === "number") return `${c.min ?? ""}〜${c.max ?? ""}`;
+    return `${c.from || ""}〜${c.to || ""}`;
+  }
+
   const searchPlaceholder =
     props.searchPlaceholder ?? (props.searchFields ? `${props.searchFields} を検索…` : "検索…");
+
+  // カード本文（cardLayout の標準構造）。
+  function cardBody(r: T): ReactNode {
+    if (props.card) return props.card(r);
+    const L = props.cardLayout!(r) || {};
+    const badges = (L.badges ?? []).filter(Boolean) as { label: string; cls?: string }[];
+    const meta = (L.meta ?? []).filter((x) => x != null && x !== "");
+    const stats = (L.stats ?? []).filter((x) => x != null && x !== "");
+    return (
+      <>
+        {L.title != null && <div className="dt-card__title">{L.title}</div>}
+        {(badges.length > 0 || meta.length > 0) && (
+          <div className="dt-card__meta">
+            {badges.map((b, i) => (
+              <span key={`b${i}`} className={`badge ${b.cls ?? "badge-muted"}`}>
+                {b.label}
+              </span>
+            ))}
+            {meta.map((m, i) => (
+              <span key={`m${i}`}>{m}</span>
+            ))}
+          </div>
+        )}
+        {stats.length > 0 && (
+          <div className="dt-card__stats">
+            {stats.map((s, i) => (
+              <span key={`s${i}`}>{s}</span>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  function pinButton(id: string, pinnedNow: boolean, float: boolean) {
+    if (!pinsEnabled) return null;
+    return (
+      <button
+        className={`dt-pin-toggle${float ? " dt-pin-float" : ""}`}
+        type="button"
+        aria-pressed={pinnedNow}
+        title={pinnedNow ? "固定を解除" : "この行を固定"}
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePin(id);
+        }}
+      >
+        {pinnedNow ? "📌" : "📍"}
+      </button>
+    );
+  }
+
+  const clickable = Boolean(props.onRowClick);
+
+  function renderRow(r: T, pinnedNow: boolean) {
+    const id = String(rowId(r));
+    const trCls = [clickable ? "dt-row--link" : "", pinnedNow ? "is-pinned" : "", props.rowClass?.(r) ?? ""]
+      .filter(Boolean)
+      .join(" ");
+    return (
+      <tr
+        key={id}
+        data-dt-row={id}
+        className={trCls || undefined}
+        onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
+      >
+        {visibleCols.map((c, i) => {
+          const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
+            .filter(Boolean)
+            .join(" ");
+          const inner = c.render ? c.render(r) : c.sortVal ? String(c.sortVal(r)) : "";
+          return (
+            <td key={c.key} className={cellCls || undefined}>
+              {i === 0 && pinsEnabled ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  {pinButton(id, pinnedNow, false)}
+                  {inner}
+                </span>
+              ) : (
+                inner
+              )}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  }
+
+  function renderCard(r: T, pinnedNow: boolean) {
+    const id = String(rowId(r));
+    if (props.cardRaw) {
+      const raw = props.cardRaw(r);
+      if (!pinsEnabled) return <div key={id}>{raw}</div>;
+      return (
+        <div key={id} className={`dt-cardraw${pinnedNow ? " is-pinned" : ""}`}>
+          {raw}
+          {pinButton(id, pinnedNow, true)}
+        </div>
+      );
+    }
+    const cls = [
+      "dt-card",
+      pinnedNow ? "is-pinned" : "",
+      clickable ? "dt-card--link" : "",
+      actionsCol ? "dt-card--has-actions" : "",
+      props.rowClass?.(r) ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const acts = actionsCol?.render ? actionsCol.render(r) : null;
+    return (
+      <div
+        key={id}
+        className={cls}
+        data-dt-row={id}
+        role="listitem"
+        tabIndex={clickable ? 0 : undefined}
+        onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
+        onKeyDown={
+          clickable
+            ? (e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
+                e.preventDefault();
+                props.onRowClick?.(r);
+              }
+            : undefined
+        }
+      >
+        {pinButton(id, pinnedNow, true)}
+        {acts && <div className="dt-card__tools">{acts}</div>}
+        <div className="dt-card__body">{cardBody(r)}</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -262,98 +599,168 @@ export function DataTable<T>(props: DataTableProps<T>) {
               }}
             />
           </div>
+          {sortableCols.length > 0 && (
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => setSortOpen(true)}>
+              ↕ 並び替え{sort.length > 0 && <span className="dt-badge">{sort.length}</span>}
+            </button>
+          )}
+          {filterableCols.length > 0 && (
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => setFilterOpen(true)}>
+              ⧩ 絞り込み
+              {Object.keys(filters).length > 0 && <span className="dt-badge">{Object.keys(filters).length}</span>}
+            </button>
+          )}
         </div>
         <div className="tools">
+          {!useCard && (
+            <button className="btn btn-outline btn-sm" type="button" ref={colBtnRef} onClick={openColMenu}>
+              列設定
+            </button>
+          )}
+          <button className="btn btn-outline btn-sm" type="button" onClick={exportCsv}>
+            エクスポート
+          </button>
           <span className="seg seg-density" role="group" aria-label="表示密度">
-            <button
-              className="seg__btn"
-              type="button"
-              aria-pressed={density === "normal"}
-              onClick={() => setDensity("normal")}
-            >
+            <button className="seg__btn" type="button" aria-pressed={density === "normal"} onClick={() => setDensity("normal")}>
               標準
             </button>
-            <button
-              className="seg__btn"
-              type="button"
-              aria-pressed={density === "compact"}
-              onClick={() => setDensity("compact")}
-            >
+            <button className="seg__btn" type="button" aria-pressed={density === "compact"} onClick={() => setDensity("compact")}>
               コンパクト
             </button>
           </span>
+          {hasCard && (
+            <div className="viewtoggle" role="radiogroup" aria-label="表示切替">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={view === "card"}
+                className={view === "card" ? "is-on" : undefined}
+                title="カード表示"
+                onClick={() => setView("card")}
+              >
+                🔲 カード
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={view === "list"}
+                className={view === "list" ? "is-on" : undefined}
+                title="リスト表示"
+                onClick={() => setView("list")}
+              >
+                ☰ リスト
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* 適用中チップ（検索・並び替え・絞込を全て）＋右端「すべてクリア」 */}
+        {(searchActive || sort.length > 0 || Object.keys(filters).length > 0) && (
+          <div className="dt-chips">
+            <span className="dt-chips__label">適用中:</span>
+            {searchActive && (
+              <span className="dt-chip">
+                🔍 &quot;{searchActive}&quot;
+                <button className="dt-chip__x" type="button" aria-label="検索を解除" onClick={() => { setSearch(""); setPage(1); }}>
+                  ✕
+                </button>
+              </span>
+            )}
+            {sort.length > 0 && (
+              <span className="dt-chip">
+                並び替え: {sort.map((s) => `${labelOf(s.key)}${s.dir === "desc" ? "▼" : "▲"}`).join(" › ")}
+                <button
+                  className="dt-chip__x"
+                  type="button"
+                  aria-label="並び替えを解除"
+                  onClick={() => { setSimpleSort(null); setAdvSort([]); setPage(1); }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {Object.keys(filters).map((k) => (
+              <span key={k} className="dt-chip">
+                {labelOf(k)}: {filterSummary(filters[k])}
+                <button
+                  className="dt-chip__x"
+                  type="button"
+                  aria-label="絞込を解除"
+                  onClick={() => { setFilters((prev) => { const n = { ...prev }; delete n[k]; return n; }); setPage(1); }}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <button className="dt-chip dt-chip--clear" type="button" onClick={clearAll}>
+              すべてクリア
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="table-wrap dt-scroll">
-        <table
-          className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
-          style={{ minWidth: `${minWidthPx}px` }}
-        >
-          <thead>
-            <tr>
-              {visibleCols.map((c, idx) => {
-                const pct = widths[idx] ? (widths[idx] / sumW) * 100 : 0;
-                let ariaSort: "ascending" | "descending" | "none" | undefined;
-                if (!c.sortable) ariaSort = undefined;
-                else if (!advOn && simpleSort && simpleSort.key === c.key)
-                  ariaSort = simpleSort.dir === "asc" ? "ascending" : "descending";
-                else ariaSort = "none";
-                const cls = [
-                  c.align === "num" ? "num" : "",
-                  c.actions ? "col-actions" : "",
-                  c.sortable ? "dt-sortable" : "",
-                  c.sortable && advOn ? "is-locked-sort" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                return (
-                  <th
-                    key={c.key}
-                    scope="col"
-                    className={cls || undefined}
-                    aria-sort={ariaSort}
-                    data-key={c.key}
-                    style={pct ? { width: `${pct.toFixed(4)}%` } : undefined}
-                    onClick={() => onHeaderClick(c)}
-                  >
-                    <div className="dt-th">
-                      <span className="dt-th__label">{c.label}</span>
-                      {c.sortable ? <span className="dt-sort-ind" /> : null}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.map((r) => {
-              const id = String(rowId(r));
-              const trCls = [props.onRowClick ? "dt-row--link" : "", props.rowClass?.(r) ?? ""].filter(Boolean).join(" ");
-              return (
-                <tr
-                  key={id}
-                  data-dt-row={id}
-                  className={trCls || undefined}
-                  onClick={props.onRowClick ? () => props.onRowClick!(r) : undefined}
-                >
-                  {visibleCols.map((c) => {
-                    const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
-                      .filter(Boolean)
-                      .join(" ");
-                    const inner = c.render ? c.render(r) : c.sortVal ? String(c.sortVal(r)) : "";
-                    return (
-                      <td key={c.key} className={cellCls || undefined}>
-                        {inner}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {!useCard && !isEmpty && (
+        <div className="table-wrap dt-scroll">
+          <table
+            className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
+            style={{ minWidth: `${minWidthPx}px` }}
+          >
+            <thead ref={theadRef}>
+              <tr>
+                {visibleCols.map((c, idx) => {
+                  const pct = colWidths[idx] ? (colWidths[idx] / sumW) * 100 : 0;
+                  let ariaSort: "ascending" | "descending" | "none" | undefined;
+                  if (!c.sortable) ariaSort = undefined;
+                  else if (!advOn && simpleSort && simpleSort.key === c.key)
+                    ariaSort = simpleSort.dir === "asc" ? "ascending" : "descending";
+                  else ariaSort = "none";
+                  const cls = [
+                    c.align === "num" ? "num" : "",
+                    c.actions ? "col-actions" : "",
+                    c.sortable ? "dt-sortable" : "",
+                    c.sortable && advOn ? "is-locked-sort" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <th
+                      key={c.key}
+                      scope="col"
+                      className={cls || undefined}
+                      aria-sort={ariaSort}
+                      data-key={c.key}
+                      style={pct ? { width: `${pct.toFixed(4)}%` } : undefined}
+                      onClick={(e) => onHeaderClick(c, e)}
+                    >
+                      <div className="dt-th">
+                        <span className="dt-th__label">{c.label}</span>
+                        {c.sortable ? <span className="dt-sort-ind" /> : null}
+                      </div>
+                      {!c.actions && (
+                        <span
+                          className="dt-resizer"
+                          onPointerDown={(e) => startResize(c.key, e)}
+                          onDoubleClick={() => setWidths((prev) => { const n = { ...prev }; delete n[c.key]; return n; })}
+                        />
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody ref={tbodyRef}>
+              {pinned.map((r) => renderRow(r, true))}
+              {pageRows.map((r) => renderRow(r, false))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {useCard && !isEmpty && (
+        <div className="dt-cards" role="list">
+          {pinned.map((r) => renderCard(r, true))}
+          {pageRows.map((r) => renderCard(r, false))}
+        </div>
+      )}
 
       {isEmpty ? <div className="list-empty">{props.emptyText ?? "該当するデータがありません。"}</div> : null}
 
@@ -364,6 +771,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
         </span>
         {pages > 1 ? (
           <nav className="pagination" aria-label="ページ送り">
+            <button
+              className="btn btn-outline btn-sm"
+              type="button"
+              disabled={curPage <= 1}
+              aria-label="最初のページ"
+              onClick={() => setPage(1)}
+            >
+              «
+            </button>
             <button
               className="btn btn-outline btn-sm"
               type="button"
@@ -400,6 +816,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
             >
               ›
             </button>
+            <button
+              className="btn btn-outline btn-sm"
+              type="button"
+              disabled={curPage >= pages}
+              aria-label="最後のページ"
+              onClick={() => setPage(pages)}
+            >
+              »
+            </button>
           </nav>
         ) : null}
         <label className="dt-perpage">
@@ -422,6 +847,383 @@ export function DataTable<T>(props: DataTableProps<T>) {
           件
         </label>
       </div>
+
+      {/* 列設定ポップオーバー（表示/並べ替え/幅リセット） */}
+      {colMenuOpen && (
+        <div className="col-menu" ref={colMenuRef} style={{ top: colMenuPos.top, left: colMenuPos.left }}>
+          <div className="col-menu__title">表示する列・並び順</div>
+          {order.map((k, i) => {
+            const c = colByKey[k];
+            if (!c) return null;
+            const shown = !hidden.includes(c.key);
+            return (
+              <div key={c.key} className="col-menu__item">
+                <label className="col-menu__grab checkbox">
+                  <input
+                    type="checkbox"
+                    checked={shown}
+                    disabled={c.locked}
+                    onChange={(e) => toggleColumn(c.key, e.target.checked)}
+                  />
+                  <span className="col-menu__name">{c.label || "（操作）"}</span>
+                  {c.locked && <span className="col-menu__lock">必須</span>}
+                </label>
+                <span className="col-menu__ord">
+                  <button type="button" disabled={i === 0 || c.locked} aria-label="上へ" onClick={() => moveColumn(c.key, -1)}>
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    disabled={i === order.length - 1 || c.locked}
+                    aria-label="下へ"
+                    onClick={() => moveColumn(c.key, 1)}
+                  >
+                    ▼
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+          <div className="col-menu__foot">
+            <button className="btn btn-sm btn-outline" type="button" onClick={() => setWidths({})}>
+              列幅をリセット
+            </button>
+            <button
+              className="btn btn-sm btn-outline"
+              type="button"
+              onClick={() => {
+                setOrder(defaultOrder);
+                setHidden(defaultHidden);
+                setWidths({});
+              }}
+            >
+              既定に戻す
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sortableCols.length > 0 && (
+        <SortBuilder
+          open={sortOpen}
+          onClose={() => setSortOpen(false)}
+          sortable={sortableCols}
+          current={advSort.length ? advSort : simpleSort ? [simpleSort] : []}
+          onApply={(keys) => {
+            setAdvSort(keys);
+            if (keys.length) setSimpleSort(null);
+            setPage(1);
+            setSortOpen(false);
+          }}
+        />
+      )}
+
+      {filterableCols.length > 0 && (
+        <FilterDialog
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          columns={filterableCols}
+          current={filters}
+          onApply={(next) => {
+            setFilters(next);
+            setPage(1);
+            setFilterOpen(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---- 並び替えビルダー（複数キー・2ペイン） ----------------------------------
+function SortBuilder<T>({
+  open,
+  onClose,
+  sortable,
+  current,
+  onApply,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sortable: DataTableColumn<T>[];
+  current: SortKey[];
+  onApply: (keys: SortKey[]) => void;
+}) {
+  const [work, setWork] = useState<SortKey[]>(current);
+  useEffect(() => {
+    if (open) setWork(current.map((s) => ({ ...s })));
+    // 開いた時のみ現在値で初期化。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const labelOf = (k: string) => sortable.find((c) => c.key === k)?.label ?? k;
+  const used = work.map((s) => s.key);
+  const avail = sortable.filter((c) => !used.includes(c.key));
+
+  return (
+    <Modal open={open} onClose={onClose} title="並び替え（複数項目）" size="md">
+      <ModalBody>
+        <p className="admin-sub" style={{ margin: "0 0 var(--space-3)" }}>
+          右の項目をクリックすると並び替え条件に追加されます。左は上ほど優先。
+        </p>
+        <div className="sort-builder">
+          <div className="sort-builder__pane">
+            <div className="sort-builder__title">並び替え条件（上ほど優先）</div>
+            <ul className="sort-builder__list">
+              {work.length === 0 ? (
+                <li className="sort-builder__empty">条件なし（右から追加）</li>
+              ) : (
+                work.map((s, i) => (
+                  <li key={s.key} className="sort-key">
+                    <span className="sort-key__ord">
+                      <button
+                        type="button"
+                        disabled={i === 0}
+                        aria-label="上へ"
+                        onClick={() => setWork((w) => swap(w, i, i - 1))}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={i === work.length - 1}
+                        aria-label="下へ"
+                        onClick={() => setWork((w) => swap(w, i, i + 1))}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                    <span className="sort-key__pri">{i + 1}</span>
+                    <span className="sort-key__name" title={labelOf(s.key)}>
+                      {labelOf(s.key)}
+                    </span>
+                    <span className="seg">
+                      <button
+                        type="button"
+                        className="seg__btn"
+                        aria-pressed={s.dir === "asc"}
+                        onClick={() => setWork((w) => w.map((x) => (x.key === s.key ? { ...x, dir: "asc" } : x)))}
+                      >
+                        昇順
+                      </button>
+                      <button
+                        type="button"
+                        className="seg__btn"
+                        aria-pressed={s.dir === "desc"}
+                        onClick={() => setWork((w) => w.map((x) => (x.key === s.key ? { ...x, dir: "desc" } : x)))}
+                      >
+                        降順
+                      </button>
+                    </span>
+                    <button
+                      type="button"
+                      className="sort-key__x"
+                      aria-label="除外"
+                      onClick={() => setWork((w) => w.filter((x) => x.key !== s.key))}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+          <div className="sort-builder__pane">
+            <div className="sort-builder__title">対象外の項目</div>
+            <ul className="sort-builder__list">
+              {avail.length === 0 ? (
+                <li className="sort-builder__empty">すべて条件に追加済み</li>
+              ) : (
+                avail.map((c) => (
+                  <li
+                    key={c.key}
+                    className="sort-avail"
+                    onClick={() => setWork((w) => [...w, { key: c.key, dir: "asc" }])}
+                  >
+                    <span title={c.label}>{c.label}</span>
+                    <span className="sort-avail__add">＋ 追加</span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        </div>
+      </ModalBody>
+      <ModalFooter>
+        <button className="btn btn-outline" type="button" onClick={() => setWork([])}>
+          この条件をクリア
+        </button>
+        <span style={{ flex: 1 }} />
+        <button className="btn btn-outline" type="button" onClick={onClose}>
+          キャンセル
+        </button>
+        <button className="btn btn-primary" type="button" onClick={() => onApply(work)}>
+          適用する
+        </button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
+function swap<X>(arr: X[], i: number, j: number): X[] {
+  if (j < 0 || j >= arr.length) return arr;
+  const next = [...arr];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+// ---- 絞り込みダイアログ（項目別） ------------------------------------------
+function FilterDialog<T>({
+  open,
+  onClose,
+  columns,
+  current,
+  onApply,
+}: {
+  open: boolean;
+  onClose: () => void;
+  columns: DataTableColumn<T>[];
+  current: Record<string, FilterCond>;
+  onApply: (next: Record<string, FilterCond>) => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, FilterCond>>(current);
+  useEffect(() => {
+    if (open) setDraft({ ...current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function setCond(key: string, cond: FilterCond | null) {
+    setDraft((prev) => {
+      const n = { ...prev };
+      if (cond) n[key] = cond;
+      else delete n[key];
+      return n;
+    });
+  }
+
+  function apply() {
+    // 空条件は落とす。
+    const next: Record<string, FilterCond> = {};
+    for (const key of Object.keys(draft)) {
+      const c = draft[key];
+      if (c.type === "text" && c.q.trim()) next[key] = { ...c, q: c.q.trim() };
+      else if (c.type === "enum" && c.values.length) next[key] = c;
+      else if (c.type === "number" && (c.min != null || c.max != null)) next[key] = c;
+      else if (c.type === "date" && (c.from || c.to)) next[key] = c;
+    }
+    onApply(next);
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="絞り込み" size="md">
+      <ModalBody>
+        <div className="filter-form">
+          {columns.map((c) => {
+            const f = c.filter!;
+            const cur = draft[c.key];
+            return (
+              <div key={c.key} className="filter-row">
+                <label>{c.label}</label>
+                {f.type === "text" && (
+                  <input
+                    className="input"
+                    placeholder="含む文字"
+                    value={cur?.type === "text" ? cur.q : ""}
+                    onChange={(e) => setCond(c.key, { type: "text", key: c.key, q: e.target.value })}
+                  />
+                )}
+                {f.type === "enum" && (
+                  <div className="filter-checks">
+                    {f.options.map((o) => {
+                      const values = cur?.type === "enum" ? cur.values : [];
+                      const checked = values.includes(o[0]);
+                      return (
+                        <label key={o[0]} className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const nextVals = e.target.checked ? [...values, o[0]] : values.filter((v) => v !== o[0]);
+                              setCond(c.key, nextVals.length ? { type: "enum", key: c.key, values: nextVals } : null);
+                            }}
+                          />{" "}
+                          {o[1]}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {f.type === "number" && (
+                  <div className="filter-range">
+                    <input
+                      className="input"
+                      type="number"
+                      placeholder="最小"
+                      value={cur?.type === "number" && cur.min != null ? cur.min : ""}
+                      onChange={(e) =>
+                        setCond(c.key, {
+                          type: "number",
+                          key: c.key,
+                          min: e.target.value === "" ? null : Number(e.target.value),
+                          max: cur?.type === "number" ? cur.max : null,
+                        })
+                      }
+                    />
+                    <span>〜</span>
+                    <input
+                      className="input"
+                      type="number"
+                      placeholder="最大"
+                      value={cur?.type === "number" && cur.max != null ? cur.max : ""}
+                      onChange={(e) =>
+                        setCond(c.key, {
+                          type: "number",
+                          key: c.key,
+                          min: cur?.type === "number" ? cur.min : null,
+                          max: e.target.value === "" ? null : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {f.type === "date" && (
+                  <div className="filter-range">
+                    <input
+                      className="input"
+                      type="date"
+                      value={cur?.type === "date" ? cur.from : ""}
+                      onChange={(e) =>
+                        setCond(c.key, { type: "date", key: c.key, from: e.target.value, to: cur?.type === "date" ? cur.to : "" })
+                      }
+                    />
+                    <span>〜</span>
+                    <input
+                      className="input"
+                      type="date"
+                      value={cur?.type === "date" ? cur.to : ""}
+                      onChange={(e) =>
+                        setCond(c.key, { type: "date", key: c.key, from: cur?.type === "date" ? cur.from : "", to: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </ModalBody>
+      <ModalFooter>
+        <button className="btn btn-outline" type="button" onClick={() => setDraft({})}>
+          クリア
+        </button>
+        <span style={{ flex: 1 }} />
+        <button className="btn btn-outline" type="button" onClick={onClose}>
+          キャンセル
+        </button>
+        <button className="btn btn-primary" type="button" onClick={apply}>
+          適用する
+        </button>
+      </ModalFooter>
+    </Modal>
   );
 }
