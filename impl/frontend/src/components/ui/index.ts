@@ -2,6 +2,8 @@
 export { Avatar } from "./Avatar";
 export { Button } from "./Button";
 export { Card, CardTitle } from "./Card";
+export { DataTable } from "./DataTable";
+export type { DataTableColumn, DataTableProps, CardLayout, SortKey, SortDir, FilterCond, ColumnFilter } from "./DataTable";
 export { Field } from "./Field";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { Pager } from "./Pager";
