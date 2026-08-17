@@ -4,10 +4,11 @@
 // 一覧取得＋会社作成（B.1）。業務層クリーン＝表示/UX のみ、判定はサーバー（403/409/422 を文言化）。
 // レイアウト/クラスは正＝doc/画面設計/mocks/SC-91_システム管理.html（DoD＝モック一致）。
 //
-// 一覧の操作標準は DataTable（client モード）に委譲＝検索/絞込/複数ソート/列設定/CSV/ピン/カードは
-// 全件クライアント保持で処理（管理系＝小規模。§5 の設計フォークは (a) を採用）。
-// サーバー駆動モード（アイデア/クエスト一覧・§4.5 契約後）は将来拡張＝computeRows() 境界で差し替え。
-import { useCallback, useEffect, useRef, useState } from "react";
+// 一覧の操作標準は DataTable の **サーバー駆動モード**に委譲＝検索/複数ソート/項目別フィルタ/ページ/ピン/CSV は
+// backend `GET /admin/companies`（§1.8.1 契約）が確定する。フロントは QueryState を送り {rows,total,pinned} を描画するだけ。
+// ソート可能キー/フィルタ可能フィールドは backend ホワイトリストに一致させる（下記 COLUMNS のフラグ）。
+// 表示状態（列順/幅/密度/ビュー/ピンID）は localStorage 専管（サーバーへ送らない）。
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,7 @@ import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, Swatches } fro
 import type { DataTableColumn } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
-import { createCompany, listCompanies } from "../api";
+import { companiesCsvUrl, createCompany, queryCompanies } from "../api";
 import type { Company } from "../types";
 import "../companies.css";
 
@@ -37,7 +38,6 @@ function createErrorMessage(err: unknown): string {
 }
 
 const DEFAULT_COLOR = "#2563EB"; // 会社カラー既定（swatches の先頭＝ブルー）
-const FETCH_PER_PAGE = 100; // 全件取得のバッチ（backend 上限＝100）。会社は小規模で通常1回。
 
 // 状態バッジ（会社状態＝2値。有効/停止）。
 function statusBadge(status: string): ReactNode {
@@ -49,9 +49,11 @@ function statusBadge(status: string): ReactNode {
 }
 
 // 列定義（正＝mocks/SC-91 の DataTable columns）。render は ReactNode（HTML 文字列でない）。
-// グループ数・作成日は CompanyListItem 未提供（group_count＝ドメインC／created_at＝backend 拡張）＝
-// 構造を mock と揃えて列は残すが、実データが無いため sortable/filter は付けず「—」プレースホルダ。
-// backend が値を提供したら sortable/filter/sortVal を有効化する。
+// **サーバー駆動モード**では sortable/filter フラグが backend の受け入れ範囲を表す（§1.8.1 ホワイトリスト）:
+//  ・ソート可＝name / company_code / account_count（created_at は列を出さない）。status / db_identifier は非ソート。
+//  ・フィルタ可＝status(enum) / account_count(number)。name/company_code/db_identifier は横断検索 q が担う
+//    （backend に per-field contains が無いため列別 text フィルタは付けない）。
+// グループ数・作成日は CompanyListItem 未提供（group_count＝ドメインC／created_at＝一覧項目未返却）＝「—」プレースホルダ。
 const COLUMNS: DataTableColumn<Company>[] = [
   {
     key: "name",
@@ -59,9 +61,6 @@ const COLUMNS: DataTableColumn<Company>[] = [
     locked: true,
     width: 240,
     sortable: true,
-    filter: { type: "text" },
-    sortVal: (r) => r.name,
-    searchVal: (r) => r.name,
     render: (r) => (
       <span className="co">
         <QuestIcon name={r.name} color={r.color} imageUrl={r.icon_image_path} size="sm" />
@@ -75,9 +74,6 @@ const COLUMNS: DataTableColumn<Company>[] = [
     width: 130,
     cellClass: "db-id",
     sortable: true,
-    filter: { type: "text" },
-    sortVal: (r) => r.company_code,
-    searchVal: (r) => r.company_code,
     render: (r) => r.company_code,
   },
   {
@@ -85,21 +81,13 @@ const COLUMNS: DataTableColumn<Company>[] = [
     label: "DB識別子",
     width: 150,
     cellClass: "db-id",
-    sortable: true,
-    filter: { type: "text" },
-    sortVal: (r) => r.db_identifier,
-    searchVal: (r) => r.db_identifier,
     render: (r) => r.db_identifier,
   },
   {
     key: "status",
     label: "状態",
     width: 110,
-    sortable: true,
     filter: { type: "enum", options: [["active", "有効"], ["suspended", "停止"]] },
-    sortVal: (r) => r.status,
-    filterVal: (r) => r.status,
-    csvVal: (r) => (r.status === "active" ? "有効" : "停止"),
     render: (r) => statusBadge(r.status),
   },
   {
@@ -109,8 +97,6 @@ const COLUMNS: DataTableColumn<Company>[] = [
     align: "num",
     sortable: true,
     filter: { type: "number" },
-    sortVal: (r) => r.account_count,
-    filterVal: (r) => r.account_count,
     render: (r) => r.account_count,
   },
   { key: "groups", label: "グループ", width: 100, align: "num", render: () => "—", csvVal: () => "—" },
@@ -157,9 +143,9 @@ function companyCard(c: Company): ReactNode {
 
 export function CompanyList() {
   const router = useRouter();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // 一覧は DataTable のサーバー駆動モードが取得する。作成後の再取得は reloadKey で DataTable を再マウント
+  // （検索/ページがクリアされ最新一覧を先頭から取り直す＝従来の「reload で再マウント」挙動を踏襲）。
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -171,37 +157,6 @@ export function CompanyList() {
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-
-  // 全件取得（(a) client モード）＝backend 上限 100 でループ。会社は小規模で通常1回。
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const all: Company[] = [];
-      let page = 1;
-      for (;;) {
-        const res = await listCompanies({ page, per_page: FETCH_PER_PAGE });
-        const batch = res?.data ?? [];
-        all.push(...batch);
-        const total = res?.page_info.total ?? all.length;
-        if (batch.length === 0 || all.length >= total) break;
-        page += 1;
-      }
-      setCompanies(all);
-    } catch (err) {
-      setLoadError(
-        err instanceof ApiError && err.code === "forbidden"
-          ? "この画面を表示する権限がありません。"
-          : "一覧の取得に失敗しました。",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   function resetForm() {
     setName("");
@@ -241,7 +196,7 @@ export function CompanyList() {
       // アイコン画像は未接続（MinIO 待ち）＝color のみ送信。
       await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier, color });
       closeForm();
-      await reload();
+      setReloadKey((k) => k + 1); // DataTable を再マウント＝サーバーから最新一覧を取り直す
     } catch (err) {
       setFormError(createErrorMessage(err));
     } finally {
@@ -345,26 +300,29 @@ export function CompanyList() {
         </form>
       </Modal>
 
-      {loadError && <div className="form-error" role="alert">{loadError}</div>}
-      {loading ? (
-        <p className="list-empty">読み込み中…</p>
-      ) : (
-        <DataTable<Company>
-          storageKey="sc91-companies"
-          data={companies}
-          columns={COLUMNS}
-          rowId={(r) => r.company_id}
-          unit="社"
-          perPage={5}
-          perPageOptions={[5, 10, 20, 50]}
-          maxPins={5}
-          searchFields="会社名・会社コード・DB識別子"
-          exportName="会社一覧"
-          onRowClick={(r) => router.push(`/admin/companies/${r.company_id}`)}
-          emptyText="該当する会社がありません。"
-          card={companyCard}
-        />
-      )}
+      {/* 一覧＝DataTable サーバー駆動モード（ロード/エラー/空表示は DataTable が担う）。
+          key=reloadKey で作成後に再マウント＝最新を取り直す。403 は画面ガード（B-TC-112）で遮断済み。 */}
+      <DataTable<Company>
+        key={reloadKey}
+        storageKey="sc91-companies"
+        columns={COLUMNS}
+        rowId={(r) => r.company_id}
+        unit="社"
+        perPage={5}
+        perPageOptions={[5, 10, 20, 50]}
+        maxPins={5}
+        searchFields="会社名・会社コード・DB識別子"
+        exportName="会社一覧"
+        onRowClick={(r) => router.push(`/admin/companies/${r.company_id}`)}
+        emptyText="該当する会社がありません。"
+        card={companyCard}
+        server={{
+          query: queryCompanies,
+          onExport: (state, columns) => {
+            window.location.href = companiesCsvUrl(state, columns);
+          },
+        }}
+      />
 
       <p className="role-note">
         ※ 各会社のデータは会社ごとに分けて管理されます。一覧の「DB識別子」は会社を識別するための参照キーです。

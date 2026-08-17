@@ -87,7 +87,8 @@ export type DataTableColumn<T> = {
 
 export type DataTableProps<T> = {
   storageKey: string;
-  data: T[];
+  data?: T[]; // client モード＝全件。server モードでは不要（省略可）。
+  server?: DataTableServer<T>; // 指定時＝サーバー駆動（computeRows/ローカルページングをバイパス）。
   columns: DataTableColumn<T>[];
   rowId?: (r: T) => string | number;
   unit?: string; // 件数の単位（既定「件」）
@@ -204,14 +205,28 @@ function pageWindow(cur: number, pages: number): (number | "…")[] {
   return nums;
 }
 
+// 値のデバウンス（サーバーモードの横断検索用＝入力のたびに fetch しない）。
+function useDebouncedValue<V>(value: V, ms: number): V {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
 // ---- コンポーネント --------------------------------------------------------
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { data, unit = "件", pins: pinsProp, storageKey } = props;
+  const { unit = "件", pins: pinsProp, storageKey, server } = props;
+  const hasServer = Boolean(server);
   const rowId = props.rowId ?? ((r: T) => (r as { id: string | number }).id);
   const pinsEnabled = pinsProp !== false;
   const maxPins = props.maxPins ?? 5;
   const perPageOptionsBase = props.perPageOptions ?? [10, 20, 50, 100];
   const hasCard = Boolean(props.card || props.cardLayout || props.cardRaw);
+
+  // data は参照安定化（server モードでは props.data 省略＝安定した [] を返す）。
+  const data = useMemo(() => props.data ?? [], [props.data]);
 
   // 列の既定は falsy 判定（sortable 未指定＝不可）と !c.actions（リサイズ可）で扱う。
   const cols = props.columns;
@@ -244,6 +259,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [colMenuPos, setColMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [ready, setReady] = useState(false);
+
+  // サーバー駆動モードの状態（server プロップ時のみ意味を持つ）。
+  const [srv, setSrv] = useState<ServerResult<T> | null>(null);
+  const [srvLoading, setSrvLoading] = useState(false);
+  const [srvError, setSrvError] = useState(false);
+  const [srvLoaded, setSrvLoaded] = useState(false); // 初回ロード完了（空表示のフラッシュ防止）
+  const seqRef = useRef(0); // 最新リクエストのみ commit（stale レース回避）
+  const serverRef = useRef(server); // inline server={{...}} の identity 変化で effect が暴発しないよう ref 経由で参照
+  serverRef.current = server;
 
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
@@ -304,18 +328,65 @@ export function DataTable<T>(props: DataTableProps<T>) {
     [visibleDataCols, actionsCol],
   );
 
-  const { pinned, filtered } = useMemo(
+  // サーバー駆動モードのクエリ状態（横断検索はデバウンス・ソート/フィルタ/ページ/ピンは即時）。
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const serverState = useMemo<QueryState>(
+    () => ({
+      search: debouncedSearch,
+      sort: activeSort({ simpleSort, advSort }),
+      filters,
+      page,
+      perPage,
+      pinIds: pinsEnabled ? pins : [],
+    }),
+    [debouncedSearch, simpleSort, advSort, filters, page, perPage, pins, pinsEnabled],
+  );
+
+  // 再クエリ（server モード・localStorage 復元後）。seq+AbortController で stale レースを排除。
+  useEffect(() => {
+    if (!hasServer || !ready) return;
+    const my = ++seqRef.current;
+    const ac = new AbortController();
+    setSrvLoading(true);
+    setSrvError(false);
+    serverRef.current!.query(serverState, ac.signal)
+      .then((r) => {
+        if (my !== seqRef.current) return;
+        setSrv(r);
+        setSrvLoaded(true);
+        setSrvLoading(false);
+      })
+      .catch(() => {
+        if (ac.signal.aborted || my !== seqRef.current) return;
+        setSrvError(true);
+        setSrvLoading(false);
+      });
+    return () => ac.abort();
+  }, [hasServer, ready, serverState]);
+
+  // client モードのパイプライン（server モードでは母集合として未使用＝空 data で軽量）。
+  const clientResult = useMemo(
     () => computeRows(data, dataCols, colByKey, rowId, { search, simpleSort, advSort, filters, pins, pinsEnabled }),
     [data, dataCols, colByKey, rowId, search, simpleSort, advSort, filters, pins, pinsEnabled],
   );
 
-  const totalNonPin = filtered.length;
+  const pinned = hasServer ? srv?.pinned ?? [] : clientResult.pinned;
+  const filtered = clientResult.filtered; // client モードの非固定母集合
+  const totalNonPin = hasServer ? srv?.total ?? 0 : filtered.length;
   const pages = Math.max(1, Math.ceil(totalNonPin / perPage));
   const curPage = Math.min(Math.max(1, page), pages);
   const start = (curPage - 1) * perPage;
-  const pageRows = filtered.slice(start, start + perPage);
+  const pageRows = hasServer ? srv?.rows ?? [] : filtered.slice(start, start + perPage);
   const useCard = hasCard && view === "card";
-  const isEmpty = totalNonPin + pinned.length === 0;
+  const showLoading = hasServer && srvLoading && !srvLoaded; // 初回ロード中（以降は前回行を保持して再取得）
+  const isEmpty = hasServer
+    ? srvLoaded && !srvLoading && totalNonPin + pinned.length === 0
+    : totalNonPin + pinned.length === 0;
+
+  // ページ範囲外へ縮んだら最終ページへ寄せる（server モード・絞込で件数が減った時）。
+  useEffect(() => {
+    if (hasServer && page > pages) setPage(pages);
+  }, [hasServer, page, pages]);
 
   const sort = activeSort({ simpleSort, advSort });
   const advOn = advSort.length > 0;
@@ -437,6 +508,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
   }
 
   function exportCsv() {
+    // server モード＝表示中データ列（表示順）を渡してサーバー生成へ委譲（同一絞込/ソートの全件）。
+    if (serverRef.current?.onExport) {
+      serverRef.current.onExport(serverState, visibleDataCols.map((c) => c.key));
+      return;
+    }
     const vc = visibleDataCols;
     const head = vc.map((c) => c.label);
     const cell = (c: DataTableColumn<T>, r: T) => (c.csvVal ? c.csvVal(r) : c.sortVal ? String(c.sortVal(r)) : "");
@@ -722,7 +798,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
         )}
       </div>
 
-      {!useCard && !isEmpty && (
+      {hasServer && srvError && (
+        <div className="form-error" role="alert">一覧の取得に失敗しました。時間をおいて再度お試しください。</div>
+      )}
+
+      {!useCard && !isEmpty && !showLoading && (
         <div className="table-wrap dt-scroll">
           <table
             className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
@@ -778,14 +858,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
           </table>
         </div>
       )}
-      {useCard && !isEmpty && (
+      {useCard && !isEmpty && !showLoading && (
         <div className="dt-cards" role="list">
           {pinned.map((r) => renderCard(r, true))}
           {pageRows.map((r) => renderCard(r, false))}
         </div>
       )}
 
-      {isEmpty ? <div className="list-empty">{props.emptyText ?? "該当するデータがありません。"}</div> : null}
+      {showLoading ? (
+        <div className="list-empty">読み込み中…</div>
+      ) : isEmpty ? (
+        <div className="list-empty">{props.emptyText ?? "該当するデータがありません。"}</div>
+      ) : null}
 
       <div className="dt-footer">
         <span className="list-count">

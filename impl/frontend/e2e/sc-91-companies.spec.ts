@@ -48,3 +48,28 @@ test("B-TC-112 general user cannot access SC-91", async ({ page }) => {
   await page.goto("/admin/companies");
   await expect(page).toHaveURL(/\/$/); // ダッシュボードへ差し戻し
 });
+
+// B-TC-137: 会社一覧が DataTable サーバー駆動モードで動く（§1.8.1 委譲）。
+// 初期取得は per_page=5（CompanyList の perPage を転送）／会社名ヘッダ click で sort=name が飛ぶ／
+// 件数バッジ（.list-count）が表示される（page_info.total 由来）。並び/件数はサーバーが確定する。
+test("B-TC-137 server mode: initial per_page and sort=name query", async ({ page }) => {
+  await login(page, OPS);
+  // ページ遷移（/admin/companies のドキュメント要求）ではなく API fetch（/api/v1/...）に限定して捕捉。
+  const isList = (r: { url(): string; method(): string }) =>
+    r.url().includes("/api/v1/admin/companies") && r.method() === "GET";
+  // 初期一覧リクエスト（マウント後の委譲 query）。
+  const [initialReq] = await Promise.all([
+    page.waitForRequest(isList),
+    page.goto("/admin/companies"),
+  ]);
+  expect(new URL(initialReq.url()).searchParams.get("per_page")).toBe("5");
+  await expect(page.locator(".list-count")).toBeVisible();
+  // 会社名ヘッダ click＝単一ソート昇順→ sort=name のサーバー再クエリ。
+  const [sortReq] = await Promise.all([
+    page.waitForRequest((r) => isList(r) && new URL(r.url()).searchParams.get("sort") === "name"),
+    page.getByRole("columnheader", { name: "会社名" }).click(),
+  ]);
+  expect(new URL(sortReq.url()).searchParams.get("sort")).toBe("name");
+  // 並び替えチップが出る（適用中表示）＝クライアント状態も反映。
+  await expect(page.getByText("並び替え:")).toBeVisible();
+});
