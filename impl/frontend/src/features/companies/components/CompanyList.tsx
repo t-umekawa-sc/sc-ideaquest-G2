@@ -3,11 +3,17 @@
 // SC-91 システム管理（会社一覧）。system_admin 専用（ページ側でガード）。
 // 一覧取得＋会社作成（B.1）。業務層クリーン＝表示/UX のみ、判定はサーバー（403/409/422 を文言化）。
 // レイアウト/クラスは正＝doc/画面設計/mocks/SC-91_システム管理.html（DoD＝モック一致）。
+//
+// 一覧の操作標準は DataTable（client モード）に委譲＝検索/絞込/複数ソート/列設定/CSV/ピン/カードは
+// 全件クライアント保持で処理（管理系＝小規模。§5 の設計フォークは (a) を採用）。
+// サーバー駆動モード（アイデア/クエスト一覧・§4.5 契約後）は将来拡張＝computeRows() 境界で差し替え。
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Button, Field, Modal, ModalBody, ModalFooter, Pager, Swatches } from "@/components/ui";
+import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, Swatches } from "@/components/ui";
+import type { DataTableColumn } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
 import { createCompany, listCompanies } from "../api";
@@ -30,21 +36,130 @@ function createErrorMessage(err: unknown): string {
   return "エラーが発生しました。時間をおいて再度お試しください。";
 }
 
-const PER_PAGE = 20; // 一覧の1ページ件数（backend 既定と一致・最大 100）
 const DEFAULT_COLOR = "#2563EB"; // 会社カラー既定（swatches の先頭＝ブルー）
+const FETCH_PER_PAGE = 100; // 全件取得のバッチ（backend 上限＝100）。会社は小規模で通常1回。
+
+// 状態バッジ（会社状態＝2値。有効/停止）。
+function statusBadge(status: string): ReactNode {
+  return status === "active" ? (
+    <span className="badge st-active">有効</span>
+  ) : (
+    <span className="badge st-suspended">停止</span>
+  );
+}
+
+// 列定義（正＝mocks/SC-91 の DataTable columns）。render は ReactNode（HTML 文字列でない）。
+// グループ数・作成日は CompanyListItem 未提供（group_count＝ドメインC／created_at＝backend 拡張）＝
+// 構造を mock と揃えて列は残すが、実データが無いため sortable/filter は付けず「—」プレースホルダ。
+// backend が値を提供したら sortable/filter/sortVal を有効化する。
+const COLUMNS: DataTableColumn<Company>[] = [
+  {
+    key: "name",
+    label: "会社名",
+    locked: true,
+    width: 240,
+    sortable: true,
+    filter: { type: "text" },
+    sortVal: (r) => r.name,
+    searchVal: (r) => r.name,
+    render: (r) => (
+      <span className="co">
+        <QuestIcon name={r.name} color={r.color} imageUrl={r.icon_image_path} size="sm" />
+        <strong>{r.name}</strong>
+      </span>
+    ),
+  },
+  {
+    key: "company_code",
+    label: "会社コード",
+    width: 130,
+    cellClass: "db-id",
+    sortable: true,
+    filter: { type: "text" },
+    sortVal: (r) => r.company_code,
+    searchVal: (r) => r.company_code,
+    render: (r) => r.company_code,
+  },
+  {
+    key: "db_identifier",
+    label: "DB識別子",
+    width: 150,
+    cellClass: "db-id",
+    sortable: true,
+    filter: { type: "text" },
+    sortVal: (r) => r.db_identifier,
+    searchVal: (r) => r.db_identifier,
+    render: (r) => r.db_identifier,
+  },
+  {
+    key: "status",
+    label: "状態",
+    width: 110,
+    sortable: true,
+    filter: { type: "enum", options: [["active", "有効"], ["suspended", "停止"]] },
+    sortVal: (r) => r.status,
+    filterVal: (r) => r.status,
+    csvVal: (r) => (r.status === "active" ? "有効" : "停止"),
+    render: (r) => statusBadge(r.status),
+  },
+  {
+    key: "account_count",
+    label: "アカウント",
+    width: 110,
+    align: "num",
+    sortable: true,
+    filter: { type: "number" },
+    sortVal: (r) => r.account_count,
+    filterVal: (r) => r.account_count,
+    render: (r) => r.account_count,
+  },
+  { key: "groups", label: "グループ", width: 100, align: "num", render: () => "—", csvVal: () => "—" },
+  { key: "created", label: "作成日", width: 130, render: () => "—", csvVal: () => "—" },
+  {
+    key: "_actions",
+    label: "",
+    actions: true,
+    locked: true,
+    width: 130,
+    render: (r) => (
+      <Link
+        href={`/admin/companies/${r.company_id}`}
+        className="btn btn-outline btn-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        管理する →
+      </Link>
+    ),
+  },
+];
+
+// カード表示（🔲カード/☰リスト 切替）。会社アイコン＋名称を活かす。操作は actions 列が右上に自動表示。
+function companyCard(c: Company): ReactNode {
+  return (
+    <>
+      <div className="dt-card__title co">
+        <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_path} size="sm" />
+        <span>{c.name}</span>
+      </div>
+      <div className="dt-card__meta">
+        {statusBadge(c.status)}
+        <span className="badge badge-muted">{c.company_code}</span>
+        <span className="db-id">{c.db_identifier}</span>
+      </div>
+      <div className="dt-card__stats">
+        <span>👥 {c.account_count}</span>
+        <span>🗂️ —</span>
+        <span>作成 —</span>
+      </div>
+    </>
+  );
+}
 
 export function CompanyList() {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState(""); // "" = 全件 / active / suspended
-  const [page, setPage] = useState(1);
-  const [qDraft, setQDraft] = useState("");
-  const [statusDraft, setStatusDraft] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -57,40 +172,36 @@ export function CompanyList() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // 全件取得（(a) client モード）＝backend 上限 100 でループ。会社は小規模で通常1回。
   const reload = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await listCompanies({ q: q || undefined, status: status || undefined, page, per_page: PER_PAGE });
-      setCompanies(res?.data ?? []);
-      setTotal(res?.page_info.total ?? 0);
+      const all: Company[] = [];
+      let page = 1;
+      for (;;) {
+        const res = await listCompanies({ page, per_page: FETCH_PER_PAGE });
+        const batch = res?.data ?? [];
+        all.push(...batch);
+        const total = res?.page_info.total ?? all.length;
+        if (batch.length === 0 || all.length >= total) break;
+        page += 1;
+      }
+      setCompanies(all);
     } catch (err) {
-      setLoadError(err instanceof ApiError && err.code === "forbidden"
-        ? "この画面を表示する権限がありません。"
-        : "一覧の取得に失敗しました。");
+      setLoadError(
+        err instanceof ApiError && err.code === "forbidden"
+          ? "この画面を表示する権限がありません。"
+          : "一覧の取得に失敗しました。",
+      );
     } finally {
       setLoading(false);
     }
-  }, [q, status, page]);
+  }, []);
 
   useEffect(() => {
     void reload();
   }, [reload]);
-
-  // 検索/フィルタ適用時は先頭ページへ戻す（絞り込みで現在ページが範囲外になるのを防ぐ）。
-  function onSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setQ(qDraft.trim());
-    setStatus(statusDraft);
-    setPage(1);
-  }
-  function onClearSearch() {
-    setQDraft("");
-    setStatusDraft("");
-    setQ("");
-    setStatus("");
-    setPage(1);
-  }
 
   function resetForm() {
     setName("");
@@ -234,93 +345,25 @@ export function CompanyList() {
         </form>
       </Modal>
 
-      <form className="list-toolbar" role="search" aria-label="会社検索" onSubmit={onSearch}>
-        <div className="filters">
-          <input
-            type="search"
-            className="input"
-            aria-label="検索（会社名・会社コード）"
-            placeholder="会社名・会社コード・DB識別子で検索"
-            value={qDraft}
-            onChange={(e) => setQDraft(e.target.value)}
-          />
-          <label>
-            状態{" "}
-            <select className="select" aria-label="状態で絞り込み" value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
-              <option value="">すべて</option>
-              <option value="active">有効</option>
-              <option value="suspended">停止</option>
-            </select>
-          </label>
-          <Button type="submit" variant="outline" size="sm">検索</Button>
-          {(q || status) && (
-            <Button type="button" size="sm" onClick={onClearSearch}>絞り込みをクリア</Button>
-          )}
-        </div>
-        <div className="tools">
-          <span className="list-count">{total} 社</span>
-        </div>
-      </form>
-
       {loadError && <div className="form-error" role="alert">{loadError}</div>}
       {loading ? (
         <p className="list-empty">読み込み中…</p>
-      ) : companies.length === 0 ? (
-        <p className="list-empty">該当する会社がありません。</p>
       ) : (
-        <>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">会社名</th>
-                  <th scope="col">会社コード</th>
-                  <th scope="col">DB識別子</th>
-                  <th scope="col">状態</th>
-                  <th scope="col" className="num">アカウント</th>
-                  <th scope="col" className="num">グループ</th>
-                  <th scope="col">作成日</th>
-                  <th scope="col" className="col-actions" aria-label="操作" />
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map((c) => (
-                  <tr key={c.company_id} className="row-link" onClick={() => router.push(`/admin/companies/${c.company_id}`)}>
-                    <td>
-                      <span className="co">
-                        <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_path} size="sm" />
-                        <strong>{c.name}</strong>
-                      </span>
-                    </td>
-                    <td className="db-id">{c.company_code}</td>
-                    <td className="db-id">{c.db_identifier}</td>
-                    <td>
-                      {c.status === "active" ? (
-                        <span className="badge st-active">有効</span>
-                      ) : (
-                        <span className="badge st-suspended">停止</span>
-                      )}
-                    </td>
-                    <td className="num">{c.account_count}</td>
-                    {/* グループ数・作成日は CompanyListItem 未提供（group_count＝ドメインC／created_at＝backend 拡張）＝暫定「—」 */}
-                    <td className="num">—</td>
-                    <td>—</td>
-                    <td className="col-actions">
-                      <Link
-                        href={`/admin/companies/${c.company_id}`}
-                        className="btn btn-outline btn-sm"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        管理する →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
-        </>
+        <DataTable<Company>
+          storageKey="sc91-companies"
+          data={companies}
+          columns={COLUMNS}
+          rowId={(r) => r.company_id}
+          unit="社"
+          perPage={5}
+          perPageOptions={[5, 10, 20, 50]}
+          maxPins={5}
+          searchFields="会社名・会社コード・DB識別子"
+          exportName="会社一覧"
+          onRowClick={(r) => router.push(`/admin/companies/${r.company_id}`)}
+          emptyText="該当する会社がありません。"
+          card={companyCard}
+        />
       )}
 
       <p className="role-note">

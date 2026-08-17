@@ -34,10 +34,12 @@ test("B-TC-111 create company appears in list", async ({ page }) => {
   await page.locator("#c_code").fill(code);
   await page.locator("#c_db").fill(`ideaquest_e2e_${Date.now().toString().slice(-8)}`);
   await page.getByRole("button", { name: /作成する/ }).click(); // 送信ボタンは modal（body 直下に portal）
-  // 一覧はページャ/検索付き（per_page=20）＝新規会社は先頭ページ外になり得るため検索で絞って確認
-  await page.getByRole("searchbox", { name: "検索（会社名・会社コード）" }).fill(code);
-  await page.getByRole("button", { name: "検索" }).click();
-  await expect(page.getByRole("row", { name: new RegExp(code) })).toBeVisible();
+  // 一覧は DataTable（client モード）＝ライブ検索で絞る（検索ボタンなし・placeholder「…を検索…」）。
+  // 作成後は reload で DataTable が再マウントされ検索欄がクリアされ得るため、fill→表示確認を toPass で再試行。
+  await expect(async () => {
+    await page.getByRole("searchbox").fill(code);
+    await expect(page.getByRole("row", { name: new RegExp(code) })).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
 
 // B-TC-112: 非 system_admin（general）は SC-91 に入れない（サーバーガード＝/ へリダイレクト）。
