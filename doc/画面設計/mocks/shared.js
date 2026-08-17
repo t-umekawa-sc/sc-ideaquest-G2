@@ -369,7 +369,7 @@ window.addEventListener('resize', () => applyCellClips());
   }
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.modal').forEach(watch);
-    // 動的に後から追加される .modal（例: DataTable の詳細ソート/絞込ダイアログ）も拾う
+    // 動的に後から追加される .modal（例: DataTable の並び替え/絞り込みダイアログ）も拾う
     new MutationObserver((muts) => {
       muts.forEach((mu) => mu.addedNodes.forEach((n) => {
         if (n.nodeType !== 1) return;
@@ -510,7 +510,6 @@ window.DataTable = (function () {
     // 画面が見た目を完全制御）／card(r)=本文HTML／cardLayout(r)={title,badges,meta,stats}。
     const hasCard = typeof cfg.card === 'function' || typeof cfg.cardLayout === 'function' || typeof cfg.cardRaw === 'function';
     const pinsEnabled = cfg.pins !== false;   // pins:false で行固定（ピン）を無効化（ユーザー向け一覧など）
-    const sortableCols = dataCols.filter((c) => c.sortable);
 
     // ---- 永続状態（列順/非表示/幅/密度/ピン）＋セッション状態（検索/ソート/絞込/ページ） ----
     const persisted = load(cfg.storageKey) || {};
@@ -578,25 +577,19 @@ window.DataTable = (function () {
       <div class="list-toolbar" data-dt-toolbar>
         <div class="filters">
           <div class="dt-search">
-            <input class="input" type="search" data-dt-search placeholder="${esc(cfg.searchPlaceholder || '検索…')}">
-            ${cfg.searchFields ? `<span class="dt-search__hint">${esc(cfg.searchFields)} を検索</span>` : ''}
+            <span class="dt-search__ic" aria-hidden="true">🔍</span>
+            <input class="input" type="search" data-dt-search placeholder="${esc(cfg.searchPlaceholder || (cfg.searchFields ? cfg.searchFields + ' を検索…' : '検索…'))}">
           </div>
-          <button class="btn btn-outline btn-sm" type="button" data-dt-filter>詳細絞込</button>
-          <button class="btn btn-outline btn-sm" type="button" data-dt-sort>詳細ソート</button>
-          ${hasCard && sortableCols.length ? `<label class="dt-cardsort" data-dt-card-only hidden>
-            <select class="select" data-dt-cardsort aria-label="並び替え（カード表示）">
-              <option value="">並び替え</option>
-              ${sortableCols.map((c) => `<option value="${esc(c.key)}:asc">${esc(c.label)} ↑</option><option value="${esc(c.key)}:desc">${esc(c.label)} ↓</option>`).join('')}
-            </select></label>` : ''}
-          <button class="btn btn-sm" type="button" data-dt-clear hidden>絞り込み・並び替えをクリア</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-sort>↕ 並び替え</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-filter>⧩ 絞り込み</button>
         </div>
         <div class="tools">
+          <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
+          <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
           <span class="seg seg-density" role="group" aria-label="表示密度">
             <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
             <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
           </span>
-          <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
-          <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
           ${hasCard ? `<div class="viewtoggle" role="radiogroup" aria-label="表示切替">
             <button type="button" role="radio" data-dt-view="card" title="カード表示">🔲 カード</button>
             <button type="button" role="radio" data-dt-view="list" title="リスト表示">☰ リスト</button>
@@ -731,11 +724,14 @@ window.DataTable = (function () {
       else if (b) b.remove();
     }
     function renderChips() {
+      // 「適用中」＝検索・並び替え（単一/詳細・list/card 問わず）・絞込を全てチップ化し、クリアはこの行末の「すべてクリア」1つに一本化。
       const chips = [];
-      if (st.advSort.length) chips.push(`<span class="dt-chip">詳細ソート: ${st.advSort.map((s) => esc(labelOf(s.key)) + (s.dir === 'desc' ? '▼' : '▲')).join(' › ')}<button class="dt-chip__x" type="button" data-dt-chip="sort" aria-label="詳細ソートを解除">✕</button></span>`);
+      if (st.search) chips.push(`<span class="dt-chip">🔍 "${esc(st.search)}"<button class="dt-chip__x" type="button" data-dt-chip="search" aria-label="検索を解除">✕</button></span>`);
+      const sort = activeSort();
+      if (sort.length) chips.push(`<span class="dt-chip">並び替え: ${sort.map((s) => esc(labelOf(s.key)) + (s.dir === 'desc' ? '▼' : '▲')).join(' › ')}<button class="dt-chip__x" type="button" data-dt-chip="sort" aria-label="並び替えを解除">✕</button></span>`);
       Object.keys(st.filters).forEach((k) => { chips.push(`<span class="dt-chip">${esc(labelOf(k))}: ${esc(filterSummary(st.filters[k]))}<button class="dt-chip__x" type="button" data-dt-chip="filter:${esc(k)}" aria-label="絞込を解除">✕</button></span>`); });
       chipsEl.innerHTML = chips.length ? `<span class="dt-chips__label">適用中:</span>` + chips.join('') + `<button class="dt-chip dt-chip--clear" type="button" data-dt-clear2>すべてクリア</button>` : '';
-      setBadge('[data-dt-sort]', st.advSort.length);
+      setBadge('[data-dt-sort]', sort.length);
       setBadge('[data-dt-filter]', Object.keys(st.filters).length);
     }
 
@@ -780,19 +776,12 @@ window.DataTable = (function () {
       if (hasCard) {
         root.querySelectorAll('[data-dt-view]').forEach((b) => { const on = b.dataset.dtView === st.view; b.classList.toggle('is-on', on); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
         root.querySelectorAll('[data-dt-table-only]').forEach((el) => { el.hidden = useCard; });
-        root.querySelectorAll('[data-dt-card-only]').forEach((el) => { el.hidden = !useCard; });
-        const cs = root.querySelector('[data-dt-cardsort]');
-        if (cs) { const adv = st.advSort.length > 0; cs.disabled = adv; cs.value = (!adv && st.simpleSort) ? (st.simpleSort.key + ':' + st.simpleSort.dir) : ''; cs.title = adv ? '詳細ソートが有効です（クリアで単一の並び替えに戻せます）' : ''; }
       }
       countEl.textContent = totalNonPin + ' ' + unit + (pinned.length ? `（＋固定 ${pinned.length}）` : '');
       emptyEl.hidden = !isEmpty;
       renderPager(totalNonPin);
       renderChips();
-      // クリアの一本化: 詳細ソート/詳細絞込がある時は「要約チップ行の“すべてクリア”」に任せ、
-      // .filters の標準クリアボタンは隠す（重複防止）。チップにならない検索・単一並び替えだけの時に出す。
-      const hasChips = st.advSort.length > 0 || Object.keys(st.filters).length > 0;
-      const anyFilter = st.search || st.simpleSort || hasChips;
-      root.querySelector('[data-dt-clear]').hidden = !(anyFilter && !hasChips);
+      // クリアは「適用中」行末の“すべてクリア”に一本化（段1の旧クリアボタンは廃止）。
       if (window.applyCellClips) window.applyCellClips(root); // .cell-tags のはみ出し「…」を再判定
       requestAnimationFrame(() => { wrapEl.style.setProperty('--dt-head-h', headEl.offsetHeight + 'px'); });
     }
@@ -800,7 +789,6 @@ window.DataTable = (function () {
     // ===== イベント =====
     searchEl.addEventListener('input', () => { st.search = searchEl.value.trim(); st.page = 1; render(); });
     function clearAll() { st.search = ''; st.simpleSort = null; st.advSort = []; st.filters = {}; st.page = 1; render(); }
-    root.querySelector('[data-dt-clear]').addEventListener('click', clearAll);
     root.querySelectorAll('[data-dt-density]').forEach((b) => b.addEventListener('click', () => { st.density = b.dataset.dtDensity; persist(); render(); }));
     { const pp = root.querySelector('[data-dt-perpage]'); if (pp) pp.addEventListener('change', () => { st.perPage = Number(pp.value); st.page = 1; persist(); render(); }); }
 
@@ -855,16 +843,15 @@ window.DataTable = (function () {
         st.view = st.view === 'card' ? 'list' : 'card'; persist(); render();
         const cur = vg.querySelector('[data-dt-view="' + st.view + '"]'); if (cur) cur.focus();
       });
-      // カード用の単一並び替えセレクト。詳細ソート適用中は無効（render で disabled）。
-      const cs = root.querySelector('[data-dt-cardsort]');
-      if (cs) cs.addEventListener('change', () => { const v = cs.value; if (!v) { st.simpleSort = null; } else { const p = v.split(':'); st.simpleSort = { key: p[0], dir: p[1] }; st.advSort = []; } st.page = 1; render(); });
     }
     pagerEl.addEventListener('click', (e) => { const b = e.target.closest('[data-dt-page]'); if (!b || b.disabled) return; st.page = Number(b.dataset.dtPage); render(); });
     chipsEl.addEventListener('click', (e) => {
       if (e.target.closest('[data-dt-clear2]')) return clearAll();
       const x = e.target.closest('[data-dt-chip]'); if (!x) return;
       const t = x.dataset.dtChip;
-      if (t === 'sort') st.advSort = []; else if (t.indexOf('filter:') === 0) delete st.filters[t.slice(7)];
+      if (t === 'search') st.search = '';
+      else if (t === 'sort') { st.simpleSort = null; st.advSort = []; }
+      else if (t.indexOf('filter:') === 0) delete st.filters[t.slice(7)];
       st.page = 1; render();
     });
 
@@ -910,7 +897,7 @@ window.DataTable = (function () {
           <div class="sort-builder__pane"><div class="sort-builder__title">対象外の項目</div><ul class="sort-builder__list" data-avail></ul></div>
         </div>`;
       const foot = `<button class="btn btn-outline" type="button" data-clear>この条件をクリア</button><span style="flex:1"></span><button class="btn btn-outline" type="button" data-close>キャンセル</button><button class="btn btn-primary" type="button" data-apply>適用する</button>`;
-      const dlg = dialog('詳細ソート（複数項目）', body, foot, 'md');
+      const dlg = dialog('並び替え（複数項目）', body, foot, 'md');
       const keysEl = dlg.el.querySelector('[data-keys]'), availEl = dlg.el.querySelector('[data-avail]'), builder = dlg.el.querySelector('.sort-builder');
       function paint() {
         keysEl.innerHTML = work.length ? work.map((s, i) => {
@@ -956,7 +943,7 @@ window.DataTable = (function () {
       };
       const body = `<div class="filter-form">${filterable.map(rowHtmlF).join('')}</div>`;
       const foot = `<button class="btn btn-outline" type="button" data-clear>クリア</button><span style="flex:1"></span><button class="btn btn-outline" type="button" data-close>キャンセル</button><button class="btn btn-primary" type="button" data-apply>適用する</button>`;
-      const dlg = dialog('詳細絞込', body, foot, 'md');
+      const dlg = dialog('絞り込み', body, foot, 'md');
       dlg.el.addEventListener('click', (e) => {
         if (e.target.closest('[data-clear]')) { dlg.el.querySelectorAll('input').forEach((i) => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; }); return; }
         if (!e.target.closest('[data-apply]')) return;

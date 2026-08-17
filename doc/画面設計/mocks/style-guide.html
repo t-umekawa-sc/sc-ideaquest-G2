@@ -418,8 +418,9 @@
       列幅調整・列の表示/非表示/並べ替え・CSVエクスポート・表示密度・行固定（ピン）・表示切替（テーブル/カード）</strong>を一括付与する共通部品
       （<code>DataTable.init(root, config)</code>）。<strong>列（columns）とデータ（data）を宣言するだけ</strong>で全機能が付く。
       正＝<code>デザイン標準.md §4.5 一覧の操作標準</code>／ライブ実例＝<code>SC-91</code>。</p>
-    <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定・「詳細ソート/詳細絞込/列設定/エクスポート」を上部で。<strong>表示件数セレクタ</strong>も右側に。
-      <strong>ツールバー最右の「🔲 カード / ☰ リスト」で表示切替</strong>（<code>config.card(r)</code> か <code>config.cardLayout(r)</code> を与えた時のみ・SC-10 と同じ操作感。検索・絞込・ソート・ページング・固定・<strong>⋯アクション</strong>・<strong>表示密度</strong>はカードでも共通）。カード<strong>左上に 📍固定</strong>（半分はみ出すフローティング・固定中は青）／<strong>右上に ⋯メニュー</strong>。切替は<strong>右端固定</strong>で位置が動かない（<code>列設定</code>のみテーブル専用でその左に格納）。カード時は見出しクリックの代わりに左側の<strong>「並び替え ▾」</strong>で単一ソート。カードは行/<strong>Enter/Space で開ける</strong>（<code>role=listitem</code>＋tabindex／表示切替は <code>radiogroup</code>＝矢印キー対応）。<code>cardLayout</code> は <code>{title,badges,meta,stats}</code> を宣言するだけで組み立て（デモはこれを使用）。</p>
+    <p class="hint">見出しクリック＝ソート（昇順→降順→解除）・右端ドラッグ＝列幅・行頭📌＝固定。段1左＝<strong>🔍検索／↕並び替え／⧩絞り込み</strong>（同一高さで整列）、段1右＝<strong>列設定・エクスポート・表示密度・表示切替</strong>（表示密度は表示切替の直左）。<strong>表示件数セレクタ</strong>は下部フッター右。
+      適用中の条件（<strong>検索・並び替え・絞り込み</strong>）は<strong>「適用中」チップ行にまとめて表示</strong>し、各チップ ✕ で個別解除・行末の<strong>「すべてクリア」1つ</strong>で全解除（改定 2026-08-17）。
+      <strong>ツールバー最右の「🔲 カード / ☰ リスト」で表示切替</strong>（<code>config.card(r)</code> か <code>config.cardLayout(r)</code> を与えた時のみ・SC-10 と同じ操作感。検索・絞り込み・並び替え・ページング・固定・<strong>⋯アクション</strong>・<strong>表示密度</strong>はカードでも共通）。カード<strong>左上に 📍固定</strong>（半分はみ出すフローティング・固定中は青）／<strong>右上に ⋯メニュー</strong>。切替は<strong>右端固定</strong>で位置が動かない（<code>列設定</code>のみテーブル専用でその左に格納）。カード時も並び替えは list と共通の<strong>「↕ 並び替え」ボタン</strong>（専用セレクトは廃止）。カードは行/<strong>Enter/Space で開ける</strong>（<code>role=listitem</code>＋tabindex／表示切替は <code>radiogroup</code>＝矢印キー対応）。<code>cardLayout</code> は <code>{title,badges,meta,stats}</code> を宣言するだけで組み立て（デモはこれを使用）。</p>
     <div id="sgTable"></div>
   </div>
 

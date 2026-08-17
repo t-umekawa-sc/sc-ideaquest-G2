@@ -1111,11 +1111,18 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 [data-dt-toolbar] .filters { min-width: 0; }
 [data-dt-toolbar] .tools { justify-content: flex-end; }
 [data-dt-toolbar] .dt-chips { grid-column: 1 / -1; }
-/* 横断検索＝短いプレースホルダ＋対象項目名は下に補足（hint）。ボタンは上端揃え。 */
-[data-dt-toolbar] .filters { align-items: flex-start; }
-.dt-search { display: flex; flex-direction: column; gap: 2px; }
-.dt-search__hint { font-size: var(--text-xs); color: var(--color-text-muted); padding-left: 2px; }
-/* 適用中バッジ（詳細ソート/絞込ボタンに付く件数） */
+/* 段1＝操作バー：検索・並び替え・絞り込み・密度・表示切替を同一高さに揃える（凸凹解消）。
+   検索は🔍アイコンを内包した単一行（対象項目名は placeholder に内包＝下段ヒントは廃止）。 */
+[data-dt-toolbar] { --dt-ctl-h: 34px; }
+[data-dt-toolbar] .filters, [data-dt-toolbar] .tools { align-items: center; }
+[data-dt-toolbar] .filters .btn, [data-dt-toolbar] .tools .btn,
+[data-dt-toolbar] .dt-search .input, [data-dt-toolbar] .seg, [data-dt-toolbar] .viewtoggle { height: var(--dt-ctl-h); box-sizing: border-box; }
+[data-dt-toolbar] .filters .btn, [data-dt-toolbar] .tools .btn { display: inline-flex; align-items: center; gap: 6px; }
+[data-dt-toolbar] .seg__btn, [data-dt-toolbar] .viewtoggle button { display: inline-flex; align-items: center; height: 100%; }
+.dt-search { position: relative; display: inline-flex; align-items: center; }
+.dt-search__ic { position: absolute; left: 10px; color: var(--color-text-muted); pointer-events: none; font-size: var(--text-sm); }
+.dt-search .input[type="search"] { padding-left: 30px; }
+/* 適用中バッジ（並び替え/絞り込みボタンに付く件数） */
 .dt-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25em; height: 1.25em;
   padding: 0 .35em; margin-left: 6px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700;
   background: var(--color-primary); color: #fff; }
@@ -1129,7 +1136,7 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .dt-chip__x { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 0;
   border-radius: var(--radius-full); background: transparent; color: inherit; cursor: pointer; font-size: 12px; line-height: 1; }
 .dt-chip__x:hover { background: rgba(15,23,42,.12); }
-.dt-chip--clear { background: transparent; border-color: var(--color-border); color: var(--color-text-muted); padding-left: 10px; cursor: pointer; }
+.dt-chip--clear { margin-left: auto; background: transparent; border-color: var(--color-border); color: var(--color-text-muted); padding-left: 10px; cursor: pointer; }
 .dt-chip--clear:hover { background: var(--color-surface-alt); color: var(--color-text); }
 
 /* --- 横スクロールのみのコンテナ（縦は制限しない＝テーブルは全行を縦に表示しきり、
@@ -1159,7 +1166,7 @@ th[aria-sort="ascending"] .dt-sort-ind, th[aria-sort="descending"] .dt-sort-ind 
 th[aria-sort="ascending"] .dt-sort-ind::before { content: "▲"; }
 th[aria-sort="descending"] .dt-sort-ind::before { content: "▼"; }
 th.dt-sortable[aria-sort="none"] .dt-sort-ind::before { content: "⇅"; }
-th.dt-sortable.is-locked-sort { cursor: default; }        /* 詳細ソート中は単一列ソート無効 */
+th.dt-sortable.is-locked-sort { cursor: default; }        /* 複数キー並び替え中は単一列ソート無効 */
 th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 
 /* --- 行固定（ピン）＋固定ヘッダー配下に貼り付き --- */
@@ -1228,10 +1235,6 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-cards--compact .dt-card { padding: var(--space-3); }
 .dt-cards--compact .dt-card__meta { margin-top: var(--space-1); }
 .dt-cards--compact .dt-card__stats { margin-top: var(--space-2); }
-/* カード表示中の単一並び替えセレクト（テーブルの見出しクリック相当をツールバーで代替）。
-   ラベルは持たず、コンボのプレースホルダー（未選択時の先頭 option「並び替え」）で示す。 */
-.dt-cardsort { display: inline-flex; align-items: center; font-size: var(--text-sm); white-space: nowrap; }
-.dt-cardsort select:has(option[value=""]:checked) { color: var(--color-text-muted); }  /* 未選択＝プレースホルダー風に淡色 */
 
 /* --- 列設定メニュー（ポップオーバー：表示/非表示＋並べ替え＋幅リセット） --- */
 .col-menu { position: fixed; z-index: 90; min-width: 240px; max-height: 70vh; overflow: auto; background: var(--color-surface);
@@ -1248,7 +1251,7 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .col-menu__ord button:disabled { opacity: .35; cursor: default; }
 .col-menu__foot { display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--color-border); margin-top: var(--space-2); padding-top: var(--space-2); }
 
-/* --- 詳細ソート・ビルダー（2ペイン transfer） --- */
+/* --- 並び替えビルダー（複数キー・2ペイン transfer） --- */
 .sort-builder { display: flex; gap: var(--space-4); }
 .sort-builder__pane { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-alt); display: flex; flex-direction: column; }
 .sort-builder__title { font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
@@ -1272,7 +1275,7 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   .sort-avail, .sort-key, .dt-flip { transition: none; }
 }
 
-/* --- 詳細絞込ダイアログ --- */
+/* --- 絞り込みダイアログ --- */
 .filter-form { display: flex; flex-direction: column; gap: var(--space-4); }
 .filter-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
 /* 区分（enum）の絞込は縦並び＋十分な間隔（チェックボックスと文字の近接を防ぐ） */
