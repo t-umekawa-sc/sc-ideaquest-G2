@@ -21,8 +21,10 @@ test("A-TC-021 logout from header returns to login", async ({ page }) => {
   await login(page);
   // ユーザーメニューを開く（トリガーは display_name を含むボタン）
   await page.getByRole("button", { name: /テスト 太郎/ }).click();
-  // 「全端末からログアウト」も「ログアウト」を部分一致で含むため exact で現端末のみを選ぶ。
-  await page.getByRole("menuitem", { name: "ログアウト", exact: true }).click();
+  // 「全端末からログアウト」も「ログアウト」を含むため、可視テキスト完全一致で現端末のみを選ぶ。
+  // （項目の accessible name には装飾カーソル ▶（design-system.css の ::before）が混入するため、
+  //  accessible name の exact 一致ではなく innerText ベースの hasText を使う。）
+  await page.getByRole("menuitem").filter({ hasText: /^ログアウト$/ }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.locator("#company_code")).toBeVisible();
 });
