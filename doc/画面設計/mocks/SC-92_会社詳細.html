@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SC-92 会社詳細 / 設定（システム管理） — ideaquest</title>
+<title>会社詳細 / 設定（システム管理） — ideaquest</title>
 <link rel="stylesheet" href="shared.css">
 <style>
   /* SC-92 固有スタイル（共通化する見た目は shared.css へ昇格する）
@@ -367,7 +367,7 @@
   renderIcon(document.getElementById('ctxIcon'));
   document.getElementById('ctxName').textContent = CO.name;
   document.getElementById('crumbName').textContent = CO.name;
-  document.title = 'SC-92 ' + CO.name + ' の管理 — ideaquest';
+  document.title = CO.name + ' の管理 — ideaquest';
   const [stLabel, stCls] = ST_CO[CO.state];
   const ctxState = document.getElementById('ctxState'); ctxState.textContent = stLabel; ctxState.className = 'badge ' + stCls;
   document.getElementById('ctxCode').textContent = 'コード: ' + CO.code;
