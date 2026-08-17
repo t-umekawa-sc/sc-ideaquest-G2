@@ -166,7 +166,7 @@ export interface paths {
         };
         /**
          * List Companies
-         * @description 会社一覧（SC-91・system_admin 専用）。
+         * @description 会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ/CSV/固定行 契約（§1.8.1①②③④）。
          */
         get: operations["list_companies_api_v1_admin_companies_get"];
         put?: never;
@@ -912,6 +912,11 @@ export interface components {
         CompanyListResponse: {
             /** Data */
             data: components["schemas"]["CompanyListItem"][];
+            /**
+             * Pinned
+             * @default []
+             */
+            pinned: components["schemas"]["CompanyListItem"][];
             page_info: components["schemas"]["PageInfo"];
         };
         /**
@@ -1545,6 +1550,12 @@ export interface operations {
             query?: {
                 q?: string | null;
                 status?: string | null;
+                sort?: string | null;
+                account_count_min?: number | null;
+                account_count_max?: number | null;
+                format?: string | null;
+                columns?: string | null;
+                pin_ids?: string | null;
                 page?: number;
                 per_page?: number;
             };

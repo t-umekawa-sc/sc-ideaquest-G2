@@ -36,6 +36,29 @@ export type ColumnFilter =
   | { type: "number" }
   | { type: "date" };
 
+// ---- サーバー駆動モード（§1.8.1 DataTable クエリ契約の委譲境界） --------------
+// server プロップがあるとき、DataTable は computeRows()／ローカルページングをバイパスし、
+// query(state) が返す {rows,total,pinned} をそのまま描画する（並び/絞込/件数/ページ/ピンは
+// サーバーが確定）。state→クエリ文字列の変換は呼び出し側（feature の api）が担う＝DataTable は
+// ドメイン非依存を保つ（コーディング規約 §4.1）。正＝doc/API設計/README.md §1.8.1。
+export type QueryState = {
+  search: string; // トリム済み横断検索（→ ?q=）
+  sort: SortKey[]; // 複数ソート（左優先・desc は - 前置）
+  filters: Record<string, FilterCond>; // 項目別フィルタ（列 key ごと）
+  page: number;
+  perPage: number;
+  pinIds: string[]; // 固定行 ID（localStorage 由来・ページ跨ぎ解決用）
+};
+export type ServerResult<T> = {
+  rows: T[]; // 現ページの非固定行（サーバーが並び/絞込/ページング済み）
+  total: number; // 非固定母集合の総件数（件数バッジ・ページャの元）
+  pinned?: T[]; // 固定行（ページ/絞込に関係なく解決・既定 []）
+};
+export type DataTableServer<T> = {
+  query: (state: QueryState, signal: AbortSignal) => Promise<ServerResult<T>>;
+  onExport?: (state: QueryState, columns: string[]) => void; // 表示中データ列 key（表示順）
+};
+
 // カード表示（cardLayout）の標準構造ヘルパ。
 export type CardLayout = {
   title?: ReactNode;
