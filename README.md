@@ -29,6 +29,9 @@ docker compose up --build
 | backend（FastAPI） | http://localhost:8000 | API。ヘルスチェック http://localhost:8000/healthz |
 | db（PostgreSQL 16） | localhost:5432 | 管理DB `ideaquest_control` ＋ 会社DB `ideaquest_company_acme` |
 | redis | localhost:6379 | セッション／レート制限 等 |
+| mailhog（開発用 SMTP） | http://localhost:8025 | **送信メールの確認（Web UI）**。OTP・初回パスワード設定リンク等の受信トレイ |
+
+> **送信メールを MailHog で受け取るには常駐ワーカが必要**＝`docker compose --profile workers up`（`mail-worker` が `mail_outbox` を MailHog へ非同期配信する）。ワーカ無しの起動ではメールは `mail_outbox` に溜まり MailHog UI には出ない（[`impl/backend/README.md`](impl/backend/README.md) 参照）。
 
 ポートや資格情報は `impl/.env`（雛形＝`impl/.env.example`）で変更できる。設定項目の一覧・意味・dev 既定値は追跡対象の [`impl/.env.example`](impl/.env.example)（コメント付き）を正とする。**env に置くか DB に置くか・どれが秘匿か・本番でのシークレット供給方法**の方針は [`doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md`](doc/ADR/ADR-0003_設定と秘匿情報の置き場所.md) を参照。
 
