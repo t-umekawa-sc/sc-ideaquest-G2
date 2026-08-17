@@ -4,24 +4,26 @@
 > 読者は「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。詳細仕様は必ず `doc/要件定義/README.md`（唯一の要件定義書）・`doc/API設計/`・`doc/ADR/`・`doc/データモデル.md`・`doc/テスト/`・`doc/規約/`・`doc/画面設計/` を正とすること（本 handoff は要約）。
 > 毎回このファイルは全文を上書きする（履歴は git に任せる）。
 >
-> **現在地（2026-08-17）＝(D) UI標準/モック精度の中の (D-d) mocks→impl 反映を実施中。本セッションは前セッションまでと異なり `impl/frontend` を変更した（`doc/画面設計` の作り込みは完了扱い）。本セッションの主題＝(D-d) を4スライスに分割し ①CSS同期 ②DataTable.tsx（React/TS 版・全機能）④用語/補足の impl 反映 を完了。残りは ③統合（DataTable を実画面に載せ替え・唯一の大物・Docker 検証が必要）。**
+> **現在地（2026-08-17）＝(D) UI標準/モック精度の中の (D-d) mocks→impl 反映。本セッションで (D-d ③) DataTable を管理系実画面へ載せ替え＝5画面すべて DataTable 化を完了し、§5 の「会社作成状態」設計⇔backend 矛盾も解決した。①CSS同期・②DataTable.tsx・④用語/補足 impl 反映は前セッションで完了済み。したがって (D-d) の主要作業は一通り完了。次の主眼は「一覧APIのクエリ契約（backend §4.5）」または他ドメインの画面群移植（別セッション）。**
 
 ---
 
 ## 1. 最終更新日時 / ブランチ / 最新コミット
 
 - 最終更新: **2026-08-17（本セッション終了時）**。
-- ブランチ: **main**。**origin/main より 4 コミット ahead＝本セッション分は未 push**（`git rev-list --left-right --count origin/main...HEAD` ＝ `0  4`）。**push はユーザー依頼時のみ**の運用のため本セッションは push していない。次回まず push 要否を確認。
-- 最新コミット: **`e15f51e`**（(D-d ④) 用語/補足の impl 反映）。
-- 本セッションの起点＝**`c5cf660`**（前セッション末の handoff コミット）。
-- **本セッションのコミット（新しい順・`git log c5cf660..HEAD`）**:
-  - `e15f51e` **(D-d ④) 用語/補足の impl 反映**＝会社状態2値化（準備中→有効/停止）・可視画面ID除去・`.st-provisioning` 撤去。詳細 §3-④。
-  - `2896500` **(D-d ②b–②d) DataTable 全機能**＝適用中チップ/絞込ダイアログ/複数キー並び替え/列設定/リサイズ/CSV/localStorage永続/ピン/カード切替/クリック標準。詳細 §3-②。
-  - `d0fc2dc` **(D-d ②a) DataTable.tsx 中核**＝型/compute/描画/単一ソート/ページャ/密度。詳細 §3-②。
-  - `4fa1807` **(D-d) CSS同期**＝`impl/.../design-system.css` に `mocks/shared.css` の §9y（DataTable標準・195行）を移植。詳細 §3-①。
+- ブランチ: **main**。**origin/main と同期済み（0/0）＝本セッション分は push 済み**（`git rev-list --left-right --count origin/main...HEAD` ＝ `0 0`）。次回まず push 要否の確認は不要。
+- 最新コミット: **`8a9ef5c`**（(D-d ③) QuestGroupAdminView(SC-90) を DataTable へ横展開＝§7 横展開 完了）。
+- 本セッションの起点＝**`d0600bb`**（前セッション末の handoff コミット）。
+- **本セッションのコミット（新しい順・`git log d0600bb..HEAD`・すべて push 済み）**:
+  - `8a9ef5c` **(D-d ③) QuestGroupAdminView(SC-90)** を DataTable 化＝メンバー表。§4.5⑪ メンバー行はクリック割当なし（onRowClick 無し）。詳細 §3。
+  - `5f39253` **(D-d ③) QuestGroupSection(SC-92)** を DataTable 化＋**DataTable セクション全幅化**（`.admin-create--table`）。詳細 §3。
+  - `228af68` **(D-d ③) AccountSelfSection(SC-93)** を DataTable 化＋**旧一覧依存（`useAccountList`/`AccountsToolbar`）を削除**。sys_admin 行は 🔒（SoD）。詳細 §3。
+  - `b2668fe` **(D-d ③) AccountSection(SC-92)** を DataTable 化＋共有フック `useAllAccounts` 新設。詳細 §3。
+  - `a700e4b` **(D-d ③) CompanyList(SC-91)** を DataTable 化（横展開の1本目）。詳細 §3。
+  - `61ac62c` **(D-d 申し送り) 会社作成状態の設計⇔backend 矛盾を解決**＝backend（作成=停止 `suspended`）を正とし、設計文書を訂正。詳細 §5。
 - コミットは **1変更＝1コミット**、末尾 `Co-Authored-By: Claude Opus 4.8`。
 - remote: `https://github.com/t-umekawa-sc/sc-ideaquest-G2.git`。
-- **作業ツリーの未追跡ファイル**＝`impl/frontend/package-lock.json`（ローカル `npm install` の副産物。このリポは lock 非追跡運用＝コミットしない）。`node_modules/` は gitignore 済み。tsc を回すために残置してよい。
+- **作業ツリーの未追跡ファイル**＝`impl/frontend/package-lock.json`・`impl/frontend/tsconfig.tsbuildinfo`（ローカル `npm install`／`tsc` の副産物。このリポは lock・tsbuildinfo 非追跡運用＝コミットしない）。`node_modules/` は gitignore 済み。
 
 ---
 
@@ -29,129 +31,114 @@
 
 - **ideaquest**＝社内アイデア創出をゲーミフィケーション（XP/コイン/レベル/魔法/ランキング）で促す WEB アプリ（マルチテナント SaaS・**管理DB1＋会社DB N** の2プレーン）。
 - スタック＝フロント Next.js(App Router)／バック FastAPI(4層)／PostgreSQL(会社DBのみ PGroonga)／Redis／MinIO／MailHog(dev)／Docker。
-- 設計フェーズは **API設計 A〜L・画面設計 SC-00〜93・データモデル 全確定**。現在はフロント＝「画面モック先行 → 画面群ごとに backend 接続」方針。**mocks は完成域**に達し、いまは **mocks→impl の反映（D-d）**フェーズ。
+- 設計フェーズは **API設計 A〜L・画面設計 SC-00〜93・データモデル 全確定**。現在はフロント＝「画面モック先行 → 画面群ごとに backend 接続」方針。**mocks は完成域**に達し、いまは **mocks→impl の反映（D-d）**フェーズで、うち **③ DataTable 統合＝完了**。
 
 ---
 
 ## 3. 今回やったこと — 変更したファイルと理由
 
-**本セッションで変更したのは全て `impl/frontend` 配下（`doc/` は無変更・`impl/backend` も無変更）。** 検証は `impl/frontend` で `npm install`（lock 無しのため `npm ci` 不可）→ `node_modules/.bin/tsc --noEmit`＝各段階でエラー0を実測。
+**本セッションで変更したのは主に `impl/frontend` 配下＋設計文書（§5）。`impl/backend` は docstring のみ（挙動不変）。** 検証は各コミットで `impl/frontend` の `tsc --noEmit`＝0 を実測＋**Docker 起動で管理系 e2e 16件 全 green**＋目視スクショでモック一致を確認（§4）。
 
-### ① CSS同期（`4fa1807`）
-- **背景**＝`impl/.../styles/design-system.css`（1057行）は `mocks/shared.css`（1299行）の**古い部分集合**で、DataTable 用の **`9y. 一覧の操作標準（DataTable）` セクション（約195行）が丸ごと欠落**していた（全差分を突合し確認）。
-- **やったこと**＝shared.css の 9y セクション（1097–1291行）を design-system.css の `10. レスポンシブ` 直前へ**忠実に splice**（195行完全一致・ブレース収支0を実測）。`--dt-ctl-h`・`.dt-search__ic`・適用中チップ集約・`.dt-chip--clear`・カード切替・`.dt-pin-float`・`.dt-cardraw`・`.dt-row--link`・列設定/並び替えビルダー/絞込/密度/番号ページャを含む。**純追加のみ＝既存画面ゼロ影響**（当時 DataTable.tsx 未実装で未使用）。
-- **見送った差分（意図的）**＝DataTable 無関係の design-system ドリフト（グローバル `[hidden]`・usermenu 開閉アニメ・▶ピクセルカーソルメニュー）は出荷済み header/auth に触れるため本 slice に含めず。`.st-provisioning`（会社状態「準備中」）は当時 impl が現用中だったため残置し、**④で撤去**。
+### ①（前セッション完了）CSS同期 / ②（前セッション完了）DataTable.tsx / ④（前セッション完了）用語 impl 反映
+- 本セッションでは無変更（`impl/.../components/ui/DataTable.tsx`・`design-system.css §9y` は前セッションの成果を利用）。
 
-### ② DataTable.tsx（`d0fc2dc` ②a ＋ `2896500` ②b–②d）
-- **`impl/frontend/src/components/ui/DataTable.tsx`（新規・約1229行）**＝`mocks/shared.js` の `window.DataTable`（挙動の正・491–1004行）を **Next.js/TS の generic `<T>` client component** へ移植。`index.ts` からエクスポート。
-- **意図的な React 化差分（重要）**:
-  - 列/カードの `render`/`card`/`cardRaw` は **HTML 文字列でなく `ReactNode` を返す**（`innerHTML` 不使用＝XSS 安全）。→ **操作列（`actions`）は消費側が `render` で `<RowMenu>` 等を渡す**（DataTable は RowMenu に非依存）。
-  - パイプライン（検索→絞込→ソート→ピン分離）は**純関数 `computeRows()` に分離**＝将来 backend 委譲へ差し替え可能。ページ分割は呼び出し側。
-  - ソート/絞込ダイアログは mock の自作 `dialog()` でなく**既存 `Modal`（`ModalBody`/`ModalFooter`）を再利用**。並び替えビルダーの **FLIP アニメは意図的に省略**。
-  - **CSV セルは `csvVal`／`sortVal` から生成**（`render` の ReactNode は文字化できない＝render のみの列は `csvVal` を渡す）。CSV は `filtered`（ピン除外）＝mock と一致。
-- **②a 中核**＝型（`DataTableColumn/DataTableProps/SortKey/FilterCond/ColumnFilter/CardLayout` を全 slice 分先出し）・`computeRows()`・テーブル描画・見出しクリック単一ソート（`aria-sort`）・番号ページャ・件数/空表示・密度・検索。
-- **②b–②d 全機能**＝適用中チップ（検索・並び替え・絞込を全てチップ化＋右端「すべてクリア」）・件数バッジ・絞込ダイアログ（項目別 text/enum/number/date）・複数キー並び替え（2ペイン）／列設定ポップオーバー（表示/並べ替え/幅リセット/既定に戻す）・列幅リサイズ（ドラッグ・ダブルクリックで解除）・CSV・**localStorage 永続**（接頭辞 `ideaquest_dt_`・order/hidden/widths/density/pins/perPage/view。復元は `ready` ゲートで既定上書きを防止・検索/ソート/絞込/ページはセッション非永続）／ピン（最大件数＋段積み sticky `--dt-row-top` を `useLayoutEffect` で算出）・カード/リスト切替（card/cardLayout/cardRaw）・クリック標準§4.5⑪（`a,button,input,select,label` 上は主アクション無効・ピンは stopPropagation・カードは Enter/Space）。
-- **敵対的レビュー**（shared.js と全挙動を突合）で検出2件を修正済み: ①番号ページャの `«`先頭/`»`末尾ボタン欠落→復元 ②検索チップのトリム（入力欄は生値のまま＝内部空白を打てる・チップ判定/表示のみトリム）。**その他はパイプライン/クランプ/ソート/絞込/列/永続/ピン/クリック標準まで shared.js と一致を確認**。
+### ③ DataTable を管理系5画面へ載せ替え（本セッションの主作業・§7 横展開）
+すべて **client モード**＝一覧の操作標準（検索/絞込/複数ソート/列設定/CSV/ピン/カード切替・§4.5）を DataTable に委譲し、**データは全件クライアント保持**（管理系＝小規模）。仕様の正＝`doc/画面設計/mocks/*.html` の `window.DataTable.init` 設定（DoD＝モック一致）。
 
-### ③（未着手）— §7 参照。
+- **CompanyList(SC-91)**（`a700e4b`）＝`src/features/companies/components/CompanyList.tsx`。素の table＋toolbar＋Pager を `<DataTable>` に置換。全件取得＝`listCompanies` を `per_page=100` ループ。列＝会社名(QuestIcon)/コード/DB識別子/状態(enum 有効・停止)/アカウント(number)/グループ・作成日(—・`CompanyListItem` 未提供)/操作列(管理する →)。`onRowClick`＝会社詳細へ。
+- **AccountSection(SC-92)**（`b2668fe`）＝`src/features/accounts/components/AccountSection.tsx`。**共有フック `src/features/accounts/useAllAccounts.ts` を新設**（`per_page=100` ループ・SC-92/93 共用）。列＝氏名(Avatar)/ログインID/メール/システムロール(enum)/所属グループ(—・list未提供)/状態(enum 有効・無効)/操作(RowMenu ⋯)。**操作可否は既存 impl を保持**（active＝所属・編集/PW再設定/無効化、disabled＝再有効化）＝UI枠の移植で backend 操作可否は変えない。`onRowClick`＝編集(active のみ・無効行は §4.5⑪ 割当なし)。
+- **AccountSelfSection(SC-93)**（`228af68`）＝`src/features/accounts/components/AccountSelfSection.tsx`。`useAllAccounts(listOwnAccounts)` を再利用。**system_admin 行は操作不可＝🔒（`row-locked`）・クリック割当なし（`is-rowlocked`・SoD＝SC-92 で管理）**。両アカウント画面が DataTable 化されたので**未使用の `useAccountList.ts`／`AccountsToolbar.tsx` を削除**（DRY）。`companies.css` に `.is-rowlocked` を追加（sys_admin 行の指カーソル/ホバー抑止）。状態バッジ class は DS を正として `st-active`/`st-suspended`（SC-93 mock の `st-disabled` は DS 未定義のドリフト＝不採用）。
+- **QuestGroupSection(SC-92)**（`5f39253`）＝`src/features/questgroups/components/QuestGroupSection.tsx`。`listQuestGroups` は全件返す。列＝グループ名/コード/メンバー数(N 名)/操作(RowMenu リネーム・削除)。`onRowClick`＝リネーム(§4.5⑪ 主アクション)。**レイアウト修正**＝`.admin-create` の `max-width:520px`（作成フォーム向け）が DataTable ツールバーを窮屈にしたため `.admin-create--table`(max-width:none) を `companies.css` に新設し **QuestGroup/Account セクションへ付与**＝全幅描画。
+- **QuestGroupAdminView(SC-90)**（`8a9ef5c`）＝`src/features/qgadmin/components/QuestGroupAdminView.tsx`。メンバー表を `<DataTable>` に置換。列＝氏名(Avatar)/グループ内ロール(enum 管理者・メンバー)/操作(RowMenu 除外)。**`onRowClick` を渡さない**（§4.5⑪ SC-90 メンバー行はクリック割当なし）。backend `MemberListItem` は最小射影（氏名・ロールのみ／ログインID・参加日は非提供）＝mock の loginId/参加日でなく実データの role 列を表示。ディレクトリ・ピッカー（メンバー追加モーダル）は簡易テーブルのまま（mock 同様）。
 
-### ④ 用語/補足の impl 反映（`e15f51e`）
-- **根拠**＝mocks/screens で確定済みの D-c 用語点検（会社状態2値）・補足文ユーザー向け化。今回それを impl の**可視サーフェス**へ反映。
-- **会社状態を2値（active=有効/suspended=停止）**に統一＝「準備中」を全除去。`CompanyList.tsx`（状態バッジ `st-provisioning 準備中`→`st-suspended 停止`・状態フィルタ `準備中`→`停止`）、`CompanyDetailView.tsx`（active 以外→停止）。
-- **会社作成注記をユーザー向けに刷新**＝dev ジャーゴン（プロビジョニング/compose/up/.env/物理分離）を除去。**⚠作成時状態は backend 実態に整合させた**（§5 の矛盾参照）。
-- **可視 SC-id を除去**＝`CompanyList`（補足×2）・`AccountSelfSection`（行注記「SC-92」）・`@modal/(.)quests/new/page.tsx`（モーダル見出し「（SC-11）」＋ Parallel/Intercept ジャーゴン注記）。残る SC-id は**非可視のコード注記（`//`・`{/* */}`）のみ**。
-- **`design-system.css` から `.st-provisioning` を撤去**（impl 未使用化に伴い・①で残置した用語ドリフトを解消。コメントも「有効/停止＝2値」へ）＝shared.css と一致。
-- 実測＝可視 SC-id/準備中/st-provisioning の残存ゼロ・tsc エラー0。
+### ⑤ 設計⇔backend 矛盾の解決（`61ac62c`・§5 の詳細参照）
+- **会社作成時の状態**を **backend の実装（作成＝`suspended`=停止）を正**とし、設計文書側（SC-91 §4.2/§5/§6・データモデル §4.1 注記・デザイン標準 L236・API設計 B.1・テスト B-TC-111）を「作成時=停止→プロビジョニング完了後に運営が有効化」へ訂正。あわせて④で不採用の「準備中」語を「停止」へ揃えた。**この矛盾は解決済み**（次セッションでの再判断は不要）。
 
 ---
 
 ## 4. 現在の状態 — 動いているもの / 壊れているもの / テスト
 
-- **DataTable.tsx＝実装完了・型健全（tsc 0）だが未統合・ランタイム未検証**。実画面にまだ載っていない（③）。単体テスト基盤は無い（frontend のテストは Playwright e2e のみ）ので、**型チェック＋shared.js との突合レビュー**が現状の検証。目視/ランタイム/e2e は③で Docker 起動時にまとめて。
-- **DataTable の使い方（③で必要・要点）**:
+- **管理系5画面すべて DataTable 化・型健全（tsc 0）・ランタイム検証済み**（Docker 起動で目視＋e2e）。
+- **DataTable client モードの使い方（横展開の要点・今後の別画面でも同様）**:
   - `import { DataTable } from "@/components/ui"`。`<DataTable<Row> storageKey="…" data={rows} columns={cols} …/>`。
-  - `columns`＝`{ key,label,locked?,width?,sortable?,align?:'num',hiddenDefault?,actions?,cellClass?,filter?:{type,options?},render?:(r)=>ReactNode,sortVal?,searchVal?,filterVal?,csvVal? }`。
-  - props＝`storageKey,data,columns,rowId?,unit?,perPage?,perPageOptions?,maxPins?,searchFields?,searchPlaceholder?,exportName?,onRowClick?,emptyText?,rowClass?,pins?,defaultView?,card?/cardLayout?/cardRaw?`。
-  - **操作列**は `columns` に `{actions:true, render:(r)=><RowMenu items={…}/>}` を1本入れる。
-  - **クリック標準**＝`onRowClick` を渡すと行/カードが `.dt-row--link`/`.dt-card--link`。`a,button,input,select,label` 上のクリックは主アクション化しない。
-- **CSS**＝design-system.css は §9y 同期済み＋会社状態バッジ2値化済み（shared.css と一致）。
-- **impl backend／その他 frontend 画面＝本セッション無変更**。
-- **テスト実測**＝**frontend `tsc --noEmit`＝エラー0（本セッション・全プロジェクト）**。**e2e / backend pytest は本セッション未実行**（impl backend 無変更・frontend は tsc のみ。前セッション値 e2e 26 passed・pytest 164 passed は**未再確認**）。**Docker 起動せず**。
-- **壊れているもの＝無し**（確認した範囲。DataTable は未統合ゆえ既存画面に影響しない）。
-- migration head＝前セッション記載のまま（control **0010**・company **0006**）。impl backend 無変更のため不変。
+  - 全件取得＝一覧APIを `per_page=100` でループ（会社は `listCompanies`、アカウントは共有フック `useAllAccounts`、グループ/メンバーは単一 EP が全件返す）。
+  - **操作列**＝`columns` に `{ actions:true, render:(r)=><RowMenu items={…}/> }`。破壊的/条件付きアクションは RowMenu の items で出し分け。
+  - **クリック標準§4.5⑪**＝主アクションがあれば `onRowClick` を渡す。無効行・SoD ロック行・SC-90 メンバー行は**割当なし**（`onRowClick` を渡さない or 内部で guard、`rowClass` で `is-suspended`/`is-rowlocked`）。
+  - DataTable 内部の localStorage 復元エフェクトは依存 `[storageKey]` のみ＝**columns を毎レンダー生成しても状態は壊れない**（インライン定義で可）。
+- **CSS**＝`design-system.css` は §9y 同期済み。`companies.css` に本セッションで `.is-rowlocked`（sys_admin 行クリック抑止）と `.admin-create--table`（DataTable セクション全幅）を追加。
+- **テスト実測（本セッション・Docker 起動で実行）**＝**frontend `tsc --noEmit`＝エラー0**。**管理系 e2e 16件すべて passed**（`sc-90/91/92/92b/92b2/92c/93`）。**backend pytest は本セッション未実行**（backend は docstring のみ変更＝挙動不変。前セッション値 164 passed は未再確認）。
+- **e2e の変更点（DataTable 化に伴い更新）**＝検索は DataTable のライブ検索（`getByRole("searchbox")`・「検索」ボタンなし）／件数は `list-count`「N 件」（旧「（N 件）」から変更）／絞込クリアは「すべてクリア」／行操作は RowMenu（⋯＝aria「操作」→menuitem）。発行/編集後の reload 再マウント競合は `expect(async()=>…).toPass()` で吸収。**RowMenu（`position:fixed`）の再配置ジッタ**でクリックが揺れる場合は「行を可視化→menuitem 可視アサート→`click({force:true})`」で安定（sc-92c で実証）。
+- **壊れているもの＝無し**（確認範囲）。
+- migration head＝**control 0010・company 0006**（前セッションから不変。backend 無変更）。
+- **Docker は起動したまま**（本セッション末）。DB には e2e 由来の残骸（多数の `E2E-*` 会社・`ideaquest_e2e_*` 会社DB・発行アカウント）が蓄積している＝テスト用途で無害だが、必要なら `cd impl && docker compose down -v` でボリューム初期化可。
 
 ---
 
 ## 5. 詰まっている点 — 失敗したアプローチと理由 / 要判断
 
-- **⚠最重要の申し送り＝会社作成時の状態が「設計⇔backend 実装」で矛盾**:
-  - **設計（正）**＝`mocks/SC-91` の provision-note・`screens/SC-91` §5・`データモデル.md`（`companies.status default active`）＝**作成時＝有効（active）**、会社DB未整備の間は「停止」（メンテ）へ切替。
-  - **backend 実装**＝`impl/backend/.../admin/company_application.py`・`router.py:71`・`features/companies/api.ts:26`＝会社作成は **`status=suspended`（＝停止）で行を作るのみ**（DBプロビジョニングは手動MVP）。frontend は作成時に status を送らない。→ **新規作成した会社は observably「停止」で現れる**。
-  - **本セッションの対応**＝フロントのみのため、注記は **backend 実態（作成直後=停止→準備後に有効）**に合わせた（ユーザー選択）。**設計/backend いずれを正とするかの整合は未決＝次セッションで要判断**（「設計を正」なら backend を active 作成へ／backend を正とするなら設計注記を停止始まりへ更新）。
-- **ローカル tsc の回し方**＝`impl/frontend` に **package-lock.json が無い**ため `npm ci` は EUSAGE で失敗。**`npm install`** で node_modules を生成（Node 22/npm 10 ローカル可）→ `node_modules/.bin/tsc --noEmit`。`tsc` は devDependency だが lock 無しだと未導入になるので install 必須。単体 `eslint` は本プロジェクトが `next lint`（旧 .eslintrc）構成のため flat config 不在で起動不可＝未実行。
-- **DataTable の React 化で外せない点**＝`render` は ReactNode（HTML文字列でない）。CSV は `csvVal`/`sortVal` から（render から文字を抜けない）。localStorage 復元は `ready` ゲートで「復元前の既定上書き」を防ぐ（この順序を崩すと保存が既定で潰れる）。
-- **③統合の設計フォーク（未決・③着手時に判断）**＝既存の実画面（`CompanyList`/`AccountSection`）は **backend 駆動（`listCompanies` 等でサーバーページング・page_info）**。DataTable は **全件クライアント保持**（mock と同じ）。統合方針は2択＝(a) 一覧APIから**全件取得**して DataTable にクライアント処理させる（mock 一致・管理系は件数小で妥当）／(b) サーバーページングを維持し DataTable を表示のみに使う（ただし DataTable の compute/ページャ前提と食い違う）。**mock は全件クライアント保持なので原則 (a)**。backend の一覧クエリ契約（複数ソート/項目別フィルタ/CSV/ピンID）は §4.5 が将来要求するが**別セッション**（今回フロントのみ）。
+- **§5 会社作成状態の矛盾＝本セッションで解決済み（再判断不要）**。決定＝**backend を正（作成時=`suspended`=停止）**。理由＝MVP はDBプロビジョニングが手動で作成時点の会社DBが常に未整備＝active 始まりは運用上破綻（未整備DBへのログインが 503 で綺麗に弾けない）、かつ backend/テスト/frontend が既に suspended 側で「負ける側が最小＝設計文書の記述のみ」。データモデルのカラム既定 `active` は残置し、会社作成 API が明示的に `suspended` を渡す旨を注記（`61ac62c`）。
+- **③統合のデータ供給方式＝(a) 全件クライアント処理を採用（決定済み）**。調査結論＝管理系（会社・アカウント・グループ・メンバー）は小規模で (a) が妥当。**アイデア一覧(SC-12)・クエスト一覧(SC-10)は (a) 不適**＝PGroonga 全文検索がサーバー専用・カーソルページング・件数無制限（`doc/API設計/J_全文検索.md`・`D.1`・`C.1`）。→ **これらは DataTable 統合の対象外で、既存のサーバー駆動コンポーネントのまま据え置き**。
+- **DataTable のサーバー駆動モード＝将来拡張（未実装・gated）**。`computeRows()` を純関数境界として、`data:T[]` の代わりに `query(state)=>{rows,total}` を委譲する形へ差し替え可能に設計してある（列順/表示/密度/幅/ピンの表示状態は localStorage のまま）。**今は作らない**＝(1) 委譲先の backend §4.5 契約（複数ソート/項目別フィルタ/CSVエクスポートEP/ピンID）が未実装、(2) アイデア/クエストは対象外、(3) YAGNI。実装は「backend §4.5 セッション」とセットで別途。
+- **ローカル tsc の回し方**＝`impl/frontend` に **package-lock.json が無い**ため `npm ci` は失敗。**`npm install`** で node_modules 生成 → `node_modules/.bin/tsc --noEmit`。単体 eslint は flat config 不在で未実行。
+- **e2e の実行にはコンテナ再ビルドが必要**＝`impl/frontend` は src・e2e を**イメージに焼き込む（ボリュームマウント無し）**。src を変えたら `docker compose up -d --build frontend`。**再ビルドすると chromium が消える**ので毎回 `playwright install-deps chromium` ＋ `install chromium` が要る。**e2e spec だけの変更**なら再ビルド不要＝`docker compose cp frontend/e2e/xxx.spec.ts frontend:/app/e2e/xxx.spec.ts` でコピーして実行。
 
 ---
 
 ## 6. 決定事項と根拠（採用しなかった案も）
 
 ### 本セッション
-- **CSS同期は DataTable の §9y のみ移植**（不採用＝shared.css 全面ミラー）。理由＝handoff の同期対象は §9y の DataTable クラス群で、usermenu/pixel/`[hidden]` は無関係ドリフト＝出荷済みコンポーネントに触れ回帰リスク。
-- **DataTable は忠実クライアント側ポート＋`compute` 分離**（不採用＝最初からサーバー駆動の controlled component）。理由＝backend が今回スコープ外＝controlled では動かせない・handoff が `window.DataTable` を仕様の正と明記・mock も対象画面を全件クライアント保持・DoD＝モック一致。`compute` を純関数化して将来の backend 委譲を安価にした。
-- **ダイアログは既存 Modal 再利用・操作列は消費側が RowMenu を渡す**（不採用＝mock の自作 dialog を移植）。理由＝impl 流儀に寄せ二重実装を避ける。
-- **会社作成注記は backend 実態（作成=停止）に整合**（不採用＝設計の「作成=有効」）。理由＝ユーザー選択＋今回フロントのみで observable 挙動と一致させる。設計/backend の恒久整合は §5 の申し送り。
-- **③統合は本セッション未着手で区切り**（Docker 検証が必要な大物のため次セッションへ）。
+- **会社作成状態は backend（作成=停止）を正**（不採用＝設計の「作成=有効」）。理由＝§5。handoff 一般原則「矛盾は設計を正」に逆行するが、運用実態・整合コスト・observable 挙動で backend が正当（ユーザー承認済み）。
+- **③は (a) 全件クライアント処理**（不採用＝(b) サーバーページング維持／サーバーモードの今実装）。理由＝管理系は小規模で mock 一致、サーバーモードは委譲先未実装で YAGNI（§5）。**アイデア/クエストは対象外**と明確化。
+- **操作可否セマンティクスは既存 impl を保持**（不採用＝mock のメニューをそのまま移植して disabled 行にも編集/PW を出す）。理由＝DataTable 化は UI 枠の移植であり backend 操作可否を変えるのはスコープ外。
+- **状態バッジ class は DS（`st-active`/`st-suspended`）を正**（不採用＝SC-93 mock の `st-disabled`）。理由＝`st-disabled` は shared.css/design-system.css に未定義のドリフト。
+- **`.admin-create--table` で DataTable セクションを全幅化**（不採用＝`.admin-create` の 520px を全画面で撤廃）。理由＝520px は作成フォーム向けで維持したい。
+- **e2e の RowMenu 操作は force クリック＋可視化待機で安定化**（不採用＝待機だけ）。理由＝RowMenu の `position:fixed` 再配置がクリック時スクロールで stability 再判定を揺らすため。
 
 ### 過去の確定（正は各設計文書。要約）
-- **DataTable ツールバー（刷新）**＝2段固定・クリアは「すべてクリア」1つ・適用中は全条件チップ化・段1同一高さ・list/card 共通「↕ 並び替え」（`デザイン標準.md §4.5`）。
-- **クリックの標準挙動＝§4.5 ⑪**（行/カードは常にクリック可・破壊的単一/無効行は割当なし）。**SC-90 メンバー行はクリック割当なし**。
-- **フロントエンド先行プロトタイプ**（画面群ごとに移植→接続）。**shared.css/shared.js を単一デザインシステム**（impl `design-system.css`/コンポーネントはその移植）。**モック⇔設計の矛盾は設計を正**。
-- 認証＝Cookie＋Redis 不透明セッション（ADR-0001）ほか。2プレーン×縦スライス4層。
+- **DataTable の挙動の正＝`mocks/shared.js` の `window.DataTable`**＋`デザイン標準.md §4.5`（⑪＝クリック標準）。React 化差分＝`render` は ReactNode（HTML文字列でない）／`compute` 分離／Modal・RowMenu 再利用／CSV は `csvVal`・`sortVal`／localStorage は `ready` ゲート。
+- **フロントエンド先行プロトタイプ**（画面群ごとに移植→接続）。**shared.css/shared.js を単一デザインシステム**（impl `design-system.css`/コンポーネントはその移植）。**モック⇔設計の矛盾は設計を正**（ただし §5 は設計⇔backend の別軸で backend を正とした）。
+- 認証＝Cookie＋Redis 不透明セッション（ADR-0001）。2プレーン×縦スライス4層。管理ロール3階層（system_admin / company_account_admin / QG管理者＝SoD）。
 
 ---
 
 ## 7. 次にやること — 優先順に、具体的に
 
-> 最優先＝**(D-d ③) DataTable を実画面に統合**（唯一の残り・大物）。①②④は本セッションで完了。
+> (D-d) の主要作業（①〜⑤＋③横展開）は完了。以降は別軸の作業。
 
-### (D-d ③) DataTable を impl 実画面へ載せ替え（大物・Docker 検証あり）
-1. **まず push 要否をユーザーに確認**（本セッションの4コミットは未 push）。
-2. **1画面から**着手を推奨＝`impl/frontend/src/features/companies/components/CompanyList.tsx`（現状は素の `<table>`＋別 toolbar＋`Pager`）。`<DataTable>` に載せ替え:
-   - `columns`＝会社名（`render` で `<QuestIcon>`＋名称）/会社コード/DB識別子/状態（`render` で `st-active|st-suspended` バッジ・`filter:enum [['active','有効'],['suspended','停止']]`）/アカウント/グループ/作成日/操作列（`actions:true`・`render:(r)=><Link>管理する →</Link>` 相当）。`onRowClick`＝会社詳細へ遷移（§4.5⑪）。
-   - **§5 の設計フォークを先に決める**＝(a) 全件取得してクライアント処理（mock 一致・推奨）か (b) サーバーページング維持か。(a) なら `listCompanies` を per_page 大 or 全件で取得し `data` に流す。
-3. **検証**＝ここで初めて Docker 起動（`cd impl && docker compose up -d --build`）→ frontend で目視（ツールバー・ソート・絞込・ページャ・列設定・ピン・カード）＋ **e2e 再実行**（既存の会社一覧 e2e が DataTable 化で壊れないか）＋ **tsc**。
-4. 他の一覧画面（`AccountSection`/`AccountSelfSection`/`QuestGroupSection`/`QuestGroupAdminView`）へ横展開。
+### 【最有力・別セッション】(A) 一覧APIのクエリ契約（backend・§4.5）＋ DataTable サーバーモード
+- backend（4層）に **複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得** を追加（`doc/API設計/§4.5` が将来要求）。test-first。
+- そのうえで DataTable に**サーバー駆動モード**を実装（`computeRows()` 境界に `query(state)=>{rows,total}` 委譲・表示状態は localStorage 維持）。これでアイデア一覧(SC-12)・クエスト一覧(SC-10)にも一覧の操作標準を適用できる。**backend 契約なしに先行実装しない**（§5）。
 
-### 【申し送り・要判断】設計⇔backend の会社作成状態（§5）
-- 「作成時=有効（設計）」か「作成時=停止（backend）」かを確定し、負けた側を修正（backend か設計注記か）。
+### 【別軸】(B) 他ドメインの画面群移植（mocks→impl）
+- ダッシュボード(SC-01)・クエスト(SC-10/11/12)・アイデア(SC-13〜)・チャット/魔法(SC-24)・評価・ゲーミフィケーション(SC-30/31/40)・ランキング等。フロントエンド実装フロー規約＝「画面モック先行→画面群ごとに backend 接続」。
 
-### 【別セッション】一覧APIのクエリ契約（backend・§4.5）
-- 複数ソートキー・項目別フィルタ・CSVエクスポートEP・ピンID取得を `impl/backend`（4層）に追加。§4.5 が要求。③で (a) を採ればしばらくクライアント処理で足りる。
+### 【任意】(C) handoff の DB 残骸クリーンアップ
+- e2e 蓄積の `E2E-*` 会社・`ideaquest_e2e_*` DB が気になるなら `cd impl && docker compose down -v` で初期化（seed から作り直し）。
 
-### 【保留】(A) 管理系 impl 整合 / (B) 画面群移植
-- いずれも本セッション未着手。
+### 【確認】backend pytest の再確認
+- 本セッション backend 挙動は不変だが、pytest（前回 164 passed）は未再実行。気になれば §8 の手順で回す。
 
 ---
 
 ## 8. 再開に必要な環境情報
 
-- **frontend の型チェック（本セッションの主検証・Docker 不要）**＝`cd impl/frontend && npm install`（**lock 無しのため `npm ci` は不可**）→ `node_modules/.bin/tsc --noEmit`。`node_modules/`・`package-lock.json` は未追跡（コミットしない）。
-- **impl フル起動（③で必要）**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／mailhog `:1025`/`:8025`／backend `:8000`／frontend `:3000`。
-- **frontend 型チェック（Docker 版）**＝`cd impl && docker compose run --rm --no-deps -T -v "$PWD/frontend/src:/app/src" frontend node_modules/.bin/tsc --noEmit`。
-- **frontend e2e**＝`docker compose up -d --build frontend` → `docker compose exec -u root -T frontend npx playwright install-deps chromium` → `install chromium` → `docker compose exec -T -e LOGIN_RATE_LIMIT_MAX=50 frontend npx playwright test --workers=1`（前セッション 26 passed・**本セッション未再実行**）。
-- **backend テスト**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -T -v "$PWD/backend:/app" backend pytest tests/ -q`（前セッション 164 passed・**本セッション未再実行**）。
-- **mocks の検証（chromium ヘッドレス・Docker 不要）**＝`chromium-browser --headless=new --no-sandbox --disable-gpu --dump-dom "file://…/mocks/SC-91_システム管理.html"`。スクショ出力先は `$HOME` 配下（`/tmp` は snap sandbox 不可視）。
+- **frontend の型チェック（Docker 不要）**＝`cd impl/frontend && npm install`（`npm ci` は不可）→ `node_modules/.bin/tsc --noEmit`。`node_modules/`・`package-lock.json`・`tsconfig.tsbuildinfo` は未追跡（コミットしない）。
+- **impl フル起動**＝`cd impl && docker compose up -d --build`。ポート＝db `:5432`／redis `:6379`／mailhog `:1025`/`:8025`／backend `:8000`／frontend `:3000`。backend ヘルスは `/healthz`（`/health` は 404）。
+- **frontend e2e（Docker）**＝`docker compose up -d --build frontend` → `docker compose exec -u root -T frontend npx playwright install-deps chromium` → `docker compose exec -T frontend npx playwright install chromium` → `docker compose exec -T -e LOGIN_RATE_LIMIT_MAX=50 frontend npx playwright test <spec…> --workers=1`。**再ビルドで chromium は消える**ので install を毎回。**spec だけ変更**なら `docker compose cp frontend/e2e/xxx.spec.ts frontend:/app/e2e/xxx.spec.ts` で差し替え可（再ビルド不要）。本セッションの管理系 spec＝`sc-90/91/92/92b/92b2/92c/93`（計16件）。
+- **目視スクショ（Docker・ヘッドレス）**＝コンテナ内に一時 spec を書いて `page.screenshot`→`docker compose cp frontend:/app/test-results/xxx.png <host>`。frontend はマウント無しなので screenshot は `/app/test-results/` 経由で取り出す。
+- **backend テスト**＝`cd impl && docker compose up -d db redis && docker compose run --rm --no-deps -T -v "$PWD/backend:/app" backend pytest tests/ -q`（前セッション 164 passed・本セッション未再実行）。
+- **DB 直接確認**＝`docker compose exec -T db psql -U ideaquest -d ideaquest_control -c "…"`（管理DB。POSTGRES_USER=`ideaquest`・会社DBは `ideaquest_company_acme` 等）。
 - **dev ログイン（seed・PW 全て `Passw0rd!`）**＝system_admin `OPS`/`admin@ops.example`／一般 `ACME-01`/`user@acme.example`（MFA OFF）・`ACME-02`/`mfa@acme2.example`（MFA ON）。
-- **正となる場所**＝デザインシステム＝`doc/画面設計/mocks/shared.css`・`shared.js`（impl `src/styles/design-system.css`・`src/components/ui/*` はその移植）。DataTable の挙動の正＝`shared.js` の `window.DataTable`（末尾 IIFE）。UI標準＝`doc/画面設計/デザイン標準.md`（`§4.5` 一覧の操作標準〔⑪=クリック標準〕・`§4.6` 用語）。見た目＝`mocks/SC-xx_*.html`・機能/遷移＝`screens/SC-xx_*.md`・画面間遷移＝`画面遷移図.md`。
+- **正となる場所**＝デザインシステム＝`doc/画面設計/mocks/shared.css`・`shared.js`（impl `src/styles/design-system.css`・`src/components/ui/*` はその移植）。DataTable の挙動の正＝`shared.js` の `window.DataTable`。UI標準＝`doc/画面設計/デザイン標準.md`（`§4.5` 一覧の操作標準〔⑪=クリック標準〕・`§4.6` 用語）。見た目＝`mocks/SC-xx_*.html`・機能/遷移＝`screens/SC-xx_*.md`・画面間遷移＝`画面遷移図.md`。
 - **運用**＝`.gitignore` で `*.pdf`・`.env`・`node_modules` 追跡外。末尾 Co-Authored-By。push は原則ユーザー依頼時のみ。CLAUDE.md が各規約への入口。
 
 ---
 
 ### 自己チェック（このファイルだけで再開できるか）
-- ✅ 再開点＝§7＝**(D-d ③) DataTable を実画面へ統合**（まず push 確認→CompanyList から→§5の設計フォーク決定→Docker で目視/e2e）。①CSS同期・②DataTable.tsx・④用語/補足 impl 反映は本セッション完了。
-- ✅ 本セッション＝**`impl/frontend` を変更**（前セッションまでの mocks/screens 中心から局面転換）。4コミット・**未 push**（origin/main より 4 ahead）。
-- ✅ 状態＝HEAD `e15f51e`・作業ツリーは追跡分クリーン（未追跡＝`package-lock.json` のみ・残置可）。**frontend tsc=0（実測）**。e2e/pytest は前セッション値＝**本セッション未再実行**。Docker 停止中。
-- ⚠ **DataTable.tsx は完成・型健全だが未統合＝ランタイム/目視/e2e 未検証**（③で Docker 起動時に）。仕様の正は `shared.js` の `window.DataTable`＋`デザイン標準.md §4.5`。React 化差分（render=ReactNode／compute 分離／Modal・RowMenu 再利用／CSV は csvVal・sortVal／localStorage `ready` ゲート）は §3-②・§5。
-- ⚠ **会社作成状態が設計⇔backend で矛盾**（§5）。本セッションは注記を backend 実態に合わせただけ＝恒久整合は次セッションで要判断。
-- ⚠ **ローカル tsc は `npm install`（`npm ci` 不可）**。package-lock は非追跡。
+- ✅ (D-d ③) DataTable 統合＝**管理系5画面すべて完了**（CompanyList/AccountSection/AccountSelfSection/QuestGroupSection/QuestGroupAdminView）。①②④は前セッション、⑤（§5 矛盾解決）は本セッション完了。
+- ✅ 本セッション＝**6コミット・すべて push 済み**（origin/main = `8a9ef5c`・0/0）。作業ツリーは追跡分クリーン（未追跡＝`package-lock.json`・`tsconfig.tsbuildinfo` のみ・残置可）。
+- ✅ 検証＝**frontend tsc=0／管理系 e2e 16件 全 passed（Docker 実測）**。backend pytest は未再実行（挙動不変）。**Docker は起動したまま**。
+- ✅ 次の主眼＝§7＝**(A) backend §4.5 クエリ契約＋DataTable サーバーモード**（アイデア/クエスト一覧向け・別セッション）または **(B) 他ドメイン画面群移植**。
+- ⚠ アイデア一覧(SC-12)・クエスト一覧(SC-10)は **DataTable 統合の対象外**＝サーバー駆動が必須（全文検索/カーソル/件数大）。サーバーモードは backend §4.5 契約後（§5）。
+- ⚠ e2e は再ビルドで chromium が消える／RowMenu クリックは可視化＋force で安定化（§4・§5・§8）。
+- ⚠ §5 会社作成状態＝**解決済み（backend=停止 が正）**。再判断不要。
