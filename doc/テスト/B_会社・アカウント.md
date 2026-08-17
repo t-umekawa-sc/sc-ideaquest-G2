@@ -90,8 +90,11 @@
 | B-TC-053 | api | 会社詳細取得と不明時の秘匿 | system_admin | `GET /admin/companies/{id}`／不明 id | `200`＋設定フラグ＋`account_count`／不明＝`404` | B.1 |
 | B-TC-054 | api | 記名設定時の開示フラグ整合強制 | system_admin | `PATCH .../settings`（`vote_anonymized=false`）／`PATCH .../{id}`（color） | 記名時は **`hide_voters_from_managers` を無効化して保存**（サーバー整合）／プロフィール更新 200 | B.1 |
 | B-TC-055 | api | 会社管理 API の system_admin 専用担保 | general | `GET /admin/companies` | `403 forbidden`（system_admin 専用） | B.1／B.0.1 |
+| B-TC-126 | api | 複数ソートキーの優先順位適用（DataTable 契約） | system_admin・名前に一意トークンを持つ会社を name が昇順と異なる作成順で3件作成 | `GET /admin/companies?q=<token>&sort=name`／`&sort=-name`／同名2件で `&sort=name,-company_code` | `sort=name`＝name 昇順・`-name`＝降順（作成順でなくキー順）／複数キー＝第1キー同値は第2キーで解決（左が最優先・§1.8.1①） | §1.8.1①／B.1 |
+| B-TC-127 | api | ソートキーのホワイトリスト検証（列挙・注入耐性） | system_admin | `GET /admin/companies?sort=badcol` | `422 validation_error`（`errors[].field="sort"`）＝ホワイトリスト外の任意列ソートを拒否（§1.8.1①） | §1.8.1①／§2.2 |
 
 - **red 確認（後追い）**＝記名時整合行の無効化で B-TC-054 が `hide_voters_from_managers=true` のまま（本来 false）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
+- **red 確認（test-first）**＝B-TC-126/127 は複数ソート実装前に確認（`sort` 未対応＝順序が作成順のまま／未知キーが無視され 200）。証跡＝コミットメッセージ。
 
 ## 4. クエストグループ・所属スキーマ（会社DB `quest_groups`/`quest_group_members`・§5.4/§5.5・C テーブル）
 

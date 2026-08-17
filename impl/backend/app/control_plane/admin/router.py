@@ -56,12 +56,14 @@ def list_companies(
     request: Request,
     q: str | None = None,
     status: str | None = Query(default=None, pattern="^(active|suspended)$"),
+    sort: str | None = None,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
 ) -> CompanyListResponse:
-    """会社一覧（SC-91・system_admin 専用）。"""
-    return CompanyListResponse(**company_service.list_companies(q=q, status=status, page=page, per_page=per_page))
+    """会社一覧（SC-91・system_admin 専用）＋複数ソート契約（§1.8.1①）。"""
+    return CompanyListResponse(**company_service.list_companies(
+        q=q, status=status, sort=sort, page=page, per_page=per_page))
 
 
 @router.post("/companies", response_model=CompanyDetail, status_code=201)

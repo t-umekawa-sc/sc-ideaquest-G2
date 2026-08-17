@@ -24,9 +24,33 @@ _SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_require
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
 
-def _account_counts(session) -> dict:
-    rows = session.execute(select(Account.company_id, func.count()).group_by(Account.company_id)).all()
-    return {cid: n for cid, n in rows}
+# DataTable 契約（§1.8.1①）＝ソート可能キーのホワイトリスト。直カラムはここ、集計 account_count は
+# list_companies 内で subquery カラムを渡す（`group_count` は会社DB `quest_groups` 依存＝ドメインC後）。
+_SORT_COLUMNS = {
+    "name": Company.name,
+    "company_code": Company.company_code,
+    "created_at": Company.created_at,
+}
+
+
+def _parse_sort(sort: str | None, *, extra: dict | None = None) -> list:
+    """`?sort=a,-b` を ORDER BY 式のリストへ（左が最優先・`-` で降順・§1.8.1①）。
+
+    ホワイトリスト外のキーは `422 validation_error`（列挙耐性・任意列ソート/注入の遮断・§2.2）。
+    """
+    allowed = {**_SORT_COLUMNS, **(extra or {})}
+    order: list = []
+    for token in (sort or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        desc = token.startswith("-")
+        key = token[1:] if desc else token
+        col = allowed.get(key)
+        if col is None:
+            raise AppError(422, "validation_error", extra={"errors": [{"field": "sort", "value": key}]})
+        order.append(col.desc() if desc else col.asc())
+    return order
 
 
 def _item(c: Company, account_count: int) -> dict:
@@ -46,12 +70,20 @@ def _detail(c: Company, account_count: int) -> dict:
     }
 
 
-def list_companies(*, q: str | None = None, status: str | None = None,
+def list_companies(*, q: str | None = None, status: str | None = None, sort: str | None = None,
                    page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
-    """会社一覧（SC-91・オフセット・§1.8）。"""
+    """会社一覧（SC-91・オフセット・§1.8）＋複数ソート契約（§1.8.1①）。"""
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
     with control_session() as session:
+        # account_count を SQL 集計（ソート可能にするため subquery を outerjoin＝§1.8.1① account_count）。
+        acc_sq = (
+            select(Account.company_id.label("cid"), func.count().label("n"))
+            .group_by(Account.company_id).subquery()
+        )
+        account_count = func.coalesce(acc_sq.c.n, 0)
+        order = _parse_sort(sort, extra={"account_count": account_count})  # 未知キーは 422（ここで先に検証）
+
         conds = []
         if status in ("active", "suspended"):
             conds.append(Company.status == status)
@@ -60,12 +92,14 @@ def list_companies(*, q: str | None = None, status: str | None = None,
             conds.append(or_(Company.name.ilike(like), Company.company_code.ilike(like),
                              Company.db_identifier.ilike(like)))
         total = session.execute(select(func.count()).select_from(Company).where(*conds)).scalar_one()
-        rows = session.execute(
-            select(Company).where(*conds).order_by(Company.created_at, Company.id)
-            .offset((page - 1) * per_page).limit(per_page)
-        ).scalars().all()
-        counts = _account_counts(session)
-        data = [_item(c, counts.get(c.id, 0)) for c in rows]
+        stmt = (
+            select(Company, account_count.label("account_count"))
+            .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
+        )
+        # 明示ソートはキー順＋末尾 id で一意化／無指定は従来の created_at,id 決定的順序（§1.8.1①）。
+        stmt = stmt.order_by(*order, Company.id) if order else stmt.order_by(Company.created_at, Company.id)
+        rows = session.execute(stmt.offset((page - 1) * per_page).limit(per_page)).all()
+        data = [_item(c, n) for c, n in rows]
     return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 

@@ -110,3 +110,45 @@ def test_b_tc_055_non_admin_forbidden(client, factory):
     acc = factory.make_seed_company_account()
     _login(client, acc["company_code"], acc["login_id"], acc["password"])
     assert client.get(COMPANIES).status_code == 403
+
+
+def _mk(client, companies, name: str, code: str) -> dict:
+    """指定 name/code で会社を作成し掃除に登録（ソート検証用の決定的データ）。"""
+    body = {"name": name, "company_code": code, "db_identifier": f"ideaquest_test_{code.lower()}"}
+    r = client.post(COMPANIES, json=body, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    data = r.json()
+    companies.append(uuid.UUID(data["company_id"]))
+    return data
+
+
+def _names(client, params: dict) -> list:
+    r = client.get(COMPANIES, params=params)
+    assert r.status_code == 200, r.text
+    return [c["name"] for c in r.json()["data"]]
+
+
+def test_b_tc_126_multi_sort_priority(client, companies):
+    """B-TC-126 複数ソートはキー順に並ぶ（作成順でない）＋第1キー同値は第2キーで解決。根拠 §1.8.1①。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    _mk(client, companies, f"{t} c", f"TC{t}C")  # 作成順 c,a,b（name 昇順と異なる）
+    _mk(client, companies, f"{t} a", f"TC{t}A")
+    _mk(client, companies, f"{t} b", f"TC{t}B")
+    assert _names(client, {"q": t, "sort": "name"}) == [f"{t} a", f"{t} b", f"{t} c"]
+    assert _names(client, {"q": t, "sort": "-name"}) == [f"{t} c", f"{t} b", f"{t} a"]
+
+    d = uuid.uuid4().hex[:6].upper()  # name 同値 → 第2キー company_code 降順で解決
+    _mk(client, companies, f"{d} same", f"TD{d}A")
+    _mk(client, companies, f"{d} same", f"TD{d}B")
+    r = client.get(COMPANIES, params={"q": d, "sort": "name,-company_code"})
+    assert r.status_code == 200, r.text
+    assert [c["company_code"] for c in r.json()["data"]] == [f"TD{d}B", f"TD{d}A"]
+
+
+def test_b_tc_127_sort_whitelist_422(client):
+    """B-TC-127 ホワイトリスト外のソートキーは 422（列挙/注入耐性）。根拠 §1.8.1①。"""
+    _login_system_admin(client)
+    r = client.get(COMPANIES, params={"sort": "badcol"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "sort"

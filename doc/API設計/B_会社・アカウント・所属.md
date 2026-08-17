@@ -44,7 +44,7 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /admin/companies` | 会社一覧を取得（SC-91） | クエリ: `q`（会社名/会社コード/db_identifier の部分一致）・`status`（`active\|suspended`）・`page`/`per_page`（オフセット・§1.8）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`name`/`company_code`/`account_count`/`group_count`/`created_at`（複数ソート `?sort=` 可）／フィルタ可能＝`status`（enum・多値可）・`account_count`/`group_count`（number 範囲）／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可 | `data`=会社の配列。各行に基本情報＋`status`＋集計 `account_count`/`group_count`。`page_info.total`＝総件数（バッジ） |
+| `GET /admin/companies` | 会社一覧を取得（SC-91） | クエリ: `q`（会社名/会社コード/db_identifier の部分一致）・`status`（`active\|suspended`）・`page`/`per_page`（オフセット・§1.8）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`name`/`company_code`/`account_count`/`created_at`（複数ソート `?sort=` 可）／フィルタ可能＝`status`（enum・多値可）・`account_count`（number 範囲）／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可。※`group_count`（ソート/フィルタ/集計）は会社DB `quest_groups` 依存＝**ドメインC実装後に追加**（本スライスは `account_count` のみ） | `data`=会社の配列。各行に基本情報＋`status`＋集計 `account_count`（`group_count` はドメインC後）。`page_info.total`＝総件数（バッジ） |
 | `POST /admin/companies` | 会社を新規作成（SC-91） | ボディ: `name`,`company_code`,`db_identifier`,`color`,`icon_image_path?` | 作成された会社（**`status=suspended`＝停止**で返す＝作成時点は会社DB未整備）。`company_code` は大文字正規化＋一意検証／DBプロビジョニングは MVP 手動（§8-⑫）・完了後に `active`（有効）化 |
 | `GET /admin/companies/{company_id}` | 会社詳細を取得（SC-92 バナー/カード） | パス: `company_id` | 会社の詳細＋設定フラグ（`vote_anonymized` 等）＋件数（`account_count`/`group_count`） |
 | `PATCH /admin/companies/{company_id}` | 会社プロフィールを更新（SC-92） | パス: `company_id`／ボディ: `color`,`icon_image_path?`（アイコンは MinIO・§1.10） | 更新後の会社プロフィール |
