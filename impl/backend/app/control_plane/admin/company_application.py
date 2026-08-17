@@ -53,6 +53,20 @@ def _parse_sort(sort: str | None, *, extra: dict | None = None) -> list:
     return order
 
 
+_COMPANY_STATUSES = ("active", "suspended")
+
+
+def _parse_enum(value: str | None, field: str, allowed) -> list | None:
+    """`?field=a,b` を検証済みの値リストへ（enum 多値＝OR・§1.8.1②）。未知値は 422（ホワイトリスト・§2.2）。"""
+    if not value:
+        return None
+    vals = [v.strip() for v in value.split(",") if v.strip()]
+    for v in vals:
+        if v not in allowed:
+            raise AppError(422, "validation_error", extra={"errors": [{"field": field, "value": v}]})
+    return vals or None
+
+
 def _item(c: Company, account_count: int) -> dict:
     return {
         "company_id": str(c.id), "company_code": c.company_code, "name": c.name,
@@ -71,27 +85,38 @@ def _detail(c: Company, account_count: int) -> dict:
 
 
 def list_companies(*, q: str | None = None, status: str | None = None, sort: str | None = None,
+                   account_count_min: int | None = None, account_count_max: int | None = None,
                    page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
-    """会社一覧（SC-91・オフセット・§1.8）＋複数ソート契約（§1.8.1①）。"""
+    """会社一覧（SC-91・オフセット・§1.8）＋複数ソート/項目別フィルタ契約（§1.8.1①②）。"""
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
     with control_session() as session:
-        # account_count を SQL 集計（ソート可能にするため subquery を outerjoin＝§1.8.1① account_count）。
+        # account_count を SQL 集計（ソート/範囲フィルタ可能にするため subquery を outerjoin・§1.8.1①②）。
         acc_sq = (
             select(Account.company_id.label("cid"), func.count().label("n"))
             .group_by(Account.company_id).subquery()
         )
         account_count = func.coalesce(acc_sq.c.n, 0)
-        order = _parse_sort(sort, extra={"account_count": account_count})  # 未知キーは 422（ここで先に検証）
+        order = _parse_sort(sort, extra={"account_count": account_count})  # 未知キーは 422（先に検証）
+        statuses = _parse_enum(status, "status", _COMPANY_STATUSES)        # 未知 enum 値は 422
 
         conds = []
-        if status in ("active", "suspended"):
-            conds.append(Company.status == status)
+        if statuses:  # enum 多値＝OR（IN）・§1.8.1②
+            conds.append(Company.status.in_(statuses))
         if q:
             like = f"%{q}%"
             conds.append(or_(Company.name.ilike(like), Company.company_code.ilike(like),
                              Company.db_identifier.ilike(like)))
-        total = session.execute(select(func.count()).select_from(Company).where(*conds)).scalar_one()
+        if account_count_min is not None:  # number 範囲＝集計への WHERE・§1.8.1②
+            conds.append(account_count >= account_count_min)
+        if account_count_max is not None:
+            conds.append(account_count <= account_count_max)
+
+        # total も同じ join+conds で数える（範囲フィルタは集計依存＝join 必須）。
+        total = session.execute(
+            select(func.count()).select_from(Company)
+            .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)
+        ).scalar_one()
         stmt = (
             select(Company, account_count.label("account_count"))
             .outerjoin(acc_sq, acc_sq.c.cid == Company.id).where(*conds)

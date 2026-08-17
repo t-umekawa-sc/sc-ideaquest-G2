@@ -55,15 +55,19 @@ def _company_id(session: dict) -> uuid.UUID:
 def list_companies(
     request: Request,
     q: str | None = None,
-    status: str | None = Query(default=None, pattern="^(active|suspended)$"),
+    status: str | None = None,  # enum 多値（`active,suspended`）＝値検証は application（§1.8.1②）
     sort: str | None = None,
+    account_count_min: int | None = Query(default=None, ge=0),
+    account_count_max: int | None = Query(default=None, ge=0),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
 ) -> CompanyListResponse:
-    """会社一覧（SC-91・system_admin 専用）＋複数ソート契約（§1.8.1①）。"""
+    """会社一覧（SC-91・system_admin 専用）＋複数ソート/項目別フィルタ契約（§1.8.1①②）。"""
     return CompanyListResponse(**company_service.list_companies(
-        q=q, status=status, sort=sort, page=page, per_page=per_page))
+        q=q, status=status, sort=sort,
+        account_count_min=account_count_min, account_count_max=account_count_max,
+        page=page, per_page=per_page))
 
 
 @router.post("/companies", response_model=CompanyDetail, status_code=201)

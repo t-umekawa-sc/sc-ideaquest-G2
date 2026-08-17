@@ -152,3 +152,50 @@ def test_b_tc_127_sort_whitelist_422(client):
     r = client.get(COMPANIES, params={"sort": "badcol"})
     assert r.status_code == 422, r.text
     assert r.json()["errors"][0]["field"] == "sort"
+
+
+def test_b_tc_128_enum_multi_filter(client, companies):
+    """B-TC-128 enum フィルタは多値 OR（status=a,b は和集合）。根拠 §1.8.1②。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    a = _mk(client, companies, f"{t} act", f"TE{t}A")
+    _mk(client, companies, f"{t} sus", f"TE{t}S")
+    with control_session() as sess:  # 作成は suspended 固定のため片方を active に（状態を用意）
+        sess.query(Company).filter_by(id=uuid.UUID(a["company_id"])).update({"status": "active"})
+        sess.commit()
+
+    def codes(st):
+        r = client.get(COMPANIES, params={"q": t, "status": st})
+        assert r.status_code == 200, r.text
+        return sorted(c["company_code"] for c in r.json()["data"])
+
+    assert codes("active") == [f"TE{t}A"]
+    assert codes("suspended") == [f"TE{t}S"]
+    both = client.get(COMPANIES, params={"q": t, "status": "active,suspended"})
+    assert both.status_code == 200, both.text
+    assert sorted(c["company_code"] for c in both.json()["data"]) == [f"TE{t}A", f"TE{t}S"]
+    assert both.json()["page_info"]["total"] == 2  # total も多値フィルタを反映
+
+
+def test_b_tc_129_enum_whitelist_422(client):
+    """B-TC-129 未知の enum 値は 422（ホワイトリスト）。根拠 §1.8.1②。"""
+    _login_system_admin(client)
+    r = client.get(COMPANIES, params={"status": "bogus"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "status"
+
+
+def test_b_tc_130_number_range_filter(client, companies):
+    """B-TC-130 number 範囲フィルタ（account_count の _min/_max）。根拠 §1.8.1②。"""
+    _login_system_admin(client)
+    t = uuid.uuid4().hex[:6].upper()
+    for i in range(3):
+        _mk(client, companies, f"{t} n{i}", f"TN{t}{i}")  # account_count=0
+
+    r_min = client.get(COMPANIES, params={"q": t, "account_count_min": 1})
+    assert r_min.status_code == 200, r_min.text
+    assert r_min.json()["page_info"]["total"] == 0   # 0件（全て count=0）
+
+    r_max = client.get(COMPANIES, params={"q": t, "account_count_max": 0})
+    assert r_max.status_code == 200, r_max.text
+    assert r_max.json()["page_info"]["total"] == 3   # 全件
