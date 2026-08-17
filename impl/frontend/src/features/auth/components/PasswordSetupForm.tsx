@@ -126,7 +126,7 @@ export function PasswordSetupForm({ token }: { token: string }) {
 
         {phase === "ready" && (
           <>
-            <p className="auth-lead">新しいパスワードを設定してください。</p>
+            <p className="auth-lead">新しいパスワードを設定してください。設定後はログイン画面からログインできます。</p>
 
             {error && <div className="form-error">{error}</div>}
 
@@ -144,6 +144,7 @@ export function PasswordSetupForm({ token }: { token: string }) {
                     className="input"
                     type={showPw ? "text" : "password"}
                     autoComplete="new-password"
+                    placeholder="新しいパスワード"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -164,6 +165,7 @@ export function PasswordSetupForm({ token }: { token: string }) {
                   className="input"
                   type={showPw ? "text" : "password"}
                   autoComplete="new-password"
+                  placeholder="もう一度入力"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required

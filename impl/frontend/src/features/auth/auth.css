@@ -131,6 +131,13 @@
   line-height: 1.7;
 }
 
+/* 認証コード（OTP）入力＝中央寄せ・大きめ・字間（モック SC-00 状態C 準拠） */
+.otp-input {
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-size: var(--text-xl);
+}
+
 /* カード下の著作権表示（カードの外・背景の上に白文字・モック SC-00 準拠） */
 .login-foot {
   text-align: center;

@@ -132,15 +132,14 @@
           <input class="input" id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code"
                  maxlength="6" placeholder="000000" style="letter-spacing:.4em;text-align:center;font-size:var(--text-xl)" required>
         </div>
-        <label class="checkbox"><input type="checkbox" id="trustDevice"> このデバイスを信頼する（次回からコード入力を省略・30日間）</label>
+        <label class="checkbox"><input type="checkbox" id="trustDevice"> このデバイスを信頼する（次回から認証コードを省略・共有端末では選ばないでください）</label>
         <button class="btn btn-primary" type="submit" style="width:100%">認証してログイン</button>
       </form>
 
       <p class="login-note">
         メールが届かない場合は迷惑メールをご確認ください。<br>
         <a href="#" onclick="return false">コードを再送信</a>（60秒お待ちください）　/
-        <a href="#" onclick="showView('login')">別のIDでログイン</a><br>
-        共有端末では「このデバイスを信頼する」をONにしないでください。
+        <a href="#" onclick="showView('login')">別のIDでログイン</a>
       </p>
     </div>
 
@@ -160,10 +159,7 @@
             <button type="button" class="pw-toggle" aria-label="パスワードを表示" onclick="togglePw('newPw', this)">👁</button>
           </div>
         </div>
-        <ul class="pw-req">
-          <li>8文字以上</li>
-          <li>英字・数字を含む</li>
-        </ul>
+        <p class="muted text-sm" style="margin-top:calc(-1*var(--space-3));margin-bottom:var(--space-4)">8文字以上・英字と数字を含む</p>
         <div class="field">
           <label for="newPw2">新しいパスワード（確認）<span class="req">*</span></label>
           <input class="input" id="newPw2" type="password" autocomplete="new-password" placeholder="もう一度入力" required>

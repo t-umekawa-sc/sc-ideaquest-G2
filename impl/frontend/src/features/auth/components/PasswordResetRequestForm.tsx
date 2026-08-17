@@ -45,7 +45,7 @@ export function PasswordResetRequestForm() {
         {sent ? (
           <>
             <p className="auth-confirm">
-              該当するアカウントがあれば、登録メールアドレスへ再設定用リンクを送信しました。数分お待ちください。
+              該当するアカウントがあれば、登録メールアドレスへ再設定用リンクを送信しました。メールをご確認ください。
             </p>
             <div className="login-links">
               <Link href="/login">ログインへ戻る</Link>
@@ -54,7 +54,7 @@ export function PasswordResetRequestForm() {
         ) : (
           <>
             <p className="auth-lead">
-              会社コードとログインIDを入力すると、登録メールアドレスへ再設定用リンクを送信します。
+              会社コードとログインIDを入力すると、登録メールアドレスへ再設定用リンク（72時間有効）を送信します。
             </p>
 
             {error && <div className="form-error">{error}</div>}
@@ -65,6 +65,7 @@ export function PasswordResetRequestForm() {
                   id="company_code"
                   className="input"
                   autoComplete="organization"
+                  placeholder="例: systemcon"
                   value={companyCode}
                   onChange={(e) => setCompanyCode(e.target.value)}
                   required
@@ -75,6 +76,7 @@ export function PasswordResetRequestForm() {
                   id="login_id"
                   className="input"
                   autoComplete="username"
+                  placeholder="例: system.concierge"
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   required
@@ -85,6 +87,9 @@ export function PasswordResetRequestForm() {
               </Button>
             </form>
 
+            <p className="login-note">
+              ※ セキュリティのため、アカウントの有無にかかわらず同じ案内を表示します。
+            </p>
             <div className="login-links">
               <Link href="/login">ログインへ戻る</Link>
             </div>

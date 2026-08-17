@@ -2,6 +2,7 @@
 
 // SC-00 状態C（認証コード入力・MFA）。login が mfa_required を返した後に表示する。
 // pre-auth（iq_preauth）中に mfa/verify で OTP を検証（CSRF＋Origin 必須＝apiFetch が iq_csrf を付与）。
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -94,23 +95,27 @@ export function MfaForm({ challenge, onRestart }: Props) {
   return (
     <div className="login-page">
       <div className="login-card">
+        <div className="login-logo">
+          <Image src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={185} height={84} priority />
+        </div>
         <h1>認証コードの入力</h1>
 
         <p className="auth-lead">
-          登録メールアドレス（{challenge.masked_to}）宛に認証コードを送信しました。メールに記載の6桁のコードを入力してください。
+          登録メールアドレス（{challenge.masked_to}）宛に認証コードを送信しました。メールに記載の6桁のコードを入力してください（10分間有効）。
         </p>
 
         {error && <div className="form-error">{error}</div>}
         {info && !error && <div className="auth-confirm">{info}</div>}
 
         <form onSubmit={onSubmit} noValidate>
-          <Field id="otp_code" label="認証コード" required>
+          <Field id="otp_code" label="認証コード（6桁）" required>
             <input
               id="otp_code"
-              className="input"
+              className="input otp-input"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
+              placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
               required
@@ -128,6 +133,8 @@ export function MfaForm({ challenge, onRestart }: Props) {
             {pending ? "認証中…" : "認証してログイン"}
           </Button>
         </form>
+
+        <p className="login-note">メールが届かない場合は迷惑メールをご確認ください。</p>
 
         <div className="login-links">
           <button
