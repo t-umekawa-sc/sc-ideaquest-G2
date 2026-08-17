@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // SC-92 アカウント & 所属（この会社）＝system_admin（doc/テスト/B §9・API設計 B.2/B.5）。
+// 一覧は DataTable（client モード）＝ライブ検索（検索ボタンなし）・件数は list-count「N 件」・
+// 発行/編集後は reload で DataTable が再マウントされ検索欄がクリアされ得るため fill→確認を toPass で再試行。
 const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
@@ -29,22 +31,22 @@ test("B-TC-114 issue account appears in company account list", async ({ page }) 
   await page.locator("#a_email").fill(newLogin);
   await page.getByRole("button", { name: /発行する/ }).click();
 
-  // 発行後は一覧が先頭ページに戻る＝多数アカウント環境では検索で当該行を絞って確認（per_page=20・ページング/検索 UI 導入）
+  // DataTable のライブ検索で当該行を絞って確認（発行後の reload 再マウント競合は toPass で吸収）
   const region = page.getByRole("region", { name: "この会社のアカウント管理" });
-  await region.getByRole("searchbox", { name: "検索（氏名・ログインID・メール）" }).fill(newLogin);
-  await region.getByRole("button", { name: "検索" }).click();
-  await expect(region.getByRole("row", { name: new RegExp(newLogin) })).toBeVisible();
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(newLogin);
+    await expect(region.getByRole("row", { name: new RegExp(newLogin) })).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
 
-// B-TC-125: SC-92 会社アカウント一覧の検索（q）・メール列・ページャ（本スライス＝ページング/検索 UI・doc/テスト/B §16）。
+// B-TC-125: SC-92 会社アカウント一覧の検索（q）・メール列・件数（DataTable client モード・doc/テスト/B §16）。
 // login と email を別値で発行し、検索絞り込み後に両セルが出る＝メール列が email を表示している証拠。
-test("B-TC-125 company account list: search, email column, pager", async ({ page }) => {
+test("B-TC-125 company account list: search, email column, clear", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
   await page.getByRole("row", { name: /ACME-01/ }).getByRole("link").click();
   const region = page.getByRole("region", { name: "この会社のアカウント管理" });
-  await expect(region.getByRole("columnheader", { name: "メールアドレス" })).toBeVisible();
-  await expect(region.getByRole("button", { name: "前へ" })).toBeDisabled(); // 1ページ目
+  await expect(region.getByRole("columnheader", { name: /メールアドレス/ })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);
   const loginId = `e2e-l-${stamp}@acme.example`;
@@ -56,15 +58,15 @@ test("B-TC-125 company account list: search, email column, pager", async ({ page
   await page.getByRole("button", { name: /発行する/ }).click(); // 送信ボタンは modal（body 直下に portal）＝region 外
   await expect(page.getByText("アカウントを発行")).toHaveCount(0); // フォームが閉じる＝発行成功
 
-  // 検索＝一意スタンプで絞ると当該行のみ（total=1）
-  await region.getByRole("searchbox", { name: "検索（氏名・ログインID・メール）" }).fill(stamp);
-  await region.getByRole("button", { name: "検索" }).click();
-  await expect(region.getByRole("cell", { name: loginId })).toBeVisible();
+  // 検索＝一意スタンプで絞ると当該行のみ（1 件）。login と email が別セルに出る＝メール列が email 表示
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(stamp);
+    await expect(region.getByRole("cell", { name: loginId })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(region.getByRole("cell", { name: emailAddr })).toBeVisible();
-  await expect(region.getByText("（1 件）")).toBeVisible();
-  await expect(region.getByRole("button", { name: "次へ" })).toBeDisabled();
+  await expect(region.getByText("1 件", { exact: true })).toBeVisible();
 
-  // クリアで全件へ戻る（ACME-01 は seed＋発行分で 2 件以上＝「1 件」表示が消える）
-  await region.getByRole("button", { name: "クリア" }).click();
-  await expect(region.getByText("（1 件）")).toHaveCount(0);
+  // 「すべてクリア」で全件へ戻る（ACME-01 は seed＋発行分で 2 件以上＝「1 件」表示が消える）
+  await region.getByRole("button", { name: "すべてクリア" }).click();
+  await expect(region.getByText("1 件", { exact: true })).toHaveCount(0);
 });
