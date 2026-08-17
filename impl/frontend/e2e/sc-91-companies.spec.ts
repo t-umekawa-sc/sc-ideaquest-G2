@@ -14,6 +14,10 @@ async function login(page: Page, c: { company: string; loginId: string; password
   await expect(page.getByText("ようこそ")).toBeVisible();
 }
 
+// ページ遷移（/admin/companies のドキュメント要求）ではなく API fetch（/api/v1/...）に限定して捕捉。
+const isCompaniesApi = (r: { url(): string; method(): string }) =>
+  r.url().includes("/api/v1/admin/companies") && r.method() === "GET";
+
 // B-TC-110: system_admin が会社一覧を表示＝seed 会社（ACME-01）が見える。
 test("B-TC-110 system admin sees company list", async ({ page }) => {
   await login(page, OPS);
@@ -72,4 +76,56 @@ test("B-TC-137 server mode: initial per_page and sort=name query", async ({ page
   expect(new URL(sortReq.url()).searchParams.get("sort")).toBe("name");
   // 並び替えチップが出る（適用中表示）＝クライアント状態も反映。
   await expect(page.getByText("並び替え:")).toBeVisible();
+});
+
+// B-TC-138: 項目別フィルタ（§1.8.1②）がサーバー委譲される。状態=停止 を適用→ status=suspended が飛び、
+// 適用中チップ「状態: 停止」が出る（絞込はサーバーが確定＝backend の enum ホワイトリスト）。
+test("B-TC-138 server mode: status filter issues status= query", async ({ page }) => {
+  await login(page, OPS);
+  await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
+  await page.getByRole("button", { name: /絞り込み/ }).click();
+  await page.getByRole("checkbox", { name: "停止" }).check();
+  const [req] = await Promise.all([
+    page.waitForRequest((r) => isCompaniesApi(r) && new URL(r.url()).searchParams.get("status") === "suspended"),
+    page.getByRole("button", { name: "適用する" }).click(),
+  ]);
+  expect(new URL(req.url()).searchParams.get("status")).toBe("suspended");
+  await expect(page.getByText(/状態: 停止/)).toBeVisible();
+});
+
+// B-TC-139: 行固定（ピン）のページ跨ぎ（§1.8.1④）。ACME-01 を固定→状態=停止 で絞ると母集合（data）からは
+// 外れるが、pin_ids でサーバーが解決して pinned に返すため固定セクションに残り続ける（絞込非依存）。
+test("B-TC-139 server mode: pinned row survives an excluding filter", async ({ page }) => {
+  await login(page, OPS);
+  await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
+  // ACME-01（active）を検索で出して固定する。
+  await page.getByRole("searchbox").fill("ACME-01");
+  const acmeRow = page.getByRole("row", { name: /ACME-01/ });
+  await expect(acmeRow).toBeVisible();
+  await acmeRow.getByRole("button", { name: "この行を固定" }).click();
+  await expect(acmeRow).toHaveClass(/is-pinned/);
+  // 検索を解除（固定は pin_ids で保持される）。
+  await page.getByRole("button", { name: "検索を解除" }).click();
+  // 状態=停止 で絞る（ACME-01=active は data から外れる）。リクエストに status=suspended と pin_ids が載る。
+  await page.getByRole("button", { name: /絞り込み/ }).click();
+  await page.getByRole("checkbox", { name: "停止" }).check();
+  const [req] = await Promise.all([
+    page.waitForRequest((r) => isCompaniesApi(r) && new URL(r.url()).searchParams.get("status") === "suspended"),
+    page.getByRole("button", { name: "適用する" }).click(),
+  ]);
+  expect(new URL(req.url()).searchParams.get("pin_ids")).not.toBeNull();
+  // 絞込後も ACME-01 は固定行として残る（サーバーが pin を絞込非依存で解決）。
+  await expect(page.getByRole("row", { name: /ACME-01/ })).toHaveClass(/is-pinned/);
+});
+
+// B-TC-140: CSV エクスポート（§1.8.1③）。エクスポート押下→同一 EP の ?format=csv でダウンロード（companies.csv）。
+// 生成/BOM/監査は backend（B-TC-131/132）。ここではフロントが正しく委譲しダウンロードが発火することを検証。
+test("B-TC-140 server mode: export downloads companies.csv", async ({ page }) => {
+  await login(page, OPS);
+  await Promise.all([page.waitForRequest(isCompaniesApi), page.goto("/admin/companies")]);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "エクスポート" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("companies.csv");
 });
