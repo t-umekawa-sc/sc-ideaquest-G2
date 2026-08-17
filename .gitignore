@@ -23,3 +23,4 @@ test-results/
 # Docker ビルドは package.json＋npm install だけを使い、これらを参照しないので追跡しない。
 package-lock.json
 *.tsbuildinfo
+next-env.d.ts
