@@ -87,7 +87,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -175,7 +175,7 @@
   <!-- ===== アイデア一覧（既定タブ・テーブル） ===== -->
   <section class="tab-panel" id="tab-ideas" role="tabpanel">
     <div id="ideaTable"></div>
-    <p class="muted text-xs" style="margin-top:var(--space-6)">※ <strong>自分の下書きアイデアも本一覧に表示</strong>（下書きバッジ・本人のみ／他パーティーメンバーには見えない）。<strong>下書き行クリックで SC-21 編集モーダル</strong>（公開済みは SC-22 詳細）。下書きは公開して初めて投票/コメントの対象（一覧では賛成・反対/コメント/評価は「—」）。ダッシュボード（SC-01）にも集約＝両導線。</p>
+    <p class="muted text-xs" style="margin-top:var(--space-6)">自分の下書きアイデアも一覧に表示されます（下書きバッジ・本人のみ）。下書きは公開して初めて投票・コメントの対象になります（一覧では賛成・反対／コメント／評価は「—」）。</p>
   </section>
 
   <!-- ===== 全文検索（件名・アイデア・価値・備考・チャット・添付ファイル名を日本語全文検索） ===== -->
@@ -194,7 +194,7 @@
     </div>
     <div id="ftResults" class="stack"></div>
     <div class="list-empty" id="ftEmpty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。</div>
-    <p class="hint" style="margin-top:var(--space-3)">※ 検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>＋<strong>添付ファイル名</strong>（このクエスト内）。日本語全文検索の実装は PostgreSQL の <strong>PGroonga（決定）</strong> で分かち書き不要・ランキング・ハイライトに対応。<strong>添付ヒットは紐づくアイデア/チャットへ遷移</strong>（詳細は画面設計 SC-12）。</p>
+    <p class="hint" style="margin-top:var(--space-3)">検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>＋<strong>添付ファイル名</strong>（このクエスト内）。添付ファイルがヒットした場合は、ひもづくアイデア／チャットへ移動します。</p>
   </section>
 
   <!-- ===== パーティー ===== -->

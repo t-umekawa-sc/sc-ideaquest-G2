@@ -92,7 +92,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html" aria-current="page">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html" aria-current="page">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -124,7 +124,6 @@
         <span class="viewer__name">山田 太郎</span>
         <span class="viewer__lv">Lv.7</span>
       </div>
-      <p class="viewer__hint">本番は 3D（VRM）で表示・回転。ここはモックの見立て。</p>
     </section>
 
     <!-- 右: ワードローブ（スロットごと） -->
@@ -141,8 +140,7 @@
       <div id="slots"><!-- JSでスロット×装備を描画 --></div>
 
       <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-        ※ 装備ラインナップ・価格・レアリティは<strong>初期値（調整可）</strong>。入手は<strong>コイン購入のみ</strong>（レベル解放・実績等での装備直接付与なし。実績はコインを付与）。
-        購入・装備はサーバーで残高/所有を検証。3Dは three-vrm（R3F）＋パーツ差し替え方式。
+        アイテムの入手は<strong>コイン購入のみ</strong>です（レベルや実績で装備が直接手に入ることはありません。実績ではコインを獲得できます）。
       </p>
     </section>
 
@@ -266,7 +264,7 @@
     const id = card.dataset.id;
     if (card.dataset.buy) {   // 未所有 → ショップへ
       const it = itemOf(slot, id);
-      if (confirm('「' + it.name + '」はショップで購入できます（◆' + it.price + '）。\nショップ（SC-30）へ移動しますか？')) {
+      if (confirm('「' + it.name + '」はショップで購入できます（◆' + it.price + '）。\nショップへ移動しますか？')) {
         location.href = 'SC-30_ショップ.html';
       }
       return;

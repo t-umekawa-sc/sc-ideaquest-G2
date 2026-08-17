@@ -49,7 +49,7 @@
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
   <h1 class="page-title">システム管理（運営）</h1>
-  <p class="admin-sub">会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント/所属の管理は、会社を選ぶと会社詳細（SC-92）で行います</strong>。<strong>システム管理者のみ</strong>。</p>
+  <p class="admin-sub">会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント／所属の管理は、会社を選ぶと会社詳細で行います</strong>。<strong>システム管理者のみ</strong>。</p>
 
   <div class="section-head">
     <h2>会社（テナント）</h2>
@@ -59,9 +59,6 @@
        正＝デザイン標準.md「一覧の操作標準」・挙動は shared.js の DataTable。 -->
   <div id="companyTable"></div>
 
-  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ 会社DBは物理分離（別コンテナ）。接続情報の実体は <code>.env</code>・ここでは参照キー（DB識別子）のみ表示。作成後、<strong>会社DBは別途プロビジョニング</strong>（MVP: compose 手編集 → <code>up</code> → 管理DBに登録）で有効化。会社を選ぶと<strong>会社詳細（SC-92）</strong>で設定・アカウント/所属を管理。
-  </p>
 </main>
 
 <!-- ===== 会社作成モーダル ===== -->
@@ -75,7 +72,7 @@
     <div class="modal__body">
     <div class="form-row"><label class="req" for="cmName">会社名</label><input class="input" id="cmName" placeholder="例: アクロス株式会社"></div>
     <div class="form-row"><label class="req" for="cmCode">会社コード</label><input class="input db-id" id="cmCode" placeholder="例: ACROSS" maxlength="20" style="text-transform:uppercase"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・<strong>全社で一意</strong>（大文字に正規化）。作成後は変更不可。</div></div>
-    <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。接続情報の実体は <code>.env</code>。</div></div>
+    <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。</div></div>
 
     <div class="form-row">
       <label>会社アバター / アイコン</label>
@@ -104,7 +101,7 @@
         <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#475569" data-color="#475569" aria-label="スレート"></button>
       </div>
     </div>
-    <div class="provision-note">作成すると管理DBに会社を登録し、状態＝<strong>有効</strong>で始まります。<strong>会社DBの実体は別途プロビジョニング</strong>（MVP: compose にサービス追記 → <code>up</code>）が必要で、未整備の間は「停止」（メンテナンス）に切り替えて運用します。</div>
+    <div class="provision-note">作成すると会社を登録し、状態＝<strong>有効</strong>で始まります。会社DBの準備が整うまでは「停止」（メンテナンス）に切り替えて運用できます。</div>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
@@ -213,7 +210,7 @@
     COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'active', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
     companyTable.render();
     closeModal(document.getElementById('companyModal'));
-    alert('「' + name + '」（' + code + '）を作成しました（デモ）。会社アイコン・カラーも保存されます。会社DBのプロビジョニング後に有効化されます。');
+    alert('「' + name + '」（' + code + '）を作成しました。会社アイコン・カラーも保存されます。');
   });
 </script>
 </body>

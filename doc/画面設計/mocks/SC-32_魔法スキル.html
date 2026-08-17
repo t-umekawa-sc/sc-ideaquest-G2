@@ -71,7 +71,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -180,7 +180,7 @@
   </div>
 
   <p class="role-note" style="margin-top:var(--space-6); color:var(--color-text-muted); font-size:var(--text-xs)">
-    ※ 魔法カタログ・系統・SPコスト・レアリティは<strong>初期値（調整可）</strong>。解放は <strong>同系統の下位魔法が解放済み</strong>＋SP消費で恒久所有（`UserSpell`）。本番はサーバーで前提・SP残高・コストを検証。エフェクトは <code>spell-fx--*</code>（shared.css・SC-24 と共通）。
+    魔法の解放には、<strong>同じ系統の下位魔法が解放済み</strong>であることと <strong>SP の消費</strong>が必要です。解放した魔法はずっと使えます。
   </p>
 </main>
 
@@ -241,7 +241,7 @@
       '<span class="spell-cost">✦ ' + cost + ' <span class="muted">SP</span></span>' +
       '<span class="spell-state">✓ 解放済み</span>';
     refresh();
-    alert('「' + name + '」を解放しました！\nチャット（SC-24）の魔法リアクションで使えます。');
+    alert('「' + name + '」を解放しました！\nチャットの魔法リアクションで使えます。');
   });
 
   refresh();

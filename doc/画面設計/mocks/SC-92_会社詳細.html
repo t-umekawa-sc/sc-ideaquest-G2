@@ -214,8 +214,7 @@
     </div>
 
     <div class="provision-note">
-      <strong>DB接続識別子:</strong> <code id="dbId">—</code>（接続情報の実体は <code>.env</code> で管理・ここでは参照キーのみ表示）<br>
-      <strong>プロビジョニング（MVP）:</strong> 会社DBは物理分離（別コンテナ）。会社追加は「<code>docker compose</code> に会社DBサービスを追記 → <code>up</code> → 管理DBに接続先を登録」の手動運用。
+      <strong>DB接続識別子:</strong> <code id="dbId">—</code>
     </div>
   </section>
 
@@ -227,7 +226,7 @@
   <!-- 一覧操作標準（DataTable）。グループ名/コード/メンバー数＋⋯（リネーム/削除）。 -->
   <div id="groupTable"></div>
   <p class="role-note" style="margin-top:var(--space-4);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ グループの<strong>作成・リネーム・削除はシステム管理者のみ</strong>（会社構造の変更・B.3）。<strong>コードは作成時のみ（以後不変）</strong>／リネームは名称のみ。<strong>削除は空のグループのみ</strong>（所属メンバーがいる間は不可＝先に所属を外す）。ここで作ったグループが、下のアカウント編集「所属グループ」の候補になります。
+    グループの<strong>作成・リネーム・削除はシステム管理者のみ</strong>が行えます。<strong>コードは作成時のみ設定でき、以後は変更できません</strong>（リネームは名称のみ）。<strong>削除は空のグループのみ</strong>可能です（メンバーがいる間は、先に所属を外してください）。ここで作ったグループが、下のアカウント編集「所属グループ」の候補になります。
   </p>
 
   <!-- ===== アカウント & クエストグループ所属（この会社） ===== -->
@@ -240,7 +239,7 @@
   <div id="accountTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ アカウントは<strong>管理者発行のみ</strong>（自己新規登録なし）→初回ログイン時にパスワード設定。会社設定は Company の各フラグ（`vote_anonymized`／`hide_voters_from_managers`／`mfa_required`）。<strong>クエストグループ所属の割当はシステム管理者のフル操作</strong>（クエストグループ管理者は自グループ範囲のみ＝SC-90）。この画面の操作は<strong>すべて上部バナーの会社に対して</strong>適用されます。
+    アカウントは<strong>管理者による発行のみ</strong>です（自己新規登録はできません）。発行後、対象者は初回ログイン時にパスワードを設定します。<strong>クエストグループ所属の割り当てはシステム管理者が行えます。</strong>この画面の操作は<strong>すべて上部バナーの会社に対して</strong>適用されます。
   </p>
 </main>
 
@@ -263,7 +262,7 @@
         <option value="company_account_admin">会社アカウント管理者</option>
         <option value="sys_admin">システム管理者</option>
       </select>
-      <div class="hint">3値。<strong>一般</strong>＝業務利用者／<strong>会社アカウント管理者</strong>＝自社の全アカウントの発行・無効化・PW再設定（SC-93）／<strong>システム管理者</strong>＝運営。<strong>ロール付与はシステム管理者のみ</strong>。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（system_role では持たない）。</div>
+      <div class="hint">3値。<strong>一般</strong>＝業務利用者／<strong>会社アカウント管理者</strong>＝自社の全アカウントの発行・無効化・PW再設定／<strong>システム管理者</strong>＝運営。<strong>ロール付与はシステム管理者のみ</strong>。<strong>クエストグループ管理者は下の所属グループごとに指定</strong>（システムロールとしては持ちません）。</div>
     </div>
     <div class="form-row"><label>所属クエストグループ</label>
       <div class="mrows" id="amGroups"></div>
@@ -273,7 +272,7 @@
       </div>
       <div class="hint">この会社のクエストグループから複数選択可。各グループの役割を <strong>メンバー / 管理者</strong> で指定（既定=メンバー）。<strong>「管理者」＝クエストグループ管理者の任命</strong>（system_admin＋会社アカウント管理者〔SC-93〕が可・2026-08-02）。指定されたユーザーは当該グループを SC-90 で管理可。</div>
     </div>
-    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロールの付与（会社アカウント管理者/システム管理者）は<strong>システム管理者のみ</strong>。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>（system_role では持たない）。</div>
+    <div class="provision-note">発行後、対象者は<strong>初回ログイン時にパスワード設定</strong>。システムロールの付与（会社アカウント管理者/システム管理者）は<strong>システム管理者のみ</strong>。<strong>クエストグループ管理者はグループ内ロール（admin）で表現</strong>（システムロールとしては持ちません）。</div>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
@@ -657,7 +656,7 @@
     else if (b.dataset.gdelete != null) {
       const g = CO.questGroups.find((x) => x.code === b.dataset.gdelete); if (!g) return;
       const mc = groupMemberCount(g.name);
-      if (mc > 0) { alert('「' + g.name + '」には所属メンバーが ' + mc + ' 名います。\n削除は空のグループのみ可（B.3）。先に全員の所属を外してください。'); return; }
+      if (mc > 0) { alert('「' + g.name + '」には所属メンバーが ' + mc + ' 名います。\n削除は空のグループのみ可能です。先に全員の所属を外してください。'); return; }
       if (confirm('クエストグループ「' + g.name + '」を削除しますか？\n空のグループのみ削除でき、過去の所属履歴は保持されます（トゥームストーン・デモ）。')) {
         CO.questGroups.splice(CO.questGroups.indexOf(g), 1);
         refreshGroups();

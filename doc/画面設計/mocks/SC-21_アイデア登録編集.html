@@ -54,7 +54,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -139,12 +139,11 @@
       <input type="file" id="fileInput" multiple hidden>
       <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="ファイルを添付">
         📎 クリックまたはドラッグ＆ドロップで添付
-        <div class="dropzone__hint">実体は MinIO に保管・物理名はハッシュ化。上限サイズ/許可形式は今後確定（TBD）。</div>
       </div>
       <div class="attach-list" id="attachList"></div>
     </div>
 
-    <p class="role-note" style="margin-top:var(--space-3)">※ 必須3項目がそろうと「投稿する」が有効。<strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>投稿</strong>でパーティーに公開し、アイデアごとのチャットグループを自動作成、投稿 XP を付与。本番は SC-12「アイデア追加/編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。</p>
+    <p class="role-note" style="margin-top:var(--space-3)">必須3項目がそろうと「投稿する」が押せます。<strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>投稿</strong>でパーティーに公開し、アイデアごとのチャットが自動で作成され、投稿で XP を獲得します。</p>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button">キャンセル</button>

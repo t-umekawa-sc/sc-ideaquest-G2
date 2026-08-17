@@ -71,7 +71,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="SC-31_アバター着せ替え.html">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -152,8 +152,7 @@
   <div class="list-empty" id="empty" hidden>条件に合う装備がありません。絞り込みを見直してください。</div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    ※ ラインナップ・価格・レアリティは<strong>初期値（調整可）</strong>。**購入時はサーバーでコイン残高・価格・所有を検証**し、不正入手を防止（第7節）。
-    購入は恒久（`UserItem` を作成）。着せ替え（スロット反映）は SC-31。装備の実体は VRM パーツ（three-vrm）。
+    購入したアイテムはずっと持てます（コイン残高を確認して購入します）。着せ替えは「アバター着せ替え」画面で反映できます。
   </p>
 </main>
 
@@ -263,7 +262,7 @@
     // 購入直後の軽い演出
     const card = grid.querySelector('.buy[data-id="' + id + '"]');
     if (card) { card.classList.add('just-bought'); card.addEventListener('animationend', () => card.classList.remove('just-bought'), { once: true }); }
-    alert('「' + it.name + '」を購入しました！\nきせかえ（SC-31）で装備できます。');
+    alert('「' + it.name + '」を購入しました！\nきせかえで装備できます。');
   }
 
   grid.addEventListener('click', (e) => {

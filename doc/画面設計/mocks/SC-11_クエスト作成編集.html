@@ -63,7 +63,7 @@
         </button>
         <ul class="usermenu__list" role="menu" hidden>
           <li role="none"><a role="menuitem" href="#">プロフィール</a></li>
-          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え（SC-31）</a></li>
+          <li role="none"><a role="menuitem" href="#">アバター / 着せ替え</a></li>
           <li role="none"><a role="menuitem" href="#">設定</a></li>
           <li role="none"><div class="usermenu__sep"></div></li>
           <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
@@ -99,7 +99,7 @@
           <input type="file" id="iconInput" accept="image/*" hidden>
           <button class="btn btn-outline btn-sm" type="button" id="iconUpload">画像をアップロード</button>
           <button class="btn btn-sm" type="button" id="iconClear" hidden>未設定に戻す</button>
-          <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。推奨: 正方形の画像。実体は MinIO 保管。</div>
+          <div class="hint">未設定なら「件名の頭文字＋所有者アバター」を自動表示。推奨: 正方形の画像。</div>
         </div>
       </div>
     </div>
@@ -222,7 +222,7 @@
       </div>
     </div>
 
-    <p class="role-note" style="margin-top:var(--space-3)">※ <strong>下書き保存</strong>＝本人のみ表示（パーティー未公開・XP/コインは付与しない）。<strong>作成</strong>で公開しパーティーに通知（クエスト作成/公開に XP は付与しない）。本番は SC-10「＋作成」/SC-12「編集」/SC-01 下書き から <strong>Intercept Route でモーダル差し込み</strong>（URL直/リロードはフルページ）。パネル→モーダルの拡大は framer-motion <code>layoutId</code>。</p>
+    <p class="role-note" style="margin-top:var(--space-3)"><strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>作成</strong>で公開し、パーティーに通知します。</p>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button">キャンセル</button>
