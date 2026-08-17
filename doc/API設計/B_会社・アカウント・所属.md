@@ -44,7 +44,7 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /admin/companies` | 会社一覧を取得（SC-91） | クエリ: `q`（会社名/会社コード/db_identifier の部分一致）・`status`（`active\|suspended`）・`page`/`per_page`（オフセット・§1.8） | `data`=会社の配列。各行に基本情報＋`status`＋集計 `account_count`/`group_count`。`page_info.total`＝総件数（バッジ） |
+| `GET /admin/companies` | 会社一覧を取得（SC-91） | クエリ: `q`（会社名/会社コード/db_identifier の部分一致）・`status`（`active\|suspended`）・`page`/`per_page`（オフセット・§1.8）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`name`/`company_code`/`account_count`/`group_count`/`created_at`（複数ソート `?sort=` 可）／フィルタ可能＝`status`（enum・多値可）・`account_count`/`group_count`（number 範囲）／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可 | `data`=会社の配列。各行に基本情報＋`status`＋集計 `account_count`/`group_count`。`page_info.total`＝総件数（バッジ） |
 | `POST /admin/companies` | 会社を新規作成（SC-91） | ボディ: `name`,`company_code`,`db_identifier`,`color`,`icon_image_path?` | 作成された会社（**`status=suspended`＝停止**で返す＝作成時点は会社DB未整備）。`company_code` は大文字正規化＋一意検証／DBプロビジョニングは MVP 手動（§8-⑫）・完了後に `active`（有効）化 |
 | `GET /admin/companies/{company_id}` | 会社詳細を取得（SC-92 バナー/カード） | パス: `company_id` | 会社の詳細＋設定フラグ（`vote_anonymized` 等）＋件数（`account_count`/`group_count`） |
 | `PATCH /admin/companies/{company_id}` | 会社プロフィールを更新（SC-92） | パス: `company_id`／ボディ: `color`,`icon_image_path?`（アイコンは MinIO・§1.10） | 更新後の会社プロフィール |
@@ -62,7 +62,7 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧を取得（SC-92） | パス: `company_id`／クエリ: `q`（氏名/login_id/email）・`status`（`active\|disabled`）・`group_id`・`page`/`per_page`（オフセット） | `data`=アカウントの配列。各行に氏名/`login_id`/`email`/`system_role`/`status`＋所属グループ＋グループ内ロール。`page_info.total` |
+| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧を取得（SC-92） | パス: `company_id`／クエリ: `q`（氏名/login_id/email）・`status`（`active\|disabled`）・`group_id`・`page`/`per_page`（オフセット）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`display_name`/`login_id`/`email`/`system_role`/`status`/`last_login_at`/`created_at`／フィルタ可能＝`status`・`system_role`（enum・多値可）・`group_id`／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可 | `data`=アカウントの配列。各行に氏名/`login_id`/`email`/`system_role`/`status`＋所属グループ＋グループ内ロール。`page_info.total` |
 | `POST /admin/companies/{company_id}/accounts` | アカウントを発行（→ B.5 発行フロー） | パス: `company_id`／ボディ: `display_name`,`login_id`,`email`,`system_role`(`general\|system_admin`),`memberships`(`[{group_id, role: member\|admin}]`) | 発行されたアカウント（`status=active`・`password_set=false`）。初回PW設定リンクを送信 |
 | `PATCH /admin/companies/{company_id}/accounts/{account_id}` | アカウントを編集 | パス: `company_id`,`account_id`／ボディ（差分）: `display_name`/`login_id`/`email`/`system_role`/`memberships` | 更新後のアカウント。identity（`login_id`/`email`）は会社内一意検証 |
 | `POST /.../accounts/{account_id}/disable` | アカウントを無効化 | パス: `account_id` | 無効化後の状態（`status=disabled`）。**全アクティブセッション破棄＋信頼端末失効**（A.9-③）。入力データは保持（監査） |
@@ -91,7 +91,7 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /admin/accounts` | 自社アカウント一覧（B.2 の `GET .../accounts` と同形） | クエリ: `q`・`status`・`group_id`・`page`/`per_page` | `data`＝アカウント配列（氏名/`login_id`/`email`/`system_role`/`status`＋所属＋グループ内ロール）。`page_info.total` |
+| `GET /admin/accounts` | 自社アカウント一覧（B.2 の `GET .../accounts` と同形） | クエリ: `q`・`status`・`group_id`・`page`/`per_page`。**DataTable 契約（§1.8.1）＝B.2 `GET .../accounts` と同一**（ソート可能キー・フィルタ可能フィールド・`?format=csv`〔監査対象〕・`?pin_ids=` を同形で受ける） | `data`＝アカウント配列（氏名/`login_id`/`email`/`system_role`/`status`＋所属＋グループ内ロール）。`page_info.total` |
 | `POST /admin/accounts` | アカウント発行（B.5 発行フロー） | ボディ: `display_name`,`login_id`,`email`,`memberships`（`[{group_id, role: member\|admin}]`） | 発行結果（`status=active`・`password_set=false`）。初回PW設定リンク送信 |
 | `PATCH /admin/accounts/{account_id}` | アカウント編集 | ボディ（差分）: `display_name`/`login_id`/`email`/`memberships` | 更新後アカウント（identity は会社内一意） |
 | `POST /admin/accounts/{account_id}/disable` ／ `/enable` | 無効化⇄再有効化 | — | 状態更新（B.2 と同挙動＝全セッション破棄＋信頼端末失効） |

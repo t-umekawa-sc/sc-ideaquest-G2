@@ -28,7 +28,7 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属クエストグループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
+| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属クエストグループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8）。**DataTable 契約（§1.8.1）**: 上記 `sort` キーは**複数指定可**（カンマ区切り・カーソルがソートタプルを内包）／フィルタ可能＝`status`・`group_id`（enum・多値可）／横断 `q` の全文検索は §1.11 の PGroonga（`GET /quests/{id}/search`）に委譲＝ここは簡易絞り／ページ方式＝**カーソル型**（「もっと見る」・番号ページャは使わない）／`?format=csv`・`?pin_ids=`＝SC-10 適用（ピンは list/card 共通・§4.5⑨） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
 | `GET /quests/{quest_id}` | クエスト詳細を取得（SC-12 ヘッダー/概要タブ） | パス: `quest_id` | クエスト詳細（上記＋`purpose`〔目的・テーマ全文〕/`created_at`）＋**`my_permissions`**（自分が持つ 6 権限の配列＝フロントの UX 出し分け用）＋集計 |
 | `GET /quests/{quest_id}/members` | パーティー＋各メンバーの権限を取得（SC-12 パーティータブ） | パス: `quest_id` | `data`=メンバーの配列（`user`〔アバター/氏名〕＋`permissions[]`＋`joined_at`＋`is_creator`）。権限バッジ描画に使用 |
 
