@@ -88,3 +88,77 @@ def test_b_tc_014_filter_and_pagination(client):
     r2 = client.get(_url(cid, "?q=user@acme"))
     assert r2.status_code == 200
     assert any("user@acme" in a["login_id"] for a in r2.json()["data"])
+
+
+# --- §1.8.1 DataTable クエリ契約の横展開（B.2・会社の B-TC-126〜135 に対応するアカウント版） ------
+# 会社一覧EP（company_application）で実証した契約を list_query 共通パーサ経由でアカウント一覧へ展開。
+# 検証用データは factory の専用会社＋アカウント（管理DBのみ・会社DB不要）で決定的に作る。
+
+
+def test_b_tc_141_multi_sort_by_display_name(client, factory):
+    """B-TC-141 複数ソート（§1.8.1①）＝?sort=display_name で氏名昇順・- 接頭辞で降順。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    factory.make_account(co, display_name="Charlie")
+    factory.make_account(co, display_name="Alice")
+    factory.make_account(co, display_name="Bob")
+
+    r = client.get(_url(co["id"], "?sort=display_name"))
+    assert r.status_code == 200, r.text
+    assert [a["display_name"] for a in r.json()["data"]] == ["Alice", "Bob", "Charlie"]
+
+    r2 = client.get(_url(co["id"], "?sort=-display_name"))
+    assert r2.status_code == 200, r2.text
+    assert [a["display_name"] for a in r2.json()["data"]] == ["Charlie", "Bob", "Alice"]
+
+
+def test_b_tc_142_unknown_sort_key_422(client, factory):
+    """B-TC-142 ソートキーはホワイトリスト＝未知キーは 422 validation_error(field=sort)（§1.8.1①・§2.2）。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    r = client.get(_url(co["id"], "?sort=password_hash"))
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "sort"
+
+
+def test_b_tc_143_enum_status_multi(client, factory):
+    """B-TC-143 enum 多値フィルタ（§1.8.1②）＝?status=active,disabled は OR。単値も可。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    factory.make_account(co, status="active", display_name="ActiveOne")
+    factory.make_account(co, status="disabled", display_name="DisabledOne")
+
+    only_disabled = client.get(_url(co["id"], "?status=disabled")).json()["data"]
+    assert [a["display_name"] for a in only_disabled] == ["DisabledOne"]
+
+    both = client.get(_url(co["id"], "?status=active,disabled&sort=display_name")).json()["data"]
+    assert [a["display_name"] for a in both] == ["ActiveOne", "DisabledOne"]
+
+
+def test_b_tc_144_unknown_status_enum_422(client, factory):
+    """B-TC-144 enum 未知値は 422 validation_error(field=status)（ホワイトリスト・§2.2）。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    r = client.get(_url(co["id"], "?status=bogus"))
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "status"
+
+
+def test_b_tc_145_enum_system_role_multi(client, factory):
+    """B-TC-145 system_role の enum 多値フィルタ（§1.8.1②・B.2）。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    factory.make_account(co, system_role="general", display_name="Gen")
+    factory.make_account(co, system_role="company_account_admin", display_name="Adm")
+
+    only_admin = client.get(_url(co["id"], "?system_role=company_account_admin")).json()["data"]
+    assert [a["display_name"] for a in only_admin] == ["Adm"]
+
+
+def test_b_tc_146_unknown_system_role_enum_422(client, factory):
+    """B-TC-146 system_role の未知値は 422 validation_error(field=system_role)。"""
+    _login_system_admin(client)
+    co = factory.make_company()
+    r = client.get(_url(co["id"], "?system_role=root"))
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "system_role"

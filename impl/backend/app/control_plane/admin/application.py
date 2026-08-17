@@ -13,6 +13,7 @@ import redis
 from sqlalchemy import func, or_, select
 
 from app.control_plane.account_sync import repository as account_sync_repo
+from app.control_plane.admin import list_query as lq
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.orm import Account, Company
@@ -275,41 +276,73 @@ def reset_password(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
     return {"status": "sent"}
 
 
+# DataTable 契約（§1.8.1）＝アカウント一覧のソート可能キー/enum ホワイトリスト（B.2）。
+# group_id フィルタ（会社DB `quest_group_members` join）は所属スライス後＝ここには含めない（設計↔実装ドリフト回避）。
+_ACCOUNT_SORT_COLUMNS = {
+    "display_name": Account.display_name,
+    "login_id": Account.login_id,
+    "email": Account.email,
+    "system_role": Account.system_role,
+    "status": Account.status,
+    "last_login_at": Account.last_login_at,
+    "created_at": Account.created_at,
+}
+_ACCOUNT_STATUSES = ("active", "disabled")
+_ACCOUNT_ROLES = ("general", "company_account_admin", "system_admin")
+
+
+def _account_query(company_id: uuid.UUID, *, q, status, system_role, sort, exclude_ids=None):
+    """アカウント一覧の検索/フィルタ/ソートを共通適用（一覧・CSV で共有・§1.8.1①②）。
+
+    戻り値＝(rows_stmt〔order 済み・offset/limit 未適用〕, count_stmt)。未知 sort/enum はここで 422（先に検証）。
+    `exclude_ids`＝固定行（ピン）を非固定母集合から除外（§1.8.1④）。
+    """
+    order = lq.parse_sort(sort, _ACCOUNT_SORT_COLUMNS)
+    statuses = lq.parse_enum(status, "status", _ACCOUNT_STATUSES)
+    roles = lq.parse_enum(system_role, "system_role", _ACCOUNT_ROLES)
+
+    conds = [Account.company_id == company_id]
+    if statuses:  # enum 多値＝OR（IN）・§1.8.1②
+        conds.append(Account.status.in_(statuses))
+    if roles:
+        conds.append(Account.system_role.in_(roles))
+    if q:
+        like = f"%{q}%"
+        conds.append(
+            or_(Account.display_name.ilike(like), Account.login_id.ilike(like), Account.email.ilike(like))
+        )
+    if exclude_ids:  # 固定行は非固定母集合（data/total）から除外・§1.8.1④
+        conds.append(Account.id.notin_(exclude_ids))
+
+    rows_stmt = select(Account).where(*conds)
+    # 明示ソートはキー順＋末尾 id で一意化／無指定は従来の created_at,id 決定的順序（§1.8.1①）。
+    rows_stmt = rows_stmt.order_by(*order, Account.id) if order else rows_stmt.order_by(Account.created_at, Account.id)
+    count_stmt = select(func.count()).select_from(Account).where(*conds)
+    return rows_stmt, count_stmt
+
+
 def list_company_accounts(
     company_id: uuid.UUID,
     *,
     q: str | None = None,
     status: str | None = None,
+    system_role: str | None = None,
+    sort: str | None = None,
     page: int = 1,
     per_page: int = _DEFAULT_PER_PAGE,
 ) -> dict:
-    """会社のアカウント一覧（オフセット・§1.8）。対象会社が無ければ 404（存在秘匿・B.2）。"""
+    """会社のアカウント一覧（オフセット・§1.8）＋複数ソート/enum 多値フィルタ（§1.8.1①②）。会社が無ければ 404（存在秘匿・B.2）。"""
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
     with control_session() as session:
         company = session.get(Company, company_id)
         if company is None:
             raise AppError(404, "not_found")  # 対象会社の実在（B.2・§1.6）
-
-        conds = [Account.company_id == company_id]
-        if status in ("active", "disabled"):
-            conds.append(Account.status == status)
-        if q:
-            like = f"%{q}%"
-            conds.append(
-                or_(Account.display_name.ilike(like), Account.login_id.ilike(like), Account.email.ilike(like))
-            )
-
-        total = session.execute(select(func.count()).select_from(Account).where(*conds)).scalar_one()
-        rows = session.execute(
-            select(Account)
-            .where(*conds)
-            .order_by(Account.created_at, Account.id)
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-        ).scalars().all()
+        rows_stmt, count_stmt = _account_query(
+            company_id, q=q, status=status, system_role=system_role, sort=sort)
+        total = session.execute(count_stmt).scalar_one()
+        rows = session.execute(rows_stmt.offset((page - 1) * per_page).limit(per_page)).scalars().all()
         data = [_account_item(a) for a in rows]
-
     return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 

@@ -36,6 +36,23 @@
 | B-TC-013 | api | 存在しない会社の存在秘匿 | system_admin | 存在しない `company_id` で GET | `404 {code:"not_found"}`（存在秘匿・§1.6） | B.2／§1.6 |
 | B-TC-014 | api | 検索/状態フィルタ/オフセットページングの実効性 | system_admin | `?status=active&per_page=1&page=1`／`?q=…` | オフセットページング（`page_info.per_page/page/total`）＋`q`/`status` フィルタが効く | §1.8 |
 
+### 2.1 §1.8.1 DataTable クエリ契約の横展開（アカウント一覧・B.2）
+
+> 会社一覧（§3 B-TC-126〜135）で実証した §1.8.1 契約を、共通パーサ（`app/control_plane/admin/list_query.py`）経由で
+> アカウント一覧（`GET /admin/companies/{company_id}/accounts`・`GET /admin/accounts`）へ展開。検証データは factory の
+> 専用会社＋アカウント（管理DB のみ・会社DB 不要）で決定的に作る。`group_id` フィルタ（会社DB `quest_group_members`）は所属スライス後。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-141 | api | 複数ソート（氏名昇順/降順） | 専用会社に display_name の異なる3件 | `?sort=display_name`／`-display_name` | キー順に昇順/降順（作成順でない・§1.8.1①） | §1.8.1①／B.2 |
+| B-TC-142 | api | ソートキーのホワイトリスト検証 | 専用会社 | `?sort=password_hash` | `422 validation_error`（`errors[].field="sort"`） | §1.8.1①／§2.2 |
+| B-TC-143 | api | status の enum 多値 OR | active/disabled を各1件 | `?status=disabled`／`=active,disabled` | 単値＝該当のみ／多値＝和集合（§1.8.1②） | §1.8.1②／B.2 |
+| B-TC-144 | api | status enum 値のホワイトリスト検証 | 専用会社 | `?status=bogus` | `422 validation_error`（`errors[].field="status"`） | §1.8.1②／§2.2 |
+| B-TC-145 | api | system_role の enum 多値フィルタ | general/company_account_admin を各1件 | `?system_role=company_account_admin` | 該当ロールのみ（§1.8.1②） | §1.8.1②／B.2 |
+| B-TC-146 | api | system_role enum 値のホワイトリスト検証 | 専用会社 | `?system_role=root` | `422 validation_error`（`errors[].field="system_role"`） | §1.8.1②／§2.2 |
+
+**red 確認（test-first）**＝B-TC-141〜146 は sort/system_role/多値 status 実装前に確認（未対応＝順序が作成順・未知キー/値が無視され 200）。証跡＝コミットメッセージ。
+
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |

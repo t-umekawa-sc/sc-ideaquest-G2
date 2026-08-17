@@ -176,14 +176,16 @@ def list_company_accounts(
     company_id: uuid.UUID,
     request: Request,
     q: str | None = None,
-    status: str | None = Query(default=None, pattern="^(active|disabled)$"),
+    status: str | None = None,  # enum 多値（`active,disabled`）＝値検証は application（§1.8.1②）
+    system_role: str | None = None,  # enum 多値（general/company_account_admin/system_admin）（§1.8.1②）
+    sort: str | None = None,  # 複数ソート（§1.8.1①）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     _session: dict = Depends(require_system_admin),
 ) -> AccountListResponse:
-    """会社のアカウント一覧（SC-92・B.2・system_admin 専用）。"""
+    """会社のアカウント一覧（SC-92・B.2・system_admin 専用）＋複数ソート/enum 多値フィルタ（§1.8.1①②）。"""
     result = admin_service.list_company_accounts(
-        company_id, q=q, status=status, page=page, per_page=per_page
+        company_id, q=q, status=status, system_role=system_role, sort=sort, page=page, per_page=per_page
     )
     return AccountListResponse(**result)
 
@@ -261,14 +263,16 @@ def password_reset(
 def list_own_accounts(
     request: Request,
     q: str | None = None,
-    status: str | None = Query(default=None, pattern="^(active|disabled)$"),
+    status: str | None = None,  # enum 多値（値検証は application・§1.8.1②）
+    system_role: str | None = None,  # enum 多値（§1.8.1②）
+    sort: str | None = None,  # 複数ソート（§1.8.1①）
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
     session: dict = Depends(require_company_account_admin),
 ) -> AccountListResponse:
-    """自社アカウント一覧（SC-93・B.2.1）。"""
+    """自社アカウント一覧（SC-93・B.2.1）＝B.2 と同形の契約（複数ソート/enum 多値フィルタ・§1.8.1①②）。"""
     result = admin_service.list_company_accounts(
-        _company_id(session), q=q, status=status, page=page, per_page=per_page
+        _company_id(session), q=q, status=status, system_role=system_role, sort=sort, page=page, per_page=per_page
     )
     return AccountListResponse(**result)
 

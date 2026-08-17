@@ -145,7 +145,8 @@ def factory():
             return {"id": c.id, "company_code": code}
 
     def make_account(company: dict, password: str = "Passw0rd!", password_set: bool = True,
-                     status: str = "active") -> dict:
+                     status: str = "active", system_role: str = "general",
+                     display_name: str = "Test User") -> dict:
         lid = f"user-{uuid.uuid4().hex[:8]}@t.example"
         with control_session() as s:
             a = Account(
@@ -153,10 +154,10 @@ def factory():
                 company_id=company["id"],
                 login_id=lid,
                 email=lid,
-                display_name="Test User",
+                display_name=display_name,
                 password_hash=hash_password(password) if password_set else None,
                 locale="ja",
-                system_role="general",
+                system_role=system_role,
                 status=status,
             )
             s.add(a)
