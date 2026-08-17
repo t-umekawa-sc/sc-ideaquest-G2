@@ -28,22 +28,39 @@ test("B-TC-110 system admin sees company list", async ({ page }) => {
   await expect(page.getByText("ACME-01")).toBeVisible();
 });
 
-// B-TC-111: 会社作成＝一覧に現れる（status=suspended＝「停止」バッジ）。
+// B-TC-111: 会社作成＝一覧に現れる（status=suspended＝「停止」バッジ）。作成は URL モーダル（intercept）。
 test("B-TC-111 create company appears in list", async ({ page }) => {
   await login(page, OPS);
   await page.goto("/admin/companies");
   const code = `E2E-${Date.now().toString().slice(-8)}`;
-  await page.getByRole("button", { name: "＋ 会社を作成" }).click();
+  await page.getByRole("link", { name: "＋ 会社を作成" }).click(); // トリガは URL モーダルへの Link
   await page.locator("#c_name").fill("E2E テスト社");
   await page.locator("#c_code").fill(code);
   await page.locator("#c_db").fill(`ideaquest_e2e_${Date.now().toString().slice(-8)}`);
   await page.getByRole("button", { name: /作成する/ }).click(); // 送信ボタンは modal（body 直下に portal）
-  // 一覧は DataTable（client モード）＝ライブ検索で絞る（検索ボタンなし・placeholder「…を検索…」）。
-  // 作成後は reload で DataTable が再マウントされ検索欄がクリアされ得るため、fill→表示確認を toPass で再試行。
+  // 作成成功＝モーダルが閉じ、イベントで一覧が再取得される。ライブ検索で絞って行の出現を toPass で再試行。
   await expect(async () => {
     await page.getByRole("searchbox").fill(code);
     await expect(page.getByRole("row", { name: new RegExp(code) })).toBeVisible({ timeout: 1000 });
   }).toPass();
+});
+
+// B-TC-160: 会社作成ダイアログは URL 付きモーダル（Parallel@modal＋Intercept・§112）。
+// 一覧からのソフト遷移＝URL が /new になりモーダルが差し込まれ背景の一覧は維持／直アクセス＝フルページ・フォールバック。
+test("B-TC-160 create dialog is a URL modal (intercept) with full-page fallback", async ({ page }) => {
+  await login(page, OPS);
+  await page.goto("/admin/companies");
+  await page.getByRole("link", { name: "＋ 会社を作成" }).click();
+  await expect(page).toHaveURL(/\/admin\/companies\/new$/); // URL を持つ
+  await expect(page.getByRole("dialog")).toBeVisible(); // モーダルが出る
+  await expect(page.getByRole("heading", { name: "会社（テナント）を作成" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "システム管理（運営）" })).toBeVisible(); // 背景の一覧は維持
+  await page.getByRole("button", { name: "キャンセル" }).click(); // 閉じると URL が戻る
+  await expect(page).toHaveURL(/\/admin\/companies$/);
+  // 直アクセス（リロード相当）＝intercept にマッチせずフルページ・フォールバック（モーダルでない）。
+  await page.goto("/admin/companies/new");
+  await expect(page.getByRole("heading", { name: "会社（テナント）を作成" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "← 会社一覧へ戻る" })).toBeVisible();
 });
 
 // B-TC-112: 非 system_admin（general）は SC-91 に入れない（サーバーガード＝/ へリダイレクト）。
