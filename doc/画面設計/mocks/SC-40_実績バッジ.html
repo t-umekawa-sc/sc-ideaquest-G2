@@ -203,7 +203,7 @@
   const TIER_LABEL = { bronze:'ブロンズ', silver:'シルバー', gold:'ゴールド' };
   const TIER_REWARD = { bronze:20, silver:50, gold:150 }; // 難易度に応じたコイン付与（初期値）
 
-  // カテゴリ select を生成
+  // カテゴリー select を生成
   const fCat = document.getElementById('fCat');
   Object.entries(CATS).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; fCat.appendChild(o); });
 
