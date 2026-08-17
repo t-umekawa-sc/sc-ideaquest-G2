@@ -27,7 +27,7 @@ test("B-TC-117 own-company account issue appears", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "会社アカウント管理" })).toBeVisible();
 
   const loginId = `e2e-self-${Date.now().toString().slice(-8)}@ops.example`;
-  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#s_name").fill("E2E 自社太郎");
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(loginId);
@@ -58,7 +58,7 @@ test("B-TC-124 own-account list: search, email column, clear", async ({ page }) 
   const stamp = Date.now().toString().slice(-8);
   const loginId = `e2e-l-${stamp}@ops.example`;
   const emailAddr = `e2e-m-${stamp}@ops.example`;
-  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#s_name").fill(`検索対象_${stamp}`);
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(emailAddr);
@@ -96,7 +96,7 @@ test("B-TC-122 self issue with membership picker", async ({ page }) => {
   // SC-93: 発行フォームの所属ピッカーに当該グループが出る→選択→発行
   await page.goto("/admin/accounts");
   const loginId = `e2e-selfm-${stamp}@ops.example`;
-  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#s_name").fill("自社所属太郎");
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(loginId);

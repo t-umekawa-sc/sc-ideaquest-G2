@@ -25,7 +25,7 @@ test("B-TC-114 issue account appears in company account list", async ({ page }) 
   await expect(page.getByText("user@acme.example").first()).toBeVisible();
 
   const newLogin = `e2e-${Date.now().toString().slice(-8)}@acme.example`;
-  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#a_name").fill("E2E 発行太郎");
   await page.locator("#a_login").fill(newLogin);
   await page.locator("#a_email").fill(newLogin);
@@ -51,7 +51,7 @@ test("B-TC-125 company account list: search, email column, clear", async ({ page
   const stamp = Date.now().toString().slice(-8);
   const loginId = `e2e-l-${stamp}@acme.example`;
   const emailAddr = `e2e-m-${stamp}@acme.example`;
-  await region.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await region.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#a_name").fill(`検索対象_${stamp}`);
   await page.locator("#a_login").fill(loginId);
   await page.locator("#a_email").fill(emailAddr);

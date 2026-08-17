@@ -1,10 +1,41 @@
 // accounts 機能の API 呼び出し（§4.1・lib/api 経由）。正＝doc/API設計/B_会社・アカウント・所属.md B.2/B.3/B.5。
 // system_admin のクロステナント経路（/admin/companies/{company_id}/accounts）を使う（SC-92）。
 import { apiFetch } from "@/lib/api/client";
-import type { AccountCreateInput, AccountListResponse, AccountResponse, Membership } from "./types";
+import type { Account, AccountCreateInput, AccountListResponse, AccountResponse, Membership } from "./types";
 import type { components } from "@/lib/api/schema";
 
 type QuestGroupListResponse = components["schemas"]["QuestGroupListResponse"];
+
+// 発行/編集/無効化などでアカウント集合が変化したことを一覧へ通知する window イベント（跨ルート更新）。
+// URL 付きモーダル（別ルート）は背景一覧を再マウントしないため、成功時に発火し一覧が購読して再取得する
+// （COMPANIES_CHANGED_EVENT と同型・将来はサーバーデータ流路へ整理・handoff §5）。
+export const ACCOUNTS_CHANGED_EVENT = "ideaquest:accounts-changed";
+
+const FIND_PER_PAGE = 100; // backend 上限。単一アカウントの取得 EP が無いため一覧をループして id で解決する。
+
+// 編集モーダル（URL 化）のプリフィル用。単一取得 EP が無いので一覧を全件ループして id 一致を返す
+// （useAllAccounts と同じ流儀・管理系は小〜数百件で妥当）。見つからなければ null（フォームが not-found 表示）。
+export async function findAccountById(companyId: string, accountId: string): Promise<Account | null> {
+  for (let page = 1; ; page += 1) {
+    const res = await listAccounts(companyId, { page, per_page: FIND_PER_PAGE });
+    const batch = res?.data ?? [];
+    const hit = batch.find((a) => a.account_id === accountId);
+    if (hit) return hit;
+    const total = res?.page_info.total ?? batch.length;
+    if (batch.length === 0 || page * FIND_PER_PAGE >= total) return null;
+  }
+}
+
+export async function findOwnAccountById(accountId: string): Promise<Account | null> {
+  for (let page = 1; ; page += 1) {
+    const res = await listOwnAccounts({ page, per_page: FIND_PER_PAGE });
+    const batch = res?.data ?? [];
+    const hit = batch.find((a) => a.account_id === accountId);
+    if (hit) return hit;
+    const total = res?.page_info.total ?? batch.length;
+    if (batch.length === 0 || page * FIND_PER_PAGE >= total) return null;
+  }
+}
 
 export function listAccounts(
   companyId: string,

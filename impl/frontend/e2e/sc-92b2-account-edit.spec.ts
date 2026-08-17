@@ -21,7 +21,7 @@ test("B-TC-115 edit account display name", async ({ page }) => {
 
   const stamp = Date.now().toString().slice(-8);
   const loginId = `e2e-edit-${stamp}@acme.example`;
-  await page.getByRole("button", { name: "＋ アカウント発行" }).click();
+  await page.getByRole("link", { name: "＋ アカウント発行" }).click();
   await page.locator("#a_name").fill("編集前太郎");
   await page.locator("#a_login").fill(loginId);
   await page.locator("#a_email").fill(loginId);
