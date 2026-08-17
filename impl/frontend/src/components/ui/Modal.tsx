@@ -6,6 +6,7 @@
 // 背景スクロールロック・aria-modal/aria-labelledby・**本文スクロール**（modal__body）・**ヘッダードラッグ移動（§105）**・
 // **最大化/復元（§106）**。狭幅は CSS で自動フルスクリーン＝ドラッグ/最大化は無効。portal で body 直下に描画。
 // 後続（§111）＝本番形の URL 付きモーダル（Parallel/Intercept Routes・共有要素アニメ）へ載せ替え予定。
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -13,7 +14,8 @@ type Size = "sm" | "md" | "lg";
 
 type Props = {
   open: boolean;
-  onClose: () => void;
+  onClose: () => void; // 閉じる要求（Esc/バックドロップ/×）。呼び出し側が open を false にする。
+  onClosed?: () => void; // 閉じアニメ完了後（AnimatePresence onExitComplete）。URL モーダルの router.back 用。
   title: string;
   size?: Size;
   draggable?: boolean; // ヘッダーを掴んで移動（既定 on・§105「全入力モーダルで有効」）
@@ -26,7 +28,8 @@ const FOCUSABLE =
 
 const NARROW = 640; // これ以下は自動フルスクリーン＝ドラッグ/最大化しない（shared.css と一致）
 
-export function Modal({ open, onClose, title, size = "md", draggable = true, maximizable = true, children }: Props) {
+export function Modal({ open, onClose, onClosed, title, size = "md", draggable = true, maximizable = true, children }: Props) {
+  const reduce = useReducedMotion();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -116,42 +119,63 @@ export function Modal({ open, onClose, title, size = "md", draggable = true, max
     document.addEventListener("pointerup", up);
   }
 
-  if (!open || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   const canDrag = draggable && !maximized;
-  const panelStyle = !maximized && (pos.x !== 0 || pos.y !== 0) ? { transform: `translate(${pos.x}px, ${pos.y}px)` } : undefined;
 
   return createPortal(
-    <div
-      className={`modal modal--${size} show${canDrag ? " modal--draggable" : ""}`}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
-      <div className="modal__backdrop" onClick={onClose} aria-hidden="true" />
-      <div className={`modal__panel sectioned${maximized ? " is-max" : ""}`} ref={panelRef} style={panelStyle}>
-        <div className="modal__header" onPointerDown={onHeaderPointerDown}>
-          <h2 id={titleId}>{title}</h2>
-          <span className="modal__header__tools">
-            {maximizable && window.innerWidth > NARROW && (
-              <button
-                type="button"
-                className="modal__maxbtn"
-                aria-label={maximized ? "元のサイズに戻す" : "最大化"}
-                aria-pressed={maximized}
-                onClick={() => setMaximized((v) => !v)}
-              >
-                {maximized ? "⤡" : "⤢"}
-              </button>
-            )}
-            <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>
-              ✕
-            </button>
-          </span>
+    <AnimatePresence onExitComplete={onClosed}>
+      {open && (
+        <div
+          key="modal"
+          className={`modal modal--${size} modal--anim${canDrag ? " modal--draggable" : ""}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+        >
+          <motion.div
+            className="modal__backdrop"
+            onClick={onClose}
+            aria-hidden="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.2 }}
+          />
+          <motion.div
+            // CRT 電源ON＝細い横線（scaleY≈0）が一瞬光って（CSS フラッシュ）縦に開く。閉じは縦に畳む。
+            className={`modal__panel sectioned${maximized ? " is-max" : ""}${reduce ? "" : " modal__panel--crt-in"}`}
+            ref={panelRef}
+            style={{ x: maximized ? 0 : pos.x, y: maximized ? 0 : pos.y, transformOrigin: "center center" }}
+            initial={{ opacity: reduce ? 1 : 0.15, scaleY: reduce ? 1 : 0.04 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: reduce ? 1 : 0.04 }}
+            transition={{ duration: reduce ? 0 : 0.26, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="modal__header" onPointerDown={onHeaderPointerDown}>
+              <h2 id={titleId}>{title}</h2>
+              <span className="modal__header__tools">
+                {maximizable && window.innerWidth > NARROW && (
+                  <button
+                    type="button"
+                    className="modal__maxbtn"
+                    aria-label={maximized ? "元のサイズに戻す" : "最大化"}
+                    aria-pressed={maximized}
+                    onClick={() => setMaximized((v) => !v)}
+                  >
+                    {maximized ? "⤡" : "⤢"}
+                  </button>
+                )}
+                <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>
+                  ✕
+                </button>
+              </span>
+            </div>
+            {children}
+          </motion.div>
         </div>
-        {children}
-      </div>
-    </div>,
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

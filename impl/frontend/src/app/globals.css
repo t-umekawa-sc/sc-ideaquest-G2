@@ -14,6 +14,11 @@ body {
   padding: 0;
   margin: 0;
 }
+/* スクロールバーのガターを常時確保＝モーダル表示で body の overflow:hidden にしても背景幅が変わらず、
+   開閉時の横ズレ（チラつき）を防ぐ（スクロールバー消失で本文が右へ広がる問題の解消）。 */
+html {
+  scrollbar-gutter: stable;
+}
 body {
   font-family: var(--font-base);
   font-size: var(--text-base);

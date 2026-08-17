@@ -17,6 +17,7 @@ export type {
 } from "./DataTable";
 export { Field } from "./Field";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
+export { RouteModal } from "./RouteModal";
 export { Pager } from "./Pager";
 export { RowMenu } from "./RowMenu";
 export type { RowMenuItem } from "./RowMenu";

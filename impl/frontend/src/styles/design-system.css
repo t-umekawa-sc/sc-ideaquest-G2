@@ -301,6 +301,27 @@ img { max-width: 100%; display: block; }
 .modal--md .modal__panel { max-width: 600px; }
 .modal--lg .modal__panel { max-width: 720px; }
 
+/* --- アニメ・モーダル（framer-motion で enter/exit＝デザイン標準 §113）。CRT 電源ON演出（縦に開く）--- */
+/* backdrop の opacity は framer が制御＝既存 CSS transition と二重になるため無効化 */
+.modal--anim .modal__backdrop { transition: none; }
+/* 昔のブラウン管の電源ON＝細い横線が一瞬光ってから縦に開く。縦展開(scaleY)は framer が担当し、
+   ここでは開いた瞬間の「白い発光フラッシュ」を重ねて“通電感”を出す（縦展開中のスクイーズも覆って隠す）。
+   ゲーム層 CRTガラスに整合・意図的クロスオーバー §117/§120。reduced-motion で静止（下記）。 */
+.modal__panel--crt-in::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(130% 80% at 50% 50%, rgba(255,255,255,.95), rgba(190,225,255,.5) 45%, transparent 72%);
+  animation: modal-crt-flash .3s ease-out 1;
+  opacity: 0;
+}
+@keyframes modal-crt-flash {
+  0% { opacity: 0; }
+  25% { opacity: .9; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal__panel--crt-in::after { display: none; animation: none; }
+}
+
 /* 入力バリデーションのインラインエラー（フィールド標準。alert() の代替） */
 .field__error { color: var(--color-danger); font-size: var(--text-xs); margin-top: 4px; }
 .input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--color-danger); }
