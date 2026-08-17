@@ -354,18 +354,18 @@
   const ftCount = document.getElementById('ftCount');
   // このクエスト内の検索対象（種別・フィールド・所属アイデア・本文・遷移先）
   const FT_DATA = [
-    { type: 'idea', field: '件名', idea: '夜間配送の集約', text: '夜間配送の集約', target: 'アイデア詳細 (SC-22)' },
-    { type: 'idea', field: 'アイデア本文', idea: '夜間配送の集約', text: '現状は拠点ごとに小口配送しており積載率が低い。夜間の集約便を設定し、翌朝に各拠点へ再配分することで台数を削減できる。試算では月間15%の配送コスト削減。', target: 'アイデア詳細 (SC-22)' },
-    { type: 'idea', field: '価値', idea: '夜間配送の集約', text: '夜間帯の配送を1拠点に集約し、積載率を上げて配送コストとCO2を同時に削減する。', target: 'アイデア詳細 (SC-22)' },
-    { type: 'idea', field: '備考・特記事項', idea: '夜間配送の集約', text: '倉庫の夜間稼働には労務面の調整が必要。試験導入は東京拠点から段階的に。', target: 'アイデア詳細 (SC-22)' },
-    { type: 'idea', field: '価値', idea: '置き配の写真通知', text: '置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。', target: 'アイデア詳細 (SC-22)' },
-    { type: 'idea', field: 'アイデア本文', idea: '再配達の予測AI', text: '過去の配達実績から不在になりやすい時間帯を予測し、配送前に受取人へリマインドして再配達を減らす。', target: 'アイデア詳細 (SC-22)' },
-    { type: 'chat', field: 'チャット', idea: '夜間配送の集約', text: '鈴木: 夜間の集約なら積載率がかなり上がりそうですね。倉庫の稼働時間だけ要調整です。', target: 'チャット (SC-24)' },
-    { type: 'chat', field: 'チャット', idea: '置き配の写真通知', text: '佐藤: 写真通知は再配達の削減に効きそう。プライバシーの配慮だけ検討しましょう。', target: 'チャット (SC-24)' },
-    { type: 'chat', field: 'チャット', idea: '再配達の予測AI', text: '田中: 予測モデルの学習データは配送ログから。まずデータ整備が必要かもしれません。', target: 'チャット (SC-24)' },
-    { type: 'attachment', field: '添付ファイル名', idea: '夜間配送の集約', text: '夜間集約便_コスト試算.xlsx', target: 'アイデア詳細 (SC-22)' },
-    { type: 'attachment', field: '添付ファイル名', idea: '置き配の写真通知', text: '置き配_写真通知_仕様書.pdf', target: 'アイデア詳細 (SC-22)' },
-    { type: 'attachment', field: '添付ファイル名', idea: '再配達の予測AI', text: '配送ログ_サンプル.csv', target: 'チャット (SC-24)' },
+    { type: 'idea', field: '件名', idea: '夜間配送の集約', text: '夜間配送の集約', target: 'アイデア詳細' },
+    { type: 'idea', field: 'アイデア本文', idea: '夜間配送の集約', text: '現状は拠点ごとに小口配送しており積載率が低い。夜間の集約便を設定し、翌朝に各拠点へ再配分することで台数を削減できる。試算では月間15%の配送コスト削減。', target: 'アイデア詳細' },
+    { type: 'idea', field: '価値', idea: '夜間配送の集約', text: '夜間帯の配送を1拠点に集約し、積載率を上げて配送コストとCO2を同時に削減する。', target: 'アイデア詳細' },
+    { type: 'idea', field: '備考・特記事項', idea: '夜間配送の集約', text: '倉庫の夜間稼働には労務面の調整が必要。試験導入は東京拠点から段階的に。', target: 'アイデア詳細' },
+    { type: 'idea', field: '価値', idea: '置き配の写真通知', text: '置き配完了時に写真付きで通知し、不在時の不安と再配達を減らす。', target: 'アイデア詳細' },
+    { type: 'idea', field: 'アイデア本文', idea: '再配達の予測AI', text: '過去の配達実績から不在になりやすい時間帯を予測し、配送前に受取人へリマインドして再配達を減らす。', target: 'アイデア詳細' },
+    { type: 'chat', field: 'チャット', idea: '夜間配送の集約', text: '鈴木: 夜間の集約なら積載率がかなり上がりそうですね。倉庫の稼働時間だけ要調整です。', target: 'チャット' },
+    { type: 'chat', field: 'チャット', idea: '置き配の写真通知', text: '佐藤: 写真通知は再配達の削減に効きそう。プライバシーの配慮だけ検討しましょう。', target: 'チャット' },
+    { type: 'chat', field: 'チャット', idea: '再配達の予測AI', text: '田中: 予測モデルの学習データは配送ログから。まずデータ整備が必要かもしれません。', target: 'チャット' },
+    { type: 'attachment', field: '添付ファイル名', idea: '夜間配送の集約', text: '夜間集約便_コスト試算.xlsx', target: 'アイデア詳細' },
+    { type: 'attachment', field: '添付ファイル名', idea: '置き配の写真通知', text: '置き配_写真通知_仕様書.pdf', target: 'アイデア詳細' },
+    { type: 'attachment', field: '添付ファイル名', idea: '再配達の予測AI', text: '配送ログ_サンプル.csv', target: 'チャット' },
   ];
   const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   function snippet(text, q) {
@@ -389,7 +389,7 @@
     ftResults.innerHTML = hits.map((r) => {
       const cls = r.type === 'chat' ? 'badge badge-muted' : 'badge';
       const ctx = r.type === 'chat' ? ('アイデア: ' + r.idea + ' のチャット')
-        : r.type === 'attachment' ? ('アイデア: ' + r.idea + ' の添付（→ ' + (r.target.includes('SC-24') ? 'チャット' : 'アイデア') + 'へ）')
+        : r.type === 'attachment' ? ('アイデア: ' + r.idea + ' の添付（→ ' + (r.target.includes('チャット') ? 'チャット' : 'アイデア') + 'へ）')
         : ('アイデア: ' + r.idea);
       return '<a class="card ft-result" href="#">'
         + '<div class="ft-result__head"><span class="' + cls + '">' + r.field + '</span><span class="ft-result__ctx">' + esc(ctx) + '</span></div>'
