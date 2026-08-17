@@ -27,6 +27,10 @@ docker compose --profile workers up --build   # worker / mail-worker も起動
 > 両ワーカは共有 control DB の `*_outbox` を real sender で drain するため、backend の pytest（プロセス内
 > `FakeMailSender` で同じ `mail_outbox` を drain）と同時稼働すると mail 系 TC がフレーク化する。よって
 > **backend pytest は `--profile workers` を有効にしないまま**回すこと（下記テスト手順は既定どおりワーカ無し）。
+>
+> 逆に、**非同期を要する frontend e2e は `docker compose --profile workers up -d` が必要**＝`sc-00-mfa`/
+> `sc-00-password-setup` は OTP/設定リンクの MailHog 配信（`mail-worker`）に、`sc-90` のディレクトリ参加追加は
+> 会社DB users ミラー（`account_sync worker`）に依存する。ワーカ非依存の e2e（`sc-91` 等）は既定の `up` でも通る。
 
 シード（開発用ログイン情報）＝会社コード `ACME-01` / ログインID `user@acme.example` / PW `Passw0rd!`（会社は `mfa_required=false`）。
 

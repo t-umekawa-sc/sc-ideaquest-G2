@@ -5,9 +5,12 @@
 # 常駐ワーカ（worker / mail-worker）は profile `workers` に隔離する（既定の `docker compose up` では起動しない）。
 # 理由＝両ワーカは共有 control DB の *_outbox を real sender で drain するため、backend の pytest（プロセス内
 # FakeMailSender で同じ mail_outbox を drain する）と同時に走ると mail 行の取り合いになり mail 系 TC がフレーク化する
-# （mail_worker.py の docstring「テストは直接呼ぶ＝常駐不要」）。非同期パイプライン込みの手動起動や検証は
-# `docker compose --profile workers up -d` で明示起動する。backend pytest（`up -d db redis`）と frontend e2e
-# （`up -d frontend`＝依存グラフにワーカを含まない）はいずれもワーカ不要なので既定のままで動く。
+# （mail_worker.py の docstring「テストは直接呼ぶ＝常駐不要」）。
+#   ・backend pytest（`up -d db redis`）＝ワーカ不要（既定のままで安全＝mail 競合が起きない）。
+#   ・非同期を要する frontend e2e＝**`docker compose --profile workers up -d` が必要**。sc-00-mfa/password-setup は
+#     OTP/設定リンクの MailHog 配信（mail-worker）に、sc-90 のディレクトリ参加追加は会社DB users ミラー
+#     （account_sync worker）に依存する。ワーカ非依存の e2e（sc-91 等）は既定の `up` でも動く。
+#   ・注意＝`--profile workers` で mail-worker を上げたまま backend pytest を回すと mail 競合が再発する（上記理由）。
 services:
   db:
     image: postgres:16
