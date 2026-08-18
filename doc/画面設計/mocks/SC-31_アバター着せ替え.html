@@ -12,12 +12,14 @@
      （レアリティ色・.btn-pixel・ピクセル見出し）。本番の3Dは three-vrm/R3F。 */
   .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
 
-  /* 2カラム: 左=アバタービューア（sticky）／右=ワードローブ */
+  /* 2カラム: 左=アバタービューア（広幅は sticky）／右=ワードローブ */
   .dressup { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: var(--space-6); align-items: start; }
-  @media (max-width: 900px) { .dressup { grid-template-columns: 1fr; } .viewer { position: static; } }
+  @media (max-width: 900px) { .dressup { grid-template-columns: 1fr; } }
 
   /* --- アバタービューア（CRTガラス） --- */
-  .viewer { position: sticky; top: var(--space-4); }
+  /* sticky は広幅（2カラム）のみ。狭幅（1カラム）は静的＝スクロール時にアバターが天面に残って
+     ワードローブが背面に流れるのを防ぐ。min-width で限定＝後続の規則に上書きされて sticky が復活しない。 */
+  @media (min-width: 901px) { .viewer { position: sticky; top: var(--space-4); } }
   .viewer__stage {
     position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius);
     overflow: hidden; display: grid; place-items: center;
