@@ -108,7 +108,9 @@
 /* hidden 属性は常に非表示（.btn/.pagination 等の display 指定が UA の [hidden] を
    上書きして「hidden なのに見える」不具合を防ぐ＝標準挙動に統一）。 */
 [hidden] { display: none !important; }
-html { -webkit-text-size-adjust: 100%; }
+/* スクロールバーのガターを常時確保＝モーダル/ダイアログ表示で body を overflow:hidden にしても背景幅が変わらず、
+   開閉時の横ズレ（チラつき）を防ぐ（スクロールバー消失で本文が右へ広がる問題の解消）。impl globals.css と同方針。 */
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
 body {
   margin: 0;
   font-family: var(--font-base);
