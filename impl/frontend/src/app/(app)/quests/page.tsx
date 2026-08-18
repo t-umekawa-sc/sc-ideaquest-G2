@@ -1,16 +1,12 @@
-// SC-10 クエスト一覧（プロトタイプ・スタブ）。実体は features/quests へ。
-import { ScreenStub } from "@/components/layout";
+// SC-10 クエスト一覧。所属グループ内で作られ、自分がパーティー参加中のクエスト一覧。
+// 正＝doc/画面設計/mocks/SC-10_クエスト一覧.html・doc/画面設計/screens/SC-10_クエスト一覧.md。
+import { redirect } from "next/navigation";
 
-export default function QuestListPage() {
-  return (
-    <ScreenStub
-      code="SC-10"
-      title="クエスト一覧"
-      description="所属グループ内で作られ、自分がパーティー参加中のクエスト一覧（モック移植予定）。"
-      links={[
-        { href: "/quests/new", label: "＋ クエスト作成（SC-11・モーダル）" },
-        { href: "/quests/q-001", label: "サンプルのクエスト詳細へ（SC-12）" },
-      ]}
-    />
-  );
+import { QuestListView } from "@/features/quests";
+import { getServerSession } from "@/lib/session";
+
+export default async function QuestListPage() {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+  return <QuestListView />;
 }
