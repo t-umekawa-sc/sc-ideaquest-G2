@@ -26,7 +26,8 @@
   .how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
 
   /* バッジグリッド */
-  .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+  /* 実績カードは DataTable の cardRaw で描画。密度は実績仕様の minmax(220)（狭幅 150）。 */
+  #achTable .dt-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   .ach { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
   .ach__medal {
     width: 68px; height: 68px; margin: var(--space-2) auto 0; display: grid; place-items: center;
@@ -63,7 +64,7 @@
   .ach.is-secret .ach__medal { color: var(--color-text-muted); }
   .ach__secret-badge { position: absolute; top: 8px; right: 8px; }
 
-  @media (max-width: 640px) { .ach-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+  @media (max-width: 640px) { #achTable .dt-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 </style>
 </head>
 <body>
@@ -125,29 +126,9 @@
     <strong>🔒 シークレット</strong>実績は達成するまで内容が伏せられます。
   </p>
 
-  <!-- 絞り込み（一覧標準） -->
-  <div class="list-toolbar">
-    <div class="filters">
-      <label>カテゴリー
-        <select class="select" id="fCat">
-          <option value="">すべて</option>
-        </select>
-      </label>
-      <label>状態
-        <select class="select" id="fState">
-          <option value="">すべて</option>
-          <option value="earned">獲得済み</option>
-          <option value="locked">未獲得</option>
-        </select>
-      </label>
-    </div>
-    <div class="tools">
-      <span class="list-count" id="count">— 件</span>
-    </div>
-  </div>
-
-  <div class="ach-grid" id="grid"><!-- JSで描画 --></div>
-  <div class="list-empty" id="empty" hidden>条件に合う実績がありません。</div>
+  <!-- 実績一覧＝一覧の操作標準（DataTable）。検索/絞込（カテゴリー・ティア・状態）/並び替え/
+       表示切替（カード⇄リスト）/CSV/行固定/ページャは DataTable 標準。カードの見た目は cardRaw で完全制御。 -->
+  <div id="achTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     実績を獲得すると、<strong>ティアに応じたコイン（ブロンズ◆20／シルバー◆50／ゴールド◆150）</strong>が付与されます。シークレット実績は、達成するまで名称・条件・報酬が伏せられます。
@@ -202,15 +183,6 @@
   const TIER_LABEL = { bronze:'ブロンズ', silver:'シルバー', gold:'ゴールド' };
   const TIER_REWARD = { bronze:20, silver:50, gold:150 }; // 難易度に応じたコイン付与（初期値）
 
-  // カテゴリー select を生成
-  const fCat = document.getElementById('fCat');
-  Object.entries(CATS).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; fCat.appendChild(o); });
-
-  const grid = document.getElementById('grid');
-  const empty = document.getElementById('empty');
-  const countEl = document.getElementById('count');
-  const fState = document.getElementById('fState');
-
   function cardHTML(a) {
     const earned = !!a.earned;
     const locked = !earned;
@@ -253,19 +225,34 @@
       </article>`;
   }
 
-  function render() {
-    const cat = fCat.value, state = fState.value;
-    const list = ACH.filter(a => {
-      if (cat && a.cat !== cat) return false;
-      const earned = !!a.earned;
-      if (state === 'earned' && !earned) return false;
-      if (state === 'locked' && earned) return false;
-      return true;
-    });
-    grid.innerHTML = list.map(cardHTML).join('');
-    countEl.textContent = list.length + ' 件';
-    empty.hidden = list.length !== 0;
-  }
+  // 表示名/ティアはシークレット未獲得なら伏せる（一覧のリスト表示・検索でも同様に扱う）。
+  const secretLocked = (a) => a.secret && !a.earned;
+  const dispName = (a) => secretLocked(a) ? '？？？' : a.name;
+
+  // 一覧の操作標準（DataTable）＝列を宣言してデータを渡すだけ。実績カードは cardRaw で完全制御（見た目不変）。
+  const achTable = window.DataTable.init(document.getElementById('achTable'), {
+    storageKey: 'sc40-ach',
+    data: ACH,
+    rowId: (a) => a.id,
+    unit: '件',
+    perPage: 24,
+    perPageOptions: [12, 24, 48],
+    defaultView: 'card',
+    searchFields: '実績名',
+    exportName: '実績バッジ',
+    emptyText: '条件に合う実績がありません。',
+    cardRaw: cardHTML,
+    columns: [
+      { key: 'name', label: '実績', locked: true, width: 220, sortable: true, filter: { type: 'text' }, sortVal: dispName, searchVal: dispName, csvVal: dispName,
+        render: (a) => '<span class="row-center" style="gap:6px">' + (secretLocked(a) ? '🔒' : a.icon) + '<span class="idea-title">' + dispName(a) + '</span></span>' },
+      { key: 'cat', label: 'カテゴリー', width: 150, sortable: true, filter: { type: 'enum', options: Object.entries(CATS) }, sortVal: (a) => CATS[a.cat], filterVal: (a) => a.cat, csvVal: (a) => CATS[a.cat], render: (a) => CATS[a.cat] },
+      { key: 'tier', label: 'ティア', width: 110, sortable: true, filter: { type: 'enum', options: [['bronze', 'ブロンズ'], ['silver', 'シルバー'], ['gold', 'ゴールド']] }, sortVal: (a) => ({ bronze: 0, silver: 1, gold: 2 }[a.tier]), filterVal: (a) => a.tier, csvVal: (a) => TIER_LABEL[a.tier], render: (a) => secretLocked(a) ? '<span class="muted">？？？</span>' : '<span class="tier-' + a.tier + '" style="font-weight:700">' + TIER_LABEL[a.tier] + '</span>' },
+      { key: 'state', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: [['earned', '獲得済み'], ['locked', '未獲得']] }, sortVal: (a) => a.earned ? 0 : 1, filterVal: (a) => a.earned ? 'earned' : 'locked', csvVal: (a) => a.earned ? '獲得済み' : '未獲得',
+        render: (a) => a.earned ? '<span class="badge badge-success">✓ 獲得</span>' : '<span class="badge badge-muted">🔒 未獲得</span>' },
+      { key: 'reward', label: '報酬', width: 90, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (a) => TIER_REWARD[a.tier], filterVal: (a) => TIER_REWARD[a.tier], csvVal: (a) => secretLocked(a) ? '' : TIER_REWARD[a.tier], render: (a) => secretLocked(a) ? '◆?' : '◆' + TIER_REWARD[a.tier] },
+      { key: 'earned', label: '獲得日', width: 120, hiddenDefault: true, sortable: true, sortVal: (a) => a.earned || '', csvVal: (a) => a.earned || '', render: (a) => a.earned || '<span class="muted">—</span>' },
+    ],
+  });
 
   // サマリー（全体・フィルタに依らない）
   function summary() {
@@ -281,10 +268,7 @@
     document.getElementById('coinEarned').textContent = coinEarned;
   }
 
-  fCat.addEventListener('change', render);
-  fState.addEventListener('change', render);
   summary();
-  render();
 </script>
 </body>
 </html>
