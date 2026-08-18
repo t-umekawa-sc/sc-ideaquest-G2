@@ -1,0 +1,58 @@
+/* SC-40 実績/バッジ（features/achievements・ゲーム層）＝mocks/SC-40_実績バッジ.html 準拠。
+   収集サマリーは CRTガラス（.pixel-panel）、バッジ一覧は可読性優先のクリーンカード＋ゲーム要素（ティア色リング・進捗バー）。
+   共通クラス（.pixel-panel/.xp-bar/.badge/.card/DataTable）は design-system.css。ここは SC-40 固有のみ。 */
+
+/* ティア色（実績のブロンズ/シルバー/ゴールド） */
+:root { --tier-bronze: #B45309; --tier-silver: #64748B; --tier-gold: #D97706; }
+
+.ach-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+/* 収集サマリー（ヒーロー・CRTガラス） */
+.col-hero { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+.col-hero__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-xp); }
+.col-hero__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
+.col-hero__bar { flex: 1; min-width: 220px; }
+.col-hero__bar .xp-bar { max-width: 480px; }
+.col-hero__pct { font-family: var(--font-pixel); color: var(--pixel-cyan); font-size: var(--text-sm); margin-top: 4px; }
+
+.how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
+
+/* バッジグリッド（実績カードは DataTable の cardRaw で描画。密度は実績仕様の minmax(220)／狭幅 150）。 */
+.ach-grid .dt-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+@media (max-width: 640px) { .ach-grid .dt-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+
+.ach { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
+.ach__medal {
+  width: 68px; height: 68px; margin: var(--space-2) auto 0; display: grid; place-items: center;
+  font-size: 34px; border-radius: 50%; background: var(--color-surface-alt); border: 3px solid var(--color-border);
+}
+.ach.tier-bronze .ach__medal { border-color: var(--tier-bronze); }
+.ach.tier-silver .ach__medal { border-color: var(--tier-silver); }
+.ach.tier-gold .ach__medal { border-color: var(--tier-gold); }
+.ach__tier { font-size: var(--text-xs); font-weight: 700; letter-spacing: .04em; }
+.ach.tier-bronze .ach__tier { color: var(--tier-bronze); }
+.ach.tier-silver .ach__tier { color: var(--tier-silver); }
+.ach.tier-gold .ach__tier { color: var(--tier-gold); }
+.ach__name { font-size: var(--text-base); font-weight: 700; }
+.ach__desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.6; min-height: 2.9em; }
+.ach__cond { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 報酬（ティア連動コイン） */
+.ach__reward { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-sm); }
+.ach__reward .lbl { font-family: var(--font-base); color: var(--color-text-muted); font-size: var(--text-xs); }
+.ach.is-locked .ach__reward { opacity: .8; }
+/* 進捗バー（未獲得の数値系） */
+.ach__prog { height: 8px; background: var(--color-surface-alt); border-radius: 99px; overflow: hidden; }
+.ach__prog > span { display: block; height: 100%; background: var(--color-primary); }
+.ach__prognum { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+/* フッター状態 */
+.ach__foot { margin-top: auto; padding-top: var(--space-2); font-size: var(--text-sm); }
+.ach__earned { color: var(--color-success); font-weight: 700; }
+.ach__date { color: var(--color-text-muted); font-size: var(--text-xs); font-weight: 400; }
+.ach__locked { color: var(--color-text-muted); font-weight: 700; }
+
+/* 未獲得は淡く */
+.ach.is-locked .ach__medal { filter: grayscale(1); opacity: .55; }
+.ach.is-locked .ach__name { color: var(--color-text-muted); }
+/* シークレット（未獲得） */
+.ach.is-secret .ach__medal { color: var(--color-text-muted); }
+.ach__secret-badge { position: absolute; top: 8px; right: 8px; }
