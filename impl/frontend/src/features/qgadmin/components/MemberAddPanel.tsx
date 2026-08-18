@@ -16,6 +16,7 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
   const [groupName, setGroupName] = useState<string | null>(null);
   const [dirQuery, setDirQuery] = useState("");
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+  const [loading, setLoading] = useState(true); // 初回取得完了まで＝リスト領域内でローディング表示（高さは常に確保）
   const [error, setError] = useState<string | null>(null);
 
   // 追加先グループ名の表示用（自分が admin のグループから id 一致を解決）。取得失敗は表示のみ影響。
@@ -31,6 +32,8 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
       setDirectory(res?.data ?? []);
     } catch {
       setError("ディレクトリの取得に失敗しました。");
+    } finally {
+      setLoading(false); // 初回で解除（以後は結果を差し替えるだけ＝リストのちらつき/高さジャンプ無し）
     }
   }, [dirQuery]);
 
@@ -75,20 +78,25 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
             自社の有効アカウントから選択。既にこのグループに参加中の人は表示されません。氏名・アバターのみ表示（メール・ロール・他グループ所属は非開示）。
           </div>
         </div>
-        <div className="dir-list">
-          {directory.map((d) => (
-            <div className="dir-row" key={d.account_id}>
-              <Avatar name={d.display_name} size="sm" />
-              <span className="dir-row__name">{d.display_name}</span>
-              <Button type="button" variant="primary" onClick={() => onAdd(d.account_id)}>追加</Button>
+        {/* リスト領域は高さを常に確保（qgadmin.css .dir-list min-height）＝取得完了で伸びてモーダルが
+            再センタリングするちらつきを防ぐ。ローディング/空/行はすべてこの領域内で切り替える。 */}
+        <div className="dir-list" aria-busy={loading}>
+          {loading ? (
+            <div className="dir-list__status">読み込み中…</div>
+          ) : directory.length === 0 ? (
+            <div className="dir-list__status">
+              候補がありません。未発行の場合は<strong>会社アカウント管理者</strong>へ発行を依頼してください。
             </div>
-          ))}
+          ) : (
+            directory.map((d) => (
+              <div className="dir-row" key={d.account_id}>
+                <Avatar name={d.display_name} size="sm" />
+                <span className="dir-row__name">{d.display_name}</span>
+                <Button type="button" variant="primary" onClick={() => onAdd(d.account_id)}>追加</Button>
+              </div>
+            ))
+          )}
         </div>
-        {directory.length === 0 && (
-          <div className="list-empty">
-            候補がありません。未発行の場合は<strong>会社アカウント管理者</strong>へ発行を依頼してください。
-          </div>
-        )}
       </ModalBody>
       <ModalFooter>
         <Button type="button" variant="outline" onClick={onClose}>閉じる</Button>
