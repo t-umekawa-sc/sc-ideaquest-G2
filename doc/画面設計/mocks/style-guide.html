@@ -16,6 +16,34 @@
   .token .name { font-size: var(--text-xs); margin-top: 6px; }
   .token .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
   .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: var(--space-4); }
+
+  /* ============================================================
+   * 提案（サンプル）: 15. 確認ダイアログ（window.confirm の置き換え・ゲーム要素入り）
+   * ※ 採用時は shared.css / shared.js（window.iqConfirm）へ昇格予定。ここは style-guide 内蔵の提案。
+   * ============================================================ */
+  .iq-confirm { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: var(--space-6); }
+  .iq-confirm[hidden] { display: none; }
+  .iq-confirm .modal__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.5); opacity: 0; transition: opacity .2s ease; }
+  .iq-confirm.show .modal__backdrop { opacity: 1; }
+  .iq-confirm .modal__panel { position: relative; max-width: 440px; width: 100%; opacity: 0; transform: translateY(10px) scale(.96); transition: opacity .18s ease, transform .18s cubic-bezier(.16,1,.3,1); }
+  .iq-confirm.show .modal__panel { opacity: 1; transform: none; }
+  .iq-confirm__body { display: flex; gap: var(--space-3); align-items: flex-start; }
+  .iq-confirm__icon { font-size: 26px; flex: 0 0 auto; line-height: 1.3; }
+  .iq-confirm__msg { margin: 0; line-height: 1.8; font-size: var(--text-sm); }
+  .iq-confirm__msg strong { color: var(--color-text); }
+  /* 危険（削除など）＝赤アクセント */
+  .iq-confirm--danger .iq-confirm__icon { color: var(--color-danger); }
+  /* ゲーム（購入など）＝ピクセル見出し＋コスト・残高プレビュー */
+  .iq-confirm--game .modal__header h2 { font-family: var(--font-pixel); letter-spacing: .04em; }
+  .iq-confirm__cost { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-alt); }
+  .iq-confirm__thumb { font-size: 34px; line-height: 1; flex: 0 0 auto; }
+  .iq-confirm__costbody { flex: 1; min-width: 0; }
+  .iq-confirm__costname { font-weight: 700; }
+  .iq-confirm__bal { font-family: var(--font-pixel); font-size: var(--text-sm); margin-top: 2px; }
+  .iq-confirm__bal .from { color: var(--color-text-muted); } .iq-confirm__bal .arrow { color: var(--color-text-muted); margin: 0 6px; } .iq-confirm__bal .to { color: var(--pixel-coin); }
+  .iq-confirm__pricechip { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); flex: 0 0 auto; }
+  @media (prefers-reduced-motion: reduce) { .iq-confirm .modal__panel, .iq-confirm .modal__backdrop { transition: none; } }
 </style>
 </head>
 <body>
@@ -526,6 +554,22 @@
     <p class="hint">呼び出しは1関数（デモの <code>iqSnack({type,title,msg,rewards,action,duration})</code>）を想定。
       <code>type</code>＝success/error/info（意味色）と reward/levelup（報酬・CRTガラス）。<code>aria-live</code> で読み上げ、エラーは <code>role="alert"</code>。<code>prefers-reduced-motion</code> で動きを抑制。</p>
   </div>
+
+  <!-- 15. 確認ダイアログ（提案・ゲーム要素入り） -->
+  <div class="section">
+    <h2>15. 確認ダイアログ（提案・ゲーム要素入り）</h2>
+    <p class="muted text-sm">ブラウザ標準の <code>window.confirm</code> を、デザインに合ったダイアログに置き換える提案。
+      共通モーダルの見た目（<code>.modal__panel.sectioned</code>）を流用し、<strong>Promise を返す1関数</strong>で使う。
+      業務は<strong>危険操作（削除）＝赤の確定ボタン</strong>、ゲーム文脈は<strong>購入確認＝ピクセル見出し＋コスト/残高プレビュー＋ <code>▶</code> ボタン</strong>。
+      Enter で確定 / Esc・バックドロップ・✕ でキャンセル。<code>prefers-reduced-motion</code> で動きを抑制。</p>
+    <div class="row" style="gap:var(--space-2); flex-wrap:wrap">
+      <button class="btn btn-danger" type="button" id="cfDelete">削除の確認（危険）</button>
+      <button class="btn-pixel" type="button" id="cfBuy">▶ 購入の確認（ゲーム）</button>
+      <button class="btn btn-outline" type="button" id="cfPlain">一般的な確認</button>
+    </div>
+    <p class="hint">呼び出しは <code>await iqConfirm({title, msg, variant:'danger'|'game', confirmLabel, cancelLabel, cost:{icon,name,price,balance}})</code> を想定（<code>true/false</code> を返す）。
+      確定後は「14.」の <code>iqSnack</code> と連動（削除＝成功／購入＝報酬）。</p>
+  </div>
 </main>
 
 
@@ -704,6 +748,94 @@
     document.getElementById('snkReward').addEventListener('click', () => snk({ type: 'reward', title: 'アイデアを投稿！', msg: 'パーティーに公開しました。', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }));
     document.getElementById('snkLevel').addEventListener('click', () => snk({ type: 'levelup', icon: '★', title: 'LEVEL UP! Lv.8', msg: '新しい装備が解放されました。', rewards: [{ k: 'sp', t: '✦ SP +1' }], duration: 5000 }));
   })();
+
+  // --- 15. 確認ダイアログ（window.confirm の置き換え・ゲーム要素入り）。Promise<boolean> を返す ---
+  function iqConfirm(o) {
+    o = o || {};
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const icon = o.icon || (o.variant === 'danger' ? '⚠️' : o.variant === 'game' ? '✨' : '❓');
+    const confirmLabel = o.confirmLabel || (o.variant === 'danger' ? '削除する' : o.variant === 'game' ? '購入する' : 'OK');
+    const cancelLabel = o.cancelLabel || (o.variant === 'game' ? 'やめる' : 'キャンセル');
+    const confirmCls = o.variant === 'danger' ? 'btn btn-danger' : o.variant === 'game' ? 'btn-pixel' : 'btn btn-primary';
+    // 購入確認のコスト/残高プレビュー（ゲーム）
+    let costHtml = '';
+    if (o.cost) {
+      const after = o.cost.balance - o.cost.price;
+      costHtml =
+        '<div class="iq-confirm__cost">' +
+          '<span class="iq-confirm__thumb">' + (o.cost.icon || '🎁') + '</span>' +
+          '<div class="iq-confirm__costbody"><div class="iq-confirm__costname">' + o.cost.name + '</div>' +
+            '<div class="iq-confirm__bal"><span class="from">◆ ' + o.cost.balance + '</span><span class="arrow">→</span><span class="to">◆ ' + after + '</span></div></div>' +
+          '<span class="iq-confirm__pricechip">◆ -' + o.cost.price + '</span>' +
+        '</div>';
+    }
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'iq-confirm' + (o.variant ? ' iq-confirm--' + o.variant : '');
+      el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+      el.innerHTML =
+        '<div class="modal__backdrop" data-cancel></div>' +
+        '<div class="modal__panel sectioned" role="document">' +
+          '<div class="modal__header"><h2>' + (o.title || '確認') + '</h2>' +
+            '<button class="modal__close" type="button" aria-label="閉じる" data-cancel>✕</button></div>' +
+          '<div class="modal__body"><div class="iq-confirm__body">' +
+            '<span class="iq-confirm__icon">' + icon + '</span>' +
+            '<div><p class="iq-confirm__msg">' + (o.msg || '') + '</p>' + costHtml + '</div>' +
+          '</div></div>' +
+          '<div class="modal__footer">' +
+            '<button class="btn btn-outline" type="button" data-cancel>' + cancelLabel + '</button>' +
+            '<button class="' + confirmCls + '" type="button" data-ok>' + confirmLabel + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(el);
+      document.body.classList.add('modal-open');
+      const prevFocus = document.activeElement;
+      requestAnimationFrame(() => el.classList.add('show'));
+      function done(val) {
+        el.classList.remove('show');
+        setTimeout(() => {
+          el.remove();
+          if (!document.querySelector('.modal.show, .iq-confirm.show')) document.body.classList.remove('modal-open');
+          if (prevFocus && prevFocus.focus) prevFocus.focus();
+        }, reduce ? 0 : 180);
+        resolve(val);
+      }
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-ok]')) done(true);
+        else if (e.target.closest('[data-cancel]')) done(false);
+      });
+      // Enter=確定 / Esc=キャンセル / Tab=パネル内フォーカストラップ
+      const focusable = () => Array.from(el.querySelectorAll('button')).filter((b) => b.offsetParent !== null);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+        else if (e.key === 'Tab') {
+          const f = focusable(); if (!f.length) return;
+          const first = f[0], last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      });
+      // 初期フォーカス＝危険はキャンセル（安全側）、それ以外は確定
+      const focusTarget = o.variant === 'danger' ? el.querySelector('[data-cancel].btn') : el.querySelector('[data-ok]');
+      setTimeout(() => { (focusTarget || el.querySelector('button')).focus(); }, 30);
+    });
+  }
+  window.iqConfirm = iqConfirm;
+
+  document.getElementById('cfDelete').addEventListener('click', async () => {
+    const ok = await iqConfirm({ variant: 'danger', title: 'アイデアを削除しますか？', msg: '「経費精算の自動化」を削除します。<strong>この操作は取り消せません。</strong>' });
+    if (ok) window.iqSnack({ type: 'success', title: '削除しました', msg: '「経費精算の自動化」を削除。', action: { label: '元に戻す', onClick: () => window.iqSnack({ type: 'info', title: '元に戻しました' }) } });
+  });
+  document.getElementById('cfBuy').addEventListener('click', async () => {
+    const ok = await iqConfirm({ variant: 'game', title: '▶ 購入の確認', msg: 'この装備を購入します。よろしいですか？', cost: { icon: '🎩', name: 'シルクハット（標準）', price: 120, balance: 320 } });
+    if (ok) window.iqSnack({ type: 'reward', title: '装備を購入しました', msg: '「シルクハット」を入手！ きせかえで装備できます。', rewards: [{ k: 'coin', t: '◆ -120' }] });
+    else window.iqSnack({ type: 'info', title: '購入をやめました' });
+  });
+  document.getElementById('cfPlain').addEventListener('click', async () => {
+    const ok = await iqConfirm({ title: 'ページを離れますか？', msg: '入力中の内容は保存されません。' });
+    window.iqSnack({ type: ok ? 'success' : 'info', title: ok ? '移動しました（デモ）' : 'キャンセルしました' });
+  });
 
   // --- 13.4 パネル遮蔽オーバーレイ（NOW LOADING）デモ ---
   (function () {
