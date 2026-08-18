@@ -146,6 +146,8 @@ img { max-width: 100%; display: block; }
   display: flex; align-items: center;
   position: sticky; top: 0; z-index: 10;
 }
+/* ヘッダー内の .container は全幅に＝space-between でロゴ（左）とアクション（右）を端に寄せる。 */
+.app-header .container { width: 100%; }
 .app-header .brand { display: inline-flex; align-items: center; }
 /* ブランドロゴ（剣と盾の紋章＋IDEAQUESTワードマーク） */
 .brand-logo { height: 40px; width: auto; display: block; }
@@ -190,6 +192,11 @@ img { max-width: 100%; display: block; }
 }
 .usermenu__list li > *:hover { background: var(--color-primary-soft); text-decoration: none; }
 .usermenu__sep { height: 1px; margin: 6px 4px; background: var(--color-border); }
+/* 狭幅でヘッダーから畳んだ項目（ステータス／通知）＝既定は非表示・狭幅のみ表示（AppHeader が注入）。
+   display は表示時（狭幅メディアクエリ）でのみ指定＝ここで display を付けると .usermenu__m の none を上書きしてしまう。 */
+.usermenu__m { display: none; }
+.usermenu__status { flex-wrap: nowrap; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-3); margin-bottom: 4px; border-bottom: 1px solid var(--color-border); }
+.usermenu__status .pixel-stat { border: none; background: none; padding: 0; white-space: nowrap; cursor: default; }
 
 /* コンテンツ領域の背景画像（ユーザー個人設定・全認証画面に反映）
    本文の背後(z-index:-1)に固定レイヤーを敷き、可読性のため薄い明色スクリムを重ねる。
@@ -208,6 +215,7 @@ img { max-width: 100%; display: block; }
   border-radius: var(--radius); border: 1px solid transparent;
   background: var(--color-surface-alt); color: var(--color-text);
   cursor: pointer; transition: background .15s, border-color .15s, box-shadow .1s, transform .05s;
+  white-space: nowrap; /* ボタンのラベルは折り返さない（狭幅ではフッターを縦積みにして全幅表示） */
 }
 .btn:hover { background: var(--color-border); text-decoration: none; }
 /* 押下フィードバック（業務層）: 1px 沈み込み＋内側の影で“押し込み”を表現し、
@@ -354,6 +362,18 @@ body.modal-open { overflow: hidden; }
     width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
   }
   .modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: default; }  /* モバイルはドラッグ無効 */
+  /* モーダルフッターは折り返し可の横並び＝縦節約。主アクション(.btn-primary)のみ単独行・全幅で最下段、
+     それ以外（キャンセル/下書き保存等）は同じ行で等分。 */
+  .modal__footer { flex-direction: row; flex-wrap: wrap; align-items: stretch; }
+  .modal__footer > .btn { flex: 1 1 auto; width: auto; }
+  .modal__footer > .btn-primary { flex-basis: 100%; }
+  /* ヘッダーはロゴ＋アバターメニューのみ。ステータス(Lv/コイン/SP)と通知ベルはメニューへ畳む（AppHeader が注入）。 */
+  .header-actions > .pixel-stat, .header-actions > .bell { display: none; }
+  .usermenu__list li.usermenu__m { display: block; }
+  .usermenu__list li.usermenu__status { display: flex; }
+  /* 文脈バナー(SC-92)のメタは縦積み（状態／コード＋DB／件数）＋設定行を縦積みで補足文をパネル幅に。 */
+  .ctx__meta { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .setting-row { flex-direction: column; }
 }
 
 /* =============================================================
@@ -456,6 +476,8 @@ body.modal-open { overflow: hidden; }
 .list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
 .list-toolbar .filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .list-toolbar .tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* 密度（標準/コンパクト）と表示切替（カード/リスト）は一体の「表示コントロール」＝常に同じ行に置く。 */
+.dt-viewctls { display: inline-flex; align-items: center; gap: var(--space-2); }
 .list-toolbar .input, .list-toolbar .select { width: auto; }        /* フォーム既定の幅100%を打ち消す */
 .list-toolbar .input[type="search"] { min-width: 200px; }
 .list-count { font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
@@ -1131,7 +1153,8 @@ a.quest-card:active { transform: translateY(1px); }
 }
 .ctx__label { font-size: var(--text-xs); color: var(--color-text-muted); letter-spacing: .04em; }
 .ctx__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
-.ctx__meta { display: flex; align-items: center; gap: var(--space-2); margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-muted); }
+.ctx__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-muted); }
+.ctx__metaline { display: inline-flex; align-items: center; gap: var(--space-3); }
 .ctx__db { font-family: ui-monospace, monospace; }
 .ctx__actions { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; }
 /* 細い会社識別バー（condensed sticky header）。広幅では全バナーが sticky なので不要＝非表示。
@@ -1349,7 +1372,8 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 
 @media (max-width: 768px) {
   .sort-builder { flex-direction: column; }
-  .list-toolbar .tools { width: 100%; justify-content: space-between; }
+  /* 狭幅はツールを左寄せでグループ化（列設定・エクスポートを隣接／密度・表示は .dt-viewctls で一体）。 */
+  .list-toolbar .tools { width: 100%; justify-content: flex-start; }
   /* モバイルは縦積み（filters の上に tools）。1 カラムグリッドへ。 */
   [data-dt-toolbar] { grid-template-columns: 1fr; }
 }

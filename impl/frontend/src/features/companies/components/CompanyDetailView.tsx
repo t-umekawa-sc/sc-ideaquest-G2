@@ -127,8 +127,11 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           <div className="ctx__name">{company.name}</div>
           <div className="ctx__meta">
             <span className={`badge ${stCls}`}>{stLabel}</span>
-            <span className="ctx__db">コード: {company.company_code}</span>
-            <span className="ctx__db">DB: {company.db_identifier}</span>
+            {/* 狭幅ではメタが縦積み＝コード＋DB を1行にグループ化（.ctx__metaline）。件数は別行。 */}
+            <span className="ctx__metaline">
+              <span className="ctx__db">コード: {company.company_code}</span>
+              <span className="ctx__db">DB: {company.db_identifier}</span>
+            </span>
             <span>アカウント {company.account_count} / グループ —</span>
           </div>
         </div>

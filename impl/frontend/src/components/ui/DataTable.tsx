@@ -720,6 +720,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
           <button className="btn btn-outline btn-sm" type="button" onClick={exportCsv}>
             エクスポート
           </button>
+          {/* 密度＋表示切替は一体（.dt-viewctls）＝狭幅でも同じ行に収める。 */}
+          <div className="dt-viewctls">
           <span className="seg seg-density" role="group" aria-label="表示密度">
             <button className="seg__btn" type="button" aria-pressed={density === "normal"} onClick={() => setDensity("normal")}>
               標準
@@ -752,6 +754,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         {/* 適用中チップ（検索・並び替え・絞込を全て）＋右端「すべてクリア」 */}

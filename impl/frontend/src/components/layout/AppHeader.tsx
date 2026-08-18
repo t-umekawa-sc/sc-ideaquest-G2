@@ -69,6 +69,19 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
             </button>
             <ul className="usermenu__list" role="menu" hidden={!open}>
+              {/* 狭幅ではヘッダーのステータス／通知をここに畳む（.usermenu__m は design-system.css の @media で表示切替・
+                  広幅は非表示）。バー側のチップ/ベルは狭幅で display:none。 */}
+              {balance && (
+                <li className="usermenu__m usermenu__status" role="none">
+                  <span className="pixel-stat level">Lv.{balance.level}</span>
+                  <span className="pixel-stat coin">◆ {balance.coin}</span>
+                  <span className="pixel-stat skill">✦ SP {balance.sp}</span>
+                </li>
+              )}
+              <li className="usermenu__m" role="none">
+                <Link role="menuitem" href="/notifications">🔔 通知{unreadCount > 0 ? `（未読${unreadCount}件）` : ""}</Link>
+              </li>
+              <li className="usermenu__m" role="none"><div className="usermenu__sep" /></li>
               {children}
             </ul>
           </div>
