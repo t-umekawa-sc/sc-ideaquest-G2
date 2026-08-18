@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { Avatar, Modal, ModalBody, ModalFooter } from "@/components/ui";
 
+import { IdeaEditForm } from "./IdeaEditForm";
 import "../ideas.css";
 
 // ---- デモ fixtures（モック SC-22 と一致） ----
@@ -52,6 +53,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [myVote, setMyVote] = useState<"agree" | "disagree" | null>("agree");
   const [ackUpdate, setAckUpdate] = useState(false); // 更新後に投票し直したら見直し導線を消す
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const base = { agree: 11, disagree: 3 }; // 自分の1票を除いた基礎値
   const agreeN = base.agree + (myVote === "agree" ? 1 : 0);
@@ -92,7 +94,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
             {/* 権限（作成者本人／クエスト管理）に応じて表示 */}
-            <button className="btn btn-outline" type="button">
+            <button className="btn btn-outline" type="button" onClick={() => setEditOpen(true)}>
               編集
             </button>
           </div>
@@ -388,6 +390,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           </section>
         </div>
       </div>
+
+      {/* ============ アイデア編集モーダル（SC-21 フォームの編集モード） ============ */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="アイデアを編集" size="lg">
+        <IdeaEditForm onDone={() => setEditOpen(false)} onCancel={() => setEditOpen(false)} />
+      </Modal>
 
       {/* ============ 更新履歴モーダル（版タイムライン＋差分） ============ */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">

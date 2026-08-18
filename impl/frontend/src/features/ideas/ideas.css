@@ -138,3 +138,39 @@
 .rev-since { text-align: center; font-size: var(--text-xs); font-weight: 700; color: var(--color-warning); background: #FEF3C7; border-radius: 999px; padding: 2px 10px; margin: var(--space-2) 0; }
 .meta-history { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary); cursor: pointer; }
 .meta-history:hover { text-decoration: underline; }
+
+/* =============================================================
+ * SC-22 アイデア編集モーダル＝SC-21 アイデア登録・編集フォームの編集モード。
+ * 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html（編集モーダル）／mocks/SC-21_アイデア登録編集.html。
+ * ============================================================= */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+/* 任意項目の折りたたみ（投稿ハードルを下げる） */
+.optional { border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-4); background: var(--color-surface); }
+.optional > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
+.optional > summary::-webkit-details-marker { display: none; }
+.optional > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
+.optional[open] > summary::before { transform: rotate(90deg); }
+.optional__body { padding: 0 var(--space-4) var(--space-2); border-top: 1px solid var(--color-border); }
+
+/* 利害関係者（簡易マルチセレクト＝選択チップ＋自由入力＋定義済み候補） */
+.tagselect__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-2); }
+.tagselect__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary-active); font-size: var(--text-sm); font-weight: 600; }
+.tagselect__chip button { background: none; border: none; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0; }
+.tagselect__sug { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+.tagselect__sugbtn { padding: 3px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
+.tagselect__sugbtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
+
+/* 添付ドロップゾーン＋チップ */
+.dropzone { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
+  color: var(--color-text-muted); cursor: pointer; background: var(--color-surface-alt); transition: border-color .15s, background .15s; }
+.dropzone:hover, .dropzone.is-over { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+.attach-list { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }
+.attach { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.attach__icon { font-size: 18px; }
+.attach__meta { flex: 1; min-width: 0; }
+.attach__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
+.attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-sm); }
+.attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
