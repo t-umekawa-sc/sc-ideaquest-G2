@@ -97,9 +97,9 @@ export function DashboardView({
               <span className="pixel-stat skill">✦ SP {balance.sp}</span>
             </div>
             <div className="hero__actions">
-              <Link className="btn-pixel" href="/shop">▶ ショップ</Link>
-              <Link className="btn-pixel" href="/avatar">▶ きせかえ</Link>
-              <Link className="btn-pixel" href="/spells">▶ 魔法・スキル</Link>
+              <Link className="btn-pixel" href="/shop">ショップ</Link>
+              <Link className="btn-pixel" href="/avatar">きせかえ</Link>
+              <Link className="btn-pixel" href="/spells">魔法・スキル</Link>
             </div>
           </div>
         </section>

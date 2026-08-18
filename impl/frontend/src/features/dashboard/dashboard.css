@@ -20,7 +20,8 @@
 .dash-page .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
 .dash-page .hero .xp-bar { max-width: 420px; }
 .dash-page .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.dash-page .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
+/* 3ゲーム画面ボタンは1行（狭幅では横スクロールで折り返さない）。 */
+.dash-page .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: nowrap; overflow-x: auto; }
 @media (prefers-reduced-motion: reduce) { .dash-page .hero__avatar img { animation: none; } }
 
 /* セクション見出し */

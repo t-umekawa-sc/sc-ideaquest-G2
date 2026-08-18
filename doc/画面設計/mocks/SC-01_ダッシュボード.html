@@ -37,7 +37,8 @@
   .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
   .hero .xp-bar { max-width: 420px; }
   .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
+  /* 3ゲーム画面ボタンは1行（狭幅では横スクロールで折り返さない）。 */
+  .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: nowrap; overflow-x: auto; }
   @media (prefers-reduced-motion: reduce) { .hero__avatar img { animation: none; } }
 
   /* 週間ランキングパネル .rank-panel は shared.css（複数画面で共用）へ昇格。 */
@@ -255,9 +256,9 @@
           <span class="pixel-stat skill">✦ SP 3</span>
         </div>
         <div class="hero__actions">
-          <a class="btn-pixel" href="SC-30_ショップ.html">▶ ショップ</a>
-          <a class="btn-pixel" href="SC-31_アバター着せ替え.html">▶ きせかえ</a>
-          <a class="btn-pixel" href="SC-32_魔法スキル.html">▶ 魔法・スキル</a>
+          <a class="btn-pixel" href="SC-30_ショップ.html">ショップ</a>
+          <a class="btn-pixel" href="SC-31_アバター着せ替え.html">きせかえ</a>
+          <a class="btn-pixel" href="SC-32_魔法スキル.html">魔法・スキル</a>
         </div>
       </div>
     </section>
