@@ -6,6 +6,11 @@ import type { components } from "@/lib/api/schema";
 export type QuestGroup = components["schemas"]["QuestGroupListItem"];
 export type Member = components["schemas"]["MemberListItem"];
 export type DirectoryEntry = components["schemas"]["DirectoryItem"];
+
+// メンバーの参加追加が起きたことを背景の一覧へ通知する window イベント（跨ルート更新）。
+// メンバー追加は URL 付きモーダル（別ルート・ピッカーは開いたまま複数追加）で行うため、追加ごとに発火し
+// 背景の QuestGroupAdminView が購読してメンバー一覧/件数を再取得する（ACCOUNTS_CHANGED_EVENT と同型）。
+export const GROUP_MEMBERS_CHANGED_EVENT = "ideaquest:group-members-changed";
 type QuestGroupListResponse = components["schemas"]["QuestGroupListResponse"];
 type MemberListResponse = components["schemas"]["MemberListResponse"];
 type DirectoryResponse = components["schemas"]["DirectoryResponse"];
