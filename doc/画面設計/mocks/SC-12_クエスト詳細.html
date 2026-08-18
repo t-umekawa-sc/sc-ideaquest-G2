@@ -23,10 +23,12 @@
   .quest-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
   /* --- タブ --- */
-  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); }
+  /* タブは横スクロール（狭幅で縦書きにならないよう nowrap＋overflow-x）。 */
+  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5);
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
   .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
     padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
-    display: inline-flex; align-items: center; gap: 6px; }
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
   .tab:hover { color: var(--color-text); }
   .tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
   .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); border-radius: var(--radius-sm); }
@@ -64,7 +66,18 @@
 
   /* モーダル内フォームの補助 */
   .modal__foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
-  @media (max-width: 640px) { .def-list { grid-template-columns: 1fr; gap: 2px var(--space-4); } .def-list dd { margin-bottom: var(--space-2); } }
+  @media (max-width: 640px) {
+    .def-list { grid-template-columns: 1fr; gap: 2px var(--space-4); }
+    .def-list dd { margin-bottom: var(--space-2); }
+    /* クエストヘッダー＝アイコンは中央、情報（バッジ/件名/テーマ/メタ）は一行下にパネル幅で左寄せ。 */
+    .quest-head__main { flex-direction: column; }
+    .quest-head__main > .quest-icon { align-self: center; }
+    .quest-head__main > div { width: 100%; }
+    /* パーティー一覧＝アイデア一覧と同様に折り返さず横スクロール（行は内容幅・権限バッジは nowrap）。 */
+    #tab-party .card { overflow-x: auto; }
+    .member-row { flex-wrap: nowrap; min-width: max-content; }
+    .member-perms { flex-wrap: nowrap; margin-left: var(--space-5); }
+  }
 </style>
 </head>
 <body>
@@ -322,19 +335,19 @@
       stats: r.draft ? ['公開前（投票・コメント対象外）'] : ['賛成 ' + r.agree + ' / 反対 ' + r.disagree, '💬 ' + r.comments],
     }),
     columns: [
-      { key: 'title', label: '件名', locked: true, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
+      { key: 'title', label: '件名', locked: true, width: 260, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
         render: (r) => '<span class="idea-title">' + r.title + '</span>' + (r.draft ? ' <span class="badge badge-muted">下書き</span>' : '') },
-      { key: 'poster', label: '投稿者', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
+      { key: 'poster', label: '投稿者', width: 150, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
         render: (r) => '<span class="poster"><span class="avatar sm"><span class="avatar__img placeholder">' + r.initial + '</span></span>' + r.poster + '</span>' },
-      { key: 'votes', label: '賛成 / 反対', align: 'num', sortable: true, sortVal: (r) => r.agree, csvVal: (r) => r.draft ? '' : ('▲' + r.agree + ' ▼' + r.disagree),
+      { key: 'votes', label: '賛成 / 反対', width: 120, align: 'num', sortable: true, sortVal: (r) => r.agree, csvVal: (r) => r.draft ? '' : ('▲' + r.agree + ' ▼' + r.disagree),
         render: (r) => r.draft ? dash : '<span class="vote-agree">▲' + r.agree + '</span> / <span class="vote-disagree">▼' + r.disagree + '</span>' },
-      { key: 'comments', label: '💬', align: 'num', sortable: true, sortVal: (r) => r.comments, csvVal: (r) => r.draft ? '' : r.comments,
+      { key: 'comments', label: '💬', width: 72, align: 'num', sortable: true, sortVal: (r) => r.comments, csvVal: (r) => r.draft ? '' : r.comments,
         render: (r) => r.draft ? dash : String(r.comments) },
-      { key: 'eval', label: '評価', sortable: true, filter: { type: 'enum', options: [['pending', '評価待ち'], ['done', '評価済']] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate, csvVal: (r) => r.draft ? '' : (r.evalstate === 'done' ? (r.ev + '/5') : '評価待ち'),
+      { key: 'eval', label: '評価', width: 120, sortable: true, filter: { type: 'enum', options: [['pending', '評価待ち'], ['done', '評価済']] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate, csvVal: (r) => r.draft ? '' : (r.evalstate === 'done' ? (r.ev + '/5') : '評価待ち'),
         render: (r) => r.draft ? dash : (r.evalstate === 'done' ? '<span class="badge ' + (r.ev >= 5 ? 'badge-success' : 'badge-muted') + '">' + r.ev + '/5 評価</span>' : '<span class="badge">評価待ち</span>') },
-      { key: 'mystate', label: 'あなた', filter: { type: 'enum', options: [['unvoted', '未投票'], ['voted', '投票済'], ['mine', '自分の投稿'], ['draft', '下書き']] }, filterVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
+      { key: 'mystate', label: 'あなた', width: 110, filter: { type: 'enum', options: [['unvoted', '未投票'], ['voted', '投票済'], ['mine', '自分の投稿'], ['draft', '下書き']] }, filterVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
         render: (r) => '<span class="badge ' + YOU[r.mystate][1] + '">' + YOU[r.mystate][0] + '</span>' },
-      { key: 'created', label: '投稿日', hiddenDefault: true, sortable: true, sortVal: (r) => r.created, csvVal: daysText, render: daysText },
+      { key: 'created', label: '投稿日', width: 100, hiddenDefault: true, sortable: true, sortVal: (r) => r.created, csvVal: daysText, render: daysText },
     ],
   });
 
