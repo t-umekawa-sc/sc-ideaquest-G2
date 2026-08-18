@@ -43,6 +43,8 @@
   .iq-confirm__bal { font-family: var(--font-pixel); font-size: var(--text-sm); margin-top: 2px; }
   .iq-confirm__bal .from { color: var(--color-text-muted); } .iq-confirm__bal .arrow { color: var(--color-text-muted); margin: 0 6px; } .iq-confirm__bal .to { color: var(--pixel-coin); }
   .iq-confirm__pricechip { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); flex: 0 0 auto; }
+  /* ゲーム確認の「やめる」＝購入するボタンと同じ .btn-pixel アニメ（▶点滅・持ち上がり・押下沈み）で、色だけ控えめに。 */
+  .btn-pixel.btn-pixel--muted { background: var(--color-surface-alt); }
   @media (prefers-reduced-motion: reduce) { .iq-confirm .modal__panel, .iq-confirm .modal__backdrop { transition: none; } }
 </style>
 </head>
@@ -757,6 +759,8 @@
     const confirmLabel = o.confirmLabel || (o.variant === 'danger' ? '削除する' : o.variant === 'game' ? '購入する' : 'OK');
     const cancelLabel = o.cancelLabel || (o.variant === 'game' ? 'やめる' : 'キャンセル');
     const confirmCls = o.variant === 'danger' ? 'btn btn-danger' : o.variant === 'game' ? 'btn-pixel' : 'btn btn-primary';
+    // ゲームは「やめる」も購入するボタンと同じ .btn-pixel アニメ（色は控えめ）にそろえる。
+    const cancelCls = o.variant === 'game' ? 'btn-pixel btn-pixel--muted' : 'btn btn-outline';
     // 購入確認のコスト/残高プレビュー（ゲーム）
     let costHtml = '';
     if (o.cost) {
@@ -783,7 +787,7 @@
             '<div><p class="iq-confirm__msg">' + (o.msg || '') + '</p>' + costHtml + '</div>' +
           '</div></div>' +
           '<div class="modal__footer">' +
-            '<button class="btn btn-outline" type="button" data-cancel>' + cancelLabel + '</button>' +
+            '<button class="' + cancelCls + '" type="button" data-cancel>' + cancelLabel + '</button>' +
             '<button class="' + confirmCls + '" type="button" data-ok>' + confirmLabel + '</button>' +
           '</div>' +
         '</div>';
