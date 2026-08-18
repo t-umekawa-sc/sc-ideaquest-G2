@@ -1,13 +1,13 @@
-// SC-31 アバター/着せ替え（プロトタイプ・スタブ）。実体は features/avatar へ（ゲーム層）。
-import { ScreenStub } from "@/components/layout";
+// SC-31 アバター/着せ替え（ゲーム層）＝3Dアバタービューア＋ワードローブ（5スロット×装備・クリック着替え）。
+// 正＝doc/画面設計/mocks/SC-31_アバター着せ替え.html・doc/画面設計/screens/SC-31_アバター着せ替え.md。
+// 装備/コイン backend 未実装＝デモ fixtures（画面モック先行）。
+import { redirect } from "next/navigation";
 
-export default function AvatarPage() {
-  return (
-    <ScreenStub
-      code="SC-31"
-      title="アバター / 着せ替え"
-      description="3Dアバタービューア＋ワードローブ（5スロット×装備・クリック着替え）。モック移植予定。"
-      links={[{ href: "/shop", label: "ショップへ（SC-30）" }]}
-    />
-  );
+import { AvatarView } from "@/features/avatar";
+import { getServerSession } from "@/lib/session";
+
+export default async function AvatarPage() {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+  return <AvatarView />;
 }

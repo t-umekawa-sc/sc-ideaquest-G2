@@ -1,0 +1,60 @@
+/* SC-31 アバター/着せ替え（features/avatar・ゲーム層）＝mocks/SC-31_アバター着せ替え.html 準拠。
+   3Dアバタービューアは CRTガラス（.pixel-panel）、ワードローブは可読性優先のクリーンカード＋ゲーム要素（レアリティ色）。
+   本番の3Dは three-vrm/R3F（モックはマスコット画像で代用）。共通クラスは design-system.css。ここは SC-31 固有のみ。 */
+
+.dressup-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+/* 2カラム: 左=アバタービューア（広幅は sticky）／右=ワードローブ */
+.dressup { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: var(--space-6); align-items: start; }
+@media (max-width: 900px) { .dressup { grid-template-columns: 1fr; } }
+
+/* --- アバタービューア（CRTガラス） --- */
+/* sticky は広幅（2カラム）のみ。狭幅（1カラム）は静的＝スクロール時にアバターが天面に残らないように。 */
+@media (min-width: 901px) { .viewer { position: sticky; top: var(--space-4); } }
+.viewer__stage {
+  position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius);
+  overflow: hidden; display: grid; place-items: center;
+  background:
+    radial-gradient(120% 90% at 50% 15%, rgba(148,163,184,.20), rgba(2,6,23,0) 60%),
+    linear-gradient(180deg, #0b1220, #020617);
+}
+.viewer__bg { position: absolute; inset: 0; display: grid; place-items: center; font-size: 220px; opacity: .5; filter: saturate(1.1); }
+.viewer__avatar { position: relative; z-index: 1; width: 60%; image-rendering: pixelated; filter: drop-shadow(0 8px 12px rgba(0,0,0,.5)); }
+.viewer__slot { position: absolute; z-index: 2; line-height: 1; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+.viewer__slot[data-slot="head"] { top: 8%;  left: 50%; transform: translateX(-50%); font-size: 40px; }
+.viewer__slot[data-slot="face"] { top: 27%; left: 50%; transform: translateX(-50%); font-size: 30px; }
+.viewer__slot[data-slot="hand"] { top: 46%; right: 14%; font-size: 40px; }
+.viewer__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+.viewer__name { font-family: var(--font-pixel); font-size: var(--text-lg); color: var(--pixel-ink); }
+.viewer__lv { font-family: var(--font-pixel); color: var(--pixel-level-on-dark); }
+
+/* --- ワードローブ（右） --- */
+.wardrobe__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.coin-line { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); }
+
+.slot { margin-bottom: var(--space-6); }
+.slot__head { display: flex; align-items: baseline; gap: var(--space-3); margin: 0 0 var(--space-3); flex-wrap: wrap; }
+.slot__name { font-family: var(--font-pixel); font-size: var(--text-lg); }
+.slot__equipped { font-size: var(--text-sm); color: var(--color-text-muted); }
+.slot__equipped strong { color: var(--color-text); }
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); }
+
+/* 装備カード（クリーンカード＋レアリティ） */
+.item { display: flex; flex-direction: column; gap: var(--space-2); cursor: pointer; align-items: stretch; text-align: center; padding: var(--space-3); position: relative; }
+.item[aria-disabled="true"] { cursor: default; }
+.item__thumb { font-size: 40px; line-height: 1; padding: var(--space-3) 0; background: var(--color-surface-alt); border-radius: var(--radius); }
+.item__name { font-size: var(--text-sm); font-weight: 600; }
+.item__rarity { font-size: var(--text-xs); font-weight: 700; }
+.item__rarity.rarity-common { color: var(--rarity-common); }
+.item__rarity.rarity-standard { color: var(--rarity-standard); }
+.item__rarity.rarity-rare { color: var(--rarity-rare); }
+/* 装備中 */
+.item.is-equipped { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary) inset; }
+.item__equipped-badge { position: absolute; top: 6px; right: 6px; }
+/* 未所有（ショップ導線） */
+.item.is-locked .item__thumb { filter: grayscale(1); opacity: .55; }
+.item__price { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-sm); }
+.item__buy { font-size: var(--text-xs); }
+
+/* 「外す」ピル */
+.item--none .item__thumb { color: var(--color-text-muted); font-size: 28px; }
