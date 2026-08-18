@@ -371,10 +371,12 @@ body.modal-open { overflow: hidden; }
     width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
   }
   .modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: default; }  /* モバイルはドラッグ無効 */
-  /* モーダルのフッターは全幅・縦積み＝ボタン名を変えずに折り返しを解消。DOM 順のまま主アクション（塗り）が
-     最下段＝広幅の右端相当・親指が届きやすい位置に。 */
-  .modal__footer { flex-direction: column; align-items: stretch; }
-  .modal__footer > .btn { width: 100%; }
+  /* モーダルのフッターは折り返し可の横並び＝縦領域を節約。主アクション（.btn-primary）だけ単独行・全幅で
+     最下段（広幅の右端相当・親指が届きやすい）。それ以外（キャンセル/下書き保存など）は同じ行で等分。
+     ボタン名は変えず折り返さない（.btn は white-space:nowrap）。 */
+  .modal__footer { flex-direction: row; flex-wrap: wrap; align-items: stretch; }
+  .modal__footer > .btn { flex: 1 1 auto; width: auto; }
+  .modal__footer > .btn-primary { flex-basis: 100%; }
   /* ヘッダーはロゴ＋アバターメニューのみに。ステータス(Lv/コイン/SP)と通知ベルはメニューへ畳む
      （shared.js が menu 先頭に .usermenu__m を注入）＝狭幅で横並びが窮屈になるのを解消。 */
   .header-actions > .pixel-stat, .header-actions > .bell { display: none; }
