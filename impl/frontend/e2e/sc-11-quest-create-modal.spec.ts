@@ -18,7 +18,7 @@ async function login(page: Page) {
 test("quest-create URL modal opens from list and closes", async ({ page }) => {
   await login(page);
   await page.goto("/quests");
-  await page.getByRole("link", { name: /クエスト作成/ }).click();
+  await page.getByRole("link", { name: /クエストを作成/ }).click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
