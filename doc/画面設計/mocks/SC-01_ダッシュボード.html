@@ -20,28 +20,30 @@
    * ========================================================= */
   .dash-top { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8); align-items: stretch; }
 
-  /* --- 左：ヒーロー（.pixel-panel を土台にする） --- */
-  .hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-6); }
+  /* --- 左：ヒーロー（.pixel-panel を土台にする） ---
+     上段＝アバター＋ステータス（名前/Lv/XP/コイン・SP）、下段＝ゲーム3ボタンをパネル全幅で1行。 */
+  .hero { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "avatar status" "actions actions"; align-items: center; gap: var(--space-4) var(--space-6); }
   /* アバター（3Dは実装フェーズ。モックは仮画像＝マスコットで代用） */
   .hero__avatar {
+    grid-area: avatar;
     display: grid; place-items: center; width: 120px; height: 120px;
     background: #0f172a; border: 3px solid var(--pixel-ink); box-shadow: var(--shadow-pixel);
     image-rendering: pixelated;
   }
   .hero__avatar img { width: 88px; height: auto; image-rendering: pixelated;
     filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); animation: mascot-bob 1.8s ease-in-out infinite; }
-  .hero__status { min-width: 0; }
+  .hero__status { grid-area: status; min-width: 0; }
   .hero__name { font-family: var(--font-pixel); font-size: var(--text-lg); margin-bottom: 2px; }
   .hero__lvline { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
   .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
   .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
   .hero .xp-bar { max-width: 420px; }
   .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  /* 3ゲーム画面ボタン＝広幅は横1行、狭幅（≤700px）は縦積み（全幅）。文字は char 折れさせない。 */
-  .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: nowrap; overflow-x: auto; }
+  /* 3ゲーム画面ボタン＝パネル全幅の下段（avatar/status 2列ぶち抜き）。広幅は横1行、狭幅（≤700px）は縦積み（全幅）。 */
+  .hero__actions { grid-area: actions; display: flex; gap: var(--space-3); flex-wrap: nowrap; }
   .hero__actions .btn-pixel { flex: 0 0 auto; white-space: nowrap; }
   @media (max-width: 700px) {
-    .hero__actions { flex-direction: column; overflow-x: visible; }
+    .hero__actions { flex-direction: column; }
     .hero__actions .btn-pixel { width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) { .hero__avatar img { animation: none; } }
@@ -260,11 +262,11 @@
           <span class="pixel-stat coin">◆ 320 コイン</span>
           <span class="pixel-stat skill">✦ SP 3</span>
         </div>
-        <div class="hero__actions">
-          <a class="btn-pixel" href="SC-30_ショップ.html">ショップ</a>
-          <a class="btn-pixel" href="SC-31_アバター着せ替え.html">きせかえ</a>
-          <a class="btn-pixel" href="SC-32_魔法スキル.html">魔法・スキル</a>
-        </div>
+      </div>
+      <div class="hero__actions">
+        <a class="btn-pixel" href="SC-30_ショップ.html">ショップ</a>
+        <a class="btn-pixel" href="SC-31_アバター着せ替え.html">きせかえ</a>
+        <a class="btn-pixel" href="SC-32_魔法スキル.html">魔法・スキル</a>
       </div>
     </section>
 

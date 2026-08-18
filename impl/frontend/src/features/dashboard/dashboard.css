@@ -10,21 +10,22 @@
    隣接 section だが、下の「主要セクション間の余白」ルールは > で直接の子に限定して margin を当てない
    （grid item に margin が付くと stretch が行高−margin になり高さ/位置がズレるため）。 */
 .dash-page .dash-top { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8); align-items: stretch; }
-.dash-page .hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-6); }
-.dash-page .hero__avatar { display: grid; place-items: center; width: 120px; height: 120px; background: #0f172a; border: 3px solid var(--pixel-ink); box-shadow: var(--shadow-pixel); image-rendering: pixelated; }
+/* 上段＝アバター＋ステータス（名前/Lv/XP/コイン・SP）、下段＝ゲーム3ボタンをパネル全幅で1行。 */
+.dash-page .hero { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "avatar status" "actions actions"; align-items: center; gap: var(--space-4) var(--space-6); }
+.dash-page .hero__avatar { grid-area: avatar; display: grid; place-items: center; width: 120px; height: 120px; background: #0f172a; border: 3px solid var(--pixel-ink); box-shadow: var(--shadow-pixel); image-rendering: pixelated; }
 .dash-page .hero__avatar img { width: 88px; height: auto; image-rendering: pixelated; filter: drop-shadow(0 4px 3px rgba(0,0,0,.4)); animation: mascot-bob 1.8s ease-in-out infinite; }
-.dash-page .hero__status { min-width: 0; }
+.dash-page .hero__status { grid-area: status; min-width: 0; }
 .dash-page .hero__name { font-family: var(--font-pixel); font-size: var(--text-lg); margin-bottom: 2px; }
 .dash-page .hero__lvline { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
 .dash-page .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
 .dash-page .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
 .dash-page .hero .xp-bar { max-width: 420px; }
 .dash-page .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
-/* 3ゲーム画面ボタン＝広幅は横1行、狭幅（≤700px）は縦積み（全幅）。文字は char 折れさせない。 */
-.dash-page .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: nowrap; overflow-x: auto; }
+/* 3ゲーム画面ボタン＝パネル全幅の下段（avatar/status 2列ぶち抜き）。広幅は横1行、狭幅（≤700px）は縦積み（全幅）。 */
+.dash-page .hero__actions { grid-area: actions; display: flex; gap: var(--space-3); flex-wrap: nowrap; }
 .dash-page .hero__actions .btn-pixel { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 700px) {
-  .dash-page .hero__actions { flex-direction: column; overflow-x: visible; }
+  .dash-page .hero__actions { flex-direction: column; }
   .dash-page .hero__actions .btn-pixel { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .dash-page .hero__avatar img { animation: none; } }
