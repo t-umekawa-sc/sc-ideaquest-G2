@@ -1,0 +1,48 @@
+/* SC-25 評価画面（features/evaluations）＝mocks/SC-25_評価画面.html 準拠。
+   共通クラス（.card/.field/.textarea/.req/.hint/.badge/.btn/.field__error）は design-system.css。
+   ここは SC-25 固有（アイデア要約の折りたたみ・5観点採点行・スター・集計プレビュー・公開範囲）のみ。 */
+
+/* 折りたたみのアイデア要約（評価しながら内容を確認） */
+.eval-idea { border: 1px solid var(--color-border); border-radius: var(--radius); margin: var(--space-3) 0; background: var(--color-surface); }
+.eval-idea > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
+.eval-idea > summary::-webkit-details-marker { display: none; }
+.eval-idea > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
+.eval-idea[open] > summary::before { transform: rotate(90deg); }
+.eval-idea__body { padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--color-border); }
+.eval-idea__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: var(--space-3) 0 var(--space-1); }
+.eval-idea__body p { margin: 0; line-height: 1.75; }
+
+.eval-context { margin-bottom: var(--space-4); }
+.eval-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
+.eval-context__title { font-weight: 700; font-size: var(--text-lg); }
+.eval-context__link { font-size: var(--text-sm); }
+
+/* 5観点の採点行 */
+.eval-row { padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+.eval-row__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.eval-aspect { font-weight: 700; }
+.eval-desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+.eval-rate { display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
+.stars { display: inline-flex; }
+.star { font-size: 26px; line-height: 1; background: none; border: none; cursor: pointer; color: var(--color-border-strong); padding: 0 1px; }
+.star.is-on { color: var(--pixel-coin); }
+.star:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); border-radius: var(--radius-sm); }
+.eval-score-num { min-width: 2.6em; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.eval-score-num .muted { font-weight: 400; }
+.eval-comment { margin-top: var(--space-3); }
+.eval-cost-note { color: var(--color-info); }
+
+/* 集計プレビュー */
+.eval-summary { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+  background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; }
+.eval-summary__avg { font-size: var(--text-2xl); font-weight: 800; color: var(--color-primary); }
+.eval-summary__note { font-size: var(--text-xs); color: var(--color-text-muted); flex: 1; min-width: 180px; }
+
+/* 公開範囲 */
+.visibility { display: flex; flex-direction: column; gap: var(--space-2); }
+.vis-opt { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); cursor: pointer; }
+.vis-opt:hover { background: var(--color-surface-alt); }
+.vis-opt input { margin-top: 3px; accent-color: var(--color-primary); cursor: pointer; }
+.vis-opt.is-sel { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.vis-opt__title { font-weight: 600; }
+.vis-opt__desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
