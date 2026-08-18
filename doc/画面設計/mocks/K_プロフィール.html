@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プロフィール — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* K プロフィール（ドメイン K・API設計 K_プロフィール・背景画像.md）。
+     共通ヘッダーのユーザーメニュー →「プロフィール」。本人のみ（/me＝セッションの account_id）。
+     責務＝自己プロフィール（表示名・言語・アバター）＋セキュリティ（パスワード・メール）の取得と編集。
+     ・identity（表示名/メール/言語/パスワード）＝管理DB accounts 源泉（K.0）。
+     ・残高（レベル/XP/コイン/SP）＝会社DB users・読取専用（canonical は G）。ここでは GET /me の値を表示。
+     ・背景画像は本画面に置かない＝ヘッダーのユーザーメニュー「背景画像を変更/リセット」（FR-30・K.4）。
+     共通の見た目は shared.css（.card/.field/.input/.btn/.pixel-stat/.xp-bar/.provision-note/.role-note/
+     .backlink/.page-title/.admin-sub/.section-head/.icon-field）。ここは当画面ローカルのみ。 */
+
+  /* アカウント情報サマリ（アバター＋氏名＋残高＋identity） */
+  .prof-head { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+  .prof-head__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
+  .prof-head__role { margin-top: 4px; }
+  .prof-stats { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .prof-stats .xp-bar { flex: 1 1 220px; max-width: 320px; }
+  /* identity（読取専用）＝ラベル＋値の行 */
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin-top: var(--space-4);
+        border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+  .kv dt { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .kv dd { margin: 0; font-size: var(--text-sm); }
+  .kv .db-id { font-family: ui-monospace, monospace; }
+
+  /* 設定行（プロフィール編集のアバター行） */
+  .setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
+  .setting-row:first-of-type { border-top: 0; }
+  .setting-row__name { font-weight: 600; }
+  .setting-row__desc { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 2px; }
+
+  .form-row { margin-bottom: var(--space-4); }
+  .form-row > label { display: block; font-weight: 600; font-size: var(--text-sm); margin-bottom: 6px; }
+  .req::after { content: " *"; color: var(--color-danger); }
+  .card + .card { margin-top: var(--space-4); }
+  .sec-sub { border-top: 1px solid var(--color-border); margin-top: var(--space-5); padding-top: var(--space-4); }
+  .sec-sub:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="pixel-stat level">Lv.7</span>
+      <span class="pixel-stat coin">◆ 320</span>
+      <a class="pixel-stat skill" href="SC-32_魔法スキル.html" title="スキルポイント（魔法/スキル画面へ）">✦ SP 3</a>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span><span class="avatar__level">Lv.7</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="K_プロフィール.html" aria-current="page">プロフィール</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">プロフィール</h1>
+  <p class="admin-sub">あなたの<strong>表示名・アバター・言語</strong>と<strong>セキュリティ（パスワード・メールアドレス）</strong>を管理します。（背景画像はヘッダーのユーザーメニュー「背景画像を変更／リセット」から設定できます）</p>
+
+  <!-- ===== アカウント情報＋残高（読取専用・GET /me） ===== -->
+  <section class="card" aria-label="アカウント情報">
+    <div class="prof-head">
+      <span class="quest-icon lg" style="--accent:#2563EB"><span class="quest-icon__char">山</span></span>
+      <div>
+        <div class="prof-head__name">山田 太郎</div>
+        <div class="prof-head__role"><span class="badge badge-muted" title="システムロール">一般</span></div>
+        <div class="prof-stats">
+          <span class="pixel-stat level">Lv.7</span>
+          <div class="xp-bar" title="次のレベルまで 120 XP"><span style="width:65%"></span></div>
+          <span class="pixel-stat coin">◆ 320 コイン</span>
+          <span class="pixel-stat skill">✦ SP 3</span>
+        </div>
+      </div>
+    </div>
+    <dl class="kv">
+      <dt>会社</dt><dd>アクロス株式会社 <span class="db-id">（ACROSS）</span></dd>
+      <dt>ログインID</dt><dd class="db-id">yamada.taro</dd>
+      <dt>メールアドレス</dt><dd class="db-id">yamada@across.example</dd>
+      <dt>システムロール</dt><dd>一般</dd>
+    </dl>
+    <div class="provision-note">
+      ログインID は変更できません。<strong>メールアドレス・パスワード</strong>の変更は下の「セキュリティ」から（現在のパスワードで再認証）。<strong>レベル・XP・コイン・スキルポイント</strong>は活動で増減します（表示のみ）。
+    </div>
+  </section>
+
+  <!-- ===== プロフィール編集（表示名・言語・アバター＝PATCH /me・PUT/DELETE /me/avatar-image） ===== -->
+  <div class="section-head"><h2>プロフィール編集</h2></div>
+  <section class="card" aria-label="プロフィール編集">
+    <div class="setting-row">
+      <div class="setting-row__info">
+        <div class="setting-row__name">アバター画像</div>
+        <div class="setting-row__desc">一覧・ランキング・ダッシュボードなどに表示。未設定時は「頭文字＋カラー」で表示（画像アップロードは今後対応）。</div>
+      </div>
+      <div class="icon-field">
+        <span class="quest-icon lg" id="avPreview" style="--accent:#2563EB"><span class="quest-icon__char">山</span></span>
+        <div class="icon-actions">
+          <button class="btn btn-outline" type="button" id="avUpload">画像を選ぶ</button>
+          <button class="btn btn-outline" type="button" id="avClear" hidden>削除（既定に戻す）</button>
+          <input type="file" id="avInput" accept="image/*" hidden>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:var(--space-4)">
+      <label class="req" for="pName">表示名</label>
+      <input class="input" id="pName" value="山田 太郎" maxlength="50">
+    </div>
+    <div class="form-row">
+      <label for="pLocale">言語</label>
+      <select class="input" id="pLocale">
+        <option value="ja" selected>日本語</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="button" id="saveProfile">保存する</button>
+  </section>
+
+  <!-- ===== セキュリティ（K.3＝パスワード変更・メールアドレス変更） ===== -->
+  <div class="section-head"><h2>セキュリティ</h2></div>
+  <section class="card" aria-label="セキュリティ">
+    <div class="sec-sub">
+      <h3 style="margin:0 0 var(--space-1)">パスワード変更</h3>
+      <p class="setting-row__desc" style="margin-bottom:var(--space-3)">変更が完了すると<strong>すべての端末からログアウト</strong>されます（要再ログイン）。</p>
+      <div class="form-row"><label class="req" for="curPw">現在のパスワード</label><input class="input" id="curPw" type="password" autocomplete="current-password"></div>
+      <div class="form-row"><label class="req" for="newPw">新しいパスワード</label><input class="input" id="newPw" type="password" autocomplete="new-password"></div>
+      <div class="form-row"><label class="req" for="confirmPw">新しいパスワード（確認）</label><input class="input" id="confirmPw" type="password" autocomplete="new-password"></div>
+      <button class="btn btn-primary" type="button" id="changePw">パスワードを変更（要再ログイン）</button>
+    </div>
+
+    <div class="sec-sub">
+      <h3 style="margin:0 0 var(--space-1)">メールアドレス変更</h3>
+      <p class="setting-row__desc" style="margin-bottom:var(--space-3)"><strong>新しいメールアドレス宛に確認リンク</strong>を送ります。リンクを開くまで変更は確定しません（旧アドレスには変更通知が届きます）。</p>
+      <div class="form-row"><label class="req" for="newEmail">新しいメールアドレス</label><input class="input" id="newEmail" type="email" placeholder="例: yamada.new@across.example"></div>
+      <div class="form-row"><label class="req" for="emailCurPw">現在のパスワード（確認）</label><input class="input" id="emailCurPw" type="password" autocomplete="current-password"></div>
+      <button class="btn btn-primary" type="button" id="changeEmail">確認メールを送信</button>
+    </div>
+  </section>
+
+  <p class="role-note" style="margin-top:var(--space-6)">
+    プロフィール（表示名・言語）は本人のみ編集できます。<strong>パスワード変更</strong>は現在のパスワードで再認証し、完了時に全端末からログアウトします（セキュリティ通知＋メールが届きます）。<strong>メールアドレス変更</strong>は新アドレスの確認リンクを開くまで確定しません（ダブルオプトイン）。ログインID・システムロール・残高（レベル/XP/コイン/SP）はこの画面では変更できません。
+  </p>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // アバター（ローカルプレビュー＝送信しないデモ。実体は MinIO・PUT /me/avatar-image）
+  const avPreview = document.getElementById('avPreview');
+  const avInput = document.getElementById('avInput');
+  const avClear = document.getElementById('avClear');
+  document.getElementById('avUpload').addEventListener('click', () => avInput.click());
+  avInput.addEventListener('change', () => {
+    const f = avInput.files[0]; if (!f) return;
+    avClear.hidden = false;
+    avPreview.innerHTML = '<img class="quest-icon__img" src="' + URL.createObjectURL(f) + '" alt="">';
+  });
+  avClear.addEventListener('click', () => { avClear.hidden = true; avInput.value = ''; avPreview.innerHTML = '<span class="quest-icon__char">山</span>'; });
+
+  // 表示名→アバター頭文字（未設定時のフォールバック）
+  const pName = document.getElementById('pName');
+  pName.addEventListener('input', () => { if (avClear.hidden) avPreview.innerHTML = '<span class="quest-icon__char">' + (pName.value.trim()[0] || '山') + '</span>'; });
+
+  document.getElementById('saveProfile').addEventListener('click', () => {
+    const name = pName.value.trim();
+    if (!name) { setFieldError(pName, '表示名を入力してください'); pName.focus(); return; }
+    clearFieldErrors(document.body);
+    alert('プロフィールを保存しました（表示名・言語）。');
+  });
+
+  document.getElementById('changePw').addEventListener('click', () => {
+    const cur = document.getElementById('curPw'), np = document.getElementById('newPw'), cp = document.getElementById('confirmPw');
+    clearFieldErrors(document.body);
+    if (!cur.value) { setFieldError(cur, '現在のパスワードを入力してください'); cur.focus(); return; }
+    if (np.value !== cp.value) { setFieldError(cp, '新しいパスワードと確認用が一致しません'); cp.focus(); return; }
+    alert('パスワードを変更しました。すべての端末からログアウトします（要再ログイン）。');
+  });
+
+  document.getElementById('changeEmail').addEventListener('click', () => {
+    const em = document.getElementById('newEmail'), pw = document.getElementById('emailCurPw');
+    clearFieldErrors(document.body);
+    if (!/.+@.+\..+/.test(em.value)) { setFieldError(em, 'メールアドレスの形式を確認してください'); em.focus(); return; }
+    if (!pw.value) { setFieldError(pw, '現在のパスワードを入力してください'); pw.focus(); return; }
+    alert('確認メールを ' + em.value + ' に送信しました。メール内のリンクを開くと変更が確定します。');
+  });
+</script>
+</body>
+</html>
