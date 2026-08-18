@@ -140,16 +140,32 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0 : 0.2 }}
+            transition={{ duration: reduce ? 0 : 0.3 }}
           />
           <motion.div
-            // CRT 電源ON＝細い横線（scaleY≈0）が一瞬光って（CSS フラッシュ）縦に開く。閉じは縦に畳む。
+            // CRT 電源ON＝細い横線（scaleY≈0）が一瞬光って（CSS フラッシュ）縦に開く。
+            // 閉じ＝CRT 電源OFF＝いったん細い横線に潰れ（scaleY→0）、その線が青白く発光しながら中央の点へ収束して消える（scaleX→0）。
+            // 開く/閉じるがハッキリ対になるよう、閉じは2段キーフレーム＋発光（enter フラッシュと同色）。
             className={`modal__panel sectioned${maximized ? " is-max" : ""}${reduce ? "" : " modal__panel--crt-in"}`}
             ref={panelRef}
             style={{ x: maximized ? 0 : pos.x, y: maximized ? 0 : pos.y, transformOrigin: "center center" }}
             initial={{ opacity: reduce ? 1 : 0.15, scaleY: reduce ? 1 : 0.04 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: reduce ? 1 : 0.04 }}
+            animate={{ opacity: 1, scaleY: 1, scaleX: 1 }}
+            exit={
+              reduce
+                ? { opacity: 0 }
+                : {
+                    scaleY: [1, 0.05, 0.05],
+                    scaleX: [1, 1, 0],
+                    opacity: [1, 1, 0],
+                    boxShadow: [
+                      "0 24px 48px -12px rgba(15,23,42,.25)",
+                      "0 0 28px 8px rgba(190,225,255,.95)",
+                      "0 0 48px 14px rgba(190,225,255,0)",
+                    ],
+                    transition: { duration: 0.34, ease: "easeIn", times: [0, 0.5, 1] },
+                  }
+            }
             transition={{ duration: reduce ? 0 : 0.26, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="modal__header" onPointerDown={onHeaderPointerDown}>
