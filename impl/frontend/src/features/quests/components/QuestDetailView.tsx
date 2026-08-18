@@ -119,8 +119,8 @@ export function QuestDetailView({ questId }: { questId: string }) {
               </div>
             </div>
             <div className="quest-actions">
-              {/* アイデア追加＝SC-21（未実装）／クエスト編集＝SC-11 編集（未実装）＝接続までデモ。 */}
-              <button className="btn btn-primary" type="button" onClick={() => router.push(`/ideas/new?quest=${questId}`)}>＋ アイデアを追加</button>
+              {/* アイデア追加＝SC-21（URL付きモーダル・Intercept）／クエスト編集＝SC-11 編集（未実装）＝接続までデモ。 */}
+              <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
               <button className="btn btn-outline" type="button" onClick={() => router.push("/quests/new")}>クエスト編集</button>
             </div>
           </div>

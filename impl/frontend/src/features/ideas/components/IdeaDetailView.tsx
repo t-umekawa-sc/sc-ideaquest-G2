@@ -8,8 +8,22 @@ import { useState } from "react";
 
 import { Avatar, Modal, ModalBody, ModalFooter } from "@/components/ui";
 
-import { IdeaEditForm } from "./IdeaEditForm";
+import { IdeaForm, type IdeaInitial } from "./IdeaForm";
 import "../ideas.css";
+
+// 編集モードの初期値（デモ・当該アイデア＝表示中のもの）。接続時は GET /ideas/{id} で供給。
+const EDIT_INITIAL: IdeaInitial = {
+  subject: "夜間配送の集約による積載率改善",
+  value: "配送コストを約15%削減しつつ、CO2排出も同時に削減できる。ドライバーの日中拘束を減らし労務環境も改善。",
+  body: "複数拠点で個別に走らせている夜間配送を1本のルートに集約し、積載率を高める。AIで需要予測しながら翌日ルートを自動生成、繁忙期は臨時便を差し込む。まずは首都圏3拠点でパイロット運用し、効果を検証してから全国展開する。",
+  limit: "2026-07-25",
+  stakeholders: ["物流部", "配送委託先"],
+  note: "",
+  attachments: [
+    { icon: "📊", name: "夜間配送_試算シート.xlsx", size: "248 KB" },
+    { icon: "🖼️", name: "ルート集約イメージ.png", size: "1.2 MB" },
+  ],
+};
 
 // ---- デモ fixtures（モック SC-22 と一致） ----
 const ATTACHMENTS = [
@@ -393,7 +407,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
       {/* ============ アイデア編集モーダル（SC-21 フォームの編集モード） ============ */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="アイデアを編集" size="lg">
-        <IdeaEditForm onDone={() => setEditOpen(false)} onCancel={() => setEditOpen(false)} />
+        <IdeaForm mode="edit" initial={EDIT_INITIAL} onDone={() => setEditOpen(false)} onCancel={() => setEditOpen(false)} />
       </Modal>
 
       {/* ============ 更新履歴モーダル（版タイムライン＋差分） ============ */}
