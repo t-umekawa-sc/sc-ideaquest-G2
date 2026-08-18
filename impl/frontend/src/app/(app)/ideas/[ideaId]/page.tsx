@@ -1,17 +1,14 @@
-// SC-22 アイデア詳細（プロトタイプ・スタブ）。実体は features/ideas へ。
-import { ScreenStub } from "@/components/layout";
+// SC-22 アイデア詳細（本文・価値・添付・投票・評価結果・チャット導線・更新履歴）。
+// 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md。
+// アイデア backend 未実装＝デモ fixtures（フロントエンド実装フロー規約＝画面モック先行）。
+import { redirect } from "next/navigation";
+
+import { IdeaDetailView } from "@/features/ideas";
+import { getServerSession } from "@/lib/session";
 
 export default async function IdeaDetailPage({ params }: { params: Promise<{ ideaId: string }> }) {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
   const { ideaId } = await params;
-  return (
-    <ScreenStub
-      code="SC-22"
-      title={`アイデア詳細（${ideaId}）`}
-      description="本文・価値・添付・投票（賛成/反対）・評価結果・チャット導線。モック移植予定。"
-      links={[
-        { href: `/ideas/${ideaId}/chat`, label: "アイデアチャットへ（SC-24）" },
-        { href: `/ideas/${ideaId}/eval`, label: "評価へ（SC-25）" },
-      ]}
-    />
-  );
+  return <IdeaDetailView ideaId={ideaId} />;
 }

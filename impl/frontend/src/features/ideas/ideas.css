@@ -1,0 +1,140 @@
+/* SC-22 アイデア詳細（features/ideas）＝mocks/SC-22_アイデア詳細.html 準拠。
+   共通クラス（.card/.card-title/.badge/.avatar/.poster/.btn/.pixel-stat/.modal__foot/.role-note）は
+   design-system.css。ここは SC-22 固有（ヘッダー・2カラム・投票/評価/情報パネル・議論アクティビティ・更新履歴）のみ。 */
+
+.detail-main { padding-block: var(--space-6) var(--space-16); }
+
+/* --- アイデアヘッダー --- */
+.idea-head { position: relative; }
+.idea-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.idea-head__badges { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.idea-head h1 { font-size: var(--text-2xl); margin: var(--space-2) 0 var(--space-2); }
+.idea-head .poster { margin-bottom: var(--space-3); }
+.idea-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.idea-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-2); }
+.idea-meta .soon { color: var(--color-danger); font-weight: 600; }
+
+/* フォロー★（ON=ゴールド）。SC-01 と同挙動 */
+.follow-star { background: none; border: 1px solid var(--color-border); cursor: pointer; border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3); font: inherit; font-weight: 600; color: var(--pixel-xp); display: inline-flex; align-items: center; gap: 6px; }
+.follow-star:hover { background: var(--color-surface-alt); }
+.follow-star[aria-pressed="false"] { color: var(--color-text-muted); }
+
+/* --- 2カラム（メイン＋右レール）。狭い/モーダルでは1カラム縦積み --- */
+.idea-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: var(--space-5); align-items: start; margin-top: var(--space-5); }
+@media (max-width: 920px) { .idea-layout { grid-template-columns: 1fr; } }
+.idea-main, .idea-rail { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* セクション内の小見出し */
+.sub-label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-1); }
+.sub-label .req { color: var(--color-danger); margin-left: 2px; }
+.sub-block + .sub-block { margin-top: var(--space-5); }
+.sub-block p { margin: 0; line-height: 1.8; }
+
+/* --- 添付ファイル --- */
+.file-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.file-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); }
+.file-icon { font-size: 20px; flex: 0 0 auto; }
+.file-info { min-width: 0; flex: 1; }
+.file-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* --- チャット（直近プレビュー＋導線） --- */
+.chat-preview { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+.chat-msg { display: flex; gap: var(--space-3); }
+.chat-msg__body { min-width: 0; }
+.chat-msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
+.chat-msg__name { font-weight: 600; font-size: var(--text-sm); }
+.chat-msg__time { font-size: var(--text-xs); color: var(--color-text-muted); }
+.chat-msg__text { margin: 2px 0 0; font-size: var(--text-sm); line-height: 1.7; }
+.chat-msg__text .mention { color: var(--color-primary); font-weight: 600; }
+
+/* --- 投票パネル（右レール） --- */
+.vote-summary { display: flex; gap: var(--space-5); align-items: baseline; margin-bottom: var(--space-3); }
+.vote-summary .vote-agree, .vote-summary .vote-disagree { font-size: var(--text-lg); }
+.vote-btns { display: flex; gap: var(--space-2); }
+.vote-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: var(--space-3); border-radius: var(--radius); border: 2px solid var(--color-border-strong); background: var(--color-surface);
+  cursor: pointer; font: inherit; font-weight: 700; font-size: var(--text-base); color: var(--color-text);
+  transition: background .12s, border-color .12s, transform .05s; }
+.vote-btn:hover { background: var(--color-surface-alt); }
+.vote-btn:active { transform: translateY(1px); }
+.vote-btn.agree.is-on { color: #fff; background: var(--color-agree); border-color: var(--color-agree); }
+.vote-btn.disagree.is-on { color: #fff; background: var(--color-disagree); border-color: var(--color-disagree); }
+.vote-note { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; }
+.vote-note .xp { color: var(--color-warning); font-weight: 600; }
+
+/* --- 評価結果パネル --- */
+.eval-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.eval-avg { display: flex; align-items: baseline; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); }
+.eval-avg__num { font-size: var(--text-3xl); font-weight: 800; color: var(--color-primary); line-height: 1; }
+.eval-avg__max { color: var(--color-text-muted); }
+.eval-avg__coin { margin-left: auto; font-size: var(--text-sm); }
+.score-row { display: grid; grid-template-columns: 84px 1fr 34px; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+.score-row__label { font-size: var(--text-sm); }
+.score-bar { height: 8px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
+.score-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: var(--radius-full); }
+.score-row__val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: var(--text-sm); }
+.eval-comments { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.eval-section-label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: var(--space-4) 0 var(--space-2); }
+/* 総評（全体コメント）は左アクセント帯付きで観点別コメントと差別化 */
+.eval-overall { display: flex; flex-direction: column; gap: var(--space-3); }
+.eval-overall__item { border-left: 3px solid var(--color-primary-border); background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3); }
+.eval-comment { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.eval-comment:first-child { border-top: 0; padding-top: 0; }
+.eval-comment__head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.eval-comment__aspect { margin-left: auto; }
+.eval-comment__text { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: 1.7; }
+
+/* 情報リスト（定義リスト） */
+.info-list { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-4); margin: 0; font-size: var(--text-sm); }
+.info-list dt { color: var(--color-text-muted); }
+.info-list dd { margin: 0; }
+
+/* --- 議論アクティビティ・グラフ（活発度） --- */
+.activity { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); background: var(--color-surface-alt); }
+.activity__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.activity__label { font-weight: 700; font-size: var(--text-sm); }
+.activity__state { font-size: var(--text-xs); font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.activity__state.hot { background: var(--color-disagree-bg); color: var(--color-danger); }
+.activity__state.calm { background: var(--color-primary-soft); color: var(--color-primary-active); }
+.activity__state.idle { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+/* 棒グラフ（日次メッセージ数） */
+.spark { display: flex; align-items: flex-end; gap: 3px; height: 48px; margin: var(--space-3) 0 var(--space-1); }
+.spark__bar { position: relative; flex: 1; min-width: 5px; background: var(--color-primary); border-radius: 2px 2px 0 0; opacity: .55; }
+.spark__bar:hover { opacity: 1; }
+.spark__bar.is-recent { opacity: .9; }
+/* アイデア更新マーカー（棒の上に縦線＋点） */
+.spark__bar.has-update::after { content: "◆"; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--color-warning); }
+.spark__bar.has-update::before { content: ""; position: absolute; top: -2px; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--color-warning); opacity: .5; }
+.activity__axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-subtle); }
+.activity__summary { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+.activity__summary b { color: var(--color-text); }
+.activity__legend { font-size: 10px; color: var(--color-text-subtle); margin-top: 2px; }
+
+/* --- 投票見直し（更新後の差分導線） --- */
+.vote-updated { display: flex; flex-direction: column; gap: var(--space-2); background: #FFFBEB; border: 1px solid var(--color-warning); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); font-size: var(--text-sm); }
+.vote-updated__title { font-weight: 700; color: var(--color-warning); }
+.vote-stale-badge { font-size: var(--text-xs); font-weight: 700; color: var(--color-warning); background: #FEF3C7; border-radius: 999px; padding: 1px 8px; }
+
+/* --- 更新履歴モーダル：版タイムライン＋差分 --- */
+.rev { border-left: 2px solid var(--color-border); padding: 0 0 var(--space-4) var(--space-4); margin-left: 6px; position: relative; }
+.rev::before { content: ""; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-primary); border: 2px solid var(--color-surface); }
+.rev.is-current::before { background: var(--color-warning); }
+.rev:last-child { border-left-color: transparent; padding-bottom: 0; }
+.rev__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); }
+.rev__time { font-weight: 700; }
+.rev__fields { display: flex; gap: 4px; flex-wrap: wrap; margin: var(--space-1) 0; }
+.rev__note { font-size: var(--text-xs); color: var(--color-text-muted); }
+.rev__diff { margin-top: var(--space-2); }
+.diff-field { margin-bottom: var(--space-3); }
+.diff-field__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin-bottom: 2px; }
+.diff-text { font-size: var(--text-sm); line-height: 1.8; background: var(--color-surface-alt); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.diff-add { background: var(--color-agree-bg); color: var(--color-success); border-radius: 3px; padding: 0 2px; }
+.diff-del { background: var(--color-disagree-bg); color: var(--color-danger); border-radius: 3px; padding: 0 2px; text-decoration: line-through; }
+.diff-oldnew { font-size: var(--text-sm); }
+.diff-oldnew .old { color: var(--color-danger); text-decoration: line-through; }
+.diff-oldnew .new { color: var(--color-success); font-weight: 600; }
+.rev-since { text-align: center; font-size: var(--text-xs); font-weight: 700; color: var(--color-warning); background: #FEF3C7; border-radius: 999px; padding: 2px 10px; margin: var(--space-2) 0; }
+.meta-history { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary); cursor: pointer; }
+.meta-history:hover { text-decoration: underline; }
