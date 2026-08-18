@@ -202,10 +202,40 @@
    </div>
 */
 (function () {
+  // 狭幅（≤640px）では、ヘッダー右のステータス(Lv/コイン/SP)と通知ベルをアバターメニューの先頭に畳む
+  // （バーはロゴ＋アバターのみに。CSS .usermenu__m を @media で表示切替）。各画面の HTML 変更は不要。
+  function foldHeaderIntoMenu(root, menu) {
+    const actions = root.parentElement;
+    if (!actions || menu.querySelector('.usermenu__m')) return;
+    const chips = actions.querySelectorAll(':scope > .pixel-stat');
+    const bell = actions.querySelector(':scope > .bell');
+    const frag = document.createDocumentFragment();
+    if (chips.length) {
+      const li = document.createElement('li');
+      li.className = 'usermenu__m usermenu__status'; li.setAttribute('role', 'none');
+      chips.forEach((c) => { const s = c.cloneNode(true); s.removeAttribute('href'); s.removeAttribute('role'); li.appendChild(s); });
+      frag.appendChild(li);
+    }
+    if (bell) {
+      const li = document.createElement('li'); li.className = 'usermenu__m'; li.setAttribute('role', 'none');
+      const a = document.createElement('a'); a.setAttribute('role', 'menuitem');
+      a.href = bell.getAttribute('href') || '#';
+      const badge = bell.querySelector('.bell__badge'); const n = badge ? badge.textContent.trim() : '';
+      a.textContent = '🔔 通知' + (n ? '（未読' + n + '件）' : '');
+      li.appendChild(a); frag.appendChild(li);
+    }
+    if (frag.childNodes.length) {
+      const sep = document.createElement('li'); sep.className = 'usermenu__m'; sep.setAttribute('role', 'none');
+      sep.innerHTML = '<div class="usermenu__sep"></div>';
+      frag.appendChild(sep);
+      menu.insertBefore(frag, menu.firstChild);
+    }
+  }
   function initUserMenu(root) {
     const trigger = root.querySelector('.usermenu__trigger');
     const menu = root.querySelector('.usermenu__list');
     if (!trigger || !menu) return;
+    foldHeaderIntoMenu(root, menu);
     function close() { menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -586,14 +616,16 @@ window.DataTable = (function () {
         <div class="tools">
           <button class="btn btn-outline btn-sm" type="button" data-dt-cols data-dt-table-only>列設定</button>
           <button class="btn btn-outline btn-sm" type="button" data-dt-export>エクスポート</button>
-          <span class="seg seg-density" role="group" aria-label="表示密度">
-            <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
-            <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
-          </span>
-          ${hasCard ? `<div class="viewtoggle" role="radiogroup" aria-label="表示切替">
-            <button type="button" role="radio" data-dt-view="card" title="カード表示">🔲 カード</button>
-            <button type="button" role="radio" data-dt-view="list" title="リスト表示">☰ リスト</button>
-          </div>` : ''}
+          <div class="dt-viewctls">
+            <span class="seg seg-density" role="group" aria-label="表示密度">
+              <button class="seg__btn" type="button" data-dt-density="normal">標準</button>
+              <button class="seg__btn" type="button" data-dt-density="compact">コンパクト</button>
+            </span>
+            ${hasCard ? `<div class="viewtoggle" role="radiogroup" aria-label="表示切替">
+              <button type="button" role="radio" data-dt-view="card" title="カード表示">🔲 カード</button>
+              <button type="button" role="radio" data-dt-view="list" title="リスト表示">☰ リスト</button>
+            </div>` : ''}
+          </div>
         </div>
         <div class="dt-chips" data-dt-chips></div>
       </div>

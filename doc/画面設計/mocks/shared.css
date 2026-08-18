@@ -214,6 +214,11 @@ img { max-width: 100%; display: block; }
 .usermenu__list [role="menuitem"]:hover { background: var(--color-primary-soft); color: var(--color-primary-active); text-decoration: none; }
 /* グループ間の区切り罫線（細線） */
 .usermenu__sep { height: 1px; margin: var(--space-2) var(--space-1); background: var(--color-border); }
+/* 狭幅でヘッダーから畳んだ項目（ステータス／通知）＝既定は非表示・狭幅のみ表示（shared.js が注入）。
+   display は表示時（狭幅メディアクエリ）でのみ指定＝ここで display を付けると .usermenu__m の none を上書きしてしまう。 */
+.usermenu__m { display: none; }
+.usermenu__status { flex-wrap: wrap; gap: 6px; padding: var(--space-2) var(--space-3); }
+.usermenu__status .pixel-stat { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .usermenu__list, .usermenu__list[hidden] { transition: visibility 0s; transform: none; }
   .usermenu__list li > * { transition: none; }
@@ -360,6 +365,11 @@ body.modal-open { overflow: hidden; }
     width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
   }
   .modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: default; }  /* モバイルはドラッグ無効 */
+  /* ヘッダーはロゴ＋アバターメニューのみに。ステータス(Lv/コイン/SP)と通知ベルはメニューへ畳む
+     （shared.js が menu 先頭に .usermenu__m を注入）＝狭幅で横並びが窮屈になるのを解消。 */
+  .header-actions > .pixel-stat, .header-actions > .bell { display: none; }
+  .usermenu__list li.usermenu__m { display: block; }
+  .usermenu__list li.usermenu__status { display: flex; }
 }
 
 /* =============================================================
@@ -462,6 +472,9 @@ body.modal-open { overflow: hidden; }
 .list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
 .list-toolbar .filters { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .list-toolbar .tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* 密度（標準/コンパクト）と表示切替（カード/リスト）は一体の「表示コントロール」＝常に同じ行に置く
+   （折り返しても2つで1つのまとまりとして動く）。 */
+.dt-viewctls { display: inline-flex; align-items: center; gap: var(--space-2); }
 .list-toolbar .input, .list-toolbar .select { width: auto; }        /* フォーム既定の幅100%を打ち消す */
 .list-toolbar .input[type="search"] { min-width: 200px; }
 .list-count { font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
