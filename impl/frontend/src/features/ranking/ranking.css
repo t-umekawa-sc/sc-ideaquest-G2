@@ -1,0 +1,47 @@
+/* SC-41 ランキング（features/ranking・ゲーム層）＝mocks/SC-41_ランキング.html 準拠。
+   ランキング本体は CRTガラス（.pixel-panel＋既存 .rank-panel/.rank-list を全件で使用）。期間切替はクリーンなセグメント。
+   共通クラス（.pixel-panel/.rank-panel/.rank-list/.rank-medal/.rank-name/.rank-score/.avatar/.card-accent）は design-system.css。ここは SC-41 固有のみ。 */
+
+.rank-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+/* 期間切替（クリーンなセグメント） */
+.rank-tabs { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-3); }
+.rank-tabs button {
+  font: inherit; cursor: pointer; padding: 6px 14px; border-radius: var(--radius);
+  border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text);
+}
+.rank-tabs button:hover { background: var(--color-surface-alt); }
+.rank-tabs button.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.rank-scope { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+
+/* あなたの順位サマリー（クリーンカード＋色アクセント） */
+.myrank { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
+.myrank__pos { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--color-primary); }
+.myrank__of { color: var(--color-text-muted); font-size: var(--text-sm); }
+.myrank__score { margin-left: auto; font-family: var(--font-pixel); }
+.myrank__score .exp { color: var(--pixel-coin); }
+.myrank__jump { margin-left: var(--space-2); }
+
+/* 表彰台（TOP3・ゲーム層） */
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: var(--space-4); margin: var(--space-2) 0 var(--space-6); }
+.podium__col { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 130px; max-width: 30%; }
+.podium__medal { font-size: 28px; line-height: 1; }
+.podium__name { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.podium__score { font-family: var(--font-pixel); color: var(--pixel-xp); }
+.podium__block {
+  width: 100%; border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+  border: 2px solid var(--pixel-glass-border); border-bottom: 0;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+  font-family: var(--font-pixel); font-size: var(--text-lg);
+  background: rgba(148,163,184,.18);
+}
+.podium__col.rank1 .podium__block { height: 96px; background: rgba(251,191,36,.22); color: var(--pixel-xp); }
+.podium__col.rank2 .podium__block { height: 68px; background: rgba(203,213,225,.20); }
+.podium__col.rank3 .podium__block { height: 48px; background: rgba(217,119,6,.20); }
+.podium__col.is-me .podium__name { color: var(--pixel-cyan); }
+
+/* 全件リスト: rank-panel を流用。順位番号を追加 */
+.rank-list li .rank-no { flex: 0 0 auto; width: 22px; text-align: right; font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
+.rank-panel.full { max-height: none; }
+
+@media (max-width: 640px) { .podium__col { width: 100px; } }
