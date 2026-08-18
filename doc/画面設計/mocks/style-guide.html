@@ -796,6 +796,7 @@
       const prevFocus = document.activeElement;
       requestAnimationFrame(() => el.classList.add('show'));
       function done(val) {
+        document.removeEventListener('keydown', onKey, true);
         el.classList.remove('show');
         setTimeout(() => {
           el.remove();
@@ -808,18 +809,21 @@
         if (e.target.closest('[data-ok]')) done(true);
         else if (e.target.closest('[data-cancel]')) done(false);
       });
-      // Enter=確定 / Esc=キャンセル / Tab=パネル内フォーカストラップ
+      // Enter=確定 / Esc=キャンセル / Tab=パネル内フォーカストラップ。
+      // フォーカスが未着地でも確実に効くよう document（capture）で購読し、閉じる時に解除。
       const focusable = () => Array.from(el.querySelectorAll('button')).filter((b) => b.offsetParent !== null);
-      el.addEventListener('keydown', (e) => {
+      function onKey(e) {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
-        else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(true); }
         else if (e.key === 'Tab') {
           const f = focusable(); if (!f.length) return;
           const first = f[0], last = f[f.length - 1];
-          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+          const active = document.activeElement;
+          if (e.shiftKey && (active === first || !el.contains(active))) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && (active === last || !el.contains(active))) { e.preventDefault(); first.focus(); }
         }
-      });
+      }
+      document.addEventListener('keydown', onKey, true);
       // 初期フォーカス＝危険はキャンセル（安全側）、それ以外は確定
       const focusTarget = o.variant === 'danger' ? el.querySelector('[data-cancel].btn') : el.querySelector('[data-ok]');
       setTimeout(() => { (focusTarget || el.querySelector('button')).focus(); }, 30);
@@ -833,12 +837,12 @@
   });
   document.getElementById('cfBuy').addEventListener('click', async () => {
     const ok = await iqConfirm({ variant: 'game', title: '▶ 購入の確認', msg: 'この装備を購入します。よろしいですか？', cost: { icon: '🎩', name: 'シルクハット（標準）', price: 120, balance: 320 } });
+    // キャンセル（処理なし）ではスナックバーを出さない＝実行された処理の結果だけ通知する。
     if (ok) window.iqSnack({ type: 'reward', title: '装備を購入しました', msg: '「シルクハット」を入手！ きせかえで装備できます。', rewards: [{ k: 'coin', t: '◆ -120' }] });
-    else window.iqSnack({ type: 'info', title: '購入をやめました' });
   });
   document.getElementById('cfPlain').addEventListener('click', async () => {
     const ok = await iqConfirm({ title: 'ページを離れますか？', msg: '入力中の内容は保存されません。' });
-    window.iqSnack({ type: ok ? 'success' : 'info', title: ok ? '移動しました（デモ）' : 'キャンセルしました' });
+    if (ok) window.iqSnack({ type: 'success', title: '移動しました（デモ）' });
   });
 
   // --- 13.4 パネル遮蔽オーバーレイ（NOW LOADING）デモ ---
