@@ -188,19 +188,22 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
 
   return (
     <section aria-label="自社アカウント管理">
-      <div className="admin-toolbar">
-        <h1>会社アカウント管理</h1>
-        {/* 発行は URL 付きモーダル（別ルート /admin/accounts/new）。直アクセス/リロードはフルページ。 */}
-        <Link href="/admin/accounts/new" className="btn btn-primary">
-          ＋ アカウント発行
-        </Link>
-      </div>
+      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <h1 className="page-title">会社アカウント管理</h1>
       <p className="admin-sub">
         自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>＋<strong>クエストグループ管理者（QG管理者）の任命</strong>ができます。（会社設定・システムロール付与は<strong>システム管理者</strong>の領分）
       </p>
       <div className="company-ctx">
         <span className="company-ctx__name">{companyCode}</span>
         <span className="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
+      </div>
+
+      <div className="section-head">
+        <h2>アカウント</h2>
+        {/* 発行は URL 付きモーダル（別ルート /admin/accounts/new）。直アクセス/リロードはフルページ。 */}
+        <Link href="/admin/accounts/new" className="btn btn-primary">
+          ＋ アカウント発行
+        </Link>
       </div>
 
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
@@ -241,6 +244,10 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
           })}
         />
       )}
+
+      <p className="role-note" style={{ marginTop: "var(--space-6)" }}>
+        アカウントは<strong>管理者による発行のみ</strong>です（自己新規登録はできません）。発行後、対象者は<strong>初回ログイン時にパスワードを設定</strong>します（メールのリンク・72時間有効）。<strong>無効化</strong>するとログインできなくなりますが、それまでの入力（アイデア／投票／評価／コメント）は残ります。この画面で発行・編集できるのは<strong>一般アカウント</strong>で、<strong>システムロールの付与（会社アカウント管理者／システム管理者）はシステム管理者が行います</strong>（システム管理者アカウントはこの画面では操作できません）。所属クエストグループは<strong>メンバー／管理者（QG管理者）を指定できます</strong>。
+      </p>
     </section>
   );
 }
