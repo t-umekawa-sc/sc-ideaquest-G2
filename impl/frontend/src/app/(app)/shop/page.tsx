@@ -1,13 +1,13 @@
-// SC-30 ショップ（プロトタイプ・スタブ）。実体は features/shop へ（ゲーム層）。
-import { ScreenStub } from "@/components/layout";
+// SC-30 ショップ（ゲーム層）＝コイン残高＋装備一覧（5スロット・レアリティ・購入＝コイン消費）。
+// 正＝doc/画面設計/mocks/SC-30_ショップ.html・doc/画面設計/screens/SC-30_ショップ.md。
+// 装備/コイン backend 未実装＝デモ fixtures（画面モック先行）。
+import { redirect } from "next/navigation";
 
-export default function ShopPage() {
-  return (
-    <ScreenStub
-      code="SC-30"
-      title="ショップ"
-      description="コイン残高＋装備グリッド（5スロット・レアリティ・購入＝コイン消費）。モック移植予定。"
-      links={[{ href: "/avatar", label: "アバター / 着せ替えへ（SC-31）" }]}
-    />
-  );
+import { ShopView } from "@/features/shop";
+import { getServerSession } from "@/lib/session";
+
+export default async function ShopPage() {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+  return <ShopView />;
 }
