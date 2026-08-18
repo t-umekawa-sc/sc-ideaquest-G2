@@ -246,6 +246,7 @@ img { max-width: 100%; display: block; }
   border-radius: var(--radius); border: 1px solid transparent;
   background: var(--color-surface-alt); color: var(--color-text);
   cursor: pointer; transition: background .15s, border-color .15s, box-shadow .1s, transform .05s;
+  white-space: nowrap; /* ボタンのラベルは折り返さない（狭幅ではフッターを縦積みにして全幅表示） */
 }
 .btn:hover { background: var(--color-border); text-decoration: none; }
 /* 押下フィードバック（業務層）: 1px 沈み込み＋内側の影で“押し込み”を表現し、
@@ -370,6 +371,10 @@ body.modal-open { overflow: hidden; }
     width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
   }
   .modal--draggable .modal__header, .modal--draggable .modal__drag { cursor: default; }  /* モバイルはドラッグ無効 */
+  /* モーダルのフッターは全幅・縦積み＝ボタン名を変えずに折り返しを解消。DOM 順のまま主アクション（塗り）が
+     最下段＝広幅の右端相当・親指が届きやすい位置に。 */
+  .modal__footer { flex-direction: column; align-items: stretch; }
+  .modal__footer > .btn { width: 100%; }
   /* ヘッダーはロゴ＋アバターメニューのみに。ステータス(Lv/コイン/SP)と通知ベルはメニューへ畳む
      （shared.js が menu 先頭に .usermenu__m を注入）＝狭幅で横並びが窮屈になるのを解消。 */
   .header-actions > .pixel-stat, .header-actions > .bell { display: none; }
