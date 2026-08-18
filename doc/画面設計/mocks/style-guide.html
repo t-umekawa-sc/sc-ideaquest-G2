@@ -16,97 +16,6 @@
   .token .name { font-size: var(--text-xs); margin-top: 6px; }
   .token .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
   .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: var(--space-4); }
-
-  /* ============================================================
-   * 提案（サンプル）: 13. 処理中プログレス / 14. 完了スナックバー（ゲーム要素入り）
-   * ※ ここは style-guide 内蔵の提案用。採用時は shared.css へ昇格し、各画面から利用する。
-   * ============================================================ */
-
-  /* --- 13. プログレス --- */
-  /* コインが回るスピナー（ゲーム要素） */
-  .iq-spinner { display: inline-flex; align-items: center; gap: var(--space-2); }
-  .iq-spinner__coin { font-size: 20px; color: var(--pixel-coin); display: inline-block; animation: iq-coinspin 1s linear infinite; }
-  @keyframes iq-coinspin { to { transform: rotateY(360deg); } }
-  .iq-spinner__label { font-size: var(--text-sm); color: var(--color-text-muted); }
-  /* 汎用の小さな回転スピナー（ボタン内など・currentColor で親色に追従） */
-  .iq-dot-spin { width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%;
-    display: inline-block; vertical-align: -2px; margin-right: 6px; animation: iq-rot .7s linear infinite; }
-  @keyframes iq-rot { to { transform: rotate(360deg); } }
-  .btn.is-loading, .btn-pixel.is-loading { pointer-events: none; opacity: .85; }
-
-  /* 確定プログレスバー（業務クリーン基調） */
-  .progress__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); margin-bottom: 6px; font-size: var(--text-sm); }
-  .progress__pct { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--color-primary); }
-  .progress__track { position: relative; height: 12px; background: var(--color-surface-alt); border-radius: var(--radius-full); overflow: hidden; }
-  .progress__fill { height: 100%; width: 0; border-radius: inherit; background: var(--color-primary); transition: width .25s ease; }
-  .progress__done { display: none; margin-top: 6px; font-family: var(--font-pixel); color: var(--color-success); font-size: var(--text-sm); }
-  .progress.is-complete .progress__done { display: block; animation: iq-pop .4s ease; }
-  @keyframes iq-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
-  /* ゲーム変種＝XPバー風（ゴールドのグラデ＋流れる光沢） */
-  .progress--xp .progress__track { background: rgba(0,0,0,.12); }
-  .progress--xp .progress__pct { color: var(--color-warning); }
-  .progress--xp .progress__fill { background: linear-gradient(90deg, var(--pixel-coin), var(--pixel-xp)); }
-  .progress--xp .progress__fill::after { content: ""; position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
-    background-size: 40% 100%; background-repeat: no-repeat; animation: iq-shine 1.1s linear infinite; }
-  @keyframes iq-shine { 0% { background-position: -40% 0; } 100% { background-position: 140% 0; } }
-  .progress.is-complete .progress__fill { background: linear-gradient(90deg, var(--pixel-xp), var(--color-success)); }
-  /* 不確定バー（流れるブロック） */
-  .progress--indeterminate .progress__track::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
-    border-radius: inherit; background: var(--color-primary); animation: iq-indet 1.1s ease-in-out infinite; }
-  @keyframes iq-indet { 0% { transform: translateX(-110%); } 100% { transform: translateX(310%); } }
-
-  /* パネル遮蔽オーバーレイ（NOW LOADING＝CRTガラス＋ドット） */
-  .iq-block { position: relative; }
-  .iq-block__overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 5; border-radius: inherit;
-    background: repeating-linear-gradient(0deg, var(--pixel-glass-scan) 0 2px, rgba(0,0,0,0) 2px 4px), rgba(15,23,42,.55); backdrop-filter: blur(2px); }
-  .iq-loading-badge { font-family: var(--font-pixel); color: #fff; letter-spacing: .08em; display: inline-flex; align-items: center; gap: 8px; }
-  .iq-loading-badge .dots::after { content: "▚"; animation: iq-dots 1s steps(1) infinite; }
-  @keyframes iq-dots { 0% { content: "▚"; } 25% { content: "▚▚"; } 50% { content: "▚▚▚"; } 75% { content: "▚▚▚▚"; } 100% { content: "▚"; } }
-
-  /* --- 14. スナックバー（完了通知・ゲーム要素入り） --- */
-  .snackbar-stack { position: fixed; left: 50%; bottom: var(--space-6); transform: translateX(-50%);
-    display: flex; flex-direction: column; gap: var(--space-2); z-index: 90; width: min(92vw, 460px); pointer-events: none; }
-  .snackbar { pointer-events: auto; position: relative; overflow: hidden; display: flex; align-items: flex-start; gap: var(--space-3);
-    background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary);
-    border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--space-3) var(--space-4); animation: iq-snack-in .28s cubic-bezier(.16,1,.3,1); }
-  .snackbar.is-leaving { animation: iq-snack-out .2s ease forwards; }
-  @keyframes iq-snack-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
-  @keyframes iq-snack-out { to { opacity: 0; transform: translateY(10px) scale(.98); } }
-  .snackbar__icon { font-size: 18px; flex: 0 0 auto; line-height: 1.5; }
-  .snackbar__body { flex: 1; min-width: 0; }
-  .snackbar__title { font-weight: 700; font-size: var(--text-sm); }
-  .snackbar__msg { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 1px; }
-  .snackbar__action { background: none; border: none; color: var(--color-primary); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm); flex: 0 0 auto; }
-  .snackbar__action:hover { background: var(--color-primary-soft); }
-  .snackbar__close { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px; flex: 0 0 auto; }
-  .snackbar__close:hover { color: var(--color-text); }
-  .snackbar__timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--color-primary); transform-origin: left; animation: iq-snack-timer linear forwards; }
-  @keyframes iq-snack-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-  .snackbar--success { border-left-color: var(--color-success); } .snackbar--success .snackbar__timer { background: var(--color-success); }
-  .snackbar--error { border-left-color: var(--color-danger); } .snackbar--error .snackbar__timer { background: var(--color-danger); }
-  .snackbar--info { border-left-color: var(--color-info); } .snackbar--info .snackbar__timer { background: var(--color-info); }
-  /* ゲーム変種＝報酬スナックバー（CRTガラス＋XP/コインチップ＋きらめき） */
-  .snackbar--reward { color: #fff; border: 2px solid var(--pixel-glass-border); border-left: 4px solid var(--pixel-xp); backdrop-filter: blur(4px);
-    background: linear-gradient(180deg, var(--pixel-glass-gloss), rgba(255,255,255,0) 45%),
-      repeating-linear-gradient(0deg, var(--pixel-glass-scan) 0 2px, rgba(0,0,0,0) 2px 4px), var(--pixel-glass-fill); }
-  .snackbar--reward .snackbar__title { font-family: var(--font-pixel); letter-spacing: .04em; }
-  .snackbar--reward .snackbar__msg { color: rgba(255,255,255,.82); }
-  .snackbar--reward .snackbar__timer { background: var(--pixel-xp); }
-  .snackbar--reward .snackbar__close { color: rgba(255,255,255,.7); }
-  .snackbar--reward .snackbar__icon { animation: iq-sparkle 1.2s ease-in-out infinite; }
-  @keyframes iq-sparkle { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.25) rotate(12deg); } }
-  .snackbar__rewards { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-  .reward-chip { font-family: var(--font-pixel); font-size: var(--text-xs); padding: 2px 8px; border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.35); display: inline-flex; align-items: center; gap: 4px; }
-  .reward-chip.xp { color: var(--pixel-xp); } .reward-chip.coin { color: var(--pixel-coin); } .reward-chip.sp { color: var(--pixel-skill); }
-
-  @media (prefers-reduced-motion: reduce) {
-    .iq-spinner__coin, .iq-dot-spin, .progress--xp .progress__fill::after, .progress--indeterminate .progress__track::before,
-    .iq-loading-badge .dots::after, .progress.is-complete .progress__done,
-    .snackbar, .snackbar.is-leaving, .snackbar--reward .snackbar__icon { animation: none; }
-    .snackbar__timer { animation-duration: 0s; }
-  }
 </style>
 </head>
 <body>
@@ -619,8 +528,6 @@
   </div>
 </main>
 
-<!-- スナックバーの重なり置き場（画面下中央） -->
-<div class="snackbar-stack" id="snackStack" aria-live="polite" aria-atomic="false"></div>
 
 <!-- サンプルダイアログ（標準の入力モーダル・ドラッグ＋最大化。挙動は shared.js が共通適用） -->
 <div class="modal modal--md modal--draggable modal--maximizable" id="sgDialog" role="dialog" aria-modal="true" aria-labelledby="sgDlgTitle" hidden>
@@ -787,62 +694,15 @@
     document.getElementById('sgDlgSave').addEventListener('click', () => { alert('保存しました（デモ）'); close(); });
   })();
 
-  // --- 14. スナックバー（完了通知・ゲーム要素） ---
-  const iqSnack = (function () {
-    const stack = document.getElementById('snackStack');
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const ICONS = { success: '✅', error: '⚠️', info: 'ℹ️', reward: '✨', levelup: '★' };
-    function show(o) {
-      o = o || {};
-      const isReward = o.type === 'reward' || o.type === 'levelup';
-      const variant = isReward ? 'reward' : (o.type || 'info');
-      const dur = o.duration || (o.action ? 6000 : 4000);
-      const el = document.createElement('div');
-      el.className = 'snackbar snackbar--' + variant;
-      el.setAttribute('role', o.type === 'error' ? 'alert' : 'status');
-      let html = '<span class="snackbar__icon">' + (o.icon || ICONS[o.type] || 'ℹ️') + '</span><div class="snackbar__body">';
-      if (o.title) html += '<div class="snackbar__title">' + o.title + '</div>';
-      if (o.msg) html += '<div class="snackbar__msg">' + o.msg + '</div>';
-      if (o.rewards && o.rewards.length) html += '<div class="snackbar__rewards">' + o.rewards.map(r => '<span class="reward-chip ' + r.k + '">' + r.t + '</span>').join('') + '</div>';
-      html += '</div>';
-      if (o.action) html += '<button class="snackbar__action" type="button">' + o.action.label + '</button>';
-      html += '<button class="snackbar__close" type="button" aria-label="閉じる">✕</button>';
-      html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>';
-      el.innerHTML = html;
-      stack.appendChild(el);
-      let timer = setTimeout(dismiss, dur);
-      function dismiss() { clearTimeout(timer); el.classList.add('is-leaving'); setTimeout(() => el.remove(), reduce ? 0 : 200); }
-      el.querySelector('.snackbar__close').addEventListener('click', dismiss);
-      const act = el.querySelector('.snackbar__action');
-      if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(); } });
-      // ホバーで自動消滅を一時停止（タイマーバーも止める）
-      const bar = el.querySelector('.snackbar__timer');
-      el.addEventListener('mouseenter', () => { clearTimeout(timer); if (bar) bar.style.animationPlayState = 'paused'; });
-      el.addEventListener('mouseleave', () => { if (bar) bar.style.animationPlayState = 'running'; timer = setTimeout(dismiss, 1500); });
-      return el;
-    }
-    window.iqSnack = show;
-    document.getElementById('snkOk').addEventListener('click', () => show({ type: 'success', title: '更新しました', msg: '会社プロフィールを保存しました。' }));
-    document.getElementById('snkUndo').addEventListener('click', () => show({ type: 'success', title: '削除しました', msg: '「経費精算の自動化」を削除。', action: { label: '元に戻す', onClick: () => show({ type: 'info', title: '元に戻しました' }) } }));
-    document.getElementById('snkErr').addEventListener('click', () => show({ type: 'error', title: '保存に失敗しました', msg: '通信エラー。時間をおいて再試行してください。' }));
-    document.getElementById('snkInfo').addEventListener('click', () => show({ type: 'info', title: '下書きを保存しました', msg: 'あなただけに表示されます。' }));
-    document.getElementById('snkReward').addEventListener('click', () => show({ type: 'reward', title: 'アイデアを投稿！', msg: 'パーティーに公開しました。', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }));
-    document.getElementById('snkLevel').addEventListener('click', () => show({ type: 'levelup', icon: '★', title: 'LEVEL UP! Lv.8', msg: '新しい装備が解放されました。', rewards: [{ k: 'sp', t: '✦ SP +1' }], duration: 5000 }));
-    return show;
-  })();
-
-  // --- 13.2 進捗バー（確定・XPバー風）デモ。完了で報酬スナックバーと連動 ---
+  // --- 14. スナックバー（完了通知）デモ。生成 API は shared.js の window.iqSnack ---
   (function () {
-    const p = document.getElementById('sgProg'), fill = document.getElementById('sgProgFill'), pct = document.getElementById('sgProgPct');
-    let anim = null;
-    document.getElementById('sgProgRun').addEventListener('click', () => {
-      if (anim) clearInterval(anim);
-      p.classList.remove('is-complete'); let v = 0; pct.textContent = '0%'; fill.style.width = '0%';
-      anim = setInterval(() => {
-        v = Math.min(100, v + Math.random() * 12 + 4); fill.style.width = v + '%'; pct.textContent = Math.round(v) + '%';
-        if (v >= 100) { clearInterval(anim); anim = null; p.classList.add('is-complete'); iqSnack({ type: 'reward', title: '投稿完了！', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }); }
-      }, 260);
-    });
+    const snk = window.iqSnack;
+    document.getElementById('snkOk').addEventListener('click', () => snk({ type: 'success', title: '更新しました', msg: '会社プロフィールを保存しました。' }));
+    document.getElementById('snkUndo').addEventListener('click', () => snk({ type: 'success', title: '削除しました', msg: '「経費精算の自動化」を削除。', action: { label: '元に戻す', onClick: () => snk({ type: 'info', title: '元に戻しました' }) } }));
+    document.getElementById('snkErr').addEventListener('click', () => snk({ type: 'error', title: '保存に失敗しました', msg: '通信エラー。時間をおいて再試行してください。' }));
+    document.getElementById('snkInfo').addEventListener('click', () => snk({ type: 'info', title: '下書きを保存しました', msg: 'あなただけに表示されます。' }));
+    document.getElementById('snkReward').addEventListener('click', () => snk({ type: 'reward', title: 'アイデアを投稿！', msg: 'パーティーに公開しました。', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }));
+    document.getElementById('snkLevel').addEventListener('click', () => snk({ type: 'levelup', icon: '★', title: 'LEVEL UP! Lv.8', msg: '新しい装備が解放されました。', rewards: [{ k: 'sp', t: '✦ SP +1' }], duration: 5000 }));
   })();
 
   // --- 13.4 パネル遮蔽オーバーレイ（NOW LOADING）デモ ---
@@ -854,7 +714,7 @@
       ov.className = 'iq-block__overlay';
       ov.innerHTML = '<span class="iq-loading-badge">NOW LOADING <span class="dots"></span></span>';
       card.appendChild(ov);
-      setTimeout(() => { ov.remove(); iqSnack({ type: 'success', title: '再取得しました', msg: 'ランキングを更新。' }); }, 3000);
+      setTimeout(() => { ov.remove(); window.iqSnack({ type: 'success', title: '再取得しました', msg: 'ランキングを更新。' }); }, 3000);
     });
   })();
 </script>

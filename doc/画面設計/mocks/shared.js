@@ -1034,3 +1034,52 @@ window.DataTable = (function () {
   }
   return { init: init };
 })();
+
+/* --- 完了スナックバー（全モック共通・window.iqSnack） -----------------------------
+   使い方: iqSnack({ type:'success'|'error'|'info'|'reward'|'levelup', title, msg,
+                     rewards:[{k:'xp'|'coin'|'sp', t:'＋50 XP'}], action:{label, onClick}, duration })
+   ・下中央に積み重ね・自動消滅（タイマーバー・ホバーで一時停止）・✕/アクション付き。
+   ・見た目は shared.css の .snackbar*（業務＝意味色／ゲーム＝.snackbar--reward）。 */
+(function () {
+  const ICONS = { success: '✅', error: '⚠️', info: 'ℹ️', reward: '✨', levelup: '★' };
+  function stack() {
+    let s = document.getElementById('iqSnackStack');
+    if (!s) {
+      s = document.createElement('div');
+      s.id = 'iqSnackStack'; s.className = 'snackbar-stack';
+      s.setAttribute('aria-live', 'polite'); s.setAttribute('aria-atomic', 'false');
+      document.body.appendChild(s);
+    }
+    return s;
+  }
+  function show(o) {
+    o = o || {};
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isReward = o.type === 'reward' || o.type === 'levelup';
+    const variant = isReward ? 'reward' : (o.type || 'info');
+    const dur = o.duration || (o.action ? 6000 : 4000);
+    const el = document.createElement('div');
+    el.className = 'snackbar snackbar--' + variant;
+    el.setAttribute('role', o.type === 'error' ? 'alert' : 'status');
+    let html = '<span class="snackbar__icon">' + (o.icon || ICONS[o.type] || 'ℹ️') + '</span><div class="snackbar__body">';
+    if (o.title) html += '<div class="snackbar__title">' + o.title + '</div>';
+    if (o.msg) html += '<div class="snackbar__msg">' + o.msg + '</div>';
+    if (o.rewards && o.rewards.length) html += '<div class="snackbar__rewards">' + o.rewards.map((r) => '<span class="reward-chip ' + r.k + '">' + r.t + '</span>').join('') + '</div>';
+    html += '</div>';
+    if (o.action) html += '<button class="snackbar__action" type="button">' + o.action.label + '</button>';
+    html += '<button class="snackbar__close" type="button" aria-label="閉じる">✕</button>';
+    html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>';
+    el.innerHTML = html;
+    stack().appendChild(el);
+    let timer = setTimeout(dismiss, dur);
+    function dismiss() { clearTimeout(timer); el.classList.add('is-leaving'); setTimeout(() => el.remove(), reduce ? 0 : 200); }
+    el.querySelector('.snackbar__close').addEventListener('click', dismiss);
+    const act = el.querySelector('.snackbar__action');
+    if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(); } });
+    const bar = el.querySelector('.snackbar__timer');
+    el.addEventListener('mouseenter', () => { clearTimeout(timer); if (bar) bar.style.animationPlayState = 'paused'; });
+    el.addEventListener('mouseleave', () => { if (bar) bar.style.animationPlayState = 'running'; timer = setTimeout(dismiss, 1500); });
+    return el;
+  }
+  window.iqSnack = show;
+})();

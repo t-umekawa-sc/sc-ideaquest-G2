@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useSnackbar } from "@/components/ui";
+
 import "../evaluations.css";
 
 type AspectKey = "novelty" | "impact" | "feasibility" | "fit" | "cost";
@@ -21,6 +23,7 @@ const ASPECTS: Aspect[] = [
 
 export function EvaluationView({ ideaId }: { ideaId: string }) {
   const router = useRouter();
+  const snack = useSnackbar();
   // 既存評価の編集を想定したシード
   const [scores, setScores] = useState<Record<AspectKey, number>>({ novelty: 4, impact: 4, feasibility: 3, fit: 4, cost: 5 });
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
@@ -41,11 +44,16 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
     setOverallErr(noOverall);
     if (missing || noOverall) return;
     // 評価 backend 未実装＝デモ（送信せず）。接続時に PUT /ideas/{id}/evaluations/me へ差し替え。
-    window.alert(`評価を確定しました（デモ）\n平均: ${avg.toFixed(1)} / 5.0\n公開範囲: ${visibility === "party" ? "パーティー全員" : "限定"}`);
+    snack({
+      type: "reward",
+      title: "評価を確定しました",
+      msg: `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`,
+      rewards: [{ k: "xp", t: "＋10 XP" }],
+    });
     router.push(`/ideas/${ideaId}`);
   }
   function saveDraft() {
-    window.alert(`下書きを保存しました（デモ）\n採点: ${rated}/5 観点\n※ あなただけに表示。確定するまで XP・コインは付与されません。`);
+    snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });
   }
 
   return (

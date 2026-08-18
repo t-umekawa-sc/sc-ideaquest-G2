@@ -5,7 +5,7 @@
 // アイデア backend は未実装＝画面モック先行（デモ・送信は onDone のみ）。共通モーダル（Modal/RouteModal）に body/footer を渡す。
 import { useRef, useState } from "react";
 
-import { Button, Field, ModalBody, ModalFooter } from "@/components/ui";
+import { Button, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 
 const STAKE_SUGGESTIONS = ["物流部", "配送委託先", "経営企画部", "情報システム部", "現場ドライバー"];
 
@@ -50,6 +50,7 @@ export function IdeaForm({
   onCancel: () => void;
 }) {
   const init = initial ?? EMPTY;
+  const snack = useSnackbar();
   const [subject, setSubject] = useState(init.subject);
   const [value, setValue] = useState(init.value);
   const [body, setBody] = useState(init.body);
@@ -85,6 +86,15 @@ export function IdeaForm({
     e.preventDefault();
     // アイデア backend 未実装＝デモ（送信せず閉じる）。接続時に POST /ideas（登録）/ PATCH /ideas/{id}（編集）へ差し替え。
     setPending(true);
+    if (isEdit) {
+      snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
+    } else {
+      snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: "＋50 XP" }] });
+    }
+    onDone();
+  }
+  function saveDraft() {
+    snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
     onDone();
   }
 
@@ -281,7 +291,7 @@ export function IdeaForm({
           キャンセル
         </Button>
         {!isEdit && (
-          <Button type="button" variant="outline" onClick={onDone}>
+          <Button type="button" variant="outline" onClick={saveDraft}>
             下書き保存
           </Button>
         )}
