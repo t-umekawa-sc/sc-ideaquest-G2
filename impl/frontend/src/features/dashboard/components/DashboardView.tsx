@@ -92,10 +92,14 @@ export function DashboardView({
               <span className="hero__next">NEXT {balance.xpToNext} XP</span>
             </div>
             <div className="xp-bar"><span style={{ width: `${balance.xpPct}%` }} /></div>
-            <div className="hero__coin"><span className="pixel-stat coin">◆ {balance.coin} コイン</span></div>
+            <div className="hero__coin">
+              <span className="pixel-stat coin">◆ {balance.coin} コイン</span>
+              <span className="pixel-stat skill">✦ SP {balance.sp}</span>
+            </div>
             <div className="hero__actions">
-              <Link className="btn-pixel" href="/shop">▶ SHOP へ</Link>
+              <Link className="btn-pixel" href="/shop">▶ ショップ</Link>
               <Link className="btn-pixel" href="/avatar">▶ きせかえ</Link>
+              <Link className="btn-pixel" href="/spells">▶ 魔法・スキル</Link>
             </div>
           </div>
         </section>

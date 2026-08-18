@@ -36,7 +36,7 @@
   .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
   .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
   .hero .xp-bar { max-width: 420px; }
-  .hero__coin { margin-top: var(--space-3); }
+  .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
   .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
   @media (prefers-reduced-motion: reduce) { .hero__avatar img { animation: none; } }
 
@@ -250,10 +250,14 @@
           <span class="hero__next">NEXT 120 XP</span>
         </div>
         <div class="xp-bar"><span style="width:65%"></span></div>
-        <div class="hero__coin"><span class="pixel-stat coin">◆ 320 コイン</span></div>
+        <div class="hero__coin">
+          <span class="pixel-stat coin">◆ 320 コイン</span>
+          <span class="pixel-stat skill">✦ SP 3</span>
+        </div>
         <div class="hero__actions">
-          <a class="btn-pixel" href="#">▶ SHOP へ</a>
-          <a class="btn-pixel" href="#">▶ きせかえ</a>
+          <a class="btn-pixel" href="SC-30_ショップ.html">▶ ショップ</a>
+          <a class="btn-pixel" href="SC-31_アバター着せ替え.html">▶ きせかえ</a>
+          <a class="btn-pixel" href="SC-32_魔法スキル.html">▶ 魔法・スキル</a>
         </div>
       </div>
     </section>

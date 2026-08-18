@@ -19,7 +19,7 @@
 .dash-page .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
 .dash-page .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
 .dash-page .hero .xp-bar { max-width: 420px; }
-.dash-page .hero__coin { margin-top: var(--space-3); }
+.dash-page .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .dash-page .hero__actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { .dash-page .hero__avatar img { animation: none; } }
 
