@@ -15,8 +15,18 @@
      共通の見た目は shared.css（.card/.field/.input/.btn/.pixel-stat/.xp-bar/.provision-note/.role-note/
      .backlink/.page-title/.admin-sub/.section-head/.icon-field）。ここは当画面ローカルのみ。 */
 
-  /* アカウント情報サマリ（アバター＋氏名＋残高＋identity） */
-  .prof-head { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+  /* アカウント情報サマリ（3Dアバター＋氏名＋残高＋identity） */
+  .prof-head { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+  /* 3Dアバター（VRM）ビューア＝ここでは読取表示。着せ替え（装備）は G ドメイン＝SC-31 で行う。
+     本番は three-vrm/R3F、モックは mascot-hero.png を暗いステージに置いた見立て（SC-31/SC-01 と同じ）。 */
+  .avatar3d { position: relative; flex: 0 0 auto; width: 132px; height: 156px; border-radius: var(--radius);
+    display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+    background: radial-gradient(120% 90% at 50% 20%, #1e293b 0%, #0f172a 70%); border: 1px solid var(--color-border); }
+  .avatar3d__img { width: 108px; height: auto; image-rendering: pixelated; margin-bottom: 6px; }
+  .avatar3d__tag { position: absolute; top: 6px; left: 6px; font-size: var(--text-xs); color: #cbd5e1;
+    background: rgba(15,23,42,.55); padding: 2px 6px; border-radius: var(--radius-sm); }
+  .prof-head__body { min-width: 0; }
+  .prof-head__actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
   .prof-head__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
   .prof-head__role { margin-top: 4px; }
   .prof-stats { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
@@ -74,13 +84,16 @@
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
   <h1 class="page-title">プロフィール</h1>
-  <p class="admin-sub">あなたの<strong>表示名・アバター・言語</strong>と<strong>セキュリティ（パスワード・メールアドレス）</strong>を管理します。（背景画像はヘッダーのユーザーメニュー「背景画像を変更／リセット」から設定できます）</p>
+  <p class="admin-sub">あなたの<strong>表示名・プロフィール画像・言語</strong>と<strong>セキュリティ（パスワード・メールアドレス）</strong>を管理します。（<strong>3D アバターの着せ替え</strong>は「きせかえ」、<strong>背景画像</strong>はヘッダーのユーザーメニューから設定できます）</p>
 
   <!-- ===== アカウント情報＋残高（読取専用・GET /me） ===== -->
   <section class="card" aria-label="アカウント情報">
     <div class="prof-head">
-      <span class="quest-icon lg" style="--accent:#2563EB"><span class="quest-icon__char">山</span></span>
-      <div>
+      <div class="avatar3d">
+        <span class="avatar3d__tag">3D アバター</span>
+        <img class="avatar3d__img" src="assets/mascot-hero.png" alt="あなたの3Dアバター">
+      </div>
+      <div class="prof-head__body">
         <div class="prof-head__name">山田 太郎</div>
         <div class="prof-head__role"><span class="badge badge-muted" title="システムロール">一般</span></div>
         <div class="prof-stats">
@@ -88,6 +101,10 @@
           <div class="xp-bar" title="次のレベルまで 120 XP"><span style="width:65%"></span></div>
           <span class="pixel-stat coin">◆ 320 コイン</span>
           <span class="pixel-stat skill">✦ SP 3</span>
+        </div>
+        <div class="prof-head__actions">
+          <a class="btn btn-outline btn-sm" href="SC-31_アバター着せ替え.html">▶ きせかえ（装備を変更）</a>
+          <a class="btn btn-outline btn-sm" href="SC-30_ショップ.html">🛒 ショップ</a>
         </div>
       </div>
     </div>
@@ -98,7 +115,7 @@
       <dt>システムロール</dt><dd>一般</dd>
     </dl>
     <div class="provision-note">
-      ログインID は変更できません。<strong>メールアドレス・パスワード</strong>の変更は下の「セキュリティ」から（現在のパスワードで再認証）。<strong>レベル・XP・コイン・スキルポイント</strong>は活動で増減します（表示のみ）。
+      ログインID は変更できません。<strong>メールアドレス・パスワード</strong>の変更は下の「セキュリティ」から（現在のパスワードで再認証）。<strong>レベル・XP・コイン・スキルポイント</strong>は活動で増減します（表示のみ）。<strong>3D アバターの装備（着せ替え）</strong>は「<a href="SC-31_アバター着せ替え.html">きせかえ</a>」で変更します。
     </div>
   </section>
 
@@ -107,8 +124,8 @@
   <section class="card" aria-label="プロフィール編集">
     <div class="setting-row">
       <div class="setting-row__info">
-        <div class="setting-row__name">アバター画像</div>
-        <div class="setting-row__desc">一覧・ランキング・ダッシュボードなどに表示。未設定時は「頭文字＋カラー」で表示（画像アップロードは今後対応）。</div>
+        <div class="setting-row__name">プロフィール画像（アイコン）</div>
+        <div class="setting-row__desc">一覧・ランキング・コメントなどに表示される<strong>アイコン画像</strong>です（<strong>3D アバターとは別</strong>＝着せ替えは上の「きせかえ」）。未設定時は「頭文字＋カラー」で表示（画像アップロードは今後対応）。</div>
       </div>
       <div class="icon-field">
         <span class="quest-icon lg" id="avPreview" style="--accent:#2563EB"><span class="quest-icon__char">山</span></span>
