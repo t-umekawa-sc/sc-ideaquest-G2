@@ -131,10 +131,17 @@
   /* 削除済みトゥームストーン */
   .msg.is-deleted .msg__text { color: var(--color-text-muted); font-style: italic; }
 
-  /* 引用返信ブロック（メッセージ内） */
-  .msg__quote { border-left: 3px solid var(--color-border-strong); background: var(--color-surface-alt);
-    border-radius: var(--radius-sm); padding: 4px var(--space-3); margin: 2px 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+  /* 引用返信ブロック（メッセージ内）＝クリックで引用元メッセージへジャンプ（アンカーリンク） */
+  .msg__quote { display: block; text-decoration: none; cursor: pointer; border-left: 3px solid var(--color-border-strong); background: var(--color-surface-alt);
+    border-radius: var(--radius-sm); padding: 4px var(--space-3); margin: 2px 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted);
+    transition: background .12s, border-color .12s, color .12s; }
+  .msg__quote:hover { background: var(--color-primary-soft); border-left-color: var(--color-primary); color: var(--color-text); }
   .msg__quote b { color: var(--color-text); font-weight: 600; }
+
+  /* 引用元メッセージへジャンプした時のハイライト（一時的にフラッシュ） */
+  @keyframes msg-flash { 0%, 30% { background: #FEF3C7; box-shadow: 0 0 0 2px var(--color-warning) inset; } 100% { background: transparent; box-shadow: none; } }
+  .msg.msg--flash { animation: msg-flash 1.6s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .msg.msg--flash { animation-duration: .01ms; } }
 
   /* 添付：画像のインラインプレビュー（ギャラリー＋ライトボックス） */
   .msg__gallery { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
@@ -216,7 +223,7 @@
   <div class="chat-thread" id="thread">
     <div class="chat-day">2026/07/15</div>
 
-    <div class="msg">
+    <div class="msg" id="m1">
       <span class="avatar sm"><span class="avatar__img placeholder">田</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">田中 一郎</span><span class="msg__time">14:20</span></div>
@@ -224,7 +231,7 @@
       </div>
     </div>
 
-    <div class="msg">
+    <div class="msg" id="m2">
       <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">15:02</span></div>
@@ -235,7 +242,7 @@
       </div>
     </div>
 
-    <div class="msg is-me">
+    <div class="msg is-me" id="m3">
       <span class="avatar sm"><span class="avatar__img placeholder">山</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">15:20</span></div>
@@ -247,7 +254,7 @@
 
     <div class="unread-sep">ここから未読</div>
 
-    <div class="msg">
+    <div class="msg" id="m4">
       <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">09:12</span></div>
@@ -258,7 +265,7 @@
       </div>
     </div>
 
-    <div class="msg">
+    <div class="msg" id="m5">
       <span class="avatar sm"><span class="avatar__img placeholder">佐</span></span>
       <div class="msg__body">
         <div class="msg__head"><span class="msg__name">佐藤 大輔</span><span class="msg__time">10:05</span></div>
@@ -379,9 +386,10 @@
     if (!val && pendingAtts.length === 0) return;
     const msg = document.createElement('div');
     msg.className = 'msg is-me';
+    msg.id = 'u' + (++msgSeq);   // 送信メッセージにもアンカーID（後から引用リンクの飛び先になる）
     const files = pendingAtts.map(f => '<span class="file-chip"><span class="file-icon">📎</span><a href="#">' + f + '</a></span>').join('');
-    // 引用は複数可＝引用の数だけ .msg__quote を積む。
-    const quotes = replyTargets.map(t => '<div class="msg__quote"><b>' + t.name + '</b> ' + t.text + '</div>').join('');
+    // 引用は複数可＝引用の数だけ .msg__quote を積む。引用文は引用元メッセージへのアンカーリンク。
+    const quotes = replyTargets.map(t => '<a class="msg__quote" href="#' + t.id + '"><b>' + t.name + '</b> ' + t.text + '</a>').join('');
     msg.innerHTML =
       '<span class="avatar sm"><span class="avatar__img placeholder">山</span></span>' +
       '<div class="msg__body">' +
@@ -818,6 +826,7 @@
   // 複数のメッセージを引用して1つの返信に含められる。各引用は入力欄上のコンテキストに一覧表示され、
   // 行ごとの✕で個別に外せる。送信時は引用の数だけ .msg__quote ブロックを本文の上に積む。
   let replyTargets = [];
+  let msgSeq = 0; // 送信メッセージのアンカーID採番
   const replyCtx = document.getElementById('replyCtx');
   function renderReplyCtx() {
     if (!replyTargets.length) { replyCtx.classList.remove('is-on'); replyCtx.innerHTML = ''; return; }
@@ -831,12 +840,22 @@
   function startReply(msg) {
     const name = msg.querySelector('.msg__name').textContent;
     let text = msgPlainText(msg); if (text.length > 60) text = text.slice(0, 60) + '…';
-    // 同じ発言の重複追加は避ける（name＋抜粋で判定）。
-    if (!replyTargets.some(t => t.name === name && t.text === text)) replyTargets.push({ name, text });
+    const id = msg.id;   // 引用元メッセージ＝リンク先アンカー
+    // 同じメッセージの重複追加は避ける（アンカーIDで判定）。
+    if (!replyTargets.some(t => t.id === id)) replyTargets.push({ name, text, id });
     renderReplyCtx();
     if (composer.classList.contains('is-collapsed')) expandComposer();
     box.focus();
   }
+  // 引用文（.msg__quote）クリックで引用元メッセージへスクロール＋一時ハイライト。
+  thread.addEventListener('click', (e) => {
+    const q = e.target.closest('.msg__quote'); if (!q) return;
+    e.preventDefault();
+    const target = document.getElementById(q.getAttribute('href').slice(1)); if (!target) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    target.classList.remove('msg--flash'); void target.offsetWidth; target.classList.add('msg--flash');
+  });
   function clearReply() { replyTargets = []; renderReplyCtx(); }
   // 各引用行の✕で個別解除。
   replyCtx.addEventListener('click', (e) => {

@@ -123,10 +123,17 @@
 /* 削除済みトゥームストーン */
 .msg.is-deleted .msg__text { color: var(--color-text-muted); font-style: italic; }
 
-/* 引用返信ブロック（メッセージ内） */
-.msg__quote { border-left: 3px solid var(--color-border-strong); background: var(--color-surface-alt);
-  border-radius: var(--radius-sm); padding: 4px var(--space-3); margin: 2px 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+/* 引用返信ブロック（メッセージ内）＝クリックで引用元メッセージへジャンプ（アンカーリンク） */
+.msg__quote { display: block; text-decoration: none; cursor: pointer; border-left: 3px solid var(--color-border-strong); background: var(--color-surface-alt);
+  border-radius: var(--radius-sm); padding: 4px var(--space-3); margin: 2px 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted);
+  transition: background .12s, border-color .12s, color .12s; }
+.msg__quote:hover { background: var(--color-primary-soft); border-left-color: var(--color-primary); color: var(--color-text); }
 .msg__quote b { color: var(--color-text); font-weight: 600; }
+
+/* 引用元メッセージへジャンプした時のハイライト（一時的にフラッシュ） */
+@keyframes msg-flash { 0%, 30% { background: #FEF3C7; box-shadow: 0 0 0 2px var(--color-warning) inset; } 100% { background: transparent; box-shadow: none; } }
+.msg.msg--flash { animation: msg-flash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .msg.msg--flash { animation-duration: .01ms; } }
 
 /* 添付：画像のインラインプレビュー（ギャラリー＋ライトボックス） */
 .msg__gallery { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }

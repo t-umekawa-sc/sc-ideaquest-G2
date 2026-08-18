@@ -27,7 +27,7 @@ type FileChip = { name: string; size?: string; icon?: string };
 type GalleryImg = { src: string; alt: string; full: string };
 type Reaction = { emoji: string; count: number; mine: boolean; names: string[] };
 type Magic = { spellId: string; mine: boolean; by?: string };
-type Quote = { name: string; text: string };
+type Quote = { name: string; text: string; id: string }; // id＝引用元メッセージのアンカー
 type Msg = {
   id: string;
   name: string;
@@ -102,6 +102,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAtts, setEditAtts] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null); // 引用リンクでジャンプした時の一時ハイライト
 
   // ポップアップ（メンション/絵文字/リアクション）。target はどの textarea/msg を対象にするか。
   const [mention, setMention] = useState<{ pos: Pos; matches: string[]; active: number } | null>(null);
@@ -315,10 +316,26 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const startReply = (m: Msg) => {
     let text = plainText(m.raw);
     if (text.length > 60) text = text.slice(0, 60) + "…";
-    setReplyTargets((rt) => (rt.some((t) => t.name === m.name && t.text === text) ? rt : [...rt, { name: m.name, text }]));
+    // 引用元メッセージ＝リンク先アンカー。同一メッセージの重複引用は避ける（id で判定）。
+    setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, { name: m.name, text, id: m.id }]));
     if (collapsed) setCollapsed(false);
     boxRef.current?.focus();
   };
+  // 引用文クリックで引用元メッセージへスクロール＋一時ハイライト。二度目も再発火するよう二重 rAF で class を付け直す。
+  const jumpToQuote = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+    setFlashId(null);
+    requestAnimationFrame(() => requestAnimationFrame(() => setFlashId(id)));
+  };
+  useEffect(() => {
+    if (!flashId) return;
+    const t = setTimeout(() => setFlashId(null), 1600);
+    return () => clearTimeout(t);
+  }, [flashId]);
 
   // ---- 編集 / 削除 ----
   const startEdit = (m: Msg) => {
@@ -387,7 +404,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
             {m.dayBefore && <div className="chat-day">{m.dayBefore}</div>}
             {m.unreadBefore && <div className="unread-sep">ここから未読</div>}
             <div
-              className={["msg", m.isMe ? "is-me" : "", m.deleted ? "is-deleted" : "", m.magic ? "spell-fx " + SPELLS.find((s) => s.id === m.magic!.spellId)?.fx : ""].filter(Boolean).join(" ")}
+              id={m.id}
+              className={["msg", m.isMe ? "is-me" : "", m.deleted ? "is-deleted" : "", m.magic ? "spell-fx " + SPELLS.find((s) => s.id === m.magic!.spellId)?.fx : "", flashId === m.id ? "msg--flash" : ""].filter(Boolean).join(" ")}
             >
               <span className="avatar sm">
                 <span className="avatar__img placeholder">{m.initial}</span>
@@ -400,11 +418,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                   {m.edited && <span className="msg__edited">（編集済み）</span>}
                 </div>
 
-                {/* 引用返信ブロック（複数可） */}
+                {/* 引用返信ブロック（複数可）＝引用元メッセージへのアンカーリンク */}
                 {m.quotes.map((q, i) => (
-                  <div className="msg__quote" key={i}>
+                  <a className="msg__quote" href={`#${q.id}`} key={i} onClick={(e) => jumpToQuote(e, q.id)}>
                     <b>{q.name}</b> {q.text}
-                  </div>
+                  </a>
                 ))}
 
                 {/* 本文（編集中はエディタ） */}
