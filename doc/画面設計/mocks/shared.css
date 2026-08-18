@@ -1303,7 +1303,9 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 
 @media (max-width: 768px) {
   .sort-builder { flex-direction: column; }
-  .list-toolbar .tools { width: 100%; justify-content: space-between; }
+  /* 狭幅はツールを左寄せでグループ化（列設定・エクスポートを隣接／密度・表示は .dt-viewctls で一体）。
+     space-between だとエクスポートが画面右端へ押し出されるため flex-start に。 */
+  .list-toolbar .tools { width: 100%; justify-content: flex-start; }
   /* モバイルは縦積み（filters の上に tools）。1 カラムグリッドへ。 */
   [data-dt-toolbar] { grid-template-columns: 1fr; }
 }
