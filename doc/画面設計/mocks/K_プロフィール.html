@@ -29,8 +29,11 @@
   .prof-head__actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
   .prof-head__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
   .prof-head__role { margin-top: 4px; }
-  .prof-stats { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
-  .prof-stats .xp-bar { flex: 1 1 220px; max-width: 320px; }
+  /* 残高チップは2段に整理＝1段目: レベル＋次レベルまでのバー／2段目: コイン＋SP */
+  .prof-stats { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); align-items: flex-start; }
+  .prof-stats__line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .prof-stats__line .xp-bar { flex: 1 1 200px; max-width: 300px; }
+  .prof-stats__next { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--color-text-muted); }
   /* identity（読取専用）＝ラベル＋値の行 */
   .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin-top: var(--space-4);
         border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
@@ -60,8 +63,9 @@
   @media (max-width: 640px) {
     .prof-head { flex-direction: column; align-items: center; text-align: center; }
     .prof-head__body { width: 100%; }
-    .prof-stats, .prof-head__actions { justify-content: center; }
-    .prof-stats .xp-bar { flex-basis: 160px; }
+    .prof-stats { align-items: center; }
+    .prof-stats__line, .prof-head__actions { justify-content: center; }
+    .prof-stats__line .xp-bar { flex-basis: 150px; }
     .kv { grid-template-columns: 1fr; gap: 2px var(--space-4); }
     .kv dt { margin-top: 8px; }
     .kv dt:first-child { margin-top: 0; }
@@ -116,10 +120,15 @@
         <div class="prof-head__name">山田 太郎</div>
         <div class="prof-head__role"><span class="badge badge-muted" title="システムロール">一般</span></div>
         <div class="prof-stats">
-          <span class="pixel-stat level">Lv.7</span>
-          <div class="xp-bar" title="次のレベルまで 120 XP"><span style="width:65%"></span></div>
-          <span class="pixel-stat coin">◆ 320 コイン</span>
-          <span class="pixel-stat skill">✦ SP 3</span>
+          <div class="prof-stats__line">
+            <span class="pixel-stat level">Lv.7</span>
+            <div class="xp-bar" title="次のレベルまで 120 XP"><span style="width:65%"></span></div>
+            <span class="prof-stats__next">NEXT 120 XP</span>
+          </div>
+          <div class="prof-stats__line">
+            <span class="pixel-stat coin">◆ 320 コイン</span>
+            <span class="pixel-stat skill">✦ SP 3</span>
+          </div>
         </div>
         <div class="prof-head__actions">
           <a class="btn btn-outline btn-sm" href="SC-31_アバター着せ替え.html">▶ きせかえ（装備を変更）</a>
