@@ -1,0 +1,54 @@
+/* SC-03 プロフィール（features/profile）＝mocks/SC-03_プロフィール.html 準拠。
+   共通クラス（.card/.setting-row/.icon-field/.pixel-stat/.xp-bar/.provision-note/.role-note/.page-title/
+   .backlink/.admin-sub/.section-head/.badge/.field/.input）は design-system.css。ここは当画面固有のみ。
+   影響範囲を限定するため .profile-page 配下にスコープ（.setting-row の上書きが SC-92 等へ波及しないように）。 */
+
+/* アカウント情報サマリ（3Dアバター＋氏名＋残高＋identity） */
+.profile-page .prof-head { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+/* 3Dアバター（VRM）ビューア＝ここでは読取表示。着せ替え（装備）は G ドメイン＝SC-31。
+   本番は three-vrm/R3F、現状は mascot 画像を暗いステージに置いた見立て（SC-01/SC-31 と同じ）。 */
+.profile-page .avatar3d { position: relative; flex: 0 0 auto; width: 132px; height: 156px; border-radius: var(--radius);
+  display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 20%, #1e293b 0%, #0f172a 70%); border: 1px solid var(--color-border); }
+.profile-page .avatar3d__img { width: 108px; height: auto; image-rendering: pixelated; margin-bottom: 6px; }
+.profile-page .avatar3d__tag { position: absolute; top: 6px; left: 6px; font-size: var(--text-xs); color: #cbd5e1;
+  background: rgba(15, 23, 42, .55); padding: 2px 6px; border-radius: var(--radius-sm); }
+.profile-page .prof-head__body { min-width: 0; }
+.profile-page .prof-head__name { font-family: var(--font-pixel); font-size: var(--text-xl); line-height: 1.1; }
+.profile-page .prof-head__role { margin-top: 4px; }
+.profile-page .prof-head__actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* 残高チップは2段＝1段目: レベル＋次レベルまでのバー／2段目: コイン＋SP */
+.profile-page .prof-stats { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); align-items: flex-start; }
+.profile-page .prof-stats__line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.profile-page .prof-stats__line .xp-bar { flex: 1 1 200px; max-width: 300px; }
+.profile-page .prof-stats__next { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* identity（読取専用）＝ラベル＋値 */
+.profile-page .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.profile-page .kv dt { font-size: var(--text-sm); color: var(--color-text-muted); }
+.profile-page .kv dd { margin: 0; font-size: var(--text-sm); }
+
+/* プロフィール編集のアイコン行＝アイコン設定を縮ませない（ボタンの縦潰れ防止） */
+.profile-page .setting-row .icon-field { flex: 0 0 auto; align-items: flex-start; }
+.profile-page .icon-actions { min-width: 8.5rem; }
+.profile-page .icon-actions button { white-space: nowrap; }
+
+/* セキュリティの小節（パスワード変更／メールアドレス変更） */
+.profile-page .sec-sub { border-top: 1px solid var(--color-border); margin-top: var(--space-5); padding-top: var(--space-4); }
+.profile-page .sec-sub:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+
+/* 狭幅レスポンシブ＝3Dアバター中央、identity と設定行は縦積み */
+@media (max-width: 640px) {
+  .profile-page .prof-head { flex-direction: column; align-items: center; text-align: center; }
+  .profile-page .prof-head__body { width: 100%; }
+  .profile-page .prof-stats { align-items: center; }
+  .profile-page .prof-stats__line, .profile-page .prof-head__actions { justify-content: center; }
+  .profile-page .prof-stats__line .xp-bar { flex-basis: 150px; }
+  .profile-page .kv { grid-template-columns: 1fr; gap: 2px var(--space-4); }
+  .profile-page .kv dt { margin-top: 8px; }
+  .profile-page .kv dt:first-child { margin-top: 0; }
+  .profile-page .setting-row { flex-direction: column; }
+  .profile-page .setting-row .icon-field { align-self: flex-start; }
+}

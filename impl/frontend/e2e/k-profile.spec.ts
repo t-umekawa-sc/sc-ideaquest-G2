@@ -17,7 +17,7 @@ async function login(page: Page) {
 test("K-TC-006 edit own profile persists", async ({ page }) => {
   await login(page);
   await page.goto("/profile");
-  await expect(page.getByRole("heading", { name: "プロフィール" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "プロフィール", exact: true })).toBeVisible();
   await expect(page.locator("#p_name")).toBeVisible(); // GET /me が読み込めている
 
   const newName = `プロフ_${Date.now().toString().slice(-8)}`;
@@ -45,7 +45,7 @@ test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
   await page.locator("#cur_pw").fill("WRONGpw1");
   await page.getByRole("button", { name: /パスワードを変更/ }).click();
   await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "プロフィール" })).toBeVisible(); // 変更なし＝画面維持
+  await expect(page.getByRole("heading", { name: "プロフィール", exact: true })).toBeVisible(); // 変更なし＝画面維持
 });
 
 // K-TC-009(email): メール変更の error-path＋要求成功の文言（ダブルオプトイン・ADR-0008）。
