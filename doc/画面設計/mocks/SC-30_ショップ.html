@@ -23,8 +23,8 @@
   .how .rarity-standard { color: var(--rarity-standard); font-weight: 700; }
   .how .rarity-rare     { color: var(--rarity-rare);     font-weight: 700; }
 
-  /* 装備グリッド */
-  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-4); }
+  /* 装備グリッド（DataTable のカード表示＝装備カードは cardRaw で描画。密度は shop 仕様の minmax(180)） */
+  #shopTable .dt-cards { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   .buy { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
   .buy__thumb { font-size: 46px; line-height: 1; padding: var(--space-4) 0; background: var(--color-surface-alt); border-radius: var(--radius); border: 2px solid transparent; }
   .buy.rarity-common   .buy__thumb { border-color: var(--rarity-common); }
@@ -111,45 +111,9 @@
     のレアリティがあります。購入した装備は <a href="SC-31_アバター着せ替え.html">きせかえ</a> で着せ替えできます。
   </p>
 
-  <!-- 絞り込み・並び替え（一覧標準） -->
-  <div class="list-toolbar">
-    <div class="filters">
-      <label>スロット
-        <select class="select" id="fSlot">
-          <option value="">すべて</option>
-          <option value="head">頭</option>
-          <option value="face">顔</option>
-          <option value="body">体</option>
-          <option value="hand">手持ち</option>
-          <option value="bg">背景</option>
-        </select>
-      </label>
-      <label>レアリティ
-        <select class="select" id="fRarity">
-          <option value="">すべて</option>
-          <option value="common">コモン</option>
-          <option value="standard">標準</option>
-          <option value="rare">レア</option>
-        </select>
-      </label>
-      <label class="checkbox"><input type="checkbox" id="fAfford"><span>買えるものだけ</span></label>
-      <label class="checkbox"><input type="checkbox" id="fUnowned"><span>未所有だけ</span></label>
-    </div>
-    <div class="tools">
-      <label>並び替え
-        <select class="select" id="fSort">
-          <option value="rarity">レアリティ順</option>
-          <option value="price-asc">価格が安い順</option>
-          <option value="price-desc">価格が高い順</option>
-          <option value="slot">スロット順</option>
-        </select>
-      </label>
-      <span class="list-count" id="count">— 件</span>
-    </div>
-  </div>
-
-  <div class="shop-grid" id="grid"><!-- JSで装備を描画 --></div>
-  <div class="list-empty" id="empty" hidden>条件に合う装備がありません。絞り込みを見直してください。</div>
+  <!-- 装備一覧＝一覧の操作標準（DataTable）。検索/絞込（スロット・レアリティ・価格・状態）/並び替え/
+       表示切替（カード⇄リスト）/CSV/行固定/ページャは DataTable 標準。カードの見た目は cardRaw で完全制御。 -->
+  <div id="shopTable"></div>
 
   <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
     購入したアイテムはずっと持てます（コイン残高を確認して購入します）。着せ替えは「アバター着せ替え」画面で反映できます。
@@ -197,34 +161,12 @@
   ];
   let coins = 320;
 
-  const grid   = document.getElementById('grid');
-  const empty  = document.getElementById('empty');
-  const countEl= document.getElementById('count');
-  const F = { slot: document.getElementById('fSlot'), rarity: document.getElementById('fRarity'),
-              afford: document.getElementById('fAfford'), unowned: document.getElementById('fUnowned'),
-              sort: document.getElementById('fSort') };
-
   function syncCoin() {
     document.getElementById('coinBalance').textContent = coins;
     document.getElementById('coinStat').textContent = '◆ ' + coins;
   }
 
-  function currentList() {
-    let list = ITEMS.slice();
-    if (F.slot.value)   list = list.filter(i => i.slot === F.slot.value);
-    if (F.rarity.value) list = list.filter(i => i.rarity === F.rarity.value);
-    if (F.unowned.checked) list = list.filter(i => !i.owned);
-    if (F.afford.checked)  list = list.filter(i => i.owned || i.price <= coins);
-    const s = F.sort.value;
-    list.sort((a, b) => {
-      if (s === 'price-asc')  return a.price - b.price;
-      if (s === 'price-desc') return b.price - a.price;
-      if (s === 'slot')       return SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || a.price - b.price;
-      return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || a.price - b.price; // rarity（既定）
-    });
-    return list;
-  }
-
+  // 装備カード（見た目は不変）。DataTable の cardRaw で丸ごと描画する。
   function cardHTML(it) {
     const canAfford = it.price <= coins;
     const foot = it.owned
@@ -244,13 +186,36 @@
       </article>`;
   }
 
-  function render() {
-    syncCoin();
-    const list = currentList();
-    grid.innerHTML = list.map(cardHTML).join('');
-    countEl.textContent = list.length + ' 件';
-    empty.hidden = list.length !== 0;
-  }
+  // 状態（所有済/購入可/コイン不足）＝coins に連動（render 時に再評価）。「買えるものだけ」の絞込を代替。
+  const stateOf = (it) => it.owned ? 'owned' : (it.price <= coins ? 'affordable' : 'short');
+  const STATE_LABEL = { owned: '所有済', affordable: '購入可', short: 'コイン不足' };
+
+  // 既定＝レアリティ順（以降はツールバーの並び替えで操作）。
+  ITEMS.sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || a.price - b.price);
+
+  // 一覧の操作標準（DataTable）＝列を宣言してデータを渡すだけ。カードは cardRaw で完全制御（見た目不変）。
+  const shopTable = window.DataTable.init(document.getElementById('shopTable'), {
+    storageKey: 'sc30-shop',
+    data: ITEMS,
+    rowId: (it) => it.id,
+    unit: '件',
+    perPage: 24,
+    perPageOptions: [12, 24, 48],
+    defaultView: 'card',
+    searchFields: '装備名',
+    exportName: 'ショップ装備',
+    emptyText: '条件に合う装備がありません。絞り込みを見直してください。',
+    cardRaw: cardHTML,
+    columns: [
+      { key: 'name', label: '装備', locked: true, width: 200, sortable: true, filter: { type: 'text' }, sortVal: (i) => i.name, searchVal: (i) => i.name, csvVal: (i) => i.name,
+        render: (i) => '<span class="row-center" style="gap:6px">' + i.icon + '<span class="idea-title">' + i.name + '</span></span>' },
+      { key: 'slot', label: 'スロット', width: 110, sortable: true, filter: { type: 'enum', options: [['head', '頭'], ['face', '顔'], ['body', '体'], ['hand', '手持ち'], ['bg', '背景']] }, sortVal: (i) => SLOT_ORDER[i.slot], filterVal: (i) => i.slot, csvVal: (i) => SLOT_LABEL[i.slot], render: (i) => SLOT_LABEL[i.slot] },
+      { key: 'rarity', label: 'レアリティ', width: 120, sortable: true, filter: { type: 'enum', options: [['common', 'コモン'], ['standard', '標準'], ['rare', 'レア']] }, sortVal: (i) => RARITY_ORDER[i.rarity], filterVal: (i) => i.rarity, csvVal: (i) => RARITY_LABEL[i.rarity], render: (i) => '<span class="rarity-' + i.rarity + '" style="font-weight:700">' + RARITY_LABEL[i.rarity] + '</span>' },
+      { key: 'price', label: '価格', width: 100, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (i) => i.price, filterVal: (i) => i.price, csvVal: (i) => i.price, render: (i) => '◆ ' + i.price },
+      { key: 'state', label: '状態', width: 120, filter: { type: 'enum', options: [['owned', '所有済'], ['affordable', '購入可'], ['short', 'コイン不足']] }, filterVal: (i) => stateOf(i), csvVal: (i) => STATE_LABEL[stateOf(i)],
+        render: (i) => { const s = stateOf(i); const cls = s === 'owned' ? 'badge-muted' : (s === 'affordable' ? 'badge-success' : 'badge-danger'); return '<span class="badge ' + cls + '">' + STATE_LABEL[s] + '</span>'; } },
+    ],
+  });
 
   function buy(id) {
     const it = ITEMS.find(i => i.id === id);
@@ -258,19 +223,20 @@
     if (!confirm('「' + it.name + '」を ◆' + it.price + ' で購入しますか？\n（残高 ◆' + coins + ' → ◆' + (coins - it.price) + '）')) return;
     coins -= it.price;
     it.owned = true;
-    render();
-    // 購入直後の軽い演出
-    const card = grid.querySelector('.buy[data-id="' + id + '"]');
+    syncCoin();
+    shopTable.render();     // DataTable を再描画（cardRaw と状態列が新残高で再評価される）
+    // 購入直後の軽い演出（cardRaw のカードは .dt-cardraw 内にある）
+    const card = document.querySelector('.buy[data-id="' + id + '"]');
     if (card) { card.classList.add('just-bought'); card.addEventListener('animationend', () => card.classList.remove('just-bought'), { once: true }); }
     alert('「' + it.name + '」を購入しました！\nきせかえで装備できます。');
   }
 
-  grid.addEventListener('click', (e) => {
+  // 購入ボタンはカード再描画で作り直されるため document へ委譲。
+  document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-buy]'); if (btn && !btn.disabled) buy(btn.dataset.buy);
   });
-  Object.values(F).forEach(el => el.addEventListener('change', render));
 
-  render();
+  syncCoin();
 </script>
 </body>
 </html>
