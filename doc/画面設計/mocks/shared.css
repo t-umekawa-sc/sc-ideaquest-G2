@@ -1450,3 +1450,15 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 /* ゲーム確認の「やめる」＝購入するボタンと同じ .btn-pixel アニメ（▶点滅・持ち上がり・押下沈み）で、色だけ控えめに。 */
 .btn-pixel.btn-pixel--muted { background: var(--color-surface-alt); }
 @media (prefers-reduced-motion: reduce) { .iq-confirm .modal__panel, .iq-confirm .modal__backdrop { transition: none; } }
+
+/* =============================================================
+ * 13. ゲーム層3画面の相互ナビ（ショップ / きせかえ / 魔法・スキル）
+ *  - SC-30/31/32 の見出し直下に置く共通ピル。現在地は aria-current="page" で非リンク表示。
+ *  - 「通貨アイコン＝使う画面（ヘッダーのコイン→ショップ・SP→魔法）」と併せて導線を統一。
+ * ============================================================= */
+.gamenav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-5); }
+.gamenav__link { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
+  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted);
+  font-weight: 600; font-size: var(--text-sm); text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
+.gamenav__link:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
+.gamenav__link[aria-current="page"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; cursor: default; }

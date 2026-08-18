@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { DataTable, useConfirm, useSnackbar } from "@/components/ui";
+import { DataTable, GameNav, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 
 import "../shop.css";
@@ -130,6 +130,7 @@ export function ShopView() {
     <section aria-label="ショップ">
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
+      <GameNav current="shop" />
 
       {/* コイン残高（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="コイン残高">

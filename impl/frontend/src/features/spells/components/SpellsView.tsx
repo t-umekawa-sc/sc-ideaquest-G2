@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { useConfirm, useSnackbar } from "@/components/ui";
+import { GameNav, useConfirm, useSnackbar } from "@/components/ui";
 
 import "../spells.css";
 
@@ -87,6 +87,7 @@ export function SpellsView() {
     <section aria-label="魔法 / スキル">
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
+      <GameNav current="spells" />
 
       {/* SPステータス（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="スキルポイント">

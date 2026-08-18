@@ -55,6 +55,7 @@ const TILES = [
   { href: "/quests", ico: "🗺️", label: "クエスト一覧" },
   { href: "/shop", ico: "🛒", label: "ショップ" },
   { href: "/avatar", ico: "🧍", label: "アバター" },
+  { href: "/spells", ico: "✦", label: "魔法 / スキル" },
   { href: "/achievements", ico: "🏆", label: "実績 / バッジ" },
   { href: "/ranking", ico: "📊", label: "ランキング" },
   { href: "/notifications", ico: "🔔", label: "通知" },

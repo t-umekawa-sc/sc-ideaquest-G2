@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useConfirm } from "@/components/ui";
+import { GameNav, useConfirm } from "@/components/ui";
 
 import "../avatar.css";
 
@@ -89,6 +89,7 @@ export function AvatarView() {
     <section aria-label="アバター / 着せ替え">
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="dressup-title">アバター / 着せ替え</h1>
+      <GameNav current="avatar" />
 
       <div className="dressup">
         {/* 左: 3Dアバタービューア（ゲーム層・CRTガラス） */}

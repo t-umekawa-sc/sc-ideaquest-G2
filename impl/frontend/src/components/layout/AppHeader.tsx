@@ -48,7 +48,9 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
           {balance && (
             <>
               <span className="pixel-stat level">Lv.{balance.level}</span>
-              <span className="pixel-stat coin">◆ {balance.coin}</span>
+              <Link className="pixel-stat coin" href="/shop" title="コイン残高（ショップへ）">
+                ◆ {balance.coin}
+              </Link>
               <Link className="pixel-stat skill" href="/spells" title="スキルポイント（魔法/スキル画面へ）">
                 ✦ SP {balance.sp}
               </Link>
