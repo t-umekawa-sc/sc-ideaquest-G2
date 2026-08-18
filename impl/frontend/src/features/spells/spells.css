@@ -1,0 +1,49 @@
+/* SC-32 魔法/スキル（features/spells・ゲーム層）＝mocks/SC-32_魔法スキル.html 準拠。
+   SPステータスは CRTガラス（.pixel-panel）、魔法カタログは可読性優先のクリーンカード＋ゲーム要素
+   （効果プレビュー spell-fx・ピクセル見出し・.btn-pixel）。共通クラスは design-system.css。ここは SC-32 固有のみ。 */
+
+.spells-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+/* SPステータス（ヒーロー・CRTガラス） */
+.sp-hero { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+.sp-hero__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-skill); }
+.sp-hero__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
+.sp-hero__meta { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); color: var(--pixel-ink); }
+.sp-hero__progress { margin-left: auto; text-align: right; }
+.sp-hero__unlocked { font-family: var(--font-pixel); color: var(--rarity-rare-on-dark); }
+
+/* 使い方の注記 */
+.how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
+
+/* 魔法カタログ（系統ごとの段階解放＝スキルツリー） */
+.spell-line { margin-bottom: var(--space-6); }
+/* 系統の区切りを明確化＝連続する系統の間に罫線＋余白。 */
+.spell-line + .spell-line { border-top: 1px solid var(--color-border); padding-top: var(--space-6); }
+.spell-line__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.spell-line__name { font-family: var(--font-pixel); font-size: var(--text-lg); }
+.spell-line__sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+.spell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+/* 前提条件（下位の同系統） */
+.spell-req { font-size: var(--text-xs); color: var(--color-text-muted); }
+.spell-req.met { color: var(--color-success); }
+.spell-req.unmet { color: var(--color-warning); font-weight: 600; }
+.spell-card { display: flex; flex-direction: column; gap: var(--space-3); }
+.spell-card__head { display: flex; align-items: center; gap: var(--space-2); }
+.spell-card__icon { font-size: 26px; line-height: 1; }
+.spell-card__name { font-family: var(--font-pixel); font-size: var(--text-lg); }
+/* レアリティバッジ（rarity トークンで色付け・.badge の既定青を上書き） */
+.spell-card__rarity { margin-left: auto; background: var(--color-surface); border: 1px solid var(--color-border); font-weight: 700; box-shadow: none; }
+.spell-card__rarity.rarity-common { color: var(--rarity-common); border-color: var(--rarity-common); }
+.spell-card__rarity.rarity-standard { color: var(--rarity-standard); border-color: var(--rarity-standard); }
+.spell-card__rarity.rarity-rare { color: var(--rarity-rare); border-color: var(--rarity-rare); box-shadow: none; }
+/* 効果プレビュー（サンプルメッセージに spell-fx を適用して見せる） */
+.spell-preview { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text); }
+.spell-desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; min-height: 2.6em; }
+.spell-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: auto; }
+.spell-cost { font-weight: 700; color: var(--pixel-skill); font-variant-numeric: tabular-nums; }
+.spell-cost .muted { color: var(--color-text-muted); font-weight: 400; font-size: var(--text-xs); }
+.spell-state { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-success); font-size: var(--text-sm); }
+.btn-pixel.btn-pixel--sm { padding: 6px 12px; font-size: var(--text-sm); }
+.btn-pixel:disabled { opacity: .5; cursor: not-allowed; box-shadow: var(--shadow-pixel); }
+.btn-pixel:disabled::before { content: none; }
