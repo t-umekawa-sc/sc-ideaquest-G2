@@ -72,7 +72,7 @@
     <div class="modal__body">
     <div class="form-row"><label class="req" for="cmName">会社名</label><input class="input" id="cmName" placeholder="例: アクロス株式会社"></div>
     <div class="form-row"><label class="req" for="cmCode">会社コード</label><input class="input db-id" id="cmCode" placeholder="例: ACROSS" maxlength="20" style="text-transform:uppercase"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・<strong>全社で一意</strong>（大文字に正規化）。作成後は変更不可。</div></div>
-    <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。</div></div>
+    <div class="form-row"><label class="req" for="cmDb">DB識別子</label><input class="input" id="cmDb" placeholder="例: db_across"><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:4px">会社DBの参照キー。接続情報の実体は .env。</div></div>
 
     <div class="form-row">
       <label>会社アバター / アイコン</label>
@@ -82,7 +82,7 @@
           <button class="btn btn-outline" type="button" id="cmIconUpload">画像を選ぶ</button>
           <button class="btn btn-outline" type="button" id="cmIconClear" hidden>クリア</button>
           <input type="file" id="cmIconInput" accept="image/*" hidden>
-          <span style="font-size:var(--text-xs);color:var(--color-text-muted)">未設定時は「頭文字＋会社カラー」で表示</span>
+          <span style="font-size:var(--text-xs);color:var(--color-text-muted)">未設定時は「頭文字＋会社カラー」で表示（画像アップロードは今後対応）</span>
         </div>
       </div>
     </div>
@@ -101,7 +101,7 @@
         <button type="button" class="swatch" role="radio" aria-checked="false" style="--sw:#475569" data-color="#475569" aria-label="スレート"></button>
       </div>
     </div>
-    <div class="provision-note">作成すると会社を登録し、状態＝<strong>有効</strong>で始まります。会社DBの準備が整うまでは「停止」（メンテナンス）に切り替えて運用できます。</div>
+    <div class="provision-note">作成すると会社が登録され、最初は「<strong>停止</strong>（メンテナンス）」の状態です。会社DBの準備が整うと「有効」になり、利用できるようになります。</div>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
@@ -152,14 +152,19 @@
         + `<div class="dt-card__meta">${stateBadge(c.state)}<span class="badge badge-muted">${c.code}</span><span class="db-id">${c.db}</span></div>`
         + `<div class="dt-card__stats"><span>👥 ${c.accounts}</span><span>🗂️ ${c.groups}</span><span>作成 ${c.created}</span></div>`;
     },
+    // 列フラグは backend `GET /admin/companies`（API設計 §1.8.1 ホワイトリスト）に一致させる:
+    //  ・ソート可＝会社名 / 会社コード / アカウント（状態・DB識別子・グループ・作成日は非ソート）。
+    //  ・フィルタ可＝状態(enum) / アカウント(number)。会社名/会社コード/DB識別子は横断検索 q が担う
+    //    （backend に per-field contains が無いため列別 text フィルタは付けない）。
+    //  ・グループ数（group_count＝ドメインC）と作成日（一覧項目未返却）は非提供＝「—」プレースホルダ。
     columns: [
-      { key: 'name', label: '会社名', locked: true, width: 240, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.name, searchVal: (r) => r.name, render: coCell },
-      { key: 'code', label: '会社コード', width: 130, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.code, searchVal: (r) => r.code, render: (r) => r.code },
-      { key: 'db', label: 'DB識別子', width: 150, cellClass: 'db-id', sortable: true, filter: { type: 'text' }, sortVal: (r) => r.db, searchVal: (r) => r.db, render: (r) => r.db },
-      { key: 'state', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: [['active', '有効'], ['suspended', '停止']] }, sortVal: (r) => r.state, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => stateBadge(r.state) },
+      { key: 'name', label: '会社名', locked: true, width: 240, sortable: true, sortVal: (r) => r.name, searchVal: (r) => r.name, render: coCell },
+      { key: 'code', label: '会社コード', width: 130, cellClass: 'db-id', sortable: true, sortVal: (r) => r.code, searchVal: (r) => r.code, render: (r) => r.code },
+      { key: 'db', label: 'DB識別子', width: 150, cellClass: 'db-id', searchVal: (r) => r.db, render: (r) => r.db },
+      { key: 'state', label: '状態', width: 110, filter: { type: 'enum', options: [['active', '有効'], ['suspended', '停止']] }, filterVal: (r) => r.state, csvVal: (r) => (ST[r.state] || ['—'])[0], render: (r) => stateBadge(r.state) },
       { key: 'accounts', label: 'アカウント', width: 110, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.accounts, filterVal: (r) => r.accounts, render: (r) => r.accounts },
-      { key: 'groups', label: 'グループ', width: 100, align: 'num', sortable: true, filter: { type: 'number' }, sortVal: (r) => r.groups, filterVal: (r) => r.groups, render: (r) => r.groups },
-      { key: 'created', label: '作成日', width: 130, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.created, filterVal: (r) => r.created, render: (r) => r.created },
+      { key: 'groups', label: 'グループ', width: 100, align: 'num', render: () => '—', csvVal: () => '—' },
+      { key: 'created', label: '作成日', width: 130, render: () => '—', csvVal: () => '—' },
       { key: '_actions', label: '', actions: true, locked: true, width: 130, render: (r) => `<a class="btn btn-outline btn-sm" href="SC-92_会社詳細.html?company=${r.id}">管理する →</a>` },
     ],
   });
@@ -207,10 +212,11 @@
     if (firstBad) { firstBad.focus(); return; }
     // デモ：一覧に即時追加（状態=有効）。選択した会社カラーを反映。
     const selColor = (cmSwatches.querySelector('.swatch[aria-checked="true"]') || {}).dataset ? cmSwatches.querySelector('.swatch[aria-checked="true"]').dataset.color : '#2563EB';
-    COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'active', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
+    // 作成直後の状態は backend 確定＝停止(suspended)（会社DB 準備が整うと有効化）。
+    COMPANIES.unshift({ id: code.toLowerCase(), name, code, color: selColor, db: document.getElementById('cmDb').value.trim() || ('db_' + code.toLowerCase()), state: 'suspended', accounts: 0, groups: 0, created: new Date().toISOString().slice(0, 10) });
     companyTable.render();
     closeModal(document.getElementById('companyModal'));
-    alert('「' + name + '」（' + code + '）を作成しました。会社アイコン・カラーも保存されます。');
+    alert('「' + name + '」（' + code + '）を作成しました（状態＝停止／会社DBの準備が整うと有効化）。会社アイコン・カラーも保存されます。');
   });
 </script>
 </body>

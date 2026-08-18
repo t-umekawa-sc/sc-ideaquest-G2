@@ -72,7 +72,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
       <ModalBody>
         {formError && <div className="form-error" role="alert">{formError}</div>}
         <Field id="c_name" label="会社名" required>
-          <input id="c_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input id="c_name" className="input" placeholder="例: アクロス株式会社" value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field
           id="c_code"
