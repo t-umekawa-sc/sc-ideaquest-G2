@@ -1418,3 +1418,35 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   .snackbar, .snackbar.is-leaving, .snackbar--reward .snackbar__icon { animation: none; }
   .snackbar__timer { animation-duration: 0s; }
 }
+
+/* =============================================================
+ * 12. 確認ダイアログ（window.confirm の置き換え・ゲーム要素入り・全モック共通）
+ *  - 共通モーダルの見た目（.modal__panel.sectioned）を流用。生成は shared.js の window.iqConfirm(o)=>Promise<boolean>。
+ *  - variant='danger'（赤の確定）/'game'（ピクセル見出し＋コスト/残高プレビュー＋やめる/確定とも .btn-pixel）/既定。
+ *  - Enter=確定 / Esc・バックドロップ・✕=キャンセル。prefers-reduced-motion で動きを抑制。
+ * ============================================================= */
+.iq-confirm { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: var(--space-6); }
+.iq-confirm[hidden] { display: none; }
+.iq-confirm .modal__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.5); opacity: 0; transition: opacity .2s ease; }
+.iq-confirm.show .modal__backdrop { opacity: 1; }
+.iq-confirm .modal__panel { position: relative; max-width: 440px; width: 100%; opacity: 0; transform: translateY(10px) scale(.96); transition: opacity .18s ease, transform .18s cubic-bezier(.16,1,.3,1); }
+.iq-confirm.show .modal__panel { opacity: 1; transform: none; }
+.iq-confirm__body { display: flex; gap: var(--space-3); align-items: flex-start; }
+.iq-confirm__icon { font-size: 26px; flex: 0 0 auto; line-height: 1.3; }
+.iq-confirm__msg { margin: 0; line-height: 1.8; font-size: var(--text-sm); }
+.iq-confirm__msg strong { color: var(--color-text); }
+/* 危険（削除など）＝赤アクセント */
+.iq-confirm--danger .iq-confirm__icon { color: var(--color-danger); }
+/* ゲーム（購入など）＝ピクセル見出し＋コスト・残高プレビュー */
+.iq-confirm--game .modal__header h2 { font-family: var(--font-pixel); letter-spacing: .04em; }
+.iq-confirm__cost { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface-alt); }
+.iq-confirm__thumb { font-size: 34px; line-height: 1; flex: 0 0 auto; }
+.iq-confirm__costbody { flex: 1; min-width: 0; }
+.iq-confirm__costname { font-weight: 700; }
+.iq-confirm__bal { font-family: var(--font-pixel); font-size: var(--text-sm); margin-top: 2px; }
+.iq-confirm__bal .from { color: var(--color-text-muted); } .iq-confirm__bal .arrow { color: var(--color-text-muted); margin: 0 6px; } .iq-confirm__bal .to { color: var(--pixel-coin); }
+.iq-confirm__pricechip { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); flex: 0 0 auto; }
+/* ゲーム確認の「やめる」＝購入するボタンと同じ .btn-pixel アニメ（▶点滅・持ち上がり・押下沈み）で、色だけ控えめに。 */
+.btn-pixel.btn-pixel--muted { background: var(--color-surface-alt); }
+@media (prefers-reduced-motion: reduce) { .iq-confirm .modal__panel, .iq-confirm .modal__backdrop { transition: none; } }

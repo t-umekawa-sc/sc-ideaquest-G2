@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { DataTable, useSnackbar } from "@/components/ui";
+import { DataTable, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 
 import "../shop.css";
@@ -54,15 +54,22 @@ const STATE_OPTIONS: [string, string][] = [["owned", "所有済"], ["affordable"
 
 export function ShopView() {
   const snack = useSnackbar();
+  const confirm = useConfirm();
   const [items, setItems] = useState<Item[]>(SORTED);
   const [coins, setCoins] = useState(320);
   const [flashId, setFlashId] = useState<string | null>(null);
 
   const stateOf = (it: Item): State => (it.owned ? "owned" : it.price <= coins ? "affordable" : "short");
 
-  function buy(it: Item) {
+  async function buy(it: Item) {
     if (it.owned || it.price > coins) return;
-    if (!window.confirm(`「${it.name}」を ◆${it.price} で購入しますか？\n（残高 ◆${coins} → ◆${coins - it.price}）`)) return;
+    const ok = await confirm({
+      variant: "game",
+      title: "▶ 購入の確認",
+      msg: "この装備を購入します。よろしいですか？",
+      cost: { icon: it.icon, name: `${it.name}（${RARITY_LABEL[it.rarity]}）`, price: it.price, balance: coins },
+    });
+    if (!ok) return; // キャンセル（処理なし）＝スナックバーは出さない
     setCoins((c) => c - it.price);
     setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
     setFlashId(it.id);

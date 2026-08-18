@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/layout";
-import { SnackbarProvider } from "@/components/ui";
+import { ConfirmProvider, SnackbarProvider } from "@/components/ui";
 import { LogoutAllMenuItem, LogoutMenuItem } from "@/features/auth";
 import { getServerSession } from "@/lib/session";
 
@@ -22,6 +22,7 @@ export default async function AppLayout({
   const demoUnread = 3;
   return (
     <SnackbarProvider>
+     <ConfirmProvider>
       {/* コンテンツ背景（ユーザー個人設定・全認証画面に反映＝K.4 接続で画像を差す。現状は基底レイヤーのみ） */}
       <div className="app-bg" aria-hidden="true" />
       <AppHeader user={session.user} balance={demoBalance} unreadCount={demoUnread}>
@@ -61,6 +62,7 @@ export default async function AppLayout({
         {children}
       </main>
       {modal}
+     </ConfirmProvider>
     </SnackbarProvider>
   );
 }

@@ -22,6 +22,8 @@ export { Pager } from "./Pager";
 export { Progress, Spinner, BlockOverlay } from "./Progress";
 export { SnackbarProvider, useSnackbar } from "./Snackbar";
 export type { SnackType, SnackReward, SnackOptions } from "./Snackbar";
+export { ConfirmProvider, useConfirm } from "./ConfirmDialog";
+export type { ConfirmVariant, ConfirmCost, ConfirmOptions } from "./ConfirmDialog";
 export { RowMenu } from "./RowMenu";
 export type { RowMenuItem } from "./RowMenu";
 export { Swatches, SWATCH_PRESETS } from "./Swatches";

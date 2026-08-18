@@ -1083,3 +1083,85 @@ window.DataTable = (function () {
   }
   window.iqSnack = show;
 })();
+
+/* --- 確認ダイアログ（全モック共通・window.iqConfirm）------------------------------
+   window.confirm の置き換え。Promise<boolean> を返す（OK=true / キャンセル=false）。
+   使い方: const ok = await iqConfirm({ title, msg, variant:'danger'|'game', confirmLabel, cancelLabel,
+                                        cost:{icon,name,price,balance} });
+   ・見た目は shared.css の .iq-confirm*（共通モーダルの .modal__panel を流用）。
+   ・Enter=確定 / Esc・バックドロップ・✕=キャンセル / Tab フォーカストラップ（document capture）。
+   ・注意: 呼び出し側は「実行された処理の結果」だけを iqSnack で通知する（キャンセルでは出さない）。 */
+(function () {
+  function iqConfirm(o) {
+    o = o || {};
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const icon = o.icon || (o.variant === 'danger' ? '⚠️' : o.variant === 'game' ? '✨' : '❓');
+    const confirmLabel = o.confirmLabel || (o.variant === 'danger' ? '削除する' : o.variant === 'game' ? '購入する' : 'OK');
+    const cancelLabel = o.cancelLabel || (o.variant === 'game' ? 'やめる' : 'キャンセル');
+    const confirmCls = o.variant === 'danger' ? 'btn btn-danger' : o.variant === 'game' ? 'btn-pixel' : 'btn btn-primary';
+    const cancelCls = o.variant === 'game' ? 'btn-pixel btn-pixel--muted' : 'btn btn-outline';
+    let costHtml = '';
+    if (o.cost) {
+      const after = o.cost.balance - o.cost.price;
+      costHtml =
+        '<div class="iq-confirm__cost">' +
+          '<span class="iq-confirm__thumb">' + (o.cost.icon || '🎁') + '</span>' +
+          '<div class="iq-confirm__costbody"><div class="iq-confirm__costname">' + o.cost.name + '</div>' +
+            '<div class="iq-confirm__bal"><span class="from">◆ ' + o.cost.balance + '</span><span class="arrow">→</span><span class="to">◆ ' + after + '</span></div></div>' +
+          '<span class="iq-confirm__pricechip">◆ -' + o.cost.price + '</span>' +
+        '</div>';
+    }
+    return new Promise((resolve) => {
+      const el = document.createElement('div');
+      el.className = 'iq-confirm' + (o.variant ? ' iq-confirm--' + o.variant : '');
+      el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+      el.innerHTML =
+        '<div class="modal__backdrop" data-cancel></div>' +
+        '<div class="modal__panel sectioned" role="document">' +
+          '<div class="modal__header"><h2>' + (o.title || '確認') + '</h2>' +
+            '<button class="modal__close" type="button" aria-label="閉じる" data-cancel>✕</button></div>' +
+          '<div class="modal__body"><div class="iq-confirm__body">' +
+            '<span class="iq-confirm__icon">' + icon + '</span>' +
+            '<div><p class="iq-confirm__msg">' + (o.msg || '') + '</p>' + costHtml + '</div>' +
+          '</div></div>' +
+          '<div class="modal__footer">' +
+            '<button class="' + cancelCls + '" type="button" data-cancel>' + cancelLabel + '</button>' +
+            '<button class="' + confirmCls + '" type="button" data-ok>' + confirmLabel + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(el);
+      document.body.classList.add('modal-open');
+      const prevFocus = document.activeElement;
+      requestAnimationFrame(() => el.classList.add('show'));
+      function done(val) {
+        document.removeEventListener('keydown', onKey, true);
+        el.classList.remove('show');
+        setTimeout(() => {
+          el.remove();
+          if (!document.querySelector('.modal.show, .iq-confirm.show')) document.body.classList.remove('modal-open');
+          if (prevFocus && prevFocus.focus) prevFocus.focus();
+        }, reduce ? 0 : 180);
+        resolve(val);
+      }
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-ok]')) done(true);
+        else if (e.target.closest('[data-cancel]')) done(false);
+      });
+      const focusable = () => Array.from(el.querySelectorAll('button')).filter((b) => b.offsetParent !== null);
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(true); }
+        else if (e.key === 'Tab') {
+          const f = focusable(); if (!f.length) return;
+          const first = f[0], last = f[f.length - 1], active = document.activeElement;
+          if (e.shiftKey && (active === first || !el.contains(active))) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && (active === last || !el.contains(active))) { e.preventDefault(); first.focus(); }
+        }
+      }
+      document.addEventListener('keydown', onKey, true);
+      const focusTarget = o.variant === 'danger' ? el.querySelector('[data-cancel].btn') : el.querySelector('[data-ok]');
+      setTimeout(() => { (focusTarget || el.querySelector('button')).focus(); }, 30);
+    });
+  }
+  window.iqConfirm = iqConfirm;
+})();
