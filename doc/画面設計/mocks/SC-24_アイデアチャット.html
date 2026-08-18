@@ -144,12 +144,15 @@
   .lightbox img { max-width: 92vw; max-height: 90vh; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
   .lightbox__close { position: absolute; top: var(--space-4); right: var(--space-5); background: none; border: none; color: #fff; font-size: 28px; cursor: pointer; line-height: 1; }
 
-  /* 引用返信の入力コンテキスト（入力欄の上） */
-  .reply-ctx { display: none; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+  /* 引用返信の入力コンテキスト（入力欄の上）＝複数の引用に対応（各行に✕で個別解除）。 */
+  .reply-ctx { display: none; flex-direction: column; gap: 4px; padding: var(--space-2) var(--space-3);
     border-left: 3px solid var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-sm); margin-bottom: var(--space-2); font-size: var(--text-sm); }
   .reply-ctx.is-on { display: flex; }
+  .reply-ctx__head { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
+  .reply-ctx__item { display: flex; align-items: center; gap: var(--space-2); }
   .reply-ctx__body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .reply-ctx__cancel { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 16px; }
+  .reply-ctx__cancel { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 16px; line-height: 1; padding: 0 2px; }
+  .reply-ctx__cancel:hover { color: var(--color-danger); }
 
   /* --- 入力欄の最小化（折りたたみ） --- */
   .composer__toggle, .composer__info { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm); }
@@ -274,11 +277,8 @@
         <button class="composer__info" id="hintToggle" type="button" title="使い方を表示" aria-label="使い方を表示" aria-expanded="false" aria-controls="composerHint">ⓘ 使い方</button>
         <button class="composer__toggle" id="composerToggle" type="button" title="入力欄を最小化" aria-label="入力欄を最小化">⌄ 最小化</button>
       </div>
-      <!-- 引用返信のコンテキスト -->
-      <div class="reply-ctx" id="replyCtx">
-        <div class="reply-ctx__body"><span id="replyCtxText"></span></div>
-        <button class="reply-ctx__cancel" type="button" id="replyCancel" aria-label="引用をやめる">✕</button>
-      </div>
+      <!-- 引用返信のコンテキスト（複数可・JS が引用リストを描画。各行の✕で個別解除） -->
+      <div class="reply-ctx" id="replyCtx"></div>
       <div class="composer__attachments" id="attList"></div>
       <div class="composer__field">
         <textarea class="composer__box" id="box" rows="1" placeholder="メッセージを入力…（@ でメンション、書式は下のツールバー）"></textarea>
@@ -380,13 +380,13 @@
     const msg = document.createElement('div');
     msg.className = 'msg is-me';
     const files = pendingAtts.map(f => '<span class="file-chip"><span class="file-icon">📎</span><a href="#">' + f + '</a></span>').join('');
-    const quote = replyTarget
-      ? '<div class="msg__quote"><b>' + replyTarget.name + '</b> ' + replyTarget.text + '</div>' : '';
+    // 引用は複数可＝引用の数だけ .msg__quote を積む。
+    const quotes = replyTargets.map(t => '<div class="msg__quote"><b>' + t.name + '</b> ' + t.text + '</div>').join('');
     msg.innerHTML =
       '<span class="avatar sm"><span class="avatar__img placeholder">山</span></span>' +
       '<div class="msg__body">' +
         '<div class="msg__head"><span class="msg__name">山田 太郎</span><span class="msg__me">（あなた）</span><span class="msg__time">' + nowTime() + '</span></div>' +
-        quote +
+        quotes +
         (val ? '<p class="msg__text">' + renderText(val) + '</p>' : '') +
         (files ? '<div class="msg__files">' + files + '</div>' : '') +
       '</div>';
@@ -814,21 +814,35 @@
     textEl.textContent = '🗑 このメッセージは削除されました';
   }
 
-  // --- 引用返信 ---
-  let replyTarget = null;
+  // --- 引用返信（複数可） ---
+  // 複数のメッセージを引用して1つの返信に含められる。各引用は入力欄上のコンテキストに一覧表示され、
+  // 行ごとの✕で個別に外せる。送信時は引用の数だけ .msg__quote ブロックを本文の上に積む。
+  let replyTargets = [];
   const replyCtx = document.getElementById('replyCtx');
-  const replyCtxText = document.getElementById('replyCtxText');
+  function renderReplyCtx() {
+    if (!replyTargets.length) { replyCtx.classList.remove('is-on'); replyCtx.innerHTML = ''; return; }
+    const head = '<div class="reply-ctx__head">引用返信（' + replyTargets.length + '件）</div>';
+    const items = replyTargets.map((t, i) =>
+      '<div class="reply-ctx__item"><span class="reply-ctx__body"><b>' + t.name + '</b> に返信：' + t.text + '</span>' +
+      '<button class="reply-ctx__cancel" type="button" data-remove="' + i + '" aria-label="この引用をやめる">✕</button></div>').join('');
+    replyCtx.innerHTML = head + items;
+    replyCtx.classList.add('is-on');
+  }
   function startReply(msg) {
     const name = msg.querySelector('.msg__name').textContent;
     let text = msgPlainText(msg); if (text.length > 60) text = text.slice(0, 60) + '…';
-    replyTarget = { name, text };
-    replyCtxText.innerHTML = '<b>' + name + '</b> に返信：' + text;
-    replyCtx.classList.add('is-on');
+    // 同じ発言の重複追加は避ける（name＋抜粋で判定）。
+    if (!replyTargets.some(t => t.name === name && t.text === text)) replyTargets.push({ name, text });
+    renderReplyCtx();
     if (composer.classList.contains('is-collapsed')) expandComposer();
     box.focus();
   }
-  function clearReply() { replyTarget = null; replyCtx.classList.remove('is-on'); }
-  document.getElementById('replyCancel').addEventListener('click', clearReply);
+  function clearReply() { replyTargets = []; renderReplyCtx(); }
+  // 各引用行の✕で個別解除。
+  replyCtx.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-remove]'); if (!b) return;
+    replyTargets.splice(Number(b.dataset.remove), 1); renderReplyCtx();
+  });
 
   // ===== 画像ライトボックス =====
   const lightbox = document.getElementById('lightbox');
