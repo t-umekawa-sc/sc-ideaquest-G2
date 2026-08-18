@@ -6,6 +6,9 @@
 .dash-page .dash-greeting { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
 
 /* 上部2カラム＝左ヒーロー／右 週間ランキング */
+/* 2カラムは align-items:stretch で等高（行高＝背の高い方に揃う）。dash-top 内の hero→rank は
+   隣接 section だが、下の「主要セクション間の余白」ルールは > で直接の子に限定して margin を当てない
+   （grid item に margin が付くと stretch が行高−margin になり高さ/位置がズレるため）。 */
 .dash-page .dash-top { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8); align-items: stretch; }
 .dash-page .hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-6); }
 .dash-page .hero__avatar { display: grid; place-items: center; width: 120px; height: 120px; background: #0f172a; border: 3px solid var(--pixel-ink); box-shadow: var(--shadow-pixel); image-rendering: pixelated; }
@@ -23,7 +26,8 @@
 /* セクション見出し */
 .dash-page .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-4); }
 .dash-page .section-head h2 { font-size: var(--text-xl); margin: 0; }
-.dash-page section + section { margin-top: var(--space-10); }
+/* 主要セクション間の余白（直接の子セクションのみ＝dash-top 内の hero→rank 隣接には効かせない）。 */
+.dash-page > section + section { margin-top: var(--space-10); }
 
 /* 参加中クエスト（quest-card 系は design-system.css の共有クラス＝SC-01/SC-10/SC-12 一貫） */
 .dash-page .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
