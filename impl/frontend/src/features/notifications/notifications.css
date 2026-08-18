@@ -1,0 +1,31 @@
+/* SC-02 通知一覧（features/notifications・業務層）＝mocks/SC-02_通知一覧.html 準拠。
+   通知は「読ませる一覧」なのでクリーン不透明（ゲーム層のガラスは使わない）。各通知はクリックで参照先へ遷移。
+   共通クラス（.list-toolbar/.filters/.tools/.select/.list-count/.badge）は design-system.css。ここは SC-02 固有のみ。 */
+
+.notif-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
+
+.notif-group { margin-bottom: var(--space-5); }
+.notif-group__label { font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin: 0 0 var(--space-2); }
+
+/* 通知カード（行・クリックで参照先へ） */
+.n { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: var(--space-3);
+     padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius);
+     background: var(--color-surface); text-decoration: none; color: var(--color-text); margin-bottom: 8px; }
+.n:hover { background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+.n.is-unread { background: var(--color-primary-soft); border-color: var(--color-primary); }
+.n.is-unread:hover { background: #E4EEFE; }
+.n__ico { width: 34px; height: 34px; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 16px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.n.is-unread .n__ico { background: #fff; }
+.n__body { min-width: 0; font-size: var(--text-sm); line-height: 1.5; }
+.n__ctx { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 2px; }
+.n__gain { display: inline-block; margin-top: 4px; font-family: var(--font-pixel); font-size: var(--text-xs); }
+.n__gain .xp { color: var(--pixel-xp); } .n__gain .coin { color: var(--pixel-coin); } .n__gain .sp { color: var(--pixel-skill); }
+.n__right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; white-space: nowrap; }
+.n__time { color: var(--color-text-subtle); font-size: var(--text-xs); }
+/* 未読ドット＋既読トグル */
+.n__read { border: none; background: none; cursor: pointer; font-size: 12px; color: var(--color-text-subtle); padding: 2px 6px; border-radius: var(--radius); }
+.n__read:hover { background: var(--color-surface); color: var(--color-text); }
+.n.is-unread .n__dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--color-danger); }
+.n:not(.is-unread) .n__dot { display: none; }
+
+.list-empty { border: 1px dashed var(--color-border); border-radius: var(--radius); padding: var(--space-6); text-align: center; color: var(--color-text-muted); }
