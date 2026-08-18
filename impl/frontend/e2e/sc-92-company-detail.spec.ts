@@ -37,10 +37,15 @@ test("B-TC-113 company detail settings toggle persists", async ({ page }) => {
   const co = (created.data ?? []).find((c: { company_code: string }) => c.company_code === code);
   expect(co, "作成した会社が一覧APIに現れる").toBeTruthy();
   await page.goto(`/admin/companies/${co.company_id}`);
-  await expect(page.getByRole("heading", { name: cname })).toBeVisible();
+  // 会社名は文脈バナー（.ctx＝region「メンテナンス中の会社」）に表示（SC-92 モック準拠＝見出しではない）。
+  await expect(page.getByRole("region", { name: "メンテナンス中の会社" }).getByText(cname)).toBeVisible();
 
-  const before = await page.getByRole("checkbox", { name: /MFA/ }).isChecked();
-  await page.getByRole("checkbox", { name: /MFA/ }).click();
+  // トグルはスイッチUI（.switch）＝input は視覚的に隠れ、可視の .switch__track がクリックを受ける。
+  // 状態は checkbox で読み、操作は input を内包する label.switch（可視コントロール）をクリックする。
+  const mfa = page.getByRole("checkbox", { name: /MFA/ });
+  const mfaSwitch = page.locator("label.switch", { has: mfa });
+  const before = await mfa.isChecked();
+  await mfaSwitch.click();
   await page.reload();
   await expect(page.getByRole("checkbox", { name: /MFA/ })).toBeChecked({ checked: !before });
 });
