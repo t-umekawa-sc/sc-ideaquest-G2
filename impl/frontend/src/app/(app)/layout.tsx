@@ -35,23 +35,31 @@ export default async function AppLayout({
           <Link role="menuitem" href="/avatar">アバター / 着せ替え</Link>
         </li>
         <li role="none"><div className="usermenu__sep" /></li>
-        {session.system_role === "system_admin" && (
-          <li role="none">
-            <Link role="menuitem" href="/admin/companies">システム管理（会社）</Link>
-          </li>
+        {/* 管理導線は権限保持者にのみ出す。1つも該当しない一般ユーザーでは
+            区切り線ごと描画しない＝非表示項目の空きを作らない（高さ0）。 */}
+        {(session.system_role === "system_admin" ||
+          session.system_role === "company_account_admin" ||
+          session.is_qg_admin) && (
+          <>
+            {session.system_role === "system_admin" && (
+              <li role="none">
+                <Link role="menuitem" href="/admin/companies">システム管理（会社）</Link>
+              </li>
+            )}
+            {session.system_role === "company_account_admin" && (
+              <li role="none">
+                <Link role="menuitem" href="/admin/accounts">アカウント管理（自社）</Link>
+              </li>
+            )}
+            {/* QG管理者（会社DBの有効 admin 所属を1つ以上・ログイン時スナップショット is_qg_admin）にのみ出す */}
+            {session.is_qg_admin && (
+              <li role="none">
+                <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
+              </li>
+            )}
+            <li role="none"><div className="usermenu__sep" /></li>
+          </>
         )}
-        {session.system_role === "company_account_admin" && (
-          <li role="none">
-            <Link role="menuitem" href="/admin/accounts">アカウント管理（自社）</Link>
-          </li>
-        )}
-        {/* QG管理者（会社DBの有効 admin 所属を1つ以上・ログイン時スナップショット is_qg_admin）にのみ出す */}
-        {session.is_qg_admin && (
-          <li role="none">
-            <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
-          </li>
-        )}
-        <li role="none"><div className="usermenu__sep" /></li>
         <li role="none">
           <LogoutMenuItem />
         </li>

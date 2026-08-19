@@ -74,8 +74,19 @@
   background: var(--color-primary-soft);
   text-decoration: none;
 }
+/* 区切り線は menuitem ではない＝`li > *` の padding/hover を打ち消して 1px の線に戻す
+   （`.usermenu__list li > *` (0,1,1) を上回る (0,2,1) の特異度で design-system.css の重複定義も抑える）。 */
+.usermenu__list li > .usermenu__sep,
+.usermenu__list li > .usermenu__sep:hover {
+  padding: 0;
+  border-radius: 0;
+  cursor: default;
+  /* `li > *` の `background: none`(0,1,1) を打ち消して罫線色を出す（本セレクタは 0,2,1）。 */
+  background: var(--color-border-strong);
+}
 .usermenu__sep {
   height: 1px;
   margin: 6px 4px;
-  background: var(--color-border);
+  /* グループ境界の罫線＝白面で視認できる濃さ（slate-300）。--color-border(slate-200) は薄く埋もれる。 */
+  background: var(--color-border-strong);
 }
