@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.tenant.gamification.orm import Activity
@@ -33,6 +33,30 @@ def exists_reason_between(
         )
     )
     return session.execute(stmt).scalar_one() > 0
+
+
+def list_activities(
+    session: Session, user_id: uuid.UUID, *,
+    kind: str | None = None,
+    bounds: tuple[datetime, datetime] | None = None,
+    cursor: tuple[datetime, uuid.UUID] | None = None,
+    limit: int,
+) -> list[Activity]:
+    """`user_id` の活動履歴を新しい順（created_at desc, id desc）でキーセット取得（G.6・§1.8）。
+
+    `kind`／`bounds`（期間 [start, end)）で絞り込み、`cursor`＝(created_at, id) より古い行のみ返す。
+    呼び出し側は `limit+1` を要求して has_next を判定する。
+    """
+    stmt = select(Activity).where(Activity.user_id == user_id)
+    if kind is not None:
+        stmt = stmt.where(Activity.kind == kind)
+    if bounds is not None:
+        stmt = stmt.where(Activity.created_at >= bounds[0], Activity.created_at < bounds[1])
+    if cursor is not None:
+        # (created_at, id) の行値比較で決定的なキーセット境界（desc 順＝カーソルより小さいタプル）
+        stmt = stmt.where(tuple_(Activity.created_at, Activity.id) < tuple_(cursor[0], cursor[1]))
+    stmt = stmt.order_by(Activity.created_at.desc(), Activity.id.desc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
 
 
 def exists_ref(

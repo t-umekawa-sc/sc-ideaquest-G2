@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.tenant.gamification.daily import jst_date, jst_day_bounds_utc
+from app.tenant.gamification.daily import jst_date, jst_day_bounds_utc, period_bounds_utc
 
 
 def test_jst_date_crosses_at_15z():
@@ -30,3 +30,27 @@ def test_same_jst_day_shares_bounds_across_utc_midnight():
     late = datetime(2026, 8, 19, 23, 0, 0, tzinfo=timezone.utc)   # JST 8/20 08:00
     early = datetime(2026, 8, 20, 1, 0, 0, tzinfo=timezone.utc)   # JST 8/20 10:00
     assert jst_day_bounds_utc(late) == jst_day_bounds_utc(early)
+
+
+def test_period_bounds_all_is_none():
+    assert period_bounds_utc("all", datetime(2026, 8, 19, 3, 0, tzinfo=timezone.utc)) is None
+
+
+def test_period_bounds_this_and_last_week():
+    # 2026-08-19 は水曜（JST）。週起点＝月曜 2026-08-17 00:00 JST＝2026-08-16T15:00Z。
+    now = datetime(2026, 8, 19, 3, 0, tzinfo=timezone.utc)  # JST 8/19 12:00（水）
+    this_w = period_bounds_utc("this_week", now)
+    assert this_w == (datetime(2026, 8, 16, 15, 0, tzinfo=timezone.utc),
+                      datetime(2026, 8, 23, 15, 0, tzinfo=timezone.utc))
+    last_w = period_bounds_utc("last_week", now)
+    assert last_w == (datetime(2026, 8, 9, 15, 0, tzinfo=timezone.utc),
+                      datetime(2026, 8, 16, 15, 0, tzinfo=timezone.utc))
+
+
+def test_period_bounds_this_month():
+    now = datetime(2026, 8, 19, 3, 0, tzinfo=timezone.utc)
+    # 当月＝2026-08-01 00:00 JST〜2026-09-01 00:00 JST（UTC は前日 15:00Z）
+    assert period_bounds_utc("this_month", now) == (
+        datetime(2026, 7, 31, 15, 0, tzinfo=timezone.utc),
+        datetime(2026, 8, 31, 15, 0, tzinfo=timezone.utc),
+    )

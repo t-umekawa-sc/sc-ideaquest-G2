@@ -1,6 +1,7 @@
 """`/me` の入出力 DTO（Pydantic・§3.2 DB モデル直返し禁止・§2.2 Mass Assignment 防止）。"""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -51,6 +52,33 @@ class MeResponse(BaseModel):
     profile: MeProfileDTO
     balance: MeBalanceDTO
     system_role: str
+
+
+class MeActivityDTO(BaseModel):
+    """活動履歴の1行（G の `activities` 元帳・G.6）。残高そのものではなく付与/消費の記録。
+
+    `amount` は常に正・方向は `kind`（*_gain/*_spend）。`ref_type`/`ref_id` は多態参照（NULL 可・対でセット）。
+    """
+    id: str
+    kind: str
+    amount: int
+    reason: str
+    quest_id: str | None = None
+    ref_type: str | None = None
+    ref_id: str | None = None
+    created_at: datetime
+
+
+class CursorPageInfo(BaseModel):
+    """カーソルページングのページ情報（§1.8）。"""
+    next_cursor: str | None = None
+    has_next: bool
+
+
+class MeActivitiesResponse(BaseModel):
+    """`GET /me/activities`（履歴・G.6）＝カーソル一覧共通形（§1.8）。新しい順。"""
+    data: list[MeActivityDTO]
+    page_info: CursorPageInfo
 
 
 class PasswordChangeRequest(BaseModel):

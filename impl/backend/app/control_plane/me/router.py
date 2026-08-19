@@ -6,8 +6,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.me import application as me_service
 from app.control_plane.me.deps import require_me
@@ -16,6 +17,7 @@ from app.control_plane.me.schemas import (
     EmailChangeConfirmedResponse,
     EmailChangeConfirmRequest,
     EmailChangeRequest,
+    MeActivitiesResponse,
     MeResponse,
     MeUpdateRequest,
     PasswordChangeRequest,
@@ -32,6 +34,23 @@ def get_me(request: Request, session: dict = Depends(require_me)) -> MeResponse:
     return MeResponse(**me_service.get_me(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
     ))
+
+
+@router.get("/me/activities", response_model=MeActivitiesResponse)
+def get_my_activities(
+    request: Request,
+    kind: Literal["xp_gain", "coin_gain", "coin_spend", "sp_gain", "sp_spend"] | None = None,
+    period: Literal["this_week", "last_week", "this_month", "all"] = "all",
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = None,
+    session: dict = Depends(require_me),
+) -> MeActivitiesResponse:
+    """自分の活動履歴（G.6・新しい順・カーソル §1.8）。`kind`/`period` で絞り込み。読取専用。"""
+    result = me_service.get_my_activities(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        kind=kind, period=period, limit=limit, cursor=cursor,
+    )
+    return MeActivitiesResponse(**result)
 
 
 @router.patch("/me", response_model=MeResponse)

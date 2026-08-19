@@ -6,6 +6,8 @@ identity（`display_name`/`locale`）の源泉は管理DB `accounts`（§4.2）�
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -33,6 +35,8 @@ from app.core.security import (
 )
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.gamification import repository as gami_repo
+from app.tenant.gamification.daily import period_bounds_utc
 from app.tenant.gamification.level import level_progress
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
@@ -84,6 +88,60 @@ def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         if account is None:
             raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
     return _me(account, _tenant_user(company_id, account_id))
+
+
+_EMPTY_PAGE = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}
+
+
+def _encode_cursor(activity) -> str:
+    """(created_at, id) を不透明カーソルにエンコード（§1.8・キーセット境界）。"""
+    raw = f"{activity.created_at.isoformat()}|{activity.id}".encode()
+    return base64.urlsafe_b64encode(raw).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    """不透明カーソルを (created_at, id) に戻す。壊れていれば 422（field=cursor）。"""
+    try:
+        created_str, id_str = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
+        return datetime.fromisoformat(created_str), uuid.UUID(id_str)
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
+
+
+def _activity_dto(a) -> dict:
+    return {
+        "id": str(a.id), "kind": a.kind, "amount": a.amount, "reason": a.reason,
+        "quest_id": str(a.quest_id) if a.quest_id else None,
+        "ref_type": a.ref_type, "ref_id": str(a.ref_id) if a.ref_id else None,
+        "created_at": a.created_at,
+    }
+
+
+def get_my_activities(
+    account_id: uuid.UUID, company_id: uuid.UUID, *,
+    kind: str | None, period: str, limit: int, cursor: str | None,
+) -> dict:
+    """自分の活動履歴（G.6・新しい順・カーソル §1.8）。会社DB `activities` を読む（残高の元帳）。
+
+    `kind`（activity_kind）・`period`（this_week/last_week/this_month/all）で絞り込み。会社/ユーザー
+    未解決（通常起きない）は空ページ。SP 消費/付与もランキング非対象だが履歴には含める（§7）。
+    """
+    bounds = period_bounds_utc(period, datetime.now(timezone.utc))
+    cur = _decode_cursor(cursor) if cursor else None  # 不正カーソルは query 前に 422
+    with control_session() as session:
+        company = session.get(Company, company_id)
+    if company is None:
+        return _EMPTY_PAGE
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return _EMPTY_PAGE
+        rows = gami_repo.list_activities(ts, user.id, kind=kind, bounds=bounds, cursor=cur, limit=limit + 1)
+    has_next = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
+    return {"data": [_activity_dto(a) for a in rows],
+            "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
 def update_me(account_id: uuid.UUID, company_id: uuid.UUID, *, changes: dict) -> dict:
