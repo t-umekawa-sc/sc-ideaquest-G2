@@ -893,6 +893,20 @@ body.modal-open { overflow: hidden; }
   border-radius: var(--radius-pixel); overflow: hidden;
 }
 .xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); }
+/* XPバーのホバー/フォーカスで獲得XPをツールチップ表示（SC-01 ダッシュボード／SC-03 プロフィール共通）。
+   ::after は overflow:hidden の .xp-bar だと切れるため、ラッパー .xp-bar-wrap に出す。data-xp を各画面で設定。 */
+.xp-bar-wrap { position: relative; cursor: help; }
+.xp-bar-wrap:focus-visible { outline: none; }
+.xp-bar-wrap[data-xp]:hover::after,
+.xp-bar-wrap[data-xp]:focus-visible::after {
+  content: attr(data-xp);
+  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-pixel); font-size: var(--text-xs); white-space: nowrap;
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--pixel-ink); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pixel); pointer-events: none;
+}
 
 /* コイン/レベルのピル（ドット風） */
 .pixel-stat {

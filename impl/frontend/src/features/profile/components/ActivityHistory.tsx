@@ -75,7 +75,7 @@ export function ActivityHistory({ initial }: { initial: Activities }) {
   }
 
   return (
-    <section className="pixel-panel activity-history" aria-label="獲得履歴">
+    <section className="activity-history" aria-label="獲得履歴">
       <h2 className="activity-history__title">獲得履歴</h2>
       {items.length === 0 ? (
         <p className="activity-history__empty">まだアクティビティはありません。</p>

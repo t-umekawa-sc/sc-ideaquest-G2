@@ -24,10 +24,9 @@ const ROLE_LABEL: Record<string, string> = {
   system_admin: "システム管理者",
 };
 
-// 残高＝GET /me 残高（K.1・接続済み）。呼び出し側（profile/page）が /me から算出して渡す。
-type Balance = { level: number; xpPct: number; xpToNext: number; coin: number; sp: number };
-
-export function ProfileForm({ companyCode, balance }: { companyCode: string; balance: Balance }) {
+// 3Dアバター表示グループ＋残高は上部のゲーム風パネル（ProfileHero・profile/page）へ分離。
+// 本コンポーネントは identity（読取）＋プロフィール編集（表示名/言語/アイコン）を担う。
+export function ProfileForm({ companyCode }: { companyCode: string }) {
   const router = useRouter();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,42 +94,14 @@ export function ProfileForm({ companyCode, balance }: { companyCode: string; bal
 
   return (
     <>
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
-      <h1 className="page-title">プロフィール</h1>
       <p className="admin-sub">
         あなたの<strong>表示名・プロフィール画像・言語</strong>と<strong>セキュリティ（パスワード・メールアドレス）</strong>を管理します。
         （<strong>3D アバターの着せ替え</strong>は「きせかえ」、<strong>背景画像</strong>はヘッダーのユーザーメニューから設定できます）
       </p>
 
-      {/* アカウント情報＋残高（読取専用・GET /me） */}
-      <section className="card" aria-label="アカウント情報">
-        <div className="prof-head">
-          <div className="avatar3d">
-            <span className="avatar3d__tag">3D アバター</span>
-            {/* 3D アバターは読取表示（本番は three-vrm/R3F）＝着せ替えは SC-31。素の img で描画。 */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="avatar3d__img" src="/assets/mascot-hero.png" alt="あなたの3Dアバター" />
-          </div>
-          <div className="prof-head__body">
-            <div className="prof-head__name">{displayName}</div>
-            <div className="prof-head__role"><span className="badge badge-muted" title="システムロール">{roleLabel}</span></div>
-            <div className="prof-stats">
-              <div className="prof-stats__line">
-                <span className="pixel-stat level">Lv.{balance.level}</span>
-                <div className="xp-bar" title={`次のレベルまで ${balance.xpToNext} XP`}><span style={{ width: `${balance.xpPct}%` }} /></div>
-                <span className="prof-stats__next">NEXT {balance.xpToNext} XP</span>
-              </div>
-              <div className="prof-stats__line">
-                <span className="pixel-stat coin">◆ {balance.coin} コイン</span>
-                <span className="pixel-stat skill">✦ SP {balance.sp}</span>
-              </div>
-            </div>
-            <div className="prof-head__actions">
-              <Link className="btn btn-outline btn-sm" href="/avatar">▶ きせかえ（装備を変更）</Link>
-              <Link className="btn btn-outline btn-sm" href="/shop">🛒 ショップ</Link>
-            </div>
-          </div>
-        </div>
+      {/* ユーザ情報（identity・読取専用・GET /me）。3Dアバター表示グループ＋残高は上部パネルへ分離。 */}
+      <div className="section-head"><h2>ユーザ情報</h2></div>
+      <section className="card" aria-label="ユーザ情報">
         <dl className="kv">
           <dt>会社</dt><dd className="db-id">{companyCode}</dd>
           <dt>ログインID</dt><dd className="db-id">{profile.account.login_id}</dd>

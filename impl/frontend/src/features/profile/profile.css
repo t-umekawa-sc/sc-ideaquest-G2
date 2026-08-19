@@ -21,12 +21,12 @@
 /* 残高チップは2段＝1段目: レベル＋次レベルまでのバー／2段目: コイン＋SP */
 .profile-page .prof-stats { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); align-items: flex-start; }
 .profile-page .prof-stats__line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.profile-page .prof-stats__line .xp-bar { flex: 1 1 200px; max-width: 300px; }
+/* 幅指定は flex 子である .xp-bar-wrap 側に（内側 .xp-bar はラッパー全幅）。 */
+.profile-page .prof-stats__line .xp-bar-wrap { flex: 1 1 200px; max-width: 300px; }
 .profile-page .prof-stats__next { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--color-text-muted); }
 
-/* identity（読取専用）＝ラベル＋値 */
-.profile-page .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin-top: var(--space-4);
-  border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+/* identity（読取専用）＝ラベル＋値。カード先頭要素＝旧アバター群との仕切り罫線(border-top)は不要。 */
+.profile-page .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin: 0; }
 .profile-page .kv dt { font-size: var(--text-sm); color: var(--color-text-muted); }
 .profile-page .kv dd { margin: 0; font-size: var(--text-sm); }
 
@@ -45,7 +45,7 @@
   .profile-page .prof-head__body { width: 100%; }
   .profile-page .prof-stats { align-items: center; }
   .profile-page .prof-stats__line, .profile-page .prof-head__actions { justify-content: center; }
-  .profile-page .prof-stats__line .xp-bar { flex-basis: 150px; }
+  .profile-page .prof-stats__line .xp-bar-wrap { flex-basis: 150px; }
   .profile-page .kv { grid-template-columns: 1fr; gap: 2px var(--space-4); }
   .profile-page .kv dt { margin-top: 8px; }
   .profile-page .kv dt:first-child { margin-top: 0; }
@@ -68,3 +68,15 @@
 /* ダーク面（pixel-panel）で読める淡色＝当ファイルの .avatar3d__tag と同系（slate-300）。 */
 .profile-page .activity-item__time { color: #cbd5e1; font-size: var(--text-xs); white-space: nowrap; }
 .profile-page .activity-history__more { margin-top: var(--space-3); }
+
+/* 上部ゲーム風パネル（pixel-panel）＝3Dアバター表示グループ＋獲得履歴をまとめる。
+   pixel-panel は暗面（文字は --pixel-ink=明色が既定）。暗面で沈む一部要素だけ上書きする。 */
+.profile-page .prof-panel { margin-bottom: var(--space-5); }
+.profile-page .prof-panel .prof-stats__next { color: var(--pixel-cyan); }        /* 薄灰→暗面で読める */
+.profile-page .prof-panel .btn-outline {                                          /* 既定は暗文字＝暗面で沈む */
+  color: var(--pixel-ink); border-color: var(--pixel-glass-border); background: transparent; }
+.profile-page .prof-panel .btn-outline:hover { background: rgba(255, 255, 255, .08); }
+/* 3Dアバター群と獲得履歴の境界（半透明の細線）。 */
+.profile-page .prof-panel__sep { height: 1px; margin: var(--space-4) 0; background: var(--pixel-glass-border); opacity: .6; }
+/* 履歴はパネル内に同居＝独立 pixel-panel を外したので上マージンを詰める。 */
+.profile-page .prof-panel .activity-history { margin-top: 0; }
