@@ -541,8 +541,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return `${c.from || ""}〜${c.to || ""}`;
   }
 
-  const searchPlaceholder =
-    props.searchPlaceholder ?? (props.searchFields ? `${props.searchFields} を検索…` : "検索…");
+  // プレースホルダは定型文（短文＝入力欄で文字切れしない）。対象項目の全文は虫眼鏡アイコンの
+  // ツールチップ（title）と入力欄の aria-label で示す（可読性＋アクセシビリティ）。
+  const searchPlaceholder = props.searchPlaceholder ?? "検索…";
+  const searchTitle = props.searchFields ? `${props.searchFields} を検索` : "検索";
 
   // カード本文（cardLayout の標準構造）。
   function cardBody(r: T): ReactNode {
@@ -685,13 +687,14 @@ export function DataTable<T>(props: DataTableProps<T>) {
       <div className="list-toolbar" data-dt-toolbar>
         <div className="filters">
           <div className="dt-search">
-            <span className="dt-search__ic" aria-hidden="true">
+            <span className="dt-search__ic" title={searchTitle}>
               🔍
             </span>
             <input
               className="input"
               type="search"
               value={search}
+              aria-label={searchTitle}
               placeholder={searchPlaceholder}
               onChange={(e) => {
                 setSearch(e.target.value);
