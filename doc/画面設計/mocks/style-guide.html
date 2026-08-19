@@ -737,6 +737,20 @@
     if (ok) window.iqSnack({ type: 'success', title: '移動しました（デモ）' });
   });
 
+  // --- 13.2 進捗バー（確定・XPバー風）デモ。完了で報酬スナックバーと連動 ---
+  (function () {
+    const p = document.getElementById('sgProg'), fill = document.getElementById('sgProgFill'), pct = document.getElementById('sgProgPct');
+    let anim = null;
+    document.getElementById('sgProgRun').addEventListener('click', () => {
+      if (anim) clearInterval(anim);
+      p.classList.remove('is-complete'); let v = 0; pct.textContent = '0%'; fill.style.width = '0%';
+      anim = setInterval(() => {
+        v = Math.min(100, v + Math.random() * 12 + 4); fill.style.width = v + '%'; pct.textContent = Math.round(v) + '%';
+        if (v >= 100) { clearInterval(anim); anim = null; p.classList.add('is-complete'); window.iqSnack({ type: 'reward', title: '投稿完了！', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }); }
+      }, 260);
+    });
+  })();
+
   // --- 13.4 パネル遮蔽オーバーレイ（NOW LOADING）デモ ---
   (function () {
     const card = document.getElementById('sgBlockCard');
