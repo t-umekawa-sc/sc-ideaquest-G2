@@ -110,6 +110,17 @@ def mail():
 
 
 @pytest.fixture
+def storage():
+    """オブジェクトストレージをフェイク（メモリ）へ差し替える（K.4 画像・MinIO 非依存）。teardown で解除。"""
+    from app.infra import storage as storage_mod
+
+    fake = storage_mod.FakeStorage()
+    storage_mod.set_storage(fake)
+    yield fake
+    storage_mod.set_storage(None)
+
+
+@pytest.fixture
 def factory():
     """エッジ検証用の会社/アカウントを作る。teardown で削除。
 

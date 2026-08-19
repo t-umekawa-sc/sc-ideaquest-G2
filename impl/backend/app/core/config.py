@@ -81,6 +81,19 @@ class Settings(BaseSettings):
     # メールリンクの基点（フロントのオリジン。password-setup ページを開く）
     app_base_url: str = "http://localhost:3000"
 
+    # MinIO（オブジェクトストレージ・画像/添付・API設計 §1.10・infra/storage.py）
+    # endpoint＝backend→MinIO の内部ホスト（put/remove/bucket）。public_endpoint＝ブラウザが叩く
+    # 署名URL のホスト（presign 用・dev は localhost 公開ポート）。署名は host を含むため両者を分ける。
+    minio_endpoint: str = "localhost:9000"
+    minio_public_endpoint: str = "localhost:9000"
+    minio_access_key: str = "ideaquest"
+    minio_secret_key: str = "ideaquest-secret"
+    minio_bucket: str = "ideaquest"
+    minio_secure: bool = False            # dev は HTTP（本番は TLS＝True）
+    minio_url_ttl_seconds: int = 300      # 署名URL の TTL（短命・直リンク流出耐性・§1.10）
+    # region を明示＝presign が region 解決の HTTP を打たずオフライン署名できる（公開ホストへ到達不要）。
+    minio_region: str = "us-east-1"
+
     # ブートストラップ（運営テナント＋初期 system_admin・API設計 B.5.1・案a＝シークレット直投入）
     ops_company_code: str = "OPS"             # 運営テナントの予約会社コード
     ops_db_identifier: str = "ideaquest_ops"  # 運営テナントの会社DB識別子

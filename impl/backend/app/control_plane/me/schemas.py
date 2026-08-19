@@ -81,6 +81,16 @@ class MeActivitiesResponse(BaseModel):
     page_info: CursorPageInfo
 
 
+class AvatarImageResponse(BaseModel):
+    """`PUT /me/avatar-image` の応答（K.4）＝設定後の短TTL 署名URL。"""
+    avatar_image_url: str
+
+
+class BackgroundImageResponse(BaseModel):
+    """`PUT /me/background-image` の応答（K.4）＝設定後の短TTL 署名URL。"""
+    background_image_url: str
+
+
 class PasswordChangeRequest(BaseModel):
     """自己パスワード変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。"""
     model_config = ConfigDict(extra="forbid")

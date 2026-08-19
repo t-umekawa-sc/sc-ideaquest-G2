@@ -44,6 +44,24 @@ services:
       - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP（backend が送信）
       - "${MAILHOG_UI_PORT:-8025}:8025"     # Web UI（受信メール確認）
 
+  # オブジェクトストレージ（画像/添付・API設計 §1.10）。非公開バケット＝backend が短TTL署名URLを発行。
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-ideaquest}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-ideaquest-secret}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"          # S3 API（ブラウザが署名URLを叩く＝public_endpoint）
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # 管理コンソール
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     build: ./backend
     environment: &backend_env
@@ -95,6 +113,14 @@ services:
       BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-admin@ops.example}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@ops.example}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Passw0rd!}   # dev 供給・本番は必ず強い秘密を供給
+      # オブジェクトストレージ（MinIO・画像/添付・§1.10）。endpoint＝内部（put/remove）、public＝署名URLのホスト。
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-ideaquest}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-ideaquest-secret}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ideaquest}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_URL_TTL_SECONDS: ${MINIO_URL_TTL_SECONDS:-300}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -103,6 +129,8 @@ services:
       redis:
         condition: service_healthy
       mailhog:
+        condition: service_started
+      minio:
         condition: service_started
 
   # account_sync_outbox 常駐ワーカ（管理DB→会社DB users ミラー・§4.6・両プレーンを跨ぐ唯一の実行主体）。
@@ -144,3 +172,4 @@ services:
 
 volumes:
   db_data:
+  minio_data:

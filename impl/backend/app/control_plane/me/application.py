@@ -37,6 +37,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.gamification.daily import period_bounds_utc
+from app.infra.storage import ALLOWED_IMAGE_MIME, MAX_IMAGE_BYTES, get_storage
 from app.tenant.gamification.level import level_progress
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
@@ -44,11 +45,17 @@ from app.tenant.profile.orm import User
 _EDITABLE_FIELDS = ("display_name", "locale")  # allowlist（§2.2）
 
 
+def _image_url(path: str | None) -> str | None:
+    """MinIO オブジェクトキー→短TTL 署名URL（K.4・§1.10）。未設定は None（storage 未呼び出し）。"""
+    return get_storage().presigned_get(path) if path else None
+
+
 def _me(account: Account, user: "User | None") -> dict:
     """K.1 正準形（account／profile／balance／system_role）。
 
     identity・display_name の源泉は accounts（§4.2・K.6）。残高は会社DB `users`（読み取り専用・K.0）で
-    `level`/`xp_to_next`/`level_span` は G の純粋レベル関数（§7）で `xp` から算出。画像署名URL（K.4）は別スライス＝現状 None。
+    `level`/`xp_to_next`/`level_span` は G の純粋レベル関数（§7）で `xp` から算出。画像は会社DB `users` の
+    パスを短TTL 署名URL（K.4・§1.10）に解決して返す（パス直返し禁止）。
     """
     xp = user.xp if user else 0
     prog = level_progress(xp)
@@ -56,8 +63,8 @@ def _me(account: Account, user: "User | None") -> dict:
         "account": {"login_id": account.login_id, "email": account.email, "locale": account.locale},
         "profile": {
             "display_name": account.display_name,
-            "avatar_image_url": None,       # K.4（MinIO 署名URL）は別スライス
-            "background_image_url": None,   # 同上
+            "avatar_image_url": _image_url(user.avatar_image_path if user else None),
+            "background_image_url": _image_url(user.background_image_path if user else None),
         },
         "balance": {
             "level": prog["level"],
@@ -88,6 +95,85 @@ def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         if account is None:
             raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
     return _me(account, _tenant_user(company_id, account_id))
+
+
+# --- プロフィール画像・背景画像（K.4・MinIO・§1.10）。会社DB users 直接更新（identity ではない＝outbox なし） ---
+
+def _validate_image(content_type: str, size: int) -> None:
+    """画像アップロードのサーバー検証（§2.2⑧・§1.10）＝MIME allowlist・サイズ上限・非空。"""
+    if content_type not in ALLOWED_IMAGE_MIME:
+        raise AppError(422, "validation_error", detail="対応していない画像形式です（PNG/JPEG/WebP/GIF）",
+                       errors=[{"field": "file"}])
+    if size == 0:
+        raise AppError(422, "validation_error", detail="ファイルが空です", errors=[{"field": "file"}])
+    if size > MAX_IMAGE_BYTES:
+        raise AppError(422, "validation_error", detail="画像サイズが上限を超えています", errors=[{"field": "file"}])
+
+
+def _company_db_identifier(company_id: uuid.UUID) -> str:
+    with control_session() as session:
+        company = session.get(Company, company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    return company.db_identifier
+
+
+def _set_user_image(company_id: uuid.UUID, account_id: uuid.UUID, *,
+                    field: str, data: bytes, content_type: str, prefix: str) -> str:
+    """会社DB users の画像パス列を差し替え、旧オブジェクトを best-effort 削除。署名URL を返す。"""
+    _validate_image(content_type, len(data))
+    storage = get_storage()
+    key = storage.put(data, content_type, prefix=prefix)  # 物理名ハッシュ・非公開バケット
+    with get_tenant_session(_company_db_identifier(company_id)) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        old = getattr(user, field)
+        setattr(user, field, key)
+        ts.commit()
+    if old:
+        try:
+            storage.remove(old)  # 旧画像は best-effort（失敗しても新設定は成立・整合は運用掃除）
+        except Exception:
+            pass
+    return storage.presigned_get(key)
+
+
+def _delete_user_image(company_id: uuid.UUID, account_id: uuid.UUID, *, field: str) -> None:
+    with get_tenant_session(_company_db_identifier(company_id)) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        old = getattr(user, field)
+        setattr(user, field, None)
+        ts.commit()
+    if old:
+        try:
+            get_storage().remove(old)
+        except Exception:
+            pass
+
+
+def set_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """アバター画像を設定（K.4）＝会社DB users.avatar_image_path 更新＋署名URL 返却。"""
+    return {"avatar_image_url": _set_user_image(
+        company_id, account_id, field="avatar_image_path", data=data, content_type=content_type, prefix="avatars")}
+
+
+def delete_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID) -> None:
+    """アバター画像を削除（既定に戻す・K.4）。"""
+    _delete_user_image(company_id, account_id, field="avatar_image_path")
+
+
+def set_background_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """背景画像を設定（K.4・全認証画面に反映）＝会社DB users.background_image_path 更新＋署名URL 返却。"""
+    return {"background_image_url": _set_user_image(
+        company_id, account_id, field="background_image_path", data=data, content_type=content_type, prefix="backgrounds")}
+
+
+def delete_background_image(account_id: uuid.UUID, company_id: uuid.UUID) -> None:
+    """背景画像をリセット（既定背景へ・K.4）。"""
+    _delete_user_image(company_id, account_id, field="background_image_path")
 
 
 _EMPTY_PAGE = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}

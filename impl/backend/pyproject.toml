@@ -12,6 +12,8 @@ dependencies = [
     "redis>=5.0",
     "argon2-cffi>=23.1",
     "pydantic-settings>=2.4",
+    "minio>=7.2",               # オブジェクトストレージ（画像/添付・§1.10）
+    "python-multipart>=0.0.9",  # multipart/form-data（画像アップロード・FastAPI UploadFile）
 ]
 
 [project.optional-dependencies]

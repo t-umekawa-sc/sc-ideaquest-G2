@@ -28,6 +28,7 @@ class User(CompanyBase):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     system_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     avatar_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)  # MinIO キー（生パス）
+    background_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)  # 背景画像 MinIO キー（K.4）
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     # accounts.password_set のミラー（源泉=accounts・§4.6 outbox で反映）

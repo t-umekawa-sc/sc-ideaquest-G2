@@ -8,11 +8,13 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.control_plane.me import application as me_service
 from app.control_plane.me.deps import require_me
 from app.control_plane.me.schemas import (
+    AvatarImageResponse,
+    BackgroundImageResponse,
     EmailChangeAcceptedResponse,
     EmailChangeConfirmedResponse,
     EmailChangeConfirmRequest,
@@ -78,6 +80,52 @@ def change_password(
         get_redis(), uuid.UUID(session["account_id"]),
         current_password=body.current_password, new_password=body.new_password,
     )
+
+
+@router.put("/me/avatar-image", response_model=AvatarImageResponse)
+async def put_avatar_image(
+    request: Request, file: UploadFile = File(...), session: dict = Depends(require_me),
+) -> AvatarImageResponse:
+    """プロフィールアバター画像を設定（K.4・multipart）。会社DB users 直接更新＋短TTL 署名URL 返却。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    result = me_service.set_avatar_image(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        data=data, content_type=file.content_type or "",
+    )
+    return AvatarImageResponse(**result)
+
+
+@router.delete("/me/avatar-image", status_code=204)
+def delete_avatar_image(request: Request, session: dict = Depends(require_me)) -> None:
+    """アバター画像を削除（既定に戻す・K.4）。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    me_service.delete_avatar_image(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.put("/me/background-image", response_model=BackgroundImageResponse)
+async def put_background_image(
+    request: Request, file: UploadFile = File(...), session: dict = Depends(require_me),
+) -> BackgroundImageResponse:
+    """コンテンツ背景画像を設定（K.4・全認証画面に反映・multipart）。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    result = me_service.set_background_image(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        data=data, content_type=file.content_type or "",
+    )
+    return BackgroundImageResponse(**result)
+
+
+@router.delete("/me/background-image", status_code=204)
+def delete_background_image(request: Request, session: dict = Depends(require_me)) -> None:
+    """背景画像をリセット（既定背景へ・K.4）。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    me_service.delete_background_image(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
 
 
 @router.post("/me/email", response_model=EmailChangeAcceptedResponse, status_code=202)

@@ -649,6 +649,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/avatar-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Avatar Image
+         * @description プロフィールアバター画像を設定（K.4・multipart）。会社DB users 直接更新＋短TTL 署名URL 返却。変更系＝Origin/CSRF 必須。
+         */
+        put: operations["put_avatar_image_api_v1_me_avatar_image_put"];
+        post?: never;
+        /**
+         * Delete Avatar Image
+         * @description アバター画像を削除（既定に戻す・K.4）。変更系＝Origin/CSRF 必須。
+         */
+        delete: operations["delete_avatar_image_api_v1_me_avatar_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/background-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Background Image
+         * @description コンテンツ背景画像を設定（K.4・全認証画面に反映・multipart）。変更系＝Origin/CSRF 必須。
+         */
+        put: operations["put_background_image_api_v1_me_background_image_put"];
+        post?: never;
+        /**
+         * Delete Background Image
+         * @description 背景画像をリセット（既定背景へ・K.4）。変更系＝Origin/CSRF 必須。
+         */
+        delete: operations["delete_background_image_api_v1_me_background_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/email": {
         parameters: {
             query?: never;
@@ -866,6 +914,32 @@ export interface components {
             email?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipInput"][] | null;
+        };
+        /**
+         * AvatarImageResponse
+         * @description `PUT /me/avatar-image` の応答（K.4）＝設定後の短TTL 署名URL。
+         */
+        AvatarImageResponse: {
+            /** Avatar Image Url */
+            avatar_image_url: string;
+        };
+        /**
+         * BackgroundImageResponse
+         * @description `PUT /me/background-image` の応答（K.4）＝設定後の短TTL 署名URL。
+         */
+        BackgroundImageResponse: {
+            /** Background Image Url */
+            background_image_url: string;
+        };
+        /** Body_put_avatar_image_api_v1_me_avatar_image_put */
+        Body_put_avatar_image_api_v1_me_avatar_image_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_put_background_image_api_v1_me_background_image_put */
+        Body_put_background_image_api_v1_me_background_image_put: {
+            /** File */
+            file: string;
         };
         /**
          * CompanyCreateRequest
@@ -2653,6 +2727,108 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    put_avatar_image_api_v1_me_avatar_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_avatar_image_api_v1_me_avatar_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_avatar_image_api_v1_me_avatar_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_background_image_api_v1_me_background_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_background_image_api_v1_me_background_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackgroundImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_background_image_api_v1_me_background_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
