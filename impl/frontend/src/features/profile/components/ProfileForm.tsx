@@ -24,7 +24,7 @@ const ROLE_LABEL: Record<string, string> = {
   system_admin: "システム管理者",
 };
 
-// 残高＝GET /me 残高の接続までの demo 値（共通ヘッダーの demoBalance と同じ seam）。
+// 残高＝GET /me 残高（K.1・接続済み）。呼び出し側（profile/page）が /me から算出して渡す。
 type Balance = { level: number; xpPct: number; xpToNext: number; coin: number; sp: number };
 
 export function ProfileForm({ companyCode, balance }: { companyCode: string; balance: Balance }) {
@@ -46,8 +46,8 @@ export function ProfileForm({ companyCode, balance }: { companyCode: string; bal
         const me = await getMe();
         if (me) {
           setProfile(me);
-          setDisplayName(me.display_name);
-          setLocale(me.locale === "en" ? "en" : "ja");
+          setDisplayName(me.profile.display_name);
+          setLocale(me.account.locale === "en" ? "en" : "ja");
         }
       } catch {
         setLoadError("プロフィールの取得に失敗しました。");
@@ -64,7 +64,7 @@ export function ProfileForm({ companyCode, balance }: { companyCode: string; bal
       const updated = await updateMe({ display_name: displayName, locale });
       if (updated) {
         setProfile(updated);
-        setDisplayName(updated.display_name);
+        setDisplayName(updated.profile.display_name);
       }
       setSaved(true);
       router.refresh(); // 共通ヘッダーの表示名を更新（次のセッション読取で反映）
@@ -133,8 +133,8 @@ export function ProfileForm({ companyCode, balance }: { companyCode: string; bal
         </div>
         <dl className="kv">
           <dt>会社</dt><dd className="db-id">{companyCode}</dd>
-          <dt>ログインID</dt><dd className="db-id">{profile.login_id}</dd>
-          <dt>メールアドレス</dt><dd className="db-id">{profile.email}</dd>
+          <dt>ログインID</dt><dd className="db-id">{profile.account.login_id}</dd>
+          <dt>メールアドレス</dt><dd className="db-id">{profile.account.email}</dd>
           <dt>システムロール</dt><dd>{roleLabel}</dd>
         </dl>
         <div className="provision-note">

@@ -282,7 +282,7 @@ export interface paths {
         };
         /**
          * List Company Accounts
-         * @description 会社のアカウント一覧（SC-92・B.2・system_admin 専用）。
+         * @description 会社のアカウント一覧（SC-92・B.2・system_admin 専用）＋複数ソート/enum 多値フィルタ/CSV/固定行（§1.8.1①②③④）。
          */
         get: operations["list_company_accounts_api_v1_admin_companies__company_id__accounts_get"];
         put?: never;
@@ -386,7 +386,7 @@ export interface paths {
         };
         /**
          * List Own Accounts
-         * @description 自社アカウント一覧（SC-93・B.2.1）。
+         * @description 自社アカウント一覧（SC-93・B.2.1）＝B.2 と同形の契約（複数ソート/enum 多値フィルタ/CSV/固定行・§1.8.1①②③④）。
          */
         get: operations["list_own_accounts_api_v1_admin_accounts_get"];
         put?: never;
@@ -594,7 +594,7 @@ export interface paths {
         };
         /**
          * Get Me
-         * @description 自分のプロフィール（identity・K.1）。残高・画像（署名URL）は K.1 全体＝別スライス。
+         * @description 自分のプロフィール＋残高（正準・K.1）。identity＝accounts／残高＝会社DB users。画像署名URL は K.4 で。
          */
         get: operations["get_me_api_v1_me_get"];
         put?: never;
@@ -786,6 +786,11 @@ export interface components {
         AccountListResponse: {
             /** Data */
             data: components["schemas"]["AccountListItem"][];
+            /**
+             * Pinned
+             * @default []
+             */
+            pinned: components["schemas"]["AccountListItem"][];
             page_info: components["schemas"]["PageInfo"];
         };
         /**
@@ -1023,20 +1028,57 @@ export interface components {
             mfa?: components["schemas"]["MfaChallenge"] | null;
         };
         /**
-         * MeProfileResponse
-         * @description 自己プロフィールの identity 部分（K.1 のうち accounts 源泉の項目）。
-         *
-         *     残高・画像（署名URL）は会社DB `users` 由来で `GET /me` 全体（K.1）＝別スライス。
+         * MeAccountDTO
+         * @description identity（accounts 源泉・K.1）＝ログインID/メール/ロケール。
          */
-        MeProfileResponse: {
+        MeAccountDTO: {
             /** Login Id */
             login_id: string;
             /** Email */
             email: string;
-            /** Display Name */
-            display_name: string;
             /** Locale */
             locale: string;
+        };
+        /**
+         * MeBalanceDTO
+         * @description 残高（会社DB `users`・読み取り専用・canonical は G の activities・K.0）。
+         *
+         *     `level`/`xp_to_next`/`level_span` は G の純粋レベル関数（データモデル §7）で `xp` から算出。
+         */
+        MeBalanceDTO: {
+            /** Level */
+            level: number;
+            /** Xp */
+            xp: number;
+            /** Xp To Next */
+            xp_to_next: number;
+            /** Level Span */
+            level_span: number;
+            /** Coin Balance */
+            coin_balance: number;
+            /** Skill Point Balance */
+            skill_point_balance: number;
+        };
+        /**
+         * MeProfileDTO
+         * @description プロフィール表示（K.1）。display_name は accounts 源泉。画像は署名URL（K.4・未設定は None）。
+         */
+        MeProfileDTO: {
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+            /** Background Image Url */
+            background_image_url?: string | null;
+        };
+        /**
+         * MeResponse
+         * @description `GET /me`（正準・K.1）＝identity＋プロフィール＋残高。ダッシュボード hero も同読取（I.1 と両立）。
+         */
+        MeResponse: {
+            account: components["schemas"]["MeAccountDTO"];
+            profile: components["schemas"]["MeProfileDTO"];
+            balance: components["schemas"]["MeBalanceDTO"];
             /** System Role */
             system_role: string;
         };
@@ -1856,6 +1898,11 @@ export interface operations {
             query?: {
                 q?: string | null;
                 status?: string | null;
+                system_role?: string | null;
+                sort?: string | null;
+                pin_ids?: string | null;
+                format?: string | null;
+                columns?: string | null;
                 page?: number;
                 per_page?: number;
             };
@@ -2059,6 +2106,11 @@ export interface operations {
             query?: {
                 q?: string | null;
                 status?: string | null;
+                system_role?: string | null;
+                sort?: string | null;
+                pin_ids?: string | null;
+                format?: string | null;
+                columns?: string | null;
                 page?: number;
                 per_page?: number;
             };
@@ -2435,7 +2487,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeProfileResponse"];
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
         };
@@ -2459,7 +2511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeProfileResponse"];
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
             /** @description Validation Error */

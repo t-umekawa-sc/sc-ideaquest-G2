@@ -3,17 +3,18 @@
 import { redirect } from "next/navigation";
 
 import { ProfileForm, SecuritySection } from "@/features/profile";
+import { getServerMe, heroBalance } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function ProfilePage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  // 残高（Lv/XP/コイン/SP）は GET /me 残高（K.1）の接続までの demo 値＝共通ヘッダー(layout)の demoBalance と同じ seam。
-  // フロントエンド実装フロー規約＝画面モック先行（接続時に fixtures→api へ差し替え）。会社は session から。
-  const demoBalance = { level: 7, xpPct: 65, xpToNext: 120, coin: 320, sp: 3 };
+  // 残高（Lv/XP/コイン/SP）＝GET /me 残高（K.1・接続済み）。会社は session から。
+  const me = await getServerMe();
+  const balance = me ? heroBalance(me.balance) : { level: 1, xpPct: 0, xpToNext: 100, coin: 0, sp: 0 };
   return (
     <div className="profile-page">
-      <ProfileForm companyCode={session.company_code} balance={demoBalance} />
+      <ProfileForm companyCode={session.company_code} balance={balance} />
       <SecuritySection />
     </div>
   );
