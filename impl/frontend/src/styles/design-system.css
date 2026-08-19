@@ -894,13 +894,14 @@ body.modal-open { overflow: hidden; }
   border-radius: var(--radius-pixel); overflow: hidden;
 }
 .xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); }
-/* XPバーのホバー/フォーカスで獲得XPをツールチップ表示（SC-01 ダッシュボード／SC-03 プロフィール共通）。
-   ::after は overflow:hidden の .xp-bar だと切れるため、ラッパー .xp-bar-wrap に出す。data-xp を各画面で設定。 */
-.xp-bar-wrap { position: relative; cursor: help; }
-.xp-bar-wrap:focus-visible { outline: none; }
-.xp-bar-wrap[data-xp]:hover::after,
-.xp-bar-wrap[data-xp]:focus-visible::after {
-  content: attr(data-xp);
+/* 汎用ツールチップ（デザイン標準・SC-01 ダッシュボードの XP バー由来）。ホスト要素に `has-tip`＋
+   `data-tip="…"` を付けるとホバー/フォーカスで pixel 風ツールチップを上側に表示する。全画面で統一。
+   ホストは位置文脈（position≠static）であること（.xp-bar-wrap は relative／絶対配置の要素はそのまま可）。 */
+.has-tip { cursor: help; }
+.has-tip:focus-visible { outline: none; }
+.has-tip[data-tip]:hover::after,
+.has-tip[data-tip]:focus-visible::after {
+  content: attr(data-tip);
   position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40;
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-pixel); font-size: var(--text-xs); white-space: nowrap;
@@ -908,6 +909,8 @@ body.modal-open { overflow: hidden; }
   border: 1px solid var(--pixel-ink); border-radius: var(--radius-sm);
   box-shadow: var(--shadow-pixel); pointer-events: none;
 }
+/* XPバーのラッパ＝ツールチップの位置文脈（::after は overflow:hidden の .xp-bar だと切れるため外側に出す）。 */
+.xp-bar-wrap { position: relative; }
 
 /* コイン/レベルのピル（ドット風） */
 .pixel-stat {

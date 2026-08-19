@@ -687,7 +687,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
       <div className="list-toolbar" data-dt-toolbar>
         <div className="filters">
           <div className="dt-search">
-            <span className="dt-search__ic" title={searchTitle}>
+            <span className="dt-search__ic has-tip" data-tip={searchTitle}>
               🔍
             </span>
             <input

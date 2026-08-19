@@ -542,6 +542,26 @@
     <p class="hint">呼び出しは <code>await iqConfirm({title, msg, variant:'danger'|'game', confirmLabel, cancelLabel, cost:{icon,name,price,balance}})</code> を想定（<code>true/false</code> を返す）。
       確定後は「14.」の <code>iqSnack</code> と連動（削除＝成功／購入＝報酬）。</p>
   </div>
+
+  <div class="section">
+    <h2>16. ツールチップ（ホバーで補足・pixel 風）</h2>
+    <p class="muted text-sm">ダッシュボードの XP バーと同一デザインの<strong>共通ツールチップ</strong>。要素に
+      <code>class="has-tip"</code> ＋ <code>data-tip="…"</code> を付けるとホバー/フォーカスで上側に表示する（JS 不要・CSS <code>::after</code>）。
+      文字切れする値の全文表示や、アイコンの補足に使う（例: 一覧の検索アイコン）。<strong>ホストは位置文脈</strong>
+      （<code>position:relative</code> など。絶対配置要素はそのまま）にすること。</p>
+    <div class="row" style="gap:var(--space-6); flex-wrap:wrap; align-items:center; padding-block:var(--space-4)">
+      <span class="has-tip" data-tip="件名・テーマ・カテゴリー を検索" tabindex="0" style="position:relative; display:inline-flex; align-items:center; gap:6px">
+        🔍 <span class="muted text-sm">検索アイコン（全文をツールチップ表示）</span>
+      </span>
+      <span class="has-tip" data-tip="ここに補足説明が入ります（獲得 XP など）" tabindex="0" style="position:relative; display:inline-block">
+        ⓘ ヘルプ
+      </span>
+      <span class="has-tip" data-tip="非常に長いラベルでも全文をホバーで確認できます" tabindex="0" style="position:relative; display:inline-block; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom">
+        非常に長いラベルでも全文をホバーで…
+      </span>
+    </div>
+    <p class="hint">実装＝<code>.has-tip[data-tip]:hover/:focus-visible::after</code>（<code>shared.css</code>）。ネイティブ <code>title</code> は使わず本ツールチップに統一する。</p>
+  </div>
 </main>
 
 

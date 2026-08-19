@@ -98,10 +98,10 @@ export function DashboardView({
             {/* ホバー/フォーカスで獲得XPをツールチップ表示。ツールチップ(::after)は overflow:hidden の
                 .xp-bar に置くと切れるため、ラッパー(.xp-bar-wrap)側に出す。 */}
             <div
-              className="xp-bar-wrap"
+              className="xp-bar-wrap has-tip"
               role="img"
               tabIndex={0}
-              data-xp={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}（累計 ${balance.xp}）`}
+              data-tip={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}（累計 ${balance.xp}）`}
               aria-label={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}、累計 ${balance.xp}`}
             >
               <div className="xp-bar"><span style={{ width: `${balance.xpPct}%` }} /></div>

@@ -1462,3 +1462,19 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   font-weight: 600; font-size: var(--text-sm); text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
 .gamenav__link:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
 .gamenav__link[aria-current="page"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; cursor: default; }
+
+/* 汎用ツールチップ（デザイン標準・SC-01 ダッシュボードの XP バー由来）。ホスト要素に `has-tip`＋
+   `data-tip="…"` を付けるとホバー/フォーカスで pixel 風ツールチップを上側に表示（全画面で統一）。
+   ホストは位置文脈（position≠static）にすること（絶対配置要素はそのまま／通常要素は position:relative）。 */
+.has-tip { cursor: help; }
+.has-tip:focus-visible { outline: none; }
+.has-tip[data-tip]:hover::after,
+.has-tip[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-pixel); font-size: var(--text-xs); white-space: nowrap;
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--pixel-ink); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pixel); pointer-events: none;
+}

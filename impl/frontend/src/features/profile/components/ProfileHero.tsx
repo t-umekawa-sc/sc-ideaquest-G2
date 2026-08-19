@@ -37,10 +37,10 @@ export function ProfileHero({
             <span className="pixel-stat level">Lv.{balance.level}</span>
             {/* XPバー＝ホバー/フォーカスで獲得XPのツールチップ（SC-01 ダッシュボードと同一・共通様式）。 */}
             <div
-              className="xp-bar-wrap"
+              className="xp-bar-wrap has-tip"
               role="img"
               tabIndex={0}
-              data-xp={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}（累計 ${balance.xp}）`}
+              data-tip={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}（累計 ${balance.xp}）`}
               aria-label={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}、累計 ${balance.xp}`}
             >
               <div className="xp-bar"><span style={{ width: `${balance.xpPct}%` }} /></div>
