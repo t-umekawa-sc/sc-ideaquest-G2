@@ -26,3 +26,23 @@ export function requestEmailChange(body: EmailChangeInput): Promise<null> {
 export function confirmEmailChange(token: string): Promise<null> {
   return apiFetch<null>("/me/email/confirm", { method: "POST", body: JSON.stringify({ token }) }) as Promise<null>;
 }
+
+// プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO・multipart）。CSRF は apiFetch が付与。
+export function setAvatarImage(file: File): Promise<{ avatar_image_url: string } | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch<{ avatar_image_url: string }>("/me/avatar-image", { method: "PUT", body: fd });
+}
+export function deleteAvatarImage(): Promise<null> {
+  return apiFetch<null>("/me/avatar-image", { method: "DELETE" }) as Promise<null>;
+}
+
+// 背景画像（K.4・全認証画面に反映・FR-30）。
+export function setBackgroundImage(file: File): Promise<{ background_image_url: string } | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch<{ background_image_url: string }>("/me/background-image", { method: "PUT", body: fd });
+}
+export function deleteBackgroundImage(): Promise<null> {
+  return apiFetch<null>("/me/background-image", { method: "DELETE" }) as Promise<null>;
+}

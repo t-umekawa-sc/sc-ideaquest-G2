@@ -13,7 +13,7 @@ import Link from "next/link";
 
 import { Button, Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { getMe, updateMe } from "../api";
+import { deleteAvatarImage, getMe, setAvatarImage, updateMe } from "../api";
 import type { MeProfile } from "../types";
 import "@/features/companies/companies.css";
 import "../profile.css";
@@ -35,8 +35,10 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  // プロフィール画像（アイコン）のローカルプレビュー（MinIO 未接続＝送信しない仮実装）。
-  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  // プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO 署名URL）。
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [iconBusy, setIconBusy] = useState(false);
+  const [iconError, setIconError] = useState<string | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setProfile(me);
           setDisplayName(me.profile.display_name);
           setLocale(me.account.locale === "en" ? "en" : "ja");
+          setAvatarUrl(me.profile.avatar_image_url ?? null);
         }
       } catch {
         setLoadError("プロフィールの取得に失敗しました。");
@@ -74,16 +77,36 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     }
   }
 
-  function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    if (iconInputRef.current) iconInputRef.current.value = "";  // 同一ファイル再選択でも change を発火
     if (!file) return;
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconPreview(URL.createObjectURL(file));
+    setIconError(null);
+    setIconBusy(true);
+    try {
+      const res = await setAvatarImage(file);  // PUT /me/avatar-image（K.4）
+      if (res) setAvatarUrl(res.avatar_image_url);
+      router.refresh();  // 共通ヘッダー等のアバターを更新
+    } catch (err) {
+      setIconError(err instanceof ApiError && err.status === 422
+        ? "画像の形式またはサイズをご確認ください（PNG/JPEG/WebP/GIF・5MB まで）。"
+        : "画像のアップロードに失敗しました。");
+    } finally {
+      setIconBusy(false);
+    }
   }
-  function onClearIcon() {
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconPreview(null);
-    if (iconInputRef.current) iconInputRef.current.value = "";
+  async function onClearIcon() {
+    setIconError(null);
+    setIconBusy(true);
+    try {
+      await deleteAvatarImage();  // DELETE /me/avatar-image
+      setAvatarUrl(null);
+      router.refresh();
+    } catch {
+      setIconError("画像の削除に失敗しました。");
+    } finally {
+      setIconBusy(false);
+    }
   }
 
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
@@ -130,20 +153,23 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           </div>
           <div className="icon-field">
             <span className="quest-icon lg" style={{ ["--accent" as string]: "#2563EB" } as React.CSSProperties}>
-              {iconPreview ? (
-                // 送信しないローカルプレビュー（objectURL）＝素の img で描画。
+              {avatarUrl ? (
+                // 会社DB users のアイコン（K.4・短TTL 署名URL）＝素の img で描画。
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="quest-icon__img" src={iconPreview} alt="" />
+                <img className="quest-icon__img" src={avatarUrl} alt="" />
               ) : (
                 <span className="quest-icon__char">{initial}</span>
               )}
             </span>
             <div className="icon-actions">
-              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>画像を選ぶ</Button>
-              {iconPreview && (
-                <Button type="button" variant="outline" onClick={onClearIcon}>削除（既定に戻す）</Button>
+              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()} disabled={iconBusy}>
+                {iconBusy ? "処理中…" : "画像を選ぶ"}
+              </Button>
+              {avatarUrl && (
+                <Button type="button" variant="outline" onClick={onClearIcon} disabled={iconBusy}>削除（既定に戻す）</Button>
               )}
-              <input ref={iconInputRef} type="file" accept="image/*" hidden onChange={onPickIcon} />
+              <input ref={iconInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={onPickIcon} />
+              {iconError && <div className="form-error" role="alert" style={{ marginTop: "var(--space-2)" }}>{iconError}</div>}
             </div>
           </div>
         </div>

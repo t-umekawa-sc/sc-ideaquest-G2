@@ -24,7 +24,8 @@ function readCookie(name: string): string | null {
 export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<T | null> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  if (init.body) headers.set("Content-Type", "application/json");
+  // FormData（ファイルアップロード）は Content-Type をブラウザに任せる（boundary 自動付与）。
+  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (method !== "GET" && method !== "HEAD") {
     const csrf = readCookie("iq_csrf");
     if (csrf) headers.set("X-CSRF-Token", csrf);
