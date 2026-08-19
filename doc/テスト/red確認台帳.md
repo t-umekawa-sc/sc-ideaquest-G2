@@ -230,3 +230,36 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 無効化した箇所 | 観測 red（actual） |
 | --- | --- | --- |
 | B-TC-100/103 | `audit/repository.record` を早期 return の no-op に一時変更（監査行を書かない） | 特権操作（disable/settings 更新・membership add/remove）後に `system_audit_logs` に行が無く、`len(rows)==1` の assert が落ちる＝各 application からの `audit.record` 呼び出しが load-bearing。復元して green（154 passed）。 |
+
+## 追記: 会社一覧クエリ写像 unit（B-TC-136・frontend vitest）— 2026-08-19
+
+- **retro の理由**＝test-first で導入したが、当初コミット（`1945ce2`）が記録した red は「vitest 赤(9 failed＝**関数未定義**)」＝関数が未 export ゆえの失敗（`ImportError` 相当）で、テスト規約 §5.1 が「無関係な失敗で満足しない」と名指しする**アサーション未到達の red**だった。behavior-red を目視していなかったため、実装済みの現状に対して反転手技で retro 確認する。
+- 対象＝`impl/frontend/src/features/companies/api.test.ts`（`companiesQueryParams`/`companiesCsvUrl` の純関数写像・9 it・正＝API設計 README §1.8.1）。
+- 手技＝各関数の**写像の主アサーション**を「起こり得ない値 `"RED-AUDIT"`」へ反転→当該 it が red（観測 actual＝反転前の正しい写像値＝関数へ確かに到達）→反転を戻して green（9 passed）を確認。反転は編集で復元済み（diff クリーン）。空振り 0。
+
+| TC-ID | 反転した主アサーション | 観測 red（actual） |
+| --- | --- | --- |
+| B-TC-136（複数ソート写像） | `companiesQueryParams(...).get("sort") == "name,-account_count"` → `== "RED-AUDIT"` | `name,-account_count`（左優先・desc 前置の写像に到達） |
+| B-TC-136（CSV 列ホワイトリスト） | `companiesCsvUrl(...) の columns == "name,status,account_count"` → `== "RED-AUDIT"` | `name,status,account_count`（表示列→CSV 許可列の絞り込みに到達） |
+
+## 追記: クエストグループ API の未定義/404 red を behavior-red で貼り直し（B-TC-080〜083/086〜093・backend）— 2026-08-19
+
+- **retro の理由**＝いずれも test-first で導入したが、当初コミットが記録した red が**アサーション未到達**の型だった＝テスト規約 §5.1 が名指しで不可とする「ルート未定義の 404／405」で満足していた。behavior-red を目視していなかったため、実装済みの現状に対して反転手技で retro 確認する。
+  - 該当コミット＝`3420317`（B-TC-080〜083「endpoints 未実装のルーティング 404 で red」）／`9aa22ba`（B-TC-086/087「ルーティング 404」）／`22e85f0`（B-TC-088/089「POST 未実装の 405」）／`355c2d9`（B-TC-090〜093「endpoints 未実装の 404/405」）。※B-TC-084/085/103 は当初から反転手技で目視済み（上掲の各節）。
+- 対象＝`impl/backend/tests/admin/test_admin_quest_groups.py`（B.4・SC-90）＋`test_admin_company_quest_groups.py`（B.3・§4.6）。正＝API設計 B.3/B.4。
+- 手技＝各 TC の**主アサーション（status）を「起こり得ない値 `599`」へ反転**→当該 test が red（観測 actual＝反転前の正しい status＝ルート/ガード/検証に確かに到達）→反転を `git checkout` で戻して green（対象2ファイル **15 passed**）を確認。反転はコミットに含めない（復元済み・diff クリーン）。空振り 0。実行環境＝ledger「実施概要」と同じ（`docker compose run --rm --no-deps -v "$PWD/backend:/app" backend pytest`）。
+
+| TC-ID | 反転した主アサーション | 観測 red（actual・到達点） |
+| --- | --- | --- |
+| B-TC-080 | 一覧 `status_code == 200` → `599` | 200（general でも per-group admin＝一覧＋member_count に到達） |
+| B-TC-081 | admin 所属ゼロの `status_code == 403` → `599` | 403（QG管理者でない＝per-group 認可ガードが発火） |
+| B-TC-082 | members `status_code == 200` → `599` | 200（admin の members 一覧に到達） |
+| B-TC-083 | directory `status_code == 200` → `599` | 200（最小射影ディレクトリに到達） |
+| B-TC-086 | 候補一覧 `status_code == 200` → `599` | 200（system_admin のクロステナント候補一覧に到達） |
+| B-TC-087 | general の `status_code == 403` → `599` | 403（system_admin 専用ガードが発火） |
+| B-TC-088 | 作成 `status_code == 201` → `599` | 201（グループ作成＋code 大文字正規化に到達） |
+| B-TC-089 | 不正形式 `status_code == 422` → `599` | 422（`quest_group_code` 形式バリデーションに到達） |
+| B-TC-090 | リネーム `status_code == 200` → `599` | 200（name 更新・code 不変に到達） |
+| B-TC-091 | 空削除 `status_code == 204` → `599` | 204（tombstone 削除に到達） |
+| B-TC-092 | 使用中削除 `status_code == 409` → `599` | 409（`in_use` conflict ガードが発火） |
+| B-TC-093 | 未認証 PATCH `status_code == 401` → `599` | 401（認証ガードに到達） |
