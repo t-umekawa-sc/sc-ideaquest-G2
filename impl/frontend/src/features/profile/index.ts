@@ -2,3 +2,4 @@
 export { ProfileForm } from "./components/ProfileForm";
 export { SecuritySection } from "./components/SecuritySection";
 export { EmailChangeConfirm } from "./components/EmailChangeConfirm";
+export { ActivityHistory } from "./components/ActivityHistory";

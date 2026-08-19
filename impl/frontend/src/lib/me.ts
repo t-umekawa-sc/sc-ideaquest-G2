@@ -19,6 +19,20 @@ export const getServerMe = cache(async (): Promise<Me | null> => {
   return (await res.json()) as Me;
 });
 
+// 活動履歴（G.6・GET /me/activities）の初回ページをサーバ側取得。続き（もっと見る）は
+// クライアントで next rewrite 経由に fetch する（ActivityHistory）。
+export type Activities = components["schemas"]["MeActivitiesResponse"];
+export type Activity = components["schemas"]["MeActivityDTO"];
+
+export async function getServerActivities(limit = 8): Promise<Activities | null> {
+  const cookie = (await cookies()).toString();
+  const res = await fetch(`${backend}/api/v1/me/activities?limit=${limit}`, {
+    headers: { cookie }, cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as Activities;
+}
+
 // ヒーロー/プロフィール残高（XPバー付き）。現レベル内の進捗率＝(level_span - xp_to_next)/level_span。
 // xpInLevel＝現レベルで獲得済み XP（バー実数値＝ホバー表示に使う）。xp＝累計獲得 XP。
 export function heroBalance(b: Balance) {

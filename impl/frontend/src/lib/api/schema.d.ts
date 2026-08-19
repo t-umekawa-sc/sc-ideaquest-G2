@@ -609,6 +609,26 @@ export interface paths {
         patch: operations["update_me_api_v1_me_patch"];
         trace?: never;
     };
+    "/api/v1/me/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Activities
+         * @description 自分の活動履歴（G.6・新しい順・カーソル §1.8）。`kind`/`period` で絞り込み。読取専用。
+         */
+        get: operations["get_my_activities_api_v1_me_activities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/password": {
         parameters: {
             query?: never;
@@ -949,6 +969,16 @@ export interface components {
             mfa_required?: boolean | null;
         };
         /**
+         * CursorPageInfo
+         * @description カーソルページングのページ情報（§1.8）。
+         */
+        CursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /**
          * DirectoryItem
          * @description 自社ディレクトリの 1 行（B.4・**最小射影**＝PII/role/組織構造は出さない）。
          */
@@ -1038,6 +1068,42 @@ export interface components {
             email: string;
             /** Locale */
             locale: string;
+        };
+        /**
+         * MeActivitiesResponse
+         * @description `GET /me/activities`（履歴・G.6）＝カーソル一覧共通形（§1.8）。新しい順。
+         */
+        MeActivitiesResponse: {
+            /** Data */
+            data: components["schemas"]["MeActivityDTO"][];
+            page_info: components["schemas"]["CursorPageInfo"];
+        };
+        /**
+         * MeActivityDTO
+         * @description 活動履歴の1行（G の `activities` 元帳・G.6）。残高そのものではなく付与/消費の記録。
+         *
+         *     `amount` は常に正・方向は `kind`（*_gain/*_spend）。`ref_type`/`ref_id` は多態参照（NULL 可・対でセット）。
+         */
+        MeActivityDTO: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Amount */
+            amount: number;
+            /** Reason */
+            reason: string;
+            /** Quest Id */
+            quest_id?: string | null;
+            /** Ref Type */
+            ref_type?: string | null;
+            /** Ref Id */
+            ref_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * MeBalanceDTO
@@ -2512,6 +2578,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_activities_api_v1_me_activities_get: {
+        parameters: {
+            query?: {
+                kind?: ("xp_gain" | "coin_gain" | "coin_spend" | "sp_gain" | "sp_spend") | null;
+                period?: "this_week" | "last_week" | "this_month" | "all";
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeActivitiesResponse"];
                 };
             };
             /** @description Validation Error */

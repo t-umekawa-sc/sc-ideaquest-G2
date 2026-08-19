@@ -52,3 +52,19 @@
   .profile-page .setting-row { flex-direction: column; }
   .profile-page .setting-row .icon-field { align-self: flex-start; }
 }
+
+/* 獲得履歴（SC-03・G.6 GET /me/activities）＝付与/消費の元帳を新しい順で表示。 */
+.profile-page .activity-history { margin-top: var(--space-5); }
+.profile-page .activity-history__title { font-family: var(--font-pixel); font-size: var(--text-lg); margin-bottom: var(--space-3); }
+.profile-page .activity-history__empty { color: var(--color-text-muted); }
+.profile-page .activity-list { list-style: none; margin: 0; padding: 0; }
+.profile-page .activity-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center;
+  gap: var(--space-3); padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--color-border); }
+.profile-page .activity-item:last-child { border-bottom: 0; }
+.profile-page .activity-item__reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-page .activity-item__amount { font-family: var(--font-pixel); font-size: var(--text-sm); white-space: nowrap; }
+.profile-page .activity-item__amount.is-gain { color: var(--pixel-xp); }
+.profile-page .activity-item__amount.is-spend { color: var(--color-danger); }
+/* ダーク面（pixel-panel）で読める淡色＝当ファイルの .avatar3d__tag と同系（slate-300）。 */
+.profile-page .activity-item__time { color: #cbd5e1; font-size: var(--text-xs); white-space: nowrap; }
+.profile-page .activity-history__more { margin-top: var(--space-3); }
