@@ -118,11 +118,12 @@ def test_k_tc_004_get_me(client, factory):
     assert body["account"]["login_id"] == acc["login_id"]
     assert set(body["account"].keys()) == {"login_id", "email", "locale"}
     assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "background_image_url"}
-    # 残高（会社DB users・seed 既定＝level1/xp0/coin0/sp0）＋レベル進捗（§7）
+    # 残高（会社DB users）＋レベル進捗（§7）。ログイン成功でログイン XP（G.6 login・+10）が付与済み
+    # ＝新規アカウントでも当日初ログイン後は xp=10（Lv1・次まで 90）。coin/SP は未付与で 0。
     bal = body["balance"]
     assert set(bal.keys()) == {"level", "xp", "xp_to_next", "level_span", "coin_balance", "skill_point_balance"}
-    assert bal["level"] == 1 and bal["xp"] == 0
-    assert bal["level_span"] == 100 and bal["xp_to_next"] == 100  # Lv1→2 必要 XP=100
+    assert bal["level"] == 1 and bal["xp"] == 10
+    assert bal["level_span"] == 100 and bal["xp_to_next"] == 90  # Lv1→2 必要 XP=100・残 90
     assert bal["coin_balance"] == 0 and bal["skill_point_balance"] == 0
     # 機密は返さない
     assert "password_hash" not in body and "password" not in str(body)

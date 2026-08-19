@@ -13,6 +13,7 @@ import redis
 
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.auth import repository as account_repo
+from app.tenant.gamification import ledger
 from app.tenant.quest_group import repository as qg_repo
 from app.control_plane.mail_outbox import repository as mail_repo
 from app.control_plane.mail_outbox.templates import (
@@ -97,6 +98,11 @@ def _issue_session(r: redis.Redis, session, account, company) -> LoginResult:
         user = user_repo.get_user_by_account(tsession, account.id)
         # QG管理者性（会社DBの有効 admin 所属を1つ以上持つか）をログイン時にスナップショット（B.4・ナビ出し分け）
         is_qg_admin = bool(user and qg_repo.list_active_group_ids_for_user(tsession, user.id, role="admin"))
+        # ログイン XP（G.6 login・+10・ユーザー×JST日で1回）＝残高 write の canonical（会社DB Tx で確定）。
+        # 会社DB は管理DB と別＝別 Tx（冪等なので万一 last_login_at 側が失敗しても二重付与しない）。
+        if user is not None:
+            ledger.grant_daily_login(tsession, user, now=datetime.now(timezone.utc))
+            tsession.commit()
     payload = _build_session_payload(account, company, user, is_qg_admin)
     token = create_session(r, payload)
     csrf = generate_token()

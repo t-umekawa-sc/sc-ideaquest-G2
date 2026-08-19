@@ -24,6 +24,7 @@ from app.db.tenant import get_tenant_session
 from app.infra import mail as mail_infra
 from app.infra.cache import get_redis
 from app.main import app
+from app.tenant.gamification.orm import Activity
 from app.tenant.profile.orm import User
 
 # bootstrap のシード（開発用ログイン情報）
@@ -260,5 +261,9 @@ def factory():
         s.commit()
     for db_identifier, aid in created_users:
         with get_tenant_session(db_identifier) as ts:
+            # activities（FK→users・ON DELETE RESTRICT）は user 削除前に掃除（G 台帳付与の後始末）
+            user = ts.query(User).filter_by(account_id=aid).one_or_none()
+            if user is not None:
+                ts.query(Activity).filter_by(user_id=user.id).delete()
             ts.query(User).filter_by(account_id=aid).delete()
             ts.commit()
