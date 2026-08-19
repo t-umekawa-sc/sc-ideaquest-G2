@@ -19,7 +19,29 @@
 .dash-page .hero__lvline { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
 .dash-page .hero__lv { font-family: var(--font-pixel); font-size: var(--text-2xl); color: var(--pixel-level-on-dark); text-shadow: 1px 1px 0 rgba(0,0,0,.55); }
 .dash-page .hero__next { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-cyan); }
-.dash-page .hero .xp-bar { max-width: 420px; }
+.dash-page .hero .xp-bar-wrap { max-width: 420px; position: relative; cursor: help; }
+.dash-page .hero .xp-bar-wrap:focus-visible { outline: none; }
+.dash-page .hero .xp-bar-wrap .xp-bar { max-width: none; }
+/* XPバーにホバー/フォーカスで獲得XPをツールチップ表示（data-xp の文字列を ::after で描画）。
+   ::after は overflow:hidden の .xp-bar ではなくラッパーに出す（クリップ回避）。 */
+.dash-page .hero .xp-bar-wrap[data-xp]:hover::after,
+.dash-page .hero .xp-bar-wrap[data-xp]:focus-visible::after {
+  content: attr(data-xp);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-pixel);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--pixel-ink);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pixel);
+  pointer-events: none;
+}
 .dash-page .hero__coin { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); }
 /* 3ゲーム画面ボタン＝パネル全幅の下段（avatar/status 2列ぶち抜き）。広幅は横1行、狭幅（≤700px）は縦積み（全幅）。 */
 .dash-page .hero__actions { grid-area: actions; display: flex; gap: var(--space-3); flex-wrap: nowrap; justify-content: center; }

@@ -13,7 +13,9 @@ export default async function HomePage() {
   if (!session) redirect("/login");
   const me = await getServerMe();
   // /me が取れない稀ケース（セッション有効中の消失）だけ最小フォールバック。
-  const balance = me ? heroBalance(me.balance) : { level: 1, xpPct: 0, xpToNext: 100, coin: 0, sp: 0 };
+  const balance = me
+    ? heroBalance(me.balance)
+    : { level: 1, xpPct: 0, xpToNext: 100, xpInLevel: 0, levelSpan: 100, xp: 0, coin: 0, sp: 0 };
   return (
     <DashboardView
       displayName={session.user.display_name}

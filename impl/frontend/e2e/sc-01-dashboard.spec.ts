@@ -28,6 +28,11 @@ test("hero and header balance reflect GET /me", async ({ page }) => {
   await expect(page.locator(".hero__next")).toHaveText(`NEXT ${b.xp_to_next} XP`);
   await expect(page.locator(".hero__coin .coin")).toContainText(`◆ ${b.coin_balance}`);
   await expect(page.locator(".hero__coin .skill")).toContainText(`✦ SP ${b.skill_point_balance}`);
+  // XPバーのツールチップ（ホバー表示）データ＝/me と一致（レベル内獲得 XP＝level_span − xp_to_next・累計＝xp）。
+  const xpInLevel = b.level_span - b.xp_to_next;
+  await expect(page.locator(".xp-bar-wrap")).toHaveAttribute(
+    "data-xp", `獲得 XP ${xpInLevel} / ${b.level_span}（累計 ${b.xp}）`
+  );
 
   // 共通ヘッダー通貨（バー・§4.1）＝同じ /me balance
   await expect(page.locator(".app-header .pixel-stat.level").first()).toHaveText(`Lv.${b.level}`);

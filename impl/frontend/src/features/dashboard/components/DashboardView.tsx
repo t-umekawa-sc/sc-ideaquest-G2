@@ -13,7 +13,11 @@ import Image from "next/image";
 import { Avatar } from "@/components/ui";
 import "../dashboard.css";
 
-type Balance = { level: number; xpPct: number; xpToNext: number; coin: number; sp: number };
+type Balance = {
+  level: number; xpPct: number; xpToNext: number;
+  xpInLevel: number; levelSpan: number; xp: number;
+  coin: number; sp: number;
+};
 
 const RANKING = [
   { name: "鈴木 花子", level: 12, total: 530, exp: 480, coin: 50, me: false },
@@ -91,7 +95,17 @@ export function DashboardView({
               <span className="hero__lv">Lv.{balance.level}</span>
               <span className="hero__next">NEXT {balance.xpToNext} XP</span>
             </div>
-            <div className="xp-bar"><span style={{ width: `${balance.xpPct}%` }} /></div>
+            {/* ホバー/フォーカスで獲得XPをツールチップ表示。ツールチップ(::after)は overflow:hidden の
+                .xp-bar に置くと切れるため、ラッパー(.xp-bar-wrap)側に出す。 */}
+            <div
+              className="xp-bar-wrap"
+              role="img"
+              tabIndex={0}
+              data-xp={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}（累計 ${balance.xp}）`}
+              aria-label={`獲得 XP ${balance.xpInLevel} / ${balance.levelSpan}、累計 ${balance.xp}`}
+            >
+              <div className="xp-bar"><span style={{ width: `${balance.xpPct}%` }} /></div>
+            </div>
             <div className="hero__coin">
               <span className="pixel-stat coin">◆ {balance.coin} コイン</span>
               <span className="pixel-stat skill">✦ SP {balance.sp}</span>

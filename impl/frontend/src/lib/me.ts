@@ -20,9 +20,15 @@ export const getServerMe = cache(async (): Promise<Me | null> => {
 });
 
 // ヒーロー/プロフィール残高（XPバー付き）。現レベル内の進捗率＝(level_span - xp_to_next)/level_span。
+// xpInLevel＝現レベルで獲得済み XP（バー実数値＝ホバー表示に使う）。xp＝累計獲得 XP。
 export function heroBalance(b: Balance) {
-  const pct = b.level_span > 0 ? Math.round(((b.level_span - b.xp_to_next) / b.level_span) * 100) : 0;
-  return { level: b.level, xpPct: pct, xpToNext: b.xp_to_next, coin: b.coin_balance, sp: b.skill_point_balance };
+  const xpInLevel = Math.max(0, b.level_span - b.xp_to_next);
+  const pct = b.level_span > 0 ? Math.round((xpInLevel / b.level_span) * 100) : 0;
+  return {
+    level: b.level, xpPct: pct, xpToNext: b.xp_to_next,
+    xpInLevel, levelSpan: b.level_span, xp: b.xp,
+    coin: b.coin_balance, sp: b.skill_point_balance,
+  };
 }
 
 // 共通ヘッダー通貨（Lv/コイン/SP）。
