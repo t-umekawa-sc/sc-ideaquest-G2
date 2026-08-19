@@ -16,7 +16,7 @@ from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.domain.service import password_policy_errors
-from app.control_plane.auth.orm import Account
+from app.control_plane.auth.orm import Account, Company
 from app.control_plane.mail_outbox import repository as mail_repo
 from app.control_plane.mail_outbox.templates import (
     CATEGORY_EMAIL_CHANGE_CONFIRM,
@@ -32,27 +32,58 @@ from app.core.security import (
     verify_password,
 )
 from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.gamification.level import level_progress
+from app.tenant.profile import repository as profile_repo
+from app.tenant.profile.orm import User
 
 _EDITABLE_FIELDS = ("display_name", "locale")  # allowlist（§2.2）
 
 
-def _me(account: Account) -> dict:
+def _me(account: Account, user: "User | None") -> dict:
+    """K.1 正準形（account／profile／balance／system_role）。
+
+    identity・display_name の源泉は accounts（§4.2・K.6）。残高は会社DB `users`（読み取り専用・K.0）で
+    `level`/`xp_to_next`/`level_span` は G の純粋レベル関数（§7）で `xp` から算出。画像署名URL（K.4）は別スライス＝現状 None。
+    """
+    xp = user.xp if user else 0
+    prog = level_progress(xp)
     return {
-        "login_id": account.login_id,
-        "email": account.email,
-        "display_name": account.display_name,
-        "locale": account.locale,
+        "account": {"login_id": account.login_id, "email": account.email, "locale": account.locale},
+        "profile": {
+            "display_name": account.display_name,
+            "avatar_image_url": None,       # K.4（MinIO 署名URL）は別スライス
+            "background_image_url": None,   # 同上
+        },
+        "balance": {
+            "level": prog["level"],
+            "xp": xp,
+            "xp_to_next": prog["xp_to_next"],
+            "level_span": prog["level_span"],
+            "coin_balance": user.coin_balance if user else 0,
+            "skill_point_balance": user.skill_point_balance if user else 0,
+        },
         "system_role": account.system_role,
     }
 
 
-def get_me(account_id: uuid.UUID) -> dict:
-    """自分のプロフィール（identity サブセット）を返す（K.1）。残高・画像（K.1 全体）は別スライス。"""
+def _tenant_user(company_id: uuid.UUID, account_id: uuid.UUID) -> "User | None":
+    """会社DB `users` ミラー（残高・K.1）を account_id で読む（§1.5 動的ルーティング）。"""
+    with control_session() as session:
+        company = session.get(Company, company_id)
+    if company is None:
+        return None
+    with get_tenant_session(company.db_identifier) as ts:
+        return profile_repo.get_user_by_account(ts, account_id)
+
+
+def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """自分のプロフィール＋残高（正準・K.1）。accounts（identity）＋会社DB users（残高）を読む。"""
     with control_session() as session:
         account = session.get(Account, account_id)
         if account is None:
             raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
-        return _me(account)
+    return _me(account, _tenant_user(company_id, account_id))
 
 
 def update_me(account_id: uuid.UUID, company_id: uuid.UUID, *, changes: dict) -> dict:
@@ -70,7 +101,8 @@ def update_me(account_id: uuid.UUID, company_id: uuid.UUID, *, changes: dict) ->
         if payload:  # 変更があるときだけミラー enqueue（会社DB `users` はワーカが反映・§4.6）
             account_sync_repo.enqueue(session, account_id, company_id, "upsert", payload)
         session.commit()
-        return _me(account)
+    # 返却は K.1 正準形（残高は会社DB users＝ミラーは非同期・display_name は accounts 源泉で即反映）
+    return _me(account, _tenant_user(company_id, account_id))
 
 
 def _require_current_password(account: Account | None, current_password: str) -> Account:

@@ -16,7 +16,7 @@ from app.control_plane.me.schemas import (
     EmailChangeConfirmedResponse,
     EmailChangeConfirmRequest,
     EmailChangeRequest,
-    MeProfileResponse,
+    MeResponse,
     MeUpdateRequest,
     PasswordChangeRequest,
 )
@@ -26,16 +26,18 @@ from app.infra.cache import get_redis
 router = APIRouter(prefix="/api/v1", tags=["me"])
 
 
-@router.get("/me", response_model=MeProfileResponse)
-def get_me(request: Request, session: dict = Depends(require_me)) -> MeProfileResponse:
-    """自分のプロフィール（identity・K.1）。残高・画像（署名URL）は K.1 全体＝別スライス。"""
-    return MeProfileResponse(**me_service.get_me(uuid.UUID(session["account_id"])))
+@router.get("/me", response_model=MeResponse)
+def get_me(request: Request, session: dict = Depends(require_me)) -> MeResponse:
+    """自分のプロフィール＋残高（正準・K.1）。identity＝accounts／残高＝会社DB users。画像署名URL は K.4 で。"""
+    return MeResponse(**me_service.get_me(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+    ))
 
 
-@router.patch("/me", response_model=MeProfileResponse)
+@router.patch("/me", response_model=MeResponse)
 def update_me(
     body: MeUpdateRequest, request: Request, session: dict = Depends(require_me),
-) -> MeProfileResponse:
+) -> MeResponse:
     """表示名・ロケールを編集（K.2）。accounts 更新＋会社DB users ミラー enqueue。変更系＝Origin/CSRF 必須。"""
     verify_origin(request)
     verify_csrf(request)
@@ -43,7 +45,7 @@ def update_me(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         changes=body.model_dump(exclude_unset=True),  # 指定フィールドのみ（allowlist は DTO＋application で二重防御）
     )
-    return MeProfileResponse(**result)
+    return MeResponse(**result)
 
 
 @router.post("/me/password", status_code=204)

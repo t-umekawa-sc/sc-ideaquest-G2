@@ -72,7 +72,8 @@ def test_k_tc_001_patch_me_updates_and_mirrors(client, factory):
 
     r = client.patch(ME, json={"display_name": "新しい名前", "locale": "en"}, headers=_csrf(client))
     assert r.status_code == 200, r.text
-    assert r.json()["display_name"] == "新しい名前" and r.json()["locale"] == "en"
+    body = r.json()  # K.1 正準形（account/profile/balance/system_role）
+    assert body["profile"]["display_name"] == "新しい名前" and body["account"]["locale"] == "en"
 
     a = _account(acc["id"])  # accounts（源泉）更新
     assert a.display_name == "新しい名前" and a.locale == "en"
@@ -107,14 +108,42 @@ def test_k_tc_003_auth_and_csrf(client, factory):
 
 
 def test_k_tc_004_get_me(client, factory):
-    """K-TC-004 GET /me＝ログイン中の identity を返す（機密は返さない）。K.1。"""
+    """K-TC-004 GET /me＝正準形（K.1・identity＋プロフィール＋残高）を返す（機密は返さない）。"""
     acc = _login_seed(client, factory)
     r = client.get(ME)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["login_id"] == acc["login_id"]
-    assert set(body.keys()) == {"login_id", "email", "display_name", "locale", "system_role"}
-    assert "password_hash" not in body and "password" not in body
+    # K.1 正準形＝account/profile/balance/system_role のネスト
+    assert set(body.keys()) == {"account", "profile", "balance", "system_role"}
+    assert body["account"]["login_id"] == acc["login_id"]
+    assert set(body["account"].keys()) == {"login_id", "email", "locale"}
+    assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "background_image_url"}
+    # 残高（会社DB users・seed 既定＝level1/xp0/coin0/sp0）＋レベル進捗（§7）
+    bal = body["balance"]
+    assert set(bal.keys()) == {"level", "xp", "xp_to_next", "level_span", "coin_balance", "skill_point_balance"}
+    assert bal["level"] == 1 and bal["xp"] == 0
+    assert bal["level_span"] == 100 and bal["xp_to_next"] == 100  # Lv1→2 必要 XP=100
+    assert bal["coin_balance"] == 0 and bal["skill_point_balance"] == 0
+    # 機密は返さない
+    assert "password_hash" not in body and "password" not in str(body)
+
+
+def test_k_tc_004b_get_me_balance_reflects_users(client, factory):
+    """K-TC-004b GET /me の残高は会社DB users を反映し、レベル進捗は §7 で xp から算出。"""
+    acc = _login_seed(client, factory)
+    # 会社DB users の残高を直接更新（G の台帳付与を代替＝残高読取の担保）。xp=260→Lv3。
+    with get_tenant_session(_db_identifier()) as ts:
+        u = get_user_by_account(ts, acc["id"])
+        u.xp = 260
+        u.coin_balance = 320
+        u.skill_point_balance = 3
+        ts.commit()
+
+    bal = client.get(ME).json()["balance"]
+    # 累積: Lv1→2=100, Lv2→3=150（計250）を消化し Lv3・残10。Lv3→4 必要=200。
+    assert bal["level"] == 3
+    assert bal["level_span"] == 200 and bal["xp_to_next"] == 190  # 200 - (260-250)
+    assert bal["xp"] == 260 and bal["coin_balance"] == 320 and bal["skill_point_balance"] == 3
 
 
 def test_k_tc_005_get_me_requires_session(client):

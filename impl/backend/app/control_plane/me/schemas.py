@@ -18,15 +18,38 @@ class MeUpdateRequest(BaseModel):
     locale: Literal["ja", "en"] | None = None
 
 
-class MeProfileResponse(BaseModel):
-    """自己プロフィールの identity 部分（K.1 のうち accounts 源泉の項目）。
-
-    残高・画像（署名URL）は会社DB `users` 由来で `GET /me` 全体（K.1）＝別スライス。
-    """
+class MeAccountDTO(BaseModel):
+    """identity（accounts 源泉・K.1）＝ログインID/メール/ロケール。"""
     login_id: str
     email: str
-    display_name: str
     locale: str
+
+
+class MeProfileDTO(BaseModel):
+    """プロフィール表示（K.1）。display_name は accounts 源泉。画像は署名URL（K.4・未設定は None）。"""
+    display_name: str
+    avatar_image_url: str | None = None
+    background_image_url: str | None = None
+
+
+class MeBalanceDTO(BaseModel):
+    """残高（会社DB `users`・読み取り専用・canonical は G の activities・K.0）。
+
+    `level`/`xp_to_next`/`level_span` は G の純粋レベル関数（データモデル §7）で `xp` から算出。
+    """
+    level: int
+    xp: int
+    xp_to_next: int
+    level_span: int
+    coin_balance: int
+    skill_point_balance: int
+
+
+class MeResponse(BaseModel):
+    """`GET /me`（正準・K.1）＝identity＋プロフィール＋残高。ダッシュボード hero も同読取（I.1 と両立）。"""
+    account: MeAccountDTO
+    profile: MeProfileDTO
+    balance: MeBalanceDTO
     system_role: str
 
 
