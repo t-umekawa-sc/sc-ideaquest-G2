@@ -33,10 +33,13 @@ test("SC-03 avatar icon upload and delete", async ({ page }) => {
   // GET /me もアイコン署名URL を返す（接続の証明）。
   const me = await page.request.get("/api/v1/me").then((r) => r.json());
   expect(me.profile.avatar_image_url).toContain("/avatars/");
+  // ヘッダーのユーザーアイコンも反映（/me 由来・router.refresh で更新）。
+  await expect(page.locator(".usermenu__trigger img.avatar__img")).toHaveAttribute("src", /\/avatars\//, { timeout: 8000 });
 
-  // 削除＝既定（頭文字）へ戻る。
+  // 削除＝既定（頭文字）へ戻る。ヘッダーも頭文字に戻る。
   await page.getByRole("button", { name: "削除（既定に戻す）" }).click();
   await expect(page.locator(".icon-field .quest-icon__char")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator(".usermenu__trigger .avatar__img.placeholder")).toBeVisible({ timeout: 8000 });
 });
 
 test("SC-03 background image set and reset from header menu", async ({ page }) => {

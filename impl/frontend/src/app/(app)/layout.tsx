@@ -22,6 +22,12 @@ export default async function AppLayout({
   const me = await getServerMe();
   const balance = me ? headerBalance(me.balance) : undefined;
   const backgroundUrl = me?.profile.background_image_url ?? null;  // K.4・全認証画面に反映（FR-30）
+  // ヘッダーのユーザーアイコン/表示名は GET /me を源泉にする（アバター/表示名の変更が router.refresh で即反映。
+  // session.user はログイン時スナップショットで陳腐化するため）。me 取得不可時のみ session へフォールバック。
+  const headerUser = {
+    display_name: me?.profile.display_name ?? session.user.display_name,
+    avatar_url: me?.profile.avatar_image_url ?? null,
+  };
   const demoUnread = 0;
   return (
     <SnackbarProvider>
@@ -32,7 +38,7 @@ export default async function AppLayout({
         aria-hidden="true"
         style={backgroundUrl ? { backgroundImage: `url("${backgroundUrl}")` } : undefined}
       />
-      <AppHeader user={session.user} balance={balance} unreadCount={demoUnread}>
+      <AppHeader user={headerUser} balance={balance} unreadCount={demoUnread}>
         {/* メニュー項目は app 層が features から差し込む */}
         <li role="none">
           <Link role="menuitem" href="/profile">プロフィール</Link>
