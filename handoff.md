@@ -70,13 +70,14 @@
 - UI＝アクションメニューはグループ罫線で区切り非表示項目は高さ0／XPバーはホバーで獲得XPをツールチップ（SC-01/SC-03 共通様式・`design-system.css .xp-bar-wrap`）／プロフィール上部はゲーム風パネル（アバター群＋履歴）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **G を続けて §1.1 を回す**（依存の少ない順）。有力＝
-   - **ショップ SC-30（`GET /items`＋`POST /items/{id}/purchase`）**＝spend 系の初回。`ledger.grant(COIN_SPEND, reason=shop_purchase)` を UoW で使い、残高検証（不足→409 `insufficient_balance`）・`Idempotency-Key`（§1.9）・`user_items` 作成。**残高がコインでも動き出す**・**購入が獲得履歴(SC-03)に出る**。**推奨**。
-   - または **H 通知（SC-02）**＝一覧/既読 API（ref 解決は ideas/achievements 未実装で seed body 部分実装）。
-   - 着手前に必ず対象ドメインの `doc/API設計/*` と既存4層テンプレ（`control_plane/me`・`tenant/gamification`）を読む。
-2. **時系列フィード（SC-12→SC-01）**＝**C（パーティー・所属）を実装する周回**で `GET /quests/{id}/activities`→`GET /me/feed` を接続（G.5.1・門番は C.0）。リンク付き表示は D/E 後。
-3. **既存脆弱性 `sc-92c B-TC-116` の修整**（別件・RowMenu の viewport 収まり手当）。
-4. SC-01 の残り（週間ランキング/下書き/未投票/参加中クエスト/フォロー中）＝I 集約 or 各ドメイン（G/C/D）接続時に demo→API 差替。
+- **実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)**（2026-08-19 決定・ユーザー選択）。順序＝**アカウント登録→クエスト管理→アイデア→評価→その他**。**アップロード（添付/背景/アバターアイコン）は後回しにせず各フェーズで実装**。
+1. **フェーズ1＝MinIO 基盤＋画像アップロード→B 検証**（実装計画 §2 フェーズ1）。
+   - **1-a MinIO 画像/ファイル基盤を新設**（`app/infra/storage`＝署名URL・アップロード・MIME/サイズ検証・API設計 §1.10）。以降の全アップロードで再利用。
+   - **1-b/1-c** アバターアイコン `PUT/DELETE /me/avatar-image`（K）＋背景画像（K.4/FR-30・ユーザーメニュー・全認証画面反映）。
+   - **1-d** アカウント登録（B）は backend 実装済み＝受入確認＋穴埋め。
+   - 着手前に `doc/API設計/K_*.md`（K.4）と既存4層テンプレ（`control_plane/me`）・compose の MinIO サービス設定を読む。
+2. **フェーズ2 クエスト管理（C）**→ **3 アイデア（D・添付）**→ **4 評価（F）**→ **5 その他**（E/G残り/H/I＋フィード/J/L）。詳細は 実装計画 §2。
+3. 既存脆弱性 `sc-92c B-TC-116` の修整（別件・RowMenu の viewport 収まり手当・随時）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose は `impl/compose.yaml`。**コマンドは絶対パス `-f /home/t-umekawa/sc-ideaquest-G2/impl/compose.yaml` 推奨**（特に background）。
