@@ -4,10 +4,10 @@
 > ルール＝毎回全文上書き（履歴は git）／確認した事実のみ・未確認は「未確認」と明記／コードの塊は貼らずファイルパス+関数名で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-08-19 JST**
+- 最終更新: **2026-08-20 JST**
 - ブランチ: **main**（作業も main に直接コミット）。**origin/main と同期済み・作業ツリー clean**。
-- 最新コミット: **`08922f3` refactor(ui): ツールチップをダッシュボード様式に統一（汎用 .has-tip[data-tip]）＋style-guide に追加**。
-- 直近の並び（新しい順）＝`08922f3` tooltip統一 ／ `5b5cd14` DataTableボタン不透明化+検索プレースホルダ ／ `a5250a1` ヘッダーアバター即反映 ／ `7cb1b96` SC-03画像アップロード frontend ／ `529f6af` MinIO基盤+画像 backend ／ `0f33a0d` 実装計画。
+- 最新コミット: **`fix(ui/RowMenu): ドロップダウンをビューポート内にクランプ（下端で上フリップ）＝sc-92c B-TC-116 解消`**（＋直後に本 handoff の docs コミット）。
+- 直近の並び（新しい順）＝RowMenu viewport 修正 ／ `1539ad1` handoff全文更新 ／ `08922f3` tooltip統一 ／ `5b5cd14` DataTableボタン不透明化+検索プレースホルダ ／ `a5250a1` ヘッダーアバター即反映 ／ `7cb1b96` SC-03画像アップロード frontend ／ `529f6af` MinIO基盤+画像 backend。
 
 ## 2. ゴール（プロジェクト概要）
 - **ideaquest** = 社内アイデア創出のゲーミフィケーション型マルチテナント SaaS（XP/コイン/レベル/魔法/ランキング）。
@@ -15,7 +15,17 @@
 - 現フェーズ＝**画面移植は完了**。**backend 接続フェーズ**を **1画面単位ループ**（フロー規約 §1.1）で回している。**実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)**（アカウント登録→クエスト→アイデア→評価→その他／アップロードは後回し禁止）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-本セッション＝**フェーズ1（画像アップロード基盤・実装計画 §2 フェーズ1）を完了**＋UI 修正数件。
+本セッション＝**既存脆弱性 `sc-92c B-TC-116` の修整**（RowMenu の viewport はみ出し）。フェーズ2（C ドメイン）には未着手。前セッション分（フェーズ1 画像アップロード）は §3-0 に退避。
+
+### 3-0. 前セッション（フェーズ1 完了・要約）
+MinIO 画像基盤＋アバター/背景画像アップロード（backend `529f6af`／frontend `7cb1b96`・ヘッダー即反映 `a5250a1`）＋UI 修正（DataTable ボタン不透明化 `5b5cd14`／ツールチップ統一 `08922f3`）。詳細は git 履歴と本 §3-1〜3-3 参照（下記は前回記述を保持）。
+
+### 3-α. RowMenu ドロップダウンの viewport 収まり修整（sc-92c B-TC-116 解消）
+- **`components/ui/RowMenu.tsx`**＝`position:fixed` のドロップダウンが常にトリガー直下に開き、行が画面下端近くだと menuitem が viewport 外に出て click 不可だった（`force:true` でも `Element is outside of the viewport`）。
+  - `computePos(r, listH)` 新設＝トリガー直下を基本に、**下に収まらなければ上へフリップ**＋左右上下を **viewport 内へクランプ**（`VP_MARGIN=8`）。
+  - 配置を `useEffect`→**`useLayoutEffect`** 化＋`listRef.offsetHeight`（実高さ）測定でペイント前に最終座標確定＝再配置ジッタ解消。`toggleOpen` 初回も概算高さ（`EST_ITEM_H=40`×項目数）で上フリップを効かせる。
+- **`e2e/sc-92c-quest-groups.spec.ts`**＝メニューが常に画面内で安定するため、リネーム/削除の `click({force:true})` を素直な `click()` に戻し（安定性チェックを実効化）、コメント更新。
+- red-green＝修整前に spec 実行で `outside of the viewport` を目視（red）→修整＋frontend 再ビルドで green。回帰確認＝RowMenu 使用の sc-91/sc-92/sc-92b2 の 11 件も全 passed。
 
 ### 3-1. MinIO 画像/ファイル基盤 ＋ アバター/背景アップロード backend（`529f6af`・K.4/§1.10）
 - **新規 `impl/backend/app/infra/storage.py`**＝`ObjectStorage` 抽象（`MinioStorage`/`FakeStorage`・`set_storage`/`get_storage` で差替＝`infra/mail.py` と同流儀）。非公開バケット＋**短TTL 署名URL**（`presigned_get`）・物理名ハッシュ（`hashed_key`）・MIME allowlist（`ALLOWED_IMAGE_MIME`）＋サイズ上限（`MAX_IMAGE_BYTES`=5MB）。
@@ -53,7 +63,7 @@
 ### 4-3. テスト
 - **backend pytest＝216 passed**（最後にフル実行で確認・`-v "$PWD/backend:/app"` マウント＝即反映・entrypoint bootstrap が migration 0008 も適用・MinIO は Fake で非依存）。
 - **frontend e2e**＝本セッションで green 確認＝`sc-01-dashboard`／`sc-03-images`（2）／`sc-03-activities`／`k-profile`（3）／`sc-91`／`sc-92b`／`sc-93`。フルは並列ログインのレート制限フレーク（直列＋FLUSHALL で切り分け）。
-- **既知の壊れ（本変更と無関係の既存）**＝`sc-92c B-TC-116`（RowMenu `position:fixed` の「リネーム」menuitem が viewport 外＝`click({force:true})` でも失敗・line 43・旧レイアウトでも再現＝既存脆弱性）。backend `test_a_tc_040` が pytest-randomly のランダム順で稀に IndexError（単独/別シードで green）。
+- **既知の壊れ**＝`sc-92c B-TC-116` は本セッションで**解消**（§3-α）。残＝backend `test_a_tc_040` が pytest-randomly のランダム順で稀に IndexError（単独/別シードで green）。
 
 ## 5. 詰まっている点（試して失敗した/注意）
 - **MinIO 署名URL の docker ホスト問題**＝backend は内部 `minio:9000` で put/remove、ブラウザは公開 `localhost:9000` で GET。署名は host を含むため2クライアント（`MinioStorage._ops`/`_url`）に分離。**`presigned_get_object` は region 未指定だと GetBucketLocation の HTTP を打ち公開ホストへ到達できず 500**＝**`region` を明示**してオフライン署名化（`config.minio_region`・`storage.py` で両クライアントに `region=` を渡す）。ここでハマった。
@@ -82,7 +92,7 @@
    - G 連動は C 完了後の D/E/F で `tenant/gamification/ledger.grant` を発火。
    - §1.1 の1画面ループ＋**受入ゲート（ユーザー動作確認）で必ず止める**。
 2. **時系列フィード（SC-12→SC-01）**＝C 実装の周回で `GET /quests/{id}/activities`→`GET /me/feed`（API設計 G.5.1・門番 C.0・公開種別のみ）。リンク付き表示は D/E 後。
-3. **既存脆弱性 `sc-92c B-TC-116` の修整**（別件・RowMenu `position:fixed` の viewport 収まり手当・`e2e/sc-92c-quest-groups.spec.ts` line 41-43 付近）。
+   - （`sc-92c B-TC-116` の修整は本セッションで完了＝§3-α。次の別件は無し。）
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose は `impl/compose.yaml`。**コマンドは絶対パス `-f /home/t-umekawa/sc-ideaquest-G2/impl/compose.yaml` 推奨**。
