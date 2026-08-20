@@ -10,6 +10,7 @@
 // 会社カラーは backend 対応済み（CompanyProfileUpdateRequest.color）＝スウォッチ選択で即保存しバナーへ反映。
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button, Swatches } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
@@ -25,6 +26,7 @@ function statusView(status: string): [string, string] {
 }
 
 export function CompanyDetailView({ companyId }: { companyId: string }) {
+  const router = useRouter();
   const [company, setCompany] = useState<CompanyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +112,13 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     }
   }
 
+  // 一覧へ戻る＝履歴を戻す（一覧は検索/絞込/ページを URL に持つため、ブラウザ戻ると同様に絞込付きで復帰）。
+  // 詳細に直接アクセスした場合（履歴なし）は素の一覧へ。
+  function backToList() {
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push("/admin/companies");
+  }
+
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
   if (!company) return <p className="admin-muted">読み込み中…</p>;
 
@@ -146,7 +155,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           </div>
         </div>
         <div className="ctx__actions">
-          <Link className="btn btn-outline" href="/admin/companies">← 会社一覧へ戻る</Link>
+          <button type="button" className="btn btn-outline" onClick={backToList}>← 会社一覧へ戻る</button>
         </div>
       </section>
 

@@ -13,10 +13,14 @@
 //    列は csvVal を渡す。未指定なら空セル）。
 //
 // 永続（localStorage・キー接頭辞 ideaquest_dt_）＝列順/非表示/幅/密度/ピン/表示件数/ビュー。
-// 検索/ソート/絞込/ページはセッション（非永続）。SSR ハイドレーション不整合を避けるため、
-// 初期描画は既定値→マウント後に localStorage から復元（ready フラグで復元前の上書き保存を抑止）。
+// 検索/ソート/絞込/ページは **URL クエリ**（`<storageKey>.q/.sort/.f/.page`）に同期＝ドリルイン→戻る/
+// ブラウザ戻る/再読込/ブックマークで復元（デザイン標準 §4.5⑨・API設計 README §1.8.1）。URL 名前空間は
+// storageKey なので 1 画面に複数 DataTable があっても衝突しない。SSR ハイドレーション不整合を避けるため
+// localStorage 由来（列/密度/ビュー等）はマウント後に復元（ready フラグ）。
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { ReadonlyURLSearchParams } from "next/navigation";
 import { Modal, ModalBody, ModalFooter } from "./Modal";
 
 export type SortDir = "asc" | "desc";
@@ -215,6 +219,48 @@ function useDebouncedValue<V>(value: V, ms: number): V {
   return v;
 }
 
+// ---- URL 同期コーデック（検索/ソート/絞込/ページ・§1.8.1） -------------------
+// URL キーは `<storageKey>.<name>`（画面内の複数 DataTable を名前空間で分離）。ソートは backend と同じ
+// `key`（昇順）/`-key`（降順）カンマ連結、絞込は FilterCond をそのまま JSON（型が多様＝厳密に round-trip）。
+type UrlState = { search: string; sort: SortKey[]; filters: Record<string, FilterCond>; page: number };
+
+function encodeSort(sort: SortKey[]): string {
+  return sort.map((s) => (s.dir === "desc" ? "-" : "") + s.key).join(",");
+}
+function decodeSort(v: string | null): SortKey[] {
+  if (!v) return [];
+  return v.split(",").filter(Boolean).map((t) => (t.startsWith("-") ? { key: t.slice(1), dir: "desc" as const } : { key: t, dir: "asc" as const }));
+}
+function decodeFilters(v: string | null): Record<string, FilterCond> {
+  if (!v) return {};
+  try {
+    const o = JSON.parse(v);
+    return o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, FilterCond>) : {};
+  } catch {
+    return {};
+  }
+}
+function decodeUrlState(sp: ReadonlyURLSearchParams, storageKey: string): UrlState {
+  const g = (k: string) => sp.get(`${storageKey}.${k}`);
+  const page = Number(g("page"));
+  return {
+    search: g("q") ?? "",
+    sort: decodeSort(g("sort")),
+    filters: decodeFilters(g("f")),
+    page: Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1,
+  };
+}
+// 既定値は URL に載せない（URL を短く保つ）。
+function encodeUrlState(st: UrlState): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (st.search) out.q = st.search;
+  const sortStr = encodeSort(st.sort);
+  if (sortStr) out.sort = sortStr;
+  if (Object.keys(st.filters).length) out.f = JSON.stringify(st.filters);
+  if (st.page > 1) out.page = String(st.page);
+  return out;
+}
+
 // ---- コンポーネント --------------------------------------------------------
 export function DataTable<T>(props: DataTableProps<T>) {
   const { unit = "件", pins: pinsProp, storageKey, server } = props;
@@ -238,13 +284,22 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const sortableCols = useMemo(() => dataCols.filter((c) => c.sortable), [dataCols]);
   const filterableCols = useMemo(() => dataCols.filter((c) => c.filter), [dataCols]);
 
+  // ---- URL 同期（検索/ソート/絞込/ページ） ----
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // マウント時 1 回だけ URL から初期状態を決める（以降 URL は state → URL の一方向で書き戻す＝ループ回避）。
+  const urlInitRef = useRef<UrlState | null>(null);
+  if (urlInitRef.current === null) urlInitRef.current = decodeUrlState(searchParams, storageKey);
+  const urlInit = urlInitRef.current;
+
   // ---- 状態 ----
-  // セッション（非永続）
-  const [search, setSearch] = useState("");
-  const [simpleSort, setSimpleSort] = useState<SortKey | null>(null);
-  const [advSort, setAdvSort] = useState<SortKey[]>([]);
-  const [filters, setFilters] = useState<Record<string, FilterCond>>({});
-  const [page, setPage] = useState(1);
+  // セッション（URL 同期）＝検索/ソート/絞込/ページ。単一キーは simpleSort（ヘッダー click 可）に戻す。
+  const [search, setSearch] = useState(urlInit.search);
+  const [simpleSort, setSimpleSort] = useState<SortKey | null>(urlInit.sort.length === 1 ? urlInit.sort[0] : null);
+  const [advSort, setAdvSort] = useState<SortKey[]>(urlInit.sort.length > 1 ? urlInit.sort : []);
+  const [filters, setFilters] = useState<Record<string, FilterCond>>(urlInit.filters);
+  const [page, setPage] = useState(urlInit.page);
   // 永続
   const [perPage, setPerPage] = useState(props.perPage ?? 20);
   const [density, setDensity] = useState<Density>("normal");
@@ -341,6 +396,24 @@ export function DataTable<T>(props: DataTableProps<T>) {
     }),
     [debouncedSearch, simpleSort, advSort, filters, page, perPage, pins, pinsEnabled],
   );
+
+  // state → URL 書き戻し（検索はデバウンス値を使う＝1打鍵ごとに URL を書かない）。replace で履歴を汚さず、
+  // 現在エントリに畳み込む＝詳細へ push→ブラウザ戻るで絞込付き URL に復帰する。他テーブル/無関係な
+  // クエリは維持し、自分の名前空間キーだけ差し替える。ready 後のみ（復元中の空書き込みを避ける）。
+  useEffect(() => {
+    if (!ready) return;
+    const params = new URLSearchParams(window.location.search);
+    const prefix = `${storageKey}.`;
+    for (const k of Array.from(params.keys())) if (k.startsWith(prefix)) params.delete(k);
+    const desired = encodeUrlState({ search: debouncedSearch, sort: activeSort({ simpleSort, advSort }), filters, page });
+    for (const [k, v] of Object.entries(desired)) params.set(prefix + k, v);
+    const qs = params.toString();
+    if (qs !== window.location.search.replace(/^\?/, "")) {
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+    // searchParams は依存に入れない（書き戻しで変化→再発火のループを避ける・基点は window.location）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, debouncedSearch, simpleSort, advSort, filters, page, pathname, storageKey]);
 
   // 再クエリ（server モード・localStorage 復元後）。seq+AbortController で stale レースを排除。
   useEffect(() => {
