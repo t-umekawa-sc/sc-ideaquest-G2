@@ -49,7 +49,7 @@ const COLUMNS: DataTableColumn<Company>[] = [
     sortable: true,
     render: (r) => (
       <span className="co">
-        <QuestIcon name={r.name} color={r.color} imageUrl={r.icon_image_path} size="sm" />
+        <QuestIcon name={r.name} color={r.color} imageUrl={r.icon_image_url} size="sm" />
         <strong>{r.name}</strong>
       </span>
     ),
@@ -110,7 +110,7 @@ function companyCard(c: Company): ReactNode {
   return (
     <>
       <div className="dt-card__title co">
-        <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_path} size="sm" />
+        <QuestIcon name={c.name} color={c.color} imageUrl={c.icon_image_url} size="sm" />
         <span>{c.name}</span>
       </div>
       <div className="dt-card__meta">

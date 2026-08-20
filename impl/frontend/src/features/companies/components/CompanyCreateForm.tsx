@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 
 import { Button, Field, ModalBody, ModalFooter, Swatches } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { createCompany } from "../api";
+import { createCompany, setCompanyIcon } from "../api";
 import "../companies.css";
 
 const DEFAULT_COLOR = "#2563EB"; // 会社カラー既定（swatches の先頭＝ブルー）
@@ -21,6 +21,8 @@ function createErrorMessage(err: unknown): string {
       return "指定された値は既に使われています。";
     }
     if (err.code === "validation_error") {
+      const field = (err.body as { errors?: { field?: string }[] } | null)?.errors?.[0]?.field;
+      if (field === "file") return "画像は PNG/JPEG/WebP/GIF・5MB 以下でお願いします。";
       return "入力内容をご確認ください（会社コードは英大文字始まり・A-Z/0-9/- ・4〜20 字）。";
     }
     if (err.code === "forbidden") return "この操作を行う権限がありません。";
@@ -33,8 +35,10 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
   const [companyCode, setCompanyCode] = useState("");
   const [dbIdentifier, setDbIdentifier] = useState("");
   const [color, setColor] = useState(DEFAULT_COLOR);
-  // アイコン画像は MinIO 基盤前提（別スライス）＝ここではローカルプレビューのみ（送信しない仮実装）。
+  // アイコン画像は会社作成後に専用 EP（PUT .../icon-image・B.1）へアップロードする（会社は先に実在が必要）。
+  // 選択直後はローカルプレビュー（objectURL）で見せ、送信するファイル本体は iconFile に保持する。
   const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -44,10 +48,12 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
     if (!file) return;
     if (iconPreview) URL.revokeObjectURL(iconPreview);
     setIconPreview(URL.createObjectURL(file));
+    setIconFile(file);
   }
   function onClearIcon() {
     if (iconPreview) URL.revokeObjectURL(iconPreview);
     setIconPreview(null);
+    setIconFile(null);
     if (iconInputRef.current) iconInputRef.current.value = "";
   }
 
@@ -56,8 +62,9 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
     setFormError(null);
     setPending(true);
     try {
-      // アイコン画像は未接続（MinIO 待ち）＝color のみ送信。
-      await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier, color });
+      // 作成（会社は status=suspended で作られる）→ 画像が選択されていれば作成会社にアイコンを設定（2段・B.1）。
+      const created = await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier, color });
+      if (iconFile && created) await setCompanyIcon(created.company_id, iconFile);
       if (iconPreview) URL.revokeObjectURL(iconPreview);
       onDone();
     } catch (err) {
@@ -72,7 +79,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
       <ModalBody>
         {formError && <div className="form-error" role="alert">{formError}</div>}
         <Field id="c_name" label="会社名" required>
-          <input id="c_name" className="input" placeholder="例: アクロス株式会社" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
         <Field
           id="c_code"
@@ -95,7 +102,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
           <input
             id="c_db"
             className="input"
-            placeholder="例: db_across"
+            placeholder="例: db_sc"
             value={dbIdentifier}
             onChange={(e) => setDbIdentifier(e.target.value)}
             required
@@ -123,7 +130,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
                 </Button>
               )}
               <input ref={iconInputRef} id="c_icon" type="file" accept="image/*" hidden onChange={onPickIcon} />
-              <span className="hint">未設定時は「頭文字＋会社カラー」で表示（画像アップロードは今後対応）</span>
+              <span className="hint">未設定時は「頭文字＋会社カラー」で表示。PNG/JPEG/WebP/GIF・5MB まで（作成時に保存）。</span>
             </div>
           </div>
         </Field>

@@ -133,6 +133,7 @@ class CompanyListItem(BaseModel):
     status: str
     color: str
     icon_image_path: str | None = None
+    icon_image_url: str | None = None  # 短TTL 署名URL（表示用・生キーは出さない・§1.10）
     account_count: int
 
 
@@ -152,6 +153,7 @@ class CompanyDetail(BaseModel):
     status: str
     color: str
     icon_image_path: str | None = None
+    icon_image_url: str | None = None  # 短TTL 署名URL（表示用・生キーは出さない・§1.10）
     mfa_required: bool
     vote_anonymized: bool
     hide_voters_from_managers: bool

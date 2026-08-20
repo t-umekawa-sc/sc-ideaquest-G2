@@ -17,6 +17,7 @@ from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
 _SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required")
@@ -35,11 +36,20 @@ _SORT_COLUMNS = {
 _COMPANY_STATUSES = ("active", "suspended")
 
 
+def _icon_url(path: str | None) -> str | None:
+    """会社アイコンの MinIO キー→短TTL 署名URL（B.1・§1.10）。未設定は None（storage 未呼び出し）。
+
+    presign は HMAC 計算のみ（接続しない）＝一覧の各行で呼んでも I/O は発生しない。生キーは応答に出さない。
+    """
+    return get_storage().presigned_get(path) if path else None
+
+
 def _item(c: Company, account_count: int) -> dict:
     return {
         "company_id": str(c.id), "company_code": c.company_code, "name": c.name,
         "db_identifier": c.db_identifier, "status": c.status, "color": c.color,
-        "icon_image_path": c.icon_image_path, "account_count": account_count,
+        "icon_image_path": c.icon_image_path, "icon_image_url": _icon_url(c.icon_image_path),
+        "account_count": account_count,
     }
 
 
@@ -212,6 +222,54 @@ def update_company_profile(company_id: uuid.UUID, changes: dict) -> dict:
             select(func.count()).select_from(Account).where(Account.company_id == company_id)
         ).scalar_one()
         return _detail(company, count)
+
+
+def set_company_icon(company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """会社アイコン画像を設定（B.1・§1.10）＝管理DB companies.icon_image_path 更新＋旧オブジェクト掃除。
+
+    /me/avatar-image（K.4）と同流儀＝非公開バケットへ物理名ハッシュで put、応答は署名URL に解決した会社詳細。
+    会社アイコンは管理DB `companies` のみを触る（会社DB 未整備＝suspended でも設定可）。
+    """
+    validate_image_upload(content_type, len(data))
+    storage = get_storage()
+    key = storage.put(data, content_type, prefix="company-icons")
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")
+        old = company.icon_image_path
+        company.icon_image_path = key
+        audit.record("company.icon_set",  # 監査（B.6・同一Tx）
+                     {"company_id": str(company_id)}, session=session)
+        session.commit()
+        count = session.execute(
+            select(func.count()).select_from(Account).where(Account.company_id == company_id)
+        ).scalar_one()
+        detail = _detail(company, count)
+    if old and old != key:
+        try:
+            storage.remove(old)  # 旧画像は best-effort（失敗しても新設定は成立・整合は運用掃除）
+        except Exception:
+            pass
+    return detail
+
+
+def delete_company_icon(company_id: uuid.UUID) -> None:
+    """会社アイコン画像を削除（既定＝頭文字＋会社カラーへ・B.1）。冪等。"""
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")
+        old = company.icon_image_path
+        company.icon_image_path = None
+        audit.record("company.icon_delete",  # 監査（B.6・同一Tx）
+                     {"company_id": str(company_id)}, session=session)
+        session.commit()
+    if old:
+        try:
+            get_storage().remove(old)
+        except Exception:
+            pass
 
 
 def list_company_quest_groups(company_id: uuid.UUID) -> dict:

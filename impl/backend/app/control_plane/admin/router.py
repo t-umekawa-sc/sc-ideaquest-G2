@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 
 from app.control_plane.admin import application as admin_service
 from app.control_plane.admin import company_application as company_service
@@ -111,6 +111,30 @@ def update_company(
     return CompanyDetail(**company_service.update_company_profile(
         company_id, body.model_dump(exclude_unset=True)
     ))
+
+
+@router.put("/companies/{company_id}/icon-image", response_model=CompanyDetail)
+async def put_company_icon(
+    company_id: uuid.UUID, request: Request, file: UploadFile = File(...),
+    _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社アイコン画像を設定（SC-91/92・B.1・§1.10・multipart）。管理DB companies 直接更新＋署名URL 返却。"""
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    return CompanyDetail(**company_service.set_company_icon(
+        company_id, data=data, content_type=file.content_type or "",
+    ))
+
+
+@router.delete("/companies/{company_id}/icon-image", status_code=204)
+def delete_company_icon(
+    company_id: uuid.UUID, request: Request, _session: dict = Depends(require_system_admin),
+) -> None:
+    """会社アイコン画像を削除（既定＝頭文字＋会社カラーへ・B.1）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    company_service.delete_company_icon(company_id)
 
 
 @router.patch("/companies/{company_id}/settings", response_model=CompanyDetail)

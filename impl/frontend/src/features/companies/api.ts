@@ -130,3 +130,14 @@ export function updateCompanyProfile(companyId: string, input: CompanyProfileInp
     body: JSON.stringify(input),
   });
 }
+
+// 会社アイコン画像＝管理DB companies.icon_image_path（B.1・MinIO・multipart）。応答は署名URL 込みの会社詳細。
+// CSRF は apiFetch が付与、Content-Type は FormData をブラウザに任せる（client.ts）。
+export function setCompanyIcon(companyId: string, file: File): Promise<CompanyDetail | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch<CompanyDetail>(`/admin/companies/${companyId}/icon-image`, { method: "PUT", body: fd });
+}
+export function deleteCompanyIcon(companyId: string): Promise<null> {
+  return apiFetch<null>(`/admin/companies/${companyId}/icon-image`, { method: "DELETE" }) as Promise<null>;
+}

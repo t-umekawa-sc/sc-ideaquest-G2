@@ -6,8 +6,8 @@
 // レイアウト/クラス/コピーの正＝doc/画面設計/mocks/SC-92_会社詳細.html（DoD＝モック一致）。
 //
 // 会社名の編集はモック SC-92 に無い（名称はバナー/パンくず表示・変更は設けない）＝ここでは扱わない。
-// 会社アイコン画像は MinIO 基盤前提（別スライス）＝ローカルプレビューのみ（送信しない）。会社カラーは
-// backend 対応済み（CompanyProfileUpdateRequest.color）＝スウォッチ選択で即保存しバナーへ反映。
+// 会社アイコン画像は専用 EP（PUT/DELETE .../icon-image・B.1・MinIO）に接続＝選択で即保存し署名URL 表示。
+// 会社カラーは backend 対応済み（CompanyProfileUpdateRequest.color）＝スウォッチ選択で即保存しバナーへ反映。
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -16,7 +16,7 @@ import { QuestIcon } from "@/components/layout";
 import { AccountSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
-import { getCompany, updateCompanyProfile, updateCompanySettings } from "../api";
+import { deleteCompanyIcon, getCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
 import "../companies.css";
 
@@ -29,8 +29,6 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [color, setColor] = useState("#2563EB");
-  // 会社アイコンのローカルプレビュー（MinIO 未接続＝送信しない仮実装）。
-  const [iconPreview, setIconPreview] = useState<string | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const ctxRef = useRef<HTMLElement>(null);
@@ -88,16 +86,28 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     }
   }
 
-  function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    if (iconInputRef.current) iconInputRef.current.value = ""; // 同じファイル再選択でも onChange が発火するように
     if (!file) return;
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconPreview(URL.createObjectURL(file));
+    setError(null);
+    try {
+      const updated = await setCompanyIcon(companyId, file); // 即保存＝応答は署名URL 込みの会社詳細
+      setCompany(updated);
+    } catch (err) {
+      setError(err instanceof ApiError && err.code === "validation_error"
+        ? "画像は PNG/JPEG/WebP/GIF・5MB 以下でお願いします。"
+        : "アイコン画像の更新に失敗しました。");
+    }
   }
-  function onClearIcon() {
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconPreview(null);
-    if (iconInputRef.current) iconInputRef.current.value = "";
+  async function onClearIcon() {
+    setError(null);
+    try {
+      await deleteCompanyIcon(companyId); // 既定（頭文字＋会社カラー）へ戻す
+      await load();
+    } catch {
+      setError("アイコン画像の削除に失敗しました。");
+    }
   }
 
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
@@ -114,14 +124,14 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
 
       {/* 細い会社識別バー（狭幅・スクロール時）。JS が .is-visible を付与。 */}
       <div className="ctx-mini" ref={miniRef} aria-hidden="true">
-        <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_path} size="sm" />
+        <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_url} size="sm" />
         <span className="ctx-mini__name">{company.name}</span>
         <span className={`badge ${stCls}`}>{stLabel}</span>
       </div>
 
       {/* 文脈バナー（メンテ中の会社を明示） */}
       <section className="ctx" aria-label="メンテナンス中の会社" ref={ctxRef}>
-        <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_path} size="lg" />
+        <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_url} size="lg" />
         <div>
           <div className="ctx__label">メンテナンス中の会社</div>
           <div className="ctx__name">{company.name}</div>
@@ -148,23 +158,15 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
         <div className="setting-row">
           <div className="setting-row__info">
             <div className="setting-row__name">会社アバター / アイコン</div>
-            <div className="setting-row__desc">一覧・バナー・（将来）ログイン画面などに表示。未設定時は「頭文字＋会社カラー」で表示（画像アップロードは今後対応）。</div>
+            <div className="setting-row__desc">一覧・バナー・（将来）ログイン画面などに表示。未設定時は「頭文字＋会社カラー」で表示。PNG/JPEG/WebP/GIF・5MB まで。</div>
           </div>
           <div className="icon-field">
-            <span className="quest-icon lg" style={{ ["--accent" as string]: color } as React.CSSProperties}>
-              {iconPreview ? (
-                // 送信しないローカルプレビュー（objectURL）＝next/image を通さず素の img で描画。
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="quest-icon__img" src={iconPreview} alt="" />
-              ) : (
-                <span className="quest-icon__char">{company.name.trim().charAt(0) || "会"}</span>
-              )}
-            </span>
+            <QuestIcon name={company.name} color={color} imageUrl={company.icon_image_url} size="lg" />
             <div className="icon-actions">
               <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>
                 画像を選ぶ
               </Button>
-              {iconPreview && (
+              {company.icon_image_url && (
                 <Button type="button" variant="outline" onClick={onClearIcon}>
                   クリア
                 </Button>

@@ -18,6 +18,7 @@ from datetime import timedelta
 from typing import Protocol
 
 from app.core.config import get_settings
+from app.core.errors import AppError
 
 # 画像 MIME allowlist（K.4・データモデル §8-⑦・初期値）。拡張子は物理名生成用。
 ALLOWED_IMAGE_MIME: dict[str, str] = {
@@ -27,6 +28,20 @@ ALLOWED_IMAGE_MIME: dict[str, str] = {
     "image/gif": "gif",
 }
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 画像 1ファイル 5MB（初期値・K.6 TBD）
+
+
+def validate_image_upload(content_type: str, size: int) -> None:
+    """画像アップロードのサーバー検証（§2.2⑧・§1.10）＝MIME allowlist・サイズ上限・非空。
+
+    アバター/背景（K.4）・会社アイコン（B.1）など全画像 EP で共用（DRY・§2.3）。
+    """
+    if content_type not in ALLOWED_IMAGE_MIME:
+        raise AppError(422, "validation_error", detail="対応していない画像形式です（PNG/JPEG/WebP/GIF）",
+                       errors=[{"field": "file"}])
+    if size == 0:
+        raise AppError(422, "validation_error", detail="ファイルが空です", errors=[{"field": "file"}])
+    if size > MAX_IMAGE_BYTES:
+        raise AppError(422, "validation_error", detail="画像サイズが上限を超えています", errors=[{"field": "file"}])
 
 
 def hashed_key(data: bytes, content_type: str, *, prefix: str) -> str:

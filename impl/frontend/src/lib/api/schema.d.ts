@@ -205,6 +205,30 @@ export interface paths {
         patch: operations["update_company_api_v1_admin_companies__company_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/companies/{company_id}/icon-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Company Icon
+         * @description 会社アイコン画像を設定（SC-91/92・B.1・§1.10・multipart）。管理DB companies 直接更新＋署名URL 返却。
+         */
+        put: operations["put_company_icon_api_v1_admin_companies__company_id__icon_image_put"];
+        post?: never;
+        /**
+         * Delete Company Icon
+         * @description 会社アイコン画像を削除（既定＝頭文字＋会社カラーへ・B.1）。
+         */
+        delete: operations["delete_company_icon_api_v1_admin_companies__company_id__icon_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/{company_id}/settings": {
         parameters: {
             query?: never;
@@ -941,6 +965,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_put_company_icon_api_v1_admin_companies__company_id__icon_image_put */
+        Body_put_company_icon_api_v1_admin_companies__company_id__icon_image_put: {
+            /** File */
+            file: string;
+        };
         /**
          * CompanyCreateRequest
          * @description 会社作成の入力（SC-91）。`company_code` は大文字正規化＋形式検証（§4.1）。想定外プロパティ拒否。
@@ -976,6 +1005,8 @@ export interface components {
             color: string;
             /** Icon Image Path */
             icon_image_path?: string | null;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
             /** Mfa Required */
             mfa_required: boolean;
             /** Vote Anonymized */
@@ -1004,6 +1035,8 @@ export interface components {
             color: string;
             /** Icon Image Path */
             icon_image_path?: string | null;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
             /** Account Count */
             account_count: number;
         };
@@ -1854,6 +1887,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CompanyDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_company_icon_api_v1_admin_companies__company_id__icon_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_company_icon_api_v1_admin_companies__company_id__icon_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_company_icon_api_v1_admin_companies__company_id__icon_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

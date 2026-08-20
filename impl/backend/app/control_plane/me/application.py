@@ -37,7 +37,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.gamification.daily import period_bounds_utc
-from app.infra.storage import ALLOWED_IMAGE_MIME, MAX_IMAGE_BYTES, get_storage
+from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.gamification.level import level_progress
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
@@ -99,17 +99,6 @@ def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
 
 # --- プロフィール画像・背景画像（K.4・MinIO・§1.10）。会社DB users 直接更新（identity ではない＝outbox なし） ---
 
-def _validate_image(content_type: str, size: int) -> None:
-    """画像アップロードのサーバー検証（§2.2⑧・§1.10）＝MIME allowlist・サイズ上限・非空。"""
-    if content_type not in ALLOWED_IMAGE_MIME:
-        raise AppError(422, "validation_error", detail="対応していない画像形式です（PNG/JPEG/WebP/GIF）",
-                       errors=[{"field": "file"}])
-    if size == 0:
-        raise AppError(422, "validation_error", detail="ファイルが空です", errors=[{"field": "file"}])
-    if size > MAX_IMAGE_BYTES:
-        raise AppError(422, "validation_error", detail="画像サイズが上限を超えています", errors=[{"field": "file"}])
-
-
 def _company_db_identifier(company_id: uuid.UUID) -> str:
     with control_session() as session:
         company = session.get(Company, company_id)
@@ -121,7 +110,7 @@ def _company_db_identifier(company_id: uuid.UUID) -> str:
 def _set_user_image(company_id: uuid.UUID, account_id: uuid.UUID, *,
                     field: str, data: bytes, content_type: str, prefix: str) -> str:
     """会社DB users の画像パス列を差し替え、旧オブジェクトを best-effort 削除。署名URL を返す。"""
-    _validate_image(content_type, len(data))
+    validate_image_upload(content_type, len(data))
     storage = get_storage()
     key = storage.put(data, content_type, prefix=prefix)  # 物理名ハッシュ・非公開バケット
     with get_tenant_session(_company_db_identifier(company_id)) as ts:
