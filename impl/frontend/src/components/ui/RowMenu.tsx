@@ -2,11 +2,27 @@
 
 // 行アクション ⋯（ケバブ）メニュー（デザイン標準 §4・shared.css .rowmenu）。sticky 操作列に置く。
 // ドロップダウンは table-wrap の overflow に隠れないよう position:fixed で配置（shared.js 相当）。
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type RowMenuItem = { label: string; onClick: () => void; danger?: boolean };
 
 const LIST_MIN_W = 176;
+const VP_MARGIN = 8; // ビューポート端との最小余白
+const EST_ITEM_H = 40; // 高さ未測定時（初回・チラつき防止）の1項目あたり概算
+
+// トリガー矩形とメニュー実高さから fixed 配置座標を求める。トリガー直下(右寄せ)を基本に、
+// 下に収まらなければ上へフリップし、最後にビューポート内へクランプ（menuitem が画面外に出ない）。
+function computePos(r: DOMRect, listH: number): { top: number; left: number } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const left = Math.min(Math.max(VP_MARGIN, r.right - LIST_MIN_W), vw - LIST_MIN_W - VP_MARGIN);
+  let top = r.bottom + 4; // トリガー直下
+  if (listH > 0 && top + listH > vh - VP_MARGIN) {
+    const above = r.top - 4 - listH; // 下に収まらない → 上へフリップ
+    top = above >= VP_MARGIN ? above : Math.max(VP_MARGIN, vh - VP_MARGIN - listH);
+  }
+  return { top, left };
+}
 
 export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; label?: string }) {
   const [open, setOpen] = useState(false);
@@ -24,13 +40,15 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
     return () => td.classList.remove("rowmenu-open");
   }, [open]);
 
-  useEffect(() => {
+  // 配置は useLayoutEffect（描画前確定）＝メニュー実高さを測って上フリップ/クランプを適用し、
+  // ペイント前に最終座標へ。これによりスクロール追従以外での再配置ジッタが出ない（stability 揺れ解消）。
+  useLayoutEffect(() => {
     if (!open) return;
     const trigger = triggerRef.current;
     if (!trigger) return;
     const place = () => {
-      const r = trigger.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: Math.max(8, r.right - LIST_MIN_W) }); // 右寄せ・トリガー直下
+      const listH = listRef.current?.offsetHeight ?? 0;
+      setPos(computePos(trigger.getBoundingClientRect(), listH));
     };
     place();
     function onDown(e: MouseEvent) {
@@ -54,13 +72,14 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
 
   // 開く前に座標を確定してから開く（先に pos を計算 → setOpen）。これをしないと最初の描画が
   // pos 未確定（fixed だが top/left なし＝ボタン直下の静的位置）になり、直後に再配置してチラつく。
+  // 高さ未測定なので項目数から概算し、上フリップ判定を初回描画から効かせる（実測は useLayoutEffect で補正）。
   function toggleOpen() {
     if (open) {
       setOpen(false);
       return;
     }
     const r = triggerRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, left: Math.max(8, r.right - LIST_MIN_W) });
+    if (r) setPos(computePos(r, items.length * EST_ITEM_H + 8));
     setOpen(true);
   }
 

@@ -31,16 +31,14 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await page.getByRole("button", { name: "作成する" }).click();
   await expect(page.getByText(code)).toBeVisible();
 
-  // 一覧は DataTable＝操作は RowMenu（⋯）。RowMenu は position:fixed でスクロールに追従再配置するため、
-  // クリック時スクロールで「不安定」判定にならないよう、メニューを開く前に行を可視化しておく（+ menuitem 可視化を明示待機）。
+  // 一覧は DataTable＝操作は RowMenu（⋯）。RowMenu は position:fixed だが下端では上へフリップして
+  // 常にビューポート内に収まる（RowMenu.computePos）ため、素直に可視待機→クリックで良い。
   const renameRow = page.getByRole("row", { name: new RegExp(code) });
   await renameRow.scrollIntoViewIfNeeded();
   await renameRow.getByRole("button", { name: "操作" }).click();
-  // menuitem は可視を明示アサート済み。RowMenu(position:fixed)の再配置ジッタで stability 再判定が
-  // 揺れるため force:true で安定性チェックをスキップ（要素は可視＝クリック自体は妥当）。
   await expect(page.getByRole("menuitem", { name: "リネーム" })).toBeVisible();
   page.once("dialog", (d) => d.accept(renamed));
-  await page.getByRole("menuitem", { name: "リネーム" }).click({ force: true });
+  await page.getByRole("menuitem", { name: "リネーム" }).click();
   await expect(page.getByText(renamed)).toBeVisible();
 
   // 削除（confirm・空グループ→204）
@@ -49,6 +47,6 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await deleteRow.getByRole("button", { name: "操作" }).click();
   await expect(page.getByRole("menuitem", { name: "削除" })).toBeVisible();
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("menuitem", { name: "削除" }).click({ force: true });
+  await page.getByRole("menuitem", { name: "削除" }).click();
   await expect(page.getByText(code)).toHaveCount(0);
 });
