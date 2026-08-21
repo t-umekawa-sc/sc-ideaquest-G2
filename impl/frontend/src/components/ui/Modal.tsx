@@ -44,6 +44,9 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
     }
   }, [open]);
 
+  // 初期フォーカス／スクロールロック／復帰は **open の遷移時のみ**（依存は [open] だけ）。
+  // ※ ここに onClose を依存させると、呼び出し側のインライン onClose が毎レンダで別関数になり、
+  //   入力のたびに effect が再実行されて先頭フィールドへフォーカスが飛ぶ（フォーカス喪失バグ）。
   useEffect(() => {
     if (!open) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
@@ -54,11 +57,24 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
       panel?.querySelector<HTMLElement>(`.modal__body ${FOCUSABLE.split(",").join(", .modal__body ")}`) ??
       panel?.querySelector<HTMLElement>(FOCUSABLE);
     first?.focus();
+    return () => {
+      document.body.classList.remove("modal-open");
+      restoreRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Esc/フォーカストラップの keydown。onClose は ref 経由で最新を参照＝依存に入れず再購読しない
+  // （リスナー再登録でフォーカスを動かさない）。
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !panel) return;
@@ -76,12 +92,8 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
     }
 
     document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      document.body.classList.remove("modal-open");
-      restoreRef.current?.focus?.();
-    };
-  }, [open, onClose]);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open]);
 
   // ヘッダードラッグ（§105）＝画面外に出さないよう clamp。ボタン/入力からは開始しない。
   function onHeaderPointerDown(e: React.PointerEvent) {

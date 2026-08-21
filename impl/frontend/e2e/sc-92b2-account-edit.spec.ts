@@ -16,7 +16,7 @@ async function login(page: Page) {
 test("B-TC-115 edit account display name", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("link").click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);

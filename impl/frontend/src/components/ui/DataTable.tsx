@@ -457,9 +457,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
     : totalNonPin + pinned.length === 0;
 
   // ページ範囲外へ縮んだら最終ページへ寄せる（server モード・絞込で件数が減った時）。
+  // ※ 初回ロード完了前（srvLoaded=false）はクランプしない＝`srv` 未取得だと total=0→pages=1 となり、
+  //   URL から復元したページ（例: 一覧→詳細→戻るの page=2）を、クエリが返る前に 1 へ潰してしまうため
+  //   （SC-91 でページが保持されないバグの原因・デザイン標準 §4.5⑨）。
   useEffect(() => {
-    if (hasServer && page > pages) setPage(pages);
-  }, [hasServer, page, pages]);
+    if (hasServer && srvLoaded && page > pages) setPage(pages);
+  }, [hasServer, srvLoaded, page, pages]);
 
   const sort = activeSort({ simpleSort, advSort });
   const advOn = advSort.length > 0;

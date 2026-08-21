@@ -19,7 +19,7 @@ test("B-TC-114 issue account appears in company account list", async ({ page }) 
   await login(page);
   await page.goto("/admin/companies");
   // ACME-01 の行の会社名リンクから詳細へ
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("link").click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
   // 既存 seed アカウントが見える（メール列追加で login==email の seed は login/email 2セルに出るため first）
   await expect(page.getByText("user@acme.example").first()).toBeVisible();
@@ -44,7 +44,7 @@ test("B-TC-114 issue account appears in company account list", async ({ page }) 
 test("B-TC-125 company account list: search, email column, clear", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("link").click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
   const region = page.getByRole("region", { name: "この会社のアカウント管理" });
   await expect(region.getByRole("columnheader", { name: /メールアドレス/ })).toBeVisible();
 

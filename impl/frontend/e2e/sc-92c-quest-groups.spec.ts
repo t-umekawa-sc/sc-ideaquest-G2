@@ -12,11 +12,31 @@ async function login(page: Page) {
   await expect(page.getByText("ようこそ")).toBeVisible();
 }
 
+// B-TC-117: 作成ダイアログのフォーカス保持（Modal の初期フォーカス effect が入力のたびに再実行され
+// 先頭フィールドへ飛ぶバグの回帰）。コード入力後、グループ名に文字入力してもフォーカスが名前に残る。
+test("B-TC-117 create dialog keeps focus while typing name", async ({ page }) => {
+  await login(page);
+  await page.goto("/admin/companies");
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
+  await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
+
+  await page.getByRole("button", { name: "＋ グループ作成" }).click();
+  await page.locator("#g_code").fill("SCDEV-01");
+  // 名前欄へフォーカス→1文字ずつ入力（各キーで再レンダ＝バグ時は先頭のコード欄へフォーカスが飛ぶ）。
+  await page.locator("#g_name").focus();
+  await page.locator("#g_name").pressSequentially("計画", { delay: 30 });
+
+  // フォーカスは名前欄に残り、入力値も保持される（コード欄の値も維持）。
+  await expect(page.locator("#g_name")).toBeFocused();
+  await expect(page.locator("#g_name")).toHaveValue("計画");
+  await expect(page.locator("#g_code")).toHaveValue("SCDEV-01");
+});
+
 // B-TC-116: グループ作成→リネーム→削除（空グループ）の縦通し。
 test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("link").click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);

@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { DataTable } from "@/components/ui";
+import { DataTable, RowMenu } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { companiesCsvUrl, queryCompanies } from "../api";
@@ -87,22 +87,6 @@ const COLUMNS: DataTableColumn<Company>[] = [
   },
   { key: "groups", label: "グループ", width: 100, align: "num", render: () => "—", csvVal: () => "—" },
   { key: "created", label: "作成日", width: 130, render: () => "—", csvVal: () => "—" },
-  {
-    key: "_actions",
-    label: "",
-    actions: true,
-    locked: true,
-    width: 130,
-    render: (r) => (
-      <Link
-        href={`/admin/companies/${r.company_id}`}
-        className="btn btn-outline btn-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
-        管理する →
-      </Link>
-    ),
-  },
 ];
 
 // カード表示（🔲カード/☰リスト 切替）。会社アイコン＋名称を活かす。操作は actions 列が右上に自動表示。
@@ -139,6 +123,22 @@ export function CompanyList() {
     return () => window.removeEventListener(COMPANIES_CHANGED_EVENT, onChanged);
   }, []);
 
+  // 操作列＝三点リーダー RowMenu（テーブル/カード共通で右上に自動表示＝カードで会社名に被らない・§4.5⑩/⑪）。
+  // 「管理する」で会社詳細へ。router を使うため component 内で列を組み立てる（COLUMNS は表示列のみ）。
+  const columns: DataTableColumn<Company>[] = [
+    ...COLUMNS,
+    {
+      key: "_actions",
+      label: "",
+      actions: true,
+      locked: true,
+      width: 90,
+      render: (r) => (
+        <RowMenu items={[{ label: "管理する", onClick: () => router.push(`/admin/companies/${r.company_id}`) }]} />
+      ),
+    },
+  ];
+
   return (
     <section aria-label="会社一覧">
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
@@ -161,7 +161,7 @@ export function CompanyList() {
       <DataTable<Company>
         key={reloadKey}
         storageKey="sc91-companies"
-        columns={COLUMNS}
+        columns={columns}
         rowId={(r) => r.company_id}
         unit="社"
         perPage={5}
