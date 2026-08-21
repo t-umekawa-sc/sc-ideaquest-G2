@@ -766,6 +766,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quests
+         * @description 参加中クエスト＋自分の下書き一覧（SC-10・C.1・FR-15）。参照制限はサーバー強制。読取専用。
+         */
+        get: operations["list_quests_api_v1_quests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quest-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quest Groups
+         * @description 自分が有効所属するクエストグループ一覧（SC-10 フィルタ・SC-11 グループ選択・C.4）。読取専用。
+         */
+        get: operations["list_quest_groups_api_v1_quest_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1428,12 +1468,65 @@ export interface components {
             login_id: string;
         };
         /**
+         * QuestCardDTO
+         * @description 一覧カード/行の1件（C.1・SC-10 §4.1）。
+         */
+        QuestCardDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Status */
+            status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Idea Count */
+            idea_count: number;
+            owner: components["schemas"]["QuestOwnerDTO"];
+            quest_group: components["schemas"]["QuestGroupRefDTO"];
+            /** My State */
+            my_state: string;
+        };
+        /**
+         * QuestCursorPageInfo
+         * @description カーソルページングの共通エンベロープ（§1.8・me.CursorPageInfo と同形）。
+         *
+         *     OpenAPI schema 名の衝突回避のため C ドメイン専用に命名（同名だと openapi-typescript が
+         *     両者を完全修飾名にリネームし既存機能の型参照を壊すため）。
+         */
+        QuestCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /**
          * QuestGroupCreateRequest
          * @description クエストグループ作成の入力（B.3・system_admin）。`quest_group_code` は大文字正規化＋形式検証（§5.4）。
          *
          *     想定外プロパティは拒否（Mass Assignment 防止・§B.6）。会社内一意は application で担保（重複=409）。
          */
         QuestGroupCreateRequest: {
+            /** Quest Group Code */
+            quest_group_code: string;
+            /** Name */
+            name: string;
+        };
+        /** QuestGroupDTO */
+        QuestGroupDTO: {
+            /** Id */
+            id: string;
             /** Quest Group Code */
             quest_group_code: string;
             /** Name */
@@ -1458,6 +1551,15 @@ export interface components {
             /** Data */
             data: components["schemas"]["QuestGroupListItem"][];
         };
+        /** QuestGroupRefDTO */
+        QuestGroupRefDTO: {
+            /** Id */
+            id: string;
+            /** Quest Group Code */
+            quest_group_code: string;
+            /** Name */
+            name: string;
+        };
         /**
          * QuestGroupRenameRequest
          * @description クエストグループのリネーム入力（B.3.1・`name` のみ）。`quest_group_code` は不変（受け取らない）。
@@ -1465,6 +1567,29 @@ export interface components {
         QuestGroupRenameRequest: {
             /** Name */
             name: string;
+        };
+        /**
+         * QuestGroupsResponse
+         * @description C.4 GET /quest-groups の応答（B ドメイン admin.QuestGroupListResponse と衝突しない一意名）。
+         */
+        QuestGroupsResponse: {
+            /** Data */
+            data: components["schemas"]["QuestGroupDTO"][];
+        };
+        /** QuestListResponse */
+        QuestListResponse: {
+            /** Data */
+            data: components["schemas"]["QuestCardDTO"][];
+            page_info: components["schemas"]["QuestCursorPageInfo"];
+        };
+        /** QuestOwnerDTO */
+        QuestOwnerDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
         };
         /**
          * Session
@@ -2982,6 +3107,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailChangeConfirmedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quests_api_v1_quests_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string[] | null;
+                group_id?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quest_groups_api_v1_quest_groups_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupsResponse"];
                 };
             };
             /** @description Validation Error */
