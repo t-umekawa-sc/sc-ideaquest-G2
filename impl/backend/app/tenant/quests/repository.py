@@ -1,0 +1,280 @@
+"""会社DB クエスト・カテゴリ・パーティー・権限の永続化プリミティブ（API設計 C.1〜C.5・§5.6〜§5.9）。
+
+方針（quest_group.repository と同じ）:
+- いずれも呼び出し側の Tx に相乗（自身では commit しない）＝application が UoW 境界を持つ。
+- 論理削除はトゥームストーン（quests=`deleted_at`／quest_members=`removed_at`）。有効行のみを返す関数は
+  `deleted_at IS NULL` / `removed_at IS NULL` で絞る。
+- パーティー再追加は既存トゥームストーン行を**再利用**（`removed_at` を NULL・`joined_at=now()`・既定権限再付与）。
+- 一覧はキーセット（カーソル）ページング（§1.8）。ソートタプル `(created_at, id)` DESC を既定にする。
+
+認可（候補制限・owner 付与制限・作成者保護・状態機械）は application 層で強制する（C.0/C.3/C.5）。
+本 repository は永続化の原子操作のみを提供する。
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import func, select, tuple_
+from sqlalchemy.orm import Session
+
+from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
+
+# 新規参加メンバーの既定権限（サーバー自動付与・§5.9/C.3）。
+DEFAULT_MEMBER_PERMISSIONS: tuple[str, ...] = ("vote", "idea_create", "comment")
+
+
+# ---- クエスト本体（C.1/C.2） ----
+
+def create_quest(
+    session: Session,
+    *,
+    quest_group_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    title: str,
+    color: str,
+    status: str,
+    purpose: str | None = None,
+    deadline=None,
+    icon_image_path: str | None = None,
+    quest_id: uuid.UUID | None = None,
+) -> Quest:
+    """クエストを1件作成（カテゴリ/パーティーは別プリミティブ）。作成者を owner_id に保存。"""
+    quest = Quest(
+        id=quest_id or uuid.uuid4(),
+        quest_group_id=quest_group_id,
+        owner_id=owner_id,
+        title=title,
+        color=color,
+        status=status,
+        purpose=purpose,
+        deadline=deadline,
+        icon_image_path=icon_image_path,
+    )
+    session.add(quest)
+    return quest
+
+
+def get_quest(session: Session, quest_id: uuid.UUID) -> Quest | None:
+    """有効なクエスト（`deleted_at IS NULL`）を1件取得。削除済み/不在は None。"""
+    return session.execute(
+        select(Quest).where(Quest.id == quest_id, Quest.deleted_at.is_(None))
+    ).scalars().first()
+
+
+def list_quests_for_user(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    visible_group_ids: list[uuid.UUID],
+    q: str | None = None,
+    status: list[str] | None = None,
+    group_id: uuid.UUID | None = None,
+    cursor: tuple[datetime, uuid.UUID] | None = None,
+    limit: int = 20,
+) -> list[Quest]:
+    """参照制限（C.1・FR-15）を満たすクエストを新着順（created_at, id DESC）で取得。
+
+    (A) 公開系＝`status != 'draft'` かつ **所属グループ内**（`quest_group_id IN visible_group_ids`）
+        かつ **自分がパーティー参加中**（当該クエストに `quest_members.removed_at IS NULL` の自分の行あり）。
+        グループ門番とパーティー門番の**両方**（C.0）を満たす行のみ返す。
+    (B) 自分の下書き＝`owner_id = user_id` かつ `status = 'draft'`（パーティー門番の対象外＝本人だけに見える）。
+    どちらも `deleted_at IS NULL`。ソート系は §1.8.1 の複数指定に後で対応（本スライスは新着順のみ）。
+    """
+    from sqlalchemy import and_, exists, or_
+
+    is_party_member = exists().where(
+        QuestMember.quest_id == Quest.id,
+        QuestMember.user_id == user_id,
+        QuestMember.removed_at.is_(None),
+    )
+    public_cond = and_(
+        Quest.status != "draft",
+        Quest.quest_group_id.in_(visible_group_ids or []),
+        is_party_member,
+    )
+    draft_cond = and_(Quest.status == "draft", Quest.owner_id == user_id)
+    stmt = select(Quest).where(Quest.deleted_at.is_(None), or_(public_cond, draft_cond))
+
+    if q:
+        stmt = stmt.where(Quest.title.ilike(f"%{q}%"))
+    if status:
+        stmt = stmt.where(Quest.status.in_(status))
+    if group_id is not None:
+        stmt = stmt.where(Quest.quest_group_id == group_id)
+    if cursor is not None:
+        stmt = stmt.where(tuple_(Quest.created_at, Quest.id) < tuple_(cursor[0], cursor[1]))
+
+    stmt = stmt.order_by(Quest.created_at.desc(), Quest.id.desc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
+
+
+# ---- カテゴリ（C.2・§5.7） ----
+
+def list_categories(session: Session, quest_id: uuid.UUID) -> list[QuestCategory]:
+    return list(
+        session.execute(
+            select(QuestCategory).where(QuestCategory.quest_id == quest_id).order_by(QuestCategory.label)
+        ).scalars().all()
+    )
+
+
+def replace_categories(
+    session: Session, quest_id: uuid.UUID, entries: list[tuple[str, bool]]
+) -> None:
+    """カテゴリを置換セットで全置換（§5.7）。`entries`＝正規化済み (label, is_custom) の列。
+
+    application 側でトリム＋大小文字/全半角正規化・重複排除済みの前提。
+    """
+    for row in session.execute(
+        select(QuestCategory).where(QuestCategory.quest_id == quest_id)
+    ).scalars().all():
+        session.delete(row)
+    session.flush()
+    for label, is_custom in entries:
+        session.add(QuestCategory(id=uuid.uuid4(), quest_id=quest_id, label=label, is_custom=is_custom))
+
+
+# ---- パーティー・権限（C.3・§5.8/§5.9） ----
+
+def get_active_member(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestMember | None:
+    """有効なパーティー参加（`removed_at IS NULL`）を返す。無ければ None（部分ユニークで高々1件）。"""
+    return session.execute(
+        select(QuestMember).where(
+            QuestMember.quest_id == quest_id,
+            QuestMember.user_id == user_id,
+            QuestMember.removed_at.is_(None),
+        )
+    ).scalars().first()
+
+
+def add_member(
+    session: Session,
+    quest_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    permissions: list[str] | None = None,
+    granted_by_id: uuid.UUID | None = None,
+) -> QuestMember:
+    """メンバーを追加（既定権限は vote+idea_create+comment）。
+
+    再追加＝既存トゥームストーン行を再利用（`removed_at`→NULL・`joined_at=now()`・権限を張り直し・§5.8）。
+    有効行が既にあれば権限のみ置換する。
+    """
+    perms = list(permissions) if permissions is not None else list(DEFAULT_MEMBER_PERMISSIONS)
+    active = get_active_member(session, quest_id, user_id)
+    if active is not None:
+        _replace_permissions(session, active, perms, granted_by_id)
+        return active
+    tombstoned = session.execute(
+        select(QuestMember)
+        .where(
+            QuestMember.quest_id == quest_id,
+            QuestMember.user_id == user_id,
+            QuestMember.removed_at.is_not(None),
+        )
+        .order_by(QuestMember.removed_at.desc())
+    ).scalars().first()
+    if tombstoned is not None:
+        tombstoned.removed_at = None
+        tombstoned.joined_at = datetime.now(timezone.utc)
+        _replace_permissions(session, tombstoned, perms, granted_by_id)
+        return tombstoned
+    member = QuestMember(id=uuid.uuid4(), quest_id=quest_id, user_id=user_id)
+    session.add(member)
+    session.flush()  # id 確定＝権限行の FK に使う
+    _replace_permissions(session, member, perms, granted_by_id)
+    return member
+
+
+def remove_member(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestMember | None:
+    """パーティーから外す（`removed_at` 設定＝論理削除）＋権限行を削除して権限を失う（§5.8）。
+
+    アイデア/投票/評価/コメントは削除しない（表示継続）。有効参加が無ければ no-op で None（冪等）。
+    """
+    active = get_active_member(session, quest_id, user_id)
+    if active is None:
+        return None
+    active.removed_at = datetime.now(timezone.utc)
+    for perm in session.execute(
+        select(QuestMemberPermission).where(QuestMemberPermission.quest_member_id == active.id)
+    ).scalars().all():
+        session.delete(perm)
+    return active
+
+
+def set_member_permissions(
+    session: Session,
+    quest_id: uuid.UUID,
+    user_id: uuid.UUID,
+    permissions: list[str],
+    *,
+    granted_by_id: uuid.UUID | None = None,
+) -> QuestMember | None:
+    """有効メンバーの権限セットを置換（C.3 PUT .../permissions）。無効/不在は None。"""
+    active = get_active_member(session, quest_id, user_id)
+    if active is None:
+        return None
+    _replace_permissions(session, active, permissions, granted_by_id)
+    return active
+
+
+def get_permissions(session: Session, quest_member_id: uuid.UUID) -> list[str]:
+    return list(
+        session.execute(
+            select(QuestMemberPermission.permission).where(
+                QuestMemberPermission.quest_member_id == quest_member_id
+            )
+        ).scalars().all()
+    )
+
+
+def list_active_members(session: Session, quest_id: uuid.UUID) -> list[QuestMember]:
+    """有効なパーティー参加（`removed_at IS NULL`）を参加日時順で取得（C.1 GET .../members）。"""
+    return list(
+        session.execute(
+            select(QuestMember)
+            .where(QuestMember.quest_id == quest_id, QuestMember.removed_at.is_(None))
+            .order_by(QuestMember.joined_at)
+        ).scalars().all()
+    )
+
+
+def count_active_members(session: Session, quest_id: uuid.UUID) -> int:
+    """有効パーティー人数（一覧の member_count・C.1）。"""
+    return int(
+        session.execute(
+            select(func.count())
+            .select_from(QuestMember)
+            .where(QuestMember.quest_id == quest_id, QuestMember.removed_at.is_(None))
+        ).scalar_one()
+    )
+
+
+def _replace_permissions(
+    session: Session,
+    member: QuestMember,
+    permissions: list[str],
+    granted_by_id: uuid.UUID | None,
+) -> None:
+    """当該メンバーの権限行を全置換（重複排除・順序非依存）。UNIQUE(quest_member_id, permission)。"""
+    desired = list(dict.fromkeys(permissions))  # 重複排除・順序保持
+    existing = {
+        p.permission: p
+        for p in session.execute(
+            select(QuestMemberPermission).where(QuestMemberPermission.quest_member_id == member.id)
+        ).scalars().all()
+    }
+    for perm, row in existing.items():
+        if perm not in desired:
+            session.delete(row)
+    for perm in desired:
+        if perm not in existing:
+            session.add(
+                QuestMemberPermission(
+                    id=uuid.uuid4(),
+                    quest_member_id=member.id,
+                    permission=perm,
+                    granted_by_id=granted_by_id,
+                )
+            )
