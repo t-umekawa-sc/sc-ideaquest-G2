@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
+from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
 
 # 新規参加メンバーの既定権限（サーバー自動付与・§5.9/C.3）。
@@ -97,7 +98,9 @@ def list_quests_for_user(
     stmt = select(Quest).where(Quest.deleted_at.is_(None), or_(public_cond, draft_cond))
 
     if q:
-        stmt = stmt.where(Quest.title.ilike(f"%{q}%"))
+        # 簡易絞り＝件名/目的の部分一致（横断全文検索は §1.11 PGroonga に委譲・C.1）。カテゴリ一致は後続。
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Quest.title.ilike(like), Quest.purpose.ilike(like)))
     if status:
         stmt = stmt.where(Quest.status.in_(status))
     if group_id is not None:
@@ -240,6 +243,58 @@ def list_active_members(session: Session, quest_id: uuid.UUID) -> list[QuestMemb
     )
 
 
+def list_visible_groups(session: Session, user_id: uuid.UUID, *, q: str | None = None) -> list[QuestGroup]:
+    """自分が有効所属する（`quest_group_members.removed_at IS NULL`）有効グループ一覧（C.4 GET /quest-groups）。
+
+    削除済みグループ（`deleted_at`）は除外。`q` 指定で name 部分一致。SC-10 フィルタ・SC-11 グループ選択に使う。
+    """
+    stmt = (
+        select(QuestGroup)
+        .join(QuestGroupMember, QuestGroupMember.quest_group_id == QuestGroup.id)
+        .where(
+            QuestGroupMember.user_id == user_id,
+            QuestGroupMember.removed_at.is_(None),
+            QuestGroup.deleted_at.is_(None),
+        )
+    )
+    if q:
+        stmt = stmt.where(QuestGroup.name.ilike(f"%{q}%"))
+    return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
+
+
+def get_owners_and_groups(
+    session: Session, owner_ids: list[uuid.UUID], group_ids: list[uuid.UUID]
+) -> tuple[dict, dict]:
+    """一覧の N+1 回避＝ページ分の owner（users）と quest_group をまとめて引く（id→ORM の dict）。"""
+    from app.tenant.profile.orm import User
+
+    owners: dict = {}
+    groups: dict = {}
+    if owner_ids:
+        owners = {
+            u.id: u
+            for u in session.execute(select(User).where(User.id.in_(owner_ids))).scalars().all()
+        }
+    if group_ids:
+        groups = {
+            g.id: g
+            for g in session.execute(select(QuestGroup).where(QuestGroup.id.in_(group_ids))).scalars().all()
+        }
+    return owners, groups
+
+
+def list_categories_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict:
+    """複数クエストのカテゴリをまとめて引く（quest_id→[QuestCategory]）。一覧の N+1 回避。"""
+    result: dict = {}
+    if not quest_ids:
+        return result
+    for c in session.execute(
+        select(QuestCategory).where(QuestCategory.quest_id.in_(quest_ids)).order_by(QuestCategory.label)
+    ).scalars().all():
+        result.setdefault(c.quest_id, []).append(c)
+    return result
+
+
 def count_active_members(session: Session, quest_id: uuid.UUID) -> int:
     """有効パーティー人数（一覧の member_count・C.1）。"""
     return int(
@@ -249,6 +304,18 @@ def count_active_members(session: Session, quest_id: uuid.UUID) -> int:
             .where(QuestMember.quest_id == quest_id, QuestMember.removed_at.is_(None))
         ).scalar_one()
     )
+
+
+def count_active_members_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict:
+    """複数クエストの有効パーティー人数をまとめて計上（quest_id→count・一覧の N+1 回避）。"""
+    if not quest_ids:
+        return {}
+    rows = session.execute(
+        select(QuestMember.quest_id, func.count())
+        .where(QuestMember.quest_id.in_(quest_ids), QuestMember.removed_at.is_(None))
+        .group_by(QuestMember.quest_id)
+    ).all()
+    return {qid: int(n) for qid, n in rows}
 
 
 def _replace_permissions(
