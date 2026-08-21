@@ -426,9 +426,10 @@ window.addEventListener('resize', () => applyCellClips());
   });
 })();
 
-/* --- 入力バリデーションのインラインエラー（alert() の代替・標準ヘルパー） ---
-   使い方: clearFieldErrors(モーダルパネル) でリセット → 必須未入力等に setFieldError(input, '文言')。
-   最初のエラーフィールドへフォーカスする（呼び出し側で focusFirstError も可）。 */
+/* --- 入力バリデーションのインラインエラー（alert() の代替・標準ヘルパー・デザイン標準 §4.7） ---
+   使い方: clearFieldErrors(モーダルパネル) でリセット → 必須未入力/形式不正等に setFieldError(input, '文言')。
+   検証は送信時＋blur。エラー項目へのフォーカス自動移動はしない（改定 2026-08-22）。
+   フィールドに紐づかない一般エラー/件数要約はフォーム先頭の .form-summary に出す（§4.7・上部サマリ）。 */
 function clearFieldErrors(root) {
   (root || document).querySelectorAll('.field__error').forEach(e => e.remove());
   (root || document).querySelectorAll('[aria-invalid="true"]').forEach(e => e.removeAttribute('aria-invalid'));
