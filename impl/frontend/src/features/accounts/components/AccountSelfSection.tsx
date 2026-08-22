@@ -11,8 +11,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Avatar, DataTable, RowMenu } from "@/components/ui";
-import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import type { ConfirmOptions, DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   ACCOUNTS_CHANGED_EVENT,
@@ -44,6 +44,8 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
   const router = useRouter();
   const { accounts, loading, loadError, reload } = useAllAccounts(listOwnAccounts);
   const [actionError, setActionError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const snack = useSnackbar();
 
   // 発行/編集は別ルート（URL モーダル）で行う＝成功時の ACCOUNTS_CHANGED_EVENT を購読して一覧を再取得。
   useEffect(() => {
@@ -54,19 +56,21 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
 
   const editHref = (a: Account) => `/admin/accounts/${a.account_id}/edit`;
 
-  async function runAction(fn: () => Promise<unknown>, confirmMsg?: string, sentMsg?: string) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  // 副作用アクションはカスタム確認（§15 useConfirm）→完了はスナックバー（§14）。window.confirm/alert は使わない。
+  async function runAction(fn: () => Promise<unknown>, confirmOpts?: ConfirmOptions, doneMsg?: string) {
+    if (confirmOpts && !(await confirm(confirmOpts))) return;
     setActionError(null);
     try {
       await fn();
-      if (sentMsg) window.alert(sentMsg);
+      if (doneMsg) snack({ type: "success", title: doneMsg });
       await reload();
     } catch (err) {
-      setActionError(
+      const msg =
         err instanceof ApiError && err.code === "forbidden"
           ? "この操作を行う権限がありません（システム管理者は無効化できません）。"
-          : "操作に失敗しました。",
-      );
+          : "操作に失敗しました。";
+      setActionError(msg);
+      snack({ type: "error", title: "操作に失敗しました", msg });
     }
   }
 
@@ -78,16 +82,36 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
         { label: "編集", onClick: () => router.push(editHref(a)) },
         {
           label: "パスワード再設定",
-          onClick: () => runAction(() => resetOwnPassword(a.account_id), undefined, "パスワード再設定リンクを送信しました。"),
+          onClick: () =>
+            runAction(
+              () => resetOwnPassword(a.account_id),
+              { title: "パスワード再設定", msg: `「${a.display_name}」にパスワード再設定リンクを送信しますか？`, confirmLabel: "送信する" },
+              "パスワード再設定リンクを送信しました。",
+            ),
         },
         {
           label: "無効化",
           danger: true,
-          onClick: () => runAction(() => disableOwnAccount(a.account_id), `「${a.display_name}」を無効化しますか？`),
+          onClick: () =>
+            runAction(
+              () => disableOwnAccount(a.account_id),
+              { variant: "danger", title: "アカウントを無効化", msg: `「${a.display_name}」を無効化しますか？（ログインできなくなります）`, confirmLabel: "無効化する" },
+              "アカウントを無効化しました。",
+            ),
         },
       ];
     }
-    return [{ label: "再有効化", onClick: () => runAction(() => enableOwnAccount(a.account_id)) }];
+    return [
+      {
+        label: "再有効化",
+        onClick: () =>
+          runAction(
+            () => enableOwnAccount(a.account_id),
+            { title: "アカウントを再有効化", msg: `「${a.display_name}」を再有効化しますか？`, confirmLabel: "再有効化する" },
+            "アカウントを再有効化しました。",
+          ),
+      },
+    ];
   }
 
   // 列定義（正＝mocks/SC-93 の DataTable columns）。所属グループは list 未提供＝「—」プレースホルダ。

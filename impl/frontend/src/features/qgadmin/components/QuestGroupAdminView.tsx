@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, DataTable, RowMenu } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { GROUP_MEMBERS_CHANGED_EVENT, listGroupMembers, listMyGroups, removeMember, type Member, type QuestGroup } from "../api";
@@ -16,6 +16,8 @@ import "@/features/companies/companies.css";
 import "../qgadmin.css";
 
 export function QuestGroupAdminView() {
+  const confirm = useConfirm();
+  const snack = useSnackbar();
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [notAdmin, setNotAdmin] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -71,13 +73,23 @@ export function QuestGroupAdminView() {
 
   async function onRemove(accountId: string, name: string) {
     if (!selectedId) return;
-    if (!window.confirm(`「${name}」をこのグループから除外しますか？`)) return;
+    // 除外は編集ダイアログを開かない副作用＝カスタム確認ダイアログ（§15・破壊的）。
+    const ok = await confirm({
+      variant: "danger",
+      title: "グループから除外",
+      msg: `「${name}」をこのグループから除外しますか？（アカウント本体・他グループ所属・これまでの入力は残ります）`,
+      confirmLabel: "除外する",
+    });
+    if (!ok) return;
     setError(null);
     try {
       await removeMember(selectedId, accountId);
+      snack({ type: "success", title: `「${name}」を除外しました` });
       await loadMembers(selectedId);
     } catch {
-      setError("除外に失敗しました。");
+      const msg = "除外に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
     }
   }
 

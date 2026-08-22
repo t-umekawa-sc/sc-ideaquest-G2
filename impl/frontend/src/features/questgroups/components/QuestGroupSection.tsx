@@ -6,7 +6,7 @@
 // 一覧の操作標準は DataTable に委譲＝検索/絞込/ソート/列設定/CSV/ピン/カード（§4.5）。listQuestGroups は全件返す。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, RowMenu } from "@/components/ui";
+import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createQuestGroup, deleteQuestGroup, listQuestGroups, renameQuestGroup, type QuestGroup } from "../api";
@@ -22,6 +22,8 @@ function createErrorMessage(err: unknown): string {
 }
 
 export function QuestGroupSection({ companyId }: { companyId: string }) {
+  const confirm = useConfirm();
+  const snack = useSnackbar();
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,17 +122,26 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
   }
 
   async function onDelete(g: QuestGroup) {
-    if (!window.confirm(`クエストグループ「${g.name}」を削除しますか？（空のグループのみ）`)) return;
+    // 削除は編集ダイアログを開かない副作用＝カスタム確認ダイアログ（§15）。
+    const ok = await confirm({
+      variant: "danger",
+      title: "クエストグループを削除",
+      msg: `クエストグループ「${g.name}」を削除しますか？（空のグループのみ）`,
+      confirmLabel: "削除する",
+    });
+    if (!ok) return;
     setActionError(null);
     try {
       await deleteQuestGroup(companyId, g.group_id);
+      snack({ type: "success", title: "クエストグループを削除しました" });
       await reload();
     } catch (err) {
-      setActionError(
+      const msg =
         err instanceof ApiError && err.code === "conflict"
           ? "所属メンバーがいるため削除できません（先に所属を外してください）。"
-          : "削除に失敗しました。",
-      );
+          : "削除に失敗しました。";
+      setActionError(msg);
+      snack({ type: "error", title: "削除できませんでした", msg });
     }
   }
 
