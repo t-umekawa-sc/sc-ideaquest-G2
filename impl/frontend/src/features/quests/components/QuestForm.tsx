@@ -10,7 +10,7 @@
 // 権限キーは UI（manage/eval/vote/idea/comment）⇔ API（quest_admin/evaluator/vote/idea_create/comment）で写像。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, FormSummary, ModalBody, ModalFooter, Swatches } from "@/components/ui";
+import { Button, Field, FormSummary, ModalBody, ModalFooter, Swatches, useSnackbar } from "@/components/ui";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
 import {
   createQuest,
@@ -77,6 +77,7 @@ type Props = {
 
 export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, locale = "ja", onDone, onCancel }: Props) {
   const isEdit = mode === "edit";
+  const snack = useSnackbar();
 
   const msg = useMemo(
     () =>
@@ -336,6 +337,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         await applyIcon(questId!);
       }
       if (iconPreview) URL.revokeObjectURL(iconPreview);
+      const doneTitle =
+        kind === "create-draft" ? "下書きを保存しました"
+        : kind === "create-publish" ? "クエストを作成・公開しました"
+        : kind === "edit-publish" ? "クエストを公開しました"
+        : "クエストを保存しました";
+      snack({ type: "success", title: doneTitle });
       onDone();
     } catch (err) {
       const mapped = mapServerErrors(err, locale, {

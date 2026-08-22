@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, ModalBody, ModalFooter } from "@/components/ui";
+import { Button, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
@@ -51,6 +51,7 @@ type Props = {
 };
 
 export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, onCancel }: Props) {
+  const snack = useSnackbar();
   const isCompany = scope === "company";
   const idPrefix = isCompany ? "a" : "s"; // field id 接頭辞（SC-92=a／SC-93=s・e2e/mock 保持）
   const showRole = isCompany; // system_role は SC-92 のみ（SC-93 は general 固定・付与不可 B.2.1）
@@ -141,6 +142,11 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           });
         }
       }
+      snack(
+        mode === "issue"
+          ? { type: "success", title: "アカウントを発行しました", msg: "初回パスワード設定リンクを送信しました。" }
+          : { type: "success", title: "アカウントを更新しました" },
+      );
       onDone();
     } catch (err) {
       setFormError(issueErrorMessage(err));

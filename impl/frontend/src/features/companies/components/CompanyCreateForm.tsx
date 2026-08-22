@@ -6,7 +6,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, ModalBody, ModalFooter, Swatches } from "@/components/ui";
+import { Button, Field, ModalBody, ModalFooter, Swatches, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import { createCompany, setCompanyIcon } from "../api";
@@ -33,6 +33,7 @@ function createErrorMessage(err: unknown): string {
 }
 
 export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const snack = useSnackbar();
   // 複製で開かれた場合は名前・カラーを引き継ぐ（会社コード/DB識別子は一意キー＝引き継がない・§4.5 複製）。
   const searchParams = useSearchParams();
   const dup = useMemo(
@@ -74,6 +75,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
       const created = await createCompany({ name, company_code: companyCode, db_identifier: dbIdentifier, color });
       if (iconFile && created) await setCompanyIcon(created.company_id, iconFile);
       if (iconPreview) URL.revokeObjectURL(iconPreview);
+      snack({ type: "success", title: "会社を作成しました", msg: `「${name}」を登録しました（停止状態）。` });
       onDone();
     } catch (err) {
       setFormError(createErrorMessage(err));

@@ -92,6 +92,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       setName("");
       setDupMode(false);
       setShowForm(false);
+      snack({ type: "success", title: "クエストグループを作成しました" });
       await reload();
     } catch (err) {
       setFormError(createErrorMessage(err));
@@ -111,9 +112,13 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     setEditError(null);
     setEditPending(true);
     try {
-      if (next !== editing.name) await renameQuestGroup(companyId, editing.group_id, next);
+      const changed = next !== editing.name;
+      if (changed) await renameQuestGroup(companyId, editing.group_id, next);
       setEditing(null);
-      await reload();
+      if (changed) {
+        snack({ type: "success", title: "グループ名を更新しました" });
+        await reload();
+      }
     } catch (err) {
       setEditError(createErrorMessage(err));
     } finally {

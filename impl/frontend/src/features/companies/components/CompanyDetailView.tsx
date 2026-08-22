@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Button, Swatches } from "@/components/ui";
+import { Button, Swatches, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { AccountSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
@@ -27,6 +27,7 @@ function statusView(status: string): [string, string] {
 
 export function CompanyDetailView({ companyId }: { companyId: string }) {
   const router = useRouter();
+  const snack = useSnackbar();
   const [company, setCompany] = useState<CompanyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +73,11 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     try {
       const updated = await updateCompanySettings(companyId, { [field]: value });
       setCompany(updated); // サーバー整合後の値で反映（記名時 hide_voters=false 等）
+      snack({ type: "success", title: "設定を更新しました" });
     } catch {
-      setError("設定の更新に失敗しました。");
+      const msg = "設定の更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
     }
   }
 
@@ -83,8 +87,11 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     try {
       const updated = await updateCompanyProfile(companyId, { color: next });
       setCompany(updated);
+      snack({ type: "success", title: "会社カラーを更新しました" });
     } catch {
-      setError("会社カラーの更新に失敗しました。");
+      const msg = "会社カラーの更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
     }
   }
 
@@ -96,10 +103,13 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     try {
       const updated = await setCompanyIcon(companyId, file); // 即保存＝応答は署名URL 込みの会社詳細
       setCompany(updated);
+      snack({ type: "success", title: "アイコン画像を更新しました" });
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "validation_error"
+      const msg = err instanceof ApiError && err.code === "validation_error"
         ? "画像は PNG/JPEG/WebP/GIF・5MB 以下でお願いします。"
-        : "アイコン画像の更新に失敗しました。");
+        : "アイコン画像の更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: "更新できませんでした", msg });
     }
   }
   async function onClearIcon() {
@@ -107,8 +117,11 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     try {
       await deleteCompanyIcon(companyId); // 既定（頭文字＋会社カラー）へ戻す
       await load();
+      snack({ type: "success", title: "アイコン画像を削除しました" });
     } catch {
-      setError("アイコン画像の削除に失敗しました。");
+      const msg = "アイコン画像の削除に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
     }
   }
 
