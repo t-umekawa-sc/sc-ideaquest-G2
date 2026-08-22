@@ -232,7 +232,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
             <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
               キャンセル
             </Button>
-            <Button type="submit" variant="primary" disabled={pending}>
+            <Button type="submit" variant="primary" loading={pending}>
               {pending ? "作成中…" : "作成する"}
             </Button>
           </ModalFooter>
@@ -262,7 +262,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
             <Button type="button" variant="outline" onClick={() => setEditing(null)}>
               キャンセル
             </Button>
-            <Button type="submit" variant="primary" disabled={editPending}>
+            <Button type="submit" variant="primary" loading={editPending}>
               {editPending ? "保存中…" : "保存する"}
             </Button>
           </ModalFooter>

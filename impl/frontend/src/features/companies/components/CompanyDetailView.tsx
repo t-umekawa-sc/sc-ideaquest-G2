@@ -203,7 +203,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           <span>状態: {company.status === "active"
             ? <span className="badge st-active">有効</span>
             : <span className="badge st-suspended">停止（DB未整備）</span>}</span>
-          <Button type="button" variant="primary" onClick={onProvision} disabled={provisioning}>
+          <Button type="button" variant="primary" onClick={onProvision} loading={provisioning}>
             {provisioning ? "準備中…" : company.status === "active" ? "会社DBを再準備" : "会社DBを作成して有効化"}
           </Button>
         </div>

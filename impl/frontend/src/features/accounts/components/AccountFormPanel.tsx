@@ -215,7 +215,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         <Button type="button" variant="outline" onClick={onCancel}>
           キャンセル
         </Button>
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" loading={pending}>
           {pending ? "保存中…" : mode === "issue" ? "発行する（初回PW設定リンク送信）" : "保存する"}
         </Button>
       </ModalFooter>

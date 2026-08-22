@@ -133,6 +133,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [summary, setSummary] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const [pendingKind, setPendingKind] = useState<string | null>(null); // 押下ボタンだけを processing 表示（§13-1）
 
   const ownerInitial = ownerLabel.trim().charAt(0) || "?";
   const iconChar = name.trim().charAt(0) || "新";
@@ -321,6 +322,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     setFieldErrors({});
     setSummary([]);
     setPending(true);
+    setPendingKind(kind);
     try {
       if (kind === "create-draft" || kind === "create-publish") {
         const created = await createQuest({
@@ -357,6 +359,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       setSummary(mapped.summary);
     } finally {
       setPending(false);
+      setPendingKind(null);
     }
   }
 
@@ -550,16 +553,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>キャンセル</Button>
         {!isEdit ? (
           <>
-            <Button type="button" variant="outline" onClick={() => void persist("create-draft")} disabled={pending || noGroups}>下書き保存</Button>
-            <Button type="submit" variant="primary" disabled={pending || noGroups}>{pending ? "保存中…" : "クエストを作成"}</Button>
+            <Button type="button" variant="outline" onClick={() => void persist("create-draft")} disabled={pending || noGroups} loading={pendingKind === "create-draft"}>下書き保存</Button>
+            <Button type="submit" variant="primary" disabled={pending || noGroups} loading={pendingKind === "create-publish"}>{pendingKind === "create-publish" ? "保存中…" : "クエストを作成"}</Button>
           </>
         ) : status === "draft" ? (
           <>
-            <Button type="button" variant="outline" onClick={() => void persist("edit-save")} disabled={pending}>下書き保存</Button>
-            <Button type="submit" variant="primary" disabled={pending}>{pending ? "公開中…" : "公開する"}</Button>
+            <Button type="button" variant="outline" onClick={() => void persist("edit-save")} disabled={pending} loading={pendingKind === "edit-save"}>下書き保存</Button>
+            <Button type="submit" variant="primary" disabled={pending} loading={pendingKind === "edit-publish"}>{pendingKind === "edit-publish" ? "公開中…" : "公開する"}</Button>
           </>
         ) : (
-          <Button type="submit" variant="primary" disabled={pending || frozen}>{pending ? "保存中…" : "保存する"}</Button>
+          <Button type="submit" variant="primary" disabled={pending || frozen} loading={pendingKind === "edit-save"}>{pendingKind === "edit-save" ? "保存中…" : "保存する"}</Button>
         )}
       </ModalFooter>
     </form>

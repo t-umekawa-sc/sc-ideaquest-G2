@@ -162,7 +162,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
         <Button type="button" variant="outline" onClick={onCancel}>
           キャンセル
         </Button>
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" loading={pending}>
           {pending ? "作成中…" : "作成する"}
         </Button>
       </ModalFooter>
