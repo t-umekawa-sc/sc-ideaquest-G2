@@ -20,7 +20,14 @@ from app.tenant.quests.schemas import (
     QuestGroupsResponse,
     QuestIconImageResponse,
     QuestListResponse,
+    QuestMemberAddRequest,
+    QuestMemberDTO,
+    QuestMemberPermissionsRequest,
+    QuestMembersResponse,
+    QuestPartyUpdateRequest,
+    QuestPermissionsResponse,
     QuestPublishRequest,
+    QuestTransitionRequest,
     QuestUpdateRequest,
 )
 
@@ -167,5 +174,117 @@ def delete_quest_icon(
     verify_origin(request)
     verify_csrf(request)
     quest_service.delete_quest_icon(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+
+
+# ---- パーティー粒度（SC-12 パーティータブ・C.3）／状態遷移（C.5）／削除 ----
+
+
+@router.get("/quests/{quest_id}/members", response_model=QuestMembersResponse)
+def list_quest_members(
+    quest_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestMembersResponse:
+    """パーティー＋権限（SC-12 パーティータブ・C.1）。可視性はサーバー強制（範囲外 404）。読取専用。"""
+    result = quest_service.list_party_members(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+    return QuestMembersResponse(**result)
+
+
+@router.put("/quests/{quest_id}/party", response_model=QuestMembersResponse)
+def set_quest_party(
+    quest_id: str,
+    body: QuestPartyUpdateRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestMembersResponse:
+    """パーティーを一括更新（C.3 PUT /party・あるべき全体像で差分適用）。owner/quest_admin。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.set_party(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, members=body.members,
+    )
+    return QuestMembersResponse(**result)
+
+
+@router.post("/quests/{quest_id}/members", response_model=QuestMemberDTO, status_code=201)
+def add_quest_member(
+    quest_id: str,
+    body: QuestMemberAddRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestMemberDTO:
+    """メンバーを1名追加（C.3 POST /members・増分）。候補制限・owner 付与は作成者のみ・既定権限。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.add_party_member(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+        user_id=body.user_id, permissions=body.permissions,
+    )
+    return QuestMemberDTO(**result)
+
+
+@router.delete("/quests/{quest_id}/members/{user_id}", status_code=204)
+def remove_quest_member(
+    quest_id: str,
+    user_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """メンバーをパーティーから外す（C.3 DELETE /members・論理削除）。作成者は除外不可。owner/quest_admin。"""
+    verify_origin(request)
+    verify_csrf(request)
+    quest_service.remove_party_member(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id=user_id,
+    )
+
+
+@router.put("/quests/{quest_id}/members/{user_id}/permissions", response_model=QuestPermissionsResponse)
+def set_quest_member_permissions(
+    quest_id: str,
+    user_id: str,
+    body: QuestMemberPermissionsRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestPermissionsResponse:
+    """あるメンバーの権限セットを置換（C.3 PUT .../permissions）。owner 付与は作成者のみ・作成者は保護。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.set_member_permissions(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+        user_id=user_id, permissions=body.permissions,
+    )
+    return QuestPermissionsResponse(**result)
+
+
+@router.post("/quests/{quest_id}/transition", response_model=QuestDetailDTO)
+def transition_quest(
+    quest_id: str,
+    body: QuestTransitionRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestDetailDTO:
+    """ステータスを前進（C.5・owner/quest_admin）。逆行・飛び越えは 409。draft→recruiting は strict 検証。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.transition_quest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, to=body.to,
+    )
+    return QuestDetailDTO(**result)
+
+
+@router.delete("/quests/{quest_id}", status_code=204)
+def delete_quest(
+    quest_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """クエストを論理削除（C.2 DELETE・owner/quest_admin）。子データは監査保持（§5.6）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    quest_service.delete_quest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )

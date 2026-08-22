@@ -338,3 +338,122 @@ def test_c_tc_129_get_recruiting_detail_as_member(client, env):
     assert body["status"] == "recruiting"
     assert body["categories"] == ["UX"]
     assert body["quest_group"]["id"] == str(env.group_id)
+
+
+# ---- SC-12: パーティー粒度（C.3）／状態遷移（C.5）／削除（C-TC-130〜142） ----
+
+
+def test_c_tc_130_list_members(client, env):
+    """C-TC-130: GET /quests/{id}/members＝作成者を含むパーティーを返す（SC-12 パーティータブ）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.get(f"{QUESTS}/{qid}/members")
+    assert r.status_code == 200, r.text
+    assert any(m["is_creator"] for m in r.json()["data"])
+
+
+def test_c_tc_131_put_party_bulk(client, env):
+    """C-TC-131: PUT /party＝あるべき全体像で一括差分適用（作成者は保護され残る）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.put(f"{QUESTS}/{qid}/party", json={"members": [{"user_id": str(env.other_user_id)}]}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    ids = {m["user"]["user_id"] for m in r.json()["data"]}
+    assert str(env.user_id) in ids and str(env.other_user_id) in ids
+
+
+def test_c_tc_132_add_member(client, env):
+    """C-TC-132: POST /members＝1名追加・既定権限（vote/idea_create/comment）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    assert set(r.json()["permissions"]) == {"vote", "idea_create", "comment"}
+
+
+def test_c_tc_133_remove_member(client, env):
+    """C-TC-133: DELETE /members/{user_id}＝論理削除でパーティーから外れる。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    r = client.delete(f"{QUESTS}/{qid}/members/{env.other_user_id}", headers=_csrf(client))
+    assert r.status_code == 204, r.text
+    ids = {m["user"]["user_id"] for m in client.get(f"{QUESTS}/{qid}/members").json()["data"]}
+    assert str(env.other_user_id) not in ids
+
+
+def test_c_tc_134_cannot_remove_creator(client, env):
+    """C-TC-134: 作成者はパーティーから外せない（422 作成者保護・C.3）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.delete(f"{QUESTS}/{qid}/members/{env.user_id}", headers=_csrf(client))
+    assert r.status_code == 422, r.text
+
+
+def test_c_tc_135_set_member_permissions(client, env):
+    """C-TC-135: PUT .../permissions＝権限セットを置換。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    r = client.put(f"{QUESTS}/{qid}/members/{env.other_user_id}/permissions", json={"permissions": ["vote", "evaluator"]}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert set(r.json()["permissions"]) == {"vote", "evaluator"}
+
+
+def test_c_tc_136_cannot_change_creator_permissions(client, env):
+    """C-TC-136: 作成者の権限は変更不可（422 保護・owner 剥奪防止・C.3）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.put(f"{QUESTS}/{qid}/members/{env.user_id}/permissions", json={"permissions": ["vote"]}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+
+
+def test_c_tc_137_transition_forward(client, env):
+    """C-TC-137: 前進遷移 recruiting→in_progress＝200。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.post(f"{QUESTS}/{qid}/transition", json={"to": "in_progress"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "in_progress"
+
+
+def test_c_tc_138_transition_skip_conflicts(client, env):
+    """C-TC-138: 飛び越え遷移 recruiting→evaluating は 409（逆行/飛び越え禁止・C.5）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.post(f"{QUESTS}/{qid}/transition", json={"to": "evaluating"}, headers=_csrf(client))
+    assert r.status_code == 409, r.text
+
+
+def test_c_tc_139_transition_draft_publishes_with_strict(client, env):
+    """C-TC-139: draft→recruiting は publish 相当＝strict 充足なら 200 recruiting。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="draft")  # seed_quest は category UX 付き＝strict 充足
+    r = client.post(f"{QUESTS}/{qid}/transition", json={"to": "recruiting"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "recruiting"
+
+
+def test_c_tc_140_delete_quest(client, env):
+    """C-TC-140: DELETE /quests/{id}＝論理削除。以後 GET 詳細は 404。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    r = client.delete(f"{QUESTS}/{qid}", headers=_csrf(client))
+    assert r.status_code == 204, r.text
+    assert client.get(f"{QUESTS}/{qid}").status_code == 404
+
+
+def test_c_tc_141_party_edit_forbidden_for_non_admin(client, env):
+    """C-TC-141: owner/quest_admin でない者のパーティー編集は 403（C.3 認可）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting", owner=env.other_user_id)  # seed user は非 owner/非メンバー
+    r = client.put(f"{QUESTS}/{qid}/party", json={"members": []}, headers=_csrf(client))
+    assert r.status_code == 403, r.text
+
+
+def test_c_tc_142_completed_party_frozen(client, env):
+    """C-TC-142: 完了クエストのパーティー編集は 409（書き込み凍結・C.5）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="completed")
+    r = client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    assert r.status_code == 409, r.text

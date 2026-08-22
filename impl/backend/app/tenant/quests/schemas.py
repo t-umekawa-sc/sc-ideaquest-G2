@@ -182,3 +182,51 @@ class QuestCandidateDTO(BaseModel):
 class QuestCandidatesResponse(BaseModel):
     data: list[QuestCandidateDTO]
     page_info: QuestCursorPageInfo
+
+
+# ---- パーティー粒度（C.3）／状態遷移（C.5）。request は extra=forbid（§2.2） ----
+
+
+class QuestMembersResponse(BaseModel):
+    """GET /quests/{id}/members・PUT /quests/{id}/party の応答（パーティー一覧・C.1/C.3）。"""
+
+    data: list[QuestMemberDTO]
+
+
+class QuestPartyUpdateRequest(BaseModel):
+    """PUT /quests/{id}/party（C.3）＝あるべき全体像で一括差分適用。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    members: list[QuestMemberInput] = []
+
+
+class QuestMemberAddRequest(BaseModel):
+    """POST /quests/{id}/members（C.3・増分）。permissions 省略時は既定を付与。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str
+    permissions: list[str] | None = None
+
+
+class QuestMemberPermissionsRequest(BaseModel):
+    """PUT /quests/{id}/members/{user_id}/permissions（C.3）＝権限セット置換。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    permissions: list[str] = []
+
+
+class QuestPermissionsResponse(BaseModel):
+    """権限置換後の権限配列（C.3 PUT .../permissions）。"""
+
+    permissions: list[str] = []
+
+
+class QuestTransitionRequest(BaseModel):
+    """POST /quests/{id}/transition（C.5）＝前進のみの状態遷移。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    to: str

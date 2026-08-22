@@ -11,7 +11,7 @@ import binascii
 import re
 import unicodedata
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
@@ -417,6 +417,199 @@ def get_group_member_candidates(
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
+# ---- パーティー粒度（C.3・SC-12 パーティータブ）／状態遷移（C.5）／削除 ----
+
+# 状態機械の前進順（§3・C.5）。逆行・飛び越えは 409。
+_STATUS_ORDER = ["draft", "recruiting", "in_progress", "evaluating", "completed"]
+
+
+def list_party_members(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """パーティー＋権限（SC-12 パーティータブ・C.1 GET .../members）。可視性＝owner か有効メンバー（範囲外 404）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.owner_id != user.id and repo.get_active_member(ts, quest.id, user.id) is None:
+            raise AppError(404, "not_found")
+        return {"data": _members_payload(ts, quest)}
+
+
+def set_party(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, members) -> dict:
+    """パーティーを一括更新（C.3 PUT /party・あるべき全体像で差分適用）。owner/quest_admin。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        _guard_not_completed(quest)
+        _apply_party_diff(ts, quest, members, requester=user, group_id=quest.quest_group_id)
+        data = _members_payload(ts, quest)
+        ts.commit()
+    return {"data": data}
+
+
+def add_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
+                     user_id: str, permissions) -> dict:
+    """メンバーを1名追加（C.3 POST /members・増分）。候補制限・owner 付与は作成者のみ・既定権限。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    uid = _parse_uuid(user_id, field="user_id")
+    perms = _validate_permissions(permissions)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        _guard_not_completed(quest)
+        if uid not in repo.list_active_group_member_user_ids(ts, quest.quest_group_id):
+            raise AppError(422, "validation_error", detail="候補外のユーザーは追加できません", errors=[{"field": "user_id"}])
+        if perms and "owner" in perms and user.id != quest.owner_id:
+            raise AppError(403, "forbidden", detail="owner 権限の付与は作成者のみ可能です")
+        member = repo.add_member(ts, quest.id, uid, permissions=perms, granted_by_id=user.id)
+        users = repo.get_users_by_ids(ts, {uid})
+        dto = _member_dto(ts, member, quest.owner_id, users.get(uid))
+        ts.commit()
+    return dto
+
+
+def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, user_id: str) -> None:
+    """メンバーをパーティーから外す（C.3 DELETE /members・論理削除）。作成者は除外不可（422）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    uid = _parse_uuid(user_id, field="user_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        _guard_not_completed(quest)
+        if uid == quest.owner_id:
+            raise AppError(422, "validation_error", detail="作成者はパーティーから外せません", errors=[{"field": "user_id", "reason": "last_owner"}])
+        repo.remove_member(ts, quest.id, uid)  # 有効参加が無ければ no-op（冪等）
+        ts.commit()
+
+
+def set_member_permissions(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
+                           user_id: str, permissions) -> dict:
+    """あるメンバーの権限セットを置換（C.3 PUT .../permissions）。owner 付与は作成者のみ・作成者は保護。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    uid = _parse_uuid(user_id, field="user_id")
+    perms = _validate_permissions(permissions) or []
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        _guard_not_completed(quest)
+        if uid == quest.owner_id:
+            # 作成者は常に全権限＝owner 剥奪不可（保護）。権限置換の対象にしない。
+            raise AppError(422, "validation_error", detail="作成者の権限は変更できません", errors=[{"field": "user_id", "reason": "last_owner"}])
+        if "owner" in perms and user.id != quest.owner_id:
+            raise AppError(403, "forbidden", detail="owner 権限の付与は作成者のみ可能です")
+        member = repo.set_member_permissions(ts, quest.id, uid, perms, granted_by_id=user.id)
+        if member is None:
+            raise AppError(404, "not_found")  # 有効参加でない
+        result = repo.get_permissions(ts, member.id)
+        ts.commit()
+    return {"permissions": result}
+
+
+def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, to: str) -> dict:
+    """ステータスを前進（C.5・owner/quest_admin）。逆行・飛び越えは 409。draft→recruiting は strict 検証。"""
+    if to not in _VALID_STATUS:
+        raise AppError(422, "validation_error", detail="to が不正です", errors=[{"field": "to"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        cur_idx = _STATUS_ORDER.index(quest.status)
+        # 前進は「現在の次」のみ許可（逆行・飛び越えは 409・C.5）。
+        if not (cur_idx + 1 < len(_STATUS_ORDER) and to == _STATUS_ORDER[cur_idx + 1]):
+            raise AppError(409, "conflict", detail="許可されない状態遷移です", extra={"errors": [{"reason": "invalid_state"}]})
+        if to == "recruiting":  # draft→recruiting は公開＝strict 再検証（publish と同一関門）
+            _validate_publishable(
+                title=quest.title, color=quest.color,
+                categories=repo.list_categories(ts, quest.id), quest_group_id=quest.quest_group_id,
+            )
+        quest.status = to
+        if to == "completed":
+            _finalize_completion(company_id, quest.id)  # F.4 コイン一括確定は F 実装まで no-op
+        detail = _build_detail(ts, quest, user.id)
+        ts.commit()
+    return detail
+
+
+def delete_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> None:
+    """クエストを論理削除（C.2 DELETE・owner/quest_admin）。子データは物理削除せず監査保持（§5.6）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)
+        quest.deleted_at = datetime.now(timezone.utc)
+        quest.deleted_by_id = user.id
+        ts.commit()
+
+
+def _guard_not_completed(quest) -> None:
+    """完了後の書き込み凍結（C.5）。完了クエストへの変更は 409。"""
+    if quest.status == "completed":
+        raise AppError(409, "conflict", detail="完了後は変更できません", extra={"errors": [{"reason": "invalid_state"}]})
+
+
+def _finalize_completion(company_id: uuid.UUID, quest_id: uuid.UUID) -> None:
+    """evaluating→completed の副作用＝投稿者コイン一括確定フック（正＝データモデル §7／API設計 F.4）。
+
+    TODO(F): F ドメイン実装時に評価連動コインを一括確定・付与（reason=evaluation_coin・冪等）。現フェーズは no-op。
+    """
+    return None
+
+
 # ---- ドメイン関数（全経路で共有・C.2/C.3 サーバー強制ルール） ----
 
 
@@ -557,34 +750,39 @@ def _authorize_edit(ts, quest, user) -> None:
         raise AppError(403, "forbidden")
 
 
+def _member_dto(ts, member, creator_id, user) -> dict:
+    """パーティーメンバー1件の DTO（C.1 GET .../members・SC-11/SC-12 共通形）。"""
+    return {
+        "user": {
+            "user_id": str(member.user_id),
+            "display_name": user.display_name if user else "",
+            "avatar_image_url": _image_url(user.avatar_image_path) if user else None,
+        },
+        "permissions": repo.get_permissions(ts, member.id),
+        "joined_at": member.joined_at,
+        "is_creator": member.user_id == creator_id,
+    }
+
+
+def _members_payload(ts, quest) -> list[dict]:
+    """有効パーティーの DTO 配列（GET members・PUT party・詳細で共有）。N+1 回避で users を一括取得。"""
+    members = repo.list_active_members(ts, quest.id)
+    users = repo.get_users_by_ids(ts, {m.user_id for m in members})
+    return [_member_dto(ts, m, quest.owner_id, users.get(m.user_id)) for m in members]
+
+
 def _build_detail(ts, quest, viewer_id) -> dict:
     """作成/編集/公開の応答＝クエスト詳細（カード項目＋purpose/created_at＋my_permissions＋パーティー）。"""
     owners, groups = repo.get_owners_and_groups(ts, [quest.owner_id], [quest.quest_group_id])
     cats = repo.list_categories(ts, quest.id)
-    members = repo.list_active_members(ts, quest.id)
-    users = repo.get_users_by_ids(ts, {m.user_id for m in members} | {quest.owner_id})
-    owner = owners.get(quest.owner_id) or users.get(quest.owner_id)
+    owner = owners.get(quest.owner_id)
     group = groups.get(quest.quest_group_id)
 
-    member_dtos = []
-    my_permissions: list[str] = []
-    for m in members:
-        u = users.get(m.user_id)
-        perms = repo.get_permissions(ts, m.id)
-        if m.user_id == viewer_id:
-            my_permissions = perms
-        member_dtos.append(
-            {
-                "user": {
-                    "user_id": str(m.user_id),
-                    "display_name": u.display_name if u else "",
-                    "avatar_image_url": _image_url(u.avatar_image_path) if u else None,
-                },
-                "permissions": perms,
-                "joined_at": m.joined_at,
-                "is_creator": m.user_id == quest.owner_id,
-            }
-        )
+    member_dtos = _members_payload(ts, quest)
+    my_permissions = next(
+        (m["permissions"] for m in member_dtos if m["user"]["user_id"] == str(viewer_id)), []
+    )
+    members = member_dtos  # member_count は有効パーティー数
     return {
         "id": str(quest.id),
         "title": quest.title,

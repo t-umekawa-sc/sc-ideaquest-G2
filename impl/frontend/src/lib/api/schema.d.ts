@@ -804,7 +804,11 @@ export interface paths {
         get: operations["get_quest_api_v1_quests__quest_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Quest
+         * @description クエストを論理削除（C.2 DELETE・owner/quest_admin）。子データは監査保持（§5.6）。
+         */
+        delete: operations["delete_quest_api_v1_quests__quest_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -893,6 +897,110 @@ export interface paths {
          * @description クエストアイコンを削除（既定表示に戻す・論点2）。owner/quest_admin。
          */
         delete: operations["delete_quest_icon_api_v1_quests__quest_id__icon_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quest Members
+         * @description パーティー＋権限（SC-12 パーティータブ・C.1）。可視性はサーバー強制（範囲外 404）。読取専用。
+         */
+        get: operations["list_quest_members_api_v1_quests__quest_id__members_get"];
+        put?: never;
+        /**
+         * Add Quest Member
+         * @description メンバーを1名追加（C.3 POST /members・増分）。候補制限・owner 付与は作成者のみ・既定権限。
+         */
+        post: operations["add_quest_member_api_v1_quests__quest_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/party": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Quest Party
+         * @description パーティーを一括更新（C.3 PUT /party・あるべき全体像で差分適用）。owner/quest_admin。
+         */
+        put: operations["set_quest_party_api_v1_quests__quest_id__party_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Quest Member
+         * @description メンバーをパーティーから外す（C.3 DELETE /members・論理削除）。作成者は除外不可。owner/quest_admin。
+         */
+        delete: operations["remove_quest_member_api_v1_quests__quest_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/members/{user_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Quest Member Permissions
+         * @description あるメンバーの権限セットを置換（C.3 PUT .../permissions）。owner 付与は作成者のみ・作成者は保護。
+         */
+        put: operations["set_quest_member_permissions_api_v1_quests__quest_id__members__user_id__permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transition Quest
+         * @description ステータスを前進（C.5・owner/quest_admin）。逆行・飛び越えは 409。draft→recruiting は strict 検証。
+         */
+        post: operations["transition_quest_api_v1_quests__quest_id__transition_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1788,6 +1896,16 @@ export interface components {
             page_info: components["schemas"]["QuestCursorPageInfo"];
         };
         /**
+         * QuestMemberAddRequest
+         * @description POST /quests/{id}/members（C.3・増分）。permissions 省略時は既定を付与。
+         */
+        QuestMemberAddRequest: {
+            /** User Id */
+            user_id: string;
+            /** Permissions */
+            permissions?: string[] | null;
+        };
+        /**
          * QuestMemberDTO
          * @description パーティーメンバー1件の応答（C.1 GET .../members と同形・SC-11/SC-12 で再利用）。
          */
@@ -1816,6 +1934,25 @@ export interface components {
             /** Permissions */
             permissions?: string[] | null;
         };
+        /**
+         * QuestMemberPermissionsRequest
+         * @description PUT /quests/{id}/members/{user_id}/permissions（C.3）＝権限セット置換。
+         */
+        QuestMemberPermissionsRequest: {
+            /**
+             * Permissions
+             * @default []
+             */
+            permissions: string[];
+        };
+        /**
+         * QuestMembersResponse
+         * @description GET /quests/{id}/members・PUT /quests/{id}/party の応答（パーティー一覧・C.1/C.3）。
+         */
+        QuestMembersResponse: {
+            /** Data */
+            data: components["schemas"]["QuestMemberDTO"][];
+        };
         /** QuestOwnerDTO */
         QuestOwnerDTO: {
             /** User Id */
@@ -1824,6 +1961,28 @@ export interface components {
             display_name: string;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
+        };
+        /**
+         * QuestPartyUpdateRequest
+         * @description PUT /quests/{id}/party（C.3）＝あるべき全体像で一括差分適用。
+         */
+        QuestPartyUpdateRequest: {
+            /**
+             * Members
+             * @default []
+             */
+            members: components["schemas"]["QuestMemberInput"][];
+        };
+        /**
+         * QuestPermissionsResponse
+         * @description 権限置換後の権限配列（C.3 PUT .../permissions）。
+         */
+        QuestPermissionsResponse: {
+            /**
+             * Permissions
+             * @default []
+             */
+            permissions: string[];
         };
         /**
          * QuestPublishRequest
@@ -1844,6 +2003,14 @@ export interface components {
             icon_image_path?: string | null;
             /** Members */
             members?: components["schemas"]["QuestMemberInput"][] | null;
+        };
+        /**
+         * QuestTransitionRequest
+         * @description POST /quests/{id}/transition（C.5）＝前進のみの状態遷移。
+         */
+        QuestTransitionRequest: {
+            /** To */
+            to: string;
         };
         /**
          * QuestUpdateRequest
@@ -3495,6 +3662,35 @@ export interface operations {
             };
         };
     };
+    delete_quest_api_v1_quests__quest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_quest_api_v1_quests__quest_id__patch: {
         parameters: {
             query?: never;
@@ -3684,6 +3880,208 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quest_members_api_v1_quests__quest_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestMembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_quest_member_api_v1_quests__quest_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestMemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestMemberDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_quest_party_api_v1_quests__quest_id__party_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestPartyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestMembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_quest_member_api_v1_quests__quest_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_quest_member_permissions_api_v1_quests__quest_id__members__user_id__permissions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestMemberPermissionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestPermissionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_quest_api_v1_quests__quest_id__transition_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
             };
             /** @description Validation Error */
             422: {
