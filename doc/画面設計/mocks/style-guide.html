@@ -624,7 +624,7 @@
     </div>
     <p class="hint">呼び出しは1関数（デモの <code>iqSnack({type,title,msg,rewards,action,duration})</code>）を想定。
       <code>type</code>＝success/error/info（意味色）と reward/levelup（報酬・CRTガラス）。<code>aria-live</code> で読み上げ、エラーは <code>role="alert"</code>。<code>prefers-reduced-motion</code> で動きを抑制。</p>
-    <p class="hint"><strong>重なり増加時の UI（決定 2026-08-22）＝同時表示は最新 3 件まで</strong>。4 件目以降は上部に「<strong>▽ その他 N 件</strong>」を表示し、<strong>クリックで全件を縦スクロール表示（展開中は自動消滅を停止）</strong>・「▲ 折りたたむ」で戻す。「重なり（5件・上限確認）」で挙動を確認できる。</p>
+    <p class="hint"><strong>重なり増加時の UI（決定 2026-08-22）＝同時表示は最新 3 件まで</strong>。4 件目以降は上部に「<strong>▽ その他 N 件</strong>」を表示し、<strong>クリックで全件を縦スクロール表示</strong>（<strong>スナックバー領域だけに縦スクロール・各バーは潰れず自然高さ・残り時間インジケータは動き続ける</strong>）・「▲ 折りたたむ」で戻す。「重なり（5件・上限確認）」で挙動を確認できる。</p>
   </div>
 
   <!-- 15. 確認ダイアログ（提案・ゲーム要素入り） -->

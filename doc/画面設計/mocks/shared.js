@@ -1076,7 +1076,7 @@ window.DataTable = (function () {
       more.type = 'button'; more.className = 'snackbar-more'; more.style.display = 'none';
       more.addEventListener('click', () => {
         expanded = !expanded;
-        snacks(s).forEach(expanded ? pause : arm);   // 展開中は自動消滅を止め、折りたたみで再開
+        // 展開しても自動消滅は止めない＝各スナックバーの残り時間インジケータは動き続ける（ユーザー要望）。
         reflow();
         if (expanded) s.scrollTop = s.scrollHeight;   // 最新（下）まで見せる
       });
@@ -1110,8 +1110,8 @@ window.DataTable = (function () {
     const act = el.querySelector('.snackbar__action');
     if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(el); } });
     el.addEventListener('mouseenter', () => pause(el));
-    el.addEventListener('mouseleave', () => { const m = meta.get(el); if (m && !expanded) { m.timer = setTimeout(() => dismiss(el), 1500); if (m.bar) m.bar.style.animationPlayState = 'running'; } });
-    if (!expanded) arm(el);   // 展開中の新着はタイマーを張らない（閲覧中は消さない）
+    el.addEventListener('mouseleave', () => { const m = meta.get(el); if (m) { m.timer = setTimeout(() => dismiss(el), 1500); if (m.bar) m.bar.style.animationPlayState = 'running'; } });
+    arm(el);   // 展開中も含め常に自動消滅タイマーを張る（インジケータを動かし続ける）
     reflow();
     return el;
   }
