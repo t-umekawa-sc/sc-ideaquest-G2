@@ -1311,6 +1311,17 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .seg__btn { border: 0; background: var(--color-surface); color: var(--color-text-muted); padding: 4px 10px; font-size: var(--text-sm); cursor: pointer; }
 .seg__btn + .seg__btn { border-left: 1px solid var(--color-border); }
 .seg__btn[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
+
+/* 所属クエストグループ行（per-group ロール member/admin・正＝mocks/SC-92）。
+   各行を薄い灰色（surface-alt）＋角丸のカードにして境界を明確化（ユーザー指摘 2026-08-22）。 */
+.mrows { display: flex; flex-direction: column; gap: 6px; }
+.mrow { display: flex; align-items: center; gap: var(--space-3); padding: 8px 10px; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius); }
+.mrow__name { flex: 1; font-size: var(--text-sm); font-weight: 600; }
+.mrow__remove { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1; padding: 4px; border-radius: var(--radius); }
+.mrow__remove:hover { color: var(--color-danger); }
+.mrow-empty { font-size: var(--text-sm); color: var(--color-text-muted); padding: 6px 2px; }
+.mrow-add { margin-top: 8px; }
+
 .table--compact th, .table--compact td { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
 
 /* --- 番号ページャ --- */

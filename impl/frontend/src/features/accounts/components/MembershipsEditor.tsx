@@ -20,33 +20,44 @@ export function MembershipsEditor({
 
   return (
     <div>
-      {value.map((m, i) => (
-        <div key={m.group_id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBlock: "var(--space-1)" }}>
-          <span style={{ minWidth: "8rem" }}>{nameOf(m.group_id)}</span>
-          <div className="seg" role="group" aria-label={`${nameOf(m.group_id)} の役割`} style={{ marginLeft: "auto" }}>
-            {(["member", "admin"] as const).map((role) => (
+      {value.length > 0 ? (
+        <div className="mrows">
+          {value.map((m, i) => (
+            <div className="mrow" key={m.group_id}>
+              <span className="mrow__name">{nameOf(m.group_id)}</span>
+              <div className="seg" role="group" aria-label={`${nameOf(m.group_id)} の役割`}>
+                {(["member", "admin"] as const).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    className="seg__btn"
+                    aria-pressed={m.role === role}
+                    onClick={() => {
+                      const next = [...value];
+                      next[i] = { ...m, role };
+                      onChange(next);
+                    }}
+                  >
+                    {role === "member" ? "メンバー" : "管理者"}
+                  </button>
+                ))}
+              </div>
               <button
-                key={role}
                 type="button"
-                className="seg__btn"
-                aria-pressed={m.role === role}
-                onClick={() => {
-                  const next = [...value];
-                  next[i] = { ...m, role };
-                  onChange(next);
-                }}
+                className="mrow__remove"
+                aria-label={`${nameOf(m.group_id)} を削除`}
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
               >
-                {role === "member" ? "メンバー" : "管理者"}
+                ✕
               </button>
-            ))}
-          </div>
-          <button type="button" aria-label={`${nameOf(m.group_id)} を削除`} onClick={() => onChange(value.filter((_, j) => j !== i))}>
-            ✕
-          </button>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : (
+        <div className="mrow-empty">所属グループはまだありません。下の「＋グループを追加…」から選択してください。</div>
+      )}
       <select
-        className="input"
+        className="input mrow-add"
         aria-label="所属グループを追加"
         value=""
         disabled={rest.length === 0}
