@@ -790,6 +790,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest
+         * @description クエスト詳細（SC-12 概要／SC-11 編集プリフィル・C.1）。可視性はサーバー強制（範囲外は 404）。読取専用。
+         */
+        get: operations["get_quest_api_v1_quests__quest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Quest
+         * @description クエストを編集（SC-11・C.2）。差分適用・検証は現在 status で分岐。owner/quest_admin。
+         */
+        patch: operations["update_quest_api_v1_quests__quest_id__patch"];
+        trace?: never;
+    };
     "/api/v1/quest-groups": {
         parameters: {
             query?: never;
@@ -828,26 +852,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/v1/quests/{quest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Quest
-         * @description クエストを編集（SC-11・C.2）。差分適用・検証は現在 status で分岐。owner/quest_admin。
-         */
-        patch: operations["update_quest_api_v1_quests__quest_id__patch"];
         trace?: never;
     };
     "/api/v1/quests/{quest_id}/publish": {
@@ -3460,6 +3464,72 @@ export interface operations {
             };
         };
     };
+    get_quest_api_v1_quests__quest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_quest_api_v1_quests__quest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_quest_groups_api_v1_quest_groups_get: {
         parameters: {
             query?: {
@@ -3514,41 +3584,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestCandidatesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_quest_api_v1_quests__quest_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                quest_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuestUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuestDetailDTO"];
                 };
             };
             /** @description Validation Error */

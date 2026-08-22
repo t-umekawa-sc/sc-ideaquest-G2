@@ -60,6 +60,11 @@ export function listGroupMemberCandidates(
   return apiFetch<QuestCandidatesResponse>(`/quest-groups/${groupId}/members${suffix}`);
 }
 
+// クエスト詳細（SC-12 概要／SC-11 編集プリフィル・C.1）。可視性はサーバー強制（範囲外は 404）。
+export function getQuest(questId: string): Promise<QuestDetail | null> {
+  return apiFetch<QuestDetail>(`/quests/${questId}`);
+}
+
 // クエスト作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
 export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input) });

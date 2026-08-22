@@ -45,6 +45,19 @@ def list_quests(
     return QuestListResponse(**result)
 
 
+@router.get("/quests/{quest_id}", response_model=QuestDetailDTO)
+def get_quest(
+    quest_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestDetailDTO:
+    """クエスト詳細（SC-12 概要／SC-11 編集プリフィル・C.1）。可視性はサーバー強制（範囲外は 404）。読取専用。"""
+    result = quest_service.get_quest_detail(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+    return QuestDetailDTO(**result)
+
+
 @router.get("/quest-groups", response_model=QuestGroupsResponse)
 def list_quest_groups(
     request: Request,

@@ -4,3 +4,5 @@ export { QuestDetailView } from "./components/QuestDetailView";
 export { QuestForm } from "./components/QuestForm";
 export { QuestCreateModal } from "./components/QuestCreateModal";
 export { QuestCreatePanel } from "./components/QuestCreatePanel";
+export { QuestEditModal } from "./components/QuestEditModal";
+export { QuestEditPanel } from "./components/QuestEditPanel";

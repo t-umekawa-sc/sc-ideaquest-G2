@@ -37,9 +37,9 @@ function myBadge(m: string): string {
   if (m === "投稿済み") return "badge badge-success";
   return "badge badge-muted";
 }
-// 下書きは本人だけに見え、クリックで SC-11 編集モーダル。公開クエストは SC-12 詳細。
+// 下書きは本人だけに見え、クリックで SC-11 編集モーダル（/quests/{id}/edit）。公開クエストは SC-12 詳細。
 function questHref(x: Quest): string {
-  return x.draft ? "/quests/new" : `/quests/${x.id}`;
+  return x.draft ? `/quests/${x.id}/edit` : `/quests/${x.id}`;
 }
 
 // 締切文字列（YYYY-MM-DD）→ 表示（YYYY/MM/DD）・ソート用数値・締切近接（14日以内）。

@@ -172,6 +172,30 @@ def _parse_uuid(value: str, *, field: str) -> uuid.UUID:
 # ============================================================================
 
 
+def get_quest_detail(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """クエスト詳細（C.1・SC-12 概要／SC-11 編集プリフィル）。可視性をサーバー強制。
+
+    下書きは本人のみ（他人は 404 存在秘匿）。公開系は owner か有効パーティー員のみ（範囲外は 404）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.status == "draft":
+            if quest.owner_id != user.id:
+                raise AppError(404, "not_found")  # 下書きは本人だけに見える
+        elif quest.owner_id != user.id and repo.get_active_member(ts, quest.id, user.id) is None:
+            raise AppError(404, "not_found")  # 公開系もパーティー外には秘匿
+        return _build_detail(ts, quest, user.id)
+
+
 def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     """クエストを作成（C.2・SC-11）。作成者＝所有者（全権限）。status=recruiting は即公開扱い。
 

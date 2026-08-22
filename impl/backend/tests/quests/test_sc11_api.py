@@ -305,3 +305,36 @@ def test_c_tc_126_create_requires_auth(client, env):
     """C-TC-126: 未認証の作成は 401（require_me・P1）。"""
     r = client.post(QUESTS, json=_base_body(env))
     assert r.status_code == 401, r.text
+
+
+def test_c_tc_127_get_own_draft_detail(client, env):
+    """C-TC-127: 自分の下書き詳細を取得＝200・status draft・作成者がメンバーに含まれ my_permissions に owner。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="draft")
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "draft"
+    assert body["my_state"] == "draft"
+    assert "owner" in body["my_permissions"]
+    assert any(m["is_creator"] for m in body["members"])
+
+
+def test_c_tc_128_get_detail_non_member_hidden(client, env):
+    """C-TC-128: 自分がパーティー外のクエスト詳細は 404（存在秘匿・C.1 可視性）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting", owner=env.other_user_id)  # seed user は非メンバー
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 404, r.text
+
+
+def test_c_tc_129_get_recruiting_detail_as_member(client, env):
+    """C-TC-129: 参加中の公開クエスト詳細を取得＝200・カテゴリ/パーティーを同梱（SC-11 編集プリフィル）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")  # seed user が owner＝メンバー
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "recruiting"
+    assert body["categories"] == ["UX"]
+    assert body["quest_group"]["id"] == str(env.group_id)
