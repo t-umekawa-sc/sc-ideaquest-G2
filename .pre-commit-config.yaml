@@ -1,0 +1,14 @@
+# pre-commit 設定（テスト規約 §5 の DoD ゲートをコミット時に自動実行）。
+# 有効化＝各端末で最初に1回だけ `pre-commit install`（README「pre-commit（任意・推奨）」参照）。
+# 本設定はリポジトリで共有され、実体フックは各端末ローカルに作られる（`git commit --no-verify` で回避可）。
+repos:
+  - repo: local
+    hooks:
+      # テストコードの TC-ID が doc/テスト/*.md に対応行を持つかを照合（md 先行の飛ばしを検出）。
+      # python3 のみで動く（外部依存なし）。全体を走査するため個別ファイルは渡さない。
+      - id: tc-traceability
+        name: TC-ID トレーサビリティ検査（doc/テスト ↔ tests）
+        entry: python3 scripts/check_tc_traceability.py
+        language: system
+        pass_filenames: false
+        always_run: true

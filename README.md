@@ -128,6 +128,20 @@ docker compose exec db psql -U ideaquest -d ideaquest_control        # 管理DB
 docker compose exec db psql -U ideaquest -d ideaquest_company_acme   # 会社DB(ACME)
 ```
 
+## pre-commit（任意・推奨／最初に1回だけ）
+
+テスト追加時の「テストパターン md 先行」漏れを防ぐため、コミット時に **TC-ID トレーサビリティ検査**（[`scripts/check_tc_traceability.py`](scripts/check_tc_traceability.py)＝テストコードの `X-TC-###` が `doc/テスト/*.md` に在るか照合）を自動実行する設定を `.pre-commit-config.yaml` に用意している。**有効化は各端末で最初に1回だけ**（`.git/hooks/` はリポジトリ共有されないため）。
+
+```bash
+# リポジトリ直下で（初回のみ）
+pip install pre-commit        # または pipx install pre-commit / brew install pre-commit
+pre-commit install            # git commit 時にフックが自動実行されるよう .git/hooks に登録
+```
+
+- 以後 `git commit` のたびに検査が走り、**❌（TC-ID が md 未記載）ならコミットが中断**する（テスト規約 §5 の DoD ゲート）。
+- 手動実行＝`python3 scripts/check_tc_traceability.py`（`--list` で一覧）。
+- どうしても回避したいコミットは `git commit --no-verify`（＝検査をスキップ・常用しない）。
+
 ## 仕組みのメモ
 
 - **同一オリジン方針**＝ブラウザは常に `:3000` と通信し、`/api/v1/*` は Next.js の rewrite で backend にプロキシする（CORS 不要＋CSRF ダブルサブミットが同一オリジンで成立）。
