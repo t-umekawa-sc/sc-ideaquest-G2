@@ -16,7 +16,7 @@ export function IdeaCreatePanel({ questId }: { questId: string }) {
       </Link>
       <h1 className="page-title">アイデアを登録</h1>
       <div className="modal__panel sectioned" style={{ maxWidth: 640, margin: "var(--space-4) auto 0" }}>
-        <IdeaForm mode="create" onDone={back} onCancel={back} />
+        <IdeaForm mode="create" questId={questId} onDone={back} onCancel={back} />
       </div>
     </section>
   );

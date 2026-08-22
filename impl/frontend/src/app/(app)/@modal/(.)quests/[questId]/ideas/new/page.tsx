@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 import { IdeaCreateModal } from "@/features/ideas";
 import { getServerSession } from "@/lib/session";
 
-export default async function IdeaCreateInterceptModal() {
+export default async function IdeaCreateInterceptModal({ params }: { params: Promise<{ questId: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <IdeaCreateModal />;
+  const { questId } = await params;
+  return <IdeaCreateModal questId={questId} />;
 }

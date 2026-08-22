@@ -5,10 +5,10 @@ import { RouteModal } from "@/components/ui";
 
 import { IdeaForm } from "./IdeaForm";
 
-export function IdeaCreateModal() {
+export function IdeaCreateModal({ questId }: { questId: string }) {
   return (
     <RouteModal title="アイデアを登録" size="lg">
-      {(close) => <IdeaForm mode="create" onCancel={close} onDone={close} />}
+      {(close) => <IdeaForm mode="create" questId={questId} onCancel={close} onDone={close} />}
     </RouteModal>
   );
 }

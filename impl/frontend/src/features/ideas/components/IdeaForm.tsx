@@ -2,27 +2,29 @@
 
 // SC-21 アイデア登録・編集フォーム（登録＝新規／編集＝SC-22 から）。create/edit で共有（DRY）。
 // レイアウト/コピー/フィールドの正＝doc/画面設計/mocks/SC-21_アイデア登録編集.html・SC-22（編集モーダル）。
-// アイデア backend は未実装＝画面モック先行（デモ・送信は onDone のみ）。共通モーダル（Modal/RouteModal）に body/footer を渡す。
-import { useRef, useState } from "react";
+// 実接続（D.2）:
+//  - 作成: 投稿する＝POST /quests/{id}/ideas（status=published・即公開）／下書き保存＝status=draft（本人のみ）。
+//  - 編集: マウント時 GET /ideas/{id} でプリフィル → PATCH /ideas/{id}（差分・版記録＋通知は H no-op）。
+// 入力検証はデザイン標準 §4.7（インライン aria-invalid＋上部サマリ・送信時＋blur・フォーカス移動しない）。
+// 添付（関連資料）の保存 EP は未実装＝本スライスでは送信しない（UI はモック維持・注記で明示）。投票/フォローは SC-22。
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout";
+import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
+import { getQuest, type QuestDetail } from "@/features/quests/api";
+import {
+  createIdea,
+  getIdea,
+  IDEAS_CHANGED_EVENT,
+  publishIdea,
+  updateIdea,
+  type IdeaStakeholderInput,
+} from "../api";
 
 const STAKE_SUGGESTIONS = ["物流部", "配送委託先", "経営企画部", "情報システム部", "現場ドライバー"];
 
 export type IdeaAttach = { icon: string; name: string; size: string };
-export type IdeaInitial = {
-  subject: string;
-  value: string;
-  body: string;
-  limit: string;
-  stakeholders: string[];
-  note: string;
-  attachments: IdeaAttach[];
-};
-const EMPTY: IdeaInitial = { subject: "", value: "", body: "", limit: "", stakeholders: [], note: "", attachments: [] };
-
-type Quest = { char: string; ownerInitial: string; name: string; category: string };
-const DEFAULT_QUEST: Quest = { char: "配", ownerInitial: "山", name: "配送ルート最適化", category: "業務改善" };
 
 function iconFor(name: string) {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -36,35 +38,88 @@ function fmtSize(b: number) {
   return b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 }
 
-export function IdeaForm({
-  mode,
-  quest = DEFAULT_QUEST,
-  initial,
-  onDone,
-  onCancel,
-}: {
+type Props = {
   mode: "create" | "edit";
-  quest?: Quest;
-  initial?: IdeaInitial;
+  questId?: string; // create で必須（投稿先クエスト）
+  ideaId?: string; // edit で必須（対象アイデア）
+  locale?: Locale;
   onDone: () => void;
   onCancel: () => void;
-}) {
-  const init = initial ?? EMPTY;
+};
+
+export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCancel }: Props) {
   const snack = useSnackbar();
-  const [subject, setSubject] = useState(init.subject);
-  const [value, setValue] = useState(init.value);
-  const [body, setBody] = useState(init.body);
-  const [limit, setLimit] = useState(init.limit);
-  const [stakeholders, setStakeholders] = useState<string[]>(init.stakeholders);
+  const { summaryRef, notify } = useFormErrorNotice();
+  const isEdit = mode === "edit";
+
+  const msg = useMemo(
+    () =>
+      locale === "en"
+        ? { title: "Subject is required.", value: "Value is required.", body: "Idea body is required." }
+        : { title: "件名は必須です。", value: "価値は必須です。", body: "アイデア本文は必須です。" },
+    [locale],
+  );
+
+  const [subject, setSubject] = useState("");
+  const [value, setValue] = useState("");
+  const [body, setBody] = useState("");
+  const [limit, setLimit] = useState("");
+  const [stakeholders, setStakeholders] = useState<string[]>([]);
   const [stakeInput, setStakeInput] = useState("");
-  const [note, setNote] = useState(init.note);
-  const [attachments, setAttachments] = useState<IdeaAttach[]>(init.attachments);
+  const [note, setNote] = useState("");
+  const [attachments, setAttachments] = useState<IdeaAttach[]>([]);
   const [over, setOver] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pendingKind, setPendingKind] = useState<null | "draft" | "publish" | "save">(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [summary, setSummary] = useState<string[]>([]);
+  const [loading, setLoading] = useState(isEdit);
+  const [notFound, setNotFound] = useState(false);
+  const [quest, setQuest] = useState<QuestDetail | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isEdit = mode === "edit";
+  const pending = pendingKind !== null;
   const canSave = Boolean(subject.trim() && value.trim() && body.trim());
+
+  // 投稿先クエストの文脈カード（作成時）＝getQuest で取得。取得失敗は非致命（カードを出さない）。
+  useEffect(() => {
+    if (isEdit || !questId) return;
+    let alive = true;
+    void getQuest(questId)
+      .then((q) => alive && setQuest(q))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [isEdit, questId]);
+
+  // 編集＝既存アイデアを id で解決してプリフィル（D.1）。
+  useEffect(() => {
+    if (!isEdit || !ideaId) return;
+    let alive = true;
+    void getIdea(ideaId)
+      .then((idea) => {
+        if (!alive) return;
+        if (!idea) {
+          setNotFound(true);
+        } else {
+          setSubject(idea.title);
+          setValue(idea.value);
+          setBody(idea.body);
+          setLimit(idea.time_limit ?? "");
+          setStakeholders((idea.stakeholders ?? []).map((s) => s.label));
+          setNote(idea.note ?? "");
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setNotFound(true);
+        setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isEdit, ideaId]);
 
   function addStake(v: string) {
     const t = v.trim();
@@ -82,36 +137,125 @@ export function IdeaForm({
     setAttachments((a) => [...a, ...next]);
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    // アイデア backend 未実装＝デモ（送信せず閉じる）。接続時に POST /ideas（登録）/ PATCH /ideas/{id}（編集）へ差し替え。
-    setPending(true);
-    if (isEdit) {
-      snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
-    } else {
-      snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: "＋50 XP" }] });
-    }
-    onDone();
+  // 利害関係者を API 入力へ（候補に無い＝手入力は is_custom=true・§正規化はサーバー）。
+  function stakeInputs(): IdeaStakeholderInput[] {
+    return stakeholders.map((label) => ({ label, is_custom: !STAKE_SUGGESTIONS.includes(label) }));
   }
-  function saveDraft() {
-    snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
-    onDone();
+
+  const validate = useCallback((): FieldErrors => {
+    const e: FieldErrors = {};
+    if (!subject.trim()) e.title = msg.title;
+    if (!value.trim()) e.value = msg.value;
+    if (!body.trim()) e.body = msg.body;
+    return e;
+  }, [subject, value, body, msg]);
+
+  function onBlurField(field: "title" | "value" | "body") {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      const map = { title: [subject, msg.title], value: [value, msg.value], body: [body, msg.body] } as const;
+      const [v, m] = map[field];
+      if (!v.trim()) next[field] = m;
+      else delete next[field];
+      return next;
+    });
+  }
+
+  async function persist(kind: "draft" | "publish" | "save") {
+    // 下書き保存は必須未充足でも可（loose・本人のみ表示）。公開/保存は 3 必須を検証（§4.7）。
+    if (kind !== "draft") {
+      const clientErrors = validate();
+      if (Object.keys(clientErrors).length > 0) {
+        setFieldErrors(clientErrors);
+        const list = Object.values(clientErrors);
+        setSummary(list); // 上部サマリ＝インラインと同文言（フォーカス移動なし）
+        notify(list); // スクロール＋エラースナックバー（§4.7）
+        return;
+      }
+    }
+    setFieldErrors({});
+    setSummary([]);
+    setPendingKind(kind);
+    try {
+      const content = {
+        title: subject.trim(),
+        value: value.trim(),
+        body: body.trim(),
+        time_limit: limit || null,
+        stakeholders: stakeInputs(),
+        note: note.trim() || null,
+      };
+      if (kind === "save") {
+        await updateIdea(ideaId!, content);
+      } else if (kind === "draft") {
+        await createIdea(questId!, { ...content, status: "draft" });
+      } else {
+        await createIdea(questId!, { ...content, status: "published" });
+      }
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+      if (kind === "save") {
+        snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
+      } else if (kind === "draft") {
+        snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
+      } else {
+        snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: "＋50 XP" }] });
+      }
+      onDone();
+    } catch (err) {
+      const mapped = mapServerErrors(err, locale, { title: msg.title, value: msg.value, body: msg.body });
+      setFieldErrors(mapped.fieldErrors);
+      setSummary(mapped.summary);
+      notify(mapped.summary);
+    } finally {
+      setPendingKind(null);
+    }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    // 送信（Enter/主ボタン）＝作成は公開、編集は保存。
+    if (isEdit) void persist("save");
+    else void persist("publish");
+  }
+
+  if (loading) {
+    return (
+      <ModalBody>
+        <p className="admin-muted">読み込み中…</p>
+      </ModalBody>
+    );
+  }
+  if (notFound) {
+    return (
+      <>
+        <ModalBody>
+          <div className="form-error" role="alert">対象のアイデアが見つかりませんでした。</div>
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            閉じる
+          </Button>
+        </ModalFooter>
+      </>
+    );
   }
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form onSubmit={onSubmit} noValidate>
       <ModalBody>
-        {/* 投稿先クエストの文脈 */}
-        <div className="card" style={{ padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)" }}>
-          <div className="text-xs muted">投稿先クエスト</div>
-          <div style={{ fontWeight: 700 }}>
-            <span className="quest-icon sm" style={{ verticalAlign: "middle", marginRight: 6 }}>
-              <span className="quest-icon__char">{quest.char}</span>
-              <span className="quest-icon__owner placeholder">{quest.ownerInitial}</span>
-            </span>
-            {quest.name} <span className="badge badge-muted">{quest.category}</span>
+        <FormSummary title={t(locale, "summary.title")} errors={summary} innerRef={summaryRef} />
+
+        {/* 投稿先クエストの文脈（作成時・取得できた場合のみ） */}
+        {!isEdit && quest && (
+          <div className="card" style={{ padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)" }}>
+            <div className="text-xs muted">投稿先クエスト</div>
+            <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              <QuestIcon name={quest.title} color={quest.color} imageUrl={quest.icon_image_url ?? undefined} size="sm" />
+              {quest.title}
+              {quest.categories[0] && <span className="badge badge-muted">{quest.categories[0]}</span>}
+            </div>
           </div>
-        </div>
+        )}
         <p className="role-note" style={{ marginTop: 0 }}>
           {isEdit ? (
             <>
@@ -127,17 +271,19 @@ export function IdeaForm({
         </p>
 
         {/* 必須 3 項目 */}
-        <Field id="idea_subject" label="件名" required>
+        <Field id="idea_subject" label="件名" required error={fieldErrors.title}>
           <input
             id="idea_subject"
             className="input"
             placeholder="アイデアのタイトル"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            onBlur={() => onBlurField("title")}
+            aria-invalid={fieldErrors.title ? true : undefined}
             required
           />
         </Field>
-        <Field id="idea_value" label="価値" required>
+        <Field id="idea_value" label="価値" required error={fieldErrors.value}>
           <textarea
             id="idea_value"
             className="textarea"
@@ -145,10 +291,12 @@ export function IdeaForm({
             placeholder="このアイデアがもたらす価値・メリット（評価の要になります）"
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            onBlur={() => onBlurField("value")}
+            aria-invalid={fieldErrors.value ? true : undefined}
             required
           />
         </Field>
-        <Field id="idea_body" label="アイデア本文" required>
+        <Field id="idea_body" label="アイデア本文" required error={fieldErrors.body}>
           <textarea
             id="idea_body"
             className="textarea"
@@ -156,6 +304,8 @@ export function IdeaForm({
             placeholder="どんなアイデアか、内容を説明してください"
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onBlur={() => onBlurField("body")}
+            aria-invalid={fieldErrors.body ? true : undefined}
             required
           />
         </Field>
@@ -213,7 +363,7 @@ export function IdeaForm({
           </div>
         </details>
 
-        {/* 関連資料 添付（任意・複数可） */}
+        {/* 関連資料 添付（任意・複数可）。※保存 EP は後続スライス＝現状は送信しない。 */}
         <Field id="idea_files" label="関連資料（任意・複数可）">
           <input
             ref={fileRef}
@@ -270,6 +420,7 @@ export function IdeaForm({
               ))}
             </div>
           )}
+          <p className="hint">※ 添付ファイルの保存は準備中です。この画面ではまだ送信されません。</p>
         </Field>
 
         <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
@@ -287,16 +438,23 @@ export function IdeaForm({
         </p>
       </ModalBody>
       <ModalFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <FormFooterError show={summary.length > 0} />
+        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           キャンセル
         </Button>
         {!isEdit && (
-          <Button type="button" variant="outline" onClick={saveDraft}>
+          <Button type="button" variant="outline" onClick={() => void persist("draft")} disabled={pending} loading={pendingKind === "draft"}>
             下書き保存
           </Button>
         )}
-        <Button type="submit" variant="primary" disabled={!canSave || pending}>
-          {isEdit ? (pending ? "保存中…" : "変更を保存") : pending ? "投稿中…" : "投稿する"}
+        <Button type="submit" variant="primary" disabled={!canSave || pending} loading={pendingKind === "publish" || pendingKind === "save"}>
+          {isEdit
+            ? pendingKind === "save"
+              ? "保存中…"
+              : "変更を保存"
+            : pendingKind === "publish"
+              ? "投稿中…"
+              : "投稿する"}
         </Button>
       </ModalFooter>
     </form>
