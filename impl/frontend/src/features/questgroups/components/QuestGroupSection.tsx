@@ -34,6 +34,18 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // 編集ダイアログ（グループ名のみ編集可・コードは作成後不変）。
+  const [editing, setEditing] = useState<QuestGroup | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editPending, setEditPending] = useState(false);
+
+  function openEdit(g: QuestGroup) {
+    setEditing(g);
+    setEditName(g.name);
+    setEditError(null);
+  }
+
   // 新規作成ダイアログを開く（空）。
   function openCreate() {
     setCode("");
@@ -86,15 +98,24 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     }
   }
 
-  async function onRename(g: QuestGroup) {
-    const next = window.prompt("新しいグループ名", g.name);
-    if (next === null || next.trim() === "" || next === g.name) return;
-    setActionError(null);
+  async function onEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    const next = editName.trim();
+    if (next === "") {
+      setEditError("グループ名を入力してください。");
+      return;
+    }
+    setEditError(null);
+    setEditPending(true);
     try {
-      await renameQuestGroup(companyId, g.group_id, next.trim());
+      if (next !== editing.name) await renameQuestGroup(companyId, editing.group_id, next);
+      setEditing(null);
       await reload();
-    } catch {
-      setActionError("リネームに失敗しました。");
+    } catch (err) {
+      setEditError(createErrorMessage(err));
+    } finally {
+      setEditPending(false);
     }
   }
 
@@ -157,7 +178,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       render: (g) => (
         <RowMenu
           items={[
-            { label: "リネーム", onClick: () => onRename(g) },
+            { label: "編集", onClick: () => openEdit(g) },
             { label: "複製", onClick: () => openDuplicate(g) },
             { label: "削除", danger: true, onClick: () => onDelete(g) },
           ]}
@@ -202,6 +223,36 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         </form>
       </Modal>
 
+      {/* 編集ダイアログ＝グループ名のみ編集可（コードは作成後不変・B.3.1）。 */}
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title="クエストグループを編集" size="sm">
+        <form onSubmit={onEditSubmit} noValidate>
+          <ModalBody>
+            {editError && <div className="form-error" role="alert">{editError}</div>}
+            <Field id="g_edit_code" label="クエストグループコード" hint="コードは作成後は変更できません。">
+              <input id="g_edit_code" className="input db-id" value={editing?.quest_group_code ?? ""} readOnly disabled />
+            </Field>
+            <Field id="g_edit_name" label="グループ名" required>
+              <input
+                id="g_edit_name"
+                className="input"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                aria-invalid={editError ? true : undefined}
+                required
+              />
+            </Field>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+              キャンセル
+            </Button>
+            <Button type="submit" variant="primary" disabled={editPending}>
+              {editPending ? "保存中…" : "保存する"}
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
       {actionError && <div className="form-error" role="alert">{actionError}</div>}
 
       {loadError ? (
@@ -220,7 +271,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
           searchFields="グループ名・コード"
           exportName="クエストグループ"
           emptyText="クエストグループがありません。「＋ グループ作成」から追加してください。"
-          onRowClick={(g) => onRename(g)} // §4.5⑪: 複数操作あり＝クリックは主アクション(リネーム)
+          onRowClick={(g) => openEdit(g)} // §4.5⑪: 複数操作あり＝クリックは主アクション(編集)
           cardLayout={(g) => ({
             title: g.name,
             meta: [`コード: ${g.quest_group_code}`],
