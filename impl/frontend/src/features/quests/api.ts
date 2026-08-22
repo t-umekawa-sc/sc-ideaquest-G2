@@ -80,6 +80,16 @@ export function publishQuest(questId: string, input: QuestPublishInput): Promise
   return apiFetch<QuestDetail>(`/quests/${questId}/publish`, { method: "POST", body: JSON.stringify(input) });
 }
 
+// ステータスを前進（SC-12・C.5・owner/quest_admin）。逆行/飛び越えは 409、draft→recruiting は strict。
+export function transitionQuest(questId: string, input: { to: string }): Promise<QuestDetail | null> {
+  return apiFetch<QuestDetail>(`/quests/${questId}/transition`, { method: "POST", body: JSON.stringify(input) });
+}
+
+// クエストを論理削除（SC-12・C.2・owner/quest_admin）。子データは監査保持。
+export function deleteQuest(questId: string): Promise<null> {
+  return apiFetch<null>(`/quests/${questId}`, { method: "DELETE" }) as Promise<null>;
+}
+
 // クエストアイコン設定/削除（SC-11・論点2・multipart・K.4 流儀）。CSRF/Content-Type は apiFetch/ブラウザが処理。
 export function setQuestIcon(questId: string, file: File): Promise<QuestIconImageResponse | null> {
   const fd = new FormData();

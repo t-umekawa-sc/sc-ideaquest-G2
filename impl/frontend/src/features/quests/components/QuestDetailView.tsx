@@ -2,16 +2,27 @@
 
 // SC-12 クエスト詳細＝クエストヘッダー＋クエスト内週間ランキング＋タブ（アイデア一覧/パーティー/全文検索/概要）。
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-12_クエスト詳細.html（DoD＝モック一致）。
-// クエスト backend 未実装＝フロントエンド実装フロー規約に沿う画面モック先行（デモ fixtures）。
-// アイデア一覧は DataTable（client モード）。行クリックで SC-22 アイデア詳細（/ideas/[id]・現状スタブ）へ。
-import { useState } from "react";
+// 接続範囲（C ドメイン）＝ヘッダー/概要/パーティー（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
+// 編集導線（SC-11 /quests/{id}/edit）。**アイデア一覧＝D／全文検索＝J／週間ランキング＝G は未実装ドメイン依存**の
+// ためデモ fixtures を維持（接続は各ドメイン実装時）。
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Avatar, DataTable } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
+import { QuestIcon } from "@/components/layout";
+import {
+  deleteQuest,
+  getQuest,
+  QUESTS_CHANGED_EVENT,
+  transitionQuest,
+  type QuestDetail,
+} from "../api";
 import "../quests.css";
 
+// ---- 未接続タブ（D/J/G）のデモ fixtures ----
 type Idea = {
   id: string; title: string; poster: string; initial: string; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
@@ -20,41 +31,37 @@ const IDEAS: Idea[] = [
   { id: "okihai", title: "置き配の写真通知", poster: "佐藤 大輔", initial: "佐", agree: 15, disagree: 5, comments: 4, ev: -1, evalstate: "pending", mystate: "voted", created: 5, draft: false },
   { id: "yakan", title: "夜間配送の集約", poster: "鈴木 花子", initial: "鈴", agree: 12, disagree: 3, comments: 8, ev: 3, evalstate: "done", mystate: "unvoted", created: 3, draft: false },
   { id: "konpo", title: "梱包資材の削減", poster: "伊藤 彩", initial: "伊", agree: 11, disagree: 0, comments: 2, ev: -1, evalstate: "pending", mystate: "voted", created: 2, draft: false },
-  { id: "saihai", title: "再配達の予測AI", poster: "田中 一郎", initial: "田", agree: 9, disagree: 2, comments: 6, ev: 5, evalstate: "done", mystate: "voted", created: 1, draft: false },
-  { id: "route", title: "配送ルートの動的最適化", poster: "山田 太郎", initial: "山", agree: 7, disagree: 1, comments: 3, ev: -1, evalstate: "pending", mystate: "mine", created: 6, draft: false },
-  { id: "drone", title: "ドローン配送の実証", poster: "高橋 実", initial: "高", agree: 5, disagree: 8, comments: 12, ev: 2, evalstate: "done", mystate: "unvoted", created: 4, draft: false },
-  { id: "kyodo", title: "共同配送のマッチング（下書き）", poster: "山田 太郎", initial: "山", agree: 0, disagree: 0, comments: 0, ev: -1, evalstate: "pending", mystate: "draft", created: 7, draft: true },
 ];
 const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
 const daysText = (r: Idea) => { const d = 7 - r.created; return d <= 0 ? "今日" : `${d}日前`; };
 const dash = <span className="muted">—</span>;
-
 const RANKING = [
   { name: "鈴木 花子", level: 12, total: 310, exp: 280, coin: 30, me: false },
   { name: "山田 太郎", level: 7, total: 235, exp: 210, coin: 25, me: true },
   { name: "田中 一郎", level: 9, total: 200, exp: 180, coin: 20, me: false },
 ];
-const PARTY = [
-  { name: "山田 太郎", ini: "山", level: 7, perms: [{ label: "👑 所有者", cls: "" }] },
-  { name: "鈴木 花子", ini: "鈴", level: 12, perms: [{ label: "評価者", cls: "badge-muted" }, { label: "投票", cls: "badge-muted" }, { label: "作成", cls: "badge-muted" }, { label: "コメント", cls: "badge-muted" }] },
-  { name: "佐藤 大輔", ini: "佐", level: 3, perms: [{ label: "評価者", cls: "badge-muted" }, { label: "投票", cls: "badge-muted" }, { label: "作成", cls: "badge-muted" }, { label: "コメント", cls: "badge-muted" }] },
-  { name: "田中 一郎", ini: "田", level: 9, perms: [{ label: "クエスト管理", cls: "badge-muted" }, { label: "投票", cls: "badge-muted" }, { label: "作成", cls: "badge-muted" }, { label: "コメント", cls: "badge-muted" }] },
-  { name: "高橋 実", ini: "高", level: 5, perms: [{ label: "投票", cls: "badge-muted" }, { label: "作成", cls: "badge-muted" }, { label: "コメント", cls: "badge-muted" }] },
-  { name: "伊藤 彩", ini: "伊", level: 8, perms: [{ label: "投票", cls: "badge-muted" }, { label: "作成", cls: "badge-muted" }, { label: "コメント", cls: "badge-muted" }] },
-];
-// 全文検索のデモ対象（アイデア本文＋チャット＋添付ファイル名）。
 const SEARCHABLE = [
   { id: "yakan", kind: "アイデア", ctx: "夜間配送の集約", text: "夜間帯の配送を1拠点に集約し、積載率を上げてコストとCO2を同時に削減する。" },
-  { id: "route", kind: "アイデア", ctx: "配送ルートの動的最適化", text: "交通状況に応じてルートを動的に再計算し、配送効率を高める。" },
-  { id: "yakan", kind: "チャット", ctx: "夜間配送の集約 / コメント", text: "積載率の現状値は約60%です。集約で75%を目標にしたいです。" },
   { id: "okihai", kind: "添付", ctx: "置き配の写真通知 / 添付", text: "置き配_通知フロー.pdf" },
 ];
 
+// quest_status（enum・§3）→ ラベル/バッジ。
+const STATUS_LABEL: Record<string, string> = { draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了" };
+const STATUS_ORDER = ["draft", "recruiting", "in_progress", "evaluating", "completed"];
+function statusBadgeClass(s: string): string {
+  if (s === "completed") return "badge badge-muted";
+  if (s === "draft") return "badge badge-muted";
+  return "badge badge-success";
+}
+// API 権限 → パーティー表示バッジ（👑 所有者を先頭に）。
+const PERM_BADGE: Record<string, string> = { owner: "👑 所有者", quest_admin: "クエスト管理", evaluator: "評価者", vote: "投票", idea_create: "作成", comment: "コメント" };
+const PERM_VIEW_ORDER = ["owner", "quest_admin", "evaluator", "vote", "idea_create", "comment"];
+
 const TABS = [
-  { key: "ideas", label: "💡 アイデア", count: IDEAS.length },
-  { key: "party", label: "👥 パーティー", count: PARTY.length },
-  { key: "search", label: "🔍 全文検索", count: null },
-  { key: "about", label: "📋 概要", count: null },
+  { key: "ideas", label: "💡 アイデア" },
+  { key: "party", label: "👥 パーティー" },
+  { key: "search", label: "🔍 全文検索" },
+  { key: "about", label: "📋 概要" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -64,17 +71,88 @@ function highlight(text: string, q: string) {
   if (i < 0) return text;
   return (<>{text.slice(0, i)}<mark>{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>);
 }
+function deadlineText(d: string | null | undefined): string {
+  if (!d) return "未設定";
+  return d.replaceAll("-", "/");
+}
 
 export function QuestDetailView({ questId }: { questId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const snack = useSnackbar();
   const [tab, setTab] = useState<TabKey>("ideas");
   const [ftq, setFtq] = useState("");
   const [ftScope, setFtScope] = useState("");
 
-  const scopeMap: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
-  const ftResults = ftq.trim()
-    ? SEARCHABLE.filter((r) => (!ftScope || r.kind === scopeMap[ftScope]) && (r.text.includes(ftq) || r.ctx.includes(ftq)))
-    : [];
+  const [quest, setQuest] = useState<QuestDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await getQuest(questId);
+      setQuest(d);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiError && err.status === 404
+          ? "このクエストは見つからないか、参照する権限がありません。"
+          : err instanceof ApiError && err.status === 401
+            ? "セッションが切れています。再ログインしてください。"
+            : "クエストの取得に失敗しました。",
+      );
+    }
+  }, [questId]);
+
+  useEffect(() => {
+    void load();
+    const onChanged = () => void load();
+    window.addEventListener(QUESTS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(QUESTS_CHANGED_EVENT, onChanged);
+  }, [load]);
+
+  const canEdit = !!quest && (quest.my_permissions.includes("owner") || quest.my_permissions.includes("quest_admin"));
+  const nextStatus = quest ? STATUS_ORDER[STATUS_ORDER.indexOf(quest.status) + 1] : undefined;
+
+  async function onTransition() {
+    if (!quest || !nextStatus) return;
+    const ok = await confirm({
+      title: "ステータスを進める",
+      msg: `「${STATUS_LABEL[quest.status]}」→「${STATUS_LABEL[nextStatus]}」に進めます。よろしいですか？（前進のみ・戻せません）`,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const updated = await transitionQuest(questId, { to: nextStatus });
+      setQuest(updated);
+      window.dispatchEvent(new Event(QUESTS_CHANGED_EVENT));
+      snack({ type: "success", title: "ステータスを更新しました", msg: `${STATUS_LABEL[nextStatus]} に進めました。` });
+    } catch (err) {
+      snack({ type: "error", title: "更新できませんでした", msg: err instanceof ApiError && err.code === "validation_error" ? "公開に必要な項目が不足しています。" : "時間をおいて再度お試しください。" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete() {
+    if (!quest) return;
+    const ok = await confirm({
+      variant: "danger",
+      title: "クエストを削除",
+      msg: `「${quest.title}」を削除しますか？ 一覧・詳細から見えなくなります（投稿されたアイデア等は監査のため保持されます）。`,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deleteQuest(questId);
+      window.dispatchEvent(new Event(QUESTS_CHANGED_EVENT));
+      snack({ type: "success", title: "クエストを削除しました" });
+      router.push("/quests");
+    } catch {
+      snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+      setBusy(false);
+    }
+  }
 
   const ideaColumns: DataTableColumn<Idea>[] = [
     { key: "title", label: "件名", locked: true, width: 260, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
@@ -86,10 +164,32 @@ export function QuestDetailView({ questId }: { questId: string }) {
     { key: "comments", label: "💬", width: 72, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)), render: (r) => r.draft ? dash : String(r.comments) },
     { key: "eval", label: "評価", width: 120, sortable: true, filter: { type: "enum", options: [["pending", "評価待ち"], ["done", "評価済"]] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate, csvVal: (r) => (r.draft ? "" : r.evalstate === "done" ? `${r.ev}/5` : "評価待ち"),
       render: (r) => r.draft ? dash : (r.evalstate === "done" ? <span className={`badge ${r.ev >= 5 ? "badge-success" : "badge-muted"}`}>{r.ev}/5 評価</span> : <span className="badge">評価待ち</span>) },
-    { key: "mystate", label: "あなた", width: 110, filter: { type: "enum", options: [["unvoted", "未投票"], ["voted", "投票済"], ["mine", "自分の投稿"], ["draft", "下書き"]] }, filterVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
-      render: (r) => <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span> },
-    { key: "created", label: "投稿日", width: 100, hiddenDefault: true, sortable: true, sortVal: (r) => r.created, csvVal: daysText, render: daysText },
   ];
+
+  const scopeMap: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
+  const ftResults = ftq.trim()
+    ? SEARCHABLE.filter((r) => (!ftScope || r.kind === scopeMap[ftScope]) && (r.text.includes(ftq) || r.ctx.includes(ftq)))
+    : [];
+
+  if (loadError) {
+    return (
+      <section aria-label="クエスト詳細">
+        <p><Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link></p>
+        <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div>
+      </section>
+    );
+  }
+  if (!quest) {
+    return (
+      <section aria-label="クエスト詳細">
+        <p><Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link></p>
+        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
+      </section>
+    );
+  }
+
+  const ownerName = quest.owner.display_name || "?";
+  const party = quest.members;
 
   return (
     <section aria-label="クエスト詳細">
@@ -100,35 +200,45 @@ export function QuestDetailView({ questId }: { questId: string }) {
         <section className="card quest-head" aria-label="クエスト情報">
           <div className="quest-head__top">
             <div className="quest-head__main">
-              <span className="quest-icon lg" style={{ ["--accent" as string]: "#0D9488" } as React.CSSProperties}>
-                <span className="quest-icon__char">配</span>
-                <span className="quest-icon__owner placeholder">山</span>
-              </span>
+              <QuestIcon name={quest.title} color={quest.color} imageUrl={quest.icon_image_url} size="lg" />
               <div>
-                <span className="badge badge-muted">業務改善</span>
-                <span className="badge badge-success" style={{ marginLeft: 6 }}>評価中</span>
-                <h1>配送ルート最適化</h1>
-                <p className="quest-head__theme">配送コストと CO2 削減の両立を実現するアイデアを集める。</p>
+                {quest.categories.map((c) => <span key={c} className="badge badge-muted" style={{ marginRight: 6 }}>{c}</span>)}
+                <span className={statusBadgeClass(quest.status)}>{STATUS_LABEL[quest.status] ?? quest.status}</span>
+                <h1>{quest.title}</h1>
+                {quest.purpose && <p className="quest-head__theme">{quest.purpose}</p>}
                 <div className="quest-meta">
-                  <span className="soon">⏳ 締切 2026/12/20（あと3日）</span>
-                  <span>👥 パーティー 6人</span>
-                  <span>💡 アイデア 6件</span>
-                  <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name="山田 太郎" size="sm" /><span className="name">山田 太郎</span></span>
-                  <span>🗂 グループ: プロダクト開発部</span>
+                  <span>⏳ 締切 {deadlineText(quest.deadline)}</span>
+                  <span>👥 パーティー {quest.member_count}人</span>
+                  <span>💡 アイデア {quest.idea_count}件</span>
+                  <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} size="sm" /><span className="name">{ownerName}</span></span>
+                  <span>🗂 グループ: {quest.quest_group.name}</span>
                 </div>
               </div>
             </div>
             <div className="quest-actions">
-              {/* アイデア追加＝SC-21（URL付きモーダル・Intercept）／クエスト編集＝SC-11 編集（未実装）＝接続までデモ。 */}
+              {/* アイデア追加＝SC-21（D 未実装＝デモルート）。編集/遷移/削除は C 接続済み。 */}
               <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
-              <button className="btn btn-outline" type="button" onClick={() => router.push("/quests/new")}>クエスト編集</button>
+              {canEdit && (
+                <>
+                  <button className="btn btn-outline" type="button" onClick={() => router.push(`/quests/${questId}/edit`)}>クエスト編集</button>
+                  <RowMenu
+                    items={[
+                      ...(quest.status !== "completed" && nextStatus
+                        ? [{ label: `ステータスを進める（→ ${STATUS_LABEL[nextStatus]}）`, onClick: () => void onTransition() }]
+                        : []),
+                      { label: "クエストを削除", danger: true, onClick: () => void onDelete() },
+                    ]}
+                  />
+                </>
+              )}
             </div>
           </div>
         </section>
 
+        {/* 週間ランキング＝ドメイン G 未実装＝デモ。 */}
         <section className="pixel-panel rank-panel" aria-label="クエスト内 週間ランキング">
           <h3>★ クエスト内ランキング ★</h3>
-          <div className="rank-panel__sub">このクエストの活動で獲得（今週・EXP＋コイン）</div>
+          <div className="rank-panel__sub">このクエストの活動で獲得（今週・EXP＋コイン）※デモ</div>
           <ol className="rank-list">
             {RANKING.map((r, i) => (
               <li key={r.name} className={r.me ? "is-me" : undefined}>
@@ -144,14 +254,17 @@ export function QuestDetailView({ questId }: { questId: string }) {
 
       {/* タブ */}
       <div className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
-        {TABS.map((t) => (
-          <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
-            {t.label}{t.count != null && <span className="tab-count">{t.count}</span>}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const count = t.key === "party" ? party.length : t.key === "ideas" ? IDEAS.length : null;
+          return (
+            <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
+              {t.label}{count != null && <span className="tab-count">{count}</span>}
+            </button>
+          );
+        })}
       </div>
 
-      {/* アイデア一覧 */}
+      {/* アイデア一覧（デモ・D 未実装） */}
       {tab === "ideas" && (
         <section aria-label="アイデア一覧">
           <DataTable<Idea>
@@ -167,20 +280,16 @@ export function QuestDetailView({ questId }: { questId: string }) {
             onRowClick={(r) => router.push(`/ideas/${r.id}`)}
             cardLayout={(r) => ({
               title: r.title,
-              badges: r.draft
-                ? [{ label: "下書き", cls: "badge-muted" }]
-                : [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }, { label: r.evalstate === "done" ? `${r.ev}/5 評価` : "評価待ち", cls: r.evalstate === "done" && r.ev >= 5 ? "badge-success" : "badge-muted" }],
+              badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
               meta: [r.poster, daysText(r)],
-              stats: r.draft ? ["公開前（投票・コメント対象外）"] : [`賛成 ${r.agree} / 反対 ${r.disagree}`, `💬 ${r.comments}`],
+              stats: [`賛成 ${r.agree} / 反対 ${r.disagree}`, `💬 ${r.comments}`],
             })}
           />
-          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>
-            自分の下書きアイデアも一覧に表示されます（下書きバッジ・本人のみ）。下書きは公開して初めて投票・コメントの対象になります（一覧では賛成・反対／コメント／評価は「—」）。
-          </p>
+          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>※ アイデア一覧はドメイン D 実装までデモ表示です。</p>
         </section>
       )}
 
-      {/* 全文検索 */}
+      {/* 全文検索（デモ・J 未実装） */}
       {tab === "search" && (
         <section aria-label="全文検索">
           <div className="list-toolbar">
@@ -188,7 +297,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
               <select className="input" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
                 <option value="">対象: すべて</option>
-                <option value="idea">アイデア（件名/本文/価値/備考）</option>
+                <option value="idea">アイデア</option>
                 <option value="chat">チャット</option>
                 <option value="attachment">添付ファイル名</option>
               </select>
@@ -196,7 +305,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
             {ftq.trim() && <span className="list-count">{ftResults.length} 件</span>}
           </div>
           {!ftq.trim() ? (
-            <div className="list-empty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。</div>
+            <div className="list-empty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。※ドメイン J 実装までデモ。</div>
           ) : ftResults.length === 0 ? (
             <div className="list-empty">「{ftq}」に一致する結果がありません。</div>
           ) : (
@@ -209,26 +318,29 @@ export function QuestDetailView({ questId }: { questId: string }) {
               ))}
             </div>
           )}
-          <p className="hint" style={{ marginTop: "var(--space-3)" }}>
-            検索対象＝アイデアの<strong>件名・本文・価値・備考</strong>＋<strong>チャット</strong>＋<strong>添付ファイル名</strong>（このクエスト内）。
-          </p>
         </section>
       )}
 
-      {/* パーティー */}
+      {/* パーティー（実接続・C.1/C.3） */}
       {tab === "party" && (
         <section aria-label="パーティー">
           <div className="list-toolbar">
             <div className="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => router.push("/quests/new")}>パーティー・権限を編集</button>
+            {canEdit && (
+              <button className="btn btn-outline btn-sm" type="button" onClick={() => router.push(`/quests/${questId}/edit`)}>パーティー・権限を編集</button>
+            )}
           </div>
           <div className="card tab-party-card" style={{ padding: 0 }}>
             <ul className="member-list">
-              {PARTY.map((m) => (
-                <li className="member-row" key={m.name}>
-                  <Avatar name={m.name} level={m.level} />
-                  <span className="member-name">{m.name}</span>
-                  <span className="member-perms">{m.perms.map((p, i) => <span key={i} className={`badge ${p.cls}`}>{p.label}</span>)}</span>
+              {party.map((m) => (
+                <li className="member-row" key={m.user.user_id}>
+                  <Avatar name={m.user.display_name} />
+                  <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}</span>
+                  <span className="member-perms">
+                    {PERM_VIEW_ORDER.filter((p) => m.permissions.includes(p)).map((p) => (
+                      <span key={p} className={`badge ${p === "owner" ? "" : "badge-muted"}`}>{PERM_BADGE[p]}</span>
+                    ))}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -237,19 +349,19 @@ export function QuestDetailView({ questId }: { questId: string }) {
         </section>
       )}
 
-      {/* 概要 */}
+      {/* 概要（実接続・C.1） */}
       {tab === "about" && (
         <section aria-label="概要">
           <div className="card">
             <dl className="def-list">
-              <dt>ステータス</dt><dd><span className="badge badge-success">評価中</span></dd>
-              <dt>カテゴリー</dt><dd>業務改善</dd>
-              <dt>目的・テーマ</dt><dd>配送コストと CO2 削減の両立を実現するアイデアを集める。現状は拠点ごとの小口配送で積載率が低く、コスト・環境負荷ともに課題がある。</dd>
-              <dt>期限日</dt><dd>2026/12/20（あと3日）</dd>
-              <dt>クエストグループ</dt><dd>プロダクト開発部</dd>
-              <dt>所有者</dt><dd><span className="poster"><Avatar name="山田 太郎" size="sm" /><span className="name">山田 太郎</span></span></dd>
-              <dt>作成日</dt><dd>2026/11/15</dd>
-              <dt>アイデア数</dt><dd>6件</dd>
+              <dt>ステータス</dt><dd><span className={statusBadgeClass(quest.status)}>{STATUS_LABEL[quest.status] ?? quest.status}</span></dd>
+              <dt>カテゴリー</dt><dd>{quest.categories.length ? quest.categories.join("、") : "—"}</dd>
+              <dt>目的・テーマ</dt><dd>{quest.purpose || "—"}</dd>
+              <dt>期限日</dt><dd>{deadlineText(quest.deadline)}</dd>
+              <dt>クエストグループ</dt><dd>{quest.quest_group.name}</dd>
+              <dt>所有者</dt><dd><span className="poster"><Avatar name={ownerName} size="sm" /><span className="name">{ownerName}</span></span></dd>
+              <dt>パーティー</dt><dd>{quest.member_count}名</dd>
+              <dt>アイデア数</dt><dd>{quest.idea_count}件</dd>
             </dl>
           </div>
         </section>
