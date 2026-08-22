@@ -531,7 +531,7 @@
         <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
         <ul class="rowmenu__list" role="menu" hidden>
           <li role="none"><button role="menuitem" type="button" data-sg-act2="edit">編集</button></li>
-          <li role="none"><button role="menuitem" type="button" data-sg-act2="dup">複製</button></li>
+          <li role="none"><button role="menuitem" type="button" data-sg-act2="dup">複写</button></li>
           <li role="none"><button role="menuitem" type="button" data-sg-act2="move">別グループへ移動</button></li>
           <li role="none"><button role="menuitem" type="button" class="is-danger" data-sg-act2="del">削除</button></li>
         </ul>
@@ -770,7 +770,7 @@
             <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
             <ul class="rowmenu__list" role="menu" hidden>
               <li role="none"><button role="menuitem" type="button" data-sg-act="edit" data-id="${r.id}">編集</button></li>
-              <li role="none"><button role="menuitem" type="button" data-sg-act="dup" data-id="${r.id}">複製</button></li>
+              <li role="none"><button role="menuitem" type="button" data-sg-act="dup" data-id="${r.id}">複写</button></li>
               <li role="none"><button role="menuitem" type="button" class="is-danger" data-sg-act="del" data-id="${r.id}">削除</button></li>
             </ul>
           </div>` },
@@ -779,7 +779,7 @@
     // アクションメニューの実処理（デモ）。RowMenu の開閉自体は shared.js が担当。
     document.getElementById('sgTable').addEventListener('click', (e) => {
       const mi = e.target.closest('[data-sg-act]'); if (!mi) return;
-      const label = { edit: '編集', dup: '複製', del: '削除' }[mi.dataset.sgAct] || mi.dataset.sgAct;
+      const label = { edit: '編集', dup: '複写', del: '削除' }[mi.dataset.sgAct] || mi.dataset.sgAct;
       const row = DATA.find((x) => x.id === mi.dataset.id);
       alert(label + '：' + (row ? row.name : mi.dataset.id) + '（デモ）');
     });
@@ -788,7 +788,7 @@
   // --- 12. ゲーム風カーソル付きアクションメニュー デモ（開閉は shared.js の RowMenu が処理） ---
   document.getElementById('sgPixelMenu').addEventListener('click', (e) => {
     const mi = e.target.closest('[data-sg-act2]'); if (!mi) return;
-    const label = { edit: '編集', dup: '複製', move: '別グループへ移動', del: '削除' }[mi.dataset.sgAct2] || mi.dataset.sgAct2;
+    const label = { edit: '編集', dup: '複写', move: '別グループへ移動', del: '削除' }[mi.dataset.sgAct2] || mi.dataset.sgAct2;
     alert(label + '（デモ）');
   });
 
