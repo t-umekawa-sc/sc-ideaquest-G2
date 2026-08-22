@@ -18,6 +18,7 @@ from app.control_plane.admin.router import router as admin_router
 from app.control_plane.auth.router import router as auth_router
 from app.control_plane.me.router import router as me_router
 from app.tenant.quests.router import router as quests_router
+from app.tenant.ideas.router import router as ideas_router
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -55,6 +56,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(me_router)
 app.include_router(quests_router)  # テナントプレーン（ドメイン C・SC-10 読み取り）
+app.include_router(ideas_router)  # テナントプレーン（ドメイン D・アイデア CRUD/公開）
 
 
 @app.middleware("http")

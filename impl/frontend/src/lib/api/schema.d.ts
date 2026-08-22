@@ -1006,6 +1006,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ideas
+         * @description クエスト内アイデア一覧＋自分の下書き（SC-12・D.1）。門番はサーバー強制。読取専用。
+         */
+        get: operations["list_ideas_api_v1_quests__quest_id__ideas_get"];
+        put?: never;
+        /**
+         * Create Idea
+         * @description アイデアを作成（SC-21・idea_create 権限）。status=published は作成＋即公開。
+         */
+        post: operations["create_idea_api_v1_quests__quest_id__ideas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Idea
+         * @description アイデア詳細（SC-22・D.1）。可視性はサーバー強制（範囲外 404）。読取専用。
+         */
+        get: operations["get_idea_api_v1_ideas__idea_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Idea
+         * @description アイデアを論理削除（D.2）。投稿者本人 or owner/quest_admin。
+         */
+        delete: operations["delete_idea_api_v1_ideas__idea_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Idea
+         * @description アイデア編集（D.2）。現在 status で検証分岐・公開中は版記録。投稿者本人 or owner/quest_admin。
+         */
+        patch: operations["update_idea_api_v1_ideas__idea_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Idea
+         * @description 下書きを公開（draft→published・D.2・アトミック）。draft 以外は 409。
+         */
+        post: operations["publish_idea_api_v1_ideas__idea_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1392,6 +1464,210 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IdeaAuthorDTO */
+        IdeaAuthorDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+            /** Level */
+            level?: number | null;
+        };
+        /**
+         * IdeaCardDTO
+         * @description 一覧の1件（SC-12 アイデアタブ・D.1）。
+         */
+        IdeaCardDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            author: components["schemas"]["IdeaAuthorDTO"];
+            vote_summary: components["schemas"]["IdeaVoteSummaryDTO"];
+            /** Comment Count */
+            comment_count: number;
+            /** Is Selected */
+            is_selected: boolean;
+            /** Current Revision */
+            current_revision: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** My Vote */
+            my_vote?: string | null;
+            /**
+             * Following
+             * @default false
+             */
+            following: boolean;
+            /** My State */
+            my_state: string;
+        };
+        /** IdeaCreateRequest */
+        IdeaCreateRequest: {
+            /** Title */
+            title: string;
+            /** Value */
+            value: string;
+            /** Body */
+            body: string;
+            /** Time Limit */
+            time_limit?: string | null;
+            /**
+             * Stakeholders
+             * @default []
+             */
+            stakeholders: components["schemas"]["IdeaStakeholderInput"][];
+            /** Note */
+            note?: string | null;
+            /**
+             * Status
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "published";
+        };
+        /**
+         * IdeaCursorPageInfo
+         * @description カーソルページングの共通エンベロープ（§1.8・D 専用の一意名）。
+         */
+        IdeaCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /**
+         * IdeaDetailDTO
+         * @description アイデア詳細（SC-22・D.1）。評価(F)/チャット(E)/添付(D.3)は各ドメインで合成/後続。
+         */
+        IdeaDetailDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Value */
+            value: string;
+            /** Body */
+            body: string;
+            /**
+             * Stakeholders
+             * @default []
+             */
+            stakeholders: components["schemas"]["IdeaStakeholderDTO"][];
+            /** Time Limit */
+            time_limit?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Status */
+            status: string;
+            /** Is Selected */
+            is_selected: boolean;
+            /** Current Revision */
+            current_revision: number;
+            author: components["schemas"]["IdeaAuthorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Vote */
+            vote: {
+                [key: string]: unknown;
+            };
+            /**
+             * Following
+             * @default false
+             */
+            following: boolean;
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+            /** My State */
+            my_state: string;
+        };
+        /** IdeaListResponse */
+        IdeaListResponse: {
+            /** Data */
+            data: components["schemas"]["IdeaCardDTO"][];
+            page_info: components["schemas"]["IdeaCursorPageInfo"];
+        };
+        /**
+         * IdeaPublishRequest
+         * @description POST /ideas/{id}/publish（D.2）。内容フィールドは省略可（未送信は現在値）。
+         */
+        IdeaPublishRequest: {
+            /** Title */
+            title?: string | null;
+            /** Value */
+            value?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Time Limit */
+            time_limit?: string | null;
+            /** Stakeholders */
+            stakeholders?: components["schemas"]["IdeaStakeholderInput"][] | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** IdeaStakeholderDTO */
+        IdeaStakeholderDTO: {
+            /** Label */
+            label: string;
+            /** Is Custom */
+            is_custom: boolean;
+        };
+        /** IdeaStakeholderInput */
+        IdeaStakeholderInput: {
+            /** Label */
+            label: string;
+            /** Is Custom */
+            is_custom?: boolean | null;
+        };
+        /**
+         * IdeaUpdateRequest
+         * @description PATCH /ideas/{id}（D.2）。差分＝送られたフィールドのみ。status は受け付けない（遷移は publish）。
+         */
+        IdeaUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Value */
+            value?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Time Limit */
+            time_limit?: string | null;
+            /** Stakeholders */
+            stakeholders?: components["schemas"]["IdeaStakeholderInput"][] | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** IdeaVoteSummaryDTO */
+        IdeaVoteSummaryDTO: {
+            /**
+             * Approve
+             * @default 0
+             */
+            approve: number;
+            /**
+             * Oppose
+             * @default 0
+             */
+            oppose: number;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -4081,6 +4357,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ideas_api_v1_quests__quest_id__ideas_get: {
+        parameters: {
+            query?: {
+                status?: string[] | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_idea_api_v1_quests__quest_id__ideas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeaCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_idea_api_v1_ideas__idea_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_idea_api_v1_ideas__idea_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_idea_api_v1_ideas__idea_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeaUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_idea_api_v1_ideas__idea_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeaPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaDetailDTO"];
                 };
             };
             /** @description Validation Error */

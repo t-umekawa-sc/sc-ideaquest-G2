@@ -22,3 +22,28 @@
 | D-TC-010 | int | 添付の追加/計数/削除 | アイデア1件 | `add_attachment`→`count`→`remove` | count 1→0（size CHECK 満たす） | D.3／§5.12 |
 | D-TC-011 | int | フォローの冪等 | アイデア1件 | `add_follow`×2→`remove_follow` | 重複行を作らない・is_following True→False | D.6／§5.23 |
 | D-TC-012 | int | フォロー中アイデア集合 | 1件フォロー | `list_followed_idea_ids` | フォロー中のみ含む | D.6 |
+
+## 2. 作成・一覧・詳細・編集・公開・削除 API（SC-21/12/22・D.1/D.2）
+
+> 対象＝`app/tenant/ideas/application.py`・`router.py`（`POST/GET/PATCH/DELETE /quests/{quest_id}/ideas`・`/ideas/{id}`・`/ideas/{id}/publish`）。門番＝クエストのパーティー所属（C.0）／作成は `idea_create` 権限／編集・削除・公開は投稿者本人 or `owner`/`quest_admin`。公開処理（chat_groups 作成・投稿 XP+50・idea_updated 通知）は E/G/H 実装まで no-op フック。前提＝seed 一般ユーザー（ACME-01）でログインし会社DB にクエスト＋自分のパーティー参加を seed。変更系は Origin/CSRF。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-TC-101 | api | 下書き作成 | パーティー参加（idea_create）| `POST /quests/{id}/ideas`（draft） | 201・status draft・author=本人・my_state draft | D.2 |
+| D-TC-102 | api | 即公開作成 | 同上 | `POST /quests/{id}/ideas`（published・必須充足） | 201・status published（公開処理は no-op フック） | D.2 |
+| D-TC-103 | api | 作成は idea_create 権限必須 | パーティー参加だが idea_create なし | `POST .../ideas` | 403 | D.2 |
+| D-TC-104 | api | 即公開は strict 検証 | パーティー参加 | `POST .../ideas`（published・body 空） | 422（body） | D.2／validate_publishable |
+| D-TC-105 | api | 一覧の可視性 | 公開/自分の下書き/他人の下書きを seed | `GET /quests/{id}/ideas` | 公開＋自分の下書きのみ・他人の下書きは除外 | D.1 (A)(B) |
+| D-TC-106 | api | 一覧はパーティー門番 | 非パーティーのクエスト | `GET /quests/{id}/ideas` | 404（存在秘匿・C.0） | D.1 門番 |
+| D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
+| D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
+| D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア | `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision++・版1件 | D.2/D.4 |
+| D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
+| D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
+| D-TC-112 | api | 下書き公開 | 自分の下書き（充足） | `POST /ideas/{id}/publish` | 200・published | D.2 |
+| D-TC-113 | api | 公開の状態機械 | 公開済みアイデア | `POST /ideas/{id}/publish` | 409（invalid_state） | D.2 |
+| D-TC-114 | api | 編集/公開の認可 | 他人の公開アイデア（自分は一般メンバー）| `PATCH`/`publish` | 403 | D.2 |
+| D-TC-115 | api | 論理削除 | 自分のアイデア | `DELETE /ideas/{id}` | 204・以後詳細 404 | D.2／§5.10 |
+| D-TC-116 | api | 削除の認可 | 他人のアイデア（自分は一般メンバー）| `DELETE /ideas/{id}` | 403 | D.2 |
+| D-TC-117 | api | 変更系の CSRF 必須 | ログイン済・CSRF なし | `POST .../ideas` | 403 csrf_failed | A.0 |
+| D-TC-118 | api | 未認証遮断 | セッションなし | `POST .../ideas` | 401 | require_me |

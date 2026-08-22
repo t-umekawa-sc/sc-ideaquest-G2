@@ -289,3 +289,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-002 | 一覧の下書き author 門番（`author_id == viewer_id`） | 他人の下書きが混入して AssertionError |
 | D-TC-006 | 投票 upsert の既存判定（常に新規 insert） | 切替が created=True＋行が増え AssertionError／一意制約 |
 | D-TC-011 | フォロー冪等（既存再利用） | 重複行で UNIQUE 制約違反（sqlalchemy IntegrityError） |
+
+## D. アイデア API（2026-08-22）
+
+> 手技＝サーバー強制ガードを一時無効化（`if False:` 等）→ 該当 TC red 目視 → 復元して green（tests/ideas api 18＋repo 12）。
+
+| TC-ID | 一時無効化したガード | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-103 | 作成の idea_create 権限チェック（403） | 403 期待→ 201 |
+| D-TC-106 | 一覧のパーティー門番（非メンバー 404） | 404 期待→ 200 |
+| D-TC-113 | publish の状態機械（draft 以外 409） | 409 期待→ 200 |
