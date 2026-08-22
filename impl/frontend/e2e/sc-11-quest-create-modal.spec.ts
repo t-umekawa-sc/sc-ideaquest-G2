@@ -30,7 +30,7 @@ async function cleanupByTitlePrefix(page: Page, prefix: string) {
 }
 
 // 一覧からのソフト遷移＝モーダルで差し込まれ、Esc で閉じて一覧へ戻る（URL を持つモーダル）。
-test("quest-create URL modal opens from list and closes", async ({ page }) => {
+test("C-TC-201 quest-create URL modal opens from list and closes", async ({ page }) => {
   await login(page);
   await page.goto("/quests");
   await page.getByRole("link", { name: /クエストを作成/ }).click();
@@ -46,7 +46,7 @@ test("quest-create URL modal opens from list and closes", async ({ page }) => {
 });
 
 // 直アクセス/リロードはフルページにフォールバック（モーダルではない）。
-test("quest-create direct access renders full page (no modal)", async ({ page }) => {
+test("C-TC-202 quest-create direct access renders full page (no modal)", async ({ page }) => {
   await login(page);
   await page.goto("/quests/new");
   await expect(page.getByRole("heading", { name: "クエスト作成" })).toBeVisible();
@@ -54,7 +54,7 @@ test("quest-create direct access renders full page (no modal)", async ({ page })
 });
 
 // §4.7: 必須未入力で「クエストを作成」＝上部サマリ＋インライン aria-invalid、遷移しない（フォーカス移動もしない）。
-test("SC-11 validation shows inline errors and summary on empty submit", async ({ page }) => {
+test("C-TC-203 SC-11 validation shows inline errors and summary on empty submit", async ({ page }) => {
   await login(page);
   await page.goto("/quests/new"); // フルページで検証（モーダルと同一フォーム）
   await page.getByRole("button", { name: "クエストを作成" }).click();
@@ -65,7 +65,7 @@ test("SC-11 validation shows inline errors and summary on empty submit", async (
 });
 
 // 実接続: 下書きを作成→一覧に下書きが出る（GET /quest-groups の実データ＝デモグループを使用）。
-test("SC-11 create draft persists and appears in list", async ({ page }) => {
+test("C-TC-204 SC-11 create draft persists and appears in list", async ({ page }) => {
   await login(page);
   const title = `E2E下書き_${Date.now().toString().slice(-8)}`;
   try {

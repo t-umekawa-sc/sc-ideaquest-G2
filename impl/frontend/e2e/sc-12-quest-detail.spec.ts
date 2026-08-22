@@ -38,7 +38,7 @@ async function deleteQuiet(page: Page, id: string) {
 }
 
 // ヘッダー/概要/パーティーが GET /quests/{id} の実データを描画する。
-test("SC-12 detail renders header/about/party from API", async ({ page }) => {
+test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page }) => {
   await login(page);
   const title = `E2E詳細_${Date.now().toString().slice(-8)}`;
   const id = await createRecruiting(page, title);
@@ -61,7 +61,7 @@ test("SC-12 detail renders header/about/party from API", async ({ page }) => {
 });
 
 // 状態遷移（recruiting→in_progress）と削除（→一覧へ）。owner のみの ⋯ アクション。
-test("SC-12 transition forward then delete", async ({ page }) => {
+test("C-TC-206 SC-12 transition forward then delete", async ({ page }) => {
   await login(page);
   const title = `E2E遷移_${Date.now().toString().slice(-8)}`;
   const id = await createRecruiting(page, title);

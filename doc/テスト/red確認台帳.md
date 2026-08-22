@@ -263,3 +263,29 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | B-TC-091 | 空削除 `status_code == 204` → `599` | 204（tombstone 削除に到達） |
 | B-TC-092 | 使用中削除 `status_code == 409` → `599` | 409（`in_use` conflict ガードが発火） |
 | B-TC-093 | 未認証 PATCH `status_code == 401` → `599` | 401（認証ガードに到達） |
+
+## C. クエスト（SC-10/11/12・2026-08-22）
+
+> 手技＝**対象のサーバー強制ガードを一時無効化（`if False:` 等）→ 該当 TC が red になることを目視 → 復元して green**（実装先行の後追い確認・テスト規約 §5.1）。無効化差分はコミットに含めない。全実行は full 269 passed（緑）。
+
+| TC-ID | 一時無効化したガード | 観測 red（actual） |
+| --- | --- | --- |
+| C-TC-116 | publish の `draft` 前提（`status != draft` の 409） | 409 期待→ 200（無効化で公開が通る） |
+| C-TC-118 | 完了後の書き込み凍結（PATCH の 409） | 409 期待→ 200 |
+| C-TC-121 | パーティー候補制限（グループ外 422） | 422 期待→ 200/他 |
+| C-TC-122 | owner 付与の作成者限定（403） | 403 期待→ 200 |
+| C-TC-128 | 詳細の可視性ガード（パーティー外 404） | 404 期待→ 200 |
+| C-TC-134 | 作成者のパーティー除外禁止（422） | 422 期待→ 204 |
+| C-TC-138 | 状態遷移の飛び越え禁止（409） | 409 期待→ 200 |
+
+> 上記以外の C-TC（repository・一覧・作成/編集など）は test-first 相当で実装時に緑を確認（証跡＝コミットメッセージ）。
+
+## D. アイデア（データ基盤・2026-08-22）
+
+> 手技＝repository のガード/分岐を一時破壊 → 該当 D-TC が red → 復元して green（tests/ideas 12 passed）。
+
+| TC-ID | 一時無効化したガード | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-002 | 一覧の下書き author 門番（`author_id == viewer_id`） | 他人の下書きが混入して AssertionError |
+| D-TC-006 | 投票 upsert の既存判定（常に新規 insert） | 切替が created=True＋行が増え AssertionError／一意制約 |
+| D-TC-011 | フォロー冪等（既存再利用） | 重複行で UNIQUE 制約違反（sqlalchemy IntegrityError） |
