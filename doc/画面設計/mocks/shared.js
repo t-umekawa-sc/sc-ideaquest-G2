@@ -1043,19 +1043,50 @@ window.DataTable = (function () {
    ・見た目は shared.css の .snackbar*（業務＝意味色／ゲーム＝.snackbar--reward）。 */
 (function () {
   const ICONS = { success: '✅', error: '⚠️', info: 'ℹ️', reward: '✨', levelup: '★' };
+  const MAX = 3;            // 同時表示の上限（デザイン標準 §14）
+  let expanded = false;     // 「その他N件」を開いて全件を縦スクロール表示中か
+  const meta = new Map();   // el -> { dur, timer, bar }
+
+  function snacks(s) { return Array.prototype.slice.call(s.querySelectorAll('.snackbar')); }
+  function pause(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); m.timer = null; if (m.bar) m.bar.style.animationPlayState = 'paused'; }
+  function arm(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); if (m.bar) m.bar.style.animationPlayState = 'running'; m.timer = setTimeout(() => dismiss(el), m.dur); }
+  function dismiss(el) {
+    const m = meta.get(el); if (m) clearTimeout(m.timer);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.classList.add('is-leaving');
+    setTimeout(() => { el.remove(); meta.delete(el); reflow(); }, reduce ? 0 : 200);
+  }
+  function reflow() {
+    const s = document.getElementById('iqSnackStack'); if (!s) return;
+    const more = s.querySelector('.snackbar-more');
+    if (more && s.firstElementChild !== more) s.insertBefore(more, s.firstElementChild); // トグルは常に先頭（上）
+    const list = snacks(s); const n = list.length; const many = n > MAX;
+    s.classList.toggle('is-expanded', expanded && many);
+    list.forEach((el, i) => el.classList.toggle('is-collapsed-hidden', !expanded && many && i < n - MAX));
+    if (many) { more.style.display = ''; more.textContent = expanded ? '▲ 折りたたむ' : ('▽ その他 ' + (n - MAX) + ' 件'); }
+    else { more.style.display = 'none'; if (expanded) { expanded = false; s.classList.remove('is-expanded'); } }
+  }
   function stack() {
     let s = document.getElementById('iqSnackStack');
     if (!s) {
       s = document.createElement('div');
       s.id = 'iqSnackStack'; s.className = 'snackbar-stack';
       s.setAttribute('aria-live', 'polite'); s.setAttribute('aria-atomic', 'false');
+      const more = document.createElement('button');
+      more.type = 'button'; more.className = 'snackbar-more'; more.style.display = 'none';
+      more.addEventListener('click', () => {
+        expanded = !expanded;
+        snacks(s).forEach(expanded ? pause : arm);   // 展開中は自動消滅を止め、折りたたみで再開
+        reflow();
+        if (expanded) s.scrollTop = s.scrollHeight;   // 最新（下）まで見せる
+      });
+      s.appendChild(more);
       document.body.appendChild(s);
     }
     return s;
   }
   function show(o) {
     o = o || {};
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const isReward = o.type === 'reward' || o.type === 'levelup';
     const variant = isReward ? 'reward' : (o.type || 'info');
     const dur = o.duration || (o.action ? 6000 : 4000);
@@ -1071,18 +1102,17 @@ window.DataTable = (function () {
     html += '<button class="snackbar__close" type="button" aria-label="閉じる">✕</button>';
     html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>';
     el.innerHTML = html;
-    const st = stack();
-    st.appendChild(el);
-    // 同時表示は最大3件（デザイン標準 §14・重なり増加時の UI）。超過は最古（先頭）から退場＝FIFO。
-    while (st.children.length > 3) st.firstElementChild.remove();
-    let timer = setTimeout(dismiss, dur);
-    function dismiss() { clearTimeout(timer); el.classList.add('is-leaving'); setTimeout(() => el.remove(), reduce ? 0 : 200); }
-    el.querySelector('.snackbar__close').addEventListener('click', dismiss);
-    const act = el.querySelector('.snackbar__action');
-    if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(); } });
+    const s = stack();
+    s.appendChild(el);
     const bar = el.querySelector('.snackbar__timer');
-    el.addEventListener('mouseenter', () => { clearTimeout(timer); if (bar) bar.style.animationPlayState = 'paused'; });
-    el.addEventListener('mouseleave', () => { if (bar) bar.style.animationPlayState = 'running'; timer = setTimeout(dismiss, 1500); });
+    meta.set(el, { dur: dur, timer: null, bar: bar });
+    el.querySelector('.snackbar__close').addEventListener('click', () => dismiss(el));
+    const act = el.querySelector('.snackbar__action');
+    if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(el); } });
+    el.addEventListener('mouseenter', () => pause(el));
+    el.addEventListener('mouseleave', () => { const m = meta.get(el); if (m && !expanded) { m.timer = setTimeout(() => dismiss(el), 1500); if (m.bar) m.bar.style.animationPlayState = 'running'; } });
+    if (!expanded) arm(el);   // 展開中の新着はタイマーを張らない（閲覧中は消さない）
+    reflow();
     return el;
   }
   window.iqSnack = show;
