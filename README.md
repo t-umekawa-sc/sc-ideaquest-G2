@@ -47,6 +47,34 @@ docker compose up --build
 
 ログイン成功でダッシュボード（SC-01 プレースホルダ）に遷移する。一般ユーザーには管理導線は表示されない（ロールで出し分け・サーバーが権限を強制）。
 
+## 検証用の会社・ユーザーを追加する（手動プロビジョニング）
+
+シードの会社（`ACME-01` 等）以外に**自分の検証用テナントを増やしたい**ときの手順。会社DBの用意と有効化は **MVP では手動運用**（会社作成 API は control DB に `status=suspended` の行を作るだけ／専用の「有効化」管理 EP は未実装・データモデル §8-⑫）。コマンドは `impl/` で実行する。
+
+1. **会社を作成（system_admin）**＝`OPS`（`admin@ops.example`）でログイン → 右上メニュー「システム管理（会社）」→ `/admin/companies` →「＋ 会社を作成」。
+   - **DB識別子（`db_identifier`）＝会社DBのデータベース名**になる（例 `db_acme_test`）。**既存 DB と重複しない名前**にする。
+   - 作成直後は **「停止（suspended）」**（会社DB 未整備のため）。
+
+2. **会社DB を用意（作成＋マイグレーション）**＝bootstrap を再実行する（**冪等**）。control DB の全会社を走査し、各 `db_identifier` について `CREATE DATABASE`（無ければ）→ 会社用マイグレーションを head まで適用 → アカウントの会社DBミラー（`users`）を seed する。
+   ```bash
+   docker compose exec backend python -m scripts.bootstrap
+   ```
+   > 手動でやる場合＝`CREATE DATABASE "<db_identifier>"` → `alembic -c alembic_company.ini upgrade head`（`sqlalchemy.url` を当該DBへ向ける）。
+
+3. **会社を「有効（active）」にする**＝会社DBが整ったら `companies.status` を `active` に更新（**現状は専用 EP が無いので control DB を直接更新**）。`suspended` のままだと一般ユーザーのテナント API は 503 になる。
+   ```bash
+   docker compose exec db psql -U ideaquest -d ideaquest_control \
+     -c "UPDATE companies SET status='active' WHERE company_code='<会社コード>';"
+   ```
+   > 元に戻す＝`... SET status='suspended' ...`。
+
+4. **アカウントを発行（＝検証用ユーザー）**＝会社詳細（`/admin/companies/{id}`）→「＋ アカウント発行」。発行後、対象アドレス宛に**初回パスワード設定リンク**が送られる（**MailHog `http://localhost:8025`** で受信 → パスワード設定）。以後 `会社コード / ログインID / 設定したパスワード` でログインできる。
+   - メール配信には常駐ワーカが必要＝起動は `docker compose --profile workers up`（`mail-worker`）。
+
+5. **（クエスト機能を試すなら）クエストグループへ所属させる**＝一般ユーザーは**クエストグループ所属が無いとクエストを作成できない**（一覧も空）。会社詳細でクエストグループを作成し、アカウント編集の「所属クエストグループ」でそのユーザーを追加する。
+
+> まとめると **会社作成 → `bootstrap`（会社DB作成+移行）→ `status=active` に更新 → アカウント発行 → 初回PW設定（MailHog）→ ログイン**。将来的には SC-91/92 に「会社を有効化（＋DBプロビジョニング）」アクションを設けて手動手順を無くす想定。
+
 ## API 仕様（OpenAPI）の確認
 
 backend（FastAPI）が**コードから自動生成**する API 仕様を、起動中（`docker compose up`）に以下で確認できる。
