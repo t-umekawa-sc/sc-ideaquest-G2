@@ -1045,11 +1045,11 @@ window.DataTable = (function () {
   const ICONS = { success: '✅', error: '⚠️', info: 'ℹ️', reward: '✨', levelup: '★' };
   const MAX = 3;            // 同時表示の上限（デザイン標準 §14）
   let expanded = false;     // 「その他N件」を開いて全件を縦スクロール表示中か
-  const meta = new Map();   // el -> { dur, timer, bar }
+  const meta = new Map();   // el -> { dur, timer, bar, start }
 
   function snacks(s) { return Array.prototype.slice.call(s.querySelectorAll('.snackbar')); }
   function pause(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); m.timer = null; if (m.bar) m.bar.style.animationPlayState = 'paused'; }
-  function arm(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); if (m.bar) m.bar.style.animationPlayState = 'running'; m.timer = setTimeout(() => dismiss(el), m.dur); }
+  function arm(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); m.start = Date.now(); if (m.bar) m.bar.style.animationPlayState = 'running'; m.timer = setTimeout(() => dismiss(el), m.dur); }
   function dismiss(el) {
     const m = meta.get(el); if (m) clearTimeout(m.timer);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1063,8 +1063,26 @@ window.DataTable = (function () {
     const list = snacks(s); const n = list.length; const many = n > MAX;
     s.classList.toggle('is-expanded', expanded && many);
     list.forEach((el, i) => el.classList.toggle('is-collapsed-hidden', !expanded && many && i < n - MAX));
-    if (many) { more.style.display = ''; more.textContent = expanded ? '▲ 折りたたむ' : ('▽ その他 ' + (n - MAX) + ' 件'); }
-    else { more.style.display = 'none'; if (expanded) { expanded = false; s.classList.remove('is-expanded'); } }
+    const label = more.querySelector('.snackbar-more__label');
+    const gauge = more.querySelector('.snackbar-more__timer');
+    if (many) {
+      more.style.display = '';
+      if (label) label.textContent = expanded ? '▲ 折りたたむ' : ('▽ その他 ' + (n - MAX) + ' 件');
+      // 折りたたみ時のみゲージ表示＝隠れ項目のうち「最後に消える（残り時間最長）」ものの残りで減らす。
+      if (!expanded) {
+        const hidden = list.slice(0, n - MAX);
+        let best = null;
+        hidden.forEach((el) => { const m = meta.get(el); if (m && m.timer && (!best || m.start + m.dur > best.start + best.dur)) best = m; });
+        if (best && gauge) {
+          const elapsed = Math.max(0, Date.now() - best.start);
+          gauge.style.display = '';
+          gauge.style.animation = 'none'; void gauge.offsetWidth; // リフロー＝アニメ再適用の下ごしらえ
+          gauge.style.animation = 'iq-snack-timer linear forwards';
+          gauge.style.animationDuration = best.dur + 'ms';
+          gauge.style.animationDelay = '-' + elapsed + 'ms';   // 経過分を先送り＝現在の残りから始める
+        } else if (gauge) { gauge.style.display = 'none'; }
+      } else if (gauge) { gauge.style.display = 'none'; }
+    } else { more.style.display = 'none'; if (expanded) { expanded = false; s.classList.remove('is-expanded'); } }
   }
   function stack() {
     let s = document.getElementById('iqSnackStack');
@@ -1074,6 +1092,7 @@ window.DataTable = (function () {
       s.setAttribute('aria-live', 'polite'); s.setAttribute('aria-atomic', 'false');
       const more = document.createElement('button');
       more.type = 'button'; more.className = 'snackbar-more'; more.style.display = 'none';
+      more.innerHTML = '<span class="snackbar-more__label"></span><span class="snackbar-more__timer" style="display:none"></span>';
       more.addEventListener('click', () => {
         expanded = !expanded;
         // 展開しても自動消滅は止めない＝各スナックバーの残り時間インジケータは動き続ける（ユーザー要望）。

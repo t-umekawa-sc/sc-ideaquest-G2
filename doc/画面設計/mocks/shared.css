@@ -1398,8 +1398,12 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 /* 重なり上限（§14）＝最新3件＋「その他N件」トグル。展開で全件を縦スクロール表示。 */
 .snackbar-more { pointer-events: auto; align-self: center; cursor: pointer; border: 1px solid var(--color-border);
   background: var(--color-surface); color: var(--color-text-muted); border-radius: 999px; padding: 4px 14px;
-  font-size: var(--text-xs); box-shadow: var(--shadow); }
+  font-size: var(--text-xs); box-shadow: var(--shadow); position: relative; overflow: hidden; }
 .snackbar-more:hover { background: var(--color-surface-alt); color: var(--color-text); }
+/* トグルの残り時間ゲージ＝標準スナックバーの .snackbar__timer と同じ見た目（緑・scaleX 減少）。
+   折りたたみ中で「最後に消える（残り時間が最長の）」隠れスナックバーの残り時間を表す。 */
+.snackbar-more__timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--color-success);
+  transform-origin: left; animation: iq-snack-timer linear forwards; }
 .snackbar-stack.is-expanded { max-height: 60vh; overflow-y: auto; overflow-x: hidden; pointer-events: auto; padding: 6px; }
 /* 折りたたみで隠す項目＝display:none にすると CSS アニメ（残り時間バー）が止まって展開時に再スタートするため、
    レンダリングは残したままオフスクリーンへ退避（visually-hidden）。折りたたみ中もカウントダウンが進み続ける。 */
@@ -1442,7 +1446,7 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   .iq-spinner__coin, .iq-dot-spin, .progress--xp .progress__fill::after, .progress--indeterminate .progress__track::before,
   .iq-loading-badge .dots::after, .progress.is-complete .progress__done,
   .snackbar, .snackbar.is-leaving, .snackbar--reward .snackbar__icon { animation: none; }
-  .snackbar__timer { animation-duration: 0s; }
+  .snackbar__timer, .snackbar-more__timer { animation-duration: 0s; }
 }
 
 /* =============================================================
