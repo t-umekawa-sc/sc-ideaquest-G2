@@ -82,7 +82,7 @@ export function PasswordResetRequestForm() {
                   required
                 />
               </Field>
-              <Button type="submit" variant="primary" block disabled={pending}>
+              <Button type="submit" variant="primary" block loading={pending}>
                 {pending ? "送信中…" : "再設定リンクを送信"}
               </Button>
             </form>

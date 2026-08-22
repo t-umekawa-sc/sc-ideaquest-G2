@@ -129,7 +129,7 @@ export function MfaForm({ challenge, onRestart }: Props) {
             />
             このデバイスを信頼する（次回から認証コードを省略・共有端末では選ばないでください）
           </label>
-          <Button type="submit" variant="primary" block disabled={pending}>
+          <Button type="submit" variant="primary" block loading={pending}>
             {pending ? "認証中…" : "認証してログイン"}
           </Button>
         </form>

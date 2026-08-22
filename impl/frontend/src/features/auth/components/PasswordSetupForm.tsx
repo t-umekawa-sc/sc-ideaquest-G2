@@ -171,7 +171,7 @@ export function PasswordSetupForm({ token }: { token: string }) {
                   required
                 />
               </Field>
-              <Button type="submit" variant="primary" block disabled={pending}>
+              <Button type="submit" variant="primary" block loading={pending}>
                 {pending ? "送信中…" : "パスワードを設定してはじめる"}
               </Button>
             </form>
