@@ -84,7 +84,10 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
   }
 
   return (
-    <div className="rowmenu">
+    // メニュー領域（トリガー＋fixed リスト＋各パディング）のクリックは一切カード/行へ伝播させない。
+    // ボタン外側（li/ul のパディング）をクリックしても card の onRowClick（詳細遷移）が発火しないための門番。
+    // リストは position:fixed だが React ツリー上は本 div の子＝React のイベントバブリングは本 div を通る。
+    <div className="rowmenu" onClick={(e) => e.stopPropagation()}>
       <button
         ref={triggerRef}
         type="button"
