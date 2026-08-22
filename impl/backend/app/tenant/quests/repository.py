@@ -262,6 +262,66 @@ def list_visible_groups(session: Session, user_id: uuid.UUID, *, q: str | None =
     return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
 
 
+def list_active_group_member_user_ids(session: Session, group_id: uuid.UUID) -> set[uuid.UUID]:
+    """当該グループの有効メンバー（`quest_group_members.removed_at IS NULL`）の user_id 集合（候補制限・C.3）。"""
+    return set(
+        session.execute(
+            select(QuestGroupMember.user_id).where(
+                QuestGroupMember.quest_group_id == group_id,
+                QuestGroupMember.removed_at.is_(None),
+            )
+        ).scalars().all()
+    )
+
+
+def list_group_member_candidates(
+    session: Session,
+    group_id: uuid.UUID,
+    *,
+    q: str | None = None,
+    exclude_user_ids: list[uuid.UUID] | None = None,
+    cursor: tuple[str, uuid.UUID] | None = None,
+    limit: int = 20,
+) -> list:
+    """パーティー候補＝当該グループの有効メンバー×`users.status='active'`（C.4 GET /quest-groups/{id}/members）。
+
+    `exclude_user_ids`（既参加/追加中/作成者本人）を**サーバー側で除外**してからページング（C.4 決定 2026-08-02）。
+    並びは display_name→id 昇順のキーセット（`cursor`＝(display_name, id)）。
+    """
+    from app.tenant.profile.orm import User
+
+    stmt = (
+        select(User)
+        .join(QuestGroupMember, QuestGroupMember.user_id == User.id)
+        .where(
+            QuestGroupMember.quest_group_id == group_id,
+            QuestGroupMember.removed_at.is_(None),
+            User.status == "active",
+        )
+    )
+    if exclude_user_ids:
+        stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
+    if q:
+        stmt = stmt.where(User.display_name.ilike(f"%{q}%"))
+    if cursor is not None:
+        stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
+    stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_users_by_ids(session: Session, ids) -> dict:
+    """user_id→User の dict（詳細/メンバー DTO 組み立ての N+1 回避）。"""
+    from app.tenant.profile.orm import User
+
+    id_list = list(ids)
+    if not id_list:
+        return {}
+    return {
+        u.id: u
+        for u in session.execute(select(User).where(User.id.in_(id_list))).scalars().all()
+    }
+
+
 def get_owners_and_groups(
     session: Session, owner_ids: list[uuid.UUID], group_ids: list[uuid.UUID]
 ) -> tuple[dict, dict]:

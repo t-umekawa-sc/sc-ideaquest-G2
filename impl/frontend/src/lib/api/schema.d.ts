@@ -779,7 +779,11 @@ export interface paths {
          */
         get: operations["list_quests_api_v1_quests_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Quest
+         * @description クエストを作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
+         */
+        post: operations["create_quest_api_v1_quests_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -801,6 +805,90 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quest-groups/{group_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Group Member Candidates
+         * @description パーティー候補＝同一グループの有効メンバー（SC-11・C.4）。`exclude_user_ids` はサーバー側で除外。読取専用。
+         */
+        get: operations["list_group_member_candidates_api_v1_quest_groups__group_id__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Quest
+         * @description クエストを編集（SC-11・C.2）。差分適用・検証は現在 status で分岐。owner/quest_admin。
+         */
+        patch: operations["update_quest_api_v1_quests__quest_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Quest
+         * @description 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証・参加通知（H まで no-op）。
+         */
+        post: operations["publish_quest_api_v1_quests__quest_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/icon-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Quest Icon
+         * @description クエストアイコンを設定（SC-11・論点2・multipart・K.4 流儀）。owner/quest_admin。
+         */
+        put: operations["put_quest_icon_api_v1_quests__quest_id__icon_image_put"];
+        post?: never;
+        /**
+         * Delete Quest Icon
+         * @description クエストアイコンを削除（既定表示に戻す・論点2）。owner/quest_admin。
+         */
+        delete: operations["delete_quest_icon_api_v1_quests__quest_id__icon_image_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1007,6 +1095,11 @@ export interface components {
         };
         /** Body_put_company_icon_api_v1_admin_companies__company_id__icon_image_put */
         Body_put_company_icon_api_v1_admin_companies__company_id__icon_image_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put */
+        Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
             /** File */
             file: string;
         };
@@ -1468,6 +1561,24 @@ export interface components {
             login_id: string;
         };
         /**
+         * QuestCandidateDTO
+         * @description パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members）。
+         */
+        QuestCandidateDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+        };
+        /** QuestCandidatesResponse */
+        QuestCandidatesResponse: {
+            /** Data */
+            data: components["schemas"]["QuestCandidateDTO"][];
+            page_info: components["schemas"]["QuestCursorPageInfo"];
+        };
+        /**
          * QuestCardDTO
          * @description 一覧カード/行の1件（C.1・SC-10 §4.1）。
          */
@@ -1499,6 +1610,40 @@ export interface components {
             my_state: string;
         };
         /**
+         * QuestCreateRequest
+         * @description POST /quests（C.2）。`owner_id`/`status` 以外の内部列は受けない（§1.4/C.6）。
+         */
+        QuestCreateRequest: {
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Quest Group Id */
+            quest_group_id: string;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Deadline */
+            deadline?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /**
+             * Members
+             * @default []
+             */
+            members: components["schemas"]["QuestMemberInput"][];
+            /**
+             * Status
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "recruiting";
+        };
+        /**
          * QuestCursorPageInfo
          * @description カーソルページングの共通エンベロープ（§1.8・me.CursorPageInfo と同形）。
          *
@@ -1510,6 +1655,54 @@ export interface components {
             next_cursor?: string | null;
             /** Has Next */
             has_next: boolean;
+        };
+        /**
+         * QuestDetailDTO
+         * @description 作成/編集/公開の応答＝クエスト詳細（カード項目＋purpose/created_at＋自分の権限＋パーティー）。
+         */
+        QuestDetailDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Status */
+            status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Idea Count */
+            idea_count: number;
+            owner: components["schemas"]["QuestOwnerDTO"];
+            quest_group: components["schemas"]["QuestGroupRefDTO"];
+            /** My State */
+            my_state: string;
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+            /**
+             * Members
+             * @default []
+             */
+            members: components["schemas"]["QuestMemberDTO"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * QuestGroupCreateRequest
@@ -1576,11 +1769,48 @@ export interface components {
             /** Data */
             data: components["schemas"]["QuestGroupDTO"][];
         };
+        /**
+         * QuestIconImageResponse
+         * @description PUT/DELETE /quests/{id}/icon-image の応答＝設定後の短TTL 署名URL（削除時は None・K.4 流儀）。
+         */
+        QuestIconImageResponse: {
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+        };
         /** QuestListResponse */
         QuestListResponse: {
             /** Data */
             data: components["schemas"]["QuestCardDTO"][];
             page_info: components["schemas"]["QuestCursorPageInfo"];
+        };
+        /**
+         * QuestMemberDTO
+         * @description パーティーメンバー1件の応答（C.1 GET .../members と同形・SC-11/SC-12 で再利用）。
+         */
+        QuestMemberDTO: {
+            user: components["schemas"]["QuestOwnerDTO"];
+            /**
+             * Permissions
+             * @default []
+             */
+            permissions: string[];
+            /**
+             * Joined At
+             * Format: date-time
+             */
+            joined_at: string;
+            /** Is Creator */
+            is_creator: boolean;
+        };
+        /**
+         * QuestMemberInput
+         * @description パーティーメンバー1件の入力（あるべき全体像の1要素・C.3）。permissions 省略時は既定を付与。
+         */
+        QuestMemberInput: {
+            /** User Id */
+            user_id: string;
+            /** Permissions */
+            permissions?: string[] | null;
         };
         /** QuestOwnerDTO */
         QuestOwnerDTO: {
@@ -1590,6 +1820,48 @@ export interface components {
             display_name: string;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
+        };
+        /**
+         * QuestPublishRequest
+         * @description POST /quests/{id}/publish（C.2）。内容フィールドは省略可（未送信は現在値）＋任意の members。
+         */
+        QuestPublishRequest: {
+            /** Title */
+            title?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Categories */
+            categories?: string[] | null;
+            /** Deadline */
+            deadline?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Members */
+            members?: components["schemas"]["QuestMemberInput"][] | null;
+        };
+        /**
+         * QuestUpdateRequest
+         * @description PATCH /quests/{id}（C.2）。差分＝送られたフィールドのみ適用（`model_fields_set` で判定）。
+         *
+         *     `quest_group_id` は不変・`status` は受け付けない（状態遷移は publish/transition）＝フィールド自体を持たない。
+         */
+        QuestUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Categories */
+            categories?: string[] | null;
+            /** Deadline */
+            deadline?: string | null;
+            /** Purpose */
+            purpose?: string | null;
+            /** Icon Image Path */
+            icon_image_path?: string | null;
+            /** Members */
+            members?: components["schemas"]["QuestMemberInput"][] | null;
         };
         /**
          * Session
@@ -3155,6 +3427,39 @@ export interface operations {
             };
         };
     };
+    create_quest_api_v1_quests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_quest_groups_api_v1_quest_groups_get: {
         parameters: {
             query?: {
@@ -3174,6 +3479,176 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuestGroupsResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_group_member_candidates_api_v1_quest_groups__group_id__members_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                exclude_user_ids?: string[] | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestCandidatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_quest_api_v1_quests__quest_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_quest_api_v1_quests__quest_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestIconImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_quest_icon_api_v1_quests__quest_id__icon_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
