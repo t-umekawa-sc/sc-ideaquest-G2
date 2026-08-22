@@ -70,7 +70,15 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
             >
               <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
             </button>
-            <ul className="usermenu__list" role="menu" hidden={!open}>
+            <ul
+              className="usermenu__list"
+              role="menu"
+              hidden={!open}
+              // メニュー項目（リンク/ボタン）をクリックしたらメニューを閉じる（外側クリック待ちにしない）。
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a,button")) setOpen(false);
+              }}
+            >
               {/* 狭幅ではヘッダーのステータス／通知をここに畳む（.usermenu__m は design-system.css の @media で表示切替・
                   広幅は非表示）。バー側のチップ/ベルは狭幅で display:none。 */}
               {balance && (

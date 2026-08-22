@@ -92,7 +92,10 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
-        onClick={toggleOpen}
+        onClick={(e) => {
+          e.stopPropagation(); // カード/行の onRowClick（主アクション）へ伝播させない（§4.5⑪・カード形式で誤遷移防止）
+          toggleOpen();
+        }}
       >
         ⋯
       </button>
@@ -104,7 +107,8 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
                 role="menuitem"
                 type="button"
                 className={it.danger ? "is-danger" : undefined}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation(); // カード/行の onRowClick へ伝播させない（fixed リストでもカードの子孫のため）
                   setOpen(false);
                   it.onClick();
                 }}
