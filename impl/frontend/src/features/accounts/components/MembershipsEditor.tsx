@@ -2,6 +2,7 @@
 
 // 所属エディタ（B.2/B.3）＝選択済みグループを行表示＋役割セグメント（member/admin）＋削除、末尾に追加プルダウン。
 // `admin` 指定＝QG管理者の任命（system_admin＋会社アカウント管理者が可・B.2.1）。表示/UX のみ、判定はサーバー。
+// 役割は **セグメント切替（.seg／メンバー・管理者）**でモック SC-92 に一致させる（DoD＝モック一致・native select は使わない）。
 import type { Membership, QuestGroup } from "../types";
 
 export function MembershipsEditor({
@@ -22,19 +23,23 @@ export function MembershipsEditor({
       {value.map((m, i) => (
         <div key={m.group_id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBlock: "var(--space-1)" }}>
           <span style={{ minWidth: "8rem" }}>{nameOf(m.group_id)}</span>
-          <select
-            className="input"
-            aria-label={`${nameOf(m.group_id)} の役割`}
-            value={m.role}
-            onChange={(e) => {
-              const next = [...value];
-              next[i] = { ...m, role: e.target.value as Membership["role"] };
-              onChange(next);
-            }}
-          >
-            <option value="member">メンバー</option>
-            <option value="admin">管理者</option>
-          </select>
+          <div className="seg" role="group" aria-label={`${nameOf(m.group_id)} の役割`} style={{ marginLeft: "auto" }}>
+            {(["member", "admin"] as const).map((role) => (
+              <button
+                key={role}
+                type="button"
+                className="seg__btn"
+                aria-pressed={m.role === role}
+                onClick={() => {
+                  const next = [...value];
+                  next[i] = { ...m, role };
+                  onChange(next);
+                }}
+              >
+                {role === "member" ? "メンバー" : "管理者"}
+              </button>
+            ))}
+          </div>
           <button type="button" aria-label={`${nameOf(m.group_id)} を削除`} onClick={() => onChange(value.filter((_, j) => j !== i))}>
             ✕
           </button>
