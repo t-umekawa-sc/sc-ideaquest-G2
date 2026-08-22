@@ -2,7 +2,11 @@
 
 // 行アクション ⋯（ケバブ）メニュー（デザイン標準 §4・shared.css .rowmenu）。sticky 操作列に置く。
 // ドロップダウンは table-wrap の overflow に隠れないよう position:fixed で配置（shared.js 相当）。
+// リストは **document.body へ portal**＝カード/行のスタッキング文脈やトランスフォームに閉じ込められず常に最前面。
+// これによりカード形式でメニューが背後カードに覆われ、クリックが背後カードに当たって誤遷移する不具合を防ぐ。
+// portal でも React ツリー上は本コンポーネントの子＝イベントは `.rowmenu` を通り stopPropagation が効く。
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type RowMenuItem = { label: string; onClick: () => void; danger?: boolean };
 
@@ -102,26 +106,28 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
       >
         ⋯
       </button>
-      {open && pos && (
-        <ul ref={listRef} className="rowmenu__list" role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}>
-          {items.map((it, i) => (
-            <li role="none" key={i}>
-              <button
-                role="menuitem"
-                type="button"
-                className={it.danger ? "is-danger" : undefined}
-                onClick={(e) => {
-                  e.stopPropagation(); // カード/行の onRowClick へ伝播させない（fixed リストでもカードの子孫のため）
-                  setOpen(false);
-                  it.onClick();
-                }}
-              >
-                {it.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && pos && typeof document !== "undefined" &&
+        createPortal(
+          <ul ref={listRef} className="rowmenu__list" role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }} onClick={(e) => e.stopPropagation()}>
+            {items.map((it, i) => (
+              <li role="none" key={i}>
+                <button
+                  role="menuitem"
+                  type="button"
+                  className={it.danger ? "is-danger" : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    it.onClick();
+                  }}
+                >
+                  {it.label}
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </div>
   );
 }

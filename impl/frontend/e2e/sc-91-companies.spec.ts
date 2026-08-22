@@ -146,3 +146,21 @@ test("B-TC-140 server mode: export downloads companies.csv", async ({ page }) =>
   ]);
   expect(download.suggestedFilename()).toBe("companies.csv");
 });
+
+// B-TC-161: カード形式の ⋯「複製」が誤遷移しない（回帰）。RowMenu を body へ portal＝最前面化し、
+// メニューのクリックがカードの onRowClick（会社詳細へ遷移）を誘発しないことを担保。
+test("B-TC-161 card view: 複製 opens create(dup) modal, not company detail", async ({ page }) => {
+  await login(page, OPS);
+  await page.goto("/admin/companies");
+  await expect(page.getByRole("heading", { name: /システム管理/ })).toBeVisible();
+
+  // カード表示へ切替（不具合はカード形式でのみ再現）。
+  await page.getByRole("radio", { name: /カード/ }).click();
+  // 先頭カードの ⋯（操作）→「複製」。
+  await page.getByRole("button", { name: "操作" }).first().click();
+  await page.getByRole("menuitem", { name: "複製" }).click();
+
+  // 作成（複製）モーダル /admin/companies/new?dup=... が開く（会社詳細 /admin/companies/{uuid} ではない）。
+  await expect(page).toHaveURL(/\/admin\/companies\/new\?dup=/);
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
