@@ -335,6 +335,12 @@ img { max-width: 100%; display: block; }
 .field__error { color: var(--color-danger); font-size: var(--text-xs); margin-top: 4px; }
 .input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--color-danger); }
 
+/* 入力検証エラーの上部サマリ（デザイン標準 §4.7・インライン＋上部サマリ併用。正＝mocks/shared.css） */
+.form-summary { border: 1px solid var(--color-danger); background: rgba(239, 68, 68, .08); color: var(--color-danger); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); font-size: var(--text-sm); }
+.form-summary > strong { display: block; margin-bottom: var(--space-2); }
+.form-summary ul { margin: 0; padding-left: 1.2em; }
+.form-summary a { color: inherit; text-decoration: underline; }
+
 /* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
 body.modal-open { overflow: hidden; }
 

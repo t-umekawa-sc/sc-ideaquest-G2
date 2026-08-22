@@ -9,5 +9,11 @@ import { getServerSession } from "@/lib/session";
 export default async function QuestCreateFullPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <QuestCreatePanel ownerName={session.user.display_name} />;
+  return (
+    <QuestCreatePanel
+      ownerName={session.user.display_name}
+      ownerUserId={session.user.user_id}
+      locale={session.locale === "en" ? "en" : "ja"}
+    />
+  );
 }

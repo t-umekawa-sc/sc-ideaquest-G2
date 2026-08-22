@@ -16,6 +16,7 @@ export type {
   DataTableServer,
 } from "./DataTable";
 export { Field } from "./Field";
+export { FormSummary } from "./FormSummary";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { RouteModal } from "./RouteModal";
 export { Pager } from "./Pager";

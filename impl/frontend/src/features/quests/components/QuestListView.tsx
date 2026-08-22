@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DataTable } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { listQuests, type QuestCard } from "../api";
+import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
@@ -93,7 +93,7 @@ export function QuestListView() {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       try {
         const res = await listQuests({ limit: 100 });
         if (!alive) return;
@@ -105,8 +105,15 @@ export function QuestListView() {
           ? "セッションが切れています。再ログインしてください。"
           : "クエスト一覧の取得に失敗しました。");
       }
-    })();
-    return () => { alive = false; };
+    };
+    void load();
+    // 作成/公開（別ルートのモーダル）成功時に再取得＝作ったクエストが一覧に反映される（跨ルート更新）。
+    const onChanged = () => void load();
+    window.addEventListener(QUESTS_CHANGED_EVENT, onChanged);
+    return () => {
+      alive = false;
+      window.removeEventListener(QUESTS_CHANGED_EVENT, onChanged);
+    };
   }, []);
 
   // 絞り込み候補（カテゴリー/グループ）は取得データから動的生成＝実データに一致（SC-11 の候補 API は後続）。
