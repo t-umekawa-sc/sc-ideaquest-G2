@@ -21,6 +21,9 @@ type Snack = SnackOptions & { id: number };
 
 const ICONS: Record<SnackType, string> = { success: "✅", error: "⚠️", info: "ℹ️", reward: "✨", levelup: "★" };
 
+// 同時表示の上限（デザイン標準 §14・重なり増加時の UI）。超過は最古から退場＝FIFO。画面を埋めない。
+const SNACK_MAX = 3;
+
 const SnackbarContext = createContext<(o: SnackOptions) => void>(() => {});
 export function useSnackbar() {
   return useContext(SnackbarContext);
@@ -30,7 +33,11 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<Snack[]>([]);
   const [mounted, setMounted] = useState(false); // ポータルはマウント後のみ描画＝SSR/初回描画は null で一致（hydration mismatch 回避）
   const idRef = useRef(0);
-  const show = useCallback((o: SnackOptions) => setItems((xs) => [...xs, { ...o, id: ++idRef.current }]), []);
+  // 新規を末尾（最新＝最前面/下寄せ）に積み、上限 SNACK_MAX を超えたら最古（先頭）から落とす（FIFO）。
+  const show = useCallback(
+    (o: SnackOptions) => setItems((xs) => [...xs, { ...o, id: ++idRef.current }].slice(-SNACK_MAX)),
+    [],
+  );
   const remove = useCallback((id: number) => setItems((xs) => xs.filter((x) => x.id !== id)), []);
   useEffect(() => setMounted(true), []);
   return (

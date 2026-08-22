@@ -1071,7 +1071,10 @@ window.DataTable = (function () {
     html += '<button class="snackbar__close" type="button" aria-label="閉じる">✕</button>';
     html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>';
     el.innerHTML = html;
-    stack().appendChild(el);
+    const st = stack();
+    st.appendChild(el);
+    // 同時表示は最大3件（デザイン標準 §14・重なり増加時の UI）。超過は最古（先頭）から退場＝FIFO。
+    while (st.children.length > 3) st.firstElementChild.remove();
     let timer = setTimeout(dismiss, dur);
     function dismiss() { clearTimeout(timer); el.classList.add('is-leaving'); setTimeout(() => el.remove(), reduce ? 0 : 200); }
     el.querySelector('.snackbar__close').addEventListener('click', dismiss);

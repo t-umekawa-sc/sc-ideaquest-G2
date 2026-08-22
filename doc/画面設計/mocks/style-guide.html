@@ -620,9 +620,11 @@
       <button class="btn btn-outline" type="button" id="snkInfo">情報</button>
       <button class="btn-pixel" type="button" id="snkReward">▶ 報酬（＋XP/コイン）</button>
       <button class="btn-pixel" type="button" id="snkLevel">▶ レベルアップ！</button>
+      <button class="btn btn-outline" type="button" id="snkStack">重なり（5件・上限確認）</button>
     </div>
     <p class="hint">呼び出しは1関数（デモの <code>iqSnack({type,title,msg,rewards,action,duration})</code>）を想定。
       <code>type</code>＝success/error/info（意味色）と reward/levelup（報酬・CRTガラス）。<code>aria-live</code> で読み上げ、エラーは <code>role="alert"</code>。<code>prefers-reduced-motion</code> で動きを抑制。</p>
+    <p class="hint"><strong>重なり増加時の UI（決定 2026-08-22）＝同時表示は最大 3 件</strong>。4 件目以降が来たら<strong>最古から自動で退場（FIFO）</strong>し、画面を埋めない（新しいものほど下＝出現位置に近い）。「重なり（5件）」で挙動を確認できる。</p>
   </div>
 
   <!-- 15. 確認ダイアログ（提案・ゲーム要素入り） -->
@@ -837,6 +839,10 @@
     document.getElementById('snkInfo').addEventListener('click', () => snk({ type: 'info', title: '下書きを保存しました', msg: 'あなただけに表示されます。' }));
     document.getElementById('snkReward').addEventListener('click', () => snk({ type: 'reward', title: 'アイデアを投稿！', msg: 'パーティーに公開しました。', rewards: [{ k: 'xp', t: '＋50 XP' }, { k: 'coin', t: '◆ +10' }] }));
     document.getElementById('snkLevel').addEventListener('click', () => snk({ type: 'levelup', icon: '★', title: 'LEVEL UP! Lv.8', msg: '新しい装備が解放されました。', rewards: [{ k: 'sp', t: '✦ SP +1' }], duration: 5000 }));
+    // 重なり（5件）＝上限3件に収まり、最古から退場する（FIFO）ことを確認するデモ。
+    document.getElementById('snkStack').addEventListener('click', () => {
+      for (let i = 1; i <= 5; i++) snk({ type: 'success', title: '通知 ' + i + ' / 5', msg: '最大3件・超過は最古から退場します。' });
+    });
   })();
 
   // --- 15. 確認ダイアログ デモ。生成 API は shared.js の window.iqConfirm（Promise<boolean>） ---
