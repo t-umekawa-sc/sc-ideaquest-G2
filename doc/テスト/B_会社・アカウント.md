@@ -332,3 +332,13 @@
 | B-TC-140 | e2e | CSV エクスポート | OPS・会社一覧 | エクスポート押下 | 同一 EP の `?format=csv` で `companies.csv` をダウンロード | §1.8.1③ |
 | B-TC-160 | e2e | 会社作成は URL モーダル（intercept） | OPS・会社一覧 | 「＋ 会社を作成」→ソフト遷移／直アクセス | `/admin/companies/new` の URL モーダル／直アクセスはフルページにフォールバック | B.1／§112 |
 | B-TC-161 | e2e | **カード形式**の ⋯「複製」が誤遷移しない（回帰） | OPS・会社一覧をカード表示 | カードの ⋯→「複製」をクリック | 会社作成（複製）モーダル `/admin/companies/new?dup=` が開く（会社詳細へ遷移**しない**）＝RowMenu を body へ portal し最前面化した回帰担保 | B.1／§4.5⑪／デザイン標準 §4.5 複製 |
+
+## 18. 会社DB プロビジョニング（SC-92「会社DB」・B.1・system_admin）
+
+> 対象＝`POST /admin/companies/{company_id}/provision`（`company_application.provision_company`）＝DB作成→マイグレーション head→users ミラー seed→`active` 化。MVP 手動運用（§8-⑫）を管理 EP 化・**冪等**。前提＝OPS system_admin。seed 会社（ACME-01）は既に整備済み＝再実行が冪等に 200 で通ることを確認（新規DB作成/DROP は伴わない）。**（2026-08-22 追加）**
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-162 | api | プロビジョニングは冪等・active 化 | OPS・seed 会社 ACME-01（整備済み） | `POST /admin/companies/{id}/provision` | 200・`status=active`（DB作成/移行/ミラーは存在済みで no-op） | B.1／§8-⑫ |
+| B-TC-163 | api | 非 system_admin の越権遮断 | 一般ユーザー | 同 POST | 403 forbidden | B.0.1 P6 |
+| B-TC-164 | api | 存在しない会社の存在秘匿 | OPS | 不明 company_id で POST | 404 not_found | B.2／§1.6 |

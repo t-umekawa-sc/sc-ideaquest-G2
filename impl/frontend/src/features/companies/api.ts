@@ -115,6 +115,11 @@ export function getCompany(companyId: string): Promise<CompanyDetail | null> {
   return apiFetch<CompanyDetail>(`/admin/companies/${companyId}`);
 }
 
+// 会社DBのプロビジョニング（SC-92「会社DB」・B.1）＝DB作成→マイグレーション→users ミラー→active 化。冪等。
+export function provisionCompany(companyId: string): Promise<CompanyDetail | null> {
+  return apiFetch<CompanyDetail>(`/admin/companies/${companyId}/provision`, { method: "POST" });
+}
+
 // 会社設定フラグ更新（B.1・記名時は hide_voters をサーバーが無効化して整合）。
 export function updateCompanySettings(companyId: string, input: CompanySettingsInput): Promise<CompanyDetail | null> {
   return apiFetch<CompanyDetail>(`/admin/companies/${companyId}/settings`, {

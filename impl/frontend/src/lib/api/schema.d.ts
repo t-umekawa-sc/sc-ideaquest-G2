@@ -205,6 +205,26 @@ export interface paths {
         patch: operations["update_company_api_v1_admin_companies__company_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/companies/{company_id}/provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Provision Company
+         * @description 会社DBをプロビジョニング（SC-92「会社DB」・B.1）＝DB作成→マイグレーション→users ミラー seed→active 化。冪等。
+         */
+        post: operations["provision_company_api_v1_admin_companies__company_id__provision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/{company_id}/icon-image": {
         parameters: {
             query?: never;
@@ -2722,6 +2742,37 @@ export interface operations {
                 "application/json": components["schemas"]["CompanyProfileUpdateRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provision_company_api_v1_admin_companies__company_id__provision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

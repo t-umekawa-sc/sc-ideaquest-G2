@@ -113,6 +113,17 @@ def update_company(
     ))
 
 
+@router.post("/companies/{company_id}/provision", response_model=CompanyDetail)
+def provision_company(
+    company_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> CompanyDetail:
+    """会社DBをプロビジョニング（SC-92「会社DB」・B.1）＝DB作成→マイグレーション→users ミラー seed→active 化。冪等。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return CompanyDetail(**company_service.provision_company(company_id))
+
+
 @router.put("/companies/{company_id}/icon-image", response_model=CompanyDetail)
 async def put_company_icon(
     company_id: uuid.UUID, request: Request, file: UploadFile = File(...),

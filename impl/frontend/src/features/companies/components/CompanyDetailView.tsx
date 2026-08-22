@@ -17,7 +17,7 @@ import { QuestIcon } from "@/components/layout";
 import { AccountSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
-import { deleteCompanyIcon, getCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
+import { deleteCompanyIcon, getCompany, provisionCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
 import "../companies.css";
 
@@ -32,6 +32,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [color, setColor] = useState("#2563EB");
+  const [provisioning, setProvisioning] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const ctxRef = useRef<HTMLElement>(null);
@@ -125,6 +126,23 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
     }
   }
 
+  // 会社DB プロビジョニング（DB作成→マイグレーション→ミラー→active 化・B.1）。冪等・system_admin。
+  async function onProvision() {
+    setError(null);
+    setProvisioning(true);
+    try {
+      const updated = await provisionCompany(companyId);
+      setCompany(updated);
+      snack({ type: "success", title: "会社DBを準備しました", msg: "DB作成・マイグレーション・有効化が完了しました。" });
+    } catch {
+      const msg = "会社DBのプロビジョニングに失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: "プロビジョニングに失敗しました", msg });
+    } finally {
+      setProvisioning(false);
+    }
+  }
+
   // 一覧へ戻る＝履歴を戻す（一覧は検索/絞込/ページを URL に持つため、ブラウザ戻ると同様に絞込付きで復帰）。
   // 詳細に直接アクセスした場合（履歴なし）は素の一覧へ。
   function backToList() {
@@ -173,6 +191,23 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
+
+      {/* 会社DB（プロビジョニング＝DB作成・マイグレーション・有効化。MVP 手動運用の管理操作・B.1/§8-⑫） */}
+      <div className="section-head"><h2>会社DB</h2></div>
+      <section className="card" aria-label="会社DB">
+        <p className="admin-sub" style={{ marginTop: 0 }}>
+          会社DB（識別子 <code className="db-id">{company.db_identifier}</code>）を作成し、テーブルを最新化してからこの会社を<strong>有効化</strong>します。
+          有効化されるまで一般ユーザーはこの会社のデータを利用できません（メンテナンス中）。この操作は<strong>繰り返し実行しても安全</strong>です。
+        </p>
+        <div className="row" style={{ alignItems: "center", gap: "var(--space-3)" }}>
+          <span>状態: {company.status === "active"
+            ? <span className="badge st-active">有効</span>
+            : <span className="badge st-suspended">停止（DB未整備）</span>}</span>
+          <Button type="button" variant="primary" onClick={onProvision} disabled={provisioning}>
+            {provisioning ? "準備中…" : company.status === "active" ? "会社DBを再準備" : "会社DBを作成して有効化"}
+          </Button>
+        </div>
+      </section>
 
       {/* 会社プロフィール（アバター・カラー） */}
       <div className="section-head"><h2>会社プロフィール</h2></div>

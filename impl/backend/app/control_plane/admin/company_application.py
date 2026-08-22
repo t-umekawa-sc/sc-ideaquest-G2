@@ -206,6 +206,49 @@ def get_company_detail(company_id: uuid.UUID) -> dict:
         return _detail(company, count)
 
 
+def provision_company(company_id: uuid.UUID) -> dict:
+    """会社DBをプロビジョニング（B.1・SC-92「会社DB」）＝DB作成→マイグレーション head→users ミラー seed→`active` 化。
+
+    MVP 手動運用（データモデル §8-⑫）の運用手順を system_admin 管理 EP 化。**冪等**＝CREATE DATABASE は存在時
+    スキップ／alembic は head 済みなら no-op／users ミラーは無い分のみ INSERT／status は active に確定。
+    重い同期処理（CREATE DATABASE・alembic upgrade）だが system_admin の明示操作＝許容（スレッドプールで実行）。
+    """
+    from app.tenant.profile.orm import User  # 会社DB users ミラー（§5.3）
+    from scripts.bootstrap import create_database, migrate_company
+
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        if company is None:
+            raise AppError(404, "not_found")
+        db_identifier = company.db_identifier
+
+    create_database(db_identifier)   # 1) DB 作成（無ければ）
+    migrate_company(db_identifier)   # 2) 会社DB を head までマイグレーション（冪等）
+
+    # 3) この会社のアカウントの会社DB users ミラーを seed（無い分だけ・§5.3）。
+    with control_session() as session:
+        accounts = session.execute(select(Account).where(Account.company_id == company_id)).scalars().all()
+        acc = [
+            (a.id, a.display_name, a.locale, a.login_id, a.email, a.system_role, a.password_hash is not None)
+            for a in accounts
+        ]
+    with get_tenant_session(db_identifier) as ts:
+        for aid, name, locale, login_id, email, role, pw_set in acc:
+            if ts.execute(select(User).where(User.account_id == aid)).scalars().first() is None:
+                ts.add(User(
+                    id=uuid.uuid4(), account_id=aid, display_name=name, locale=locale, status="active",
+                    password_set=pw_set, login_id=login_id, email=email, system_role=role,
+                ))
+        ts.commit()
+
+    # 4) 有効化（会社DB が整った＝一般ユーザーのテナント API を通す・§1.5）。
+    with control_session() as session:
+        company = session.get(Company, company_id)
+        company.status = "active"
+        session.commit()
+    return get_company_detail(company_id)
+
+
 def update_company_profile(company_id: uuid.UUID, changes: dict) -> dict:
     """会社プロフィール更新（SC-92・name/color/icon）。"""
     with control_session() as session:
