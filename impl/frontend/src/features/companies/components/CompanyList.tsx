@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { DataTable, RowMenu } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
+import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { companiesCsvUrl, queryCompanies } from "../api";
 import type { Company } from "../types";
 import "../companies.css";
@@ -134,7 +135,18 @@ export function CompanyList() {
       locked: true,
       width: 90,
       render: (r) => (
-        <RowMenu items={[{ label: "管理する", onClick: () => router.push(`/admin/companies/${r.company_id}`) }]} />
+        <RowMenu
+          items={[
+            { label: "管理する", onClick: () => router.push(`/admin/companies/${r.company_id}`) },
+            // 複製＝作成ダイアログを追加モードで開き、名前・カラーを引き継ぐ（会社コード・DB識別子は
+            // 一意キーのため引き継がず新規入力・デザイン標準 §4.5 複製）。
+            {
+              label: "複製",
+              onClick: () =>
+                router.push(buildDuplicateHref("/admin/companies/new", { name: r.name, color: r.color })),
+            },
+          ]}
+        />
       ),
     },
   ];

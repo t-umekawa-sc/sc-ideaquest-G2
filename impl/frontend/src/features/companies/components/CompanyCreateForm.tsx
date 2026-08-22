@@ -3,10 +3,12 @@
 // SC-91 会社（テナント）作成フォーム（B.1）。URL 付きモーダル（intercept）とフルページ（直アクセス）で共有する。
 // 業務層クリーン＝表示/UX のみ、判定はサーバー（409/422/403 を文言化）。レイアウト/コピーの正＝mocks/SC-91。
 // 成功時は onDone() を呼ぶ（呼び出し側が「モーダルを閉じて一覧更新」or「一覧へ遷移」を担う）。
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button, Field, ModalBody, ModalFooter, Swatches } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import { createCompany, setCompanyIcon } from "../api";
 import "../companies.css";
 
@@ -31,10 +33,16 @@ function createErrorMessage(err: unknown): string {
 }
 
 export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [name, setName] = useState("");
+  // 複製で開かれた場合は名前・カラーを引き継ぐ（会社コード/DB識別子は一意キー＝引き継がない・§4.5 複製）。
+  const searchParams = useSearchParams();
+  const dup = useMemo(
+    () => readDuplicatePrefill<{ name?: string; color?: string }>(searchParams),
+    [searchParams],
+  );
+  const [name, setName] = useState(dup?.name ?? "");
   const [companyCode, setCompanyCode] = useState("");
   const [dbIdentifier, setDbIdentifier] = useState("");
-  const [color, setColor] = useState(DEFAULT_COLOR);
+  const [color, setColor] = useState(dup?.color ?? DEFAULT_COLOR);
   // アイコン画像は会社作成後に専用 EP（PUT .../icon-image・B.1）へアップロードする（会社は先に実在が必要）。
   // 選択直後はローカルプレビュー（objectURL）で見せ、送信するファイル本体は iconFile に保持する。
   const [iconPreview, setIconPreview] = useState<string | null>(null);
@@ -78,6 +86,11 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
         {formError && <div className="form-error" role="alert">{formError}</div>}
+        {dup && (
+          <p className="provision-note">
+            複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子は新しい値を入力してください</strong>（一意のため引き継ぎません）。
+          </p>
+        )}
         <Field id="c_name" label="会社名" required>
           <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>

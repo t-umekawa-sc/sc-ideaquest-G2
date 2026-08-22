@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { Avatar, DataTable, RowMenu } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { ACCOUNTS_CHANGED_EVENT, disableAccount, enableAccount, listAccounts, resetPassword } from "../api";
 import type { Account } from "../types";
 import { useAllAccounts } from "../useAllAccounts";
@@ -72,10 +73,24 @@ export function AccountSection({ companyId }: { companyId: string }) {
 
   // 行アクション（RowMenu ⋯）。操作可否は既存 impl を保持＝active/disabled で内容が変わる。
   // 編集は URL モーダルへ遷移（router.push＝ソフト遷移で intercept を差し込む）。
+  // 複製＝発行ダイアログを追加モードで開き、表示名・システムロールを引き継ぐ（ログインID・メールは
+  // 一意キーのため引き継がず新規入力・デザイン標準 §4.5 複製）。所属クエストグループは一覧が返さないため引き継げない。
+  const duplicateItem = (a: Account): RowMenuItem => ({
+    label: "複製",
+    onClick: () =>
+      router.push(
+        buildDuplicateHref(`/admin/companies/${companyId}/accounts/new`, {
+          display_name: a.display_name,
+          system_role: a.system_role,
+        }),
+      ),
+  });
+
   function accountMenuItems(a: Account): RowMenuItem[] {
     if (a.status === "active") {
       return [
         { label: "所属・編集", onClick: () => router.push(editHref(a)) },
+        duplicateItem(a),
         {
           label: "パスワード再設定",
           onClick: () => runAction(() => resetPassword(companyId, a.account_id), undefined, "パスワード再設定リンクを送信しました。"),
@@ -87,7 +102,10 @@ export function AccountSection({ companyId }: { companyId: string }) {
         },
       ];
     }
-    return [{ label: "再有効化", onClick: () => runAction(() => enableAccount(companyId, a.account_id)) }];
+    return [
+      { label: "再有効化", onClick: () => runAction(() => enableAccount(companyId, a.account_id)) },
+      duplicateItem(a),
+    ];
   }
 
   // 列定義（正＝mocks/SC-92 の DataTable columns）。render は ReactNode。

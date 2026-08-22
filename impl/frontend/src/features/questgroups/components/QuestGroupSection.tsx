@@ -30,8 +30,26 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
   const [showForm, setShowForm] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [dupMode, setDupMode] = useState(false); // 複製で開いたか（案内文の出し分け）
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // 新規作成ダイアログを開く（空）。
+  function openCreate() {
+    setCode("");
+    setName("");
+    setDupMode(false);
+    setFormError(null);
+    setShowForm(true);
+  }
+  // 複製＝作成ダイアログを追加モードで開き、名前を引き継ぐ（コードは一意キーのため引き継がず新規入力・§4.5 複製）。
+  function openDuplicate(g: QuestGroup) {
+    setCode("");
+    setName(g.name);
+    setDupMode(true);
+    setFormError(null);
+    setShowForm(true);
+  }
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -58,6 +76,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       await createQuestGroup(companyId, { quest_group_code: code, name });
       setCode("");
       setName("");
+      setDupMode(false);
       setShowForm(false);
       await reload();
     } catch (err) {
@@ -139,6 +158,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         <RowMenu
           items={[
             { label: "リネーム", onClick: () => onRename(g) },
+            { label: "複製", onClick: () => openDuplicate(g) },
             { label: "削除", danger: true, onClick: () => onDelete(g) },
           ]}
         />
@@ -150,7 +170,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     <div className="card admin-create admin-create--table">
       <div className="admin-toolbar">
         <h2>クエストグループ</h2>
-        <Button type="button" variant="primary" onClick={() => setShowForm(true)}>
+        <Button type="button" variant="primary" onClick={openCreate}>
           ＋ グループ作成
         </Button>
       </div>
@@ -159,6 +179,11 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         <form onSubmit={onCreate} noValidate>
           <ModalBody>
             {formError && <div className="form-error" role="alert">{formError}</div>}
+            {dupMode && (
+              <p className="provision-note">
+                複製元の名前を引き継いで新規作成します。<strong>コードは新しい値を入力してください</strong>（一意のため引き継ぎません）。
+              </p>
+            )}
             <Field id="g_code" label="クエストグループコード" required>
               <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} required />
             </Field>

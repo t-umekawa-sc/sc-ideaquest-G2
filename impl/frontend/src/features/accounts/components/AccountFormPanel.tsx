@@ -5,10 +5,12 @@
 // 内部で出し分け（DRY §2.3）。業務層クリーン＝表示/UX のみ、判定はサーバー（409/422/403 を文言化）。
 // レイアウト/コピー/フィールド id の正＝mocks/SC-92・SC-93（DoD＝モック一致・field id は #a_*／#s_* を保持）。
 // 成功時は onDone() を呼ぶ（呼び出し側が「モーダルを閉じて一覧更新」or「一覧へ遷移」を担う）。
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button, Field, ModalBody, ModalFooter } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
   editAccount,
   editOwnAccount,
@@ -53,10 +55,17 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   const idPrefix = isCompany ? "a" : "s"; // field id 接頭辞（SC-92=a／SC-93=s・e2e/mock 保持）
   const showRole = isCompany; // system_role は SC-92 のみ（SC-93 は general 固定・付与不可 B.2.1）
 
-  const [displayName, setDisplayName] = useState("");
+  // 複製（発行モードのみ）＝表示名・システムロールを引き継ぐ（ログインID・メールは一意キーのため引き継がない・§4.5 複製）。
+  const searchParams = useSearchParams();
+  const dup = useMemo(
+    () => (mode === "issue" ? readDuplicatePrefill<{ display_name?: string; system_role?: SystemRole }>(searchParams) : null),
+    [mode, searchParams],
+  );
+
+  const [displayName, setDisplayName] = useState(dup?.display_name ?? "");
   const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
-  const [systemRole, setSystemRole] = useState<SystemRole>("general");
+  const [systemRole, setSystemRole] = useState<SystemRole>(dup?.system_role ?? "general");
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [groups, setGroups] = useState<QuestGroup[]>([]);
