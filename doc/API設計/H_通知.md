@@ -1,6 +1,6 @@
 # ドメイン H. 通知（テナントプレーン）＝詳細確定（2026-08-07）
 
-> API 全体規約は [`README.md`](./README.md) 第1章（特に §1.8 一覧〔カーソル〕・§1.12 リアルタイム配信〔WebSocket `notifications:{user_id}`〕）を参照。多言語方針はデータモデル §8-⑬。通知の**発火元**は各ドメイン＝[`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md)（D.126）・[`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md)（E.6）・[`F_評価.md`](./F_評価.md)（F.5）・[`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md)（G.4）・[`A_認証・セッション.md`](./A_認証・セッション.md)（A.9・`security_*`）・**K（プロフィール〔確定済み〕・`security_password_changed` の自己PW変更経路＝A.9-⑧(b)/K.3）**。本ファイルはドメイン H の分割レビュー成果。
+> API 全体規約は [`README.md`](./README.md) 第1章（特に §1.8 一覧〔カーソル〕・§1.12 リアルタイム配信〔WebSocket `notifications:{user_id}`〕）を参照。多言語方針はデータモデル §8-⑬。通知の**発火元**は各ドメイン＝[`C_クエスト・パーティー・権限.md`](./C_クエスト・パーティー・権限.md)（C.2 publish・`quest_party_invited`）・[`D_アイデア・添付・版・投票・フォロー.md`](./D_アイデア・添付・版・投票・フォロー.md)（D.126）・[`E_チャット・リアクション・魔法発動.md`](./E_チャット・リアクション・魔法発動.md)（E.6）・[`F_評価.md`](./F_評価.md)（F.5）・[`G_ゲーミフィケーション.md`](./G_ゲーミフィケーション.md)（G.4）・[`A_認証・セッション.md`](./A_認証・セッション.md)（A.9・`security_*`）・**K（プロフィール〔確定済み〕・`security_password_changed` の自己PW変更経路＝A.9-⑧(b)/K.3）**。本ファイルはドメイン H の分割レビュー成果。
 
 対象画面＝**SC-02 通知一覧**（＋全認証画面共通ヘッダーの 🔔 ベル・未読バッジ）。すべて**テナントAPI**（会社DB＝`notifications`）。データモデル §5.24・§3（`notification_type`）・§8-⑬（i18n）・§8-⑳（取得時レンダリング）。コーディング規約 §1・§2.2・§3.4・**§3.5-(3)（副作用は post-commit＋冪等）**準拠。
 
@@ -29,10 +29,12 @@
 | `idea_updated` | D（版追加） | 投票者＋フォロワー（FR-34） | `ref_idea_id`＋`ref_idea_revision_id` | `revision` |
 | `magic_reaction` | E（魔法付与） | 対象メッセージの投稿者 | `ref_idea_id`＋`ref_chat_message_id` | `actor_name`,`spell`〔`spell_id`/`code`〕 |
 | `achievement` | G（実績フック） | 本人 | `ref_achievement_id` | `tier`,`coin` |
+| `quest_party_invited` | **C（publish・C.2）** | 公開されたクエストに追加されたパーティーメンバー（作成者=owner 除く） | `ref_quest_id` | `actor_name`〔公開者=owner の表示名〕 |
 | `security_new_device` | A（ログイン成功） | 本人 | —（本文のみ） | `device`,`ip`,`at` |
 | `security_password_changed` | A/K（PW変更完了） | 本人 | —（本文のみ・メールも） | `at` |
 
 - **`security_*` はオプトアウト不可**（A.9-⑧・将来の種別 ON/OFF 対象外）。`security_password_changed` のメール実送信は認証/セキュリティ基盤（A 経路＝初回設定/再設定・K 経路＝プロフィールでの自己PW変更のいずれも／H は会社DBの通知行を担当）。**`security_password_changed` は A（初回設定/再設定）に加え K（プロフィールでの自己PW変更・A.9-⑧(b)）も発火元**＝どちらの application も post-commit で `notify()` を呼ぶ（K は確定済み・K.3 と整合）。
+- **`quest_party_invited`（C→H・実装は H フェーズ）**: クエスト publish（`draft→recruiting`・C.2）成功時に、追加されたパーティーメンバー（作成者=owner 除く）へ post-commit で `notify()` を呼ぶ。**H 未実装フェーズでは C 側は notify() を no-op フックとして置く**（C.2・SC-11 実装時に stub＋TODO を残す）＝H 実装時に本表の行を拾って結線する（発火元台帳に登録済みなので実装漏れしない）。参照＝`ref_quest_id`（SC-02→SC-12 遷移・データモデル §5.24）。**TBD**＝公開済みクエストへのパーティー増分追加（C.3 の `POST /members` 等）でも同種別を出すか（現状は publish 時のみ規定・C.7 で継続検討）。
 
 ## H.1 通知サービス `notify()`（生成・内部）
 
@@ -74,7 +76,7 @@
 
 ## H.4 他ドメイン境界・残 TBD
 
-- **委譲/連携**: 通知の**発火（生成契機）**＝D/E/F/G/A（＋K＝自己PW変更・H.0 表）／**Redis publish（`notifications:{user_id}`）＝H の `notify()`（post-commit）**・**WS トランスポート＝L**（§1.12）／**多言語テンプレの元方針**＝§8-⑬（実カタログは H が保有）／`security_*` のメール送信＝A。
+- **委譲/連携**: 通知の**発火（生成契機）**＝C/D/E/F/G/A（＋K＝自己PW変更・H.0 表）／**Redis publish（`notifications:{user_id}`）＝H の `notify()`（post-commit）**・**WS トランスポート＝L**（§1.12）／**多言語テンプレの元方針**＝§8-⑬（実カタログは H が保有）／`security_*` のメール送信＝A。
 - **確定済み（本レビュー）**: 取得時レンダリング＋`params`/`body` NULL 可（§5.24・§8-⑳）／1 イベント×1 宛先＝最具体種別1件に集約／生成は H の `notify()` を post-commit 呼び出し。
 - **セキュリティ突合（規約 §2.2）**: 主リスク＝**IDOR（他人宛通知の閲覧/既読操作）**。対策＝全 EP で `recipient_id = セッションユーザー` を強制し不一致は 404（列挙耐性・H.0/H.3）。本文に権限外情報を載せない（評価スコアは F.5 が除外・`follow_*` は「付きました」程度）。`security_*` の `params`（IP/UA/日時）は本人の自己情報のみ。書き込み系（read/unread/read-all）も自分宛限定。監査証跡は各発火ドメイン側（例＝A.9-⑥）。
 - **残 TBD（軽微・実装 or 運用で確定）**: **グルーピング/集約**（「3件の新しいコメント」等の束ね方＝SC-02 §9・現状は 1 イベント1件で束ねない）／**保持期間・件数上限・自動既読**／**種別ごとの ON/OFF 設定**（`security_*` は対象外）／**参照先が論理削除/トゥームストーンのときの取得時レンダリング**（idea 論理削除・チャット tombstone＝`params` のみで描画し遷移を抑止/無効表示にするか）／**外部通知（メール/Slack）**の時期・方式（将来）／レベルアップ/SP 獲得を通知に含めるか（現状は SC-01 の演出）。
