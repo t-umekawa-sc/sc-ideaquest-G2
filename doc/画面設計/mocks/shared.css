@@ -661,6 +661,18 @@ body.modal-open { overflow: hidden; }
   border: 1px solid var(--color-border-strong); border-radius: var(--radius);
   background: var(--color-surface); color: var(--color-text);
 }
+/* 編集不可（無効/読み取り専用）＝一目で「編集できない」と分かる標準（デザイン標準 §4.8）。
+   muted な塗り＋文字色＋弱いボーダーで、編集可能フィールド（白面・濃いボーダー）と明確に区別する。 */
+.input:disabled, .input[readonly],
+.textarea:disabled, .textarea[readonly],
+.select:disabled {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+  opacity: 1;
+}
+.input[readonly], .textarea[readonly] { cursor: default; }
 /* コンボボックス（選択式）はクリック可能なので指ポインター。
    ※ ネイティブ select の候補(option)には cursor が効かない（OS描画のため）。
      候補までポインター/ハイライトを制御したい場合は下の .combobox を使う。 */
