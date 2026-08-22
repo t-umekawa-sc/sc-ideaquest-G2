@@ -17,6 +17,8 @@ export type {
 } from "./DataTable";
 export { Field } from "./Field";
 export { FormSummary } from "./FormSummary";
+export { FormFooterError } from "./FormFooterError";
+export { useFormErrorNotice } from "./useFormErrorNotice";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { RouteModal } from "./RouteModal";
 export { Pager } from "./Pager";

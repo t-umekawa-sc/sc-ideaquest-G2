@@ -6,7 +6,7 @@
 // 一覧の操作標準は DataTable に委譲＝検索/絞込/ソート/列設定/CSV/ピン/カード（§4.5）。listQuestGroups は全件返す。
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Button, DataTable, Field, FormFooterError, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createQuestGroup, deleteQuestGroup, listQuestGroups, renameQuestGroup, type QuestGroup } from "../api";
@@ -24,6 +24,8 @@ function createErrorMessage(err: unknown): string {
 export function QuestGroupSection({ companyId }: { companyId: string }) {
   const confirm = useConfirm();
   const snack = useSnackbar();
+  const { summaryRef: createErrRef, notify: notifyCreate } = useFormErrorNotice();
+  const { summaryRef: editErrRef, notify: notifyEdit } = useFormErrorNotice();
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,7 +97,9 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       snack({ type: "success", title: "クエストグループを作成しました" });
       await reload();
     } catch (err) {
-      setFormError(createErrorMessage(err));
+      const m = createErrorMessage(err);
+      setFormError(m);
+      notifyCreate([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);
     }
@@ -106,7 +110,9 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     if (!editing) return;
     const next = editName.trim();
     if (next === "") {
-      setEditError("グループ名を入力してください。");
+      const m = "グループ名を入力してください。";
+      setEditError(m);
+      notifyEdit([m]); // スクロール＋エラースナックバー（§4.7）
       return;
     }
     setEditError(null);
@@ -120,7 +126,9 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         await reload();
       }
     } catch (err) {
-      setEditError(createErrorMessage(err));
+      const m = createErrorMessage(err);
+      setEditError(m);
+      notifyEdit([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setEditPending(false);
     }
@@ -215,7 +223,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       <Modal open={showForm} onClose={() => setShowForm(false)} title="クエストグループを作成" size="sm">
         <form onSubmit={onCreate} noValidate>
           <ModalBody>
-            {formError && <div className="form-error" role="alert">{formError}</div>}
+            {formError && <div className="form-error" role="alert" ref={createErrRef} tabIndex={-1}>{formError}</div>}
             {dupMode && (
               <p className="provision-note">
                 複製元の名前を引き継いで新規作成します。<strong>コードは新しい値を入力してください</strong>（一意のため引き継ぎません）。
@@ -229,6 +237,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
             </Field>
           </ModalBody>
           <ModalFooter>
+            <FormFooterError show={Boolean(formError)} />
             <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
               キャンセル
             </Button>
@@ -243,7 +252,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="クエストグループを編集" size="sm">
         <form onSubmit={onEditSubmit} noValidate>
           <ModalBody>
-            {editError && <div className="form-error" role="alert">{editError}</div>}
+            {editError && <div className="form-error" role="alert" ref={editErrRef} tabIndex={-1}>{editError}</div>}
             <Field id="g_edit_code" label="クエストグループコード" hint="コードは作成後は変更できません。">
               <input id="g_edit_code" className="input db-id" value={editing?.quest_group_code ?? ""} readOnly disabled />
             </Field>
@@ -259,6 +268,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
             </Field>
           </ModalBody>
           <ModalFooter>
+            <FormFooterError show={Boolean(editError)} />
             <Button type="button" variant="outline" onClick={() => setEditing(null)}>
               キャンセル
             </Button>

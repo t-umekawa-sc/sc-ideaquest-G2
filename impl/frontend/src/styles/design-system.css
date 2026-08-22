@@ -340,6 +340,8 @@ img { max-width: 100%; display: block; }
 .form-summary > strong { display: block; margin-bottom: var(--space-2); }
 .form-summary ul { margin: 0; padding-left: 1.2em; }
 .form-summary a { color: inherit; text-decoration: underline; }
+/* 送信ボタン近くの検証エラーヒント（§4.7・スクロールで上部サマリが隠れても足元で気づける） */
+.form-footer-error { display: inline-flex; align-items: center; margin-right: auto; color: var(--color-danger); font-size: var(--text-sm); font-weight: 600; }
 
 /* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
 body.modal-open { overflow: hidden; }

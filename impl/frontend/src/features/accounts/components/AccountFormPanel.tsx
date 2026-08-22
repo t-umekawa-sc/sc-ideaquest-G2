@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
@@ -52,6 +52,7 @@ type Props = {
 
 export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, onCancel }: Props) {
   const snack = useSnackbar();
+  const { summaryRef, notify } = useFormErrorNotice();
   const isCompany = scope === "company";
   const idPrefix = isCompany ? "a" : "s"; // field id 接頭辞（SC-92=a／SC-93=s・e2e/mock 保持）
   const showRole = isCompany; // system_role は SC-92 のみ（SC-93 は general 固定・付与不可 B.2.1）
@@ -149,7 +150,9 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
       );
       onDone();
     } catch (err) {
-      setFormError(issueErrorMessage(err));
+      const m = issueErrorMessage(err);
+      setFormError(m);
+      notify([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);
     }
@@ -180,7 +183,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   return (
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
-        {formError && <div className="form-error" role="alert">{formError}</div>}
+        {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
         <Field id={`${idPrefix}_name`} label="氏名" required>
           <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
         </Field>
@@ -212,6 +215,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         )}
       </ModalBody>
       <ModalFooter>
+        <FormFooterError show={Boolean(formError)} />
         <Button type="button" variant="outline" onClick={onCancel}>
           キャンセル
         </Button>

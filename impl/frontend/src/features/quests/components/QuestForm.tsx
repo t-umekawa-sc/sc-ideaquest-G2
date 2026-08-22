@@ -10,7 +10,7 @@
 // 権限キーは UI（manage/eval/vote/idea/comment）⇔ API（quest_admin/evaluator/vote/idea_create/comment）で写像。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, FormSummary, ModalBody, ModalFooter, Swatches, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
 import {
   createQuest,
@@ -78,6 +78,7 @@ type Props = {
 export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, locale = "ja", onDone, onCancel }: Props) {
   const isEdit = mode === "edit";
   const snack = useSnackbar();
+  const { summaryRef, notify } = useFormErrorNotice();
 
   const msg = useMemo(
     () =>
@@ -316,7 +317,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     const clientErrors = validate(forPublish);
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
-      setSummary(Object.values(clientErrors)); // 上部サマリ＝インラインと同文言（§4.7・フォーカス移動なし）
+      const list = Object.values(clientErrors);
+      setSummary(list); // 上部サマリ＝インラインと同文言（§4.7・フォーカス移動なし）
+      notify(list); // スクロール＋エラースナックバー（§4.7）
       return;
     }
     setFieldErrors({});
@@ -357,6 +360,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       });
       setFieldErrors(mapped.fieldErrors);
       setSummary(mapped.summary);
+      notify(mapped.summary);
     } finally {
       setPending(false);
       setPendingKind(null);
@@ -400,7 +404,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           <strong>作成</strong>は認証済みなら誰でも（作成者＝所有者）。<strong>編集</strong>は所有者・クエスト管理権限者のみ。
         </p>
 
-        <FormSummary title={t(locale, "summary.title")} errors={summary} />
+        <FormSummary title={t(locale, "summary.title")} errors={summary} innerRef={summaryRef} />
 
         {noGroups && (
           <p className="role-note" role="alert">
@@ -550,6 +554,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         </p>
       </ModalBody>
       <ModalFooter>
+        <FormFooterError show={summary.length > 0} />
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>キャンセル</Button>
         {!isEdit ? (
           <>

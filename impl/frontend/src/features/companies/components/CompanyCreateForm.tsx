@@ -6,7 +6,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, ModalBody, ModalFooter, Swatches, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import { createCompany, setCompanyIcon } from "../api";
@@ -34,6 +34,7 @@ function createErrorMessage(err: unknown): string {
 
 export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const snack = useSnackbar();
+  const { summaryRef, notify } = useFormErrorNotice();
   // 複製で開かれた場合は名前・カラーを引き継ぐ（会社コード/DB識別子は一意キー＝引き継がない・§4.5 複製）。
   const searchParams = useSearchParams();
   const dup = useMemo(
@@ -78,7 +79,9 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
       snack({ type: "success", title: "会社を作成しました", msg: `「${name}」を登録しました（停止状態）。` });
       onDone();
     } catch (err) {
-      setFormError(createErrorMessage(err));
+      const m = createErrorMessage(err);
+      setFormError(m);
+      notify([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);
     }
@@ -87,7 +90,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
   return (
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
-        {formError && <div className="form-error" role="alert">{formError}</div>}
+        {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
         {dup && (
           <p className="provision-note">
             複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子は新しい値を入力してください</strong>（一意のため引き継ぎません）。
@@ -159,6 +162,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
         </p>
       </ModalBody>
       <ModalFooter>
+        <FormFooterError show={Boolean(formError)} />
         <Button type="button" variant="outline" onClick={onCancel}>
           キャンセル
         </Button>

@@ -130,7 +130,9 @@ function SnackbarItem({ snack, hidden, remove }: { snack: Snack; hidden: boolean
   }, [remove, snack.id]);
 
   // 折りたたみ中（hidden＝オフスクリーン）でもタイマーは進む＝カウントダウンが止まらない。
+  // dur<=0 は自動消滅しない（sticky・§4.7 検証エラー等）＝✕クローズのみ。
   useEffect(() => {
+    if (dur <= 0) return;
     timerRef.current = setTimeout(dismiss, dur);
     return () => clearTimeout(timerRef.current);
   }, [dur, dismiss]);
@@ -141,7 +143,7 @@ function SnackbarItem({ snack, hidden, remove }: { snack: Snack; hidden: boolean
   };
   const resume = () => {
     setPaused(false);
-    timerRef.current = setTimeout(dismiss, 1500);
+    if (dur > 0) timerRef.current = setTimeout(dismiss, 1500);
   };
 
   return (
@@ -180,7 +182,9 @@ function SnackbarItem({ snack, hidden, remove }: { snack: Snack; hidden: boolean
       <button className="snackbar__close" type="button" aria-label="閉じる" onClick={dismiss}>
         ✕
       </button>
-      <span className="snackbar__timer" style={{ animationDuration: `${dur}ms`, animationPlayState: paused ? "paused" : "running" }} />
+      {dur > 0 && (
+        <span className="snackbar__timer" style={{ animationDuration: `${dur}ms`, animationPlayState: paused ? "paused" : "running" }} />
+      )}
     </div>
   );
 }
