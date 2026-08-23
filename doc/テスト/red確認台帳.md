@@ -299,3 +299,16 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-103 | 作成の idea_create 権限チェック（403） | 403 期待→ 201 |
 | D-TC-106 | 一覧のパーティー門番（非メンバー 404） | 404 期待→ 200 |
 | D-TC-113 | publish の状態機械（draft 以外 409） | 409 期待→ 200 |
+
+## D. アイデア 画面 e2e（SC-21・2026-08-23）
+
+> 手技＝実装が先に在る後追い e2e（`sc-21-idea-form.spec.ts`）につき、各 TC の**主アサーションを1つだけ一時反転**した
+> 使い捨て spec を流して behavior-red を目視 → 破棄（本 spec は不変）→ 反転前で green（sc-21 e2e 4 passed）。
+> 反転は使い捨てファイルのためコミット差分に痕跡が残らない＝本台帳に記録（テスト規約 §5.1 line 84・91）。
+
+| TC-ID | 反転した主アサーション | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-201 | 一覧に投稿が出る `expect(found).toBeTruthy()` → `toBeFalsy()` | 一覧に当該 idea が出現（`status:"published"`・`title:"公開アイデア_…"`）＝投稿→公開→一覧反映に到達 |
+| D-TC-202 | 下書きが本人一覧に出る `toBeTruthy()` → `toBeFalsy()` | 一覧に当該 idea が出現（`status:"draft"`・`my_state:"draft"`）＝下書き保存→本人可視に到達 |
+| D-TC-203 | 編集後 title `.toBe(after)` → `.toBe(before)` | `Expected "編集前_…" / Received "編集後_…"`＝PATCH で title 更新に到達 |
+| D-TC-204 | 送信ボタン初期 `toBeDisabled()` → `toBeEnabled()` | `Expected enabled / Received disabled`＝3必須未充足で活性ガードが効いている |

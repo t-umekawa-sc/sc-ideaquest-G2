@@ -47,3 +47,15 @@
 | D-TC-116 | api | 削除の認可 | 他人のアイデア（自分は一般メンバー）| `DELETE /ideas/{id}` | 403 | D.2 |
 | D-TC-117 | api | 変更系の CSRF 必須 | ログイン済・CSRF なし | `POST .../ideas` | 403 csrf_failed | A.0 |
 | D-TC-118 | api | 未認証遮断 | セッションなし | `POST .../ideas` | 401 | require_me |
+
+## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
+
+> 対象＝フロント接続済み SC-21（`impl/frontend/src/features/ideas/components/IdeaForm.tsx`・登録フルページ `/(app)/quests/[questId]/ideas/new`・編集モーダル `IdeaDetailView`）。e2e は**契約の最終確認**（画面↔API）に限定し、分岐は §2 の api レベルで担保（テスト規約 §4・§5.1 line 112＝接続後は red-green 適用）。前提＝dev seed 一般ユーザー ACME-01「テスト 太郎」（デモグループ所属）。下地クエスト/アイデアは API で作成し teardown で論理削除。変更系は Cookie セッション＋X-CSRF-Token。
+> **§4.7 の 3 チャネル（上部サマリ scroll＋足元ヒント＋sticky スナックバー）は SC-21 では主経路で到達不能**＝主ボタン「投稿する／変更を保存」が `disabled={!canSave}`（3 必須が揃うまで無効）で client `validate()` と同条件のため client 検証エラーが出ない。下書き保存は検証スキップ。3 チャネルが発火するのはサーバエラー（完了クエスト編集の 409・公開状態機械の 409 等）経由のみで、これは後続 TC（サーバエラー seed が必要）に回す。本節はその**前段ガード**（ボタン活性・blur インライン）を D-TC-204 で担保する。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-TC-201 | e2e | 即公開作成→一覧反映 | ログイン・API で recruiting クエスト作成 | `/quests/{id}/ideas/new` で件名/価値/本文を入力→「投稿する」 | 成功トースト「アイデアを投稿しました」・`/quests/{id}` へ戻る・`GET /quests/{id}/ideas` に当該が status=published で出る | D.2／SC-21／§13 |
+| D-TC-202 | e2e | 下書き保存→本人に表示 | 同上 | 件名/価値/本文を入力→「下書き保存」 | トースト「下書きを保存しました」・`GET /quests/{id}/ideas` に status=draft・author=本人で出る（可視性＝本人） | D.2／D.1／SC-21 |
+| D-TC-203 | e2e | 編集で件名更新→反映 | API で published アイデア作成 | `/ideas/{id}`→「編集」→件名変更→「変更を保存」 | トースト「変更を保存しました」・`GET /ideas/{id}` の title が更新値 | D.2／D.4／SC-22 |
+| D-TC-204 | e2e | 必須ボタン活性ガード＋blur インライン検証（§4.7 前段） | 登録フルページ | 3 必須空／件名を空 blur | 「投稿する」は初期 disabled（3 必須充足で活性）・件名 blur で `aria-invalid`＋インライン「件名は必須です。」表示 | §4.7／SC-21 |
