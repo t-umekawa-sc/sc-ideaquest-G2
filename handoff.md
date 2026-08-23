@@ -5,7 +5,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-23**（時刻は概算・セッション終了時）。
 - ブランチ: `main`（作業ツリーはクリーン＝本ファイル更新のコミット前を除き未コミットなし）。
-- 最新コミット: **`70dc1f1`** `fix(ui): ⋯メニューを行の操作セルより前面に`。
+- 最新コミット: **`1c52d6c`** `feat(D/SC-12): アイデアタブを backend 接続`（push は下記コマンドで）。
 - 本セッションの追加コミット（新しい順）: `70dc1f1`（⋯ z-order 本修正）／`d4224b0`(handoff)／`69f88a8`（ADR-0009 メール確認 設計）／`c687543`（RowMenu 上フリップ拡張＝**70dc1f1 で撤去**）／`11b50d6`(handoff)／`483685f`（SC-21 D e2e）／`c5bdd4a`（複製を SC-93/SC-10 へ）／`9591413`（RowMenu footer 重なり＝**70dc1f1 で撤去**）。**すべて push 済み**（origin/main = `70dc1f1`）。
 - **⚠️ RowMenu 重なりの顛末（重要）**＝当初「⋯ 被り」を「メニューが行/footer に重なる」問題と誤診し上フリップで対処（`9591413`/`c687543`）。**真因は z-index**＝開いている行の操作セル `.rowmenu-open=1001` がメニュー `1000` より前面で ⋯ が透けて手前に見えていた。`70dc1f1` で **`.rowmenu__list` を z-index:1002** にし、上フリップ系ロジックは撤去（素直な下開き＋ビューポート下端フリップに戻した）。**重なりは許容・重なり順のみで解決**が確定方針。dev モードのため**旧タブはハードリロード（Ctrl+Shift+R）**で反映。
 
@@ -43,8 +43,9 @@
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. frontend
 - **tsc＝既知2件のみ**（本セッション確認）＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれもデモ/既存）。今回の変更はクリーン。
-- 再ビルド済み・起動中。接続済み画面＝SC-00／SC-03,K／SC-10（＋複製）／SC-11／SC-12（詳細本体）／SC-21（登録・編集・**受入済み**）／SC-90/91/92/93（SC-93 に複製追加）。
-- まだデモ＝**SC-12 アイデアタブ**（`QuestDetailView` 内 IDEAS 配列）／**SC-22 アイデア詳細の本体**（`IdeaDetailView` の fixtures＝投票/評価/チャット/履歴・編集経路のみ実接続）。SC-01/02/24/25/30/31/32/40/41。
+- 再ビルド済み・起動中。接続済み画面＝SC-00／SC-03,K／SC-10（＋複製）／SC-11／SC-12（詳細本体＋**アイデアタブ NEW**）／SC-21（登録・編集・受入済み）／SC-90/91/92/93（SC-93 に複製追加）。
+- まだデモ＝**SC-22 アイデア詳細の本体**（`IdeaDetailView` の fixtures＝投票/評価/チャット/履歴・編集経路のみ実接続）。SC-12 の評価列(F)/週間ランキング(G)/全文検索(J)は未接続の暫定表示。SC-01/02/24/25/30/31/32/40/41。
+- **既知の不整合（backend follow-up）**＝クエスト DTO の `idea_count`（C.1 GET /quests/{id}）が D アイデアを数えず、SC-12 ヘッダー「💡 N件」とアイデアタブ実件数が不一致（例＝タブ3件でもヘッダー0件）。SC-10 の 💡 列も同様のはず。backend の count を D 連動に要修正（別スライス）。
 ### 4-2. backend
 - 登録ルータ＝auth / admin / me / quests / ideas。D API＝6 EP（一覧/詳細/作成/編集/公開/削除）。**添付/投票/フォローの EP は未実装**（repository には関数あり・router 未公開）。**本セッションで backend 変更なし**。
 - pytest＝本セッション実行＝`tests/ideas tests/quests` **78 passed**（healthz ok）。
@@ -69,7 +70,7 @@
 
 ## 7. 次にやること（優先順・具体的に）
 1. **メール確認フローの実装**（設計は `69f88a8`/ADR-0009 で確定済み・§3-E）＝**md 先行→red-green**。(a) backend migration＝`accounts.email_verified_at` 追加 (b) 送信 EP `POST /admin/(companies/{cid}/)accounts/{id}/email-verification`（`purpose=email_verify`・72h・現メール宛・`mail_category=email_verify_link`） (c) 公開確定 EP `POST /auth/email-verify/confirm`（未認証・410/409・`email_verified_at=now`） (d) `GET .../accounts` の行に `email_verified` (e) `PATCH email` 変更で `email_verified_at=NULL`（＋K.3 confirm で now） (f) フロント＝SC-92/93 の一覧メール列バッジ＋⋯「確認メールを送信」。**添付/投票/フォロー（D 残り EP）とどちらを先にするかは要判断**。
-2. **SC-12 アイデアタブの実接続**＝`QuestDetailView` のデモ `IDEAS` を `listIdeas(questId)`（`features/ideas/api.ts`）へ差し替え＋`IDEAS_CHANGED_EVENT` 購読で投稿後再取得。カードは `IdeaCardDTO`（`vote_summary`/`comment_count`/`my_vote`/`my_state`）に整合。
+2. **（完了 `1c52d6c`）SC-12 アイデアタブの実接続**＝`listIdeas`＋`IDEAS_CHANGED` 購読。e2e＝D-TC-205/206。→ 次は SC-22（下記 #3）。付随の backend follow-up＝`idea_count` を D 連動に（§4-1 不整合）。
 3. **SC-22 詳細の実接続**＝`IdeaDetailView` の fixtures を `getIdea(ideaId)` へ。**投票・フォローは EP 未実装＝表示のみ**（disabled か「準備中」明示）。チャット導線は E 未接続。
 4. **mock/style-guide の §4.7 反映**（正本 `デザイン標準.md` は更新済み・mock 側未反映）＝`mocks/shared.css`（`.form-footer-error`）・`shared.js`（sticky スナックバー）・`style-guide.html`「4b.」。
 5. **backend D 残り EP**＝添付アップロード（multipart・MinIO・`validate_image_upload` 流用）／投票（1人1票 upsert・集計）／フォロー（冪等）を `router.py` に公開（repository 実装済み）。公開時 chat_groups（E 依存 no-op）・投稿 XP+50（G 依存 no-op）。**md 先行**→red-green。
