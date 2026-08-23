@@ -2,9 +2,9 @@
 
 // SC-12 クエスト詳細＝クエストヘッダー＋クエスト内週間ランキング＋タブ（アイデア一覧/パーティー/全文検索/概要）。
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-12_クエスト詳細.html（DoD＝モック一致）。
-// 接続範囲（C ドメイン）＝ヘッダー/概要/パーティー（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
-// 編集導線（SC-11 /quests/{id}/edit）。**アイデア一覧＝D／全文検索＝J／週間ランキング＝G は未実装ドメイン依存**の
-// ためデモ fixtures を維持（接続は各ドメイン実装時）。
+// 接続範囲＝ヘッダー/概要/パーティー（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
+// 編集導線（SC-11 /quests/{id}/edit）＋**アイデアタブ（D.1 GET /quests/{id}/ideas・IDEAS_CHANGED 購読）**。
+// **全文検索＝J／週間ランキング＝G／評価列＝F は未実装ドメイン依存**のためデモ/暫定表示を維持（接続は各ドメイン実装時）。
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,21 +20,32 @@ import {
   transitionQuest,
   type QuestDetail,
 } from "../api";
+import { IDEAS_CHANGED_EVENT, listIdeas, type IdeaCard } from "@/features/ideas/api";
 import "../quests.css";
 
-// ---- 未接続タブ（D/J/G）のデモ fixtures ----
+// アイデアタブの行ビュー型（SC-12・D.1）。列/カードの描画に必要な最小射影。
 type Idea = {
   id: string; title: string; poster: string; initial: string; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
 };
-const IDEAS: Idea[] = [
-  { id: "okihai", title: "置き配の写真通知", poster: "佐藤 大輔", initial: "佐", agree: 15, disagree: 5, comments: 4, ev: -1, evalstate: "pending", mystate: "voted", created: 5, draft: false },
-  { id: "yakan", title: "夜間配送の集約", poster: "鈴木 花子", initial: "鈴", agree: 12, disagree: 3, comments: 8, ev: 3, evalstate: "done", mystate: "unvoted", created: 3, draft: false },
-  { id: "konpo", title: "梱包資材の削減", poster: "伊藤 彩", initial: "伊", agree: 11, disagree: 0, comments: 2, ev: -1, evalstate: "pending", mystate: "voted", created: 2, draft: false },
-];
+// IdeaCardDTO（D.1）→ 行ビュー。評価（F）は未接続＝評価待ち固定。あなたバッジは status＋my_vote から導出
+// （下書き＝draft／自分の投票あり＝voted／なし＝unvoted）。created＝更新からの経過日数（カードの相対表示用）。
+function toIdeaView(c: IdeaCard): Idea {
+  const isDraft = c.status === "draft";
+  const days = Math.max(0, Math.floor((Date.now() - new Date(c.updated_at).getTime()) / 86400000));
+  const mystate: Idea["mystate"] = isDraft ? "draft" : c.my_vote ? "voted" : "unvoted";
+  const name = c.author.display_name || "?";
+  return {
+    id: c.id, title: c.title, poster: name, initial: name.slice(0, 1),
+    agree: c.vote_summary.approve, disagree: c.vote_summary.oppose, comments: c.comment_count,
+    ev: -1, evalstate: "pending", mystate, created: days, draft: isDraft,
+  };
+}
 const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
-const daysText = (r: Idea) => { const d = 7 - r.created; return d <= 0 ? "今日" : `${d}日前`; };
+const daysText = (r: Idea) => (r.created <= 0 ? "今日" : `${r.created}日前`);
 const dash = <span className="muted">—</span>;
+
+// ---- 未接続タブ（J/G）のデモ fixtures ----
 const RANKING = [
   { name: "鈴木 花子", level: 12, total: 310, exp: 280, coin: 30, me: false },
   { name: "山田 太郎", level: 7, total: 235, exp: 210, coin: 25, me: true },
@@ -87,6 +98,8 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [quest, setQuest] = useState<QuestDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
+  const [ideasError, setIdeasError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -110,6 +123,30 @@ export function QuestDetailView({ questId }: { questId: string }) {
     window.addEventListener(QUESTS_CHANGED_EVENT, onChanged);
     return () => window.removeEventListener(QUESTS_CHANGED_EVENT, onChanged);
   }, [load]);
+
+  // アイデアタブ（D.1）＝マウント時に一覧取得。SC-21 の投稿/下書き/編集・削除成功で発火する
+  // IDEAS_CHANGED_EVENT（跨ルート・window）を購読して再取得＝投稿後に一覧へ反映する。
+  const loadIdeas = useCallback(async () => {
+    try {
+      const res = await listIdeas(questId, { limit: 100 });
+      setIdeas((res?.data ?? []).map(toIdeaView));
+      setIdeasError(null);
+    } catch (err) {
+      setIdeasError(
+        err instanceof ApiError && err.status === 401
+          ? "セッションが切れています。再ログインしてください。"
+          : "アイデア一覧の取得に失敗しました。",
+      );
+      setIdeas([]);
+    }
+  }, [questId]);
+
+  useEffect(() => {
+    void loadIdeas();
+    const onIdeasChanged = () => void loadIdeas();
+    window.addEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
+    return () => window.removeEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
+  }, [loadIdeas]);
 
   const canEdit = !!quest && (quest.my_permissions.includes("owner") || quest.my_permissions.includes("quest_admin"));
   const nextStatus = quest ? STATUS_ORDER[STATUS_ORDER.indexOf(quest.status) + 1] : undefined;
@@ -216,7 +253,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               </div>
             </div>
             <div className="quest-actions">
-              {/* アイデア追加＝SC-21（D 未実装＝デモルート）。編集/遷移/削除は C 接続済み。 */}
+              {/* アイデア追加＝SC-21（D.2 接続済み・投稿成功で IDEAS_CHANGED→一覧再取得）。編集/遷移/削除は C 接続済み。 */}
               <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
               {canEdit && (
                 <>
@@ -255,7 +292,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
       {/* タブ */}
       <div className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
         {TABS.map((t) => {
-          const count = t.key === "party" ? party.length : t.key === "ideas" ? IDEAS.length : null;
+          const count = t.key === "party" ? party.length : t.key === "ideas" ? ideas?.length ?? null : null;
           return (
             <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}{count != null && <span className="tab-count">{count}</span>}
@@ -264,28 +301,34 @@ export function QuestDetailView({ questId }: { questId: string }) {
         })}
       </div>
 
-      {/* アイデア一覧（デモ・D 未実装） */}
+      {/* アイデア一覧（D.1 実接続・公開＋自分の下書き＝サーバー強制の可視性） */}
       {tab === "ideas" && (
         <section aria-label="アイデア一覧">
-          <DataTable<Idea>
-            storageKey="sc12-ideas"
-            data={IDEAS}
-            columns={ideaColumns}
-            rowId={(r) => r.id}
-            unit="件"
-            perPage={20}
-            searchFields="件名・投稿者"
-            exportName="アイデア一覧"
-            emptyText="該当するアイデアがありません。条件を変えてお試しください。"
-            onRowClick={(r) => router.push(`/ideas/${r.id}`)}
-            cardLayout={(r) => ({
-              title: r.title,
-              badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
-              meta: [r.poster, daysText(r)],
-              stats: [`賛成 ${r.agree} / 反対 ${r.disagree}`, `💬 ${r.comments}`],
-            })}
-          />
-          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>※ アイデア一覧はドメイン D 実装までデモ表示です。</p>
+          {ideasError ? (
+            <p className="form-error" role="alert">{ideasError}</p>
+          ) : ideas === null ? (
+            <p className="admin-muted">読み込み中…</p>
+          ) : (
+            <DataTable<Idea>
+              storageKey="sc12-ideas"
+              data={ideas}
+              columns={ideaColumns}
+              rowId={(r) => r.id}
+              unit="件"
+              perPage={20}
+              searchFields="件名・投稿者"
+              exportName="アイデア一覧"
+              emptyText="まだアイデアがありません。「＋ アイデアを追加」から投稿できます。"
+              onRowClick={(r) => router.push(`/ideas/${r.id}`)}
+              cardLayout={(r) => ({
+                title: r.title,
+                badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
+                meta: [r.poster, daysText(r)],
+                stats: [`賛成 ${r.agree} / 反対 ${r.disagree}`, `💬 ${r.comments}`],
+              })}
+            />
+          )}
+          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>※ 評価（F）・週間ランキング（G）・全文検索（J）は未接続のためデモ/暫定表示です。</p>
         </section>
       )}
 

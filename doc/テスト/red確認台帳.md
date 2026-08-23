@@ -312,3 +312,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-202 | 下書きが本人一覧に出る `toBeTruthy()` → `toBeFalsy()` | 一覧に当該 idea が出現（`status:"draft"`・`my_state:"draft"`）＝下書き保存→本人可視に到達 |
 | D-TC-203 | 編集後 title `.toBe(after)` → `.toBe(before)` | `Expected "編集前_…" / Received "編集後_…"`＝PATCH で title 更新に到達 |
 | D-TC-204 | 送信ボタン初期 `toBeDisabled()` → `toBeEnabled()` | `Expected enabled / Received disabled`＝3必須未充足で活性ガードが効いている |
+
+## D. アイデア SC-12 タブ e2e（2026-08-23）
+
+> 手技＝後追い e2e（`sc-12-ideas.spec.ts`）。D-TC-205 は naive 反転（`.not.toBeVisible`）が読み込み中の一瞬で真になり behavior-red 不成立のため、**`listIdeas` の GET を `page.route(...).abort()` で遮断**して「接続が効いていれば idea が出ない」ことで behavior-red を目視。D-TC-206 は主アサーション反転。いずれも使い捨て spec で確認→破棄→green（sc-12 e2e 2 passed）。
+
+| TC-ID | 手技 | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-205 | `**/quests/*/ideas`（GET）を abort → 実データ idea 可視を期待 | `Expected visible / Received element(s) not found`＝一覧描画が listIdeas に依存（デモ据置きなら出るはず） |
+| D-TC-206 | 投稿後の一覧反映 `toBeVisible()` → `.not.toBeVisible()` | `Expected not visible / Received visible`＝IDEAS_CHANGED 購読で投稿がリロードなしに一覧へ反映 |
