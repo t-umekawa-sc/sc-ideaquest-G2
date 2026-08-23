@@ -50,7 +50,7 @@
 - **パスワード変更（1-㉒）**：**現在の PW を再確認**（未認証＝`401 unauthenticated`／セッションは有効だが現在PW不一致＝`403 reauth_failed`）→ **PW ポリシー検証**（最低文字数・漏えい/よく使われる PW 拒否＝§A.9-④）→ `accounts.password_hash`（Argon2id）更新。**完了で §A.9-③＝当該アカウントの全アクティブセッション破棄＋信頼端末失効**（本人操作でも「なぜログアウトされたか」は通知で補足）。**`security_password_changed` 通知＋メール**を **K が H の `notify()` を post-commit で呼んで発火**（A.9-⑧(b)・H.0/H.1 の B-5 契約・付与契機はセッション解決とは無関係な本操作）。監査記録（A.9-⑥）。
 - **メール変更（1-㉓）＝ダブルオプトイン（[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) 確定・2026-08-12）**：
   - **要求（`POST /me/email`）**＝**再認証**（現在 PW）→ 新メールの**会社内一意**を検証（`UNIQUE(company_id, email)`・重複 409 field=email）→ `accounts.pending_email` に格納（`email` は**変えない**）＋ `otp_challenges`（`purpose=email_change`・単回・TTL `email_change_ttl_seconds`＝24h）発行 → **新メールへ確認リンク**（`mail_category=email_change_confirm`）＋**旧メールへ変更通知**（`email_change_notice`・乗っ取り検知）を `mail_outbox` へ enqueue → **202**（この時点で `account_sync_outbox` へは積まない）。
-  - **確定（`POST /me/email/confirm`・未認証＝トークンが認可）**＝トークン照合（無効/期限切れ/使用済み一律 410）→ **会社内一意を再検証**（TOCTOU・衝突 409）→ `email=pending_email`・`pending_email=NULL`・チャレンジ単回消費 → **同一 Tx で `account_sync_outbox` へ `upsert{email}` enqueue**（会社 DB `users` ミラーは確定時）→ 監査記録。
+  - **確定（`POST /me/email/confirm`・未認証＝トークンが認可）**＝トークン照合（無効/期限切れ/使用済み一律 410）→ **会社内一意を再検証**（TOCTOU・衝突 409）→ `email=pending_email`・`pending_email=NULL`・**`email_verified_at=now`**（ダブルオプトインで到達確認済み＝「確認済み」概念を管理者経路と統一・[ADR-0009](../ADR/ADR-0009_管理者によるメールアドレス確認.md)）・チャレンジ単回消費 → **同一 Tx で `account_sync_outbox` へ `upsert{email}` enqueue**（会社 DB `users` ミラーは確定時）→ 監査記録。
   - **セッション破棄は必須化しない**（§A.9-③ は PW 変更/再設定・ロール変更・disable が対象。メール変更は要求時の再認証で担保・[ADR-0008](../ADR/ADR-0008_メール変更のダブルオプトイン.md) §2.5）。
 - 列挙耐性＝本人操作（認証済み）なので実存漏洩の問題はない（A.9-⑧ と同じ整理）。
 

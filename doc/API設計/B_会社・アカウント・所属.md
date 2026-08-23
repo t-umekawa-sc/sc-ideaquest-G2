@@ -66,9 +66,10 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧を取得（SC-92） | パス: `company_id`／クエリ: `q`（氏名/login_id/email）・`status`（`active\|disabled`）・`group_id`・`page`/`per_page`（オフセット）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`display_name`/`login_id`/`email`/`system_role`/`status`/`last_login_at`/`created_at`／フィルタ可能＝`status`・`system_role`（enum・多値可）・`group_id`／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可 | `data`=アカウントの配列。各行に氏名/`login_id`/`email`/`system_role`/`status`＋所属グループ＋グループ内ロール。`page_info.total` |
-| `POST /admin/companies/{company_id}/accounts` | アカウントを発行（→ B.5 発行フロー） | パス: `company_id`／ボディ: `display_name`,`login_id`,`email`,`system_role`(`general\|system_admin`),`memberships`(`[{group_id, role: member\|admin}]`) | 発行されたアカウント（`status=active`・`password_set=false`）。初回PW設定リンクを送信 |
-| `PATCH /admin/companies/{company_id}/accounts/{account_id}` | アカウントを編集 | パス: `company_id`,`account_id`／ボディ（差分）: `display_name`/`login_id`/`email`/`system_role`/`memberships` | 更新後のアカウント。identity（`login_id`/`email`）は会社内一意検証 |
+| `GET /admin/companies/{company_id}/accounts` | この会社のアカウント一覧を取得（SC-92） | パス: `company_id`／クエリ: `q`（氏名/login_id/email）・`status`（`active\|disabled`）・`group_id`・`page`/`per_page`（オフセット）。**DataTable 契約（§1.8.1）**: ソート可能キー＝`display_name`/`login_id`/`email`/`system_role`/`status`/`last_login_at`/`created_at`／フィルタ可能＝`status`・`system_role`（enum・多値可）・`group_id`／`?format=csv`＝可（監査対象）／`?pin_ids=`＝可 | `data`=アカウントの配列。各行に氏名/`login_id`/`email`/**`email_verified`（bool・ADR-0009）**/`system_role`/`status`＋所属グループ＋グループ内ロール。`page_info.total` |
+| `POST /admin/companies/{company_id}/accounts` | アカウントを発行（→ B.5 発行フロー） | パス: `company_id`／ボディ: `display_name`,`login_id`,`email`,`system_role`(`general\|system_admin`),`memberships`(`[{group_id, role: member\|admin}]`) | 発行されたアカウント（`status=active`・`password_set=false`・`email_verified=false`）。初回PW設定リンクを送信 |
+| `PATCH /admin/companies/{company_id}/accounts/{account_id}` | アカウントを編集 | パス: `company_id`,`account_id`／ボディ（差分）: `display_name`/`login_id`/`email`/`system_role`/`memberships` | 更新後のアカウント。identity（`login_id`/`email`）は会社内一意検証。**`email` が実際に変わったら `email_verified_at` を NULL リセット**（新アドレスは未確認・ADR-0009） |
+| `POST /.../accounts/{account_id}/email-verification` | **現メール宛に確認リンクを送付**（opt-in・SC-92 ⋯「確認メールを送信」・ADR-0009） | パス: `account_id` | `202`。`otp_challenges` purpose=`email_verify`・72h・単回・旧 `email_verify` 失効。宛先＝対象の現 `email`（`mail_category=email_verify_link`）。**確認済みでも再送可**（アドレス変更後の再確認） |
 | `POST /.../accounts/{account_id}/disable` | アカウントを無効化 | パス: `account_id` | 無効化後の状態（`status=disabled`）。**全アクティブセッション破棄＋信頼端末失効**（A.9-③）。入力データは保持（監査） |
 | `POST /.../accounts/{account_id}/enable` | アカウントを再有効化 | パス: `account_id` | 再有効化後の状態（`status=active`） |
 | `POST /.../accounts/{account_id}/password-reset` | 初回/再設定PWリンクを再送 | パス: `account_id` | 送信結果（`otp_challenges` purpose=`password_setup`・72h・旧リンク失効・A.7） |
@@ -95,9 +96,10 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /admin/accounts` | 自社アカウント一覧（B.2 の `GET .../accounts` と同形） | クエリ: `q`・`status`・`group_id`・`page`/`per_page`。**DataTable 契約（§1.8.1）＝B.2 `GET .../accounts` と同一**（ソート可能キー・フィルタ可能フィールド・`?format=csv`〔監査対象〕・`?pin_ids=` を同形で受ける） | `data`＝アカウント配列（氏名/`login_id`/`email`/`system_role`/`status`＋所属＋グループ内ロール）。`page_info.total` |
-| `POST /admin/accounts` | アカウント発行（B.5 発行フロー） | ボディ: `display_name`,`login_id`,`email`,`memberships`（`[{group_id, role: member\|admin}]`） | 発行結果（`status=active`・`password_set=false`）。初回PW設定リンク送信 |
-| `PATCH /admin/accounts/{account_id}` | アカウント編集 | ボディ（差分）: `display_name`/`login_id`/`email`/`memberships` | 更新後アカウント（identity は会社内一意） |
+| `GET /admin/accounts` | 自社アカウント一覧（B.2 の `GET .../accounts` と同形） | クエリ: `q`・`status`・`group_id`・`page`/`per_page`。**DataTable 契約（§1.8.1）＝B.2 `GET .../accounts` と同一**（ソート可能キー・フィルタ可能フィールド・`?format=csv`〔監査対象〕・`?pin_ids=` を同形で受ける） | `data`＝アカウント配列（氏名/`login_id`/`email`/**`email_verified`（bool・ADR-0009）**/`system_role`/`status`＋所属＋グループ内ロール）。`page_info.total` |
+| `POST /admin/accounts` | アカウント発行（B.5 発行フロー） | ボディ: `display_name`,`login_id`,`email`,`memberships`（`[{group_id, role: member\|admin}]`） | 発行結果（`status=active`・`password_set=false`・`email_verified=false`）。初回PW設定リンク送信 |
+| `PATCH /admin/accounts/{account_id}` | アカウント編集 | ボディ（差分）: `display_name`/`login_id`/`email`/`memberships` | 更新後アカウント（identity は会社内一意）。**`email` 変更で `email_verified_at` を NULL リセット**（ADR-0009） |
+| `POST /admin/accounts/{account_id}/email-verification` | **現メール宛に確認リンクを送付**（opt-in・SC-93 ⋯「確認メールを送信」・ADR-0009） | — | `202`（B.2 の同名 EP と同挙動＝`purpose=email_verify`・72h・単回・現 `email` 宛・再送可） |
 | `POST /admin/accounts/{account_id}/disable` ／ `/enable` | 無効化⇄再有効化 | — | 状態更新（B.2 と同挙動＝全セッション破棄＋信頼端末失効） |
 | `POST /admin/accounts/{account_id}/password-reset` | 初回/再設定PWリンク再送 | — | 送信結果（A.7） |
 | `GET /admin/company-quest-groups` | 自社のクエストグループ一覧（**発行/編集の `memberships` 割当の候補**） | （セッション会社固定・パラメータなし） | `data`＝グループの配列（`group_id`/`quest_group_code`/`name`/`member_count`・`deleted_at IS NULL`） |

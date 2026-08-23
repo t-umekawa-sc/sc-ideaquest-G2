@@ -116,6 +116,17 @@ stateDiagram-v2
 - **SC-00 対応**: 「パスワードをお忘れですか？」導線→再設定リクエストのフォーム（company_code＋login_id・送信後は**常に同一の確認メッセージ**）／メールリンクを開いた初回/再設定パスワード設定状態のフォーム（PW／確認・表示切替）。
 - **管理者再設定との関係**: **B.2〔system_admin〕/ B.2.1〔会社アカウント管理者〕** の `password-reset`（管理者起点）と本 `request`（本人起点）は**同じ `password_setup` リンクを発行**する等価な入口。監査上は起点（操作者）で区別（§A.9-⑥）。QG管理者（B.4）は PW 再設定を持たない（SoD）。
 
+## A.7.1 メールアドレス確認（`/auth/email-verify`・ADR-0009）
+
+用途＝**管理者が opt-in で送った「現アドレス確認リンク」を本人が開いて確定**する公開 EP（[ADR-0009](../ADR/ADR-0009_管理者によるメールアドレス確認.md)）。リンク発行の起点は**管理者**（[`B_会社・アカウント・所属.md`](B_会社・アカウント・所属.md) B.2/B.2.1 の `POST .../accounts/{id}/email-verification`）＝`otp_challenges` purpose=`email_verify`（単回・**72h**・`mail_category=email_verify_link`・現 `email` 宛）。確定は**未認証**（トークンが本人性を担保）・CSRF＝Origin のみ（未ログイン起点）。**メール変更（ADR-0008・`email_change`）とは別 purpose**＝こちらは identity を書き換えず `accounts.email_verified_at` を刻むだけ（ADR-0009 §2.2）。
+
+| メソッド/パス | 概要 | リクエスト（ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `POST /auth/email-verify/confirm` | 確認リンクのトークンでメール到達/所有を確定 | ボディ: `token`（**未認証**＝トークンが認可） | `200 { status:"verified" }`（`accounts.email_verified_at=now`・チャレンジ単回消費）。無効・期限切れ・使用済＝`410 { code:"token_expired" }`（管理者に再送を依頼）。**トークンの `email` が現 `accounts.email` と不一致**（送信後に別アドレスへ再編集）＝`409 { code:"stale" }`（`email_verified_at` は変えず再送を促す） |
+
+- **未認証 EP のため最小ボディ**（identity 全体は返さない）。**ミラー enqueue は不要**（`email` 不変＝会社 DB `users` へ反映すべき identity 変更がない）。監査記録（`email.verify.confirm`・機密〔トークン〕は detail に入れない・§A.9-⑥）。
+- **自己メール変更（K.3・ADR-0008）の確定でも `email_verified_at=now`**＝ダブルオプトインで到達確認済み＝「確認済み」概念を両経路で統一（ADR-0009 §2.2）。
+
 ## A.8 未確定（実装時に確定でも可）
 
 - **セッションの具体値**：無操作タイムアウト・絶対有効期限は確定＝[`../ADR/ADR-0001_認証・セッション基本パラメータ.md`](../ADR/ADR-0001_認証・セッション基本パラメータ.md) §2.2（アイドル30分／絶対12時間）。**pre-auth TTL（10分）・信頼端末 TTL（30日）は確定＝[`../ADR/ADR-0004_MFA・信頼端末基本パラメータ.md`](../ADR/ADR-0004_MFA・信頼端末基本パラメータ.md) §2.1**（env・状態C）。
