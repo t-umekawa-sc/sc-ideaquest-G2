@@ -14,36 +14,16 @@ const LIST_MIN_W = 176;
 const VP_MARGIN = 8; // ビューポート端との最小余白
 const EST_ITEM_H = 40; // 高さ未測定時（初回・チラつき防止）の1項目あたり概算
 
-// 同一 DataTable（[data-dt-root]）内で「下方向の配置境界」を返す＝**最終データ行の上端**と footer 上端の
-// 小さい方。ここを超えて下に開くと、下開きメニューが**最終行や footer（件数/ページャ/表示件数）を覆う**
-// （solid 白・z-1000 で透けはしないが、隣の行/⋯ と視覚的に衝突して見える）。境界を超えるなら上フリップする。
-// - 最終行上端＝末尾の td.col-actions が属する行の上端（＝これ以下にメニューを侵入させない＝最終行を覆わない）。
-//   末尾行やその直前の行から下に開くと最終行に重なるため、その場合は上へ開く。
-// - DataTable 外で使う RowMenu（例＝クエスト詳細の操作メニュー）は境界なし＝従来どおりビューポート下端のみ。
-function downBoundary(trigger: HTMLElement): number | null {
-  const root = trigger.closest("[data-dt-root]");
-  if (!root) return null;
-  let limit = Number.POSITIVE_INFINITY;
-  const cells = root.querySelectorAll<HTMLElement>("td.col-actions");
-  const lastRow = cells[cells.length - 1]?.closest("tr");
-  if (lastRow) limit = Math.min(limit, lastRow.getBoundingClientRect().top);
-  const footer = root.querySelector<HTMLElement>(".dt-footer");
-  if (footer) limit = Math.min(limit, footer.getBoundingClientRect().top - 4);
-  return Number.isFinite(limit) ? limit : null;
-}
-
 // トリガー矩形とメニュー実高さから fixed 配置座標を求める。トリガー直下(右寄せ)を基本に、
-// 下に収まらなければ（ビューポート下端 or DataTable footer 上端の手前）上へフリップし、
-// 最後にビューポート内へクランプ（menuitem が画面外に出ない）。
-function computePos(r: DOMRect, listH: number, maxBottom?: number | null): { top: number; left: number } {
+// 下に収まらなければ（ビューポート下端の手前）上へフリップし、最後にビューポート内へクランプ
+// （menuitem が画面外に出ない）。※行/footer との重なりは許容（重なり順は CSS で menu を最前面にする）。
+function computePos(r: DOMRect, listH: number): { top: number; left: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const left = Math.min(Math.max(VP_MARGIN, r.right - LIST_MIN_W), vw - LIST_MIN_W - VP_MARGIN);
-  // 下方向の許容下端＝ビューポート下端と footer 上端の小さい方（footer が無ければビューポートのみ）。
-  const downLimit = Math.min(vh - VP_MARGIN, maxBottom ?? Number.POSITIVE_INFINITY);
   let top = r.bottom + 4; // トリガー直下
-  if (listH > 0 && top + listH > downLimit) {
-    const above = r.top - 4 - listH; // 下に収まらない → 上へフリップ
+  if (listH > 0 && top + listH > vh - VP_MARGIN) {
+    const above = r.top - 4 - listH; // ビューポート下端に収まらない → 上へフリップ
     top = above >= VP_MARGIN ? above : Math.max(VP_MARGIN, vh - VP_MARGIN - listH);
   }
   return { top, left };
@@ -73,7 +53,7 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
     if (!trigger) return;
     const place = () => {
       const listH = listRef.current?.offsetHeight ?? 0;
-      setPos(computePos(trigger.getBoundingClientRect(), listH, downBoundary(trigger)));
+      setPos(computePos(trigger.getBoundingClientRect(), listH));
     };
     place();
     function onDown(e: MouseEvent) {
@@ -105,7 +85,7 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
     }
     const trigger = triggerRef.current;
     const r = trigger?.getBoundingClientRect();
-    if (r && trigger) setPos(computePos(r, items.length * EST_ITEM_H + 8, downBoundary(trigger)));
+    if (r && trigger) setPos(computePos(r, items.length * EST_ITEM_H + 8));
     setOpen(true);
   }
 
