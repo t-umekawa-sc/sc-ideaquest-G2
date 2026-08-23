@@ -3,91 +3,84 @@
 > 読者＝「このセッションの記憶が無い次回の自分」。会話ログは参照不可。本ファイルだけで再開できるよう全文を上書きする（履歴は git）。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-08-23**（時刻は概算・セッション終了時）。
-- ブランチ: `main`（作業ツリーはクリーン＝本ファイル更新のコミット前を除き未コミットなし）。
-- 最新コミット: **`8065cd8`** `feat(auth/§14): セッション終了時の通知`（push 要）。
-- **本セッション後半（新しい順）**: `8065cd8`（セッション切れ通知）／`77f1048`（登録モーダル初期誤検証 fix）／`ad2750f`（D 投票/フォロー EP）／`8e0df30`（SC-22 接続）／`1c52d6c`（SC-12 接続）。
-- **セッション切れ通知（`8065cd8`・デザイン標準 §14）**＝401 で `/login?reason=session_expired` へ一元リダイレクト→ログイン画面で info スナックバー。セキュリティ＝reason は固定文言 enum（生値非描画）・リダイレクト先固定 `/login`・`/auth/*` 除外＋ループ防止。実体＝`lib/api/client` apiFetch／`(app)` layout（無効 Cookie 検知）／`(auth)` layout の `SessionNotice`／logout は `?reason=logged_out`。e2e＝A-TC-023〜025。
-- **登録モーダル初期誤検証 fix（`77f1048`）**＝Modal のフォーカス effect（dev StrictMode 二重実行）で件名が一時 blur→復帰し必須エラーが初期表示される不具合を、blur 検証を「フォーム内へのフォーカス移動時のみ（`relatedTarget` in form）」に限定して修正。e2e＝D-TC-208。
-- **D 投票/フォロー EP（`ad2750f`）**＝`POST/DELETE /ideas/{id}/vote`・`/follow`（repository 実装済み→router 公開）。フロントの投票/フォロー・ボタン接続は未（表示のみ）。添付（D.3）は別スライス。
-- 本セッションの追加コミット（新しい順）: `70dc1f1`（⋯ z-order 本修正）／`d4224b0`(handoff)／`69f88a8`（ADR-0009 メール確認 設計）／`c687543`（RowMenu 上フリップ拡張＝**70dc1f1 で撤去**）／`11b50d6`(handoff)／`483685f`（SC-21 D e2e）／`c5bdd4a`（複製を SC-93/SC-10 へ）／`9591413`（RowMenu footer 重なり＝**70dc1f1 で撤去**）。**すべて push 済み**（origin/main = `70dc1f1`）。
-- **⚠️ RowMenu 重なりの顛末（重要）**＝当初「⋯ 被り」を「メニューが行/footer に重なる」問題と誤診し上フリップで対処（`9591413`/`c687543`）。**真因は z-index**＝開いている行の操作セル `.rowmenu-open=1001` がメニュー `1000` より前面で ⋯ が透けて手前に見えていた。`70dc1f1` で **`.rowmenu__list` を z-index:1002** にし、上フリップ系ロジックは撤去（素直な下開き＋ビューポート下端フリップに戻した）。**重なりは許容・重なり順のみで解決**が確定方針。dev モードのため**旧タブはハードリロード（Ctrl+Shift+R）**で反映。
+- 最終更新: **2026-08-23**（セッション終了時・時刻は概算）。
+- ブランチ: `main`。**作業ツリーはクリーン**（本ファイルのコミット前を除き未コミットなし）。
+- 最新コミット: **`ab05830`** `docs(handoff)`。**origin/main と同期済み（push 済み）**。
+- 本セッションの主なコミット（新しい順）: `8065cd8`(セッション切れ通知)／`77f1048`(登録モーダル初期誤検証 fix)／`ad2750f`(D 投票/フォロー EP)／`8e0df30`(SC-22 詳細接続)／`1c52d6c`(SC-12 アイデアタブ接続)／`70dc1f1`(⋯メニュー z-order 本修正)／`69f88a8`(ADR-0009 メール確認 設計)／`c5bdd4a`(複製を SC-93/SC-10 へ)／`483685f`(SC-21 D e2e)。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router、バック＝FastAPI 4層、DB＝PostgreSQL/Redis/MinIO/MailHog/Docker。開発は**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順＝アカウント→クエスト(C)→アイデア(D)→評価→その他。正本＝[`doc/実装計画.md`](doc/実装計画.md)。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（dev モード起動）、バック＝FastAPI 4層、DB＝PostgreSQL/Redis/MinIO/MailHog/Docker。開発は**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)＝アカウント→クエスト(C)→**アイデア(D)**→評価→その他。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-### 3-A. SC-21 受入＝アイデア登録・編集の画面 e2e（`483685f`）
-- 前セッションで D/SC-21 をフロント接続済み（`f479889`）だが**受入ゲート未実施**だったため、画面 e2e を追加＋ブラウザ受入。
-- 新規＝`impl/frontend/e2e/sc-21-idea-form.spec.ts`（D-TC-201 即公開作成→一覧反映／D-TC-202 下書き保存→本人可視／D-TC-203 編集で件名更新→API反映／D-TC-204 §4.7 前段ガード＝3必須が揃うまで投稿ボタン無効＋件名 blur インライン検証）。**4 passed**。
-- md 先行＝`doc/テスト/D_アイデア.md` に **§3 画面 e2e** を追記（根拠列付き）。red-green＝主アサーション一時反転で behavior-red 目視→green、証跡＝`doc/テスト/red確認台帳.md` の「D. アイデア 画面 e2e」。TC-ID トレーサビリティ ✅（code 283）。
-- **重要な設計事実**＝**§4.7 の3チャネル（上部サマリ scroll＋足元ヒント＋sticky スナックバー）は SC-21 では主経路で到達不能**。主ボタン「投稿する／変更を保存」が `disabled={!canSave}` で client `validate()` と同条件＝client 検証エラーが出ない（下書き保存は検証スキップ）。3チャネルが出るのは**サーバエラー（完了クエスト編集の 409・公開状態機械の 409 等）経由のみ**＝後続 TC（サーバエラー seed が必要）。D-TC-204 は前段ガード（活性・blur）を担保。
-- ブラウザ受入（スクショ確認済み）＝登録フォーム（投稿先クエスト文脈カード＋3必須＋任意＋添付「保存は準備中」注記）／投稿後の成功トースト「アイデアを投稿しました・+50 XP」／編集モーダルが実 `getIdea` で件名・価値・本文をプリフィル（詳細本体はデモのまま・編集経路だけ実接続）。
+### 3-A. D（アイデア）フロント接続＝主要3画面が縦に通った
+- **SC-21 受入＋D e2e（`483685f`）**＝前セッションで接続済みだった登録/編集フォームの受入ゲート。`impl/frontend/e2e/sc-21-idea-form.spec.ts`（D-TC-201〜204）。
+- **SC-12 アイデアタブ接続（`1c52d6c`）**＝`impl/frontend/src/features/quests/components/QuestDetailView.tsx` のデモ `IDEAS` を `listIdeas(questId)`（`features/ideas/api.ts`）へ差し替え＋`IDEAS_CHANGED_EVENT` 購読で投稿後再取得。`IdeaCardDTO`→行ビューは `toIdeaView()`。e2e＝`sc-12-ideas.spec.ts`（D-TC-205/206）。
+- **SC-22 詳細接続（`8e0df30`）**＝`impl/frontend/src/features/ideas/components/IdeaDetailView.tsx` のデモ本体を `getIdea(ideaId)` へ（件名/価値/本文/利害関係者/ステータス/作成者/版/投票集計）。投票/フォロー/添付/評価/チャット/版差分は表示のみ/デモと明示。e2e＝`sc-22-idea-detail.spec.ts`（D-TC-207）。
+- **D 投票/フォロー EP（`ad2750f`）**＝`impl/backend/app/tenant/ideas/router.py` に `POST/DELETE /ideas/{id}/vote`・`/follow` を公開（repository は実装済みだった）。application＝`app/tenant/ideas/application.py` の `vote_idea`/`remove_vote`/`follow_idea`/`unfollow_idea`＋ガード `_guard_votable`/`_resolve_visible_idea`／XP は G 実装まで no-op（`_award_vote_xp`＝False）。schemas に `IdeaVoteRequest`/`IdeaVoteResponse`。openapi 型再生成（`impl/frontend/src/lib/api/schema.d.ts`）。api テスト＝`tests/ideas/test_api.py` の D-TC-119〜129。
 
-### 3-B. 行アクション ⋯ メニューが DataTable footer と重なる不具合の修正（`9591413`）
-- 理由＝ユーザー指摘。行が少ない一覧（例 `/admin/accounts` 2行）で最終行の ⋯ を下に開くと、件数/ページャ/表示件数の footer と視覚的に重なる（メニューは solid 白・z-1000 で透けはしないが右端の「表示 N 件」が衝突）。
-- 修正＝`components/ui/RowMenu.tsx`＝`footerBoundary(trigger)` で同一 DataTable（`[data-dt-root]`）の `.dt-footer` 上端を検出し、下方向の配置境界を `min(ビューポート下端, footer上端)` に。下に収まらなければ**上フリップ**。`components/ui/DataTable.tsx`＝root `<div>` に `data-dt-root` 付与。DataTable 外の RowMenu（クエスト詳細の操作メニュー）は境界なし＝従来どおり。
-- 検証＝ブラウザ実測で `overlaps footer: false`（メニューが上フリップ）。回帰 e2e＝`sc-93-own-accounts` 4／`sc-91-companies` 9 green。
+### 3-B. ⋯（RowMenu）メニューの重なり＝**z-order の本修正**（`70dc1f1`）
+- **顛末（重要・誤診の記録）**＝当初「⋯ が被る」を「メニューが行/footer に重なる」問題と誤診し**上フリップ**で対処（`9591413` footer 版・`c687543` 最終行版）。ユーザーの再指摘で真因判明＝**開いている行の操作セル `.rowmenu-open`(z-index:1001) がメニュー(1000)より前面**で、隣接行/自行の ⋯ ボタンがメニューの手前に描画されていた。
+- **本修正**＝`impl/frontend/src/styles/design-system.css` の `.rowmenu__list` を **z-index:1002** に（全 ⋯ セルより前面）。上フリップ系は撤去し、`impl/frontend/src/components/ui/RowMenu.tsx` を素直な下開き＋ビューポート下端フリップに戻す（`DataTable.tsx` の `data-dt-root` も削除）。**「重なりは許容・重なり順のみで解決」が確定方針**。
 
-### 3-C. 「複製」アクションの監査＋取りこぼし追加（`c5bdd4a`）
-- 理由＝ユーザー指摘「一覧のアクションメニューに複製が無い／実装済み全一覧を見直せ」。デザイン標準 §4.5 複製（登録ダイアログを追加モードで開き選択行を引き継ぐ）。
-- **SC-93 自社アカウント（`AccountSelfSection`）**＝兄弟 SC-92（`AccountSection`）にはあったが取りこぼし→「複製」追加（表示名を引き継ぐ・ログインID/メールは一意キーで除外・system_role は general 固定で引き継がない）。
-- **SC-10 クエスト一覧（`QuestListView`）**＝リスト表示は操作列、カード表示はカード右下に ⋯ を重ねる（`<Link>` の兄弟に置き button-in-anchor 回避）。`QuestForm` を `dup` プリフィル対応（件名/カラー/カテゴリー/グループを引き継ぎ、id・ステータス→下書き・アイコン・パーティー・目的〔一覧DTOに無い〕は除外）。
-- **複製が明らかに不要（対象外）**＝QGメンバー一覧（`QuestGroupAdminView`）・クエスト詳細のパーティー（人の関係データ）／クエスト詳細の操作メニュー（単一クエスト）／クエスト詳細のアイデアタブ（未接続デモ）。**既に複製あり**＝会社一覧・SC-92 会社別アカウント・QGグループ。
+### 3-C. 「複製」を全一覧へ（`c5bdd4a`）
+- 取りこぼしていた **SC-93 自社アカウント**（`features/accounts/components/AccountSelfSection.tsx`）と **SC-10 クエスト一覧**（`features/quests/components/QuestListView.tsx`＝操作列＋カード右下 ⋯・`QuestForm.tsx` を `dup` プリフィル対応）に複製を追加。**複製が不要な一覧**＝QGメンバー/パーティー（人の関係データ）・クエスト操作メニュー（単一）・未接続タブ。
 
-### 3-D. RowMenu 上フリップ境界を最終データ行まで拡張（`c687543`）
-- 理由＝ユーザー再指摘。行が多い一覧（/admin/companies）で末尾付近の行の ⋯ を下に開くと**最終データ行を覆う**（footer だけの前修正では未対応）。
-- 修正＝`downBoundary(trigger)` が「最終 `td.col-actions` の行の上端」と footer 上端の小さい方を返し、そこを超えるなら上フリップ。末尾付近の行は上方向に開き最終行/footer を覆わない。ブラウザ実測で下行 ⋯ との矩形重なり false。
+### 3-D. 登録モーダルの初期誤検証 fix（`77f1048`）
+- 症状＝`/quests/{id}` で「＋ アイデアを追加」→ URL モーダルを開いた**直後（無操作）に「件名は必須です。」が誤表示**（フルページ版では起きない）。原因＝`components/ui/Modal.tsx` のフォーカス effect が **dev の React StrictMode 二重実行**で先頭フィールドを一時 blur→復帰させ、`IdeaForm.tsx` の `onBlurField` が誤発火。
+- 修正＝`onBlurField(field, e)` に変更し、**blur 検証はフォーム内へのフォーカス移動時のみ**（`e.relatedTarget` がフォーム内）に限定。開閉 churn の blur（relatedTarget＝起動ボタン＝フォーム外）はスキップ。§4.7 のタブ移動 blur 検証は維持。e2e＝D-TC-208。
 
-### 3-E. メール確認フロー＝設計を正本へ起こした（`69f88a8`・ADR-0009・実装は未）
-- 発見＝**自己メール変更（K.3・ADR-0008）は既にダブルオプトインで確認済み**。ギャップは管理者経路（B PATCH）だけ。
-- 決定（ユーザー承認）＝**(A) 現アドレスの確認方式**＝編集は no-block 維持＋opt-in「確認メール送信」で現メール到達/所有確認→`accounts.email_verified_at` に記録。`otp_challenges` に新 `purpose=email_verify`（72h・単回）・確定 EP は未認証。`email_change`（変更）と `email_verify`（確認）は purpose 分離。
-- 正本追記＝ADR-0009 新規／データモデル（`email_verified_at`・`otp_purpose`・`mail_category`）／API B（送信 EP・`GET` 行に `email_verified`・PATCH で NULL リセット）／API A（`POST /auth/email-verify/confirm`・A.7.1）／API K（K.3 confirm も `email_verified_at=now`）／SC-92・SC-93（バッジ＋⋯「確認メールを送信」）。**実装は別スライス（md 先行→red-green）**。
+### 3-E. セッション切れ通知（`8065cd8`・デザイン標準 §14 に正本化）
+- 401 で無言リダイレクトされる UX を改善＝ログイン画面着地時に info スナックバーで理由を通知。実体＝`lib/api/client.ts` の `apiFetch`（401 で `/login?reason=session_expired` へ一元リダイレクト）／`app/(app)/layout.tsx`（無効 `iq_session` Cookie 検知時のみ理由付きリダイレクト）／`app/(auth)/layout.tsx`（新規・`SnackbarProvider`＋`SessionNotice`）／`features/auth/components/SessionNotice.tsx`（新規・reason enum→固定文言→query 除去）／`LogoutMenuItem`・`LogoutAllMenuItem`（`?reason=logged_out`）。e2e＝`sc-00-session-expiry.spec.ts`（A-TC-023〜025）。
+
+### 3-F. ADR-0009 メール確認の設計（`69f88a8`・**実装は未着手**）
+- 管理者経路のメール編集に到達確認が無いギャップを設計確定。正本＝`doc/ADR/ADR-0009_管理者によるメールアドレス確認.md`＋データモデル（`accounts.email_verified_at`・`otp_purpose=email_verify`・`mail_category=email_verify_link`）＋API B/A/K＋SC-92/93 画面。方式＝**現アドレスの確認**（opt-in「確認メール送信」＋`email_verified_at`）。**backend/フロント実装は未着手**。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-### 4-1. frontend
-- **tsc＝既知2件のみ**（本セッション確認）＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれもデモ/既存）。今回の変更はクリーン。
-- 再ビルド済み・起動中。接続済み画面＝SC-00／SC-03,K／SC-10（＋複製）／SC-11／SC-12（詳細本体＋**アイデアタブ NEW**）／SC-21（登録・編集・受入済み）／SC-90/91/92/93（SC-93 に複製追加）。
-- **SC-22 アイデア詳細＝本体接続済み NEW**（`getIdea`＝件名/価値/本文/利害関係者/ステータス/作成者/版/投票集計）。投票/フォロー(D.5/D.6)・添付(D.3)・評価(F)・チャット(E)・版差分(D.4)は表示のみ/デモで明示。SC-12 の評価列(F)/週間ランキング(G)/全文検索(J)も未接続の暫定表示。SC-01/02/24/25/30/31/32/40/41 は未接続。
-- **既知の不整合（backend follow-up）**＝クエスト DTO の `idea_count`（C.1 GET /quests/{id}）が D アイデアを数えず、SC-12 ヘッダー「💡 N件」とアイデアタブ実件数が不一致（例＝タブ3件でもヘッダー0件）。SC-10 の 💡 列も同様のはず。backend の count を D 連動に要修正（別スライス）。
-### 4-2. backend
-- 登録ルータ＝auth / admin / me / quests / ideas。D API＝6 EP（一覧/詳細/作成/編集/公開/削除）。**添付/投票/フォローの EP は未実装**（repository には関数あり・router 未公開）。**本セッションで backend 変更なし**。
-- pytest＝本セッション実行＝`tests/ideas tests/quests` **78 passed**（healthz ok）。
-### 4-3. テスト
-- 追加＝画面 e2e `sc-21-idea-form.spec.ts`（D-TC-201〜204・4 passed）。TC-ID トレーサビリティ ✅（code 283）。回帰＝sc-93(4)/sc-91(9) green。
-- e2e＝`sc-11`/`sc-12`/`sc-91`/`sc-93` 等が green。**D の e2e は SC-21 分を新規追加済み**。SC-12/22 の e2e は未（未接続のため）。
+### 4-1. frontend（tsc・e2e）
+- **tsc＝既知2件のみ**（本セッション複数回確認）＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれもデモ/既存）。今回の変更はクリーン。
+- **接続済み画面**＝SC-00／SC-03,K／SC-10（＋複製）／SC-11／SC-12（詳細本体＋**アイデアタブ**）／SC-21（登録・編集）／SC-22（詳細本体）／SC-90/91/92/93（SC-93 に複製）。
+- **まだ表示のみ/デモ**＝SC-22 の投票/フォロー（EP は公開済みだが**フロントのボタン未接続＝無効表示**）・添付(D.3)・評価(F)・チャット(E)・版差分(D.4)／SC-12 の評価列(F)/週間ランキング(G)/全文検索(J)／SC-01/02/24/25/30/31/32/40/41（未接続）。
+- **e2e（本セッションで green 確認）**＝`sc-21-idea-form`(5)／`sc-12-ideas`(2)／`sc-22-idea-detail`(1)／`sc-00-session-expiry`(3)／`sc-00-login`(3)／`sc-91-companies`(9)／`sc-93-own-accounts`(4)／`k-profile`(3)。
+### 4-2. backend（pytest）
+- 登録ルータ＝auth / admin / me / quests / ideas。**D API＝10 EP**（一覧/詳細/作成/編集/公開/削除＋**投票 POST/DELETE・フォロー POST/DELETE NEW**）。**添付(D.3)の EP は未実装**（repository には関数あり）。
+- **pytest `tests/ideas`＝41 passed（本セッション末に確認）**。`tests/quests`＝**本セッション末は未再実行**（セッション開始時に ideas+quests 合算 78 passed を確認・以後 quests 側は変更なし）。
+### 4-3. テスト運用
+- **TC-ID トレーサビリティ ✅（code 291・本セッション末に確認）**。red-green は `doc/テスト/red確認台帳.md` に本セッション分を追記（SC-12/22 e2e・投票/フォロー API・登録モーダル fix・セッション通知）。
 
 ## 5. 詰まっている点（試した/注意）
-- **§4.7 3チャネルは SC-21 では未到達**（§3-A 参照）。サーバエラー経由 TC が必要＝後続。
-- **RowMenu の footer 境界**＝`[data-dt-root]` マーカー＋`.dt-footer` 検出に依存。DataTable の root `<div>` に `data-dt-root` が無いと従来動作（ビューポートのみ）に戻る。DataTable 外利用は境界なしで正常。
-- **メール確認は現行仕様に無い**（§3-D）。実装は要件/API B・K/データモデルへの追記が先（設計先行）。
-- **backend テスト/red-green の cwd 罠**（再発）＝`run --rm -T -v "$PWD/backend:/app" backend pytest ...` は **cwd=`impl` 前提**。**必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl`**。
-- **焼き込み反映**＝frontend `up -d --build frontend`／backend `up -d --build backend worker mail-worker`。e2e spec は `docker compose cp <spec> frontend:/app/e2e/`。
-- **impl 共通部品**＝`useConfirm` 本文は `msg`。`QuestIcon` は `@/components/layout`。`RowMenu` は body へ portal・stopPropagation でカード誤遷移防止。`useSnackbar()` は `duration:0`=sticky。複製は `buildDuplicateHref`（`lib/forms/duplicate.ts`）＋作成フォームが `readDuplicatePrefill(searchParams)` で読む（accounts/quests/companies が採用）。
+- **`sc-92c-quest-groups` の B-TC-116 は本変更と無関係の既存フラキー**＝ACME-01 に e2e 蓄積 QG が **14件/6頁**あり、新規作成行が1頁目に出ず `getByText(code)` が line 52 で不可視になり失敗（作成ステップ・RowMenu 未使用箇所）。実機確認済み。掃除 or テスト頑健化（新規行を検索で絞る等）は別途。
+- **クエスト DTO の `idea_count`（C.1 `GET /quests/{id}`）が D アイデアを数えない**＝SC-12 ヘッダー「💡 N件」とアイデアタブ実件数が不一致（例＝タブ3件でもヘッダー0件）。SC-10 の 💡 列も同様のはず。backend の count を D 連動に要修正（別スライス）。
+- **`IdeaDetailDTO` に `quest_id`/カテゴリーが無い**＝SC-22 の「クエストへ戻る/クエスト行/カテゴリーバッジ」が暫定（一覧へ戻る）。DTO 拡張で解消（下記 §7）。
+- **§4.7 の3チャネルは SC-21 では主経路で到達不能**＝主ボタンが `disabled={!canSave}` で client 検証エラーが出ないため。サーバエラー経由 TC は後続。
+- **dev モード起動**＝`next dev`。コード反映後、**開きっぱなしのタブはハードリロード（Ctrl+Shift+R）**しないと古いバンドルのまま（重なり修正が「直らない」と見えたのはこれが原因だった）。
+- **backend テスト/red-green の cwd 罠（再発注意）**＝`run --rm -T -v "$PWD/backend:/app" backend pytest ...` は **cwd=`impl` 前提**。別ディレクトリへ移ると `$PWD/backend` が消え bootstrap が落ちる。**必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl`**。backend ソースはマウント（test は再ビルド不要）だが、**EP 追加を実アプリ/openapi に反映するには backend 再ビルドが必要**。
+- **診断用の使い捨て e2e は e2e/ に置いて実行後必ず削除**（ローカル＋コンテナ両方）。本セッションでは全て削除済み。
 
 ## 6. 決定事項と根拠
-- **複製は「登録系一覧」にのみ付ける**＝人の関係データ（メンバー/パーティー）や単一レコードの操作メニューには付けない（§3-C の対象外リスト）。
-- **RowMenu は footer と重ならないよう上フリップ**（§3-B）＝dropdown が同一 DataTable の footer chrome を隠さないようにする判断。
-- **SC-21 の §4.7 は前段ガードで担保**＝主ボタン活性ガードにより client 検証エラー経路が無いため、3チャネル e2e はサーバエラー seed の後続 TC に回す（§3-A）。
-- **メール確認は opt-in アクション方式で追加する方針**（§3-D・実装は設計先行後）。
+- **⋯メニューは「重なり許容・重なり順のみで解決」**（§3-B）＝メニュー z-index:1002 で全 ⋯ セルより前面に。上フリップは誤診に基づく過剰対応として撤去。
+- **複製は登録系一覧にのみ付ける**（§3-C の対象外リスト）。
+- **ADR-0009＝現アドレスの確認方式**（`email_change` は変更・`email_verify` は確認で purpose 分離）。XP 系は G 実装まで no-op。
+- **セッション通知のセキュリティ3ルール**（reason は固定文言 enum・生値非描画／リダイレクト先固定 `/login`・可変 next 無し／`/auth/*` 除外＋`/login` 上は無処理）＝XSS/オープンリダイレクト/ループ防止。
+- **IdeaForm の blur 検証は `relatedTarget` がフォーム内の時のみ**（§3-D）＝Modal のフォーカス churn での誤検証を防ぎつつ §4.7 タブ移動検証を維持。
 - （継続）会社プロビジョニングは MVP 手動（`POST /companies/{id}/provision`・SC-92）。テスト運用＝md 先行＋TC-ID トレーサビリティ＋red確認台帳。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **メール確認フローの実装**（設計は `69f88a8`/ADR-0009 で確定済み・§3-E）＝**md 先行→red-green**。(a) backend migration＝`accounts.email_verified_at` 追加 (b) 送信 EP `POST /admin/(companies/{cid}/)accounts/{id}/email-verification`（`purpose=email_verify`・72h・現メール宛・`mail_category=email_verify_link`） (c) 公開確定 EP `POST /auth/email-verify/confirm`（未認証・410/409・`email_verified_at=now`） (d) `GET .../accounts` の行に `email_verified` (e) `PATCH email` 変更で `email_verified_at=NULL`（＋K.3 confirm で now） (f) フロント＝SC-92/93 の一覧メール列バッジ＋⋯「確認メールを送信」。**添付/投票/フォロー（D 残り EP）とどちらを先にするかは要判断**。
-2. **（完了 `1c52d6c`）SC-12 アイデアタブの実接続**＝`listIdeas`＋`IDEAS_CHANGED` 購読。e2e＝D-TC-205/206。→ 次は SC-22（下記 #3）。付随の backend follow-up＝`idea_count` を D 連動に（§4-1 不整合）。
-3. **（完了 `8e0df30`）SC-22 詳細の実接続**＝`getIdea`。投票/フォローは表示のみ。次の候補＝(a) backend D 残り EP（添付/投票/フォロー・repository 実装済み→router 公開）で SC-22/SC-12 の該当を実接続 (b) メール確認実装（ADR-0009） (c) `idea_count` 不整合修正 (d) IdeaDetailDTO に quest_id/カテゴリー追加（SC-22 のクエスト導線）。
-4. **mock/style-guide の §4.7 反映**（正本 `デザイン標準.md` は更新済み・mock 側未反映）＝`mocks/shared.css`（`.form-footer-error`）・`shared.js`（sticky スナックバー）・`style-guide.html`「4b.」。
-5. **backend D 残り EP**＝添付アップロード（multipart・MinIO・`validate_image_upload` 流用）／投票（1人1票 upsert・集計）／フォロー（冪等）を `router.py` に公開（repository 実装済み）。公開時 chat_groups（E 依存 no-op）・投稿 XP+50（G 依存 no-op）。**md 先行**→red-green。
-6. **（折衷）§4.7 サーバエラー経由 TC**＝SC-21 の3チャネルを完了クエスト編集 409 等で発火させる e2e（seed が必要）。認証系フォームのフィールド別インライン化も未。
+1. **SC-22/SC-12 の投票・フォローをフロント接続**（EP は `ad2750f` で公開済み）＝`features/ideas/api.ts` に `voteIdea(ideaId,{type})`/`removeVote(ideaId)`/`followIdea(ideaId)`/`unfollowIdea(ideaId)` を追加 → `features/ideas/components/IdeaDetailView.tsx` の `vote-btns`（現在 disabled）・`follow-star` を接続（締切/権限で無効化＝サーバ 409/403 をハンドル・楽観更新）。SC-12 カードの `my_vote` 表示も精緻化可。**md 先行**で `doc/テスト/D_アイデア.md` に e2e TC 追加→red-green。
+2. **メール確認フローの実装**（設計は `69f88a8`/ADR-0009 確定・§3-F）＝(a) backend migration `accounts.email_verified_at` (b) 送信 EP `POST /admin/(companies/{cid}/)accounts/{id}/email-verification`（`otp_challenges` purpose=`email_verify`・72h・現メール宛・`mail_category=email_verify_link`）(c) 公開確定 EP `POST /auth/email-verify/confirm`（未認証・410/409・`email_verified_at=now`）(d) `GET .../accounts` 行に `email_verified` (e) `PATCH email` 変更で NULL リセット (f) フロント SC-92/93 のメール列バッジ＋⋯「確認メールを送信」。**md 先行→red-green**。
+3. **`idea_count` の backend 修正**＝`impl/backend/app/tenant/quests/`（DTO/repository）でクエストの `idea_count` を D アイデア（`deleted_at IS NULL`・可視性は一覧と別＝総数）に連動。SC-12 ヘッダー/SC-10 💡列の不一致を解消。
+4. **`IdeaDetailDTO` に `quest_id`（＋できればクエスト名/カテゴリー）追加**＝`app/tenant/ideas/application.py` `_build_detail`／`schemas.py`。SC-22 の「クエストへ戻る/情報のクエスト行」を実導線化（`IdeaDetailView.tsx` の暫定リンクを差し替え）。
+5. **添付 D.3（multipart/MinIO）**＝`app/tenant/ideas/router.py` に `POST/DELETE /ideas/{id}/attachments`（repository は実装済み・`validate_image_upload` 流用・§1.10）。SC-21 の添付 UI（現在「保存は準備中」注記）とフロント接続。**md 先行→red-green**。
+6. **mock/style-guide の反映**＝`doc/画面設計/mocks/`（`shared.css`/`shared.js`/`style-guide.html`）に §4.7（足元ヒント/sticky スナックバー）と §14（セッション終了通知）を反映（正本は更新済み・mock 側が未反映）。
+7. **§4.7 サーバエラー経由 TC**＝SC-21 の3チャネルを完了クエスト編集 409 等で発火させる e2e（seed が必要）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose＝`-f /home/t-umekawa/sc-ideaquest-G2/impl/compose.yaml`。
-- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
-- **反映**＝frontend `up -d --build frontend`／backend `up -d --build backend worker mail-worker`。
+- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。セッション終了時点で**全サービス Up**。
+- **反映**＝frontend `up -d --build frontend`／backend `up -d --build backend worker mail-worker`。**再ビルド後は playwright を再インストール**（`exec -T -u root frontend npx playwright install-deps chromium` ＋ `exec -T frontend npx playwright install chromium`）。
 - **frontend tsc**＝`cd impl/frontend && npx tsc --noEmit`（既知2件は §4-1）。
-- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose -f /home/t-umekawa/sc-ideaquest-G2/impl/compose.yaml run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。範囲＝`tests/ideas`／`tests/quests`。
-- **e2e**＝(1)`exec -T -u root frontend npx playwright install-deps chromium`（再ビルド毎）(2)`exec -T frontend npx playwright install chromium`(3)`cp <spec> frontend:/app/e2e/`(4)`exec -T redis redis-cli FLUSHALL`(5)`exec -T frontend npx playwright test e2e/<spec> --workers=1 --reporter=line`。**1ファイルずつ**。診断用の使い捨て spec は e2e/ に置いて実行後**必ず削除**（ローカル＋コンテナ両方）。
-- **TC-ID 検査**＝`python3 scripts/check_tc_traceability.py`（`--list` で一覧）。
+- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose -f /home/t-umekawa/sc-ideaquest-G2/impl/compose.yaml run --rm -T -v "$PWD/backend:/app" backend pytest tests/ideas -q`。範囲＝`tests/ideas`／`tests/quests`／`tests/`。
+- **e2e**＝(1)deps/browser 再インストール（上記）(2)`docker compose cp <spec> frontend:/app/e2e/`(3)`exec -T redis redis-cli FLUSHALL`(4)`exec -T frontend npx playwright test e2e/<spec> --workers=1 --reporter=line`。**1ファイルずつ**。
 - **openapi 型再生成**（backend 再ビルド後）＝`exec -T -e OPENAPI_URL=http://backend:8000/openapi.json frontend npm run codegen` → `cp frontend:/app/src/lib/api/schema.d.ts impl/frontend/src/lib/api/schema.d.ts`。
-- **dev ログイン（PW 全て `Passw0rd!`）**＝system_admin `OPS`/`admin@ops.example`／一般 `ACME-01`/`user@acme.example`(MFA OFF・「テスト 太郎」・デモグループ所属)・`ACME-02`/`mfa@acme2.example`(MFA ON)。手動追加＝`SYSCON`/`t-umekawa`(system_admin)。MailHog＝`http://localhost:8025`。
-- 規約/正本＝`CLAUDE.md`（各種規約＋設計の正本のパス参照）。UI 標準＝`doc/画面設計/デザイン標準.md`＋見本 `doc/画面設計/mocks/style-guide.html`。API＝`doc/API設計/{A..L}_*.md`＋`README.md`。データモデル＝`doc/データモデル.md`。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`。
+- **TC-ID 検査**＝`python3 scripts/check_tc_traceability.py`（`--list` で一覧）。コミット前ゲート。
+- **dev ログイン（PW 全て `Passw0rd!`）**＝system_admin `OPS`/`admin@ops.example`／一般 `ACME-01`/`user@acme.example`（MFA OFF・「テスト 太郎」・デモグループ所属）・`ACME-02`/`mfa@acme2.example`（MFA ON）。手動追加＝`SYSCON`/`t-umekawa`（system_admin）。MailHog＝`http://localhost:8025`。
+- 規約/正本＝`CLAUDE.md`（各種規約＋設計の正本のパス参照）。UI 標準＝`doc/画面設計/デザイン標準.md`。API＝`doc/API設計/{A..L}_*.md`＋`README.md`。データモデル＝`doc/データモデル.md`。ADR＝`doc/ADR/`。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`。
