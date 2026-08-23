@@ -1,5 +1,6 @@
 // 認証後グループのレイアウト。未認証は /login へ。共通ヘッダー（app-shell）を全画面に敷く。
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/layout";
@@ -17,7 +18,12 @@ export default async function AppLayout({
   modal: React.ReactNode; // Parallel Route スロット（@modal）＝URL 付きモーダル（Intercept Routes）の差し込み先
 }) {
   const session = await getServerSession();
-  if (!session) redirect("/login");
+  if (!session) {
+    // 「無効な iq_session Cookie が存在した時のみ」＝期限切れとして通知（未ログイン直アクセスは無言）。
+    // reason は非機密 enum・リダイレクト先は固定 /login（デザイン標準 §14・セキュリティ）。
+    const hadSession = (await cookies()).has("iq_session");
+    redirect(hadSession ? "/login?reason=session_expired" : "/login");
+  }
   // 残高（Lv/コイン/SP）＝GET /me（K.1・接続済み）。通知未読数（H）は未接続のため 0（H 接続で差替）。
   const me = await getServerMe();
   const balance = me ? headerBalance(me.balance) : undefined;

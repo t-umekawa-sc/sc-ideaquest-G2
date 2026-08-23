@@ -14,7 +14,7 @@ export function LogoutMenuItem() {
     try {
       await logout();
     } finally {
-      router.push("/login");
+      router.push("/login?reason=logged_out");
       router.refresh();
     }
   }

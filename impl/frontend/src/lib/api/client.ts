@@ -35,6 +35,12 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const code = (body && typeof body === "object" && "code" in body && (body as { code?: string }).code) || "error";
+    // セッション切れ（401）は一元でログインへ誘導＋理由を渡す（デザイン標準 §14 セッション終了時の通知）。
+    // セキュリティ＝リダイレクト先は固定 `/login`（可変 next なし＝オープンリダイレクト防止）／認証系 EP は
+    // 401 が想定内のため除外＋既に /login 上なら無処理（ループ＝自己 DoS 防止）／reason は非機密 enum のみ。
+    if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth/") && window.location.pathname !== "/login") {
+      window.location.assign("/login?reason=session_expired");
+    }
     throw new ApiError(res.status, code, body);
   }
   return body as T;

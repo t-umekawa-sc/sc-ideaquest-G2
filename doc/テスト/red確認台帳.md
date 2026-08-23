@@ -333,6 +333,15 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-124 | 完了クエストの投票凍結（`_guard_not_completed` の 409） | 409 期待→ 200 |
 | D-TC-128 | 完了クエストの新規フォロー凍結（同上） | 409 期待→ 204（完了後もフォローが通る） |
 
+## A. セッション終了通知 e2e（2026-08-23）
+
+> 後追い e2e（`sc-00-session-expiry.spec.ts`）。主アサーション（スナックバー可視）を反転して behavior-red を目視→復元して green（3 passed）。A-TC-024 の反転はスナックバー自動消滅のタイミングで trivial pass になり得るため、redirect（サーバ layout の reason 付与）が主眼＝green の遷移で担保。
+
+| TC-ID | 反転した主アサーション | 観測 red（actual） |
+| --- | --- | --- |
+| A-TC-023 | `/login?reason=session_expired` のトースト可視 `toBeVisible()` → `.not.toBeVisible()` | `Expected not visible / Received visible`＝reason enum→固定文言のトーストに到達 |
+| A-TC-025 | ログアウト後の「ログアウトしました」可視 → `.not.toBeVisible()` | `Expected not visible / Received visible`＝logged_out トーストに到達 |
+
 ## D. アイデア 登録モーダルの初期誤検証 fix（2026-08-23）
 
 > バグ修正の retro-red＝**修正前に不具合を実機再現**（`/quests/{id}` で「＋ アイデアを追加」→ URL モーダルを開いた直後、無操作で「件名は必須です。」が表示され `#idea_subject` の `aria-invalid=true`）。原因＝Modal のフォーカス effect が dev の StrictMode 二重実行で先頭フィールドを一時 blur→復帰し、`onBlurField` が誤発火。修正＝blur 検証は**フォーム内へのフォーカス移動時のみ**（`relatedTarget` がフォーム内）に限定。修正後は D-TC-208 green（初期は誤表示なし・タブ移動 blur では従来どおり検証）。
