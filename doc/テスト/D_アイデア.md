@@ -47,6 +47,17 @@
 | D-TC-116 | api | 削除の認可 | 他人のアイデア（自分は一般メンバー）| `DELETE /ideas/{id}` | 403 | D.2 |
 | D-TC-117 | api | 変更系の CSRF 必須 | ログイン済・CSRF なし | `POST .../ideas` | 403 csrf_failed | A.0 |
 | D-TC-118 | api | 未認証遮断 | セッションなし | `POST .../ideas` | 401 | require_me |
+| D-TC-119 | api | 投票登録（賛成） | vote 権限・公開アイデア | `POST /ideas/{id}/vote`（approve） | 200・my_vote=approve・summary.approve=1 | D.5 |
+| D-TC-120 | api | 投票切替（賛成→反対・1人1票） | 投票済み（approve） | `POST /ideas/{id}/vote`（oppose） | 200・my_vote=oppose・summary=approve0/oppose1（行は1つ） | D.5／§5.13 |
+| D-TC-121 | api | 投票取消の冪等 | 投票済み | `DELETE /ideas/{id}/vote` ×2 | 1回目204／2回目204（XP は戻さない） | D.5／§8-⑥ |
+| D-TC-122 | api | 投票は vote 権限必須 | パーティー参加だが vote なし | `POST /ideas/{id}/vote` | 403 | D.5 |
+| D-TC-123 | api | 下書きへの投票不可 | 自分の下書き | `POST /ideas/{id}/vote` | 409（invalid_state） | D.5 |
+| D-TC-124 | api | 完了クエストの投票凍結 | completed クエストの公開アイデア | `POST /ideas/{id}/vote` | 409（invalid_state） | D.5／C.5 |
+| D-TC-125 | api | 投票のパーティー門番 | 非パーティーのアイデア | `POST /ideas/{id}/vote` | 404（存在秘匿） | D.5／C.0 |
+| D-TC-126 | api | フォローの冪等 | パーティー員・公開アイデア | `POST /ideas/{id}/follow` ×2 | 204／204（重複行なし・is_following True） | D.6／§5.23 |
+| D-TC-127 | api | フォロー解除の冪等 | フォロー済み | `DELETE /ideas/{id}/follow` ×2 | 204／204（is_following False） | D.6 |
+| D-TC-128 | api | 完了後は新規フォロー不可・解除は可 | completed クエストのアイデア | `POST follow`／`DELETE follow` | POST=409（invalid_state）／DELETE=204 | D.6／C.5 |
+| D-TC-129 | api | フォローのパーティー門番 | 非パーティーのアイデア | `POST /ideas/{id}/follow` | 404（存在秘匿） | D.6／C.0 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 

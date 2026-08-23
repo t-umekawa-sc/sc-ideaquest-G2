@@ -101,10 +101,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     );
   }
 
-  // 投票集計は DTO の vote（{approve,oppose,my_vote}）から。投票 EP 未実装＝表示のみ（ボタンは無効）。
-  const v = (idea.vote ?? {}) as { approve?: number; oppose?: number; my_vote?: string | null };
-  const agreeN = v.approve ?? 0;
-  const disagreeN = v.oppose ?? 0;
+  // 投票集計は DTO の vote（{summary:{approve,oppose}, my_vote}）から。投票 POST/DELETE EP は公開済み
+  // だがフロント接続は後続＝本画面は表示のみ（ボタン無効）。
+  const v = (idea.vote ?? {}) as { summary?: { approve?: number; oppose?: number }; my_vote?: string | null };
+  const agreeN = v.summary?.approve ?? 0;
+  const disagreeN = v.summary?.oppose ?? 0;
   const myVote = v.my_vote === "approve" ? "agree" : v.my_vote === "oppose" ? "disagree" : null;
   const following = idea.following;
   const [stLabel, stClass] = statusLabel(idea.status, idea.is_selected);

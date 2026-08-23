@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
@@ -214,6 +214,111 @@ def delete_idea(account_id, company_id, idea_id) -> None:
         _authorize_edit_idea(ts, idea, quest, user)
         idea.deleted_at = datetime.now(timezone.utc)
         idea.deleted_by_id = user.id
+        ts.commit()
+
+
+# ---- 投票（D.5）・フォロー（D.6） ----
+
+
+def _resolve_visible_idea(ts, iid, user):
+    """アイデア＋クエストを解決し可視性門番を適用（範囲外 404）。投票/フォロー共通。"""
+    idea = repo.get_idea(ts, iid)
+    if idea is None:
+        raise AppError(404, "not_found")
+    if idea.status == "draft" and idea.author_id != user.id:
+        raise AppError(404, "not_found")  # 下書きは本人のみ
+    if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
+        raise AppError(404, "not_found")  # 非パーティーは秘匿（C.0）
+    quest = quests_repo.get_quest(ts, idea.quest_id)
+    return idea, quest
+
+
+def _guard_votable(ts, idea, quest, user) -> None:
+    """投票可否（D.5・サーバー強制）＝published＋未完了＋締切前＋vote 権限（owner は全権限）。"""
+    if idea.status != "published":
+        raise AppError(409, "conflict", detail="公開前のアイデアには投票できません", extra={"errors": [{"reason": "invalid_state"}]})
+    _guard_not_completed(quest)
+    if quest is not None and quest.deadline is not None and quest.deadline < date.today():
+        raise AppError(409, "conflict", detail="締切後は投票できません", extra={"errors": [{"reason": "invalid_state"}]})
+    if quest is not None and quest.owner_id == user.id:
+        return
+    member = quests_repo.get_active_member(ts, idea.quest_id, user.id)
+    if member is None or "vote" not in quests_repo.get_permissions(ts, member.id):
+        raise AppError(403, "forbidden", detail="投票の権限がありません")
+
+
+def _award_vote_xp(ts, idea, user_id, created) -> bool:
+    """投票 XP+5（各アイデア初回のみ・§8-⑥）。ドメイン G（activities/XP）実装まで no-op（False）＋TODO。
+
+    TODO(G): 当該 user×idea で過去に vote XP 未記帳なら activities（reason=vote,ref_type=ideas,ref_id=idea_id）を
+    1件記帳＝XP+5。切替/取消/再投票では追加付与しない。日次上限＝初回投票成立 5 回/日。
+    """
+    return False
+
+
+def vote_idea(account_id, company_id, idea_id, *, vote_type) -> dict:
+    """投票を登録/切替（D.5・1人1票 upsert）。voted_revision を現版で更新（陳腐化解消）。返り値＝投票結果。"""
+    iid = _parse_uuid(idea_id, field="idea_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, quest = _resolve_visible_idea(ts, iid, user)
+        _guard_votable(ts, idea, quest, user)
+        _, created = repo.upsert_vote(ts, idea.id, user.id, type=vote_type, voted_revision=idea.current_revision)
+        xp_awarded = _award_vote_xp(ts, idea, user.id, created)
+        vc = repo.count_votes(ts, idea.id)
+        ts.commit()
+    return {"my_vote": vote_type, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "xp_awarded": xp_awarded}
+
+
+def remove_vote(account_id, company_id, idea_id) -> None:
+    """投票を取消（D.5・冪等・XP は戻さない・§8-⑥）。完了後は 409。"""
+    iid = _parse_uuid(idea_id, field="idea_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, quest = _resolve_visible_idea(ts, iid, user)
+        _guard_not_completed(quest)
+        repo.remove_vote(ts, idea.id, user.id)
+        ts.commit()
+
+
+def follow_idea(account_id, company_id, idea_id) -> None:
+    """アイデアをフォロー（D.6・冪等）。門番＝パーティー所属（権限バッジ不問）。完了後の新規は 409。"""
+    iid = _parse_uuid(idea_id, field="idea_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, quest = _resolve_visible_idea(ts, iid, user)
+        _guard_not_completed(quest)  # 完了後の新規フォローは無意味＝409（D.6）
+        repo.add_follow(ts, user.id, idea.id)
+        ts.commit()
+
+
+def unfollow_idea(account_id, company_id, idea_id) -> None:
+    """フォロー解除（D.6・冪等）。完了後も許可（残存購読の後片付け・状態を汚さない）。"""
+    iid = _parse_uuid(idea_id, field="idea_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, _quest = _resolve_visible_idea(ts, iid, user)
+        repo.remove_follow(ts, user.id, idea.id)
         ts.commit()
 
 

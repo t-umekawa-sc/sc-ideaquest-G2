@@ -322,6 +322,17 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-205 | `**/quests/*/ideas`（GET）を abort → 実データ idea 可視を期待 | `Expected visible / Received element(s) not found`＝一覧描画が listIdeas に依存（デモ据置きなら出るはず） |
 | D-TC-206 | 投稿後の一覧反映 `toBeVisible()` → `.not.toBeVisible()` | `Expected not visible / Received visible`＝IDEAS_CHANGED 購読で投稿がリロードなしに一覧へ反映 |
 
+## D. アイデア 投票/フォロー API（2026-08-23）
+
+> 手技＝application のサーバー強制ガードを一時無効化（`if False:`）→ 該当 api TC が red になることを目視 → 復元して green（tests/ideas 41 passed）。無効化差分はコミットに含めない。membership 門番（D-TC-125/129）は詳細と同一の C.0 門番＝既存 D-TC-106/108 の red 証跡で担保／1人1票 upsert（D-TC-120）は repository D-TC-006 の red で担保。
+
+| TC-ID | 一時無効化したガード | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-123 | 投票の published 前提（`status != published` の 409） | 409 期待→ 200（下書きへの投票が通る・`{"my_vote":"approve",...}`） |
+| D-TC-122 | 投票の vote 権限チェック（403） | 403 期待→ 200（無権限で投票が通る） |
+| D-TC-124 | 完了クエストの投票凍結（`_guard_not_completed` の 409） | 409 期待→ 200 |
+| D-TC-128 | 完了クエストの新規フォロー凍結（同上） | 409 期待→ 204（完了後もフォローが通る） |
+
 ## D. アイデア SC-22 詳細 e2e（2026-08-23）
 
 > 手技＝`GET /ideas/{id}`（getIdea）を `page.route(...).abort()` で遮断し、詳細が描画できない behavior-red を目視→復元して green（sc-22 e2e 1 passed）。

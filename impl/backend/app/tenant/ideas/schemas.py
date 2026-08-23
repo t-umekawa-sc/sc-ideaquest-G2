@@ -88,6 +88,22 @@ class IdeaPublishRequest(BaseModel):
     note: str | None = None
 
 
+class IdeaVoteRequest(BaseModel):
+    """POST /ideas/{id}/vote（D.5）。賛成/反対の登録・切替。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["approve", "oppose"]
+
+
+class IdeaVoteResponse(BaseModel):
+    """投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か（G 実装まで False）。"""
+
+    my_vote: str | None = None
+    summary: IdeaVoteSummaryDTO
+    xp_awarded: bool = False
+
+
 # ---- response（一覧カード/詳細） ----
 
 

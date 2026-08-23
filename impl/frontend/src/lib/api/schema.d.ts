@@ -1098,6 +1098,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vote Idea
+         * @description 投票を登録/切替（SC-22・D.5・vote 権限・公開＋未凍結）。1人1票 upsert・締切後/completed は 409。
+         */
+        post: operations["vote_idea_api_v1_ideas__idea_id__vote_post"];
+        /**
+         * Remove Vote
+         * @description 投票を取消（D.5・冪等・XP は戻さない）。completed は 409。
+         */
+        delete: operations["remove_vote_api_v1_ideas__idea_id__vote_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Follow Idea
+         * @description アイデアをフォロー（D.6・冪等・パーティー所属）。completed 後の新規は 409。
+         */
+        post: operations["follow_idea_api_v1_ideas__idea_id__follow_post"];
+        /**
+         * Unfollow Idea
+         * @description フォロー解除（D.6・冪等・completed 後も可）。
+         */
+        delete: operations["unfollow_idea_api_v1_ideas__idea_id__follow_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1675,6 +1723,31 @@ export interface components {
             stakeholders?: components["schemas"]["IdeaStakeholderInput"][] | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * IdeaVoteRequest
+         * @description POST /ideas/{id}/vote（D.5）。賛成/反対の登録・切替。
+         */
+        IdeaVoteRequest: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "approve" | "oppose";
+        };
+        /**
+         * IdeaVoteResponse
+         * @description 投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か（G 実装まで False）。
+         */
+        IdeaVoteResponse: {
+            /** My Vote */
+            my_vote?: string | null;
+            summary: components["schemas"]["IdeaVoteSummaryDTO"];
+            /**
+             * Xp Awarded
+             * @default false
+             */
+            xp_awarded: boolean;
         };
         /** IdeaVoteSummaryDTO */
         IdeaVoteSummaryDTO: {
@@ -4609,6 +4682,128 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IdeaDetailDTO"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vote_idea_api_v1_ideas__idea_id__vote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeaVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaVoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_vote_api_v1_ideas__idea_id__vote_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_idea_api_v1_ideas__idea_id__follow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unfollow_idea_api_v1_ideas__idea_id__follow_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

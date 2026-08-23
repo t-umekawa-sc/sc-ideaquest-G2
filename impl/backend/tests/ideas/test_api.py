@@ -252,3 +252,106 @@ def test_d_tc_118_create_requires_auth(client, env):
     qid = env.make_quest()
     r = client.post(IDEAS(qid), json={"title": "T", "value": "V", "body": "B", "status": "draft"})
     assert r.status_code == 401, r.text
+
+
+# ---- D-TC-119〜129: 投票（D.5）・フォロー（D.6） ----
+
+VOTE = lambda iid: f"/api/v1/ideas/{iid}/vote"  # noqa: E731
+FOLLOW = lambda iid: f"/api/v1/ideas/{iid}/follow"  # noqa: E731
+
+
+def test_d_tc_119_vote_approve(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["my_vote"] == "approve" and b["summary"]["approve"] == 1 and b["summary"]["oppose"] == 0
+
+
+def test_d_tc_120_vote_switch_one_per_user(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    r = client.post(VOTE(idea), json={"type": "oppose"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["my_vote"] == "oppose" and b["summary"]["approve"] == 0 and b["summary"]["oppose"] == 1
+
+
+def test_d_tc_121_vote_cancel_idempotent(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    assert client.delete(VOTE(idea), headers=_csrf(client)).status_code == 204
+    assert client.delete(VOTE(idea), headers=_csrf(client)).status_code == 204
+
+
+def test_d_tc_122_vote_requires_vote_permission(client, env):
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_member=True, seed_perms=["idea_create", "comment"])
+    idea = env.make_idea(quest_id=qid, status="published", author=env.other_id)
+    r = client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    assert r.status_code == 403, r.text
+
+
+def test_d_tc_123_vote_draft_forbidden(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    draft = env.make_idea(quest_id=qid, status="draft")
+    r = client.post(VOTE(draft), json={"type": "approve"}, headers=_csrf(client))
+    assert r.status_code == 409, r.text
+
+
+def test_d_tc_124_vote_frozen_on_completed(client, env):
+    _login_seed(client)
+    qid = env.make_quest(status="completed")
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    assert r.status_code == 409, r.text
+
+
+def test_d_tc_125_vote_requires_membership(client, env):
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_member=False)
+    idea = env.make_idea(quest_id=qid, status="published", author=env.other_id)
+    r = client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client))
+    assert r.status_code == 404, r.text
+
+
+def test_d_tc_126_follow_idempotent(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    assert client.post(FOLLOW(idea), headers=_csrf(client)).status_code == 204
+    assert client.post(FOLLOW(idea), headers=_csrf(client)).status_code == 204
+    assert client.get(IDEA(idea)).json()["following"] is True
+
+
+def test_d_tc_127_unfollow_idempotent(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    client.post(FOLLOW(idea), headers=_csrf(client))
+    assert client.delete(FOLLOW(idea), headers=_csrf(client)).status_code == 204
+    assert client.delete(FOLLOW(idea), headers=_csrf(client)).status_code == 204
+    assert client.get(IDEA(idea)).json()["following"] is False
+
+
+def test_d_tc_128_follow_frozen_new_but_unfollow_ok(client, env):
+    _login_seed(client)
+    qid = env.make_quest(status="completed")
+    idea = env.make_idea(quest_id=qid, status="published")
+    assert client.post(FOLLOW(idea), headers=_csrf(client)).status_code == 409
+    assert client.delete(FOLLOW(idea), headers=_csrf(client)).status_code == 204
+
+
+def test_d_tc_129_follow_requires_membership(client, env):
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_member=False)
+    idea = env.make_idea(quest_id=qid, status="published", author=env.other_id)
+    r = client.post(FOLLOW(idea), headers=_csrf(client))
+    assert r.status_code == 404, r.text

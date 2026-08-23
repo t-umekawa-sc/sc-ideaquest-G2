@@ -18,6 +18,8 @@ from app.tenant.ideas.schemas import (
     IdeaListResponse,
     IdeaPublishRequest,
     IdeaUpdateRequest,
+    IdeaVoteRequest,
+    IdeaVoteResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["ideas"])
@@ -111,5 +113,63 @@ def delete_idea(
     verify_origin(request)
     verify_csrf(request)
     idea_service.delete_idea(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+
+
+@router.post("/ideas/{idea_id}/vote", response_model=IdeaVoteResponse)
+def vote_idea(
+    idea_id: str,
+    body: IdeaVoteRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> IdeaVoteResponse:
+    """投票を登録/切替（SC-22・D.5・vote 権限・公開＋未凍結）。1人1票 upsert・締切後/completed は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = idea_service.vote_idea(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, vote_type=body.type,
+    )
+    return IdeaVoteResponse(**result)
+
+
+@router.delete("/ideas/{idea_id}/vote", status_code=204)
+def remove_vote(
+    idea_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """投票を取消（D.5・冪等・XP は戻さない）。completed は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idea_service.remove_vote(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+
+
+@router.post("/ideas/{idea_id}/follow", status_code=204)
+def follow_idea(
+    idea_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """アイデアをフォロー（D.6・冪等・パーティー所属）。completed 後の新規は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idea_service.follow_idea(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+
+
+@router.delete("/ideas/{idea_id}/follow", status_code=204)
+def unfollow_idea(
+    idea_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """フォロー解除（D.6・冪等・completed 後も可）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idea_service.unfollow_idea(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
