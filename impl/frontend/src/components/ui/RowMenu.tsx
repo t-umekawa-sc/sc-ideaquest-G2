@@ -14,14 +14,29 @@ const LIST_MIN_W = 176;
 const VP_MARGIN = 8; // ビューポート端との最小余白
 const EST_ITEM_H = 40; // 高さ未測定時（初回・チラつき防止）の1項目あたり概算
 
+// 同一 DataTable（[data-dt-root]）の footer 上端を「下方向の配置境界」として返す。行が少ないと
+// footer（件数/ページャ/表示件数）が ⋯ 直下に来て、下開きメニューが footer と重なる（solid 白・z-1000 で
+// 透けはしないが視覚的に衝突）。footer を境界にして下に収まらなければ上フリップさせる。DataTable 外で使う
+// RowMenu（例＝クエスト詳細の操作メニュー）は境界なし＝従来どおりビューポート下端のみで判定。
+function footerBoundary(trigger: HTMLElement): number | null {
+  const root = trigger.closest("[data-dt-root]");
+  const footer = root?.querySelector<HTMLElement>(".dt-footer");
+  if (!footer) return null;
+  const top = footer.getBoundingClientRect().top;
+  return Number.isFinite(top) ? top - 4 : null;
+}
+
 // トリガー矩形とメニュー実高さから fixed 配置座標を求める。トリガー直下(右寄せ)を基本に、
-// 下に収まらなければ上へフリップし、最後にビューポート内へクランプ（menuitem が画面外に出ない）。
-function computePos(r: DOMRect, listH: number): { top: number; left: number } {
+// 下に収まらなければ（ビューポート下端 or DataTable footer 上端の手前）上へフリップし、
+// 最後にビューポート内へクランプ（menuitem が画面外に出ない）。
+function computePos(r: DOMRect, listH: number, maxBottom?: number | null): { top: number; left: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const left = Math.min(Math.max(VP_MARGIN, r.right - LIST_MIN_W), vw - LIST_MIN_W - VP_MARGIN);
+  // 下方向の許容下端＝ビューポート下端と footer 上端の小さい方（footer が無ければビューポートのみ）。
+  const downLimit = Math.min(vh - VP_MARGIN, maxBottom ?? Number.POSITIVE_INFINITY);
   let top = r.bottom + 4; // トリガー直下
-  if (listH > 0 && top + listH > vh - VP_MARGIN) {
+  if (listH > 0 && top + listH > downLimit) {
     const above = r.top - 4 - listH; // 下に収まらない → 上へフリップ
     top = above >= VP_MARGIN ? above : Math.max(VP_MARGIN, vh - VP_MARGIN - listH);
   }
@@ -52,7 +67,7 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
     if (!trigger) return;
     const place = () => {
       const listH = listRef.current?.offsetHeight ?? 0;
-      setPos(computePos(trigger.getBoundingClientRect(), listH));
+      setPos(computePos(trigger.getBoundingClientRect(), listH, footerBoundary(trigger)));
     };
     place();
     function onDown(e: MouseEvent) {
@@ -82,8 +97,9 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
       setOpen(false);
       return;
     }
-    const r = triggerRef.current?.getBoundingClientRect();
-    if (r) setPos(computePos(r, items.length * EST_ITEM_H + 8));
+    const trigger = triggerRef.current;
+    const r = trigger?.getBoundingClientRect();
+    if (r && trigger) setPos(computePos(r, items.length * EST_ITEM_H + 8, footerBoundary(trigger)));
     setOpen(true);
   }
 

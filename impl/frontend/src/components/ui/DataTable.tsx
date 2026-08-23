@@ -759,7 +759,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
   }
 
   return (
-    <div>
+    // data-dt-root＝RowMenu が「同一 DataTable の footer（件数/ページャ/表示件数）」を下方向の
+    // 配置境界として検出するための目印。行が少ないと footer が ⋯ 直下に来て下開きメニューが重なるため、
+    // RowMenu は footer 上端を境界に上フリップする（design-system.css .dt-footer・§4.5 操作列）。
+    <div data-dt-root>
       <div className="list-toolbar" data-dt-toolbar>
         <div className="filters">
           <div className="dt-search">
