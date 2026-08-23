@@ -9,9 +9,11 @@
 // 入力検証はデザイン標準 §4.7（インライン aria-invalid＋上部サマリ・送信時＋blur・フォーカス移動しない）。
 // 権限キーは UI（manage/eval/vote/idea/comment）⇔ API（quest_admin/evaluator/vote/idea_create/comment）で写像。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
+import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
   createQuest,
   deleteQuestIcon,
@@ -106,21 +108,39 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     [locale],
   );
 
-  const [color, setColor] = useState(DEFAULT_COLOR);
+  // 複製（作成モードのみ）＝選択クエストの内容を引き継いで追加ダイアログを開く（デザイン標準 §4.5 複製）。
+  // id・status（→draft）・アイコン画像・パーティー編成は引き継がない（一意/サーバー採番/関係データ）。
+  const searchParams = useSearchParams();
+  const dup = useMemo(
+    () =>
+      isEdit
+        ? null
+        : readDuplicatePrefill<{
+            title?: string;
+            color?: string;
+            categories?: string[];
+            purpose?: string;
+            quest_group_id?: string;
+            deadline?: string;
+          }>(searchParams),
+    [isEdit, searchParams],
+  );
+
+  const [color, setColor] = useState(dup?.color || DEFAULT_COLOR);
   const [iconPreview, setIconPreview] = useState<string | null>(null); // ローカル選択のプレビュー
   const [iconUrl, setIconUrl] = useState<string | null>(null); // 既存アイコンの署名URL（編集）
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconRemoved, setIconRemoved] = useState(false); // 既存アイコンを削除する指示
   const iconInputRef = useRef<HTMLInputElement>(null);
-  const [name, setName] = useState("");
-  const [categories, setCategories] = useState<string[]>([]);
+  const [name, setName] = useState(dup?.title ?? "");
+  const [categories, setCategories] = useState<string[]>(dup?.categories ?? []);
   const [catInput, setCatInput] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [theme, setTheme] = useState("");
+  const [deadline, setDeadline] = useState(dup?.deadline ?? "");
+  const [theme, setTheme] = useState(dup?.purpose ?? "");
 
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
-  const [groupId, setGroupId] = useState("");
+  const [groupId, setGroupId] = useState(dup?.quest_group_id ?? "");
   const [groupName, setGroupName] = useState(""); // 編集時の固定表示用
   const [candidates, setCandidates] = useState<QuestCandidate[]>([]);
   const [members, setMembers] = useState<Member[]>([]);

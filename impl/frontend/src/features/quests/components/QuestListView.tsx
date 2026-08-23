@@ -10,15 +10,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { DataTable } from "@/components/ui";
-import type { DataTableColumn } from "@/components/ui";
+import { DataTable, RowMenu } from "@/components/ui";
+import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
   id: string; title: string; theme: string; cat: string; cats: string[]; status: string; group: string;
-  owner: string; char: string; accent: string; iconUrl: string | null; deadline: string; dl: number;
+  groupId: string; owner: string; char: string; accent: string; iconUrl: string | null; deadline: string; dl: number;
   soon: boolean; party: number; ideas: number; my: string; order: number; draft?: boolean;
 };
 
@@ -60,7 +61,7 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
   const draft = c.my_state === "draft";
   return {
     id: c.id, title: c.title, theme: "", cat: c.categories[0] ?? "", cats: c.categories,
-    status, group: c.quest_group.name, owner: (c.owner.display_name || "?").slice(0, 1),
+    status, group: c.quest_group.name, groupId: c.quest_group.id, owner: (c.owner.display_name || "?").slice(0, 1),
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
     deadline: dl.deadline, dl: dl.dl, soon: dl.soon, party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
@@ -128,6 +129,18 @@ export function QuestListView() {
     return [...set].map((g) => [g, g]);
   }, [quests]);
 
+  // 複製＝作成ダイアログ（SC-11）を追加モードで開き、件名/カラー/カテゴリー/グループを引き継ぐ（デザイン標準 §4.5 複製）。
+  // id・ステータス（→下書き）・アイコン画像・パーティー編成・目的（目的は一覧DTOに無い）は引き継がず新規入力。
+  const questMenu = (x: Quest): RowMenuItem[] => [
+    {
+      label: "複製",
+      onClick: () =>
+        router.push(
+          buildDuplicateHref("/quests/new", { title: x.title, color: x.accent, categories: x.cats, quest_group_id: x.groupId }),
+        ),
+    },
+  ];
+
   const columns: DataTableColumn<Quest>[] = [
     {
       key: "title", label: "クエスト", locked: true, width: 300, sortable: true, filter: { type: "text" },
@@ -145,6 +158,7 @@ export function QuestListView() {
     { key: "party", label: "👥", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.party, filterVal: (x) => x.party, render: (x) => x.party },
     { key: "ideas", label: "💡", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.ideas, filterVal: (x) => x.ideas, render: (x) => x.ideas },
     { key: "my", label: "あなた", width: 110, sortable: true, filter: { type: "enum", options: MY_OPTIONS }, sortVal: (x) => x.my, filterVal: (x) => x.my, render: (x) => <span className={myBadge(x.my)}>{x.my}</span> },
+    { key: "_actions", label: "", actions: true, locked: true, width: 64, render: (x) => <RowMenu items={questMenu(x)} /> },
   ];
 
   return (
@@ -179,23 +193,30 @@ export function QuestListView() {
           emptyText="該当するクエストがありません。条件を変えてお試しください。"
           onRowClick={(x) => router.push(questHref(x))}
           cardRaw={(x) => (
-            <Link className="card card-accent quest-card" href={questHref(x)} style={{ ["--accent" as string]: x.accent } as React.CSSProperties}>
-              <div className="between">
-                <span className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
-                  <QuestIcon q={x} /><span className="card-title">{x.title}</span>
-                </span>
-                <span className={statusBadge(x.status)}>{x.status}</span>
+            // ⋯ は Link の外（兄弟・右下）に置く＝アンカー内 button の不正 HTML を避けつつ複製導線を出す（§4.5 操作列）。
+            // stats は左寄せ（flex gap）で右下が空くため、そこに重ねる。RowMenu は stopPropagation でカード遷移を抑止。
+            <div className="quest-card-wrap" style={{ position: "relative" }}>
+              <Link className="card card-accent quest-card" href={questHref(x)} style={{ ["--accent" as string]: x.accent } as React.CSSProperties}>
+                <div className="between">
+                  <span className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
+                    <QuestIcon q={x} /><span className="card-title">{x.title}</span>
+                  </span>
+                  <span className={statusBadge(x.status)}>{x.status}</span>
+                </div>
+                <div className="quest-card__meta">
+                  {x.cat ? <span className="badge badge-muted">{x.cat}</span> : null}
+                  <span className={x.soon ? "deadline soon" : "deadline"}>⏳ 締切 {x.deadline}</span>
+                </div>
+                <div className="quest-card__stats">
+                  <span>👥 {x.party}</span>
+                  <span>💡 {x.ideas}</span>
+                  <span className={myBadge(x.my)}>{x.my}</span>
+                </div>
+              </Link>
+              <div className="quest-card__menu" style={{ position: "absolute", right: "var(--space-3)", bottom: "var(--space-3)" }}>
+                <RowMenu items={questMenu(x)} />
               </div>
-              <div className="quest-card__meta">
-                {x.cat ? <span className="badge badge-muted">{x.cat}</span> : null}
-                <span className={x.soon ? "deadline soon" : "deadline"}>⏳ 締切 {x.deadline}</span>
-              </div>
-              <div className="quest-card__stats">
-                <span>👥 {x.party}</span>
-                <span>💡 {x.ideas}</span>
-                <span className={myBadge(x.my)}>{x.my}</span>
-              </div>
-            </Link>
+            </div>
           )}
         />
       )}
