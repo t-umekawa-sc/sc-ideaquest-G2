@@ -5,9 +5,8 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-23**（時刻は概算・セッション終了時）。
 - ブランチ: `main`（作業ツリーはクリーン＝本ファイル更新のコミット前を除き未コミットなし）。
-- 最新コミット: **`483685f`** `test(D/SC-21): アイデア登録・編集フォームの画面 e2e`。
-- 本セッションの追加コミット（新しい順）: `483685f`（SC-21 D e2e）／`c5bdd4a`（複製を SC-93/SC-10 へ）／`9591413`（RowMenu footer 重なり修正）。
-- **⚠️ push 未実施**＝本セッションのコミットは**まだ push していない**（ユーザー指示は「コミット」まで）。origin/main = `61035e7` のまま。再開時 or 指示があれば `git push`。
+- 最新コミット: **`69f88a8`** `docs(ADR-0009): 管理者によるメールアドレス確認`。
+- 本セッションの追加コミット（新しい順）: `69f88a8`（ADR-0009 メール確認 設計）／`c687543`（RowMenu 上フリップ境界を最終行まで拡張）／`11b50d6`（handoff 全文更新）／`483685f`（SC-21 D e2e）／`c5bdd4a`（複製を SC-93/SC-10 へ）／`9591413`（RowMenu footer 重なり修正）。**すべて push 済み**（origin/main = `69f88a8`）。
 
 ## 2. ゴール
 社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router、バック＝FastAPI 4層、DB＝PostgreSQL/Redis/MinIO/MailHog/Docker。開発は**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順＝アカウント→クエスト(C)→アイデア(D)→評価→その他。正本＝[`doc/実装計画.md`](doc/実装計画.md)。
@@ -31,9 +30,14 @@
 - **SC-10 クエスト一覧（`QuestListView`）**＝リスト表示は操作列、カード表示はカード右下に ⋯ を重ねる（`<Link>` の兄弟に置き button-in-anchor 回避）。`QuestForm` を `dup` プリフィル対応（件名/カラー/カテゴリー/グループを引き継ぎ、id・ステータス→下書き・アイコン・パーティー・目的〔一覧DTOに無い〕は除外）。
 - **複製が明らかに不要（対象外）**＝QGメンバー一覧（`QuestGroupAdminView`）・クエスト詳細のパーティー（人の関係データ）／クエスト詳細の操作メニュー（単一クエスト）／クエスト詳細のアイデアタブ（未接続デモ）。**既に複製あり**＝会社一覧・SC-92 会社別アカウント・QGグループ。
 
-### 3-D. メール確認フロー＝方針合意（未実装・設計案 pending）
-- ユーザー質問＝「管理者によるメール修正時にアドレス確認は行わない仕様か？」→**回答: 現行はそう**（API 設計 B の PATCH は会社内一意検証のみ・確認/検証メールなし。関連要件 1-㉓「email 変更時の再認証」はドメイン K の**本人自己変更の再認証**であって新アドレス所有確認ではない）。
-- ユーザー提案＝「編集は現状通りノーブロック可＋アクションメニューに opt-in の『確認メール送信』を追加し、実行時に確認フローへ入る」。**合意方針**。次セッションで設計案を正本へ起こす（下記 §7-1）。
+### 3-D. RowMenu 上フリップ境界を最終データ行まで拡張（`c687543`）
+- 理由＝ユーザー再指摘。行が多い一覧（/admin/companies）で末尾付近の行の ⋯ を下に開くと**最終データ行を覆う**（footer だけの前修正では未対応）。
+- 修正＝`downBoundary(trigger)` が「最終 `td.col-actions` の行の上端」と footer 上端の小さい方を返し、そこを超えるなら上フリップ。末尾付近の行は上方向に開き最終行/footer を覆わない。ブラウザ実測で下行 ⋯ との矩形重なり false。
+
+### 3-E. メール確認フロー＝設計を正本へ起こした（`69f88a8`・ADR-0009・実装は未）
+- 発見＝**自己メール変更（K.3・ADR-0008）は既にダブルオプトインで確認済み**。ギャップは管理者経路（B PATCH）だけ。
+- 決定（ユーザー承認）＝**(A) 現アドレスの確認方式**＝編集は no-block 維持＋opt-in「確認メール送信」で現メール到達/所有確認→`accounts.email_verified_at` に記録。`otp_challenges` に新 `purpose=email_verify`（72h・単回）・確定 EP は未認証。`email_change`（変更）と `email_verify`（確認）は purpose 分離。
+- 正本追記＝ADR-0009 新規／データモデル（`email_verified_at`・`otp_purpose`・`mail_category`）／API B（送信 EP・`GET` 行に `email_verified`・PATCH で NULL リセット）／API A（`POST /auth/email-verify/confirm`・A.7.1）／API K（K.3 confirm も `email_verified_at=now`）／SC-92・SC-93（バッジ＋⋯「確認メールを送信」）。**実装は別スライス（md 先行→red-green）**。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. frontend
@@ -63,7 +67,7 @@
 - （継続）会社プロビジョニングは MVP 手動（`POST /companies/{id}/provision`・SC-92）。テスト運用＝md 先行＋TC-ID トレーサビリティ＋red確認台帳。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **メール確認フローの設計案を正本へ起こす**（§3-D 合意）＝(a) データモデルに `accounts.email_verified_at`（nullable）追加案＋メール変更時 NULL リセット (b) API 設計 B/K に「確認メール送信」EP（`purpose=email_verify`・A.7 流用・72h）＋公開 confirm EP (c) 一覧メール列に「未確認/確認済み」バッジ (d) ⋯ メニューに「確認メールを送信」。**まず要件/API/データモデルへの追記案を提示→合意→実装**（md 先行）。
+1. **メール確認フローの実装**（設計は `69f88a8`/ADR-0009 で確定済み・§3-E）＝**md 先行→red-green**。(a) backend migration＝`accounts.email_verified_at` 追加 (b) 送信 EP `POST /admin/(companies/{cid}/)accounts/{id}/email-verification`（`purpose=email_verify`・72h・現メール宛・`mail_category=email_verify_link`） (c) 公開確定 EP `POST /auth/email-verify/confirm`（未認証・410/409・`email_verified_at=now`） (d) `GET .../accounts` の行に `email_verified` (e) `PATCH email` 変更で `email_verified_at=NULL`（＋K.3 confirm で now） (f) フロント＝SC-92/93 の一覧メール列バッジ＋⋯「確認メールを送信」。**添付/投票/フォロー（D 残り EP）とどちらを先にするかは要判断**。
 2. **SC-12 アイデアタブの実接続**＝`QuestDetailView` のデモ `IDEAS` を `listIdeas(questId)`（`features/ideas/api.ts`）へ差し替え＋`IDEAS_CHANGED_EVENT` 購読で投稿後再取得。カードは `IdeaCardDTO`（`vote_summary`/`comment_count`/`my_vote`/`my_state`）に整合。
 3. **SC-22 詳細の実接続**＝`IdeaDetailView` の fixtures を `getIdea(ideaId)` へ。**投票・フォローは EP 未実装＝表示のみ**（disabled か「準備中」明示）。チャット導線は E 未接続。
 4. **mock/style-guide の §4.7 反映**（正本 `デザイン標準.md` は更新済み・mock 側未反映）＝`mocks/shared.css`（`.form-footer-error`）・`shared.js`（sticky スナックバー）・`style-guide.html`「4b.」。
