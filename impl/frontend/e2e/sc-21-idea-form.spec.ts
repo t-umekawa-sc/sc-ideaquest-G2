@@ -159,3 +159,24 @@ test("D-TC-204 SC-21 submit gated by required + blur inline validation", async (
     await deleteQuestQuiet(page, questId);
   }
 });
+
+// D-TC-208 登録モーダルは初期表示で誤検証しない（モーダルのフォーカス制御で件名の必須エラーが出ない）。
+// blur 検証（タブ移動）は維持されることも確認。
+test("D-TC-208 SC-21 modal has no premature validation on open", async ({ page }) => {
+  await login(page);
+  const questId = await createRecruiting(page, `E2Eモーダル_${Date.now().toString().slice(-8)}`);
+  try {
+    await page.goto(`/quests/${questId}`);
+    await page.getByRole("button", { name: "＋ アイデアを追加" }).click(); // URL モーダル（intercept）
+    await page.locator("#idea_subject").waitFor();
+    // 初期表示（無操作）＝誤検証なし。
+    await expect(page.getByText("件名は必須です。")).toHaveCount(0);
+    await expect(page.locator("#idea_subject")).not.toHaveAttribute("aria-invalid", "true");
+    // 件名→価値へタブ移動（blur）＝§4.7 の blur 検証は維持。
+    await page.locator("#idea_subject").click();
+    await page.locator("#idea_value").click();
+    await expect(page.getByText("件名は必須です。")).toBeVisible();
+  } finally {
+    await deleteQuestQuiet(page, questId);
+  }
+});

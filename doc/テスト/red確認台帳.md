@@ -333,6 +333,14 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-124 | 完了クエストの投票凍結（`_guard_not_completed` の 409） | 409 期待→ 200 |
 | D-TC-128 | 完了クエストの新規フォロー凍結（同上） | 409 期待→ 204（完了後もフォローが通る） |
 
+## D. アイデア 登録モーダルの初期誤検証 fix（2026-08-23）
+
+> バグ修正の retro-red＝**修正前に不具合を実機再現**（`/quests/{id}` で「＋ アイデアを追加」→ URL モーダルを開いた直後、無操作で「件名は必須です。」が表示され `#idea_subject` の `aria-invalid=true`）。原因＝Modal のフォーカス effect が dev の StrictMode 二重実行で先頭フィールドを一時 blur→復帰し、`onBlurField` が誤発火。修正＝blur 検証は**フォーム内へのフォーカス移動時のみ**（`relatedTarget` がフォーム内）に限定。修正後は D-TC-208 green（初期は誤表示なし・タブ移動 blur では従来どおり検証）。
+
+| TC-ID | 観測 red（修正前 actual） |
+| --- | --- |
+| D-TC-208 | モーダルを開いた直後（無操作）で「件名は必須です。」表示＋`#idea_subject aria-invalid=true`（誤検証）→ 修正後は非表示・aria-invalid なし |
+
 ## D. アイデア SC-22 詳細 e2e（2026-08-23）
 
 > 手技＝`GET /ideas/{id}`（getIdea）を `page.route(...).abort()` で遮断し、詳細が描画できない behavior-red を目視→復元して green（sc-22 e2e 1 passed）。

@@ -150,7 +150,13 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
     return e;
   }, [subject, value, body, msg]);
 
-  function onBlurField(field: "title" | "value" | "body") {
+  function onBlurField(field: "title" | "value" | "body", e: React.FocusEvent<HTMLElement>) {
+    // モーダルの開閉フォーカス制御（dev の StrictMode 二重実行で先頭フィールドが一時 blur→復帰）による
+    // 初期表示の誤検証を防ぐ＝**フォーム内の別要素へフォーカスが移った時（タブ移動）だけ**検証する。
+    // 開閉churn の blur は relatedTarget がフォーム外（起動ボタン等）なのでスキップされる（§4.7 の blur 検証は維持）。
+    const to = e.relatedTarget as Node | null;
+    const form = e.currentTarget.closest("form");
+    if (!to || !form || !form.contains(to)) return;
     setFieldErrors((prev) => {
       const next = { ...prev };
       const map = { title: [subject, msg.title], value: [value, msg.value], body: [body, msg.body] } as const;
@@ -278,7 +284,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             placeholder="アイデアのタイトル"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            onBlur={() => onBlurField("title")}
+            onBlur={(e) => onBlurField("title", e)}
             aria-invalid={fieldErrors.title ? true : undefined}
             required
           />
@@ -291,7 +297,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             placeholder="このアイデアがもたらす価値・メリット（評価の要になります）"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onBlur={() => onBlurField("value")}
+            onBlur={(e) => onBlurField("value", e)}
             aria-invalid={fieldErrors.value ? true : undefined}
             required
           />
@@ -304,7 +310,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             placeholder="どんなアイデアか、内容を説明してください"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            onBlur={() => onBlurField("body")}
+            onBlur={(e) => onBlurField("body", e)}
             aria-invalid={fieldErrors.body ? true : undefined}
             required
           />
