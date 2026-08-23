@@ -1,17 +1,33 @@
 "use client";
 
-// SC-22 アイデア詳細＝本文/価値/添付・投票（賛成/反対・インライン）・評価結果・チャット導線・更新履歴。
+// SC-22 アイデア詳細＝本文/価値/利害関係者/ステータス/作成者/版数（D.1 GET /ideas/{id} 実接続）。
 // 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md。
-// アイデア backend 未実装＝デモ fixtures（フロントエンド実装フロー規約＝画面モック先行）。
+// **未接続（EP 未実装/他ドメイン）＝表示のみ or デモ**: 投票/フォロー（D.5/D.6 router 未公開）・添付（D.3）・
+// 評価結果（F）・チャット（E）・更新履歴の差分（版 EP 未公開）。IdeaDetailDTO に quest_id/カテゴリーが
+// 無いため、クエストへの導線・カテゴリーバッジは暫定（follow-up＝DTO 拡張）。
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Avatar, Modal, ModalBody, ModalFooter } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 
+import { getIdea, type IdeaDetail } from "../api";
 import { IdeaForm } from "./IdeaForm";
 import "../ideas.css";
 
-// ---- デモ fixtures（モック SC-22 と一致） ----
+// YYYY-MM-DDTHH:MM:SSZ → YYYY/MM/DD（表示用）。
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+function statusLabel(status: string, isSelected: boolean): [string, string] {
+  if (isSelected) return ["選定候補", "badge badge-success"];
+  if (status === "draft") return ["下書き", "badge badge-muted"];
+  return ["公開", "badge badge-success"];
+}
+
+// ---- デモ fixtures（未接続セクション用・添付/評価/チャット/履歴） ----
 const ATTACHMENTS = [
   { icon: "📄", name: "夜間配送_試算シート.xlsx", sub: "248 KB ・ 鈴木 花子 ・ 2026/07/10" },
   { icon: "🖼️", name: "ルート集約イメージ.png", sub: "1.2 MB ・ 鈴木 花子 ・ 2026/07/10" },
@@ -49,25 +65,57 @@ const ASPECT_COMMENTS = [
 ];
 
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
-  const [following, setFollowing] = useState(true);
-  const [myVote, setMyVote] = useState<"agree" | "disagree" | null>("agree");
-  const [ackUpdate, setAckUpdate] = useState(false); // 更新後に投票し直したら見直し導線を消す
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [idea, setIdea] = useState<IdeaDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const base = { agree: 11, disagree: 3 }; // 自分の1票を除いた基礎値
-  const agreeN = base.agree + (myVote === "agree" ? 1 : 0);
-  const disagreeN = base.disagree + (myVote === "disagree" ? 1 : 0);
+  const load = useCallback(async () => {
+    try {
+      const d = await getIdea(ideaId);
+      if (!d) setLoadError("このアイデアは見つからないか、参照する権限がありません。");
+      else { setIdea(d); setLoadError(null); }
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiError && err.status === 401
+          ? "セッションが切れています。再ログインしてください。"
+          : "アイデアの取得に失敗しました。",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [ideaId]);
 
-  function vote(choice: "agree" | "disagree") {
-    setMyVote((cur) => (cur === choice ? null : choice));
-    setAckUpdate(true);
+  useEffect(() => { void load(); }, [load]);
+
+  if (loading) {
+    return <main className="container detail-main"><p className="admin-muted" style={{ marginTop: "var(--space-6)" }}>読み込み中…</p></main>;
   }
+  if (loadError || !idea) {
+    return (
+      <main className="container detail-main">
+        <Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link>
+        <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError ?? "アイデアが見つかりません。"}</div>
+      </main>
+    );
+  }
+
+  // 投票集計は DTO の vote（{approve,oppose,my_vote}）から。投票 EP 未実装＝表示のみ（ボタンは無効）。
+  const v = (idea.vote ?? {}) as { approve?: number; oppose?: number; my_vote?: string | null };
+  const agreeN = v.approve ?? 0;
+  const disagreeN = v.oppose ?? 0;
+  const myVote = v.my_vote === "approve" ? "agree" : v.my_vote === "oppose" ? "disagree" : null;
+  const following = idea.following;
+  const [stLabel, stClass] = statusLabel(idea.status, idea.is_selected);
+  const authorName = idea.author.display_name || "?";
+  const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
 
   return (
     <main className="container detail-main">
-      <Link className="backlink" href={`/quests/${ideaId}`}>
-        ← クエスト「配送ルート最適化」へ戻る
+      {/* IdeaDetailDTO に quest_id が無いため一覧へ戻る（DTO 拡張は follow-up）。 */}
+      <Link className="backlink" href="/quests">
+        ← クエスト一覧へ戻る
       </Link>
 
       {/* ============ アイデアヘッダー ============ */}
@@ -75,40 +123,35 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         <div className="idea-head__top">
           <div style={{ minWidth: 0 }}>
             <div className="idea-head__badges">
-              <span className="badge badge-muted">業務改善</span>
-              <span className="badge badge-success">選定候補</span>
+              <span className={stClass}>{stLabel}</span>
             </div>
-            <h1>夜間配送の集約による積載率改善</h1>
+            <h1>{idea.title}</h1>
             <div className="poster">
-              <Avatar name="鈴木 花子" size="sm" level={12} />
-              <span className="name">投稿: 鈴木 花子</span>
+              <Avatar name={authorName} size="sm" level={idea.author.level ?? undefined} />
+              <span className="name">投稿: {authorName}</span>
             </div>
           </div>
           <div className="idea-actions">
-            <button
-              className="follow-star"
-              type="button"
-              aria-pressed={following}
-              onClick={() => setFollowing((v) => !v)}
-            >
+            {/* フォローは D.6 EP 未公開＝現状は表示のみ（無効）。 */}
+            <button className="follow-star" type="button" aria-pressed={following} disabled title="フォローは準備中です">
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
-            {/* 権限（作成者本人／クエスト管理）に応じて表示 */}
+            {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。 */}
             <button className="btn btn-outline" type="button" onClick={() => setEditOpen(true)}>
               編集
             </button>
           </div>
         </div>
         <div className="idea-meta">
-          <span>🗓 投稿 2026/07/10</span>
+          <span>🗓 投稿 {fmtDate(idea.created_at)}</span>
           <span>
-            🔄 更新 2026/07/16・
+            🔄 更新 {fmtDate(idea.updated_at)}・
             <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
-              3回更新（履歴を見る）
+              版 {idea.current_revision}（履歴・デモ）
             </button>
           </span>
-          <span className="soon">⏳ タイムリミット 2026/07/25（あと7日）</span>
-          <span>🤝 利害関係者: 物流部・配送委託先</span>
+          {idea.time_limit && <span>⏳ タイムリミット {fmtDate(idea.time_limit)}</span>}
+          <span>🤝 利害関係者: {stakeText}</span>
         </div>
       </section>
 
@@ -123,20 +166,24 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <p className="sub-label">
                 価値<span className="req" title="必須項目">*</span>
               </p>
-              <p>配送コストを約15%削減しつつ、CO2排出も同時に削減できる。ドライバーの日中拘束を減らし労務環境も改善。</p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{idea.value}</p>
             </div>
             <div className="sub-block">
               <p className="sub-label">
                 アイデア本文<span className="req" title="必須項目">*</span>
               </p>
-              <p>
-                複数拠点で個別に走らせている夜間配送を1本のルートに集約し、積載率を高める。AIで需要予測しながら翌日ルートを自動生成、繁忙期は臨時便を差し込む。まずは首都圏3拠点でパイロット運用し、効果を検証してから全国展開する。
-              </p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{idea.body}</p>
             </div>
             <div className="sub-block">
               <p className="sub-label">利害関係者</p>
-              <p>物流部（運用）／配送委託先（実働）／情報システム部（ルート生成基盤）。</p>
+              <p>{stakeText}</p>
             </div>
+            {idea.note && (
+              <div className="sub-block">
+                <p className="sub-label">備考 / 特記事項</p>
+                <p style={{ whiteSpace: "pre-wrap" }}>{idea.note}</p>
+              </div>
+            )}
           </section>
 
           {/* 関連資料（添付） */}
@@ -159,7 +206,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               ))}
             </ul>
             <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-              添付ファイルのダウンロードは、権限を確認したうえで行われます。
+              ※ 添付（アップロード/ダウンロード）は準備中です（D.3 未接続＝以下はデモ表示）。
             </p>
           </section>
 
@@ -169,7 +216,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <h2 className="card-title" style={{ margin: 0 }}>
                 チャット <span className="badge badge-muted">💬 8</span>
               </h2>
-              <span className="role-note">パーティー全員が閲覧・投稿できます</span>
+              <span className="role-note">チャット（E）は未接続＝デモ表示</span>
             </div>
 
             {/* 議論アクティビティ・グラフ（活発度の可視化） */}
@@ -244,51 +291,24 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           <section className="card" aria-label="投票">
             <h2 className="card-title">投票</h2>
 
-            {/* 自分の投票後にアイデアが更新された場合の見直し導線 */}
-            {!ackUpdate && (
-              <div className="vote-updated">
-                <span className="vote-updated__title">⚠ あなたの投票後にアイデアが更新されました</span>
-                <span className="role-note" style={{ color: "var(--color-text)" }}>
-                  7/16 に <strong>本文・添付</strong> が更新されました。差分を確認して、賛成/反対を見直せます。
-                </span>
-                <button className="btn btn-outline btn-sm" type="button" onClick={() => setHistoryOpen(true)}>
-                  投票時点からの差分を見る
-                </button>
-              </div>
-            )}
-
             <div className="vote-summary">
               <span className="vote-agree">▲ 賛成 {agreeN}</span>
               <span className="vote-disagree">▼ 反対 {disagreeN}</span>
             </div>
             <div className="vote-btns">
-              <button
-                className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`}
-                type="button"
-                aria-pressed={myVote === "agree"}
-                onClick={() => vote("agree")}
-              >
+              {/* 投票は D.5 EP 未公開＝表示のみ（無効）。集計は DTO の vote から。 */}
+              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled title="投票は準備中です">
                 ▲ 賛成
               </button>
-              <button
-                className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`}
-                type="button"
-                aria-pressed={myVote === "disagree"}
-                onClick={() => vote("disagree")}
-              >
+              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled title="投票は準備中です">
                 ▼ 反対
               </button>
             </div>
-            {!ackUpdate && (
-              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>
-                <span className="vote-stale-badge">更新前に投票</span> あなたの賛成は 7/16 の更新より前のものです。
-              </p>
-            )}
+            <p className="role-note" style={{ marginTop: "var(--space-2)" }}>※ 投票（賛成/反対）は準備中です。現在は集計の表示のみです。</p>
             <p className="vote-note">
-              1人1票・<strong>締切まで変更できます</strong>。投票すると <span className="xp">+5 XP</span>
-              （自分のアイデアにも投票可）。
+              1人1票・<strong>締切まで変更できます</strong>。投票すると <span className="xp">+5 XP</span>（自分のアイデアにも投票可）。
               <br />
-              🔒 この会社は<strong>匿名モード</strong>（賛成/反対の集計数のみ表示）。記名モードでは投票者のアバターを表示します。
+              🔒 匿名モードでは賛成/反対の集計数のみ表示します。
             </p>
           </section>
 
@@ -298,8 +318,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <h2 className="card-title" style={{ margin: 0 }}>
                 評価結果
               </h2>
-              <span className="badge badge-muted" title="評価者が指定した公開範囲">
-                🔓 公開: パーティー全員
+              <span className="badge badge-muted" title="評価（F）は未接続＝デモ表示">
+                🔓 デモ表示（F 未接続）
               </span>
             </div>
 
@@ -372,20 +392,16 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             <dl className="info-list">
               <dt>ステータス</dt>
               <dd>
-                <span className="badge badge-success">選定候補</span>
+                <span className={stClass}>{stLabel}</span>
               </dd>
-              <dt>カテゴリー</dt>
-              <dd>業務改善</dd>
               <dt>公開範囲</dt>
               <dd>このクエストのパーティー内</dd>
-              <dt>クエスト</dt>
-              <dd>
-                <Link href={`/quests/${ideaId}`}>配送ルート最適化</Link>
-              </dd>
+              <dt>版</dt>
+              <dd>v{idea.current_revision}</dd>
               <dt>投稿日</dt>
-              <dd>2026/07/10</dd>
+              <dd>{fmtDate(idea.created_at)}</dd>
               <dt>最終更新</dt>
-              <dd>2026/07/16</dd>
+              <dd>{fmtDate(idea.updated_at)}</dd>
             </dl>
           </section>
         </div>
@@ -393,15 +409,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
       {/* ============ アイデア編集モーダル（SC-21 フォームの編集モード） ============ */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="アイデアを編集" size="lg">
-        <IdeaForm mode="edit" ideaId={ideaId} onDone={() => setEditOpen(false)} onCancel={() => setEditOpen(false)} />
+        <IdeaForm mode="edit" ideaId={ideaId} onDone={() => { setEditOpen(false); void load(); }} onCancel={() => setEditOpen(false)} />
       </Modal>
 
       {/* ============ 更新履歴モーダル（版タイムライン＋差分） ============ */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">
         <ModalBody>
           <p className="role-note" style={{ marginTop: 0 }}>
-            アイデアの変更を新しい順に表示。各版を開くと差分（<span className="diff-add">追加</span>／
-            <span className="diff-del">削除</span>）が見られます。更新時は<strong>投票者とフォロワーに通知</strong>されます。
+            ※ 版の履歴/差分（D.4）は未接続のため<strong>デモ表示</strong>です。アイデアの変更を新しい順に表示予定。
+            各版を開くと差分（<span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
           </p>
 
           <div style={{ marginTop: "var(--space-4)" }}>

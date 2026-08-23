@@ -321,3 +321,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- | --- |
 | D-TC-205 | `**/quests/*/ideas`（GET）を abort → 実データ idea 可視を期待 | `Expected visible / Received element(s) not found`＝一覧描画が listIdeas に依存（デモ据置きなら出るはず） |
 | D-TC-206 | 投稿後の一覧反映 `toBeVisible()` → `.not.toBeVisible()` | `Expected not visible / Received visible`＝IDEAS_CHANGED 購読で投稿がリロードなしに一覧へ反映 |
+
+## D. アイデア SC-22 詳細 e2e（2026-08-23）
+
+> 手技＝`GET /ideas/{id}`（getIdea）を `page.route(...).abort()` で遮断し、詳細が描画できない behavior-red を目視→復元して green（sc-22 e2e 1 passed）。
+
+| TC-ID | 手技 | 観測 red（actual） |
+| --- | --- | --- |
+| D-TC-207 | `**/ideas/*`（GET）を abort → 件名見出し可視を期待 | `Expected visible / Received element(s) not found`＝詳細描画が getIdea に依存（デモ据置きなら出るはず） |
