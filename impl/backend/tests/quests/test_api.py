@@ -7,6 +7,7 @@ teardown で seed 行を物理削除。未認証は 401。
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +16,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.ideas.orm import Idea
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group import repository as qg_repo
@@ -144,3 +146,57 @@ def test_c_tc_105_requires_auth(client, env):
     """C-TC-105: 未認証は 401（require_me・P1）。"""
     r = client.get(QUESTS)
     assert r.status_code == 401, r.text
+
+
+def _seed_ideas_for_count(db_identifier, quest_id, author_id) -> list[uuid.UUID]:
+    """idea_count 検証用に published 2件・draft 1件・published+削除 1件を seed。返り値＝cleanup 用 id。"""
+    ids: list[uuid.UUID] = []
+    with get_tenant_session(db_identifier) as ts:
+        def _add(status, deleted=False):
+            iid = uuid.uuid4()
+            ts.add(Idea(
+                id=iid, quest_id=quest_id, author_id=author_id,
+                title="t", body="b", value="v", status=status,
+                deleted_at=datetime.now(timezone.utc) if deleted else None,
+            ))
+            ids.append(iid)
+        _add("published")
+        _add("published")
+        _add("draft")               # 下書き＝件数に含めない
+        _add("published", deleted=True)  # 削除＝deleted_at で除外
+        ts.commit()
+    return ids
+
+
+def _delete_ideas(db_identifier, ids):
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(Idea.__table__.delete().where(Idea.id.in_(ids)))
+        ts.commit()
+
+
+def test_c_tc_143_detail_idea_count_published_only(client, env):
+    """C-TC-143: GET /quests/{id} の idea_count は公開アイデア数（下書き/削除は除外）。"""
+    qid = env.make_quest(status="recruiting")
+    idea_ids = _seed_ideas_for_count(env.db_identifier, qid, env.user_id)
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.get(f"{QUESTS}/{qid}")
+        assert r.status_code == 200, r.text
+        assert r.json()["idea_count"] == 2
+    finally:
+        _delete_ideas(env.db_identifier, idea_ids)
+
+
+def test_c_tc_144_list_idea_count_published_only(client, env):
+    """C-TC-144: GET /quests のカード idea_count も公開アイデア数を反映（batch 集計）。"""
+    qid = env.make_quest(status="recruiting")
+    idea_ids = _seed_ideas_for_count(env.db_identifier, qid, env.user_id)
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.get(QUESTS)
+        assert r.status_code == 200, r.text
+        card = next((c for c in r.json()["data"] if c["id"] == str(qid)), None)
+        assert card is not None
+        assert card["idea_count"] == 2
+    finally:
+        _delete_ideas(env.db_identifier, idea_ids)

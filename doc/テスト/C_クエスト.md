@@ -66,6 +66,8 @@
 | C-TC-127 | api | 自分の下書き詳細 | 自分の下書き | `GET /quests/{id}` | 200・status draft・my_permissions に owner・作成者メンバー | C.1 |
 | C-TC-128 | api | パーティー外は 404 | 他人所有・自分は非メンバー | `GET /quests/{id}` | 404（存在秘匿） | C.1 可視性 |
 | C-TC-129 | api | 参加中の公開詳細 | 自分が owner の recruiting | `GET /quests/{id}` | 200・categories/quest_group 同梱 | C.1 |
+| C-TC-143 | api | 詳細の idea_count は公開アイデア数（下書き/削除は除外） | recruiting クエスト＋published 2件・自分の下書き 1件・削除済み 1件 | `GET /quests/{id}` | idea_count=2（published・deleted_at IS NULL のみ／draft・削除は数えない） | C.1／D.1／SC-12 |
+| C-TC-144 | api | 一覧の idea_count も公開アイデア数を反映 | 同上のクエスト | `GET /quests` | 当該カードの idea_count=2（batch 集計・N+1 回避） | C.1／D.1／SC-10 |
 
 ## 5. パーティー粒度・状態遷移・削除 API（SC-12・C.3/C.5/C.2）
 

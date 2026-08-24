@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・`tests/ideas` 41 passed・`tests/ideas+quests` 89 passed・e2e `sc-22-vote-follow` 4 passed／`sc-22-idea-detail` 1 passed・TC-ID トレーサビリティ ✅（code 295）。
+> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・`tests/ideas+quests` 91 passed・e2e `sc-22-vote-follow` 4 passed／`sc-22-idea-detail` 1 passed・TC-ID トレーサビリティ ✅（code 297）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -20,9 +20,9 @@
 | SC-01 | ダッシュボード | 🟡 | `(app)/` | ヒーロー残高は `GET /me`（K.1）接続済み。週間ランキング/下書き/未投票/参加中等は G/C/D 接続まで demo |
 | SC-02 | 通知一覧 | ⬜ | `(app)/notifications` | モックのみ |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
-| SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count` が D 未連動（下記課題） |
+| SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動 |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
-| SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。評価列(F)/週間ランキング(G)/全文検索(J) は demo。ヘッダー💡件数が実件数と不一致（課題） |
+| SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。ヘッダー💡件数は `idea_count`（公開数）に連動。評価列(F)/週間ランキング(G)/全文検索(J) は demo |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証・登録モーダル初期誤検証 fix 済み |
 | SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー接続済み**（D.5/D.6・楽観更新＋サーバー権威）。締切後/権限の事前無効化は DTO 拡張後（現状 409/403 で理由提示）。添付(D.3)/評価(F)/チャット(E)/版差分(D.4) は表示のみ |
 | SC-24 | アイデアチャット | ⬜ | `(app)/ideas/[ideaId]/chat` | モックのみ（E） |
@@ -56,7 +56,6 @@
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
 - **投票/フォローの事前無効化**（締切後/権限なし）＝`IdeaDetailDTO` に `quest_status`/`my_permissions` が無く、現状はサーバー 409/403 で理由提示（DTO 拡張で事前 disabled 化が follow-up）。
-- **`idea_count` が D アイデア未連動**＝SC-12 ヘッダー/SC-10 💡列と実件数が不一致。
 - **`IdeaDetailDTO` に `quest_id`/カテゴリー無し**＝SC-22 の「クエストへ戻る」が暫定。
 - tsc 既知2件＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれも既存/デモ）。
 

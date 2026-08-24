@@ -368,3 +368,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-210 | 同上（`disabled` で click 不可）→ 接続後は賛成→反対の切替で 反対 1/賛成 0（1人1票・`my_vote=oppose`） |
 | D-TC-211 | 同上 → 接続後は同ボタン再クリックで取消（賛成 0・`my_vote=null`） |
 | D-TC-212 | 「☆ フォロー」ボタンが `disabled` → 接続後はトグルで `★ フォロー中`（`following=true`）↔ 解除（false） |
+
+## C. クエスト idea_count を D アイデア連動（2026-08-24）
+
+> 後追い（既存 DTO の値を実装済み後に検証）。手技＝`_quest_card_dto`／詳細 DTO の `idea_count` を一時的に `0` 固定（実装前の挙動）へ戻して red を目視→復元して green（tests/quests+ideas 91 passed）。定義＝公開(`published`)・`deleted_at IS NULL` のみ（下書き/削除は除外・API設計 C.1・存在漏れ防止）。
+
+| TC-ID | 観測 red（0固定に戻した actual） |
+| --- | --- |
+| C-TC-143 | `GET /quests/{id}` の idea_count＝`assert 0 == 2`（published 2件でも 0固定）→ 復元後 2 |
+| C-TC-144 | `GET /quests` カードの idea_count＝`assert 0 == 2`（batch 集計未反映）→ 復元後 2 |

@@ -171,6 +171,25 @@ def count_votes(session: Session, idea_id: uuid.UUID) -> dict[str, int]:
     return result
 
 
+def count_published_ideas_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """クエストごとの公開アイデア数（C.1 `idea_count`・下書き/削除は除外・N+1 回避）。
+
+    定義＝`status='published'` かつ `deleted_at IS NULL`（API設計 C.1 idea_count・下書きは存在漏れ防止で
+    数えない）。返す dict は集計 0 のクエストを含まない（呼び出し側で `.get(qid, 0)`）。
+    """
+    result: dict[uuid.UUID, int] = {}
+    if not quest_ids:
+        return result
+    rows = session.execute(
+        select(Idea.quest_id, func.count())
+        .where(Idea.quest_id.in_(quest_ids), Idea.status == "published", Idea.deleted_at.is_(None))
+        .group_by(Idea.quest_id)
+    ).all()
+    for qid, n in rows:
+        result[qid] = int(n)
+    return result
+
+
 def count_votes_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, int]]:
     """複数アイデアの賛成/反対数をまとめて集計（一覧の N+1 回避）。"""
     result: dict[uuid.UUID, dict[str, int]] = {}

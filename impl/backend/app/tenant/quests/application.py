@@ -18,6 +18,7 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
+from app.tenant.ideas import repository as ideas_repo
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as repo
@@ -108,8 +109,9 @@ def get_quests(
         owners, groups = repo.get_owners_and_groups(ts, owner_ids, gids)
         cats = repo.list_categories_for_quests(ts, qids)
         member_counts = repo.count_active_members_for_quests(ts, qids)
+        idea_counts = ideas_repo.count_published_ideas_for_quests(ts, qids)
         data = [
-            _quest_card_dto(r, user.id, owners, groups, cats, member_counts) for r in rows
+            _quest_card_dto(r, user.id, owners, groups, cats, member_counts, idea_counts) for r in rows
         ]
     next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
@@ -131,7 +133,7 @@ def get_quest_groups(account_id: uuid.UUID, company_id: uuid.UUID, *, q: str | N
     return {"data": data}
 
 
-def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts) -> dict:
+def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts, idea_counts) -> dict:
     owner = owners.get(quest.owner_id)
     group = groups.get(quest.quest_group_id)
     return {
@@ -143,8 +145,8 @@ def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts) -> di
         "status": quest.status,
         "deadline": quest.deadline,
         "member_count": member_counts.get(quest.id, 0),
-        # idea_count はドメイン D（ideas）実装後に接続。未実装のため 0。
-        "idea_count": 0,
+        # 公開アイデア数（C.1・下書き/削除は除外・N+1 回避＝一括集計を受け取る）。
+        "idea_count": idea_counts.get(quest.id, 0),
         "owner": {
             "user_id": str(quest.owner_id),
             "display_name": owner.display_name if owner else "",
@@ -783,6 +785,7 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         (m["permissions"] for m in member_dtos if m["user"]["user_id"] == str(viewer_id)), []
     )
     members = member_dtos  # member_count は有効パーティー数
+    idea_count = ideas_repo.count_published_ideas_for_quests(ts, [quest.id]).get(quest.id, 0)
     return {
         "id": str(quest.id),
         "title": quest.title,
@@ -793,7 +796,8 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         "deadline": quest.deadline,
         "purpose": quest.purpose,
         "member_count": len(members),
-        "idea_count": 0,
+        # 公開アイデア数（C.1・下書き/削除は除外）。
+        "idea_count": idea_count,
         "owner": {
             "user_id": str(quest.owner_id),
             "display_name": owner.display_name if owner else "",
