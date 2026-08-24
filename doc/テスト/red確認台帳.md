@@ -377,3 +377,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | C-TC-143 | `GET /quests/{id}` の idea_count＝`assert 0 == 2`（published 2件でも 0固定）→ 復元後 2 |
 | C-TC-144 | `GET /quests` カードの idea_count＝`assert 0 == 2`（batch 集計未反映）→ 復元後 2 |
+
+## D. アイデア IdeaDetailDTO に quest 参照追加＋SC-22 導線/凍結（2026-08-24）
+
+> api＝`_build_detail` から `"quest": quest_ref` を一時除去して red 目視（`IdeaDetailDTO` の `quest` 必須欠落で pydantic ValidationError→500→`assert 200` 失敗）→復元で green（tests/ideas+quests 92 passed）。e2e＝frontend 非マウントを利用し、quest-ref 接続前バンドルで sc-22-quest-ref を実行して 2 red 目視→再ビルド後 green（2 passed・回帰 vote-follow/idea-detail 5 passed）。
+
+| TC-ID | 観測 red（actual） |
+| --- | --- |
+| D-TC-130 | quest 除去時＝`ValidationError: IdeaDetailDTO.quest missing`（500）→ `assert r.status_code==200` 失敗。復元後は quest.id/title/status/categories/deadline を返す |
+| D-TC-213 | 接続前＝「クエストへ戻る」href が `/quests`（一覧固定）でカテゴリーバッジ無し → 接続後は href=`/quests/{id}`・「業務改善」バッジ可視 |
+| D-TC-214 | 接続前＝投票/フォローが活性（completed 未判定）→ 接続後は `⏸ 完了（凍結）`＋投票/新規フォロー `disabled` |

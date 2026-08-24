@@ -29,6 +29,16 @@ class IdeaAuthorDTO(BaseModel):
     level: int | None = None
 
 
+class IdeaQuestRefDTO(BaseModel):
+    """アイデアが属するクエストの参照（SC-22 の「クエストへ戻る」導線・カテゴリーバッジ・凍結判定・D.1）。"""
+
+    id: str
+    title: str
+    status: str
+    categories: list[str] = []
+    deadline: date | None = None
+
+
 class IdeaVoteSummaryDTO(BaseModel):
     approve: int = 0
     oppose: int = 0
@@ -144,6 +154,7 @@ class IdeaDetailDTO(BaseModel):
     is_selected: bool
     current_revision: int
     author: IdeaAuthorDTO
+    quest: IdeaQuestRefDTO
     created_at: datetime
     updated_at: datetime
     vote: dict  # {summary:{approve,oppose}, my_vote}

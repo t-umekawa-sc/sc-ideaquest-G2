@@ -2,10 +2,10 @@
 
 // SC-22 アイデア詳細＝本文/価値/利害関係者/ステータス/作成者/版数（D.1 GET /ideas/{id} 実接続）。
 // 投票（D.5）・フォロー（D.6）も実接続＝楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
+// quest 参照（D.1）でクエストへの戻る導線・カテゴリーバッジ・completed 凍結の事前無効化を実装。
 // 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md（§4.5）。
 // **未接続（EP 未実装/他ドメイン）＝表示のみ or デモ**: 添付（D.3）・評価結果（F）・チャット（E）・更新履歴の差分（版 EP 未公開）。
-// IdeaDetailDTO に quest_id/カテゴリー/quest_status が無いため、クエストへの導線・カテゴリーバッジ・投票/フォローの
-// 事前無効化は暫定（follow-up＝DTO 拡張。現状は可否をサーバー判定に委ね 409/403 で理由提示）。
+// 締切後（時刻）の事前無効化は deadline 判定を要するため未実装＝サーバー 409 を権威に理由提示（completed のみ事前無効化）。
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -186,14 +186,18 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const disagreeN = vote.oppose;
   const myVote = vote.my === "approve" ? "agree" : vote.my === "oppose" ? "disagree" : null;
   const [stLabel, stClass] = statusLabel(idea.status, idea.is_selected);
+  // クエスト凍結（completed）＝投票不可・新規フォロー不可（解除のみ可）。サーバー 409 も権威（C.5）。
+  const questCompleted = idea.quest.status === "completed";
+  const voteDisabled = voteBusy || questCompleted;
+  const followDisabled = followBusy || (questCompleted && !following);
   const authorName = idea.author.display_name || "?";
   const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
 
   return (
     <main className="container detail-main">
-      {/* IdeaDetailDTO に quest_id が無いため一覧へ戻る（DTO 拡張は follow-up）。 */}
-      <Link className="backlink" href="/quests">
-        ← クエスト一覧へ戻る
+      {/* クエストへ戻る（D.1 quest 参照・実導線）。 */}
+      <Link className="backlink" href={`/quests/${idea.quest.id}`}>
+        ← {idea.quest.title || "クエスト"}へ戻る
       </Link>
 
       {/* ============ アイデアヘッダー ============ */}
@@ -201,7 +205,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         <div className="idea-head__top">
           <div style={{ minWidth: 0 }}>
             <div className="idea-head__badges">
+              {idea.quest.categories.map((c) => (
+                <span className="badge badge-muted" key={c}>{c}</span>
+              ))}
               <span className={stClass}>{stLabel}</span>
+              {questCompleted && <span className="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span>}
             </div>
             <h1>{idea.title}</h1>
             <div className="poster">
@@ -210,8 +218,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </div>
           </div>
           <div className="idea-actions">
-            {/* フォロー（D.6・トグル）。可否はサーバー権威（completed 後の新規は 409→理由トースト）。 */}
-            <button className="follow-star" type="button" aria-pressed={following} disabled={followBusy} onClick={() => void handleFollow()}>
+            {/* フォロー（D.6・トグル）。completed は新規フォロー不可＝事前無効化（解除は可）＋サーバー 409 も権威。 */}
+            <button
+              className="follow-star"
+              type="button"
+              aria-pressed={following}
+              disabled={followDisabled}
+              title={questCompleted && !following ? "完了したクエストには新規フォローできません" : undefined}
+              onClick={() => void handleFollow()}
+            >
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
             {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。 */}
@@ -374,14 +389,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className="vote-disagree">▼ 反対 {disagreeN}</span>
             </div>
             <div className="vote-btns">
-              {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。可否はサーバー権威（締切後/権限なしは 409/403→理由トースト）。 */}
-              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteBusy} onClick={() => void handleVote("approve")}>
+              {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。completed は事前無効化＋サーバー権威（締切後/権限なしは 409/403→理由トースト）。 */}
+              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void handleVote("approve")}>
                 ▲ 賛成
               </button>
-              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteBusy} onClick={() => void handleVote("oppose")}>
+              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteDisabled} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void handleVote("oppose")}>
                 ▼ 反対
               </button>
             </div>
+            {questCompleted && <p className="role-note" style={{ marginTop: "var(--space-2)" }}>※ このクエストは完了済みのため投票は締め切られています。</p>}
             <p className="vote-note">
               1人1票・<strong>締切まで変更できます</strong>。投票すると <span className="xp">+5 XP</span>（自分のアイデアにも投票可）。
               <br />

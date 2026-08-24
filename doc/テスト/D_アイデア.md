@@ -58,6 +58,7 @@
 | D-TC-127 | api | フォロー解除の冪等 | フォロー済み | `DELETE /ideas/{id}/follow` ×2 | 204／204（is_following False） | D.6 |
 | D-TC-128 | api | 完了後は新規フォロー不可・解除は可 | completed クエストのアイデア | `POST follow`／`DELETE follow` | POST=409（invalid_state）／DELETE=204 | D.6／C.5 |
 | D-TC-129 | api | フォローのパーティー門番 | 非パーティーのアイデア | `POST /ideas/{id}/follow` | 404（存在秘匿） | D.6／C.0 |
+| D-TC-130 | api | 詳細に quest 参照が入る（SC-22 導線用） | published アイデア（categories 付きクエスト） | `GET /ideas/{id}` | `quest.id`＝当該クエスト・`quest.title`/`quest.status`/`quest.categories[]`/`quest.deadline` が返る | D.1／SC-22 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 
@@ -78,5 +79,7 @@
 | D-TC-210 | e2e | SC-22 投票切替（賛成→反対・1人1票） | 賛成投票済み | 「▼ 反対」クリック | 反対 1・賛成 0・「▼ 反対」が `is-on`／「▲ 賛成」off（行は1つ・`my_vote=oppose`） | D.5／§5.13／SC-22 §4.5 |
 | D-TC-211 | e2e | SC-22 投票取消（同ボタン再クリック） | 賛成投票済み | 「▲ 賛成」を再クリック | 賛成 0・どちらも未ハイライト・`GET` の `vote.my_vote=null`（`removeVote`） | D.5／SC-22 §4.5 |
 | D-TC-212 | e2e | SC-22 フォロー→解除（トグル） | published アイデア（パーティー員） | 「☆ フォロー」→「★ フォロー中」→再クリック | ON: `aria-pressed=true`＋`GET` `following=true`（`followIdea`）／OFF: false（`unfollowIdea`・楽観更新） | D.6／SC-22 §4.5 |
+| D-TC-213 | e2e | SC-22「クエストへ戻る」が実導線＋カテゴリーバッジ | published アイデア（categories 付きクエスト） | `/ideas/{id}` を表示 | 「← クエストへ戻る」の href が `/quests/{quest_id}`（一覧固定でない）・ヘッダーにクエストのカテゴリーバッジ表示（`quest.categories`） | D.1／SC-22 |
+| D-TC-214 | e2e | SC-22 完了クエストは投票/新規フォローを事前無効化 | recruiting→…→completed に遷移した published アイデア | `/ideas/{id}` を表示 | 「▲ 賛成」「▼ 反対」が `disabled`（凍結理由 title）・「☆ フォロー」が `disabled`（`quest.status=completed` 事前判定・サーバー 409 も権威） | D.5/D.6／SC-22 §4.5／C.5 |
 
 > **サーバー権威の可否判定（締切後/権限なし）**: 本スライスは可否を**サーバー判定を権威**とし、`POST vote` の 409（`invalid_state`＝締切後/`completed`/下書き）・403（vote 権限なし）・`POST follow` の 409（completed 後の新規）を受けたら**楽観更新をロールバック＋理由をトースト表示**する（API設計 D.5「締切後はボタン無効化＋理由」の権威）。`IdeaDetailDTO` は現状 `quest_status`/`my_permissions` を返さないため**事前無効化（disabled）は follow-up**（DTO 拡張後）＝それまではサーバーエラー経由で理由提示。分岐網羅は §2 の api（D-TC-122〜125/128〜129）で担保し、e2e は happy path（209〜212）に限定する。

@@ -20,7 +20,7 @@ from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group.orm import QuestGroup
 from app.tenant.quests import repository as quests_repo
-from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -93,6 +93,7 @@ def env():
             if mids:
                 ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
             ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id.in_(quests)))
+            ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(quests)))
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(quests)))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == group_id))
         ts.execute(User.__table__.delete().where(User.id == other_id))
@@ -162,6 +163,24 @@ def test_d_tc_107_detail_own(client, env):
     assert client.get(IDEA(draft)).status_code == 200
     r = client.get(IDEA(pub))
     assert r.status_code == 200 and "vote" in r.json() and "my_permissions" in r.json()
+
+
+def test_d_tc_130_detail_has_quest_ref(client, env):
+    """D-TC-130: 詳細に quest 参照（id/title/status/categories/deadline）が入る（SC-22 導線用）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    with get_tenant_session(env.db_identifier) as ts:
+        quests_repo.replace_categories(ts, qid, [("UX", False), ("業務改善", False)])
+        ts.commit()
+    pub = env.make_idea(quest_id=qid, status="published")
+    r = client.get(IDEA(pub))
+    assert r.status_code == 200, r.text
+    quest = r.json()["quest"]
+    assert quest["id"] == str(qid)
+    assert quest["title"] == "Q"
+    assert quest["status"] == "recruiting"
+    assert set(quest["categories"]) == {"UX", "業務改善"}
+    assert "deadline" in quest
 
 
 def test_d_tc_108_detail_hidden(client, env):

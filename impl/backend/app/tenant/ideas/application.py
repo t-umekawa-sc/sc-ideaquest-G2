@@ -447,6 +447,16 @@ def _build_detail(ts, idea, viewer_id) -> dict:
     member = quests_repo.get_active_member(ts, idea.quest_id, viewer_id)
     if member is not None:
         my_permissions = quests_repo.get_permissions(ts, member.id)
+    # クエスト参照（SC-22 の「クエストへ戻る」導線・カテゴリーバッジ・凍結〔completed〕判定・D.1）。
+    quest = quests_repo.get_quest(ts, idea.quest_id)
+    quest_cats = [c.label for c in quests_repo.list_categories(ts, idea.quest_id)]
+    quest_ref = {
+        "id": str(idea.quest_id),
+        "title": quest.title if quest else "",
+        "status": quest.status if quest else "",
+        "categories": quest_cats,
+        "deadline": quest.deadline if quest else None,
+    }
     return {
         "id": str(idea.id),
         "title": idea.title,
@@ -459,6 +469,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "is_selected": idea.is_selected,
         "current_revision": idea.current_revision,
         "author": _author_dto(author, idea.author_id),
+        "quest": quest_ref,
         "created_at": idea.created_at,
         "updated_at": idea.updated_at,
         "vote": {"summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "my_vote": my_vote.type if my_vote else None},

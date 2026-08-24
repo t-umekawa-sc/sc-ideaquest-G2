@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・`tests/ideas+quests` 91 passed・e2e `sc-22-vote-follow` 4 passed／`sc-22-idea-detail` 1 passed・TC-ID トレーサビリティ ✅（code 297）。
+> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・`tests/ideas+quests` 92 passed・e2e sc-22（quest-ref 2／vote-follow 4／idea-detail 1）passed・TC-ID トレーサビリティ ✅（code 300）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -24,7 +24,7 @@
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
 | SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。ヘッダー💡件数は `idea_count`（公開数）に連動。評価列(F)/週間ランキング(G)/全文検索(J) は demo |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証・登録モーダル初期誤検証 fix 済み |
-| SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー接続済み**（D.5/D.6・楽観更新＋サーバー権威）。締切後/権限の事前無効化は DTO 拡張後（現状 409/403 で理由提示）。添付(D.3)/評価(F)/チャット(E)/版差分(D.4) は表示のみ |
+| SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー接続済み**（D.5/D.6・楽観更新＋サーバー権威）。**quest 参照**（D.1）でクエストへ戻る導線・カテゴリーバッジ・completed 事前無効化。締切(時刻)後は 409 で理由提示。添付(D.3)/評価(F)/チャット(E)/版差分(D.4) は表示のみ |
 | SC-24 | アイデアチャット | ⬜ | `(app)/ideas/[ideaId]/chat` | モックのみ（E） |
 | SC-25 | 評価画面 | ⬜ | `(app)/ideas/[ideaId]/eval` | モックのみ（F） |
 | SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
@@ -55,7 +55,7 @@
 
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
-- **投票/フォローの事前無効化**（締切後/権限なし）＝`IdeaDetailDTO` に `quest_status`/`my_permissions` が無く、現状はサーバー 409/403 で理由提示（DTO 拡張で事前 disabled 化が follow-up）。
+- **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。
 - **`IdeaDetailDTO` に `quest_id`/カテゴリー無し**＝SC-22 の「クエストへ戻る」が暫定。
 - tsc 既知2件＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれも既存/デモ）。
 

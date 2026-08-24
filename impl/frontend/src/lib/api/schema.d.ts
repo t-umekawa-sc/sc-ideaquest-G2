@@ -1641,6 +1641,7 @@ export interface components {
             /** Current Revision */
             current_revision: number;
             author: components["schemas"]["IdeaAuthorDTO"];
+            quest: components["schemas"]["IdeaQuestRefDTO"];
             /**
              * Created At
              * Format: date-time
@@ -1691,6 +1692,25 @@ export interface components {
             stakeholders?: components["schemas"]["IdeaStakeholderInput"][] | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * IdeaQuestRefDTO
+         * @description アイデアが属するクエストの参照（SC-22 の「クエストへ戻る」導線・カテゴリーバッジ・凍結判定・D.1）。
+         */
+        IdeaQuestRefDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Deadline */
+            deadline?: string | null;
         };
         /** IdeaStakeholderDTO */
         IdeaStakeholderDTO: {
