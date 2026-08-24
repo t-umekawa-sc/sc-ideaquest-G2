@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・`tests/ideas+quests` 99 passed・e2e sc-22（attachments 1／quest-ref 2／vote-follow 4／idea-detail 1）＋sc-21（5）passed・TC-ID トレーサビリティ ✅（code 308）。
+> 進捗の最終確認: **2026-08-24**。tsc 既知2件のみ・**backend `pytest tests/` 全体 332 passed**（A-TC-095 は既存フラキー・単独 green）・e2e sc-22（attachments 1／quest-ref 2／vote-follow 4／idea-detail 1）＋sc-21（5）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 318）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
