@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request, Response
 from app.control_plane.auth import application as auth_service
 from app.control_plane.auth.schemas import (
     AcceptedResponse,
+    EmailVerifyConfirmedResponse,
+    EmailVerifyConfirmReq,
     LoginRequest,
     LoginResponse,
     MfaChallenge,
@@ -145,6 +147,17 @@ def password_setup_complete(body: PasswordSetupCompleteReq, request: Request) ->
     verify_origin(request)
     auth_service.complete_password_setup(get_redis(), body.token, body.new_password)
     return OkResponse()
+
+
+@router.post("/email-verify/confirm", response_model=EmailVerifyConfirmedResponse)
+def email_verify_confirm(body: EmailVerifyConfirmReq, request: Request) -> EmailVerifyConfirmedResponse:
+    """メールアドレス確認の確定（ADR-0009・未認証＝トークンが認可）。
+
+    `password-setup/complete` と同型＝セッション不要・CSRF 免除（トークンが唯一の資格）・Origin のみ検証。
+    無効/期限/使用済は 410／送信後に email 変更は 409 stale。
+    """
+    verify_origin(request)  # 未認証だが状態変更＝Origin/Sec-Fetch は検証
+    return EmailVerifyConfirmedResponse(**auth_service.confirm_email_verify(body.token))
 
 
 @router.post("/logout", status_code=204)

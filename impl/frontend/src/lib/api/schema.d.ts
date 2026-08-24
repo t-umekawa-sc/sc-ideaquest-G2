@@ -140,6 +140,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/email-verify/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Email Verify Confirm
+         * @description メールアドレス確認の確定（ADR-0009・未認証＝トークンが認可）。
+         *
+         *     `password-setup/complete` と同型＝セッション不要・CSRF 免除（トークンが唯一の資格）・Origin のみ検証。
+         *     無効/期限/使用済は 410／送信後に email 変更は 409 stale。
+         */
+        post: operations["email_verify_confirm_api_v1_auth_email_verify_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -421,6 +444,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/companies/{company_id}/accounts/{account_id}/email-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Email Verification
+         * @description メールアドレス確認リンクを現メール宛に送信（B.2・opt-in・ADR-0009・非同期送信）。
+         */
+        post: operations["send_email_verification_api_v1_admin_companies__company_id__accounts__account_id__email_verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/accounts": {
         parameters: {
             query?: never;
@@ -519,6 +562,26 @@ export interface paths {
          * @description 自社アカウントのPWリンク再送（B.2.1・A.7）。
          */
         post: operations["password_reset_own_account_api_v1_admin_accounts__account_id__password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/accounts/{account_id}/email-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Email Verification Own
+         * @description 自社アカウントに確認リンクを送信（B.2.1・opt-in・ADR-0009・セッション会社固定）。
+         */
+        post: operations["send_email_verification_own_api_v1_admin_accounts__account_id__email_verification_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1307,6 +1370,11 @@ export interface components {
             login_id: string;
             /** Email */
             email: string;
+            /**
+             * Email Verified
+             * @default false
+             */
+            email_verified: boolean;
             /** System Role */
             system_role: string;
             /** Status */
@@ -1338,6 +1406,11 @@ export interface components {
             login_id: string;
             /** Email */
             email: string;
+            /**
+             * Email Verified
+             * @default false
+             */
+            email_verified: boolean;
             /** System Role */
             system_role: string;
             /** Status */
@@ -1592,6 +1665,33 @@ export interface components {
             new_email: string;
             /** Current Password */
             current_password: string;
+        };
+        /**
+         * EmailVerificationResponse
+         * @description メールアドレス確認リンク送信の結果（ADR-0009・opt-in・202）。
+         */
+        EmailVerificationResponse: {
+            /** Status */
+            status: string;
+        };
+        /**
+         * EmailVerifyConfirmReq
+         * @description メールアドレス確認の確定（ADR-0009・未認証＝トークンが認可）。
+         */
+        EmailVerifyConfirmReq: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * EmailVerifyConfirmedResponse
+         * @description 確認確定の結果（未認証のため最小ボディ）。
+         */
+        EmailVerifyConfirmedResponse: {
+            /**
+             * Status
+             * @default verified
+             */
+            status: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2808,6 +2908,39 @@ export interface operations {
             };
         };
     };
+    email_verify_confirm_api_v1_auth_email_verify_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailVerifyConfirmReq"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVerifyConfirmedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -3435,6 +3568,38 @@ export interface operations {
             };
         };
     };
+    send_email_verification_api_v1_admin_companies__company_id__accounts__account_id__email_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVerificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_own_accounts_api_v1_admin_accounts_get: {
         parameters: {
             query?: {
@@ -3622,6 +3787,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PasswordResetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_email_verification_own_api_v1_admin_accounts__account_id__email_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailVerificationResponse"];
                 };
             };
             /** @description Validation Error */

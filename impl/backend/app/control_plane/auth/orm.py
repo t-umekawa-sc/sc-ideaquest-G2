@@ -51,6 +51,8 @@ class Account(ControlBase):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     # メール変更（K.3・ADR-0008）の確定待ち新メール。確認リンク到達で email へ確定しクリア。一意制約なし（確定時に再検証）
     pending_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # 現 email の到達/所有確認済み日時（ADR-0009）。未確認は NULL。email が変わったら必ず NULL リセット。
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)  # identity 源泉（K/1b）
     # password_hash が NULL＝password_set=false（初回未設定）。列挙耐性のため照合は必ず実行（A.1）
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -82,7 +84,9 @@ class OtpChallenge(ControlBase):
         UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
     )
     code_hash: Mapped[str] = mapped_column(String(128), nullable=False)  # SHA-256 hex（トークンのハッシュ）
-    purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup | email_change
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)  # login | password_setup | email_change | email_verify
+    # email_verify（ADR-0009）が束ねる送信時の email スナップショット。confirm で現 email と照合し不一致は 409 stale。
+    target_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

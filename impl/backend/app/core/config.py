@@ -60,6 +60,8 @@ class Settings(BaseSettings):
 
     # メール変更のダブルオプトイン（ADR-0008）。確認リンクトークン TTL（24時間・単回・otp_challenges purpose=email_change）
     email_change_ttl_seconds: int = 86400
+    # メールアドレス確認（ADR-0009・管理者 opt-in）。確認リンクトークン TTL（72時間・単回・otp_challenges purpose=email_verify）
+    email_verify_ttl_seconds: int = 259200
 
     # MFA（メールOTP）・信頼端末（ADR-0004・しきい値は env＝ADR-0003 §2.1）
     otp_length: int = 6                          # OTP 桁数（数字）

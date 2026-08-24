@@ -30,6 +30,7 @@ from app.control_plane.admin.schemas import (
     CompanyProfileUpdateRequest,
     CompanySettingsUpdateRequest,
     DirectoryResponse,
+    EmailVerificationResponse,
     MemberAddRequest,
     MemberListResponse,
     MembershipResponse,
@@ -300,6 +301,18 @@ def password_reset(
     return PasswordResetResponse(**admin_service.reset_password(company_id, account_id))
 
 
+@router.post("/companies/{company_id}/accounts/{account_id}/email-verification",
+             response_model=EmailVerificationResponse, status_code=202)
+def send_email_verification(
+    company_id: uuid.UUID, account_id: uuid.UUID, request: Request,
+    _session: dict = Depends(require_system_admin),
+) -> EmailVerificationResponse:
+    """メールアドレス確認リンクを現メール宛に送信（B.2・opt-in・ADR-0009・非同期送信）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return EmailVerificationResponse(**admin_service.send_email_verification(company_id, account_id))
+
+
 # --- 会社アカウント管理者（`/admin/accounts`・セッション会社固定・B.2.1） ---------------------
 @router.get("/accounts", response_model=AccountListResponse)
 def list_own_accounts(
@@ -393,6 +406,18 @@ def password_reset_own_account(
     verify_origin(request)
     verify_csrf(request)
     return PasswordResetResponse(**admin_service.reset_password(_company_id(session), account_id))
+
+
+@router.post("/accounts/{account_id}/email-verification",
+             response_model=EmailVerificationResponse, status_code=202)
+def send_email_verification_own(
+    account_id: uuid.UUID, request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> EmailVerificationResponse:
+    """自社アカウントに確認リンクを送信（B.2.1・opt-in・ADR-0009・セッション会社固定）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return EmailVerificationResponse(**admin_service.send_email_verification(_company_id(session), account_id))
 
 
 @router.get("/company-quest-groups", response_model=QuestGroupListResponse)

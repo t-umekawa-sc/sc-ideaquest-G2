@@ -14,6 +14,7 @@ CATEGORY_PASSWORD_SETUP = "password_setup"
 CATEGORY_LOCK_NOTIFICATION = "lock_notification"
 CATEGORY_EMAIL_CHANGE_CONFIRM = "email_change_confirm"    # メール変更確認リンク（新メール宛・ADR-0008）
 CATEGORY_EMAIL_CHANGE_NOTICE = "email_change_notice"      # メール変更通知（旧メール宛・乗っ取り検知・ADR-0008）
+CATEGORY_EMAIL_VERIFY_LINK = "email_verify_link"          # メールアドレス確認リンク（現メール宛・ADR-0009）
 
 
 def render(category: str, secret: str | None, locale: str | None = None) -> tuple[str, str]:
@@ -60,6 +61,17 @@ def render(category: str, secret: str | None, locale: str | None = None) -> tupl
             f"以下のリンクを開くと、このメールアドレスへの変更が確定します（有効期限 {hours} 時間・1回限り）。\n"
             f"{link}\n\n"
             "このメールに心当たりがない場合は破棄してください（リンクを開かなければ変更は行われません）。"
+        )
+        return subject, body
+    if category == CATEGORY_EMAIL_VERIFY_LINK:
+        hours = s.email_verify_ttl_seconds // 3600
+        link = f"{s.app_base_url}/email-verify/confirm?token={secret}"
+        subject = "【ideaquest】メールアドレスの確認"
+        body = (
+            "ideaquest のメールアドレス確認のお願いです。\n\n"
+            f"以下のリンクを開くと、このメールアドレスが確認済みになります（有効期限 {hours} 時間・1回限り）。\n"
+            f"{link}\n\n"
+            "このメールに心当たりがない場合は破棄してください（メールアドレスは変更されません）。"
         )
         return subject, body
     if category == CATEGORY_EMAIL_CHANGE_NOTICE:

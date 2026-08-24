@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import redis
 
 from app.control_plane.account_sync import repository as account_sync_repo
+from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.tenant.gamification import ledger
 from app.tenant.quest_group import repository as qg_repo
@@ -384,6 +385,34 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
     delete_account_sessions(r, account_id)
     # 本人がメール経由で PW 再設定＝到達の証拠。当該 login_id のログインロックを即解除（ADR-0005 §2.5(b)）
     clear_login_locks_for_login_id(r, login_id)
+
+
+def confirm_email_verify(token: str) -> dict:
+    """メールアドレス確認の確定（ADR-0009・未認証＝トークンが認可）。
+
+    トークン照合（無効/期限切れ/使用済は一律 410）→ トークンが束ねる account の現 `email` が確認対象のまま
+    （送信後に別アドレスへ再編集されていない）かを保証できないため、確定は「現 email を確認済みにする」だけで
+    副作用は `email_verified_at=now`＋チャレンジ単回消費のみ（identity 書き換え無し）。送信後に email が変わった
+    ケースは `email_verified_at` を NULL リセット済み（管理者 PATCH）＝confirm しても最新 email を確認済みにするのは
+    不適切なので **409 `stale`** で弾く（確認済みフラグは変えずやり直しを促す）。応答＝`{status:"verified"}`。
+    """
+    with control_session() as session:
+        challenge = account_repo.find_email_verify_challenge_by_hash(session, hash_token(token))
+        if not _challenge_is_valid(challenge):
+            raise AppError(410, "token_expired")
+        account = account_repo.get_account(session, challenge.account_id)
+        if account is None:
+            raise AppError(410, "token_expired")
+        # 送信〜確定の間に email が別アドレスへ再編集された（送信時スナップショットと現 email が不一致）＝stale。
+        # `email_verified_at` は変えずやり直しを促す（チャレンジも消費しない）。
+        if challenge.target_email != account.email:
+            raise AppError(409, "stale")
+        account.email_verified_at = datetime.now(timezone.utc)
+        challenge.used_at = datetime.now(timezone.utc)  # 単回消費
+        audit.record("email.verify.confirm",  # 監査（B.6）。機密（token）は入れない（§15）
+                     {"company_id": str(account.company_id), "account_id": str(account.id)}, session=session)
+        session.commit()
+    return {"status": "verified"}
 
 
 def _challenge_is_valid(challenge) -> bool:

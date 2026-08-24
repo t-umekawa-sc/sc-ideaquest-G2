@@ -325,6 +325,7 @@ def confirm_email_change(token: str) -> None:
             raise
         account.email = new_email
         account.pending_email = None
+        account.email_verified_at = datetime.now(timezone.utc)  # ダブルオプトインで到達確認済み（ADR-0009 §2.2）
         challenge.used_at = datetime.now(timezone.utc)  # 単回消費
         account_sync_repo.enqueue(session, account.id, account.company_id, "upsert", {"email": new_email})
         audit.record("email.change.confirm",  # 監査（B.6）。機密（token）は入れない（§15）

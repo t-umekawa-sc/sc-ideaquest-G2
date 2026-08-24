@@ -208,3 +208,14 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 - **`failed` 行の監視/アラート・手動再送 UI** は管理面が整うまで後続（ADR-0007 §5）。手動再送は新規 enqueue でやり直す（`secret` は破棄済み）。
 - **クラッシュ窓の重複送信**（SMTP 成功〜`done` 書込の間・at-least-once）は無害として許容＝**重複しないことのテストは置かない**（原理的に排除しない・ADR-0007 §2.5）。
 - **他ドメインの送信系メール**（`security_password_changed` 等・データモデル §8-⑳）は本基盤に将来載せる＝該当ドメイン実装時に TC 追加。
+
+## 8. テストパターン（メールアドレス確認＝管理者 opt-in・ADR-0009）
+
+> 仕様の正＝[`../ADR/ADR-0009_管理者によるメールアドレス確認.md`](../ADR/ADR-0009_管理者によるメールアドレス確認.md)（現アドレスの到達/所有確認・`purpose=email_verify`・TTL 72h・確定 EP は未認証＝トークンが認可）。テーブル＝[`../データモデル.md`](../データモデル.md) §4.2 `accounts.email_verified_at`／§4.4 `otp_challenges`。送信 EP（管理者）は [`../テスト/B_会社・アカウント.md`](B_会社・アカウント.md)、本節は**公開 confirm EP**（`POST /auth/email-verify/confirm`）を担う。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-103 | api | 確認リンクで email_verified_at が刻まれる | 送信済み（`email_verify` チャレンジ有効・現メール不変） | `POST /auth/email-verify/confirm {token}` | 200・`{status:"verified"}`・`accounts.email_verified_at` が now・チャレンジ単回消費（`used_at`） | ADR-0009 §2.1 |
+| A-TC-104 | api | 無効/期限切れ/使用済トークンは一律 410 | 使用済み（confirm 済み）トークン | 同 EP を再実行／不正 token | 410 `token_expired`（列挙耐性・状態を変えない） | ADR-0009 §2.1/§2.5 |
+| A-TC-105 | api | 送信後に email 変更されたら 409 stale | 送信後に管理者が別アドレスへ `PATCH email` | 旧トークンで confirm | 409 `stale`（`email_verified_at` は変えずやり直しを促す） | ADR-0009 §2.1 |
+| A-TC-106 | api | 未認証＝トークンが認可（セッション不要・CSRF 免除・Origin 検証） | 有効トークン・セッション無し | 同 EP（Origin 付き） | 200（`password-setup/complete` と同型） | ADR-0009 §2.5／A.7 |

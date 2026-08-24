@@ -38,6 +38,7 @@ class AccountListItem(BaseModel):
     display_name: str
     login_id: str
     email: str
+    email_verified: bool = False  # 現 email が到達/所有確認済みか（ADR-0009・バッジ表示用）
     system_role: str
     status: str
     last_login_at: str | None = None
@@ -113,6 +114,7 @@ class AccountResponse(BaseModel):
     display_name: str
     login_id: str
     email: str
+    email_verified: bool = False  # 現 email が到達/所有確認済みか（ADR-0009）
     system_role: str
     status: str
     password_set: bool
@@ -120,6 +122,11 @@ class AccountResponse(BaseModel):
 
 class PasswordResetResponse(BaseModel):
     """PWリンク再送の結果（A.7）。"""
+    status: str  # "sent"
+
+
+class EmailVerificationResponse(BaseModel):
+    """メールアドレス確認リンク送信の結果（ADR-0009・opt-in・202）。"""
     status: str  # "sent"
 
 

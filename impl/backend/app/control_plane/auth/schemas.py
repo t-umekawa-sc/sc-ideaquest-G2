@@ -86,3 +86,13 @@ class PasswordSetupCompleteReq(BaseModel):
 
 class OkResponse(BaseModel):
     status: str = "ok"
+
+
+class EmailVerifyConfirmReq(BaseModel):
+    """メールアドレス確認の確定（ADR-0009・未認証＝トークンが認可）。"""
+    token: str = Field(min_length=1)
+
+
+class EmailVerifyConfirmedResponse(BaseModel):
+    """確認確定の結果（未認証のため最小ボディ）。"""
+    status: str = "verified"

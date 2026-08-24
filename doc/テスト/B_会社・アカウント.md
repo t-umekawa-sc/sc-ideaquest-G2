@@ -342,3 +342,14 @@
 | B-TC-162 | api | プロビジョニングは冪等・active 化 | OPS・seed 会社 ACME-01（整備済み） | `POST /admin/companies/{id}/provision` | 200・`status=active`（DB作成/移行/ミラーは存在済みで no-op） | B.1／§8-⑫ |
 | B-TC-163 | api | 非 system_admin の越権遮断 | 一般ユーザー | 同 POST | 403 forbidden | B.0.1 P6 |
 | B-TC-164 | api | 存在しない会社の存在秘匿 | OPS | 不明 company_id で POST | 404 not_found | B.2／§1.6 |
+
+## 19. テストパターン（管理者によるメールアドレス確認 送信＝opt-in・ADR-0009）
+
+> 仕様の正＝[`../ADR/ADR-0009_管理者によるメールアドレス確認.md`](../ADR/ADR-0009_管理者によるメールアドレス確認.md)。送信 EP＝`POST /admin/companies/{cid}/accounts/{id}/email-verification`（B.2・system_admin）／`POST /admin/accounts/{id}/email-verification`（B.2.1・company_account_admin・自社）。現メール宛に確認リンク（`mail_category=email_verify_link`・`purpose=email_verify`・72h・旧未使用チャレンジは失効）。確定は [`A_認証.md`](A_認証.md) §8。一覧行に `email_verified`（bool）。`PATCH email` の変更で `email_verified_at` は NULL リセット。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-165 | api | 確認メール送信（system_admin・B.2） | OPS・対象 active アカウント | `POST /admin/companies/{cid}/accounts/{id}/email-verification` | 202・`otp_challenges`（`purpose=email_verify`・未使用・72h）1件・`mail_outbox` に `email_verify_link`（現メール宛・`secret`＝トークン） | ADR-0009 §2.1／§4.4 |
+| B-TC-166 | api | 確認メール送信（company_account_admin・B.2.1・自社） | 自社アカウント管理者・対象 active | `POST /admin/accounts/{id}/email-verification` | 202・同上（会社スコープはセッション固定） | ADR-0009 §2.1／B.2.1 |
+| B-TC-167 | api | email 変更で email_verified が NULL リセット | 確認済み（`email_verified_at` 有）アカウント | `PATCH .../accounts/{id}`（email 変更）→ `GET .../accounts` | 変更後の行 `email_verified=false`（新アドレスは未確認・ADR-0009 §2.3） | ADR-0009 §2.3 |
+| B-TC-168 | api | 一覧行に email_verified（発行直後は false） | 新規発行アカウント | `GET .../accounts` | 当該行 `email_verified=false`（未確認）／confirm 後は true | ADR-0009 §2.4 |

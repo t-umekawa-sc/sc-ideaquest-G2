@@ -18,7 +18,7 @@ from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.orm import Account, Company
 from app.control_plane.mail_outbox import repository as mail_repo
-from app.control_plane.mail_outbox.templates import CATEGORY_PASSWORD_SETUP
+from app.control_plane.mail_outbox.templates import CATEGORY_EMAIL_VERIFY_LINK, CATEGORY_PASSWORD_SETUP
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import delete_account_sessions, generate_token, hash_token
@@ -38,6 +38,7 @@ def _account_state(a: Account) -> dict:
         "display_name": a.display_name,
         "login_id": a.login_id,
         "email": a.email,
+        "email_verified": a.email_verified_at is not None,
         "system_role": a.system_role,
         "status": a.status,
         "password_set": a.password_hash is not None,
@@ -176,9 +177,12 @@ def edit_account(
                     raise AppError(409, "conflict", extra={"errors": [{"field": "email"}]})
 
         old_role = account.system_role  # 監査用に変更前を退避（§2-⑬ 権限変更履歴）
+        email_changed = new_email is not None and new_email != account.email  # 変更判定は setattr 前
         payload = {f: changes[f] for f in _EDITABLE_FIELDS if f in changes}
         for field, value in payload.items():
             setattr(account, field, value)
+        if email_changed:
+            account.email_verified_at = None  # 新アドレスは未確認へリセット（ADR-0009 §2.3）
         if payload:
             account_sync_repo.enqueue(session, account_id, company_id, "upsert", payload)  # users ミラー
         audit.record("account.edit", {  # 監査（B.6・同一Tx）。system_role は前後、identity は変更キーのみ
@@ -271,6 +275,29 @@ def reset_password(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
             account_id=account_id, company_id=company_id,
         )
         audit.record("account.password_reset",  # 監査（B.6）。token 等の機密は入れない（§15）
+                     {"company_id": str(company_id), "account_id": str(account_id)}, session=session)
+        session.commit()
+    return {"status": "sent"}
+
+
+def send_email_verification(company_id: uuid.UUID, account_id: uuid.UUID) -> dict:
+    """メールアドレス確認リンクを送信（B.2/B.2.1・opt-in・ADR-0009）。
+
+    現 `email` 宛に確認リンク（`email_verify`・単回・72h・旧未使用チャレンジは失効）を mail_outbox で非同期送信。
+    確認済みでも再送可（アドレス変更後の再確認）。応答＝202（受理）。
+    """
+    s = get_settings()
+    with control_session() as session:
+        account = _account_in_company(session, company_id, account_id)
+        token = generate_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.email_verify_ttl_seconds)
+        account_repo.invalidate_email_verify_challenges(session, account_id)  # 最新リンクのみ有効（§2.1）
+        account_repo.create_email_verify_challenge(session, account_id, hash_token(token), expires_at, account.email)
+        mail_repo.enqueue(
+            session, account.email, CATEGORY_EMAIL_VERIFY_LINK, secret=token, locale=account.locale,
+            account_id=account_id, company_id=company_id,
+        )
+        audit.record("account.email_verification.send",  # 監査（B.6）。token 等の機密は入れない（§15）
                      {"company_id": str(company_id), "account_id": str(account_id)}, session=session)
         session.commit()
     return {"status": "sent"}
@@ -370,6 +397,7 @@ def _account_item(a: Account) -> dict:
         "display_name": a.display_name,
         "login_id": a.login_id,
         "email": a.email,
+        "email_verified": a.email_verified_at is not None,
         "system_role": a.system_role,
         "status": a.status,
         "last_login_at": a.last_login_at.isoformat() if a.last_login_at else None,

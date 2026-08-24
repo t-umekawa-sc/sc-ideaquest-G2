@@ -103,6 +103,44 @@ def find_email_change_challenge_by_hash(session: Session, code_hash: str) -> Otp
     ).scalar_one_or_none()
 
 
+# --- メールアドレス確認リンク（email_verify・ADR-0009／データモデル §4.4） --------------------
+_EMAIL_VERIFY = "email_verify"
+
+
+def invalidate_email_verify_challenges(session: Session, account_id: uuid.UUID) -> None:
+    """当該アカウントの未使用 email_verify チャレンジを失効（削除）。最新リンクのみ有効（ADR-0009 §2.1）。"""
+    session.execute(
+        delete(OtpChallenge).where(
+            OtpChallenge.account_id == account_id,
+            OtpChallenge.purpose == _EMAIL_VERIFY,
+            OtpChallenge.used_at.is_(None),
+        )
+    )
+
+
+def create_email_verify_challenge(
+    session: Session, account_id: uuid.UUID, code_hash: str, expires_at: datetime, target_email: str
+) -> OtpChallenge:
+    challenge = OtpChallenge(
+        id=uuid.uuid4(),
+        account_id=account_id,
+        code_hash=code_hash,
+        purpose=_EMAIL_VERIFY,
+        target_email=target_email,  # confirm で現 email と照合（不一致は 409 stale・ADR-0009）
+        expires_at=expires_at,
+    )
+    session.add(challenge)
+    return challenge
+
+
+def find_email_verify_challenge_by_hash(session: Session, code_hash: str) -> OtpChallenge | None:
+    return session.execute(
+        select(OtpChallenge).where(
+            OtpChallenge.code_hash == code_hash, OtpChallenge.purpose == _EMAIL_VERIFY
+        )
+    ).scalar_one_or_none()
+
+
 def get_account(session: Session, account_id: uuid.UUID) -> Account | None:
     return session.get(Account, account_id)
 
