@@ -1,17 +1,18 @@
 "use client";
 
 // SC-22 アイデア詳細＝本文/価値/利害関係者/ステータス/作成者/版数（D.1 GET /ideas/{id} 実接続）。
-// 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md。
-// **未接続（EP 未実装/他ドメイン）＝表示のみ or デモ**: 投票/フォロー（D.5/D.6 router 未公開）・添付（D.3）・
-// 評価結果（F）・チャット（E）・更新履歴の差分（版 EP 未公開）。IdeaDetailDTO に quest_id/カテゴリーが
-// 無いため、クエストへの導線・カテゴリーバッジは暫定（follow-up＝DTO 拡張）。
+// 投票（D.5）・フォロー（D.6）も実接続＝楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
+// 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md（§4.5）。
+// **未接続（EP 未実装/他ドメイン）＝表示のみ or デモ**: 添付（D.3）・評価結果（F）・チャット（E）・更新履歴の差分（版 EP 未公開）。
+// IdeaDetailDTO に quest_id/カテゴリー/quest_status が無いため、クエストへの導線・カテゴリーバッジ・投票/フォローの
+// 事前無効化は暫定（follow-up＝DTO 拡張。現状は可否をサーバー判定に委ね 409/403 で理由提示）。
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, Modal, ModalBody, ModalFooter } from "@/components/ui";
+import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { getIdea, type IdeaDetail } from "../api";
+import { followIdea, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { IdeaForm } from "./IdeaForm";
 import "../ideas.css";
 
@@ -65,17 +66,33 @@ const ASPECT_COMMENTS = [
 ];
 
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
+  const snack = useSnackbar();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 投票/フォローは楽観更新のためローカル state で保持（load 時に DTO から同期）。
+  const [vote, setVote] = useState<{ approve: number; oppose: number; my: IdeaVoteType | null }>({ approve: 0, oppose: 0, my: null });
+  const [following, setFollowing] = useState(false);
+  const [voteBusy, setVoteBusy] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const d = await getIdea(ideaId);
       if (!d) setLoadError("このアイデアは見つからないか、参照する権限がありません。");
-      else { setIdea(d); setLoadError(null); }
+      else {
+        setIdea(d);
+        const dv = (d.vote ?? {}) as { summary?: { approve?: number; oppose?: number }; my_vote?: string | null };
+        setVote({
+          approve: dv.summary?.approve ?? 0,
+          oppose: dv.summary?.oppose ?? 0,
+          my: dv.my_vote === "approve" || dv.my_vote === "oppose" ? dv.my_vote : null,
+        });
+        setFollowing(!!d.following);
+        setLoadError(null);
+      }
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 401
@@ -89,6 +106,69 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // 投票（賛成/反対の登録・切替・同ボタン再クリックで取消）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
+  const handleVote = useCallback(async (type: IdeaVoteType) => {
+    if (voteBusy) return;
+    const prev = vote;
+    setVoteBusy(true);
+    try {
+      if (prev.my === type) {
+        // 同じ選択肢を再クリック＝取消。
+        setVote((s) => ({ ...s, [type]: Math.max(0, s[type] - 1), my: null }));
+        await removeVote(ideaId);
+      } else {
+        // 新規 or 切替（1人1票・前の票を減算）。
+        setVote((s) => ({
+          approve: s.approve + (type === "approve" ? 1 : 0) - (prev.my === "approve" ? 1 : 0),
+          oppose: s.oppose + (type === "oppose" ? 1 : 0) - (prev.my === "oppose" ? 1 : 0),
+          my: type,
+        }));
+        const res = await voteIdea(ideaId, type);
+        // サーバー集計を権威に反映（匿名化・整合）。
+        if (res) setVote({ approve: res.summary.approve, oppose: res.summary.oppose, my: (res.my_vote as IdeaVoteType | null) ?? null });
+      }
+    } catch (err) {
+      setVote(prev); // ロールバック
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg:
+          status === 409 ? "締切後・完了したクエストのアイデアには投票できません。"
+          : status === 403 ? "投票する権限がありません。"
+          : status === 404 ? "このアイデアは見つからないか、参照する権限がありません。"
+          : status === 401 ? "セッションが切れています。再ログインしてください。"
+          : "投票に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setVoteBusy(false);
+    }
+  }, [ideaId, vote, voteBusy, snack]);
+
+  // フォロー（ウォッチ）トグル。楽観更新＋サーバー権威（completed 後の新規は 409）。
+  const handleFollow = useCallback(async () => {
+    if (followBusy) return;
+    const prev = following;
+    setFollowBusy(true);
+    setFollowing(!prev);
+    try {
+      if (prev) await unfollowIdea(ideaId);
+      else await followIdea(ideaId);
+    } catch (err) {
+      setFollowing(prev); // ロールバック
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg:
+          status === 409 ? "完了したクエストのアイデアは新規フォローできません（解除のみ可）。"
+          : status === 404 ? "このアイデアは見つからないか、参照する権限がありません。"
+          : status === 401 ? "セッションが切れています。再ログインしてください。"
+          : "フォローの更新に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [ideaId, following, followBusy, snack]);
+
   if (loading) {
     return <main className="container detail-main"><p className="admin-muted" style={{ marginTop: "var(--space-6)" }}>読み込み中…</p></main>;
   }
@@ -101,13 +181,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     );
   }
 
-  // 投票集計は DTO の vote（{summary:{approve,oppose}, my_vote}）から。投票 POST/DELETE EP は公開済み
-  // だがフロント接続は後続＝本画面は表示のみ（ボタン無効）。
-  const v = (idea.vote ?? {}) as { summary?: { approve?: number; oppose?: number }; my_vote?: string | null };
-  const agreeN = v.summary?.approve ?? 0;
-  const disagreeN = v.summary?.oppose ?? 0;
-  const myVote = v.my_vote === "approve" ? "agree" : v.my_vote === "oppose" ? "disagree" : null;
-  const following = idea.following;
+  // 投票集計/自分の投票/フォローはローカル state（楽観更新・load 時に DTO から同期）。
+  const agreeN = vote.approve;
+  const disagreeN = vote.oppose;
+  const myVote = vote.my === "approve" ? "agree" : vote.my === "oppose" ? "disagree" : null;
   const [stLabel, stClass] = statusLabel(idea.status, idea.is_selected);
   const authorName = idea.author.display_name || "?";
   const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
@@ -133,8 +210,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </div>
           </div>
           <div className="idea-actions">
-            {/* フォローは D.6 EP 未公開＝現状は表示のみ（無効）。 */}
-            <button className="follow-star" type="button" aria-pressed={following} disabled title="フォローは準備中です">
+            {/* フォロー（D.6・トグル）。可否はサーバー権威（completed 後の新規は 409→理由トースト）。 */}
+            <button className="follow-star" type="button" aria-pressed={following} disabled={followBusy} onClick={() => void handleFollow()}>
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
             {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。 */}
@@ -297,15 +374,14 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className="vote-disagree">▼ 反対 {disagreeN}</span>
             </div>
             <div className="vote-btns">
-              {/* 投票は D.5 EP 未公開＝表示のみ（無効）。集計は DTO の vote から。 */}
-              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled title="投票は準備中です">
+              {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。可否はサーバー権威（締切後/権限なしは 409/403→理由トースト）。 */}
+              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteBusy} onClick={() => void handleVote("approve")}>
                 ▲ 賛成
               </button>
-              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled title="投票は準備中です">
+              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteBusy} onClick={() => void handleVote("oppose")}>
                 ▼ 反対
               </button>
             </div>
-            <p className="role-note" style={{ marginTop: "var(--space-2)" }}>※ 投票（賛成/反対）は準備中です。現在は集計の表示のみです。</p>
             <p className="vote-note">
               1人1票・<strong>締切まで変更できます</strong>。投票すると <span className="xp">+5 XP</span>（自分のアイデアにも投票可）。
               <br />

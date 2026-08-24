@@ -357,3 +357,14 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 手技 | 観測 red（actual） |
 | --- | --- | --- |
 | D-TC-207 | `**/ideas/*`（GET）を abort → 件名見出し可視を期待 | `Expected visible / Received element(s) not found`＝詳細描画が getIdea に依存（デモ据置きなら出るはず） |
+
+## D. アイデア SC-22 投票/フォロー フロント接続 e2e（2026-08-24）
+
+> 手技＝behavior-red を**接続前バンドルで目視**（frontend はソース非マウント＝現行コンテナは変更前コード＝投票/フォローボタンが `disabled`）。新 spec `sc-22-vote-follow.spec.ts`（D-TC-209〜212）を再ビルド前に実行し、`disabled` ボタンへの click がタイムアウトして 4件 red を確認 → IdeaDetailView 接続＋frontend 再ビルド後に green（4 passed）。回帰＝D-TC-207 は「投票/フォロー活性」へ更新し green（1 passed）。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| D-TC-209 | 「▲ 賛成」ボタンが `disabled`＝`locator.click: Timeout`（Received: disabled）→ 接続後は賛成 1・`aria-pressed=true`・`my_vote=approve` |
+| D-TC-210 | 同上（`disabled` で click 不可）→ 接続後は賛成→反対の切替で 反対 1/賛成 0（1人1票・`my_vote=oppose`） |
+| D-TC-211 | 同上 → 接続後は同ボタン再クリックで取消（賛成 0・`my_vote=null`） |
+| D-TC-212 | 「☆ フォロー」ボタンが `disabled` → 接続後はトグルで `★ フォロー中`（`following=true`）↔ 解除（false） |

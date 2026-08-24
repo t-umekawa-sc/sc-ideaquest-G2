@@ -72,5 +72,11 @@
 | D-TC-204 | e2e | 必須ボタン活性ガード＋blur インライン検証（§4.7 前段） | 登録フルページ | 3 必須空／件名を空 blur | 「投稿する」は初期 disabled（3 必須充足で活性）・件名 blur で `aria-invalid`＋インライン「件名は必須です。」表示 | §4.7／SC-21 |
 | D-TC-205 | e2e | SC-12 アイデアタブに一覧が実データで出る | API で recruiting クエスト＋published アイデア作成 | `/quests/{id}` のアイデアタブを表示 | タブ件数＝1・当該アイデアの件名が一覧に出る（`listIdeas`・公開可視） | D.1／SC-12 |
 | D-TC-206 | e2e | 投稿後に IDEAS_CHANGED で一覧へ反映（跨ルート） | 空クエスト・詳細表示 | 「＋ アイデアを追加」→モーダルで投稿→戻る | 初期は空表示（「まだアイデアがありません」）→投稿後リロードせずタブ一覧に出現（`IDEAS_CHANGED_EVENT` 購読） | D.1/D.2／SC-12 |
-| D-TC-207 | e2e | SC-22 詳細が getIdea の実データを描画 | API で published アイデア作成（value/body/stakeholders 指定） | `/ideas/{id}` を表示 | 件名/価値/本文/利害関係者/ステータスバッジ（公開）/作成者が実データで出る。投票ボタンは無効（準備中）＝表示のみ | D.1／SC-22 |
+| D-TC-207 | e2e | SC-22 詳細が getIdea の実データを描画 | API で published アイデア作成（value/body/stakeholders 指定） | `/ideas/{id}` を表示 | 件名/価値/本文/利害関係者/ステータスバッジ（公開）/作成者が実データで出る。投票/フォローのボタンが活性（挙動は D-TC-209〜212） | D.1／SC-22 |
 | D-TC-208 | e2e | 登録モーダルは初期表示で誤検証しない（フォーカス制御） | クエスト詳細で「＋ アイデアを追加」（URL モーダル） | モーダルを開いた直後（無操作） | 「件名は必須です。」が出ない・`aria-invalid` なし。件名→価値へタブ移動（blur）した時のみ検証が出る（§4.7 blur 維持） | §4.7／SC-21 |
+| D-TC-209 | e2e | SC-22 投票（賛成）→集計反映・ハイライト | API で recruiting クエスト＋published アイデア作成（vote は新規パーティーの既定権限） | `/ideas/{id}` で「▲ 賛成」クリック | 賛成 1・「▲ 賛成」が `is-on`（`aria-pressed=true`）・`GET /ideas/{id}` の `vote.my_vote=approve`（`voteIdea`・楽観更新） | D.5／SC-22 §4.5 |
+| D-TC-210 | e2e | SC-22 投票切替（賛成→反対・1人1票） | 賛成投票済み | 「▼ 反対」クリック | 反対 1・賛成 0・「▼ 反対」が `is-on`／「▲ 賛成」off（行は1つ・`my_vote=oppose`） | D.5／§5.13／SC-22 §4.5 |
+| D-TC-211 | e2e | SC-22 投票取消（同ボタン再クリック） | 賛成投票済み | 「▲ 賛成」を再クリック | 賛成 0・どちらも未ハイライト・`GET` の `vote.my_vote=null`（`removeVote`） | D.5／SC-22 §4.5 |
+| D-TC-212 | e2e | SC-22 フォロー→解除（トグル） | published アイデア（パーティー員） | 「☆ フォロー」→「★ フォロー中」→再クリック | ON: `aria-pressed=true`＋`GET` `following=true`（`followIdea`）／OFF: false（`unfollowIdea`・楽観更新） | D.6／SC-22 §4.5 |
+
+> **サーバー権威の可否判定（締切後/権限なし）**: 本スライスは可否を**サーバー判定を権威**とし、`POST vote` の 409（`invalid_state`＝締切後/`completed`/下書き）・403（vote 権限なし）・`POST follow` の 409（completed 後の新規）を受けたら**楽観更新をロールバック＋理由をトースト表示**する（API設計 D.5「締切後はボタン無効化＋理由」の権威）。`IdeaDetailDTO` は現状 `quest_status`/`my_permissions` を返さないため**事前無効化（disabled）は follow-up**（DTO 拡張後）＝それまではサーバーエラー経由で理由提示。分岐網羅は §2 の api（D-TC-122〜125/128〜129）で担保し、e2e は happy path（209〜212）に限定する。
