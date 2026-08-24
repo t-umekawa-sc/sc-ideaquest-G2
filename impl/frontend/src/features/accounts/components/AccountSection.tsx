@@ -16,7 +16,7 @@ import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/component
 import type { ConfirmOptions, DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
-import { ACCOUNTS_CHANGED_EVENT, disableAccount, enableAccount, listAccounts, resetPassword } from "../api";
+import { ACCOUNTS_CHANGED_EVENT, disableAccount, enableAccount, listAccounts, resetPassword, sendEmailVerification } from "../api";
 import type { Account } from "../types";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css";
@@ -106,6 +106,15 @@ export function AccountSection({ companyId }: { companyId: string }) {
             ),
         },
         {
+          label: "確認メールを送信",
+          onClick: () =>
+            runAction(
+              () => sendEmailVerification(companyId, a.account_id),
+              { title: "確認メールを送信", msg: `「${a.display_name}」の現在のメールアドレス（${a.email}）宛に確認リンクを送信しますか？`, confirmLabel: "送信する" },
+              "確認メールを送信しました。",
+            ),
+        },
+        {
           label: "無効化",
           danger: true,
           onClick: () =>
@@ -171,7 +180,15 @@ export function AccountSection({ companyId }: { companyId: string }) {
       filter: { type: "text" },
       sortVal: (a) => a.email,
       searchVal: (a) => a.email,
-      render: (a) => a.email,
+      csvVal: (a) => a.email,
+      render: (a) => (
+        <span className="co" style={{ gap: "var(--space-2)" }}>
+          <span>{a.email}</span>
+          {a.email_verified
+            ? <span className="badge badge-success" title="到達/所有を確認済み">確認済み</span>
+            : <span className="badge badge-muted" title="未確認（確認メールを送信できます）">未確認</span>}
+        </span>
+      ),
     },
     {
       key: "system_role",

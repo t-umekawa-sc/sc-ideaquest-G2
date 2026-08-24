@@ -16,7 +16,7 @@
 
 | 画面 | 名称 | 状態 | ルート | 備考 |
 |---|---|---|---|---|
-| SC-00 | ログイン | ✅ | `(auth)/login` | 401→`/login?reason=…` セッション終了通知（デザイン標準 §14）。password-reset/-setup・email-change も配置 |
+| SC-00 | ログイン | ✅ | `(auth)/login` | 401→`/login?reason=…` セッション終了通知（デザイン標準 §14）。password-reset/-setup・email-change・**email-verify/confirm**（ADR-0009）も配置 |
 | SC-01 | ダッシュボード | 🟡 | `(app)/` | ヒーロー残高は `GET /me`（K.1）接続済み。週間ランキング/下書き/未投票/参加中等は G/C/D 接続まで demo |
 | SC-02 | 通知一覧 | ⬜ | `(app)/notifications` | モックのみ |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
@@ -34,8 +34,8 @@
 | SC-41 | ランキング | ⬜ | `(app)/ranking` | モックのみ（G） |
 | SC-90 | クエストグループ管理 | ✅ | `(app)/admin/quest-groups` | メンバー管理含む |
 | SC-91 | システム管理 | ✅ | `(app)/admin/companies` | 会社一覧・手動プロビジョニング |
-| SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動 |
-| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み |
+| SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009） |
+| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み。**メール確認バッジ＋送信アクション**（ADR-0009） |
 
 **接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
 **モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`chat`・`evaluations`・`shop`・`avatar`・`spells`・`achievements`・`ranking`。
@@ -51,7 +51,7 @@
 | アイデア（D） | `tenant/ideas` | ✅ **13 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋**添付 POST/DELETE・DL**）。版差分 GET(D.4) は未実装 |
 | 評価（F）/チャット（E）/ゲーム(G) | — | ⬜ 未着手（投票 XP は G 実装まで no-op） |
 
-**設計確定・実装未着手**＝メール確認フロー（ADR-0009・`accounts.email_verified_at`・API B/A/K・SC-92/93）。
+**メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 

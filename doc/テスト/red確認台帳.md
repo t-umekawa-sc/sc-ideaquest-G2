@@ -397,3 +397,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-132 | `too_many` 無効化時＝既存9＋2 でも 201（11件受理）→ `assert 422` 失敗。復元後 422（`code=too_many`） |
 | D-TC-133 | mime 検証無効化時＝`evil.exe` を `application/pdf` として 201 受理 → `assert 422` 失敗。復元後 422（`code=mime_not_allowed`） |
 | D-TC-215 | 接続前＝SC-21 投稿後も SC-22 にデモ添付のみ／`attachments=[]`（アップロード未送信）→ 実ファイル名が出ず失敗。接続後は SC-22 に実添付＋DL 署名URL |
+
+## B. メールアドレス確認 フロント（SC-92 バッジ＋⋯送信・2026-08-24）
+
+> e2e＝frontend 非マウントを利用し、接続前バンドル（未確認バッジ/「確認メールを送信」なし）で B-TC-169 を実行して red 目視→再ビルド後 green（1 passed・回帰 sc-92b/sc-93 計6 passed）。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| B-TC-169 | 接続前＝メール列に「未確認」バッジ無し・⋯に「確認メールを送信」menuitem 無し → 接続後はバッジ表示＋送信で成功トースト |

@@ -90,6 +90,11 @@ export function resetPassword(companyId: string, accountId: string): Promise<{ s
   return apiFetch<{ status: string }>(`/admin/companies/${companyId}/accounts/${accountId}/password-reset`, { method: "POST" });
 }
 
+// メールアドレス確認リンクを現メール宛に送信（B.2・system_admin・ADR-0009・202）。
+export function sendEmailVerification(companyId: string, accountId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/admin/companies/${companyId}/accounts/${accountId}/email-verification`, { method: "POST" });
+}
+
 // 所属エディタの候補＝この会社のクエストグループ一覧（B.3）。
 export function listQuestGroups(companyId: string): Promise<QuestGroupListResponse | null> {
   return apiFetch<QuestGroupListResponse>(`/admin/companies/${companyId}/quest-groups`);
@@ -130,4 +135,14 @@ export function enableOwnAccount(accountId: string): Promise<AccountResponse | n
 
 export function resetOwnPassword(accountId: string): Promise<{ status: string } | null> {
   return apiFetch<{ status: string }>(`/admin/accounts/${accountId}/password-reset`, { method: "POST" });
+}
+
+// 自社アカウントに確認リンクを送信（B.2.1・company_account_admin・ADR-0009・202）。
+export function sendOwnEmailVerification(accountId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/admin/accounts/${accountId}/email-verification`, { method: "POST" });
+}
+
+// メールアドレス確認の確定（公開・未認証＝トークンが認可・ADR-0009）。410/409 はハンドル側で判定。
+export function confirmEmailVerify(token: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>("/auth/email-verify/confirm", { method: "POST", body: JSON.stringify({ token }) });
 }

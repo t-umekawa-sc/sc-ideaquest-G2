@@ -353,3 +353,11 @@
 | B-TC-166 | api | 確認メール送信（company_account_admin・B.2.1・自社） | 自社アカウント管理者・対象 active | `POST /admin/accounts/{id}/email-verification` | 202・同上（会社スコープはセッション固定） | ADR-0009 §2.1／B.2.1 |
 | B-TC-167 | api | email 変更で email_verified が NULL リセット | 確認済み（`email_verified_at` 有）アカウント | `PATCH .../accounts/{id}`（email 変更）→ `GET .../accounts` | 変更後の行 `email_verified=false`（新アドレスは未確認・ADR-0009 §2.3） | ADR-0009 §2.3 |
 | B-TC-168 | api | 一覧行に email_verified（発行直後は false） | 新規発行アカウント | `GET .../accounts` | 当該行 `email_verified=false`（未確認）／confirm 後は true | ADR-0009 §2.4 |
+
+## 20. frontend e2e（SC-92 メール確認バッジ＋⋯「確認メールを送信」・ADR-0009）
+
+> 対象＝SC-92 会社詳細のアカウント一覧（`features/accounts/AccountSection`・OPS system_admin）。メール列の未確認/確認済みバッジ（`email_verified`）と ⋯ RowMenu「確認メールを送信」（202→成功トースト）を検証する。確定 EP の分岐は [`A_認証.md`](A_認証.md) §8、送信 API は §19 で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-169 | e2e | 未確認バッジ＋確認メール送信アクション | OPS で SC-92・新規アカウント発行（発行直後は未確認） | 当該行のメール列を確認→⋯「確認メールを送信」→確認ダイアログ「送信する」 | 行に「未確認」バッジ・実行で成功トースト「確認メールを送信しました。」（`sendEmailVerification`・202） | ADR-0009 §2.4／SC-92 |
