@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.ideas import application as idea_service
 from app.tenant.ideas.schemas import (
+    IdeaAttachmentDownloadResponse,
+    IdeaAttachmentsResponse,
     IdeaCreateRequest,
     IdeaDetailDTO,
     IdeaListResponse,
@@ -173,3 +175,47 @@ def unfollow_idea(
     idea_service.unfollow_idea(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
+
+
+@router.post("/ideas/{idea_id}/attachments", response_model=IdeaAttachmentsResponse, status_code=201)
+async def add_attachments(
+    idea_id: str,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    session: dict = Depends(require_me),
+) -> IdeaAttachmentsResponse:
+    """アイデアに添付を追加（D.3・multipart・編集権限・完了は 409）。検証はサーバー強制（§1.10）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    payloads = [((f.filename or ""), await f.read()) for f in files]
+    result = idea_service.add_attachments(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, files=payloads,
+    )
+    return IdeaAttachmentsResponse(**result)
+
+
+@router.delete("/ideas/{idea_id}/attachments/{attachment_id}", status_code=204)
+def remove_attachment(
+    idea_id: str,
+    attachment_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """添付を削除（D.3・編集権限・完了は 409）。DB 行＋MinIO オブジェクト削除。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idea_service.remove_attachment(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, attachment_id,
+    )
+
+
+@router.get("/attachments/{attachment_id}/download", response_model=IdeaAttachmentDownloadResponse)
+def download_attachment(
+    attachment_id: str,
+    session: dict = Depends(require_me),
+) -> IdeaAttachmentDownloadResponse:
+    """添付ダウンロード（D.3・§1.10）＝パーティー所属を検証し短TTL 署名URL を返す。読取専用。"""
+    result = idea_service.download_attachment(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), attachment_id,
+    )
+    return IdeaAttachmentDownloadResponse(**result)

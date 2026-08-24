@@ -374,3 +374,100 @@ def test_d_tc_129_follow_requires_membership(client, env):
     idea = env.make_idea(quest_id=qid, status="published", author=env.other_id)
     r = client.post(FOLLOW(idea), headers=_csrf(client))
     assert r.status_code == 404, r.text
+
+
+# ---- D-TC-131〜137: 添付（D.3・MinIO/multipart） ----
+
+ATTACH = lambda iid: f"/api/v1/ideas/{iid}/attachments"  # noqa: E731
+DOWNLOAD = lambda aid: f"/api/v1/attachments/{aid}/download"  # noqa: E731
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+def test_d_tc_131_add_attachments_and_detail(client, env, storage):
+    """D-TC-131: 添付追加（png+pdf）→ 201・詳細にも反映。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[
+        ("files", ("a.png", PNG, "image/png")),
+        ("files", ("b.pdf", b"%PDF-1.4 test", "application/pdf")),
+    ], headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    atts = r.json()["attachments"]
+    assert len(atts) == 2
+    names = {a["original_name"] for a in atts}
+    assert names == {"a.png", "b.pdf"}
+    assert all("uploaded_by" in a and "id" in a for a in atts)
+    detail = client.get(IDEA(idea)).json()
+    assert len(detail["attachments"]) == 2
+
+
+def test_d_tc_132_attachment_count_limit(client, env, storage):
+    """D-TC-132: 既存9件＋今回2件＝11 は 422 too_many。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    with get_tenant_session(env.db_identifier) as ts:
+        for i in range(9):
+            repo.add_attachment(ts, idea_id=idea, object_key=f"k{i}", original_name=f"f{i}.txt",
+                                size_bytes=1, mime_type="text/plain", uploaded_by_id=env.user_id)
+        ts.commit()
+    r = client.post(ATTACH(idea), files=[
+        ("files", ("x.png", PNG, "image/png")),
+        ("files", ("y.pdf", b"%PDF", "application/pdf")),
+    ], headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("code") == "too_many" for e in r.json().get("errors", []))
+
+
+def test_d_tc_133_attachment_mime_not_allowed(client, env, storage):
+    """D-TC-133: 不許可拡張子は 422 mime_not_allowed。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[("files", ("evil.exe", b"MZ", "application/octet-stream"))], headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("code") == "mime_not_allowed" for e in r.json().get("errors", []))
+
+
+def test_d_tc_134_delete_attachment(client, env, storage):
+    """D-TC-134: 添付削除＝204・詳細から消える・storage からも remove。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[("files", ("a.png", PNG, "image/png"))], headers=_csrf(client))
+    aid = r.json()["attachments"][0]["id"]
+    assert len(storage.objects) == 1
+    assert client.delete(f"{ATTACH(idea)}/{aid}", headers=_csrf(client)).status_code == 204
+    assert client.get(IDEA(idea)).json()["attachments"] == []
+    assert len(storage.objects) == 0
+
+
+def test_d_tc_135_add_requires_edit_permission(client, env, storage):
+    """D-TC-135: 他人のアイデア（自分は vote のみ）への添付追加は 403。"""
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_member=True, seed_perms=["vote"])
+    idea = env.make_idea(quest_id=qid, status="published", author=env.other_id)
+    r = client.post(ATTACH(idea), files=[("files", ("a.png", PNG, "image/png"))], headers=_csrf(client))
+    assert r.status_code == 403, r.text
+
+
+def test_d_tc_136_download_returns_signed_url(client, env, storage):
+    """D-TC-136: DL はパーティー所属→署名URL を返す。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[("files", ("a.png", PNG, "image/png"))], headers=_csrf(client))
+    aid = r.json()["attachments"][0]["id"]
+    d = client.get(DOWNLOAD(aid))
+    assert d.status_code == 200, d.text
+    assert isinstance(d.json()["url"], str) and d.json()["url"]
+
+
+def test_d_tc_137_completed_quest_freezes_attachments(client, env, storage):
+    """D-TC-137: 完了クエストは添付追加を 409（凍結）。"""
+    _login_seed(client)
+    qid = env.make_quest(status="completed")
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[("files", ("a.png", PNG, "image/png"))], headers=_csrf(client))
+    assert r.status_code == 409, r.text

@@ -29,6 +29,29 @@ ALLOWED_IMAGE_MIME: dict[str, str] = {
 }
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 画像 1ファイル 5MB（初期値・K.6 TBD）
 
+# 添付 MIME allowlist（D.3・§5.12・§1.10・初期値）＝画像＋pdf/Office/テキスト/zip。値は物理名生成用の拡張子。
+ALLOWED_ATTACHMENT_MIME: dict[str, str] = {
+    "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif",
+    "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "text/plain": "txt", "text/csv": "csv", "text/markdown": "md",
+    "application/zip": "zip",
+}
+# 拡張子→正規 MIME（申告 Content-Type を信用せず拡張子から MIME を導出＝D.3・§1.10）。
+ATTACHMENT_EXT_TO_MIME: dict[str, str] = {
+    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif",
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "txt": "text/plain", "csv": "text/csv", "md": "text/markdown",
+    "zip": "application/zip",
+}
+MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 添付 1ファイル 20MB（D.3・§5.12 初期値）
+MAX_ATTACHMENTS_PER_IDEA = 10  # 1アイデアあたり添付上限（D.3）
+
 
 def validate_image_upload(content_type: str, size: int) -> None:
     """画像アップロードのサーバー検証（§2.2⑧・§1.10）＝MIME allowlist・サイズ上限・非空。
@@ -44,10 +67,33 @@ def validate_image_upload(content_type: str, size: int) -> None:
         raise AppError(422, "validation_error", detail="画像サイズが上限を超えています", errors=[{"field": "file"}])
 
 
+def validate_attachment_upload(filename: str, size: int) -> str:
+    """添付アップロードのサーバー検証（D.3・§1.10・§5.12）＝拡張子 allowlist・サイズ上限・非空。
+
+    申告 Content-Type は信用せず**拡張子から正規 MIME を導出**して返す（永続化する mime_type）。
+    完全な magic-byte スニッフィングは follow-up（D.8）。返り値＝正規 MIME。
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    mime = ATTACHMENT_EXT_TO_MIME.get(ext)
+    if mime is None:
+        raise AppError(422, "validation_error", detail="対応していないファイル形式です",
+                       errors=[{"field": "files", "code": "mime_not_allowed"}])
+    if size == 0:
+        raise AppError(422, "validation_error", detail="ファイルが空です",
+                       errors=[{"field": "files", "code": "empty"}])
+    if size > MAX_ATTACHMENT_BYTES:
+        raise AppError(422, "validation_error", detail="ファイルサイズが上限（20MB）を超えています",
+                       errors=[{"field": "files", "code": "too_large"}])
+    return mime
+
+
 def hashed_key(data: bytes, content_type: str, *, prefix: str) -> str:
-    """物理オブジェクトキー＝`<prefix>/<sha256前半>-<乱数>.<ext>`（元名非露出・衝突/列挙耐性）。"""
+    """物理オブジェクトキー＝`<prefix>/<sha256前半>-<乱数>.<ext>`（元名非露出・衝突/列挙耐性）。
+
+    拡張子は画像/添付双方の allowlist から解決（未知は bin）。
+    """
     digest = hashlib.sha256(data).hexdigest()[:32]
-    ext = ALLOWED_IMAGE_MIME.get(content_type, "bin")
+    ext = ALLOWED_IMAGE_MIME.get(content_type) or ALLOWED_ATTACHMENT_MIME.get(content_type, "bin")
     return f"{prefix}/{digest}-{uuid.uuid4().hex[:8]}.{ext}"
 
 

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { followIdea, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
+import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { IdeaForm } from "./IdeaForm";
 import "../ideas.css";
 
@@ -28,12 +28,24 @@ function statusLabel(status: string, isSelected: boolean): [string, string] {
   return ["公開", "badge badge-success"];
 }
 
-// ---- デモ fixtures（未接続セクション用・添付/評価/チャット/履歴） ----
-const ATTACHMENTS = [
-  { icon: "📄", name: "夜間配送_試算シート.xlsx", sub: "248 KB ・ 鈴木 花子 ・ 2026/07/10" },
-  { icon: "🖼️", name: "ルート集約イメージ.png", sub: "1.2 MB ・ 鈴木 花子 ・ 2026/07/10" },
-];
+// 添付アイコン（mime/拡張子から絵文字・表示のみ）。
+function attachIcon(name: string, mime: string): string {
+  if (mime.startsWith("image/")) return "🖼️";
+  if (mime === "application/pdf") return "📕";
+  if (mime.includes("spreadsheet") || name.endsWith(".csv")) return "📊";
+  if (mime.includes("word")) return "📝";
+  if (mime.includes("presentation")) return "📽️";
+  if (mime === "application/zip") return "🗜️";
+  return "📄";
+}
+// バイト数→表示（KB/MB）。
+function fmtBytes(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+  return `${n} B`;
+}
 
+// ---- デモ fixtures（未接続セクション用・評価/チャット/履歴） ----
 // 直近14日の日次メッセージ数（has=アイデア更新日 / recent=直近） ※モックの棒グラフと一致
 const SPARK = [
   { h: 12 }, { h: 28 }, { h: 20 }, { h: 45, update: "7/10 投稿" },
@@ -143,6 +155,20 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       setVoteBusy(false);
     }
   }, [ideaId, vote, voteBusy, snack]);
+
+  // 添付ダウンロード＝権限検証後の署名URL を取得して新規タブで開く（D.3・§1.10）。
+  const handleDownload = useCallback(async (attachmentId: string) => {
+    try {
+      const res = await getAttachmentDownloadUrl(attachmentId);
+      if (res?.url) window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg: status === 404 ? "この添付は見つからないか、参照する権限がありません。" : "ダウンロードに失敗しました。",
+      });
+    }
+  }, [snack]);
 
   // フォロー（ウォッチ）トグル。楽観更新＋サーバー権威（completed 後の新規は 409）。
   const handleFollow = useCallback(async () => {
@@ -279,29 +305,30 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             )}
           </section>
 
-          {/* 関連資料（添付） */}
-          <section className="card" aria-label="関連資料">
-            <h2 className="card-title">
-              関連資料 <span className="badge badge-muted">{ATTACHMENTS.length}</span>
-            </h2>
-            <ul className="file-list">
-              {ATTACHMENTS.map((f) => (
-                <li className="file-item" key={f.name}>
-                  <span className="file-icon">{f.icon}</span>
-                  <span className="file-info">
-                    <span className="file-name">{f.name}</span>
-                    <span className="file-sub">{f.sub}</span>
-                  </span>
-                  <button className="btn btn-outline btn-sm" type="button">
-                    ⬇ ダウンロード
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-              ※ 添付（アップロード/ダウンロード）は準備中です（D.3 未接続＝以下はデモ表示）。
-            </p>
-          </section>
+          {/* 関連資料（添付・D.3）。SC-22 §4.3＝一覧＋ダウンロードのみ・0件なら非表示。追加/削除は SC-21 フォーム。 */}
+          {idea.attachments.length > 0 && (
+            <section className="card" aria-label="関連資料">
+              <h2 className="card-title">
+                関連資料 <span className="badge badge-muted">{idea.attachments.length}</span>
+              </h2>
+              <ul className="file-list">
+                {idea.attachments.map((f) => (
+                  <li className="file-item" key={f.id}>
+                    <span className="file-icon">{attachIcon(f.original_name, f.mime_type)}</span>
+                    <span className="file-info">
+                      <span className="file-name">{f.original_name}</span>
+                      <span className="file-sub">
+                        {fmtBytes(f.size_bytes)} ・ {f.uploaded_by.display_name || "?"} ・ {fmtDate(f.uploaded_at)}
+                      </span>
+                    </span>
+                    <button className="btn btn-outline btn-sm" type="button" onClick={() => void handleDownload(f.id)}>
+                      ⬇ ダウンロード
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* チャット（導線＋直近プレビュー） */}
           <section className="card" aria-label="チャット">

@@ -12,6 +12,8 @@ export type IdeaPublishInput = components["schemas"]["IdeaPublishRequest"];
 export type IdeaStakeholderInput = components["schemas"]["IdeaStakeholderInput"];
 export type IdeaVoteType = components["schemas"]["IdeaVoteRequest"]["type"];
 export type IdeaVoteResult = components["schemas"]["IdeaVoteResponse"];
+export type IdeaAttachment = components["schemas"]["IdeaAttachmentDTO"];
+export type IdeaAttachmentsResult = components["schemas"]["IdeaAttachmentsResponse"];
 
 // アイデアの変更（作成/公開/編集/削除）通知イベント名。URL モーダル（別ルート）からの成功時に window へ発火し、
 // クエスト詳細のアイデアタブ（QuestDetailView）が購読して再取得する（跨ルートの疎結合ブリッジ・QUESTS_CHANGED と同方式）。
@@ -74,4 +76,22 @@ export function followIdea(ideaId: string): Promise<null> {
 // フォロー解除（D.6・冪等・completed 後も可）。
 export function unfollowIdea(ideaId: string): Promise<null> {
   return apiFetch<null>(`/ideas/${ideaId}/follow`, { method: "DELETE" }) as Promise<null>;
+}
+
+// 添付を追加（SC-21/SC-22・D.3・multipart）。検証はサーバー強制（20MB/10件/MIME allowlist）。
+// FormData は Content-Type をブラウザに任せる（apiFetch が boundary 自動付与）。
+export function uploadAttachments(ideaId: string, files: File[]): Promise<IdeaAttachmentsResult | null> {
+  const fd = new FormData();
+  for (const f of files) fd.append("files", f);
+  return apiFetch<IdeaAttachmentsResult>(`/ideas/${ideaId}/attachments`, { method: "POST", body: fd });
+}
+
+// 添付を削除（D.3・編集権限・完了は 409）。
+export function deleteAttachment(ideaId: string, attachmentId: string): Promise<null> {
+  return apiFetch<null>(`/ideas/${ideaId}/attachments/${attachmentId}`, { method: "DELETE" }) as Promise<null>;
+}
+
+// 添付ダウンロード（D.3・§1.10）＝権限検証後の短TTL 署名URL を取得。呼び出し側で window.open 等。
+export function getAttachmentDownloadUrl(attachmentId: string): Promise<{ url: string } | null> {
+  return apiFetch<{ url: string }>(`/attachments/${attachmentId}/download`);
 }

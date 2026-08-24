@@ -29,6 +29,29 @@ class IdeaAuthorDTO(BaseModel):
     level: int | None = None
 
 
+class IdeaAttachmentDTO(BaseModel):
+    """アイデア添付のメタ（D.3・SC-22 §4.3）。object_key/uploaded_by_id 等の内部値は露出しない（§3.2）。"""
+
+    id: str
+    original_name: str
+    size_bytes: int
+    mime_type: str
+    uploaded_by: IdeaAuthorDTO
+    uploaded_at: datetime
+
+
+class IdeaAttachmentsResponse(BaseModel):
+    """POST /ideas/{id}/attachments の応答（追加後の添付一覧・D.3）。"""
+
+    attachments: list[IdeaAttachmentDTO] = []
+
+
+class IdeaAttachmentDownloadResponse(BaseModel):
+    """GET /attachments/{id}/download の応答＝短TTL 署名URL（D.3・§1.10）。"""
+
+    url: str
+
+
 class IdeaQuestRefDTO(BaseModel):
     """アイデアが属するクエストの参照（SC-22 の「クエストへ戻る」導線・カテゴリーバッジ・凍結判定・D.1）。"""
 
@@ -155,6 +178,7 @@ class IdeaDetailDTO(BaseModel):
     current_revision: int
     author: IdeaAuthorDTO
     quest: IdeaQuestRefDTO
+    attachments: list[IdeaAttachmentDTO] = []
     created_at: datetime
     updated_at: datetime
     vote: dict  # {summary:{approve,oppose}, my_vote}

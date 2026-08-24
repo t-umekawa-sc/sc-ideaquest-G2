@@ -59,6 +59,13 @@
 | D-TC-128 | api | 完了後は新規フォロー不可・解除は可 | completed クエストのアイデア | `POST follow`／`DELETE follow` | POST=409（invalid_state）／DELETE=204 | D.6／C.5 |
 | D-TC-129 | api | フォローのパーティー門番 | 非パーティーのアイデア | `POST /ideas/{id}/follow` | 404（存在秘匿） | D.6／C.0 |
 | D-TC-130 | api | 詳細に quest 参照が入る（SC-22 導線用） | published アイデア（categories 付きクエスト） | `GET /ideas/{id}` | `quest.id`＝当該クエスト・`quest.title`/`quest.status`/`quest.categories[]`/`quest.deadline` が返る | D.1／SC-22 |
+| D-TC-131 | api | 添付追加（複数）→ 詳細に反映 | published アイデア・Fake storage | `POST /ideas/{id}/attachments`（png+pdf の2件） | 201・`attachments` 2件（`id`/`original_name`/`size_bytes`/`mime_type`/`uploaded_by`/`uploaded_at`）・`GET /ideas/{id}` の `attachments` も2件 | D.3／§1.10 |
+| D-TC-132 | api | 添付は1アイデア10件まで | 既に9件添付 | `POST attachments`（2件） | 422 `validation_error`（`errors[].code=too_many`・既存＋今回で超過） | D.3／§5.12 |
+| D-TC-133 | api | 不許可 MIME は拒否 | published アイデア | `POST attachments`（`evil.exe`） | 422 `validation_error`（`mime_not_allowed`・拡張子/申告 Content-Type を信用しない） | D.3／§1.10 |
+| D-TC-134 | api | 添付削除＝DB＋MinIO 削除 | 添付1件 | `DELETE /ideas/{id}/attachments/{aid}` | 204・`GET /ideas/{id}` の `attachments` から消える・storage からも remove | D.3 |
+| D-TC-135 | api | 添付追加は編集権限（本人/owner/quest_admin） | 他人の published（自分は vote のみ） | `POST attachments` | 403 | D.3 |
+| D-TC-136 | api | DL はパーティー所属→短TTL 署名URL | 添付1件 | `GET /attachments/{aid}/download` | 200・`{url}`（署名URL・生パス非露出） | D.3／§1.10 |
+| D-TC-137 | api | 完了クエストは添付追加を凍結 | completed クエストの published アイデア | `POST attachments` | 409 `conflict`（invalid_state） | D.3／C.5 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 
@@ -81,5 +88,8 @@
 | D-TC-212 | e2e | SC-22 フォロー→解除（トグル） | published アイデア（パーティー員） | 「☆ フォロー」→「★ フォロー中」→再クリック | ON: `aria-pressed=true`＋`GET` `following=true`（`followIdea`）／OFF: false（`unfollowIdea`・楽観更新） | D.6／SC-22 §4.5 |
 | D-TC-213 | e2e | SC-22「クエストへ戻る」が実導線＋カテゴリーバッジ | published アイデア（categories 付きクエスト） | `/ideas/{id}` を表示 | 「← クエストへ戻る」の href が `/quests/{quest_id}`（一覧固定でない）・ヘッダーにクエストのカテゴリーバッジ表示（`quest.categories`） | D.1／SC-22 |
 | D-TC-214 | e2e | SC-22 完了クエストは投票/新規フォローを事前無効化 | recruiting→…→completed に遷移した published アイデア | `/ideas/{id}` を表示 | 「▲ 賛成」「▼ 反対」が `disabled`（凍結理由 title）・「☆ フォロー」が `disabled`（`quest.status=completed` 事前判定・サーバー 409 も権威） | D.5/D.6／SC-22 §4.5／C.5 |
+| D-TC-215 | e2e | SC-21 で添付して投稿→SC-22 に出る＋DL | 登録フォームで件名/価値/本文＋ファイル添付→投稿 | `/quests/{id}/ideas/new` で添付付き投稿→`/ideas/{id}` | SC-22 の関連資料に添付名が実データで出る（`uploadAttachments`）・ダウンロードボタンが活性・`GET /attachments/{aid}/download` が `{url}` を返す | D.3／SC-21/SC-22 |
+
+> **削除 UI の置き場所（SC-22 §4.3 準拠）**＝SC-22 の関連資料は「一覧＋ダウンロード」のみ（削除ボタンは無い・0件なら非表示）。添付の**削除は SC-21 フォームの添付チップ（×）**で行い、EP は `DELETE /ideas/{id}/attachments/{aid}`（api の D-TC-134 で担保）。SC-21 編集モードでの**既存添付の一覧/削除 UI は follow-up**（本スライスは新規アップロード〔create/edit〕＋SC-22 表示/DL に限定・投稿前の未アップロード添付の × はクライアント除去）。
 
 > **サーバー権威の可否判定（締切後/権限なし）**: 本スライスは可否を**サーバー判定を権威**とし、`POST vote` の 409（`invalid_state`＝締切後/`completed`/下書き）・403（vote 権限なし）・`POST follow` の 409（completed 後の新規）を受けたら**楽観更新をロールバック＋理由をトースト表示**する（API設計 D.5「締切後はボタン無効化＋理由」の権威）。`IdeaDetailDTO` は現状 `quest_status`/`my_permissions` を返さないため**事前無効化（disabled）は follow-up**（DTO 拡張後）＝それまではサーバーエラー経由で理由提示。分岐網羅は §2 の api（D-TC-122〜125/128〜129）で担保し、e2e は happy path（209〜212）に限定する。

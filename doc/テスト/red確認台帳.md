@@ -387,3 +387,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-130 | quest 除去時＝`ValidationError: IdeaDetailDTO.quest missing`（500）→ `assert r.status_code==200` 失敗。復元後は quest.id/title/status/categories/deadline を返す |
 | D-TC-213 | 接続前＝「クエストへ戻る」href が `/quests`（一覧固定）でカテゴリーバッジ無し → 接続後は href=`/quests/{id}`・「業務改善」バッジ可視 |
 | D-TC-214 | 接続前＝投票/フォローが活性（completed 未判定）→ 接続後は `⏸ 完了（凍結）`＋投票/新規フォロー `disabled` |
+
+## D. アイデア 添付（D.3・MinIO/multipart）（2026-08-24）
+
+> api＝新規 EP（POST/DELETE/download）は test-first（未実装時は 404/405＝自然 red・コミット参照）。サーバー強制ガードは retro-red を目視＝`validate_attachment_upload` を常に通す＋`too_many` チェックを一時無効化して 132/133 が red→復元で green（tests/ideas+quests 99 passed）。e2e＝frontend 非マウントで接続前バンドルに添付 UI が無く D-TC-215 red→再ビルド後 green（sc-22 系 8・sc-21 系 5 passed）。
+
+| TC-ID | 観測 red（actual） |
+| --- | --- |
+| D-TC-132 | `too_many` 無効化時＝既存9＋2 でも 201（11件受理）→ `assert 422` 失敗。復元後 422（`code=too_many`） |
+| D-TC-133 | mime 検証無効化時＝`evil.exe` を `application/pdf` として 201 受理 → `assert 422` 失敗。復元後 422（`code=mime_not_allowed`） |
+| D-TC-215 | 接続前＝SC-21 投稿後も SC-22 にデモ添付のみ／`attachments=[]`（アップロード未送信）→ 実ファイル名が出ず失敗。接続後は SC-22 に実添付＋DL 署名URL |

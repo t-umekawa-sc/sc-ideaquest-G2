@@ -1146,6 +1146,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Attachments
+         * @description アイデアに添付を追加（D.3・multipart・編集権限・完了は 409）。検証はサーバー強制（§1.10）。
+         */
+        post: operations["add_attachments_api_v1_ideas__idea_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Attachment
+         * @description 添付を削除（D.3・編集権限・完了は 409）。DB 行＋MinIO オブジェクト削除。
+         */
+        delete: operations["remove_attachment_api_v1_ideas__idea_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{attachment_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Attachment
+         * @description 添付ダウンロード（D.3・§1.10）＝パーティー所属を検証し短TTL 署名URL を返す。読取専用。
+         */
+        get: operations["download_attachment_api_v1_attachments__attachment_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1334,6 +1394,11 @@ export interface components {
         BackgroundImageResponse: {
             /** Background Image Url */
             background_image_url: string;
+        };
+        /** Body_add_attachments_api_v1_ideas__idea_id__attachments_post */
+        Body_add_attachments_api_v1_ideas__idea_id__attachments_post: {
+            /** Files */
+            files: string[];
         };
         /** Body_put_avatar_image_api_v1_me_avatar_image_put */
         Body_put_avatar_image_api_v1_me_avatar_image_put: {
@@ -1533,6 +1598,45 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * IdeaAttachmentDTO
+         * @description アイデア添付のメタ（D.3・SC-22 §4.3）。object_key/uploaded_by_id 等の内部値は露出しない（§3.2）。
+         */
+        IdeaAttachmentDTO: {
+            /** Id */
+            id: string;
+            /** Original Name */
+            original_name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Mime Type */
+            mime_type: string;
+            uploaded_by: components["schemas"]["IdeaAuthorDTO"];
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+        };
+        /**
+         * IdeaAttachmentDownloadResponse
+         * @description GET /attachments/{id}/download の応答＝短TTL 署名URL（D.3・§1.10）。
+         */
+        IdeaAttachmentDownloadResponse: {
+            /** Url */
+            url: string;
+        };
+        /**
+         * IdeaAttachmentsResponse
+         * @description POST /ideas/{id}/attachments の応答（追加後の添付一覧・D.3）。
+         */
+        IdeaAttachmentsResponse: {
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["IdeaAttachmentDTO"][];
+        };
         /** IdeaAuthorDTO */
         IdeaAuthorDTO: {
             /** User Id */
@@ -1642,6 +1746,11 @@ export interface components {
             current_revision: number;
             author: components["schemas"]["IdeaAuthorDTO"];
             quest: components["schemas"]["IdeaQuestRefDTO"];
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["IdeaAttachmentDTO"][];
             /**
              * Created At
              * Format: date-time
@@ -4824,6 +4933,102 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_attachments_api_v1_ideas__idea_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_attachments_api_v1_ideas__idea_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaAttachmentsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_attachment_api_v1_ideas__idea_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_attachment_api_v1_attachments__attachment_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaAttachmentDownloadResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

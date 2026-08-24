@@ -6,7 +6,7 @@
 //  - 作成: 投稿する＝POST /quests/{id}/ideas（status=published・即公開）／下書き保存＝status=draft（本人のみ）。
 //  - 編集: マウント時 GET /ideas/{id} でプリフィル → PATCH /ideas/{id}（差分・版記録＋通知は H no-op）。
 // 入力検証はデザイン標準 §4.7（インライン aria-invalid＋上部サマリ・送信時＋blur・フォーカス移動しない）。
-// 添付（関連資料）の保存 EP は未実装＝本スライスでは送信しない（UI はモック維持・注記で明示）。投票/フォローは SC-22。
+// 添付（関連資料・D.3）＝作成/編集の保存成功後に uploadAttachments で送信（id 先行が要るため保存後・§1.10）。投票/フォローは SC-22。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -19,12 +19,13 @@ import {
   IDEAS_CHANGED_EVENT,
   publishIdea,
   updateIdea,
+  uploadAttachments,
   type IdeaStakeholderInput,
 } from "../api";
 
 const STAKE_SUGGESTIONS = ["物流部", "配送委託先", "経営企画部", "情報システム部", "現場ドライバー"];
 
-export type IdeaAttach = { icon: string; name: string; size: string };
+export type IdeaAttach = { icon: string; name: string; size: string; file: File };
 
 function iconFor(name: string) {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -133,7 +134,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
     }
   }
   function addFiles(files: FileList) {
-    const next = Array.from(files).map((f) => ({ icon: iconFor(f.name), name: f.name, size: fmtSize(f.size) }));
+    const next = Array.from(files).map((f) => ({ icon: iconFor(f.name), name: f.name, size: fmtSize(f.size), file: f }));
     setAttachments((a) => [...a, ...next]);
   }
 
@@ -191,12 +192,24 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         stakeholders: stakeInputs(),
         note: note.trim() || null,
       };
+      let targetId = ideaId;
       if (kind === "save") {
         await updateIdea(ideaId!, content);
       } else if (kind === "draft") {
-        await createIdea(questId!, { ...content, status: "draft" });
+        const created = await createIdea(questId!, { ...content, status: "draft" });
+        targetId = created?.id ?? undefined;
       } else {
-        await createIdea(questId!, { ...content, status: "published" });
+        const created = await createIdea(questId!, { ...content, status: "published" });
+        targetId = created?.id ?? undefined;
+      }
+      // 添付は id 先行が必要なため保存成功後に送信（D.3）。検証エラー等は非致命＝本体は保存済み。
+      const files = attachments.map((a) => a.file);
+      if (targetId && files.length > 0) {
+        try {
+          await uploadAttachments(targetId, files);
+        } catch {
+          snack({ type: "error", msg: "一部の添付をアップロードできませんでした（サイズ/形式/件数をご確認ください）。" });
+        }
       }
       if (typeof window !== "undefined") window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
       if (kind === "save") {
@@ -426,7 +439,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
               ))}
             </div>
           )}
-          <p className="hint">※ 添付ファイルの保存は準備中です。この画面ではまだ送信されません。</p>
+          <p className="hint">※ 1ファイル20MB・1アイデア10件まで（画像/PDF/Office/テキスト/zip）。保存時にアップロードします。</p>
         </Field>
 
         <p className="role-note" style={{ marginTop: "var(--space-3)" }}>

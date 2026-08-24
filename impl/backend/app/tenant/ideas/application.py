@@ -322,6 +322,103 @@ def unfollow_idea(account_id, company_id, idea_id) -> None:
         ts.commit()
 
 
+# ---- 添付（D.3・§1.10・MinIO） ----
+
+
+def add_attachments(account_id, company_id, idea_id, *, files) -> dict:
+    """アイデアに添付を追加（D.3・multipart）。編集権限＝本人 or owner/quest_admin・完了は 409。
+
+    files＝[(filename, data)]。全ファイルを先に検証（不正 1 件で保存しない）→ 件数上限（既存＋今回≤10）→
+    storage.put ＋ DB 記帳。返り値＝追加後の添付一覧。
+    """
+    from app.infra.storage import MAX_ATTACHMENTS_PER_IDEA, get_storage, validate_attachment_upload
+
+    iid = _parse_uuid(idea_id, field="idea_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if not files:
+        raise AppError(422, "validation_error", detail="ファイルがありません", errors=[{"field": "files", "code": "empty"}])
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        quest = quests_repo.get_quest(ts, idea.quest_id)
+        _authorize_edit_idea(ts, idea, quest, user)  # 本人 or owner/quest_admin（下書きは本人のみ可視）
+        _guard_not_completed(quest)
+        # 先に全件検証（不正で部分保存しない）＝拡張子 allowlist・サイズ・非空。mime は拡張子から導出。
+        validated = [(fn, data, validate_attachment_upload(fn, len(data))) for (fn, data) in files]
+        if repo.count_attachments(ts, idea.id) + len(validated) > MAX_ATTACHMENTS_PER_IDEA:
+            raise AppError(422, "validation_error", detail=f"添付は1アイデア{MAX_ATTACHMENTS_PER_IDEA}件までです",
+                           errors=[{"field": "files", "code": "too_many"}])
+        storage = get_storage()
+        for fn, data, mime in validated:
+            key = storage.put(data, mime, prefix="idea-attachments")
+            repo.add_attachment(ts, idea_id=idea.id, object_key=key, original_name=fn,
+                                size_bytes=len(data), mime_type=mime, uploaded_by_id=user.id)
+        ts.flush()
+        result = {"attachments": _attachments_payload(ts, repo.list_attachments(ts, idea.id))}
+        ts.commit()
+    return result
+
+
+def remove_attachment(account_id, company_id, idea_id, attachment_id) -> None:
+    """添付を削除（D.3・編集権限・完了は 409）。DB 行削除＋MinIO オブジェクト削除（同一 UoW）。"""
+    from app.infra.storage import get_storage
+
+    iid = _parse_uuid(idea_id, field="idea_id")
+    aid = _parse_uuid(attachment_id, field="attachment_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        quest = quests_repo.get_quest(ts, idea.quest_id)
+        _authorize_edit_idea(ts, idea, quest, user)
+        _guard_not_completed(quest)
+        att = repo.get_attachment(ts, aid)
+        if att is None or att.idea_id != idea.id:
+            raise AppError(404, "not_found")
+        key = att.object_key
+        repo.remove_attachment(ts, att)
+        ts.flush()
+        get_storage().remove(key)  # 失敗時は例外で UoW ロールバック（DB 行は残る）
+        ts.commit()
+
+
+def download_attachment(account_id, company_id, attachment_id) -> dict:
+    """添付ダウンロード（D.3・§1.10）＝パーティー所属を検証し短TTL 署名URL を返す。範囲外は 404。"""
+    from app.infra.storage import get_storage
+
+    aid = _parse_uuid(attachment_id, field="attachment_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        att = repo.get_attachment(ts, aid)
+        if att is None or att.idea_id is None:
+            raise AppError(404, "not_found")
+        idea = repo.get_idea(ts, att.idea_id)
+        if idea is None:
+            raise AppError(404, "not_found")
+        if idea.status == "draft" and idea.author_id != user.id:
+            raise AppError(404, "not_found")  # 下書きは本人のみ
+        if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
+            raise AppError(404, "not_found")  # 非パーティーは秘匿（閲覧できる＝落とせる）
+        return {"url": get_storage().presigned_get(att.object_key)}
+
+
 # ---- ドメイン関数（共有） ----
 
 
@@ -470,6 +567,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "current_revision": idea.current_revision,
         "author": _author_dto(author, idea.author_id),
         "quest": quest_ref,
+        "attachments": _attachments_payload(ts, repo.list_attachments(ts, idea.id)),
         "created_at": idea.created_at,
         "updated_at": idea.updated_at,
         "vote": {"summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "my_vote": my_vote.type if my_vote else None},
@@ -486,3 +584,20 @@ def _author_dto(user, author_id) -> dict:
         "avatar_image_url": _image_url(user.avatar_image_path) if user else None,
         "level": user.level if user else None,
     }
+
+
+def _attachments_payload(ts, atts) -> list[dict]:
+    """添付メタ配列を DTO 化（D.3・uploaded_by は表示用ユーザー・object_key 等は非露出）。"""
+    uploader_ids = {a.uploaded_by_id for a in atts}
+    users = quests_repo.get_users_by_ids(ts, uploader_ids) if uploader_ids else {}
+    return [
+        {
+            "id": str(a.id),
+            "original_name": a.original_name,
+            "size_bytes": a.size_bytes,
+            "mime_type": a.mime_type,
+            "uploaded_by": _author_dto(users.get(a.uploaded_by_id), a.uploaded_by_id),
+            "uploaded_at": a.uploaded_at,
+        }
+        for a in atts
+    ]
