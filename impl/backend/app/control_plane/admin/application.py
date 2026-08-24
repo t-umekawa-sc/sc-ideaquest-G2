@@ -53,10 +53,28 @@ def _account_in_company(session, company_id: uuid.UUID, account_id: uuid.UUID) -
     return account
 
 
+def _ops_company_id(session) -> uuid.UUID | None:
+    """運営テナント（OPS）の会社 id。予約会社コード（config・固定）で識別（B.5.1・ADR なし＝設計固定）。"""
+    s = get_settings()
+    company = session.execute(
+        select(Company).where(Company.company_code == s.ops_company_code)
+    ).scalars().first()
+    return company.id if company else None
+
+
 def _active_system_admin_count(session) -> int:
+    """**OPS テナント内**の有効な system_admin 数（last_system_admin 保護＝B.5.1 は OPS 内が対象）。
+
+    以前は全社横断で数えており、他社の system_admin が居ると OPS の「最後の1人」保護が誤って無効化された
+    （＝ロックアウト保護の抜け）。保護対象は運営テナントなので OPS 会社に絞る。
+    """
+    ops_id = _ops_company_id(session)
+    if ops_id is None:
+        return 0
     return session.execute(
         select(func.count()).select_from(Account).where(
-            Account.system_role == "system_admin", Account.status == "active"
+            Account.system_role == "system_admin", Account.status == "active",
+            Account.company_id == ops_id,
         )
     ).scalar_one()
 
@@ -153,8 +171,9 @@ def edit_account(
             # 自己降格は常に不可（自己ロックアウト防止・B.2）
             if str(account_id) == acting_account_id:
                 raise AppError(422, "last_system_admin")
-            # 0 名化する降格は拒否（B.2/B.5.1）
-            if account.status == "active" and _active_system_admin_count(session) <= 1:
+            # OPS テナントを 0 名化する降格は拒否（B.2/B.5.1・保護対象は OPS 内）
+            if account.company_id == _ops_company_id(session) and account.status == "active" \
+                    and _active_system_admin_count(session) <= 1:
                 raise AppError(422, "last_system_admin")
 
         # identity 会社内一意（自分を除く）＝重複 409（B.2）
@@ -235,9 +254,10 @@ def disable_account(
         account = _account_in_company(session, company_id, account_id)
         if forbid_system_admin_target and account.system_role == "system_admin":
             raise AppError(403, "forbidden")  # 会社アカ管理者は system_admin を disable 不可（B.2.1）
-        if account.system_role == "system_admin" and account.status == "active":
-            if _active_system_admin_count(session) <= 1:
-                raise AppError(422, "last_system_admin")  # ロックアウト防止（B.2/B.5.1）
+        # OPS テナントを 0 名化する無効化は拒否（保護対象は OPS 内・B.5.1）。非 OPS の system_admin は対象外。
+        if account.company_id == _ops_company_id(session) and account.system_role == "system_admin" \
+                and account.status == "active" and _active_system_admin_count(session) <= 1:
+            raise AppError(422, "last_system_admin")  # ロックアウト防止（B.2/B.5.1）
         account.status = "disabled"
         account_sync_repo.enqueue(session, account_id, company_id, "disable", {"status": "disabled"})
         account_repo.revoke_all_trusted_devices(session, account_id)  # 信頼端末失効（A.9-③）

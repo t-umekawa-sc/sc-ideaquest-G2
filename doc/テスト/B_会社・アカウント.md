@@ -75,8 +75,9 @@
 | B-TC-025 | api | 無効化による全セッション即時失効 | 対象アカウントがログイン中（有効セッション） | `POST .../disable` | `200`＋`status=disabled`＋outbox（disable）。**対象の全アクティブセッション破棄＋信頼端末失効**＝対象の `GET /session` が 401（A.9-③） | B.2／A.9-③ |
 | B-TC-026 | api | 再有効化の状態復帰 | `disabled` のアカウント | `POST .../enable` | `200`＋`status=active`（outbox enable） | B.2 |
 | B-TC-027 | api | PW再設定の旧リンク失効と再送 | 実アカウント | `POST .../password-reset` | `200 {status:"sent"}`＋**新 `password_setup` チャレンジ＋mail_outbox 1行**（旧リンク失効・A.7・非同期送信） | B.2／A.7／§4.7（mail_outbox） |
-| B-TC-028 | api | 最後の system_admin 無効化の拒否 | 有効な system_admin が 1 名だけ（seed OPS 管理者） | その system_admin を `POST .../disable` | `422 {code:"last_system_admin"}`（0 名化の拒否・運営テナント保護・B.5.1） | B.2／B.5.1 |
+| B-TC-028 | api | 最後の system_admin 無効化の拒否 | OPS テナント内の有効な system_admin が 1 名だけ（seed OPS 管理者） | その system_admin を `POST .../disable` | `422 {code:"last_system_admin"}`（0 名化の拒否・運営テナント保護・B.5.1） | B.2／B.5.1 |
 | B-TC-029 | api | 範囲外アカウントの存在秘匿 | system_admin | 不明/他会社の `account_id` で `POST .../disable` | `404 not_found`（存在秘匿・§1.6） | B.2 |
+| B-TC-170 | api | last_system_admin 保護は OPS スコープ（他社 system_admin を数えない） | 非 OPS 会社に active な system_admin が別途存在＋OPS 管理者は 1 名 | OPS 管理者を `POST .../disable` | `422 last_system_admin`（他社に system_admin が居ても OPS の最後の1人は保護＝会社横断カウントの抜けを修正・B.5.1） | B.2／B.5.1 |
 
 **編集（`PATCH .../accounts/{id}`・system_admin・差分・B.2）**。
 

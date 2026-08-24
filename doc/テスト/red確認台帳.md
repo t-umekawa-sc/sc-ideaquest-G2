@@ -405,3 +405,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | B-TC-169 | 接続前＝メール列に「未確認」バッジ無し・⋯に「確認メールを送信」menuitem 無し → 接続後はバッジ表示＋送信で成功トースト |
+
+## B. last_system_admin 保護を OPS スコープに修正（2026-08-24）
+
+> 既存の抜け修正＝`_active_system_admin_count` が全社横断で数えており、非 OPS 会社に system_admin が居ると OPS の「最後の1人」保護が誤って無効化された（ロックアウト保護の穴＋テスト汚染で b_tc_028 が OPS を無効化）。OPS 会社（予約コード）スコープに限定。retro-red＝count を全社横断へ戻して B-TC-170 が red（他社 admin 併存で OPS 無効化が 200 になる）→復元で green（full 332 passed・t-umekawa active のまま）。
+
+| TC-ID | 観測 red（全社横断に戻した actual） |
+| --- | --- |
+| B-TC-170 | 非 OPS の system_admin 併存時、OPS 管理者 disable が `200`（本来 422）＝会社横断カウントで「最後の1人」と見なされず保護が外れる → OPS スコープ修正で 422 |

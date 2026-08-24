@@ -85,6 +85,21 @@ def test_b_tc_028_last_system_admin_guard(client):
     assert r.status_code == 422 and r.json()["code"] == "last_system_admin"
 
 
+def test_b_tc_170_last_system_admin_guard_is_ops_scoped(client, factory):
+    """B-TC-170 他社に active な system_admin が居ても OPS の最後の1人は保護（OPS スコープカウント・B.5.1）。"""
+    factory.make_seed_company_account(system_role="system_admin")  # 非 OPS 会社（ACME-01）の system_admin
+    _login_system_admin(client)
+    s = get_settings()
+    with control_session() as sess:
+        admin = sess.query(Account).filter_by(login_id=s.bootstrap_admin_login).one()
+        ops_id, admin_id = admin.company_id, admin.id
+
+    r = client.post(_op_url(ops_id, admin_id, "disable"), headers=_csrf(client))
+
+    # 会社横断カウントなら count>=2 で 200（OPS 無効化）になってしまう＝抜け。OPS スコープなら 422。
+    assert r.status_code == 422 and r.json()["code"] == "last_system_admin"
+
+
 def test_b_tc_029_unknown_account_404(client):
     """B-TC-029 不明/他会社アカウントの状態変更は 404（存在秘匿・B.2）。"""
     _login_system_admin(client)
