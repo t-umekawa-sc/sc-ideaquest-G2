@@ -288,10 +288,13 @@
 
   <!-- 入力検証エラー（横断標準・レビュー用） -->
   <div class="section">
-    <h2>4b. 入力検証エラーの表示（横断標準・レビュー用・2026-08-22）</h2>
-    <p class="hint" style="max-width:640px">
+    <h2>4b. 入力検証エラーの表示（横断標準・確定・2026-08-22）</h2>
+    <p class="hint" style="max-width:680px">
       <strong>インライン中心＋上部サマリ併用</strong>。エラー要素は<strong>枠が赤</strong>（<code>aria-invalid</code>）＋直下に赤字メッセージ（<code>.field__error</code>）。
       <strong>送信時＋blur</strong> で検証（入力途中では出さない）。<strong>エラー項目へのフォーカス自動移動はしない</strong>。文言は i18n（ja/en）。デザイン標準 §4.7。
+    </p>
+    <p class="hint" style="max-width:680px">
+      <strong>スクロールするフォーム/モーダルでの3チャネル（2026-08-22）</strong>＝送信失敗時に併用: ①<strong>上部サマリへスクロール</strong>（フォーカスは奪わない）②<strong>足元ヒント</strong>（送信ボタン近くの <code>.form-footer-error</code>＝スクロールしても見える）③<strong>エラースナックバー</strong>（§14・<code>type:'error'</code>・<code>duration:0</code>＝自動消滅させず✕クローズのみ）。「送信して検証」を空のまま押すと3チャネルが出ます。
     </p>
     <form id="sgValForm" class="stack" novalidate style="max-width:560px" onsubmit="return false">
       <div class="form-summary" id="sgValSummary" role="alert" hidden>
@@ -307,6 +310,8 @@
         <input class="input" id="sgValEmail" placeholder="name@example.com">
         <div class="hint">形式が不正なまま項目を離れる（blur）と、その場で赤くなります。</div>
       </div>
+      <!-- ③足元ヒント（常時見えるフッター・スクロールしても見える）。impl＝components/ui/FormFooterError。 -->
+      <p class="form-footer-error" id="sgValFooter" role="alert" hidden>入力エラーがあります。内容をご確認ください。</p>
       <div class="row">
         <button class="btn btn-primary" type="submit">送信して検証</button>
         <button class="btn btn-outline" type="button" id="sgValReset">リセット</button>
@@ -320,6 +325,8 @@
         var email = document.getElementById('sgValEmail');
         var summary = document.getElementById('sgValSummary');
         var summaryList = document.getElementById('sgValSummaryList');
+        var footer = document.getElementById('sgValFooter');
+        var errSnack = null; // 持続エラースナックバー（duration:0）＝重複させないため参照を保持
         // (field, ルール) → メッセージ。本番は i18n カタログ（ja/en）で解決（§4.7）。ここは ja 見本。
         function validate(input) {
           var v = (input.value || '').trim();
@@ -348,12 +355,21 @@
           if (items.length) {
             summaryList.innerHTML = items.map(function (it) { return '<li><a href="#' + it.id + '" onclick="document.getElementById(\'' + it.id + '\').focus();return false;">' + it.label + '</a>：' + it.msg + '</li>'; }).join('');
             summary.hidden = false; // フォーカスは移動しない（サマリ内リンクはユーザーが押した時のみ移動）
+            // ①上部サマリへスクロール（フォーカスは奪わない）②足元ヒント表示 ③エラースナックバー（duration:0）
+            summary.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            footer.hidden = false;
+            var m = items.length === 1 ? items[0].msg : (items.length + '件の入力エラーがあります。');
+            if (errSnack && errSnack.isConnected) errSnack.remove();
+            errSnack = window.iqSnack({ type: 'error', title: '入力内容を確認してください', msg: m, duration: 0 });
           } else {
-            summary.hidden = true;
+            summary.hidden = true; footer.hidden = true;
+            if (errSnack && errSnack.isConnected) { errSnack.remove(); errSnack = null; }
           }
         });
         document.getElementById('sgValReset').addEventListener('click', function () {
-          window.clearFieldErrors(form); summary.hidden = true; title.value = ''; email.value = '';
+          window.clearFieldErrors(form); summary.hidden = true; footer.hidden = true;
+          if (errSnack && errSnack.isConnected) { errSnack.remove(); errSnack = null; }
+          title.value = ''; email.value = '';
         });
       })();
     </script>
@@ -621,10 +637,21 @@
       <button class="btn-pixel" type="button" id="snkReward">▶ 報酬（＋XP/コイン）</button>
       <button class="btn-pixel" type="button" id="snkLevel">▶ レベルアップ！</button>
       <button class="btn btn-outline" type="button" id="snkStack">重なり（5件・上限確認）</button>
+      <button class="btn btn-outline" type="button" id="snkPersist">持続エラー（✕のみ・duration:0）</button>
     </div>
     <p class="hint">呼び出しは1関数（デモの <code>iqSnack({type,title,msg,rewards,action,duration})</code>）を想定。
-      <code>type</code>＝success/error/info（意味色）と reward/levelup（報酬・CRTガラス）。<code>aria-live</code> で読み上げ、エラーは <code>role="alert"</code>。<code>prefers-reduced-motion</code> で動きを抑制。</p>
+      <code>type</code>＝success/error/info（意味色）と reward/levelup（報酬・CRTガラス）。<code>aria-live</code> で読み上げ、エラーは <code>role="alert"</code>。<code>prefers-reduced-motion</code> で動きを抑制。
+      <strong><code>duration:0</code> で自動消滅させない</strong>（✕クローズのみ＝§4.7 の持続エラー等）。</p>
     <p class="hint"><strong>重なり増加時の UI（決定 2026-08-22）＝同時表示は最新 3 件まで</strong>。4 件目以降は上部に「<strong>▽ その他 N 件</strong>」を表示（<strong>標準スナックバーと同じ緑のゲージ付き＝折りたたみ中で「最後に消える」隠れ通知の残り時間を表す</strong>）。<strong>クリックで全件を縦スクロール表示</strong>（<strong>スナックバー領域だけに縦スクロール・各バーは潰れず自然高さ・残り時間インジケータは動き続ける</strong>）・「▲ 折りたたむ」で戻す。「重なり（5件・上限確認）」で挙動を確認できる。</p>
+
+    <h3 style="margin-top:var(--space-5)">14b. セッション終了時の通知（§14・決定 2026-08-23）</h3>
+    <p class="muted text-sm">セッション切れで<strong>ログイン画面へ戻された時</strong>、なぜ戻されたかを <code>info</code> トーストで伝える（無言リダイレクトの UX 改善・<strong>自動消滅</strong>＝一過性の案内で sticky は使わない）。
+      受け渡しは URL query の enum <code>reason</code>（<code>session_expired</code>／<code>logged_out</code>）で、ログイン画面が<strong>固定文言にマップ</strong>して表示（表示後 query を除去＝ワンショット）。<strong>未ログインの直アクセス</strong>（Cookie が最初から無い）は<strong>通知なし</strong>。</p>
+    <div class="row" style="gap:var(--space-2); flex-wrap:wrap">
+      <button class="btn btn-outline" type="button" id="snkSession">セッション切れ（session_expired）</button>
+      <button class="btn btn-outline" type="button" id="snkLogout">ログアウト（logged_out）</button>
+    </div>
+    <p class="hint">実体（impl）＝401 を <code>lib/api/client</code> の <code>apiFetch</code> が <code>/login?reason=session_expired</code> へ一元リダイレクト（<code>/auth/*</code> 除外・<code>/login</code> 上は無処理）／<code>(auth)</code> レイアウトの <code>SessionNotice</code> が <code>reason</code> を固定文言にマップ→トースト→query 除去。セキュリティ＝reason は非機密 enum のみ・リダイレクト先は固定 <code>/login</code>（可変 next 無し）。</p>
   </div>
 
   <!-- 15. 確認ダイアログ（提案・ゲーム要素入り） -->
@@ -843,6 +870,11 @@
     document.getElementById('snkStack').addEventListener('click', () => {
       for (let i = 1; i <= 5; i++) snk({ type: 'success', title: '通知 ' + i + ' / 5', msg: '最大3件・超過は最古から退場します。' });
     });
+    // 持続エラー（duration:0）＝自動消滅させず ✕クローズのみ（§4.7 の3チャネル③）。
+    document.getElementById('snkPersist').addEventListener('click', () => snk({ type: 'error', title: '入力内容を確認してください', msg: '3件の入力エラーがあります。', duration: 0 }));
+    // 14b. セッション終了通知（§14）＝reason enum を固定文言にマップ・自動消滅の info。
+    document.getElementById('snkSession').addEventListener('click', () => snk({ type: 'info', msg: 'セッションの有効期限が切れました。もう一度ログインしてください。' }));
+    document.getElementById('snkLogout').addEventListener('click', () => snk({ type: 'info', msg: 'ログアウトしました。' }));
   })();
 
   // --- 15. 確認ダイアログ デモ。生成 API は shared.js の window.iqConfirm（Promise<boolean>） ---

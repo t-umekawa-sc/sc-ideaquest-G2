@@ -1049,7 +1049,7 @@ window.DataTable = (function () {
 
   function snacks(s) { return Array.prototype.slice.call(s.querySelectorAll('.snackbar')); }
   function pause(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); m.timer = null; if (m.bar) m.bar.style.animationPlayState = 'paused'; }
-  function arm(el) { const m = meta.get(el); if (!m) return; clearTimeout(m.timer); m.start = Date.now(); if (m.bar) m.bar.style.animationPlayState = 'running'; m.timer = setTimeout(() => dismiss(el), m.dur); }
+  function arm(el) { const m = meta.get(el); if (!m || !m.dur) return; clearTimeout(m.timer); m.start = Date.now(); if (m.bar) m.bar.style.animationPlayState = 'running'; m.timer = setTimeout(() => dismiss(el), m.dur); }
   function dismiss(el) {
     const m = meta.get(el); if (m) clearTimeout(m.timer);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1108,7 +1108,8 @@ window.DataTable = (function () {
     o = o || {};
     const isReward = o.type === 'reward' || o.type === 'levelup';
     const variant = isReward ? 'reward' : (o.type || 'info');
-    const dur = o.duration || (o.action ? 6000 : 4000);
+    // duration:0 ＝自動消滅させない（✕クローズのみ・§4.7 の持続的エラー等）。未指定はアクション有 6s/無 4s。
+    const dur = o.duration === 0 ? 0 : (o.duration || (o.action ? 6000 : 4000));
     const el = document.createElement('div');
     el.className = 'snackbar snackbar--' + variant;
     el.setAttribute('role', o.type === 'error' ? 'alert' : 'status');
@@ -1119,7 +1120,7 @@ window.DataTable = (function () {
     html += '</div>';
     if (o.action) html += '<button class="snackbar__action" type="button">' + o.action.label + '</button>';
     html += '<button class="snackbar__close" type="button" aria-label="閉じる">✕</button>';
-    html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>';
+    if (dur) html += '<span class="snackbar__timer" style="animation-duration:' + dur + 'ms"></span>'; // 持続（dur:0）はタイマーバー無し
     el.innerHTML = html;
     const s = stack();
     s.appendChild(el);
@@ -1129,7 +1130,7 @@ window.DataTable = (function () {
     const act = el.querySelector('.snackbar__action');
     if (act) act.addEventListener('click', () => { try { o.action.onClick && o.action.onClick(); } finally { dismiss(el); } });
     el.addEventListener('mouseenter', () => pause(el));
-    el.addEventListener('mouseleave', () => { const m = meta.get(el); if (m) { m.timer = setTimeout(() => dismiss(el), 1500); if (m.bar) m.bar.style.animationPlayState = 'running'; } });
+    el.addEventListener('mouseleave', () => { const m = meta.get(el); if (m && m.dur) { m.timer = setTimeout(() => dismiss(el), 1500); if (m.bar) m.bar.style.animationPlayState = 'running'; } });
     arm(el);   // 展開中も含め常に自動消滅タイマーを張る（インジケータを動かし続ける）
     reflow();
     return el;

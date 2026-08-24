@@ -350,6 +350,13 @@ img { max-width: 100%; display: block; }
 .form-summary ul { margin: 0; padding-left: 1.2em; }
 .form-summary a { color: inherit; text-decoration: underline; }
 
+/* 足元ヒント（§4.7 の3チャネルの一つ）＝送信ボタン近く（常時見えるフッター）の簡潔なエラー行。
+   スクロールするフォーム/モーダルでも見える点が要（上部サマリが画面外でも気づける）。 */
+.form-footer-error { display: flex; align-items: center; gap: var(--space-2); color: var(--color-danger);
+  font-size: var(--text-sm); font-weight: 500; }
+.form-footer-error[hidden] { display: none; }
+.form-footer-error::before { content: "⚠"; }
+
 /* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
 body.modal-open { overflow: hidden; }
 
