@@ -66,6 +66,9 @@ def env():
     with get_tenant_session(db_identifier) as ts:
         ts.add(QuestGroup(id=group_id, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
         ts.add(User(id=other_id, account_id=uuid.uuid4(), display_name="Other", locale="ja", status="active"))
+        # 投稿 XP の日次上限(10/日)前提をリセット＝seed ユーザーの chat XP を掃除（e2e 等の蓄積で E-TC-102 が
+        # 上限に阻まれないようにする・テスト分離）。
+        ts.execute(Activity.__table__.delete().where(Activity.user_id == user_id, Activity.reason == "chat"))
         ts.commit()
 
     def make_quest(*, owner=None, status="recruiting", seed_perms=None, seed_member=True) -> uuid.UUID:

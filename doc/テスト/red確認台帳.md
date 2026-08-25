@@ -502,3 +502,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前/単一引用 actual） |
 | --- | --- |
 | E-TC-203 | 旧（単一引用）バンドルでは 2件目の💬引用が1件目を上書きし「引用返信（2件）」にならず、返信の `.msg__quote` が2件にならない → red。複数引用実装＋再ビルドで `quoted_message_ids[]`→`quotes[]` により2件表示 → green |
+
+## G. ショップ/装備（新モジュール・G-TC-301〜308・2026-08-25）
+
+> 新規モジュール `tenant/shop`（items/user_items・migration 0015＋シード19点）＝新規 EP は test-first。中核ガードの反転で retro-red。backend 396 passed（chat XP 日次上限のテスト分離も修正＝env セットアップで seed ユーザーの reason=chat を掃除）。
+
+| TC-ID | 観測 red（中核ガード反転 actual） |
+| --- | --- |
+| G-TC-303 | 購入の残高チェックを無効化＝残高不足でも購入できる → `assert 409`（insufficient_balance）が 200 で red。復元で 409 → green |
+| G-TC-307 | 装備の所有/スロット検証を無効化＝別スロットのアイテムを装備できる → `assert 422` が 200 で red。復元で 422（field=slot）→ green |

@@ -22,3 +22,18 @@
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-201 | e2e | 魔法カタログが実データ（SP残高・解放数・6魔法） | ログイン | `/spells` を表示 | `GET /spells` と照合＝SP残高 `✦{skill_point_balance}`・「解放 {unlocked} / 6」・6魔法（炎/雷/虹/氷/キラキラ/オーラ）が2系統で出る（デモ固定 3/6・✦3 でない） | G／SC-32 |
+
+## 3. ショップ/装備 API（SC-30/SC-31・G.1/G.2）
+
+> 対象＝`app/tenant/shop/`（items/user_items・migration 0015＋シード19点）。購入＝残高検証＋コイン消費（ledger COIN_SPEND・reason=shop_purchase）＋所有行作成。装備＝部分マップ（各スロット1点＝部分ユニーク）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-301 | api | 装備マスタ＋所有/装備/残高 | 未所有 | `GET /items` | 200・19点・各行 `owned`/`is_equipped`・`coin_balance` | G.1／§5.25 |
+| G-TC-302 | api | 購入成功（コイン消費＋所有） | 残高≥価格・未所有 | `POST /items/{id}/purchase` | 200・`owned=true`・`coin_balance` が price 分減・`activities`(coin_spend/shop_purchase/items) 記帳 | G.1／§7 |
+| G-TC-303 | api | 残高不足は 409 | 残高<価格 | `POST purchase` | 409 `insufficient_balance`・残高不変 | G.1 |
+| G-TC-304 | api | 所有済みは 409 | 所有済み | `POST purchase` | 409 `already_owned`・二重消費なし | G.1／§5.26 |
+| G-TC-305 | api | 自分の所有装備（スロット別） | 数点所有 | `GET /me/items` | `slots`（head/face/body/hand/background）＋`equipped` | G.2 |
+| G-TC-306 | api | 装備更新（各スロット1点・切替/解除） | 同スロット2点所有 | `PUT /me/equipment`（装備→別装備→null） | 装備で `equipped[slot]`＝item・切替で1点のみ（部分ユニーク）・null で解除 | G.2／§8-⑩ |
+| G-TC-307 | api | 未所有/スロット不一致は 422 | 未所有 item / 別スロット item | `PUT /me/equipment` | 422（`field`＝slot） | G.2 |
+| G-TC-308 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST purchase`／`PUT equipment` | 403 csrf_failed／401 | A.0 |
