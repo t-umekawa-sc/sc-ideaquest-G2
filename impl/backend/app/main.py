@@ -21,6 +21,7 @@ from app.tenant.quests.router import router as quests_router
 from app.tenant.ideas.router import router as ideas_router
 from app.tenant.evaluations.router import router as evaluations_router
 from app.tenant.chat.router import router as chat_router
+from app.tenant.gamification.router import router as gamification_router
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -61,6 +62,7 @@ app.include_router(quests_router)  # テナントプレーン（ドメイン C�
 app.include_router(ideas_router)  # テナントプレーン（ドメイン D・アイデア CRUD/公開）
 app.include_router(evaluations_router)  # テナントプレーン（ドメイン F・評価/選定/投稿者コイン）
 app.include_router(chat_router)  # テナントプレーン（ドメイン E・チャット/既読/活発度）
+app.include_router(gamification_router)  # テナントプレーン（ドメイン G・魔法カタログ/解放）
 
 
 @app.middleware("http")

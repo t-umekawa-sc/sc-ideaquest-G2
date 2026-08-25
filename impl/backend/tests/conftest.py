@@ -272,9 +272,11 @@ def factory():
         s.commit()
     for db_identifier, aid in created_users:
         with get_tenant_session(db_identifier) as ts:
-            # activities（FK→users・ON DELETE RESTRICT）は user 削除前に掃除（G 台帳付与の後始末）
+            # activities/user_spells（FK→users）は user 削除前に掃除（G 台帳付与・魔法解放の後始末）
             user = ts.query(User).filter_by(account_id=aid).one_or_none()
             if user is not None:
                 ts.query(Activity).filter_by(user_id=user.id).delete()
+                from app.tenant.chat.orm import UserSpell as _UserSpell
+                ts.query(_UserSpell).filter_by(user_id=user.id).delete()
             ts.query(User).filter_by(account_id=aid).delete()
             ts.commit()

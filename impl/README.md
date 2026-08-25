@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 374 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／**チャット E コア会話 ＝14**）・e2e sc-25（3＝評価 F-TC-201〜203）＋sc-22（attachments 2／quest-ref 2／vote-follow 4／idea-detail 1／revisions 1）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 336）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 388 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／**チャット E ＝22**〔コア14＋リアクション8〕／**魔法解放 G ＝6**）・e2e sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 337）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -25,7 +25,7 @@
 | SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。ヘッダー💡件数は `idea_count`（公開数）に連動。評価列(F)/週間ランキング(G)/全文検索(J) は demo |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |
 | SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー**（D.5/D.6）＋**添付（D.3）表示/DL**＋**quest 参照**（D.1）＋**更新履歴モーダル**（D.4）＋**評価結果（F.1 集計・limited 非表示）＋選定（F.3）＋評価導線**（my_permissions 出し分け）。チャット(E) は表示のみ |
-| SC-24 | アイデアチャット | ⬜ | `(app)/ideas/[ideaId]/chat` | **backend E コア会話 実装済み**（メッセージ CRUD・既読・活発度・添付・メンション・投稿XP）。リアクション/魔法（E.4）とフロント接続は次スライス（現状モック） |
+| SC-24 | アイデアチャット | ⬜ | `(app)/ideas/[ideaId]/chat` | **backend E 実装済み**（会話 CRUD・既読・活発度・添付・メンション・投稿XP＋リアクション/魔法 E.4）＋**G 魔法解放**（`/spells`・unlock）。フロント接続は次スライス（現状モック） |
 | SC-25 | 評価画面 | ✅ | `(app)/ideas/[ideaId]/eval` | 5観点採点＋観点別コメント＋総評＋公開範囲＋集計プレビュー（F.2）。`getMyEvaluation` プリフィル・確定/下書き＝`putEvaluation`・422/403/409 はサーバー権威。※設計はモーダル（Intercept）だが現状フルページ（intercept モーダル化は follow-up） |
 | SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
 | SC-31 | アバター着せ替え | ⬜ | `(app)/avatar` | モックのみ |
@@ -64,8 +64,8 @@
 | クエスト（C） | `tenant/quests` | ✅ 一覧/詳細/CRUD |
 | アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011） |
 | 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |
-| チャット（E） | `tenant/chat` | 🟡 **コア会話 6 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`）＝投稿/編集/削除・既読・活発度・添付（D.3 共通 DL に拡張）・メンション・投稿XP+5（日次上限）。公開で chat_group 自動作成。migration 0013（全 E テーブル＋reaction_emojis/spells シード）。**リアクション/魔法（E.4）は未実装** |
-| ゲーム(G) | 一部（`gamification`） | 🟡 ledger（XP/コイン/SP 台帳・残高・レベル）は実装済み。魔法解放（`user_spells`/unlock）・ショップ等は未着手 |
+| チャット（E） | `tenant/chat` | ✅ **8 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`＋**`POST/DELETE chat-messages/{id}/reactions`**〔通常/魔法・E.4〕）＝投稿/編集/削除・既読・活発度・添付・メンション・投稿XP+5・リアクション（マスタ絵文字）・魔法（1メッセージ1魔法/1チャット1回）。公開で chat_group 自動作成。migration 0013。**通知(H)/リアルタイム(L)は no-op** |
+| ゲーム(G) | `gamification` | 🟡 ledger（XP/コイン/SP 台帳・残高・レベル）＋**魔法カタログ/解放 2 EP**（`GET /spells`・`POST /spells/{id}/unlock`＝SP消費・前提/二重解放ガード）。ショップ/装備/実績/ランキングは未着手 |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 

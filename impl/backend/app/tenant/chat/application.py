@@ -255,6 +255,85 @@ def mark_read(account_id, company_id, idea_id, *, last_read_message_id) -> dict:
     return {"last_read_message_id": str(lrid), "unread_count": 0}
 
 
+# ---- リアクション（通常＋魔法・E.4） ----
+
+
+def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_id=None) -> dict:
+    """リアクション付与（E.4）。通常＝絵文字マスタ／魔法＝解放済み＋1メッセージ1魔法＋1チャット1回。完了は 409。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    mid = _parse_uuid(message_id, field="message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        msg, idea, quest, cg = _resolve_message(ts, mid, user)
+        _guard_not_completed(quest)
+        if msg.is_deleted:
+            raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
+        if type == "normal":
+            if not emoji or repo.get_active_emoji(ts, emoji) is None:
+                raise AppError(422, "validation_error", detail="使用できない絵文字です", errors=[{"field": "emoji", "code": "invalid_reaction_emoji"}])
+            if repo.get_normal_reaction(ts, msg.id, user.id, emoji) is None:  # 同一ユーザー×同一絵文字は冪等
+                repo.add_reaction(ts, chat_message_id=msg.id, chat_group_id=cg.id, user_id=user.id, type="normal", emoji=emoji)
+        elif type == "magic":
+            sid = _parse_uuid(str(spell_id), field="spell_id")
+            if repo.get_spell(ts, sid) is None:
+                raise AppError(404, "not_found")
+            if not repo.is_spell_unlocked(ts, user.id, sid):
+                raise AppError(403, "forbidden", detail="この魔法は未解放です", extra={"errors": [{"reason": "spell_not_unlocked"}]})
+            if repo.get_magic_reaction_of_message(ts, msg.id) is not None:
+                raise AppError(409, "conflict", detail="このメッセージには既に魔法が付いています", extra={"errors": [{"reason": "message_already_has_magic"}]})
+            if repo.get_user_magic_in_group(ts, cg.id, user.id, sid) is not None:
+                raise AppError(409, "conflict", detail="この魔法はこのチャットで既に使用済みです", extra={"errors": [{"reason": "spell_already_used_in_chat"}]})
+            repo.add_reaction(ts, chat_message_id=msg.id, chat_group_id=cg.id, user_id=user.id, type="magic", spell_id=sid)
+        else:
+            raise AppError(422, "validation_error", detail="type が不正です", errors=[{"field": "type"}])
+        result = {"reactions": _message_reactions(ts, msg, user.id)}
+        ts.commit()
+    _notify_reaction(idea.id, msg.id, type)
+    return result
+
+
+def remove_reaction(account_id, company_id, message_id, *, emoji=None, magic=False) -> dict:
+    """リアクション取消（E.4・自分の分のみ）。通常＝emoji／魔法＝type=magic。完了は 409。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    mid = _parse_uuid(message_id, field="message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        msg, _idea, quest, _cg = _resolve_message(ts, mid, user)
+        _guard_not_completed(quest)
+        if magic:
+            r = repo.get_magic_reaction_of_message(ts, msg.id)
+            if r is not None and r.user_id == user.id:  # 他人の魔法は取消不可
+                repo.remove_reaction(ts, r)
+        elif emoji:
+            r = repo.get_normal_reaction(ts, msg.id, user.id, emoji)
+            if r is not None:
+                repo.remove_reaction(ts, r)
+        result = {"reactions": _message_reactions(ts, msg, user.id)}
+        ts.commit()
+    return result
+
+
+def _message_reactions(ts, msg, viewer_id) -> dict:
+    """当該メッセージのリアクション集計（E.1 の reactions 形）。"""
+    rs = repo.list_reactions_for_messages(ts, [msg.id]).get(msg.id, [])
+    users = quests_repo.get_users_by_ids(ts, {r.user_id for r in rs}) if rs else {}
+    spells = {s.id: s for s in repo.list_spells(ts)}
+    return _reactions_dto(rs, viewer_id, users, spells)
+
+
+def _notify_reaction(idea_id, message_id, type) -> None:
+    """魔法リアクション付与時の magic_reaction 通知（H・E.6）＋chat.reaction 配信（L・E.7）。実装まで no-op。"""
+    return None
+
+
 # ---- ドメイン関数（門番・認可・検証・表現） ----
 
 

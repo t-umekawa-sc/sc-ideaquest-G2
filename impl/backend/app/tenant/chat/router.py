@@ -17,6 +17,8 @@ from app.tenant.chat.schemas import (
     ChatDeleteResponse,
     ChatListResponse,
     ChatMessageDTO,
+    ChatReactionRequest,
+    ChatReactionsResponse,
     ChatReadRequest,
     ChatReadResponse,
 )
@@ -111,6 +113,41 @@ def delete_message(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id,
     )
     return ChatDeleteResponse(**result)
+
+
+@router.post("/chat-messages/{message_id}/reactions", response_model=ChatReactionsResponse)
+def add_reaction(
+    message_id: str,
+    body: ChatReactionRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> ChatReactionsResponse:
+    """リアクション付与（通常/魔法・E.4）。マスタ/解放/1メッセージ1魔法/1チャット1回はサーバー強制。完了は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.add_reaction(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id,
+        type=body.type, emoji=body.emoji, spell_id=body.spell_id,
+    )
+    return ChatReactionsResponse(**result)
+
+
+@router.delete("/chat-messages/{message_id}/reactions", response_model=ChatReactionsResponse)
+def remove_reaction(
+    message_id: str,
+    request: Request,
+    emoji: str | None = Query(default=None),
+    type: str | None = Query(default=None),
+    session: dict = Depends(require_me),
+) -> ChatReactionsResponse:
+    """リアクション取消（自分の分・E.4）。通常＝`emoji`／魔法＝`type=magic`。完了は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.remove_reaction(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id,
+        emoji=emoji, magic=(type == "magic"),
+    )
+    return ChatReactionsResponse(**result)
 
 
 @router.post("/ideas/{idea_id}/chat/read", response_model=ChatReadResponse)

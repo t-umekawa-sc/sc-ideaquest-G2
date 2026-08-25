@@ -15,7 +15,7 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as chat_repo
-from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatRead, Reaction
+from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatRead, Reaction, Spell, UserSpell
 from app.tenant.gamification.orm import Activity
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.ideas.orm import Attachment, Idea, IdeaRevision
@@ -114,8 +114,21 @@ def env():
                 ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(member_ids)))
             ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id.in_(quests)))
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(quests)))
+        # テストで解放した魔法（user_spells）を掃除（ACME-01/other・spell マスタは残す）。
+        ts.execute(UserSpell.__table__.delete().where(UserSpell.user_id.in_([user_id, other_id])))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == group_id))
         ts.execute(User.__table__.delete().where(User.id == other_id))
+        ts.commit()
+
+
+def _spell_id(env, code):
+    with get_tenant_session(env.db_identifier) as ts:
+        return ts.execute(select(Spell.id).where(Spell.code == code)).scalars().one()
+
+
+def _unlock(env, user_id, code):
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(UserSpell(id=uuid.uuid4(), user_id=user_id, spell_id=ts.execute(select(Spell.id).where(Spell.code == code)).scalars().one()))
         ts.commit()
 
 
@@ -276,3 +289,94 @@ def test_e_tc_114_csrf_and_unauth(client, env):
     assert client.post(MSGS, data={"idea_id": str(idea), "body": "x"}).status_code == 401
     _login_seed(client)
     assert client.post(MSGS, data={"idea_id": str(idea), "body": "x"}).status_code == 403
+
+
+# ---- リアクション（E.4） ----
+
+def _react(client, mid, **body):
+    return client.post(f"{MSGS}/{mid}/reactions", json=body, headers=_csrf(client))
+
+
+def test_e_tc_115_normal_toggle(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    r = _react(client, mid, type="normal", emoji="👍")
+    assert r.status_code == 200, r.text
+    normal = {n["emoji"]: n for n in r.json()["reactions"]["normal"]}
+    assert normal["👍"]["count"] == 1 and normal["👍"]["reacted_by_me"] is True
+    d = client.delete(f"{MSGS}/{mid}/reactions", params={"emoji": "👍"}, headers=_csrf(client))
+    assert d.status_code == 200 and d.json()["reactions"]["normal"] == []
+
+
+def test_e_tc_116_normal_master_only(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    assert _react(client, mid, type="normal", emoji="🍣").status_code == 422
+
+
+def test_e_tc_117_normal_idempotent(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    _react(client, mid, type="normal", emoji="👍")
+    r = _react(client, mid, type="normal", emoji="👍")
+    normal = {n["emoji"]: n for n in r.json()["reactions"]["normal"]}
+    assert normal["👍"]["count"] == 1
+
+
+def test_e_tc_118_magic_requires_unlock(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    assert _react(client, mid, type="magic", spell_id=str(_spell_id(env, "flame_1"))).status_code == 403
+
+
+def test_e_tc_119_one_magic_per_message(client, env):
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    mid = _post(client, idea, body="m").json()["id"]
+    # 他ユーザーが先に魔法を付与済み（直接 seed）。
+    with get_tenant_session(env.db_identifier) as ts:
+        cg = chat_repo.get_chat_group_by_idea(ts, idea)
+        chat_repo.add_reaction(ts, chat_message_id=uuid.UUID(mid), chat_group_id=cg.id, user_id=env.other_id,
+                               type="magic", spell_id=_spell_id(env, "light_1"))
+        ts.commit()
+    _unlock(env, env.user_id, "flame_1")  # 自分は別 spell 解放済み
+    assert _react(client, mid, type="magic", spell_id=str(_spell_id(env, "flame_1"))).status_code == 409
+
+
+def test_e_tc_120_one_spell_per_chat(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    m1 = _post(client, idea, body="1").json()["id"]
+    m2 = _post(client, idea, body="2").json()["id"]
+    _unlock(env, env.user_id, "flame_1")
+    assert _react(client, m1, type="magic", spell_id=str(_spell_id(env, "flame_1"))).status_code == 200
+    assert _react(client, m2, type="magic", spell_id=str(_spell_id(env, "flame_1"))).status_code == 409
+
+
+def test_e_tc_121_magic_remove_own_only(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    _unlock(env, env.user_id, "flame_1")
+    _react(client, mid, type="magic", spell_id=str(_spell_id(env, "flame_1")))
+    d = client.delete(f"{MSGS}/{mid}/reactions", params={"type": "magic"}, headers=_csrf(client))
+    assert d.status_code == 200 and d.json()["reactions"]["magic"] is None
+
+
+def test_e_tc_122_completed_frozen(client, env):
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    mid = _post(client, idea, body="m").json()["id"]
+    # 投稿後にクエストを完了へ（seed で completed に作ると投稿自体が 409 になるため、ORM で完了化）。
+    with get_tenant_session(env.db_identifier) as ts:
+        from app.tenant.quests.orm import Quest
+        idea_row = ts.get(Idea, uuid.UUID(str(idea)))
+        quest = ts.get(Quest, idea_row.quest_id)
+        quest.status = "completed"
+        ts.commit()
+    assert _react(client, mid, type="normal", emoji="👍").status_code == 409

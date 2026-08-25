@@ -468,3 +468,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | E-TC-104 | `_require_comment` を no-op に反転＝comment 権限なしでも投稿できる → `assert 403` が失敗（201）で red。復元で 403 → green |
 | E-TC-102 | `_award_chat_xp` の grant を抑止＝投稿しても XP が付かない → `activities`(reason=chat) が 0 で red。復元で XP+5（日次上限10/日）→ green |
+
+## E/G. リアクション/魔法＋魔法解放（E-TC-115〜122・G-TC-101〜106・2026-08-25）
+
+> コミット2＝リアクション（通常/魔法・E.4）＋魔法解放（G unlock・SP 消費）。新規 EP は test-first。retro-red は中核ガードの反転（解放済みチェック・SP チェック）で目視。backend 388 passed（374＋14）。
+
+| TC-ID | 観測 red（中核ロジック反転 actual） |
+| --- | --- |
+| E-TC-118 | 魔法リアクションの `is_spell_unlocked` ガードを無効化＝未解放でも魔法を付けられる → `assert 403`（spell_not_unlocked）失敗で red。復元で 403 → green |
+| G-TC-103 | unlock の SP 充足チェックを無効化＝SP 不足でも解放できてしまう → `assert 409`（insufficient_sp）失敗で red。復元で 409 → green |

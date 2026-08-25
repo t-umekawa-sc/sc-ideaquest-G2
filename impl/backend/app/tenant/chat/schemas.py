@@ -79,6 +79,16 @@ class ChatActivityResponse(BaseModel):
     total_messages: int = 0
 
 
+class ChatReactionRequest(BaseModel):
+    type: str  # normal / magic
+    emoji: str | None = None
+    spell_id: str | None = None
+
+
+class ChatReactionsResponse(BaseModel):
+    reactions: dict  # {normal:[...], magic:{...}|null}
+
+
 class ChatReadRequest(BaseModel):
     last_read_message_id: str
 

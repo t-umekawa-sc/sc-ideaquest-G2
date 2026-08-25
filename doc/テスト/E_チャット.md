@@ -23,3 +23,18 @@
 | E-TC-112 | api | 活発度集計（日次＋版マーカー） | メッセージ数件＋公開後編集（版2） | `GET /ideas/{id}/chat-activity` | `daily[]`（日次件数）・`revision_markers[]`（版日時）・`total_messages` | E.1／D.4 |
 | E-TC-113 | api | チャット添付→DL 署名URL | comment 権限・Fake storage | `POST`（files=png）→`GET /attachments/{aid}/download` | 201・メッセージ `attachments[]`（kind=image）・DL EP が `{url}`（チャット添付も共通 EP で解決） | E.3／§1.10 |
 | E-TC-114 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /chat-messages` | 403 csrf_failed／401 | A.0 |
+
+## 2. リアクション（通常＋魔法・E.4）
+
+> 対象＝`POST/DELETE /chat-messages/{id}/reactions`（統合 EP・`type` 判別）。通常＝`reaction_emojis` マスタ・同一ユーザー×同一絵文字不可。魔法＝解放済み（`user_spells`）＋1メッセージ1魔法（早い者勝ち）＋1チャット1回。完了は 409。魔法解放（前提）は §G 参照。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E-TC-115 | api | 通常リアクション付与→取消（トグル・集計） | メッセージ1件 | `POST reactions`（normal 👍）→`DELETE ?emoji=👍` | 付与で `normal[👍].count=1`・`reacted_by_me`／取消で 0 | E.4／§5.18 |
+| E-TC-116 | api | 通常はマスタ絵文字のみ | メッセージ1件 | `POST reactions`（normal・非マスタ絵文字） | 422 `invalid_reaction_emoji` | E.4／§5.30 |
+| E-TC-117 | api | 同一ユーザー×同一絵文字は冪等 | 👍付与済み | `POST reactions`（normal 👍）再送 | 200・`count` は 1 のまま（重複行なし） | E.4／§5.18 |
+| E-TC-118 | api | 魔法は解放済み必須 | 未解放の spell | `POST reactions`（magic・未解放） | 403 `spell_not_unlocked` | E.4／§5.20 |
+| E-TC-119 | api | 1メッセージ1魔法（早い者勝ち） | 他ユーザーが魔法付与済みのメッセージ・自分は別 spell 解放済み | `POST reactions`（magic） | 409 `message_already_has_magic` | E.4／§5.18 魔法② |
+| E-TC-120 | api | 1チャット1回（同一ユーザー×同一 spell） | msg1 に自分の魔法済み・同 spell | 別 msg2 に `POST reactions`（同 spell） | 409 `spell_already_used_in_chat`。取消すれば付け替え可 | E.4／§5.18 魔法① |
+| E-TC-121 | api | 魔法取消は本人のみ | 自分の魔法／他人の魔法 | `DELETE ?type=magic` | 本人＝除去（別メッセージへ付け替え可）／他人＝残る | E.4 |
+| E-TC-122 | api | 完了クエストはリアクション凍結 | completed クエスト | `POST/DELETE reactions` | 409（invalid_state） | E.4／C.5 |
