@@ -35,6 +35,7 @@ class ChatMessageDTO(BaseModel):
 
     id: str
     is_deleted: bool = False
+    is_mine: bool = False
     created_at: datetime
     deleted_at: datetime | None = None
     author: ChatAuthorDTO | None = None

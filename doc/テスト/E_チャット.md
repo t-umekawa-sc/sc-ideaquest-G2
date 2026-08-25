@@ -38,3 +38,11 @@
 | E-TC-120 | api | 1チャット1回（同一ユーザー×同一 spell） | msg1 に自分の魔法済み・同 spell | 別 msg2 に `POST reactions`（同 spell） | 409 `spell_already_used_in_chat`。取消すれば付け替え可 | E.4／§5.18 魔法① |
 | E-TC-121 | api | 魔法取消は本人のみ | 自分の魔法／他人の魔法 | `DELETE ?type=magic` | 本人＝除去（別メッセージへ付け替え可）／他人＝残る | E.4 |
 | E-TC-122 | api | 完了クエストはリアクション凍結 | completed クエスト | `POST/DELETE reactions` | 409（invalid_state） | E.4／C.5 |
+
+## 3. 画面 e2e（SC-24 アイデアチャット・E.1/E.2/E.4）
+
+> 対象＝フロント接続済み SC-24（`features/chat/components/IdeaChatView.tsx`・`/(app)/ideas/[ideaId]/chat`）。e2e は契約の最終確認（画面↔API）に限定。前提＝dev seed ACME-01（owner＝comment 権限）。下地クエスト/公開アイデアは API で作成し teardown で論理削除。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E-TC-201 | e2e | メッセージ投稿→スレッド反映＋通常リアクション | ログイン・API で recruiting クエスト＋published アイデア（chat_group は公開で自動作成） | `/ideas/{id}/chat` で入力→送信→リアクション ＋→👍 | 送信メッセージが `.msg__text` に出る（`postMessage`→`getChat`）・「＋」→ピッカー→👍 で `.reaction` チップ（`addReaction`・`getChat` 実データ） | E.1/E.2/E.4／SC-24 |

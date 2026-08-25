@@ -477,3 +477,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | E-TC-118 | 魔法リアクションの `is_spell_unlocked` ガードを無効化＝未解放でも魔法を付けられる → `assert 403`（spell_not_unlocked）失敗で red。復元で 403 → green |
 | G-TC-103 | unlock の SP 充足チェックを無効化＝SP 不足でも解放できてしまう → `assert 409`（insufficient_sp）失敗で red。復元で 409 → green |
+
+## E. SC-24 チャット フロント接続（E-TC-201・2026-08-25）
+
+> frontend 非マウント＝接続前バンドル（IdeaChatView がデモ fixtures＝OPS ログイン・初期5件固定）に対し E-TC-201 を実行 → 実データ文脈（アイデア件名）が出ず red → `features/chat/api.ts`＋IdeaChatView を実接続（getChat/getIdea/postMessage/addReaction/markRead 等）＋再ビルドで green。backend メッセージ表現に is_mine 追加。※複数引用は backend 単一 reply のため単一（follow-up）。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| E-TC-201 | 接続前＝デモ（固定メッセージ・「夜間配送…」）で作成したアイデアの文脈が出ず、投稿もサーバーに載らない → `チャットアイデア_stamp` 不可視で red。接続後は `postMessage`→`getChat` の実データ＋👍リアクション（`addReaction`）が描画 → green |

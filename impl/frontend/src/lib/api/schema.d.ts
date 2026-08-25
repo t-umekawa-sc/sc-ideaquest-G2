@@ -1377,6 +1377,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat
+         * @description チャットメッセージ一覧＋未読情報（SC-24・E.1）。門番はサーバー強制。読取専用。
+         */
+        get: operations["get_chat_api_v1_ideas__idea_id__chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/chat-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Activity
+         * @description 議論アクティビティ集計（SC-22 §4.4・D から委譲・E.1）。読取専用。
+         */
+        get: operations["get_chat_activity_api_v1_ideas__idea_id__chat_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Message
+         * @description メッセージ投稿（SC-24・E.2・multipart）。空は 422・投稿 XP+5（日次上限）。完了は 409。
+         */
+        post: operations["post_message_api_v1_chat_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat-messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Message
+         * @description メッセージを論理削除（E.2・本人＋owner/quest_admin）。完了は 409。
+         */
+        delete: operations["delete_message_api_v1_chat_messages__message_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Message
+         * @description 自分のメッセージを編集（E.2・本人のみ）。本文/添付/メンションを更新。完了は 409。
+         */
+        patch: operations["edit_message_api_v1_chat_messages__message_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/chat-messages/{message_id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Reaction
+         * @description リアクション付与（通常/魔法・E.4）。マスタ/解放/1メッセージ1魔法/1チャット1回はサーバー強制。完了は 409。
+         */
+        post: operations["add_reaction_api_v1_chat_messages__message_id__reactions_post"];
+        /**
+         * Remove Reaction
+         * @description リアクション取消（自分の分・E.4）。通常＝`emoji`／魔法＝`type=magic`。完了は 409。
+         */
+        delete: operations["remove_reaction_api_v1_chat_messages__message_id__reactions_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/chat/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read
+         * @description 既読位置を更新（E.5・後退防止 upsert）。完了後も許可。
+         */
+        post: operations["mark_read_api_v1_ideas__idea_id__chat_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/spells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Spells
+         * @description 魔法カタログ＋解放状態（SC-32・E.4 ピッカー）。読取専用。
+         */
+        get: operations["list_spells_api_v1_spells_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/spells/{spell_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock Spell
+         * @description 魔法を解放（SC-32・SP 消費）。前提/SP/二重解放はサーバー強制。
+         */
+        post: operations["unlock_spell_api_v1_spells__spell_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1581,6 +1749,30 @@ export interface components {
             /** Files */
             files: string[];
         };
+        /** Body_edit_message_api_v1_chat_messages__message_id__patch */
+        Body_edit_message_api_v1_chat_messages__message_id__patch: {
+            /** Body */
+            body?: string | null;
+            /** Mentions */
+            mentions?: string[] | null;
+            /** Files */
+            files?: string[] | null;
+            /** Remove Attachment Ids */
+            remove_attachment_ids?: string[] | null;
+        };
+        /** Body_post_message_api_v1_chat_messages_post */
+        Body_post_message_api_v1_chat_messages_post: {
+            /** Idea Id */
+            idea_id: string;
+            /** Body */
+            body?: string | null;
+            /** Reply To Message Id */
+            reply_to_message_id?: string | null;
+            /** Mentions */
+            mentions?: string[] | null;
+            /** Files */
+            files?: string[] | null;
+        };
         /** Body_put_avatar_image_api_v1_me_avatar_image_put */
         Body_put_avatar_image_api_v1_me_avatar_image_put: {
             /** File */
@@ -1600,6 +1792,183 @@ export interface components {
         Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
             /** File */
             file: string;
+        };
+        /** ChatActivityDaily */
+        ChatActivityDaily: {
+            /** Date */
+            date: string;
+            /** Message Count */
+            message_count: number;
+        };
+        /** ChatActivityMarker */
+        ChatActivityMarker: {
+            /** Date */
+            date: string;
+            /** Revision */
+            revision: number;
+        };
+        /** ChatActivityResponse */
+        ChatActivityResponse: {
+            /**
+             * Daily
+             * @default []
+             */
+            daily: components["schemas"]["ChatActivityDaily"][];
+            /**
+             * Revision Markers
+             * @default []
+             */
+            revision_markers: components["schemas"]["ChatActivityMarker"][];
+            /**
+             * Total Messages
+             * @default 0
+             */
+            total_messages: number;
+        };
+        /** ChatAttachmentDTO */
+        ChatAttachmentDTO: {
+            /** Id */
+            id: string;
+            /** Original Name */
+            original_name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Mime Type */
+            mime_type: string;
+            /** Kind */
+            kind: string;
+        };
+        /** ChatAuthorDTO */
+        ChatAuthorDTO: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Avatar */
+            avatar?: string | null;
+            /** Level */
+            level?: number | null;
+        };
+        /** ChatCursorPageInfo */
+        ChatCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /** ChatDeleteResponse */
+        ChatDeleteResponse: {
+            /** Id */
+            id: string;
+            /** Is Deleted */
+            is_deleted: boolean;
+            /** Deleted At */
+            deleted_at?: string | null;
+        };
+        /** ChatListResponse */
+        ChatListResponse: {
+            /** Chat Group Id */
+            chat_group_id: string;
+            /** Data */
+            data: components["schemas"]["ChatMessageDTO"][];
+            page_info: components["schemas"]["ChatCursorPageInfo"];
+            unread: components["schemas"]["ChatUnreadDTO"];
+        };
+        /** ChatMentionDTO */
+        ChatMentionDTO: {
+            /** User Id */
+            user_id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ChatMessageDTO
+         * @description メッセージ表現（E.1）。削除済みは `is_deleted=true`＋`id/created_at/deleted_at` のみ。
+         */
+        ChatMessageDTO: {
+            /** Id */
+            id: string;
+            /**
+             * Is Deleted
+             * @default false
+             */
+            is_deleted: boolean;
+            /**
+             * Is Mine
+             * @default false
+             */
+            is_mine: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Deleted At */
+            deleted_at?: string | null;
+            author?: components["schemas"]["ChatAuthorDTO"] | null;
+            /** Body */
+            body?: string | null;
+            /** Is Edited */
+            is_edited?: boolean | null;
+            /** Reply To */
+            reply_to?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["ChatAttachmentDTO"][];
+            /**
+             * Mentions
+             * @default []
+             */
+            mentions: components["schemas"]["ChatMentionDTO"][];
+            /** Reactions */
+            reactions?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ChatReactionRequest */
+        ChatReactionRequest: {
+            /** Type */
+            type: string;
+            /** Emoji */
+            emoji?: string | null;
+            /** Spell Id */
+            spell_id?: string | null;
+        };
+        /** ChatReactionsResponse */
+        ChatReactionsResponse: {
+            /** Reactions */
+            reactions: {
+                [key: string]: unknown;
+            };
+        };
+        /** ChatReadRequest */
+        ChatReadRequest: {
+            /** Last Read Message Id */
+            last_read_message_id: string;
+        };
+        /** ChatReadResponse */
+        ChatReadResponse: {
+            /** Last Read Message Id */
+            last_read_message_id: string;
+            /**
+             * Unread Count
+             * @default 0
+             */
+            unread_count: number;
+        };
+        /** ChatUnreadDTO */
+        ChatUnreadDTO: {
+            /** First Unread Message Id */
+            first_unread_message_id?: string | null;
+            /**
+             * Unread Count
+             * @default 0
+             */
+            unread_count: number;
         };
         /**
          * CompanyCreateRequest
@@ -2995,6 +3364,60 @@ export interface components {
             display_name: string;
             /** Avatar Url */
             avatar_url?: string | null;
+        };
+        /** SpellCatalogResponse */
+        SpellCatalogResponse: {
+            /** Data */
+            data: components["schemas"]["SpellDTO"][];
+            /** Skill Point Balance */
+            skill_point_balance: number;
+        };
+        /**
+         * SpellDTO
+         * @description 魔法カタログ1件（§5.19）＋当該ユーザーの解放状態。
+         */
+        SpellDTO: {
+            /** Id */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name Ja */
+            name_ja: string;
+            /** Name En */
+            name_en: string;
+            /** Icon */
+            icon: string;
+            /** Effect */
+            effect: string;
+            /** Sp Cost */
+            sp_cost: number;
+            /** Rarity */
+            rarity: string;
+            /** Line */
+            line: string;
+            /** Requires Spell Id */
+            requires_spell_id?: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Unlocked
+             * @default false
+             */
+            unlocked: boolean;
+            /**
+             * Can Unlock
+             * @default false
+             */
+            can_unlock: boolean;
+        };
+        /** SpellUnlockResponse */
+        SpellUnlockResponse: {
+            /** Spell Id */
+            spell_id: string;
+            /** Unlocked */
+            unlocked: boolean;
+            /** Skill Point Balance */
+            skill_point_balance: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -5784,6 +6207,328 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeaSelectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_api_v1_ideas__idea_id__chat_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before?: string | null;
+                after?: string | null;
+            };
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_activity_api_v1_ideas__idea_id__chat_activity_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_message_api_v1_chat_messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_message_api_v1_chat_messages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_message_api_v1_chat_messages__message_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_message_api_v1_chat_messages__message_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_edit_message_api_v1_chat_messages__message_id__patch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_reaction_api_v1_chat_messages__message_id__reactions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReactionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_reaction_api_v1_chat_messages__message_id__reactions_delete: {
+        parameters: {
+            query?: {
+                emoji?: string | null;
+                type?: string | null;
+            };
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReactionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_ideas__idea_id__chat_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_spells_api_v1_spells_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpellCatalogResponse"];
+                };
+            };
+        };
+    };
+    unlock_spell_api_v1_spells__spell_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                spell_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpellUnlockResponse"];
                 };
             };
             /** @description Validation Error */

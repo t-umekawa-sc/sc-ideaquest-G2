@@ -463,6 +463,7 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
         out.append({
             "id": str(m.id),
             "author": _author_dto(users.get(m.author_id), m.author_id),
+            "is_mine": m.author_id == viewer_id,
             "body": m.body,
             "created_at": m.created_at,
             "is_edited": m.is_edited,
