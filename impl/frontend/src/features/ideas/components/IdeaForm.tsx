@@ -9,17 +9,20 @@
 // 添付（関連資料・D.3）＝作成/編集の保存成功後に uploadAttachments で送信（id 先行が要るため保存後・§1.10）。投票/フォローは SC-22。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
+import { ApiError } from "@/lib/api/client";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
 import { getQuest, type QuestDetail } from "@/features/quests/api";
 import {
   createIdea,
+  deleteAttachment,
   getIdea,
   IDEAS_CHANGED_EVENT,
   publishIdea,
   updateIdea,
   uploadAttachments,
+  type IdeaAttachment,
   type IdeaStakeholderInput,
 } from "../api";
 
@@ -50,6 +53,7 @@ type Props = {
 
 export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCancel }: Props) {
   const snack = useSnackbar();
+  const confirm = useConfirm();
   const { summaryRef, notify } = useFormErrorNotice();
   const isEdit = mode === "edit";
 
@@ -69,6 +73,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const [stakeInput, setStakeInput] = useState("");
   const [note, setNote] = useState("");
   const [attachments, setAttachments] = useState<IdeaAttach[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<IdeaAttachment[]>([]); // 編集＝保存済みの添付（D.3）
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const [pendingKind, setPendingKind] = useState<null | "draft" | "publish" | "save">(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -109,6 +115,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           setLimit(idea.time_limit ?? "");
           setStakeholders((idea.stakeholders ?? []).map((s) => s.label));
           setNote(idea.note ?? "");
+          setExistingAttachments(idea.attachments ?? []); // 保存済み添付の管理（D.3・編集）
         }
         setLoading(false);
       })
@@ -136,6 +143,37 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   function addFiles(files: FileList) {
     const next = Array.from(files).map((f) => ({ icon: iconFor(f.name), name: f.name, size: fmtSize(f.size), file: f }));
     setAttachments((a) => [...a, ...next]);
+  }
+
+  // 保存済み添付の削除（D.3・編集モード）。添付は本文編集と独立＝即時にサーバー削除（版を生まない・§D.3）。
+  // 破壊的操作のため確認ダイアログ→成功でリストから除去＋トースト。完了/権限/不在はサーバー権威で理由提示。
+  async function removeExisting(att: IdeaAttachment) {
+    if (deletingId || !ideaId) return;
+    const ok = await confirm({
+      variant: "danger",
+      title: "添付を削除",
+      msg: `「${att.original_name}」を削除します。この操作は取り消せません。`,
+      confirmLabel: "削除する",
+    });
+    if (!ok) return;
+    setDeletingId(att.id);
+    try {
+      await deleteAttachment(ideaId, att.id);
+      setExistingAttachments((cur) => cur.filter((a) => a.id !== att.id));
+      snack({ type: "success", msg: "添付を削除しました。" });
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg:
+          status === 409 ? "完了したクエストのアイデアは変更できません。"
+          : status === 403 ? "この添付を削除する権限がありません。"
+          : status === 404 ? "この添付は見つかりません（すでに削除済みの可能性があります）。"
+          : "削除に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   // 利害関係者を API 入力へ（候補に無い＝手入力は is_custom=true・§正規化はサーバー）。
@@ -382,8 +420,34 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           </div>
         </details>
 
-        {/* 関連資料 添付（任意・複数可）。※保存 EP は後続スライス＝現状は送信しない。 */}
+        {/* 関連資料 添付（任意・複数可）。新規＝保存成功後にアップロード（D.3）／編集＝保存済みは即時削除可。 */}
         <Field id="idea_files" label="関連資料（任意・複数可）">
+          {/* 保存済みの添付（編集モードのみ・D.3）＝× で即時サーバー削除（本文編集と独立・版を生まない）。 */}
+          {isEdit && existingAttachments.length > 0 && (
+            <>
+              <p className="hint" style={{ marginTop: 0 }}>保存済みの添付（× で削除・すぐに反映されます）</p>
+              <div className="attach-list" aria-label="保存済みの添付">
+                {existingAttachments.map((a) => (
+                  <div className="attach" key={a.id}>
+                    <span className="attach__icon">{iconFor(a.original_name)}</span>
+                    <div className="attach__meta">
+                      <div className="attach__name">{a.original_name}</div>
+                      <div className="attach__size">{fmtSize(a.size_bytes)}</div>
+                    </div>
+                    <button
+                      className="attach__remove"
+                      type="button"
+                      aria-label={`${a.original_name} を削除`}
+                      disabled={deletingId === a.id || pending}
+                      onClick={() => void removeExisting(a)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <input
             ref={fileRef}
             id="idea_files"

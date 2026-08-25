@@ -431,3 +431,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | D-TC-142 | `_record_initial_revision` を no-op に反転＝publish 後の `GET revisions` が空 → `assert [r.revision]==[1]` が `[]==[1]` で red。復元で初版 revision=1 記録（通知なし）→ green |
 | D-TC-140/141 | `_diff_fields` を空返しに反転＝差分 `fields` が `{}` → `'body'/'title' in fields` が偽で red。復元で語句差分セグメント（テキスト系）＋`{old,new}`（scalar）→ green |
 | D-TC-217 | 接続前バンドル（更新履歴モーダル＝デモ静的表示）では編集内容に対応する実データ（v2 の価値/アイデア本文バッジ・実 diff セグメント）が出ず red → RevisionHistory 実接続＋再ビルドで `getRevisions`/`getRevisionDiff` の実データ（初版バッジ・変更フィールド・`.diff-add`）→ green |
+
+## D. SC-21 編集モードの既存添付 管理 UI（D-TC-218・2026-08-25）
+
+> frontend 非マウント＝接続前バンドル（編集フォームは新規アップロードのみで保存済み添付を表示しない）に対し D-TC-218 を実行 → 編集モーダルに `.attach` 既存添付行が出ず red → IdeaForm に既存添付一覧＋× 即時削除（`getIdea.attachments`／`deleteAttachment`／確認ダイアログ）を実装＋再ビルドで green。回帰＝sc-22-attachments 2（215/218）・sc-21-idea-form 6 passed・tsc 既知2件のみ。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| D-TC-218 | 接続前＝編集モーダルに保存済み添付が一切出ない（`.attach` 0件）→ `attachRow` 不可視で red。接続後は `getIdea.attachments` を `.attach` 行で表示し、× →確認ダイアログ「削除する」で `deleteAttachment` 即時削除→一覧から消え `GET /ideas/{id}` の attachments 空・`current_revision` は 1 のまま（版を生まない） |

@@ -64,3 +64,51 @@ test("D-TC-215 SC-21 upload attachment then SC-22 shows it with download", async
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
+
+// アイデアを作成＋添付を1件アップロード（編集モードの下地）。返り値＝アイデア id。
+async function createIdeaWithAttachment(page: Page, questId: string, stamp: string, fileName: string): Promise<string> {
+  const csrf = csrfOf(await page.context().cookies());
+  const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: { title: `添付編集_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  const ideaId = (await res.json()).id as string;
+  const up = await page.request.post(`/api/v1/ideas/${ideaId}/attachments`, {
+    headers: { "X-CSRF-Token": csrf },
+    multipart: { files: { name: fileName, mimeType: "image/png", buffer: PNG } },
+  });
+  expect(up.status(), await up.text()).toBe(201);
+  return ideaId;
+}
+
+// D-TC-218 SC-21 編集モードで既存添付の一覧＋削除（確認ダイアログ→即時サーバー削除・版を生まない）。
+test("D-TC-218 SC-21 edit mode lists existing attachment and deletes it", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E既存添付_${stamp}`);
+  const fileName = `shiryo_${stamp}.png`;
+  const ideaId = await createIdeaWithAttachment(page, questId, stamp, fileName);
+  try {
+    await page.goto(`/ideas/${ideaId}`);
+    await page.getByRole("button", { name: "編集", exact: true }).click();
+    // 編集フォームがプリフィルされ、保存済み添付が一覧に出る。
+    await expect(page.locator("#idea_subject")).toHaveValue(`添付編集_${stamp}`);
+    const attachRow = page.locator(".attach", { hasText: fileName });
+    await expect(attachRow).toBeVisible();
+
+    // × → 確認ダイアログ「削除する」で即時サーバー削除。
+    await attachRow.getByRole("button", { name: `${fileName} を削除` }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "削除する" }).click();
+    await expect(page.getByText("添付を削除しました。")).toBeVisible();
+    await expect(page.locator(".attach", { hasText: fileName })).toHaveCount(0);
+
+    // サーバー側でも消えている（版は増えない＝current_revision は 1 のまま）。
+    const detail = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
+    expect(detail.attachments).toHaveLength(0);
+    expect(detail.current_revision).toBe(1);
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
