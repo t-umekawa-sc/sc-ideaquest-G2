@@ -486,3 +486,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | E-TC-201 | 接続前＝デモ（固定メッセージ・「夜間配送…」）で作成したアイデアの文脈が出ず、投稿もサーバーに載らない → `チャットアイデア_stamp` 不可視で red。接続後は `postMessage`→`getChat` の実データ＋👍リアクション（`addReaction`）が描画 → green |
 | E-TC-202 | 接続前＝SC-22 チャットカードがデモ（💬 8 固定・デモプレビュー）で、API 投稿した本文が `.chat-preview` に出ず red。接続後は `getChatActivity`（total_messages）＋`getChat`（直近3件）の実データが描画 → green |
+
+## G. SC-32 魔法スキル画面 フロント接続（G-TC-201・2026-08-25）
+
+> frontend 非マウント＝接続前バンドル（SpellsView がデモ＝SP固定✦3・解放3/6・fire/thunder/ice 解放済み）に対し G-TC-201 を実行 → `GET /spells` の実データ（SP残高・解放数）と一致せず red → SpellsView を getSpells/unlockSpell で実接続＋再ビルドで green。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| G-TC-201 | 接続前＝`.sp-hero__num` がデモ固定「✦ 3」で、実 `skill_point_balance` と一致せず red（解放数 3/6 もデモ固定）。接続後は `getSpells` の実 SP残高・解放数・6魔法（2系統）が描画 → green |

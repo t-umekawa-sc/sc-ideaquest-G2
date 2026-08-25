@@ -1,86 +1,111 @@
 "use client";
 
 // SC-32 魔法/スキル（ゲーム層）＝SPステータス（CRTガラス）＋魔法カタログ（系統ごとの段階解放＝スキルツリー）。
-// 解放した魔法は SC-24 アイデアチャットの魔法リアクションで発動。装飾/社交演出のみで XP/評価/投票に影響しない。
+// G 実接続＝getSpells（カタログ＋unlocked/can_unlock＋SP残高）・unlockSpell（SP消費・前提/二重解放はサーバー強制）。
+// 解放した魔法は SC-24 チャットの魔法リアクションで発動。装飾/社交演出のみで XP/評価/投票に影響しない。
 // 正＝doc/画面設計/mocks/SC-32_魔法スキル.html・doc/画面設計/screens/SC-32_魔法スキル.md。
-// SP/魔法 backend 未実装＝デモ fixtures（画面モック先行）。解放は確認ダイアログ→完了は報酬スナックバー。
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 
+import { getSpells, unlockSpell, type SpellDTO } from "../api";
 import "../spells.css";
 
-type Rarity = "common" | "standard" | "rare";
-type LineKey = "blaze" | "glow";
-type Spell = {
-  id: string;
-  line: LineKey;
-  icon: string;
-  name: string;
-  rarity: Rarity;
-  fx: string; // spell-fx--*
-  preview: string;
-  desc: string;
-  requires: string | null;
-  cost: number;
-  unlocked: boolean;
+const RARITY: Record<string, string> = { common: "コモン", standard: "標準", rare: "レア" };
+// 系統（backend line）→ 表示名。flame=烈火系・quiet_light=静輝系。
+const LINES: { key: string; name: string; short: string }[] = [
+  { key: "flame", name: "🔥 烈火系", short: "烈火系" },
+  { key: "quiet_light", name: "🌟 静輝系", short: "静輝系" },
+];
+// エフェクト種別 → CSS（spell-fx--*）。
+const FX: Record<string, string> = { fire: "spell-fx--fire", thunder: "spell-fx--thunder", rainbow: "spell-fx--rainbow", ice: "spell-fx--ice", sparkle: "spell-fx--sparkle", aura: "spell-fx--aura" };
+// エフェクト種別 → プレビュー演出コピー（presentation・backend の description_ja が無い場合の既定）。
+const FLAVOR: Record<string, { preview: string; desc: string }> = {
+  fire: { preview: "メッセージ枠が燃え上がる 🔥", desc: "対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。" },
+  thunder: { preview: "鋭い気づきに稲妻が走る ⚡", desc: "黄色い閃光が明滅。鋭い指摘・ハッとする気づきに。" },
+  rainbow: { preview: "多彩な視点をたたえる虹 🌈", desc: "色相が回る多色グロー。斬新・多面的なアイデアへの最上級の賛辞。" },
+  ice: { preview: "冷静に、と伝える青い光 ❄️", desc: "冷たく澄んだ青のグロー。落ち着いた指摘・冷静な視点に。" },
+  sparkle: { preview: "素敵なアイデアに祝福を ✨", desc: "紫の柔らかな輝き。称賛・応援のニュアンスに。" },
+  aura: { preview: "神々しい光をまとう 🌟", desc: "エメラルドの光輪が脈動。特別なアイデアに、荘厳なオーラを。" },
 };
-
-const RARITY: Record<Rarity, string> = { common: "コモン", standard: "標準", rare: "レア" };
-const LINES: { key: LineKey; name: string }[] = [
-  { key: "blaze", name: "🔥 烈火系" },
-  { key: "glow", name: "🌟 静輝系" },
-];
-
-const INITIAL: Spell[] = [
-  { id: "fire", line: "blaze", icon: "🔥", name: "炎", rarity: "common", fx: "spell-fx--fire", preview: "メッセージ枠が燃え上がる 🔥", desc: "対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。", requires: null, cost: 1, unlocked: true },
-  { id: "thunder", line: "blaze", icon: "⚡", name: "雷", rarity: "standard", fx: "spell-fx--thunder", preview: "鋭い気づきに稲妻が走る ⚡", desc: "黄色い閃光が明滅。鋭い指摘・ハッとする気づきに。", requires: "fire", cost: 2, unlocked: true },
-  { id: "rainbow", line: "blaze", icon: "🌈", name: "虹", rarity: "rare", fx: "spell-fx--rainbow", preview: "多彩な視点をたたえる虹 🌈", desc: "色相が回る多色グロー。斬新・多面的なアイデアへの最上級の賛辞。", requires: "thunder", cost: 3, unlocked: false },
-  { id: "ice", line: "glow", icon: "❄️", name: "氷", rarity: "common", fx: "spell-fx--ice", preview: "冷静に、と伝える青い光 ❄️", desc: "冷たく澄んだ青のグロー。落ち着いた指摘・冷静な視点に。", requires: null, cost: 1, unlocked: true },
-  { id: "sparkle", line: "glow", icon: "✨", name: "キラキラ", rarity: "standard", fx: "spell-fx--sparkle", preview: "素敵なアイデアに祝福を ✨", desc: "紫の柔らかな輝き。称賛・応援のニュアンスに。", requires: "ice", cost: 2, unlocked: false },
-  { id: "aura", line: "glow", icon: "🌟", name: "オーラ", rarity: "rare", fx: "spell-fx--aura", preview: "神々しい光をまとう 🌟", desc: "エメラルドの光輪が脈動。特別なアイデアに、荘厳なオーラを。", requires: "sparkle", cost: 3, unlocked: false },
-];
 
 export function SpellsView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
-  const [spells, setSpells] = useState<Spell[]>(INITIAL);
-  const [sp, setSp] = useState(3);
+  const [spells, setSpells] = useState<SpellDTO[]>([]);
+  const [sp, setSp] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const byId = (id: string) => spells.find((s) => s.id === id);
-  const isUnlocked = (id: string | null) => (id ? !!byId(id)?.unlocked : true);
-  const labelOf = (id: string) => {
-    const s = byId(id);
-    return s ? `${s.icon} ${s.name}` : id;
-  };
+  const load = useCallback(async () => {
+    try {
+      const r = await getSpells();
+      if (!r) { setLoadError("魔法カタログの取得に失敗しました。"); return; }
+      setSpells(r.data);
+      setSp(r.skill_point_balance);
+      setLoadError(null);
+    } catch {
+      setLoadError("魔法カタログの取得に失敗しました。");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const byId = (id: string | null | undefined) => (id ? spells.find((s) => s.id === id) : undefined);
+  const isUnlocked = (id: string | null | undefined) => (id ? !!byId(id)?.unlocked : true);
+  const labelOf = (id: string) => { const s = byId(id); return s ? `${s.icon} ${s.name_ja}` : id; };
   const unlockedCount = spells.filter((s) => s.unlocked).length;
 
-  async function unlock(s: Spell) {
-    if (s.unlocked) return;
-    if (s.requires && !isUnlocked(s.requires)) return;
-    if (sp < s.cost) return;
+  const unlock = async (s: SpellDTO) => {
+    if (s.unlocked || busyId) return;
     const ok = await confirm({
       variant: "game",
       title: "▶ 魔法を解放",
-      msg: `${s.icon}「${s.name}」を ✦${s.cost} SP で解放しますか？（恒久・取り消し不可）`,
+      msg: `${s.icon}「${s.name_ja}」を ✦${s.sp_cost} SP で解放しますか？（恒久・取り消し不可）`,
       confirmLabel: "解放する",
     });
-    if (!ok) return; // キャンセル（処理なし）＝スナックバーは出さない
-    setSp((v) => v - s.cost);
-    setSpells((xs) => xs.map((x) => (x.id === s.id ? { ...x, unlocked: true } : x)));
-    snack({
-      type: "reward",
-      title: "魔法を解放しました",
-      msg: `「${s.name}」をチャットの魔法リアクションで使えます。`,
-      rewards: [{ k: "sp", t: `✦ -${s.cost} SP` }],
-    });
-  }
+    if (!ok) return;
+    setBusyId(s.id);
+    try {
+      const res = await unlockSpell(s.id);
+      if (res) setSp(res.skill_point_balance);
+      await load(); // unlocked/can_unlock を最新化
+      snack({
+        type: "reward",
+        title: "魔法を解放しました",
+        msg: `「${s.name_ja}」をチャットの魔法リアクションで使えます。`,
+        rewards: [{ k: "sp", t: `✦ -${s.sp_cost} SP` }],
+      });
+    } catch (err) {
+      const reason = err instanceof ApiError ? (err.body as { errors?: { reason?: string }[] } | undefined)?.errors?.[0]?.reason : undefined;
+      snack({
+        type: "error",
+        msg:
+          reason === "insufficient_sp" ? "スキルポイントが不足しています。"
+          : reason === "prerequisite_not_met" ? "前提の魔法を先に解放してください。"
+          : reason === "already_unlocked" ? "すでに解放済みです。"
+          : "解放に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
-  function buttonState(s: Spell): { disabled: boolean; label: string } {
-    if (s.requires && !isUnlocked(s.requires)) return { disabled: true, label: `前提: ${labelOf(s.requires)} が必要` };
-    if (sp < s.cost) return { disabled: true, label: `SP不足（あと ${s.cost - sp}）` };
+  const buttonState = (s: SpellDTO): { disabled: boolean; label: string } => {
+    if (s.requires_spell_id && !isUnlocked(s.requires_spell_id)) return { disabled: true, label: `前提: ${labelOf(s.requires_spell_id)} が必要` };
+    if (sp < s.sp_cost) return { disabled: true, label: `SP不足（あと ${s.sp_cost - sp}）` };
     return { disabled: false, label: "解放する" };
+  };
+
+  if (loading) {
+    return <section aria-label="魔法 / スキル"><Link className="backlink" href="/">← ダッシュボードへ戻る</Link><p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p></section>;
+  }
+  if (loadError) {
+    return <section aria-label="魔法 / スキル"><Link className="backlink" href="/">← ダッシュボードへ戻る</Link><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></section>;
   }
 
   return (
@@ -128,33 +153,34 @@ export function SpellsView() {
                 .filter((s) => s.line === line.key)
                 .map((s) => {
                   const btn = buttonState(s);
-                  const reqMet = isUnlocked(s.requires);
+                  const reqMet = isUnlocked(s.requires_spell_id);
+                  const flavor = FLAVOR[s.effect] ?? { preview: s.name_ja, desc: "" };
                   return (
                     <article className="card spell-card" key={s.id}>
                       <div className="spell-card__head">
                         <span className="spell-card__icon">{s.icon}</span>
-                        <span className="spell-card__name">{s.name}</span>
-                        <span className={`badge rarity-${s.rarity} spell-card__rarity`}>{RARITY[s.rarity]}</span>
+                        <span className="spell-card__name">{s.name_ja}</span>
+                        <span className={`badge rarity-${s.rarity} spell-card__rarity`}>{RARITY[s.rarity] ?? s.rarity}</span>
                       </div>
-                      <div className={`spell-preview spell-fx ${s.fx}`}>{s.preview}</div>
-                      <p className="spell-desc">{s.desc}</p>
-                      {s.requires ? (
+                      <div className={`spell-preview spell-fx ${FX[s.effect] ?? ""}`}>{flavor.preview}</div>
+                      <p className="spell-desc">{flavor.desc}</p>
+                      {s.requires_spell_id ? (
                         <div className={`spell-req ${reqMet ? "met" : "unmet"}`}>
                           {reqMet ? "✓ 前提: " : "🔒 前提: "}
-                          {labelOf(s.requires)}
+                          {labelOf(s.requires_spell_id)}
                         </div>
                       ) : (
-                        <div className="spell-req">前提なし（{line.name.replace(/^\S+\s?/, "")}の起点）</div>
+                        <div className="spell-req">前提なし（{line.short}の起点）</div>
                       )}
                       <div className="spell-card__foot">
                         <span className="spell-cost">
-                          ✦ {s.cost} <span className="muted">SP</span>
+                          ✦ {s.sp_cost} <span className="muted">SP</span>
                         </span>
                         {s.unlocked ? (
                           <span className="spell-state">✓ 解放済み</span>
                         ) : (
-                          <button className="btn-pixel btn-pixel--sm" type="button" disabled={btn.disabled} onClick={() => unlock(s)}>
-                            {btn.label}
+                          <button className="btn-pixel btn-pixel--sm" type="button" disabled={btn.disabled || busyId === s.id} onClick={() => void unlock(s)}>
+                            {busyId === s.id ? "解放中…" : btn.label}
                           </button>
                         )}
                       </div>
