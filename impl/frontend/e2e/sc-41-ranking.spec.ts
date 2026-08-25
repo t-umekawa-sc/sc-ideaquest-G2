@@ -1,45 +1,29 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// SC-41 ランキング＝期間切替でスコア再計算の回帰 e2e（デモ fixtures・ランキング backend 未接続）。
-// 根拠＝doc/画面設計/screens/SC-41_ランキング.md・mocks/SC-41_ランキング.html／フロントエンド実装フロー規約 §3・§8。
-// 担保範囲＝スコア＝期間内 獲得XP＋獲得コイン（RankingView の MEMBERS fixtures）で順位付けし、
-// 期間タブ（今週/先週/今月/通算）の切替で自分の順位・スコア・TOP1 が再計算される（クライアント state のみ）。
-// 期間切替はクライアント計算のみ（backend 非依存）のため red-green §5.1 は接続時に適用。OPS でログインして /ranking を検証。
-const OPS = { company: "OPS", loginId: "admin@ops.example", password: "Passw0rd!" };
+// SC-41 ランキング（G.5 実接続）＝会社内ランキングが実データ（getRankings）で描画される。ACME-01 で確認。
+// 集計は会社全体（共有 DB）で非決定的なため、in-test で GET /rankings と照合して決定的に検証する。
+// 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-206）・API設計 G.5・§7・SC-41。
+const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
   await page.goto("/login");
-  await page.locator("#company_code").fill(OPS.company);
-  await page.locator("#login_id").fill(OPS.loginId);
-  await page.locator("#password").fill(OPS.password);
+  await page.locator("#company_code").fill(USER.company);
+  await page.locator("#login_id").fill(USER.loginId);
+  await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
   await expect(page.getByText("ようこそ")).toBeVisible();
 }
 
-async function gotoRanking(page: Page) {
+test("G-TC-206 SC-41 ranking renders real data (me/total)", async ({ page }) => {
   await login(page);
+  const rk = await page.request.get("/api/v1/rankings?period=this_week&scope=company").then((r) => r.json());
   await page.goto("/ranking");
-  // 見出しは h1「ランキング」と h3「★ 社内ランキング ★」が併存＝部分一致だと strict 違反（handoff §5 末尾）。
   await expect(page.getByRole("heading", { name: "ランキング", exact: true })).toBeVisible();
-}
-
-// 初期＝今週。自分（山田 太郎）は 2位・スコア405（360XP＋45コイン）、TOP1 は鈴木 花子 530（480＋50）。
-test("initial week period shows my rank and top score", async ({ page }) => {
-  await gotoRanking(page);
-  await expect(page.getByRole("tab", { name: "今週" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".myrank__pos")).toHaveText("2位");
-  await expect(page.locator(".myrank__score .exp")).toHaveText("405");
-  await expect(page.locator(".rank-list li").first().locator(".rank-score .total")).toHaveText("530");
-});
-
-// 通算へ切替＝スコア再計算。自分は 5位・8520（7800＋720）、TOP1 は鈴木 花子 15300（14000＋1300）。
-test("switching to total period recomputes rank and top score", async ({ page }) => {
-  await gotoRanking(page);
-  await page.getByRole("tab", { name: "通算" }).click();
-
-  await expect(page.getByRole("tab", { name: "通算" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "今週" })).toHaveAttribute("aria-selected", "false");
-  await expect(page.locator(".myrank__pos")).toHaveText("5位"); // 2位 → 5位
-  await expect(page.locator(".myrank__score .exp")).toHaveText("8520"); // 405 → 8520
-  await expect(page.locator(".rank-list li").first().locator(".rank-score .total")).toHaveText("15300"); // 530 → 15300
+  // 「あなたの順位」の総人数が実データ（デモ固定 全12人中 でない）。
+  await expect(page.getByLabel("あなたの順位").getByText(`/ 全${rk.me.total_users}人中`)).toBeVisible();
+  // 順位（圏外なら「圏外」）も実データ。
+  const posText = rk.me.rank != null ? `${rk.me.rank}位` : "圏外";
+  await expect(page.getByLabel("あなたの順位").locator(".myrank__pos")).toHaveText(posText);
+  // ランキング行数が API の data 件数と一致（this_week・1ページ）。
+  await expect(page.locator(".rank-list li")).toHaveCount(rk.data.length);
 });

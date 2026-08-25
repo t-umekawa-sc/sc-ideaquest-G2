@@ -1,42 +1,19 @@
 "use client";
 
-// SC-41 ランキング（ゲーム層）＝会社内全メンバーを期間（今週/先週/今月/通算）で順位付け。
+// SC-41 ランキング（ゲーム層）＝会社内全メンバーを期間（今週/先週/今月/通算）で順位付け（G.5 実接続）。
 // スコア＝期間内の獲得XP＋獲得コイン（ダッシュボード/クエスト内週間ランキングと同定義・SP は対象外）。
-// 正＝doc/画面設計/mocks/SC-41_ランキング.html・doc/画面設計/screens/SC-41_ランキング.md。
-// ランキング backend 未実装＝デモ fixtures（画面モック先行）。
+// 正＝doc/画面設計/mocks/SC-41_ランキング.html・screens/SC-41・API設計 G.5・§7。
+// getRankings（period×scope=company・me 常時同梱）。自分の行は me.rank と一致する順位で強調。
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Avatar } from "@/components/ui";
 
+import { getRankings, type RankingMe, type RankingPeriod } from "../api";
 import "../ranking.css";
 
 type Period = "week" | "last" | "month" | "total";
-type Member = {
-  n: string;
-  s: string;
-  lv: number;
-  me: boolean;
-  week: [number, number];
-  last: [number, number];
-  month: [number, number];
-  total: [number, number];
-};
-
-const MEMBERS: Member[] = [
-  { n: "鈴木 花子", s: "鈴", lv: 12, me: false, week: [480, 50], last: [500, 45], month: [2100, 220], total: [14000, 1300] },
-  { n: "山田 太郎", s: "山", lv: 7, me: true, week: [360, 45], last: [300, 30], month: [1500, 180], total: [7800, 720] },
-  { n: "佐藤 大輔", s: "佐", lv: 3, me: false, week: [300, 40], last: [260, 25], month: [1300, 150], total: [2400, 210] },
-  { n: "田中 美咲", s: "田", lv: 9, me: false, week: [300, 35], last: [360, 40], month: [1600, 190], total: [10500, 980] },
-  { n: "伊藤 彩", s: "伊", lv: 8, me: false, week: [280, 30], last: [240, 25], month: [1200, 140], total: [9200, 860] },
-  { n: "小林 直樹", s: "小", lv: 10, me: false, week: [260, 40], last: [320, 35], month: [1700, 200], total: [12000, 1150] },
-  { n: "高橋 健", s: "高", lv: 6, me: false, week: [240, 25], last: [200, 20], month: [1000, 110], total: [6400, 600] },
-  { n: "渡辺 剛", s: "渡", lv: 5, me: false, week: [210, 20], last: [180, 20], month: [900, 100], total: [4800, 430] },
-  { n: "加藤 恵", s: "加", lv: 6, me: false, week: [190, 25], last: [210, 20], month: [950, 110], total: [6100, 560] },
-  { n: "中村 優", s: "中", lv: 4, me: false, week: [160, 15], last: [150, 10], month: [700, 70], total: [3600, 320] },
-  { n: "山本 麻衣", s: "山", lv: 7, me: false, week: [140, 20], last: [170, 15], month: [800, 90], total: [7500, 700] },
-  { n: "吉田 翔", s: "吉", lv: 2, me: false, week: [90, 10], last: [80, 10], month: [400, 40], total: [1500, 120] },
-];
+const TO_API: Record<Period, RankingPeriod> = { week: "this_week", last: "last_week", month: "this_month", total: "all" };
 
 const PERIODS: { key: Period; label: string }[] = [
   { key: "week", label: "今週" },
@@ -53,19 +30,31 @@ const RESET_NOTE: Record<Period, string> = {
 };
 const MEDAL = ["🥇", "🥈", "🥉"];
 
-type Ranked = Member & { xp: number; coin: number; score: number; rank: number };
+type Ranked = { n: string; lv: number | null; me: boolean; xp: number; coin: number; score: number; rank: number };
 
 export function RankingView() {
   const [period, setPeriod] = useState<Period>("week");
+  const [list, setList] = useState<Ranked[]>([]);
+  const [me, setMe] = useState<RankingMe | null>(null);
+  const [loading, setLoading] = useState(true);
   const listRef = useRef<HTMLOListElement>(null);
 
-  const list = useMemo<Ranked[]>(() => {
-    return MEMBERS.map((m) => ({ ...m, xp: m[period][0], coin: m[period][1], score: m[period][0] + m[period][1] }))
-      .sort((a, b) => b.score - a.score || b.xp - a.xp || a.n.localeCompare(b.n, "ja"))
-      .map((m, i) => ({ ...m, rank: i + 1 }));
-  }, [period]);
+  const load = useCallback(async (p: Period) => {
+    setLoading(true);
+    const r = await getRankings(TO_API[p]).catch(() => null);
+    if (r) {
+      setMe(r.me);
+      setList(r.data.map((row) => ({
+        n: row.user.name || "?", lv: row.user.level ?? null,
+        me: r.me.rank != null && row.rank === r.me.rank,
+        xp: row.xp, coin: row.coin, score: row.score, rank: row.rank,
+      })));
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => { void load(period); }, [load, period]);
 
-  const me = list.find((m) => m.me)!;
+  const totalUsers = me?.total_users ?? list.length;
   const top3 = list.slice(0, 3);
   const podium = [top3[1], top3[0], top3[2]].filter(Boolean) as Ranked[]; // 2・1・3
 
@@ -102,24 +91,32 @@ export function RankingView() {
         魔法/リアクションはスコアに影響しません。
       </p>
 
-      {/* あなたの順位サマリー */}
-      <section className="card card-accent myrank" style={{ ["--accent" as string]: "var(--color-primary)" } as React.CSSProperties} aria-label="あなたの順位">
-        <Avatar name={me.n} size="sm" level={me.lv} />
-        <div>
-          <div>
-            <strong>{me.n}（あなた）</strong>
-          </div>
-          <div>
-            <span className="myrank__pos">{me.rank}位</span> <span className="myrank__of">/ 全{list.length}人中</span>
-          </div>
-        </div>
-        <div className="myrank__score">
-          スコア <span className="exp">{me.score}</span>
-          <button className="btn btn-outline myrank__jump" type="button" onClick={jumpToMe}>
-            ▼ 自分の順位へ
-          </button>
-        </div>
-      </section>
+      {/* あなたの順位サマリー（me は圏外でも同梱） */}
+      {(() => {
+        const meRow = list.find((m) => m.me);
+        const myName = meRow?.n ?? "あなた";
+        return (
+          <section className="card card-accent myrank" style={{ ["--accent" as string]: "var(--color-primary)" } as React.CSSProperties} aria-label="あなたの順位">
+            <Avatar name={myName} size="sm" level={meRow?.lv ?? undefined} />
+            <div>
+              <div>
+                <strong>{myName}（あなた）</strong>
+              </div>
+              <div>
+                <span className="myrank__pos">{me?.rank != null ? `${me.rank}位` : "圏外"}</span> <span className="myrank__of">/ 全{totalUsers}人中</span>
+              </div>
+            </div>
+            <div className="myrank__score">
+              スコア <span className="exp">{me?.score ?? 0}</span>
+              <button className="btn btn-outline myrank__jump" type="button" onClick={jumpToMe} disabled={!meRow}>
+                ▼ 自分の順位へ
+              </button>
+            </div>
+          </section>
+        );
+      })()}
+      {loading && <p className="admin-muted">読み込み中…</p>}
+      {!loading && list.length === 0 && <p className="role-note">この期間のランキングデータがありません。</p>}
 
       {/* ランキング本体（ゲーム層・CRTガラス） */}
       <section className="pixel-panel rank-panel full" aria-label="ランキング">
@@ -129,9 +126,9 @@ export function RankingView() {
         {/* 表彰台 TOP3（2・1・3 の順で中央を高く） */}
         <div className="podium">
           {podium.map((m) => (
-            <div key={m.n} className={`podium__col rank${m.rank}${m.me ? " is-me" : ""}`}>
+            <div key={m.rank} className={`podium__col rank${m.rank}${m.me ? " is-me" : ""}`}>
               <span className="podium__medal">{MEDAL[m.rank - 1]}</span>
-              <Avatar name={m.n} size="sm" level={m.lv} />
+              <Avatar name={m.n} size="sm" level={m.lv ?? undefined} />
               <span className="podium__name">
                 {m.n}
                 {m.me ? "（あなた）" : ""}
@@ -145,12 +142,12 @@ export function RankingView() {
         {/* 全件 */}
         <ol className="rank-list" ref={listRef}>
           {list.map((m) => (
-            <li key={m.n} className={m.me ? "is-me" : undefined}>
+            <li key={m.rank} className={m.me ? "is-me" : undefined}>
               <span className="rank-no">{m.rank}</span>
               <span className="rank-medal" aria-label={`${m.rank}位`}>
                 {m.rank <= 3 ? MEDAL[m.rank - 1] : ""}
               </span>
-              <Avatar name={m.n} size="sm" level={m.lv} />
+              <Avatar name={m.n} size="sm" level={m.lv ?? undefined} />
               <span className="rank-name">
                 {m.n}
                 {m.me && <span className="rank-you">（あなた）</span>}

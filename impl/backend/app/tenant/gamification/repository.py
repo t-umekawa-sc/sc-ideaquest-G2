@@ -18,6 +18,30 @@ def add(session: Session, activity: Activity) -> Activity:
     return activity
 
 
+def aggregate_ranking(
+    session: Session, *, start: datetime | None, end: datetime | None, quest_id: uuid.UUID | None = None
+) -> list[tuple]:
+    """ランキング集計（G.5・§7）＝ユーザー別の 獲得XP／獲得コイン（期間内）＋期間内初回付与時刻。
+
+    score は application 側で `xp+coin`。SP は対象外（kind を xp_gain/coin_gain に限定）。
+    `quest_id` 指定でクエスト内（`activities.quest_id`）。返り値＝[(user_id, xp, coin, first_at)]。
+    """
+    xp = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "xp_gain"), 0).label("xp")
+    coin = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "coin_gain"), 0).label("coin")
+    stmt = (
+        select(Activity.user_id, xp, coin, func.min(Activity.created_at).label("first_at"))
+        .where(Activity.kind.in_(("xp_gain", "coin_gain")))
+        .group_by(Activity.user_id)
+    )
+    if start is not None:
+        stmt = stmt.where(Activity.created_at >= start)
+    if end is not None:
+        stmt = stmt.where(Activity.created_at < end)
+    if quest_id is not None:
+        stmt = stmt.where(Activity.quest_id == quest_id)
+    return [(uid, int(x), int(c), fa) for uid, x, c, fa in session.execute(stmt).all()]
+
+
 def exists_reason_between(
     session: Session, user_id: uuid.UUID, reason: str, start: datetime, end: datetime
 ) -> bool:

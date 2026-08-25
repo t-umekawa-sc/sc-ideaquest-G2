@@ -520,3 +520,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | G-TC-202 | 接続前＝`.wallet__num` がデモ固定「◆ 320」で実 `coin_balance` と不一致 → red。接続後は `getItems` の実残高・19点カタログ → green |
 | G-TC-203 | 接続前＝ワードローブがデモ固定所有（王冠等 owned）で `.item.is-locked` 件数が実 `GET /items` の未所有数と不一致 → red。接続後は実所有/装備で一致 → green |
+
+### SC-41 ランキング フロント接続（e2e G-TC-206・2026-08-25）／backend retro-red（G-TC-402）
+
+> backend＝新規 EP `GET /rankings`（gamification・activities 集計・新テーブルなし）。中核の期間境界（this_week）を無効化する反転で G-TC-402 が red（先週分を含んでしまう）→復元で green。frontend＝接続前デモ（全12人中固定）に対し G-TC-206 を実行 → 実 `me.total_users`/順位と不一致で red → RankingView を getRankings で実接続＋再ビルドで green。
+
+| TC-ID | 観測 red（反転/接続前 actual） |
+| --- | --- |
+| G-TC-402 | `_period_bounds` の this_week を境界なしに反転＝先週分も集計 → `assert me.xp==10`（今週分のみ）が 109 で red。復元で月曜00:00 JST 起点 → green |
+| G-TC-206 | 接続前＝「あなたの順位」が全12人中固定（デモ）で実 `GET /rankings` の `me.total_users`/順位と不一致 → red。接続後は実データ（total_users・rank・行数一致）→ green |

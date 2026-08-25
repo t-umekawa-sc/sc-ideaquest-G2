@@ -3,14 +3,31 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.gamification import application as gami_service
-from app.tenant.gamification.schemas import SpellCatalogResponse, SpellUnlockResponse
+from app.tenant.gamification.schemas import RankingResponse, SpellCatalogResponse, SpellUnlockResponse
 
 router = APIRouter(prefix="/api/v1", tags=["gamification"])
+
+
+@router.get("/rankings", response_model=RankingResponse)
+def get_rankings(
+    request: Request,
+    period: str = Query(default="this_week"),
+    scope: str = Query(default="company"),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = None,
+    session: dict = Depends(require_me),
+) -> RankingResponse:
+    """期間スコア（獲得XP＋獲得コイン）ランキング（SC-41 全社／SC-12 クエスト内・G.5）。me 常時同梱。読取専用。"""
+    result = gami_service.get_rankings(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        period=period, scope=scope, limit=limit, cursor=cursor,
+    )
+    return RankingResponse(**result)
 
 
 @router.get("/spells", response_model=SpellCatalogResponse)

@@ -1505,6 +1505,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rankings
+         * @description 期間スコア（獲得XP＋獲得コイン）ランキング（SC-41 全社／SC-12 クエスト内・G.5）。me 常時同梱。読取専用。
+         */
+        get: operations["get_rankings_api_v1_rankings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/spells": {
         parameters: {
             query?: never;
@@ -3504,6 +3524,68 @@ export interface components {
             icon_image_path?: string | null;
             /** Members */
             members?: components["schemas"]["QuestMemberInput"][] | null;
+        };
+        /** RankingCursorPageInfo */
+        RankingCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /** RankingMeDTO */
+        RankingMeDTO: {
+            /** Rank */
+            rank?: number | null;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /**
+             * Xp
+             * @default 0
+             */
+            xp: number;
+            /**
+             * Coin
+             * @default 0
+             */
+            coin: number;
+            /**
+             * Total Users
+             * @default 0
+             */
+            total_users: number;
+        };
+        /** RankingResponse */
+        RankingResponse: {
+            /** Data */
+            data: components["schemas"]["RankingRowDTO"][];
+            page_info: components["schemas"]["RankingCursorPageInfo"];
+            me: components["schemas"]["RankingMeDTO"];
+        };
+        /** RankingRowDTO */
+        RankingRowDTO: {
+            /** Rank */
+            rank: number;
+            user: components["schemas"]["RankingUserDTO"];
+            /** Score */
+            score: number;
+            /** Xp */
+            xp: number;
+            /** Coin */
+            coin: number;
+        };
+        /** RankingUserDTO */
+        RankingUserDTO: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Avatar */
+            avatar?: string | null;
+            /** Level */
+            level?: number | null;
         };
         /**
          * Session
@@ -6649,6 +6731,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_rankings_api_v1_rankings_get: {
+        parameters: {
+            query?: {
+                period?: string;
+                scope?: string;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankingResponse"];
                 };
             };
             /** @description Validation Error */

@@ -31,3 +31,40 @@ class SpellUnlockResponse(BaseModel):
     spell_id: str
     unlocked: bool
     skill_point_balance: int
+
+
+# ---- ランキング（G.5） ----
+
+
+class RankingUserDTO(BaseModel):
+    id: str
+    name: str
+    avatar: str | None = None
+    level: int | None = None
+
+
+class RankingRowDTO(BaseModel):
+    rank: int
+    user: RankingUserDTO
+    score: int
+    xp: int
+    coin: int
+
+
+class RankingMeDTO(BaseModel):
+    rank: int | None = None
+    score: int = 0
+    xp: int = 0
+    coin: int = 0
+    total_users: int = 0
+
+
+class RankingCursorPageInfo(BaseModel):
+    next_cursor: str | None = None
+    has_next: bool
+
+
+class RankingResponse(BaseModel):
+    data: list[RankingRowDTO]
+    page_info: RankingCursorPageInfo
+    me: RankingMeDTO
