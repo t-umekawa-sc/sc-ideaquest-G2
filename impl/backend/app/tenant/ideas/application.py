@@ -19,6 +19,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.ideas import repository as repo
 from app.tenant.ideas.schemas import STATUS_VALUES
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
 
@@ -544,11 +545,22 @@ def _apply_content(ts, idea, body) -> None:
 
 
 def _record_revision(ts, idea, editor_id) -> None:
-    """公開中アイデアの保存ごとに1版（スナップショット）を追加し current_revision++（D.4）。通知は H まで no-op。"""
+    """公開中アイデアの保存ごとに1版（スナップショット）を追加し current_revision++（D.4）＋idea_updated 通知（H）。"""
     next_rev = idea.current_revision + 1
-    repo.add_revision(ts, idea.id, revision=next_rev, editor_id=editor_id, changes=_content_snapshot(ts, idea))
+    rev = repo.add_revision(ts, idea.id, revision=next_rev, editor_id=editor_id, changes=_content_snapshot(ts, idea))
     idea.current_revision = next_rev
-    _notify_idea_updated(idea.id, next_rev)
+    _notify_idea_updated(ts, idea.id, rev.id, next_rev, editor_id)
+
+
+def _notify_idea_updated(ts, idea_id, revision_id, revision, editor_id) -> None:
+    """版追加時の idea_updated 通知（投票者＋フォロワー・編集者除く・FR-34/H.0）。編集と同一 UoW（取りこぼしなし）。"""
+    recipients = (repo.list_voter_ids(ts, idea_id) | repo.list_follower_ids(ts, idea_id)) - {editor_id}
+    if not recipients:
+        return
+    refs = {"ref_idea_id": idea_id, "ref_idea_revision_id": revision_id}
+    notify_svc.notify(ts, [
+        notify_svc.entry(r, "idea_updated", refs=refs, params={"revision": revision}) for r in recipients
+    ])
 
 
 def _content_snapshot(ts, idea) -> dict:
@@ -664,11 +676,6 @@ def _record_initial_revision(ts, idea, editor_id) -> None:
     `ideas.current_revision` は既定 1 のまま（インクリメントしない）。**通知は発火しない**（公開自体の通知は D の公開処理）。
     """
     repo.add_revision(ts, idea.id, revision=idea.current_revision, editor_id=editor_id, changes=_content_snapshot(ts, idea))
-
-
-def _notify_idea_updated(idea_id, revision) -> None:
-    """版追加時の idea_updated 通知（投票者＋フォロワー・D.4/H）。H 実装まで post-commit no-op フック＋TODO。"""
-    return None
 
 
 def _idea_card(ts, idea, viewer_id, users, vote_counts, followed) -> dict:

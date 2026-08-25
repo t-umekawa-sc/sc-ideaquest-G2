@@ -305,3 +305,17 @@ def list_followed_idea_ids(session: Session, user_id: uuid.UUID) -> set[uuid.UUI
     return set(
         session.execute(select(Follow.idea_id).where(Follow.user_id == user_id)).scalars().all()
     )
+
+
+def list_follower_ids(session: Session, idea_id: uuid.UUID) -> set[uuid.UUID]:
+    """アイデアのフォロワー user_id 集合（通知宛先解決・H）。"""
+    return set(
+        session.execute(select(Follow.user_id).where(Follow.idea_id == idea_id)).scalars().all()
+    )
+
+
+def list_voter_ids(session: Session, idea_id: uuid.UUID) -> set[uuid.UUID]:
+    """アイデアの投票者 user_id 集合（idea_updated 通知宛先＝投票者＋フォロワー・FR-34/H）。"""
+    return set(
+        session.execute(select(Vote.user_id).where(Vote.idea_id == idea_id)).scalars().all()
+    )

@@ -545,3 +545,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | G-TC-207 | 接続前＝デモ 21 件の獲得数/総数で `col-hero__num` が実 summary（total 12）と不一致 → red。接続後は `getAchievements` の実 summary・カタログ・シークレット伏せ → green |
+
+## H. 通知（新ドメイン・H-TC-101〜143・2026-08-25）
+
+> 新規ドメイン H 通知（notifications・migration 0017）＝新規 EP は test-first。生成は各発火ドメインが H の `notify()` を呼ぶ（テナント発火系フル＝mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）。security_*/Redis publish（L）は follow-up。chat/quests-SC11 の teardown に notifications 掃除を追加（参照先削除前）。full 422 passed（407→+15）。
+
+| TC-ID | 観測 red（中核＝生成 `notify()` 反転 actual） |
+| --- | --- |
+| H-TC-101〜143（生成依存 13 件） | `service.notify()` 先頭に `return []` を差し込み＝どの発火でも通知行が作られない → 一覧空・未読数0・read 対象 index 無し・dedup/achievement フック不成立で 13 件 red（生成非依存の H-TC-101 空一覧／H-TC-109 type 422 の 2 件のみ green）。撤去＝宛先重複排除（最具体1件）＋INSERT＋取得時レンダリング＋achievement 台帳フック end-to-end で 15 件 green |

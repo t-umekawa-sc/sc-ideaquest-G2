@@ -97,6 +97,9 @@ def env():
     )
 
     with get_tenant_session(db_identifier) as ts:
+        # 通知（H）は message/idea/quest/user を参照するので、参照先削除の前に掃除（宛先＝テスト内ユーザー）。
+        from app.tenant.notifications.orm import Notification as _Notif
+        ts.execute(_Notif.__table__.delete().where(_Notif.recipient_id.in_([user_id, other_id])))
         cg_ids = [cg.id for i in ideas for cg in ([chat_repo.get_chat_group_by_idea(ts, i)] if chat_repo.get_chat_group_by_idea(ts, i) else [])]
         if cg_ids:
             msg_ids = [m.id for cg in cg_ids for m in ts.execute(select(ChatMessage).where(ChatMessage.chat_group_id == cg)).scalars()]

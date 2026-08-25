@@ -19,7 +19,9 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.ideas import repository as ideas_repo
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
+from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as repo
 from app.tenant.quests.schemas import PERMISSION_VALUES
@@ -239,7 +241,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         quest_id = quest.id
         ts.commit()
     if body.status == "recruiting":
-        _notify_party_invited(company_id, quest_id, recipients)  # 即公開＝参加通知（H 実装まで no-op）
+        _notify_party_invited(company_id, quest_id, recipients, user.id)  # 即公開＝参加通知（H・C.2）
     return detail
 
 
@@ -316,7 +318,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         published_id = quest.id
         ts.commit()
-    _notify_party_invited(company_id, published_id, recipients)  # H 実装まで no-op
+    _notify_party_invited(company_id, published_id, recipients, user.id)  # 公開＝参加通知（H・C.2）
     return detail
 
 
@@ -818,14 +820,23 @@ def _build_detail(ts, quest, viewer_id) -> dict:
     }
 
 
-def _notify_party_invited(company_id: uuid.UUID, quest_id: uuid.UUID, recipient_ids: list[uuid.UUID]) -> None:
-    """publish/即公開時の参加通知（`quest_party_invited`・H.0 発火元表に登録済み）。
+def _notify_party_invited(
+    company_id: uuid.UUID, quest_id: uuid.UUID, recipient_ids: list[uuid.UUID], owner_id: uuid.UUID
+) -> None:
+    """publish/即公開時の参加通知（`quest_party_invited`・宛先＝追加パーティー員〔owner 除く〕・H.0/C.2）。post-commit。
 
-    TODO(H): ドメイン H 実装時に post-commit で notify() を呼ぶ（宛先＝recipient_ids・ref_quest_id=quest_id）。
-    通知種別・参照列（notifications.ref_quest_id）・発火元台帳は spec 登録済み（データモデル §3/§5.24・H.0）＝
-    H 実装で必ず結線される。現フェーズは no-op（C.7-補・論点3 の確定方針）。
+    参照＝`ref_quest_id`（SC-02→SC-12 遷移）。actor_name＝公開者（owner）の表示名をイベント時点で凍結（H.1）。
     """
-    return None
+    if not recipient_ids:
+        return
+
+    def _build(ts):
+        owner = ts.get(User, owner_id)
+        params = {"actor_name": owner.display_name if owner else None}
+        refs = {"ref_quest_id": quest_id}
+        return [notify_svc.entry(r, "quest_party_invited", refs=refs, params=params) for r in recipient_ids]
+
+    notify_svc.dispatch(company_id, _build)
 
 
 def _parse_exclude(values) -> list[uuid.UUID]:

@@ -18,6 +18,7 @@ from app.tenant.evaluations.repository import ASPECTS
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.ideas import repository as ideas_repo
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
 
@@ -115,7 +116,7 @@ def put_evaluation(account_id, company_id, idea_id, *, body) -> dict:
             if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "evaluation", "evaluations", ev.id):
                 ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_EVALUATION, reason="evaluation",
                              ref_type="evaluations", ref_id=ev.id, quest_id=idea.quest_id)
-            _notify_follow_evaluation(idea.id, user.id)
+            _notify_follow_evaluation(ts, idea.id, user.id)
             # 投稿者コインの確定トリガ(a)＝evaluator 全員がこのアイデアを submitted 済みか判定。
             _maybe_finalize_idea_coin(ts, idea, quest)
         detail = _me_payload(ts, ev)
@@ -145,7 +146,7 @@ def select_idea(account_id, company_id, idea_id, *, selected: bool) -> dict:
             if author is not None and not gami_repo.exists_ref(ts, author.id, ledger.XP_GAIN, "selection", "ideas", idea.id):
                 ledger.grant(ts, author, kind=ledger.XP_GAIN, amount=_XP_SELECTION, reason="selection",
                              ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
-            _notify_follow_selection(idea.id)
+            _notify_follow_selection(ts, idea.id, user.id)
         detail = {"id": str(idea.id), "is_selected": idea.is_selected}
         ts.commit()
     return detail
@@ -349,11 +350,22 @@ def _author_dto(user, user_id) -> dict:
     }
 
 
-def _notify_follow_evaluation(idea_id, evaluator_id) -> None:
-    """評価確定時の follow_evaluation 通知（H・§F.5）。H 実装まで post-commit no-op フック。"""
-    return None
+def _notify_follow_evaluation(ts, idea_id, evaluator_id) -> None:
+    """評価確定時の follow_evaluation 通知（フォロワー宛・評価者除く・H.0/§F.5）。確定と同一 UoW。
+
+    本文にスコアは載せない（F.5＝「新しい評価がつきました」程度・権限外情報を出さない・H.4）。
+    """
+    recipients = ideas_repo.list_follower_ids(ts, idea_id) - {evaluator_id}
+    if not recipients:
+        return
+    refs = {"ref_idea_id": idea_id}
+    notify_svc.notify(ts, [notify_svc.entry(r, "follow_evaluation", refs=refs) for r in recipients])
 
 
-def _notify_follow_selection(idea_id) -> None:
-    """選定時の follow_selection 通知（H・§F.5）。H 実装まで no-op フック。"""
-    return None
+def _notify_follow_selection(ts, idea_id, actor_id) -> None:
+    """選定時の follow_selection 通知（フォロワー宛・操作者除く・H.0/§F.5）。選定と同一 UoW。"""
+    recipients = ideas_repo.list_follower_ids(ts, idea_id) - {actor_id}
+    if not recipients:
+        return
+    refs = {"ref_idea_id": idea_id}
+    notify_svc.notify(ts, [notify_svc.entry(r, "follow_selection", refs=refs) for r in recipients])

@@ -102,6 +102,12 @@ def env():
             ts.execute(select(Quest.id).where(Quest.quest_group_id == group_id)).scalars()
         )
         qids = list(set(created_quests) | set(api_made))
+        # 通知（H・quest_party_invited）は quest/user を参照するので、参照先削除の前に掃除。
+        from app.tenant.notifications.orm import Notification as _Notif
+        _cond = _Notif.recipient_id.in_([other_user_id, third_user_id])
+        if qids:
+            _cond = _cond | _Notif.ref_quest_id.in_(qids)
+        ts.execute(_Notif.__table__.delete().where(_cond))
         if qids:
             mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(qids))).scalars())
             if mids:

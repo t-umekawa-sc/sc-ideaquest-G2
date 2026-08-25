@@ -95,9 +95,19 @@ def evaluate(session, user, reason: str, kind: str) -> None:
             if not gami_repo.exists_ref(session, user.id, ledger.COIN_GAIN, "achievement_reward", "achievements", ach.id):
                 ledger.grant(session, user, kind=ledger.COIN_GAIN, amount=ach.coin_reward, reason="achievement_reward",
                              ref_type="achievements", ref_id=ach.id, judge=False)
-            _notify_achievement(user.id, ach.id)
+            _notify_achievement(session, user, ach)
 
 
-def _notify_achievement(user_id, achievement_id) -> None:
-    """実績獲得通知（notification_type=achievement・H）。H 実装まで post-commit no-op フック。"""
-    return None
+def _notify_achievement(session, user, ach) -> None:
+    """実績獲得通知（notification_type=achievement・本人宛・H.0）。
+
+    実績付与は grant の同一 UoW 内なので通知も同セッションで生成（post-commit ではなく in-session＝
+    達成とセットで確定・取りこぼしなし）。params にティア/コインを凍結（H.1・meta 用）。
+    """
+    from app.tenant.notifications import service as notify_svc
+
+    notify_svc.notify(session, [notify_svc.entry(
+        user.id, "achievement",
+        refs={"ref_achievement_id": ach.id},
+        params={"tier": ach.tier, "coin": ach.coin_reward},
+    )])

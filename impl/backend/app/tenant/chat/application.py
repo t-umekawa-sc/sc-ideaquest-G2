@@ -19,7 +19,9 @@ from app.tenant.chat import repository as repo
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.ideas import repository as ideas_repo
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
+from app.tenant.profile.orm import User
 from app.tenant.quests import repository as quests_repo
 
 _XP_CHAT = 5
@@ -154,7 +156,7 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         _award_chat_xp(ts, user, msg.id, idea.quest_id)
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
-    _notify_message_posted(idea.id, msg.id)
+    _notify_message_posted(company_id, idea.id, msg.id)
     return payload
 
 
@@ -290,11 +292,14 @@ def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_
             if repo.get_user_magic_in_group(ts, cg.id, user.id, sid) is not None:
                 raise AppError(409, "conflict", detail="この魔法はこのチャットで既に使用済みです", extra={"errors": [{"reason": "spell_already_used_in_chat"}]})
             repo.add_reaction(ts, chat_message_id=msg.id, chat_group_id=cg.id, user_id=user.id, type="magic", spell_id=sid)
+            magic_spell_id = sid
         else:
             raise AppError(422, "validation_error", detail="type が不正です", errors=[{"field": "type"}])
         result = {"reactions": _message_reactions(ts, msg, user.id)}
+        author_id = msg.author_id
         ts.commit()
-    _notify_reaction(idea.id, msg.id, type)
+    if type == "magic":
+        _notify_reaction(company_id, idea.id, msg.id, author_id, user.id, magic_spell_id)
     return result
 
 
@@ -331,9 +336,22 @@ def _message_reactions(ts, msg, viewer_id) -> dict:
     return _reactions_dto(rs, viewer_id, users, spells)
 
 
-def _notify_reaction(idea_id, message_id, type) -> None:
-    """魔法リアクション付与時の magic_reaction 通知（H・E.6）＋chat.reaction 配信（L・E.7）。実装まで no-op。"""
-    return None
+def _notify_reaction(company_id, idea_id, message_id, author_id, reactor_id, spell_id) -> None:
+    """魔法リアクション付与時の magic_reaction 通知（対象メッセージの投稿者宛・H.0/E.6）。post-commit。
+
+    自分のメッセージへの自分の魔法は通知しない（宛先＝投稿者・reactor 除く）。魔法名は識別子を凍結（取得時解決・H.1）。
+    """
+    def _build(ts):
+        if author_id == reactor_id:
+            return []
+        actor = ts.get(User, reactor_id)
+        return [notify_svc.entry(
+            author_id, "magic_reaction",
+            refs={"ref_idea_id": idea_id, "ref_chat_message_id": message_id},
+            params={"actor_name": actor.display_name if actor else None, "spell_id": str(spell_id)},
+        )]
+
+    notify_svc.dispatch(company_id, _build)
 
 
 # ---- ドメイン関数（門番・認可・検証・表現） ----
@@ -529,9 +547,33 @@ def _author_dto(user, user_id) -> dict:
     }
 
 
-def _notify_message_posted(idea_id, message_id) -> None:
-    """メンション/idea_comment/follow_comment 通知（H・E.6）＋chat.message.created 配信（L・E.7）。実装まで no-op。"""
-    return None
+def _notify_message_posted(company_id, idea_id, message_id) -> None:
+    """投稿時の通知（H・E.6）＝mention（被メンション）／idea_comment（アイデア投稿者）／follow_comment（フォロワー）。post-commit。
+
+    宛先単位で最具体1件に畳む（notify の dedup・H.1）。いずれも投稿者本人は除外（自分の投稿で自分に通知しない）。
+    """
+    def _build(ts):
+        msg = repo.get_message(ts, message_id)
+        idea = ideas_repo.get_idea(ts, idea_id)
+        if msg is None or idea is None:
+            return []
+        author_id = msg.author_id
+        actor = ts.get(User, author_id)
+        params = {"actor_name": actor.display_name if actor else None}
+        refs = {"ref_idea_id": idea_id, "ref_chat_message_id": message_id}
+        entries = []
+        mentioned = repo.get_mentions_for_messages(ts, [message_id]).get(message_id, [])
+        for m in mentioned:
+            if m != author_id:
+                entries.append(notify_svc.entry(m, "mention", refs=refs, params=params))
+        if idea.author_id != author_id:
+            entries.append(notify_svc.entry(idea.author_id, "idea_comment", refs=refs, params=params))
+        for f in ideas_repo.list_follower_ids(ts, idea_id):
+            if f != author_id:
+                entries.append(notify_svc.entry(f, "follow_comment", refs=refs, params=params))
+        return entries
+
+    notify_svc.dispatch(company_id, _build)
 
 
 def _notify_message_updated(idea_id, message_id) -> None:
