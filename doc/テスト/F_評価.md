@@ -48,3 +48,13 @@
 | F-TC-118 | api | コイン確定(a)＝evaluator 全員提出でアイデア単位に1回 | evaluator 2名・両者 submitted | 2人目の `PUT submitted` | 投稿者に evaluation_coin 1件（`round(avg×10)`・最大50）・再判定で増えない | F.4／§8-⑱ |
 | F-TC-119 | api | コイン確定(b)＝completed 遷移で未確定を一括確定 | submitted 有・未確定のまま completed | `POST /quests/{id}/transition`(completed) | 未確定 published の投稿者へ evaluation_coin を一括付与（冪等・(a) 済みは二重付与しない） | F.4／C.5 |
 | F-TC-120 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `PUT`／`POST select` | 403 csrf_failed／401 | A.0 |
+
+## 4. 画面 e2e（SC-25 評価画面・SC-22 §4.6 評価結果・F.1〜F.3）
+
+> 対象＝フロント接続済み SC-25（`features/evaluations/components/EvaluationView.tsx`・`/(app)/ideas/[ideaId]/eval`）と SC-22 §4.6 評価結果（`features/ideas/components/IdeaDetailView.tsx`）。e2e は**契約の最終確認**（画面↔API）に限定し、分岐は §2/§3 の api で担保。前提＝dev seed 一般ユーザー ACME-01（owner＝評価者＋選定可）。下地クエスト/アイデアは API で作成し teardown で論理削除。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-TC-201 | e2e | SC-25 確定→SC-22 評価結果に反映 | ログイン・API で recruiting クエスト＋published アイデア（author=ACME-01・owner=評価者） | `/ideas/{id}/eval` で5観点を★5採点＋総評入力→「評価を確定」 | 成功トースト・`/ideas/{id}` へ戻る・評価結果に「評価者1名」・平均 5.0・観点バー・総評が実データ（`getEvaluationAggregate`）で出る | F.1/F.2／SC-25/SC-22 |
+| F-TC-202 | e2e | SC-25 下書き→再訪でプリフィル | 同上 | `/ideas/{id}/eval` で新規性=★3 →「下書き保存」→再訪 | トースト「下書きを保存しました」・再訪時に新規性の3点が復元（`getMyEvaluation`・`aria-pressed`）・確定していないので SC-22 は評価者0名 | F.1/F.2／SC-25 |
+| F-TC-203 | e2e | SC-22 選定トグル（owner） | published アイデア（ACME-01 owner） | `/ideas/{id}` で「☆ このアイデアを選定」クリック | トースト「アイデアを選定しました」・ボタンが「★ 選定済み（解除）」・ヘッダーに「選定候補」バッジ（`selectIdea`・楽観更新＋サーバー権威） | F.3／SC-22 |

@@ -1309,6 +1309,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/evaluation/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Evaluation
+         * @description 自分の評価/下書き（SC-25・F.1）。門番＋evaluator 権限はサーバー強制。読取専用。
+         */
+        get: operations["get_my_evaluation_api_v1_ideas__idea_id__evaluation_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Aggregate
+         * @description 評価結果の集計（SC-22 §4.6・F.1）。可視な評価のみで算定・limited は範囲外非表示。読取専用。
+         */
+        get: operations["get_aggregate_api_v1_ideas__idea_id__evaluation_get"];
+        /**
+         * Put Evaluation
+         * @description 自分の評価を登録/更新（SC-25・F.2）。submitted は全5観点＋総評検証＋XP+30＋コイン確定判定(a)。
+         */
+        put: operations["put_evaluation_api_v1_ideas__idea_id__evaluation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select Idea
+         * @description アイデアを選定（F.3・owner/quest_admin）。投稿者へ XP+200（初回・剥奪なし）。完了は 409。
+         */
+        post: operations["select_idea_api_v1_ideas__idea_id__select_post"];
+        /**
+         * Unselect Idea
+         * @description 選定を解除（F.3・owner/quest_admin）。XP は剥奪しない。完了は 409。
+         */
+        delete: operations["unselect_idea_api_v1_ideas__idea_id__select_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1733,6 +1801,150 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * EvaluationAggregateDTO
+         * @description 評価結果の集計（SC-22 §4.6 右レール・F.1）。閲覧者に可視な評価のみで算定。
+         */
+        EvaluationAggregateDTO: {
+            /**
+             * Aspects
+             * @default {}
+             */
+            aspects: {
+                [key: string]: number;
+            };
+            /** Overall Avg */
+            overall_avg?: number | null;
+            /**
+             * Evaluator Count
+             * @default 0
+             */
+            evaluator_count: number;
+            /**
+             * Evaluators
+             * @default []
+             */
+            evaluators: components["schemas"]["EvaluationEvaluatorDTO"][];
+            /** @default {
+             *       "projected": 0
+             *     } */
+            coin: components["schemas"]["EvaluationCoinDTO"];
+            my_evaluation?: components["schemas"]["EvaluationMeDTO"] | null;
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+        };
+        /** EvaluationAuthorDTO */
+        EvaluationAuthorDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+            /** Level */
+            level?: number | null;
+        };
+        /**
+         * EvaluationCoinDTO
+         * @description 投稿者コイン（F.4）。projected＝現時点の見込み・finalized＝確定額（確定済みのみ）。
+         */
+        EvaluationCoinDTO: {
+            /**
+             * Projected
+             * @default 0
+             */
+            projected: number;
+            /** Finalized */
+            finalized?: number | null;
+            /** Finalized At */
+            finalized_at?: string | null;
+        };
+        /**
+         * EvaluationEvaluatorDTO
+         * @description 集計に含める1評価者の内訳（SC-22 §4.6・可視な評価のみ）。
+         */
+        EvaluationEvaluatorDTO: {
+            evaluator: components["schemas"]["EvaluationAuthorDTO"];
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+        };
+        /**
+         * EvaluationMeDTO
+         * @description 自分の評価/下書き（SC-25 読み込み・F.1）。未作成は status=null。
+         */
+        EvaluationMeDTO: {
+            /** Status */
+            status?: ("draft" | "submitted") | null;
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /**
+             * Visibility
+             * @default party
+             * @enum {string}
+             */
+            visibility: "party" | "limited";
+            /** Submitted At */
+            submitted_at?: string | null;
+        };
+        /**
+         * EvaluationPutRequest
+         * @description PUT /ideas/{id}/evaluation（F.2）。submitted は全5観点＋総評をサーバー検証。
+         */
+        EvaluationPutRequest: {
+            /** Scores */
+            scores?: {
+                [key: string]: number;
+            };
+            /** Comments */
+            comments?: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /**
+             * Visibility
+             * @default party
+             * @enum {string}
+             */
+            visibility: "party" | "limited";
+            /**
+             * Status
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "submitted";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2031,6 +2243,16 @@ export interface components {
             /** Data */
             data: components["schemas"]["IdeaRevisionDTO"][];
             page_info: components["schemas"]["IdeaCursorPageInfo"];
+        };
+        /**
+         * IdeaSelectResponse
+         * @description POST/DELETE /ideas/{id}/select（F.3）。
+         */
+        IdeaSelectResponse: {
+            /** Id */
+            id: string;
+            /** Is Selected */
+            is_selected: boolean;
         };
         /** IdeaStakeholderDTO */
         IdeaStakeholderDTO: {
@@ -5403,6 +5625,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeaAttachmentDownloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_evaluation_api_v1_ideas__idea_id__evaluation_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_aggregate_api_v1_ideas__idea_id__evaluation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationAggregateDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_evaluation_api_v1_ideas__idea_id__evaluation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluationPutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_idea_api_v1_ideas__idea_id__select_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaSelectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unselect_idea_api_v1_ideas__idea_id__select_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaSelectResponse"];
                 };
             };
             /** @description Validation Error */

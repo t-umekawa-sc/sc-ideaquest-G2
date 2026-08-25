@@ -4,13 +4,16 @@
 // 投票（D.5）・フォロー（D.6）も実接続＝楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
 // quest 参照（D.1）でクエストへの戻る導線・カテゴリーバッジ・completed 凍結の事前無効化を実装。
 // 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md（§4.5）。
-// **未接続（EP 未実装/他ドメイン）＝表示のみ or デモ**: 添付（D.3）・評価結果（F）・チャット（E）・更新履歴の差分（版 EP 未公開）。
+// 評価結果（F.1 集計・§4.6）も実接続＝可視な評価のみ・limited は範囲外非表示・選定（F.3）＋評価導線は my_permissions で出し分け。
+// **未接続（他ドメイン）＝デモ表示**: チャット（E・議論アクティビティ/プレビュー）。
 // 締切後（時刻）の事前無効化は deadline 判定を要するため未実装＝サーバー 409 を権威に理由提示（completed のみ事前無効化）。
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+
+import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { IdeaForm } from "./IdeaForm";
@@ -60,22 +63,13 @@ const CHAT_PREVIEW = [
   { initial: "鈴", name: "鈴木 花子", time: "7/15 15:02", mention: "@田中一郎", text: " 平均62%です。集約後は80%超を見込んでいます（添付の試算シート参照）。" },
 ];
 
-const SCORES = [
-  { label: "新規性", pct: 90, val: "4.5" },
-  { label: "影響度", pct: 80, val: "4.0" },
-  { label: "実現度", pct: 70, val: "3.5" },
-  { label: "適合性", pct: 90, val: "4.5" },
-  { label: "コスト", pct: 90, val: "4.5", info: true },
-];
-
-const OVERALL = [
-  { initial: "山", name: "山田 太郎", text: "全体として実現性の担保が課題だが、コスト効果と環境貢献を両立できる点は非常に魅力的。まず首都圏3拠点のパイロットで数字を出せれば、全社展開の説得力が一気に高まる。" },
-  { initial: "田", name: "田中 一郎", text: "費用対効果が明確で優先度は高い。実行に移すなら早期に物流部と合意形成を進めたい。" },
-];
-
-const ASPECT_COMMENTS = [
-  { initial: "山", name: "山田 太郎", aspect: "実現度", text: "拠点間の調整が鍵。パイロットの3拠点選定を早めに。" },
-  { initial: "田", name: "田中 一郎", aspect: "コスト", text: "削減幅が大きく、初期投資も小さい。費用対効果は高い。" },
+// 評価観点キー→表示名（F・SC-25/SC-22 §4.6）。順序＝5観点の表示順。
+const ASPECT_LABELS: [string, string][] = [
+  ["novelty", "新規性"],
+  ["impact", "影響度"],
+  ["feasibility", "実現度"],
+  ["fit", "適合性"],
+  ["cost", "コスト"],
 ];
 
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
@@ -90,6 +84,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [following, setFollowing] = useState(false);
   const [voteBusy, setVoteBusy] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  // 評価結果（F.1 集計）＋選定状態（楽観更新）。
+  const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
+  const [selected, setSelected] = useState(false);
+  const [selectBusy, setSelectBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -104,6 +102,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           my: dv.my_vote === "approve" || dv.my_vote === "oppose" ? dv.my_vote : null,
         });
         setFollowing(!!d.following);
+        setSelected(!!d.is_selected);
+        // 評価結果の集計（F.1）＝非致命（取得失敗/権限なしは「評価待ち」表示）。
+        setEvalAgg(await getEvaluationAggregate(ideaId).catch(() => null));
         setLoadError(null);
       }
     } catch (err) {
@@ -196,6 +197,31 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     }
   }, [ideaId, following, followBusy, snack]);
 
+  // 選定/選定解除（F.3・owner/quest_admin）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
+  const handleSelect = useCallback(async () => {
+    if (selectBusy) return;
+    const prev = selected;
+    setSelectBusy(true);
+    setSelected(!prev);
+    try {
+      const res = prev ? await unselectIdea(ideaId) : await selectIdea(ideaId);
+      if (res) setSelected(res.is_selected);
+      snack({ type: prev ? "info" : "success", msg: prev ? "選定を解除しました。" : "アイデアを選定しました。投稿者にコイン・XP を付与しました。" });
+    } catch (err) {
+      setSelected(prev); // ロールバック
+      const status = err instanceof ApiError ? err.status : 0;
+      snack({
+        type: "error",
+        msg:
+          status === 409 ? "完了したクエストのアイデアは選定を変更できません。"
+          : status === 403 ? "選定する権限がありません。"
+          : "選定の更新に失敗しました。時間をおいて再度お試しください。",
+      });
+    } finally {
+      setSelectBusy(false);
+    }
+  }, [ideaId, selected, selectBusy, snack]);
+
   if (loading) {
     return <main className="container detail-main"><p className="admin-muted" style={{ marginTop: "var(--space-6)" }}>読み込み中…</p></main>;
   }
@@ -212,13 +238,18 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const agreeN = vote.approve;
   const disagreeN = vote.oppose;
   const myVote = vote.my === "approve" ? "agree" : vote.my === "oppose" ? "disagree" : null;
-  const [stLabel, stClass] = statusLabel(idea.status, idea.is_selected);
+  const [stLabel, stClass] = statusLabel(idea.status, selected);
   // クエスト凍結（completed）＝投票不可・新規フォロー不可（解除のみ可）。サーバー 409 も権威（C.5）。
   const questCompleted = idea.quest.status === "completed";
   const voteDisabled = voteBusy || questCompleted;
   const followDisabled = followBusy || (questCompleted && !following);
   const authorName = idea.author.display_name || "?";
   const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
+  // 評価結果（F.1 集計）＝サーバー算出の my_permissions で UX 出し分け。
+  const canEvaluate = !!evalAgg?.my_permissions?.includes("evaluate");
+  const canSelect = !!evalAgg?.my_permissions?.includes("select");
+  const evalCount = evalAgg?.evaluator_count ?? 0;
+  const evalCoin = evalAgg?.coin?.finalized ?? evalAgg?.coin?.projected ?? 0;
 
   return (
     <main className="container detail-main">
@@ -433,78 +464,108 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </p>
           </section>
 
-          {/* 評価結果 */}
+          {/* 評価結果（F.1 集計・可視な評価のみ・limited は範囲外非表示） */}
           <section className="card" aria-label="評価結果">
             <div className="eval-head">
               <h2 className="card-title" style={{ margin: 0 }}>
                 評価結果
               </h2>
-              <span className="badge badge-muted" title="評価（F）は未接続＝デモ表示">
-                🔓 デモ表示（F 未接続）
-              </span>
+              {canSelect && (
+                <button
+                  className={`btn btn-sm ${selected ? "btn-primary" : "btn-outline"}`}
+                  type="button"
+                  aria-pressed={selected}
+                  disabled={selectBusy || questCompleted}
+                  title={questCompleted ? "完了したクエストでは選定を変更できません" : undefined}
+                  onClick={() => void handleSelect()}
+                >
+                  {selected ? "★ 選定済み（解除）" : "☆ このアイデアを選定"}
+                </button>
+              )}
             </div>
 
-            <div className="eval-avg">
-              <span className="eval-avg__num">4.2</span>
-              <span className="eval-avg__max">/ 5.0（平均・評価者2名）</span>
-              <span className="eval-avg__coin">
-                <span className="pixel-stat coin">◆ +42</span>
-              </span>
-            </div>
-            {SCORES.map((s) => (
-              <div className="score-row" key={s.label}>
-                <span className="score-row__label">
-                  {s.label}
-                  {s.info && <span className="muted">ⓘ</span>}
-                </span>
-                <span className="score-bar">
-                  <i style={{ width: `${s.pct}%` }} />
-                </span>
-                <span className="score-row__val">{s.val}</span>
-              </div>
-            ))}
-
-            {/* 総評（評価者ごとの全体コメント） */}
-            <div className="eval-section-label">総評</div>
-            <div className="eval-overall">
-              {OVERALL.map((c) => (
-                <div className="eval-overall__item" key={c.name}>
-                  <div className="eval-comment__head">
-                    <Avatar name={c.initial} size="sm" />
-                    <span className="chat-msg__name">{c.name}</span>
-                  </div>
-                  <p className="eval-comment__text">{c.text}</p>
+            {evalCount === 0 ? (
+              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>
+                まだ提出済みの評価がありません{canEvaluate ? "。あなたが最初の評価者になれます。" : "（評価者の評価を待っています）。"}
+              </p>
+            ) : (
+              <>
+                <div className="eval-avg">
+                  <span className="eval-avg__num">{evalAgg?.overall_avg?.toFixed(1) ?? "–"}</span>
+                  <span className="eval-avg__max">/ 5.0（平均・評価者{evalCount}名）</span>
+                  <span className="eval-avg__coin">
+                    <span className="pixel-stat coin">◆ +{evalCoin}</span>
+                  </span>
                 </div>
-              ))}
-            </div>
+                {ASPECT_LABELS.map(([key, label]) => {
+                  const v = evalAgg?.aspects?.[key];
+                  return (
+                    <div className="score-row" key={key}>
+                      <span className="score-row__label">
+                        {label}
+                        {key === "cost" && <span className="muted" title="低コストほど高得点">ⓘ</span>}
+                      </span>
+                      <span className="score-bar">
+                        <i style={{ width: `${v ? (v / 5) * 100 : 0}%` }} />
+                      </span>
+                      <span className="score-row__val">{v ? v.toFixed(1) : "–"}</span>
+                    </div>
+                  );
+                })}
 
-            <div className="eval-section-label">観点別コメント</div>
-            <div className="eval-comments">
-              {ASPECT_COMMENTS.map((c) => (
-                <div className="eval-comment" key={c.name}>
-                  <div className="eval-comment__head">
-                    <Avatar name={c.initial} size="sm" />
-                    <span className="chat-msg__name">{c.name}</span>
-                    <span className="badge badge-muted eval-comment__aspect">{c.aspect}</span>
-                  </div>
-                  <p className="eval-comment__text">{c.text}</p>
-                </div>
-              ))}
-            </div>
+                {/* 総評（評価者ごとの全体コメント） */}
+                {evalAgg?.evaluators?.some((e) => e.overall_comment) && (
+                  <>
+                    <div className="eval-section-label">総評</div>
+                    <div className="eval-overall">
+                      {evalAgg.evaluators.filter((e) => e.overall_comment).map((e) => (
+                        <div className="eval-overall__item" key={e.evaluator.user_id}>
+                          <div className="eval-comment__head">
+                            <Avatar name={e.evaluator.display_name || "?"} size="sm" />
+                            <span className="chat-msg__name">{e.evaluator.display_name || "?"}</span>
+                          </div>
+                          <p className="eval-comment__text">{e.overall_comment}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* 観点別コメント（評価者×観点） */}
+                {evalAgg?.evaluators?.some((e) => Object.keys(e.comments ?? {}).length > 0) && (
+                  <>
+                    <div className="eval-section-label">観点別コメント</div>
+                    <div className="eval-comments">
+                      {evalAgg.evaluators.flatMap((e) =>
+                        ASPECT_LABELS.filter(([k]) => e.comments?.[k]).map(([k, label]) => (
+                          <div className="eval-comment" key={`${e.evaluator.user_id}-${k}`}>
+                            <div className="eval-comment__head">
+                              <Avatar name={e.evaluator.display_name || "?"} size="sm" />
+                              <span className="chat-msg__name">{e.evaluator.display_name || "?"}</span>
+                              <span className="badge badge-muted eval-comment__aspect">{label}</span>
+                            </div>
+                            <p className="eval-comment__text">{e.comments?.[k]}</p>
+                          </div>
+                        )),
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
             <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
               5観点は<strong>均等平均</strong>。コインは <code>round(平均×10)</code>（最大50）を投稿者に付与。コスト観点は
               <strong>低コストほど高得点</strong>。
             </p>
 
-            {/* 評価者向けアクション（▼ 評価者権限がある場合のみ表示） */}
-            <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
-              <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`}>
-                評価する / 編集
-              </Link>
-            </div>
-            <p className="role-note" style={{ marginTop: "var(--space-2)" }}>
-              ▲ 評価ボタンは<strong>評価者権限</strong>がある場合のみ表示。公開範囲（既定＝パーティー全員／限定）は評価時に指定。
-            </p>
+            {/* 評価者向けアクション（評価者権限がある場合のみ・サーバー算出 my_permissions） */}
+            {canEvaluate && (
+              <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
+                <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`}>
+                  評価する / 編集
+                </Link>
+              </div>
+            )}
           </section>
 
           {/* 情報（メタ） */}

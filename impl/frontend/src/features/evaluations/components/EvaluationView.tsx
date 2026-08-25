@@ -1,59 +1,149 @@
 "use client";
 
-// SC-25 評価画面＝5観点×5点のスター採点＋観点別コメント＋総評（必須）＋集計プレビュー＋公開範囲。
-// 正＝doc/画面設計/mocks/SC-25_評価画面.html・doc/画面設計/screens/SC-25_評価画面.md。
-// 評価 backend 未実装＝デモ fixtures（画面モック先行）。設計上はSC-22からのモーダル（Intercept）／URL直・リロードは本フルページ。
+// SC-25 評価画面＝5観点×5点のスター採点＋観点別コメント＋総評（必須）＋集計プレビュー＋公開範囲（F.2 実接続）。
+// 正＝doc/画面設計/mocks/SC-25_評価画面.html・doc/画面設計/screens/SC-25_評価画面.md・API設計 F.2。
+// 実接続: マウントで getMyEvaluation（プリフィル）＋getIdea（対象アイデアの文脈）。確定/下書きは PUT /ideas/{id}/evaluation。
+// 権限/検証/状態機械はサーバー権威（403/409/422）。設計上はSC-22 からのモーダル（Intercept）だが本 impl はフルページ（接続維持）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useSnackbar } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
+import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
+import { getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
 import "../evaluations.css";
 
 type AspectKey = "novelty" | "impact" | "feasibility" | "fit" | "cost";
-type Aspect = { key: AspectKey; label: string; desc: string; seed: number; cost?: boolean };
+type Aspect = { key: AspectKey; label: string; desc: string; cost?: boolean };
 const ASPECTS: Aspect[] = [
-  { key: "novelty", label: "新規性", desc: "アイデアの目新しさ・独自性", seed: 4 },
-  { key: "impact", label: "影響度", desc: "実現した場合のインパクトの大きさ", seed: 4 },
-  { key: "feasibility", label: "実現度", desc: "実現可能性の高さ", seed: 3 },
-  { key: "fit", label: "適合性", desc: "クエストのテーマ・目的への合致度", seed: 4 },
-  { key: "cost", label: "コスト", desc: "💡 低コストほど高得点（★5＝非常に低コスト）", seed: 5, cost: true },
+  { key: "novelty", label: "新規性", desc: "アイデアの目新しさ・独自性" },
+  { key: "impact", label: "影響度", desc: "実現した場合のインパクトの大きさ" },
+  { key: "feasibility", label: "実現度", desc: "実現可能性の高さ" },
+  { key: "fit", label: "適合性", desc: "クエストのテーマ・目的への合致度" },
+  { key: "cost", label: "コスト", desc: "💡 低コストほど高得点（★5＝非常に低コスト）", cost: true },
 ];
 
 export function EvaluationView({ ideaId }: { ideaId: string }) {
   const router = useRouter();
   const snack = useSnackbar();
-  // 既存評価の編集を想定したシード
-  const [scores, setScores] = useState<Record<AspectKey, number>>({ novelty: 4, impact: 4, feasibility: 3, fit: 4, cost: 5 });
+  const [scores, setScores] = useState<Partial<Record<AspectKey, number>>>({});
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
   const [comments, setComments] = useState<Partial<Record<AspectKey, string>>>({});
   const [overall, setOverall] = useState("");
-  const [visibility, setVisibility] = useState<"party" | "limited">("party");
+  const [visibility, setVisibility] = useState<EvaluationVisibility>("party");
   const [missingErr, setMissingErr] = useState(0);
   const [overallErr, setOverallErr] = useState(false);
+  const [idea, setIdea] = useState<IdeaDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pending, setPending] = useState<null | "draft" | "submit">(null);
 
-  const ratedVals = ASPECTS.map((a) => scores[a.key]).filter(Boolean);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    // 自分の評価（プリフィル）＋対象アイデアの文脈を並行取得。評価権限が無ければ me が 403。
+    Promise.all([getMyEvaluation(ideaId), getIdea(ideaId).catch(() => null)])
+      .then(([me, d]) => {
+        if (!alive) return;
+        if (me && me.status) {
+          setScores((me.scores ?? {}) as Partial<Record<AspectKey, number>>);
+          setComments((me.comments ?? {}) as Partial<Record<AspectKey, string>>);
+          setOverall(me.overall_comment ?? "");
+          setVisibility(me.visibility ?? "party");
+        }
+        setIdea(d);
+        setLoadError(null);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        const status = err instanceof ApiError ? err.status : 0;
+        setLoadError(
+          status === 403 ? "この画面は評価者権限を持つメンバーのみ利用できます。"
+          : status === 404 ? "このアイデアは見つからないか、評価できません。"
+          : "評価の読み込みに失敗しました。",
+        );
+      })
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [ideaId]);
+
+  const ratedVals = ASPECTS.map((a) => scores[a.key]).filter((v): v is number => !!v);
   const rated = ratedVals.length;
   const avg = rated ? ratedVals.reduce((s, v) => s + v, 0) / rated : 0;
 
-  function submit() {
-    const missing = ASPECTS.filter((a) => !scores[a.key]).length;
-    const noOverall = !overall.trim();
-    setMissingErr(missing);
-    setOverallErr(noOverall);
-    if (missing || noOverall) return;
-    // 評価 backend 未実装＝デモ（送信せず）。接続時に PUT /ideas/{id}/evaluations/me へ差し替え。
-    snack({
-      type: "reward",
-      title: "評価を確定しました",
-      msg: `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`,
-      rewards: [{ k: "xp", t: "＋10 XP" }],
-    });
-    router.push(`/ideas/${ideaId}`);
+  const persist = useCallback(
+    async (status: "draft" | "submitted") => {
+      if (pending) return;
+      if (status === "submitted") {
+        // クライアント前段検証（サーバーも 422 で権威）＝全5観点＋総評。
+        const missing = ASPECTS.filter((a) => !scores[a.key]).length;
+        const noOverall = !overall.trim();
+        setMissingErr(missing);
+        setOverallErr(noOverall);
+        if (missing || noOverall) return;
+      }
+      setPending(status === "submitted" ? "submit" : "draft");
+      try {
+        await putEvaluation(ideaId, {
+          scores: scores as Record<string, number>,
+          comments: Object.fromEntries(Object.entries(comments).filter(([, v]) => v && v.trim())) as Record<string, string>,
+          overall_comment: overall.trim() || null,
+          visibility,
+          status,
+        });
+        if (status === "submitted") {
+          snack({
+            type: "reward",
+            title: "評価を確定しました",
+            msg: `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`,
+            rewards: [{ k: "xp", t: "＋30 XP" }],
+          });
+          router.push(`/ideas/${ideaId}`);
+        } else {
+          snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });
+        }
+      } catch (err) {
+        const st = err instanceof ApiError ? err.status : 0;
+        if (st === 422) {
+          setMissingErr(ASPECTS.filter((a) => !scores[a.key]).length);
+          setOverallErr(!overall.trim());
+          snack({ type: "error", msg: "確定には全5観点の採点と総評が必要です。" });
+        } else {
+          snack({
+            type: "error",
+            msg:
+              st === 403 ? "評価する権限がありません。"
+              : st === 409 ? "完了したクエストのアイデアは評価できません。"
+              : st === 404 ? "このアイデアは見つからないか、評価できません。"
+              : "保存に失敗しました。時間をおいて再度お試しください。",
+          });
+        }
+      } finally {
+        setPending(null);
+      }
+    },
+    [ideaId, scores, comments, overall, visibility, avg, rated, pending, snack, router],
+  );
+
+  if (loading) {
+    return (
+      <main className="container" style={{ paddingBlock: "var(--space-6)", maxWidth: 760 }}>
+        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
+        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
+      </main>
+    );
   }
-  function saveDraft() {
-    snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });
+  if (loadError) {
+    return (
+      <main className="container" style={{ paddingBlock: "var(--space-6)", maxWidth: 760 }}>
+        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
+        <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div>
+      </main>
+    );
   }
 
   return (
@@ -68,28 +158,35 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
           ▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。
         </p>
 
-        {/* 対象アイデアの文脈 */}
+        {/* 対象アイデアの文脈（実データ・getIdea） */}
         <div className="eval-context card" style={{ padding: "var(--space-3) var(--space-4)" }}>
-          <div className="eval-context__quest">配送ルート最適化 ・ 業務改善</div>
-          <div className="eval-context__title">夜間配送の集約による積載率改善</div>
+          <div className="eval-context__quest">
+            {idea?.quest?.title || "クエスト"}{idea?.quest?.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}
+          </div>
+          <div className="eval-context__title">{idea?.title || "アイデア"}</div>
           <div className="eval-context__link">
             <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
           </div>
         </div>
 
-        {/* 折りたたみ: アイデアを確認 */}
+        {/* 折りたたみ: アイデアを確認（実データ） */}
         <details className="eval-idea" open>
           <summary>アイデアを確認</summary>
           <div className="eval-idea__body">
             <div className="eval-idea__label">価値</div>
-            <p>配送コストを約15%削減しつつ、CO2排出も同時に削減できる。ドライバーの日中拘束を減らし労務環境も改善。</p>
+            <p style={{ whiteSpace: "pre-wrap" }}>{idea?.value || "—"}</p>
             <div className="eval-idea__label">アイデア本文</div>
-            <p>複数拠点で個別に走らせている夜間配送を1本のルートに集約し、積載率を高める。AIで需要予測しながら翌日ルートを自動生成、繁忙期は臨時便を差し込む。まずは首都圏3拠点でパイロット運用し、効果を検証してから全国展開する。</p>
-            <div className="eval-idea__label">関連資料</div>
-            <p>
-              <span className="badge badge-muted">📄 夜間配送_試算シート.xlsx</span>{" "}
-              <span className="badge badge-muted">🖼️ ルート集約イメージ.png</span>
-            </p>
+            <p style={{ whiteSpace: "pre-wrap" }}>{idea?.body || "—"}</p>
+            {idea?.attachments && idea.attachments.length > 0 && (
+              <>
+                <div className="eval-idea__label">関連資料</div>
+                <p>
+                  {idea.attachments.map((f) => (
+                    <span className="badge badge-muted" key={f.id}>📎 {f.original_name}</span>
+                  ))}
+                </p>
+              </>
+            )}
           </div>
         </details>
 
@@ -199,7 +296,7 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
               <input type="radio" name="vis" value="limited" checked={visibility === "limited"} onChange={() => setVisibility("limited")} />
               <span>
                 <span className="vis-opt__title">🔒 限定公開</span>
-                <span className="vis-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーへの見せ方（集計のみ/非表示）は今後確定（TBD）。</span>
+                <span className="vis-opt__desc">投稿者＋評価者＋所有者/クエスト管理権限者のみ閲覧可。範囲外メンバーには集計にも含めず完全非表示。</span>
               </span>
             </label>
           </div>
@@ -213,11 +310,11 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
           <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>
             キャンセル
           </Link>
-          <button className="btn btn-outline" type="button" onClick={saveDraft}>
-            下書き保存
+          <button className="btn btn-outline" type="button" onClick={() => void persist("draft")} disabled={pending !== null}>
+            {pending === "draft" ? "保存中…" : "下書き保存"}
           </button>
-          <button className="btn btn-primary" type="button" onClick={submit}>
-            評価を確定
+          <button className="btn btn-primary" type="button" onClick={() => void persist("submitted")} disabled={pending !== null}>
+            {pending === "submit" ? "確定中…" : "評価を確定"}
           </button>
         </div>
       </section>

@@ -449,3 +449,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | F-TC-118/119 | `_finalize_idea_coin` を no-op に反転＝(a) 全員提出／(b) completed 遷移でも投稿者コインが確定されず → `coin.finalized`/`evaluation_coin` activity が 0 で red。復元で `round(avg×10)`（最大50）を1回だけ確定（冪等）→ green |
 | F-TC-111 | `_can_view_evaluation` を常に True に反転＝limited 評価が範囲外にも漏れる → `evaluator_count`/`aspects` が limited を含み red（分母が2になる）。復元で limited を集計から除外（coin は visibility 無視で全 submitted 算定は維持）→ green |
 | F-TC-104/106 | `_validate_evaluation` を no-op に反転＝submitted で全5観点/総評未充足・score 範囲外でも通過 → `assert 422` が失敗（200 になる）で red。復元で 422（errors[].field）→ green |
+
+## F. 評価フロント接続（SC-25/SC-22 §4.6・F-TC-201〜203・2026-08-25）
+
+> frontend 非マウント＝接続前バンドル（EvaluationView/SC-22 §4.6 がデモ）に対し sc-25-eval を実行 → 3件とも red（確定後に実データが出ない／選定ボタンが無い）→ EvaluationView を `getMyEvaluation`/`putEvaluation`、SC-22 を `getEvaluationAggregate`/`selectIdea` で実接続＋再ビルドで green。回帰＝sc-22 系（idea-detail/quest-ref/revisions/vote-follow/attachments）green・tsc 既知2件のみ・backend 360 passed。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| F-TC-201 | 接続前＝確定するとデモトースト（＋10XP）で戻るのみ・SC-22 は「デモ表示（F 未接続）」で評価者2名固定 → 実データ「評価者1名」/平均5.0/総評が出ず red。接続後は `getEvaluationAggregate` の実集計が描画 → green |
+| F-TC-202 | 接続前＝下書きはデモ（サーバー保存なし）・再訪しても採点が復元しない → `aria-pressed` が false で red。接続後は `putEvaluation(draft)`→`getMyEvaluation` プリフィルで復元 → green |
+| F-TC-203 | 接続前＝SC-22 に選定ボタンが無い（デモは評価導線のみ） → `このアイデアを選定` 不可視で red。接続後は `my_permissions.select` で表示・`selectIdea` で is_selected＋「選定候補」バッジ → green |
