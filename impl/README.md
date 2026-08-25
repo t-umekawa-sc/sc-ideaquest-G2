@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 388 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6）・e2e **sc-24（1＝チャット投稿+リアクション E-TC-201）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 338）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 388 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6）・e2e **sc-24（2＝投稿+リアクション E-TC-201／SC-22 活発度+プレビュー E-TC-202）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 339）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -24,7 +24,7 @@
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
 | SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。ヘッダー💡件数は `idea_count`（公開数）に連動。評価列(F)/週間ランキング(G)/全文検索(J) は demo |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |
-| SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー**（D.5/D.6）＋**添付（D.3）表示/DL**＋**quest 参照**（D.1）＋**更新履歴モーダル**（D.4）＋**評価結果（F.1 集計・limited 非表示）＋選定（F.3）＋評価導線**（my_permissions 出し分け）。チャット(E) は表示のみ |
+| SC-22 | アイデア詳細 | ✅ | `(app)/ideas/[ideaId]` | 本体＋投票/フォロー（D.5/D.6）＋添付（D.3）＋quest 参照（D.1）＋更新履歴（D.4）＋評価結果/選定（F.1/F.3）＋**チャット活発度/プレビュー（E.1・`getChatActivity`/`getChat`）**。全セクション実接続 |
 | SC-24 | アイデアチャット | ✅ | `(app)/ideas/[ideaId]/chat` | **実接続**（`getChat`/`postMessage`/`editMessage`/`deleteMessage`/`markRead`/`addReaction`/`removeReaction`/`getSpells`）＝投稿/編集/削除・リアクション/魔法・メンション（実メンバー）・添付（署名DL）・引用（単一）・既読・comment 権限/completed 凍結。複数引用は backend 単一 reply のため単一（follow-up） |
 | SC-25 | 評価画面 | ✅ | `(app)/ideas/[ideaId]/eval` | 5観点採点＋観点別コメント＋総評＋公開範囲＋集計プレビュー（F.2）。`getMyEvaluation` プリフィル・確定/下書き＝`putEvaluation`・422/403/409 はサーバー権威。※設計はモーダル（Intercept）だが現状フルページ（intercept モーダル化は follow-up） |
 | SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
@@ -39,7 +39,7 @@
 
 **接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
 **モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`shop`・`avatar`・`spells`(SC-32画面)・`achievements`・`ranking`。
-> ※ SC-22 §4.4 の議論アクティビティ/チャットプレビューは E 集計 EP はあるが SC-22 側は未接続（デモ）＝follow-up。SC-32 魔法スキル画面は G 解放 EP（`/spells`）はあるが画面は未接続（デモ）。
+> ※ SC-32 魔法スキル画面は G 解放 EP（`/spells`・unlock）はあるが画面は未接続（デモ）＝follow-up。
 
 ## ブラウザ受入状況（バッチ・後日まとめて）
 

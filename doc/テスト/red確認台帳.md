@@ -485,3 +485,4 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | E-TC-201 | 接続前＝デモ（固定メッセージ・「夜間配送…」）で作成したアイデアの文脈が出ず、投稿もサーバーに載らない → `チャットアイデア_stamp` 不可視で red。接続後は `postMessage`→`getChat` の実データ＋👍リアクション（`addReaction`）が描画 → green |
+| E-TC-202 | 接続前＝SC-22 チャットカードがデモ（💬 8 固定・デモプレビュー）で、API 投稿した本文が `.chat-preview` に出ず red。接続後は `getChatActivity`（total_messages）＋`getChat`（直近3件）の実データが描画 → green |

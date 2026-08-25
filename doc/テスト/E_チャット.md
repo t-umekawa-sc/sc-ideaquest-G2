@@ -46,3 +46,4 @@
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | E-TC-201 | e2e | メッセージ投稿→スレッド反映＋通常リアクション | ログイン・API で recruiting クエスト＋published アイデア（chat_group は公開で自動作成） | `/ideas/{id}/chat` で入力→送信→リアクション ＋→👍 | 送信メッセージが `.msg__text` に出る（`postMessage`→`getChat`）・「＋」→ピッカー→👍 で `.reaction` チップ（`addReaction`・`getChat` 実データ） | E.1/E.2/E.4／SC-24 |
+| E-TC-202 | e2e | SC-22 §4.4 チャット活発度/プレビューが実データ | published アイデア＋API でメッセージ投稿 | `/ideas/{id}` を表示 | チャットカードの件数バッジ＝実 `total_messages`・`.chat-preview` に投稿本文が出る（`getChatActivity`/`getChat`・デモ文言なし） | E.1／SC-22 §4.4 |

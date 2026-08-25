@@ -5,7 +5,7 @@
 // quest 参照（D.1）でクエストへの戻る導線・カテゴリーバッジ・completed 凍結の事前無効化を実装。
 // 正＝doc/画面設計/mocks/SC-22_アイデア詳細.html・doc/画面設計/screens/SC-22_アイデア詳細.md（§4.5）。
 // 評価結果（F.1 集計・§4.6）も実接続＝可視な評価のみ・limited は範囲外非表示・選定（F.3）＋評価導線は my_permissions で出し分け。
-// **未接続（他ドメイン）＝デモ表示**: チャット（E・議論アクティビティ/プレビュー）。
+// チャット（E・§4.4）も実接続＝議論アクティビティ（chat-activity）＋直近3件プレビュー（getChat）。
 // 締切後（時刻）の事前無効化は deadline 判定を要するため未実装＝サーバー 409 を権威に理由提示（completed のみ事前無効化）。
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -14,6 +14,7 @@ import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components
 import { ApiError } from "@/lib/api/client";
 
 import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
+import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { IdeaForm } from "./IdeaForm";
@@ -49,20 +50,6 @@ function fmtBytes(n: number): string {
   return `${n} B`;
 }
 
-// ---- デモ fixtures（未接続セクション用・評価/チャット/履歴） ----
-// 直近14日の日次メッセージ数（has=アイデア更新日 / recent=直近） ※モックの棒グラフと一致
-const SPARK = [
-  { h: 12 }, { h: 28 }, { h: 20 }, { h: 45, update: "7/10 投稿" },
-  { h: 60 }, { h: 35 }, { h: 18 }, { h: 8 },
-  { h: 70, update: "7/16 更新（本文・添付）" }, { h: 85 },
-  { h: 55, recent: true }, { h: 95, recent: true }, { h: 75, recent: true }, { h: 40, recent: true },
-];
-
-const CHAT_PREVIEW = [
-  { initial: "田", name: "田中 一郎", time: "7/15 14:20", text: "積載率の現状値ってどれくらいですか？試算の前提が知りたいです。" },
-  { initial: "鈴", name: "鈴木 花子", time: "7/15 15:02", mention: "@田中一郎", text: " 平均62%です。集約後は80%超を見込んでいます（添付の試算シート参照）。" },
-];
-
 // 評価観点キー→表示名（F・SC-25/SC-22 §4.6）。順序＝5観点の表示順。
 const ASPECT_LABELS: [string, string][] = [
   ["novelty", "新規性"],
@@ -88,6 +75,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [selected, setSelected] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
+  // チャット（E）＝活発度集計＋直近プレビュー（SC-22 §4.4）。
+  const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null);
+  const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +95,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         setSelected(!!d.is_selected);
         // 評価結果の集計（F.1）＝非致命（取得失敗/権限なしは「評価待ち」表示）。
         setEvalAgg(await getEvaluationAggregate(ideaId).catch(() => null));
+        // チャット（E）＝活発度集計＋直近3件プレビュー（非致命）。
+        void getChatActivity(ideaId).then(setChatActivity).catch(() => {});
+        void getChat(ideaId, { limit: 50 }).then((c) => setChatPreview((c?.data ?? []).filter((m) => !m.is_deleted).slice(-3))).catch(() => {});
         setLoadError(null);
       }
     } catch (err) {
@@ -250,6 +243,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const canSelect = !!evalAgg?.my_permissions?.includes("select");
   const evalCount = evalAgg?.evaluator_count ?? 0;
   const evalCoin = evalAgg?.coin?.finalized ?? evalAgg?.coin?.projected ?? 0;
+  // 活発度バー（E.1 daily を正規化・版マーカー日は has-update）。
+  const chatTotal = chatActivity?.total_messages ?? 0;
+  const revDays = new Set((chatActivity?.revision_markers ?? []).map((m) => m.date));
+  const dailyMax = Math.max(1, ...(chatActivity?.daily ?? []).map((d) => d.message_count));
+  const sparkBars = (chatActivity?.daily ?? []).map((d) => ({ date: d.date, h: Math.round((d.message_count / dailyMax) * 100), update: revDays.has(d.date) }));
 
   return (
     <main className="container detail-main">
@@ -366,71 +364,51 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           <section className="card" aria-label="チャット">
             <div className="between" style={{ marginBottom: "var(--space-3)" }}>
               <h2 className="card-title" style={{ margin: 0 }}>
-                チャット <span className="badge badge-muted">💬 8</span>
+                チャット <span className="badge badge-muted">💬 {chatTotal}</span>
               </h2>
-              <span className="role-note">チャット（E）は未接続＝デモ表示</span>
             </div>
 
-            {/* 議論アクティビティ・グラフ（活発度の可視化） */}
-            <div className="activity" aria-label="議論の活発度">
-              <div className="activity__head">
-                <span className="activity__label">議論の活発度</span>
-                <span className="activity__state hot">🔥 活発</span>
+            {/* 議論アクティビティ・グラフ（E.1 chat-activity 実データ） */}
+            {sparkBars.length > 0 && (
+              <div className="activity" aria-label="議論の活発度">
+                <div className="activity__head">
+                  <span className="activity__label">議論の活発度</span>
+                </div>
+                <div className="spark" role="img" aria-label={`直近${sparkBars.length}日の日次メッセージ数の棒グラフ`}>
+                  {sparkBars.map((b, i) => (
+                    <span
+                      key={i}
+                      className={["spark__bar", b.update ? "has-update" : "", i >= sparkBars.length - 3 ? "is-recent" : ""].filter(Boolean).join(" ")}
+                      style={{ height: `${Math.max(6, b.h)}%` }}
+                      title={b.update ? `${b.date}（アイデア更新）` : b.date}
+                    />
+                  ))}
+                </div>
+                <div className="activity__legend">
+                  ◆ = アイデア更新の記録された日。棒＝日次メッセージ数（直近3日を強調）。
+                </div>
               </div>
-              <div
-                className="spark"
-                role="img"
-                aria-label="直近14日の日次メッセージ数の棒グラフ。7/16に更新、直近3日が活発。"
-              >
-                {SPARK.map((b, i) => (
-                  <span
-                    key={i}
-                    className={["spark__bar", b.update ? "has-update" : "", b.recent ? "is-recent" : ""]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={{ height: `${b.h}%` }}
-                    title={b.update}
-                  />
+            )}
+
+            {/* 直近メッセージのプレビュー（E.1・最新3件） */}
+            {chatPreview.length > 0 ? (
+              <div className="chat-preview">
+                {chatPreview.map((m) => (
+                  <div className="chat-msg" key={m.id}>
+                    <Avatar name={m.author?.name || "?"} size="sm" />
+                    <div className="chat-msg__body">
+                      <div className="chat-msg__head">
+                        <span className="chat-msg__name">{m.author?.name}</span>
+                        <span className="chat-msg__time">{fmtDate(m.created_at)}</span>
+                      </div>
+                      <p className="chat-msg__text">{m.body}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
-              <div className="activity__axis">
-                <span>7/05</span>
-                <span>7/12</span>
-                <span>今日</span>
-              </div>
-              <div className="activity__summary">
-                <span>
-                  今週 <b>18件</b>（先週比 <b>↑ +7</b>）
-                </span>
-                <span>
-                  参加 <b>5人</b>
-                </span>
-                <span>
-                  最終投稿 <b>3時間前</b>
-                </span>
-              </div>
-              <div className="activity__legend">
-                ◆ = アイデア更新（更新後に議論が再燃）。まだ活発に議論中のため、評価は落ち着いてからが目安。
-              </div>
-            </div>
-
-            <div className="chat-preview">
-              {CHAT_PREVIEW.map((m, i) => (
-                <div className="chat-msg" key={i}>
-                  <Avatar name={m.initial} size="sm" />
-                  <div className="chat-msg__body">
-                    <div className="chat-msg__head">
-                      <span className="chat-msg__name">{m.name}</span>
-                      <span className="chat-msg__time">{m.time}</span>
-                    </div>
-                    <p className="chat-msg__text">
-                      {m.mention && <span className="mention">{m.mention}</span>}
-                      {m.text}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ) : (
+              <p className="role-note">まだコメントはありません。</p>
+            )}
             <Link className="btn btn-primary" href={`/ideas/${ideaId}/chat`}>
               チャットを開く →
             </Link>

@@ -66,3 +66,31 @@ test("E-TC-201 SC-24 post message appears and normal reaction", async ({ page })
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
+
+async function postMsg(page: Page, ideaId: string, body: string) {
+  const csrf = csrfOf(await page.context().cookies());
+  const res = await page.request.post("/api/v1/chat-messages", {
+    headers: { "X-CSRF-Token": csrf },
+    multipart: { idea_id: ideaId, body },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+}
+
+// E-TC-202 SC-22 §4.4 チャット活発度/プレビューが実データ。
+test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E活発度_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  const body = `プレビュー投稿_${stamp}`;
+  await postMsg(page, ideaId, body);
+  try {
+    await page.goto(`/ideas/${ideaId}`);
+    const chatCard = page.getByLabel("チャット");
+    await expect(chatCard.getByText("💬 1")).toBeVisible(); // 実 total_messages
+    await expect(chatCard.locator(".chat-preview").getByText(body)).toBeVisible();
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
