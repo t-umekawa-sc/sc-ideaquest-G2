@@ -1685,6 +1685,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description 自分宛の通知一覧（SC-02・H.2）＋未読数。カーソル（§1.8・新着降順）。読取専用。
+         */
+        get: operations["list_notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unread Count
+         * @description 未読数のみ（ヘッダーベル・軽量・H.2）。読取専用。
+         */
+        get: operations["unread_count_api_v1_notifications_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notif_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read
+         * @description 個別に既読化（SC-02・参照先クリック時もサーバー既読化・H.3）。冪等。
+         */
+        post: operations["mark_read_api_v1_notifications__notif_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notif_id}/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Unread
+         * @description 個別に未読へ戻す（SC-02「未読に戻す」・H.3）。冪等。
+         */
+        post: operations["mark_unread_api_v1_notifications__notif_id__unread_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read All
+         * @description すべて既読化（type フィルタ適用可・H.3）。
+         */
+        post: operations["read_all_api_v1_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -2291,16 +2391,6 @@ export interface components {
             hide_voters_from_managers?: boolean | null;
             /** Mfa Required */
             mfa_required?: boolean | null;
-        };
-        /**
-         * CursorPageInfo
-         * @description カーソルページングのページ情報（§1.8）。
-         */
-        CursorPageInfo: {
-            /** Next Cursor */
-            next_cursor?: string | null;
-            /** Has Next */
-            has_next: boolean;
         };
         /**
          * DirectoryItem
@@ -3002,7 +3092,7 @@ export interface components {
         MeActivitiesResponse: {
             /** Data */
             data: components["schemas"]["MeActivityDTO"][];
-            page_info: components["schemas"]["CursorPageInfo"];
+            page_info: components["schemas"]["app__control_plane__me__schemas__CursorPageInfo"];
         };
         /**
          * MeActivityDTO
@@ -3226,6 +3316,66 @@ export interface components {
             equipped: {
                 [key: string]: string | null;
             };
+        };
+        /**
+         * NotifMeta
+         * @description 獲得表示用（本人が獲得した値のみ＝achievement のコイン・H.2）。
+         */
+        NotifMeta: {
+            /** Coin */
+            coin?: number | null;
+        };
+        /**
+         * NotifRef
+         * @description 種別に応じた遷移先（フロントが href を解決・H.2）。
+         */
+        NotifRef: {
+            /** Idea Id */
+            idea_id?: string | null;
+            /** Chat Message Id */
+            chat_message_id?: string | null;
+            /** Idea Revision Id */
+            idea_revision_id?: string | null;
+            /** Achievement Id */
+            achievement_id?: string | null;
+            /** Quest Id */
+            quest_id?: string | null;
+        };
+        /** NotificationDTO */
+        NotificationDTO: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Body */
+            body: string;
+            /** Context */
+            context?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Tag */
+            tag?: string | null;
+            /** @default {} */
+            ref: components["schemas"]["NotifRef"];
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            meta?: components["schemas"]["NotifMeta"] | null;
+        };
+        /** NotificationListResponse */
+        NotificationListResponse: {
+            /** Data */
+            data: components["schemas"]["NotificationDTO"][];
+            page_info: components["schemas"]["app__tenant__notifications__schemas__CursorPageInfo"];
+            /** Unread Count */
+            unread_count: number;
         };
         /** OkResponse */
         OkResponse: {
@@ -3724,6 +3874,27 @@ export interface components {
             /** Level */
             level?: number | null;
         };
+        /** ReadAllRequest */
+        ReadAllRequest: {
+            /** Type */
+            type?: string | null;
+        };
+        /** ReadAllResponse */
+        ReadAllResponse: {
+            /** Updated */
+            updated: number;
+            /** Unread Count */
+            unread_count: number;
+        };
+        /** ReadResponse */
+        ReadResponse: {
+            /** Id */
+            id: string;
+            /** Is Read */
+            is_read: boolean;
+            /** Unread Count */
+            unread_count: number;
+        };
         /**
          * Session
          * @description A.6 セッションスキーマ（GET /auth/session の応答・login authenticated 応答に内包）。
@@ -3809,6 +3980,11 @@ export interface components {
             /** Skill Point Balance */
             skill_point_balance: number;
         };
+        /** UnreadCountResponse */
+        UnreadCountResponse: {
+            /** Unread Count */
+            unread_count: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -3821,6 +3997,26 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * CursorPageInfo
+         * @description カーソルページングのページ情報（§1.8）。
+         */
+        app__control_plane__me__schemas__CursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Has Next */
+            has_next: boolean;
+        };
+        /** CursorPageInfo */
+        app__tenant__notifications__schemas__CursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
         };
     };
     responses: never;
@@ -7118,6 +7314,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyAchievementsResponse"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                state?: string;
+                type?: string[] | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unread_count_api_v1_notifications_unread_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountResponse"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_notifications__notif_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notif_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_unread_api_v1_notifications__notif_id__unread_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notif_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_all_api_v1_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReadAllRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadAllResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -20,6 +20,14 @@
 | H-TC-108 | api | カーソル（新着降順・ページング） | 通知3件 | `GET ?limit=2` → `?cursor=next` | 1ページ目2件（新しい順）・`has_next=true`・2ページ目に残り1件 | H.2／§1.8 |
 | H-TC-109 | api | 種別不正は 422 | — | `GET ?type=bogus` | 422（`field=type`） | H.2 |
 
+## 1e. 画面 e2e（SC-02 通知一覧・H）
+
+> 対象＝フロント接続済み SC-02（`features/notifications/components/NotificationsView.tsx`・`/(app)/notifications`）。e2e は契約の最終確認（画面↔API）。前提＝dev seed ACME-01。一覧/未読数は `GET /notifications` の実データを画面と照合（デモ固定 13 行でないこと）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H-TC-208 | e2e | 通知一覧が実データ（未読数・行数・デモ排除） | ログイン | `/notifications` を表示 | `GET /notifications` と照合＝「{unread_count} 件の未読」＝実 unread_count・`.n` 行数＝実 `data.length`・デモ固定文字列（`IP 203.0.113.42`）が出ない | H.2／SC-02 |
+
 ## 2. セキュリティ（IDOR・認可・§2.2）
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |

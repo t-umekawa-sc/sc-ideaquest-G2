@@ -553,3 +553,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（中核＝生成 `notify()` 反転 actual） |
 | --- | --- |
 | H-TC-101〜143（生成依存 13 件） | `service.notify()` 先頭に `return []` を差し込み＝どの発火でも通知行が作られない → 一覧空・未読数0・read 対象 index 無し・dedup/achievement フック不成立で 13 件 red（生成非依存の H-TC-101 空一覧／H-TC-109 type 422 の 2 件のみ green）。撤去＝宛先重複排除（最具体1件）＋INSERT＋取得時レンダリング＋achievement 台帳フック end-to-end で 15 件 green |
+
+### SC-02 通知 フロント接続（e2e H-TC-208・2026-08-25）
+
+> frontend 非マウント＝接続前デモ（13 行固定 fixtures・未読 4 件）に対し H-TC-208 を実行 → `.list-count` が実 `GET /notifications` の unread_count と不一致で red → NotificationsView を getNotifications で実接続＋再ビルドで green。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| H-TC-208 | 接続前＝デモ「4 件の未読」で `.list-count` が実 unread_count（0）と不一致 → red（実測 `Received "4 件の未読" / Expected "0 件の未読"`）。接続後は `getNotifications` の実 unread_count・実 `.n` 行数・デモ固定 IP 非表示 → green |
