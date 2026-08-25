@@ -494,3 +494,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | G-TC-201 | 接続前＝`.sp-hero__num` がデモ固定「✦ 3」で、実 `skill_point_balance` と一致せず red（解放数 3/6 もデモ固定）。接続後は `getSpells` の実 SP残高・解放数・6魔法（2系統）が描画 → green |
+
+## E. 複数引用返信（E-TC-203／E-TC-108・2026-08-25）
+
+> 設計内不整合の解消＝SC-24 §3（複数引用・2026-08-18 決定）を正とし、API設計 E.1/E.2・データモデル §5.16 の単一 `reply_to_message_id` を撤去して結合テーブル `chat_message_quotes`（§5.16b）へ。migration 0014・ORM/repo/app/schemas/router/frontend を更新。E-TC-108（api）は単一→複数引用（`quotes[]`）に更新。e2e E-TC-203 は frontend 非マウントの旧（単一引用）バンドルに対し実行して red 目視→再ビルドで green。backend 22 passed（chat）・全体 387 passed（a_tc_040 は full-suite 順序 flaky・単独 green）。
+
+| TC-ID | 観測 red（接続前/単一引用 actual） |
+| --- | --- |
+| E-TC-203 | 旧（単一引用）バンドルでは 2件目の💬引用が1件目を上書きし「引用返信（2件）」にならず、返信の `.msg__quote` が2件にならない → red。複数引用実装＋再ビルドで `quoted_message_ids[]`→`quotes[]` により2件表示 → green |

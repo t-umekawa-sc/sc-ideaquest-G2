@@ -25,15 +25,15 @@ export function getChatActivity(ideaId: string, days = 14): Promise<ChatActivity
   return apiFetch<ChatActivity>(`/ideas/${ideaId}/chat-activity?days=${days}`);
 }
 
-// メッセージ投稿（E.2・multipart）。body/mentions/reply_to/files を単一 UoW。空は 422・投稿 XP+5。
+// メッセージ投稿（E.2・multipart）。body/mentions/引用（複数可）/files を単一 UoW。空は 422・投稿 XP+5。
 export function postMessage(
   ideaId: string,
-  input: { body?: string; replyTo?: string | null; mentions?: string[]; files?: File[] },
+  input: { body?: string; quotedMessageIds?: string[]; mentions?: string[]; files?: File[] },
 ): Promise<ChatMessage | null> {
   const fd = new FormData();
   fd.append("idea_id", ideaId);
   if (input.body) fd.append("body", input.body);
-  if (input.replyTo) fd.append("reply_to_message_id", input.replyTo);
+  for (const q of input.quotedMessageIds ?? []) fd.append("quoted_message_ids", q);
   for (const m of input.mentions ?? []) fd.append("mentions", m);
   for (const f of input.files ?? []) fd.append("files", f);
   return apiFetch<ChatMessage>(`/chat-messages`, { method: "POST", body: fd });

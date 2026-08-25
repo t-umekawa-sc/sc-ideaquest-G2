@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 388 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6）・e2e sc-24（2）＋**sc-32（1＝魔法カタログ実データ G-TC-201）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 341）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 388 passed**（A-TC-095 は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6）・e2e sc-24（**3**＝投稿+リアクション/複数引用/SC-22活発度）＋sc-32（1）＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 343）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -25,7 +25,7 @@
 | SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**接続済み。ヘッダー💡件数は `idea_count`（公開数）に連動。評価列(F)/週間ランキング(G)/全文検索(J) は demo |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |
 | SC-22 | アイデア詳細 | ✅ | `(app)/ideas/[ideaId]` | 本体＋投票/フォロー（D.5/D.6）＋添付（D.3）＋quest 参照（D.1）＋更新履歴（D.4）＋評価結果/選定（F.1/F.3）＋**チャット活発度/プレビュー（E.1・`getChatActivity`/`getChat`）**。全セクション実接続 |
-| SC-24 | アイデアチャット | ✅ | `(app)/ideas/[ideaId]/chat` | **実接続**（`getChat`/`postMessage`/`editMessage`/`deleteMessage`/`markRead`/`addReaction`/`removeReaction`/`getSpells`）＝投稿/編集/削除・リアクション/魔法・メンション（実メンバー）・添付（署名DL）・引用（単一）・既読・comment 権限/completed 凍結。複数引用は backend 単一 reply のため単一（follow-up） |
+| SC-24 | アイデアチャット | ✅ | `(app)/ideas/[ideaId]/chat` | **実接続**（`getChat`/`postMessage`/`editMessage`/`deleteMessage`/`markRead`/`addReaction`/`removeReaction`/`getSpells`）＝投稿/編集/削除・リアクション/魔法・メンション（実メンバー）・添付（署名DL）・**複数引用**（`chat_message_quotes`・§5.16b）・既読・comment 権限/completed 凍結 |
 | SC-25 | 評価画面 | ✅ | `(app)/ideas/[ideaId]/eval` | 5観点採点＋観点別コメント＋総評＋公開範囲＋集計プレビュー（F.2）。`getMyEvaluation` プリフィル・確定/下書き＝`putEvaluation`・422/403/409 はサーバー権威。※設計はモーダル（Intercept）だが現状フルページ（intercept モーダル化は follow-up） |
 | SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
 | SC-31 | アバター着せ替え | ⬜ | `(app)/avatar` | モックのみ |
@@ -51,7 +51,7 @@
 - [ ] **SC-22 quest参照/completed 事前無効化（D-TC-213/214）**＝「クエストへ戻る」導線・カテゴリーバッジ・完了時の投票/新規フォロー disabled＋⏸凍結バッジ。
 - [ ] **SC-21/22 添付 D.3（D-TC-215）**＝登録/編集で添付アップロード→SC-22 に実添付表示＋DL（署名URL）。
 - [ ] **SC-21 編集モードの既存添付 削除（D-TC-218）**＝編集フォームに保存済み添付が出る→× →確認ダイアログ「削除する」で即時削除・トースト・SC-22 から消える（版は増えない）。
-- [ ] **SC-24 チャット E（E-TC-201）**＝メッセージ投稿/編集/削除・引用（単一）・添付DL・@メンション候補・通常リアクション・魔法（SC-32 で解放した魔法）・既読セパレータ・comment 権限/completed 凍結。
+- [ ] **SC-24 チャット E（E-TC-201/203）**＝メッセージ投稿/編集/削除・**複数引用**・添付DL・@メンション候補・通常リアクション・魔法（SC-32 で解放した魔法）・既読セパレータ・comment 権限/completed 凍結。
 - [ ] **SC-32 魔法スキル G（G-TC-201）**＝カタログ/SP残高/解放数が実データ・SP を使って解放（確認→報酬スナックバー）→ SC-24 の魔法ピッカーで使えるようになる通し。
 - [ ] **SC-25/SC-22 評価 F（F-TC-201〜203）**＝SC-25 で5観点採点＋総評→確定→SC-22 §4.6 に平均/観点/総評/コインが反映・下書き復元・owner の選定トグル（★選定済み＋「選定候補」バッジ）。評価者/選定は my_permissions 出し分け。
 - [ ] **SC-92/93 メール確認 ADR-0009（B-TC-169 等）**＝「確認メールを送信」→MailHog で確認リンク→`/email-verify/confirm` 確定→verified バッジ化を通しで。

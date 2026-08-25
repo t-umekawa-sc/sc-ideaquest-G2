@@ -76,6 +76,38 @@ async function postMsg(page: Page, ideaId: string, body: string) {
   expect(res.status(), await res.text()).toBe(201);
 }
 
+// E-TC-203 SC-24 複数引用返信＝2件を引用して1つの返信に積む。
+test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E複数引用_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  try {
+    await page.goto(`/ideas/${ideaId}/chat`);
+    // 2件投稿。
+    for (const t of [`親A_${stamp}`, `親B_${stamp}`]) {
+      await page.locator(".composer__box").fill(t);
+      await page.getByRole("button", { name: "送信", exact: true }).click();
+      await expect(page.locator(".msg", { hasText: t })).toBeVisible();
+    }
+    // 2件を💬で引用（ホバーアクション）。
+    for (const t of [`親A_${stamp}`, `親B_${stamp}`]) {
+      const m = page.locator(".msg", { hasText: t });
+      await m.hover();
+      await m.getByRole("button", { name: "引用返信" }).click();
+    }
+    await expect(page.locator(".reply-ctx__head")).toHaveText("引用返信（2件）");
+    // まとめ返信を送信→2件の引用ブロック。
+    await page.locator(".composer__box").fill(`まとめ_${stamp}`);
+    await page.getByRole("button", { name: "送信", exact: true }).click();
+    const reply = page.locator(".msg", { hasText: `まとめ_${stamp}` });
+    await expect(reply.locator(".msg__quote")).toHaveCount(2);
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
+
 // E-TC-202 SC-22 §4.4 チャット活発度/プレビューが実データ。
 test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page }) => {
   await login(page);

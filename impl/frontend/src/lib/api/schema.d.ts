@@ -1428,7 +1428,7 @@ export interface paths {
         put?: never;
         /**
          * Post Message
-         * @description メッセージ投稿（SC-24・E.2・multipart）。空は 422・投稿 XP+5（日次上限）。完了は 409。
+         * @description メッセージ投稿（SC-24・E.2・multipart）。空は 422・投稿 XP+5（日次上限）。引用は複数可。完了は 409。
          */
         post: operations["post_message_api_v1_chat_messages_post"];
         delete?: never;
@@ -1766,8 +1766,8 @@ export interface components {
             idea_id: string;
             /** Body */
             body?: string | null;
-            /** Reply To Message Id */
-            reply_to_message_id?: string | null;
+            /** Quoted Message Ids */
+            quoted_message_ids?: string[] | null;
             /** Mentions */
             mentions?: string[] | null;
             /** Files */
@@ -1910,10 +1910,13 @@ export interface components {
             body?: string | null;
             /** Is Edited */
             is_edited?: boolean | null;
-            /** Reply To */
-            reply_to?: {
+            /**
+             * Quotes
+             * @default []
+             */
+            quotes: {
                 [key: string]: unknown;
-            } | null;
+            }[];
             /**
              * Attachments
              * @default []

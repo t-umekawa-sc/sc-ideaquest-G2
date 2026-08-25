@@ -62,18 +62,18 @@ async def post_message(
     request: Request,
     idea_id: str = Form(...),
     body: str | None = Form(default=None),
-    reply_to_message_id: str | None = Form(default=None),
+    quoted_message_ids: list[str] | None = Form(default=None),
     mentions: list[str] | None = Form(default=None),
     files: list[UploadFile] | None = File(default=None),
     session: dict = Depends(require_me),
 ) -> ChatMessageDTO:
-    """メッセージ投稿（SC-24・E.2・multipart）。空は 422・投稿 XP+5（日次上限）。完了は 409。"""
+    """メッセージ投稿（SC-24・E.2・multipart）。空は 422・投稿 XP+5（日次上限）。引用は複数可。完了は 409。"""
     verify_origin(request)
     verify_csrf(request)
     payloads = [((f.filename or ""), await f.read()) for f in (files or [])]
     result = chat_service.post_message(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-        idea_id=idea_id, body=body, reply_to_message_id=reply_to_message_id,
+        idea_id=idea_id, body=body, quoted_message_ids=quoted_message_ids,
         mention_ids=mentions, files=payloads,
     )
     return ChatMessageDTO(**result)

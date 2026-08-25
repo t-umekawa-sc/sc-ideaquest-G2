@@ -4,7 +4,7 @@
 // リアクション（通常＋魔法）・引用返信（単一・backend 契約）・編集/削除・既読・活発度。
 // 正＝doc/画面設計/mocks/SC-24_アイデアチャット.html・screens/SC-24・API設計 E.1〜E.5/G（魔法解放）。
 // 実接続: getChat（一覧＋未読）・getIdea（文脈＋comment 権限＋completed）・getPartyMembers（@候補）・getSpells（魔法）。
-// 送信/編集/削除/既読/リアクション/魔法はサーバー権威（403/409/422 は理由トースト）。※複数引用は backend 単一 reply のため単一（follow-up）。
+// 送信/編集/削除/既読/リアクション/魔法はサーバー権威（403/409/422 は理由トースト）。引用返信は複数可（quoted_message_ids[]・§5.16b）。
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -79,7 +79,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [replyTo, setReplyTo] = useState<{ id: string; name: string; text: string } | null>(null);
+  const [replyTargets, setReplyTargets] = useState<{ id: string; name: string; text: string }[]>([]);
   const [canSend, setCanSend] = useState(false);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -198,10 +198,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     if ((!body && pendingFiles.length === 0) || sending || !canPost) return;
     setSending(true);
     try {
-      await postMessage(ideaId, { body, replyTo: replyTo?.id ?? null, mentions: extractMentionIds(body), files: pendingFiles });
+      await postMessage(ideaId, { body, quotedMessageIds: replyTargets.map((r) => r.id), mentions: extractMentionIds(body), files: pendingFiles });
       if (ta) { ta.value = ""; autoGrow(ta, 180); }
       setPendingFiles([]);
-      setReplyTo(null);
+      setReplyTargets([]);
       setCanSend(false);
       scrollNextRef.current = true;
       await refetch();
@@ -347,11 +347,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                     {m.is_edited && <span className="msg__edited">（編集済み）</span>}
                   </div>
 
-                  {m.reply_to && (
-                    <a className="msg__quote" href={`#${(m.reply_to as { id: string }).id}`}>
-                      <b>{(m.reply_to as { author_name?: string }).author_name}</b> {(m.reply_to as { excerpt?: string }).excerpt}
+                  {((m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? []).map((q, i) => (
+                    <a className="msg__quote" href={`#${q.id}`} key={i}>
+                      <b>{q.author_name}</b> {q.excerpt}
                     </a>
-                  )}
+                  ))}
 
                   {editingId === m.id ? (
                     <div className="msg__editwrap">
@@ -404,7 +404,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {!m.is_deleted && !completed && (
                   <div className="msg__actions">
                     <button className="msg__act" type="button" data-act="react" aria-label="リアクション" onClick={(e) => { e.stopPropagation(); openPicker(m.id, e.currentTarget); }}>🙂</button>
-                    <button className="msg__act" type="button" aria-label="引用返信" onClick={() => { setReplyTo({ id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) }); boxRef.current?.focus(); }}>💬</button>
+                    <button className="msg__act" type="button" aria-label="引用返信" onClick={() => { setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, { id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) }])); boxRef.current?.focus(); }}>💬</button>
                     {m.is_mine && (
                       <>
                         <button className="msg__act" type="button" aria-label="編集" onClick={() => setEditingId(m.id)}>✏️</button>
@@ -429,12 +429,15 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           )}
           {canPost && (
             <>
-              {replyTo && (
+              {replyTargets.length > 0 && (
                 <div className="reply-ctx is-on">
-                  <div className="reply-ctx__item">
-                    <span className="reply-ctx__body"><b>{replyTo.name}</b> に返信：{replyTo.text}</span>
-                    <button className="reply-ctx__cancel" type="button" aria-label="引用をやめる" onClick={() => setReplyTo(null)}>✕</button>
-                  </div>
+                  <div className="reply-ctx__head">引用返信（{replyTargets.length}件）</div>
+                  {replyTargets.map((t, i) => (
+                    <div className="reply-ctx__item" key={t.id}>
+                      <span className="reply-ctx__body"><b>{t.name}</b> に返信：{t.text}</span>
+                      <button className="reply-ctx__cancel" type="button" aria-label="この引用をやめる" onClick={() => setReplyTargets((rt) => rt.filter((_, j) => j !== i))}>✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
               {pendingFiles.length > 0 && (

@@ -41,7 +41,7 @@ class ChatMessageDTO(BaseModel):
     author: ChatAuthorDTO | None = None
     body: str | None = None
     is_edited: bool | None = None
-    reply_to: dict | None = None  # {id, author_name, excerpt}
+    quotes: list[dict] = []  # 引用返信（複数可）＝[{id, author_name, excerpt}]
     attachments: list[ChatAttachmentDTO] = []
     mentions: list[ChatMentionDTO] = []
     reactions: dict | None = None  # {normal:[...], magic:{...}|null}

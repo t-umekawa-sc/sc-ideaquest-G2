@@ -16,7 +16,7 @@
 | E-TC-105 | api | 門番/可視性（非パーティー・下書き） | 非パーティー／draft アイデア | `GET chat`／`POST` | 404（存在秘匿・未公開はチャット無し） | E.0 |
 | E-TC-106 | api | 完了クエストは投稿凍結 | completed クエストの公開アイデア | `POST` | 409（invalid_state） | E.0／C.5 |
 | E-TC-107 | api | メンション検証 | パーティー員＋非メンバー | `POST`（mentions=member）／（mentions=非member） | 前者 201・`mentions[]` 反映／後者 422 `invalid_mention` | E.2 |
-| E-TC-108 | api | 引用返信は同一チャットのみ | 同グループのメッセージ／別アイデアのメッセージ | `POST`（reply_to_message_id） | 前者 201・`reply_to` に抜粋／後者 422 | E.2 |
+| E-TC-108 | api | 引用返信は複数可・同一チャットのみ | 同グループ2件／別アイデアのメッセージ | `POST`（quoted_message_ids[]） | 複数引用で 201・`quotes[]` に各抜粋／別アイデア引用は 422 | E.2／§5.16b |
 | E-TC-109 | api | 編集＝本人のみ・is_edited | 自分／他人のメッセージ | `PATCH /chat-messages/{id}`（body） | 本人 200・`is_edited=true`・本文更新／他人 403／削除済み 409 | E.2 |
 | E-TC-110 | api | 削除＝本人＋owner/quest_admin・トゥームストーン | 自分／他人（一般）／他人（owner） | `DELETE /chat-messages/{id}` | 本人 200・`is_deleted`／一般が他人 403／owner が他人 200・一覧でトゥームストーン化 | E.2／§8-⑪ |
 | E-TC-111 | api | 既読更新→未読件数（後退防止） | メッセージ2件 | `POST .../chat/read`（1件目）→`GET chat` | `unread.first_unread_message_id`＝2件目・`unread_count=1`。古い id 再送で後退しない | E.5／§5.31 |
@@ -47,3 +47,4 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | E-TC-201 | e2e | メッセージ投稿→スレッド反映＋通常リアクション | ログイン・API で recruiting クエスト＋published アイデア（chat_group は公開で自動作成） | `/ideas/{id}/chat` で入力→送信→リアクション ＋→👍 | 送信メッセージが `.msg__text` に出る（`postMessage`→`getChat`）・「＋」→ピッカー→👍 で `.reaction` チップ（`addReaction`・`getChat` 実データ） | E.1/E.2/E.4／SC-24 |
 | E-TC-202 | e2e | SC-22 §4.4 チャット活発度/プレビューが実データ | published アイデア＋API でメッセージ投稿 | `/ideas/{id}` を表示 | チャットカードの件数バッジ＝実 `total_messages`・`.chat-preview` に投稿本文が出る（`getChatActivity`/`getChat`・デモ文言なし） | E.1／SC-22 §4.4 |
+| E-TC-203 | e2e | SC-24 複数引用返信 | published アイデア＋2メッセージ投稿 | 2件を💬で引用→本文入力→送信 | 送信メッセージに `.msg__quote` が**2件**（両方の抜粋）＝複数引用（`quoted_message_ids[]`・§5.16b） | E.2／SC-24 §3 |

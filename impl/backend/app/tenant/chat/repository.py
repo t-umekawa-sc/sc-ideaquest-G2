@@ -11,7 +11,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatRead, Reaction, ReactionEmoji, Spell, UserSpell
+from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, Reaction, ReactionEmoji, Spell, UserSpell
 from app.tenant.ideas.orm import Attachment
 
 
@@ -36,15 +36,35 @@ def ensure_chat_group(session: Session, idea_id: uuid.UUID) -> ChatGroup:
 
 def create_message(
     session: Session, *, chat_group_id: uuid.UUID, author_id: uuid.UUID, body: str,
-    reply_to_message_id: uuid.UUID | None = None, message_id: uuid.UUID | None = None,
+    message_id: uuid.UUID | None = None,
 ) -> ChatMessage:
-    msg = ChatMessage(
-        id=message_id or uuid.uuid4(), chat_group_id=chat_group_id, author_id=author_id, body=body,
-        reply_to_message_id=reply_to_message_id,
-    )
+    msg = ChatMessage(id=message_id or uuid.uuid4(), chat_group_id=chat_group_id, author_id=author_id, body=body)
     session.add(msg)
     session.flush()
     return msg
+
+
+def add_quotes(session: Session, message_id: uuid.UUID, quoted_message_ids: list[uuid.UUID]) -> None:
+    """引用返信（複数可・§5.16b）。同一メッセージの重複引用は 1 件に集約。"""
+    seen: set[uuid.UUID] = set()
+    for qid in quoted_message_ids:
+        if qid in seen:
+            continue
+        seen.add(qid)
+        session.add(ChatMessageQuote(id=uuid.uuid4(), chat_message_id=message_id, quoted_message_id=qid))
+
+
+def get_quotes_for_messages(session: Session, message_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[uuid.UUID]]:
+    result: dict[uuid.UUID, list[uuid.UUID]] = {}
+    if not message_ids:
+        return result
+    rows = session.execute(
+        select(ChatMessageQuote.chat_message_id, ChatMessageQuote.quoted_message_id)
+        .where(ChatMessageQuote.chat_message_id.in_(message_ids)).order_by(ChatMessageQuote.id)
+    ).all()
+    for mid, qid in rows:
+        result.setdefault(mid, []).append(qid)
+    return result
 
 
 def get_message(session: Session, message_id: uuid.UUID) -> ChatMessage | None:

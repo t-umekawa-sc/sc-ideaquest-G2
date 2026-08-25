@@ -15,7 +15,7 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as chat_repo
-from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatRead, Reaction, Spell, UserSpell
+from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, Reaction, Spell, UserSpell
 from app.tenant.gamification.orm import Activity
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.ideas.orm import Attachment, Idea, IdeaRevision
@@ -40,12 +40,12 @@ def _login_seed(client) -> None:
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
 
 
-def _post(client, idea_id, *, body=None, mentions=None, reply_to=None, files=None):
+def _post(client, idea_id, *, body=None, mentions=None, quotes=None, files=None):
     data = {"idea_id": str(idea_id)}
     if body is not None:
         data["body"] = body
-    if reply_to is not None:
-        data["reply_to_message_id"] = str(reply_to)
+    if quotes is not None:
+        data["quoted_message_ids"] = [str(q) for q in quotes]
     if mentions is not None:
         data["mentions"] = [str(m) for m in mentions]
     return client.post(MSGS, data=data, files=files, headers=_csrf(client))
@@ -99,6 +99,7 @@ def env():
             msg_ids = [m.id for cg in cg_ids for m in ts.execute(select(ChatMessage).where(ChatMessage.chat_group_id == cg)).scalars()]
             if msg_ids:
                 ts.execute(Reaction.__table__.delete().where(Reaction.chat_message_id.in_(msg_ids)))
+                ts.execute(ChatMessageQuote.__table__.delete().where(ChatMessageQuote.chat_message_id.in_(msg_ids)))
                 ts.execute(ChatMention.__table__.delete().where(ChatMention.chat_message_id.in_(msg_ids)))
                 ts.execute(Attachment.__table__.delete().where(Attachment.chat_message_id.in_(msg_ids)))
                 ts.execute(Activity.__table__.delete().where(Activity.ref_id.in_(msg_ids)))
@@ -199,15 +200,19 @@ def test_e_tc_107_mentions(client, env):
 
 
 def test_e_tc_108_reply_same_group(client, env):
+    """E-TC-108: 引用返信は複数可・同一チャットのみ。別アイデアの引用は 422。"""
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())
-    first = _post(client, idea, body="親").json()["id"]
-    ok = _post(client, idea, body="返信", reply_to=first)
-    assert ok.status_code == 201 and ok.json()["reply_to"]["excerpt"] == "親"
+    a = _post(client, idea, body="親A").json()["id"]
+    b = _post(client, idea, body="親B").json()["id"]
+    ok = _post(client, idea, body="まとめ返信", quotes=[a, b])  # 複数引用
+    assert ok.status_code == 201, ok.text
+    excerpts = {q["excerpt"] for q in ok.json()["quotes"]}
+    assert excerpts == {"親A", "親B"}
     # 別アイデアのメッセージを引用＝422。
     other_idea = env.make_idea(quest_id=env.make_quest())
     other_msg = _post(client, other_idea, body="別").json()["id"]
-    assert _post(client, idea, body="x", reply_to=other_msg).status_code == 422
+    assert _post(client, idea, body="x", quotes=[other_msg]).status_code == 422
 
 
 def test_e_tc_109_edit(client, env):

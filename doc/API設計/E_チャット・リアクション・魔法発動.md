@@ -36,7 +36,7 @@
 | `GET /ideas/{idea_id}/chat-activity` | 議論アクティビティ・グラフ用の集計（SC-22 §4.4・**D から委譲**） | パス: `idea_id`／クエリ: `days?`（既定 14） | `daily`=直近 `days` 日の `[{date, message_count}]`（削除済みは除外・投稿者の `created_at` 基準・会社TZ）＋`revision_markers`=版が記録された日付 `[{date, revision}]`（元データは D.4 の `idea_revisions` 日時）＋`total_messages` |
 
 ### メッセージ表現（`GET /ideas/{idea_id}/chat` の各行・`chat_preview` も同形の抜粋）
-- `id`／`author`（`{id, name, avatar, level}`）／`body`（Markdown ライト＝太字 `**`・コード `` ` ``・リンク `[]()`・メンション `@`。**サーバーは保存時サニタイズ、表示エスケープはフロント**・一覧 1/2 系）／`created_at`／`is_edited`／`reply_to`（`{id, author_name, excerpt}`＝引用返信元・自己参照 `reply_to_message_id`。元が削除済みなら excerpt はトゥームストーン文言）。
+- `id`／`author`（`{id, name, avatar, level}`）／`body`（Markdown ライト＝太字 `**`・コード `` ` ``・リンク `[]()`・メンション `@`。**サーバーは保存時サニタイズ、表示エスケープはフロント**・一覧 1/2 系）／`created_at`／`is_edited`／`quotes[]`（**複数引用可**・SC-24 §3・各要素 `{id, author_name, excerpt}`＝引用元・`chat_message_quotes`。元が削除済みなら excerpt はトゥームストーン文言）。
 - `attachments[]`（D.3 と同じメタ＝`{id, original_name, size_bytes, mime, kind:image|file, download_url?}`。DL は署名URL＝§1.10・E.3）／`mentions[]`（`{user_id, name}`）。
 - `reactions`（集計）＝`{normal:[{emoji, count, reacted_by_me, users?}], magic: {spell_id, effect, icon, actor?}|null}`（`users?`/`actor?` はホバーの「誰が押したか」用・匿名化なし＝チャットは記名。魔法は 1 メッセージ 1 件＝オブジェクト or null）。
 - **削除済み（`is_deleted=true`）はトゥームストーン化して返す**＝`{id, is_deleted:true, deleted_at, created_at}` のみ（`body`・`attachments`・`mentions`・`reactions` は返さない＝UI 非表示。本文は監査用に DB 保持）。§8-⑪。
@@ -51,14 +51,14 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `POST /chat-messages` | メッセージ投稿（**multipart**・本文/メンション/添付を単一 UoW） | **`multipart/form-data`**: `idea_id`（server が `chat_groups` を解決）・`body?`（Markdown ライト）・`reply_to_message_id?`・`mentions[]?`（`user_id` の配列）・`files[]?`（添付・§1.10）。**`Idempotency-Key` 必須**（§1.9・XP 副作用） | 201＋作成メッセージ表現（E.1）。副作用＝投稿 XP+5（下記）・メンション/フォロワー/投稿者通知（E.6）・Redis event（E.7） |
+| `POST /chat-messages` | メッセージ投稿（**multipart**・本文/メンション/引用/添付を単一 UoW） | **`multipart/form-data`**: `idea_id`（server が `chat_groups` を解決）・`body?`（Markdown ライト）・`quoted_message_ids[]?`（**複数引用**・同一 chat_group 内）・`mentions[]?`（`user_id` の配列）・`files[]?`（添付・§1.10）。**`Idempotency-Key` 必須**（§1.9・XP 副作用） | 201＋作成メッセージ表現（E.1）。副作用＝投稿 XP+5（下記）・メンション/フォロワー/投稿者通知（E.6）・Redis event（E.7） |
 | `PATCH /chat-messages/{message_id}` | 自分のメッセージを編集（本文/添付追加・multipart） | パス: `message_id`／`multipart/form-data`: `body?`・`mentions[]?`（置換）・`files[]?`（追加）・`remove_attachment_ids[]?`（除去） | 200＋更新後メッセージ表現（`is_edited=true`）。Redis event（`chat.message.updated`・canonical＝E.7/L.3） |
 | `DELETE /chat-messages/{message_id}` | メッセージを論理削除（トゥームストーン） | パス: `message_id` | 200（`{id, is_deleted:true, deleted_at}`）。Redis event（`chat.message.deleted`・canonical＝E.7/L.3） |
 
 - **空メッセージ不可**: `body` が空**かつ** `files[]` も無い場合は **422 `empty_message`**（SC-24 §4.3・添付のみ〔本文空〕は可）。
 - **投稿 XP+5（各ユーザー日次初回のみ・日次上限=チャット10/日）**: `activities` に `kind=xp_gain`,`reason=chat`,`ref_type=chat_messages`,`ref_id=message_id` を**同一 UoW で記帳**（ドメイン G の gamification repo を呼ぶ・コーディング規約 §3.4）。上限到達後の投稿は XP 付与なしで成功（投稿自体は可）。canonical XP 表・日次上限は README §6／データモデル §8-⑥。
 - **メンション（`chat_mentions`）**: `mentions[]` は**当該パーティーのメンバーに限定**（非メンバー指定は 422 `invalid_mention`）。`UNIQUE(chat_message_id, mentioned_user_id)`（§5.17）。編集時は差し替え（増減した対象の通知整合は E.6/H）。
-- **引用返信（`reply_to_message_id`）**: 同一 `chat_group` 内のメッセージのみ（他チャット/他アイデアは 422）。ネスト式スレッドは将来（SC-24 §9・MVP スコープ外）。
+- **引用返信（`quoted_message_ids[]`・複数可）**: 各引用元は同一 `chat_group` 内のメッセージのみ（他チャット/他アイデアは 422）。同一メッセージの重複引用は 1 件に集約（`UNIQUE(chat_message_id, quoted_message_id)`・§5.16b）。ネスト式スレッドは将来（SC-24 §9・MVP スコープ外）。
 - **編集＝本人のみ・履歴なし**（`is_edited=true`・本文上書き）。他者の編集は **403**。**削除＝論理（トゥームストーン）**で**本人＋`owner`/`quest_admin`＋QG管理者/システム管理者**（`deleted_by_id` に実行者・モデレーション）。権限外の削除は 403。既に削除済みへの編集/削除は 409 `invalid_state`。§8-⑪。
 - **完了凍結**: 上記 3 EP は `quest_status=completed` で **409 `invalid_state`**（canonical C.5）。
 - **冪等（§1.9）**: `POST /chat-messages` は `Idempotency-Key` 必須（二重送信での重複投稿・二重 XP を防ぐ）。同一キー再送は保存済みレスポンスを再生。編集/削除は自然冪等（状態収束）につきキー任意。

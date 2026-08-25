@@ -114,8 +114,8 @@ def get_chat_activity(account_id, company_id, idea_id, *, days=14) -> dict:
 # ---- 投稿・編集・削除（E.2） ----
 
 
-def post_message(account_id, company_id, *, idea_id, body, reply_to_message_id, mention_ids, files) -> dict:
-    """メッセージ投稿（multipart・E.2）。本文/メンション/添付を単一 UoW。空は 422。投稿 XP+5（日次上限）。"""
+def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, mention_ids, files) -> dict:
+    """メッセージ投稿（multipart・E.2）。本文/メンション/引用（複数可）/添付を単一 UoW。空は 422。投稿 XP+5（日次上限）。"""
     from app.infra.storage import MAX_ATTACHMENTS_PER_IDEA, get_storage, validate_attachment_upload
 
     company = _resolve_company(company_id)
@@ -133,14 +133,16 @@ def post_message(account_id, company_id, *, idea_id, body, reply_to_message_id, 
         _guard_not_completed(quest)
         _require_comment(ts, quest, user)
         cg = repo.ensure_chat_group(ts, idea.id)
-        reply_id = _validate_reply(ts, cg.id, reply_to_message_id)
+        quote_ids = _validate_quotes(ts, cg.id, quoted_message_ids)
         mentions = _validate_mentions(ts, quest, mention_ids)
         # 添付は先に全件検証（不正で部分保存しない）。
         validated = [(fn, data, validate_attachment_upload(fn, len(data))) for (fn, data) in (files or [])]
         if len(validated) > MAX_ATTACHMENTS_PER_IDEA:
             raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])
-        msg = repo.create_message(ts, chat_group_id=cg.id, author_id=user.id, body=body, reply_to_message_id=reply_id)
+        msg = repo.create_message(ts, chat_group_id=cg.id, author_id=user.id, body=body)
+        if quote_ids:
+            repo.add_quotes(ts, msg.id, quote_ids)
         if mentions:
             repo.replace_mentions(ts, msg.id, mentions)
         if validated:
@@ -387,14 +389,20 @@ def _guard_not_completed(quest) -> None:
         raise AppError(409, "conflict", detail="完了後は変更できません", extra={"errors": [{"reason": "invalid_state"}]})
 
 
-def _validate_reply(ts, chat_group_id, reply_to_message_id):
-    if not reply_to_message_id:
-        return None
-    rid = _parse_uuid(reply_to_message_id, field="reply_to_message_id")
-    src = repo.get_message(ts, rid)
-    if src is None or src.chat_group_id != chat_group_id:
-        raise AppError(422, "validation_error", detail="返信元が不正です", errors=[{"field": "reply_to_message_id"}])
-    return rid
+def _validate_quotes(ts, chat_group_id, quoted_message_ids) -> list[uuid.UUID]:
+    """引用元（複数可）を検証（E.2）。各引用元は同一 chat_group 内のみ（他は 422）。重複は集約。"""
+    result: list[uuid.UUID] = []
+    seen: set[uuid.UUID] = set()
+    for raw in (quoted_message_ids or []):
+        rid = _parse_uuid(str(raw), field="quoted_message_ids")
+        if rid in seen:
+            continue
+        src = repo.get_message(ts, rid)
+        if src is None or src.chat_group_id != chat_group_id:
+            raise AppError(422, "validation_error", detail="引用元が不正です", errors=[{"field": "quoted_message_ids"}])
+        seen.add(rid)
+        result.append(rid)
+    return result
 
 
 def _validate_mentions(ts, quest, mention_ids) -> list[uuid.UUID]:
@@ -432,10 +440,11 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
     """メッセージ表現の配列（E.1）。削除済みはトゥームストーン化。author/attachments/mentions/reactions を合成。"""
     active = [m for m in messages if not m.is_deleted]
     ids = [m.id for m in active]
-    # 返信元の解決（同一グループ内・抜粋 or トゥームストーン）。
-    reply_ids = {m.reply_to_message_id for m in active if m.reply_to_message_id}
-    reply_map = {rid: repo.get_message(ts, rid) for rid in reply_ids}
-    author_ids = {m.author_id for m in active} | {r.author_id for r in reply_map.values() if r is not None}
+    # 引用返信（複数可）の解決（同一グループ内・抜粋 or トゥームストーン）。
+    quotes_map = repo.get_quotes_for_messages(ts, ids)  # message_id -> [quoted_id]
+    quoted_ids = {qid for qs in quotes_map.values() for qid in qs}
+    quoted_msgs = {qid: repo.get_message(ts, qid) for qid in quoted_ids}
+    author_ids = {m.author_id for m in active} | {q.author_id for q in quoted_msgs.values() if q is not None}
     atts = repo.get_attachments_for_messages(ts, ids)
     mentions = repo.get_mentions_for_messages(ts, ids)
     reactions = repo.list_reactions_for_messages(ts, ids)
@@ -450,16 +459,16 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
         if m.is_deleted:
             out.append({"id": str(m.id), "is_deleted": True, "deleted_at": m.deleted_at, "created_at": m.created_at})
             continue
-        reply = None
-        if m.reply_to_message_id:
-            src = reply_map.get(m.reply_to_message_id)
+        quotes = []
+        for qid in quotes_map.get(m.id, []):
+            src = quoted_msgs.get(qid)
             if src is None:
-                reply = {"id": str(m.reply_to_message_id), "author_name": "", "excerpt": "（削除された投稿）"}
+                quotes.append({"id": str(qid), "author_name": "", "excerpt": "（削除された投稿）"})
             elif src.is_deleted:
-                reply = {"id": str(src.id), "author_name": "", "excerpt": "このメッセージは削除されました"}
+                quotes.append({"id": str(src.id), "author_name": "", "excerpt": "このメッセージは削除されました"})
             else:
                 a = users.get(src.author_id)
-                reply = {"id": str(src.id), "author_name": (a.display_name if a else ""), "excerpt": src.body[:_EXCERPT]}
+                quotes.append({"id": str(src.id), "author_name": (a.display_name if a else ""), "excerpt": src.body[:_EXCERPT]})
         out.append({
             "id": str(m.id),
             "author": _author_dto(users.get(m.author_id), m.author_id),
@@ -468,7 +477,7 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
             "created_at": m.created_at,
             "is_edited": m.is_edited,
             "is_deleted": False,
-            "reply_to": reply,
+            "quotes": quotes,
             "attachments": [_attachment_dto(a) for a in atts.get(m.id, [])],
             "mentions": [{"user_id": str(u), "name": (users.get(u).display_name if users.get(u) else "")} for u in mentions.get(m.id, [])],
             "reactions": _reactions_dto(reactions.get(m.id, []), viewer_id, users, spells),
