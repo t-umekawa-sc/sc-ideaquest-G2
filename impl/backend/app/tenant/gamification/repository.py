@@ -76,3 +76,19 @@ def exists_ref(
         )
     )
     return session.execute(stmt).scalar_one() > 0
+
+
+def get_ref_activity(
+    session: Session, user_id: uuid.UUID, kind: str, reason: str,
+    ref_type: str | None, ref_id: uuid.UUID | None,
+) -> Activity | None:
+    """`(user_id, kind, reason, ref_type, ref_id)` の付与行を取得（確定額/日時の参照用・高々1件）。"""
+    return session.execute(
+        select(Activity).where(
+            Activity.user_id == user_id,
+            Activity.kind == kind,
+            Activity.reason == reason,
+            Activity.ref_type == ref_type,
+            Activity.ref_id == ref_id,
+        )
+    ).scalars().first()

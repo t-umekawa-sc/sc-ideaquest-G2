@@ -183,6 +183,17 @@ def count_votes(session: Session, idea_id: uuid.UUID) -> dict[str, int]:
     return result
 
 
+def list_published_ideas_for_quest(session: Session, quest_id: uuid.UUID) -> list[Idea]:
+    """クエストの公開（published・未削除）アイデア全件（F.4(b) 完了時コイン一括確定・閲覧者非依存）。"""
+    return list(
+        session.execute(
+            select(Idea).where(
+                Idea.quest_id == quest_id, Idea.status == "published", Idea.deleted_at.is_(None)
+            )
+        ).scalars().all()
+    )
+
+
 def count_published_ideas_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     """クエストごとの公開アイデア数（C.1 `idea_count`・下書き/削除は除外・N+1 回避）。
 

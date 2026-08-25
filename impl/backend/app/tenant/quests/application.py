@@ -573,7 +573,7 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             )
         quest.status = to
         if to == "completed":
-            _finalize_completion(company_id, quest.id)  # F.4 コイン一括確定は F 実装まで no-op
+            _finalize_completion(ts, quest)  # F.4 投稿者コイン一括確定（同一 UoW・冪等）
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
     return detail
@@ -604,12 +604,15 @@ def _guard_not_completed(quest) -> None:
         raise AppError(409, "conflict", detail="完了後は変更できません", extra={"errors": [{"reason": "invalid_state"}]})
 
 
-def _finalize_completion(company_id: uuid.UUID, quest_id: uuid.UUID) -> None:
-    """evaluating→completed の副作用＝投稿者コイン一括確定フック（正＝データモデル §7／API設計 F.4）。
+def _finalize_completion(ts, quest) -> None:
+    """evaluating→completed の副作用＝投稿者コイン一括確定（正＝データモデル §7／API設計 F.4(b)）。
 
-    TODO(F): F ドメイン実装時に評価連動コインを一括確定・付与（reason=evaluation_coin・冪等）。現フェーズは no-op。
+    F ドメインへ委譲（同一 UoW）＝未確定の全 published アイデアの評価連動コインを冪等に確定・付与
+    （reason=evaluation_coin・アイデア単位1回・(a) 早期確定済みは二重付与しない）。局所 import で循環回避。
     """
-    return None
+    from app.tenant.evaluations import application as eval_service
+
+    eval_service.finalize_quest_author_coins(ts, quest)
 
 
 # ---- ドメイン関数（全経路で共有・C.2/C.3 サーバー強制ルール） ----

@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 337 passed**（A-TC-095 は既存フラキー・単独 green）・e2e sc-22（attachments **2**＝アップロード＋**既存添付削除 D-TC-218**／quest-ref 2／vote-follow 4／idea-detail 1／revisions 1＝更新履歴 D-TC-217）＋sc-21（6＝§4.7 サーバエラー3チャネル D-TC-216）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 326）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 360 passed**（A-TC-095 は既存フラキー・単独 green／**評価 F ＝23 追加**）・e2e sc-22（attachments 2＝アップロード＋既存添付削除 D-TC-218／quest-ref 2／vote-follow 4／idea-detail 1／revisions 1＝更新履歴 D-TC-217）＋sc-21（6＝§4.7 サーバエラー3チャネル D-TC-216）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 332）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -26,7 +26,7 @@
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |
 | SC-22 | アイデア詳細 | 🟡 | `(app)/ideas/[ideaId]` | 本体＋**投票/フォロー**（D.5/D.6・楽観更新＋サーバー権威）＋**添付（D.3）表示/ダウンロード**（署名URL）＋**quest 参照**（D.1・戻る導線/カテゴリー/completed 事前無効化）＋**更新履歴モーダル**（D.4・版タイムライン＋差分・遅延取得）。評価(F)/チャット(E) は表示のみ |
 | SC-24 | アイデアチャット | ⬜ | `(app)/ideas/[ideaId]/chat` | モックのみ（E） |
-| SC-25 | 評価画面 | ⬜ | `(app)/ideas/[ideaId]/eval` | モックのみ（F） |
+| SC-25 | 評価画面 | ⬜ | `(app)/ideas/[ideaId]/eval` | **backend F 実装済み**（評価取得/集計/確定・選定・投稿者コイン）。フロント接続は次スライス（現状モック） |
 | SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
 | SC-31 | アバター着せ替え | ⬜ | `(app)/avatar` | モックのみ |
 | SC-32 | 魔法スキル | ⬜ | `(app)/spells` | モックのみ |
@@ -62,7 +62,8 @@
 | 認証（A/B） | `control_plane/auth`・`control_plane/admin`・`control_plane/me` | ✅ ログイン/管理/プロフィール |
 | クエスト（C） | `tenant/quests` | ✅ 一覧/詳細/CRUD |
 | アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011） |
-| 評価（F）/チャット（E）/ゲーム(G) | — | ⬜ 未着手（投票 XP は G 実装まで no-op） |
+| 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |
+| チャット（E）/ゲーム(G) | — | ⬜ 未着手（投票 XP は G 実装まで no-op） |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 

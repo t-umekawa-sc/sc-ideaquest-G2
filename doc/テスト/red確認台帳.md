@@ -439,3 +439,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | D-TC-218 | 接続前＝編集モーダルに保存済み添付が一切出ない（`.attach` 0件）→ `attachRow` 不可視で red。接続後は `getIdea.attachments` を `.attach` 行で表示し、× →確認ダイアログ「削除する」で `deleteAttachment` 即時削除→一覧から消え `GET /ideas/{id}` の attachments 空・`current_revision` は 1 のまま（版を生まない） |
+
+## F. 評価（新ドメイン・F-TC-101〜120・2026-08-25）
+
+> 新規ドメイン F（evaluations/evaluation_scores・migration 0012）＝新規 EP は test-first（未登録時は 404）。backend はソースマウントで中核ロジックの retro-red を安価に実施（再ビルド不要）。全 backend 360 passed（337＋F 23）。XP/コインは G `ledger.grant`＋`exists_ref` 冪等。C の完了遷移フック `_finalize_completion` を F へ接続（同一 UoW・(b) 一括確定）。
+
+| TC-ID | 観測 red（中核ロジック反転 actual） |
+| --- | --- |
+| F-TC-118/119 | `_finalize_idea_coin` を no-op に反転＝(a) 全員提出／(b) completed 遷移でも投稿者コインが確定されず → `coin.finalized`/`evaluation_coin` activity が 0 で red。復元で `round(avg×10)`（最大50）を1回だけ確定（冪等）→ green |
+| F-TC-111 | `_can_view_evaluation` を常に True に反転＝limited 評価が範囲外にも漏れる → `evaluator_count`/`aspects` が limited を含み red（分母が2になる）。復元で limited を集計から除外（coin は visibility 無視で全 submitted 算定は維持）→ green |
+| F-TC-104/106 | `_validate_evaluation` を no-op に反転＝submitted で全5観点/総評未充足・score 範囲外でも通過 → `assert 422` が失敗（200 になる）で red。復元で 422（errors[].field）→ green |
