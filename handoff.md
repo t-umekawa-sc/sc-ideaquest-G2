@@ -67,12 +67,23 @@
 - （継続）テスト運用＝md 先行＋TC-ID トレーサビリティ＋red確認台帳。会社プロビジョニングは MVP 手動。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **§7-7 §4.7 サーバエラー経由 TC**＝SC-21 の3チャネル（上部サマリ scroll＋足元ヒント＋エラースナックバー）は主ボタンが `disabled={!canSave}` で client 検証エラーが出ず主経路で到達不能。**サーバエラー（完了クエスト編集の 409・公開状態機械の 409 等）で発火させる e2e**が必要（seed が要る）。対象＝`impl/frontend/src/features/ideas/components/IdeaForm.tsx` の `persist()` の catch（`mapServerErrors`→`notify`）。md 先行で `doc/テスト/D_アイデア.md` に TC 追加→red-green。
-2. **D 版差分 GET（D.4）**＝`impl/backend/app/tenant/ideas/router.py` に版一覧/差分 EP（`idea_revisions` は publish/edit で記録済み）。SC-22 `IdeaDetailView.tsx` の更新履歴モーダル（現在デモ）を実接続。md 先行→red-green。
-3. **SC-21 編集モードの既存添付 管理 UI**＝現状は新規アップロードのみ接続。編集時に `getIdea` の `attachments` を `IdeaForm` に読み込み、既存添付の一覧＋削除（`deleteAttachment`）を出す（backend の DELETE EP は実装済み）。
-4. **評価 F（SC-25）／チャット E（SC-24）**＝実装計画フェーズ4/5。`doc/API設計/F_*.md`・`E_*.md`＋`doc/画面設計/screens/SC-25,SC-24`。着手は依存（C/D 済み）を満たすため可能。
-5. **メール確認の実機受入（後回し可）**＝SC-92/93 で「確認メールを送信」→MailHog（`http://localhost:8025`）で確認リンクを開き `/email-verify/confirm` の確定（verified バッジ化）を通しで確認。**backend api（B-TC-165〜168/A-TC-103〜106）は green だが、ブラウザ通しの受入は未実施**。
-6. **`idea_count`/添付等の受入**＝本セッションの D 系フロント接続はいずれも e2e green だが**ユーザーのブラウザ受入は後追い**（受入ゲート §1.1-4）。
+
+> **完了済み（本セッション 2026-08-25）**: §7-1 SC-21 §4.7 サーバエラー3チャネル e2e（D-TC-216・commit `b06ea53`）／§7-2 D 版差分 GET D.4＋SC-22 更新履歴モーダル実接続（D-TC-138〜142/217・commit `a85b146`）。
+
+1. **SC-21 編集モードの既存添付 管理 UI**＝現状は新規アップロードのみ接続。編集時に `getIdea` の `attachments` を `IdeaForm` に読み込み、既存添付の一覧＋削除（`deleteAttachment`）を出す（backend の DELETE EP は実装済み）。
+2. **評価 F（SC-25）／チャット E（SC-24）**＝実装計画フェーズ4/5。`doc/API設計/F_*.md`・`E_*.md`＋`doc/画面設計/screens/SC-25,SC-24`。着手は依存（C/D 済み）を満たすため可能。
+
+## 7.5 ブラウザ受入待ち（バッチ・後でまとめて実施）
+
+> **運用（ユーザー確認 2026-08-25）**＝各画面のブラウザ受入は**その場では行わず後日まとめて**実施する（e2e green でクローズ扱い・次へ進む）。本節に受入待ちを集約し、受入完了まで消さない。**dev ログイン**＝`ACME-01`/`user@acme.example`/`Passw0rd!`。**MailHog**＝`http://localhost:8025`。**受入用デモデータは受入完了まで削除しない**。
+
+- [ ] **SC-22 更新履歴 D.4（D-TC-217）**＝デモデータ用意済み＝`http://localhost:3000/ideas/f183174b-b090-4151-972e-832b2f824a9a`（クエスト「【受入】更新履歴デモ」内「夜間配送の集約」）。「版 2（履歴）」→ 版2/初版・文字差分（価値 1̶0̶→5・本文語句差分・タイムリミット `（なし）→2027-01-31`）の見え方を確認。
+- [ ] **SC-21 §4.7 サーバエラー3チャネル（D-TC-216）**＝完了クエストのアイデアを「編集」→件名変更→「変更を保存」で 409→①上部サマリ ②足元ヒント ③持続エラースナックバー（自動消滅しない）の3チャネル。要 seed（完了クエスト＋公開アイデア）。
+- [ ] **SC-22 投票/フォロー（D-TC-209〜212）**＝賛成/反対/切替/同ボタン再クリック取消・★フォロートグルの楽観更新＋サーバー権威。
+- [ ] **SC-10/12 idea_count 連動**＝クエストカード/詳細の公開アイデア数が実データに連動。
+- [ ] **SC-22 quest参照/completed 事前無効化（D-TC-213/214）**＝「クエストへ戻る」導線・カテゴリーバッジ・完了時の投票/新規フォロー disabled＋⏸凍結バッジ。
+- [ ] **SC-21/22 添付 D.3（D-TC-215）**＝登録/編集で添付アップロード→SC-22 に実添付表示＋DL（署名URL）。
+- [ ] **SC-92/93 メール確認 ADR-0009（B-TC-169 等）**＝「確認メールを送信」→MailHog で確認リンク→`/email-verify/confirm` 確定→verified バッジ化を通しで。backend api は green・ブラウザ通しは未実施。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。
