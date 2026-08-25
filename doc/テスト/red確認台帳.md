@@ -421,3 +421,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（catch 反転＝3チャネル抑止 actual） |
 | --- | --- |
 | D-TC-216 | 反転時＝完了クエスト編集で PATCH 409 を受けても `.form-summary`／`.form-footer-error`／`.snackbar--error` がいずれも出ず「押したのに無反応」→ `.form-summary` 不出現で red。復元後は 3 チャネル（上部サマリ「現在の状態では実行できません。」＋足元ヒント＋持続エラースナックバー〔`.snackbar__timer` 無し＝duration:0〕）が出て green |
+
+## D. 版・変更履歴・差分 D.4（D-TC-138〜142/217・2026-08-25）
+
+> 設計を正とし実装を追随＝(1) 初版 revision=1 が公開処理で未記録だったギャップを修正（`_publish_processing`→`_record_initial_revision`・D-TC-109 の版数期待も更新）、(2) `idea_revisions.created_at` がデータモデル §5.14 に無く API設計 D.4 が要求 → §5.14 に追記＋migration `0011_company_idea_revisions_created_at`＋ORM 追加。api＝新規 EP（revisions/diff）は test-first（未実装時は 404）。backend はソースマウントで retro-red を安価に実施（再ビルド不要）。e2e＝frontend 非マウントで接続前バンドル（デモモーダル）に対し D-TC-217 が red→再ビルド後 green（全体 backend 337 passed／sc-22 系＋sc-21 系 回帰 green・attachments はコールドコンパイル flake でウォーム再実行 green）。
+
+| TC-ID | 観測 red（反転/接続前 actual） |
+| --- | --- |
+| D-TC-142 | `_record_initial_revision` を no-op に反転＝publish 後の `GET revisions` が空 → `assert [r.revision]==[1]` が `[]==[1]` で red。復元で初版 revision=1 記録（通知なし）→ green |
+| D-TC-140/141 | `_diff_fields` を空返しに反転＝差分 `fields` が `{}` → `'body'/'title' in fields` が偽で red。復元で語句差分セグメント（テキスト系）＋`{old,new}`（scalar）→ green |
+| D-TC-217 | 接続前バンドル（更新履歴モーダル＝デモ静的表示）では編集内容に対応する実データ（v2 の価値/アイデア本文バッジ・実 diff セグメント）が出ず red → RevisionHistory 実接続＋再ビルドで `getRevisions`/`getRevisionDiff` の実データ（初版バッジ・変更フィールド・`.diff-add`）→ green |

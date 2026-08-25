@@ -67,7 +67,14 @@ def env():
     def make_idea(*, quest_id, author=None, status="published", title="I", value="v", body="b") -> uuid.UUID:
         iid = uuid.uuid4()
         with get_tenant_session(db_identifier) as ts:
-            repo.create_idea(ts, idea_id=iid, quest_id=quest_id, author_id=author or user_id, title=title, value=value, body=body, status=status)
+            idea = repo.create_idea(ts, idea_id=iid, quest_id=quest_id, author_id=author or user_id, title=title, value=value, body=body, status=status)
+            # 公開 seed は不変条件「published ⇒ 初版 revision=1 が存在」を満たす（実 API の _publish_processing 相当・D.4）。
+            if status == "published":
+                ts.flush()
+                repo.add_revision(
+                    ts, iid, revision=idea.current_revision, editor_id=author or user_id,
+                    changes={"title": title, "value": value, "body": body, "time_limit": None, "note": None, "stakeholders": []},
+                )
             ts.commit()
         ideas.append(iid)
         return iid
@@ -203,7 +210,8 @@ def test_d_tc_109_edit_draft_vs_published_revision(client, env):
     r2 = client.patch(IDEA(pub), json={"title": "T3"}, headers=_csrf(client))
     assert r2.status_code == 200 and r2.json()["current_revision"] == 2  # 公開中は版記録
     with get_tenant_session(env.db_identifier) as ts:
-        assert len(repo.list_revisions(ts, pub)) == 1
+        # 初版 revision=1（公開時）＋編集 revision=2 の2件（D.4 line104・D-TC-142）。
+        assert [r.revision for r in repo.list_revisions(ts, pub)] == [2, 1]
 
 
 def test_d_tc_110_edit_published_strict(client, env):
@@ -471,3 +479,93 @@ def test_d_tc_137_completed_quest_freezes_attachments(client, env, storage):
     idea = env.make_idea(quest_id=qid, status="published")
     r = client.post(ATTACH(idea), files=[("files", ("a.png", PNG, "image/png"))], headers=_csrf(client))
     assert r.status_code == 409, r.text
+
+
+# ---- 版・差分（D.4・D-TC-138〜142） ----
+
+REVS = lambda iid: f"/api/v1/ideas/{iid}/revisions"  # noqa: E731
+DIFF = lambda iid, rev: f"/api/v1/ideas/{iid}/revisions/{rev}/diff"  # noqa: E731
+
+
+def test_d_tc_142_publish_records_initial_revision(client, env):
+    """D-TC-142: 公開処理で初版 revision=1 を記録（通知なし）＝publish／作成公開の双方。changed_fields=[]・current_revision=1。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    # (a) 下書きを publish → 初版 revision=1。
+    draft = env.make_idea(quest_id=qid, status="draft")
+    assert client.post(f"{IDEA(draft)}/publish", json={}, headers=_csrf(client)).status_code == 200
+    rr = client.get(REVS(draft))
+    assert rr.status_code == 200, rr.text
+    data = rr.json()["data"]
+    assert [r["revision"] for r in data] == [1]
+    assert data[0]["changed_fields"] == [] and data[0]["editor"]["display_name"]
+    assert client.get(IDEA(draft)).json()["current_revision"] == 1
+    # (b) 作成即公開（POST ideas・published）も初版 revision=1。
+    cr = client.post(IDEAS(qid), json={"title": "T", "value": "v", "body": "b", "status": "published"}, headers=_csrf(client))
+    assert cr.status_code == 201, cr.text
+    pub = cr.json()["id"]
+    assert [r["revision"] for r in client.get(REVS(pub)).json()["data"]] == [1]
+
+
+def test_d_tc_138_revision_timeline(client, env):
+    """D-TC-138: 版タイムライン＝新しい順・editor/created_at/changed_fields/memo・初版含む。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # 初版 revision=1（seed）
+    assert client.patch(IDEA(pub), json={"title": "T2"}, headers=_csrf(client)).status_code == 200  # rev2
+    assert client.patch(IDEA(pub), json={"body": "B3"}, headers=_csrf(client)).status_code == 200   # rev3
+    rr = client.get(REVS(pub))
+    assert rr.status_code == 200, rr.text
+    data = rr.json()["data"]
+    assert [r["revision"] for r in data] == [3, 2, 1]  # 新しい順
+    by_rev = {r["revision"]: r for r in data}
+    assert by_rev[1]["changed_fields"] == []           # 初版は空
+    assert by_rev[2]["changed_fields"] == ["title"]    # 前版比＝title
+    assert by_rev[3]["changed_fields"] == ["body"]     # 前版比＝body
+    assert all(r["created_at"] and r["editor"]["display_name"] for r in data)
+
+
+def test_d_tc_139_revision_timeline_gated(client, env):
+    """D-TC-139: 版タイムラインは門番（非パーティー404）＋下書きは本人のみ（他人下書き404）。"""
+    _login_seed(client)
+    q2 = env.make_quest(owner=env.other_id, seed_member=False)
+    non_party = env.make_idea(quest_id=q2, status="published", author=env.other_id)
+    assert client.get(REVS(non_party)).status_code == 404
+    qid = env.make_quest()
+    others_draft = env.make_idea(quest_id=qid, status="draft", author=env.other_id)
+    assert client.get(REVS(others_draft)).status_code == 404
+
+
+def test_d_tc_140_revision_diff_default_prev(client, env):
+    """D-TC-140: 差分（既定＝前版比較）＝テキスト系は segments・その他は {old,new}。存在しない版は 404。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # rev1（value="v", body="b", time_limit=None）
+    # 本文/価値/タイムリミットを編集 → rev2。
+    assert client.patch(IDEA(pub), json={"body": "b2", "value": "v2", "time_limit": "2027-01-01"}, headers=_csrf(client)).status_code == 200
+    dd = client.get(DIFF(pub, 2))
+    assert dd.status_code == 200, dd.text
+    body = dd.json()
+    assert body["from_revision"] == 1 and body["to_revision"] == 2
+    fields = body["fields"]
+    assert "title" not in fields                       # 未変更は含まない
+    assert fields["body"]["kind"] == "text" and any(s["op"] == "add" for s in fields["body"]["segments"])
+    assert fields["value"]["kind"] == "text"
+    assert fields["time_limit"]["kind"] == "scalar" and fields["time_limit"]["old"] is None and fields["time_limit"]["new"] == "2027-01-01"
+    assert client.get(DIFF(pub, 99)).status_code == 404  # 存在しない版
+
+
+def test_d_tc_141_revision_diff_from_explicit(client, env):
+    """D-TC-141: from 明示（投票時点差分）＝from=1 で初版からの累積差分。from>revision は 422。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # rev1
+    assert client.patch(IDEA(pub), json={"title": "T2"}, headers=_csrf(client)).status_code == 200  # rev2
+    assert client.patch(IDEA(pub), json={"body": "B3"}, headers=_csrf(client)).status_code == 200   # rev3
+    dd = client.get(f"{DIFF(pub, 3)}?from=1")
+    assert dd.status_code == 200, dd.text
+    body = dd.json()
+    assert body["from_revision"] == 1 and body["to_revision"] == 3
+    assert "title" in body["fields"] and "body" in body["fields"]  # 初版からは title/body 両方変化
+    # from > revision は 422。
+    assert client.get(f"{DIFF(pub, 2)}?from=5").status_code == 422

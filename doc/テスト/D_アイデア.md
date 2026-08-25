@@ -37,7 +37,7 @@
 | D-TC-106 | api | 一覧はパーティー門番 | 非パーティーのクエスト | `GET /quests/{id}/ideas` | 404（存在秘匿・C.0） | D.1 門番 |
 | D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
 | D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
-| D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア | `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision++・版1件 | D.2/D.4 |
+| D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |
 | D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
 | D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
 | D-TC-112 | api | 下書き公開 | 自分の下書き（充足） | `POST /ideas/{id}/publish` | 200・published | D.2 |
@@ -66,6 +66,11 @@
 | D-TC-135 | api | 添付追加は編集権限（本人/owner/quest_admin） | 他人の published（自分は vote のみ） | `POST attachments` | 403 | D.3 |
 | D-TC-136 | api | DL はパーティー所属→短TTL 署名URL | 添付1件 | `GET /attachments/{aid}/download` | 200・`{url}`（署名URL・生パス非露出） | D.3／§1.10 |
 | D-TC-137 | api | 完了クエストは添付追加を凍結 | completed クエストの published アイデア | `POST attachments` | 409 `conflict`（invalid_state） | D.3／C.5 |
+| D-TC-142 | api | 公開処理で初版 revision=1 を記録（通知なし・D.4 line104） | 下書きを `POST publish`／`POST ideas`（published） | `GET /ideas/{id}/revisions` | 初版 revision=1 が1件・`current_revision=1`・`changed_fields=[]`（初版）・通知は発火しない | D.4／§5.14 |
+| D-TC-138 | api | 版タイムライン取得（新しい順） | published を2回編集（初版1＋編集2/3）| `GET /ideas/{id}/revisions` | `data` が `revision` 降順〔3,2,1〕・各行に `editor`〔氏名〕/`created_at`/`changed_fields[]`〔前版比の変更フィールド・初版は空〕/`memo?`・`page_info` | D.4 |
+| D-TC-139 | api | 版タイムラインの門番/可視性 | 非パーティーのアイデア／他人の下書き | `GET /ideas/{id}/revisions` | 404（存在秘匿・下書きは本人のみ・C.0） | D.4／C.0 |
+| D-TC-140 | api | 差分取得（既定＝前版比較） | published を編集（本文/価値/タイムリミット変更）| `GET /ideas/{id}/revisions/{rev}/diff` | `from_revision=rev-1`・`to_revision=rev`・`fields` にテキスト系（title/value/body/note）は add/del セグメント・その他（time_limit/stakeholders）は `{old,new}`。存在しない版は 404 | D.4 |
+| D-TC-141 | api | 差分の from 明示（投票時点からの差分）| revision=3 のアイデア | `GET .../revisions/3/diff?from=1` | `from_revision=1`・`to_revision=3`・初版からの累積差分。`from>to`/範囲外は 422/404 | D.4／D.5 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 
@@ -90,6 +95,7 @@
 | D-TC-214 | e2e | SC-22 完了クエストは投票/新規フォローを事前無効化 | recruiting→…→completed に遷移した published アイデア | `/ideas/{id}` を表示 | 「▲ 賛成」「▼ 反対」が `disabled`（凍結理由 title）・「☆ フォロー」が `disabled`（`quest.status=completed` 事前判定・サーバー 409 も権威） | D.5/D.6／SC-22 §4.5／C.5 |
 | D-TC-215 | e2e | SC-21 で添付して投稿→SC-22 に出る＋DL | 登録フォームで件名/価値/本文＋ファイル添付→投稿 | `/quests/{id}/ideas/new` で添付付き投稿→`/ideas/{id}` | SC-22 の関連資料に添付名が実データで出る（`uploadAttachments`）・ダウンロードボタンが活性・`GET /attachments/{aid}/download` が `{url}` を返す | D.3／SC-21/SC-22 |
 | D-TC-216 | e2e | SC-21 サーバエラー（完了クエスト編集 409）で §4.7 の 3 チャネルが発火 | API で recruiting クエスト＋published アイデアを作成し `completed` へ遷移（`/quests/{id}/transition`）| `/ideas/{id}`→「編集」→件名を変更→「変更を保存」（PATCH が 409 invalid_state）| `mapServerErrors`→conflict で ① 上部サマリ `.form-summary` に「現在の状態では実行できません。」・② 足元ヒント `.form-footer-error`「⚠ 入力エラーがあります。…」・③ エラースナックバー `.snackbar--error`（`duration:0`＝`.snackbar__timer` 無し＝自動消滅しない）の 3 チャネルが出る | §4.7／D.0/C.5／SC-21 |
+| D-TC-217 | e2e | SC-22 更新履歴モーダルが実データ（版タイムライン＋差分） | API で published アイデア作成→本文/価値を PATCH で1回編集（版2に） | `/ideas/{id}`→「版 N（履歴）」クリック→更新履歴モーダル | デモ文言でなく実データ＝版が新しい順（v2/v1〔初版〕）・v1 に「初版」表記・v2 の変更フィールドと差分（`.diff-add`/`.diff-del` セグメント）が `getRevisions`/`getRevisionDiff` で描画される | D.4／SC-22 |
 
 > **削除 UI の置き場所（SC-22 §4.3 準拠）**＝SC-22 の関連資料は「一覧＋ダウンロード」のみ（削除ボタンは無い・0件なら非表示）。添付の**削除は SC-21 フォームの添付チップ（×）**で行い、EP は `DELETE /ideas/{id}/attachments/{aid}`（api の D-TC-134 で担保）。SC-21 編集モードでの**既存添付の一覧/削除 UI は follow-up**（本スライスは新規アップロード〔create/edit〕＋SC-22 表示/DL に限定・投稿前の未アップロード添付の × はクライアント除去）。
 

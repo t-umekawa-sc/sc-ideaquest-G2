@@ -1141,6 +1141,46 @@ export interface paths {
         patch: operations["update_idea_api_v1_ideas__idea_id__patch"];
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Revisions
+         * @description 版タイムライン（SC-22 更新履歴・D.4）。可視性はサーバー強制（範囲外 404）。読取専用。
+         */
+        get: operations["list_revisions_api_v1_ideas__idea_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/revisions/{revision}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Revision Diff
+         * @description 版差分（SC-22・D.4）。既定は前版比較・`from` で比較元を指定（投票時点差分）。範囲外 404/422。読取専用。
+         */
+        get: operations["revision_diff_api_v1_ideas__idea_id__revisions__revision__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/publish": {
         parameters: {
             query?: never;
@@ -1878,6 +1918,36 @@ export interface components {
             /** My State */
             my_state: string;
         };
+        /**
+         * IdeaDiffField
+         * @description フィールドごとの差分（D.4）。kind=text は segments・kind=scalar は old/new。
+         */
+        IdeaDiffField: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scalar";
+            /** Segments */
+            segments?: components["schemas"]["IdeaDiffSegment"][] | null;
+            /** Old */
+            old?: string | null;
+            /** New */
+            new?: string | null;
+        };
+        /**
+         * IdeaDiffSegment
+         * @description テキスト差分の1セグメント（D.4）。op＝equal/add/del。
+         */
+        IdeaDiffSegment: {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "equal" | "add" | "del";
+            /** Text */
+            text: string;
+        };
         /** IdeaListResponse */
         IdeaListResponse: {
             /** Data */
@@ -1920,6 +1990,47 @@ export interface components {
             categories: string[];
             /** Deadline */
             deadline?: string | null;
+        };
+        /**
+         * IdeaRevisionDTO
+         * @description 版タイムラインの1行（SC-22 更新履歴・D.4）。changed_fields＝前版比の変更フィールド（初版は空）。
+         */
+        IdeaRevisionDTO: {
+            /** Revision */
+            revision: number;
+            editor: components["schemas"]["IdeaAuthorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Changed Fields
+             * @default []
+             */
+            changed_fields: string[];
+            /** Memo */
+            memo?: string | null;
+        };
+        /**
+         * IdeaRevisionDiffResponse
+         * @description 版差分（SC-22・D.4）。fields＝変わったフィールドのみ（field 名→差分）。
+         */
+        IdeaRevisionDiffResponse: {
+            /** From Revision */
+            from_revision: number;
+            /** To Revision */
+            to_revision: number;
+            /** Fields */
+            fields: {
+                [key: string]: components["schemas"]["IdeaDiffField"];
+            };
+        };
+        /** IdeaRevisionListResponse */
+        IdeaRevisionListResponse: {
+            /** Data */
+            data: components["schemas"]["IdeaRevisionDTO"][];
+            page_info: components["schemas"]["IdeaCursorPageInfo"];
         };
         /** IdeaStakeholderDTO */
         IdeaStakeholderDTO: {
@@ -4971,6 +5082,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeaDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_api_v1_ideas__idea_id__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaRevisionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revision_diff_api_v1_ideas__idea_id__revisions__revision__diff_get: {
+        parameters: {
+            query?: {
+                from?: number | null;
+            };
+            header?: never;
+            path: {
+                idea_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaRevisionDiffResponse"];
                 };
             };
             /** @description Validation Error */

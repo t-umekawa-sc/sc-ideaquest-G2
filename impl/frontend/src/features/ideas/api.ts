@@ -14,6 +14,11 @@ export type IdeaVoteType = components["schemas"]["IdeaVoteRequest"]["type"];
 export type IdeaVoteResult = components["schemas"]["IdeaVoteResponse"];
 export type IdeaAttachment = components["schemas"]["IdeaAttachmentDTO"];
 export type IdeaAttachmentsResult = components["schemas"]["IdeaAttachmentsResponse"];
+export type IdeaRevision = components["schemas"]["IdeaRevisionDTO"];
+export type IdeaRevisionListResponse = components["schemas"]["IdeaRevisionListResponse"];
+export type IdeaRevisionDiff = components["schemas"]["IdeaRevisionDiffResponse"];
+export type IdeaDiffField = components["schemas"]["IdeaDiffField"];
+export type IdeaDiffSegment = components["schemas"]["IdeaDiffSegment"];
 
 // アイデアの変更（作成/公開/編集/削除）通知イベント名。URL モーダル（別ルート）からの成功時に window へ発火し、
 // クエスト詳細のアイデアタブ（QuestDetailView）が購読して再取得する（跨ルートの疎結合ブリッジ・QUESTS_CHANGED と同方式）。
@@ -94,4 +99,27 @@ export function deleteAttachment(ideaId: string, attachmentId: string): Promise<
 // 添付ダウンロード（D.3・§1.10）＝権限検証後の短TTL 署名URL を取得。呼び出し側で window.open 等。
 export function getAttachmentDownloadUrl(attachmentId: string): Promise<{ url: string } | null> {
   return apiFetch<{ url: string }>(`/attachments/${attachmentId}/download`);
+}
+
+// 版タイムライン（SC-22 更新履歴モーダル・D.4）。新しい順・可視性はサーバー強制（範囲外は 404）。
+export function getRevisions(
+  ideaId: string,
+  params?: { limit?: number; cursor?: string },
+): Promise<IdeaRevisionListResponse | null> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(params?.limit ?? 50));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  return apiFetch<IdeaRevisionListResponse>(`/ideas/${ideaId}/revisions?${qs.toString()}`);
+}
+
+// 版差分（SC-22・D.4）。既定＝前版比較／from で比較元を指定（投票時点からの差分）。サーバーが2版を比較して算出。
+export function getRevisionDiff(
+  ideaId: string,
+  revision: number,
+  params?: { from?: number },
+): Promise<IdeaRevisionDiff | null> {
+  const qs = new URLSearchParams();
+  if (params?.from !== undefined) qs.set("from", String(params.from));
+  const query = qs.toString();
+  return apiFetch<IdeaRevisionDiff>(`/ideas/${ideaId}/revisions/${revision}/diff${query ? `?${query}` : ""}`);
 }

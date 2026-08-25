@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import difflib
 import uuid
 from datetime import date, datetime, timezone
 
@@ -107,6 +108,52 @@ def get_idea_detail(account_id, company_id, idea_id) -> dict:
         if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
             raise AppError(404, "not_found")  # 非パーティーは秘匿
         return _build_detail(ts, idea, user.id)
+
+
+# ---- 版・差分（D.4） ----
+
+
+def get_revisions(account_id, company_id, idea_id, *, limit, cursor=None) -> dict:
+    """版タイムライン（SC-22 更新履歴・D.4）。門番＝アイデア可視性（下書きは本人／パーティー所属）。範囲外 404。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    cur = _decode_revision_cursor(cursor) if cursor else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, _quest = _resolve_visible_idea(ts, iid, user)
+        rows = repo.list_revisions(ts, idea.id, cursor=cur, limit=limit + 1)
+        has_next = len(rows) > limit
+        rows = rows[:limit]
+        editors = quests_repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+        data = [_revision_dto(ts, idea.id, r, editors) for r in rows]
+        next_cursor = _encode_revision_cursor(rows[-1].revision) if has_next and rows else None
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+def get_revision_diff(account_id, company_id, idea_id, revision, *, from_revision=None) -> dict:
+    """版の差分（SC-22・D.4）。既定＝前版（revision-1）と比較。テキスト系は語句差分・その他は {old,new}。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea, _quest = _resolve_visible_idea(ts, iid, user)
+        to_rev = repo.get_revision(ts, idea.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")  # 対象版が無い
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_revision(ts, idea.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": _diff_fields(old, to_rev.changes)}
 
 
 # ---- 作成・編集・公開・削除（D.2） ----
@@ -488,24 +535,121 @@ def _apply_content(ts, idea, body) -> None:
 def _record_revision(ts, idea, editor_id) -> None:
     """公開中アイデアの保存ごとに1版（スナップショット）を追加し current_revision++（D.4）。通知は H まで no-op。"""
     next_rev = idea.current_revision + 1
-    snapshot = {
+    repo.add_revision(ts, idea.id, revision=next_rev, editor_id=editor_id, changes=_content_snapshot(ts, idea))
+    idea.current_revision = next_rev
+    _notify_idea_updated(idea.id, next_rev)
+
+
+def _content_snapshot(ts, idea) -> dict:
+    """版に保存する対象フィールドの全値スナップショット（§8-⑤・D.4 line101）。"""
+    return {
         "title": idea.title, "value": idea.value, "body": idea.body,
         "time_limit": idea.time_limit.isoformat() if idea.time_limit else None,
         "note": idea.note,
         "stakeholders": [{"label": s.label, "is_custom": s.is_custom} for s in repo.list_stakeholders(ts, idea.id)],
     }
-    repo.add_revision(ts, idea.id, revision=next_rev, editor_id=editor_id, changes=snapshot)
-    idea.current_revision = next_rev
-    _notify_idea_updated(idea.id, next_rev)
+
+
+# 版で追跡する対象フィールド（D.4・§5.14）。テキスト系＝語句差分、その他＝{old,new}。
+_TEXT_FIELDS = ("title", "value", "body", "note")
+_TRACKED_FIELDS = ("title", "value", "body", "time_limit", "note", "stakeholders")
+
+
+def _encode_revision_cursor(revision: int) -> str:
+    return base64.urlsafe_b64encode(f"rev|{revision}".encode()).decode()
+
+
+def _decode_revision_cursor(cursor: str) -> int:
+    try:
+        prefix, rev = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
+        if prefix != "rev":
+            raise ValueError
+        return int(rev)
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
+
+
+def _revision_dto(ts, idea_id, rev, editors) -> dict:
+    """版タイムラインの1行（D.4）。changed_fields＝前版比較で変わったフィールド（初版は空）。"""
+    prev = repo.get_revision(ts, idea_id, rev.revision - 1) if rev.revision > 1 else None
+    changed = _changed_fields(prev.changes if prev is not None else None, rev.changes)
+    return {
+        "revision": rev.revision,
+        "editor": _author_dto(editors.get(rev.editor_id), rev.editor_id),
+        "created_at": rev.created_at,
+        "changed_fields": changed,
+        "memo": rev.memo,
+    }
+
+
+def _changed_fields(old: dict | None, new: dict) -> list[str]:
+    """前版スナップショット比較で変わったフィールド名（初版＝old None は空・D.4）。"""
+    if old is None:
+        return []
+    return [f for f in _TRACKED_FIELDS if old.get(f) != new.get(f)]
+
+
+def _diff_fields(old: dict, new: dict) -> dict:
+    """2版のスナップショットから、変わったフィールドの差分を算出（D.4）。
+
+    テキスト系（title/value/body/note）＝語句（文字）差分の add/del/equal セグメント。
+    その他（time_limit/stakeholders）＝`{old,new}`（stakeholders はラベルを「・」連結）。
+    """
+    result: dict[str, dict] = {}
+    for f in _TRACKED_FIELDS:
+        ov, nv = old.get(f), new.get(f)
+        if ov == nv:
+            continue
+        if f in _TEXT_FIELDS:
+            result[f] = {"kind": "text", "segments": _text_diff_segments(ov or "", nv or "")}
+        elif f == "stakeholders":
+            result[f] = {"kind": "scalar", "old": _stakeholders_str(ov), "new": _stakeholders_str(nv)}
+        else:  # time_limit
+            result[f] = {"kind": "scalar", "old": ov, "new": nv}
+    return result
+
+
+def _text_diff_segments(old: str, new: str) -> list[dict]:
+    """文字単位の差分セグメント（equal/add/del）。日本語対応のため文字レベル SequenceMatcher（D.4・語句差分は D.8）。"""
+    sm = difflib.SequenceMatcher(a=old, b=new, autojunk=False)
+    segments: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            segments.append({"op": "equal", "text": old[i1:i2]})
+        elif op == "delete":
+            segments.append({"op": "del", "text": old[i1:i2]})
+        elif op == "insert":
+            segments.append({"op": "add", "text": new[j1:j2]})
+        elif op == "replace":
+            segments.append({"op": "del", "text": old[i1:i2]})
+            segments.append({"op": "add", "text": new[j1:j2]})
+    return segments
+
+
+def _stakeholders_str(value) -> str:
+    """利害関係者スナップショット（[{label,is_custom}]）を表示用の「・」連結ラベルに。"""
+    if not value:
+        return ""
+    return "・".join((s.get("label") or "") for s in value)
 
 
 def _publish_processing(ts, idea, author_id) -> None:
-    """公開の瞬間の処理（D.2）。chat_groups 作成(E)・投稿 XP+50(G)・参加通知は各ドメイン実装まで no-op フック。
+    """公開の瞬間の処理（D.2/D.4）。初版 revision=1 のスナップショットを記録（通知なし）。
 
+    chat_groups 作成(E)・投稿 XP+50(G)・参加通知は各ドメイン実装まで no-op フック。
     TODO(E): ensure chat_group (UNIQUE(idea_id))。TODO(G): activities に idea_post/XP+50 を同一 UoW 記帳。
-    現フェーズは no-op（公開＝draft→published＋strict＋版なし）。冪等は status 遷移（再 publish は 409）で担保。
+    冪等は status 遷移（再 publish は 409）で担保。
     """
-    return None
+    _record_initial_revision(ts, idea, author_id)
+
+
+def _record_initial_revision(ts, idea, editor_id) -> None:
+    """公開処理の同一 UoW で初版 revision=1 を記録（D.4 line104・決定 2026-08-06）。
+
+    差分の起点（`diff` の `from` 既定）と `votes.voted_revision` 判定の基準を revision=1 で常に存在させるため。
+    `ideas.current_revision` は既定 1 のまま（インクリメントしない）。**通知は発火しない**（公開自体の通知は D の公開処理）。
+    """
+    repo.add_revision(ts, idea.id, revision=idea.current_revision, editor_id=editor_id, changes=_content_snapshot(ts, idea))
 
 
 def _notify_idea_updated(idea_id, revision) -> None:

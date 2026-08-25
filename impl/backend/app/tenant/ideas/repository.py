@@ -114,13 +114,25 @@ def add_revision(
     return rev
 
 
-def list_revisions(session: Session, idea_id: uuid.UUID) -> list[IdeaRevision]:
-    """版タイムライン（新しい順・SC-22 更新履歴）。"""
-    return list(
-        session.execute(
-            select(IdeaRevision).where(IdeaRevision.idea_id == idea_id).order_by(IdeaRevision.revision.desc())
-        ).scalars().all()
-    )
+def list_revisions(
+    session: Session,
+    idea_id: uuid.UUID,
+    *,
+    cursor: int | None = None,
+    limit: int | None = None,
+) -> list[IdeaRevision]:
+    """版タイムライン（新しい順・SC-22 更新履歴・D.4）。
+
+    `revision` 降順のキーセットページング（§1.8）。`cursor`＝直前ページ末尾の `revision`（それ未満を返す）／
+    `limit`＝取得件数（None＝全件）。件数が少ない前提だが契約（limit/cursor）に合わせる。
+    """
+    stmt = select(IdeaRevision).where(IdeaRevision.idea_id == idea_id)
+    if cursor is not None:
+        stmt = stmt.where(IdeaRevision.revision < cursor)
+    stmt = stmt.order_by(IdeaRevision.revision.desc())
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return list(session.execute(stmt).scalars().all())
 
 
 def get_revision(session: Session, idea_id: uuid.UUID, revision: int) -> IdeaRevision | None:

@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/client";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { IdeaForm } from "./IdeaForm";
+import { RevisionHistory } from "./RevisionHistory";
 import "../ideas.css";
 
 // YYYY-MM-DDTHH:MM:SSZ → YYYY/MM/DD（表示用）。
@@ -266,7 +267,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           <span>
             🔄 更新 {fmtDate(idea.updated_at)}・
             <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
-              版 {idea.current_revision}（履歴・デモ）
+              版 {idea.current_revision}（履歴）
             </button>
           </span>
           {idea.time_limit && <span>⏳ タイムリミット {fmtDate(idea.time_limit)}</span>}
@@ -532,102 +533,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         <IdeaForm mode="edit" ideaId={ideaId} onDone={() => { setEditOpen(false); void load(); }} onCancel={() => setEditOpen(false)} />
       </Modal>
 
-      {/* ============ 更新履歴モーダル（版タイムライン＋差分） ============ */}
+      {/* ============ 更新履歴モーダル（版タイムライン＋差分・D.4 実接続） ============ */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">
         <ModalBody>
           <p className="role-note" style={{ marginTop: 0 }}>
-            ※ 版の履歴/差分（D.4）は未接続のため<strong>デモ表示</strong>です。アイデアの変更を新しい順に表示予定。
-            各版を開くと差分（<span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+            アイデアの変更を新しい順に表示します。各版を開くと差分（
+            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
           </p>
-
           <div style={{ marginTop: "var(--space-4)" }}>
-            {/* v3（現在） */}
-            <div className="rev is-current">
-              <div className="rev__head">
-                <span className="rev__time">2026/07/16 14:30</span>
-                <span className="badge badge-muted">現在</span>
-                <span className="poster">
-                  <Avatar name="鈴木 花子" size="sm" />
-                  <span className="name">鈴木 花子</span>
-                </span>
-              </div>
-              <div className="rev__fields">
-                <span className="badge badge-muted">本文</span>
-                <span className="badge badge-muted">添付</span>
-              </div>
-              <div className="rev__note">📝 試算の前提を明確化し、根拠シートを最新版へ差し替え。</div>
-              <details className="rev__diff" open>
-                <summary className="role-note" style={{ cursor: "pointer" }}>
-                  差分を表示
-                </summary>
-                <div className="diff-field">
-                  <div className="diff-field__label">アイデア本文</div>
-                  <div className="diff-text">
-                    複数拠点の夜間配送を1本のルートに集約し、積載率を高める。
-                    <span className="diff-del">需要予測は担当者が手動で行う。</span>
-                    <span className="diff-add">AIで需要予測して翌日ルートを自動生成し、繁忙期は臨時便を差し込む。</span>
-                    まず首都圏3拠点でパイロット運用し、効果を検証してから全国へ展開する。
-                  </div>
-                </div>
-                <div className="diff-field">
-                  <div className="diff-field__label">関連資料</div>
-                  <div className="diff-text">
-                    <span className="diff-del">📊 夜間配送_試算.xlsx</span> →{" "}
-                    <span className="diff-add">📊 夜間配送_試算シートv2.xlsx</span>
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            {/* あなたの投票時点の区切り */}
-            <div className="rev-since">↑ ここから上が「あなたの投票（7/12）より後」の変更です</div>
-
-            {/* v2 */}
-            <div className="rev">
-              <div className="rev__head">
-                <span className="rev__time">2026/07/12 10:05</span>
-                <span className="poster">
-                  <Avatar name="鈴木 花子" size="sm" />
-                  <span className="name">鈴木 花子</span>
-                </span>
-              </div>
-              <div className="rev__fields">
-                <span className="badge badge-muted">価値</span>
-                <span className="badge badge-muted">タイムリミット</span>
-              </div>
-              <div className="rev__note">📝 レビューコメントを反映。</div>
-              <details className="rev__diff">
-                <summary className="role-note" style={{ cursor: "pointer" }}>
-                  差分を表示
-                </summary>
-                <div className="diff-field">
-                  <div className="diff-field__label">価値</div>
-                  <div className="diff-text">
-                    配送コストを約<span className="diff-del">10%</span>
-                    <span className="diff-add">15%</span>削減しつつ、CO2排出も同時に削減できる。
-                  </div>
-                </div>
-                <div className="diff-field">
-                  <div className="diff-field__label">タイムリミット</div>
-                  <div className="diff-oldnew">
-                    <span className="old">2026/07/20</span> → <span className="new">2026/07/25</span>
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            {/* v1（初版） */}
-            <div className="rev">
-              <div className="rev__head">
-                <span className="rev__time">2026/07/10 09:00</span>
-                <span className="badge badge-muted">初版</span>
-                <span className="poster">
-                  <Avatar name="鈴木 花子" size="sm" />
-                  <span className="name">鈴木 花子</span>
-                </span>
-              </div>
-              <div className="rev__note">アイデアを投稿。</div>
-            </div>
+            <RevisionHistory ideaId={ideaId} currentRevision={idea.current_revision} />
           </div>
         </ModalBody>
         <ModalFooter>

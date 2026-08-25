@@ -101,6 +101,8 @@ class IdeaRevision(CompanyBase):
     # 版スナップショット（対象フィールド全値・§8-⑤）。差分は表示時に前版と比較して算出。
     changes: Mapped[dict] = mapped_column(JSONB, nullable=False)
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 版の記録日時（版タイムラインの表示・更新マーカー元データ・§5.14／D.4 line44/98）。
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Follow(CompanyBase):

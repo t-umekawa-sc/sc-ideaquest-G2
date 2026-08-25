@@ -163,6 +163,45 @@ class IdeaListResponse(BaseModel):
     page_info: IdeaCursorPageInfo
 
 
+class IdeaRevisionDTO(BaseModel):
+    """版タイムラインの1行（SC-22 更新履歴・D.4）。changed_fields＝前版比の変更フィールド（初版は空）。"""
+
+    revision: int
+    editor: IdeaAuthorDTO
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+
+
+class IdeaRevisionListResponse(BaseModel):
+    data: list[IdeaRevisionDTO]
+    page_info: IdeaCursorPageInfo
+
+
+class IdeaDiffSegment(BaseModel):
+    """テキスト差分の1セグメント（D.4）。op＝equal/add/del。"""
+
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class IdeaDiffField(BaseModel):
+    """フィールドごとの差分（D.4）。kind=text は segments・kind=scalar は old/new。"""
+
+    kind: Literal["text", "scalar"]
+    segments: list[IdeaDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class IdeaRevisionDiffResponse(BaseModel):
+    """版差分（SC-22・D.4）。fields＝変わったフィールドのみ（field 名→差分）。"""
+
+    from_revision: int
+    to_revision: int
+    fields: dict[str, IdeaDiffField]
+
+
 class IdeaDetailDTO(BaseModel):
     """アイデア詳細（SC-22・D.1）。評価(F)/チャット(E)/添付(D.3)は各ドメインで合成/後続。"""
 

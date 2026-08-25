@@ -19,6 +19,8 @@ from app.tenant.ideas.schemas import (
     IdeaDetailDTO,
     IdeaListResponse,
     IdeaPublishRequest,
+    IdeaRevisionDiffResponse,
+    IdeaRevisionListResponse,
     IdeaUpdateRequest,
     IdeaVoteRequest,
     IdeaVoteResponse,
@@ -55,6 +57,38 @@ def get_idea(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
     return IdeaDetailDTO(**result)
+
+
+@router.get("/ideas/{idea_id}/revisions", response_model=IdeaRevisionListResponse)
+def list_revisions(
+    idea_id: str,
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = None,
+    session: dict = Depends(require_me),
+) -> IdeaRevisionListResponse:
+    """版タイムライン（SC-22 更新履歴・D.4）。可視性はサーバー強制（範囲外 404）。読取専用。"""
+    result = idea_service.get_revisions(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+        limit=limit, cursor=cursor,
+    )
+    return IdeaRevisionListResponse(**result)
+
+
+@router.get("/ideas/{idea_id}/revisions/{revision}/diff", response_model=IdeaRevisionDiffResponse)
+def revision_diff(
+    idea_id: str,
+    revision: int,
+    request: Request,
+    from_: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> IdeaRevisionDiffResponse:
+    """版差分（SC-22・D.4）。既定は前版比較・`from` で比較元を指定（投票時点差分）。範囲外 404/422。読取専用。"""
+    result = idea_service.get_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, revision,
+        from_revision=from_,
+    )
+    return IdeaRevisionDiffResponse(**result)
 
 
 @router.post("/quests/{quest_id}/ideas", response_model=IdeaDetailDTO, status_code=201)
