@@ -1,49 +1,31 @@
 "use client";
 
 // SC-30 ショップ（ゲーム層）＝コイン残高ヒーロー（CRTガラス）＋装備一覧（DataTable cardRaw）＋購入フロー。
-// 正＝doc/画面設計/mocks/SC-30_ショップ.html・doc/画面設計/screens/SC-30_ショップ.md。
-// 装備/コイン backend 未実装＝デモ fixtures（画面モック先行）。購入完了は報酬スナックバー（§14）で通知。
+// 正＝doc/画面設計/mocks/SC-30_ショップ.html・doc/画面設計/screens/SC-30_ショップ.md・API設計 G.1。
+// G 実接続＝getItems（マスタ＋所有＋残高）／purchaseItem（コイン消費・残高不足/所有済みはサーバー権威 409）。
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { DataTable, GameNav, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 
+import { getItems, ITEM_ICON, purchaseItem } from "../api";
 import "../shop.css";
 
 type Slot = "head" | "face" | "body" | "hand" | "bg";
 type Rarity = "common" | "standard" | "rare";
 type Item = { id: string; slot: Slot; name: string; icon: string; rarity: Rarity; price: number; owned: boolean };
 
+// backend slot（background）→ 表示スロット（bg）。
+function toSlot(s: string): Slot {
+  return (s === "background" ? "bg" : s) as Slot;
+}
+
 const SLOT_LABEL: Record<Slot, string> = { head: "頭", face: "顔", body: "体", hand: "手持ち", bg: "背景" };
 const RARITY_LABEL: Record<Rarity, string> = { common: "コモン", standard: "標準", rare: "レア" };
 const RARITY_ORDER: Record<Rarity, number> = { common: 0, standard: 1, rare: 2 };
 const SLOT_ORDER: Record<Slot, number> = { head: 0, face: 1, body: 2, hand: 3, bg: 4 };
-
-// owned=所有済み（SC-31 の初期所有と一致）。価格はレアリティ帯（コモン10〜30/標準50〜150/レア300〜800）。
-const INITIAL_ITEMS: Item[] = [
-  { id: "crown", slot: "head", name: "王冠", icon: "👑", rarity: "rare", price: 600, owned: true },
-  { id: "tophat", slot: "head", name: "シルクハット", icon: "🎩", rarity: "standard", price: 120, owned: true },
-  { id: "cap", slot: "head", name: "キャップ", icon: "🧢", rarity: "common", price: 20, owned: true },
-  { id: "straw", slot: "head", name: "麦わら帽", icon: "👒", rarity: "common", price: 20, owned: false },
-  { id: "shades", slot: "face", name: "サングラス", icon: "🕶️", rarity: "standard", price: 90, owned: true },
-  { id: "glasses", slot: "face", name: "メガネ", icon: "👓", rarity: "common", price: 15, owned: true },
-  { id: "mask", slot: "face", name: "マスク", icon: "😷", rarity: "common", price: 15, owned: false },
-  { id: "armor", slot: "body", name: "アーマー", icon: "🛡️", rarity: "rare", price: 700, owned: true },
-  { id: "suit", slot: "body", name: "スーツ", icon: "👔", rarity: "standard", price: 150, owned: true },
-  { id: "gi", slot: "body", name: "道着", icon: "🥋", rarity: "common", price: 30, owned: true },
-  { id: "coat", slot: "body", name: "ロングコート", icon: "🧥", rarity: "standard", price: 120, owned: false },
-  { id: "sword", slot: "hand", name: "剣", icon: "⚔️", rarity: "rare", price: 500, owned: true },
-  { id: "wand", slot: "hand", name: "魔法の杖", icon: "🪄", rarity: "standard", price: 120, owned: true },
-  { id: "book", slot: "hand", name: "本", icon: "📖", rarity: "common", price: 25, owned: true },
-  { id: "hammer", slot: "hand", name: "大槌", icon: "🔨", rarity: "standard", price: 90, owned: false },
-  { id: "sunset", slot: "bg", name: "夕焼けの海", icon: "🌅", rarity: "standard", price: 100, owned: true },
-  { id: "galaxy", slot: "bg", name: "星空", icon: "🌌", rarity: "rare", price: 400, owned: true },
-  { id: "forest", slot: "bg", name: "森", icon: "🌲", rarity: "common", price: 25, owned: true },
-  { id: "castle", slot: "bg", name: "古城", icon: "🏰", rarity: "rare", price: 500, owned: false },
-];
-// 既定＝レアリティ順（以降はツールバーの並び替えで操作）。
-const SORTED = [...INITIAL_ITEMS].sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || a.price - b.price);
 
 type State = "owned" | "affordable" | "short";
 const STATE_LABEL: Record<State, string> = { owned: "所有済", affordable: "購入可", short: "コイン不足" };
@@ -55,9 +37,25 @@ const STATE_OPTIONS: [string, string][] = [["owned", "所有済"], ["affordable"
 export function ShopView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
-  const [items, setItems] = useState<Item[]>(SORTED);
-  const [coins, setCoins] = useState(320);
+  const [items, setItems] = useState<Item[]>([]);
+  const [coins, setCoins] = useState(0);
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const r = await getItems().catch(() => null);
+    if (r) {
+      setItems(
+        r.data.map((d) => ({
+          id: d.id, slot: toSlot(d.slot), name: d.name_ja, icon: ITEM_ICON[d.code] ?? "❔",
+          rarity: d.rarity as Rarity, price: d.price_coin, owned: d.owned,
+        })),
+      );
+      setCoins(r.coin_balance);
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const stateOf = (it: Item): State => (it.owned ? "owned" : it.price <= coins ? "affordable" : "short");
 
@@ -70,16 +68,26 @@ export function ShopView() {
       cost: { icon: it.icon, name: `${it.name}（${RARITY_LABEL[it.rarity]}）`, price: it.price, balance: coins },
     });
     if (!ok) return; // キャンセル（処理なし）＝スナックバーは出さない
-    setCoins((c) => c - it.price);
-    setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
-    setFlashId(it.id);
-    setTimeout(() => setFlashId((f) => (f === it.id ? null : f)), 500);
-    snack({
-      type: "reward",
-      title: "装備を購入しました",
-      msg: `「${it.name}」を入手！ きせかえで装備できます。`,
-      rewards: [{ k: "coin", t: `◆ -${it.price}` }],
-    });
+    try {
+      const res = await purchaseItem(it.id);
+      if (res) setCoins(res.coin_balance);
+      setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
+      setFlashId(it.id);
+      setTimeout(() => setFlashId((f) => (f === it.id ? null : f)), 500);
+      snack({
+        type: "reward",
+        title: "装備を購入しました",
+        msg: `「${it.name}」を入手！ きせかえで装備できます。`,
+        rewards: [{ k: "coin", t: `◆ -${it.price}` }],
+      });
+    } catch (err) {
+      const reason = err instanceof ApiError ? (err.body as { errors?: { reason?: string }[] } | undefined)?.errors?.[0]?.reason : undefined;
+      snack({
+        type: "error",
+        msg: reason === "insufficient_balance" ? "コインが不足しています。" : reason === "already_owned" ? "すでに所有しています。" : "購入に失敗しました。",
+      });
+      void load(); // サーバー権威に整合
+    }
   }
 
   const columns: DataTableColumn<Item>[] = [
@@ -95,7 +103,7 @@ export function ShopView() {
     },
     { key: "slot", label: "スロット", width: 110, sortable: true, filter: { type: "enum", options: SLOT_OPTIONS }, sortVal: (i) => SLOT_ORDER[i.slot], filterVal: (i) => i.slot, csvVal: (i) => SLOT_LABEL[i.slot], render: (i) => SLOT_LABEL[i.slot] },
     { key: "rarity", label: "レアリティ", width: 120, sortable: true, filter: { type: "enum", options: RARITY_OPTIONS }, sortVal: (i) => RARITY_ORDER[i.rarity], filterVal: (i) => i.rarity, csvVal: (i) => RARITY_LABEL[i.rarity], render: (i) => <span className={`rarity-${i.rarity}`} style={{ fontWeight: 700 }}>{RARITY_LABEL[i.rarity]}</span> },
-    { key: "price", label: "価格", width: 100, align: "num", sortable: true, filter: { type: "number" }, sortVal: (i) => i.price, filterVal: (i) => i.price, csvVal: (i) => i.price, render: (i) => `◆ ${i.price}` },
+    { key: "price", label: "価格", width: 100, align: "num", sortable: true, filter: { type: "number" }, sortVal: (i) => i.price, filterVal: (i) => i.price, csvVal: (i) => String(i.price), render: (i) => `◆ ${i.price}` },
     { key: "state", label: "状態", width: 120, filter: { type: "enum", options: STATE_OPTIONS }, filterVal: (i) => stateOf(i), csvVal: (i) => STATE_LABEL[stateOf(i)], render: (i) => { const s = stateOf(i); const cls = s === "owned" ? "badge-muted" : s === "affordable" ? "badge-success" : "badge-danger"; return <span className={`badge ${cls}`}>{STATE_LABEL[s]}</span>; } },
   ];
 
@@ -131,6 +139,7 @@ export function ShopView() {
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
       <GameNav current="shop" />
+      {loading && <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>}
 
       {/* コイン残高（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="コイン残高">

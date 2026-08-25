@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知2件のみ・**backend `pytest tests/` 全体 396 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／**ショップ/装備 G ＝8**）・e2e sc-24（3）＋sc-32（1）＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 345）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 396 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／**ショップ/装備 G ＝8**）・e2e sc-24（3）＋sc-32（1）＋**sc-30（2＝ショップ/アバター実データ G-TC-202/203）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 348）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -27,8 +27,8 @@
 | SC-22 | アイデア詳細 | ✅ | `(app)/ideas/[ideaId]` | 本体＋投票/フォロー（D.5/D.6）＋添付（D.3）＋quest 参照（D.1）＋更新履歴（D.4）＋評価結果/選定（F.1/F.3）＋**チャット活発度/プレビュー（E.1・`getChatActivity`/`getChat`）**。全セクション実接続 |
 | SC-24 | アイデアチャット | ✅ | `(app)/ideas/[ideaId]/chat` | **実接続**（`getChat`/`postMessage`/`editMessage`/`deleteMessage`/`markRead`/`addReaction`/`removeReaction`/`getSpells`）＝投稿/編集/削除・リアクション/魔法・メンション（実メンバー）・添付（署名DL）・**複数引用**（`chat_message_quotes`・§5.16b）・既読・comment 権限/completed 凍結 |
 | SC-25 | 評価画面 | ✅ | `(app)/ideas/[ideaId]/eval` | 5観点採点＋観点別コメント＋総評＋公開範囲＋集計プレビュー（F.2）。`getMyEvaluation` プリフィル・確定/下書き＝`putEvaluation`・422/403/409 はサーバー権威。※設計はモーダル（Intercept）だが現状フルページ（intercept モーダル化は follow-up） |
-| SC-30 | ショップ | ⬜ | `(app)/shop` | モックのみ |
-| SC-31 | アバター着せ替え | ⬜ | `(app)/avatar` | モックのみ |
+| SC-30 | ショップ | ✅ | `(app)/shop` | 実接続（`getItems`＝カタログ＋所有＋コイン残高・`purchaseItem`＝コイン消費・残高不足/所有済みはサーバー権威）。購入は確認ダイアログ→報酬スナックバー。アイコンはクライアント presentation |
+| SC-31 | アバター着せ替え | ✅ | `(app)/avatar` | 実接続（`getItems`＝所有/装備・`updateEquipment`＝各スロット1点・楽観更新＋サーバー権威）。未所有はショップ導線。3D は VRM 未対応でマスコット代用 |
 | SC-32 | 魔法スキル | ✅ | `(app)/spells` | 実接続（`getSpells`＝カタログ＋SP残高＋unlocked/can_unlock・`unlockSpell`＝SP消費・前提/二重解放はサーバー権威）。解放は確認ダイアログ→報酬スナックバー。演出コピーはクライアント（G シードに説明文なし） |
 | SC-40 | 実績バッジ | ⬜ | `(app)/achievements` | モックのみ |
 | SC-41 | ランキング | ⬜ | `(app)/ranking` | モックのみ（G） |
@@ -37,8 +37,8 @@
 | SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009） |
 | SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み。**メール確認バッジ＋送信アクション**（ADR-0009） |
 
-**接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
-**モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`shop`・`avatar`・`achievements`・`ranking`。
+**接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`shop`・`avatar`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
+**モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`achievements`・`ranking`。
 
 ## ブラウザ受入状況（バッチ・後日まとめて）
 
@@ -53,6 +53,7 @@
 - [ ] **SC-21 編集モードの既存添付 削除（D-TC-218）**＝編集フォームに保存済み添付が出る→× →確認ダイアログ「削除する」で即時削除・トースト・SC-22 から消える（版は増えない）。
 - [ ] **SC-24 チャット E（E-TC-201/203）**＝メッセージ投稿/編集/削除・**複数引用**・添付DL・@メンション候補・通常リアクション・魔法（SC-32 で解放した魔法）・既読セパレータ・comment 権限/completed 凍結。
 - [ ] **SC-32 魔法スキル G（G-TC-201）**＝カタログ/SP残高/解放数が実データ・SP を使って解放（確認→報酬スナックバー）→ SC-24 の魔法ピッカーで使えるようになる通し。
+- [ ] **SC-30/SC-31 ショップ/アバター G（G-TC-202/203）**＝ショップでコイン購入（確認→報酬・残高減）→アバターで着せ替え（各スロット1点・即反映）→SC-30 で「所有済み」。要コイン（評価等で獲得）。
 - [ ] **SC-25/SC-22 評価 F（F-TC-201〜203）**＝SC-25 で5観点採点＋総評→確定→SC-22 §4.6 に平均/観点/総評/コインが反映・下書き復元・owner の選定トグル（★選定済み＋「選定候補」バッジ）。評価者/選定は my_permissions 出し分け。
 - [ ] **SC-92/93 メール確認 ADR-0009（B-TC-169 等）**＝「確認メールを送信」→MailHog で確認リンク→`/email-verify/confirm` 確定→verified バッジ化を通しで。
 
@@ -75,7 +76,7 @@
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。
 - **`IdeaDetailDTO` に `quest_id`/カテゴリー無し**＝SC-22 の「クエストへ戻る」が暫定。
-- tsc 既知2件＝`components/ui/Snackbar.tsx:122`・`features/shop/components/ShopView.tsx:98`（いずれも既存/デモ）。
+- tsc 既知1件＝`components/ui/Snackbar.tsx:122`（既存デモ・Snackbar 呼び出しの引数）。※ShopView の csvVal 型は G 接続時に修正済み。
 
 ## 起動・テスト
 

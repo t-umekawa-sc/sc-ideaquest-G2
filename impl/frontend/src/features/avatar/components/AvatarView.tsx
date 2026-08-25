@@ -2,13 +2,16 @@
 
 // SC-31 アバター/着せ替え（ゲーム層）＝3Dアバタービューア（CRTガラス・モックはマスコットで代用）＋
 // ワードローブ（5スロット×装備・クリック着替え・即反映）。装備セットは SC-30 ショップと共通。
-// 正＝doc/画面設計/mocks/SC-31_アバター着せ替え.html・doc/画面設計/screens/SC-31_アバター着せ替え.md。
-// 装備/コイン backend 未実装＝デモ fixtures（画面モック先行）。未所有クリックはショップ導線（確認ダイアログ）。
+// 正＝doc/画面設計/mocks/SC-31_アバター着せ替え.html・screens/SC-31・API設計 G.1/G.2。
+// G 実接続＝getItems（カタログ＋所有＋装備＋残高）／updateEquipment（各スロット1点はサーバー強制）。未所有はショップ導線。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { GameNav, useConfirm } from "@/components/ui";
+import { GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
+
+import { getItems, ITEM_ICON, updateEquipment } from "@/features/shop/api";
 
 import "../avatar.css";
 
@@ -24,50 +27,40 @@ const SLOTS: { key: SlotKey; label: string; preview: boolean }[] = [
   { key: "bg", label: "背景", preview: true },
 ];
 const RARITY: Record<Rarity, string> = { common: "コモン", standard: "標準", rare: "レア" };
-
-const ITEMS: Record<SlotKey, Item[]> = {
-  head: [
-    { id: "crown", name: "王冠", icon: "👑", rarity: "rare", owned: true },
-    { id: "tophat", name: "シルクハット", icon: "🎩", rarity: "standard", owned: true },
-    { id: "cap", name: "キャップ", icon: "🧢", rarity: "common", owned: true },
-    { id: "straw", name: "麦わら帽", icon: "👒", rarity: "common", owned: false, price: 20 },
-  ],
-  face: [
-    { id: "shades", name: "サングラス", icon: "🕶️", rarity: "standard", owned: true },
-    { id: "glasses", name: "メガネ", icon: "👓", rarity: "common", owned: true },
-    { id: "mask", name: "マスク", icon: "😷", rarity: "common", owned: false, price: 15 },
-  ],
-  body: [
-    { id: "armor", name: "アーマー", icon: "🛡️", rarity: "rare", owned: true },
-    { id: "suit", name: "スーツ", icon: "👔", rarity: "standard", owned: true },
-    { id: "gi", name: "道着", icon: "🥋", rarity: "common", owned: true },
-    { id: "coat", name: "ロングコート", icon: "🧥", rarity: "standard", owned: false, price: 120 },
-  ],
-  hand: [
-    { id: "sword", name: "剣", icon: "⚔️", rarity: "rare", owned: true },
-    { id: "wand", name: "魔法の杖", icon: "🪄", rarity: "standard", owned: true },
-    { id: "book", name: "本", icon: "📖", rarity: "common", owned: true },
-    { id: "hammer", name: "大槌", icon: "🔨", rarity: "standard", owned: false, price: 90 },
-  ],
-  bg: [
-    { id: "sunset", name: "夕焼けの海", icon: "🌅", rarity: "standard", owned: true },
-    { id: "galaxy", name: "星空", icon: "🌌", rarity: "rare", owned: true },
-    { id: "forest", name: "森", icon: "🌲", rarity: "common", owned: true },
-    { id: "castle", name: "古城", icon: "🏰", rarity: "rare", owned: false, price: 500 },
-  ],
-};
-
-const coins = 320;
+const EMPTY_ITEMS: Record<SlotKey, Item[]> = { head: [], face: [], body: [], hand: [], bg: [] };
+// view スロット（bg）↔ backend スロット（background）。
+const toSlot = (s: string): SlotKey => (s === "background" ? "bg" : s) as SlotKey;
+const backendSlot = (s: SlotKey): string => (s === "bg" ? "background" : s);
 
 export function AvatarView() {
   const router = useRouter();
   const confirm = useConfirm();
-  // 初期装備（各スロット1点・null=未装備）
-  const [equipped, setEquipped] = useState<Record<SlotKey, string | null>>({
-    head: "crown", face: "shades", body: "armor", hand: "sword", bg: "galaxy",
-  });
+  const snack = useSnackbar();
+  const [items, setItems] = useState<Record<SlotKey, Item[]>>(EMPTY_ITEMS);
+  const [equipped, setEquipped] = useState<Record<SlotKey, string | null>>({ head: null, face: null, body: null, hand: null, bg: null });
+  const [coins, setCoins] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const itemOf = (slot: SlotKey, id: string | null) => (id ? ITEMS[slot].find((i) => i.id === id) ?? null : null);
+  const load = useCallback(async () => {
+    const r = await getItems().catch(() => null);
+    if (r) {
+      const grouped: Record<SlotKey, Item[]> = { head: [], face: [], body: [], hand: [], bg: [] };
+      const eq: Record<SlotKey, string | null> = { head: null, face: null, body: null, hand: null, bg: null };
+      for (const d of r.data) {
+        const slot = toSlot(d.slot);
+        if (!grouped[slot]) continue;
+        grouped[slot].push({ id: d.id, name: d.name_ja, icon: ITEM_ICON[d.code] ?? "❔", rarity: d.rarity as Rarity, owned: d.owned, price: d.price_coin });
+        if (d.is_equipped) eq[slot] = d.id;
+      }
+      setItems(grouped);
+      setEquipped(eq);
+      setCoins(r.coin_balance);
+    }
+    setLoading(false);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const itemOf = (slot: SlotKey, id: string | null) => (id ? items[slot].find((i) => i.id === id) ?? null : null);
   const preview = (slot: SlotKey) => itemOf(slot, equipped[slot])?.icon ?? "";
 
   async function onLocked(_slot: SlotKey, it: Item) {
@@ -81,8 +74,26 @@ export function AvatarView() {
     if (ok) router.push("/shop");
   }
 
-  function equip(slot: SlotKey, id: string | null) {
-    setEquipped((e) => ({ ...e, [slot]: id }));
+  async function equip(slot: SlotKey, id: string | null) {
+    const prev = equipped[slot];
+    setEquipped((e) => ({ ...e, [slot]: id })); // 楽観更新
+    try {
+      const res = await updateEquipment({ [backendSlot(slot)]: id });
+      if (res) setEquipped((e) => ({ ...e, [slot]: res.equipped[backendSlot(slot)] ?? null }));
+    } catch (err) {
+      setEquipped((e) => ({ ...e, [slot]: prev })); // ロールバック
+      const st = err instanceof ApiError ? err.status : 0;
+      snack({ type: "error", msg: st === 422 ? "この装備は着用できません。" : "着せ替えに失敗しました。" });
+    }
+  }
+
+  if (loading) {
+    return (
+      <section aria-label="アバター / 着せ替え">
+        <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
+      </section>
+    );
   }
 
   return (
@@ -151,9 +162,9 @@ export function AvatarView() {
                     {!eqId && <span className="badge item__equipped-badge">装備中</span>}
                   </article>
 
-                  {ITEMS[slot.key].map((it) => {
+                  {items[slot.key].map((it) => {
                     const isEq = eqId === it.id;
-                    const act = () => (it.owned ? equip(slot.key, it.id) : onLocked(slot.key, it));
+                    const act = () => (it.owned ? void equip(slot.key, it.id) : void onLocked(slot.key, it));
                     return (
                       <article
                         key={it.id}

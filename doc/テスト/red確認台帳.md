@@ -511,3 +511,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | G-TC-303 | 購入の残高チェックを無効化＝残高不足でも購入できる → `assert 409`（insufficient_balance）が 200 で red。復元で 409 → green |
 | G-TC-307 | 装備の所有/スロット検証を無効化＝別スロットのアイテムを装備できる → `assert 422` が 200 で red。復元で 422（field=slot）→ green |
+
+### SC-30/SC-31 フロント接続（e2e G-TC-202/203・2026-08-25）
+
+> frontend 非マウント＝接続前バンドル（ShopView/AvatarView がデモ＝◆320固定・固定所有/装備）に対し実行 → 実データ（`GET /items` のコイン残高・所有/装備）と一致せず red → ShopView/AvatarView を getItems/purchaseItem/updateEquipment で実接続＋再ビルドで green。ShopView の既知 tsc（csvVal number）も修正（既知2→1）。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| G-TC-202 | 接続前＝`.wallet__num` がデモ固定「◆ 320」で実 `coin_balance` と不一致 → red。接続後は `getItems` の実残高・19点カタログ → green |
+| G-TC-203 | 接続前＝ワードローブがデモ固定所有（王冠等 owned）で `.item.is-locked` 件数が実 `GET /items` の未所有数と不一致 → red。接続後は実所有/装備で一致 → green |

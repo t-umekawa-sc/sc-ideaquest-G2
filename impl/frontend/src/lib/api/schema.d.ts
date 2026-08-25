@@ -1545,6 +1545,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Items
+         * @description 装備マスタ＋自分の所有/装備＋コイン残高（SC-30/SC-31・G.1）。読取専用。
+         */
+        get: operations["list_items_api_v1_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/items/{item_id}/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purchase Item
+         * @description 装備を購入（G.1・コイン消費）。残高不足/所有済みはサーバー権威（409）。
+         */
+        post: operations["purchase_item_api_v1_items__item_id__purchase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Items
+         * @description 自分の所有装備（スロット別）＋装備中（SC-31・G.2）。読取専用。
+         */
+        get: operations["get_my_items_api_v1_me_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/equipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Equipment
+         * @description 装備スロットを更新（SC-31・G.2・部分マップ）。各スロット1点はサーバー強制。
+         */
+        put: operations["update_equipment_api_v1_me_equipment_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -2174,6 +2254,29 @@ export interface components {
             status: string;
         };
         /**
+         * EquipmentRequest
+         * @description PUT /me/equipment（部分マップ・キー有=設定／null=外す／キー無=不変）。
+         */
+        EquipmentRequest: {
+            /** Head */
+            head?: string | null;
+            /** Face */
+            face?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Hand */
+            hand?: string | null;
+            /** Background */
+            background?: string | null;
+        };
+        /** EquipmentResponse */
+        EquipmentResponse: {
+            /** Equipped */
+            equipped: {
+                [key: string]: string | null;
+            };
+        };
+        /**
          * EvaluationAggregateDTO
          * @description 評価結果の集計（SC-22 §4.6 右レール・F.1）。閲覧者に可視な評価のみで算定。
          */
@@ -2696,6 +2799,40 @@ export interface components {
              */
             oppose: number;
         };
+        /** ItemDTO */
+        ItemDTO: {
+            /** Id */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name Ja */
+            name_ja: string;
+            /** Name En */
+            name_en: string;
+            /** Slot */
+            slot: string;
+            /** Rarity */
+            rarity: string;
+            /** Price Coin */
+            price_coin: number;
+            /**
+             * Owned
+             * @default false
+             */
+            owned: boolean;
+            /**
+             * Is Equipped
+             * @default false
+             */
+            is_equipped: boolean;
+        };
+        /** ItemListResponse */
+        ItemListResponse: {
+            /** Data */
+            data: components["schemas"]["ItemDTO"][];
+            /** Coin Balance */
+            coin_balance: number;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Company Code */
@@ -2911,6 +3048,28 @@ export interface components {
              */
             trust_device: boolean;
         };
+        /** MyItemEntry */
+        MyItemEntry: {
+            /** Item Id */
+            item_id: string;
+            /** Name */
+            name: string;
+            /** Rarity */
+            rarity: string;
+            /** Is Equipped */
+            is_equipped: boolean;
+        };
+        /** MyItemsResponse */
+        MyItemsResponse: {
+            /** Slots */
+            slots: {
+                [key: string]: components["schemas"]["MyItemEntry"][];
+            };
+            /** Equipped */
+            equipped: {
+                [key: string]: string | null;
+            };
+        };
         /** OkResponse */
         OkResponse: {
             /**
@@ -2974,6 +3133,15 @@ export interface components {
             valid: boolean;
             /** Login Id */
             login_id: string;
+        };
+        /** PurchaseResponse */
+        PurchaseResponse: {
+            /** Item Id */
+            item_id: string;
+            /** Owned */
+            owned: boolean;
+            /** Coin Balance */
+            coin_balance: number;
         };
         /**
          * QuestCandidateDTO
@@ -6532,6 +6700,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpellUnlockResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_items_api_v1_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemListResponse"];
+                };
+            };
+        };
+    };
+    purchase_item_api_v1_items__item_id__purchase_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_items_api_v1_me_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyItemsResponse"];
+                };
+            };
+        };
+    };
+    update_equipment_api_v1_me_equipment_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentResponse"];
                 };
             };
             /** @description Validation Error */
