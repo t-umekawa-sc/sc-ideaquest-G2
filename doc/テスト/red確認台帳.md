@@ -413,3 +413,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（全社横断に戻した actual） |
 | --- | --- |
 | B-TC-170 | 非 OPS の system_admin 併存時、OPS 管理者 disable が `200`（本来 422）＝会社横断カウントで「最後の1人」と見なされず保護が外れる → OPS スコープ修正で 422 |
+
+## D. SC-21 §4.7 サーバエラー経由の 3 チャネル（D-TC-216・2026-08-25）
+
+> 後追いテスト（3 チャネル発火は `IdeaForm.persist()` の catch に既実装）＝反転手技で red 目視。`IdeaForm.tsx` の catch を一時反転（`setFieldErrors`/`setSummary`/`notify` を抑止＝サーバエラーを握り潰す）→ frontend 再ビルドで接続バンドルに反映 → D-TC-216 が red（`.form-summary` 不出現）→ 復元＋再ビルドで green。完了クエスト編集の PATCH は 409 invalid_state（api D-TC-111 と同経路）。回帰＝sc-21-idea-form 全 6 passed・tsc 既知2件のみ。
+
+| TC-ID | 観測 red（catch 反転＝3チャネル抑止 actual） |
+| --- | --- |
+| D-TC-216 | 反転時＝完了クエスト編集で PATCH 409 を受けても `.form-summary`／`.form-footer-error`／`.snackbar--error` がいずれも出ず「押したのに無反応」→ `.form-summary` 不出現で red。復元後は 3 チャネル（上部サマリ「現在の状態では実行できません。」＋足元ヒント＋持続エラースナックバー〔`.snackbar__timer` 無し＝duration:0〕）が出て green |

@@ -70,7 +70,7 @@
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 
 > 対象＝フロント接続済み SC-21（`impl/frontend/src/features/ideas/components/IdeaForm.tsx`・登録フルページ `/(app)/quests/[questId]/ideas/new`・編集モーダル `IdeaDetailView`）。e2e は**契約の最終確認**（画面↔API）に限定し、分岐は §2 の api レベルで担保（テスト規約 §4・§5.1 line 112＝接続後は red-green 適用）。前提＝dev seed 一般ユーザー ACME-01「テスト 太郎」（デモグループ所属）。下地クエスト/アイデアは API で作成し teardown で論理削除。変更系は Cookie セッション＋X-CSRF-Token。
-> **§4.7 の 3 チャネル（上部サマリ scroll＋足元ヒント＋sticky スナックバー）は SC-21 では主経路で到達不能**＝主ボタン「投稿する／変更を保存」が `disabled={!canSave}`（3 必須が揃うまで無効）で client `validate()` と同条件のため client 検証エラーが出ない。下書き保存は検証スキップ。3 チャネルが発火するのはサーバエラー（完了クエスト編集の 409・公開状態機械の 409 等）経由のみで、これは後続 TC（サーバエラー seed が必要）に回す。本節はその**前段ガード**（ボタン活性・blur インライン）を D-TC-204 で担保する。
+> **§4.7 の 3 チャネル（上部サマリ scroll＋足元ヒント＋sticky スナックバー）は SC-21 では主経路で到達不能**＝主ボタン「投稿する／変更を保存」が `disabled={!canSave}`（3 必須が揃うまで無効）で client `validate()` と同条件のため client 検証エラーが出ない。下書き保存は検証スキップ。3 チャネルが発火するのはサーバエラー（完了クエスト編集の 409・公開状態機械の 409 等）経由のみで、これは **D-TC-216**（完了クエストのアイデア編集で 409 を seed）で担保する。本節の前段ガード（ボタン活性・blur インライン）は D-TC-204 で担保する。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -89,6 +89,7 @@
 | D-TC-213 | e2e | SC-22「クエストへ戻る」が実導線＋カテゴリーバッジ | published アイデア（categories 付きクエスト） | `/ideas/{id}` を表示 | 「← クエストへ戻る」の href が `/quests/{quest_id}`（一覧固定でない）・ヘッダーにクエストのカテゴリーバッジ表示（`quest.categories`） | D.1／SC-22 |
 | D-TC-214 | e2e | SC-22 完了クエストは投票/新規フォローを事前無効化 | recruiting→…→completed に遷移した published アイデア | `/ideas/{id}` を表示 | 「▲ 賛成」「▼ 反対」が `disabled`（凍結理由 title）・「☆ フォロー」が `disabled`（`quest.status=completed` 事前判定・サーバー 409 も権威） | D.5/D.6／SC-22 §4.5／C.5 |
 | D-TC-215 | e2e | SC-21 で添付して投稿→SC-22 に出る＋DL | 登録フォームで件名/価値/本文＋ファイル添付→投稿 | `/quests/{id}/ideas/new` で添付付き投稿→`/ideas/{id}` | SC-22 の関連資料に添付名が実データで出る（`uploadAttachments`）・ダウンロードボタンが活性・`GET /attachments/{aid}/download` が `{url}` を返す | D.3／SC-21/SC-22 |
+| D-TC-216 | e2e | SC-21 サーバエラー（完了クエスト編集 409）で §4.7 の 3 チャネルが発火 | API で recruiting クエスト＋published アイデアを作成し `completed` へ遷移（`/quests/{id}/transition`）| `/ideas/{id}`→「編集」→件名を変更→「変更を保存」（PATCH が 409 invalid_state）| `mapServerErrors`→conflict で ① 上部サマリ `.form-summary` に「現在の状態では実行できません。」・② 足元ヒント `.form-footer-error`「⚠ 入力エラーがあります。…」・③ エラースナックバー `.snackbar--error`（`duration:0`＝`.snackbar__timer` 無し＝自動消滅しない）の 3 チャネルが出る | §4.7／D.0/C.5／SC-21 |
 
 > **削除 UI の置き場所（SC-22 §4.3 準拠）**＝SC-22 の関連資料は「一覧＋ダウンロード」のみ（削除ボタンは無い・0件なら非表示）。添付の**削除は SC-21 フォームの添付チップ（×）**で行い、EP は `DELETE /ideas/{id}/attachments/{aid}`（api の D-TC-134 で担保）。SC-21 編集モードでの**既存添付の一覧/削除 UI は follow-up**（本スライスは新規アップロード〔create/edit〕＋SC-22 表示/DL に限定・投稿前の未アップロード添付の × はクライアント除去）。
 

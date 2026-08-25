@@ -56,6 +56,16 @@ async function deleteQuestQuiet(page: Page, id: string) {
   await page.request.delete(`/api/v1/quests/${id}`, { headers: { "X-CSRF-Token": csrf } });
 }
 
+// クエストのステータス遷移（recruiting→…→completed 等）。§3 完了凍結 seed 用。
+async function transition(page: Page, questId: string, to: string) {
+  const csrf = csrfOf(await page.context().cookies());
+  const res = await page.request.post(`/api/v1/quests/${questId}/transition`, {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: { to },
+  });
+  expect(res.status(), await res.text()).toBe(200);
+}
+
 // D-TC-201 即公開作成＝フォームで投稿→成功トースト→クエスト詳細へ戻る→一覧(API)に published で出る。
 test("D-TC-201 SC-21 publish idea via form appears in list", async ({ page }) => {
   await login(page);
@@ -155,6 +165,45 @@ test("D-TC-204 SC-21 submit gated by required + blur inline validation", async (
     await page.locator("#idea_value").fill("価値");
     await page.locator("#idea_body").fill("本文");
     await expect(submit).toBeEnabled();
+  } finally {
+    await deleteQuestQuiet(page, questId);
+  }
+});
+
+// D-TC-216 §4.7 サーバエラー経由の 3 チャネル＝完了クエストのアイデアを編集→PATCH 409（invalid_state）で
+// 上部サマリ（.form-summary）＋足元ヒント（.form-footer-error）＋持続エラースナックバー（.snackbar--error・duration:0＝timer 無し）が出る。
+// 主ボタンは canSave（3 必須）で活性・client 検証は通過するためサーバエラーが主経路（§3 前文・mapServerErrors→conflict）。
+test("D-TC-216 SC-21 server 409 (completed quest edit) fires §4.7 three channels", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2Eサーバエラー_${stamp}`);
+  const ideaId = await createIdeaApi(page, questId, `凍結編集_${stamp}`, "published");
+  // 公開後にクエストを完了へ前進（編集は 409 invalid_state で凍結）。
+  await transition(page, questId, "in_progress");
+  await transition(page, questId, "evaluating");
+  await transition(page, questId, "completed");
+  try {
+    await page.goto(`/ideas/${ideaId}`);
+    // 完了でも編集ボタンは出る（凍結はサーバー権威）。編集モーダル→プリフィルを待つ。
+    await page.getByRole("button", { name: "編集", exact: true }).click();
+    const subject = page.locator("#idea_subject");
+    await expect(subject).toHaveValue(`凍結編集_${stamp}`);
+    // 件名を変更（canSave 維持）→ 保存で PATCH 409。
+    await subject.fill(`凍結編集_更新_${stamp}`);
+    await page.getByRole("button", { name: "変更を保存" }).click();
+
+    // ① 上部サマリ（.form-summary）に conflict 文言。
+    const summary = page.locator(".form-summary");
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText("現在の状態では実行できません。");
+    // ② 足元ヒント（.form-footer-error）。
+    await expect(page.locator(".form-footer-error")).toBeVisible();
+    await expect(page.locator(".form-footer-error")).toContainText("入力エラーがあります");
+    // ③ エラースナックバー（.snackbar--error）＝duration:0＝自動消滅しない（timer バー無し）。
+    const snack = page.locator(".snackbar--error");
+    await expect(snack).toBeVisible();
+    await expect(snack.locator(".snackbar__msg")).toHaveText("現在の状態では実行できません。");
+    await expect(snack.locator(".snackbar__timer")).toHaveCount(0);
   } finally {
     await deleteQuestQuiet(page, questId);
   }
