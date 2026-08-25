@@ -40,6 +40,18 @@
 **接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
 **モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`chat`・`evaluations`・`shop`・`avatar`・`spells`・`achievements`・`ranking`。
 
+## ブラウザ受入状況（バッチ・後日まとめて）
+
+> 上表の ✅/🟡＝**backend 接続＋e2e green** の状態。**ユーザーによるブラウザ受入は別軸**で、後日まとめて実施する（e2e green でクローズ扱い・次画面へ進む・[受入ゲート](../doc/規約/フロントエンド実装フロー規約.md) §1.1）。ここに受入待ちを集約し、受入完了までチェックを残す（受入用デモデータも受入完了まで削除しない）。**dev ログイン**＝`ACME-01`/`user@acme.example`/`Passw0rd!`・**MailHog**＝`http://localhost:8025`。
+
+- [ ] **SC-22 更新履歴 D.4（D-TC-217）**＝デモデータ用意済み＝`http://localhost:3000/ideas/f183174b-b090-4151-972e-832b2f824a9a`（クエスト「【受入】更新履歴デモ」内「夜間配送の集約」）。「版 2（履歴）」→版2/初版・文字差分（価値 1̶0̶→5・本文語句差分・タイムリミット `（なし）→2027-01-31`）の見え方。
+- [ ] **SC-21 §4.7 サーバエラー3チャネル（D-TC-216）**＝完了クエストのアイデアを「編集」→件名変更→「変更を保存」で 409→①上部サマリ ②足元ヒント ③持続エラースナックバー（自動消滅しない）。要 seed（完了クエスト＋公開アイデア）。
+- [ ] **SC-22 投票/フォロー（D-TC-209〜212）**＝賛成/反対/切替/同ボタン再クリック取消・★フォロートグルの楽観更新＋サーバー権威。
+- [ ] **SC-10/12 idea_count 連動**＝クエストカード/詳細の公開アイデア数が実データに連動。
+- [ ] **SC-22 quest参照/completed 事前無効化（D-TC-213/214）**＝「クエストへ戻る」導線・カテゴリーバッジ・完了時の投票/新規フォロー disabled＋⏸凍結バッジ。
+- [ ] **SC-21/22 添付 D.3（D-TC-215）**＝登録/編集で添付アップロード→SC-22 に実添付表示＋DL（署名URL）。
+- [ ] **SC-92/93 メール確認 ADR-0009（B-TC-169 等）**＝「確認メールを送信」→MailHog で確認リンク→`/email-verify/confirm` 確定→verified バッジ化を通しで。
+
 ## backend API 進捗
 
 登録ルータ = **auth / admin / me**（control_plane）・**quests / ideas**（tenant）。
