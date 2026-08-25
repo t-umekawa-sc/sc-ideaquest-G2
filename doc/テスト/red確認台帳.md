@@ -529,3 +529,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | G-TC-402 | `_period_bounds` の this_week を境界なしに反転＝先週分も集計 → `assert me.xp==10`（今週分のみ）が 109 で red。復元で月曜00:00 JST 起点 → green |
 | G-TC-206 | 接続前＝「あなたの順位」が全12人中固定（デモ）で実 `GET /rankings` の `me.total_users`/順位と不一致 → red。接続後は実データ（total_users・rank・行数一致）→ green |
+
+## G. 実績（新ドメイン・G-TC-501〜506・台帳フック・2026-08-25）
+
+> 新規ドメイン G 実績（achievements/user_achievements・migration 0016＋シード12）＝新規 EP は test-first。付与は `ledger.grant` の後フック（engine.evaluate）で一元化＝**全付与行動で即時判定**。seed 閾値は単発行動で発火しない値にし既存テスト非破壊（full 407 passed）。ranking/各 throwaway teardown に user_achievements 掃除を追加。
+
+| TC-ID | 観測 red（中核＝台帳フック 反転 actual） |
+| --- | --- |
+| G-TC-502 | `ledger.grant` の実績判定フック（`if judge`）を `and False` で無効化＝評価3件付与しても `evaluator_3` が unlocked にならず achievement_reward も出ない → `assert unlocked` が false で red。復元で 3件目付与時に自動解放＋コイン20（冪等）→ green |

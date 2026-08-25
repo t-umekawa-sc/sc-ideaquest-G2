@@ -278,7 +278,9 @@ def factory():
                 ts.query(Activity).filter_by(user_id=user.id).delete()
                 from app.tenant.chat.orm import UserSpell as _UserSpell
                 from app.tenant.shop.orm import UserItem as _UserItem
+                from app.tenant.achievements.orm import UserAchievement as _UserAch
                 ts.query(_UserSpell).filter_by(user_id=user.id).delete()
                 ts.query(_UserItem).filter_by(user_id=user.id).delete()
+                ts.query(_UserAch).filter_by(user_id=user.id).delete()
             ts.query(User).filter_by(account_id=aid).delete()
             ts.commit()

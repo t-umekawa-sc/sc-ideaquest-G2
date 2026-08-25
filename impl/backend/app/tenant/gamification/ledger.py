@@ -66,16 +66,22 @@ def _settle_levelups(session: Session, user: User) -> None:
 
 def grant(session: Session, user: User, *, kind: str, amount: int, reason: str,
           ref_type: str | None = None, ref_id: uuid.UUID | None = None,
-          quest_id: uuid.UUID | None = None) -> Activity:
+          quest_id: uuid.UUID | None = None, judge: bool = True) -> Activity:
     """`activities` 追記＋残高更新を同一 UoW で実行（commit は呼び出し側）。
 
     XP 付与時はレベルを再計算し `levelup_sp` を連動発行する。冪等判定は呼び出し側の責務。
+    `judge=True`（既定）で**実績の即時判定フック**（G.4・§8-⑲）を呼ぶ＝全付与行動を一元化。
+    実績報酬コインの付与など再帰を避けたい内部呼び出しは `judge=False`。
     """
     activity = _append(session, user.id, kind, amount, reason,
                        ref_type=ref_type, ref_id=ref_id, quest_id=quest_id)
     _apply_balance(user, kind, amount)
     if kind == XP_GAIN:
         _settle_levelups(session, user)
+    if judge:
+        from app.tenant.achievements import engine  # 局所 import で循環回避（engine→ledger）
+
+        engine.evaluate(session, user, reason, kind)
     return activity
 
 

@@ -52,3 +52,16 @@
 | G-TC-403 | api | me は圏外でも同梱 | quest 内に他ユーザーのみ付与・自分は0 | `GET /rankings?scope=quest:{id}` | `me.rank=null`・`me.score=0`・`total_users` は他ユーザー数 | G.5 |
 | G-TC-404 | api | クエスト内は門番（非パーティー404） | 非パーティーのクエスト | `GET /rankings?scope=quest:{id}` | 404（存在秘匿・C.0） | G.5／C.0 |
 | G-TC-405 | api | period 不正は 422 | — | `GET /rankings?period=xxx` | 422（`field=period`） | G.5 |
+
+## 5. 実績 API（SC-40・G.4・§8-⑲）
+
+> 対象＝`app/tenant/achievements/`（achievements/user_achievements・migration 0016＋シード12）。付与は `ledger.grant` の後フック（engine.evaluate）で即時判定・冪等（reason ルーティング／condition＝count/streak_login/level/all_spells/all_items）。ティア連動コイン（bronze20/silver50/gold150）。決定性のため throwaway ユーザーで閾値到達させる。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-501 | api | 一覧＋summary・シークレット伏せ | 未獲得 | `GET /achievements` | 12件・`summary{unlocked:0,total:12}`・シークレット未獲得は `is_secret:true`・name「？？？」・tier null | G.4 |
+| G-TC-502 | api | 台帳フックで自動付与（count） | 評価3件付与（reason=evaluation×3・ledger） | 3件目付与→`GET /achievements` | `evaluator_3` が unlocked・`activities`(coin_gain/achievement_reward/achievements) 20・`coin_balance` +20 | G.4／§8-⑲ |
+| G-TC-503 | api | 進捗の反映（未達） | 評価2件付与 | `GET /achievements` | `evaluator_3` の `progress{current:2,target:3}`・unlocked false | G.4 |
+| G-TC-504 | api | 報酬は一度きり（冪等） | 評価3件→さらに1件付与 | achievement_reward activity 件数 | evaluator_3 の achievement_reward は1件のまま（UNIQUE＋exists_ref） | G.4 |
+| G-TC-505 | api | 全種系（all_spells） | user_spells 6件を seed→spell_unlock 付与 | `GET /achievements` | `spellmaster` unlocked・coin 150 | G.4 |
+| G-TC-506 | api | 自分の獲得実績 | evaluator_3 獲得済み | `GET /me/achievements` | evaluator_3 が unlocked_at 付きで返る | G.4 |

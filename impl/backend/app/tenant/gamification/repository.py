@@ -59,6 +59,21 @@ def exists_reason_between(
     return session.execute(stmt).scalar_one() > 0
 
 
+def count_reason(session: Session, user_id: uuid.UUID, reason: str) -> int:
+    """`user_id` の `reason` 付与件数（全期間・実績 count 系判定・G.4）。"""
+    return int(session.execute(
+        select(func.count()).select_from(Activity).where(Activity.user_id == user_id, Activity.reason == reason)
+    ).scalar_one())
+
+
+def login_dates(session: Session, user_id: uuid.UUID) -> list:
+    """`user_id` のログイン日（reason=login の created_at・降順の生値）。連続ログイン判定用（JST 換算は呼び出し側）。"""
+    return list(session.execute(
+        select(Activity.created_at).where(Activity.user_id == user_id, Activity.reason == "login")
+        .order_by(Activity.created_at.desc())
+    ).scalars().all())
+
+
 def count_reason_between(
     session: Session, user_id: uuid.UUID, reason: str, start: datetime, end: datetime
 ) -> int:

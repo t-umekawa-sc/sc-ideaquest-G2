@@ -68,8 +68,11 @@ def _make_quest_with(me_id, members: list) -> tuple:
 
 
 def _cleanup(qid, gid, extra):
+    from app.tenant.achievements.orm import UserAchievement
     with get_tenant_session(_db()) as ts:
         ts.execute(Activity.__table__.delete().where(Activity.quest_id == qid))
+        if extra:  # 実績フック（level 判定 on xp_gain）が作る user_achievements を掃除（FK: user 削除前）
+            ts.execute(UserAchievement.__table__.delete().where(UserAchievement.user_id.in_(extra)))
         mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id == qid)).scalars())
         if mids:
             ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
