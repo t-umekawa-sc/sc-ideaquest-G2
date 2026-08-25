@@ -454,9 +454,20 @@ def download_attachment(account_id, company_id, attachment_id) -> dict:
         if user is None:
             raise AppError(401, "unauthenticated")
         att = repo.get_attachment(ts, aid)
-        if att is None or att.idea_id is None:
+        if att is None:
             raise AppError(404, "not_found")
-        idea = repo.get_idea(ts, att.idea_id)
+        # 添付の所属アイデアを解決＝アイデア添付（idea_id）／チャット添付（chat_message_id→chat_group→idea・E.3 共通 EP）。
+        if att.idea_id is not None:
+            idea = repo.get_idea(ts, att.idea_id)
+        elif att.chat_message_id is not None:
+            from app.tenant.chat import repository as chat_repo
+            from app.tenant.chat.orm import ChatGroup
+
+            msg = chat_repo.get_message(ts, att.chat_message_id)
+            cg = ts.get(ChatGroup, msg.chat_group_id) if msg else None
+            idea = repo.get_idea(ts, cg.idea_id) if cg else None
+        else:
+            raise AppError(404, "not_found")
         if idea is None:
             raise AppError(404, "not_found")
         if idea.status == "draft" and idea.author_id != user.id:
@@ -634,13 +645,16 @@ def _stakeholders_str(value) -> str:
 
 
 def _publish_processing(ts, idea, author_id) -> None:
-    """公開の瞬間の処理（D.2/D.4）。初版 revision=1 のスナップショットを記録（通知なし）。
+    """公開の瞬間の処理（D.2/D.4/E）。初版 revision=1 記録（通知なし）＋チャットグループ作成（E・1:1）。
 
-    chat_groups 作成(E)・投稿 XP+50(G)・参加通知は各ドメイン実装まで no-op フック。
-    TODO(E): ensure chat_group (UNIQUE(idea_id))。TODO(G): activities に idea_post/XP+50 を同一 UoW 記帳。
-    冪等は status 遷移（再 publish は 409）で担保。
+    投稿 XP+50(G)・参加通知は各ドメイン実装まで no-op フック。冪等は status 遷移（再 publish は 409）＋
+    chat_groups の `UNIQUE(idea_id)`（ensure は既存なら再利用）で担保。
+    TODO(G): activities に idea_post/XP+50 を同一 UoW 記帳。
     """
     _record_initial_revision(ts, idea, author_id)
+    from app.tenant.chat import repository as chat_repo
+
+    chat_repo.ensure_chat_group(ts, idea.id)  # E＝アイデアと 1:1（§5.15・公開時に自動作成）
 
 
 def _record_initial_revision(ts, idea, editor_id) -> None:

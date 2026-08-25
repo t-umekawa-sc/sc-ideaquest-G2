@@ -35,6 +35,20 @@ def exists_reason_between(
     return session.execute(stmt).scalar_one() > 0
 
 
+def count_reason_between(
+    session: Session, user_id: uuid.UUID, reason: str, start: datetime, end: datetime
+) -> int:
+    """`user_id` の `reason` 付与件数を半開区間 `[start, end)` で数える（日次上限判定・チャット XP 等・§8-⑥）。"""
+    return int(session.execute(
+        select(func.count()).select_from(Activity).where(
+            Activity.user_id == user_id,
+            Activity.reason == reason,
+            Activity.created_at >= start,
+            Activity.created_at < end,
+        )
+    ).scalar_one())
+
+
 def list_activities(
     session: Session, user_id: uuid.UUID, *,
     kind: str | None = None,

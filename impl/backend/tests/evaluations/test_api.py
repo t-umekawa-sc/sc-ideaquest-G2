@@ -105,6 +105,9 @@ def env():
                 ts.execute(Activity.__table__.delete().where(Activity.ref_id.in_(eval_ids)))
             ts.execute(Evaluation.__table__.delete().where(Evaluation.idea_id.in_(ideas)))
             ts.execute(Activity.__table__.delete().where(Activity.ref_id.in_(ideas)))
+            # 公開で作られる chat_groups（E・§5.15）も掃除（FK: chat_groups.idea_id）。
+            from app.tenant.chat.orm import ChatGroup
+            ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(ideas)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(ideas)))
         if quests:
             member_ids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(quests))).scalars())

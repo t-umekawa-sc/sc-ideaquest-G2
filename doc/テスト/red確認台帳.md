@@ -459,3 +459,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | F-TC-201 | 接続前＝確定するとデモトースト（＋10XP）で戻るのみ・SC-22 は「デモ表示（F 未接続）」で評価者2名固定 → 実データ「評価者1名」/平均5.0/総評が出ず red。接続後は `getEvaluationAggregate` の実集計が描画 → green |
 | F-TC-202 | 接続前＝下書きはデモ（サーバー保存なし）・再訪しても採点が復元しない → `aria-pressed` が false で red。接続後は `putEvaluation(draft)`→`getMyEvaluation` プリフィルで復元 → green |
 | F-TC-203 | 接続前＝SC-22 に選定ボタンが無い（デモは評価導線のみ） → `このアイデアを選定` 不可視で red。接続後は `my_permissions.select` で表示・`selectIdea` で is_selected＋「選定候補」バッジ → green |
+
+## E. チャット コア会話（新ドメイン・E-TC-101〜114・2026-08-25）
+
+> 新規ドメイン E（chat_groups/chat_messages/chat_mentions/reactions/reaction_emojis/chat_reads/spells/user_spells・migration 0013＋マスタシード）＝新規 EP は test-first（未登録時 404/405）。backend はソースマウントで中核ロジックの retro-red を安価に実施。本コミットは**コア会話**（メッセージ CRUD・既読・活発度・添付・メンション）。リアクション/魔法（E.4）と魔法解放（G）は後続コミット。公開で chat_group を作成（D `_publish_processing`）・DL は D.3 共通 EP をチャット添付にも拡張。全 backend 374 passed（360＋14）。
+
+| TC-ID | 観測 red（中核ロジック反転 actual） |
+| --- | --- |
+| E-TC-104 | `_require_comment` を no-op に反転＝comment 権限なしでも投稿できる → `assert 403` が失敗（201）で red。復元で 403 → green |
+| E-TC-102 | `_award_chat_xp` の grant を抑止＝投稿しても XP が付かない → `activities`(reason=chat) が 0 で red。復元で XP+5（日次上限10/日）→ green |

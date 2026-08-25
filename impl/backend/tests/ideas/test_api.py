@@ -89,6 +89,9 @@ def env():
         api_ideas = list(ts.execute(select(Idea.id).where(Idea.quest_id.in_(quests or [uuid.uuid4()]))).scalars())
         iids = list(set(ideas) | set(api_ideas))
         if iids:
+            # 公開で作られる chat_groups（E・§5.15）も掃除（FK: chat_groups.idea_id）。
+            from app.tenant.chat.orm import ChatGroup
+            ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(iids)))
             ts.execute(IdeaStakeholder.__table__.delete().where(IdeaStakeholder.idea_id.in_(iids)))
             ts.execute(Vote.__table__.delete().where(Vote.idea_id.in_(iids)))
             ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(iids)))
