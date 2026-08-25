@@ -3,89 +3,92 @@
 > 読者＝「このセッションの記憶が無い次回の自分」。会話ログは参照不可。本ファイルだけで再開できるよう全文を上書きする（履歴は git）。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-08-24**（セッション終了時・時刻は概算）。
-- ブランチ: `main`。**作業ツリーはクリーン**（未コミットなし）。
-- 最新コミット: **`5cc05e8`** `fix(B/B.5.1): last_system_admin 保護を OPS テナントスコープに限定`。**origin/main と同期済み（push 済み）**。
-- 本セッションの主なコミット（新しい順）: `5cc05e8`(last_system_admin OPS スコープ修正)／`1d20184`(メール確認 frontend)／`766cb20`(メール確認 backend)／`6f4dcc2`(mock §4.7/§14 反映)／`f2c8119`(添付 D.3)／`03ec931`(IdeaDetailDTO に quest 参照)／`8ed4d02`(idea_count 連動)／`4ae948f`(投票/フォロー フロント接続)／`57f8b1d`(impl/README.md 新設＋追随更新規約化)。
+- 最終更新: **2026-08-25**（セッション終了時・時刻は概算）。
+- ブランチ: `main`。**作業ツリーはクリーン**（本 handoff コミット前時点で未コミットなし）。
+- 最新コミット（本 handoff コミット前）: **`22fd272`** `feat(H/SC-02): 通知一覧のフロント接続`。**push 状況＝本 handoff コミットで origin/main へ push 予定**（handoff 更新直前の実測＝ローカルが origin/main より 2 先行＝`33a2273`/`22fd272` が未 push だった）。再開時は `git status -sb` で ahead=0 を確認。
+- 本セッションの主なコミット（新しい順）: `22fd272`(通知H frontend SC-02)／`33a2273`(通知H backend＋発火8フック結線)／`c45edd6`(実績 SC-40 frontend)。
+- **直近の履歴（参考・本セッション前）**: `91315ad`(実績 backend)／`5982621`(ランキング SC-41)／`9ab3054`(ショップ/アバター SC-30/31)。それ以前に E チャット・F 評価・魔法 SC-32 も接続済み（詳細は git log と `impl/README.md`）。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（dev モード起動）、バック＝FastAPI 4層、DB＝PostgreSQL/Redis/MinIO/MailHog/Docker。開発は**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)＝アカウント→クエスト(C)→**アイデア(D)**→評価(F)→その他。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（dev モード起動）、バック＝FastAPI 4層（router/application/repository/infra）、DB＝PostgreSQL/Redis/MinIO/MailHog/Docker。開発は**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価(F)→その他。**現況の正＝[`impl/README.md`](impl/README.md)**（画面別/EP別の済・未・追随更新）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### 3-0. 進捗スナップショットの正を新設（`57f8b1d`）
-- **`impl/README.md` を「実装現況（画面別/EP別の済・未）の正」として新設**＝画面進捗テーブル・backend API 進捗・既知課題・起動/テスト手順。**進捗が進むたび追随更新**する運用を規約化（[`doc/規約/フロントエンド実装フロー規約.md`](doc/規約/フロントエンド実装フロー規約.md) **§1.2 新設**・§1.1-5 に更新トリガー組込）。役割分担＝**計画順=実装計画.md／現況=impl/README.md／経緯・次アクション=handoff.md**。`doc/実装計画.md` §0/§4 は現況を impl/README.md へ委譲（重複回避）。`CLAUDE.md` 設計の正本節に impl/README.md ポインタ追加。
+### 3-A. 通知ドメイン H の backend 新設（`33a2273`）— スコープ＝「テナント発火系フル」（ユーザー選択 2026-08-25）
+- **新ドメイン `impl/backend/app/tenant/notifications/`**＝`orm.py`(Notification)・`repository.py`(add/get_for_recipient/list_for_recipient〔カーソル〕/unread_count/mark_all_read・全て recipient スコープ)・`catalog.py`(取得時レンダリング §8-⑳・ja・種別→body/context/tag/icon/meta を ref 解決＋params 差し込み)・`service.py`(`notify`＝**宛先重複排除**〔1イベント×1宛先＝最具体1件・`TYPE_PRIORITY`〕＋`dispatch`＝post-commit best-effort・at-most-once＋`_publish`＝**L=WS まで no-op**)・`application.py`(get_notifications/get_unread_count/mark_read/mark_unread/mark_all_read)・`schemas.py`・`router.py`。
+- **migration `impl/backend/migrations/company/versions/0017_company_notifications.py`**＝`notifications`（`params jsonb`・`body` NULL 可・`ref_idea_id/ref_chat_message_id/ref_idea_revision_id/ref_achievement_id/ref_quest_id`・`is_read`・`created_at`・index `(recipient_id,is_read,created_at)`）。
+- **API 5 EP**（`app/main.py` に `notifications_router` 登録）＝`GET /api/v1/notifications`（state=all/unread・type 複数・limit/cursor §1.8・unread_count 同梱）／`GET /notifications/unread-count`／`POST /notifications/{id}/read`／`/unread`／`/read-all`（body `{type?}`）。**自分宛スコープ＝他人宛は 404（IDOR）**・変更系 Origin/CSRF。
+- **発火8フックを no-op から実結線**（各ドメイン application）＝
+  - `app/tenant/chat/application.py`：`_notify_message_posted`（mention/idea_comment/follow_comment・post-commit dispatch・投稿者除外）／`_notify_reaction`（magic_reaction・投稿者宛・reactor 除外・spell 識別子凍結）。
+  - `app/tenant/ideas/application.py`：`_notify_idea_updated`（版追加時・**投票者∪フォロワー − 編集者**・in-session）。
+  - `app/tenant/evaluations/application.py`：`_notify_follow_evaluation`／`_notify_follow_selection`（フォロワー − 操作者・in-session）。
+  - `app/tenant/achievements/engine.py`：`_notify_achievement`（実績解放時・本人宛・**台帳フックの同一 UoW で in-session**）。
+  - `app/tenant/quests/application.py`：`_notify_party_invited`（publish/即公開・追加パーティー員〔owner 除く〕・post-commit dispatch・owner 表示名を params 凍結）。
+  - 宛先解決ヘルパを `app/tenant/ideas/repository.py` に追加＝`list_follower_ids`・`list_voter_ids`。
+- **テスト**＝`doc/テスト/H_通知.md`（H-TC-101〜143 api＋§1e H-TC-208 e2e）新設。`impl/backend/tests/notifications/test_api.py`（15 件）。`tests/conftest.py`・`tests/chat/test_api.py`・`tests/quests/test_sc11_api.py` の teardown に**通知行の掃除**を追加（notifications が users/ideas/quests/messages を FK 参照するため参照先削除の前に消す）。`doc/テスト/red確認台帳.md` に H の red 証跡。
 
-### 3-A. D 投票・フォローのフロント接続（`4ae948f`）
-- `impl/frontend/src/features/ideas/api.ts` に `voteIdea`/`removeVote`/`followIdea`/`unfollowIdea` を追加。`impl/frontend/src/features/ideas/components/IdeaDetailView.tsx` の投票（賛成/反対/切替/**同ボタン再クリックで取消**）とフォロー★トグルを実接続＝**楽観更新＋サーバー権威**（409/403/404 でロールバック＋理由トースト）。e2e＝`sc-22-vote-follow.spec.ts`（D-TC-209〜212）。D-TC-207（`sc-22-idea-detail.spec.ts`）は「ボタン活性」へ更新。
+### 3-B. SC-02 通知一覧のフロント接続（`22fd272`）
+- `impl/frontend/src/features/notifications/api.ts` 新設＝`getNotifications`/`getUnreadCount`/`markRead`/`markUnread`/`markAllRead`。
+- `impl/frontend/src/features/notifications/components/NotificationsView.tsx` をデモ fixtures から実接続へ書換＝未読数・行・**サーバー取得時レンダリング済み body**・context/tag/`meta.coin` を描画。状態/種別（**9カテゴリー**＝mention/comment/eval/select/update/achievement/magic/quest/security をサーバー `type[]` 絞り込みへマップ）・日付グループ（today/yesterday/earlier をクライアント算出）・行クリックで既読化＋`ref` から遷移（chat/idea/achievements/quest）・楽観更新＋サーバー権威・すべて既読。
+- `impl/frontend/src/lib/api/schema.d.ts` を codegen で再生成（NotificationDTO 等）。
+- e2e `impl/frontend/e2e/sc-02-notifications.spec.ts` を旧デモ回帰から実データ照合（H-TC-208）へ置換。
 
-### 3-B. idea_count を公開アイデア数に連動（`8ed4d02`）
-- クエストDTO の `idea_count` が 0 固定だった不整合を解消。`impl/backend/app/tenant/ideas/repository.py` に `count_published_ideas_for_quests`（batch・N+1回避）追加、`impl/backend/app/tenant/quests/application.py` の一覧カード/詳細 DTO で連動。**定義＝公開(published)・未削除のみ**（下書きは作成者のみ可視で数えると存在漏れ・`sort=-idea_count` も安定）＝`doc/API設計/C_クエスト・パーティー・権限.md` に明記。フロントは既に表示（変更不要）。api テスト C-TC-143/144。
-
-### 3-C. IdeaDetailDTO に quest 参照追加（`03ec931`）
-- `impl/backend/app/tenant/ideas/schemas.py` に `IdeaQuestRefDTO`（id/title/status/categories/deadline）、`IdeaDetailDTO.quest` を必須公開。`_build_detail`（`app/tenant/ideas/application.py`）で合成。フロント SC-22＝「クエストへ戻る」を実導線化・カテゴリーバッジ・**completed 凍結の事前無効化**（投票/新規フォロー disabled＋⏸バッジ）。締切(時刻)超過はサーバー 409 を権威に維持。api D-TC-130／e2e `sc-22-quest-ref.spec.ts`（D-TC-213/214）。
-
-### 3-D. 添付ファイル D.3（`f2c8119`）
-- `impl/backend/app/infra/storage.py` に添付 allowlist（画像/pdf/Office/txt/csv/md/zip）・20MB・`validate_attachment_upload`（**申告 Content-Type を信用せず拡張子から MIME 導出**）・`hashed_key` 汎用化。EP 3本（`app/tenant/ideas/router.py`）＝`POST /ideas/{id}/attachments`（複数・編集権限・完了409・10件上限）／`DELETE .../{aid}`（DB＋MinIO）／`GET /attachments/{aid}/download`（パーティー所属→短TTL署名URL）。`IdeaDetailDTO.attachments` 追加。フロント＝`features/ideas/api.ts`（`uploadAttachments`/`deleteAttachment`/`getAttachmentDownloadUrl`）／SC-22 で実添付表示＋DL（0件非表示・§4.3）／SC-21 `IdeaForm.tsx` で**保存成功後にアップロード**（id 先行）。api D-TC-131〜137／e2e `sc-22-attachments.spec.ts`（D-TC-215）。
-
-### 3-E. mock/style-guide に §4.7・§14 反映（`6f4dcc2`）
-- 正本は更新済みで mock 未反映だった2点を追随。`doc/画面設計/mocks/shared.js` の `iqSnack` が **`duration:0`（自動消滅させない・✕のみ）** を honor するよう修正（従来 0 が握り潰されていた）。`shared.css` に足元ヒント `.form-footer-error` 追加。`style-guide.html`「4b.」に §4.7 の3チャネル（上部サマリへスクロール＋足元ヒント＋エラースナックバー duration:0）を実演。「14b.」にセッション終了通知（session_expired/logged_out の固定文言・reason enum マップ）追加。デザイン標準 §14 に mock サンプル参照追記。
-
-### 3-F. 管理者によるメールアドレス確認 ADR-0009（backend `766cb20`／frontend `1d20184`）
-- migration `impl/backend/migrations/control/versions/0011_accounts_email_verified_at.py`＝`accounts.email_verified_at`＋`otp_challenges.target_email` 追加。ORM/config＝`email_verify` purpose・`email_verify_ttl_seconds`(72h)・mail category `email_verify_link`（`app/control_plane/mail_outbox/templates.py`）。repo helper（`app/control_plane/auth/repository.py`）＝invalidate/create/find email_verify challenges。
-- 送信 EP（`app/control_plane/admin/router.py`・`application.py send_email_verification`）＝B.2(system_admin)/B.2.1(company_admin) の2系統・現メール宛に確認リンク（単回・旧失効・現メールを target_email に束ねる）・202。確定 EP（`app/control_plane/auth/router.py`・`application.py confirm_email_verify`）＝`POST /auth/email-verify/confirm`・未認証（Origin のみ）・`email_verified_at=now`／410（無効/期限/使用済）／**409 stale**（送信後 email 変更・target_email≠現email）。`PATCH email` 変更で `email_verified_at=NULL`（`admin/application.py edit_account`）・自己変更確定でも now を刻む（`me/application.py confirm_email_change`）。一覧/状態 DTO に `email_verified`。
-- フロント＝`features/accounts/api.ts`（`sendEmailVerification`/`sendOwnEmailVerification`/`confirmEmailVerify`）／SC-92 `AccountSection.tsx`・SC-93 `AccountSelfSection.tsx` にメール列バッジ（未確認/確認済み）＋⋯「確認メールを送信」／`app/(auth)/email-verify/confirm/page.tsx`＋`features/accounts/components/EmailVerifyConfirm.tsx`（明示ボタンで確定・410/409 分岐）。api B-TC-165〜168・A-TC-103〜106／e2e `sc-92d-email-verify.spec.ts`（B-TC-169）。
-
-### 3-G. last_system_admin 保護を OPS スコープに修正（`5cc05e8`・**セッション中に発見した既存バグ**）
-- `impl/backend/app/control_plane/admin/application.py` の `_active_system_admin_count` が**全社横断**で数えていた抜けを修正＝**OPS 会社内**（予約コード `ops_company_code` で識別・新ヘルパ `_ops_company_id`）の active system_admin のみ。`disable_account`/`edit_account` のガードも「対象が OPS 会社の system_admin」に限定（非 OPS の system_admin 無効化を誤ブロックしない）。api B-TC-170。詳細は §5・§6。
+### 3-C. 直前セッションの SC-40 実績 frontend（`c45edd6`）
+- `features/achievements/api.ts`＋`AchievementsView.tsx` を `getAchievements` に接続（収集サマリー実データ・シークレット伏せ・DataTable）。e2e G-TC-207。※backend `91315ad` は前セッション。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-### 4-1. frontend（tsc・e2e）
-- **tsc＝既知2件のみ**（本セッション複数回確認）＝`impl/frontend/src/components/ui/Snackbar.tsx:122`・`impl/frontend/src/features/shop/components/ShopView.tsx:98`（いずれもデモ/既存）。今回の変更はクリーン。
-- **接続済み画面**＝SC-00／SC-03,K／SC-10（idea_count 連動）／SC-11／SC-12（アイデアタブ＋ヘッダー idea_count）／SC-21（登録・編集・**添付アップロード**）／SC-22（本体＋**投票/フォロー/添付/quest参照/completed事前無効化**）／SC-90/91／SC-92,93（**メール確認バッジ＋送信**）。
-- **まだ表示のみ/デモ**＝SC-22 の評価(F)/チャット(E)/版差分(D.4)／SC-12 の評価列(F)/週間ランキング(G)/全文検索(J)／SC-01(一部)/02/24/25/30/31/32/40/41。
-- **e2e（本セッションで green 確認）**＝`sc-22-vote-follow`(4)／`sc-22-quest-ref`(2)／`sc-22-attachments`(1)／`sc-22-idea-detail`(1)／`sc-21-idea-form`(5)／`sc-92b-accounts`／`sc-93-own-accounts`／`sc-92d-email-verify`(1)。**注＝dev の `next dev` はコールドコンパイルで各 spec の最初の login が稀にタイムアウト→ウォームで再実行すれば green**（本セッションで複数回観測）。
-### 4-2. backend（pytest）
-- 登録ルータ＝auth / admin / me（control_plane）・quests / ideas（tenant）。**D API＝13 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋**添付 POST/DELETE・DL**）。版差分 GET(D.4) は未実装。
-- **本セッション末に `pytest tests/`（backend 全体）＝332 passed（0 failed）を確認**（下記 §5 の OPS スコープ修正後・`t-umekawa` を active のままで）。以前は `test_b_tc_028` が OPS を無効化して連鎖失敗していたが根治済み。
+### 4-1. backend（pytest）
+- **本セッション末に `pytest tests/`（backend 全体）＝422 passed（0 failed）を確認**（407→+15＝通知 H 15 件）。
+- 登録ルータ＝auth/admin/me（control_plane）・quests/ideas/evaluations/chat/gamification/shop/achievements/**notifications**（tenant）。EP 別の詳細は `impl/README.md`「backend API 進捗」。
+- 会社DB migration は **0017 が head**。**適用は `scripts.bootstrap` が冪等に `alembic upgrade head`**（`docker compose ... run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`）。本セッションで ACME-01 等に 0017 適用済みを確認。
+### 4-2. frontend（tsc・e2e）
+- **tsc＝既知1件のみ**（本セッション確認）＝`impl/frontend/src/components/ui/Snackbar.tsx:122`（既存デモ）。※前 handoff の ShopView.tsx:98 は G 接続時に解消済み。今回の変更はクリーン。
+- **接続済み画面**（`impl/README.md` 画面テーブルが正）＝SC-00／SC-01(部分＝ヒーロー残高のみ)／SC-03,K／SC-10／SC-11／SC-12(部分)／SC-21／SC-22／SC-24／SC-25／SC-30／SC-31／SC-32／SC-40／SC-41／**SC-02**／SC-90/91／SC-92/93。
+- **まだモック/部分**＝SC-02 の security_* 種別（未結線）／SC-01 のダッシュボード集約(I)／SC-12 の週間ランキング列・全文検索(J)／リアルタイム(L)。
+- **e2e**＝本セッションで green を実測したのは `sc-02-notifications`(H-TC-208・1) のみ。他 spec（sc-24/25/30/32/40/41/22/21/92d 等）は**前セッションで green・今回は未再実行**（`impl/README.md` 進捗行に一覧）。
+- **注＝dev の `next dev` はコールドコンパイルで各 spec の最初の login が稀にタイムアウト→ウォームで再実行すれば green**（継続観測）。
 ### 4-3. テスト運用
-- **TC-ID トレーサビリティ ✅（code 318・本セッション末に確認）**。red-green は `doc/テスト/red確認台帳.md` に本セッション分を追記（投票/フォロー・idea_count・quest参照・添付・メール確認・OPS スコープ）。**新規 EP は test-first／後追い・ガード確認は反転手技を台帳へ**（テスト規約 §5.1）。
+- **TC-ID トレーサビリティ ✅（code 354・本セッション末に確認）**。`python3 scripts/check_tc_traceability.py`。新規 EP は test-first／後追い・ガードは反転手技を `doc/テスト/red確認台帳.md` へ（テスト規約 §5.1）。
+- 本セッションの red-green 証跡＝(backend) `service.notify()` に `return []` を一時差込→H api 15 件中 13 件 red→撤去で green。(e2e) 接続前デモ「4 件の未読」が実 API unread_count と不一致で red→再ビルドで green。
 
 ## 5. 詰まっている点（試した/注意）
-- **backend api テストは共有 control DB（`ideaquest_control`）を使う**＝dev の永続 DB。ここに**手動追加の `t-umekawa`（非 OPS 会社の active system_admin）が居る**。これが last_system_admin 保護の全社横断カウントと噛み合い、`test_b_tc_028`（OPS 管理者 disable→422 期待）が **200 になり OPS を無効化→以後の admin/auth 系テストが OPS ログイン 401 で連鎖失敗**する現象を引き起こしていた。→ §3-G の OPS スコープ修正で**根治**（`t-umekawa` active のままで 332 passed）。**もし再びこの汚染に遭遇したら**＝`docker compose -f impl/compose.yaml exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_control -c "update accounts set status='"'"'active'"'"' where login_id='"'"'admin@ops.example'"'"';"'` で OPS を復元。
-- **`test_a_tc_095_independent_processing`（tests/mail_outbox）は既存フラキー**＝`tests/` 全体実行時の順序/タイミング依存で稀に落ちるが**単独では green**。本セッションの変更とは無関係。
-- **frontend はソース非マウント**（`impl/compose.yaml` に volume マウント無し）＝コード反映には `up -d --build frontend` が必須。逆にこれは**接続前バンドルで e2e の red を目視**するのに好都合（本セッションの red-green は全てこの方式）。
-- **backend ソースは pytest 時にマウント**（`run --rm -T -v "$PWD/backend:/app"`）＝test は再ビルド不要。ただし**実アプリ/openapi へ反映するには `up -d --build backend` が必要**。
-- **backend テスト/red-green の cwd 罠**＝`run --rm -T -v "$PWD/backend:/app"` は **cwd=`impl` 前提**。別ディレクトリだと `$PWD/backend` が消える。**必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl`**。
+- **notifications の FK と teardown**＝`notifications` は `users`/`ideas`/`quests`/`chat_messages`/`idea_revisions`/`achievements` を参照。発火を伴うテスト（chat mention・quest publish）の teardown で参照先を消す前に通知行を消す必要があった（`recipient_id` or `ref_quest_id` で削除）。**新たに発火を伴うテストを足すときは同様の掃除を忘れると teardown で IntegrityError**。factory 経由の throwaway ユーザーは `tests/conftest.py` が `Notification` を掃除済み。
+- **`notify()` の dedup はイベント単位**＝同一 `notify()` 呼び出し内で同一宛先の複数種別は最具体1件に畳まれる。**テストで「同一ユーザーに複数通知」を作るには別イベント（別 `notify()` 呼び出し）にする**（`tests/notifications/test_api.py` の `_seed` vs `_seed_each` 参照）。
+- **frontend はソース非マウント**（`impl/compose.yaml` に volume 無し）＝コード反映に `up -d --build frontend` 必須。接続前バンドルで e2e の red を目視できる（本セッションの red-green もこの方式）。
+- **backend ソースは pytest 時のみマウント**（`run --rm -T -v "$PWD/backend:/app"`）＝test は再ビルド不要。**実アプリ/openapi へ反映するには `up -d --build backend`**（本セッションで実施＝codegen と e2e が新 EP を叩けるようにした）。
+- **backend テスト/コマンドの cwd 罠**＝`-v "$PWD/backend:/app"` は **cwd=`impl` 前提**。必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl`。
+- **既存フラキー**＝`tests/mail_outbox` の `test_a_tc_095` 等・A-TC-038/040/063/068 系は全体実行の順序依存で稀に落ちるが**単独 green**・本セッション変更と無関係。
+- **共有 control DB 汚染（継続注意）**＝dev 永続 `ideaquest_control` に手動追加の `t-umekawa`（非 OPS の active system_admin）が居る。last_system_admin 保護は OPS スコープに限定済み（前セッション `5cc05e8`）なので現状 422 passed で無害だが、OPS が無効化される汚染に再遭遇したら §8 の psql で復元。
 
 ## 6. 決定事項と根拠
-- **OPS は固定運用**（ユーザー確認 2026-08-24）＝OPS 会社は予約コード `ops_company_code`（config・既定 "OPS"）で識別し、デプロイ寿命の間固定。「is_ops フラグ新設（案B）」は不採用＝(a) 再起動なしで OPS を切替える運用要件が無い、(b) 案B は SoT 二重化＋is_ops を bootstrap/migration 限定にする security 手当てが要る。**採用＝案A（予約コードで OPS スコープ化・migration/フラグ不要）**。last_system_admin 保護の対象は B.5.1 どおり**OPS テナント内**（`disable_account` docstring と一致）。
-- **idea_count＝公開・未削除のみ**（下書きは数えない）＝他人下書きの存在漏れ防止＋`sort=-idea_count` の閲覧者非依存の安定。自分の下書きがあるクエストではタブ件数がヘッダーを上回りうる（仕様・C API設計に明記）。
-- **添付の MIME 判定＝拡張子から正規 MIME を導出**（申告 Content-Type 非信用）。完全な magic-byte スニッフィングは follow-up（D.8）。**削除 UI は SC-22 に置かない**（§4.3＝一覧＋DL のみ）＝削除は SC-21 フォームの×／api（D-TC-134）で担保。
-- **メール確認（ADR-0009）**＝`email_change`(ADR-0008・変更) と `email_verify`(確認) は purpose 分離。確定の副作用は `email_verified_at` 更新のみ（identity 書換なし）。送信時 email を `otp_challenges.target_email` に束ね、confirm で現 email と照合＝不一致は 409 stale（`email_verified_at` は変えずやり直し）。**MVP は情報提供のみ・未確認でも通知/リンクは止めない**（発行直後は必ず未確認のため）。
-- **snackbar `duration:0`＝自動消滅させない**（§4.7 の持続エラー・§14）。impl（`components/ui/Snackbar`）は既に対応、mock 側を今回追随。
-- （継続）テスト運用＝md 先行＋TC-ID トレーサビリティ＋red確認台帳。会社プロビジョニングは MVP 手動。
+- **通知 H スコープ＝テナント発火系フル＋security_*/L 後回し**（ユーザー選択 2026-08-25）＝mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited を結線。`security_new_device`/`security_password_changed` は**コントロールプレーン auth 由来で会社DB へ書く cross-plane 結線**が要るため follow-up。Redis publish（`notifications:{user_id}`）は WS トランスポート（ドメイン L）とセットなので `service._publish` を no-op（TODO(L) 明記）。
+- **生成の in-session と post-commit の使い分け**＝実績(achievement)/idea_updated/follow_* は**すでに開いている書込 UoW 内で `notify(session, entries)`**（取りこぼしゼロ・トランザクショナル）。chat 投稿/魔法・quest publish は**本体 commit 後に `dispatch(company_id, builder)`**（別セッション・best-effort・at-most-once＝二重生成しないが取りこぼしうる＝H.1 の意味論）。`expire_on_commit=False`（`app/db/tenant.py`）なので post-commit の id アクセスは安全。
+- **本文＝取得時レンダリング**（§8-⑳）＝`body` を発火時に確定せず `GET` 時に受信者ロケール（現状 ja のみ実装）でテンプレ＋`params`＋`ref_*` から組む。ref から辿れる値（idea/quest/実績/魔法名）は都度解決、辿れない/可変値（actor_name・revision・tier・coin・spell 識別子）は `params` に凍結。
+- **重複排除＝1イベント×1宛先＝最具体1件**（`TYPE_PRIORITY`・mention>magic_reaction>idea_comment>follow_comment>…）。
+- **SC-02 の「すべて既読」は絞り込みに関わらず全既読**（一般的 UX・H.3 は type 省略で全件）。
+- **enum は String 列**（プロジェクト方針・notification_type も String(40)）。
+- （継続）テスト運用＝md 先行＋TC-ID トレーサビリティ＋red確認台帳。会社プロビジョニングは MVP 手動。ブラウザ受入は後日バッチ（§7.5）。
 
 ## 7. 次にやること（優先順・具体的に）
-
-> **完了済み（本セッション 2026-08-25）**: §7-1 SC-21 §4.7 サーバエラー3チャネル e2e（D-TC-216・commit `b06ea53`）／§7-2 D 版差分 GET D.4＋SC-22 更新履歴モーダル実接続（D-TC-138〜142/217・commit `a85b146`）。
-
-1. **SC-21 編集モードの既存添付 管理 UI**＝現状は新規アップロードのみ接続。編集時に `getIdea` の `attachments` を `IdeaForm` に読み込み、既存添付の一覧＋削除（`deleteAttachment`）を出す（backend の DELETE EP は実装済み）。
-2. **評価 F（SC-25）／チャット E（SC-24）**＝実装計画フェーズ4/5。`doc/API設計/F_*.md`・`E_*.md`＋`doc/画面設計/screens/SC-25,SC-24`。着手は依存（C/D 済み）を満たすため可能。
+1. **通知 H 後半＝security_*（cross-plane）**＝ログイン成功時の新端末検知（`app/control_plane/auth/application.py` のログイン成功パス）と PW 変更完了（`auth` の初回設定/再設定＋`app/control_plane/me/application.py` の自己 PW 変更）から、ログインで確定した `company_id`（PW 変更は token→account→company_id）でテナント DB へ `notify()`（`security_new_device`/`security_password_changed`・`params` に device/ip/at）。`security_password_changed` はメールも（A 経路）。catalog に本文テンプレは実装済み（未結線なだけ）。SC-02 の種別フィルタ「セキュリティ」も実データで出るようになる。テスト＝`doc/テスト/H_通知.md` に §（security）を追加し API設計 H.0 表と A.9-⑧ を根拠に。
+2. **リアルタイム L（WS `notifications:{user_id}`）**＝`app/tenant/notifications/service.py` の `_publish` を実装（行 INSERT 後に Redis publish）＋WS トランスポート（購読/転送）を新設。ヘッダーベルの未読バッジ即時更新。`doc/API設計/L_リアルタイム配信.md`・§1.12。
+3. **ダッシュボード集約 I（SC-01）**＝`doc/API設計/I_ダッシュボード集約.md`＋`doc/画面設計/screens/SC-01`。週間ランキング/下書き/未投票/参加中等を集約 EP で。SC-01 は現状ヒーロー残高（`/me`）のみ接続。
+4. **全文検索 J（SC-12/SC-22）**＝`doc/API設計/J_全文検索.md`。
+- いずれも着手前に `impl/README.md` の現況と該当 API/画面/データモデル正本を開く。**未着手の H/I/J/L に着手する前にユーザーへスコープ確認**（本セッションの H と同様、発火元/cross-plane の範囲で判断が要る）。
 
 ## 7.5 ブラウザ受入待ち（バッチ）
-
-> **運用（ユーザー確認 2026-08-25）**＝各画面のブラウザ受入は**その場では行わず後日まとめて**実施する（e2e green でクローズ扱い・次へ進む）。**受入待ちの一覧は現況の正である [`impl/README.md`](impl/README.md)「ブラウザ受入状況」節に集約**（受入用デモデータ・dev ログイン・確認ポイント付き）。ここには置かない（重複回避・現況は impl/README、経緯/次アクションは本ファイル）。
+- **運用（ユーザー確認 2026-08-25）**＝各画面のブラウザ受入は**その場では行わず後日まとめて**実施（e2e green でクローズ扱い・次へ進む）。**受入待ちの一覧は現況の正 [`impl/README.md`](impl/README.md)「ブラウザ受入状況」節に集約**（受入用デモデータ・dev ログイン・確認ポイント付き）。SC-02 通知（H-TC-208）も追記済み。ここには置かない（重複回避）。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。
-- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。セッション終了時点で**全サービス Up**。
-- **反映**＝frontend `up -d --build frontend`／backend `up -d --build backend worker mail-worker`。**frontend 再ビルド後は playwright を再インストール**（`exec -T -u root frontend npx playwright install-deps chromium` ＋ `exec -T frontend npx playwright install chromium`）。
-- **frontend tsc**＝`cd impl/frontend && npx tsc --noEmit`（既知2件は §4-1）。
-- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose -f "$PWD/compose.yaml" run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。範囲を絞るなら `tests/ideas` `tests/quests` `tests/admin` `tests/auth` 等。
-- **e2e**＝(1)deps/browser 再インストール（上記）(2)`CID=$(docker compose -f impl/compose.yaml ps -q frontend); docker cp <spec> "$CID":/app/e2e/`(3)`docker compose -f impl/compose.yaml exec -T redis redis-cli FLUSHALL`(4)`exec -T frontend npx playwright test e2e/<spec> --workers=1 --reporter=line`。**1ファイルずつ・login コールドコンパイルで初回落ちたらウォームで再実行**。
-- **openapi 型再生成**（backend 再ビルド後）＝`exec -T -e OPENAPI_URL=http://backend:8000/openapi.json frontend npm run codegen` → `docker cp "$CID":/app/src/lib/api/schema.d.ts impl/frontend/src/lib/api/schema.d.ts`。
-- **TC-ID 検査**＝`python3 scripts/check_tc_traceability.py`（`--list` で一覧）。コミット前ゲート。
-- **DB 直接確認**（control DB）＝`docker compose -f impl/compose.yaml exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_control -c "..."'`（`POSTGRES_USER` 既定 `ideaquest`）。system_admin 汚染復元は §5 参照。
-- **dev ログイン（PW 全て `Passw0rd!`）**＝system_admin `OPS`/`admin@ops.example`／一般 `ACME-01`/`user@acme.example`（MFA OFF・「テスト 太郎」・デモグループ所属）・`ACME-02`/`mfa@acme2.example`（MFA ON）。手動追加＝`SYSCON`/`t-umekawa`（system_admin・非 OPS＝§5 の注意点）。MailHog＝`http://localhost:8025`。
-- 規約/正本＝`CLAUDE.md`（各種規約＋設計の正本のパス参照）。**現況の正＝`impl/README.md`**（追随更新・フロントエンド実装フロー規約 §1.2）。UI 標準＝`doc/画面設計/デザイン標準.md`。API＝`doc/API設計/{A..L}_*.md`＋`README.md`。データモデル＝`doc/データモデル.md`。ADR＝`doc/ADR/`。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`。
+- 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。セッション終了時点で**全サービス Up**（backend/frontend は本セッションで再ビルド済み）。
+- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
+- **反映**＝frontend `docker compose -f impl/compose.yaml up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。**frontend 再ビルド後は playwright を再インストール**（`exec -T -u root frontend npx playwright install-deps chromium` ＋ `exec -T frontend npx playwright install chromium`）。
+- **会社DB migration 適用**（新 migration 追加時）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`（冪等・全会社DB＋シード）。
+- **frontend tsc**＝`cd impl/frontend && npx tsc --noEmit`（既知1件＝Snackbar.tsx:122）。
+- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。範囲限定＝`tests/notifications` `tests/chat` `tests/quests` `tests/ideas` `tests/evaluations` 等。
+- **e2e**＝(1)deps/browser 再インストール（上記）(2)`CID=$(docker compose -f impl/compose.yaml ps -q frontend); docker cp <spec> "$CID":/app/e2e/`(3)`docker compose -f impl/compose.yaml exec -T redis redis-cli FLUSHALL`(4)`docker compose -f impl/compose.yaml exec -T frontend npx playwright test e2e/<spec> --workers=1 --reporter=line`。**1ファイルずつ・login コールドコンパイルで初回落ちたらウォームで再実行**。
+- **openapi 型再生成**（backend 再ビルド後・localhost:8000 が新 EP を出す状態で）＝`cd impl/frontend && npm run codegen`（既定 `http://localhost:8000/openapi.json` → `src/lib/api/schema.d.ts`）。
+- **TC-ID 検査**＝`python3 scripts/check_tc_traceability.py`。コミット前ゲート。
+- **DB 直接確認**（control DB）＝`docker compose -f impl/compose.yaml exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_control -c "..."'`。OPS 汚染復元＝`... -c "update accounts set status='active' where login_id='admin@ops.example';"`。会社DB は `-d ideaquest_company_acme`（ACME-01）等。
+- **dev ログイン（PW 全て `Passw0rd!`）**＝一般 `ACME-01`/`user@acme.example`（MFA OFF・「テスト 太郎」・デモグループ所属）／`ACME-02`/`mfa@acme2.example`（MFA ON）／system_admin `OPS`/`admin@ops.example`。手動追加 `SYSCON`/`t-umekawa`（非 OPS system_admin＝§5 注意）。MailHog＝`http://localhost:8025`。
+- 規約/正本＝`CLAUDE.md`（各種規約＋設計正本のパス参照）。**現況の正＝`impl/README.md`**。UI 標準＝`doc/画面設計/デザイン標準.md`。API＝`doc/API設計/{A..L}_*.md`＋`README.md`。データモデル＝`doc/データモデル.md`（notifications＝§5.24）。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`。
