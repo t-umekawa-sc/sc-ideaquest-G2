@@ -537,3 +537,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（中核＝台帳フック 反転 actual） |
 | --- | --- |
 | G-TC-502 | `ledger.grant` の実績判定フック（`if judge`）を `and False` で無効化＝評価3件付与しても `evaluator_3` が unlocked にならず achievement_reward も出ない → `assert unlocked` が false で red。復元で 3件目付与時に自動解放＋コイン20（冪等）→ green |
+
+### SC-40 実績 フロント接続（e2e G-TC-207・2026-08-25）
+
+> frontend 非マウント＝接続前デモ（21件固定 fixtures・獲得日固定）に対し G-TC-207 を実行 → 収集サマリー `col-hero__num` が実 `GET /achievements` の summary（total 12）と不一致で red → AchievementsView を getAchievements で実接続＋再ビルドで green。
+
+| TC-ID | 観測 red（接続前 actual） |
+| --- | --- |
+| G-TC-207 | 接続前＝デモ 21 件の獲得数/総数で `col-hero__num` が実 summary（total 12）と不一致 → red。接続後は `getAchievements` の実 summary・カタログ・シークレット伏せ → green |

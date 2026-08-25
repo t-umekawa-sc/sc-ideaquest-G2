@@ -1645,6 +1645,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Achievements
+         * @description 実績マスタ＋自分の獲得/進捗（SC-40・G.4）。シークレット未獲得は伏せる。読取専用。
+         */
+        get: operations["list_achievements_api_v1_achievements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Achievements
+         * @description 自分の獲得実績（獲得日・進捗・G.4）。読取専用。
+         */
+        get: operations["get_my_achievements_api_v1_me_achievements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -1827,6 +1867,80 @@ export interface components {
             email?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipInput"][] | null;
+        };
+        /** AchievementDTO */
+        AchievementDTO: {
+            /** Id */
+            id: string;
+            /**
+             * Unlocked
+             * @default false
+             */
+            unlocked: boolean;
+            /**
+             * Is Secret
+             * @default false
+             */
+            is_secret: boolean;
+            /** Tier */
+            tier?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Condition Label */
+            condition_label?: string | null;
+            /**
+             * Coin Reward
+             * @default 0
+             */
+            coin_reward: number;
+            /** Unlocked At */
+            unlocked_at?: string | null;
+            /** @default {
+             *       "current": 0
+             *     } */
+            progress: components["schemas"]["AchievementProgress"];
+        };
+        /** AchievementListResponse */
+        AchievementListResponse: {
+            /** Data */
+            data: components["schemas"]["AchievementDTO"][];
+            summary: components["schemas"]["AchievementSummary"];
+        };
+        /** AchievementProgress */
+        AchievementProgress: {
+            /**
+             * Current
+             * @default 0
+             */
+            current: number;
+            /** Target */
+            target?: number | null;
+        };
+        /** AchievementSummary */
+        AchievementSummary: {
+            /**
+             * Unlocked
+             * @default 0
+             */
+            unlocked: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Coin Earned
+             * @default 0
+             */
+            coin_earned: number;
         };
         /**
          * AvatarImageResponse
@@ -3067,6 +3181,29 @@ export interface components {
              * @default false
              */
             trust_device: boolean;
+        };
+        /** MyAchievementDTO */
+        MyAchievementDTO: {
+            /** Achievement Id */
+            achievement_id: string;
+            /** Code */
+            code: string;
+            /** Tier */
+            tier: string;
+            /** Unlocked At */
+            unlocked_at?: string | null;
+            /**
+             * Progress Current
+             * @default 0
+             */
+            progress_current: number;
+            /** Progress Target */
+            progress_target?: number | null;
+        };
+        /** MyAchievementsResponse */
+        MyAchievementsResponse: {
+            /** Data */
+            data: components["schemas"]["MyAchievementDTO"][];
         };
         /** MyItemEntry */
         MyItemEntry: {
@@ -6929,6 +7066,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_achievements_api_v1_achievements_get: {
+        parameters: {
+            query?: {
+                category?: string | null;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_achievements_api_v1_me_achievements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAchievementsResponse"];
                 };
             };
         };

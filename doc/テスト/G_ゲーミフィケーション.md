@@ -25,6 +25,7 @@
 | G-TC-202 | e2e | SC-30 ショップが実データ（19点・コイン残高） | ログイン | `/shop` を表示 | `GET /items` と照合＝装備カード19点・コイン残高 `◆{coin_balance}`（デモ固定 ◆320 でない） | G.1／SC-30 |
 | G-TC-203 | e2e | SC-31 アバターが実データ（所有/装備） | ログイン（未所有） | `/avatar` を表示 | `GET /items` と照合＝未所有アイテムは「🔒 ショップで購入」・装備スロットは実 is_equipped（デモの固定装備でない） | G.1/G.2／SC-31 |
 | G-TC-206 | e2e | SC-41 ランキングが実データ（me/総人数） | ログイン | `/ranking` を表示 | `GET /rankings?period=this_week` と照合＝「あなたの順位」の総人数＝実 `me.total_users`・順位＝`me.rank`（デモ固定 全12人中 でない）・期間タブ切替で再取得 | G.5／SC-41 |
+| G-TC-207 | e2e | SC-40 実績が実データ（12件/summary・シークレット伏せ） | ログイン | `/achievements` を表示 | `GET /achievements` と照合＝収集サマリー「{unlocked} / {total}」＝実 summary（total 12・デモ固定でない）・シークレット未獲得カードは「？？？」 | G.4／SC-40 |
 
 ## 3. ショップ/装備 API（SC-30/SC-31・G.1/G.2）
 

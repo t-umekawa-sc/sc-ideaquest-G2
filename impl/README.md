@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 407 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／**実績 G ＝6**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋**sc-41（1＝ランキング実データ G-TC-206）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 351）。
+> 進捗の最終確認: **2026-08-25**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 407 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／**実績 G ＝6**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋**sc-40（1＝実績実データ G-TC-207）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 352）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -30,15 +30,15 @@
 | SC-30 | ショップ | ✅ | `(app)/shop` | 実接続（`getItems`＝カタログ＋所有＋コイン残高・`purchaseItem`＝コイン消費・残高不足/所有済みはサーバー権威）。購入は確認ダイアログ→報酬スナックバー。アイコンはクライアント presentation |
 | SC-31 | アバター着せ替え | ✅ | `(app)/avatar` | 実接続（`getItems`＝所有/装備・`updateEquipment`＝各スロット1点・楽観更新＋サーバー権威）。未所有はショップ導線。3D は VRM 未対応でマスコット代用 |
 | SC-32 | 魔法スキル | ✅ | `(app)/spells` | 実接続（`getSpells`＝カタログ＋SP残高＋unlocked/can_unlock・`unlockSpell`＝SP消費・前提/二重解放はサーバー権威）。解放は確認ダイアログ→報酬スナックバー。演出コピーはクライアント（G シードに説明文なし） |
-| SC-40 | 実績バッジ | ⬜ | `(app)/achievements` | モックのみ |
+| SC-40 | 実績バッジ | ✅ | `(app)/achievements` | 実接続（`getAchievements`＝カタログ＋自分の獲得/進捗＋summary・シークレット未獲得は伏せる）。付与はサーバー（台帳フック）が自動判定＝表示のみ。DataTable（カテゴリー/ティア/状態） |
 | SC-41 | ランキング | ✅ | `(app)/ranking` | 実接続（`getRankings`＝期間×会社スコープ・獲得XP＋獲得コイン集計・me 常時同梱）。期間タブ（今週/先週/今月/通算）で再取得・表彰台/一覧/自分順位 |
 | SC-90 | クエストグループ管理 | ✅ | `(app)/admin/quest-groups` | メンバー管理含む |
 | SC-91 | システム管理 | ✅ | `(app)/admin/companies` | 会社一覧・手動プロビジョニング |
 | SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009） |
 | SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み。**メール確認バッジ＋送信アクション**（ADR-0009） |
 
-**接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`shop`・`avatar`・`ranking`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
-**モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)・`achievements`。
+**接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`shop`・`avatar`・`ranking`・`achievements`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
+**モック feature**（`api.ts` 無し）＝`notifications`・`dashboard`(一部)。
 
 ## ブラウザ受入状況（バッチ・後日まとめて）
 
@@ -55,6 +55,7 @@
 - [ ] **SC-32 魔法スキル G（G-TC-201）**＝カタログ/SP残高/解放数が実データ・SP を使って解放（確認→報酬スナックバー）→ SC-24 の魔法ピッカーで使えるようになる通し。
 - [ ] **SC-30/SC-31 ショップ/アバター G（G-TC-202/203）**＝ショップでコイン購入（確認→報酬・残高減）→アバターで着せ替え（各スロット1点・即反映）→SC-30 で「所有済み」。要コイン（評価等で獲得）。
 - [ ] **SC-41 ランキング G（G-TC-206）**＝期間タブ（今週/先週/今月/通算）でスコア（獲得XP＋コイン）順位・自分順位/総人数が実データ・表彰台。
+- [ ] **SC-40 実績 G（G-TC-207）**＝収集サマリー「{unlocked} / 12」が実データ・シークレット未獲得は「？？？」で伏せ・DataTable（カテゴリー/ティア/状態フィルタ）。付与は活動連動で自動（例＝評価3件で evaluator_3）。
 - [ ] **SC-25/SC-22 評価 F（F-TC-201〜203）**＝SC-25 で5観点採点＋総評→確定→SC-22 §4.6 に平均/観点/総評/コインが反映・下書き復元・owner の選定トグル（★選定済み＋「選定候補」バッジ）。評価者/選定は my_permissions 出し分け。
 - [ ] **SC-92/93 メール確認 ADR-0009（B-TC-169 等）**＝「確認メールを送信」→MailHog で確認リンク→`/email-verify/confirm` 確定→verified バッジ化を通しで。
 
@@ -69,7 +70,7 @@
 | アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011） |
 | 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |
 | チャット（E） | `tenant/chat` | ✅ **8 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`＋**`POST/DELETE chat-messages/{id}/reactions`**〔通常/魔法・E.4〕）＝投稿/編集/削除・既読・活発度・添付・メンション・投稿XP+5・リアクション（マスタ絵文字）・魔法（1メッセージ1魔法/1チャット1回）。公開で chat_group 自動作成。migration 0013。**通知(H)/リアルタイム(L)は no-op** |
-| ゲーム(G) | `gamification`・`shop`・`achievements` | 🟡 ledger＋魔法（`/spells`・unlock）＋ショップ/装備（migration 0015）＋ランキング（`/rankings`）＋**実績 2 EP**（`GET /achievements`・`GET /me/achievements`・migration 0016＋シード12）。**付与は `ledger.grant` の後フック（engine）で一元自動判定**（condition＝count/streak/level/all_*・tier コイン報酬・冪等）。SC-40 フロント接続は次スライス |
+| ゲーム(G) | `gamification`・`shop`・`achievements` | ✅ ledger＋魔法（`/spells`・unlock）＋ショップ/装備（migration 0015）＋ランキング（`/rankings`）＋実績 2 EP（`/achievements`・`/me/achievements`・migration 0016）。**付与は `ledger.grant` の後フック（engine）で一元自動判定**（condition＝count/streak/level/all_*・tier コイン報酬・冪等）。SC-30/31/32/40/41 フロント接続済み |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 
