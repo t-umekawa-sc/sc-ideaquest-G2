@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
+import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { ApiError } from "@/lib/api/client";
 import { QuestIcon } from "@/components/layout";
 import {
@@ -51,11 +52,6 @@ const RANKING = [
   { name: "山田 太郎", level: 7, total: 235, exp: 210, coin: 25, me: true },
   { name: "田中 一郎", level: 9, total: 200, exp: 180, coin: 20, me: false },
 ];
-const SEARCHABLE = [
-  { id: "yakan", kind: "アイデア", ctx: "夜間配送の集約", text: "夜間帯の配送を1拠点に集約し、積載率を上げてコストとCO2を同時に削減する。" },
-  { id: "okihai", kind: "添付", ctx: "置き配の写真通知 / 添付", text: "置き配_通知フロー.pdf" },
-];
-
 // quest_status（enum・§3）→ ラベル/バッジ。
 const STATUS_LABEL: Record<string, string> = { draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了" };
 const STATUS_ORDER = ["draft", "recruiting", "in_progress", "evaluating", "completed"];
@@ -76,11 +72,20 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-function highlight(text: string, q: string) {
-  if (!q) return text;
-  const i = text.toLowerCase().indexOf(q.toLowerCase());
-  if (i < 0) return text;
-  return (<>{text.slice(0, i)}<mark>{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>);
+// 全文検索（J）の種別ラベルと安全なスニペット描画。
+const FT_TYPE_LABEL: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
+const _ENT: Record<string, string> = { "&lt;": "<", "&gt;": ">", "&amp;": "&", "&quot;": '"', "&#39;": "'" };
+function _decode(s: string): string {
+  return s.replace(/&(?:lt|gt|amp|quot|#39);/g, (m) => _ENT[m] ?? m);
+}
+// PGroonga は user 文をエスケープし `<span class="keyword">…</span>` のみ生タグで注入（J.5）。
+// dangerouslySetInnerHTML を使わず keyword span で分割し React 要素を組む（許可リストサニタイズ・§2.2④）。
+function renderSnippet(html: string): React.ReactNode {
+  return html.split(/(<span class="keyword">.*?<\/span>)/g).map((part, i) => {
+    const m = part.match(/^<span class="keyword">([\s\S]*?)<\/span>$/);
+    if (m) return <mark key={i} className="keyword">{_decode(m[1])}</mark>;
+    return <span key={i}>{_decode(part)}</span>;
+  });
 }
 function deadlineText(d: string | null | undefined): string {
   if (!d) return "未設定";
@@ -94,6 +99,11 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [tab, setTab] = useState<TabKey>("ideas");
   const [ftq, setFtq] = useState("");
   const [ftScope, setFtScope] = useState("");
+  const [ftRows, setFtRows] = useState<SearchRow[]>([]);
+  const [ftTotal, setFtTotal] = useState(0);
+  const [ftPage, setFtPage] = useState(1);
+  const [ftLoading, setFtLoading] = useState(false);
+  const ftPerPage = 20;
 
   const [quest, setQuest] = useState<QuestDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -203,10 +213,23 @@ export function QuestDetailView({ questId }: { questId: string }) {
       render: (r) => r.draft ? dash : (r.evalstate === "done" ? <span className={`badge ${r.ev >= 5 ? "badge-success" : "badge-muted"}`}>{r.ev}/5 評価</span> : <span className="badge">評価待ち</span>) },
   ];
 
-  const scopeMap: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
-  const ftResults = ftq.trim()
-    ? SEARCHABLE.filter((r) => (!ftScope || r.kind === scopeMap[ftScope]) && (r.text.includes(ftq) || r.ctx.includes(ftq)))
-    : [];
+  // クエリ/対象の変更でページを先頭へ戻す。
+  useEffect(() => { setFtPage(1); }, [ftq, ftScope]);
+  // 全文検索（J）＝デバウンス取得。空クエリ/検索タブ以外は何もしない。真実は REST。
+  useEffect(() => {
+    const term = ftq.trim();
+    if (tab !== "search" || !term) { setFtRows([]); setFtTotal(0); return; }
+    setFtLoading(true);
+    const timer = setTimeout(async () => {
+      const res = await searchQuest(questId, {
+        q: term, types: (ftScope || undefined) as SearchType | undefined, page: ftPage, perPage: ftPerPage,
+      }).catch(() => null);
+      setFtRows(res?.data ?? []);
+      setFtTotal(res?.page_info.total ?? 0);
+      setFtLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ftq, ftScope, ftPage, tab, questId]);
 
   if (loadError) {
     return (
@@ -328,11 +351,11 @@ export function QuestDetailView({ questId }: { questId: string }) {
               })}
             />
           )}
-          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>※ 評価（F）・週間ランキング（G）・全文検索（J）は未接続のためデモ/暫定表示です。</p>
+          <p className="muted text-xs" style={{ marginTop: "var(--space-6)" }}>※ 評価（F）・週間ランキング（G）は未接続のためデモ/暫定表示です（全文検索（J）は実接続済み）。</p>
         </section>
       )}
 
-      {/* 全文検索（デモ・J 未実装） */}
+      {/* 全文検索（J・実接続＝GET /quests/{id}/search・PGroonga） */}
       {tab === "search" && (
         <section aria-label="全文検索">
           <div className="list-toolbar">
@@ -345,20 +368,33 @@ export function QuestDetailView({ questId }: { questId: string }) {
                 <option value="attachment">添付ファイル名</option>
               </select>
             </div>
-            {ftq.trim() && <span className="list-count">{ftResults.length} 件</span>}
+            {ftq.trim() && <span className="list-count">{ftTotal} 件</span>}
           </div>
           {!ftq.trim() ? (
-            <div className="list-empty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。※ドメイン J 実装までデモ。</div>
-          ) : ftResults.length === 0 ? (
+            <div className="list-empty">キーワードを入力してください（このクエスト内のアイデア・チャット・添付ファイル名を検索）。</div>
+          ) : ftLoading && ftRows.length === 0 ? (
+            <div className="list-empty">検索中…</div>
+          ) : ftRows.length === 0 ? (
             <div className="list-empty">「{ftq}」に一致する結果がありません。</div>
           ) : (
             <div className="stack">
-              {ftResults.map((r, i) => (
-                <Link key={i} className="card card-accent ft-result" href={`/ideas/${r.id}`}>
-                  <div className="ft-result__head"><span className="badge badge-muted">{r.kind}</span><span className="ft-result__ctx">{r.ctx}</span></div>
-                  <p className="ft-result__snippet">{highlight(r.text, ftq)}</p>
+              {ftRows.map((r, i) => (
+                <Link
+                  key={`${r.type}-${r.attachment_id ?? r.chat_message_id ?? r.idea_id ?? i}`}
+                  className="card card-accent ft-result"
+                  href={r.idea_id ? (r.type === "idea" ? `/ideas/${r.idea_id}` : `/ideas/${r.idea_id}/chat`) : "#"}
+                >
+                  <div className="ft-result__head"><span className="badge badge-muted">{FT_TYPE_LABEL[r.type]}</span><span className="ft-result__ctx">{r.idea_title}</span></div>
+                  <p className="ft-result__snippet">{renderSnippet(r.snippet_html)}</p>
                 </Link>
               ))}
+              {ftTotal > ftPerPage && (
+                <div className="row-center" style={{ gap: "var(--space-3)", justifyContent: "center" }}>
+                  <button type="button" className="btn btn-outline btn-sm" disabled={ftPage <= 1 || ftLoading} onClick={() => setFtPage((p) => Math.max(1, p - 1))}>← 前へ</button>
+                  <span className="muted text-sm">{ftPage} / {Math.max(1, Math.ceil(ftTotal / ftPerPage))}</span>
+                  <button type="button" className="btn btn-outline btn-sm" disabled={ftPage >= Math.ceil(ftTotal / ftPerPage) || ftLoading} onClick={() => setFtPage((p) => p + 1)}>次へ →</button>
+                </div>
+              )}
             </div>
           )}
         </section>

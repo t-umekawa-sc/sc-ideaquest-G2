@@ -585,3 +585,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（横断パネル stub actual） |
 | --- | --- |
 | I-TC-103（下書き/未投票/フォロー） | `_drafts`/`_unvoted` の先頭に `return []` を一時差込＝横断 read を無効化 → drafts に idea/evaluation が出ず・未投票（公開B）も出ず assert 不成立で red。撤去（D/F 横断 read 復元）で drafts(idea+eval 進捗2/5)・未投票(公開B のみ)・フォロー(公開B) が揃い green。hero/roles/login_bonus/401 は非依存で green のまま |
+
+## J. 全文検索（PGroonga・J-TC-101〜131・2026-08-26）
+
+> 新規ドメイン J（`app/tenant/search/`・PGroonga・migration 0018）は新規なので test-first。可視範囲は WHERE 述語で強制（索引ヒットをそのまま返さない・J.0）。DB イメージを PGroonga 同梱（`impl/db/Dockerfile`＝postgres:16 trixie＋postgresql-16-pgdg-pgroonga）へ差替。
+
+| TC-ID | 観測 red（search repo stub actual） |
+| --- | --- |
+| J-TC-101〜104・105・106・131（4 件） | `search.repository.search` に `return []` を一時差込＝pgroonga 検索を無効化 → idea/chat/attachment ヒット・types 絞り込み・ページング total・スニペットの assert が不成立で red。撤去で 3 種 UNION（score 順）・下書き/削除/トゥームストーン除外・門番404・スニペット（ハイライト＋エスケープ）が揃い green（8 件）。門番404/401/空/422 は検索非依存で green のまま |

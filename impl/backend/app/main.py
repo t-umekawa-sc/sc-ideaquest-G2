@@ -28,6 +28,7 @@ from app.tenant.notifications.router import router as notifications_router
 from app.tenant.realtime.router import router as realtime_router
 from app.tenant.realtime.hub import get_hub
 from app.tenant.dashboard.router import router as dashboard_router
+from app.tenant.search.router import router as search_router
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -78,6 +79,7 @@ app.include_router(achievements_router)  # テナントプレーン（ドメイ�
 app.include_router(notifications_router)  # テナントプレーン（ドメイン H・通知 SC-02＋ヘッダーベル）
 app.include_router(realtime_router)  # テナントプレーン（ドメイン L・WS 配信ハブ /realtime）
 app.include_router(dashboard_router)  # テナントプレーン（ドメイン I・ダッシュボード集約 SC-01）
+app.include_router(search_router)  # テナントプレーン（ドメイン J・全文検索 SC-12）
 
 
 @app.middleware("http")

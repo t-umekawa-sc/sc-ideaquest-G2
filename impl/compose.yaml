@@ -13,7 +13,9 @@
 #   ・注意＝`--profile workers` で mail-worker を上げたまま backend pytest を回すと mail 競合が再発する（上記理由）。
 services:
   db:
-    image: postgres:16
+    build:
+      context: ./db          # PGroonga 同梱のカスタム Postgres16（全文検索・データモデル §6・J）
+    image: ideaquest-db-pgroonga:16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ideaquest}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ideaquest}
