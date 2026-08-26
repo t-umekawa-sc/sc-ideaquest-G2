@@ -33,7 +33,8 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝455 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151＋**XP 結線 D-TC-160/161/162**）。cwd=`impl` 厳守。
+- **`pytest tests/`（全体）＝464 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（XP 結線 D-TC-160/161/162＋**セキュリティ横断 SEC-TC-001〜040＋J-TC-141**）。cwd=`impl` 厳守。
+- **セキュリティ監査補完済み**＝(実装追加) セキュリティ応答ヘッダ middleware（§10・`main.py`）／アップロードのマジックバイト検証（§8・`storage._signature_ok`＝validate_image/attachment_upload が `data: bytes` を受ける様に変更・全 6 呼び出し側追随）。(テスト補完) 検索インジェクション(J-TC-141)/画像サイズ/cross-tenant(会社別DB=404)/機密ログ非出力/Mass Assignment(extra=forbid)。**残＝フロント許可リストサニタイズ（`renderSnippet`）の e2e/ユニット**（React ユニット基盤が無く現状バッチ受入へ）。**注＝マジックバイトでアップロードテストは有効な先頭バイトが必須**（PNG=`\x89PNG`・JPEG=`\xff\xd8\xff`・PDF=`%PDF-`・office/zip=`PK`／text/*は署名なしで許可）。
 - **XP 結線漏れ修正済み**＝監査で判明した実バグ（投稿 XP+50／投票 XP+5 が no-op）を G 台帳へ結線（`ideas.application._publish_processing`＝idea_post 冪等・`_award_vote_xp`＝各アイデア初回のみ＋日次上限5/日・§8-⑥）。**注＝seed 会社（ACME-01）の activities は cross-run で残るため、投票 XP の日次上限に依存するテストは fresh factory ユーザーを使う**（seed ユーザーは daily count が汚れる）。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
