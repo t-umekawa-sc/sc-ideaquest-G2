@@ -4,8 +4,8 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-26**（セッション終了時・時刻は概算）。
-- ブランチ: `main`。**本セッションで 4 スライス実装**＝(A) 通知 H `security_*`（push 済み）／(B) リアルタイム L（push 済み）／(C) ダッシュボード集約 I（push 済み `c3cb524`+`3d0b7ed`）／(D) **全文検索 J（本 handoff コミット直前の作業ツリー・コミット可否はユーザー指示）**。
-- J 実装＝**PGroonga（設計準拠）× SC-12 タブ end-to-end**（グローバル `GET /search` は予約）（ユーザー選択 2026-08-26）。
+- ブランチ: `main`。**本セッションで 5 スライス実装**＝(A) 通知 H `security_*`（push 済み）／(B) リアルタイム L（push 済み）／(C) ダッシュボード I（push 済み）／(D) 全文検索 J（push 済み `8735b39`+`b6c01c5`）／(E) **SC-12 残 demo 接続＝評価列(F)＋クエスト内週間ランキング(G)（本 handoff コミット直前の作業ツリー・コミット可否はユーザー指示）**。
+- E 実装＝アイデア一覧カードに評価集計（`IdeaCardDTO.evaluation`＝評価待ち/評価済 n/5・F 可視のみ）追加＋SC-12 ランキングを `GET /rankings?scope=quest:{id}` で実接続（ユーザー指示「接続して」2026-08-26）。
 
 ## 2. ゴール
 社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router、バック＝FastAPI 4層。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)。**現況の正＝[`impl/README.md`](impl/README.md)**。
@@ -15,7 +15,12 @@
 - **B リアルタイム L**（push 済み）＝WS 配信ハブ `GET /api/v1/realtime`・H/E/C から発行。
 - **C ダッシュボード I**（push 済み `c3cb524`）＝`GET /dashboard` 読取合成の殻・SC-01 全パネル実接続・login_bonus。
 
-### 3-D. 全文検索 J（本セッションのメイン・SC-12）
+### 3-E. SC-12 残 demo 接続＝評価列(F)＋週間ランキング(G)（本セッション末）
+- **backend**＝`IdeaCardDTO` に `evaluation`（`{state, overall_avg, evaluator_count}`）追加。`evaluations.application.eval_states_for_ideas(ts, quest, user, ideas)`＝submitted 評価を batch（`repo.list_submitted_evaluations_for_ideas`）→ アイデアごとに可視評価（`_can_view_evaluation`・F.1）で `overall_avg`（n/5・`_aggregate` 再利用）を算定。state＝submitted が1件でもあれば done。`ideas.get_ideas` が batch し `_idea_card` へ渡す（evaluations.application を遅延 import・循環回避）。
+- **frontend**＝`QuestDetailView` の評価列を `card.evaluation` にマップ（評価済 n/5・可視0は「評価済」・未評価は「評価待ち」）。クエスト内週間ランキングを `getRankings("this_week", {scope:"quest:{id}", limit:3})` で実接続（デモ RANKING 撤去）。codegen 再生成で `IdeaCardDTO.evaluation` 型反映。
+- **テスト**＝`doc/テスト/D_アイデア.md` D-TC-150＋`tests/evaluations/test_api.py::test_d_tc_150_ideas_list_eval_aggregate`。red-green＝`eval_states_for_ideas` に `return {}` 差込で red→撤去で green（台帳 D/SC-12 節）。ランキング(G) は既存テストで担保。
+
+### 3-D. 全文検索 J（SC-12）
 - **PGroonga カスタム DB イメージ**＝`impl/db/Dockerfile`（`FROM postgres:16`〔現 trixie〕＋`postgresql-16-pgdg-pgroonga`＝PGDG 版の正しいパッケージ名。`-pgroonga` 単体は PGDG では候補なし）。`compose.yaml` の db を `build: ./db`（image `ideaquest-db-pgroonga:16`）へ。**既存 db_data ボリューム（trixie/glibc2.41）と一致＝collation 警告なし・データ保持**。
 - **会社DB migration `0018_company_pgroonga_fts`**＝`CREATE EXTENSION IF NOT EXISTS pgroonga`＋索引3本（ideas 連結式・chat_messages.body・attachments.original_name・§6）。bootstrap で全会社DBへ適用済み。
 - **新ドメイン `app/tenant/search/`**＝
@@ -27,7 +32,7 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝448 passed＋既存フラキー 2（A-TC-038・A-TC-095＝mail 系順序依存・単独 green）**（442→+8＝J 8）。cwd=`impl` 厳守。
+- **`pytest tests/`（全体）＝450 passed＋既存フラキー（A-TC-038/095/096＝mail 系順序依存・全体実行で稀に1件落ち・単独 green）**（J 8＋SC-12 評価集計 D-TC-150）。cwd=`impl` 厳守。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
 - **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。J のフロント変更はクリーン。
@@ -54,8 +59,8 @@
 
 ## 7. 次にやること（優先順・具体的に）
 - **横断ドメインは H/L/I/J 完了**（通知・リアルタイム・ダッシュボード・全文検索）。残りは `doc/実装計画.md`「その他」＋`impl/README.md` の 🟡/未接続を棚卸し。候補＝
-  1. **SC-12 の残 demo**＝評価列(F)/クエスト内週間ランキング(G) の実接続（当該ドメインは実装済み＝`get_rankings(scope=quest:{id})`・評価は F）。
-  2. **SC-01 等の細部**／未接続画面の洗い出し（`impl/README.md` 画面テーブルの 🟡）。
+  1. **SC-12 の残 demo＝完了**（評価列 F・クエスト内週間ランキング G 接続済み）。
+  2. **未接続画面/細部の洗い出し**（`impl/README.md` 画面テーブルの 🟡＝例＝SC-01 の細部・その他）／コメント数(E) は IdeaCard で 0 固定＝一覧のコメント数接続が残（D 側 `comment_count`）。
   3. **アップロード/画像まわり**の未接続があれば（実装計画で後回し禁止の項目）。
 - 着手前に `impl/README.md` の現況と正本を開き、**未着手はユーザーへスコープ確認**。
 - **J の follow-up（任意・将来）**＝グローバル `GET /search`＋ヘッダー導線／検索語の最小文字数・演算子（OR/フレーズ）・正規化／種別間スコア重み／`per_page` 最終値／高精度化（Meilisearch/OpenSearch＋kuromoji・§6）（J.6 残 TBD）。
