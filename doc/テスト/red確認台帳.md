@@ -601,3 +601,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（`eval_states_for_ideas` stub actual） |
 | --- | --- |
 | D-TC-150 | `evaluations.application.eval_states_for_ideas` に `return {}` を一時差込＝集計を無効化 → 評価済アイデアのカードが `state=pending`/`overall_avg=None` になり `== {state:done, overall_avg:4.0, evaluator_count:1}` の assert が不成立で red。撤去（batch 集計＋visibility 復元）で評価済=`done`/`4.0`・未評価=`pending`/`null` が揃い green |
+
+## D/SC-12. アイデア一覧のコメント数（E 接続・D-TC-151・2026-08-26）
+
+> SC-12 一覧 💬 の残ゼロ固定を解消＝`IdeaCardDTO.comment_count` を E の非削除チャット件数に接続（`chat_repo.count_active_messages_for_ideas` の batch・`ideas.get_ideas` で合成）。フロントは既に `comment_count` を表示（変更不要）。
+
+| TC-ID | 観測 red（`count_active_messages_for_ideas` stub actual） |
+| --- | --- |
+| D-TC-151 | `chat.repository.count_active_messages_for_ideas` に `return {}` を一時差込＝件数を無効化 → カードの `comment_count` が 0 になり `== 2` の assert が不成立で red（実測 `assert 0 == 2`）。撤去（chat_groups×非削除メッセージの group_by 集計）で非削除2（削除1除外）・chat 無し0 が揃い green |

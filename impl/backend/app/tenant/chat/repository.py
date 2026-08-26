@@ -131,6 +131,19 @@ def count_active_messages(session: Session, chat_group_id: uuid.UUID) -> int:
     ).scalar_one())
 
 
+def count_active_messages_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """複数アイデアの非削除チャット件数（SC-12 一覧の 💬 コメント数・D.1）。chat_group 未生成は 0（結果に出ない）。"""
+    if not idea_ids:
+        return {}
+    rows = session.execute(
+        select(ChatGroup.idea_id, func.count(ChatMessage.id))
+        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
+        .where(ChatGroup.idea_id.in_(idea_ids))
+        .group_by(ChatGroup.idea_id)
+    ).all()
+    return {iid: int(n) for iid, n in rows}
+
+
 def count_messages_after(session: Session, chat_group_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> int:
     """既読カーソル（created_at,id）より後の未削除メッセージ数（未読件数・E.5）。cursor None＝全件。"""
     stmt = select(func.count()).select_from(ChatMessage).where(

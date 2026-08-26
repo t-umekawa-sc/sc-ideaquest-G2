@@ -36,6 +36,7 @@
 | D-TC-105 | api | 一覧の可視性 | 公開/自分の下書き/他人の下書きを seed | `GET /quests/{id}/ideas` | 公開＋自分の下書きのみ・他人の下書きは除外 | D.1 (A)(B) |
 | D-TC-106 | api | 一覧はパーティー門番 | 非パーティーのクエスト | `GET /quests/{id}/ideas` | 404（存在秘匿・C.0） | D.1 門番 |
 | D-TC-150 | api | 一覧カードの評価集計（F・SC-12 評価列） | published アイデア2（1つに submitted 評価 val=4 party）＋未評価1 | `GET /quests/{id}/ideas` | 評価済カード＝`evaluation.state="done"`・`overall_avg=4.0`／未評価＝`state="pending"`・`overall_avg=null`。数値は可視評価のみ（F.1） | D.1／F.1／SC-12 §69 |
+| D-TC-151 | api | 一覧カードのコメント数（E・SC-12 💬） | published アイデアの chat_group に非削除2＋削除1 | `GET /quests/{id}/ideas` | 当該カード `comment_count=2`（削除トゥームストーンは除外・E.1）。chat 無しは 0 | D.1／E.1／SC-12 §69 |
 | D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
 | D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |

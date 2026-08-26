@@ -572,3 +572,29 @@ def test_d_tc_141_revision_diff_from_explicit(client, env):
     assert "title" in body["fields"] and "body" in body["fields"]  # 初版からは title/body 両方変化
     # from > revision は 422。
     assert client.get(f"{DIFF(pub, 2)}?from=5").status_code == 422
+
+
+def test_d_tc_151_ideas_list_comment_count(client, env):
+    """D-TC-151 一覧カードのコメント数（E・非削除のみ・SC-12 💬）。"""
+    from app.tenant.chat.orm import ChatGroup, ChatMessage
+
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    no_chat = env.make_idea(quest_id=qid)
+    cg = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(ChatGroup(id=cg, idea_id=idea))
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="c1"))
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="c2"))
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="del", is_deleted=True))
+        ts.commit()
+    try:
+        cards = {c["id"]: c for c in client.get(IDEAS(qid)).json()["data"]}
+        assert cards[str(idea)]["comment_count"] == 2       # 非削除2（削除1は除外）
+        assert cards[str(no_chat)]["comment_count"] == 0     # chat 無し
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id == cg))
+            ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id == cg))
+            ts.commit()

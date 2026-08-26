@@ -157,7 +157,7 @@ class IdeaCardDTO(BaseModel):
     author: IdeaAuthorDTO
     vote_summary: IdeaVoteSummaryDTO
     evaluation: IdeaEvaluationDTO  # 評価集計（SC-12 評価列・F）
-    comment_count: int  # ドメイン E 未実装＝0
+    comment_count: int  # E 非削除チャット件数（💬・SC-12）
     is_selected: bool
     current_revision: int
     updated_at: datetime

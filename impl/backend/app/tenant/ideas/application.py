@@ -87,8 +87,10 @@ def get_ideas(account_id, company_id, quest_id, *, status=None, limit, cursor=No
         vote_counts = repo.count_votes_for_ideas(ts, [r.id for r in rows])
         followed = repo.list_followed_idea_ids(ts, user.id)
         from app.tenant.evaluations import application as evals_app  # 遅延 import（循環回避）
+        from app.tenant.chat import repository as chat_repo
         eval_states = evals_app.eval_states_for_ideas(ts, quest, user, rows)  # F 評価集計（SC-12 評価列・D.1）
-        data = [_idea_card(ts, r, user.id, users, vote_counts, followed, eval_states) for r in rows]
+        comment_counts = chat_repo.count_active_messages_for_ideas(ts, [r.id for r in rows])  # E コメント数（💬）
+        data = [_idea_card(ts, r, user.id, users, vote_counts, followed, eval_states, comment_counts) for r in rows]
         next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
@@ -680,7 +682,7 @@ def _record_initial_revision(ts, idea, editor_id) -> None:
     repo.add_revision(ts, idea.id, revision=idea.current_revision, editor_id=editor_id, changes=_content_snapshot(ts, idea))
 
 
-def _idea_card(ts, idea, viewer_id, users, vote_counts, followed, eval_states=None) -> dict:
+def _idea_card(ts, idea, viewer_id, users, vote_counts, followed, eval_states=None, comment_counts=None) -> dict:
     author = users.get(idea.author_id)
     my_vote = repo.get_vote(ts, idea.id, viewer_id)
     vc = vote_counts.get(idea.id, {"approve": 0, "oppose": 0})
@@ -692,7 +694,7 @@ def _idea_card(ts, idea, viewer_id, users, vote_counts, followed, eval_states=No
         "status": idea.status,
         "author": _author_dto(author, idea.author_id),
         "vote_summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
-        "comment_count": 0,  # ドメイン E 実装後に接続
+        "comment_count": (comment_counts or {}).get(idea.id, 0),  # E 非削除チャット件数（💬・D.1）
         "is_selected": idea.is_selected,
         "current_revision": idea.current_revision,
         "updated_at": idea.updated_at,
