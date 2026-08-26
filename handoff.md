@@ -33,7 +33,8 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝452 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151）。cwd=`impl` 厳守。
+- **`pytest tests/`（全体）＝455 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151＋**XP 結線 D-TC-160/161/162**）。cwd=`impl` 厳守。
+- **XP 結線漏れ修正済み**＝監査で判明した実バグ（投稿 XP+50／投票 XP+5 が no-op）を G 台帳へ結線（`ideas.application._publish_processing`＝idea_post 冪等・`_award_vote_xp`＝各アイデア初回のみ＋日次上限5/日・§8-⑥）。**注＝seed 会社（ACME-01）の activities は cross-run で残るため、投票 XP の日次上限に依存するテストは fresh factory ユーザーを使う**（seed ユーザーは daily count が汚れる）。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
 - **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。J のフロント変更はクリーン。
