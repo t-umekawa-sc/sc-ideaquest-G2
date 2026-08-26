@@ -33,7 +33,7 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝452 passed＋既存フラキー（A-TC-038/095/096＝mail 系順序依存・全体実行で稀に1件落ち・単独 green）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151）。cwd=`impl` 厳守。
+- **`pytest tests/`（全体）＝452 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151）。cwd=`impl` 厳守。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
 - **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。J のフロント変更はクリーン。
@@ -48,7 +48,7 @@
 - **スニペット XSS**＝`pgroonga_snippet_html` は user 文をエスケープし `<span class="keyword">` のみ生注入。フロントは許可リストで `<mark>`＋text 化（生 `dangerouslySetInnerHTML` 禁止・§2.2④）。
 - **検索 dict 返却（response_model なし）**＝FE は `features/search/api.ts` で手動型付け。バック DTO 変更時は api.ts 追随。
 - **login の副作用（security_new_device）**＝auth を跨ぐテストの seed 後は purge（既存の各テストに踏襲済み）。
-- **既存フラキー**＝`tests/mail_outbox`/A-TC-038/095 系は全体実行の順序依存で稀に落ちる（mail 系・単独 green・本セッションと無関係）。
+- **フラキー根治済み（重要な運用ルール）**＝以前「稀に落ちる」とされた A-TC-038/040/068/070/095/096・B-TC-001/005 の真因は**環境汚染**＝pytest 実行中に `worker`/`mail-worker` が起動したままだと、両ワーカが共有 control DB の `mail_outbox`/`account_sync_outbox` を real sender で drain して pytest のプロセス内 drain と競合する（`impl/compose.yaml` 冒頭コメントの警告事象）。**pytest 時は必ずワーカ停止**（`docker compose stop worker mail-worker`／pytest は `up -d db redis` だけで回す）。ワーカ停止で 8/8 green 実測。併せて防御的隔離を投入（`conftest._clean_account_sync_outbox`＝outbox の autouse truncate・`conftest._reset_settings_cache`＝設定リーク遮断・mail 系テストの自スコープ化）。**e2e 実行時は `--profile workers` が必要なので、e2e とバックエンド pytest を同時に回さない**。
 - **共有 control DB 汚染（継続）**＝`t-umekawa`（非 OPS system_admin）。現状無害。
 
 ## 6. 決定事項と根拠
@@ -76,7 +76,7 @@
 - **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（**db のビルドを含む＝初回は数分**）。ポート＝frontend :3000／backend :8000／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
 - **反映**＝db `... up -d --build db`（PGroonga イメージ変更時）／frontend `... up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。
 - **会社/管理DB migration 適用**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`（冪等・0018 pgroonga 含む）。
-- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。J＝`tests/search`・I＝`tests/dashboard`・L＝`tests/realtime`。
+- **backend テスト**（cwd=`impl` 厳守・**ワーカ停止必須**）＝`docker compose stop worker mail-worker` してから `cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（ワーカ起動中は outbox 競合でフラキー・§5）。J＝`tests/search`・I＝`tests/dashboard`・L＝`tests/realtime`。
 - **PGroonga 疎通確認**＝`docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tc "select name,default_version from pg_available_extensions where name=''pgroonga'';"'`（→ pgroonga 4.0.x）。
 - **frontend tsc**＝`cd impl/frontend && npx tsc --noEmit`（既知1件＝Snackbar.tsx:122）。
 - **TC-ID 検査**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
