@@ -615,3 +615,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 > 症状＝全体実行で稀に（〜40%/回）1件が落ちる（mail 件数不足/行が `sending` のまま/outbox attempts++/OTP 未捕捉）。単独 green。
 > **真因＝環境汚染**: pytest 実行中に `worker`/`mail-worker` サービスが起動したままだと、両ワーカが共有 control DB の `mail_outbox`/`account_sync_outbox` を **real sender で drain** し、pytest のプロセス内 drain（`process_mail_outbox_once`/`process_outbox_once`/`mail.sent`）と競合する（`impl/compose.yaml` 冒頭コメントが警告する事象）。→ **pytest 時はワーカ停止**（`docker compose stop worker mail-worker`／`up -d db redis` のみで回す）。ワーカ停止で **8/8 green**（452 passed）を実測。
 > **併せて投入した防御的テスト隔離**（ワーカ停止と独立に堅牢化）＝(1) `account_sync_outbox` の autouse truncate 追加（`mail_outbox` と対等・`conftest._clean_account_sync_outbox`）(2) `get_settings` lru_cache の autouse リセット（`monkeypatch.setenv＋finally cache_clear` の設定リーク遮断・`conftest._reset_settings_cache`）(3) mail 系テスト（A-TC-038/040/095/096）をグローバル `mail.sent`/`stats` 依存から**自スコープ**へ。
+
+## D/G. XP 結線漏れ修正（投稿+50・投票+5・D-TC-160/161/162・2026-08-26）
+
+> 監査で判明した実バグ＝`ideas.application` の `_publish_processing`（投稿 XP+50）と `_award_vote_xp`（投票 XP+5）が G 台帳へ未結線（no-op／`return False`）。他 XP（chat/評価/選定）は結線済み。§8-⑥ 準拠で結線（投稿=idea_post 冪等・投票=vote 各アイデア初回のみ＋日次上限5/日・いずれも ref 冪等）。
+
+| TC-ID | 観測 red（no-op へ一時差戻し actual） |
+| --- | --- |
+| D-TC-160/161/162 | `_award_vote_xp` 先頭に `return False`／`_publish_processing` の grant を `if False` で無効化＝旧 no-op 状態に戻すと、公開しても `idea_post` activity が出ず（160）・投票 XP が付与されず（161 `assert False`）・日次上限判定以前に全件付与なし（162）で 3 件 red。撤去（G 台帳 grant を結線）で idea_post +50 1件・vote +5 初回のみ・6件目は上限で付与なし が揃い green |

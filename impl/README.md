@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 452 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 384）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。
+> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 455 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 387）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -68,7 +68,7 @@
 |---|---|---|
 | 認証（A/B） | `control_plane/auth`・`control_plane/admin`・`control_plane/me` | ✅ ログイン/管理/プロフィール |
 | クエスト（C） | `tenant/quests` | ✅ 一覧/詳細/CRUD |
-| アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011） |
+| アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011）。**XP 結線済み＝公開で投稿 XP+50（idea_post・冪等）／投票で XP+5（各アイデア初回のみ・日次上限5/日・vote 冪等）＝G 台帳（§8-⑥）** |
 | 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |
 | チャット（E） | `tenant/chat` | ✅ **8 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`＋**`POST/DELETE chat-messages/{id}/reactions`**〔通常/魔法・E.4〕）＝投稿/編集/削除・既読・活発度・添付・メンション・投稿XP+5・リアクション（マスタ絵文字）・魔法（1メッセージ1魔法/1チャット1回）。公開で chat_group 自動作成。migration 0013。**通知(H)結線済み（mention/idea_comment/follow_comment/magic_reaction）／リアルタイム(L)結線済み＝post-commit で `chat.*` を `chat:{cg}` へ publish（created/updated/deleted/reaction added/removed）** |
 | ゲーム(G) | `gamification`・`shop`・`achievements` | ✅ ledger＋魔法（`/spells`・unlock）＋ショップ/装備（migration 0015）＋ランキング（`/rankings`）＋実績 2 EP（`/achievements`・`/me/achievements`・migration 0016）。**付与は `ledger.grant` の後フック（engine）で一元自動判定**（condition＝count/streak/level/all_*・tier コイン報酬・冪等）。SC-30/31/32/40/41 フロント接続済み |

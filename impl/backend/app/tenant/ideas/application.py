@@ -20,10 +20,18 @@ from app.db.tenant import get_tenant_session
 from app.tenant.ideas import repository as repo
 from app.tenant.ideas.schemas import STATUS_VALUES
 from app.tenant.notifications import service as notify_svc
+from app.tenant.gamification import ledger
+from app.tenant.gamification import repository as gami_repo
+from app.tenant.gamification.daily import jst_day_bounds_utc
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
 
 _EMPTY_PAGE = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}
+
+# XP 付与（§8-⑥）。投稿＝公開で+50（アイデア初回のみ・ref 冪等）／投票＝各アイデア初回のみ+5・日次上限5/日。
+_XP_IDEA_POST = 50
+_XP_VOTE = 5
+_VOTE_XP_DAILY_CAP = 5
 
 
 def _resolve_company(company_id: uuid.UUID) -> Company | None:
@@ -192,7 +200,7 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
         ts.flush()
         repo.replace_stakeholders(ts, idea.id, _normalize_stakeholders(body.stakeholders))
         if body.status == "published":
-            _publish_processing(ts, idea, user.id)
+            _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -243,7 +251,7 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         _apply_content(ts, idea, body)
         _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
         idea.status = "published"
-        _publish_processing(ts, idea, user.id)
+        _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -299,13 +307,20 @@ def _guard_votable(ts, idea, quest, user) -> None:
         raise AppError(403, "forbidden", detail="投票の権限がありません")
 
 
-def _award_vote_xp(ts, idea, user_id, created) -> bool:
-    """投票 XP+5（各アイデア初回のみ・§8-⑥）。ドメイン G（activities/XP）実装まで no-op（False）＋TODO。
+def _award_vote_xp(ts, idea, user, created) -> bool:
+    """投票 XP+5（各アイデア初回のみ・日次上限5/日・§8-⑥）。切替/取消/再投票では追加なし。
 
-    TODO(G): 当該 user×idea で過去に vote XP 未記帳なら activities（reason=vote,ref_type=ideas,ref_id=idea_id）を
-    1件記帳＝XP+5。切替/取消/再投票では追加付与しない。日次上限＝初回投票成立 5 回/日。
+    冪等＝`activities(kind=xp_gain,reason=vote,ref_type=ideas,ref_id=idea_id)` の存在（投票行を消して再作成しても
+    元帳は残るため二重付与しない）。日次上限は「初回投票が成立した回数」に効く（JST 日集計）。返り値＝付与したか。
     """
-    return False
+    if gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "vote", "ideas", idea.id):
+        return False
+    start, end = jst_day_bounds_utc(datetime.now(timezone.utc))
+    if gami_repo.count_reason_between(ts, user.id, "vote", start, end) >= _VOTE_XP_DAILY_CAP:
+        return False
+    ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_VOTE, reason="vote",
+                 ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
+    return True
 
 
 def vote_idea(account_id, company_id, idea_id, *, vote_type) -> dict:
@@ -321,7 +336,7 @@ def vote_idea(account_id, company_id, idea_id, *, vote_type) -> dict:
         idea, quest = _resolve_visible_idea(ts, iid, user)
         _guard_votable(ts, idea, quest, user)
         _, created = repo.upsert_vote(ts, idea.id, user.id, type=vote_type, voted_revision=idea.current_revision)
-        xp_awarded = _award_vote_xp(ts, idea, user.id, created)
+        xp_awarded = _award_vote_xp(ts, idea, user, created)
         vc = repo.count_votes(ts, idea.id)
         ts.commit()
     return {"my_vote": vote_type, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "xp_awarded": xp_awarded}
@@ -660,17 +675,20 @@ def _stakeholders_str(value) -> str:
     return "・".join((s.get("label") or "") for s in value)
 
 
-def _publish_processing(ts, idea, author_id) -> None:
-    """公開の瞬間の処理（D.2/D.4/E）。初版 revision=1 記録（通知なし）＋チャットグループ作成（E・1:1）。
+def _publish_processing(ts, idea, user) -> None:
+    """公開の瞬間の処理（D.2/D.4/E/G）。初版 revision=1 記録（通知なし）＋チャットグループ作成（E・1:1）＋投稿 XP+50。
 
-    投稿 XP+50(G)・参加通知は各ドメイン実装まで no-op フック。冪等は status 遷移（再 publish は 409）＋
-    chat_groups の `UNIQUE(idea_id)`（ensure は既存なら再利用）で担保。
-    TODO(G): activities に idea_post/XP+50 を同一 UoW 記帳。
+    冪等は status 遷移（再 publish は 409）＋chat_groups の `UNIQUE(idea_id)`＋XP は ref 存在チェック
+    （`reason=idea_post,ref_type=ideas,ref_id=idea_id`）で担保（多重呼びでも二重付与しない）。
     """
-    _record_initial_revision(ts, idea, author_id)
+    _record_initial_revision(ts, idea, user.id)
     from app.tenant.chat import repository as chat_repo
 
     chat_repo.ensure_chat_group(ts, idea.id)  # E＝アイデアと 1:1（§5.15・公開時に自動作成）
+    # 投稿 XP+50（G・§8-⑥・アイデア初回公開のみ）。付与先＝投稿者（idea.author_id＝公開者 user）。
+    if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "idea_post", "ideas", idea.id):
+        ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_IDEA_POST, reason="idea_post",
+                     ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
 
 
 def _record_initial_revision(ts, idea, editor_id) -> None:

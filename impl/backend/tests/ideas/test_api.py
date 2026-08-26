@@ -598,3 +598,62 @@ def test_d_tc_151_ideas_list_comment_count(client, env):
             ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id == cg))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id == cg))
             ts.commit()
+
+
+# ---- XP 付与（G 結線・§8-⑥・FR-01/FR-23） ----
+from app.tenant.gamification.orm import Activity  # noqa: E402
+from app.tenant.ideas import application as _ideas_app  # noqa: E402
+
+
+def _acts(db_identifier, user_id, reason, ref_id=None):
+    with get_tenant_session(db_identifier) as ts:
+        q = ts.query(Activity).filter_by(user_id=user_id, reason=reason)
+        if ref_id is not None:
+            q = q.filter_by(ref_id=ref_id)
+        return [(a.amount, a.kind, str(a.ref_type)) for a in q.all()]
+
+
+def test_d_tc_160_publish_awards_idea_post_xp(client, factory, env):
+    """D-TC-160 公開で投稿 XP+50（idea_post・冪等・FR-01/§8-⑥）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    draft = env.make_idea(quest_id=qid, status="draft")
+    r = client.post(f"/api/v1/ideas/{draft}/publish", json={}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    acts = _acts(env.db_identifier, env.user_id, "idea_post", draft)
+    assert acts == [(50, "xp_gain", "ideas")]              # +50 が1件
+    # 二重公開は 409・加算なし（冪等）。
+    assert client.post(f"/api/v1/ideas/{draft}/publish", json={}, headers=_csrf(client)).status_code == 409
+    assert len(_acts(env.db_identifier, env.user_id, "idea_post", draft)) == 1
+
+
+def test_d_tc_161_vote_xp_first_only(factory, env):
+    """D-TC-161 投票 XP+5（各アイデア初回のみ・切替/再投票は追加なし・FR-23/§8-⑥）。"""
+    qid = env.make_quest()
+    idea_id = env.make_idea(quest_id=qid)
+    voter = factory.make_seed_company_account()  # fresh user＝日次カウント隔離（teardown で activities 掃除）
+    with get_tenant_session(env.db_identifier) as ts:
+        vu, idea = get_user_by_account(ts, voter["id"]), repo.get_idea(ts, idea_id)
+        assert _ideas_app._award_vote_xp(ts, idea, vu, True) is True    # 初回＝付与
+        ts.commit()
+    with get_tenant_session(env.db_identifier) as ts:
+        vu, idea = get_user_by_account(ts, voter["id"]), repo.get_idea(ts, idea_id)
+        assert _ideas_app._award_vote_xp(ts, idea, vu, False) is False  # 同一アイデアは冪等（追加なし）
+        ts.commit()
+    with get_tenant_session(env.db_identifier) as ts:
+        vu = get_user_by_account(ts, voter["id"])
+        assert _acts(env.db_identifier, vu.id, "vote", idea_id) == [(5, "xp_gain", "ideas")]
+
+
+def test_d_tc_162_vote_xp_daily_cap(factory, env):
+    """D-TC-162 投票 XP は日次上限5/日（6件目は付与なし・§8-⑥）。"""
+    qid = env.make_quest()
+    ideas = [env.make_idea(quest_id=qid) for _ in range(6)]
+    voter = factory.make_seed_company_account()
+    granted = []
+    for iid in ideas:
+        with get_tenant_session(env.db_identifier) as ts:
+            vu, idea = get_user_by_account(ts, voter["id"]), repo.get_idea(ts, iid)
+            granted.append(_ideas_app._award_vote_xp(ts, idea, vu, True))
+            ts.commit()
+    assert granted == [True, True, True, True, True, False]  # 6件目は日次上限で付与なし
