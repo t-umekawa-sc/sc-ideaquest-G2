@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 448 passed（+既存フラキー A-TC-038/095 2件＝単独 green）**（評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（J-TC-101〜131・PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 382）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。
+> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 450 passed（+既存フラキー mail 系 A-TC-038/095/096 が全体実行で稀に1件落ち＝単独 green）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 383）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -22,7 +22,7 @@
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
 | SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動 |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
-| SC-12 | クエスト詳細 | 🟡 | `(app)/quests/[questId]` | 本体＋**アイデアタブ**＋**全文検索タブ（J 実接続＝`GET /quests/{id}/search`・PGroonga・種別バッジ/スニペット/ページング/SC-22・24 遷移・スニペット許可リストサニタイズ）**接続済み。ヘッダー💡件数は `idea_count` 連動。評価列(F)/週間ランキング(G) は demo |
+| SC-12 | クエスト詳細 | ✅ | `(app)/quests/[questId]` | 本体＋**アイデアタブ（D.1・評価列 F 実接続＝`evaluation` 集計 n/5・評価待ち/評価済・可視のみ）**＋**全文検索タブ（J・PGroonga・種別/スニペット/ページング/遷移）**＋**クエスト内週間ランキング（G 実接続＝`GET /rankings?scope=quest:{id}&period=this_week`）**。ヘッダー💡件数は `idea_count` 連動。残 demo なし（コメント数 E は D 側で 0 固定＝別途） |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |
 | SC-22 | アイデア詳細 | ✅ | `(app)/ideas/[ideaId]` | 本体＋投票/フォロー（D.5/D.6）＋添付（D.3）＋quest 参照（D.1）＋更新履歴（D.4）＋評価結果/選定（F.1/F.3）＋**チャット活発度/プレビュー（E.1・`getChatActivity`/`getChat`）**。全セクション実接続 |
 | SC-24 | アイデアチャット | ✅ | `(app)/ideas/[ideaId]/chat` | **実接続**（`getChat`/`postMessage`/`editMessage`/`deleteMessage`/`markRead`/`addReaction`/`removeReaction`/`getSpells`）＝投稿/編集/削除・リアクション/魔法・メンション（実メンバー）・添付（署名DL）・**複数引用**（`chat_message_quotes`・§5.16b）・既読・comment 権限/completed 凍結。**リアルタイム(L) 接続済み＝chat:{cg} 購読で新着/編集/削除/リアクションを即時反映（WS 受信で再取得）** |

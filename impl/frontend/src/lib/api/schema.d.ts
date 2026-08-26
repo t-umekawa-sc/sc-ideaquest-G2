@@ -1785,6 +1785,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard
+         * @description SC-01 の全パネルを1レスポンスに集約（I.1）。部分失敗はパネル単位 null（I.4）。
+         */
+        get: operations["get_dashboard_api_v1_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Quest
+         * @description クエスト内 全文検索（SC-12・J.1）＝3 種 UNION・score 順・オフセットページング。
+         */
+        get: operations["search_quest_api_v1_quests__quest_id__search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -2712,6 +2752,7 @@ export interface components {
             status: string;
             author: components["schemas"]["IdeaAuthorDTO"];
             vote_summary: components["schemas"]["IdeaVoteSummaryDTO"];
+            evaluation: components["schemas"]["IdeaEvaluationDTO"];
             /** Comment Count */
             comment_count: number;
             /** Is Selected */
@@ -2858,6 +2899,21 @@ export interface components {
             op: "equal" | "add" | "del";
             /** Text */
             text: string;
+        };
+        /**
+         * IdeaEvaluationDTO
+         * @description 一覧の評価集計（SC-12 評価列・F/D.1）。state＝pending/done・overall_avg＝n/5（可視0は None）。
+         */
+        IdeaEvaluationDTO: {
+            /** State */
+            state: string;
+            /** Overall Avg */
+            overall_avg?: number | null;
+            /**
+             * Evaluator Count
+             * @default 0
+             */
+            evaluator_count: number;
         };
         /** IdeaListResponse */
         IdeaListResponse: {
@@ -7454,6 +7510,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadAllResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_v1_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    search_quest_api_v1_quests__quest_id__search_get: {
+        parameters: {
+            query: {
+                /** @description 検索語（必須・PGroonga クエリ） */
+                q: string;
+                /** @description idea,chat,attachment の CSV（既定 all） */
+                types?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

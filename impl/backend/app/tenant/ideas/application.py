@@ -86,7 +86,9 @@ def get_ideas(account_id, company_id, quest_id, *, status=None, limit, cursor=No
         users = quests_repo.get_users_by_ids(ts, {r.author_id for r in rows})
         vote_counts = repo.count_votes_for_ideas(ts, [r.id for r in rows])
         followed = repo.list_followed_idea_ids(ts, user.id)
-        data = [_idea_card(ts, r, user.id, users, vote_counts, followed) for r in rows]
+        from app.tenant.evaluations import application as evals_app  # 遅延 import（循環回避）
+        eval_states = evals_app.eval_states_for_ideas(ts, quest, user, rows)  # F 評価集計（SC-12 評価列・D.1）
+        data = [_idea_card(ts, r, user.id, users, vote_counts, followed, eval_states) for r in rows]
         next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
@@ -678,11 +680,13 @@ def _record_initial_revision(ts, idea, editor_id) -> None:
     repo.add_revision(ts, idea.id, revision=idea.current_revision, editor_id=editor_id, changes=_content_snapshot(ts, idea))
 
 
-def _idea_card(ts, idea, viewer_id, users, vote_counts, followed) -> dict:
+def _idea_card(ts, idea, viewer_id, users, vote_counts, followed, eval_states=None) -> dict:
     author = users.get(idea.author_id)
     my_vote = repo.get_vote(ts, idea.id, viewer_id)
     vc = vote_counts.get(idea.id, {"approve": 0, "oppose": 0})
+    ev = (eval_states or {}).get(idea.id) or {"state": "pending", "overall_avg": None, "evaluator_count": 0}
     return {
+        "evaluation": ev,  # SC-12 評価列（F 集計・D.1）＝state/overall_avg(n/5)/evaluator_count
         "id": str(idea.id),
         "title": idea.title,
         "status": idea.status,

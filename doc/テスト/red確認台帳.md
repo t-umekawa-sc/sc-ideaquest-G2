@@ -593,3 +593,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（search repo stub actual） |
 | --- | --- |
 | J-TC-101〜104・105・106・131（4 件） | `search.repository.search` に `return []` を一時差込＝pgroonga 検索を無効化 → idea/chat/attachment ヒット・types 絞り込み・ページング total・スニペットの assert が不成立で red。撤去で 3 種 UNION（score 順）・下書き/削除/トゥームストーン除外・門番404・スニペット（ハイライト＋エスケープ）が揃い green（8 件）。門番404/401/空/422 は検索非依存で green のまま |
+
+## D/SC-12. アイデア一覧の評価集計（F 接続・D-TC-150・2026-08-26）
+
+> SC-12 残 demo の接続＝アイデア一覧カードに評価集計（F）を追加（`IdeaCardDTO.evaluation`＝state/overall_avg/evaluator_count・可視評価のみ・F.1）。週間ランキング(G) は既存 `get_rankings(scope=quest:{id})` の frontend 接続（テストは既存 G で担保）。
+
+| TC-ID | 観測 red（`eval_states_for_ideas` stub actual） |
+| --- | --- |
+| D-TC-150 | `evaluations.application.eval_states_for_ideas` に `return {}` を一時差込＝集計を無効化 → 評価済アイデアのカードが `state=pending`/`overall_avg=None` になり `== {state:done, overall_avg:4.0, evaluator_count:1}` の assert が不成立で red。撤去（batch 集計＋visibility 復元）で評価済=`done`/`4.0`・未評価=`pending`/`null` が揃い green |

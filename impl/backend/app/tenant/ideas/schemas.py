@@ -140,6 +140,14 @@ class IdeaVoteResponse(BaseModel):
 # ---- response（一覧カード/詳細） ----
 
 
+class IdeaEvaluationDTO(BaseModel):
+    """一覧の評価集計（SC-12 評価列・F/D.1）。state＝pending/done・overall_avg＝n/5（可視0は None）。"""
+
+    state: str
+    overall_avg: float | None = None
+    evaluator_count: int = 0
+
+
 class IdeaCardDTO(BaseModel):
     """一覧の1件（SC-12 アイデアタブ・D.1）。"""
 
@@ -148,6 +156,7 @@ class IdeaCardDTO(BaseModel):
     status: str
     author: IdeaAuthorDTO
     vote_summary: IdeaVoteSummaryDTO
+    evaluation: IdeaEvaluationDTO  # 評価集計（SC-12 評価列・F）
     comment_count: int  # ドメイン E 未実装＝0
     is_selected: bool
     current_revision: int

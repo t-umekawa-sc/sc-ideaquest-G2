@@ -73,6 +73,19 @@ def list_draft_evaluations_by_evaluator(session: Session, evaluator_id: uuid.UUI
     )
 
 
+def list_submitted_evaluations_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> list[Evaluation]:
+    """複数アイデアの submitted 評価を一括取得（SC-12 一覧の評価集計・D.1）。"""
+    if not idea_ids:
+        return []
+    return list(
+        session.execute(
+            select(Evaluation).where(
+                Evaluation.idea_id.in_(idea_ids), Evaluation.status == "submitted"
+            )
+        ).scalars().all()
+    )
+
+
 def list_evaluations_for_idea(session: Session, idea_id: uuid.UUID, *, status: str | None = None) -> list[Evaluation]:
     """アイデアの評価一覧（新しい提出順の安定化は application 側）。status 指定で絞る（例＝'submitted'）。"""
     stmt = select(Evaluation).where(Evaluation.idea_id == idea_id)

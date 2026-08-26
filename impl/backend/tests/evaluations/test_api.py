@@ -325,3 +325,16 @@ def test_f_tc_120_csrf_and_unauth(client, env):
     _login_seed(client)
     # CSRF なし。
     assert client.put(EVAL(idea), json={"scores": FULL, "overall_comment": "x", "status": "submitted"}).status_code == 403
+
+
+def test_d_tc_150_ideas_list_eval_aggregate(client, env):
+    """D-TC-150 アイデア一覧カードに評価集計（評価済 n/5・未評価は評価待ち・F 可視のみ・SC-12 §69）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    evaluated = env.make_idea(quest_id=qid)
+    pending = env.make_idea(quest_id=qid)
+    env.seed_evaluation(evaluated, env.other_id, val=4, visibility="party")  # 全観点4→overall 4.0
+    cards = {c["id"]: c for c in client.get(f"/api/v1/quests/{qid}/ideas").json()["data"]}
+    assert cards[str(evaluated)]["evaluation"] == {"state": "done", "overall_avg": 4.0, "evaluator_count": 1}
+    assert cards[str(pending)]["evaluation"]["state"] == "pending"
+    assert cards[str(pending)]["evaluation"]["overall_avg"] is None

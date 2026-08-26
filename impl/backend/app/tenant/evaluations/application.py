@@ -255,6 +255,34 @@ def _evaluator_user_ids(ts, quest) -> set[uuid.UUID]:
     return ids
 
 
+def eval_states_for_ideas(ts, quest, user, ideas) -> dict:
+    """SC-12 一覧の評価集計（D.1）＝アイデアごとに `{state, overall_avg, evaluator_count}`。
+
+    `state`＝submitted 評価が1件でもあれば `done`（評価済）／無ければ `pending`（評価待ち）。数値（`overall_avg`＝
+    観点平均の総合・n/5）は**閲覧者に可視な評価のみ**で算定（F.1 visibility・limited は範囲外に出さない）＝可視0なら None。
+    """
+    idea_list = list(ideas)
+    idea_ids = [i.id for i in idea_list]
+    if not idea_ids:
+        return {}
+    subs = repo.list_submitted_evaluations_for_ideas(ts, idea_ids)
+    by_idea: dict = {}
+    for e in subs:
+        by_idea.setdefault(e.idea_id, []).append(e)
+    scores = repo.get_scores_for_evaluations(ts, [e.id for e in subs]) if subs else {}
+    out: dict = {}
+    for idea in idea_list:
+        evs = by_idea.get(idea.id, [])
+        visible = [e for e in evs if _can_view_evaluation(ts, idea, quest, user, e)]
+        agg = _aggregate(visible, scores, ts) if visible else None
+        out[idea.id] = {
+            "state": "done" if evs else "pending",
+            "overall_avg": agg["overall_avg"] if agg else None,
+            "evaluator_count": len(visible),
+        }
+    return out
+
+
 def _can_view_evaluation(ts, idea, quest, user, ev) -> bool:
     """評価の閲覧可否（visibility 適用・F.1）。party＝全員／limited＝投稿者＋当該評価者＋owner/quest_admin。"""
     if ev.visibility == "party":
