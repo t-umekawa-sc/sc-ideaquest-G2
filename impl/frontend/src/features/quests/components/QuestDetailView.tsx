@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
+import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { ApiError } from "@/lib/api/client";
 import { QuestIcon } from "@/components/layout";
@@ -70,18 +71,12 @@ type TabKey = (typeof TABS)[number]["key"];
 
 // 全文検索（J）の種別ラベルと安全なスニペット描画。
 const FT_TYPE_LABEL: Record<string, string> = { idea: "アイデア", chat: "チャット", attachment: "添付" };
-const _ENT: Record<string, string> = { "&lt;": "<", "&gt;": ">", "&amp;": "&", "&quot;": '"', "&#39;": "'" };
-function _decode(s: string): string {
-  return s.replace(/&(?:lt|gt|amp|quot|#39);/g, (m) => _ENT[m] ?? m);
-}
-// PGroonga は user 文をエスケープし `<span class="keyword">…</span>` のみ生タグで注入（J.5）。
-// dangerouslySetInnerHTML を使わず keyword span で分割し React 要素を組む（許可リストサニタイズ・§2.2④）。
+// スニペットの許可リストサニタイズは純ロジック（features/search/snippet.ts）に分離＝単体テスト可。
+// dangerouslySetInnerHTML は使わず、keyword ハイライトのみ <mark>、他はテキストとして React 描画（§2.2④）。
 function renderSnippet(html: string): React.ReactNode {
-  return html.split(/(<span class="keyword">.*?<\/span>)/g).map((part, i) => {
-    const m = part.match(/^<span class="keyword">([\s\S]*?)<\/span>$/);
-    if (m) return <mark key={i} className="keyword">{_decode(m[1])}</mark>;
-    return <span key={i}>{_decode(part)}</span>;
-  });
+  return parseSnippet(html).map((seg, i) =>
+    seg.hit ? <mark key={i} className="keyword">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
+  );
 }
 function deadlineText(d: string | null | undefined): string {
   if (!d) return "未設定";

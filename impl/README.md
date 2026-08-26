@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 464 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 388）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
+> 進捗の最終確認: **2026-08-26**。**tsc クリーン（Snackbar.tsx:122 の React19 useRef 型エラー修正済み）・frontend vitest 単体 15/15（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6＝SEC-TC-013 スニペット許可リストサニタイズ）**・**backend `pytest tests/` 全体 464 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 388）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -83,7 +83,7 @@
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。
 - **`IdeaDetailDTO` に `quest_id`/カテゴリー無し**＝SC-22 の「クエストへ戻る」が暫定。
-- tsc 既知1件＝`components/ui/Snackbar.tsx:122`（既存デモ・Snackbar 呼び出しの引数）。※ShopView の csvVal 型は G 接続時に修正済み。
+- tsc 既知エラー＝なし（`Snackbar.tsx:122` の React19 `useRef` 型を `useRef<...|undefined>(undefined)` に修正済み）。※ShopView の csvVal 型は G 接続時に修正済み。
 
 ## 起動・テスト
 
@@ -92,8 +92,9 @@
 docker compose -f impl/compose.yaml --profile workers up -d --build
 # ポート: frontend :3000 / backend :8000(/healthz) / db :5432 / redis :6379 / minio :9000,:9001 / mailhog :8025
 
-# frontend tsc（cwd=impl/frontend）
+# frontend tsc / vitest 単体（cwd=impl/frontend）
 cd impl/frontend && npx tsc --noEmit
+cd impl/frontend && npx vitest run   # node 環境の純ロジック単体（DOM 非依存）
 
 # backend pytest（cwd=impl 厳守）
 cd impl && docker compose -f "$PWD/compose.yaml" run --rm -T -v "$PWD/backend:/app" backend pytest tests/ideas -q

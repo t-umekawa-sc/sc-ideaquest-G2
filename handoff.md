@@ -6,6 +6,7 @@
 - 最終更新: **2026-08-26**（セッション終了時・時刻は概算）。
 - ブランチ: `main`。**本セッションで 5 スライス実装**＝(A) 通知 H `security_*`（push 済み）／(B) リアルタイム L（push 済み）／(C) ダッシュボード I（push 済み）／(D) 全文検索 J（push 済み `8735b39`+`b6c01c5`）／(E) **SC-12 残 demo 接続＝評価列(F)＋クエスト内週間ランキング(G)（本 handoff コミット直前の作業ツリー・コミット可否はユーザー指示）**。
 - E 実装＝アイデア一覧カードに評価集計（`IdeaCardDTO.evaluation`＝評価待ち/評価済 n/5・F 可視のみ）追加＋SC-12 ランキングを `GET /rankings?scope=quest:{id}` で実接続（ユーザー指示「接続して」2026-08-26）。
+- **加えて (F) セキュリティ監査残＝フロント許可リストサニタイズの単体テスト**＝`parseSnippet` 純関数化＋vitest 6 件（SEC-TC-013）／`Snackbar.tsx` tsc 修正で `tsc --noEmit` クリーン（3-F・作業ツリー・コミット可否はユーザー指示）。
 
 ## 2. ゴール
 社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router、バック＝FastAPI 4層。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)。**現況の正＝[`impl/README.md`](impl/README.md)**。
@@ -21,6 +22,12 @@
 - **コメント数(E)も接続**＝`IdeaCardDTO.comment_count` を E 非削除チャット件数に（`chat_repo.count_active_messages_for_ideas` の batch・`get_ideas` で合成・トゥームストーン除外）。フロントは既に表示（変更不要）。テスト＝D-TC-151（`tests/ideas/test_api.py`・red-green＝batch stub）。
 - **テスト**＝`doc/テスト/D_アイデア.md` D-TC-150/151＋`tests/evaluations/test_api.py::test_d_tc_150_ideas_list_eval_aggregate`。red-green＝`eval_states_for_ideas`/`count_active_messages_for_ideas` に stub 差込で red→撤去で green（台帳 D/SC-12 節）。ランキング(G) は既存テストで担保。
 
+### 3-F. フロント許可リストサニタイズの単体テスト（監査残の解消・本セッション末）
+- **純ロジック分離**＝スニペットのサニタイズを `QuestDetailView` のインライン `_ENT`/`_decode`/`renderSnippet` から純関数 `features/search/snippet.ts`（`parseSnippet(html) -> {text,hit}[]`＋`decodeEntities`）へ抽出（設計 J.5 の「構造化セグメント」オプション）。`QuestDetailView.renderSnippet` は `parseSnippet` を map して hit→`<mark className="keyword">`・text→`<span>`（`dangerouslySetInnerHTML` 不使用は不変・§2.2④）。
+- **vitest 単体**＝`src/features/search/snippet.test.ts`（6 件）＝keyword span のみ hit・`&lt;script&gt;` 等はデコードしてテキスト化（生タグを残さない＝原理的に無害）・不正 class span は hit にしない・空入力・`decodeEntities` 既知エンティティのみ。**red-green＝`decodeEntities` 呼びを剥がして 2 件 red→戻して green を実測**。SEC-TC-013 として `doc/テスト/セキュリティ横断.md` に追加。
+- **ドライブバイ修正**＝React 19 の `useRef` 型変更（初期引数必須）で残っていた既知 tsc エラー `Snackbar.tsx:122` を `useRef<...|undefined>(undefined)` に修正。**これで `tsc --noEmit` が完全クリーン**。
+- **注**＝TC トレーサビリティ検査は `src/**/*.test.ts` を走査しない（backend py＋frontend e2e のみ）・正規表現も `SEC-TC-`（3文字接頭辞）に不一致。よって本 vitest は検査対象外だが md（SEC-TC-013）で追跡。監査の「React ユニット基盤が無く」は不正確（vitest node は既設＝`companies/api.test.ts` 前例あり・`npx vitest run` で 15/15）。
+
 ### 3-D. 全文検索 J（SC-12）
 - **PGroonga カスタム DB イメージ**＝`impl/db/Dockerfile`（`FROM postgres:16`〔現 trixie〕＋`postgresql-16-pgdg-pgroonga`＝PGDG 版の正しいパッケージ名。`-pgroonga` 単体は PGDG では候補なし）。`compose.yaml` の db を `build: ./db`（image `ideaquest-db-pgroonga:16`）へ。**既存 db_data ボリューム（trixie/glibc2.41）と一致＝collation 警告なし・データ保持**。
 - **会社DB migration `0018_company_pgroonga_fts`**＝`CREATE EXTENSION IF NOT EXISTS pgroonga`＋索引3本（ideas 連結式・chat_messages.body・attachments.original_name・§6）。bootstrap で全会社DBへ適用済み。
@@ -34,14 +41,15 @@
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
 - **`pytest tests/`（全体）＝464 passed（フラキー根治済み＝ワーカ停止で 8/8 green 実測）**（XP 結線 D-TC-160/161/162＋**セキュリティ横断 SEC-TC-001〜040＋J-TC-141**）。cwd=`impl` 厳守。
-- **セキュリティ監査補完済み**＝(実装追加) セキュリティ応答ヘッダ middleware（§10・`main.py`）／アップロードのマジックバイト検証（§8・`storage._signature_ok`＝validate_image/attachment_upload が `data: bytes` を受ける様に変更・全 6 呼び出し側追随）。(テスト補完) 検索インジェクション(J-TC-141)/画像サイズ/cross-tenant(会社別DB=404)/機密ログ非出力/Mass Assignment(extra=forbid)。**残＝フロント許可リストサニタイズ（`renderSnippet`）の e2e/ユニット**（React ユニット基盤が無く現状バッチ受入へ）。**注＝マジックバイトでアップロードテストは有効な先頭バイトが必須**（PNG=`\x89PNG`・JPEG=`\xff\xd8\xff`・PDF=`%PDF-`・office/zip=`PK`／text/*は署名なしで許可）。
+- **セキュリティ監査補完済み**＝(実装追加) セキュリティ応答ヘッダ middleware（§10・`main.py`）／アップロードのマジックバイト検証（§8・`storage._signature_ok`＝validate_image/attachment_upload が `data: bytes` を受ける様に変更・全 6 呼び出し側追随）。(テスト補完) 検索インジェクション(J-TC-141)/画像サイズ/cross-tenant(会社別DB=404)/機密ログ非出力/Mass Assignment(extra=forbid)。**フロント許可リストサニタイズ＝解消済み**＝`parseSnippet` を純関数化し vitest 単体 6 件（SEC-TC-013・3-F）。**注＝マジックバイトでアップロードテストは有効な先頭バイトが必須**（PNG=`\x89PNG`・JPEG=`\xff\xd8\xff`・PDF=`%PDF-`・office/zip=`PK`／text/*は署名なしで許可）。
 - **XP 結線漏れ修正済み**＝監査で判明した実バグ（投稿 XP+50／投票 XP+5 が no-op）を G 台帳へ結線（`ideas.application._publish_processing`＝idea_post 冪等・`_award_vote_xp`＝各アイデア初回のみ＋日次上限5/日・§8-⑥）。**注＝seed 会社（ACME-01）の activities は cross-run で残るため、投票 XP の日次上限に依存するテストは fresh factory ユーザーを使う**（seed ユーザーは daily count が汚れる）。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
-- **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。J のフロント変更はクリーン。
-- **e2e＝SC-12 全文検索のブラウザ確認はバッチへ**（§7.5）。backend 契約は J 8 件で担保。
+- **tsc＝完全クリーン**（`Snackbar.tsx:122` の既知 React19 `useRef` 型エラーを 3-F で修正）。
+- **vitest 単体＝15/15**（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6）。`cd impl/frontend && npx vitest run`。
+- **e2e＝SC-12 全文検索のブラウザ確認はバッチへ**（§7.5）。backend 契約は J 8 件で担保。サニタイズは純関数の vitest 単体で担保（DOM 非依存＝node 環境）。
 ### 4-3. テスト運用
-- **TC-ID トレーサビリティ ✅（code 382）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
+- **TC-ID トレーサビリティ ✅（code 388）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。**注＝本検査は `src/**/*.test.ts`（vitest）を走査しない＝frontend は e2e のみ対象**。vitest 単体の追跡は md（SEC-TC-013 等）で担保。
 
 ## 5. 詰まっている点（試した/注意）
 - **PGroonga パッケージ名**＝公式 postgres イメージ（PGDG）では **`postgresql-16-pgdg-pgroonga`**（`postgresql-16-pgroonga` は Debian 標準 PG 用で PGDG では候補なし）。`postgres:16` は現在 **Debian trixie**（bookworm ではない）。既存ボリュームも trixie で作られていたため trixie 継続が collation 一致（bookworm に落とすと glibc 2.36<2.41 で collation 警告）。

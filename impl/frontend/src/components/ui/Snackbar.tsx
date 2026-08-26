@@ -119,7 +119,7 @@ function SnackbarItem({ snack, hidden, remove }: { snack: Snack; hidden: boolean
   const dur = snack.dur;
   const [leaving, setLeaving] = useState(false);
   const [paused, setPaused] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // remove は安定参照・snack.id は不変＝dismiss も安定＝新着追加の再レンダでタイマーがリセットされない。
   const dismiss = useCallback(() => {
