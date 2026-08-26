@@ -4,82 +4,76 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-26**（セッション終了時・時刻は概算）。
-- ブランチ: `main`。**本セッションでは 2 スライスを実装**＝(A) 通知 H `security_*`（コミット/push 済み `6daa68d`+`58e7b73`）／(B) **リアルタイム L（WS 配信）＝コミット状況は §末尾参照**。
-- セッション開始時の最新コミット: `e55ddc1`。security_* コミット後＝`58e7b73`。L の差分は本 handoff コミット直前の作業ツリー（コミット可否はユーザー指示）。
-- **L 実装＝フル（通知＋chat）を backend＋frontend で end-to-end**（ユーザー選択 2026-08-26）。
+- ブランチ: `main`。**本セッションで 3 スライスを実装**＝(A) 通知 H `security_*`（push 済み `6daa68d`+`58e7b73`）／(B) リアルタイム L（push 済み `f8c0861`+`0b6a378`）／(C) **ダッシュボード集約 I（本 handoff コミット直前の作業ツリー・コミット可否はユーザー指示）**。
+- I 実装＝**フル end-to-end（全パネル＋クイック投票＋フォロー★）＋ login_bonus ワンショット**（ユーザー選択 2026-08-26）。
 
 ## 2. ゴール
 社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router、バック＝FastAPI 4層。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)。**現況の正＝[`impl/README.md`](impl/README.md)**。
 
-## 3. 今回やったこと
+## 3. 今回やったこと（3スライス）
 
-### 3-A. 通知 H `security_*`（cross-plane・コミット済み `6daa68d`）
-- new_device（login/mfa verify）・password_changed（password-setup complete/自己PW変更）を in-app＋メール＋監査で発火。`mail_outbox.params`（migration **0012**）／`auth/security_events.py`／`notifications.notify_account`。詳細は git log と `impl/README.md`。
+### 3-A. 通知 H `security_*`（push 済み `6daa68d`）
+new_device/password_changed を in-app＋メール＋監査で発火。`mail_outbox.params`（migration 0017 系は既存・追加 0012）／`auth/security_events.py`／`notifications.notify_account`。詳細は git log。
 
-### 3-B. リアルタイム L（WS 配信ハブ）＝本セッションのメイン
-- **新ドメイン `app/tenant/realtime/`**＝
-  - `events.py`＝**publish は sync**（`get_redis().publish`）。`publish_event(topic,type,data,company_id)`／`publish_revoke(...)`／`notifications_topic`/`chat_topic`／`REVOKE_CHANNEL="realtime:revoke"`。封筒＝`{topic,type,data,id,company_id}`。
-  - `hub.py`＝**プロセス毎シングルトン Hub**（`get_hub()`）。`redis.asyncio` で `PSUBSCRIBE notifications:* / chat:*` ＋ `SUBSCRIBE realtime:revoke`（背景タスク）。購読テーブル `dict[topic→set[Connection]]`。転送は購読集合＋**`company_id` フィルタ**（cross-tenant 遮断・最後の砦）。`_handle_revoke` で L.4 ドロップ。`start/stop` は lifespan から（`stop` はループ跨ぎに堅牢化済み）。
-  - `gate.py`＝`can_subscribe_chat`＝REST と同一門番（`chat.application._resolve_chat_idea` を再利用＝公開アイデア＋パーティー参加）。存在秘匿で bool。
-  - `router.py`＝**`GET /api/v1/realtime`**（Cookie セッション認証＝`read_session`・Origin 検証・未認証は accept せずクローズ）。接続を account/user/company にバインドし `notifications:{user_id}` **自動購読**。受信ループは `{op:subscribe|unsubscribe,topic}` の**購読制御のみ**（receive-only）。chat 購読は門番（threadpool で同期 gate）。
-- **`app/main.py`**＝`realtime_router` 登録＋lifespan で `get_hub().start()/stop()`。
-- **発行の結線**＝
-  - **H**（`notifications/service.py`）＝`_publish` no-op を撤廃し、**post-commit publish**（SQLAlchemy `after_commit` フックに保留をためて commit 後に発行・rollback で破棄）。`notification.created`（catalog レンダリング済み表現＋unread_count）／既読操作で `notification.unread_count`（application の `_set_read`/`mark_all_read` から `publish_unread_count`）。**封筒 company_id はセッションの bind（db 名）→company_id を lru_cache で解決**（呼出側の company_id スレッディング不要）。
-  - **E**（`chat/application.py`）＝post-commit で `chat.message.created/updated/deleted`・`chat.reaction.added/removed` を `chat:{cg}` へ（既存 DTO をそのまま data に・ビューア依存フィールドは best-effort）。
-  - **C**（`quests/application.py` `remove_party_member`）＝除去後に当該クエストの全 chat_group へ `publish_revoke`（`chat_repo.list_chat_group_ids_for_quest` 追加）。
-- **frontend**＝`lib/realtime.ts`（単一 WS・再接続バックオフ 1s→15s・`on(type)`/`onTopic(topic)`/`subscribe`/`unsubscribe`）。`features/notifications/RealtimeProvider.tsx`（ベル未読数の context・初期 seed=getUnreadCount・WS で即時更新）＋`LiveAppHeader.tsx`（components→features 依存を作らない薄い client ラッパ）。`(app)/layout.tsx` を `RealtimeProvider`＋`LiveAppHeader` に差し替え（従来のデモ unread 撤去）。`NotificationsView`（SC-02）＝通知イベントで再取得/未読更新。`IdeaChatView`（SC-24）＝`chat:{cg}` 購読で新着/編集/削除/リアクションを再取得。
-- **テスト**＝`doc/テスト/L_リアルタイム.md`（L-TC-101〜121）新設。`tests/realtime/test_ws.py`（通知 4）＋`test_ws_chat.py`（chat 4）＝starlette `TestClient.websocket_connect`（context-managed で lifespan→ハブ起動）。red-green＝`events.publish_event` の type 破壊で配信 4 件 red→撤去で green（`red確認台帳.md` に L 節）。
+### 3-B. リアルタイム L（WS 配信・push 済み `f8c0861`）
+新ドメイン `app/tenant/realtime/`（events/hub/gate/router）＝`GET /api/v1/realtime`。プロセス毎ハブ（`redis.asyncio` PSUBSCRIBE・company_id フィルタ）。発行＝H notify post-commit／E chat post-commit／C 除去で `publish_revoke`。フロント＝`lib/realtime.ts`＋`RealtimeProvider`/`LiveAppHeader`。詳細は git log。
+
+### 3-C. ダッシュボード集約 I（本セッションのメイン・SC-01）
+- **新ドメイン `app/tenant/dashboard/`**＝
+  - `application.py` `get_dashboard(session)`＝**読取合成の殻**（新業務ロジックなし・I.0）。パネル＝hero/drafts(quest/idea/eval)/unvoted_ideas/quests/followed_ideas/weekly_ranking/notifications/roles/login_bonus。**部分失敗は `_safe` でパネル単位 null**（全体は落とさない・I.4）。company_id 未解決/user 無しのみ 401。
+  - `router.py`＝`GET /api/v1/dashboard`（`Depends(require_me)`・読取専用）。**response_model なし＝dict 返却**（FE は `api.ts` で手動型付け）。
+  - `login_bonus.py`＝Redis ワンショット（`mark`/`consume`＝GETDEL・キー `dashboard:login_bonus:{user_id}`・24h TTL）。
+- **横断 read（別 EP 新設せず・I.3）**＝D `ideas/repository.py` に `list_draft_ideas_by_author`/`list_unvoted_published_ideas`/`list_followed_ideas`／F `evaluations/repository.py` に `list_draft_evaluations_by_evaluator`／C `quests/repository.py` に `list_member_quest_ids`。
+- **リッチパネルは既存 application 再利用**＝週間ランキング＝`gami_app.get_rankings(period=this_week, scope=company, limit=3)`（返り値＝`{data, me, page_info}`）／参加中クエスト＝`quests_app.get_quests(status=非draft, limit=6)["data"]`／下書きクエスト＝`get_quests(status=["draft"])`／通知＝`notif_app.get_notifications(limit=5)`。hero＝users 残高＋`level_progress`＋署名URL。roles＝session（is_qg_admin/system_role）。
+- **login_bonus 結線**＝`auth/application.py` `_issue_session`＝`grant_daily_login` が Activity を返した（当日初回付与）時に `login_bonus.mark(r, user.id, granted.amount)`。I が `consume` で1回だけ返す。
+- **frontend**＝`features/dashboard/api.ts`（`getDashboard`＋型）。`DashboardView` をデモ fixtures から `GET /dashboard` 実データへ全面差替（空パネル非表示）。クイック投票＝`voteIdea(id, "approve"|"oppose")`（楽観＝リストから除外・失敗ロールバック）／フォロー解除＝`unfollowIdea`（楽観）。login_bonus＝`useSnackbar`（reward トースト・1回）。ヒーロー初期値は server の `/me` 残高（page.tsx が displayName/balance/admin を渡す＝初回描画のフォールバック）、取得後は集約 hero 優先。
+- **テスト**＝`doc/テスト/I_ダッシュボード.md`（I-TC-101〜143）＋`tests/dashboard/test_api.py`（6件）。red-green＝`_drafts`/`_unvoted` に `return []` 一時差込で I-TC-103 red→撤去で green（`red確認台帳.md` に I 節）。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝436 passed（0 failed）**（428→+8＝L 8）。**mail アサーションを宛先メールで絞り**、H-TC-153 等の順序依存フレークを解消（決定性）。cwd=`impl` 厳守。
-- 会社/管理DB migration＝control は **0012 が head**（`mail_outbox.params`・L は新 migration 無し＝Redis/メモリのみ）。
-- **backend/frontend イメージは本セッションで再ビルド済み**（実アプリに反映）。**WS は Next rewrite が :3000→backend へプロキシ確認済み**（未認証ハンドシェイクが 403＝backend 到達）。
+- **`pytest tests/`（全体）＝442 passed（0 failed）**（436→+6＝I 6）。cwd=`impl` 厳守。
+- migration＝control head は **0012**（L/I は新 migration 無し＝I は Redis/読取のみ）。**backend/frontend/worker は本セッションで再ビルド済み**。`GET /api/v1/dashboard` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
-- **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。L のフロント変更はクリーン。
-- **e2e＝L のブラウザ即時反映（SC-02 ベル/SC-24 チャット）は未作成＝ブラウザ受入バッチへ**（§7.5・2 セッション必要で複雑。backend 契約は WS 8 件で担保）。既存 e2e は前セッション green のまま（今回フロント破壊なし）。
+- **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。I のフロント変更はクリーン。
+- **e2e＝SC-01 のブラウザ確認はバッチへ**（§7.5）。backend 契約は I 6 件で担保。既存 e2e は前セッション green のまま。
 ### 4-3. テスト運用
-- **TC-ID トレーサビリティ ✅（code 368）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
+- **TC-ID トレーサビリティ ✅（code 374）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
 
 ## 5. 詰まっている点（試した/注意）
-- **WS テストは lifespan 必須**＝配信ハブは lifespan 起動なので、WS テストは `with TestClient(app) as c:`（context-managed）で張る。conftest の素の `client` フィクスチャ（lifespan 無し）では WS が届かない。
-- **2 セッション WS テストは 1 ループに集約**＝context-managed TestClient を 2 つ張ると 2 イベントループができ、シングルトンのハブがループ跨ぎで壊れる。片方（owner の REST/publish 用）は**素の `TestClient(app)`**（lifespan 不要）にし、WS を張るのは 1 つだけ（`test_ws_chat.py` L-TC-121 参照）。
-- **login の副作用（security_new_device）**＝MFA-OFF ログインは毎回 new_device 通知＋監査を作る。WS/notifications テストの seed 後は `security_new_device` を purge（`_login_ws_user`/`_login_new` 参照）。auth を跨ぐテストで通知/監査件数を厳密検証するときは切り分け必須。
-- **mail アサーションは宛先で絞る**＝`mail` フィクスチャの `.sent` は `process_mail_outbox_once()` で**全**pending を drain するため、他テストの行が混じる。`m.to == acc["email"]` で絞ると決定的（`tests/notifications/test_security.py` の `_mail_subjects(mail, to)`）。
-- **publish の company_id**＝`notify()` は呼出側が company_id を渡さない。セッション bind の DB 名→company_id を lru_cache で解決している（`service._company_id_of`）。テスト DB を増やしても FK は無いので問題ないが、db 名→company_id が変わる運用があればキャッシュ注意。
-- **chat 配信 data のビューア依存**＝リアクションの `mine` 等は発行元視点（best-effort）。フロントは受信で REST 再取得するので UI は正になる（L.3）。
-- **既存フラキー**＝`tests/mail_outbox`/A-TC-038 系は順序依存で稀に落ちるが単独 green・本セッションと無関係。
-- **共有 control DB 汚染（継続）**＝`t-umekawa`（非 OPS system_admin）。現状 436 passed で無害。
+- **`get_quests` の (A) 可視は「所属クエストグループ × パーティー参加」の AND**＝ダッシュボードの参加中クエスト/下書きクエストを出すには、対象ユーザーが `quest_group_members`（有効）にも居る必要がある。テスト seed は `qg_repo.upsert_membership(ts, gid, uid, "member")` を必ず入れる（`tests/dashboard/test_api.py` 参照）。未投票の絞り込みは `quests_repo.list_member_quest_ids`（パーティーのみ）で足りる。
+- **login の副作用（security_new_device）**＝ダッシュボードの通知パネル検証では seed 後に `security_new_device` を purge（`_login_dash`）。
+- **login_bonus の当日初回**＝`grant_daily_login` は「新 JST 日の初回」で1回だけ Activity を返す。dev で同じ account が同日再ログインしても付与されない＝login_bonus は出ない。テストは factory の新規 account を使い、`_flush_redis`（autouse）でワンショットキーも毎テスト初期化されるので I-TC-110 は決定的。
+- **/dashboard は dict 返却（response_model なし）**＝openapi に厳密型が出ないため FE は `features/dashboard/api.ts` で手動型付け。バックの DTO キーを変えたら api.ts も追随。
+- **既存フラキー**＝`tests/mail_outbox`/A-TC-038 系は順序依存で稀に落ちるが単独 green・本セッションと無関係。mail アサーションは宛先で絞る流儀（security テスト）を踏襲。
+- **共有 control DB 汚染（継続）**＝`t-umekawa`（非 OPS system_admin）。現状 442 passed で無害。
 
 ## 6. 決定事項と根拠
-- **L スコープ＝フル（通知＋chat）×backend＋frontend**（ユーザー選択 2026-08-26）。
-- **設計 TBD（L.5）を実装で確定**＝購読方式＝**パターン購読**（`PSUBSCRIBE notifications:*/chat:*`・実装単純）／失効チャネル＝**`realtime:revoke`**（`{user_id,chat_group_id,company_id}`）／ハブ購読テーブル＝**プロセス内 dict**（シングルトン）。`doc/API設計/L_リアルタイム配信.md` L.5 に反映済み。
-- **publish は sync／購読は async**＝発行元（同期 application）は sync publish 1 コール、ハブだけ `redis.asyncio`。余計な async 化なし。
-- **publish は post-commit**＝H は `after_commit` フック、E/C は `with` 抜け後の直接呼び出し。best-effort（例外は握り潰し・本処理成功を優先）。真実は REST（L は速報）。
-- **cross-tenant 遮断**＝封筒 `company_id` とハブでのフィルタ（`user_id`/`chat_group_id` は UUID で実質会社一意だが多層防御）。
-- **門番は REST と同一**＝chat 購読は `_resolve_chat_idea` を再利用（WS と REST の認可を一致）。
-- **frontend の層分離**＝`AppHeader`（components）は features 非依存のまま。live 化は `LiveAppHeader`（features）で供給。
+- **I スコープ＝フル end-to-end＋login_bonus**（ユーザー選択 2026-08-26）。
+- **集約1本 `GET /dashboard`**（設計 I.0 採用理由＝ランディングの1往復・パネル固定）。横断 read は D/F repo に置き別 EP を新設しない（I.3・匿名化/門番を各ドメインで一元適用）。
+- **設計 I.5 TBD を実装で確定**＝件数上限（通知5/未投票・参加・フォロー各6/下書き全件）・並び（下書き/フォロー＝更新降順・未投票/参加＝締切近い順）・部分失敗＝パネル単位 best-effort（null）・login_bonus＝Redis ワンショット（GETDEL）。`doc/API設計/I_ダッシュボード集約.md` I.5 に反映済み。
+- **リッチパネルは既存 application 再利用**（DRY・re-実装しない）＝ランキング/クエストカード/通知は各ドメインの application を呼ぶ（自前セッション・読取・best-effort）。横断のみ repo read を新設。
+- **ヒーロー残高の正準は K の `/me`**＝I も `/dashboard` に同梱（両立・別用途・I.4/K.1）。
 - （継続）テスト運用＝md 先行＋TC-ID＋red確認台帳。ブラウザ受入は後日バッチ（§7.5）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **ダッシュボード集約 I（SC-01）**＝`doc/API設計/I_ダッシュボード集約.md`＋`doc/画面設計/screens/SC-01`。週間ランキング/下書き/未投票/参加中等を集約 EP で。SC-01 は現状ヒーロー残高（`/me`）のみ接続。
-2. **全文検索 J（SC-12/SC-22）**＝`doc/API設計/J_全文検索.md`。
-- 着手前に `impl/README.md` の現況と該当 API/画面/データモデル正本を開く。**未着手の I/J に着手する前にユーザーへスコープ確認**。
-- **通知 H・リアルタイム L は完了**（H=発火系フル＋security_*・L=WS 配信フル）。残る横断は I/J。
-- **L の follow-up（任意・将来）**＝`Last-Event-ID` 再送・ハートビート/接続数上限・プレゼンス/タイピング・外部通知（メール/Slack）・chat data のビューア依存最適化（L.5 残 TBD）。
+1. **全文検索 J（SC-12/SC-22）**＝`doc/API設計/J_全文検索.md`。着手前に該当 API/画面/データモデル正本を開き、**スコープ確認**（検索対象範囲・匿名化/門番・PG 全文 or 別基盤）。
+2. **その他の横断/仕上げ**＝`doc/実装計画.md`「その他」＋`impl/README.md` の 🟡/未接続を確認。L/I の follow-up（下記）も候補。
+- 着手前に `impl/README.md` の現況と正本を開く。**未着手ドメインはユーザーへスコープ確認**。
+- **完了済み横断**＝通知 H（発火系フル＋security_*）・リアルタイム L（WS 配信フル）・ダッシュボード I（集約フル）。**横断で残るのは主に J（全文検索）**。
+- **I の follow-up（任意・将来）**＝各 read の並列化/キャッシュ・レベルアップ演出・通知ベル簡易ドロップダウン・実績サマリ・未投票/フォローの付加情報（category/comment_count）・3D アバター（I.5 残 TBD）。
 
 ## 7.5 ブラウザ受入待ち（バッチ）
 - **運用（ユーザー確認 2026-08-25）**＝ブラウザ受入は後日まとめて（e2e green でクローズ扱い・次へ進む）。一覧は `impl/README.md`「ブラウザ受入状況」節。
-- **L 追加分**＝(1) SC-02＋ヘッダーベル＝別ユーザーの発火で**未読バッジが即時**増える／既読で即時減る（2 セッション：発火者と受信者）。(2) SC-24＝別パーティー員の投稿/編集/削除/リアクションが**リロード無しで反映**。(3) パーティー除去で当該ユーザーの chat 即時停止（L.4）。dev＝ACME-01 の 2 ユーザー（`user@acme.example` ＋ もう1名を同クエストのパーティーに）。MailHog 不要（WS は Redis）。
+- **I 追加分**＝SC-01 ダッシュボードで (1) 参加中クエスト/フォロー中/未投票/下書き/週間ランキング/最近の通知が実データで出る（空パネルは非表示）(2) 未投票カードの▲賛成/▼反対で投票が確定しリストから外れる (3) フォロー★解除でカードが外れる (4) 当日初回ログイン直後に login_bonus トーストが1回出る。dev＝ACME-01 `user@acme.example`（同クエストのパーティー＋グループ所属・公開アイデア/下書き/評価を用意）。
+- **L 追加分**（前スライス・未消化）＝ベル/SC-02 の WS 即時反映・SC-24 chat 即時反映・パーティー除去の購読失効。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ: `/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。db/redis/minio/mailhog/backend/frontend/worker/mail-worker は本セッションで Up＋再ビルド済み。
 - **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`。ポート＝frontend :3000／backend :8000／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
-- **反映**＝frontend `... up -d --build frontend`（WS クライアント）／backend `... up -d --build backend worker mail-worker`（ハブは backend プロセス内・lifespan 起動）。
-- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。WS＝`tests/realtime`。
-- **WS 疎通確認**（proxy）＝`curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" -H "Origin: http://localhost:3000" http://localhost:3000/api/v1/realtime`＝未認証で **403**（backend 到達＝proxy OK）。
+- **反映**＝frontend `... up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。
+- **backend テスト**（cwd=`impl` 厳守）＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`。I＝`tests/dashboard`・L＝`tests/realtime`・security＝`tests/notifications/test_security.py`。
 - **frontend tsc**＝`cd impl/frontend && npx tsc --noEmit`（既知1件＝Snackbar.tsx:122）。
 - **TC-ID 検査**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
 - **会社/管理DB migration 適用**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`（冪等）。
 - **dev ログイン（PW 全て `Passw0rd!`）**＝一般 `ACME-01`/`user@acme.example`（MFA OFF）／`ACME-02`/`mfa@acme2.example`（MFA ON）／system_admin `OPS`/`admin@ops.example`。MailHog＝`http://localhost:8025`。
-- 規約/正本＝`CLAUDE.md`。現況の正＝`impl/README.md`。API＝`doc/API設計/{A..L}_*.md`（L＝`L_リアルタイム配信.md`・§1.12）。データモデル＝`doc/データモデル.md`。テスト＝`doc/テスト/*.md`（`L_リアルタイム.md`）＋`red確認台帳.md`。
+- 規約/正本＝`CLAUDE.md`。現況の正＝`impl/README.md`。API＝`doc/API設計/{A..L}_*.md`（I＝`I_ダッシュボード集約.md`・L＝`L_リアルタイム配信.md`）。データモデル＝`doc/データモデル.md`。テスト＝`doc/テスト/*.md`（`I_ダッシュボード.md`）＋`red確認台帳.md`。
