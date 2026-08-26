@@ -1,7 +1,7 @@
 # テストパターン H. 通知（取得・未読・既読・発火・重複排除）
 
 > 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../API設計/H_通知.md`](../API設計/H_通知.md)（H.0〜H.4）・[`../データモデル.md`](../データモデル.md) §5.24・§3（`notification_type`）・§8-⑬/§8-⑳（取得時レンダリング）。エラー code は OpenAPI が SoT（API設計 README §1.7）。
-> 対象＝ドメイン H（通知）の縦スライス＝`app/tenant/notifications/`（orm/migration 0017/repository/catalog/service/application/router）。**生成は各発火ドメインが H の `notify()`（内部サービス）を呼ぶ**（in-session or post-commit dispatch・H.1）。本スライスは**テナント発火系フル**（mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）。`security_*`（cross-plane）と Redis publish（L=WS）は follow-up。
+> 対象＝ドメイン H（通知）の縦スライス＝`app/tenant/notifications/`（orm/migration 0017/repository/catalog/service/application/router）。**生成は各発火ドメインが H の `notify()`（内部サービス）を呼ぶ**（in-session or post-commit dispatch・H.1）。本スライスは**テナント発火系フル**（mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）＋**`security_*`（cross-plane・§4）**。Redis publish（L=WS）は follow-up。
 > 前提フィクスチャ＝seed 会社 ACME-01。api テストは throwaway アカウント（factory）でログインし、`notify()` を tenant セッションで直接呼んで宛先に通知を作る（発火経路の縦スライスは achievement をレジャーフック経由で end-to-end 検証）。変更系は Origin/CSRF。すべて自分宛スコープ（IDOR 対策・H.4）。
 
 ## 1. 取得・未読数・既読/未読 API（H.2/H.3・SC-02＋ヘッダーベル）
@@ -45,3 +45,16 @@
 | H-TC-141 | int | 1イベント×1宛先＝最具体1件 | 同一宛先に mention＋follow_comment 候補 | `notify()` | 生成は1件・`type=mention`（より具体）・follow_comment は畳まれる | H.1 |
 | H-TC-142 | int | 別宛先は各1件 | A に mention・B に follow_comment | `notify()` | A/B にそれぞれ1件・混ざらない | H.1 |
 | H-TC-143 | api | 実績獲得の自動通知（レジャーフック end-to-end） | 評価3件付与（reason=evaluation×3・ledger→engine） | `GET /notifications` | `type=achievement` 1件・`body` に実績名＋ティア・`meta.coin` にティア連動コイン | H.0／§8-⑲ |
+
+## 4. セキュリティ通知の発火（cross-plane・A.9-⑧）
+
+> 対象＝認証フロー（`app/control_plane/auth/application.py`＝`login`/`verify_mfa`/`complete_password_setup`）＋プロフィール（`app/control_plane/me/application.py`＝`change_password`）が、**ログインで確定した `company_id`** でテナントDBへ `notify()`（post-commit dispatch・H.0）。in-app 発火は `notifications.service.notify_account`（account→user 解決）、メール＋監査は control-plane（`auth/security_events.py`）。`security_*` はオプトアウト不可（A.9-⑧）。**new_device の端末認識＝有効な `iq_trust`（`trusted_devices`）を持たない端末**（MFA-ON=毎回 OTP 経由＝`verify_mfa` 成功／MFA-OFF=`iq_trust` を端末認識に拡張・初回は発行）。メール＝password_changed は常時／new_device は `mfa_required=false` 会社のみ前倒し（A.9-⑧(a)）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H-TC-151 | api | MFA-OFF 未登録端末ログイン→新端末通知＋メール＋iq_trust 発行 | MFA-OFF 会社の実アカウント・`iq_trust` 無し | `POST /auth/login` 成功 | `security_new_device` 1件（`body` に IP/UA/日時）・`mail_outbox` に new_device メール1通・`Set-Cookie: iq_trust`・`trusted_devices` 1行 | A.9-⑧(a)／H.0 |
+| H-TC-152 | api | MFA-OFF 既知端末（有効 iq_trust）再ログイン→通知しない（ノイズ回避） | H-TC-151 後の `iq_trust` を保持 | 同端末で再 `login` 成功 | `security_new_device` 増えない・new_device メール増えない・`last_used_at` 更新 | A.9-⑧(a) ノイズ回避 |
+| H-TC-153 | api | MFA-ON verify 成功（未登録端末）→新端末通知・メール無し | MFA-ON 会社の実アカウント | `login`→`mfa/verify` 成功 | `security_new_device` 1件・new_device メールは送らない（MFA-ON） | A.9-⑧(a) |
+| H-TC-154 | api | MFA-ON 信頼端末で MFA スキップ→通知しない | 有効 `iq_trust` を持つ MFA-ON 実アカウント | `login`（trust で MFA スキップ）成功 | `security_new_device` を生成しない（既知端末） | A.9-⑧(a) ノイズ回避 |
+| H-TC-161 | api | PW 設定完了（A 経路）→変更完了通知＋メール | 実アカウント・有効な password_setup トークン | `POST /auth/password-setup/complete` 成功 | `security_password_changed` 1件・`mail_outbox` に password_changed メール1通 | A.9-⑧(b)／A.7 |
+| H-TC-162 | api | 自己 PW 変更（K 経路）→変更完了通知＋メール | ログイン中の実アカウント | `POST /me/password`（自己PW変更）成功 | `security_password_changed` 1件・password_changed メール1通・全セッション破棄 | A.9-⑧(b)／K.3 |

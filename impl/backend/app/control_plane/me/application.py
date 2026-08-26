@@ -17,6 +17,7 @@ from sqlalchemy import select
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
+from app.control_plane.auth import security_events
 from app.control_plane.auth.domain.service import password_policy_errors
 from app.control_plane.auth.orm import Account, Company
 from app.control_plane.mail_outbox import repository as mail_repo
@@ -248,7 +249,7 @@ def _require_current_password(account: Account | None, current_password: str) ->
 def change_password(r: "redis.Redis", account_id: uuid.UUID, *, current_password: str, new_password: str) -> None:
     """自己パスワード変更（K.3）。現在PW再認証→ポリシー検証→更新→**全セッション破棄＋信頼端末失効**（A.9-③）。
 
-    完了後は要再ログイン（新セッションは張らない）。security_password_changed 通知は H ドメイン実装時に接続（K.5）。
+    完了後は要再ログイン（新セッションは張らない）。完了後に security_password_changed 通知（in-app＋メール・A.9-⑧(b)）。
     """
     errors = password_policy_errors(new_password)
     if errors:
@@ -257,8 +258,13 @@ def change_password(r: "redis.Redis", account_id: uuid.UUID, *, current_password
         account = _require_current_password(session.get(Account, account_id), current_password)
         account.password_hash = hash_password(new_password)
         account_repo.revoke_all_trusted_devices(session, account_id)  # 信頼端末失効（A.9-③）
+        pw_company_id = account.company_id      # post-commit 発火用に退避（A.9-⑧(b)）
+        pw_email = account.email
+        pw_locale = account.locale
         session.commit()
     delete_account_sessions(r, str(account_id))  # 全アクティブセッション破棄（A.9-③）＝要再ログイン
+    # PW 変更完了通知（in-app＋メール・A.9-⑧(b)／K.3）＝A 経路（complete_password_setup）と等価
+    security_events.fire_password_changed(pw_company_id, account_id, email=pw_email, locale=pw_locale)
 
 
 def _assert_email_unique_in_company(session, company_id: uuid.UUID, account_id: uuid.UUID, email: str) -> None:

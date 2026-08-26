@@ -14,6 +14,7 @@ import redis
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
+from app.control_plane.auth import security_events
 from app.tenant.gamification import ledger
 from app.tenant.quest_group import repository as qg_repo
 from app.control_plane.mail_outbox import repository as mail_repo
@@ -112,7 +113,7 @@ def _issue_session(r: redis.Redis, session, account, company) -> LoginResult:
 
 def login(
     r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str,
-    trust_token: str | None = None,
+    trust_token: str | None = None, user_agent: str | None = None,
 ) -> LoginResult:
     check_login_rate_limit(r, client_ip, login_id)  # 第一層＝粗い (IP+login_id) レート制限（429）
 
@@ -155,11 +156,35 @@ def login(
                 if td is not None:
                     td.last_used_at = datetime.now(timezone.utc)
                     session.commit()
-                    needs_mfa = False
+                    needs_mfa = False  # 既知端末＝新端末通知しない（ここに来るのは trust 一致のみ）
 
             if not needs_mfa:
+                # 新端末検知（A.9-⑧(a)）。MFA-OFF は iq_trust を端末認識に流用（未登録＝新端末）。
+                # MFA-ON でここに来るのは trust 一致（＝既知端末）だけなので通知対象外。
+                new_trust: str | None = None
+                if not company.mfa_required:
+                    td = (account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
+                          if trust_token else None)
+                    if td is not None:
+                        td.last_used_at = datetime.now(timezone.utc)  # 既知端末＝静かに更新
+                    else:
+                        new_trust = generate_token()  # 未登録＝新端末。認識用に iq_trust を発行
+                        ttl = get_settings().trusted_device_ttl_seconds
+                        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+                        account_repo.create_trusted_device(session, account.id, hash_token(new_trust), expires_at)
                 result = _issue_session(r, session, account, company)  # ORM 接続中に解決＋副作用
-                session.commit()  # last_login_at 更新＋outbox を確定（同一Tx）
+                if new_trust is not None:
+                    result.trust_token = new_trust
+                nd = {"company_id": company.id, "account_id": account.id,
+                      "email": account.email, "locale": account.locale} if new_trust else None
+                session.commit()  # last_login_at 更新＋outbox（＋trusted_device）を確定（同一Tx）
+                if nd is not None:  # post-commit＝新端末通知（MFA-OFF はメールも前倒し・A.9-⑧(a)）
+                    security_events.fire_new_device(
+                        nd["company_id"], nd["account_id"],
+                        client_ip=client_ip, user_agent=user_agent,
+                        at=datetime.now(timezone.utc).isoformat(),
+                        email=nd["email"], locale=nd["locale"], send_email=True,
+                    )
                 return result
 
             # 要MFA: OTP 送信に必要な値だけ確定してセッションを閉じる（以降 Redis/メール）
@@ -222,7 +247,8 @@ def _enqueue_mail(
 
 
 def verify_mfa(
-    r: redis.Redis, preauth_token: str, preauth: dict, code: str, trust_device: bool
+    r: redis.Redis, preauth_token: str, preauth: dict, code: str, trust_device: bool,
+    client_ip: str | None = None, user_agent: str | None = None,
 ) -> LoginResult:
     """pre-auth 中の OTP を検証し本セッション発行（A.0-③）。失敗上限で pre-auth 失効（A.0-④）。"""
     s = get_settings()
@@ -253,9 +279,19 @@ def verify_mfa(
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.trusted_device_ttl_seconds)
             account_repo.create_trusted_device(session, account.id, hash_token(trust_token), expires_at)
             result.trust_token = trust_token
+        nd_company_id = account.company_id  # post-commit 発火用に退避（session を閉じてから）
+        nd_account_id = account.id
         session.commit()  # last_login_at 更新＋outbox（＋trusted_device）を確定（同一Tx）
 
     delete_preauth(r, preauth_token)  # pre-auth 消費（固定化対策・A.0-③）
+    # MFA-ON の verify 成功＝毎回 OTP を経た未登録端末ログイン＝新端末（A.9-⑧(a)）。
+    # in-app のみ（メールは MFA-OFF 優先＝OTP と経路が重複する MFA-ON では送らない）。
+    security_events.fire_new_device(
+        nd_company_id, nd_account_id,
+        client_ip=client_ip, user_agent=user_agent,
+        at=datetime.now(timezone.utc).isoformat(),
+        email=None, locale=None, send_email=False,
+    )
     return result
 
 
@@ -375,6 +411,10 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
         challenge.used_at = datetime.now(timezone.utc)  # 単回消費
         account_id = str(account.id)
         login_id = account.login_id
+        pw_company_id = account.company_id      # post-commit 発火用に退避（A.9-⑧(b)）
+        pw_account_id = account.id
+        pw_email = account.email
+        pw_locale = account.locale
         # accounts 更新と同一Tx で会社DB users への password_set ミラーを outbox へ積む（§4.6・A.7）
         account_sync_repo.enqueue(
             session, account.id, account.company_id, "upsert", {"password_set": True}
@@ -385,6 +425,10 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
     delete_account_sessions(r, account_id)
     # 本人がメール経由で PW 再設定＝到達の証拠。当該 login_id のログインロックを即解除（ADR-0005 §2.5(b)）
     clear_login_locks_for_login_id(r, login_id)
+    # PW 変更完了通知（in-app＋メール・A.9-⑧(b)）＝初回設定/自己再設定/管理者再設定の3経路共通
+    security_events.fire_password_changed(
+        pw_company_id, pw_account_id, email=pw_email, locale=pw_locale
+    )
 
 
 def confirm_email_verify(token: str) -> dict:

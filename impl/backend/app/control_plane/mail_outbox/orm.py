@@ -23,7 +23,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import ControlBase
@@ -53,6 +53,8 @@ class MailOutboxEntry(ControlBase):
     category: Mapped[str] = mapped_column(String(32), nullable=False)  # otp|password_setup|lock_notification
     locale: Mapped[str | None] = mapped_column(String(8), nullable=True)
     secret: Mapped[str | None] = mapped_column(Text, nullable=True)  # 送信後 NULL 化
+    # 非秘匿の描画パラメータ（例＝new_device の ip/device/at）。secret と分離＝秘匿は secret のみ（NULL 化対象）
+    params: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True
     )

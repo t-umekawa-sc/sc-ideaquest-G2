@@ -38,6 +38,13 @@ def _audit(action: str | None = None) -> list[SystemAuditLog]:
         return list(q.all())
 
 
+def _clear_audit() -> None:
+    """login 由来の監査（auth.login.new_device・A.9-⑧(a)）を掃除＝以降の read/authz 検証を切り分ける。"""
+    with control_session() as s:
+        s.query(SystemAuditLog).delete()
+        s.commit()
+
+
 def test_b_tc_100_mutation_writes_audit(client, factory):
     """B-TC-100 disable／会社設定更新が監査行を1件残す（actor=実行者・detail=対象・ip 記録）。"""
     _login_system_admin(client)
@@ -66,6 +73,7 @@ def test_b_tc_100_mutation_writes_audit(client, factory):
 def test_b_tc_101_reads_not_audited(client):
     """B-TC-101 一覧 GET など読み取りは監査行を作らない（変更系のみ）。"""
     _login_system_admin(client)
+    _clear_audit()  # login 由来の監査を除去（read が監査しないことの検証に集中）
     cid = _company_id()
     client.get("/api/v1/admin/companies")
     client.get(f"/api/v1/admin/companies/{cid}/accounts")
@@ -77,6 +85,7 @@ def test_b_tc_102_failed_authz_not_audited(client, factory):
     """B-TC-102 認可失敗（general→403）は監査行を作らない（操作が起きていない）。"""
     acc = factory.make_seed_company_account(system_role="general")
     _login(client, acc["company_code"], acc["login_id"], acc["password"])
+    _clear_audit()  # login 由来の監査を除去（認可失敗が監査しないことの検証に集中）
     cid = _company_id()
     r = client.post(f"/api/v1/admin/companies/{cid}/accounts/{uuid.uuid4()}/disable", headers=_csrf(client))
     assert r.status_code == 403

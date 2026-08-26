@@ -73,10 +73,11 @@ def _send_one(entry_id: uuid.UUID) -> str:
             return "skip"
         entry = session.get(MailOutboxEntry, entry_id)
         to_email, category, secret, locale = entry.to_email, entry.category, entry.secret, entry.locale
+        params = entry.params
 
     # 2) DB 接続を持たずに送信（SMTP 中はセッションを閉じる）。本文は送信時にレンダリング（§2.7）。
     try:
-        subject, body = render(category, secret, locale)
+        subject, body = render(category, secret, locale, params)
         get_mail_sender().send(to_email, subject, body)
     except Exception:
         return _mark_failure(entry_id)

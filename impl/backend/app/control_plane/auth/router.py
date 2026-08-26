@@ -70,12 +70,15 @@ def login(body: LoginRequest, request: Request, response: Response) -> LoginResp
     result = auth_service.login(
         get_redis(), client_ip, body.company_code, body.login_id, body.password,
         trust_token=request.cookies.get("iq_trust"),
+        user_agent=request.headers.get("user-agent"),  # 新端末通知の本文（UA・A.9-⑧(a)）
     )
     if result.status == "mfa_required":
         # 要MFA＝pre-auth＋CSRF を発行（本セッションはまだ張らない・A.0-②）
         _set_preauth_cookies(response, result.preauth_token, result.csrf_token)
         return LoginResponse(status="mfa_required", mfa=MfaChallenge(**result.mfa))
     _set_auth_cookies(response, result.session_token, result.csrf_token)
+    if result.trust_token:  # MFA-OFF 未登録端末＝端末認識用 iq_trust を発行（次回は新端末通知しない・A.9-⑧(a)）
+        _set_trust_cookie(response, result.trust_token)
     return LoginResponse(status="authenticated", session=Session(**result.session))
 
 
@@ -86,7 +89,8 @@ def mfa_verify(body: MfaVerifyReq, request: Request, response: Response) -> Logi
     verify_origin(request)
     verify_csrf(request)
     result = auth_service.verify_mfa(
-        get_redis(), preauth_token, preauth, body.code, body.trust_device
+        get_redis(), preauth_token, preauth, body.code, body.trust_device,
+        client_ip=get_client_ip(request), user_agent=request.headers.get("user-agent"),
     )
     _set_auth_cookies(response, result.session_token, result.csrf_token)
     response.delete_cookie("iq_preauth", path="/")  # pre-auth 消費（A.0-③）

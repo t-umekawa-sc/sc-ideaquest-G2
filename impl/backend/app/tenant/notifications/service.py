@@ -85,6 +85,24 @@ def _resolve_company(company_id: uuid.UUID) -> Company | None:
         return s.get(Company, company_id)
 
 
+def notify_account(
+    company_id: uuid.UUID, account_id: uuid.UUID, type: str, *, params: dict | None = None
+) -> None:
+    """コントロールプレーン発火の cross-plane 通知（H.0・A.9-⑧）。
+
+    認証フロー（別プレーン）が `company_id`＋`account_id` を渡す。テナントDBで account→user を解決して
+    post-commit dispatch する（best-effort・at-most-once）。宛先が解決できなければ何もしない。
+    """
+    def builder(ts: Session) -> list[dict]:
+        from app.tenant.profile.repository import get_user_by_account
+        user = get_user_by_account(ts, account_id)
+        if user is None:
+            return []
+        return [entry(user.id, type, params=params)]
+
+    dispatch(company_id, builder)
+
+
 def dispatch(company_id: uuid.UUID, builder: Callable[[Session], Iterable[dict]]) -> None:
     """post-commit の通知生成（別セッション・best-effort・at-most-once・H.1）。
 

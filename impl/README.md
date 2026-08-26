@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-25**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 422 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 354）。
+> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 428 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6（H-TC-151〜162）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 360）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | SC-00 | ログイン | ✅ | `(auth)/login` | 401→`/login?reason=…` セッション終了通知（デザイン標準 §14）。password-reset/-setup・email-change・**email-verify/confirm**（ADR-0009）も配置 |
 | SC-01 | ダッシュボード | 🟡 | `(app)/` | ヒーロー残高は `GET /me`（K.1）接続済み。週間ランキング/下書き/未投票/参加中等は G/C/D 接続まで demo |
-| SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。security_*/リアルタイム(L) は follow-up |
+| SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ（新端末/PW変更完了・cross-plane 結線済み）**。リアルタイム(L) は follow-up |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
 | SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動 |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
@@ -72,7 +72,7 @@
 | 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |
 | チャット（E） | `tenant/chat` | ✅ **8 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`＋**`POST/DELETE chat-messages/{id}/reactions`**〔通常/魔法・E.4〕）＝投稿/編集/削除・既読・活発度・添付・メンション・投稿XP+5・リアクション（マスタ絵文字）・魔法（1メッセージ1魔法/1チャット1回）。公開で chat_group 自動作成。migration 0013。**通知(H)結線済み（mention/idea_comment/follow_comment/magic_reaction）／リアルタイム(L)は no-op** |
 | ゲーム(G) | `gamification`・`shop`・`achievements` | ✅ ledger＋魔法（`/spells`・unlock）＋ショップ/装備（migration 0015）＋ランキング（`/rankings`）＋実績 2 EP（`/achievements`・`/me/achievements`・migration 0016）。**付与は `ledger.grant` の後フック（engine）で一元自動判定**（condition＝count/streak/level/all_*・tier コイン報酬・冪等）。SC-30/31/32/40/41 フロント接続済み |
-| 通知（H） | `tenant/notifications` | ✅ **5 EP**（`GET notifications`〔カーソル §1.8・state/type 絞り込み・unread_count〕・`GET notifications/unread-count`・`POST notifications/{id}/read`・`/unread`・`/read-all`）＝自分宛スコープ（IDOR 404）。**生成は各発火ドメインが `notify()` を呼ぶ**（テナント発火系フル＝mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）。宛先重複排除（最具体1件）＋取得時レンダリング（§8-⑳）。migration 0017。**security_*（cross-plane）/Redis publish(L=WS)は follow-up**。SC-02 フロント接続済み |
+| 通知（H） | `tenant/notifications` | ✅ **5 EP**（`GET notifications`〔カーソル §1.8・state/type 絞り込み・unread_count〕・`GET notifications/unread-count`・`POST notifications/{id}/read`・`/unread`・`/read-all`）＝自分宛スコープ（IDOR 404）。**生成は各発火ドメインが `notify()` を呼ぶ**（テナント発火系フル＝mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）＋**`security_*` cross-plane**（`security_new_device`＝login/mfa verify・`security_password_changed`＝password-setup complete/自己PW変更〔me〕・`notify_account` で account→user 解決）。宛先重複排除（最具体1件）＋取得時レンダリング（§8-⑳）。migration 0017。**新端末認識＝有効 iq_trust**（MFA-ON=毎回 OTP／MFA-OFF=iq_trust を認識に流用・初回発行）。メール＝password_changed 常時／new_device は MFA-OFF 前倒し（`mail_outbox.params` 列＝0012）＋監査（auth.login.new_device/auth.password_changed）。**Redis publish(L=WS)は follow-up**。SC-02 フロント接続済み |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 

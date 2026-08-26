@@ -12,6 +12,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification import ledger
 from app.tenant.notifications import service as notify_svc
+from app.tenant.notifications.orm import Notification
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from tests.admin.test_admin_accounts import _login
@@ -33,7 +34,12 @@ def _login_new(client, factory) -> uuid.UUID:
     acc = factory.make_seed_company_account()
     _login(client, SEED_COMPANY_CODE, acc["login_id"], acc["password"])
     with get_tenant_session(_db()) as s:
-        return get_user_by_account(s, acc["id"]).id
+        uid = get_user_by_account(s, acc["id"]).id
+        # login は security_new_device（A.9-⑧(a)）を発火する。本ファイルは他種別の挙動を検証するため除去
+        # （security_* の発火自体は tests/notifications/test_security.py で検証）。
+        s.query(Notification).filter_by(recipient_id=uid, type="security_new_device").delete()
+        s.commit()
+        return uid
 
 
 def _seed(entries: list[dict]) -> None:

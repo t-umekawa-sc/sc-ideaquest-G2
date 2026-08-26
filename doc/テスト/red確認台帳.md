@@ -561,3 +561,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（接続前 actual） |
 | --- | --- |
 | H-TC-208 | 接続前＝デモ「4 件の未読」で `.list-count` が実 unread_count（0）と不一致 → red（実測 `Received "4 件の未読" / Expected "0 件の未読"`）。接続後は `getNotifications` の実 unread_count・実 `.n` 行数・デモ固定 IP 非表示 → green |
+
+## H. 通知 security_*（cross-plane 発火・H-TC-151〜162・2026-08-26）
+
+> H 後半＝`security_new_device`/`security_password_changed` を認証フロー（login/mfa verify/password-setup complete）＋自己PW変更（me）から cross-plane で発火（in-app＝`notify_account`／メール＝mail_outbox・params 列 0012／監査）。新端末認識＝有効 iq_trust（MFA-ON=毎回 OTP／MFA-OFF=iq_trust を認識に流用・初回発行）。メール＝password_changed 常時／new_device は MFA-OFF 前倒し。
+
+| TC-ID | 観測 red（発火ヘルパ反転 actual） |
+| --- | --- |
+| H-TC-151〜162（6 件） | `security_events.fire_new_device`/`fire_password_changed` 先頭に `return` を差し込み＝どの認証イベントでも通知/メールが作られない → 6 件全て red（実測 `6 failed`：in-app 通知 0 件・new_device/password_changed メール subject 不在・iq_trust 未発行）。撤去＝両ヘルパ復元で in-app＋メール＋監査が発火し 6 件 green |
