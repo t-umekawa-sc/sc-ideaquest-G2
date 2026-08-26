@@ -101,7 +101,8 @@ def test_a_tc_038_request_rate_limited_still_202_but_suppressed(client, factory,
     for _ in range(6):
         res = client.post(REQUEST, json={"company_code": acc["company_code"], "login_id": acc["login_id"]})
         assert res.status_code == 202
-    assert len(mail.sent) == 5  # 6回目以降は無送信
+    # 自分の宛先だけを数える（グローバル mail.sent の他テスト行に依存しない・順序依存フラキー回避）。
+    assert len([m for m in mail.sent if m.to == acc["email"]]) == 5  # 6回目以降は無送信
 
 
 def test_a_tc_039_request_missing_field_422(client):
@@ -116,8 +117,9 @@ def test_a_tc_040_request_invalidates_previous_challenge(client, factory, mail):
     acc = factory.make_seed_company_account()
     client.post(REQUEST, json={"company_code": acc["company_code"], "login_id": acc["login_id"]})
     client.post(REQUEST, json={"company_code": acc["company_code"], "login_id": acc["login_id"]})
-    old_token = _token_from_mail(mail.sent[0])
-    new_token = _token_from_mail(mail.sent[1])
+    mine = [m for m in mail.sent if m.to == acc["email"]]  # 自分宛のみ（グローバル依存回避）
+    old_token = _token_from_mail(mine[0])
+    new_token = _token_from_mail(mine[1])
     assert client.post(VERIFY, json={"token": old_token}).status_code == 410  # 失効
     assert client.post(VERIFY, json={"token": new_token}).status_code == 200  # 最新のみ有効
 

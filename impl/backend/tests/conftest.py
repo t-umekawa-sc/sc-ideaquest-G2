@@ -66,6 +66,41 @@ def _clean_mail_outbox():
 
 
 @pytest.fixture(autouse=True)
+def _reset_settings_cache():
+    """各テストの前後で `get_settings` の lru_cache を初期化（設定リークの根治）。
+
+    一部テストは `monkeypatch.setenv(...)＋get_settings.cache_clear()` で設定を差し替えるが、
+    テスト内 `finally: cache_clear()` は **monkeypatch が env を戻す前**に走るため、直後に誰かが
+    `get_settings()` を呼ぶと**リークした env 値で再キャッシュ**され後続テストを汚す（順序依存フラキー）。
+    本 autouse は monkeypatch teardown（＝env 復元）より後に走る（autouse は最後に teardown）ので、
+    クリーンな env で必ずキャッシュを空にでき、設定リークを断つ。
+    """
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _clean_account_sync_outbox():
+    """各テストの前後で account_sync_outbox を空にする（トランスポート状態＝mail_outbox と同様に隔離）。
+
+    `process_outbox_once()` は**全 pending 行**を処理するため、他テストが残した行が混じると
+    B-TC-001/005 等の件数/順序/attempts アサーションが非決定になる（順序依存フラキーの根治）。
+    OutboxEntry は accounts/companies への FK を持つ子テーブルなので、行削除は FK に抵触しない。
+    """
+    def _truncate() -> None:
+        with control_session() as s:
+            s.query(OutboxEntry).delete()
+            s.commit()
+
+    _truncate()
+    yield
+    _truncate()
+
+
+@pytest.fixture(autouse=True)
 def _clean_audit_logs():
     """各テストの前後で system_audit_logs を空にする（監査行の隔離・FK は actor 側＝子テーブル）。"""
     def _truncate() -> None:

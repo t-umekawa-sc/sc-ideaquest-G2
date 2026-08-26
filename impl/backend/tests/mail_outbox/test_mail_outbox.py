@@ -111,13 +111,15 @@ def test_a_tc_094_retry_then_failed_clears_secret(set_sender, monkeypatch):
 def test_a_tc_095_independent_processing(set_sender):
     """A-TC-095 先頭行の送信失敗は後続の別行をブロックしない（HOL 無し）。根拠 ADR-0007 §2.4。"""
     set_sender(_SelectiveFailSender(fail_to="bad@x.example"))
-    _enqueue("bad@x.example", CATEGORY_LOCK_NOTIFICATION)     # 先に積む（seq 小）＝送信失敗
+    bad = _enqueue("bad@x.example", CATEGORY_LOCK_NOTIFICATION)   # 先に積む（seq 小）＝送信失敗
     good = _enqueue("good@x.example", CATEGORY_LOCK_NOTIFICATION)
 
-    stats = process_mail_outbox_once()
+    process_mail_outbox_once()
 
-    assert stats["sent"] == 1 and stats["failed"] == 1
-    assert _get(good).status == "done"       # 後続の別行は送信される
+    # 自分の 2 行で HOL 無し（別行独立処理）を検証＝グローバル stats に依存しない（順序依存フラキー回避）。
+    assert _get(bad).status in ("pending", "failed")  # 失敗行は試行済み（pending 再送 or failed）
+    assert _get(bad).attempts >= 1                     # 少なくとも1回試行して失敗した
+    assert _get(good).status == "done"                 # 後続の別行は送信される
 
 
 def test_a_tc_096_reclaim_stuck_sending(mail):
@@ -132,7 +134,7 @@ def test_a_tc_096_reclaim_stuck_sending(mail):
     assert stats["reclaimed"] >= 1
     assert _get(stale).status == "done"      # 滞留 → pending → 送信
     assert _get(fresh).status == "sending"   # 送信中（新しい）は横取りしない
-    assert len(mail.sent) == 1
+    assert len([m for m in mail.sent if m.to == "u096@x.example"]) == 1  # 自分の行のみ（グローバル件数に依存しない）
 
 
 def test_a_tc_100_worker_process_registers_fk_targets():

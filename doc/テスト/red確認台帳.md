@@ -609,3 +609,9 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（`count_active_messages_for_ideas` stub actual） |
 | --- | --- |
 | D-TC-151 | `chat.repository.count_active_messages_for_ideas` に `return {}` を一時差込＝件数を無効化 → カードの `comment_count` が 0 になり `== 2` の assert が不成立で red（実測 `assert 0 == 2`）。撤去（chat_groups×非削除メッセージの group_by 集計）で非削除2（削除1除外）・chat 無し0 が揃い green |
+
+## フラキー根治（順序依存の A-TC-038/040/068/070/095/096・B-TC-001/005・2026-08-26）
+
+> 症状＝全体実行で稀に（〜40%/回）1件が落ちる（mail 件数不足/行が `sending` のまま/outbox attempts++/OTP 未捕捉）。単独 green。
+> **真因＝環境汚染**: pytest 実行中に `worker`/`mail-worker` サービスが起動したままだと、両ワーカが共有 control DB の `mail_outbox`/`account_sync_outbox` を **real sender で drain** し、pytest のプロセス内 drain（`process_mail_outbox_once`/`process_outbox_once`/`mail.sent`）と競合する（`impl/compose.yaml` 冒頭コメントが警告する事象）。→ **pytest 時はワーカ停止**（`docker compose stop worker mail-worker`／`up -d db redis` のみで回す）。ワーカ停止で **8/8 green**（452 passed）を実測。
+> **併せて投入した防御的テスト隔離**（ワーカ停止と独立に堅牢化）＝(1) `account_sync_outbox` の autouse truncate 追加（`mail_outbox` と対等・`conftest._clean_account_sync_outbox`）(2) `get_settings` lru_cache の autouse リセット（`monkeypatch.setenv＋finally cache_clear` の設定リーク遮断・`conftest._reset_settings_cache`）(3) mail 系テスト（A-TC-038/040/095/096）をグローバル `mail.sent`/`stats` 依存から**自スコープ**へ。
