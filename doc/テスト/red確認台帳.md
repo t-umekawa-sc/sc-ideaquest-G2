@@ -577,3 +577,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（`publish_event` の type 破壊 actual） |
 | --- | --- |
 | L-TC-102/103・104・111・113（配信 4 件） | `events.publish_event` で `type="_red_"` を一時差込＝購読者へは届くが type が不正 → `notification.created`/`notification.unread_count`/`chat.message.created`/`chat.reaction.added` の type/body アサーションが不一致で 4 件 red。撤去で 8 件 green。接続/認証（L-TC-101）・門番拒否（L-TC-112）・cross-tenant（L-TC-105）・失効（L-TC-121）は配信 type に非依存で green のまま |
+
+## I. ダッシュボード集約（GET /dashboard・I-TC-101〜143・2026-08-26）
+
+> 新規ドメイン I（`app/tenant/dashboard/`）は新規なので test-first。合成の殻＝各ドメイン read を1レスポンスに合成（新業務ロジックなし）。横断 read は D/F の repository に追加（別 EP 無し・I.3）。
+
+| TC-ID | 観測 red（横断パネル stub actual） |
+| --- | --- |
+| I-TC-103（下書き/未投票/フォロー） | `_drafts`/`_unvoted` の先頭に `return []` を一時差込＝横断 read を無効化 → drafts に idea/evaluation が出ず・未投票（公開B）も出ず assert 不成立で red。撤去（D/F 横断 read 復元）で drafts(idea+eval 進捗2/5)・未投票(公開B のみ)・フォロー(公開B) が揃い green。hero/roles/login_bonus/401 は非依存で green のまま |

@@ -151,6 +151,19 @@ def get_active_member(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID)
     ).scalars().first()
 
 
+def list_member_quest_ids(session: Session, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """自分が有効参加中（`removed_at IS NULL`）の未削除クエスト id 集合（I の未投票アイデア絞り込み用）。"""
+    return list(
+        session.execute(
+            select(QuestMember.quest_id).join(Quest, Quest.id == QuestMember.quest_id).where(
+                QuestMember.user_id == user_id,
+                QuestMember.removed_at.is_(None),
+                Quest.deleted_at.is_(None),
+            )
+        ).scalars().all()
+    )
+
+
 def add_member(
     session: Session,
     quest_id: uuid.UUID,

@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 436 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6（H-TC-151〜162）**／**リアルタイム L ＝8（L-TC-101〜121・WS 配信ハブ）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 368）。
+> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 442 passed**（A-TC-095 等は既存フラキー・単独 green／評価 F ＝23／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6（I-TC-101〜121）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 374）。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -17,7 +17,7 @@
 | 画面 | 名称 | 状態 | ルート | 備考 |
 |---|---|---|---|---|
 | SC-00 | ログイン | ✅ | `(auth)/login` | 401→`/login?reason=…` セッション終了通知（デザイン標準 §14）。password-reset/-setup・email-change・**email-verify/confirm**（ADR-0009）も配置 |
-| SC-01 | ダッシュボード | 🟡 | `(app)/` | ヒーロー残高は `GET /me`（K.1）接続済み。週間ランキング/下書き/未投票/参加中等は G/C/D 接続まで demo |
+| SC-01 | ダッシュボード | ✅ | `(app)/` | **実接続（`GET /dashboard`＝I 集約1本）**＝ヒーロー（残高＋level）・週間ランキング・下書き（quest/idea/eval 進捗）・未投票・参加中クエスト・フォロー中・最近の通知・roles・login_bonus。クイック投票（POST /ideas/{id}/vote）・フォロー解除（D follow EP）実接続・login_bonus トースト。空パネル非表示 |
 | SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ**。**リアルタイム(L) 接続済み＝WS で新着/未読数を即時反映（ヘッダーベル＋一覧）** |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
 | SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動 |
@@ -73,6 +73,7 @@
 | チャット（E） | `tenant/chat` | ✅ **8 EP**（`GET chat`〔一覧＋未読〕・`GET chat-activity`・`POST/PATCH/DELETE chat-messages`・`POST chat/read`＋**`POST/DELETE chat-messages/{id}/reactions`**〔通常/魔法・E.4〕）＝投稿/編集/削除・既読・活発度・添付・メンション・投稿XP+5・リアクション（マスタ絵文字）・魔法（1メッセージ1魔法/1チャット1回）。公開で chat_group 自動作成。migration 0013。**通知(H)結線済み（mention/idea_comment/follow_comment/magic_reaction）／リアルタイム(L)結線済み＝post-commit で `chat.*` を `chat:{cg}` へ publish（created/updated/deleted/reaction added/removed）** |
 | ゲーム(G) | `gamification`・`shop`・`achievements` | ✅ ledger＋魔法（`/spells`・unlock）＋ショップ/装備（migration 0015）＋ランキング（`/rankings`）＋実績 2 EP（`/achievements`・`/me/achievements`・migration 0016）。**付与は `ledger.grant` の後フック（engine）で一元自動判定**（condition＝count/streak/level/all_*・tier コイン報酬・冪等）。SC-30/31/32/40/41 フロント接続済み |
 | 通知（H） | `tenant/notifications` | ✅ **5 EP**（`GET notifications`〔カーソル §1.8・state/type 絞り込み・unread_count〕・`GET notifications/unread-count`・`POST notifications/{id}/read`・`/unread`・`/read-all`）＝自分宛スコープ（IDOR 404）。**生成は各発火ドメインが `notify()` を呼ぶ**（テナント発火系フル＝mention/idea_comment/follow_comment/magic_reaction/idea_updated/follow_evaluation/follow_selection/achievement/quest_party_invited）＋**`security_*` cross-plane**（`security_new_device`＝login/mfa verify・`security_password_changed`＝password-setup complete/自己PW変更〔me〕・`notify_account` で account→user 解決）。宛先重複排除（最具体1件）＋取得時レンダリング（§8-⑳）。migration 0017。**新端末認識＝有効 iq_trust**（MFA-ON=毎回 OTP／MFA-OFF=iq_trust を認識に流用・初回発行）。メール＝password_changed 常時／new_device は MFA-OFF 前倒し（`mail_outbox.params` 列＝0012）＋監査（auth.login.new_device/auth.password_changed）。**Redis publish(L)結線済み＝`notify()` の post-commit で `notification.created`＋`notification.unread_count` を `notifications:{user_id}` へ発行（既読操作も未読数を発行）**。SC-02 フロント接続済み |
+| ダッシュボード集約（I） | `tenant/dashboard` | ✅ **`GET /api/v1/dashboard`**（読取合成の殻・新業務ロジックなし）＝hero/drafts(quest/idea/eval)/unvoted_ideas/quests/followed_ideas/weekly_ranking/notifications/roles/login_bonus を1レスポンスに合成。横断 read は D/F repo に追加（`list_draft_ideas_by_author`/`list_unvoted_published_ideas`/`list_followed_ideas`/`list_draft_evaluations_by_evaluator`＋C `list_member_quest_ids`・別 EP 新設せず・I.3）。リッチパネルは C/G/H の application 再利用。部分失敗 best-effort（パネル単位 null）。login_bonus＝Redis ワンショット（A の login で mark・I が GETDEL consume）。上限＝通知5/未投票・参加・フォロー各6/下書き全件 |
 | リアルタイム（L） | `tenant/realtime` | ✅ **WS `GET /api/v1/realtime`**（Cookie セッション認証＋Origin 検証）＝プロセス毎ハブ（`redis.asyncio` PSUBSCRIBE `notifications:*`/`chat:*`＋`realtime:revoke`・購読テーブル topic→接続・`company_id` フィルタで cross-tenant 遮断）。`notifications:{user_id}` 自動購読／`chat:{cg}` は動的購読（門番＝REST と同一・gate.py）。**発行＝H（notify post-commit）・E（chat post-commit）・C（除去で `publish_revoke`＝L.4 購読ドロップ）**。配信専用（書き込みは REST）。lifespan でハブ起動/停止。フロント＝`lib/realtime.ts`（単一 WS・再接続）＋`RealtimeProvider`（ベル）／SC-02・SC-24 は WS で再取得 |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。

@@ -62,6 +62,17 @@ def replace_scores(session: Session, evaluation_id: uuid.UUID, entries: list[tup
         session.add(EvaluationScore(id=uuid.uuid4(), evaluation_id=evaluation_id, aspect=aspect, score=score, comment=comment))
 
 
+def list_draft_evaluations_by_evaluator(session: Session, evaluator_id: uuid.UUID) -> list[Evaluation]:
+    """本人の下書き評価（全アイデア横断・SC-01 下書き・I.3）。進捗 scored/5 は application が `list_scores` で算出。"""
+    return list(
+        session.execute(
+            select(Evaluation).where(
+                Evaluation.evaluator_id == evaluator_id, Evaluation.status == "draft"
+            )
+        ).scalars().all()
+    )
+
+
 def list_evaluations_for_idea(session: Session, idea_id: uuid.UUID, *, status: str | None = None) -> list[Evaluation]:
     """アイデアの評価一覧（新しい提出順の安定化は application 側）。status 指定で絞る（例＝'submitted'）。"""
     stmt = select(Evaluation).where(Evaluation.idea_id == idea_id)

@@ -82,6 +82,45 @@ def list_ideas_for_quest(
 
 # ---- 利害関係者（D.2・§5.11） ----
 
+def list_draft_ideas_by_author(session: Session, author_id: uuid.UUID) -> list[Idea]:
+    """本人の下書きアイデア（全クエスト横断・SC-01 下書き・I.3）。最終更新降順。"""
+    return list(
+        session.execute(
+            select(Idea).where(
+                Idea.author_id == author_id, Idea.status == "draft", Idea.deleted_at.is_(None)
+            ).order_by(Idea.updated_at.desc())
+        ).scalars().all()
+    )
+
+
+def list_unvoted_published_ideas(
+    session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID], *, limit: int
+) -> list[Idea]:
+    """参加クエストの公開アイデアで自分が未投票のもの（SC-01 未投票・I.3）。締切近い順（PG ASC は NULLS LAST）。"""
+    if not quest_ids:
+        return []
+    voted = select(Vote.idea_id).where(Vote.user_id == user_id)
+    return list(
+        session.execute(
+            select(Idea).where(
+                Idea.quest_id.in_(quest_ids), Idea.status == "published",
+                Idea.deleted_at.is_(None), Idea.id.not_in(voted),
+            ).order_by(Idea.time_limit.asc(), Idea.created_at.asc()).limit(limit)
+        ).scalars().all()
+    )
+
+
+def list_followed_ideas(session: Session, user_id: uuid.UUID, *, limit: int) -> list[Idea]:
+    """フォロー中アイデア（follows×ideas・SC-01 フォロー・I.3）。直近更新順。"""
+    return list(
+        session.execute(
+            select(Idea).join(Follow, Follow.idea_id == Idea.id).where(
+                Follow.user_id == user_id, Idea.deleted_at.is_(None)
+            ).order_by(Idea.updated_at.desc()).limit(limit)
+        ).scalars().all()
+    )
+
+
 def list_stakeholders(session: Session, idea_id: uuid.UUID) -> list[IdeaStakeholder]:
     return list(
         session.execute(
