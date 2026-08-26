@@ -139,7 +139,7 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         quote_ids = _validate_quotes(ts, cg.id, quoted_message_ids)
         mentions = _validate_mentions(ts, quest, mention_ids)
         # 添付は先に全件検証（不正で部分保存しない）。
-        validated = [(fn, data, validate_attachment_upload(fn, len(data))) for (fn, data) in (files or [])]
+        validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in (files or [])]
         if len(validated) > MAX_ATTACHMENTS_PER_IDEA:
             raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])
@@ -188,7 +188,7 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
                 repo.remove_attachment(ts, att)
         ts.flush()
         # 添付の追加（件数上限＝既存＋今回≤10）。
-        validated = [(fn, data, validate_attachment_upload(fn, len(data))) for (fn, data) in (files or [])]
+        validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in (files or [])]
         if len(repo.list_attachments_for_message(ts, msg.id)) + len(validated) > MAX_ATTACHMENTS_PER_IDEA:
             raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])

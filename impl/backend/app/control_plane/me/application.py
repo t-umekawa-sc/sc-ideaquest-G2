@@ -111,7 +111,7 @@ def _company_db_identifier(company_id: uuid.UUID) -> str:
 def _set_user_image(company_id: uuid.UUID, account_id: uuid.UUID, *,
                     field: str, data: bytes, content_type: str, prefix: str) -> str:
     """会社DB users の画像パス列を差し替え、旧オブジェクトを best-effort 削除。署名URL を返す。"""
-    validate_image_upload(content_type, len(data))
+    validate_image_upload(content_type, data)
     storage = get_storage()
     key = storage.put(data, content_type, prefix=prefix)  # 物理名ハッシュ・非公開バケット
     with get_tenant_session(_company_db_identifier(company_id)) as ts:

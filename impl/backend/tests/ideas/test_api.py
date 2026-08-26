@@ -425,7 +425,7 @@ def test_d_tc_132_attachment_count_limit(client, env, storage):
         ts.commit()
     r = client.post(ATTACH(idea), files=[
         ("files", ("x.png", PNG, "image/png")),
-        ("files", ("y.pdf", b"%PDF", "application/pdf")),
+        ("files", ("y.pdf", b"%PDF-1.4", "application/pdf")),
     ], headers=_csrf(client))
     assert r.status_code == 422, r.text
     assert any(e.get("code") == "too_many" for e in r.json().get("errors", []))
@@ -657,3 +657,22 @@ def test_d_tc_162_vote_xp_daily_cap(factory, env):
             granted.append(_ideas_app._award_vote_xp(ts, idea, vu, True))
             ts.commit()
     assert granted == [True, True, True, True, True, False]  # 6件目は日次上限で付与なし
+
+
+def test_sec_tc_011_attachment_signature_mismatch(client, env):
+    """SEC-TC-011 拡張子 .png だが中身が非PNG→422 signature_mismatch（拡張子偽装拒否・§8）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, status="published")
+    r = client.post(ATTACH(idea), files=[("files", ("a.png", b"not a real png", "image/png"))], headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("code") == "signature_mismatch" for e in r.json().get("errors", []))
+
+
+def test_sec_tc_040_idea_create_mass_assignment_forbidden(client, env):
+    """SEC-TC-040 作成 request は extra=forbid＝サーバー制御列（is_selected 等）の混入は 422（Mass Assignment 防止）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    r = client.post(IDEAS(qid), json={"title": "T", "value": "V", "body": "B", "status": "draft",
+                                      "is_selected": True}, headers=_csrf(client))
+    assert r.status_code == 422, r.text  # extra=forbid（§2.2）

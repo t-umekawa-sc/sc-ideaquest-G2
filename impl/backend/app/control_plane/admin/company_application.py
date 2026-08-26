@@ -273,7 +273,7 @@ def set_company_icon(company_id: uuid.UUID, *, data: bytes, content_type: str) -
     /me/avatar-image（K.4）と同流儀＝非公開バケットへ物理名ハッシュで put、応答は署名URL に解決した会社詳細。
     会社アイコンは管理DB `companies` のみを触る（会社DB 未整備＝suspended でも設定可）。
     """
-    validate_image_upload(content_type, len(data))
+    validate_image_upload(content_type, data)
     storage = get_storage()
     key = storage.put(data, content_type, prefix="company-icons")
     with control_session() as session:

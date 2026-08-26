@@ -327,7 +327,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
 def set_quest_icon(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                    data: bytes, content_type: str) -> dict:
     """クエストアイコンを設定（論点2・K.4 流儀の専用 multipart EP）。owner/quest_admin。旧画像は best-effort 削除。"""
-    validate_image_upload(content_type, len(data))
+    validate_image_upload(content_type, data)
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")

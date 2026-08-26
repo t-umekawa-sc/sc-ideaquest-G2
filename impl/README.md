@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 455 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 387）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。
+> 進捗の最終確認: **2026-08-26**。tsc 既知1件のみ（Snackbar.tsx:122）・**backend `pytest tests/` 全体 464 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 388）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）

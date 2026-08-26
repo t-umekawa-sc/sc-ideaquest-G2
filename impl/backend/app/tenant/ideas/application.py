@@ -417,7 +417,7 @@ def add_attachments(account_id, company_id, idea_id, *, files) -> dict:
         _authorize_edit_idea(ts, idea, quest, user)  # 本人 or owner/quest_admin（下書きは本人のみ可視）
         _guard_not_completed(quest)
         # 先に全件検証（不正で部分保存しない）＝拡張子 allowlist・サイズ・非空。mime は拡張子から導出。
-        validated = [(fn, data, validate_attachment_upload(fn, len(data))) for (fn, data) in files]
+        validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in files]
         if repo.count_attachments(ts, idea.id) + len(validated) > MAX_ATTACHMENTS_PER_IDEA:
             raise AppError(422, "validation_error", detail=f"添付は1アイデア{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])

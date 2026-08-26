@@ -12,11 +12,13 @@ ME = "/api/v1/me"
 AVATAR = "/api/v1/me/avatar-image"
 BACKGROUND = "/api/v1/me/background-image"
 
-# 最小の PNG（1x1・シグネチャのみで十分＝サーバーは MIME/サイズを見る）
+# 最小の PNG（1x1・シグネチャ含む＝サーバーは MIME/サイズ＋マジックバイト §8 を検証）
 PNG = bytes.fromhex(
     "89504e470d0a1a0a0000000d494844520000000100000001080600000"
     "01f15c4890000000a49444154789c6360000002000154a24f0e0000000049454e44ae426082"
 )
+# 最小の JPEG（SOI＋APP0 JFIF・シグネチャ \xff\xd8\xff で十分）
+JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00" + b"\xff\xd9"
 
 
 def _csrf(client) -> dict:
@@ -69,7 +71,7 @@ def test_k_tc_avatar_delete_resets(client, factory, storage):
 def test_k_tc_background_put_and_delete(client, factory, storage):
     """K-TC-bg-01 背景画像 設定＝200＋署名URL、削除＝204＋None。"""
     _login_seed(client, factory)
-    r = client.put(BACKGROUND, files={"file": ("b.jpg", PNG, "image/jpeg")}, headers=_csrf(client))
+    r = client.put(BACKGROUND, files={"file": ("b.jpg", JPEG, "image/jpeg")}, headers=_csrf(client))
     assert r.status_code == 200, r.text
     assert r.json()["background_image_url"].startswith("https://minio.test/backgrounds/")
     assert client.get(ME).json()["profile"]["background_image_url"].startswith("https://minio.test/backgrounds/")

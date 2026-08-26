@@ -623,3 +623,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（no-op へ一時差戻し actual） |
 | --- | --- |
 | D-TC-160/161/162 | `_award_vote_xp` 先頭に `return False`／`_publish_processing` の grant を `if False` で無効化＝旧 no-op 状態に戻すと、公開しても `idea_post` activity が出ず（160）・投票 XP が付与されず（161 `assert False`）・日次上限判定以前に全件付与なし（162）で 3 件 red。撤去（G 台帳 grant を結線）で idea_post +50 1件・vote +5 初回のみ・6件目は上限で付与なし が揃い green |
+
+## セキュリティ横断（監査補完・SEC-TC-001〜040＋J-TC-141・2026-08-26）
+
+> 監査で判明した「実装追加が必要」＝セキュリティ応答ヘッダ（§10・`main.py` middleware）／ファイルシグネチャ検証（§8・`storage.py` マジックバイト）を実装＋テスト。「実装済みだがテスト漏れ」＝画像サイズ上限/cross-tenant/機密ログ非出力/Mass Assignment/検索インジェクションのテストを補完（実装は既存＝coverage）。
+
+| TC-ID | 観測 red（実装追加分の一時無効化 actual） |
+| --- | --- |
+| SEC-TC-001（ヘッダ）・SEC-TC-010/011（signature） | `main.py` のヘッダ設定を `if False` で無効化＋`storage._signature_ok` を `return True` に一時差戻し → 応答にセキュリティヘッダが付かず SEC-001 red・MIME/拡張子偽装が通って SEC-010/011（`signature_mismatch` 期待）red。撤去（middleware＋マジックバイト復元）で 3 件 green |
+| SEC-TC-002/012/020/030/040・J-TC-141 | いずれも既存実装の coverage（HSTS 非付与・サイズ上限・会社別DB遮断・監査 detail に秘匿値なし・extra=forbid・q バインド変数）＝実装済みにつき red なし（テスト追加のみ）。SEC-010/011 の red で「MIME 申告を信用しない」実装の効果を担保 |

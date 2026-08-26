@@ -88,6 +88,14 @@ async def add_request_id(request: Request, call_next):  # noqa: ANN001, ANN201
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    # セキュリティ応答ヘッダ（セキュリティ対策一覧 §10）。API は JSON 応答のため CSP は最小（default-src 'none'）で
+    # 十分＋クリックジャッキング対策に frame-ancestors/X-Frame。HSTS は TLS 環境（cookie_secure=本番）でのみ付与。
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+    if get_settings().cookie_secure:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 

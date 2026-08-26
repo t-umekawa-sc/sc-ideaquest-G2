@@ -189,3 +189,13 @@ def test_j_tc_131_snippet_highlight_and_escape(client, factory):
             ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id == gid))
             ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == gid))
             ts.commit()
+
+
+def test_j_tc_141_query_injection_safe(client, factory, env):
+    """J-TC-141 q に PGroonga 演算子/SQL メタ文字を入れても 5xx にならず 200（バインド変数・§2.2③）。"""
+    acc, uid = _login_user(client, factory)
+    env["build"](uid)
+    for q in ['"(', ')\\', 'a OR b', '*', "'; DROP TABLE ideas; --", '&@~ (( ']:
+        r = _search(client, env["qid"], q=q)
+        assert r.status_code == 200, f"q={q!r} -> {r.status_code} {r.text}"
+        assert isinstance(r.json().get("data"), list)

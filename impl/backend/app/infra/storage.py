@@ -52,12 +52,36 @@ ATTACHMENT_EXT_TO_MIME: dict[str, str] = {
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 添付 1ファイル 20MB（D.3・§5.12 初期値）
 MAX_ATTACHMENTS_PER_IDEA = 10  # 1アイデアあたり添付上限（D.3）
 
+# ファイルシグネチャ（マジックバイト）＝MIME/拡張子の申告を信用せず先頭バイトで実体を検証（セキュリティ一覧 §8）。
+# 署名を持たない型（text/*）は検証不能＝allowlist に委ねる（許可）。webp は RIFF....WEBP で別途判定。
+_MAGIC: dict[str, list[bytes]] = {
+    "image/png": [b"\x89PNG\r\n\x1a\n"],
+    "image/jpeg": [b"\xff\xd8\xff"],
+    "image/gif": [b"GIF87a", b"GIF89a"],
+    "application/pdf": [b"%PDF-"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    "application/zip": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+}
 
-def validate_image_upload(content_type: str, size: int) -> None:
-    """画像アップロードのサーバー検証（§2.2⑧・§1.10）＝MIME allowlist・サイズ上限・非空。
 
-    アバター/背景（K.4）・会社アイコン（B.1）など全画像 EP で共用（DRY・§2.3）。
+def _signature_ok(mime: str, data: bytes) -> bool:
+    """先頭バイトが申告 MIME のシグネチャと一致するか（§8「MIME だけを信用しない／シグネチャ確認」）。"""
+    if mime == "image/webp":
+        return len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP"
+    prefixes = _MAGIC.get(mime)
+    if prefixes is None:
+        return True  # 署名不明の型（text/* 等）＝検証不能なので allowlist に委ねる
+    return any(data.startswith(p) for p in prefixes)
+
+
+def validate_image_upload(content_type: str, data: bytes) -> None:
+    """画像アップロードのサーバー検証（§2.2⑧・§1.10・§8）＝MIME allowlist・サイズ上限・非空・シグネチャ一致。
+
+    アバター/背景（K.4）・会社アイコン（B.1）など全画像 EP で共用（DRY・§2.3）。`data`＝実バイト。
     """
+    size = len(data)
     if content_type not in ALLOWED_IMAGE_MIME:
         raise AppError(422, "validation_error", detail="対応していない画像形式です（PNG/JPEG/WebP/GIF）",
                        errors=[{"field": "file"}])
@@ -65,14 +89,18 @@ def validate_image_upload(content_type: str, size: int) -> None:
         raise AppError(422, "validation_error", detail="ファイルが空です", errors=[{"field": "file"}])
     if size > MAX_IMAGE_BYTES:
         raise AppError(422, "validation_error", detail="画像サイズが上限を超えています", errors=[{"field": "file"}])
+    if not _signature_ok(content_type, data):  # MIME 申告を信用せずシグネチャで実体検証（§8）
+        raise AppError(422, "validation_error", detail="ファイル内容が申告した画像形式と一致しません",
+                       errors=[{"field": "file", "code": "signature_mismatch"}])
 
 
-def validate_attachment_upload(filename: str, size: int) -> str:
-    """添付アップロードのサーバー検証（D.3・§1.10・§5.12）＝拡張子 allowlist・サイズ上限・非空。
+def validate_attachment_upload(filename: str, data: bytes) -> str:
+    """添付アップロードのサーバー検証（D.3・§1.10・§5.12・§8）＝拡張子 allowlist・サイズ上限・非空・シグネチャ一致。
 
-    申告 Content-Type は信用せず**拡張子から正規 MIME を導出**して返す（永続化する mime_type）。
-    完全な magic-byte スニッフィングは follow-up（D.8）。返り値＝正規 MIME。
+    申告 Content-Type は信用せず**拡張子から正規 MIME を導出**し、さらに**先頭バイト（マジックバイト）で実体を検証**
+    （MIME/拡張子偽装拒否・§8）。署名を持たない型（text/*）は allowlist に委ねる。返り値＝正規 MIME。
     """
+    size = len(data)
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     mime = ATTACHMENT_EXT_TO_MIME.get(ext)
     if mime is None:
@@ -84,6 +112,9 @@ def validate_attachment_upload(filename: str, size: int) -> str:
     if size > MAX_ATTACHMENT_BYTES:
         raise AppError(422, "validation_error", detail="ファイルサイズが上限（20MB）を超えています",
                        errors=[{"field": "files", "code": "too_large"}])
+    if not _signature_ok(mime, data):  # 拡張子と実体（マジックバイト）の一致を検証（§8）
+        raise AppError(422, "validation_error", detail="ファイル内容が拡張子と一致しません",
+                       errors=[{"field": "files", "code": "signature_mismatch"}])
     return mime
 
 
