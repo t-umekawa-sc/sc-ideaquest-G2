@@ -18,7 +18,8 @@
 ### 3-E. SC-12 残 demo 接続＝評価列(F)＋週間ランキング(G)（本セッション末）
 - **backend**＝`IdeaCardDTO` に `evaluation`（`{state, overall_avg, evaluator_count}`）追加。`evaluations.application.eval_states_for_ideas(ts, quest, user, ideas)`＝submitted 評価を batch（`repo.list_submitted_evaluations_for_ideas`）→ アイデアごとに可視評価（`_can_view_evaluation`・F.1）で `overall_avg`（n/5・`_aggregate` 再利用）を算定。state＝submitted が1件でもあれば done。`ideas.get_ideas` が batch し `_idea_card` へ渡す（evaluations.application を遅延 import・循環回避）。
 - **frontend**＝`QuestDetailView` の評価列を `card.evaluation` にマップ（評価済 n/5・可視0は「評価済」・未評価は「評価待ち」）。クエスト内週間ランキングを `getRankings("this_week", {scope:"quest:{id}", limit:3})` で実接続（デモ RANKING 撤去）。codegen 再生成で `IdeaCardDTO.evaluation` 型反映。
-- **テスト**＝`doc/テスト/D_アイデア.md` D-TC-150＋`tests/evaluations/test_api.py::test_d_tc_150_ideas_list_eval_aggregate`。red-green＝`eval_states_for_ideas` に `return {}` 差込で red→撤去で green（台帳 D/SC-12 節）。ランキング(G) は既存テストで担保。
+- **コメント数(E)も接続**＝`IdeaCardDTO.comment_count` を E 非削除チャット件数に（`chat_repo.count_active_messages_for_ideas` の batch・`get_ideas` で合成・トゥームストーン除外）。フロントは既に表示（変更不要）。テスト＝D-TC-151（`tests/ideas/test_api.py`・red-green＝batch stub）。
+- **テスト**＝`doc/テスト/D_アイデア.md` D-TC-150/151＋`tests/evaluations/test_api.py::test_d_tc_150_ideas_list_eval_aggregate`。red-green＝`eval_states_for_ideas`/`count_active_messages_for_ideas` に stub 差込で red→撤去で green（台帳 D/SC-12 節）。ランキング(G) は既存テストで担保。
 
 ### 3-D. 全文検索 J（SC-12）
 - **PGroonga カスタム DB イメージ**＝`impl/db/Dockerfile`（`FROM postgres:16`〔現 trixie〕＋`postgresql-16-pgdg-pgroonga`＝PGDG 版の正しいパッケージ名。`-pgroonga` 単体は PGDG では候補なし）。`compose.yaml` の db を `build: ./db`（image `ideaquest-db-pgroonga:16`）へ。**既存 db_data ボリューム（trixie/glibc2.41）と一致＝collation 警告なし・データ保持**。
@@ -32,7 +33,7 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 ### 4-1. backend（pytest）
-- **`pytest tests/`（全体）＝450 passed＋既存フラキー（A-TC-038/095/096＝mail 系順序依存・全体実行で稀に1件落ち・単独 green）**（J 8＋SC-12 評価集計 D-TC-150）。cwd=`impl` 厳守。
+- **`pytest tests/`（全体）＝452 passed＋既存フラキー（A-TC-038/095/096＝mail 系順序依存・全体実行で稀に1件落ち・単独 green）**（J 8＋SC-12 評価集計 D-TC-150＋コメント数 D-TC-151）。cwd=`impl` 厳守。
 - migration＝control head **0012**／company head **0018**（pgroonga）。**db/backend/frontend/worker は本セッションで再ビルド済み**。`GET /quests/{id}/search` 未認証 401 を実アプリで確認。
 ### 4-2. frontend（tsc・e2e）
 - **tsc＝既知1件のみ**（`Snackbar.tsx:122`）。J のフロント変更はクリーン。
@@ -60,7 +61,7 @@
 ## 7. 次にやること（優先順・具体的に）
 - **横断ドメインは H/L/I/J 完了**（通知・リアルタイム・ダッシュボード・全文検索）。残りは `doc/実装計画.md`「その他」＋`impl/README.md` の 🟡/未接続を棚卸し。候補＝
   1. **SC-12 の残 demo＝完了**（評価列 F・クエスト内週間ランキング G 接続済み）。
-  2. **未接続画面/細部の洗い出し**（`impl/README.md` 画面テーブルの 🟡＝例＝SC-01 の細部・その他）／コメント数(E) は IdeaCard で 0 固定＝一覧のコメント数接続が残（D 側 `comment_count`）。
+  2. **コメント数(E)＝完了**（`IdeaCardDTO.comment_count` を E 非削除チャット件数に接続・D-TC-151）。残＝`impl/README.md` 画面テーブルは全 ✅・細部の follow-up（SC-25 intercept モーダル化・締切事前 disable）と UI ポリッシュのみ。全画面・全横断ドメインが実接続済みなので、次は要件(FR)網羅の点検 or 本番デプロイ準備（`doc/本番デプロイ要件.md`）が候補。
   3. **アップロード/画像まわり**の未接続があれば（実装計画で後回し禁止の項目）。
 - 着手前に `impl/README.md` の現況と正本を開き、**未着手はユーザーへスコープ確認**。
 - **J の follow-up（任意・将来）**＝グローバル `GET /search`＋ヘッダー導線／検索語の最小文字数・演算子（OR/フレーズ）・正規化／種別間スコア重み／`per_page` 最終値／高精度化（Meilisearch/OpenSearch＋kuromoji・§6）（J.6 残 TBD）。
