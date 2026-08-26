@@ -50,8 +50,9 @@ def _login(client, acc) -> None:
     assert r.status_code == 200, r.text
 
 
-def _mail_subjects(mail) -> list[str]:
-    return [m.subject for m in mail.sent]
+def _mail_subjects(mail, to: str | None = None) -> list[str]:
+    """当該宛先の送信メール subject（to 指定＝他テストの drain 行に依存しない・決定性）。"""
+    return [m.subject for m in mail.sent if to is None or m.to == to]
 
 
 # --- new_device（A.9-⑧(a)） --------------------------------------------------------------
@@ -65,7 +66,7 @@ def test_h_tc_151_mfa_off_new_device_notifies_and_mails(client, factory, mail):
     ns = _security_notifs(SEED_COMPANY_CODE, acc["id"], "security_new_device")
     assert len(ns) == 1
     assert ns[0]["params"] and ns[0]["params"].get("device") and ns[0]["params"].get("at")
-    assert any("新しい端末" in s for s in _mail_subjects(mail))   # MFA-OFF 前倒しメール
+    assert any("新しい端末" in s for s in _mail_subjects(mail, acc["email"]))   # MFA-OFF 前倒しメール
     assert client.cookies.get("iq_trust")                          # 端末認識トークン発行
 
 
@@ -74,10 +75,10 @@ def test_h_tc_152_mfa_off_known_device_silent(client, factory, mail):
     acc = factory.make_seed_company_account()
     _login(client, acc)
     assert len(_security_notifs(SEED_COMPANY_CODE, acc["id"], "security_new_device")) == 1
-    mails_first = sum("新しい端末" in s for s in _mail_subjects(mail))
+    mails_first = sum("新しい端末" in s for s in _mail_subjects(mail, acc["email"]))
     _login(client, acc)  # iq_trust 保持で再ログイン＝既知端末
     assert len(_security_notifs(SEED_COMPANY_CODE, acc["id"], "security_new_device")) == 1
-    assert sum("新しい端末" in s for s in _mail_subjects(mail)) == mails_first
+    assert sum("新しい端末" in s for s in _mail_subjects(mail, acc["email"])) == mails_first
 
 
 def test_h_tc_153_mfa_on_verify_new_device_no_mail(client, factory, mail):
@@ -90,7 +91,7 @@ def test_h_tc_153_mfa_on_verify_new_device_no_mail(client, factory, mail):
     r2 = client.post(VERIFY, json={"code": otp}, headers=_csrf(client))
     assert r2.status_code == 200 and r2.json()["status"] == "authenticated", r2.text
     assert len(_security_notifs(SEED_MFA_COMPANY_CODE, acc["id"], "security_new_device")) == 1
-    subjects = _mail_subjects(mail)
+    subjects = _mail_subjects(mail, acc["email"])
     assert not any("新しい端末" in s for s in subjects)   # MFA-ON はメール無し
     assert any("認証コード" in s for s in subjects)         # OTP は送っている
 
@@ -119,7 +120,7 @@ def test_h_tc_161_password_setup_complete_notifies_and_mails(client, factory, ma
     r = client.post(COMPLETE, json={"token": token, "new_password": GOOD_PW})
     assert r.status_code == 200, r.text
     assert len(_security_notifs(SEED_COMPANY_CODE, acc["id"], "security_password_changed")) == 1
-    assert any("パスワードが変更されました" in s for s in _mail_subjects(mail))
+    assert any("パスワードが変更されました" in s for s in _mail_subjects(mail, acc["email"]))
 
 
 def test_h_tc_162_self_password_change_notifies_and_mails(client, factory, mail):
@@ -130,4 +131,4 @@ def test_h_tc_162_self_password_change_notifies_and_mails(client, factory, mail)
                     headers=_csrf(client))
     assert r.status_code == 204, r.text
     assert len(_security_notifs(SEED_COMPANY_CODE, acc["id"], "security_password_changed")) == 1
-    assert any("パスワードが変更されました" in s for s in _mail_subjects(mail))
+    assert any("パスワードが変更されました" in s for s in _mail_subjects(mail, acc["email"]))

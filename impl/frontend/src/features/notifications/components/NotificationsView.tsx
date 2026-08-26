@@ -6,6 +6,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { realtime } from "@/lib/realtime";
+
 import { getNotifications, markAllRead, markRead, markUnread, type NotificationDTO } from "../api";
 import "../notifications.css";
 
@@ -89,6 +91,19 @@ export function NotificationsView() {
     setLoading(false);
   }, [fState, fCat]);
   useEffect(() => { void load(); }, [load]);
+
+  // リアルタイム（L）＝新着で再取得（現在の絞り込みを維持）・未読数はイベントで即時反映。真実は REST。
+  useEffect(() => {
+    realtime.start();
+    const offs = [
+      realtime.on("notification.created", () => { void load(); }),
+      realtime.on("notification.unread_count", (d) => {
+        const u = (d as { unread_count?: number }).unread_count;
+        if (typeof u === "number") setUnreadCount(u);
+      }),
+    ];
+    return () => offs.forEach((f) => f());
+  }, [load]);
 
   const setRead = async (id: string, read: boolean) => {
     // 楽観更新＋サーバー権威（未読数はレスポンスで補正）。

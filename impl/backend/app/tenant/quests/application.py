@@ -18,8 +18,10 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
+from app.tenant.chat import repository as chat_repo
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.notifications import service as notify_svc
+from app.tenant.realtime import events as realtime_events
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
@@ -513,8 +515,12 @@ def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: 
         _guard_not_completed(quest)
         if uid == quest.owner_id:
             raise AppError(422, "validation_error", detail="作成者はパーティーから外せません", errors=[{"field": "user_id", "reason": "last_owner"}])
+        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id)  # L.4 失効対象（除去前に取得）
         repo.remove_member(ts, quest.id, uid)  # 有効参加が無ければ no-op（冪等）
         ts.commit()
+    # L.4＝除去後、このユーザーの当該クエスト chat 購読を強制ドロップ（ハブへ失効シグナル）
+    for cg_id in cg_ids:
+        realtime_events.publish_revoke(uid, cg_id, company_id=company_id)
 
 
 def set_member_permissions(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,

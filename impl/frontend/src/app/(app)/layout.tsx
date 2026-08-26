@@ -3,9 +3,9 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { AppHeader } from "@/components/layout";
 import { ConfirmProvider, SnackbarProvider } from "@/components/ui";
 import { LogoutAllMenuItem, LogoutMenuItem } from "@/features/auth";
+import { LiveAppHeader, RealtimeProvider } from "@/features/notifications";
 import { BackgroundImageMenuItem } from "@/features/profile";
 import { getServerMe, headerBalance } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
@@ -34,17 +34,18 @@ export default async function AppLayout({
     display_name: me?.profile.display_name ?? session.user.display_name,
     avatar_url: me?.profile.avatar_image_url ?? null,
   };
-  const demoUnread = 0;
   return (
     <SnackbarProvider>
      <ConfirmProvider>
+      {/* リアルタイム（L）＝ヘッダーベルの未読数を WS で即時更新。初期値は provider が getUnreadCount で seed。 */}
+      <RealtimeProvider>
       {/* コンテンツ背景（ユーザー個人設定・全認証画面に反映・K.4）。設定時は署名URL を敷き薄スクリム（.is-set）。 */}
       <div
         className={backgroundUrl ? "app-bg is-set" : "app-bg"}
         aria-hidden="true"
         style={backgroundUrl ? { backgroundImage: `url("${backgroundUrl}")` } : undefined}
       />
-      <AppHeader user={headerUser} balance={balance} unreadCount={demoUnread}>
+      <LiveAppHeader user={headerUser} balance={balance}>
         {/* メニュー項目は app 層が features から差し込む */}
         <li role="none">
           <Link role="menuitem" href="/profile">プロフィール</Link>
@@ -86,11 +87,12 @@ export default async function AppLayout({
         <li role="none">
           <LogoutAllMenuItem />
         </li>
-      </AppHeader>
+      </LiveAppHeader>
       <main className="container" style={{ paddingBlock: "var(--space-8)" }}>
         {children}
       </main>
       {modal}
+      </RealtimeProvider>
      </ConfirmProvider>
     </SnackbarProvider>
   );

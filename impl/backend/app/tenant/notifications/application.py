@@ -14,6 +14,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.notifications import catalog
 from app.tenant.notifications import repository as repo
+from app.tenant.notifications import service
 from app.tenant.profile import repository as profile_repo
 from app.tenant.notifications.service import TYPE_PRIORITY
 
@@ -119,6 +120,7 @@ def _set_read(account_id, company_id, notif_id, is_read: bool) -> dict:
             raise AppError(404, "not_found")  # 他人宛は存在秘匿（IDOR・H.4）
         n.is_read = is_read  # 冪等（既に同状態でも no-op で 200）
         unread = repo.unread_count(ts, user.id)
+        service.publish_unread_count(ts, user.id, unread)  # ベル同期（post-commit・L.3）
         ts.commit()
         return {"id": str(n.id), "is_read": is_read, "unread_count": unread}
 
@@ -141,5 +143,6 @@ def mark_all_read(account_id, company_id, *, type_param=None) -> dict:
             raise AppError(401, "unauthenticated")
         updated = repo.mark_all_read(ts, user.id, types=types)
         unread = repo.unread_count(ts, user.id)
+        service.publish_unread_count(ts, user.id, unread)  # ベル同期（post-commit・L.3）
         ts.commit()
         return {"updated": updated, "unread_count": unread}

@@ -21,6 +21,17 @@ def get_chat_group_by_idea(session: Session, idea_id: uuid.UUID) -> ChatGroup | 
     return session.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
 
 
+def list_chat_group_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストの全アイデアの chat_group_id（L.4 購読失効の対象特定）。"""
+    from app.tenant.ideas.orm import Idea
+
+    return list(
+        session.execute(
+            select(ChatGroup.id).join(Idea, Idea.id == ChatGroup.idea_id).where(Idea.quest_id == quest_id)
+        ).scalars().all()
+    )
+
+
 def ensure_chat_group(session: Session, idea_id: uuid.UUID) -> ChatGroup:
     """アイデアのチャットグループを取得、無ければ作成（`UNIQUE(idea_id)`・冪等）。"""
     cg = get_chat_group_by_idea(session, idea_id)

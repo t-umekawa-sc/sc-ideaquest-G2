@@ -9,17 +9,20 @@
 """
 from __future__ import annotations
 
+import functools
 import logging
 import uuid
 from typing import Callable, Iterable
 
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.tenant.notifications import repository as repo
+from app.tenant.notifications import catalog, repository as repo
 from app.tenant.notifications.orm import Notification
+from app.tenant.realtime.events import notifications_topic, publish_event
 
 logger = logging.getLogger("app.notifications")
 
@@ -67,17 +70,81 @@ def notify(session: Session, entries: Iterable[dict]) -> list[Notification]:
         )
         repo.add(session, n)
         created.append(n)
-    _publish(best.keys())
+    _queue_created(session, created)  # post-commit で `notifications:{user_id}` へ配信（L.3）
     return created
 
 
-def _publish(recipient_ids) -> None:
-    """`notifications:{user_id}` への Redis publish（L=WS 実装まで no-op・§1.12・H.0）。
+# --- リアルタイム配信（L・post-commit best-effort・§1.12/L.3）------------------------------
 
-    TODO(L): ドメイン L（リアルタイム配信）実装時に、行 INSERT に続けて post-commit で
-    `notifications:{user_id}` へ新着＋未読数イベントを publish する（H が発行・L が WS 転送）。
-    """
-    return None
+@functools.lru_cache(maxsize=256)
+def _company_id_for_db(db_identifier: str) -> str | None:
+    """会社DB 名→company_id（安定・キャッシュ）。WS 封筒の cross-tenant フィルタ用（§1.5）。"""
+    with control_session() as s:
+        c = s.query(Company).filter_by(db_identifier=db_identifier).one_or_none()
+        return str(c.id) if c else None
+
+
+def _company_id_of(session: Session) -> str | None:
+    try:
+        return _company_id_for_db(session.get_bind().url.database)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _ensure_after_commit(session: Session) -> None:
+    """このセッションの commit 後に保留配信を publish（rollback では捨てる）。1 セッション 1 回だけ登録。"""
+    if session.info.get("_rt_hooked"):
+        return
+    session.info["_rt_hooked"] = True
+    event.listen(session, "after_commit", _flush_pending)
+    event.listen(session, "after_rollback", _drop_pending)
+
+
+def _flush_pending(session: Session) -> None:
+    for topic, type_, data in session.info.pop("_rt_pending", []):
+        company_id = data.pop("_company_id", None)  # 内部キー＝封筒へ。data からは除く
+        publish_event(topic, type_, data, company_id=company_id)
+
+
+def _drop_pending(session: Session) -> None:
+    session.info.pop("_rt_pending", None)
+
+
+def _queue(session: Session, topic: str, type_: str, data: dict) -> None:
+    data["_company_id"] = _company_id_of(session)  # 封筒 company_id（_flush で取り出す）
+    session.info.setdefault("_rt_pending", []).append((topic, type_, data))
+    _ensure_after_commit(session)
+
+
+def _created_data(session: Session, n: Notification, unread_count: int) -> dict:
+    """`notification.created` の data＝REST 表現（H.2）＋unread_count（速報 best-effort・§8-⑳）。"""
+    r = catalog.render(session, n)
+    return {
+        "id": str(n.id), "type": n.type, "body": r["body"], "context": r["context"],
+        "icon": r["icon"], "tag": r["tag"], "meta": r["meta"], "is_read": n.is_read,
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+        "ref": {
+            "idea_id": str(n.ref_idea_id) if n.ref_idea_id else None,
+            "chat_message_id": str(n.ref_chat_message_id) if n.ref_chat_message_id else None,
+            "idea_revision_id": str(n.ref_idea_revision_id) if n.ref_idea_revision_id else None,
+            "achievement_id": str(n.ref_achievement_id) if n.ref_achievement_id else None,
+            "quest_id": str(n.ref_quest_id) if n.ref_quest_id else None,
+        },
+        "unread_count": unread_count,
+    }
+
+
+def _queue_created(session: Session, created: list[Notification]) -> None:
+    for n in created:
+        unread = repo.unread_count(session, n.recipient_id)  # INSERT 後（同一 Tx・未 commit）
+        _queue(session, notifications_topic(n.recipient_id), "notification.created",
+               _created_data(session, n, unread))
+
+
+def publish_unread_count(session: Session, recipient_id: uuid.UUID, unread_count: int) -> None:
+    """既読/未読操作でベルの未読数を同期（`notification.unread_count`・post-commit・L.3）。"""
+    _queue(session, notifications_topic(recipient_id), "notification.unread_count",
+           {"unread_count": unread_count})
 
 
 def _resolve_company(company_id: uuid.UUID) -> Company | None:

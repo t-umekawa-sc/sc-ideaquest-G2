@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { realtime } from "@/lib/realtime";
 import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import {
@@ -78,6 +79,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
+  const [chatGroupId, setChatGroupId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [replyTargets, setReplyTargets] = useState<{ id: string; name: string; text: string }[]>([]);
   const [canSend, setCanSend] = useState(false);
@@ -109,6 +111,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       }
       setIdea(d);
       setMessages(chat.data);
+      setChatGroupId(chat.chat_group_id);
       setFirstUnread(chat.unread?.first_unread_message_id ?? null);
       setLoadError(null);
       // メンション候補・魔法カタログ（非致命）。
@@ -139,6 +142,16 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     const chat = await getChat(ideaId);
     if (chat) setMessages(chat.data);
   }, [ideaId]);
+
+  // リアルタイム（L）＝chat:{chat_group_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
+  useEffect(() => {
+    if (!chatGroupId) return;
+    realtime.start();
+    const topic = `chat:${chatGroupId}`;
+    realtime.subscribe(topic);
+    const off = realtime.onTopic(topic, () => { void refetch(); });
+    return () => { off(); realtime.unsubscribe(topic); };
+  }, [chatGroupId, refetch]);
 
   const updateSendState = useCallback(() => {
     setCanSend((boxRef.current?.value.trim().length ?? 0) > 0 || pendingFiles.length > 0);

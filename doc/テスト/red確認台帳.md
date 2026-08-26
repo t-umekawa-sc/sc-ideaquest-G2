@@ -569,3 +569,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（発火ヘルパ反転 actual） |
 | --- | --- |
 | H-TC-151〜162（6 件） | `security_events.fire_new_device`/`fire_password_changed` 先頭に `return` を差し込み＝どの認証イベントでも通知/メールが作られない → 6 件全て red（実測 `6 failed`：in-app 通知 0 件・new_device/password_changed メール subject 不在・iq_trust 未発行）。撤去＝両ヘルパ復元で in-app＋メール＋監査が発火し 6 件 green |
+
+## L. リアルタイム配信（WS 配信ハブ・L-TC-101〜121・2026-08-26）
+
+> 新規ドメイン L（配信ハブ＝`app/tenant/realtime/`・`GET /api/v1/realtime`）は新規なので test-first。WS 受信テストは配信が壊れると receive がハングするため、red は**イベント `type` を一時的に破壊**（配信は起きるが type/body 不一致で assert が落ちる）方式で目視。gate/filter 系（L-TC-105/112）は別途アサーション反転で確認可能。
+
+| TC-ID | 観測 red（`publish_event` の type 破壊 actual） |
+| --- | --- |
+| L-TC-102/103・104・111・113（配信 4 件） | `events.publish_event` で `type="_red_"` を一時差込＝購読者へは届くが type が不正 → `notification.created`/`notification.unread_count`/`chat.message.created`/`chat.reaction.added` の type/body アサーションが不一致で 4 件 red。撤去で 8 件 green。接続/認証（L-TC-101）・門番拒否（L-TC-112）・cross-tenant（L-TC-105）・失効（L-TC-121）は配信 type に非依存で green のまま |

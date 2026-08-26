@@ -25,6 +25,8 @@ from app.tenant.gamification.router import router as gamification_router
 from app.tenant.shop.router import router as shop_router
 from app.tenant.achievements.router import router as achievements_router
 from app.tenant.notifications.router import router as notifications_router
+from app.tenant.realtime.router import router as realtime_router
+from app.tenant.realtime.hub import get_hub
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -51,7 +53,11 @@ def _warn_untrusted_proxy_config() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN201
     _warn_untrusted_proxy_config()
-    yield
+    await get_hub().start()  # 配信ハブ起動＝Redis 購読ループ（L・§1.12）
+    try:
+        yield
+    finally:
+        await get_hub().stop()
 
 
 app = FastAPI(title="ideaquest backend", version="0.0.1", lifespan=lifespan)
@@ -69,6 +75,7 @@ app.include_router(gamification_router)  # テナントプレーン（ドメイ�
 app.include_router(shop_router)  # テナントプレーン（ドメイン G・ショップ/装備 SC-30/31）
 app.include_router(achievements_router)  # テナントプレーン（ドメイン G・実績 SC-40）
 app.include_router(notifications_router)  # テナントプレーン（ドメイン H・通知 SC-02＋ヘッダーベル）
+app.include_router(realtime_router)  # テナントプレーン（ドメイン L・WS 配信ハブ /realtime）
 
 
 @app.middleware("http")

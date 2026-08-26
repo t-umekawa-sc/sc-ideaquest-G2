@@ -20,6 +20,7 @@ from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.notifications import service as notify_svc
+from app.tenant.realtime import events as realtime_events
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
 from app.tenant.quests import repository as quests_repo
@@ -157,6 +158,8 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
     _notify_message_posted(company_id, idea.id, msg.id)
+    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.created",
+                                  payload, company_id=company_id)  # 即時反映（L.3）
     return payload
 
 
@@ -207,6 +210,8 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
     _notify_message_updated(idea.id, msg.id)
+    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.updated",
+                                  payload, company_id=company_id)  # 即時反映（L.3）
     return payload
 
 
@@ -220,7 +225,7 @@ def delete_message(account_id, company_id, message_id) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, idea, quest, _cg = _resolve_message(ts, mid, user)
+        msg, idea, quest, cg = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
@@ -231,6 +236,10 @@ def delete_message(account_id, company_id, message_id) -> dict:
         msg.deleted_at = datetime.now(timezone.utc)
         ts.commit()
     _notify_message_deleted(idea.id, msg.id)
+    tombstone = {"id": str(msg.id), "is_deleted": True,
+                 "deleted_at": msg.deleted_at.isoformat() if msg.deleted_at else None}
+    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.deleted",
+                                  tombstone, company_id=company_id)  # トゥームストーン即時反映（L.3）
     return {"id": str(msg.id), "is_deleted": True, "deleted_at": msg.deleted_at}
 
 
@@ -300,6 +309,9 @@ def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_
         ts.commit()
     if type == "magic":
         _notify_reaction(company_id, idea.id, msg.id, author_id, user.id, magic_spell_id)
+    realtime_events.publish_event(
+        realtime_events.chat_topic(cg.id), "chat.reaction.added",
+        {"message_id": str(msg.id), "reactions": result["reactions"]}, company_id=company_id)  # L.3
     return result
 
 
@@ -313,7 +325,7 @@ def remove_reaction(account_id, company_id, message_id, *, emoji=None, magic=Fal
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, _idea, quest, _cg = _resolve_message(ts, mid, user)
+        msg, _idea, quest, cg = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if magic:
             r = repo.get_magic_reaction_of_message(ts, msg.id)
@@ -325,6 +337,9 @@ def remove_reaction(account_id, company_id, message_id, *, emoji=None, magic=Fal
                 repo.remove_reaction(ts, r)
         result = {"reactions": _message_reactions(ts, msg, user.id)}
         ts.commit()
+    realtime_events.publish_event(
+        realtime_events.chat_topic(cg.id), "chat.reaction.removed",
+        {"message_id": str(msg.id), "reactions": result["reactions"]}, company_id=company_id)  # L.3
     return result
 
 
