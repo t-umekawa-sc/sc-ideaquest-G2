@@ -135,27 +135,28 @@ def get_rankings(account_id, company_id, *, period="this_week", scope="company",
             raise AppError(401, "unauthenticated")
         if quest_id is not None and quests_repo.get_active_member(ts, quest_id, user.id) is None:
             raise AppError(404, "not_found")  # クエスト内は門番（C.0）
-        rows = gami_repo.aggregate_ranking(ts, start=start, end=end, quest_id=quest_id)
-        # スコア降順・タイブレーク＝XP→コイン→先着（first_at 昇順）。
-        rows.sort(key=lambda r: (-(r[1] + r[2]), -r[1], -r[2], r[3]))
-        total = len(rows)
-        users = quests_repo.get_users_by_ids(ts, {r[0] for r in rows})
-        ranked = [
-            {"rank": i + 1, "user": _rank_user_dto(users.get(r[0]), r[0]), "score": r[1] + r[2], "xp": r[1], "coin": r[2]}
-            for i, r in enumerate(rows)
-        ]
-        page = ranked[offset:offset + limit]
-        has_next = offset + limit < total
-        next_cursor = _encode_offset(offset + limit) if has_next else None
-        # me＝ランキング内の自分（圏外でも同梱）。
-        mine = next((e for e in ranked if e["user"]["id"] == str(user.id)), None)
+        rows = gami_repo.aggregate_ranking(ts, start=start, end=end, quest_id=quest_id)  # DB 側で順位確定済み（§7）
+        total = len(rows)  # 軽量タプルのみ（DTO/署名URL は生成しない）
+        # me＝順位/スコア（圏外でも同梱）。全行走査は軽量（DTO 化しない）。
+        my_idx = next((i for i, r in enumerate(rows) if r[0] == user.id), None)
+        my = rows[my_idx] if my_idx is not None else None
         me = {
-            "rank": mine["rank"] if mine else None,
-            "score": mine["score"] if mine else 0,
-            "xp": mine["xp"] if mine else 0,
-            "coin": mine["coin"] if mine else 0,
+            "rank": (my_idx + 1) if my_idx is not None else None,
+            "score": (my[1] + my[2]) if my else 0,
+            "xp": my[1] if my else 0,
+            "coin": my[2] if my else 0,
             "total_users": total,
         }
+        # DTO（氏名/アバター署名URL）解決はページ分のみ＝全ユーザー分の署名URL 生成を避ける（性能）。
+        page_rows = rows[offset:offset + limit]
+        users = quests_repo.get_users_by_ids(ts, {r[0] for r in page_rows})
+        page = [
+            {"rank": offset + i + 1, "user": _rank_user_dto(users.get(r[0]), r[0]),
+             "score": r[1] + r[2], "xp": r[1], "coin": r[2]}
+            for i, r in enumerate(page_rows)
+        ]
+        has_next = offset + limit < total
+        next_cursor = _encode_offset(offset + limit) if has_next else None
     return {"data": page, "page_info": {"next_cursor": next_cursor, "has_next": has_next}, "me": me}
 
 

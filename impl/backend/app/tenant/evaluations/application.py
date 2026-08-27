@@ -78,7 +78,8 @@ def get_aggregate(account_id, company_id, idea_id) -> dict:
         submitted = repo.list_evaluations_for_idea(ts, idea.id, status="submitted")
         scores_by_eval = repo.get_scores_for_evaluations(ts, [e.id for e in submitted])
         # 表示集計＝閲覧者に可視な評価のみ（limited は範囲外に完全非表示・分母にも入れない）。
-        visible = [e for e in submitted if _can_view_evaluation(ts, idea, quest, user, e)]
+        is_manager = _viewer_is_manager(ts, quest, user)  # 権限は評価に依らず不変＝1回
+        visible = [e for e in submitted if _can_view_evaluation(idea, user, e, is_manager)]
         agg = _aggregate(visible, scores_by_eval, ts)
         # コイン見込み＝visibility 無視で全 submitted から算定。確定済みなら確定額。
         agg["coin"] = _coin_status(ts, idea, submitted, scores_by_eval)
@@ -270,10 +271,11 @@ def eval_states_for_ideas(ts, quest, user, ideas) -> dict:
     for e in subs:
         by_idea.setdefault(e.idea_id, []).append(e)
     scores = repo.get_scores_for_evaluations(ts, [e.id for e in subs]) if subs else {}
+    is_manager = _viewer_is_manager(ts, quest, user)  # 権限はページ内不変＝ループ外で1回（per-評価の N+1 回避）
     out: dict = {}
     for idea in idea_list:
         evs = by_idea.get(idea.id, [])
-        visible = [e for e in evs if _can_view_evaluation(ts, idea, quest, user, e)]
+        visible = [e for e in evs if _can_view_evaluation(idea, user, e, is_manager)]
         agg = _aggregate(visible, scores, ts) if visible else None
         out[idea.id] = {
             "state": "done" if evs else "pending",
@@ -283,13 +285,21 @@ def eval_states_for_ideas(ts, quest, user, ideas) -> dict:
     return out
 
 
-def _can_view_evaluation(ts, idea, quest, user, ev) -> bool:
-    """評価の閲覧可否（visibility 適用・F.1）。party＝全員／limited＝投稿者＋当該評価者＋owner/quest_admin。"""
+def _viewer_is_manager(ts, quest, user) -> bool:
+    """閲覧者が owner/quest_admin か（limited 評価の閲覧可否・**ページ内不変**＝呼出側でループ外に1回算出）。"""
+    return _is_owner(quest, user) or "quest_admin" in _perms_of(ts, quest, user)
+
+
+def _can_view_evaluation(idea, user, ev, is_manager: bool) -> bool:
+    """評価の閲覧可否（visibility 適用・F.1）。party＝全員／limited＝投稿者＋当該評価者＋owner/quest_admin。
+
+    `is_manager`＝`_viewer_is_manager`（ページ内不変）を受け取り、per-評価の権限クエリ（N+1）を避ける。
+    """
     if ev.visibility == "party":
         return True
     if ev.evaluator_id == user.id or idea.author_id == user.id:
         return True
-    return _is_owner(quest, user) or "quest_admin" in _perms_of(ts, quest, user)
+    return is_manager
 
 
 def _guard_not_completed(quest) -> None:

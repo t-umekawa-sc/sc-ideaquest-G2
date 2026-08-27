@@ -26,12 +26,15 @@ def aggregate_ranking(
     score は application 側で `xp+coin`。SP は対象外（kind を xp_gain/coin_gain に限定）。
     `quest_id` 指定でクエスト内（`activities.quest_id`）。返り値＝[(user_id, xp, coin, first_at)]。
     """
-    xp = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "xp_gain"), 0).label("xp")
-    coin = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "coin_gain"), 0).label("coin")
+    xp_e = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "xp_gain"), 0)
+    coin_e = func.coalesce(func.sum(Activity.amount).filter(Activity.kind == "coin_gain"), 0)
+    first_e = func.min(Activity.created_at)
     stmt = (
-        select(Activity.user_id, xp, coin, func.min(Activity.created_at).label("first_at"))
+        select(Activity.user_id, xp_e.label("xp"), coin_e.label("coin"), first_e.label("first_at"))
         .where(Activity.kind.in_(("xp_gain", "coin_gain")))
         .group_by(Activity.user_id)
+        # 順位確定は DB 側で＝スコア(xp+coin)降順・タイブレーク XP→コイン→先着(first_at 昇順・§7）。
+        .order_by((xp_e + coin_e).desc(), xp_e.desc(), coin_e.desc(), first_e.asc())
     )
     if start is not None:
         stmt = stmt.where(Activity.created_at >= start)
