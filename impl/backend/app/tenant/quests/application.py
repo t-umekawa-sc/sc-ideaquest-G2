@@ -271,8 +271,10 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                 extra={"errors": [{"reason": "invalid_state"}]},
             )
         _apply_content(ts, quest, body)
+        removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
-            _apply_party_diff(ts, quest, body.members, requester=user, group_id=quest.quest_group_id)
+            removed = _apply_party_diff(ts, quest, body.members, requester=user, group_id=quest.quest_group_id)
+        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
         # 公開中クエストは不正な状態へ落とせない＝strict 再検証（未充足は 422）。
         if quest.status in _PUBLIC_STATUS:
             _validate_publishable(
@@ -281,6 +283,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
             )
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
+    _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・全体編集での除外も失効）
     return detail
 
 
@@ -309,8 +312,10 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
                 extra={"errors": [{"reason": "invalid_state"}]},
             )
         _apply_content(ts, quest, body)
+        removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
-            _apply_party_diff(ts, quest, body.members, requester=user, group_id=quest.quest_group_id)
+            removed = _apply_party_diff(ts, quest, body.members, requester=user, group_id=quest.quest_group_id)
+        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
         _validate_publishable(
             title=quest.title, color=quest.color,
             categories=repo.list_categories(ts, quest.id), quest_group_id=quest.quest_group_id,
@@ -321,6 +326,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
         published_id = quest.id
         ts.commit()
     _notify_party_invited(company_id, published_id, recipients, user.id)  # 公開＝参加通知（H・C.2）
+    _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・publish 時の除外も失効）
     return detail
 
 
@@ -462,9 +468,11 @@ def set_party(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, me
             raise AppError(404, "not_found")
         _authorize_edit(ts, quest, user)
         _guard_not_completed(quest)
-        _apply_party_diff(ts, quest, members, requester=user, group_id=quest.quest_group_id)
+        removed = _apply_party_diff(ts, quest, members, requester=user, group_id=quest.quest_group_id)
+        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
         data = _members_payload(ts, quest)
         ts.commit()
+    _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・バルク除外でも失効）
     return {"data": data}
 
 
@@ -497,6 +505,17 @@ def add_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
     return dto
 
 
+def _revoke_chat_subscriptions(company_id: uuid.UUID, cg_ids, removed_uids) -> None:
+    """L.4＝除去メンバーの当該クエスト chat 購読を強制ドロップ（**post-commit**・ハブへ失効シグナル）。
+
+    バルクのパーティー差分（set_party/update_quest/publish_quest）でも増分 DELETE と同じく発火させる。
+    再接続時は L.2 gate が再検証するが、除去直後の生 WS を即ドロップする（L.4）。
+    """
+    for uid in removed_uids:
+        for cg_id in cg_ids:
+            realtime_events.publish_revoke(uid, cg_id, company_id=company_id)
+
+
 def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, user_id: str) -> None:
     """メンバーをパーティーから外す（C.3 DELETE /members・論理削除）。作成者は除外不可（422）。"""
     company = _resolve_company(company_id)
@@ -518,9 +537,7 @@ def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: 
         cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id)  # L.4 失効対象（除去前に取得）
         repo.remove_member(ts, quest.id, uid)  # 有効参加が無ければ no-op（冪等）
         ts.commit()
-    # L.4＝除去後、このユーザーの当該クエスト chat 購読を強制ドロップ（ハブへ失効シグナル）
-    for cg_id in cg_ids:
-        realtime_events.publish_revoke(uid, cg_id, company_id=company_id)
+    _revoke_chat_subscriptions(company_id, cg_ids, [uid])  # L.4（post-commit）
 
 
 def set_member_permissions(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
@@ -641,7 +658,7 @@ def _validate_publishable(*, title, color, categories, quest_group_id) -> None:
         raise AppError(422, "validation_error", detail="公開に必要な項目が不足しています", errors=errors)
 
 
-def _apply_party_diff(ts, quest, desired_members, *, requester, group_id) -> None:
+def _apply_party_diff(ts, quest, desired_members, *, requester, group_id) -> list:
     """パーティーの差分適用（あるべき全体像→追加/更新/除外）。全経路共有のサーバー強制ルール（C.3）。
 
     - 候補制限＝追加/更新対象は当該グループの有効メンバーのみ（範囲外は 422 user_id）。
@@ -673,8 +690,10 @@ def _apply_party_diff(ts, quest, desired_members, *, requester, group_id) -> Non
     }
     for uid, perms in desired.items():
         repo.add_member(ts, quest.id, uid, permissions=perms, granted_by_id=requester.id)
-    for uid in current - set(desired):
+    removed = list(current - set(desired))
+    for uid in removed:
         repo.remove_member(ts, quest.id, uid)
+    return removed  # L.4＝呼び出し側が post-commit で除去メンバーの chat 購読を失効させる
 
 
 def _validate_permissions(perms) -> list[str] | None:

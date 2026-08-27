@@ -159,3 +159,29 @@ def test_l_tc_121_revoke_on_member_removal(chatenv, factory):
             ws.send_json({"op": "subscribe", "topic": f"chat:{cg}"})
             resp = ws.receive_json()
             assert resp["op"] == "error" and resp["code"] == "subscribe_denied"  # "after" は届いていない
+
+
+def test_l_tc_122_revoke_on_bulk_party_removal(chatenv, factory, monkeypatch):
+    """L-TC-122 バルクのパーティー更新（PUT /party）での除去でも失効シグナルが発火（L.4・M1）。
+
+    増分 DELETE /members（L-TC-121）だけでなく、SC-11 の全体編集経路（set_party/update_quest/publish）
+    でも除去メンバー×chat group に publish_revoke を出す（結線漏れの根治）。
+    """
+    cg = _cg_id(chatenv)
+    member = factory.make_seed_company_account()
+    with get_tenant_session(chatenv["db"]) as ts:
+        muid = get_user_by_account(ts, member["id"]).id
+        quests_repo.add_member(ts, chatenv["quest_id"], muid, permissions=["comment"])
+        ts.commit()
+
+    calls: list = []
+    monkeypatch.setattr("app.tenant.realtime.events.publish_revoke",
+                        lambda uid, cg_id, *, company_id: calls.append((str(uid), str(cg_id))))
+
+    owner = TestClient(app)
+    _login(owner, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # PUT /party で member を除外（owner のみ残す＝bulk 除去）
+    r = owner.put(f"/api/v1/quests/{chatenv['quest_id']}/party", json={"members": []}, headers=_csrf(owner))
+    assert r.status_code == 200, r.text
+    # 除去メンバー×chat group に失効シグナルが発火（bulk 経路でも L.4）
+    assert (str(muid), str(cg)) in calls

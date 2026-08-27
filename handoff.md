@@ -71,7 +71,8 @@
 > **仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
 > - ✅ **H1 修正済**＝`complete_password_setup`（PW再設定完了）で信頼端末を失効していなかった（A.7/A.9-③ 違反）→ `revoke_all_trusted_devices` を同一Txに追加（A-TC-049 拡張・red→green）。
 > - ✅ **H2 修正済**＝`change_account`（ロール変更）で信頼端末を失効していなかった（A.9-③ 違反）→ 同上（B-TC-032 拡張・red→green）。
-> - ⬜ **M1**（med・guard-missing）＝L.4 購読失効 `publish_revoke` がバルクのパーティー除外（`quests/application.py:_apply_party_diff`）・グループ除去で未発火（専用 `DELETE /members` のみ結線）。再接続時は L.2 で塞がるが除外直後の WS 窓。
+> - ✅ **M1 修正済（パーティー差分）**＝L.4 購読失効を**バルク経路にも結線**。`_apply_party_diff` が除去 uid を返し、`set_party`/`update_quest`/`publish_quest` が post-commit で `_revoke_chat_subscriptions`（除去×chat group に `publish_revoke`）を発火（増分 `DELETE /members` の DRY 化含む）。L-TC-122（bulk PUT /party・monkeypatch で発火検証・red→green）。
+> - ⬜ **M1b（残・小）**＝**クエストグループ除去**（`quest_group_application.py:remove_membership`／`admin/application.py`）は依然 `publish_revoke` 未発火。グループ除去はグループ内全クエストの chat 可視性を失わせるため、除去 user × グループ内全クエストの chat group に失効が要る（control_plane 側・system_admin 操作でより低頻度）。着手時は tenant 側 `_revoke_chat_subscriptions` を再利用する導線を検討。
 > - ✅ **M2 修正済**＝公開アイデアの並行 `PATCH` を 409 `edit_conflict` に（版INSERTの `UNIQUE(idea_id,revision)` 違反を `ideas/application.py` の `update_idea` で `IntegrityError`→翻訳・`edit_conflict` code 追加・フロント `mapServerErrors` に実行可能文言）。D-TC-143（red→green）＋vitest 3。
 > - ✅ **M3 誤検知（コード変更不要・調査で確定）**＝「代理公開で投稿XP+50 が公開者に付く」は**発生しない**。下書きは本人のみ可視で、他人（owner/quest_admin）の下書き公開は `_authorize_edit_idea` が 404（代理公開不可）＝publish 時は常に `user==投稿者`ゆえ現行の付与先は正しい。ガードテスト D-TC-145（他人 owner の publish=404・誰にも idea_post 付与なし）で不変条件を固定し、コメントも明確化。将来この経路を開くなら D-TC-145 が赤化して XP 受給者の再検討を促す。
 > - ✅ **M4 修正済**＝`GET /ideas/{id}` の `vote.stale`（`my_vote` あり かつ `voted_revision < current_revision`）を `_build_detail` で算出。フロント SC-22 に「⚠ 投票後に更新」バッジ＋見直し文言（押し直しで解消）。D-TC-144（red→green）。
