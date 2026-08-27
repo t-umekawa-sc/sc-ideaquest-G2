@@ -32,6 +32,7 @@ def get_achievements(account_id, company_id, *, category=None, state="all") -> d
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
+        en = user.locale == "en"  # 受信者 locale でマスタ名を出し分け（§2.1・既定 ja）
         owned = repo.list_user_achievements(ts, user.id)
         all_achs = repo.list_achievements(ts)  # 1回だけ取得（total 用の再取得を排除）
         data = []
@@ -61,8 +62,11 @@ def get_achievements(account_id, company_id, *, category=None, state="all") -> d
                 cur, target, _ = engine.compute(ts, user, ach)  # 未評価は読み取り算出
             data.append({
                 "id": str(ach.id), "code": ach.code, "category": ach.category, "tier": ach.tier,
-                "icon": ach.icon, "name": ach.name_ja, "description": ach.description_ja,
-                "condition_label": ach.description_ja, "coin_reward": ach.coin_reward,
+                "icon": ach.icon,
+                "name": ach.name_en if en else ach.name_ja,
+                "description": ach.description_en if en else ach.description_ja,
+                "condition_label": ach.description_en if en else ach.description_ja,
+                "coin_reward": ach.coin_reward,
                 "is_secret": ach.is_secret, "unlocked": unlocked,
                 "unlocked_at": ua.unlocked_at if ua else None,
                 "progress": {"current": cur, "target": target},

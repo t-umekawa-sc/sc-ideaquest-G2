@@ -11,6 +11,7 @@ from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification.orm import Activity
+from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.shop.orm import Item, UserItem
 from tests.admin.test_admin_accounts import _login
@@ -136,3 +137,23 @@ def test_g_tc_308_csrf_and_unauth(client, factory):
     _login_new(client, factory)
     assert client.post(f"{ITEMS}/{item.id}/purchase").status_code == 403
     assert client.put("/api/v1/me/equipment", json={"head": None}).status_code == 403
+
+
+def _set_locale(account_id, locale: str) -> None:
+    with get_tenant_session(_db()) as s:
+        get_user_by_account(s, account_id).locale = locale
+        s.commit()
+
+
+def test_g_tc_309_my_items_name_locale(client, factory):
+    """G-TC-309: 所有装備一覧のマスタ名 locale 出し分け（§2.1・crown=王冠/Crown）。"""
+    acc = _login_new(client, factory)
+    _own(acc, "crown", equipped=True)  # head
+
+    def _crown_name() -> str:
+        body = client.get("/api/v1/me/items").json()
+        return next(x["name"] for x in body["slots"]["head"] if x["item_id"] == str(_item("crown").id))
+
+    assert _crown_name() == "王冠"  # 既定 ja
+    _set_locale(acc, "en")
+    assert _crown_name() == "Crown"  # 受信者 locale=en で英語名

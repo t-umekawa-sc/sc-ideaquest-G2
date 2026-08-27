@@ -118,3 +118,25 @@ def test_g_tc_506_my_achievements(client, factory):
     assert r.status_code == 200, r.text
     codes = {d["code"] for d in r.json()["data"]}
     assert "evaluator_3" in codes
+
+
+def _set_locale(user_id, locale: str) -> None:
+    with get_tenant_session(_db()) as s:
+        s.get(User, user_id).locale = locale
+        s.commit()
+
+
+def test_g_tc_507_achievement_name_locale(client, factory):
+    """G-TC-507: 実績一覧のマスタ名/説明 locale 出し分け（§2.1・evaluator_3=評価者/Evaluator）。"""
+    uid = _login_new(client, factory)  # 非シークレット実績は未獲得でも実名で返る
+
+    def _row():
+        return next(a for a in client.get(ACH).json()["data"] if a.get("code") == "evaluator_3")
+
+    r_ja = _row()  # 既定 ja
+    assert r_ja["name"] == "評価者"
+    assert r_ja["description"] == "評価を3件確定する" and r_ja["condition_label"] == "評価を3件確定する"
+    _set_locale(uid, "en")
+    r_en = _row()  # 受信者 locale=en
+    assert r_en["name"] == "Evaluator"
+    assert r_en["description"] == "Submit 3 evaluations" and r_en["condition_label"] == "Submit 3 evaluations"

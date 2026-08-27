@@ -77,6 +77,7 @@ def get_my_items(account_id, company_id) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
+        en = user.locale == "en"  # 受信者 locale でマスタ名を出し分け（§2.1・既定 ja）
         items = {it.id: it for it in repo.list_items(ts)}
         slots: dict[str, list] = {s: [] for s in SLOTS}
         equipped: dict[str, str | None] = {s: None for s in SLOTS}
@@ -84,7 +85,8 @@ def get_my_items(account_id, company_id) -> dict:
             it = items.get(ui.item_id)
             if it is None or ui.slot not in slots:
                 continue
-            slots[ui.slot].append({"item_id": str(it.id), "name": it.name_ja, "rarity": it.rarity, "is_equipped": ui.is_equipped})
+            slots[ui.slot].append({"item_id": str(it.id), "name": it.name_en if en else it.name_ja,
+                                   "rarity": it.rarity, "is_equipped": ui.is_equipped})
             if ui.is_equipped:
                 equipped[ui.slot] = str(it.id)
         return {"slots": slots, "equipped": equipped}

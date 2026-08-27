@@ -45,6 +45,7 @@
 | G-TC-306 | api | 装備更新（各スロット1点・切替/解除） | 同スロット2点所有 | `PUT /me/equipment`（装備→別装備→null） | 装備で `equipped[slot]`＝item・切替で1点のみ（部分ユニーク）・null で解除 | G.2／§8-⑩ |
 | G-TC-307 | api | 未所有/スロット不一致は 422 | 未所有 item / 別スロット item | `PUT /me/equipment` | 422（`field`＝slot） | G.2 |
 | G-TC-308 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST purchase`／`PUT equipment` | 403 csrf_failed／401 | A.0 |
+| G-TC-309 | api | 所有装備一覧のマスタ名 locale 出し分けの担保（i18n 結線） | `crown`（ja=王冠/en=Crown）を装備した実ユーザー。`users.locale` を ja→en に切替 | `GET /me/items` を各 locale で | ja は `name`=「王冠」・en は `name`=「Crown」（受信者 locale で選択・§2.1・既定 ja） | コーディング規約 §2.1／G.2 |
 
 ## 4. ランキング API（SC-41 全社／SC-12 クエスト内・G.5）
 
@@ -70,3 +71,4 @@
 | G-TC-504 | api | 報酬は一度きり（冪等） | 評価3件→さらに1件付与 | achievement_reward activity 件数 | evaluator_3 の achievement_reward は1件のまま（UNIQUE＋exists_ref） | G.4 |
 | G-TC-505 | api | 全種系（all_spells） | user_spells 6件を seed→spell_unlock 付与 | `GET /achievements` | `spellmaster` unlocked・coin 150 | G.4 |
 | G-TC-506 | api | 自分の獲得実績 | evaluator_3 獲得済み | `GET /me/achievements` | evaluator_3 が unlocked_at 付きで返る | G.4 |
+| G-TC-507 | api | 実績一覧のマスタ名/説明 locale 出し分けの担保（i18n 結線） | evaluator_3（ja=評価者/en=Evaluator・説明も en 有り）。`users.locale` を ja→en に切替 | `GET /achievements` を各 locale で | ja は `name`=「評価者」/`description`=`condition_label`=「評価を3件確定する」・en は `name`=「Evaluator」/`description`=`condition_label`=「Submit 3 evaluations」（受信者 locale で選択・§2.1） | コーディング規約 §2.1／G.4 |
