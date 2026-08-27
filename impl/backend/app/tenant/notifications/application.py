@@ -52,8 +52,8 @@ def _parse_types(type_param) -> list[str] | None:
     return raw or None
 
 
-def _dto(ts, n) -> dict:
-    r = catalog.render(ts, n)
+def _dto(ts, n, locale=None) -> dict:
+    r = catalog.render(ts, n, locale)
     return {
         "id": str(n.id), "type": n.type, "body": r["body"], "context": r["context"],
         "icon": r["icon"], "tag": r["tag"],
@@ -89,7 +89,7 @@ def get_notifications(account_id, company_id, *, state="all", type_param=None, l
         if user is None:
             raise AppError(401, "unauthenticated")
         rows, has_more = repo.list_for_recipient(ts, user.id, state=state, types=types, before=before, limit=limit)
-        data = [_dto(ts, n) for n in rows]
+        data = [_dto(ts, n, user.locale) for n in rows]  # 受信者＝本人の locale で描画（§2.1）
         unread = repo.unread_count(ts, user.id)
         next_cursor = _encode_cursor(rows[-1]) if (has_more and rows) else None
         return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_more}, "unread_count": unread}

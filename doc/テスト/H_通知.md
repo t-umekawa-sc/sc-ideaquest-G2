@@ -58,3 +58,4 @@
 | H-TC-154 | api | MFA-ON 信頼端末で MFA スキップ→通知しない | 有効 `iq_trust` を持つ MFA-ON 実アカウント | `login`（trust で MFA スキップ）成功 | `security_new_device` を生成しない（既知端末） | A.9-⑧(a) ノイズ回避 |
 | H-TC-161 | api | PW 設定完了（A 経路）→変更完了通知＋メール | 実アカウント・有効な password_setup トークン | `POST /auth/password-setup/complete` 成功 | `security_password_changed` 1件・`mail_outbox` に password_changed メール1通 | A.9-⑧(b)／A.7 |
 | H-TC-162 | api | 自己 PW 変更（K 経路）→変更完了通知＋メール | ログイン中の実アカウント | `POST /me/password`（自己PW変更）成功 | `security_password_changed` 1件・password_changed メール1通・全セッション破棄 | A.9-⑧(b)／K.3 |
+| H-TC-170 | unit | 通知カタログの locale 出し分けの担保（i18n 結線） | `render()` に locale=None/`en`/`fr` を与える（security_password_changed・security_new_device・mention・未知種別） | body/context/tag/icon を検査 | 既定/不明（None/`fr`）は日本語・`en` は英語（body/tag/context とも）。icon は locale 非依存。受信者 locale の源泉＝`users.locale`（§4.6 ミラー） | コーディング規約 §2.1／H.2 |

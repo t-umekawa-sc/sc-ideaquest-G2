@@ -22,6 +22,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.notifications import catalog, repository as repo
 from app.tenant.notifications.orm import Notification
+from app.tenant.profile.orm import User
 from app.tenant.realtime.events import notifications_topic, publish_event
 
 logger = logging.getLogger("app.notifications")
@@ -116,9 +117,9 @@ def _queue(session: Session, topic: str, type_: str, data: dict) -> None:
     _ensure_after_commit(session)
 
 
-def _created_data(session: Session, n: Notification, unread_count: int) -> dict:
+def _created_data(session: Session, n: Notification, unread_count: int, locale: str | None = None) -> dict:
     """`notification.created` の data＝REST 表現（H.2）＋unread_count（速報 best-effort・§8-⑳）。"""
-    r = catalog.render(session, n)
+    r = catalog.render(session, n, locale)
     return {
         "id": str(n.id), "type": n.type, "body": r["body"], "context": r["context"],
         "icon": r["icon"], "tag": r["tag"], "meta": r["meta"], "is_read": n.is_read,
@@ -137,8 +138,10 @@ def _created_data(session: Session, n: Notification, unread_count: int) -> dict:
 def _queue_created(session: Session, created: list[Notification]) -> None:
     for n in created:
         unread = repo.unread_count(session, n.recipient_id)  # INSERT 後（同一 Tx・未 commit）
+        recipient = session.get(User, n.recipient_id)  # 受信者 locale で速報を描画（§2.1・§4.6 ミラー）
+        locale = recipient.locale if recipient else None
         _queue(session, notifications_topic(n.recipient_id), "notification.created",
-               _created_data(session, n, unread))
+               _created_data(session, n, unread, locale))
 
 
 def publish_unread_count(session: Session, recipient_id: uuid.UUID, unread_count: int) -> None:
