@@ -68,7 +68,7 @@
 | ドメイン | ルータ | 状態 |
 |---|---|---|
 | 認証（A/B） | `control_plane/auth`・`control_plane/admin`・`control_plane/me` | ✅ ログイン/管理/プロフィール。**K.4.1 `PUT /me/avatar-base`＝3D アバター男女2ベース選択（migration 0019・`users.avatar_base`・`GET /me` に同梱・K-TC-011-014）** |
-| フィード（G.5.1・FR-36） | `tenant/gamification`（feed） | 🟡 **backend 完了**＝`GET /quests/{id}/activities`（SC-12 クエスト内・門番パーティー所属）・`GET /me/feed`（SC-01 チーム横断・quest 付き）＝公開種別のみ（`PUBLIC_FEED_REASONS`）・カーソル・G-TC-109/110。**フロント接続は残**（SC-12/SC-01 の demo パネル） |
+| フィード（G.5.1・FR-36） | `tenant/gamification`（feed）／フロント `features/feed` | ✅ **backend＋フロント完了**＝`GET /quests/{id}/activities`（SC-12 クエスト内・門番パーティー所属）・`GET /me/feed`（SC-01 チーム横断・quest 付き）＝公開種別のみ（`PUBLIC_FEED_REASONS`）・カーソル・G-TC-109/110。共有 `ActivityFeed` を SC-12（ランキング下）/SC-01（チームアクティビティ）に配線＝アイデア公開→両フィードに反映をブラウザ実測（人間可読は reason→文言・ref リンクは D/E 依存） |
 | クエスト（C） | `tenant/quests` | ✅ 一覧/詳細/CRUD |
 | アイデア（D） | `tenant/ideas` | ✅ **15 EP**（一覧/詳細/作成/編集/公開/削除＋投票 POST/DELETE・フォロー POST/DELETE＋添付 POST/DELETE・DL＋**版タイムライン GET・差分 GET**〔D.4〕）。公開処理で初版 revision=1 記録・`idea_revisions.created_at` 追加（migration 0011）。**XP 結線済み＝公開で投稿 XP+50（idea_post・冪等）／投票で XP+5（各アイデア初回のみ・日次上限5/日・vote 冪等）＝G 台帳（§8-⑥）** |
 | 評価（F） | `tenant/evaluations` | ✅ **5 EP**（`GET evaluation/me`・`GET evaluation`〔集計・limited 非表示〕・`PUT evaluation`〔draft/submitted＋XP+30〕・`POST/DELETE select`〔XP+200・剥奪なし〕）。投稿者コイン確定 (a) 全員提出／(b) completed 遷移（C フック）＝`evaluation_coin` 冪等。migration 0012・G ledger 連動 |

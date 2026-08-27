@@ -14,6 +14,8 @@ import type { DataTableColumn } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
+import { getQuestActivities } from "@/features/feed/api";
+import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { ApiError } from "@/lib/api/client";
 import { QuestIcon } from "@/components/layout";
 import {
@@ -215,6 +217,9 @@ export function QuestDetailView({ questId }: { questId: string }) {
       .then((r) => { if (alive) setRanking(r); }).catch(() => {});
     return () => { alive = false; };
   }, [questId]);
+
+  // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティー所属）。
+  const loadQuestFeed = useCallback((cursor?: string | null) => getQuestActivities(questId, cursor), [questId]);
   // クエリ/対象の変更でページを先頭へ戻す。
   useEffect(() => { setFtPage(1); }, [ftq, ftScope]);
   // 全文検索（J）＝デバウンス取得。空クエリ/検索タブ以外は何もしない。真実は REST。
@@ -315,6 +320,11 @@ export function QuestDetailView({ questId }: { questId: string }) {
             })}
             {ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
           </ol>
+        </section>
+
+        {/* クエスト内アクティビティ（SC-12 §4.1c・FR-36・実接続＝GET /quests/{id}/activities・公開種別のみ） */}
+        <section className="pixel-panel" aria-label="クエスト内アクティビティ">
+          <ActivityFeed title="クエスト内アクティビティ" load={loadQuestFeed} emptyText="このクエストの活動はまだありません。" />
         </section>
       </div>
 

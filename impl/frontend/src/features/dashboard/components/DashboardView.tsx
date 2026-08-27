@@ -4,11 +4,13 @@
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-01_ダッシュボード.html（DoD＝モック一致）。
 // 実接続＝I 集約 `GET /dashboard`（1往復で全パネル）。ヒーローの初期値は server の GET /me 残高（初回描画）で、
 // 取得後は集約 hero を優先。クイック投票＝POST /ideas/{id}/vote・フォロー★＝D follow EP。空パネルは非表示（§7）。
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 import { Avatar, useSnackbar } from "@/components/ui";
+import { getTeamFeed } from "@/features/feed/api";
+import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -54,6 +56,8 @@ export function DashboardView({
   const [votes, setVotes] = useState<Record<string, IdeaVoteType>>({});
   const [unfollowed, setUnfollowed] = useState<Record<string, boolean>>({});
   const bonusShown = useRef(false);
+  // チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の公開種別のみ）。
+  const loadTeamFeed = useCallback((cursor?: string | null) => getTeamFeed(cursor), []);
 
   useEffect(() => {
     let alive = true;
@@ -271,6 +275,11 @@ export function DashboardView({
           </div>
         </section>
       )}
+
+      {/* チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の場の活動＝自分宛の「通知」とは別物） */}
+      <section className="card" aria-label="チームアクティビティ">
+        <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
+      </section>
 
       {/* 下段：最近の通知＋ショートカット */}
       <div className="dash-bottom">

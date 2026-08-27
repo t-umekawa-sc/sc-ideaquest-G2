@@ -1545,6 +1545,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Activities
+         * @description クエスト内アクティビティフィード（SC-12・G.5.1）＝メンバー活動の公開種別のみ・新しい順。門番＝パーティー所属（範囲外 404）。読取専用。
+         */
+        get: operations["get_quest_activities_api_v1_quests__quest_id__activities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Team Feed
+         * @description チームフィード（SC-01・G.5.1）＝自分の参加クエスト横断のメンバー活動（公開種別のみ・各行に quest 付き）。読取専用。
+         */
+        get: operations["get_team_feed_api_v1_me_feed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/spells": {
         parameters: {
             query?: never;
@@ -2717,6 +2757,34 @@ export interface components {
              */
             status: "draft" | "submitted";
         };
+        /**
+         * FeedActivityDTO
+         * @description 他者フィードの1行（公開種別のみ）。actor＝実行者・`quest_title` はチームフィード（SC-01）のみ付与。
+         */
+        FeedActivityDTO: {
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** Kind */
+            kind: string;
+            /** Amount */
+            amount: number;
+            /** Ref Type */
+            ref_type?: string | null;
+            /** Ref Id */
+            ref_id?: string | null;
+            /** Quest Id */
+            quest_id?: string | null;
+            /** Quest Title */
+            quest_title?: string | null;
+            actor: components["schemas"]["RankingUserDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3689,6 +3757,15 @@ export interface components {
             created_at: string;
         };
         /**
+         * QuestFeedResponse
+         * @description `GET /quests/{quest_id}/activities`（SC-12・G.5.1）＝クエスト内フィード（カーソル・新しい順）。
+         */
+        QuestFeedResponse: {
+            /** Data */
+            data: components["schemas"]["FeedActivityDTO"][];
+            page_info: components["schemas"]["RankingCursorPageInfo"];
+        };
+        /**
          * QuestGroupCreateRequest
          * @description クエストグループ作成の入力（B.3・system_admin）。`quest_group_code` は大文字正規化＋形式検証（§5.4）。
          *
@@ -4073,6 +4150,15 @@ export interface components {
             unlocked: boolean;
             /** Skill Point Balance */
             skill_point_balance: number;
+        };
+        /**
+         * TeamFeedResponse
+         * @description `GET /me/feed`（SC-01・G.5.1）＝参加クエスト横断のチームフィード（各行に quest 付き）。
+         */
+        TeamFeedResponse: {
+            /** Data */
+            data: components["schemas"]["FeedActivityDTO"][];
+            page_info: components["schemas"]["RankingCursorPageInfo"];
         };
         /** UnreadCountResponse */
         UnreadCountResponse: {
@@ -7225,6 +7311,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_activities_api_v1_quests__quest_id__activities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestFeedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_team_feed_api_v1_me_feed_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamFeedResponse"];
                 };
             };
             /** @description Validation Error */
