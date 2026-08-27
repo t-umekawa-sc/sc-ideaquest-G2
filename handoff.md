@@ -4,117 +4,88 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-27**（セッション終了時・時刻は概算）。
-- ブランチ: `main`（`origin/main` と同期・**作業ツリーはクリーン＝未コミット無し**）。
-- 最新コミット: **`72271ac`** `test(J/SC-12): スニペット許可リストサニタイズを純関数化＋vitest 単体（SEC-TC-013）`。
-- 本セッションの主コミット（新しい順）＝`72271ac`（snippet サニタイズ単体）／`083ec42`+`f5414eb`（セキュリティ監査補完＝応答ヘッダ§10＋マジックバイト§8＋テスト群）／`4c0272e`+`ca8cbd7`（XP 結線漏れ修正 投稿+50/投票+5）／`fadc42a`+`1f822a2`（フラキー根治＝ワーカ停止ルール）。それ以前（H/L/I/J/SC-12 の機能スライス）は `git log` 参照。
+- ブランチ: `main`（`origin/main` と同期・**作業ツリーはクリーン**）。
+- 最新コミット: **`3ddb775`** `docs(deploy): 本番デプロイ要件 §6 を「決定」に確定（セキュリティ非妥協で採用）`。
+- 本セッションの主コミット（新しい順）＝`3ddb775`（デプロイ §6 決定）／`5ee6f0d`（デプロイハードニング＝/docs 無効化＋seed prod ゲート・SEC-TC-045/046）／`40a24da`（通知一覧 N+1 回避＝prime_refs・H-TC-171）／`6e9b575`（i18n A-4 Accept-Language＋エラー title locale・A-TC-108/109）／`ca6ef44`（i18n A-3 マスタ名 locale・G-TC-309/507）／`f3ecc09`（i18n A-1 メール／A-2 通知 locale・A-TC-107・H-TC-170）。それ以前は `git log` 参照。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)・現況の正＝[`impl/README.md`](impl/README.md)。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)・現況の正＝[`impl/README.md`](impl/README.md)。**全画面・全横断ドメインは接続済み**（`impl/README.md` 画面テーブルは全 ✅）＝本セッションも機能スライスではなく**横断品質（i18n 結線／性能／本番デプロイ準備）**が中心。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-> 本セッションは「機能スライス」ではなく**監査 → 発見した実バグ/テスト漏れの解消**が中心。全画面・全横断ドメイン（通知H/リアルタイムL/ダッシュボードI/全文検索J/SC-12）は前セッションまでに実接続済み（`impl/README.md` 画面テーブルは全 ✅）。
 
-### 3-A. 監査（FR網羅・仕様有×実装無・セキュリティテスト漏れ）
-- ユーザー依頼で横断監査を実施。判明した3点＝(1) **XP 結線が no-op の実バグ**（3-B で修正）、(2) **セキュリティ横断のテスト/実装漏れ**（3-C で補完）、(3) **3D アバター（FR-08）は仕様有るが未実装＝テストパターンも無し**（未着手・7章の候補）。
+### 3-A. Phase A＝backend locale 結線（i18n の実効化・§2.1）
+> 仕様は JA/EN 必須だがコードは「en は将来」で保留されていた。**バックエンドの自己ローカライズ出力を全て locale 実効化**（frontend の全面 i18n は別＝§7 参照）。設計上の切り分け＝**メール/通知/マスタ名は entity-bound**（`accounts.locale`／`users.locale` が源泉）で Accept-Language は効かない。Accept-Language が効くのは entity 非依存の per-request 応答＝エラー応答のみ。
+- **A-1 メール**＝`app/control_plane/mail_outbox/templates.py`。`render(category,secret,locale,params)` が受け取りながら無視していた `locale` を実効化＝全8カテゴリに EN 文面（`en = locale=="en"`・None/不明は ja フォールバック）。auth の既存 `locale=account.locale` 経路がこれで有効化。**A-TC-107**（unit）。
+- **A-2 通知**＝`app/tenant/notifications/catalog.py`。`render(session,n,locale)` を追加し ja 固定を解消＝全11種別＋context/tag/tier/actor/spell を locale 連動。マスタ名は `name_en`（spell/achievement）で解決、**アイデア/クエスト題名は UGC のため非翻訳**。受信者 locale の源泉＝`users.locale`（§4.6 ミラー）＝GET は本人 `user.locale`／push（`service.py _created_data`）は受信者 `User.locale`（クロスプレーン照会不要）。**H-TC-170**（unit）。
+- **A-3 マスタ名 API 応答**＝achievements `get_achievements`（name/description/condition_label）・shop `get_my_items`（装備 name）を受信者 `user.locale` で `name_en/name_ja` 選択。**両言語返し型**（`GET /items`・`GET /spells`＝name_ja+name_en 両方返す）は frontend 選択待ちで backend 変更不要＝対象外。単一 name 型のみ結線＝**frontend 変更なしで EN 即効**。**G-TC-309/507**（api）。
+- **A-4 Accept-Language フォールバック＋エラー応答 locale**＝新規 `app/core/locale.py`（`normalize`／`parse_accept_language`〔q 値順・q=0 除外〕／`resolve_request_locale`＝**ユーザー設定→Accept-Language→既定 ja**）。`core/deps.py resolve_session` がセッションの `locale` を `request.state.user_locale` に載せる（最優先ソース・DBヒット無し）。`core/errors.py` は `_TITLES` を JA/EN に分離し request locale で選択＋汎用バリデーション detail も locale 連動。**`code` は不変**（機械可読の正・§1.7）＝個別 detail の JA 文言は §1.7「code が正・detail は当たり」に従い対象外。**A-TC-108/109**（unit/api）。
 
-### 3-B. XP 結線漏れ修正（実バグ・コミット `4c0272e`）
-- 監査で「アイデア投稿 XP+50／投票 XP+5」が **no-op** だったと判明（台帳へ grant していなかった）。
-- `impl/backend/app/tenant/ideas/application.py`＝`_publish_processing`（idea_post を冪等 grant）・`_award_vote_xp`（各アイデア初回投票のみ＋日次上限5/日・§8-⑥）を G 台帳（`ledger.grant`）へ結線。
-- テスト＝`tests/ideas/test_api.py` の D-TC-160/161/162（`doc/テスト/D_アイデア.md`）。
-- **注（テストの落とし穴）**＝seed 会社 ACME-01 の `activities` は cross-run で残るため、**投票 XP の日次上限に依存するテストは fresh factory ユーザーを使う**（seed ユーザーは daily count が汚れている）。
+### 3-B. 通知一覧描画の per-row ref N+1 回避（性能・コミット `40a24da`）
+- `catalog.render` が各通知の ref（idea/quest/achievement/spell）を per-row `session.get` で引く N+1（別軸監査の残・優先度低）を解消。
+- `notifications/repository.py prime_refs`（新規）＝ページ分の ref を `IN` 一括ロードして identity map に載せ、後続 get を追加クエリ無しに（描画側 `catalog.render` の署名は不変＝DRY）。`application.get_notifications` の list 直後に結線。
+- **落とし穴**＝identity map は**弱参照**。ロードした ORM を捨てると render 前に GC され get が再クエリ（実測で q7=12＝N+1 継続）。`session.info["_primed_refs"]` に強参照を残して解決。
+- **H-TC-171**（int）＝distinct 実績参照の achievement 通知 K=2/7 で `get_notifications` 中の SELECT 数を計測し**行数非依存（q2==q7）**を担保。red-green＝prime 無効時 q2=7/q7=12→有効時 q2==q7。
 
-### 3-C. セキュリティ監査補完（コミット `083ec42`/`f5414eb`）
-- **実装追加**＝(1) 応答セキュリティヘッダ middleware＝`impl/backend/app/main.py`（`X-Content-Type-Options: nosniff`・`X-Frame-Options: DENY`・`Referrer-Policy: no-referrer`・`CSP default-src 'none'; frame-ancestors 'none'`・HSTS は `cookie_secure=true` 時のみ・§10）。(2) アップロードのマジックバイト検証＝`impl/backend/app/infra/storage.py`（`_MAGIC` 表＋`_signature_ok(mime,data)`。`validate_image_upload`/`validate_attachment_upload` が **`data: bytes` を受ける様に signature 変更＝全呼び出し側6箇所を追随**）。
-- **テスト補完**＝`doc/テスト/セキュリティ横断.md`（SEC-TC-001〜040）＋`doc/テスト/J_全文検索.md` J-TC-141。応答ヘッダ／マジックバイト（画像・添付）／画像サイズ上限／cross-tenant（会社別DB＝他社IDは404）／機密ログ非出力／Mass Assignment（`extra=forbid`）／検索インジェクション。
-- **注（マジックバイトの副作用）**＝アップロード系テストは**有効な先頭バイトが必須**になった＝PNG `\x89PNG`・JPEG `\xff\xd8\xff`・PDF `%PDF-`・office/zip `PK`／`text/*` は署名なしで許可。既存テストで PNG バイトを `image/jpeg` 宣言していた箇所・`b"%PDF"`（短すぎ）等を実バイトに修正済み。
+### 3-C. 本番デプロイ準備（ハードニング＋§6 決定・コミット `5ee6f0d`/`3ddb775`）
+- `doc/本番デプロイ要件.md` を点検。**コードで閉じられる 2 点を実装**（残りはインフラ/意思決定）＝
+  - `app/main.py _docs_kwargs(app_env)`＝`APP_ENV=prod` で `/docs`・`/redoc`・`/openapi.json` を全無効（最小 CSP 下で Swagger は無意味＋スキーマ露出回避・要件§2）。**SEC-TC-045**。
+  - `scripts/bootstrap.py _seed_demo_enabled(app_env)`＝`APP_ENV=prod` で demo 会社/アカウント（`_SEEDS`＝ACME 等・既定PW）を自動スキップ＝OPS テナント＋system_admin＋migration のみ（従来 `main()` の無条件 seed による本番デモ混入リスクを解消・要件§5）。**SEC-TC-046**。**注＝prod は `APP_ENV=prod` 必須**（未設定は dev 扱いで demo が入る）。
+- **§6 意思決定を「決定」に確定**（セキュリティ非妥協）＝6.1 トポロジ `/api 直結ホップ1`→`TRUSTED_PROXY_COUNT=1`（Next rewrite の未検証 XFF 依存を排除）／6.2 メール＝マネージド送信を SMTP（STARTTLS 587＋秘匿供給＋SPF/DKIM/DMARC）／6.3 Redis＝HA（最低 AOF）＋TLS/認証/私設ネット／6.4 DB＝日次フル＋WAL の PITR・保存時暗号化・**PGroonga on マネージドPG の可否検証**を分岐条件に／6.5 監査ログ＝DB(追記専用)＋期限超過を WORM アーカイブ・叩き台 DB180日/アーカイブ1年。
 
-### 3-D. フラキーテスト根治（コミット `fadc42a`/`1f822a2`）
-- 「稀に落ちる」とされた A-TC-038/040/068/070/095/096・B-TC-001/005 の真因は**環境汚染**＝pytest 実行中に `worker`/`mail-worker` が起動したままだと、両ワーカが共有 control DB の `mail_outbox`/`account_sync_outbox` を real sender で drain し、pytest のプロセス内 drain と競合する（`impl/compose.yaml` 冒頭コメントの警告事象）。
-- **恒久ルール＝pytest 時は必ずワーカ停止**（`docker compose stop worker mail-worker`／pytest は `up -d db redis` だけで回す）。ワーカ停止で 8/8 green 実測。
-- 併せて防御的隔離を投入＝`impl/backend/tests/conftest.py` の `_clean_account_sync_outbox`（outbox の autouse truncate）・`_reset_settings_cache`（`get_settings.cache_clear`）・mail 系テストの自スコープ化。
-
-### 3-E. フロント許可リストサニタイズの単体テスト（監査残の解消・最新コミット `72271ac`）
-- スニペットのサニタイズを `QuestDetailView` のインライン `_ENT`/`_decode`/`renderSnippet` から純関数へ抽出＝**新規 `impl/frontend/src/features/search/snippet.ts`**（`parseSnippet(html) -> {text,hit}[]` ＋ `decodeEntities`。設計 J.5 の「構造化セグメント」オプション）。`QuestDetailView.renderSnippet` は `parseSnippet` を map して hit→`<mark className="keyword">`・text→`<span>`（`dangerouslySetInnerHTML` 不使用は不変・§2.2④）。
-- 単体テスト＝**新規 `impl/frontend/src/features/search/snippet.test.ts`**（vitest・6件）＝keyword span のみ hit・`&lt;script&gt;` 等はデコードしてテキスト化（生タグを残さない）・不正 class span は hit にしない・空入力・`decodeEntities` 既知エンティティのみ。**red-green＝`decodeEntities` 呼びを剥がして 2件 red→戻して green を実測**。`doc/テスト/セキュリティ横断.md` に SEC-TC-013 追加。
-- **ドライブバイ修正**＝`impl/frontend/src/components/ui/Snackbar.tsx:122` の React19 `useRef` 型エラー（初期引数必須）を `useRef<...|undefined>(undefined)` に修正 → **`tsc --noEmit` 完全クリーン**。
+### 3-D. frontend i18n＝優先度低で繰延（ユーザー方針）
+- 現状＝next-intl 未導入・JA リテラルは 174 ファイル/約2570行・URL は Parallel/Intercept モーダルで複雑。既存 seam＝`lib/forms/validation.ts` の `t(locale,key)`（検証層のみ）。
+- **ユーザー決定＝多言語対応は優先度低／やるなら一般的な方法（next-intl）で・当面全訳しない**（memory `frontend-i18n-low-priority` に保存）。着手指示が出るまで §7 の繰延項目として据え置き。backend の locale 結線（3-A）で**システム生成テキストは既に ja/en 対応済み**。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-### 4-1. frontend（本セッションで実測）
-- **tsc＝完全クリーン**（`cd impl/frontend && npx tsc --noEmit` を本セッションで実行・エラー0）。
-- **vitest 単体＝15/15**（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6・`cd impl/frontend && npx vitest run` を本セッションで実行）。**環境は node（DOM 非依存の純ロジックのみ）**＝jsdom 未導入。
-- e2e（Playwright）は本セッションでは未実行（§7.5 バッチ受入方針）。
-### 4-2. backend（本セッションで full pytest を再実測）
-- **`pytest tests/` 全体 464 passed**（本セッションで 2 回実測＝健全性確認時／avatar_base migration 追加後。いずれもワーカ停止で green）。
-- 動作確認済み＝`GET /quests/{id}/search` 未認証 401 を実アプリで確認（前スライス）。
-- migration head＝control **0012**／company **0020**（`0019_company_avatar_base`＝users.avatar_base／`0020_company_balance_guards`＝残高 CHECK(>=0)＋activities 部分ユニーク〔M6〕。いずれも bootstrap 適用＋実DB検証済み）。
-### 4-3. テスト運用（本セッションで実測）
-- **TC-ID トレーサビリティ ✅（code 388）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
-- **注＝本検査は `impl/backend/tests/**/*.py` ＋ `impl/frontend/e2e/**/*.spec.ts` のみ走査**＝frontend の `src/**/*.test.ts`（vitest 単体）は対象外。正規表現も `\b([A-Z])-TC-(\d{3})\b`＝**3文字接頭辞 `SEC-TC-` に不一致**。よって vitest 単体は検査対象外で、追跡は md（SEC-TC-013 等）で担保する。
+### 4-1. backend（本セッションで実測）
+- **`pytest tests/` 全体 490 passed**（0 失敗・ワーカ停止で複数回 green）。
+- migration head＝control **0012**／company **0020**（本セッションでの migration 追加なし）。
+### 4-2. frontend（本セッションで実測）
+- **tsc＝完全クリーン**／**vitest＝5 files・28 passed**（node 環境）／**`npm run build`＝26ページ green**。本セッションで frontend コード変更なし（健全性確認のみ）。
+- e2e（Playwright）は本セッション未実行（§7.5 バッチ受入方針）。
+### 4-3. テスト運用
+- **TC-ID トレーサビリティ ✅（code 408）**＝repo ルートで `python3 scripts/check_tc_traceability.py`。
+- **注**＝走査は `impl/backend/tests/**` ＋ `impl/frontend/e2e/**` のみ・正規表現 `\b([A-Z])-TC-(\d{3})\b`。**`SEC-TC-` は3文字接頭辞で不一致＝検査対象外**（追跡は `doc/テスト/セキュリティ横断.md` の md 行で担保）。frontend `src/**/*.test.ts`（vitest 単体）も対象外。
 
-## 5. 詰まっている点（試した/失敗と理由）
-- **フラキーの初期仮説は外れ**＝当初「設定キャッシュリーク」「account_sync outbox truncate 漏れ」を疑ったが、真因は**ワーカ競合**（3-D）。防御的隔離だけでは不十分でワーカ停止が必須だった。
-- **PGroonga イメージのビルド失敗**＝`postgres:16` は現在 **Debian trixie**。パッケージ名は PGDG 版の **`postgresql-16-pgdg-pgroonga`**（`postgresql-16-pgroonga` は Debian 標準 PG 用で PGDG では候補なし）で解決。`FROM postgres:16`（trixie）を維持＝既存 `db_data` ボリューム（glibc 2.41）と一致し collation 警告を回避（bookworm へ落とすと glibc 2.36<2.41 で警告）。ファイル＝`impl/db/Dockerfile`。
-- **マジックバイトで既存テストが赤化**＝PNG バイトを `image/jpeg` 宣言・`b"%PDF"`（短すぎ）等が signature_mismatch に。実バイトへ修正して解消（3-C 注）。
-- **ルート直下の stray `backend/` フォルダ**＝cwd トラップ（Docker マウントが root として作成）由来と確認し削除済み。実体は `impl/backend/`。
-- **共有 control DB 汚染（継続・無害）**＝`t-umekawa`（非 OPS system_admin）が残存。現状動作に影響なし。
+## 5. 詰まっている点・注意（試した/失敗と理由）
+- **通知 N+1 の identity-map 事前ロードは弱参照で GC される**（3-B）。バルクロード結果は必ず強参照（`session.info`）で保持しないと `session.get` が再クエリして N+1 が残る（実測で気付いた・回帰ガードは H-TC-171）。
+- **pytest 時はワーカ停止が恒久ルール**＝`worker`/`mail-worker` 起動中は共有 control DB の outbox を real sender で drain し pytest と競合＝フラキー化（`impl/compose.yaml` 冒頭コメント）。手順は §8。
+- **エラー応答の locale は Accept-Language ベース**＝ログイン済みは `request.state.user_locale`（セッション locale）優先。個別 `AppError(detail=…)` の JA 文言は意図的に未翻訳（§1.7 で code が正・frontend が code で多言語化する前提）。
+- **PGroonga イメージ**＝`postgres:16`（Debian trixie）＋PGDG 版 `postgresql-16-pgdg-pgroonga`（`impl/db/Dockerfile`）。本番も同等の PGroonga 導入 PG16 が必須（§6.4 の分岐＝マネージドPG で拡張可否を要検証）。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **J 全文検索エンジン＝PGroonga**（採用・§6 設計準拠）＝日本語で分かち書き不要・DB 内で score/snippet 完結。**不採用＝Meilisearch/OpenSearch+kuromoji**（別サービス運用コスト増・MVP 過剰。将来の高精度化候補として J.6 に温存）。
-- **スニペットXSS対策＝許可リスト（構造化セグメント）**（採用）＝`pgroonga_snippet_html` は user 文をエスケープし `<span class="keyword">` のみ生注入。フロントは `dangerouslySetInnerHTML` を使わず keyword のみ `<mark>`・他はデコードして text 描画。**不採用＝生 HTML 挿入＋DOMPurify**（依存追加＋原理的に許可リストの方が安全）。
-- **フロント単体は vitest（node・純ロジック）**（採用）＝サニタイズは DOM 非依存に切り出せるため jsdom 不要。**不採用＝React Testing Library/jsdom 導入**（今回の対象には過剰。将来 DOM 依存の単体が必要になったら再検討）。
-- **pytest 時はワーカ停止**（採用・恒久運用ルール・3-D）。
-- **可視範囲はクエリ WHERE で強制／門番＝パーティー∩グループ AND／下書きは本人分も FTS 対象外**（J.0）。
-- **テスト運用＝md 先行＋TC-ID＋red-green（red確認台帳）**（継続）。ブラウザ受入は後日バッチ（§7.5・ユーザー確認 2026-08-25）。
+- **backend locale 結線の切り分け**（採用・3-A）＝メール/通知/マスタ名は entity-bound（stored locale が源泉）／Accept-Language は per-request のエラー応答にのみ適用。**不採用＝全出力に Accept-Language**（entity に紐づく出力では誤り）。
+- **frontend i18n は next-intl（標準）・優先度低で繰延**（採用・ユーザー決定・3-D）。**不採用＝自作 `t()` を全画面へ手拡張**（標準でない・維持コスト）。
+- **通知 N+1 は identity-map 事前ロード（署名不変）**（採用・3-B）＝`catalog.render` を変えず repository で prime。**不採用＝render に解決済みキャッシュを引数追加**（署名変更＝呼び出し側の広範改修）。
+- **本番ハードニングはコードで自動強制**（採用・3-C）＝prod で /docs 無効・demo seed スキップ。**不採用＝運用手順書だけに委ねる**（設定漏れで露出/混入のリスク）。
+- **デプロイ §6 はセキュリティ非妥協で確定**（採用・3-C）＝実IP確定 hop1・TLS 全経路・秘匿供給・追記専用監査・保存時暗号化。
+- （継続）J 検索＝PGroonga／スニペット XSS＝許可リスト構造化セグメント／pytest はワーカ停止／テスト運用＝md 先行＋TC-ID＋red-green（`doc/テスト/red確認台帳.md`）／ブラウザ受入は後日バッチ（§7.5）。
 
 ## 7. 次にやること（優先順・具体的に）
+> 全画面・全横断ドメインは接続済み。過去セッションの大規模パンチリスト（監査 HIGH／M1-M6／FR-08 3D 骨組み／別軸監査の性能・a11y）は**すべて完了**（詳細は `git log`）。以下は**実際に残っている作業**。
 
-> **別軸監査（2026-08-27・i18n／性能N+1／a11y・並列）の punch-list**。quick win（性能+a11y）は本セッションで修正。
-> - ✅ **性能 修正済**＝`_idea_card` の投票を `get_votes_for_ideas` で一括化（SC-12 一覧の N+1 解消）／`get_team_feed` の二重 `get_quest` を `get_quests_by_ids` バッチへ（F1 の無駄除去）。
-> - ✅ **a11y 修正済**＝`Field` が `aria-describedby` で入力↔エラー/補足を結線（全フォーム・SR がフォーカス時に理由読み上げ）／SC-25 スター採点を `role=radio`+`aria-checked`+矢印キー+roving tabindex に（クリック/矢印での選択・aria-checked 更新を実測。※モーダル内のフォーカス追従は focus trap との兼ね合いで best-effort＝値変更は state ベースで機能）。
-> - ⬜ **i18n（EN）＝大規模・別判断**＝EN は事実上未実装（next-intl 未導入で UI 全面 JA／メール `templates.py` が locale 引数を無視〔XP no-op 型〕／通知 `catalog.render` に locale 引数なし／マスタ名フロントで `name_ja` 固定／`Accept-Language` 参照0）。仕様は JA/EN 必須だがコードは「en は将来」と明記＝意図的保留。潰すには frontend next-intl 導入＋backend templates/catalog/master-name への locale 適用（フェーズ分割要）。
-> - ✅ **性能 残 修正済（主要2件）**＝①ランキング＝`aggregate_ranking` に DB 側 `ORDER BY`（スコア/XP/コイン/先着・§7）を入れ Python ソート廃止＋**DTO/署名URL 解決をページ分のみ**に（全ユーザー分の avatar 署名URL 生成を回避・total/me は軽量タプルで算出）。②評価集計 `eval_states_for_ideas`＝viewer の owner/quest_admin 判定（`_viewer_is_manager`）をループ外で1回に（per-評価の権限 N+1 回避）。full pytest 481。③dashboard `_unvoted`/`_followed`＝quest/poster/vote を `get_quests_by_ids`/`get_users_by_ids`/`count_votes_for_ideas` でバッチ（`_batch_refs`・per-item N+1 解消）。④achievements＝`list_achievements` の二重取得を1回に。⑤chat＝引用元を `get_messages_by_ids` で一括。**残（軽微・任意）**＝notifications の per-row `catalog.render` 内 `ts.get`（ref 解決・limit≤30・優先度低）／dashboard `_drafts` の draft 評価の per-item（下書きは通常少数）。
-> - ✅ **a11y 残 修正済**＝①DataTable のリスト行にキーボード発火（`tabIndex=0`＋Enter/Space→`onRowClick`・カード表示と同等）＝行クリックのみの一覧もキーボードで開ける（Enter で `/ideas/{id}` 遷移をブラウザ実測）。②`<table>` に sr-only `<caption>`（`.sr-only` ユーティリティを design-system.css に追加）。③Avatar に `tabIndex=0`（CSS `.avatar[data-name]:focus-visible::after` は既存＝フォーカスで氏名ツールチップ）。tsc/vitest/build green。
-> - ✅ **J-TC-141 フラキー根治**＝真因＝chat テスト等の pgroonga 操作後、接続プール上で `pgroonga_query_extract_keywords('*')` が稀に失敗（Groonga ランタイム状態・エラー文字列にゴミ `*X||`）＝**PGroonga の脆さ**。修正＝検索 application で各種別の read を `try/except DBAPIError`＝pgroonga パース失敗は rollback して空（該当なし）＝**ユーザー入力で 5xx を出さない**（injection-safe の本旨・実 production の堅牢性向上）。full pytest 481 passed（0 失敗・フラキー消滅）。
-
-> **（前回）仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
-> - ✅ **H1 修正済**＝`complete_password_setup`（PW再設定完了）で信頼端末を失効していなかった（A.7/A.9-③ 違反）→ `revoke_all_trusted_devices` を同一Txに追加（A-TC-049 拡張・red→green）。
-> - ✅ **H2 修正済**＝`change_account`（ロール変更）で信頼端末を失効していなかった（A.9-③ 違反）→ 同上（B-TC-032 拡張・red→green）。
-> - ✅ **M1 修正済（パーティー差分）**＝L.4 購読失効を**バルク経路にも結線**。`_apply_party_diff` が除去 uid を返し、`set_party`/`update_quest`/`publish_quest` が post-commit で `_revoke_chat_subscriptions`（除去×chat group に `publish_revoke`）を発火（増分 `DELETE /members` の DRY 化含む）。L-TC-122（bulk PUT /party・monkeypatch で発火検証・red→green）。
-> - ✅ **M1b 修正済**＝**クエストグループ除去**（`quest_group_application.py:remove_member`）も `publish_revoke` を発火。新クエリ `chat_repo.list_chat_group_ids_for_group_member(group_id,user_id)`＝グループ内クエストで有効パーティー員の chat group のみ特定（過剰失効なし）→post-commit で失効。L-TC-123（クエリ int・red→green）。配線は set_party 等と同一パターン（L-TC-122 で検証済み）。
-> - ✅ **M2 修正済**＝公開アイデアの並行 `PATCH` を 409 `edit_conflict` に（版INSERTの `UNIQUE(idea_id,revision)` 違反を `ideas/application.py` の `update_idea` で `IntegrityError`→翻訳・`edit_conflict` code 追加・フロント `mapServerErrors` に実行可能文言）。D-TC-143（red→green）＋vitest 3。
-> - ✅ **M3 誤検知（コード変更不要・調査で確定）**＝「代理公開で投稿XP+50 が公開者に付く」は**発生しない**。下書きは本人のみ可視で、他人（owner/quest_admin）の下書き公開は `_authorize_edit_idea` が 404（代理公開不可）＝publish 時は常に `user==投稿者`ゆえ現行の付与先は正しい。ガードテスト D-TC-145（他人 owner の publish=404・誰にも idea_post 付与なし）で不変条件を固定し、コメントも明確化。将来この経路を開くなら D-TC-145 が赤化して XP 受給者の再検討を促す。
-> - ✅ **M4 修正済**＝`GET /ideas/{id}` の `vote.stale`（`my_vote` あり かつ `voted_revision < current_revision`）を `_build_detail` で算出。フロント SC-22 に「⚠ 投票後に更新」バッジ＋見直し文言（押し直しで解消）。D-TC-144（red→green）。
-> - ✅ **M5 修正済（サーバー＋spend系フロント）**＝横断ミドルウェア `app/core/idempotency.py`（会社×アカウント×キーで Redis スコープ・24h・`SET NX` in_flight→done・replay/in_progress/key_reuse・2xx/決定的4xx のみ保存・5xx 解放・commit 後保存）。`main.py` に `add_request_id` の内側で登録＝**POST＋`Idempotency-Key` ヘッダ有りのみ作動**（未付与 POST は素通し＝既存 479 テスト不変）。フロント `idempotencyHeader()`＝**購入/魔法解放/アイデア投稿(作成・公開)/クエスト作成(作成・公開) 配線済み**（評価確定は `PUT`＝HTTP 冪等でヘッダ不要）。SEC-TC-041-044（red→green）。§1.9 対象 POST のクライアント配線は完了。
-> - ✅ **M6 修正済**＝migration `0020_company_balance_guards`＝`users.xp/coin_balance/skill_point_balance` に `CHECK(>=0)`（負残高を DB 拒否）＋`activities` 部分ユニーク `UNIQUE(user_id,kind,reason,ref_type,ref_id) WHERE ref_id IS NOT NULL`（付与冪等の DB 最終防御＝`exists_ref` の SELECT を抜けた並行 INSERT を拒否・ref_id NULL の login/levelup_sp は重複可）。G-TC-107/108（red→green・既存データ重複0/負残高0を事前確認）。company head 0020。
-> - ✅ **F1 完了（backend＋フロント）**＝FR-36 アクティビティフィード ②`GET /quests/{id}/activities`（SC-12・門番＝パーティー所属）・③`GET /me/feed`（SC-01・参加クエスト横断・各行 quest 付き）＝**公開種別のみ**（`gami_repo.PUBLIC_FEED_REASONS`＝idea_post/selection/achievement_reward/levelup_sp）・カーソル。G-TC-109/110（api）。フロント＝共有 `features/feed/`（api＋`ActivityFeed` コンポーネント）を SC-12（QuestDetailView・ランキング下）と SC-01（DashboardView・チームアクティビティ）に配線。人間可読は reason→文言（ref リンクは D/E 依存で当面テキスト）。**ブラウザ受入 実測**＝アイデア公開→両フィードに「投稿しました」1件・エラーなし（スクショ確認・§7.5）。tsc/vitest/build green。
-> - ✅ **stale-doc 一括修正済**（コード挙動不変・コメント/文言のみ）＝FR-01/Idea 定義「投稿でコイン付与」→「XP+50・コインは評価連動（§6）」／`ledger.py` docstring（全ドメイン共用へ）／`publish_quest`・`chat/application.py` の「no-op フック」古コメント→「結線済み」／API設計 C.7「publish 通知は H まで no-op」→「H 結線済み」。import OK 確認。
-> - **監査で確認して問題なし**（主要）＝XP/コイン付与の台帳結線（投稿+50/投票+5/評価+30/選定+200/評価連動コイン round(平均×10)・冪等・上限）／可視性門番（グループ∩パーティー・下書き本人のみ・cross-tenant 404）／権限6種の実強制／通知10種別の発生源結線／全文検索の WHERE 強制＋インジェクション対策／Mass Assignment（extra=forbid）／accounts→users ミラー網羅。
-
-1. **（推奨・低コスト）再開時の健全性確認**＝backend full pytest を再実行（4-2 の 468 が維持か）。手順＝§8 の「backend テスト」。frontend は tsc/vitest/traceability を再実行（§8）。
-2. **3D アバター（FR-08）＝着せ替え機能は実装/接続/テスト済み・残るは 3D VRM 描画のみ**（前回 handoff の「未実装」は不正確と本セッションで判明。実態＝SC-30/SC-31 ✅・migration 0015・`tests/shop`・G-TC-202/203。現状ビューアはマスコット画像＋装備アイコン重ねの 2D 見立て）。**本セッションで設計 TBD を確定**＝`doc/画面設計/screens/SC-31_アバター着せ替え.md` §9（9.1 ラインナップ確定〔既存19点シード〕・9.2 **ベース＝男女2体**〔`users.avatar_base` 新規列・要データモデル追記〕＋同一 humanoid リグで装備共用・9.3 2Dフォールバック/性能・9.4 回転ON/ズーム等MVP外・9.5 試着MVP外・9.6 将来〔動物キャラ等〕）。要件定義 第7節の非機能TBD（FPS/対応環境）も §9.3 へ整合。**次アクション**＝(a) ~~データモデル §5.3 に `avatar_base` 追記→migration~~ **完了**（データモデル §5.3＋enum節・migration `0019_company_avatar_base`・ORM `profile/orm.py` 追加・実DB検証済み）、(b) ~~`avatar_base` の read/write API~~ **backend 完了**（K.4.1 `PUT /me/avatar-base`・`GET /me` 同梱・K-TC-011-014・pytest 468）。(c) ~~three-vrm/R3F 導入＋WebGL フォールバック骨組み＋ベース切替 UI~~ **フロント骨組み完了**（three/@react-three/fiber v9/drei 導入＝package.json。`AvatarViewer3D.tsx`＝R3F Canvas＋プレースホルダ humanoid＋ドラッグ回転＋`prefers-reduced-motion`。`webgl.ts supportsWebGL()` で分岐＝WebGL 時 3D／非対応は 2D マスコット〔progressive enhancement・§9.3〕。ベース切替〔男/女〕→`PUT /me/avatar-base`〔SSR 初期値＝`GET /me`・楽観更新＋ロールバック〕。vitest 4件〔`avatar/avatar.test.ts`〕・tsc/lint クリーン）。**残＝(d) 実VRM 3Dアセット（男女2体＋装備パーツ）＝コード外の制作物・別途手配**＝これが入るまで `AvatarViewer3D.tsx` の TODO seam（`@pixiv/three-vrm` で `items.part_ref` をスロットへアタッチ）をプレースホルダのまま維持。**ブラウザ受入 完了**＝`e2e/sc-31-avatar.spec.ts`（**K-TC-015** green・実スタックで実測）＝ログイン→`/avatar`→3D Canvas 描画（headless chromium WebGL・`canvasCount=1`・2Dフォールバックせず）→ベース切替（男↔女）が `PUT /me/avatar-base` で永続（`GET /me` の `avatar_base` 反映・リロード後 `aria-pressed=true`）→元値へ cleanup。スクショで頭＝球/胴腕＝カプセルの 3D プレースホルダ描画を目視。
-   - **既存ビルド不具合＝根治済み**＝ホストの `npm run build` が **CSS minify（cssnano）"Unexpected '/'" で失敗していたのは本 3D とは無関係の既存バグ**。真因＝`chat.css`/`shop.css` のヘッダーコメント内でクラス列挙のグロブ `*` 直後に `/` が来て `*/` を形成（`.reaction*/`・`.spell-fx*/`・`.rarity-*/`）→ブロックコメントを早期終了→以降が不正 CSS→minify で露呈（dev は寛容で通っていた）。**修正＝`*/`→`*・`**。`next build` **26ページ green 実測**（`/avatar` First Load 169kB＝three は動的import で別チャンク・初回に含まれない）。cssnano 個別診断で全 CSS OK。
-3. **本番デプロイ準備**＝`doc/本番デプロイ要件.md` に沿って PGroonga カスタムイメージの本番反映・bootstrap/migration 手順・Redis 永続化・ヘッダのエッジ（プロキシ/TLS 前提の HSTS）整合を点検。
-4. **要件(FR)網羅の最終点検 / UI ポリッシュ follow-up**＝`impl/README.md` 画面テーブルは全 ✅。細部 follow-up の現況（2026-08-27 精査で前回記述の一部は既に解消と判明）＝
-   - ~~`IdeaDetailDTO` に `quest_id`/カテゴリー欠落で SC-22「クエストへ戻る」が暫定~~ **既に実装済み**（前回 handoff の記述は古い）＝DTO は `quest.id`/`quest.status`/`quest.categories`/`quest.deadline` を返し（D-TC-130）、`IdeaDetailView.tsx:255/264` が戻る導線・カテゴリーバッジに使用。
-   - ~~投票の締切日時での事前 disable~~ **本セッションで実装**（`isVotingClosed`＝`voting.ts`・サーバー `_guard_votable` の `quest.deadline < today` と一致・vitest D-TC-219・6件 red→green）＝SC-22 投票ボタンを `completed`＋締切後で事前無効化＋バッジ/文言。フォロー/選定は `completed` のみ（締切対象外＝サーバーと一致）。
-   - ~~SC-25 の intercept モーダル化~~ **完了**＝`@modal/(.)ideas/[ideaId]/eval/page.tsx`＝`EvaluationModal`（`RouteModal`＋`EvaluationView` を `onClose` 付きで）。SC-22 の「評価する」ソフト遷移＝モーダル／URL直・リロード＝フルページ（`EvaluationView` は `onClose` 有無で chrome 出し分け）。ブラウザ受入 実測（soft=dialog・hard=backlink・エラーなし）。既存 sc-25 e2e は `page.goto` ハード遷移＝フルページで不変。
-5. **J の将来拡張（任意）**＝グローバル `GET /search`＋ヘッダー導線／最小文字数・演算子(OR/フレーズ)・正規化／種別間スコア重み／`per_page` 最終値（J.6 TBD）。
-- **共通ルール**＝着手前に `impl/README.md` の現況と該当正本を開き、非自明な新規スコープはユーザーへ確認。1スライス＝backend+frontend＋テスト（md 先行・red-green）＝docs(handoff) の順でコミット、**push はユーザー承認後**。
+1. **本番デプロイの環境実装（コード外）**＝§6 の決定を環境へ反映＝`TRUSTED_PROXY_COUNT=1`＋エッジで実 IP 確定・`COOKIE_SECURE=true`・`SMTP_START_TLS=true`＋秘匿供給・Redis HA/AOF・DB PITR・監査 WORM アーカイブ。**唯一のコード外前提確認＝PGroonga on マネージドPG の可否**（不可なら自前 PGroonga 像＋WAL アーカイブ）。
+2. **監査ログ保存期間のコンプラ確認**＝§6.5 の叩き台（DB180日/アーカイブ1年）を法務/社内規定で確定（別タスク起票）。決まれば掃除/移送ジョブを実装。
+3. **frontend i18n（繰延・優先度低）**＝着手時は next-intl（標準）。`session.locale` は SSR で取得可・backend は locale 結線済みなので、frontend は provider＋カタログ＋画面訳の段階作業（1画面群ずつ）。memory `frontend-i18n-low-priority` 参照。
+4. **3D アバター残（コード外）**＝実 VRM アセット（男女2体＋装備パーツ）の手配のみ。入れば `AvatarViewer3D.tsx` の TODO seam（`@pixiv/three-vrm` で `items.part_ref` をスロットへ）を差し替え。着せ替え backend/API/2D フォールバックは完了済み。
+5. **J の将来拡張（任意）**＝グローバル `GET /search`＋ヘッダー導線／最小文字数・演算子(OR/フレーズ)／種別間スコア重み／`per_page` 最終値（J.6 TBD）。
+- **共通ルール**＝着手前に `impl/README.md` の現況と該当正本を開き、非自明な新規スコープはユーザーへ確認。1スライス＝backend+frontend＋テスト（md 先行・red-green）→docs(handoff) の順でコミット、**push はユーザー承認後**。
 
 ## 7.5 ブラウザ受入待ち（バッチ・未消化）
 - **運用**＝ブラウザ受入は後日まとめて（e2e green でクローズ扱い）。一覧は `impl/README.md`「ブラウザ受入状況」節。
-- **J（全文検索）**＝SC-12「🔍 全文検索」タブで語を入れるとこのクエスト内のアイデア/チャット/添付ファイル名がヒット・種別バッジ・ハイライトスニペット・件数/ページング・行クリックで SC-22/SC-24 へ遷移・types 絞り込み・下書き/削除は出ない。dev＝ACME-01 の参加クエストに公開アイデア＋チャット＋添付を用意。
+- **J（全文検索）**＝SC-12「🔍 全文検索」タブで語→このクエスト内のアイデア/チャット/添付ファイル名がヒット・種別バッジ・ハイライト・件数/ページング・行クリックで SC-22/SC-24 遷移・types 絞り込み・下書き/削除は出ない。dev＝ACME-01 参加クエストに公開アイデア＋チャット＋添付を用意。
 - **I/L**＝SC-01 実データ/投票/フォロー/login_bonus・ベル/SC-02/SC-24 の WS 即時反映。
+- **i18n（任意確認）**＝`accounts.locale=en` のユーザーでメール/通知/実績名/装備名が英語・エラー応答が Accept-Language に追従することを実スタックで確認（現状は unit/api テストで担保）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。db は**カスタムビルド**（PGroonga 同梱・`impl/db/Dockerfile`）。
-- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（**db のビルドを含む＝初回は数分**）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
-- **再ビルド反映**＝db `... up -d --build db`（PGroonga イメージ変更時）／frontend `... up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。**frontend 再ビルド後は Playwright を再 install**。
-- **DB migration 適用（会社/管理・冪等・0018 pgroonga 含む）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
-- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝まず `cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker`、続けて `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（ワーカ起動中は outbox 競合でフラキー・§5）。ドメイン別＝J `tests/search`／I `tests/dashboard`／L `tests/realtime`／XP `tests/ideas`・`tests/evaluations`。
-- **frontend tsc / vitest**＝`cd impl/frontend && npx tsc --noEmit`（現状クリーン）／`cd impl/frontend && npx vitest run`（現状 15/15・node 環境）。
-- **TC-ID 検査**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`（現状 ✅ code 388）。
-- **PGroonga 疎通確認**＝`docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tc "select name,default_version from pg_available_extensions where name=''pgroonga'';"'`（→ pgroonga 4.0.x）。
+- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（db ビルド含む＝初回数分）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
+- **再ビルド反映**＝db `... up -d --build db`／frontend `... up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。**frontend 再ビルド後は Playwright を再 install**。
+- **DB migration 適用（冪等・0018 pgroonga 含む）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
+- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（ワーカ起動中は outbox 競合でフラキー・§5）。終わったら `docker compose start worker mail-worker` で戻す。ドメイン別＝H `tests/notifications`／J `tests/search`／I `tests/dashboard`／L `tests/realtime`／横断 `tests/core`。
+- **frontend tsc / vitest / build**＝`cd impl/frontend && npx tsc --noEmit`（クリーン）／`npx vitest run`（28/28・node）／`npm run build`（26ページ）。
+- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 408・SEC-TC は対象外）。
+- **PGroonga 疎通**＝`docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tc "select name,default_version from pg_available_extensions where name=''pgroonga'';"'`（→ pgroonga 4.0.x）。
 - **dev ログイン（PW 全て `Passw0rd!`）**＝一般 `ACME-01`/`user@acme.example`（MFA OFF）／`ACME-02`/`mfa@acme2.example`（MFA ON）／system_admin `OPS`/`admin@ops.example`。MailHog＝`http://localhost:8025`。
-- **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。実装順＝`doc/実装計画.md`。API＝`doc/API設計/{A..L}_*.md`（横断規約は `doc/API設計/README.md`）。データモデル＝`doc/データモデル.md`（§6 PGroonga）。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`＋セキュリティ横断 `doc/テスト/セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。要件＝`doc/要件定義/README.md`（FR-xx）。
+- **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。実装順＝`doc/実装計画.md`。API＝`doc/API設計/{A..L}_*.md`（横断規約 `doc/API設計/README.md`・§2.1 i18n＝`doc/規約/コーディング規約.md`）。データモデル＝`doc/データモデル.md`（§6 PGroonga）。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`＋`セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。要件＝`doc/要件定義/README.md`（FR-xx）。
 - **コミット規約**＝メッセージ末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`／PR body 末尾に 🤖 Generated with Claude Code 行／commit・push はユーザー承認後。
