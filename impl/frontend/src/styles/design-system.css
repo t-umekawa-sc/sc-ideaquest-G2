@@ -915,8 +915,18 @@ body.modal-open { overflow: hidden; }
   height: 16px; background: #334155; border: 2px solid var(--pixel-ink);
   border-radius: var(--radius-pixel); overflow: hidden;
 }
-.xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); transition: width .8s cubic-bezier(.22,1,.36,1); }
-@media (prefers-reduced-motion: reduce) { .xp-bar > span { transition: none; } }
+.xp-bar > span { position: relative; display: block; height: 100%; background: var(--pixel-xp); transition: width .8s cubic-bezier(.22,1,.36,1); overflow: hidden; }
+/* 充填部を周期的に光が走る（ゲーム感・既存 iq-shine を再利用）。バーは overflow:hidden で充填幅内に収まる。 */
+.xp-bar > span::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: iq-shine 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-bar > span { transition: none; }
+  .xp-bar > span::after { animation: none; display: none; }
+}
 /* 汎用ツールチップ（デザイン標準・SC-01 ダッシュボードの XP バー由来）。ホスト要素に `has-tip`＋
    `data-tip="…"` を付けるとホバー/フォーカスで pixel 風ツールチップを上側に表示する。全画面で統一。
    ホストは位置文脈（position≠static）であること（.xp-bar-wrap は relative／絶対配置の要素はそのまま可）。 */
