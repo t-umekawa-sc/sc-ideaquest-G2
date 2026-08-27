@@ -12,6 +12,7 @@ import { Avatar, CountUp, useSnackbar } from "@/components/ui";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { LevelUpWatcher } from "./LevelUpWatcher";
+import { SparkBurst } from "./SparkBurst";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -62,6 +63,16 @@ export function DashboardView({
   // XP バーはマウント後に 0→現在値へ充填（CSS transition で演出・ゲーム感）。
   const [barFilled, setBarFilled] = useState(false);
   useEffect(() => setBarFilled(true), []);
+  // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
+  const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const burstId = useRef(0);
+  const fireBurst = (e: { clientX: number; clientY: number }) => {
+    if (typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = ++burstId.current;
+    setBursts((b) => [...b, { id, x: e.clientX, y: e.clientY }]);
+    setTimeout(() => setBursts((b) => b.filter((z) => z.id !== id)), 650);
+  };
   // チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の公開種別のみ）。
   const loadTeamFeed = useCallback((cursor?: string | null) => getTeamFeed(cursor), []);
 
@@ -100,7 +111,8 @@ export function DashboardView({
     is_qg_admin: admin.qgAdmin, is_company_account_admin: admin.companyAdmin, is_system_admin: admin.systemAdmin,
   };
 
-  const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType) => {
+  const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
+    if (e) fireBurst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
     setVotes((s) => ({ ...s, [idea.id]: type }));  // 楽観＝リストから外す
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
@@ -121,6 +133,7 @@ export function DashboardView({
   return (
     <div className="dash-page stack">
       <LevelUpWatcher accountId={accountId} level={level} />
+      {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
       <div className="dash-top">
         <section className="pixel-panel hero" aria-label="あなたのステータス">
@@ -217,8 +230,8 @@ export function DashboardView({
                 <div className="vote-card__value">{v.value}</div>
                 <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
                 <div className="vote-actions">
-                  <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={() => quickVote(v, "approve")}>▲ 賛成</button>
-                  <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={() => quickVote(v, "oppose")}>▼ 反対</button>
+                  <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
+                  <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
                 </div>
               </article>
             ))}

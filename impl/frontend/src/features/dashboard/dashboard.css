@@ -179,3 +179,23 @@
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ── クイック投票の押下バースト（ゲーム感・SparkBurst）──────────────────────
+   クリック位置に固定表示。6方向へ火花が飛んで ~0.6s で消える。reduce-motion 時は親が生成しない。 */
+.spark-burst { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); }
+.spark-burst .spark {
+  position: absolute; left: 0; top: 0; font-size: .8rem; color: var(--pixel-skill, #f59e0b);
+  opacity: 0; will-change: transform, opacity; animation: spark-fly .6s ease-out forwards;
+}
+.spark-burst .spark--0 { --dx:   0px; --dy: -24px; }
+.spark-burst .spark--1 { --dx:  22px; --dy: -12px; }
+.spark-burst .spark--2 { --dx:  20px; --dy:  14px; }
+.spark-burst .spark--3 { --dx:   0px; --dy:  24px; }
+.spark-burst .spark--4 { --dx: -20px; --dy:  14px; }
+.spark-burst .spark--5 { --dx: -22px; --dy: -12px; }
+@keyframes spark-fly {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) { .spark-burst { display: none; } }
