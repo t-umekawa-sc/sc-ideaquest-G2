@@ -10,12 +10,51 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.tenant.achievements.orm import Achievement
+from app.tenant.chat.orm import Spell
+from app.tenant.ideas.orm import Idea
 from app.tenant.notifications.orm import Notification
+from app.tenant.quests.orm import Quest
 
 
 def add(session: Session, n: Notification) -> Notification:
     session.add(n)
     return n
+
+
+def prime_refs(session: Session, rows: list[Notification]) -> None:
+    """一覧描画（catalog.render）の per-row ref 解決を identity map 事前ロードで一括化（H.2・N+1 回避）。
+
+    catalog.render は各通知の ref（idea/quest/achievement/spell）を `session.get`（PK 引き）で解決する。
+    `Session.get` は identity map を先に見るため、ページ分の ref id をまとめて IN ロードしておくと後続の
+    get は追加クエリ無しで解決される（DB 往復を rows 件→種別数件へ）。描画側の署名は変えない（DRY）。
+
+    注意＝identity map は**弱参照**。ロードした ORM を捨てると render 前に GC されて get が再クエリするため、
+    `session.info` に強参照を残して描画完了までライフタイムを延ばす。
+    """
+    keep = session.info.setdefault("_primed_refs", [])
+
+    def _load(model, ids) -> None:
+        wanted = {i for i in ids if i is not None}
+        if wanted:
+            keep.extend(session.execute(select(model).where(model.id.in_(wanted))).scalars().all())
+
+    _load(Idea, (n.ref_idea_id for n in rows))          # _idea_title/_quest_context 用
+    _load(Achievement, (n.ref_achievement_id for n in rows))
+    spell_ids: list[uuid.UUID] = []
+    for n in rows:
+        sid = (n.params or {}).get("spell_id")
+        if sid:
+            spell_ids.append(uuid.UUID(sid) if isinstance(sid, str) else sid)
+    _load(Spell, spell_ids)                              # magic_reaction（spell_id 経由）
+    # quest は直接 ref とアイデア経由（idea.quest_id）の両方。ideas は上で load 済み＝get は identity map ヒット
+    quest_ids: list[uuid.UUID] = [n.ref_quest_id for n in rows]
+    for n in rows:
+        if n.ref_idea_id:
+            idea = session.get(Idea, n.ref_idea_id)
+            if idea:
+                quest_ids.append(idea.quest_id)
+    _load(Quest, quest_ids)
 
 
 def get_for_recipient(session: Session, notif_id: uuid.UUID, recipient_id: uuid.UUID) -> Notification | None:

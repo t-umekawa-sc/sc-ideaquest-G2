@@ -89,6 +89,7 @@ def get_notifications(account_id, company_id, *, state="all", type_param=None, l
         if user is None:
             raise AppError(401, "unauthenticated")
         rows, has_more = repo.list_for_recipient(ts, user.id, state=state, types=types, before=before, limit=limit)
+        repo.prime_refs(ts, rows)  # ページ分の ref を一括ロード（catalog.render の per-row get を N+1 回避）
         data = [_dto(ts, n, user.locale) for n in rows]  # 受信者＝本人の locale で描画（§2.1）
         unread = repo.unread_count(ts, user.id)
         next_cursor = _encode_cursor(rows[-1]) if (has_more and rows) else None
