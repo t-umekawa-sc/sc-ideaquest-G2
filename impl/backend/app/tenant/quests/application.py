@@ -290,7 +290,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
 def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, body) -> dict:
     """下書きを公開（draft→recruiting・C.2・アトミック）。内容適用＋パーティー適用＋strict＋遷移を単一 UoW。
 
-    `draft` 以外は 409（invalid_state）。owner（作成者）のみ。参加通知は post-commit で no-op フック（H 実装まで）。
+    `draft` 以外は 409（invalid_state）。owner（作成者）のみ。参加通知（`quest_party_invited`）は post-commit で H に結線済み（`_notify_party_invited`）。
     """
     company = _resolve_company(company_id)
     if company is None:

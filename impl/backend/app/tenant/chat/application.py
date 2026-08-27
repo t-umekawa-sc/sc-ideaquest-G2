@@ -1,8 +1,9 @@
 """ドメイン E（チャット）の application（imperative shell・E.1〜E.5）。
 
 門番＝当該アイデアのクエストのパーティー所属（C.0）＋投稿/編集/削除は各権限（comment／本人／管理者）。
-投稿 XP+5 は G ledger（日次上限10/日）。通知（H）・リアルタイム（L）は post-commit no-op フック。完了は 409（C.5）。
-本コミットはコア会話（メッセージ CRUD・既読・活発度・添付・メンション）。リアクション/魔法の書込は後続。
+投稿 XP+5 は G ledger（日次上限10/日）。通知（H＝mention/idea_comment 等）・リアルタイム（L＝chat イベント）は
+post-commit で結線済み。完了は 409（C.5）。会話コア（メッセージ CRUD・既読・活発度・添付・メンション）＋
+リアクション/魔法発動（magic_reaction 通知含む）まで実装済み。
 """
 from __future__ import annotations
 

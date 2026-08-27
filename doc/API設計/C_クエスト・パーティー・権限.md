@@ -146,5 +146,5 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 
 - **論点1・編集導線ルート＝追加**: `/quests/{id}/edit`（フルページ）＋ `@modal/(.)quests/[id]/edit`（intercept モーダル）を新設し、作成（`/quests/new`）と同一の URL 付きモーダル標準に揃える（フロント側ルーティング）。
 - **論点2・クエストアイコン＝専用 multipart EP＋2段**: 会社アバターと同流儀で `PUT/DELETE /quests/{quest_id}/icon-image`（multipart・`validate_image_upload` 流用）。作成/編集は「本体保存→アイコン PUT」の2段（K.4 流儀）。作成レスポンスの `id` を使ってアイコンを PUT。
-- **論点3・publish 通知＝H まで no-op（トリガーは spec 登録済み）**: publish は内容適用＋strict 検証＋`draft→recruiting` までを実装し、参加通知（`quest_party_invited`）は H 実装まで **no-op の post-commit フック stub＋TODO** として置く。種別は データモデル §3・§5.24（`ref_quest_id`）・H.0 発火元表に**登録済み**＝H 実装時に必ず結線される（実装漏れ防止）。
+- **論点3・publish 通知（H に結線済み・2026-08 実装）**: publish は内容適用＋strict 検証＋`draft→recruiting` を実装し、参加通知（`quest_party_invited`）を **post-commit で H に結線済み**（`_notify_party_invited`＝追加パーティーメンバーへ通知）。※以前の「H 実装まで no-op フック stub」から更新。種別は データモデル §3・§5.24・H.0 発火元表に登録済み。
 - **論点4・下書き members 空＝許容**（上記 TBD 参照）。

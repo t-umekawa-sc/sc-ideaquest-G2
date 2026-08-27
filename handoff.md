@@ -79,7 +79,7 @@
 > - ⬜ **M5**（med・idempotency）＝`Idempotency-Key`（§1.9）が全面未実装（購入/魔法解放/クエスト作成/アカウント発行）。UNIQUE 制約が backstop で実害は限定的。
 > - ✅ **M6 修正済**＝migration `0020_company_balance_guards`＝`users.xp/coin_balance/skill_point_balance` に `CHECK(>=0)`（負残高を DB 拒否）＋`activities` 部分ユニーク `UNIQUE(user_id,kind,reason,ref_type,ref_id) WHERE ref_id IS NOT NULL`（付与冪等の DB 最終防御＝`exists_ref` の SELECT を抜けた並行 INSERT を拒否・ref_id NULL の login/levelup_sp は重複可）。G-TC-107/108（red→green・既存データ重複0/負残高0を事前確認）。company head 0020。
 > - ⬜ **F1**（Should・未完成）＝FR-36 アクティビティフィード ②クエスト内(SC-12 `GET /quests/{id}/activities`)・③チーム横断(SC-01 `GET /me/feed`) 未実装（①`/me/activities` のみ）。**成果系のみ公開**述語（idea_post/selection/achievement_reward/levelup_sp）を実装時に要注意。
-> - ⬜ **stale-doc**（コード不変）＝FR-01「投稿でコイン付与」表現（実装は §6 準拠で XP のみ）／`ledger.py` docstring／`publish_quest`・`chat/application.py` の「no-op フック」古コメント／C.2/C.7 の「publish 通知は H 実装まで no-op」（実際は結線済み）。
+> - ✅ **stale-doc 一括修正済**（コード挙動不変・コメント/文言のみ）＝FR-01/Idea 定義「投稿でコイン付与」→「XP+50・コインは評価連動（§6）」／`ledger.py` docstring（全ドメイン共用へ）／`publish_quest`・`chat/application.py` の「no-op フック」古コメント→「結線済み」／API設計 C.7「publish 通知は H まで no-op」→「H 結線済み」。import OK 確認。
 > - **監査で確認して問題なし**（主要）＝XP/コイン付与の台帳結線（投稿+50/投票+5/評価+30/選定+200/評価連動コイン round(平均×10)・冪等・上限）／可視性門番（グループ∩パーティー・下書き本人のみ・cross-tenant 404）／権限6種の実強制／通知10種別の発生源結線／全文検索の WHERE 強制＋インジェクション対策／Mass Assignment（extra=forbid）／accounts→users ミラー網羅。
 
 1. **（推奨・低コスト）再開時の健全性確認**＝backend full pytest を再実行（4-2 の 468 が維持か）。手順＝§8 の「backend テスト」。frontend は tsc/vitest/traceability を再実行（§8）。
