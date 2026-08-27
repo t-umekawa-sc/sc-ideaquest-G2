@@ -91,7 +91,7 @@
 | A-TC-046 | api | ポリシー違反 PW の拒否と非変更の担保 | 有効トークン | **ポリシー違反 PW**（短すぎ／数字なし／英字なし）で complete | `422 {code:"validation_error", errors:[…]}`、PW は変更されない | ADR-0002 §2.2 |
 | A-TC-047 | api | 無効トークンでの complete 拒否と非変更の担保 | 無効/期限切れ/使用済トークン | 適合PWで complete | `410 {code:"token_expired"}`、PW は変更されない | A.7 |
 | A-TC-048 | api | complete 済みトークンの単回消費の担保 | complete 成功済みのトークン | 同一トークンで**再度** complete | `410 {code:"token_expired"}`（単回消費・トークンは消える） | ADR-0002 §2.1/2.4 |
-| A-TC-049 | api | PW 完了時の全アクティブセッション破棄の担保 | 当該アカウントで**別途ログイン中**（有効 `iq_session`）→ 有効トークンで complete 成功 | complete 後、そのセッションで `GET /auth/session` | `401 {code:"unauthenticated"}`（**PW完了で全アクティブセッション破棄**） | A.9-③／ADR-0002 §2.4 |
+| A-TC-049 | api | PW 完了時の全アクティブセッション破棄**＋信頼端末失効**の担保（A.9-③・A.7 の端末リセット） | 当該アカウントで**別途ログイン中**（有効 `iq_session`）＋**有効な信頼端末1件**→ 有効トークンで complete 成功 | complete 後、そのセッションで `GET /auth/session`／`trusted_devices` を確認 | `401 {code:"unauthenticated"}`（全セッション破棄）＋**当該アカウントの信頼端末が全て `revoked`**（盗難端末の MFA スキップ継続を断つ） | A.9-③／A.7／ADR-0002 §2.4 |
 
 ### 3.4 PW ポリシー（domain 純粋関数・DB 非依存）
 

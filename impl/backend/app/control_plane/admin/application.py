@@ -210,6 +210,9 @@ def edit_account(
             "system_role": {"before": old_role, "after": account.system_role} if role_changed else None,
             "memberships": memberships,
         }, session=session)
+        if role_changed:
+            # A.9-③＝ロール変更で信頼端末も失効（変更後の端末が MFA スキップを続けないよう全端末リセット）
+            account_repo.revoke_all_trusted_devices(session, account_id)
         session.commit()
         result = _account_state(account)
 

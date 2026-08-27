@@ -422,6 +422,8 @@ def complete_password_setup(r: redis.Redis, token: str, new_password: str) -> No
         account_sync_repo.enqueue(
             session, account.id, account.company_id, "upsert", {"password_set": True}
         )
+        # A.7/A.9-③＝PW 再設定完了で信頼端末も失効（盗難端末の MFA スキップ継続を断つ＝全端末リセット）
+        account_repo.revoke_all_trusted_devices(session, account.id)
         session.commit()
 
     # PW 変更で当該アカウントの全セッションを破棄（A.9-③・ここでは新セッションは張らない）

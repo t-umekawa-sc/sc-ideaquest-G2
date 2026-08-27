@@ -67,7 +67,21 @@
 - **テスト運用＝md 先行＋TC-ID＋red-green（red確認台帳）**（継続）。ブラウザ受入は後日バッチ（§7.5・ユーザー確認 2026-08-25）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **（推奨・低コスト）再開時の健全性確認**＝backend full pytest を再実行（4-2 の 464 が維持か）。手順＝§8 の「backend テスト」。frontend は tsc/vitest/traceability を再実行（§8）。
+
+> **仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
+> - ✅ **H1 修正済**＝`complete_password_setup`（PW再設定完了）で信頼端末を失効していなかった（A.7/A.9-③ 違反）→ `revoke_all_trusted_devices` を同一Txに追加（A-TC-049 拡張・red→green）。
+> - ✅ **H2 修正済**＝`change_account`（ロール変更）で信頼端末を失効していなかった（A.9-③ 違反）→ 同上（B-TC-032 拡張・red→green）。
+> - ⬜ **M1**（med・guard-missing）＝L.4 購読失効 `publish_revoke` がバルクのパーティー除外（`quests/application.py:_apply_party_diff`）・グループ除去で未発火（専用 `DELETE /members` のみ結線）。再接続時は L.2 で塞がるが除外直後の WS 窓。
+> - ⬜ **M2**（med）＝公開アイデアの並行 `PATCH` が 409 `edit_conflict` でなく **500**（`IntegrityError` 未捕捉・D.2）。要真の同時実行。
+> - ⬜ **M3**（med・mismatch）＝代理公開（owner/quest_admin が他人下書きを公開）で 投稿XP+50 が投稿者でなく公開者に付与（`ideas/application.py:_publish_processing` の付与先を `idea.author_id` 起点へ）。
+> - ⬜ **M4**（med・missing）＝`vote.stale`（投票後に版更新）をサーバー未算出＝SC-22 の「⚠投票後に更新」導線が出せない（`_build_detail` に `voted_revision < current_revision` を足すだけ）。
+> - ⬜ **M5**（med・idempotency）＝`Idempotency-Key`（§1.9）が全面未実装（購入/魔法解放/クエスト作成/アカウント発行）。UNIQUE 制約が backstop で実害は限定的。
+> - ⬜ **M6**（med）＝`activities` に部分ユニーク無し＋`users.coin_balance`/`skill_point_balance` に `CHECK(>=0)` 無し＝並行時の二重付与/残高マイナスの窓（migration で制約追加）。
+> - ⬜ **F1**（Should・未完成）＝FR-36 アクティビティフィード ②クエスト内(SC-12 `GET /quests/{id}/activities`)・③チーム横断(SC-01 `GET /me/feed`) 未実装（①`/me/activities` のみ）。**成果系のみ公開**述語（idea_post/selection/achievement_reward/levelup_sp）を実装時に要注意。
+> - ⬜ **stale-doc**（コード不変）＝FR-01「投稿でコイン付与」表現（実装は §6 準拠で XP のみ）／`ledger.py` docstring／`publish_quest`・`chat/application.py` の「no-op フック」古コメント／C.2/C.7 の「publish 通知は H 実装まで no-op」（実際は結線済み）。
+> - **監査で確認して問題なし**（主要）＝XP/コイン付与の台帳結線（投稿+50/投票+5/評価+30/選定+200/評価連動コイン round(平均×10)・冪等・上限）／可視性門番（グループ∩パーティー・下書き本人のみ・cross-tenant 404）／権限6種の実強制／通知10種別の発生源結線／全文検索の WHERE 強制＋インジェクション対策／Mass Assignment（extra=forbid）／accounts→users ミラー網羅。
+
+1. **（推奨・低コスト）再開時の健全性確認**＝backend full pytest を再実行（4-2 の 468 が維持か）。手順＝§8 の「backend テスト」。frontend は tsc/vitest/traceability を再実行（§8）。
 2. **3D アバター（FR-08）＝着せ替え機能は実装/接続/テスト済み・残るは 3D VRM 描画のみ**（前回 handoff の「未実装」は不正確と本セッションで判明。実態＝SC-30/SC-31 ✅・migration 0015・`tests/shop`・G-TC-202/203。現状ビューアはマスコット画像＋装備アイコン重ねの 2D 見立て）。**本セッションで設計 TBD を確定**＝`doc/画面設計/screens/SC-31_アバター着せ替え.md` §9（9.1 ラインナップ確定〔既存19点シード〕・9.2 **ベース＝男女2体**〔`users.avatar_base` 新規列・要データモデル追記〕＋同一 humanoid リグで装備共用・9.3 2Dフォールバック/性能・9.4 回転ON/ズーム等MVP外・9.5 試着MVP外・9.6 将来〔動物キャラ等〕）。要件定義 第7節の非機能TBD（FPS/対応環境）も §9.3 へ整合。**次アクション**＝(a) ~~データモデル §5.3 に `avatar_base` 追記→migration~~ **完了**（データモデル §5.3＋enum節・migration `0019_company_avatar_base`・ORM `profile/orm.py` 追加・実DB検証済み）、(b) ~~`avatar_base` の read/write API~~ **backend 完了**（K.4.1 `PUT /me/avatar-base`・`GET /me` 同梱・K-TC-011-014・pytest 468）。(c) ~~three-vrm/R3F 導入＋WebGL フォールバック骨組み＋ベース切替 UI~~ **フロント骨組み完了**（three/@react-three/fiber v9/drei 導入＝package.json。`AvatarViewer3D.tsx`＝R3F Canvas＋プレースホルダ humanoid＋ドラッグ回転＋`prefers-reduced-motion`。`webgl.ts supportsWebGL()` で分岐＝WebGL 時 3D／非対応は 2D マスコット〔progressive enhancement・§9.3〕。ベース切替〔男/女〕→`PUT /me/avatar-base`〔SSR 初期値＝`GET /me`・楽観更新＋ロールバック〕。vitest 4件〔`avatar/avatar.test.ts`〕・tsc/lint クリーン）。**残＝(d) 実VRM 3Dアセット（男女2体＋装備パーツ）＝コード外の制作物・別途手配**＝これが入るまで `AvatarViewer3D.tsx` の TODO seam（`@pixiv/three-vrm` で `items.part_ref` をスロットへアタッチ）をプレースホルダのまま維持。**ブラウザ受入 完了**＝`e2e/sc-31-avatar.spec.ts`（**K-TC-015** green・実スタックで実測）＝ログイン→`/avatar`→3D Canvas 描画（headless chromium WebGL・`canvasCount=1`・2Dフォールバックせず）→ベース切替（男↔女）が `PUT /me/avatar-base` で永続（`GET /me` の `avatar_base` 反映・リロード後 `aria-pressed=true`）→元値へ cleanup。スクショで頭＝球/胴腕＝カプセルの 3D プレースホルダ描画を目視。
    - **既存ビルド不具合＝根治済み**＝ホストの `npm run build` が **CSS minify（cssnano）"Unexpected '/'" で失敗していたのは本 3D とは無関係の既存バグ**。真因＝`chat.css`/`shop.css` のヘッダーコメント内でクラス列挙のグロブ `*` 直後に `/` が来て `*/` を形成（`.reaction*/`・`.spell-fx*/`・`.rarity-*/`）→ブロックコメントを早期終了→以降が不正 CSS→minify で露呈（dev は寛容で通っていた）。**修正＝`*/`→`*・`**。`next build` **26ページ green 実測**（`/avatar` First Load 169kB＝three は動的import で別チャンク・初回に含まれない）。cssnano 個別診断で全 CSS OK。
 3. **本番デプロイ準備**＝`doc/本番デプロイ要件.md` に沿って PGroonga カスタムイメージの本番反映・bootstrap/migration 手順・Redis 永続化・ヘッダのエッジ（プロキシ/TLS 前提の HSTS）整合を点検。

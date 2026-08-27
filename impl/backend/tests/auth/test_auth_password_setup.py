@@ -7,8 +7,29 @@
 from __future__ import annotations
 
 import re
+import uuid
+from datetime import datetime, timedelta, timezone
 
+from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.domain.service import password_policy_errors
+from app.control_plane.auth.orm import TrustedDevice
+from app.db.control import control_session
+
+
+def _add_trusted_device(account_id) -> None:
+    """当該アカウントに有効な信頼端末を1件作る（A.9-③ 失効検証の下地）。"""
+    with control_session() as s:
+        account_repo.create_trusted_device(
+            s, account_id, f"hash-{uuid.uuid4().hex}", datetime.now(timezone.utc) + timedelta(days=30)
+        )
+        s.commit()
+
+
+def _all_trusted_revoked(account_id) -> bool:
+    with control_session() as s:
+        rows = s.query(TrustedDevice).filter_by(account_id=account_id).all()
+    return len(rows) > 0 and all(r.revoked for r in rows)
+
 
 REQUEST = "/api/v1/auth/password-setup/request"
 VERIFY = "/api/v1/auth/password-setup/verify"
@@ -209,8 +230,9 @@ def test_a_tc_048_complete_is_single_use(client, factory):
 
 
 def test_a_tc_049_complete_destroys_existing_sessions(client, factory):
-    """A-TC-049 別途ログイン中に complete 成功→そのセッションは破棄（401）。A.9-③。"""
+    """A-TC-049 別途ログイン中に complete 成功→そのセッション破棄（401）＋信頼端末失効（A.9-③・A.7）。"""
     acc = factory.make_seed_company_account()  # password_set=True・既知PW
+    _add_trusted_device(acc["id"])  # 有効な信頼端末を1件（PW再設定で失効すべき）
     login = client.post(LOGIN, json={
         "company_code": acc["company_code"], "login_id": acc["login_id"], "password": acc["password"],
     })
@@ -221,6 +243,8 @@ def test_a_tc_049_complete_destroys_existing_sessions(client, factory):
     assert client.post(COMPLETE, json={"token": token, "new_password": GOOD_PW}).status_code == 200
     # 既存セッションは破棄されている
     assert client.get(SESSION).status_code == 401
+    # 信頼端末も失効している（A.7/A.9-③＝PW再設定で全端末リセット・盗難端末の MFA スキップ継続を防ぐ）
+    assert _all_trusted_revoked(acc["id"])
 
 
 # --- 3.4 PW ポリシー（domain 純粋関数・DB 非依存） -----------------------------------------

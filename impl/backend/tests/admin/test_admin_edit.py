@@ -7,11 +7,13 @@ identity 一意再検証（409）・system_role 変更で対象の全セッシ�
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
 from app.control_plane.account_sync.orm import OutboxEntry
-from app.control_plane.auth.orm import Account
+from app.control_plane.auth import repository as account_repo
+from app.control_plane.auth.orm import Account, TrustedDevice
 from app.core.config import get_settings
 from app.db.control import control_session
 from app.main import app
@@ -24,6 +26,20 @@ SESSION = "/api/v1/auth/session"
 
 def _url(company_id, account_id) -> str:
     return f"/api/v1/admin/companies/{company_id}/accounts/{account_id}"
+
+
+def _add_trusted_device(account_id) -> None:
+    with control_session() as s:
+        account_repo.create_trusted_device(
+            s, account_id, f"hash-{uuid.uuid4().hex}", datetime.now(timezone.utc) + timedelta(days=30)
+        )
+        s.commit()
+
+
+def _all_trusted_revoked(account_id) -> bool:
+    with control_session() as s:
+        rows = s.query(TrustedDevice).filter_by(account_id=account_id).all()
+    return len(rows) > 0 and all(r.revoked for r in rows)
 
 
 def test_b_tc_030_edit_identity(client, factory):
@@ -57,9 +73,10 @@ def test_b_tc_031_duplicate_identity_conflict(client, factory):
 
 
 def test_b_tc_032_role_change_destroys_sessions(client, factory):
-    """B-TC-032 system_role 変更で対象の全セッション破棄（新権限適用・A.9-③）。根拠 B.2。"""
+    """B-TC-032 system_role 変更で対象の全セッション破棄＋信頼端末失効（新権限適用・A.9-③）。根拠 B.2。"""
     target = factory.make_seed_company_account()          # general
     cid, _ = _company(SEED_COMPANY_CODE)
+    _add_trusted_device(target["id"])  # 有効な信頼端末（ロール変更で失効すべき）
 
     tclient = TestClient(app)
     _login(tclient, target["company_code"], target["login_id"], target["password"])
@@ -71,6 +88,7 @@ def test_b_tc_032_role_change_destroys_sessions(client, factory):
 
     assert r.status_code == 200 and r.json()["system_role"] == "company_account_admin"
     assert tclient.get(SESSION).status_code == 401       # 対象の全セッション破棄
+    assert _all_trusted_revoked(target["id"])            # 信頼端末も失効（A.9-③＝端末リセット）
 
 
 def test_b_tc_033_self_demotion_forbidden(client):

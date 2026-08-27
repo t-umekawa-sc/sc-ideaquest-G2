@@ -85,7 +85,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | B-TC-030 | api | 編集差分のミラー反映 | system_admin | `display_name`/`login_id` を差分 PATCH | `200`＋accounts 更新＋outbox（upsert・payload に変更列）＝users ミラー | B.2 |
 | B-TC-031 | api | 編集時の自己除外つき一意検証 | system_admin | 既存の別アカウントと `login_id`/`email` が重複する編集 | `409 conflict`＋`errors[].field`（自分は一意検証から除外） | B.2 |
-| B-TC-032 | api | ロール変更時の権限再評価強制 | 対象がログイン中 | `system_role` を変更（general→company_account_admin） | `200`＋**対象の全セッション破棄**（新権限適用・A.9-③）＝対象の `GET /session` が 401 | B.2／A.9-③ |
+| B-TC-032 | api | ロール変更時の権限再評価強制（全セッション破棄**＋信頼端末失効**） | 対象がログイン中＋**有効な信頼端末1件** | `system_role` を変更（general→company_account_admin） | `200`＋**対象の全セッション破棄**（対象の `GET /session` が 401）＋**信頼端末が全て `revoked`**（変更後の端末が MFA スキップを続けない・A.9-③） | B.2／A.9-③ |
 | B-TC-033 | api | 自己降格による自己ロックアウト防止 | 自分（system_admin）を編集 | 自分の `system_role` を `general` に降格 | `422 last_system_admin`（自己降格は常に不可・自己ロックアウト防止） | B.2 |
 | B-TC-034 | api | 編集の enum 外/不明対象の遮断 | system_admin | 不正 `system_role`／想定外プロパティ／不明 account | enum 外・extra＝`422`／不明＝`404` | B.2／§B.6 |
 
