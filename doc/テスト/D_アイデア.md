@@ -105,4 +105,12 @@
 
 > **削除 UI の置き場所（SC-22 §4.3 準拠）**＝SC-22 の関連資料は「一覧＋ダウンロード」のみ（削除ボタンは無い・0件なら非表示）。添付の**削除は SC-21 フォームの添付チップ（×）**で行い、EP は `DELETE /ideas/{id}/attachments/{aid}`（api の D-TC-134 で担保）。SC-21 編集モードでの**既存添付の一覧/削除 UI は実装済み（D-TC-218）**＝`getIdea.attachments` を読み込み `.attach` 行で表示し、× は確認ダイアログ→即時サーバー削除（本文編集と独立・版を生まない・§D.3）。投稿前の未アップロード添付（新規追加分）の × は従来どおりクライアント除去。
 
-> **サーバー権威の可否判定（締切後/権限なし）**: 本スライスは可否を**サーバー判定を権威**とし、`POST vote` の 409（`invalid_state`＝締切後/`completed`/下書き）・403（vote 権限なし）・`POST follow` の 409（completed 後の新規）を受けたら**楽観更新をロールバック＋理由をトースト表示**する（API設計 D.5「締切後はボタン無効化＋理由」の権威）。`IdeaDetailDTO` は現状 `quest_status`/`my_permissions` を返さないため**事前無効化（disabled）は follow-up**（DTO 拡張後）＝それまではサーバーエラー経由で理由提示。分岐網羅は §2 の api（D-TC-122〜125/128〜129）で担保し、e2e は happy path（209〜212）に限定する。
+> **サーバー権威の可否判定（締切後/権限なし）**: 可否は**サーバー判定を権威**とし、`POST vote` の 409（`invalid_state`＝締切後/`completed`/下書き）・403（vote 権限なし）・`POST follow` の 409（completed 後の新規）を受けたら**楽観更新をロールバック＋理由をトースト表示**する。**事前無効化（disabled）＝実装済み**＝`IdeaDetailDTO` は `quest.status`/`quest.deadline`（D-TC-130）を返すため、`completed`（凍結）に加え**締切後（`quest.deadline < 今日`）も投票ボタンを事前無効化**（`isVotingClosed`＝サーバー `_guard_votable` と一致・D-TC-219）。フォロー/選定は `completed` のみ事前無効化（締切は対象外）。分岐網羅は §2 の api（D-TC-122〜125/128〜129）で担保。
+
+## 4. フロント単体（vitest・純ロジック・node）
+
+> 対象＝`impl/frontend/src/features/ideas/voting.ts`（`isVotingClosed`＝投票の事前無効化判定・SC-22）。DOM 非依存の純ロジックのみ vitest（node）で担保し、UI 結線（ボタン `disabled`・バッジ/文言）は tsc＋手動/e2e で確認。**トレーサビリティ検査対象外**（`src/**/*.test.ts` は非走査）＝本 md で追跡。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D-TC-219 | unit | 投票の事前無効化がサーバー `_guard_votable` と一致 | `quest.status`/`quest.deadline`・今日 | `isVotingClosed(quest, todayISO)` | 締切前/締切当日＝可（`closed:false`）／締切翌日以降＝`deadline` で不可／`completed`＝`completed` で不可（優先）／`deadline` 未設定＝締切無効化なし | D.5／SC-22 |
