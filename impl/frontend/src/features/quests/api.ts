@@ -1,5 +1,5 @@
 // quests 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/C_クエスト・パーティー・権限.md C.1〜C.4。
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, idempotencyHeader } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type QuestCard = components["schemas"]["QuestCardDTO"];
@@ -67,7 +67,7 @@ export function getQuest(questId: string): Promise<QuestDetail | null> {
 
 // クエスト作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
 export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null> {
-  return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input) });
+  return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });
 }
 
 // クエスト編集（SC-11・C.2）。差分＝送るフィールドのみ。status は変えない（遷移は publish/transition）。
@@ -77,7 +77,7 @@ export function updateQuest(questId: string, input: QuestUpdateInput): Promise<Q
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。
 export function publishQuest(questId: string, input: QuestPublishInput): Promise<QuestDetail | null> {
-  return apiFetch<QuestDetail>(`/quests/${questId}/publish`, { method: "POST", body: JSON.stringify(input) });
+  return apiFetch<QuestDetail>(`/quests/${questId}/publish`, { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });
 }
 
 // ステータスを前進（SC-12・C.5・owner/quest_admin）。逆行/飛び越えは 409、draft→recruiting は strict。

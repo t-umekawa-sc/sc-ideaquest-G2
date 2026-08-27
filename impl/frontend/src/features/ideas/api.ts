@@ -1,6 +1,6 @@
 // ideas 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/D_アイデア・添付・版・投票・フォロー.md D.1〜D.6。
 // backend は CRUD＋公開の 6 EP（一覧/詳細/作成/編集/公開/削除）＋投票 POST/DELETE（D.5）＋フォロー POST/DELETE（D.6）。添付（D.3）は後続スライス。
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, idempotencyHeader } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type IdeaCard = components["schemas"]["IdeaCardDTO"];
@@ -44,7 +44,7 @@ export function getIdea(ideaId: string): Promise<IdeaDetail | null> {
 // アイデア作成（SC-21・D.2）。status=published は即公開（strict 検証＋パーティー通知＋チャット作成・XP は G 依存で no-op）。
 // status=draft は本人のみ表示（loose 検証）。作成者＝author。
 export function createIdea(questId: string, input: IdeaCreateInput): Promise<IdeaDetail | null> {
-  return apiFetch<IdeaDetail>(`/quests/${questId}/ideas`, { method: "POST", body: JSON.stringify(input) });
+  return apiFetch<IdeaDetail>(`/quests/${questId}/ideas`, { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });
 }
 
 // アイデア編集（SC-21/SC-22・D.2）。差分＝送るフィールドのみ。公開中の編集は版を記録し投票者/フォロワーに通知（H は no-op）。
@@ -54,7 +54,7 @@ export function updateIdea(ideaId: string, input: IdeaUpdateInput): Promise<Idea
 
 // 下書きを公開（draft→published・D.2・アトミック）。作成者のみ・strict 検証。任意で内容も同時更新可。
 export function publishIdea(ideaId: string, input: IdeaPublishInput = {}): Promise<IdeaDetail | null> {
-  return apiFetch<IdeaDetail>(`/ideas/${ideaId}/publish`, { method: "POST", body: JSON.stringify(input) });
+  return apiFetch<IdeaDetail>(`/ideas/${ideaId}/publish`, { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });
 }
 
 // アイデアを論理削除（SC-22・D.2・作成者/クエスト管理者）。子データは監査保持。
