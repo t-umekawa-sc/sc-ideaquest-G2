@@ -1,7 +1,7 @@
 // shop 機能の API 呼び出し（§4.1・lib/api 経由）。正＝ドメイン G.1/G.2（ショップ/装備）・SC-30/SC-31。
 // backend＝GET /items（マスタ＋所有/装備＋残高）・POST /items/{id}/purchase・GET /me/items・PUT /me/equipment。
 // アイテムのアイコン（絵文字）はフロント presentation（§5.25/API G.1 に icon 列なし＝code で引く）。
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, idempotencyHeader } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
 export type ItemDTO = components["schemas"]["ItemDTO"];
@@ -23,7 +23,8 @@ export function getItems(): Promise<ItemListResponse | null> {
 }
 
 export function purchaseItem(itemId: string): Promise<{ item_id: string; owned: boolean; coin_balance: number } | null> {
-  return apiFetch<{ item_id: string; owned: boolean; coin_balance: number }>(`/items/${itemId}/purchase`, { method: "POST" });
+  // 冪等キー付き（§1.9）＝二重送信でもコインは一度しか消費されない（サーバーが最初の結果を再生）。
+  return apiFetch<{ item_id: string; owned: boolean; coin_balance: number }>(`/items/${itemId}/purchase`, { method: "POST", headers: idempotencyHeader() });
 }
 
 export function getMyItems(): Promise<MyItemsResponse | null> {

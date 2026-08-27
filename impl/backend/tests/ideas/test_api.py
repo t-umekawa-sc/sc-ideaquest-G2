@@ -727,3 +727,71 @@ def test_sec_tc_040_idea_create_mass_assignment_forbidden(client, env):
     r = client.post(IDEAS(qid), json={"title": "T", "value": "V", "body": "B", "status": "draft",
                                       "is_selected": True}, headers=_csrf(client))
     assert r.status_code == 422, r.text  # extra=forbid（§2.2）
+
+
+# ---- Idempotency-Key 横断ミドルウェア（§1.9・アイデア作成を検体に検証） ----
+def test_sec_tc_041_idempotency_replay_single_side_effect(client, env):
+    """SEC-TC-041 同一 Idempotency-Key の再送は最初の結果を再生し副作用は1回（§1.9）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    hdr = {**_csrf(client), "Idempotency-Key": str(uuid.uuid4())}
+    payload = {"title": "IdemT", "value": "V", "body": "B", "status": "published"}
+    r1 = client.post(IDEAS(qid), json=payload, headers=hdr)
+    assert r1.status_code == 201, r1.text
+    id1 = r1.json()["id"]
+    # 再送＝同一結果を再生（Idempotency-Replayed ヘッダ・同じ id・同ステータス）
+    r2 = client.post(IDEAS(qid), json=payload, headers=hdr)
+    assert r2.status_code == 201
+    assert r2.headers.get("Idempotency-Replayed") == "true"
+    assert r2.json()["id"] == id1
+    # 副作用は1回＝当該クエストのアイデアは1件のみ
+    data = client.get(IDEAS(qid)).json()["data"]
+    assert len(data) == 1 and data[0]["id"] == id1
+
+
+def test_sec_tc_042_idempotency_key_reuse_different_body(client, env):
+    """SEC-TC-042 同一キー・別内容は 422 idempotency_key_reuse（別操作には別キー・§1.9）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    hdr = {**_csrf(client), "Idempotency-Key": str(uuid.uuid4())}
+    assert client.post(IDEAS(qid), json={"title": "A", "value": "V", "body": "B", "status": "published"},
+                       headers=hdr).status_code == 201
+    r = client.post(IDEAS(qid), json={"title": "DIFFERENT", "value": "V", "body": "B", "status": "published"},
+                    headers=hdr)
+    assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reuse"
+
+
+def test_sec_tc_043_idempotency_key_too_long(client, env):
+    """SEC-TC-043 Idempotency-Key は最大128文字＝超過は 422 validation_error（§1.9）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    hdr = {**_csrf(client), "Idempotency-Key": "x" * 129}
+    r = client.post(IDEAS(qid), json={"title": "T", "value": "V", "body": "B", "status": "published"}, headers=hdr)
+    assert r.status_code == 422 and r.json()["errors"][0]["field"] == "Idempotency-Key"
+
+
+def test_sec_tc_044_idempotency_in_progress(client, env):
+    """SEC-TC-044 処理中（in_flight）の同一キー・同一内容は 409 idempotency_in_progress（§1.9）。"""
+    import hashlib
+    import json as _json
+
+    from app.infra.cache import get_redis
+
+    _login_seed(client)
+    qid = env.make_quest()
+    key = str(uuid.uuid4())
+    path = f"/api/v1/quests/{qid}/ideas"
+    raw = b'{"title":"P","value":"V","body":"B","status":"published"}'
+    with control_session() as s:
+        acc = s.execute(select(Account).where(Account.login_id == SEED_LOGIN)).scalars().one()
+        scope = f"idem:{acc.company_id}:{acc.id}:{key}"
+    fp = hashlib.sha256(f"POST {path}\n".encode() + raw).hexdigest()
+    r = get_redis()
+    r.set(scope, _json.dumps({"state": "in_flight", "fingerprint": fp}), ex=60)  # 先行が処理中を模擬
+    try:
+        resp = client.post(path, content=raw,
+                           headers={**_csrf(client), "Content-Type": "application/json", "Idempotency-Key": key})
+        assert resp.status_code == 409 and resp.json()["code"] == "idempotency_in_progress"
+        assert resp.headers.get("Retry-After") == "1"
+    finally:
+        r.delete(scope)

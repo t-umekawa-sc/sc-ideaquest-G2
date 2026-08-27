@@ -21,6 +21,10 @@ function readCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+// 冪等キー（§1.9）＝1ユーザー操作につき1個の UUIDv4。spend/作成系の二重送信をサーバーが最初の結果へ収束させる。
+// init.headers に載せると apiFetch がそのまま送る（サーバーは会社×アカウント×キーでスコープ）。
+export const idempotencyHeader = (): Record<string, string> => ({ "Idempotency-Key": crypto.randomUUID() });
+
 export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<T | null> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);

@@ -32,6 +32,7 @@ from app.tenant.search.router import router as search_router
 from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
+from app.core.idempotency import idempotency_middleware
 from app.db.control import control_session
 from app.infra.cache import get_redis
 
@@ -80,6 +81,10 @@ app.include_router(notifications_router)  # テナントプレーン（ドメイ
 app.include_router(realtime_router)  # テナントプレーン（ドメイン L・WS 配信ハブ /realtime）
 app.include_router(dashboard_router)  # テナントプレーン（ドメイン I・ダッシュボード集約 SC-01）
 app.include_router(search_router)  # テナントプレーン（ドメイン J・全文検索 SC-12）
+
+
+# 冪等キー（§1.9）＝add_request_id の内側（request_id 設定後）に置く。header 無し POST は素通し。
+app.middleware("http")(idempotency_middleware)
 
 
 @app.middleware("http")

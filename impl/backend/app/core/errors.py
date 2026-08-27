@@ -19,6 +19,8 @@ _TITLES = {
     "company_suspended": "Company Suspended",
     "token_expired": "Token Expired",
     "edit_conflict": "Edit Conflict",
+    "idempotency_in_progress": "Idempotency In Progress",
+    "idempotency_key_reuse": "Idempotency Key Reuse",
     "otp_invalid": "OTP Invalid",
     "otp_expired": "OTP Expired",
     "preauth_expired": "Pre-auth Expired",
