@@ -1,91 +1,68 @@
 # handoff — ideaquest 開発引き継ぎ
 
-> 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。
+> 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。コードの塊は貼らず**ファイルパス＋関数名**で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-08-27**（セッション終了時・時刻は概算）。
-- ブランチ: `main`（`origin/main` と同期・**作業ツリーはクリーン**）。
-- 最新コミット: **`3ddb775`** `docs(deploy): 本番デプロイ要件 §6 を「決定」に確定（セキュリティ非妥協で採用）`。
-- 本セッションの主コミット（新しい順）＝`3ddb775`（デプロイ §6 決定）／`5ee6f0d`（デプロイハードニング＝/docs 無効化＋seed prod ゲート・SEC-TC-045/046）／`40a24da`（通知一覧 N+1 回避＝prime_refs・H-TC-171）／`6e9b575`（i18n A-4 Accept-Language＋エラー title locale・A-TC-108/109）／`ca6ef44`（i18n A-3 マスタ名 locale・G-TC-309/507）／`f3ecc09`（i18n A-1 メール／A-2 通知 locale・A-TC-107・H-TC-170）。それ以前は `git log` 参照。
+- **作業ブランチ＝`feature/game-feel`**（`origin/feature/game-feel` と同期・**作業ツリーはクリーン**）。**`main` ではない**ので注意。
+- 最新コミット（`feature/game-feel`）: **`2738257`** `feat(game-feel): クイック投票の押下バースト＋受入状態更新（増分#5）`。
+- **`main` は `65153d5`**（前セッションまでの完了分＝Phase A i18n 結線／通知 N+1／本番デプロイ ハードニング＋§6 決定）。**game-feel の #1〜#5 はまだ `main` に未マージ**＝`feature/game-feel` が main より 4 コミット先行（`7418961`→`461f278`→`b25aae2`→`2738257`）。
+- game-feel の運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝私は `feature/game-feel` へ**増分ごとに commit+push を自走**（このブランチのみ standing 承認）／`main` は従来どおりユーザー承認後にまとめてマージ。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。開発は**1画面単位で backend 接続ループ**。実装順の正本＝[`doc/実装計画.md`](doc/実装計画.md)・現況の正＝[`impl/README.md`](impl/README.md)。**全画面・全横断ドメインは接続済み**（`impl/README.md` 画面テーブルは全 ✅）＝本セッションも機能スライスではなく**横断品質（i18n 結線／性能／本番デプロイ準備）**が中心。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。全画面・全横断ドメインは接続済み（`impl/README.md` 画面テーブルは全 ✅）。**現在は「ゲーム感（juiciness）向上」フェーズ**＝このシステムの特色を強化中。
 
 ## 3. 今回やったこと（変更ファイルと理由）
+> 本セッション＝(A) 前半で `main` に完了投入した横断品質群、(B) 後半で `feature/game-feel` を切って開始した**ゲーム感フェーズ**。(A) は §1 の `main=65153d5` に含まれる。
 
-### 3-A. Phase A＝backend locale 結線（i18n の実効化・§2.1）
-> 仕様は JA/EN 必須だがコードは「en は将来」で保留されていた。**バックエンドの自己ローカライズ出力を全て locale 実効化**（frontend の全面 i18n は別＝§7 参照）。設計上の切り分け＝**メール/通知/マスタ名は entity-bound**（`accounts.locale`／`users.locale` が源泉）で Accept-Language は効かない。Accept-Language が効くのは entity 非依存の per-request 応答＝エラー応答のみ。
-- **A-1 メール**＝`app/control_plane/mail_outbox/templates.py`。`render(category,secret,locale,params)` が受け取りながら無視していた `locale` を実効化＝全8カテゴリに EN 文面（`en = locale=="en"`・None/不明は ja フォールバック）。auth の既存 `locale=account.locale` 経路がこれで有効化。**A-TC-107**（unit）。
-- **A-2 通知**＝`app/tenant/notifications/catalog.py`。`render(session,n,locale)` を追加し ja 固定を解消＝全11種別＋context/tag/tier/actor/spell を locale 連動。マスタ名は `name_en`（spell/achievement）で解決、**アイデア/クエスト題名は UGC のため非翻訳**。受信者 locale の源泉＝`users.locale`（§4.6 ミラー）＝GET は本人 `user.locale`／push（`service.py _created_data`）は受信者 `User.locale`（クロスプレーン照会不要）。**H-TC-170**（unit）。
-- **A-3 マスタ名 API 応答**＝achievements `get_achievements`（name/description/condition_label）・shop `get_my_items`（装備 name）を受信者 `user.locale` で `name_en/name_ja` 選択。**両言語返し型**（`GET /items`・`GET /spells`＝name_ja+name_en 両方返す）は frontend 選択待ちで backend 変更不要＝対象外。単一 name 型のみ結線＝**frontend 変更なしで EN 即効**。**G-TC-309/507**（api）。
-- **A-4 Accept-Language フォールバック＋エラー応答 locale**＝新規 `app/core/locale.py`（`normalize`／`parse_accept_language`〔q 値順・q=0 除外〕／`resolve_request_locale`＝**ユーザー設定→Accept-Language→既定 ja**）。`core/deps.py resolve_session` がセッションの `locale` を `request.state.user_locale` に載せる（最優先ソース・DBヒット無し）。`core/errors.py` は `_TITLES` を JA/EN に分離し request locale で選択＋汎用バリデーション detail も locale 連動。**`code` は不変**（機械可読の正・§1.7）＝個別 detail の JA 文言は §1.7「code が正・detail は当たり」に従い対象外。**A-TC-108/109**（unit/api）。
+### 3-A. main に投入済み（前半・すべて 65153d5 までに merge 済み）
+- **Phase A＝backend locale 結線**（§2.1 i18n の実効化）＝メール `impl/backend/app/control_plane/mail_outbox/templates.py`（`render` の locale 実効化）／通知 `impl/backend/app/tenant/notifications/catalog.py`（`render(session,n,locale)`）／マスタ名 `achievements/application.py`・`shop/application.py`（受信者 `user.locale` で `name_en/name_ja`）／Accept-Language `impl/backend/app/core/locale.py`＋`core/deps.py resolve_session`＋`core/errors.py`（エラー title/汎用 detail の locale・code は不変）。
+- **通知一覧 N+1 回避**＝`impl/backend/app/tenant/notifications/repository.py:prime_refs`（identity map を強参照で事前ロード）を `application.get_notifications` に結線。
+- **本番デプロイ ハードニング**＝`impl/backend/app/main.py:_docs_kwargs`（prod で /docs 等無効）／`impl/backend/scripts/bootstrap.py:_seed_demo_enabled`（prod は demo seed スキップ）。`doc/本番デプロイ要件.md` §6 を「決定」に確定。
 
-### 3-B. 通知一覧描画の per-row ref N+1 回避（性能・コミット `40a24da`）
-- `catalog.render` が各通知の ref（idea/quest/achievement/spell）を per-row `session.get` で引く N+1（別軸監査の残・優先度低）を解消。
-- `notifications/repository.py prime_refs`（新規）＝ページ分の ref を `IN` 一括ロードして identity map に載せ、後続 get を追加クエリ無しに（描画側 `catalog.render` の署名は不変＝DRY）。`application.get_notifications` の list 直後に結線。
-- **落とし穴**＝identity map は**弱参照**。ロードした ORM を捨てると render 前に GC され get が再クエリ（実測で q7=12＝N+1 継続）。`session.info["_primed_refs"]` に強参照を残して解決。
-- **H-TC-171**（int）＝distinct 実績参照の achievement 通知 K=2/7 で `get_notifications` 中の SELECT 数を計測し**行数非依存（q2==q7）**を担保。red-green＝prime 無効時 q2=7/q7=12→有効時 q2==q7。
-
-### 3-C. 本番デプロイ準備（ハードニング＋§6 決定・コミット `5ee6f0d`/`3ddb775`）
-- `doc/本番デプロイ要件.md` を点検。**コードで閉じられる 2 点を実装**（残りはインフラ/意思決定）＝
-  - `app/main.py _docs_kwargs(app_env)`＝`APP_ENV=prod` で `/docs`・`/redoc`・`/openapi.json` を全無効（最小 CSP 下で Swagger は無意味＋スキーマ露出回避・要件§2）。**SEC-TC-045**。
-  - `scripts/bootstrap.py _seed_demo_enabled(app_env)`＝`APP_ENV=prod` で demo 会社/アカウント（`_SEEDS`＝ACME 等・既定PW）を自動スキップ＝OPS テナント＋system_admin＋migration のみ（従来 `main()` の無条件 seed による本番デモ混入リスクを解消・要件§5）。**SEC-TC-046**。**注＝prod は `APP_ENV=prod` 必須**（未設定は dev 扱いで demo が入る）。
-- **§6 意思決定を「決定」に確定**（セキュリティ非妥協）＝6.1 トポロジ `/api 直結ホップ1`→`TRUSTED_PROXY_COUNT=1`（Next rewrite の未検証 XFF 依存を排除）／6.2 メール＝マネージド送信を SMTP（STARTTLS 587＋秘匿供給＋SPF/DKIM/DMARC）／6.3 Redis＝HA（最低 AOF）＋TLS/認証/私設ネット／6.4 DB＝日次フル＋WAL の PITR・保存時暗号化・**PGroonga on マネージドPG の可否検証**を分岐条件に／6.5 監査ログ＝DB(追記専用)＋期限超過を WORM アーカイブ・叩き台 DB180日/アーカイブ1年。
-
-### 3-D. frontend i18n＝優先度低で繰延（ユーザー方針）
-- 現状＝next-intl 未導入・JA リテラルは 174 ファイル/約2570行・URL は Parallel/Intercept モーダルで複雑。既存 seam＝`lib/forms/validation.ts` の `t(locale,key)`（検証層のみ）。
-- **ユーザー決定＝多言語対応は優先度低／やるなら一般的な方法（next-intl）で・当面全訳しない**（memory `frontend-i18n-low-priority` に保存）。着手指示が出るまで §7 の繰延項目として据え置き。backend の locale 結線（3-A）で**システム生成テキストは既に ja/en 対応済み**。
+### 3-B. ゲーム感フェーズ（feature/game-feel・#1〜#5・純加算的な視覚のみ＝backend/挙動は不変・全て reduce-motion 尊重）
+- **#1 数値の演出（`7418961`）**＝新規 `impl/frontend/src/components/ui/CountUp.tsx`（純関数 `countUpFrame(from,to,t)` を export＝easeOutCubic 補間・reduce-motion で即時）を `impl/frontend/src/features/dashboard/components/DashboardView.tsx` のヒーロー **コイン/SP** に適用。XP バーは `barFilled` state＋`design-system.css .xp-bar>span` の transition で 0%→現在% 充填。
+- **#2 レベルアップ祝福（`7418961`）**＝純ロジック `impl/frontend/src/features/dashboard/levelup.ts`（`shouldCelebrateLevelUp`/`nextStoredLevel`/`parseSeenLevel`）＋`components/LevelUpWatcher.tsx`（前回観測レベルを `localStorage["iq:lastSeenLevel:"+accountId]` で比較→中央オーバーレイ・~2.6s 自動消滅）。`DashboardView` に `accountId` prop 追加、`app/(app)/page.tsx` から `session.account_id` を渡す。CSS＝`dashboard.css .levelup-*`。
+- **#3 登場アニメ（`461f278`）**＝`dashboard.css @keyframes dash-enter`＝パネル/カードがロード時に下からフェードイン（リスト内 nth-child スタッガ）。純CSS。
+- **#4 XP バーのシャイン（`b25aae2`）**＝`design-system.css .xp-bar>span::after`＝既存 `@keyframes iq-shine` を再利用し充填部を光が走る（overflow:hidden で充填幅内）。
+- **#5 クイック投票の押下バースト（`2738257`）**＝新規 `impl/frontend/src/features/dashboard/components/SparkBurst.tsx`＋`DashboardView` の `bursts` state/`fireBurst`（クリック座標に固定オーバーレイで✦を6方向へ・~0.6s・楽観削除でカードが消えても見える）。CSS＝`dashboard.css .spark-burst`/`@keyframes spark-fly`。ボタン `onClick={(e)=>quickVote(v,type,e)}`。
+- **受入台帳＝`doc/テスト/ゲーム感受入.md`**（一意ID `GF-AC-NNN`・ブラウザ受入用）。**GF-AC-001/002 はユーザー確認済み＝✅ OK**、残り 13 項は**未確認**。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-### 4-1. backend（本セッションで実測）
-- **`pytest tests/` 全体 490 passed**（0 失敗・ワーカ停止で複数回 green）。
-- migration head＝control **0012**／company **0020**（本セッションでの migration 追加なし）。
-### 4-2. frontend（本セッションで実測）
-- **tsc＝完全クリーン**／**vitest＝5 files・28 passed**（node 環境）／**`npm run build`＝26ページ green**。本セッションで frontend コード変更なし（健全性確認のみ）。
-- e2e（Playwright）は本セッション未実行（§7.5 バッチ受入方針）。
-### 4-3. テスト運用
-- **TC-ID トレーサビリティ ✅（code 408）**＝repo ルートで `python3 scripts/check_tc_traceability.py`。
-- **注**＝走査は `impl/backend/tests/**` ＋ `impl/frontend/e2e/**` のみ・正規表現 `\b([A-Z])-TC-(\d{3})\b`。**`SEC-TC-` は3文字接頭辞で不一致＝検査対象外**（追跡は `doc/テスト/セキュリティ横断.md` の md 行で担保）。frontend `src/**/*.test.ts`（vitest 単体）も対象外。
+- **backend**＝本セッションで game-feel の backend 変更なし。`main` の最終 full pytest＝**490 passed**（前半で実測）。migration head＝control 0012／company 0020。
+- **frontend（本セッションで実測）**＝`npx tsc --noEmit` **クリーン**／`npx vitest run` **41 passed**（7 files・node 環境。game-feel で `CountUp.test.ts`＝I-TC-150、`levelup.test.ts`＝I-TC-151 を追加）／`npm run build` **green（EXIT=0・26ページ）**。
+- **TC-ID トレーサビリティ ✅（code 408）**＝repo ルートで `python3 scripts/check_tc_traceability.py`。**注**＝`GF-AC-` と `src/**/*.test.ts`（vitest 単体）は走査対象外（`impl/backend/tests/**`＋`impl/frontend/e2e/**` のみ・正規表現 `\b([A-Z])-TC-(\d{3})\b`）。frontend 単体の追跡は md（I-TC-150/151）で担保。
+- **壊れているもの＝無し**（既知の transient は §5）。
 
-## 5. 詰まっている点・注意（試した/失敗と理由）
-- **通知 N+1 の identity-map 事前ロードは弱参照で GC される**（3-B）。バルクロード結果は必ず強参照（`session.info`）で保持しないと `session.get` が再クエリして N+1 が残る（実測で気付いた・回帰ガードは H-TC-171）。
-- **pytest 時はワーカ停止が恒久ルール**＝`worker`/`mail-worker` 起動中は共有 control DB の outbox を real sender で drain し pytest と競合＝フラキー化（`impl/compose.yaml` 冒頭コメント）。手順は §8。
-- **エラー応答の locale は Accept-Language ベース**＝ログイン済みは `request.state.user_locale`（セッション locale）優先。個別 `AppError(detail=…)` の JA 文言は意図的に未翻訳（§1.7 で code が正・frontend が code で多言語化する前提）。
-- **PGroonga イメージ**＝`postgres:16`（Debian trixie）＋PGDG 版 `postgresql-16-pgdg-pgroonga`（`impl/db/Dockerfile`）。本番も同等の PGroonga 導入 PG16 が必須（§6.4 の分岐＝マネージドPG で拡張可否を要検証）。
+## 5. 詰まっている点（試した/失敗と理由）
+- **`next build` の transient 失敗**＝`Collecting page data` フェーズで稀に `Failed to collect page data for /admin/accounts/[accountId]/edit` や `PageNotFoundError: /_document`（ENOENT）が出る。**game-feel の CSS/コードとは無関係**（変更を含まない状態でも発生・App Router の並列収集の既知の脆さ）＝**再実行で EXIT=0**。build 判定は「1回落ちたら再実行」で運用。
+- **識別できた地雷（前半・回帰防止で記録）**＝(1) 通知 N+1 の identity-map 事前ロードは**弱参照で GC される**ため `session.info` に強参照必須（`prime_refs`）。(2) pytest 時は `worker`/`mail-worker` を**必ず停止**（共有 control DB の outbox を real sender で drain して競合＝フラキー）。
+- **一次QAスクショ（Playwright headless）は未着手**＝動作中スタックが要るため未実装。現状のゲートは tsc/vitest/build。次セッションで harness 化する（§7）。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **backend locale 結線の切り分け**（採用・3-A）＝メール/通知/マスタ名は entity-bound（stored locale が源泉）／Accept-Language は per-request のエラー応答にのみ適用。**不採用＝全出力に Accept-Language**（entity に紐づく出力では誤り）。
-- **frontend i18n は next-intl（標準）・優先度低で繰延**（採用・ユーザー決定・3-D）。**不採用＝自作 `t()` を全画面へ手拡張**（標準でない・維持コスト）。
-- **通知 N+1 は identity-map 事前ロード（署名不変）**（採用・3-B）＝`catalog.render` を変えず repository で prime。**不採用＝render に解決済みキャッシュを引数追加**（署名変更＝呼び出し側の広範改修）。
-- **本番ハードニングはコードで自動強制**（採用・3-C）＝prod で /docs 無効・demo seed スキップ。**不採用＝運用手順書だけに委ねる**（設定漏れで露出/混入のリスク）。
-- **デプロイ §6 はセキュリティ非妥協で確定**（採用・3-C）＝実IP確定 hop1・TLS 全経路・秘匿供給・追記専用監査・保存時暗号化。
-- （継続）J 検索＝PGroonga／スニペット XSS＝許可リスト構造化セグメント／pytest はワーカ停止／テスト運用＝md 先行＋TC-ID＋red-green（`doc/テスト/red確認台帳.md`）／ブラウザ受入は後日バッチ（§7.5）。
+- **ゲーム感は非同期パイプラインで先行実装**（採用・記憶 `game-feel-async-pipeline`）＝ユーザー検証が遅く私の実装が速い前提で、検証待ちで止めない。**不採用＝1増分ごとに同期承認**（私が遊ぶ・遅い）。commit/push は `feature/game-feel` に standing 承認・`main` は承認後マージ。
+- **各増分は純加算的な視覚レイヤ＋reduce-motion 尊重＋テスト規約**（採用）＝純ロジック（`countUpFrame`/`shouldCelebrateLevelUp`）は必ず抽出して md 先行＋vitest red-green（I-TC-150/151）。視覚は `doc/テスト/ゲーム感受入.md` の GF-AC でブラウザ受入。**視覚のみの増分（#3/#4/#5）は純ロジックが無いので vitest 無し＝正直に GF-AC のみ**。
+- **レベルアップ検出は localStorage（account 別キー）で前回観測比較**（採用・`features/dashboard/levelup.ts`）＝初回観測は祝福しない（誤発火防止）。**不採用＝サーバーが leveled_up フラグを返す**（現状レスポンスに無い・backend 変更が要る＝#8 と同じ設計判断なので後回し）。
+- （前半・継続）backend locale 切り分け＝メール/通知/マスタ名は entity-bound・Accept-Language はエラー応答のみ／frontend 全面 i18n は優先度低で繰延（記憶 `frontend-i18n-low-priority`・next-intl 標準）／本番デプロイ §6 はセキュリティ非妥協で確定。
 
 ## 7. 次にやること（優先順・具体的に）
-> 全画面・全横断ドメインは接続済み。過去セッションの大規模パンチリスト（監査 HIGH／M1-M6／FR-08 3D 骨組み／別軸監査の性能・a11y）は**すべて完了**（詳細は `git log`）。以下は**実際に残っている作業**。
+> `feature/game-feel` で継続。着手前に `doc/テスト/ゲーム感受入.md` の未確認/指摘を確認し、GF-AC に追記しながら進める。各増分＝純ロジックは red-green・視覚は GF-AC・push は `feature/game-feel` へ自走。
 
-1. **本番デプロイの環境実装（コード外）**＝§6 の決定を環境へ反映＝`TRUSTED_PROXY_COUNT=1`＋エッジで実 IP 確定・`COOKIE_SECURE=true`・`SMTP_START_TLS=true`＋秘匿供給・Redis HA/AOF・DB PITR・監査 WORM アーカイブ。**唯一のコード外前提確認＝PGroonga on マネージドPG の可否**（不可なら自前 PGroonga 像＋WAL アーカイブ）。
-2. **監査ログ保存期間のコンプラ確認**＝§6.5 の叩き台（DB180日/アーカイブ1年）を法務/社内規定で確定（別タスク起票）。決まれば掃除/移送ジョブを実装。
-3. **frontend i18n（繰延・優先度低）**＝着手時は next-intl（標準）。`session.locale` は SSR で取得可・backend は locale 結線済みなので、frontend は provider＋カタログ＋画面訳の段階作業（1画面群ずつ）。memory `frontend-i18n-low-priority` 参照。
-4. **3D アバター残（コード外）**＝実 VRM アセット（男女2体＋装備パーツ）の手配のみ。入れば `AvatarViewer3D.tsx` の TODO seam（`@pixiv/three-vrm` で `items.part_ref` をスロットへ）を差し替え。着せ替え backend/API/2D フォールバックは完了済み。
-5. **J の将来拡張（任意）**＝グローバル `GET /search`＋ヘッダー導線／最小文字数・演算子(OR/フレーズ)／種別間スコア重み／`per_page` 最終値（J.6 TBD）。
-- **共通ルール**＝着手前に `impl/README.md` の現況と該当正本を開き、非自明な新規スコープはユーザーへ確認。1スライス＝backend+frontend＋テスト（md 先行・red-green）→docs(handoff) の順でコミット、**push はユーザー承認後**。
+1. **#6 実績アンロック祝福**＝#2 の実績版。新規 `impl/frontend/src/features/achievements/celebrate.ts`（純関数 `shouldCelebrateUnlock(prevSeenCodes:string[], currentUnlockedCodes:string[]):string[]`＝新規解放 code 群を返す）＋`components/AchievementCelebration.tsx`（`features/dashboard/components/LevelUpWatcher.tsx` を雛形に・`localStorage["iq:seenAch:"+accountId]` で差分検出）。`features/achievements/components/AchievementsView.tsx` に結線。テスト＝`doc/テスト/G_ゲーミフィケーション.md` に G-TC を先行追記＋vitest red-green。
+2. **#7 ヘッダーの微演出（全画面で効く）**＝`impl/frontend/src/features/notifications` の `LiveAppHeader`／ベル要素に「未読>0 でベルが軽く振れる」CSS、ヘッダーのコイン表示に変化時の pulse。純CSS＋データ属性駆動（未読数は既存 state）。純ロジック無し＝GF-AC のみ。
+3. **#8 獲得フィードバック「+50 XP」フローティング**＝**設計判断あり（要注意）**。投稿/投票/評価/購入の**レスポンスに XP/コイン差分が載っていない**（`features/ideas/api.ts` の vote 応答等）。潰すには (a) backend 応答に delta を足す（`ideas/application.py` 等・spec 追記）か (b) フロントで before/after 残高差分から算出。**着手前にユーザーへ設計確認**（backend 変更＝main 側の話になる）。
+4. **一次QA harness**＝Playwright headless でダッシュボードのスクショを撮り私が目視する仕組み。既存 e2e（`impl/frontend/e2e/*.spec.ts`）を雛形に。動作スタック（`--profile workers up` ＋ host `npm run dev`）前提。
+5. **`feature/game-feel` → `main` マージ**＝ユーザーが GF-AC を一通り受入（✅ OK）したらバッチで main へ。マージ時に handoff/`impl/README.md` を追随更新。
 
-## 7.5 ブラウザ受入待ち（バッチ・未消化）
-- **運用**＝ブラウザ受入は後日まとめて（e2e green でクローズ扱い）。一覧は `impl/README.md`「ブラウザ受入状況」節。
-- **J（全文検索）**＝SC-12「🔍 全文検索」タブで語→このクエスト内のアイデア/チャット/添付ファイル名がヒット・種別バッジ・ハイライト・件数/ページング・行クリックで SC-22/SC-24 遷移・types 絞り込み・下書き/削除は出ない。dev＝ACME-01 参加クエストに公開アイデア＋チャット＋添付を用意。
-- **I/L**＝SC-01 実データ/投票/フォロー/login_bonus・ベル/SC-02/SC-24 の WS 即時反映。
-- **i18n（任意確認）**＝`accounts.locale=en` のユーザーでメール/通知/実績名/装備名が英語・エラー応答が Accept-Language に追従することを実スタックで確認（現状は unit/api テストで担保）。
+- **共通ルール**＝非自明な新規スコープ（特に #8 の backend 変更）はユーザー確認。テストは md 先行・red-green（`doc/テスト/red確認台帳.md`）。`main` への push はユーザー承認後。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。compose＝`impl/compose.yaml`。db は**カスタムビルド**（PGroonga 同梱・`impl/db/Dockerfile`）。
-- **フルスタック起動**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（db ビルド含む＝初回数分）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。**e2e は `--profile workers` 必須**。
-- **再ビルド反映**＝db `... up -d --build db`／frontend `... up -d --build frontend`／backend `... up -d --build backend worker mail-worker`。**frontend 再ビルド後は Playwright を再 install**。
-- **DB migration 適用（冪等・0018 pgroonga 含む）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
-- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（ワーカ起動中は outbox 競合でフラキー・§5）。終わったら `docker compose start worker mail-worker` で戻す。ドメイン別＝H `tests/notifications`／J `tests/search`／I `tests/dashboard`／L `tests/realtime`／横断 `tests/core`。
-- **frontend tsc / vitest / build**＝`cd impl/frontend && npx tsc --noEmit`（クリーン）／`npx vitest run`（28/28・node）／`npm run build`（26ページ）。
-- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 408・SEC-TC は対象外）。
-- **PGroonga 疎通**＝`docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tc "select name,default_version from pg_available_extensions where name=''pgroonga'';"'`（→ pgroonga 4.0.x）。
-- **dev ログイン（PW 全て `Passw0rd!`）**＝一般 `ACME-01`/`user@acme.example`（MFA OFF）／`ACME-02`/`mfa@acme2.example`（MFA ON）／system_admin `OPS`/`admin@ops.example`。MailHog＝`http://localhost:8025`。
-- **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。実装順＝`doc/実装計画.md`。API＝`doc/API設計/{A..L}_*.md`（横断規約 `doc/API設計/README.md`・§2.1 i18n＝`doc/規約/コーディング規約.md`）。データモデル＝`doc/データモデル.md`（§6 PGroonga）。テスト＝`doc/テスト/*.md`＋`red確認台帳.md`＋`セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。要件＝`doc/要件定義/README.md`（FR-xx）。
-- **コミット規約**＝メッセージ末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`／PR body 末尾に 🤖 Generated with Claude Code 行／commit・push はユーザー承認後。
+- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch` で `feature/game-feel` に居るか確認**（居なければ `git checkout feature/game-feel`）。compose＝`impl/compose.yaml`。db はカスタムビルド（PGroonga 同梱・`impl/db/Dockerfile`）。
+- **ゲーム感の検証（並行ワークフロー）**＝backend 一式は compose（`docker compose -f impl/compose.yaml up -d`）、**フロントはホストで `cd impl/frontend && npm run dev`**（hot-reload・`/api` は既定で `localhost:8000` へプロキシ）。ブラウザ `http://localhost:3000` → `ACME-01`/`user@acme.example`/`Passw0rd!` → ダッシュボードで GF-AC を確認。※compose の frontend は src バインドマウントが無くホスト編集が反映されないため、開発検証は host `npm run dev` を使う。
+- **フルスタック起動（e2e 等）**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（db ビルド含む＝初回数分）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。
+- **frontend tsc / vitest / build**＝`cd impl/frontend` で `npx tsc --noEmit`（クリーン）／`npx vitest run`（41/41・node）／`npm run build`（26ページ・**transient で落ちたら再実行**＝§5）。
+- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（490 passed）。終わったら `docker compose start worker mail-worker`。
+- **DB migration 適用（冪等）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
+- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 408・GF-AC/src 単体は対象外）。
+- **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。ゲーム感受入＝`doc/テスト/ゲーム感受入.md`（GF-AC）。テスト＝`doc/テスト/*.md`（frontend 単体の TC も domain md に記す＝例 I-TC-150/151）＋`red確認台帳.md`＋`セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。API＝`doc/API設計/{A..L}_*.md`。データモデル＝`doc/データモデル.md`。
+- **コミット規約**＝メッセージ末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`／PR body 末尾に 🤖 Generated with Claude Code 行／`feature/game-feel` への push は自走可・`main` への push はユーザー承認後。
