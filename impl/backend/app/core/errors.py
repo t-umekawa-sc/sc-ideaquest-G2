@@ -8,8 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-# code -> 既定 title（人間可読・表示用の当たり）
-_TITLES = {
+from app.core.locale import resolve_request_locale
+
+# code -> 既定 title（人間可読・表示用の当たり）。locale 別（§2.1）。機械可読の正は `code`（§1.7）。
+_TITLES_EN = {
     "unauthenticated": "Unauthenticated",
     "forbidden": "Forbidden",
     "csrf_failed": "CSRF validation failed",
@@ -25,6 +27,27 @@ _TITLES = {
     "otp_expired": "OTP Expired",
     "preauth_expired": "Pre-auth Expired",
 }
+_TITLES_JA = {
+    "unauthenticated": "未認証",
+    "forbidden": "権限がありません",
+    "csrf_failed": "CSRF 検証に失敗しました",
+    "not_found": "見つかりません",
+    "validation_error": "入力値が不正です",
+    "rate_limited": "リクエストが多すぎます",
+    "company_suspended": "会社が停止中です",
+    "token_expired": "トークンの有効期限が切れています",
+    "edit_conflict": "編集が競合しました",
+    "idempotency_in_progress": "処理中です",
+    "idempotency_key_reuse": "冪等キーが再利用されました",
+    "otp_invalid": "認証コードが不正です",
+    "otp_expired": "認証コードの有効期限が切れています",
+    "preauth_expired": "認証の有効期限が切れています",
+}
+
+
+def _title(code: str, locale: str) -> str:
+    titles = _TITLES_EN if locale == "en" else _TITLES_JA  # 既定 ja（§2.1）
+    return titles.get(code, code)
 
 
 class AppError(Exception):
@@ -54,7 +77,7 @@ def _problem(
 ) -> JSONResponse:
     body = {
         "type": "about:blank",
-        "title": _TITLES.get(code, code),
+        "title": _title(code, resolve_request_locale(request)),
         "status": status,
         "code": code,
         "request_id": getattr(request.state, "request_id", None),
@@ -85,4 +108,5 @@ def install_error_handlers(app: FastAPI) -> None:
             }
             for e in exc.errors()
         ]
-        return _problem(request, 422, "validation_error", "入力値が不正です", errors)
+        detail = "Invalid input" if resolve_request_locale(request) == "en" else "入力値が不正です"
+        return _problem(request, 422, "validation_error", detail, errors)

@@ -26,7 +26,11 @@ def resolve_session(request: Request) -> dict | None:
     token = request.cookies.get("iq_session")
     if not token:
         return None
-    return read_session(get_redis(), token)
+    session = read_session(get_redis(), token)
+    if session is not None:
+        # ログイン済みユーザー設定を locale 解決の最優先ソースとして載せる（§2.1・エラー応答の言語）。
+        request.state.user_locale = session.get("locale")
+    return session
 
 
 def require_session(request: Request) -> dict:

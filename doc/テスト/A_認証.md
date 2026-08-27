@@ -203,6 +203,8 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-099 | api | SMTP 障害でもロック発火 login が 401 維持する担保 | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
 | A-TC-100 | int | import 隔離による FK 解決の回帰防止の担保 | まっさらな子プロセスで `mail_outbox.application` だけを import | `ControlBase.metadata` を検査 | FK ターゲット `accounts`/`companies` が登録済み（別プロセスの `mail_worker` で `done` 書込が `NoReferencedTableError` にならない・**import 隔離バグの回帰防止**） | ADR-0007 §2.3 |
 | A-TC-107 | unit | システム生成メールの locale 出し分けの担保（i18n 結線） | `render()` に locale=None/`en`/`fr` を与える（OTP・password_changed・new_device） | 件名/本文と new_device の detail ラベルを検査 | 既定/不明（None/`fr`）は日本語（`【ideaquest】`）・`en` は英語（`[ideaquest]`＋`verification code`）。new_device の detail ラベルも locale 連動（`en`=`Date`/`IP`/`Device`） | コーディング規約 §2.1 |
+| A-TC-108 | unit | リクエスト locale 解決の担保（Accept-Language フォールバック・§2.1 解決順） | `parse_accept_language`/`normalize`/`resolve_request_locale` に各種入力（`en-US`・q 値・未対応タグ・ユーザー設定有無） | 返り値を検査 | `en-US`→`en`・q 値順で最上位対応言語・未対応/空は None。resolve は**ユーザー設定→Accept-Language→既定 ja**の順（ユーザー設定が最優先・未対応設定は Accept-Language へ） | コーディング規約 §2.1 |
+| A-TC-109 | api | エラー応答 title の locale 出し分けの担保（§1.7 表現・§2.1） | 未認証（Accept-Language 有無）／ログイン済み（Accept-Language=en）で 401/422 を誘発 | problem+json の `title`/`code` を検査 | 未認証は Accept-Language に追従（`en`→`Unauthenticated`・ヘッダ無しは既定 ja `未認証`）。ログイン済みはユーザー設定（ja）が Accept-Language(en) より優先（`title`=日本語）。`code` は不変（機械可読の正） | README §1.7／コーディング規約 §2.1 |
 
 ### 7.1 補足・非対象（メール非同期化）
 
