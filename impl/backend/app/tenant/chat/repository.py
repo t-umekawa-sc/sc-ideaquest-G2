@@ -108,6 +108,14 @@ def get_message(session: Session, message_id: uuid.UUID) -> ChatMessage | None:
     return session.execute(select(ChatMessage).where(ChatMessage.id == message_id)).scalars().first()
 
 
+def get_messages_by_ids(session: Session, ids) -> dict[uuid.UUID, ChatMessage]:
+    """message_id→ChatMessage の dict（引用元の一括解決・per-id N+1 回避）。"""
+    id_list = list(ids)
+    if not id_list:
+        return {}
+    return {m.id: m for m in session.execute(select(ChatMessage).where(ChatMessage.id.in_(id_list))).scalars().all()}
+
+
 def list_messages(
     session: Session, chat_group_id: uuid.UUID, *,
     before: tuple[datetime, uuid.UUID] | None = None,

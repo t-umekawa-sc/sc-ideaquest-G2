@@ -33,10 +33,11 @@ def get_achievements(account_id, company_id, *, category=None, state="all") -> d
         if user is None:
             raise AppError(401, "unauthenticated")
         owned = repo.list_user_achievements(ts, user.id)
+        all_achs = repo.list_achievements(ts)  # 1回だけ取得（total 用の再取得を排除）
         data = []
         unlocked_n = 0
         coin_earned = 0
-        for ach in repo.list_achievements(ts):
+        for ach in all_achs:
             ua = owned.get(ach.id)
             unlocked = ua is not None and ua.unlocked_at is not None
             if unlocked:
@@ -66,7 +67,7 @@ def get_achievements(account_id, company_id, *, category=None, state="all") -> d
                 "unlocked_at": ua.unlocked_at if ua else None,
                 "progress": {"current": cur, "target": target},
             })
-        total = len(repo.list_achievements(ts))
+        total = len(all_achs)
         return {"data": data, "summary": {"unlocked": unlocked_n, "total": total, "coin_earned": coin_earned}}
 
 

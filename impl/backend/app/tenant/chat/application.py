@@ -477,7 +477,7 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
     # 引用返信（複数可）の解決（同一グループ内・抜粋 or トゥームストーン）。
     quotes_map = repo.get_quotes_for_messages(ts, ids)  # message_id -> [quoted_id]
     quoted_ids = {qid for qs in quotes_map.values() for qid in qs}
-    quoted_msgs = {qid: repo.get_message(ts, qid) for qid in quoted_ids}
+    quoted_msgs = repo.get_messages_by_ids(ts, quoted_ids)  # 引用元を一括（per-id N+1 回避）
     author_ids = {m.author_id for m in active} | {q.author_id for q in quoted_msgs.values() if q is not None}
     atts = repo.get_attachments_for_messages(ts, ids)
     mentions = repo.get_mentions_for_messages(ts, ids)

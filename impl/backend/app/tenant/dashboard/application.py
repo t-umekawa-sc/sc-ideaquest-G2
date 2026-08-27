@@ -56,18 +56,24 @@ def _image_url(path: str | None) -> str | None:
     return get_storage().presigned_get(path) if path else None
 
 
-def _poster(ts, user_id: uuid.UUID) -> dict:
-    u = ts.get(User, user_id)
+def _poster_from(u) -> dict:
     return {"name": u.display_name if u else "（不明）",
             "avatar": _image_url(u.avatar_image_path) if u else None}
 
 
-def _quest_ref(ts, quest_id: uuid.UUID, *, with_status: bool = False) -> dict:
-    q = ts.get(Quest, quest_id)
+def _poster(ts, user_id: uuid.UUID) -> dict:
+    return _poster_from(ts.get(User, user_id))
+
+
+def _quest_ref_from(quest_id: uuid.UUID, q, *, with_status: bool = False) -> dict:
     ref = {"id": str(quest_id), "title": q.title if q else "（削除されたクエスト）"}
     if with_status:
         ref["quest_status"] = q.status if q else None
     return ref
+
+
+def _quest_ref(ts, quest_id: uuid.UUID, *, with_status: bool = False) -> dict:
+    return _quest_ref_from(quest_id, ts.get(Quest, quest_id), with_status=with_status)
 
 
 def _hero(ts, user: User) -> dict:
@@ -107,23 +113,34 @@ def _vote_summary(ts, idea_id: uuid.UUID) -> dict:
     return ideas_repo.count_votes(ts, idea_id)
 
 
+def _batch_refs(ts, ideas):
+    """一覧アイデアの quest/poster/vote を一括取得（per-item N+1 回避）。"""
+    quests = quests_repo.get_quests_by_ids(ts, {i.quest_id for i in ideas})
+    posters = quests_repo.get_users_by_ids(ts, {i.author_id for i in ideas})
+    votes = ideas_repo.count_votes_for_ideas(ts, [i.id for i in ideas])
+    return quests, posters, votes
+
+
 def _unvoted(ts, user: User) -> list[dict]:
     quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
     ideas = ideas_repo.list_unvoted_published_ideas(ts, user.id, quest_ids, limit=_UNVOTED_LIMIT)
+    quests, posters, votes = _batch_refs(ts, ideas)
     return [{
-        "id": str(i.id), "title": i.title, "quest": _quest_ref(ts, i.quest_id),
-        "poster": _poster(ts, i.author_id), "value": i.value,
-        "vote_summary": _vote_summary(ts, i.id),
+        "id": str(i.id), "title": i.title, "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id)),
+        "poster": _poster_from(posters.get(i.author_id)), "value": i.value,
+        "vote_summary": votes.get(i.id, {"approve": 0, "oppose": 0}),
         "deadline": i.time_limit.isoformat() if i.time_limit else None,
     } for i in ideas]
 
 
 def _followed(ts, user: User) -> list[dict]:
     ideas = ideas_repo.list_followed_ideas(ts, user.id, limit=_FOLLOWED_LIMIT)
+    quests, posters, votes = _batch_refs(ts, ideas)
     return [{
-        "id": str(i.id), "title": i.title, "quest": _quest_ref(ts, i.quest_id, with_status=True),
-        "poster": _poster(ts, i.author_id), "value": i.value,
-        "vote_summary": _vote_summary(ts, i.id),
+        "id": str(i.id), "title": i.title,
+        "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id), with_status=True),
+        "poster": _poster_from(posters.get(i.author_id)), "value": i.value,
+        "vote_summary": votes.get(i.id, {"approve": 0, "oppose": 0}),
         "updated_at": i.updated_at.isoformat() if i.updated_at else None, "following": True,
     } for i in ideas]
 
