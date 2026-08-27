@@ -57,6 +57,15 @@ SEED_MFA_ACCOUNT = {
 _SEEDS = [(SEED_COMPANY, SEED_ACCOUNT), (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT)]
 
 
+def _seed_demo_enabled(app_env: str) -> bool:
+    """demo 会社/アカウント（`_SEEDS`）を seed してよいか（本番デプロイ要件 §5）。
+
+    prod では既定PW のデモアカウント/会社を作らない（OPS テナント＋system_admin＋migration のみ）。
+    非 prod（dev/e2e/test）は従来どおり demo を seed する（テスト/開発の前提データ）。
+    """
+    return app_env != "prod"
+
+
 def _server_conninfo(dbname: str) -> str:
     s = get_settings()
     return f"host={s.postgres_host} port={s.postgres_port} user={s.postgres_user} password={s.postgres_password} dbname={dbname}"
@@ -125,8 +134,13 @@ def _seed_ops_admin(session) -> None:
 
 
 def seed_control() -> None:
+    s = get_settings()
     with control_session() as session:
-        _seed_ops_admin(session)
+        _seed_ops_admin(session)  # OPS テナント＋初期 system_admin（本番でも必要・B.5.1）
+        if not _seed_demo_enabled(s.app_env):
+            session.commit()  # prod は demo を seed しない（本番デプロイ要件 §5）
+            print(f"[bootstrap] APP_ENV={s.app_env}: demo seed をスキップ（OPS のみ）")
+            return
         for company_def, account_def in _SEEDS:
             company = (
                 session.query(Company)

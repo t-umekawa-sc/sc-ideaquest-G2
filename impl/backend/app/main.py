@@ -63,7 +63,21 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
         await get_hub().stop()
 
 
-app = FastAPI(title="ideaquest backend", version="0.0.1", lifespan=lifespan)
+def _docs_kwargs(app_env: str) -> dict:
+    """本番は API スキーマ/Swagger を非公開にする（本番デプロイ要件 §2）。
+
+    最小 CSP（`default-src 'none'`・§10）下では Swagger UI 資産が読めず無意味な上、OpenAPI スキーマの
+    公開自体を避けたい。prod では `/docs`・`/redoc`・`/openapi.json` を全て無効化（非 prod は既定のまま）。
+    """
+    if app_env == "prod":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {}
+
+
+app = FastAPI(
+    title="ideaquest backend", version="0.0.1", lifespan=lifespan,
+    **_docs_kwargs(get_settings().app_env),
+)
 
 app.add_middleware(AuditContextMiddleware)  # 監査ログの実行者/IP/UA を contextvar に載せる（B.6・§4.5）
 install_error_handlers(app)
