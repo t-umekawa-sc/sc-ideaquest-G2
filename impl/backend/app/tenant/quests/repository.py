@@ -335,6 +335,17 @@ def get_users_by_ids(session: Session, ids) -> dict:
     }
 
 
+def get_quests_by_ids(session: Session, ids) -> dict:
+    """quest_id→Quest の dict（チームフィード等の DTO 組み立ての N+1 回避）。"""
+    id_list = list(ids)
+    if not id_list:
+        return {}
+    return {
+        q.id: q
+        for q in session.execute(select(Quest).where(Quest.id.in_(id_list))).scalars().all()
+    }
+
+
 def get_owners_and_groups(
     session: Session, owner_ids: list[uuid.UUID], group_ids: list[uuid.UUID]
 ) -> tuple[dict, dict]:

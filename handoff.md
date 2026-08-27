@@ -68,7 +68,15 @@
 
 ## 7. 次にやること（優先順・具体的に）
 
-> **仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
+> **別軸監査（2026-08-27・i18n／性能N+1／a11y・並列）の punch-list**。quick win（性能+a11y）は本セッションで修正。
+> - ✅ **性能 修正済**＝`_idea_card` の投票を `get_votes_for_ideas` で一括化（SC-12 一覧の N+1 解消）／`get_team_feed` の二重 `get_quest` を `get_quests_by_ids` バッチへ（F1 の無駄除去）。
+> - ✅ **a11y 修正済**＝`Field` が `aria-describedby` で入力↔エラー/補足を結線（全フォーム・SR がフォーカス時に理由読み上げ）／SC-25 スター採点を `role=radio`+`aria-checked`+矢印キー+roving tabindex に（クリック/矢印での選択・aria-checked 更新を実測。※モーダル内のフォーカス追従は focus trap との兼ね合いで best-effort＝値変更は state ベースで機能）。
+> - ⬜ **i18n（EN）＝大規模・別判断**＝EN は事実上未実装（next-intl 未導入で UI 全面 JA／メール `templates.py` が locale 引数を無視〔XP no-op 型〕／通知 `catalog.render` に locale 引数なし／マスタ名フロントで `name_ja` 固定／`Accept-Language` 参照0）。仕様は JA/EN 必須だがコードは「en は将来」と明記＝意図的保留。潰すには frontend next-intl 導入＋backend templates/catalog/master-name への locale 適用（フェーズ分割要）。
+> - ⬜ **性能 残（MVP規模では動く）**＝ランキング集計 `aggregate_ranking` が activities 全件 GROUP BY→Python ソート/ページング（DB 側ページング化推奨）／評価集計 `eval_states_for_ideas` が viewer 権限をループ内で毎回引く（ループ外化）／dashboard/notifications/achievements/chat の軽微な per-item 取得。
+> - ⬜ **a11y 残**＝DataTable のリスト行がキーボードで開けない（`<tr onClick>` のみ・デザイン標準 §4.5 が「将来課題」と自認）／DataTable sr-only `<caption>` 欠落／Avatar tooltip の `tabindex=0` 欠落。
+> - **⚠ 既知フラキー**＝`tests/search/test_api.py::test_j_tc_141_query_injection_safe` は **full 実行で PGroonga パースエラー（`*X||`）で失敗・単独では成功**＝順序/状態依存（**変更前 stash でも同様に失敗を実測＝pre-existing**）。要別途調査。
+
+> **（前回）仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
 > - ✅ **H1 修正済**＝`complete_password_setup`（PW再設定完了）で信頼端末を失効していなかった（A.7/A.9-③ 違反）→ `revoke_all_trusted_devices` を同一Txに追加（A-TC-049 拡張・red→green）。
 > - ✅ **H2 修正済**＝`change_account`（ロール変更）で信頼端末を失効していなかった（A.9-③ 違反）→ 同上（B-TC-032 拡張・red→green）。
 > - ✅ **M1 修正済（パーティー差分）**＝L.4 購読失効を**バルク経路にも結線**。`_apply_party_diff` が除去 uid を返し、`set_party`/`update_quest`/`publish_quest` が post-commit で `_revoke_chat_subscriptions`（除去×chat group に `publish_revoke`）を発火（増分 `DELETE /members` の DRY 化含む）。L-TC-122（bulk PUT /party・monkeypatch で発火検証・red→green）。

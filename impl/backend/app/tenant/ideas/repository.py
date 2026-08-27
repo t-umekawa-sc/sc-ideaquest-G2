@@ -188,6 +188,17 @@ def get_vote(session: Session, idea_id: uuid.UUID, user_id: uuid.UUID) -> Vote |
     ).scalars().first()
 
 
+def get_votes_for_ideas(session: Session, idea_ids, user_id: uuid.UUID) -> dict[uuid.UUID, str]:
+    """viewer の投票を一括取得（idea_id→type）。SC-12 一覧の per-idea N+1 回避（`uq_votes_idea_user` が IN に効く）。"""
+    ids = list(idea_ids)
+    if not ids:
+        return {}
+    rows = session.execute(
+        select(Vote.idea_id, Vote.type).where(Vote.idea_id.in_(ids), Vote.user_id == user_id)
+    ).all()
+    return {iid: t for iid, t in rows}
+
+
 def upsert_vote(
     session: Session, idea_id: uuid.UUID, user_id: uuid.UUID, *, type: str, voted_revision: int
 ) -> tuple[Vote, bool]:

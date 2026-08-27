@@ -202,14 +202,40 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
                     <div className={"eval-desc" + (a.cost ? " eval-cost-note" : "")}>{a.desc}</div>
                   </div>
                   <div className="eval-rate">
-                    <span className="stars" role="radiogroup" aria-label={`${a.label}の点数`} onMouseLeave={() => setHover((h) => ({ ...h, [a.key]: undefined }))}>
+                    <span
+                      className="stars"
+                      role="radiogroup"
+                      aria-label={`${a.label}の点数`}
+                      onMouseLeave={() => setHover((h) => ({ ...h, [a.key]: undefined }))}
+                      onKeyDown={(e) => {
+                        // 矢印キーで採点移動＝radiogroup 標準（Home/End で 1/5）。選択後は当該★へフォーカス。
+                        const cur = val ?? 0;
+                        let next: number | null = null;
+                        if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = Math.max(1, (cur || 1) - 1);
+                        else if (e.key === "ArrowRight" || e.key === "ArrowUp") next = Math.min(5, cur + 1);
+                        else if (e.key === "Home") next = 1;
+                        else if (e.key === "End") next = 5;
+                        if (next != null) {
+                          const nv = next;
+                          const grp = e.currentTarget;  // イベント後は currentTarget が null になるため退避
+                          e.preventDefault();
+                          setScores((s) => ({ ...s, [a.key]: nv }));
+                          if (missingErr) setMissingErr(0);
+                          // 再描画（roving tabindex 更新）＋モーダルの focus trap 後に選択★へフォーカス移動。
+                          requestAnimationFrame(() => (grp.querySelector(`[data-star="${nv}"]`) as HTMLElement | null)?.focus());
+                        }
+                      }}
+                    >
                       {[1, 2, 3, 4, 5].map((n) => (
                         <button
                           key={n}
+                          data-star={n}
                           className={"star" + (n <= filled ? " is-on" : "")}
                           type="button"
+                          role="radio"
                           aria-label={`${n}点`}
-                          aria-pressed={val === n}
+                          aria-checked={val === n}
+                          tabIndex={val === n || (val == null && n === 1) ? 0 : -1}
                           onMouseEnter={() => setHover((h) => ({ ...h, [a.key]: n }))}
                           onClick={() => {
                             setScores((s) => ({ ...s, [a.key]: n }));

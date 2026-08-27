@@ -228,9 +228,9 @@ def get_team_feed(account_id, company_id, *, limit, cursor=None) -> dict:
             return _EMPTY_FEED
         rows, has_next, next_cursor = _paginate(gami_repo.list_team_feed(ts, quest_ids, cursor=cur, limit=limit + 1), limit)
         actors = quests_repo.get_users_by_ids(ts, {a.user_id for a in rows})
-        titles = {qid2: (quests_repo.get_quest(ts, qid2).title if quests_repo.get_quest(ts, qid2) else "")
-                  for qid2 in {a.quest_id for a in rows if a.quest_id}}
-        data = [_feed_row_dto(a, actors.get(a.user_id), quest_title=titles.get(a.quest_id, "")) for a in rows]
+        quest_map = quests_repo.get_quests_by_ids(ts, {a.quest_id for a in rows if a.quest_id})  # 一括（二重 get_quest 解消）
+        data = [_feed_row_dto(a, actors.get(a.user_id),
+                              quest_title=(quest_map[a.quest_id].title if a.quest_id in quest_map else "")) for a in rows]
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
