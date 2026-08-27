@@ -12,7 +12,8 @@ export function Avatar({ name, imageUrl, size = "md", level }: Props) {
   const cls = ["avatar", size !== "md" ? size : ""].filter(Boolean).join(" ");
   const initial = name?.trim().charAt(0) || "?";
   return (
-    <span className={cls} data-name={name}>
+    // tabindex=0＝キーボードフォーカスで氏名ツールチップ（CSS `.avatar[data-name]:focus-visible::after`・デザイン標準 §4）。
+    <span className={cls} data-name={name} tabIndex={0}>
       {imageUrl ? (
         <Image className="avatar__img" src={imageUrl} alt={name} width={48} height={48} />
       ) : (

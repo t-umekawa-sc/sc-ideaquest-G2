@@ -621,6 +621,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
   // ツールチップ（title）と入力欄の aria-label で示す（可読性＋アクセシビリティ）。
   const searchPlaceholder = props.searchPlaceholder ?? "検索…";
   const searchTitle = props.searchFields ? `${props.searchFields} を検索` : "検索";
+  // sr-only テーブル表題（SR のテーブルモードで「何の表か」を伝える・デザイン標準 §4.5 F3）。
+  const caption = props.searchFields ? `${props.searchFields} の一覧` : "一覧テーブル";
 
   // カード本文（cardLayout の標準構造）。
   function cardBody(r: T): ReactNode {
@@ -686,7 +688,19 @@ export function DataTable<T>(props: DataTableProps<T>) {
         key={id}
         data-dt-row={id}
         className={trCls || undefined}
+        tabIndex={clickable ? 0 : undefined}
         onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
+        onKeyDown={
+          clickable
+            ? (e) => {
+                // 行のキーボード発火（Enter/Space）＝カード表示と同等（デザイン標準 §4.5 F3）。
+                if (e.key !== "Enter" && e.key !== " ") return;
+                if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
+                e.preventDefault();
+                props.onRowClick?.(r);
+              }
+            : undefined
+        }
       >
         {visibleCols.map((c, i) => {
           const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
@@ -891,6 +905,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
             style={{ minWidth: `${minWidthPx}px` }}
           >
+            <caption className="sr-only">{caption}</caption>
             <thead ref={theadRef}>
               <tr>
                 {visibleCols.map((c, idx) => {
