@@ -109,7 +109,7 @@
 - **門番（認可）**: `GET /quests/{id}/activities` は**当該クエストのパーティー所属**（C.0＝クエスト閲覧権）。`GET /me/feed` は「自分の有効参加クエスト集合」を C で解決してから絞る（会社DB分離で自社内に限定・§1.5）。
 - **レンダリング（ref 解決）**: 行は `reason`＋`ref_type`/`ref_id` から**人間可読イベント**（例「〈氏名〉が〈アイデア名〉を投稿」）へ組み立てる。**ref 解決は D（アイデア）/E（チャット）実装が前提**＝それまではテキスト汎用（リンクなし・H 通知と同じ制約）。
 - **ページング**＝カーソル（§1.8・新しい順・`(created_at,id)` キーセット）。`me/activities` の実装（K/me）と同方式。
-- **依存と実装順**: `GET /me/activities`（SC-03）は**依存なし＝実装済み**。`quests/{id}/activities`（SC-12）・`me/feed`（SC-01）は**C（パーティー所属）に依存**（門番と「自分の参加クエスト」集合）＝**C 実装の周回で SC-12→SC-01 の順に接続**。リンク付き表示は D/E 実装後。
+- **依存と実装順**: `GET /me/activities`（SC-03）は**依存なし＝実装済み**。`quests/{id}/activities`（SC-12）・`me/feed`（SC-01）は**C（パーティー所属）に依存**＝**backend 実装済み（2026-08・`tenant/gamification`・公開種別 `PUBLIC_FEED_REASONS`＝idea_post/selection/achievement_reward/levelup_sp・カーソル・G-TC-109/110）／フロント接続は残**（SC-12/SC-01 の demo パネル）。リンク付き表示は D/E 実装後（現状は reason/ref/actor の構造化データを返しフロントが人間可読へレンダリング）。
 
 ---
 

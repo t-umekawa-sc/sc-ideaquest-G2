@@ -16,6 +16,8 @@
 | G-TC-106 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /spells/{id}/unlock` | 403 csrf_failed／401 | A.0 |
 | G-TC-107 | int | 残高列は DB CHECK(>=0)（並行オーバースペンドの最終防御・M6） | seed 会社の実ユーザー | `users.coin_balance/skill_point_balance/xp` を -1 に更新→commit | いずれも `IntegrityError`（`ck_users_*_nonneg`）＝負残高を DB が拒否（アプリ層ガードの最終防御・migration 0020） | データモデル §5／G.0 |
 | G-TC-108 | int | 付与の冪等を DB で担保＝`activities` 部分ユニーク（並行二重付与の最終防御・M6） | 同上 | 同一 `(user,kind,reason,ref_type,ref_id)`（ref付き）を2件 INSERT／`ref_id NULL`（login）を2件 INSERT | ref付き＝`IntegrityError`（`uq_activities_grant_ref` WHERE ref_id IS NOT NULL）で後着拒否／`ref_id NULL` は重複可（login/levelup_sp）＝例外なし | API設計 F.4／migration 0020 |
+| G-TC-109 | api | クエスト内フィード＝公開種別のみ・actor 付き／非メンバーは 404（FR-36②・SC-12） | クエスト（owner=自分＋メンバー Bob）に Bob の `idea_post`（公開）・`vote`/`chat`（非公開）を付与 | `GET /quests/{id}/activities`（メンバー／非メンバー） | メンバー＝`200`・`idea_post` は出て `vote`/`chat` は出ない・`actor`（id/氏名）付き／非メンバー＝`404`（門番＝パーティー所属・存在秘匿） | G.5.1／FR-36 |
+| G-TC-110 | api | チームフィード＝参加クエスト横断の公開種別のみ・各行 quest 付き・不参加は除外（FR-36③・SC-01） | 参加 qid1(Bob idea_post/vote)・qid2(Carol selection)＋不参加 qid3(Frank idea_post) | `GET /me/feed` | `data` に `(qid1,idea_post)`・`(qid2,selection)` を含み、**qid3 は出ない**（`quest_id ∈ 参加集合`）・`vote` 等非公開は出ない・各行に `quest_title` | G.5.1／FR-36 |
 
 ## 2. 画面 e2e（SC-32 魔法スキル・G）
 

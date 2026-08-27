@@ -159,6 +159,81 @@ def get_rankings(account_id, company_id, *, period="this_week", scope="company",
     return {"data": page, "page_info": {"next_cursor": next_cursor, "has_next": has_next}, "me": me}
 
 
+# --- アクティビティフィード（SC-12 クエスト内 / SC-01 チーム・G.5.1・活動＝activities の絞り込み） ---
+
+_EMPTY_FEED = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}
+
+
+def _encode_feed_cursor(a) -> str:
+    return base64.urlsafe_b64encode(f"{a.created_at.isoformat()}|{a.id}".encode()).decode()
+
+
+def _decode_feed_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        created_str, id_str = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
+        return datetime.fromisoformat(created_str), uuid.UUID(id_str)
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
+
+
+def _paginate(rows: list, limit: int) -> tuple[list, bool, str | None]:
+    has_next = len(rows) > limit
+    rows = rows[:limit]
+    return rows, has_next, (_encode_feed_cursor(rows[-1]) if has_next and rows else None)
+
+
+def _feed_row_dto(a, actor_user, quest_title: str | None = None) -> dict:
+    row = {
+        "id": str(a.id), "reason": a.reason, "kind": a.kind, "amount": a.amount,
+        "ref_type": a.ref_type, "ref_id": str(a.ref_id) if a.ref_id else None,
+        "quest_id": str(a.quest_id) if a.quest_id else None,
+        "actor": _rank_user_dto(actor_user, a.user_id), "created_at": a.created_at,
+    }
+    if quest_title is not None:
+        row["quest_title"] = quest_title
+    return row
+
+
+def get_quest_activities(account_id, company_id, quest_id, *, limit, cursor=None) -> dict:
+    """クエスト内フィード（SC-12・G.5.1）＝当該クエストのメンバー活動（公開種別のみ・新しい順）。門番＝パーティー所属。"""
+    qid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    cur = _decode_feed_cursor(cursor) if cursor else None  # 不正カーソルは query 前に 422
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if quests_repo.get_active_member(ts, qid, user.id) is None:
+            raise AppError(404, "not_found")  # 門番＝パーティー所属（範囲外は存在秘匿）
+        rows, has_next, next_cursor = _paginate(gami_repo.list_quest_feed(ts, qid, cursor=cur, limit=limit + 1), limit)
+        actors = quests_repo.get_users_by_ids(ts, {a.user_id for a in rows})
+        data = [_feed_row_dto(a, actors.get(a.user_id)) for a in rows]
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+def get_team_feed(account_id, company_id, *, limit, cursor=None) -> dict:
+    """チームフィード（SC-01・G.5.1）＝自分の参加クエスト横断のメンバー活動（公開種別のみ）。各行に quest を付す。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    cur = _decode_feed_cursor(cursor) if cursor else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+        if not quest_ids:
+            return _EMPTY_FEED
+        rows, has_next, next_cursor = _paginate(gami_repo.list_team_feed(ts, quest_ids, cursor=cur, limit=limit + 1), limit)
+        actors = quests_repo.get_users_by_ids(ts, {a.user_id for a in rows})
+        titles = {qid2: (quests_repo.get_quest(ts, qid2).title if quests_repo.get_quest(ts, qid2) else "")
+                  for qid2 in {a.quest_id for a in rows if a.quest_id}}
+        data = [_feed_row_dto(a, actors.get(a.user_id), quest_title=titles.get(a.quest_id, "")) for a in rows]
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
 def _rank_user_dto(u, user_id) -> dict:
     return {
         "id": str(user_id),

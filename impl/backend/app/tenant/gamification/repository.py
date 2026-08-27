@@ -112,6 +112,36 @@ def list_activities(
     return list(session.execute(stmt).scalars().all())
 
 
+# 他者フィード（SC-12 クエスト内 / SC-01 チーム）で公開する成果系のみ（初期値・調整可・G.5.1）。
+# 出さない＝vote（匿名化 FR-23）・chat（ノイズ）・login・shop_purchase/spell_unlock（私的経済）・
+# evaluation/evaluation_coin（評価公開範囲 F に従属）。自分の履歴（SC-03）は list_activities（全種別）。
+PUBLIC_FEED_REASONS = ("idea_post", "selection", "achievement_reward", "levelup_sp")
+
+
+def _feed_stmt(cursor: tuple[datetime, uuid.UUID] | None, limit: int):
+    stmt = select(Activity).where(Activity.reason.in_(PUBLIC_FEED_REASONS))
+    if cursor is not None:
+        stmt = stmt.where(tuple_(Activity.created_at, Activity.id) < tuple_(cursor[0], cursor[1]))
+    return stmt.order_by(Activity.created_at.desc(), Activity.id.desc()).limit(limit)
+
+
+def list_quest_feed(session: Session, quest_id: uuid.UUID, *,
+                    cursor: tuple[datetime, uuid.UUID] | None, limit: int) -> list[Activity]:
+    """クエスト内フィード（SC-12・G.5.1）＝当該クエストのメンバー活動を公開種別のみ新しい順にキーセット取得。"""
+    stmt = _feed_stmt(cursor, limit).where(Activity.quest_id == quest_id)
+    return list(session.execute(stmt).scalars().all())
+
+
+def list_team_feed(session: Session, quest_ids, *,
+                   cursor: tuple[datetime, uuid.UUID] | None, limit: int) -> list[Activity]:
+    """チームフィード（SC-01・G.5.1）＝自分の参加クエスト横断のメンバー活動を公開種別のみ取得。参加0は空。"""
+    ids = list(quest_ids)
+    if not ids:
+        return []
+    stmt = _feed_stmt(cursor, limit).where(Activity.quest_id.in_(ids))
+    return list(session.execute(stmt).scalars().all())
+
+
 def exists_ref(
     session: Session, user_id: uuid.UUID, kind: str, reason: str,
     ref_type: str | None, ref_id: uuid.UUID | None,
