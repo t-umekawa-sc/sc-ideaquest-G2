@@ -17,9 +17,11 @@ from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.chat import repository as chat_repo
 from app.tenant.profile import repository as user_repo
 from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
+from app.tenant.realtime import events as realtime_events
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
 _MAX_PER_PAGE = 100
@@ -146,7 +148,13 @@ def remove_member(session: dict, group_id: uuid.UUID, target_account_id: uuid.UU
         target = user_repo.get_user_by_account(ts, target_account_id)
         if target is None:
             raise AppError(404, "not_found")
-        qg_repo.remove_membership(ts, group_id, target.id)  # 有効所属をトゥームストーン（冪等）
+        target_uid = target.id  # セッション閉後に使うため退避（post-commit の失効・監査で使用）
+        # L.4＝グループ除去で対象はグループ内全クエストの可視性を失う＝当該 chat 購読を失効（除去前に対象を取得）。
+        cg_ids = chat_repo.list_chat_group_ids_for_group_member(ts, group_id, target_uid)
+        qg_repo.remove_membership(ts, group_id, target_uid)  # 有効所属をトゥームストーン（冪等）
         ts.commit()
+    company_id = uuid.UUID(session["company_id"])
+    for cg_id in cg_ids:  # L.4（post-commit・ハブへ失効シグナル）
+        realtime_events.publish_revoke(target_uid, cg_id, company_id=company_id)
     audit.record("membership.remove",  # 監査（B.6・独立記録）
                  {"group_id": str(group_id), "account_id": str(target_account_id)})

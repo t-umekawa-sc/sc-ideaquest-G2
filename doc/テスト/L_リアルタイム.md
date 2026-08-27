@@ -34,3 +34,4 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | L-TC-121 | api | 除去で購読強制ドロップ（増分 DELETE /members） | chat 購読中のパーティー員 | C が当該ユーザーをパーティー除去 | 失効シグナルで当該 `chat:{cg}` 購読が即ドロップ・以後届かない（再接続も門番で不可） | L.4 |
 | L-TC-122 | api | 除去で購読強制ドロップ（**バルク PUT /party**・M1） | chat グループ有＋パーティー員 | owner が `PUT /party`（member 除外）で**一括**除去 | 除去メンバー×当該 `chat:{cg}` に `publish_revoke` が発火（増分 DELETE と同じく L.4。set_party/update_quest/publish の全体編集経路の結線漏れを根治） | L.4 |
+| L-TC-123 | int | クエストグループ除去の失効対象クエリ（M1b） | グループ内クエストに公開アイデア（chat group）＋パーティー員 | `list_chat_group_ids_for_group_member(group_id, user_id)` | グループ内クエストで**有効パーティー員**の chat group を返す／非参加ユーザーは空（過剰失効なし）。control_plane の group `remove_member` が本クエリで対象特定→post-commit `publish_revoke`（set_party と同一パターン） | L.4 |

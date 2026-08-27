@@ -32,6 +32,32 @@ def list_chat_group_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list
     )
 
 
+def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """クエストグループ内クエストで当該ユーザーが有効パーティー員である chat_group_id（L.4＝グループ除去の失効対象）。
+
+    グループ除去（control_plane）で対象ユーザーがグループ内で購読し得た chat のみを特定＝過剰失効を出さない。
+    """
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest, QuestMember
+
+    return list(
+        session.execute(
+            select(ChatGroup.id)
+            .join(Idea, Idea.id == ChatGroup.idea_id)
+            .join(Quest, Quest.id == Idea.quest_id)
+            .join(
+                QuestMember,
+                and_(
+                    QuestMember.quest_id == Quest.id,
+                    QuestMember.user_id == user_id,
+                    QuestMember.removed_at.is_(None),
+                ),
+            )
+            .where(Quest.quest_group_id == group_id)
+        ).scalars().all()
+    )
+
+
 def ensure_chat_group(session: Session, idea_id: uuid.UUID) -> ChatGroup:
     """アイデアのチャットグループを取得、無ければ作成（`UNIQUE(idea_id)`・冪等）。"""
     cg = get_chat_group_by_idea(session, idea_id)

@@ -185,3 +185,19 @@ def test_l_tc_122_revoke_on_bulk_party_removal(chatenv, factory, monkeypatch):
     assert r.status_code == 200, r.text
     # 除去メンバー×chat group に失効シグナルが発火（bulk 経路でも L.4）
     assert (str(muid), str(cg)) in calls
+
+
+def test_l_tc_123_group_removal_revoke_targets(chatenv):
+    """L-TC-123 グループ除去の失効対象クエリ＝グループ内クエストで有効パーティー員の chat group を返す（L.4・M1b）。
+
+    クエストグループ除去（control_plane の remove_member）は本クエリで対象 chat group を特定し
+    post-commit で publish_revoke する（結線は set_party 等と同一パターン＝L-TC-122）。
+    """
+    cg = _cg_id(chatenv)
+    with get_tenant_session(chatenv["db"]) as ts:
+        gid = quests_repo.get_quest(ts, chatenv["quest_id"]).quest_group_id
+        # seed_uid は当該グループ内クエストの有効パーティー員＝失効対象に cg が含まれる
+        ids = chat_repo.list_chat_group_ids_for_group_member(ts, gid, chatenv["seed_uid"])
+        assert cg in {str(x) for x in ids}
+        # グループ内クエストに参加していないユーザーは対象ゼロ（過剰失効を出さない）
+        assert chat_repo.list_chat_group_ids_for_group_member(ts, gid, uuid.uuid4()) == []
