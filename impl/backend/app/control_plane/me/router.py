@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from app.control_plane.me import application as me_service
 from app.control_plane.me.deps import require_me
 from app.control_plane.me.schemas import (
+    AvatarBaseUpdateRequest,
     AvatarImageResponse,
     BackgroundImageResponse,
     EmailChangeAcceptedResponse,
@@ -103,6 +104,19 @@ def delete_avatar_image(request: Request, session: dict = Depends(require_me)) -
     verify_origin(request)
     verify_csrf(request)
     me_service.delete_avatar_image(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.put("/me/avatar-base", response_model=MeResponse)
+def put_avatar_base(
+    body: AvatarBaseUpdateRequest, request: Request, session: dict = Depends(require_me),
+) -> MeResponse:
+    """3D アバターのベース体（男女2体）を選択（K.4.1）。会社DB `users.avatar_base` 直接更新。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = me_service.set_avatar_base(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), base=body.base,
+    )
+    return MeResponse(**result)
 
 
 @router.put("/me/background-image", response_model=BackgroundImageResponse)

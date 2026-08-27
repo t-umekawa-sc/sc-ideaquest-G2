@@ -24,6 +24,10 @@
 | K-TC-007 | api | 自己PW変更＝現在PW再認証と全セッション破棄の担保 | ログイン済み | `POST /me/password`（現在PW不一致／新PWポリシー違反／正） | 不一致＝`403 reauth_failed`（セッションは有効＝401 と区別）／違反＝`422`／正＝`204`＋**全セッション破棄**（当該セッションで `GET /me` が 401）＋新PWでログイン可 | K.3／A.9-③ |
 | K-TC-008 | api | メール変更要求は到達確認まで identity を変えない担保 | ログイン済み | `POST /me/email`＝**変更要求**（現在PW不一致／会社内重複／正） | 不一致＝`403 reauth_failed`／重複＝`409 conflict`（field=email）／正＝**`202`**＋**`accounts.email` は不変**・**`pending_email` に新メール**・`otp_challenges`（`purpose=email_change`）1件・**`mail_outbox` 2通**（`email_change_confirm`＝新宛＋`email_change_notice`＝旧宛）・**`account_sync_outbox` に email 行は積まれない**（確定時まで） | K.3／ADR-0008／§4.2 |
 | K-TC-010 | api | 確認リンク到達で初めて確定＋確定時一意再検証（TOCTOU）の担保 | K-TC-008 で変更要求済み（`email_change` トークン発行） | `POST /me/email/confirm`（正常／無効・期限切れ・使用済みトークン／確定時の会社内衝突） | 正常＝**`200`**＋`accounts.email` が `pending_email` へ確定・`pending_email=NULL`・チャレンジ単回消費（`used_at` 打刻・データモデル §4.4）・**`account_sync_outbox` に `upsert{email}` enqueue**（→worker で users ミラー）／無効・期限切れ・使用済み＝`410 token_expired`／確定時に別アカウントが同 email を確定済み＝`409 conflict`（field=email）。**未認証EP**（トークンが認可）・セッション破棄なし | K.3／ADR-0008／§4.2／§4.4 |
+| K-TC-011 | api | アバターベース体の選択が会社DB `users` に直接反映される担保（outbox 非経由） | ACME-01 実アカウントでログイン（既定 `male`） | `PUT /me/avatar-base`（`{base:"female"}`） | `200`＋更新後 `/me`（`profile.avatar_base="female"`）。**会社DB `users.avatar_base` が更新**・**`account_sync_outbox` は積まれない**（identity でない・K.4.1） | K.4.1／§5.3 |
+| K-TC-012 | api | ベース値 enum 検証と allowlist 逸脱の拒否＝Mass Assignment 防止 | ログイン済み | `PUT /me/avatar-base`（未対応値 `{base:"animal_dog"}`／allowlist 外プロパティ同梱） | いずれも `422`（`base` は `male\|female` enum／想定外プロパティ拒否・§2.2）。**`users.avatar_base` は不変** | K.4.1／§2.2 |
+| K-TC-013 | api | ベース変更の未認証優先判定と変更系 CSRF ゲートの二段防御 | セッション無し／ログイン済み CSRF 無し | `PUT /me/avatar-base` | 未認証＝`401 unauthenticated`（先）／セッション有り CSRF 無し＝`403 csrf_failed`（変更系・A.0） | A.0／K.4.1 |
+| K-TC-014 | api | `GET /me` がベース体を同梱する担保（既定 `male`） | ログイン済み（未設定＝既定 `male`） | `GET /me` | `200`＋`profile.avatar_base` を含む（未設定は `male`） | K.1／K.4.1／§5.3 |
 
 ## 2. frontend e2e（プロフィール編集・K.1/K.2）
 

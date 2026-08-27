@@ -23,9 +23,9 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale}, profile:{display_name, avatar_image_url?, background_image_url?}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, system_role}` |
+| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale}, profile:{display_name, avatar_image_url?, background_image_url?, avatar_base}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, system_role}` |
 
-- **会社DB `users`（ミラー＋残高＋画像）から読む**（管理DB 往復なし・§1.13）。`display_name`/`email`/`locale`/`login_id` はミラー、残高は `users`、画像は**署名URL（§1.10）**に解決して返す（パスを直接返さない）。
+- **会社DB `users`（ミラー＋残高＋画像）から読む**（管理DB 往復なし・§1.13）。`display_name`/`email`/`locale`/`login_id` はミラー、残高は `users`、画像は**署名URL（§1.10）**に解決して返す（パスを直接返さない）。`avatar_base`（3D アバターの男女2ベース・§5.3）も `users` からそのまま返す（enum 文字列・署名URL 化不要）。
 - **ヒーロー残高**は `GET /me` が正準。ダッシュボード（I）の `GET /dashboard` は 1 往復のため同じ `users` 読取から hero を**同梱し続ける**（両立・重複ではなく別用途＝I.1／G.0 と整合）。
 - `xp_to_next`/`level_span` は G の純粋 level 関数で算出（データモデル §7・I.1 と同形）。
 
@@ -67,6 +67,17 @@
 - **サーバー検証（§2.2⑧・§1.10）**＝画像 MIME の allowlist・サイズ上限・**物理名はハッシュ**（元名を露出しない）。上限/許可形式/推奨解像度の具体値は K.6 TBD。
 - **読取は短TTL 署名URL**（§1.10・**恒久公開URL は禁止**）＝`GET /me` や各画面はパスでなく署名URL を返す（アバターは一覧で多数表示されるため URL 発行/キャッシュ方針は実装で最適化・K.6）。
 - **背景画像**＝個人設定として全認証画面に適用（SC-01 §4.11・フロントは認証済みレイアウトで共通適用）。会社が背景変更を禁止/固定できる管理設定の要否は SC-01 §10／K.6 TBD。
+
+### K.4.1 アバターベース体（3D・男女2体）
+
+| メソッド/パス | 概要 | リクエスト（ボディ・allowlist） | レスポンス |
+| --- | --- | --- | --- |
+| `PUT /me/avatar-base` | 3D アバターのベース体（男女2体）を選択 | `{base}`（`male`/`female`・**この1つのみ**受理） | 200＋更新後の `/me`（K.1 形） |
+
+- **会社DB `users.avatar_base`（テナント）直接更新**＝プロフィール画像（K.4）と同じく**identity ではないため outbox は経由しない**（管理DB `accounts` 非関与）。既定は `male`（データモデル §5.3・調整可）。
+- **`base` は `avatar_base` enum（`male`/`female`）を検証**（想定外値・allowlist 外プロパティは `422`＝Mass Assignment 防止・§2.2）。将来 `animal_*` を追加（画面 [`SC-31`](../画面設計/screens/SC-31_アバター着せ替え.md) §9.6）。
+- **ドメイン境界**＝ベース体の**選択**は本人の恒久プロフィール属性のため **K**（本 EP）。一方、**装備の着せ替え**（VRM スロット・所有検証）は在庫/所有に依るため **G**（`PUT /me/equipment`・K.0/K.6）。両者は別物（画面 SC-31 は両方を使う）。
+- 変更系＝Origin/CSRF 必須（A.0）。UI は SC-31 ビューアの「ベース切替（男/女）」（[`SC-31`](../画面設計/screens/SC-31_アバター着せ替え.md) §4.1/§9.2）。
 
 ## K.5 セキュリティ対策マッピング（§2.2 / A.9-⑦ 委譲・突合）
 

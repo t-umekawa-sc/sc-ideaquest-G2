@@ -31,6 +31,17 @@ class MeProfileDTO(BaseModel):
     display_name: str
     avatar_image_url: str | None = None
     background_image_url: str | None = None
+    avatar_base: str = "male"  # 3D アバターの男女2ベース（K.4.1・§5.3・既定 male）
+
+
+class AvatarBaseUpdateRequest(BaseModel):
+    """アバターベース体選択の入力（K.4.1・allowlist）。`base`（`male`/`female`）のみ受理。
+
+    想定外プロパティ拒否（extra=forbid＝Mass Assignment 防止・§2.2）。将来 `animal_*` を追加（SC-31 §9.6）。
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    base: Literal["male", "female"]
 
 
 class MeBalanceDTO(BaseModel):

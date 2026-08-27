@@ -117,7 +117,7 @@ def test_k_tc_004_get_me(client, factory):
     assert set(body.keys()) == {"account", "profile", "balance", "system_role"}
     assert body["account"]["login_id"] == acc["login_id"]
     assert set(body["account"].keys()) == {"login_id", "email", "locale"}
-    assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "background_image_url"}
+    assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "background_image_url", "avatar_base"}
     # 残高（会社DB users）＋レベル進捗（§7）。ログイン成功でログイン XP（G.6 login・+10）が付与済み
     # ＝新規アカウントでも当日初ログイン後は xp=10（Lv1・次まで 90）。coin/SP は未付与で 0。
     bal = body["balance"]

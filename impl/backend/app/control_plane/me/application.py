@@ -66,6 +66,7 @@ def _me(account: Account, user: "User | None") -> dict:
             "display_name": account.display_name,
             "avatar_image_url": _image_url(user.avatar_image_path if user else None),
             "background_image_url": _image_url(user.background_image_path if user else None),
+            "avatar_base": user.avatar_base if user else "male",  # 3D 男女2ベース（K.4.1・§5.3）
         },
         "balance": {
             "level": prog["level"],
@@ -153,6 +154,29 @@ def set_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: byte
 def delete_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID) -> None:
     """アバター画像を削除（既定に戻す・K.4）。"""
     _delete_user_image(company_id, account_id, field="avatar_image_path")
+
+
+_ALLOWED_AVATAR_BASES = frozenset({"male", "female"})  # §5.3 avatar_base（将来 animal_*・SC-31 §9.6）
+
+
+def set_avatar_base(account_id: uuid.UUID, company_id: uuid.UUID, *, base: str) -> dict:
+    """3D アバターのベース体（男女2体）を選択（K.4.1）。会社DB `users.avatar_base` 直接更新（identity でない＝outbox なし）。
+
+    `base` は avatar_base enum（`male`/`female`）＝DTO の Literal と application で二重防御（§2.2）。返却は K.1 正準形。
+    """
+    if base not in _ALLOWED_AVATAR_BASES:
+        raise AppError(422, "validation_error", detail="base が不正です", errors=[{"field": "base"}])
+    with control_session() as session:
+        account = session.get(Account, account_id)
+        if account is None:
+            raise AppError(401, "unauthenticated")
+    with get_tenant_session(_company_db_identifier(company_id)) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        user.avatar_base = base
+        ts.commit()
+    return _me(account, _tenant_user(company_id, account_id))
 
 
 def set_background_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
