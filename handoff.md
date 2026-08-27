@@ -43,10 +43,10 @@
 - **tsc＝完全クリーン**（`cd impl/frontend && npx tsc --noEmit` を本セッションで実行・エラー0）。
 - **vitest 単体＝15/15**（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6・`cd impl/frontend && npx vitest run` を本セッションで実行）。**環境は node（DOM 非依存の純ロジックのみ）**＝jsdom 未導入。
 - e2e（Playwright）は本セッションでは未実行（§7.5 バッチ受入方針）。
-### 4-2. backend（本セッションでは full pytest を再実行していない＝要再確認）
-- 直近の実測は security スライス時点で **`pytest tests/` 全体 464 passed**（ワーカ停止・8/8 green の順序独立も実測）。**本セッション最後の snippet スライスは frontend のみ＝backend 不変**なので 464 は維持の見込みだが、**再開時は full pytest を再実行して確認推奨**。
+### 4-2. backend（本セッションで full pytest を再実測）
+- **`pytest tests/` 全体 464 passed**（本セッションで 2 回実測＝健全性確認時／avatar_base migration 追加後。いずれもワーカ停止で green）。
 - 動作確認済み＝`GET /quests/{id}/search` 未認証 401 を実アプリで確認（前スライス）。
-- migration head＝control **0012**／company **0018**（pgroonga）※前回確認値・本セッションでは未再確認。
+- migration head＝control **0012**／company **0019**（`0019_company_avatar_base`＝users.avatar_base 追加・本セッションで bootstrap 適用＋実DB検証済み〔既存179ユーザーは既定 male に充当・head=0019 確認〕）。
 ### 4-3. テスト運用（本セッションで実測）
 - **TC-ID トレーサビリティ ✅（code 388）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
 - **注＝本検査は `impl/backend/tests/**/*.py` ＋ `impl/frontend/e2e/**/*.spec.ts` のみ走査**＝frontend の `src/**/*.test.ts`（vitest 単体）は対象外。正規表現も `\b([A-Z])-TC-(\d{3})\b`＝**3文字接頭辞 `SEC-TC-` に不一致**。よって vitest 単体は検査対象外で、追跡は md（SEC-TC-013 等）で担保する。
@@ -68,7 +68,7 @@
 
 ## 7. 次にやること（優先順・具体的に）
 1. **（推奨・低コスト）再開時の健全性確認**＝backend full pytest を再実行（4-2 の 464 が維持か）。手順＝§8 の「backend テスト」。frontend は tsc/vitest/traceability を再実行（§8）。
-2. **3D アバター（FR-08）＝着せ替え機能は実装/接続/テスト済み・残るは 3D VRM 描画のみ**（前回 handoff の「未実装」は不正確と本セッションで判明。実態＝SC-30/SC-31 ✅・migration 0015・`tests/shop`・G-TC-202/203。現状ビューアはマスコット画像＋装備アイコン重ねの 2D 見立て）。**本セッションで設計 TBD を確定**＝`doc/画面設計/screens/SC-31_アバター着せ替え.md` §9（9.1 ラインナップ確定〔既存19点シード〕・9.2 **ベース＝男女2体**〔`users.avatar_base` 新規列・要データモデル追記〕＋同一 humanoid リグで装備共用・9.3 2Dフォールバック/性能・9.4 回転ON/ズーム等MVP外・9.5 試着MVP外・9.6 将来〔動物キャラ等〕）。要件定義 第7節の非機能TBD（FPS/対応環境）も §9.3 へ整合。**次アクション**＝(a) データモデル §5.3 に `avatar_base` 追記→migration、(b) three-vrm/R3F 導入＋WebGL フォールバック骨組み（`doc/テスト/` に TC 先行）、(c) **VRM 3Dアセット（男女2体＋装備パーツ）はコード外の制作物＝別途手配が必要**（アセット未整備の間は 2D 見立てで先行可）。
+2. **3D アバター（FR-08）＝着せ替え機能は実装/接続/テスト済み・残るは 3D VRM 描画のみ**（前回 handoff の「未実装」は不正確と本セッションで判明。実態＝SC-30/SC-31 ✅・migration 0015・`tests/shop`・G-TC-202/203。現状ビューアはマスコット画像＋装備アイコン重ねの 2D 見立て）。**本セッションで設計 TBD を確定**＝`doc/画面設計/screens/SC-31_アバター着せ替え.md` §9（9.1 ラインナップ確定〔既存19点シード〕・9.2 **ベース＝男女2体**〔`users.avatar_base` 新規列・要データモデル追記〕＋同一 humanoid リグで装備共用・9.3 2Dフォールバック/性能・9.4 回転ON/ズーム等MVP外・9.5 試着MVP外・9.6 将来〔動物キャラ等〕）。要件定義 第7節の非機能TBD（FPS/対応環境）も §9.3 へ整合。**次アクション**＝(a) ~~データモデル §5.3 に `avatar_base` 追記→migration~~ **完了**（データモデル §5.3＋enum節・migration `0019_company_avatar_base`・ORM `profile/orm.py` 追加・実DB検証済み）、(b) `avatar_base` の read/write API（GET /me に同梱＋ベース切替 PUT・A/K か G のどこに置くか要判断）＋フロント SC-31 ビューアのベース切替 UI（`doc/テスト/` に TC 先行・red-green）、(c) three-vrm/R3F 導入＋WebGL フォールバック骨組み、(d) **VRM 3Dアセット（男女2体＋装備パーツ）はコード外の制作物＝別途手配が必要**（アセット未整備の間は 2D 見立てで先行可）。
 3. **本番デプロイ準備**＝`doc/本番デプロイ要件.md` に沿って PGroonga カスタムイメージの本番反映・bootstrap/migration 手順・Redis 永続化・ヘッダのエッジ（プロキシ/TLS 前提の HSTS）整合を点検。
 4. **要件(FR)網羅の最終点検**＝`impl/README.md` 画面テーブルは全 ✅ だが、細部 follow-up（SC-25 の intercept モーダル化・投票の締切日時での事前 disable・`IdeaDetailDTO` に `quest_id`/カテゴリー欠落で SC-22「クエストへ戻る」が暫定）が残る。UI ポリッシュ扱い。
 5. **J の将来拡張（任意）**＝グローバル `GET /search`＋ヘッダー導線／最小文字数・演算子(OR/フレーズ)・正規化／種別間スコア重み／`per_page` 最終値（J.6 TBD）。
