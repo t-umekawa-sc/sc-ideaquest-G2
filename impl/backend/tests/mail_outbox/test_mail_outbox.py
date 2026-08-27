@@ -18,9 +18,12 @@ from app.control_plane.mail_outbox.application import (
     process_mail_outbox_once,
 )
 from app.control_plane.mail_outbox.orm import MailOutboxEntry
+from app.control_plane.mail_outbox import templates as mail_templates
 from app.control_plane.mail_outbox.templates import (
     CATEGORY_LOCK_NOTIFICATION,
+    CATEGORY_NEW_DEVICE,
     CATEGORY_OTP,
+    CATEGORY_PASSWORD_CHANGED,
     CATEGORY_PASSWORD_SETUP,
 )
 from app.core.config import get_settings
@@ -177,3 +180,22 @@ def test_a_tc_097_cleanup_done_retention(monkeypatch):
         assert _get(failed) is not None          # failed は残す（要手動対応）
     finally:
         get_settings.cache_clear()
+
+
+def test_a_tc_107_mail_render_locale_ja_en():
+    """A-TC-107 メールテンプレの locale 出し分け（§2.1 i18n）＝en は英語件名/本文・既定/不明は日本語。"""
+    # 既定（None）＝日本語
+    subj_ja, body_ja = mail_templates.render(CATEGORY_OTP, "123456", None)
+    assert subj_ja.startswith("【ideaquest】") and "認証コード" in body_ja and "123456" in body_ja
+    # en＝英語
+    subj_en, body_en = mail_templates.render(CATEGORY_OTP, "123456", "en")
+    assert subj_en.startswith("[ideaquest]") and "verification code" in body_en and "123456" in body_en
+    # 不明ロケールは ja にフォールバック
+    assert mail_templates.render(CATEGORY_OTP, "x", "fr")[0].startswith("【ideaquest】")
+    # 他カテゴリも EN 化（固定文＋params）
+    assert mail_templates.render(CATEGORY_PASSWORD_CHANGED, None, "en")[0] == "[ideaquest] Your password was changed"
+    # new_device の detail ラベルも locale 連動（en=Date/IP/Device）
+    _, nd_en = mail_templates.render(CATEGORY_NEW_DEVICE, None, "en", {"at": "2026-08-27", "ip": "1.2.3.4"})
+    assert "Date: 2026-08-27" in nd_en and "IP: 1.2.3.4" in nd_en
+    _, nd_ja = mail_templates.render(CATEGORY_NEW_DEVICE, None, "ja", {"at": "2026-08-27"})
+    assert "日時: 2026-08-27" in nd_ja

@@ -202,6 +202,7 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-098 | api | SMTP 障害でも request が 202 維持する列挙耐性 | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | `password-setup/request`（active 実在） | **`202` のまま**（`500` にならない）。SMTP は request 経路で走らない＝列挙耐性が SMTP 障害で崩れない | ADR-0007 §1(b)／§2.6 |
 | A-TC-099 | api | SMTP 障害でもロック発火 login が 401 維持する担保 | 送信が必ず失敗する sender を注入・**ワーカは実行しない** | 誤 PW 連続でロック発火する `login` | **`401` のまま**（SMTP 失敗が応答に出ない＝ロック通知は enqueue のみで経路外） | ADR-0007 §1(b) |
 | A-TC-100 | int | import 隔離による FK 解決の回帰防止の担保 | まっさらな子プロセスで `mail_outbox.application` だけを import | `ControlBase.metadata` を検査 | FK ターゲット `accounts`/`companies` が登録済み（別プロセスの `mail_worker` で `done` 書込が `NoReferencedTableError` にならない・**import 隔離バグの回帰防止**） | ADR-0007 §2.3 |
+| A-TC-107 | unit | システム生成メールの locale 出し分けの担保（i18n 結線） | `render()` に locale=None/`en`/`fr` を与える（OTP・password_changed・new_device） | 件名/本文と new_device の detail ラベルを検査 | 既定/不明（None/`fr`）は日本語（`【ideaquest】`）・`en` は英語（`[ideaquest]`＋`verification code`）。new_device の detail ラベルも locale 連動（`en`=`Date`/`IP`/`Device`） | コーディング規約 §2.1 |
 
 ### 7.1 補足・非対象（メール非同期化）
 
