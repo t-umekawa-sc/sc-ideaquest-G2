@@ -43,6 +43,7 @@
 | D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
 | D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |
+| D-TC-143 | api | 公開アイデアの並行 PATCH は楽観ロックで 409 `edit_conflict`（500 にしない・D.2 line67） | 公開アイデア（`current_revision=1`）で、別編集者が既に `revision=2` を作成済み（自分の base は stale） | `PATCH /ideas/{id}`（title） | `next_rev=2` の INSERT が `UNIQUE(idea_id,revision)` 違反→**`409` `code=edit_conflict`**（`IntegrityError` を捕捉して翻訳・**500 にしない**）。クライアントは最新再取得へ誘導 | D.2（楽観ロック・方針A） |
 | D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
 | D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
 | D-TC-112 | api | 下書き公開 | 自分の下書き（充足） | `POST /ideas/{id}/publish` | 200・published | D.2 |

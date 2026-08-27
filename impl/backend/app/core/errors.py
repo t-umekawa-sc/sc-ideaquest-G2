@@ -18,6 +18,7 @@ _TITLES = {
     "rate_limited": "Too Many Requests",
     "company_suspended": "Company Suspended",
     "token_expired": "Token Expired",
+    "edit_conflict": "Edit Conflict",
     "otp_invalid": "OTP Invalid",
     "otp_expired": "OTP Expired",
     "preauth_expired": "Pre-auth Expired",

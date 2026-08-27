@@ -13,6 +13,8 @@ import difflib
 import uuid
 from datetime import date, datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
+
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
@@ -225,7 +227,17 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
         _apply_content(ts, idea, body)
         if idea.status == "published":
             _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
-            _record_revision(ts, idea, user.id)  # 公開中は保存ごとに1版＋通知（H は no-op）
+            try:
+                _record_revision(ts, idea, user.id)  # 公開中は保存ごとに1版＋通知（H）
+                ts.flush()  # 版INSERTを確定＝並行編集の UNIQUE(idea_id,revision) 違反をここで検出（D.2 楽観ロック・方針A）
+            except IntegrityError as e:
+                ts.rollback()
+                # 版番号の一意制約違反＝並行編集の後着＝409 edit_conflict（最新を再取得して編集し直し）。
+                # 他の想定外の整合性違反は握り潰さず 500 のまま再送出する。
+                if "uq_idea_revisions_idea_revision" in str(getattr(e, "orig", e)):
+                    raise AppError(409, "edit_conflict",
+                                   detail="他の編集と競合しました。最新を取得してから編集し直してください。")
+                raise
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail

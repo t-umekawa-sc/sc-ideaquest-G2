@@ -28,6 +28,10 @@ const CATALOG: Record<string, Msg> = {
     ja: "現在の状態では実行できません。",
     en: "This action can't be performed in the current state.",
   },
+  "error.edit_conflict": {
+    ja: "他の編集と競合しました。ページを再読み込みして最新を取得してから、編集し直してください。",
+    en: "Your edit conflicts with another change. Reload to get the latest, then edit again.",
+  },
   "error.validation": { ja: "入力内容をご確認ください。", en: "Please review your input." },
 };
 
@@ -64,6 +68,8 @@ export function mapServerErrors(
       return { fieldErrors, summary };
     }
     if (err.code === "forbidden") return { fieldErrors: {}, summary: [t(locale, "error.forbidden")] };
+    // 並行編集の後着＝最新再取得を促す実行可能メッセージ（D.2 楽観ロック・edit_conflict）。
+    if (err.code === "edit_conflict") return { fieldErrors: {}, summary: [t(locale, "error.edit_conflict")] };
     if (err.code === "conflict") return { fieldErrors: {}, summary: [t(locale, "error.conflict")] };
   }
   return { fieldErrors: {}, summary: [t(locale, "error.generic")] };

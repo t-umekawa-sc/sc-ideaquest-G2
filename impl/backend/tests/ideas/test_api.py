@@ -217,6 +217,24 @@ def test_d_tc_109_edit_draft_vs_published_revision(client, env):
         assert [r.revision for r in repo.list_revisions(ts, pub)] == [2, 1]
 
 
+def test_d_tc_143_concurrent_edit_conflict(client, env):
+    """D-TC-143 公開アイデアの並行 PATCH は 409 edit_conflict（UNIQUE(idea_id,revision) 楽観ロック・D.2 line67）。500 にしない。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # current_revision=1・revision 1 存在
+    # 別編集者が既に revision 2 を作成済み（＝自分の current_revision=1 は stale）状態を再現
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_revision(
+            ts, pub, revision=2, editor_id=env.user_id,
+            changes={"title": "other", "value": "v", "body": "b", "time_limit": None, "note": None, "stakeholders": []},
+        )
+        ts.commit()
+    # next_rev=2 の INSERT が UNIQUE 違反 → 409 edit_conflict（500 でなく）
+    r = client.patch(IDEA(pub), json={"title": "mine"}, headers=_csrf(client))
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "edit_conflict"
+
+
 def test_d_tc_110_edit_published_strict(client, env):
     _login_seed(client)
     qid = env.make_quest()
