@@ -20,10 +20,15 @@
 }
 .viewer__bg { position: absolute; inset: 0; display: grid; place-items: center; font-size: 220px; opacity: .5; filter: saturate(1.1); }
 .viewer__avatar { position: relative; z-index: 1; width: 60%; image-rendering: pixelated; filter: drop-shadow(0 8px 12px rgba(0,0,0,.5)); }
+/* 3Dビューア（R3F Canvas）＝ステージ全面。ドラッグ回転できるよう pointer は有効（絵文字重ねは pointer-events:none 側で透過） */
+.viewer__canvas { position: absolute; inset: 0; z-index: 1; }
 .viewer__slot { position: absolute; z-index: 2; line-height: 1; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
 .viewer__slot[data-slot="head"] { top: 8%;  left: 50%; transform: translateX(-50%); font-size: 40px; }
 .viewer__slot[data-slot="face"] { top: 27%; left: 50%; transform: translateX(-50%); font-size: 30px; }
 .viewer__slot[data-slot="hand"] { top: 46%; right: 14%; font-size: 40px; }
+.viewer__base { display: flex; gap: var(--space-2); justify-content: center; margin-top: var(--space-3); }
+.viewer__base-btn { min-width: 3.5rem; }
+.viewer__base-btn.is-active { outline: 2px solid var(--pixel-level-on-dark); outline-offset: 1px; }
 .viewer__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
 .viewer__name { font-family: var(--font-pixel); font-size: var(--text-lg); color: var(--pixel-ink); }
 .viewer__lv { font-family: var(--font-pixel); color: var(--pixel-level-on-dark); }

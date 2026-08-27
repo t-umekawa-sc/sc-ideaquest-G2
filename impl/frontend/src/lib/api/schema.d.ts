@@ -780,6 +780,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/avatar-base": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Avatar Base
+         * @description 3D アバターのベース体（男女2体）を選択（K.4.1）。会社DB `users.avatar_base` 直接更新。変更系＝Origin/CSRF 必須。
+         */
+        put: operations["put_avatar_base_api_v1_me_avatar_base_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/background-image": {
         parameters: {
             query?: never;
@@ -2083,6 +2103,19 @@ export interface components {
             coin_earned: number;
         };
         /**
+         * AvatarBaseUpdateRequest
+         * @description アバターベース体選択の入力（K.4.1・allowlist）。`base`（`male`/`female`）のみ受理。
+         *
+         *     想定外プロパティ拒否（extra=forbid＝Mass Assignment 防止・§2.2）。将来 `animal_*` を追加（SC-31 §9.6）。
+         */
+        AvatarBaseUpdateRequest: {
+            /**
+             * Base
+             * @enum {string}
+             */
+            base: "male" | "female";
+        };
+        /**
          * AvatarImageResponse
          * @description `PUT /me/avatar-image` の応答（K.4）＝設定後の短TTL 署名URL。
          */
@@ -3208,6 +3241,11 @@ export interface components {
             avatar_image_url?: string | null;
             /** Background Image Url */
             background_image_url?: string | null;
+            /**
+             * Avatar Base
+             * @default male
+             */
+            avatar_base: string;
         };
         /**
          * MeResponse
@@ -5566,6 +5604,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    put_avatar_base_api_v1_me_avatar_base_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvatarBaseUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

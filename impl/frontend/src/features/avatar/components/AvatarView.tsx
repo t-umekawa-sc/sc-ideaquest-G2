@@ -4,6 +4,7 @@
 // ワードローブ（5スロット×装備・クリック着替え・即反映）。装備セットは SC-30 ショップと共通。
 // 正＝doc/画面設計/mocks/SC-31_アバター着せ替え.html・screens/SC-31・API設計 G.1/G.2。
 // G 実接続＝getItems（カタログ＋所有＋装備＋残高）／updateEquipment（各スロット1点はサーバー強制）。未所有はショップ導線。
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -13,7 +14,13 @@ import { ApiError } from "@/lib/api/client";
 
 import { getItems, ITEM_ICON, updateEquipment } from "@/features/shop/api";
 
+import { updateAvatarBase } from "../api";
+import { AVATAR_BASE_LABEL, AVATAR_BASES, type AvatarBase } from "../base";
+import { supportsWebGL } from "../webgl";
 import "../avatar.css";
+
+// 3Dビューアは WebGL/DOM 依存＝SSR 不可。client でのみ動的ロード（非対応時はそもそも描画しない・§9.3）。
+const AvatarViewer3D = dynamic(() => import("./AvatarViewer3D").then((m) => m.AvatarViewer3D), { ssr: false });
 
 type SlotKey = "head" | "face" | "body" | "hand" | "bg";
 type Rarity = "common" | "standard" | "rare";
@@ -32,7 +39,7 @@ const EMPTY_ITEMS: Record<SlotKey, Item[]> = { head: [], face: [], body: [], han
 const toSlot = (s: string): SlotKey => (s === "background" ? "bg" : s) as SlotKey;
 const backendSlot = (s: SlotKey): string => (s === "bg" ? "background" : s);
 
-export function AvatarView() {
+export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?: AvatarBase } = {}) {
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
@@ -40,6 +47,21 @@ export function AvatarView() {
   const [equipped, setEquipped] = useState<Record<SlotKey, string | null>>({ head: null, face: null, body: null, hand: null, bg: null });
   const [coins, setCoins] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [base, setBase] = useState<AvatarBase>(initialAvatarBase);
+  // WebGL 検出は client のみ（SSR/初回描画は 2D フォールバックで一致→mount 後に 3D へ昇格・§9.3）。
+  const [webgl, setWebgl] = useState(false);
+  useEffect(() => { setWebgl(supportsWebGL()); }, []);
+
+  async function switchBase(next: AvatarBase) {
+    if (next === base) return;
+    const prev = base;
+    setBase(next); // 楽観更新
+    const res = await updateAvatarBase(next).catch(() => null);
+    if (!res) {
+      setBase(prev); // ロールバック
+      snack({ type: "error", msg: "ベースの変更に失敗しました。" });
+    }
+  }
 
   const load = useCallback(async () => {
     const r = await getItems().catch(() => null);
@@ -107,11 +129,30 @@ export function AvatarView() {
         <section className="pixel-panel viewer" aria-label="アバタープレビュー">
           <div className="viewer__stage">
             <div className="viewer__bg">{preview("bg")}</div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="viewer__avatar" src="/assets/mascot-hero.png" alt="あなたのアバター" />
+            {webgl ? (
+              <AvatarViewer3D base={base} />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="viewer__avatar" src="/assets/mascot-hero.png" alt="あなたのアバター" />
+            )}
+            {/* 装備プレビュー（絵文字重ね）＝2D 見立て。3D の実パーツ反映はアセット導入時（§9.2 seam） */}
             <span className="viewer__slot" data-slot="head">{preview("head")}</span>
             <span className="viewer__slot" data-slot="face">{preview("face")}</span>
             <span className="viewer__slot" data-slot="hand">{preview("hand")}</span>
+          </div>
+          {/* ベース切替（男/女・§4.1/§9.2）＝即時プレビュー反映＋PUT /me/avatar-base で永続 */}
+          <div className="viewer__base" role="group" aria-label="ベース体の切替">
+            {AVATAR_BASES.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className={`btn btn-pixel viewer__base-btn${b === base ? " is-active" : ""}`}
+                aria-pressed={b === base}
+                onClick={() => void switchBase(b)}
+              >
+                {AVATAR_BASE_LABEL[b]}
+              </button>
+            ))}
           </div>
           <div className="viewer__foot">
             <span className="viewer__name">山田 太郎</span>
