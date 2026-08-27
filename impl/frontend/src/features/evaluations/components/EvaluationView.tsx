@@ -3,10 +3,11 @@
 // SC-25 評価画面＝5観点×5点のスター採点＋観点別コメント＋総評（必須）＋集計プレビュー＋公開範囲（F.2 実接続）。
 // 正＝doc/画面設計/mocks/SC-25_評価画面.html・doc/画面設計/screens/SC-25_評価画面.md・API設計 F.2。
 // 実接続: マウントで getMyEvaluation（プリフィル）＋getIdea（対象アイデアの文脈）。確定/下書きは PUT /ideas/{id}/evaluation。
-// 権限/検証/状態機械はサーバー権威（403/409/422）。設計上はSC-22 からのモーダル（Intercept）だが本 impl はフルページ（接続維持）。
+// 権限/検証/状態機械はサーバー権威（403/409/422）。SC-22 からのソフト遷移は URL 付きモーダル（Intercept・
+// EvaluationModal が onClose 付きで本 View を使う）／URL 直・リロードは本フルページ（onClose 無し＝chrome を出す）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -25,8 +26,20 @@ const ASPECTS: Aspect[] = [
   { key: "cost", label: "コスト", desc: "💡 低コストほど高得点（★5＝非常に低コスト）", cost: true },
 ];
 
-export function EvaluationView({ ideaId }: { ideaId: string }) {
+// onClose あり＝モーダル（Intercept・SC-22 から）＝chrome（container/backlink）は RouteModal が担うので出さず、
+// 確定成功で close()。無し＝フルページ（URL 直/リロード）＝従来どおり container＋backlink＋router.push。
+export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: () => void }) {
   const router = useRouter();
+  const inModal = onClose != null;
+  const Frame = ({ children }: { children: ReactNode }) =>
+    inModal ? (
+      <>{children}</>
+    ) : (
+      <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
+        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
+        {children}
+      </main>
+    );
   const snack = useSnackbar();
   const [scores, setScores] = useState<Partial<Record<AspectKey, number>>>({});
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
@@ -102,7 +115,7 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
             msg: `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`,
             rewards: [{ k: "xp", t: "＋30 XP" }],
           });
-          router.push(`/ideas/${ideaId}`);
+          if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);  // モーダルは close・フルページは詳細へ
         } else {
           snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });
         }
@@ -126,34 +139,20 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
         setPending(null);
       }
     },
-    [ideaId, scores, comments, overall, visibility, avg, rated, pending, snack, router],
+    [ideaId, scores, comments, overall, visibility, avg, rated, pending, snack, router, onClose],
   );
 
   if (loading) {
-    return (
-      <main className="container" style={{ paddingBlock: "var(--space-6)", maxWidth: 760 }}>
-        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
-        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
-      </main>
-    );
+    return <Frame><p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p></Frame>;
   }
   if (loadError) {
-    return (
-      <main className="container" style={{ paddingBlock: "var(--space-6)", maxWidth: 760 }}>
-        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
-        <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div>
-      </main>
-    );
+    return <Frame><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></Frame>;
   }
 
   return (
-    <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
-      <Link className="backlink" href={`/ideas/${ideaId}`}>
-        ← アイデア詳細へ戻る
-      </Link>
-
+    <Frame>
       <section className="card">
-        <h1 style={{ fontSize: "var(--text-xl)", margin: "0 0 var(--space-2)" }}>アイデアを評価</h1>
+        {!inModal && <h1 style={{ fontSize: "var(--text-xl)", margin: "0 0 var(--space-2)" }}>アイデアを評価</h1>}
         <p className="role-note" style={{ marginTop: 0 }}>
           ▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。
         </p>
@@ -307,9 +306,11 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
         </p>
 
         <div className="modal__foot" style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-6)", flexWrap: "wrap" }}>
-          <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>
-            キャンセル
-          </Link>
+          {inModal ? (
+            <button className="btn btn-outline" type="button" onClick={onClose}>キャンセル</button>
+          ) : (
+            <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>キャンセル</Link>
+          )}
           <button className="btn btn-outline" type="button" onClick={() => void persist("draft")} disabled={pending !== null}>
             {pending === "draft" ? "保存中…" : "下書き保存"}
           </button>
@@ -318,6 +319,6 @@ export function EvaluationView({ ideaId }: { ideaId: string }) {
           </button>
         </div>
       </section>
-    </main>
+    </Frame>
   );
 }

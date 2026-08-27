@@ -89,7 +89,7 @@
 4. **要件(FR)網羅の最終点検 / UI ポリッシュ follow-up**＝`impl/README.md` 画面テーブルは全 ✅。細部 follow-up の現況（2026-08-27 精査で前回記述の一部は既に解消と判明）＝
    - ~~`IdeaDetailDTO` に `quest_id`/カテゴリー欠落で SC-22「クエストへ戻る」が暫定~~ **既に実装済み**（前回 handoff の記述は古い）＝DTO は `quest.id`/`quest.status`/`quest.categories`/`quest.deadline` を返し（D-TC-130）、`IdeaDetailView.tsx:255/264` が戻る導線・カテゴリーバッジに使用。
    - ~~投票の締切日時での事前 disable~~ **本セッションで実装**（`isVotingClosed`＝`voting.ts`・サーバー `_guard_votable` の `quest.deadline < today` と一致・vitest D-TC-219・6件 red→green）＝SC-22 投票ボタンを `completed`＋締切後で事前無効化＋バッジ/文言。フォロー/選定は `completed` のみ（締切対象外＝サーバーと一致）。
-   - **残＝SC-25 の intercept モーダル化**（現状 `ideas/[ideaId]/eval/page.tsx` はフルページ・`@modal` slot 未整備）＝URL 付きモーダル標準（デザイン標準/フロント実装フロー規約）への寄せ。未対応。
+   - ~~SC-25 の intercept モーダル化~~ **完了**＝`@modal/(.)ideas/[ideaId]/eval/page.tsx`＝`EvaluationModal`（`RouteModal`＋`EvaluationView` を `onClose` 付きで）。SC-22 の「評価する」ソフト遷移＝モーダル／URL直・リロード＝フルページ（`EvaluationView` は `onClose` 有無で chrome 出し分け）。ブラウザ受入 実測（soft=dialog・hard=backlink・エラーなし）。既存 sc-25 e2e は `page.goto` ハード遷移＝フルページで不変。
 5. **J の将来拡張（任意）**＝グローバル `GET /search`＋ヘッダー導線／最小文字数・演算子(OR/フレーズ)・正規化／種別間スコア重み／`per_page` 最終値（J.6 TBD）。
 - **共通ルール**＝着手前に `impl/README.md` の現況と該当正本を開き、非自明な新規スコープはユーザーへ確認。1スライス＝backend+frontend＋テスト（md 先行・red-green）＝docs(handoff) の順でコミット、**push はユーザー承認後**。
 
