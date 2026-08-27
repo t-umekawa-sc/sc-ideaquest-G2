@@ -45,6 +45,7 @@
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |
 | D-TC-143 | api | 公開アイデアの並行 PATCH は楽観ロックで 409 `edit_conflict`（500 にしない・D.2 line67） | 公開アイデア（`current_revision=1`）で、別編集者が既に `revision=2` を作成済み（自分の base は stale） | `PATCH /ideas/{id}`（title） | `next_rev=2` の INSERT が `UNIQUE(idea_id,revision)` 違反→**`409` `code=edit_conflict`**（`IntegrityError` を捕捉して翻訳・**500 にしない**）。クライアントは最新再取得へ誘導 | D.2（楽観ロック・方針A） |
 | D-TC-144 | api | 投票後に版が進むと `vote.stale=true`（投票見直し導線・D.1/D.5） | 公開アイデアに投票（`voted_revision=1`）→ 公開中編集で `current_revision=2` | `GET /ideas/{id}`（投票直後／編集後） | 投票直後＝`vote.my_vote=approve`・**`vote.stale=false`**（同版）／編集後＝`vote.my_vote=approve`・**`vote.stale=true`**（`voted_revision < current_revision`）。押し直しで解消 | D.1／D.5 |
+| D-TC-145 | api | 下書きの公開は投稿者のみ＝代理公開は不可（他人 owner でも 404） | owner（seed・投稿者でない）が他ユーザー（Other）の下書きを `POST publish` | 応答＋`activities` | **404**（下書きは本人のみ可視・`_authorize_edit_idea`）＝公開が起きず `idea_post` は誰にも付与されない。ゆえに投稿 XP+50 の受給者は常に投稿者本人（監査 M3「公開者に付く」は本ガードにより発生しない誤検知・将来この経路を開くなら本テスト赤化で再検討を促す） | D.2／§8-⑥ |
 | D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
 | D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
 | D-TC-112 | api | 下書き公開 | 自分の下書き（充足） | `POST /ideas/{id}/publish` | 200・published | D.2 |

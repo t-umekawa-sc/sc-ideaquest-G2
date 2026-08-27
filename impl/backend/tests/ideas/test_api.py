@@ -660,6 +660,24 @@ def test_d_tc_160_publish_awards_idea_post_xp(client, factory, env):
     assert len(_acts(env.db_identifier, env.user_id, "idea_post", draft)) == 1
 
 
+def test_d_tc_145_draft_publish_is_author_only(client, env):
+    """D-TC-145 下書きの公開は投稿者のみ＝他人(owner)でも 404（代理公開は不可）。
+
+    ゆえに公開処理の投稿 XP+50 の受給者は常に投稿者本人（`_publish_processing` の `user==author` 不変）。
+    監査 M3「代理公開で XP が公開者に付く」は本ガードにより発生しない（誤検知）。将来この経路を開くなら
+    本テストが赤化して XP 受給者の再検討を促す。根拠＝D.2（下書きは本人のみ可視）／§8-⑥。
+    """
+    _login_seed(client)                                        # seed=クエスト owner（投稿者ではない）
+    qid = env.make_quest()                                     # owner=env.user_id
+    draft = env.make_idea(quest_id=qid, author=env.other_id, status="draft")  # 投稿者=Other
+    # owner でも他人の下書きは 404（下書きは本人のみ可視・_authorize_edit_idea）＝代理公開は起きない
+    r = client.post(f"/api/v1/ideas/{draft}/publish", json={}, headers=_csrf(client))
+    assert r.status_code == 404, r.text
+    # 公開自体が起きないので idea_post は誰にも付与されない
+    assert _acts(env.db_identifier, env.other_id, "idea_post", draft) == []
+    assert _acts(env.db_identifier, env.user_id, "idea_post", draft) == []
+
+
 def test_d_tc_161_vote_xp_first_only(factory, env):
     """D-TC-161 投票 XP+5（各アイデア初回のみ・切替/再投票は追加なし・FR-23/§8-⑥）。"""
     qid = env.make_quest()

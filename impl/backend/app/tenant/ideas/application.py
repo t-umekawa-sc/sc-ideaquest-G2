@@ -697,7 +697,8 @@ def _publish_processing(ts, idea, user) -> None:
     from app.tenant.chat import repository as chat_repo
 
     chat_repo.ensure_chat_group(ts, idea.id)  # E＝アイデアと 1:1（§5.15・公開時に自動作成）
-    # 投稿 XP+50（G・§8-⑥・アイデア初回公開のみ）。付与先＝投稿者（idea.author_id＝公開者 user）。
+    # 投稿 XP+50（G・§8-⑥・アイデア初回公開のみ）。付与先＝投稿者。**公開時は常に user==投稿者**＝下書きは
+    # 本人のみ公開可（他人は _authorize_edit_idea で 404・代理公開は不可・D-TC-145）ため user.id が投稿者に一致する。
     if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "idea_post", "ideas", idea.id):
         ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_IDEA_POST, reason="idea_post",
                      ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
