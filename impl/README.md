@@ -7,7 +7,7 @@
 - **backend/** — FastAPI 4層（router / application / repository / infra）。
 - **compose.yaml** — フルスタック（PostgreSQL / Redis / MinIO / MailHog / workers / Docker）。
 
-> 進捗の最終確認: **2026-08-26**。**tsc クリーン（Snackbar.tsx:122 の React19 useRef 型エラー修正済み）・frontend vitest 単体 19/19（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6＋`avatar/avatar.test.ts` 4＝ベース正規化/WebGL・motion の SSR ガード）**・**backend `pytest tests/` 全体 464 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）passed・TC-ID トレーサビリティ ✅（code 388）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
+> 進捗の最終確認: **2026-08-27**。**tsc クリーン（Snackbar.tsx:122 の React19 useRef 型エラー修正済み）・frontend vitest 単体 19/19（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6＋`avatar/avatar.test.ts` 4＝ベース正規化/WebGL・motion の SSR ガード）**・**backend `pytest tests/` 全体 468 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**／**K アバターベース 4（K-TC-011-014＝`PUT /me/avatar-base`）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）＋**sc-31（1＝K-TC-015 ベース体切替の永続）**passed・TC-ID トレーサビリティ ✅（code 393）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
 
 ## 画面実装進捗（SC-xx）
@@ -54,6 +54,7 @@
 - [ ] **SC-24 チャット E（E-TC-201/203）**＝メッセージ投稿/編集/削除・**複数引用**・添付DL・@メンション候補・通常リアクション・魔法（SC-32 で解放した魔法）・既読セパレータ・comment 権限/completed 凍結。
 - [ ] **SC-32 魔法スキル G（G-TC-201）**＝カタログ/SP残高/解放数が実データ・SP を使って解放（確認→報酬スナックバー）→ SC-24 の魔法ピッカーで使えるようになる通し。
 - [ ] **SC-30/SC-31 ショップ/アバター G（G-TC-202/203）**＝ショップでコイン購入（確認→報酬・残高減）→アバターで着せ替え（各スロット1点・即反映）→SC-30 で「所有済み」。要コイン（評価等で獲得）。
+- [x] **SC-31 3Dビューア/ベース体切替（K-TC-015・e2e green）**＝`/avatar` で 3D Canvas 描画（WebGL 時・非対応は 2D マスコットへ自動フォールバック§9.3）＋ベース切替（男/女）が `PUT /me/avatar-base` で永続（リロード反映）。**実VRMアセット未整備のためプレースホルダ humanoid**（実描画・回転・永続は e2e/スクショで確認済み）。実 VRM 差し替えは `AvatarViewer3D.tsx` seam。
 - [ ] **SC-41 ランキング G（G-TC-206）**＝期間タブ（今週/先週/今月/通算）でスコア（獲得XP＋コイン）順位・自分順位/総人数が実データ・表彰台。
 - [ ] **SC-40 実績 G（G-TC-207）**＝収集サマリー「{unlocked} / 12」が実データ・シークレット未獲得は「？？？」で伏せ・DataTable（カテゴリー/ティア/状態フィルタ）。付与は活動連動で自動（例＝評価3件で evaluator_3）。
 - [ ] **SC-25/SC-22 評価 F（F-TC-201〜203）**＝SC-25 で5観点採点＋総評→確定→SC-22 §4.6 に平均/観点/総評/コインが反映・下書き復元・owner の選定トグル（★選定済み＋「選定候補」バッジ）。評価者/選定は my_permissions 出し分け。
