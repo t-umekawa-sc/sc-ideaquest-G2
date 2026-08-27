@@ -74,7 +74,7 @@
 > - ⬜ **M1**（med・guard-missing）＝L.4 購読失効 `publish_revoke` がバルクのパーティー除外（`quests/application.py:_apply_party_diff`）・グループ除去で未発火（専用 `DELETE /members` のみ結線）。再接続時は L.2 で塞がるが除外直後の WS 窓。
 > - ✅ **M2 修正済**＝公開アイデアの並行 `PATCH` を 409 `edit_conflict` に（版INSERTの `UNIQUE(idea_id,revision)` 違反を `ideas/application.py` の `update_idea` で `IntegrityError`→翻訳・`edit_conflict` code 追加・フロント `mapServerErrors` に実行可能文言）。D-TC-143（red→green）＋vitest 3。
 > - ⬜ **M3**（med・mismatch）＝代理公開（owner/quest_admin が他人下書きを公開）で 投稿XP+50 が投稿者でなく公開者に付与（`ideas/application.py:_publish_processing` の付与先を `idea.author_id` 起点へ）。
-> - ⬜ **M4**（med・missing）＝`vote.stale`（投票後に版更新）をサーバー未算出＝SC-22 の「⚠投票後に更新」導線が出せない（`_build_detail` に `voted_revision < current_revision` を足すだけ）。
+> - ✅ **M4 修正済**＝`GET /ideas/{id}` の `vote.stale`（`my_vote` あり かつ `voted_revision < current_revision`）を `_build_detail` で算出。フロント SC-22 に「⚠ 投票後に更新」バッジ＋見直し文言（押し直しで解消）。D-TC-144（red→green）。
 > - ⬜ **M5**（med・idempotency）＝`Idempotency-Key`（§1.9）が全面未実装（購入/魔法解放/クエスト作成/アカウント発行）。UNIQUE 制約が backstop で実害は限定的。
 > - ⬜ **M6**（med）＝`activities` に部分ユニーク無し＋`users.coin_balance`/`skill_point_balance` に `CHECK(>=0)` 無し＝並行時の二重付与/残高マイナスの窓（migration で制約追加）。
 > - ⬜ **F1**（Should・未完成）＝FR-36 アクティビティフィード ②クエスト内(SC-12 `GET /quests/{id}/activities`)・③チーム横断(SC-01 `GET /me/feed`) 未実装（①`/me/activities` のみ）。**成果系のみ公開**述語（idea_post/selection/achievement_reward/levelup_sp）を実装時に要注意。

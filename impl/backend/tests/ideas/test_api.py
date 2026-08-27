@@ -235,6 +235,21 @@ def test_d_tc_143_concurrent_edit_conflict(client, env):
     assert r.json()["code"] == "edit_conflict"
 
 
+def test_d_tc_144_vote_stale_after_revision(client, env):
+    """D-TC-144 投票後に版が進むと GET /ideas/{id} の vote.stale=true（D.1/D.5）。投票直後は false。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # current_revision=1
+    assert client.post(f"/api/v1/ideas/{pub}/vote", json={"type": "approve"}, headers=_csrf(client)).status_code == 200
+    d0 = client.get(IDEA(pub)).json()
+    assert d0["vote"]["my_vote"] == "approve" and d0["vote"]["stale"] is False  # 同版＝stale なし
+    # 公開中の編集で版が 2 に進む → 投票は voted_revision=1 のまま
+    assert client.patch(IDEA(pub), json={"title": "updated"}, headers=_csrf(client)).status_code == 200
+    d1 = client.get(IDEA(pub)).json()
+    assert d1["current_revision"] == 2
+    assert d1["vote"]["my_vote"] == "approve" and d1["vote"]["stale"] is True  # 投票後に更新
+
+
 def test_d_tc_110_edit_published_strict(client, env):
     _login_seed(client)
     qid = env.make_quest()

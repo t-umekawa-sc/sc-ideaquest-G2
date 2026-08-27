@@ -771,7 +771,13 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "attachments": _attachments_payload(ts, repo.list_attachments(ts, idea.id)),
         "created_at": idea.created_at,
         "updated_at": idea.updated_at,
-        "vote": {"summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "my_vote": my_vote.type if my_vote else None},
+        "vote": {
+            "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+            "my_vote": my_vote.type if my_vote else None,
+            # 投票後に版が進んだか（D.1/D.5）＝投票済みで voted_revision < current_revision のとき true。
+            # フロントは「⚠ 投票後に更新」を出し、内容を確認して投票し直せる（押し直しで voted_revision 更新）。
+            "stale": bool(my_vote and my_vote.voted_revision < idea.current_revision),
+        },
         "following": repo.is_following(ts, viewer_id, idea.id),
         "my_permissions": my_permissions,
         "my_state": "draft" if idea.status == "draft" and idea.author_id == viewer_id else "member",

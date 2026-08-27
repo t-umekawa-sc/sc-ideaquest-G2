@@ -68,7 +68,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   // 投票/フォローは楽観更新のためローカル state で保持（load 時に DTO から同期）。
-  const [vote, setVote] = useState<{ approve: number; oppose: number; my: IdeaVoteType | null }>({ approve: 0, oppose: 0, my: null });
+  const [vote, setVote] = useState<{ approve: number; oppose: number; my: IdeaVoteType | null; stale: boolean }>({ approve: 0, oppose: 0, my: null, stale: false });
   const [following, setFollowing] = useState(false);
   const [voteBusy, setVoteBusy] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
@@ -86,11 +86,12 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       if (!d) setLoadError("このアイデアは見つからないか、参照する権限がありません。");
       else {
         setIdea(d);
-        const dv = (d.vote ?? {}) as { summary?: { approve?: number; oppose?: number }; my_vote?: string | null };
+        const dv = (d.vote ?? {}) as { summary?: { approve?: number; oppose?: number }; my_vote?: string | null; stale?: boolean };
         setVote({
           approve: dv.summary?.approve ?? 0,
           oppose: dv.summary?.oppose ?? 0,
           my: dv.my_vote === "approve" || dv.my_vote === "oppose" ? dv.my_vote : null,
+          stale: dv.stale === true,  // 投票後に版が進んだ（D.5・押し直しで解消）
         });
         setFollowing(!!d.following);
         setSelected(!!d.is_selected);
@@ -121,19 +122,20 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     setVoteBusy(true);
     try {
       if (prev.my === type) {
-        // 同じ選択肢を再クリック＝取消。
-        setVote((s) => ({ ...s, [type]: Math.max(0, s[type] - 1), my: null }));
+        // 同じ選択肢を再クリック＝取消（票が無くなるので stale は解消）。
+        setVote((s) => ({ ...s, [type]: Math.max(0, s[type] - 1), my: null, stale: false }));
         await removeVote(ideaId);
       } else {
-        // 新規 or 切替（1人1票・前の票を減算）。
+        // 新規 or 切替（1人1票・前の票を減算）。押し直し＝現版で投票し直す＝stale 解消（voted_revision 更新）。
         setVote((s) => ({
           approve: s.approve + (type === "approve" ? 1 : 0) - (prev.my === "approve" ? 1 : 0),
           oppose: s.oppose + (type === "oppose" ? 1 : 0) - (prev.my === "oppose" ? 1 : 0),
           my: type,
+          stale: false,
         }));
         const res = await voteIdea(ideaId, type);
-        // サーバー集計を権威に反映（匿名化・整合）。
-        if (res) setVote({ approve: res.summary.approve, oppose: res.summary.oppose, my: (res.my_vote as IdeaVoteType | null) ?? null });
+        // サーバー集計を権威に反映（匿名化・整合）。投票し直したので stale は false。
+        if (res) setVote({ approve: res.summary.approve, oppose: res.summary.oppose, my: (res.my_vote as IdeaVoteType | null) ?? null, stale: false });
       }
     } catch (err) {
       setVote(prev); // ロールバック
@@ -425,7 +427,17 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         <div className="idea-rail">
           {/* 投票 */}
           <section className="card" aria-label="投票">
-            <h2 className="card-title">投票</h2>
+            <h2 className="card-title">
+              投票{" "}
+              {vote.stale && vote.my && (
+                <span className="vote-stale-badge" title="投票後にアイデアが更新されました。内容を確認して投票し直せます（押し直しで反映）。">⚠ 投票後に更新</span>
+              )}
+            </h2>
+            {vote.stale && vote.my && (
+              <p className="role-note" style={{ marginTop: "var(--space-1)" }}>
+                ※ あなたの投票後にこのアイデアは更新されました。内容を確認し、必要なら<strong>投票し直して</strong>ください（同じ側をもう一度押すと最新版で見直し完了）。
+              </p>
+            )}
 
             <div className="vote-summary">
               <span className="vote-agree">▲ 賛成 {agreeN}</span>
