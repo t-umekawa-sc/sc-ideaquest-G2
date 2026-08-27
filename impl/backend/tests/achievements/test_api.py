@@ -102,6 +102,7 @@ def test_g_tc_505_all_spells(client, factory):
         s.commit()
     with get_tenant_session(_db()) as s:
         u = s.get(User, acc)
+        u.skill_point_balance = 6  # 解放前提の SP を保持（CHECK(>=0)・実運用はレベルアップで獲得）
         ledger.grant(s, u, kind=ledger.SP_SPEND, amount=1, reason="spell_unlock", ref_type="spells", ref_id=uuid.uuid4())
         s.commit()
     body = client.get(ACH).json()

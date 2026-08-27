@@ -46,7 +46,7 @@
 ### 4-2. backend（本セッションで full pytest を再実測）
 - **`pytest tests/` 全体 464 passed**（本セッションで 2 回実測＝健全性確認時／avatar_base migration 追加後。いずれもワーカ停止で green）。
 - 動作確認済み＝`GET /quests/{id}/search` 未認証 401 を実アプリで確認（前スライス）。
-- migration head＝control **0012**／company **0019**（`0019_company_avatar_base`＝users.avatar_base 追加・本セッションで bootstrap 適用＋実DB検証済み〔既存179ユーザーは既定 male に充当・head=0019 確認〕）。
+- migration head＝control **0012**／company **0020**（`0019_company_avatar_base`＝users.avatar_base／`0020_company_balance_guards`＝残高 CHECK(>=0)＋activities 部分ユニーク〔M6〕。いずれも bootstrap 適用＋実DB検証済み）。
 ### 4-3. テスト運用（本セッションで実測）
 - **TC-ID トレーサビリティ ✅（code 388）**＝**repo ルートで** `python3 scripts/check_tc_traceability.py`。
 - **注＝本検査は `impl/backend/tests/**/*.py` ＋ `impl/frontend/e2e/**/*.spec.ts` のみ走査**＝frontend の `src/**/*.test.ts`（vitest 単体）は対象外。正規表現も `\b([A-Z])-TC-(\d{3})\b`＝**3文字接頭辞 `SEC-TC-` に不一致**。よって vitest 単体は検査対象外で、追跡は md（SEC-TC-013 等）で担保する。
@@ -76,7 +76,7 @@
 > - ✅ **M3 誤検知（コード変更不要・調査で確定）**＝「代理公開で投稿XP+50 が公開者に付く」は**発生しない**。下書きは本人のみ可視で、他人（owner/quest_admin）の下書き公開は `_authorize_edit_idea` が 404（代理公開不可）＝publish 時は常に `user==投稿者`ゆえ現行の付与先は正しい。ガードテスト D-TC-145（他人 owner の publish=404・誰にも idea_post 付与なし）で不変条件を固定し、コメントも明確化。将来この経路を開くなら D-TC-145 が赤化して XP 受給者の再検討を促す。
 > - ✅ **M4 修正済**＝`GET /ideas/{id}` の `vote.stale`（`my_vote` あり かつ `voted_revision < current_revision`）を `_build_detail` で算出。フロント SC-22 に「⚠ 投票後に更新」バッジ＋見直し文言（押し直しで解消）。D-TC-144（red→green）。
 > - ⬜ **M5**（med・idempotency）＝`Idempotency-Key`（§1.9）が全面未実装（購入/魔法解放/クエスト作成/アカウント発行）。UNIQUE 制約が backstop で実害は限定的。
-> - ⬜ **M6**（med）＝`activities` に部分ユニーク無し＋`users.coin_balance`/`skill_point_balance` に `CHECK(>=0)` 無し＝並行時の二重付与/残高マイナスの窓（migration で制約追加）。
+> - ✅ **M6 修正済**＝migration `0020_company_balance_guards`＝`users.xp/coin_balance/skill_point_balance` に `CHECK(>=0)`（負残高を DB 拒否）＋`activities` 部分ユニーク `UNIQUE(user_id,kind,reason,ref_type,ref_id) WHERE ref_id IS NOT NULL`（付与冪等の DB 最終防御＝`exists_ref` の SELECT を抜けた並行 INSERT を拒否・ref_id NULL の login/levelup_sp は重複可）。G-TC-107/108（red→green・既存データ重複0/負残高0を事前確認）。company head 0020。
 > - ⬜ **F1**（Should・未完成）＝FR-36 アクティビティフィード ②クエスト内(SC-12 `GET /quests/{id}/activities`)・③チーム横断(SC-01 `GET /me/feed`) 未実装（①`/me/activities` のみ）。**成果系のみ公開**述語（idea_post/selection/achievement_reward/levelup_sp）を実装時に要注意。
 > - ⬜ **stale-doc**（コード不変）＝FR-01「投稿でコイン付与」表現（実装は §6 準拠で XP のみ）／`ledger.py` docstring／`publish_quest`・`chat/application.py` の「no-op フック」古コメント／C.2/C.7 の「publish 通知は H 実装まで no-op」（実際は結線済み）。
 > - **監査で確認して問題なし**（主要）＝XP/コイン付与の台帳結線（投稿+50/投票+5/評価+30/選定+200/評価連動コイン round(平均×10)・冪等・上限）／可視性門番（グループ∩パーティー・下書き本人のみ・cross-tenant 404）／権限6種の実強制／通知10種別の発生源結線／全文検索の WHERE 強制＋インジェクション対策／Mass Assignment（extra=forbid）／accounts→users ミラー網羅。

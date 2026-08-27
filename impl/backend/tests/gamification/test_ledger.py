@@ -8,6 +8,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -25,6 +28,41 @@ def _db_identifier() -> str:
 def _activities(dbid: str, user_id: uuid.UUID) -> list[Activity]:
     with get_tenant_session(dbid) as s:
         return list(s.query(Activity).filter_by(user_id=user_id).order_by(Activity.created_at).all())
+
+
+def test_g_tc_107_balance_check_nonneg(factory):
+    """G-TC-107 残高列は DB CHECK(>=0)＝負残高への更新は拒否（並行オーバースペンドの最終防御・データモデル §5/G.0・M6）。"""
+    dbid = _db_identifier()
+    acc = factory.make_seed_company_account()
+    for field in ("coin_balance", "skill_point_balance", "xp"):
+        with get_tenant_session(dbid) as s:
+            user = get_user_by_account(s, acc["id"])
+            setattr(user, field, -1)
+            with pytest.raises(IntegrityError):
+                s.commit()  # CHECK(>=0) で拒否
+
+
+def test_g_tc_108_activities_grant_ref_unique(factory):
+    """G-TC-108 activities の付与は (user,kind,reason,ref_type,ref_id) が ref付きで部分ユニーク＝並行二重付与を DB で拒否（F.4・M6）。
+
+    ref_id NULL（login/levelup_sp）は重複可＝日次ログイン等が複数行入る。
+    """
+    dbid = _db_identifier()
+    acc = factory.make_seed_company_account()
+    with get_tenant_session(dbid) as s:
+        uid = get_user_by_account(s, acc["id"]).id
+    ref = uuid.uuid4()
+    # 同一 ref の二重付与＝DB で拒否（exists_ref の SELECT を抜けた並行 INSERT の最終防御）
+    with get_tenant_session(dbid) as s:
+        s.add(Activity(id=uuid.uuid4(), user_id=uid, kind="xp_gain", amount=5, reason="vote", ref_type="ideas", ref_id=ref))
+        s.add(Activity(id=uuid.uuid4(), user_id=uid, kind="xp_gain", amount=5, reason="vote", ref_type="ideas", ref_id=ref))
+        with pytest.raises(IntegrityError):
+            s.commit()
+    # ref_id NULL は重複可（login を2件入れても通る）
+    with get_tenant_session(dbid) as s:
+        s.add(Activity(id=uuid.uuid4(), user_id=uid, kind="xp_gain", amount=10, reason="login", ref_type=None, ref_id=None))
+        s.add(Activity(id=uuid.uuid4(), user_id=uid, kind="xp_gain", amount=10, reason="login", ref_type=None, ref_id=None))
+        s.commit()  # 例外なし
 
 
 def test_grant_xp_updates_balance_level_and_levelup_sp(factory):
