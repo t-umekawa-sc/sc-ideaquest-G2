@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy.exc import DBAPIError
+
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
@@ -82,8 +84,17 @@ def search_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
         if qg_repo.get_active_membership(ts, quest.quest_group_id, user.id) is None:
             raise AppError(404, "not_found")
         for kind in kinds:
-            for r in search_repo.search(ts, kind, q, [qid], cap=_CAP):
-                rows.append(_row_dto(kind, r, quest))
+            try:
+                for r in search_repo.search(ts, kind, q, [qid], cap=_CAP):
+                    rows.append(_row_dto(kind, r, quest))
+            except DBAPIError as e:
+                # PGroonga のクエリ構文パース失敗（`*`・`((` 等の演算子のみ/不正入力）は「該当なし」として
+                # 安全に握る＝ユーザー入力で 5xx を出さない（J.0 injection-safe の本旨・§2.2③）。エラーで
+                # トランザクションが中断するため rollback して次の種別へ。pgroonga 以外の想定外は再送出。
+                ts.rollback()
+                if "pgroonga" in str(getattr(e, "orig", e)).lower():
+                    continue
+                raise
 
     # score 降順・タイブレーク＝created_at/uploaded_at 降順（J.3）。
     rows.sort(key=lambda x: (x["score"], x["_sort_ts"]), reverse=True)

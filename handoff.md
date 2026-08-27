@@ -74,7 +74,7 @@
 > - ⬜ **i18n（EN）＝大規模・別判断**＝EN は事実上未実装（next-intl 未導入で UI 全面 JA／メール `templates.py` が locale 引数を無視〔XP no-op 型〕／通知 `catalog.render` に locale 引数なし／マスタ名フロントで `name_ja` 固定／`Accept-Language` 参照0）。仕様は JA/EN 必須だがコードは「en は将来」と明記＝意図的保留。潰すには frontend next-intl 導入＋backend templates/catalog/master-name への locale 適用（フェーズ分割要）。
 > - ⬜ **性能 残（MVP規模では動く）**＝ランキング集計 `aggregate_ranking` が activities 全件 GROUP BY→Python ソート/ページング（DB 側ページング化推奨）／評価集計 `eval_states_for_ideas` が viewer 権限をループ内で毎回引く（ループ外化）／dashboard/notifications/achievements/chat の軽微な per-item 取得。
 > - ⬜ **a11y 残**＝DataTable のリスト行がキーボードで開けない（`<tr onClick>` のみ・デザイン標準 §4.5 が「将来課題」と自認）／DataTable sr-only `<caption>` 欠落／Avatar tooltip の `tabindex=0` 欠落。
-> - **⚠ 既知フラキー**＝`tests/search/test_api.py::test_j_tc_141_query_injection_safe` は **full 実行で PGroonga パースエラー（`*X||`）で失敗・単独では成功**＝順序/状態依存（**変更前 stash でも同様に失敗を実測＝pre-existing**）。要別途調査。
+> - ✅ **J-TC-141 フラキー根治**＝真因＝chat テスト等の pgroonga 操作後、接続プール上で `pgroonga_query_extract_keywords('*')` が稀に失敗（Groonga ランタイム状態・エラー文字列にゴミ `*X||`）＝**PGroonga の脆さ**。修正＝検索 application で各種別の read を `try/except DBAPIError`＝pgroonga パース失敗は rollback して空（該当なし）＝**ユーザー入力で 5xx を出さない**（injection-safe の本旨・実 production の堅牢性向上）。full pytest 481 passed（0 失敗・フラキー消滅）。
 
 > **（前回）仕様×実装 網羅監査（2026-08-27・全ドメイン並列）の punch-list**。HIGH は本セッションで修正済み。残りは未着手のバックログ（着手時は §7 共通ルール＝TC先行・red-green）。
 > - ✅ **H1 修正済**＝`complete_password_setup`（PW再設定完了）で信頼端末を失効していなかった（A.7/A.9-③ 違反）→ `revoke_all_trusted_devices` を同一Txに追加（A-TC-049 拡張・red→green）。
