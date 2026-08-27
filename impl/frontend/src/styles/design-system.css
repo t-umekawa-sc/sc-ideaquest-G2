@@ -915,7 +915,8 @@ body.modal-open { overflow: hidden; }
   height: 16px; background: #334155; border: 2px solid var(--pixel-ink);
   border-radius: var(--radius-pixel); overflow: hidden;
 }
-.xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); }
+.xp-bar > span { display: block; height: 100%; background: var(--pixel-xp); transition: width .8s cubic-bezier(.22,1,.36,1); }
+@media (prefers-reduced-motion: reduce) { .xp-bar > span { transition: none; } }
 /* 汎用ツールチップ（デザイン標準・SC-01 ダッシュボードの XP バー由来）。ホスト要素に `has-tip`＋
    `data-tip="…"` を付けるとホバー/フォーカスで pixel 風ツールチップを上側に表示する。全画面で統一。
    ホストは位置文脈（position≠static）であること（.xp-bar-wrap は relative／絶対配置の要素はそのまま可）。 */

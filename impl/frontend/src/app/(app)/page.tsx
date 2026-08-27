@@ -19,6 +19,7 @@ export default async function HomePage() {
   return (
     <DashboardView
       displayName={session.user.display_name}
+      accountId={session.account_id}
       balance={balance}
       admin={{
         systemAdmin: session.system_role === "system_admin",

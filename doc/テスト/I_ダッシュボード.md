@@ -40,3 +40,12 @@
 | I-TC-141 | int | D 横断 read＝本人下書きアイデア（全クエスト横断） | 別クエストに下書き2・公開1 | `list_draft_ideas_by_author` | 下書き2のみ（公開は除く・author=自分） | I.3 |
 | I-TC-142 | int | D 横断 read＝未投票（参加クエスト・自票なし・締切内） | 参加/非参加・投票済/未投票混在 | `list_unvoted_published_ideas` | 参加クエストの published で自票なしのみ | I.3 |
 | I-TC-143 | int | F 横断 read＝本人下書き評価（進捗 scored/5） | 下書き評価（scored 2）＋確定評価 | `list_draft_evaluations_by_evaluator` | 下書きのみ・progress scored=2/total=5 | I.3 |
+
+## ゲーム感（SC-01 ヒーローの数値演出・frontend vitest）
+
+> フロント純ロジックの単体（vitest・node）。視覚（XPバー充填・カウントアップの見た目）はブラウザ操作で受入。
+
+| TC-ID | 目的（担保する性質） | 種別 | 前提 | 操作 | 期待結果 | 根拠 |
+|---|---|---|---|---|---|---|
+| I-TC-150 | カウントアップの1フレーム値が単調・端点厳密・easeOutCubic である担保（ゲーム感） | unit | `countUpFrame(from,to,t)`（純関数） | t=0/0.5/1・範囲外 t・逆方向（減少）を与える | t≤0→from・t≥1→to（端点厳密）／t=0.5 は easeOutCubic（eased=0.875）で `round(from+(to-from)*0.875)`／0<t<1 は単調非減少／範囲外はクランプ | SC-01 ヒーロー演出 |
+| I-TC-151 | レベルアップ祝福の発火判定（誤発火防止）の担保（ゲーム感） | unit | `shouldCelebrateLevelUp(prevSeen,current)`／`nextStoredLevel`／`parseSeenLevel`（純関数） | 初回観測(null)・上昇・同値・低下・不正 raw を与える | 初回(null)は祝福しない（記録のみ）／`current>prevSeen` のみ祝福／同値・低下は祝福しない・記録は current 追随／`parseSeenLevel` は未記録/不正/1未満を null | SC-01 レベルアップ演出 |

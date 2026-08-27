@@ -8,9 +8,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { Avatar, useSnackbar } from "@/components/ui";
+import { Avatar, CountUp, useSnackbar } from "@/components/ui";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
+import { LevelUpWatcher } from "./LevelUpWatcher";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -44,10 +45,12 @@ function hrefOfDraft(d: DashboardData["drafts"][number]): string {
 
 export function DashboardView({
   displayName,
+  accountId,
   balance,
   admin,
 }: {
   displayName: string;
+  accountId: string;
   balance: Balance;
   admin: { systemAdmin: boolean; companyAdmin: boolean; qgAdmin: boolean };
 }) {
@@ -56,6 +59,9 @@ export function DashboardView({
   const [votes, setVotes] = useState<Record<string, IdeaVoteType>>({});
   const [unfollowed, setUnfollowed] = useState<Record<string, boolean>>({});
   const bonusShown = useRef(false);
+  // XP バーはマウント後に 0→現在値へ充填（CSS transition で演出・ゲーム感）。
+  const [barFilled, setBarFilled] = useState(false);
+  useEffect(() => setBarFilled(true), []);
   // チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の公開種別のみ）。
   const loadTeamFeed = useCallback((cursor?: string | null) => getTeamFeed(cursor), []);
 
@@ -114,6 +120,7 @@ export function DashboardView({
 
   return (
     <div className="dash-page stack">
+      <LevelUpWatcher accountId={accountId} level={level} />
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
       <div className="dash-top">
         <section className="pixel-panel hero" aria-label="あなたのステータス">
@@ -133,11 +140,11 @@ export function DashboardView({
               data-tip={`獲得 XP ${xpInLevel} / ${levelSpan}（累計 ${xpTotal}）`}
               aria-label={`獲得 XP ${xpInLevel} / ${levelSpan}、累計 ${xpTotal}`}
             >
-              <div className="xp-bar"><span style={{ width: `${xpPct}%` }} /></div>
+              <div className="xp-bar"><span style={{ width: `${barFilled ? xpPct : 0}%` }} /></div>
             </div>
             <div className="hero__coin">
-              <span className="pixel-stat coin">◆ {coin} コイン</span>
-              <span className="pixel-stat skill">✦ SP {sp}</span>
+              <span className="pixel-stat coin">◆ <CountUp value={coin} /> コイン</span>
+              <span className="pixel-stat skill">✦ SP <CountUp value={sp} /></span>
             </div>
           </div>
           <div className="hero__actions">
