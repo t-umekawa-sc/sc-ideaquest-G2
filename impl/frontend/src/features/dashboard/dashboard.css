@@ -164,3 +164,18 @@
   .levelup-aura, .levelup-spark { animation: none; }
   .levelup-spark { display: none; }
 }
+
+/* ── 登場アニメ（ロード時にパネル/カードが下からフェードイン・ゲーム感）───────────
+   reduce-motion では無効（既定 opacity のまま即表示）。カードはリスト内 nth-child で軽くスタッガ。 */
+@media (prefers-reduced-motion: no-preference) {
+  .dash-page .pixel-panel,
+  .dash-page .card { animation: dash-enter .32s ease-out both; }
+  .dash-page .card:nth-child(2) { animation-delay: .05s; }
+  .dash-page .card:nth-child(3) { animation-delay: .10s; }
+  .dash-page .card:nth-child(4) { animation-delay: .15s; }
+  .dash-page .card:nth-child(n+5) { animation-delay: .20s; }
+}
+@keyframes dash-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
