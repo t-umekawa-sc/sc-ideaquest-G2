@@ -1,5 +1,5 @@
 /* SC-24 アイデアチャット（features/chat）＝mocks/SC-24_アイデアチャット.html 準拠。
-   共通クラス（.avatar/.badge/.btn/.card/.reaction*/.spell-fx*/.rarity-rare）は design-system.css。
+   共通クラス（.avatar/.badge/.btn/.card/.reaction*・.spell-fx*・.rarity-rare）は design-system.css。
    ここは SC-24 固有（文脈バー・スレッド・メッセージ・コンポーザー・各ポップアップ・ライトボックス・引用）のみ。 */
 
 .chat-main { padding-block: var(--space-5) 0; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-h)); }

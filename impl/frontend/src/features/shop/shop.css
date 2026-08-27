@@ -1,6 +1,6 @@
 /* SC-30 ショップ（features/shop・ゲーム層）＝mocks/SC-30_ショップ.html 準拠。
    コイン残高ヒーローは CRTガラス（.pixel-panel）、装備一覧は可読性優先のクリーンカード＋ゲーム要素（レアリティ色・.btn-pixel）。
-   共通クラス（.pixel-panel/.btn-pixel/.rarity-*/.badge/.card/DataTable）は design-system.css。ここは SC-30 固有のみ。 */
+   共通クラス（.pixel-panel/.btn-pixel/.rarity-*・.badge/.card/DataTable）は design-system.css。ここは SC-30 固有のみ。 */
 
 .shop-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
 
