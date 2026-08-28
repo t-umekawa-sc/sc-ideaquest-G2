@@ -9,7 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { Avatar } from "@/components/ui";
+import { Avatar, CountUp } from "@/components/ui";
 
 type Props = {
   user: { display_name: string; avatar_url?: string | null };
@@ -79,7 +79,8 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
             <>
               <span className="pixel-stat level">Lv.{balance.level}</span>
               <Link className="pixel-stat coin" href="/shop" title="コイン残高（ショップへ）" data-bump={coinPulse ? "true" : undefined}>
-                ◆ {balance.coin}
+                {/* GF-AC-061: 残高変化時に数値がぐるぐる（前値→新値へ補間・減少も可）。書式は現状維持（カンマ無し）。 */}
+                ◆ <CountUp value={balance.coin} format={(n) => `${n}`} />
               </Link>
               <Link className="pixel-stat skill" href="/spells" title="スキルポイント（魔法/スキル画面へ）">
                 ✦ SP {balance.sp}
@@ -122,7 +123,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               {balance && (
                 <li className="usermenu__m usermenu__status" role="none">
                   <span className="pixel-stat level">Lv.{balance.level}</span>
-                  <span className="pixel-stat coin" data-bump={coinPulse ? "true" : undefined}>◆ {balance.coin}</span>
+                  <span className="pixel-stat coin" data-bump={coinPulse ? "true" : undefined}>◆ <CountUp value={balance.coin} format={(n) => `${n}`} /></span>
                   <span className="pixel-stat skill">✦ SP {balance.sp}</span>
                 </li>
               )}
