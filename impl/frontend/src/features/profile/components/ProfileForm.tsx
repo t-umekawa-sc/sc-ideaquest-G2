@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { deleteAvatarImage, getMe, setAvatarImage, updateMe } from "../api";
 import type { MeProfile } from "../types";
@@ -28,6 +28,7 @@ const ROLE_LABEL: Record<string, string> = {
 // 本コンポーネントは identity（読取）＋プロフィール編集（表示名/言語/アイコン）を担う。
 export function ProfileForm({ companyCode }: { companyCode: string }) {
   const router = useRouter();
+  const snack = useSnackbar(); // 更新成功は他の更新系と同じ共通トースト（SnackbarProvider・(app) レイアウト）
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -35,7 +36,6 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [animOff, setAnimOff] = useState(false); // アニメ演出を抑制（accounts.reduce_motion・§4.9）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   // プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO 署名URL）。
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [iconBusy, setIconBusy] = useState(false);
@@ -62,7 +62,6 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSaved(false);
     setSaving(true);
     try {
       const updated = await updateMe({ display_name: displayName, locale, reduce_motion: animOff });
@@ -70,7 +69,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
         setProfile(updated);
         setDisplayName(updated.profile.display_name);
       }
-      setSaved(true);
+      snack({ type: "success", title: "プロフィールを更新しました" }); // 他の更新系と同じ通知
       router.refresh(); // 共通ヘッダーの表示名を更新（次のセッション読取で反映）
     } catch (err) {
       setError(err instanceof ApiError && err.code === "validation_error" ? "入力内容をご確認ください。" : "保存に失敗しました。");
@@ -144,7 +143,6 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
       <div className="section-head"><h2>プロフィール編集</h2></div>
       <section className="card" aria-label="プロフィール編集">
         {error && <div className="form-error" role="alert">{error}</div>}
-        {saved && <p className="admin-muted" role="status">保存しました。</p>}
 
         <div className="setting-row">
           <div className="setting-row__info">
