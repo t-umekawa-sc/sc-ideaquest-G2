@@ -18,7 +18,7 @@ import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggreg
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
-import { isVotingClosed, todayISODate } from "../voting";
+import { isVotingClosed, todayISODate, votePercents } from "../voting";
 import { IdeaForm } from "./IdeaForm";
 import { RevisionHistory } from "./RevisionHistory";
 import "../ideas.css";
@@ -78,6 +78,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [selected, setSelected] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
   const [celebrateSelect, setCelebrateSelect] = useState(false); // #16: 選定成立の祝福オーバーレイ
+  const [voteBarReady, setVoteBarReady] = useState(false); // #23: 賛否バーをマウント後に 0→比率へ伸ばす
+  useEffect(() => setVoteBarReady(true), []);
   // チャット（E）＝活発度集計＋直近プレビュー（SC-22 §4.4）。
   const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null);
   const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]);
@@ -240,6 +242,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   // 投票集計/自分の投票/フォローはローカル state（楽観更新・load 時に DTO から同期）。
   const agreeN = vote.approve;
   const disagreeN = vote.oppose;
+  const votePct = votePercents(agreeN, disagreeN); // #23: 賛否バーの比率
   const myVote = vote.my === "approve" ? "agree" : vote.my === "oppose" ? "disagree" : null;
   const [stLabel, stClass] = statusLabel(idea.status, selected);
   // クエスト凍結（completed）＝投票不可・新規フォロー不可（解除のみ可）。サーバー 409 も権威（C.5）。
@@ -465,6 +468,13 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className="vote-agree">▲ 賛成 {agreeN}</span>
               <span className="vote-disagree">▼ 反対 {disagreeN}</span>
             </div>
+            {/* #23: 賛否の比率バー（伸びるアニメ・total 0 は非表示）。数値は上、割合は一目で。 */}
+            {votePct.total > 0 && (
+              <div className="vote-bar" role="img" aria-label={`賛成 ${votePct.approve}% ・ 反対 ${votePct.oppose}%`}>
+                <span className="vote-bar__agree" style={{ width: `${voteBarReady ? votePct.approve : 0}%` }} />
+                <span className="vote-bar__disagree" style={{ width: `${voteBarReady ? votePct.oppose : 0}%` }} />
+              </div>
+            )}
             <div className="vote-btns">
               {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。completed/締切後は事前無効化＋サーバー権威（権限なしは 403→理由トースト）。 */}
               <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={() => void handleVote("approve")}>

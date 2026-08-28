@@ -2,7 +2,7 @@
 // 設計＝doc/API設計/D_アイデア・添付・版・投票・フォロー.md D.5（締切後は 409）・SC-22。
 import { describe, expect, it } from "vitest";
 
-import { isVotingClosed, todayISODate } from "./voting";
+import { isVotingClosed, todayISODate, votePercents } from "./voting";
 
 const TODAY = "2026-08-27";
 
@@ -28,5 +28,23 @@ describe("isVotingClosed（D.5 事前無効化＝サーバー _guard_votable と
 describe("todayISODate", () => {
   it("Date を YYYY-MM-DD で返す", () => {
     expect(todayISODate(new Date("2026-08-27T09:00:00Z"))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("votePercents（D-TC-220・#23 賛否バーの比率）", () => {
+  it("合計0は両0（total 0）", () => {
+    expect(votePercents(0, 0)).toEqual({ approve: 0, oppose: 0, total: 0 });
+  });
+  it("approve%=round(a/total*100)・oppose%=100-approve%（合計常に100）", () => {
+    expect(votePercents(3, 1)).toEqual({ approve: 75, oppose: 25, total: 4 });
+    expect(votePercents(1, 1)).toEqual({ approve: 50, oppose: 50, total: 2 });
+    expect(votePercents(1, 2)).toEqual({ approve: 33, oppose: 67, total: 3 });
+    expect(votePercents(2, 1)).toEqual({ approve: 67, oppose: 33, total: 3 });
+    expect(votePercents(5, 0)).toEqual({ approve: 100, oppose: 0, total: 5 });
+  });
+  it("負値・NaN は 0 クランプ・小数は floor", () => {
+    expect(votePercents(-3, 1)).toEqual({ approve: 0, oppose: 100, total: 1 });
+    expect(votePercents(Number.NaN, 2)).toEqual({ approve: 0, oppose: 100, total: 2 });
+    expect(votePercents(2.9, 1.9)).toEqual({ approve: 67, oppose: 33, total: 3 });
   });
 });

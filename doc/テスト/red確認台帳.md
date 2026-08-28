@@ -673,3 +673,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（levelTitle.ts 未作成 actual） |
 | --- | --- |
 | I-TC-153 | テスト（`src/features/dashboard/levelTitle.test.ts`）を先行作成し vitest＝`Failed to load url ./levelTitle`（モジュール未存在で 0 test・suite fail）で red。`levelTitle.ts`（しきい値 70/50/35/20/10/5/1 を高い順に判定・0/負/NaN/小数は max(1,floor)）を実装して 4 passed で green（全体 60 passed）。src 単体は TC 走査対象外＝追跡は `I_ダッシュボード.md` I-TC-153 |
+
+## ゲーム感 #23. 投票結果の賛否バー frontend 単体（D-TC-220・2026-08-28）
+
+> SC-22 の賛否比率バーの純ロジック＝`impl/frontend/src/features/ideas/voting.ts`（`votePercents`）。視覚＝`IdeaDetailView` の `.vote-bar`（伸びるアニメ・GF-AC-230..232）。
+
+| TC-ID | 観測 red（votePercents 未実装 actual） |
+| --- | --- |
+| D-TC-220 | 既存 `voting.test.ts` に votePercents ケースを追加＝`votePercents` が未 export で 3 件 red（実測 3 failed / 6 passed）。実装（合計0は両0／approve%=round・oppose%=100-approve%／負・NaN は0・小数 floor）で 9 passed green（全体 63 passed）。src 単体は TC 走査対象外＝追跡は `D_アイデア.md` D-TC-220 |

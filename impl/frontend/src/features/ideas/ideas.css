@@ -206,3 +206,11 @@
   .select-celebrate, .select-celebrate__card, .select-celebrate__aura, .select-celebrate__spark { animation: none; }
   .select-celebrate__spark { display: none; }
 }
+
+/* ── ゲーム感 #23: 投票結果の賛否バー（SC-22・純CSS）───────────────────────────────
+   賛成(緑)/反対(赤)の比率を伸びるバーで可視化。マウント時 0→比率、投票変更で滑らかに伸縮。reduce-motion で即時。 */
+.vote-bar { display: flex; height: 10px; margin-top: var(--space-2); border-radius: 99px; overflow: hidden; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
+.vote-bar__agree { background: var(--color-agree); }
+.vote-bar__disagree { background: var(--color-disagree); }
+.vote-bar__agree, .vote-bar__disagree { height: 100%; transition: width .6s cubic-bezier(.22,1,.36,1); }
+@media (prefers-reduced-motion: reduce) { .vote-bar__agree, .vote-bar__disagree { transition: none; } }

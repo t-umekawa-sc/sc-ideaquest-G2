@@ -19,3 +19,14 @@ export function isVotingClosed(
 export function todayISODate(now: Date = new Date()): string {
   return now.toLocaleDateString("sv-SE");
 }
+
+// 賛否バー用の比率（%・#23 投票結果の可視化・SC-22/SC-12）。合計0は両0。
+// approve% を四捨五入し、oppose% は 100-approve% で丸め誤差を吸収（合計は常に 100）。負値/NaN は 0、小数は floor。
+export function votePercents(approve: number, oppose: number): { approve: number; oppose: number; total: number } {
+  const a = Math.max(0, Math.floor(approve) || 0);
+  const o = Math.max(0, Math.floor(oppose) || 0);
+  const total = a + o;
+  if (total === 0) return { approve: 0, oppose: 0, total: 0 };
+  const approvePct = Math.round((a / total) * 100);
+  return { approve: approvePct, oppose: 100 - approvePct, total };
+}

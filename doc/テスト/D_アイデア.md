@@ -119,3 +119,4 @@
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | D-TC-219 | unit | 投票の事前無効化がサーバー `_guard_votable` と一致 | `quest.status`/`quest.deadline`・今日 | `isVotingClosed(quest, todayISO)` | 締切前/締切当日＝可（`closed:false`）／締切翌日以降＝`deadline` で不可／`completed`＝`completed` で不可（優先）／`deadline` 未設定＝締切無効化なし | D.5／SC-22 |
+| D-TC-220 | unit | 賛否バーの比率（%）計算（#23 投票結果の可視化） | `approve`/`oppose` 票数 | `votePercents(approve, oppose)` | 合計0は両0（total 0）／approve% は `round(a/total*100)`・oppose% は `100-approve%`（丸め誤差を吸収して合計常に100）／負値・NaN は 0 クランプ・小数は floor | D.5／SC-22/SC-12 |
