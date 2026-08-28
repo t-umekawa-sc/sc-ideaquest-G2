@@ -689,3 +689,4 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（deadline.ts 未作成 actual） |
 | --- | --- |
 | C-TC-210 | テスト（`src/lib/deadline.test.ts`）を先行作成し vitest＝`Failed to load url ./deadline`（モジュール未存在で 0 test・suite fail）で red。実装（none/over/urgent(≤2)/soon(≤7)/safe・UTC 深夜固定の暦日差／countdown ""/締切超過/今日締切/残りN日）で 6 passed green（全体 69 passed）。src 単体は TC 走査対象外＝追跡は `C_クエスト.md` C-TC-210 |
+| I-TC-154 | テスト（`src/lib/greeting.test.ts`）を先行作成し vitest＝`Test Files 1 failed / Tests no tests`（`./greeting` 未存在で suite fail）で red。実装（朝5-10/昼11-17/夜18-4・0..23正規化・NaN=正午）で 5 passed green（全体 74 passed）。src 単体は TC 走査対象外＝追跡は `I_ダッシュボード.md` I-TC-154 |
