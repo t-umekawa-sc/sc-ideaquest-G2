@@ -22,6 +22,22 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // ゲーム感 #7: コイン残高が変化したら残高チップを一瞬パルスさせる（純視覚・データ属性駆動）。
+  // 前回値は ref で保持し、初回描画（prev=undefined）は発火しない＝誤発火防止。CSS は .pixel-stat.coin[data-bump]。
+  const coin = balance?.coin;
+  const prevCoin = useRef<number | undefined>(undefined);
+  const [coinPulse, setCoinPulse] = useState(false);
+  useEffect(() => {
+    if (coin === undefined) return;
+    if (prevCoin.current !== undefined && coin !== prevCoin.current) {
+      prevCoin.current = coin;
+      setCoinPulse(true);
+      const t = setTimeout(() => setCoinPulse(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevCoin.current = coin;
+  }, [coin]);
+
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
@@ -48,7 +64,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
           {balance && (
             <>
               <span className="pixel-stat level">Lv.{balance.level}</span>
-              <Link className="pixel-stat coin" href="/shop" title="コイン残高（ショップへ）">
+              <Link className="pixel-stat coin" href="/shop" title="コイン残高（ショップへ）" data-bump={coinPulse ? "true" : undefined}>
                 ◆ {balance.coin}
               </Link>
               <Link className="pixel-stat skill" href="/spells" title="スキルポイント（魔法/スキル画面へ）">
@@ -56,8 +72,8 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               </Link>
             </>
           )}
-          <Link className="bell" href="/notifications" aria-label={`通知（未読${unreadCount}件）`}>
-            🔔{unreadCount > 0 && <span className="bell__badge">{unreadCount}</span>}
+          <Link className="bell" href="/notifications" aria-label={`通知（未読${unreadCount}件）`} data-has-unread={unreadCount > 0 ? "true" : undefined}>
+            <span className="bell__icon" aria-hidden>🔔</span>{unreadCount > 0 && <span className="bell__badge">{unreadCount}</span>}
           </Link>
           <div className="usermenu" ref={ref}>
             <button
@@ -84,7 +100,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               {balance && (
                 <li className="usermenu__m usermenu__status" role="none">
                   <span className="pixel-stat level">Lv.{balance.level}</span>
-                  <span className="pixel-stat coin">◆ {balance.coin}</span>
+                  <span className="pixel-stat coin" data-bump={coinPulse ? "true" : undefined}>◆ {balance.coin}</span>
                   <span className="pixel-stat skill">✦ SP {balance.sp}</span>
                 </li>
               )}

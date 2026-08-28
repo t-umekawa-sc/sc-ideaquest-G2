@@ -171,6 +171,21 @@ img { max-width: 100%; display: block; }
   font-size: 11px; font-weight: 700; line-height: 1; color: #fff;
   background: var(--color-danger); border: 2px solid var(--color-surface); border-radius: var(--radius-full);
 }
+/* ゲーム感 #7: 未読>0 のときベルの絵文字だけを周期的に軽く振る（バッジは固定）。データ属性駆動・純視覚。 */
+.bell__icon { display: inline-block; transform-origin: 50% 12%; }
+.bell[data-has-unread="true"] .bell__icon { animation: bell-wiggle 2.8s ease-in-out infinite; }
+@keyframes bell-wiggle {
+  0%, 58%, 100% { transform: rotate(0); }
+  62% { transform: rotate(-13deg); }
+  66% { transform: rotate(11deg); }
+  70% { transform: rotate(-8deg); }
+  74% { transform: rotate(5deg); }
+  78% { transform: rotate(-2deg); }
+  82% { transform: rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bell[data-has-unread="true"] .bell__icon { animation: none; }
+}
 /* アバターメニュー（クリックでドロップダウン・shared.js が開閉） */
 .usermenu { position: relative; }
 .usermenu__trigger {
@@ -956,6 +971,16 @@ body.modal-open { overflow: hidden; }
 .pixel-stat.level { color: var(--pixel-level); }
 .pixel-stat.skill { color: var(--pixel-skill); } /* スキルポイント(SP) */
 a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の下線消し */
+/* ゲーム感 #7: コイン残高が変化した瞬間だけチップをパルス（獲得/消費の手応え）。データ属性駆動・純視覚。 */
+.pixel-stat.coin[data-bump="true"] { animation: coin-bump .7s ease-out; }
+@keyframes coin-bump {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, .0); }
+  35%  { transform: scale(1.16); box-shadow: 0 0 0 4px rgba(245, 158, 11, .35); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, .0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-stat.coin[data-bump="true"] { animation: none; }
+}
 
 /* 週間ランキングパネル（ゲーム層・.pixel-panel の中で使う）
    ダッシュボードの全社ランキング／クエスト詳細のクエスト内ランキング等で共用。
