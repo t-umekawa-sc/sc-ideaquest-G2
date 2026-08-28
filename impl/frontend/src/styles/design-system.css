@@ -186,6 +186,20 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) {
   .bell[data-has-unread="true"] .bell__icon { animation: none; }
 }
+/* ゲーム感 #15: 新着通知が届いた瞬間（未読が増えた時＝realtime）にベルがポンと跳ねる（data-arrived・one-shot）。
+   赤いグローの明滅＋バッジのポップを伴う。#7 の常時わずかな揺れ（icon）とは別の一撃演出。 */
+.bell[data-arrived="true"] { animation: bell-arrive .6s cubic-bezier(.2,1.4,.4,1); }
+.bell[data-arrived="true"] .bell__badge { animation: bell-badge-pop .6s ease; }
+@keyframes bell-arrive {
+  0%   { transform: translateY(0) scale(1);      box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  35%  { transform: translateY(-4px) scale(1.18); box-shadow: 0 0 0 6px rgba(239,68,68,.28); }
+  60%  { transform: translateY(0) scale(.96);     box-shadow: 0 0 0 2px rgba(239,68,68,.14); }
+  100% { transform: translateY(0) scale(1);       box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+@keyframes bell-badge-pop { 0% { transform: scale(1); } 40% { transform: scale(1.55); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .bell[data-arrived="true"], .bell[data-arrived="true"] .bell__badge { animation: none; }
+}
 /* アバターメニュー（クリックでドロップダウン・shared.js が開閉） */
 .usermenu { position: relative; }
 .usermenu__trigger {

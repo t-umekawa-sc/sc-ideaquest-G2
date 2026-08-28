@@ -38,6 +38,20 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
     prevCoin.current = coin;
   }, [coin]);
 
+  // ゲーム感 #15: 新着通知が届いた瞬間（未読が「増えた」時＝realtime）にベルをポンと跳ねさせる。
+  // 前回値は ref で保持し初回描画は発火しない。増加時のみ（既読で減った時は出さない）。CSS は .bell[data-arrived]。
+  const prevUnread = useRef<number | undefined>(undefined);
+  const [bellPulse, setBellPulse] = useState(false);
+  useEffect(() => {
+    if (prevUnread.current !== undefined && unreadCount > prevUnread.current) {
+      prevUnread.current = unreadCount;
+      setBellPulse(true);
+      const t = setTimeout(() => setBellPulse(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevUnread.current = unreadCount;
+  }, [unreadCount]);
+
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
@@ -72,7 +86,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               </Link>
             </>
           )}
-          <Link className="bell" href="/notifications" aria-label={`通知（未読${unreadCount}件）`} data-has-unread={unreadCount > 0 ? "true" : undefined}>
+          <Link className="bell" href="/notifications" aria-label={`通知（未読${unreadCount}件）`} data-has-unread={unreadCount > 0 ? "true" : undefined} data-arrived={bellPulse ? "true" : undefined}>
             <span className="bell__icon" aria-hidden>🔔</span>{unreadCount > 0 && <span className="bell__badge">{unreadCount}</span>}
           </Link>
           <div className="usermenu" ref={ref}>
