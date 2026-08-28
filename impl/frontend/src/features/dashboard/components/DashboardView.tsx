@@ -18,6 +18,7 @@ import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
 import { reduceMotion } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
+import { greetingFor } from "@/lib/greeting";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -68,6 +69,12 @@ export function DashboardView({
   // XP バーはマウント後に 0→現在値へ充填（CSS transition で演出・ゲーム感）。
   const [barFilled, setBarFilled] = useState(false);
   useEffect(() => setBarFilled(true), []);
+  // #31: 時間帯の挨拶（E 時間/環境）。SSR/クライアントの時刻差でのハイドレーション不一致を避けるため mount 後に算出。
+  const [greet, setGreet] = useState<{ text: string; date: string } | null>(null);
+  useEffect(() => {
+    const d = new Date();
+    setGreet({ text: greetingFor(d.getHours()), date: d.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" }) });
+  }, []);
   // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const burstId = useRef(0);
@@ -163,6 +170,8 @@ export function DashboardView({
       <LevelUpWatcher accountId={accountId} level={level} />
       {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
       {xpFloats.map((f) => <XpFloat key={f.id} x={f.x} y={f.y} label={f.label} />)}
+      {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
+      {greet && <div className="dash-greeting">{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</div>}
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
       <div className="dash-top">
         <section className="pixel-panel hero" aria-label="あなたのステータス">
