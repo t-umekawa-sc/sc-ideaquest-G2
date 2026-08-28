@@ -1788,3 +1788,16 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .lvring[data-near="true"] { animation: lvring-pulse 1.4s ease-in-out infinite; }
 @keyframes lvring-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); } 50% { box-shadow: 0 0 8px 2px var(--pixel-xp); } }
 @media (prefers-reduced-motion: reduce) { .lvring[data-near="true"] { animation: none; } }
+
+/* ── ゲーム感 #13/#30: ランキング演出の共通キーフレーム（SC-41 フル＋SC-01 ミニ）───────────
+   メダルのきらめき／自分の行の登場ハイライト。適用側の selector は各 feature CSS（.rank-panel.full＝#13／
+   .dash-page .rank-panel＝#30）。 */
+@keyframes rank-medal-shine {
+  0%, 70%, 100% { transform: scale(1); filter: brightness(1); }
+  78% { transform: scale(1.22) rotate(-6deg); filter: brightness(1.5) drop-shadow(0 0 5px rgba(251,191,36,.8)); }
+  86% { transform: scale(1.1) rotate(4deg); filter: brightness(1.2); }
+}
+@keyframes rank-me-row {
+  0% { background: rgba(59,130,246,.28); }
+  100% { background: var(--color-primary-soft, rgba(59,130,246,.10)); }
+}

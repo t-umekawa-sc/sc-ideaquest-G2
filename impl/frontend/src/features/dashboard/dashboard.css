@@ -247,3 +247,12 @@
   background: color-mix(in srgb, var(--aura) 15%, transparent);
 }
 @media (prefers-reduced-motion: reduce) { .dash-page .hero__avatar[data-tier]::after { animation: none; } }
+
+/* ── ゲーム感 #30: ミニ週間ランキングの演出（SC-01・#13 をダッシュボードのミニ版に）─────────
+   メダルのきらめき＋自分の行の登場ハイライト（keyframe は design-system.css で SC-41 と共用）。reduce-motion 尊重。 */
+.dash-page .rank-panel .rank-list li .rank-medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; }
+.dash-page .rank-panel .rank-list li.is-me { animation: rank-me-row .7s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-page .rank-panel .rank-list li .rank-medal,
+  .dash-page .rank-panel .rank-list li.is-me { animation: none; }
+}
