@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/ui";
 import { realtime } from "@/lib/realtime";
 
 import { getNotifications, markAllRead, markRead, markUnread, type NotificationDTO } from "../api";
@@ -218,7 +219,7 @@ export function NotificationsView() {
       {loading ? (
         <p className="admin-muted">読み込み中…</p>
       ) : rows.length === 0 ? (
-        <div className="list-empty">該当する通知はありません。</div>
+        <EmptyState icon="🔔" title="該当する通知はありません" />
       ) : (
         GROUP_ORDER.map((g) => {
           const items = rows.filter((n) => groupOf(n.created_at) === g);

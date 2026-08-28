@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, Avatar, CountUp } from "@/components/ui";
+import { EmptyState, Spinner, Avatar, CountUp } from "@/components/ui";
 
 import { getRankings, type RankingMe, type RankingPeriod } from "../api";
 import "../ranking.css";
@@ -116,7 +116,7 @@ export function RankingView() {
         );
       })()}
       {loading && <Spinner label="読み込み中…" />}
-      {!loading && list.length === 0 && <p className="role-note">この期間のランキングデータがありません。</p>}
+      {!loading && list.length === 0 && <EmptyState icon="📊" title="この期間のランキングデータがありません" />}
 
       {/* ランキング本体（ゲーム層・CRTガラス） */}
       <section className="pixel-panel rank-panel full" aria-label="ランキング">

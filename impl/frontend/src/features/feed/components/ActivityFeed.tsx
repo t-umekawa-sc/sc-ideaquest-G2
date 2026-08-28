@@ -6,7 +6,7 @@
 // （チーム時）クエスト名＋相対時刻。カーソル「もっと見る」。
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar } from "@/components/ui";
+import { EmptyState, Avatar } from "@/components/ui";
 
 import type { FeedActivity } from "../api";
 import "../feed.css";
@@ -78,7 +78,7 @@ export function ActivityFeed({
     <div className="feed">
       <h3 className="feed__title">{title}</h3>
       {ready && items.length === 0 ? (
-        <p className="feed__empty">{emptyText}</p>
+        <EmptyState icon="📣" title={emptyText} />
       ) : (
         <ul className="feed__list">
           {items.map((a) => (

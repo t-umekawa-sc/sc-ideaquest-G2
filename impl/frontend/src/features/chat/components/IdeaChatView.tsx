@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
+import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -359,7 +359,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
 
       {/* スレッド */}
       <div className="chat-thread" id="thread">
-        {messages.length === 0 && <p className="role-note" style={{ textAlign: "center" }}>まだコメントはありません。最初のコメントを投稿しましょう。</p>}
+        {messages.length === 0 && <EmptyState icon="💬" title="まだコメントはありません" hint="最初のコメントを投稿しましょう。" />}
         {messages.map((m) => {
           const day = fmtDay(m.created_at);
           const showDay = day !== lastDay;

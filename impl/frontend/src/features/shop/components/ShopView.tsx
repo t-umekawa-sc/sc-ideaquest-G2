@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { EmptyState, Spinner, CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
@@ -208,7 +208,7 @@ export function ShopView() {
           defaultView="card"
           searchFields="装備名"
           exportName="ショップ装備"
-          emptyText="条件に合う装備がありません。絞り込みを見直してください。"
+          emptyText={<EmptyState icon="🛒" title="条件に合う装備がありません" hint="絞り込みを見直してください。" />}
           cardRaw={cardRaw}
         />
       </div>

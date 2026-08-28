@@ -1712,3 +1712,16 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .spell-cast--aura .spell-cast__ring { animation-duration: 1.05s; }  /* オーラ＝リングを主役に長め */
 
 @media (prefers-reduced-motion: reduce) { .spell-cast { display: none; } }
+
+/* ── ゲーム感 #19: 空状態の演出（EmptyState・共通）───────────────────────────────────
+   マスコット/絵文字＋一言で空の寂しさを解消。アイコンはゆるく上下に揺れる（mascot-bob 再利用）。
+   reduce-motion で静止。情報は title/hint に残る（純視覚）。 */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2); text-align: center;
+  padding: var(--space-8) var(--space-4); color: var(--color-text-muted);
+}
+.empty-state__icon { font-size: 44px; line-height: 1; animation: mascot-bob 1.8s ease-in-out infinite; filter: drop-shadow(0 4px 4px rgba(15,23,42,.18)); }
+.empty-state__title { font-weight: 700; color: var(--color-text); font-size: var(--text-base); }
+.empty-state__hint { font-size: var(--text-sm); color: var(--color-text-muted); }
+@media (prefers-reduced-motion: reduce) { .empty-state__icon { animation: none; } }

@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { Spinner, DataTable } from "@/components/ui";
+import { EmptyState, Spinner, DataTable } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 
 import { getAchievements } from "../api";
@@ -176,7 +176,7 @@ export function AchievementsView({ accountId }: { accountId: string }) {
           defaultView="card"
           searchFields="実績名"
           exportName="実績バッジ"
-          emptyText="条件に合う実績がありません。"
+          emptyText={<EmptyState icon="🏆" title="条件に合う実績がありません" hint="絞り込みを見直してください。" />}
           cardRaw={(a) => <AchCard a={a} />}
         />
       </div>

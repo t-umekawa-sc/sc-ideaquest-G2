@@ -3,6 +3,7 @@ export { Avatar } from "./Avatar";
 export { Button } from "./Button";
 export { CountUp } from "./CountUp";
 export { SpellCastFx, type CastRect } from "./SpellCastFx";
+export { EmptyState } from "./EmptyState";
 export { Card, CardTitle } from "./Card";
 export { DataTable } from "./DataTable";
 export type {
