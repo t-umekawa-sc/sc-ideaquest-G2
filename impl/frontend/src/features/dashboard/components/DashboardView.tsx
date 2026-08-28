@@ -10,12 +10,10 @@ import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-import { Avatar, CountUp, useSnackbar } from "@/components/ui";
+import { Avatar, CountUp, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { LevelUpWatcher } from "./LevelUpWatcher";
-import { SparkBurst } from "./SparkBurst";
-import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
 import { reduceMotion, isMotionReduced } from "@/lib/motion";

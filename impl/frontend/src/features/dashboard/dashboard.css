@@ -193,41 +193,9 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* ── クイック投票の押下バースト（ゲーム感・SparkBurst）──────────────────────
-   クリック位置に固定表示。6方向へ火花が飛んで ~0.6s で消える。reduce-motion 時は親が生成しない。 */
-.spark-burst { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); }
-.spark-burst .spark {
-  position: absolute; left: 0; top: 0; font-size: .8rem; color: var(--pixel-skill, #f59e0b);
-  opacity: 0; will-change: transform, opacity; animation: spark-fly .6s ease-out forwards;
-}
-.spark-burst .spark--0 { --dx:   0px; --dy: -24px; }
-.spark-burst .spark--1 { --dx:  22px; --dy: -12px; }
-.spark-burst .spark--2 { --dx:  20px; --dy:  14px; }
-.spark-burst .spark--3 { --dx:   0px; --dy:  24px; }
-.spark-burst .spark--4 { --dx: -20px; --dy:  14px; }
-.spark-burst .spark--5 { --dx: -22px; --dy: -12px; }
-@keyframes spark-fly {
-  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
-  20%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.15); }
-}
-@media (prefers-reduced-motion: reduce) { .spark-burst { display: none; } }
-
-/* ── ゲーム感 #8: 投票の獲得フィードバック（+N XP フロート＋ヒーロー XP バー連動）─────────
-   段階ハイブリッド step1（backend 変更ゼロ・xp_awarded ゲート）。純視覚・reduce-motion 尊重。
-   純ロジック＝xpAward.ts（I-TC-152）。 */
-.xp-float { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); will-change: transform, opacity; }
-.xp-float__txt {
-  display: inline-block; font-family: var(--font-pixel); font-weight: 800;
-  font-size: var(--text-lg); color: var(--pixel-xp); white-space: nowrap;
-  text-shadow: 0 2px 0 rgba(2, 6, 23, .35), 0 0 6px rgba(59, 130, 246, .5);
-  animation: xp-float-rise 1.05s ease-out forwards;
-}
-@keyframes xp-float-rise {
-  0%   { transform: translateY(0) scale(.8);   opacity: 0; }
-  20%  { transform: translateY(-6px) scale(1.1); opacity: 1; }
-  100% { transform: translateY(-46px) scale(1);  opacity: 0; }
-}
+/* ── ゲーム感 #8: 投票の獲得フィードバック（ヒーロー XP バー連動・ダッシュボード固有）─────────
+   火花バースト（.spark-burst）と +N XP フロート（.xp-float）は横断利用（SC-01/SC-22 等）のため
+   design-system.css へ移設。ここはヒーロー XP バーの one-shot グロー（dash 固有）のみ残す。 */
 /* 付与時にヒーロー XP バーが一瞬グロー（awardKey 再マウントで one-shot 再生・充填幅内に収まる） */
 .dash-page .hero .xp-bar { position: relative; }
 .xp-bar__pulse {
@@ -236,10 +204,7 @@
   animation: xp-bar-pulse .7s ease-out forwards;
 }
 @keyframes xp-bar-pulse { 0% { opacity: 0; } 25% { opacity: .85; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .xp-float { display: none; }
-  .xp-bar__pulse { display: none; }
-}
+@media (prefers-reduced-motion: reduce) { .xp-bar__pulse { display: none; } }
 
 /* ── ゲーム感 #21: レベル称号＆オーラ（SC-01 ヒーロー・純CSS）───────────────────────────
    レベル帯（levelTitle.levelRank）でヒーローに色オーラ＋称号チップ。tier→色は --aura。reduce-motion で静止。 */

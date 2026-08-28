@@ -8,9 +8,10 @@
 // チャット（E・§4.4）も実接続＝議論アクティビティ（chat-activity）＋直近3件プレビュー（getChat）。
 // 投票の事前無効化＝completed 凍結＋締切後（quest.deadline < 今日・D.5 の isVotingClosed でサーバー _guard_votable と一致）。最終権威はサーバー 409。
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
@@ -63,6 +64,25 @@ const ASPECT_LABELS: [string, string][] = [
 
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const snack = useSnackbar();
+  const router = useRouter();
+  // 投票の押下フィードバック（ダッシュボードと共通）＝クリック位置の火花＋「+N XP」フロート。
+  // 座標固定オーバーレイ（要素非依存）・reduce-motion 時は生成しない。CSS＝design-system.css。
+  const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const burstId = useRef(0);
+  const fireBurst = useCallback((e: { clientX: number; clientY: number }) => {
+    if (reduceMotion()) return;
+    const id = ++burstId.current;
+    setBursts((b) => [...b, { id, x: e.clientX, y: e.clientY }]);
+    setTimeout(() => setBursts((b) => b.filter((z) => z.id !== id)), 650);
+  }, []);
+  const [xpFloats, setXpFloats] = useState<{ id: number; x: number; y: number; label: string }[]>([]);
+  const xpFloatId = useRef(0);
+  const fireXpFloat = useCallback((e: { clientX: number; clientY: number }, label: string) => {
+    if (reduceMotion()) return;
+    const id = ++xpFloatId.current;
+    setXpFloats((f) => [...f, { id, x: e.clientX, y: e.clientY, label }]);
+    setTimeout(() => setXpFloats((f) => f.filter((z) => z.id !== id)), 1100);
+  }, []);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
@@ -120,15 +140,18 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   useEffect(() => { void load(); }, [load]);
 
   // 投票（賛成/反対の登録・切替・同ボタン再クリックで取消）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
-  const handleVote = useCallback(async (type: IdeaVoteType) => {
+  const handleVote = useCallback(async (type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (voteBusy) return;
     const prev = vote;
+    const isCancel = prev.my === type;
+    if (!isCancel && e) fireBurst(e); // 新規/切替の押下バースト（成否に関わらず即時・ダッシュボードと共通）
     setVoteBusy(true);
     try {
-      if (prev.my === type) {
+      if (isCancel) {
         // 同じ選択肢を再クリック＝取消（票が無くなるので stale は解消）。
         setVote((s) => ({ ...s, [type]: Math.max(0, s[type] - 1), my: null, stale: false }));
         await removeVote(ideaId);
+        snack({ type: "info", msg: "投票を取り消しました。" });
       } else {
         // 新規 or 切替（1人1票・前の票を減算）。押し直し＝現版で投票し直す＝stale 解消（voted_revision 更新）。
         setVote((s) => ({
@@ -140,6 +163,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
         const res = await voteIdea(ideaId, type);
         // サーバー集計を権威に反映（匿名化・整合）。投票し直したので stale は false。
         if (res) setVote({ approve: res.summary.approve, oppose: res.summary.oppose, my: (res.my_vote as IdeaVoteType | null) ?? null, stale: false });
+        snack({ type: "success", title: "投票しました" }); // 更新系と同じ成功トースト
+        // #8: server が付与した XP（xp_delta＝初回/日次上限内なら +5）だけ「+N XP」フロート（ダッシュボードと共通）。
+        if (res && res.xp_delta > 0 && e) fireXpFloat(e, `+${res.xp_delta} XP`);
+        router.refresh(); // ヘッダーのレベルリング/コイン等（getServerMe 由来）を更新
       }
     } catch (err) {
       setVote(prev); // ロールバック
@@ -156,7 +183,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     } finally {
       setVoteBusy(false);
     }
-  }, [ideaId, vote, voteBusy, snack]);
+  }, [ideaId, vote, voteBusy, snack, router, fireBurst, fireXpFloat]);
 
   // 添付ダウンロード＝権限検証後の署名URL を取得して新規タブで開く（D.3・§1.10）。
   const handleDownload = useCallback(async (attachmentId: string) => {
@@ -268,6 +295,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
   return (
     <main className="container detail-main">
+      {/* 投票の押下フィードバック（火花＋「+N XP」・ダッシュボードと共通・reduce-motion 時は生成しない） */}
+      {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
+      {xpFloats.map((f) => <XpFloat key={f.id} x={f.x} y={f.y} label={f.label} />)}
       {/* #16: 選定成立の祝福（中央オーバーレイ・~2.8s 自動消滅・クリックで即閉じ・reduce-motion 時は非表示） */}
       {celebrateSelect && (
         <div className="select-celebrate" role="status" aria-live="polite" onClick={() => setCelebrateSelect(false)}>
@@ -477,10 +507,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             )}
             <div className="vote-btns">
               {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。completed/締切後は事前無効化＋サーバー権威（権限なしは 403→理由トースト）。 */}
-              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={() => void handleVote("approve")}>
+              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("approve", e)}>
                 ▲ 賛成
               </button>
-              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteDisabled} title={voteCloseTitle} onClick={() => void handleVote("oppose")}>
+              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("oppose", e)}>
                 ▼ 反対
               </button>
             </div>

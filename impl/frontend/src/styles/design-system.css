@@ -1801,3 +1801,39 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   0% { background: rgba(59,130,246,.28); }
   100% { background: var(--color-primary-soft, rgba(59,130,246,.10)); }
 }
+
+/* ── 投票の押下フィードバック（横断・SparkBurst / XpFloat）─────────────────────
+   クリック位置に固定表示する火花バーストと「+N XP」フロート。SC-01（ダッシュボードのクイック投票）と
+   SC-22（アイデア詳細の投票）で共用。生成/破棄は各画面が管理（reduce-motion 時は親が生成しない＋下記で表示無効）。
+   ※ ヒーロー XP バーの one-shot グローはダッシュボード固有＝dashboard.css。 */
+.spark-burst { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); }
+.spark-burst .spark {
+  position: absolute; left: 0; top: 0; font-size: .8rem; color: var(--pixel-skill, #f59e0b);
+  opacity: 0; will-change: transform, opacity; animation: spark-fly .6s ease-out forwards;
+}
+.spark-burst .spark--0 { --dx:   0px; --dy: -24px; }
+.spark-burst .spark--1 { --dx:  22px; --dy: -12px; }
+.spark-burst .spark--2 { --dx:  20px; --dy:  14px; }
+.spark-burst .spark--3 { --dx:   0px; --dy:  24px; }
+.spark-burst .spark--4 { --dx: -20px; --dy:  14px; }
+.spark-burst .spark--5 { --dx: -22px; --dy: -12px; }
+@keyframes spark-fly {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) { .spark-burst { display: none; } }
+
+.xp-float { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); will-change: transform, opacity; }
+.xp-float__txt {
+  display: inline-block; font-family: var(--font-pixel); font-weight: 800;
+  font-size: var(--text-lg); color: var(--pixel-xp); white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(2, 6, 23, .35), 0 0 6px rgba(59, 130, 246, .5);
+  animation: xp-float-rise 1.05s ease-out forwards;
+}
+@keyframes xp-float-rise {
+  0%   { transform: translateY(0) scale(.8);   opacity: 0; }
+  20%  { transform: translateY(-6px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(-46px) scale(1);  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .xp-float { display: none; } }
