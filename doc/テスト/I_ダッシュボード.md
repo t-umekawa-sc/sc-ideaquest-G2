@@ -49,3 +49,4 @@
 |---|---|---|---|---|---|---|
 | I-TC-150 | カウントアップの1フレーム値が単調・端点厳密・easeOutCubic である担保（ゲーム感） | unit | `countUpFrame(from,to,t)`（純関数） | t=0/0.5/1・範囲外 t・逆方向（減少）を与える | t≤0→from・t≥1→to（端点厳密）／t=0.5 は easeOutCubic（eased=0.875）で `round(from+(to-from)*0.875)`／0<t<1 は単調非減少／範囲外はクランプ | SC-01 ヒーロー演出 |
 | I-TC-151 | レベルアップ祝福の発火判定（誤発火防止）の担保（ゲーム感） | unit | `shouldCelebrateLevelUp(prevSeen,current)`／`nextStoredLevel`／`parseSeenLevel`（純関数） | 初回観測(null)・上昇・同値・低下・不正 raw を与える | 初回(null)は祝福しない（記録のみ）／`current>prevSeen` のみ祝福／同値・低下は祝福しない・記録は current 追随／`parseSeenLevel` は未記録/不正/1未満を null | SC-01 レベルアップ演出 |
+| I-TC-152 | 投票獲得 XP の楽観バー前進％のクランプ（#8 獲得フィードバック・段階ハイブリッド step1） | unit | `bumpedXpPct(xpInLevel,levelSpan,bump)`（純関数）／定数 `VOTE_XP` | bump=0／正の bump／levelSpan 超過／levelSpan≤0／負の合算 を与える | bump=0 は基準％と一致／bump 分だけ前進（`round((xpInLevel+bump)/levelSpan*100)`）／合算は 0..levelSpan にクランプ（レベルアップは詐称しない=最大100%）／levelSpan≤0 は 0／`VOTE_XP===5`（暫定＝仕様固定・backend delta 移行で解消） | SC-01 投票フィードバック（ゲーム感 #8） |

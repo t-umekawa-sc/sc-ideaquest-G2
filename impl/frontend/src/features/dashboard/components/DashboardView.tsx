@@ -13,6 +13,8 @@ import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { LevelUpWatcher } from "./LevelUpWatcher";
 import { SparkBurst } from "./SparkBurst";
+import { XpFloat } from "./XpFloat";
+import { VOTE_XP, bumpedXpPct } from "../xpAward";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -66,12 +68,25 @@ export function DashboardView({
   // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const burstId = useRef(0);
+  const prefersReduceMotion = () =>
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const fireBurst = (e: { clientX: number; clientY: number }) => {
-    if (typeof window !== "undefined"
-      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReduceMotion()) return;
     const id = ++burstId.current;
     setBursts((b) => [...b, { id, x: e.clientX, y: e.clientY }]);
     setTimeout(() => setBursts((b) => b.filter((z) => z.id !== id)), 650);
+  };
+  // #8 獲得フィードバック（段階ハイブリッド step1）＝投票が XP 付与された時のみ「+5 XP」を出し、
+  // ヒーロー XP バーを楽観的に +5 分だけ前進＋pulse（連動）。金額 +5 は暫定（xpAward.VOTE_XP）。
+  const [xpBump, setXpBump] = useState(0);       // 読み込み後に付与された XP の累積（楽観・server 権威は次ロードで整合）
+  const [awardKey, setAwardKey] = useState(0);   // バー pulse を確実に再生させる再マウントキー
+  const [xpFloats, setXpFloats] = useState<{ id: number; x: number; y: number; label: string }[]>([]);
+  const xpFloatId = useRef(0);
+  const fireXpFloat = (e: { clientX: number; clientY: number }, label: string) => {
+    if (prefersReduceMotion()) return;
+    const id = ++xpFloatId.current;
+    setXpFloats((f) => [...f, { id, x: e.clientX, y: e.clientY, label }]);
+    setTimeout(() => setXpFloats((f) => f.filter((z) => z.id !== id)), 1100);
   };
   // チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の公開種別のみ）。
   const loadTeamFeed = useCallback((cursor?: string | null) => getTeamFeed(cursor), []);
@@ -96,8 +111,10 @@ export function DashboardView({
   const xpToNext = hero?.xp_to_next ?? balance.xpToNext;
   const levelSpan = hero?.level_span ?? balance.levelSpan;
   const xpInLevel = hero ? hero.level_span - hero.xp_to_next : balance.xpInLevel;
-  const xpPct = levelSpan > 0 ? Math.round((xpInLevel / levelSpan) * 100) : balance.xpPct;
-  const xpTotal = hero?.xp ?? balance.xp;
+  // #8: 楽観 XP（xpBump）を上乗せしたバー値（現レベル内でクランプ＝レベルアップは詐称しない）。
+  const xpInLevelLive = Math.min(levelSpan, xpInLevel + xpBump);
+  const xpPct = bumpedXpPct(xpInLevel, levelSpan, xpBump);
+  const xpTotal = (hero?.xp ?? balance.xp) + xpBump;
   const coin = hero?.coin_balance ?? balance.coin;
   const sp = hero?.skill_point_balance ?? balance.sp;
 
@@ -118,6 +135,13 @@ export function DashboardView({
     if (!res) {
       setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 失敗はロールバック
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
+      return;
+    }
+    // #8: server が実際に XP を付与した時のみ（初回・日次上限内＝xp_awarded）フィードバック。
+    if (res.xp_awarded) {
+      setXpBump((x) => x + VOTE_XP);
+      setAwardKey((k) => k + 1);
+      if (e) fireXpFloat(e, `+${VOTE_XP} XP`);
     }
   };
 
@@ -134,6 +158,7 @@ export function DashboardView({
     <div className="dash-page stack">
       <LevelUpWatcher accountId={accountId} level={level} />
       {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
+      {xpFloats.map((f) => <XpFloat key={f.id} x={f.x} y={f.y} label={f.label} />)}
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
       <div className="dash-top">
         <section className="pixel-panel hero" aria-label="あなたのステータス">
@@ -150,10 +175,14 @@ export function DashboardView({
               className="xp-bar-wrap has-tip"
               role="img"
               tabIndex={0}
-              data-tip={`獲得 XP ${xpInLevel} / ${levelSpan}（累計 ${xpTotal}）`}
-              aria-label={`獲得 XP ${xpInLevel} / ${levelSpan}、累計 ${xpTotal}`}
+              data-tip={`獲得 XP ${xpInLevelLive} / ${levelSpan}（累計 ${xpTotal}）`}
+              aria-label={`獲得 XP ${xpInLevelLive} / ${levelSpan}、累計 ${xpTotal}`}
             >
-              <div className="xp-bar"><span style={{ width: `${barFilled ? xpPct : 0}%` }} /></div>
+              <div className="xp-bar">
+                <span style={{ width: `${barFilled ? xpPct : 0}%` }} />
+                {/* #8: 付与のたびに一瞬グロー（awardKey で再マウントして one-shot 再生・reduce-motion 無効） */}
+                {awardKey > 0 && <i key={awardKey} className="xp-bar__pulse" aria-hidden />}
+              </div>
             </div>
             <div className="hero__coin">
               <span className="pixel-stat coin">◆ <CountUp value={coin} /> コイン</span>

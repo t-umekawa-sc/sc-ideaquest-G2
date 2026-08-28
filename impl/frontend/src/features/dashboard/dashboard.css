@@ -199,3 +199,31 @@
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.15); }
 }
 @media (prefers-reduced-motion: reduce) { .spark-burst { display: none; } }
+
+/* ── ゲーム感 #8: 投票の獲得フィードバック（+N XP フロート＋ヒーロー XP バー連動）─────────
+   段階ハイブリッド step1（backend 変更ゼロ・xp_awarded ゲート）。純視覚・reduce-motion 尊重。
+   純ロジック＝xpAward.ts（I-TC-152）。 */
+.xp-float { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); will-change: transform, opacity; }
+.xp-float__txt {
+  display: inline-block; font-family: var(--font-pixel); font-weight: 800;
+  font-size: var(--text-lg); color: var(--pixel-xp); white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(2, 6, 23, .35), 0 0 6px rgba(59, 130, 246, .5);
+  animation: xp-float-rise 1.05s ease-out forwards;
+}
+@keyframes xp-float-rise {
+  0%   { transform: translateY(0) scale(.8);   opacity: 0; }
+  20%  { transform: translateY(-6px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(-46px) scale(1);  opacity: 0; }
+}
+/* 付与時にヒーロー XP バーが一瞬グロー（awardKey 再マウントで one-shot 再生・充填幅内に収まる） */
+.dash-page .hero .xp-bar { position: relative; }
+.xp-bar__pulse {
+  position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: rgba(255, 255, 255, .65); mix-blend-mode: screen;
+  animation: xp-bar-pulse .7s ease-out forwards;
+}
+@keyframes xp-bar-pulse { 0% { opacity: 0; } 25% { opacity: .85; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .xp-float { display: none; }
+  .xp-bar__pulse { display: none; }
+}

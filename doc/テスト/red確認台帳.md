@@ -640,3 +640,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（celebrate.ts 未作成 actual） |
 | --- | --- |
 | G-TC-150 | テスト（`src/features/achievements/celebrate.test.ts`）を先行作成し vitest 実行＝`Failed to load url ./celebrate … Does the file exist?`（モジュール未存在で 0 test・suite fail）で red。`celebrate.ts` を実装（初回観測=[]・current∖prevSeen を current 順・prev∪current 重複除去）して 7 passed で green（全体 48 passed）。src 単体は TC 走査対象外のため追跡は `G_ゲーミフィケーション.md` G-TC-150 で担保 |
+
+## ゲーム感 #8. 投票獲得フィードバック frontend 単体（I-TC-152・2026-08-28）
+
+> SC-01 クイック投票の「+5 XP」＝獲得 XP を楽観的にヒーロー XP バーへ前進表示する純ロジック＝`impl/frontend/src/features/dashboard/xpAward.ts`（`bumpedXpPct`／定数 `VOTE_XP`）。視覚＝`components/XpFloat.tsx`＋`dashboard.css`（GF-AC-070..074）。段階ハイブリッド step1（backend 変更ゼロ・`IdeaVoteResponse.xp_awarded` でゲート）。金額 +5 は暫定 frontend 定数（step2 で backend delta へ移行）。
+
+| TC-ID | 観測 red（xpAward.ts 未作成 actual） |
+| --- | --- |
+| I-TC-152 | テスト（`src/features/dashboard/xpAward.test.ts`）を先行作成し vitest 実行＝`Failed to load url ./xpAward … Does the file exist?`（モジュール未存在で 0 test・suite fail）で red。`xpAward.ts` を実装（`bumpedXpPct`＝合算を 0..levelSpan にクランプ＝レベルアップ詐称なし・最大100%／`VOTE_XP=5`）して 6 passed で green（全体 54 passed）。src 単体は TC 走査対象外のため追跡は `I_ダッシュボード.md` I-TC-152 で担保 |
