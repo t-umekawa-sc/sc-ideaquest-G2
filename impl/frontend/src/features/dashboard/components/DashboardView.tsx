@@ -15,7 +15,7 @@ import { LevelUpWatcher } from "./LevelUpWatcher";
 import { SparkBurst } from "./SparkBurst";
 import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
-import { levelRank } from "../levelTitle";
+import { levelRank } from "@/lib/levelTitle";
 import { reduceMotion } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";

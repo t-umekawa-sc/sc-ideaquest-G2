@@ -3,6 +3,9 @@
 // 3D アバター（VRM）は読取表示＝着せ替えは SC-31。残高は表示のみ（canonical は G の activities）。
 import Link from "next/link";
 
+import { CountUp } from "@/components/ui";
+import { levelRank } from "@/lib/levelTitle";
+
 import "../profile.css";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -21,16 +24,17 @@ export function ProfileHero({
   displayName, systemRole, balance,
 }: { displayName: string; systemRole: string; balance: Balance }) {
   const roleLabel = ROLE_LABEL[systemRole] ?? systemRole;
+  const rank = levelRank(balance.level); // #26/#21: レベル→称号/ティア（オーラ色）
   return (
     <div className="prof-head">
-      <div className="avatar3d">
+      <div className="avatar3d" data-tier={rank.tier}>
         <span className="avatar3d__tag">3D アバター</span>
         {/* 3D アバターは読取表示（本番は three-vrm/R3F）＝着せ替えは SC-31。素の img で描画。 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="avatar3d__img" src="/assets/mascot-hero.png" alt="あなたの3Dアバター" />
       </div>
       <div className="prof-head__body">
-        <div className="prof-head__name">{displayName}</div>
+        <div className="prof-head__name">{displayName}<span className="prof-head__title" data-tier={rank.tier}>{rank.title}</span></div>
         <div className="prof-head__role"><span className="badge badge-muted" title="システムロール">{roleLabel}</span></div>
         <div className="prof-stats">
           <div className="prof-stats__line">
@@ -48,8 +52,8 @@ export function ProfileHero({
             <span className="prof-stats__next">NEXT {balance.xpToNext} XP</span>
           </div>
           <div className="prof-stats__line">
-            <span className="pixel-stat coin">◆ {balance.coin} コイン</span>
-            <span className="pixel-stat skill">✦ SP {balance.sp}</span>
+            <span className="pixel-stat coin">◆ <CountUp value={balance.coin} /> コイン</span>
+            <span className="pixel-stat skill">✦ SP <CountUp value={balance.sp} /></span>
           </div>
         </div>
         <div className="prof-head__actions">

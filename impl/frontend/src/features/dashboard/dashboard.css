@@ -236,13 +236,6 @@
 
 /* ── ゲーム感 #21: レベル称号＆オーラ（SC-01 ヒーロー・純CSS）───────────────────────────
    レベル帯（levelTitle.levelRank）でヒーローに色オーラ＋称号チップ。tier→色は --aura。reduce-motion で静止。 */
-.dash-page [data-tier] { --aura: #94a3b8; }                       /* novice（既定=グレー） */
-.dash-page [data-tier="apprentice"] { --aura: #22c55e; }         /* 駆け出し */
-.dash-page [data-tier="adept"] { --aura: #3b82f6; }              /* 一人前 */
-.dash-page [data-tier="expert"] { --aura: #a855f7; }            /* 熟練 */
-.dash-page [data-tier="master"] { --aura: #f59e0b; }           /* 達人 */
-.dash-page [data-tier="mythic"] { --aura: #ef4444; }          /* 英雄 */
-.dash-page [data-tier="legend"] { --aura: #eab308; }         /* 伝説 */
 .dash-page .hero__avatar[data-tier] { position: relative; }
 .dash-page .hero__avatar[data-tier]::after {
   content: ""; position: absolute; inset: -3px; pointer-events: none;

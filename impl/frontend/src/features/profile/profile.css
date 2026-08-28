@@ -80,3 +80,26 @@
 .profile-page .prof-panel__sep { height: 1px; margin: var(--space-4) 0; background: var(--pixel-glass-border); opacity: .6; }
 /* 履歴はパネル内に同居＝独立 pixel-panel を外したので上マージンを詰める。 */
 .profile-page .prof-panel .activity-history { margin-top: 0; }
+
+/* ── ゲーム感 #26: プロフィールのショーケース演出（SC-03）─────────────────────────────────
+   ヒーローの登場（下からフェード・スタッガ）＋称号チップ＋アバターのレベルオーラ＋XPバーの伸び＋
+   コイン/SP のカウントアップ（コンポーネント側 CountUp）。reduce-motion 尊重。 */
+@media (prefers-reduced-motion: no-preference) {
+  .profile-page .avatar3d { animation: prof-in .5s ease-out both; }
+  .profile-page .prof-head__body > * { animation: prof-in .5s ease-out both; }
+  .profile-page .prof-head__body > *:nth-child(1) { animation-delay: .06s; }
+  .profile-page .prof-head__body > *:nth-child(2) { animation-delay: .13s; }
+  .profile-page .prof-head__body > *:nth-child(3) { animation-delay: .20s; }
+  .profile-page .prof-head__body > *:nth-child(4) { animation-delay: .27s; }
+}
+@keyframes prof-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+/* 称号チップ（レベル帯の色） */
+.profile-page .prof-head__title { margin-left: var(--space-2); font-family: var(--font-pixel); font-size: var(--text-xs); padding: 1px 8px; border-radius: 99px; border: 2px solid var(--aura); color: var(--aura); background: color-mix(in srgb, var(--aura) 15%, transparent); vertical-align: middle; }
+/* アバターのレベルオーラ */
+.profile-page .avatar3d[data-tier]::after { content: ""; position: absolute; inset: -3px; pointer-events: none; border-radius: inherit; box-shadow: 0 0 18px 4px var(--aura); opacity: .5; animation: aura-pulse 2s ease-in-out infinite; }
+/* XPバーの伸び（#25 と同流儀） */
+.profile-page .prof-stats .xp-bar > span { transform-origin: left; animation: bar-grow .9s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .profile-page .avatar3d[data-tier]::after { animation: none; }
+  .profile-page .prof-stats .xp-bar > span { animation: none; }
+}

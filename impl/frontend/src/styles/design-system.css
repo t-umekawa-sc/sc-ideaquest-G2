@@ -1748,3 +1748,13 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
    バーの塗り要素を scaleX(0→1) で左から伸ばす（width は現在値のまま＝animation は transform のみ）。
    要素マウント時（データ取得後）に一度再生。適用は各所（reduce-motion で無効）。 */
 @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ── ゲーム感 #21/#26: レベルティア→オーラ色（横断・[data-tier] に --aura を供給）──────────
+   ダッシュボードのヒーロー（#21）・プロフィールのショーケース（#26）等で共通利用。純ロジックは lib/levelTitle.ts。 */
+[data-tier] { --aura: #94a3b8; }                 /* novice（既定=グレー） */
+[data-tier="apprentice"] { --aura: #22c55e; }   /* 駆け出し */
+[data-tier="adept"] { --aura: #3b82f6; }        /* 一人前 */
+[data-tier="expert"] { --aura: #a855f7; }       /* 熟練 */
+[data-tier="master"] { --aura: #f59e0b; }       /* 達人 */
+[data-tier="mythic"] { --aura: #ef4444; }       /* 英雄 */
+[data-tier="legend"] { --aura: #eab308; }       /* 伝説 */

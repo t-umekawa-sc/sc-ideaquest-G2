@@ -668,7 +668,7 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 
 ## ゲーム感 #21. レベル称号＆オーラ frontend 単体（I-TC-153・2026-08-28）
 
-> SC-01 ヒーローのレベル→称号/ティア（オーラ色）の純ロジック＝`impl/frontend/src/features/dashboard/levelTitle.ts`（`levelRank`）。視覚＝称号チップ＋ヒーローのオーラ（`dashboard.css .hero__avatar[data-tier]`・GF-AC-210..212）。
+> SC-01 ヒーローのレベル→称号/ティア（オーラ色）の純ロジック＝`impl/frontend/src/lib/levelTitle.ts`（`levelRank`）。視覚＝称号チップ＋ヒーローのオーラ（`dashboard.css .hero__avatar[data-tier]`・GF-AC-210..212）。
 
 | TC-ID | 観測 red（levelTitle.ts 未作成 actual） |
 | --- | --- |
