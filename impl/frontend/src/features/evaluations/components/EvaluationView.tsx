@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
-import { useSnackbar } from "@/components/ui";
+import { Spinner, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
@@ -146,7 +146,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   );
 
   if (loading) {
-    return <Frame><p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p></Frame>;
+    return <Frame><Spinner label="読み込み中…" /></Frame>;
   }
   if (loadError) {
     return <Frame><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></Frame>;

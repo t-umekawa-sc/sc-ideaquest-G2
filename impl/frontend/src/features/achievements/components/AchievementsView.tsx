@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { DataTable } from "@/components/ui";
+import { Spinner, DataTable } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 
 import { getAchievements } from "../api";
@@ -161,7 +161,7 @@ export function AchievementsView({ accountId }: { accountId: string }) {
         <strong>🔒 シークレット</strong>実績は達成するまで内容が伏せられます。
       </p>
 
-      {loading && <p className="admin-muted">読み込み中…</p>}
+      {loading && <Spinner label="読み込み中…" />}
 
       {/* 実績一覧＝DataTable（検索/絞込/並び替え/表示切替/CSV/固定/ページャ）。カードは cardRaw で完全制御。 */}
       <div className="ach-grid">

@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Avatar, CountUp } from "@/components/ui";
+import { Spinner, Avatar, CountUp } from "@/components/ui";
 
 import { getRankings, type RankingMe, type RankingPeriod } from "../api";
 import "../ranking.css";
@@ -115,7 +115,7 @@ export function RankingView() {
           </section>
         );
       })()}
-      {loading && <p className="admin-muted">読み込み中…</p>}
+      {loading && <Spinner label="読み込み中…" />}
       {!loading && list.length === 0 && <p className="role-note">この期間のランキングデータがありません。</p>}
 
       {/* ランキング本体（ゲーム層・CRTガラス） */}

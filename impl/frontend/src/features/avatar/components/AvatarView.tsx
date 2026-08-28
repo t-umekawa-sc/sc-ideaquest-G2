@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { Spinner, GameNav, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { getItems, ITEM_ICON, updateEquipment } from "@/features/shop/api";
@@ -122,7 +122,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
     return (
       <section aria-label="アバター / 着せ替え">
         <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
-        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
+        <Spinner label="読み込み中…" />
       </section>
     );
   }

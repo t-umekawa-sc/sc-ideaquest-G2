@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
+import { Spinner, useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -328,7 +328,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   }, [picker, mention]);
 
   if (loading) {
-    return <main className="container chat-main"><p className="admin-muted" style={{ marginTop: "var(--space-6)" }}>読み込み中…</p></main>;
+    return <main className="container chat-main"><Spinner label="読み込み中…" /></main>;
   }
   if (loadError || !idea) {
     return (

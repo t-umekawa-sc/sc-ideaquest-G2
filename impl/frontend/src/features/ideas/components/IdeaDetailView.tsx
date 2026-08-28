@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { Spinner, Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
@@ -226,7 +226,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   }, [ideaId, selected, selectBusy, snack]);
 
   if (loading) {
-    return <main className="container detail-main"><p className="admin-muted" style={{ marginTop: "var(--space-6)" }}>読み込み中…</p></main>;
+    return <main className="container detail-main"><Spinner label="読み込み中…" /></main>;
   }
   if (loadError || !idea) {
     return (
