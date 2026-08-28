@@ -15,6 +15,7 @@ import { LevelUpWatcher } from "./LevelUpWatcher";
 import { SparkBurst } from "./SparkBurst";
 import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
+import { levelRank } from "../levelTitle";
 import { reduceMotion } from "@/lib/motion";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
@@ -116,6 +117,7 @@ export function DashboardView({
   const xpTotal = (hero?.xp ?? balance.xp) + xpBump;
   const coin = hero?.coin_balance ?? balance.coin;
   const sp = hero?.skill_point_balance ?? balance.sp;
+  const rank = levelRank(level); // #21: レベル→称号/ティア（オーラ色）
 
   const drafts = data?.drafts ?? [];
   const unvoted = (data?.unvoted_ideas ?? []).filter((v) => !votes[v.id]);
@@ -162,13 +164,14 @@ export function DashboardView({
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
       <div className="dash-top">
         <section className="pixel-panel hero" aria-label="あなたのステータス">
-          <div className="hero__avatar">
+          <div className="hero__avatar" data-tier={rank.tier}>
             <Image src="/assets/mascot-hero.png" alt="あなたのアバター" width={88} height={88} />
           </div>
           <div className="hero__status">
             <div className="hero__name">{hero?.display_name ?? displayName}</div>
             <div className="hero__lvline">
               <span className="hero__lv">Lv.{level}</span>
+              <span className="hero__title" data-tier={rank.tier}>{rank.title}</span>
               <span className="hero__next">NEXT {xpToNext} XP</span>
             </div>
             <div

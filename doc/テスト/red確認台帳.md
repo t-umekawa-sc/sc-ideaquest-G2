@@ -665,3 +665,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | K-TC-020 | `MeAccountDTO` の `reduce_motion` フィールドを一時撤去して pytest＝`GET /me` の `account` に `reduce_motion` が載らず `KeyError: 'reduce_motion'` で red。復元（ORM 列＋DTO＋allowlist＋`_me` dict）で green（3 passed＝K-TC-020/001/002） |
 | K-TC-021 | 純ロジック未作成で vitest＝`Failed to load url ./motion`（0 test・suite fail）で red。`lib/motion.ts` 実装（`isMotionReduced = osReduce OR userReduce`）で green（3 tests・全体 56 passed）。src 単体は TC 走査対象外のため追跡は `K_プロフィール.md` K-TC-021 で担保 |
+
+## ゲーム感 #21. レベル称号＆オーラ frontend 単体（I-TC-153・2026-08-28）
+
+> SC-01 ヒーローのレベル→称号/ティア（オーラ色）の純ロジック＝`impl/frontend/src/features/dashboard/levelTitle.ts`（`levelRank`）。視覚＝称号チップ＋ヒーローのオーラ（`dashboard.css .hero__avatar[data-tier]`・GF-AC-210..212）。
+
+| TC-ID | 観測 red（levelTitle.ts 未作成 actual） |
+| --- | --- |
+| I-TC-153 | テスト（`src/features/dashboard/levelTitle.test.ts`）を先行作成し vitest＝`Failed to load url ./levelTitle`（モジュール未存在で 0 test・suite fail）で red。`levelTitle.ts`（しきい値 70/50/35/20/10/5/1 を高い順に判定・0/負/NaN/小数は max(1,floor)）を実装して 4 passed で green（全体 60 passed）。src 単体は TC 走査対象外＝追跡は `I_ダッシュボード.md` I-TC-153 |
