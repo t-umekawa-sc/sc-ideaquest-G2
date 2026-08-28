@@ -11,6 +11,11 @@ RUN npm install
 
 COPY . .
 
+# Next の /api リライト先（next.config.ts）は**ビルド時に焼かれる**ため、build 前に compose ネットワークの
+# backend を指しておく（未設定だと localhost:8000 の fallback が焼かれ、コンテナ内で ECONNREFUSED になる）。
+ARG BACKEND_ORIGIN=http://backend:8000
+ENV BACKEND_ORIGIN=$BACKEND_ORIGIN
+
 # 本番ビルド（.next を生成）。dynamic ページは実行時サーバーレンダ＝build に backend 不要。
 RUN npm run build
 
