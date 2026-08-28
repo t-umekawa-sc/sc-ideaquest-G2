@@ -110,17 +110,21 @@ def put_evaluation(account_id, company_id, idea_id, *, body) -> dict:
             overall_comment=(body.overall_comment or None), status=body.status, visibility=body.visibility,
         )
         repo.replace_scores(ts, ev.id, [(a, body.scores[a], body.comments.get(a)) for a in ASPECTS if a in body.scores])
+        xp_delta = 0
         if body.status == "submitted":
             if ev.submitted_at is None:
                 ev.submitted_at = datetime.now(timezone.utc)
             # 評価者 XP+30（評価1件につき1回・exists_ref 冪等・日次上限対象外）。
+            # xp_delta＝実際に付与した XP（初回のみ +30・冪等スキップ時 0）＝獲得フィードバック（#8・F-TC-141）。
             if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "evaluation", "evaluations", ev.id):
                 ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_EVALUATION, reason="evaluation",
                              ref_type="evaluations", ref_id=ev.id, quest_id=idea.quest_id)
+                xp_delta = _XP_EVALUATION
             _notify_follow_evaluation(ts, idea.id, user.id)
             # 投稿者コインの確定トリガ(a)＝evaluator 全員がこのアイデアを submitted 済みか判定。
             _maybe_finalize_idea_coin(ts, idea, quest)
         detail = _me_payload(ts, ev)
+        detail["xp_delta"] = xp_delta
         ts.commit()
     return detail
 

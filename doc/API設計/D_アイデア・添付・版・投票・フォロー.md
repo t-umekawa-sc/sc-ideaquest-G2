@@ -52,7 +52,7 @@
 | `POST /quests/{quest_id}/ideas` | アイデアを作成（SC-21・`idea_create` 権限） | パス: `quest_id`／ボディ: `title`（必須）,`value`（必須）,`body`（必須）,`time_limit?`,`stakeholders?`（`[{label, is_custom?}]`）,`note?`,`status`（`draft\|published`）。`Idempotency-Key` 推奨（§1.9） | 作成されたアイデア（`draft` は本人のみ表示・`published` は公開）。`author_id`＝セッション本人。`published` で公開処理（下記）を同一 UoW 実行 |
 | `PATCH /ideas/{idea_id}` | アイデアを編集（投稿者本人 or `owner`/`quest_admin`） | パス: `idea_id`／ボディ（差分）: `title`/`value`/`body`/`time_limit`/`stakeholders`/`note` | 更新後のアイデア。**公開済みなら 1 版を記録し通知発火**（D.4）。`stakeholders` は**置換セット**（送られた配列で `idea_stakeholders` を全置換） |
 | `DELETE /ideas/{idea_id}` | アイデアを論理削除（投稿者本人 or `owner`/`quest_admin`） | パス: `idea_id` | 204。`deleted_at`＋`deleted_by_id` を設定（トゥームストーン）。以後一覧/詳細/検索/集計から除外。子（チャット/投票/評価/版/添付/フォロー・`activities` 元帳）は**物理削除せず監査保持**（§5.10・`ON DELETE RESTRICT`） |
-| `POST /ideas/{idea_id}/publish` | 下書きを公開（`draft` → `published`・**アトミック**） | パス: `idea_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`value`/`body`/`time_limit`/`stakeholders`/`note`。省略可＝未送信分は現在値を使用）。`Idempotency-Key` 推奨（§1.9） | 公開後のアイデア（`status=published`）。**内容適用＋strict 検証（`validate_publishable`）＋`draft→published`＋公開処理（`chat_groups` 作成・投稿 XP+50・下記）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・公開されない）**。投稿者本人 or `owner`/`quest_admin` |
+| `POST /ideas/{idea_id}/publish` | 下書きを公開（`draft` → `published`・**アトミック**） | パス: `idea_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`value`/`body`/`time_limit`/`stakeholders`/`note`。省略可＝未送信分は現在値を使用）。`Idempotency-Key` 推奨（§1.9） | 公開後のアイデア（`status=published`）＋`xp_delta`〔初回公開で実際に付与した投稿 XP＝+50・冪等/参照時は 0＝獲得フィードバック #8・金額の正はサーバー。`GET /ideas/{id}` 等の参照系も同フィールドを持つが常に 0〕。**内容適用＋strict 検証（`validate_publishable`）＋`draft→published`＋公開処理（`chat_groups` 作成・投稿 XP+50・下記）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・公開されない）**。投稿者本人 or `owner`/`quest_admin` |
 
 - **必須充足＝strict 検証（`validate_publishable`）**（サーバー検証・§2.2 入力検証）: 公開状態のアイデアは `title`・`value`・`body` を満たすこと。未充足は **422 `validation_error`**（`errors[].field`）。`time_limit`/`stakeholders`/`note` は任意（§5.10 は NULL 可＝SC-21 の必須 3 項目表示はフロント UX、権威はサーバーの本規約）。**この strict 検証は `POST /ideas`（`status=published`）・`POST .../publish`・公開中アイデアの `PATCH` で同一ドメイン関数 `validate_publishable` を共有**（下書きの `PATCH` は緩い＝未充足でも保存可）。
 - **公開処理（`published` になる瞬間に 1 回だけ・publish/作成公開の同一 UoW 内）**:
@@ -107,7 +107,7 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `POST /ideas/{idea_id}/vote` | 投票を登録・切替（`vote` 権限） | パス: `idea_id`／ボディ: `type`（`approve\|oppose`） | 更新後の `vote`（`my_vote`＝`approve\|oppose`／`summary`〔賛成/反対数〕／`xp_awarded`〔初回のみ true〕） |
+| `POST /ideas/{idea_id}/vote` | 投票を登録・切替（`vote` 権限） | パス: `idea_id`／ボディ: `type`（`approve\|oppose`） | 更新後の `vote`（`my_vote`＝`approve\|oppose`／`summary`〔賛成/反対数〕／`xp_awarded`〔初回のみ true〕／`xp_delta`〔この投票で実際に付与した XP＝初回・上限内なら +5・それ以外 0。`xp_awarded` と `xp_delta>0` は同値＝獲得フィードバック #8・金額の正はサーバー〕） |
 | `DELETE /ideas/{idea_id}/vote` | 投票を取消 | パス: `idea_id` | 204。`votes` 行を削除（**XP は戻さない**＝初回付与済み分は保持・§8-⑥） |
 
 - **1 人 1 票・締切まで変更可**（§5.13・`UNIQUE(idea_id, user_id)`）。`POST` は**冪等な upsert**＝既存行があれば `type` を切替（賛成⇄反対）、無ければ作成。**`voted_revision` は毎回 `ideas.current_revision` で更新**（＝賛成/反対を押し直すと陳腐化フラグ〔`stale`〕が解消・SC-22 §4.5「押し直せば見直し完了」）。`voted_at` も更新。

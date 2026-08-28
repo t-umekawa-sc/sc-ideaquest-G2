@@ -231,6 +231,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         note: note.trim() || null,
       };
       let targetId = ideaId;
+      let publishXp = 0;  // #8: 初回公開で実際に付与された投稿 XP（server の xp_delta・金額の正はサーバー）
       if (kind === "save") {
         await updateIdea(ideaId!, content);
       } else if (kind === "draft") {
@@ -239,6 +240,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       } else {
         const created = await createIdea(questId!, { ...content, status: "published" });
         targetId = created?.id ?? undefined;
+        publishXp = created?.xp_delta ?? 0;
       }
       // 添付は id 先行が必要なため保存成功後に送信（D.3）。検証エラー等は非致命＝本体は保存済み。
       const files = attachments.map((a) => a.file);
@@ -254,8 +256,11 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
       } else if (kind === "draft") {
         snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
+      } else if (publishXp > 0) {
+        // 実際に付与された額を表示（金額の正はサーバー・#8）。冪等等で 0 の時は素の成功表示。
+        snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: `＋${publishXp} XP` }] });
       } else {
-        snack({ type: "reward", title: "アイデアを投稿しました", msg: "パーティーに公開しました。", rewards: [{ k: "xp", t: "＋50 XP" }] });
+        snack({ type: "success", title: "アイデアを投稿しました", msg: "パーティーに公開しました。" });
       }
       onDone();
     } catch (err) {

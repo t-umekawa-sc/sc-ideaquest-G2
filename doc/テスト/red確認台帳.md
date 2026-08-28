@@ -648,3 +648,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（xpAward.ts 未作成 actual） |
 | --- | --- |
 | I-TC-152 | テスト（`src/features/dashboard/xpAward.test.ts`）を先行作成し vitest 実行＝`Failed to load url ./xpAward … Does the file exist?`（モジュール未存在で 0 test・suite fail）で red。`xpAward.ts` を実装（`bumpedXpPct`＝合算を 0..levelSpan にクランプ＝レベルアップ詐称なし・最大100%／`VOTE_XP=5`）して 6 passed で green（全体 54 passed）。src 単体は TC 走査対象外のため追跡は `I_ダッシュボード.md` I-TC-152 で担保 |
+
+## ゲーム感 #8 step2. 獲得 XP delta を応答に載せる（D-TC-163/164・F-TC-141・2026-08-28）
+
+> 投票/投稿公開/評価確定の応答に**実付与 XP（`xp_delta`）**を追加（金額の正を backend に一本化・frontend の暫定定数 `VOTE_XP` を撤去）。`ledger.grant` の戻り `Activity.amount` を各コールサイトで拾い、冪等スキップ時は 0。実装＝`ideas/application.py`（`_publish_processing` 返り値／`vote_idea` 応答）・`evaluations/application.py`（`put_evaluation`）＋各 schemas に `xp_delta:int=0`。frontend＝ダッシュボード投票フロート/バーを実額駆動・投稿/評価の報酬スナックバーを実額駆動（ハードコード撤去）。
+
+| TC-ID | 観測 red（DTO の xp_delta フィールドを一時撤去 actual） |
+| --- | --- |
+| D-TC-163／D-TC-164／F-TC-141 | 3 応答 DTO（`IdeaDetailDTO`/`IdeaVoteResponse`/`EvaluationMeDTO`）から `xp_delta` フィールドを一時撤去して pytest 実行＝応答に `xp_delta` キーが載らず `KeyError: 'xp_delta'` で 3 件 red（実測）。フィールドを復元（application は `Activity.amount` 由来の実額を格納）して green（3 passed／全体 493 passed）。D-TC-164 は seed ユーザーの日次上限干渉を避けるため fresh voter（quest owner）で隔離 |

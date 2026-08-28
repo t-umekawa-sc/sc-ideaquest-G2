@@ -26,6 +26,7 @@
 | F-TC-103 | api | 確定（全5観点＋総評）→XP+30 | evaluator | `PUT`（5観点1..5＋overall・submitted） | 200・status submitted・submitted_at・評価者に XP+30（`activities` reason=evaluation） | F.2／§7 |
 | F-TC-104 | api | 確定の必須検証（観点欠け/総評空） | evaluator | `PUT`（4観点 or overall 空・submitted） | 422 `validation_error`（`errors[].field`） | F.2 |
 | F-TC-105 | api | 確定 XP は1回のみ（再確定で再付与しない） | 確定済み | `PUT`（submitted）再送 | 200・`activities` の evaluation XP は1件のまま（`exists_ref` 冪等） | F.2／§8-⑥ |
+| F-TC-141 | api | 確定応答に `xp_delta` を載せる（獲得フィードバック・#8） | evaluator | `PUT`（初回 submitted→再確定→draft 保存） | 初回確定は `xp_delta=30`（実付与額）・再確定（冪等）は `xp_delta=0`・下書き保存は `xp_delta=0`。金額の正はサーバー（evaluation=+30） | F.2／§8-⑥／#8 |
 | F-TC-106 | api | スコア範囲外は 422 | evaluator | `PUT`（score=0 or 6） | 422（`scores`） | F.2 |
 | F-TC-107 | api | 入力は evaluator 権限必須 | パーティー参加だが evaluator なし | `PUT` | 403 | F.0 |
 | F-TC-108 | api | 門番/可視性（非パーティー・下書きアイデア） | 非パーティー／draft アイデア | `PUT`／`GET me` | 404（存在秘匿・評価対象外） | F.0 |

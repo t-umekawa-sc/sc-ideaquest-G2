@@ -2700,6 +2700,9 @@ export interface components {
         /**
          * EvaluationMeDTO
          * @description 自分の評価/下書き（SC-25 読み込み・F.1）。未作成は status=null。
+         *
+         *     xp_delta＝この確定(submitted)で実際に付与した評価 XP（初回のみ +30・冪等スキップ/下書き保存/参照時は 0）
+         *     ＝獲得フィードバック用（#8）。金額の正はサーバー（F 台帳 evaluation=+30）。
          */
         EvaluationMeDTO: {
             /** Status */
@@ -2728,6 +2731,11 @@ export interface components {
             visibility: "party" | "limited";
             /** Submitted At */
             submitted_at?: string | null;
+            /**
+             * Xp Delta
+             * @default 0
+             */
+            xp_delta: number;
         };
         /**
          * EvaluationPutRequest
@@ -2970,6 +2978,11 @@ export interface components {
             my_permissions: string[];
             /** My State */
             my_state: string;
+            /**
+             * Xp Delta
+             * @default 0
+             */
+            xp_delta: number;
         };
         /**
          * IdeaDiffField
@@ -3155,7 +3168,10 @@ export interface components {
         };
         /**
          * IdeaVoteResponse
-         * @description 投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か（G 実装まで False）。
+         * @description 投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か。
+         *
+         *     xp_delta＝この投票で実際に付与した XP（初回・日次上限内なら +5・それ以外 0）＝獲得フィードバック用（#8）。
+         *     金額の正はサーバー（D 台帳 vote=+5）。xp_awarded は xp_delta>0 と同値（後方互換で残置）。
          */
         IdeaVoteResponse: {
             /** My Vote */
@@ -3166,6 +3182,11 @@ export interface components {
              * @default false
              */
             xp_awarded: boolean;
+            /**
+             * Xp Delta
+             * @default 0
+             */
+            xp_delta: number;
         };
         /** IdeaVoteSummaryDTO */
         IdeaVoteSummaryDTO: {

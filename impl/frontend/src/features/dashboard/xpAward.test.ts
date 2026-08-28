@@ -1,7 +1,7 @@
 // I-TC-152: 投票獲得 XP の楽観バー前進％のクランプ（#8 獲得フィードバック・純ロジック）。視覚はブラウザ受入（GF-AC）。
 import { describe, expect, it } from "vitest";
 
-import { VOTE_XP, bumpedXpPct } from "./xpAward";
+import { bumpedXpPct } from "./xpAward";
 
 describe("bumpedXpPct (I-TC-152)", () => {
   it("bump=0 は基準％と一致", () => {
@@ -22,11 +22,5 @@ describe("bumpedXpPct (I-TC-152)", () => {
   it("levelSpan≤0 は 0", () => {
     expect(bumpedXpPct(10, 0, 5)).toBe(0);
     expect(bumpedXpPct(10, -5, 5)).toBe(0);
-  });
-});
-
-describe("VOTE_XP (I-TC-152)", () => {
-  it("暫定＝仕様固定 +5（backend delta 移行で解消）", () => {
-    expect(VOTE_XP).toBe(5);
   });
 });

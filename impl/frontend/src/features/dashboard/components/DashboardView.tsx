@@ -14,7 +14,7 @@ import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { LevelUpWatcher } from "./LevelUpWatcher";
 import { SparkBurst } from "./SparkBurst";
 import { XpFloat } from "./XpFloat";
-import { VOTE_XP, bumpedXpPct } from "../xpAward";
+import { bumpedXpPct } from "../xpAward";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -137,11 +137,12 @@ export function DashboardView({
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
     }
-    // #8: server が実際に XP を付与した時のみ（初回・日次上限内＝xp_awarded）フィードバック。
-    if (res.xp_awarded) {
-      setXpBump((x) => x + VOTE_XP);
+    // #8: server が実際に付与した XP 差分（res.xp_delta＝初回・日次上限内なら +5・それ以外 0）でフィードバック。
+    // 金額の正はサーバー（step2 で backend delta に一本化＝frontend 定数を撤去）。
+    if (res.xp_delta > 0) {
+      setXpBump((x) => x + res.xp_delta);
       setAwardKey((k) => k + 1);
-      if (e) fireXpFloat(e, `+${VOTE_XP} XP`);
+      if (e) fireXpFloat(e, `+${res.xp_delta} XP`);
     }
   };
 

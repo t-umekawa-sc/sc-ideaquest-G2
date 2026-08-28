@@ -40,6 +40,8 @@
 | D-TC-160 | api | 公開で投稿 XP+50（G 結線・FR-01） | 下書きアイデア | `POST /ideas/{id}/publish`（or 作成 status=published） | 投稿者に `activities(kind=xp_gain,reason=idea_post,ref_type=ideas,ref_id=idea,quest_id)` 1件・+50・`users.xp` 反映。二重公開は 409 で加算なし | D.2／§8-⑥（投稿=50）|
 | D-TC-161 | api | 初回投票で XP+5（G 結線・FR-23） | 参加クエストの公開アイデア | `POST /ideas/{id}/vote`（approve） | 投票者に `reason=vote,ref_type=ideas,ref_id=idea` 1件・+5・応答 `xp_awarded=true` | D.5／§8-⑥（投票=5・初回のみ）|
 | D-TC-162 | int | 投票 XP は各アイデア初回のみ＋日次上限5 | 同一アイデアで賛成→反対→取消→再投票／別アイデア6件に初回投票 | `_award_vote_xp` 経由 | 同一アイデアは切替/取消/再投票で追加なし（`xp_awarded=false`・冪等 ref）・別アイデアは初回のみ付与し**6件目は日次上限で付与なし**（最大25XP/日） | §8-⑥（初回のみ・上限5/日）|
+| D-TC-163 | api | 公開応答に `xp_delta` を載せる（獲得フィードバック・#8） | 下書きアイデア | `POST /ideas/{id}/publish`／`GET /ideas/{id}` | 初回公開の応答は `xp_delta=50`（実付与額）・参照系（取得）は `xp_delta=0`（アクションでないため）。金額の正はサーバー（idea_post=+50） | D.2／§8-⑥／#8 |
+| D-TC-164 | api | 投票応答に `xp_delta` を載せる（獲得フィードバック・#8） | 参加クエストの公開アイデア | `POST /ideas/{id}/vote`（初回→切替） | 初回は `xp_delta=5`・`xp_awarded=true`／切替（2回目）は `xp_delta=0`・`xp_awarded=false`（`xp_awarded` と `xp_delta>0` が同値） | D.5／§8-⑥／#8 |
 | D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
 | D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |

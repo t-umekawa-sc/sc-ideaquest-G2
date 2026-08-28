@@ -101,7 +101,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
       }
       setPending(status === "submitted" ? "submit" : "draft");
       try {
-        await putEvaluation(ideaId, {
+        const res = await putEvaluation(ideaId, {
           scores: scores as Record<string, number>,
           comments: Object.fromEntries(Object.entries(comments).filter(([, v]) => v && v.trim())) as Record<string, string>,
           overall_comment: overall.trim() || null,
@@ -109,12 +109,15 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           status,
         });
         if (status === "submitted") {
-          snack({
-            type: "reward",
-            title: "評価を確定しました",
-            msg: `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`,
-            rewards: [{ k: "xp", t: "＋30 XP" }],
-          });
+          // #8: 実際に付与された評価 XP（server の xp_delta）を表示。再確定（冪等・0）は XP を出さない
+          //（従来は再確定でも「＋30 XP」と誤表示していた＝金額の正はサーバー）。
+          const xp = res?.xp_delta ?? 0;
+          const msgBody = `平均 ${avg.toFixed(1)} / 5.0・公開: ${visibility === "party" ? "パーティー全員" : "限定"}`;
+          if (xp > 0) {
+            snack({ type: "reward", title: "評価を確定しました", msg: msgBody, rewards: [{ k: "xp", t: `＋${xp} XP` }] });
+          } else {
+            snack({ type: "success", title: "評価を更新しました", msg: msgBody });
+          }
           if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);  // モーダルは close・フルページは詳細へ
         } else {
           snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });

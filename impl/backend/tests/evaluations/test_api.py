@@ -213,6 +213,21 @@ def test_f_tc_105_submit_xp_once(client, env):
         assert _activity_count(env, kind="xp_gain", reason="evaluation", ref_id=ev.id) == 1
 
 
+def test_f_tc_141_submit_response_carries_xp_delta(client, env):
+    """F-TC-141 確定応答に xp_delta を載せる（初回確定=+30／再確定=0／下書き=0・#8 獲得フィードバック）。"""
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    body = {"scores": FULL, "overall_comment": "総評", "status": "submitted"}
+    first = client.put(EVAL(idea), json=body, headers=_csrf(client))
+    assert first.status_code == 200 and first.json()["xp_delta"] == 30   # 初回確定＝実付与額
+    again = client.put(EVAL(idea), json={**body, "overall_comment": "改訂"}, headers=_csrf(client))
+    assert again.status_code == 200 and again.json()["xp_delta"] == 0     # 再確定は冪等（追加なし）
+    # 別アイデアの下書き保存はアクション付与なし＝0
+    idea2 = env.make_idea(quest_id=env.make_quest())
+    draft = client.put(EVAL(idea2), json={"scores": {"novelty": 3}, "status": "draft"}, headers=_csrf(client))
+    assert draft.status_code == 200 and draft.json()["xp_delta"] == 0
+
+
 def test_f_tc_106_score_range(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())

@@ -1,9 +1,6 @@
-// 投票の獲得 XP フィードバックの純ロジック（SC-01・ゲーム感 #8・段階ハイブリッド step1）。
-// 視覚は XpFloat／ヒーロー XP バー（DashboardView）。金額の正は最終的に backend delta へ寄せる方針で、
-// 当面は仕様固定 +5 を frontend 定数で持つ（暫定・backend delta 移行で解消）。
-
-// 投票の初回付与 XP（仕様固定・D 台帳 vote=+5／日次上限は server の xp_awarded でゲート）。
-export const VOTE_XP = 5;
+// 投票の獲得 XP フィードバックの純ロジック（SC-01・ゲーム感 #8）。
+// 視覚は XpFloat／ヒーロー XP バー（DashboardView）。金額は server の応答 `xp_delta` が正
+// （step2 で backend delta に一本化＝frontend 定数は撤去済み）。ここは表示用のバー％計算のみを担う。
 
 /**
  * 楽観的に前進させた XP バーの充填％（現レベル内）。

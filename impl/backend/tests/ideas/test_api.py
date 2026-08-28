@@ -710,6 +710,36 @@ def test_d_tc_162_vote_xp_daily_cap(factory, env):
     assert granted == [True, True, True, True, True, False]  # 6件目は日次上限で付与なし
 
 
+def test_d_tc_163_publish_response_carries_xp_delta(client, env):
+    """D-TC-163 公開応答に xp_delta を載せる（初回公開=+50・参照=0・#8 獲得フィードバック）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    draft = env.make_idea(quest_id=qid, status="draft")
+    r = client.post(f"/api/v1/ideas/{draft}/publish", json={}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["xp_delta"] == 50            # 初回公開＝実付与額（金額の正はサーバー）
+    # 参照系（取得）はアクションではない＝delta を持たない（0）
+    assert client.get(f"/api/v1/ideas/{draft}").json()["xp_delta"] == 0
+
+
+def test_d_tc_164_vote_response_carries_xp_delta(client, factory, env):
+    """D-TC-164 投票応答に xp_delta を載せる（初回=+5／切替=0・xp_awarded と同値・#8）。
+
+    seed ユーザーは他テストで日次上限（5/日）に達し得るため、fresh voter（quest owner＝全権限）で
+    隔離してから API で投票する（D-TC-161/162 と同じ隔離方針）。
+    """
+    voter = factory.make_seed_company_account()
+    with get_tenant_session(env.db_identifier) as ts:
+        voter_uid = get_user_by_account(ts, voter["id"]).id
+    qid = env.make_quest(owner=voter_uid)          # voter=owner（vote 可）・seed も member に入る
+    idea = env.make_idea(quest_id=qid, status="published")
+    _login(client, voter["company_code"], voter["login_id"], voter["password"])
+    first = client.post(VOTE(idea), json={"type": "approve"}, headers=_csrf(client)).json()
+    assert first["xp_delta"] == 5 and first["xp_awarded"] is True     # 初回＝付与
+    switch = client.post(VOTE(idea), json={"type": "oppose"}, headers=_csrf(client)).json()
+    assert switch["xp_delta"] == 0 and switch["xp_awarded"] is False  # 切替は追加なし
+
+
 def test_sec_tc_011_attachment_signature_mismatch(client, env):
     """SEC-TC-011 拡張子 .png だが中身が非PNG→422 signature_mismatch（拡張子偽装拒否・§8）。"""
     _login_seed(client)

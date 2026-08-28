@@ -45,7 +45,7 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `PUT /ideas/{idea_id}/evaluation` | 自分の評価を登録/更新（upsert・`UNIQUE(idea_id, evaluator_id)`） | パス: `idea_id`／ボディ: `{scores:{aspect:1..5}, comments?:{aspect:string}, overall_comment?, visibility:'party'\|'limited', status:'draft'\|'submitted'}` | 200/201＋保存後の自分の評価（F.1 `me` 形）。`status=submitted` で評価者 XP+30・確定トリガ判定（F.4） |
+| `PUT /ideas/{idea_id}/evaluation` | 自分の評価を登録/更新（upsert・`UNIQUE(idea_id, evaluator_id)`） | パス: `idea_id`／ボディ: `{scores:{aspect:1..5}, comments?:{aspect:string}, overall_comment?, visibility:'party'\|'limited', status:'draft'\|'submitted'}` | 200/201＋保存後の自分の評価（F.1 `me` 形）＋`xp_delta`〔この確定で実際に付与した評価 XP＝初回 submitted は +30・冪等/下書き/参照時は 0＝獲得フィードバック #8・金額の正はサーバー〕。`status=submitted` で評価者 XP+30・確定トリガ判定（F.4） |
 
 - **下書き（`draft`）**: 観点が揃わなくても保存可（部分可・`overall_comment` 空可）。**本人のみ可視**・XP/コイン付与なし。何度でも上書き。
 - **確定（`submitted`）**: サーバーが**全5観点（`novelty`/`impact`/`feasibility`/`fit`/`cost`）が 1..5 で揃い、`overall_comment` が非空**であることを検証（未充足は **422 `validation_error`**・`errors[].field`）。初回確定時に `submitted_at` を記録。

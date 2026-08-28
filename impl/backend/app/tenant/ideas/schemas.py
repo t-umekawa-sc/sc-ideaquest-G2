@@ -130,11 +130,16 @@ class IdeaVoteRequest(BaseModel):
 
 
 class IdeaVoteResponse(BaseModel):
-    """投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か（G 実装まで False）。"""
+    """投票結果（D.5）。my_vote＝自分の投票／summary＝賛成/反対数／xp_awarded＝初回付与か。
+
+    xp_delta＝この投票で実際に付与した XP（初回・日次上限内なら +5・それ以外 0）＝獲得フィードバック用（#8）。
+    金額の正はサーバー（D 台帳 vote=+5）。xp_awarded は xp_delta>0 と同値（後方互換で残置）。
+    """
 
     my_vote: str | None = None
     summary: IdeaVoteSummaryDTO
     xp_awarded: bool = False
+    xp_delta: int = 0
 
 
 # ---- response（一覧カード/詳細） ----
@@ -233,3 +238,6 @@ class IdeaDetailDTO(BaseModel):
     following: bool = False
     my_permissions: list[str] = []
     my_state: str
+    # この応答が「初回公開」の結果である時のみ、実際に付与した投稿 XP（+50）を載せる＝獲得フィードバック（#8）。
+    # 参照系（取得/編集）や再公開・冪等スキップ時は 0。金額の正はサーバー（D 台帳 idea_post=+50）。
+    xp_delta: int = 0

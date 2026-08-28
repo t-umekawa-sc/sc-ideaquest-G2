@@ -202,9 +202,11 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
         )
         ts.flush()
         repo.replace_stakeholders(ts, idea.id, _normalize_stakeholders(body.stakeholders))
+        xp_delta = 0
         if body.status == "published":
-            _publish_processing(ts, idea, user)
+            xp_delta = _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
+        detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         ts.commit()
     return detail
 
@@ -264,8 +266,9 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         _apply_content(ts, idea, body)
         _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
         idea.status = "published"
-        _publish_processing(ts, idea, user)
+        xp_delta = _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
+        detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         ts.commit()
     return detail
 
@@ -352,7 +355,9 @@ def vote_idea(account_id, company_id, idea_id, *, vote_type) -> dict:
         xp_awarded = _award_vote_xp(ts, idea, user, created)
         vc = repo.count_votes(ts, idea.id)
         ts.commit()
-    return {"my_vote": vote_type, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}, "xp_awarded": xp_awarded}
+    # xp_delta＝実際に付与した XP（初回・上限内なら +5・それ以外 0）。金額の正はサーバー（#8・D-TC-164）。
+    return {"my_vote": vote_type, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+            "xp_awarded": xp_awarded, "xp_delta": _XP_VOTE if xp_awarded else 0}
 
 
 def remove_vote(account_id, company_id, idea_id) -> None:
@@ -688,8 +693,10 @@ def _stakeholders_str(value) -> str:
     return "・".join((s.get("label") or "") for s in value)
 
 
-def _publish_processing(ts, idea, user) -> None:
+def _publish_processing(ts, idea, user) -> int:
     """公開の瞬間の処理（D.2/D.4/E/G）。初版 revision=1 記録（通知なし）＋チャットグループ作成（E・1:1）＋投稿 XP+50。
+
+    返り値＝実際に付与した投稿 XP（初回公開 +50・冪等スキップ時 0）＝獲得フィードバック（#8）。
 
     冪等は status 遷移（再 publish は 409）＋chat_groups の `UNIQUE(idea_id)`＋XP は ref 存在チェック
     （`reason=idea_post,ref_type=ideas,ref_id=idea_id`）で担保（多重呼びでも二重付与しない）。
@@ -700,9 +707,12 @@ def _publish_processing(ts, idea, user) -> None:
     chat_repo.ensure_chat_group(ts, idea.id)  # E＝アイデアと 1:1（§5.15・公開時に自動作成）
     # 投稿 XP+50（G・§8-⑥・アイデア初回公開のみ）。付与先＝投稿者。**公開時は常に user==投稿者**＝下書きは
     # 本人のみ公開可（他人は _authorize_edit_idea で 404・代理公開は不可・D-TC-145）ため user.id が投稿者に一致する。
+    # 返り値＝実際に付与した XP（初回のみ +50・冪等スキップ時 0）＝獲得フィードバック用（#8・D-TC-163）。
     if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "idea_post", "ideas", idea.id):
         ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_IDEA_POST, reason="idea_post",
                      ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
+        return _XP_IDEA_POST
+    return 0
 
 
 def _record_initial_revision(ts, idea, editor_id) -> None:

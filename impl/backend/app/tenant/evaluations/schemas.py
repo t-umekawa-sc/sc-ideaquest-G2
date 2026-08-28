@@ -42,7 +42,11 @@ class EvaluationAuthorDTO(BaseModel):
 
 
 class EvaluationMeDTO(BaseModel):
-    """自分の評価/下書き（SC-25 読み込み・F.1）。未作成は status=null。"""
+    """自分の評価/下書き（SC-25 読み込み・F.1）。未作成は status=null。
+
+    xp_delta＝この確定(submitted)で実際に付与した評価 XP（初回のみ +30・冪等スキップ/下書き保存/参照時は 0）
+    ＝獲得フィードバック用（#8）。金額の正はサーバー（F 台帳 evaluation=+30）。
+    """
 
     status: EvaluationStatus | None = None
     scores: dict[str, int] = {}
@@ -50,6 +54,7 @@ class EvaluationMeDTO(BaseModel):
     overall_comment: str | None = None
     visibility: EvaluationVisibility = "party"
     submitted_at: datetime | None = None
+    xp_delta: int = 0
 
 
 class EvaluationEvaluatorDTO(BaseModel):
