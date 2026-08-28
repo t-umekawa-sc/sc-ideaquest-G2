@@ -816,7 +816,7 @@ body.modal-open { overflow: hidden; }
 }
 .checkbox > input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
-  flex: 0 0 auto; width: 18px; height: 18px; margin: 1px 0 0; /* 1行目に揃える */
+  flex: 0 0 auto; width: 18px; height: 18px; margin: 0.2em 0 0; /* 1行目のテキスト中心に光学的に揃える（JP は行内で下寄り描画のため em で少し下げる） */
   border: 2px solid var(--color-border-strong); border-radius: 5px;
   background: var(--color-surface) center / 13px no-repeat;
   cursor: pointer;
