@@ -367,7 +367,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           const magic = (m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; mine?: boolean } })?.magic ?? null;
           const normal = ((m.reactions as { normal?: Array<{ emoji: string; count: number; reacted_by_me: boolean; users?: string[] }> })?.normal) ?? [];
           return (
-            <div key={m.id}>
+            // #17: key=id なので新着メッセージだけが mount＝CSS で登場（既存は再利用され再生しない）。
+            <div key={m.id} className="msg-row">
               {showDay && <div className="chat-day">{day}</div>}
               {firstUnread === m.id && <div className="unread-sep">ここから未読</div>}
               <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : ""].filter(Boolean).join(" ")}>

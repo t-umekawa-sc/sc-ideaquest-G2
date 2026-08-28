@@ -164,3 +164,13 @@
 .composer.is-collapsed .composer__toggle { display: none; }
 .composer.is-collapsed .composer__mini { display: block; }
 
+
+/* ── ゲーム感 #17: チャットの手触り（SC-24・純CSS）───────────────────────────────────
+   新着メッセージの登場（下からフェード）＋リアクション追加時のポップ。key=id により新着だけが
+   mount するので、既存メッセージ/既存リアクションは再生されない。reduce-motion 尊重。 */
+.msg-row { animation: msg-enter .28s ease both; }
+@keyframes msg-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* リアクション（通常＋魔法）の追加時ポップ。fill を付けない＝押下 :active の transform を潰さない。 */
+.reaction { animation: reaction-pop .3s cubic-bezier(.2,1.4,.4,1); }
+@keyframes reaction-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .msg-row, .reaction { animation: none; } }
