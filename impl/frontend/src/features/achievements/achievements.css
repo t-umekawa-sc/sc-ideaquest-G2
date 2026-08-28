@@ -111,3 +111,10 @@
   .ach-unlock-aura, .ach-unlock-spark { animation: none; }
   .ach-unlock-spark { display: none; }
 }
+
+/* #25: 進捗バーの伸びる演出（実績カードの進捗＋収集サマリーの達成率）。 */
+.ach__prog > span { transform-origin: left; animation: bar-grow .8s cubic-bezier(.22,1,.36,1) both; }
+.col-hero__bar .xp-bar > span { transform-origin: left; animation: bar-grow .9s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ach__prog > span, .col-hero__bar .xp-bar > span { animation: none; }
+}

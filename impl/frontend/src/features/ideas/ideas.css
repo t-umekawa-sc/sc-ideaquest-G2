@@ -214,3 +214,7 @@
 .vote-bar__disagree { background: var(--color-disagree); }
 .vote-bar__agree, .vote-bar__disagree { height: 100%; transition: width .6s cubic-bezier(.22,1,.36,1); }
 @media (prefers-reduced-motion: reduce) { .vote-bar__agree, .vote-bar__disagree { transition: none; } }
+
+/* #25: 進捗バーの伸びる演出（評価結果の観点別平均バー）。 */
+.score-bar > i { transform-origin: left; animation: bar-grow .8s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion: reduce) { .score-bar > i { animation: none; } }

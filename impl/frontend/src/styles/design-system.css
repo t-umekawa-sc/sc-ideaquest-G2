@@ -1743,3 +1743,8 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 }
 .mascot3d canvas { display: block; width: 100% !important; height: 100% !important; }
 @media (prefers-reduced-motion: reduce) { .mascot3d { display: none; } }
+
+/* ── ゲーム感 #25: 進捗バーの伸びる演出（共通キーフレーム）─────────────────────────────
+   バーの塗り要素を scaleX(0→1) で左から伸ばす（width は現在値のまま＝animation は transform のみ）。
+   要素マウント時（データ取得後）に一度再生。適用は各所（reduce-motion で無効）。 */
+@keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
