@@ -8,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
 import { Avatar, CountUp, useSnackbar } from "@/components/ui";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
@@ -16,7 +18,7 @@ import { SparkBurst } from "./SparkBurst";
 import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
-import { reduceMotion } from "@/lib/motion";
+import { reduceMotion, isMotionReduced } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
@@ -78,9 +80,13 @@ export function DashboardView({
   // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const burstId = useRef(0);
-  // GF-AC-040: 投票したカードは即消えず、火花と同じ時間だけかけて「ふわっと退場」→退場後にリストから外す。
-  // これで火花が正しいカード上に重なり、繰り上がりや空スペースに火花だけ残らない（reduce-motion は即削除）。
-  const [leaving, setLeaving] = useState<Record<string, boolean>>({});
+  // GF-AC-040: 投票カードは framer-motion で「ふわっと退場（fade）＋残りカードの繰り上がりを滑らかに移動（layout）」。
+  // 退場中は popLayout で流れから外し、残りが同時にスライドして詰まる＝火花が空スペースに残らない。
+  // reduce-motion（OS＋ユーザー設定 accounts.reduce_motion）時は演出なし＝即時入替。
+  const osReduce = useReducedMotion();
+  const [userReduce, setUserReduce] = useState(false);
+  useEffect(() => { setUserReduce(document.querySelector('[data-anim-reduced="true"]') !== null); }, []);
+  const reduceAnim = isMotionReduced(!!osReduce, userReduce);
   const fireBurst = (e: { clientX: number; clientY: number }) => {
     if (reduceMotion()) return;
     const id = ++burstId.current;
@@ -143,24 +149,12 @@ export function DashboardView({
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (e) fireBurst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
-    // 楽観削除。通常は「ふわっと退場」（火花と同じ ~0.6s かけてフェード）→退場後にリストから外す。
-    // reduce-motion（OS/設定）時は演出なし＝即削除（従来どおり）。
-    const reduced = reduceMotion();
-    let removeTimer: ReturnType<typeof setTimeout> | null = null;
-    if (reduced) {
-      setVotes((s) => ({ ...s, [idea.id]: type }));
-    } else {
-      setLeaving((s) => ({ ...s, [idea.id]: true }));
-      removeTimer = setTimeout(() => {
-        setVotes((s) => ({ ...s, [idea.id]: type }));
-        setLeaving((s) => { const n = { ...s }; delete n[idea.id]; return n; });
-      }, 600);  // 火花（spark-fly .6s）と揃える＝退場しきってから外す
-    }
+    // 楽観＝配列から即除外。AnimatePresence が exit（フェード ~0.6s＝火花と同尺）を再生し、
+    // 残りカードは layout で滑らかに繰り上がる（reduce-motion 時は即時入替＝演出なし）。
+    setVotes((s) => ({ ...s, [idea.id]: type }));
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
-      if (removeTimer) clearTimeout(removeTimer);  // 退場アニメを取り消し
-      setLeaving((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 退場を戻す
-      setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 失敗はロールバック
+      setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 失敗はロールバック（再登場）
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
     }
@@ -283,18 +277,30 @@ export function DashboardView({
             <span className="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
           </div>
           <div className="vote-grid">
-            {unvoted.map((v) => (
-              <article key={v.id} className="card card-accent vote-card" data-leaving={leaving[v.id] ? "true" : undefined}>
-                <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
-                <div className="vote-card__quest">{v.quest.title}</div>
-                <div className="vote-card__value">{v.value}</div>
-                <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
-                <div className="vote-actions">
-                  <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
-                  <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
-                </div>
-              </article>
-            ))}
+            {/* GF-AC-040: 投票カードの退場（fade）＋残りの繰り上がり（layout）を framer-motion で。
+                popLayout＝退場カードを流れから外し、残りが同時に詰まる。reduce-motion 時は演出なし（即時）。 */}
+            <AnimatePresence mode="popLayout" initial={false}>
+              {unvoted.map((v, i) => (
+                <motion.article
+                  key={v.id}
+                  layout={!reduceAnim}
+                  className="card card-accent vote-card"
+                  initial={reduceAnim ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.6, ease: "easeOut" } }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
+                >
+                  <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
+                  <div className="vote-card__quest">{v.quest.title}</div>
+                  <div className="vote-card__value">{v.value}</div>
+                  <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
+                  <div className="vote-actions">
+                    <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
+                    <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
+                  </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
           </div>
         </section>
       )}
