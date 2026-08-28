@@ -208,11 +208,13 @@
 }
 
 /* ── ゲーム感 #23: 投票結果の賛否バー（SC-22・純CSS）───────────────────────────────
-   賛成(緑)/反対(赤)の比率を伸びるバーで可視化。マウント時 0→比率、投票変更で滑らかに伸縮。reduce-motion で即時。 */
-.vote-bar { display: flex; height: 10px; margin-top: var(--space-2); border-radius: 99px; overflow: hidden; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
-.vote-bar__agree { background: var(--color-agree); }
-.vote-bar__disagree { background: var(--color-disagree); }
-.vote-bar__agree, .vote-bar__disagree { height: 100%; transition: width .6s cubic-bezier(.22,1,.36,1); }
+   賛成(緑)/反対(赤)の比率を伸びるバーで可視化。0-0 でも空トラックを常時表示。
+   賛成＝左アンカー（左→右へ伸び／解除で右→左へ引っ込む）、反対＝右アンカー（右→左へ伸び／解除で左→右へ引っ込む）
+   ＝各辺に固定した絶対配置＋width アニメで実現。マウント時 0→比率、投票変更で滑らかに伸縮。reduce-motion で即時。 */
+.vote-bar { position: relative; height: 10px; margin-top: var(--space-2); border-radius: 99px; overflow: hidden; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
+.vote-bar__agree, .vote-bar__disagree { position: absolute; top: 0; height: 100%; transition: width .6s cubic-bezier(.22,1,.36,1); }
+.vote-bar__agree { left: 0; background: var(--color-agree); }
+.vote-bar__disagree { right: 0; background: var(--color-disagree); }
 @media (prefers-reduced-motion: reduce) { .vote-bar__agree, .vote-bar__disagree { transition: none; } }
 
 /* #25: 進捗バーの伸びる演出（評価結果の観点別平均バー）。 */

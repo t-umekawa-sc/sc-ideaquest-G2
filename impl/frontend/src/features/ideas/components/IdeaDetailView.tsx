@@ -498,13 +498,12 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className="vote-agree">▲ 賛成 {agreeN}</span>
               <span className="vote-disagree">▼ 反対 {disagreeN}</span>
             </div>
-            {/* #23: 賛否の比率バー（伸びるアニメ・total 0 は非表示）。数値は上、割合は一目で。 */}
-            {votePct.total > 0 && (
-              <div className="vote-bar" role="img" aria-label={`賛成 ${votePct.approve}% ・ 反対 ${votePct.oppose}%`}>
-                <span className="vote-bar__agree" style={{ width: `${voteBarReady ? votePct.approve : 0}%` }} />
-                <span className="vote-bar__disagree" style={{ width: `${voteBarReady ? votePct.oppose : 0}%` }} />
-              </div>
-            )}
+            {/* #23: 賛否の比率バー（常時表示＝0-0 は空バー）。賛成＝左アンカーで左→右に伸び、反対＝右アンカーで
+                右→左に伸びる。解除時は width が 0 に戻る＝伸びた向きと逆にゲージが引っ込む（GF-AC-230/231/233）。 */}
+            <div className="vote-bar" role="img" aria-label={votePct.total > 0 ? `賛成 ${votePct.approve}% ・ 反対 ${votePct.oppose}%` : "まだ投票がありません"}>
+              <span className="vote-bar__agree" style={{ width: `${voteBarReady ? votePct.approve : 0}%` }} />
+              <span className="vote-bar__disagree" style={{ width: `${voteBarReady ? votePct.oppose : 0}%` }} />
+            </div>
             <div className="vote-btns">
               {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。completed/締切後は事前無効化＋サーバー権威（権限なしは 403→理由トースト）。 */}
               <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("approve", e)}>
