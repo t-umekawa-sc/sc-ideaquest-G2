@@ -11,6 +11,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { Spinner, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { reduceMotion } from "@/lib/motion";
 import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import { getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
@@ -43,6 +44,13 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const snack = useSnackbar();
   const [scores, setScores] = useState<Partial<Record<AspectKey, number>>>({});
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
+  // #22: 採点確定時に星が「フィルスイープ」でポップ（純視覚・reduce-motion 時は出さない）。
+  const [popAspect, setPopAspect] = useState<string | null>(null);
+  const firePop = (key: string) => {
+    if (reduceMotion()) return;
+    setPopAspect(key);
+    setTimeout(() => setPopAspect((p) => (p === key ? null : p)), 450);
+  };
   const [comments, setComments] = useState<Partial<Record<AspectKey, string>>>({});
   const [overall, setOverall] = useState("");
   const [visibility, setVisibility] = useState<EvaluationVisibility>("party");
@@ -209,6 +217,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
                       className="stars"
                       role="radiogroup"
                       aria-label={`${a.label}の点数`}
+                      data-pop={popAspect === a.key ? "true" : undefined}
                       onMouseLeave={() => setHover((h) => ({ ...h, [a.key]: undefined }))}
                       onKeyDown={(e) => {
                         // 矢印キーで採点移動＝radiogroup 標準（Home/End で 1/5）。選択後は当該★へフォーカス。
@@ -224,6 +233,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
                           e.preventDefault();
                           setScores((s) => ({ ...s, [a.key]: nv }));
                           if (missingErr) setMissingErr(0);
+                          firePop(a.key);
                           // 再描画（roving tabindex 更新）＋モーダルの focus trap 後に選択★へフォーカス移動。
                           requestAnimationFrame(() => (grp.querySelector(`[data-star="${nv}"]`) as HTMLElement | null)?.focus());
                         }
@@ -243,6 +253,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
                           onClick={() => {
                             setScores((s) => ({ ...s, [a.key]: n }));
                             if (missingErr) setMissingErr(0);
+                            firePop(a.key);
                           }}
                         >
                           ★

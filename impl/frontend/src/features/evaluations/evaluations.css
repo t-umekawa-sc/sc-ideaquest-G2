@@ -46,3 +46,23 @@
 .vis-opt.is-sel { border-color: var(--color-primary); background: var(--color-primary-soft); }
 .vis-opt__title { font-weight: 600; }
 .vis-opt__desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+
+/* ── ゲーム感 #22: 評価の星採点の手触り（SC-25・純CSS）───────────────────────────────
+   ホバーした星の拡大＋点灯星のグロー、確定時に星がフィルスイープでポップ（data-pop）。reduce-motion 尊重。 */
+.star { transition: transform .1s ease, color .1s ease; transform-origin: center 60%; }
+.star.is-on { text-shadow: 0 0 6px rgba(245,158,11,.6); }
+.stars:hover .star:hover { transform: scale(1.28); }
+.stars:hover .star:hover ~ .star { transform: none; }         /* ホバー星より右は拡大しない（プレビューの境界を明快に） */
+.star:active { transform: scale(1.1); }
+/* 確定時のフィルスイープ（点灯星が左から順にポン） */
+.stars[data-pop="true"] .star.is-on { animation: star-pop .4s ease; }
+.stars[data-pop="true"] .star.is-on:nth-child(1) { animation-delay: 0s; }
+.stars[data-pop="true"] .star.is-on:nth-child(2) { animation-delay: .05s; }
+.stars[data-pop="true"] .star.is-on:nth-child(3) { animation-delay: .10s; }
+.stars[data-pop="true"] .star.is-on:nth-child(4) { animation-delay: .15s; }
+.stars[data-pop="true"] .star.is-on:nth-child(5) { animation-delay: .20s; }
+@keyframes star-pop { 0% { transform: scale(1); } 45% { transform: scale(1.5); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .star, .stars:hover .star:hover, .star:active { transition: none; transform: none; }
+  .stars[data-pop="true"] .star.is-on { animation: none; }
+}
