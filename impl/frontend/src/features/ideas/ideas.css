@@ -174,3 +174,35 @@
 .attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
 .attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-sm); }
 .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+
+/* ── ゲーム感 #16: 選定成立の祝福（SC-22・中央オーバーレイ）─────────────────────────────
+   owner/quest_admin がアイデアを選定した瞬間の祝福。~2.8s で自動消滅・クリックで即閉じ。純視覚。
+   発火自体は reduce-motion 時に JS 側で抑止（ここは演出のみ・@media は保険）。 */
+.select-celebrate {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2,6,23,.34); animation: select-fade .2s ease both; cursor: pointer;
+}
+.select-celebrate__card {
+  position: relative; text-align: center; padding: var(--space-6) var(--space-8);
+  background: var(--pixel-paper, #fff); border: 3px solid var(--pixel-ink);
+  border-radius: var(--radius-pixel);
+  box-shadow: 0 0 0 4px rgba(245,158,11,.4), 0 10px 0 rgba(2,6,23,.25);
+  animation: select-pop .5s cubic-bezier(.18,1.4,.4,1) both; max-width: min(92vw, 30rem);
+}
+.select-celebrate__aura { position: absolute; inset: -6px; border-radius: var(--radius-pixel); pointer-events: none; animation: aura-pulse 1.3s ease-in-out infinite; }
+.select-celebrate__crown { font-size: 2.6rem; line-height: 1; }
+.select-celebrate__title { font-weight: 800; letter-spacing: .12em; font-size: 1.4rem; color: var(--pixel-coin, #f59e0b); text-shadow: 2px 2px 0 rgba(2,6,23,.18); }
+.select-celebrate__idea { margin-top: var(--space-1); font-weight: 800; font-size: var(--text-lg); }
+.select-celebrate__sub { margin-top: var(--space-2); color: var(--pixel-skill, #f59e0b); font-weight: 700; font-size: var(--text-sm); }
+.select-celebrate__spark { position: absolute; font-size: 1.4rem; opacity: 0; pointer-events: none; color: var(--pixel-coin, #f59e0b); }
+.select-celebrate__spark--a { top: -6px; left: 10%; animation: select-spark 1.1s ease-out .05s infinite; }
+.select-celebrate__spark--b { top: 40%; right: -4px; animation: select-spark 1.1s ease-out .30s infinite; }
+.select-celebrate__spark--c { bottom: -6px; left: 64%; animation: select-spark 1.1s ease-out .55s infinite; }
+@keyframes select-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes select-pop { 0% { transform: scale(.6) translateY(8px); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes select-spark { 0% { transform: scale(.4) translateY(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1.3) translateY(-14px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .select-celebrate, .select-celebrate__card, .select-celebrate__aura, .select-celebrate__spark { animation: none; }
+  .select-celebrate__spark { display: none; }
+}

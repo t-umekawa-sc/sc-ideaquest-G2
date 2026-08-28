@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Avatar, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { reduceMotion } from "@/lib/motion";
 
 import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -76,6 +77,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [selected, setSelected] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
+  const [celebrateSelect, setCelebrateSelect] = useState(false); // #16: 選定成立の祝福オーバーレイ
   // チャット（E）＝活発度集計＋直近プレビュー（SC-22 §4.4）。
   const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null);
   const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]);
@@ -203,6 +205,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       const res = prev ? await unselectIdea(ideaId) : await selectIdea(ideaId);
       if (res) setSelected(res.is_selected);
       snack({ type: prev ? "info" : "success", msg: prev ? "選定を解除しました。" : "アイデアを選定しました。投稿者にコイン・XP を付与しました。" });
+      // #16: 選定（解除ではない）成立時に祝福（純装飾＝reduce-motion 時は出さずスナックバーで通知）。
+      if (!prev && res?.is_selected && !reduceMotion()) {
+        setCelebrateSelect(true);
+        setTimeout(() => setCelebrateSelect(false), 2800);
+      }
     } catch (err) {
       setSelected(prev); // ロールバック
       const status = err instanceof ApiError ? err.status : 0;
@@ -258,6 +265,21 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
   return (
     <main className="container detail-main">
+      {/* #16: 選定成立の祝福（中央オーバーレイ・~2.8s 自動消滅・クリックで即閉じ・reduce-motion 時は非表示） */}
+      {celebrateSelect && (
+        <div className="select-celebrate" role="status" aria-live="polite" onClick={() => setCelebrateSelect(false)}>
+          <div className="select-celebrate__card">
+            <div className="select-celebrate__aura" aria-hidden />
+            <div className="select-celebrate__spark select-celebrate__spark--a" aria-hidden>✦</div>
+            <div className="select-celebrate__spark select-celebrate__spark--b" aria-hidden>✧</div>
+            <div className="select-celebrate__spark select-celebrate__spark--c" aria-hidden>★</div>
+            <div className="select-celebrate__crown" aria-hidden>👑</div>
+            <div className="select-celebrate__title">SELECTED!</div>
+            <div className="select-celebrate__idea">{idea.title}</div>
+            <div className="select-celebrate__sub">このアイデアを選定しました ・ 投稿者へ ✦+200 XP</div>
+          </div>
+        </div>
+      )}
       {/* クエストへ戻る（D.1 quest 参照・実導線）。 */}
       <Link className="backlink" href={`/quests/${idea.quest.id}`}>
         ← {idea.quest.title || "クエスト"}へ戻る
