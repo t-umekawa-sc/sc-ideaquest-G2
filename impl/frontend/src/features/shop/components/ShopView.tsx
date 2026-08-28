@@ -4,10 +4,11 @@
 // 正＝doc/画面設計/mocks/SC-30_ショップ.html・doc/画面設計/screens/SC-30_ショップ.md・API設計 G.1。
 // G 実接続＝getItems（マスタ＋所有＋残高）／purchaseItem（コイン消費・残高不足/所有済みはサーバー権威 409）。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CountUp, DataTable, GameNav, useConfirm, useSnackbar } from "@/components/ui";
-import type { DataTableColumn } from "@/components/ui";
+import { CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
@@ -39,6 +40,7 @@ const STATE_OPTIONS: [string, string][] = [["owned", "所有済"], ["affordable"
 export function ShopView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
   const [coins, setCoins] = useState(0);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -72,6 +74,14 @@ export function ShopView() {
   useEffect(() => { void load(); }, [load]);
 
   const stateOf = (it: Item): State => (it.owned ? "owned" : it.price <= coins ? "affordable" : "short");
+
+  // 行アクション（リスト表示の「操作」⋯）。状態で内容が変わる＝購入可は「購入する」・所有済みは着せ替え導線・
+  // コイン不足は理由提示（RowMenuItem に disabled が無いため、押下で不足を通知）。カード表示の購入ボタンと同じ buy() を呼ぶ。
+  const itemMenu = (it: Item): RowMenuItem[] => {
+    if (it.owned) return [{ label: "▶ きせかえで装備", onClick: () => router.push("/avatar") }];
+    if (it.price <= coins) return [{ label: "購入する", onClick: () => void buy(it) }];
+    return [{ label: `コイン不足（あと ◆${it.price - coins}）`, onClick: () => snack({ type: "info", msg: `コインが不足しています（あと ◆${it.price - coins}）。評価などでコインを貯めましょう。` }) }];
+  };
 
   async function buy(it: Item) {
     if (it.owned || it.price > coins) return;
@@ -121,6 +131,8 @@ export function ShopView() {
     { key: "rarity", label: "レアリティ", width: 120, sortable: true, filter: { type: "enum", options: RARITY_OPTIONS }, sortVal: (i) => RARITY_ORDER[i.rarity], filterVal: (i) => i.rarity, csvVal: (i) => RARITY_LABEL[i.rarity], render: (i) => <span className={`rarity-${i.rarity}`} style={{ fontWeight: 700 }}>{RARITY_LABEL[i.rarity]}</span> },
     { key: "price", label: "価格", width: 100, align: "num", sortable: true, filter: { type: "number" }, sortVal: (i) => i.price, filterVal: (i) => i.price, csvVal: (i) => String(i.price), render: (i) => `◆ ${i.price}` },
     { key: "state", label: "状態", width: 120, filter: { type: "enum", options: STATE_OPTIONS }, filterVal: (i) => stateOf(i), csvVal: (i) => STATE_LABEL[stateOf(i)], render: (i) => { const s = stateOf(i); const cls = s === "owned" ? "badge-muted" : s === "affordable" ? "badge-success" : "badge-danger"; return <span className={`badge ${cls}`}>{STATE_LABEL[s]}</span>; } },
+    // リスト表示の行アクション（購入する / 着せ替え / コイン不足）。カード表示は cardRaw の購入ボタンで導線あり。
+    { key: "_actions", label: "", actions: true, locked: true, width: 64, render: (i) => <RowMenu items={itemMenu(i)} /> },
   ];
 
   function cardRaw(it: Item) {
