@@ -4,13 +4,15 @@
 // 正＝doc/画面設計/mocks/SC-30_ショップ.html・doc/画面設計/screens/SC-30_ショップ.md・API設計 G.1。
 // G 実接続＝getItems（マスタ＋所有＋残高）／purchaseItem（コイン消費・残高不足/所有済みはサーバー権威 409）。
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { DataTable, GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { CountUp, DataTable, GameNav, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { reduceMotion } from "@/lib/motion";
 
 import { getItems, ITEM_ICON, purchaseItem } from "../api";
+import { ItemGetFx, type GetRect } from "./ItemGetFx";
 import "../shop.css";
 
 type Slot = "head" | "face" | "body" | "hand" | "bg";
@@ -41,6 +43,18 @@ export function ShopView() {
   const [coins, setCoins] = useState(0);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // #12: 購入成立の「アイテム入手」演出（購入カード矩形に one-shot・reduce-motion 尊重）。
+  const [gets, setGets] = useState<{ id: number; rect: GetRect; icon: string; cost: number }[]>([]);
+  const getId = useRef(0);
+  const fireGet = (itemId: string, icon: string, cost: number) => {
+    if (reduceMotion()) return;
+    const el = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-id="${itemId}"]`) : null;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const id = ++getId.current;
+    setGets((g) => [...g, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, icon, cost }]);
+    setTimeout(() => setGets((g) => g.filter((z) => z.id !== id)), 1000);
+  };
 
   const load = useCallback(async () => {
     const r = await getItems().catch(() => null);
@@ -74,6 +88,8 @@ export function ShopView() {
       setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
       setFlashId(it.id);
       setTimeout(() => setFlashId((f) => (f === it.id ? null : f)), 500);
+      fireGet(it.id, it.icon, it.price); // 入手の瞬間演出（カードにアイコンポップ＋◆-N）
+
       snack({
         type: "reward",
         title: "装備を購入しました",
@@ -136,6 +152,8 @@ export function ShopView() {
 
   return (
     <section aria-label="ショップ">
+      {/* #12: 購入成立の「アイテム入手」演出（購入カード矩形に固定オーバーレイ） */}
+      {gets.map((g) => <ItemGetFx key={g.id} rect={g.rect} icon={g.icon} cost={g.cost} />)}
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
       <GameNav current="shop" />
@@ -145,7 +163,7 @@ export function ShopView() {
       <section className="pixel-panel" aria-label="コイン残高">
         <div className="wallet">
           <div>
-            <div className="wallet__num">◆ {coins}</div>
+            <div className="wallet__num">◆ <CountUp value={coins} /></div>
             <div className="wallet__label">COIN</div>
           </div>
           <div className="wallet__meta">
