@@ -106,6 +106,9 @@ export function ShopView() {
         msg: `「${it.name}」を入手！ きせかえで装備できます。`,
         rewards: [{ k: "coin", t: `◆ -${it.price}` }],
       });
+      // ヘッダーのコイン残高（レイアウトの getServerMe 由来）を再取得＝コインチップのパルス（GF-AC-061）を発火。
+      // AppHeader はマウント維持のまま coin prop が変わり、前回値比較で data-bump が立つ。
+      router.refresh();
     } catch (err) {
       const reason = err instanceof ApiError ? (err.body as { errors?: { reason?: string }[] } | undefined)?.errors?.[0]?.reason : undefined;
       snack({
