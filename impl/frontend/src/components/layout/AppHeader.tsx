@@ -13,7 +13,7 @@ import { Avatar } from "@/components/ui";
 
 type Props = {
   user: { display_name: string; avatar_url?: string | null };
-  balance?: { level: number; coin: number; sp: number };
+  balance?: { level: number; coin: number; sp: number; xpPct?: number };
   unreadCount?: number;
   children: React.ReactNode; // .usermenu__list の中身（<li>…</li>）
 };
@@ -98,7 +98,15 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               aria-label={`${user.display_name} のメニュー`}
               onClick={() => setOpen((v) => !v)}
             >
-              <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
+              {/* #29: レベルリング＝現レベル内 XP 進捗を円環で表示（レベルアップ間近は data-near で脈動）。 */}
+              <span
+                className="lvring"
+                data-near={balance && (balance.xpPct ?? 0) >= 90 ? "true" : undefined}
+                style={{ ["--pct" as string]: `${balance?.xpPct ?? 0}` }}
+                title={balance ? `Lv.${balance.level}・次のレベルまで ${100 - (balance.xpPct ?? 0)}%` : undefined}
+              >
+                <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
+              </span>
             </button>
             <ul
               className="usermenu__list"

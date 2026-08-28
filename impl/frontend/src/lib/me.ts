@@ -45,7 +45,9 @@ export function heroBalance(b: Balance) {
   };
 }
 
-// 共通ヘッダー通貨（Lv/コイン/SP）。
+// 共通ヘッダー通貨（Lv/コイン/SP）＋現レベル内の XP 進捗率（#29 レベルリング用・heroBalance と同式）。
 export function headerBalance(b: Balance) {
-  return { level: b.level, coin: b.coin_balance, sp: b.skill_point_balance };
+  const xpInLevel = Math.max(0, b.level_span - b.xp_to_next);
+  const xpPct = b.level_span > 0 ? Math.round((xpInLevel / b.level_span) * 100) : 0;
+  return { level: b.level, coin: b.coin_balance, sp: b.skill_point_balance, xpPct };
 }

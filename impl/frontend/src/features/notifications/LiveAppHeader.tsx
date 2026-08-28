@@ -8,7 +8,7 @@ import { useRealtimeUnread } from "./RealtimeProvider";
 
 type Props = {
   user: { display_name: string; avatar_url?: string | null };
-  balance?: { level: number; coin: number; sp: number };
+  balance?: { level: number; coin: number; sp: number; xpPct?: number };
   initialUnread?: number;
   children: React.ReactNode;
 };
