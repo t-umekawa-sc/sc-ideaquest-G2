@@ -58,7 +58,7 @@
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch` で `feature/game-feel` に居るか確認**（居なければ `git checkout feature/game-feel`）。compose＝`impl/compose.yaml`。db はカスタムビルド（PGroonga 同梱・`impl/db/Dockerfile`）。
-- **進め方・QAスタックの作法の正本＝[`doc/ゲーム感フェーズ_進め方.md`](doc/ゲーム感フェーズ_進め方.md)**（安定・コミット管理）。本 handoff は都度状況のみ。要点＝QAは `cd impl && docker compose --profile workers up -d --build`（**worker/mail-worker 必須**＝無いと MailHog にコード来ず）・**frontend は本番ビルド**（F5 で剥がれない）・**push 後は `--build` 再ビルド**（backend 変更時は backend も）・**pytest はワーカ停止/cwd=impl**。ログイン＝`ACME-01`/`user@acme.example`/`Passw0rd!`。ポート＝frontend:3000／backend:8000(`/healthz`)／mailhog:8025／db:5432／redis:6379／minio:9000/:9001。
+- **進め方・QAスタックの作法の正本＝[`doc/フェーズ毎ルール/ゲーム感フェーズ.md`](doc/フェーズ毎ルール/ゲーム感フェーズ.md)**（安定・コミット管理）。本 handoff は都度状況のみ。要点＝QAは `cd impl && docker compose --profile workers up -d --build`（**worker/mail-worker 必須**＝無いと MailHog にコード来ず）・**frontend は本番ビルド**（F5 で剥がれない）・**push 後は `--build` 再ビルド**（backend 変更時は backend も）・**pytest はワーカ停止/cwd=impl**。ログイン＝`ACME-01`/`user@acme.example`/`Passw0rd!`。ポート＝frontend:3000／backend:8000(`/healthz`)／mailhog:8025／db:5432／redis:6379／minio:9000/:9001。
 - **frontend tsc / vitest / build**＝`cd impl/frontend` で `npx tsc --noEmit`（クリーン）／`npx vitest run`（56/56・node）／`npm run build`（26ページ・**transient で落ちたら再実行**＝§5）。
 - **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（493 passed）。終わったら `docker compose start worker mail-worker`。
 - **DB migration 適用（冪等）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
