@@ -28,10 +28,12 @@ import {
 } from "../api";
 import "../chat.css";
 
+import { SpellCastFx, type CastRect } from "./SpellCastFx";
+
 const NORMAL_EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀"];
 const EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀", "🔥", "✨", "😅", "🙌", "💡", "👏", "🤔", "🚀", "✅", "⚠️", "📌", "🎯"];
-// エフェクト種別→CSS（魔法エフェクト・chat.css の spell-fx--*）。
-const FX: Record<string, string> = { fire: "spell-fx--fire", ice: "spell-fx--ice", thunder: "spell-fx--thunder", sparkle: "spell-fx--sparkle", rainbow: "spell-fx--sparkle", aura: "spell-fx--ice" };
+// エフェクト種別→CSS（魔法エフェクト・design-system.css の spell-fx--*）。6 種を各々の見た目に（#10 で rainbow/aura を実効化）。
+const FX: Record<string, string> = { fire: "spell-fx--fire", ice: "spell-fx--ice", thunder: "spell-fx--thunder", sparkle: "spell-fx--sparkle", rainbow: "spell-fx--rainbow", aura: "spell-fx--aura" };
 
 type Member = { user_id: string; name: string; nospace: string };
 
@@ -87,6 +89,18 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [mention, setMention] = useState<{ pos: Pos; matches: Member[]; active: number } | null>(null);
   const [picker, setPicker] = useState<{ pos: Pos; msgId: string } | null>(null);
+  // #10: 魔法発動の瞬間演出（対象メッセージ矩形に one-shot・自分の発動のみ・reduce-motion 尊重）。
+  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string }[]>([]);
+  const castId = useRef(0);
+  const fireCast = (msgId: string, effect: string) => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const id = ++castId.current;
+    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect }]);
+    setTimeout(() => setCasts((c) => c.filter((z) => z.id !== id)), 1000);
+  };
 
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -278,7 +292,12 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const castSpell = async (m: ChatMessage, spell: Spell) => {
     try {
       const res = await addReaction(m.id, { type: "magic", spell_id: spell.id });
-      if (res) setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
+      if (res) {
+        setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
+        // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
+        const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
+        fireCast(m.id, eff);
+      }
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
       snack({ type: "error", msg: st === 403 ? "この魔法は未解放です（SC-32 で解放）。" : st === 409 ? "この魔法は使用済みか、既に魔法が付いています。" : "魔法の発動に失敗しました。" });
@@ -326,6 +345,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
 
   return (
     <main className="container chat-main">
+      {/* #10: 魔法発動の瞬間演出（対象メッセージ矩形に固定オーバーレイ・自分の発動時のみ） */}
+      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
       {/* 文脈バー */}
       <section className="card chat-context" aria-label="対象アイデア">
         <div className="chat-context__body">
