@@ -177,21 +177,10 @@
   .levelup-spark { display: none; }
 }
 
-/* ── 登場アニメ（ロード時にパネル/カードが下からフェードイン・ゲーム感）───────────
-   reduce-motion では無効（既定 opacity のまま即表示）。カードはリスト内 nth-child で軽くスタッガ。 */
-@media (prefers-reduced-motion: no-preference) {
-  /* vote-card は framer-motion（登場/退場/繰り上がり）に委譲＝CSS 登場から除外（transform 競合回避）。 */
-  .dash-page .pixel-panel,
-  .dash-page .card:not(.vote-card) { animation: dash-enter .32s ease-out both; }
-  .dash-page .card:not(.vote-card):nth-child(2) { animation-delay: .05s; }
-  .dash-page .card:not(.vote-card):nth-child(3) { animation-delay: .10s; }
-  .dash-page .card:not(.vote-card):nth-child(4) { animation-delay: .15s; }
-  .dash-page .card:not(.vote-card):nth-child(n+5) { animation-delay: .20s; }
-}
-@keyframes dash-enter {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: none; }
-}
+/* 登場アニメ（旧 CSS dash-enter）は廃止＝framer-motion に一本化（DashboardView の flowMotion）。
+   理由＝主要コンテナを layout アニメ化した際、CSS animation の `both` フィルタが transform を固定して
+   framer の layout transform を上書きし、投票/解除でのリフローがチラつくため。登場は framer の
+   マウント時のみ opacity フェード（load 限定）で再現。 */
 
 /* ── ゲーム感 #8: 投票の獲得フィードバック（ヒーロー XP バー連動・ダッシュボード固有）─────────
    火花バースト（.spark-burst）と +N XP フロート（.xp-float）は横断利用（SC-01/SC-22 等）のため

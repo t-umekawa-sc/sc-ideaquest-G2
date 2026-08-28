@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 
 import { Avatar, CountUp, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { getTeamFeed } from "@/features/feed/api";
@@ -174,15 +174,29 @@ export function DashboardView({
     }
   };
 
+  // 主要フローコンテナ共通の framer 設定：layout（高さ変化で全体を滑らかに再配置＝チラつき解消）＋
+  // マウント時のみの opacity フェード登場（旧 CSS dash-enter を置換・load 時限定）。
+  // transform は layout が使うため登場は opacity のみ（競合回避）。reduce-motion 時は演出なし（layout も無効）。
+  const flowMotion = (i: number) =>
+    reduceAnim
+      ? {}
+      : {
+          layout: true,
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: { duration: 0.3, ease: "easeOut", delay: Math.min(i, 6) * 0.05, layout: { duration: 0.35, ease: "easeOut" } },
+        };
+
   return (
     <div className="dash-page stack">
+      <LayoutGroup>
       <LevelUpWatcher accountId={accountId} level={level} />
       {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
       {xpFloats.map((f) => <XpFloat key={f.id} x={f.x} y={f.y} label={f.label} />)}
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
-      {greet && <div className="dash-greeting">{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</div>}
+      {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
-      <div className="dash-top">
+      <motion.div className="dash-top" {...flowMotion(1)}>
         <section className="pixel-panel hero" aria-label="あなたのステータス">
           <div className="hero__avatar" data-tier={rank.tier}>
             <Image src="/assets/mascot-hero.png" alt="あなたのアバター" width={88} height={88} />
@@ -238,11 +252,11 @@ export function DashboardView({
           </ol>
           <div className="rank-panel__foot"><Link href="/ranking">ランキングをすべて見る →</Link></div>
         </section>
-      </div>
+      </motion.div>
 
       {/* 下書き（1件も無ければ非表示） */}
       {drafts.length > 0 && (
-        <section aria-label="下書き">
+        <motion.section aria-label="下書き" {...flowMotion(2)}>
           <div className="section-head">
             <h2>下書き</h2>
             <span className="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
@@ -264,12 +278,12 @@ export function DashboardView({
               </Link>
             ))}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* 未投票のアイデア（0件なら非表示） */}
       {unvoted.length > 0 && (
-        <section aria-label="未投票のアイデア">
+        <motion.section aria-label="未投票のアイデア" {...flowMotion(3)}>
           <div className="section-head">
             <h2>未投票のアイデア</h2>
             <span className="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
@@ -300,12 +314,12 @@ export function DashboardView({
               ))}
             </AnimatePresence>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* 参加中クエスト（0件なら非表示） */}
       {quests.length > 0 && (
-        <section aria-label="参加中クエスト">
+        <motion.section aria-label="参加中クエスト" {...flowMotion(4)}>
           <div className="section-head">
             <h2>参加中クエスト</h2>
             <Link href="/quests">すべて見る →</Link>
@@ -331,21 +345,31 @@ export function DashboardView({
               );
             })}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* フォロー中のアイデア（0件なら非表示） */}
       {followed.length > 0 && (
-        <section aria-label="フォロー中のアイデア">
+        <motion.section aria-label="フォロー中のアイデア" {...flowMotion(5)}>
           <div className="section-head">
             <h2>フォロー中のアイデア</h2>
             <span className="muted text-sm">動きがあると通知でお知らせ</span>
           </div>
           <div className="follow-grid">
-            {followed.map((f) => {
+            {/* フォロー解除も投票カードと同様に fade 退場＋残りの繰り上がりを framer-motion で（reduce-motion 時は即時）。 */}
+            <AnimatePresence mode="popLayout" initial={false}>
+            {followed.map((f, i) => {
               const frozen = f.quest.quest_status === "completed";
               return (
-                <article key={f.id} className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}>
+                <motion.article
+                  key={f.id}
+                  layout={!reduceAnim}
+                  className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}
+                  initial={reduceAnim ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.4, ease: "easeOut" } }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
+                >
                   <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={() => toggleFollow(f)}>★</button>
                   <Link className="card-title" href={`/ideas/${f.id}`}>{f.title}</Link>
                   <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
@@ -356,20 +380,21 @@ export function DashboardView({
                     <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>
                   </div>
                   {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
-                </article>
+                </motion.article>
               );
             })}
+            </AnimatePresence>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の場の活動＝自分宛の「通知」とは別物） */}
-      <section className="card" aria-label="チームアクティビティ">
+      <motion.section className="card" aria-label="チームアクティビティ" {...flowMotion(6)}>
         <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
-      </section>
+      </motion.section>
 
       {/* 下段：最近の通知＋ショートカット */}
-      <div className="dash-bottom">
+      <motion.div className="dash-bottom" {...flowMotion(6)}>
         <section className="card" aria-label="最近の通知">
           <div className="section-head">
             <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>
@@ -400,17 +425,18 @@ export function DashboardView({
             ))}
           </div>
         </section>
-      </div>
+      </motion.div>
 
       {/* ロール条件付き管理導線（サーバー権威 roles で出し分け） */}
       {(roles.is_qg_admin || roles.is_company_account_admin || roles.is_system_admin) && (
-        <div className="admin-links">
+        <motion.div className="admin-links" {...flowMotion(6)}>
           <span className="role-note">▼ ロールに応じて表示</span>
           {roles.is_qg_admin && <Link className="btn btn-outline btn-sm" href="/admin/quest-groups">クエストグループ管理</Link>}
           {roles.is_company_account_admin && <Link className="btn btn-outline btn-sm" href="/admin/accounts">会社アカウント管理</Link>}
           {roles.is_system_admin && <Link className="btn btn-outline btn-sm" href="/admin/companies">システム管理</Link>}
-        </div>
+        </motion.div>
       )}
+      </LayoutGroup>
     </div>
   );
 }
