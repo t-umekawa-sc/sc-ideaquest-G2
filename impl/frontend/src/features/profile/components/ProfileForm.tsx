@@ -87,6 +87,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     try {
       const res = await setAvatarImage(file);  // PUT /me/avatar-image（K.4）
       if (res) setAvatarUrl(res.avatar_image_url);
+      snack({ type: "success", title: "プロフィール画像を更新しました" }); // 他の更新系と同じ通知
       router.refresh();  // 共通ヘッダー等のアバターを更新
     } catch (err) {
       setIconError(err instanceof ApiError && err.status === 422
@@ -102,6 +103,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     try {
       await deleteAvatarImage();  // DELETE /me/avatar-image
       setAvatarUrl(null);
+      snack({ type: "success", title: "プロフィール画像を削除しました", msg: "既定（頭文字）に戻しました。" }); // 他の更新系と同じ通知
       router.refresh();
     } catch {
       setIconError("画像の削除に失敗しました。");
