@@ -5,6 +5,7 @@
 import { redirect } from "next/navigation";
 
 import { DashboardView } from "@/features/dashboard";
+import { MascotFollower, toAvatarBase } from "@/features/avatar";
 import { getServerMe, heroBalance } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
@@ -17,15 +18,19 @@ export default async function HomePage() {
     ? heroBalance(me.balance)
     : { level: 1, xpPct: 0, xpToNext: 100, xpInLevel: 0, levelSpan: 100, xp: 0, coin: 0, sp: 0 };
   return (
-    <DashboardView
-      displayName={session.user.display_name}
-      accountId={session.account_id}
-      balance={balance}
-      admin={{
-        systemAdmin: session.system_role === "system_admin",
-        companyAdmin: session.system_role === "company_account_admin",
-        qgAdmin: session.is_qg_admin,
-      }}
-    />
+    <>
+      <DashboardView
+        displayName={session.user.display_name}
+        accountId={session.account_id}
+        balance={balance}
+        admin={{
+          systemAdmin: session.system_role === "system_admin",
+          companyAdmin: session.system_role === "company_account_admin",
+          qgAdmin: session.is_qg_admin,
+        }}
+      />
+      {/* #20: 3Dアバターのマスコット追従（SC-01 限定・app 層で feature を合成＝dashboard→avatar の直依存を避ける） */}
+      <MascotFollower base={toAvatarBase(me?.profile.avatar_base)} />
+    </>
   );
 }

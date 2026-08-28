@@ -1725,3 +1725,14 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .empty-state__title { font-weight: 700; color: var(--color-text); font-size: var(--text-base); }
 .empty-state__hint { font-size: var(--text-sm); color: var(--color-text-muted); }
 @media (prefers-reduced-motion: reduce) { .empty-state__icon { animation: none; } }
+
+/* ── ゲーム感 #20: 3Dアバターのマスコット追従（SC-01 限定・MascotFollower）──────────────
+   小さな固定キャンバス（3Dアバター）がホバーしたカードの右上へスプリングで飛ぶ。pointer-events:none で
+   クリックを妨げない。WebGL 非対応/アニメ抑制では JS 側が非描画（本 @media は保険）。 */
+.mascot3d {
+  position: fixed; z-index: 900; width: 84px; height: 84px; pointer-events: none;
+  transition: top .5s cubic-bezier(.34,1.4,.64,1), left .5s cubic-bezier(.34,1.4,.64,1), opacity .25s ease;
+  filter: drop-shadow(0 6px 6px rgba(15,23,42,.35));
+}
+.mascot3d canvas { display: block; width: 100% !important; height: 100% !important; }
+@media (prefers-reduced-motion: reduce) { .mascot3d { display: none; } }
