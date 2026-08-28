@@ -1768,3 +1768,11 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   50%      { box-shadow: 0 0 0 2px var(--rarity-rare) inset, 0 0 16px 1px var(--rarity-rare); }
 }
 @media (prefers-reduced-motion: reduce) { .card.rarity-rare { animation: none; } }
+
+/* ── ゲーム感 #28: ページ遷移の登場演出（(app)/template.tsx・ナビ毎に再生）─────────────────
+   ページ本体が軽くフェードインする（chrome=ヘッダーは layout に残り遷移しない）。**opacity のみ**＝
+   transform は fixed オーバーレイ（バースト/フロート/マスコット追従）の含みブロックを作るため使わない。
+   OS reduce＋ユーザー設定（[data-anim-reduced] のキルスイッチ）で無効。 */
+.page-transition { animation: page-enter .28s ease-out both; }
+@keyframes page-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .page-transition { animation: none; } }
