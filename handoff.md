@@ -58,11 +58,11 @@
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch` で `feature/game-feel` に居るか確認**（居なければ `git checkout feature/game-feel`）。compose＝`impl/compose.yaml`。db はカスタムビルド（PGroonga 同梱・`impl/db/Dockerfile`）。
-- **ゲーム感の検証（並行ワークフロー）**＝backend 一式は compose（`docker compose -f impl/compose.yaml up -d`）、**フロントはホストで `cd impl/frontend && npm run dev`**（hot-reload・`/api` は既定で `localhost:8000` へプロキシ）。ブラウザ `http://localhost:3000` → `ACME-01`/`user@acme.example`/`Passw0rd!` → ダッシュボードで GF-AC を確認。※compose の frontend は src バインドマウントが無くホスト編集が反映されないため、開発検証は host `npm run dev` を使う。
-- **フルスタック起動（e2e 等）**＝`docker compose -f impl/compose.yaml --profile workers up -d --build`（db ビルド含む＝初回数分）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。
-- **frontend tsc / vitest / build**＝`cd impl/frontend` で `npx tsc --noEmit`（クリーン）／`npx vitest run`（41/41・node）／`npm run build`（26ページ・**transient で落ちたら再実行**＝§5）。
-- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（490 passed）。終わったら `docker compose start worker mail-worker`。
+- **ゲーム感の受入/QA（並行ワークフロー・2026-08-28 更新）＝compose を workers 込みでフル起動**＝`cd impl && docker compose --profile workers up -d --build`。**worker と mail-worker を必ず上げる**（無いと初回PW/OTP/メール変更等の**コードが MailHog(:8025) に届かない**）。**frontend は本番ビルド配信**（`Dockerfile`＝`next build && next start`・`ARG BACKEND_ORIGIN=http://backend:8000` を build 時に焼く）＝**F5 でスタイルが剥がれない**（`next dev` のオンデマンド compile 起因を回避）。ブラウザ `http://localhost:3000` → `ACME-01`/`user@acme.example`/`Passw0rd!` → GF-AC を確認。**push 後に QA するなら反映のため `docker compose up -d --build frontend`（backend 変更を含むなら backend も `--build`）**。詳細ルール＝記憶 `game-feel-qa-parallel-ops`。
+- **素早いコード反復だけホスト**＝`cd impl/frontend && npm run dev`（HMR・`/api`→`localhost:8000`）。※`next dev` は稀にリロードで CSS グリッチ＝dev サーバー再起動で直る（コンテナ再起動は不要）。ポート＝frontend :3000／backend :8000(`/healthz`)／db :5432／redis :6379／minio :9000/:9001／mailhog :8025。
+- **frontend tsc / vitest / build**＝`cd impl/frontend` で `npx tsc --noEmit`（クリーン）／`npx vitest run`（56/56・node）／`npm run build`（26ページ・**transient で落ちたら再実行**＝§5）。
+- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（493 passed）。終わったら `docker compose start worker mail-worker`。
 - **DB migration 適用（冪等）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
-- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 408・GF-AC/src 単体は対象外）。
+- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 412・GF-AC/src 単体は対象外）。
 - **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。ゲーム感受入＝`doc/テスト/ゲーム感受入.md`（GF-AC）。テスト＝`doc/テスト/*.md`（frontend 単体の TC も domain md に記す＝例 I-TC-150/151）＋`red確認台帳.md`＋`セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。API＝`doc/API設計/{A..L}_*.md`。データモデル＝`doc/データモデル.md`。
 - **コミット規約**＝メッセージ末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`／PR body 末尾に 🤖 Generated with Claude Code 行／`feature/game-feel` への push は自走可・`main` への push はユーザー承認後。
