@@ -10,6 +10,7 @@ import { DataTable } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 
 import { getAchievements } from "../api";
+import { AchievementCelebration } from "./AchievementCelebration";
 import "../achievements.css";
 
 type Tier = "bronze" | "silver" | "gold";
@@ -73,7 +74,7 @@ function AchCard({ a }: { a: Ach }) {
   );
 }
 
-export function AchievementsView() {
+export function AchievementsView({ accountId }: { accountId: string }) {
   const [rows, setRows] = useState<Ach[]>([]);
   const [summary, setSummary] = useState<{ unlocked: number; total: number; coin_earned: number }>({ unlocked: 0, total: 0, coin_earned: 0 });
   const [loading, setLoading] = useState(true);
@@ -124,6 +125,12 @@ export function AchievementsView() {
 
   return (
     <section aria-label="実績 / バッジ">
+      {/* ゲーム感 #6: 新規解放された実績の祝福（読み込み完了後に前回観測と差分・純ロジック celebrate.ts） */}
+      <AchievementCelebration
+        accountId={accountId}
+        ready={!loading}
+        unlocked={rows.filter((a) => a.earned).map((a) => ({ id: a.id, name: a.name, icon: a.icon }))}
+      />
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="ach-title">実績 / バッジ</h1>
 

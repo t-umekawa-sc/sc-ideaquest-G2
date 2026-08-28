@@ -632,3 +632,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | SEC-TC-001（ヘッダ）・SEC-TC-010/011（signature） | `main.py` のヘッダ設定を `if False` で無効化＋`storage._signature_ok` を `return True` に一時差戻し → 応答にセキュリティヘッダが付かず SEC-001 red・MIME/拡張子偽装が通って SEC-010/011（`signature_mismatch` 期待）red。撤去（middleware＋マジックバイト復元）で 3 件 green |
 | SEC-TC-002/012/020/030/040・J-TC-141 | いずれも既存実装の coverage（HSTS 非付与・サイズ上限・会社別DB遮断・監査 detail に秘匿値なし・extra=forbid・q バインド変数）＝実装済みにつき red なし（テスト追加のみ）。SEC-010/011 の red で「MIME 申告を信用しない」実装の効果を担保 |
+
+## ゲーム感 #6. 実績アンロック祝福フロント単体（G-TC-150・2026-08-28）
+
+> SC-40 実績画面の「新規解放を祝福」＝前回観測 id 群（localStorage・アカウント別）との差分検出。純ロジック＝`impl/frontend/src/features/achievements/celebrate.ts`（`shouldCelebrateUnlock`/`parseSeenCodes`/`nextStoredCodes`）。視覚＝`components/AchievementCelebration.tsx`＋`achievements.css`（GF-AC-050..053）。backend/挙動は不変（純加算的な視覚レイヤ・reduce-motion 尊重）。
+
+| TC-ID | 観測 red（celebrate.ts 未作成 actual） |
+| --- | --- |
+| G-TC-150 | テスト（`src/features/achievements/celebrate.test.ts`）を先行作成し vitest 実行＝`Failed to load url ./celebrate … Does the file exist?`（モジュール未存在で 0 test・suite fail）で red。`celebrate.ts` を実装（初回観測=[]・current∖prevSeen を current 順・prev∪current 重複除去）して 7 passed で green（全体 48 passed）。src 単体は TC 走査対象外のため追跡は `G_ゲーミフィケーション.md` G-TC-150 で担保 |

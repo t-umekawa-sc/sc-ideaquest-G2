@@ -56,3 +56,58 @@
 /* シークレット（未獲得） */
 .ach.is-secret .ach__medal { color: var(--color-text-muted); }
 .ach__secret-badge { position: absolute; top: 8px; right: 8px; }
+
+/* ── ゲーム感 #6: 実績アンロック祝福オーバーレイ（SC-40）──────────────────
+   新規に解放された実績を中央へ祝福し ~3.2s で自動消滅。クリックで即閉じ。
+   reduced-motion では静的表示（アニメなし）。純ロジック＝celebrate.ts（G-TC-150）。 */
+.ach-unlock-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2, 6, 23, .32);
+  animation: ach-unlock-fade .2s ease both;
+  cursor: pointer;
+}
+.ach-unlock-card {
+  position: relative; text-align: center;
+  padding: var(--space-6) var(--space-8);
+  background: var(--pixel-paper, #fff); border: 3px solid var(--pixel-ink);
+  border-radius: var(--radius-pixel);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, .35), 0 10px 0 rgba(2, 6, 23, .25);
+  animation: ach-unlock-pop .5s cubic-bezier(.18,1.4,.4,1) both;
+  max-width: min(92vw, 30rem);
+}
+.ach-unlock-aura {
+  position: absolute; inset: -6px; border-radius: var(--radius-pixel); pointer-events: none;
+  animation: aura-pulse 1.3s ease-in-out infinite;
+}
+.ach-unlock-title {
+  font-weight: 800; letter-spacing: .1em; font-size: 1.25rem;
+  color: var(--pixel-coin, #f59e0b); text-shadow: 2px 2px 0 rgba(2,6,23,.18);
+}
+.ach-unlock-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ach-unlock-item { display: flex; align-items: center; gap: var(--space-2); justify-content: center; font-weight: 700; }
+.ach-unlock-medal { font-size: 1.8rem; line-height: 1; }
+.ach-unlock-name { font-size: var(--text-lg); }
+.ach-unlock-sub { margin-top: var(--space-3); color: var(--color-text-muted); font-weight: 700; font-size: var(--text-sm); }
+.ach-unlock-spark { position: absolute; font-size: 1.4rem; opacity: 0; pointer-events: none; color: var(--pixel-coin, #f59e0b); }
+.ach-unlock-spark--a { top: -6px;  left: 8%;   animation: ach-unlock-spark 1.1s ease-out .05s infinite; }
+.ach-unlock-spark--b { top: 40%;   right: -4px; animation: ach-unlock-spark 1.1s ease-out .30s infinite; }
+.ach-unlock-spark--c { bottom: -6px; left: 62%; animation: ach-unlock-spark 1.1s ease-out .55s infinite; }
+
+@keyframes ach-unlock-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ach-unlock-pop {
+  0%   { transform: scale(.6) translateY(8px); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes ach-unlock-spark {
+  0%   { transform: scale(.4) translateY(0); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: scale(1.3) translateY(-14px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ach-unlock-overlay { animation: none; }
+  .ach-unlock-card { animation: none; }
+  .ach-unlock-aura, .ach-unlock-spark { animation: none; }
+  .ach-unlock-spark { display: none; }
+}

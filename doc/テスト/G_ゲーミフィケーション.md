@@ -72,3 +72,12 @@
 | G-TC-505 | api | 全種系（all_spells） | user_spells 6件を seed→spell_unlock 付与 | `GET /achievements` | `spellmaster` unlocked・coin 150 | G.4 |
 | G-TC-506 | api | 自分の獲得実績 | evaluator_3 獲得済み | `GET /me/achievements` | evaluator_3 が unlocked_at 付きで返る | G.4 |
 | G-TC-507 | api | 実績一覧のマスタ名/説明 locale 出し分けの担保（i18n 結線） | evaluator_3（ja=評価者/en=Evaluator・説明も en 有り）。`users.locale` を ja→en に切替 | `GET /achievements` を各 locale で | ja は `name`=「評価者」/`description`=`condition_label`=「評価を3件確定する」・en は `name`=「Evaluator」/`description`=`condition_label`=「Submit 3 evaluations」（受信者 locale で選択・§2.1） | コーディング規約 §2.1／G.4 |
+
+## 6. ゲーム感フロント単体（実績アンロック祝福・#6・SC-40）
+
+> 対象＝`impl/frontend/src/features/achievements/celebrate.ts`（純ロジック）。前回このブラウザで観測した「獲得済み実績 id 群」（`localStorage["iq:seenAch:"+accountId]`・アカウント別・JSON 文字列配列）と現在の獲得済み id 群を比べ、**新規に解放された id 群を返す**。視覚（中央オーバーレイ）は `components/AchievementCelebration.tsx`＋`achievements.css` でブラウザ受入（GF-AC）。設計判断＝**初回観測は祝福しない**（既存の獲得を一斉に祝福する誤発火を防ぐ・#2 レベルアップ [`../../impl/frontend/src/features/dashboard/levelup.ts`] と同型）。backend/挙動は不変（純加算的な視覚レイヤ）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-150）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-150 | unit(front) | 新規解放の差分検出＝祝福対象を返す | 前回観測 id 群と現在の獲得 id 群 | `shouldCelebrateUnlock(prevSeen, current)` | 初回観測(null)＝`[]`（記録のみ・誤発火防止）／current のうち prevSeen に無い id を current の順で返す／既知のみ＝`[]` | G.4／#6 |
+| G-TC-150 | unit(front) | 観測記録の生成/読取（重複除去・不正は初回扱い） | localStorage 生値 | `parseSeenCodes(raw)`／`nextStoredCodes(prev, current)` | 未記録/非配列/壊れ JSON は `null`（初回扱い）・文字列以外は除外／`nextStoredCodes` は prev∪current を重複除去（実績は失われない前提で減らさない） | G.4／#6 |
