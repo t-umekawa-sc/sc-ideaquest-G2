@@ -57,6 +57,8 @@ class Account(ControlBase):
     # password_hash が NULL＝password_set=false（初回未設定）。列挙耐性のため照合は必ず実行（A.1）
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")  # ja | en
+    # アニメ演出のユーザー別 OFF（デザイン標準 §4.9）。true＝この人は演出を抑制。実効=OS reduce OR 本フラグ。
+    reduce_motion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     system_role: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")  # active | disabled
     # ログイン成功時に更新（源泉）→ 会社DB users.last_login_at へ §4.6 outbox でミラー

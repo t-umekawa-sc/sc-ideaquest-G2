@@ -32,6 +32,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [locale, setLocale] = useState<"ja" | "en">("ja");
+  const [animOff, setAnimOff] = useState(false); // アニメ演出を抑制（accounts.reduce_motion・§4.9）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -49,6 +50,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setProfile(me);
           setDisplayName(me.profile.display_name);
           setLocale(me.account.locale === "en" ? "en" : "ja");
+          setAnimOff(!!me.account.reduce_motion);
           setAvatarUrl(me.profile.avatar_image_url ?? null);
         }
       } catch {
@@ -63,7 +65,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     setSaved(false);
     setSaving(true);
     try {
-      const updated = await updateMe({ display_name: displayName, locale });
+      const updated = await updateMe({ display_name: displayName, locale, reduce_motion: animOff });
       if (updated) {
         setProfile(updated);
         setDisplayName(updated.profile.display_name);
@@ -183,6 +185,14 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>
+          </Field>
+          {/* アニメーション演出の抑制（accounts.reduce_motion・デザイン標準 §4.9）。checked=動きを減らす。 */}
+          <Field id="p_anim" label="アニメーション演出">
+            <label className="checkbox">
+              <input id="p_anim" type="checkbox" checked={animOff} onChange={(e) => setAnimOff(e.target.checked)} />
+              <span>動きを減らす（カウントアップ・祝福・バースト等の演出を抑制する）</span>
+            </label>
+            <p className="hint">OS の「視差効果を減らす」が ON のときは、この設定に関わらず常に抑制されます。</p>
           </Field>
           <Button type="submit" variant="primary" disabled={saving}>
             {saving ? "保存中…" : "保存する"}

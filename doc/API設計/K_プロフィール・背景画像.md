@@ -23,7 +23,7 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale}, profile:{display_name, avatar_image_url?, background_image_url?, avatar_base}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, system_role}` |
+| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale, reduce_motion}, profile:{display_name, avatar_image_url?, background_image_url?, avatar_base}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, system_role}`（`reduce_motion`＝アニメ演出のユーザー別 OFF・デザイン標準 §4.9・既定 false・`accounts` 源泉） |
 
 - **会社DB `users`（ミラー＋残高＋画像）から読む**（管理DB 往復なし・§1.13）。`display_name`/`email`/`locale`/`login_id` はミラー、残高は `users`、画像は**署名URL（§1.10）**に解決して返す（パスを直接返さない）。`avatar_base`（3D アバターの男女2ベース・§5.3）も `users` からそのまま返す（enum 文字列・署名URL 化不要）。
 - **ヒーロー残高**は `GET /me` が正準。ダッシュボード（I）の `GET /dashboard` は 1 往復のため同じ `users` 読取から hero を**同梱し続ける**（両立・重複ではなく別用途＝I.1／G.0 と整合）。
@@ -33,9 +33,10 @@
 
 | メソッド/パス | 概要 | リクエスト（ボディ・allowlist） | レスポンス |
 | --- | --- | --- | --- |
-| `PATCH /me` | 表示名・ロケールを編集 | `{display_name?, locale?}`（**この2つのみ**受理） | 200＋更新後の `/me`（K.1 形） |
+| `PATCH /me` | 表示名・ロケール・アニメ設定を編集 | `{display_name?, locale?, reduce_motion?}`（**この3つのみ**受理） | 200＋更新後の `/me`（K.1 形） |
 
 - **`display_name`・`locale` はいずれも `accounts` 源泉**＝**管理DB `accounts` を更新＋同一Tx で `account_sync_outbox` INSERT**（§1.13）。会社DB `users` ミラーはワーカが反映（応答は更新値を即返す＝楽観的表示・実ミラーは結果整合）。**PATCH /me は単一のコントロールプレーン Tx**（両フィールドとも accounts のため跨ぎ書き込みが起きない）。
+- **`reduce_motion`（アニメ演出 OFF・デザイン標準 §4.9）は `accounts` のみ更新**＝会社DB `users` へは**ミラーしない**（identity/認証系でない UI 個人設定・consumer は未知キーを無視）。フロントは `GET /me` の値で `(app)` 直下に `data-anim-reduced` を立て、CSS キルスイッチ＋JS `reduceMotion()` が全演出を抑制する。実効 = OS `prefers-reduced-motion` OR 本値（OS が最優先の下限）。
 - **email・password は本 EP では変更しない**（重い/再認証が要る＝K.3 の専用 EP）。`login_id` は変更不可（固定・§4.2）。
 - `locale` は `ja`/`en`（enum）を検証。`display_name` は文字数上限等をサーバー検証（具体値 K.6 TBD）。
 

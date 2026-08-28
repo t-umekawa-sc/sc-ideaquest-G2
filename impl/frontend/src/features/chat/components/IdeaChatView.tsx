@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
+import { reduceMotion } from "@/lib/motion";
 import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import {
@@ -93,7 +94,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string }[]>([]);
   const castId = useRef(0);
   const fireCast = (msgId: string, effect: string) => {
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (reduceMotion()) return;
     const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
     if (!el) return;
     const r = el.getBoundingClientRect();

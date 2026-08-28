@@ -3253,7 +3253,7 @@ export interface components {
         };
         /**
          * MeAccountDTO
-         * @description identity（accounts 源泉・K.1）＝ログインID/メール/ロケール。
+         * @description identity（accounts 源泉・K.1）＝ログインID/メール/ロケール＋アニメ設定。
          */
         MeAccountDTO: {
             /** Login Id */
@@ -3262,6 +3262,11 @@ export interface components {
             email: string;
             /** Locale */
             locale: string;
+            /**
+             * Reduce Motion
+             * @default false
+             */
+            reduce_motion: boolean;
         };
         /**
          * MeActivitiesResponse
@@ -3359,6 +3364,8 @@ export interface components {
             display_name?: string | null;
             /** Locale */
             locale?: ("ja" | "en") | null;
+            /** Reduce Motion */
+            reduce_motion?: boolean | null;
         };
         /**
          * MemberAddRequest

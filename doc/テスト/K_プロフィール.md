@@ -18,6 +18,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | K-TC-001 | api | accounts 源泉更新と同一Tx outbox によるミラー結果整合の担保 | ACME-01 実アカウントでログイン | `PATCH /me`（`display_name`＋`locale`） | `200`＋更新値を返す。**`accounts` 更新**＋**同一Tx で `account_sync_outbox` pending 1行**（`op=upsert`・payload に `display_name`/`locale`）→ `process_outbox_once` で **会社DB `users` にミラー** | K.2／§4.6／§5.3 |
 | K-TC-002 | api | allowlist 逸脱と enum 違反の拒否＝Mass Assignment 防止 | 同上 | allowlist 外（`system_role`/`login_id` 等）を送る／`locale` に不正値（`fr`） | いずれも `422`（想定外プロパティ拒否＝Mass Assignment 防止・§2.2／`locale` は `ja\|en` enum） | K.2／§2.2 |
+| K-TC-020 | api | アニメ演出のユーザー別設定 `reduce_motion` の編集＋配信（デザイン標準 §4.9） | ACME-01 実アカウントでログイン（既定 false） | `GET /me`／`PATCH /me`（`{reduce_motion:true}`→`false`） | `GET /me` の `account.reduce_motion` は既定 `false`。`PATCH` で `true`＝`200`＋応答 `account.reduce_motion=true`・**`accounts.reduce_motion` 更新**（account-only＝`users` へはミラーしない＝consumer が未知キー無視）。`false` に戻せる | K.2／§4.9 |
+| K-TC-021 | unit(front) | アニメ抑制の実効判定（OS 最優先の下限）＝純ロジック | — | `isMotionReduced(osReduce, userReduce)`（`impl/frontend/src/lib/motion.ts`） | 実効 = `osReduce OR userReduce`。OS reduce なら常に抑制（ユーザー設定で ON に戻せない）／OS 通常でもユーザー OFF なら抑制／両方 false のみ演出あり | §4.9 |
 | K-TC-003 | api | 未認証優先判定と変更系 CSRF ゲートの二段防御 | セッション無し／ログイン済み CSRF 無し | `PATCH /me` | 未認証＝`401 unauthenticated`（先）／セッション有り CSRF 無し＝`403 csrf_failed`（変更系・A.0） | A.0／B.0.1 P1/P3 |
 | K-TC-004 | api | identity 取得での機密（PWハッシュ等）非露出の担保 | ログイン済み | `GET /me` | `200`＋`{login_id, email, display_name, locale, system_role}`（identity）。**機密は返さない**（PW ハッシュ等） | K.1／§B.6 |
 | K-TC-005 | api | プロフィール取得の未認証遮断 | セッション無し | `GET /me` | `401 unauthenticated`（B.0.1 P1） | B.0.1 P1 |

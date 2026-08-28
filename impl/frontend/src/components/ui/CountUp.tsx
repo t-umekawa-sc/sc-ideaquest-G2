@@ -1,20 +1,16 @@
 "use client";
 
 // 数値のカウントアップ演出（ゲーム感）。マウント時は 0→value、以降は前値→value を easeOutCubic で補間。
-// `prefers-reduced-motion: reduce` では即時反映（アクセシビリティ・演出は付けない）。純表示 span。
+// アニメ抑制（OS reduce OR ユーザー設定・§4.9）では即時反映（アクセシビリティ・演出は付けない）。純表示 span。
 import { useEffect, useRef, useState } from "react";
+
+import { reduceMotion } from "@/lib/motion";
 
 /** カウントアップの1フレーム値（純関数・テスト可能）。progress t∈[0,1] を easeOutCubic で補間し四捨五入。 */
 export function countUpFrame(from: number, to: number, t: number): number {
   const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
   const eased = 1 - Math.pow(1 - clamped, 3); // easeOutCubic（終端で滑らかに減速）
   return Math.round(from + (to - from) * eased);
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined"
-    && !!window.matchMedia
-    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 export function CountUp({
@@ -39,7 +35,7 @@ export function CountUp({
       setDisplay(to);
       return;
     }
-    if (prefersReducedMotion()) {
+    if (reduceMotion()) {
       setDisplay(to);
       fromRef.current = to;
       return;

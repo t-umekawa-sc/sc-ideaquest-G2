@@ -43,7 +43,7 @@ from app.tenant.gamification.level import level_progress
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
 
-_EDITABLE_FIELDS = ("display_name", "locale")  # allowlist（§2.2）
+_EDITABLE_FIELDS = ("display_name", "locale", "reduce_motion")  # allowlist（§2.2）
 
 
 def _image_url(path: str | None) -> str | None:
@@ -61,7 +61,8 @@ def _me(account: Account, user: "User | None") -> dict:
     xp = user.xp if user else 0
     prog = level_progress(xp)
     return {
-        "account": {"login_id": account.login_id, "email": account.email, "locale": account.locale},
+        "account": {"login_id": account.login_id, "email": account.email, "locale": account.locale,
+                    "reduce_motion": account.reduce_motion},
         "profile": {
             "display_name": account.display_name,
             "avatar_image_url": _image_url(user.avatar_image_path if user else None),

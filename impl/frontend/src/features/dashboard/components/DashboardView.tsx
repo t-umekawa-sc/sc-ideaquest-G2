@@ -15,6 +15,7 @@ import { LevelUpWatcher } from "./LevelUpWatcher";
 import { SparkBurst } from "./SparkBurst";
 import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
+import { reduceMotion } from "@/lib/motion";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -68,10 +69,8 @@ export function DashboardView({
   // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const burstId = useRef(0);
-  const prefersReduceMotion = () =>
-    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const fireBurst = (e: { clientX: number; clientY: number }) => {
-    if (prefersReduceMotion()) return;
+    if (reduceMotion()) return;
     const id = ++burstId.current;
     setBursts((b) => [...b, { id, x: e.clientX, y: e.clientY }]);
     setTimeout(() => setBursts((b) => b.filter((z) => z.id !== id)), 650);
@@ -83,7 +82,7 @@ export function DashboardView({
   const [xpFloats, setXpFloats] = useState<{ id: number; x: number; y: number; label: string }[]>([]);
   const xpFloatId = useRef(0);
   const fireXpFloat = (e: { clientX: number; clientY: number }, label: string) => {
-    if (prefersReduceMotion()) return;
+    if (reduceMotion()) return;
     const id = ++xpFloatId.current;
     setXpFloats((f) => [...f, { id, x: e.clientX, y: e.clientY, label }]);
     setTimeout(() => setXpFloats((f) => f.filter((z) => z.id !== id)), 1100);

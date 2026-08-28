@@ -1627,3 +1627,17 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   a.card, button.card { transition: box-shadow .15s, border-color .15s; }
   a.card:hover, button.card:hover, a.card:active, button.card:active { transform: none; }
 }
+
+/* ── デザイン標準 §4.9: アニメ抑制のキルスイッチ（ユーザー設定 accounts.reduce_motion）────────
+   (app) レイアウトが GET /me の account.reduce_motion で `[data-anim-reduced="true"]` を立てる。
+   配下の全アニメ/トランジションを実質停止（動きだけ消す＝情報は残す）。OS の prefers-reduced-motion は
+   各コンポーネントの @media で別途担保（実効 = OS OR 本設定）。JS 駆動の演出は lib/motion.ts の
+   reduceMotion() が本属性を参照して発火を抑止する。 */
+[data-anim-reduced="true"] *,
+[data-anim-reduced="true"] *::before,
+[data-anim-reduced="true"] *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+  scroll-behavior: auto !important;
+}

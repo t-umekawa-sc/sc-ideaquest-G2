@@ -39,6 +39,10 @@ export default async function AppLayout({
      <ConfirmProvider>
       {/* リアルタイム（L）＝ヘッダーベルの未読数を WS で即時更新。初期値は provider が getUnreadCount で seed。 */}
       <RealtimeProvider>
+      {/* アニメ抑制のルート（デザイン標準 §4.9）＝GET /me の account.reduce_motion で立てる。
+          CSS のキルスイッチ `[data-anim-reduced="true"] *` と JS の reduceMotion() が本要素を参照。
+          header/main/modal すべてを内包（サーバー描画＝フラッシュ無し）。OS reduce は別途 @media で担保。 */}
+      <div data-anim-reduced={me?.account.reduce_motion ? "true" : undefined}>
       {/* コンテンツ背景（ユーザー個人設定・全認証画面に反映・K.4）。設定時は署名URL を敷き薄スクリム（.is-set）。 */}
       <div
         className={backgroundUrl ? "app-bg is-set" : "app-bg"}
@@ -92,6 +96,7 @@ export default async function AppLayout({
         {children}
       </main>
       {modal}
+      </div>
       </RealtimeProvider>
      </ConfirmProvider>
     </SnackbarProvider>

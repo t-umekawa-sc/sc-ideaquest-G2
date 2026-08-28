@@ -89,6 +89,22 @@ def test_k_tc_001_patch_me_updates_and_mirrors(client, factory):
     assert u.display_name == "新しい名前" and u.locale == "en"
 
 
+def test_k_tc_020_patch_me_reduce_motion(client, factory):
+    """K-TC-020 アニメ演出のユーザー別設定 reduce_motion の編集＋配信（デザイン標準 §4.9・account-only）。"""
+    acc = _login_seed(client, factory)
+    # 既定は false（演出あり）
+    assert client.get(ME).json()["account"]["reduce_motion"] is False
+    # true（抑制 ON）へ更新＝accounts 更新＋応答に反映
+    r = client.patch(ME, json={"reduce_motion": True}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["account"]["reduce_motion"] is True
+    assert _account(acc["id"]).reduce_motion is True
+    # GET /me でも配信される
+    assert client.get(ME).json()["account"]["reduce_motion"] is True
+    # false に戻せる
+    assert client.patch(ME, json={"reduce_motion": False}, headers=_csrf(client)).json()["account"]["reduce_motion"] is False
+
+
 def test_k_tc_002_allowlist_and_locale_validation(client, factory):
     """K-TC-002 allowlist 外は 422（Mass Assignment 防止）・locale は ja|en enum。"""
     _login_seed(client, factory)

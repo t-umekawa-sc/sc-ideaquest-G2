@@ -17,13 +17,16 @@ class MeUpdateRequest(BaseModel):
 
     display_name: str | None = Field(default=None, min_length=1, max_length=255)
     locale: Literal["ja", "en"] | None = None
+    # アニメ演出のユーザー別 OFF（デザイン標準 §4.9）。true＝抑制。OS reduce が最優先の下限（本値では ON に戻せない）。
+    reduce_motion: bool | None = None
 
 
 class MeAccountDTO(BaseModel):
-    """identity（accounts 源泉・K.1）＝ログインID/メール/ロケール。"""
+    """identity（accounts 源泉・K.1）＝ログインID/メール/ロケール＋アニメ設定。"""
     login_id: str
     email: str
     locale: str
+    reduce_motion: bool = False  # アニメ演出のユーザー別 OFF（§4.9・GET /me で配信・既定 false=演出あり）
 
 
 class MeProfileDTO(BaseModel):

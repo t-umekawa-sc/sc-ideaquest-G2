@@ -656,3 +656,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（DTO の xp_delta フィールドを一時撤去 actual） |
 | --- | --- |
 | D-TC-163／D-TC-164／F-TC-141 | 3 応答 DTO（`IdeaDetailDTO`/`IdeaVoteResponse`/`EvaluationMeDTO`）から `xp_delta` フィールドを一時撤去して pytest 実行＝応答に `xp_delta` キーが載らず `KeyError: 'xp_delta'` で 3 件 red（実測）。フィールドを復元（application は `Activity.amount` 由来の実額を格納）して green（3 passed／全体 493 passed）。D-TC-164 は seed ユーザーの日次上限干渉を避けるため fresh voter（quest owner）で隔離 |
+
+## アニメ設定（ユーザー別 reduce_motion・K-TC-020/021・デザイン標準 §4.9・2026-08-28）
+
+> UI アニメ演出のユーザー別 OFF（`accounts.reduce_motion`・migration control 0013）。実効 = OS `prefers-reduced-motion` OR 本設定（OS が最優先の下限）。backend＝`GET/PATCH /me`（`MeAccountDTO`/`MeUpdateRequest` に `reduce_motion`・me/application の allowlist＋`_me` dict）。frontend＝純ロジック `lib/motion.ts`（`isMotionReduced`＋runtime `reduceMotion()`）／`(app)` レイアウトが `data-anim-reduced` を立て CSS キルスイッチ＋JS 判定で全演出（#1〜#10）を横断抑制／プロフィール設定にトグル。
+
+| TC-ID | 観測 red（実装の一時撤去 actual） |
+| --- | --- |
+| K-TC-020 | `MeAccountDTO` の `reduce_motion` フィールドを一時撤去して pytest＝`GET /me` の `account` に `reduce_motion` が載らず `KeyError: 'reduce_motion'` で red。復元（ORM 列＋DTO＋allowlist＋`_me` dict）で green（3 passed＝K-TC-020/001/002） |
+| K-TC-021 | 純ロジック未作成で vitest＝`Failed to load url ./motion`（0 test・suite fail）で red。`lib/motion.ts` 実装（`isMotionReduced = osReduce OR userReduce`）で green（3 tests・全体 56 passed）。src 単体は TC 走査対象外のため追跡は `K_プロフィール.md` K-TC-021 で担保 |
