@@ -73,6 +73,13 @@
 .dash-page .vote-quick.disagree:hover { background: #FECACA; }
 .dash-page .vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
 .dash-page .vote-card.is-voted { opacity: .6; }
+/* GF-AC-040: 投票したカードの「ふわっと退場」。火花（spark-fly .6s）と同じ時間かけてフェード＋わずかに縮小し、
+   退場しきってから JS がリストから外す＝火花が正しいカード上に重なる/空スペースに残らない。退場中は操作不可。
+   reduce-motion（OS/設定）は JS 側で即削除＝この演出を使わない（デザイン標準 §4.9・防御的に無効化も併記）。 */
+.dash-page .vote-card[data-leaving="true"] { pointer-events: none; animation: vote-leave .6s ease forwards; }
+@keyframes vote-leave { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .dash-page .vote-card[data-leaving="true"] { animation: none; } }
+[data-anim-reduced="true"] .dash-page .vote-card[data-leaving="true"] { animation: none; }
 
 /* フォロー中のアイデア */
 .dash-page .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }

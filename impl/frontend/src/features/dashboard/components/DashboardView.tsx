@@ -78,6 +78,9 @@ export function DashboardView({
   // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
   const burstId = useRef(0);
+  // GF-AC-040: 投票したカードは即消えず、火花と同じ時間だけかけて「ふわっと退場」→退場後にリストから外す。
+  // これで火花が正しいカード上に重なり、繰り上がりや空スペースに火花だけ残らない（reduce-motion は即削除）。
+  const [leaving, setLeaving] = useState<Record<string, boolean>>({});
   const fireBurst = (e: { clientX: number; clientY: number }) => {
     if (reduceMotion()) return;
     const id = ++burstId.current;
@@ -140,9 +143,23 @@ export function DashboardView({
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (e) fireBurst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
-    setVotes((s) => ({ ...s, [idea.id]: type }));  // 楽観＝リストから外す
+    // 楽観削除。通常は「ふわっと退場」（火花と同じ ~0.6s かけてフェード）→退場後にリストから外す。
+    // reduce-motion（OS/設定）時は演出なし＝即削除（従来どおり）。
+    const reduced = reduceMotion();
+    let removeTimer: ReturnType<typeof setTimeout> | null = null;
+    if (reduced) {
+      setVotes((s) => ({ ...s, [idea.id]: type }));
+    } else {
+      setLeaving((s) => ({ ...s, [idea.id]: true }));
+      removeTimer = setTimeout(() => {
+        setVotes((s) => ({ ...s, [idea.id]: type }));
+        setLeaving((s) => { const n = { ...s }; delete n[idea.id]; return n; });
+      }, 600);  // 火花（spark-fly .6s）と揃える＝退場しきってから外す
+    }
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
+      if (removeTimer) clearTimeout(removeTimer);  // 退場アニメを取り消し
+      setLeaving((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 退場を戻す
       setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 失敗はロールバック
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
@@ -267,7 +284,7 @@ export function DashboardView({
           </div>
           <div className="vote-grid">
             {unvoted.map((v) => (
-              <article key={v.id} className="card card-accent vote-card">
+              <article key={v.id} className="card card-accent vote-card" data-leaving={leaving[v.id] ? "true" : undefined}>
                 <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
                 <div className="vote-card__quest">{v.quest.title}</div>
                 <div className="vote-card__value">{v.value}</div>
