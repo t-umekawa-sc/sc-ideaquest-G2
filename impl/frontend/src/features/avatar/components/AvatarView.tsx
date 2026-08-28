@@ -48,6 +48,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
   const [coins, setCoins] = useState(0);
   const [loading, setLoading] = useState(true);
   const [base, setBase] = useState<AvatarBase>(initialAvatarBase);
+  const [justEquippedId, setJustEquippedId] = useState<string | null>(null); // #14: 装着したカードの一瞬フラッシュ
   // WebGL 検出は client のみ（SSR/初回描画は 2D フォールバックで一致→mount 後に 3D へ昇格・§9.3）。
   const [webgl, setWebgl] = useState(false);
   useEffect(() => { setWebgl(supportsWebGL()); }, []);
@@ -101,7 +102,15 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
     setEquipped((e) => ({ ...e, [slot]: id })); // 楽観更新
     try {
       const res = await updateEquipment({ [backendSlot(slot)]: id });
-      if (res) setEquipped((e) => ({ ...e, [slot]: res.equipped[backendSlot(slot)] ?? null }));
+      if (res) {
+        const newId = res.equipped[backendSlot(slot)] ?? null;
+        setEquipped((e) => ({ ...e, [slot]: newId }));
+        // #14: 装着（外す=null は除く）でカードを一瞬フラッシュ。アバター側の装着ポップは viewer__slot の keyed 内側要素（CSS）。
+        if (newId) {
+          setJustEquippedId(newId);
+          setTimeout(() => setJustEquippedId((j) => (j === newId ? null : j)), 650);
+        }
+      }
     } catch (err) {
       setEquipped((e) => ({ ...e, [slot]: prev })); // ロールバック
       const st = err instanceof ApiError ? err.status : 0;
@@ -135,10 +144,12 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
               // eslint-disable-next-line @next/next/no-img-element
               <img className="viewer__avatar" src="/assets/mascot-hero.png" alt="あなたのアバター" />
             )}
-            {/* 装備プレビュー（絵文字重ね）＝2D 見立て。3D の実パーツ反映はアセット導入時（§9.2 seam） */}
-            <span className="viewer__slot" data-slot="head">{preview("head")}</span>
-            <span className="viewer__slot" data-slot="face">{preview("face")}</span>
-            <span className="viewer__slot" data-slot="hand">{preview("hand")}</span>
+            {/* 装備プレビュー（絵文字重ね）＝2D 見立て。3D の実パーツ反映はアセット導入時（§9.2 seam）。
+                #14: 内側 <i> を装備 id で key 化＝装着した瞬間にその要素が再マウントし CSS pop＋sparkle を再生
+                （外側 .viewer__slot は位置決めの transform を持つため、pop は内側要素で行い衝突を避ける）。 */}
+            <span className="viewer__slot" data-slot="head">{preview("head") && <i className="slot-fx" key={equipped.head ?? ""}>{preview("head")}</i>}</span>
+            <span className="viewer__slot" data-slot="face">{preview("face") && <i className="slot-fx" key={equipped.face ?? ""}>{preview("face")}</i>}</span>
+            <span className="viewer__slot" data-slot="hand">{preview("hand") && <i className="slot-fx" key={equipped.hand ?? ""}>{preview("hand")}</i>}</span>
           </div>
           {/* ベース切替（男/女・§4.1/§9.2）＝即時プレビュー反映＋PUT /me/avatar-base で永続 */}
           <div className="viewer__base" role="group" aria-label="ベース体の切替">
@@ -209,7 +220,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
                     return (
                       <article
                         key={it.id}
-                        className={`card item${isEq ? " is-equipped" : ""}${it.owned ? "" : " is-locked"}`}
+                        className={`card item${isEq ? " is-equipped" : ""}${it.owned ? "" : " is-locked"}${justEquippedId === it.id ? " just-equipped" : ""}`}
                         role="button"
                         tabIndex={0}
                         onClick={act}

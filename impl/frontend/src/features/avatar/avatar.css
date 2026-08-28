@@ -63,3 +63,24 @@
 
 /* 「外す」ピル */
 .item--none .item__thumb { color: var(--color-text-muted); font-size: 28px; }
+
+/* ── ゲーム感 #14: 装備の装着演出（SC-31・純CSS）─────────────────────────────────────
+   アバターに装着した瞬間、そのスロットの絵文字がポップ＋sparkle リング（.viewer__slot の内側 keyed 要素）。
+   装着したカードは一瞬フラッシュ。純視覚・reduce-motion 尊重（OS＋ユーザー設定の kill-switch 両対応）。 */
+.viewer__slot .slot-fx { display: inline-block; position: relative; font-style: normal; animation: equip-pop .55s cubic-bezier(.2,1.4,.4,1); }
+.viewer__slot .slot-fx::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; border-radius: 50%;
+  transform: translate(-50%,-50%); border: 2px solid rgba(255,255,255,.85); opacity: 0;
+  animation: equip-ring .6s ease-out; pointer-events: none;
+}
+@keyframes equip-pop { 0% { transform: scale(.2); opacity: 0; } 55% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes equip-ring { 0% { width: 8px; height: 8px; opacity: 0; } 25% { opacity: .9; } 100% { width: 72px; height: 72px; opacity: 0; } }
+.item.just-equipped { animation: equip-card .6s ease; }
+@keyframes equip-card {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,.5); }
+  30%  { box-shadow: 0 0 0 5px rgba(59,130,246,.4); transform: scale(1.03); }
+  100% { box-shadow: 0 0 0 2px var(--color-primary) inset; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewer__slot .slot-fx, .viewer__slot .slot-fx::after, .item.just-equipped { animation: none; }
+}
