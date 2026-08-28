@@ -1613,3 +1613,17 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   font-weight: 600; font-size: var(--text-sm); text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
 .gamenav__link:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
 .gamenav__link[aria-current="page"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; cursor: default; }
+
+/* ── ゲーム感 #9: クリック可能カードの hover リフト＋押下の手応え（全画面・純CSS）─────────────
+   リンク/ボタン化したカード（.card が <a>/<button>）だけ対象＝静的パネル（.card の div/article）は不変。
+   個別 :hover を持つ dashboard の draft/quest カードは transform 未指定なので、本 lift が per-property で
+   合成される（影は各所、浮きは共通）。quest-list/spells の素の a.card にも横断で効く。reduce-motion 尊重。 */
+a.card, button.card {
+  transition: transform .12s cubic-bezier(.22,1,.36,1), box-shadow .15s, border-color .15s, background .15s;
+}
+a.card:hover, button.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); text-decoration: none; }
+a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--shadow); transition-duration: .04s; }
+@media (prefers-reduced-motion: reduce) {
+  a.card, button.card { transition: box-shadow .15s, border-color .15s; }
+  a.card:hover, button.card:hover, a.card:active, button.card:active { transform: none; }
+}
