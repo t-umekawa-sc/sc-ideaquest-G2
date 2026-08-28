@@ -14,13 +14,14 @@ import { DataTable, RowMenu } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
+import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
 import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
   id: string; title: string; theme: string; cat: string; cats: string[]; status: string; group: string;
   groupId: string; owner: string; char: string; accent: string; iconUrl: string | null; deadline: string; dl: number;
-  soon: boolean; party: number; ideas: number; my: string; order: number; draft?: boolean;
+  urgency: DeadlineLevel; days: number | null; party: number; ideas: number; my: string; order: number; draft?: boolean;
 };
 
 // quest_status（enum・§3）→ 画面ラベル。"選定" は enum でなく evaluating〜completed の選定行為の呼称（C.5）。
@@ -43,14 +44,13 @@ function questHref(x: Quest): string {
   return x.draft ? `/quests/${x.id}/edit` : `/quests/${x.id}`;
 }
 
-// 締切文字列（YYYY-MM-DD）→ 表示（YYYY/MM/DD）・ソート用数値・締切近接（14日以内）。
-function parseDeadline(d: string | null | undefined): { deadline: string; dl: number; soon: boolean } {
-  if (!d) return { deadline: "—", dl: 99999999, soon: false };
+// 締切文字列（YYYY-MM-DD）→ 表示（YYYY/MM/DD）・ソート用数値・切迫度（#24・共通 deadlineUrgency）。
+function parseDeadline(d: string | null | undefined): { deadline: string; dl: number; urgency: DeadlineLevel; days: number | null } {
+  if (!d) return { deadline: "—", dl: 99999999, urgency: "none", days: null };
   const [y, m, day] = d.split("-").map((n) => Number(n));
   const dl = y * 10000 + m * 100 + day;
-  const target = new Date(y, m - 1, day).getTime();
-  const days = (target - Date.now()) / 86400000;
-  return { deadline: `${y}/${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}`, dl, soon: days >= 0 && days <= 14 };
+  const u = deadlineUrgency(d, todayISO());
+  return { deadline: `${y}/${String(m).padStart(2, "0")}/${String(day).padStart(2, "0")}`, dl, urgency: u.level, days: u.days };
 }
 
 // backend DTO（C.1）→ 一覧ビュー型。theme/purpose は一覧DTOに無い（検索は件名/カテゴリー）。
@@ -63,7 +63,7 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
     id: c.id, title: c.title, theme: "", cat: c.categories[0] ?? "", cats: c.categories,
     status, group: c.quest_group.name, groupId: c.quest_group.id, owner: (c.owner.display_name || "?").slice(0, 1),
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
-    deadline: dl.deadline, dl: dl.dl, soon: dl.soon, party: c.member_count, ideas: c.idea_count,
+    deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
   };
 }
@@ -154,7 +154,7 @@ export function QuestListView() {
     { key: "cat", label: "カテゴリー", width: 130, sortable: true, filter: { type: "enum", options: catOptions }, sortVal: (x) => x.cat, filterVal: (x) => x.cat, render: (x) => <span className="badge badge-muted">{x.cat}</span> },
     { key: "status", label: "ステータス", width: 120, sortable: true, filter: { type: "enum", options: STATUS_OPTIONS }, sortVal: (x) => x.status, filterVal: (x) => x.status, render: (x) => <span className={statusBadge(x.status)}>{x.status}</span> },
     { key: "group", label: "グループ", width: 170, hiddenDefault: true, sortable: true, filter: { type: "enum", options: groupOptions }, sortVal: (x) => x.group, filterVal: (x) => x.group, csvVal: (x) => x.group, render: (x) => x.group },
-    { key: "deadline", label: "締切", width: 120, sortable: true, sortVal: (x) => x.dl, filter: { type: "text" }, filterVal: (x) => x.deadline, csvVal: (x) => x.deadline, render: (x) => <span className={x.soon ? "deadline soon" : "deadline"}>{x.deadline}</span> },
+    { key: "deadline", label: "締切", width: 120, sortable: true, sortVal: (x) => x.dl, filter: { type: "text" }, filterVal: (x) => x.deadline, csvVal: (x) => x.deadline, render: (x) => <span className="deadline" data-urgency={x.urgency}>{x.deadline}</span> },
     { key: "party", label: "👥", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.party, filterVal: (x) => x.party, render: (x) => x.party },
     { key: "ideas", label: "💡", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.ideas, filterVal: (x) => x.ideas, render: (x) => x.ideas },
     { key: "my", label: "あなた", width: 110, sortable: true, filter: { type: "enum", options: MY_OPTIONS }, sortVal: (x) => x.my, filterVal: (x) => x.my, render: (x) => <span className={myBadge(x.my)}>{x.my}</span> },
@@ -205,7 +205,7 @@ export function QuestListView() {
                 </div>
                 <div className="quest-card__meta">
                   {x.cat ? <span className="badge badge-muted">{x.cat}</span> : null}
-                  <span className={x.soon ? "deadline soon" : "deadline"}>⏳ 締切 {x.deadline}</span>
+                  <span className="deadline" data-urgency={x.urgency}>⏳ 締切 {x.deadline}{x.urgency !== "safe" && x.urgency !== "none" ? ` ・${deadlineCountdown(x.days)}` : ""}</span>
                 </div>
                 <div className="quest-card__stats">
                   <span>👥 {x.party}</span>

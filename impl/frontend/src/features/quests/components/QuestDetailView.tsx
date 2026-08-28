@@ -17,6 +17,7 @@ import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { getQuestActivities } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { ApiError } from "@/lib/api/client";
+import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import {
   deleteQuest,
@@ -274,7 +275,9 @@ export function QuestDetailView({ questId }: { questId: string }) {
                 <h1>{quest.title}</h1>
                 {quest.purpose && <p className="quest-head__theme">{quest.purpose}</p>}
                 <div className="quest-meta">
-                  <span>⏳ 締切 {deadlineText(quest.deadline)}</span>
+                  {(() => { const du = deadlineUrgency(quest.deadline, todayISO()); return (
+                    <span className="deadline" data-urgency={du.level}>⏳ 締切 {deadlineText(quest.deadline)}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>
+                  ); })()}
                   <span>👥 パーティー {quest.member_count}人</span>
                   <span>💡 アイデア {quest.idea_count}件</span>
                   <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} size="sm" /><span className="name">{ownerName}</span></span>

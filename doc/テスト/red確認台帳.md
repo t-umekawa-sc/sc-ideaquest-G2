@@ -681,3 +681,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（votePercents 未実装 actual） |
 | --- | --- |
 | D-TC-220 | 既存 `voting.test.ts` に votePercents ケースを追加＝`votePercents` が未 export で 3 件 red（実測 3 failed / 6 passed）。実装（合計0は両0／approve%=round・oppose%=100-approve%／負・NaN は0・小数 floor）で 9 passed green（全体 63 passed）。src 単体は TC 走査対象外＝追跡は `D_アイデア.md` D-TC-220 |
+
+## ゲーム感 #24. 締切の切迫演出 frontend 単体（C-TC-210・2026-08-28）
+
+> クエスト締切の切迫度/残日表示の純ロジック＝`impl/frontend/src/lib/deadline.ts`（`deadlineUrgency`/`deadlineCountdown`）。視覚＝`.deadline[data-urgency]`（段階色＋urgent 脈動・GF-AC-240..242）を SC-01/10/11/12 の ⏳ 締切に横断適用。
+
+| TC-ID | 観測 red（deadline.ts 未作成 actual） |
+| --- | --- |
+| C-TC-210 | テスト（`src/lib/deadline.test.ts`）を先行作成し vitest＝`Failed to load url ./deadline`（モジュール未存在で 0 test・suite fail）で red。実装（none/over/urgent(≤2)/soon(≤7)/safe・UTC 深夜固定の暦日差／countdown ""/締切超過/今日締切/残りN日）で 6 passed green（全体 69 passed）。src 単体は TC 走査対象外＝追跡は `C_クエスト.md` C-TC-210 |

@@ -17,6 +17,7 @@ import { XpFloat } from "./XpFloat";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "../levelTitle";
 import { reduceMotion } from "@/lib/motion";
+import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import {
   getDashboard,
@@ -118,6 +119,7 @@ export function DashboardView({
   const coin = hero?.coin_balance ?? balance.coin;
   const sp = hero?.skill_point_balance ?? balance.sp;
   const rank = levelRank(level); // #21: レベル→称号/ティア（オーラ色）
+  const today = todayISO(); // #24: 締切切迫度の基準日
 
   const drafts = data?.drafts ?? [];
   const unvoted = (data?.unvoted_ideas ?? []).filter((v) => !votes[v.id]);
@@ -279,7 +281,9 @@ export function DashboardView({
             <Link href="/quests">すべて見る →</Link>
           </div>
           <div className="quest-grid">
-            {quests.map((q) => (
+            {quests.map((q) => {
+              const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
+              return (
               <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
                 <div className="between">
                   <span className="card-title">{q.title}</span>
@@ -287,14 +291,15 @@ export function DashboardView({
                 </div>
                 <div className="quest-card__meta">
                   {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
-                  {q.deadline && <span className="deadline">⏳ {q.deadline}</span>}
+                  {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
                 </div>
                 <div className="quest-card__stats">
                   <span>👥 パーティー{q.member_count ?? 0}</span>
                   <span>💡 アイデア{q.idea_count ?? 0}</span>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

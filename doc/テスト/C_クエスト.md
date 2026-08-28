@@ -101,3 +101,11 @@
 | C-TC-204 | e2e | 下書き作成→一覧反映 | 必須入力→下書き保存 | 一覧に作成タイトルが出る | C.2／SC-10 |
 | C-TC-205 | e2e | 詳細の実データ描画 | 詳細を開く | ヘッダー/概要/パーティーが実データ（作成者バッジ） | C.1／SC-12 |
 | C-TC-206 | e2e | 遷移→削除 | ⋯ステータスを進める→⋯削除 | in_progress に更新／削除で一覧へ・タイトル消失 | C.5／C.2 |
+
+## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
+
+> 対象＝`impl/frontend/src/lib/deadline.ts`（`deadlineUrgency`/`deadlineCountdown`＝締切表示の切迫度・純ロジック）。DOM 非依存のみ vitest（node）で担保・UI 結線（バッジ色/脈動・SC-01/10/11/12 の ⏳ 締切）は tsc＋ブラウザ受入（GF-AC）。**トレーサビリティ検査対象外**（`src/**/*.test.ts` は非走査）＝本 md で追跡。
+
+| TC-ID | 階層 | 目的 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| C-TC-210 | unit | 締切→切迫度と残日表示の決定（#24） | `deadlineUrgency(deadline, todayISO)`／`deadlineCountdown(days)` | 締切なし=none/null／過去=over（days<0）／当日〜2日=urgent／3〜7日=soon／8日以上=safe／不正日付=none。`deadlineCountdown`＝null→""・負→「締切超過」・0→「今日締切」・正→「残りN日」 | SC-01/10/11/12（⏳ 締切）／ゲーム感 #24 |
