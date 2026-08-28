@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Avatar } from "@/components/ui";
+import { Avatar, CountUp } from "@/components/ui";
 
 import { getRankings, type RankingMe, type RankingPeriod } from "../api";
 import "../ranking.css";
@@ -107,7 +107,7 @@ export function RankingView() {
               </div>
             </div>
             <div className="myrank__score">
-              スコア <span className="exp">{me?.score ?? 0}</span>
+              スコア <span className="exp"><CountUp value={me?.score ?? 0} /></span>
               <button className="btn btn-outline myrank__jump" type="button" onClick={jumpToMe} disabled={!meRow}>
                 ▼ 自分の順位へ
               </button>
@@ -123,8 +123,8 @@ export function RankingView() {
         <h3>★ 社内ランキング ★</h3>
         <div className="rank-panel__sub">{PERIOD_LABEL[period]}の獲得EXP＋コイン</div>
 
-        {/* 表彰台 TOP3（2・1・3 の順で中央を高く） */}
-        <div className="podium">
+        {/* 表彰台 TOP3（2・1・3 の順で中央を高く）。key に period を含め、期間切替で登場演出を再生。 */}
+        <div className="podium" key={period}>
           {podium.map((m) => (
             <div key={m.rank} className={`podium__col rank${m.rank}${m.me ? " is-me" : ""}`}>
               <span className="podium__medal">{MEDAL[m.rank - 1]}</span>
@@ -133,14 +133,14 @@ export function RankingView() {
                 {m.n}
                 {m.me ? "（あなた）" : ""}
               </span>
-              <span className="podium__score">{m.score}</span>
+              <span className="podium__score"><CountUp value={m.score} /></span>
               <div className="podium__block">{m.rank}</div>
             </div>
           ))}
         </div>
 
-        {/* 全件 */}
-        <ol className="rank-list" ref={listRef}>
+        {/* 全件（key に period を含め、期間切替で自分の行の登場ハイライトを再生） */}
+        <ol className="rank-list" ref={listRef} key={period}>
           {list.map((m) => (
             <li key={m.rank} className={m.me ? "is-me" : undefined}>
               <span className="rank-no">{m.rank}</span>

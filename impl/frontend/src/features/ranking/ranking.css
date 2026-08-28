@@ -45,3 +45,37 @@
 .rank-panel.full { max-height: none; }
 
 @media (max-width: 640px) { .podium__col { width: 100px; } }
+
+/* ── ゲーム感 #13: ランキングの登場演出（SC-41・純CSS）───────────────────────────────
+   表彰台のせり上がり・メダルのきらめき・自分の順位カード/行の登場グロー。SC-41 固有に限定
+   （`.rank-panel.full` 配下）＝ダッシュボードのミニランキングには波及させない。reduce-motion 尊重。 */
+.podium__col { animation: rank-podium-rise .5s cubic-bezier(.22,1,.36,1) both; }
+.podium__col:nth-child(1) { animation-delay: .10s; }  /* 2位 */
+.podium__col:nth-child(2) { animation-delay: 0s; }    /* 1位（中央・先に） */
+.podium__col:nth-child(3) { animation-delay: .18s; }  /* 3位 */
+@keyframes rank-podium-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+/* メダルのきらめき（周期的にポン＋輝度） */
+.podium__medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; transform-origin: 50% 60%; }
+.rank-panel.full .rank-list li .rank-medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; }
+@keyframes rank-medal-shine {
+  0%, 70%, 100% { transform: scale(1); filter: brightness(1); }
+  78% { transform: scale(1.22) rotate(-6deg); filter: brightness(1.5) drop-shadow(0 0 5px rgba(251,191,36,.8)); }
+  86% { transform: scale(1.1) rotate(4deg); filter: brightness(1.2); }
+}
+/* あなたの順位カードの登場グロー（一度きり・注意喚起） */
+.myrank { animation: rank-myrank-in .6s ease-out both; }
+@keyframes rank-myrank-in {
+  0% { opacity: 0; transform: translateY(-6px); box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  40% { opacity: 1; box-shadow: 0 0 0 4px rgba(59,130,246,.28); }
+  100% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
+/* 自分の行の登場ハイライト（数回パルスして落ち着く） */
+.rank-panel.full .rank-list li.is-me { animation: rank-me-row .7s ease-out both; }
+@keyframes rank-me-row {
+  0% { background: rgba(59,130,246,.28); }
+  100% { background: var(--color-primary-soft, rgba(59,130,246,.10)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium__col, .podium__medal, .rank-panel.full .rank-list li .rank-medal,
+  .myrank, .rank-panel.full .rank-list li.is-me { animation: none; }
+}
