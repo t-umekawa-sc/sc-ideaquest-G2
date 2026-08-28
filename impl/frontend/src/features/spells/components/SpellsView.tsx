@@ -5,10 +5,11 @@
 // 解放した魔法は SC-24 チャットの魔法リアクションで発動。装飾/社交演出のみで XP/評価/投票に影響しない。
 // 正＝doc/画面設計/mocks/SC-32_魔法スキル.html・doc/画面設計/screens/SC-32_魔法スキル.md。
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { CountUp, GameNav, SpellCastFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { reduceMotion } from "@/lib/motion";
 
 import { getSpells, unlockSpell, type SpellDTO } from "../api";
 import "../spells.css";
@@ -39,6 +40,18 @@ export function SpellsView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // #11: 魔法解放の瞬間演出（解放したカード矩形にその魔法の signature エフェクトを弾く・reduce-motion 尊重）。
+  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string }[]>([]);
+  const castId = useRef(0);
+  const fireCast = (cardId: string, effect: string) => {
+    if (reduceMotion()) return;
+    const el = typeof document !== "undefined" ? document.getElementById(cardId) : null;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const id = ++castId.current;
+    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect }]);
+    setTimeout(() => setCasts((c) => c.filter((z) => z.id !== id)), 1000);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +86,7 @@ export function SpellsView() {
     try {
       const res = await unlockSpell(s.id);
       if (res) setSp(res.skill_point_balance);
+      fireCast("spell-" + s.id, s.effect); // 解放の瞬間演出（その魔法の signature エフェクト）
       await load(); // unlocked/can_unlock を最新化
       snack({
         type: "reward",
@@ -110,6 +124,8 @@ export function SpellsView() {
 
   return (
     <section aria-label="魔法 / スキル">
+      {/* #11: 魔法解放の瞬間演出（解放カード矩形に固定オーバーレイ・自分の解放時のみ） */}
+      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
       <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
       <GameNav current="spells" />
@@ -118,7 +134,7 @@ export function SpellsView() {
       <section className="pixel-panel" aria-label="スキルポイント">
         <div className="sp-hero">
           <div>
-            <div className="sp-hero__num">✦ {sp}</div>
+            <div className="sp-hero__num">✦ <CountUp value={sp} /></div>
             <div className="sp-hero__label">SKILL POINT</div>
           </div>
           <div className="sp-hero__meta">
@@ -156,7 +172,7 @@ export function SpellsView() {
                   const reqMet = isUnlocked(s.requires_spell_id);
                   const flavor = FLAVOR[s.effect] ?? { preview: s.name_ja, desc: "" };
                   return (
-                    <article className="card spell-card" key={s.id}>
+                    <article className="card spell-card" key={s.id} id={"spell-" + s.id}>
                       <div className="spell-card__head">
                         <span className="spell-card__icon">{s.icon}</span>
                         <span className="spell-card__name">{s.name_ja}</span>

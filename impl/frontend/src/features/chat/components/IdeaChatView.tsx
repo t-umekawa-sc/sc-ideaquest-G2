@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useConfirm, useSnackbar } from "@/components/ui";
+import { useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -28,8 +28,6 @@ import {
   type Spell,
 } from "../api";
 import "../chat.css";
-
-import { SpellCastFx, type CastRect } from "./SpellCastFx";
 
 const NORMAL_EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀"];
 const EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀", "🔥", "✨", "😅", "🙌", "💡", "👏", "🤔", "🚀", "✅", "⚠️", "📌", "🎯"];

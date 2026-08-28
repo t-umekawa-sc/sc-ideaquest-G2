@@ -1641,3 +1641,60 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   transition-duration: .001ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ── ゲーム感 #10/#11: 魔法演出の共通 one-shot（SpellCastFx・SC-24 発動／SC-32 解放）──────────
+   対象要素（チャットのメッセージ矩形／解放したスキルカード）に重ねる固定オーバーレイ。~1s で消え、
+   チャットでは永続 .spell-fx に着地。エフェクト種別テーマ。純視覚・prefers-reduced-motion で無効。
+   座標は呼び出し側が getBoundingClientRect で付与（`@/components/ui` の SpellCastFx）。 */
+.spell-cast { position: fixed; z-index: 1000; pointer-events: none; --fx: rgba(168,85,247,.55); }
+.spell-cast > * { position: absolute; }
+/* メッセージ全体を一瞬染めるフラッシュ */
+.spell-cast__flash {
+  inset: 0; border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 60%, var(--fx), transparent 72%);
+  opacity: 0; animation: cast-flash .7s ease-out forwards;
+}
+/* 中心から広がるリング */
+.spell-cast__ring {
+  left: 50%; top: 55%; width: 12px; height: 12px; border-radius: 50%;
+  transform: translate(-50%,-50%); border: 2px solid var(--fx); opacity: 0;
+  animation: cast-ring .85s ease-out forwards;
+}
+/* 中心で弾ける主エフェクト */
+.spell-cast__core {
+  left: 50%; top: 55%; font-size: 2.4rem; line-height: 1;
+  transform: translate(-50%,-50%) scale(.3); opacity: 0;
+  filter: drop-shadow(0 0 8px var(--fx));
+  animation: cast-core .9s cubic-bezier(.2,1.3,.4,1) forwards;
+}
+/* 飛び散る小エフェクト */
+.spell-cast__p { left: 50%; top: 55%; font-size: 1.2rem; opacity: 0; animation: cast-particle .8s ease-out forwards; }
+.spell-cast__p--0 { --dx: -36px; --dy: -22px; animation-delay: .04s; }
+.spell-cast__p--1 { --dx:  36px; --dy: -16px; animation-delay: .10s; }
+.spell-cast__p--2 { --dx:   0px; --dy: -44px; animation-delay: .07s; }
+
+@keyframes cast-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cast-ring { 0% { width: 12px; height: 12px; opacity: 0; } 20% { opacity: .85; } 100% { width: 190px; height: 190px; opacity: 0; } }
+@keyframes cast-core {
+  0%   { transform: translate(-50%,-50%) scale(.3);  opacity: 0; }
+  35%  { transform: translate(-50%,-62%) scale(1.7); opacity: 1; }
+  100% { transform: translate(-50%,-78%) scale(1);   opacity: 0; }
+}
+@keyframes cast-particle {
+  0%   { transform: translate(-50%,-50%) scale(.4); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+@keyframes cast-flash-thunder { 0%,100% { opacity: 0; } 18%,52% { opacity: 1; } 30% { opacity: .2; } }
+
+/* 種別ごとの色味・味付け */
+.spell-cast--fire    { --fx: rgba(249,115,22,.62); }
+.spell-cast--thunder { --fx: rgba(251,191,36,.72); }
+.spell-cast--thunder .spell-cast__flash { animation: cast-flash-thunder .6s steps(1) forwards; }  /* 稲妻＝ストロボ */
+.spell-cast--ice     { --fx: rgba(56,189,248,.6); }
+.spell-cast--sparkle { --fx: rgba(168,85,247,.55); }
+.spell-cast--rainbow { --fx: rgba(236,72,153,.5); }
+.spell-cast--aura    { --fx: rgba(139,92,246,.55); }
+.spell-cast--aura .spell-cast__ring { animation-duration: 1.05s; }  /* オーラ＝リングを主役に長め */
+
+@media (prefers-reduced-motion: reduce) { .spell-cast { display: none; } }

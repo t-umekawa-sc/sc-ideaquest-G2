@@ -2,6 +2,7 @@
 export { Avatar } from "./Avatar";
 export { Button } from "./Button";
 export { CountUp } from "./CountUp";
+export { SpellCastFx, type CastRect } from "./SpellCastFx";
 export { Card, CardTitle } from "./Card";
 export { DataTable } from "./DataTable";
 export type {
