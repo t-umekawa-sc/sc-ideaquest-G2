@@ -172,7 +172,7 @@ export function SpellsView() {
                   const reqMet = isUnlocked(s.requires_spell_id);
                   const flavor = FLAVOR[s.effect] ?? { preview: s.name_ja, desc: "" };
                   return (
-                    <article className="card spell-card" key={s.id} id={"spell-" + s.id}>
+                    <article className={`card spell-card rarity-${s.rarity}`} key={s.id} id={"spell-" + s.id}>
                       <div className="spell-card__head">
                         <span className="spell-card__icon">{s.icon}</span>
                         <span className="spell-card__name">{s.name_ja}</span>

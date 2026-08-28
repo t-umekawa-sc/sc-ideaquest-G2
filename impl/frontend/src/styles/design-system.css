@@ -1758,3 +1758,13 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 [data-tier="master"] { --aura: #f59e0b; }       /* 達人 */
 [data-tier="mythic"] { --aura: #ef4444; }       /* 英雄 */
 [data-tier="legend"] { --aura: #eab308; }       /* 伝説 */
+
+/* ── ゲーム感 #27: レアリティの輝き（レアのカード枠が脈動）───────────────────────────────
+   .card.rarity-rare（ショップ/アバター/魔法のカード枠）を紫グローで脈動＝収集意欲。コモン/標準は
+   既存の枠色のまま（無地/控えめ）。レア inset リング（.rarity-rare 既存）は維持。reduce-motion で静止。 */
+.card.rarity-rare { animation: rarity-shine 2.4s ease-in-out infinite; }
+@keyframes rarity-shine {
+  0%, 100% { box-shadow: 0 0 0 2px var(--rarity-rare) inset, 0 0 6px -2px var(--rarity-rare); }
+  50%      { box-shadow: 0 0 0 2px var(--rarity-rare) inset, 0 0 16px 1px var(--rarity-rare); }
+}
+@media (prefers-reduced-motion: reduce) { .card.rarity-rare { animation: none; } }

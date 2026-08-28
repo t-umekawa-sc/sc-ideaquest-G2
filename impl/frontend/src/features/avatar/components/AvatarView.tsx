@@ -220,7 +220,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
                     return (
                       <article
                         key={it.id}
-                        className={`card item${isEq ? " is-equipped" : ""}${it.owned ? "" : " is-locked"}${justEquippedId === it.id ? " just-equipped" : ""}`}
+                        className={`card item rarity-${it.rarity}${isEq ? " is-equipped" : ""}${it.owned ? "" : " is-locked"}${justEquippedId === it.id ? " just-equipped" : ""}`}
                         role="button"
                         tabIndex={0}
                         onClick={act}
