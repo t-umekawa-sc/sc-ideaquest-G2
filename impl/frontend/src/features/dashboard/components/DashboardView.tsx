@@ -175,15 +175,14 @@ export function DashboardView({
   };
 
   // 主要フローコンテナ共通の framer 設定：マウント時のみの opacity フェード登場（旧 CSS dash-enter を置換・load 限定）。
-  // 位置/サイズは固定＝透明度だけふわっと（layout アニメは使わない＝投票時の上下チラつきを避ける）。reduce-motion 時は演出なし。
-  const flowMotion = (i: number) =>
-    reduceAnim
-      ? {}
-      : {
-          initial: { opacity: 0 },
-          animate: { opacity: 1 },
-          transition: { duration: 0.3, ease: "easeOut", delay: Math.min(i, 6) * 0.05 },
-        };
+  // 位置/サイズは固定＝透明度だけふわっと（layout アニメは使わない＝投票時の上下チラつきを避ける）。
+  // 常に animate:opacity=1 を持たせる（reduce 検知が初回 null→true に切替わっても opacity 0 で固定されないように）。
+  // reduce-motion 時は initial=false＋duration=0＝即表示（演出なし）。
+  const flowMotion = (i: number) => ({
+    initial: reduceAnim ? false : { opacity: 0 },
+    animate: { opacity: 1 },
+    transition: reduceAnim ? { duration: 0 } : { duration: 0.3, ease: "easeOut", delay: Math.min(i, 6) * 0.05 },
+  });
 
   return (
     <div className="dash-page stack">
