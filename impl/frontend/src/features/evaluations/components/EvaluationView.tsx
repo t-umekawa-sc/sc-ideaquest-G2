@@ -154,10 +154,12 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   );
 
   if (loading) {
-    return <Frame><Spinner label="読み込み中…" /></Frame>;
+    // モーダル時はパネル（padding:0）直下に置かれるため標準ガターを付ける（フルページは container 側で確保）。
+    return <Frame><div style={inModal ? { padding: "var(--space-5) var(--space-6)" } : undefined}><Spinner label="読み込み中…" /></div></Frame>;
   }
   if (loadError) {
-    return <Frame><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></Frame>;
+    // モーダル時は .modal__body の外＝パネル直下のため、左右に隙間（標準ガター）を確保する。
+    return <Frame><div className="form-error" role="alert" style={inModal ? { margin: "var(--space-5) var(--space-6)" } : { marginTop: "var(--space-4)" }}>{loadError}</div></Frame>;
   }
 
   return (
