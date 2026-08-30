@@ -180,6 +180,12 @@ export function DashboardView({
       setAwardKey((k) => k + 1);
       if (e) fxRef.current?.xpFloat(e, `+${res.xp_delta} XP`);
     }
+    // 継続投票：表示中の未投票を投票し切ったら次のバッチを取得（リロード不要）。
+    // サーバーは投票済みを除外して返すので、楽観 votes/xpBump はクリアして実データに置換。
+    if (unvoted.filter((v) => v.id !== idea.id).length === 0) {
+      const d = await getDashboard().catch(() => null);
+      if (d) { setData(d); setVotes({}); setXpBump(0); }
+    }
   };
 
   const toggleFollow = async (f: FollowedIdea) => {
