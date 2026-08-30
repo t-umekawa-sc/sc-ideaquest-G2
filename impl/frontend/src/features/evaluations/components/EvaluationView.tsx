@@ -34,7 +34,8 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const inModal = onClose != null;
   const Frame = ({ children }: { children: ReactNode }) =>
     inModal ? (
-      <>{children}</>
+      // モーダル時は .modal__body で包む＝パネル(88vh)内で本文だけスクロール＋標準ガター（padding）。
+      <div className="modal__body">{children}</div>
     ) : (
       <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
         <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
@@ -154,12 +155,10 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   );
 
   if (loading) {
-    // モーダル時はパネル（padding:0）直下に置かれるため標準ガターを付ける（フルページは container 側で確保）。
-    return <Frame><div style={inModal ? { padding: "var(--space-5) var(--space-6)" } : undefined}><Spinner label="読み込み中…" /></div></Frame>;
+    return <Frame><Spinner label="読み込み中…" /></Frame>;
   }
   if (loadError) {
-    // モーダル時は .modal__body の外＝パネル直下のため、左右に隙間（標準ガター）を確保する。
-    return <Frame><div className="form-error" role="alert" style={inModal ? { margin: "var(--space-5) var(--space-6)" } : { marginTop: "var(--space-4)" }}>{loadError}</div></Frame>;
+    return <Frame><div className="form-error" role="alert" style={{ marginTop: inModal ? 0 : "var(--space-4)" }}>{loadError}</div></Frame>;
   }
 
   return (
@@ -177,7 +176,13 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </div>
           <div className="eval-context__title">{idea?.title || "アイデア"}</div>
           <div className="eval-context__link">
-            <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
+            {/* モーダル時は正規の閉じる処理（アニメ付きで戻る＝背後のアイデア詳細を表示・スクロール位置も復元）。
+                直リンク遷移は intercept スロットが残り背後がトップへスクロールしてしまうため避ける。 */}
+            {inModal ? (
+              <Link href={`/ideas/${ideaId}`} onClick={(e) => { e.preventDefault(); onClose?.(); }}>アイデア詳細を見る →</Link>
+            ) : (
+              <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
+            )}
           </div>
         </div>
 
