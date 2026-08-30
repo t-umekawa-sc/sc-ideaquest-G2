@@ -27,21 +27,26 @@ const ASPECTS: Aspect[] = [
   { key: "cost", label: "コスト", desc: "💡 低コストほど高得点（★5＝非常に低コスト）", cost: true },
 ];
 
+// 枠（モーダル＝.modal__body／フルページ＝container＋backlink）。**モジュールレベルで定義**すること。
+// コンポーネント内で定義すると再描画のたびに関数 identity が変わり、React が別コンポーネント扱いで
+// 本文 DOM を作り直す＝スクロール位置が先頭にリセットされる（★ホバー等で上部へ自動スクロールの原因）。
+function EvalFrame({ inModal, ideaId, children }: { inModal: boolean; ideaId: string; children: ReactNode }) {
+  return inModal ? (
+    // モーダル時は .modal__body で包む＝パネル(88vh)内で本文だけスクロール＋標準ガター（padding）。
+    <div className="modal__body">{children}</div>
+  ) : (
+    <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
+      <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
+      {children}
+    </main>
+  );
+}
+
 // onClose あり＝モーダル（Intercept・SC-22 から）＝chrome（container/backlink）は RouteModal が担うので出さず、
 // 確定成功で close()。無し＝フルページ（URL 直/リロード）＝従来どおり container＋backlink＋router.push。
 export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: () => void }) {
   const router = useRouter();
   const inModal = onClose != null;
-  const Frame = ({ children }: { children: ReactNode }) =>
-    inModal ? (
-      // モーダル時は .modal__body で包む＝パネル(88vh)内で本文だけスクロール＋標準ガター（padding）。
-      <div className="modal__body">{children}</div>
-    ) : (
-      <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
-        <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
-        {children}
-      </main>
-    );
   const snack = useSnackbar();
   const [scores, setScores] = useState<Partial<Record<AspectKey, number>>>({});
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
@@ -155,14 +160,14 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   );
 
   if (loading) {
-    return <Frame><Spinner label="読み込み中…" /></Frame>;
+    return <EvalFrame inModal={inModal} ideaId={ideaId}><Spinner label="読み込み中…" /></EvalFrame>;
   }
   if (loadError) {
-    return <Frame><div className="form-error" role="alert" style={{ marginTop: inModal ? 0 : "var(--space-4)" }}>{loadError}</div></Frame>;
+    return <EvalFrame inModal={inModal} ideaId={ideaId}><div className="form-error" role="alert" style={{ marginTop: inModal ? 0 : "var(--space-4)" }}>{loadError}</div></EvalFrame>;
   }
 
   return (
-    <Frame>
+    <EvalFrame inModal={inModal} ideaId={ideaId}>
       <section className="card">
         {!inModal && <h1 style={{ fontSize: "var(--text-xl)", margin: "0 0 var(--space-2)" }}>アイデアを評価</h1>}
         <p className="role-note" style={{ marginTop: 0 }}>
@@ -366,6 +371,6 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </button>
         </div>
       </section>
-    </Frame>
+    </EvalFrame>
   );
 }
