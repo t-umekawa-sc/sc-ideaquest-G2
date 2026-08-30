@@ -59,11 +59,14 @@
 .dash-page .draft-card__cta { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; color: var(--color-primary); }
 
 /* 未投票のアイデア */
-.dash-page .vote-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
-/* vote-card は登場/退場/繰り上がりを framer-motion（layout）で制御するため、transform は CSS transition から外す
-   （CSS transition が framer の layout transform を throttle しないように）。 */
+/* position: relative＝退場カードの absolute 固定と offset 基準 FLIP の基準（DashboardView の useIsoLayoutEffect）。 */
+.dash-page .vote-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+/* 繰り上がりは JS の FLIP（WAAPI）で transform を動かすため、CSS transition に transform は入れない。 */
 .dash-page .vote-card { --accent: var(--color-primary); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block;
   transition: box-shadow .15s, border-color .15s; }
+/* GF-AC-040: 退場カード＝クリック位置に absolute 固定してフェード（穴を残さず流れから外す）。 */
+.dash-page .vote-card[data-leaving="true"] { opacity: 0; transition: opacity .32s ease; pointer-events: none; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .dash-page .vote-card[data-leaving="true"] { transition: none; } }
 .dash-page .vote-card__quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .dash-page .vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .dash-page .vote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }

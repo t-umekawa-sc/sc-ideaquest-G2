@@ -4,7 +4,7 @@
 // レイアウト/コピーの正＝doc/画面設計/mocks/SC-01_ダッシュボード.html（DoD＝モック一致）。
 // 実接続＝I 集約 `GET /dashboard`（1往復で全パネル）。ヒーローの初期値は server の GET /me 残高（初回描画）で、
 // 取得後は集約 hero を優先。クイック投票＝POST /ideas/{id}/vote・フォロー★＝D follow EP。空パネルは非表示（§7）。
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -51,6 +51,9 @@ function hrefOfDraft(d: DashboardData["drafts"][number]): string {
   return `/ideas/${d.idea.id}/eval`;
 }
 
+// SSR で警告を出さない isomorphic layout effect（client では useLayoutEffect＝FLIP のちらつき防止）。
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function DashboardView({
   displayName,
   accountId,
@@ -84,8 +87,38 @@ export function DashboardView({
   useEffect(() => { setUserReduce(document.querySelector('[data-anim-reduced="true"]') !== null); }, []);
   const reduceAnim = isMotionReduced(!!osReduce, userReduce);
   // 火花/XPフロートは DashboardFx（別 state）に委譲＝時間差消去（650ms/1100ms）で本コンポーネントを
-  // 再描画させない＝繰り上がり（layout）完了後に再計測されてカードが再ゆれするのを防ぐ（GF-AC-040）。
+  // 再描画させない＝繰り上がり完了後に再計測されてカードが再ゆれするのを防ぐ（GF-AC-040）。
   const fxRef = useRef<DashboardFxHandle>(null);
+  // GF-AC-040: 投票カードの繰り上がりを手組み FLIP（First-Last-Invert-Play）で実現。
+  // framer の layout は残留トランスフォームが蓄積してドリフトしたため不採用。WAAPI は終了後に
+  // transform を残さない（fill 既定）＝ドリフトしない。位置は offset 基準＝スクロール非依存。
+  const voteCardEls = useRef<Map<string, HTMLElement>>(new Map());
+  const voteRects = useRef<Map<string, { top: number; left: number }>>(new Map());
+  const voteCommitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // 退場中の投票カード＝クリック時の位置で absolute に固定してフェード（穴を残さず流れから外す）。
+  const [voteLeaving, setVoteLeaving] = useState<Record<string, { top: number; left: number; width: number }>>({});
+  useIsoLayoutEffect(() => {
+    const els = voteCardEls.current;
+    const prev = voteRects.current;
+    const next = new Map<string, { top: number; left: number }>();
+    els.forEach((el, id) => next.set(id, { top: el.offsetTop, left: el.offsetLeft }));
+    if (!reduceAnim) {
+      next.forEach((last, id) => {
+        if (voteLeaving[id]) return;          // 退場中(absolute)はスキップ
+        const first = prev.get(id);
+        if (!first) return;                   // 新規カードはスライドさせない
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        if (dx || dy) {
+          els.get(id)?.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+            { duration: 320, easing: "cubic-bezier(.22,1,.36,1)" },
+          );
+        }
+      });
+    }
+    voteRects.current = next;   // 現在位置を次回の First として保存（消えた id は自然に除去）
+  });
   // #8 獲得フィードバック（段階ハイブリッド step1）＝投票が XP 付与された時のみ「+5 XP」を出し、
   // ヒーロー XP バーを楽観的に +5 分だけ前進＋pulse（連動）。金額 +5 は暫定（xpAward.VOTE_XP）。
   const [xpBump, setXpBump] = useState(0);       // 読み込み後に付与された XP の累積（楽観・server 権威は次ロードで整合）
@@ -134,12 +167,26 @@ export function DashboardView({
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (e) fxRef.current?.burst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
-    // 楽観＝配列から即除外。AnimatePresence が exit（フェード ~0.6s＝火花と同尺）を再生し、
-    // 残りカードは layout で滑らかに繰り上がる（reduce-motion 時は即時入替＝演出なし）。
-    setVotes((s) => ({ ...s, [idea.id]: type }));
+    const el = voteCardEls.current.get(idea.id);
+    if (!reduceAnim && el) {
+      // 退場カードを現在位置で absolute に固定してフェード（穴を残さず流れから外す）。
+      // 流れから外れることで残りカードが即リフロー→FLIP effect が旧位置→新位置へスライド。
+      setVoteLeaving((m) => ({ ...m, [idea.id]: { top: el.offsetTop, left: el.offsetLeft, width: el.offsetWidth } }));
+      const t = setTimeout(() => {
+        setVotes((s) => ({ ...s, [idea.id]: type }));           // 退場アニメ後にリストから確定除外
+        setVoteLeaving((m) => { const n = { ...m }; delete n[idea.id]; return n; });
+        voteCommitTimers.current.delete(idea.id);
+      }, 320);
+      voteCommitTimers.current.set(idea.id, t);
+    } else {
+      setVotes((s) => ({ ...s, [idea.id]: type }));  // reduce-motion は即時入替
+    }
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
-      setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });  // 失敗はロールバック（再登場）
+      const t = voteCommitTimers.current.get(idea.id);
+      if (t) { clearTimeout(t); voteCommitTimers.current.delete(idea.id); }
+      setVoteLeaving((m) => { const n = { ...m }; delete n[idea.id]; return n; });  // 退場を取り消し
+      setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });        // 失敗はロールバック（再登場）
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
     }
@@ -281,18 +328,18 @@ export function DashboardView({
             <span className="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
           </div>
           <div className="vote-grid">
-            {/* GF-AC-040: 投票カードは「その場で opacity フェード＋わずかに縮小」して退場（~0.2秒）。
-                framer の layout/popLayout は使わない（グリッドで残留トランスフォームが蓄積してカードが
-                徐々に下へドリフトする不具合を根絶）。退場後はリストが即詰め＝決定的で安定。reduce-motion 時は即時。 */}
-            <AnimatePresence initial={false}>
-              {unvoted.map((v) => (
-                <motion.article
+            {/* GF-AC-040: 投票カードの繰り上がりは手組み FLIP（上の useIsoLayoutEffect）。
+                投票カードは data-leaving で absolute 固定＋フェード（穴を残さず流れから外す）、
+                残りカードは WAAPI で旧位置→新位置へスライド（ドリフトしない）。reduce-motion 時は即時。 */}
+            {unvoted.map((v) => {
+              const lv = voteLeaving[v.id];
+              return (
+                <article
                   key={v.id}
+                  ref={(el) => { if (el) voteCardEls.current.set(v.id, el); else voteCardEls.current.delete(v.id); }}
                   className="card card-accent vote-card"
-                  initial={reduceAnim ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.3, ease: "easeOut" }}
+                  data-leaving={lv ? "true" : undefined}
+                  style={lv ? { position: "absolute", top: lv.top, left: lv.left, width: lv.width } : undefined}
                 >
                   <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
                   <div className="vote-card__quest">{v.quest.title}</div>
@@ -302,9 +349,9 @@ export function DashboardView({
                     <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
                     <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
                   </div>
-                </motion.article>
-              ))}
-            </AnimatePresence>
+                </article>
+              );
+            })}
           </div>
         </motion.section>
       )}
