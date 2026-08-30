@@ -57,6 +57,18 @@
 /* アイデアタブ：一覧の上に「＋ アイデアを追加」を右寄せで配置。 */
 .ideas-tab-toolbar { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
 
+/* クエスト KPI パネル（1行目＝概要の隣・pixel-panel 内）。2×2 の大きな数字タイル。 */
+.quest-kpi { display: flex; flex-direction: column; }
+.quest-kpi h3 { font-family: var(--font-pixel); color: var(--pixel-xp); margin: 0 0 var(--space-3); }
+.quest-kpi__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); flex: 1; grid-auto-rows: 1fr; }
+.quest-kpi__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: var(--space-3) var(--space-2); text-align: center;
+  background: rgba(0,0,0,.25); border: 1px solid rgba(248,250,252,.14); border-radius: var(--radius-pixel); }
+.quest-kpi__ico { font-size: 20px; line-height: 1; }
+.quest-kpi__num { font-family: var(--font-pixel); font-size: var(--text-2xl); font-weight: 800; line-height: 1.1; color: var(--pixel-ink); }
+.quest-kpi__num[data-urgency="urgent"], .quest-kpi__num[data-urgency="over"] { color: var(--color-danger); }
+.quest-kpi__num[data-urgency="soon"] { color: var(--pixel-coin, #f59e0b); }
+.quest-kpi__label { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--pixel-cyan); }
+
 /* タブ（横スクロール＝狭幅で縦書きにならない）。overflow-x を指定すると overflow-y が auto に強制されるため、
    overflow-y:hidden を明示＝タブの margin-bottom:-2px（アクティブ下線の重なり）で縦スクロールバーが出ないように。 */
 .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }

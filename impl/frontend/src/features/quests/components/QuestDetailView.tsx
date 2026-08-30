@@ -313,6 +313,27 @@ export function QuestDetailView({ questId }: { questId: string }) {
           </div>
         </section>
 
+        {/* クエスト KPI（概要の隣＝一目でクエストの状態。1行目＝概要｜KPI） */}
+        <section className="pixel-panel quest-kpi" aria-label="クエスト KPI">
+          <h3>★ クエスト KPI ★</h3>
+          <div className="quest-kpi__grid">
+            <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>💡</span><span className="quest-kpi__num">{quest.idea_count}</span><span className="quest-kpi__label">アイデア</span></div>
+            <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>👥</span><span className="quest-kpi__num">{quest.member_count}</span><span className="quest-kpi__label">パーティー</span></div>
+            {(() => {
+              const du = deadlineUrgency(quest.deadline, todayISO());
+              const txt = du.level === "none" ? "—" : du.level === "over" ? "超過" : String(du.days);
+              return (
+                <div className="quest-kpi__item">
+                  <span className="quest-kpi__ico" aria-hidden>⏳</span>
+                  <span className="quest-kpi__num" data-urgency={du.level}>{txt}</span>
+                  <span className="quest-kpi__label">{du.level === "over" || du.level === "none" ? "締切" : "締切まで(日)"}</span>
+                </div>
+              );
+            })()}
+            <div className="quest-kpi__item"><span className="quest-kpi__ico" aria-hidden>⭐</span><span className="quest-kpi__num">{ideas ? ideas.filter((i) => i.evalstate === "done").length : "—"}</span><span className="quest-kpi__label">評価済み</span></div>
+          </div>
+        </section>
+
         {/* クエスト内 週間ランキング（G・実接続＝GET /rankings?scope=quest:{id}&period=this_week・G.5） */}
         <section className="pixel-panel rank-panel" aria-label="クエスト内 週間ランキング">
           <h3>★ クエスト内ランキング ★</h3>
