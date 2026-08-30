@@ -219,3 +219,10 @@
   .dash-page .rank-panel .rank-list li .rank-medal,
   .dash-page .rank-panel .rank-list li.is-me { animation: none; }
 }
+/* 読み込み中のスケルトン行（枠高を実データと合わせてリロード時の高さジャンプを防ぐ）。
+   行高は 32px アバター/スコア2行で決まるので、それに合わせた高さのプレースホルダを置く。 */
+.dash-page .rank-panel .rank-list li.rank-skel-row .rank-medal { animation: none; opacity: .5; }
+.dash-page .rank-skel { display: inline-block; background: rgba(248, 250, 252, .14); border-radius: 6px; }
+.dash-page .rank-skel--avatar { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; }
+.dash-page .rank-skel--name { flex: 1; height: 14px; }
+.dash-page .rank-skel--score { flex: 0 0 auto; width: 46px; height: 30px; }

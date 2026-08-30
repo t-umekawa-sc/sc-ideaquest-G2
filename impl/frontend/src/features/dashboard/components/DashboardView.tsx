@@ -233,18 +233,28 @@ export function DashboardView({
           <h3>★ 週間ランキング ★</h3>
           <div className="rank-panel__sub">今週の獲得EXP＋コイン</div>
           <ol className="rank-list">
-            {(ranking?.data ?? []).slice(0, 3).map((r, i) => {
-              const me = ranking?.me?.rank === r.rank;
-              return (
-                <li key={r.user.id} className={me ? "is-me" : undefined}>
-                  <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
-                  <Avatar name={r.user.name} size="sm" level={r.user.level} />
-                  <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
-                  <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
-                </li>
-              );
-            })}
-            {ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
+            {/* 読み込み前は 3行ぶんのスケルトンで枠高を確保＝データ到着時に高さがジャンプせずチラつかない。 */}
+            {!data
+              ? [0, 1, 2].map((i) => (
+                  <li key={`rk-skel-${i}`} className="rank-skel-row" aria-hidden>
+                    <span className="rank-medal">{["🥇", "🥈", "🥉"][i]}</span>
+                    <span className="rank-skel rank-skel--avatar" />
+                    <span className="rank-skel rank-skel--name" />
+                    <span className="rank-skel rank-skel--score" />
+                  </li>
+                ))
+              : (ranking?.data ?? []).slice(0, 3).map((r, i) => {
+                  const me = ranking?.me?.rank === r.rank;
+                  return (
+                    <li key={r.user.id} className={me ? "is-me" : undefined}>
+                      <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
+                      <Avatar name={r.user.name} size="sm" level={r.user.level} />
+                      <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
+                      <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
+                    </li>
+                  );
+                })}
+            {data && ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
           </ol>
           <div className="rank-panel__foot"><Link href="/ranking">ランキングをすべて見る →</Link></div>
         </section>
