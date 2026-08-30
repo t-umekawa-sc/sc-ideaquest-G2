@@ -3,65 +3,93 @@
 > 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。コードの塊は貼らず**ファイルパス＋関数名**で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-08-27**（セッション終了時・時刻は概算）。
-- **作業ブランチ＝`feature/game-feel`**（`origin/feature/game-feel` と同期・**作業ツリーはクリーン**）。**`main` ではない**ので注意。
-- 最新コミット（`feature/game-feel`）: **`2738257`** `feat(game-feel): クイック投票の押下バースト＋受入状態更新（増分#5）`。
-- **`main` は `65153d5`**（前セッションまでの完了分＝Phase A i18n 結線／通知 N+1／本番デプロイ ハードニング＋§6 決定）。**game-feel の #1〜#5 はまだ `main` に未マージ**＝`feature/game-feel` が main より 4 コミット先行（`7418961`→`461f278`→`b25aae2`→`2738257`）。
-- game-feel の運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝私は `feature/game-feel` へ**増分ごとに commit+push を自走**（このブランチのみ standing 承認）／`main` は従来どおりユーザー承認後にまとめてマージ。
+- 最終更新: **2026-08-30 16:33 JST**。
+- **作業ブランチ＝`feature/game-feel`**（`origin` と同期・**作業ツリーはクリーン**）。**`main` ではない**。
+- 最新コミット: **`ef2cca0`** `feat(ui): 戻るリンクのフローティングを9画面に展開`。
+- **`feature/game-feel` は `main` に未マージ**（ゲーム感フェーズの全増分がこのブランチに積まれている）。マージはユーザーが GF-AC 受入を一通り終えてから（§7-5）。
+- 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝`feature/game-feel` へ増分ごとに commit+push を自走（standing 承認）／`main` は承認後マージ。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。全画面・全横断ドメインは接続済み（`impl/README.md` 画面テーブルは全 ✅）。**現在は「ゲーム感（juiciness）向上」フェーズ**＝このシステムの特色を強化中。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（TypeScript）、バック＝FastAPI 4層（会社別DB動的ルーティング）。全画面・全横断ドメインは接続済み。**現在は「ゲーム感（juiciness）向上」フェーズ**＝ユーザーがブラウザで受入（`doc/テスト/ゲーム感受入.md` の `GF-AC-NNN`）し、指摘を受けて私が実装する反復。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-> 本セッション＝(A) 前半で `main` に完了投入した横断品質群、(B) 後半で `feature/game-feel` を切って開始した**ゲーム感フェーズ**。(A) は §1 の `main=65153d5` に含まれる。
+> 本セッションは長く、ゲーム感の増分実装＋ユーザー指摘の多数修正＋認証バグ修正。**正本＝** 進め方 `doc/フェーズ毎ルール/ゲーム感フェーズ.md`／受入台帳 `doc/テスト/ゲーム感受入.md`／横断UI標準 `doc/画面設計/デザイン標準.md`。以下は主な変更（コミットは `git log` 参照）。
 
-### 3-A. main に投入済み（前半・すべて 65153d5 までに merge 済み）
-- **Phase A＝backend locale 結線**（§2.1 i18n の実効化）＝メール `impl/backend/app/control_plane/mail_outbox/templates.py`（`render` の locale 実効化）／通知 `impl/backend/app/tenant/notifications/catalog.py`（`render(session,n,locale)`）／マスタ名 `achievements/application.py`・`shop/application.py`（受信者 `user.locale` で `name_en/name_ja`）／Accept-Language `impl/backend/app/core/locale.py`＋`core/deps.py resolve_session`＋`core/errors.py`（エラー title/汎用 detail の locale・code は不変）。
-- **通知一覧 N+1 回避**＝`impl/backend/app/tenant/notifications/repository.py:prime_refs`（identity map を強参照で事前ロード）を `application.get_notifications` に結線。
-- **本番デプロイ ハードニング**＝`impl/backend/app/main.py:_docs_kwargs`（prod で /docs 等無効）／`impl/backend/scripts/bootstrap.py:_seed_demo_enabled`（prod は demo seed スキップ）。`doc/本番デプロイ要件.md` §6 を「決定」に確定。
+### 3-A. 投票カードのアニメ（GF-AC-040/042・難航の末に決着）
+- 最終方式＝**手組み FLIP（First-Last-Invert-Play）**。`impl/frontend/src/features/dashboard/components/DashboardView.tsx`：`useIsoLayoutEffect`（module 定数）で各投票カードの `offsetTop/Left`（スクロール非依存）の First/Last を測り WAAPI `el.animate` で旧→新位置へスライド。`voteCardEls`/`voteRects` ref。**framer の `layout` は不採用**（グリッドで残留 transform が蓄積しカードが下へドリフト）。
+- 投票は **即時に配列から除外**（`unvotedList` state を filter）＝退場カードを `position:absolute` にしない（absolute 化がビューポート上部の DOM を変え、ブラウザのスクロール補正で下ずれを誘発したため）。`impl/frontend/src/features/dashboard/dashboard.css` に `.dash-page { overflow-anchor: none; }`・`.vote-grid { position: relative }`。
+- 火花/XPフロートは `impl/frontend/src/features/dashboard/components/DashboardFx.tsx`（imperative handle `burst`/`xpFloat`）に**隔離**＝時間差消去の setState で DashboardView を再描画させない（繰り上がり後の再ゆれ防止）。`SparkBurst`/`XpFloat` は `impl/frontend/src/components/ui/` へ移設（CSS は `design-system.css`）。
 
-### 3-B. ゲーム感フェーズ（feature/game-feel・#1〜#5・純加算的な視覚のみ＝backend/挙動は不変・全て reduce-motion 尊重）
-- **#1 数値の演出（`7418961`）**＝新規 `impl/frontend/src/components/ui/CountUp.tsx`（純関数 `countUpFrame(from,to,t)` を export＝easeOutCubic 補間・reduce-motion で即時）を `impl/frontend/src/features/dashboard/components/DashboardView.tsx` のヒーロー **コイン/SP** に適用。XP バーは `barFilled` state＋`design-system.css .xp-bar>span` の transition で 0%→現在% 充填。
-- **#2 レベルアップ祝福（`7418961`）**＝純ロジック `impl/frontend/src/features/dashboard/levelup.ts`（`shouldCelebrateLevelUp`/`nextStoredLevel`/`parseSeenLevel`）＋`components/LevelUpWatcher.tsx`（前回観測レベルを `localStorage["iq:lastSeenLevel:"+accountId]` で比較→中央オーバーレイ・~2.6s 自動消滅）。`DashboardView` に `accountId` prop 追加、`app/(app)/page.tsx` から `session.account_id` を渡す。CSS＝`dashboard.css .levelup-*`。
-- **#3 登場アニメ（`461f278`）**＝`dashboard.css @keyframes dash-enter`＝パネル/カードがロード時に下からフェードイン（リスト内 nth-child スタッガ）。純CSS。
-- **#4 XP バーのシャイン（`b25aae2`）**＝`design-system.css .xp-bar>span::after`＝既存 `@keyframes iq-shine` を再利用し充填部を光が走る（overflow:hidden で充填幅内）。
-- **#5 クイック投票の押下バースト（`2738257`）**＝新規 `impl/frontend/src/features/dashboard/components/SparkBurst.tsx`＋`DashboardView` の `bursts` state/`fireBurst`（クリック座標に固定オーバーレイで✦を6方向へ・~0.6s・楽観削除でカードが消えても見える）。CSS＝`dashboard.css .spark-burst`/`@keyframes spark-fly`。ボタン `onClick={(e)=>quickVote(v,type,e)}`。
-- **受入台帳＝`doc/テスト/ゲーム感受入.md`**（一意ID `GF-AC-NNN`・ブラウザ受入用）。**GF-AC-001/002 はユーザー確認済み＝✅ OK**、残り 13 項は**未確認**。
+### 3-B. 継続投票（GF-AC-043）
+- `DashboardView`：未投票は `unvotedList` ローカル state（`data` 派生をやめた）。`quickVote` 成功後に `getDashboard` を再取得し、まだ表示していない未投票を**末尾に1件追記**（6→5で6個目補充・リロード不要）。
+
+### 3-C. アイデア詳細（SC-22）
+- `impl/frontend/src/features/ideas/components/IdeaDetailView.tsx`：投票成功で更新系と同じ成功トースト＋ダッシュボード共通演出（`SparkBurst`/`XpFloat`＋`router.refresh`）＝#33。賛否バーは **0-0 でも空バー常時表示**＋賛成=左アンカー/反対=右アンカー（`ideas.css .vote-bar__agree/__disagree` を絶対配置・解除は逆方向に引っ込む）。「← {クエスト名}へ戻る」に `#quest-tabs`＋フローティング。
+
+### 3-D. クエスト画面
+- `impl/frontend/src/features/quests/components/QuestDetailView.tsx`：上部を**2行**（1行目=概要｜新規**クエストKPIパネル** `.quest-kpi`＝アイデア/パーティー/締切まで/評価済み、2行目=ランキング｜アクティビティ）。「＋ アイデアを追加」をヘッダーから**アイデアタブの一覧上部**へ。アイデア詳細から戻った時に**タブを画面上部へスクロール**（`useRef alignedRef`＋`ResizeObserver` で上部パネル遅延ロード後も再整列）。戻るリンク float。`quests.css` に `.quest-kpi*`・`#quest-tabs { scroll-margin-top }`・`.ideas-tab-toolbar`。
+
+### 3-E. アイデアチャット（SC-24）
+- `impl/frontend/src/features/chat/components/IdeaChatView.tsx`：**コンポーザーをモック準拠に**（`insertFmt`/`insertMentionAt`/`insertEmoji`＝📎 @ 😀 B `</>` 🔗＋「ⓘ 使い方」「⌄ 最小化」）。本文描画 `renderTextHtml` は元から `**太字**`/`` `コード` ``/`[](url)`/`@mention` 対応済み＝CSS も移植済みで JSX の実装漏れだった。上部**文脈パネルを折りたたみ可**（`ctxOpen`・たたむと右に戻るリンク）＋パネル自体をフローティング（`.chat-context--float`）。
+
+### 3-F. 評価ダイアログ（SC-25）
+- `impl/frontend/src/features/evaluations/components/EvaluationView.tsx`：本文を `.modal__body` で包み**スクロール可**に（従来パネル直下で切れて確定ボタン到達不可）。**枠を module レベル `EvalFrame` に切り出し**（★ホバー等の再描画で本文 DOM が作り直され先頭へ自動スクロールする不具合＝コンポーネント内 `Frame` 定義が原因）。「アイデア詳細を見る」は `onClose`（intercept モーダルを正しく閉じる）。
+
+### 3-G. 横断・その他
+- **戻るリンクのフローティング共通UI**＝`design-system.css .backlink--float`（sticky ヘッダー直下・surface ピル）。`doc/画面設計/デザイン標準.md` §4.10 に明文化。適用＝クエスト一覧/クエスト詳細/アイデア詳細/チャット、および ランキング/ショップ/きせかえ/魔法/通知/実績/**admin 3画面**（`CompanyList`/`AccountSelfSection`/`QuestGroupAdminView`）。**注意＝sticky は親の高さ内でのみ効く＝`<p>` 等1行要素で包まず tall コンテナ直下に置く**。
+- **ヘッダーのコイン数値ロール**＝`impl/frontend/src/components/layout/AppHeader.tsx` に `CountUp`（GF-AC-061）。ショップ購入後 `router.refresh()` でヘッダー残高更新（`ShopView.buy`）。
+- **プロフィール保存の通知統一**＝`ProfileForm.tsx`（`useSnackbar` に統一）＝#32。`.checkbox` の縦位置を em 補正（`design-system.css`）。
+- **時間帯の挨拶**＝`impl/frontend/src/lib/greeting.ts`（`greetingFor(hour)`・I-TC-154）＝#31。
+- **マスコット追従の暫定版**＝`impl/frontend/src/features/avatar/components/MascotFollower.tsx`＝アバターアイコンが追従（3D VRM 未整備の代替・#20・GF-AC-200..202）。
+- **クエスト内アクティビティ日時の視認性**＝`feed.css` で `.pixel-panel .feed__time` 等を明色に（暗背景で低コントラストだった）。
+
+### 3-H. 信頼端末（MFA）の複数ユーザー対応（backend・`5a891fa`）
+- 症状＝同一ブラウザで別ユーザーがログイン/信頼すると `iq_trust`（単一クッキー）が上書きされ、前ユーザーに戻ると DB の信頼端末は有効なのに再び MFA 要求（`t-umekawa → scdev01 → t-umekawa` で再現）。
+- 対応＝`impl/backend/app/control_plane/auth/router.py`：`_parse_trust`／`_set_trust_cookie` を**追記式**（カンマ区切り複数トークン・上限10）／logout-all は **`iq_trust` を削除しない**（DB revoke で当該アカウントは不一致→MFA、他ユーザー分は温存）。`application.py`：`login` の引数を `trust_tokens: list[str]`、`_match_trusted` で各トークンを突合。ADR-0004 §2.3.1 追補、`doc/テスト/A_認証.md` A-TC-071/072、テスト `impl/backend/tests/auth/test_auth_mfa.py`。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-- **backend**＝本セッションで game-feel の backend 変更なし。`main` の最終 full pytest＝**490 passed**（前半で実測）。migration head＝control 0012／company 0020。
-- **frontend（本セッションで実測）**＝`npx tsc --noEmit` **クリーン**／`npx vitest run` **41 passed**（7 files・node 環境。game-feel で `CountUp.test.ts`＝I-TC-150、`levelup.test.ts`＝I-TC-151 を追加）／`npm run build` **green（EXIT=0・26ページ）**。
-- **TC-ID トレーサビリティ ✅（code 408）**＝repo ルートで `python3 scripts/check_tc_traceability.py`。**注**＝`GF-AC-` と `src/**/*.test.ts`（vitest 単体）は走査対象外（`impl/backend/tests/**`＋`impl/frontend/e2e/**` のみ・正規表現 `\b([A-Z])-TC-(\d{3})\b`）。frontend 単体の追跡は md（I-TC-150/151）で担保。
-- **壊れているもの＝無し**（既知の transient は §5）。
+- **frontend（本セッションで実測・repo ルート基準は `impl/frontend`）**＝`npx tsc --noEmit` **クリーン**／`npx vitest run` **74 passed**／`npm run build` **green**。
+- **backend トレーサビリティ**＝repo ルートで `python3 scripts/check_tc_traceability.py` → **✅（code 412）**。※ `GF-AC-` と `src/**/*.test.ts` は走査対象外（`impl/backend/tests/**`＋`impl/frontend/e2e/**` のみ）。frontend 単体は md（I-TC-15x）で追跡。
+- **backend MFA/信頼端末テスト**＝**13 passed**（A-TC-071/072 含む）。ただし**ホストのソースをマウントして実行**した結果（下記 §5・§8）。
+- **GF-AC 受入**＝`doc/テスト/ゲーム感受入.md` で **✅ OK 行 31 件**。直近で実装した以下は**ブラウザ受入 未確認**：GF-AC-043（継続投票）・330/331/332（SC-22 投票演出）・340..343（#34 opacity/繰り上がり）・評価モーダルのスクロール/★ホバー修正・9画面のフローティング戻るリンク・信頼端末（要 backend 再ビルド）。
+- **壊れているもの＝コード上は無し**（build/tsc/vitest green）。**ただし実行中 backend には信頼端末フィックスが未反映**（§5）。
 
 ## 5. 詰まっている点（試した/失敗と理由）
-- **`next build` の transient 失敗**＝`Collecting page data` フェーズで稀に `Failed to collect page data for /admin/accounts/[accountId]/edit` や `PageNotFoundError: /_document`（ENOENT）が出る。**game-feel の CSS/コードとは無関係**（変更を含まない状態でも発生・App Router の並列収集の既知の脆さ）＝**再実行で EXIT=0**。build 判定は「1回落ちたら再実行」で運用。
-- **識別できた地雷（前半・回帰防止で記録）**＝(1) 通知 N+1 の identity-map 事前ロードは**弱参照で GC される**ため `session.info` に強参照必須（`prime_refs`）。(2) pytest 時は `worker`/`mail-worker` を**必ず停止**（共有 control DB の outbox を real sender で drain して競合＝フラキー）。
-- **一次QAスクショ（Playwright headless）は未着手**＝動作中スタックが要るため未実装。現状のゲートは tsc/vitest/build。次セッションで harness 化する（§7）。
+- **backend はイメージ焼き込み**＝`impl/compose.yaml` の backend/worker/mail-worker は**ソースを volume マウントせず `uvicorn` は `--reload` なし**。よって**ホストのコード編集は実行中コンテナに反映されない**。
+  - 影響1＝信頼端末フィックス（`5a891fa`）は commit 済みだが**実行中 backend は旧コードのまま**。ブラウザ検証には **`docker compose up -d --build backend worker mail-worker`（cwd=`impl`）で再ビルド**が必要。
+  - 影響2＝`docker compose exec backend pytest` は**コンテナ内の旧テストコード**を走らせる（新テストが動かず「passed」に見えて誤認しかけた）。新コード/新テストは **`docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest ...`（cwd=`impl`）** で実行する。
+- **framer-motion `layout` はグリッドで使うと残留 transform で下へドリフト**＝#34 で採用→ドリフト→`overflow-anchor` でも直らず→最終的に**手組み FLIP＋absolute 廃止**で解消（§3-A）。
+- **`Frame` をコンポーネント内で定義するとホバー再描画で本文が先頭スクロール**（§3-F）＝module レベルに出して解消。記憶 `framer-reducemotion-null-flip` と同系統の「再描画でのリセット」注意。
+
+### 開発DB を手で改変済み（コード・git ではない。次回の自分へ注意）
+> GF-AC-073（満杯付近でクランプ）検証用に ACME-01 テナントDB `ideaquest_company_acme` を直接編集した。**seed からの再構築で消える一時状態**。
+- テスト太郎（display_name=`テスト 太郎`）の `users.xp` を **93845→94488**（Lv.60・次まで12）に変更。戻す＝`UPDATE users SET xp=93845 WHERE display_name='テスト 太郎';`。
+- テスト太郎の**下書きを全削除**（ideas 11・quests 2・evaluations 2＋子テーブル）。
+- 「New Quest」(`cef6643d-e5fe-41e1-970b-727a7ce128c8`) に**投票用の公開アイデア5件**を追加（title `GF073投票用_%`・author=E2E 発行太郎）。消す＝`DELETE FROM ideas WHERE title LIKE 'GF073投票用_%';`（子＝idea_revisions は CASCADE でなければ手動）。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **ゲーム感は非同期パイプラインで先行実装**（採用・記憶 `game-feel-async-pipeline`）＝ユーザー検証が遅く私の実装が速い前提で、検証待ちで止めない。**不採用＝1増分ごとに同期承認**（私が遊ぶ・遅い）。commit/push は `feature/game-feel` に standing 承認・`main` は承認後マージ。
-- **各増分は純加算的な視覚レイヤ＋reduce-motion 尊重＋テスト規約**（採用）＝純ロジック（`countUpFrame`/`shouldCelebrateLevelUp`）は必ず抽出して md 先行＋vitest red-green（I-TC-150/151）。視覚は `doc/テスト/ゲーム感受入.md` の GF-AC でブラウザ受入。**視覚のみの増分（#3/#4/#5）は純ロジックが無いので vitest 無し＝正直に GF-AC のみ**。
-- **レベルアップ検出は localStorage（account 別キー）で前回観測比較**（採用・`features/dashboard/levelup.ts`）＝初回観測は祝福しない（誤発火防止）。**不採用＝サーバーが leveled_up フラグを返す**（現状レスポンスに無い・backend 変更が要る＝#8 と同じ設計判断なので後回し）。
-- （前半・継続）backend locale 切り分け＝メール/通知/マスタ名は entity-bound・Accept-Language はエラー応答のみ／frontend 全面 i18n は優先度低で繰延（記憶 `frontend-i18n-low-priority`・next-intl 標準）／本番デプロイ §6 はセキュリティ非妥協で確定。
+- **投票カードのアニメは手組み FLIP＋WAAPI**（採用）。不採用＝framer `layout`（グリッドでドリフト）／`popLayout`（穴は消えるがドリフト）／absolute 退場（スクロール補正で下ずれ）。WAAPI は終了後 transform を残さない＝ドリフト無し。
+- **`iq_trust` は複数トークン保持（追記式）**（採用・ADR-0004 §2.3.1）。不採用＝単一トークン（別ユーザーのログインで上書き＝再 MFA）。logout-all はクッキー削除せず DB revoke に委ねる（他ユーザーの信頼を巻き添えにしない）。
+- **戻るリンクは sticky ピルで最上部1本のみ**（採用・§4.10）。不採用＝FAB 風丸ボタン（未提案）。sticky の親高さ制約に注意。
+- **GF-AC-073 検証は開発DB直編集で状況を作る**（採用）。バックエンドに XP 付与テストAPIは作らない（過剰）。
+- **枠コンポーネントは module レベルで定義**（採用・再描画リセット回避）。
 
 ## 7. 次にやること（優先順・具体的に）
-> `feature/game-feel` で継続。着手前に `doc/テスト/ゲーム感受入.md` の未確認/指摘を確認し、GF-AC に追記しながら進める。各増分＝純ロジックは red-green・視覚は GF-AC・push は `feature/game-feel` へ自走。
+> `feature/game-feel` で継続。着手前に `doc/テスト/ゲーム感受入.md` の 未確認/要修正 と `doc/フェーズ毎ルール/ゲーム感フェーズ.md` を確認。
 
-1. **#6 実績アンロック祝福**＝#2 の実績版。新規 `impl/frontend/src/features/achievements/celebrate.ts`（純関数 `shouldCelebrateUnlock(prevSeenCodes:string[], currentUnlockedCodes:string[]):string[]`＝新規解放 code 群を返す）＋`components/AchievementCelebration.tsx`（`features/dashboard/components/LevelUpWatcher.tsx` を雛形に・`localStorage["iq:seenAch:"+accountId]` で差分検出）。`features/achievements/components/AchievementsView.tsx` に結線。テスト＝`doc/テスト/G_ゲーミフィケーション.md` に G-TC を先行追記＋vitest red-green。
-2. **#7 ヘッダーの微演出（全画面で効く）**＝`impl/frontend/src/features/notifications` の `LiveAppHeader`／ベル要素に「未読>0 でベルが軽く振れる」CSS、ヘッダーのコイン表示に変化時の pulse。純CSS＋データ属性駆動（未読数は既存 state）。純ロジック無し＝GF-AC のみ。
-3. **#8 獲得フィードバック「+50 XP」フローティング**＝**設計判断あり（要注意）**。投稿/投票/評価/購入の**レスポンスに XP/コイン差分が載っていない**（`features/ideas/api.ts` の vote 応答等）。潰すには (a) backend 応答に delta を足す（`ideas/application.py` 等・spec 追記）か (b) フロントで before/after 残高差分から算出。**着手前にユーザーへ設計確認**（backend 変更＝main 側の話になる）。
-4. **一次QA harness**＝Playwright headless でダッシュボードのスクショを撮り私が目視する仕組み。既存 e2e（`impl/frontend/e2e/*.spec.ts`）を雛形に。動作スタック（`--profile workers up` ＋ host `npm run dev`）前提。
-5. **`feature/game-feel` → `main` マージ**＝ユーザーが GF-AC を一通り受入（✅ OK）したらバッチで main へ。マージ時に handoff/`impl/README.md` を追随更新。
+1. **backend を再ビルドして信頼端末フィックスをブラウザ検証**＝`cd impl && docker compose up -d --build backend worker mail-worker`。その後 `t-umekawa → scdev01 → t-umekawa`（SYSCON・MFA ON）で**再ログイン時にコードが出ない**ことを確認（A-TC-071/072 の実挙動）。ユーザー報告バグの実機確認。
+2. **直近実装のブラウザ受入をユーザーに促し、`doc/テスト/ゲーム感受入.md` を ✅ OK に更新**＝GF-AC-043（継続投票 1件補充）／330/331/332（SC-22 投票演出）／340..343（#34）／評価モーダルのスクロール・★ホバー・9画面のフローティング戻るリンク。
+3. **GF-AC-073 の受入**＝§5 のDB編集で満杯付近＋投票用アイデア5件は用意済み。投票して**楽観バーが100%を超えない**（レベルアップ詐称なし）を確認→✅化。日次上限は5票/日（`ideas/application.py _VOTE_XP_DAILY_CAP`）。
+4. **ゲーム感の次増分**＝カテゴリE（時間・環境）の続き（動的背景/季節アクセント）や、ユーザーからの新規指摘。純ロジックは md 先行＋vitest red-green、視覚は GF-AC。
+5. **`feature/game-feel` → `main` マージ**＝GF-AC を一通り受入後にバッチで。マージ時に本 handoff と `impl/README.md` を追随更新。
 
-- **共通ルール**＝非自明な新規スコープ（特に #8 の backend 変更）はユーザー確認。テストは md 先行・red-green（`doc/テスト/red確認台帳.md`）。`main` への push はユーザー承認後。
+- **共通ルール**＝backend 変更は再ビルドしないと実行に反映されない（§5）。テストは md 先行・red-green（`doc/テスト/red確認台帳.md`）。`main` への push はユーザー承認後。非自明な認証/セキュリティ挙動変更は ADR 追補＋ユーザー承認。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch` で `feature/game-feel` に居るか確認**（居なければ `git checkout feature/game-feel`）。compose＝`impl/compose.yaml`。db はカスタムビルド（PGroonga 同梱・`impl/db/Dockerfile`）。
-- **進め方・QAスタックの作法の正本＝[`doc/フェーズ毎ルール/ゲーム感フェーズ.md`](doc/フェーズ毎ルール/ゲーム感フェーズ.md)**（安定・コミット管理）。本 handoff は都度状況のみ。要点＝QAは `cd impl && docker compose --profile workers up -d --build`（**worker/mail-worker 必須**＝無いと MailHog にコード来ず）・**frontend は本番ビルド**（F5 で剥がれない）・**push 後は `--build` 再ビルド**（backend 変更時は backend も）・**pytest はワーカ停止/cwd=impl**。ログイン＝`ACME-01`/`user@acme.example`/`Passw0rd!`。ポート＝frontend:3000／backend:8000(`/healthz`)／mailhog:8025／db:5432／redis:6379／minio:9000/:9001。
-- **frontend tsc / vitest / build**＝`cd impl/frontend` で `npx tsc --noEmit`（クリーン）／`npx vitest run`（56/56・node）／`npm run build`（26ページ・**transient で落ちたら再実行**＝§5）。
-- **backend テスト（cwd=`impl` 厳守・ワーカ停止必須）**＝`cd /home/t-umekawa/sc-ideaquest-G2/impl && docker compose stop worker mail-worker` の後 `docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/ -q`（493 passed）。終わったら `docker compose start worker mail-worker`。
-- **DB migration 適用（冪等）**＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend python -m scripts.bootstrap`。
-- **TC-ID 検査**＝repo ルートで `python3 scripts/check_tc_traceability.py`（✅ code 412・GF-AC/src 単体は対象外）。
-- **正本の在り処**＝規約/入口＝`CLAUDE.md`。現況＝`impl/README.md`。ゲーム感受入＝`doc/テスト/ゲーム感受入.md`（GF-AC）。テスト＝`doc/テスト/*.md`（frontend 単体の TC も domain md に記す＝例 I-TC-150/151）＋`red確認台帳.md`＋`セキュリティ横断.md`。本番＝`doc/本番デプロイ要件.md`。API＝`doc/API設計/{A..L}_*.md`。データモデル＝`doc/データモデル.md`。
-- **コミット規約**＝メッセージ末尾に `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`／PR body 末尾に 🤖 Generated with Claude Code 行／`feature/game-feel` への push は自走可・`main` への push はユーザー承認後。
+- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `feature/game-feel` を確認**。compose＝`impl/compose.yaml`（cwd=`impl` で `docker compose` 実行）。
+- **QA スタック起動**（記憶 `game-feel-qa-parallel-ops`）＝`cd impl && docker compose --profile workers up -d --build`。frontend は**本番ビルド**（F5でスタイル落ちを避ける）＝push後に反映させるには `--build` 再ビルド必須。backend も同様にイメージ焼き込み（§5）。フロント＝`localhost:3000`／MailHog＝`localhost:8025`（MFAコード確認）。
+- **frontend ゲート**（cwd=`impl/frontend`）＝`npx tsc --noEmit`／`npx vitest run`（74）／`npm run build`。
+- **backend テスト**（cwd=`impl`・ホストソースで新コードを走らせる）＝`docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest tests/auth/test_auth_mfa.py -q`。※`worker`/`mail-worker` 起動中でも本コマンドは throwaway DB で完結（信頼端末系は 13 passed 実測）。full pytest は未実測。
+- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`。
+- **テナントDB 直参照例**＝`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c "..."`（ACME-01。会社→DB名は control DB `companies.db_identifier`）。
+- 記憶（`~/.claude/.../memory/`）に運用ルール多数（`game-feel-async-pipeline`／`game-feel-qa-parallel-ops`／`animation-reduce-motion-standard`／`framer-reducemotion-null-flip`／`spec-is-source-of-truth` 等）。
