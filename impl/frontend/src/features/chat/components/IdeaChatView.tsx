@@ -82,6 +82,9 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
   const [chatGroupId, setChatGroupId] = useState<string | null>(null);
   const [ctxOpen, setCtxOpen] = useState(true); // 上部の文脈パネルの開閉（たたむと右に戻るリンクだけ残す）
+  const [hintOpen, setHintOpen] = useState(false);   // 使い方ヒントの開閉（SC-24 モック）
+  const [composerMin, setComposerMin] = useState(false); // 入力欄の最小化（SC-24 モック）
+  const [emojiOpen, setEmojiOpen] = useState(false);  // コンポーザーの絵文字ピッカー
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [replyTargets, setReplyTargets] = useState<{ id: string; name: string; text: string }[]>([]);
   const [canSend, setCanSend] = useState(false);
@@ -199,6 +202,24 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     autoGrow(ta, ta === boxRef.current ? 180 : 200);
     updateSendState();
   };
+  // 書式ツールバー＝選択範囲を before/after で囲む（未選択はカーソル位置に挿入）。本文は renderTextHtml が
+  // **太字**/`コード`/[text](url)/@メンション を描画するのでそのまま反映される。
+  const insertFmt = (before: string, after = "") => {
+    const ta = boxRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const sel = ta.value.slice(s, e);
+    const inserted = before + sel + after;
+    ta.value = ta.value.slice(0, s) + inserted + ta.value.slice(e);
+    ta.focus();
+    // 選択があれば末尾、無ければ before の直後（囲みの中）にキャレット。
+    const caret = sel ? s + inserted.length : s + before.length;
+    ta.setSelectionRange(caret, caret);
+    autoGrow(ta, 180);
+    updateSendState();
+  };
+  const insertMentionAt = () => { insertFmt("@"); if (boxRef.current) updateMention(boxRef.current); };
+  const insertEmoji = (em: string) => { insertFmt(em); setEmojiOpen(false); };
   const handleMentionKeys = (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (!mention || !mention.matches.length) return false;
     if (e.key === "ArrowDown") { e.preventDefault(); setMention((s) => (s ? { ...s, active: (s.active + 1) % s.matches.length } : s)); }
@@ -475,7 +496,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       </div>
 
       {/* 入力欄 */}
-      <div className="composer" aria-label="メッセージ入力">
+      <div className={`composer${composerMin ? " is-collapsed" : ""}`} aria-label="メッセージ入力">
+        {/* 最小化時のスリムバー（クリックで展開）＝SC-24 モック */}
+        {canPost && (
+          <button className="composer__mini" type="button" onClick={() => setComposerMin(false)}>＋ メッセージを入力…</button>
+        )}
         <div className="composer__full">
           {!canPost && (
             <p className="role-note" style={{ margin: 0 }}>
@@ -484,6 +509,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           )}
           {canPost && (
             <>
+              {/* 使い方／最小化（右寄せ・独立行）＝SC-24 モック */}
+              <div className="composer__bar">
+                <button className="composer__info" type="button" aria-expanded={hintOpen} aria-controls="composerHint" title="使い方を表示" onClick={() => setHintOpen((v) => !v)}>ⓘ 使い方</button>
+                <button className="composer__toggle" type="button" title="入力欄を最小化" aria-label="入力欄を最小化" onClick={() => setComposerMin(true)}>⌄ 最小化</button>
+              </div>
               {replyTargets.length > 0 && (
                 <div className="reply-ctx is-on">
                   <div className="reply-ctx__head">引用返信（{replyTargets.length}件）</div>
@@ -505,17 +535,38 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 </div>
               )}
               <div className="composer__field">
-                <textarea ref={boxRef} className="composer__box" rows={1} placeholder="メッセージを入力…（@ でメンション）"
+                <textarea ref={boxRef} className="composer__box" rows={1} placeholder="メッセージを入力…（@ でメンション、書式は下のツールバー）"
                   onInput={(e) => { autoGrow(e.currentTarget, 180); updateMention(e.currentTarget); updateSendState(); }}
                   onKeyDown={(e) => { if (handleMentionKeys(e)) return; if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
+                {/* コンポーザーの絵文字ピッカー（本文へ挿入） */}
+                {emojiOpen && (
+                  <div className="emoji-pop" role="menu" aria-label="絵文字を挿入">
+                    {EMOJIS.map((em) => (
+                      <button key={em} type="button" onClick={() => insertEmoji(em)}>{em}</button>
+                    ))}
+                  </div>
+                )}
               </div>
+              {/* ツールバー: 左＝書式/アクション、右＝送信（SC-24 モック） */}
               <div className="composer__toolbar">
                 <div className="composer__tools">
                   <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) setPendingFiles((a) => [...a, ...Array.from(e.target.files!)]); e.target.value = ""; updateSendState(); }} />
-                  <button className="tbtn" type="button" aria-label="ファイルを添付" onClick={() => fileRef.current?.click()}>📎</button>
+                  <button className="tbtn" type="button" aria-label="ファイルを添付" title="ファイルを添付" onClick={() => fileRef.current?.click()}>📎</button>
+                  <button className="tbtn" type="button" aria-label="メンション" title="メンション（@）" onClick={insertMentionAt}>@</button>
+                  <button className={`tbtn${emojiOpen ? " is-on" : ""}`} type="button" aria-label="絵文字" title="絵文字" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((v) => !v)}>😀</button>
+                  <span className="tbar-sep" aria-hidden="true" />
+                  <button className="tbtn" type="button" aria-label="太字" title="太字（**）" onClick={() => insertFmt("**", "**")}><b>B</b></button>
+                  <button className="tbtn" type="button" aria-label="コード" title="コード（``）" onClick={() => insertFmt("`", "`")}>&lt;/&gt;</button>
+                  <button className="tbtn" type="button" aria-label="リンク" title="リンク（[text](url)）" onClick={() => insertFmt("[", "](https://)")}>🔗</button>
                 </div>
                 <button className="btn btn-primary" type="button" disabled={!canSend || sending} onClick={() => void send()}>{sending ? "送信中…" : "送信"}</button>
               </div>
+              {hintOpen && (
+                <p className="composer__hint" id="composerHint">
+                  <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span className="xp">+5 XP</span>（日次上限あり）。<br />
+                  ツールバー: 📎添付 ・ <code>@</code>メンション ・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。
+                </p>
+              )}
             </>
           )}
         </div>
