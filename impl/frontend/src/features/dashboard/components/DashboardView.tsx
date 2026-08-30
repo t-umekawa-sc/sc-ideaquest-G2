@@ -302,12 +302,12 @@ export function DashboardView({
               {unvoted.map((v, i) => (
                 <motion.article
                   key={v.id}
-                  layout={!reduceAnim}
+                  layout={reduceAnim ? false : "position"}
                   className="card card-accent vote-card"
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.4, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
+                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.32, ease: "easeOut" } }}
                 >
                   <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
                   <div className="vote-card__quest">{v.quest.title}</div>
@@ -370,12 +370,12 @@ export function DashboardView({
               return (
                 <motion.article
                   key={f.id}
-                  layout={!reduceAnim}
+                  layout={reduceAnim ? false : "position"}
                   className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.4, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
+                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.32, ease: "easeOut" } }}
                 >
                   <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={() => toggleFollow(f)}>★</button>
                   <Link className="card-title" href={`/ideas/${f.id}`}>{f.title}</Link>
