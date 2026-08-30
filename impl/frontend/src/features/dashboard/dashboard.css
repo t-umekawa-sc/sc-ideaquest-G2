@@ -3,6 +3,10 @@
    .pixel-stat/.xp-bar/.card/.card-accent/.card-title/.between/.row-center/.poster/.muted）は design-system.css。
    当画面固有のみをここに置き、他画面への波及を避けるため .dash-page 配下にスコープする。 */
 
+/* 投票でカードを外した時、ブラウザのスクロールアンカリングが scrollTop を自動補正して
+   セクションが少しずつ下へずれるのを防ぐ（退場カードの absolute 化と噛み合うため無効化）。 */
+.dash-page { overflow-anchor: none; }
+
 .dash-page .dash-greeting { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); animation: greeting-in 0.5s ease both; }
 /* #31: 時間帯の挨拶。mount 後に差し込むためフェードイン。OS/ユーザー抑制で無効化（デザイン標準 §4.9）。 */
 @keyframes greeting-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
