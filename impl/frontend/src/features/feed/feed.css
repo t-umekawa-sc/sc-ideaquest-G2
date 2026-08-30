@@ -9,3 +9,8 @@
 .feed__quest { color: var(--color-text-muted); font-size: var(--text-xs); }
 .feed__time { color: var(--color-text-muted); font-size: var(--text-xs); white-space: nowrap; }
 .feed__more { align-self: center; }
+/* 暗いガラス調 pixel-panel（クエスト内アクティビティ等）に埋め込まれた時は、muted 色が暗すぎて
+   読みにくいため明るめに上書き（ダッシュボードの明るい .card 側には影響しない）。 */
+.pixel-panel .feed__actor { color: var(--pixel-ink); }
+.pixel-panel .feed__quest { color: rgba(248, 250, 252, .65); }
+.pixel-panel .feed__time { color: rgba(248, 250, 252, .62); }

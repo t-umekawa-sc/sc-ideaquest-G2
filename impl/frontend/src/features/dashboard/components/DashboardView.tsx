@@ -10,13 +10,14 @@ import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
-import { Avatar, CountUp, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
+import { Avatar, CountUp, useSnackbar } from "@/components/ui";
+import { DashboardFx, type DashboardFxHandle } from "./DashboardFx";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { LevelUpWatcher } from "./LevelUpWatcher";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
-import { reduceMotion, isMotionReduced } from "@/lib/motion";
+import { isMotionReduced } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
@@ -75,9 +76,6 @@ export function DashboardView({
     const d = new Date();
     setGreet({ text: greetingFor(d.getHours()), date: d.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" }) });
   }, []);
-  // クイック投票の押下バースト（クリック位置に火花・楽観削除でカードが消えても見えるよう固定表示）。
-  const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
-  const burstId = useRef(0);
   // GF-AC-040: 投票カードは framer-motion で「ふわっと退場（fade）＋残りカードの繰り上がりを滑らかに移動（layout）」。
   // 退場中は popLayout で流れから外し、残りが同時にスライドして詰まる＝火花が空スペースに残らない。
   // reduce-motion（OS＋ユーザー設定 accounts.reduce_motion）時は演出なし＝即時入替。
@@ -85,24 +83,13 @@ export function DashboardView({
   const [userReduce, setUserReduce] = useState(false);
   useEffect(() => { setUserReduce(document.querySelector('[data-anim-reduced="true"]') !== null); }, []);
   const reduceAnim = isMotionReduced(!!osReduce, userReduce);
-  const fireBurst = (e: { clientX: number; clientY: number }) => {
-    if (reduceMotion()) return;
-    const id = ++burstId.current;
-    setBursts((b) => [...b, { id, x: e.clientX, y: e.clientY }]);
-    setTimeout(() => setBursts((b) => b.filter((z) => z.id !== id)), 650);
-  };
+  // 火花/XPフロートは DashboardFx（別 state）に委譲＝時間差消去（650ms/1100ms）で本コンポーネントを
+  // 再描画させない＝繰り上がり（layout）完了後に再計測されてカードが再ゆれするのを防ぐ（GF-AC-040）。
+  const fxRef = useRef<DashboardFxHandle>(null);
   // #8 獲得フィードバック（段階ハイブリッド step1）＝投票が XP 付与された時のみ「+5 XP」を出し、
   // ヒーロー XP バーを楽観的に +5 分だけ前進＋pulse（連動）。金額 +5 は暫定（xpAward.VOTE_XP）。
   const [xpBump, setXpBump] = useState(0);       // 読み込み後に付与された XP の累積（楽観・server 権威は次ロードで整合）
   const [awardKey, setAwardKey] = useState(0);   // バー pulse を確実に再生させる再マウントキー
-  const [xpFloats, setXpFloats] = useState<{ id: number; x: number; y: number; label: string }[]>([]);
-  const xpFloatId = useRef(0);
-  const fireXpFloat = (e: { clientX: number; clientY: number }, label: string) => {
-    if (reduceMotion()) return;
-    const id = ++xpFloatId.current;
-    setXpFloats((f) => [...f, { id, x: e.clientX, y: e.clientY, label }]);
-    setTimeout(() => setXpFloats((f) => f.filter((z) => z.id !== id)), 1100);
-  };
   // チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の公開種別のみ）。
   const loadTeamFeed = useCallback((cursor?: string | null) => getTeamFeed(cursor), []);
 
@@ -146,7 +133,7 @@ export function DashboardView({
   };
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
-    if (e) fireBurst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
+    if (e) fxRef.current?.burst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
     // 楽観＝配列から即除外。AnimatePresence が exit（フェード ~0.6s＝火花と同尺）を再生し、
     // 残りカードは layout で滑らかに繰り上がる（reduce-motion 時は即時入替＝演出なし）。
     setVotes((s) => ({ ...s, [idea.id]: type }));
@@ -161,7 +148,7 @@ export function DashboardView({
     if (res.xp_delta > 0) {
       setXpBump((x) => x + res.xp_delta);
       setAwardKey((k) => k + 1);
-      if (e) fireXpFloat(e, `+${res.xp_delta} XP`);
+      if (e) fxRef.current?.xpFloat(e, `+${res.xp_delta} XP`);
     }
   };
 
@@ -187,8 +174,7 @@ export function DashboardView({
   return (
     <div className="dash-page stack">
       <LevelUpWatcher accountId={accountId} level={level} />
-      {bursts.map((b) => <SparkBurst key={b.id} x={b.x} y={b.y} />)}
-      {xpFloats.map((f) => <XpFloat key={f.id} x={f.x} y={f.y} label={f.label} />)}
+      <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
       {/* 上部2カラム：ヒーロー＋週間ランキング */}
