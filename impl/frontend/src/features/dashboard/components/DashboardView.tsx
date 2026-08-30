@@ -90,13 +90,11 @@ export function DashboardView({
   // 再描画させない＝繰り上がり完了後に再計測されてカードが再ゆれするのを防ぐ（GF-AC-040）。
   const fxRef = useRef<DashboardFxHandle>(null);
   // GF-AC-040: 投票カードの繰り上がりを手組み FLIP（First-Last-Invert-Play）で実現。
-  // framer の layout は残留トランスフォームが蓄積してドリフトしたため不採用。WAAPI は終了後に
-  // transform を残さない（fill 既定）＝ドリフトしない。位置は offset 基準＝スクロール非依存。
+  // 投票＝即座に配列から除外（＝ずれない「即時削除」）→残りカードだけ WAAPI で旧位置→新位置へスライド。
+  // WAAPI は終了後に transform を残さない＝ドリフトしない。位置は offset 基準＝スクロール非依存。
+  // absolute 化はしない（それがビューポート上部の DOM を変えてスクロール補正＝下ずれを誘発していたため）。
   const voteCardEls = useRef<Map<string, HTMLElement>>(new Map());
   const voteRects = useRef<Map<string, { top: number; left: number }>>(new Map());
-  const voteCommitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  // 退場中の投票カード＝クリック時の位置で absolute に固定してフェード（穴を残さず流れから外す）。
-  const [voteLeaving, setVoteLeaving] = useState<Record<string, { top: number; left: number; width: number }>>({});
   useIsoLayoutEffect(() => {
     const els = voteCardEls.current;
     const prev = voteRects.current;
@@ -104,7 +102,6 @@ export function DashboardView({
     els.forEach((el, id) => next.set(id, { top: el.offsetTop, left: el.offsetLeft }));
     if (!reduceAnim) {
       next.forEach((last, id) => {
-        if (voteLeaving[id]) return;          // 退場中(absolute)はスキップ
         const first = prev.get(id);
         if (!first) return;                   // 新規カードはスライドさせない
         const dx = first.left - last.left;
@@ -167,25 +164,11 @@ export function DashboardView({
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (e) fxRef.current?.burst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
-    const el = voteCardEls.current.get(idea.id);
-    if (!reduceAnim && el) {
-      // 退場カードを現在位置で absolute に固定してフェード（穴を残さず流れから外す）。
-      // 流れから外れることで残りカードが即リフロー→FLIP effect が旧位置→新位置へスライド。
-      setVoteLeaving((m) => ({ ...m, [idea.id]: { top: el.offsetTop, left: el.offsetLeft, width: el.offsetWidth } }));
-      const t = setTimeout(() => {
-        setVotes((s) => ({ ...s, [idea.id]: type }));           // 退場アニメ後にリストから確定除外
-        setVoteLeaving((m) => { const n = { ...m }; delete n[idea.id]; return n; });
-        voteCommitTimers.current.delete(idea.id);
-      }, 320);
-      voteCommitTimers.current.set(idea.id, t);
-    } else {
-      setVotes((s) => ({ ...s, [idea.id]: type }));  // reduce-motion は即時入替
-    }
+    // 楽観＝即座に配列から除外（＝ずれない「即時削除」と同じ土台）。残りカードは FLIP effect が
+    // 旧位置→新位置へスライド（absolute 化しない＝ドリフトの原因を排除）。
+    setVotes((s) => ({ ...s, [idea.id]: type }));
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
-      const t = voteCommitTimers.current.get(idea.id);
-      if (t) { clearTimeout(t); voteCommitTimers.current.delete(idea.id); }
-      setVoteLeaving((m) => { const n = { ...m }; delete n[idea.id]; return n; });  // 退場を取り消し
       setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });        // 失敗はロールバック（再登場）
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
@@ -329,17 +312,12 @@ export function DashboardView({
           </div>
           <div className="vote-grid">
             {/* GF-AC-040: 投票カードの繰り上がりは手組み FLIP（上の useIsoLayoutEffect）。
-                投票カードは data-leaving で absolute 固定＋フェード（穴を残さず流れから外す）、
-                残りカードは WAAPI で旧位置→新位置へスライド（ドリフトしない）。reduce-motion 時は即時。 */}
-            {unvoted.map((v) => {
-              const lv = voteLeaving[v.id];
-              return (
+                投票＝即座に配列から除外→残りカードだけ WAAPI で旧位置→新位置へスライド（ドリフトしない）。reduce-motion 時は即時。 */}
+            {unvoted.map((v) => (
                 <article
                   key={v.id}
                   ref={(el) => { if (el) voteCardEls.current.set(v.id, el); else voteCardEls.current.delete(v.id); }}
                   className="card card-accent vote-card"
-                  data-leaving={lv ? "true" : undefined}
-                  style={lv ? { position: "absolute", top: lv.top, left: lv.left, width: lv.width } : undefined}
                 >
                   <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
                   <div className="vote-card__quest">{v.quest.title}</div>
@@ -350,8 +328,7 @@ export function DashboardView({
                     <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
                   </div>
                 </article>
-              );
-            })}
+            ))}
           </div>
         </motion.section>
       )}

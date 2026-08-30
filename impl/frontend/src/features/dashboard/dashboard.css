@@ -68,9 +68,6 @@
 /* 繰り上がりは JS の FLIP（WAAPI）で transform を動かすため、CSS transition に transform は入れない。 */
 .dash-page .vote-card { --accent: var(--color-primary); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block;
   transition: box-shadow .15s, border-color .15s; }
-/* GF-AC-040: 退場カード＝クリック位置に absolute 固定してフェード（穴を残さず流れから外す）。 */
-.dash-page .vote-card[data-leaving="true"] { opacity: 0; transition: opacity .32s ease; pointer-events: none; z-index: 1; }
-@media (prefers-reduced-motion: reduce) { .dash-page .vote-card[data-leaving="true"] { transition: none; } }
 .dash-page .vote-card__quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .dash-page .vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .dash-page .vote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
