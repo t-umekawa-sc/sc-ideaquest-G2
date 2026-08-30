@@ -285,17 +285,19 @@ export function DashboardView({
             <span className="muted text-sm">参加クエストで、あなたがまだ投票していないアイデア</span>
           </div>
           <div className="vote-grid">
-            {/* GF-AC-040: 投票カードの退場は opacity のフェードのみ（サイズ/位置は固定＝上下チラつきを避ける）。
-                退場中はその場で場所を保持し、フェードしきってからリストが1回だけ詰まる。reduce-motion 時は即時。 */}
-            <AnimatePresence initial={false}>
+            {/* GF-AC-040: 投票カードは opacity でフェード退場。グリッドなので popLayout で退場カードを即座に流れから外す
+                （＝フェード中に空きセルの「穴」が残らない）。残りカードは layout で滑らかに繰り上がる（カードのみ＝ページ全体は動かさない）。
+                サイズは固定（縮小/移動のスケールは無し）。reduce-motion 時は演出なし（即時）。 */}
+            <AnimatePresence mode="popLayout" initial={false}>
               {unvoted.map((v, i) => (
                 <motion.article
                   key={v.id}
+                  layout={!reduceAnim}
                   className="card card-accent vote-card"
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.45, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05 }}
+                  exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.4, ease: "easeOut" } }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
                 >
                   <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
                   <div className="vote-card__quest">{v.quest.title}</div>
@@ -351,18 +353,19 @@ export function DashboardView({
             <span className="muted text-sm">動きがあると通知でお知らせ</span>
           </div>
           <div className="follow-grid">
-            {/* フォロー解除も opacity のフェードのみ（サイズ/位置は固定）。フェード後にリストが1回だけ詰まる。reduce-motion 時は即時。 */}
-            <AnimatePresence initial={false}>
+            {/* フォロー解除も投票カードと同じ＝popLayout で穴を残さず opacity フェード、残りは layout で滑らかに繰り上がる。reduce-motion 時は即時。 */}
+            <AnimatePresence mode="popLayout" initial={false}>
             {followed.map((f, i) => {
               const frozen = f.quest.quest_status === "completed";
               return (
                 <motion.article
                   key={f.id}
+                  layout={!reduceAnim}
                   className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.4, ease: "easeOut" } }}
-                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05 }}
+                  transition={{ duration: reduceAnim ? 0 : 0.32, ease: "easeOut", delay: reduceAnim ? 0 : Math.min(i, 4) * 0.05, layout: { duration: reduceAnim ? 0 : 0.35, ease: "easeOut" } }}
                 >
                   <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={() => toggleFollow(f)}>★</button>
                   <Link className="card-title" href={`/ideas/${f.id}`}>{f.title}</Link>

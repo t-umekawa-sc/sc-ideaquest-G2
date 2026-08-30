@@ -78,8 +78,10 @@
 
 /* フォロー中のアイデア */
 .dash-page .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+/* follow-card は繰り上がりを framer-motion（layout）で制御するため transform は CSS transition から外す
+   （CSS transition が framer の layout transform を throttle しないように・vote-card と同方針）。 */
 .dash-page .follow-card { --accent: var(--color-info); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block;
-  transition: box-shadow .15s, transform .05s, border-color .15s; }
+  transition: box-shadow .15s, border-color .15s; }
 .dash-page .follow-card .card-title { padding-right: 28px; }
 .dash-page .follow-quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .dash-page .follow-value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
