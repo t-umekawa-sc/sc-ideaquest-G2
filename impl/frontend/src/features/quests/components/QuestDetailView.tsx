@@ -106,6 +106,15 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
   const [ideasError, setIdeasError] = useState<string | null>(null);
 
+  // アイデア詳細から「← {クエスト名}へ戻る」（/quests/{id}#quest-tabs）で戻った時、タブを画面上部へ。
+  // データ非同期のため Next のネイティブ hash スクロールでは要素が未描画＝quest 確定後に手動スクロール。
+  useEffect(() => {
+    if (!quest) return;
+    if (typeof window !== "undefined" && window.location.hash === "#quest-tabs") {
+      document.getElementById("quest-tabs")?.scrollIntoView({ block: "start" });
+    }
+  }, [quest]);
+
   const load = useCallback(async () => {
     try {
       const d = await getQuest(questId);
@@ -286,8 +295,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               </div>
             </div>
             <div className="quest-actions">
-              {/* アイデア追加＝SC-21（D.2 接続済み・投稿成功で IDEAS_CHANGED→一覧再取得）。編集/遷移/削除は C 接続済み。 */}
-              <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
+              {/* 「＋ アイデアを追加」はアイデアタブの一覧上部へ移動（下記 tab==="ideas"）。編集/遷移/削除は C 接続済み。 */}
               {canEdit && (
                 <>
                   <button className="btn btn-outline" type="button" onClick={() => router.push(`/quests/${questId}/edit`)}>クエスト編集</button>
@@ -332,7 +340,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
       </div>
 
       {/* タブ */}
-      <div className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
+      <div id="quest-tabs" className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
         {TABS.map((t) => {
           const count = t.key === "party" ? party.length : t.key === "ideas" ? ideas?.length ?? null : null;
           return (
@@ -346,6 +354,10 @@ export function QuestDetailView({ questId }: { questId: string }) {
       {/* アイデア一覧（D.1 実接続・公開＋自分の下書き＝サーバー強制の可視性） */}
       {tab === "ideas" && (
         <section aria-label="アイデア一覧">
+          {/* アイデア追加＝SC-21（D.2・投稿成功で IDEAS_CHANGED→一覧再取得）。一覧の上に配置。 */}
+          <div className="ideas-tab-toolbar">
+            <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
+          </div>
           {ideasError ? (
             <p className="form-error" role="alert">{ideasError}</p>
           ) : ideas === null ? (

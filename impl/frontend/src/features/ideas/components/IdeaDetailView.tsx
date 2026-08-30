@@ -313,8 +313,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           </div>
         </div>
       )}
-      {/* クエストへ戻る（D.1 quest 参照・実導線）。 */}
-      <Link className="backlink" href={`/quests/${idea.quest.id}`}>
+      {/* クエストへ戻る（D.1 quest 参照・実導線）。#quest-tabs＝戻った先でアイデアタブを画面上部へスクロール。 */}
+      <Link className="backlink" href={`/quests/${idea.quest.id}#quest-tabs`}>
         ← {idea.quest.title || "クエスト"}へ戻る
       </Link>
 
