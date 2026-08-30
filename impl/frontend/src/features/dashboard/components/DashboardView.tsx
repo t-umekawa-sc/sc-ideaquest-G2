@@ -67,7 +67,8 @@ export function DashboardView({
 }) {
   const snackbar = useSnackbar();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [votes, setVotes] = useState<Record<string, IdeaVoteType>>({});
+  // 未投票の表示リストはローカルで持つ（投票で1件除去→サーバー再取得で末尾に次の1件を追記＝常に満杯を保つ）。
+  const [unvotedList, setUnvotedList] = useState<UnvotedIdea[] | null>(null);
   const [unfollowed, setUnfollowed] = useState<Record<string, boolean>>({});
   const bonusShown = useRef(false);
   // XP バーはマウント後に 0→現在値へ充填（CSS transition で演出・ゲーム感）。
@@ -128,6 +129,7 @@ export function DashboardView({
     void getDashboard().then((d) => {
       if (!alive || !d) return;
       setData(d);
+      setUnvotedList(d.unvoted_ideas ?? []);
       if (d.login_bonus && !bonusShown.current) {
         bonusShown.current = true;
         snackbar({ type: "reward", title: "デイリーログインボーナス！",
@@ -153,7 +155,7 @@ export function DashboardView({
   const today = todayISO(); // #24: 締切切迫度の基準日
 
   const drafts = data?.drafts ?? [];
-  const unvoted = (data?.unvoted_ideas ?? []).filter((v) => !votes[v.id]);
+  const unvoted = unvotedList ?? [];
   const quests = data?.quests ?? [];
   const followed = (data?.followed_ideas ?? []).filter((f) => !unfollowed[f.id]);
   const ranking = data?.weekly_ranking;
@@ -164,12 +166,13 @@ export function DashboardView({
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (e) fxRef.current?.burst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
-    // 楽観＝即座に配列から除外（＝ずれない「即時削除」と同じ土台）。残りカードは FLIP effect が
+    // 楽観＝即座にリストから除外（＝ずれない「即時削除」と同じ土台）。残りカードは FLIP effect が
     // 旧位置→新位置へスライド（absolute 化しない＝ドリフトの原因を排除）。
-    setVotes((s) => ({ ...s, [idea.id]: type }));
+    setUnvotedList((l) => (l ?? []).filter((v) => v.id !== idea.id));
     const res = await voteIdea(idea.id, type).catch(() => null);
     if (!res) {
-      setVotes((s) => { const n = { ...s }; delete n[idea.id]; return n; });        // 失敗はロールバック（再登場）
+      // 失敗はロールバック（元の位置に戻す）
+      setUnvotedList((l) => { const cur = l ?? []; return cur.some((v) => v.id === idea.id) ? cur : [idea, ...cur]; });
       snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
       return;
     }
@@ -180,11 +183,16 @@ export function DashboardView({
       setAwardKey((k) => k + 1);
       if (e) fxRef.current?.xpFloat(e, `+${res.xp_delta} XP`);
     }
-    // 継続投票：表示中の未投票を投票し切ったら次のバッチを取得（リロード不要）。
-    // サーバーは投票済みを除外して返すので、楽観 votes/xpBump はクリアして実データに置換。
-    if (unvoted.filter((v) => v.id !== idea.id).length === 0) {
-      const d = await getDashboard().catch(() => null);
-      if (d) { setData(d); setVotes({}); setXpBump(0); }
+    // 継続投票：1件投票するたびにサーバーから次の未投票を取得し、まだ表示していないものを末尾に追記
+    // （6→5 になったら6個目を末尾に補充）。サーバーが未投票を返さなくなれば末尾に何も足さず終了。
+    const d = await getDashboard().catch(() => null);
+    if (d) {
+      setUnvotedList((l) => {
+        const cur = l ?? [];
+        const have = new Set(cur.map((v) => v.id));
+        const add = (d.unvoted_ideas ?? []).filter((n) => !have.has(n.id));
+        return add.length ? [...cur, ...add] : cur;
+      });
     }
   };
 
