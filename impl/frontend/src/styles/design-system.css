@@ -1744,6 +1744,16 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .mascot3d canvas { display: block; width: 100% !important; height: 100% !important; }
 @media (prefers-reduced-motion: reduce) { .mascot3d { display: none; } }
 
+/* #20（暫定）: アバターアイコンのマスコット追従。カード右上へスプリングで移動＋ゆるく上下に揺れる。 */
+.mascot-follow {
+  position: fixed; z-index: 900; pointer-events: none;
+  transition: top .5s cubic-bezier(.34,1.4,.64,1), left .5s cubic-bezier(.34,1.4,.64,1), opacity .25s ease;
+  filter: drop-shadow(0 6px 6px rgba(15,23,42,.35));
+}
+.mascot-follow .avatar { animation: mascot-bob 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .mascot-follow { display: none; } }
+[data-anim-reduced="true"] .mascot-follow { display: none; }
+
 /* ── ゲーム感 #25: 進捗バーの伸びる演出（共通キーフレーム）─────────────────────────────
    バーの塗り要素を scaleX(0→1) で左から伸ばす（width は現在値のまま＝animation は transform のみ）。
    要素マウント時（データ取得後）に一度再生。適用は各所（reduce-motion で無効）。 */

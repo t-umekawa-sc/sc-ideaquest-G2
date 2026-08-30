@@ -5,7 +5,7 @@
 import { redirect } from "next/navigation";
 
 import { DashboardView } from "@/features/dashboard";
-import { MascotFollower, toAvatarBase } from "@/features/avatar";
+import { MascotFollower } from "@/features/avatar";
 import { getServerMe, heroBalance } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
@@ -29,8 +29,8 @@ export default async function HomePage() {
           qgAdmin: session.is_qg_admin,
         }}
       />
-      {/* #20: 3Dアバターのマスコット追従（SC-01 限定・app 層で feature を合成＝dashboard→avatar の直依存を避ける） */}
-      <MascotFollower base={toAvatarBase(me?.profile.avatar_base)} />
+      {/* #20（暫定）: アバターアイコンのマスコット追従（SC-01 限定・3D VRM 整備までの代替） */}
+      <MascotFollower name={me?.profile.display_name ?? session.user.display_name} imageUrl={me?.profile.avatar_image_url} />
     </>
   );
 }
