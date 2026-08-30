@@ -116,8 +116,16 @@ def _issue_session(r: redis.Redis, session, account, company) -> LoginResult:
 
 def login(
     r: redis.Redis, client_ip: str, company_code: str, login_id: str, password: str,
-    trust_token: str | None = None, user_agent: str | None = None,
+    trust_tokens: list[str] | None = None, user_agent: str | None = None,
 ) -> LoginResult:
+    # iq_trust は複数ユーザー分のトークンを保持しうる（ADR-0004 追補）。当該アカウントに一致する
+    # 有効な信頼端末があれば、その1つを返すヘルパ（無ければ None）。
+    def _match_trusted(session, account_id):
+        for t in (trust_tokens or []):
+            td = account_repo.find_active_trusted_device(session, account_id, hash_token(t))
+            if td is not None:
+                return td
+        return None
     check_login_rate_limit(r, client_ip, login_id)  # 第一層＝粗い (IP+login_id) レート制限（429）
 
     # 第二層＝(IP+login_id) 一時ロック（ADR-0005 §2.3）。ロック中は資格照合に到達させないが、
@@ -152,10 +160,10 @@ def login(
             # PROCEED＝資格照合成功。失敗計数とロックを解除する（§2.2 成功で streak と lock 削除）。
             clear_login_lock(r, client_ip, login_id)
 
-            # MFA 要否は会社設定で分岐。信頼端末（iq_trust）が有効なら MFA スキップ（A.0-①）
+            # MFA 要否は会社設定で分岐。信頼端末（iq_trust の複数トークンのいずれか）が有効なら MFA スキップ（A.0-①）
             needs_mfa = company.mfa_required
-            if needs_mfa and trust_token:
-                td = account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
+            if needs_mfa:
+                td = _match_trusted(session, account.id)
                 if td is not None:
                     td.last_used_at = datetime.now(timezone.utc)
                     session.commit()
@@ -166,8 +174,7 @@ def login(
                 # MFA-ON でここに来るのは trust 一致（＝既知端末）だけなので通知対象外。
                 new_trust: str | None = None
                 if not company.mfa_required:
-                    td = (account_repo.find_active_trusted_device(session, account.id, hash_token(trust_token))
-                          if trust_token else None)
+                    td = _match_trusted(session, account.id)
                     if td is not None:
                         td.last_used_at = datetime.now(timezone.utc)  # 既知端末＝静かに更新
                     else:

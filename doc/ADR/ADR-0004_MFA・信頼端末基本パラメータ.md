@@ -48,6 +48,14 @@ pre-auth の実体は Redis（A.0）。**login OTP も同じ pre-auth レコー�
 - **mfa/verify 時 `trust_device=true`**＝新規トークンを発行し `trusted_devices` に登録＋`iq_trust` Cookie を張る。
 - **logout-all**＝当該アカウントの全セッション破棄＋`trusted_devices` を全 `revoked`（A.0-⑤＝全端末で次回 MFA 必須）。
 
+#### 2.3.1 [追補・2026-08-30 ユーザー承認] iq_trust は複数トークンを保持（同一端末を複数ユーザーが信頼できる）
+
+初版は `iq_trust` を**単一トークン**（上書き）としていたが、**同一ブラウザで複数ユーザーが各自「このデバイスを信頼する」場合**に、後からログインしたユーザーのトークンで `iq_trust` が上書きされ、前ユーザーに戻ると（DB の信頼端末は有効なのに）クッキーにトークンが無く**再び MFA が要求される**問題が判明した（共有端末・開発時のユーザー切替で顕在化）。
+
+- **決定**＝`iq_trust` は**カンマ区切りで複数トークンを保持**（`_TRUST_MAX=10`・最新優先で切り詰め）。verify/login でトークンを発行する時は**上書きせず追記**する。login の MFA スキップ判定は**クッキー内の各トークンを当該アカウントの信頼端末と突合**し、1つでも一致すれば skip（`_match_trusted`）。
+- **logout-all**＝従来は `iq_trust` を削除していたが、**削除しない**（当該アカウントの信頼端末は DB で全 `revoked` 済み＝照合で不一致になり MFA 必須になる。同端末の**他ユーザー分のトークンを巻き添えで消さない**ため）。revoked トークンは照合対象外なので安全、上限で自然に切り詰められる。
+- **保持内容/TTL/失効は上記のまま**（トークン平文は保存しない・hash 照合・30日・revoked/expired 除外）。単一→複数は互換（`_parse_trust` は 1個も N個も同様に扱う）。
+
 ### 2.4 [採用] 状態遷移・Cookie・列挙耐性（A.0/A.1 準拠・具体化）
 
 - **login `mfa_required` 分岐**＝資格照合が成功（PROCEED）した会社が `mfa_required=true` かつ信頼端末でない場合のみ。OTP をメール送信し `iq_preauth`＋`iq_csrf` を発行（pre-auth 中の verify/resend がダブルサブミットを満たせるように）。応答＝`200 { status:"mfa_required", mfa:{ delivery:"email", masked_to, expires_in, resend_available_in } }`。

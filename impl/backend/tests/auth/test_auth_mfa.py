@@ -190,3 +190,48 @@ def test_a_tc_070_logout_all_revokes_trust(client, factory, mail):
     r2 = client.post(LOGIN, json={"company_code": account["company_code"], "login_id": account["login_id"], "password": account["password"]})
     assert r2.status_code == 200
     assert r2.json()["status"] == "mfa_required"
+
+
+LOGOUT = "/api/v1/auth/logout"
+
+
+def _trust_and_logout(client, mail, company_code, login_id, password):
+    """当該アカウントで MFA→verify(trust_device)→通常 logout（iq_trust は温存）まで進める。"""
+    _login_mfa(client, mail, company_code, login_id, password)
+    otp = _otp_from_mail(mail)
+    r = client.post(VERIFY, json={"code": otp, "trust_device": True}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    client.post(LOGOUT, headers=_csrf(client))
+
+
+def test_a_tc_071_multiple_users_trust_coexist(client, factory, mail):
+    """A-TC-071 同一端末を A/B が各自信頼→iq_trust 複数トークン保持→後の信頼で前が上書きされず両者スキップ。ADR-0004 §2.3.1。"""
+    # 認証成功まで進める＝実テナントDBを持つシード MFA 会社の実アカウントを2つ（呼ぶたび別アカウント）。
+    a = factory.make_seed_mfa_account()
+    b = factory.make_seed_mfa_account()
+    _trust_and_logout(client, mail, a["company_code"], a["login_id"], a["password"])
+    _trust_and_logout(client, mail, b["company_code"], b["login_id"], b["password"])  # 同じ client=同じ iq_trust に追記
+    # A の再 login は B の信頼で上書きされず authenticated（MFA スキップ）
+    ra = client.post(LOGIN, json={"company_code": a["company_code"], "login_id": a["login_id"], "password": a["password"]})
+    assert ra.status_code == 200 and ra.json()["status"] == "authenticated", ra.text
+    client.post(LOGOUT, headers=_csrf(client))
+    # B も同様に authenticated
+    rb = client.post(LOGIN, json={"company_code": b["company_code"], "login_id": b["login_id"], "password": b["password"]})
+    assert rb.status_code == 200 and rb.json()["status"] == "authenticated", rb.text
+
+
+def test_a_tc_072_logout_all_keeps_other_user_trust(client, factory, mail):
+    """A-TC-072 A の logout-all は B の信頼を巻き添えにしない（iq_trust を消さない）。ADR-0004 §2.3.1。"""
+    a = factory.make_seed_mfa_account()
+    b = factory.make_seed_mfa_account()
+    _trust_and_logout(client, mail, a["company_code"], a["login_id"], a["password"])
+    _trust_and_logout(client, mail, b["company_code"], b["login_id"], b["password"])
+    # A で再 login（trust skip）してから logout-all（A の信頼端末を revoke）
+    ra = client.post(LOGIN, json={"company_code": a["company_code"], "login_id": a["login_id"], "password": a["password"]})
+    assert ra.json()["status"] == "authenticated", ra.text
+    assert client.post(LOGOUT_ALL, headers=_csrf(client)).status_code == 204
+    # A は再び MFA 必須（DB 側 revoke）／B は authenticated（B のトークンは温存＝クッキー削除しない）
+    ra2 = client.post(LOGIN, json={"company_code": a["company_code"], "login_id": a["login_id"], "password": a["password"]})
+    assert ra2.json()["status"] == "mfa_required", ra2.text
+    rb = client.post(LOGIN, json={"company_code": b["company_code"], "login_id": b["login_id"], "password": b["password"]})
+    assert rb.json()["status"] == "authenticated", rb.text

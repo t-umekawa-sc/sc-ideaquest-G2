@@ -54,11 +54,23 @@ def _set_preauth_cookies(response: Response, preauth_token: str, csrf_token: str
     )
 
 
-def _set_trust_cookie(response: Response, trust_token: str) -> None:
-    """信頼端末トークン（iq_trust・30日・httpOnly）。次回 login で MFA スキップ照合に使う（A.0-①）。"""
+# 1台の端末を複数ユーザーが「信頼」できるよう iq_trust は複数トークンをカンマ区切りで保持（ADR-0004 追補）。
+# 単一トークン（上書き）だと別ユーザーのログインで前ユーザーのトークンが消え、戻ると再び MFA が要求される。
+_TRUST_MAX = 10  # 1端末あたりの保持上限（最新を優先。クッキー肥大化の抑止）
+
+
+def _parse_trust(raw: str | None) -> list[str]:
+    """iq_trust（カンマ区切り）をトークン配列へ。空要素は除外。"""
+    return [t for t in (raw or "").split(",") if t]
+
+
+def _set_trust_cookie(response: Response, request: Request, new_token: str) -> None:
+    """信頼端末トークン（iq_trust・30日・httpOnly）を**追記**する（既存の他ユーザー分は温存）。
+    次回 login で、クッキー内の各トークンを当該アカウントの信頼端末と突合して MFA スキップ判定（A.0-①）。"""
     s = get_settings()
+    tokens = [new_token] + [t for t in _parse_trust(request.cookies.get("iq_trust")) if t != new_token]
     response.set_cookie(
-        "iq_trust", trust_token, httponly=True, secure=s.cookie_secure, samesite="lax", path="/",
+        "iq_trust", ",".join(tokens[:_TRUST_MAX]), httponly=True, secure=s.cookie_secure, samesite="lax", path="/",
         max_age=s.trusted_device_ttl_seconds,
     )
 
@@ -69,7 +81,7 @@ def login(body: LoginRequest, request: Request, response: Response) -> LoginResp
     client_ip = get_client_ip(request)  # 実クライアント IP（信頼プロキシ・ADR-0006）
     result = auth_service.login(
         get_redis(), client_ip, body.company_code, body.login_id, body.password,
-        trust_token=request.cookies.get("iq_trust"),
+        trust_tokens=_parse_trust(request.cookies.get("iq_trust")),
         user_agent=request.headers.get("user-agent"),  # 新端末通知の本文（UA・A.9-⑧(a)）
     )
     if result.status == "mfa_required":
@@ -77,8 +89,8 @@ def login(body: LoginRequest, request: Request, response: Response) -> LoginResp
         _set_preauth_cookies(response, result.preauth_token, result.csrf_token)
         return LoginResponse(status="mfa_required", mfa=MfaChallenge(**result.mfa))
     _set_auth_cookies(response, result.session_token, result.csrf_token)
-    if result.trust_token:  # MFA-OFF 未登録端末＝端末認識用 iq_trust を発行（次回は新端末通知しない・A.9-⑧(a)）
-        _set_trust_cookie(response, result.trust_token)
+    if result.trust_token:  # MFA-OFF 未登録端末＝端末認識用 iq_trust を追記（次回は新端末通知しない・A.9-⑧(a)）
+        _set_trust_cookie(response, request, result.trust_token)
     return LoginResponse(status="authenticated", session=Session(**result.session))
 
 
@@ -95,7 +107,7 @@ def mfa_verify(body: MfaVerifyReq, request: Request, response: Response) -> Logi
     _set_auth_cookies(response, result.session_token, result.csrf_token)
     response.delete_cookie("iq_preauth", path="/")  # pre-auth 消費（A.0-③）
     if result.trust_token:
-        _set_trust_cookie(response, result.trust_token)
+        _set_trust_cookie(response, request, result.trust_token)  # 既存の他ユーザー分を温存して追記
     return LoginResponse(status="authenticated", session=Session(**result.session))
 
 
@@ -117,7 +129,8 @@ def logout_all(request: Request) -> Response:
     response = Response(status_code=204)
     response.delete_cookie("iq_session", path="/")
     response.delete_cookie("iq_csrf", path="/")
-    response.delete_cookie("iq_trust", path="/")
+    # iq_trust は削除しない＝当該アカウントの信頼端末は DB 側で全 revoked 済み（照合で不一致→MFA 必須）。
+    # 同端末の**他ユーザー分のトークンを消さない**ため（複数ユーザー対応・ADR-0004 追補）。
     return response
 
 

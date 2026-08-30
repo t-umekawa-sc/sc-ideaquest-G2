@@ -131,6 +131,8 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | A-TC-070 | api | logout-all による全端末破棄と信頼端末失効の担保 | verify（`trust_device=true`）で信頼端末登録済み | `POST /logout-all` → 再 `login` | `204`（全セッション破棄＋`trusted_devices` 全 revoked）→ 再 login は再び `mfa_required` | A.0-⑤ |
+| A-TC-071 | api | 複数ユーザーの信頼端末が同一端末で共存（iq_trust 複数トークン・ADR-0004 §2.3.1） | MFA必須会社の2アカウント A/B。A で verify(`trust_device=true`)→ 同じ `iq_trust` を引き継いで B で verify(`trust_device=true`) | A/B それぞれで再 `login`（相手の信頼後） | `iq_trust` に A・B 両トークンが保持され（追記）、**A の再 login も B の再 login も `authenticated`**（後から信頼した相手で上書きされない）＝MFA スキップ | A.0-①／ADR-0004 §2.3.1 |
+| A-TC-072 | api | logout-all は同一端末の**他ユーザーの信頼を巻き添えにしない**（iq_trust を消さない・§2.3.1） | A/B とも同一端末で信頼登録済み（`iq_trust` に両トークン） | **A** で `POST /logout-all` → 同じ `iq_trust` で **B** が再 `login` | A は再 login で `mfa_required`（DB 側 revoke）／**B は `authenticated`**（B のトークンは温存＝クッキー削除しない） | ADR-0004 §2.3.1 |
 
 ### 4.3 補足・非対象（状態C）
 
