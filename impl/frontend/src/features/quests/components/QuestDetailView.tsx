@@ -270,7 +270,9 @@ export function QuestDetailView({ questId }: { questId: string }) {
 
   return (
     <section aria-label="クエスト詳細">
-      <p><Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link></p>
+      {/* 戻るリンクはフローティング（sticky）＝スクロールしても常時上部に表示（デザイン標準 §4.10）。
+          sticky は親の高さ範囲でのみ効くため <p> で包まず section 直下に置く。 */}
+      <Link className="backlink backlink--float" href="/quests">← クエスト一覧へ戻る</Link>
 
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">

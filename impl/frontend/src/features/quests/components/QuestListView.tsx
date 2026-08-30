@@ -163,7 +163,7 @@ export function QuestListView() {
 
   return (
     <section aria-label="クエスト一覧">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <div className="page-head">
         <h1>クエスト一覧</h1>
         {/* 作成は SC-11（モーダル）。現状は quests/new へ（後日 URL モーダル化）。 */}

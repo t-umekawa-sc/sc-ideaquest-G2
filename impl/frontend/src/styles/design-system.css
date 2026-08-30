@@ -1211,6 +1211,17 @@ a.quest-card:active { transform: translateY(1px); }
 /* 前画面へ戻るリンク（画面上部） */
 .backlink { display: inline-block; margin-bottom: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .backlink:hover { color: var(--color-text); }
+/* ページ最上部の「戻る」リンクの共通フローティング標準（デザイン標準 §4.10）。
+   sticky ヘッダー(top:0/高さ var(--header-h)/z:10)の直下に固定し、スクロールしても常時表示。
+   コンテンツはピルの下に流れるため、背景を持つ小さなピル（surface＋枠＋影）で可読性を確保。 */
+.backlink--float {
+  position: sticky; top: calc(var(--header-h) + var(--space-2)); z-index: 9;
+  display: inline-flex; align-items: center; align-self: flex-start;
+  padding: 6px var(--space-3); border-radius: var(--radius-full);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  box-shadow: var(--shadow); color: var(--color-text-muted); font-weight: 600;
+}
+.backlink--float:hover { color: var(--color-text); border-color: var(--color-text-subtle); text-decoration: none; }
 /* 会社名セル（アイコン＋名称）と識別子の等幅表示（会社コード/DB識別子） */
 .co { display: flex; align-items: center; gap: var(--space-3); }
 .db-id { font-family: ui-monospace, monospace; }
