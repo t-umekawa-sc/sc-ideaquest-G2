@@ -346,8 +346,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     <main className="container chat-main">
       {/* #10: 魔法発動の瞬間演出（対象メッセージ矩形に固定オーバーレイ・自分の発動時のみ） */}
       {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
-      {/* 文脈バー */}
-      <section className="card chat-context" aria-label="対象アイデア">
+      {/* 文脈バー（戻るリンク含む）自体をフローティング（sticky）で常時上部に表示（デザイン標準 §4.10）。 */}
+      <section className="card chat-context chat-context--float" aria-label="対象アイデア">
         <div className="chat-context__body">
           <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
           <div className="chat-context__title">💬 {idea.title}</div>

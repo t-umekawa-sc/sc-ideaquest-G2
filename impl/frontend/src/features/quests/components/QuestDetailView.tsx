@@ -5,7 +5,7 @@
 // 接続範囲＝ヘッダー/概要/パーティー（GET /quests/{id}・C.1）＋状態遷移（C.5）＋削除（C.2）＋
 // 編集導線（SC-11 /quests/{id}/edit）＋**アイデアタブ（D.1 GET /quests/{id}/ideas・IDEAS_CHANGED 購読）**。
 // アイデアタブ/全文検索(J)/評価列(F)/クエスト内週間ランキング(G) すべて実接続。
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -107,12 +107,33 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [ideasError, setIdeasError] = useState<string | null>(null);
 
   // アイデア詳細から「← {クエスト名}へ戻る」（/quests/{id}#quest-tabs）で戻った時、タブを画面上部へ。
-  // データ非同期のため Next のネイティブ hash スクロールでは要素が未描画＝quest 確定後に手動スクロール。
+  // 上部パネル（ランキング/アクティビティ）が非同期で後から伸びてタブ位置がずれるため、
+  // 1回だけでなく「上部の高さが変わるたび再整列」する（quest-top を ResizeObserver で監視）。
+  // ユーザーが自分でスクロールしたら即解除、最長1.5秒で自動解除（操作の邪魔をしない）。
+  const alignedRef = useRef(false);
   useEffect(() => {
-    if (!quest) return;
-    if (typeof window !== "undefined" && window.location.hash === "#quest-tabs") {
-      document.getElementById("quest-tabs")?.scrollIntoView({ block: "start" });
+    if (!quest || alignedRef.current) return;
+    if (typeof window === "undefined" || window.location.hash !== "#quest-tabs") return;
+    const tabsEl = document.getElementById("quest-tabs");
+    if (!tabsEl) return;
+    alignedRef.current = true;
+    const topEl = document.querySelector<HTMLElement>(".quest-top");
+    let active = true;
+    const align = () => { if (active) tabsEl.scrollIntoView({ block: "start" }); };
+    const ro = topEl && "ResizeObserver" in window ? new ResizeObserver(() => align()) : null;
+    function stop() {
+      active = false;
+      ro?.disconnect();
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+      window.clearTimeout(timer);
     }
+    const timer = window.setTimeout(stop, 1500);
+    align();
+    if (ro && topEl) ro.observe(topEl);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    return stop;
   }, [quest]);
 
   const load = useCallback(async () => {

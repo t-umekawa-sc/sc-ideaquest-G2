@@ -6,6 +6,8 @@
 
 /* --- 上部の文脈バー（アイデアの件名・クエスト・戻る） --- */
 .chat-context { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+/* 文脈パネル自体をフローティング（sticky ヘッダー直下・デザイン標準 §4.10）＝スクロールしても常時上部に表示。 */
+.chat-context--float { position: sticky; top: calc(var(--header-h) + var(--space-2)); z-index: 9; }
 .chat-context__body { min-width: 0; flex: 1; }
 .chat-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
 .chat-context__title { font-weight: 700; font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
