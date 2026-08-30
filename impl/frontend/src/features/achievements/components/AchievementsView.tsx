@@ -131,7 +131,7 @@ export function AchievementsView({ accountId }: { accountId: string }) {
         ready={!loading}
         unlocked={rows.filter((a) => a.earned).map((a) => ({ id: a.id, name: a.name, icon: a.icon }))}
       />
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="ach-title">実績 / バッジ</h1>
 
       {/* 収集サマリー（ゲーム層・CRTガラス・実データ summary） */}

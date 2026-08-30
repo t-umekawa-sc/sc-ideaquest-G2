@@ -169,7 +169,7 @@ export function ShopView() {
     <section aria-label="ショップ">
       {/* #12: 購入成立の「アイテム入手」演出（購入カード矩形に固定オーバーレイ） */}
       {gets.map((g) => <ItemGetFx key={g.id} rect={g.rect} icon={g.icon} cost={g.cost} />)}
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
       <GameNav current="shop" />
       {loading && <Spinner label="読み込み中…" />}

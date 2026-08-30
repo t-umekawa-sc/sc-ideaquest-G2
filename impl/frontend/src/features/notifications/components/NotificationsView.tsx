@@ -185,7 +185,7 @@ export function NotificationsView() {
 
   return (
     <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 820 }}>
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="notif-title">通知</h1>
 
       {/* 絞り込み・一括操作 */}

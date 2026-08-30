@@ -121,7 +121,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
   if (loading) {
     return (
       <section aria-label="アバター / 着せ替え">
-        <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+        <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
         <Spinner label="読み込み中…" />
       </section>
     );
@@ -129,7 +129,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
 
   return (
     <section aria-label="アバター / 着せ替え">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="dressup-title">アバター / 着せ替え</h1>
       <GameNav current="avatar" />
 

@@ -145,7 +145,7 @@ export function QuestGroupAdminView() {
   if (notAdmin) {
     return (
       <section aria-label="クエストグループ管理">
-        <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+        <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
         <h1 className="page-title">クエストグループ管理</h1>
         <p className="admin-sub">あなたが管理するクエストグループはありません（グループの管理者〔admin〕所属が必要です）。</p>
       </section>
@@ -154,7 +154,7 @@ export function QuestGroupAdminView() {
 
   return (
     <section aria-label="クエストグループ管理">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="page-title">クエストグループ管理</h1>
       <p className="admin-sub">
         あなたが管理するクエストグループの<strong>参加メンバーを追加・除外</strong>できます。

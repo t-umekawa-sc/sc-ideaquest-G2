@@ -116,17 +116,17 @@ export function SpellsView() {
   };
 
   if (loading) {
-    return <section aria-label="魔法 / スキル"><Link className="backlink" href="/">← ダッシュボードへ戻る</Link><Spinner label="読み込み中…" /></section>;
+    return <section aria-label="魔法 / スキル"><Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link><Spinner label="読み込み中…" /></section>;
   }
   if (loadError) {
-    return <section aria-label="魔法 / スキル"><Link className="backlink" href="/">← ダッシュボードへ戻る</Link><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></section>;
+    return <section aria-label="魔法 / スキル"><Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></section>;
   }
 
   return (
     <section aria-label="魔法 / スキル">
       {/* #11: 魔法解放の瞬間演出（解放カード矩形に固定オーバーレイ・自分の解放時のみ） */}
       {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
       <GameNav current="spells" />
 

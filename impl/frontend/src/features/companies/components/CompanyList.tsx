@@ -153,7 +153,7 @@ export function CompanyList() {
 
   return (
     <section aria-label="会社一覧">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="page-title">システム管理（運営）</h1>
       <p className="admin-sub">
         会社（テナント）の一覧・作成。<strong>各会社の設定・アカウント/所属の管理は、会社を選ぶと会社詳細で行います</strong>。

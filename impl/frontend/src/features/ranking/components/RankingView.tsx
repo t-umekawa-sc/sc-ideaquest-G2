@@ -67,7 +67,7 @@ export function RankingView() {
 
   return (
     <section aria-label="ランキング">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="rank-title">ランキング</h1>
 
       {/* 期間切替 */}
