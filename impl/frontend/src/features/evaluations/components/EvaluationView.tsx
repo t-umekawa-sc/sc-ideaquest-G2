@@ -30,10 +30,14 @@ const ASPECTS: Aspect[] = [
 // 枠（モーダル＝.modal__body／フルページ＝container＋backlink）。**モジュールレベルで定義**すること。
 // コンポーネント内で定義すると再描画のたびに関数 identity が変わり、React が別コンポーネント扱いで
 // 本文 DOM を作り直す＝スクロール位置が先頭にリセットされる（★ホバー等で上部へ自動スクロールの原因）。
-function EvalFrame({ inModal, ideaId, children }: { inModal: boolean; ideaId: string; children: ReactNode }) {
+function EvalFrame({ inModal, ideaId, footer, children }: { inModal: boolean; ideaId: string; footer?: ReactNode; children: ReactNode }) {
   return inModal ? (
-    // モーダル時は .modal__body で包む＝パネル(88vh)内で本文だけスクロール＋標準ガター（padding）。
-    <div className="modal__body">{children}</div>
+    // モーダル時は .modal__body（本文だけスクロール）＋ .modal__footer（下端固定・右寄せ・区切り線）を
+    // パネル(.sectioned)直下の兄弟として並べる＝デザイン標準 §4 の入力モーダル標準構造（フッターは本文外）。
+    <>
+      <div className="modal__body">{children}</div>
+      {footer}
+    </>
   ) : (
     <main className="container" style={{ paddingBlock: "var(--space-6) var(--space-16)", maxWidth: 760 }}>
       <Link className="backlink" href={`/ideas/${ideaId}`}>← アイデア詳細へ戻る</Link>
@@ -166,8 +170,25 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
     return <EvalFrame inModal={inModal} ideaId={ideaId}><div className="form-error" role="alert" style={{ marginTop: inModal ? 0 : "var(--space-4)" }}>{loadError}</div></EvalFrame>;
   }
 
+  // フッターのアクション行（キャンセル/下書き保存/評価を確定）＝標準 .modal__footer に載せる（右寄せ・区切り線）。
+  const actions = (
+    <>
+      {inModal ? (
+        <button className="btn btn-outline" type="button" onClick={onClose}>キャンセル</button>
+      ) : (
+        <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>キャンセル</Link>
+      )}
+      <button className="btn btn-outline" type="button" onClick={() => void persist("draft")} disabled={pending !== null}>
+        {pending === "draft" ? "保存中…" : "下書き保存"}
+      </button>
+      <button className="btn btn-primary" type="button" onClick={() => void persist("submitted")} disabled={pending !== null}>
+        {pending === "submit" ? "確定中…" : "評価を確定"}
+      </button>
+    </>
+  );
+
   return (
-    <EvalFrame inModal={inModal} ideaId={ideaId}>
+    <EvalFrame inModal={inModal} ideaId={ideaId} footer={inModal ? <div className="modal__footer">{actions}</div> : null}>
       <section className="card">
         {!inModal && <h1 style={{ fontSize: "var(--text-xl)", margin: "0 0 var(--space-2)" }}>アイデアを評価</h1>}
         <p className="role-note" style={{ marginTop: 0 }}>
@@ -357,19 +378,12 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           <strong>下書き保存</strong>は一時保存です（本人のみ表示・全観点がそろっていなくても保存できます）。<strong>確定</strong>すると他の評価者・パーティーに反映され、評価で XP、投稿者にコインが付与されます。
         </p>
 
-        <div className="modal__foot" style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-6)", flexWrap: "wrap" }}>
-          {inModal ? (
-            <button className="btn btn-outline" type="button" onClick={onClose}>キャンセル</button>
-          ) : (
-            <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>キャンセル</Link>
-          )}
-          <button className="btn btn-outline" type="button" onClick={() => void persist("draft")} disabled={pending !== null}>
-            {pending === "draft" ? "保存中…" : "下書き保存"}
-          </button>
-          <button className="btn btn-primary" type="button" onClick={() => void persist("submitted")} disabled={pending !== null}>
-            {pending === "submit" ? "確定中…" : "評価を確定"}
-          </button>
-        </div>
+        {/* フルページ時はカード内末尾に標準フッター（右寄せ・区切り線）。モーダル時は本文外の .modal__footer（EvalFrame）へ。 */}
+        {!inModal && (
+          <div className="modal__footer" style={{ paddingInline: 0, background: "transparent", marginTop: "var(--space-6)" }}>
+            {actions}
+          </div>
+        )}
       </section>
     </EvalFrame>
   );
