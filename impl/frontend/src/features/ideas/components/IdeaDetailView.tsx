@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
-import { backToListOr, consumeIdeaFromQuest } from "@/lib/nav";
+import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav";
 
 import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -643,7 +643,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             {/* 評価者向けアクション（評価者権限がある場合のみ・サーバー算出 my_permissions） */}
             {canEvaluate && (
               <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
-                <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`}>
+                <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`} onClick={() => markEvalFromIdea()}>
                   評価する / 編集
                 </Link>
               </div>

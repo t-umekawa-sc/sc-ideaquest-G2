@@ -7,11 +7,12 @@
 // EvaluationModal が onClose 付きで本 View を使う）／URL 直・リロードは本フルページ（onClose 無し＝chrome を出す）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { Spinner, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
+import { consumeEvalFromIdea } from "@/lib/nav";
 import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import { getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
@@ -52,6 +53,15 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const router = useRouter();
   const inModal = onClose != null;
   const snack = useSnackbar();
+  // アイデア詳細から開いた時は背後がアイデア詳細なので「アイデア詳細を見る」導線を隠す（冗長）。
+  // 来歴（sessionStorage）をマウント時に1回だけ消費（ref ガードで StrictMode 二重実行も防ぐ）。
+  const [openedFromIdea, setOpenedFromIdea] = useState(false);
+  const evalCtxConsumed = useRef(false);
+  useEffect(() => {
+    if (evalCtxConsumed.current) return;
+    evalCtxConsumed.current = true;
+    setOpenedFromIdea(consumeEvalFromIdea());
+  }, []);
   const [scores, setScores] = useState<Partial<Record<AspectKey, number>>>({});
   const [hover, setHover] = useState<Partial<Record<AspectKey, number>>>({});
   // #22: 採点確定時に星が「フィルスイープ」でポップ（純視覚・reduce-motion 時は出さない）。
@@ -201,18 +211,22 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
             {idea?.quest?.title || "クエスト"}{idea?.quest?.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}
           </div>
           <div className="eval-context__title">{idea?.title || "アイデア"}</div>
-          <div className="eval-context__link">
-            {/* intercept モーダルの背後は開いた元画面（アイデア詳細とは限らない＝ダッシュボードの評価下書きから開くと背後は
-                ダッシュボード）。onClose(=router.back) だと元画面に戻るだけで詳細に到達しない不具合があった。
-                origin に依らずアイデア詳細へ確実に遷移させる＝ソフト遷移だと intercept の @modal スロットが残る既知挙動が
-                あるためハードナビゲーション、かつ **replace**（assign でなく）で評価 URL(/ideas/{id}/eval)を履歴から除去する。
-                これで詳細の戻るは評価画面を飛ばして真の起点（ダッシュボード等）へ戻る（詳細→評価→詳細のループを解消）。 */}
-            {inModal ? (
-              <Link href={`/ideas/${ideaId}`} onClick={(e) => { e.preventDefault(); window.location.replace(`/ideas/${ideaId}`); }}>アイデア詳細を見る →</Link>
-            ) : (
-              <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
-            )}
-          </div>
+          {/* アイデア詳細から開いた評価モーダルは背後がアイデア詳細なので、この導線は冗長＝隠す。
+              ダッシュボードの評価下書き経由・フルページ（直/リロード）では出す。 */}
+          {!(inModal && openedFromIdea) && (
+            <div className="eval-context__link">
+              {/* intercept モーダルの背後は開いた元画面（アイデア詳細とは限らない＝ダッシュボードの評価下書きから開くと背後は
+                  ダッシュボード）。onClose(=router.back) だと元画面に戻るだけで詳細に到達しない不具合があった。
+                  origin に依らずアイデア詳細へ確実に遷移させる＝ソフト遷移だと intercept の @modal スロットが残る既知挙動が
+                  あるためハードナビゲーション、かつ **replace**（assign でなく）で評価 URL(/ideas/{id}/eval)を履歴から除去する。
+                  これで詳細の戻るは評価画面を飛ばして真の起点（ダッシュボード等）へ戻る（詳細→評価→詳細のループを解消）。 */}
+              {inModal ? (
+                <Link href={`/ideas/${ideaId}`} onClick={(e) => { e.preventDefault(); window.location.replace(`/ideas/${ideaId}`); }}>アイデア詳細を見る →</Link>
+              ) : (
+                <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 折りたたみ: アイデアを確認（実データ） */}

@@ -28,3 +28,20 @@ export function consumeIdeaFromQuest(): string | null {
     return v;
   } catch { return null; }
 }
+
+// 評価ダイアログを「アイデア詳細から」開いたことのワンショット来歴。背後がアイデア詳細なら
+// 評価モーダルの「アイデア詳細を見る」導線は冗長なので隠すために使う（ダッシュボードの評価下書き
+// から開いた時は set しない＝リンクを出す）。マウント時に1回だけ消費する。
+const EVAL_FROM_IDEA_KEY = "iq_eval_from_idea";
+
+export function markEvalFromIdea(): void {
+  try { sessionStorage.setItem(EVAL_FROM_IDEA_KEY, "1"); } catch { /* SSR/未対応環境は無視 */ }
+}
+
+export function consumeEvalFromIdea(): boolean {
+  try {
+    const v = sessionStorage.getItem(EVAL_FROM_IDEA_KEY);
+    if (v != null) sessionStorage.removeItem(EVAL_FROM_IDEA_KEY);
+    return v != null;
+  } catch { return false; }
+}
