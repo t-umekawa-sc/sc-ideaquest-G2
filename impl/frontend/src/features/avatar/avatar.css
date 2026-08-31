@@ -5,7 +5,8 @@
 .dressup-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
 
 /* 2カラム: 左=アバタービューア（広幅は sticky）／右=ワードローブ */
-.dressup { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: var(--space-6); align-items: start; }
+.dressup { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: var(--space-6); align-items: start;
+  margin-top: var(--space-6); } /* 上部の概要パネルとの間に余白（3Dアバター/補足文の両方が下がる） */
 @media (max-width: 900px) { .dressup { grid-template-columns: 1fr; } }
 
 /* --- アバタービューア（CRTガラス） --- */
