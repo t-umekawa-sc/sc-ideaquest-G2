@@ -661,6 +661,9 @@ body.modal-open { overflow: hidden; }
  * ============================================================= */
 .field { display: block; margin-bottom: var(--space-4); }
 .field > label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-2); }
+/* .checkbox（それ自体が <label>）を .field 直下に置いても崩れない＝上の .field>label(display:block・太字・下余白)に
+   負けて flex(gap/align)が壊れるのを防ぐ明示リセット。specificity 0,1,2 で上書き。 */
+.field > label.checkbox { display: inline-flex; font-weight: 400; margin-bottom: 0; }
 .field .req { color: var(--color-danger); margin-left: 2px; }
 .input, .textarea, .select {
   width: 100%; font-family: var(--font-base); font-size: var(--text-base);
