@@ -17,7 +17,7 @@ import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { getQuestActivities } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { ApiError } from "@/lib/api/client";
-import { backToListOr, markIdeaFromQuest } from "@/lib/nav";
+import { backToListOr, markIdeaFromQuest, consumeQuestFromList } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import {
@@ -91,6 +91,18 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
+  // 戻るラベルの文脈判定（動的ラベル）＝クエスト一覧から来た時（or 直アクセスで戻り先が一覧）だけ
+  // 「← クエスト一覧へ戻る」、それ以外（ダッシュボード等）は「← 戻る」。来歴はマウント時に1回だけ消費。
+  const [fromQuestList, setFromQuestList] = useState(false);
+  const [directAccess, setDirectAccess] = useState(false);
+  const backCtxConsumed = useRef(false);
+  useEffect(() => {
+    if (backCtxConsumed.current) return;
+    backCtxConsumed.current = true;
+    setFromQuestList(consumeQuestFromList());
+    setDirectAccess(typeof window !== "undefined" && window.history.length <= 1);
+  }, []);
+  const questBackLabel = fromQuestList || directAccess ? "← クエスト一覧へ戻る" : "← 戻る";
   const [tab, setTab] = useState<TabKey>("ideas");
   const [ftq, setFtq] = useState("");
   const [ftScope, setFtScope] = useState("");
@@ -273,7 +285,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
   if (loadError) {
     return (
       <section aria-label="クエスト詳細">
-        <p><Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</Link></p>
+        <p><Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link></p>
         <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div>
       </section>
     );
@@ -281,7 +293,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
   if (!quest) {
     return (
       <section aria-label="クエスト詳細">
-        <p><Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</Link></p>
+        <p><Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link></p>
         <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
       </section>
     );
@@ -296,7 +308,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
           sticky は親の高さ範囲でのみ効くため <p> で包まず section 直下に置く。
           標準どおり履歴を戻す（§4.5 ⑨）＝SC-10 一覧の検索/ソート/絞込/ページ・スクロール位置ごと復帰。
           href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
-      <Link className="backlink backlink--float" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</Link>
+      <Link className="backlink backlink--float" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link>
 
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">

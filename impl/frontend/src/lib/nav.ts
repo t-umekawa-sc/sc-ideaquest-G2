@@ -45,3 +45,20 @@ export function consumeEvalFromIdea(): boolean {
     return v != null;
   } catch { return false; }
 }
+
+// クエスト詳細の戻るラベルを文脈で出し分けるワンショット来歴。クエスト一覧(SC-10)から詳細へ来た時だけ
+// 「← クエスト一覧へ戻る」、それ以外（ダッシュボード等）は「← 戻る」。戻る動作自体は常に router.back()。
+// 一覧→詳細のときだけ set（下書き→編集モーダルでは set しない＝消費されず残るのを防ぐ）。
+const QUEST_FROM_LIST_KEY = "iq_quest_from_list";
+
+export function markQuestFromList(): void {
+  try { sessionStorage.setItem(QUEST_FROM_LIST_KEY, "1"); } catch { /* SSR/未対応環境は無視 */ }
+}
+
+export function consumeQuestFromList(): boolean {
+  try {
+    const v = sessionStorage.getItem(QUEST_FROM_LIST_KEY);
+    if (v != null) sessionStorage.removeItem(QUEST_FROM_LIST_KEY);
+    return v != null;
+  } catch { return false; }
+}

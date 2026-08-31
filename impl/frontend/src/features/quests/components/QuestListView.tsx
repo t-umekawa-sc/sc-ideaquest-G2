@@ -14,6 +14,7 @@ import { DataTable, RowMenu } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
+import { markQuestFromList } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
 import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
@@ -191,12 +192,12 @@ export function QuestListView() {
           searchFields="件名・カテゴリー"
           exportName="クエスト一覧"
           emptyText="該当するクエストがありません。条件を変えてお試しください。"
-          onRowClick={(x) => router.push(questHref(x))}
+          onRowClick={(x) => { if (!x.draft) markQuestFromList(); router.push(questHref(x)); }}
           cardRaw={(x) => (
             // ⋯ は Link の外（兄弟・右下）に置く＝アンカー内 button の不正 HTML を避けつつ複製導線を出す（§4.5 操作列）。
             // stats は左寄せ（flex gap）で右下が空くため、そこに重ねる。RowMenu は stopPropagation でカード遷移を抑止。
             <div className="quest-card-wrap" style={{ position: "relative" }}>
-              <Link className="card card-accent quest-card" href={questHref(x)} style={{ ["--accent" as string]: x.accent } as React.CSSProperties}>
+              <Link className="card card-accent quest-card" href={questHref(x)} onClick={() => { if (!x.draft) markQuestFromList(); }} style={{ ["--accent" as string]: x.accent } as React.CSSProperties}>
                 <div className="between">
                   <span className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
                     <QuestIcon q={x} /><span className="card-title">{x.title}</span>
