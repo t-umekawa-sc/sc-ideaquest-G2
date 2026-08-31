@@ -105,6 +105,22 @@ def test_k_tc_020_patch_me_reduce_motion(client, factory):
     assert client.patch(ME, json={"reduce_motion": False}, headers=_csrf(client)).json()["account"]["reduce_motion"] is False
 
 
+def test_k_tc_022_patch_me_mascot_follow(client, factory):
+    """K-TC-022 アバター追従アニメ表示 mascot_follow の編集＋配信（#20・§4.9 系・account-only・既定 true）。"""
+    acc = _login_seed(client, factory)
+    # 既定は true（表示＝現行挙動）
+    assert client.get(ME).json()["account"]["mascot_follow"] is True
+    # false（追従 OFF）へ更新＝accounts 更新＋応答に反映
+    r = client.patch(ME, json={"mascot_follow": False}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["account"]["mascot_follow"] is False
+    assert _account(acc["id"]).mascot_follow is False
+    # GET /me でも配信される
+    assert client.get(ME).json()["account"]["mascot_follow"] is False
+    # true に戻せる（他フィールドと独立）
+    assert client.patch(ME, json={"mascot_follow": True}, headers=_csrf(client)).json()["account"]["mascot_follow"] is True
+
+
 def test_k_tc_002_allowlist_and_locale_validation(client, factory):
     """K-TC-002 allowlist 外は 422（Mass Assignment 防止）・locale は ja|en enum。"""
     _login_seed(client, factory)
@@ -132,7 +148,7 @@ def test_k_tc_004_get_me(client, factory):
     # K.1 正準形＝account/profile/balance/system_role のネスト
     assert set(body.keys()) == {"account", "profile", "balance", "system_role"}
     assert body["account"]["login_id"] == acc["login_id"]
-    assert set(body["account"].keys()) == {"login_id", "email", "locale"}
+    assert set(body["account"].keys()) == {"login_id", "email", "locale", "reduce_motion", "mascot_follow"}
     assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "background_image_url", "avatar_base"}
     # 残高（会社DB users）＋レベル進捗（§7）。ログイン成功でログイン XP（G.6 login・+10）が付与済み
     # ＝新規アカウントでも当日初ログイン後は xp=10（Lv1・次まで 90）。coin/SP は未付与で 0。

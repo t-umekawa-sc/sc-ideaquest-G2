@@ -30,7 +30,7 @@ export default async function HomePage() {
         }}
       />
       {/* #20（暫定）: アバターアイコンのマスコット追従（SC-01 限定・3D VRM 整備までの代替） */}
-      <MascotFollower name={me?.profile.display_name ?? session.user.display_name} imageUrl={me?.profile.avatar_image_url} />
+      <MascotFollower name={me?.profile.display_name ?? session.user.display_name} imageUrl={me?.profile.avatar_image_url} follow={me?.account.mascot_follow ?? true} />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { toAvatarBase } from "./base";
+import { mascotFollowEffective } from "./follow";
 import { prefersReducedMotion, supportsWebGL } from "./webgl";
 
 describe("toAvatarBase（GET /me の profile.avatar_base を安全に正規化）", () => {
@@ -15,6 +16,19 @@ describe("toAvatarBase（GET /me の profile.avatar_base を安全に正規化�
     expect(toAvatarBase(null)).toBe("male");
     expect(toAvatarBase("")).toBe("male");
     expect(toAvatarBase("animal_dog")).toBe("male"); // 将来 enum 追加前の未知値も安全に丸める
+  });
+});
+
+describe("mascotFollowEffective（K-TC-023・追従アニメの実効表示＝抑制優先）", () => {
+  it("抑制でなく follow=true のときだけ表示", () => {
+    expect(mascotFollowEffective(false, true)).toBe(true);
+  });
+  it("抑制中（OS reduce OR reduce_motion）は follow=true でも非表示", () => {
+    expect(mascotFollowEffective(true, true)).toBe(false);
+  });
+  it("follow=false は常に非表示（抑制の有無に関わらず）", () => {
+    expect(mascotFollowEffective(false, false)).toBe(false);
+    expect(mascotFollowEffective(true, false)).toBe(false);
   });
 });
 

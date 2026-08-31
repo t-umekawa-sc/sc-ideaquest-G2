@@ -10,12 +10,16 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui";
 import { reduceMotion } from "@/lib/motion";
 
-export function MascotFollower({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
+import { mascotFollowEffective } from "../follow";
+
+// follow＝ユーザー設定 accounts.mascot_follow（既定 true）。実効表示は「follow かつ 非抑制」＝
+// 「動きを減らす」(OS reduce OR reduce_motion)が立てば follow=true でも出さない（follow.ts）。
+export function MascotFollower({ name, imageUrl, follow = true }: { name: string; imageUrl?: string | null; follow?: boolean }) {
   const [enabled, setEnabled] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  // アニメ抑制でない時のみ有効（client 判定。アイコンなので WebGL は不要）。
-  useEffect(() => { setEnabled(!reduceMotion()); }, []);
+  // 実効表示のみ有効（client 判定。アイコンなので WebGL は不要）。抑制 or 追従OFF なら出さない。
+  useEffect(() => { setEnabled(mascotFollowEffective(reduceMotion(), follow)); }, [follow]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -59,6 +59,9 @@ class Account(ControlBase):
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="ja")  # ja | en
     # アニメ演出のユーザー別 OFF（デザイン標準 §4.9）。true＝この人は演出を抑制。実効=OS reduce OR 本フラグ。
     reduce_motion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # ダッシュボードのアバター追従アニメの表示 ON/OFF（暫定マスコット #20・§4.9 系）。true＝表示（既定＝現行挙動）。
+    # 実効表示 = 追従ON かつ 非抑制（reduce_motion＝OS reduce OR 個別設定 が立てば追従も出さない）。目立つ演出のため個別に切れる。
+    mascot_follow: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     system_role: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")  # active | disabled
     # ログイン成功時に更新（源泉）→ 会社DB users.last_login_at へ §4.6 outbox でミラー

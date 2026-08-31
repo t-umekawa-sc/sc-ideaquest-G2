@@ -34,6 +34,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [displayName, setDisplayName] = useState("");
   const [locale, setLocale] = useState<"ja" | "en">("ja");
   const [animOff, setAnimOff] = useState(false); // アニメ演出を抑制（accounts.reduce_motion・§4.9）
+  const [mascotFollow, setMascotFollow] = useState(true); // アバター追従アニメ表示（accounts.mascot_follow・#20・既定 true）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO 署名URL）。
@@ -51,6 +52,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setDisplayName(me.profile.display_name);
           setLocale(me.account.locale === "en" ? "en" : "ja");
           setAnimOff(!!me.account.reduce_motion);
+          setMascotFollow(me.account.mascot_follow ?? true);
           setAvatarUrl(me.profile.avatar_image_url ?? null);
         }
       } catch {
@@ -64,7 +66,9 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     setError(null);
     setSaving(true);
     try {
-      const updated = await updateMe({ display_name: displayName, locale, reduce_motion: animOff });
+      // mascot_follow は「動きを減らす」ON でも**保存値としては保持**（抑制解除で元の設定に戻る）。実効表示は
+      // MascotFollower 側で「follow かつ 非抑制」で判定するため、ここでは disabled 表示に関わらず本人の設定値を送る。
+      const updated = await updateMe({ display_name: displayName, locale, reduce_motion: animOff, mascot_follow: mascotFollow });
       if (updated) {
         setProfile(updated);
         setDisplayName(updated.profile.display_name);
@@ -195,6 +199,22 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               動きを減らす（カウントアップ・祝福・バースト等の演出を抑制する）
             </label>
             <p className="hint">OS の「視差効果を減らす」が ON のときは、この設定に関わらず常に抑制されます。</p>
+            {/* 追従アニメの ON/OFF（#20・かなり目立つのでこれだけ個別に切れる）。「動きを減らす」ON のときは
+                自動 OFF＝操作不可（disabled）。表示は off だが保存値 mascotFollow は保持（抑制解除で元に戻る）。 */}
+            <label className="checkbox" style={{ marginTop: "var(--space-3)" }}>
+              <input
+                id="p_mascot"
+                type="checkbox"
+                checked={!animOff && mascotFollow}
+                disabled={animOff}
+                onChange={(e) => setMascotFollow(e.target.checked)}
+              />{" "}
+              ダッシュボードでアバターが追従するアニメーションを表示する
+            </label>
+            <p className="hint">
+              ダッシュボードでアバターがカードに追従します。かなり目立つ演出です。
+              {animOff && "「動きを減らす」が ON のため、自動的にオフになっています。"}
+            </p>
           </Field>
           <Button type="submit" variant="primary" disabled={saving}>
             {saving ? "保存中…" : "保存する"}

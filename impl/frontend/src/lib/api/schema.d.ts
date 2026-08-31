@@ -3267,6 +3267,11 @@ export interface components {
              * @default false
              */
             reduce_motion: boolean;
+            /**
+             * Mascot Follow
+             * @default true
+             */
+            mascot_follow: boolean;
         };
         /**
          * MeActivitiesResponse
@@ -3366,6 +3371,8 @@ export interface components {
             locale?: ("ja" | "en") | null;
             /** Reduce Motion */
             reduce_motion?: boolean | null;
+            /** Mascot Follow */
+            mascot_follow?: boolean | null;
         };
         /**
          * MemberAddRequest

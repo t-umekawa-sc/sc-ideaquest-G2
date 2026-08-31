@@ -19,6 +19,8 @@ class MeUpdateRequest(BaseModel):
     locale: Literal["ja", "en"] | None = None
     # アニメ演出のユーザー別 OFF（デザイン標準 §4.9）。true＝抑制。OS reduce が最優先の下限（本値では ON に戻せない）。
     reduce_motion: bool | None = None
+    # ダッシュボードのアバター追従アニメ表示 ON/OFF（#20・§4.9 系）。true＝表示。実効=追従ON かつ 非抑制。
+    mascot_follow: bool | None = None
 
 
 class MeAccountDTO(BaseModel):
@@ -27,6 +29,7 @@ class MeAccountDTO(BaseModel):
     email: str
     locale: str
     reduce_motion: bool = False  # アニメ演出のユーザー別 OFF（§4.9・GET /me で配信・既定 false=演出あり）
+    mascot_follow: bool = True  # アバター追従アニメ表示（#20・GET /me で配信・既定 true=表示＝現行挙動）
 
 
 class MeProfileDTO(BaseModel):
