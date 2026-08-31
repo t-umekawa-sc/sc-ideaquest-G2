@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
-import { backToListOr } from "@/lib/nav";
+import { backToListOr, consumeIdeaFromQuest } from "@/lib/nav";
 
 import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -66,6 +66,18 @@ const ASPECT_LABELS: [string, string][] = [
 export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const snack = useSnackbar();
   const router = useRouter();
+  // 戻るラベルの文脈判定（動的ラベル）＝クエストのアイデア一覧から来た時だけ「← {クエスト名}へ戻る」。
+  // 来歴（sessionStorage）はマウント時に1回だけ消費（ref ガードで StrictMode 二重実行も防ぐ）。
+  // 直アクセス（履歴なし）は戻る先＝クエスト（backToListOr の fallback）なのでクエスト名を出す。
+  const [fromQuestId, setFromQuestId] = useState<string | null>(null);
+  const [directAccess, setDirectAccess] = useState(false);
+  const backCtxConsumed = useRef(false);
+  useEffect(() => {
+    if (backCtxConsumed.current) return;
+    backCtxConsumed.current = true;
+    setFromQuestId(consumeIdeaFromQuest());
+    setDirectAccess(typeof window !== "undefined" && window.history.length <= 1);
+  }, []);
   // 投票の押下フィードバック（ダッシュボードと共通）＝クリック位置の火花＋「+N XP」フロート。
   // 座標固定オーバーレイ（要素非依存）・reduce-motion 時は生成しない。CSS＝design-system.css。
   const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
@@ -315,17 +327,19 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           </div>
         </div>
       )}
-      {/* クエストへ戻る（D.1 quest 参照・実導線）＝標準どおり履歴を戻す（デザイン標準 §4.5 ⑨・line 191）。
-          アイデアタブの一覧は検索/ソート/絞込/ページを URL クエリに持つため、router.back() で
-          絞込・ページ・スクロール位置ごと元の一覧に復帰する（#quest-tabs への新規遷移だとクエリが落ちて絞込が消えていた）。
-          直接アクセス（履歴なし）は素のクエスト詳細へフォールバック。フローティング表示は §4.10。
-          href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
+      {/* 戻る＝標準どおり履歴を戻す（デザイン標準 §4.5 ⑨・line 191）＝来た画面へ戻り、アイデアタブ一覧の
+          検索/ソート/絞込/ページ・スクロール位置を復元する（quest URL クエリに載るため）。直アクセス（履歴なし）は
+          素のクエスト詳細へフォールバック。フローティング表示は §4.10。href は右クリック/新規タブ/JS 無効時の保険。
+          ラベルは動的＝クエストの一覧から来た時（or 直アクセスで戻り先がクエスト）だけ「← {クエスト名}へ戻る」、
+          それ以外（ダッシュボードの評価下書き経由・チャット等）は「← 戻る」＝動きとラベルを一致させる。 */}
       <Link
         className="backlink backlink--float"
         href={`/quests/${idea.quest.id}`}
         onClick={(e) => { e.preventDefault(); backToListOr(router, `/quests/${idea.quest.id}`); }}
       >
-        ← {idea.quest.title || "クエスト"}へ戻る
+        {(fromQuestId != null ? fromQuestId === idea.quest.id : directAccess)
+          ? `← ${idea.quest.title || "クエスト"}へ戻る`
+          : "← 戻る"}
       </Link>
 
       {/* ============ アイデアヘッダー ============ */}

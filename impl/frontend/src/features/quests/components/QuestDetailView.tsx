@@ -17,7 +17,7 @@ import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { getQuestActivities } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { ApiError } from "@/lib/api/client";
-import { backToListOr } from "@/lib/nav";
+import { backToListOr, markIdeaFromQuest } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import {
@@ -420,7 +420,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               searchFields="件名・投稿者"
               exportName="アイデア一覧"
               emptyText="まだアイデアがありません。「＋ アイデアを追加」から投稿できます。"
-              onRowClick={(r) => router.push(`/ideas/${r.id}`)}
+              onRowClick={(r) => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); }}
               cardLayout={(r) => ({
                 title: r.title,
                 badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
