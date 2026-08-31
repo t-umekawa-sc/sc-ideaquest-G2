@@ -87,6 +87,9 @@ function deadlineText(d: string | null | undefined): string {
   return d.replaceAll("-", "/");
 }
 
+// クエスト詳細のスクロール位置保存キー（アイデア詳細へドリルイン→戻る での復元用・sessionStorage）。
+const QSCROLL_KEY = "iq_quest_detail_scroll:";
+
 export function QuestDetailView({ questId }: { questId: string }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -118,6 +121,24 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [busy, setBusy] = useState(false);
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
   const [ideasError, setIdeasError] = useState<string | null>(null);
+  // アイデア詳細から戻った時のスクロール位置復元。Next の自動復元は本画面が戻り時に再取得＝高さ0で
+  // クランプされ効かないため、行クリック時に保存した scrollY を「一覧描画で高さが出てから」rAF で復元する。
+  const scrollRestored = useRef(false);
+  useEffect(() => {
+    if (ideas === null || scrollRestored.current) return; // 一覧ロード完了後に1回だけ
+    scrollRestored.current = true;
+    let saved: string | null = null;
+    try { saved = sessionStorage.getItem(QSCROLL_KEY + questId); if (saved != null) sessionStorage.removeItem(QSCROLL_KEY + questId); } catch { /* 非対応環境は無視 */ }
+    const y = saved != null ? parseInt(saved, 10) : NaN;
+    if (!Number.isFinite(y) || y <= 0) return;
+    let tries = 0;
+    const restore = () => {
+      window.scrollTo(0, y);
+      // まだ内容が短くて届かない（ランキング/行の遅延ロード）なら次フレームで再試行（上限あり）。
+      if (Math.abs(window.scrollY - y) > 2 && tries++ < 30) requestAnimationFrame(restore);
+    };
+    requestAnimationFrame(restore);
+  }, [ideas, questId]);
 
   // アイデア詳細から「← {クエスト名}へ戻る」（/quests/{id}#quest-tabs）で戻った時、タブを画面上部へ。
   // 上部パネル（ランキング/アクティビティ）が非同期で後から伸びてタブ位置がずれるため、
@@ -432,7 +453,11 @@ export function QuestDetailView({ questId }: { questId: string }) {
               searchFields="件名・投稿者"
               exportName="アイデア一覧"
               emptyText="まだアイデアがありません。「＋ アイデアを追加」から投稿できます。"
-              onRowClick={(r) => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); }}
+              onRowClick={(r) => {
+                markIdeaFromQuest(questId);
+                try { sessionStorage.setItem(QSCROLL_KEY + questId, String(window.scrollY)); } catch { /* 無視 */ }
+                router.push(`/ideas/${r.id}`);
+              }}
               cardLayout={(r) => ({
                 title: r.title,
                 badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
