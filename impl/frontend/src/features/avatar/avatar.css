@@ -11,7 +11,9 @@
 
 /* --- アバタービューア（CRTガラス） --- */
 /* sticky は広幅（2カラム）のみ。狭幅（1カラム）は静的＝スクロール時にアバターが天面に残らないように。 */
-@media (min-width: 901px) { .viewer { position: sticky; top: var(--space-4); } }
+/* sticky の基準はビューポート天面なので、共通ヘッダー（--header-h・sticky）の下に来るよう高さ分オフセットする
+   （space-4 だけだとヘッダーに被る・.backlink--float と同方針）。 */
+@media (min-width: 901px) { .viewer { position: sticky; top: calc(var(--header-h) + var(--space-4)); } }
 .viewer__stage {
   position: relative; aspect-ratio: 3 / 4; border-radius: var(--radius);
   overflow: hidden; display: grid; place-items: center;
