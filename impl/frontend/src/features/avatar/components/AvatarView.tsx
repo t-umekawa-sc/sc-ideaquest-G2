@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Spinner, GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { Spinner, CountUp, GameNav, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { getItems, ITEM_ICON, updateEquipment } from "@/features/shop/api";
@@ -133,6 +133,24 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
       <h1 className="dressup-title">アバター / 着せ替え</h1>
       <GameNav current="avatar" />
 
+      {/* コイン残高＋きせかえの概要（ショップ／魔法と同じ CRTガラスの概要パネル）。
+          ショップへのリンクはショップ画面の「▶ きせかえへ」と同じ .btn-pixel で統一。 */}
+      <section className="pixel-panel" aria-label="コイン残高">
+        <div className="wallet">
+          <div>
+            <div className="wallet__num">◆ <CountUp value={coins} /></div>
+            <div className="wallet__label">COIN</div>
+          </div>
+          <div className="wallet__meta">
+            <span>▶ 装備は<strong>5スロット（頭 / 顔 / 体 / 手持ち / 背景）</strong>・所有装備をクリックで<strong>即着せ替え</strong></span>
+            <span>▶ 未所有の装備は<strong>ショップでコイン購入</strong>（購入後ここで付け替え）</span>
+          </div>
+          <div className="wallet__actions">
+            <Link className="btn-pixel" href="/shop">▶ ショップへ</Link>
+          </div>
+        </div>
+      </section>
+
       <div className="dressup">
         {/* 左: 3Dアバタービューア（ゲーム層・CRTガラス） */}
         <section className="pixel-panel viewer" aria-label="アバタープレビュー">
@@ -173,10 +191,7 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
 
         {/* 右: ワードローブ（スロットごと） */}
         <section className="wardrobe" aria-label="装備一覧">
-          <div className="wardrobe__top">
-            <span className="coin-line" title="コイン残高">◆ {coins} コイン</span>
-            <Link className="btn btn-primary" href="/shop">🛒 ショップへ（装備を買う）</Link>
-          </div>
+          {/* コイン残高／ショップ導線は上部の概要パネル（.wallet）へ集約したためここでは重複表示しない。 */}
           <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)", marginBottom: "var(--space-5)", lineHeight: 1.7 }}>
             アバターは <strong>5スロット（頭 / 顔 / 体 / 手持ち / 背景）</strong>・各スロット1点まで装備できます。
             所有済みの装備をクリックで<strong>着せ替え</strong>（即反映）。未所有はショップでコイン購入。

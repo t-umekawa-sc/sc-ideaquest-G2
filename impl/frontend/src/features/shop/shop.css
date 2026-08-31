@@ -4,12 +4,7 @@
 
 .shop-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-4); }
 
-/* コイン残高ヒーロー（CRTガラス） */
-.wallet { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
-.wallet__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-coin); }
-.wallet__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
-.wallet__meta { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); color: var(--pixel-ink); }
-.wallet__actions { margin-left: auto; }
+/* コイン残高ヒーロー（CRTガラス）の .wallet* は design-system.css へ移動（ショップ／きせかえ 共有）。 */
 
 .how { margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.8; }
 .how .rarity-common { color: var(--rarity-common); font-weight: 700; }

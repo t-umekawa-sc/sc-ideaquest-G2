@@ -894,6 +894,14 @@ body.modal-open { overflow: hidden; }
 }
 .pixel-panel h1, .pixel-panel h2, .pixel-panel h3 { font-family: var(--font-pixel); }
 
+/* コイン残高＋概要の共通ウォレット行（ショップ／きせかえ 等ゲーム層の pixel-panel 内で使用・元は shop.css）。
+   複数 feature で使うため共有へ（直アクセスでも CSS が載る design-system.css に置く）。 */
+.wallet { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+.wallet__num { font-family: var(--font-pixel); font-size: 40px; line-height: 1; color: var(--pixel-coin); }
+.wallet__label { font-family: var(--font-pixel); font-size: var(--text-sm); color: var(--pixel-ink); opacity: .85; }
+.wallet__meta { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); color: var(--pixel-ink); }
+.wallet__actions { margin-left: auto; }
+
 /* ピクセル風ボタン（角丸なし・ハードシャドウ・押し込み）
    ホバー時にレトロRPGのメニュー選択カーソル ▶ が左に出現して点滅＋バウンド。 */
 .btn-pixel {

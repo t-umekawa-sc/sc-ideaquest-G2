@@ -551,7 +551,14 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
               {/* ツールバー: 左＝書式/アクション、右＝送信（SC-24 モック） */}
               <div className="composer__toolbar">
                 <div className="composer__tools">
-                  <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) setPendingFiles((a) => [...a, ...Array.from(e.target.files!)]); e.target.value = ""; updateSendState(); }} />
+                  <input ref={fileRef} type="file" multiple hidden onChange={(e) => {
+                    // ファイルを**先に取り出す**。setPendingFiles の updater は遅延実行で、その前に value="" で
+                    // input をクリアすると updater 内の e.target.files が空になり添付が積まれない不具合だった。
+                    const picked = e.target.files ? Array.from(e.target.files) : [];
+                    e.target.value = ""; // 同じファイルを再選択できるようクリア
+                    if (picked.length) setPendingFiles((a) => [...a, ...picked]);
+                    updateSendState();
+                  }} />
                   <button className="tbtn" type="button" aria-label="ファイルを添付" title="ファイルを添付" onClick={() => fileRef.current?.click()}>📎</button>
                   <button className="tbtn" type="button" aria-label="メンション" title="メンション（@）" onClick={insertMentionAt}>@</button>
                   <button className={`tbtn${emojiOpen ? " is-on" : ""}`} type="button" aria-label="絵文字" title="絵文字" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((v) => !v)}>😀</button>
