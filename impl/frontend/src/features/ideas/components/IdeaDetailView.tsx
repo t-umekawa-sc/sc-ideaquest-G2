@@ -262,7 +262,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     return (
       <main className="container detail-main">
         {/* 読み込み失敗フォールバック＝クエスト不明のため素の一覧へ。履歴があれば元の一覧に戻す（§4.5 ⑨）。 */}
-        <a className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</a>
+        <Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</Link>
         <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError ?? "アイデアが見つかりません。"}</div>
       </main>
     );
@@ -320,13 +320,13 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           絞込・ページ・スクロール位置ごと元の一覧に復帰する（#quest-tabs への新規遷移だとクエリが落ちて絞込が消えていた）。
           直接アクセス（履歴なし）は素のクエスト詳細へフォールバック。フローティング表示は §4.10。
           href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
-      <a
+      <Link
         className="backlink backlink--float"
         href={`/quests/${idea.quest.id}`}
         onClick={(e) => { e.preventDefault(); backToListOr(router, `/quests/${idea.quest.id}`); }}
       >
         ← {idea.quest.title || "クエスト"}へ戻る
-      </a>
+      </Link>
 
       {/* ============ アイデアヘッダー ============ */}
       <section className="card idea-head" aria-label="アイデア情報">
