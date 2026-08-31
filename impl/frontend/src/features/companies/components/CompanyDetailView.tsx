@@ -17,6 +17,7 @@ import { QuestIcon } from "@/components/layout";
 import { AccountSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
+import { backToListOr } from "@/lib/nav";
 import { deleteCompanyIcon, getCompany, provisionCompany, setCompanyIcon, updateCompanyProfile, updateCompanySettings } from "../api";
 import type { CompanyDetail, CompanySettingsInput } from "../types";
 import "../companies.css";
@@ -144,11 +145,8 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
   }
 
   // 一覧へ戻る＝履歴を戻す（一覧は検索/絞込/ページを URL に持つため、ブラウザ戻ると同様に絞込付きで復帰）。
-  // 詳細に直接アクセスした場合（履歴なし）は素の一覧へ。
-  function backToList() {
-    if (typeof window !== "undefined" && window.history.length > 1) router.back();
-    else router.push("/admin/companies");
-  }
+  // 詳細に直接アクセスした場合（履歴なし）は素の一覧へ（共通 backToListOr・デザイン標準 §4.5 ⑨）。
+  const backToList = () => backToListOr(router, "/admin/companies");
 
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
   if (!company) return <p className="admin-muted">読み込み中…</p>;

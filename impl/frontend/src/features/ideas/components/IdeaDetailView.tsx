@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
+import { backToListOr } from "@/lib/nav";
 
 import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
@@ -260,7 +261,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   if (loadError || !idea) {
     return (
       <main className="container detail-main">
-        <Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link>
+        {/* 読み込み失敗フォールバック＝クエスト不明のため素の一覧へ。履歴があれば元の一覧に戻す（§4.5 ⑨）。 */}
+        <a className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</a>
         <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError ?? "アイデアが見つかりません。"}</div>
       </main>
     );
@@ -313,11 +315,18 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           </div>
         </div>
       )}
-      {/* クエストへ戻る（D.1 quest 参照・実導線）。#quest-tabs＝戻った先でアイデアタブを画面上部へスクロール。
-          フローティング（sticky）で常時上部に表示（デザイン標準 §4.10）。 */}
-      <Link className="backlink backlink--float" href={`/quests/${idea.quest.id}#quest-tabs`}>
+      {/* クエストへ戻る（D.1 quest 参照・実導線）＝標準どおり履歴を戻す（デザイン標準 §4.5 ⑨・line 191）。
+          アイデアタブの一覧は検索/ソート/絞込/ページを URL クエリに持つため、router.back() で
+          絞込・ページ・スクロール位置ごと元の一覧に復帰する（#quest-tabs への新規遷移だとクエリが落ちて絞込が消えていた）。
+          直接アクセス（履歴なし）は素のクエスト詳細へフォールバック。フローティング表示は §4.10。
+          href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
+      <a
+        className="backlink backlink--float"
+        href={`/quests/${idea.quest.id}`}
+        onClick={(e) => { e.preventDefault(); backToListOr(router, `/quests/${idea.quest.id}`); }}
+      >
         ← {idea.quest.title || "クエスト"}へ戻る
-      </Link>
+      </a>
 
       {/* ============ アイデアヘッダー ============ */}
       <section className="card idea-head" aria-label="アイデア情報">

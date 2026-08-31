@@ -17,6 +17,7 @@ import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { getQuestActivities } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
 import { ApiError } from "@/lib/api/client";
+import { backToListOr } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import {
@@ -272,7 +273,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
   if (loadError) {
     return (
       <section aria-label="クエスト詳細">
-        <p><Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link></p>
+        <p><a className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</a></p>
         <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div>
       </section>
     );
@@ -280,7 +281,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
   if (!quest) {
     return (
       <section aria-label="クエスト詳細">
-        <p><Link className="backlink" href="/quests">← クエスト一覧へ戻る</Link></p>
+        <p><a className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</a></p>
         <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
       </section>
     );
@@ -292,8 +293,10 @@ export function QuestDetailView({ questId }: { questId: string }) {
   return (
     <section aria-label="クエスト詳細">
       {/* 戻るリンクはフローティング（sticky）＝スクロールしても常時上部に表示（デザイン標準 §4.10）。
-          sticky は親の高さ範囲でのみ効くため <p> で包まず section 直下に置く。 */}
-      <Link className="backlink backlink--float" href="/quests">← クエスト一覧へ戻る</Link>
+          sticky は親の高さ範囲でのみ効くため <p> で包まず section 直下に置く。
+          標準どおり履歴を戻す（§4.5 ⑨）＝SC-10 一覧の検索/ソート/絞込/ページ・スクロール位置ごと復帰。
+          href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
+      <a className="backlink backlink--float" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>← クエスト一覧へ戻る</a>
 
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">
