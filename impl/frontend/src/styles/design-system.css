@@ -906,6 +906,7 @@ body.modal-open { overflow: hidden; }
   padding: var(--space-2) var(--space-4);
   /* カーソル分の左余白をあらかじめ確保（ホバーでガタつかせない） */
   padding-left: calc(var(--space-4) + 1.1em);
+  white-space: nowrap; /* ラベルを折り返さない（狭い列でも1行・▶ と重ならない） */
   transition: transform .08s steps(2);
   cursor: pointer; /* OS標準の指差しポインター */
 }

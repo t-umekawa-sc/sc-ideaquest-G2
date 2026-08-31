@@ -44,6 +44,6 @@
 .spell-cost { font-weight: 700; color: var(--pixel-skill); font-variant-numeric: tabular-nums; }
 .spell-cost .muted { color: var(--color-text-muted); font-weight: 400; font-size: var(--text-xs); }
 .spell-state { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-success); font-size: var(--text-sm); }
-.btn-pixel.btn-pixel--sm { padding: 6px 12px; font-size: var(--text-sm); }
+.btn-pixel.btn-pixel--sm { padding: 6px 12px; padding-left: calc(12px + 1.1em); font-size: var(--text-sm); } /* ▶ カーソル分の左余白を維持（基底の padding-left を打ち消さない） */
 .btn-pixel:disabled { opacity: .5; cursor: not-allowed; box-shadow: var(--shadow-pixel); }
 .btn-pixel:disabled::before { content: none; }

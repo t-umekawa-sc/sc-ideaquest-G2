@@ -133,7 +133,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       setLoadError(null);
       // メンション候補・魔法カタログ（非致命）。
       void getPartyMembers(d.quest.id).then((r) =>
-        setMembers((r?.data ?? []).map((m) => ({ user_id: m.user_id, name: m.display_name, nospace: (m.display_name || "").replace(/\s/g, "") }))),
+        // 応答は `{ user: {user_id, display_name} }`（ネスト）。以前フラット想定で name が undefined になり @ でクラッシュしていた。
+        setMembers((r?.data ?? []).map((m) => ({ user_id: m.user.user_id, name: m.user.display_name ?? "", nospace: (m.user.display_name || "").replace(/\s/g, "") }))),
       ).catch(() => {});
       void getSpells().then((r) => setSpells(r?.data ?? [])).catch(() => {});
       // 既読を最新まで前進。
@@ -577,8 +578,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         <div className="mention-pop" role="listbox" aria-label="メンション候補" style={{ left: mention.pos.left, top: mention.pos.top }}>
           {mention.matches.map((n, i) => (
             <div key={n.user_id} className={"mention-opt" + (i === mention.active ? " is-active" : "")} role="option" aria-selected={i === mention.active} onMouseDown={(e) => { e.preventDefault(); chooseMention(n); }}>
-              <span className="avatar sm" style={{ ["--avatar-size" as string]: "22px" } as React.CSSProperties}><span className="avatar__img placeholder">{n.name.charAt(0)}</span></span>
-              <span className="mention-opt__name">{n.name}</span>
+              <span className="avatar sm" style={{ ["--avatar-size" as string]: "22px" } as React.CSSProperties}><span className="avatar__img placeholder">{(n.name || "?").charAt(0)}</span></span>
+              <span className="mention-opt__name">{n.name || "（名称未設定）"}</span>
             </div>
           ))}
         </div>

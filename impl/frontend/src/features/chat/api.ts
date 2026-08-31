@@ -85,7 +85,9 @@ export function unlockSpell(spellId: string): Promise<{ unlocked: boolean; skill
   return apiFetch<{ unlocked: boolean; skill_point_balance: number }>(`/spells/${spellId}/unlock`, { method: "POST" });
 }
 
-// パーティーメンバー（@メンション候補・C.1）。{user_id, display_name} を最小取得。
-export function getPartyMembers(questId: string): Promise<{ data: Array<{ user_id: string; display_name: string }> } | null> {
-  return apiFetch<{ data: Array<{ user_id: string; display_name: string }> }>(`/quests/${questId}/members`);
+// パーティーメンバー（@メンション候補・C.1）。応答は QuestMembersResponse＝各要素は
+// `{ user: {user_id, display_name, …}, permissions, joined_at, is_creator }`（display_name は **user にネスト**）。
+export type PartyMember = { user: { user_id: string; display_name: string; avatar_image_url?: string | null } };
+export function getPartyMembers(questId: string): Promise<{ data: PartyMember[] } | null> {
+  return apiFetch<{ data: PartyMember[] }>(`/quests/${questId}/members`);
 }
