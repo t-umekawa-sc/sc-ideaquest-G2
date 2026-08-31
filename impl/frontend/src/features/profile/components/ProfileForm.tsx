@@ -188,9 +188,11 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           </Field>
           {/* アニメーション演出の抑制（accounts.reduce_motion・デザイン標準 §4.9）。checked=動きを減らす。 */}
           <Field id="p_anim" label="アニメーション演出">
+            {/* style-guide.html / DataTable と同じ素テキスト構造（<input>{" "}ラベル）。span で包むと先頭スペース分の
+                間隔が消えて文字が近づくため使わない（.checkbox は gap:10px＋先頭スペースで間隔を作る）。 */}
             <label className="checkbox">
-              <input id="p_anim" type="checkbox" checked={animOff} onChange={(e) => setAnimOff(e.target.checked)} />
-              <span>動きを減らす（カウントアップ・祝福・バースト等の演出を抑制する）</span>
+              <input id="p_anim" type="checkbox" checked={animOff} onChange={(e) => setAnimOff(e.target.checked)} />{" "}
+              動きを減らす（カウントアップ・祝福・バースト等の演出を抑制する）
             </label>
             <p className="hint">OS の「視差効果を減らす」が ON のときは、この設定に関わらず常に抑制されます。</p>
           </Field>
