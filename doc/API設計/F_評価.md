@@ -62,8 +62,8 @@
 
 | メソッド/パス | 概要 | リクエスト（パス） | レスポンス |
 | --- | --- | --- | --- |
-| `POST /ideas/{idea_id}/select` | アイデアを選定（`is_selected=true`） | パス: `idea_id` | 200（`{id, is_selected:true}`）。投稿者へ XP+200・`follow_selection` 通知（H） |
-| `DELETE /ideas/{idea_id}/select` | 選定を解除（`is_selected=false`） | パス: `idea_id` | 200（`{id, is_selected:false}`）。**XP は剥奪しない** |
+| `POST /ideas/{idea_id}/select` | アイデアを選定（`is_selected=true`） | パス: `idea_id` | 200（`{id, is_selected:true, xp_awarded}`）。投稿者へ XP+200・`follow_selection` 通知（H）。`xp_awarded`＝**この呼び出しで新規付与したか**（初回のみ true・冪等＝再選定は false）＝フロントは true の時だけ祝福演出を出す |
+| `DELETE /ideas/{idea_id}/select` | 選定を解除（`is_selected=false`） | パス: `idea_id` | 200（`{id, is_selected:false, xp_awarded:false}`）。**XP は剥奪しない** |
 
 - **権限＝`owner`/`quest_admin`**（それ以外は 403）。`is_selected` はクライアント入力では変えられず本 EP 専任（D の Mass Assignment 方針・D 注記「`is_selected` の変更は F/G の責務」）。
 - **複数アイデア選定可**（アイデア単位のトグル・上限は設けない）。

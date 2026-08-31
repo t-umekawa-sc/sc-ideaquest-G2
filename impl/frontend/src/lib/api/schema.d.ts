@@ -3122,6 +3122,11 @@ export interface components {
             id: string;
             /** Is Selected */
             is_selected: boolean;
+            /**
+             * Xp Awarded
+             * @default false
+             */
+            xp_awarded: boolean;
         };
         /** IdeaStakeholderDTO */
         IdeaStakeholderDTO: {

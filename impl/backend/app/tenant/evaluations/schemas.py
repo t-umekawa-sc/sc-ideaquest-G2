@@ -91,3 +91,5 @@ class IdeaSelectResponse(BaseModel):
 
     id: str
     is_selected: bool
+    # この呼び出しで新規に投稿者 XP を付与したか（初回選定のみ true・冪等）。再選定は false＝祝福を出さない。
+    xp_awarded: bool = False

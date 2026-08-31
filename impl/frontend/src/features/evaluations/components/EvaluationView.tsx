@@ -15,7 +15,7 @@ import { reduceMotion } from "@/lib/motion";
 import { consumeEvalFromIdea } from "@/lib/nav";
 import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
-import { getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
+import { EVALUATIONS_CHANGED_EVENT, getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
 import "../evaluations.css";
 
 type AspectKey = "novelty" | "impact" | "feasibility" | "fit" | "cost";
@@ -146,6 +146,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           } else {
             snack({ type: "success", title: "評価を更新しました", msg: msgBody });
           }
+          // 背後の画面（アイデア詳細＝評価結果／ダッシュボード＝下書き）にクロスルートで再取得を促す。
+          // intercept モーダルの背後は再マウントされず自前 state のため、イベントで明示的に更新させる。
+          if (typeof window !== "undefined") window.dispatchEvent(new Event(EVALUATIONS_CHANGED_EVENT));
           if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);  // モーダルは close・フルページは詳細へ
         } else {
           snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });

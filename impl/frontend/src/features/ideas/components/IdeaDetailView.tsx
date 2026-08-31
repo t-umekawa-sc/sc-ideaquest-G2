@@ -16,7 +16,7 @@ import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav";
 
-import { getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
+import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
@@ -152,6 +152,13 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // 評価確定（別ルートの評価モーダル）後に評価結果/選定を再取得＝リロード不要で反映（F.1・クロスルート）。
+  useEffect(() => {
+    const onEval = () => void load();
+    window.addEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
+    return () => window.removeEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
+  }, [load]);
+
   // 投票（賛成/反対の登録・切替・同ボタン再クリックで取消）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
   const handleVote = useCallback(async (type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (voteBusy) return;
@@ -246,9 +253,18 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     try {
       const res = prev ? await unselectIdea(ideaId) : await selectIdea(ideaId);
       if (res) setSelected(res.is_selected);
-      snack({ type: prev ? "info" : "success", msg: prev ? "選定を解除しました。" : "アイデアを選定しました。投稿者にコイン・XP を付与しました。" });
-      // #16: 選定（解除ではない）成立時に祝福（純装飾＝reduce-motion 時は出さずスナックバーで通知）。
-      if (!prev && res?.is_selected && !reduceMotion()) {
+      // 新規選定で**実際に XP を付与したときだけ**祝福＋付与メッセージ（再選定・解除では出さない）。
+      // 付与の有無は server 権威（xp_awarded・冪等）＝ON/OFF を繰り返しても毎回演出しない。
+      const awarded = !prev && res?.xp_awarded === true;
+      snack({
+        type: prev ? "info" : "success",
+        msg: prev
+          ? "選定を解除しました。"
+          : awarded
+            ? "アイデアを選定しました。投稿者に XP を付与しました。"
+            : "アイデアを選定しました。",
+      });
+      if (awarded && !reduceMotion()) {
         setCelebrateSelect(true);
         setTimeout(() => setCelebrateSelect(false), 2800);
       }

@@ -41,9 +41,9 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F-TC-113 | api | 選定→is_selected＋投稿者 XP+200 | owner・公開アイデア | `POST .../select` | 200・`is_selected=true`・投稿者に XP+200（reason=selection） | F.3／§7 |
+| F-TC-113 | api | 選定→is_selected＋投稿者 XP+200 | owner・公開アイデア | `POST .../select` | 200・`is_selected=true`・**`xp_awarded=true`**（新規付与）・投稿者に XP+200（reason=selection） | F.3／§7 |
 | F-TC-114 | api | 選定解除は XP を剥奪しない | 選定済み | `DELETE .../select` | 200・`is_selected=false`・XP は残る | F.3 |
-| F-TC-115 | api | 選定 XP は1回のみ（再選定で再付与しない） | 一度選定→解除→再選定 | `POST/DELETE/POST` | selection XP は1件のまま（`exists_ref` 冪等） | F.3 |
+| F-TC-115 | api | 選定 XP は1回のみ（再選定で再付与しない） | 一度選定→解除→再選定 | `POST/DELETE/POST` | selection XP は1件のまま（`exists_ref` 冪等）・**再選定は `xp_awarded=false`**（祝福を毎回出さない） | F.3 |
 | F-TC-116 | api | 選定は owner/quest_admin 必須 | 一般メンバー | `POST .../select` | 403 | F.3 |
 | F-TC-117 | api | 完了クエストは選定/解除も 409 | completed | `POST/DELETE .../select` | 409（invalid_state） | F.3／C.5 |
 | F-TC-118 | api | コイン確定(a)＝evaluator 全員提出でアイデア単位に1回 | evaluator 2名・両者 submitted | 2人目の `PUT submitted` | 投稿者に evaluation_coin 1件（`round(avg×10)`・最大50）・再判定で増えない | F.4／§8-⑱ |

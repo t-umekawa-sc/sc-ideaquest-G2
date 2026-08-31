@@ -264,6 +264,7 @@ def test_f_tc_113_select_grants_xp200(client, env):
     idea = env.make_idea(quest_id=env.make_quest())  # ACME-01 owner＝author
     r = client.post(SELECT(idea), headers=_csrf(client))
     assert r.status_code == 200 and r.json()["is_selected"] is True, r.text
+    assert r.json()["xp_awarded"] is True  # 初回選定＝新規付与＝祝福を出す
     assert _activity_count(env, kind="xp_gain", reason="selection", ref_id=idea) == 1
 
 
@@ -281,7 +282,8 @@ def test_f_tc_115_select_xp_once(client, env):
     idea = env.make_idea(quest_id=env.make_quest())
     client.post(SELECT(idea), headers=_csrf(client))
     client.delete(SELECT(idea), headers=_csrf(client))
-    client.post(SELECT(idea), headers=_csrf(client))  # 再選定でも再付与しない
+    r = client.post(SELECT(idea), headers=_csrf(client))  # 再選定でも再付与しない
+    assert r.json()["xp_awarded"] is False  # 既付与＝祝福を出さない（毎回演出しない）
     assert _activity_count(env, kind="xp_gain", reason="selection", ref_id=idea) == 1
 
 

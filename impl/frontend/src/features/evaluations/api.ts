@@ -12,6 +12,11 @@ export type EvaluationPutInput = components["schemas"]["EvaluationPutRequest"];
 export type EvaluationVisibility = EvaluationPutInput["visibility"];
 export type IdeaSelectResult = components["schemas"]["IdeaSelectResponse"];
 
+// 評価の確定（PUT submitted）等でクロスルートに「評価が変わった」を通知する window イベント。
+// アイデア詳細（評価結果の再取得）・ダッシュボード（下書きの消去）が購読して再取得する
+// （intercept モーダルで開くと背後の画面は再マウントされず自前 state のため・IDEAS_CHANGED_EVENT と同流儀）。
+export const EVALUATIONS_CHANGED_EVENT = "ideaquest:evaluations-changed";
+
 // 自分の評価/下書き（SC-25 読み込み・F.1）。門番＋evaluator 権限はサーバー強制（範囲外 404／権限なし 403）。
 export function getMyEvaluation(ideaId: string): Promise<EvaluationMe | null> {
   return apiFetch<EvaluationMe>(`/ideas/${ideaId}/evaluation/me`);

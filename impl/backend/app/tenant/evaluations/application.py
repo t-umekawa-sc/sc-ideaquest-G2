@@ -146,13 +146,17 @@ def select_idea(account_id, company_id, idea_id, *, selected: bool) -> dict:
         _require_owner_or_admin(ts, quest, user)
         _guard_not_completed(quest)
         idea.is_selected = selected
+        # xp_awarded＝この呼び出しで**新規に**投稿者 XP を付与したか（初回選定のみ true・冪等）。
+        # 再選定（解除→再選定）は exists_ref で既付与＝false。フロントは true の時だけ祝福演出を出す（毎回出さない）。
+        awarded = False
         if selected:
             author = quests_repo.get_users_by_ids(ts, {idea.author_id}).get(idea.author_id)
             if author is not None and not gami_repo.exists_ref(ts, author.id, ledger.XP_GAIN, "selection", "ideas", idea.id):
                 ledger.grant(ts, author, kind=ledger.XP_GAIN, amount=_XP_SELECTION, reason="selection",
                              ref_type="ideas", ref_id=idea.id, quest_id=idea.quest_id)
+                awarded = True
             _notify_follow_selection(ts, idea.id, user.id)
-        detail = {"id": str(idea.id), "is_selected": idea.is_selected}
+        detail = {"id": str(idea.id), "is_selected": idea.is_selected, "xp_awarded": awarded}
         ts.commit()
     return detail
 

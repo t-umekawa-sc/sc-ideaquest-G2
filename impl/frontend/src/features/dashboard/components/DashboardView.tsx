@@ -21,6 +21,7 @@ import { isMotionReduced } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
+import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
 import {
   getDashboard,
   type DashboardData,
@@ -138,6 +139,14 @@ export function DashboardView({
     });
     return () => { alive = false; };
   }, [snackbar]);
+
+  // 評価確定（別ルートの評価モーダル）後にダッシュボードを再取得＝**下書きの評価**が消える（確定済みは下書きに出ない）。
+  // data のみ差し替え＝unvotedList（継続投票の補充 state）には触れない（GF-AC-043 を壊さない）。
+  useEffect(() => {
+    const onEval = () => { void getDashboard().then((d) => { if (d) setData(d); }); };
+    window.addEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
+    return () => window.removeEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
+  }, []);
 
   // ヒーロー＝集約 hero を優先、未取得は server の /me 残高で初回描画。
   const hero = data?.hero;
