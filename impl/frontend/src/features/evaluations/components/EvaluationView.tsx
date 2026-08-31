@@ -202,10 +202,12 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </div>
           <div className="eval-context__title">{idea?.title || "アイデア"}</div>
           <div className="eval-context__link">
-            {/* モーダル時は正規の閉じる処理（アニメ付きで戻る＝背後のアイデア詳細を表示・スクロール位置も復元）。
-                直リンク遷移は intercept スロットが残り背後がトップへスクロールしてしまうため避ける。 */}
+            {/* intercept モーダルの背後は開いた元画面（アイデア詳細とは限らない＝ダッシュボードの評価下書きから開くと背後は
+                ダッシュボード）。onClose(=router.back) だと元画面に戻るだけで詳細に到達しない不具合があった。
+                origin に依らずアイデア詳細へ確実に遷移させる＝/ideas/{id}/eval → /ideas/{id} はソフト遷移だと
+                @modal スロットが残る既知挙動があるため、ハードナビゲーションで確実に intercept を抜けて詳細を開く。 */}
             {inModal ? (
-              <Link href={`/ideas/${ideaId}`} onClick={(e) => { e.preventDefault(); onClose?.(); }}>アイデア詳細を見る →</Link>
+              <Link href={`/ideas/${ideaId}`} onClick={(e) => { e.preventDefault(); window.location.assign(`/ideas/${ideaId}`); }}>アイデア詳細を見る →</Link>
             ) : (
               <Link href={`/ideas/${ideaId}`}>アイデア詳細を見る →</Link>
             )}
