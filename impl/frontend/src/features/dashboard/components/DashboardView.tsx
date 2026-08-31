@@ -400,25 +400,30 @@ export function DashboardView({
             {followed.map((f) => {
               const frozen = f.quest.quest_status === "completed";
               return (
-                <motion.article
+                <motion.div
                   key={f.id}
-                  className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}
+                  className="follow-card-wrap"
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: "easeOut" } }}
                   transition={{ duration: reduceAnim ? 0 : 0.3, ease: "easeOut" }}
                 >
-                  <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={() => toggleFollow(f)}>★</button>
-                  <Link className="card-title" href={`/ideas/${f.id}`}>{f.title}</Link>
-                  <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
-                  <div className="follow-value">{f.value}</div>
-                  <div className="follow-card__poster poster"><Avatar name={f.poster.name} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>
-                  <div className="follow-stats">
-                    <span className="vote-agree">▲ {f.vote_summary.approve}</span>
-                    <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>
-                  </div>
-                  {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
-                </motion.article>
+                  {/* カード全体をアイデア詳細への遷移対象に（クリックで自然に開ける）＝a.card の hover リフトが効く。
+                      ★（フォロー解除）は Link の外＝アンカー内 button を避け、クリックがカード遷移に伝播しないよう別要素にする
+                      （QuestListView の cardRaw と同方針）。退場アニメは外側ラッパ（framer）＝リフト transform と衝突しない。 */}
+                  <Link className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`} href={`/ideas/${f.id}`}>
+                    <div className="card-title">{f.title}</div>
+                    <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
+                    <div className="follow-value">{f.value}</div>
+                    <div className="follow-card__poster poster"><Avatar name={f.poster.name} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>
+                    <div className="follow-stats">
+                      <span className="vote-agree">▲ {f.vote_summary.approve}</span>
+                      <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>
+                    </div>
+                    {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
+                  </Link>
+                  <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow(f); }}>★</button>
+                </motion.div>
               );
             })}
             </AnimatePresence>
