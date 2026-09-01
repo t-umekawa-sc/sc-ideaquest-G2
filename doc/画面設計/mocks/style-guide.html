@@ -721,7 +721,7 @@
       /* 火球＝ヘッダーのユーザアバターから発射しメッセージへ飛来する固定オーバーレイ（JS が座標付与・WAAPI）。
          本番 SpellCastFx も同様に avatar 矩形→対象矩形で飛ばす想定。3D感＝小さく→大きく＋斜め移動。 */
       /* 外殻＝位置(WAAPI)とグロー担当。内側 .ball-core＝属性ごとの「形」と自転（既定＝炎の円）。 */
-      .fcast-ball-fx { position: fixed; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+      .fcast-ball-fx { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px;
         border-radius: 50%; z-index: 2000; pointer-events: none; opacity: 0;
         box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 0 0 30px 8px rgba(255,90,20,.5); }
       .ball-core { position: absolute; inset: 0; border-radius: 50%;
@@ -739,7 +739,7 @@
         50%  { transform: scale(.93);  box-shadow: 0 0 10px 3px rgba(255,120,30,.6); }
         100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,120,30,0); } }
       /* マズルフラッシュ＋発射リング（アバター中心の固定オーバーレイ・JS が座標付与） */
-      .fcast-muzzle { position: fixed; z-index: 1999; pointer-events: none; width: 0; height: 0;
+      .fcast-muzzle { position: absolute; z-index: 1999; pointer-events: none; width: 0; height: 0;
         --mz1: rgba(255,190,90,.9); --mz2: rgba(255,120,30,.4); --mzr: rgba(255,150,60,.9); }
       .fcast-muzzle::before, .fcast-muzzle::after { content: ""; position: absolute; left: 0; top: 0; transform: translate(-50%,-50%); border-radius: 50%; opacity: 0; }
       .fcast-muzzle::before { width: 62px; height: 62px;
@@ -878,7 +878,7 @@
       .fcast-muzzle.fx-rainbow::before { clip-path: polygon(50% 0, 63% 38%, 100% 38%, 70% 62%, 80% 100%, 50% 78%, 20% 100%, 30% 62%, 0 38%, 37% 38%); }
 
       /* 雷の発射＝飛ぶ弾でなく、発射元→対象へ伸びるギザギザの稲妻（チカチカ＋途切れ・JSが座標/形を付与） */
-      .fcast-bolt-fx { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none;
+      .fcast-bolt-fx { position: absolute; left: 0; top: 0; z-index: 2000; pointer-events: none;
         animation: bolt-fx-flicker .42s steps(1, end) forwards; }
       .fcast-bolt-fx .bolt-glow { fill: none; stroke: #fbbf24; stroke-width: 6; stroke-linejoin: round; stroke-linecap: round;
         opacity: .5; filter: blur(2px); animation: bolt-draw .16s ease-out forwards; }
@@ -891,21 +891,21 @@
       .fcast-bolt-fx .bolt-branch { fill: none; stroke: #fffde7; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round;
         filter: drop-shadow(0 0 3px #fbbf24); opacity: 0; }
       /* 雷の着弾フラッシュ（稲妻の到達と同期） */
-      .bolt-strike { position: fixed; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+      .bolt-strike { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
         z-index: 1999; pointer-events: none;
         background: radial-gradient(circle, rgba(255,255,230,.95), rgba(251,191,36,.4) 45%, transparent 70%); animation: bolt-strike-fl .24s ease-out forwards; }
       @keyframes bolt-strike-fl { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
 
       /* 氷＝大小の尖ってギザギザな氷片が回転しながら飛散（形は各片ごとに clip-path をインライン付与） */
-      .fcast-iceshard { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; opacity: 0;
+      .fcast-iceshard { position: absolute; left: 0; top: 0; z-index: 2000; pointer-events: none; opacity: 0;
         background: linear-gradient(140deg, #ffffff, #bae6fd 40%, #38bdf8 72%, #0284c7);
         filter: drop-shadow(0 0 3px rgba(125,211,252,.95)); }
       /* 虹＝ビーム（発射元から対象へ一気に伸びるレーザー） */
-      .fcast-beam { position: fixed; left: 0; top: 0; height: 8px; margin-top: -4px; transform-origin: 0 50%; z-index: 2000; pointer-events: none; border-radius: 4px;
+      .fcast-beam { position: absolute; left: 0; top: 0; height: 8px; margin-top: -4px; transform-origin: 0 50%; z-index: 2000; pointer-events: none; border-radius: 4px;
         background: linear-gradient(90deg, rgba(255,255,255,.95), #ff004c, #ff9a00, #ffe600, #37ff00, #00e5ff, #3d5bff, #c400ff);
         box-shadow: 0 0 10px 2px rgba(255,120,180,.6), 0 0 18px 4px rgba(120,200,255,.4); }
       /* オーラ＝三日月の隊列（4〜5個が連なって進み、近づくほど増える。まわりはうっすらぼやけ） */
-      .fcast-crescents { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; }
+      .fcast-crescents { position: absolute; left: 0; top: 0; z-index: 2000; pointer-events: none; }
       .aura-crescent { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
         background: radial-gradient(circle at 34% 36%, #ffffff, #c4b5fd 46%, #8b5cf6 84%);
         -webkit-mask: radial-gradient(circle at 70% 50%, transparent 0 53%, #000 54%);
@@ -1107,7 +1107,8 @@
     <p class="muted text-sm">左上＝<strong>作成者</strong>／右上＝<strong>発動者バッジ</strong>（<code>発動者≠作成者</code>の時だけ）。<strong>画面表示時に1回だけ</strong>
       発動アニメ（発動者アバター→メッセージへ飛来→着弾）→以後は<strong>枠の炎が永続</strong>。自作自演（発動者＝作成者）は
       バッジを出さず作成者アバターに<strong>✦自己発動マーク</strong>（発射元は作成者アバター）。誰が何をかけたかは本文＋<code>aria-label</code>＋バッジ hover。
-      ※<strong>自分がライブで発動</strong>した瞬間だけは上の「自分が放つ」演出（ヘッダーアバターから発射）を使う。</p>
+      ※<strong>自分がライブで発動</strong>した瞬間だけは上の「自分が放つ」演出（ヘッダーアバターから発射）を使う。
+      <br>※これらの発動演出は §18 の対策を反映済み＝<strong>A: 弾は文書スクロール座標にアンカー</strong>（発動中にページをスクロールしても対象に追従してズレない）／<strong>B: スクロールが止まってから発火</strong>（速い流し見中は間引く）。</p>
 
     <p class="muted text-sm" style="margin-top:var(--space-4)">① <strong>他人→自分</strong>（自分の投稿に他人が魔法・トースト/通知連動）</p>
     <div class="fcast-stage fcast-reveal" data-src=".msg-avatar.caster" data-toast="佐藤 花子 があなたのメッセージに【炎】をかけました" style="min-height:150px">
@@ -1230,26 +1231,28 @@
          初回判定と復元がすれ違い『可視なのに未発火』が起きうるため、復元後に同期判定（rAF/load/pageshow/遅延）で
          自己修復する＝未実行なら getBoundingClientRect で可視を確認して実行。多重発火は done フラグで抑止。 */
       function fcastWhenVisible(el, cb) {
-        var done = false;
+        var done = false, idleT = null, IDLE = 350; /* B: スクロールが IDLE ms 止まってから発火 */
         function visible() {
           var r = el.getBoundingClientRect();
           var vh = window.innerHeight || document.documentElement.clientHeight;
           return r.height > 0 && r.top < vh * 0.9 && r.bottom > vh * 0.1; /* 4割方見えていれば可視とみなす */
         }
-        function fire() { if (done) return; done = true; if (io) io.disconnect(); cb(); }
-        function check() { if (!done && visible()) fire(); }
+        function fire() { if (done) return; done = true; if (io) io.disconnect(); window.removeEventListener('scroll', settleSoon); cb(); }
+        function attempt() { if (!done && visible()) fire(); }           /* 沈静後の確定発火 */
+        function settleSoon() { clearTimeout(idleT); idleT = setTimeout(attempt, IDLE); } /* 可視化/スクロール毎に沈静待ちを張り直す */
         var io = null;
         if ('IntersectionObserver' in window) {
-          io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) fire(); }, { threshold: 0.35 });
+          io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) settleSoon(); }, { threshold: 0.35 });
           io.observe(el);
         }
-        /* スクロール復元レースへの保険＝复元が済んだ頃に何度か同期チェック */
-        requestAnimationFrame(function () { requestAnimationFrame(check); });
-        window.addEventListener('load', function () { setTimeout(check, 60); });
-        window.addEventListener('pageshow', function () { setTimeout(check, 60); }); /* bfcache 復帰も */
-        setTimeout(check, 250);
-        setTimeout(check, 600);
-        if (!io) check();
+        /* B: スクロール中は発火せず、止まって IDLE 経過で発火（速い流し見の無駄撃ちを間引く） */
+        window.addEventListener('scroll', settleSoon, { passive: true });
+        /* スクロール復元レース＆初期表示の保険 */
+        requestAnimationFrame(function () { requestAnimationFrame(settleSoon); });
+        window.addEventListener('load', function () { setTimeout(settleSoon, 60); });
+        window.addEventListener('pageshow', function () { setTimeout(settleSoon, 60); });
+        setTimeout(settleSoon, 250);
+        if (!io) settleSoon();
       }
 
       /* 火球＝外殻(位置/グロー)＋内側コア(属性ごとの形/自転)。両デモで共用。 */
@@ -1264,8 +1267,8 @@
       function fcastLightning(sx, sy, ex, ey) {
         var ns = 'http://www.w3.org/2000/svg';
         var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'fcast-bolt-fx'); svg.setAttribute('aria-hidden', 'true');
-        svg.setAttribute('width', window.innerWidth); svg.setAttribute('height', window.innerHeight);
-        svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
+        var dw = document.documentElement.scrollWidth, dh = document.documentElement.scrollHeight; /* 文書全体を覆う（点は文書座標） */
+        svg.setAttribute('width', dw); svg.setAttribute('height', dh); svg.setAttribute('viewBox', '0 0 ' + dw + ' ' + dh);
         var glow = document.createElementNS(ns, 'polyline'); glow.setAttribute('class', 'bolt-glow');
         var line = document.createElementNS(ns, 'polyline'); line.setAttribute('class', 'bolt-line');
         var br1 = document.createElementNS(ns, 'polyline'); br1.setAttribute('class', 'bolt-branch');
@@ -1388,11 +1391,12 @@
 
           if (reduce.checked) { msg.classList.add('is-burning'); return; } /* 抑制＝発動演出なし・静的燃焼 */
 
-          /* 発射元＝ヘッダーのユーザアバター、着弾先＝メッセージ中央（ビューポート座標） */
+          /* 発射元＝ヘッダーのユーザアバター、着弾先＝メッセージ中央（文書スクロール座標にアンカー） */
           var av = document.querySelector('.usermenu .avatar');
           var a = av.getBoundingClientRect(), m = msg.getBoundingClientRect();
-          var sx = a.left + a.width / 2, sy = a.top + a.height / 2;
-          var ex = m.left + m.width / 2, ey = m.top + m.height / 2;
+          var ox = window.pageXOffset, oy = window.pageYOffset;
+          var sx = a.left + a.width / 2 + ox, sy = a.top + a.height / 2 + oy;
+          var ex = m.left + m.width / 2 + ox, ey = m.top + m.height / 2 + oy;
 
           /* 発射リアクション＝アバターが魔法を放つ（反動＋グロー）＋マズルフラッシュ/リング */
           av.classList.remove('fcast-caster'); void av.offsetWidth; av.classList.add('fcast-caster');
@@ -1566,9 +1570,11 @@
           function reveal() {
             if (played) return; played = true; /* 画面表示時に1回だけ */
             if (reduced()) { msg.classList.add('is-burning'); return; } /* 抑制＝静的燃焼のみ */
+            /* A: 弾は文書スクロール座標にアンカー（絶対配置＋スクロールオフセット）＝スクロールしても対象に追従 */
             var a = src.getBoundingClientRect(), m = msg.getBoundingClientRect();
-            var sx = a.left + a.width / 2, sy = a.top + a.height / 2;
-            var ex = m.left + m.width / 2, ey = m.top + m.height / 2;
+            var ox = window.pageXOffset, oy = window.pageYOffset;
+            var sx = a.left + a.width / 2 + ox, sy = a.top + a.height / 2 + oy;
+            var ex = m.left + m.width / 2 + ox, ey = m.top + m.height / 2 + oy;
             /* 発射元アバターが発動リアクション＋マズル */
             if (src.classList && src.classList.contains('msg-avatar')) {
               src.classList.remove('fcast-caster'); void src.offsetWidth; src.classList.add('fcast-caster');
