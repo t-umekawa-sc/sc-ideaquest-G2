@@ -720,10 +720,15 @@
 
       /* 火球＝ヘッダーのユーザアバターから発射しメッセージへ飛来する固定オーバーレイ（JS が座標付与・WAAPI）。
          本番 SpellCastFx も同様に avatar 矩形→対象矩形で飛ばす想定。3D感＝小さく→大きく＋斜め移動。 */
+      /* 外殻＝位置(WAAPI)とグロー担当。内側 .ball-core＝属性ごとの「形」と自転（既定＝炎の円）。 */
       .fcast-ball-fx { position: fixed; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px;
         border-radius: 50%; z-index: 2000; pointer-events: none; opacity: 0;
-        background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
         box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 0 0 30px 8px rgba(255,90,20,.5); }
+      .ball-core { position: absolute; inset: 0; border-radius: 50%;
+        background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%); }
+      @keyframes ball-spin { to { transform: rotate(360deg); } }
+      @keyframes ball-flicker { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+      @keyframes ball-pulse { 0%,100% { transform: scale(1); opacity: .7; } 50% { transform: scale(1.3); opacity: .15; } }
 
       /* 発射リアクション＝ユーザアバターが「魔法を放った」感（反動でぐっと拡大→戻る＋暖色グロー）。
          発射元アバターの種別を問わず使えるよう .fcast-caster 単独で適用（ヘッダー／メッセージ右上バッジ 共通）。 */
@@ -848,15 +853,28 @@
       .fcast.fx-rainbow { --hot:#ec4899; --warm:#f9a8d4; --spark:#ffffff; --flash: rgba(236,72,153,.55);  --plume1: rgba(255,154,0,.45);  --plume2: rgba(255,230,0,.8); }
       .fcast.fx-aura    { --hot:#8b5cf6; --warm:#c4b5fd; --spark:#ede9fe; --flash: rgba(167,139,250,.7);  --plume1: rgba(139,92,246,.5);  --plume2: rgba(237,233,254,.85); }
 
-      .fcast-ball-fx.fx-thunder { background: radial-gradient(circle at 38% 36%, #fff 8%, #fffde7 26%, #fbbf24 60%, #f59e0b 88%); box-shadow: 0 0 14px 4px rgba(251,191,36,.9), 0 0 30px 8px rgba(255,240,150,.55); }
-      .fcast-ball-fx.fx-ice     { background: radial-gradient(circle at 38% 36%, #fff 8%, #e0f2fe 26%, #38bdf8 60%, #0284c7 88%); box-shadow: 0 0 14px 4px rgba(56,189,248,.85), 0 0 30px 8px rgba(186,230,253,.5); }
-      .fcast-ball-fx.fx-rainbow { background: conic-gradient(from 0deg, #ff004c,#ff9a00,#ffe600,#37ff00,#00e5ff,#3d5bff,#c400ff,#ff004c); box-shadow: 0 0 14px 4px rgba(255,120,180,.8), 0 0 30px 8px rgba(120,200,255,.5); }
-      .fcast-ball-fx.fx-aura    { background: radial-gradient(circle at 38% 36%, #fff 8%, #ede9fe 26%, #8b5cf6 60%, #6d28d9 88%); box-shadow: 0 0 14px 4px rgba(139,92,246,.85), 0 0 30px 8px rgba(196,181,253,.55); }
+      /* 火球の形＝内側コアで属性別に。外殻はグロー色のみ差し替え。 */
+      .fcast-ball-fx.fx-thunder { box-shadow: 0 0 14px 4px rgba(251,191,36,.9), 0 0 30px 8px rgba(255,240,150,.55); }
+      .fcast-ball-fx.fx-thunder .ball-core { border-radius: 0; clip-path: polygon(60% 0, 22% 54%, 48% 54%, 32% 100%, 82% 40%, 54% 40%);
+        background: linear-gradient(120deg, #fffde7, #fbbf24 60%, #f59e0b); animation: ball-flicker .18s steps(2, jump-none) infinite; } /* 稲妻弾 */
+      .fcast-ball-fx.fx-ice { box-shadow: 0 0 14px 4px rgba(56,189,248,.85), 0 0 30px 8px rgba(186,230,253,.5); }
+      .fcast-ball-fx.fx-ice .ball-core { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+        background: linear-gradient(#ffffff, #7dd3fc 60%, #0284c7); animation: ball-spin .5s linear infinite; } /* 結晶ダイヤ */
+      .fcast-ball-fx.fx-rainbow { box-shadow: 0 0 14px 4px rgba(255,120,180,.8), 0 0 30px 8px rgba(120,200,255,.5); }
+      .fcast-ball-fx.fx-rainbow .ball-core { border-radius: 0; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+        background: conic-gradient(from 0deg, #ff004c,#ff9a00,#ffe600,#37ff00,#00e5ff,#3d5bff,#c400ff,#ff004c); animation: ball-spin .7s linear infinite; } /* 回転する星 */
+      .fcast-ball-fx.fx-aura { box-shadow: 0 0 14px 4px rgba(139,92,246,.85), 0 0 30px 8px rgba(196,181,253,.55); }
+      .fcast-ball-fx.fx-aura .ball-core { background: radial-gradient(circle at 38% 36%, #fff 8%, #ede9fe 26%, #8b5cf6 60%, #6d28d9 88%); } /* 光球 */
+      .fcast-ball-fx.fx-aura::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid rgba(196,181,253,.6); animation: ball-pulse 1s ease-in-out infinite; } /* ハロー */
 
       .fcast-muzzle.fx-thunder { --mz1: rgba(255,245,170,.95); --mz2: rgba(251,191,36,.4); --mzr: rgba(253,224,71,.95); }
       .fcast-muzzle.fx-ice     { --mz1: rgba(224,242,254,.95); --mz2: rgba(56,189,248,.4);  --mzr: rgba(125,211,252,.95); }
       .fcast-muzzle.fx-rainbow { --mz1: rgba(255,255,255,.95); --mz2: rgba(236,72,153,.4);  --mzr: rgba(120,200,255,.95); }
       .fcast-muzzle.fx-aura    { --mz1: rgba(237,233,254,.95); --mz2: rgba(139,92,246,.4);  --mzr: rgba(196,181,253,.95); }
+      /* マズルの閃光も属性で形を変える（雷＝星／氷＝ダイヤ／虹＝星／オーラ＝円のまま） */
+      .fcast-muzzle.fx-thunder::before { clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+      .fcast-muzzle.fx-ice::before     { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+      .fcast-muzzle.fx-rainbow::before { clip-path: polygon(50% 0, 63% 38%, 100% 38%, 70% 62%, 80% 100%, 50% 78%, 20% 100%, 30% 62%, 0 38%, 37% 38%); }
 
       /* ── 属性別の着弾バースト粒子（幾何を属性化・JS が中心から放射配置） ── */
       /* 雷＝放射する稲光レイ */
@@ -1139,6 +1157,14 @@
         if (!io) check();
       }
 
+      /* 火球＝外殻(位置/グロー)＋内側コア(属性ごとの形/自転)。両デモで共用。 */
+      function fcastMakeBall(fxName) {
+        var ball = document.createElement('span');
+        ball.className = 'fcast-ball-fx' + (fxName ? ' fx-' + fxName : ''); ball.setAttribute('aria-hidden', 'true');
+        var core = document.createElement('span'); core.className = 'ball-core'; ball.appendChild(core);
+        return ball;
+      }
+
       (function () {
         var stage = document.getElementById('fcastStage');
         var msg = document.getElementById('fcastMsg');
@@ -1173,8 +1199,7 @@
           setTimeout(function () { if (mz.parentNode) mz.remove(); av.classList.remove('fcast-caster'); }, 560);
 
           /* 火球＝固定オーバーレイを WAAPI で avatar→message へ。小さく→大きく（3D感）→着弾で弾ける */
-          var ball = document.createElement('span');
-          ball.className = 'fcast-ball-fx'; ball.setAttribute('aria-hidden', 'true');
+          var ball = fcastMakeBall('fire');
           document.body.appendChild(ball);
           var DUR = 620;
           ball.animate([
@@ -1304,8 +1329,8 @@
             var mz = document.createElement('span'); mz.className = 'fcast-muzzle fx-' + fxName; mz.setAttribute('aria-hidden', 'true');
             mz.style.left = sx + 'px'; mz.style.top = sy + 'px'; document.body.appendChild(mz);
             setTimeout(function () { if (mz.parentNode) mz.remove(); }, 560);
-            /* 火球（属性色）＝発射元→メッセージ中央（短距離なので拡大は控えめ） */
-            var ball = document.createElement('span'); ball.className = 'fcast-ball-fx fx-' + fxName; ball.setAttribute('aria-hidden', 'true');
+            /* 火球（属性の形/色）＝発射元→メッセージ中央（短距離なので拡大は控えめ） */
+            var ball = fcastMakeBall(fxName);
             document.body.appendChild(ball);
             var DUR = 500;
             ball.animate([
