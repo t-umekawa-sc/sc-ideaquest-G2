@@ -1292,7 +1292,7 @@
         ], { duration: DUR, easing: 'cubic-bezier(.4,.05,.5,1)', fill: 'forwards' });
         function addCrescent(idx) { /* 先頭から後方(-進行方向)へ idx*spacing ずらして連ねる */
           var c = document.createElement('span'); c.className = 'aura-crescent';
-          c.style.transform = 'translate(' + (-Math.cos(rad) * idx * spacing).toFixed(1) + 'px,' + (-Math.sin(rad) * idx * spacing).toFixed(1) + 'px) rotate(' + ang + 'deg)';
+          c.style.transform = 'translate(' + (-Math.cos(rad) * idx * spacing).toFixed(1) + 'px,' + (-Math.sin(rad) * idx * spacing).toFixed(1) + 'px) rotate(' + (ang + 180) + 'deg)';
           group.appendChild(c);
         }
         var n = 4; for (var i = 0; i < n; i++) addCrescent(i); /* 最初は4個 */
