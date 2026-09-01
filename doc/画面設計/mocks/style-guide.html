@@ -968,15 +968,15 @@
       /* 氷の永続＝液体がカチカチ固まる薄いガラス板→少しずつヒビ→割れて飛散→再凍結のループ */
       .spell-persist--ice { --iced: 5.5s; }
       .ice-panel { position: absolute; inset: 0; border-radius: 14px; overflow: hidden; opacity: 0;
-        background: linear-gradient(135deg, rgba(224,242,254,.42), rgba(125,211,252,.26) 45%, rgba(14,165,233,.2));
-        box-shadow: inset 0 0 14px rgba(186,230,253,.6), inset 0 1px 0 rgba(255,255,255,.5);
-        border: 1px solid rgba(186,230,253,.6); animation: ice-freeze var(--iced) ease-in-out infinite; }
+        background: linear-gradient(135deg, rgba(240,249,255,.5), rgba(186,230,253,.34) 45%, rgba(56,189,248,.26));
+        box-shadow: inset 0 0 16px rgba(224,242,254,.7), inset 0 1px 0 rgba(255,255,255,.6);
+        border: 1px solid rgba(224,242,254,.7); animation: ice-freeze var(--iced) ease-in-out infinite; }
       .ice-panel::before { content: ""; position: absolute; inset: 0;
         background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%); } /* ガラスの光沢 */
-      .ice-cracks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-      .ice-cracks polyline { fill: none; stroke: rgba(255,255,255,.92); stroke-width: 1.4; vector-effect: non-scaling-stroke;
-        filter: drop-shadow(0 0 1px rgba(56,189,248,.95)); stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0;
-        animation: ice-crack var(--iced) linear infinite; }
+      /* ヒビ＝四隅から内側へ伸びる細い線分（端から scaleX で少しずつ伸びる・CSSで確実に描画） */
+      .ice-crackseg { position: absolute; height: 1.6px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
+        background: linear-gradient(90deg, rgba(3,105,161,.95), rgba(224,242,254,.95));
+        box-shadow: 0 0 2px rgba(255,255,255,.85); animation: ice-crack var(--iced) linear infinite; }
       .ice-shard-piece { position: absolute; opacity: 0; border: 1px solid rgba(186,230,253,.6);
         background: linear-gradient(135deg, rgba(224,242,254,.5), rgba(56,189,248,.32)); animation: ice-shatter var(--iced) ease-in infinite; }
       @keyframes ice-freeze {
@@ -986,9 +986,9 @@
         74% { opacity: .6; } 78% { opacity: .72; transform: scale(1.012); } /* 割れる寸前の張り */
         82% { opacity: 0; transform: scale(1.05); } 100% { opacity: 0; } } /* 割れて消える */
       @keyframes ice-crack {
-        0%,26% { stroke-dashoffset: 1; opacity: 0; } 30% { opacity: 1; }
-        70% { stroke-dashoffset: 0; opacity: 1; }                      /* 少しずつヒビが伸びる */
-        79% { opacity: 1; } 83% { opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
+        0%,26% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 30% { opacity: 1; }
+        70% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } /* 端から少しずつ伸びる */
+        79% { opacity: 1; } 83% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-shatter {
         0%,77% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 79% { opacity: .85; }
         92% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.9); } 100% { opacity: 0; } }
@@ -1040,7 +1040,7 @@
         .fcast-caster { animation: none; }
         .spell-edge { animation: none !important; }
         .ice-panel { animation: none !important; opacity: .5; } /* 氷＝静的な薄いガラス板のみ */
-        .ice-cracks, .ice-shard-piece { display: none !important; }
+        .ice-crackseg, .ice-shard-piece { display: none !important; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -1053,7 +1053,7 @@
       .fcast-stage.reduce .fx-mote, .fcast-stage.reduce .fx-aura-ring { animation: none !important; opacity: 0 !important; }
       .fcast-stage.reduce .fx-shimmer::before { display: none; }
       .fcast-stage.reduce .ice-panel { animation: none !important; opacity: .5; }
-      .fcast-stage.reduce .ice-cracks, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
+      .fcast-stage.reduce .ice-crackseg, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
     </style>
 
     <div class="fcast-stage" id="fcastStage">
@@ -1474,12 +1474,14 @@
           } else if (fx === 'ice') {
             /* 薄いガラス板＋亀裂(SVG draw-on)＋割れる破片 */
             wrap.appendChild(el('ice-panel'));
-            var ns = 'http://www.w3.org/2000/svg';
-            var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'ice-cracks'); svg.setAttribute('viewBox', '0 0 200 80'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
-            ['40,12 88,40 128,30 176,58', '88,40 66,74', '128,30 150,8', '88,40 118,14', '128,30 106,66', '40,12 20,42'].forEach(function (pl) {
-              var p = document.createElementNS(ns, 'polyline'); p.setAttribute('points', pl); p.setAttribute('pathLength', '1'); svg.appendChild(p);
+            [ /* left%, top%, 長さpx, 角度deg ＝四隅から内側へ細かいヒビ（中央には入れない） */
+              [3, 5, 30, 28], [3, 5, 22, 66], [15, 16, 22, 8], [9, 30, 17, -16], [6, 12, 16, 44],       /* 左上 */
+              [97, 5, 30, 152], [97, 6, 22, 113], [85, 17, 20, 176], [90, 30, 17, 150], [94, 12, 16, 136], /* 右上 */
+              [3, 95, 30, -28], [3, 94, 22, -66], [15, 84, 22, -8], [9, 70, 17, 16], [6, 88, 16, -44],   /* 左下 */
+              [97, 95, 30, 208], [97, 94, 22, 247], [85, 84, 20, 184], [90, 70, 17, 210], [94, 88, 16, 224] /* 右下 */
+            ].forEach(function (sg) {
+              var c = el('ice-crackseg'); c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg'); wrap.appendChild(c);
             });
-            wrap.appendChild(svg);
             [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片 */
               [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -26, -18, -30],
               [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 26, -16, 28],
