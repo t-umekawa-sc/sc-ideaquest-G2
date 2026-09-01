@@ -984,6 +984,7 @@
       .ice-crackseg.g3 { animation: ice-crack-3 var(--iced) linear infinite; }
       .ice-crackseg.g4 { animation: ice-crack-4 var(--iced) linear infinite; }
       .ice-crackseg.g5 { animation: ice-crack-5 var(--iced) linear infinite; }
+      .ice-crackseg.g6 { animation: ice-crack-6 var(--iced) linear infinite; } /* 割れる寸前に中央寄りへ */
       .ice-shard-piece { position: absolute; opacity: 0; border: 1px solid rgba(186,230,253,.6);
         background: linear-gradient(135deg, rgba(224,242,254,.5), rgba(56,189,248,.32)); animation: ice-shatter var(--iced) ease-in infinite; }
       @keyframes ice-freeze {
@@ -998,6 +999,7 @@
       @keyframes ice-crack-3 { 0%,54% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 62% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-crack-4 { 0%,63% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 70% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-crack-5 { 0%,71% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 77% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-6 { 0%,73% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 79% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } } /* 割れる寸前(73-79%)に中央寄りへ小さく */
       @keyframes ice-shatter {
         0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
         85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } } /* 割れは速く鋭く */
@@ -1522,6 +1524,14 @@
             order.forEach(function (sg, i) {
               var tier = 1; while (i >= bounds[tier - 1]) tier++;
               var c = el('ice-crackseg g' + tier);
+              c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg');
+              wrap.appendChild(c);
+            });
+            [ /* 割れる寸前(g6)に中央寄りへ入る小さいヒビ（left%, top%, 長さpx, 角度deg） */
+              [38, 42, 12, 22], [46, 58, 10, -30], [58, 40, 12, 200], [54, 62, 11, 150], [42, 52, 9, 84],
+              [60, 50, 10, -68], [50, 38, 10, 112], [48, 64, 9, 8], [64, 56, 9, 172], [36, 56, 9, -14]
+            ].forEach(function (sg) {
+              var c = el('ice-crackseg g6');
               c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg');
               wrap.appendChild(c);
             });
