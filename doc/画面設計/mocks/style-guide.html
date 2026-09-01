@@ -694,7 +694,8 @@
   <div class="section">
     <h2>17. 魔法発動エフェクト（提案・炎／GF-AC-091）</h2>
     <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
-      ①<strong>ヘッダーのユーザアバターから火球を放ち</strong>（＝ユーザが魔法を発動）、<strong>3D的に飛来</strong>（最初は小さく、近づくほど大きく）→ ②メッセージ中央で<strong>衝突・着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
+      ①<strong>ヘッダーのユーザアバターが発射リアクション</strong>（反動でぐっと拡大＋暖色グロー＋マズルフラッシュ/発射リング）＝ユーザが魔法を発動 →
+      そこから<strong>火球を放ち3D的に飛来</strong>（最初は小さく、近づくほど大きく）→ ②メッセージ中央で<strong>衝突・着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
       ④<strong>立ち上る炎柱</strong> → ⑤<strong>飛び散る火の粉</strong> → ⑥<strong>きらめき</strong>＋着弾に合わせた<strong>画面シェイク</strong>。
       <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後（炎）は<strong>メッセージ下辺が一つにつながった低い炎</strong>で、
       ところどころ“<strong>良く燃える箇所</strong>”が背の高い<strong>火柱</strong>になり、その火柱が<strong>左右にゆれる</strong>（永続＝本番 <code>.spell-fx--fire</code> 相当）。
@@ -723,6 +724,26 @@
         border-radius: 50%; z-index: 2000; pointer-events: none; opacity: 0;
         background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
         box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 0 0 30px 8px rgba(255,90,20,.5); }
+
+      /* 発射リアクション＝ユーザアバターが「魔法を放った」感（反動でぐっと拡大→戻る＋暖色グロー） */
+      .avatar.fcast-caster { animation: caster-kick .5s ease-out; }
+      @keyframes caster-kick {
+        0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,120,30,0); }
+        22%  { transform: scale(1.24); box-shadow: 0 0 16px 5px rgba(255,150,50,.95); }
+        50%  { transform: scale(.93);  box-shadow: 0 0 10px 3px rgba(255,120,30,.6); }
+        100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,120,30,0); } }
+      /* マズルフラッシュ＋発射リング（アバター中心の固定オーバーレイ・JS が座標付与） */
+      .fcast-muzzle { position: fixed; z-index: 1999; pointer-events: none; width: 0; height: 0; }
+      .fcast-muzzle::before, .fcast-muzzle::after { content: ""; position: absolute; left: 0; top: 0; transform: translate(-50%,-50%); border-radius: 50%; opacity: 0; }
+      .fcast-muzzle::before { width: 62px; height: 62px;
+        background: radial-gradient(circle, rgba(255,190,90,.9), rgba(255,120,30,.4) 45%, transparent 70%);
+        animation: muzzle-flash .45s ease-out forwards; }
+      .fcast-muzzle::after { width: 12px; height: 12px; border: 2px solid rgba(255,150,60,.9);
+        animation: muzzle-ring .5s ease-out forwards; }
+      @keyframes muzzle-flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+      @keyframes muzzle-ring { 0% { width: 12px; height: 12px; opacity: 0; } 20% { opacity: .9; }
+        100% { width: 86px; height: 86px; opacity: 0; } }
+
       /* 着弾バースト＝JS が着弾タイミングで stage に投入するため各レイヤーは遅延0（投入＝発火） */
       .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
         background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
@@ -797,7 +818,8 @@
         100% { transform: translateX(28px) scaleY(1.04); } }
 
       @media (prefers-reduced-motion: reduce) {
-        .fcast, .fcast-ball-fx { display: none; }
+        .fcast, .fcast-ball-fx, .fcast-muzzle { display: none; }
+        .avatar.fcast-caster { animation: none; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -874,6 +896,8 @@
           /* リセット */
           var oldFx = stage.querySelector('.fcast'); if (oldFx) oldFx.remove();
           var oldBall = document.querySelector('.fcast-ball-fx'); if (oldBall) oldBall.remove();
+          var oldMz = document.querySelector('.fcast-muzzle'); if (oldMz) oldMz.remove();
+          document.querySelectorAll('.avatar.fcast-caster').forEach(function (a) { a.classList.remove('fcast-caster'); });
           msg.classList.remove('is-burning');
           [t1, t2, t3].forEach(function (t) { if (t) clearTimeout(t); });
           stage.classList.remove('playing');
@@ -885,6 +909,14 @@
           var a = av.getBoundingClientRect(), m = msg.getBoundingClientRect();
           var sx = a.left + a.width / 2, sy = a.top + a.height / 2;
           var ex = m.left + m.width / 2, ey = m.top + m.height / 2;
+
+          /* 発射リアクション＝アバターが魔法を放つ（反動＋グロー）＋マズルフラッシュ/リング */
+          av.classList.remove('fcast-caster'); void av.offsetWidth; av.classList.add('fcast-caster');
+          var mz = document.createElement('span');
+          mz.className = 'fcast-muzzle'; mz.setAttribute('aria-hidden', 'true');
+          mz.style.left = sx + 'px'; mz.style.top = sy + 'px';
+          document.body.appendChild(mz);
+          setTimeout(function () { if (mz.parentNode) mz.remove(); av.classList.remove('fcast-caster'); }, 560);
 
           /* 火球＝固定オーバーレイを WAAPI で avatar→message へ。小さく→大きく（3D感）→着弾で弾ける */
           var ball = document.createElement('span');
