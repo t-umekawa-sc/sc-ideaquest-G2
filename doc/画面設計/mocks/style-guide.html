@@ -843,9 +843,10 @@
       .demo-msg.fx-aura    .msg-avatar.caster { background: #6d28d9; box-shadow: 0 0 0 2px rgba(167,139,250,.55), 0 1px 4px rgba(0,0,0,.35); }
       /* 自作自演（発動者＝作成者）＝右上バッジは出さず、作成者アバターに自己発動マーク */
       .msg-avatar.author.is-selfcast { box-shadow: 0 0 0 2px rgba(255,140,50,.55), 0 1px 4px rgba(0,0,0,.35); }
-      .msg-avatar.author.is-selfcast::after { content: "✦"; position: absolute; right: -5px; bottom: -5px;
+      /* 自己発動マークは ::before に置く（::after は .has-tip ツールチップが使うため衝突回避） */
+      .msg-avatar.author.is-selfcast::before { content: "✦"; position: absolute; right: -5px; bottom: -5px;
         width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
-        font-size: .66rem; color: #ffca42; background: #3a2a12; box-shadow: 0 0 0 1px rgba(255,180,60,.7); }
+        font-size: .66rem; color: #ffca42; background: #3a2a12; box-shadow: 0 0 0 1px rgba(255,180,60,.7); z-index: 1; }
 
       /* ── 属性テーマ（雷/氷/虹/オーラ）＝火球・着弾バースト・マズルの配色を差し替え。炎は既定値。 ── */
       .fcast.fx-thunder { --hot:#fbbf24; --warm:#fde68a; --spark:#fffde7; --flash: rgba(255,240,150,.85); --plume1: rgba(251,191,36,.5); --plume2: rgba(255,255,200,.9); }
