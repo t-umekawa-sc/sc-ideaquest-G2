@@ -757,7 +757,7 @@
       .demo-msg.is-burning .fcast-burn { opacity: 1; }
       .demo-msg.is-burning { animation: burn-underglow 1.3s ease-in-out infinite; }
 
-      .fcast-fire { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 18px; overflow: hidden; }
+      .fcast-fire { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 12px; overflow: hidden; }
       .fcast-fire::before, .fcast-fire::after { content: ""; position: absolute; left: -20%; right: -20%; bottom: 0; height: 100%;
         transform-origin: 50% 100%;
         -webkit-mask: linear-gradient(#000,#000) 0 100%/100% 45% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 62%, transparent 74%) 0 0/38px 100% repeat-x;
@@ -769,10 +769,10 @@
         -webkit-mask-size: 100% 45%, 28px 100%; mask-size: 100% 45%, 28px 100%;
         animation: fire-b 1.05s linear infinite; }
 
-      @keyframes fire-a { 0% { transform: translateX(0) scaleY(1); } 50% { transform: translateX(-19px) scaleY(1.18); }
+      @keyframes fire-a { 0% { transform: translateX(0) scaleY(1); } 50% { transform: translateX(-19px) scaleY(1.12); }
         100% { transform: translateX(-38px) scaleY(1); } }
-      @keyframes fire-b { 0% { transform: translateX(0) scaleY(1.06); } 50% { transform: translateX(14px) scaleY(.9); }
-        100% { transform: translateX(28px) scaleY(1.06); } }
+      @keyframes fire-b { 0% { transform: translateX(0) scaleY(1.04); } 50% { transform: translateX(14px) scaleY(.9); }
+        100% { transform: translateX(28px) scaleY(1.04); } }
       @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px rgba(255,90,20,.4); }
         50% { box-shadow: 0 8px 20px rgba(255,130,40,.72); } }
 
