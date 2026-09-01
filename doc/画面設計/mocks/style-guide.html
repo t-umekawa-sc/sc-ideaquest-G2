@@ -876,6 +876,17 @@
       .fcast-muzzle.fx-ice::before     { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
       .fcast-muzzle.fx-rainbow::before { clip-path: polygon(50% 0, 63% 38%, 100% 38%, 70% 62%, 80% 100%, 50% 78%, 20% 100%, 30% 62%, 0 38%, 37% 38%); }
 
+      /* 雷の発射＝飛ぶ弾でなく、発射元→対象へ伸びるギザギザの稲妻（チカチカ＋途切れ・JSが座標/形を付与） */
+      .fcast-bolt-fx { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none;
+        animation: bolt-fx-flicker .42s steps(1, end) forwards; }
+      .fcast-bolt-fx .bolt-glow { fill: none; stroke: #fbbf24; stroke-width: 6; stroke-linejoin: round; stroke-linecap: round;
+        opacity: .5; filter: blur(2px); animation: bolt-draw .16s ease-out forwards; }
+      .fcast-bolt-fx .bolt-line { fill: none; stroke: #fffde7; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round;
+        filter: drop-shadow(0 0 3px #fbbf24) drop-shadow(0 0 7px #fde68a); animation: bolt-draw .16s ease-out forwards; }
+      @keyframes bolt-draw { to { stroke-dashoffset: 0; } }
+      @keyframes bolt-fx-flicker { 0% { opacity: .25; } 10% { opacity: 1; } 22% { opacity: .4; } 34% { opacity: 1; }
+        50% { opacity: .6; } 64% { opacity: 1; } 82% { opacity: .5; } 100% { opacity: 0; } }
+
       /* ── 属性別の着弾バースト粒子（幾何を属性化・JS が中心から放射配置） ── */
       /* 雷＝放射する稲光レイ */
       .burst-ray { position: absolute; left: 50%; top: 58%; width: 3px; height: 56px; transform-origin: 50% 100%;
@@ -970,7 +981,7 @@
         .fx-bolt, .fx-espark, .frost-spike, .fx-snow, .fx-twinkle, .fx-mote, .fx-aura-ring { animation: none !important; }
         .fx-shimmer::before { animation: none !important; display: none; }
         .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .fx-aura-ring { opacity: 0 !important; } /* 明滅系は静止時は消す */
-        .fcast, .fcast-ball-fx, .fcast-muzzle { display: none; }
+        .fcast, .fcast-ball-fx, .fcast-muzzle, .fcast-bolt-fx { display: none; }
         .fcast-caster { animation: none; }
         .spell-edge { animation: none !important; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
@@ -1165,6 +1176,39 @@
         return ball;
       }
 
+      /* 雷＝発射元(sx,sy)→対象(ex,ey)へ伸びるギザギザ稲妻。チカチカ＋形の再生成＋途切れ→着弾で消える。 */
+      function fcastLightning(sx, sy, ex, ey) {
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'fcast-bolt-fx'); svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('width', window.innerWidth); svg.setAttribute('height', window.innerHeight);
+        svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
+        var glow = document.createElementNS(ns, 'polyline'); glow.setAttribute('class', 'bolt-glow');
+        var line = document.createElementNS(ns, 'polyline'); line.setAttribute('class', 'bolt-line');
+        svg.appendChild(glow); svg.appendChild(line); document.body.appendChild(svg);
+        var dx = ex - sx, dy = ey - sy, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+        function jag() {
+          var n = 11, pts = [];
+          for (var i = 0; i <= n; i++) {
+            var t = i / n, x = sx + dx * t, y = sy + dy * t;
+            var amp = (i === 0 || i === n) ? 0 : (Math.random() * 2 - 1) * 20;
+            pts.push((x + px * amp).toFixed(1) + ',' + (y + py * amp).toFixed(1));
+          }
+          var s = pts.join(' '); line.setAttribute('points', s); glow.setAttribute('points', s);
+        }
+        jag();
+        var L = (line.getTotalLength ? line.getTotalLength() : len * 1.35) + 30;
+        [line, glow].forEach(function (el) { el.style.strokeDasharray = L; el.style.strokeDashoffset = L; }); /* draw-on で伸びる */
+        var chat = null;
+        setTimeout(function () { /* 伸び切ったら形を再生成＋ランダムに途切れさせてチカチカ */
+          chat = setInterval(function () {
+            jag(); line.style.strokeDashoffset = 0; glow.style.strokeDashoffset = 0;
+            if (Math.random() < 0.6) { var a = L * (0.25 + Math.random() * 0.5); line.style.strokeDasharray = a + ' ' + (6 + Math.random() * 12) + ' ' + L; }
+            else { line.style.strokeDasharray = L; }
+          }, 50);
+        }, 165);
+        setTimeout(function () { if (chat) clearInterval(chat); if (svg.parentNode) svg.remove(); }, 430);
+      }
+
       (function () {
         var stage = document.getElementById('fcastStage');
         var msg = document.getElementById('fcastMsg');
@@ -1329,26 +1373,33 @@
             var mz = document.createElement('span'); mz.className = 'fcast-muzzle fx-' + fxName; mz.setAttribute('aria-hidden', 'true');
             mz.style.left = sx + 'px'; mz.style.top = sy + 'px'; document.body.appendChild(mz);
             setTimeout(function () { if (mz.parentNode) mz.remove(); }, 560);
-            /* 火球（属性の形/色）＝発射元→メッセージ中央（短距離なので拡大は控えめ） */
-            var ball = fcastMakeBall(fxName);
-            document.body.appendChild(ball);
-            var DUR = 500;
-            ball.animate([
-              { transform: 'translate(' + sx + 'px,' + sy + 'px) scale(.4)', opacity: 0, offset: 0 },
-              { opacity: 1, offset: .2 },
-              { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1)', opacity: 1, offset: .86 },
-              { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.6)', opacity: 0, offset: 1 }
-            ], { duration: DUR, easing: 'cubic-bezier(.4,.02,.7,1)', fill: 'forwards' });
-            setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
-            setTimeout(function () {
+            /* 着弾処理（バースト＋枠燃え＋トースト）を共通化 */
+            function impact() {
               stage.classList.remove('playing'); void stage.offsetWidth; stage.classList.add('playing');
               var fx = buildBurst(fxName); stage.appendChild(fx); /* 属性別の着弾バースト */
               setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1400);
               setTimeout(function () { msg.classList.add('is-burning'); }, 430);
-              /* 他人→自分 はトースト（デモ・shared.js の iqSnack があれば） */
               var toast = stage.getAttribute('data-toast');
               if (toast && typeof window.iqSnack === 'function') { try { window.iqSnack({ type: 'reward', title: '魔法を受けました', msg: toast }); } catch (e) {} }
-            }, Math.round(DUR * .86));
+            }
+            if (fxName === 'thunder') {
+              /* 雷＝弾でなくギザギザ稲妻が伸びて着弾 */
+              fcastLightning(sx, sy, ex, ey);
+              setTimeout(impact, 200); /* 伸び切って接続した頃に着弾 */
+            } else {
+              /* 他属性＝属性の形/色の火球が飛来 */
+              var ball = fcastMakeBall(fxName);
+              document.body.appendChild(ball);
+              var DUR = 500;
+              ball.animate([
+                { transform: 'translate(' + sx + 'px,' + sy + 'px) scale(.4)', opacity: 0, offset: 0 },
+                { opacity: 1, offset: .2 },
+                { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1)', opacity: 1, offset: .86 },
+                { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.6)', opacity: 0, offset: 1 }
+              ], { duration: DUR, easing: 'cubic-bezier(.4,.02,.7,1)', fill: 'forwards' });
+              setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
+              setTimeout(impact, Math.round(DUR * .86));
+            }
           }
           fcastWhenVisible(stage, reveal); /* 可視で1回だけ・スクロール復元レース耐性あり */
         }
