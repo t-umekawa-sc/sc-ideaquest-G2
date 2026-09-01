@@ -725,8 +725,9 @@
         background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
         box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 0 0 30px 8px rgba(255,90,20,.5); }
 
-      /* 発射リアクション＝ユーザアバターが「魔法を放った」感（反動でぐっと拡大→戻る＋暖色グロー） */
-      .avatar.fcast-caster { animation: caster-kick .5s ease-out; }
+      /* 発射リアクション＝ユーザアバターが「魔法を放った」感（反動でぐっと拡大→戻る＋暖色グロー）。
+         発射元アバターの種別を問わず使えるよう .fcast-caster 単独で適用（ヘッダー／メッセージ右上バッジ 共通）。 */
+      .fcast-caster { animation: caster-kick .5s ease-out; }
       @keyframes caster-kick {
         0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,120,30,0); }
         22%  { transform: scale(1.24); box-shadow: 0 0 16px 5px rgba(255,150,50,.95); }
@@ -817,9 +818,17 @@
       @keyframes lava-b { 0% { transform: translateX(0) scaleY(1.04); } 50% { transform: translateX(14px) scaleY(.9); }
         100% { transform: translateX(28px) scaleY(1.04); } }
 
+      /* 受信側＝自分のメッセージに他ユーザが魔法をかけた表示。左上＝作成者(自分)／右上＝魔法を放ったユーザ。 */
+      .demo-msg.recv { position: relative; overflow: visible; }
+      .msg-avatar { position: absolute; top: -13px; width: 30px; height: 30px; border-radius: 50%;
+        display: grid; place-items: center; font-weight: 700; font-size: .8rem; color: #fff;
+        border: 2px solid var(--color-surface, #fff); box-shadow: 0 1px 4px rgba(0,0,0,.35); z-index: 4; }
+      .msg-avatar.author { left: -12px; background: #5b7cfa; }
+      .msg-avatar.caster { right: -12px; background: #c0563a; box-shadow: 0 0 0 2px rgba(255,140,50,.55), 0 1px 4px rgba(0,0,0,.35); }
+
       @media (prefers-reduced-motion: reduce) {
         .fcast, .fcast-ball-fx, .fcast-muzzle { display: none; }
-        .avatar.fcast-caster { animation: none; }
+        .fcast-caster { animation: none; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -850,6 +859,30 @@
     <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
       <button class="btn-pixel" type="button" id="fcastReplay">▶ 炎を発動</button>
       <label class="checkbox"><input type="checkbox" id="fcastReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <p class="muted text-sm" style="margin-top:var(--space-5)">＜受信側＞<strong>自分のメッセージに他ユーザが魔法をかけた表示</strong>。
+      左上＝作成者（自分）／右上＝<strong>魔法を放ったユーザ</strong>のアバター。<strong>画面表示時に1回だけ</strong>発動アニメ
+      （放ったユーザのバッジから飛来→着弾）が走り、その後は<strong>枠の炎が永続</strong>。誰が何をかけたかは本文＋バッジ hover で示す。</p>
+    <div class="fcast-stage" id="fcastRecvStage" style="min-height:150px">
+      <div class="demo-msg recv" id="fcastRecvMsg" aria-label="あなたのメッセージに 佐藤 花子 が 炎 の魔法をかけました">
+        <span class="msg-avatar author has-tip" data-tip="山田 太郎（作成者・あなた）" aria-hidden="true">山</span>
+        <span class="msg-avatar caster has-tip" id="fcastRecvCaster" data-tip="佐藤 花子 が【炎】をかけました" aria-hidden="true">佐</span>
+        <span class="fcast-burn" aria-hidden="true">
+          <span class="fcast-fire">
+            <span class="fcast-fire__base"></span>
+            <span class="fcast-fire__peak" style="left:10%;--h:12px;--d:0s;--dur:.95s"></span>
+            <span class="fcast-fire__peak" style="left:22%;--h:18px;--d:-.25s;--dur:1.05s"></span>
+            <span class="fcast-fire__peak" style="left:34%;--h:11px;--d:-.5s;--dur:.85s"></span>
+            <span class="fcast-fire__peak" style="left:46%;--h:16px;--d:-.15s;--dur:1s"></span>
+            <span class="fcast-fire__peak" style="left:58%;--h:12px;--d:-.35s;--dur:.9s"></span>
+            <span class="fcast-fire__peak" style="left:70%;--h:19px;--d:-.05s;--dur:1.1s"></span>
+            <span class="fcast-fire__peak" style="left:82%;--h:11px;--d:-.45s;--dur:.8s"></span>
+            <span class="fcast-fire__peak" style="left:92%;--h:14px;--d:-.2s;--dur:.95s"></span>
+          </span>
+        </span>
+        「配送ルートを AI で最適化しよう」に佐藤さんが炎の魔法をかけた！
+      </div>
     </div>
 
     <p class="muted text-sm" style="margin-top:var(--space-5)">＜保存版＞<strong>溶岩</strong>の発動後アニメ（別スペル用に取り置き）＝連続した帯が横に流れる。</p>
@@ -897,7 +930,7 @@
           var oldFx = stage.querySelector('.fcast'); if (oldFx) oldFx.remove();
           var oldBall = document.querySelector('.fcast-ball-fx'); if (oldBall) oldBall.remove();
           var oldMz = document.querySelector('.fcast-muzzle'); if (oldMz) oldMz.remove();
-          document.querySelectorAll('.avatar.fcast-caster').forEach(function (a) { a.classList.remove('fcast-caster'); });
+          document.querySelectorAll('.usermenu .avatar.fcast-caster').forEach(function (a) { a.classList.remove('fcast-caster'); });
           msg.classList.remove('is-burning');
           [t1, t2, t3].forEach(function (t) { if (t) clearTimeout(t); });
           stage.classList.remove('playing');
@@ -947,6 +980,51 @@
           var io = new IntersectionObserver(function (es, obs) { if (es[0].isIntersecting) { play(); obs.disconnect(); } }, { threshold: .4 });
           io.observe(stage);
         } else { play(); }
+      })();
+
+      /* 受信側＝自分のメッセージに他ユーザが魔法をかけた表示。画面表示時に1回だけ
+         「放ったユーザのバッジ→メッセージ」へ飛来→着弾→枠が永続。dedupe は played フラグ（1回だけ）。 */
+      (function () {
+        var stage = document.getElementById('fcastRecvStage');
+        var msg = document.getElementById('fcastRecvMsg');
+        var caster = document.getElementById('fcastRecvCaster');
+        var tpl = document.getElementById('fcastTpl');
+        var reduceCb = document.getElementById('fcastReduce');
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        var played = false;
+        function reveal() {
+          if (played) return; played = true; /* 画面表示時に1回だけ */
+          if (reduced()) { msg.classList.add('is-burning'); return; } /* 抑制＝静的燃焼のみ */
+          var a = caster.getBoundingClientRect(), m = msg.getBoundingClientRect();
+          var sx = a.left + a.width / 2, sy = a.top + a.height / 2;
+          var ex = m.left + m.width / 2, ey = m.top + m.height / 2;
+          /* 放ったユーザのバッジが発動リアクション＋マズル */
+          caster.classList.remove('fcast-caster'); void caster.offsetWidth; caster.classList.add('fcast-caster');
+          var mz = document.createElement('span'); mz.className = 'fcast-muzzle'; mz.setAttribute('aria-hidden', 'true');
+          mz.style.left = sx + 'px'; mz.style.top = sy + 'px'; document.body.appendChild(mz);
+          setTimeout(function () { if (mz.parentNode) mz.remove(); caster.classList.remove('fcast-caster'); }, 560);
+          /* 火球＝バッジ→メッセージ中央（短距離なので拡大は控えめ） */
+          var ball = document.createElement('span'); ball.className = 'fcast-ball-fx'; ball.setAttribute('aria-hidden', 'true');
+          document.body.appendChild(ball);
+          var DUR = 500;
+          ball.animate([
+            { transform: 'translate(' + sx + 'px,' + sy + 'px) scale(.4)', opacity: 0, offset: 0 },
+            { opacity: 1, offset: .2 },
+            { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1)', opacity: 1, offset: .86 },
+            { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.6)', opacity: 0, offset: 1 }
+          ], { duration: DUR, easing: 'cubic-bezier(.4,.02,.7,1)', fill: 'forwards' });
+          setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
+          setTimeout(function () {
+            stage.classList.remove('playing'); void stage.offsetWidth; stage.classList.add('playing');
+            var fx = tpl.content.firstElementChild.cloneNode(true); stage.appendChild(fx);
+            setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1400);
+            setTimeout(function () { msg.classList.add('is-burning'); }, 430);
+          }, Math.round(DUR * .86));
+        }
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(function (es, obs) { if (es[0].isIntersecting) { reveal(); obs.disconnect(); } }, { threshold: .5 });
+          io.observe(stage);
+        } else { reveal(); }
       })();
     </script>
   </div>
