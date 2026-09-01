@@ -696,7 +696,9 @@
     <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
       ①<strong>溜め</strong>（収束リング＝予兆）→ ②<strong>暖色フラッシュ</strong> → ③<strong>衝撃波リング（二重）</strong> →
       ④<strong>立ち上る炎柱</strong> → ⑤<strong>舞い上がる火の粉</strong> → ⑥<strong>きらめき</strong>＋軽い<strong>画面シェイク</strong>。
-      <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後は<strong>メッセージ枠の下辺が一面つながった背の低い炎</strong>でメラメラ燃え続ける（永続＝本番 <code>.spell-fx--fire</code> 相当）。まずは炎のみのイテレーション用サンプル。</p>
+      <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後（炎）は<strong>メッセージ下辺が一つにつながった低い炎</strong>で、
+      ところどころ“<strong>良く燃える箇所</strong>”が背の高い<strong>火柱</strong>になり、その火柱が<strong>左右にゆれる</strong>（永続＝本番 <code>.spell-fx--fire</code> 相当）。
+      ※以前の「横に流れる」版は<strong>溶岩</strong>として下に保存（別スペル用）。</p>
     <p class="hint">本ページ内の <code>&lt;style&gt;</code>／<code>&lt;template&gt;</code> は<strong>サンプル（試作）</strong>。見た目確定後に
       <code>shared.css</code> ／ <code>design-system.css</code> の <code>.spell-cast--fire</code> へ昇格し、粒子座標は
       <code>features/spells/cast.ts</code>（<code>castParticles</code>）が生成する想定。<code>prefers-reduced-motion</code>（OS）または下の疑似トグルで演出を止める。</p>
@@ -749,47 +751,73 @@
         30% { opacity: 1; transform: translate(-50%,-50%) translate(var(--tx,0px), var(--ty,-40px)) scale(1.2);}
         100% { transform: translate(-50%,-50%) translate(var(--tx,0px), var(--ty,-70px)) scale(.6); opacity: 0;} }
 
-      /* 発動後：メッセージ枠の下辺が「一面つながった背の低い炎」でメラメラ燃え続ける永続エフェクト
-         （本番 .spell-fx--fire 相当の試作）。連続炎＝マスク帯（下 45% は常時塗り＝土台がつながる／上側は
-         炎の山形）を2レイヤー別サイズ・別速度で横に流し＋高さを揺らす。下辺グローで“下線が燃える”感。 */
+      /* 発動後の永続エフェクト（本番 .spell-fx--* 相当の試作）。共通枠＝.fcast-burn（.is-burning で表示）＋下辺グロー。 */
       .fcast-burn { position: absolute; inset: 0; border-radius: 14px; opacity: 0;
         pointer-events: none; transition: opacity .3s ease; z-index: 2; }
       .demo-msg.is-burning .fcast-burn { opacity: 1; }
       .demo-msg.is-burning { animation: burn-underglow 1.3s ease-in-out infinite; }
+      @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px rgba(255,90,20,.4); }
+        50% { box-shadow: 0 8px 20px rgba(255,130,40,.72); } }
 
-      .fcast-fire { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 12px; overflow: hidden; }
-      .fcast-fire::before, .fcast-fire::after { content: ""; position: absolute; left: -20%; right: -20%; bottom: 0; height: 100%;
+      /* 【炎】下辺は一つにつながった低い炎（__base）。ところどころ“良く燃える箇所”が背の高い火柱（__peak）で、
+         各火柱が根元を軸に左右へゆれる（横移動ではなく首振り）。火柱ごとに高さ・周期をずらして自然に。 */
+      .fcast-fire { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 22px; }
+      .fcast-fire__base { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; transform-origin: 50% 100%;
+        background: linear-gradient(to top, #ff5a1a, #ff8a1e 55%, #ffd23f 100%);
+        -webkit-mask: linear-gradient(#000,#000) 0 100%/100% 55% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 66%, transparent 80%) 0 0/24px 100% repeat-x;
+                mask: linear-gradient(#000,#000) 0 100%/100% 55% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 66%, transparent 80%) 0 0/24px 100% repeat-x;
+        animation: fire-base 1.1s ease-in-out infinite; }
+      .fcast-fire__peak { position: absolute; bottom: 0; width: 15px; height: var(--h, 14px);
+        background: radial-gradient(52% 68% at 50% 82%, #fff 4%, #ffe08a 24%, #ff8a1e 58%, transparent 74%);
+        border-radius: 50% 50% 48% 48% / 72% 72% 40% 40%; transform-origin: 50% 100%; filter: blur(.4px);
+        animation: fire-sway var(--dur, .9s) ease-in-out var(--d, 0s) infinite; }
+      @keyframes fire-base { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.18); } }
+      @keyframes fire-sway {
+        0%,100% { transform: translateX(-50%) rotate(-7deg) scaleY(.94); }
+        50%     { transform: translateX(-50%) rotate(7deg) scaleY(1.08); } }
+
+      /* 【溶岩】発動後アニメの保存版＝連続した帯が横に流れる（別スペル用に取り置き）。 */
+      .fcast-lava { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 12px; overflow: hidden; }
+      .fcast-lava::before, .fcast-lava::after { content: ""; position: absolute; left: -20%; right: -20%; bottom: 0; height: 100%;
         transform-origin: 50% 100%;
         -webkit-mask: linear-gradient(#000,#000) 0 100%/100% 45% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 62%, transparent 74%) 0 0/38px 100% repeat-x;
                 mask: linear-gradient(#000,#000) 0 100%/100% 45% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 62%, transparent 74%) 0 0/38px 100% repeat-x; }
-      .fcast-fire::before { background: linear-gradient(to top, #ff4d0d 0%, #ff8a1e 42%, #ffd23f 82%, transparent 100%);
-        animation: fire-a 1.5s linear infinite; }
-      .fcast-fire::after { background: linear-gradient(to top, #ff7a18 0%, #ffd23f 60%, #fff6cf 92%, transparent 100%);
+      .fcast-lava::before { background: linear-gradient(to top, #ff4d0d 0%, #ff8a1e 42%, #ffd23f 82%, transparent 100%);
+        animation: lava-a 1.5s linear infinite; }
+      .fcast-lava::after { background: linear-gradient(to top, #ff7a18 0%, #ffd23f 60%, #fff6cf 92%, transparent 100%);
         mix-blend-mode: screen; opacity: .85;
         -webkit-mask-size: 100% 45%, 28px 100%; mask-size: 100% 45%, 28px 100%;
-        animation: fire-b 1.05s linear infinite; }
-
-      @keyframes fire-a { 0% { transform: translateX(0) scaleY(1); } 50% { transform: translateX(-19px) scaleY(1.12); }
+        animation: lava-b 1.05s linear infinite; }
+      @keyframes lava-a { 0% { transform: translateX(0) scaleY(1); } 50% { transform: translateX(-19px) scaleY(1.12); }
         100% { transform: translateX(-38px) scaleY(1); } }
-      @keyframes fire-b { 0% { transform: translateX(0) scaleY(1.04); } 50% { transform: translateX(14px) scaleY(.9); }
+      @keyframes lava-b { 0% { transform: translateX(0) scaleY(1.04); } 50% { transform: translateX(14px) scaleY(.9); }
         100% { transform: translateX(28px) scaleY(1.04); } }
-      @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px rgba(255,90,20,.4); }
-        50% { box-shadow: 0 8px 20px rgba(255,130,40,.72); } }
 
       @media (prefers-reduced-motion: reduce) {
         .fcast { display: none; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
-        .fcast-fire::before, .fcast-fire::after { animation: none; }
+        .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
       .fcast-stage.reduce .fcast { display: none; }
       .fcast-stage.reduce .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
-      .fcast-stage.reduce .fcast-fire::before, .fcast-stage.reduce .fcast-fire::after { animation: none; }
+      .fcast-stage.reduce .fcast-fire__base, .fcast-stage.reduce .fcast-fire__peak,
+      .fcast-stage.reduce .fcast-lava::before, .fcast-stage.reduce .fcast-lava::after { animation: none; }
     </style>
 
     <div class="fcast-stage" id="fcastStage">
       <div class="demo-msg" id="fcastMsg">
         <span class="fcast-burn" aria-hidden="true">
-          <span class="fcast-fire"></span>
+          <span class="fcast-fire">
+            <span class="fcast-fire__base"></span>
+            <span class="fcast-fire__peak" style="left:10%;--h:12px;--d:0s;--dur:.95s"></span>
+            <span class="fcast-fire__peak" style="left:22%;--h:18px;--d:-.25s;--dur:1.05s"></span>
+            <span class="fcast-fire__peak" style="left:34%;--h:11px;--d:-.5s;--dur:.85s"></span>
+            <span class="fcast-fire__peak" style="left:46%;--h:16px;--d:-.15s;--dur:1s"></span>
+            <span class="fcast-fire__peak" style="left:58%;--h:12px;--d:-.35s;--dur:.9s"></span>
+            <span class="fcast-fire__peak" style="left:70%;--h:19px;--d:-.05s;--dur:1.1s"></span>
+            <span class="fcast-fire__peak" style="left:82%;--h:11px;--d:-.45s;--dur:.8s"></span>
+            <span class="fcast-fire__peak" style="left:92%;--h:14px;--d:-.2s;--dur:.95s"></span>
+          </span>
         </span>
         「配送ルートを AI で最適化しよう」に炎の魔法をかけた！
       </div>
@@ -797,6 +825,14 @@
     <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
       <button class="btn-pixel" type="button" id="fcastReplay">▶ 炎を発動</button>
       <label class="checkbox"><input type="checkbox" id="fcastReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <p class="muted text-sm" style="margin-top:var(--space-5)">＜保存版＞<strong>溶岩</strong>の発動後アニメ（別スペル用に取り置き）＝連続した帯が横に流れる。</p>
+    <div class="fcast-stage" style="min-height:120px">
+      <div class="demo-msg is-burning">
+        <span class="fcast-burn" aria-hidden="true"><span class="fcast-lava"></span></span>
+        「配送ルートを AI で最適化しよう」に溶岩の魔法をかけた！
+      </div>
     </div>
 
     <template id="fcastTpl">
