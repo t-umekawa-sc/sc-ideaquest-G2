@@ -81,3 +81,13 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-150 | unit(front) | 新規解放の差分検出＝祝福対象を返す | 前回観測 id 群と現在の獲得 id 群 | `shouldCelebrateUnlock(prevSeen, current)` | 初回観測(null)＝`[]`（記録のみ・誤発火防止）／current のうち prevSeen に無い id を current の順で返す／既知のみ＝`[]` | G.4／#6 |
 | G-TC-150 | unit(front) | 観測記録の生成/読取（重複除去・不正は初回扱い） | localStorage 生値 | `parseSeenCodes(raw)`／`nextStoredCodes(prev, current)` | 未記録/非配列/壊れ JSON は `null`（初回扱い）・文字列以外は除外／`nextStoredCodes` は prev∪current を重複除去（実績は失われない前提で減らさない） | G.4／#6 |
+
+## 5. 魔法発動演出のランク差 frontend 単体（SpellCastFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/cast.ts`（純ロジック）。魔法発動の瞬間演出（`components/ui/SpellCastFx.tsx`・チャット SC-24／魔法解放 SC-32 で発火）の「中央にアイコンが表示され外側へ広がる」放射状粒子の配置と、**レアリティ（ランク）が高いほど派手**になる強度を決める。種別の正規化（未知→sparkle）・レアリティ正規化（未知→standard）・粒子数（common<standard<rare）・放射座標（先頭は真上・全周にほぼ等半径・rare ほど広い）を担保。視覚（色/動き/二重リング/グロー）は `design-system.css .spell-cast--*` ＋GF-AC でブラウザ受入。reduce-motion は親が生成抑制＋CSS で無効（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-151）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-151 | unit(front) | 種別/ランクの正規化 | 任意の effect/rarity 文字列 | `castEffect(e)`／`castTier(r)` | 既知はそのまま／未知の effect は `sparkle`・未知の rarity は `standard` に畳む | GF-AC-091／#10 |
+| G-TC-151 | unit(front) | ランクが高いほど派手（粒子数） | common/standard/rare | `castParticleCount(r)` | `common < standard < rare`・未知は standard 相当 | GF-AC-091 |
+| G-TC-151 | unit(front) | 中央から外側へ放射状に広がる粒子配置 | rarity | `castParticles(r)` | 数は `castParticleCount` と一致／先頭は真上（dx≈0, dy<0）／全周にほぼ等半径で散る（上下左右いずれにも向く）／rare の半径 > common／決定的 | GF-AC-091 |

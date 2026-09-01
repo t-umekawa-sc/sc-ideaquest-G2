@@ -41,15 +41,15 @@ export function SpellsView() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   // #11: 魔法解放の瞬間演出（解放したカード矩形にその魔法の signature エフェクトを弾く・reduce-motion 尊重）。
-  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string }[]>([]);
+  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
   const castId = useRef(0);
-  const fireCast = (cardId: string, effect: string) => {
+  const fireCast = (cardId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
     const el = typeof document !== "undefined" ? document.getElementById(cardId) : null;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const id = ++castId.current;
-    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect }]);
+    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect, rarity }]);
     setTimeout(() => setCasts((c) => c.filter((z) => z.id !== id)), 1000);
   };
 
@@ -86,7 +86,7 @@ export function SpellsView() {
     try {
       const res = await unlockSpell(s.id);
       if (res) setSp(res.skill_point_balance);
-      fireCast("spell-" + s.id, s.effect); // 解放の瞬間演出（その魔法の signature エフェクト）
+      fireCast("spell-" + s.id, s.effect, s.rarity); // 解放の瞬間演出（signature エフェクト・レアリティで派手さ変化）
       await load(); // unlocked/can_unlock を最新化
       snack({
         type: "reward",
@@ -125,7 +125,7 @@ export function SpellsView() {
   return (
     <section aria-label="魔法 / スキル">
       {/* #11: 魔法解放の瞬間演出（解放カード矩形に固定オーバーレイ・自分の解放時のみ） */}
-      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
+      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} rarity={c.rarity} />)}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
       <GameNav current="spells" />

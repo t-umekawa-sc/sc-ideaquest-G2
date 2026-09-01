@@ -698,3 +698,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（follow.ts 未作成 actual） |
 | --- | --- |
 | K-TC-023 | テスト（`src/features/avatar/avatar.test.ts` に追記）を先行し vitest＝`Failed to load url ./follow`（モジュール未存在で suite fail・no tests）で red。実装（`follow && !reduced`）で green（全体 77 passed）。src 単体は TC 走査対象外＝追跡は `K_プロフィール.md` K-TC-023 |
+
+## 魔法発動演出のランク差 frontend 単体（G-TC-151・2026-09-01）
+
+> 魔法発動の瞬間演出（`SpellCastFx`・GF-AC-091）の純ロジック `impl/frontend/src/features/spells/cast.ts`（種別/ランク正規化・粒子数のランク差・中央から外側へ放射する粒子配置）。test-first だが証跡を本台帳にも残す。
+
+| TC-ID | 観測 red（cast.ts 未作成 actual） |
+| --- | --- |
+| G-TC-151 | テスト（`src/features/spells/cast.test.ts`）を先行作成し vitest＝`Failed to load url ./cast`（モジュール未存在で 0 test・suite fail）で red。実装（`castEffect`/`castTier`/`castParticleCount`＝common4<standard6<rare9／`castParticles`＝放射状・先頭真上・rare ほど広半径・決定的）で 11 passed green（全体 88 passed）。src 単体は TC 走査対象外＝追跡は `G_ゲーミフィケーション.md` G-TC-151 |

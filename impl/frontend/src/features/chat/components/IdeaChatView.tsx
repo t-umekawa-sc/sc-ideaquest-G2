@@ -93,15 +93,15 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [mention, setMention] = useState<{ pos: Pos; matches: Member[]; active: number } | null>(null);
   const [picker, setPicker] = useState<{ pos: Pos; msgId: string } | null>(null);
   // #10: 魔法発動の瞬間演出（対象メッセージ矩形に one-shot・自分の発動のみ・reduce-motion 尊重）。
-  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string }[]>([]);
+  const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
   const castId = useRef(0);
-  const fireCast = (msgId: string, effect: string) => {
+  const fireCast = (msgId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
     const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const id = ++castId.current;
-    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect }]);
+    setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect, rarity }]);
     setTimeout(() => setCasts((c) => c.filter((z) => z.id !== id)), 1000);
   };
 
@@ -318,7 +318,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
         // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
-        fireCast(m.id, eff);
+        fireCast(m.id, eff, spell.rarity); // レアリティが高いほど派手に（GF-AC-091）
       }
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
@@ -368,7 +368,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   return (
     <main className="container chat-main">
       {/* #10: 魔法発動の瞬間演出（対象メッセージ矩形に固定オーバーレイ・自分の発動時のみ） */}
-      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} />)}
+      {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} rarity={c.rarity} />)}
       {/* 文脈パネル（戻るリンク含む）自体をフローティング（sticky）で常時上部に表示（デザイン標準 §4.10）。
           折りたたみ可能＝たたむと薄いバーになり、右側に戻るリンクだけ残す。 */}
       <section className={`card chat-context chat-context--float${ctxOpen ? "" : " is-collapsed"}`} aria-label="対象アイデア">
