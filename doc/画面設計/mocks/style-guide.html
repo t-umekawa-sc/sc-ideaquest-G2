@@ -974,10 +974,16 @@
         border: 1px solid rgba(224,242,254,.7); animation: ice-freeze var(--iced) ease-in-out infinite; }
       .ice-panel::before { content: ""; position: absolute; inset: 0;
         background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%); } /* ガラスの光沢 */
-      /* ヒビ＝四隅から内側へ伸びる細い線分（端から scaleX で少しずつ伸びる・CSSで確実に描画） */
-      .ice-crackseg { position: absolute; height: 1.3px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
+      /* ヒビ＝四隅から放射する細い線分（端から scaleX で伸びる）。5段階の開始時期(g1..g5)で
+         最初ゆっくり→加速度的に本数が増える。animation-delay を使わず同一ループで同期(割れは全部一緒)。 */
+      .ice-crackseg { position: absolute; height: 1.2px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
         background: linear-gradient(90deg, rgba(3,105,161,.95), rgba(224,242,254,.95));
-        box-shadow: 0 0 2px rgba(255,255,255,.85); animation: ice-crack var(--iced) linear infinite; }
+        box-shadow: 0 0 2px rgba(255,255,255,.85); }
+      .ice-crackseg.g1 { animation: ice-crack-1 var(--iced) linear infinite; }
+      .ice-crackseg.g2 { animation: ice-crack-2 var(--iced) linear infinite; }
+      .ice-crackseg.g3 { animation: ice-crack-3 var(--iced) linear infinite; }
+      .ice-crackseg.g4 { animation: ice-crack-4 var(--iced) linear infinite; }
+      .ice-crackseg.g5 { animation: ice-crack-5 var(--iced) linear infinite; }
       .ice-shard-piece { position: absolute; opacity: 0; border: 1px solid rgba(186,230,253,.6);
         background: linear-gradient(135deg, rgba(224,242,254,.5), rgba(56,189,248,.32)); animation: ice-shatter var(--iced) ease-in infinite; }
       @keyframes ice-freeze {
@@ -986,10 +992,12 @@
         13% { opacity: .5; } 68% { opacity: .5; }                      /* 固まって保持 */
         74% { opacity: .6; } 78% { opacity: .72; transform: scale(1.012); } /* 割れる寸前の張り */
         82% { opacity: 0; transform: scale(1.05); } 100% { opacity: 0; } } /* 割れて消える */
-      @keyframes ice-crack {
-        0%,26% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 30% { opacity: 1; }
-        70% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } /* 端から少しずつ伸びる */
-        79% { opacity: 1; } 83% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      /* g1(遅い開始少数)→g5(遅い開始多数)＝進むほど一気に増える。伸び切ったら保持し、割れ(80→84%)で一斉消滅 */
+      @keyframes ice-crack-1 { 0%,28% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 38% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-2 { 0%,42% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 52% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-3 { 0%,54% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 62% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-4 { 0%,63% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 70% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-5 { 0%,71% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } 77% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-shatter {
         0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
         85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } } /* 割れは速く鋭く */
@@ -1025,9 +1033,9 @@
       .rainbow-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0;
         animation: rb-arc-fade var(--rbd, 4.6s) ease-in-out infinite; }
       .rainbow-arc path { fill: none; stroke-width: 2.6; vector-effect: non-scaling-stroke; stroke-linecap: round;
-        stroke-dasharray: 1; stroke-dashoffset: 1; filter: blur(.4px); animation: rb-arc-draw var(--rbd, 4.6s) ease-out infinite; }
-      @keyframes rb-arc-fade { 0% { opacity: 0; } 32% { opacity: .55; } 60% { opacity: .5; } 86% { opacity: 0; } 100% { opacity: 0; } } /* うっすら→ふわっと消える */
-      @keyframes rb-arc-draw { 0% { stroke-dashoffset: 1; } 50% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } } /* 端から少しずつ */
+        stroke-dasharray: 1; stroke-dashoffset: 1; filter: blur(.4px); animation: rb-arc-draw var(--rbd, 4.6s) linear infinite; }
+      @keyframes rb-arc-fade { 0% { opacity: 0; } 22% { opacity: .55; } 70% { opacity: .5; } 90% { opacity: 0; } 100% { opacity: 0; } } /* うっすら→（左端まで架けて保持）→ふわっと消える */
+      @keyframes rb-arc-draw { 0% { stroke-dashoffset: 1; } 38% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } } /* 左端(対象)まで確実に架ける＝早めに完走し保持 */
 
       /* オーラ＝脈動する縁＋外周へ広がるリング＋ゆっくり昇る紫のモート */
       .fx-aura-ring { position: absolute; left: 50%; top: 50%; width: 62%; height: 118%; border-radius: 50%;
@@ -1486,13 +1494,28 @@
           } else if (fx === 'ice') {
             /* 薄いガラス板＋亀裂(SVG draw-on)＋割れる破片 */
             wrap.appendChild(el('ice-panel'));
-            [ /* left%, top%, 長さpx, 角度deg ＝四隅から内側へ細かいヒビ（短く本数多め・中央には入れない） */
-              [2, 4, 20, 30], [2, 4, 15, 64], [3, 3, 16, 10], [12, 12, 14, 42], [10, 22, 12, -14], [6, 9, 11, 20], [16, 10, 12, -4],   /* 左上 */
-              [98, 4, 20, 150], [98, 4, 15, 116], [97, 3, 16, 170], [88, 12, 14, 138], [90, 22, 12, 194], [94, 9, 11, 160], [84, 10, 12, 184], /* 右上 */
-              [2, 96, 20, -30], [2, 96, 15, -64], [3, 97, 16, -10], [12, 88, 14, -42], [10, 78, 12, 14], [6, 91, 11, -20], [16, 90, 12, 4], /* 左下 */
-              [98, 96, 20, 210], [98, 96, 15, 244], [97, 97, 16, 190], [88, 88, 14, 222], [90, 78, 12, 166], [94, 91, 11, 200], [84, 90, 12, 176] /* 右下 */
-            ].forEach(function (sg) {
-              var c = el('ice-crackseg'); c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg'); wrap.appendChild(c);
+            /* 四隅から放射する細かいヒビを大量生成（各隅 PER 本）。角度を扇状に散らし長さも変える。 */
+            var PER = 11;
+            function cornerFan(bx, by, a0, a1) {
+              var out = [];
+              for (var k = 0; k < PER; k++) {
+                var f = PER === 1 ? 0 : k / (PER - 1);
+                var ang = a0 + (a1 - a0) * f + (k % 2 ? 5 : -4);       /* 扇状＋ジグザグ感 */
+                var len = 9 + (k % 3) * 5;                             /* 9/14/19px */
+                var lx = bx + ((k % 3) - 1) * 1.5, ly = by + (k % 4) * 2.2; /* 起点を少しばらす */
+                out.push([+lx.toFixed(1), +ly.toFixed(1), len, Math.round(ang)]);
+              }
+              return out;
+            }
+            var TL = cornerFan(3, 4, 4, 82), TR = cornerFan(97, 4, 98, 176), BL = cornerFan(3, 96, -4, -82), BR = cornerFan(97, 96, 184, 262);
+            var order = [];
+            for (var k = 0; k < PER; k++) { [TL, TR, BL, BR].forEach(function (arr) { if (arr[k]) order.push(arr[k]); }); } /* 隅を交互に＝加速時に全隅で増える */
+            var bounds = [4, 12, 22, 34, order.length]; /* g1..g5 の本数境界（後半ほど多い＝加速） */
+            order.forEach(function (sg, i) {
+              var tier = 1; while (i >= bounds[tier - 1]) tier++;
+              var c = el('ice-crackseg g' + tier);
+              c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg');
+              wrap.appendChild(c);
             });
             [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片（速く遠くへ） */
               [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -44, -31, -46],
