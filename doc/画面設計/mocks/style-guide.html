@@ -1535,14 +1535,13 @@
                発動者→対象の向きに端から draw-on・うっすら→ふわっと消える。枠は spell-edge--rainbow のまま。 */
             var ns = 'http://www.w3.org/2000/svg';
             var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'rainbow-arc'); svg.setAttribute('viewBox', '0 0 200 80'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
-            var cx = 100, feetY = 2, R0 = 204.5, dy = 179.5; /* 浅い全幅弧（頂点は上辺の約23px上） */
+            /* 平行な7バンド＝全色が両端(2/198)まで届く。同心ではなく上方向へ等間隔にずらした同形の弧。 */
+            var cx = 100, half = 98, Y0 = 5, sp = 2.5, h = 20, R = (half * half + h * h) / (2 * h);
             ['#ff004c', '#ff7a00', '#ffe000', '#28d200', '#00c8ff', '#3b5bff', '#b000ff'].forEach(function (col, i) {
-              var R = R0 - i * 3; /* 外側ほど大＝広い（赤が一番外） */
-              var off = Math.sqrt(R * R - dy * dy);
-              var pR = [(cx + off).toFixed(1), feetY], pL = [(cx - off).toFixed(1), feetY];
+              var feetY = (Y0 - (6 - i) * sp).toFixed(2); /* 赤(i=0)が一番上・紫(i=6)が一番下 */
               var path = document.createElementNS(ns, 'path');
-              /* 右足(発動者)→左足(対象)を上側の弧で結ぶ（sweep 0） */
-              path.setAttribute('d', 'M ' + pR[0] + ' ' + pR[1] + ' A ' + R.toFixed(1) + ' ' + R.toFixed(1) + ' 0 0 0 ' + pL[0] + ' ' + pL[1]);
+              /* 右足(発動者)→左足(対象)を上側の弧で結ぶ（sweep 0）。全バンド同じ x 範囲＝両端まで架かる */
+              path.setAttribute('d', 'M ' + (cx + half) + ' ' + feetY + ' A ' + R.toFixed(1) + ' ' + R.toFixed(1) + ' 0 0 0 ' + (cx - half) + ' ' + feetY);
               path.setAttribute('stroke', col); path.setAttribute('pathLength', '1'); svg.appendChild(path);
             });
             wrap.appendChild(svg);
