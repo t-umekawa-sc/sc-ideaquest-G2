@@ -944,6 +944,32 @@
     </template>
 
     <script>
+      /* 可視になったら1回だけ cb を実行する堅牢トリガ。IO 単独だと「ハードリロード×スクロール復元」で
+         初回判定と復元がすれ違い『可視なのに未発火』が起きうるため、復元後に同期判定（rAF/load/pageshow/遅延）で
+         自己修復する＝未実行なら getBoundingClientRect で可視を確認して実行。多重発火は done フラグで抑止。 */
+      function fcastWhenVisible(el, cb) {
+        var done = false;
+        function visible() {
+          var r = el.getBoundingClientRect();
+          var vh = window.innerHeight || document.documentElement.clientHeight;
+          return r.height > 0 && r.top < vh * 0.9 && r.bottom > vh * 0.1; /* 4割方見えていれば可視とみなす */
+        }
+        function fire() { if (done) return; done = true; if (io) io.disconnect(); cb(); }
+        function check() { if (!done && visible()) fire(); }
+        var io = null;
+        if ('IntersectionObserver' in window) {
+          io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) fire(); }, { threshold: 0.35 });
+          io.observe(el);
+        }
+        /* スクロール復元レースへの保険＝复元が済んだ頃に何度か同期チェック */
+        requestAnimationFrame(function () { requestAnimationFrame(check); });
+        window.addEventListener('load', function () { setTimeout(check, 60); });
+        window.addEventListener('pageshow', function () { setTimeout(check, 60); }); /* bfcache 復帰も */
+        setTimeout(check, 250);
+        setTimeout(check, 600);
+        if (!io) check();
+      }
+
       (function () {
         var stage = document.getElementById('fcastStage');
         var msg = document.getElementById('fcastMsg');
@@ -1001,11 +1027,8 @@
         }
         reduce.addEventListener('change', function () { stage.classList.toggle('reduce', reduce.checked); if (reduce.checked) play(); });
         btn.addEventListener('click', play);
-        /* §17 が画面に入ったら自動再生（初回1回）＝ヘッダーとメッセージが同時に見える状態で見せる */
-        if ('IntersectionObserver' in window) {
-          var io = new IntersectionObserver(function (es, obs) { if (es[0].isIntersecting) { play(); obs.disconnect(); } }, { threshold: .4 });
-          io.observe(stage);
-        } else { play(); }
+        /* §17 が画面に入ったら自動再生（初回1回・スクロール復元レース耐性あり） */
+        fcastWhenVisible(stage, play);
       })();
 
       /* 受信/表示側の汎用リビール＝.fcast-reveal な各 stage を「画面表示時に1回だけ」演出。
@@ -1068,10 +1091,7 @@
               if (toast && typeof window.iqSnack === 'function') { try { window.iqSnack({ type: 'reward', title: '魔法を受けました', msg: toast }); } catch (e) {} }
             }, Math.round(DUR * .86));
           }
-          if ('IntersectionObserver' in window) {
-            var io = new IntersectionObserver(function (es, obs) { if (es[0].isIntersecting) { reveal(); obs.disconnect(); } }, { threshold: .5 });
-            io.observe(stage);
-          } else { reveal(); }
+          fcastWhenVisible(stage, reveal); /* 可視で1回だけ・スクロール復元レース耐性あり */
         }
         document.querySelectorAll('.fcast-stage.fcast-reveal').forEach(wire);
       })();
