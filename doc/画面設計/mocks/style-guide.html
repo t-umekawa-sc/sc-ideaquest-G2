@@ -694,8 +694,8 @@
   <div class="section">
     <h2>17. 魔法発動エフェクト（提案・炎／GF-AC-091）</h2>
     <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
-      ①<strong>溜め</strong>（収束リング＝予兆）→ ②<strong>暖色フラッシュ</strong> → ③<strong>衝撃波リング（二重）</strong> →
-      ④<strong>立ち上る炎柱</strong> → ⑤<strong>舞い上がる火の粉</strong> → ⑥<strong>きらめき</strong>＋軽い<strong>画面シェイク</strong>。
+      ①<strong>火球が右斜め下からチャット中央へ飛来</strong> → ②中央で<strong>着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
+      ④<strong>立ち上る炎柱</strong> → ⑤<strong>飛び散る火の粉</strong> → ⑥<strong>きらめき</strong>＋着弾に合わせた<strong>画面シェイク</strong>。
       <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後（炎）は<strong>メッセージ下辺が一つにつながった低い炎</strong>で、
       ところどころ“<strong>良く燃える箇所</strong>”が背の高い<strong>火柱</strong>になり、その火柱が<strong>左右にゆれる</strong>（永続＝本番 <code>.spell-fx--fire</code> 相当）。
       ※以前の「横に流れる」版は<strong>溶岩</strong>として下に保存（別スペル用）。</p>
@@ -711,34 +711,40 @@
       .fcast-stage .demo-msg { position: relative; z-index: 1; max-width: 340px; text-align: center;
         padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6;
         box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: var(--text-sm); }
-      .fcast-stage.playing { animation: fcast-shake .4s ease-out; }
+      .fcast-stage.playing { animation: fcast-shake .4s ease-out .38s; } /* 着弾のタイミングで揺れる */
 
       .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
         --hot: #ff7a18; --warm: #ffb347; --spark: #ffe08a; }
       .fcast > * { position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%); }
 
-      .fcast__charge { width: 150px; height: 150px; border-radius: 50%; border: 2px solid var(--spark);
-        opacity: 0; animation: fcast-charge .34s ease-in forwards; }
+      /* 火球＝右斜め下からチャット中央へ飛来（末尾の box-shadow を進行方向の逆＝右下に伸ばして尾を表現） */
+      .fcast__ball { width: 26px; height: 26px; border-radius: 50%;
+        background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
+        box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 14px 12px 26px 2px rgba(255,90,20,.5);
+        opacity: 0; animation: fcast-ball .42s cubic-bezier(.35,.02,.6,1) forwards; }
       .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
         background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
-        opacity: 0; animation: fcast-flash .7s ease-out .28s forwards; }
+        opacity: 0; animation: fcast-flash .7s ease-out .40s forwards; }
       .fcast__shock { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--hot);
-        opacity: 0; animation: fcast-shock .8s ease-out .3s forwards; }
-      .fcast__shock.d2 { border-color: var(--warm); animation-delay: .42s; animation-duration: .9s; }
+        opacity: 0; animation: fcast-shock .8s ease-out .40s forwards; }
+      .fcast__shock.d2 { border-color: var(--warm); animation-delay: .52s; animation-duration: .9s; }
       .fcast__plume { width: 70px; height: 130px; top: 62%; border-radius: 50% 50% 42% 42%;
         background: linear-gradient(to top, rgba(255,90,20,0), rgba(255,120,30,.55) 40%, rgba(255,210,120,.85));
         filter: blur(2px); opacity: 0; transform-origin: 50% 100%;
-        animation: fcast-plume .9s ease-out .3s forwards; }
+        animation: fcast-plume .9s ease-out .40s forwards; }
       .fcast__ember { width: 10px; height: 10px; border-radius: 50%; opacity: 0; margin-left: var(--sx, 0px);
         background: radial-gradient(circle, #fff, var(--spark) 30%, var(--hot) 62%, transparent 70%);
-        animation: fcast-ember var(--dur, 1s) ease-out var(--d, 0s) forwards; }
+        animation: fcast-ember var(--dur, 1s) ease-out calc(.40s + var(--d, 0s)) forwards; }
       .fcast__spark { font-size: 1rem; opacity: 0; margin-left: var(--sx, 0px);
-        animation: fcast-spark .7s ease-out var(--d, 0s) forwards; }
+        animation: fcast-spark .7s ease-out calc(.40s + var(--d, 0s)) forwards; }
 
       @keyframes fcast-shake { 0%,100% { transform: translate(0,0);} 20% { transform: translate(-4px,2px);}
         40% { transform: translate(4px,-2px);} 60% { transform: translate(-3px,1px);} 80% { transform: translate(2px,-1px);} }
-      @keyframes fcast-charge { 0% { transform: translate(-50%,-50%) scale(1.6); opacity: 0;}
-        60% { opacity: .9;} 100% { transform: translate(-50%,-50%) scale(.2); opacity: 0;} }
+      @keyframes fcast-ball {
+        0%   { transform: translate(-50%,-50%) translate(190px, 150px) scale(.45); opacity: 0; }
+        14%  { opacity: 1; }
+        82%  { transform: translate(-50%,-50%) translate(14px, 11px) scale(1.1); opacity: 1; }
+        100% { transform: translate(-50%,-50%) translate(0,0) scale(1.7); opacity: 0; } }
       @keyframes fcast-flash { 0% { opacity: 0;} 22% { opacity: 1;} 100% { opacity: 0;} }
       @keyframes fcast-shock { 0% { width: 16px; height: 16px; opacity: 0;}
         18% { opacity: .85;} 100% { width: 240px; height: 240px; opacity: 0;} }
@@ -837,7 +843,7 @@
 
     <template id="fcastTpl">
       <div class="fcast" aria-hidden="true">
-        <span class="fcast__charge"></span>
+        <span class="fcast__ball"></span>
         <span class="fcast__flash"></span>
         <span class="fcast__plume"></span>
         <span class="fcast__shock"></span>
