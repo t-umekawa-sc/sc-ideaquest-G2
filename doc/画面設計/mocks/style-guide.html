@@ -1609,6 +1609,114 @@
       })();
     </script>
   </div>
+
+  <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
+  <div class="section">
+    <h2>18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静）</h2>
+    <p class="muted text-sm">実チャットで「発射後にスクロールすると弾が発射前の位置に着弾する」問題への対策検証。
+      <strong>A＝弾をスクロール内容の座標に置く（アンカー）</strong>と、スクロールしても対象に追従してズレない。
+      <strong>B＝スクロールが止まってから発火</strong>すると、速い流し見中の無駄な連続発火を間引ける。</p>
+
+    <style>
+      .anchor-frame { position: relative; max-width: 520px; }
+      .anchor-scroll { height: 210px; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius);
+        background: radial-gradient(120% 80% at 50% 120%, #201a12, #14100f 70%); }
+      .anchor-content { position: relative; height: 620px; }
+      .anchor-caster { position: absolute; top: 40px; right: 22px; width: 30px; height: 30px; border-radius: 50%;
+        display: grid; place-items: center; color: #fff; font-weight: 700; font-size: .8rem; background: #c0563a; box-shadow: 0 0 0 2px rgba(255,140,50,.55); }
+      .anchor-target { position: absolute; top: 300px; left: 26px; right: 60px; }
+      .demo-ball { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; pointer-events: none; z-index: 5;
+        background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
+        box-shadow: 0 0 12px 3px rgba(255,120,30,.85); }
+      .demo-ball.fixed { box-shadow: 0 0 12px 3px rgba(120,170,255,.85); background: radial-gradient(circle at 38% 36%, #fff 6%, #cfe0ff 30%, #5b8cff 62%, #2244cc 88%); }
+      .b-msg { position: relative; margin: 10px 12px; transition: box-shadow .3s; }
+      .b-fired { box-shadow: 0 0 0 2px rgba(255,160,60,.7), 0 4px 14px rgba(255,120,30,.5); }
+      .anchor-log { font-family: var(--font-pixel); font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-2); min-height: 3em; white-space: pre-line; }
+    </style>
+
+    <h3 style="margin-top:var(--space-5)">A. 着弾ずれ対策：スクロール座標系アンカー</h3>
+    <p class="muted text-sm">発動ボタンを押した<strong>直後に枠内をスクロール</strong>してみてください。<strong>アンカー（橙）</strong>は対象メッセージに追従してズレず、
+      <strong>固定＝従来（青）</strong>はスクロールでズレます（弾はデモ用に約2秒）。</p>
+    <div class="row" style="gap:var(--space-2); flex-wrap:wrap; margin-bottom:var(--space-2)">
+      <button class="btn btn-primary btn-sm" type="button" id="fireAnchor">▶ アンカーで発動（橙）</button>
+      <button class="btn btn-outline btn-sm" type="button" id="fireFixed">▶ 固定=従来で発動（青）</button>
+    </div>
+    <div class="anchor-frame" id="aframe">
+      <div class="anchor-scroll" id="ascroll">
+        <div class="anchor-content" id="acontent">
+          <div class="anchor-caster" id="acaster" aria-hidden="true">佐</div>
+          <div class="demo-msg anchor-target" id="atarget">「配送ルートを AI で最適化しよう」＝この対象メッセージに着弾します</div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:var(--space-6)">B. 演出の間引き：スクロール沈静で発火</h3>
+    <p class="muted text-sm">枠内を<strong>速くスクロール</strong>すると発火せず、<strong>スクロールを止めると</strong>見えているメッセージで1回だけ発火します（沈静 350ms）。</p>
+    <div class="anchor-scroll" id="bscroll" style="max-width:520px">
+      <div style="position:relative; padding:6px 0">
+        <div class="demo-msg b-msg" data-id="1">メッセージ 1（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="2">メッセージ 2（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="3">メッセージ 3（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="4">メッセージ 4（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="5">メッセージ 5（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="6">メッセージ 6（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="7">メッセージ 7（魔法あり）</div>
+        <div class="demo-msg b-msg" data-id="8">メッセージ 8（魔法あり）</div>
+      </div>
+    </div>
+    <div class="anchor-log" id="blog">（ここに発火ログ）</div>
+
+    <script>
+      (function () {
+        /* A: アンカー（スクロール内容座標）vs 固定（枠オーバーレイ座標） */
+        var ascroll = document.getElementById('ascroll'), acontent = document.getElementById('acontent');
+        var aframe = document.getElementById('aframe'), acaster = document.getElementById('acaster'), atarget = document.getElementById('atarget');
+        function centerIn(el, base) { return { x: el.offsetLeft + el.offsetWidth / 2 - (base ? base.offsetLeft : 0), y: el.offsetTop + el.offsetHeight / 2 - (base ? base.offsetTop : 0) }; }
+        document.getElementById('fireAnchor').addEventListener('click', function () {
+          /* 弾は acontent の子＝スクロールで対象と一緒に動く。座標は内容座標(offset) */
+          var s = centerIn(acaster), t = centerIn(atarget);
+          var ball = document.createElement('span'); ball.className = 'demo-ball'; acontent.appendChild(ball);
+          ball.animate([
+            { transform: 'translate(' + s.x + 'px,' + s.y + 'px) scale(.4)', opacity: 0, offset: 0 },
+            { opacity: 1, offset: .15 },
+            { transform: 'translate(' + t.x + 'px,' + t.y + 'px) scale(1)', opacity: 1, offset: .9 },
+            { transform: 'translate(' + t.x + 'px,' + t.y + 'px) scale(1.7)', opacity: 0, offset: 1 }
+          ], { duration: 2000, easing: 'ease-in-out', fill: 'forwards' });
+          setTimeout(function () { if (ball.parentNode) ball.remove(); }, 2100);
+        });
+        document.getElementById('fireFixed').addEventListener('click', function () {
+          /* 弾は aframe の子＝枠に固定（スクロールしても動かない）。座標は発射時のビューポート基準で焼き込み */
+          var fr = aframe.getBoundingClientRect(), sr = acaster.getBoundingClientRect(), tr = atarget.getBoundingClientRect();
+          var s = { x: sr.left + sr.width / 2 - fr.left, y: sr.top + sr.height / 2 - fr.top };
+          var t = { x: tr.left + tr.width / 2 - fr.left, y: tr.top + tr.height / 2 - fr.top };
+          var ball = document.createElement('span'); ball.className = 'demo-ball fixed'; aframe.appendChild(ball);
+          ball.animate([
+            { transform: 'translate(' + s.x + 'px,' + s.y + 'px) scale(.4)', opacity: 0, offset: 0 },
+            { opacity: 1, offset: .15 },
+            { transform: 'translate(' + t.x + 'px,' + t.y + 'px) scale(1)', opacity: 1, offset: .9 },
+            { transform: 'translate(' + t.x + 'px,' + t.y + 'px) scale(1.7)', opacity: 0, offset: 1 }
+          ], { duration: 2000, easing: 'ease-in-out', fill: 'forwards' });
+          setTimeout(function () { if (ball.parentNode) ball.remove(); }, 2100);
+        });
+
+        /* B: スクロール沈静(350ms idle)で、見えている未発火メッセージを1回発火 */
+        var bscroll = document.getElementById('bscroll'), blog = document.getElementById('blog');
+        var logs = [];
+        function log(m) { logs.unshift(m); logs = logs.slice(0, 4); blog.textContent = logs.join('\n'); }
+        var idle = null;
+        function settle() {
+          var cr = bscroll.getBoundingClientRect();
+          [].forEach.call(bscroll.querySelectorAll('.b-msg'), function (m) {
+            if (m.dataset.fired) return;
+            var r = m.getBoundingClientRect();
+            if (r.top < cr.bottom - 20 && r.bottom > cr.top + 20) { m.dataset.fired = '1'; m.classList.add('b-fired'); log('発火: メッセージ ' + m.dataset.id + '（沈静後）'); }
+          });
+        }
+        bscroll.addEventListener('scroll', function () { clearTimeout(idle); idle = setTimeout(settle, 350); });
+        log('（速くスクロール＝発火せず／止めると発火）');
+      })();
+    </script>
+  </div>
 </main>
 
 
