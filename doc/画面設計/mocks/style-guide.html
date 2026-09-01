@@ -1021,6 +1021,13 @@
       @keyframes shimmer-sweep { 0% { left: -45%; } 60%,100% { left: 120%; } }
       .fx-twinkle { position: absolute; top: -10px; font-size: .8rem; opacity: 0; animation: twinkle 1.8s ease-in-out infinite; }
       @keyframes twinkle { 0%,100% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; transform: scale(1.15); } }
+      /* 虹アーク＝パネル中央やや右から端が少しずつ現れ、右上端へ。うっすら→ふわっと消えるループ */
+      .rainbow-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0;
+        animation: rb-arc-fade var(--rbd, 4.6s) ease-in-out infinite; }
+      .rainbow-arc path { fill: none; stroke-width: 2.6; vector-effect: non-scaling-stroke; stroke-linecap: round;
+        stroke-dasharray: 1; stroke-dashoffset: 1; filter: blur(.4px); animation: rb-arc-draw var(--rbd, 4.6s) ease-out infinite; }
+      @keyframes rb-arc-fade { 0% { opacity: 0; } 32% { opacity: .55; } 60% { opacity: .5; } 86% { opacity: 0; } 100% { opacity: 0; } } /* うっすら→ふわっと消える */
+      @keyframes rb-arc-draw { 0% { stroke-dashoffset: 1; } 50% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } } /* 端から少しずつ */
 
       /* オーラ＝脈動する縁＋外周へ広がるリング＋ゆっくり昇る紫のモート */
       .fx-aura-ring { position: absolute; left: 50%; top: 50%; width: 62%; height: 118%; border-radius: 50%;
@@ -1042,6 +1049,8 @@
         .spell-edge { animation: none !important; }
         .ice-panel { animation: none !important; opacity: .5; } /* 氷＝静的な薄いガラス板のみ */
         .ice-crackseg, .ice-shard-piece { display: none !important; }
+        .rainbow-arc { animation: none !important; opacity: .4; } /* 虹＝静的にうっすら */
+        .rainbow-arc path { animation: none !important; stroke-dashoffset: 0 !important; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -1055,6 +1064,8 @@
       .fcast-stage.reduce .fx-shimmer::before { display: none; }
       .fcast-stage.reduce .ice-panel { animation: none !important; opacity: .5; }
       .fcast-stage.reduce .ice-crackseg, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
+      .fcast-stage.reduce .rainbow-arc { animation: none !important; opacity: .4; }
+      .fcast-stage.reduce .rainbow-arc path { animation: none !important; stroke-dashoffset: 0 !important; }
     </style>
 
     <div class="fcast-stage" id="fcastStage">
@@ -1136,7 +1147,7 @@
     <h3 style="margin-top:var(--space-6)">属性バリエーション（雷 / 氷 / 虹 / オーラ）</h3>
     <p class="muted text-sm">各属性で<strong>発射の仕方・着弾バースト・発動者バッジ・永続枠</strong>が変わる（画面表示時に1回だけ発動→枠が永続）。
       発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：大小4つの氷礫が飛散／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：三日月の隊列（4〜5個が連なり、近づくほど数が増える・まわりはぼやけ）。
-      永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：薄いガラスがカチカチ固まる→少しずつヒビ→割れて飛散→再凍結のループ／<strong>虹</strong>：流れる虹＋光スイープ／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
+      永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：薄いガラスがカチカチ固まる→少しずつヒビ→割れて飛散→再凍結のループ／<strong>虹</strong>：流れる縁取り＋中央やや右から端が少しずつ現れ右上端へ伸びる虹アーク（うっすら→ふわっと消えるループ）／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
 
     <p class="muted text-sm" style="margin-top:var(--space-4)">⚡ <strong>雷</strong></p>
     <div class="fcast-stage fcast-reveal" data-fx="thunder" data-src=".msg-avatar.caster" style="min-height:150px">
@@ -1495,8 +1506,18 @@
               s.style.setProperty('--tx', pc[5] + 'px'); s.style.setProperty('--ty', pc[6] + 'px'); s.style.setProperty('--rot', pc[7] + 'deg'); wrap.appendChild(s);
             });
           } else if (fx === 'rainbow') {
-            wrap.appendChild(el('fx-shimmer'));
-            [[16, -.1], [50, -.5], [84, -.9]].forEach(function (p) { var s = el('fx-twinkle'); s.textContent = '✨'; s.style.left = p[0] + '%'; s.style.animationDelay = p[1] + 's'; wrap.appendChild(s); });
+            /* 虹アーク（中央やや右→右上端・端から draw-on・ふわっと消える）。枠は spell-edge--rainbow のまま。 */
+            var ns = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'rainbow-arc'); svg.setAttribute('viewBox', '0 0 200 80'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
+            var cx = 172.5, cy = 110, R = 100.8, a0 = 224 * Math.PI / 180, a1 = 277 * Math.PI / 180;
+            ['#ff004c', '#ff7a00', '#ffe000', '#28d200', '#00c8ff', '#3b5bff', '#b000ff'].forEach(function (col, i) {
+              var r = R - i * 3; /* 内側ほど紫 */
+              var p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)], p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)];
+              var path = document.createElementNS(ns, 'path');
+              path.setAttribute('d', 'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 0 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1));
+              path.setAttribute('stroke', col); path.setAttribute('pathLength', '1'); svg.appendChild(path);
+            });
+            wrap.appendChild(svg);
           } else if (fx === 'aura') {
             var r2 = el('fx-aura-ring'); r2.style.animationDelay = '-1s'; wrap.appendChild(el('fx-aura-ring')); wrap.appendChild(r2);
             [[12, -8, 0, 3.2], [30, 6, -.8, 3.8], [50, -4, -1.6, 3], [70, 10, -.4, 3.6], [88, -6, -2.2, 3.4]].forEach(function (p) { /* left%, dx, delay, dur */
