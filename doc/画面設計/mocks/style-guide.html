@@ -858,6 +858,28 @@
       .fcast-muzzle.fx-rainbow { --mz1: rgba(255,255,255,.95); --mz2: rgba(236,72,153,.4);  --mzr: rgba(120,200,255,.95); }
       .fcast-muzzle.fx-aura    { --mz1: rgba(237,233,254,.95); --mz2: rgba(139,92,246,.4);  --mzr: rgba(196,181,253,.95); }
 
+      /* ── 属性別の着弾バースト粒子（幾何を属性化・JS が中心から放射配置） ── */
+      /* 雷＝放射する稲光レイ */
+      .burst-ray { position: absolute; left: 50%; top: 58%; width: 3px; height: 56px; transform-origin: 50% 100%;
+        background: linear-gradient(to top, transparent, var(--spark, #fffde7) 42%, var(--hot, #fbbf24)); border-radius: 2px;
+        filter: drop-shadow(0 0 5px var(--hot, #fbbf24)); opacity: 0; animation: burst-ray .42s ease-out forwards; }
+      @keyframes burst-ray { 0% { opacity: 0; transform: translate(-50%,-100%) rotate(var(--rot,0deg)) scaleY(.2); }
+        25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-100%) rotate(var(--rot,0deg)) scaleY(1.35); } }
+      /* 氷＝飛散する結晶シャード（回転しながら外へ） */
+      .burst-shard { position: absolute; left: 50%; top: 58%; width: 11px; height: 16px;
+        background: linear-gradient(#ffffff, var(--warm, #7dd3fc)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+        filter: drop-shadow(0 0 3px var(--hot, #38bdf8)); opacity: 0; animation: burst-shard .55s ease-out forwards; }
+      @keyframes burst-shard { 0% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--rot,0deg)) scale(.3); }
+        25% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx,0px)), calc(-50% + var(--ty,0px))) rotate(calc(var(--rot,0deg) + 200deg)) scale(1); } }
+      /* 汎用リング（虹のプリズム/オーラの同心）※色/最大径はインライン */
+      .burst-ring2 { position: absolute; left: 50%; top: 58%; width: 16px; height: 16px; border-radius: 50%;
+        border: 3px solid var(--hot, #ff7a18); transform: translate(-50%,-50%); opacity: 0; animation: burst-ring2 .7s ease-out forwards; }
+      @keyframes burst-ring2 { 0% { opacity: 0; } 20% { opacity: .9; } 100% { opacity: 0; width: var(--rmax, 180px); height: var(--rmax, 180px); } }
+      /* 汎用の放射ドット（虹の紙吹雪/オーラの粒子）※色はインライン */
+      .burst-dot { position: absolute; left: 50%; top: 58%; width: 8px; height: 8px; border-radius: 50%; opacity: 0; animation: burst-dot .6s ease-out forwards; }
+      @keyframes burst-dot { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.3); }
+        25% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--tx,0px)), calc(-50% + var(--ty,0px))) scale(1); } }
+
       /* ── 属性ごとの永続「枠」エフェクト（炎＝火柱は別＝.fcast-fire）。inset オーバーレイ。 ── */
       .spell-edge { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; }
       /* 雷＝電気的にストロボ（速い明滅＋白飛び） */
@@ -1204,6 +1226,37 @@
           var pl = document.createElementNS(ns, 'polyline'); pl.setAttribute('points', '13,0 5,26 15,30 3,70');
           svg.appendChild(pl); return svg;
         }
+        function radialParticles(n, R, startDeg) {
+          var a = [], off = startDeg || 0;
+          for (var i = 0; i < n; i++) { var deg = (360 / n) * i + off; var rad = deg * Math.PI / 180; a.push({ deg: deg, tx: Math.round(Math.cos(rad) * R), ty: Math.round(Math.sin(rad) * R) }); }
+          return a;
+        }
+        /* 着弾バースト（属性で幾何が変わる）。炎は従来テンプレ、他は放射レイ/シャード/リング/ドットを構成。 */
+        function buildBurst(fx) {
+          if (fx === 'fire' || !fx) return tpl.content.firstElementChild.cloneNode(true);
+          var root = el('fcast fx-' + fx); root.setAttribute('aria-hidden', 'true');
+          root.appendChild(el('fcast__flash'));
+          var ps;
+          if (fx === 'thunder') {
+            ps = radialParticles(8, 0, 0);
+            ps.forEach(function (q, i) { var r = el('burst-ray'); r.style.setProperty('--rot', (q.deg + 90) + 'deg'); r.style.animationDelay = (i % 2 ? .03 : 0) + 's'; root.appendChild(r); });
+            var ring = el('burst-ring2'); ring.style.setProperty('--rmax', '150px'); root.appendChild(ring);
+          } else if (fx === 'ice') {
+            ps = radialParticles(8, 46, 0);
+            ps.forEach(function (q, i) { var s = el('burst-shard'); s.style.setProperty('--tx', q.tx + 'px'); s.style.setProperty('--ty', q.ty + 'px'); s.style.setProperty('--rot', q.deg + 'deg'); s.style.animationDelay = (i * .02) + 's'; root.appendChild(s); });
+            var ring2 = el('burst-ring2'); ring2.style.setProperty('--rmax', '160px'); root.appendChild(ring2);
+          } else if (fx === 'rainbow') {
+            ['#ff004c', '#37ff00', '#00e5ff'].forEach(function (c, i) { var r = el('burst-ring2'); r.style.borderColor = c; r.style.setProperty('--rmax', (140 + i * 30) + 'px'); r.style.animationDelay = (i * .08) + 's'; root.appendChild(r); });
+            var rc = ['#ff004c', '#ff9a00', '#ffe600', '#37ff00', '#00e5ff', '#3d5bff', '#c400ff', '#ff66cc'];
+            ps = radialParticles(8, 52, 0);
+            ps.forEach(function (q, i) { var d = el('burst-dot'); d.style.setProperty('--tx', q.tx + 'px'); d.style.setProperty('--ty', q.ty + 'px'); d.style.background = rc[i % rc.length]; d.style.boxShadow = '0 0 6px ' + rc[i % rc.length]; d.style.animationDelay = (i * .02) + 's'; root.appendChild(d); });
+          } else if (fx === 'aura') {
+            for (var i = 0; i < 3; i++) { var r = el('burst-ring2'); r.style.borderColor = 'rgba(167,139,250,.8)'; r.style.setProperty('--rmax', (150 + i * 26) + 'px'); r.style.animationDelay = (i * .12) + 's'; r.style.filter = 'blur(1px)'; root.appendChild(r); }
+            ps = radialParticles(8, 48, 0);
+            ps.forEach(function (q, i) { var d = el('burst-dot'); d.style.setProperty('--tx', q.tx + 'px'); d.style.setProperty('--ty', q.ty + 'px'); d.style.background = 'radial-gradient(circle,#fff,#c4b5fd 45%,#8b5cf6 80%,transparent)'; d.style.animationDelay = (i * .03) + 's'; root.appendChild(d); });
+          }
+          return root;
+        }
         function buildPersist(fx) {
           if (fx === 'fire' || !fx) return buildFire(); /* 炎＝下辺の火柱（別実装） */
           var wrap = el('spell-persist spell-persist--' + fx);
@@ -1264,7 +1317,7 @@
             setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
             setTimeout(function () {
               stage.classList.remove('playing'); void stage.offsetWidth; stage.classList.add('playing');
-              var fx = tpl.content.firstElementChild.cloneNode(true); fx.classList.add('fx-' + fxName); stage.appendChild(fx);
+              var fx = buildBurst(fxName); stage.appendChild(fx); /* 属性別の着弾バースト */
               setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1400);
               setTimeout(function () { msg.classList.add('is-burning'); }, 430);
               /* 他人→自分 はトースト（デモ・shared.js の iqSnack があれば） */
