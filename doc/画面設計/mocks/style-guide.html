@@ -895,10 +895,11 @@
         background: radial-gradient(circle, rgba(255,255,230,.95), rgba(251,191,36,.4) 45%, transparent 70%); animation: bolt-strike-fl .24s ease-out forwards; }
       @keyframes bolt-strike-fl { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
 
-      /* 氷＝つらら射出（発射元→対象へ尖った氷が飛翔・進行方向を向く） */
-      .fcast-icicle { position: fixed; left: 0; top: 0; width: 16px; height: 40px; margin: -20px 0 0 -8px; z-index: 2000; pointer-events: none; opacity: 0;
-        background: linear-gradient(to top, rgba(2,132,199,.15), #7dd3fc 45%, #ffffff);
-        clip-path: polygon(50% 0, 68% 60%, 50% 100%, 32% 60%); filter: drop-shadow(0 0 5px rgba(56,189,248,.9)); }
+      /* 氷＝大小4つの氷礫（不定形チャンク）が回転しながら飛散 */
+      .fcast-iceshard { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; opacity: 0;
+        background: linear-gradient(140deg, #ffffff, #7dd3fc 55%, #0284c7);
+        clip-path: polygon(50% 0, 82% 18%, 100% 55%, 72% 100%, 28% 92%, 0 50%, 22% 14%);
+        filter: drop-shadow(0 0 4px rgba(56,189,248,.9)); }
       /* 虹＝ビーム（発射元から対象へ一気に伸びるレーザー） */
       .fcast-beam { position: fixed; left: 0; top: 0; height: 8px; margin-top: -4px; transform-origin: 0 50%; z-index: 2000; pointer-events: none; border-radius: 4px;
         background: linear-gradient(90deg, rgba(255,255,255,.95), #ff004c, #ff9a00, #ffe600, #37ff00, #00e5ff, #3d5bff, #c400ff);
@@ -1008,7 +1009,7 @@
         .fx-shimmer::before { animation: none !important; display: none; }
         .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .fx-aura-ring { opacity: 0 !important; } /* 明滅系は静止時は消す */
         .fcast, .fcast-ball-fx, .fcast-muzzle, .fcast-bolt-fx,
-        .fcast-icicle, .fcast-beam, .fcast-crescents, .bolt-strike { display: none; }
+        .fcast-iceshard, .fcast-beam, .fcast-crescents, .bolt-strike { display: none; }
         .fcast-caster { animation: none; }
         .spell-edge { animation: none !important; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
@@ -1102,7 +1103,7 @@
 
     <h3 style="margin-top:var(--space-6)">属性バリエーション（雷 / 氷 / 虹 / オーラ）</h3>
     <p class="muted text-sm">各属性で<strong>発射の仕方・着弾バースト・発動者バッジ・永続枠</strong>が変わる（画面表示時に1回だけ発動→枠が永続）。
-      発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：つらら射出／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：三日月の隊列（4〜5個が連なり、近づくほど数が増える・まわりはぼやけ）。
+      発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：大小4つの氷礫が飛散／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：三日月の隊列（4〜5個が連なり、近づくほど数が増える・まわりはぼやけ）。
       永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：霜のトゲ＋雪／<strong>虹</strong>：流れる虹＋光スイープ／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
 
     <p class="muted text-sm" style="margin-top:var(--space-4)">⚡ <strong>雷</strong></p>
@@ -1248,18 +1249,25 @@
         setTimeout(function () { if (chat) clearInterval(chat); if (svg.parentNode) svg.remove(); }, 440);
       }
 
-      /* 氷＝つらら射出（進行方向を向いて飛翔→着弾で消える） */
-      function fcastIcicle(sx, sy, ex, ey) {
-        var ic = document.createElement('span'); ic.className = 'fcast-icicle'; ic.setAttribute('aria-hidden', 'true');
-        document.body.appendChild(ic);
-        var ang = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI + 90; /* 尖端を進行方向へ */
-        ic.animate([
-          { transform: 'translate(' + sx + 'px,' + sy + 'px) rotate(' + ang + 'deg) scale(.4)', opacity: 0, offset: 0 },
-          { opacity: 1, offset: .2 },
-          { transform: 'translate(' + ex + 'px,' + ey + 'px) rotate(' + ang + 'deg) scale(1)', opacity: 1, offset: .82 },
-          { transform: 'translate(' + ex + 'px,' + ey + 'px) rotate(' + ang + 'deg) scale(1.12)', opacity: 0, offset: 1 }
-        ], { duration: 460, easing: 'cubic-bezier(.3,.02,.5,1)', fill: 'forwards' });
-        setTimeout(function () { if (ic.parentNode) ic.remove(); }, 540);
+      /* 氷＝大小4つの氷礫が回転しながら飛散（発射元→対象・少しずつ散らす） */
+      function fcastIceShards(sx, sy, ex, ey) {
+        var ang = Math.atan2(ey - sy, ex - sx), px = -Math.sin(ang), py = Math.cos(ang);
+        /* [サイズpx, 垂直オフセット, 開始遅延ms, 回転deg] ＝大小まぜて4つ */
+        var shards = [[22, -10, 0, 300], [14, 9, 40, -260], [18, -3, 20, 220], [11, 13, 60, -320]];
+        shards.forEach(function (sp) {
+          var c = document.createElement('span'); c.className = 'fcast-iceshard'; c.setAttribute('aria-hidden', 'true');
+          var sz = sp[0], off = sp[1], m = sz / 2;
+          c.style.width = sz + 'px'; c.style.height = sz + 'px'; c.style.margin = (-m) + 'px 0 0 ' + (-m) + 'px';
+          var ssx = sx + px * off, ssy = sy + py * off, eex = ex + px * off * 0.5, eey = ey + py * off * 0.5;
+          document.body.appendChild(c);
+          c.animate([
+            { transform: 'translate(' + ssx + 'px,' + ssy + 'px) rotate(0deg) scale(.4)', opacity: 0, offset: 0 },
+            { opacity: 1, offset: .22 },
+            { transform: 'translate(' + eex + 'px,' + eey + 'px) rotate(' + sp[3] + 'deg) scale(1)', opacity: 1, offset: .82 },
+            { transform: 'translate(' + eex + 'px,' + eey + 'px) rotate(' + (sp[3] + 40) + 'deg) scale(1.1)', opacity: 0, offset: 1 }
+          ], { duration: 440, delay: sp[2], easing: 'cubic-bezier(.3,.02,.5,1)', fill: 'forwards' });
+          setTimeout(function () { if (c.parentNode) c.remove(); }, 440 + sp[2] + 80);
+        });
       }
 
       /* 虹＝ビーム（発射元から対象へ一気に伸びる） */
@@ -1475,7 +1483,7 @@
             }
             /* 属性ごとに「発射の仕方」が異なる（弾／稲妻／つらら／ビーム／波動） */
             if (fxName === 'thunder') { fcastLightning(sx, sy, ex, ey); setTimeout(impact, 190); }
-            else if (fxName === 'ice') { fcastIcicle(sx, sy, ex, ey); setTimeout(impact, 380); }
+            else if (fxName === 'ice') { fcastIceShards(sx, sy, ex, ey); setTimeout(impact, 400); }
             else if (fxName === 'rainbow') { fcastBeam(sx, sy, ex, ey); setTimeout(impact, 210); }
             else if (fxName === 'aura') { fcastCrescents(sx, sy, ex, ey); setTimeout(impact, 480); }
             else {
