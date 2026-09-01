@@ -903,11 +903,15 @@
       .fcast-beam { position: fixed; left: 0; top: 0; height: 8px; margin-top: -4px; transform-origin: 0 50%; z-index: 2000; pointer-events: none; border-radius: 4px;
         background: linear-gradient(90deg, rgba(255,255,255,.95), #ff004c, #ff9a00, #ffe600, #37ff00, #00e5ff, #3d5bff, #c400ff);
         box-shadow: 0 0 10px 2px rgba(255,120,180,.6), 0 0 18px 4px rgba(120,200,255,.4); }
-      /* オーラ＝波動（発射元から広がる波紋＋対象へ届くエネルギー球） */
-      .fcast-wave-ring { position: fixed; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; z-index: 2000; pointer-events: none;
-        border: 2px solid rgba(167,139,250,.8); box-shadow: 0 0 12px rgba(139,92,246,.5); }
-      .fcast-wave-orb { position: fixed; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; z-index: 2000; pointer-events: none;
-        background: radial-gradient(circle at 40% 38%, #fff, #c4b5fd 45%, #8b5cf6 78%, transparent); box-shadow: 0 0 16px 6px rgba(139,92,246,.6); }
+      /* オーラ＝三日月の隊列（4〜5個が連なって進み、近づくほど増える。まわりはうっすらぼやけ） */
+      .fcast-crescents { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; }
+      .aura-crescent { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+        background: radial-gradient(circle at 34% 36%, #ffffff, #c4b5fd 46%, #8b5cf6 84%);
+        -webkit-mask: radial-gradient(circle at 70% 50%, transparent 0 53%, #000 54%);
+                mask: radial-gradient(circle at 70% 50%, transparent 0 53%, #000 54%);
+        filter: blur(.6px) drop-shadow(0 0 5px rgba(167,139,250,.85)); opacity: .92; }
+      .crescent-aura { position: absolute; left: -26px; top: -20px; width: 52px; height: 40px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(167,139,250,.35), transparent 70%); filter: blur(7px); } /* まわりのぼやけ */
 
       /* ── 属性別の着弾バースト粒子（幾何を属性化・JS が中心から放射配置） ── */
       /* 雷＝放射する稲光レイ */
@@ -1004,7 +1008,7 @@
         .fx-shimmer::before { animation: none !important; display: none; }
         .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .fx-aura-ring { opacity: 0 !important; } /* 明滅系は静止時は消す */
         .fcast, .fcast-ball-fx, .fcast-muzzle, .fcast-bolt-fx,
-        .fcast-icicle, .fcast-beam, .fcast-wave-ring, .fcast-wave-orb, .bolt-strike { display: none; }
+        .fcast-icicle, .fcast-beam, .fcast-crescents, .bolt-strike { display: none; }
         .fcast-caster { animation: none; }
         .spell-edge { animation: none !important; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
@@ -1098,7 +1102,7 @@
 
     <h3 style="margin-top:var(--space-6)">属性バリエーション（雷 / 氷 / 虹 / オーラ）</h3>
     <p class="muted text-sm">各属性で<strong>発射の仕方・着弾バースト・発動者バッジ・永続枠</strong>が変わる（画面表示時に1回だけ発動→枠が永続）。
-      発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：つらら射出／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：波動（波紋＋エネルギー球）。
+      発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：つらら射出／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：三日月の隊列（4〜5個が連なり、近づくほど数が増える・まわりはぼやけ）。
       永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：霜のトゲ＋雪／<strong>虹</strong>：流れる虹＋光スイープ／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
 
     <p class="muted text-sm" style="margin-top:var(--space-4)">⚡ <strong>雷</strong></p>
@@ -1273,25 +1277,27 @@
         setTimeout(function () { if (beam.parentNode) beam.remove(); }, 520);
       }
 
-      /* オーラ＝波動（発射元から広がる波紋＋対象へ届くエネルギー球） */
-      function fcastWave(sx, sy, ex, ey) {
-        for (var i = 0; i < 3; i++) {
-          (function (i) {
-            var r = document.createElement('span'); r.className = 'fcast-wave-ring'; r.setAttribute('aria-hidden', 'true');
-            r.style.left = sx + 'px'; r.style.top = sy + 'px'; document.body.appendChild(r);
-            r.animate([{ transform: 'translate(-50%,-50%) scale(.2)', opacity: .7 }, { transform: 'translate(-50%,-50%) scale(3.4)', opacity: 0 }],
-              { duration: 620, delay: i * 120, easing: 'ease-out', fill: 'forwards' });
-            setTimeout(function () { if (r.parentNode) r.remove(); }, 620 + i * 120 + 60);
-          })(i);
+      /* オーラ＝三日月の隊列が進む。発射元→対象へ移動、進行の後方へ三日月が連なり、近づくほど数が増える。 */
+      function fcastCrescents(sx, sy, ex, ey) {
+        var ang = Math.atan2(ey - sy, ex - sx) * 180 / Math.PI, rad = ang * Math.PI / 180;
+        var group = document.createElement('span'); group.className = 'fcast-crescents'; group.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(group);
+        var aura = document.createElement('span'); aura.className = 'crescent-aura'; group.appendChild(aura); /* まわりのぼやけ（先頭に追従） */
+        var DUR = 560, spacing = 16;
+        group.animate([
+          { transform: 'translate(' + sx + 'px,' + sy + 'px)', opacity: 0, offset: 0 },
+          { opacity: 1, offset: .15 },
+          { transform: 'translate(' + ex + 'px,' + ey + 'px)', opacity: 1, offset: .85 },
+          { transform: 'translate(' + ex + 'px,' + ey + 'px)', opacity: 0, offset: 1 }
+        ], { duration: DUR, easing: 'cubic-bezier(.4,.05,.5,1)', fill: 'forwards' });
+        function addCrescent(idx) { /* 先頭から後方(-進行方向)へ idx*spacing ずらして連ねる */
+          var c = document.createElement('span'); c.className = 'aura-crescent';
+          c.style.transform = 'translate(' + (-Math.cos(rad) * idx * spacing).toFixed(1) + 'px,' + (-Math.sin(rad) * idx * spacing).toFixed(1) + 'px) rotate(' + ang + 'deg)';
+          group.appendChild(c);
         }
-        var orb = document.createElement('span'); orb.className = 'fcast-wave-orb'; orb.setAttribute('aria-hidden', 'true'); document.body.appendChild(orb);
-        orb.animate([
-          { transform: 'translate(' + sx + 'px,' + sy + 'px) scale(.5)', opacity: 0, offset: 0 },
-          { opacity: 1, offset: .2 },
-          { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.1)', opacity: .9, offset: .85 },
-          { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.5)', opacity: 0, offset: 1 }
-        ], { duration: 480, easing: 'ease-in-out', fill: 'forwards' });
-        setTimeout(function () { if (orb.parentNode) orb.remove(); }, 560);
+        var n = 4; for (var i = 0; i < n; i++) addCrescent(i); /* 最初は4個 */
+        var grow = setInterval(function () { if (n < 9) { addCrescent(n); n++; } }, 80); /* 近づくほど増やす（最大9） */
+        setTimeout(function () { clearInterval(grow); if (group.parentNode) group.remove(); }, DUR + 80);
       }
 
       (function () {
@@ -1471,7 +1477,7 @@
             if (fxName === 'thunder') { fcastLightning(sx, sy, ex, ey); setTimeout(impact, 190); }
             else if (fxName === 'ice') { fcastIcicle(sx, sy, ex, ey); setTimeout(impact, 380); }
             else if (fxName === 'rainbow') { fcastBeam(sx, sy, ex, ey); setTimeout(impact, 210); }
-            else if (fxName === 'aura') { fcastWave(sx, sy, ex, ey); setTimeout(impact, 420); }
+            else if (fxName === 'aura') { fcastCrescents(sx, sy, ex, ey); setTimeout(impact, 480); }
             else {
               /* 炎＝丸い火球が飛来 */
               var ball = fcastMakeBall(fxName);
