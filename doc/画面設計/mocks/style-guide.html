@@ -694,7 +694,7 @@
   <div class="section">
     <h2>17. 魔法発動エフェクト（提案・炎／GF-AC-091）</h2>
     <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
-      ①<strong>火球が右斜め下の遠くから3D的に飛来</strong>（最初は小さく、近づくほど大きくなる）→ ②中央で<strong>衝突・着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
+      ①<strong>ヘッダーのユーザアバターから火球を放ち</strong>（＝ユーザが魔法を発動）、<strong>3D的に飛来</strong>（最初は小さく、近づくほど大きく）→ ②メッセージ中央で<strong>衝突・着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
       ④<strong>立ち上る炎柱</strong> → ⑤<strong>飛び散る火の粉</strong> → ⑥<strong>きらめき</strong>＋着弾に合わせた<strong>画面シェイク</strong>。
       <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後（炎）は<strong>メッセージ下辺が一つにつながった低い炎</strong>で、
       ところどころ“<strong>良く燃える箇所</strong>”が背の高い<strong>火柱</strong>になり、その火柱が<strong>左右にゆれる</strong>（永続＝本番 <code>.spell-fx--fire</code> 相当）。
@@ -711,42 +711,37 @@
       .fcast-stage .demo-msg { position: relative; z-index: 1; max-width: 340px; text-align: center;
         padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6;
         box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: var(--text-sm); }
-      .fcast-stage.playing { animation: fcast-shake .4s ease-out .38s; } /* 着弾のタイミングで揺れる */
+      .fcast-stage.playing { animation: fcast-shake .4s ease-out; } /* 着弾のタイミングで JS が付与 */
 
       .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
-        perspective: 700px; /* 火球の3D飛来（奥行き）に使う */
         --hot: #ff7a18; --warm: #ffb347; --spark: #ffe08a; }
       .fcast > * { position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%); }
 
-      /* 火球＝右斜め下からチャット中央へ飛来（末尾の box-shadow を進行方向の逆＝右下に伸ばして尾を表現） */
-      .fcast__ball { width: 26px; height: 26px; border-radius: 50%;
+      /* 火球＝ヘッダーのユーザアバターから発射しメッセージへ飛来する固定オーバーレイ（JS が座標付与・WAAPI）。
+         本番 SpellCastFx も同様に avatar 矩形→対象矩形で飛ばす想定。3D感＝小さく→大きく＋斜め移動。 */
+      .fcast-ball-fx { position: fixed; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+        border-radius: 50%; z-index: 2000; pointer-events: none; opacity: 0;
         background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
-        box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 14px 12px 26px 2px rgba(255,90,20,.5);
-        opacity: 0; animation: fcast-ball .46s cubic-bezier(.4,.02,.7,1) forwards; }
+        box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 0 0 30px 8px rgba(255,90,20,.5); }
+      /* 着弾バースト＝JS が着弾タイミングで stage に投入するため各レイヤーは遅延0（投入＝発火） */
       .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
         background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
-        opacity: 0; animation: fcast-flash .7s ease-out .40s forwards; }
+        opacity: 0; animation: fcast-flash .7s ease-out forwards; }
       .fcast__shock { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--hot);
-        opacity: 0; animation: fcast-shock .8s ease-out .40s forwards; }
-      .fcast__shock.d2 { border-color: var(--warm); animation-delay: .52s; animation-duration: .9s; }
+        opacity: 0; animation: fcast-shock .8s ease-out forwards; }
+      .fcast__shock.d2 { border-color: var(--warm); animation-delay: .12s; animation-duration: .9s; }
       .fcast__plume { width: 70px; height: 130px; top: 62%; border-radius: 50% 50% 42% 42%;
         background: linear-gradient(to top, rgba(255,90,20,0), rgba(255,120,30,.55) 40%, rgba(255,210,120,.85));
         filter: blur(2px); opacity: 0; transform-origin: 50% 100%;
-        animation: fcast-plume .9s ease-out .40s forwards; }
+        animation: fcast-plume .9s ease-out forwards; }
       .fcast__ember { width: 10px; height: 10px; border-radius: 50%; opacity: 0; margin-left: var(--sx, 0px);
         background: radial-gradient(circle, #fff, var(--spark) 30%, var(--hot) 62%, transparent 70%);
-        animation: fcast-ember var(--dur, 1s) ease-out calc(.40s + var(--d, 0s)) forwards; }
+        animation: fcast-ember var(--dur, 1s) ease-out var(--d, 0s) forwards; }
       .fcast__spark { font-size: 1rem; opacity: 0; margin-left: var(--sx, 0px);
-        animation: fcast-spark .7s ease-out calc(.40s + var(--d, 0s)) forwards; }
+        animation: fcast-spark .7s ease-out var(--d, 0s) forwards; }
 
       @keyframes fcast-shake { 0%,100% { transform: translate(0,0);} 20% { transform: translate(-4px,2px);}
         40% { transform: translate(4px,-2px);} 60% { transform: translate(-3px,1px);} 80% { transform: translate(2px,-1px);} }
-      /* 3D飛来＝遠く(右斜め下・translateZ奥)で小さく→近づくほど大きく→中央で衝突して弾ける */
-      @keyframes fcast-ball {
-        0%   { transform: translate(-50%,-50%) translate(175px, 138px) translateZ(-520px) scale(.12); opacity: 0; }
-        16%  { opacity: 1; }
-        86%  { transform: translate(-50%,-50%) translate(12px, 9px) translateZ(0) scale(1.25); opacity: 1; }
-        100% { transform: translate(-50%,-50%) translate(0,0) translateZ(160px) scale(1.9); opacity: 0; } }
       @keyframes fcast-flash { 0% { opacity: 0;} 22% { opacity: 1;} 100% { opacity: 0;} }
       @keyframes fcast-shock { 0% { width: 16px; height: 16px; opacity: 0;}
         18% { opacity: .85;} 100% { width: 240px; height: 240px; opacity: 0;} }
@@ -802,7 +797,7 @@
         100% { transform: translateX(28px) scaleY(1.04); } }
 
       @media (prefers-reduced-motion: reduce) {
-        .fcast { display: none; }
+        .fcast, .fcast-ball-fx { display: none; }
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -845,7 +840,6 @@
 
     <template id="fcastTpl">
       <div class="fcast" aria-hidden="true">
-        <span class="fcast__ball"></span>
         <span class="fcast__flash"></span>
         <span class="fcast__plume"></span>
         <span class="fcast__shock"></span>
@@ -875,21 +869,52 @@
         var tpl = document.getElementById('fcastTpl');
         var btn = document.getElementById('fcastReplay');
         var reduce = document.getElementById('fcastReduce');
-        var burnTimer = null;
+        var t1 = null, t2 = null, t3 = null;
         function play() {
-          var old = stage.querySelector('.fcast'); if (old) old.remove();
-          msg.classList.remove('is-burning'); if (burnTimer) clearTimeout(burnTimer);
-          stage.classList.remove('playing'); void stage.offsetWidth; /* reflow でシェイク再生 */
-          if (!reduce.checked) stage.classList.add('playing');
-          var fx = tpl.content.firstElementChild.cloneNode(true);
-          stage.appendChild(fx);
-          setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1700);
-          /* 発動バーストが収まった頃に枠が燃え始め、以後ずっとメラメラ燃え続ける（reduce 時は即・静的） */
-          burnTimer = setTimeout(function () { msg.classList.add('is-burning'); }, reduce.checked ? 0 : 850);
+          /* リセット */
+          var oldFx = stage.querySelector('.fcast'); if (oldFx) oldFx.remove();
+          var oldBall = document.querySelector('.fcast-ball-fx'); if (oldBall) oldBall.remove();
+          msg.classList.remove('is-burning');
+          [t1, t2, t3].forEach(function (t) { if (t) clearTimeout(t); });
+          stage.classList.remove('playing');
+
+          if (reduce.checked) { msg.classList.add('is-burning'); return; } /* 抑制＝発動演出なし・静的燃焼 */
+
+          /* 発射元＝ヘッダーのユーザアバター、着弾先＝メッセージ中央（ビューポート座標） */
+          var av = document.querySelector('.usermenu .avatar');
+          var a = av.getBoundingClientRect(), m = msg.getBoundingClientRect();
+          var sx = a.left + a.width / 2, sy = a.top + a.height / 2;
+          var ex = m.left + m.width / 2, ey = m.top + m.height / 2;
+
+          /* 火球＝固定オーバーレイを WAAPI で avatar→message へ。小さく→大きく（3D感）→着弾で弾ける */
+          var ball = document.createElement('span');
+          ball.className = 'fcast-ball-fx'; ball.setAttribute('aria-hidden', 'true');
+          document.body.appendChild(ball);
+          var DUR = 620;
+          ball.animate([
+            { transform: 'translate(' + sx + 'px,' + sy + 'px) scale(.18)', opacity: 0, offset: 0 },
+            { opacity: 1, offset: .18 },
+            { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1)', opacity: 1, offset: .86 },
+            { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(1.7)', opacity: 0, offset: 1 }
+          ], { duration: DUR, easing: 'cubic-bezier(.4,.02,.7,1)', fill: 'forwards' });
+          t1 = setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
+
+          /* 着弾（≒86%）でシェイク＋バースト投入（各レイヤー遅延0で即発火）→少し置いて枠が燃え始める */
+          t2 = setTimeout(function () {
+            stage.classList.remove('playing'); void stage.offsetWidth; stage.classList.add('playing');
+            var fx = tpl.content.firstElementChild.cloneNode(true);
+            stage.appendChild(fx);
+            setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1400);
+            t3 = setTimeout(function () { msg.classList.add('is-burning'); }, 430);
+          }, Math.round(DUR * .86));
         }
-        reduce.addEventListener('change', function () { stage.classList.toggle('reduce', reduce.checked); });
+        reduce.addEventListener('change', function () { stage.classList.toggle('reduce', reduce.checked); if (reduce.checked) play(); });
         btn.addEventListener('click', play);
-        play(); /* 初回自動再生 */
+        /* §17 が画面に入ったら自動再生（初回1回）＝ヘッダーとメッセージが同時に見える状態で見せる */
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(function (es, obs) { if (es[0].isIntersecting) { play(); obs.disconnect(); } }, { threshold: .4 });
+          io.observe(stage);
+        } else { play(); }
       })();
     </script>
   </div>
