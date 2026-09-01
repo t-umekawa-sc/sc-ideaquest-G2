@@ -975,7 +975,7 @@
       .ice-panel::before { content: ""; position: absolute; inset: 0;
         background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%); } /* ガラスの光沢 */
       /* ヒビ＝四隅から内側へ伸びる細い線分（端から scaleX で少しずつ伸びる・CSSで確実に描画） */
-      .ice-crackseg { position: absolute; height: 1.6px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
+      .ice-crackseg { position: absolute; height: 1.3px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
         background: linear-gradient(90deg, rgba(3,105,161,.95), rgba(224,242,254,.95));
         box-shadow: 0 0 2px rgba(255,255,255,.85); animation: ice-crack var(--iced) linear infinite; }
       .ice-shard-piece { position: absolute; opacity: 0; border: 1px solid rgba(186,230,253,.6);
@@ -991,8 +991,8 @@
         70% { opacity: 1; transform: rotate(var(--a,0deg)) scaleX(1); } /* 端から少しずつ伸びる */
         79% { opacity: 1; } 83% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-shatter {
-        0%,77% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 79% { opacity: .85; }
-        92% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.9); } 100% { opacity: 0; } }
+        0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
+        85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } } /* 割れは速く鋭く */
 
       /* 雷＝縁のストロボ＋落ちる稲妻（SVGジグザグ・二連フラッシュ）＋電気スパーク */
       .fx-bolt { position: absolute; top: -8px; width: 22px; height: 58px; overflow: visible;
@@ -1486,35 +1486,35 @@
           } else if (fx === 'ice') {
             /* 薄いガラス板＋亀裂(SVG draw-on)＋割れる破片 */
             wrap.appendChild(el('ice-panel'));
-            [ /* left%, top%, 長さpx, 角度deg ＝四隅から内側へ細かいヒビ（中央には入れない） */
-              [3, 5, 30, 28], [3, 5, 22, 66], [15, 16, 22, 8], [9, 30, 17, -16], [6, 12, 16, 44],       /* 左上 */
-              [97, 5, 30, 152], [97, 6, 22, 113], [85, 17, 20, 176], [90, 30, 17, 150], [94, 12, 16, 136], /* 右上 */
-              [3, 95, 30, -28], [3, 94, 22, -66], [15, 84, 22, -8], [9, 70, 17, 16], [6, 88, 16, -44],   /* 左下 */
-              [97, 95, 30, 208], [97, 94, 22, 247], [85, 84, 20, 184], [90, 70, 17, 210], [94, 88, 16, 224] /* 右下 */
+            [ /* left%, top%, 長さpx, 角度deg ＝四隅から内側へ細かいヒビ（短く本数多め・中央には入れない） */
+              [2, 4, 20, 30], [2, 4, 15, 64], [3, 3, 16, 10], [12, 12, 14, 42], [10, 22, 12, -14], [6, 9, 11, 20], [16, 10, 12, -4],   /* 左上 */
+              [98, 4, 20, 150], [98, 4, 15, 116], [97, 3, 16, 170], [88, 12, 14, 138], [90, 22, 12, 194], [94, 9, 11, 160], [84, 10, 12, 184], /* 右上 */
+              [2, 96, 20, -30], [2, 96, 15, -64], [3, 97, 16, -10], [12, 88, 14, -42], [10, 78, 12, 14], [6, 91, 11, -20], [16, 90, 12, 4], /* 左下 */
+              [98, 96, 20, 210], [98, 96, 15, 244], [97, 97, 16, 190], [88, 88, 14, 222], [90, 78, 12, 166], [94, 91, 11, 200], [84, 90, 12, 176] /* 右下 */
             ].forEach(function (sg) {
               var c = el('ice-crackseg'); c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg'); wrap.appendChild(c);
             });
-            [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片 */
-              [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -26, -18, -30],
-              [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 26, -16, 28],
-              [22, 28, 52, 72, 'polygon(0 0,100% 30%,50% 100%)', -4, 24, -14],
-              [0, 46, 54, 54, 'polygon(0 100%,0 0,100% 100%)', -24, 22, 22],
-              [52, 46, 48, 54, 'polygon(100% 100%,100% 0,0 100%)', 26, 24, -24]
+            [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片（速く遠くへ） */
+              [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -44, -31, -46],
+              [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 44, -27, 44],
+              [22, 28, 52, 72, 'polygon(0 0,100% 30%,50% 100%)', -7, 42, -22],
+              [0, 46, 54, 54, 'polygon(0 100%,0 0,100% 100%)', -41, 37, 36],
+              [52, 46, 48, 54, 'polygon(100% 100%,100% 0,0 100%)', 44, 41, -40]
             ].forEach(function (pc) {
               var s = el('ice-shard-piece'); s.style.left = pc[0] + '%'; s.style.top = pc[1] + '%'; s.style.width = pc[2] + '%'; s.style.height = pc[3] + '%';
               s.style.clipPath = pc[4]; s.style.webkitClipPath = pc[4];
               s.style.setProperty('--tx', pc[5] + 'px'); s.style.setProperty('--ty', pc[6] + 'px'); s.style.setProperty('--rot', pc[7] + 'deg'); wrap.appendChild(s);
             });
           } else if (fx === 'rainbow') {
-            /* 虹アーク（中央やや右→右上端・端から draw-on・ふわっと消える）。枠は spell-edge--rainbow のまま。 */
+            /* 虹アーク＝枠の外（上辺の上）に、中央やや右で足を置き上へ弧を描く。端から draw-on・ふわっと消える。枠は spell-edge--rainbow のまま。 */
             var ns = 'http://www.w3.org/2000/svg';
             var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'rainbow-arc'); svg.setAttribute('viewBox', '0 0 200 80'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
-            var cx = 172.5, cy = 110, R = 100.8, a0 = 224 * Math.PI / 180, a1 = 277 * Math.PI / 180;
+            var cx = 150, cy = 4; /* 上辺やや上に足を置く円中心（cy 小さいほど上） */
             ['#ff004c', '#ff7a00', '#ffe000', '#28d200', '#00c8ff', '#3b5bff', '#b000ff'].forEach(function (col, i) {
-              var r = R - i * 3; /* 内側ほど紫 */
-              var p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)], p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)];
+              var r = 32 - i * 3; /* 内側ほど紫（同心の弧） */
+              var pL = [cx - r, cy], pR = [cx + r, cy];
               var path = document.createElementNS(ns, 'path');
-              path.setAttribute('d', 'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 0 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1));
+              path.setAttribute('d', 'M ' + pL[0] + ' ' + pL[1] + ' A ' + r + ' ' + r + ' 0 0 1 ' + pR[0] + ' ' + pR[1]); /* sweep 1 = 上側（枠外）へ弧 */
               path.setAttribute('stroke', col); path.setAttribute('pathLength', '1'); svg.appendChild(path);
             });
             wrap.appendChild(svg);
