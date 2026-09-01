@@ -689,6 +689,130 @@
     </div>
     <p class="hint">実装＝<code>.has-tip[data-tip]:hover/:focus-visible::after</code>（<code>shared.css</code>）。ネイティブ <code>title</code> は使わず本ツールチップに統一する。</p>
   </div>
+
+  <!-- 17. 魔法発動エフェクト（提案・炎／GF-AC-091） -->
+  <div class="section">
+    <h2>17. 魔法発動エフェクト（提案・炎／GF-AC-091）</h2>
+    <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
+      ①<strong>溜め</strong>（収束リング＝予兆）→ ②<strong>暖色フラッシュ</strong> → ③<strong>中央コアの爆発</strong>（🔥）→
+      ④<strong>衝撃波リング（二重）</strong> → ⑤<strong>立ち上る炎柱</strong> → ⑥<strong>舞い上がる火の粉</strong> → ⑦<strong>きらめき</strong>＋
+      軽い<strong>画面シェイク</strong>。まずは炎のみのイテレーション用サンプル。</p>
+    <p class="hint">本ページ内の <code>&lt;style&gt;</code>／<code>&lt;template&gt;</code> は<strong>サンプル（試作）</strong>。見た目確定後に
+      <code>shared.css</code> ／ <code>design-system.css</code> の <code>.spell-cast--fire</code> へ昇格し、粒子座標は
+      <code>features/spells/cast.ts</code>（<code>castParticles</code>）が生成する想定。<code>prefers-reduced-motion</code>（OS）または下の疑似トグルで演出を止める。</p>
+
+    <style>
+      /* 17. 魔法発動（炎）サンプル — スコープは .fcast*（試作・shared には未昇格） */
+      .fcast-stage { position: relative; overflow: hidden; border-radius: var(--radius-lg);
+        min-height: 200px; display: grid; place-items: center; isolation: isolate; max-width: 560px;
+        background: radial-gradient(120% 80% at 50% 120%, #2a1206, #14100f 70%); }
+      .fcast-stage .demo-msg { position: relative; z-index: 1; max-width: 340px; text-align: center;
+        padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6;
+        box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: var(--text-sm); }
+      .fcast-stage.playing { animation: fcast-shake .4s ease-out; }
+
+      .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
+        --hot: #ff7a18; --warm: #ffb347; --spark: #ffe08a; }
+      .fcast > * { position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%); }
+
+      .fcast__charge { width: 150px; height: 150px; border-radius: 50%; border: 2px solid var(--spark);
+        opacity: 0; animation: fcast-charge .34s ease-in forwards; }
+      .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
+        background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
+        opacity: 0; animation: fcast-flash .7s ease-out .28s forwards; }
+      .fcast__shock { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--hot);
+        opacity: 0; animation: fcast-shock .8s ease-out .3s forwards; }
+      .fcast__shock.d2 { border-color: var(--warm); animation-delay: .42s; animation-duration: .9s; }
+      .fcast__plume { width: 70px; height: 130px; top: 62%; border-radius: 50% 50% 42% 42%;
+        background: linear-gradient(to top, rgba(255,90,20,0), rgba(255,120,30,.55) 40%, rgba(255,210,120,.85));
+        filter: blur(2px); opacity: 0; transform-origin: 50% 100%;
+        animation: fcast-plume .9s ease-out .3s forwards; }
+      .fcast__core { font-size: 2.6rem; line-height: 1; opacity: 0;
+        filter: drop-shadow(0 0 10px var(--hot)) drop-shadow(0 0 22px rgba(255,120,30,.7));
+        animation: fcast-core 1s cubic-bezier(.2,1.3,.35,1) .28s forwards; }
+      .fcast__ember { width: 10px; height: 10px; border-radius: 50%; opacity: 0; margin-left: var(--sx, 0px);
+        background: radial-gradient(circle, #fff, var(--spark) 30%, var(--hot) 62%, transparent 70%);
+        animation: fcast-ember var(--dur, 1s) ease-out var(--d, 0s) forwards; }
+      .fcast__spark { font-size: 1rem; opacity: 0; margin-left: var(--sx, 0px);
+        animation: fcast-spark .7s ease-out var(--d, 0s) forwards; }
+
+      @keyframes fcast-shake { 0%,100% { transform: translate(0,0);} 20% { transform: translate(-4px,2px);}
+        40% { transform: translate(4px,-2px);} 60% { transform: translate(-3px,1px);} 80% { transform: translate(2px,-1px);} }
+      @keyframes fcast-charge { 0% { transform: translate(-50%,-50%) scale(1.6); opacity: 0;}
+        60% { opacity: .9;} 100% { transform: translate(-50%,-50%) scale(.2); opacity: 0;} }
+      @keyframes fcast-flash { 0% { opacity: 0;} 22% { opacity: 1;} 100% { opacity: 0;} }
+      @keyframes fcast-shock { 0% { width: 16px; height: 16px; opacity: 0;}
+        18% { opacity: .85;} 100% { width: 240px; height: 240px; opacity: 0;} }
+      @keyframes fcast-plume { 0% { transform: translate(-50%,-50%) scaleY(.3); opacity: 0;}
+        30% { opacity: .9;} 100% { transform: translate(-50%,-115%) scaleY(1.15); opacity: 0;} }
+      @keyframes fcast-core { 0% { transform: translate(-50%,-50%) scale(.3); opacity: 0;}
+        32% { transform: translate(-50%,-64%) scale(1.9); opacity: 1;}
+        100% { transform: translate(-50%,-96%) scale(1.05); opacity: 0;} }
+      @keyframes fcast-ember { 0% { transform: translate(-50%,-50%) scale(.2); opacity: 0;}
+        15% { opacity: 1;} 70% { opacity: .95;}
+        100% { transform: translate(-50%,-50%) translate(var(--tx,0px), var(--ty,-140px)) scale(.5); opacity: 0;} }
+      @keyframes fcast-spark { 0% { transform: translate(-50%,-50%) scale(.2); opacity: 0;}
+        30% { opacity: 1; transform: translate(-50%,-50%) translate(var(--tx,0px), var(--ty,-40px)) scale(1.2);}
+        100% { transform: translate(-50%,-50%) translate(var(--tx,0px), var(--ty,-70px)) scale(.6); opacity: 0;} }
+
+      @media (prefers-reduced-motion: reduce) { .fcast { display: none; } }
+      .fcast-stage.reduce .fcast { display: none; }
+    </style>
+
+    <div class="fcast-stage" id="fcastStage">
+      <div class="demo-msg">「配送ルートを AI で最適化しよう」に炎の魔法をかけた！🔥</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="fcastReplay">▶ 炎を発動</button>
+      <label class="checkbox"><input type="checkbox" id="fcastReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <template id="fcastTpl">
+      <div class="fcast" aria-hidden="true">
+        <span class="fcast__charge"></span>
+        <span class="fcast__flash"></span>
+        <span class="fcast__plume"></span>
+        <span class="fcast__shock"></span>
+        <span class="fcast__shock d2"></span>
+        <span class="fcast__core">🔥</span>
+        <span class="fcast__ember" style="--sx:-24px;--tx:-30px;--ty:-120px;--d:.02s;--dur:1s"></span>
+        <span class="fcast__ember" style="--sx:-10px;--tx:-8px;--ty:-150px;--d:0s;--dur:1.15s"></span>
+        <span class="fcast__ember" style="--sx:6px;--tx:18px;--ty:-135px;--d:.05s;--dur:1.05s"></span>
+        <span class="fcast__ember" style="--sx:22px;--tx:40px;--ty:-110px;--d:.08s;--dur:.95s"></span>
+        <span class="fcast__ember" style="--sx:-30px;--tx:-50px;--ty:-95px;--d:.1s;--dur:.9s"></span>
+        <span class="fcast__ember" style="--sx:14px;--tx:26px;--ty:-160px;--d:.04s;--dur:1.2s"></span>
+        <span class="fcast__ember" style="--sx:-6px;--tx:-14px;--ty:-170px;--d:.07s;--dur:1.25s"></span>
+        <span class="fcast__ember" style="--sx:30px;--tx:54px;--ty:-130px;--d:.12s;--dur:1s"></span>
+        <span class="fcast__ember" style="--sx:-18px;--tx:-36px;--ty:-145px;--d:.14s;--dur:1.1s"></span>
+        <span class="fcast__ember" style="--sx:2px;--tx:6px;--ty:-185px;--d:.09s;--dur:1.3s"></span>
+        <span class="fcast__ember" style="--sx:10px;--tx:20px;--ty:-100px;--d:.16s;--dur:.85s"></span>
+        <span class="fcast__ember" style="--sx:-12px;--tx:-22px;--ty:-125px;--d:.18s;--dur:.95s"></span>
+        <span class="fcast__spark" style="--sx:-20px;--tx:-26px;--ty:-60px;--d:.12s">✨</span>
+        <span class="fcast__spark" style="--sx:24px;--tx:30px;--ty:-52px;--d:.2s">✨</span>
+        <span class="fcast__spark" style="--sx:0px;--tx:4px;--ty:-80px;--d:.28s">✨</span>
+      </div>
+    </template>
+
+    <script>
+      (function () {
+        var stage = document.getElementById('fcastStage');
+        var tpl = document.getElementById('fcastTpl');
+        var btn = document.getElementById('fcastReplay');
+        var reduce = document.getElementById('fcastReduce');
+        function play() {
+          var old = stage.querySelector('.fcast'); if (old) old.remove();
+          stage.classList.remove('playing'); void stage.offsetWidth; /* reflow でシェイク再生 */
+          if (!reduce.checked) stage.classList.add('playing');
+          var fx = tpl.content.firstElementChild.cloneNode(true);
+          stage.appendChild(fx);
+          setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1700);
+        }
+        reduce.addEventListener('change', function () { stage.classList.toggle('reduce', reduce.checked); });
+        btn.addEventListener('click', play);
+        play(); /* 初回自動再生 */
+      })();
+    </script>
+  </div>
 </main>
 
 
