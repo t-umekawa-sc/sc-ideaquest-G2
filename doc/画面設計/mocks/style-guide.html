@@ -1147,7 +1147,7 @@
     <h3 style="margin-top:var(--space-6)">属性バリエーション（雷 / 氷 / 虹 / オーラ）</h3>
     <p class="muted text-sm">各属性で<strong>発射の仕方・着弾バースト・発動者バッジ・永続枠</strong>が変わる（画面表示時に1回だけ発動→枠が永続）。
       発射＝<strong>炎</strong>：丸い火球／<strong>雷</strong>：伸びるギザギザ稲妻（チカチカ＋途切れ＋枝分かれ＋着弾フラッシュ）／<strong>氷</strong>：大小4つの氷礫が飛散／<strong>虹</strong>：ビーム／<strong>オーラ</strong>：三日月の隊列（4〜5個が連なり、近づくほど数が増える・まわりはぼやけ）。
-      永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：薄いガラスがカチカチ固まる→少しずつヒビ→割れて飛散→再凍結のループ／<strong>虹</strong>：流れる縁取り＋中央やや右から端が少しずつ現れ右上端へ伸びる虹アーク（うっすら→ふわっと消えるループ）／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
+      永続枠＝<strong>雷</strong>：電気ストロボ＋稲妻／<strong>氷</strong>：薄いガラスがカチカチ固まる→少しずつヒビ→割れて飛散→再凍結のループ／<strong>虹</strong>：流れる縁取り＋枠の上を右上端（発動者アバター）→左上端（対象アバター）に架かる全幅の虹（端から draw-on・うっすら→ふわっと消えるループ）／<strong>オーラ</strong>：脈動リング＋昇るモート。</p>
 
     <p class="muted text-sm" style="margin-top:var(--space-4)">⚡ <strong>雷</strong></p>
     <div class="fcast-stage fcast-reveal" data-fx="thunder" data-src=".msg-avatar.caster" style="min-height:150px">
@@ -1506,15 +1506,18 @@
               s.style.setProperty('--tx', pc[5] + 'px'); s.style.setProperty('--ty', pc[6] + 'px'); s.style.setProperty('--rot', pc[7] + 'deg'); wrap.appendChild(s);
             });
           } else if (fx === 'rainbow') {
-            /* 虹アーク＝枠の外（上辺の上）に、中央やや右で足を置き上へ弧を描く。端から draw-on・ふわっと消える。枠は spell-edge--rainbow のまま。 */
+            /* 虹アーク＝枠の外（上辺の上）を、右上端（発動者アバター）→左上端（対象アバター）へ全幅で架ける。
+               発動者→対象の向きに端から draw-on・うっすら→ふわっと消える。枠は spell-edge--rainbow のまま。 */
             var ns = 'http://www.w3.org/2000/svg';
             var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('class', 'rainbow-arc'); svg.setAttribute('viewBox', '0 0 200 80'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
-            var cx = 150, cy = 4; /* 上辺やや上に足を置く円中心（cy 小さいほど上） */
+            var cx = 100, feetY = 2, R0 = 204.5, dy = 179.5; /* 浅い全幅弧（頂点は上辺の約23px上） */
             ['#ff004c', '#ff7a00', '#ffe000', '#28d200', '#00c8ff', '#3b5bff', '#b000ff'].forEach(function (col, i) {
-              var r = 32 - i * 3; /* 内側ほど紫（同心の弧） */
-              var pL = [cx - r, cy], pR = [cx + r, cy];
+              var R = R0 - i * 3; /* 外側ほど大＝広い（赤が一番外） */
+              var off = Math.sqrt(R * R - dy * dy);
+              var pR = [(cx + off).toFixed(1), feetY], pL = [(cx - off).toFixed(1), feetY];
               var path = document.createElementNS(ns, 'path');
-              path.setAttribute('d', 'M ' + pL[0] + ' ' + pL[1] + ' A ' + r + ' ' + r + ' 0 0 1 ' + pR[0] + ' ' + pR[1]); /* sweep 1 = 上側（枠外）へ弧 */
+              /* 右足(発動者)→左足(対象)を上側の弧で結ぶ（sweep 0） */
+              path.setAttribute('d', 'M ' + pR[0] + ' ' + pR[1] + ' A ' + R.toFixed(1) + ' ' + R.toFixed(1) + ' 0 0 0 ' + pL[0] + ' ' + pL[1]);
               path.setAttribute('stroke', col); path.setAttribute('pathLength', '1'); svg.appendChild(path);
             });
             wrap.appendChild(svg);
