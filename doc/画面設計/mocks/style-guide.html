@@ -1030,14 +1030,18 @@
       .fx-twinkle { position: absolute; top: -10px; font-size: .8rem; opacity: 0; animation: twinkle 1.8s ease-in-out infinite; }
       @keyframes twinkle { 0%,100% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; transform: scale(1.15); } }
       /* 虹アーク＝パネル中央やや右から端が少しずつ現れ、右上端へ。うっすら→ふわっと消えるループ */
+      /* 虹は常に完全描画。見せ方は右(発動者)→左(対象)への clip ワイプ＋全体一様フェード。
+         （dash+pathLength+非スケールstroke+非均等スケールの組合せは実ブラウザで途中で止まるため不使用） */
       .rainbow-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0;
-        animation: rb-arc-fade var(--rbd, 4.6s) ease-in-out infinite; }
-      .rainbow-arc path { fill: none; stroke-width: 2.6; vector-effect: non-scaling-stroke; stroke-linecap: round;
-        stroke-dasharray: 1; stroke-dashoffset: 1; filter: blur(.4px); animation: rb-arc-draw var(--rbd, 4.6s) linear infinite; }
-      /* 全体が均一に薄くなって消える→完全に消えてから右上端(発動者)から再度架かる。部分的な消えは無し。 */
-      @keyframes rb-arc-fade { 0% { opacity: 0; } 18% { opacity: .55; } 55% { opacity: .5; } 80% { opacity: 0; } 100% { opacity: 0; } }
-      /* 描画は 0-35% で右→左に完走、35-80% は全体を保持(この間にfadeで一様に消える)、80-100%(不可視)でリセット */
-      @keyframes rb-arc-draw { 0% { stroke-dashoffset: 1; } 35% { stroke-dashoffset: 0; } 80% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 1; } }
+        clip-path: inset(-60px 0 0 100%); animation: rb-arc var(--rbd, 4.6s) linear infinite; }
+      .rainbow-arc path { fill: none; stroke-width: 2.6; vector-effect: non-scaling-stroke; stroke-linecap: round; filter: blur(.4px); }
+      @keyframes rb-arc {
+        0% { opacity: 0; clip-path: inset(-60px 0 0 100%); }   /* 右端(発動者)からワイプ開始 */
+        18% { opacity: .55; }
+        35% { clip-path: inset(-60px 0 0 0%); }                /* 左端(対象)まで架け終わる */
+        55% { opacity: .5; clip-path: inset(-60px 0 0 0%); }
+        80% { opacity: 0; clip-path: inset(-60px 0 0 0%); }    /* 全体一様に薄くなって消える */
+        100% { opacity: 0; clip-path: inset(-60px 0 0 100%); } } /* 不可視のままリセット */
 
       /* オーラ＝脈動する縁＋外周へ広がるリング＋ゆっくり昇る紫のモート */
       .fx-aura-ring { position: absolute; left: 50%; top: 50%; width: 62%; height: 118%; border-radius: 50%;
@@ -1059,8 +1063,7 @@
         .spell-edge { animation: none !important; }
         .ice-panel { animation: none !important; opacity: .5; } /* 氷＝静的な薄いガラス板のみ */
         .ice-crackseg, .ice-shard-piece { display: none !important; }
-        .rainbow-arc { animation: none !important; opacity: .4; } /* 虹＝静的にうっすら */
-        .rainbow-arc path { animation: none !important; stroke-dashoffset: 0 !important; }
+        .rainbow-arc { animation: none !important; opacity: .4; clip-path: none !important; } /* 虹＝静的に全体うっすら */
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
@@ -1074,8 +1077,7 @@
       .fcast-stage.reduce .fx-shimmer::before { display: none; }
       .fcast-stage.reduce .ice-panel { animation: none !important; opacity: .5; }
       .fcast-stage.reduce .ice-crackseg, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
-      .fcast-stage.reduce .rainbow-arc { animation: none !important; opacity: .4; }
-      .fcast-stage.reduce .rainbow-arc path { animation: none !important; stroke-dashoffset: 0 !important; }
+      .fcast-stage.reduce .rainbow-arc { animation: none !important; opacity: .4; clip-path: none !important; }
     </style>
 
     <div class="fcast-stage" id="fcastStage">
