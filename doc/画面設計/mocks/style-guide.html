@@ -694,7 +694,7 @@
   <div class="section">
     <h2>17. 魔法発動エフェクト（提案・炎／GF-AC-091）</h2>
     <p class="muted text-sm">チャット（SC-24）で魔法を発動した瞬間の“見どころ”演出。<strong>純CSSキーフレームの多層合成</strong>＝
-      ①<strong>火球が右斜め下からチャット中央へ飛来</strong> → ②中央で<strong>着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
+      ①<strong>火球が右斜め下の遠くから3D的に飛来</strong>（最初は小さく、近づくほど大きくなる）→ ②中央で<strong>衝突・着弾</strong>（暖色フラッシュ）→ ③<strong>衝撃波リング（二重）</strong> →
       ④<strong>立ち上る炎柱</strong> → ⑤<strong>飛び散る火の粉</strong> → ⑥<strong>きらめき</strong>＋着弾に合わせた<strong>画面シェイク</strong>。
       <strong>中央の炎アイコン（🔥コア）は出さない</strong>版。発動後（炎）は<strong>メッセージ下辺が一つにつながった低い炎</strong>で、
       ところどころ“<strong>良く燃える箇所</strong>”が背の高い<strong>火柱</strong>になり、その火柱が<strong>左右にゆれる</strong>（永続＝本番 <code>.spell-fx--fire</code> 相当）。
@@ -714,6 +714,7 @@
       .fcast-stage.playing { animation: fcast-shake .4s ease-out .38s; } /* 着弾のタイミングで揺れる */
 
       .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
+        perspective: 700px; /* 火球の3D飛来（奥行き）に使う */
         --hot: #ff7a18; --warm: #ffb347; --spark: #ffe08a; }
       .fcast > * { position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%); }
 
@@ -721,7 +722,7 @@
       .fcast__ball { width: 26px; height: 26px; border-radius: 50%;
         background: radial-gradient(circle at 38% 36%, #fff 6%, #ffd23f 30%, #ff7a18 62%, #ff3b00 88%);
         box-shadow: 0 0 14px 4px rgba(255,120,30,.85), 14px 12px 26px 2px rgba(255,90,20,.5);
-        opacity: 0; animation: fcast-ball .42s cubic-bezier(.35,.02,.6,1) forwards; }
+        opacity: 0; animation: fcast-ball .46s cubic-bezier(.4,.02,.7,1) forwards; }
       .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
         background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
         opacity: 0; animation: fcast-flash .7s ease-out .40s forwards; }
@@ -740,11 +741,12 @@
 
       @keyframes fcast-shake { 0%,100% { transform: translate(0,0);} 20% { transform: translate(-4px,2px);}
         40% { transform: translate(4px,-2px);} 60% { transform: translate(-3px,1px);} 80% { transform: translate(2px,-1px);} }
+      /* 3D飛来＝遠く(右斜め下・translateZ奥)で小さく→近づくほど大きく→中央で衝突して弾ける */
       @keyframes fcast-ball {
-        0%   { transform: translate(-50%,-50%) translate(190px, 150px) scale(.45); opacity: 0; }
-        14%  { opacity: 1; }
-        82%  { transform: translate(-50%,-50%) translate(14px, 11px) scale(1.1); opacity: 1; }
-        100% { transform: translate(-50%,-50%) translate(0,0) scale(1.7); opacity: 0; } }
+        0%   { transform: translate(-50%,-50%) translate(175px, 138px) translateZ(-520px) scale(.12); opacity: 0; }
+        16%  { opacity: 1; }
+        86%  { transform: translate(-50%,-50%) translate(12px, 9px) translateZ(0) scale(1.25); opacity: 1; }
+        100% { transform: translate(-50%,-50%) translate(0,0) translateZ(160px) scale(1.9); opacity: 0; } }
       @keyframes fcast-flash { 0% { opacity: 0;} 22% { opacity: 1;} 100% { opacity: 0;} }
       @keyframes fcast-shock { 0% { width: 16px; height: 16px; opacity: 0;}
         18% { opacity: .85;} 100% { width: 240px; height: 240px; opacity: 0;} }
