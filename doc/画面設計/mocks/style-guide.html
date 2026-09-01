@@ -734,12 +734,13 @@
         50%  { transform: scale(.93);  box-shadow: 0 0 10px 3px rgba(255,120,30,.6); }
         100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,120,30,0); } }
       /* マズルフラッシュ＋発射リング（アバター中心の固定オーバーレイ・JS が座標付与） */
-      .fcast-muzzle { position: fixed; z-index: 1999; pointer-events: none; width: 0; height: 0; }
+      .fcast-muzzle { position: fixed; z-index: 1999; pointer-events: none; width: 0; height: 0;
+        --mz1: rgba(255,190,90,.9); --mz2: rgba(255,120,30,.4); --mzr: rgba(255,150,60,.9); }
       .fcast-muzzle::before, .fcast-muzzle::after { content: ""; position: absolute; left: 0; top: 0; transform: translate(-50%,-50%); border-radius: 50%; opacity: 0; }
       .fcast-muzzle::before { width: 62px; height: 62px;
-        background: radial-gradient(circle, rgba(255,190,90,.9), rgba(255,120,30,.4) 45%, transparent 70%);
+        background: radial-gradient(circle, var(--mz1), var(--mz2) 45%, transparent 70%);
         animation: muzzle-flash .45s ease-out forwards; }
-      .fcast-muzzle::after { width: 12px; height: 12px; border: 2px solid rgba(255,150,60,.9);
+      .fcast-muzzle::after { width: 12px; height: 12px; border: 2px solid var(--mzr);
         animation: muzzle-ring .5s ease-out forwards; }
       @keyframes muzzle-flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
       @keyframes muzzle-ring { 0% { width: 12px; height: 12px; opacity: 0; } 20% { opacity: .9; }
@@ -747,13 +748,13 @@
 
       /* 着弾バースト＝JS が着弾タイミングで stage に投入するため各レイヤーは遅延0（投入＝発火） */
       .fcast__flash { inset: 0; left: 0; top: 0; transform: none;
-        background: radial-gradient(circle at 50% 58%, rgba(255,150,60,.75), transparent 62%);
+        background: radial-gradient(circle at 50% 58%, var(--flash, rgba(255,150,60,.75)), transparent 62%);
         opacity: 0; animation: fcast-flash .7s ease-out forwards; }
       .fcast__shock { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--hot);
         opacity: 0; animation: fcast-shock .8s ease-out forwards; }
       .fcast__shock.d2 { border-color: var(--warm); animation-delay: .12s; animation-duration: .9s; }
       .fcast__plume { width: 70px; height: 130px; top: 62%; border-radius: 50% 50% 42% 42%;
-        background: linear-gradient(to top, rgba(255,90,20,0), rgba(255,120,30,.55) 40%, rgba(255,210,120,.85));
+        background: linear-gradient(to top, transparent, var(--plume1, rgba(255,120,30,.55)) 40%, var(--plume2, rgba(255,210,120,.85)));
         filter: blur(2px); opacity: 0; transform-origin: 50% 100%;
         animation: fcast-plume .9s ease-out forwards; }
       .fcast__ember { width: 10px; height: 10px; border-radius: 50%; opacity: 0; margin-left: var(--sx, 0px);
@@ -781,8 +782,13 @@
         pointer-events: none; transition: opacity .3s ease; z-index: 2; }
       .demo-msg.is-burning .fcast-burn { opacity: 1; }
       .demo-msg.is-burning { animation: burn-underglow 1.3s ease-in-out infinite; }
-      @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px rgba(255,90,20,.4); }
-        50% { box-shadow: 0 8px 20px rgba(255,130,40,.72); } }
+      @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
+        50% { box-shadow: 0 8px 20px var(--ug2, rgba(255,130,40,.72)); } }
+      /* 属性ごとの底面グロー色（作成者メッセージに fx-* を付与） */
+      .demo-msg.fx-thunder { --ug1: rgba(251,191,36,.4);  --ug2: rgba(255,240,150,.72); }
+      .demo-msg.fx-ice     { --ug1: rgba(56,189,248,.38); --ug2: rgba(186,230,253,.68); }
+      .demo-msg.fx-rainbow { --ug1: rgba(236,72,153,.35); --ug2: rgba(120,200,255,.6); }
+      .demo-msg.fx-aura    { --ug1: rgba(139,92,246,.4);  --ug2: rgba(196,181,253,.72); }
 
       /* 【炎】下辺は一つにつながった低い炎（__base）。ところどころ“良く燃える箇所”が背の高い火柱（__peak）で、
          各火柱が根元を軸に左右へゆれる（横移動ではなく首振り）。火柱ごとに高さ・周期をずらして自然に。 */
@@ -825,20 +831,69 @@
         border: 2px solid var(--color-surface, #fff); box-shadow: 0 1px 4px rgba(0,0,0,.35); z-index: 4; }
       .msg-avatar.author { left: -12px; background: #5b7cfa; }
       .msg-avatar.caster { right: -12px; background: #c0563a; box-shadow: 0 0 0 2px rgba(255,140,50,.55), 0 1px 4px rgba(0,0,0,.35); }
+      /* 発動者バッジも属性色に */
+      .demo-msg.fx-thunder .msg-avatar.caster { background: #d97706; box-shadow: 0 0 0 2px rgba(251,191,36,.55), 0 1px 4px rgba(0,0,0,.35); }
+      .demo-msg.fx-ice     .msg-avatar.caster { background: #0284c7; box-shadow: 0 0 0 2px rgba(56,189,248,.55), 0 1px 4px rgba(0,0,0,.35); }
+      .demo-msg.fx-rainbow .msg-avatar.caster { background: #be185d; box-shadow: 0 0 0 2px rgba(236,72,153,.55), 0 1px 4px rgba(0,0,0,.35); }
+      .demo-msg.fx-aura    .msg-avatar.caster { background: #6d28d9; box-shadow: 0 0 0 2px rgba(167,139,250,.55), 0 1px 4px rgba(0,0,0,.35); }
       /* 自作自演（発動者＝作成者）＝右上バッジは出さず、作成者アバターに自己発動マーク */
       .msg-avatar.author.is-selfcast { box-shadow: 0 0 0 2px rgba(255,140,50,.55), 0 1px 4px rgba(0,0,0,.35); }
       .msg-avatar.author.is-selfcast::after { content: "✦"; position: absolute; right: -5px; bottom: -5px;
         width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
         font-size: .66rem; color: #ffca42; background: #3a2a12; box-shadow: 0 0 0 1px rgba(255,180,60,.7); }
 
+      /* ── 属性テーマ（雷/氷/虹/オーラ）＝火球・着弾バースト・マズルの配色を差し替え。炎は既定値。 ── */
+      .fcast.fx-thunder { --hot:#fbbf24; --warm:#fde68a; --spark:#fffde7; --flash: rgba(255,240,150,.85); --plume1: rgba(251,191,36,.5); --plume2: rgba(255,255,200,.9); }
+      .fcast.fx-ice     { --hot:#38bdf8; --warm:#7dd3fc; --spark:#e0f2fe; --flash: rgba(125,211,252,.7);  --plume1: rgba(56,189,248,.45); --plume2: rgba(224,242,254,.85); }
+      .fcast.fx-rainbow { --hot:#ec4899; --warm:#f9a8d4; --spark:#ffffff; --flash: rgba(236,72,153,.55);  --plume1: rgba(255,154,0,.45);  --plume2: rgba(255,230,0,.8); }
+      .fcast.fx-aura    { --hot:#8b5cf6; --warm:#c4b5fd; --spark:#ede9fe; --flash: rgba(167,139,250,.7);  --plume1: rgba(139,92,246,.5);  --plume2: rgba(237,233,254,.85); }
+
+      .fcast-ball-fx.fx-thunder { background: radial-gradient(circle at 38% 36%, #fff 8%, #fffde7 26%, #fbbf24 60%, #f59e0b 88%); box-shadow: 0 0 14px 4px rgba(251,191,36,.9), 0 0 30px 8px rgba(255,240,150,.55); }
+      .fcast-ball-fx.fx-ice     { background: radial-gradient(circle at 38% 36%, #fff 8%, #e0f2fe 26%, #38bdf8 60%, #0284c7 88%); box-shadow: 0 0 14px 4px rgba(56,189,248,.85), 0 0 30px 8px rgba(186,230,253,.5); }
+      .fcast-ball-fx.fx-rainbow { background: conic-gradient(from 0deg, #ff004c,#ff9a00,#ffe600,#37ff00,#00e5ff,#3d5bff,#c400ff,#ff004c); box-shadow: 0 0 14px 4px rgba(255,120,180,.8), 0 0 30px 8px rgba(120,200,255,.5); }
+      .fcast-ball-fx.fx-aura    { background: radial-gradient(circle at 38% 36%, #fff 8%, #ede9fe 26%, #8b5cf6 60%, #6d28d9 88%); box-shadow: 0 0 14px 4px rgba(139,92,246,.85), 0 0 30px 8px rgba(196,181,253,.55); }
+
+      .fcast-muzzle.fx-thunder { --mz1: rgba(255,245,170,.95); --mz2: rgba(251,191,36,.4); --mzr: rgba(253,224,71,.95); }
+      .fcast-muzzle.fx-ice     { --mz1: rgba(224,242,254,.95); --mz2: rgba(56,189,248,.4);  --mzr: rgba(125,211,252,.95); }
+      .fcast-muzzle.fx-rainbow { --mz1: rgba(255,255,255,.95); --mz2: rgba(236,72,153,.4);  --mzr: rgba(120,200,255,.95); }
+      .fcast-muzzle.fx-aura    { --mz1: rgba(237,233,254,.95); --mz2: rgba(139,92,246,.4);  --mzr: rgba(196,181,253,.95); }
+
+      /* ── 属性ごとの永続「枠」エフェクト（炎＝火柱は別＝.fcast-fire）。inset オーバーレイ。 ── */
+      .spell-edge { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; }
+      /* 雷＝電気的にストロボ（速い明滅＋白飛び） */
+      .spell-edge--thunder { border: 2px solid #fbbf24; animation: edge-thunder .9s steps(2, jump-none) infinite; }
+      @keyframes edge-thunder {
+        0%,100% { box-shadow: 0 0 6px rgba(251,191,36,.6), inset 0 0 6px rgba(251,191,36,.4); border-color: #fbbf24; }
+        18% { box-shadow: 0 0 22px rgba(255,255,190,.98), inset 0 0 16px rgba(255,244,150,.85); border-color: #fffde7; }
+        40% { box-shadow: 0 0 4px rgba(245,158,11,.4); border-color: #f59e0b; }
+        62% { box-shadow: 0 0 24px rgba(255,255,220,1), inset 0 0 14px rgba(255,255,190,.9); border-color: #fff; } }
+      /* 氷＝青白いグローがゆっくり呼吸＋内側に霜 */
+      .spell-edge--ice { border: 2px solid #7dd3fc; animation: edge-ice 2.6s ease-in-out infinite; }
+      @keyframes edge-ice {
+        0%,100% { box-shadow: 0 0 8px rgba(56,189,248,.5), inset 0 0 10px rgba(186,230,253,.45); }
+        50% { box-shadow: 0 0 18px rgba(125,211,252,.9), inset 0 0 20px rgba(224,242,254,.75); } }
+      /* 虹＝流れる虹色の縁取り（conic ＋ hue 回転） */
+      .spell-edge--rainbow { padding: 2px; border-radius: 14px;
+        background: conic-gradient(from 0deg, #ff004c,#ff9a00,#ffe600,#37ff00,#00e5ff,#3d5bff,#c400ff,#ff004c);
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude;
+        animation: edge-rainbow 3s linear infinite; }
+      @keyframes edge-rainbow { to { filter: hue-rotate(360deg); } }
+      /* オーラ＝外側へ広がる同心グローの脈動 */
+      .spell-edge--aura { border: 2px solid rgba(196,181,253,.9); animation: edge-aura 1.9s ease-in-out infinite; }
+      @keyframes edge-aura {
+        0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,.5), 0 0 12px rgba(139,92,246,.5); }
+        50% { box-shadow: 0 0 0 8px rgba(139,92,246,0), 0 0 26px rgba(167,139,250,.9); } }
+
       @media (prefers-reduced-motion: reduce) {
         .fcast, .fcast-ball-fx, .fcast-muzzle { display: none; }
         .fcast-caster { animation: none; }
-        .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
+        .spell-edge { animation: none !important; }
+        .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
       .fcast-stage.reduce .fcast { display: none; }
-      .fcast-stage.reduce .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px rgba(255,90,20,.4); }
+      .fcast-stage.reduce .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
       .fcast-stage.reduce .fcast-fire__base, .fcast-stage.reduce .fcast-fire__peak,
       .fcast-stage.reduce .fcast-lava::before, .fcast-stage.reduce .fcast-lava::after { animation: none; }
     </style>
@@ -916,6 +971,50 @@
       <div class="demo-msg is-burning">
         <span class="fcast-burn" aria-hidden="true"><span class="fcast-lava"></span></span>
         「配送ルートを AI で最適化しよう」に溶岩の魔法をかけた！
+      </div>
+    </div>
+
+    <h3 style="margin-top:var(--space-6)">属性バリエーション（雷 / 氷 / 虹 / オーラ）</h3>
+    <p class="muted text-sm">各属性で<strong>火球・着弾バースト・発動者バッジ・永続枠</strong>の配色/動きが変わる（画面表示時に1回だけ発動→枠が永続）。
+      炎は上の各デモ。永続枠＝<strong>雷</strong>：電気的ストロボ／<strong>氷</strong>：青白いグローの呼吸／<strong>虹</strong>：流れる虹色の縁取り／<strong>オーラ</strong>：外側へ脈動するグロー。</p>
+
+    <p class="muted text-sm" style="margin-top:var(--space-4)">⚡ <strong>雷</strong></p>
+    <div class="fcast-stage fcast-reveal" data-fx="thunder" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="鈴木 一郎 のメッセージに 佐藤 花子 が 雷 の魔法をかけました">
+        <span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        「配送ルートを AI で最適化しよう」に⚡雷の魔法をかけた！
+      </div>
+    </div>
+
+    <p class="muted text-sm" style="margin-top:var(--space-4)">❄️ <strong>氷</strong></p>
+    <div class="fcast-stage fcast-reveal" data-fx="ice" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="鈴木 一郎 のメッセージに 佐藤 花子 が 氷 の魔法をかけました">
+        <span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        「配送ルートを AI で最適化しよう」に❄️氷の魔法をかけた！
+      </div>
+    </div>
+
+    <p class="muted text-sm" style="margin-top:var(--space-4)">🌈 <strong>虹</strong></p>
+    <div class="fcast-stage fcast-reveal" data-fx="rainbow" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="鈴木 一郎 のメッセージに 佐藤 花子 が 虹 の魔法をかけました">
+        <span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        「配送ルートを AI で最適化しよう」に🌈虹の魔法をかけた！
+      </div>
+    </div>
+
+    <p class="muted text-sm" style="margin-top:var(--space-4)">🔮 <strong>オーラ</strong></p>
+    <div class="fcast-stage fcast-reveal" data-fx="aura" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="鈴木 一郎 のメッセージに 佐藤 花子 が オーラ の魔法をかけました">
+        <span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        「配送ルートを AI で最適化しよう」に🔮オーラの魔法をかけた！
       </div>
     </div>
 
@@ -1050,10 +1149,16 @@
         var reduceCb = document.getElementById('fcastReduce');
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
 
+        function buildPersist(fx) {
+          if (fx === 'fire' || !fx) return buildFire(); /* 炎＝下辺の火柱（別実装） */
+          var e = document.createElement('span'); e.className = 'spell-edge spell-edge--' + fx; return e; /* 雷/氷/虹/オーラ＝枠エフェクト */
+        }
         function wire(stage) {
           var msg = stage.querySelector('.demo-msg');
+          var fxName = stage.getAttribute('data-fx') || 'fire';
+          msg.classList.add('fx-' + fxName); /* 底面グロー色などを属性で切替 */
           var burn = msg.querySelector('.fcast-burn[data-fill-fire]');
-          if (burn && !burn.childElementCount) burn.appendChild(buildFire()); /* 火柱を注入（HTML 軽量化） */
+          if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName)); /* 永続エフェクトを注入 */
           var src = msg.querySelector(stage.getAttribute('data-src')) || msg;
           var played = false;
           function reveal() {
@@ -1067,11 +1172,11 @@
               src.classList.remove('fcast-caster'); void src.offsetWidth; src.classList.add('fcast-caster');
               setTimeout(function () { src.classList.remove('fcast-caster'); }, 560);
             }
-            var mz = document.createElement('span'); mz.className = 'fcast-muzzle'; mz.setAttribute('aria-hidden', 'true');
+            var mz = document.createElement('span'); mz.className = 'fcast-muzzle fx-' + fxName; mz.setAttribute('aria-hidden', 'true');
             mz.style.left = sx + 'px'; mz.style.top = sy + 'px'; document.body.appendChild(mz);
             setTimeout(function () { if (mz.parentNode) mz.remove(); }, 560);
-            /* 火球＝発射元→メッセージ中央（短距離なので拡大は控えめ） */
-            var ball = document.createElement('span'); ball.className = 'fcast-ball-fx'; ball.setAttribute('aria-hidden', 'true');
+            /* 火球（属性色）＝発射元→メッセージ中央（短距離なので拡大は控えめ） */
+            var ball = document.createElement('span'); ball.className = 'fcast-ball-fx fx-' + fxName; ball.setAttribute('aria-hidden', 'true');
             document.body.appendChild(ball);
             var DUR = 500;
             ball.animate([
@@ -1083,7 +1188,7 @@
             setTimeout(function () { if (ball.parentNode) ball.remove(); }, DUR + 80);
             setTimeout(function () {
               stage.classList.remove('playing'); void stage.offsetWidth; stage.classList.add('playing');
-              var fx = tpl.content.firstElementChild.cloneNode(true); stage.appendChild(fx);
+              var fx = tpl.content.firstElementChild.cloneNode(true); fx.classList.add('fx-' + fxName); stage.appendChild(fx);
               setTimeout(function () { if (fx.parentNode) fx.remove(); }, 1400);
               setTimeout(function () { msg.classList.add('is-burning'); }, 430);
               /* 他人→自分 はトースト（デモ・shared.js の iqSnack があれば） */
