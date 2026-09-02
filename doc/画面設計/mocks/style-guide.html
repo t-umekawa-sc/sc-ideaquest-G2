@@ -789,6 +789,16 @@
       .demo-msg.is-burning { animation: burn-underglow 1.3s ease-in-out infinite; }
       @keyframes burn-underglow { 0%,100% { box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
         50% { box-shadow: 0 8px 20px var(--ug2, rgba(255,130,40,.72)); } }
+      /* 氷だけは固い＝スムーズに呼吸せず「少し広がって止まる」を数回繰り返す(steps)。氷の凍結ループ(--iced=5.5s)に同期し、
+         カチッと段階的に張っていき→割れる瞬間だけ一瞬滑らかに強く光って→落ち着く。＝割れの前兆(剛性の蓄積)として演出。 */
+      .demo-msg.fx-ice.is-burning { animation: ice-underglow 5.5s steps(1, end) infinite; }
+      @keyframes ice-underglow {
+        0%,12% { box-shadow: 0 4px 10px var(--ug1); }
+        30%    { box-shadow: 0 6px 14px var(--ug2); }   /* カチッと一段広がって止まる */
+        52%    { box-shadow: 0 7px 17px var(--ug2); }   /* さらに一段 */
+        70%    { box-shadow: 0 8px 21px var(--ug2); }   /* もう一段＝割れる寸前の張り */
+        80%    { box-shadow: 0 6px 28px var(--ug2); animation-timing-function: ease-out; } /* 割れる瞬間だけ滑らかに強く */
+        84%,100% { box-shadow: 0 4px 10px var(--ug1); } }
       /* 属性ごとの底面グロー色（作成者メッセージに fx-* を付与） */
       .demo-msg.fx-thunder { --ug1: rgba(251,191,36,.4);  --ug2: rgba(255,240,150,.72); }
       .demo-msg.fx-ice     { --ug1: rgba(56,189,248,.38); --ug2: rgba(186,230,253,.68); }
@@ -1101,6 +1111,7 @@
         .ice-crackseg, .ice-shard-piece { display: none !important; }
         .rainbow-arc { animation: none !important; opacity: .4; clip-path: none !important; } /* 虹＝静的に全体うっすら */
         .demo-msg.is-burning { animation: none; box-shadow: 0 5px 12px var(--ug1, rgba(255,90,20,.4)); }
+        .demo-msg.fx-ice.is-burning { animation: none; box-shadow: 0 4px 10px var(--ug1, rgba(56,189,248,.5)); } /* 氷=段階グローも静止 */
         .fcast-fire__base, .fcast-fire__peak, .fcast-lava::before, .fcast-lava::after { animation: none; }
       }
       .fcast-stage.reduce .fcast { display: none; }
