@@ -835,6 +835,25 @@
         0%   { transform: translate(-50%,-100%) rotate(calc(var(--rot,0deg) - 8deg)) scaleY(.86); }
         50%  { transform: translate(-50%,-100%) rotate(calc(var(--rot,0deg) + 8deg)) scaleY(1.16); }
         100% { transform: translate(-50%,-100%) rotate(calc(var(--rot,0deg) - 8deg)) scaleY(.86); } }
+
+      /* ── 炎の永続 比較用バリアント ── */
+      /* 案A: パネル全体が炎に包まれる＝炎を太く・強いバックライト。上辺の高い炎で“立ち上る”感。 */
+      .fcast-fire--engulf .fcast-fire__lick { width: 22px; filter: blur(.7px); }
+      .fcast-fire--engulf::before { border-color: rgba(255,150,60,.5);
+        box-shadow: inset 0 0 26px 7px rgba(255,120,30,.6), 0 0 30px 12px rgba(255,90,20,.6);
+        animation: fire-engulf-glow .9s ease-in-out infinite; }
+      @keyframes fire-engulf-glow {
+        0%,100% { box-shadow: inset 0 0 22px 6px rgba(255,110,30,.55), 0 0 26px 10px rgba(255,80,20,.5); }
+        50%     { box-shadow: inset 0 0 34px 10px rgba(255,150,55,.85), 0 0 40px 16px rgba(255,110,30,.7); } }
+      /* 案B: 紙の端から燃える＝小さな炎・炎色をやや黄寄りに、縁は焦げ(黒)+熾(オレンジ)。本文可読性優先。 */
+      .fcast-fire--paper .fcast-fire__lick { width: 12px;
+        background: radial-gradient(46% 74% at 50% 88%, #ffe08a 8%, #ffab2e 40%, #ff6a12 66%, transparent 82%); }
+      .fcast-fire--paper::before { border: 2.5px solid rgba(28,16,9,.92); /* 焦げ */
+        box-shadow: inset 0 0 0 4px rgba(64,32,14,.55), inset 0 0 11px 3px rgba(255,120,20,.9), 0 0 7px 2px rgba(255,90,20,.35);
+        animation: fire-paper-ember 1.5s ease-in-out infinite; }
+      @keyframes fire-paper-ember {
+        0%,100% { box-shadow: inset 0 0 0 4px rgba(54,28,12,.55), inset 0 0 9px 3px rgba(255,110,20,.78), 0 0 6px 2px rgba(255,90,20,.32); }
+        50%     { box-shadow: inset 0 0 0 4px rgba(74,38,16,.6), inset 0 0 15px 4px rgba(255,150,40,1), 0 0 11px 3px rgba(255,110,30,.5); } }
       /* 旧【炎】下辺の火柱(__base/__peak)＝溶岩などで再利用しうるので残置（現在の永続は __lick に統一）。 */
       .fcast-fire__base { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; transform-origin: 50% 100%;
         background: linear-gradient(to top, #ff5a1a, #ff8a1e 55%, #ffd23f 100%);
@@ -1345,6 +1364,27 @@
       </div>
     </div>
 
+    <h3 style="margin-top:var(--space-6)">炎の永続＝2案の比較（発動ボタンで再生）</h3>
+    <p class="muted text-sm"><strong>案A＝パネル全体が炎に包まれる</strong>（やる気を出した人のイメージ／上辺に高い炎が立ち上る）。<strong>案B＝紙の端から燃える</strong>（縁が焦げ＋熾＋小さな炎・本文可読性優先）。それぞれ「魔法を発動」で発射→着弾→永続を再生。</p>
+    <p class="muted text-sm" style="margin-top:var(--space-3)">案A：パネル全体が炎に包まれる</p>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="fire" data-fire-style="engulf" data-src=".msg-avatar.caster" style="min-height:240px">
+      <div class="demo-msg recv" aria-label="炎 永続案A パネル全体">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥
+      </div>
+    </div>
+    <p class="muted text-sm" style="margin-top:var(--space-3)">案B：紙の端から燃える</p>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="fire" data-fire-style="paper" data-src=".msg-avatar.caster" style="min-height:170px">
+      <div class="demo-msg recv" aria-label="炎 永続案B 紙の端から燃える">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥
+      </div>
+    </div>
+
     <template id="fcastTpl">
       <!-- 着弾＝火花が四方(全周)へ飛び散る。ember の --tx/--ty を放射方向に配置（16粒＝22.5°刻み・距離ばらつき）＋角の✨。 -->
       <div class="fcast" aria-hidden="true">
@@ -1597,27 +1637,48 @@
          4パターン（自分↔他人）を同一ロジックで扱う：違いは発射元アバターと右上バッジの有無だけ。 */
       (function () {
         var FIRE_H = [12,18,11,16,12,19,11,14], FIRE_DUR = [.95,1.05,.85,1,.9,1.1,.8,.95];
-        /* 炎の永続＝メッセージ枠の四辺に炎の舌(__lick)を並べて燃やす。本数は辺長に比例（幅で上下辺・高さで左右辺が増える）。
-           各舌は base(下端)を辺に置き --rot で外向き。上=0/下=180/左=-90/右=90。size-adaptive。 */
-        function buildFire(mw, mh) {
-          mw = mw || 340; mh = mh || 150;
-          var fire = document.createElement('span'); fire.className = 'fcast-fire';
+        /* 炎の永続＝メッセージ枠に炎の舌(__lick)を並べて燃やす。style で見せ方を切替（比較用）:
+           'frame'(既定)=四辺が燃える／'engulf'=パネル全体が炎に包まれる(上・側面が高く立ち上がる)／'paper'=紙の端が焦げて燃える(小さな炎+焦げ+熾)。
+           各舌は base(下端)を辺に置き --rot で向き。上=0/下=180/左=-90/右=90。本数は辺長比例(size-adaptive)。 */
+        function buildFire(mw, mh, style) {
+          mw = mw || 340; mh = mh || 150; style = style || 'frame';
+          var fire = document.createElement('span'); fire.className = 'fcast-fire fcast-fire--' + style;
           var idx = 0;
-          var LICK_H = [15,18,13,17,14,18,12,16]; /* 12..18px：枠外へはみ出しすぎない範囲でばらす */
-          function lick(left, top, rot) {
+          function lick(left, top, rot, hArr) {
             var lk = document.createElement('span'); lk.className = 'fcast-fire__lick';
             lk.style.left = left; lk.style.top = top;
             lk.style.setProperty('--rot', rot + 'deg');
-            lk.style.setProperty('--h', LICK_H[idx % LICK_H.length] + 'px');
+            lk.style.setProperty('--h', hArr[idx % hArr.length] + 'px');
             lk.style.setProperty('--d', (-((idx * 0.19) % 1.3)).toFixed(2) + 's');
             lk.style.setProperty('--dur', FIRE_DUR[idx % FIRE_DUR.length] + 's');
             fire.appendChild(lk); idx++;
           }
-          var nH = Math.max(8, Math.min(44, Math.round(mw / 26))); /* 上下辺：約26pxに1本＝隣と重なり連続した炎に */
-          var nV = Math.max(3, Math.min(16, Math.round(mh / 22))); /* 左右辺：約22pxに1本 */
-          var i, t;
-          for (i = 0; i < nH; i++) { t = (((i + 0.5) / nH) * 100).toFixed(1) + '%'; lick(t, '0%', 0); lick(t, '100%', 180); }
-          for (i = 0; i < nV; i++) { t = (((i + 0.5) / nV) * 100).toFixed(1) + '%'; lick('0%', t, -90); lick('100%', t, 90); }
+          var i, t, nH, nV;
+          if (style === 'engulf') {
+            /* パネル全体が炎に包まれる＝上辺は背の高い炎が立ち上がり、左右は斜め上へ、下辺は控えめ。強いグローは CSS 側。 */
+            var TALL = [40,54,34,48,38,52,32,44], MID = [26,36,22,32,24,34,20,30], LOW = [14,18,12,16];
+            nH = Math.max(8, Math.min(48, Math.round(mw / 24)));
+            nV = Math.max(3, Math.min(18, Math.round(mh / 20)));
+            for (i = 0; i < nH; i++) { t = (((i + 0.5) / nH) * 100).toFixed(1) + '%'; lick(t, '0%', 0, TALL); }        /* 上＝高い炎 */
+            for (i = 0; i < nV; i++) { t = (((i + 0.5) / nV) * 100).toFixed(1) + '%'; lick('0%', t, -34, MID); lick('100%', t, 34, MID); } /* 側面＝斜め上へ */
+            for (i = 0; i < nH; i++) { t = (((i + 0.5) / nH) * 100).toFixed(1) + '%'; lick(t, '100%', 180, LOW); } /* 下＝控えめ */
+            return fire;
+          }
+          if (style === 'paper') {
+            /* 紙の端が燃える＝小さな炎が縁沿いに密に。焦げ(黒)+熾(オレンジ)の縁は CSS(::before)。 */
+            var SM = [10,13,8,12,9,13,8,11];
+            nH = Math.max(10, Math.min(56, Math.round(mw / 20)));
+            nV = Math.max(4, Math.min(20, Math.round(mh / 18)));
+            for (i = 0; i < nH; i++) { t = (((i + 0.5) / nH) * 100).toFixed(1) + '%'; lick(t, '0%', 0, SM); lick(t, '100%', 180, SM); }
+            for (i = 0; i < nV; i++) { t = (((i + 0.5) / nV) * 100).toFixed(1) + '%'; lick('0%', t, -90, SM); lick('100%', t, 90, SM); }
+            return fire;
+          }
+          /* 既定＝frame（四辺が燃える・現行） */
+          var LICK_H = [15,18,13,17,14,18,12,16];
+          nH = Math.max(8, Math.min(44, Math.round(mw / 26)));
+          nV = Math.max(3, Math.min(16, Math.round(mh / 22)));
+          for (i = 0; i < nH; i++) { t = (((i + 0.5) / nH) * 100).toFixed(1) + '%'; lick(t, '0%', 0, LICK_H); lick(t, '100%', 180, LICK_H); }
+          for (i = 0; i < nV; i++) { t = (((i + 0.5) / nV) * 100).toFixed(1) + '%'; lick('0%', t, -90, LICK_H); lick('100%', t, 90, LICK_H); }
           return fire;
         }
         var tpl = document.getElementById('fcastTpl');
@@ -1662,11 +1723,11 @@
           }
           return root;
         }
-        function buildPersist(fx, msg) {
+        function buildPersist(fx, msg, fireStyle) {
           /* 枠(メッセージ)の実寸を測り、パネル依存の効果(炎の本数/オーラの分散/氷ツリー)を size-adaptive に生成。 */
           var mr = (msg && msg.getBoundingClientRect) ? msg.getBoundingClientRect() : { width: 340, height: 150 };
           var MW = Math.round(mr.width) || 340, MH = Math.round(mr.height) || 150;
-          if (fx === 'fire' || !fx) return buildFire(MW, MH); /* 炎＝枠の四辺が燃える（本数は辺長に比例） */
+          if (fx === 'fire' || !fx) return buildFire(MW, MH, fireStyle); /* 炎＝枠が燃える。fireStyle で frame/engulf/paper を切替 */
           var wrap = el('spell-persist spell-persist--' + fx);
           if (fx !== 'ice') wrap.appendChild(el('spell-edge spell-edge--' + fx)); /* 縁の基調（氷はガラス板が主役なので付けない） */
           if (fx === 'thunder') {
@@ -1771,7 +1832,7 @@
           var fxName = stage.getAttribute('data-fx') || 'fire';
           msg.classList.add('fx-' + fxName); /* 底面グロー色などを属性で切替 */
           var burn = msg.querySelector('.fcast-burn[data-fill-fire]');
-          if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName, msg)); /* 永続エフェクトを注入（枠実測で size-adaptive） */
+          if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName, msg, stage.getAttribute('data-fire-style'))); /* 永続を注入。炎は data-fire-style で見せ方切替 */
           var src = msg.querySelector(stage.getAttribute('data-src')) || msg;
           var played = false;
           /* 発動シーケンス本体（発射リアクション→デリバリー→着弾→燃焼）。reveal と 手動リプレイで共有。 */
