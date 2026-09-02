@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
-  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks, rainbowArcBands,
+  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks, rainbowArcBands, auraMotes,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -216,5 +216,19 @@ describe("rainbowArcBands", () => {
     for (let i = 1; i < bands.length; i++) expect(bands[i].feetY).toBeGreaterThan(bands[i - 1].feetY);
     for (const b of bands) { expect(b.d).toContain("M 198"); expect(b.d).toContain(" 2 "); } // 右端→左端
     expect(rainbowArcBands()).toEqual(rainbowArcBands());
+  });
+});
+
+describe("auraMotes", () => {
+  it("12粒・中央から四方八方・半径3段でばらつく・決定的", () => {
+    const ms = auraMotes();
+    expect(ms).toHaveLength(12);
+    expect(ms.some((m) => m.dx > 0)).toBe(true);
+    expect(ms.some((m) => m.dx < 0)).toBe(true);
+    expect(ms.some((m) => m.dy > 0)).toBe(true);
+    expect(ms.some((m) => m.dy < 0)).toBe(true);
+    const radii = new Set(ms.map((m) => Math.round(Math.hypot(m.dx, m.dy))));
+    expect(radii.size).toBeGreaterThanOrEqual(3); // 半径のばらつき
+    expect(auraMotes()).toEqual(auraMotes());
   });
 });

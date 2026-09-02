@@ -1189,6 +1189,38 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   55% { opacity: .5; clip-path: inset(-60px 0 0 0%); }
   80% { opacity: 0; clip-path: inset(-60px 0 0 0%); }    /* 全体一様に薄くなって消える */
   100% { opacity: 0; clip-path: inset(-60px 0 0 100%); } }
+/* Phase D: オーラの永続＝「活力を送るバフ」。内側の呼吸発光＋外周の太陽フレア＋輪郭の波動×3＋中央発の活力の粒。
+   枠の脈動は .spell-fx--aura が担う（モック §17）。 */
+.spell-fx__aura { position: absolute; inset: 0; border-radius: var(--radius); pointer-events: none; }
+.spell-fx__aura > * { position: absolute; }
+/* 波動＝角丸輪郭のまま外へ広がって消える（box-shadow spread） */
+.spell-fx__aura-wave { inset: 0; border-radius: var(--radius); animation: aura-wave 3.4s ease-out var(--d, 0s) infinite; }
+@keyframes aura-wave {
+  0%   { box-shadow: 0 0 8px 0 rgba(167,139,250,.55), 0 0 0 0 rgba(139,92,246,.45); }
+  70%  { box-shadow: 0 0 20px 5px rgba(167,139,250,.12), 0 0 0 14px rgba(139,92,246,.08); }
+  100% { box-shadow: 0 0 26px 8px rgba(167,139,250,0),   0 0 0 22px rgba(139,92,246,0); } }
+/* 内側からやわらかく滲む発光の呼吸 */
+.spell-fx__aura-breath { inset: 0; border-radius: var(--radius);
+  background: radial-gradient(ellipse at 50% 46%, rgba(167,139,250,.3), rgba(139,92,246,.12) 55%, transparent 76%);
+  animation: aura-breath 3.4s ease-in-out infinite; }
+@keyframes aura-breath { 0%,100% { opacity: .28; transform: scale(.98); } 50% { opacity: .62; transform: scale(1.015); } }
+/* 外周＝太陽フレア風コロナ（逆回転2層の放射光を縁の帯だけに出す） */
+.spell-fx__aura-flare { inset: -12px; border-radius: calc(var(--radius) + 8px); opacity: 0;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(196,181,253,0) 0deg, rgba(196,181,253,.22) 5deg, rgba(196,181,253,0) 15deg),
+    repeating-conic-gradient(from 7deg, rgba(167,139,250,0) 0deg, rgba(167,139,250,.16) 4deg, rgba(167,139,250,0) 19deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 60%, #000 84%, transparent 100%);
+          mask: radial-gradient(closest-side, transparent 60%, #000 84%, transparent 100%);
+  mix-blend-mode: screen; animation: aura-flare 7s ease-in-out infinite; }
+@keyframes aura-flare { 0%,100% { opacity: .3; transform: rotate(0deg) scale(1); } 50% { opacity: .55; transform: rotate(8deg) scale(1.04); } }
+/* 活力の粒＝中央から四方八方へ放射状に広がる（外へ抜けて波動の源に） */
+.spell-fx__aura-mote { left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle, #fff, #c4b5fd 42%, #8b5cf6 78%, transparent);
+  filter: drop-shadow(0 0 3px rgba(167,139,250,.8)); opacity: 0; transform: translate(-50%,-50%) scale(.4);
+  animation: aura-mote-spread var(--dur, 2.6s) ease-out var(--d, 0s) infinite; }
+@keyframes aura-mote-spread {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); } 20% { opacity: .95; } 70% { opacity: .7; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1); } }
 /* 氷: 冷たい青グロー */
 .spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
 /* 雷: 黄の明滅 */
@@ -1220,6 +1252,8 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   .spell-fx__bolt { animation: none; opacity: 0; } /* 雷の稲妻＝明滅系は静止時は消す */
   .spell-fx__espark { animation: none; opacity: 0; }
   .spell-fx__arc { animation: none; opacity: .4; clip-path: none; } /* 虹＝静的に全体うっすら */
+  .spell-fx__aura-wave, .spell-fx__aura-mote { animation: none; opacity: 0; } /* 波動/粒は静止時消す */
+  .spell-fx__aura-breath, .spell-fx__aura-flare { animation: none; opacity: .3; } /* 内側発光/外周フレアは静的に薄く残す */
 }
 
 /* =============================================================

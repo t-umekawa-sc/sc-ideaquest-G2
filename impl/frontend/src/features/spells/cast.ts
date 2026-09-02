@@ -136,6 +136,23 @@ export function rainbowArcBands(): RainbowBand[] {
   });
 }
 
+// オーラの永続＝メッセージに活力を送るバフ。中央から四方八方へ広がる「活力の粒」（外へ抜けて波動の源になる）。
+// 全周12方向に等間隔＋軽いジッタ、半径は3段(74/94/114px)でばらす。連続的に湧くよう遅延/周期もばらつく。決定的。GF-AC-091 §17。
+export type AuraMote = { dx: number; dy: number; delay: number; dur: number };
+export function auraMotes(): AuraMote[] {
+  const N = 12;
+  return Array.from({ length: N }, (_, i) => {
+    const ang = (Math.PI * 2 * i) / N + (i % 2 ? 0.18 : -0.12); // 等間隔＋軽いジッタ
+    const rad = 74 + (i % 3) * 20; // 74/94/114px
+    return {
+      dx: Math.round(Math.cos(ang) * rad * 10) / 10,
+      dy: Math.round(Math.sin(ang) * rad * 10) / 10,
+      delay: Math.round(-((i * 0.22) % 2.6) * 100) / 100,
+      dur: Math.round((2.4 + (i % 4) * 0.3) * 10) / 10,
+    };
+  });
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

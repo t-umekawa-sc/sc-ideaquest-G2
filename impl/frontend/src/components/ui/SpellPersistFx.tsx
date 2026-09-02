@@ -1,7 +1,10 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { castEffect, firePillars, thunderBolts, thunderSparks, rainbowArcBands } from "@/features/spells/cast";
+import { castEffect, firePillars, thunderBolts, thunderSparks, rainbowArcBands, auraMotes } from "@/features/spells/cast";
+
+// オーラの波動＝3枚を等間隔にずらして連続波に（box-shadow spread が角丸輪郭に沿って外へ）。
+const AURA_WAVE_DELAYS = [0, -1.13, -2.26];
 
 // Phase D: 属性別の永続エフェクト（モック §17 buildPersist→production）。魔法が着地したメッセージ枠に重ねる。
 // 枠の基調グロー/ボーダーは message の `.spell-fx spell-fx--{effect}` クラスが担い、本コンポーネントは
@@ -47,6 +50,25 @@ export function SpellPersistFx({ effect }: { effect: string }) {
           <path key={i} d={b.d} stroke={b.color} />
         ))}
       </svg>
+    );
+  }
+  if (eff === "aura") {
+    // 「活力を送るバフ」＝内側の呼吸発光＋外周の太陽フレア＋輪郭の波動×3＋中央から放射する活力の粒。
+    return (
+      <span className="spell-fx__aura" aria-hidden>
+        <span className="spell-fx__aura-breath" />
+        <span className="spell-fx__aura-flare" />
+        {AURA_WAVE_DELAYS.map((d, i) => (
+          <span key={i} className="spell-fx__aura-wave" style={{ "--d": `${d}s` } as CSSProperties} />
+        ))}
+        {auraMotes().map((m, i) => (
+          <span
+            key={i}
+            className="spell-fx__aura-mote"
+            style={{ "--dx": `${m.dx}px`, "--dy": `${m.dy}px`, "--d": `${m.delay}s`, "--dur": `${m.dur}s` } as CSSProperties}
+          />
+        ))}
+      </span>
     );
   }
   return null;
