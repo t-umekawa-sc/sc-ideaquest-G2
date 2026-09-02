@@ -1623,7 +1623,7 @@
               return addSeg(x1, y1, Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, Math.hypot(x2 - x1, y2 - y1), cls);
             }
             /* 各隅：初手(t1)→2方向へ枝(t2)→奥へ(t3)→細い末端(t4)。隅→中心の向き base・長さは reach(隅→中心距離)比＝幅で伸びる。 */
-            var ICX = IW / 2, ICY = IH / 2, tips = [];
+            var ICX = IW / 2, ICY = IH / 2, tips = [], outer = [];
             [[14, 14], [IW - 14, 14], [14, IH - 14], [IW - 14, IH - 14]].forEach(function (c) {
               var base = Math.atan2(ICY - c[1], ICX - c[0]) * 180 / Math.PI;
               var reach = Math.hypot(ICX - c[0], ICY - c[1]);
@@ -1633,7 +1633,7 @@
               var e2a = addSeg(e1a.x, e1a.y, base + 8, reach * 0.22, 't3');
               addSeg(e1b.x, e1b.y, base - 10, reach * 0.20, 't3');
               addSeg(e2a.x, e2a.y, base - 38, reach * 0.14, 't4');
-              tips.push(e2a);
+              tips.push(e2a); outer.push(e0); /* e2a=中心寄りの深い先端／e0=隅の第1節点(中間半径) */
             });
             /* 致命的なヒビ＝既存の節点(tips)を左→右になぞる長い折れ線。3群(fa→fb→fc)で素早く走らせる（突然の直線でなく関係性のある経路）。 */
             tips.sort(function (a, b) { return a.x - b.x; });
@@ -1642,6 +1642,16 @@
             for (var fi = 0; fi < fpath.length - 1; fi++) {
               segPts(fpath[fi].x, fpath[fi].y, fpath[fi + 1].x, fpath[fi + 1].y, 'fatal ' + (fgrp[fi] || 'fc'));
             }
+            /* 割れる寸前の追加致命ヒビ＝隅の第1節点(e0)を結ぶ大きな破断ダイヤ(4辺)＋対角線2本。
+               枠全体が網目状に割れる直前の姿。fatal 群なので終盤(72〜80%)に畳み掛けで走る。 */
+            var ring = [outer[0], outer[1], outer[3], outer[2]]; /* TL→TR→BR→BL の環 */
+            var rgrp = ['fa', 'fb', 'fc', 'fb'];
+            for (var ri = 0; ri < ring.length; ri++) {
+              var np = ring[(ri + 1) % ring.length];
+              segPts(ring[ri].x, ring[ri].y, np.x, np.y, 'fatal ' + rgrp[ri]);
+            }
+            segPts(outer[0].x, outer[0].y, outer[3].x, outer[3].y, 'fatal fc'); /* TL↔BR 対角 */
+            segPts(outer[1].x, outer[1].y, outer[2].x, outer[2].y, 'fatal fc'); /* TR↔BL 対角 */
             [ /* 割れて飛ぶ破片（クリップ内なのでパネル外へは出ない） */
               [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -44, -31, -46],
               [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 44, -27, 44],

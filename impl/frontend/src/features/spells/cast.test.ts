@@ -233,14 +233,15 @@ describe("auraMotes", () => {
 });
 
 describe("iceCrackTree", () => {
-  it("四隅から t1×4→t2×8→t3×8→t4×4＋致命ヒビ5本・有限座標・決定的", () => {
+  it("四隅から t1×4→t2×8→t3×8→t4×4＋致命ヒビ11本(中央折れ線5+破断ダイヤ4+対角2)・有限座標・決定的", () => {
     const segs = iceCrackTree(300, 110);
     const count = (t: string) => segs.filter((s) => s.tier === t).length;
     expect(count("t1")).toBe(4);
     expect(count("t2")).toBe(8);
     expect(count("t3")).toBe(8);
     expect(count("t4")).toBe(4);
-    expect(segs.filter((s) => s.tier === "fa" || s.tier === "fb" || s.tier === "fc")).toHaveLength(5);
+    // 割れる寸前の致命ヒビ＝中央を横断する折れ線(5)＋隅の第1節点を結ぶ破断ダイヤ(4)＋対角線(2)。
+    expect(segs.filter((s) => s.tier === "fa" || s.tier === "fb" || s.tier === "fc")).toHaveLength(11);
     for (const s of segs) { expect(Number.isFinite(s.leftPct)).toBe(true); expect(Number.isFinite(s.topPct)).toBe(true); }
     expect(iceCrackTree(300, 110)).toEqual(iceCrackTree(300, 110));
   });
