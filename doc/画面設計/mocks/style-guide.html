@@ -957,11 +957,11 @@
         -webkit-mask-composite: xor; mask-composite: exclude;
         animation: edge-rainbow 3s linear infinite; }
       @keyframes edge-rainbow { to { filter: hue-rotate(360deg); } }
-      /* オーラ＝外側へ広がる同心グローの脈動 */
-      .spell-edge--aura { border: 2px solid rgba(196,181,253,.9); animation: edge-aura 1.9s ease-in-out infinite; }
+      /* オーラ＝攻撃ではなく「メッセージに活力を送るバフ」。縁はゆったり呼吸する柔らかな発光（同心リングの飛び出しはやめる） */
+      .spell-edge--aura { border: 1.5px solid rgba(196,181,253,.55); animation: edge-aura 3.2s ease-in-out infinite; }
       @keyframes edge-aura {
-        0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,.5), 0 0 12px rgba(139,92,246,.5); }
-        50% { box-shadow: 0 0 0 8px rgba(139,92,246,0), 0 0 26px rgba(167,139,250,.9); } }
+        0%,100% { border-color: rgba(196,181,253,.4);  box-shadow: inset 0 0 10px rgba(167,139,250,.28), 0 0 10px rgba(139,92,246,.3); }
+        50%     { border-color: rgba(196,181,253,.85); box-shadow: inset 0 0 18px rgba(167,139,250,.5),  0 0 22px rgba(167,139,250,.6); } }
 
       /* ── 各属性の作り込み（炎の火柱レベル）＝永続枠に重ねる追加レイヤ（JS 注入） ── */
       .spell-persist { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; }
@@ -1044,20 +1044,33 @@
         80% { opacity: 0; clip-path: inset(-60px 0 0 0%); }    /* 全体一様に薄くなって消える */
         100% { opacity: 0; clip-path: inset(-60px 0 0 100%); } } /* 不可視のままリセット */
 
-      /* オーラ＝脈動する縁＋外周へ広がるリング＋ゆっくり昇る紫のモート */
-      .fx-aura-ring { position: absolute; left: 50%; top: 50%; width: 62%; height: 118%; border-radius: 50%;
-        border: 2px solid rgba(167,139,250,.7); transform: translate(-50%,-50%) scale(.4); opacity: 0; animation: aura-ring 2s ease-out infinite; }
-      @keyframes aura-ring { 0% { transform: translate(-50%,-50%) scale(.4); opacity: .7; } 100% { transform: translate(-50%,-50%) scale(1.15); opacity: 0; } }
-      .fx-mote { position: absolute; bottom: 6px; width: 6px; height: 6px; border-radius: 50%;
-        background: radial-gradient(circle, #fff, #c4b5fd 40%, #8b5cf6 75%, transparent); opacity: 0;
-        animation: mote-rise var(--dur, 3s) ease-in-out var(--d, 0s) infinite; }
-      @keyframes mote-rise { 0% { opacity: 0; transform: translate(0,0) scale(.6); } 20% { opacity: .9; } 80% { opacity: .6; }
-        100% { opacity: 0; transform: translate(var(--dx,0), -46px) scale(1); } }
+      /* オーラ＝パネル全体から波動的に滲み出る活力＋内側からやわらかく呼吸する発光＋ふわっと昇る活力の粒 */
+      /* 波動＝パネルの角丸輪郭のまま外へ広がって消える（box-shadow spread が角丸矩形に沿って拡がる） */
+      .aura-wave { position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
+        animation: aura-wave 3.4s ease-out var(--d, 0s) infinite; }
+      @keyframes aura-wave {
+        0%   { box-shadow: 0 0 8px 0 rgba(167,139,250,.55), 0 0 0 0 rgba(139,92,246,.45); }
+        70%  { box-shadow: 0 0 20px 5px rgba(167,139,250,.12), 0 0 0 14px rgba(139,92,246,.08); }
+        100% { box-shadow: 0 0 26px 8px rgba(167,139,250,0),   0 0 0 22px rgba(139,92,246,0); } }
+      /* 内側からやわらかく滲む発光の呼吸 */
+      .aura-breath { position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
+        background: radial-gradient(ellipse at 50% 46%, rgba(167,139,250,.3), rgba(139,92,246,.12) 55%, transparent 76%);
+        animation: aura-breath 3.4s ease-in-out infinite; }
+      @keyframes aura-breath { 0%,100% { opacity: .28; transform: scale(.98); } 50% { opacity: .62; transform: scale(1.015); } }
+      /* 活力の粒＝ゆっくり左右に揺れながらふわっと昇る */
+      .fx-mote { position: absolute; bottom: 4px; width: 5px; height: 5px; border-radius: 50%;
+        background: radial-gradient(circle, #fff, #c4b5fd 42%, #8b5cf6 78%, transparent); opacity: 0;
+        filter: drop-shadow(0 0 3px rgba(167,139,250,.8));
+        animation: mote-rise var(--dur, 3.6s) ease-in-out var(--d, 0s) infinite; }
+      @keyframes mote-rise { 0% { opacity: 0; transform: translate(0,0) scale(.5); } 15% { opacity: .9; }
+        50% { opacity: .85; transform: translate(calc(var(--dx,0px) * .4), -22px) scale(.85); } 70% { opacity: .7; }
+        100% { opacity: 0; transform: translate(var(--dx,0px), -42px) scale(1); } }
 
       @media (prefers-reduced-motion: reduce) {
-        .fx-bolt, .fx-espark, .frost-spike, .fx-snow, .fx-twinkle, .fx-mote, .fx-aura-ring { animation: none !important; }
+        .fx-bolt, .fx-espark, .frost-spike, .fx-snow, .fx-twinkle, .fx-mote, .aura-wave, .aura-breath { animation: none !important; }
         .fx-shimmer::before { animation: none !important; display: none; }
-        .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .fx-aura-ring { opacity: 0 !important; } /* 明滅系は静止時は消す */
+        .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .aura-wave { opacity: 0 !important; } /* 明滅・波動系は静止時は消す */
+        .aura-breath { opacity: .35 !important; } /* オーラ＝内側の発光だけ静的に薄く残す */
         .fcast, .fcast-ball-fx, .fcast-muzzle, .fcast-bolt-fx,
         .fcast-iceshard, .fcast-beam, .fcast-crescents, .bolt-strike { display: none; }
         .fcast-caster { animation: none; }
@@ -1074,7 +1087,8 @@
       .fcast-stage.reduce .fcast-lava::before, .fcast-stage.reduce .fcast-lava::after,
       .fcast-stage.reduce .spell-edge, .fcast-stage.reduce .frost-spike, .fcast-stage.reduce .fx-snow { animation: none !important; }
       .fcast-stage.reduce .fx-bolt, .fcast-stage.reduce .fx-espark, .fcast-stage.reduce .fx-twinkle,
-      .fcast-stage.reduce .fx-mote, .fcast-stage.reduce .fx-aura-ring { animation: none !important; opacity: 0 !important; }
+      .fcast-stage.reduce .fx-mote, .fcast-stage.reduce .aura-wave { animation: none !important; opacity: 0 !important; }
+      .fcast-stage.reduce .aura-breath { animation: none !important; opacity: .35 !important; }
       .fcast-stage.reduce .fx-shimmer::before { display: none; }
       .fcast-stage.reduce .ice-panel { animation: none !important; opacity: .5; }
       .fcast-stage.reduce .ice-crackseg, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
@@ -1553,9 +1567,11 @@
             });
             wrap.appendChild(svg);
           } else if (fx === 'aura') {
-            var r2 = el('fx-aura-ring'); r2.style.animationDelay = '-1s'; wrap.appendChild(el('fx-aura-ring')); wrap.appendChild(r2);
-            [[12, -8, 0, 3.2], [30, 6, -.8, 3.8], [50, -4, -1.6, 3], [70, 10, -.4, 3.6], [88, -6, -2.2, 3.4]].forEach(function (p) { /* left%, dx, delay, dur */
-              var m = el('fx-mote'); m.style.left = p[0] + '%'; m.style.setProperty('--dx', p[1] + 'px'); m.style.animationDelay = p[2] + 's'; m.style.setProperty('--dur', p[3] + 's'); wrap.appendChild(m);
+            /* パネル全体から波動が滲み出る（角丸矩形のまま外へ）＋内側の呼吸発光＋昇る活力の粒 */
+            wrap.appendChild(el('aura-breath'));
+            [0, -1.13, -2.26].forEach(function (d) { var w = el('aura-wave'); w.style.setProperty('--d', d + 's'); wrap.appendChild(w); }); /* 3枚を等間隔にずらして連続波に */
+            [[10, -6, 0, 3.6], [26, 7, -.9, 4], [42, -5, -1.8, 3.4], [58, 6, -.5, 3.8], [74, -8, -2.4, 3.6], [90, 5, -1.3, 4.2]].forEach(function (p) { /* left%, dx, delay, dur */
+              var m = el('fx-mote'); m.style.left = p[0] + '%'; m.style.setProperty('--dx', p[1] + 'px'); m.style.setProperty('--d', p[2] + 's'); m.style.setProperty('--dur', p[3] + 's'); wrap.appendChild(m);
             });
           }
           return wrap;
