@@ -974,19 +974,21 @@
         border: 1px solid rgba(224,242,254,.7); animation: ice-freeze var(--iced) ease-in-out infinite; }
       .ice-panel::before { content: ""; position: absolute; inset: 0;
         background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%); } /* ガラスの光沢 */
-      /* ヒビ＝四隅から入り、先端から別方向へ直線で枝分かれして次々に伝播→最後に致命的なヒビで割れる。
-         開始時期は t1<t2<t3<t4<fatal（＝次々に）。animation-delay を使わず同一ループで割れを一斉同期(84%消滅)。
-         色は控えめ＝細い1px・薄い青で本文の可読性を優先。 */
-      .ice-crackseg { position: absolute; height: 1px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
-        background: linear-gradient(90deg, rgba(7,89,133,.55), rgba(186,230,253,.5));
-        box-shadow: 0 0 1.5px rgba(255,255,255,.5); }
+      /* ヒビ＝四隅から入り、先端から別方向へ直線で枝分かれして伝播→最後に加速して致命ヒビが横断→割れる。
+         序盤(t1)→長い静穏→終盤に t2/t3/t4/fatal が一気(加速)。animation-delay を使わず割れ(84%)は一斉同期。
+         色は控えめ＝極細0.7px・薄い青・グロー無しで本文の可読性を最優先。 */
+      .ice-clip { position: absolute; inset: 0; border-radius: 14px; overflow: hidden; } /* ヒビ/破片をパネル内にクリップ（外へ出さない） */
+      .ice-crackseg { position: absolute; height: .7px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
+        background: linear-gradient(90deg, rgba(7,89,133,.4), rgba(186,230,253,.34)); }
       .ice-crackseg.t1 { animation: ice-crack-1 var(--iced) linear infinite; }
       .ice-crackseg.t2 { animation: ice-crack-2 var(--iced) linear infinite; }
       .ice-crackseg.t3 { animation: ice-crack-3 var(--iced) linear infinite; }
       .ice-crackseg.t4 { animation: ice-crack-4 var(--iced) linear infinite; }
-      /* 致命的なヒビ＝割れる直前(72→79%)に面を横断して一気に走る。やや濃く/太めだが短命 */
-      .ice-crackseg.fatal { height: 1.4px; background: linear-gradient(90deg, rgba(3,74,110,.72), rgba(125,211,252,.62));
-        box-shadow: 0 0 2px rgba(255,255,255,.6); animation: ice-crack-fatal var(--iced) linear infinite; }
+      /* 致命的なヒビ＝既存の節点をなぞる長い折れ線。極細だが僅かに濃く、fa→fb→fc の順で素早く走る */
+      .ice-crackseg.fatal { height: .9px; background: linear-gradient(90deg, rgba(3,74,110,.5), rgba(125,211,252,.44)); }
+      .ice-crackseg.fatal.fa { animation: ice-crack-fa var(--iced) linear infinite; }
+      .ice-crackseg.fatal.fb { animation: ice-crack-fb var(--iced) linear infinite; }
+      .ice-crackseg.fatal.fc { animation: ice-crack-fc var(--iced) linear infinite; }
       .ice-shard-piece { position: absolute; opacity: 0; border: 1px solid rgba(186,230,253,.6);
         background: linear-gradient(135deg, rgba(224,242,254,.5), rgba(56,189,248,.32)); animation: ice-shatter var(--iced) ease-in infinite; }
       @keyframes ice-freeze {
@@ -995,13 +997,15 @@
         13% { opacity: .5; } 68% { opacity: .5; }                      /* 固まって保持 */
         74% { opacity: .6; } 78% { opacity: .72; transform: scale(1.012); } /* 割れる寸前の張り */
         82% { opacity: 0; transform: scale(1.05); } 100% { opacity: 0; } } /* 割れて消える */
-      /* 各段は「開始時期に scaleX 0→1 で先端から伸びる→80%まで保持→84%で一斉消滅」。
-         t1(四隅の初手)→t2→t3→t4(枝分かれが奥へ)→fatal(致命)の順で次々に走る。 */
-      @keyframes ice-crack-1 { 0%,15% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 24% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
-      @keyframes ice-crack-2 { 0%,28% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 38% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
-      @keyframes ice-crack-3 { 0%,44% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 54% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
-      @keyframes ice-crack-4 { 0%,58% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 68% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
-      @keyframes ice-crack-fatal { 0%,72% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 79% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      /* 加速タイムライン：t1(隅)は 18→28% で静かに入り→長い静穏→終盤 t2(56→63)・t3(63→69)・t4(69→74)・
+         致命 fa(72→76)/fb(75→78)/fc(77→80) が畳み掛けるように走る（＝最後に急加速）。割れ(80→84%)で一斉消滅。 */
+      @keyframes ice-crack-1 { 0%,18% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 28% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-2 { 0%,56% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 63% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-3 { 0%,63% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 69% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-4 { 0%,69% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 74% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-fa { 0%,72% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 76% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-fb { 0%,75% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 78% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+      @keyframes ice-crack-fc { 0%,77% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
       @keyframes ice-shatter {
         0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
         85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } } /* 割れは速く鋭く */
@@ -1533,34 +1537,41 @@
             });
             [[8, 8, -.2], [92, 12, -.55]].forEach(function (p) { var d = el('fx-espark'); d.style.left = p[0] + '%'; d.style.top = p[1] + 'px'; d.style.animationDelay = p[2] + 's'; wrap.appendChild(d); });
           } else if (fx === 'ice') {
-            /* 薄いガラス板＋亀裂(SVG draw-on)＋割れる破片 */
-            wrap.appendChild(el('ice-panel'));
-            /* 四隅から入り、先端から別方向へ直線で枝分かれして次々に伝播する亀裂ツリー。
-               基準サイズ(px)で座標計算→起点は%へ変換・長さはpx・角度はdeg。段(tier)＝伝播の深さ＝現れる順。
-               実寸パネルは本番移植時に計測して差し替える（今はモック確認用の近似）。 */
-            var IW = 300, IH = 110;                          /* 基準パネル寸法(近似) */
-            function addSeg(x, y, a, l, tier) {              /* 起点(x,y)px→角度a方向へ長さlの線分。先端座標を返す */
+            /* 薄いガラス板＋亀裂(四隅→枝分かれ→致命)＋割れる破片。すべて角丸パネル内にクリップ（外へ出さない）。 */
+            var clip = el('ice-clip'); wrap.appendChild(clip);
+            clip.appendChild(el('ice-panel'));
+            var IW = 300, IH = 110;                          /* 基準パネル寸法(近似)。実寸は本番移植時に計測 */
+            function addSeg(x, y, a, l, cls) {               /* 起点(x,y)px→角度a方向へ長さl。先端座標を返す */
               var rad = a * Math.PI / 180;
-              var c = el('ice-crackseg ' + tier);
+              var c = el('ice-crackseg ' + cls);
               c.style.left = (x / IW * 100).toFixed(1) + '%'; c.style.top = (y / IH * 100).toFixed(1) + '%';
               c.style.width = l.toFixed(0) + 'px'; c.style.setProperty('--a', Math.round(a) + 'deg');
-              wrap.appendChild(c);
+              clip.appendChild(c);
               return { x: x + Math.cos(rad) * l, y: y + Math.sin(rad) * l };
             }
-            /* 各隅：内向きの初手(t1)→先端から2方向へ枝(t2)→さらに奥へ枝(t3)→細い末端(t4)。 */
+            function segPts(x1, y1, x2, y2, cls) {           /* 2点を結ぶ線分（致命ヒビの折れ線用） */
+              return addSeg(x1, y1, Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, Math.hypot(x2 - x1, y2 - y1), cls);
+            }
+            /* 各隅：初手(t1)→2方向へ枝(t2)→奥へ(t3)→細い末端(t4)。中央寄りの節点(e2a)を致命ヒビの経由点に。 */
+            var tips = [];
             [[14, 14, 34], [286, 14, 146], [14, 96, -34], [286, 96, 214]].forEach(function (c) {
               var base = c[2];
-              var e0 = addSeg(c[0], c[1], base, 58, 't1');        /* 初手＝隅から中央へ */
-              var e1a = addSeg(e0.x, e0.y, base - 40, 44, 't2');  /* 先端から左へ折れる枝 */
-              var e1b = addSeg(e0.x, e0.y, base + 34, 40, 't2');  /* 先端から右へ折れる枝 */
-              var e2a = addSeg(e1a.x, e1a.y, base + 6, 32, 't3'); /* さらに奥へ */
-              addSeg(e1b.x, e1b.y, base - 12, 30, 't3');
-              addSeg(e2a.x, e2a.y, base - 44, 22, 't4');          /* 細い末端 */
+              var e0 = addSeg(c[0], c[1], base, 54, 't1');
+              var e1a = addSeg(e0.x, e0.y, base - 40, 40, 't2');
+              var e1b = addSeg(e0.x, e0.y, base + 34, 36, 't2');
+              var e2a = addSeg(e1a.x, e1a.y, base + 6, 28, 't3');
+              addSeg(e1b.x, e1b.y, base - 12, 26, 't3');
+              addSeg(e2a.x, e2a.y, base - 44, 18, 't4');
+              tips.push(e2a);
             });
-            /* 致命的なヒビ＝割れる直前に面を横断して一気に走る（少数・X字に交差） */
-            addSeg(28, 30, 14, 250, 'fatal');                     /* 左上→右下へ全幅横断 */
-            addSeg(270, 30, 160, 240, 'fatal');                   /* 右上→左下へ全幅横断 */
-            [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片（速く遠くへ） */
+            /* 致命的なヒビ＝既存の節点(tips)を左→右になぞる長い折れ線。3群(fa→fb→fc)で素早く走らせる（突然の直線でなく関係性のある経路）。 */
+            tips.sort(function (a, b) { return a.x - b.x; });
+            var fpath = [{ x: 6, y: 56 }].concat(tips).concat([{ x: 294, y: 54 }]);
+            var fgrp = ['fa', 'fa', 'fb', 'fb', 'fc'];
+            for (var fi = 0; fi < fpath.length - 1; fi++) {
+              segPts(fpath[fi].x, fpath[fi].y, fpath[fi + 1].x, fpath[fi + 1].y, 'fatal ' + (fgrp[fi] || 'fc'));
+            }
+            [ /* 割れて飛ぶ破片（クリップ内なのでパネル外へは出ない） */
               [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -44, -31, -46],
               [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 44, -27, 44],
               [22, 28, 52, 72, 'polygon(0 0,100% 30%,50% 100%)', -7, 42, -22],
@@ -1569,7 +1580,7 @@
             ].forEach(function (pc) {
               var s = el('ice-shard-piece'); s.style.left = pc[0] + '%'; s.style.top = pc[1] + '%'; s.style.width = pc[2] + '%'; s.style.height = pc[3] + '%';
               s.style.clipPath = pc[4]; s.style.webkitClipPath = pc[4];
-              s.style.setProperty('--tx', pc[5] + 'px'); s.style.setProperty('--ty', pc[6] + 'px'); s.style.setProperty('--rot', pc[7] + 'deg'); wrap.appendChild(s);
+              s.style.setProperty('--tx', pc[5] + 'px'); s.style.setProperty('--ty', pc[6] + 'px'); s.style.setProperty('--rot', pc[7] + 'deg'); clip.appendChild(s);
             });
           } else if (fx === 'rainbow') {
             /* 虹アーク＝枠の外（上辺の上）を、右上端（発動者アバター）→左上端（対象アバター）へ全幅で架ける。
