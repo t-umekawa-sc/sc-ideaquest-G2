@@ -67,6 +67,28 @@ export function crescentCount(distance: number): number {
   return Math.max(4, Math.min(9, 4 + Math.round(distance / 60)));
 }
 
+// ── Phase C: 着弾バースト（属性別幾何）の決定的レイアウト（モック §17 buildBurst→production 移植・GF-AC-091） ──
+// 着弾の瞬間に属性ごとに違う幾何で弾ける。数の派手さは castParticleCount（common<standard<rare）を流用。
+export type CastBurstKind = "plume" | "rays" | "shards" | "rings" | "motes";
+
+// fire=噴煙 / thunder=放射レイ / ice=結晶シャード / rainbow=多色リング / aura・sparkle=粒子（motes）。未知は motes。
+const BURST: Record<CastEffect, CastBurstKind> = {
+  fire: "plume", sparkle: "motes", thunder: "rays", ice: "shards", rainbow: "rings", aura: "motes",
+};
+export function castBurstKind(effect: string): CastBurstKind {
+  return BURST[castEffect(effect)];
+}
+
+// 中心から全周へ等間隔・等半径に配る放射レイアウト（レイ/シャード/ドット共通）。既定の起点は真上。決定的。
+export type RadialPoint = { deg: number; dx: number; dy: number };
+export function radialBurst(n: number, radius: number, startDeg = -90): RadialPoint[] {
+  return Array.from({ length: Math.max(0, n) }, (_, i) => {
+    const deg = startDeg + (360 * i) / n;
+    const rad = (deg * Math.PI) / 180;
+    return { deg: Math.round(deg), dx: Math.round(Math.cos(rad) * radius), dy: Math.round(Math.sin(rad) * radius) };
+  });
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

@@ -102,3 +102,12 @@
 | G-TC-152 | unit(front) | 稲妻のジグザグ折れ線 | 分割数 seg | `boltPoints(seg)` | 点数は seg+1／t は 0→1 単調増加で両端 0/1／両端の横オフセット off=0（発射元/着弾点に接続）／中間に +と− 両方の振れがある／決定的 | GF-AC-091 |
 | G-TC-152 | unit(front) | 氷礫4片の相対レイアウト | なし | `iceShards()` | 4片／大小が異なる（scale が一様でない）／左右いずれにもズレる片がある（dx に +と−）／決定的 | GF-AC-091 |
 | G-TC-152 | unit(front) | 三日月の本数（距離で増える） | 発射元→着弾点の距離 | `crescentCount(d)` | 4..9 にクランプ／距離が長いほど単調非減少／近距離=4・十分遠い=9 | GF-AC-091 |
+
+### 5-C. 着弾バースト（属性別幾何）の純ロジック（Phase C・SpellCastFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/cast.ts`（純ロジック追加分）。モック §17 の `buildBurst` 相当＝着弾の瞬間に属性ごとに違う幾何で弾ける（雷=放射レイ／氷=結晶シャード／虹=多色リング／オーラ/キラキラ=粒子／炎=噴煙）。effect→バースト種別（`castBurstKind`）と、中心から全周へ等間隔・等半径に配る決定的レイアウト（`radialBurst`）を担保。視覚（色/グロー/リング）は `components/ui/SpellCastFx.tsx`＋`design-system.css .spell-cast__*` で GF-AC 受入。数の派手さは既存 `castParticleCount`（common<standard<rare）を流用。reduce-motion は親が生成抑制＋CSS 無効（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-153）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-153 | unit(front) | effect→バースト種別の対応 | 任意の effect 文字列 | `castBurstKind(e)` | fire=`plume`・thunder=`rays`・ice=`shards`・rainbow=`rings`・aura=`motes`・sparkle=`motes`／未知は sparkle 相当＝`motes` | GF-AC-091／#10 |
+| G-TC-153 | unit(front) | 中心から全周へ等間隔・等半径に配る | 個数 n／半径 r／起点角 | `radialBurst(n, r, startDeg?)` | 要素数は n（n≤0 は空）／各点の半径は r にほぼ一致（丸め誤差のみ）／隣接角は 360/n で等間隔／既定起点は真上（先頭 dx≈0, dy<0）／決定的 | GF-AC-091 |

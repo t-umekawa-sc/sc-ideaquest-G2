@@ -1751,6 +1751,27 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .spell-cast--r-rare .spell-cast__flash { animation-duration: .95s; }
 .spell-cast__ring--2 { --ring-max: 330px; animation-delay: .12s; border-width: 1px; }
 
+/* Phase C: 着弾バーストの属性別幾何（雷=放射レイ / 氷=結晶シャード / 虹=多色リング。数は rarity 連動＝cast.ts） */
+/* 雷＝中心から放射する稲光レイ（下端を中心に置き --rot で全周へ） */
+.spell-cast__ray { left: 50%; top: 55%; width: 3px; height: 52px; margin-left: -1.5px; transform-origin: 50% 100%;
+  background: linear-gradient(to top, transparent, var(--spark) 42%, var(--fx)); border-radius: 2px;
+  filter: drop-shadow(0 0 5px var(--fx)); opacity: 0; animation: cast-ray .5s ease-out forwards; }
+@keyframes cast-ray {
+  0% { opacity: 0; transform: translate(-50%,-100%) rotate(var(--rot,0deg)) scaleY(.2); }
+  25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-100%) rotate(var(--rot,0deg)) scaleY(1.3); } }
+/* 氷＝回転しながら外へ飛散する結晶シャード（到達座標 --dx/--dy・--cast-scale で半径をランク連動） */
+.spell-cast__shard { left: 50%; top: 55%; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  background: linear-gradient(135deg, var(--spark), var(--fx)); clip-path: polygon(50% 0, 100% 42%, 62% 100%, 12% 74%);
+  box-shadow: 0 0 6px var(--fx); opacity: 0; animation: cast-shard .55s ease-out forwards; }
+@keyframes cast-shard {
+  0% { opacity: 0; transform: translate(-50%,-50%) rotate(0) scale(.4); } 20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx) * var(--cast-scale)), calc(-50% + var(--dy) * var(--cast-scale))) rotate(calc(var(--rot) * 3)) scale(1); } }
+/* 虹＝多色の同心リングが次々に広がる（色は inline・index で遅延） */
+.spell-cast__bring { left: 50%; top: 55%; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%,-50%);
+  border: 2px solid; opacity: 0; animation: cast-bring .7s ease-out forwards; animation-delay: calc(var(--bi) * .08s); }
+@keyframes cast-bring { 0% { width: 12px; height: 12px; opacity: 0; } 20% { opacity: .9; }
+  100% { width: var(--ring-max); height: var(--ring-max); opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) { .spell-cast { display: none; } }
 
 /* ── Phase B: 属性別デリバリー（発射方式）＝発射元 from→対象 to へ飛ぶ（SpellDeliveryFx・GF-AC-091 §17） ── */

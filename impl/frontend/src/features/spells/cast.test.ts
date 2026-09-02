@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
+  castBurstKind, radialBurst,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -139,5 +140,44 @@ describe("crescentCount", () => {
       expect(n).toBeLessThanOrEqual(9);
       prev = n;
     }
+  });
+});
+
+// G-TC-153: 着弾バースト（属性別幾何）の純ロジック（Phase C・SpellCastFx / GF-AC-091）。
+describe("castBurstKind", () => {
+  it("effect ごとにバースト幾何が変わる", () => {
+    expect(castBurstKind("fire")).toBe("plume");
+    expect(castBurstKind("thunder")).toBe("rays");
+    expect(castBurstKind("ice")).toBe("shards");
+    expect(castBurstKind("rainbow")).toBe("rings");
+    expect(castBurstKind("aura")).toBe("motes");
+    expect(castBurstKind("sparkle")).toBe("motes");
+  });
+  it("未知の effect は sparkle 相当＝motes に畳む", () => {
+    expect(castBurstKind("unknown")).toBe("motes");
+    expect(castBurstKind("")).toBe("motes");
+  });
+});
+
+describe("radialBurst", () => {
+  it("要素数は n（n≤0 は空）", () => {
+    expect(radialBurst(8, 40)).toHaveLength(8);
+    expect(radialBurst(0, 40)).toHaveLength(0);
+    expect(radialBurst(-3, 40)).toHaveLength(0);
+  });
+  it("各点は半径 r にほぼ一致・隣接角は 360/n で等間隔", () => {
+    const n = 8, r = 50;
+    const ps = radialBurst(n, r);
+    for (const p of ps) expect(Math.abs(Math.hypot(p.dx, p.dy) - r)).toBeLessThanOrEqual(2);
+    const degs = ps.map((p) => p.deg);
+    for (let i = 1; i < degs.length; i++) expect(degs[i] - degs[i - 1]).toBe(360 / n);
+  });
+  it("既定の起点は真上（先頭 dx≈0, dy<0）", () => {
+    const [head] = radialBurst(6, 40);
+    expect(Math.abs(head.dx)).toBeLessThanOrEqual(1);
+    expect(head.dy).toBeLessThan(0);
+  });
+  it("決定的（同入力で同結果）", () => {
+    expect(radialBurst(9, 60, -90)).toEqual(radialBurst(9, 60, -90));
   });
 });
