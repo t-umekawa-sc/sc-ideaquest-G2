@@ -177,7 +177,6 @@ export function iceCrackTree(w: number, h: number): IceSeg[] {
   // 長さは reach(隅→中心距離)の比率で決める＝幅に比例して伸びる。枝角は base(中心向き)からの相対。
   const cx = w / 2, cy = h / 2;
   const tips: { x: number; y: number }[] = [];
-  const outer: { x: number; y: number }[] = []; // e0=隅の第1節点(中間半径)。追加の破断ダイヤ/対角に使う。
   ([[14, 14], [w - 14, 14], [14, h - 14], [w - 14, h - 14]] as const).forEach(([px, py]) => {
     const base = (Math.atan2(cy - py, cx - px) * 180) / Math.PI; // 隅→中心の向き
     const reach = Math.hypot(cx - px, cy - py);                  // 隅→中心の距離
@@ -188,22 +187,11 @@ export function iceCrackTree(w: number, h: number): IceSeg[] {
     push(e1b.x, e1b.y, base - 10, reach * 0.2, "t3");
     push(e2a.x, e2a.y, base - 38, reach * 0.14, "t4");
     tips.push(e2a);
-    outer.push(e0);
   });
   tips.sort((a, b) => a.x - b.x);
   const fpath = [{ x: 6, y: cy }, ...tips, { x: w - 6, y: cy }];
   const fgrp: IceSegTier[] = ["fa", "fa", "fb", "fb", "fc"];
   for (let i = 0; i < fpath.length - 1; i++) seg2(fpath[i].x, fpath[i].y, fpath[i + 1].x, fpath[i + 1].y, fgrp[i] ?? "fc");
-  // 割れる寸前の追加致命ヒビ＝隅の第1節点(e0)を結ぶ大きな破断ダイヤ(4辺)＋対角線2本。
-  // 枠全体が網目状に割れる直前の姿。fatal 群なので終盤(72〜80%)に畳み掛けで走る。
-  const ring = [outer[0], outer[1], outer[3], outer[2]]; // TL→TR→BR→BL の環
-  const rgrp: IceSegTier[] = ["fa", "fb", "fc", "fb"];
-  for (let i = 0; i < ring.length; i++) {
-    const np = ring[(i + 1) % ring.length];
-    seg2(ring[i].x, ring[i].y, np.x, np.y, rgrp[i]);
-  }
-  seg2(outer[0].x, outer[0].y, outer[3].x, outer[3].y, "fc"); // TL↔BR 対角
-  seg2(outer[1].x, outer[1].y, outer[2].x, outer[2].y, "fc"); // TR↔BL 対角
   return segs;
 }
 
