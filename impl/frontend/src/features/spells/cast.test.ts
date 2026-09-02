@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
-  castBurstKind, radialBurst, firePillars,
+  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -193,5 +193,17 @@ describe("firePillars", () => {
   });
   it("決定的（同入力で同結果）", () => {
     expect(firePillars()).toEqual(firePillars());
+  });
+});
+
+describe("thunderBolts / thunderSparks", () => {
+  it("稲妻3本・スパーク2個・left は 0..100%・決定的", () => {
+    const bolts = thunderBolts();
+    const sparks = thunderSparks();
+    expect(bolts).toHaveLength(3);
+    expect(sparks).toHaveLength(2);
+    for (const b of [...bolts, ...sparks]) { expect(b.left).toBeGreaterThanOrEqual(0); expect(b.left).toBeLessThanOrEqual(100); }
+    expect(thunderBolts()).toEqual(thunderBolts());
+    expect(thunderSparks()).toEqual(thunderSparks());
   });
 });

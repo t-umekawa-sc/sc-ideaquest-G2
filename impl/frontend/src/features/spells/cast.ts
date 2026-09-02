@@ -105,6 +105,23 @@ export function firePillars(): FirePillar[] {
   ];
 }
 
+// 雷の永続＝落ちる稲妻3本（left%・傾き rot・遅延）＋弾ける電気スパーク2個（left%・top px・遅延）。決定的。
+export type ThunderBolt = { left: number; rot: number; delay: number };
+export function thunderBolts(): ThunderBolt[] {
+  return [
+    { left: 20, rot: -8, delay: 0 },
+    { left: 52, rot: 6, delay: -0.35 },
+    { left: 82, rot: -5, delay: -0.62 },
+  ];
+}
+export type ThunderSpark = { left: number; top: number; delay: number };
+export function thunderSparks(): ThunderSpark[] {
+  return [
+    { left: 8, top: 8, delay: -0.2 },
+    { left: 92, top: 12, delay: -0.55 },
+  ];
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

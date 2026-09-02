@@ -1166,6 +1166,17 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 @keyframes fire-sway {
   0%,100% { transform: translateX(-50%) rotate(-7deg) scaleY(.94); }
   50%     { transform: translateX(-50%) rotate(7deg) scaleY(1.08); } }
+/* Phase D: 雷の永続＝落ちる稲妻(SVGジグザグ・二連フラッシュ)＋弾ける電気スパーク。枠のストロボは .spell-fx--thunder が担う。 */
+.spell-fx__thunder { position: absolute; inset: 0; border-radius: var(--radius); pointer-events: none; overflow: hidden; }
+.spell-fx__thunder > * { position: absolute; }
+.spell-fx__bolt { top: -8px; width: 22px; height: 58px; overflow: visible; transform: translateX(-50%) rotate(var(--rot, 0deg));
+  opacity: 0; animation: bolt-flash 1.1s steps(1, end) infinite; }
+.spell-fx__bolt polyline { fill: none; stroke: #fffde7; stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round;
+  filter: drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 8px #fde68a); }
+@keyframes bolt-flash { 0%,44% { opacity: 0; } 47% { opacity: 1; } 51% { opacity: .12; } 55% { opacity: 1; } 63% { opacity: 0; } 100% { opacity: 0; } }
+.spell-fx__espark { width: 5px; height: 5px; border-radius: 50%; background: #fffde7; box-shadow: 0 0 6px 2px rgba(251,191,36,.9);
+  opacity: 0; animation: espark 1s ease-in-out infinite; }
+@keyframes espark { 0%,100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } }
 /* 氷: 冷たい青グロー */
 .spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
 /* 雷: 黄の明滅 */
@@ -1194,6 +1205,8 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   .spell-fx--fire, .spell-fx--thunder, .spell-fx--rainbow, .spell-fx--aura { animation: none; }
   .spell-fx__pbase, .spell-fx__peak { animation: none; } /* 炎の火柱＝静的な炎として残す */
   .spell-preview.spell-fx--fire::before { animation: none; }
+  .spell-fx__bolt { animation: none; opacity: 0; } /* 雷の稲妻＝明滅系は静止時は消す */
+  .spell-fx__espark { animation: none; opacity: 0; }
 }
 
 /* =============================================================

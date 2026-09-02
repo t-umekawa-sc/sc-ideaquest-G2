@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { castEffect, firePillars } from "@/features/spells/cast";
+import { castEffect, firePillars, thunderBolts, thunderSparks } from "@/features/spells/cast";
 
 // Phase D: 属性別の永続エフェクト（モック §17 buildPersist→production）。魔法が着地したメッセージ枠に重ねる。
 // 枠の基調グロー/ボーダーは message の `.spell-fx spell-fx--{effect}` クラスが担い、本コンポーネントは
@@ -20,6 +20,21 @@ export function SpellPersistFx({ effect }: { effect: string }) {
             className="spell-fx__peak"
             style={{ left: `${p.left}%`, "--h": `${p.h}px`, "--d": `${p.delay}s`, "--dur": `${p.dur}s` } as CSSProperties}
           />
+        ))}
+      </span>
+    );
+  }
+  if (eff === "thunder") {
+    // 落ちる稲妻＋弾ける電気スパーク（枠の基調ストロボは spell-fx--thunder クラスが担う）。
+    return (
+      <span className="spell-fx__thunder" aria-hidden>
+        {thunderBolts().map((b, i) => (
+          <svg key={i} className="spell-fx__bolt" viewBox="0 0 24 70" style={{ left: `${b.left}%`, "--rot": `${b.rot}deg`, animationDelay: `${b.delay}s` } as CSSProperties} aria-hidden>
+            <polyline points="13,0 5,26 15,30 3,70" />
+          </svg>
+        ))}
+        {thunderSparks().map((s, i) => (
+          <span key={i} className="spell-fx__espark" style={{ left: `${s.left}%`, top: `${s.top}px`, animationDelay: `${s.delay}s` } as CSSProperties} />
         ))}
       </span>
     );
