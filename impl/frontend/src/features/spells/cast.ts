@@ -153,6 +153,43 @@ export function auraMotes(): AuraMote[] {
   });
 }
 
+// 氷のヒビ伝播ツリー（枠の実寸 w×h で生成＝直線ヒビが実アスペクト比で正しく走る）。
+// 四隅から初手(t1)→先端から2方向へ枝(t2)→奥へ(t3)→末端(t4)。中央寄りの節点(e2a)を致命ヒビの経由点に。
+// 致命ヒビ(fa→fb→fc)は既存の節点を左→右になぞる長い折れ線。開始時期は tier で段階化し割れは一斉同期（CSS 側）。決定的。
+export type IceSegTier = "t1" | "t2" | "t3" | "t4" | "fa" | "fb" | "fc";
+export type IceSeg = { leftPct: number; topPct: number; len: number; angle: number; tier: IceSegTier };
+export function iceCrackTree(w: number, h: number): IceSeg[] {
+  const segs: IceSeg[] = [];
+  const push = (x: number, y: number, a: number, l: number, tier: IceSegTier) => {
+    const rad = (a * Math.PI) / 180;
+    segs.push({
+      leftPct: Math.round((x / w) * 1000) / 10,
+      topPct: Math.round((y / h) * 1000) / 10,
+      len: Math.round(l),
+      angle: Math.round(a),
+      tier,
+    });
+    return { x: x + Math.cos(rad) * l, y: y + Math.sin(rad) * l };
+  };
+  const seg2 = (x1: number, y1: number, x2: number, y2: number, tier: IceSegTier) =>
+    push(x1, y1, (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI, Math.hypot(x2 - x1, y2 - y1), tier);
+  const tips: { x: number; y: number }[] = [];
+  ([[14, 14, 34], [w - 14, 14, 146], [14, h - 14, -34], [w - 14, h - 14, 214]] as const).forEach(([cx, cy, base]) => {
+    const e0 = push(cx, cy, base, 54, "t1");
+    const e1a = push(e0.x, e0.y, base - 40, 40, "t2");
+    const e1b = push(e0.x, e0.y, base + 34, 36, "t2");
+    const e2a = push(e1a.x, e1a.y, base + 6, 28, "t3");
+    push(e1b.x, e1b.y, base - 12, 26, "t3");
+    push(e2a.x, e2a.y, base - 44, 18, "t4");
+    tips.push(e2a);
+  });
+  tips.sort((a, b) => a.x - b.x);
+  const fpath = [{ x: 6, y: h * 0.51 }, ...tips, { x: w - 6, y: h * 0.49 }];
+  const fgrp: IceSegTier[] = ["fa", "fa", "fb", "fb", "fc"];
+  for (let i = 0; i < fpath.length - 1; i++) seg2(fpath[i].x, fpath[i].y, fpath[i + 1].x, fpath[i + 1].y, fgrp[i] ?? "fc");
+  return segs;
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

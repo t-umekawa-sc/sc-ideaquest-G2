@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
-  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks, rainbowArcBands, auraMotes,
+  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks, rainbowArcBands, auraMotes, iceCrackTree,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -230,5 +230,22 @@ describe("auraMotes", () => {
     const radii = new Set(ms.map((m) => Math.round(Math.hypot(m.dx, m.dy))));
     expect(radii.size).toBeGreaterThanOrEqual(3); // 半径のばらつき
     expect(auraMotes()).toEqual(auraMotes());
+  });
+});
+
+describe("iceCrackTree", () => {
+  it("四隅から t1×4→t2×8→t3×8→t4×4＋致命ヒビ5本・有限座標・決定的", () => {
+    const segs = iceCrackTree(300, 110);
+    const count = (t: string) => segs.filter((s) => s.tier === t).length;
+    expect(count("t1")).toBe(4);
+    expect(count("t2")).toBe(8);
+    expect(count("t3")).toBe(8);
+    expect(count("t4")).toBe(4);
+    expect(segs.filter((s) => s.tier === "fa" || s.tier === "fb" || s.tier === "fc")).toHaveLength(5);
+    for (const s of segs) { expect(Number.isFinite(s.leftPct)).toBe(true); expect(Number.isFinite(s.topPct)).toBe(true); }
+    expect(iceCrackTree(300, 110)).toEqual(iceCrackTree(300, 110));
+  });
+  it("枠の実寸でスケールする（横長パネルと縦長で結果が変わる）", () => {
+    expect(iceCrackTree(400, 80)).not.toEqual(iceCrackTree(200, 160));
   });
 });

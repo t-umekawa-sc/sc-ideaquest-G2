@@ -1221,6 +1221,48 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 @keyframes aura-mote-spread {
   0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); } 20% { opacity: .95; } 70% { opacity: .7; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1); } }
+/* Phase D: 氷の永続＝薄いガラス板が固まる→四隅から伝播ヒビ→致命ヒビ→割れて飛散→再凍結のループ（モック §17）。
+   ヒビ/破片は角丸パネル内にクリップ（外へ出さない）。ヒビの直線は枠実測(iceCrackTree)で実アスペクト比に沿う。 */
+.spell-fx__ice-clip { position: absolute; inset: 0; border-radius: var(--radius); overflow: hidden; pointer-events: none; --iced: 5.5s; }
+.spell-fx__ice-clip > * { position: absolute; }
+.spell-fx__ice-panel { inset: 0; border-radius: var(--radius); overflow: hidden; opacity: 0;
+  background: linear-gradient(135deg, rgba(240,249,255,.5), rgba(186,230,253,.34) 45%, rgba(56,189,248,.26));
+  box-shadow: inset 0 0 16px rgba(224,242,254,.7), inset 0 1px 0 rgba(255,255,255,.6);
+  border: 1px solid rgba(224,242,254,.7); animation: ice-freeze var(--iced) ease-in-out infinite; }
+.spell-fx__ice-panel::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.35) 50%, transparent 58%); } /* ガラスの光沢 */
+@keyframes ice-freeze {
+  0% { opacity: 0; } 3% { opacity: .18; } 5% { opacity: .18; } 8% { opacity: .34; } 10% { opacity: .34; } /* カチッ */
+  13% { opacity: .5; } 68% { opacity: .5; }                     /* 固まって保持 */
+  74% { opacity: .6; } 78% { opacity: .72; transform: scale(1.012); } /* 割れる寸前の張り */
+  82% { opacity: 0; transform: scale(1.05); } 100% { opacity: 0; } } /* 割れて消える */
+/* ヒビ＝極細・薄い青（本文の可読性を最優先）。開始時期のみ段でずらし割れ(84%)は一斉同期。 */
+.spell-fx__crack { height: .7px; transform-origin: 0 50%; opacity: 0; border-radius: 1px;
+  background: linear-gradient(90deg, rgba(7,89,133,.4), rgba(186,230,253,.34)); }
+.spell-fx__crack.t1 { animation: ice-crack-1 var(--iced) linear infinite; }
+.spell-fx__crack.t2 { animation: ice-crack-2 var(--iced) linear infinite; }
+.spell-fx__crack.t3 { animation: ice-crack-3 var(--iced) linear infinite; }
+.spell-fx__crack.t4 { animation: ice-crack-4 var(--iced) linear infinite; }
+/* 致命ヒビ＝既存節点をなぞる折れ線。極細だが僅かに濃く、fa→fb→fc の順で素早く走る。 */
+.spell-fx__crack.fa, .spell-fx__crack.fb, .spell-fx__crack.fc { height: .9px;
+  background: linear-gradient(90deg, rgba(3,74,110,.5), rgba(125,211,252,.44)); }
+.spell-fx__crack.fa { animation: ice-crack-fa var(--iced) linear infinite; }
+.spell-fx__crack.fb { animation: ice-crack-fb var(--iced) linear infinite; }
+.spell-fx__crack.fc { animation: ice-crack-fc var(--iced) linear infinite; }
+/* 加速タイムライン：t1(隅)18→28% 静かに入る→長い静穏→終盤 t2/t3/t4/致命 が畳み掛ける→割れ(80→84%)で一斉消滅。 */
+@keyframes ice-crack-1 { 0%,18% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 28% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-2 { 0%,56% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 63% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-3 { 0%,63% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 69% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-4 { 0%,69% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 74% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-fa { 0%,72% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 76% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-fb { 0%,75% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 78% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+@keyframes ice-crack-fc { 0%,77% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } 80% { opacity:1; transform: rotate(var(--a,0deg)) scaleX(1); } 84% { opacity:0; } 100% { opacity:0; transform: rotate(var(--a,0deg)) scaleX(0); } }
+/* 割れて飛ぶ破片（クリップ内なのでパネル外へは出ない） */
+.spell-fx__ishard { opacity: 0; border: 1px solid rgba(186,230,253,.6);
+  background: linear-gradient(135deg, rgba(224,242,254,.5), rgba(56,189,248,.32)); animation: ice-shatter var(--iced) ease-in infinite; }
+@keyframes ice-shatter {
+  0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
+  85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } }
 /* 氷: 冷たい青グロー */
 .spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
 /* 雷: 黄の明滅 */
@@ -1254,6 +1296,8 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   .spell-fx__arc { animation: none; opacity: .4; clip-path: none; } /* 虹＝静的に全体うっすら */
   .spell-fx__aura-wave, .spell-fx__aura-mote { animation: none; opacity: 0; } /* 波動/粒は静止時消す */
   .spell-fx__aura-breath, .spell-fx__aura-flare { animation: none; opacity: .3; } /* 内側発光/外周フレアは静的に薄く残す */
+  .spell-fx__ice-panel { animation: none; opacity: .5; } /* 氷＝静的な薄いガラス板のみ */
+  .spell-fx__crack, .spell-fx__ishard { display: none; } /* ヒビ/破片は静止時は出さない */
 }
 
 /* =============================================================
