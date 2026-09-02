@@ -712,6 +712,10 @@
       .fcast-stage .demo-msg { position: relative; z-index: 1; max-width: 340px; text-align: center;
         padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6;
         box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: var(--text-sm); }
+      /* 実寸サンプル＝本番チャットのメッセージ寸法(実測 約1056×102・アスペクト ~10:1)に合わせた幅広・低い箱。
+         パネル依存の演出(オーラ放射粒の半径・氷ツリー・波動)をこの寸法で再調整するための土台。 */
+      .fcast-stage--real { max-width: 1080px; }
+      .fcast-stage--real .demo-msg { max-width: none; width: 100%; text-align: left; box-sizing: border-box; min-height: 102px; }
       .fcast-stage.playing { animation: fcast-shake .4s ease-out; } /* 着弾のタイミングで JS が付与 */
 
       .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
@@ -1247,6 +1251,49 @@
         <span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>
         <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
         「配送ルートを AI で最適化しよう」に🔮オーラの魔法をかけた！
+      </div>
+    </div>
+
+    <h3 style="margin-top:var(--space-6)">実寸メッセージ（幅広・低い ~1056×102）での永続エフェクト</h3>
+    <p class="muted text-sm">本番チャットのメッセージ寸法に合わせた再調整用サンプル。パネル依存の演出を実寸で確認する。</p>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="fire" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="実寸サンプル 炎">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥
+      </div>
+    </div>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="thunder" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="実寸サンプル 雷">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい ⚡
+      </div>
+    </div>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="ice" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="実寸サンプル 氷">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい ❄️
+      </div>
+    </div>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="rainbow" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="実寸サンプル 虹">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🌈
+      </div>
+    </div>
+    <div class="fcast-stage fcast-reveal fcast-stage--real" data-fx="aura" data-src=".msg-avatar.caster" style="min-height:150px">
+      <div class="demo-msg recv" aria-label="実寸サンプル オーラ">
+        <span class="msg-avatar author" aria-hidden="true">鈴</span>
+        <span class="msg-avatar caster" aria-hidden="true">佐</span>
+        <span class="fcast-burn" data-fill-fire aria-hidden="true"></span>
+        配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔮
       </div>
     </div>
 
