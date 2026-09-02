@@ -122,6 +122,20 @@ export function thunderSparks(): ThunderSpark[] {
   ];
 }
 
+// 虹の永続＝上辺の上に架かる全幅アーク。同心ではなく上方向へ等間隔にずらした平行7バンド（全色が両端 x=2/198 まで届く）。
+// viewBox 0 0 200 80。各バンドは右端(発動者側)→左端(対象側)を上側の弧(sweep 0)で結ぶ。決定的。GF-AC-091 §17。
+export type RainbowBand = { color: string; feetY: number; d: string };
+export function rainbowArcBands(): RainbowBand[] {
+  const cx = 100, half = 98, Y0 = 5, sp = 2.5, h = 20;
+  const R = (half * half + h * h) / (2 * h);
+  const cols = ["#ff004c", "#ff7a00", "#ffe000", "#28d200", "#00c8ff", "#3b5bff", "#b000ff"];
+  return cols.map((color, i) => {
+    const feetY = Math.round((Y0 - (6 - i) * sp) * 100) / 100; // 赤(i=0)が一番上・紫(i=6)が一番下
+    const d = `M ${cx + half} ${feetY} A ${R.toFixed(1)} ${R.toFixed(1)} 0 0 0 ${cx - half} ${feetY}`;
+    return { color, feetY, d };
+  });
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
-  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks,
+  castBurstKind, radialBurst, firePillars, thunderBolts, thunderSparks, rainbowArcBands,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -205,5 +205,16 @@ describe("thunderBolts / thunderSparks", () => {
     for (const b of [...bolts, ...sparks]) { expect(b.left).toBeGreaterThanOrEqual(0); expect(b.left).toBeLessThanOrEqual(100); }
     expect(thunderBolts()).toEqual(thunderBolts());
     expect(thunderSparks()).toEqual(thunderSparks());
+  });
+});
+
+describe("rainbowArcBands", () => {
+  it("7バンド・色は相異・feetY 単調増加・両端まで架かる・決定的", () => {
+    const bands = rainbowArcBands();
+    expect(bands).toHaveLength(7);
+    expect(new Set(bands.map((b) => b.color)).size).toBe(7);
+    for (let i = 1; i < bands.length; i++) expect(bands[i].feetY).toBeGreaterThan(bands[i - 1].feetY);
+    for (const b of bands) { expect(b.d).toContain("M 198"); expect(b.d).toContain(" 2 "); } // 右端→左端
+    expect(rainbowArcBands()).toEqual(rainbowArcBands());
   });
 });

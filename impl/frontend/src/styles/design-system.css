@@ -1177,6 +1177,18 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 .spell-fx__espark { width: 5px; height: 5px; border-radius: 50%; background: #fffde7; box-shadow: 0 0 6px 2px rgba(251,191,36,.9);
   opacity: 0; animation: espark 1s ease-in-out infinite; }
 @keyframes espark { 0%,100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } }
+/* Phase D: 虹の永続＝上辺の上に架かる全幅アーク（平行7バンド）。右(発動者)→左(対象)へ clip ワイプで現れうっすら消える。
+   枠の色相回転は .spell-fx--rainbow が担う。dash 描画は実ブラウザで途中停止するため clip ワイプを採用（GF-AC-091 §17）。 */
+.spell-fx__arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0; pointer-events: none;
+  clip-path: inset(-60px 0 0 100%); animation: rb-arc 4.6s linear infinite; }
+.spell-fx__arc path { fill: none; stroke-width: 2.6; vector-effect: non-scaling-stroke; stroke-linecap: round; filter: blur(.4px); }
+@keyframes rb-arc {
+  0% { opacity: 0; clip-path: inset(-60px 0 0 100%); }   /* 右端(発動者)からワイプ開始 */
+  18% { opacity: .55; }
+  35% { clip-path: inset(-60px 0 0 0%); }                /* 左端(対象)まで架け終わる */
+  55% { opacity: .5; clip-path: inset(-60px 0 0 0%); }
+  80% { opacity: 0; clip-path: inset(-60px 0 0 0%); }    /* 全体一様に薄くなって消える */
+  100% { opacity: 0; clip-path: inset(-60px 0 0 100%); } }
 /* 氷: 冷たい青グロー */
 .spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
 /* 雷: 黄の明滅 */
@@ -1207,6 +1219,7 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   .spell-preview.spell-fx--fire::before { animation: none; }
   .spell-fx__bolt { animation: none; opacity: 0; } /* 雷の稲妻＝明滅系は静止時は消す */
   .spell-fx__espark { animation: none; opacity: 0; }
+  .spell-fx__arc { animation: none; opacity: .4; clip-path: none; } /* 虹＝静的に全体うっすら */
 }
 
 /* =============================================================

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { castEffect, firePillars, thunderBolts, thunderSparks } from "@/features/spells/cast";
+import { castEffect, firePillars, thunderBolts, thunderSparks, rainbowArcBands } from "@/features/spells/cast";
 
 // Phase D: 属性別の永続エフェクト（モック §17 buildPersist→production）。魔法が着地したメッセージ枠に重ねる。
 // 枠の基調グロー/ボーダーは message の `.spell-fx spell-fx--{effect}` クラスが担い、本コンポーネントは
@@ -37,6 +37,16 @@ export function SpellPersistFx({ effect }: { effect: string }) {
           <span key={i} className="spell-fx__espark" style={{ left: `${s.left}%`, top: `${s.top}px`, animationDelay: `${s.delay}s` } as CSSProperties} />
         ))}
       </span>
+    );
+  }
+  if (eff === "rainbow") {
+    // 上辺の上に架かる全幅アーク（右→左へ clip ワイプで現れる）。枠の色相回転は spell-fx--rainbow クラスが担う。
+    return (
+      <svg className="spell-fx__arc" viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden>
+        {rainbowArcBands().map((b, i) => (
+          <path key={i} d={b.d} stroke={b.color} />
+        ))}
+      </svg>
     );
   }
   return null;
