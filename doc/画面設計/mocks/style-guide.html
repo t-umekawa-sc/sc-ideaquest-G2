@@ -714,7 +714,9 @@
         box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: var(--text-sm); }
       /* 実寸サンプル＝本番チャットのメッセージ寸法(実測 約1056×102・アスペクト ~10:1)に合わせた幅広・低い箱。
          パネル依存の演出(オーラ放射粒の半径・氷ツリー・波動)をこの寸法で再調整するための土台。 */
-      .fcast-stage--real { max-width: 1080px; }
+      /* 左右パディング＝全幅メッセージの端に付くアバターバッジ(author=left:-12px / caster=right:-12px)や
+         幅いっぱいの永続演出が、ステージの overflow:hidden で切れないための逃げ幅。 */
+      .fcast-stage--real { max-width: 1080px; padding-inline: 22px; }
       .fcast-stage--real .demo-msg { max-width: none; width: 100%; text-align: left; box-sizing: border-box; min-height: 102px; }
       .fcast-stage.playing { animation: fcast-shake .4s ease-out; } /* 着弾のタイミングで JS が付与 */
 
