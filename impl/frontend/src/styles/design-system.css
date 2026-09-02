@@ -1139,17 +1139,33 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
   box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22);
   animation: fire-flicker 1.3s ease-in-out infinite;
 }
-.spell-fx--fire::before {
+@keyframes fire-flicker {
+  0%,100% { box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22); }
+  50%     { box-shadow: 0 0 16px 4px rgba(249,115,22,.8),  inset 0 0 18px rgba(220,38,38,.32); }
+}
+/* 魔法カタログ(SC-32)のプレビュー箱は従来どおり上端に揺れる🔥。チャットは火柱(下記 __pillars)に統一（モック §17 準拠）。 */
+.spell-preview.spell-fx--fire::before {
   content: "🔥🔥🔥🔥🔥"; position: absolute; left: 8px; right: 8px; top: -12px;
   display: flex; justify-content: space-between; font-size: 15px; line-height: 1;
   pointer-events: none; filter: drop-shadow(0 0 4px rgba(249,115,22,.8));
   animation: fire-rise 1.1s ease-in-out infinite; transform-origin: bottom;
 }
-@keyframes fire-flicker {
-  0%,100% { box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22); }
-  50%     { box-shadow: 0 0 16px 4px rgba(249,115,22,.8),  inset 0 0 18px rgba(220,38,38,.32); }
-}
 @keyframes fire-rise { 0%,100% { transform: translateY(0) scaleY(1); opacity:.9; } 50% { transform: translateY(-2px) scaleY(1.12); opacity:1; } }
+/* Phase D: 炎の永続＝下辺の火柱（つながった低い炎 __pbase＋根元を軸に首を振る火柱 __peak）。SpellPersistFx が注入。 */
+.spell-fx__pillars { position: absolute; left: 4px; right: 4px; bottom: -3px; height: 22px; pointer-events: none; }
+.spell-fx__pbase { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; transform-origin: 50% 100%;
+  background: linear-gradient(to top, #ff5a1a, #ff8a1e 55%, #ffd23f 100%);
+  -webkit-mask: linear-gradient(#000,#000) 0 100%/100% 55% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 66%, transparent 80%) 0 0/24px 100% repeat-x;
+          mask: linear-gradient(#000,#000) 0 100%/100% 55% no-repeat, radial-gradient(60% 100% at 50% 100%, #000 66%, transparent 80%) 0 0/24px 100% repeat-x;
+  animation: fire-base 1.1s ease-in-out infinite; }
+.spell-fx__peak { position: absolute; bottom: 0; width: 15px; height: var(--h, 14px);
+  background: radial-gradient(52% 68% at 50% 82%, #fff 4%, #ffe08a 24%, #ff8a1e 58%, transparent 74%);
+  border-radius: 50% 50% 48% 48% / 72% 72% 40% 40%; transform-origin: 50% 100%; filter: blur(.4px);
+  animation: fire-sway var(--dur, .9s) ease-in-out var(--d, 0s) infinite; }
+@keyframes fire-base { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.18); } }
+@keyframes fire-sway {
+  0%,100% { transform: translateX(-50%) rotate(-7deg) scaleY(.94); }
+  50%     { transform: translateX(-50%) rotate(7deg) scaleY(1.08); } }
 /* 氷: 冷たい青グロー */
 .spell-fx--ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
 /* 雷: 黄の明滅 */
@@ -1176,7 +1192,8 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 
 @media (prefers-reduced-motion: reduce) {
   .spell-fx--fire, .spell-fx--thunder, .spell-fx--rainbow, .spell-fx--aura { animation: none; }
-  .spell-fx--fire::before { animation: none; }
+  .spell-fx__pbase, .spell-fx__peak { animation: none; } /* 炎の火柱＝静的な炎として残す */
+  .spell-preview.spell-fx--fire::before { animation: none; }
 }
 
 /* =============================================================

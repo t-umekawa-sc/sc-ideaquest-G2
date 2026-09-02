@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   castEffect, castTier, castParticleCount, castParticles,
   castDelivery, boltPoints, iceShards, crescentCount,
-  castBurstKind, radialBurst,
+  castBurstKind, radialBurst, firePillars,
 } from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
@@ -179,5 +179,19 @@ describe("radialBurst", () => {
   });
   it("決定的（同入力で同結果）", () => {
     expect(radialBurst(9, 60, -90)).toEqual(radialBurst(9, 60, -90));
+  });
+});
+
+// G-TC-154: 属性別永続エフェクトの純ロジック（Phase D・SpellPersistFx / GF-AC-091）。
+describe("firePillars", () => {
+  it("8本・left は左→右へ単調増加で 0..100%・高さは一様でない", () => {
+    const ps = firePillars();
+    expect(ps).toHaveLength(8);
+    for (let i = 1; i < ps.length; i++) expect(ps[i].left).toBeGreaterThan(ps[i - 1].left);
+    for (const p of ps) { expect(p.left).toBeGreaterThanOrEqual(0); expect(p.left).toBeLessThanOrEqual(100); }
+    expect(new Set(ps.map((p) => p.h)).size).toBeGreaterThan(1); // 背の高い火柱がある
+  });
+  it("決定的（同入力で同結果）", () => {
+    expect(firePillars()).toEqual(firePillars());
   });
 });

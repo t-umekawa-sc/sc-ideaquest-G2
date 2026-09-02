@@ -89,6 +89,22 @@ export function radialBurst(n: number, radius: number, startDeg = -90): RadialPo
   });
 }
 
+// ── Phase D: 属性別永続エフェクト（buildPersist→production 移植・GF-AC-091 §17） ──
+// 炎の永続＝下辺の火柱。8本の左位置(%)・高さ(px)・遅延(s)・周期(s)をばらし、各火柱が根元を軸に首を振る。決定的。
+export type FirePillar = { left: number; h: number; delay: number; dur: number };
+export function firePillars(): FirePillar[] {
+  return [
+    { left: 10, h: 12, delay: 0, dur: 0.95 },
+    { left: 22, h: 18, delay: -0.25, dur: 1.05 },
+    { left: 34, h: 11, delay: -0.5, dur: 0.85 },
+    { left: 46, h: 16, delay: -0.15, dur: 1.0 },
+    { left: 58, h: 12, delay: -0.35, dur: 0.9 },
+    { left: 70, h: 19, delay: -0.05, dur: 1.1 },
+    { left: 82, h: 11, delay: -0.45, dur: 0.8 },
+    { left: 92, h: 14, delay: -0.2, dur: 0.95 },
+  ];
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

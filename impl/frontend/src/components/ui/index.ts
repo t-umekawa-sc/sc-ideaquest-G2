@@ -4,6 +4,7 @@ export { Button } from "./Button";
 export { CountUp } from "./CountUp";
 export { SpellCastFx, type CastRect } from "./SpellCastFx";
 export { SpellDeliveryFx, type CastPoint } from "./SpellDeliveryFx";
+export { SpellPersistFx } from "./SpellPersistFx";
 export { SparkBurst } from "./SparkBurst";
 export { XpFloat } from "./XpFloat";
 export { EmptyState } from "./EmptyState";

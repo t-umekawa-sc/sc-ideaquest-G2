@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, type CastRect, type CastPoint } from "@/components/ui";
+import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, type CastRect, type CastPoint } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -433,6 +433,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
               {showDay && <div className="chat-day">{day}</div>}
               {firstUnread === m.id && <div className="unread-sep">ここから未読</div>}
               <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : ""].filter(Boolean).join(" ")}>
+                {/* Phase D: 属性別の永続装飾（炎=火柱 等）を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。 */}
+                {magic && <SpellPersistFx effect={magic.effect ?? ""} />}
                 <span className="avatar sm"><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
                 <div className="msg__body">
                   <div className="msg__head">

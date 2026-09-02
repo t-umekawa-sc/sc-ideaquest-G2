@@ -111,3 +111,11 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-153 | unit(front) | effect→バースト種別の対応 | 任意の effect 文字列 | `castBurstKind(e)` | fire=`plume`・thunder=`rays`・ice=`shards`・rainbow=`rings`・aura=`motes`・sparkle=`motes`／未知は sparkle 相当＝`motes` | GF-AC-091／#10 |
 | G-TC-153 | unit(front) | 中心から全周へ等間隔・等半径に配る | 個数 n／半径 r／起点角 | `radialBurst(n, r, startDeg?)` | 要素数は n（n≤0 は空）／各点の半径は r にほぼ一致（丸め誤差のみ）／隣接角は 360/n で等間隔／既定起点は真上（先頭 dx≈0, dy<0）／決定的 | GF-AC-091 |
+
+### 5-D. 属性別永続エフェクトの純ロジック（Phase D・SpellPersistFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/cast.ts`（純ロジック追加分）。モック §17 `buildPersist` 相当＝発動後にメッセージ枠へ着地するリッチな永続を production 化。属性ごとに DOM を生成する `components/ui/SpellPersistFx.tsx` の決定的レイアウトを担保。まず炎＝下辺の火柱（`firePillars`＝8本の左位置/高さ/遅延/周期をばらす）。視覚（グラデ/マスク/首振り）は `design-system.css .spell-fx__*` で GF-AC 受入。属性は増分で追加（雷/虹/オーラ/氷ツリーは後続）。reduce-motion は CSS で animation 無効（静的）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-154）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-154 | unit(front) | 炎の火柱レイアウト | なし | `firePillars()` | 8本／left は左→右へ単調増加で 0..100% に収まる／高さ h は一様でない（背の高い火柱がある）／決定的 | GF-AC-091／#10 |
