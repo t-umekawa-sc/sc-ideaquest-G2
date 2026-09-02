@@ -91,3 +91,14 @@
 | G-TC-151 | unit(front) | 種別/ランクの正規化 | 任意の effect/rarity 文字列 | `castEffect(e)`／`castTier(r)` | 既知はそのまま／未知の effect は `sparkle`・未知の rarity は `standard` に畳む | GF-AC-091／#10 |
 | G-TC-151 | unit(front) | ランクが高いほど派手（粒子数） | common/standard/rare | `castParticleCount(r)` | `common < standard < rare`・未知は standard 相当 | GF-AC-091 |
 | G-TC-151 | unit(front) | 中央から外側へ放射状に広がる粒子配置 | rarity | `castParticles(r)` | 数は `castParticleCount` と一致／先頭は真上（dx≈0, dy<0）／全周にほぼ等半径で散る（上下左右いずれにも向く）／rare の半径 > common／決定的 | GF-AC-091 |
+
+### 5-B. 属性別デリバリー（発射方式）の純ロジック（Phase B・SpellDeliveryFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/cast.ts`（純ロジック追加分）。モック §17 の「属性ごとに飛び方が違う」発射方式を production へ移植する Phase B の決定的レイアウト。effect→デリバリー種別（火球/稲妻/氷礫/ビーム/三日月）・稲妻のジグザグ折れ線（両端は発射元/着弾点に接続・中間が交互に振れる）・氷礫4片の相対レイアウト（大小/回転）・三日月の本数（距離が長いほど道中で増える・4..9 でクランプ）を担保。座標→画面上の実位置変換（角度/距離）と視覚（色/グロー/マズル）は `components/ui/SpellDeliveryFx.tsx`＋`design-system.css` で GF-AC 受入。reduce-motion は親が生成抑制（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-152）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-152 | unit(front) | effect→発射方式の対応 | 任意の effect 文字列 | `castDelivery(e)` | fire/sparkle=`ball`・thunder=`bolt`・ice=`shards`・rainbow=`beam`・aura=`crescents`／未知は sparkle 相当＝`ball` | GF-AC-091／#10 |
+| G-TC-152 | unit(front) | 稲妻のジグザグ折れ線 | 分割数 seg | `boltPoints(seg)` | 点数は seg+1／t は 0→1 単調増加で両端 0/1／両端の横オフセット off=0（発射元/着弾点に接続）／中間に +と− 両方の振れがある／決定的 | GF-AC-091 |
+| G-TC-152 | unit(front) | 氷礫4片の相対レイアウト | なし | `iceShards()` | 4片／大小が異なる（scale が一様でない）／左右いずれにもズレる片がある（dx に +と−）／決定的 | GF-AC-091 |
+| G-TC-152 | unit(front) | 三日月の本数（距離で増える） | 発射元→着弾点の距離 | `crescentCount(d)` | 4..9 にクランプ／距離が長いほど単調非減少／近距離=4・十分遠い=9 | GF-AC-091 |

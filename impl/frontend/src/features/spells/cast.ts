@@ -26,6 +26,47 @@ export function castParticleCount(rarity: string): number {
   return tier === "rare" ? 9 : tier === "common" ? 4 : 6;
 }
 
+// ── Phase B: 属性別デリバリー（発射方式）の決定的レイアウト（モック §17→production 移植・GF-AC-091） ──
+// effect ごとに「飛び方」が変わる。視覚（色/グロー/マズル）は SpellDeliveryFx＋design-system.css。
+export type CastDelivery = "ball" | "bolt" | "shards" | "beam" | "crescents";
+
+// fire/sparkle=火球 / thunder=稲妻 / ice=氷礫 / rainbow=ビーム / aura=三日月。未知は sparkle 相当＝ball。
+const DELIVERY: Record<CastEffect, CastDelivery> = {
+  fire: "ball", sparkle: "ball", thunder: "bolt", ice: "shards", rainbow: "beam", aura: "crescents",
+};
+export function castDelivery(effect: string): CastDelivery {
+  return DELIVERY[castEffect(effect)];
+}
+
+// 稲妻のジグザグ折れ線＝進行 t（0=発射元, 1=着弾点）と中心線からの横オフセット off(px)。
+// 両端は必ず off=0（発射元/着弾点に接続）、中間は交互に振れる（端に近いほど振幅小＝自然なジグザグ）。決定的。
+export type BoltPoint = { t: number; off: number };
+export function boltPoints(seg = 6): BoltPoint[] {
+  const pts: BoltPoint[] = [];
+  for (let i = 0; i <= seg; i++) {
+    const edge = i === 0 || i === seg;
+    const off = edge ? 0 : (i % 2 ? 1 : -1) * (6 + (i % 3) * 3); // ±6/9/12px を交互に
+    pts.push({ t: Math.round((i / seg) * 1000) / 1000, off });
+  }
+  return pts;
+}
+
+// 氷礫＝大小4つの尖った氷片の相対レイアウト（横/縦ズレ・回転・大きさ）。決定的。
+export type IceShard = { dx: number; dy: number; rot: number; scale: number };
+export function iceShards(): IceShard[] {
+  return [
+    { dx: -8, dy: -6, rot: -24, scale: 1.0 },
+    { dx: 7, dy: -2, rot: 18, scale: 0.7 },
+    { dx: -3, dy: 6, rot: 40, scale: 0.85 },
+    { dx: 9, dy: 8, rot: -12, scale: 0.6 },
+  ];
+}
+
+// 三日月の隊列の本数＝発射元→着弾点の距離が長いほど道中で増える（4..9 でクランプ）。GF-AC-091 §17。
+export function crescentCount(distance: number): number {
+  return Math.max(4, Math.min(9, 4 + Math.round(distance / 60)));
+}
+
 export type CastParticle = { dx: number; dy: number; delay: number };
 
 // 中央アイコンから外側へ放射状に広がる粒子の到達座標（px）と発火遅延（秒）。

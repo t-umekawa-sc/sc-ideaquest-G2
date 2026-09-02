@@ -1753,6 +1753,55 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 
 @media (prefers-reduced-motion: reduce) { .spell-cast { display: none; } }
 
+/* ── Phase B: 属性別デリバリー（発射方式）＝発射元 from→対象 to へ飛ぶ（SpellDeliveryFx・GF-AC-091 §17） ── */
+/* 座標固定オーバーレイ。--dist=距離px / --ang=進行角 / --dscale=レア係数。親が from/to を算出し reduce-motion 時は生成しない。 */
+.spell-deliver { position: fixed; z-index: 1001; pointer-events: none; --fx: rgba(139,92,246,.85); --spark: #fff; }
+.spell-deliver--fire    { --fx: #ff7a18; --spark: #ffe08a; }
+.spell-deliver--thunder { --fx: #fbbf24; --spark: #fffde7; }
+.spell-deliver--ice     { --fx: #38bdf8; --spark: #e0f2fe; }
+.spell-deliver--sparkle { --fx: #a855f7; --spark: #f3e8ff; }
+.spell-deliver--rainbow { --fx: #ec4899; --spark: #ffffff; }
+.spell-deliver--aura    { --fx: #8b5cf6; --spark: #ede9fe; }
+.spell-deliver > * { position: absolute; left: 0; top: 0; }
+/* マズル閃光（発射元で一瞬弾ける） */
+.spell-deliver__muzzle { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: radial-gradient(circle, var(--spark), var(--fx) 55%, transparent 72%);
+  opacity: 0; animation: deliver-muzzle .38s ease-out forwards; }
+@keyframes deliver-muzzle { 0% { opacity: 0; transform: scale(.3); } 30% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.5); } }
+/* 進行方向へ回転した軌道（原点＝from、+X が to 方向・幅＝距離） */
+.spell-deliver__track { transform: rotate(var(--ang)) scale(var(--dscale, 1)); transform-origin: 0 0; width: var(--dist); height: 0; }
+.spell-deliver__track > * { position: absolute; left: 0; top: 0; }
+/* 火球＝丸い光弾が from→to へ（小さく始まって大きく） */
+.spell-deliver__ball { width: 18px; height: 18px; margin: -9px 0 0 0; border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, var(--spark), var(--fx) 62%, transparent);
+  box-shadow: 0 0 12px 3px var(--fx); opacity: 0; animation: deliver-ball .42s ease-in forwards; }
+@keyframes deliver-ball { 0% { opacity: 0; transform: translateX(0) scale(.5); } 15% { opacity: 1; } 100% { opacity: 1; transform: translateX(var(--dist)) scale(1.15); } }
+/* ビーム＝from→to へ一気に伸びる光条 */
+.spell-deliver__beam { height: 4px; margin-top: -2px; width: var(--dist); transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, var(--fx) 30%, var(--spark)); box-shadow: 0 0 10px var(--fx);
+  opacity: 0; transform: scaleX(0); animation: deliver-beam .4s ease-out forwards; }
+@keyframes deliver-beam { 0% { opacity: 0; transform: scaleX(0); } 20% { opacity: 1; } 80% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+/* 稲妻＝全幅のジグザグを描いて明滅（途切れる） */
+.spell-deliver__bolt { width: var(--dist); height: 40px; margin-top: -20px; overflow: visible; opacity: 0; animation: deliver-bolt .42s steps(1, end) forwards; }
+.spell-deliver__bolt polyline { fill: none; stroke: var(--spark); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--fx)) drop-shadow(0 0 8px var(--fx)); vector-effect: non-scaling-stroke; }
+@keyframes deliver-bolt { 0% { opacity: 0; } 12% { opacity: 1; } 30% { opacity: .3; } 48% { opacity: 1; } 100% { opacity: 0; } }
+/* 氷礫＝4片が回転しながら from→to へ飛散 */
+.spell-deliver__shard { width: 12px; height: 12px; margin: -6px 0 0 0;
+  background: linear-gradient(135deg, var(--spark), var(--fx)); clip-path: polygon(50% 0, 100% 42%, 62% 100%, 12% 74%);
+  box-shadow: 0 0 6px var(--fx); opacity: 0; animation: deliver-shard .44s ease-in forwards; }
+@keyframes deliver-shard {
+  0% { opacity: 0; transform: translate(0, var(--sdy)) rotate(0) scale(var(--sscale)); } 15% { opacity: 1; }
+  100% { opacity: 1; transform: translate(var(--dist), var(--sdy)) rotate(calc(var(--srot) * 6)) scale(var(--sscale)); } }
+/* 三日月＝隊列で from→to へ（index で少し遅延して連なる） */
+.spell-deliver__crescent { width: 14px; height: 14px; margin: -7px 0 0 0; border-radius: 50%;
+  background: radial-gradient(circle at 34% 36%, var(--spark), var(--fx) 84%);
+  -webkit-mask: radial-gradient(circle at 72% 50%, transparent 0 52%, #000 54%);
+          mask: radial-gradient(circle at 72% 50%, transparent 0 52%, #000 54%);
+  filter: drop-shadow(0 0 5px var(--fx)); opacity: 0; animation: deliver-crescent .5s ease-out calc(var(--ci) * .045s) forwards; }
+@keyframes deliver-crescent { 0% { opacity: 0; transform: translateX(0) scale(.7); } 20% { opacity: .95; } 100% { opacity: 0; transform: translateX(var(--dist)) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .spell-deliver { display: none; } }
+
 /* ── ゲーム感 #19: 空状態の演出（EmptyState・共通）───────────────────────────────────
    マスコット/絵文字＋一言で空の寂しさを解消。アイコンはゆるく上下に揺れる（mascot-bob 再利用）。
    reduce-motion で静止。情報は title/hint に残る（純視覚）。 */

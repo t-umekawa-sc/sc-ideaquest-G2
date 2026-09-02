@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { castEffect, castTier, castParticleCount, castParticles } from "./cast";
+import {
+  castEffect, castTier, castParticleCount, castParticles,
+  castDelivery, boltPoints, iceShards, crescentCount,
+} from "./cast";
 
 // G-TC-151: 魔法発動演出（SpellCastFx / GF-AC-091）の純ロジック。
 // 種別の正規化・レアリティ強度・「中央から外側へ広がる」放射状粒子配置を担保する。
@@ -69,5 +72,72 @@ describe("castParticles", () => {
   });
   it("決定的（同入力で同結果）", () => {
     expect(castParticles("rare")).toEqual(castParticles("rare"));
+  });
+});
+
+// G-TC-152: 属性別デリバリー（発射方式）の純ロジック（Phase B・SpellDeliveryFx / GF-AC-091）。
+// effect→種別・稲妻ジグザグ・氷礫レイアウト・三日月本数を決定的に担保する。
+describe("castDelivery", () => {
+  it("effect ごとに発射方式が変わる", () => {
+    expect(castDelivery("fire")).toBe("ball");
+    expect(castDelivery("sparkle")).toBe("ball");
+    expect(castDelivery("thunder")).toBe("bolt");
+    expect(castDelivery("ice")).toBe("shards");
+    expect(castDelivery("rainbow")).toBe("beam");
+    expect(castDelivery("aura")).toBe("crescents");
+  });
+  it("未知の effect は sparkle 相当＝ball に畳む", () => {
+    expect(castDelivery("unknown")).toBe("ball");
+    expect(castDelivery("")).toBe("ball");
+  });
+});
+
+describe("boltPoints", () => {
+  it("点数は seg+1・t は 0→1 単調増加で両端 0/1", () => {
+    const pts = boltPoints(6);
+    expect(pts).toHaveLength(7);
+    expect(pts[0].t).toBe(0);
+    expect(pts[pts.length - 1].t).toBe(1);
+    for (let i = 1; i < pts.length; i++) expect(pts[i].t).toBeGreaterThan(pts[i - 1].t);
+  });
+  it("両端は横オフセット 0（発射元/着弾点に接続）・中間は交互に振れる", () => {
+    const pts = boltPoints(6);
+    expect(pts[0].off).toBe(0);
+    expect(pts[pts.length - 1].off).toBe(0);
+    const mids = pts.slice(1, -1).map((p) => p.off);
+    expect(mids.some((o) => o > 0)).toBe(true);
+    expect(mids.some((o) => o < 0)).toBe(true);
+  });
+  it("決定的（同入力で同結果）", () => {
+    expect(boltPoints(6)).toEqual(boltPoints(6));
+  });
+});
+
+describe("iceShards", () => {
+  it("4片・大小が異なる・左右いずれにもズレる", () => {
+    const sh = iceShards();
+    expect(sh).toHaveLength(4);
+    expect(new Set(sh.map((s) => s.scale)).size).toBeGreaterThan(1); // 一様でない
+    expect(sh.some((s) => s.dx > 0)).toBe(true);
+    expect(sh.some((s) => s.dx < 0)).toBe(true);
+  });
+  it("決定的（同入力で同結果）", () => {
+    expect(iceShards()).toEqual(iceShards());
+  });
+});
+
+describe("crescentCount", () => {
+  it("4..9 にクランプ・距離が長いほど単調非減少", () => {
+    expect(crescentCount(0)).toBe(4);
+    expect(crescentCount(-100)).toBe(4);        // 下限
+    expect(crescentCount(100000)).toBe(9);      // 上限
+    let prev = crescentCount(0);
+    for (let d = 0; d <= 600; d += 30) {
+      const n = crescentCount(d);
+      expect(n).toBeGreaterThanOrEqual(prev);
+      expect(n).toBeGreaterThanOrEqual(4);
+      expect(n).toBeLessThanOrEqual(9);
+      prev = n;
+    }
   });
 });

@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, type CastRect } from "@/components/ui";
+import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, type CastRect, type CastPoint } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -94,6 +94,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [picker, setPicker] = useState<{ pos: Pos; msgId: string } | null>(null);
   // #10: 魔法発動の瞬間演出（対象メッセージ矩形に one-shot・自分の発動のみ・reduce-motion 尊重）。
   const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
+  // Phase B: 発射元→対象メッセージへ飛ぶデリバリー（属性別・GF-AC-091 §17）。着弾で one-shot(SpellCastFx) に接続。
+  const [delivers, setDelivers] = useState<{ id: number; from: CastPoint; to: CastPoint; effect: string; rarity: string }[]>([]);
   const castId = useRef(0);
   const fireCast = (msgId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
@@ -103,6 +105,19 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     const id = ++castId.current;
     setCasts((c) => [...c, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, effect, rarity }]);
     setTimeout(() => setCasts((c) => c.filter((z) => z.id !== id)), 1000);
+  };
+  // 発射元 from（発動した魔法ボタン位置）→対象メッセージ中央へ飛ばし、着弾(約420ms)で fireCast を発火。
+  const DELIVER_MS = 420;
+  const fireDelivery = (from: CastPoint, msgId: string, effect: string, rarity: string) => {
+    if (reduceMotion()) { fireCast(msgId, effect, rarity); return; }
+    const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
+    if (!el) { fireCast(msgId, effect, rarity); return; }
+    const r = el.getBoundingClientRect();
+    const to = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    const id = ++castId.current;
+    setDelivers((d) => [...d, { id, from, to, effect, rarity }]);
+    setTimeout(() => setDelivers((d) => d.filter((z) => z.id !== id)), DELIVER_MS + 260);
+    setTimeout(() => fireCast(msgId, effect, rarity), DELIVER_MS); // 着弾＝一撃＋永続へ
   };
 
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -311,14 +326,16 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   };
 
   // ---- 魔法 ----
-  const castSpell = async (m: ChatMessage, spell: Spell) => {
+  const castSpell = async (m: ChatMessage, spell: Spell, from?: CastPoint) => {
     try {
       const res = await addReaction(m.id, { type: "magic", spell_id: spell.id });
       if (res) {
         setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
         // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
-        fireCast(m.id, eff, spell.rarity); // レアリティが高いほど派手に（GF-AC-091）
+        // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
+        if (from) fireDelivery(from, m.id, eff, spell.rarity);
+        else fireCast(m.id, eff, spell.rarity);
       }
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
@@ -367,7 +384,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
 
   return (
     <main className="container chat-main">
-      {/* #10: 魔法発動の瞬間演出（対象メッセージ矩形に固定オーバーレイ・自分の発動時のみ） */}
+      {/* #10/Phase B: 発射元→対象へ飛ぶデリバリー（属性別）＋着弾の瞬間演出（固定オーバーレイ・自分の発動時のみ） */}
+      {delivers.map((d) => <SpellDeliveryFx key={d.id} from={d.from} to={d.to} effect={d.effect} rarity={d.rarity} />)}
       {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} rarity={c.rarity} />)}
       {/* 文脈パネル（戻るリンク含む）自体をフローティング（sticky）で常時上部に表示（デザイン標準 §4.10）。
           折りたたみ可能＝たたむと薄いバーになり、右側に戻るリンクだけ残す。 */}
@@ -613,7 +631,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 spells.filter((s) => unlockedSpellIds.has(s.id)).map((s) => {
                   const used = myMagicSpellIds.has(s.id);
                   return (
-                    <button key={s.id} type="button" className="rp__spell" disabled={used} onClick={() => void castSpell(pickerTarget, s)}>
+                    <button key={s.id} type="button" className="rp__spell" disabled={used} onClick={(e) => {
+                      const b = e.currentTarget.getBoundingClientRect();
+                      void castSpell(pickerTarget, s, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
+                    }}>
                       {s.icon} {s.name_ja}{used && <span className="cd">使用中</span>}
                     </button>
                   );
