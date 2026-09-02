@@ -718,6 +718,8 @@
          幅いっぱいの永続演出が、ステージの overflow:hidden で切れないための逃げ幅。 */
       .fcast-stage--real { max-width: 1080px; padding-inline: 22px; }
       .fcast-stage--real .demo-msg { max-width: none; width: 100%; text-align: left; box-sizing: border-box; min-height: 102px; }
+      /* 実寸サンプル直下の「発動」ボタン（JS が生成）＝押すたびに発動→着弾→燃焼を再生。 */
+      .fcast-replayctrl { max-width: 1080px; margin: var(--space-2) 0 var(--space-5); }
       .fcast-stage.playing { animation: fcast-shake .4s ease-out; } /* 着弾のタイミングで JS が付与 */
 
       .fcast { position: absolute; inset: 0; z-index: 3; pointer-events: none;
@@ -1694,8 +1696,8 @@
           if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName, msg)); /* 永続エフェクトを注入（枠実測で size-adaptive） */
           var src = msg.querySelector(stage.getAttribute('data-src')) || msg;
           var played = false;
-          function reveal() {
-            if (played) return; played = true; /* 画面表示時に1回だけ */
+          /* 発動シーケンス本体（発射リアクション→デリバリー→着弾→燃焼）。reveal と 手動リプレイで共有。 */
+          function castAnim() {
             if (reduced()) { msg.classList.add('is-burning'); return; } /* 抑制＝静的燃焼のみ */
             /* A: 弾は文書スクロール座標にアンカー（絶対配置＋スクロールオフセット）＝スクロールしても対象に追従 */
             var a = src.getBoundingClientRect(), m = msg.getBoundingClientRect();
@@ -1739,7 +1741,28 @@
               setTimeout(impact, Math.round(DUR * .86));
             }
           }
+          function reveal() {
+            if (played) return; played = true; /* 画面表示時に1回だけ */
+            castAnim();
+          }
+          /* 手動リプレイ＝燃焼状態を解除→残っている着弾バーストを除去→発動シーケンスを再生（発動ボタン用）。
+             デリバリー弾（火球/稲妻/ビーム等）は body 直付けで各自 setTimeout により自己除去されるためここでは触れない。 */
+          function replay() {
+            played = true;
+            msg.classList.remove('is-burning');
+            stage.classList.remove('playing');
+            var oldBurst = stage.querySelector('.fcast'); if (oldBurst) oldBurst.remove();
+            void msg.offsetWidth; /* リフロー＝is-burning 解除を確定させてから再点火 */
+            castAnim();
+          }
           fcastWhenVisible(stage, reveal); /* 可視で1回だけ・スクロール復元レース耐性あり */
+          /* 実寸サンプルには直下に「発動」ボタンを生成＝押すたびに発動から再生できる。 */
+          if (stage.classList.contains('fcast-stage--real')) {
+            var ctrl = document.createElement('div'); ctrl.className = 'fcast-replayctrl';
+            var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn-pixel';
+            rb.textContent = '魔法を発動'; rb.addEventListener('click', replay);
+            ctrl.appendChild(rb); stage.insertAdjacentElement('afterend', ctrl);
+          }
         }
         document.querySelectorAll('.fcast-stage.fcast-reveal').forEach(wire);
       })();
