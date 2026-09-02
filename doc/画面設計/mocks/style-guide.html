@@ -905,19 +905,20 @@
       .fcast-ball-fx.fx-aura { box-shadow: 0 0 14px 4px rgba(139,92,246,.85), 0 0 30px 8px rgba(196,181,253,.55); }
       .fcast-ball-fx.fx-aura .ball-core { background: radial-gradient(circle at 38% 36%, #fff 8%, #ede9fe 26%, #8b5cf6 60%, #6d28d9 88%); } /* 光球 */
       .fcast-ball-fx.fx-aura::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid rgba(196,181,253,.6); animation: ball-pulse 1s ease-in-out infinite; } /* ハロー */
-      /* 火の玉＝コアが素早くちらつき、周囲に炎の舌(::before=揺らぐ炎)＋後方の火の粉(::after)。丸い弾でなく“燃える塊”に。 */
-      .fcast-ball-fx.fx-fire { box-shadow: 0 0 16px 5px rgba(255,120,30,.92), 0 0 36px 11px rgba(255,80,20,.55); }
-      .fcast-ball-fx.fx-fire .ball-core { animation: fireball-flicker .1s steps(2, jump-none) infinite; }
-      .fcast-ball-fx.fx-fire::before { content: ""; position: absolute; inset: -9px -5px -13px -5px; z-index: -1;
-        background: radial-gradient(50% 62% at 50% 66%, rgba(255,235,170,.98), rgba(255,130,35,.72) 46%, transparent 74%);
-        border-radius: 50% 50% 46% 46% / 62% 62% 46% 46%; filter: blur(2px); transform-origin: 50% 78%;
-        animation: fireball-tongue .14s ease-in-out infinite alternate; }
-      .fcast-ball-fx.fx-fire::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; z-index: -2;
-        background: radial-gradient(circle, rgba(255,190,90,.7), transparent 68%); filter: blur(3px);
-        animation: fireball-spark .18s steps(2) infinite; }
-      @keyframes fireball-flicker { 0% { opacity: 1; transform: scale(1); filter: brightness(1); } 100% { opacity: .84; transform: scale(1.08); filter: brightness(1.25); } }
-      @keyframes fireball-tongue { 0% { transform: scaleY(1) rotate(-5deg); opacity: .85; } 100% { transform: scaleY(1.28) rotate(5deg); opacity: 1; } }
-      @keyframes fireball-spark { 0% { transform: scale(1.15) translate(1px,1px); opacity: .8; } 100% { transform: scale(1.4) translate(-1px,-1px); opacity: .35; } }
+      /* 火の玉＝彗星型SVG。頭(黄)が進行方向、尾(赤橙の炎)が後方へ流れる。--angle は発射時に JS が進行方向で設定。
+         回転原点＝頭(72% 49%)＝弾の着弾点に頭を合わせ、尾は後方へ振れる。 */
+      .fcast-ball-fx.fx-fire { box-shadow: none; overflow: visible; }
+      .fcast-ball-fx.fx-fire .fball { position: absolute; left: 50%; top: 50%;
+        width: 60px; height: 36px; transform: translate(-72%, -49%) rotate(var(--angle, 0deg)); transform-origin: 72% 49%;
+        overflow: visible; filter: drop-shadow(0 0 5px rgba(255,120,30,.9)) drop-shadow(0 0 12px rgba(255,80,20,.55));
+        animation: fball-flick .11s steps(2, jump-none) infinite; }
+      .fball-outer { fill: #ff3d00; }
+      .fball-mid { fill: #ff9422; }
+      .fball-head { fill: #ffd23a; }
+      .fball-hot { fill: #fff6cf; }
+      @keyframes fball-flick {
+        0%   { filter: drop-shadow(0 0 5px rgba(255,120,30,.9)) drop-shadow(0 0 12px rgba(255,80,20,.55)) brightness(1); }
+        100% { filter: drop-shadow(0 0 8px rgba(255,150,50,1)) drop-shadow(0 0 15px rgba(255,90,20,.65)) brightness(1.15); } }
 
       .fcast-muzzle.fx-thunder { --mz1: rgba(255,245,170,.95); --mz2: rgba(251,191,36,.4); --mzr: rgba(253,224,71,.95); }
       .fcast-muzzle.fx-ice     { --mz1: rgba(224,242,254,.95); --mz2: rgba(56,189,248,.4);  --mzr: rgba(125,211,252,.95); }
@@ -1403,10 +1404,20 @@
       }
 
       /* 火球＝外殻(位置/グロー)＋内側コア(属性ごとの形/自転)。両デモで共用。 */
+      /* 火の玉＝彗星型SVG（頭=右/尾=左の局所座標）。発射時に進行方向で回転(--angle)させ尾を後方へ流す。
+         層＝外炎(赤)→中炎(橙)→頭(黄)→ホット(白)。尾は上下に分岐した炎の舌。 */
+      var FIREBALL_SVG =
+        '<svg class="fball" viewBox="0 0 150 90" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+          '<path class="fball-outer" d="M112 10 Q86 4 74 26 Q62 12 46 22 Q56 30 44 36 Q24 26 18 42 Q32 44 24 52 Q6 54 16 68 Q34 66 32 74 Q52 84 68 62 Q94 74 116 56 Q140 46 130 22 Q126 8 112 10 Z"/>' +
+          '<path class="fball-mid" d="M110 22 Q88 18 80 34 Q70 24 58 32 Q66 38 54 44 Q40 38 40 48 Q50 48 44 54 Q34 58 42 66 Q54 62 54 68 Q68 74 78 58 Q100 66 112 52 Q130 44 122 28 Q118 20 110 22 Z"/>' +
+          '<circle class="fball-head" cx="108" cy="44" r="25"/>' +
+          '<circle class="fball-hot" cx="114" cy="41" r="13"/>' +
+        '</svg>';
       function fcastMakeBall(fxName) {
         var ball = document.createElement('span');
         ball.className = 'fcast-ball-fx' + (fxName ? ' fx-' + fxName : ''); ball.setAttribute('aria-hidden', 'true');
-        var core = document.createElement('span'); core.className = 'ball-core'; ball.appendChild(core);
+        if (fxName === 'fire') { ball.innerHTML = FIREBALL_SVG; }
+        else { var core = document.createElement('span'); core.className = 'ball-core'; ball.appendChild(core); }
         return ball;
       }
 
@@ -1555,6 +1566,7 @@
 
           /* 火球＝固定オーバーレイを WAAPI で avatar→message へ。小さく→大きく（3D感）→着弾で弾ける */
           var ball = fcastMakeBall('fire');
+          ball.style.setProperty('--angle', (Math.atan2(ey - sy, ex - sx) * 180 / Math.PI).toFixed(1) + 'deg'); /* 進行方向＝頭の向き（尾は後方へ） */
           document.body.appendChild(ball);
           var DUR = 620;
           ball.animate([
@@ -1793,8 +1805,9 @@
             else if (fxName === 'rainbow') { fcastBeam(sx, sy, ex, ey); setTimeout(impact, 210); }
             else if (fxName === 'aura') { fcastCrescents(sx, sy, ex, ey); setTimeout(impact, 480); }
             else {
-              /* 炎＝丸い火球が飛来 */
+              /* 炎＝彗星型の火の玉が飛来（頭＝進行方向・尾は後方へ流れる） */
               var ball = fcastMakeBall(fxName);
+              ball.style.setProperty('--angle', (Math.atan2(ey - sy, ex - sx) * 180 / Math.PI).toFixed(1) + 'deg');
               document.body.appendChild(ball);
               var DUR = 500;
               ball.animate([
