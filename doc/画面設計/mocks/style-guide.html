@@ -1002,6 +1002,16 @@
       @keyframes ice-shatter {
         0%,78% { opacity: 0; transform: translate(0,0) rotate(0) scale(1); } 80% { opacity: .95; }
         85% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) rotate(var(--rot,0deg)) scale(.8); } 100% { opacity: 0; } } /* 割れは速く鋭く */
+      /* 割れる寸前の「網」＝面内部に細い亀裂が広がって割れの前兆に（隅だけ→突然割れる、の突然感を解消）。
+         控えめ＝細く/薄く・可読性優先。68→76%で一気に現れ、割れ(80→84%)で一斉消滅。 */
+      .ice-crackseg.web { height: 1px; opacity: 0;
+        background: linear-gradient(90deg, rgba(3,105,161,.5), rgba(186,230,253,.55));
+        box-shadow: 0 0 1.5px rgba(255,255,255,.55); animation: ice-crack-web var(--iced) linear infinite; }
+      @keyframes ice-crack-web {
+        0%,68% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); }
+        76% { opacity: .5;  transform: rotate(var(--a,0deg)) scaleX(1); }
+        79% { opacity: .55; transform: rotate(var(--a,0deg)) scaleX(1); }
+        84% { opacity: 0; } 100% { opacity: 0; transform: rotate(var(--a,0deg)) scaleX(0); } }
 
       /* 雷＝縁のストロボ＋落ちる稲妻（SVGジグザグ・二連フラッシュ）＋電気スパーク */
       .fx-bolt { position: absolute; top: -8px; width: 22px; height: 58px; overflow: visible;
@@ -1052,6 +1062,18 @@
         0%   { box-shadow: 0 0 8px 0 rgba(167,139,250,.55), 0 0 0 0 rgba(139,92,246,.45); }
         70%  { box-shadow: 0 0 20px 5px rgba(167,139,250,.12), 0 0 0 14px rgba(139,92,246,.08); }
         100% { box-shadow: 0 0 26px 8px rgba(167,139,250,0),   0 0 0 22px rgba(139,92,246,0); } }
+      /* 外周＝太陽フレア風のコロナ（放射状の光条がゆらめく）。控えめ＝薄い/やわらかい。
+         2層を逆回転させて機械的な均等さを崩し、ゆらぎ感を出す（closest-side マスクで縁の帯だけに出す）。 */
+      .aura-flare { position: absolute; inset: -12px; border-radius: 22px; pointer-events: none; opacity: 0;
+        background:
+          repeating-conic-gradient(from 0deg, rgba(196,181,253,0) 0deg, rgba(196,181,253,.22) 5deg, rgba(196,181,253,0) 15deg),
+          repeating-conic-gradient(from 7deg, rgba(167,139,250,0) 0deg, rgba(167,139,250,.16) 4deg, rgba(167,139,250,0) 19deg);
+        -webkit-mask: radial-gradient(closest-side, transparent 60%, #000 84%, transparent 100%);
+                mask: radial-gradient(closest-side, transparent 60%, #000 84%, transparent 100%);
+        mix-blend-mode: screen; animation: aura-flare 7s ease-in-out infinite; }
+      @keyframes aura-flare {
+        0%,100% { opacity: .3;  transform: rotate(0deg)  scale(1); }
+        50%     { opacity: .55; transform: rotate(8deg)  scale(1.04); } }
       /* 内側からやわらかく滲む発光の呼吸 */
       .aura-breath { position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
         background: radial-gradient(ellipse at 50% 46%, rgba(167,139,250,.3), rgba(139,92,246,.12) 55%, transparent 76%);
@@ -1070,10 +1092,10 @@
         100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1); } }
 
       @media (prefers-reduced-motion: reduce) {
-        .fx-bolt, .fx-espark, .frost-spike, .fx-snow, .fx-twinkle, .fx-mote, .aura-wave, .aura-breath { animation: none !important; }
+        .fx-bolt, .fx-espark, .frost-spike, .fx-snow, .fx-twinkle, .fx-mote, .aura-wave, .aura-breath, .aura-flare { animation: none !important; }
         .fx-shimmer::before { animation: none !important; display: none; }
         .fx-bolt, .fx-espark, .fx-twinkle, .fx-mote, .aura-wave { opacity: 0 !important; } /* 明滅・波動系は静止時は消す */
-        .aura-breath { opacity: .35 !important; } /* オーラ＝内側の発光だけ静的に薄く残す */
+        .aura-breath, .aura-flare { opacity: .3 !important; } /* オーラ＝内側の発光と外周フレアだけ静的に薄く残す */
         .fcast, .fcast-ball-fx, .fcast-muzzle, .fcast-bolt-fx,
         .fcast-iceshard, .fcast-beam, .fcast-crescents, .bolt-strike { display: none; }
         .fcast-caster { animation: none; }
@@ -1091,7 +1113,7 @@
       .fcast-stage.reduce .spell-edge, .fcast-stage.reduce .frost-spike, .fcast-stage.reduce .fx-snow { animation: none !important; }
       .fcast-stage.reduce .fx-bolt, .fcast-stage.reduce .fx-espark, .fcast-stage.reduce .fx-twinkle,
       .fcast-stage.reduce .fx-mote, .fcast-stage.reduce .aura-wave { animation: none !important; opacity: 0 !important; }
-      .fcast-stage.reduce .aura-breath { animation: none !important; opacity: .35 !important; }
+      .fcast-stage.reduce .aura-breath, .fcast-stage.reduce .aura-flare { animation: none !important; opacity: .3 !important; }
       .fcast-stage.reduce .fx-shimmer::before { display: none; }
       .fcast-stage.reduce .ice-panel { animation: none !important; opacity: .5; }
       .fcast-stage.reduce .ice-crackseg, .fcast-stage.reduce .ice-shard-piece { display: none !important; }
@@ -1543,6 +1565,17 @@
               c.style.left = sg[0] + '%'; c.style.top = sg[1] + '%'; c.style.width = sg[2] + 'px'; c.style.setProperty('--a', sg[3] + 'deg');
               wrap.appendChild(c);
             });
+            /* 割れる寸前の亀裂の網＝面内部の3節点から放射して広がる細い前兆ヒビ（控えめ・可読性優先） */
+            var webNodes = [[34, 46], [66, 54], [50, 30]];               /* 内部の「割れ核」位置(%) */
+            var webAngles = [[-20, 40, 130, 215], [10, 95, 175, 285], [55, 150, 235, 320]]; /* 各核から放射する向き */
+            webNodes.forEach(function (nd, ni) {
+              webAngles[ni].forEach(function (a, k) {
+                var len = 48 + ((k + ni) % 4) * 12;                       /* 48..84px＝内部へ伸びる長さ差 */
+                var c = el('ice-crackseg web');
+                c.style.left = nd[0] + '%'; c.style.top = nd[1] + '%'; c.style.width = len + 'px'; c.style.setProperty('--a', a + 'deg');
+                wrap.appendChild(c);
+              });
+            });
             [ /* left,top,w,h(%), clip, tx,ty,rot＝割れて飛ぶ破片（速く遠くへ） */
               [0, 0, 56, 60, 'polygon(0 0,100% 0,0 100%)', -44, -31, -46],
               [46, 0, 54, 56, 'polygon(100% 0,100% 100%,0 0)', 44, -27, 44],
@@ -1570,8 +1603,9 @@
             });
             wrap.appendChild(svg);
           } else if (fx === 'aura') {
-            /* 中央から四方八方へ広がる活力の粒＝外へ抜けてオーラの波動になる。内側の呼吸発光＋輪郭の波動と連なる。 */
+            /* 中央から四方八方へ広がる活力の粒＝外へ抜けてオーラの波動になる。内側の呼吸発光＋外周の太陽フレア＋輪郭の波動と連なる。 */
             wrap.appendChild(el('aura-breath'));
+            wrap.appendChild(el('aura-flare')); /* 外周の太陽フレア風コロナ */
             [0, -1.13, -2.26].forEach(function (d) { var w = el('aura-wave'); w.style.setProperty('--d', d + 's'); wrap.appendChild(w); }); /* 3枚を等間隔にずらして連続波に */
             var N = 12;
             for (var mi = 0; mi < N; mi++) {
