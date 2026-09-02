@@ -90,19 +90,18 @@ export function radialBurst(n: number, radius: number, startDeg = -90): RadialPo
 }
 
 // ── Phase D: 属性別永続エフェクト（buildPersist→production 移植・GF-AC-091 §17） ──
-// 炎の永続＝下辺の火柱。8本の左位置(%)・高さ(px)・遅延(s)・周期(s)をばらし、各火柱が根元を軸に首を振る。決定的。
+// 炎の永続＝下辺の火柱。本数は枠幅に比例（幅広メッセージでも密度を保つ）。各火柱の高さ/遅延/周期をばらし首を振る。決定的。
 export type FirePillar = { left: number; h: number; delay: number; dur: number };
-export function firePillars(): FirePillar[] {
-  return [
-    { left: 10, h: 12, delay: 0, dur: 0.95 },
-    { left: 22, h: 18, delay: -0.25, dur: 1.05 },
-    { left: 34, h: 11, delay: -0.5, dur: 0.85 },
-    { left: 46, h: 16, delay: -0.15, dur: 1.0 },
-    { left: 58, h: 12, delay: -0.35, dur: 0.9 },
-    { left: 70, h: 19, delay: -0.05, dur: 1.1 },
-    { left: 82, h: 11, delay: -0.45, dur: 0.8 },
-    { left: 92, h: 14, delay: -0.2, dur: 0.95 },
-  ];
+const FIRE_H = [12, 18, 11, 16, 12, 19, 11, 14];   // 高さのばらつき（巡回）
+const FIRE_DUR = [0.95, 1.05, 0.85, 1.0, 0.9, 1.1, 0.8, 0.95];
+export function firePillars(w = 340): FirePillar[] {
+  const n = Math.max(8, Math.min(28, Math.round(w / 44))); // 約44pxに1本（幅で増える）
+  return Array.from({ length: n }, (_, i) => ({
+    left: Math.round(((i + 0.5) / n) * 1000) / 10, // 等間隔に配置（%）
+    h: FIRE_H[i % FIRE_H.length],
+    delay: Math.round((-((i * 0.17) % 1.2)) * 100) / 100,
+    dur: FIRE_DUR[i % FIRE_DUR.length],
+  }));
 }
 
 // 雷の永続＝落ちる稲妻3本（left%・傾き rot・遅延）＋弾ける電気スパーク2個（left%・top px・遅延）。決定的。
@@ -136,19 +135,20 @@ export function rainbowArcBands(): RainbowBand[] {
   });
 }
 
-// オーラの永続＝メッセージに活力を送るバフ。中央から四方八方へ広がる「活力の粒」（外へ抜けて波動の源になる）。
-// 全周12方向に等間隔＋軽いジッタ、半径は3段(74/94/114px)でばらす。連続的に湧くよう遅延/周期もばらつく。決定的。GF-AC-091 §17。
-export type AuraMote = { dx: number; dy: number; delay: number; dur: number };
-export function auraMotes(): AuraMote[] {
-  const N = 12;
-  return Array.from({ length: N }, (_, i) => {
-    const ang = (Math.PI * 2 * i) / N + (i % 2 ? 0.18 : -0.12); // 等間隔＋軽いジッタ
-    const rad = 74 + (i % 3) * 20; // 74/94/114px
+// オーラの永続＝メッセージに活力を送るバフ。活力の粒を「枠全体に散らして浮上・拡散」させる（幅広メッセージ対応）。
+// 数は枠幅に比例（幅で増える）。原点(startX/Y %)は黄金比で横に均等分散、各粒は上＋左右へ少し漂って消える。決定的。GF-AC-091 §17。
+export type AuraMote = { startX: number; startY: number; dx: number; dy: number; delay: number; dur: number };
+export function auraMotes(w = 340, _h = 150): AuraMote[] {
+  const n = Math.max(6, Math.min(26, Math.round(w / 110))); // 約110pxに1粒（幅で増える）
+  return Array.from({ length: n }, (_, i) => {
+    const fx = (i * 0.61803) % 1; // 黄金比＝横方向に均等分散
     return {
-      dx: Math.round(Math.cos(ang) * rad * 10) / 10,
-      dy: Math.round(Math.sin(ang) * rad * 10) / 10,
-      delay: Math.round(-((i * 0.22) % 2.6) * 100) / 100,
-      dur: Math.round((2.4 + (i % 4) * 0.3) * 10) / 10,
+      startX: Math.round((5 + fx * 90) * 10) / 10,            // 5..95%
+      startY: Math.round((38 + ((i * 29) % 34)) * 10) / 10,   // 38..72%
+      dx: Math.round(Math.cos(i * 1.7) * 16 * 10) / 10,       // 左右に少し
+      dy: -(20 + (i % 4) * 8),                                // 上へ 20..44px
+      delay: Math.round(-((i * 0.31) % 2.6) * 100) / 100,
+      dur: Math.round((2.4 + (i % 5) * 0.25) * 10) / 10,
     };
   });
 }
@@ -173,18 +173,23 @@ export function iceCrackTree(w: number, h: number): IceSeg[] {
   };
   const seg2 = (x1: number, y1: number, x2: number, y2: number, tier: IceSegTier) =>
     push(x1, y1, (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI, Math.hypot(x2 - x1, y2 - y1), tier);
+  // 隅→中心の「向き」と「距離」で生成＝枠のアスペクト比に追従（幅広・低い実寸でも中央までヒビが届く）。
+  // 長さは reach(隅→中心距離)の比率で決める＝幅に比例して伸びる。枝角は base(中心向き)からの相対。
+  const cx = w / 2, cy = h / 2;
   const tips: { x: number; y: number }[] = [];
-  ([[14, 14, 34], [w - 14, 14, 146], [14, h - 14, -34], [w - 14, h - 14, 214]] as const).forEach(([cx, cy, base]) => {
-    const e0 = push(cx, cy, base, 54, "t1");
-    const e1a = push(e0.x, e0.y, base - 40, 40, "t2");
-    const e1b = push(e0.x, e0.y, base + 34, 36, "t2");
-    const e2a = push(e1a.x, e1a.y, base + 6, 28, "t3");
-    push(e1b.x, e1b.y, base - 12, 26, "t3");
-    push(e2a.x, e2a.y, base - 44, 18, "t4");
+  ([[14, 14], [w - 14, 14], [14, h - 14], [w - 14, h - 14]] as const).forEach(([px, py]) => {
+    const base = (Math.atan2(cy - py, cx - px) * 180) / Math.PI; // 隅→中心の向き
+    const reach = Math.hypot(cx - px, cy - py);                  // 隅→中心の距離
+    const e0 = push(px, py, base, reach * 0.42, "t1");
+    const e1a = push(e0.x, e0.y, base - 34, reach * 0.3, "t2");
+    const e1b = push(e0.x, e0.y, base + 30, reach * 0.26, "t2");
+    const e2a = push(e1a.x, e1a.y, base + 8, reach * 0.22, "t3");
+    push(e1b.x, e1b.y, base - 10, reach * 0.2, "t3");
+    push(e2a.x, e2a.y, base - 38, reach * 0.14, "t4");
     tips.push(e2a);
   });
   tips.sort((a, b) => a.x - b.x);
-  const fpath = [{ x: 6, y: h * 0.51 }, ...tips, { x: w - 6, y: h * 0.49 }];
+  const fpath = [{ x: 6, y: cy }, ...tips, { x: w - 6, y: cy }];
   const fgrp: IceSegTier[] = ["fa", "fa", "fb", "fb", "fc"];
   for (let i = 0; i < fpath.length - 1; i++) seg2(fpath[i].x, fpath[i].y, fpath[i + 1].x, fpath[i + 1].y, fgrp[i] ?? "fc");
   return segs;

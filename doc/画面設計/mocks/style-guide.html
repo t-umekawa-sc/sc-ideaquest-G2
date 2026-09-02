@@ -1090,15 +1090,15 @@
         background: radial-gradient(ellipse at 50% 46%, rgba(167,139,250,.3), rgba(139,92,246,.12) 55%, transparent 76%);
         animation: aura-breath 3.4s ease-in-out infinite; }
       @keyframes aura-breath { 0%,100% { opacity: .28; transform: scale(.98); } 50% { opacity: .62; transform: scale(1.015); } }
-      /* 活力の粒＝中央から四方八方へ放射状に広がる（外へ抜けて波動＝オーラの源になる） */
-      .fx-mote { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+      /* 活力の粒＝枠全体に散らばった原点(left/top)から上＋左右へ漂って消える（幅広メッセージで数が増え全体に散る） */
+      .fx-mote { position: absolute; width: 5px; height: 5px; border-radius: 50%;
         background: radial-gradient(circle, #fff, #c4b5fd 42%, #8b5cf6 78%, transparent); opacity: 0;
         filter: drop-shadow(0 0 3px rgba(167,139,250,.8));
         transform: translate(-50%,-50%) scale(.4);
-        animation: mote-spread var(--dur, 2.6s) ease-out var(--d, 0s) infinite; }
-      @keyframes mote-spread {
+        animation: mote-rise var(--dur, 2.6s) ease-out var(--d, 0s) infinite; }
+      @keyframes mote-rise {
         0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
-        20%  { opacity: .95; }
+        20%  { opacity: .9; }
         70%  { opacity: .7; }
         100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1); } }
 
@@ -1532,15 +1532,20 @@
          発射元は data-src（発動者バッジ or 自作なら作成者アバター）。dedupe は played フラグ（1回だけ）。
          4パターン（自分↔他人）を同一ロジックで扱う：違いは発射元アバターと右上バッジの有無だけ。 */
       (function () {
-        var PEAKS = [[10,12,0,.95],[22,18,-.25,1.05],[34,11,-.5,.85],[46,16,-.15,1],[58,12,-.35,.9],[70,19,-.05,1.1],[82,11,-.45,.8],[92,14,-.2,.95]];
-        function buildFire() {
+        var FIRE_H = [12,18,11,16,12,19,11,14], FIRE_DUR = [.95,1.05,.85,1,.9,1.1,.8,.95];
+        function buildFire(mw) {
+          mw = mw || 340;
+          var n = Math.max(8, Math.min(28, Math.round(mw / 44))); /* 約44pxに1本＝幅で増える */
           var fire = document.createElement('span'); fire.className = 'fcast-fire';
           var base = document.createElement('span'); base.className = 'fcast-fire__base'; fire.appendChild(base);
-          PEAKS.forEach(function (p) {
+          for (var i = 0; i < n; i++) {
             var pk = document.createElement('span'); pk.className = 'fcast-fire__peak';
-            pk.style.left = p[0] + '%'; pk.style.setProperty('--h', p[1] + 'px'); pk.style.setProperty('--d', p[2] + 's'); pk.style.setProperty('--dur', p[3] + 's');
+            pk.style.left = (((i + 0.5) / n) * 100).toFixed(1) + '%';
+            pk.style.setProperty('--h', FIRE_H[i % FIRE_H.length] + 'px');
+            pk.style.setProperty('--d', (-((i * 0.17) % 1.2)).toFixed(2) + 's');
+            pk.style.setProperty('--dur', FIRE_DUR[i % FIRE_DUR.length] + 's');
             fire.appendChild(pk);
-          });
+          }
           return fire;
         }
         var tpl = document.getElementById('fcastTpl');
@@ -1585,8 +1590,11 @@
           }
           return root;
         }
-        function buildPersist(fx) {
-          if (fx === 'fire' || !fx) return buildFire(); /* 炎＝下辺の火柱（別実装） */
+        function buildPersist(fx, msg) {
+          /* 枠(メッセージ)の実寸を測り、パネル依存の効果(炎の本数/オーラの分散/氷ツリー)を size-adaptive に生成。 */
+          var mr = (msg && msg.getBoundingClientRect) ? msg.getBoundingClientRect() : { width: 340, height: 150 };
+          var MW = Math.round(mr.width) || 340, MH = Math.round(mr.height) || 150;
+          if (fx === 'fire' || !fx) return buildFire(MW); /* 炎＝下辺の火柱（本数は幅で増える） */
           var wrap = el('spell-persist spell-persist--' + fx);
           if (fx !== 'ice') wrap.appendChild(el('spell-edge spell-edge--' + fx)); /* 縁の基調（氷はガラス板が主役なので付けない） */
           if (fx === 'thunder') {
@@ -1598,7 +1606,7 @@
             /* 薄いガラス板＋亀裂(四隅→枝分かれ→致命)＋割れる破片。すべて角丸パネル内にクリップ（外へ出さない）。 */
             var clip = el('ice-clip'); wrap.appendChild(clip);
             clip.appendChild(el('ice-panel'));
-            var IW = 300, IH = 110;                          /* 基準パネル寸法(近似)。実寸は本番移植時に計測 */
+            var IW = MW, IH = MH;                            /* 枠の実寸で生成＝アスペクト比に追従（幅広・低い実寸でも中央まで届く） */
             function addSeg(x, y, a, l, cls) {               /* 起点(x,y)px→角度a方向へ長さl。先端座標を返す */
               var rad = a * Math.PI / 180;
               var c = el('ice-crackseg ' + cls);
@@ -1610,21 +1618,22 @@
             function segPts(x1, y1, x2, y2, cls) {           /* 2点を結ぶ線分（致命ヒビの折れ線用） */
               return addSeg(x1, y1, Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI, Math.hypot(x2 - x1, y2 - y1), cls);
             }
-            /* 各隅：初手(t1)→2方向へ枝(t2)→奥へ(t3)→細い末端(t4)。中央寄りの節点(e2a)を致命ヒビの経由点に。 */
-            var tips = [];
-            [[14, 14, 34], [286, 14, 146], [14, 96, -34], [286, 96, 214]].forEach(function (c) {
-              var base = c[2];
-              var e0 = addSeg(c[0], c[1], base, 54, 't1');
-              var e1a = addSeg(e0.x, e0.y, base - 40, 40, 't2');
-              var e1b = addSeg(e0.x, e0.y, base + 34, 36, 't2');
-              var e2a = addSeg(e1a.x, e1a.y, base + 6, 28, 't3');
-              addSeg(e1b.x, e1b.y, base - 12, 26, 't3');
-              addSeg(e2a.x, e2a.y, base - 44, 18, 't4');
+            /* 各隅：初手(t1)→2方向へ枝(t2)→奥へ(t3)→細い末端(t4)。隅→中心の向き base・長さは reach(隅→中心距離)比＝幅で伸びる。 */
+            var ICX = IW / 2, ICY = IH / 2, tips = [];
+            [[14, 14], [IW - 14, 14], [14, IH - 14], [IW - 14, IH - 14]].forEach(function (c) {
+              var base = Math.atan2(ICY - c[1], ICX - c[0]) * 180 / Math.PI;
+              var reach = Math.hypot(ICX - c[0], ICY - c[1]);
+              var e0 = addSeg(c[0], c[1], base, reach * 0.42, 't1');
+              var e1a = addSeg(e0.x, e0.y, base - 34, reach * 0.30, 't2');
+              var e1b = addSeg(e0.x, e0.y, base + 30, reach * 0.26, 't2');
+              var e2a = addSeg(e1a.x, e1a.y, base + 8, reach * 0.22, 't3');
+              addSeg(e1b.x, e1b.y, base - 10, reach * 0.20, 't3');
+              addSeg(e2a.x, e2a.y, base - 38, reach * 0.14, 't4');
               tips.push(e2a);
             });
             /* 致命的なヒビ＝既存の節点(tips)を左→右になぞる長い折れ線。3群(fa→fb→fc)で素早く走らせる（突然の直線でなく関係性のある経路）。 */
             tips.sort(function (a, b) { return a.x - b.x; });
-            var fpath = [{ x: 6, y: 56 }].concat(tips).concat([{ x: 294, y: 54 }]);
+            var fpath = [{ x: 6, y: ICY }].concat(tips).concat([{ x: IW - 6, y: ICY }]);
             var fgrp = ['fa', 'fa', 'fb', 'fb', 'fc'];
             for (var fi = 0; fi < fpath.length - 1; fi++) {
               segPts(fpath[fi].x, fpath[fi].y, fpath[fi + 1].x, fpath[fi + 1].y, 'fatal ' + (fgrp[fi] || 'fc'));
@@ -1656,19 +1665,20 @@
             });
             wrap.appendChild(svg);
           } else if (fx === 'aura') {
-            /* 中央から四方八方へ広がる活力の粒＝外へ抜けてオーラの波動になる。内側の呼吸発光＋外周の太陽フレア＋輪郭の波動と連なる。 */
+            /* 活力の粒＝枠全体に散らして上へ浮上・拡散（幅広メッセージで数が増える）。内側の呼吸発光＋外周の太陽フレア＋輪郭の波動と連なる。 */
             wrap.appendChild(el('aura-breath'));
             wrap.appendChild(el('aura-flare')); /* 外周の太陽フレア風コロナ */
             [0, -1.13, -2.26].forEach(function (d) { var w = el('aura-wave'); w.style.setProperty('--d', d + 's'); wrap.appendChild(w); }); /* 3枚を等間隔にずらして連続波に */
-            var N = 12;
+            var N = Math.max(6, Math.min(26, Math.round(MW / 110))); /* 約110pxに1粒＝幅で増える */
             for (var mi = 0; mi < N; mi++) {
-              var ang = (Math.PI * 2 * mi) / N + (mi % 2 ? .18 : -.12); /* 全周に等間隔＋軽いジッタ */
-              var rad = 74 + (mi % 3) * 20;                            /* 74/94/114px＝外へ抜ける距離差 */
+              var fxr = (mi * 0.61803) % 1;                            /* 黄金比＝横方向に均等分散 */
               var m = el('fx-mote');
-              m.style.setProperty('--dx', (Math.cos(ang) * rad).toFixed(1) + 'px');
-              m.style.setProperty('--dy', (Math.sin(ang) * rad).toFixed(1) + 'px');
-              m.style.setProperty('--d', (-((mi * 0.22) % 2.6)).toFixed(2) + 's'); /* 連続的に湧き出す */
-              m.style.setProperty('--dur', (2.4 + (mi % 4) * 0.3).toFixed(1) + 's');
+              m.style.left = (5 + fxr * 90).toFixed(1) + '%';          /* 5..95% */
+              m.style.top = (38 + ((mi * 29) % 34)).toFixed(1) + '%';  /* 38..72% */
+              m.style.setProperty('--dx', (Math.cos(mi * 1.7) * 16).toFixed(1) + 'px'); /* 左右に少し */
+              m.style.setProperty('--dy', (-(20 + (mi % 4) * 8)) + 'px');               /* 上へ 20..44px */
+              m.style.setProperty('--d', (-((mi * 0.31) % 2.6)).toFixed(2) + 's');
+              m.style.setProperty('--dur', (2.4 + (mi % 5) * 0.25).toFixed(2) + 's');
               wrap.appendChild(m);
             }
           }
@@ -1679,7 +1689,7 @@
           var fxName = stage.getAttribute('data-fx') || 'fire';
           msg.classList.add('fx-' + fxName); /* 底面グロー色などを属性で切替 */
           var burn = msg.querySelector('.fcast-burn[data-fill-fire]');
-          if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName)); /* 永続エフェクトを注入 */
+          if (burn && !burn.childElementCount) burn.appendChild(buildPersist(fxName, msg)); /* 永続エフェクトを注入（枠実測で size-adaptive） */
           var src = msg.querySelector(stage.getAttribute('data-src')) || msg;
           var played = false;
           function reveal() {

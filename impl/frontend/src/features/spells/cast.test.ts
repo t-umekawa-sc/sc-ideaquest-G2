@@ -184,15 +184,16 @@ describe("radialBurst", () => {
 
 // G-TC-154: 属性別永続エフェクトの純ロジック（Phase D・SpellPersistFx / GF-AC-091）。
 describe("firePillars", () => {
-  it("8本・left は左→右へ単調増加で 0..100%・高さは一様でない", () => {
-    const ps = firePillars();
-    expect(ps).toHaveLength(8);
+  it("left は左→右へ単調増加で 0..100%・高さは一様でない・本数は枠幅に比例", () => {
+    const ps = firePillars(340);
     for (let i = 1; i < ps.length; i++) expect(ps[i].left).toBeGreaterThan(ps[i - 1].left);
     for (const p of ps) { expect(p.left).toBeGreaterThanOrEqual(0); expect(p.left).toBeLessThanOrEqual(100); }
     expect(new Set(ps.map((p) => p.h)).size).toBeGreaterThan(1); // 背の高い火柱がある
+    expect(firePillars(1056).length).toBeGreaterThan(firePillars(340).length); // 幅広ほど本数が増える
+    expect(firePillars(340).length).toBeGreaterThanOrEqual(8); // 下限
   });
   it("決定的（同入力で同結果）", () => {
-    expect(firePillars()).toEqual(firePillars());
+    expect(firePillars(1056)).toEqual(firePillars(1056));
   });
 });
 
@@ -220,16 +221,14 @@ describe("rainbowArcBands", () => {
 });
 
 describe("auraMotes", () => {
-  it("12粒・中央から四方八方・半径3段でばらつく・決定的", () => {
-    const ms = auraMotes();
-    expect(ms).toHaveLength(12);
-    expect(ms.some((m) => m.dx > 0)).toBe(true);
-    expect(ms.some((m) => m.dx < 0)).toBe(true);
-    expect(ms.some((m) => m.dy > 0)).toBe(true);
-    expect(ms.some((m) => m.dy < 0)).toBe(true);
-    const radii = new Set(ms.map((m) => Math.round(Math.hypot(m.dx, m.dy))));
-    expect(radii.size).toBeGreaterThanOrEqual(3); // 半径のばらつき
-    expect(auraMotes()).toEqual(auraMotes());
+  it("枠幅に比例した数・枠全体に横分散・上へ浮上・決定的", () => {
+    const ms = auraMotes(340, 102);
+    expect(auraMotes(1056, 102).length).toBeGreaterThan(ms.length); // 幅広ほど粒が増える
+    for (const m of ms) { expect(m.startX).toBeGreaterThanOrEqual(0); expect(m.startX).toBeLessThanOrEqual(100); expect(m.dy).toBeLessThan(0); }
+    const wide = auraMotes(1056, 102);
+    expect(wide.some((m) => m.startX < 25)).toBe(true); // 左方
+    expect(wide.some((m) => m.startX > 75)).toBe(true); // 右方（横に散る）
+    expect(auraMotes(1056, 102)).toEqual(auraMotes(1056, 102));
   });
 });
 

@@ -1133,6 +1133,9 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 
 /* --- 魔法エフェクト（メッセージ枠に付与・永続） --- */
 .spell-fx { position: relative; border-radius: var(--radius); }
+/* Phase D: 永続装飾の実測ラッパ（枠実寸を測り、size-adaptive な効果に w,h を渡す）。効果は枠外へ描くため overflow は切らない。 */
+.spell-fx__layer { position: absolute; inset: 0; border-radius: var(--radius); pointer-events: none; }
+.spell-fx__layer > * { position: absolute; }
 /* 炎: 枠が燃える。ちらつく暖色グロー＋上端に揺れる炎。 */
 .spell-fx--fire {
   border: 1px solid rgba(249,115,22,.75);
@@ -1213,13 +1216,13 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
           mask: radial-gradient(closest-side, transparent 60%, #000 84%, transparent 100%);
   mix-blend-mode: screen; animation: aura-flare 7s ease-in-out infinite; }
 @keyframes aura-flare { 0%,100% { opacity: .3; transform: rotate(0deg) scale(1); } 50% { opacity: .55; transform: rotate(8deg) scale(1.04); } }
-/* 活力の粒＝中央から四方八方へ放射状に広がる（外へ抜けて波動の源に） */
-.spell-fx__aura-mote { left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+/* 活力の粒＝枠全体に散らばった原点(left/top)から上＋左右へ漂って消える（幅広メッセージで数が増え全体に散る） */
+.spell-fx__aura-mote { width: 5px; height: 5px; border-radius: 50%;
   background: radial-gradient(circle, #fff, #c4b5fd 42%, #8b5cf6 78%, transparent);
   filter: drop-shadow(0 0 3px rgba(167,139,250,.8)); opacity: 0; transform: translate(-50%,-50%) scale(.4);
-  animation: aura-mote-spread var(--dur, 2.6s) ease-out var(--d, 0s) infinite; }
-@keyframes aura-mote-spread {
-  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); } 20% { opacity: .95; } 70% { opacity: .7; }
+  animation: aura-mote-rise var(--dur, 2.6s) ease-out var(--d, 0s) infinite; }
+@keyframes aura-mote-rise {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(.4); } 20% { opacity: .9; } 70% { opacity: .7; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), calc(-50% + var(--dy,0px))) scale(1); } }
 /* Phase D: 氷の永続＝薄いガラス板が固まる→四隅から伝播ヒビ→致命ヒビ→割れて飛散→再凍結のループ（モック §17）。
    ヒビ/破片は角丸パネル内にクリップ（外へ出さない）。ヒビの直線は枠実測(iceCrackTree)で実アスペクト比に沿う。 */
