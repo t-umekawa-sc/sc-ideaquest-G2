@@ -2512,7 +2512,7 @@
     <h2>17e. 氷結（複数の氷シャード発射→中央着弾→霜が広がって凍結→雪が舞う）</h2>
     <p class="muted text-sm">炎(§17b)・雷(§17d)と同じ実寸チャットパネルで氷を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(氷色=シアン)。
       発動で<strong>術者(caster)アバターが反動リアクション → とがった氷の塊（シャード）を複数発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>着弾点から霜が左右へ広がってパネルを凍らせる</strong>（凍結アニメは<strong>非ドット絵＝滑らかなフロストガラス調</strong>／縁ほど濃い羽毛状・文字は透けて読める）→ <strong>覆ったまま時々雪が舞う</strong>。
+      <strong>着弾点から霜が左右へ段階的に凍りつく</strong>（じわじわではなく<strong>一定距離まで瞬間スナップ→少し止まる→また急にスナップ</strong>を繰り返し徐々に全幅へ／非ドット絵＝滑らかなフロストガラス・縁ほど濃い羽毛状・文字は透けて読める）→ <strong>覆ったまま時々雪が舞う</strong>。
       フル解像度 canvas で描画。<code>prefers-reduced-motion</code>／下のトグルで静止（凍結済み・雪も静止）。</p>
     <div class="pixfire-stage" id="pixfrostStage">
       <div class="pixfire-msg fx-ice" aria-label="氷結デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -2543,7 +2543,8 @@
         var CX = W / 2, CY = H / 2;
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
         var shards = [], splinters = [], snow = [], ferns = [], cover = 0;
-        var COVER_SPEED = (W / 2) / 78;                              /* 霜が中央→端まで広がる速さ（約1.3秒） */
+        /* 段階的な凍結＝一定距離まで瞬間スナップ→少し止まる→また急にスナップ（距離は段階的に拡大） */
+        var steps = [], stepIdx = 0, stepHold = 0, STEP_HOLD = 10, NSTEPS = 6, snapFlash = 0;
         var frostGrad = ctx.createLinearGradient(0, 0, 0, H);        /* 縁ほど濃いフロストガラスの地 */
         frostGrad.addColorStop(0, 'rgba(214,236,255,0.34)'); frostGrad.addColorStop(0.32, 'rgba(214,236,255,0.10)');
         frostGrad.addColorStop(0.5, 'rgba(214,236,255,0.05)'); frostGrad.addColorStop(0.68, 'rgba(214,236,255,0.10)');
@@ -2592,19 +2593,30 @@
           for (var i = 0; i < ferns.length; i++) { var f = ferns[i]; ctx.beginPath(); ctx.moveTo(f.pts[0][0], f.pts[0][1]); for (var j = 1; j < f.pts.length; j++) ctx.lineTo(f.pts[j][0], f.pts[j][1]); ctx.stroke();
             ctx.beginPath(); for (var k = 0; k < f.barbs.length; k++) { var b = f.barbs[k]; ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); } ctx.stroke(); }
           ctx.shadowBlur = 0; ctx.restore();
-          if (state === 'freezing') {                               /* 広がる先端＝きらめく凍結フロント */
-            for (var sgn = -1; sgn <= 1; sgn += 2) { var fx = CX + sgn * cov; var fg = ctx.createLinearGradient(fx - 8, 0, fx + 8, 0);
-              fg.addColorStop(0, 'rgba(240,252,255,0)'); fg.addColorStop(0.5, 'rgba(240,252,255,0.5)'); fg.addColorStop(1, 'rgba(240,252,255,0)');
-              ctx.fillStyle = fg; ctx.fillRect(fx - 8, 0, 16, H); }
+          if (state === 'freezing') {                               /* スナップした先端＝直後ほど強くきらめく凍結フロント */
+            var fa = (0.3 + snapFlash * 0.6).toFixed(2), fw = 6 + snapFlash * 8;
+            for (var sgn = -1; sgn <= 1; sgn += 2) { var fx = CX + sgn * cov; var fg = ctx.createLinearGradient(fx - fw, 0, fx + fw, 0);
+              fg.addColorStop(0, 'rgba(240,252,255,0)'); fg.addColorStop(0.5, 'rgba(240,252,255,' + fa + ')'); fg.addColorStop(1, 'rgba(240,252,255,0)');
+              ctx.fillStyle = fg; ctx.fillRect(fx - fw, 0, fw * 2, H); }
           }
         }
         function drawSnow() { ctx.fillStyle = 'rgba(246,252,255,0.92)'; for (var i = 0; i < snow.length; i++) { var p = snow[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill(); } }
 
+        function startFreeze() {   /* 段階距離を用意して最初の距離まで瞬間スナップ */
+          state = 'freezing'; steps = []; for (var i = 0; i < NSTEPS; i++) steps.push(CX * (i + 1) / NSTEPS);
+          stepIdx = 0; cover = steps[0]; stepHold = STEP_HOLD; snapFlash = 1;
+        }
+        function updateFreeze() {   /* 保持→時間が来たら次の距離へ瞬間スナップ（じわじわ進まない） */
+          if (snapFlash > 0) snapFlash *= 0.8;
+          if (stepHold > 0) { stepHold--; return; }
+          if (stepIdx < steps.length - 1) { stepIdx++; cover = steps[stepIdx]; stepHold = STEP_HOLD; snapFlash = 1; }
+          else { state = 'done'; }
+        }
         function updateShards() {
           for (var i = shards.length - 1; i >= 0; i--) {
             var s = shards[i], dx = s.tx - s.x, dy = s.ty - s.y, d = Math.sqrt(dx*dx + dy*dy) || 1;
             s.ang = Math.atan2(dy, dx) + s.spin;
-            if (d <= s.speed) { splinterBurst(s.tx, s.ty); if (state === 'incoming') { state = 'freezing'; cover = 0; } shards.splice(i, 1); }
+            if (d <= s.speed) { splinterBurst(s.tx, s.ty); if (state === 'incoming') startFreeze(); shards.splice(i, 1); }
             else { s.x += dx/d*s.speed; s.y += dy/d*s.speed; }
           }
         }
@@ -2623,12 +2635,11 @@
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
           if (state === 'incoming') updateShards();
-          if (state === 'freezing') { cover += COVER_SPEED; if (cover >= CX) { cover = CX; state = 'done'; } }
-          while (acc >= 33) { t++; updateSplinters(); updateSnow(); acc -= 33; }
+          while (acc >= 33) { t++; if (state === 'freezing') updateFreeze(); updateSplinters(); updateSnow(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { shards = []; splinters = []; snow.length = 0; cover = 0; t = 0; genFerns(); }
+        function reset() { shards = []; splinters = []; snow.length = 0; cover = 0; t = 0; steps = []; stepIdx = 0; stepHold = 0; snapFlash = 0; genFerns(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); state = 'incoming'; spawnShards(ox == null ? W - 6 : ox, oy == null ? 4 : oy); render(); runLoop(); },
