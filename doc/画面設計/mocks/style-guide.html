@@ -2049,8 +2049,7 @@
             putPix(d, s.x|0, s.y|0, 255, hot?235:150, hot?170:40, sa); }
           ctx.putImageData(img, 0, 0);
         }
-        function burstSparks() {                                   /* 着弾で火の玉が破裂＝火花が四方へ飛散 */
-          var ox = CX, oy = H - 4;
+        function burstSparks(ox, oy) {                             /* 着弾点(=火の玉の実座標)で破裂＝火花が四方へ飛散 */
           for (var i = 0; i < 22; i++) {
             var ang = -Math.PI + Math.random() * Math.PI;           /* 上半円中心に放射（下向きは抑える） */
             var sp = 0.9 + Math.random() * 2.2;
@@ -2060,15 +2059,20 @@
         function updateSparks() {
           for (var i = sparks.length - 1; i >= 0; i--) { var s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += 0.14; s.vx *= 0.98; s.life -= 0.035; if (s.life <= 0 || s.y >= H) sparks.splice(i, 1); }
         }
-        function ignite() {                                        /* 中央下部で着火（火の玉着弾点）＝ここから左右へ延焼 */
-          state = 'lit'; lit = true; lit0 = true; frontL = CX - 2; frontR = CX + 2;
+        function ignite() {                                        /* 火の玉の実着弾点で着火＝ここから左右へ延焼（火花もこの点から） */
+          var ix = proj ? (proj.x | 0) : CX; if (ix < 2) ix = 2; else if (ix > W - 3) ix = W - 3;
+          var iy = proj ? (proj.y | 0) : (H - 4);
+          state = 'lit'; lit = true; lit0 = true; frontL = ix - 2; frontR = ix + 2;
           for (var x = frontL; x <= frontR; x++) for (var y = H - 6; y < H; y++) if (x >= 0 && x < W && y >= 0) heat[y * W + x] = MAXH;
-          burstSparks();
+          burstSparks(ix, iy);
         }
         function reset() { heat.fill(0); smoke.length = 0; sparks.length = 0; lit = false; lit0 = false; proj = null; frontL = CX; frontR = CX; }
         function frame(t) {
           if (!last) last = t; var dt = t - last; last = t; acc += dt;
-          if (state === 'incoming' && proj) { proj.x += (CX - proj.x)*0.08; proj.y += ((H - 3) - proj.y)*0.08 + 0.4; if (proj.y >= H - 4) ignite(); }
+          if (state === 'incoming' && proj) {   /* x/y 等速イージング＝直線軌道で (CX,H-3) へ同時到達→着弾点=弾の実座標で一致 */
+            proj.x += (CX - proj.x)*0.11; proj.y += ((H - 3) - proj.y)*0.11;
+            if (Math.abs(CX - proj.x) < 2 && Math.abs((H - 3) - proj.y) < 2) ignite();
+          }
           if (state === 'lit') { if (frontL > 0) { frontL -= FRONT_SPEED; if (frontL < 0) frontL = 0; } if (frontR < W - 1) { frontR += FRONT_SPEED; if (frontR > W - 1) frontR = W - 1; } }
           while (acc >= 33) { if (state === 'lit') step(); updateSmoke(); updateSparks(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
