@@ -3143,6 +3143,7 @@
         var star = null, burst = [], twinkles = [];
         var mwStars = [], bgFade = 0;   /* 天の川の微星＋背景(天の川/オーロラ)フェードイン */
         var AUR = [[80,255,175],[70,215,255],[180,130,255],[255,150,220]];   /* オーロラ色（緑→シアン→紫→桃で巡回） */
+        var ufo = null, ufoTimer = 300 + (Math.random()*300|0);   /* たまに横切るUFO（少なめ） */
 
         function rnd(n) { return Math.random() * n; }
         function pick() { return COLS[(rnd(COLS.length))|0]; }
@@ -3201,6 +3202,46 @@
           ctx.globalAlpha = 1;
           drawGlint(star.x, star.y, 7, 1, '255,246,210');
         }
+        function spawnUFO() {   /* 10パターンからランダムに動きを選ぶ／画面外→反対側へ */
+          var pat = (rnd(10))|0, dir = Math.random() < 0.5 ? 1 : -1;
+          ufo = { pat: pat, dir: dir, x0: dir > 0 ? -30 : W+30, x1: dir > 0 ? W+30 : -30,
+            yBase: H*0.12 + rnd(H*0.42), amp: H*0.1 + rnd(H*0.12), freq: 2 + (rnd(4)|0),
+            spd: 0.013 + rnd(0.008), prog: 0, hover: 0, x: 0, y: 0 };
+          computeUFO();
+          ufoTimer = 420 + (rnd(600)|0);   /* 次のUFOまで＝少なめ（約14〜34秒） */
+        }
+        function computeUFO() {   /* パターン別に (x,y) を prog から算出 */
+          var u = ufo, p = u.prog; u.x = u.x0 + (u.x1-u.x0)*p; u.y = u.yBase;
+          if (u.pat === 1) u.y = u.yBase + Math.sin(p*Math.PI*u.freq)*u.amp;               /* うねうね */
+          else if (u.pat === 2) u.y = u.yBase + Math.sin(p*Math.PI)*u.amp;                  /* 中央でディップ（下） */
+          else if (u.pat === 3) u.y = u.yBase - Math.sin(p*Math.PI)*u.amp;                  /* 中央で山（上） */
+          else if (u.pat === 4) { var tw = 1 - Math.abs(((p*u.freq)%1)*2 - 1); u.y = u.yBase + (tw-0.5)*u.amp*2; }   /* ジグザグ */
+          else if (u.pat === 5) u.y = H*0.12 + (H*0.58)*p;                                  /* 斜め下 */
+          else if (u.pat === 6) u.y = H*0.62 - (H*0.5)*p;                                   /* 斜め上 */
+          else if (u.pat === 7) { if (p > 0.4 && p < 0.6) { var la = (p-0.4)/0.2*Math.PI*2 - Math.PI/2; u.x += Math.cos(la)*20; u.y += Math.sin(la)*20 + 20; } }   /* 途中でループ */
+          /* pat 0=直線, 8=ホバー→ダート(prog制御), 9=加速(prog制御) は y=yBase 直線 */
+        }
+        function updateUFO() {
+          if (ufo) {
+            var u = ufo;
+            if (u.pat === 8) { if (u.prog > 0.42 && u.prog < 0.5 && u.hover < 14) u.hover++; else u.prog += u.spd; }   /* 中央で一瞬ホバー→ダート */
+            else if (u.pat === 9) u.prog += u.spd * (0.35 + u.prog*1.7);                                              /* だんだん加速 */
+            else u.prog += u.spd;
+            computeUFO();
+            if (u.prog >= 1) ufo = null;
+          } else if (state === 'persist') { ufoTimer--; if (ufoTimer <= 0) spawnUFO(); }
+        }
+        function drawUFO() {
+          if (!ufo) return; var x = ufo.x, y = ufo.y + Math.sin(t*0.14)*1.5;
+          var bg = ctx.createRadialGradient(x, y+7, 0, x, y+7, 22);   /* 下向きの淡い光 */
+          bg.addColorStop(0, 'rgba(120,240,220,' + (0.22*bgFade).toFixed(2) + ')'); bg.addColorStop(1, 'rgba(120,240,220,0)');
+          ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(x, y+7, 22, 12, 0, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = '#93a6c4'; ctx.beginPath(); ctx.ellipse(x, y, 16, 5, 0, 0, 6.2832); ctx.fill();   /* 円盤本体 */
+          ctx.fillStyle = '#c9dcf0'; ctx.beginPath(); ctx.ellipse(x, y-1, 16, 2.6, 0, 0, 6.2832); ctx.fill();   /* 上ハイライト */
+          ctx.fillStyle = 'rgba(190,235,255,0.9)'; ctx.beginPath(); ctx.ellipse(x, y-2.5, 7, 5.5, 0, Math.PI, 2*Math.PI); ctx.fill();   /* ドーム */
+          for (var i = 0; i < 3; i++) { var lx = x + (i-1)*8, on = Math.sin(t*0.4 + i*2) > 0;   /* 点滅ライト */
+            ctx.fillStyle = on ? '#ffe14d' : '#40e0ff'; ctx.beginPath(); ctx.arc(lx, y+2.5, 1.4, 0, 6.2832); ctx.fill(); }
+        }
         function spawnBurst(x, y) {   /* 着弾で四方へ弾けるキラキラ */
           for (var i = 0; i < 20; i++) { var ang = rnd(6.283), sp = 1.4 + rnd(3.6);
             burst.push({ x: x, y: y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, size: 2 + rnd(3), col: pick() }); }
@@ -3211,6 +3252,7 @@
         function render() {
           ctx.clearRect(0, 0, W, H);
           if (bgFade > 0.01) { drawAurora(); drawMilkyWay(); }   /* 背景＝オーロラ→天の川（きらめきの奥） */
+          drawUFO();
           for (var i = 0; i < twinkles.length; i++) { var w = twinkles[i], a = Math.sin(w.age / w.dur * 3.14159); drawGlint(w.x, w.y, w.size, a*0.95, w.col); }
           for (i = 0; i < burst.length; i++) { var p = burst[i]; drawGlint(p.x, p.y, p.size*(0.6 + p.life*0.7), p.life, p.col); }
           if (state === 'incoming' && star) drawStar();
@@ -3222,11 +3264,11 @@
             if (dist <= SPEED) { spawnBurst(CX, CY); star = null; state = 'persist'; }
             else { star.x += dx/dist*SPEED; star.y += dy/dist*SPEED; star.trail.push([star.x, star.y]); if (star.trail.length > 10) star.trail.shift(); }
           }
-          while (acc >= 33) { t++; if (state === 'persist' && bgFade < 1) bgFade = Math.min(1, bgFade + 0.02); updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); acc -= 33; }
+          while (acc >= 33) { t++; if (state === 'persist' && bgFade < 1) bgFade = Math.min(1, bgFade + 0.02); updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); updateUFO(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { star = null; burst = []; twinkles = []; bgFade = 0; t = 0; buildMilkyWay(); }
+        function reset() { star = null; burst = []; twinkles = []; bgFade = 0; ufo = null; ufoTimer = 300 + (rnd(300)|0); t = 0; buildMilkyWay(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); var sx = (ox == null ? W-6 : ox), sy = (oy == null ? 4 : oy); state = 'incoming'; star = { x: sx, y: sy, trail: [[sx, sy]] }; render(); runLoop(); },
