@@ -1940,14 +1940,14 @@
     </script>
   </div>
 
-  <!-- 17b. ドット絵の焚火（枯れ木→着火→炎＋黒煙）＝リアル炎に代わる新方針 GF-AC-091 -->
+  <!-- 17b. ドット絵の延焼（右下着弾→パネル下辺を右→左へ延焼）＝リアル炎に代わる新方針 GF-AC-091 -->
   <div class="section">
-    <h2>17b. ドット絵の焚火（枯れ木→着火→炎＋黒煙）</h2>
-    <p class="muted text-sm">リアル炎の路線をやめ、<strong>ドット絵</strong>で表現。魔法発動で<strong>チャットパネル下部に枯れ木の束</strong>ができ、
-      <strong>火の玉が着弾</strong>して<strong>焚火に着火</strong>、<strong>炎＋黒い煙が立ち上る</strong>。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大＝ドット感。
-      炎は古典的なピクセル炎（下から熱が上へ伝播＋左右の揺らぎ）＋黒煙パーティクル。<code>prefers-reduced-motion</code>／下のトグルで静止（静的な焚火）。</p>
+    <h2>17b. ドット絵の延焼（右下着弾→パネル下辺を右→左へ延焼）</h2>
+    <p class="muted text-sm">リアル炎の路線をやめ、<strong>ドット絵</strong>で表現。魔法発動で<strong>火の玉がパネル右下に着弾</strong>して着火し、
+      <strong>下辺に沿って右→左へ炎が延焼</strong>していく。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大＝ドット感。
+      炎は古典的なピクセル炎（下から熱が上へ伝播＋左右の揺らぎ）＋黒煙パーティクル。<code>prefers-reduced-motion</code>／下のトグルで静止（延焼済みの静的な炎）。</p>
     <div class="pixfire-stage" id="pixfireStage">
-      <div class="pixfire-msg" aria-label="ドット絵の焚火デモ">配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥</div>
+      <div class="pixfire-msg" aria-label="ドット絵の延焼デモ">配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥</div>
     </div>
     <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
       <button class="btn-pixel" type="button" id="pixfireBtn">魔法を発動</button>
@@ -1960,68 +1960,57 @@
         background: radial-gradient(120% 90% at 50% 120%, #241009, #140f0e 70%); }
       .pixfire-msg { position: relative; z-index: 1; width: 100%; min-height: 102px; box-sizing: border-box;
         padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6; font-size: var(--text-sm); text-align: left; }
-      /* 焚火＝メッセージ下部中央に置く低解像度 canvas を拡大（ドット絵）。炎は上へ、煙はさらに上へ。 */
-      .pix-campfire { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); z-index: 3;
+      /* 延焼＝メッセージパネル全面に重ねる低解像度 canvas。炎は下辺からなめ上がり、右→左へ広がる。 */
+      .pix-fireline { position: absolute; inset: 0; z-index: 3;
         image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none;
-        filter: drop-shadow(0 0 7px rgba(255,120,30,.45)); }
+        filter: drop-shadow(0 0 6px rgba(255,120,30,.45)); }
     </style>
 
     <script>
-      /* ドット絵の焚火エンジン（自己完結・vanilla）。低解像度 canvas にピクセル炎＋枯れ木＋黒煙を描く。
-         API: start()=枯れ木出現→火の玉降下→着火→燃焼／reduceStatic()=静的な焚火／stop()。 */
-      function createPixelCampfire(opts) {
+      /* ドット絵の延焼エンジン（自己完結・vanilla）。パネル全面の低解像度 canvas に、下辺からなめ上がるピクセル炎＋黒煙を描く。
+         API: start()=火の玉が右下へ降下→着弾で右下着火→下辺を右→左へ延焼／reduceStatic()=延焼済みの静的炎／stop()。 */
+      function createPixelFireLine(opts) {
         opts = opts || {};
-        var W = 48, H = 64, scale = opts.scale || 3, WOOD_TOP = H - 9;
-        var seedX0 = 14, seedX1 = 34, cx = (seedX0 + seedX1) / 2;
+        var scale = opts.scale || 3;
+        var W = Math.max(120, opts.cols || 200), H = Math.max(20, opts.rows || 34);
         var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
-        canvas.className = 'pix-campfire'; canvas.setAttribute('aria-hidden', 'true');
-        canvas.style.width = (W * scale) + 'px'; canvas.style.height = (H * scale) + 'px';
-        var ctx = canvas.getContext('2d'); var img = ctx.createImageData(W, H);
+        canvas.className = 'pix-fireline'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.style.width = '100%'; canvas.style.height = '100%';   /* パネル全面に重ね、下辺から炎がなめる */
+        var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+        var img = ctx.createImageData(W, H);
         var PAL = [ [0,0,0,0],[40,12,8,150],[90,20,10,205],[140,28,12,235],[190,44,14,250],
           [225,80,16,255],[244,120,22,255],[250,160,34,255],[253,196,64,255],[255,224,120,255],[255,246,205,255] ];
         var MAXH = PAL.length - 1;
         var heat = new Uint8Array(W * H), smoke = [];
-        var state = 'idle', woodShown = false, lit = false, proj = null, raf = null, last = 0, acc = 0;
+        var state = 'idle', lit = false, proj = null, raf = null, last = 0, acc = 0;
+        var front = W;                 /* 延焼の先端 x（この x 以上の列が着火済み）。W=未着火・0=全延焼 */
+        var FRONT_SPEED = W / 66;      /* 右→左へ1フレームで進む列数（約1.1秒で下辺全体へ延焼） */
 
         function putPix(d, x, y, r, g, b, a) { if (x < 0 || x >= W || y < 0 || y >= H) return; var o = (y * W + x) * 4; d[o]=r; d[o+1]=g; d[o+2]=b; d[o+3]=a; }
         function spreadFire(y, x) {
           var src = y * W + x, pix = heat[src], ny = y - 1;
           if (pix === 0) { heat[ny * W + x] = 0; return; }
-          var rnd = (Math.random() * 3) | 0, nx = x + (1 - rnd);
+          var rnd = (Math.random() * 3) | 0, nx = x + (1 - rnd);   /* 左右の揺らぎ */
           if (nx < 0) nx = 0; else if (nx >= W) nx = W - 1;
-          heat[ny * W + nx] = Math.max(0, pix - (rnd & 1));
+          var cool = Math.random() < 0.72 ? 1 : 0;                 /* 冷却＝炎の高さを下辺付近に抑える */
+          heat[ny * W + nx] = Math.max(0, pix - cool);
+        }
+        function seedRow() {                                       /* 着火済み列の最下2行を最高熱に */
+          var by = H - 1, x0 = front < 0 ? 0 : (front | 0), x;
+          for (x = x0; x < W; x++) { heat[by * W + x] = MAXH; heat[(by - 1) * W + x] = MAXH; }
+          for (var k = 0; k < 10; k++) { var fx = x0 + k; if (fx >= 0 && fx < W) heat[(by - 2) * W + fx] = MAXH; }   /* 先端＝延焼の“頭”を高く */
         }
         function step() {
-          var sy = WOOD_TOP - 1, sx;
-          for (sx = seedX0; sx <= seedX1; sx++) heat[sy * W + sx] = MAXH;   /* 焚火の芯＝毎フレーム最高熱 */
-          for (var x = 0; x < W; x++) for (var y = 1; y <= sy; y++) spreadFire(y, x);
+          seedRow();
+          for (var x = 0; x < W; x++) for (var y = 1; y < H; y++) spreadFire(y, x);
         }
-        function topFlameY() { for (var y = 0; y < WOOD_TOP; y++) for (var x = 0; x < W; x++) if (heat[y * W + x] > 3) return Math.max(1, y - 1); return WOOD_TOP - 6; }
+        function topFlameYAt(x) { for (var y = 0; y < H; y++) if (heat[y * W + x] > 3) return y; return H - 3; }
         function updateSmoke() {
-          if (state === 'lit' && Math.random() < 0.7) smoke.push({ x: cx + (Math.random()*2-1)*7, y: topFlameY(), vx:(Math.random()*2-1)*0.12, vy:-(0.35+Math.random()*0.35), life:1 });
-          for (var i = smoke.length - 1; i >= 0; i--) { var p = smoke[i]; p.x += p.vx; p.y += p.vy; p.vx += (Math.random()*2-1)*0.03; p.life -= 0.014; if (p.life <= 0 || p.y < -2) smoke.splice(i, 1); }
-        }
-        function drawEnd(d, cx, cy) {   /* 丸太の木口（切り口の年輪）＝明るい丸 */
-          putPix(d, cx, cy, 236, 202, 150, 255);
-          putPix(d, cx-1, cy, 198, 154, 100, 255); putPix(d, cx+1, cy, 198, 154, 100, 255);
-          putPix(d, cx, cy-1, 198, 154, 100, 255); putPix(d, cx, cy+1, 198, 154, 100, 255);
-          putPix(d, cx-1, cy-1, 150, 100, 55, 255); putPix(d, cx+1, cy-1, 150, 100, 55, 255);
-          putPix(d, cx-1, cy+1, 150, 100, 55, 255); putPix(d, cx+1, cy+1, 150, 100, 55, 255);
-        }
-        function drawLogLine(d, x0, y0, x1, y1) {   /* 斜めの丸太（本体＋上ハイライト/下影）＋両端の木口 */
-          var dx = x1 - x0, dy = y1 - y0, n = Math.max(Math.abs(dx), Math.abs(dy)) || 1;
-          for (var i = 0; i <= n; i++) {
-            var t = i / n, x = Math.round(x0 + dx * t), y = Math.round(y0 + dy * t);
-            putPix(d, x, y-1, 208, 160, 106, 255);   /* 上＝ハイライト */
-            putPix(d, x, y,   178, 126,  72, 255);   /* 本体 */
-            putPix(d, x, y+1, 120,  80,  42, 255);   /* 下＝影 */
+          if (state === 'lit') {
+            var x0 = front < 0 ? 0 : (front | 0);
+            if (Math.random() < 0.45 && x0 < W) { var sx = (x0 + Math.random() * (W - x0)) | 0; smoke.push({ x: sx, y: topFlameYAt(sx), vx:(Math.random()*2-1)*0.12, vy:-(0.30+Math.random()*0.30), life:1 }); }
           }
-          drawEnd(d, x0, y0); drawEnd(d, x1, y1);
-        }
-        function drawWood(d) {
-          drawLogLine(d, 11, 63, 37, 63);   /* 土台の横丸太 */
-          drawLogLine(d,  8, 62, 30, 55);   /* 交差＝右上がり */
-          drawLogLine(d, 40, 62, 18, 55);   /* 交差＝左上がり */
+          for (var i = smoke.length - 1; i >= 0; i--) { var p = smoke[i]; p.x += p.vx; p.y += p.vy; p.vx += (Math.random()*2-1)*0.03; p.life -= 0.02; if (p.life <= 0 || p.y < -2) smoke.splice(i, 1); }
         }
         function drawProjectile(d) {
           var px = proj.x|0, py = proj.y|0;
@@ -2030,25 +2019,28 @@
         }
         function render() {
           var d = img.data, i, x, y; for (i = 0; i < d.length; i++) d[i] = 0;
-          for (y = 0; y < WOOD_TOP; y++) for (x = 0; x < W; x++) { var h = heat[y*W+x]; if (h > 0) { var c = PAL[h], o = (y*W+x)*4; d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=c[3]; } }
-          if (woodShown) drawWood(d);
+          for (y = 0; y < H; y++) for (x = 0; x < W; x++) { var h = heat[y*W+x]; if (h > 0) { var c = PAL[h], o = (y*W+x)*4; d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=c[3]; } }
           if (state === 'incoming' && proj) drawProjectile(d);
-          for (i = 0; i < smoke.length; i++) { var p = smoke[i], a = (p.life*0.7*255)|0; putPix(d, p.x|0, p.y|0, 48, 46, 52, a); putPix(d, (p.x|0)+1, p.y|0, 40, 38, 44, (p.life*0.55*255)|0); }
+          for (i = 0; i < smoke.length; i++) { var p = smoke[i], a = (p.life*0.6*255)|0; putPix(d, p.x|0, p.y|0, 48, 46, 52, a); putPix(d, (p.x|0)+1, p.y|0, 40, 38, 44, (p.life*0.45*255)|0); }
           ctx.putImageData(img, 0, 0);
         }
-        function ignite() { state = 'lit'; lit = true; for (var x = seedX0-2; x <= seedX1+2; x++) for (var y = WOOD_TOP-6; y < WOOD_TOP; y++) if (x>=0 && x<W) heat[y*W+x] = MAXH; }
-        function reset() { heat.fill(0); smoke.length = 0; lit = false; proj = null; woodShown = false; }
+        function ignite() {                                        /* 右下で着火（火の玉着弾点） */
+          state = 'lit'; lit = true; front = W - 3;
+          for (var x = front; x < W; x++) for (var y = H - 6; y < H; y++) if (y >= 0) heat[y * W + x] = MAXH;
+        }
+        function reset() { heat.fill(0); smoke.length = 0; lit = false; proj = null; front = W; }
         function frame(t) {
           if (!last) last = t; var dt = t - last; last = t; acc += dt;
-          if (state === 'incoming' && proj) { proj.x += (cx - proj.x)*0.18; proj.y += (WOOD_TOP-3 - proj.y)*0.18 + 0.7; if (proj.y >= WOOD_TOP-4) ignite(); }
+          if (state === 'incoming' && proj) { proj.x += ((W - 3) - proj.x)*0.16; proj.y += ((H - 3) - proj.y)*0.16 + 0.9; if (proj.y >= H - 4) ignite(); }
+          if (state === 'lit' && front > 0) { front -= FRONT_SPEED; if (front < 0) front = 0; }
           while (acc >= 33) { if (state === 'lit') step(); updateSmoke(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
         return {
           canvas: canvas,
-          start: function () { reset(); woodShown = true; state = 'incoming'; proj = { x: W-6, y: 2 }; render(); runLoop(); },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); woodShown = true; state = 'lit'; lit = true; for (var k = 0; k < 70; k++) step(); render(); },
+          start: function () { reset(); state = 'incoming'; proj = { x: W - 3, y: 0 }; render(); runLoop(); },   /* 右上→右下へ火の玉降下→着弾で右下着火→左へ延焼 */
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'lit'; lit = true; front = 0; for (var k = 0; k < 60; k++) step(); render(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
@@ -2058,7 +2050,10 @@
         var btn = document.getElementById('pixfireBtn');
         var reduceCb = document.getElementById('pixfireReduce');
         if (!stage || !msg || !btn) return;
-        var fire = createPixelCampfire({ scale: 3 });
+        var scale = 3;
+        var cols = Math.max(140, Math.round(msg.clientWidth / scale));
+        var rows = Math.max(20, Math.round(msg.clientHeight / scale));
+        var fire = createPixelFireLine({ scale: scale, cols: cols, rows: rows });
         msg.appendChild(fire.canvas);
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
         function play() { if (reduced()) fire.reduceStatic(); else fire.start(); }
