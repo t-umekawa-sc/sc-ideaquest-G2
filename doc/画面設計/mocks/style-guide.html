@@ -2239,6 +2239,139 @@
     </script>
   </div>
 
+  <!-- 17d. ドット絵の落雷（実寸大サンプル）＝炎(§17b)と同じチャットパネルで一本ずつ作る GF-AC-091 -->
+  <div class="section">
+    <h2>17d. ドット絵の落雷（実寸大サンプル）</h2>
+    <p class="muted text-sm">炎(§17b)と同じ実寸チャットパネルで、雷を一本ずつドット絵化。魔法発動で<strong>上から稲妻が突き刺さり</strong>、
+      <strong>閃光＋分岐した稲妻＋落下火花</strong>。その後は<strong>間欠的に再落雷＋微弱なチャージのちらつき</strong>。
+      稲妻は細く・間欠表示にして、重なった文字が読めるよう配慮。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（1本の稲妻＋淡い発光）。</p>
+    <div class="pixfire-stage" id="pixboltStage">
+      <div class="pixfire-msg" aria-label="ドット絵の落雷デモ">配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="pixboltBtn">魔法を発動</button>
+      <label class="checkbox"><input type="checkbox" id="pixboltReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <style>
+      /* 落雷＝メッセージパネル全面に重ねる低解像度 canvas。稲妻は上→下、閃光はパネル全体。 */
+      .pix-thunder { position: absolute; inset: 0; z-index: 3;
+        image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none;
+        filter: drop-shadow(0 0 6px rgba(120,170,255,.5)); }
+    </style>
+
+    <script>
+      /* ドット絵の落雷エンジン（自己完結・vanilla）。パネル全面の低解像度 canvas に、上から突き刺さる稲妻＋閃光＋火花を描く。
+         API: start()=発動(初回落雷→間欠再落雷)／reduceStatic()=静的な稲妻1本／stop()。 */
+      function createPixelThunder(opts) {
+        opts = opts || {};
+        var scale = opts.scale || 3;
+        var W = Math.max(120, opts.cols || 240), H = Math.max(20, opts.rows || 34);
+        var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+        canvas.className = 'pix-thunder'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.style.width = '100%'; canvas.style.height = '100%';
+        var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+        var img = ctx.createImageData(W, H), D = img.data;
+        var state = 'idle', raf = null, last = 0, acc = 0;
+        var bolt = [], branches = [], sparks = [], charge = [];
+        var flash = 0, strikeTimer = 0, strikeX = W >> 1;
+
+        function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
+        function put(x, y, r, g, b, a) {   /* 透明背景に重ねる＝最も不透明な寄与を採用（暗色化しない） */
+          x |= 0; y |= 0; a |= 0; if (a <= 0 || x < 0 || x >= W || y < 0 || y >= H) return;
+          var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; }
+        }
+        function rnd(n) { return Math.random() * n; }
+        function genBolt(x0) {
+          bolt = []; branches = [];
+          var x = x0, y = 0;
+          while (y < H - 1) { bolt.push([x, y]); y += 1 + (rnd(2)|0); x += (rnd(5)|0) - 2; if (x < 1) x = 1; if (x > W-2) x = W-2; }
+          bolt.push([x, H - 1]);
+          var nb = 1 + (rnd(2)|0);
+          for (var i = 0; i < nb; i++) {
+            var ni = 2 + (rnd(Math.max(1, bolt.length - 4))|0);
+            var bx = bolt[ni][0], by = bolt[ni][1], dir = rnd(1) < 0.5 ? -1 : 1, br = [[bx, by]], len = 3 + (rnd(5)|0);
+            for (var k = 0; k < len; k++) { bx += dir*(1+(rnd(2)|0)); by += 1+(rnd(2)|0); if (bx<1) bx=1; if (bx>W-2) bx=W-2; if (by>H-1) by=H-1; br.push([bx, by]); }
+            branches.push(br);
+          }
+        }
+        function spawnSparks(x, y) {
+          for (var i = 0; i < 12; i++) { var a = rnd(6.283); sparks.push({ x:x, y:y, vx:Math.cos(a)*rnd(1.6), vy:Math.sin(a)*rnd(1.6)-0.4, life:1 }); }
+        }
+        function strike() {
+          strikeX = 6 + (rnd(W - 12)|0);
+          genBolt(strikeX); flash = 1; spawnSparks(bolt[bolt.length-1][0], H - 2);
+          strikeTimer = 26 + (rnd(30)|0);   /* 次の落雷まで（間欠）＝約0.9〜1.9秒 */
+        }
+        function drawPath(pts, bright) {
+          for (var i = 0; i < pts.length - 1; i++) {
+            var a = pts[i], b = pts[i+1], steps = Math.max(Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1])) || 1;
+            for (var s = 0; s <= steps; s++) {
+              var tx = a[0]+(b[0]-a[0])*s/steps, ty = a[1]+(b[1]-a[1])*s/steps;
+              put(tx-1, ty, 90,150,255, 120*bright); put(tx+1, ty, 90,150,255, 120*bright);
+              put(tx, ty-1, 170,225,255, 150*bright); put(tx, ty+1, 170,225,255, 150*bright);
+              put(tx, ty, 255,255,255, 255*bright);
+            }
+          }
+        }
+        function update() {
+          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strike(); }
+          flash *= 0.82;
+          if (flash > 0.45 && rnd(1) < 0.4) genBolt(strikeX);   /* 明るい間は稲妻を再ジグザグ＝フリッカー */
+          /* 微弱なチャージ＝上辺で小さくスパークがちらつく（可読性のため疎・淡） */
+          if (rnd(1) < 0.10) { var cx0 = 2 + (rnd(W-4)|0); charge.push({ x: cx0, y: (rnd(3))|0, life: 1 }); }
+          for (var c = charge.length-1; c >= 0; c--) { charge[c].life -= 0.10; if (charge[c].life <= 0) charge.splice(c,1); }
+          for (var i = sparks.length-1; i >= 0; i--) { var p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life -= 0.05; if (p.life <= 0) sparks.splice(i,1); }
+        }
+        function draw() {
+          clear();
+          if (flash > 0.04) for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 150,190,255, (flash*36)|0);
+          if (flash > 0.1 && bolt.length) {   /* 稲妻の明るさ＝閃光に連動して減衰（消えかけの残光まで見える） */
+            var bright = Math.min(1, flash + 0.25); drawPath(bolt, bright);
+            for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
+          }
+          for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 170,225,255, (g.life*130)|0); put(g.x+1, g.y+1, 120,180,255, (g.life*90)|0); }
+          for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 200,240,255, (q.life*255)|0); }
+          ctx.putImageData(img, 0, 0);
+        }
+        function frame(ts) {
+          if (!last) last = ts; acc += ts - last; last = ts;
+          while (acc >= 33) { update(); acc -= 33; }
+          draw(); raf = requestAnimationFrame(frame);
+        }
+        function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; }
+        return {
+          canvas: canvas,
+          start: function () { reset(); strike(); state = 'live'; runLoop(); },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; strikeX = W >> 1; genBolt(strikeX); flash = 0.7; draw(); },
+          stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+        };
+      }
+      (function () {
+        var stage = document.getElementById('pixboltStage');
+        var msg = stage && stage.querySelector('.pixfire-msg');
+        var btn = document.getElementById('pixboltBtn');
+        var reduceCb = document.getElementById('pixboltReduce');
+        if (!stage || !msg || !btn) return;
+        var scale = 3;
+        var cols = Math.max(140, Math.round(msg.clientWidth / scale));
+        var rows = Math.max(20, Math.round(msg.clientHeight / scale));
+        var bolt = createPixelThunder({ scale: scale, cols: cols, rows: rows });
+        msg.appendChild(bolt.canvas);
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        function play() { if (reduced()) bolt.reduceStatic(); else bolt.start(); }
+        btn.addEventListener('click', play);
+        if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) bolt.reduceStatic(); });
+        if ('IntersectionObserver' in window) {
+          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
+          io.observe(stage);
+        }
+      })();
+    </script>
+  </div>
+
   <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
   <div class="section">
     <h2>18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静）</h2>
