@@ -2021,9 +2021,18 @@
           for (var i = smoke.length - 1; i >= 0; i--) { var p = smoke[i]; p.x += p.vx; p.y += p.vy; p.vx += (Math.random()*2-1)*0.03; p.life -= 0.02; if (p.life <= 0 || p.y < -2) smoke.splice(i, 1); }
         }
         function drawProjectile(d) {
-          var px = proj.x|0, py = proj.y|0;
-          for (var dy=-1; dy<=1; dy++) for (var dx=-1; dx<=1; dx++) putPix(d, px+dx, py+dy, 255, 190, 70, 255);
-          putPix(d, px, py, 255, 246, 210, 255); putPix(d, px, py-2, 255, 140, 40, 190); putPix(d, px, py-4, 235, 90, 20, 120);
+          var px = proj.x, py = proj.y;
+          /* 尾＝進行方向の逆側へ伸ばす（caster→中央下部の軌道の後方） */
+          var vx = CX - px, vy = (H - 3) - py, len = Math.sqrt(vx*vx + vy*vy) || 1, ux = vx/len, uy = vy/len;
+          for (var t = 1; t <= 7; t++) { var txp = px - ux*t, typ = py - uy*t, a = 255*(1 - t/8);
+            putPix(d, txp|0, typ|0, 255, 140, 40, a|0); putPix(d, (txp|0), (typ|0)-1, 235, 90, 20, (a*0.55)|0); }
+          /* 本体＝半径約3.5px の火球（中心=白熱→黄→橙） */
+          for (var yy = -4; yy <= 4; yy++) for (var xx = -4; xx <= 4; xx++) {
+            var r = Math.sqrt(xx*xx + yy*yy); if (r > 3.6) continue;
+            var col = r < 1.2 ? [255,246,210] : (r < 2.4 ? [255,210,90] : [255,150,50]);
+            putPix(d, (px|0)+xx, (py|0)+yy, col[0], col[1], col[2], 255);
+          }
+          putPix(d, px|0, py|0, 255, 255, 235, 255);   /* 白熱コア */
         }
         /* 高さフェード＝根元(下辺)は不透明、上端ほど透過＝重なった文字が透けて読める＆炎らしさは保つ */
         var FADE_SOLID = 3, FADE_SPAN = 8, FADE_MIN = 0.28;
