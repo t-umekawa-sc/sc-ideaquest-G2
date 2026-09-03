@@ -2314,7 +2314,7 @@
       function createPixelThunder(opts) {
         opts = opts || {};
         var scale = opts.scale || 3;
-        var W = Math.max(120, opts.cols || 240), H = Math.max(20, opts.rows || 34);
+        var W = Math.max(120, opts.cols || 240), PANEL_H = Math.max(20, opts.rows || 34), ABOVE = Math.max(0, opts.above || 0), H = PANEL_H + ABOVE;
         var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
         canvas.className = 'pix-thunder'; canvas.setAttribute('aria-hidden', 'true');
         canvas.style.width = '100%'; canvas.style.height = '100%';
@@ -2324,8 +2324,12 @@
         var bolt = [], branches = [], sparks = [], charge = [];
         var flash = 0, strikeTimer = 0, strikeX = W >> 1;
         var proj = null;                                   /* caster からの発射弾 */
-        var CX = W >> 1, IMPACT_Y = (H * 0.55) | 0;         /* 着弾点＝パネル中央 */
-        var CLOUD_HALF = Math.max(8, (W * 0.20) | 0), CLOUD_CY = 4, CLOUD_BOTTOM = 7;  /* 雷雲＝上部中央 */
+        var CX = W >> 1;
+        var PANEL_TOP = ABOVE;                             /* パネル上線の行（この上=パネル外） */
+        var IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;    /* 着弾点＝パネル中央 */
+        var CLOUD_BOTTOM = PANEL_TOP;                      /* 雷雲の下端＝パネル上線 */
+        var CLOUD_HALF = (W >> 1) - 1;                     /* 幅＝ユーザアイコン間≒パネル全幅 */
+        var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8)); /* 雲の高さ（パネル外の上方に描く） */
         var riseT = 0, RISE_FRAMES = 12, cloudGrow = 0;    /* rising=電気が上昇し雲が育つ／cloudGrow 0→1 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
@@ -2381,10 +2385,11 @@
           if (cloudGrow <= 0) return;
           var g = cloudGrow > 1 ? 1 : cloudGrow, a = (255 * g) | 0, half = CLOUD_HALF, x;
           for (x = -half; x <= half; x++) {
-            var nx = x / half;
-            var base = Math.sqrt(Math.max(0, 1 - nx*nx));            /* 半円プロファイル＝中央が高い */
-            var bump = 0.16*Math.sin(x*0.8) + 0.10*Math.sin(x*1.9 + 1);   /* もこもこの凹凸 */
-            var thick = (base * (CLOUD_BOTTOM - 1) + bump*3) * g;
+            var nx = x / half, an = nx < 0 ? -nx : nx;
+            var edge = an < 0.78 ? 1 : (1 - an) / 0.22;             /* 中央は台形の平ら・両端でテーパー＝幅広の雲 */
+            if (edge < 0) edge = 0;
+            var bump = 0.22*Math.sin(x*0.7) + 0.16*Math.sin(x*1.6 + 1) + 0.10*Math.sin(x*3.1 + 2);   /* もこもこの凹凸 */
+            var thick = (edge * CLOUD_H + bump*3.5) * g;
             if (thick <= 0.5) continue;
             var topY = Math.round(CLOUD_BOTTOM - thick), cxx = CX + x;
             for (var y = topY; y <= CLOUD_BOTTOM; y++) {
@@ -2463,16 +2468,20 @@
         var scale = 3;
         var cols = Math.max(140, Math.round(msg.clientWidth / scale));
         var rows = Math.max(20, Math.round(msg.clientHeight / scale));
-        var bolt = createPixelThunder({ scale: scale, cols: cols, rows: rows });
+        var abovePx = 33, aboveRows = Math.round(abovePx / scale), totalRows = rows + aboveRows;   /* 雷雲を載せるためパネル上へ拡張 */
+        var bolt = createPixelThunder({ scale: scale, cols: cols, rows: rows, above: aboveRows });
+        bolt.canvas.style.top = (-abovePx) + 'px';                 /* canvas をパネル上線より上へ伸ばす */
+        bolt.canvas.style.bottom = 'auto';
+        bolt.canvas.style.height = 'calc(100% + ' + abovePx + 'px)';
         msg.appendChild(bolt.canvas);
         var caster = msg.querySelector('.msg-avatar.caster');   /* 術者アバター＝発射元（右上バッジ） */
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
         function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
-        function origin() {   /* caster アバター中心を canvas 論理座標に変換＝発射元 */
-          if (!caster) return { x: cols - 3, y: 0 };
+        function origin() {   /* caster アバター中心を canvas 論理座標に変換＝発射元（canvas は上へ拡張済みなので totalRows でマップ） */
+          if (!caster) return { x: cols - 3, y: aboveRows };
           var cr = bolt.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
-          if (!cr.width || !cr.height) return { x: cols - 3, y: 0 };
-          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * cols, y: (ar.top + ar.height/2 - cr.top) / cr.height * rows };
+          if (!cr.width || !cr.height) return { x: cols - 3, y: aboveRows };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * cols, y: (ar.top + ar.height/2 - cr.top) / cr.height * totalRows };
         }
         function play() { if (reduced()) { bolt.reduceStatic(); return; } kick(caster); var o = origin(); bolt.start(o.x, o.y); }
         btn.addEventListener('click', play);
