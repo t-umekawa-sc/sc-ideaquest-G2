@@ -2712,8 +2712,8 @@
     <p class="muted text-sm">炎(§17b)・雷(§17d)・氷(§17e)と同じ実寸チャットパネルで虹を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(虹色=マゼンタ)。
       発動で<strong>術者(caster)アバターが反動リアクション → 虹色の光ビームを発射</strong>し<strong>パネル中央に着弾</strong>、
       <strong>虹色の粒子がふわっと出て着弾点から左上の隅へ進み</strong>、
-      その後<strong>パネルの外側に各辺の虹アーチがかかる</strong>＝<strong>①左 → ②下 → ③右 → ④上</strong> の順に、
-      <strong>前の辺がふわっと消えながら次の辺の虹がかかり始める</strong>クロスフェードで巡回ループ（フル解像度＝滑らか）。
+      その後<strong>パネルの外側に各辺の虹アーチが順にかかる</strong>＝<strong>①左 → ②下 → ③右 → ④上</strong> の順に描かれ、<strong>描いた虹はそのまま残る（消えない）</strong>。
+      全辺が揃うと<strong>小さな光の球が定期的に虹の上を走る</strong>（フル解像度＝滑らか）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（4辺の虹が同時にかかった状態）。</p>
     <div class="pixfire-stage" id="pixrbowStage">
       <div class="pixfire-msg fx-rainbow" aria-label="虹デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹と重なる位置＝外側にかかる虹で文字が読めるかの確認用テキスト 🌈</div>
@@ -2758,7 +2758,11 @@
           ar.pts = pts; ar.norm = norm; ar.N = N;
         }
         for (var ai = 0; ai < arches.length; ai++) buildArch(arches[ai]);
-        var IN = 16, HOLD = 26, OUT = 18, LIFE = IN+HOLD+OUT, STEP = IN+HOLD, CYCLE = arches.length*STEP;  /* OUT中に次辺がIN＝クロスフェード */
+        var IN = 16, STEP = 28, ALL_DRAWN = (arches.length-1)*STEP + IN;   /* 各辺を順に描く→描いたら残す(消えない) */
+        var loopPts = [];                                           /* 全アーチを連結＝光の球が虹をなぞって走る経路 */
+        for (var li = 0; li < arches.length; li++) for (var lj = 0; lj <= arches[li].N; lj++) loopPts.push(arches[li].pts[lj]);
+        var loopLen = loopPts.length;
+        var orb = null, orbCooldown = 0, ORB_SPEED = 2.4, ORB_GAP = 34;   /* 定期的に虹上を走る小さな光の球 */
         var state = 'idle', raf = null, last = 0, acc = 0, T = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
         var motes = [], leadT = 0, LEAD_FRAMES = 22;                 /* lead=着弾後に虹色の粒子がふわっと出て左上の隅へ進む */
 
@@ -2794,20 +2798,21 @@
         }
         function updateMotes() { for (var i = motes.length-1; i >= 0; i--) { var m = motes[i]; m.x += m.vx; m.y += m.vy; m.vx *= 0.965; m.vy *= 0.965; m.life -= 0.018; if (m.life <= 0) motes.splice(i, 1); } }
         function drawMotes() { for (var i = 0; i < motes.length; i++) { var m = motes[i]; ctx.globalAlpha = Math.min(1, m.life) * 0.95; ctx.fillStyle = m.col; ctx.shadowColor = m.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill(); ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); } ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
+        function drawOrb(idx) {   /* 虹上を走る小さな光の球（白い球＋グロー） */
+          var p = loopPts[Math.min(loopLen-1, Math.max(0, idx|0))];
+          var g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 9);
+          g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.4, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.98)'; ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 6.2832); ctx.fill();
+        }
         function render() {
           ctx.clearRect(0, 0, W, H);
           if (state === 'arches') {
-            for (var k = 0; k < arches.length; k++) {
-              var since = T - k*STEP; if (since < 0) continue;   /* まだ開始時刻前の辺は出さない（初回の回り込み防止） */
-              var local = since % CYCLE;
-              if (local < LIFE) {
-                var prog, alpha;
-                if (local < IN) { prog = local/IN; alpha = local/IN; }
-                else if (local < IN+HOLD) { prog = 1; alpha = 1; }
-                else { prog = 1; alpha = 1 - (local-(IN+HOLD))/OUT; }
-                drawArch(arches[k], prog, alpha);
-              }
+            for (var k = 0; k < arches.length; k++) {   /* 各辺は描いたら残す（フェードアウトしない） */
+              var prog = (T - k*STEP) / IN; if (prog <= 0) continue; if (prog > 1) prog = 1;
+              drawArch(arches[k], prog, 0.9);
             }
+            if (orb !== null) drawOrb(orb);   /* 定期的に虹上を走る光の球 */
           }
           drawMotes();
           drawSparks();
@@ -2818,13 +2823,19 @@
           if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'lead'; leadT = 0; } }
           while (acc >= 33) {
             if (state === 'lead') { leadT++; spawnMotes(4); if (leadT >= LEAD_FRAMES) { state = 'arches'; T = 0; } }
-            if (state === 'arches') T++;
+            if (state === 'arches') {
+              T++;
+              if (T >= ALL_DRAWN) {   /* 全辺を描き終えたら虹上を走る光の球を定期的に */
+                if (orb !== null) { orb += ORB_SPEED; if (orb >= loopLen-1) { orb = null; orbCooldown = ORB_GAP; } }
+                else if (orbCooldown > 0) orbCooldown--; else orb = 0;
+              }
+            }
             updateMotes(); updateSparks(); acc -= 33;
           }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { sparks = []; motes = []; leadT = 0; T = 0; }
+        function reset() { sparks = []; motes = []; leadT = 0; T = 0; orb = null; orbCooldown = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); casterX = (ox == null ? W-6 : ox); casterY = (oy == null ? M : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
