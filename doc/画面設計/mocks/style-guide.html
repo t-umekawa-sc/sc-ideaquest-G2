@@ -2706,15 +2706,16 @@
     </script>
   </div>
 
-  <!-- 17f. 虹（caster発射=虹色ビーム→中央着弾→虹が左上へ→周回ループ／実寸大サンプル）GF-AC-091 -->
+  <!-- 17f. 虹（caster発射=虹色ビーム→中央着弾→外側4辺に虹アーチがクロスフェードで巡回／実寸大サンプル）GF-AC-091 -->
   <div class="section">
-    <h2>17f. 虹（虹色ビーム発射→中央着弾→虹が左上へ→パネルを周回ループ）</h2>
+    <h2>17f. 虹（虹色ビーム→中央着弾→パネル外側の各辺に虹がかかる→左→下→右→上でクロスフェード巡回）</h2>
     <p class="muted text-sm">炎(§17b)・雷(§17d)・氷(§17e)と同じ実寸チャットパネルで虹を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(虹色=マゼンタ)。
       発動で<strong>術者(caster)アバターが反動リアクション → 虹色の光ビームを発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>着弾点から虹（多色の帯）が左上へスッと移動</strong>→ その後<strong>左上→左下→右下→右上→左上の順にパネル外周を弧（楕円）を描いて周回してループ</strong>（直線でなく滑らかなカーブで縁を回り続ける・フル解像度）。
-      <code>prefers-reduced-motion</code>／下のトグルで静止（虹のアーチ）。</p>
+      その後<strong>パネルの外側に各辺の虹アーチがかかる</strong>＝<strong>①左 → ②下 → ③右 → ④上</strong> の順に、
+      <strong>前の辺がふわっと消えながら次の辺の虹がかかり始める</strong>クロスフェードで巡回ループ（フル解像度＝滑らか）。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（4辺の虹が同時にかかった状態）。</p>
     <div class="pixfire-stage" id="pixrbowStage">
-      <div class="pixfire-msg fx-rainbow" aria-label="虹デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹と重なる位置＝外周を回る虹で文字が読めるかの確認用テキスト 🌈</div>
+      <div class="pixfire-msg fx-rainbow" aria-label="虹デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹と重なる位置＝外側にかかる虹で文字が読めるかの確認用テキスト 🌈</div>
     </div>
     <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
       <button class="btn-pixel" type="button" id="pixrbowBtn">魔法を発動</button>
@@ -2724,98 +2725,98 @@
     <style>
       /* 発動者バッジ＝虹はマゼンタ（アバタールール §17 準拠） */
       .pixfire-msg.fx-rainbow .msg-avatar.caster { background: #be185d; box-shadow: 0 0 0 2px rgba(236,72,153,.55), 0 1px 4px rgba(0,0,0,.35); }
-      /* 虹＝メッセージパネル全面に重ねるフル解像度 canvas（滑らか）。 */
-      .pix-rainbow { position: absolute; inset: 0; z-index: 3; pointer-events: none;
-        filter: drop-shadow(0 0 5px rgba(255,180,240,.35)); }
+      /* 虹はパネル外側にかかるので左右に逃げ幅を確保 */
+      #pixrbowStage { padding-inline: 48px; }
+      .pix-rainbow { position: absolute; pointer-events: none; z-index: 3; filter: drop-shadow(0 0 5px rgba(255,180,240,.35)); }
     </style>
 
     <script>
-      /* 虹エンジン（自己完結・vanilla／フル解像度）。虹色ビーム発射→中央着弾→虹の帯が左上へ→外周を周回ループ。
+      /* 虹エンジン（自己完結・vanilla／フル解像度）。虹色ビーム→中央着弾→パネル外側の各辺に虹アーチがクロスフェードで巡回。
          API: start(ox,oy)／reduceStatic()／stop()。 */
       function createRainbowSpell(opts) {
         opts = opts || {};
-        var W = Math.max(80, opts.w || 320), H = Math.max(24, opts.h || 110), dpr = opts.dpr || 1;
+        var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), M = opts.margin || 30, dpr = opts.dpr || 1;
+        var W = PW + 2*M, H = PH + 2*M;                             /* canvas はパネルの外側 M 分だけ広い */
         var canvas = document.createElement('canvas'); canvas.className = 'pix-rainbow'; canvas.setAttribute('aria-hidden', 'true');
         canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-        canvas.style.width = '100%'; canvas.style.height = '100%';
         var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
-        var CX = W / 2, CY = H / 2;
+        var CX = W / 2, CY = H / 2;                                 /* = パネル中央（着弾点） */
         var RAINBOW = ['#ff5a5a', '#ff9f40', '#ffe14d', '#5fd06a', '#4aa0ff', '#b478ff'];
-        var BAND_STEP = 3, BAND_W = 4, TRAIL_LEN = 34, HEAD_SPEED = Math.max(4, (W + H) / 140);
-        var inset = Math.max(10, Math.min(W, H) * 0.14);
-        var RA = W/2 - inset, RB = H/2 - inset;                      /* 周回パス＝楕円（直線でなく弧を描く） */
-        var START_ANG = Math.PI * 1.25;                             /* 開始＝楕円の左上(225°) */
-        var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var casterX = W - 6, casterY = 4, beamT = 0, BEAM_FRAMES = 11;
-        var ang = START_ANG, sliding = false, slideT = 0, SLIDE_FRAMES = 14, prevH = [CX, CY], trail = [], sparks = [];
+        var BAND_STEP = 3, BAND_W = 4, bulge = M * 0.82;
+        var pTL = [M, M], pTR = [M+PW, M], pBR = [M+PW, M+PH], pBL = [M, M+PH];
+        var arches = [                                              /* ①左 ②下 ③右 ④上（外側へ膨らむ弧） */
+          { p0: pTL, p1: pBL, out: [-1, 0] },
+          { p0: pBL, p1: pBR, out: [0, 1] },
+          { p0: pBR, p1: pTR, out: [1, 0] },
+          { p0: pTR, p1: pTL, out: [0, -1] }
+        ];
+        function buildArch(ar) {
+          var p0 = ar.p0, p1 = ar.p1, mid = [(p0[0]+p1[0])/2, (p0[1]+p1[1])/2], pc = [mid[0]+ar.out[0]*bulge, mid[1]+ar.out[1]*bulge], N = 30, pts = [], norm = [];
+          for (var i = 0; i <= N; i++) { var u = i/N, iu = 1-u; pts.push([iu*iu*p0[0] + 2*iu*u*pc[0] + u*u*p1[0], iu*iu*p0[1] + 2*iu*u*pc[1] + u*u*p1[1]]); }
+          for (i = 0; i <= N; i++) { var a = pts[Math.max(0,i-1)], b = pts[Math.min(N,i+1)], dx = b[0]-a[0], dy = b[1]-a[1], dl = Math.sqrt(dx*dx+dy*dy) || 1; norm.push([-dy/dl, dx/dl]); }
+          ar.pts = pts; ar.norm = norm; ar.N = N;
+        }
+        for (var ai = 0; ai < arches.length; ai++) buildArch(arches[ai]);
+        var IN = 16, HOLD = 26, OUT = 18, LIFE = IN+HOLD+OUT, STEP = IN+HOLD, CYCLE = arches.length*STEP;  /* OUT中に次辺がIN＝クロスフェード */
+        var state = 'idle', raf = null, last = 0, acc = 0, T = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
 
         function rnd(n) { return Math.random() * n; }
-        function ellipse(a) { return [CX + RA*Math.cos(a), CY + RB*Math.sin(a)]; }
-        function initTravel() { sliding = true; slideT = 0; ang = START_ANG; prevH = [CX, CY]; trail = []; }
-        function updateHead() {
-          var hx, hy;
-          if (sliding) {                                            /* 着弾点→楕円の左上へスッと（ease-out） */
-            slideT++; var tt = slideT / SLIDE_FRAMES; if (tt > 1) tt = 1; var e = 1 - (1-tt)*(1-tt);
-            var sp = ellipse(START_ANG); hx = CX + (sp[0]-CX)*e; hy = CY + (sp[1]-CY)*e;
-            if (slideT >= SLIDE_FRAMES) sliding = false;
-          } else {                                                  /* 楕円上を弧を描いて反時計回りに周回（左上→左下→右下→右上→左上） */
-            var spd = Math.sqrt(RA*RA*Math.sin(ang)*Math.sin(ang) + RB*RB*Math.cos(ang)*Math.cos(ang)) || 1;
-            ang -= HEAD_SPEED / spd;                                /* 角度を減らす＝正しい周回順・弧長で等速化 */
-            var pt = ellipse(ang); hx = pt[0]; hy = pt[1];
-          }
-          var vx = hx - prevH[0], vy = hy - prevH[1], vl = Math.sqrt(vx*vx+vy*vy) || 1;
-          var nx = -vy/vl, ny = vx/vl;                              /* 進行方向の法線＝虹帯の向き */
-          prevH = [hx, hy];
-          trail.unshift({ x: hx, y: hy, nx: nx, ny: ny }); if (trail.length > TRAIL_LEN) trail.pop();
-          if (Math.random() < 0.6) sparks.push({ x: hx, y: hy, vx: (rnd(2)-1)*0.8, vy: (rnd(2)-1)*0.8, life: 1, col: RAINBOW[(rnd(6)|0)] });
-        }
-        function drawRibbon() {
+        function drawArch(ar, prog, alpha) {
+          var upto = Math.max(1, Math.floor(ar.N * prog));
           ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = BAND_W;
           for (var c = 0; c < RAINBOW.length; c++) {
-            var off = (c - (RAINBOW.length-1)/2) * BAND_STEP; ctx.strokeStyle = RAINBOW[c];
-            for (var i = 0; i < trail.length-1; i++) {
-              var a = trail[i], b = trail[i+1]; ctx.globalAlpha = (1 - i/trail.length) * 0.9;
-              ctx.beginPath(); ctx.moveTo(a.x+a.nx*off, a.y+a.ny*off); ctx.lineTo(b.x+b.nx*off, b.y+b.ny*off); ctx.stroke();
-            }
+            var off = (c - (RAINBOW.length-1)/2) * BAND_STEP; ctx.strokeStyle = RAINBOW[c]; ctx.globalAlpha = alpha * 0.9;
+            ctx.beginPath();
+            for (var i = 0; i <= upto; i++) { var p = ar.pts[i], n = ar.norm[i], x = p[0]+n[0]*off, y = p[1]+n[1]*off; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+            ctx.stroke();
           }
           ctx.globalAlpha = 1;
-          if (trail.length) { var h = trail[0]; var g = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, 14);   /* 先頭の白い輝き */
-            g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(h.x, h.y, 14, 0, 6.2832); ctx.fill(); }
+          if (prog < 1) { var tp = ar.pts[upto], g = ctx.createRadialGradient(tp[0], tp[1], 0, tp[0], tp[1], 12);   /* 描き進む先端の輝き */
+            g.addColorStop(0, 'rgba(255,255,255,' + (alpha*0.8).toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tp[0], tp[1], 12, 0, 6.2832); ctx.fill();
+            if (Math.random() < 0.5) sparks.push({ x: tp[0], y: tp[1], vx: (rnd(2)-1)*0.8, vy: (rnd(2)-1)*0.8, life: 1, col: RAINBOW[(rnd(6)|0)] }); }
         }
         function drawBeam() {
-          var p = beamT / BEAM_FRAMES; var g = ctx.createLinearGradient(casterX, casterY, CX, CY);
+          var p = beamT / BEAM_FRAMES, g = ctx.createLinearGradient(casterX, casterY, CX, CY);
           for (var i = 0; i < RAINBOW.length; i++) g.addColorStop(i/(RAINBOW.length-1), RAINBOW[i]);
-          ctx.globalAlpha = Math.min(1, p * 1.4); ctx.strokeStyle = g; ctx.lineWidth = 3 + p*4; ctx.lineCap = 'round';
-          ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 6;
-          ctx.beginPath(); ctx.moveTo(casterX, casterY); ctx.lineTo(CX, CY); ctx.stroke();
+          ctx.globalAlpha = Math.min(1, p*1.4); ctx.strokeStyle = g; ctx.lineWidth = 3 + p*4; ctx.lineCap = 'round';
+          ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 6; ctx.beginPath(); ctx.moveTo(casterX, casterY); ctx.lineTo(CX, CY); ctx.stroke();
           ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         }
         function drawSparks() { for (var i = 0; i < sparks.length; i++) { var s = sparks[i]; ctx.globalAlpha = s.life; ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(s.x, s.y, 1.6, 0, 6.2832); ctx.fill(); } ctx.globalAlpha = 1; }
         function updateSparks() { for (var i = sparks.length-1; i >= 0; i--) { var s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += 0.03; s.life -= 0.04; if (s.life <= 0) sparks.splice(i, 1); } }
         function render() {
           ctx.clearRect(0, 0, W, H);
-          if (state === 'travel') drawRibbon();
+          if (state === 'arches') {
+            for (var k = 0; k < arches.length; k++) {
+              var since = T - k*STEP; if (since < 0) continue;   /* まだ開始時刻前の辺は出さない（初回の回り込み防止） */
+              var local = since % CYCLE;
+              if (local < LIFE) {
+                var prog, alpha;
+                if (local < IN) { prog = local/IN; alpha = local/IN; }
+                else if (local < IN+HOLD) { prog = 1; alpha = 1; }
+                else { prog = 1; alpha = 1 - (local-(IN+HOLD))/OUT; }
+                drawArch(arches[k], prog, alpha);
+              }
+            }
+          }
           drawSparks();
           if (state === 'beam') drawBeam();
         }
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
-          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'travel'; initTravel(); } }
-          if (state === 'travel') updateHead();
-          while (acc >= 33) { t++; updateSparks(); acc -= 33; }
+          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'arches'; T = 0; } }
+          while (acc >= 33) { if (state === 'arches') T++; updateSparks(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { sparks = []; trail = []; segDist = 0; loopIdx = 0; t = 0; }
+        function reset() { sparks = []; T = 0; }
         return {
           canvas: canvas,
-          start: function (ox, oy) { reset(); casterX = (ox == null ? W - 6 : ox); casterY = (oy == null ? 4 : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
-          reduceStatic: function () {   /* 静止＝虹のアーチ（半円） */
+          start: function (ox, oy) { reset(); casterX = (ox == null ? W-6 : ox); casterY = (oy == null ? M : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
+          reduceStatic: function () {   /* 静止＝4辺の虹が同時にかかった状態 */
             if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; ctx.clearRect(0, 0, W, H);
-            ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.globalAlpha = 0.85;
-            var R = Math.min(W*0.32, H*1.3);
-            for (var c = 0; c < RAINBOW.length; c++) { ctx.strokeStyle = RAINBOW[c]; ctx.beginPath(); ctx.arc(CX, H + H*0.2, R - c*BAND_W, Math.PI, 2*Math.PI); ctx.stroke(); }
-            ctx.globalAlpha = 1;
+            for (var k = 0; k < arches.length; k++) drawArch(arches[k], 1, 0.85);
           },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
@@ -2826,18 +2827,20 @@
         var btn = document.getElementById('pixrbowBtn');
         var reduceCb = document.getElementById('pixrbowReduce');
         if (!stage || !msg || !btn) return;
-        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        var dpr = Math.min(2, window.devicePixelRatio || 1), M = 30;
         var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
-        var rb = createRainbowSpell({ w: w, h: h, dpr: dpr });
+        var rb = createRainbowSpell({ w: w, h: h, margin: M, dpr: dpr });
+        rb.canvas.style.left = (-M) + 'px'; rb.canvas.style.top = (-M) + 'px'; rb.canvas.style.right = 'auto'; rb.canvas.style.bottom = 'auto';
+        rb.canvas.style.width = 'calc(100% + ' + (2*M) + 'px)'; rb.canvas.style.height = 'calc(100% + ' + (2*M) + 'px)';
         msg.appendChild(rb.canvas);
         var caster = msg.querySelector('.msg-avatar.caster');
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
         function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
-        function origin() {
-          if (!caster) return { x: w - 6, y: 4 };
+        function origin() {   /* caster 中心を canvas 論理座標に（canvas はパネル外へ拡張済み） */
+          if (!caster) return { x: w + M - 6, y: M };
           var cr = rb.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
-          if (!cr.width || !cr.height) return { x: w - 6, y: 4 };
-          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * w, y: (ar.top + ar.height/2 - cr.top) / cr.height * h };
+          if (!cr.width || !cr.height) return { x: w + M - 6, y: M };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * (w + 2*M), y: (ar.top + ar.height/2 - cr.top) / cr.height * (h + 2*M) };
         }
         function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
         btn.addEventListener('click', play);
