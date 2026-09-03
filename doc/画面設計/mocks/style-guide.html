@@ -2928,14 +2928,11 @@
         function bezDir(p0, c, p1, tt) { var u = 1-tt; return [2*u*(c[0]-p0[0]) + 2*tt*(p1[0]-c[0]), 2*u*(c[1]-p0[1]) + 2*tt*(p1[1]-c[1])]; }
         function spawnGroups(ox, oy) {
           groups = []; var p0 = [ox, oy], p1 = [CX, CY];
-          var dx = p1[0]-p0[0], dy = p1[1]-p0[1], dl = Math.sqrt(dx*dx+dy*dy) || 1, px = -dy/dl, py = dx/dl;
-          if (py > 0) { px = -px; py = -py; }   /* 法線は上向きに固定＝下側へ回り込まない */
-          var BOW = Math.min(H*0.34, 34), bows = [1, 0.18, -0.5];   /* 上/やや/わずかに下＝小さめの3方向の弧 */
-          var mx0 = (p0[0]+p1[0])/2, my0 = (p0[1]+p1[1])/2, mgn = CR_SIZE + 4;
-          for (var k = 0; k < bows.length; k++) {
-            var cx = mx0 + px*bows[k]*BOW, cy = my0 + py*bows[k]*BOW;
-            cx = Math.max(mgn, Math.min(W-mgn, cx)); cy = Math.max(mgn, Math.min(H*0.6, cy));   /* パネル内に収め・下側へ行かない */
-            groups.push({ p0: p0, c: [cx, cy], p1: p1, prog: 0 });
+          var mx0 = (p0[0]+p1[0])/2, my0 = (p0[1]+p1[1])/2, mgn = CR_SIZE + 4, BOW = Math.min(H*0.4, 40);
+          /* 制御点の高さを3段に分散＝3本が明確に分かれる／いずれも中央より上（下側へ行かない） */
+          var cxs = [mx0, mx0 - (mx0-CX)*0.25, mx0], cys = [Math.max(mgn, my0 - BOW), my0 + BOW*0.15, Math.min(CY, my0 + BOW)];
+          for (var k = 0; k < 3; k++) {
+            groups.push({ p0: p0, c: [Math.max(mgn, Math.min(W-mgn, cxs[k])), cys[k]], p1: p1, prog: 0 });
           }
         }
         function drawCrescent(x, y, size, ang, alpha) {
