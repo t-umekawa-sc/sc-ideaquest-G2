@@ -2712,9 +2712,9 @@
     <p class="muted text-sm">炎(§17b)・雷(§17d)・氷(§17e)と同じ実寸チャットパネルで虹を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(虹色=マゼンタ)。
       発動で<strong>術者(caster)アバターが反動リアクション → 虹色の光ビームを発射</strong>し<strong>パネル中央に着弾</strong>、
       <strong>虹色の粒子がふわっと出て着弾点から左上の隅へ進み</strong>、
-      その後<strong>パネルの外側に各辺の虹アーチが順にかかる</strong>＝<strong>①左 → ②下 → ③右 → ④上</strong> の順に描かれ、<strong>描いた虹はそのまま残る（消えない）</strong>。
-      全辺が揃うと<strong>小さな光の球が定期的に虹の上を走る</strong>（フル解像度＝滑らか）。
-      <code>prefers-reduced-motion</code>／下のトグルで静止（4辺の虹が同時にかかった状態）。</p>
+      その後<strong>小さな光の球がパネル外周を一周しながら、一周つながった1本の虹を描いていく</strong>（左上→左下→右下→右上→左上）。
+      <strong>描いた虹はそのまま残り（消えない）</strong>、以後は<strong>その球が定期的にもう一度虹をなぞって一周する</strong>（＝虹がかかる時の球／フル解像度＝滑らか）。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（一周つながった虹）。</p>
     <div class="pixfire-stage" id="pixrbowStage">
       <div class="pixfire-msg fx-rainbow" aria-label="虹デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹と重なる位置＝外側にかかる虹で文字が読めるかの確認用テキスト 🌈</div>
     </div>
@@ -2758,29 +2758,34 @@
           ar.pts = pts; ar.norm = norm; ar.N = N;
         }
         for (var ai = 0; ai < arches.length; ai++) buildArch(arches[ai]);
-        var IN = 16, STEP = 28, ALL_DRAWN = (arches.length-1)*STEP + IN;   /* 各辺を順に描く→描いたら残す(消えない) */
-        var loopPts = [];                                           /* 全アーチを連結＝光の球が虹をなぞって走る経路 */
-        for (var li = 0; li < arches.length; li++) for (var lj = 0; lj <= arches[li].N; lj++) loopPts.push(arches[li].pts[lj]);
+        /* 4辺のアーチを連結＝一周つながった1本の虹ループ（+各点の法線＝帯の向き） */
+        var loopPts = [], loopNorm = [];
+        for (var li = 0; li < arches.length; li++) for (var lj = 0; lj <= arches[li].N; lj++) { loopPts.push(arches[li].pts[lj]); loopNorm.push(arches[li].norm[lj]); }
         var loopLen = loopPts.length;
-        var orb = null, orbCooldown = 0, ORB_SPEED = 2.4, ORB_GAP = 34;   /* 定期的に虹上を走る小さな光の球 */
-        var state = 'idle', raf = null, last = 0, acc = 0, T = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
+        /* 球がループを一周しながら虹を描く。初回で描いて残り(消えない)、以後は定期的に球が再び一周（＝虹がかかる時の球） */
+        var drawnUpto = 0, sphere = null, sphereCooldown = 0, SPHERE_SPEED = 2.6, SPHERE_GAP = 40;
+        var state = 'idle', raf = null, last = 0, acc = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
         var motes = [], leadT = 0, LEAD_FRAMES = 22;                 /* lead=着弾後に虹色の粒子がふわっと出て左上の隅へ進む */
 
         function rnd(n) { return Math.random() * n; }
-        function drawArch(ar, prog, alpha) {
-          var upto = Math.max(1, Math.floor(ar.N * prog));
+        function drawRainbowLoop(upto) {   /* 一周つながった虹を先頭 upto まで連続描画（6色の帯） */
+          if (upto < 1) return; var u = Math.min(loopLen-1, upto|0);
           ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = BAND_W;
           for (var c = 0; c < RAINBOW.length; c++) {
-            var off = (c - (RAINBOW.length-1)/2) * BAND_STEP; ctx.strokeStyle = RAINBOW[c]; ctx.globalAlpha = alpha * 0.9;
+            var off = (c - (RAINBOW.length-1)/2) * BAND_STEP; ctx.strokeStyle = RAINBOW[c]; ctx.globalAlpha = 0.9;
             ctx.beginPath();
-            for (var i = 0; i <= upto; i++) { var p = ar.pts[i], n = ar.norm[i], x = p[0]+n[0]*off, y = p[1]+n[1]*off; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+            for (var i = 0; i <= u; i++) { var p = loopPts[i], n = loopNorm[i], x = p[0]+n[0]*off, y = p[1]+n[1]*off; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
             ctx.stroke();
           }
           ctx.globalAlpha = 1;
-          if (prog < 1) { var tp = ar.pts[upto], g = ctx.createRadialGradient(tp[0], tp[1], 0, tp[0], tp[1], 12);   /* 描き進む先端の輝き */
-            g.addColorStop(0, 'rgba(255,255,255,' + (alpha*0.8).toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tp[0], tp[1], 12, 0, 6.2832); ctx.fill();
-            if (Math.random() < 0.5) sparks.push({ x: tp[0], y: tp[1], vx: (rnd(2)-1)*0.8, vy: (rnd(2)-1)*0.8, life: 1, col: RAINBOW[(rnd(6)|0)] }); }
+        }
+        function drawSphere(pos) {   /* 虹をなぞって走る（＝虹がかかる時の）小さな光の球 */
+          var p = loopPts[Math.min(loopLen-1, Math.max(0, pos|0))];
+          var g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 13);
+          g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.4, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], 13, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.98)'; ctx.beginPath(); ctx.arc(p[0], p[1], 2.6, 0, 6.2832); ctx.fill();
+          if (Math.random() < 0.5) sparks.push({ x: p[0], y: p[1], vx: (rnd(2)-1)*0.8, vy: (rnd(2)-1)*0.8, life: 1, col: RAINBOW[(rnd(6)|0)] });
         }
         function drawBeam() {
           var p = beamT / BEAM_FRAMES, g = ctx.createLinearGradient(casterX, casterY, CX, CY);
@@ -2798,21 +2803,11 @@
         }
         function updateMotes() { for (var i = motes.length-1; i >= 0; i--) { var m = motes[i]; m.x += m.vx; m.y += m.vy; m.vx *= 0.965; m.vy *= 0.965; m.life -= 0.018; if (m.life <= 0) motes.splice(i, 1); } }
         function drawMotes() { for (var i = 0; i < motes.length; i++) { var m = motes[i]; ctx.globalAlpha = Math.min(1, m.life) * 0.95; ctx.fillStyle = m.col; ctx.shadowColor = m.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill(); ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); } ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
-        function drawOrb(idx) {   /* 虹上を走る小さな光の球（白い球＋グロー） */
-          var p = loopPts[Math.min(loopLen-1, Math.max(0, idx|0))];
-          var g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 9);
-          g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.4, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 6.2832); ctx.fill();
-          ctx.fillStyle = 'rgba(255,255,255,0.98)'; ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 6.2832); ctx.fill();
-        }
         function render() {
           ctx.clearRect(0, 0, W, H);
-          if (state === 'arches') {
-            for (var k = 0; k < arches.length; k++) {   /* 各辺は描いたら残す（フェードアウトしない） */
-              var prog = (T - k*STEP) / IN; if (prog <= 0) continue; if (prog > 1) prog = 1;
-              drawArch(arches[k], prog, 0.9);
-            }
-            if (orb !== null) drawOrb(orb);   /* 定期的に虹上を走る光の球 */
+          if (state === 'loop') {
+            drawRainbowLoop(drawnUpto);            /* 描いた分の虹は残る（一周つながった1本） */
+            if (sphere !== null) drawSphere(sphere);   /* 虹をなぞって走る球（初回で描き、以後は定期的に一周） */
           }
           drawMotes();
           drawSparks();
@@ -2822,12 +2817,13 @@
           if (!last) last = ts; acc += ts - last; last = ts;
           if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'lead'; leadT = 0; } }
           while (acc >= 33) {
-            if (state === 'lead') { leadT++; spawnMotes(4); if (leadT >= LEAD_FRAMES) { state = 'arches'; T = 0; } }
-            if (state === 'arches') {
-              T++;
-              if (T >= ALL_DRAWN) {   /* 全辺を描き終えたら虹上を走る光の球を定期的に */
-                if (orb !== null) { orb += ORB_SPEED; if (orb >= loopLen-1) { orb = null; orbCooldown = ORB_GAP; } }
-                else if (orbCooldown > 0) orbCooldown--; else orb = 0;
+            if (state === 'lead') { leadT++; spawnMotes(4); if (leadT >= LEAD_FRAMES) { state = 'loop'; sphere = 0; drawnUpto = 0; } }
+            if (state === 'loop') {
+              if (sphere !== null) {   /* 球がループを一周＝先端まで虹を描く（＝残す） */
+                sphere += SPHERE_SPEED; if (sphere > drawnUpto) drawnUpto = sphere;
+                if (sphere >= loopLen-1) { drawnUpto = loopLen; sphere = null; sphereCooldown = SPHERE_GAP; }
+              } else if (drawnUpto >= loopLen) {   /* 全周描き終えたら定期的に球が再び一周（虹は残したまま） */
+                if (sphereCooldown > 0) sphereCooldown--; else sphere = 0;
               }
             }
             updateMotes(); updateSparks(); acc -= 33;
@@ -2835,13 +2831,12 @@
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { sparks = []; motes = []; leadT = 0; T = 0; orb = null; orbCooldown = 0; }
+        function reset() { sparks = []; motes = []; leadT = 0; drawnUpto = 0; sphere = null; sphereCooldown = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); casterX = (ox == null ? W-6 : ox); casterY = (oy == null ? M : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
-          reduceStatic: function () {   /* 静止＝4辺の虹が同時にかかった状態 */
-            if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; ctx.clearRect(0, 0, W, H);
-            for (var k = 0; k < arches.length; k++) drawArch(arches[k], 1, 0.85);
+          reduceStatic: function () {   /* 静止＝一周つながった虹（球なし） */
+            if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'loop'; drawnUpto = loopLen; ctx.clearRect(0, 0, W, H); render();
           },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
