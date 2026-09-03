@@ -2069,9 +2069,10 @@
         function reset() { heat.fill(0); smoke.length = 0; sparks.length = 0; lit = false; lit0 = false; proj = null; frontL = CX; frontR = CX; }
         function frame(t) {
           if (!last) last = t; var dt = t - last; last = t; acc += dt;
-          if (state === 'incoming' && proj) {   /* x/y 等速イージング＝直線軌道で (CX,H-3) へ同時到達→着弾点=弾の実座標で一致 */
-            proj.x += (CX - proj.x)*0.11; proj.y += ((H - 3) - proj.y)*0.11;
-            if (Math.abs(CX - proj.x) < 2 && Math.abs((H - 3) - proj.y) < 2) ignite();
+          if (state === 'incoming' && proj) {   /* 等速直線で (CX,H-3) へ＝減速せず突入し、着いた瞬間に着火＝即火花 */
+            var dx = CX - proj.x, dy = (H - 3) - proj.y, dist = Math.sqrt(dx*dx + dy*dy), SPEED = Math.max(2.5, W / 80);
+            if (dist <= SPEED) { proj.x = CX; proj.y = H - 3; ignite(); }
+            else { proj.x += dx / dist * SPEED; proj.y += dy / dist * SPEED; }
           }
           if (state === 'lit') { if (frontL > 0) { frontL -= FRONT_SPEED; if (frontL < 0) frontL = 0; } if (frontR < W - 1) { frontR += FRONT_SPEED; if (frontR > W - 1) frontR = W - 1; } }
           while (acc >= 33) { if (state === 'lit') step(); updateSmoke(); updateSparks(); acc -= 33; }
