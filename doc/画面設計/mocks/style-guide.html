@@ -2054,7 +2054,7 @@
         function reset() { heat.fill(0); smoke.length = 0; lit = false; lit0 = false; proj = null; frontL = CX; frontR = CX; }
         function frame(t) {
           if (!last) last = t; var dt = t - last; last = t; acc += dt;
-          if (state === 'incoming' && proj) { proj.x += (CX - proj.x)*0.16; proj.y += ((H - 3) - proj.y)*0.16 + 0.9; if (proj.y >= H - 4) ignite(); }
+          if (state === 'incoming' && proj) { proj.x += (CX - proj.x)*0.08; proj.y += ((H - 3) - proj.y)*0.08 + 0.4; if (proj.y >= H - 4) ignite(); }
           if (state === 'lit') { if (frontL > 0) { frontL -= FRONT_SPEED; if (frontL < 0) frontL = 0; } if (frontR < W - 1) { frontR += FRONT_SPEED; if (frontR > W - 1) frontR = W - 1; } }
           while (acc >= 33) { if (state === 'lit') step(); updateSmoke(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
