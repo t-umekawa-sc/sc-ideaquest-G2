@@ -1942,10 +1942,10 @@
 
   <!-- 17b. ドット絵の延焼（右下着弾→パネル下辺を右→左へ延焼）＝リアル炎に代わる新方針 GF-AC-091 -->
   <div class="section">
-    <h2>17b. ドット絵の延焼（caster発射→右下着弾→下辺を右→左へ延焼）</h2>
+    <h2>17b. ドット絵の延焼（caster発射→中央下部着弾→左右へ延焼）</h2>
     <p class="muted text-sm">リアル炎の路線をやめ、<strong>ドット絵</strong>で表現。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(炎色)。
-      発動で<strong>術者(caster)アバターが反動リアクション → そこから火の玉を発射</strong>し<strong>パネル右下に着弾</strong>して着火、
-      <strong>下辺に沿って右→左へ炎が延焼</strong>していく。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大＝ドット感。
+      発動で<strong>術者(caster)アバターが反動リアクション → そこから火の玉を発射</strong>し<strong>パネル中央下部に着弾</strong>して着火、
+      <strong>着弾点から左右両方向へ炎が延焼</strong>していく。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大＝ドット感。
       炎は古典的なピクセル炎（下から熱が上へ伝播＋左右の揺らぎ）＋黒煙パーティクル。<code>prefers-reduced-motion</code>／下のトグルで静止（延焼済みの静的な炎）。</p>
     <div class="pixfire-stage" id="pixfireStage">
       <div class="pixfire-msg" aria-label="ドット絵の延焼デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【炎】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は炎と重なる位置＝先端が透過して文字が読めるかの確認用テキスト 🔥</div>
@@ -1984,8 +1984,10 @@
         var MAXH = PAL.length - 1;
         var heat = new Uint8Array(W * H), smoke = [];
         var state = 'idle', lit = false, proj = null, raf = null, last = 0, acc = 0;
-        var front = W;                 /* 延焼の先端 x（この x 以上の列が着火済み）。W=未着火・0=全延焼 */
-        var FRONT_SPEED = W / 66;      /* 右→左へ1フレームで進む列数（約1.1秒で下辺全体へ延焼） */
+        var CX = W >> 1;               /* 着弾点＝中央下部 */
+        var frontL = CX, frontR = CX;  /* 延焼の先端＝中央から左右へ。着火列＝[frontL, frontR]。未着火は frontL>frontR */
+        var lit0 = false;              /* 一度でも着火したか（未着火は延焼帯なし） */
+        var FRONT_SPEED = (W / 2) / 60; /* 中央から端まで約1.0秒で延焼 */
 
         function putPix(d, x, y, r, g, b, a) { if (x < 0 || x >= W || y < 0 || y >= H) return; var o = (y * W + x) * 4; d[o]=r; d[o+1]=g; d[o+2]=b; d[o+3]=a; }
         function spreadFire(y, x) {
@@ -1996,10 +1998,15 @@
           var cool = Math.random() < 0.88 ? 1 : 0;                 /* 冷却＝炎の高さを下辺付近に抑える（大きいほど低い炎） */
           heat[ny * W + nx] = Math.max(0, pix - cool);
         }
-        function seedRow() {                                       /* 着火済み列の最下2行を最高熱に */
-          var by = H - 1, x0 = front < 0 ? 0 : (front | 0), x;
-          for (x = x0; x < W; x++) { heat[by * W + x] = MAXH; heat[(by - 1) * W + x] = MAXH; }
-          for (var k = 0; k < 10; k++) { var fx = x0 + k; if (fx >= 0 && fx < W) heat[(by - 2) * W + fx] = MAXH; }   /* 先端＝延焼の“頭”を高く */
+        function seedRow() {                                       /* 着火済み列[frontL,frontR]の最下2行を最高熱に */
+          if (!lit0) return;
+          var by = H - 1, xL = frontL < 0 ? 0 : (frontL | 0), xR = frontR >= W ? W - 1 : (frontR | 0), x;
+          for (x = xL; x <= xR; x++) { heat[by * W + x] = MAXH; heat[(by - 1) * W + x] = MAXH; }
+          for (var k = 0; k < 6; k++) {                            /* 左右それぞれの先端＝延焼の“頭”を高く */
+            var fxl = xL + k, fxr = xR - k;
+            if (fxl >= 0 && fxl < W) heat[(by - 2) * W + fxl] = MAXH;
+            if (fxr >= 0 && fxr < W) heat[(by - 2) * W + fxr] = MAXH;
+          }
         }
         function step() {
           seedRow();
@@ -2007,9 +2014,9 @@
         }
         function topFlameYAt(x) { for (var y = 0; y < H; y++) if (heat[y * W + x] > 3) return y; return H - 3; }
         function updateSmoke() {
-          if (state === 'lit') {
-            var x0 = front < 0 ? 0 : (front | 0);
-            if (Math.random() < 0.45 && x0 < W) { var sx = (x0 + Math.random() * (W - x0)) | 0; smoke.push({ x: sx, y: topFlameYAt(sx), vx:(Math.random()*2-1)*0.12, vy:-(0.30+Math.random()*0.30), life:1 }); }
+          if (state === 'lit' && lit0) {
+            var xL = frontL < 0 ? 0 : (frontL | 0), xR = frontR >= W ? W - 1 : (frontR | 0);
+            if (Math.random() < 0.45 && xL <= xR) { var sx = (xL + Math.random() * (xR - xL + 1)) | 0; smoke.push({ x: sx, y: topFlameYAt(sx), vx:(Math.random()*2-1)*0.12, vy:-(0.30+Math.random()*0.30), life:1 }); }
           }
           for (var i = smoke.length - 1; i >= 0; i--) { var p = smoke[i]; p.x += p.vx; p.y += p.vy; p.vx += (Math.random()*2-1)*0.03; p.life -= 0.02; if (p.life <= 0 || p.y < -2) smoke.splice(i, 1); }
         }
@@ -2031,23 +2038,23 @@
           for (i = 0; i < smoke.length; i++) { var p = smoke[i], a = (p.life*0.6*255)|0; putPix(d, p.x|0, p.y|0, 48, 46, 52, a); putPix(d, (p.x|0)+1, p.y|0, 40, 38, 44, (p.life*0.45*255)|0); }
           ctx.putImageData(img, 0, 0);
         }
-        function ignite() {                                        /* 右下で着火（火の玉着弾点） */
-          state = 'lit'; lit = true; front = W - 3;
-          for (var x = front; x < W; x++) for (var y = H - 6; y < H; y++) if (y >= 0) heat[y * W + x] = MAXH;
+        function ignite() {                                        /* 中央下部で着火（火の玉着弾点）＝ここから左右へ延焼 */
+          state = 'lit'; lit = true; lit0 = true; frontL = CX - 2; frontR = CX + 2;
+          for (var x = frontL; x <= frontR; x++) for (var y = H - 6; y < H; y++) if (x >= 0 && x < W && y >= 0) heat[y * W + x] = MAXH;
         }
-        function reset() { heat.fill(0); smoke.length = 0; lit = false; proj = null; front = W; }
+        function reset() { heat.fill(0); smoke.length = 0; lit = false; lit0 = false; proj = null; frontL = CX; frontR = CX; }
         function frame(t) {
           if (!last) last = t; var dt = t - last; last = t; acc += dt;
-          if (state === 'incoming' && proj) { proj.x += ((W - 3) - proj.x)*0.16; proj.y += ((H - 3) - proj.y)*0.16 + 0.9; if (proj.y >= H - 4) ignite(); }
-          if (state === 'lit' && front > 0) { front -= FRONT_SPEED; if (front < 0) front = 0; }
+          if (state === 'incoming' && proj) { proj.x += (CX - proj.x)*0.16; proj.y += ((H - 3) - proj.y)*0.16 + 0.9; if (proj.y >= H - 4) ignite(); }
+          if (state === 'lit') { if (frontL > 0) { frontL -= FRONT_SPEED; if (frontL < 0) frontL = 0; } if (frontR < W - 1) { frontR += FRONT_SPEED; if (frontR > W - 1) frontR = W - 1; } }
           while (acc >= 33) { if (state === 'lit') step(); updateSmoke(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
         return {
           canvas: canvas,
-          start: function (ox, oy) { reset(); state = 'incoming'; proj = { x: (ox == null ? W - 3 : ox), y: (oy == null ? 0 : oy) }; render(); runLoop(); },   /* caster(右上)→右下へ火の玉→着弾で右下着火→左へ延焼 */
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'lit'; lit = true; front = 0; for (var k = 0; k < 60; k++) step(); render(); },
+          start: function (ox, oy) { reset(); state = 'incoming'; proj = { x: (ox == null ? W - 3 : ox), y: (oy == null ? 0 : oy) }; render(); runLoop(); },   /* caster(右上)→中央下部へ火の玉→着弾で中央着火→左右へ延焼 */
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'lit'; lit = true; lit0 = true; frontL = 0; frontR = W - 1; for (var k = 0; k < 60; k++) step(); render(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
