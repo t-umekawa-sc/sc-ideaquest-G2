@@ -2711,6 +2711,7 @@
     <h2>17f. 虹（虹色ビーム→中央着弾→パネル外側の各辺に虹がかかる→左→下→右→上でクロスフェード巡回）</h2>
     <p class="muted text-sm">炎(§17b)・雷(§17d)・氷(§17e)と同じ実寸チャットパネルで虹を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(虹色=マゼンタ)。
       発動で<strong>術者(caster)アバターが反動リアクション → 虹色の光ビームを発射</strong>し<strong>パネル中央に着弾</strong>、
+      <strong>虹色の粒子がふわっと出て着弾点から左上の隅へ進み</strong>、
       その後<strong>パネルの外側に各辺の虹アーチがかかる</strong>＝<strong>①左 → ②下 → ③右 → ④上</strong> の順に、
       <strong>前の辺がふわっと消えながら次の辺の虹がかかり始める</strong>クロスフェードで巡回ループ（フル解像度＝滑らか）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（4辺の虹が同時にかかった状態）。</p>
@@ -2759,6 +2760,7 @@
         for (var ai = 0; ai < arches.length; ai++) buildArch(arches[ai]);
         var IN = 16, HOLD = 26, OUT = 18, LIFE = IN+HOLD+OUT, STEP = IN+HOLD, CYCLE = arches.length*STEP;  /* OUT中に次辺がIN＝クロスフェード */
         var state = 'idle', raf = null, last = 0, acc = 0, T = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
+        var motes = [], leadT = 0, LEAD_FRAMES = 22;                 /* lead=着弾後に虹色の粒子がふわっと出て左上の隅へ進む */
 
         function rnd(n) { return Math.random() * n; }
         function drawArch(ar, prog, alpha) {
@@ -2785,6 +2787,13 @@
         }
         function drawSparks() { for (var i = 0; i < sparks.length; i++) { var s = sparks[i]; ctx.globalAlpha = s.life; ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(s.x, s.y, 1.6, 0, 6.2832); ctx.fill(); } ctx.globalAlpha = 1; }
         function updateSparks() { for (var i = sparks.length-1; i >= 0; i--) { var s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += 0.03; s.life -= 0.04; if (s.life <= 0) sparks.splice(i, 1); } }
+        function spawnMotes(n) {   /* 虹色の粒子＝着弾点(中央)から左上の隅(pTL)方向へ、ふわっと広がりつつ流れる */
+          var dx = pTL[0]-CX, dy = pTL[1]-CY, dl = Math.sqrt(dx*dx+dy*dy) || 1, base = Math.atan2(dy, dx);
+          for (var i = 0; i < n; i++) { var ang = base + (rnd(1)-0.5)*0.7, sp = 1.6 + rnd(2.6);
+            motes.push({ x: CX+(rnd(2)-1)*5, y: CY+(rnd(2)-1)*5, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2.5 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
+        }
+        function updateMotes() { for (var i = motes.length-1; i >= 0; i--) { var m = motes[i]; m.x += m.vx; m.y += m.vy; m.vx *= 0.965; m.vy *= 0.965; m.life -= 0.018; if (m.life <= 0) motes.splice(i, 1); } }
+        function drawMotes() { for (var i = 0; i < motes.length; i++) { var m = motes[i]; ctx.globalAlpha = Math.min(1, m.life) * 0.95; ctx.fillStyle = m.col; ctx.shadowColor = m.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill(); ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); } ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
         function render() {
           ctx.clearRect(0, 0, W, H);
           if (state === 'arches') {
@@ -2800,17 +2809,22 @@
               }
             }
           }
+          drawMotes();
           drawSparks();
           if (state === 'beam') drawBeam();
         }
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
-          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'arches'; T = 0; } }
-          while (acc >= 33) { if (state === 'arches') T++; updateSparks(); acc -= 33; }
+          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'lead'; leadT = 0; } }
+          while (acc >= 33) {
+            if (state === 'lead') { leadT++; spawnMotes(4); if (leadT >= LEAD_FRAMES) { state = 'arches'; T = 0; } }
+            if (state === 'arches') T++;
+            updateMotes(); updateSparks(); acc -= 33;
+          }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { sparks = []; T = 0; }
+        function reset() { sparks = []; motes = []; leadT = 0; T = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); casterX = (ox == null ? W-6 : ox); casterY = (oy == null ? M : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
