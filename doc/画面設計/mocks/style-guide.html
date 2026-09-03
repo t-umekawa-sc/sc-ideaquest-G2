@@ -3106,6 +3106,125 @@
     </script>
   </div>
 
+  <!-- 17h. キラキラ（caster発射=流れ星→中央着弾でキラキラが四方へ弾け→細かいきらめきがまばらに瞬き続ける／実寸大サンプル）GF-AC-091 -->
+  <div class="section">
+    <h2>17h. キラキラ（流れ星→中央着弾でキラキラが四方へ弾け→まばらに瞬き続ける）</h2>
+    <p class="muted text-sm">炎(§17b)〜オーラ(§17g)と同じ実寸チャットパネルでキラキラを作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(キラキラ色=金)。
+      発動で<strong>術者(caster)アバターが反動リアクション → 流れ星がパネル中央へ飛来</strong>し<strong>着弾点でキラキラが四方へ弾け</strong>、
+      その後<strong>細かいキラキラがゆっくり点滅しながらまばらに瞬き続ける</strong>（白〜金〜パステル・フル解像度＝滑らか・文字は読める）。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（点滅しないきらめき）。</p>
+    <div class="pixfire-stage" id="pixsparkStage">
+      <div class="pixfire-msg fx-sparkle" aria-label="キラキラデモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【キラキラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はキラキラと重なる位置＝瞬きで文字が読めるかの確認用テキスト ✧</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="pixsparkBtn">魔法を発動</button>
+      <label class="checkbox"><input type="checkbox" id="pixsparkReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <style>
+      /* 発動者バッジ＝キラキラは金（アバタールール §17 準拠） */
+      .pixfire-msg.fx-sparkle .msg-avatar.caster { background: #ca8a04; box-shadow: 0 0 0 2px rgba(250,204,21,.55), 0 1px 4px rgba(0,0,0,.35); }
+      .pix-spark { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+    </style>
+
+    <script>
+      /* キラキラエンジン（自己完結・vanilla／フル解像度）。流れ星→中央着弾でキラキラが四方へ弾け→まばらに瞬き続ける。
+         API: start(ox,oy)／reduceStatic()／stop()。 */
+      function createSparkleSpell(opts) {
+        opts = opts || {};
+        var W = Math.max(80, opts.w || 320), H = Math.max(24, opts.h || 110), dpr = opts.dpr || 1;
+        var canvas = document.createElement('canvas'); canvas.className = 'pix-spark'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        canvas.style.width = '100%'; canvas.style.height = '100%';
+        var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+        var CX = W / 2, CY = H / 2;
+        var COLS = ['255,255,255', '255,233,168', '255,200,230', '216,240,255', '255,240,192'];
+        var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
+        var star = null, burst = [], twinkles = [];
+
+        function rnd(n) { return Math.random() * n; }
+        function pick() { return COLS[(rnd(COLS.length))|0]; }
+        function drawGlint(x, y, size, alpha, col) {   /* 4方向の輝き＋放射グロー＝きらめき */
+          if (alpha <= 0.02) return;
+          var g = ctx.createRadialGradient(x, y, 0, x, y, size*1.4);
+          g.addColorStop(0, 'rgba(' + col + ',' + (alpha*0.9).toFixed(3) + ')'); g.addColorStop(0.5, 'rgba(' + col + ',' + (alpha*0.22).toFixed(3) + ')'); g.addColorStop(1, 'rgba(' + col + ',0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, size*1.4, 0, 6.2832); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,' + alpha.toFixed(3) + ')'; ctx.lineCap = 'round';
+          ctx.lineWidth = Math.max(0.8, size*0.14); ctx.beginPath(); ctx.moveTo(x-size, y); ctx.lineTo(x+size, y); ctx.moveTo(x, y-size); ctx.lineTo(x, y+size); ctx.stroke();
+          ctx.lineWidth = Math.max(0.6, size*0.09); ctx.strokeStyle = 'rgba(255,255,255,' + (alpha*0.55).toFixed(3) + ')';
+          var d = size*0.5; ctx.beginPath(); ctx.moveTo(x-d, y-d); ctx.lineTo(x+d, y+d); ctx.moveTo(x-d, y+d); ctx.lineTo(x+d, y-d); ctx.stroke();
+        }
+        function drawStar() {   /* 流れ星＝尾を引く head glint */
+          var tr = star.trail;
+          for (var i = 0; i < tr.length-1; i++) { var a = tr[i], b = tr[i+1], al = (i / tr.length) * 0.85;
+            ctx.globalAlpha = al; ctx.strokeStyle = 'rgba(255,246,210,1)'; ctx.lineCap = 'round'; ctx.lineWidth = 0.8 + (i/tr.length)*3.2;
+            ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+          ctx.globalAlpha = 1;
+          drawGlint(star.x, star.y, 7, 1, '255,246,210');
+        }
+        function spawnBurst(x, y) {   /* 着弾で四方へ弾けるキラキラ */
+          for (var i = 0; i < 20; i++) { var ang = rnd(6.283), sp = 1.4 + rnd(3.6);
+            burst.push({ x: x, y: y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, size: 2 + rnd(3), col: pick() }); }
+        }
+        function updateBurst() { for (var i = burst.length-1; i >= 0; i--) { var p = burst[i]; p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy *= 0.93; p.life -= 0.028; if (p.life <= 0) burst.splice(i, 1); } }
+        function spawnTwinkle() { twinkles.push({ x: rnd(W), y: rnd(H), vx: (rnd(2)-1)*0.1, vy: (rnd(2)-1)*0.08 - 0.03, age: 0, dur: 28 + (rnd(44)|0), size: 1.6 + rnd(2.6), col: pick() }); }
+        function updateTwinkles() { for (var i = twinkles.length-1; i >= 0; i--) { var w = twinkles[i]; w.age++; w.x += w.vx; w.y += w.vy; if (w.age >= w.dur) twinkles.splice(i, 1); } }
+        function render() {
+          ctx.clearRect(0, 0, W, H);
+          for (var i = 0; i < twinkles.length; i++) { var w = twinkles[i], a = Math.sin(w.age / w.dur * 3.14159); drawGlint(w.x, w.y, w.size, a*0.95, w.col); }
+          for (i = 0; i < burst.length; i++) { var p = burst[i]; drawGlint(p.x, p.y, p.size*(0.6 + p.life*0.7), p.life, p.col); }
+          if (state === 'incoming' && star) drawStar();
+        }
+        function frame(ts) {
+          if (!last) last = ts; acc += ts - last; last = ts;
+          if (state === 'incoming' && star) {   /* 流れ星が中央へ→着弾でキラキラが弾ける */
+            var dx = CX - star.x, dy = CY - star.y, dist = Math.sqrt(dx*dx+dy*dy), SPEED = Math.max(6, (W+H)/70);
+            if (dist <= SPEED) { spawnBurst(CX, CY); star = null; state = 'persist'; }
+            else { star.x += dx/dist*SPEED; star.y += dy/dist*SPEED; star.trail.push([star.x, star.y]); if (star.trail.length > 10) star.trail.shift(); }
+          }
+          while (acc >= 33) { t++; updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); acc -= 33; }
+          render(); raf = requestAnimationFrame(frame);
+        }
+        function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
+        function reset() { star = null; burst = []; twinkles = []; t = 0; }
+        return {
+          canvas: canvas,
+          start: function (ox, oy) { reset(); var sx = (ox == null ? W-6 : ox), sy = (oy == null ? 4 : oy); state = 'incoming'; star = { x: sx, y: sy, trail: [[sx, sy]] }; render(); runLoop(); },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'persist';
+            for (var k = 0; k < 12; k++) twinkles.push({ x: rnd(W), y: rnd(H), vx: 0, vy: 0, age: (14+(rnd(30)|0)), dur: 60, size: 1.6 + rnd(2.6), col: pick() }); render(); },
+          stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+        };
+      }
+      (function () {
+        var stage = document.getElementById('pixsparkStage');
+        var msg = stage && stage.querySelector('.pixfire-msg');
+        var btn = document.getElementById('pixsparkBtn');
+        var reduceCb = document.getElementById('pixsparkReduce');
+        if (!stage || !msg || !btn) return;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
+        var sp = createSparkleSpell({ w: w, h: h, dpr: dpr });
+        msg.appendChild(sp.canvas);
+        var caster = msg.querySelector('.msg-avatar.caster');
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
+        function origin() {
+          if (!caster) return { x: w - 6, y: 4 };
+          var cr = sp.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
+          if (!cr.width || !cr.height) return { x: w - 6, y: 4 };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * w, y: (ar.top + ar.height/2 - cr.top) / cr.height * h };
+        }
+        function play() { if (reduced()) { sp.reduceStatic(); return; } kick(caster); var o = origin(); sp.start(o.x, o.y); }
+        btn.addEventListener('click', play);
+        if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) sp.reduceStatic(); });
+        if ('IntersectionObserver' in window) {
+          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
+          io.observe(stage);
+        }
+      })();
+    </script>
+  </div>
+
   <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
   <div class="section">
     <h2>18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静）</h2>
