@@ -2924,9 +2924,11 @@
         var PX = MS, PY = MT, CX = PX + PW/2, CY = PY + PH/2;
         var CELL = 8, GW = Math.ceil(W/CELL), GH = Math.ceil(H/CELL);
         var PAL = [ [0,0,0,0],[60,20,95,110],[100,36,150,160],[140,56,195,190],[178,86,220,210],[210,120,235,228],[236,158,205,240],[255,206,140,250],[255,246,220,255] ];
-        var PALG = [ [0,0,0,0],[92,60,18,110],[142,96,28,160],[186,136,40,190],[220,170,55,210],[240,198,88,228],[250,220,130,240],[255,236,160,250],[255,250,225,255] ];  /* 金パレット（PALと行き来） */
+        var PALG = [ [0,0,0,0],[92,60,18,110],[142,96,28,160],[186,136,40,190],[220,170,55,210],[240,198,88,228],[250,220,130,240],[255,236,160,250],[255,250,225,255] ];  /* 金 */
+        var PALB = [ [0,0,0,0],[18,44,95,110],[28,80,150,160],[40,120,200,190],[60,160,230,210],[100,195,240,228],[150,215,245,240],[200,235,250,250],[240,250,255,255] ];  /* 青 */
+        var PALS = [PAL, PALG, PALB];   /* 紫→金→青→…を巡回 */
         var PALN = [ [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0] ];  /* ブレンド結果 */
-        var COLOR_SPEED = 0.04;   /* 色が紫↔金を行き来する速さ */
+        var COLOR_SPEED = 0.008;   /* 色サイクルの速さ（1.0で1色分進む） */
         var MAXH = PAL.length - 1;
         var heat = new Uint8Array(GW*GH), seeds = [];
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
@@ -2996,9 +2998,10 @@
         function drawPixelAura() {
           var pulse = 0.82 + 0.18*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
           if (g <= 0.01) return;
-          var mix = (Math.sin(t*COLOR_SPEED) + 1) / 2;   /* 0=紫 ⇔ 1=金 を行き来 */
-          for (var k = 1; k < PAL.length; k++) { var a = PAL[k], b = PALG[k], n = PALN[k];
-            n[0] = a[0] + (b[0]-a[0])*mix; n[1] = a[1] + (b[1]-a[1])*mix; n[2] = a[2] + (b[2]-a[2])*mix; n[3] = a[3]; }
+          var phase = (t * COLOR_SPEED) % PALS.length, seg = Math.floor(phase), frac = phase - seg;   /* 紫→金→青→…を巡回 */
+          var A = PALS[seg], B = PALS[(seg+1) % PALS.length];
+          for (var k = 1; k < PAL.length; k++) { var a = A[k], b = B[k], n = PALN[k];
+            n[0] = a[0] + (b[0]-a[0])*frac; n[1] = a[1] + (b[1]-a[1])*frac; n[2] = a[2] + (b[2]-a[2])*frac; n[3] = a[3]; }
           var botRow = Math.floor((PY+PH)/CELL) - 1;   /* この行以降(下辺付近〜下)は透過を上げる＝可読性 */
           for (var i = 0; i < heat.length; i++) { var h = heat[i]; if (h <= 0) continue;
             var gy = (i / GW)|0, botFade = gy >= botRow ? 0.32 : 1;   /* 下辺オーラは薄く */
