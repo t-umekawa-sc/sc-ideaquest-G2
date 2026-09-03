@@ -2711,7 +2711,7 @@
     <h2>17f. 虹（虹色ビーム→中央着弾→パネル外側の各辺に虹がかかる→左→下→右→上でクロスフェード巡回）</h2>
     <p class="muted text-sm">炎(§17b)・雷(§17d)・氷(§17e)と同じ実寸チャットパネルで虹を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(虹色=マゼンタ)。
       発動で<strong>術者(caster)アバターが反動リアクション → 虹色の光ビームを発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>虹色の粒子がふわっと出て着弾点から左上の隅へ進み</strong>、
+      <strong>着弾の瞬間に虹色の粒子がパッと飛び散り（＋閃光）、そのまま左上の隅へ流れていき</strong>、
       その後<strong>小さな光の球がパネル外周を一周しながら、一周つながった1本の虹を描いていく</strong>（左上→左下→右下→右上→左上）。
       <strong>描いた虹はそのまま残り（消えない）</strong>、以後は<strong>その球が定期的にもう一度虹をなぞって一周する</strong>（＝虹がかかる時の球／フル解像度＝滑らか）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（一周つながった虹）。</p>
@@ -2765,7 +2765,7 @@
         /* 球がループを一周しながら虹を描く。初回で描いて残り(消えない)、以後は定期的に球が再び一周（＝虹がかかる時の球） */
         var drawnUpto = 0, sphere = null, sphereCooldown = 0, SPHERE_SPEED = 2.6, SPHERE_GAP = 40;
         var state = 'idle', raf = null, last = 0, acc = 0, beamT = 0, BEAM_FRAMES = 11, casterX = W-6, casterY = M, sparks = [];
-        var motes = [], leadT = 0, LEAD_FRAMES = 22;                 /* lead=着弾後に虹色の粒子がふわっと出て左上の隅へ進む */
+        var motes = [], leadT = 0, LEAD_FRAMES = 20, impactFlash = 0;   /* lead=着弾の瞬間に虹粒子が飛び散り左上の隅へ流れる */
 
         function rnd(n) { return Math.random() * n; }
         function drawRainbowLoop(upto) {   /* 一周つながった虹を先頭 upto まで連続描画（6色の帯） */
@@ -2796,9 +2796,10 @@
         }
         function drawSparks() { for (var i = 0; i < sparks.length; i++) { var s = sparks[i]; ctx.globalAlpha = s.life; ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(s.x, s.y, 1.6, 0, 6.2832); ctx.fill(); } ctx.globalAlpha = 1; }
         function updateSparks() { for (var i = sparks.length-1; i >= 0; i--) { var s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += 0.03; s.life -= 0.04; if (s.life <= 0) sparks.splice(i, 1); } }
-        function spawnMotes(n) {   /* 虹色の粒子＝着弾点(中央)から左上の隅(pTL)方向へ、ふわっと広がりつつ流れる */
+        function spawnMotes(n, spread, spMul) {   /* 虹色の粒子＝着弾点(中央)から左上の隅(pTL)方向へ、ふわっと広がりつつ流れる */
+          spread = spread || 0.7; spMul = spMul || 1;
           var dx = pTL[0]-CX, dy = pTL[1]-CY, dl = Math.sqrt(dx*dx+dy*dy) || 1, base = Math.atan2(dy, dx);
-          for (var i = 0; i < n; i++) { var ang = base + (rnd(1)-0.5)*0.7, sp = 1.6 + rnd(2.6);
+          for (var i = 0; i < n; i++) { var ang = base + (rnd(1)-0.5)*spread, sp = (1.6 + rnd(2.6)) * spMul;
             motes.push({ x: CX+(rnd(2)-1)*5, y: CY+(rnd(2)-1)*5, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2.5 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
         }
         function updateMotes() { for (var i = motes.length-1; i >= 0; i--) { var m = motes[i]; m.x += m.vx; m.y += m.vy; m.vx *= 0.965; m.vy *= 0.965; m.life -= 0.018; if (m.life <= 0) motes.splice(i, 1); } }
@@ -2809,15 +2810,21 @@
             drawRainbowLoop(drawnUpto);            /* 描いた分の虹は残る（一周つながった1本） */
             if (sphere !== null) drawSphere(sphere);   /* 虹をなぞって走る球（初回で描き、以後は定期的に一周） */
           }
+          if (impactFlash > 0.03) {                 /* 着弾の閃光＝広がりながら消える */
+            var fr = 10 + (1-impactFlash)*42, fg = ctx.createRadialGradient(CX, CY, 0, CX, CY, fr);
+            fg.addColorStop(0, 'rgba(255,255,255,' + (impactFlash*0.85).toFixed(2) + ')'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(CX, CY, fr, 0, 6.2832); ctx.fill();
+          }
           drawMotes();
           drawSparks();
           if (state === 'beam') drawBeam();
         }
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
-          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'lead'; leadT = 0; } }
+          if (state === 'beam') { beamT -= 1; if (beamT <= 0) { state = 'lead'; leadT = 0; impactFlash = 1; spawnMotes(22, 2.1, 1.25); } }   /* 着弾＝即バースト(広く飛び散る)＋閃光 */
           while (acc >= 33) {
-            if (state === 'lead') { leadT++; spawnMotes(4); if (leadT >= LEAD_FRAMES) { state = 'loop'; sphere = 0; drawnUpto = 0; } }
+            if (state === 'lead') { leadT++; if (leadT <= 6) spawnMotes(3, 0.8); if (leadT >= LEAD_FRAMES) { state = 'loop'; sphere = 0; drawnUpto = 0; } }
+            if (impactFlash > 0) impactFlash *= 0.8;
             if (state === 'loop') {
               if (sphere !== null) {   /* 球がループを一周＝先端まで虹を描く（＝残す） */
                 sphere += SPHERE_SPEED; if (sphere > drawnUpto) drawnUpto = sphere;
@@ -2831,7 +2838,7 @@
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { sparks = []; motes = []; leadT = 0; drawnUpto = 0; sphere = null; sphereCooldown = 0; }
+        function reset() { sparks = []; motes = []; leadT = 0; impactFlash = 0; drawnUpto = 0; sphere = null; sphereCooldown = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); casterX = (ox == null ? W-6 : ox); casterY = (oy == null ? M : oy); state = 'beam'; beamT = BEAM_FRAMES; render(); runLoop(); },
