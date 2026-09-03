@@ -2916,7 +2916,7 @@
       function createAuraSpell(opts) {
         opts = opts || {};
         var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), dpr = opts.dpr || 1;
-        var MT = 58, MS = 42, MB = 16;                             /* 上マージン大＝立ち上る余白／左右中／下小 */
+        var MT = 88, MS = 42, MB = 16;                             /* 上マージン大＝立ち上る余白／左右中／下小 */
         var W = PW + 2*MS, H = PH + MT + MB;
         var canvas = document.createElement('canvas'); canvas.className = 'pix-aura'; canvas.setAttribute('aria-hidden', 'true');
         canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
@@ -2980,11 +2980,11 @@
             seeds.push({ i: gy*GW+gx, fuel: fuel });
           }
         }
-        function spreadFire(y, x) {   /* 上昇伝播（左右にゆらぎ＋冷却） */
+        function spreadFire(y, x) {   /* 上昇伝播（左右にゆらぎ＋強めの冷却＝炎を低く保ち先端のムラが天井下に出る） */
           var src = y*GW+x, pix = heat[src], ny = y-1;
           if (pix === 0) { heat[ny*GW+x] = 0; return; }
           var r = (Math.random()*3)|0, nx = x + (1 - r); if (nx < 0) nx = 0; else if (nx >= GW) nx = GW-1;
-          heat[ny*GW+nx] = Math.max(0, pix - (r & 1));
+          heat[ny*GW+nx] = Math.max(0, pix - (Math.random() < 0.85 ? 1 : 0));
         }
         function stepAura() {
           for (var s = 0; s < seeds.length; s++) heat[seeds[s].i] = seeds[s].fuel;
@@ -3056,7 +3056,7 @@
         var btn = document.getElementById('pixauraBtn');
         var reduceCb = document.getElementById('pixauraReduce');
         if (!stage || !msg || !btn) return;
-        var dpr = Math.min(2, window.devicePixelRatio || 1), MT = 58, MS = 42, MB = 16;
+        var dpr = Math.min(2, window.devicePixelRatio || 1), MT = 88, MS = 42, MB = 16;
         var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
         var aura = createAuraSpell({ w: w, h: h, dpr: dpr });
         aura.canvas.style.left = (-MS) + 'px'; aura.canvas.style.top = (-MT) + 'px'; aura.canvas.style.right = 'auto'; aura.canvas.style.bottom = 'auto';
