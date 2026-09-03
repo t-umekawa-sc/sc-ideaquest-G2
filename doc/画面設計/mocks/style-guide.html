@@ -2892,7 +2892,7 @@
     <h2>17g. オーラ（アイコンからドット絵の波動が中央へ→上へ立ち上るドット絵オーラで強化）</h2>
     <p class="muted text-sm">炎(§17b)〜虹(§17f)と同じ実寸チャットパネルでオーラを作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(オーラ色=紫)。
       発動で<strong>術者(caster)アバターが反動リアクション → ドット絵の波動＋前向きな記号（♪音符=応援／↑矢印=オーラアップ／ハート・星・プラス）がパネル中央へ飛んでいき</strong>、
-      <strong>パネルが強化されて縁からドット絵のオーラが立ち上る</strong>＝<strong>下辺は控えめ（透過強め）／左右は上に行くほど強め／上辺は強く上へライズ（高さはムラ）</strong>（紫→マゼンタ→金→白／脈動して残る・文字は透けて読める）。
+      <strong>パネルが強化されて縁からドット絵のオーラが立ち上る</strong>＝<strong>下辺は控えめ（透過強め）／左右は上に行くほど強め／上辺は強く上へライズ（高さはムラ）</strong>（色は<strong>紫↔金をゆっくり行き来</strong>／脈動して残る・文字は透けて読める）。
       オーラは低解像度のチャンクな四角（ドット絵）で上昇。<code>prefers-reduced-motion</code>／下のトグルで静止（強化済みオーラ・脈動なし）。</p>
     <div class="pixfire-stage" id="pixauraStage">
       <div class="pixfire-msg fx-aura" aria-label="オーラデモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はオーラと重なる位置＝淡い光で文字が読めるかの確認用テキスト ✦</div>
@@ -2924,6 +2924,9 @@
         var PX = MS, PY = MT, CX = PX + PW/2, CY = PY + PH/2;
         var CELL = 8, GW = Math.ceil(W/CELL), GH = Math.ceil(H/CELL);
         var PAL = [ [0,0,0,0],[60,20,95,110],[100,36,150,160],[140,56,195,190],[178,86,220,210],[210,120,235,228],[236,158,205,240],[255,206,140,250],[255,246,220,255] ];
+        var PALG = [ [0,0,0,0],[92,60,18,110],[142,96,28,160],[186,136,40,190],[220,170,55,210],[240,198,88,228],[250,220,130,240],[255,236,160,250],[255,250,225,255] ];  /* 金パレット（PALと行き来） */
+        var PALN = [ [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0] ];  /* ブレンド結果 */
+        var COLOR_SPEED = 0.04;   /* 色が紫↔金を行き来する速さ */
         var MAXH = PAL.length - 1;
         var heat = new Uint8Array(GW*GH), seeds = [];
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
@@ -2993,10 +2996,13 @@
         function drawPixelAura() {
           var pulse = 0.82 + 0.18*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
           if (g <= 0.01) return;
+          var mix = (Math.sin(t*COLOR_SPEED) + 1) / 2;   /* 0=紫 ⇔ 1=金 を行き来 */
+          for (var k = 1; k < PAL.length; k++) { var a = PAL[k], b = PALG[k], n = PALN[k];
+            n[0] = a[0] + (b[0]-a[0])*mix; n[1] = a[1] + (b[1]-a[1])*mix; n[2] = a[2] + (b[2]-a[2])*mix; n[3] = a[3]; }
           var botRow = Math.floor((PY+PH)/CELL) - 1;   /* この行以降(下辺付近〜下)は透過を上げる＝可読性 */
           for (var i = 0; i < heat.length; i++) { var h = heat[i]; if (h <= 0) continue;
             var gy = (i / GW)|0, botFade = gy >= botRow ? 0.32 : 1;   /* 下辺オーラは薄く */
-            var col = PAL[h]; ctx.globalAlpha = (col[3]/255) * g * botFade; ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+            var col = PALN[h]; ctx.globalAlpha = (col[3]/255) * g * botFade; ctx.fillStyle = 'rgb(' + (col[0]|0) + ',' + (col[1]|0) + ',' + (col[2]|0) + ')';
             ctx.fillRect((i % GW)*CELL, gy*CELL, CELL, CELL);
           }
           ctx.globalAlpha = 1;
