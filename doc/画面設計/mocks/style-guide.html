@@ -2001,12 +2001,28 @@
           if (state === 'lit' && Math.random() < 0.7) smoke.push({ x: cx + (Math.random()*2-1)*7, y: topFlameY(), vx:(Math.random()*2-1)*0.12, vy:-(0.35+Math.random()*0.35), life:1 });
           for (var i = smoke.length - 1; i >= 0; i--) { var p = smoke[i]; p.x += p.vx; p.y += p.vy; p.vx += (Math.random()*2-1)*0.03; p.life -= 0.014; if (p.life <= 0 || p.y < -2) smoke.splice(i, 1); }
         }
-        function drawLog(d, x0, x1, y) {
-          for (var x = x0; x <= x1; x++) putPix(d, x, y, 112, 70, 38, 255);
-          for (x = x0 + 1; x <= x1 - 1; x++) { putPix(d, x, y-1, 150, 98, 52, 255); putPix(d, x, y+1, 74, 44, 22, 255); }
-          putPix(d, x0, y, 150, 98, 52, 255); putPix(d, x1, y, 150, 98, 52, 255);   /* 丸い木口 */
+        function drawEnd(d, cx, cy) {   /* 丸太の木口（切り口の年輪）＝明るい丸 */
+          putPix(d, cx, cy, 236, 202, 150, 255);
+          putPix(d, cx-1, cy, 198, 154, 100, 255); putPix(d, cx+1, cy, 198, 154, 100, 255);
+          putPix(d, cx, cy-1, 198, 154, 100, 255); putPix(d, cx, cy+1, 198, 154, 100, 255);
+          putPix(d, cx-1, cy-1, 150, 100, 55, 255); putPix(d, cx+1, cy-1, 150, 100, 55, 255);
+          putPix(d, cx-1, cy+1, 150, 100, 55, 255); putPix(d, cx+1, cy+1, 150, 100, 55, 255);
         }
-        function drawWood(d) { drawLog(d,12,36,H-2); drawLog(d,10,26,H-4); drawLog(d,24,38,H-4); drawLog(d,16,32,H-6); }
+        function drawLogLine(d, x0, y0, x1, y1) {   /* 斜めの丸太（本体＋上ハイライト/下影）＋両端の木口 */
+          var dx = x1 - x0, dy = y1 - y0, n = Math.max(Math.abs(dx), Math.abs(dy)) || 1;
+          for (var i = 0; i <= n; i++) {
+            var t = i / n, x = Math.round(x0 + dx * t), y = Math.round(y0 + dy * t);
+            putPix(d, x, y-1, 208, 160, 106, 255);   /* 上＝ハイライト */
+            putPix(d, x, y,   178, 126,  72, 255);   /* 本体 */
+            putPix(d, x, y+1, 120,  80,  42, 255);   /* 下＝影 */
+          }
+          drawEnd(d, x0, y0); drawEnd(d, x1, y1);
+        }
+        function drawWood(d) {
+          drawLogLine(d, 11, 63, 37, 63);   /* 土台の横丸太 */
+          drawLogLine(d,  8, 62, 30, 55);   /* 交差＝右上がり */
+          drawLogLine(d, 40, 62, 18, 55);   /* 交差＝左上がり */
+        }
         function drawProjectile(d) {
           var px = proj.x|0, py = proj.y|0;
           for (var dy=-1; dy<=1; dy++) for (var dx=-1; dx<=1; dx++) putPix(d, px+dx, py+dy, 255, 190, 70, 255);
