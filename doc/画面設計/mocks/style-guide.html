@@ -3231,16 +3231,35 @@
             if (u.prog >= 1) ufo = null;
           } else if (state === 'persist') { ufoTimer--; if (ufoTimer <= 0) spawnUFO(); }
         }
+        /* ドット絵の円盤スプライト（15×8）＝'.'透過／L=点滅ライト */
+        var UFO_ART = [
+          '......ddd......',
+          '.....dDDDd.....',
+          '....dDDDDDd....',
+          '.hHHHHHHHHHHHh.',
+          'BBBBBBBBBBBBBBB',
+          'BLBBBLBBBLBBBLB',
+          '.kkkkkkkkkkkkk.',
+          '.....kkkkk.....'
+        ];
+        var UFO_COL = { d: '#d6f2ff', D: '#8fd7ff', h: '#e8f4ff', H: '#c9dcf0', B: '#93a6c4', k: '#5f7290' };
+        var UFO_W = 15, UFO_H = 8, UFO_PX = 2.4;
         function drawUFO() {
           if (!ufo) return; var x = ufo.x, y = ufo.y + Math.sin(t*0.14)*1.5;
-          var bg = ctx.createRadialGradient(x, y+7, 0, x, y+7, 22);   /* 下向きの淡い光 */
-          bg.addColorStop(0, 'rgba(120,240,220,' + (0.22*bgFade).toFixed(2) + ')'); bg.addColorStop(1, 'rgba(120,240,220,0)');
-          ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(x, y+7, 22, 12, 0, 0, 6.2832); ctx.fill();
-          ctx.fillStyle = '#93a6c4'; ctx.beginPath(); ctx.ellipse(x, y, 16, 5, 0, 0, 6.2832); ctx.fill();   /* 円盤本体 */
-          ctx.fillStyle = '#c9dcf0'; ctx.beginPath(); ctx.ellipse(x, y-1, 16, 2.6, 0, 0, 6.2832); ctx.fill();   /* 上ハイライト */
-          ctx.fillStyle = 'rgba(190,235,255,0.9)'; ctx.beginPath(); ctx.ellipse(x, y-2.5, 7, 5.5, 0, Math.PI, 2*Math.PI); ctx.fill();   /* ドーム */
-          for (var i = 0; i < 3; i++) { var lx = x + (i-1)*8, on = Math.sin(t*0.4 + i*2) > 0;   /* 点滅ライト */
-            ctx.fillStyle = on ? '#ffe14d' : '#40e0ff'; ctx.beginPath(); ctx.arc(lx, y+2.5, 1.4, 0, 6.2832); ctx.fill(); }
+          var bg = ctx.createRadialGradient(x, y+9, 0, x, y+9, 20);   /* 下向きの淡い光 */
+          bg.addColorStop(0, 'rgba(120,240,220,' + (0.20*bgFade).toFixed(2) + ')'); bg.addColorStop(1, 'rgba(120,240,220,0)');
+          ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(x, y+9, 20, 11, 0, 0, 6.2832); ctx.fill();
+          /* 格子状に四角を敷く＝アンチエイリアスなしのレトロ表現。整数境界でタイル化し継ぎ目を消す */
+          var px = UFO_PX, ox = x - UFO_W*px/2, oy = y - UFO_H*px/2;
+          for (var r = 0; r < UFO_H; r++) {
+            var row = UFO_ART[r], y0 = Math.round(oy + r*px), y1 = Math.round(oy + (r+1)*px);
+            for (var c = 0; c < UFO_W; c++) {
+              var ch = row.charAt(c); if (ch === '.') continue;
+              var col = (ch === 'L') ? (Math.sin(t*0.4 + c) > 0 ? '#ffe14d' : '#40e0ff') : UFO_COL[ch];   /* 点滅ライト */
+              var x0 = Math.round(ox + c*px), x1 = Math.round(ox + (c+1)*px);
+              ctx.fillStyle = col; ctx.fillRect(x0, y0, x1-x0, y1-y0);
+            }
+          }
         }
         function spawnBurst(x, y) {   /* 着弾で四方へ弾けるキラキラ */
           for (var i = 0; i < 20; i++) { var ang = rnd(6.283), sp = 1.4 + rnd(3.6);
