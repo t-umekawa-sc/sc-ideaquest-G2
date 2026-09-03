@@ -2887,13 +2887,13 @@
     </script>
   </div>
 
-  <!-- 17g. オーラ（caster発射=三日月2個×3方向が中央合流→パネルにオーラ注入→縁からオーラが滲み出て強化／実寸大サンプル）GF-AC-091 -->
+  <!-- 17g. オーラ（caster発射=三日月2個×3方向が中央合流→パネルにオーラ注入→縁からドット絵オーラが滲み出て強化／実寸大サンプル）GF-AC-091 -->
   <div class="section">
-    <h2>17g. オーラ（三日月が3方向から中央合流→パネルにオーラ注入→縁からオーラが滲み出て強化）</h2>
+    <h2>17g. オーラ（三日月が3方向から中央合流→パネルにオーラ注入→縁からドット絵オーラが滲み出て強化）</h2>
     <p class="muted text-sm">炎(§17b)〜虹(§17f)と同じ実寸チャットパネルでオーラを作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(オーラ色=紫)。
       発動で<strong>術者(caster)アバターが反動リアクション → 三日月（クレセント）2個組が3方向に分かれて弧を描き、パネル中央で合流</strong>、
-      <strong>合流点からパネルにオーラを注入 → パネルが強化され、縁からオーラ（紫〜金）が滲み出て徐々に強くなる</strong>（脈動して残る・文字は透けて読める）。
-      フル解像度 canvas をパネル外へ広げて描画。<code>prefers-reduced-motion</code>／下のトグルで静止（強化済みオーラ・脈動なし）。</p>
+      <strong>合流点からパネルにオーラを注入 → パネルが強化され、縁から<strong>ドット絵のオーラ（紫→マゼンタ→金→白）</strong>が滲み出て徐々に強くなる</strong>（脈動して残る・文字は透けて読める）。
+      オーラは低解像度のチャンクな四角（ドット絵）でリック。<code>prefers-reduced-motion</code>／下のトグルで静止（強化済みオーラ・脈動なし）。</p>
     <div class="pixfire-stage" id="pixauraStage">
       <div class="pixfire-msg fx-aura" aria-label="オーラデモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はオーラと重なる位置＝淡い光で文字が読めるかの確認用テキスト ✦</div>
     </div>
@@ -2906,35 +2906,68 @@
       /* 発動者バッジ＝オーラは紫（アバタールール §17 準拠） */
       .pixfire-msg.fx-aura .msg-avatar.caster { background: #6d28d9; box-shadow: 0 0 0 2px rgba(167,139,250,.55), 0 1px 4px rgba(0,0,0,.35); }
       /* オーラはパネル外へ滲み出るので左右に逃げ幅を確保 */
-      #pixauraStage { padding-inline: 46px; }
+      #pixauraStage { padding-inline: 52px; }
       .pix-aura { position: absolute; pointer-events: none; z-index: 3; }
     </style>
 
     <script>
-      /* オーラエンジン（自己完結・vanilla／フル解像度）。三日月2個×3方向が中央合流→パネルにオーラ注入→縁からオーラが滲み出て強化。
+      /* オーラエンジン（自己完結・vanilla）。三日月2個×3方向が中央合流→パネルにオーラ注入→縁からドット絵オーラがリックして強化。
          API: start(ox,oy)／reduceStatic()／stop()。 */
       function createAuraSpell(opts) {
         opts = opts || {};
-        var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), M = opts.margin || 30, dpr = opts.dpr || 1;
-        var W = PW + 2*M, H = PH + 2*M;                             /* canvas はパネル外側 M 分だけ広い＝オーラが滲み出る余白 */
+        var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), M = opts.margin || 36, dpr = opts.dpr || 1;
+        var W = PW + 2*M, H = PH + 2*M;
         var canvas = document.createElement('canvas'); canvas.className = 'pix-aura'; canvas.setAttribute('aria-hidden', 'true');
         canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
         var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
-        var PX = M, PY = M, RAD = 14;                               /* パネル矩形（角丸） */
-        var CX = W / 2, CY = H / 2;                                 /* = パネル中央（合流点） */
-        var CR_SIZE = Math.max(9, Math.min(PH*0.28, 16));
-        var GROUP_SPEED = 0.02, AURA_RAMP = 0.016;                  /* AURA_RAMP=オーラが強くなる速さ（小さいほどゆっくり） */
+        var PX = M, PY = M, CX = W / 2, CY = H / 2;
+        var CR_SIZE = Math.max(9, Math.min(PH*0.28, 16)), GROUP_SPEED = 0.02, AURA_RAMP = 0.02;
+        /* ドット絵オーラ＝低解像度グリッドのヒート伝播（縁でseed→外へリック） */
+        var CELL = 8, GW = Math.ceil(W/CELL), GH = Math.ceil(H/CELL), MAXR = M + CELL*0.5;
+        var PAL = [ [0,0,0,0],[70,24,110,120],[120,44,175,175],[165,72,220,205],[205,110,235,225],[236,152,214,240],[255,206,142,250],[255,244,216,255] ];
+        var MAXH = PAL.length - 1;
+        var heat = new Uint8Array(GW*GH), cells = [];
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var groups = [], wisps = [], auraGrow = 0, inject = 0;
+        var groups = [], auraGrow = 0, inject = 0;
 
         function rnd(n) { return Math.random() * n; }
-        function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+        function buildAura() {
+          cells = []; heat = new Uint8Array(GW*GH);
+          for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++) {
+            var px = (gx+0.5)*CELL, py = (gy+0.5)*CELL;
+            var nx = Math.max(PX, Math.min(PX+PW, px)), ny = Math.max(PY, Math.min(PY+PH, py));
+            var ddx = px-nx, ddy = py-ny, dist = Math.sqrt(ddx*ddx+ddy*ddy);
+            if (dist > 0) {
+              if (dist > MAXR) continue;
+              var inx = Math.max(0, Math.min(GW-1, gx + Math.round(-ddx/dist))), iny = Math.max(0, Math.min(GH-1, gy + Math.round(-ddy/dist)));
+              cells.push({ i: gy*GW+gx, inw: iny*GW+inx, dist: dist, seed: dist <= CELL*0.9 ? MAXH : 0 });
+            } else {
+              var bin = Math.min(px-PX, PX+PW-px, py-PY, PY+PH-py);
+              if (bin <= CELL*1.6) cells.push({ i: gy*GW+gx, inw: gy*GW+gx, dist: 0, seed: MAXH-2 });   /* パネル内側の縁＝注入されたオーラ */
+            }
+          }
+          cells.sort(function (a, b) { return a.dist - b.dist; });
+        }
+        function stepAura() {
+          for (var c = 0; c < cells.length; c++) { var cc = cells[c]; if (cc.seed) heat[cc.i] = cc.seed; }
+          for (c = 0; c < cells.length; c++) { var cc2 = cells[c]; if (cc2.seed) continue; var v = heat[cc2.inw] - (Math.random() < 0.5 ? 1 : 0); heat[cc2.i] = v > 0 ? v : 0; }
+        }
+        function drawPixelAura() {
+          var pulse = 0.8 + 0.2*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
+          if (g <= 0.01) return;
+          for (var c = 0; c < cells.length; c++) { var cc = cells[c], h = heat[cc.i]; if (h <= 0) continue;
+            var col = PAL[h]; ctx.globalAlpha = (col[3]/255) * g; ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+            var gx = cc.i % GW, gy = (cc.i / GW) | 0; ctx.fillRect(gx*CELL, gy*CELL, CELL, CELL);
+          }
+          ctx.globalAlpha = 1;
+        }
+
         function bez(p0, c, p1, tt) { var u = 1-tt; return [u*u*p0[0] + 2*u*tt*c[0] + tt*tt*p1[0], u*u*p0[1] + 2*u*tt*c[1] + tt*tt*p1[1]]; }
         function bezDir(p0, c, p1, tt) { var u = 1-tt; return [2*u*(c[0]-p0[0]) + 2*tt*(p1[0]-c[0]), 2*u*(c[1]-p0[1]) + 2*tt*(p1[1]-c[1])]; }
         function spawnGroups(ox, oy) {
           groups = []; var p0 = [ox, oy], p1 = [CX, CY];
           var mx0 = (p0[0]+p1[0])/2, my0 = (p0[1]+p1[1])/2, mgn = PY + CR_SIZE, BOW = Math.min(PH*0.42, 42);
-          var cxs = [mx0, mx0 - (mx0-CX)*0.25, mx0], cys = [Math.max(mgn, my0 - BOW), my0 + BOW*0.15, Math.min(CY, my0 + BOW)];   /* 3段の高さ＝明確に3方向・中央より上 */
+          var cxs = [mx0, mx0 - (mx0-CX)*0.25, mx0], cys = [Math.max(mgn, my0 - BOW), my0 + BOW*0.15, Math.min(CY, my0 + BOW)];
           for (var k = 0; k < 3; k++) groups.push({ p0: p0, c: [cxs[k], cys[k]], p1: p1, prog: 0 });
         }
         function drawCrescent(x, y, size, ang, alpha) {
@@ -2948,7 +2981,7 @@
             for (var j = 0; j < 2; j++) {
               var tt = g.prog - j*0.13; if (tt < 0 || tt > 1) continue;
               var p = bez(g.p0, g.c, g.p1, tt), d = bezDir(g.p0, g.c, g.p1, tt), ang = Math.atan2(d[1], d[0]);
-              var a = tt > 0.88 ? Math.max(0, (1-tt)/0.12) : 1;   /* 中央で吸い込まれる（合流） */
+              var a = tt > 0.88 ? Math.max(0, (1-tt)/0.12) : 1;
               drawCrescent(p[0], p[1], CR_SIZE * (1 - j*0.18), ang, a * 0.95);
             }
           }
@@ -2956,40 +2989,16 @@
         function updateGroups() {
           var allDone = true;
           for (var i = 0; i < groups.length; i++) { groups[i].prog += GROUP_SPEED; if (groups[i].prog < 1) allDone = false; }
-          if (allDone && state === 'incoming') { state = 'aura'; auraGrow = 0; inject = 1; for (var b = 0; b < 10; b++) spawnWisp(); }   /* 合流＝注入開始 */
+          if (allDone && state === 'incoming') { state = 'aura'; auraGrow = 0; inject = 1; }
         }
-        function spawnWisp() { wisps.push({ x: CX + (rnd(2)-1)*PW*0.3, y: CY + (rnd(2)-1)*PH*0.3, vx: (rnd(2)-1)*0.25, vy: -(0.15+rnd(0.3)), r: 6+rnd(12), life: 1, col: (Math.random()<0.5 ? '210,180,255' : '255,214,140') }); }
-        function updateWisps() { for (var i = wisps.length-1; i >= 0; i--) { var m = wisps[i]; m.x += m.vx; m.y += m.vy; m.r += 0.12; m.life -= 0.012; if (m.life <= 0) wisps.splice(i, 1); } }
-        function drawAura() {
-          if (auraGrow <= 0 && inject <= 0.02) return;
-          var pulse = 0.78 + 0.22*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
-          /* 縁のオーラ＝内外へ滲むグロー（紫コア＋金ハロ）。強くなるほど広く明るく */
-          ctx.save();
-          ctx.strokeStyle = 'rgba(206,178,255,' + (0.82*g).toFixed(3) + ')'; ctx.lineWidth = 3.5;
-          ctx.shadowColor = 'rgba(150,110,255,' + g.toFixed(3) + ')'; ctx.shadowBlur = 9 + 20*g;
-          roundRect(PX, PY, PW, PH, RAD); ctx.stroke(); ctx.stroke();   /* 2度描き＝濃く */
-          ctx.strokeStyle = 'rgba(255,226,155,' + (0.42*g).toFixed(3) + ')'; ctx.lineWidth = 2.5;
-          ctx.shadowColor = 'rgba(255,198,105,' + (0.85*g).toFixed(3) + ')'; ctx.shadowBlur = 12 + 26*g;
-          roundRect(PX, PY, PW, PH, RAD); ctx.stroke();
-          ctx.restore();
-          /* パネル内側の帯電（縁ほど濃い＝注入されたオーラ） */
-          ctx.save(); roundRect(PX, PY, PW, PH, RAD); ctx.clip();
-          var ig = ctx.createRadialGradient(CX, CY, Math.min(PW, PH)*0.2, CX, CY, Math.max(PW, PH)*0.62);
-          ig.addColorStop(0, 'rgba(180,150,255,0)'); ig.addColorStop(1, 'rgba(180,150,255,' + (0.24*g).toFixed(3) + ')');
-          ctx.fillStyle = ig; ctx.fillRect(PX, PY, PW, PH);
-          for (var i = 0; i < wisps.length; i++) { var m = wisps[i]; ctx.globalAlpha = m.life * 0.4;
-            var mg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r); mg.addColorStop(0, 'rgba(' + m.col + ',1)'); mg.addColorStop(1, 'rgba(' + m.col + ',0)');
-            ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill(); }
-          ctx.globalAlpha = 1; ctx.restore();
-        }
-        function drawInject() {   /* 合流点からパネルへ注入する閃光 */
+        function drawInject() {
           if (inject <= 0.03) return; var r = 10 + (1-inject)*50, g = ctx.createRadialGradient(CX, CY, 0, CX, CY, r);
           g.addColorStop(0, 'rgba(255,245,220,' + (inject*0.85).toFixed(2) + ')'); g.addColorStop(0.6, 'rgba(200,170,255,' + (inject*0.4).toFixed(2) + ')'); g.addColorStop(1, 'rgba(200,170,255,0)');
           ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, r, 0, 6.2832); ctx.fill();
         }
         function render() {
           ctx.clearRect(0, 0, W, H);
-          drawAura();
+          drawPixelAura();
           drawInject();
           if (state === 'incoming') drawGroups();
         }
@@ -2998,20 +3007,19 @@
           while (acc >= 33) {
             t++;
             if (state === 'incoming') updateGroups();
-            if (state === 'aura') { if (auraGrow < 1) auraGrow = Math.min(1, auraGrow + AURA_RAMP); if (Math.random() < 0.28) spawnWisp(); }   /* 徐々に強く＋もやが滲む */
+            if (state === 'aura') { if (auraGrow < 1) auraGrow = Math.min(1, auraGrow + AURA_RAMP); stepAura(); }
             if (inject > 0) inject *= 0.85;
-            updateWisps(); acc -= 33;
+            acc -= 33;
           }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { groups = []; wisps = []; auraGrow = 0; inject = 0; t = 0; }
+        function reset() { groups = []; auraGrow = 0; inject = 0; t = 0; buildAura(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); state = 'incoming'; spawnGroups(ox == null ? PX+PW-6 : ox, oy == null ? PY+4 : oy); render(); runLoop(); },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'aura'; auraGrow = 1;
-            for (var k = 0; k < 6; k++) wisps.push({ x: CX+(rnd(2)-1)*PW*0.3, y: CY+(rnd(2)-1)*PH*0.3, vx:0, vy:0, r: 8+rnd(12), life: 1, col: (k%2 ? '210,180,255' : '255,214,140') });
-            t = 0; render(); },
+            for (var k = 0; k < 30; k++) stepAura(); t = 0; render(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
@@ -3021,7 +3029,7 @@
         var btn = document.getElementById('pixauraBtn');
         var reduceCb = document.getElementById('pixauraReduce');
         if (!stage || !msg || !btn) return;
-        var dpr = Math.min(2, window.devicePixelRatio || 1), M = 30;
+        var dpr = Math.min(2, window.devicePixelRatio || 1), M = 36;
         var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
         var aura = createAuraSpell({ w: w, h: h, margin: M, dpr: dpr });
         aura.canvas.style.left = (-M) + 'px'; aura.canvas.style.top = (-M) + 'px'; aura.canvas.style.right = 'auto'; aura.canvas.style.bottom = 'auto';
@@ -3030,7 +3038,7 @@
         var caster = msg.querySelector('.msg-avatar.caster');
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
         function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
-        function origin() {   /* caster 中心を canvas 論理座標に（canvas はパネル外へ拡張済み） */
+        function origin() {
           if (!caster) return { x: w + M - 6, y: M };
           var cr = aura.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
           if (!cr.width || !cr.height) return { x: w + M - 6, y: M };
