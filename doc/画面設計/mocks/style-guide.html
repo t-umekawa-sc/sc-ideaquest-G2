@@ -2288,7 +2288,7 @@
     <h2>17d. ドット絵の落雷（caster発射→中央着弾→上昇→雷雲→落雷／実寸大サンプル）</h2>
     <p class="muted text-sm">炎(§17b)と同じ実寸チャットパネルで、雷を一本ずつドット絵化。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(雷色=琥珀)。
       発動で<strong>術者(caster)アバターが反動リアクション → 電気の玉を発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>小さな電気が上部へ這い上がって粒が着き始め、その後に雷雲が中央から左右へ広がって形成</strong>（ease-out＝最初速く/最後ゆっくり）
+      <strong>電気が上線に着いたら少しだけ雲が出て、粒が着くほど雷雲がモクモクと（増えて→少し止まって→また増えて）左右へ広がり、最後は必ず上線と同じ全幅に</strong>
       <strong>→ パネルが数回チカチカ帯電 → 雲から落雷が始まる</strong>（閃光＋分岐した稲妻＋落下火花／間欠的に再落雷）。
       稲妻は細く・間欠表示にして、重なった文字が読めるよう配慮。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大。
       <code>prefers-reduced-motion</code>／下のトグルで静止（雷雲＋雲から1本の稲妻）。</p>
@@ -2331,10 +2331,9 @@
         var CLOUD_BOTTOM = PANEL_TOP;                      /* 雷雲の下端＝パネル上線 */
         var CLOUD_HALF = (W >> 1) - 1;                     /* 幅＝ユーザアイコン間≒パネル全幅 */
         var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8)); /* 雲の高さ（パネル外の上方に描く） */
-        var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;    /* rising=電気が上へ昇り切る（この間は雲を広げない） */
-        var gatherT = 0, GATHER_FRAMES = 18;               /* gather=上部に粒が集まる“ため”（雲展開の開始を遅らせる） */
-        /* spreading=ためた後に雲を中央→左右へ広げる。左右独立＋各回ランダムな到達幅(maxHalf)と展開時間(frames) */
-        var growL = 0, growR = 0, spreadTL = 0, spreadTR = 0, framesL = 26, framesR = 26, maxHalfL = CLOUD_HALF, maxHalfR = CLOUD_HALF;
+        var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;    /* rising=電気が上へ昇り切る（この間は雲を出さない） */
+        /* growing=粒が上線に着くほど雲がモクモク増える。左右独立で目標(target)へ素早くease、パフ毎にランダム休止。最後は必ず全幅 */
+        var growL = 0, growR = 0, targetL = 0, targetR = 0, puffL = 0, puffR = 0;
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;   /* charging=雲が広がった後にパネルが数回チカチカ→落雷開始 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
@@ -2388,7 +2387,7 @@
         }
         function drawCloud() {                                      /* 雷雲＝中央から左右へ広がる連続した塊（台形＋もこもこ）＋下縁の発光。左右で到達幅が異なる */
           if (growL <= 0 && growR <= 0) return;
-          var halfL = Math.max(3, Math.round(growL * maxHalfL)), halfR = Math.max(3, Math.round(growR * maxHalfR));
+          var halfL = Math.max(3, Math.round(growL * CLOUD_HALF)), halfR = Math.max(3, Math.round(growR * CLOUD_HALF));
           var a = Math.min(255, (Math.max(growL, growR) * 4) * 255) | 0;   /* 出現初期だけ素早くフェードイン */
           var x;
           for (x = -halfL; x <= halfR; x++) {
@@ -2417,25 +2416,22 @@
             y -= 1 + (rnd(2)|0); x = CX + ((rnd(5)|0) - 2);
           }
         }
+        function puffCharge(halfw) {   /* パフの度に「粒が上線に着いた」電気を少し撒く */
+          for (var k = 0; k < 3; k++) { var cx0 = CX + ((rnd(halfw*2)|0) - halfw); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); }
+        }
         function update() {
-          if (state === 'rising') {   /* まず電気が上へ昇り切る（雲はまだ広げない・上部に粒が着き始める） */
+          if (state === 'rising') {   /* まず電気が上へ昇り切る（雲はまだ出さない） */
             riseT++;
-            if (riseT >= RISE_FRAMES) { state = 'gather'; gatherT = 0; }
-          }
-          if (state === 'gather') {   /* 上部に粒が集まる“ため”（この間も雲は広げない＝展開開始を遅らせる） */
-            gatherT++;
-            if (gatherT >= GATHER_FRAMES) {   /* 展開開始＝左右それぞれ到達幅・展開時間をランダムに */
-              state = 'spreading'; spreadTL = 0; spreadTR = 0;
-              framesL = 20 + (rnd(22)|0); framesR = 20 + (rnd(22)|0);
-              maxHalfL = CLOUD_HALF * (0.68 + rnd(0.32)); maxHalfR = CLOUD_HALF * (0.68 + rnd(0.32));
+            if (riseT >= RISE_FRAMES) {   /* 上線に着いた＝少しだけ雲を出す→以後モクモク増える */
+              state = 'growing'; targetL = 0.12; targetR = 0.12; growL = 0; growR = 0; puffL = 6 + (rnd(8)|0); puffR = 6 + (rnd(8)|0);
             }
           }
-          if (state === 'spreading') {   /* 左右独立で広げる（各 ease-out・時間も幅も別） */
-            spreadTL++; spreadTR++;
-            var tl = spreadTL / framesL; if (tl > 1) tl = 1; growL = 1 - (1-tl)*(1-tl);
-            var tr = spreadTR / framesR; if (tr > 1) tr = 1; growR = 1 - (1-tr)*(1-tr);
+          if (state === 'growing') {   /* モクモク＝目標へ素早くease、パフ毎にランダム休止。最後は必ず全幅(target=1) */
+            growL += (targetL - growL) * 0.3; growR += (targetR - growR) * 0.3;
+            puffL--; if (puffL <= 0 && targetL < 1) { targetL = Math.min(1, targetL + 0.12 + rnd(0.18)); puffL = 5 + (rnd(14)|0); puffCharge((growL*CLOUD_HALF)|0); }
+            puffR--; if (puffR <= 0 && targetR < 1) { targetR = Math.min(1, targetR + 0.12 + rnd(0.18)); puffR = 5 + (rnd(14)|0); puffCharge((growR*CLOUD_HALF)|0); }
             cloudGrow = Math.max(growL, growR);
-            if (spreadTL >= framesL && spreadTR >= framesR) { state = 'charging'; chargeT = 0; flickers = 0; }
+            if (targetL >= 1 && targetR >= 1 && growL > 0.97 && growR > 0.97) { growL = 1; growR = 1; state = 'charging'; chargeT = 0; flickers = 0; }
           }
           if (state === 'charging') {   /* 雲完成→パネルが数回チカチカ→最後の閃光が消えたら落雷開始 */
             chargeT++;
@@ -2446,7 +2442,7 @@
           flash *= 0.82;
           if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBolt(strikeX, CLOUD_BOTTOM);   /* 明るい間は稲妻を再ジグザグ＝フリッカー */
           /* 微弱なチャージ＝雲の底で小さくスパークがちらつく（可読性のため疎・淡） */
-          if ((state === 'live' || state === 'rising' || state === 'gather' || state === 'spreading' || state === 'charging') && rnd(1) < 0.14) {
+          if ((state === 'live' || state === 'rising' || state === 'growing' || state === 'charging') && rnd(1) < 0.14) {
             var chalf = Math.max(6, (cloudGrow * CLOUD_HALF) | 0);   /* 上昇中は中央に粒、雲が広がるにつれ横へ */
             var cx0 = CX + ((rnd(chalf*2)|0) - chalf); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 });
           }
@@ -2460,7 +2456,7 @@
             var bright = Math.min(1, flash + 0.25); drawPath(bolt, bright);
             for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
           }
-          if (state === 'rising' || state === 'gather' || state === 'spreading') drawRise();     /* 着弾点→雲へ電気が上昇（昇り切り後も雲へ繋がる） */
+          if (state === 'rising' || state === 'growing') drawRise();     /* 着弾点→雲へ電気が上昇（growing中も雲へ繋がる） */
           drawCloud();                            /* 雷雲 */
           for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 170,225,255, (g.life*130)|0); put(g.x+1, g.y+1, 120,180,255, (g.life*90)|0); }
           for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 200,240,255, (q.life*255)|0); }
@@ -2479,7 +2475,7 @@
           draw(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; gatherT = 0; spreadTL = 0; spreadTR = 0; growL = 0; growR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; growL = 0; growR = 0; targetL = 0; targetR = 0; puffL = 0; puffR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) {   /* caster(右上)から発射→中央着弾→電気が上昇→雷雲→雲から落雷 */
@@ -2487,7 +2483,7 @@
           },
           reduceStatic: function () {   /* 静止＝雷雲＋雲から1本の稲妻＋淡い発光 */
             if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1;
-            growL = 1; growR = 1; maxHalfL = CLOUD_HALF; maxHalfR = CLOUD_HALF;
+            growL = 1; growR = 1; targetL = 1; targetR = 1;
             strikeX = CX; genBolt(CX, CLOUD_BOTTOM); flash = 0.6; draw();
           },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
@@ -2681,7 +2677,7 @@
           if (state === 'incoming') updateShards();
           while (acc >= 33) { t++; if (state === 'freezing') updateFreeze();
             if (glowVal > 0) glowVal *= 0.82;
-            if (state === 'done') { glowTimer--; if (glowTimer <= 0 && chunks.length) { glowIdx = order[(rnd(chunks.length))|0]; glowVal = 1; glowTimer = 16 + (rnd(44)|0); } }   /* ランダム位置・ランダム間隔でピカッ */
+            if (state === 'done') { glowTimer--; if (glowTimer <= 0 && chunks.length) { glowIdx = order[(rnd(chunks.length))|0]; glowVal = 1; glowTimer = 70 + (rnd(150)|0); } }   /* ランダム位置・低頻度でピカッ */
             updateSplinters(); updateSnow(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
