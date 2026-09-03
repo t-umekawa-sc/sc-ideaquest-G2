@@ -2512,7 +2512,7 @@
     <h2>17e. 氷結（複数の氷シャード発射→中央着弾→霜が広がって凍結→雪が舞う）</h2>
     <p class="muted text-sm">炎(§17b)・雷(§17d)と同じ実寸チャットパネルで氷を作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(氷色=シアン)。
       発動で<strong>術者(caster)アバターが反動リアクション → とがった氷の塊（シャード）を複数発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>着弾点から霜が左右へ段階的に凍りつく</strong>（じわじわではなく<strong>一定距離まで瞬間スナップ→少し止まる→また急にスナップ</strong>を繰り返し徐々に全幅へ／非ドット絵＝滑らかなフロストガラス・縁ほど濃い羽毛状・文字は透けて読める）→ <strong>覆ったまま時々雪が舞う</strong>。
+      <strong>パネルが不規則な塊（ブロック）に分かれ、中央→外へ塊ごとに瞬間スナップで凍っていく</strong>（じわじわではなく<strong>1塊ずつ急に固まる→少し止まる→次の塊</strong>／順序はランダムっぽく徐々に全面へ・非ドット絵＝滑らかなフロストガラス・縁ほど濃い羽毛状・文字は透けて読める）→ <strong>覆ったまま時々雪が舞う</strong>。
       フル解像度 canvas で描画。<code>prefers-reduced-motion</code>／下のトグルで静止（凍結済み・雪も静止）。</p>
     <div class="pixfire-stage" id="pixfrostStage">
       <div class="pixfire-msg fx-ice" aria-label="氷結デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -2542,9 +2542,9 @@
         var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
         var CX = W / 2, CY = H / 2;
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var shards = [], splinters = [], snow = [], ferns = [], cover = 0;
-        /* 段階的な凍結＝一定距離まで瞬間スナップ→少し止まる→また急にスナップ（距離は段階的に拡大） */
-        var steps = [], stepIdx = 0, stepHold = 0, STEP_HOLD = 10, NSTEPS = 6, snapFlash = 0;
+        var shards = [], splinters = [], snow = [], ferns = [];
+        /* チャンク凍結＝パネルを不規則な塊(ポリゴン)に分割し、中央→外へ番号順に1つずつ瞬間スナップで凍らせる */
+        var chunks = [], order = [], frozenCount = 0, stepHold = 0, STEP_HOLD = 9, snapFlash = 0;
         var frostGrad = ctx.createLinearGradient(0, 0, 0, H);        /* 縁ほど濃いフロストガラスの地 */
         frostGrad.addColorStop(0, 'rgba(214,236,255,0.34)'); frostGrad.addColorStop(0.32, 'rgba(214,236,255,0.10)');
         frostGrad.addColorStop(0.5, 'rgba(214,236,255,0.05)'); frostGrad.addColorStop(0.68, 'rgba(214,236,255,0.10)');
@@ -2560,6 +2560,22 @@
           return { x: x0, pts: pts, barbs: barbs };
         }
         function genFerns() { ferns = []; var n = Math.max(7, (W / 46) | 0); for (var k = 0; k < n; k++) ferns.push(makeFern(rnd(W), Math.random() < 0.5)); }
+        function genChunks() {   /* パネルを不規則な塊(ジッタ格子×wobblyポリゴン)に分割し、中央→外へ順序付け（ランダムっぽく） */
+          chunks = []; order = [];
+          var cols = Math.max(3, Math.round(W / (H * 2.6))), rows = 2, cw = W / cols, ch = H / rows;
+          var baseR = Math.max(cw, ch) * 0.72;
+          for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+            var sx = (c + 0.5) * cw + (rnd(1) - 0.5) * cw * 0.6, sy = (r + 0.5) * ch + (rnd(1) - 0.5) * ch * 0.5;
+            var nv = 10 + (rnd(4)|0), poly = [];
+            for (var k = 0; k < nv; k++) { var a = k / nv * 6.2832, rr = baseR * (0.7 + rnd(0.55)); poly.push([sx + Math.cos(a)*rr, sy + Math.sin(a)*rr*0.92]); }
+            chunks.push({ cx: sx, cy: sy, poly: poly });
+          }
+          var keyed = [];   /* 中央からの距離＋ジッタ＝中央始点で外へ、でもランダムっぽい順 */
+          for (var i = 0; i < chunks.length; i++) keyed.push({ i: i, key: Math.sqrt((chunks[i].cx-CX)*(chunks[i].cx-CX) + (chunks[i].cy-CY)*(chunks[i].cy-CY)) + (rnd(1)-0.5) * Math.max(cw, ch) * 1.25 });
+          keyed.sort(function (a, b) { return a.key - b.key; });
+          for (i = 0; i < keyed.length; i++) order.push(keyed[i].i);
+        }
+        function addChunkPath(idx) { var poly = chunks[idx].poly; ctx.moveTo(poly[0][0], poly[0][1]); for (var k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]); ctx.closePath(); }
 
         function spawnShards(ox, oy) {                              /* とがった氷の塊を複数（caster→中央へ収束） */
           shards = []; var n = 6;
@@ -2584,32 +2600,31 @@
         }
         function drawSplinter(s) { ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.ang); ctx.strokeStyle = 'rgba(225,245,255,' + s.life.toFixed(2) + ')'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-s.len*0.5, 0); ctx.lineTo(s.len*0.5, 0); ctx.stroke(); ctx.restore(); }
         function drawFrost() {
-          if (cover <= 0) return;
-          var cov = cover;
-          ctx.save(); ctx.beginPath(); ctx.rect(CX - cov, 0, cov * 2, H); ctx.clip();
-          ctx.fillStyle = frostGrad; ctx.fillRect(CX - cov, 0, cov * 2, H);
+          if (frozenCount <= 0) return;
+          ctx.save(); ctx.beginPath();                              /* 凍結済みチャンクの和集合でクリップ＝塊の形に凍る */
+          for (var n = 0; n < frozenCount; n++) addChunkPath(order[n]);
+          ctx.clip();
+          ctx.fillStyle = frostGrad; ctx.fillRect(0, 0, W, H);
           ctx.strokeStyle = 'rgba(236,248,255,0.5)'; ctx.lineWidth = 1; ctx.lineCap = 'round';
           ctx.shadowColor = 'rgba(190,230,255,0.9)'; ctx.shadowBlur = 3;
           for (var i = 0; i < ferns.length; i++) { var f = ferns[i]; ctx.beginPath(); ctx.moveTo(f.pts[0][0], f.pts[0][1]); for (var j = 1; j < f.pts.length; j++) ctx.lineTo(f.pts[j][0], f.pts[j][1]); ctx.stroke();
             ctx.beginPath(); for (var k = 0; k < f.barbs.length; k++) { var b = f.barbs[k]; ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); } ctx.stroke(); }
           ctx.shadowBlur = 0; ctx.restore();
-          if (state === 'freezing') {                               /* スナップした先端＝直後ほど強くきらめく凍結フロント */
-            var fa = (0.3 + snapFlash * 0.6).toFixed(2), fw = 6 + snapFlash * 8;
-            for (var sgn = -1; sgn <= 1; sgn += 2) { var fx = CX + sgn * cov; var fg = ctx.createLinearGradient(fx - fw, 0, fx + fw, 0);
-              fg.addColorStop(0, 'rgba(240,252,255,0)'); fg.addColorStop(0.5, 'rgba(240,252,255,' + fa + ')'); fg.addColorStop(1, 'rgba(240,252,255,0)');
-              ctx.fillStyle = fg; ctx.fillRect(fx - fw, 0, fw * 2, H); }
+          if (snapFlash > 0.06 && frozenCount > 0) {                 /* スナップ直後＝いま凍った塊の輪郭を強く光らせる */
+            ctx.save(); ctx.beginPath(); addChunkPath(order[frozenCount - 1]);
+            ctx.strokeStyle = 'rgba(244,252,255,' + (snapFlash * 0.85).toFixed(2) + ')'; ctx.lineWidth = 2;
+            ctx.shadowColor = 'rgba(210,240,255,0.9)'; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
           }
         }
         function drawSnow() { ctx.fillStyle = 'rgba(246,252,255,0.92)'; for (var i = 0; i < snow.length; i++) { var p = snow[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill(); } }
 
-        function startFreeze() {   /* 段階距離を用意して最初の距離まで瞬間スナップ */
-          state = 'freezing'; steps = []; for (var i = 0; i < NSTEPS; i++) steps.push(CX * (i + 1) / NSTEPS);
-          stepIdx = 0; cover = steps[0]; stepHold = STEP_HOLD; snapFlash = 1;
+        function startFreeze() {   /* 最初の塊(中央)を瞬間スナップで凍らせる */
+          state = 'freezing'; frozenCount = 1; stepHold = STEP_HOLD; snapFlash = 1;
         }
-        function updateFreeze() {   /* 保持→時間が来たら次の距離へ瞬間スナップ（じわじわ進まない） */
+        function updateFreeze() {   /* 保持→時間が来たら次の塊を瞬間スナップ（じわじわ進まない・塊ごと） */
           if (snapFlash > 0) snapFlash *= 0.8;
           if (stepHold > 0) { stepHold--; return; }
-          if (stepIdx < steps.length - 1) { stepIdx++; cover = steps[stepIdx]; stepHold = STEP_HOLD; snapFlash = 1; }
+          if (frozenCount < chunks.length) { frozenCount++; stepHold = STEP_HOLD; snapFlash = 1; }
           else { state = 'done'; }
         }
         function updateShards() {
@@ -2639,11 +2654,11 @@
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { shards = []; splinters = []; snow.length = 0; cover = 0; t = 0; steps = []; stepIdx = 0; stepHold = 0; snapFlash = 0; genFerns(); }
+        function reset() { shards = []; splinters = []; snow.length = 0; t = 0; frozenCount = 0; stepHold = 0; snapFlash = 0; genFerns(); genChunks(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); state = 'incoming'; spawnShards(ox == null ? W - 6 : ox, oy == null ? 4 : oy); render(); runLoop(); },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'done'; cover = CX;
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'done'; frozenCount = chunks.length;
             for (var k = 0; k < 10; k++) snow.push({ x: rnd(W), y: rnd(H), vy: 0, ph: 0, r: 1 + rnd(1.2) }); render(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
