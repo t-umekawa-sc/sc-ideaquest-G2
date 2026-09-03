@@ -2331,7 +2331,7 @@
         var CLOUD_BOTTOM = PANEL_TOP;                      /* 雷雲の下端＝パネル上線 */
         var CLOUD_HALF = (W >> 1) - 1;                     /* 幅＝ユーザアイコン間≒パネル全幅 */
         var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8)); /* 雲の高さ（パネル外の上方に描く） */
-        var riseT = 0, RISE_FRAMES = 16, cloudGrow = 0;    /* rising=電気が上昇し雲が中央→左右へ広がる／cloudGrow 0→1 */
+        var riseT = 0, RISE_FRAMES = 26, cloudGrow = 0;    /* rising=電気が上昇し雲が中央→左右へ広がる／cloudGrow 0→1（大きいほど広がりが遅い） */
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;   /* charging=雲が広がった後にパネルが数回チカチカ→落雷開始 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
