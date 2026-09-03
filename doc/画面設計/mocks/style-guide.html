@@ -3111,7 +3111,7 @@
     <h2>17h. キラキラ（流れ星→中央着弾でキラキラが四方へ弾け→まばらに瞬き続ける）</h2>
     <p class="muted text-sm">炎(§17b)〜オーラ(§17g)と同じ実寸チャットパネルでキラキラを作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(キラキラ色=金)。
       発動で<strong>術者(caster)アバターが反動リアクション → 流れ星がパネル中央へ飛来</strong>し<strong>着弾点でキラキラが四方へ弾け</strong>、
-      その後<strong>細かいキラキラがゆっくり点滅しながらまばらに瞬き続ける</strong>（白〜金〜パステル・フル解像度＝滑らか・文字は読める）。
+      その後<strong>背景に天の川（斜めの微星帯）とオーロラ（波打つ色のカーテン）が浮かび、細かいキラキラがゆっくり点滅しながらまばらに瞬き続ける</strong>（白〜金〜パステル・フル解像度＝滑らか・文字は読める）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（点滅しないきらめき）。</p>
     <div class="pixfire-stage" id="pixsparkStage">
       <div class="pixfire-msg fx-sparkle" aria-label="キラキラデモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【キラキラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はキラキラと重なる位置＝瞬きで文字が読めるかの確認用テキスト ✧</div>
@@ -3141,9 +3141,48 @@
         var COLS = ['255,255,255', '255,233,168', '255,200,230', '216,240,255', '255,240,192'];
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
         var star = null, burst = [], twinkles = [];
+        var mwStars = [], bgFade = 0;   /* 天の川の微星＋背景(天の川/オーロラ)フェードイン */
+        var AUR = [[80,255,175],[70,215,255],[180,130,255],[255,150,220]];   /* オーロラ色（緑→シアン→紫→桃で巡回） */
 
         function rnd(n) { return Math.random() * n; }
         function pick() { return COLS[(rnd(COLS.length))|0]; }
+        function buildMilkyWay() {   /* 天の川＝斜めの帯に沿って微星を撒く（帯の周りにガウス状に散らばる） */
+          mwStars = []; var n = Math.max(90, (W/7)|0);
+          for (var i = 0; i < n; i++) {
+            var u = rnd(1), lx = u*W, ly = H*0.18 + u*(H*0.62);            /* 帯の中心線（左上→右下のゆるい斜め） */
+            var off = ((rnd(1)+rnd(1)+rnd(1)) - 1.5) / 1.5 * H*0.34;      /* 帯の太さ＝ガウス近似 */
+            mwStars.push({ x: lx, y: ly + off, b: 0.15 + rnd(0.6), ph: rnd(6.28), sz: 0.5 + rnd(1.1) });
+          }
+        }
+        function auroraCol(ph) {   /* 位相 ph から緑→シアン→紫→桃を補間 */
+          var f = (((ph % 1) + 1) % 1) * AUR.length, i = Math.floor(f), fr = f - i, a = AUR[i], b = AUR[(i+1) % AUR.length];
+          return [(a[0]+(b[0]-a[0])*fr)|0, (a[1]+(b[1]-a[1])*fr)|0, (a[2]+(b[2]-a[2])*fr)|0];
+        }
+        function drawAurora() {   /* オーロラ＝上から垂れる波打つカーテン（色が横方向＋時間で流れる） */
+          var fade = bgFade;
+          for (var x = 0; x < W; x += 4) {
+            var wave = Math.sin(x*0.022 + t*0.03)*12 + Math.sin(x*0.06 + t*0.052)*7;
+            var hh = H*0.5 + wave; if (hh < 8) hh = 8;
+            var c = auroraCol(x*0.0018 + t*0.004);
+            var g = ctx.createLinearGradient(0, 0, 0, hh);
+            g.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (0.26*fade).toFixed(3) + ')');
+            g.addColorStop(0.5, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (0.12*fade).toFixed(3) + ')');
+            g.addColorStop(1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
+            ctx.fillStyle = g; ctx.fillRect(x, 0, 4, hh);
+          }
+        }
+        function drawMilkyWay() {   /* 天の川＝淡いもや帯＋微星の瞬き */
+          var fade = bgFade, k;
+          for (k = 0; k <= 9; k++) { var u = k/9, hx = u*W, hy = H*0.18 + u*(H*0.62);   /* もや帯 */
+            var g = ctx.createRadialGradient(hx, hy, 0, hx, hy, H*0.5);
+            g.addColorStop(0, 'rgba(196,204,240,' + (0.05*fade).toFixed(3) + ')'); g.addColorStop(1, 'rgba(196,204,240,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hx, hy, H*0.5, 0, 6.2832); ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(224,232,255,1)';
+          for (k = 0; k < mwStars.length; k++) { var s = mwStars[k], a = s.b * (0.5 + 0.5*Math.sin(t*0.06 + s.ph)) * fade;
+            if (a <= 0.02) continue; ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(s.x, s.y, s.sz, 0, 6.2832); ctx.fill(); }
+          ctx.globalAlpha = 1;
+        }
         function drawGlint(x, y, size, alpha, col) {   /* 4方向の輝き＋放射グロー＝きらめき */
           if (alpha <= 0.02) return;
           var g = ctx.createRadialGradient(x, y, 0, x, y, size*1.4);
@@ -3171,6 +3210,7 @@
         function updateTwinkles() { for (var i = twinkles.length-1; i >= 0; i--) { var w = twinkles[i]; w.age++; w.x += w.vx; w.y += w.vy; if (w.age >= w.dur) twinkles.splice(i, 1); } }
         function render() {
           ctx.clearRect(0, 0, W, H);
+          if (bgFade > 0.01) { drawAurora(); drawMilkyWay(); }   /* 背景＝オーロラ→天の川（きらめきの奥） */
           for (var i = 0; i < twinkles.length; i++) { var w = twinkles[i], a = Math.sin(w.age / w.dur * 3.14159); drawGlint(w.x, w.y, w.size, a*0.95, w.col); }
           for (i = 0; i < burst.length; i++) { var p = burst[i]; drawGlint(p.x, p.y, p.size*(0.6 + p.life*0.7), p.life, p.col); }
           if (state === 'incoming' && star) drawStar();
@@ -3182,15 +3222,15 @@
             if (dist <= SPEED) { spawnBurst(CX, CY); star = null; state = 'persist'; }
             else { star.x += dx/dist*SPEED; star.y += dy/dist*SPEED; star.trail.push([star.x, star.y]); if (star.trail.length > 10) star.trail.shift(); }
           }
-          while (acc >= 33) { t++; updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); acc -= 33; }
+          while (acc >= 33) { t++; if (state === 'persist' && bgFade < 1) bgFade = Math.min(1, bgFade + 0.02); updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { star = null; burst = []; twinkles = []; t = 0; }
+        function reset() { star = null; burst = []; twinkles = []; bgFade = 0; t = 0; buildMilkyWay(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); var sx = (ox == null ? W-6 : ox), sy = (oy == null ? 4 : oy); state = 'incoming'; star = { x: sx, y: sy, trail: [[sx, sy]] }; render(); runLoop(); },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'persist';
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'persist'; bgFade = 1;
             for (var k = 0; k < 12; k++) twinkles.push({ x: rnd(W), y: rnd(H), vx: 0, vy: 0, age: (14+(rnd(30)|0)), dur: 60, size: 1.6 + rnd(2.6), col: pick() }); render(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
