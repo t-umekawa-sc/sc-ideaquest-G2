@@ -1947,7 +1947,7 @@
       <strong>下辺に沿って右→左へ炎が延焼</strong>していく。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大＝ドット感。
       炎は古典的なピクセル炎（下から熱が上へ伝播＋左右の揺らぎ）＋黒煙パーティクル。<code>prefers-reduced-motion</code>／下のトグルで静止（延焼済みの静的な炎）。</p>
     <div class="pixfire-stage" id="pixfireStage">
-      <div class="pixfire-msg" aria-label="ドット絵の延焼デモ">配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい 🔥</div>
+      <div class="pixfire-msg" aria-label="ドット絵の延焼デモ">配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は炎と重なる位置＝先端が透過して文字が読めるかの確認用テキスト 🔥</div>
     </div>
     <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
       <button class="btn-pixel" type="button" id="pixfireBtn">魔法を発動</button>
@@ -1992,7 +1992,7 @@
           if (pix === 0) { heat[ny * W + x] = 0; return; }
           var rnd = (Math.random() * 3) | 0, nx = x + (1 - rnd);   /* 左右の揺らぎ */
           if (nx < 0) nx = 0; else if (nx >= W) nx = W - 1;
-          var cool = Math.random() < 0.72 ? 1 : 0;                 /* 冷却＝炎の高さを下辺付近に抑える */
+          var cool = Math.random() < 0.88 ? 1 : 0;                 /* 冷却＝炎の高さを下辺付近に抑える（大きいほど低い炎） */
           heat[ny * W + nx] = Math.max(0, pix - cool);
         }
         function seedRow() {                                       /* 着火済み列の最下2行を最高熱に */
@@ -2017,9 +2017,15 @@
           for (var dy=-1; dy<=1; dy++) for (var dx=-1; dx<=1; dx++) putPix(d, px+dx, py+dy, 255, 190, 70, 255);
           putPix(d, px, py, 255, 246, 210, 255); putPix(d, px, py-2, 255, 140, 40, 190); putPix(d, px, py-4, 235, 90, 20, 120);
         }
+        /* 高さフェード＝根元(下辺)は不透明、上端ほど透過＝重なった文字が透けて読める＆炎らしさは保つ */
+        var FADE_SOLID = 3, FADE_SPAN = 8, FADE_MIN = 0.28;
         function render() {
           var d = img.data, i, x, y; for (i = 0; i < d.length; i++) d[i] = 0;
-          for (y = 0; y < H; y++) for (x = 0; x < W; x++) { var h = heat[y*W+x]; if (h > 0) { var c = PAL[h], o = (y*W+x)*4; d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=c[3]; } }
+          for (y = 0; y < H; y++) {
+            var above = (H - 1 - y);
+            var fade = above <= FADE_SOLID ? 1 : Math.max(FADE_MIN, 1 - (above - FADE_SOLID) / FADE_SPAN);
+            for (x = 0; x < W; x++) { var h = heat[y*W+x]; if (h > 0) { var c = PAL[h], o = (y*W+x)*4; d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=(c[3]*fade)|0; } }
+          }
           if (state === 'incoming' && proj) drawProjectile(d);
           for (i = 0; i < smoke.length; i++) { var p = smoke[i], a = (p.life*0.6*255)|0; putPix(d, p.x|0, p.y|0, 48, 46, 52, a); putPix(d, (p.x|0)+1, p.y|0, 40, 38, 44, (p.life*0.45*255)|0); }
           ctx.putImageData(img, 0, 0);
