@@ -2891,8 +2891,8 @@
   <div class="section">
     <h2>17g. オーラ（アイコンからドット絵の波動が中央へ→上へ立ち上るドット絵オーラで強化）</h2>
     <p class="muted text-sm">炎(§17b)〜虹(§17f)と同じ実寸チャットパネルでオーラを作成。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(オーラ色=紫)。
-      発動で<strong>術者(caster)アバターが反動リアクション → ドット絵の波動（声援・応援のイメージ）がパネル中央へ数回飛んでいき</strong>、
-      <strong>パネルが強化されて縁からドット絵のオーラが立ち上る</strong>＝<strong>下辺は控えめ／左右は上に行くほど強め／上辺は強く上へライズ</strong>（強いので上に立ち上る・紫→マゼンタ→金→白／脈動して残る・文字は透けて読める）。
+      発動で<strong>術者(caster)アバターが反動リアクション → ドット絵の波動＋前向きな記号（♪音符=応援／↑矢印=オーラアップ／ハート・星・プラス）がパネル中央へ飛んでいき</strong>、
+      <strong>パネルが強化されて縁からドット絵のオーラが立ち上る</strong>＝<strong>下辺は控えめ（透過強め）／左右は上に行くほど強め／上辺は強く上へライズ（高さはムラ）</strong>（紫→マゼンタ→金→白／脈動して残る・文字は透けて読める）。
       オーラは低解像度のチャンクな四角（ドット絵）で上昇。<code>prefers-reduced-motion</code>／下のトグルで静止（強化済みオーラ・脈動なし）。</p>
     <div class="pixfire-stage" id="pixauraStage">
       <div class="pixfire-msg fx-aura" aria-label="オーラデモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はオーラと重なる位置＝淡い光で文字が読めるかの確認用テキスト ✦</div>
@@ -2930,8 +2930,37 @@
         var casterX = W-6, casterY = MT, dirx = 0, diry = 0;
         var waves = [], spawned = 0, waveTimer = 0, WAVE_GAP = 7, WAVE_SPEED = 0.06, NWAVE = 3;
         var auraGrow = 0, AURA_RAMP = 0.03;
+        /* 波動と一緒に飛ぶ前向き記号（ドット絵）＝音符(応援)/上矢印(オーラアップ)/ハート/星 */
+        var symbols = [], symTimer = 0, symCount = 0, SYM_MAX = 12;
+        var GLY = {
+          note:  ["..##","..#.","..#.","..#.","###.","##.."],
+          arrow: ["..#..",".###.","#####","..#..","..#..","..#.."],
+          heart: [".#.#.","#####","#####",".###.","..#.."],
+          star:  ["..#..",".###.","#####",".###.","..#.."],
+          plus:  ["..#..","..#..","#####","..#..","..#.."]
+        };
+        var SYMS = [ { b:'note', col:'#ffd86b' }, { b:'arrow', col:'#8affb0' }, { b:'note', col:'#ffe08a' }, { b:'heart', col:'#ff9ec4' }, { b:'star', col:'#fff2c0' }, { b:'arrow', col:'#9be8ff' }, { b:'plus', col:'#b7ff9b' } ];
 
         function rnd(n) { return Math.random() * n; }
+        function drawGlyph(bmp, cx, cy, ps, color, alpha) {
+          var hh = bmp.length, ww = bmp[0].length, ox = cx - ww*ps/2, oy = cy - hh*ps/2;
+          ctx.globalAlpha = alpha; ctx.fillStyle = color;
+          for (var r = 0; r < hh; r++) for (var c = 0; c < ww; c++) if (bmp[r].charAt(c) === '#') ctx.fillRect(Math.round(ox+c*ps), Math.round(oy+r*ps), ps, ps);
+          ctx.globalAlpha = 1;
+        }
+        function spawnSymbol() {
+          var k = SYMS[(rnd(SYMS.length))|0], sx = casterX + (rnd(2)-1)*10, sy = casterY + (rnd(2)-1)*10;
+          symbols.push({ b: k.b, col: k.col, sx: sx, sy: sy, x: sx, y: sy, tx: CX + (rnd(2)-1)*PW*0.12, ty: CY + (rnd(2)-1)*PH*0.4, prog: 0, spd: 0.018 + rnd(0.02), ph: rnd(6.28), ps: 2 + (rnd(2)|0) });
+        }
+        function updateSymbols() {
+          for (var i = symbols.length-1; i >= 0; i--) { var s = symbols[i]; s.prog += s.spd; var e = 1 - (1-s.prog)*(1-s.prog);
+            s.x = s.sx + (s.tx-s.sx)*e; s.y = s.sy + (s.ty-s.sy)*e + Math.sin(s.ph + s.prog*9)*4;
+            if (s.prog >= 1) symbols.splice(i, 1); }
+        }
+        function drawSymbols() {
+          for (var i = 0; i < symbols.length; i++) { var s = symbols[i], a = s.prog < 0.15 ? s.prog/0.15 : (s.prog > 0.82 ? (1-s.prog)/0.18 : 1);
+            drawGlyph(GLY[s.b], s.x, s.y, s.ps, s.col, a*0.95); }
+        }
         function buildSeeds() {   /* パネル縁の外側リングを重み付き燃料に（上=強/左右=上ほど強/下=弱） */
           seeds = [];
           for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++) {
@@ -2941,7 +2970,11 @@
             if (dist <= 0 || dist > CELL*1.5) continue;               /* パネル外側の縁リングのみ */
             var vf = (PY+PH - py) / PH; if (vf < 0) vf = 0; else if (vf > 1) vf = 1;   /* 上=1・下=0 */
             var fuel;
-            if (py < PY) fuel = MAXH;                                 /* 上辺＝強 */
+            if (py < PY) {                                            /* 上辺＝強＋列ごとに高さのムラ（fuel は MAXH 以下） */
+              var vv = 2 + 1.6*Math.sin(gx*0.5) + Math.sin(gx*1.7 + 1.3) + 0.6*Math.sin(gx*3.1);
+              if (vv < 0) vv = 0; else if (vv > 4) vv = 4;
+              fuel = MAXH - Math.round(vv);
+            }
             else if (py > PY+PH) fuel = 1;                            /* 下辺＝控えめ */
             else fuel = Math.round(2 + (MAXH-2)*vf);                  /* 左右＝上ほど強 */
             seeds.push({ i: gy*GW+gx, fuel: fuel });
@@ -2960,9 +2993,11 @@
         function drawPixelAura() {
           var pulse = 0.82 + 0.18*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
           if (g <= 0.01) return;
+          var botRow = Math.floor((PY+PH)/CELL) - 1;   /* この行以降(下辺付近〜下)は透過を上げる＝可読性 */
           for (var i = 0; i < heat.length; i++) { var h = heat[i]; if (h <= 0) continue;
-            var col = PAL[h]; ctx.globalAlpha = (col[3]/255) * g; ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
-            ctx.fillRect((i % GW)*CELL, ((i / GW)|0)*CELL, CELL, CELL);
+            var gy = (i / GW)|0, botFade = gy >= botRow ? 0.32 : 1;   /* 下辺オーラは薄く */
+            var col = PAL[h]; ctx.globalAlpha = (col[3]/255) * g * botFade; ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+            ctx.fillRect((i % GW)*CELL, gy*CELL, CELL, CELL);
           }
           ctx.globalAlpha = 1;
         }
@@ -2983,12 +3018,14 @@
           waveTimer--;
           if (spawned < NWAVE && waveTimer <= 0) { waves.push({ prog: 0 }); spawned++; waveTimer = WAVE_GAP; }
           for (var i = waves.length-1; i >= 0; i--) { waves[i].prog += WAVE_SPEED; if (waves[i].prog >= 1) waves.splice(i, 1); }
-          if (spawned >= NWAVE && waves.length === 0 && state === 'wave') state = 'aura';   /* 波動が届いた＝オーラ強化開始 */
+          symTimer--; if (symCount < SYM_MAX && symTimer <= 0) { spawnSymbol(); symCount++; symTimer = 2 + (rnd(2)|0); }   /* 波動と一緒に記号を飛ばす */
+          if (spawned >= NWAVE && waves.length === 0 && state === 'wave') state = 'aura';   /* 波動が届いた＝オーラ強化開始（記号は飛び続ける） */
         }
         function render() {
           ctx.clearRect(0, 0, W, H);
           drawPixelAura();
           if (state === 'wave') for (var i = 0; i < waves.length; i++) drawWave(waves[i]);
+          drawSymbols();
         }
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
@@ -2996,12 +3033,13 @@
             t++;
             if (state === 'wave') updateWaves();
             if (state === 'aura') { if (auraGrow < 1) auraGrow = Math.min(1, auraGrow + AURA_RAMP); stepAura(); }
+            updateSymbols();
             acc -= 33;
           }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { heat = new Uint8Array(GW*GH); waves = []; spawned = 0; waveTimer = 0; auraGrow = 0; t = 0; buildSeeds(); }
+        function reset() { heat = new Uint8Array(GW*GH); waves = []; spawned = 0; waveTimer = 0; symbols = []; symCount = 0; symTimer = 0; auraGrow = 0; t = 0; buildSeeds(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); casterX = (ox == null ? PX+PW-6 : ox); casterY = (oy == null ? PY+4 : oy);
