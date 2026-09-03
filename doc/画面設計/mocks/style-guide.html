@@ -2285,11 +2285,12 @@
 
   <!-- 17d. ドット絵の落雷（実寸大サンプル）＝炎(§17b)と同じチャットパネルで一本ずつ作る GF-AC-091 -->
   <div class="section">
-    <h2>17d. ドット絵の落雷（caster発射→着弾で落雷／実寸大サンプル）</h2>
+    <h2>17d. ドット絵の落雷（caster発射→中央着弾→上昇→雷雲→落雷／実寸大サンプル）</h2>
     <p class="muted text-sm">炎(§17b)と同じ実寸チャットパネルで、雷を一本ずつドット絵化。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(雷色=琥珀)。
-      発動で<strong>術者(caster)アバターが反動リアクション → 電気の玉を発射</strong>し、<strong>着弾点で落雷</strong>＝<strong>閃光＋分岐した稲妻＋落下火花</strong>。
-      その後は<strong>間欠的に再落雷＋微弱なチャージのちらつき</strong>。稲妻は細く・間欠表示にして、重なった文字が読めるよう配慮。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大。
-      <code>prefers-reduced-motion</code>／下のトグルで静止（1本の稲妻＋淡い発光）。</p>
+      発動で<strong>術者(caster)アバターが反動リアクション → 電気の玉を発射</strong>し<strong>パネル中央に着弾</strong>、
+      <strong>小さな電気が上部へ這い上がって雷雲を形成 → 雲から落雷が始まる</strong>（閃光＋分岐した稲妻＋落下火花／間欠的に再落雷）。
+      稲妻は細く・間欠表示にして、重なった文字が読めるよう配慮。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（雷雲＋雲から1本の稲妻）。</p>
     <div class="pixfire-stage" id="pixboltStage">
       <div class="pixfire-msg fx-thunder" aria-label="ドット絵の落雷デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
     </div>
@@ -2322,7 +2323,10 @@
         var state = 'idle', raf = null, last = 0, acc = 0;
         var bolt = [], branches = [], sparks = [], charge = [];
         var flash = 0, strikeTimer = 0, strikeX = W >> 1;
-        var proj = null, tx = W >> 1, ty = (H * 0.45) | 0;   /* proj=casterからの発射弾／(tx,ty)=着弾点 */
+        var proj = null;                                   /* caster からの発射弾 */
+        var CX = W >> 1, IMPACT_Y = (H * 0.55) | 0;         /* 着弾点＝パネル中央 */
+        var CLOUD_HALF = Math.max(8, (W * 0.20) | 0), CLOUD_CY = 4, CLOUD_BOTTOM = 7;  /* 雷雲＝上部中央 */
+        var riseT = 0, RISE_FRAMES = 12, cloudGrow = 0;    /* rising=電気が上昇し雲が育つ／cloudGrow 0→1 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
         function put(x, y, r, g, b, a) {   /* 透明背景に重ねる＝最も不透明な寄与を採用（暗色化しない） */
@@ -2330,9 +2334,9 @@
           var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; }
         }
         function rnd(n) { return Math.random() * n; }
-        function genBolt(x0) {
+        function genBolt(x0, y0) {                                 /* 雲の底(y0)から下へ落ちる稲妻 */
           bolt = []; branches = [];
-          var x = x0, y = 0;
+          var x = x0, y = (y0 == null ? 0 : y0);
           while (y < H - 1) { bolt.push([x, y]); y += 1 + (rnd(2)|0); x += (rnd(5)|0) - 2; if (x < 1) x = 1; if (x > W-2) x = W-2; }
           bolt.push([x, H - 1]);
           var nb = 1 + (rnd(2)|0);
@@ -2346,9 +2350,10 @@
         function spawnSparks(x, y) {
           for (var i = 0; i < 12; i++) { var a = rnd(6.283); sparks.push({ x:x, y:y, vx:Math.cos(a)*rnd(1.6), vy:Math.sin(a)*rnd(1.6)-0.4, life:1 }); }
         }
-        function strike(fx) {
-          strikeX = (fx == null) ? 6 + (rnd(W - 12)|0) : (fx | 0);
-          genBolt(strikeX); flash = 1; spawnSparks(bolt[bolt.length-1][0], H - 2);
+        function strike(fx) {                                      /* 雲の底(CLOUD_BOTTOM)・雲幅内の x から落雷 */
+          strikeX = (fx == null) ? (CX + ((rnd(CLOUD_HALF*2)|0) - CLOUD_HALF)) : (fx | 0);
+          if (strikeX < 2) strikeX = 2; else if (strikeX > W-3) strikeX = W-3;
+          genBolt(strikeX, CLOUD_BOTTOM); flash = 1; spawnSparks(bolt[bolt.length-1][0], H - 2);
           strikeTimer = 26 + (rnd(30)|0);   /* 次の落雷まで（間欠）＝約0.9〜1.9秒 */
         }
         function drawProj() {   /* casterからの発射弾＝電気の玉（白核＋シアン） */
@@ -2368,12 +2373,45 @@
             }
           }
         }
+        function drawDisk(ccx, ccy, r, cr, cg, cb, a) {
+          var ri = Math.ceil(r);
+          for (var yy = -ri; yy <= ri; yy++) for (var xx = -ri; xx <= ri; xx++) if (xx*xx + yy*yy <= r*r) put(ccx+xx, ccy+yy, cr, cg, cb, a);
+        }
+        function drawCloud() {                                      /* 雷雲＝上部中央の連続した塊（ドーム輪郭＋もこもこ）＋下縁の発光 */
+          if (cloudGrow <= 0) return;
+          var g = cloudGrow > 1 ? 1 : cloudGrow, a = (255 * g) | 0, half = CLOUD_HALF, x;
+          for (x = -half; x <= half; x++) {
+            var nx = x / half;
+            var base = Math.sqrt(Math.max(0, 1 - nx*nx));            /* 半円プロファイル＝中央が高い */
+            var bump = 0.16*Math.sin(x*0.8) + 0.10*Math.sin(x*1.9 + 1);   /* もこもこの凹凸 */
+            var thick = (base * (CLOUD_BOTTOM - 1) + bump*3) * g;
+            if (thick <= 0.5) continue;
+            var topY = Math.round(CLOUD_BOTTOM - thick), cxx = CX + x;
+            for (var y = topY; y <= CLOUD_BOTTOM; y++) {
+              var col = (y <= topY + 1) ? [176,190,224] : (y >= CLOUD_BOTTOM - 1 ? [74,82,112] : [120,132,168]);
+              put(cxx, y, col[0], col[1], col[2], a);
+            }
+          }
+          for (x = -half; x <= half; x++) {                          /* 下縁＝帯電の発光（flashで強まる） */
+            if (rnd(1) < 0.55) put(CX + x, CLOUD_BOTTOM, 170, 205, 255, ((90 + flash*150) * g) | 0);
+          }
+        }
+        function drawRise() {                                       /* 着弾点→雲へ電気が這い上がる（rising中・毎フレーム再ジグザグ＝ちらつき） */
+          var p = riseT / RISE_FRAMES; if (p > 1) p = 1;
+          var yTop = IMPACT_Y - p * (IMPACT_Y - CLOUD_BOTTOM);
+          var x = CX, y = IMPACT_Y;
+          while (y > yTop) {
+            put(x, y, 255,255,255,235); put(x-1, y, 150,200,255,150); put(x+1, y, 150,200,255,150);
+            y -= 1 + (rnd(2)|0); x = CX + ((rnd(5)|0) - 2);
+          }
+        }
         function update() {
-          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strike(); }
+          if (state === 'rising') { riseT++; cloudGrow = Math.min(1, riseT / RISE_FRAMES + 0.15); if (riseT >= RISE_FRAMES) { state = 'live'; strike(); } }
+          if (state === 'live') { if (cloudGrow < 1) cloudGrow = Math.min(1, cloudGrow + 0.06); strikeTimer--; if (strikeTimer <= 0) strike(); }
           flash *= 0.82;
-          if (flash > 0.45 && rnd(1) < 0.4) genBolt(strikeX);   /* 明るい間は稲妻を再ジグザグ＝フリッカー */
-          /* 微弱なチャージ＝上辺で小さくスパークがちらつく（可読性のため疎・淡） */
-          if (rnd(1) < 0.10) { var cx0 = 2 + (rnd(W-4)|0); charge.push({ x: cx0, y: (rnd(3))|0, life: 1 }); }
+          if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBolt(strikeX, CLOUD_BOTTOM);   /* 明るい間は稲妻を再ジグザグ＝フリッカー */
+          /* 微弱なチャージ＝雲の底で小さくスパークがちらつく（可読性のため疎・淡） */
+          if ((state === 'live' || state === 'rising') && rnd(1) < 0.14) { var cx0 = CX + ((rnd(CLOUD_HALF*2)|0) - CLOUD_HALF); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); }
           for (var c = charge.length-1; c >= 0; c--) { charge[c].life -= 0.10; if (charge[c].life <= 0) charge.splice(c,1); }
           for (var i = sparks.length-1; i >= 0; i--) { var p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life -= 0.05; if (p.life <= 0) sparks.splice(i,1); }
         }
@@ -2384,6 +2422,8 @@
             var bright = Math.min(1, flash + 0.25); drawPath(bolt, bright);
             for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
           }
+          if (state === 'rising') drawRise();     /* 着弾点→雲へ電気が上昇 */
+          drawCloud();                            /* 雷雲 */
           for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 170,225,255, (g.life*130)|0); put(g.x+1, g.y+1, 120,180,255, (g.life*90)|0); }
           for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 200,240,255, (q.life*255)|0); }
           if (state === 'incoming' && proj) drawProj();
@@ -2391,22 +2431,26 @@
         }
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
-          if (state === 'incoming' && proj) {   /* caster→着弾点へ発射弾を飛ばす */
-            proj.x += (tx - proj.x) * 0.20; proj.y += (ty - proj.y) * 0.20;
-            if (Math.abs(tx - proj.x) < 1.5 && Math.abs(ty - proj.y) < 1.5) { proj = null; strike(tx); state = 'live'; }
+          if (state === 'incoming' && proj) {   /* caster→パネル中央へ発射弾を飛ばす */
+            var dx = CX - proj.x, dy = IMPACT_Y - proj.y, dist = Math.sqrt(dx*dx + dy*dy), SPEED = Math.max(2.5, W / 70);
+            if (dist <= SPEED) {   /* 中央に着弾＝小さな電気が飛散→上昇フェーズへ */
+              proj = null; state = 'rising'; riseT = 0; cloudGrow = 0.15; flash = 0.9; spawnSparks(CX, IMPACT_Y);
+            } else { proj.x += dx / dist * SPEED; proj.y += dy / dist * SPEED; }
           }
           while (acc >= 33) { update(); acc -= 33; }
           draw(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; cloudGrow = 0; }
         return {
           canvas: canvas,
-          start: function (ox, oy) {   /* caster(右上)から発射→着弾点で落雷→間欠再落雷 */
-            reset(); tx = 6 + (rnd(W - 12)|0); ty = (H * 0.45) | 0;
-            proj = { x: (ox == null ? W - 3 : ox), y: (oy == null ? 0 : oy) }; state = 'incoming'; runLoop();
+          start: function (ox, oy) {   /* caster(右上)から発射→中央着弾→電気が上昇→雷雲→雲から落雷 */
+            reset(); proj = { x: (ox == null ? W - 3 : ox), y: (oy == null ? 0 : oy) }; state = 'incoming'; runLoop();
           },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; strikeX = W >> 1; genBolt(strikeX); flash = 0.7; draw(); },
+          reduceStatic: function () {   /* 静止＝雷雲＋雲から1本の稲妻＋淡い発光 */
+            if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1;
+            strikeX = CX; genBolt(CX, CLOUD_BOTTOM); flash = 0.6; draw();
+          },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
