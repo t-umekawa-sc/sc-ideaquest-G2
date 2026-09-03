@@ -2333,7 +2333,8 @@
         var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8)); /* 雲の高さ（パネル外の上方に描く） */
         var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;    /* rising=電気が上へ昇り切る（この間は雲を広げない） */
         var gatherT = 0, GATHER_FRAMES = 18;               /* gather=上部に粒が集まる“ため”（雲展開の開始を遅らせる） */
-        var spreadT = 0, SPREAD_FRAMES = 26;               /* spreading=ためた後に雲を中央→左右へ広げる（ease-out・大きいほど遅い） */
+        /* spreading=ためた後に雲を中央→左右へ広げる。左右独立＋各回ランダムな到達幅(maxHalf)と展開時間(frames) */
+        var growL = 0, growR = 0, spreadTL = 0, spreadTR = 0, framesL = 26, framesR = 26, maxHalfL = CLOUD_HALF, maxHalfR = CLOUD_HALF;
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;   /* charging=雲が広がった後にパネルが数回チカチカ→落雷開始 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
@@ -2385,18 +2386,17 @@
           var ri = Math.ceil(r);
           for (var yy = -ri; yy <= ri; yy++) for (var xx = -ri; xx <= ri; xx++) if (xx*xx + yy*yy <= r*r) put(ccx+xx, ccy+yy, cr, cg, cb, a);
         }
-        function drawCloud() {                                      /* 雷雲＝中央から左右へ広がる連続した塊（台形＋もこもこ）＋下縁の発光 */
-          if (cloudGrow <= 0) return;
-          var g = cloudGrow > 1 ? 1 : cloudGrow;
-          var half = Math.max(3, Math.round(g * CLOUD_HALF));       /* 表示幅＝中央から外へ伸長（g で左右に広がる） */
-          var a = Math.min(255, (g * 4) * 255) | 0;                 /* 出現初期だけ素早くフェードイン、以後は不透明 */
+        function drawCloud() {                                      /* 雷雲＝中央から左右へ広がる連続した塊（台形＋もこもこ）＋下縁の発光。左右で到達幅が異なる */
+          if (growL <= 0 && growR <= 0) return;
+          var halfL = Math.max(3, Math.round(growL * maxHalfL)), halfR = Math.max(3, Math.round(growR * maxHalfR));
+          var a = Math.min(255, (Math.max(growL, growR) * 4) * 255) | 0;   /* 出現初期だけ素早くフェードイン */
           var x;
-          for (x = -half; x <= half; x++) {
-            var nx = x / half, an = nx < 0 ? -nx : nx;
-            var edge = an < 0.78 ? 1 : (1 - an) / 0.22;             /* 中央は台形の平ら・両端(=広がる先端)でテーパー */
+          for (x = -halfL; x <= halfR; x++) {
+            var an = x < 0 ? (-x / halfL) : (x / halfR);           /* 端(=広がる先端)でテーパー・左右別スケール */
+            var edge = an < 0.78 ? 1 : (1 - an) / 0.22;
             if (edge < 0) edge = 0;
             var bump = 0.22*Math.sin(x*0.7) + 0.16*Math.sin(x*1.6 + 1) + 0.10*Math.sin(x*3.1 + 2);   /* もこもこの凹凸 */
-            var thick = edge * CLOUD_H + bump*3.5;                  /* 高さは一定＝幅だけ広がる */
+            var thick = edge * CLOUD_H + bump*3.5;
             if (thick <= 0.5) continue;
             var topY = Math.round(CLOUD_BOTTOM - thick), cxx = CX + x;
             for (var y = topY; y <= CLOUD_BOTTOM; y++) {
@@ -2404,7 +2404,7 @@
               put(cxx, y, col[0], col[1], col[2], a);
             }
           }
-          for (x = -half; x <= half; x++) {                          /* 下縁＝帯電の発光（flashで強まる） */
+          for (x = -halfL; x <= halfR; x++) {                        /* 下縁＝帯電の発光（flashで強まる） */
             if (rnd(1) < 0.55) put(CX + x, CLOUD_BOTTOM, 170, 205, 255, ((90 + flash*150) * (a/255)) | 0);
           }
         }
@@ -2424,11 +2424,18 @@
           }
           if (state === 'gather') {   /* 上部に粒が集まる“ため”（この間も雲は広げない＝展開開始を遅らせる） */
             gatherT++;
-            if (gatherT >= GATHER_FRAMES) { state = 'spreading'; spreadT = 0; }
+            if (gatherT >= GATHER_FRAMES) {   /* 展開開始＝左右それぞれ到達幅・展開時間をランダムに */
+              state = 'spreading'; spreadTL = 0; spreadTR = 0;
+              framesL = 20 + (rnd(22)|0); framesR = 20 + (rnd(22)|0);
+              maxHalfL = CLOUD_HALF * (0.68 + rnd(0.32)); maxHalfR = CLOUD_HALF * (0.68 + rnd(0.32));
+            }
           }
-          if (state === 'spreading') {   /* ためた後に雲を中央→左右へ広げる（ease-out＝最初速く/最後ゆっくり） */
-            spreadT++; var t = spreadT / SPREAD_FRAMES; if (t > 1) t = 1; cloudGrow = 1 - (1 - t) * (1 - t);
-            if (spreadT >= SPREAD_FRAMES) { state = 'charging'; chargeT = 0; flickers = 0; }
+          if (state === 'spreading') {   /* 左右独立で広げる（各 ease-out・時間も幅も別） */
+            spreadTL++; spreadTR++;
+            var tl = spreadTL / framesL; if (tl > 1) tl = 1; growL = 1 - (1-tl)*(1-tl);
+            var tr = spreadTR / framesR; if (tr > 1) tr = 1; growR = 1 - (1-tr)*(1-tr);
+            cloudGrow = Math.max(growL, growR);
+            if (spreadTL >= framesL && spreadTR >= framesR) { state = 'charging'; chargeT = 0; flickers = 0; }
           }
           if (state === 'charging') {   /* 雲完成→パネルが数回チカチカ→最後の閃光が消えたら落雷開始 */
             chargeT++;
@@ -2472,7 +2479,7 @@
           draw(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; gatherT = 0; spreadT = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; gatherT = 0; spreadTL = 0; spreadTR = 0; growL = 0; growR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) {   /* caster(右上)から発射→中央着弾→電気が上昇→雷雲→雲から落雷 */
@@ -2480,6 +2487,7 @@
           },
           reduceStatic: function () {   /* 静止＝雷雲＋雲から1本の稲妻＋淡い発光 */
             if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1;
+            growL = 1; growR = 1; maxHalfL = CLOUD_HALF; maxHalfR = CLOUD_HALF;
             strikeX = CX; genBolt(CX, CLOUD_BOTTOM); flash = 0.6; draw();
           },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
