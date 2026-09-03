@@ -2566,6 +2566,7 @@
         var shards = [], splinters = [], snow = [], ferns = [];
         /* チャンク凍結＝パネルを不規則な塊(ポリゴン)に分割し、中央→外へ番号順に1つずつ瞬間スナップで凍らせる */
         var chunks = [], order = [], frozenCount = 0, stepHold = 0, STEP_HOLD = 9, snapFlash = 0;
+        var glowIdx = -1, glowVal = 0, glowTimer = 30;   /* 全凍結後：ランダムな塊の輪郭が時々ピカッと光る */
         var frostGrad = ctx.createLinearGradient(0, 0, 0, H);        /* 縁ほど濃いフロストガラスの地 */
         frostGrad.addColorStop(0, 'rgba(214,236,255,0.34)'); frostGrad.addColorStop(0.32, 'rgba(214,236,255,0.10)');
         frostGrad.addColorStop(0.5, 'rgba(214,236,255,0.05)'); frostGrad.addColorStop(0.68, 'rgba(214,236,255,0.10)');
@@ -2636,6 +2637,13 @@
             ctx.strokeStyle = 'rgba(244,252,255,' + (snapFlash * 0.85).toFixed(2) + ')'; ctx.lineWidth = 2;
             ctx.shadowColor = 'rgba(210,240,255,0.9)'; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
           }
+          if (glowVal > 0.04 && glowIdx >= 0) {                      /* 全凍結後＝ランダムな塊の輪郭がピカッ（内側も一瞬明るく） */
+            ctx.save(); ctx.beginPath(); addChunkPath(glowIdx); ctx.clip();
+            ctx.fillStyle = 'rgba(230,246,255,' + (glowVal * 0.28).toFixed(2) + ')'; ctx.fillRect(0, 0, W, H); ctx.restore();
+            ctx.save(); ctx.beginPath(); addChunkPath(glowIdx);
+            ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(1, glowVal).toFixed(2) + ')'; ctx.lineWidth = 2.5;
+            ctx.shadowColor = 'rgba(200,238,255,0.95)'; ctx.shadowBlur = 11; ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+          }
         }
         function drawSnow() { ctx.fillStyle = 'rgba(246,252,255,0.92)'; for (var i = 0; i < snow.length; i++) { var p = snow[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill(); } }
 
@@ -2671,11 +2679,14 @@
         function frame(ts) {
           if (!last) last = ts; acc += ts - last; last = ts;
           if (state === 'incoming') updateShards();
-          while (acc >= 33) { t++; if (state === 'freezing') updateFreeze(); updateSplinters(); updateSnow(); acc -= 33; }
+          while (acc >= 33) { t++; if (state === 'freezing') updateFreeze();
+            if (glowVal > 0) glowVal *= 0.82;
+            if (state === 'done') { glowTimer--; if (glowTimer <= 0 && chunks.length) { glowIdx = order[(rnd(chunks.length))|0]; glowVal = 1; glowTimer = 16 + (rnd(44)|0); } }   /* ランダム位置・ランダム間隔でピカッ */
+            updateSplinters(); updateSnow(); acc -= 33; }
           render(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { shards = []; splinters = []; snow.length = 0; t = 0; frozenCount = 0; stepHold = 0; snapFlash = 0; genFerns(); genChunks(); }
+        function reset() { shards = []; splinters = []; snow.length = 0; t = 0; frozenCount = 0; stepHold = 0; snapFlash = 0; glowIdx = -1; glowVal = 0; glowTimer = 30; genFerns(); genChunks(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); state = 'incoming'; spawnShards(ox == null ? W - 6 : ox, oy == null ? 4 : oy); render(); runLoop(); },
