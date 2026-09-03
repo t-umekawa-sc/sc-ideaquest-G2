@@ -2288,7 +2288,7 @@
     <h2>17d. ドット絵の落雷（caster発射→中央着弾→上昇→雷雲→落雷／実寸大サンプル）</h2>
     <p class="muted text-sm">炎(§17b)と同じ実寸チャットパネルで、雷を一本ずつドット絵化。<strong>アバタールール(§17)準拠</strong>＝作成者=左上(青)・術者=右上(雷色=琥珀)。
       発動で<strong>術者(caster)アバターが反動リアクション → 電気の玉を発射</strong>し<strong>パネル中央に着弾</strong>、
-      <strong>小さな電気が上部へ這い上がり、雷雲が中央から左右へ広がって形成</strong>（ease-out＝最初速く/最後ゆっくり）
+      <strong>小さな電気が上部へ這い上がって粒が着き始め、その後に雷雲が中央から左右へ広がって形成</strong>（ease-out＝最初速く/最後ゆっくり）
       <strong>→ パネルが数回チカチカ帯電 → 雲から落雷が始まる</strong>（閃光＋分岐した稲妻＋落下火花／間欠的に再落雷）。
       稲妻は細く・間欠表示にして、重なった文字が読めるよう配慮。低解像度 canvas を <code>image-rendering:pixelated</code> で拡大。
       <code>prefers-reduced-motion</code>／下のトグルで静止（雷雲＋雲から1本の稲妻）。</p>
@@ -2331,7 +2331,8 @@
         var CLOUD_BOTTOM = PANEL_TOP;                      /* 雷雲の下端＝パネル上線 */
         var CLOUD_HALF = (W >> 1) - 1;                     /* 幅＝ユーザアイコン間≒パネル全幅 */
         var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8)); /* 雲の高さ（パネル外の上方に描く） */
-        var riseT = 0, RISE_FRAMES = 26, cloudGrow = 0;    /* rising=電気が上昇し雲が中央→左右へ広がる／cloudGrow 0→1（大きいほど広がりが遅い） */
+        var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;    /* rising=電気が上へ昇り切る（この間は雲を広げない） */
+        var spreadT = 0, SPREAD_FRAMES = 26;               /* spreading=昇り切った後に雲を中央→左右へ広げる（ease-out・大きいほど遅い） */
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;   /* charging=雲が広がった後にパネルが数回チカチカ→落雷開始 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
@@ -2416,9 +2417,13 @@
           }
         }
         function update() {
-          if (state === 'rising') {   /* 雲が中央→左右へ広がる（ease-out＝最初速く/最後ゆっくり） */
-            riseT++; var t = riseT / RISE_FRAMES; if (t > 1) t = 1; cloudGrow = 1 - (1 - t) * (1 - t);
-            if (riseT >= RISE_FRAMES) { state = 'charging'; chargeT = 0; flickers = 0; }
+          if (state === 'rising') {   /* まず電気が上へ昇り切る（雲はまだ広げない・上部に粒が着き始める） */
+            riseT++;
+            if (riseT >= RISE_FRAMES) { state = 'spreading'; spreadT = 0; }
+          }
+          if (state === 'spreading') {   /* 昇り切った後に雲を中央→左右へ広げる（ease-out＝最初速く/最後ゆっくり） */
+            spreadT++; var t = spreadT / SPREAD_FRAMES; if (t > 1) t = 1; cloudGrow = 1 - (1 - t) * (1 - t);
+            if (spreadT >= SPREAD_FRAMES) { state = 'charging'; chargeT = 0; flickers = 0; }
           }
           if (state === 'charging') {   /* 雲完成→パネルが数回チカチカ→最後の閃光が消えたら落雷開始 */
             chargeT++;
@@ -2429,7 +2434,10 @@
           flash *= 0.82;
           if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBolt(strikeX, CLOUD_BOTTOM);   /* 明るい間は稲妻を再ジグザグ＝フリッカー */
           /* 微弱なチャージ＝雲の底で小さくスパークがちらつく（可読性のため疎・淡） */
-          if ((state === 'live' || state === 'rising' || state === 'charging') && rnd(1) < 0.14) { var cx0 = CX + ((rnd(CLOUD_HALF*2)|0) - CLOUD_HALF); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); }
+          if ((state === 'live' || state === 'rising' || state === 'spreading' || state === 'charging') && rnd(1) < 0.14) {
+            var chalf = Math.max(6, (cloudGrow * CLOUD_HALF) | 0);   /* 上昇中は中央に粒、雲が広がるにつれ横へ */
+            var cx0 = CX + ((rnd(chalf*2)|0) - chalf); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 });
+          }
           for (var c = charge.length-1; c >= 0; c--) { charge[c].life -= 0.10; if (charge[c].life <= 0) charge.splice(c,1); }
           for (var i = sparks.length-1; i >= 0; i--) { var p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life -= 0.05; if (p.life <= 0) sparks.splice(i,1); }
         }
@@ -2440,7 +2448,7 @@
             var bright = Math.min(1, flash + 0.25); drawPath(bolt, bright);
             for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
           }
-          if (state === 'rising') drawRise();     /* 着弾点→雲へ電気が上昇 */
+          if (state === 'rising' || state === 'spreading') drawRise();     /* 着弾点→雲へ電気が上昇（昇り切り後も雲へ繋がる） */
           drawCloud();                            /* 雷雲 */
           for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 170,225,255, (g.life*130)|0); put(g.x+1, g.y+1, 120,180,255, (g.life*90)|0); }
           for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 200,240,255, (q.life*255)|0); }
@@ -2459,7 +2467,7 @@
           draw(); raf = requestAnimationFrame(frame);
         }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; proj = null; riseT = 0; spreadT = 0; cloudGrow = 0; chargeT = 0; flickers = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) {   /* caster(右上)から発射→中央着弾→電気が上昇→雷雲→雲から落雷 */
