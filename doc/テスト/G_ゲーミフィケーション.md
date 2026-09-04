@@ -123,3 +123,12 @@
 | G-TC-154 | unit(front) | 虹の全幅アーク（平行7バンド） | なし | `rainbowArcBands()` | 7バンド／色は7色すべて相異／足の高さ feetY は i 昇順で単調増加／各 path は右端(x=198)→左端(x=2)を上弧で結ぶ（両端まで架かる）／決定的 | GF-AC-091／#10 |
 | G-TC-154 | unit(front) | オーラの活力の粒（枠全体に分散・幅で数↑） | 枠の実寸 w×h | `auraMotes(w, h)` | **数は枠幅に比例**／原点 startX は枠全体に横分散（0..100%・左右両側に散る）／各粒は上へ浮上（dy<0）／決定的 | GF-AC-091／#10 |
 | G-TC-154 | unit(front) | 氷のヒビ伝播ツリー（実寸・アスペクト追従） | 枠の実寸 w×h | `iceCrackTree(w, h)` | 四隅から t1×4→枝分かれ t2×8→t3×8→末端 t4×4／**隅→中心の向き・長さは隅→中心距離に比例**（幅広でも中央まで届く）／致命ヒビ(fa/fb/fc)は既存節点を左→右になぞる折れ線5本／left/top(%) は有限値／決定的 | GF-AC-091／#10 |
+
+### 5-E. canvas エンジンの決定的部分（スプライト/軌道）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/sprites.ts`（純ロジック）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17b-h` の canvas+rAF エンジン）を production の canvas ハーネス（`components/ui/SpellCanvasFx.tsx`＋`features/spells/useSpellEngine.ts`）へ移植するにあたり、**canvas 本体（imperative＋`Math.random()` で非決定的）は GF-AC ブラウザ受入**に委ね、決定的に抽出できる「ドット絵スプライトのデコード」と「UFO のパターン別軌道（prog→座標）」のみ unit で担保する。`decodeSprite(art,colMap)`＝`.`透過を除外し各非透過セルを `{x,y,char,color}` に解決（未知文字＝色 null）。`ufoPosition(pat,prog,params)`＝進行 prog(0..1) から (x,y) を算出（両端で x=x0/x1・パターン別に y のうねり方が変わる）。視覚（きらめき/天の川/オーロラ/UFO の見た目）は §17h の GF-AC でブラウザ受入。reduce-motion はハーネスが `reduceStatic()` を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-155）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-155 | unit(front) | ドット絵スプライトのデコード | `UFO_ART`（15×8）／`UFO_COL` | `decodeSprite(art, colMap)` | `.` は出力に含めない／非透過セル総数は固定（76 セル）／各セルは行内 x・行 y を持つ／`colMap` にある文字は色解決・未知文字（`L`＝点滅ライト）は色 null で char を保持（4 セル）／決定的 | GF-AC-091／#10 |
+| G-TC-155 | unit(front) | UFO のパターン別軌道（prog→座標） | パターン番号 pat／進行 prog／params(x0,x1,yBase,amp,freq,H) | `ufoPosition(pat, prog, p)` | 全 pat で `prog=0→x≈x0`・`prog=1→x≈x1`（pat7 のループ区間 0.4..0.6 を除く）／pat0 は常に y=yBase（直線）／pat2 は中央 prog=0.5 で y>yBase（下ディップ）・pat3 は y<yBase（上山）で符号が反対／x,y は有限値／決定的 | GF-AC-091／#10 |

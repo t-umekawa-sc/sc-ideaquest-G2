@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { castEffect, firePillars, thunderBolts, thunderSparks, rainbowArcBands, auraMotes, iceCrackTree } from "@/features/spells/cast";
+import { useBoxSize } from "@/features/spells/useBoxSize";
 
 // Phase D: 属性別の永続エフェクト（モック §17 buildPersist→production）。魔法が着地したメッセージ枠に重ねる。
 // 枠の基調グロー/ボーダーは message の `.spell-fx spell-fx--{effect}` クラスが担い、本コンポーネントは
@@ -22,28 +23,9 @@ const ICE_SHARDS = [
   { l: 52, t: 46, w: 48, h: 54, clip: "polygon(100% 100%,100% 0,0 100%)", tx: 44, ty: 41, rot: -40 },
 ];
 
-// 枠（メッセージ）の実寸を測る。実測できるまで null。
-function useBoxSize() {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) setSize({ w: Math.round(r.width), h: Math.round(r.height) });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return { ref, size };
-}
-
 export function SpellPersistFx({ effect }: { effect: string }) {
   const eff = castEffect(effect);
-  const { ref, size } = useBoxSize();
+  const { ref, size } = useBoxSize<HTMLSpanElement>();
   const w = size?.w ?? 340;
   const h = size?.h ?? 150;
   return (

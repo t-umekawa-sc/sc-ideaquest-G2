@@ -8,7 +8,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, type CastRect, type CastPoint } from "@/components/ui";
+import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
+import { isCanvasEffect } from "@/features/spells/engines";
 import { ApiError } from "@/lib/api/client";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
@@ -96,6 +97,9 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
   // Phase B: 発射元→対象メッセージへ飛ぶデリバリー（属性別・GF-AC-091 §17）。着弾で one-shot(SpellCastFx) に接続。
   const [delivers, setDelivers] = useState<{ id: number; from: CastPoint; to: CastPoint; effect: string; rarity: string }[]>([]);
+  // Phase E: canvas 化済み effect（sparkle 等）の能動発動＝そのメッセージ canvas に「発射→着弾→永続」を再生させる。
+  // key=msgId が存在＝今セッションで能動発動した（発射を再生する）／値＝発射元の画面座標。CSS の deliver/cast は使わない。
+  const [canvasCast, setCanvasCast] = useState<Record<string, CastPoint | null>>({});
   const castId = useRef(0);
   const fireCast = (msgId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
@@ -333,9 +337,15 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
         // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
-        // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
-        if (from) fireDelivery(from, m.id, eff, spell.rarity);
-        else fireCast(m.id, eff, spell.rarity);
+        if (isCanvasEffect(eff)) {
+          // canvas 化済み＝そのメッセージの canvas が発射→着弾→永続を1枚で再生（CSS deliver/cast は使わない）。
+          setCanvasCast((c) => ({ ...c, [m.id]: from ?? null }));
+        } else if (from) {
+          // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
+          fireDelivery(from, m.id, eff, spell.rarity);
+        } else {
+          fireCast(m.id, eff, spell.rarity);
+        }
       }
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
@@ -346,7 +356,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const cancelSpell = async (m: ChatMessage) => {
     try {
       const res = await removeReaction(m.id, { magic: true });
-      if (res) setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
+      if (res) {
+        setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
+        setCanvasCast((c) => { if (!(m.id in c)) return c; const n = { ...c }; delete n[m.id]; return n; });
+      }
     } catch {
       snack({ type: "error", msg: "魔法の取消に失敗しました。" });
     }
@@ -433,8 +446,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
               {showDay && <div className="chat-day">{day}</div>}
               {firstUnread === m.id && <div className="unread-sep">ここから未読</div>}
               <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : ""].filter(Boolean).join(" ")}>
-                {/* Phase D: 属性別の永続装飾（炎=火柱 等）を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。 */}
-                {magic && <SpellPersistFx effect={magic.effect ?? ""} />}
+                {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
+                    canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
+                {magic && (isCanvasEffect(magic.effect ?? "")
+                  ? <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} />
+                  : <SpellPersistFx effect={magic.effect ?? ""} />)}
                 <span className="avatar sm"><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
                 <div className="msg__body">
                   <div className="msg__head">
