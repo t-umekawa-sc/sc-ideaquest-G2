@@ -3375,6 +3375,7 @@
         var growL = 0, growR = 0, targetL = 0, targetR = 0, puffL = 0, puffR = 0;
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;
         var strikeInT = 0, STRIKE_IN_FRAMES = 6;           /* 着弾の稲妻を見せるフレーム数 */
+        var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
         /* 明色パネル向けパレット＝黄核＋暗紺の縁取り／嵐雲は濃色 */
         var CORE = [255,225,77], EDGE = [26,38,92];
 
@@ -3392,6 +3393,24 @@
             var ni = 2 + (rnd(Math.max(1, bolt.length - 4))|0);
             var bx = bolt[ni][0], by = bolt[ni][1], dir = rnd(1) < 0.5 ? -1 : 1, br = [[bx, by]], len = 3 + (rnd(5)|0);
             for (var k = 0; k < len; k++) { bx += dir*(1+(rnd(2)|0)); by += 1+(rnd(2)|0); if (bx<1) bx=1; if (bx>W-2) bx=W-2; if (by>end) by=end; br.push([bx, by]); }
+            branches.push(br);
+          }
+        }
+        function genBoltBetween(x0, y0, x1, y1) {   /* 任意2点間のジグザグ稲妻（両端固定・中間は垂直方向に振れる）＋枝。術者→中央の着弾に使う */
+          bolt = []; branches = [];
+          var dx = x1 - x0, dy = y1 - y0, dist = Math.max(1, Math.hypot(dx, dy));
+          var steps = Math.max(4, (dist / 2) | 0);
+          var ux = dx / dist, uy = dy / dist, px = -uy, py = ux;
+          for (var i = 0; i <= steps; i++) {
+            var t = i / steps, bx = x0 + dx * t, by = y0 + dy * t;
+            var off = (i === 0 || i === steps) ? 0 : (rnd(5) - 2.5);
+            bolt.push([bx + px * off, by + py * off]);
+          }
+          var nb = 1 + (rnd(2) | 0);
+          for (var j = 0; j < nb; j++) {
+            var ni = 1 + (rnd(Math.max(1, bolt.length - 2)) | 0);
+            var sx = bolt[ni][0], sy = bolt[ni][1], br = [[sx, sy]], len = 2 + (rnd(4) | 0), bdir = rnd(1) < 0.5 ? -1 : 1;
+            for (var k = 0; k < len; k++) { sx += ux * (1 + rnd(2)) + px * bdir * (1 + rnd(1.5)); sy += uy * (1 + rnd(2)) + py * bdir * (1 + rnd(1.5)); br.push([sx, sy]); }
             branches.push(br);
           }
         }
@@ -3440,8 +3459,8 @@
         }
         function puffCharge(halfw) { for (var k = 0; k < 3; k++) { var cx0 = CX + ((rnd(halfw*2)|0) - halfw); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); } }
         function update() {
-          if (state === 'strikein') {   /* 着弾の稲妻を数フレーム見せる→電気が昇るフェーズへ */
-            strikeInT++; if (strikeInT % 2 === 0) genBoltTo(strikeX, 0, IMPACT_Y);   /* ちらつき */
+          if (state === 'strikein') {   /* 術者アイコン→パネル中央の着弾稲妻を数フレーム見せる→電気が昇るフェーズへ */
+            strikeInT++; if (strikeInT % 2 === 0) genBoltBetween(originX, originY, CX, IMPACT_Y);   /* ちらつき */
             if (strikeInT >= STRIKE_IN_FRAMES) { state = 'rising'; riseT = 0; cloudGrow = 0; flash = 0.9; spawnSparks(CX, IMPACT_Y); }
           }
           if (state === 'rising') { riseT++; if (riseT >= RISE_FRAMES) { state = 'growing'; targetL = 0.12; targetR = 0.12; growL = 0; growR = 0; puffL = 6 + (rnd(8)|0); puffR = 6 + (rnd(8)|0); } }
@@ -3480,8 +3499,9 @@
         function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; riseT = 0; growL = 0; growR = 0; targetL = 0; targetR = 0; puffL = 0; puffR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; strikeInT = 0; }
         return {
           canvas: canvas,
-          start: function () {   /* 発動＝上空からパネル中央へ稲妻が落ちて着弾→電気が昇る→雷雲→落雷 */
-            reset(); state = 'strikein'; strikeX = CX; genBoltTo(CX, 0, IMPACT_Y); flash = 1; spawnSparks(CX, IMPACT_Y); runLoop();
+          start: function (ox, oy) {   /* 発動＝術者アイコン(右上)からパネル中央へ稲妻が走って着弾→電気が昇る→雷雲→落雷 */
+            reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
+            state = 'strikein'; strikeX = CX; genBoltBetween(originX, originY, CX, IMPACT_Y); flash = 1; spawnSparks(CX, IMPACT_Y); runLoop();
           },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1; growL = 1; growR = 1; targetL = 1; targetR = 1; strikeX = CX; genBoltTo(CX, CLOUD_BOTTOM, H - 1); flash = 0.6; draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
@@ -3496,12 +3516,20 @@
         var scale = 3;
         var cols = Math.max(140, Math.round(msg.clientWidth / scale));
         var rows = Math.max(20, Math.round(msg.clientHeight / scale));
-        var abovePx = 33, aboveRows = Math.round(abovePx / scale);
+        var abovePx = 33, aboveRows = Math.round(abovePx / scale), totalRows = rows + aboveRows;
         var bolt = createPixelThunderLight({ cols: cols, rows: rows, above: aboveRows });
         bolt.canvas.style.top = (-abovePx) + 'px'; bolt.canvas.style.bottom = 'auto'; bolt.canvas.style.height = 'calc(100% + ' + abovePx + 'px)';
         msg.appendChild(bolt.canvas);
+        var caster = msg.querySelector('.msg-avatar.caster');   /* 術者アバター＝発動起点（右上バッジ） */
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
-        function play() { if (reduced()) { bolt.reduceStatic(); return; } bolt.start(); }
+        function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
+        function origin() {   /* 術者アイコン中心を canvas 論理座標へ（canvas は上へ拡張済みなので totalRows でマップ） */
+          if (!caster) return { x: cols - 3, y: aboveRows };
+          var cr = bolt.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
+          if (!cr.width || !cr.height) return { x: cols - 3, y: aboveRows };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * cols, y: (ar.top + ar.height/2 - cr.top) / cr.height * totalRows };
+        }
+        function play() { if (reduced()) { bolt.reduceStatic(); return; } kick(caster); var o = origin(); bolt.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) bolt.reduceStatic(); });
         if ('IntersectionObserver' in window) {
