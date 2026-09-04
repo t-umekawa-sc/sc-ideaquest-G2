@@ -3538,7 +3538,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネルが中央から外へ徐々に凍っていく</strong>（ひび割れたセル模様＝青いひび＋淡い白のセルがセル毎に順に固まる・凍結前線が白く光る・可読性優先で薄め）。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
+      その後<strong>パネルが中央から外へ固まっていく</strong>（ひび割れたセル模様＝スムーズなフェードではなく、前線が達したセルから一気にパッと凍る・凍った瞬間に白く光る・可読性優先で薄め）。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3614,15 +3614,15 @@
             var idx = (py * PW + px) * 3; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0; frost[idx + 2] = (seeds[s1].ft * 255) | 0;
           }
         }
-        function drawCold() {   /* 徐々に固まる＝中央から外へセル毎に凍結。cold=進行度。ひび=青/セル内=淡い白/凍結前線に白い光 */
+        function drawCold() {   /* 氷が固まっていく＝セル毎に一気にスナップ凍結（スムーズにフェードしない）＋凍った瞬間の白い光 */
           if (cold <= 0.005 || !frost) return;
           for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
-            var idx = (py * PW + px) * 3, thr = frost[idx + 2] / 255, local = (cold - thr) * 3.2;
-            if (local <= 0) continue; if (local > 1) local = 1;   /* このセルの凍結量(0→1) */
+            var idx = (py * PW + px) * 3, thr = frost[idx + 2] / 255;
+            if (cold < thr) continue;   /* このセルはまだ凍っていない（二値スナップ＝固まる瞬間がある） */
             var vein = frost[idx] / 255, bright = frost[idx + 1] / 255, x = PX0 + px, y = PY0 + py;
-            put(x, y, 214, 236, 252, (local * (13 + bright * 40)) | 0);   /* 地の霜＋セル内の白ハイライト */
-            if (vein > 0.04) put(x, y, 68, 148, 212, (local * vein * 118) | 0);   /* 青いひび（セル境界） */
-            var fr = local * (1 - local) * 4; if (fr > 0.2) put(x, y, 236, 248, 255, (fr * 70) | 0);   /* 凍結前線の白い光 */
+            put(x, y, 214, 236, 252, (13 + bright * 40) | 0);   /* 凍結（全alpha・フェードしない） */
+            if (vein > 0.04) put(x, y, 68, 148, 212, (vein * 118) | 0);   /* 青いひび */
+            var since = cold - thr; if (since < 0.14) { var fl = 1 - since / 0.14; put(x, y, 244, 252, 255, (fl * 145) | 0); }   /* 凍った瞬間のスナップ光 */
           }
         }
         function drawShardProj() {   /* Image#4＝面のある尖った氷塊。進行方向に尖る。片側にハイライト面 */
@@ -3690,8 +3690,8 @@
             } else { proj.x += axX * SPEED; proj.y += axY * SPEED; }
           }
           if (state === 'cold') {
-            if (cold < 1.4) cold = Math.min(1.4, cold + 0.022);   /* ゆっくり進行＝中央から外へ徐々に固まる */
-            if (cold >= 1.25) { pillarTimer--; if (pillarTimer <= 0 && pillars.length < 12) { spawnCluster(); pillarTimer = 16 + (rnd(40)|0); } }   /* パネルが全面凍結してから氷結晶クラスタが生える */
+            if (cold < 1.15) cold = Math.min(1.15, cold + 0.02);   /* 前線が進む＝達したセルから一気に固まる */
+            if (cold >= 1.05) { pillarTimer--; if (pillarTimer <= 0 && pillars.length < 12) { spawnCluster(); pillarTimer = 16 + (rnd(40)|0); } }   /* パネルが全面凍結してから氷結晶クラスタが生える */
             if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PW), PY1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がパネル下からふわふわ上昇 */
           }
           for (var i = pillars.length - 1; i >= 0; i--) { var p = pillars[i];
@@ -3721,7 +3721,7 @@
           start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
             var dx = CX - originX, dy = CY - originY, dd = Math.max(0.001, Math.hypot(dx, dy)); axX = dx / dd; axY = dy / dd;
             proj = { x: originX, y: originY, lit: rnd(1) < 0.5 ? 1 : -1 }; state = 'incoming'; runLoop(); },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1.4;
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1.15;
             spawnCluster(); spawnCluster(); for (var i = 0; i < pillars.length; i++) { pillars[i].grow = 1; pillars[i].phase = 'hold'; } draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
