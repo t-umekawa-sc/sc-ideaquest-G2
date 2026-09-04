@@ -3538,7 +3538,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネル全体の空気が冷たくなり</strong>（淡い青・可読性優先）、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
+      その後<strong>パネル全体が凍る</strong>（ひび割れたセル模様＝青いひび＋淡い白のセル・可読性優先で薄め）。<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3564,7 +3564,7 @@
         var img = ctx.createImageData(W, H), D = img.data;
         var CX = MARG + (PW >> 1), CY = MARG + (PH >> 1);   /* パネル中央（canvas 座標） */
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0, seal = null, sealTimer = 200;
+        var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0, seal = null, sealTimer = 200, frost = null;
         var originX = W - 3, originY = 0;
         var ICE_HI = [244,252,255], ICE_CORE = [200,236,255], ICE_MID = [120,190,238], ICE_EDGE = [52,112,176];   /* 氷パレット：ハイライト面→明芯→青→濃紺の稜線（面のある結晶） */
 
@@ -3599,15 +3599,27 @@
               else if (asn < 0.26) col = ICE_CORE;
               else if (asn > 0.76) col = ICE_EDGE;                        /* 濃紺の稜線 */
               else col = ICE_MID;
-              put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 170);   /* 透明度高め＝透き通った氷 */
+              put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 132);   /* 透明度さらに高め＝透き通った氷 */
             }
           }
         }
-        function drawCold() {   /* パネル内だけ空気が冷たい＝淡い青、縁ほど濃い（可読性優先で薄め）。はみ出し領域は色付けない */
-          if (cold <= 0.01) return;
-          for (var y = PY0; y < PY1; y++) for (var x = PX0; x < PX1; x++) {
-            var ex = Math.min(x - PX0, PX1 - 1 - x) / (PW * 0.5), ey = Math.min(y - PY0, PY1 - 1 - y) / (PH * 0.5), edgeF = 1 - Math.min(1, Math.min(ex, ey));
-            put(x, y, 150, 205, 245, (cold * (14 + edgeF * 34)) | 0);
+        function buildFrost() {   /* 凍ったパネルのひび割れセル模様（Voronoi）を1回生成＝参考画像の氷 */
+          var ns = Math.max(10, Math.round(PW * PH / 240)), seeds = [];
+          for (var i = 0; i < ns; i++) seeds.push({ x: rnd(PW), y: rnd(PH) });
+          frost = new Uint8Array(PW * PH * 2);
+          for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
+            var f1 = 1e9, f2 = 1e9;
+            for (var k = 0; k < seeds.length; k++) { var dx = px - seeds[k].x, dy = py - seeds[k].y, d = dx * dx + dy * dy; if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+            var edge = Math.sqrt(f2) - Math.sqrt(f1), vein = edge < 2.4 ? (1 - edge / 2.4) : 0, bright = Math.max(0, 1 - Math.sqrt(f1) / 13);
+            var idx = (py * PW + px) * 2; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0;
+          }
+        }
+        function drawCold() {   /* パネルが凍る＝ひび割れセル模様（参考画像）。ひび＝青、セル内＝淡い白。可読性のため薄め */
+          if (cold <= 0.01 || !frost) return;
+          for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
+            var idx = (py * PW + px) * 2, vein = frost[idx] / 255, bright = frost[idx + 1] / 255, x = PX0 + px, y = PY0 + py;
+            put(x, y, 214, 236, 252, (cold * (13 + bright * 40)) | 0);   /* 地の霜＋セル内の白ハイライト */
+            if (vein > 0.04) put(x, y, 68, 148, 212, (cold * vein * 118) | 0);   /* 青いひび（セル境界） */
           }
         }
         function drawShardProj() {   /* Image#4＝面のある尖った氷塊。進行方向に尖る。片側にハイライト面 */
@@ -3621,7 +3633,7 @@
               else if (asn < 0.28) col = ICE_CORE;
               else if (asn > 0.74) col = ICE_EDGE;
               else col = ICE_MID;
-              put(cx + ax * li + nx * s, cy + ay * li + ny * s, col[0], col[1], col[2], 215);   /* 氷塊も少し透明に */
+              put(cx + ax * li + nx * s, cy + ay * li + ny * s, col[0], col[1], col[2], 185);   /* 氷塊も透明度アップ */
             }
           }
         }
@@ -3642,7 +3654,7 @@
         /* たまにアザラシがパネル下辺から顔を出す（低頻度・遊び心） */
         var SEAL_ART = ['....GGGGG....','..GGGGGGGGG..','.GGGGGGGGGGG.','.GGGGGGGGGGG.','GGGeGGGGGeGGG','GGGGGGGGGGGGG','GGGGgwwwgGGGG','GGGGwwnwwGGGG','.GGGwwwwwGGG.','..GGGGGGGGG..','....GGGGG....'];
         var SEAL_COL = { G:[150,162,178], g:[198,208,220], w:[240,244,250], e:[38,44,60], n:[110,80,90] };
-        var SEAL_W = 13, SEAL_H = 11, SEAL_PX = 1.7;
+        var SEAL_W = 13, SEAL_H = 11, SEAL_PX = 1.1;   /* 小さめ */
         function spawnSeal() { var sw = SEAL_W * SEAL_PX; seal = { x: PX0 + rnd(Math.max(1, PW - sw)), peek: 0, phase: 'up', hold: 40 + (rnd(55) | 0) }; sealTimer = 300 + (rnd(360) | 0); }
         function updateSeal() {
           if (seal) {
@@ -3700,7 +3712,7 @@
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { t++; update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { proj = null; snows = []; specks = []; pillars = []; cold = 0; pillarTimer = 0; seal = null; sealTimer = 260 + (rnd(300) | 0); t = 0; }
+        function reset() { proj = null; snows = []; specks = []; pillars = []; cold = 0; pillarTimer = 0; seal = null; sealTimer = 260 + (rnd(300) | 0); t = 0; buildFrost(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
