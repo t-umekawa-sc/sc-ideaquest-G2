@@ -3343,7 +3343,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコン→中央着弾→着弾点から連鎖してどこかの辺へ／以降もピカッと光るたびランダムな辺から連鎖（1〜2本）</h3>
     <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ着弾</strong>し、<strong>その着弾点から別の雷が伸びて連鎖し、どこかの辺にぶつかるまで続く</strong>（手前の段から順に光る）。
-      以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。加えて<strong>枠線のランダムな位置で電気が常時ビリビリ</strong>し、<strong>雷の着弾点（連鎖の折れ点含む）で黄色い粒子が飛び散る</strong>。明色パネルで見えるよう黄核＋暗紺縁の稲妻（細め）・淡い金の閃光（パネル内のみ）。
+      以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。加えて<strong>枠線のランダムな位置で電気が常時ビリビリ</strong>し、<strong>雷の着弾点（連鎖の折れ点含む）で黄色い粒子が飛び散る</strong>。発雷時はパネルが<strong>ほんのり暖色（琥珀）に光る</strong>（可読性優先で淡め）。明色パネルで見えるよう黄核＋暗紺縁の稲妻（細め・枝多め）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
       <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
@@ -3450,17 +3450,6 @@
             put(p.x, p.y, 255, 214, 60, (a * 255) | 0); put(p.x + 1, p.y, 255, 232, 120, (a * 150) | 0);
           }
         }
-        function drawBolt(pts, bright) {   /* 参考画像＝白熱の核＋琥珀グロー（暖色グロー上で映える）。crackle は drawPath(黄+暗縁)のまま */
-          for (var i = 0; i < pts.length - 1; i++) {
-            var a = pts[i], b = pts[i+1], steps = Math.max(Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1])) || 1;
-            for (var s = 0; s <= steps; s++) {
-              var tx = a[0]+(b[0]-a[0])*s/steps, ty = a[1]+(b[1]-a[1])*s/steps;
-              put(tx-1, ty, 255,160,40, 175*bright); put(tx+1, ty, 255,160,40, 175*bright);   /* 琥珀グロー */
-              put(tx, ty-1, 255,160,40, 150*bright); put(tx, ty+1, 255,160,40, 150*bright);
-              put(tx, ty, 255,255,255, 255*bright);   /* 白熱の核 */
-            }
-          }
-        }
         function update() {
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
@@ -3473,15 +3462,15 @@
         }
         function draw() {
           clear();
-          if (flash > 0.03) {   /* 発雷でパネルが暖色(琥珀)に光る＝参考画像の雰囲気。中央の柱ほど明るい。低解像度canvas＋image-rendering:pixelated でドット絵風。パネル内のみ */
+          if (flash > 0.03) {   /* 発雷でパネルがほんのり暖色(琥珀)に＝参考画像の雰囲気を淡く。可読性優先で薄め・中央の柱ほど明るい・パネル内のみ */
             var gl = Math.min(1, flash);
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) {
               var cxd = Math.abs(x - CX) / (W * 0.5), band = 1 - cxd * 0.65; if (band < 0) band = 0;
-              put(x, y, 255, 150 + ((band * 45) | 0), 36, (gl * band * 120) | 0);
+              put(x, y, 255, 150 + ((band * 45) | 0), 36, (gl * band * 42) | 0);
             }
           }
           drawCrackles();   /* 枠線のビリビリ */
-          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawBolt(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawBolt(bo.branches[j], bright*0.85); }
+          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.85); }
           drawSparks();   /* 着弾点の黄色い粒子（稲妻の上に） */
           ctx.putImageData(img, 0, 0);
         }
