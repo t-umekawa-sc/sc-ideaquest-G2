@@ -3538,7 +3538,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネル全体の空気が冷たくなり</strong>（淡い青・可読性優先）、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（片側にハイライト面）が突然生え</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。
+      その後<strong>パネル全体の空気が冷たくなり</strong>（淡い青・可読性優先）、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3577,6 +3577,7 @@
           var bx = PX0 + rnd(PW), by = PY0 + PH * (0.45 + rnd(0.5)), m = 2 + (rnd(3) | 0);
           var baseAng = -Math.PI/2 + (rnd(1) - 0.5) * 0.5;   /* 概ね上向き */
           if (rnd(1) < 0.12) baseAng += Math.PI;             /* ごく稀に逆向き */
+          spawnSnowBurst(bx, by, 9 + (rnd(6) | 0));   /* 氷の地面を突き破って生える＝根元で雪の結晶が四方へ飛び散る */
           for (var c = 0; c < m; c++) {
             var ang = baseAng + (c - (m - 1) / 2) * 0.3 + (rnd(1) - 0.5) * 0.14;   /* 扇状にずらす */
             var L = PH * (0.5 + rnd(0.7)), w = 2.4 + rnd(3);
@@ -3598,7 +3599,7 @@
               else if (asn < 0.26) col = ICE_CORE;
               else if (asn > 0.76) col = ICE_EDGE;                        /* 濃紺の稜線 */
               else col = ICE_MID;
-              put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 240);
+              put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 170);   /* 透明度高め＝透き通った氷 */
             }
           }
         }
@@ -3620,12 +3621,12 @@
               else if (asn < 0.28) col = ICE_CORE;
               else if (asn > 0.74) col = ICE_EDGE;
               else col = ICE_MID;
-              put(cx + ax * li + nx * s, cy + ay * li + ny * s, col[0], col[1], col[2], 240);
+              put(cx + ax * li + nx * s, cy + ay * li + ny * s, col[0], col[1], col[2], 215);   /* 氷塊も少し透明に */
             }
           }
         }
-        function spawnSnowBurst(x, y) {   /* 砕け散る＝雪の結晶が四方へ飛び散る */
-          var n = 14 + (rnd(6) | 0);
+        function spawnSnowBurst(x, y, count) {   /* 砕け散る＝雪の結晶が四方へ飛び散る */
+          var n = count || (14 + (rnd(6) | 0));
           for (var i = 0; i < n; i++) { var a = rnd(6.283), sp = 0.8 + rnd(2.6); snows.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.4, life: 1, size: rnd(1) < 0.5 ? 1 : 2 }); }
         }
         function drawSnow() {   /* 雪の結晶（小さな六方の星） */
