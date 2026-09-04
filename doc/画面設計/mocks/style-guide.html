@@ -3536,9 +3536,9 @@
       })();
     </script>
 
-    <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝冷気玉が中央へ吹く→着弾でパネル全体が冷たく→ランダムな箇所から大きな氷柱（色々な形）が突然生えて一定時間で縮んで消える</h3>
-    <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）で作り直し。発動＝<strong>右上の術者アイコンから冷風（波打つシアン〜青の筋＋舞うきらめき）がパネル中央へ流れ</strong>、<strong>中央に達するとパネル全体の空気が冷たくなる</strong>（淡い青・可読性優先）。
-      その後<strong>パネルのランダムな箇所から大きな氷柱（色々な形・向き）が突然生え</strong>、<strong>一定時間経つと小さくなって消える</strong>のを繰り返す。冷気の粒がふわふわ舞う。
+    <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
+    <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
+      その後<strong>パネル全体の空気が冷たくなり</strong>（淡い青・可読性優先）、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（片側にハイライト面）が突然生え</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3550,8 +3550,8 @@
 
     <script>
       /* 氷結エンジン（ライト版・明色パネル向け＝濃いめの青）。骨格は §17e と同じ、色だけ明色パネルで見えるよう振り直し。 */
-      /* 氷結エンジン（ライト版・ドット絵）。発動＝冷気玉が中央へ吹く→着弾でパネル全体が冷たく→ランダムな箇所から
-         色々な形の大きな氷柱が突然生える→一定時間で小さくなって消える。低解像度canvas＋image-rendering:pixelated。 */
+      /* 氷結エンジン（ライト版・ドット絵）。発動＝面のある氷塊が中央へ飛来→着弾で砕け散り雪の結晶が飛び散る→
+         パネル全体が冷たく→ランダムな箇所から尖った面のある氷結晶クラスタが突然生える→一定時間で小さくなって消える。 */
       function createIceSpellLight(opts) {
         opts = opts || {};
         var PW = Math.max(60, opts.cols || 110), PH = Math.max(12, opts.rows || 40), MARG = Math.max(6, opts.marg || 14);
@@ -3564,33 +3564,40 @@
         var img = ctx.createImageData(W, H), D = img.data;
         var CX = MARG + (PW >> 1), CY = MARG + (PH >> 1);   /* パネル中央（canvas 座標） */
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var windHead = null, windStreaks = [], windT = 0, axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0;
+        var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0;
         var originX = W - 3, originY = 0;
-        var ICE_CORE = [210,238,255], ICE_MID = [130,195,238], ICE_EDGE = [56,116,176];   /* 氷パレット：明るい芯→青→濃紺の縁 */
+        var ICE_HI = [244,252,255], ICE_CORE = [200,236,255], ICE_MID = [120,190,238], ICE_EDGE = [52,112,176];   /* 氷パレット：ハイライト面→明芯→青→濃紺の稜線（面のある結晶） */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
         function put(x, y, r, g, b, a) { x |= 0; y |= 0; a |= 0; if (a <= 0 || x < 0 || x >= W || y < 0 || y >= H) return;
           var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; } }
         function rnd(n) { return Math.random() * n; }
         function spawnSpeck(x, y, vx, vy, life) { specks.push({ x: x, y: y, vx: vx, vy: vy, life: life, ph: rnd(6.28) }); }
-        function spawnPillar() {   /* パネル内のランダムな箇所から色々な形・向きの大きな氷柱（パネル外へはみ出してOK） */
-          var bx = PX0 + rnd(PW), by = PY0 + PH * (0.1 + rnd(0.85));
-          var ang = -Math.PI/2 + (rnd(1) - 0.5) * 1.8;      /* 基本は上向き、±で色々な方向 */
-          if (rnd(1) < 0.25) ang += Math.PI;                 /* 一部は逆向き等で変化 */
-          var L = PH * (0.55 + rnd(0.65)), w = 3 + rnd(4);   /* 大きな氷柱＝パネル高の 0.55〜1.2 倍（はみ出す）・太め */
-          var n = Math.max(4, (L / 3) | 0), jag = [];
-          for (var i = 0; i <= n; i++) jag.push(0.6 + rnd(0.8));   /* 幅のジッタ＝いろんな形 */
-          pillars.push({ bx: bx, by: by, ang: ang, L: L, w: w, jag: jag, grow: 0, phase: 'grow', hold: 36 + (rnd(70) | 0) });
+        function spawnCluster() {   /* Image#5＝尖った面のある氷結晶が数本まとまって突然生える（扇状に上へ） */
+          var bx = PX0 + rnd(PW), by = PY0 + PH * (0.45 + rnd(0.5)), m = 2 + (rnd(3) | 0);
+          var baseAng = -Math.PI/2 + (rnd(1) - 0.5) * 0.5;   /* 概ね上向き */
+          if (rnd(1) < 0.12) baseAng += Math.PI;             /* ごく稀に逆向き */
+          for (var c = 0; c < m; c++) {
+            var ang = baseAng + (c - (m - 1) / 2) * 0.3 + (rnd(1) - 0.5) * 0.14;   /* 扇状にずらす */
+            var L = PH * (0.5 + rnd(0.7)), w = 2.4 + rnd(3);
+            var n = Math.max(4, (L / 3) | 0), jag = [];
+            for (var i = 0; i <= n; i++) jag.push(0.7 + rnd(0.6));
+            pillars.push({ bx: bx + (rnd(7) - 3.5), by: by + (rnd(4) - 2), ang: ang, L: L, w: w, jag: jag, grow: 0, phase: 'grow', hold: 42 + (rnd(80) | 0), lit: rnd(1) < 0.5 ? 1 : -1 });
+          }
         }
-        function drawPillar(p) {
+        function drawPillar(p) {   /* 尖った面のある氷結晶（片側にハイライト面・濃紺の稜線） */
           var g = p.grow; if (g <= 0.01) return;
           var ax = Math.cos(p.ang), ay = Math.sin(p.ang), nx = -ay, ny = ax, curL = p.L * g;
-          var steps = Math.max(2, Math.round(curL)), nj = p.jag.length - 1;   /* 軸方向を1px刻みで塗る＝中身が詰まった柱 */
+          var steps = Math.max(2, Math.round(curL)), nj = p.jag.length - 1, lit = p.lit || 1;
           for (var i = 0; i <= steps; i++) {
             var tt = i / steps, cx = p.bx + ax * curL * tt, cy = p.by + ay * curL * tt;
-            var hw = p.w * (1 - tt * 0.85) * p.jag[(tt * nj) | 0] * (0.55 + g * 0.45); if (hw < 0.5) hw = 0.5;   /* 根元太く先細り＋成長で伸縮 */
+            var hw = p.w * (1 - tt * 0.92) * p.jag[(tt * nj) | 0] * (0.55 + g * 0.45); if (hw < 0.5) hw = 0.5;   /* 先端を鋭く（Image#5の尖った結晶） */
             for (var s = -hw; s <= hw; s += 1) {
-              var ed = Math.abs(s) / (hw + 0.001), col = ed > 0.72 ? ICE_EDGE : (ed < 0.34 ? ICE_CORE : ICE_MID);
+              var sn = s / (hw + 0.001), asn = Math.abs(sn), col;
+              if (sn * lit > 0.12 && sn * lit < 0.52) col = ICE_HI;      /* 片側に明るいハイライト面＝結晶の艶 */
+              else if (asn < 0.26) col = ICE_CORE;
+              else if (asn > 0.76) col = ICE_EDGE;                        /* 濃紺の稜線 */
+              else col = ICE_MID;
               put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 240);
             }
           }
@@ -3602,41 +3609,48 @@
             put(x, y, 150, 205, 245, (cold * (14 + edgeF * 34)) | 0);
           }
         }
-        function buildWind() {   /* 冷風の筋＝上ほどシアン・下ほど青（参考画像）。原点→中央の軸に沿って波打つ */
-          windStreaks = []; var n = 8;
-          for (var i = 0; i < n; i++) {
-            var f = i / (n - 1), o = (f - 0.5) * (PH * 0.72);
-            windStreaks.push({ off: o, phase: rnd(6.28), trail: 22 + rnd(16), amp: 1.4 + rnd(2.2), col: [ (f * 30) | 0, (205 - f * 115) | 0, (255 - f * 20) | 0 ] });
+        function drawShardProj() {   /* Image#4＝面のある尖った氷塊。進行方向に尖る。片側にハイライト面 */
+          if (!proj) return;
+          var ax = axX, ay = axY, nx = -ay, ny = ax, L = 13, halfL = L / 2, cx = proj.x, cy = proj.y, lit = proj.lit || 1;
+          for (var li = -halfL; li <= halfL; li += 1) {
+            var tt = (li + halfL) / L, prof = Math.sin(tt * Math.PI), hw = 3.4 * Math.pow(prof, 0.62); if (hw < 0.5 && prof > 0.02) hw = 0.5;
+            for (var s = -hw; s <= hw; s += 1) {
+              var sn = s / (hw + 0.001), asn = Math.abs(sn), col;
+              if (sn * lit > 0.1 && sn * lit < 0.55) col = ICE_HI;
+              else if (asn < 0.28) col = ICE_CORE;
+              else if (asn > 0.74) col = ICE_EDGE;
+              else col = ICE_MID;
+              put(cx + ax * li + nx * s, cy + ay * li + ny * s, col[0], col[1], col[2], 240);
+            }
           }
         }
-        function drawWind() {   /* 冷風＝原点→中央へ流れる波打つシアン〜青の筋＋先端の白 */
-          if (!windHead) return;
-          var nx = -axY, ny = axX;
-          for (var i = 0; i < windStreaks.length; i++) {
-            var s = windStreaks[i];
-            for (var l = 0; l <= s.trail; l += 1) {
-              var bx = windHead.x - axX * l, by = windHead.y - axY * l, wave = Math.sin(l * 0.3 + s.phase + windT * 0.5) * s.amp;
-              var px2 = bx + nx * (s.off + wave), py2 = by + ny * (s.off + wave), a = (1 - l / s.trail);
-              put(px2, py2, s.col[0], s.col[1], s.col[2], (a * 225) | 0);
-              if (l < 4) put(px2, py2, 235, 250, 255, ((1 - l / 4) * 235) | 0);   /* 先端の白 */
-            }
+        function spawnSnowBurst(x, y) {   /* 砕け散る＝雪の結晶が四方へ飛び散る */
+          var n = 14 + (rnd(6) | 0);
+          for (var i = 0; i < n; i++) { var a = rnd(6.283), sp = 0.8 + rnd(2.6); snows.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.4, life: 1, size: rnd(1) < 0.5 ? 1 : 2 }); }
+        }
+        function drawSnow() {   /* 雪の結晶（小さな六方の星） */
+          for (var i = 0; i < snows.length; i++) {
+            var f = snows[i], a = Math.min(1, f.life), x = f.x, y = f.y;
+            put(x, y, 240, 250, 255, (a * 255) | 0);
+            put(x-1, y, 205, 235, 255, (a * 190) | 0); put(x+1, y, 205, 235, 255, (a * 190) | 0); put(x, y-1, 205, 235, 255, (a * 190) | 0); put(x, y+1, 205, 235, 255, (a * 190) | 0);
+            if (f.size > 1) { put(x-2, y, 190,225,255, (a*120)|0); put(x+2, y, 190,225,255, (a*120)|0); put(x, y-2, 190,225,255, (a*120)|0); put(x, y+2, 190,225,255, (a*120)|0);
+              put(x-1, y-1, 195,230,255, (a*110)|0); put(x+1, y+1, 195,230,255, (a*110)|0); put(x-1, y+1, 195,230,255, (a*110)|0); put(x+1, y-1, 195,230,255, (a*110)|0); }
           }
         }
         function drawSpecks() { for (var i = 0; i < specks.length; i++) { var p = specks[i]; put(p.x, p.y, 220, 240, 255, (Math.min(1, p.life) * 200) | 0); } }
 
         function update() {
-          if (state === 'incoming' && windHead) {   /* 冷風がパネル中央へ流れる。中央到達で空気が冷たく→氷柱フェーズ */
-            windT++;
-            var dx = CX - windHead.x, dy = CY - windHead.y, dist = Math.max(0.001, Math.hypot(dx, dy)), SPEED = Math.max(1.8, W / 60);
-            if (rnd(1) < 0.6) { var bl = rnd(22), o = (rnd(1) - 0.5) * PH * 0.72; spawnSpeck(windHead.x - axX * bl - axY * o, windHead.y - axY * bl + axX * o, 0, -0.02, 1); }   /* 風に舞うきらめき */
+          if (state === 'incoming' && proj) {   /* 氷塊がパネル中央へ飛来。着弾で砕け散り雪の結晶→空気が冷たく→氷柱フェーズ */
+            var dx = CX - proj.x, dy = CY - proj.y, dist = Math.max(0.001, Math.hypot(dx, dy)), SPEED = Math.max(2.4, W / 42);
             if (dist <= SPEED) {
-              windHead = null; state = 'cold'; pillarTimer = 8 + (rnd(12)|0);
-              for (var k = 0; k < 18; k++) { var a = rnd(6.283), sp = 0.5 + rnd(1.8); spawnSpeck(CX, CY, Math.cos(a)*sp, Math.sin(a)*sp, 1); }   /* 着弾の冷気バースト */
-            } else { windHead.x += axX * SPEED; windHead.y += axY * SPEED; }
+              proj = null; state = 'cold'; pillarTimer = 6 + (rnd(10)|0);
+              spawnSnowBurst(CX, CY);   /* 砕け散る＝雪の結晶が飛び散る */
+              for (var k = 0; k < 12; k++) { var a = rnd(6.283), sp = 0.5 + rnd(1.6); spawnSpeck(CX, CY, Math.cos(a)*sp, Math.sin(a)*sp, 1); }
+            } else { proj.x += axX * SPEED; proj.y += axY * SPEED; }
           }
           if (state === 'cold') {
             if (cold < 1) cold = Math.min(1, cold + 0.04);   /* 空気がだんだん冷たく */
-            pillarTimer--; if (pillarTimer <= 0 && pillars.length < 7) { spawnPillar(); pillarTimer = 12 + (rnd(34)|0); }   /* ランダムに氷柱が突然生える */
+            pillarTimer--; if (pillarTimer <= 0 && pillars.length < 12) { spawnCluster(); pillarTimer = 16 + (rnd(40)|0); }   /* ランダムに氷結晶クラスタが突然生える */
             if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PW), PY1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がパネル下からふわふわ上昇 */
           }
           for (var i = pillars.length - 1; i >= 0; i--) { var p = pillars[i];
@@ -3645,25 +3659,27 @@
             else { p.grow -= 0.08; if (p.grow <= 0) pillars.splice(i, 1); }   /* 小さくなって消える */
           }
           for (var q = specks.length - 1; q >= 0; q--) { var s = specks[q]; s.x += s.vx + Math.sin(s.ph + t*0.05)*0.06; s.y += s.vy; s.life -= 0.018; if (s.life <= 0 || s.y < -2 || s.y > H + 2) specks.splice(q, 1); }
+          for (var w = snows.length - 1; w >= 0; w--) { var sf = snows[w]; sf.x += sf.vx; sf.y += sf.vy; sf.vy += 0.05; sf.vx *= 0.97; sf.life -= 0.02; if (sf.life <= 0) snows.splice(w, 1); }   /* 雪の結晶＝飛散して重力で落ち消える */
         }
         function draw() {
           clear();
           drawCold();
           drawSpecks();
           for (var i = 0; i < pillars.length; i++) drawPillar(pillars[i]);
-          if (state === 'incoming') drawWind();
+          drawSnow();
+          if (state === 'incoming') drawShardProj();
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { t++; update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { windHead = null; windStreaks = []; windT = 0; specks = []; pillars = []; cold = 0; pillarTimer = 0; t = 0; }
+        function reset() { proj = null; snows = []; specks = []; pillars = []; cold = 0; pillarTimer = 0; t = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
             var dx = CX - originX, dy = CY - originY, dd = Math.max(0.001, Math.hypot(dx, dy)); axX = dx / dd; axY = dy / dd;
-            buildWind(); windHead = { x: originX, y: originY }; state = 'incoming'; runLoop(); },
+            proj = { x: originX, y: originY, lit: rnd(1) < 0.5 ? 1 : -1 }; state = 'incoming'; runLoop(); },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1;
-            for (var k = 0; k < 4; k++) { spawnPillar(); pillars[k].grow = 1; pillars[k].phase = 'hold'; } draw(); },
+            spawnCluster(); spawnCluster(); for (var i = 0; i < pillars.length; i++) { pillars[i].grow = 1; pillars[i].phase = 'hold'; } draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
