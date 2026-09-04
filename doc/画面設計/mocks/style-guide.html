@@ -3374,7 +3374,7 @@
         var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;
         var growL = 0, growR = 0, targetL = 0, targetR = 0, puffL = 0, puffR = 0;
         var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;
-        var strikeInT = 0, STRIKE_IN_FRAMES = 6;           /* 着弾の稲妻を見せるフレーム数 */
+        var strikeInT = 0, STRIKE_IN_FRAMES = 9;           /* 着弾の稲妻(1本)を見せるフレーム数＝単発をしっかり見せる */
         var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
         /* 明色パネル向けパレット＝黄核＋暗紺の縁取り／嵐雲は濃色 */
         var CORE = [255,225,77], EDGE = [26,38,92];
@@ -3459,9 +3459,9 @@
         }
         function puffCharge(halfw) { for (var k = 0; k < 3; k++) { var cx0 = CX + ((rnd(halfw*2)|0) - halfw); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); } }
         function update() {
-          if (state === 'strikein') {   /* 術者アイコン→パネル中央の着弾稲妻を数フレーム見せる→電気が昇るフェーズへ */
-            strikeInT++; if (strikeInT % 2 === 0) genBoltBetween(originX, originY, CX, IMPACT_Y);   /* ちらつき */
-            if (strikeInT >= STRIKE_IN_FRAMES) { state = 'rising'; riseT = 0; cloudGrow = 0; flash = 0.9; spawnSparks(CX, IMPACT_Y); }
+          if (state === 'strikein') {   /* 術者アイコン→パネル中央の着弾稲妻は1本だけ（start で生成済み・再生成しない＝発動時1回だけ）。フラッシュ減衰で消える */
+            strikeInT++;
+            if (strikeInT >= STRIKE_IN_FRAMES) { bolt = []; branches = []; state = 'rising'; riseT = 0; cloudGrow = 0; flash = 0.9; spawnSparks(CX, IMPACT_Y); }   /* 着弾稲妻を消してから電気上昇へ（アイコンの斜め稲妻を残さない） */
           }
           if (state === 'rising') { riseT++; if (riseT >= RISE_FRAMES) { state = 'growing'; targetL = 0.12; targetR = 0.12; growL = 0; growR = 0; puffL = 6 + (rnd(8)|0); puffR = 6 + (rnd(8)|0); } }
           if (state === 'growing') {
