@@ -3341,9 +3341,9 @@
       .pixfire-msg.is-light.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
     </style>
 
-    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコンからパネル中央へ着弾→以降ピカッと光るたびランダムな辺からランダム方向へ雷（1〜2本）</h3>
-    <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ稲妻が走って着弾（1回）</strong>。以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺からランダムな方向へ雷が走る（1本／同時2本）</strong>。
-      明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
+    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコン→中央着弾→着弾点から連鎖してどこかの辺へ／以降もピカッと光るたびランダムな辺から連鎖（1〜2本）</h3>
+    <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ着弾</strong>し、<strong>その着弾点から別の雷が伸びて連鎖し、どこかの辺にぶつかるまで続く</strong>（手前の段から順に光る）。
+      以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
       <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
@@ -3391,7 +3391,7 @@
             for (var k = 0; k < len; k++) { sx += ux * (1 + rnd(2)) + px * bdir * (1 + rnd(1.5)); sy += uy * (1 + rnd(2)) + py * bdir * (1 + rnd(1.5)); br.push([sx, sy]); }
             branches.push(br);
           }
-          return { pts: pts, branches: branches, life: 1 };
+          return { pts: pts, branches: branches, life: 1, delay: 0 };
         }
         function edgeStart() {   /* ランダムな辺の上のランダムな点 */
           var e = (rnd(4)) | 0;
@@ -3401,12 +3401,19 @@
           return { x: W - 1, y: PANEL_TOP + rnd(PANEL_H) };               /* 右 */
         }
         function innerTarget() { return { x: W * (0.2 + rnd(0.6)), y: PANEL_TOP + PANEL_H * (0.2 + rnd(0.6)) }; }   /* パネル内のランダム着弾点 */
-        function strikeEvent(fromEdge) {   /* ピカッ＝発動は術者→中央の1本／以降はランダムな辺から1本 or 同時2本 */
+        function chainFrom(x, y, baseDelay) {   /* (x,y)を起点に、着弾点から次の雷が伸びて連鎖し、最後はどこかの辺で止まる。手前の段から順に出る(delay) */
+          var cur = { x: x, y: y }, hops = 2 + (rnd(3) | 0);
+          for (var h = 0; h < hops; h++) {
+            var last = (h === hops - 1), nxt = last ? edgeStart() : innerTarget();   /* 最終段は辺に着弾＝そこで連鎖終了 */
+            var bo = makeBolt(cur.x, cur.y, nxt.x, nxt.y); bo.delay = baseDelay + h * 2; bolts.push(bo); cur = nxt;
+          }
+        }
+        function strikeEvent(fromEdge) {   /* ピカッ＝発動は術者→中央→そこから連鎖／以降はランダムな辺から連鎖(1本 or 同時2本) */
           flash = 1;
           if (fromEdge) {
             var count = 1 + (rnd(1) < 0.4 ? 1 : 0);
-            for (var i = 0; i < count; i++) { var s = edgeStart(), tg = innerTarget(); bolts.push(makeBolt(s.x, s.y, tg.x, tg.y)); }
-          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); }
+            for (var i = 0; i < count; i++) { var s = edgeStart(); chainFrom(s.x, s.y, 0); }
+          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); chainFrom(CX, IMPACT_Y, 3); }   /* 発動＝術者→中央、その着弾点から連鎖して辺へ */
           strikeTimer = 42 + (rnd(96) | 0);   /* 次のピカッまで＝約1.4〜4.6秒 */
         }
         function drawPath(pts, bright) {   /* 黄核＋暗紺縁取り＝明色パネルでも見える */
@@ -3423,7 +3430,7 @@
         function update() {
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
-          for (var i = bolts.length - 1; i >= 0; i--) { bolts[i].life *= 0.72; if (bolts[i].life <= 0.05) bolts.splice(i, 1); }   /* 稲妻は一瞬の閃光 */
+          for (var i = bolts.length - 1; i >= 0; i--) { var b = bolts[i]; if (b.delay > 0) { b.delay--; continue; } b.life *= 0.72; if (b.life <= 0.05) bolts.splice(i, 1); }   /* 稲妻は一瞬の閃光。delay>0 は連鎖の待機段 */
         }
         function draw() {
           clear();
@@ -3431,7 +3438,7 @@
             var fa = (flash * 34) | 0;
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
           }
-          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i], bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
+          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
