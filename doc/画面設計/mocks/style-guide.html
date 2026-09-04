@@ -3341,9 +3341,9 @@
       .pixfire-msg.is-light.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
     </style>
 
-    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコンからパネル中央へ着弾→以降ピカッと光るたびランダムな辺からランダム方向へ雷（1〜2本）＋着弾点から上へ煙</h3>
+    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコンからパネル中央へ着弾→以降ピカッと光るたびランダムな辺からランダム方向へ雷（1〜2本）</h3>
     <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ稲妻が走って着弾（1回）</strong>。以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺からランダムな方向へ雷が走る（1本／同時2本）</strong>。
-      <strong>雷が着弾した箇所には数秒、上方向に煙が立ち上る</strong>。明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
+      明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
       <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
@@ -3365,7 +3365,7 @@
         var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
         var img = ctx.createImageData(W, H), D = img.data;
         var state = 'idle', raf = null, last = 0, acc = 0;
-        var bolts = [], smokes = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光／smokes＝着弾点から立ち上る煙 */
+        var bolts = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光 */
         var CX = W >> 1, PANEL_TOP = ABOVE, IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;   /* 着弾点＝パネル中央 */
         var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
         var CORE = [255,225,77], EDGE = [26,38,92];         /* 黄核＋暗紺の縁取り＝明色パネルで見える稲妻 */
@@ -3401,16 +3401,12 @@
           return { x: W - 1, y: PANEL_TOP + rnd(PANEL_H) };               /* 右 */
         }
         function innerTarget() { return { x: W * (0.2 + rnd(0.6)), y: PANEL_TOP + PANEL_H * (0.2 + rnd(0.6)) }; }   /* パネル内のランダム着弾点 */
-        function spawnSmoke(x, y) {   /* 着弾点から上へ立ち上る煙（数秒） */
-          var n = 6 + (rnd(4) | 0);
-          for (var i = 0; i < n; i++) smokes.push({ x: x + (rnd(6) - 3), y: y + (rnd(3) - 1), vy: -(0.16 + rnd(0.24)), drift: (rnd(0.5) - 0.25), size: 2.5 + rnd(3), age: 0, maxLife: 78 + (rnd(60) | 0), seed: rnd(6.28) });
-        }
         function strikeEvent(fromEdge) {   /* ピカッ＝発動は術者→中央の1本／以降はランダムな辺から1本 or 同時2本 */
           flash = 1;
           if (fromEdge) {
             var count = 1 + (rnd(1) < 0.4 ? 1 : 0);
-            for (var i = 0; i < count; i++) { var s = edgeStart(), tg = innerTarget(); bolts.push(makeBolt(s.x, s.y, tg.x, tg.y)); spawnSmoke(tg.x, tg.y); }
-          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); spawnSmoke(CX, IMPACT_Y); }
+            for (var i = 0; i < count; i++) { var s = edgeStart(), tg = innerTarget(); bolts.push(makeBolt(s.x, s.y, tg.x, tg.y)); }
+          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); }
           strikeTimer = 42 + (rnd(96) | 0);   /* 次のピカッまで＝約1.4〜4.6秒 */
         }
         function drawPath(pts, bright) {   /* 黄核＋暗紺縁取り＝明色パネルでも見える */
@@ -3424,22 +3420,10 @@
             }
           }
         }
-        function drawSmoke() {   /* 上へ立ち上る灰色の煙（白パネルで見える青灰・生→消をなだらかに） */
-          for (var i = 0; i < smokes.length; i++) {
-            var s = smokes[i], p = s.age / s.maxLife, a = Math.sin(p * 3.14159) * 0.4;
-            if (a <= 0.02) continue;
-            var r = s.size * (1 + p * 1.6), ri = Math.ceil(r);
-            for (var yy = -ri; yy <= ri; yy++) for (var xx = -ri; xx <= ri; xx++) {
-              var dd = (xx*xx + yy*yy) / (r*r); if (dd > 1) continue;
-              put(s.x + xx, s.y + yy, 96, 106, 128, (a * (1 - dd) * 190) | 0);
-            }
-          }
-        }
         function update() {
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
           for (var i = bolts.length - 1; i >= 0; i--) { bolts[i].life *= 0.72; if (bolts[i].life <= 0.05) bolts.splice(i, 1); }   /* 稲妻は一瞬の閃光 */
-          for (var k = smokes.length - 1; k >= 0; k--) { var s = smokes[k]; s.age++; s.y += s.vy; s.x += s.drift + Math.sin(s.age * 0.05 + s.seed) * 0.16; if (s.age >= s.maxLife || s.y < -4) smokes.splice(k, 1); }
         }
         function draw() {
           clear();
@@ -3447,13 +3431,12 @@
             var fa = (flash * 34) | 0;
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
           }
-          drawSmoke();
           for (var i = 0; i < bolts.length; i++) { var bo = bolts[i], bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolts = []; smokes = []; flash = 0; strikeTimer = 0; }
+        function reset() { bolts = []; flash = 0; strikeTimer = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) {   /* 発動＝術者アイコン(右上)→パネル中央へ着弾(1回)→以降ランダムな辺からランダム方向へ雷(1〜2本)＋着弾点から煙 */
@@ -3461,7 +3444,7 @@
             state = 'live'; strikeEvent(false); strikeTimer = 48 + (rnd(60) | 0); runLoop();
           },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static';
-            bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); spawnSmoke(CX, IMPACT_Y); for (var i = 0; i < smokes.length; i++) smokes[i].age = (smokes[i].maxLife * 0.4) | 0; flash = 0.5; draw(); },
+            bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); flash = 0.5; draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
