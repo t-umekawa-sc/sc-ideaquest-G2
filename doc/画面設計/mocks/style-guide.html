@@ -3817,15 +3817,17 @@
             }
           }
         }
-        function spawnBurst(x, y) { for (var i = 0; i < 20; i++) { var ang = rnd(6.283), sp = 1.4 + rnd(3.6);
-          burst.push({ x: x, y: y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, size: 2 + rnd(3), col: pick() }); } }
+        function spawnBurst(x, y) { for (var i = 0; i < 30; i++) { var ang = rnd(6.283), sp = 1.4 + rnd(4.2);   /* もっとキラキラ＝粒を増やし飛距離も少し広く */
+          burst.push({ x: x, y: y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, size: 2 + rnd(3.4), col: pick() }); } }
         function updateBurst() { for (var i = burst.length-1; i >= 0; i--) { var p = burst[i]; p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy *= 0.93; p.life -= 0.028; if (p.life <= 0) burst.splice(i, 1); } }
-        function spawnTwinkle() { twinkles.push({ x: rnd(W), y: rnd(H), vx: (rnd(2)-1)*0.1, vy: (rnd(2)-1)*0.08 - 0.03, age: 0, dur: 28 + (rnd(44)|0), size: 1.6 + rnd(2.6), col: pick() }); }
+        function spawnTwinkle() {   /* 1回のspawnで2粒＝密度アップ。サイズも少し大きく多彩に */
+          for (var n = 0; n < 2; n++) twinkles.push({ x: rnd(W), y: rnd(H), vx: (rnd(2)-1)*0.1, vy: (rnd(2)-1)*0.08 - 0.03, age: 0, dur: 24 + (rnd(40)|0), size: 1.8 + rnd(3.2), col: pick() });
+        }
         function updateTwinkles() { for (var i = twinkles.length-1; i >= 0; i--) { var w = twinkles[i]; w.age++; w.x += w.vx; w.y += w.vy; if (w.age >= w.dur) twinkles.splice(i, 1); } }
         function render() {
           ctx.clearRect(0, 0, W, H);
           drawUFO();
-          for (var i = 0; i < twinkles.length; i++) { var w = twinkles[i], a = Math.sin(w.age / w.dur * 3.14159); drawGlint(w.x, w.y, w.size, a*0.95, w.col); }
+          for (var i = 0; i < twinkles.length; i++) { var w = twinkles[i], a = Math.sin(w.age / w.dur * 3.14159); drawGlint(w.x, w.y, w.size, a, w.col); }   /* 瞬きを少し明るく（0.95→1.0） */
           for (i = 0; i < burst.length; i++) { var p = burst[i]; drawGlint(p.x, p.y, p.size*(0.6 + p.life*0.7), p.life, p.col); }
           if (state === 'incoming' && star) drawStar();
         }
