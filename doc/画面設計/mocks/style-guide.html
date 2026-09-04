@@ -3554,13 +3554,15 @@
          色々な形の大きな氷柱が突然生える→一定時間で小さくなって消える。低解像度canvas＋image-rendering:pixelated。 */
       function createIceSpellLight(opts) {
         opts = opts || {};
-        var W = Math.max(60, opts.cols || 110), H = Math.max(12, opts.rows || 40);
+        var PW = Math.max(60, opts.cols || 110), PH = Math.max(12, opts.rows || 40), MARG = Math.max(6, opts.marg || 14);
+        var W = PW + 2 * MARG, H = PH + 2 * MARG;   /* canvas はパネルより一回り大きい＝氷柱がパネル外へはみ出せる */
+        var PX0 = MARG, PY0 = MARG, PX1 = MARG + PW, PY1 = MARG + PH;   /* パネル内領域（この外＝はみ出し領域） */
         var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
         canvas.className = 'pix-frost'; canvas.setAttribute('aria-hidden', 'true');
         canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.imageRendering = 'pixelated';
         var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
         var img = ctx.createImageData(W, H), D = img.data;
-        var CX = W >> 1, CY = H >> 1;
+        var CX = MARG + (PW >> 1), CY = MARG + (PH >> 1);   /* パネル中央（canvas 座標） */
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
         var proj = null, specks = [], pillars = [], cold = 0, pillarTimer = 0;
         var originX = W - 3, originY = 0;
@@ -3571,11 +3573,11 @@
           var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; } }
         function rnd(n) { return Math.random() * n; }
         function spawnSpeck(x, y, vx, vy, life) { specks.push({ x: x, y: y, vx: vx, vy: vy, life: life, ph: rnd(6.28) }); }
-        function spawnPillar() {   /* ランダムな箇所から色々な形・向きの大きな氷柱 */
-          var bx = rnd(W), by = H * (0.15 + rnd(0.8));
+        function spawnPillar() {   /* パネル内のランダムな箇所から色々な形・向きの大きな氷柱（パネル外へはみ出してOK） */
+          var bx = PX0 + rnd(PW), by = PY0 + PH * (0.1 + rnd(0.85));
           var ang = -Math.PI/2 + (rnd(1) - 0.5) * 1.8;      /* 基本は上向き、±で色々な方向 */
           if (rnd(1) < 0.25) ang += Math.PI;                 /* 一部は逆向き等で変化 */
-          var L = H * (0.5 + rnd(0.5)), w = 3 + rnd(4);   /* 大きな氷柱＝長め・太め */
+          var L = PH * (0.55 + rnd(0.65)), w = 3 + rnd(4);   /* 大きな氷柱＝パネル高の 0.55〜1.2 倍（はみ出す）・太め */
           var n = Math.max(4, (L / 3) | 0), jag = [];
           for (var i = 0; i <= n; i++) jag.push(0.6 + rnd(0.8));   /* 幅のジッタ＝いろんな形 */
           pillars.push({ bx: bx, by: by, ang: ang, L: L, w: w, jag: jag, grow: 0, phase: 'grow', hold: 36 + (rnd(70) | 0) });
@@ -3593,10 +3595,10 @@
             }
           }
         }
-        function drawCold() {   /* パネル全体の空気が冷たい＝淡い青、縁ほど濃い（可読性優先で薄め） */
+        function drawCold() {   /* パネル内だけ空気が冷たい＝淡い青、縁ほど濃い（可読性優先で薄め）。はみ出し領域は色付けない */
           if (cold <= 0.01) return;
-          for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
-            var ex = Math.min(x, W - 1 - x) / (W * 0.5), ey = Math.min(y, H - 1 - y) / (H * 0.5), edgeF = 1 - Math.min(1, Math.min(ex, ey));
+          for (var y = PY0; y < PY1; y++) for (var x = PX0; x < PX1; x++) {
+            var ex = Math.min(x - PX0, PX1 - 1 - x) / (PW * 0.5), ey = Math.min(y - PY0, PY1 - 1 - y) / (PH * 0.5), edgeF = 1 - Math.min(1, Math.min(ex, ey));
             put(x, y, 150, 205, 245, (cold * (14 + edgeF * 34)) | 0);
           }
         }
@@ -3618,7 +3620,7 @@
           if (state === 'cold') {
             if (cold < 1) cold = Math.min(1, cold + 0.04);   /* 空気がだんだん冷たく */
             pillarTimer--; if (pillarTimer <= 0 && pillars.length < 7) { spawnPillar(); pillarTimer = 12 + (rnd(34)|0); }   /* ランダムに氷柱が突然生える */
-            if (rnd(1) < 0.22) spawnSpeck(rnd(W), H + 1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がふわふわ上昇 */
+            if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PW), PY1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がパネル下からふわふわ上昇 */
           }
           for (var i = pillars.length - 1; i >= 0; i--) { var p = pillars[i];
             if (p.phase === 'grow') { p.grow += 0.17; if (p.grow >= 1) { p.grow = 1; p.phase = 'hold'; } }   /* 突然生える */
@@ -3654,16 +3656,20 @@
         if (!stage || !msg || !btn) return;
         var scale = 3;
         var cols = Math.max(60, Math.round(msg.clientWidth / scale)), rows = Math.max(14, Math.round(msg.clientHeight / scale));
-        var ice = createIceSpellLight({ cols: cols, rows: rows });
+        var margPx = 48, marg = Math.max(6, Math.round(margPx / scale));   /* 氷柱がパネル外へはみ出せる余白 */
+        var ice = createIceSpellLight({ cols: cols, rows: rows, marg: marg });
+        var totalCols = cols + 2 * marg, totalRows = rows + 2 * marg;
+        ice.canvas.style.top = (-margPx) + 'px'; ice.canvas.style.left = (-margPx) + 'px'; ice.canvas.style.right = 'auto'; ice.canvas.style.bottom = 'auto';   /* canvas をパネルより一回り大きく張り出す */
+        ice.canvas.style.width = 'calc(100% + ' + (2 * margPx) + 'px)'; ice.canvas.style.height = 'calc(100% + ' + (2 * margPx) + 'px)';
         msg.appendChild(ice.canvas);
         var caster = msg.querySelector('.msg-avatar.caster');
         function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
         function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
-        function origin() {   /* 術者アイコン中心を canvas 論理座標(cols×rows)へ */
-          if (!caster) return { x: cols - 3, y: 3 };
+        function origin() {   /* 術者アイコン中心を canvas 論理座標(totalCols×totalRows＝余白込み)へ */
+          if (!caster) return { x: totalCols - marg - 3, y: marg + 3 };
           var cr = ice.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
-          if (!cr.width || !cr.height) return { x: cols - 3, y: 3 };
-          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * cols, y: (ar.top + ar.height/2 - cr.top) / cr.height * rows };
+          if (!cr.width || !cr.height) return { x: totalCols - marg - 3, y: marg + 3 };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * totalCols, y: (ar.top + ar.height/2 - cr.top) / cr.height * totalRows };
         }
         function play() { if (reduced()) { ice.reduceStatic(); return; } kick(caster); var o = origin(); ice.start(o.x, o.y); }
         btn.addEventListener('click', play);
