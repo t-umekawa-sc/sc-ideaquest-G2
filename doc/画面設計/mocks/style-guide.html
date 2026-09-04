@@ -3572,9 +3572,9 @@
         var chunks = [], order = [], frozenCount = 0, stepHold = 0, STEP_HOLD = 9, snapFlash = 0;
         var glowIdx = -1, glowVal = 0, glowTimer = 30;
         var frostGrad = ctx.createLinearGradient(0, 0, 0, H);   /* 縁ほど濃い霜（明色パネル向け＝濃いめの青） */
-        frostGrad.addColorStop(0, 'rgba(96,165,225,0.55)'); frostGrad.addColorStop(0.32, 'rgba(120,185,235,0.20)');
-        frostGrad.addColorStop(0.5, 'rgba(130,190,238,0.12)'); frostGrad.addColorStop(0.68, 'rgba(120,185,235,0.20)');
-        frostGrad.addColorStop(1, 'rgba(96,165,225,0.55)');
+        frostGrad.addColorStop(0, 'rgba(96,165,225,0.40)'); frostGrad.addColorStop(0.16, 'rgba(120,185,235,0.13)');
+        frostGrad.addColorStop(0.5, 'rgba(130,190,238,0.07)'); frostGrad.addColorStop(0.84, 'rgba(120,185,235,0.13)');
+        frostGrad.addColorStop(1, 'rgba(96,165,225,0.40)');
 
         function rnd(n) { return Math.random() * n; }
         function makeFern(x0, top) {
