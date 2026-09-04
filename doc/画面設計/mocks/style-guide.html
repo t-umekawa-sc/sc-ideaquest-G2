@@ -1958,9 +1958,17 @@
     <style>
       .pixfire-stage { position: relative; overflow: hidden; border-radius: var(--radius-lg); min-height: 340px;
         max-width: 1080px; padding-inline: 22px; display: grid; place-items: center; isolation: isolate;
-        background: radial-gradient(120% 90% at 50% 120%, #241009, #140f0e 70%); }
+        background: radial-gradient(140% 120% at 50% 0%, #eef2fb, #e2e8f4 70%); }
       .pixfire-msg { position: relative; z-index: 1; width: 100%; min-height: 102px; box-sizing: border-box;
-        padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6; font-size: var(--text-sm); text-align: left; }
+        padding: 10px 14px; border-radius: 14px; background: #ffffff; color: #1f2430; font-size: var(--text-sm); text-align: left; }
+      /* production 実態に合わせた明色チャットパネル（暗い夜空前提から変更＝b〜h 一括・GF-AC-091）。
+         吹き出し＝白/文字＝暗、各属性のグロー枠は production .spell-fx--{effect} の静的値を写す（明滅/脈動アニメは除く＝パネル一致が目的）。 */
+      #pixfireStage .pixfire-msg { border: 1px solid rgba(249,115,22,.75); box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22); }
+      .pixfire-msg.fx-thunder { border: 1px solid rgba(251,191,36,.8); box-shadow: 0 0 8px 1px rgba(251,191,36,.4); }
+      .pixfire-msg.fx-ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
+      .pixfire-msg.fx-rainbow { border: 1px solid rgba(236,72,153,.7); box-shadow: 0 0 12px 3px rgba(236,72,153,.5), inset 0 0 14px rgba(59,130,246,.2); }
+      .pixfire-msg.fx-aura { border: 1px solid rgba(52,211,153,.75); box-shadow: 0 0 8px 2px rgba(52,211,153,.4), inset 0 0 12px rgba(16,185,129,.16); }
+      .pixfire-msg.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
       /* 延焼＝メッセージパネル全面に重ねる低解像度 canvas。炎は下辺からなめ上がり、右→左へ広がる。 */
       .pix-fireline { position: absolute; inset: 0; z-index: 3;
         image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none;
@@ -3125,11 +3133,6 @@
       /* 発動者バッジ＝キラキラは金（アバタールール §17 準拠） */
       .pixfire-msg.fx-sparkle .msg-avatar.caster { background: #ca8a04; box-shadow: 0 0 0 2px rgba(250,204,21,.55), 0 1px 4px rgba(0,0,0,.35); }
       .pix-spark { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-      /* production 実態に合わせた明るいチャットパネル（暗い夜空前提から変更＝アニメ再見直し用・GF-AC-091）。
-         吹き出し＝明色/文字＝暗色、production の .spell-fx--sparkle 相当の紫グロー枠。ステージは明るいゲーム背景を模す。 */
-      #pixsparkStage.pixfire-stage { background: radial-gradient(140% 120% at 50% 0%, #eef2fb, #e2e8f4 70%); }
-      .pixfire-msg.fx-sparkle { background: #ffffff; color: #1f2430;
-        border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
     </style>
 
     <script>
