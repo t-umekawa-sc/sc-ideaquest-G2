@@ -3341,8 +3341,8 @@
       .pixfire-msg.is-light.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
     </style>
 
-    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコン→中央着弾→着弾点から連鎖してどこかの辺へ／以降もピカッと光るたびランダムな辺から連鎖（1〜2本）</h3>
-    <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ着弾</strong>し、<strong>その着弾点から別の雷が伸びて連鎖し、どこかの辺にぶつかるまで続く</strong>（手前の段から順に光る）。
+    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝発動でビリビリ玉を発射→中央着弾→ランダム方向へ雷1回→以降ピカッと光るたびランダムな辺から連鎖（1〜2本）</h3>
+    <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからビリビリ玉が発射されてパネル中央に着弾</strong>し、<strong>そこからランダムな方向へ雷が1回走る</strong>。
       以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。加えて<strong>枠線のランダムな位置で電気が常時ビリビリ</strong>し、<strong>雷の着弾点（連鎖の折れ点含む）で黄色い粒子が飛び散る</strong>。発雷時はパネルが<strong>ほんのり暖色（琥珀）に光る</strong>（可読性優先で淡め）。明色パネルで見えるよう黄核＋暗紺縁の稲妻（細め・枝多め）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
@@ -3365,7 +3365,7 @@
         var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
         var img = ctx.createImageData(W, H), D = img.data;
         var state = 'idle', raf = null, last = 0, acc = 0;
-        var bolts = [], crackles = [], sparks = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光／crackles＝枠線でビリビリ／sparks＝着弾点の黄色い粒子 */
+        var bolts = [], crackles = [], sparks = [], proj = null, flash = 0, strikeTimer = 0;   /* bolts＝閃光／crackles＝枠線ビリビリ／sparks＝着弾粒子／proj＝発動のビリビリ玉 */
         var CX = W >> 1, PANEL_TOP = ABOVE, IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;   /* 着弾点＝パネル中央 */
         var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
         var CORE = [255,225,77], EDGE = [26,38,92];         /* 黄核＋暗紺の縁取り＝明色パネルで見える稲妻 */
@@ -3408,12 +3408,10 @@
             var bo = makeBolt(cur.x, cur.y, nxt.x, nxt.y); bo.delay = baseDelay + h * 2; bolts.push(bo); cur = nxt;
           }
         }
-        function strikeEvent(fromEdge) {   /* ピカッ＝発動は術者→中央→そこから連鎖／以降はランダムな辺から連鎖(1本 or 同時2本) */
+        function strikeEvent() {   /* ピカッ＝ランダムな辺から連鎖(1本 or 同時2本)。永続の落雷 */
           flash = 1;
-          if (fromEdge) {
-            var count = 1 + (rnd(1) < 0.4 ? 1 : 0);
-            for (var i = 0; i < count; i++) { var s = edgeStart(); chainFrom(s.x, s.y, 0); }
-          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); chainFrom(CX, IMPACT_Y, 3); }   /* 発動＝術者→中央、その着弾点から連鎖して辺へ */
+          var count = 1 + (rnd(1) < 0.4 ? 1 : 0);
+          for (var i = 0; i < count; i++) { var s = edgeStart(); chainFrom(s.x, s.y, 0); }
           strikeTimer = 42 + (rnd(96) | 0);   /* 次のピカッまで＝約1.4〜4.6秒 */
         }
         function drawPath(pts, bright) {   /* 黄核＋暗紺縁取り＝明色パネルでも見える */
@@ -3450,8 +3448,25 @@
             put(p.x, p.y, 255, 214, 60, (a * 255) | 0); put(p.x + 1, p.y, 255, 232, 120, (a * 150) | 0);
           }
         }
+        function drawDisk(cx, cy, r, cr, cg, cb, a) { var ri = Math.ceil(r); for (var yy = -ri; yy <= ri; yy++) for (var xx = -ri; xx <= ri; xx++) if (xx*xx + yy*yy <= r*r) put(cx+xx, cy+yy, cr, cg, cb, a); }
+        function drawProj() {   /* 発動のビリビリ玉＝白熱の芯＋琥珀グロー＋周囲に短いジグザグ電気（毎フレーム変わる＝ビリビリ） */
+          if (!proj) return; var x = proj.x, y = proj.y;
+          drawDisk(x, y, 4, 255, 170, 40, 120); drawDisk(x, y, 2.4, 255, 220, 80, 255); put(x, y, 255,255,255, 255);
+          for (var k = 0; k < 3; k++) {
+            var ang = rnd(6.283), L = 4 + rnd(4), n = 3, pts = [[x, y]];
+            for (var i = 1; i <= n; i++) { var t = i / n; pts.push([x + Math.cos(ang)*L*t + (rnd(3)-1.5), y + Math.sin(ang)*L*t + (rnd(3)-1.5)]); }
+            drawPath(pts, 0.8);
+          }
+        }
         function update() {
-          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
+          if (state === 'incoming' && proj) {   /* ビリビリ玉が術者アイコン→中央へ。着弾でランダム方向へ雷1回→以降は永続 */
+            var dx = CX - proj.x, dy = IMPACT_Y - proj.y, dist = Math.max(0.001, Math.hypot(dx, dy)), SPEED = Math.max(2.5, W / 55);
+            if (dist <= SPEED) {
+              proj = null; var tg = edgeStart(); bolts.push(makeBolt(CX, IMPACT_Y, tg.x, tg.y)); spawnSparks(CX, IMPACT_Y); flash = 1;   /* 着弾＝ランダム方向へ雷1回＋粒子 */
+              state = 'live'; strikeTimer = 48 + (rnd(60) | 0);   /* 以降は永続アニメへ */
+            } else { proj.x += dx / dist * SPEED; proj.y += dy / dist * SPEED; }
+          }
+          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
           for (var i = bolts.length - 1; i >= 0; i--) { var b = bolts[i]; if (b.delay > 0) { b.delay--; continue; }
             if (!b.sparked) { var ep = b.pts[b.pts.length - 1]; spawnSparks(ep[0], ep[1]); b.sparked = true; }   /* 着弾点で黄色い粒子が飛び散る */
@@ -3472,16 +3487,17 @@
           drawCrackles();   /* 枠線のビリビリ */
           for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.85); }
           drawSparks();   /* 着弾点の黄色い粒子（稲妻の上に） */
+          if (state === 'incoming') drawProj();   /* 発動のビリビリ玉 */
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolts = []; crackles = []; sparks = []; flash = 0; strikeTimer = 0; }
+        function reset() { bolts = []; crackles = []; sparks = []; proj = null; flash = 0; strikeTimer = 0; }
         return {
           canvas: canvas,
-          start: function (ox, oy) {   /* 発動＝術者アイコン(右上)→パネル中央へ着弾(1回)→以降ランダムな辺からランダム方向へ雷(1〜2本)＋着弾点から煙 */
+          start: function (ox, oy) {   /* 発動＝ビリビリ玉を術者アイコン(右上)から発射→中央着弾→ランダム方向へ雷1回→以降は永続アニメ */
             reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
-            state = 'live'; strikeEvent(false); strikeTimer = 48 + (rnd(60) | 0); runLoop();
+            state = 'incoming'; proj = { x: originX, y: originY }; runLoop();
           },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static';
             bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); spawnSparks(CX, IMPACT_Y); for (var s = 0; s < sparks.length; s++) { sparks[s].x += sparks[s].vx * 3; sparks[s].y += sparks[s].vy * 3; sparks[s].life = 0.8; } spawnCrackle(); spawnCrackle(); flash = 0.5; draw(); },
