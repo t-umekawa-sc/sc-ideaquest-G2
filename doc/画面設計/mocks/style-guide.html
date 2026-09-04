@@ -3384,10 +3384,10 @@
             var off = (i === 0 || i === steps) ? 0 : (rnd(6) - 3);
             pts.push([bx + px * off, by + py * off]);
           }
-          var nb = 1 + (rnd(2) | 0);
+          var nb = 2 + (rnd(3) | 0);   /* 枝分かれを増やす＝参考画像のように稲妻が広がる */
           for (var j = 0; j < nb; j++) {
             var ni = 1 + (rnd(Math.max(1, pts.length - 2)) | 0);
-            var sx = pts[ni][0], sy = pts[ni][1], br = [[sx, sy]], len = 2 + (rnd(4) | 0), bdir = rnd(1) < 0.5 ? -1 : 1;
+            var sx = pts[ni][0], sy = pts[ni][1], br = [[sx, sy]], len = 3 + (rnd(5) | 0), bdir = rnd(1) < 0.5 ? -1 : 1;
             for (var k = 0; k < len; k++) { sx += ux * (1 + rnd(2)) + px * bdir * (1 + rnd(1.5)); sy += uy * (1 + rnd(2)) + py * bdir * (1 + rnd(1.5)); br.push([sx, sy]); }
             branches.push(br);
           }
@@ -3450,6 +3450,17 @@
             put(p.x, p.y, 255, 214, 60, (a * 255) | 0); put(p.x + 1, p.y, 255, 232, 120, (a * 150) | 0);
           }
         }
+        function drawBolt(pts, bright) {   /* 参考画像＝白熱の核＋琥珀グロー（暖色グロー上で映える）。crackle は drawPath(黄+暗縁)のまま */
+          for (var i = 0; i < pts.length - 1; i++) {
+            var a = pts[i], b = pts[i+1], steps = Math.max(Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1])) || 1;
+            for (var s = 0; s <= steps; s++) {
+              var tx = a[0]+(b[0]-a[0])*s/steps, ty = a[1]+(b[1]-a[1])*s/steps;
+              put(tx-1, ty, 255,160,40, 175*bright); put(tx+1, ty, 255,160,40, 175*bright);   /* 琥珀グロー */
+              put(tx, ty-1, 255,160,40, 150*bright); put(tx, ty+1, 255,160,40, 150*bright);
+              put(tx, ty, 255,255,255, 255*bright);   /* 白熱の核 */
+            }
+          }
+        }
         function update() {
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
@@ -3462,12 +3473,15 @@
         }
         function draw() {
           clear();
-          if (flash > 0.03) {   /* パネル内だけの淡い金の閃光（線形フェード） */
-            var fa = (flash * 34) | 0;
-            for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
+          if (flash > 0.03) {   /* 発雷でパネルが暖色(琥珀)に光る＝参考画像の雰囲気。中央の柱ほど明るい。低解像度canvas＋image-rendering:pixelated でドット絵風。パネル内のみ */
+            var gl = Math.min(1, flash);
+            for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) {
+              var cxd = Math.abs(x - CX) / (W * 0.5), band = 1 - cxd * 0.65; if (band < 0) band = 0;
+              put(x, y, 255, 150 + ((band * 45) | 0), 36, (gl * band * 120) | 0);
+            }
           }
           drawCrackles();   /* 枠線のビリビリ */
-          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
+          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawBolt(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawBolt(bo.branches[j], bright*0.85); }
           drawSparks();   /* 着弾点の黄色い粒子（稲妻の上に） */
           ctx.putImageData(img, 0, 0);
         }
