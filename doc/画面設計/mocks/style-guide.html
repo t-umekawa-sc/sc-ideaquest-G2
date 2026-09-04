@@ -3341,9 +3341,9 @@
       .pixfire-msg.is-light.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
     </style>
 
-    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版）＝発動で稲妻がパネル中央へ落ちて着弾→電気が昇って雷雲→雲から間欠落雷</h3>
-    <p class="muted text-sm">ダーク版（§17d）は「caster から電気の玉が飛ぶ」発射だったが、明色パネルでは見えにくいため<strong>発動＝上空から稲妻がパネル中央へ落ちて着弾</strong>に変更。
-      明色でも見えるよう<strong>濃い嵐雲＋暗い縁取りの黄稲妻</strong>にした（第1ドラフト・色味は調整可）。骨格（着弾→電気が昇る→雷雲がモクモク→全幅→間欠落雷）は維持。
+    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコンからパネル中央へ着弾→以降ピカッと光るたびランダムな辺からランダム方向へ雷（1〜2本）＋着弾点から上へ煙</h3>
+    <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ稲妻が走って着弾（1回）</strong>。以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺からランダムな方向へ雷が走る（1本／同時2本）</strong>。
+      <strong>雷が着弾した箇所には数秒、上方向に煙が立ち上る</strong>。明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
       <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
@@ -3365,63 +3365,53 @@
         var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
         var img = ctx.createImageData(W, H), D = img.data;
         var state = 'idle', raf = null, last = 0, acc = 0;
-        var bolt = [], branches = [], sparks = [], charge = [];
-        var flash = 0, strikeTimer = 0, strikeX = W >> 1;
-        var CX = W >> 1;
-        var PANEL_TOP = ABOVE;
-        var IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;    /* 着弾点＝パネル中央 */
-        var CLOUD_BOTTOM = PANEL_TOP;
-        var CLOUD_HALF = (W >> 1) - 1;
-        var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8));
-        var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;
-        var growL = 0, growR = 0, targetL = 0, targetR = 0, puffL = 0, puffR = 0;
-        var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;
-        var strikeInT = 0, STRIKE_IN_FRAMES = 9;           /* 着弾の稲妻(1本)を見せるフレーム数＝単発をしっかり見せる */
+        var bolts = [], smokes = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光／smokes＝着弾点から立ち上る煙 */
+        var CX = W >> 1, PANEL_TOP = ABOVE, IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;   /* 着弾点＝パネル中央 */
         var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
-        /* 明色パネル向けパレット＝黄核＋暗紺の縁取り／嵐雲は濃色 */
-        var CORE = [255,225,77], EDGE = [26,38,92];
+        var CORE = [255,225,77], EDGE = [26,38,92];         /* 黄核＋暗紺の縁取り＝明色パネルで見える稲妻 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
         function put(x, y, r, g, b, a) { x |= 0; y |= 0; a |= 0; if (a <= 0 || x < 0 || x >= W || y < 0 || y >= H) return;
           var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; } }
         function rnd(n) { return Math.random() * n; }
-        function genBoltTo(x0, y0, yEnd) {   /* y0 から yEnd まで下る稲妻（yEnd 省略で最下端）＋枝 */
-          bolt = []; branches = [];
-          var x = x0, y = y0, end = (yEnd == null ? H - 1 : yEnd);
-          while (y < end - 1) { bolt.push([x, y]); y += 1 + (rnd(2)|0); x += (rnd(5)|0) - 2; if (x < 1) x = 1; if (x > W-2) x = W-2; }
-          bolt.push([x, end]);
-          var nb = 1 + (rnd(2)|0);
-          for (var i = 0; i < nb; i++) {
-            var ni = 2 + (rnd(Math.max(1, bolt.length - 4))|0);
-            var bx = bolt[ni][0], by = bolt[ni][1], dir = rnd(1) < 0.5 ? -1 : 1, br = [[bx, by]], len = 3 + (rnd(5)|0);
-            for (var k = 0; k < len; k++) { bx += dir*(1+(rnd(2)|0)); by += 1+(rnd(2)|0); if (bx<1) bx=1; if (bx>W-2) bx=W-2; if (by>end) by=end; br.push([bx, by]); }
-            branches.push(br);
-          }
-        }
-        function genBoltBetween(x0, y0, x1, y1) {   /* 任意2点間のジグザグ稲妻（両端固定・中間は垂直方向に振れる）＋枝。術者→中央の着弾に使う */
-          bolt = []; branches = [];
+        function makeBolt(x0, y0, x1, y1) {   /* 任意2点間のジグザグ稲妻＋枝を1本ぶんのオブジェクトで返す */
+          var pts = [], branches = [];
           var dx = x1 - x0, dy = y1 - y0, dist = Math.max(1, Math.hypot(dx, dy));
-          var steps = Math.max(4, (dist / 2) | 0);
+          var steps = Math.max(5, (dist / 2.4) | 0);
           var ux = dx / dist, uy = dy / dist, px = -uy, py = ux;
           for (var i = 0; i <= steps; i++) {
             var t = i / steps, bx = x0 + dx * t, by = y0 + dy * t;
-            var off = (i === 0 || i === steps) ? 0 : (rnd(5) - 2.5);
-            bolt.push([bx + px * off, by + py * off]);
+            var off = (i === 0 || i === steps) ? 0 : (rnd(6) - 3);
+            pts.push([bx + px * off, by + py * off]);
           }
           var nb = 1 + (rnd(2) | 0);
           for (var j = 0; j < nb; j++) {
-            var ni = 1 + (rnd(Math.max(1, bolt.length - 2)) | 0);
-            var sx = bolt[ni][0], sy = bolt[ni][1], br = [[sx, sy]], len = 2 + (rnd(4) | 0), bdir = rnd(1) < 0.5 ? -1 : 1;
+            var ni = 1 + (rnd(Math.max(1, pts.length - 2)) | 0);
+            var sx = pts[ni][0], sy = pts[ni][1], br = [[sx, sy]], len = 2 + (rnd(4) | 0), bdir = rnd(1) < 0.5 ? -1 : 1;
             for (var k = 0; k < len; k++) { sx += ux * (1 + rnd(2)) + px * bdir * (1 + rnd(1.5)); sy += uy * (1 + rnd(2)) + py * bdir * (1 + rnd(1.5)); br.push([sx, sy]); }
             branches.push(br);
           }
+          return { pts: pts, branches: branches, life: 1 };
         }
-        function spawnSparks(x, y) { for (var i = 0; i < 12; i++) { var a = rnd(6.283); sparks.push({ x:x, y:y, vx:Math.cos(a)*rnd(1.6), vy:Math.sin(a)*rnd(1.6)-0.4, life:1 }); } }
-        function strike(fx) {   /* 雲の底から下へ落雷 */
-          strikeX = (fx == null) ? (CX + ((rnd(CLOUD_HALF*2)|0) - CLOUD_HALF)) : (fx | 0);
-          if (strikeX < 2) strikeX = 2; else if (strikeX > W-3) strikeX = W-3;
-          genBoltTo(strikeX, CLOUD_BOTTOM, H - 1); flash = 1; spawnSparks(bolt[bolt.length-1][0], H - 2);
-          strikeTimer = 26 + (rnd(30)|0);
+        function edgeStart() {   /* ランダムな辺の上のランダムな点 */
+          var e = (rnd(4)) | 0;
+          if (e === 0) return { x: rnd(W), y: PANEL_TOP };                 /* 上 */
+          if (e === 1) return { x: rnd(W), y: H - 1 };                     /* 下 */
+          if (e === 2) return { x: 0, y: PANEL_TOP + rnd(PANEL_H) };       /* 左 */
+          return { x: W - 1, y: PANEL_TOP + rnd(PANEL_H) };               /* 右 */
+        }
+        function innerTarget() { return { x: W * (0.2 + rnd(0.6)), y: PANEL_TOP + PANEL_H * (0.2 + rnd(0.6)) }; }   /* パネル内のランダム着弾点 */
+        function spawnSmoke(x, y) {   /* 着弾点から上へ立ち上る煙（数秒） */
+          var n = 6 + (rnd(4) | 0);
+          for (var i = 0; i < n; i++) smokes.push({ x: x + (rnd(6) - 3), y: y + (rnd(3) - 1), vy: -(0.16 + rnd(0.24)), drift: (rnd(0.5) - 0.25), size: 2.5 + rnd(3), age: 0, maxLife: 78 + (rnd(60) | 0), seed: rnd(6.28) });
+        }
+        function strikeEvent(fromEdge) {   /* ピカッ＝発動は術者→中央の1本／以降はランダムな辺から1本 or 同時2本 */
+          flash = 1;
+          if (fromEdge) {
+            var count = 1 + (rnd(1) < 0.4 ? 1 : 0);
+            for (var i = 0; i < count; i++) { var s = edgeStart(), tg = innerTarget(); bolts.push(makeBolt(s.x, s.y, tg.x, tg.y)); spawnSmoke(tg.x, tg.y); }
+          } else { bolts.push(makeBolt(originX, originY, CX, IMPACT_Y)); spawnSmoke(CX, IMPACT_Y); }
+          strikeTimer = 42 + (rnd(96) | 0);   /* 次のピカッまで＝約1.4〜4.6秒 */
         }
         function drawPath(pts, bright) {   /* 黄核＋暗紺縁取り＝明色パネルでも見える */
           for (var i = 0; i < pts.length - 1; i++) {
@@ -3434,83 +3424,44 @@
             }
           }
         }
-        function drawCloud() {   /* 濃い嵐雲＝明色パネルの上で「黒い雲」が湧くコントラスト */
-          if (growL <= 0 && growR <= 0) return;
-          var halfL = Math.max(3, Math.round(growL * CLOUD_HALF)), halfR = Math.max(3, Math.round(growR * CLOUD_HALF));
-          var a = Math.min(255, (Math.max(growL, growR) * 4) * 255) | 0;
-          var x;
-          for (x = -halfL; x <= halfR; x++) {
-            var an = x < 0 ? (-x / halfL) : (x / halfR);
-            var edge = an < 0.78 ? 1 : (1 - an) / 0.22; if (edge < 0) edge = 0;
-            var bump = 0.22*Math.sin(x*0.7) + 0.16*Math.sin(x*1.6 + 1) + 0.10*Math.sin(x*3.1 + 2);
-            var thick = edge * CLOUD_H + bump*3.5; if (thick <= 0.5) continue;
-            var topY = Math.round(CLOUD_BOTTOM - thick), cxx = CX + x;
-            for (var y = topY; y <= CLOUD_BOTTOM; y++) {
-              var col = (y <= topY + 1) ? [92,102,132] : (y >= CLOUD_BOTTOM - 1 ? [30,36,58] : [56,64,96]);
-              put(cxx, y, col[0], col[1], col[2], a);
+        function drawSmoke() {   /* 上へ立ち上る灰色の煙（白パネルで見える青灰・生→消をなだらかに） */
+          for (var i = 0; i < smokes.length; i++) {
+            var s = smokes[i], p = s.age / s.maxLife, a = Math.sin(p * 3.14159) * 0.4;
+            if (a <= 0.02) continue;
+            var r = s.size * (1 + p * 1.6), ri = Math.ceil(r);
+            for (var yy = -ri; yy <= ri; yy++) for (var xx = -ri; xx <= ri; xx++) {
+              var dd = (xx*xx + yy*yy) / (r*r); if (dd > 1) continue;
+              put(s.x + xx, s.y + yy, 96, 106, 128, (a * (1 - dd) * 190) | 0);
             }
           }
-          for (x = -halfL; x <= halfR; x++) { if (rnd(1) < 0.55) put(CX + x, CLOUD_BOTTOM, 255, 224, 130, ((70 + flash*160) * (a/255)) | 0); }
         }
-        function drawRise() {   /* 着弾点→雲へ電気が這い上がる（黄核＋暗縁） */
-          var p = riseT / RISE_FRAMES; if (p > 1) p = 1;
-          var yTop = IMPACT_Y - p * (IMPACT_Y - CLOUD_BOTTOM);
-          var x = CX, y = IMPACT_Y;
-          while (y > yTop) { put(x, y, CORE[0],CORE[1],CORE[2],240); put(x-1, y, EDGE[0],EDGE[1],EDGE[2],170); put(x+1, y, EDGE[0],EDGE[1],EDGE[2],170);
-            y -= 1 + (rnd(2)|0); x = CX + ((rnd(5)|0) - 2); }
-        }
-        function puffCharge(halfw) { for (var k = 0; k < 3; k++) { var cx0 = CX + ((rnd(halfw*2)|0) - halfw); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); } }
         function update() {
-          if (state === 'strikein') {   /* 術者アイコン→パネル中央の着弾稲妻は1本だけ（start で生成済み・再生成しない＝発動時1回だけ）。フラッシュ減衰で消える */
-            strikeInT++;
-            if (strikeInT >= STRIKE_IN_FRAMES) { bolt = []; branches = []; state = 'rising'; riseT = 0; cloudGrow = 0; flash = 0.9; spawnSparks(CX, IMPACT_Y); }   /* 着弾稲妻を消してから電気上昇へ（アイコンの斜め稲妻を残さない） */
-          }
-          if (state === 'rising') { riseT++; if (riseT >= RISE_FRAMES) { state = 'growing'; targetL = 0.12; targetR = 0.12; growL = 0; growR = 0; puffL = 6 + (rnd(8)|0); puffR = 6 + (rnd(8)|0); } }
-          if (state === 'growing') {
-            growL += (targetL - growL) * 0.3; growR += (targetR - growR) * 0.3;
-            puffL--; if (puffL <= 0 && targetL < 1) { targetL = Math.min(1, targetL + 0.12 + rnd(0.18)); puffL = 5 + (rnd(14)|0); puffCharge((growL*CLOUD_HALF)|0); }
-            puffR--; if (puffR <= 0 && targetR < 1) { targetR = Math.min(1, targetR + 0.12 + rnd(0.18)); puffR = 5 + (rnd(14)|0); puffCharge((growR*CLOUD_HALF)|0); }
-            cloudGrow = Math.max(growL, growR);
-            if (targetL >= 1 && targetR >= 1 && growL > 0.97 && growR > 0.97) { growL = 1; growR = 1; state = 'charging'; chargeT = 0; flickers = 0; }
-          }
-          if (state === 'charging') { chargeT++; if (chargeT % FLICKER_GAP === 0 && flickers < FLICKER_COUNT) { flash = 0.9; flickers++; } if (flickers >= FLICKER_COUNT && flash < 0.12) { state = 'live'; strike(); } }
-          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strike(); }
-          flash *= 0.9;   /* ゆっくり減衰＝ピカッの後すぅーっと薄くなる（従来 0.82 は速すぎた） */
-          if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBoltTo(strikeX, CLOUD_BOTTOM, H - 1);
-          if ((state === 'live' || state === 'rising' || state === 'growing' || state === 'charging') && rnd(1) < 0.14) {
-            var chalf = Math.max(6, (cloudGrow * CLOUD_HALF) | 0); var cx0 = CX + ((rnd(chalf*2)|0) - chalf); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 });
-          }
-          for (var c = charge.length-1; c >= 0; c--) { charge[c].life -= 0.10; if (charge[c].life <= 0) charge.splice(c,1); }
-          for (var i = sparks.length-1; i >= 0; i--) { var p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life -= 0.05; if (p.life <= 0) sparks.splice(i,1); }
+          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
+          flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
+          for (var i = bolts.length - 1; i >= 0; i--) { bolts[i].life *= 0.72; if (bolts[i].life <= 0.05) bolts.splice(i, 1); }   /* 稲妻は一瞬の閃光 */
+          for (var k = smokes.length - 1; k >= 0; k--) { var s = smokes[k]; s.age++; s.y += s.vy; s.x += s.drift + Math.sin(s.age * 0.05 + s.seed) * 0.16; if (s.age >= s.maxLife || s.y < -4) smokes.splice(k, 1); }
         }
         function draw() {
           clear();
-          if (flash > 0.03) {   /* 明色パネルで「ピカッ」が映えるよう鮮やかな金の閃光を濃く・鋭く（従来の淡い琥珀は白飛びして見えなかった）。パネル内(PANEL_TOP以下)だけに限定＝雲のあるパネル外は光らせない */
-            var fa = (flash * 34) | 0;   /* 線形＝flash に比例してすぅーっと薄くなる。ピーク低め（更に透明に） */
+          if (flash > 0.03) {   /* パネル内だけの淡い金の閃光（線形フェード） */
+            var fa = (flash * 34) | 0;
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
-            var rim = (flash * 52) | 0;   /* パネル上縁の帯電リムも線形フェード（淡め） */
-            for (var rx = 0; rx < W; rx++) { put(rx, PANEL_TOP, 255, 236, 150, rim); put(rx, PANEL_TOP+1, 255, 214, 90, (rim*0.7)|0); }
           }
-          if ((flash > 0.1 || state === 'strikein') && bolt.length) {
-            var bright = Math.min(1, flash + 0.4); drawPath(bolt, bright);
-            for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
-          }
-          if (state === 'rising' || state === 'growing') drawRise();
-          drawCloud();
-          for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 255,224,130, (g.life*150)|0); put(g.x+1, g.y+1, EDGE[0],EDGE[1],EDGE[2], (g.life*90)|0); }
-          for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 255,236,150, (q.life*255)|0); }
+          drawSmoke();
+          for (var i = 0; i < bolts.length; i++) { var bo = bolts[i], bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; riseT = 0; growL = 0; growR = 0; targetL = 0; targetR = 0; puffL = 0; puffR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; strikeInT = 0; }
+        function reset() { bolts = []; smokes = []; flash = 0; strikeTimer = 0; }
         return {
           canvas: canvas,
-          start: function (ox, oy) {   /* 発動＝術者アイコン(右上)からパネル中央へ稲妻が走って着弾→電気が昇る→雷雲→落雷 */
+          start: function (ox, oy) {   /* 発動＝術者アイコン(右上)→パネル中央へ着弾(1回)→以降ランダムな辺からランダム方向へ雷(1〜2本)＋着弾点から煙 */
             reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
-            state = 'strikein'; strikeX = CX; genBoltBetween(originX, originY, CX, IMPACT_Y); flash = 1; spawnSparks(CX, IMPACT_Y); runLoop();
+            state = 'live'; strikeEvent(false); strikeTimer = 48 + (rnd(60) | 0); runLoop();
           },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1; growL = 1; growR = 1; targetL = 1; targetR = 1; strikeX = CX; genBoltTo(CX, CLOUD_BOTTOM, H - 1); flash = 0.6; draw(); },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static';
+            bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); spawnSmoke(CX, IMPACT_Y); for (var i = 0; i < smokes.length; i++) smokes[i].age = (smokes[i].maxLife * 0.4) | 0; flash = 0.5; draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
