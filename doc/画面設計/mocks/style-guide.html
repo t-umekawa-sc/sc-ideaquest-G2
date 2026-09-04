@@ -3483,7 +3483,12 @@
         }
         function draw() {
           clear();
-          if (flash > 0.04) for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 232, 150, (flash*22)|0);   /* 明色向け＝淡い琥珀の閃光 */
+          if (flash > 0.03) {   /* 明色パネルで「ピカッ」が映えるよう鮮やかな金の閃光を濃く・鋭く（従来の淡い琥珀は白飛びして見えなかった） */
+            var fa = Math.min(155, (flash*flash*175)) | 0;   /* flash^2＝一瞬強く光ってすぐ引く */
+            for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
+            var rim = Math.min(230, (flash*flash*255)) | 0;   /* パネル上縁の帯電リムが強く光る＝落雷の合図 */
+            for (var rx = 0; rx < W; rx++) { put(rx, PANEL_TOP, 255, 236, 150, rim); put(rx, PANEL_TOP+1, 255, 214, 90, (rim*0.7)|0); }
+          }
           if ((flash > 0.1 || state === 'strikein') && bolt.length) {
             var bright = Math.min(1, flash + 0.4); drawPath(bolt, bright);
             for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
