@@ -3537,7 +3537,7 @@
     </script>
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝冷気玉が中央へ吹く→着弾でパネル全体が冷たく→ランダムな箇所から大きな氷柱（色々な形）が突然生えて一定時間で縮んで消える</h3>
-    <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）で作り直し。発動＝<strong>右上の術者アイコンから冷気玉がパネル中央へ吹き</strong>、<strong>着弾するとパネル全体の空気が冷たくなる</strong>（淡い青・可読性優先）。
+    <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）で作り直し。発動＝<strong>右上の術者アイコンから冷風（波打つシアン〜青の筋＋舞うきらめき）がパネル中央へ流れ</strong>、<strong>中央に達するとパネル全体の空気が冷たくなる</strong>（淡い青・可読性優先）。
       その後<strong>パネルのランダムな箇所から大きな氷柱（色々な形・向き）が突然生え</strong>、<strong>一定時間経つと小さくなって消える</strong>のを繰り返す。冷気の粒がふわふわ舞う。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
@@ -3564,7 +3564,7 @@
         var img = ctx.createImageData(W, H), D = img.data;
         var CX = MARG + (PW >> 1), CY = MARG + (PH >> 1);   /* パネル中央（canvas 座標） */
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var proj = null, specks = [], pillars = [], cold = 0, pillarTimer = 0;
+        var windHead = null, windStreaks = [], windT = 0, axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0;
         var originX = W - 3, originY = 0;
         var ICE_CORE = [210,238,255], ICE_MID = [130,195,238], ICE_EDGE = [56,116,176];   /* 氷パレット：明るい芯→青→濃紺の縁 */
 
@@ -3602,20 +3602,37 @@
             put(x, y, 150, 205, 245, (cold * (14 + edgeF * 34)) | 0);
           }
         }
-        function drawProj() {   /* 冷気の玉＝淡い青の霜のかたまり */
-          if (!proj) return; var x = proj.x, y = proj.y;
-          for (var yy = -3; yy <= 3; yy++) for (var xx = -3; xx <= 3; xx++) { var d2 = xx*xx + yy*yy; if (d2 <= 9) put(x+xx, y+yy, 200, 232, 255, d2 <= 3 ? 235 : 130); }
+        function buildWind() {   /* 冷風の筋＝上ほどシアン・下ほど青（参考画像）。原点→中央の軸に沿って波打つ */
+          windStreaks = []; var n = 8;
+          for (var i = 0; i < n; i++) {
+            var f = i / (n - 1), o = (f - 0.5) * (PH * 0.72);
+            windStreaks.push({ off: o, phase: rnd(6.28), trail: 22 + rnd(16), amp: 1.4 + rnd(2.2), col: [ (f * 30) | 0, (205 - f * 115) | 0, (255 - f * 20) | 0 ] });
+          }
+        }
+        function drawWind() {   /* 冷風＝原点→中央へ流れる波打つシアン〜青の筋＋先端の白 */
+          if (!windHead) return;
+          var nx = -axY, ny = axX;
+          for (var i = 0; i < windStreaks.length; i++) {
+            var s = windStreaks[i];
+            for (var l = 0; l <= s.trail; l += 1) {
+              var bx = windHead.x - axX * l, by = windHead.y - axY * l, wave = Math.sin(l * 0.3 + s.phase + windT * 0.5) * s.amp;
+              var px2 = bx + nx * (s.off + wave), py2 = by + ny * (s.off + wave), a = (1 - l / s.trail);
+              put(px2, py2, s.col[0], s.col[1], s.col[2], (a * 225) | 0);
+              if (l < 4) put(px2, py2, 235, 250, 255, ((1 - l / 4) * 235) | 0);   /* 先端の白 */
+            }
+          }
         }
         function drawSpecks() { for (var i = 0; i < specks.length; i++) { var p = specks[i]; put(p.x, p.y, 220, 240, 255, (Math.min(1, p.life) * 200) | 0); } }
 
         function update() {
-          if (state === 'incoming' && proj) {   /* 冷気玉がパネル中央へ吹く。着弾で空気が冷たく→氷柱フェーズ */
-            var dx = CX - proj.x, dy = CY - proj.y, dist = Math.max(0.001, Math.hypot(dx, dy)), SPEED = Math.max(2.2, W / 55);
-            if (rnd(1) < 0.9) spawnSpeck(proj.x + (rnd(6)-3), proj.y + (rnd(6)-3), -dx/dist*rnd(0.6), -dy/dist*rnd(0.6) - 0.1, 1);   /* 尾を引く冷気 */
+          if (state === 'incoming' && windHead) {   /* 冷風がパネル中央へ流れる。中央到達で空気が冷たく→氷柱フェーズ */
+            windT++;
+            var dx = CX - windHead.x, dy = CY - windHead.y, dist = Math.max(0.001, Math.hypot(dx, dy)), SPEED = Math.max(1.8, W / 60);
+            if (rnd(1) < 0.6) { var bl = rnd(22), o = (rnd(1) - 0.5) * PH * 0.72; spawnSpeck(windHead.x - axX * bl - axY * o, windHead.y - axY * bl + axX * o, 0, -0.02, 1); }   /* 風に舞うきらめき */
             if (dist <= SPEED) {
-              proj = null; state = 'cold'; pillarTimer = 8 + (rnd(12)|0);
+              windHead = null; state = 'cold'; pillarTimer = 8 + (rnd(12)|0);
               for (var k = 0; k < 18; k++) { var a = rnd(6.283), sp = 0.5 + rnd(1.8); spawnSpeck(CX, CY, Math.cos(a)*sp, Math.sin(a)*sp, 1); }   /* 着弾の冷気バースト */
-            } else { proj.x += dx/dist*SPEED; proj.y += dy/dist*SPEED; }
+            } else { windHead.x += axX * SPEED; windHead.y += axY * SPEED; }
           }
           if (state === 'cold') {
             if (cold < 1) cold = Math.min(1, cold + 0.04);   /* 空気がだんだん冷たく */
@@ -3634,15 +3651,17 @@
           drawCold();
           drawSpecks();
           for (var i = 0; i < pillars.length; i++) drawPillar(pillars[i]);
-          if (state === 'incoming') drawProj();
+          if (state === 'incoming') drawWind();
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { t++; update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { proj = null; specks = []; pillars = []; cold = 0; pillarTimer = 0; t = 0; }
+        function reset() { windHead = null; windStreaks = []; windT = 0; specks = []; pillars = []; cold = 0; pillarTimer = 0; t = 0; }
         return {
           canvas: canvas,
-          start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy); state = 'incoming'; proj = { x: originX, y: originY }; runLoop(); },
+          start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
+            var dx = CX - originX, dy = CY - originY, dd = Math.max(0.001, Math.hypot(dx, dy)); axX = dx / dd; axY = dy / dd;
+            buildWind(); windHead = { x: originX, y: originY }; state = 'incoming'; runLoop(); },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1;
             for (var k = 0; k < 4; k++) { spawnPillar(); pillars[k].grow = 1; pillars[k].phase = 'hold'; } draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
