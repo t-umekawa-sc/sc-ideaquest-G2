@@ -1958,17 +1958,9 @@
     <style>
       .pixfire-stage { position: relative; overflow: hidden; border-radius: var(--radius-lg); min-height: 340px;
         max-width: 1080px; padding-inline: 22px; display: grid; place-items: center; isolation: isolate;
-        background: radial-gradient(140% 120% at 50% 0%, #eef2fb, #e2e8f4 70%); }
+        background: radial-gradient(120% 90% at 50% 120%, #241009, #140f0e 70%); }
       .pixfire-msg { position: relative; z-index: 1; width: 100%; min-height: 102px; box-sizing: border-box;
-        padding: 10px 14px; border-radius: 14px; background: #ffffff; color: #1f2430; font-size: var(--text-sm); text-align: left; }
-      /* production 実態に合わせた明色チャットパネル（暗い夜空前提から変更＝b〜h 一括・GF-AC-091）。
-         吹き出し＝白/文字＝暗、各属性のグロー枠は production .spell-fx--{effect} の静的値を写す（明滅/脈動アニメは除く＝パネル一致が目的）。 */
-      #pixfireStage .pixfire-msg { border: 1px solid rgba(249,115,22,.75); box-shadow: 0 0 10px 2px rgba(249,115,22,.55), inset 0 0 14px rgba(220,38,38,.22); }
-      .pixfire-msg.fx-thunder { border: 1px solid rgba(251,191,36,.8); box-shadow: 0 0 8px 1px rgba(251,191,36,.4); }
-      .pixfire-msg.fx-ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
-      .pixfire-msg.fx-rainbow { border: 1px solid rgba(236,72,153,.7); box-shadow: 0 0 12px 3px rgba(236,72,153,.5), inset 0 0 14px rgba(59,130,246,.2); }
-      .pixfire-msg.fx-aura { border: 1px solid rgba(52,211,153,.75); box-shadow: 0 0 8px 2px rgba(52,211,153,.4), inset 0 0 12px rgba(16,185,129,.16); }
-      .pixfire-msg.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
+        padding: 10px 14px; border-radius: 14px; background: #3b2b2b; color: #ffe9d6; font-size: var(--text-sm); text-align: left; }
       /* 延焼＝メッセージパネル全面に重ねる低解像度 canvas。炎は下辺からなめ上がり、右→左へ広がる。 */
       .pix-fireline { position: absolute; inset: 0; z-index: 3;
         image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none;
@@ -3326,6 +3318,192 @@
         function play() { if (reduced()) { sp.reduceStatic(); return; } kick(caster); var o = origin(); sp.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) sp.reduceStatic(); });
+        if ('IntersectionObserver' in window) {
+          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
+          io.observe(stage);
+        }
+      })();
+    </script>
+  </div>
+
+  <!-- 17L. 演出のライト版（明色パネル対応） -->
+  <div class="section">
+    <h2>17L. 演出のライト版（明色パネル対応・ダーク版＝§17b〜h の別バージョン）</h2>
+    <p class="muted text-sm">アプリのライト/ダーク設定に対応するため、<strong>暗パネル前提の §17b〜h（ダーク版）はそのまま残し</strong>、
+      明色パネル（production 実態＝白い吹き出し＋暗文字）向けに演出を作り直す<strong>ライト版</strong>をここに集約する。6スペル分を順次追加。</p>
+
+    <style>
+      /* ライト版パネル＝production 実態（白い吹き出し/暗文字）。ステージは明るいゲーム背景を模す。属性グロー枠は production .spell-fx--{effect} の静的値。 */
+      .pixfire-stage.is-light { background: radial-gradient(140% 120% at 50% 0%, #eef2fb, #e2e8f4 70%); }
+      .pixfire-msg.is-light { background: #ffffff; color: #1f2430; }
+      .pixfire-msg.is-light.fx-thunder { border: 1px solid rgba(251,191,36,.85); box-shadow: 0 0 8px 1px rgba(251,191,36,.45); }
+    </style>
+
+    <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版）＝発動で稲妻がパネル中央へ落ちて着弾→電気が昇って雷雲→雲から間欠落雷</h3>
+    <p class="muted text-sm">ダーク版（§17d）は「caster から電気の玉が飛ぶ」発射だったが、明色パネルでは見えにくいため<strong>発動＝上空から稲妻がパネル中央へ落ちて着弾</strong>に変更。
+      明色でも見えるよう<strong>濃い嵐雲＋暗い縁取りの黄稲妻</strong>にした（第1ドラフト・色味は調整可）。骨格（着弾→電気が昇る→雷雲がモクモク→全幅→間欠落雷）は維持。
+      <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
+    <div class="pixfire-stage is-light" id="pixboltLStage">
+      <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="pixboltLBtn">魔法を発動</button>
+      <label class="checkbox"><input type="checkbox" id="pixboltLReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <script>
+      /* ドット絵の落雷エンジン（ライト版・明色パネル向け）。発動＝上空からパネル中央へ稲妻が落ちて着弾→電気が昇って雷雲→雲から間欠落雷。
+         明色で見えるよう濃い嵐雲＋暗縁取りの黄稲妻。API: start()／reduceStatic()／stop()。 */
+      function createPixelThunderLight(opts) {
+        opts = opts || {};
+        var W = Math.max(120, opts.cols || 240), PANEL_H = Math.max(20, opts.rows || 34), ABOVE = Math.max(0, opts.above || 0), H = PANEL_H + ABOVE;
+        var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+        canvas.className = 'pix-thunder'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.style.width = '100%'; canvas.style.height = '100%';
+        var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+        var img = ctx.createImageData(W, H), D = img.data;
+        var state = 'idle', raf = null, last = 0, acc = 0;
+        var bolt = [], branches = [], sparks = [], charge = [];
+        var flash = 0, strikeTimer = 0, strikeX = W >> 1;
+        var CX = W >> 1;
+        var PANEL_TOP = ABOVE;
+        var IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;    /* 着弾点＝パネル中央 */
+        var CLOUD_BOTTOM = PANEL_TOP;
+        var CLOUD_HALF = (W >> 1) - 1;
+        var CLOUD_H = Math.max(3, Math.min(PANEL_TOP, 8));
+        var riseT = 0, RISE_FRAMES = 13, cloudGrow = 0;
+        var growL = 0, growR = 0, targetL = 0, targetR = 0, puffL = 0, puffR = 0;
+        var chargeT = 0, flickers = 0, FLICKER_GAP = 7, FLICKER_COUNT = 3;
+        var strikeInT = 0, STRIKE_IN_FRAMES = 6;           /* 着弾の稲妻を見せるフレーム数 */
+        /* 明色パネル向けパレット＝黄核＋暗紺の縁取り／嵐雲は濃色 */
+        var CORE = [255,225,77], EDGE = [26,38,92];
+
+        function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
+        function put(x, y, r, g, b, a) { x |= 0; y |= 0; a |= 0; if (a <= 0 || x < 0 || x >= W || y < 0 || y >= H) return;
+          var o = (y * W + x) * 4; if (a >= D[o+3]) { D[o]=r; D[o+1]=g; D[o+2]=b; D[o+3]=a; } }
+        function rnd(n) { return Math.random() * n; }
+        function genBoltTo(x0, y0, yEnd) {   /* y0 から yEnd まで下る稲妻（yEnd 省略で最下端）＋枝 */
+          bolt = []; branches = [];
+          var x = x0, y = y0, end = (yEnd == null ? H - 1 : yEnd);
+          while (y < end - 1) { bolt.push([x, y]); y += 1 + (rnd(2)|0); x += (rnd(5)|0) - 2; if (x < 1) x = 1; if (x > W-2) x = W-2; }
+          bolt.push([x, end]);
+          var nb = 1 + (rnd(2)|0);
+          for (var i = 0; i < nb; i++) {
+            var ni = 2 + (rnd(Math.max(1, bolt.length - 4))|0);
+            var bx = bolt[ni][0], by = bolt[ni][1], dir = rnd(1) < 0.5 ? -1 : 1, br = [[bx, by]], len = 3 + (rnd(5)|0);
+            for (var k = 0; k < len; k++) { bx += dir*(1+(rnd(2)|0)); by += 1+(rnd(2)|0); if (bx<1) bx=1; if (bx>W-2) bx=W-2; if (by>end) by=end; br.push([bx, by]); }
+            branches.push(br);
+          }
+        }
+        function spawnSparks(x, y) { for (var i = 0; i < 12; i++) { var a = rnd(6.283); sparks.push({ x:x, y:y, vx:Math.cos(a)*rnd(1.6), vy:Math.sin(a)*rnd(1.6)-0.4, life:1 }); } }
+        function strike(fx) {   /* 雲の底から下へ落雷 */
+          strikeX = (fx == null) ? (CX + ((rnd(CLOUD_HALF*2)|0) - CLOUD_HALF)) : (fx | 0);
+          if (strikeX < 2) strikeX = 2; else if (strikeX > W-3) strikeX = W-3;
+          genBoltTo(strikeX, CLOUD_BOTTOM, H - 1); flash = 1; spawnSparks(bolt[bolt.length-1][0], H - 2);
+          strikeTimer = 26 + (rnd(30)|0);
+        }
+        function drawPath(pts, bright) {   /* 黄核＋暗紺縁取り＝明色パネルでも見える */
+          for (var i = 0; i < pts.length - 1; i++) {
+            var a = pts[i], b = pts[i+1], steps = Math.max(Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1])) || 1;
+            for (var s = 0; s <= steps; s++) {
+              var tx = a[0]+(b[0]-a[0])*s/steps, ty = a[1]+(b[1]-a[1])*s/steps;
+              put(tx-1, ty, EDGE[0],EDGE[1],EDGE[2], 210*bright); put(tx+1, ty, EDGE[0],EDGE[1],EDGE[2], 210*bright);
+              put(tx, ty-1, EDGE[0],EDGE[1],EDGE[2], 170*bright); put(tx, ty+1, EDGE[0],EDGE[1],EDGE[2], 170*bright);
+              put(tx, ty, CORE[0],CORE[1],CORE[2], 255*bright);
+            }
+          }
+        }
+        function drawCloud() {   /* 濃い嵐雲＝明色パネルの上で「黒い雲」が湧くコントラスト */
+          if (growL <= 0 && growR <= 0) return;
+          var halfL = Math.max(3, Math.round(growL * CLOUD_HALF)), halfR = Math.max(3, Math.round(growR * CLOUD_HALF));
+          var a = Math.min(255, (Math.max(growL, growR) * 4) * 255) | 0;
+          var x;
+          for (x = -halfL; x <= halfR; x++) {
+            var an = x < 0 ? (-x / halfL) : (x / halfR);
+            var edge = an < 0.78 ? 1 : (1 - an) / 0.22; if (edge < 0) edge = 0;
+            var bump = 0.22*Math.sin(x*0.7) + 0.16*Math.sin(x*1.6 + 1) + 0.10*Math.sin(x*3.1 + 2);
+            var thick = edge * CLOUD_H + bump*3.5; if (thick <= 0.5) continue;
+            var topY = Math.round(CLOUD_BOTTOM - thick), cxx = CX + x;
+            for (var y = topY; y <= CLOUD_BOTTOM; y++) {
+              var col = (y <= topY + 1) ? [92,102,132] : (y >= CLOUD_BOTTOM - 1 ? [30,36,58] : [56,64,96]);
+              put(cxx, y, col[0], col[1], col[2], a);
+            }
+          }
+          for (x = -halfL; x <= halfR; x++) { if (rnd(1) < 0.55) put(CX + x, CLOUD_BOTTOM, 255, 224, 130, ((70 + flash*160) * (a/255)) | 0); }
+        }
+        function drawRise() {   /* 着弾点→雲へ電気が這い上がる（黄核＋暗縁） */
+          var p = riseT / RISE_FRAMES; if (p > 1) p = 1;
+          var yTop = IMPACT_Y - p * (IMPACT_Y - CLOUD_BOTTOM);
+          var x = CX, y = IMPACT_Y;
+          while (y > yTop) { put(x, y, CORE[0],CORE[1],CORE[2],240); put(x-1, y, EDGE[0],EDGE[1],EDGE[2],170); put(x+1, y, EDGE[0],EDGE[1],EDGE[2],170);
+            y -= 1 + (rnd(2)|0); x = CX + ((rnd(5)|0) - 2); }
+        }
+        function puffCharge(halfw) { for (var k = 0; k < 3; k++) { var cx0 = CX + ((rnd(halfw*2)|0) - halfw); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 }); } }
+        function update() {
+          if (state === 'strikein') {   /* 着弾の稲妻を数フレーム見せる→電気が昇るフェーズへ */
+            strikeInT++; if (strikeInT % 2 === 0) genBoltTo(strikeX, 0, IMPACT_Y);   /* ちらつき */
+            if (strikeInT >= STRIKE_IN_FRAMES) { state = 'rising'; riseT = 0; cloudGrow = 0; flash = 0.9; spawnSparks(CX, IMPACT_Y); }
+          }
+          if (state === 'rising') { riseT++; if (riseT >= RISE_FRAMES) { state = 'growing'; targetL = 0.12; targetR = 0.12; growL = 0; growR = 0; puffL = 6 + (rnd(8)|0); puffR = 6 + (rnd(8)|0); } }
+          if (state === 'growing') {
+            growL += (targetL - growL) * 0.3; growR += (targetR - growR) * 0.3;
+            puffL--; if (puffL <= 0 && targetL < 1) { targetL = Math.min(1, targetL + 0.12 + rnd(0.18)); puffL = 5 + (rnd(14)|0); puffCharge((growL*CLOUD_HALF)|0); }
+            puffR--; if (puffR <= 0 && targetR < 1) { targetR = Math.min(1, targetR + 0.12 + rnd(0.18)); puffR = 5 + (rnd(14)|0); puffCharge((growR*CLOUD_HALF)|0); }
+            cloudGrow = Math.max(growL, growR);
+            if (targetL >= 1 && targetR >= 1 && growL > 0.97 && growR > 0.97) { growL = 1; growR = 1; state = 'charging'; chargeT = 0; flickers = 0; }
+          }
+          if (state === 'charging') { chargeT++; if (chargeT % FLICKER_GAP === 0 && flickers < FLICKER_COUNT) { flash = 0.9; flickers++; } if (flickers >= FLICKER_COUNT && flash < 0.12) { state = 'live'; strike(); } }
+          if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strike(); }
+          flash *= 0.82;
+          if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBoltTo(strikeX, CLOUD_BOTTOM, H - 1);
+          if ((state === 'live' || state === 'rising' || state === 'growing' || state === 'charging') && rnd(1) < 0.14) {
+            var chalf = Math.max(6, (cloudGrow * CLOUD_HALF) | 0); var cx0 = CX + ((rnd(chalf*2)|0) - chalf); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 });
+          }
+          for (var c = charge.length-1; c >= 0; c--) { charge[c].life -= 0.10; if (charge[c].life <= 0) charge.splice(c,1); }
+          for (var i = sparks.length-1; i >= 0; i--) { var p = sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life -= 0.05; if (p.life <= 0) sparks.splice(i,1); }
+        }
+        function draw() {
+          clear();
+          if (flash > 0.04) for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 232, 150, (flash*22)|0);   /* 明色向け＝淡い琥珀の閃光 */
+          if ((flash > 0.1 || state === 'strikein') && bolt.length) {
+            var bright = Math.min(1, flash + 0.4); drawPath(bolt, bright);
+            for (var i = 0; i < branches.length; i++) drawPath(branches[i], bright*0.8);
+          }
+          if (state === 'rising' || state === 'growing') drawRise();
+          drawCloud();
+          for (i = 0; i < charge.length; i++) { var g = charge[i]; put(g.x, g.y, 255,224,130, (g.life*150)|0); put(g.x+1, g.y+1, EDGE[0],EDGE[1],EDGE[2], (g.life*90)|0); }
+          for (i = 0; i < sparks.length; i++) { var q = sparks[i]; put(q.x, q.y, 255,236,150, (q.life*255)|0); }
+          ctx.putImageData(img, 0, 0);
+        }
+        function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
+        function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
+        function reset() { bolt = []; branches = []; sparks = []; charge = []; flash = 0; strikeTimer = 0; riseT = 0; growL = 0; growR = 0; targetL = 0; targetR = 0; puffL = 0; puffR = 0; cloudGrow = 0; chargeT = 0; flickers = 0; strikeInT = 0; }
+        return {
+          canvas: canvas,
+          start: function () {   /* 発動＝上空からパネル中央へ稲妻が落ちて着弾→電気が昇る→雷雲→落雷 */
+            reset(); state = 'strikein'; strikeX = CX; genBoltTo(CX, 0, IMPACT_Y); flash = 1; spawnSparks(CX, IMPACT_Y); runLoop();
+          },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; cloudGrow = 1; growL = 1; growR = 1; targetL = 1; targetR = 1; strikeX = CX; genBoltTo(CX, CLOUD_BOTTOM, H - 1); flash = 0.6; draw(); },
+          stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+        };
+      }
+      (function () {
+        var stage = document.getElementById('pixboltLStage');
+        var msg = stage && stage.querySelector('.pixfire-msg');
+        var btn = document.getElementById('pixboltLBtn');
+        var reduceCb = document.getElementById('pixboltLReduce');
+        if (!stage || !msg || !btn) return;
+        var scale = 3;
+        var cols = Math.max(140, Math.round(msg.clientWidth / scale));
+        var rows = Math.max(20, Math.round(msg.clientHeight / scale));
+        var abovePx = 33, aboveRows = Math.round(abovePx / scale);
+        var bolt = createPixelThunderLight({ cols: cols, rows: rows, above: aboveRows });
+        bolt.canvas.style.top = (-abovePx) + 'px'; bolt.canvas.style.bottom = 'auto'; bolt.canvas.style.height = 'calc(100% + ' + abovePx + 'px)';
+        msg.appendChild(bolt.canvas);
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        function play() { if (reduced()) { bolt.reduceStatic(); return; } bolt.start(); }
+        btn.addEventListener('click', play);
+        if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) bolt.reduceStatic(); });
         if ('IntersectionObserver' in window) {
           var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
           io.observe(stage);
