@@ -3343,7 +3343,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-d. 雷（ライト版・雲なし）＝右上アイコン→中央着弾→着弾点から連鎖してどこかの辺へ／以降もピカッと光るたびランダムな辺から連鎖（1〜2本）</h3>
     <p class="muted text-sm"><strong>雲は無し</strong>。発動＝<strong>右上の術者アイコンからパネル中央へ着弾</strong>し、<strong>その着弾点から別の雷が伸びて連鎖し、どこかの辺にぶつかるまで続く</strong>（手前の段から順に光る）。
-      以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。明色パネルで見えるよう黄核＋暗紺縁の稲妻・淡い金の閃光（パネル内のみ）。
+      以降は永続で、<strong>ピカッと光るたびにランダムなパネルの辺から雷が走り、内部の着弾点で折れて連鎖し、別の辺で止まる（1本／同時2本）</strong>。加えて<strong>枠線のランダムな位置で電気が常時ビリビリ</strong>する。明色パネルで見えるよう黄核＋暗紺縁の稲妻（細め）・淡い金の閃光（パネル内のみ）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixboltLStage">
       <div class="pixfire-msg is-light fx-thunder" aria-label="雷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【雷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は稲妻と重なる位置＝細く間欠表示で文字が読めるかの確認用テキスト ⚡</div>
@@ -3365,7 +3365,7 @@
         var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
         var img = ctx.createImageData(W, H), D = img.data;
         var state = 'idle', raf = null, last = 0, acc = 0;
-        var bolts = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光 */
+        var bolts = [], crackles = [], flash = 0, strikeTimer = 0;   /* bolts＝同時に複数の閃光／crackles＝枠線でビリビリする電気 */
         var CX = W >> 1, PANEL_TOP = ABOVE, IMPACT_Y = (PANEL_TOP + PANEL_H * 0.5) | 0;   /* 着弾点＝パネル中央 */
         var originX = W - 3, originY = 0;                   /* 発動起点＝術者アイコン（右上）。start で上書き */
         var CORE = [255,225,77], EDGE = [26,38,92];         /* 黄核＋暗紺の縁取り＝明色パネルで見える稲妻 */
@@ -3421,16 +3421,31 @@
             var a = pts[i], b = pts[i+1], steps = Math.max(Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1])) || 1;
             for (var s = 0; s <= steps; s++) {
               var tx = a[0]+(b[0]-a[0])*s/steps, ty = a[1]+(b[1]-a[1])*s/steps;
-              put(tx-1, ty, EDGE[0],EDGE[1],EDGE[2], 210*bright); put(tx+1, ty, EDGE[0],EDGE[1],EDGE[2], 210*bright);
-              put(tx, ty-1, EDGE[0],EDGE[1],EDGE[2], 170*bright); put(tx, ty+1, EDGE[0],EDGE[1],EDGE[2], 170*bright);
+              put(tx-1, ty, EDGE[0],EDGE[1],EDGE[2], 185*bright); put(tx, ty-1, EDGE[0],EDGE[1],EDGE[2], 155*bright);   /* 暗縁を片側だけに＝線を細く */
               put(tx, ty, CORE[0],CORE[1],CORE[2], 255*bright);
             }
           }
         }
+        function spawnCrackle() {   /* 枠線のランダムな位置に、辺に沿って走る短い電気（ビリビリ）を発生 */
+          var e = (rnd(4)) | 0, bx, by, ax, ay, px, py;
+          if (e === 0) { bx = rnd(W); by = PANEL_TOP; ax = 1; ay = 0; px = 0; py = 1; }               /* 上辺：横に走り内側(下)へ振れる */
+          else if (e === 1) { bx = rnd(W); by = H - 1; ax = 1; ay = 0; px = 0; py = -1; }             /* 下辺 */
+          else if (e === 2) { bx = 0; by = PANEL_TOP + rnd(PANEL_H); ax = 0; ay = 1; px = 1; py = 0; }  /* 左辺 */
+          else { bx = W - 1; by = PANEL_TOP + rnd(PANEL_H); ax = 0; ay = 1; px = -1; py = 0; }         /* 右辺 */
+          crackles.push({ bx: bx, by: by, ax: ax, ay: ay, px: px, py: py, len: 7 + rnd(13), dir: rnd(1) < 0.5 ? -1 : 1, life: 1 });
+        }
+        function cracklePts(c) {   /* 毎フレーム再生成＝ビリビリ揺れる。起点は枠線に固定 */
+          var n = Math.max(3, (c.len / 3) | 0), pts = [];
+          for (var i = 0; i <= n; i++) { var t = i / n, along = t * c.len * c.dir, perp = (i === 0 ? 0 : (rnd(3.4) - 1.7)); pts.push([c.bx + c.ax * along + c.px * perp, c.by + c.ay * along + c.py * perp]); }
+          return pts;
+        }
+        function drawCrackles() { for (var i = 0; i < crackles.length; i++) drawPath(cracklePts(crackles[i]), Math.min(1, crackles[i].life) * 0.8); }
         function update() {
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strikeEvent(true); }
           flash *= 0.9;   /* ピカッの後すぅーっと薄くなる */
           for (var i = bolts.length - 1; i >= 0; i--) { var b = bolts[i]; if (b.delay > 0) { b.delay--; continue; } b.life *= 0.72; if (b.life <= 0.05) bolts.splice(i, 1); }   /* 稲妻は一瞬の閃光。delay>0 は連鎖の待機段 */
+          if (state === 'live' && crackles.length < 4 && rnd(1) < 0.2) spawnCrackle();   /* 枠線のビリビリを低頻度・複数箇所で */
+          for (var m = crackles.length - 1; m >= 0; m--) { crackles[m].life -= 0.11; if (crackles[m].life <= 0) crackles.splice(m, 1); }
         }
         function draw() {
           clear();
@@ -3438,12 +3453,13 @@
             var fa = (flash * 34) | 0;
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
           }
+          drawCrackles();   /* 枠線のビリビリ */
           for (var i = 0; i < bolts.length; i++) { var bo = bolts[i]; if (bo.delay > 0) continue; var bright = Math.min(1, bo.life + 0.35); drawPath(bo.pts, bright); for (var j = 0; j < bo.branches.length; j++) drawPath(bo.branches[j], bright*0.8); }
           ctx.putImageData(img, 0, 0);
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { bolts = []; flash = 0; strikeTimer = 0; }
+        function reset() { bolts = []; crackles = []; flash = 0; strikeTimer = 0; }
         return {
           canvas: canvas,
           start: function (ox, oy) {   /* 発動＝術者アイコン(右上)→パネル中央へ着弾(1回)→以降ランダムな辺からランダム方向へ雷(1〜2本)＋着弾点から煙 */
@@ -3451,7 +3467,7 @@
             state = 'live'; strikeEvent(false); strikeTimer = 48 + (rnd(60) | 0); runLoop();
           },
           reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static';
-            bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); flash = 0.5; draw(); },
+            bolts.push(makeBolt(W - 3, 0, CX, IMPACT_Y)); spawnCrackle(); spawnCrackle(); flash = 0.5; draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
       }
