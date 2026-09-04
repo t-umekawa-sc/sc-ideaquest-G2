@@ -3473,7 +3473,7 @@
           }
           if (state === 'charging') { chargeT++; if (chargeT % FLICKER_GAP === 0 && flickers < FLICKER_COUNT) { flash = 0.9; flickers++; } if (flickers >= FLICKER_COUNT && flash < 0.12) { state = 'live'; strike(); } }
           if (state === 'live') { strikeTimer--; if (strikeTimer <= 0) strike(); }
-          flash *= 0.82;
+          flash *= 0.9;   /* ゆっくり減衰＝ピカッの後すぅーっと薄くなる（従来 0.82 は速すぎた） */
           if (state === 'live' && flash > 0.45 && rnd(1) < 0.4) genBoltTo(strikeX, CLOUD_BOTTOM, H - 1);
           if ((state === 'live' || state === 'rising' || state === 'growing' || state === 'charging') && rnd(1) < 0.14) {
             var chalf = Math.max(6, (cloudGrow * CLOUD_HALF) | 0); var cx0 = CX + ((rnd(chalf*2)|0) - chalf); charge.push({ x: cx0, y: CLOUD_BOTTOM - (rnd(2)|0), life: 1 });
@@ -3484,9 +3484,9 @@
         function draw() {
           clear();
           if (flash > 0.03) {   /* 明色パネルで「ピカッ」が映えるよう鮮やかな金の閃光を濃く・鋭く（従来の淡い琥珀は白飛びして見えなかった）。パネル内(PANEL_TOP以下)だけに限定＝雲のあるパネル外は光らせない */
-            var fa = Math.min(62, (flash*flash*78)) | 0;   /* flash^2＝一瞬光ってすぐ引く。淡めの金（透け感を残す） */
+            var fa = (flash * 34) | 0;   /* 線形＝flash に比例してすぅーっと薄くなる。ピーク低め（更に透明に） */
             for (var y = PANEL_TOP; y < H; y++) for (var x = 0; x < W; x++) put(x, y, 255, 198, 44, fa);
-            var rim = Math.min(120, (flash*flash*150)) | 0;   /* パネル上縁の帯電リムが光る＝落雷の合図（淡め） */
+            var rim = (flash * 52) | 0;   /* パネル上縁の帯電リムも線形フェード（淡め） */
             for (var rx = 0; rx < W; rx++) { put(rx, PANEL_TOP, 255, 236, 150, rim); put(rx, PANEL_TOP+1, 255, 214, 90, (rim*0.7)|0); }
           }
           if ((flash > 0.1 || state === 'strikein') && bolt.length) {
