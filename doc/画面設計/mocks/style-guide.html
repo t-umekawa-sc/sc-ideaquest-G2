@@ -3538,7 +3538,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネル全体が凍る</strong>（ひび割れたセル模様＝青いひび＋淡い白のセル・可読性優先で薄め）。<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
+      その後<strong>パネルが中央から外へ徐々に凍っていく</strong>（ひび割れたセル模様＝青いひび＋淡い白のセルがセル毎に順に固まる・凍結前線が白く光る・可読性優先で薄め）。<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3603,23 +3603,26 @@
             }
           }
         }
-        function buildFrost() {   /* 凍ったパネルのひび割れセル模様（Voronoi）を1回生成＝参考画像の氷 */
-          var ns = Math.max(10, Math.round(PW * PH / 240)), seeds = [];
-          for (var i = 0; i < ns; i++) seeds.push({ x: rnd(PW), y: rnd(PH) });
-          frost = new Uint8Array(PW * PH * 2);
+        function buildFrost() {   /* 凍ったパネルのひび割れセル模様(Voronoi)＋セル毎の凍結時刻(中央から外へ)を1回生成 */
+          var ns = Math.max(10, Math.round(PW * PH / 240)), seeds = [], cx = PW / 2, cy = PH / 2, maxD = Math.hypot(cx, cy) || 1;
+          for (var i = 0; i < ns; i++) { var sx = rnd(PW), sy = rnd(PH), ft = Math.hypot(sx - cx, sy - cy) / maxD + (rnd(1) - 0.5) * 0.18; seeds.push({ x: sx, y: sy, ft: Math.max(0, Math.min(1, ft)) }); }
+          frost = new Uint8Array(PW * PH * 3);
           for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
-            var f1 = 1e9, f2 = 1e9;
-            for (var k = 0; k < seeds.length; k++) { var dx = px - seeds[k].x, dy = py - seeds[k].y, d = dx * dx + dy * dy; if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d; }
+            var f1 = 1e9, f2 = 1e9, s1 = 0;
+            for (var k = 0; k < seeds.length; k++) { var dx = px - seeds[k].x, dy = py - seeds[k].y, d = dx * dx + dy * dy; if (d < f1) { f2 = f1; f1 = d; s1 = k; } else if (d < f2) f2 = d; }
             var edge = Math.sqrt(f2) - Math.sqrt(f1), vein = edge < 2.4 ? (1 - edge / 2.4) : 0, bright = Math.max(0, 1 - Math.sqrt(f1) / 13);
-            var idx = (py * PW + px) * 2; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0;
+            var idx = (py * PW + px) * 3; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0; frost[idx + 2] = (seeds[s1].ft * 255) | 0;
           }
         }
-        function drawCold() {   /* パネルが凍る＝ひび割れセル模様（参考画像）。ひび＝青、セル内＝淡い白。可読性のため薄め */
-          if (cold <= 0.01 || !frost) return;
+        function drawCold() {   /* 徐々に固まる＝中央から外へセル毎に凍結。cold=進行度。ひび=青/セル内=淡い白/凍結前線に白い光 */
+          if (cold <= 0.005 || !frost) return;
           for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
-            var idx = (py * PW + px) * 2, vein = frost[idx] / 255, bright = frost[idx + 1] / 255, x = PX0 + px, y = PY0 + py;
-            put(x, y, 214, 236, 252, (cold * (13 + bright * 40)) | 0);   /* 地の霜＋セル内の白ハイライト */
-            if (vein > 0.04) put(x, y, 68, 148, 212, (cold * vein * 118) | 0);   /* 青いひび（セル境界） */
+            var idx = (py * PW + px) * 3, thr = frost[idx + 2] / 255, local = (cold - thr) * 3.2;
+            if (local <= 0) continue; if (local > 1) local = 1;   /* このセルの凍結量(0→1) */
+            var vein = frost[idx] / 255, bright = frost[idx + 1] / 255, x = PX0 + px, y = PY0 + py;
+            put(x, y, 214, 236, 252, (local * (13 + bright * 40)) | 0);   /* 地の霜＋セル内の白ハイライト */
+            if (vein > 0.04) put(x, y, 68, 148, 212, (local * vein * 118) | 0);   /* 青いひび（セル境界） */
+            var fr = local * (1 - local) * 4; if (fr > 0.2) put(x, y, 236, 248, 255, (fr * 70) | 0);   /* 凍結前線の白い光 */
           }
         }
         function drawShardProj() {   /* Image#4＝面のある尖った氷塊。進行方向に尖る。片側にハイライト面 */
@@ -3687,7 +3690,7 @@
             } else { proj.x += axX * SPEED; proj.y += axY * SPEED; }
           }
           if (state === 'cold') {
-            if (cold < 1) cold = Math.min(1, cold + 0.04);   /* 空気がだんだん冷たく */
+            if (cold < 1.4) cold = Math.min(1.4, cold + 0.022);   /* ゆっくり進行＝中央から外へ徐々に固まる */
             pillarTimer--; if (pillarTimer <= 0 && pillars.length < 12) { spawnCluster(); pillarTimer = 16 + (rnd(40)|0); }   /* ランダムに氷結晶クラスタが突然生える */
             if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PW), PY1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がパネル下からふわふわ上昇 */
           }
@@ -3718,7 +3721,7 @@
           start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
             var dx = CX - originX, dy = CY - originY, dd = Math.max(0.001, Math.hypot(dx, dy)); axX = dx / dd; axY = dy / dd;
             proj = { x: originX, y: originY, lit: rnd(1) < 0.5 ? 1 : -1 }; state = 'incoming'; runLoop(); },
-          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1;
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'cold'; cold = 1.4;
             spawnCluster(); spawnCluster(); for (var i = 0; i < pillars.length; i++) { pillars[i].grow = 1; pillars[i].phase = 'hold'; } draw(); },
           stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
         };
