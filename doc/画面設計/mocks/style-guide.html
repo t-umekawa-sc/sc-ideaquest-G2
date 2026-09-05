@@ -4148,7 +4148,7 @@
         var state = 'idle', raf = null, last = 0, acc = 0;
         var origin = { x: W-6, y: M }, target = { x: CX, y: CY }, beamProg = 0, BEAM_SPEED = 0.05, beamFade = 0;
         var parts = [], flash = 0, flashPt = { x: CX, y: CY }, gatherPt = { x: CX, y: CY };
-        var phaseT = 0, SCATTER_T = 30, GATHER_MAX = 140, HOLD_T = 20;   /* SCATTER=飛散尺／GATHER_MAX=集結の保険上限／HOLD=全集結後の溜め尺 */
+        var phaseT = 0, SCATTER_T = 30, GATHER_MAX = 170, HOLD_T = 20;   /* SCATTER=飛散尺／GATHER_MAX=集結の保険上限／HOLD=全集結後の溜め尺 */
 
         function rnd(n) { return Math.random() * n; }
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -4156,7 +4156,7 @@
           flash = 1; flashPt = { x: px, y: py };
           for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 3.8 + rnd(5.2);   /* 初速は速め＝勢いよく広域へ飛散 */
             parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
-              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.02 + rnd(0.055) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら（早い粒子/遅い粒子） */
+              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.035 + rnd(0.05) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら（早い粒子/遅い粒子） */
         }
         function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
           if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
@@ -4202,11 +4202,11 @@
             ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); }
           ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         }
-        function countGathered() {   /* 集結点付近に集まった粒子数 */
-          var n = 0; for (var i = 0; i < parts.length; i++) { var dx = parts[i].x - gatherPt.x, dy = parts[i].y - gatherPt.y; if (dx*dx + dy*dy < 22*22) n++; } return n;
+        function countWithin(r) {   /* 集結点から半径 r 以内の粒子数 */
+          var n = 0, rr = r*r; for (var i = 0; i < parts.length; i++) { var dx = parts[i].x - gatherPt.x, dy = parts[i].y - gatherPt.y; if (dx*dx + dy*dy < rr) n++; } return n;
         }
         function drawEnergyBall() {   /* 集結点で溜まる光の球＝集まった粒子数に比例してエネルギー(大きさ/強さ)が高まる */
-          var n = countGathered(); if (n <= 0) return;
+          var n = countWithin(22); if (n <= 0) return;
           var grow = 4 + n * 0.95, inner = Math.min(1, 0.45 + n * 0.03), cx = gatherPt.x, cy = gatherPt.y;
           if (state === 'charge') {   /* 溜め＝脈動して強まり、こらえきれず小刻みに震える */
             var ramp = phaseT / HOLD_T;
@@ -4234,7 +4234,7 @@
             if (flash > 0) flash *= 0.82;
             if (beamFade > 0) beamFade *= 0.72;
             if (state === 'scatter') { phaseT++; if (phaseT >= SCATTER_T) { gatherPt = pickGatherFromParts(); state = 'gather'; phaseT = 0; } }
-            else if (state === 'gather') { phaseT++; if ((parts.length > 0 && countGathered() >= parts.length) || phaseT >= GATHER_MAX) { state = 'charge'; phaseT = 0; } }   /* 全粒子が集まりきったら(=保険上限)溜めへ */
+            else if (state === 'gather') { phaseT++; if ((parts.length > 0 && countWithin(8) >= parts.length) || phaseT >= GATHER_MAX) { state = 'charge'; phaseT = 0; } }   /* 全粒子が中心の狭い範囲(8px)に集まりきってから溜めへ(=保険上限) */
             else if (state === 'charge') { phaseT++; if (phaseT >= HOLD_T) { flash = 1; flashPt = { x: gatherPt.x, y: gatherPt.y }; parts.length = 0; fireFrom(gatherPt.x, gatherPt.y); } }   /* 溜め切ってこらえきれず発射 */
             updateParts(); acc -= 33;
           }
