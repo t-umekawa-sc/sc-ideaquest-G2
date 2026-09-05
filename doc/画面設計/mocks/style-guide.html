@@ -4148,7 +4148,7 @@
         var state = 'idle', raf = null, last = 0, acc = 0;
         var origin = { x: W-6, y: M }, target = { x: CX, y: CY }, beamProg = 0, BEAM_SPEED = 0.05, beamFade = 0;
         var parts = [], flash = 0, flashPt = { x: CX, y: CY }, gatherPt = { x: CX, y: CY };
-        var phaseT = 0, SCATTER_T = 30, GATHER_T = 46, CHARGE_T = 14;   /* 各フェーズの尺（ticks）＝広域に飛散→ゆっくり集まる */
+        var phaseT = 0, SCATTER_T = 30, GATHER_MAX = 140, HOLD_T = 20;   /* SCATTER=飛散尺／GATHER_MAX=集結の保険上限／HOLD=全集結後の溜め尺 */
 
         function rnd(n) { return Math.random() * n; }
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -4156,7 +4156,7 @@
           flash = 1; flashPt = { x: px, y: py };
           for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 3.8 + rnd(5.2);   /* 初速は速め＝勢いよく広域へ飛散 */
             parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
-              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4) }); }   /* ph/pv/amp＝集結時のゆらゆら揺れ用 */
+              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.02 + rnd(0.055) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら（早い粒子/遅い粒子） */
         }
         function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
           if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
@@ -4185,7 +4185,7 @@
             var p = parts[i];
             if (state === 'gather' || state === 'charge') {   /* 集結点へイージングで近づきつつ、進行方向に垂直へゆらゆら揺れる（近づくほど揺れは収まる） */
               var dx = gatherPt.x - p.x, dy = gatherPt.y - p.y, dl = Math.sqrt(dx*dx + dy*dy) || 1;
-              p.x += dx * 0.045; p.y += dy * 0.045;
+              p.x += dx * p.ease; p.y += dy * p.ease;   /* p.ease でむら＝早い粒子/遅い粒子 */
               p.ph += p.pv;
               var sway = Math.sin(p.ph) * p.amp * Math.min(1, dl / 45);   /* 遠いほど大きく揺れ、集結点付近で収束 */
               p.x += (-dy / dl) * sway; p.y += (dx / dl) * sway;
@@ -4207,10 +4207,15 @@
         }
         function drawEnergyBall() {   /* 集結点で溜まる光の球＝集まった粒子数に比例してエネルギー(大きさ/強さ)が高まる */
           var n = countGathered(); if (n <= 0) return;
-          var grow = 4 + n * 0.95, inner = Math.min(1, 0.45 + n * 0.03);
-          var g = ctx.createRadialGradient(gatherPt.x, gatherPt.y, 0, gatherPt.x, gatherPt.y, grow);
+          var grow = 4 + n * 0.95, inner = Math.min(1, 0.45 + n * 0.03), cx = gatherPt.x, cy = gatherPt.y;
+          if (state === 'charge') {   /* 溜め＝脈動して強まり、こらえきれず小刻みに震える */
+            var ramp = phaseT / HOLD_T;
+            grow *= 1 + 0.20 * Math.sin(phaseT * 0.8) + ramp * 0.25; inner = Math.min(1, inner + 0.25);
+            var sh = ramp * 1.8; cx += (rnd(2)-1) * sh; cy += (rnd(2)-1) * sh;
+          }
+          var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, grow);
           g.addColorStop(0, 'rgba(255,255,255,' + inner.toFixed(2) + ')'); g.addColorStop(0.5, 'rgba(255,220,255,' + (inner*0.55).toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gatherPt.x, gatherPt.y, grow, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, grow, 0, 6.2832); ctx.fill();
         }
         function render() {
           ctx.clearRect(0, 0, W, H);
@@ -4229,8 +4234,8 @@
             if (flash > 0) flash *= 0.82;
             if (beamFade > 0) beamFade *= 0.72;
             if (state === 'scatter') { phaseT++; if (phaseT >= SCATTER_T) { gatherPt = pickGatherFromParts(); state = 'gather'; phaseT = 0; } }
-            else if (state === 'gather') { phaseT++; if (phaseT >= GATHER_T) { state = 'charge'; phaseT = 0; } }
-            else if (state === 'charge') { phaseT++; if (phaseT >= CHARGE_T) { flash = 0.9; flashPt = { x: gatherPt.x, y: gatherPt.y }; parts.length = 0; fireFrom(gatherPt.x, gatherPt.y); } }
+            else if (state === 'gather') { phaseT++; if ((parts.length > 0 && countGathered() >= parts.length) || phaseT >= GATHER_MAX) { state = 'charge'; phaseT = 0; } }   /* 全粒子が集まりきったら(=保険上限)溜めへ */
+            else if (state === 'charge') { phaseT++; if (phaseT >= HOLD_T) { flash = 1; flashPt = { x: gatherPt.x, y: gatherPt.y }; parts.length = 0; fireFrom(gatherPt.x, gatherPt.y); } }   /* 溜め切ってこらえきれず発射 */
             updateParts(); acc -= 33;
           }
           render(); raf = requestAnimationFrame(frame);
