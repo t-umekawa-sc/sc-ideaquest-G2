@@ -40,10 +40,14 @@
 /* 効果プレビュー（サンプルメッセージに spell-fx を適用して見せる） */
 .spell-preview { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text); }
 .spell-desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; min-height: 2.6em; }
-.spell-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: auto; }
-.spell-cost { font-weight: 700; color: var(--pixel-skill); font-variant-numeric: tabular-nums; }
+/* コスト＋ボタン。前提未達/SP不足の無効ボタンは文言が長い（例「前提: ❄️ 氷 が必要」）ので、狭いカードでは
+   ボタンを次行へ折り返す（flex-wrap）。コストは常に1行（✦ N SP が「SP」だけ折り返さないように nowrap）。 */
+.spell-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); margin-top: auto; flex-wrap: wrap; }
+.spell-cost { font-weight: 700; color: var(--pixel-skill); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .spell-cost .muted { color: var(--color-text-muted); font-weight: 400; font-size: var(--text-xs); }
 .spell-state { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-success); font-size: var(--text-sm); }
 .btn-pixel.btn-pixel--sm { padding: 6px 12px; padding-left: calc(12px + 1.1em); font-size: var(--text-sm); } /* ▶ カーソル分の左余白を維持（基底の padding-left を打ち消さない） */
+/* 長い無効ラベル（前提/SP不足）はボタン内で折り返し、カード幅を超えない。 */
+.spell-card__foot .btn-pixel { white-space: normal; text-align: center; max-width: 100%; }
 .btn-pixel:disabled { opacity: .5; cursor: not-allowed; box-shadow: var(--shadow-pixel); }
 .btn-pixel:disabled::before { content: none; }
