@@ -45,6 +45,12 @@
 .msg__author.is-selfcast .avatar__img { box-shadow: 0 0 0 2px var(--rarity-rare), 0 1px 4px rgba(0,0,0,.35); }
 /* 自己発動マーク＝作成者アバターの右下に✦（::before＝.avatar のツールチップ ::after と衝突回避）。 */
 .msg__author.is-selfcast::before { content: "✦"; position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; color: #ffca42; background: #3a2a12; box-shadow: 0 0 0 1px rgba(255,180,60,.7); z-index: 3; }
+/* 新規発動＝発動者バッジ／自己発動マークが「唱える」ように出現(scale-in＋リング発光)。出現しきってから canvas が着火（JS の SUMMON_MS と一致）。 */
+@keyframes badge-summon { 0% { transform: scale(.2); opacity: 0; } 55% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes badge-ring-glow { 0% { box-shadow: 0 0 0 2px var(--rarity-rare); } 45% { box-shadow: 0 0 14px 5px var(--rarity-rare); } 100% { box-shadow: 0 0 0 2px var(--rarity-rare), 0 1px 4px rgba(0,0,0,.35); } }
+.msg__caster.is-summoning { animation: badge-summon .45s cubic-bezier(.2,1.3,.4,1); }
+.msg__caster.is-summoning .avatar__img, .msg__author.is-selfcast.is-summoning .avatar__img { animation: badge-ring-glow .45s ease-out; }
+.msg__author.is-selfcast.is-summoning::before { animation: badge-summon .45s cubic-bezier(.2,1.3,.4,1); }
 .msg__body { min-width: 0; flex: 1; }
 .msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
 .msg__name { font-weight: 700; font-size: var(--text-sm); }

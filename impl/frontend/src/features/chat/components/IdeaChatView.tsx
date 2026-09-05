@@ -99,12 +99,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [casts, setCasts] = useState<{ id: number; rect: CastRect; effect: string; rarity: string }[]>([]);
   // Phase B: 発射元→対象メッセージへ飛ぶデリバリー（属性別・GF-AC-091 §17）。着弾で one-shot(SpellCastFx) に接続。
   const [delivers, setDelivers] = useState<{ id: number; from: CastPoint; to: CastPoint; effect: string; rarity: string }[]>([]);
-  // Phase E: canvas 化済み effect（sparkle 等）の能動発動＝そのメッセージ canvas に「発射→着弾→永続」を再生させる。
-  // key=msgId が存在＝今セッションで能動発動した（発射を再生する）／値＝発射元の画面座標。CSS の deliver/cast は使わない。
-  const [canvasCast, setCanvasCast] = useState<Record<string, CastPoint | null>>({});
-  // 起点ポリシー①: ライブ発動は CSS 発射レイヤ(SpellDeliveryFx)でヘッダー→メッセージへ火の玉を飛ばし、着弾で canvas を着火。
-  // 着弾までは canvas を出さない（マウントすると②表示経路で即着火してしまうため）＝ここに入っている間は SpellCanvasFx を保留。
+  // Phase E: canvas 化済み effect（sparkle 等）の発射元＝メッセージ内の発動者アバターバッジ（自作自演は作成者アバター）＝①②とも枠内飛行。
+  // 起点ポリシー①（新規発動）＝発動者アバターバッジが「唱える」ように出現(summonアニメ)→出現しきってから canvas が着火する。
+  // 出現アニメ中はここ(true)に入り、(a) バッジに is-summoning を付与し (b) SpellCanvasFx を保留（マウント即着火を防ぐ）。
   const [pendingCanvas, setPendingCanvas] = useState<Record<string, boolean>>({});
+  const SUMMON_MS = 450; // 発動者バッジ出現アニメの尺（chat.css の badge-summon と一致）。
   const castId = useRef(0);
   const fireCast = (msgId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
@@ -128,33 +127,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     setTimeout(() => setDelivers((d) => d.filter((z) => z.id !== id)), DELIVER_MS + 260);
     setTimeout(() => fireCast(msgId, effect, rarity), DELIVER_MS); // 着弾＝一撃＋永続へ
   };
-  // 発動起点＝ヘッダーのログインユーザーアバター中心（画面座標）。ログインユーザが「新規に」魔法を発動した瞬間の
-  // 発射元（style-guide.html §17 の「自分が放つ」演出／起点ポリシーは doc/画面設計/screens/SC-24_アイデアチャット.md）。
-  const headerAvatarPoint = (): CastPoint | null => {
-    if (typeof document === "undefined") return null;
-    const el = document.querySelector(".usermenu__trigger .avatar") as HTMLElement | null;
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  };
-  // 起点ポリシー①（canvas 魔法のライブ発動）＝CSS 発射レイヤ(SpellDeliveryFx)で from（ヘッダーのユーザーアバター）→
-  // 対象メッセージへ火の玉を画面横断で飛ばし、着弾（DELIVER_MS）で canvas を着火→延焼させる。着弾までは pendingCanvas
-  // で canvas を出さない（マウントすると②表示経路で即着火するため）。着弾時に pending 解除＋canvasCast に着弾点を入れて start。
-  const fireCanvasDelivery = (from: CastPoint, msgId: string, effect: string, rarity: string) => {
-    const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
-    if (!el) { setCanvasCast((c) => ({ ...c, [msgId]: null })); return; } // 位置不明＝そのまま canvas 既定で着火
-    const r = el.getBoundingClientRect();
-    const to = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  // 起点ポリシー①（canvas 魔法の新規発動）＝発動者アバターバッジを「唱える」ように出現(summonアニメ)させ、
+  // 出現しきってから（SUMMON_MS 後に）canvas を出して着火＝バッジ起点で枠内飛行→延焼（発射レイヤ不要）。
+  const summonThenCast = (msgId: string) => {
     setPendingCanvas((p) => ({ ...p, [msgId]: true }));
-    const id = ++castId.current;
-    setDelivers((d) => [...d, { id, from, to, effect, rarity }]);
-    setTimeout(() => setDelivers((d) => d.filter((z) => z.id !== id)), DELIVER_MS + 260);
-    setTimeout(() => {
-      // 着弾＝canvas を出して着火（origin＝着弾点＝ほぼ中央。エンジンは中央下部で ignite→左右へ延焼）。
-      setPendingCanvas((p) => { const n = { ...p }; delete n[msgId]; return n; });
-      setCanvasCast((c) => ({ ...c, [msgId]: to }));
-    }, DELIVER_MS);
+    setTimeout(() => setPendingCanvas((p) => { const n = { ...p }; delete n[msgId]; return n; }), SUMMON_MS);
   };
 
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -371,12 +348,9 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
         if (isCanvasEffect(eff)) {
-          // 起点ポリシー①（doc/画面設計/screens/SC-24_アイデアチャット.md）＝ログインユーザが「新規に」発動した瞬間は
-          // ヘッダーのユーザーアバターから対象へ飛来。canvas はメッセージ枠内に限定され画面横断の飛行が見えないため、
-          // 画面全体に及ぶ CSS 発射レイヤ(SpellDeliveryFx)で火の玉を飛ばし、着弾で canvas を着火→延焼させる。
-          const hp = headerAvatarPoint();
-          if (hp && !reduceMotion()) fireCanvasDelivery(hp, m.id, eff, spell.rarity);
-          else setCanvasCast((c) => ({ ...c, [m.id]: null })); // reduce-motion/位置不明＝canvas 既定で着火(静止)
+          // 起点ポリシー①（doc/画面設計/screens/SC-24_アイデアチャット.md）＝新規発動は発動者アバターバッジを唱えるように
+          // 出現させてから、そのバッジ起点で canvas が着火（枠内飛行→延焼）。reduce-motion 時は出現/発射アニメを省き即着火(静止)。
+          if (!reduceMotion()) summonThenCast(m.id);
         } else if (from) {
           // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
           fireDelivery(from, m.id, eff, spell.rarity);
@@ -395,7 +369,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       const res = await removeReaction(m.id, { magic: true });
       if (res) {
         setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions } : x)));
-        setCanvasCast((c) => { if (!(m.id in c)) return c; const n = { ...c }; delete n[m.id]; return n; });
+        setPendingCanvas((p) => { if (!(m.id in p)) return p; const n = { ...p }; delete n[m.id]; return n; });
       }
     } catch {
       snack({ type: "error", msg: "魔法の取消に失敗しました。" });
@@ -490,12 +464,12 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
                     canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
                 {magic && (isCanvasEffect(magic.effect ?? "")
-                  ? (!pendingCanvas[m.id] && <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />)
+                  ? (!pendingCanvas[m.id] && <SpellCanvasFx effect={magic.effect ?? ""} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />)
                   : <SpellPersistFx effect={magic.effect ?? ""} />)}
-                <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "")}><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
-                {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。 */}
+                <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "") + (selfCast && pendingCanvas[m.id] ? " is-summoning" : "")}><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
+                {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。新規発動は is-summoning で唱えるように出現。 */}
                 {magic && !selfCast && (
-                  <span className="msg__caster avatar sm" data-name={casterName} title={`${casterName} が【${spellJa}】をかけました`} aria-hidden>
+                  <span className={"msg__caster avatar sm" + (pendingCanvas[m.id] ? " is-summoning" : "")} data-name={casterName} title={`${casterName} が【${spellJa}】をかけました`} aria-hidden>
                     <span className="avatar__img placeholder">{(casterName || "?").charAt(0)}</span>
                   </span>
                 )}

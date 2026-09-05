@@ -9,14 +9,14 @@ import type { CastPoint } from "@/components/ui/SpellDeliveryFx";
 // React で安全に動かす薄い配線。要件＝(a) マウント時のみ生成/開始・アンマウントで stop＋canvas 除去、
 // (b) 画面外は IntersectionObserver で rAF 停止・再可視で resume（state 保持＝発射からやり直さない）、
 // (c) reduce-motion は reduceStatic()（rAF 不要の静止1枚）、(d) dpr/実寸連動、(e) OS reduce の後付け ON を
-// matchMedia change で静止へ落とす安全弁。発射元 castFrom（画面座標）は canvas 相対 origin に変換して start に渡す。
+// matchMedia change で静止へ落とす安全弁。発射元＝メッセージ内の発動者アバターバッジ（originSelector）を canvas 相対 origin に変換して start に渡す。
 
 type Params = {
   effect: string;
   size: { w: number; h: number } | null;
-  justCast: boolean;      // 能動発動直後＝①ヘッダーのユーザーアバターから発射→着弾→永続。false＝②表示（発動者バッジから発射）。
-  castFrom?: CastPoint | null;  // ①の発射元の画面座標（ヘッダーのユーザーアバター）。無ければ既定位置から。
-  originSelector?: string | null; // ②の発射元＝メッセージ内の発動者アバターバッジ（自作自演は作成者アバター）の CSS セレクタ。
+  // 発射元＝メッセージ内の発動者アバターバッジ（自作自演は作成者アバター）の CSS セレクタ。①新規発動も②表示も同じ
+  // ＝canvas 枠内で完結（起点ポリシー: doc/画面設計/screens/SC-24_アイデアチャット.md）。取得不能時はエンジン既定（枠の右上）。
+  originSelector?: string | null;
 };
 
 // 画面座標 from を canvas 内の (w,h) 単位へ変換。
@@ -29,12 +29,7 @@ function originFromScreen(canvas: HTMLCanvasElement, from: CastPoint | null | un
 
 export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params: Params) {
   const { effect, size } = params;
-  // justCast/castFrom は生成時に読む（後続の再レンダで発射を再生しないよう ref 経由）。
-  const justCastRef = useRef(params.justCast);
-  const castFromRef = useRef(params.castFrom);
   const originSelectorRef = useRef(params.originSelector);
-  justCastRef.current = params.justCast;
-  castFromRef.current = params.castFrom;
   originSelectorRef.current = params.originSelector;
   // 一度でも開始したら以後の再生成（実寸/dpr 変化）は永続のみ＝発射は二度と再生しない。
   const everStartedRef = useRef(false);
@@ -65,22 +60,16 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
         return;
       }
       everStartedRef.current = true;
-      if (justCastRef.current) {
-        // ① ログインユーザが新規に発動した瞬間＝ヘッダーのユーザーアバターから飛来。
-        const o = originFromScreen(engine.canvas, castFromRef.current, size);
-        engine.start(o?.x, o?.y);
-      } else {
-        // ② 表示（履歴/リロード/他ユーザーの発動）＝発動者アバターバッジ（自作自演は作成者アバター）から飛来（4パターン）。
-        const host = (container.closest?.(".msg") as HTMLElement | null) ?? container;
-        const sel = originSelectorRef.current;
-        const el = sel ? (host.querySelector(sel) as HTMLElement | null) : null;
-        let o: { x: number; y: number } | null = null;
-        if (el) {
-          const r = el.getBoundingClientRect();
-          if (r.width && r.height) o = originFromScreen(engine.canvas, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, size);
-        }
-        engine.start(o?.x, o?.y); // 取得不能ならエンジン既定（枠の右上＝発動者位置）
+      // 発射元＝メッセージ内の発動者アバターバッジ（自作自演は作成者アバター）。①②とも同じ＝canvas 枠内で完結。
+      const host = (container.closest?.(".msg") as HTMLElement | null) ?? container;
+      const sel = originSelectorRef.current;
+      const el = sel ? (host.querySelector(sel) as HTMLElement | null) : null;
+      let o: { x: number; y: number } | null = null;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width && r.height) o = originFromScreen(engine.canvas, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, size);
       }
+      engine.start(o?.x, o?.y); // 取得不能ならエンジン既定（枠の右上＝発動者位置）
     };
 
     let started = false;
@@ -117,7 +106,7 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
       engine.stop();
       if (engine.canvas.parentNode === container) container.removeChild(engine.canvas);
     };
-    // 実寸/dpr（size）・effect 変化で再生成。justCast/castFrom は ref 経由なので依存に含めない。
+    // 実寸/dpr（size）・effect 変化で再生成。originSelector は ref 経由なので依存に含めない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effect, size?.w, size?.h]);
 }
