@@ -4120,9 +4120,9 @@
       })();
     </script>
 
-    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子がパネル全体へ満遍なく飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再びビーム→繰り返す</h3>
+    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビームが中央着弾→虹粒子がパネル全体へ満遍なく飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再び中央へビーム→繰り返す</h3>
     <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子がパネル全体へ満遍なく飛び散る（同心円状にならず一様に散る）</strong>。
-      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からランダムな方向へ新しい虹ビームが飛んでいく</strong>。着弾先でまた粒子が飛び散る——「広域に飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
+      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からパネル中央を狙って新しい虹ビームが飛んでいく</strong>。中央でまた粒子が飛び散る——「中央着弾で満遍なく飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→中央へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
     <div class="pixfire-stage is-light" id="pixrbowScStage">
       <div class="pixfire-msg is-light fx-rainbow" aria-label="虹ライト版・放浪デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹ビームや粒子と重なる位置＝文字が読めるかの確認用テキスト 🌈</div>
@@ -4164,10 +4164,9 @@
           if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
           return { x: PAD + rnd(W - 2*PAD), y: PAD + rnd(H - 2*PAD) };
         }
-        function fireFrom(gx, gy) {   /* 集結点からランダム方向へ新ビーム＝着弾先を canvas 内にクランプ */
-          var ang = rnd(6.2832), dist = (0.5 + rnd(0.4)) * (W + H) / 2;   /* 飛距離を延長（min(W,H)基準→平均基準）。着弾先は canvas 内にクランプ */
+        function fireFrom(gx, gy) {   /* 集結点から毎回パネル中央を狙って新ビームを発射 */
           origin = { x: gx, y: gy };
-          target = { x: clamp(gx + Math.cos(ang)*dist, PAD, W - PAD), y: clamp(gy + Math.sin(ang)*dist, PAD, H - PAD) };
+          target = { x: CX, y: CY };
           beamProg = 0; beamFade = 0; state = 'beam';
         }
         function drawBeam(o, tp, tipFrac, alpha) {
