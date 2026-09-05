@@ -4122,7 +4122,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビームが中央着弾→虹粒子がパネル全体へ満遍なく飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再び中央へビーム→繰り返す</h3>
     <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子がパネル全体へ満遍なく飛び散る（同心円状にならず一様に散る）</strong>。
-      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からパネル中央を狙って新しい虹ビームが飛んでいく</strong>。中央でまた粒子が飛び散る——「中央着弾で満遍なく飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→中央へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
+      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる（早い粒子から動き出し、遅れて動き出す粒子もいる＝集まり始めにむら）</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からパネル中央を狙って新しい虹ビームが飛んでいく</strong>。中央でまた粒子が飛び散る——「中央着弾で満遍なく飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→中央へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
     <div class="pixfire-stage is-light" id="pixrbowScStage">
       <div class="pixfire-msg is-light fx-rainbow" aria-label="虹ライト版・放浪デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹ビームや粒子と重なる位置＝文字が読めるかの確認用テキスト 🌈</div>
@@ -4148,7 +4148,7 @@
         var state = 'idle', raf = null, last = 0, acc = 0;
         var origin = { x: W-6, y: M }, target = { x: CX, y: CY }, beamProg = 0, BEAM_SPEED = 0.05, beamFade = 0;
         var parts = [], flash = 0, flashPt = { x: CX, y: CY }, gatherPt = { x: CX, y: CY };
-        var phaseT = 0, SCATTER_T = 30, GATHER_MAX = 170, HOLD_T = 20;   /* SCATTER=飛散尺／GATHER_MAX=集結の保険上限／HOLD=全集結後の溜め尺 */
+        var phaseT = 0, SCATTER_T = 30, GATHER_MAX = 220, HOLD_T = 20;   /* SCATTER=飛散尺／GATHER_MAX=集結の保険上限(開始ディレイ込み)／HOLD=全集結後の溜め尺 */
 
         function rnd(n) { return Math.random() * n; }
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -4158,7 +4158,7 @@
             var tx = PAD + rnd(W - 2*PAD), ty = PAD + rnd(H - 2*PAD);   /* パネル内の一様ランダムな行き先＝同心円にならず満遍なく散る */
             var ddx = tx - px, ddy = ty - py, dd = Math.sqrt(ddx*ddx + ddy*ddy) || 1, v0 = dd * (0.045 + rnd(0.035));
             parts.push({ x: px, y: py, vx: ddx/dd*v0, vy: ddy/dd*v0, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
-              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.035 + rnd(0.05) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら（早い粒子/遅い粒子） */
+              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.035 + rnd(0.05), startDelay: rnd(34) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら／startDelay＝集まり始めるタイミングのむら */
         }
         function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
           if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
@@ -4184,14 +4184,16 @@
         function updateParts() {
           for (var i = parts.length-1; i >= 0; i--) {
             var p = parts[i];
-            if (state === 'gather' || state === 'charge') {   /* 集結点へイージングで近づきつつ、進行方向に垂直へゆらゆら揺れる（近づくほど揺れは収まる） */
+            /* まだ集まり始めていない粒子（startDelay 未経過）は飛散の漂いを継続＝集まり始めにむら */
+            var gathering = (state === 'gather' && phaseT >= p.startDelay) || state === 'charge';
+            if (gathering) {   /* 集結点へイージングで近づきつつ、進行方向に垂直へゆらゆら揺れる（近づくほど揺れは収まる） */
               var dx = gatherPt.x - p.x, dy = gatherPt.y - p.y, dl = Math.sqrt(dx*dx + dy*dy) || 1;
               p.x += dx * p.ease; p.y += dy * p.ease;   /* p.ease でむら＝早い粒子/遅い粒子 */
               p.ph += p.pv;
               var sway = Math.sin(p.ph) * p.amp * Math.min(1, dl / 45);   /* 遠いほど大きく揺れ、集結点付近で収束 */
               p.x += (-dy / dl) * sway; p.y += (dx / dl) * sway;
               p.life -= 0.0025;
-            } else {   /* scatter＝各自の行き先へ飛び、徐々に減速して漂う（減速で行き先付近に散る＝満遍なく） */
+            } else {   /* scatter／集結開始待ち＝各自の行き先へ飛び、徐々に減速して漂う（減速で行き先付近に散る＝満遍なく） */
               p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.life -= 0.003;
             }
             if (p.life <= 0) parts.splice(i, 1);
