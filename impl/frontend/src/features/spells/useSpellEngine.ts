@@ -14,8 +14,9 @@ import type { CastPoint } from "@/components/ui/SpellDeliveryFx";
 type Params = {
   effect: string;
   size: { w: number; h: number } | null;
-  justCast: boolean;      // 能動発動直後＝発射→着弾→永続を再生（初回のみ）。false＝履歴＝永続のみ。
-  castFrom?: CastPoint | null;  // 発射元の画面座標（justCast 時）。無ければ既定位置から。
+  justCast: boolean;      // 能動発動直後＝①ヘッダーのユーザーアバターから発射→着弾→永続。false＝②表示（発動者バッジから発射）。
+  castFrom?: CastPoint | null;  // ①の発射元の画面座標（ヘッダーのユーザーアバター）。無ければ既定位置から。
+  originSelector?: string | null; // ②の発射元＝メッセージ内の発動者アバターバッジ（自作自演は作成者アバター）の CSS セレクタ。
 };
 
 // 画面座標 from を canvas 内の (w,h) 単位へ変換。
@@ -31,8 +32,10 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
   // justCast/castFrom は生成時に読む（後続の再レンダで発射を再生しないよう ref 経由）。
   const justCastRef = useRef(params.justCast);
   const castFromRef = useRef(params.castFrom);
+  const originSelectorRef = useRef(params.originSelector);
   justCastRef.current = params.justCast;
   castFromRef.current = params.castFrom;
+  originSelectorRef.current = params.originSelector;
   // 一度でも開始したら以後の再生成（実寸/dpr 変化）は永続のみ＝発射は二度と再生しない。
   const everStartedRef = useRef(false);
 
@@ -56,13 +59,28 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
     }
 
     const startInitial = () => {
-      if (justCastRef.current && !everStartedRef.current) {
+      if (everStartedRef.current) {
+        // 実寸/dpr 変化での再生成＝発射は再生せず永続のみ（発射は「初回表示」で1回だけ）。
+        engine.startPersist();
+        return;
+      }
+      everStartedRef.current = true;
+      if (justCastRef.current) {
+        // ① ログインユーザが新規に発動した瞬間＝ヘッダーのユーザーアバターから飛来。
         const o = originFromScreen(engine.canvas, castFromRef.current, size);
         engine.start(o?.x, o?.y);
       } else {
-        engine.startPersist();
+        // ② 表示（履歴/リロード/他ユーザーの発動）＝発動者アバターバッジ（自作自演は作成者アバター）から飛来（4パターン）。
+        const host = (container.closest?.(".msg") as HTMLElement | null) ?? container;
+        const sel = originSelectorRef.current;
+        const el = sel ? (host.querySelector(sel) as HTMLElement | null) : null;
+        let o: { x: number; y: number } | null = null;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width && r.height) o = originFromScreen(engine.canvas, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, size);
+        }
+        engine.start(o?.x, o?.y); // 取得不能ならエンジン既定（枠の右上＝発動者位置）
       }
-      everStartedRef.current = true;
     };
 
     let started = false;

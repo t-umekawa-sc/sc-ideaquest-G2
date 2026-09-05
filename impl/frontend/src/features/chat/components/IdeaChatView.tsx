@@ -34,6 +34,8 @@ const NORMAL_EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀"];
 const EMOJIS = ["👍", "❤️", "😄", "🎉", "🙏", "👀", "🔥", "✨", "😅", "🙌", "💡", "👏", "🤔", "🚀", "✅", "⚠️", "📌", "🎯"];
 // エフェクト種別→CSS（魔法エフェクト・design-system.css の spell-fx--*）。6 種を各々の見た目に（#10 で rainbow/aura を実効化）。
 const FX: Record<string, string> = { fire: "spell-fx--fire", ice: "spell-fx--ice", thunder: "spell-fx--thunder", sparkle: "spell-fx--sparkle", rainbow: "spell-fx--rainbow", aura: "spell-fx--aura" };
+// 発動者バッジの hover ツールチップ用の属性和名（style-guide.html §17 の「…が【炎】をかけました」に合わせる）。
+const SPELL_JA: Record<string, string> = { fire: "炎", ice: "氷", thunder: "雷", sparkle: "キラキラ", rainbow: "虹", aura: "オーラ" };
 
 type Member = { user_id: string; name: string; nospace: string };
 
@@ -453,6 +455,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           lastDay = day;
           const magic = (m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; mine?: boolean } })?.magic ?? null;
           const normal = ((m.reactions as { normal?: Array<{ emoji: string; count: number; reacted_by_me: boolean; users?: string[] }> })?.normal) ?? [];
+          // 自作自演＝発動者==作成者（§17 の4パターン④）。発動者バッジは出さず作成者アバターに✦。
+          const selfCast = !!magic && (magic.mine ? m.is_mine : magic.actor != null && magic.actor === m.author?.name);
+          const casterName = magic?.actor || (magic?.mine ? "あなた" : "");
+          const spellJa = SPELL_JA[magic?.effect ?? ""] ?? "魔法";
           return (
             // #17: key=id なので新着メッセージだけが mount＝CSS で登場（既存は再利用され再生しない）。
             <div key={m.id} className="msg-row">
@@ -462,9 +468,15 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
                     canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
                 {magic && (isCanvasEffect(magic.effect ?? "")
-                  ? <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} />
+                  ? <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />
                   : <SpellPersistFx effect={magic.effect ?? ""} />)}
-                <span className="avatar sm"><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
+                <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "")}><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
+                {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。 */}
+                {magic && !selfCast && (
+                  <span className="msg__caster avatar sm" data-name={casterName} title={`${casterName} が【${spellJa}】をかけました`} aria-hidden>
+                    <span className="avatar__img placeholder">{(casterName || "?").charAt(0)}</span>
+                  </span>
+                )}
                 <div className="msg__body">
                   <div className="msg__head">
                     <span className="msg__name">{m.is_deleted ? "" : m.author?.name}</span>

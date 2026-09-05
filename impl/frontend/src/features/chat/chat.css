@@ -36,6 +36,13 @@
 .msg.is-me { background: var(--color-primary-soft); border-left: 3px solid var(--color-primary); padding-left: calc(var(--space-3) - 3px); }
 .msg.is-me:hover { background: #DCE8FE; }
 .msg.is-me .msg__name { color: var(--color-primary-active); }
+/* 発動者アバターバッジ（§17「受信/表示側の4パターン（発動者→作成者）」＝メッセージ右上に発動者）。
+   魔法エフェクトの canvas(.spell-fx__layer z-index:0)より前面に出す。自作自演では出さず作成者アバターに✦。 */
+.msg__caster { position: absolute; top: 2px; right: 8px; z-index: 2; box-shadow: 0 0 0 2px var(--rarity-rare), 0 1px 4px rgba(0,0,0,.35); }
+.msg__author { position: relative; z-index: 2; }
+.msg__author.is-selfcast { box-shadow: 0 0 0 2px var(--rarity-rare), 0 1px 4px rgba(0,0,0,.35); }
+/* 自己発動マーク＝作成者アバターの右下に✦（::before＝.avatar のツールチップ ::after と衝突回避）。 */
+.msg__author.is-selfcast::before { content: "✦"; position: absolute; right: -4px; bottom: -4px; width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; color: #ffca42; background: #3a2a12; box-shadow: 0 0 0 1px rgba(255,180,60,.7); z-index: 1; }
 .msg__body { min-width: 0; flex: 1; }
 .msg__head { display: flex; align-items: baseline; gap: var(--space-2); }
 .msg__name { font-weight: 700; font-size: var(--text-sm); }
