@@ -4122,7 +4122,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子が広域に飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再びビーム→繰り返す</h3>
     <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子が勢いよく広域へ飛び散る</strong>。
-      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆっくり集まってくる</strong>。<strong>集まりきるとそこにエネルギーが溜まって光の球になり、球からランダムな方向へ新しい虹ビームが飛んでいく</strong>。着弾先でまた粒子が飛び散る——「広域に飛散→1粒の位置へゆっくり集結→チャージ→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
+      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からランダムな方向へ新しい虹ビームが飛んでいく</strong>。着弾先でまた粒子が飛び散る——「広域に飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
     <div class="pixfire-stage is-light" id="pixrbowScStage">
       <div class="pixfire-msg is-light fx-rainbow" aria-label="虹ライト版・放浪デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹ビームや粒子と重なる位置＝文字が読めるかの確認用テキスト 🌈</div>
@@ -4155,7 +4155,8 @@
         function burst(px, py) {   /* 着弾点で虹粒子が四方へ飛散＋閃光 */
           flash = 1; flashPt = { x: px, y: py };
           for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 3.8 + rnd(5.2);   /* 初速は速め＝勢いよく広域へ飛散 */
-            parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
+            parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
+              ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4) }); }   /* ph/pv/amp＝集結時のゆらゆら揺れ用 */
         }
         function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
           if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
@@ -4182,8 +4183,13 @@
         function updateParts() {
           for (var i = parts.length-1; i >= 0; i--) {
             var p = parts[i];
-            if (state === 'gather' || state === 'charge') {   /* 集結点へまっすぐイージングで近づくだけ（スプリングなし＝跳ね返らない） */
-              p.x += (gatherPt.x - p.x) * 0.05; p.y += (gatherPt.y - p.y) * 0.05; p.life -= 0.0025;
+            if (state === 'gather' || state === 'charge') {   /* 集結点へイージングで近づきつつ、進行方向に垂直へゆらゆら揺れる（近づくほど揺れは収まる） */
+              var dx = gatherPt.x - p.x, dy = gatherPt.y - p.y, dl = Math.sqrt(dx*dx + dy*dy) || 1;
+              p.x += dx * 0.045; p.y += dy * 0.045;
+              p.ph += p.pv;
+              var sway = Math.sin(p.ph) * p.amp * Math.min(1, dl / 45);   /* 遠いほど大きく揺れ、集結点付近で収束 */
+              p.x += (-dy / dl) * sway; p.y += (dx / dl) * sway;
+              p.life -= 0.0025;
             } else {   /* scatter＝速い初速で広域へ飛び、徐々に減速して漂う */
               p.x += p.vx; p.y += p.vy; p.vx *= 0.965; p.vy *= 0.965; p.life -= 0.003;
             }
@@ -4196,9 +4202,14 @@
             ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); }
           ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         }
-        function drawChargeBall(t) {   /* 集結点で溜まる光の球＝発射直前に強く光る */
-          var grow = 6 + (t / CHARGE_T) * 10, g = ctx.createRadialGradient(gatherPt.x, gatherPt.y, 0, gatherPt.x, gatherPt.y, grow);
-          g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.5, 'rgba(255,220,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        function countGathered() {   /* 集結点付近に集まった粒子数 */
+          var n = 0; for (var i = 0; i < parts.length; i++) { var dx = parts[i].x - gatherPt.x, dy = parts[i].y - gatherPt.y; if (dx*dx + dy*dy < 22*22) n++; } return n;
+        }
+        function drawEnergyBall() {   /* 集結点で溜まる光の球＝集まった粒子数に比例してエネルギー(大きさ/強さ)が高まる */
+          var n = countGathered(); if (n <= 0) return;
+          var grow = 4 + n * 0.95, inner = Math.min(1, 0.45 + n * 0.03);
+          var g = ctx.createRadialGradient(gatherPt.x, gatherPt.y, 0, gatherPt.x, gatherPt.y, grow);
+          g.addColorStop(0, 'rgba(255,255,255,' + inner.toFixed(2) + ')'); g.addColorStop(0.5, 'rgba(255,220,255,' + (inner*0.55).toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)');
           ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gatherPt.x, gatherPt.y, grow, 0, 6.2832); ctx.fill();
         }
         function render() {
@@ -4207,7 +4218,7 @@
             fg.addColorStop(0, 'rgba(255,255,255,' + (flash*0.85).toFixed(2) + ')'); fg.addColorStop(1, 'rgba(255,255,255,0)');
             ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(flashPt.x, flashPt.y, fr, 0, 6.2832); ctx.fill(); }
           drawParts();
-          if (state === 'charge') drawChargeBall(phaseT);
+          if (state === 'gather' || state === 'charge') drawEnergyBall();   /* 集まってくる間ずっと、集まった数に比例してエネルギーが高まる */
           if (state === 'beam') drawBeam(origin, target, beamProg, 1);
           else if (beamFade > 0.03) drawBeam(origin, target, 1, beamFade);
         }
