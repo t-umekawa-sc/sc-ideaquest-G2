@@ -1106,7 +1106,7 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
  *   炎などの魔法エフェクトは「業務層チャットに遊びを差し込む」意図的な例外演出。
  *   prefers-reduced-motion では動きを止め、静的な色味だけ残す。
  * ============================================================= */
-.reaction-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); align-items: center; }
+.reaction-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); align-items: center; position: relative; z-index: 1; }
 .reaction {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 2px var(--space-2); min-height: 26px;
@@ -1134,7 +1134,7 @@ a.pixel-stat { text-decoration: none; } /* SP等をリンクにする場合の�
 /* --- 魔法エフェクト（メッセージ枠に付与・永続） --- */
 .spell-fx { position: relative; border-radius: var(--radius); }
 /* Phase D: 永続装飾の実測ラッパ（枠実寸を測り、size-adaptive な効果に w,h を渡す）。効果は枠外へ描くため overflow は切らない。 */
-.spell-fx__layer { position: absolute; inset: 0; border-radius: var(--radius); pointer-events: none; }
+.spell-fx__layer { position: absolute; inset: 0; border-radius: var(--radius); pointer-events: none; z-index: 0; }
 .spell-fx__layer > * { position: absolute; }
 /* 炎: 枠が燃える。ちらつく暖色グロー＋上端に揺れる炎。 */
 .spell-fx--fire {
