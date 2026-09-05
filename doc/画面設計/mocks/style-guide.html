@@ -4120,8 +4120,8 @@
       })();
     </script>
 
-    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子が広域に飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再びビーム→繰り返す</h3>
-    <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子が勢いよく広域へ飛び散る</strong>。
+    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子がパネル全体へ満遍なく飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再びビーム→繰り返す</h3>
+    <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子がパネル全体へ満遍なく飛び散る（同心円状にならず一様に散る）</strong>。
       その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆらゆら揺れながらゆっくり集まってくる</strong>。<strong>集まった粒子の数に比例してその位置のエネルギー（光の球）が高まっていき、溜まりきると球からランダムな方向へ新しい虹ビームが飛んでいく</strong>。着弾先でまた粒子が飛び散る——「広域に飛散→1粒の位置へゆらゆら集結→数に比例してチャージ→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
     <div class="pixfire-stage is-light" id="pixrbowScStage">
@@ -4154,8 +4154,10 @@
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
         function burst(px, py) {   /* 着弾点で虹粒子が四方へ飛散＋閃光 */
           flash = 1; flashPt = { x: px, y: py };
-          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 3.8 + rnd(5.2);   /* 初速は速め＝勢いよく広域へ飛散 */
-            parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
+          for (var i = 0; i < 28; i++) {
+            var tx = PAD + rnd(W - 2*PAD), ty = PAD + rnd(H - 2*PAD);   /* パネル内の一様ランダムな行き先＝同心円にならず満遍なく散る */
+            var ddx = tx - px, ddy = ty - py, dd = Math.sqrt(ddx*ddx + ddy*ddy) || 1, v0 = dd * (0.045 + rnd(0.035));
+            parts.push({ x: px, y: py, vx: ddx/dd*v0, vy: ddy/dd*v0, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)],
               ph: rnd(6.2832), pv: 0.16 + rnd(0.16), amp: 0.8 + rnd(1.4), ease: 0.035 + rnd(0.05) }); }   /* ph/pv/amp＝ゆらゆら揺れ用／ease＝集まる速さのむら（早い粒子/遅い粒子） */
         }
         function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
@@ -4163,7 +4165,7 @@
           return { x: PAD + rnd(W - 2*PAD), y: PAD + rnd(H - 2*PAD) };
         }
         function fireFrom(gx, gy) {   /* 集結点からランダム方向へ新ビーム＝着弾先を canvas 内にクランプ */
-          var ang = rnd(6.2832), dist = (0.42 + rnd(0.34)) * Math.min(W, H);
+          var ang = rnd(6.2832), dist = (0.5 + rnd(0.4)) * (W + H) / 2;   /* 飛距離を延長（min(W,H)基準→平均基準）。着弾先は canvas 内にクランプ */
           origin = { x: gx, y: gy };
           target = { x: clamp(gx + Math.cos(ang)*dist, PAD, W - PAD), y: clamp(gy + Math.sin(ang)*dist, PAD, H - PAD) };
           beamProg = 0; beamFade = 0; state = 'beam';
@@ -4190,8 +4192,8 @@
               var sway = Math.sin(p.ph) * p.amp * Math.min(1, dl / 45);   /* 遠いほど大きく揺れ、集結点付近で収束 */
               p.x += (-dy / dl) * sway; p.y += (dx / dl) * sway;
               p.life -= 0.0025;
-            } else {   /* scatter＝速い初速で広域へ飛び、徐々に減速して漂う */
-              p.x += p.vx; p.y += p.vy; p.vx *= 0.965; p.vy *= 0.965; p.life -= 0.003;
+            } else {   /* scatter＝各自の行き先へ飛び、徐々に減速して漂う（減速で行き先付近に散る＝満遍なく） */
+              p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.life -= 0.003;
             }
             if (p.life <= 0) parts.splice(i, 1);
           }
