@@ -4120,9 +4120,9 @@
       })();
     </script>
 
-    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子が飛び散る→ランダムな箇所に再集結→そこからランダム方向へ再びビーム→繰り返す</h3>
-    <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子がパッと四方へ飛び散る</strong>。
-      その後<strong>飛び散った粒子がパネル内のランダムな箇所へ吸い寄せられて再集結し、光の球になる</strong>。<strong>球からランダムな方向へ新しい虹ビームが飛んでいき、着弾先でまた粒子が飛び散る</strong>——「飛散→ランダム集結→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
+    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子が広域に飛び散る→飛散粒子の1つの位置へゆっくり集結→エネルギーが溜まって再びビーム→繰り返す</h3>
+    <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子が勢いよく広域へ飛び散る</strong>。
+      その後<strong>飛び散った粒子が、その中の1つの位置へ向かってゆっくり集まってくる</strong>。<strong>集まりきるとそこにエネルギーが溜まって光の球になり、球からランダムな方向へ新しい虹ビームが飛んでいく</strong>。着弾先でまた粒子が飛び散る——「広域に飛散→1粒の位置へゆっくり集結→チャージ→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
       <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
     <div class="pixfire-stage is-light" id="pixrbowScStage">
       <div class="pixfire-msg is-light fx-rainbow" aria-label="虹ライト版・放浪デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹ビームや粒子と重なる位置＝文字が読めるかの確認用テキスト 🌈</div>
@@ -4154,12 +4154,11 @@
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
         function burst(px, py) {   /* 着弾点で虹粒子が四方へ飛散＋閃光 */
           flash = 1; flashPt = { x: px, y: py };
-          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 2.8 + rnd(4.0);   /* 初速は速め＝勢いよく広域へ飛散 */
+          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 3.8 + rnd(5.2);   /* 初速は速め＝勢いよく広域へ飛散 */
             parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
         }
-        function pickGatherPt(awayFrom) {   /* パネル内のランダム点（直前の着弾点から一定以上離す） */
-          for (var k = 0; k < 12; k++) { var gx = PAD + rnd(W - 2*PAD), gy = PAD + rnd(H - 2*PAD);
-            var dx = gx - awayFrom.x, dy = gy - awayFrom.y; if (dx*dx + dy*dy > (Math.min(W, H) * 0.28) * (Math.min(W, H) * 0.28)) return { x: gx, y: gy }; }
+        function pickGatherFromParts() {   /* 集結先＝飛散した粒子のうちの1つの位置（画面内にクランプ）。他の粒子はそこへ集まる */
+          if (parts.length) { var p = parts[(rnd(parts.length))|0]; return { x: clamp(p.x, PAD, W - PAD), y: clamp(p.y, PAD, H - PAD) }; }
           return { x: PAD + rnd(W - 2*PAD), y: PAD + rnd(H - 2*PAD) };
         }
         function fireFrom(gx, gy) {   /* 集結点からランダム方向へ新ビーム＝着弾先を canvas 内にクランプ */
@@ -4188,7 +4187,7 @@
               p.vx = (p.vx + ax) * 0.90; p.vy = (p.vy + ay) * 0.90;
               p.x += p.vx; p.y += p.vy; p.life -= 0.0025;
             } else {   /* scatter＝速い初速で広域へ飛び、徐々に減速して漂う */
-              p.x += p.vx; p.y += p.vy; p.vx *= 0.955; p.vy *= 0.955; p.life -= 0.003;
+              p.x += p.vx; p.y += p.vy; p.vx *= 0.965; p.vy *= 0.965; p.life -= 0.003;
             }
             if (p.life <= 0) parts.splice(i, 1);
           }
@@ -4220,7 +4219,7 @@
           while (acc >= 33) {
             if (flash > 0) flash *= 0.82;
             if (beamFade > 0) beamFade *= 0.72;
-            if (state === 'scatter') { phaseT++; if (phaseT >= SCATTER_T) { gatherPt = pickGatherPt(flashPt); state = 'gather'; phaseT = 0; } }
+            if (state === 'scatter') { phaseT++; if (phaseT >= SCATTER_T) { gatherPt = pickGatherFromParts(); state = 'gather'; phaseT = 0; } }
             else if (state === 'gather') { phaseT++; if (phaseT >= GATHER_T) { state = 'charge'; phaseT = 0; } }
             else if (state === 'charge') { phaseT++; if (phaseT >= CHARGE_T) { flash = 0.9; flashPt = { x: gatherPt.x, y: gatherPt.y }; parts.length = 0; fireFrom(gatherPt.x, gatherPt.y); } }
             updateParts(); acc -= 33;
