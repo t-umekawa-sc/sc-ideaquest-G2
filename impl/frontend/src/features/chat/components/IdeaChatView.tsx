@@ -339,7 +339,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
         if (isCanvasEffect(eff)) {
           // canvas 化済み＝そのメッセージの canvas が発射→着弾→永続を1枚で再生（CSS deliver/cast は使わない）。
-          setCanvasCast((c) => ({ ...c, [m.id]: from ?? null }));
+          // 発射元はモック（style-guide.html §17L）と同じ「術者位置＝枠の右上」からの飛来にする＝
+          // from（ピッカーの選択ボタン位置＝枠下部）を使うと火の玉がほとんど飛ばず着火だけに見えるため null を渡し、
+          // エンジン既定の起点（右上）から中央下部へ斜めに飛来させる（＝受入済みモックの発動アニメを再現）。
+          setCanvasCast((c) => ({ ...c, [m.id]: null }));
         } else if (from) {
           // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
           fireDelivery(from, m.id, eff, spell.rarity);
