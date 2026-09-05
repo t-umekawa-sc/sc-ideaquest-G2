@@ -3802,7 +3802,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-h. キラキラ（ライト版）＝流れ星→中央着弾で四方へ弾け→彩色のきらめきがまばらに瞬く（＋たまにUFO）</h3>
     <p class="muted text-sm">ダーク版（§17h）は夜空前提（天の川・オーロラ・白いきらめき）で明色パネルでは見えないため、<strong>昼の光のきらめき</strong>に転換した（第1ドラフト）。
-      天の川・オーロラは削除し、<strong>きらめきを金・水色・桃・紫の濃いめの彩色</strong>にして白パネルでも映えるように。骨格（流れ星→中央着弾で四方へ弾け→まばらに瞬く＋たまにドット絵UFO）は維持。
+      天の川・オーロラは削除し、<strong>きらめきを金・水色・桃・紫の濃いめの彩色</strong>にして白パネルでも映えるように。骨格（流れ星→中央着弾で四方へ弾け→まばらに瞬く＋たまにドット絵UFO）は維持。<strong>UFOが通った後の道には星がこぼれ、ゆらゆら舞いながらキラキラ瞬く</strong>。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixsparkLStage">
       <div class="pixfire-msg is-light fx-sparkle" aria-label="キラキラライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【キラキラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はキラキラと重なる位置＝瞬きで文字が読めるかの確認用テキスト ✧</div>
@@ -3874,7 +3874,9 @@
             if (u.pat === 8) { if (u.prog > 0.42 && u.prog < 0.5 && u.hover < 14) u.hover++; else u.prog += u.spd; }
             else if (u.pat === 9) u.prog += u.spd * (0.35 + u.prog*1.7);
             else u.prog += u.spd;
-            computeUFO(); if (u.prog >= 1) ufo = null;
+            computeUFO();
+            if (u.prog > 0.02 && u.prog < 0.98 && rnd(1) < 0.55) spawnTrailSparkle(u.x - u.dir*(5+rnd(9)), u.y + (rnd(10)-5));   /* 通った道に星がキラキラと舞う */
+            if (u.prog >= 1) ufo = null;
           } else if (state === 'persist') { ufoTimer--; if (ufoTimer <= 0) spawnUFO(); }
         }
         function drawUFO() {
@@ -3899,7 +3901,10 @@
         function spawnTwinkle() {   /* 1回のspawnで2粒＝密度アップ。サイズも少し大きく多彩に */
           for (var n = 0; n < 2; n++) twinkles.push({ x: rnd(W), y: rnd(H), vx: (rnd(2)-1)*0.1, vy: (rnd(2)-1)*0.08 - 0.03, age: 0, dur: 24 + (rnd(40)|0), size: 1.8 + rnd(3.2), col: pick() });
         }
-        function updateTwinkles() { for (var i = twinkles.length-1; i >= 0; i--) { var w = twinkles[i]; w.age++; w.x += w.vx; w.y += w.vy; if (w.age >= w.dur) twinkles.splice(i, 1); } }
+        function spawnTrailSparkle(x, y) {   /* UFOが通った道に星をこぼす＝ゆらゆら舞いながら瞬く（swayで横揺れ） */
+          twinkles.push({ x: x, y: y, vx: (rnd(1)-0.5)*0.3, vy: 0.04 + rnd(0.14), age: 0, dur: 40 + (rnd(50)|0), size: 1.4 + rnd(2.4), col: pick(), sway: 0.2 + rnd(0.3) });
+        }
+        function updateTwinkles() { for (var i = twinkles.length-1; i >= 0; i--) { var w = twinkles[i]; w.age++; w.x += w.vx + (w.sway ? Math.sin(w.age*0.25)*w.sway : 0); w.y += w.vy; if (w.age >= w.dur) twinkles.splice(i, 1); } }
         function render() {
           ctx.clearRect(0, 0, W, H);
           drawUFO();
