@@ -3920,7 +3920,7 @@
           if (!last) last = ts; acc += ts - last; last = ts;
           if (state === 'incoming' && star) {
             var dx = CX - star.x, dy = CY - star.y, dist = Math.sqrt(dx*dx+dy*dy), SPEED = Math.max(6, (W+H)/70);
-            if (dist <= SPEED) { spawnBurst(CX, CY); star = null; state = 'persist'; }
+            if (dist <= SPEED) { spawnBurst(CX, CY); star = null; state = 'persist'; spawnUFO(); }   /* 着弾直後に一度だけUFOを走らせる（以降はspawnUFOが設定した通常間隔） */
             else { star.x += dx/dist*SPEED; star.y += dy/dist*SPEED; star.trail.push([star.x, star.y]); if (star.trail.length > 10) star.trail.shift(); }
           }
           while (acc >= 33) { t++; if (state === 'persist' && bgFade < 1) bgFade = Math.min(1, bgFade + 0.02); updateBurst(); if (state === 'persist' && Math.random() < 0.2) spawnTwinkle(); updateTwinkles(); updateUFO(); acc -= 33; }
