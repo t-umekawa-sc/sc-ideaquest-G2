@@ -4148,7 +4148,7 @@
         var state = 'idle', raf = null, last = 0, acc = 0;
         var origin = { x: W-6, y: M }, target = { x: CX, y: CY }, beamProg = 0, BEAM_SPEED = 0.05, beamFade = 0;
         var parts = [], flash = 0, flashPt = { x: CX, y: CY }, gatherPt = { x: CX, y: CY };
-        var phaseT = 0, SCATTER_T = 30, GATHER_T = 28, CHARGE_T = 14;   /* 各フェーズの尺（ticks）＝ふわっと広がってからゆったり集まる */
+        var phaseT = 0, SCATTER_T = 30, GATHER_T = 46, CHARGE_T = 14;   /* 各フェーズの尺（ticks）＝広域に飛散→ゆっくり集まる */
 
         function rnd(n) { return Math.random() * n; }
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -4183,10 +4183,10 @@
         function updateParts() {
           for (var i = parts.length-1; i >= 0; i--) {
             var p = parts[i];
-            if (state === 'gather' || state === 'charge') {   /* 集結点へバネで柔らかく吸着＋わずかに旋回（ゆったり） */
-              var ax = (gatherPt.x - p.x)*0.032, ay = (gatherPt.y - p.y)*0.032;
-              p.vx = (p.vx + ax) * 0.88; p.vy = (p.vy + ay) * 0.88;
-              p.x += p.vx; p.y += p.vy; p.life -= 0.003;
+            if (state === 'gather' || state === 'charge') {   /* 集結点へバネで柔らかく吸着＋わずかに旋回（ゆっくり） */
+              var ax = (gatherPt.x - p.x)*0.018, ay = (gatherPt.y - p.y)*0.018;
+              p.vx = (p.vx + ax) * 0.90; p.vy = (p.vy + ay) * 0.90;
+              p.x += p.vx; p.y += p.vy; p.life -= 0.0025;
             } else {   /* scatter＝速い初速で広域へ飛び、徐々に減速して漂う */
               p.x += p.vx; p.y += p.vy; p.vx *= 0.955; p.vy *= 0.955; p.life -= 0.003;
             }
