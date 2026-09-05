@@ -3613,16 +3613,16 @@
         }
         function spawnShatter(p) {   /* パリン！＝氷柱が保持後に砕け散る。柱の稜線に沿って角ばった氷片を生成し外へ飛散＋根元で雪と冷気粒 */
           var ax = Math.cos(p.ang), ay = Math.sin(p.ang), nx = -ay, ny = ax, curL = p.L * p.grow;
-          var n = Math.max(6, (curL / 4) | 0);
+          var n = Math.max(3, (curL / 9) | 0);   /* 控えめ＝破片の数を減らす */
           for (var i = 0; i <= n; i++) {
             var tt = i / n, cx = p.bx + ax * curL * tt, cy = p.by + ay * curL * tt;
-            var side = rnd(1) < 0.5 ? 1 : -1, sp = 0.7 + rnd(1.8) + tt * 1.3;   /* 先端ほど速く飛ぶ */
-            var vx = nx * side * sp * (0.5 + rnd(0.8)) + (rnd(1) - 0.5) * 1.1;
-            var vy = ny * side * sp * 0.4 - (0.5 + rnd(1.7));   /* パリンと弾け上へ跳ねる */
-            frags.push({ x: cx, y: cy, vx: vx, vy: vy, life: 1, size: rnd(1) < 0.4 ? 3 : 2, lit: p.lit || 1 });
+            var side = rnd(1) < 0.5 ? 1 : -1, sp = 0.4 + rnd(1.0) + tt * 0.7;   /* 控えめ＝飛距離を抑える（先端はやや速く） */
+            var vx = nx * side * sp * (0.5 + rnd(0.7)) + (rnd(1) - 0.5) * 0.7;
+            var vy = ny * side * sp * 0.4 - (0.3 + rnd(1.0));   /* 控えめ＝跳ね上がりを弱く */
+            frags.push({ x: cx, y: cy, vx: vx, vy: vy, life: 0.85, size: rnd(1) < 0.25 ? 2 : 1, lit: p.lit || 1 });   /* 控えめ＝小粒・早めに消える */
           }
-          spawnSnowBurst(p.bx + ax * curL * 0.4, p.by + ay * curL * 0.4, 5 + (rnd(4) | 0));   /* 砕けた粉雪 */
-          for (var s = 0; s < 5; s++) { var a = rnd(6.283), ss = 0.6 + rnd(1.5); spawnSpeck(p.bx, p.by, Math.cos(a) * ss, Math.sin(a) * ss, 1); }
+          spawnSnowBurst(p.bx + ax * curL * 0.4, p.by + ay * curL * 0.4, 2 + (rnd(3) | 0));   /* 控えめ＝砕けた粉雪を少なく */
+          for (var s = 0; s < 3; s++) { var a = rnd(6.283), ss = 0.5 + rnd(1.1); spawnSpeck(p.bx, p.by, Math.cos(a) * ss, Math.sin(a) * ss, 1); }
         }
         function drawFrags() {   /* 割れた氷の破片＝小さな角ばったダイヤ（片側にハイライト面・青い稜線） */
           for (var i = 0; i < frags.length; i++) {
