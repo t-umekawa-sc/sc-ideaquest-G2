@@ -4154,7 +4154,7 @@
         function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
         function burst(px, py) {   /* 着弾点で虹粒子が四方へ飛散＋閃光 */
           flash = 1; flashPt = { x: px, y: py };
-          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 0.9 + rnd(2.0);   /* 初速は控えめ＝ふわっと */
+          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 2.8 + rnd(4.0);   /* 初速は速め＝勢いよく広域へ飛散 */
             parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
         }
         function pickGatherPt(awayFrom) {   /* パネル内のランダム点（直前の着弾点から一定以上離す） */
@@ -4187,8 +4187,8 @@
               var ax = (gatherPt.x - p.x)*0.032, ay = (gatherPt.y - p.y)*0.032;
               p.vx = (p.vx + ax) * 0.88; p.vy = (p.vy + ay) * 0.88;
               p.x += p.vx; p.y += p.vy; p.life -= 0.003;
-            } else {   /* scatter＝ふわっと自由飛行（減速ゆるめで長く漂う） */
-              p.x += p.vx; p.y += p.vy; p.vx *= 0.965; p.vy *= 0.965; p.life -= 0.003;
+            } else {   /* scatter＝速い初速で広域へ飛び、徐々に減速して漂う */
+              p.x += p.vx; p.y += p.vy; p.vx *= 0.955; p.vy *= 0.955; p.life -= 0.003;
             }
             if (p.life <= 0) parts.splice(i, 1);
           }
