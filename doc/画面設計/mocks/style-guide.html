@@ -3347,7 +3347,7 @@
         pointer-events: none; filter: drop-shadow(0 0 5px rgba(234,88,12,.5)); }
       .pixfire-msg.is-light.fx-rainbow { border: 1px solid rgba(236,72,153,.7); box-shadow: 0 0 12px 3px rgba(236,72,153,.5), inset 0 0 14px rgba(59,130,246,.2); }
       .pixfire-msg.is-light.fx-rainbow .msg-avatar.caster { background: #be185d; box-shadow: 0 0 0 2px rgba(236,72,153,.55), 0 1px 4px rgba(0,0,0,.35); }
-      #pixrbowLStage { padding-inline: 48px; }   /* 虹はパネル外側を囲うので左右に逃げ幅を確保 */
+      #pixrbowLStage, #pixrbowScStage { padding-inline: 48px; }   /* 虹はパネル外側にも及ぶので左右に逃げ幅を確保 */
       .pix-rainbow-l { position: absolute; pointer-events: none; z-index: 3; filter: drop-shadow(0 0 5px rgba(236,72,153,.3)); }
     </style>
 
@@ -4098,6 +4098,160 @@
         var dpr = Math.min(2, window.devicePixelRatio || 1), M = 30;
         var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
         var rb = createRainbowSpellLight({ w: w, h: h, margin: M, dpr: dpr });
+        rb.canvas.style.left = (-M) + 'px'; rb.canvas.style.top = (-M) + 'px'; rb.canvas.style.right = 'auto'; rb.canvas.style.bottom = 'auto';
+        rb.canvas.style.width = 'calc(100% + ' + (2*M) + 'px)'; rb.canvas.style.height = 'calc(100% + ' + (2*M) + 'px)';
+        msg.appendChild(rb.canvas);
+        var caster = msg.querySelector('.msg-avatar.caster');
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
+        function origin() {
+          if (!caster) return { x: w + M - 6, y: M };
+          var cr = rb.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
+          if (!cr.width || !cr.height) return { x: w + M - 6, y: M };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * (w + 2*M), y: (ar.top + ar.height/2 - cr.top) / cr.height * (h + 2*M) };
+        }
+        function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
+        btn.addEventListener('click', play);
+        if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) rb.reduceStatic(); });
+        if ('IntersectionObserver' in window) {
+          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
+          io.observe(stage);
+        }
+      })();
+    </script>
+
+    <h3 style="margin-top:var(--space-5)">17L-f2. 虹（ライト版・放浪バリエーション）＝虹ビーム着弾→虹粒子が飛び散る→ランダムな箇所に再集結→そこからランダム方向へ再びビーム→繰り返す</h3>
+    <p class="muted text-sm"><strong>フル解像度（滑らか）</strong>。§17L-f とは<strong>別バージョン</strong>。発動＝<strong>右上の術者アイコンから虹色ビームを発射</strong>しパネル中央に着弾、<strong>着弾で虹色の粒子がパッと四方へ飛び散る</strong>。
+      その後<strong>飛び散った粒子がパネル内のランダムな箇所へ吸い寄せられて再集結し、光の球になる</strong>。<strong>球からランダムな方向へ新しい虹ビームが飛んでいき、着弾先でまた粒子が飛び散る</strong>——「飛散→ランダム集結→ランダム方向へ再発射」を<strong>繰り返し続ける</strong>（囲む虹は描かない放浪型）。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（中央の虹の輝き）。</p>
+    <div class="pixfire-stage is-light" id="pixrbowScStage">
+      <div class="pixfire-msg is-light fx-rainbow" aria-label="虹ライト版・放浪デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【虹】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は虹ビームや粒子と重なる位置＝文字が読めるかの確認用テキスト 🌈</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="pixrbowScBtn">魔法を発動</button>
+      <label class="checkbox"><input type="checkbox" id="pixrbowScReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <script>
+      /* 虹エンジン（ライト版・放浪バリエーション／フル解像度）。§17L-f とは別物。
+         サイクル＝beam(ビーム進行)→着弾で burst(虹粒子が四方へ飛散)→scatter(自由飛行)→gather(ランダム集結点へ吸着)→charge(球が溜める)→ランダム方向へ再 beam …を繰り返す。
+         API: start(ox,oy)／reduceStatic()／stop()。 */
+      function createRainbowScatterSpellLight(opts) {
+        opts = opts || {};
+        var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), M = opts.margin || 30, dpr = opts.dpr || 1;
+        var W = PW + 2*M, H = PH + 2*M;
+        var canvas = document.createElement('canvas'); canvas.className = 'pix-rainbow-l'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+        var CX = W / 2, CY = H / 2, PAD = M * 0.7;   /* 集結点/着弾点はこのパッド内に収める */
+        var RAINBOW = ['#ff5a5a', '#ff9f40', '#ffe14d', '#5fd06a', '#4aa0ff', '#b478ff'];
+        var state = 'idle', raf = null, last = 0, acc = 0;
+        var origin = { x: W-6, y: M }, target = { x: CX, y: CY }, beamProg = 0, BEAM_SPEED = 0.06, beamFade = 0;
+        var parts = [], flash = 0, flashPt = { x: CX, y: CY }, gatherPt = { x: CX, y: CY };
+        var phaseT = 0, SCATTER_T = 16, GATHER_T = 22, CHARGE_T = 12;   /* 各フェーズの尺（ticks） */
+
+        function rnd(n) { return Math.random() * n; }
+        function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+        function burst(px, py) {   /* 着弾点で虹粒子が四方へ飛散＋閃光 */
+          flash = 1; flashPt = { x: px, y: py };
+          for (var i = 0; i < 28; i++) { var ang = rnd(6.2832), sp = 1.4 + rnd(3.0);
+            parts.push({ x: px, y: py, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 1, r: 2 + rnd(3), col: RAINBOW[(rnd(6)|0)] }); }
+        }
+        function pickGatherPt(awayFrom) {   /* パネル内のランダム点（直前の着弾点から一定以上離す） */
+          for (var k = 0; k < 12; k++) { var gx = PAD + rnd(W - 2*PAD), gy = PAD + rnd(H - 2*PAD);
+            var dx = gx - awayFrom.x, dy = gy - awayFrom.y; if (dx*dx + dy*dy > (Math.min(W, H) * 0.28) * (Math.min(W, H) * 0.28)) return { x: gx, y: gy }; }
+          return { x: PAD + rnd(W - 2*PAD), y: PAD + rnd(H - 2*PAD) };
+        }
+        function fireFrom(gx, gy) {   /* 集結点からランダム方向へ新ビーム＝着弾先を canvas 内にクランプ */
+          var ang = rnd(6.2832), dist = (0.42 + rnd(0.34)) * Math.min(W, H);
+          origin = { x: gx, y: gy };
+          target = { x: clamp(gx + Math.cos(ang)*dist, PAD, W - PAD), y: clamp(gy + Math.sin(ang)*dist, PAD, H - PAD) };
+          beamProg = 0; beamFade = 0; state = 'beam';
+        }
+        function drawBeam(o, tp, tipFrac, alpha) {
+          var tx = o.x + (tp.x - o.x)*tipFrac, ty = o.y + (tp.y - o.y)*tipFrac;
+          var g = ctx.createLinearGradient(o.x, o.y, tx, ty);
+          for (var i = 0; i < RAINBOW.length; i++) g.addColorStop(i/(RAINBOW.length-1), RAINBOW[i]);
+          ctx.globalAlpha = alpha; ctx.strokeStyle = g; ctx.lineWidth = 5; ctx.lineCap = 'round';
+          ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 6; ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(tx, ty); ctx.stroke();
+          ctx.shadowBlur = 0;
+          var hg = ctx.createRadialGradient(tx, ty, 0, tx, ty, 9);
+          hg.addColorStop(0, 'rgba(255,255,255,' + alpha.toFixed(2) + ')'); hg.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, 6.2832); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        function updateParts() {
+          for (var i = parts.length-1; i >= 0; i--) {
+            var p = parts[i];
+            if (state === 'gather' || state === 'charge') {   /* 集結点へバネで吸着＋わずかに旋回 */
+              var ax = (gatherPt.x - p.x)*0.045, ay = (gatherPt.y - p.y)*0.045;
+              p.vx = (p.vx + ax) * 0.84; p.vy = (p.vy + ay) * 0.84;
+              p.x += p.vx; p.y += p.vy; p.life -= 0.004;
+            } else {   /* scatter＝自由飛行して減速 */
+              p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy *= 0.93; p.life -= 0.006;
+            }
+            if (p.life <= 0) parts.splice(i, 1);
+          }
+        }
+        function drawParts() {
+          for (var i = 0; i < parts.length; i++) { var m = parts[i]; ctx.globalAlpha = Math.min(1, m.life) * 0.95;
+            ctx.fillStyle = m.col; ctx.shadowColor = m.col; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.2832); ctx.fill();
+            ctx.globalAlpha = Math.min(1, m.life); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r*0.4, 0, 6.2832); ctx.fill(); }
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        }
+        function drawChargeBall(t) {   /* 集結点で溜まる光の球＝発射直前に強く光る */
+          var grow = 6 + (t / CHARGE_T) * 10, g = ctx.createRadialGradient(gatherPt.x, gatherPt.y, 0, gatherPt.x, gatherPt.y, grow);
+          g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.5, 'rgba(255,220,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(gatherPt.x, gatherPt.y, grow, 0, 6.2832); ctx.fill();
+        }
+        function render() {
+          ctx.clearRect(0, 0, W, H);
+          if (flash > 0.03) { var fr = 8 + (1-flash)*36, fg = ctx.createRadialGradient(flashPt.x, flashPt.y, 0, flashPt.x, flashPt.y, fr);
+            fg.addColorStop(0, 'rgba(255,255,255,' + (flash*0.85).toFixed(2) + ')'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(flashPt.x, flashPt.y, fr, 0, 6.2832); ctx.fill(); }
+          drawParts();
+          if (state === 'charge') drawChargeBall(phaseT);
+          if (state === 'beam') drawBeam(origin, target, beamProg, 1);
+          else if (beamFade > 0.03) drawBeam(origin, target, 1, beamFade);
+        }
+        function frame(ts) {
+          if (!last) last = ts; acc += ts - last; last = ts;
+          if (state === 'beam') { beamProg += BEAM_SPEED; if (beamProg >= 1) { beamProg = 1; beamFade = 1; burst(target.x, target.y); state = 'scatter'; phaseT = 0; } }
+          while (acc >= 33) {
+            if (flash > 0) flash *= 0.82;
+            if (beamFade > 0) beamFade *= 0.72;
+            if (state === 'scatter') { phaseT++; if (phaseT >= SCATTER_T) { gatherPt = pickGatherPt(flashPt); state = 'gather'; phaseT = 0; } }
+            else if (state === 'gather') { phaseT++; if (phaseT >= GATHER_T) { state = 'charge'; phaseT = 0; } }
+            else if (state === 'charge') { phaseT++; if (phaseT >= CHARGE_T) { flash = 0.9; flashPt = { x: gatherPt.x, y: gatherPt.y }; parts.length = 0; fireFrom(gatherPt.x, gatherPt.y); } }
+            updateParts(); acc -= 33;
+          }
+          render(); raf = requestAnimationFrame(frame);
+        }
+        function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
+        function reset() { parts.length = 0; flash = 0; beamProg = 0; beamFade = 0; phaseT = 0; }
+        function drawStatic() {   /* reduce＝中央に静的な虹の輝き（放射する6色の短い光条） */
+          ctx.clearRect(0, 0, W, H); ctx.save(); ctx.lineWidth = 3; ctx.lineCap = 'round';
+          for (var c = 0; c < RAINBOW.length; c++) { var a = (c / RAINBOW.length) * 6.2832; ctx.globalAlpha = 0.85; ctx.strokeStyle = RAINBOW[c];
+            ctx.beginPath(); ctx.moveTo(CX + Math.cos(a)*6, CY + Math.sin(a)*6); ctx.lineTo(CX + Math.cos(a)*20, CY + Math.sin(a)*20); ctx.stroke(); }
+          var g = ctx.createRadialGradient(CX, CY, 0, CX, CY, 10); g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, 10, 0, 6.2832); ctx.fill(); ctx.restore();
+        }
+        return {
+          canvas: canvas,
+          start: function (ox, oy) { reset(); origin = { x: (ox == null ? W-6 : ox), y: (oy == null ? M : oy) }; target = { x: CX, y: CY }; state = 'beam'; beamProg = 0; render(); runLoop(); },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'static'; drawStatic(); },
+          stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+        };
+      }
+      (function () {
+        var stage = document.getElementById('pixrbowScStage');
+        var msg = stage && stage.querySelector('.pixfire-msg');
+        var btn = document.getElementById('pixrbowScBtn');
+        var reduceCb = document.getElementById('pixrbowScReduce');
+        if (!stage || !msg || !btn) return;
+        var dpr = Math.min(2, window.devicePixelRatio || 1), M = 30;
+        var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
+        var rb = createRainbowScatterSpellLight({ w: w, h: h, margin: M, dpr: dpr });
         rb.canvas.style.left = (-M) + 'px'; rb.canvas.style.top = (-M) + 'px'; rb.canvas.style.right = 'auto'; rb.canvas.style.bottom = 'auto';
         rb.canvas.style.width = 'calc(100% + ' + (2*M) + 'px)'; rb.canvas.style.height = 'calc(100% + ' + (2*M) + 'px)';
         msg.appendChild(rb.canvas);
