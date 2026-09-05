@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 import redis
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import OperationalError
 
 from app.control_plane.account_sync import repository as account_sync_repo
 from app.control_plane.admin import list_query as lq
@@ -408,9 +409,12 @@ def list_company_accounts(
         rows_stmt, count_stmt = _account_query(
             company_id, q=q, status=status, system_role=system_role, sort=sort,
             exclude_ids=pins)  # 固定行は非固定母集合から除外
+        db_identifier = company.db_identifier
         total = session.execute(count_stmt).scalar_one()
         rows = session.execute(rows_stmt.offset((page - 1) * per_page).limit(per_page)).scalars().all()
         data = [_account_item(a) for a in rows]
+    # 一覧の各行に有効所属を付与（会社DB バッチ読取・B.2 応答仕様＝複製プリフィル/会社DB単独描画）。
+    _attach_memberships(db_identifier, data + pinned)
     return {"data": data, "pinned": pinned, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 
@@ -424,7 +428,36 @@ def _account_item(a: Account) -> dict:
         "system_role": a.system_role,
         "status": a.status,
         "last_login_at": a.last_login_at.isoformat() if a.last_login_at else None,
+        "memberships": [],  # 既定＝所属無し（下の _attach_memberships が会社DB から上書き）
     }
+
+
+def _attach_memberships(db_identifier: str, items: list[dict]) -> None:
+    """一覧行（dict）に有効所属 `memberships=[{group_id, role}]` を付与（会社DB バッチ読取・B.2）。
+
+    account_id→users ミラー→`quest_group_members`（`removed_at IS NULL`）を 2 クエリで解決（N+1 回避）。
+    未ミラー（発行直後で未同期の稀ケース）や所属無しは空配列のまま。
+    """
+    if not items:
+        return
+    account_ids = list({uuid.UUID(it["account_id"]) for it in items})
+    by_account: dict[str, list[dict]] = {}
+    try:
+        with get_tenant_session(db_identifier) as tsession:
+            users = user_repo.list_users_by_accounts(tsession, account_ids)
+            user_to_account = {u.id: str(u.account_id) for u in users}
+            if user_to_account:
+                for user_id, group_id, role in qg_repo.list_active_memberships_for_users(
+                    tsession, list(user_to_account.keys())
+                ):
+                    by_account.setdefault(user_to_account[user_id], []).append(
+                        {"group_id": str(group_id), "role": role}
+                    )
+    except OperationalError:
+        # 会社DB が未プロビジョニング/到達不能＝所属は enrichment のため空で degrade（一覧自体は返す）。
+        by_account = {}
+    for it in items:
+        it["memberships"] = by_account.get(it["account_id"], [])
 
 
 # DataTable 契約（§1.8.1③）＝アカウント CSV の表示可能列とラベル（列順は ?columns= が正）。

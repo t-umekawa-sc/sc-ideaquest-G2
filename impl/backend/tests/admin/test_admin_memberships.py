@@ -206,3 +206,39 @@ def test_b_tc_077_edit_without_memberships_untouched(client, factory, mem_env):
 
     assert r.status_code == 200, r.text
     assert len(_active_members(mem_env.db_id, g1)) == 1      # 所属は不変
+
+
+# --- B-TC-171: 一覧応答に有効所属を付与（複製プリフィル・B.2・§1.8.1） ------------------
+def test_b_tc_171_list_includes_active_memberships(client, mem_env):
+    """B-TC-171 一覧応答の各行に有効所属 {group_id, role} を付与（複製プリフィル・API設計 B.2）。
+
+    memberships 付き発行→worker 適用後、一覧 GET の当該行に所属が載る。所属無しの行は空配列。
+    """
+    _login_system_admin(client)
+    gid = mem_env.make_group()
+    url = f"/api/v1/admin/companies/{mem_env.cid}/accounts"
+
+    with_body = {**_ident(), "memberships": [{"group_id": str(gid), "role": "admin"}]}
+    r1 = _issue(client, url, with_body)
+    assert r1.status_code == 201, r1.text
+    aid_with = uuid.UUID(r1.json()["account_id"])
+    mem_env.track(aid_with)
+
+    without_body = _ident()  # 所属なし発行
+    r2 = _issue(client, url, without_body)
+    assert r2.status_code == 201, r2.text
+    aid_without = uuid.UUID(r2.json()["account_id"])
+    mem_env.track(aid_without)
+
+    process_outbox_once()  # 会社DB users + quest_group_members へ適用
+
+    # q フィルタで当該行を決定的に取得（総件数に依存しない）
+    lr1 = client.get(f"{url}?q={with_body['login_id']}")
+    assert lr1.status_code == 200, lr1.text
+    row_with = next(x for x in lr1.json()["data"] if x["account_id"] == str(aid_with))
+    assert row_with["memberships"] == [{"group_id": str(gid), "role": "admin"}]
+
+    lr2 = client.get(f"{url}?q={without_body['login_id']}")
+    assert lr2.status_code == 200, lr2.text
+    row_without = next(x for x in lr2.json()["data"] if x["account_id"] == str(aid_without))
+    assert row_without["memberships"] == []

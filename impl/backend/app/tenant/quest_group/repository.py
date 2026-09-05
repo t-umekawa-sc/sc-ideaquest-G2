@@ -90,3 +90,21 @@ def list_active_group_ids_for_user(
     if role is not None:
         stmt = stmt.where(QuestGroupMember.role == role)
     return list(session.execute(stmt).scalars())
+
+
+def list_active_memberships_for_users(
+    session: Session, user_ids: list[uuid.UUID]
+) -> list[tuple[uuid.UUID, uuid.UUID, str]]:
+    """複数ユーザの有効所属を `(user_id, quest_group_id, role)` で一括取得（`removed_at IS NULL`）。
+
+    一覧応答への所属付与（B.2・複製プリフィル）＝N+1 を避けるため account 群をまとめて 1 クエリで解決する。
+    """
+    if not user_ids:
+        return []
+    stmt = select(
+        QuestGroupMember.user_id, QuestGroupMember.quest_group_id, QuestGroupMember.role
+    ).where(
+        QuestGroupMember.user_id.in_(user_ids),
+        QuestGroupMember.removed_at.is_(None),
+    )
+    return [(r[0], r[1], r[2]) for r in session.execute(stmt).all()]
