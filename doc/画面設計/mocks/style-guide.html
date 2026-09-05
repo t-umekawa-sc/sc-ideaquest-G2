@@ -746,6 +746,20 @@
     <script>
       /* 4パターンの発動演出＝§17L-b と同一の createPixelFireLineLight を遅延生成して使う（本節は §17L-b の <script> より前にあるため、
          関数が定義済みになる初回再生時（IO/クリック＝load 後）にエンジンを生成する）。発射元＝発動者バッジ（自作自演は作成者アバター）。 */
+      /* B(演出の間引き)＝対象が可視(≥40%)になり、かつスクロールが約180ms静止してから1回だけ cb を実行する。
+         高速な流し見中はタイマーが繰り返しリセットされて発火しない＝間引き。A(着弾ずれ)は canvas を対象内(inset:0)に描くことで別途担保。
+         本節が最初に定義するグローバル関数＝以降の §17b〜h・§17L の各エンジンも共有する。 */
+      function whenSettledVisible(el, cb) {
+        if (!el) return;
+        var done = false, vis = false, idle = null, io = null;
+        function fire() { if (done || !vis) return; done = true; teardown(); cb(); }
+        function bump() { if (done) return; clearTimeout(idle); if (vis) idle = setTimeout(fire, 180); }
+        function teardown() { window.removeEventListener('scroll', bump, true); if (io) io.disconnect(); }
+        if (!('IntersectionObserver' in window)) { cb(); return; }   /* 非対応環境は即発火 */
+        io = new IntersectionObserver(function (es) { es.forEach(function (e) { vis = e.intersectionRatio >= 0.4; bump(); }); }, { threshold: [0, 0.4, 0.75] });
+        io.observe(el);
+        window.addEventListener('scroll', bump, true);   /* スクロール中は静止待ちを都度リセット＝間引き */
+      }
       (function () {
         var defs = [ { stage: 'fp1', self: false }, { stage: 'fp2', self: false }, { stage: 'fp3', self: false }, { stage: 'fp4', self: true } ];
         var reduceCb = document.getElementById('fpReduce');
@@ -777,11 +791,7 @@
         var btn = document.getElementById('fpReplay');
         if (btn) btn.addEventListener('click', function () { defs.forEach(play); });
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) defs.forEach(function (p) { if (ensure(p)) p.eng.reduceStatic(); }); });
-        if ('IntersectionObserver' in window) {
-          var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !e.target._fpOnce) { e.target._fpOnce = 1;
-            for (var i = 0; i < defs.length; i++) if (defs[i].stageEl === e.target) { play(defs[i]); break; } } }); }, { threshold: 0.4 });
-          defs.forEach(function (p) { if (p.stageEl) io.observe(p.stageEl); });
-        }
+        defs.forEach(function (p) { if (p.stageEl) whenSettledVisible(p.stageEl, function () { play(p); }); });   /* B＝各パネルはスクロール静止後に1回だけ発火 */
       })();
     </script>
   </div>
@@ -956,10 +966,7 @@
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) fire.reduceStatic(); });
         /* 画面に入ったら1回だけ自動再生 */
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -1197,10 +1204,7 @@
         function play() { if (reduced()) { bolt.reduceStatic(); return; } kick(caster); var o = origin(); bolt.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) bolt.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -1394,10 +1398,7 @@
         function play() { if (reduced()) { ice.reduceStatic(); return; } kick(caster); var o = origin(); ice.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) ice.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -1575,10 +1576,7 @@
         function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) rb.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -1779,10 +1777,7 @@
         function play() { if (reduced()) { aura.reduceStatic(); return; } kick(caster); var o = origin(); aura.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) aura.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -1999,10 +1994,7 @@
         function play() { if (reduced()) { sp.reduceStatic(); return; } kick(caster); var o = origin(); sp.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) sp.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
@@ -2183,10 +2175,7 @@
         function play() { if (reduced()) { fire.reduceStatic(); return; } kick(caster); var o = origin(); fire.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) fire.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -2378,10 +2367,7 @@
         function play() { if (reduced()) { bolt.reduceStatic(); return; } kick(caster); var o = origin(); bolt.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) bolt.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -2640,10 +2626,7 @@
         function play() { if (reduced()) { ice.reduceStatic(); return; } kick(caster); var o = origin(); ice.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) ice.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -2798,10 +2781,7 @@
         function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) rb.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -2968,10 +2948,7 @@
         function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) rb.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -3160,10 +3137,7 @@
         function play() { if (reduced()) { aura.reduceStatic(); return; } kick(caster); var o = origin(); aura.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) aura.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
 
@@ -3325,10 +3299,7 @@
         function play() { if (reduced()) { sp.reduceStatic(); return; } kick(caster); var o = origin(); sp.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) sp.reduceStatic(); });
-        if ('IntersectionObserver' in window) {
-          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
-          io.observe(stage);
-        }
+        whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
   </div>
