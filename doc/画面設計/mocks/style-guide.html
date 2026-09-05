@@ -3606,14 +3606,14 @@
           }
         }
         function buildFrost() {   /* 凍ったパネルのひび割れセル模様(Voronoi)＋セル毎の凍結時刻(中央から外へ)を1回生成 */
-          var ns = Math.max(10, Math.round(PW * PH / 240)), seeds = [], cx = PW / 2, cy = PH / 2, maxD = Math.hypot(cx, cy) || 1;
+          var ns = Math.max(6, Math.round(PW * PH / 600)), seeds = [], cx = PW / 2, cy = PH / 2, maxD = Math.hypot(cx, cy) || 1;   /* セル数を減らす＝氷の塊を大きめに（ピカッが目立つ） */
           for (var i = 0; i < ns; i++) { var sx = rnd(PW), sy = rnd(PH), ft = Math.hypot(sx - cx, sy - cy) / maxD + (rnd(1) - 0.5) * 0.18; seeds.push({ x: sx, y: sy, ft: Math.max(0, Math.min(1, ft)) }); }
           NCELLS = seeds.length;
           frost = new Uint8Array(PW * PH * 4);   /* [vein, bright, ft(凍結時刻), cellId] */
           for (var py = 0; py < PH; py++) for (var px = 0; px < PW; px++) {
             var f1 = 1e9, f2 = 1e9, s1 = 0;
             for (var k = 0; k < seeds.length; k++) { var dx = px - seeds[k].x, dy = py - seeds[k].y, d = dx * dx + dy * dy; if (d < f1) { f2 = f1; f1 = d; s1 = k; } else if (d < f2) f2 = d; }
-            var edge = Math.sqrt(f2) - Math.sqrt(f1), vein = edge < 2.4 ? (1 - edge / 2.4) : 0, bright = Math.max(0, 1 - Math.sqrt(f1) / 13);
+            var edge = Math.sqrt(f2) - Math.sqrt(f1), vein = edge < 2.4 ? (1 - edge / 2.4) : 0, bright = Math.max(0, 1 - Math.sqrt(f1) / 18);   /* 大きめセルでも内側まで明るく */
             var idx = (py * PW + px) * 4; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0; frost[idx + 2] = (seeds[s1].ft * 255) | 0; frost[idx + 3] = s1 & 255;
           }
         }
@@ -3628,7 +3628,7 @@
             put(x, y, 214, 236, 252, ((13 + bright * 40) * settle) | 0);   /* 凍結（落ち着いたら薄く） */
             if (vein > 0.04) put(x, y, 68, 148, 212, (vein * 118 * settle) | 0);   /* 青いひび */
             var since = cold - thr; if (since < 0.14) { var fl = 1 - since / 0.14; put(x, y, 244, 252, 255, (fl * 145) | 0); }   /* 凍った瞬間のスナップ光（full） */
-            if (gmap) { var gv = gmap[frost[idx + 3]]; if (gv > 0.03) put(x, y, 250, 253, 255, (gv * (55 + bright * 65)) | 0); }   /* ランダムなセルがピカッと光を反射 */
+            if (gmap) { var gv = gmap[frost[idx + 3]]; if (gv > 0.03) put(x, y, 250, 253, 255, (gv * (80 + bright * 70)) | 0); }   /* ランダムなセルがピカッと光を反射（大きめセルで目立つ） */
           }
         }
         function drawShardProj() {   /* Image#4＝面のある尖った氷塊。進行方向に尖る。片側にハイライト面 */
@@ -3710,7 +3710,7 @@
           for (var q = specks.length - 1; q >= 0; q--) { var s = specks[q]; s.x += s.vx + Math.sin(s.ph + t*0.05)*0.06; s.y += s.vy; s.life -= 0.018; if (s.life <= 0 || s.y < -2 || s.y > H + 2) specks.splice(q, 1); }
           for (var w = snows.length - 1; w >= 0; w--) { var sf = snows[w]; sf.x += sf.vx; sf.y += sf.vy; sf.vy += 0.05; sf.vx *= 0.97; sf.life -= 0.02; if (sf.life <= 0) snows.splice(w, 1); }   /* 雪の結晶＝飛散して重力で落ち消える */
           updateSeal();   /* たまにアザラシ */
-          for (var gj = glints.length - 1; gj >= 0; gj--) { glints[gj].val *= 0.85; if (glints[gj].val < 0.05) glints.splice(gj, 1); }   /* ピカッの減衰 */
+          for (var gj = glints.length - 1; gj >= 0; gj--) { glints[gj].val *= 0.88; if (glints[gj].val < 0.05) glints.splice(gj, 1); }   /* ピカッの減衰（少し長め） */
         }
         function draw() {
           clear();
