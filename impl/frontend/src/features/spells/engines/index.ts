@@ -2,6 +2,7 @@
 // 受入済みモック（style-guide.html §17b-h）の自己完結 canvas+rAF エンジンを production へ移植する際の
 // 共通インターフェース。ハーネス（SpellCanvasFx/useSpellEngine）がこの契約に対してライフサイクルを管理する。
 import { createSparkleEngine } from "./sparkle";
+import { createFireEngine } from "./fire";
 
 export type SpellEngine = {
   canvas: HTMLCanvasElement;
@@ -23,6 +24,7 @@ export type EngineFactory = (opts: EngineOpts) => SpellEngine;
 // 移植済み（canvas 化済み）の effect のみ登録。未登録の effect は従来の CSS 経路（SpellPersistFx）を使う。
 const ENGINES: Record<string, EngineFactory> = {
   sparkle: createSparkleEngine,
+  fire: createFireEngine,
 };
 
 // canvas エンジンへ寄せる effect か（混在期のゲート）。リテラル一致＝未知は CSS 側に残す。

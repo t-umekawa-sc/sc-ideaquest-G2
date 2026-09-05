@@ -132,3 +132,12 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-155 | unit(front) | ドット絵スプライトのデコード | `UFO_ART`（15×8）／`UFO_COL` | `decodeSprite(art, colMap)` | `.` は出力に含めない／非透過セル総数は固定（76 セル）／各セルは行内 x・行 y を持つ／`colMap` にある文字は色解決・未知文字（`L`＝点滅ライト）は色 null で char を保持（4 セル）／決定的 | GF-AC-091／#10 |
 | G-TC-155 | unit(front) | UFO のパターン別軌道（prog→座標） | パターン番号 pat／進行 prog／params(x0,x1,yBase,amp,freq,H) | `ufoPosition(pat, prog, p)` | 全 pat で `prog=0→x≈x0`・`prog=1→x≈x1`（pat7 のループ区間 0.4..0.6 を除く）／pat0 は常に y=yBase（直線）／pat2 は中央 prog=0.5 で y>yBase（下ディップ）・pat3 は y<yBase（上山）で符号が反対／x,y は有限値／決定的 | GF-AC-091／#10 |
+
+### 5-F. 炎 canvas エンジンの決定的部分（解像度/可読性フェード）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/fire.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-b` の延焼 canvas+rAF エンジン）を production の canvas ハーネスへ移植。**canvas 本体（延焼のセルオートマトン＝`rng` で非決定的）は §17L-b／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`fireGrid(w,h,scale)`＝実寸(CSS px)→低解像度グリッド(cols×rows)＝ドット絵の解像度（下限 140×20・約 scale px/セル）。`fireFade(above)`＝下辺から数えた高さ above 行に対する不透明度係数（根元=不透明→上端ほど透過＝**重なった文字が透けて読める**可読性の担保）。視覚（延焼の動き/火の玉/黒煙/火花/暖色ハロー）は §17L-b の GF-AC で受入。reduce-motion はハーネスが `reduceStatic()`（延焼済み静止 1 枚）を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-156）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-156 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `fireGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
+| G-TC-156 | unit(front) | 可読性フェード（根元不透明→上端透過） | 下辺からの高さ above（行） | `fireFade(above)` | above≤3（根元）は 1／above が増えるほど単調非増加／下限 0.28 でクランプ（0 未満にならない＝上端でも文字が完全に消えない）／決定的 | GF-AC-091／#10 |
