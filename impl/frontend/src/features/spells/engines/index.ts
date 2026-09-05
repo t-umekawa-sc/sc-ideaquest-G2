@@ -3,6 +3,7 @@
 // 共通インターフェース。ハーネス（SpellCanvasFx/useSpellEngine）がこの契約に対してライフサイクルを管理する。
 import { createSparkleEngine } from "./sparkle";
 import { createFireEngine } from "./fire";
+import { createThunderEngine } from "./thunder";
 
 export type SpellEngine = {
   canvas: HTMLCanvasElement;
@@ -25,6 +26,7 @@ export type EngineFactory = (opts: EngineOpts) => SpellEngine;
 const ENGINES: Record<string, EngineFactory> = {
   sparkle: createSparkleEngine,
   fire: createFireEngine,
+  thunder: createThunderEngine,
 };
 
 // canvas エンジンへ寄せる effect か（混在期のゲート）。リテラル一致＝未知は CSS 側に残す。

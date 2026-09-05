@@ -141,3 +141,12 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-156 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `fireGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
 | G-TC-156 | unit(front) | 可読性フェード（根元不透明→上端透過） | 下辺からの高さ above（行） | `fireFade(above)` | above≤3（根元）は 1／above が増えるほど単調非増加／下限 0.28 でクランプ（0 未満にならない＝上端でも文字が完全に消えない）／決定的 | GF-AC-091／#10 |
+
+### 5-G. 雷 canvas エンジンの決定的部分（解像度/発雷フラッシュの水平減衰）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/thunder.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-d` の落雷 canvas+rAF エンジン）を production の canvas ハーネスへ移植。**canvas 本体（ジグザグ稲妻/枝分かれ/枠線ビリビリ/着弾粒子＝`rng` で非決定的・rAF 駆動）は §17L-d／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`thunderGrid(w,h,scale)`＝実寸(CSS px)→低解像度グリッド(cols×rows)＝ドット絵の解像度（下限 140×20・約 scale px/セル・炎と同契約）。`flashBand(x,w)`＝発雷時にパネルをほんのり暖色（琥珀）に光らせる際の**水平方向の明るさ係数**（中央の柱ほど明るく端ほど暗い・0 未満にならない）＝可読性優先で淡く光らせるための形状担保（**発雷でも文字が読める**）。視覚（稲妻の走り/枝/ビリビリ玉の飛来/枠線ビリビリ/黄粒子/連鎖）は §17L-d の GF-AC で受入。reduce-motion はハーネスが `reduceStatic()`（着弾済み静止 1 枚）を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-157）で担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-157 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `thunderGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
+| G-TC-157 | unit(front) | 発雷フラッシュの水平減衰（中央明→端暗） | パネル幅 w／x 座標 | `flashBand(x, w)` | 中央 `x=w/2` で最大 1／中央から離れるほど単調非増加／0 未満にならない（範囲外 x でもクランプ）／決定的 | GF-AC-091／#10 |
