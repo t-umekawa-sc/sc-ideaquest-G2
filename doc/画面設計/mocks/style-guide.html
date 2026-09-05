@@ -3540,7 +3540,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネルが中央から外へ固まっていく</strong>（ひび割れたセル模様＝スムーズなフェードではなく、前線が達したセルから一気にパッと凍る・凍った瞬間に白く光る）。<strong>全面凍結後は霜を薄くして読みやすくし、ランダムなセルが時々ピカッと光って氷が光を反射している感じ</strong>を出す（§17e同様）。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間で小さくなって消える</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
+      その後<strong>パネルが中央から外へ固まっていく</strong>（ひび割れたセル模様＝スムーズなフェードではなく、前線が達したセルから一気にパッと凍る・凍った瞬間に白く光る）。<strong>全面凍結後は霜を薄くして読みやすくし、ランダムなセルが時々ピカッと光って氷が光を反射している感じ</strong>を出す（§17e同様）。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間そのまま保持した後、戻らずにパリンと割れて砕片が飛び散る</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3553,7 +3553,7 @@
     <script>
       /* 氷結エンジン（ライト版・明色パネル向け＝濃いめの青）。骨格は §17e と同じ、色だけ明色パネルで見えるよう振り直し。 */
       /* 氷結エンジン（ライト版・ドット絵）。発動＝面のある氷塊が中央へ飛来→着弾で砕け散り雪の結晶が飛び散る→
-         パネル全体が冷たく→ランダムな箇所から尖った面のある氷結晶クラスタが突然生える→一定時間で小さくなって消える。 */
+         パネル全体が冷たく→ランダムな箇所から尖った面のある氷結晶クラスタが突然生える→一定時間保持後にパリンと割れて砕片が飛散（戻らない）。 */
       function createIceSpellLight(opts) {
         opts = opts || {};
         var PW = Math.max(60, opts.cols || 110), PH = Math.max(12, opts.rows || 40), MARG = Math.max(6, opts.marg || 14);
@@ -3566,7 +3566,7 @@
         var img = ctx.createImageData(W, H), D = img.data;
         var CX = MARG + (PW >> 1), CY = MARG + (PH >> 1);   /* パネル中央（canvas 座標） */
         var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
-        var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], cold = 0, pillarTimer = 0, seal = null, sealTimer = 200, frost = null, settle = 1, glints = [], glintTimer = 60, NCELLS = 0;
+        var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], frags = [], cold = 0, pillarTimer = 0, seal = null, sealTimer = 200, frost = null, settle = 1, glints = [], glintTimer = 60, NCELLS = 0;
         var originX = W - 3, originY = 0;
         var ICE_HI = [244,252,255], ICE_CORE = [200,236,255], ICE_MID = [120,190,238], ICE_EDGE = [52,112,176];   /* 氷パレット：ハイライト面→明芯→青→濃紺の稜線（面のある結晶） */
 
@@ -3605,8 +3605,32 @@
             }
           }
         }
+        function spawnShatter(p) {   /* パリン！＝氷柱が保持後に砕け散る。柱の稜線に沿って角ばった氷片を生成し外へ飛散＋根元で雪と冷気粒 */
+          var ax = Math.cos(p.ang), ay = Math.sin(p.ang), nx = -ay, ny = ax, curL = p.L * p.grow;
+          var n = Math.max(6, (curL / 4) | 0);
+          for (var i = 0; i <= n; i++) {
+            var tt = i / n, cx = p.bx + ax * curL * tt, cy = p.by + ay * curL * tt;
+            var side = rnd(1) < 0.5 ? 1 : -1, sp = 0.7 + rnd(1.8) + tt * 1.3;   /* 先端ほど速く飛ぶ */
+            var vx = nx * side * sp * (0.5 + rnd(0.8)) + (rnd(1) - 0.5) * 1.1;
+            var vy = ny * side * sp * 0.4 - (0.5 + rnd(1.7));   /* パリンと弾け上へ跳ねる */
+            frags.push({ x: cx, y: cy, vx: vx, vy: vy, life: 1, size: rnd(1) < 0.4 ? 3 : 2, lit: p.lit || 1 });
+          }
+          spawnSnowBurst(p.bx + ax * curL * 0.4, p.by + ay * curL * 0.4, 5 + (rnd(4) | 0));   /* 砕けた粉雪 */
+          for (var s = 0; s < 5; s++) { var a = rnd(6.283), ss = 0.6 + rnd(1.5); spawnSpeck(p.bx, p.by, Math.cos(a) * ss, Math.sin(a) * ss, 1); }
+        }
+        function drawFrags() {   /* 割れた氷の破片＝小さな角ばったダイヤ（片側にハイライト面・青い稜線） */
+          for (var i = 0; i < frags.length; i++) {
+            var f = frags[i], a = Math.min(1, f.life), sz = f.size, lit = f.lit;
+            for (var dy = -sz; dy <= sz; dy++) for (var dx = -sz; dx <= sz; dx++) {
+              if (Math.abs(dx) + Math.abs(dy) > sz) continue;   /* ひし形 */
+              var edge = (Math.abs(dx) + Math.abs(dy) === sz), col;
+              if (edge) col = ICE_EDGE; else if (dx * lit > 0) col = ICE_HI; else col = ICE_CORE;
+              put(f.x + dx, f.y + dy, col[0], col[1], col[2], (a * 205) | 0);
+            }
+          }
+        }
         function buildFrost() {   /* 凍ったパネルのひび割れセル模様(Voronoi)＋セル毎の凍結時刻(中央から外へ)を1回生成 */
-          var ns = Math.max(6, Math.round(PW * PH / 600)), seeds = [], cx = PW / 2, cy = PH / 2, maxD = Math.hypot(cx, cy) || 1;   /* セル数を減らす＝氷の塊を大きめに（ピカッが目立つ） */
+          var ns = Math.max(5, Math.round(PW * PH / 1050)), seeds = [], cx = PW / 2, cy = PH / 2, maxD = Math.hypot(cx, cy) || 1;   /* セル数をさらに減らす＝氷の塊をもっと大きく（ピカッが目立つ） */
           for (var i = 0; i < ns; i++) { var sx = rnd(PW), sy = rnd(PH), ft = Math.hypot(sx - cx, sy - cy) / maxD + (rnd(1) - 0.5) * 0.18; seeds.push({ x: sx, y: sy, ft: Math.max(0, Math.min(1, ft)) }); }
           NCELLS = seeds.length;
           frost = new Uint8Array(PW * PH * 4);   /* [vein, bright, ft(凍結時刻), cellId] */
@@ -3704,9 +3728,9 @@
           }
           for (var i = pillars.length - 1; i >= 0; i--) { var p = pillars[i];
             if (p.phase === 'grow') { p.grow += 0.17; if (p.grow >= 1) { p.grow = 1; p.phase = 'hold'; } }   /* 突然生える */
-            else if (p.phase === 'hold') { p.hold--; if (p.hold <= 0) p.phase = 'shrink'; }
-            else { p.grow -= 0.08; if (p.grow <= 0) pillars.splice(i, 1); }   /* 小さくなって消える */
+            else { p.hold--; if (p.hold <= 0) { spawnShatter(p); pillars.splice(i, 1); } }   /* 保持後、戻らずにパリンと割れて砕片が飛散 */
           }
+          for (var fi = frags.length - 1; fi >= 0; fi--) { var fr = frags[fi]; fr.x += fr.vx; fr.y += fr.vy; fr.vy += 0.08; fr.vx *= 0.99; fr.life -= 0.03; if (fr.life <= 0) frags.splice(fi, 1); }   /* 砕片＝重力で落ちながらフェード */
           for (var q = specks.length - 1; q >= 0; q--) { var s = specks[q]; s.x += s.vx + Math.sin(s.ph + t*0.05)*0.06; s.y += s.vy; s.life -= 0.018; if (s.life <= 0 || s.y < -2 || s.y > H + 2) specks.splice(q, 1); }
           for (var w = snows.length - 1; w >= 0; w--) { var sf = snows[w]; sf.x += sf.vx; sf.y += sf.vy; sf.vy += 0.05; sf.vx *= 0.97; sf.life -= 0.02; if (sf.life <= 0) snows.splice(w, 1); }   /* 雪の結晶＝飛散して重力で落ち消える */
           updateSeal();   /* たまにアザラシ */
@@ -3717,6 +3741,7 @@
           drawCold();
           drawSpecks();
           for (var i = 0; i < pillars.length; i++) drawPillar(pillars[i]);
+          drawFrags();   /* パリンと割れた氷の破片 */
           drawSeal();   /* たまにアザラシが下辺から顔を出す */
           drawSnow();
           if (state === 'incoming') drawShardProj();
@@ -3724,7 +3749,7 @@
         }
         function frame(ts) { if (!last) last = ts; acc += ts - last; last = ts; while (acc >= 33) { t++; update(); acc -= 33; } draw(); raf = requestAnimationFrame(frame); }
         function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
-        function reset() { proj = null; snows = []; specks = []; pillars = []; cold = 0; pillarTimer = 0; seal = null; sealTimer = 450 + (rnd(600) | 0); settle = 1; glints = []; glintTimer = 40; t = 0; buildFrost(); }
+        function reset() { proj = null; snows = []; specks = []; pillars = []; frags = []; cold = 0; pillarTimer = 0; seal = null; sealTimer = 450 + (rnd(600) | 0); settle = 1; glints = []; glintTimer = 40; t = 0; buildFrost(); }
         return {
           canvas: canvas,
           start: function (ox, oy) { reset(); originX = (ox == null ? W - 3 : ox); originY = (oy == null ? 0 : oy);
