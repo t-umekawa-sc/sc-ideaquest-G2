@@ -9,14 +9,36 @@ export function MembershipsEditor({
   value,
   groups,
   onChange,
+  readOnly = false,
 }: {
   value: Membership[];
   groups: QuestGroup[];
   onChange: (v: Membership[]) => void;
+  // 読み取り専用（編集画面で現在の所属を編集不可表示する用途・B.3）。役割/削除/追加の操作は出さない。
+  readOnly?: boolean;
 }) {
   const used = new Set(value.map((m) => m.group_id));
   const rest = groups.filter((g) => !used.has(g.group_id));
   const nameOf = (id: string) => groups.find((g) => g.group_id === id)?.name ?? id;
+
+  if (readOnly) {
+    return (
+      <div>
+        {value.length > 0 ? (
+          <div className="mrows">
+            {value.map((m) => (
+              <div className="mrow is-readonly" key={m.group_id}>
+                <span className="mrow__name">{nameOf(m.group_id)}</span>
+                <span className="badge badge-muted">{m.role === "admin" ? "管理者" : "メンバー"}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mrow-empty">現在、所属しているクエストグループはありません。</div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

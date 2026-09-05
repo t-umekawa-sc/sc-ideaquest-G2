@@ -78,15 +78,19 @@ export function AccountSection({ companyId }: { companyId: string }) {
 
   // 行アクション（RowMenu ⋯）。操作可否は既存 impl を保持＝active/disabled で内容が変わる。
   // 編集は URL モーダルへ遷移（router.push＝ソフト遷移で intercept を差し込む）。
-  // 複製＝発行ダイアログを追加モードで開き、表示名・システムロールを引き継ぐ（ログインID・メールは
-  // 一意キーのため引き継がず新規入力・デザイン標準 §4.5 複製）。所属クエストグループは一覧が返さないため引き継げない。
+  // 複製＝発行ダイアログを追加モードで開き、入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）。
+  // 一意キー（ログインID/メール）も所属クエストグループ（一覧応答の memberships・B.2）もセットする＝
+  // 空にしても保存時の一意検証で弾かれるのは同じで、空だと再入力の手間が増えるだけのため。
   const duplicateItem = (a: Account): RowMenuItem => ({
     label: "複製",
     onClick: () =>
       router.push(
         buildDuplicateHref(`/admin/companies/${companyId}/accounts/new`, {
           display_name: a.display_name,
+          login_id: a.login_id,
+          email: a.email,
           system_role: a.system_role,
+          memberships: a.memberships ?? [],
         }),
       ),
   });
@@ -141,7 +145,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
   }
 
   // 列定義（正＝mocks/SC-92 の DataTable columns）。render は ReactNode。
-  // 所属クエストグループは AccountListItem 未提供（B.2 一覧項目に無い）＝「—」プレースホルダ。
+  // 所属クエストグループは AccountListItem.memberships（group_id/role）で持つが一覧にグループ名が無い＝表示は「—」（複製プリフィルには使う）。
   const columns: DataTableColumn<Account>[] = [
     {
       key: "name",
@@ -208,6 +212,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
       csvVal: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
       render: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
     },
+    // 所属は memberships（group_id/role）で持つが一覧にグループ名が無い＝表示は「—」（複製プリフィルには memberships を使う）。
     { key: "groups", label: "所属クエストグループ", width: 220, render: () => <span className="muted">—</span>, csvVal: () => "—" },
     {
       key: "status",

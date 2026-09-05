@@ -57,18 +57,29 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   const idPrefix = isCompany ? "a" : "s"; // field id 接頭辞（SC-92=a／SC-93=s・e2e/mock 保持）
   const showRole = isCompany; // system_role は SC-92 のみ（SC-93 は general 固定・付与不可 B.2.1）
 
-  // 複製（発行モードのみ）＝表示名・システムロールを引き継ぐ（ログインID・メールは一意キーのため引き継がない・§4.5 複製）。
+  // 複製（発行モードのみ）＝入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
+  // 一意キー（ログインID/メール）も所属クエストグループ（memberships）もプリフィルする（空にしても保存時に一意検証で弾かれるだけのため）。
   const searchParams = useSearchParams();
   const dup = useMemo(
-    () => (mode === "issue" ? readDuplicatePrefill<{ display_name?: string; system_role?: SystemRole }>(searchParams) : null),
+    () =>
+      mode === "issue"
+        ? readDuplicatePrefill<{
+            display_name?: string;
+            login_id?: string;
+            email?: string;
+            system_role?: SystemRole;
+            memberships?: Membership[];
+          }>(searchParams)
+        : null,
     [mode, searchParams],
   );
 
   const [displayName, setDisplayName] = useState(dup?.display_name ?? "");
-  const [loginId, setLoginId] = useState("");
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState(dup?.login_id ?? "");
+  const [email, setEmail] = useState(dup?.email ?? "");
   const [systemRole, setSystemRole] = useState<SystemRole>(dup?.system_role ?? "general");
-  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>(dup?.memberships ?? []);
+  const [currentMemberships, setCurrentMemberships] = useState<Membership[]>([]); // 編集＝現在の所属（読み取り専用表示・B.3）
   const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,6 +111,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           setLoginId(a.login_id);
           setEmail(a.email);
           setSystemRole(a.system_role as SystemRole);
+          setCurrentMemberships(a.memberships ?? []); // 現在の所属を読み取り専用表示に使う（B.2 一覧応答）
         }
         setLoading(false);
       })
@@ -200,6 +212,12 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
               <option value="company_account_admin">会社アカウント管理者</option>
               <option value="system_admin">システム管理者</option>
             </select>
+          </Field>
+        )}
+        {mode === "edit" && !replaceMemberships && (
+          <Field id={`${idPrefix}_current_groups`} label="現在の所属クエストグループ">
+            {/* 現在の所属を編集不可で表示（置き換えチェック前）。置き換える時は下の全置換エディタに切り替わる。 */}
+            <MembershipsEditor value={currentMemberships} groups={groups} onChange={() => {}} readOnly />
           </Field>
         )}
         {mode === "edit" && (

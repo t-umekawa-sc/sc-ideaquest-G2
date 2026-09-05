@@ -22,7 +22,9 @@ import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 type Quest = {
   id: string; title: string; theme: string; cat: string; cats: string[]; status: string; group: string;
   groupId: string; owner: string; char: string; accent: string; iconUrl: string | null; deadline: string; dl: number;
-  urgency: DeadlineLevel; days: number | null; party: number; ideas: number; my: string; order: number; draft?: boolean;
+  urgency: DeadlineLevel; days: number | null;
+  deadlineRaw: string; // 生の期限日（YYYY-MM-DD）＝複製プリフィル用（表示は deadline の整形版）
+  party: number; ideas: number; my: string; order: number; draft?: boolean;
 };
 
 // quest_status（enum・§3）→ 画面ラベル。"選定" は enum でなく evaluating〜completed の選定行為の呼称（C.5）。
@@ -64,7 +66,7 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
     id: c.id, title: c.title, theme: "", cat: c.categories[0] ?? "", cats: c.categories,
     status, group: c.quest_group.name, groupId: c.quest_group.id, owner: (c.owner.display_name || "?").slice(0, 1),
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
-    deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, party: c.member_count, ideas: c.idea_count,
+    deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, deadlineRaw: (c.deadline ?? "").slice(0, 10), party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
   };
 }
@@ -130,14 +132,22 @@ export function QuestListView() {
     return [...set].map((g) => [g, g]);
   }, [quests]);
 
-  // 複製＝作成ダイアログ（SC-11）を追加モードで開き、件名/カラー/カテゴリー/グループを引き継ぐ（デザイン標準 §4.5 複製）。
-  // id・ステータス（→下書き）・アイコン画像・パーティー編成・目的（目的は一覧DTOに無い）は引き継がず新規入力。
+  // 複製＝作成ダイアログ（SC-11）を追加モードで開き、入力項目を引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
+  // 件名/カラー/カテゴリー/グループ/期限日。クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
+  // 目的（theme/purpose）は一覧DTOに無い＝現状引き継げない（引き継ぐには C.1 詳細取得 or DTO 拡張が要る・follow-up）。
+  // id・ステータス（→下書き）・アイコン画像・パーティー編成はサーバー生成/バイナリ/関係のため引き継がず新規入力。
   const questMenu = (x: Quest): RowMenuItem[] => [
     {
       label: "複製",
       onClick: () =>
         router.push(
-          buildDuplicateHref("/quests/new", { title: x.title, color: x.accent, categories: x.cats, quest_group_id: x.groupId }),
+          buildDuplicateHref("/quests/new", {
+            title: x.title,
+            color: x.accent,
+            categories: x.cats,
+            quest_group_id: x.groupId,
+            deadline: x.deadlineRaw,
+          }),
         ),
     },
   ];
