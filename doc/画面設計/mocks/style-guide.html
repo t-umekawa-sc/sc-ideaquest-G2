@@ -3577,8 +3577,8 @@
         function rnd(n) { return Math.random() * n; }
         function spawnSpeck(x, y, vx, vy, life) { specks.push({ x: x, y: y, vx: vx, vy: vy, life: life, ph: rnd(6.28) }); }
         function spawnCluster() {   /* Image#5＝尖った面のある氷結晶が数本まとまって突然生える（扇状に四方八方へ） */
-          var inX = Math.min(PW * 0.32, 22), inY = Math.min(PH * 0.32, 12);   /* 外周から一定マージン内側でのみ生成＝はみ出し抑制 */
-          var bx = PX0 + inX + rnd(Math.max(1, PW - 2 * inX)), by = PY0 + inY + rnd(Math.max(1, PH - 2 * inY)), m = 2 + (rnd(3) | 0);   /* パネル内側の一定範囲から生える＝配置は四方八方 */
+          var inX = Math.min(PW * 0.4, 10), inY = Math.min(PH * 0.4, 8);   /* 根元(ジッター±3.5+根元幅)がはみ出さない程度の小マージン */
+          var bx = PX0 + inX + rnd(Math.max(1, PW - 2 * inX)), by = PY0 + inY + rnd(Math.max(1, PH - 2 * inY)), m = 2 + (rnd(3) | 0);   /* 根元がパネル内に収まる範囲から生える（先端は四方八方へはみ出し可） */
           var baseAng = rnd(6.283);   /* 四方八方＝全方向へ均等に（上偏りを撤廃） */
           spawnSnowBurst(bx, by, 9 + (rnd(6) | 0));   /* 氷の地面を突き破って生える＝根元で雪の結晶が四方へ飛び散る */
           for (var c = 0; c < m; c++) {
