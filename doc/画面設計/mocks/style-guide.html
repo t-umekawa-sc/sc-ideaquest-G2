@@ -3349,6 +3349,10 @@
       .pixfire-msg.is-light.fx-rainbow .msg-avatar.caster { background: #be185d; box-shadow: 0 0 0 2px rgba(236,72,153,.55), 0 1px 4px rgba(0,0,0,.35); }
       #pixrbowLStage, #pixrbowScStage { padding-inline: 48px; }   /* 虹はパネル外側にも及ぶので左右に逃げ幅を確保 */
       .pix-rainbow-l { position: absolute; pointer-events: none; z-index: 3; filter: drop-shadow(0 0 5px rgba(236,72,153,.3)); }
+      .pixfire-msg.is-light.fx-aura { border: 1px solid rgba(52,211,153,.75); box-shadow: 0 0 10px 2px rgba(52,211,153,.45); }
+      .pixfire-msg.is-light.fx-aura .msg-avatar.caster { background: #6d28d9; box-shadow: 0 0 0 2px rgba(167,139,250,.55), 0 1px 4px rgba(0,0,0,.35); }
+      #pixauraLStage { padding-inline: 56px; }   /* オーラは上へ立ち上り左右にも滲むので逃げ幅を確保 */
+      .pix-aura-l { position: absolute; pointer-events: none; z-index: 3; }
     </style>
 
     <h3 style="margin-top:var(--space-5)">17L-b. 炎（ライト版・ドット絵の延焼）＝術者から火の玉が飛来→中央下部に着弾して着火→左右へ延焼（明色パネル向け配色）</h3>
@@ -4283,6 +4287,198 @@
         function play() { if (reduced()) { rb.reduceStatic(); return; } kick(caster); var o = origin(); rb.start(o.x, o.y); }
         btn.addEventListener('click', play);
         if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) rb.reduceStatic(); });
+        if ('IntersectionObserver' in window) {
+          var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
+          io.observe(stage);
+        }
+      })();
+    </script>
+
+    <h3 style="margin-top:var(--space-5)">17L-g. オーラ（ライト版・ドット絵）＝術者から波動＋応援記号が中央へ→パネルの縁からドット絵オーラが上へ立ち上って強化（明色パネル向け配色）</h3>
+    <p class="muted text-sm"><strong>ドット絵</strong>（低解像度チャンク）。ダーク版 §17g を<strong>明色パネル向け</strong>に配色を振り直したライト版。発動＝<strong>右上の術者アイコンが反動→ドット絵の波動＋前向きな記号（♪音符＝応援／↑矢印＝オーラアップ／ハート・星・プラス）がパネル中央へ飛ぶ</strong>。
+      その後<strong>パネルが強化されて縁からドット絵のオーラが立ち上る</strong>＝<strong>下辺は控えめ（透過強め）／左右は上に行くほど強め／上辺は強く上へライズ（高さはムラ）</strong>（色は<strong>紫↔金↔青をゆっくり巡回</strong>／脈動して残る・文字は透けて読める）。明色パネルで見えるよう配色は彩度寄り（白飛びさせない）。
+      <code>prefers-reduced-motion</code>／下のトグルで静止（強化済みオーラ・脈動なし）。</p>
+    <div class="pixfire-stage is-light" id="pixauraLStage">
+      <div class="pixfire-msg is-light fx-aura" aria-label="オーラライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【オーラ】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行はオーラと重なる位置＝淡い光で文字が読めるかの確認用テキスト ✦</div>
+    </div>
+    <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-3)">
+      <button class="btn-pixel" type="button" id="pixauraLBtn">魔法を発動</button>
+      <label class="checkbox"><input type="checkbox" id="pixauraLReduce"> 動きを減らす（疑似 reduce-motion）</label>
+    </div>
+
+    <script>
+      /* オーラエンジン（ライト版・明色パネル向け）。骨格は §17g(createAuraSpell)と同じ＝波動+応援記号が中央へ→縁から上昇するドット絵オーラで強化。
+         明色パネル前提の差分＝配色パレット/記号色を彩度寄り(白飛びさせない)に、canvas クラスを .pix-aura-l に。API: start(ox,oy)／reduceStatic()／stop()。 */
+      function createAuraSpellLight(opts) {
+        opts = opts || {};
+        var PW = Math.max(80, opts.w || 320), PH = Math.max(24, opts.h || 110), dpr = opts.dpr || 1;
+        var MT = 88, MS = 42, MB = 16;
+        var W = PW + 2*MS, H = PH + MT + MB;
+        var canvas = document.createElement('canvas'); canvas.className = 'pix-aura-l'; canvas.setAttribute('aria-hidden', 'true');
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+        var PX = MS, PY = MT, CX = PX + PW/2, CY = PY + PH/2;
+        var CELL = 8, GW = Math.ceil(W/CELL), GH = Math.ceil(H/CELL);
+        /* 明色パネル向け＝上端を白飛びさせず彩度を保つ（紫/金/青） */
+        var PAL  = [ [0,0,0,0],[76,29,120,150],[110,40,170,185],[140,60,200,208],[168,86,225,224],[190,110,235,238],[205,140,240,246],[220,170,245,250],[235,205,250,255] ];
+        var PALG = [ [0,0,0,0],[150,100,20,150],[190,135,30,185],[214,160,45,208],[230,180,60,224],[240,198,90,238],[246,210,120,246],[250,224,150,250],[252,236,185,255] ];
+        var PALB = [ [0,0,0,0],[28,70,150,150],[38,100,190,185],[50,130,215,208],[70,160,235,224],[100,185,242,238],[140,205,246,246],[175,222,250,250],[205,235,252,255] ];
+        var PALS = [PAL, PALG, PALB];   /* 紫→金→青→…を巡回 */
+        var PALN = [ [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0] ];
+        var COLOR_SPEED = 0.008;
+        var MAXH = PAL.length - 1;
+        var heat = new Uint8Array(GW*GH), seeds = [];
+        var state = 'idle', raf = null, last = 0, acc = 0, t = 0;
+        var casterX = W-6, casterY = MT, dirx = 0, diry = 0;
+        var waves = [], spawned = 0, waveTimer = 0, WAVE_GAP = 7, WAVE_SPEED = 0.06, NWAVE = 3;
+        var auraGrow = 0, AURA_RAMP = 0.03;
+        var symbols = [], symTimer = 0, symCount = 0, SYM_MAX = 12;
+        var GLY = {
+          note:  ["..##","..#.","..#.","..#.","###.","##.."],
+          arrow: ["..#..",".###.","#####","..#..","..#..","..#.."],
+          heart: [".#.#.","#####","#####",".###.","..#.."],
+          star:  ["..#..",".###.","#####",".###.","..#.."],
+          plus:  ["..#..","..#..","#####","..#..","..#.."]
+        };
+        /* 記号色＝明色パネルで読めるよう彩度高め（パステルは避ける） */
+        var SYMS = [ { b:'note', col:'#d97706' }, { b:'arrow', col:'#059669' }, { b:'note', col:'#ca8a04' }, { b:'heart', col:'#db2777' }, { b:'star', col:'#d97706' }, { b:'arrow', col:'#2563eb' }, { b:'plus', col:'#16a34a' } ];
+
+        function rnd(n) { return Math.random() * n; }
+        function drawGlyph(bmp, cx, cy, ps, color, alpha) {
+          var hh = bmp.length, ww = bmp[0].length, ox = cx - ww*ps/2, oy = cy - hh*ps/2;
+          ctx.globalAlpha = alpha; ctx.fillStyle = color;
+          for (var r = 0; r < hh; r++) for (var c = 0; c < ww; c++) if (bmp[r].charAt(c) === '#') ctx.fillRect(Math.round(ox+c*ps), Math.round(oy+r*ps), ps, ps);
+          ctx.globalAlpha = 1;
+        }
+        function spawnSymbol() {
+          var k = SYMS[(rnd(SYMS.length))|0], sx = casterX + (rnd(2)-1)*10, sy = casterY + (rnd(2)-1)*10;
+          symbols.push({ b: k.b, col: k.col, sx: sx, sy: sy, x: sx, y: sy, tx: CX + (rnd(2)-1)*PW*0.12, ty: CY + (rnd(2)-1)*PH*0.4, prog: 0, spd: 0.018 + rnd(0.02), ph: rnd(6.28), ps: 2 + (rnd(2)|0) });
+        }
+        function updateSymbols() {
+          for (var i = symbols.length-1; i >= 0; i--) { var s = symbols[i]; s.prog += s.spd; var e = 1 - (1-s.prog)*(1-s.prog);
+            s.x = s.sx + (s.tx-s.sx)*e; s.y = s.sy + (s.ty-s.sy)*e + Math.sin(s.ph + s.prog*9)*4;
+            if (s.prog >= 1) symbols.splice(i, 1); }
+        }
+        function drawSymbols() {
+          for (var i = 0; i < symbols.length; i++) { var s = symbols[i], a = s.prog < 0.15 ? s.prog/0.15 : (s.prog > 0.82 ? (1-s.prog)/0.18 : 1);
+            drawGlyph(GLY[s.b], s.x, s.y, s.ps, s.col, a*0.95); }
+        }
+        function buildSeeds() {
+          seeds = [];
+          for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++) {
+            var px = (gx+0.5)*CELL, py = (gy+0.5)*CELL;
+            var nx = Math.max(PX, Math.min(PX+PW, px)), ny = Math.max(PY, Math.min(PY+PH, py));
+            var ddx = px-nx, ddy = py-ny, dist = Math.sqrt(ddx*ddx+ddy*ddy);
+            if (dist <= 0 || dist > CELL*1.5) continue;
+            var vf = (PY+PH - py) / PH; if (vf < 0) vf = 0; else if (vf > 1) vf = 1;
+            var fuel;
+            if (py < PY) {
+              var vv = 2 + 1.6*Math.sin(gx*0.5) + Math.sin(gx*1.7 + 1.3) + 0.6*Math.sin(gx*3.1);
+              if (vv < 0) vv = 0; else if (vv > 4) vv = 4;
+              fuel = MAXH - Math.round(vv);
+            }
+            else if (py > PY+PH) fuel = 1;
+            else fuel = Math.round(2 + (MAXH-2)*vf);
+            seeds.push({ i: gy*GW+gx, fuel: fuel });
+          }
+        }
+        function spreadFire(y, x) {
+          var src = y*GW+x, pix = heat[src], ny = y-1;
+          if (pix === 0) { heat[ny*GW+x] = 0; return; }
+          var r = (Math.random()*3)|0, nx = x + (1 - r); if (nx < 0) nx = 0; else if (nx >= GW) nx = GW-1;
+          heat[ny*GW+nx] = Math.max(0, pix - (Math.random() < 0.85 ? 1 : 0));
+        }
+        function stepAura() {
+          for (var s = 0; s < seeds.length; s++) heat[seeds[s].i] = seeds[s].fuel;
+          for (var x = 0; x < GW; x++) for (var y = 1; y < GH; y++) spreadFire(y, x);
+        }
+        function drawPixelAura() {
+          var pulse = 0.82 + 0.18*Math.sin(t*0.05), g = Math.min(1, auraGrow) * pulse;
+          if (g <= 0.01) return;
+          var phase = (t * COLOR_SPEED) % PALS.length, seg = Math.floor(phase), frac = phase - seg;
+          var A = PALS[seg], B = PALS[(seg+1) % PALS.length];
+          for (var k = 1; k < PAL.length; k++) { var a = A[k], b = B[k], n = PALN[k];
+            n[0] = a[0] + (b[0]-a[0])*frac; n[1] = a[1] + (b[1]-a[1])*frac; n[2] = a[2] + (b[2]-a[2])*frac; n[3] = a[3]; }
+          var botRow = Math.floor((PY+PH)/CELL) - 1;
+          for (var i = 0; i < heat.length; i++) { var h = heat[i]; if (h <= 0) continue;
+            var gy = (i / GW)|0, botFade = gy >= botRow ? 0.32 : 1;
+            var col = PALN[h]; ctx.globalAlpha = (col[3]/255) * g * botFade; ctx.fillStyle = 'rgb(' + (col[0]|0) + ',' + (col[1]|0) + ',' + (col[2]|0) + ')';
+            ctx.fillRect((i % GW)*CELL, gy*CELL, CELL, CELL);
+          }
+          ctx.globalAlpha = 1;
+        }
+        function drawWave(w) {
+          var e = 1 - (1-w.prog)*(1-w.prog), wx = casterX + (CX-casterX)*e, wy = casterY + (CY-casterY)*e;
+          var perpx = -diry, perpy = dirx, reach = Math.min(PH*0.55, 38), fade = w.prog < 0.12 ? w.prog/0.12 : (w.prog > 0.9 ? (1-w.prog)/0.1 : 1);
+          for (var o = -reach; o <= reach; o += CELL) {
+            var nb = 1 - (o/reach)*(o/reach), bow = nb*11;
+            var px = wx + perpx*o + dirx*bow, py = wy + perpy*o + diry*bow;
+            var lvl = Math.max(1, Math.round(nb*MAXH)), col = PAL[lvl];
+            ctx.globalAlpha = (col[3]/255) * fade; ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+            ctx.fillRect(Math.floor(px/CELL)*CELL, Math.floor(py/CELL)*CELL, CELL, CELL);
+          }
+          ctx.globalAlpha = 1;
+        }
+        function updateWaves() {
+          waveTimer--;
+          if (spawned < NWAVE && waveTimer <= 0) { waves.push({ prog: 0 }); spawned++; waveTimer = WAVE_GAP; }
+          for (var i = waves.length-1; i >= 0; i--) { waves[i].prog += WAVE_SPEED; if (waves[i].prog >= 1) waves.splice(i, 1); }
+          symTimer--; if (symCount < SYM_MAX && symTimer <= 0) { spawnSymbol(); symCount++; symTimer = 2 + (rnd(2)|0); }
+          if (spawned >= NWAVE && waves.length === 0 && state === 'wave') state = 'aura';
+        }
+        function render() {
+          ctx.clearRect(0, 0, W, H);
+          drawPixelAura();
+          if (state === 'wave') for (var i = 0; i < waves.length; i++) drawWave(waves[i]);
+          drawSymbols();
+        }
+        function frame(ts) {
+          if (!last) last = ts; acc += ts - last; last = ts;
+          while (acc >= 33) {
+            t++;
+            if (state === 'wave') updateWaves();
+            if (state === 'aura') { if (auraGrow < 1) auraGrow = Math.min(1, auraGrow + AURA_RAMP); stepAura(); }
+            updateSymbols();
+            acc -= 33;
+          }
+          render(); raf = requestAnimationFrame(frame);
+        }
+        function runLoop() { if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); } }
+        function reset() { heat = new Uint8Array(GW*GH); waves = []; spawned = 0; waveTimer = 0; symbols = []; symCount = 0; symTimer = 0; auraGrow = 0; t = 0; buildSeeds(); }
+        return {
+          canvas: canvas,
+          start: function (ox, oy) { reset(); casterX = (ox == null ? PX+PW-6 : ox); casterY = (oy == null ? PY+4 : oy);
+            var dl = Math.sqrt((CX-casterX)*(CX-casterX) + (CY-casterY)*(CY-casterY)) || 1; dirx = (CX-casterX)/dl; diry = (CY-casterY)/dl;
+            state = 'wave'; waveTimer = 0; render(); runLoop(); },
+          reduceStatic: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } reset(); state = 'aura'; auraGrow = 1;
+            for (var k = 0; k < 30; k++) stepAura(); t = 0; render(); },
+          stop: function () { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+        };
+      }
+      (function () {
+        var stage = document.getElementById('pixauraLStage');
+        var msg = stage && stage.querySelector('.pixfire-msg');
+        var btn = document.getElementById('pixauraLBtn');
+        var reduceCb = document.getElementById('pixauraLReduce');
+        if (!stage || !msg || !btn) return;
+        var dpr = Math.min(2, window.devicePixelRatio || 1), MT = 88, MS = 42, MB = 16;
+        var w = Math.max(80, Math.round(msg.clientWidth)), h = Math.max(24, Math.round(msg.clientHeight));
+        var aura = createAuraSpellLight({ w: w, h: h, dpr: dpr });
+        aura.canvas.style.left = (-MS) + 'px'; aura.canvas.style.top = (-MT) + 'px'; aura.canvas.style.right = 'auto'; aura.canvas.style.bottom = 'auto';
+        aura.canvas.style.width = 'calc(100% + ' + (2*MS) + 'px)'; aura.canvas.style.height = 'calc(100% + ' + (MT+MB) + 'px)';
+        msg.appendChild(aura.canvas);
+        var caster = msg.querySelector('.msg-avatar.caster');
+        function reduced() { return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || (reduceCb && reduceCb.checked); }
+        function kick(el) { if (!el) return; el.classList.remove('fcast-caster'); void el.offsetWidth; el.classList.add('fcast-caster'); setTimeout(function () { el.classList.remove('fcast-caster'); }, 560); }
+        function origin() {
+          if (!caster) return { x: w + MS - 6, y: MT };
+          var cr = aura.canvas.getBoundingClientRect(), ar = caster.getBoundingClientRect();
+          if (!cr.width || !cr.height) return { x: w + MS - 6, y: MT };
+          return { x: (ar.left + ar.width/2 - cr.left) / cr.width * (w + 2*MS), y: (ar.top + ar.height/2 - cr.top) / cr.height * (h + MT + MB) };
+        }
+        function play() { if (reduced()) { aura.reduceStatic(); return; } kick(caster); var o = origin(); aura.start(o.x, o.y); }
+        btn.addEventListener('click', play);
+        if (reduceCb) reduceCb.addEventListener('change', function () { if (reduceCb.checked) aura.reduceStatic(); });
         if ('IntersectionObserver' in window) {
           var once = false, io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && !once) { once = true; play(); } }); }, { threshold: 0.4 });
           io.observe(stage);
