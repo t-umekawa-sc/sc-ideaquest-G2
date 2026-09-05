@@ -102,6 +102,9 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   // Phase E: canvas 化済み effect（sparkle 等）の能動発動＝そのメッセージ canvas に「発射→着弾→永続」を再生させる。
   // key=msgId が存在＝今セッションで能動発動した（発射を再生する）／値＝発射元の画面座標。CSS の deliver/cast は使わない。
   const [canvasCast, setCanvasCast] = useState<Record<string, CastPoint | null>>({});
+  // 起点ポリシー①: ライブ発動は CSS 発射レイヤ(SpellDeliveryFx)でヘッダー→メッセージへ火の玉を飛ばし、着弾で canvas を着火。
+  // 着弾までは canvas を出さない（マウントすると②表示経路で即着火してしまうため）＝ここに入っている間は SpellCanvasFx を保留。
+  const [pendingCanvas, setPendingCanvas] = useState<Record<string, boolean>>({});
   const castId = useRef(0);
   const fireCast = (msgId: string, effect: string, rarity: string) => {
     if (reduceMotion()) return;
@@ -134,6 +137,24 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return null;
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  // 起点ポリシー①（canvas 魔法のライブ発動）＝CSS 発射レイヤ(SpellDeliveryFx)で from（ヘッダーのユーザーアバター）→
+  // 対象メッセージへ火の玉を画面横断で飛ばし、着弾（DELIVER_MS）で canvas を着火→延焼させる。着弾までは pendingCanvas
+  // で canvas を出さない（マウントすると②表示経路で即着火するため）。着弾時に pending 解除＋canvasCast に着弾点を入れて start。
+  const fireCanvasDelivery = (from: CastPoint, msgId: string, effect: string, rarity: string) => {
+    const el = typeof document !== "undefined" ? document.getElementById(msgId) : null;
+    if (!el) { setCanvasCast((c) => ({ ...c, [msgId]: null })); return; } // 位置不明＝そのまま canvas 既定で着火
+    const r = el.getBoundingClientRect();
+    const to = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    setPendingCanvas((p) => ({ ...p, [msgId]: true }));
+    const id = ++castId.current;
+    setDelivers((d) => [...d, { id, from, to, effect, rarity }]);
+    setTimeout(() => setDelivers((d) => d.filter((z) => z.id !== id)), DELIVER_MS + 260);
+    setTimeout(() => {
+      // 着弾＝canvas を出して着火（origin＝着弾点＝ほぼ中央。エンジンは中央下部で ignite→左右へ延焼）。
+      setPendingCanvas((p) => { const n = { ...p }; delete n[msgId]; return n; });
+      setCanvasCast((c) => ({ ...c, [msgId]: to }));
+    }, DELIVER_MS);
   };
 
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -350,11 +371,12 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         // 発動の瞬間演出（発火は成功時のみ・種別はサーバー応答の effect 優先→spell.effect）。
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
         if (isCanvasEffect(eff)) {
-          // canvas 化済み＝そのメッセージの canvas が発射→着弾→永続を1枚で再生（CSS deliver/cast は使わない）。
-          // 起点ポリシー（doc/画面設計/screens/SC-24_アイデアチャット.md）＝ログインユーザが「新規に」発動した瞬間は
-          // ヘッダーのユーザーアバターから飛来（style-guide.html §17 の「自分が放つ」演出）。取得できなければ
-          // エンジン既定の起点（枠の右上＝術者位置）にフォールバック（＝受入済みモック §17L-b の発動を再現）。
-          setCanvasCast((c) => ({ ...c, [m.id]: headerAvatarPoint() }));
+          // 起点ポリシー①（doc/画面設計/screens/SC-24_アイデアチャット.md）＝ログインユーザが「新規に」発動した瞬間は
+          // ヘッダーのユーザーアバターから対象へ飛来。canvas はメッセージ枠内に限定され画面横断の飛行が見えないため、
+          // 画面全体に及ぶ CSS 発射レイヤ(SpellDeliveryFx)で火の玉を飛ばし、着弾で canvas を着火→延焼させる。
+          const hp = headerAvatarPoint();
+          if (hp && !reduceMotion()) fireCanvasDelivery(hp, m.id, eff, spell.rarity);
+          else setCanvasCast((c) => ({ ...c, [m.id]: null })); // reduce-motion/位置不明＝canvas 既定で着火(静止)
         } else if (from) {
           // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
           fireDelivery(from, m.id, eff, spell.rarity);
@@ -468,7 +490,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
                     canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
                 {magic && (isCanvasEffect(magic.effect ?? "")
-                  ? <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />
+                  ? (!pendingCanvas[m.id] && <SpellCanvasFx effect={magic.effect ?? ""} justCast={m.id in canvasCast} castFrom={canvasCast[m.id]} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />)
                   : <SpellPersistFx effect={magic.effect ?? ""} />)}
                 <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "")}><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
                 {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。 */}
