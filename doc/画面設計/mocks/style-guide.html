@@ -3335,7 +3335,9 @@
     <style>
       /* ライト版パネル＝production 実態（白い吹き出し/暗文字）。ステージは明るいゲーム背景を模す。属性グロー枠は production .spell-fx--{effect} の静的値。 */
       .pixfire-stage.is-light { background: radial-gradient(140% 120% at 50% 0%, #eef2fb, #e2e8f4 70%); }
-      .pixfire-msg.is-light { background: #ffffff; color: #1f2430; }
+      /* 可読性A＝文字に白いふち/グロー。魔法canvasが上に重なっても、白ハローで文字が浮き上がって読める（全ライト版共通） */
+      .pixfire-msg.is-light { background: #ffffff; color: #1f2430; text-shadow: 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff, 0 1px 1px #fff; }
+      .pixfire-msg.is-light .msg-avatar { text-shadow: none; }   /* アバターバッジは対象外 */
       .pixfire-msg.is-light.fx-thunder { border: 1px solid rgba(251,191,36,.85); box-shadow: 0 0 8px 1px rgba(251,191,36,.45); }
       .pixfire-msg.is-light.fx-ice { border: 1px solid rgba(56,189,248,.7); box-shadow: 0 0 10px 2px rgba(56,189,248,.5), inset 0 0 14px rgba(14,165,233,.18); }
       .pixfire-msg.is-light.fx-sparkle { border: 1px solid rgba(168,85,247,.6); box-shadow: 0 0 10px 2px rgba(168,85,247,.45); }
