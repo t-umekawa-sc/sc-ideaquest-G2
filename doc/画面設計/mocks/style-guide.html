@@ -3540,7 +3540,7 @@
 
     <h3 style="margin-top:var(--space-5)">17L-e. 氷（ライト版・ドット絵）＝面のある氷塊が飛来→中央で砕けて雪の結晶が飛び散る→パネルが冷たく→尖った氷結晶クラスタが突然生えて一定時間で消える</h3>
     <p class="muted text-sm"><strong>ドット絵</strong>（低解像度＋pixelated）。発動＝<strong>右上の術者アイコンから面のある尖った氷塊が飛来し、パネル中央に着弾すると砕け散って雪の結晶が四方へ飛び散る</strong>。
-      その後<strong>パネルが中央から外へ固まっていく</strong>（ひび割れたセル模様＝スムーズなフェードではなく、前線が達したセルから一気にパッと凍る・凍った瞬間に白く光る）。<strong>全面凍結後は霜を薄くして読みやすくし、ランダムなセルのピカッが隣のセルへ次々に連鎖して氷が光を反射している感じ</strong>を出す。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>一定時間そのまま保持した後、戻らずにパリンと割れて砕片が飛び散る</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
+      その後<strong>パネルが中央から外へ固まっていく</strong>（ひび割れたセル模様＝スムーズなフェードではなく、前線が達したセルから一気にパッと凍る・凍った瞬間に白く光る）。<strong>全面凍結後は霜を薄くして読みやすくし、ランダムなセルのピカッが隣のセルへ次々に連鎖して氷が光を反射している感じ</strong>を出す。<strong>全面が凍り切った後</strong>、<strong>ランダムな箇所から尖った面のある氷結晶クラスタ（透き通った氷・片側にハイライト面）が氷の地面を突き破るように突然生え（根元で雪の結晶が四方へ飛び散る）</strong>、<strong>生え切った瞬間と保持中に光が根元→先端へ走ってキラッと光り</strong>、<strong>一定時間そのまま保持した後、戻らずにパリンと割れて砕片が飛び散る</strong>のを繰り返す（氷結晶はパネル外へはみ出し可）。<strong>たまにアザラシがパネル下辺から顔を出す</strong>（低頻度・遊び心）。
       <code>prefers-reduced-motion</code>／下のトグルで静止。</p>
     <div class="pixfire-stage is-light" id="pixfrostLStage">
       <div class="pixfire-msg is-light fx-ice" aria-label="氷ライト版デモ"><span class="msg-avatar author has-tip" data-tip="鈴木 一郎（作成者）" aria-hidden="true">鈴</span><span class="msg-avatar caster has-tip" data-tip="佐藤 花子 が【氷】をかけました" aria-hidden="true">佐</span>配送ルートを AI で最適化して、拠点間の便を動的に組み替える案。まず小さく PoC を回して効果を測りたい。<br>需要予測モデルと連携し、繁忙期は増便・閑散期は減便を自動提案。ドライバーの拘束時間も平準化できると現場の負担が下がるはず。<br>この最下行は霜と重なる位置＝縁ほど濃い霜で文字が読めるかの確認用テキスト ❄</div>
@@ -3569,6 +3569,7 @@
         var proj = null, snows = [], axX = 0, axY = 1, specks = [], pillars = [], frags = [], cold = 0, pillarTimer = 0, seal = null, sealTimer = 200, frost = null, settle = 1, glints = [], glintQueue = [], cellAdj = [], glintTimer = 60, NCELLS = 0;
         var originX = W - 3, originY = 0;
         var ICE_HI = [244,252,255], ICE_CORE = [200,236,255], ICE_MID = [120,190,238], ICE_EDGE = [52,112,176];   /* 氷パレット：ハイライト面→明芯→青→濃紺の稜線（面のある結晶） */
+        var GL_DUR = 10;   /* 氷柱のキラッ＝光の帯が根元→先端へ走る継続フレーム数 */
 
         function clear() { for (var i = 0; i < D.length; i++) D[i] = 0; }
         function put(x, y, r, g, b, a) { x |= 0; y |= 0; a |= 0; if (a <= 0 || x < 0 || x >= W || y < 0 || y >= H) return;
@@ -3585,16 +3586,20 @@
             var L = PH * (0.5 + rnd(0.7)), w = 2.4 + rnd(3);
             var n = Math.max(4, (L / 3) | 0), jag = [];
             for (var i = 0; i <= n; i++) jag.push(0.7 + rnd(0.6));
-            pillars.push({ bx: bx + (rnd(7) - 3.5), by: by + (rnd(4) - 2), ang: ang, L: L, w: w, jag: jag, grow: 0, phase: 'grow', hold: 42 + (rnd(80) | 0), lit: rnd(1) < 0.5 ? 1 : -1 });
+            pillars.push({ bx: bx + (rnd(7) - 3.5), by: by + (rnd(4) - 2), ang: ang, L: L, w: w, jag: jag, grow: 0, phase: 'grow', hold: 42 + (rnd(80) | 0), lit: rnd(1) < 0.5 ? 1 : -1, gl: 0 });
           }
         }
         function drawPillar(p) {   /* 尖った面のある氷結晶（片側にハイライト面・濃紺の稜線） */
           var g = p.grow; if (g <= 0.01) return;
           var ax = Math.cos(p.ang), ay = Math.sin(p.ang), nx = -ay, ny = ax, curL = p.L * g;
           var steps = Math.max(2, Math.round(curL)), nj = p.jag.length - 1, lit = p.lit || 1;
+          var glP = p.gl > 0 ? (1 - p.gl / GL_DUR) : -1;              /* キラッの光の帯の位置＝根元(0)→先端(1) */
+          var glBase = p.gl > 0 ? (p.gl / GL_DUR) * 34 : 0;           /* 生え切り直後は結晶全体もほんのり閃光→フェード */
           for (var i = 0; i <= steps; i++) {
             var tt = i / steps, cx = p.bx + ax * curL * tt, cy = p.by + ay * curL * tt;
             var hw = p.w * (1 - tt * 0.92) * p.jag[(tt * nj) | 0] * (0.55 + g * 0.45); if (hw < 0.5) hw = 0.5;   /* 先端を鋭く（Image#5の尖った結晶） */
+            var gb = glP >= 0 ? Math.max(0, 1 - Math.abs(tt - glP) / 0.26) : 0;   /* 帯の中心ほど強い */
+            var ga = glBase + gb * gb * 220;   /* この断面のキラッ強度（帯は鋭く） */
             for (var s = -hw; s <= hw; s += 1) {
               var sn = s / (hw + 0.001), asn = Math.abs(sn), col;
               if (sn * lit > 0.12 && sn * lit < 0.52) col = ICE_HI;      /* 片側に明るいハイライト面＝結晶の艶 */
@@ -3602,6 +3607,7 @@
               else if (asn > 0.76) col = ICE_EDGE;                        /* 濃紺の稜線 */
               else col = ICE_MID;
               put(cx + nx * s, cy + ny * s, col[0], col[1], col[2], 132);   /* 透明度さらに高め＝透き通った氷 */
+              if (ga > 0) put(cx + nx * s, cy + ny * s, 255, 255, 255, Math.min(255, (132 + ga) | 0));   /* キラッ＝白い光が走る（最不透明採用で上書き） */
             }
           }
         }
@@ -3751,8 +3757,9 @@
             if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PW), PY1, (rnd(1)-0.5)*0.2, -(0.05 + rnd(0.14)), 1);   /* 冷気の粒がパネル下からふわふわ上昇 */
           }
           for (var i = pillars.length - 1; i >= 0; i--) { var p = pillars[i];
-            if (p.phase === 'grow') { p.grow += 0.17; if (p.grow >= 1) { p.grow = 1; p.phase = 'hold'; } }   /* 突然生える */
-            else { p.hold--; if (p.hold <= 0) { spawnShatter(p); pillars.splice(i, 1); } }   /* 保持後、戻らずにパリンと割れて砕片が飛散 */
+            if (p.phase === 'grow') { p.grow += 0.17; if (p.grow >= 1) { p.grow = 1; p.phase = 'hold'; p.gl = GL_DUR; } }   /* 突然生える→生え切った瞬間にキラッ */
+            else { p.hold--; if (p.gl > 0) p.gl--; else if (rnd(1) < 0.03) p.gl = GL_DUR;   /* 保持中もたまにキラッ */
+              if (p.hold <= 0) { spawnShatter(p); pillars.splice(i, 1); } }   /* 保持後、戻らずにパリンと割れて砕片が飛散 */
           }
           for (var fi = frags.length - 1; fi >= 0; fi--) { var fr = frags[fi]; fr.x += fr.vx; fr.y += fr.vy; fr.vy += 0.08; fr.vx *= 0.99; fr.life -= 0.03; if (fr.life <= 0) frags.splice(fi, 1); }   /* 砕片＝重力で落ちながらフェード */
           for (var q = specks.length - 1; q >= 0; q--) { var s = specks[q]; s.x += s.vx + Math.sin(s.ph + t*0.05)*0.06; s.y += s.vy; s.life -= 0.018; if (s.life <= 0 || s.y < -2 || s.y > H + 2) specks.splice(q, 1); }
