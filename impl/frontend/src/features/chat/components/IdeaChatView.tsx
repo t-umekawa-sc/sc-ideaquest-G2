@@ -123,6 +123,16 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     setTimeout(() => setDelivers((d) => d.filter((z) => z.id !== id)), DELIVER_MS + 260);
     setTimeout(() => fireCast(msgId, effect, rarity), DELIVER_MS); // 着弾＝一撃＋永続へ
   };
+  // 発動起点＝ヘッダーのログインユーザーアバター中心（画面座標）。ログインユーザが「新規に」魔法を発動した瞬間の
+  // 発射元（style-guide.html §17 の「自分が放つ」演出／起点ポリシーは doc/画面設計/screens/SC-24_アイデアチャット.md）。
+  const headerAvatarPoint = (): CastPoint | null => {
+    if (typeof document === "undefined") return null;
+    const el = document.querySelector(".usermenu__trigger .avatar") as HTMLElement | null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
 
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
@@ -339,10 +349,10 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         const eff = (res.reactions as { magic?: { effect?: string } })?.magic?.effect ?? spell.effect;
         if (isCanvasEffect(eff)) {
           // canvas 化済み＝そのメッセージの canvas が発射→着弾→永続を1枚で再生（CSS deliver/cast は使わない）。
-          // 発射元はモック（style-guide.html §17L）と同じ「術者位置＝枠の右上」からの飛来にする＝
-          // from（ピッカーの選択ボタン位置＝枠下部）を使うと火の玉がほとんど飛ばず着火だけに見えるため null を渡し、
-          // エンジン既定の起点（右上）から中央下部へ斜めに飛来させる（＝受入済みモックの発動アニメを再現）。
-          setCanvasCast((c) => ({ ...c, [m.id]: null }));
+          // 起点ポリシー（doc/画面設計/screens/SC-24_アイデアチャット.md）＝ログインユーザが「新規に」発動した瞬間は
+          // ヘッダーのユーザーアバターから飛来（style-guide.html §17 の「自分が放つ」演出）。取得できなければ
+          // エンジン既定の起点（枠の右上＝術者位置）にフォールバック（＝受入済みモック §17L-b の発動を再現）。
+          setCanvasCast((c) => ({ ...c, [m.id]: headerAvatarPoint() }));
         } else if (from) {
           // 発射元（発動した魔法ボタン位置）があれば from→対象へ飛ばし着弾で一撃、無ければ即一撃（GF-AC-091）。
           fireDelivery(from, m.id, eff, spell.rarity);
