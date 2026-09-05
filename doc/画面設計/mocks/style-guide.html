@@ -3714,10 +3714,10 @@
           }
         }
         function drawSpecks() { for (var i = 0; i < specks.length; i++) { var p = specks[i]; put(p.x, p.y, 220, 240, 255, (Math.min(1, p.life) * 200) | 0); } }
-        /* たまにアザラシがパネル下辺から顔を出す（低頻度・遊び心） */
-        var SEAL_ART = ['....GGGGG....','..GGGGGGGGG..','.GGGGGGGGGGG.','.GGGGGGGGGGG.','GGGeGGGGGeGGG','GGGGGGGGGGGGG','GGGGgwwwgGGGG','GGGGwwnwwGGGG','.GGGwwwwwGGG.','..GGGGGGGGG..','....GGGGG....'];
-        var SEAL_COL = { G:[150,162,178], g:[198,208,220], w:[240,244,250], e:[38,44,60], n:[110,80,90] };
-        var SEAL_W = 13, SEAL_H = 11, SEAL_PX = 0.8;   /* もっと小さく＝レアキャラ感 */
+        /* たまに白い子アザラシ（タテゴマアザラシの赤ちゃん）がパネル下辺から顔を出す（低頻度・遊び心） */
+        var SEAL_ART = ['..wWWWw..','.wWWWWWw.','wWWWWWWWw','WheWWWheW','WeeWWWeeW','wWWnnnWWw','kWWWnWWWk','.wWWWWWw.'];
+        var SEAL_COL = { W:[247,250,253], w:[214,225,238], e:[30,34,44], h:[226,237,249], n:[70,60,66], k:[120,140,160] };   /* 白いふわ毛・黒い大きな瞳(catchlight h)・濃い鼻・ヒゲ */
+        var SEAL_W = 9, SEAL_H = 8, SEAL_PX = 0.9;   /* 今より小さく・まるく可愛く */
         function spawnSeal() { var sw = SEAL_W * SEAL_PX; seal = { x: PX0 + rnd(Math.max(1, PW - sw)), peek: 0, phase: 'up', hold: 40 + (rnd(55) | 0) }; sealTimer = 650 + (rnd(800) | 0); }   /* レア＝出現間隔を長く */
         function updateSeal() {
           if (seal) {
@@ -3726,16 +3726,19 @@
             else { seal.peek -= 0.06; if (seal.peek <= 0) seal = null; }
           } else if (state === 'cold') { sealTimer--; if (sealTimer <= 0) spawnSeal(); }
         }
-        function drawSeal() {   /* アザラシの顔＝パネル下辺からニュッ（下辺でクリップ＝顔だけ出る） */
+        function drawSeal() {   /* アザラシの顔＝パネル下辺からニュッ（下辺でクリップ＝顔だけ出る）。出力ピクセル毎に最近傍サンプル＝小さくても列落ちで崩れない */
           if (!seal) return;
-          var px = SEAL_PX, ox = seal.x, headH = SEAL_H * px, topY = PY1 - seal.peek * headH;
-          for (var r = 0; r < SEAL_H; r++) {
-            var row = SEAL_ART[r], y0 = Math.round(topY + r * px), y1 = Math.round(topY + (r + 1) * px);
-            if (y0 >= PY1) continue; var ye = Math.min(y1, PY1);
-            for (var c = 0; c < SEAL_W; c++) {
-              var ch = row.charAt(c); if (ch === '.') continue;
-              var col = SEAL_COL[ch], x0 = Math.round(ox + c * px), x1 = Math.round(ox + (c + 1) * px);
-              for (var yy = y0; yy < ye; yy++) for (var xx = x0; xx < x1; xx++) put(xx, yy, col[0], col[1], col[2], 255);
+          var px = SEAL_PX, ow = SEAL_W * px, oh = SEAL_H * px, ox = seal.x, topY = PY1 - seal.peek * oh;
+          var xs = Math.round(ox), xe = Math.round(ox + ow), ys = Math.round(topY), ye = Math.round(topY + oh);
+          for (var yy = ys; yy < ye; yy++) {
+            if (yy >= PY1) break;   /* パネル下辺でクリップ */
+            var sr = ((yy - topY) / oh * SEAL_H) | 0; if (sr < 0 || sr >= SEAL_H) continue;
+            var row = SEAL_ART[sr];
+            for (var xx = xs; xx < xe; xx++) {
+              var sc = ((xx - ox) / ow * SEAL_W) | 0; if (sc < 0 || sc >= SEAL_W) continue;
+              var ch = row.charAt(sc); if (ch === '.') continue;
+              var col = SEAL_COL[ch]; if (!col) continue;
+              put(xx, yy, col[0], col[1], col[2], 255);
             }
           }
         }
