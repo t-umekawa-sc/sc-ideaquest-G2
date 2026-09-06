@@ -214,9 +214,9 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
             </select>
           </Field>
         )}
-        {mode === "edit" && !replaceMemberships && (
+        {mode === "edit" && (
           <Field id={`${idPrefix}_current_groups`} label="現在の所属クエストグループ">
-            {/* 現在の所属を編集不可で表示（置き換えチェック前）。置き換える時は下の全置換エディタに切り替わる。 */}
+            {/* 現在の所属を編集不可で常時表示（置き換えチェックの前後を問わず・置き換え時は下の全置換エディタと並ぶ参照用）。 */}
             <MembershipsEditor value={currentMemberships} groups={groups} onChange={() => {}} readOnly />
           </Field>
         )}
