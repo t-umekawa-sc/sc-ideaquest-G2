@@ -76,11 +76,19 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
     }
   }
 
-  // 複製＝発行ダイアログを追加モードで開き、表示名を引き継ぐ（ログインID・メールは一意キーのため引き継がず
-  // 新規入力・デザイン標準 §4.5 複製）。SC-93 は system_role=general 固定（B.2.1）＝ロールは引き継がない。
+  // 複製＝発行ダイアログを追加モードで開き、入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）。
+  // 一意キー（ログインID/メール）も所属クエストグループ（memberships・B.2）もセットする。SC-93 は system_role=general 固定（B.2.1）＝ロールは引き継がない。
   const duplicateItem = (a: Account): RowMenuItem => ({
     label: "複製",
-    onClick: () => router.push(buildDuplicateHref("/admin/accounts/new", { display_name: a.display_name })),
+    onClick: () =>
+      router.push(
+        buildDuplicateHref("/admin/accounts/new", {
+          display_name: a.display_name,
+          login_id: a.login_id,
+          email: a.email,
+          memberships: a.memberships ?? [],
+        }),
+      ),
   });
 
   // 行アクション（RowMenu ⋯）。操作可否は既存 impl を保持＝active/disabled で内容が変わる。

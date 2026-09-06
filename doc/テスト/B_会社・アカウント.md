@@ -58,6 +58,14 @@
 
 **red 確認（test-first）**＝B-TC-141〜151 は各機能の実装前に確認（未対応＝順序が作成順・未知キー/値が無視され 200・pinned 非返却・format=csv 無視で JSON 200）。証跡＝コミットメッセージ。
 
+### 2.2 一覧応答への所属付与（複製プリフィル・B.2・§1.8.1）
+
+> 対象＝`GET /admin/companies/{company_id}/accounts`・`GET /admin/accounts` の応答 `AccountListItem.memberships`（各行に有効所属 `[{group_id, role}]` を付与）。API設計 B.2/B.2.1 が「各行に…＋所属グループ＋グループ内ロール」を規定済み（当初「後続スライス」だった分の実装）。用途＝**複製プリフィル**（デザイン標準 §4.5 複製・所属クエストグループを引き継ぐ）と会社DB単独描画。実装＝ページ/固定行のアカウント群について会社DB（`db_identifier`）の `users`（account_id→user）→`quest_group_members`（有効所属）を**バッチ読取**して各行へ付与（`removed_at IS NULL` のみ）。end-to-end（発行＋所属→`process_outbox_once`→一覧 GET）で検証。ACME-01 にグループを seed し teardown で物理削除。test-first。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-171 | api | 一覧応答に有効所属（group_id/role）を付与 | ACME-01 にグループ seed・memberships 付き発行→`process_outbox_once()` で会社DB へ適用 | `GET /admin/companies/{ACME-01}/accounts`（当該アカウント行） | 行の `memberships` に `{group_id, role}` を含む（有効所属のみ・`removed_at IS NULL`）／所属の無いアカウント行は `memberships=[]` | API設計 B.2（一覧応答＝所属付き）／§5.5 |
+
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |

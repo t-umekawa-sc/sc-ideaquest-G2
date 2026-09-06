@@ -138,12 +138,20 @@ export function CompanyList() {
         <RowMenu
           items={[
             { label: "管理する", onClick: () => router.push(`/admin/companies/${r.company_id}`) },
-            // 複製＝作成ダイアログを追加モードで開き、名前・カラーを引き継ぐ（会社コード・DB識別子は
-            // 一意キーのため引き継がず新規入力・デザイン標準 §4.5 複製）。
+            // 複製＝作成ダイアログを追加モードで開き、入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）。
+            // 一意キー（会社コード・DB識別子＝いずれも作成時の入力項目）もセットする＝連番部だけ直せばよい
+            // （空にしても保存時に一意検証で弾かれるだけ）。※自動採番の主キー id はサーバー生成なので載せない。
             {
               label: "複製",
               onClick: () =>
-                router.push(buildDuplicateHref("/admin/companies/new", { name: r.name, color: r.color })),
+                router.push(
+                  buildDuplicateHref("/admin/companies/new", {
+                    name: r.name,
+                    company_code: r.company_code,
+                    db_identifier: r.db_identifier,
+                    color: r.color,
+                  }),
+                ),
             },
           ]}
         />

@@ -58,9 +58,10 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     setFormError(null);
     setShowForm(true);
   }
-  // 複製＝作成ダイアログを追加モードで開き、名前を引き継ぐ（コードは一意キーのため引き継がず新規入力・§4.5 複製）。
+  // 複製＝作成ダイアログを追加モードで開き、入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
+  // コード（一意キーだが入力項目）もプリフィルする（連番部だけ直せばよい・空でも保存時に一意検証で弾かれるだけ）。
   function openDuplicate(g: QuestGroup) {
-    setCode("");
+    setCode(g.quest_group_code);
     setName(g.name);
     setDupMode(true);
     setFormError(null);
@@ -226,7 +227,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
             {formError && <div className="form-error" role="alert" ref={createErrRef} tabIndex={-1}>{formError}</div>}
             {dupMode && (
               <p className="provision-note">
-                複製元の名前を引き継いで新規作成します。<strong>コードは新しい値を入力してください</strong>（一意のため引き継ぎません）。
+                複製元の値を引き継いで新規作成します。<strong>コードは一意のため、別の値に変更してください</strong>（そのまま保存すると重複エラーになります）。
               </p>
             )}
             <Field id="g_code" label="クエストグループコード" required>

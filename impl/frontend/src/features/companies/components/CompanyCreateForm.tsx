@@ -35,15 +35,16 @@ function createErrorMessage(err: unknown): string {
 export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
-  // 複製で開かれた場合は名前・カラーを引き継ぐ（会社コード/DB識別子は一意キー＝引き継がない・§4.5 複製）。
+  // 複製で開かれた場合は入力項目を全部引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
+  // 会社コード/DB識別子（一意キーだが入力項目）もプリフィルする（空にしても保存時に一意検証で弾かれるだけのため）。
   const searchParams = useSearchParams();
   const dup = useMemo(
-    () => readDuplicatePrefill<{ name?: string; color?: string }>(searchParams),
+    () => readDuplicatePrefill<{ name?: string; company_code?: string; db_identifier?: string; color?: string }>(searchParams),
     [searchParams],
   );
   const [name, setName] = useState(dup?.name ?? "");
-  const [companyCode, setCompanyCode] = useState("");
-  const [dbIdentifier, setDbIdentifier] = useState("");
+  const [companyCode, setCompanyCode] = useState(dup?.company_code ?? "");
+  const [dbIdentifier, setDbIdentifier] = useState(dup?.db_identifier ?? "");
   const [color, setColor] = useState(dup?.color ?? DEFAULT_COLOR);
   // アイコン画像は会社作成後に専用 EP（PUT .../icon-image・B.1）へアップロードする（会社は先に実在が必要）。
   // 選択直後はローカルプレビュー（objectURL）で見せ、送信するファイル本体は iconFile に保持する。

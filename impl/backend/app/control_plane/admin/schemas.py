@@ -32,7 +32,8 @@ class PageInfo(BaseModel):
 class AccountListItem(BaseModel):
     """アカウント一覧の 1 行（SC-92・B.2）。`password_hash` 等の機密は含めない（§B.6）。
 
-    所属グループ/グループ内ロール（会社DB `quest_group_members`）は後続スライスで付与する。
+    `memberships`＝有効所属（会社DB `quest_group_members`・`removed_at IS NULL`）の `[{group_id, role}]`。
+    複製プリフィル（デザイン標準 §4.5 複製＝所属クエストグループを引き継ぐ）と会社DB単独描画に使う（B.2 応答仕様）。
     """
     account_id: str
     display_name: str
@@ -42,6 +43,7 @@ class AccountListItem(BaseModel):
     system_role: str
     status: str
     last_login_at: str | None = None
+    memberships: list[MembershipInput] = Field(default_factory=list)  # 有効所属（group_id/role・B.2）
 
 
 class AccountListResponse(BaseModel):

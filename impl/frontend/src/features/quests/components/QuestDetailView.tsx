@@ -475,7 +475,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
           <div className="list-toolbar">
             <div className="filters">
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
-              <select className="input" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
+              <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
                 <option value="">対象: すべて</option>
                 <option value="idea">アイデア</option>
                 <option value="chat">チャット</option>
