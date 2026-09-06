@@ -62,3 +62,20 @@ export function consumeQuestFromList(): boolean {
     return v != null;
   } catch { return false; }
 }
+
+// チャットを「ダッシュボードから直行」で開いたことのワンショット来歴。チャットの戻るラベルを
+// 「← ダッシュボードへ戻る」に出し分ける（それ以外＝「← 戻る」）。戻る動作自体は常に router.back()。
+// ダッシュボードの未投票/フォロー中カードのチャット導線でだけ set する。マウント時に1回だけ消費。
+const CHAT_FROM_DASHBOARD_KEY = "iq_chat_from_dashboard";
+
+export function markChatFromDashboard(): void {
+  try { sessionStorage.setItem(CHAT_FROM_DASHBOARD_KEY, "1"); } catch { /* SSR/未対応環境は無視 */ }
+}
+
+export function consumeChatFromDashboard(): boolean {
+  try {
+    const v = sessionStorage.getItem(CHAT_FROM_DASHBOARD_KEY);
+    if (v != null) sessionStorage.removeItem(CHAT_FROM_DASHBOARD_KEY);
+    return v != null;
+  } catch { return false; }
+}

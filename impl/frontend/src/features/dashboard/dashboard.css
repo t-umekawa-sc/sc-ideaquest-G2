@@ -79,6 +79,9 @@
 .dash-page .vote-quick.disagree:hover { background: #FECACA; }
 .dash-page .vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
 .dash-page .vote-card.is-voted { opacity: .6; }
+/* チャット直行リンク（未投票カード）＝控えめな一行リンク。 */
+.dash-page .dash-chat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); }
+.dash-page .dash-chat-link:hover { text-decoration: underline; }
 
 /* フォロー中のアイデア */
 .dash-page .follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
@@ -95,6 +98,9 @@
 .dash-page .follow-star { position: absolute; top: var(--space-4); right: var(--space-4); background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--pixel-xp); padding: 2px; border-radius: var(--radius-sm); }
 .dash-page .follow-star:hover { background: var(--color-surface-alt); }
 .dash-page .follow-star[aria-pressed="false"] { color: var(--color-text-subtle); }
+/* チャット直行（フォロー中カード）＝カードLink の外＝右下に配置（star は右上）。 */
+.dash-page .follow-chat { position: absolute; right: var(--space-4); bottom: var(--space-4); font-size: 16px; line-height: 1; text-decoration: none; padding: 2px; border-radius: var(--radius-sm); z-index: 1; }
+.dash-page .follow-chat:hover { background: var(--color-surface-alt); }
 .dash-page .follow-card.is-frozen { opacity: .92; }
 .dash-page .follow-card.is-frozen .card-title { color: var(--color-text-muted); }
 .dash-page .follow-frozen-note { margin-top: var(--space-2); }

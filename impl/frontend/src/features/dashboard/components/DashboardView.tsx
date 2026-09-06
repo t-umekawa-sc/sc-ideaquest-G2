@@ -20,6 +20,7 @@ import { levelRank } from "@/lib/levelTitle";
 import { isMotionReduced } from "@/lib/motion";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
+import { markChatFromDashboard } from "@/lib/nav";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
 import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
 import {
@@ -346,6 +347,8 @@ export function DashboardView({
                   <div className="vote-card__quest">{v.quest.title}</div>
                   <div className="vote-card__value">{v.value}</div>
                   <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
+                  {/* チャットへ直行（戻るはダッシュボードに戻る＝markChatFromDashboard でラベル出し分け）。 */}
+                  <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
                   <div className="vote-actions">
                     <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
                     <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
@@ -423,6 +426,8 @@ export function DashboardView({
                     {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
                   </Link>
                   <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow(f); }}>★</button>
+                  {/* チャットへ直行＝カードLink（詳細）の外に置く（アンカー入れ子回避・star と同方針）。戻るはダッシュボードへ。 */}
+                  <Link className="follow-chat" href={`/ideas/${f.id}/chat`} onClick={() => markChatFromDashboard()} aria-label="チャットで議論" title="チャットで議論">💬</Link>
                 </motion.div>
               );
             })}

@@ -6,11 +6,13 @@
 // 実接続: getChat（一覧＋未読）・getIdea（文脈＋comment 権限＋completed）・getPartyMembers（@候補）・getSpells（魔法）。
 // 送信/編集/削除/既読/リアクション/魔法はサーバー権威（403/409/422 は理由トースト）。引用返信は複数可（quoted_message_ids[]・§5.16b）。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
 import { isCanvasEffect } from "@/features/spells/engines";
 import { ApiError } from "@/lib/api/client";
+import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
 import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
@@ -87,6 +89,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [ctxOpen, setCtxOpen] = useState(false); // 上部の文脈パネルの開閉。既定＝閉じる（ユーザー要望・▼で開く）
   const [hintOpen, setHintOpen] = useState(false);   // 使い方ヒントの開閉（SC-24 モック）
   const [composerMin, setComposerMin] = useState(true); // 入力欄の最小化（SC-24 モック）。既定＝最小化（ユーザー要望・スリムバーをクリックで展開）
+  const router = useRouter();
+  // 戻る＝履歴を戻す（デザイン標準 §4.5⑨）＝来た画面へ戻る（ダッシュボード直行→ダッシュボード／詳細→詳細）。
+  // 直アクセス/リロードは fallback＝アイデア詳細。固定リンクの相互参照によるループを構造的に回避。
+  const [backToDash, setBackToDash] = useState(false); // ダッシュボード直行時だけラベルを出し分け（one-shot）
+  useEffect(() => { setBackToDash(consumeChatFromDashboard()); }, []);
   const [emojiOpen, setEmojiOpen] = useState(false);  // コンポーザーの絵文字ピッカー
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [replyTargets, setReplyTargets] = useState<{ id: string; name: string; text: string }[]>([]);
@@ -391,13 +398,18 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
     return () => document.removeEventListener("click", onDocClick);
   }, [picker, mention]);
 
+  // 戻るリンク（3箇所共通）＝履歴があれば router.back（来た画面へ）／無ければアイデア詳細へ。ラベルは文脈ヒント。
+  const backHref = `/ideas/${ideaId}`;
+  const backLabel = backToDash ? "← ダッシュボードへ戻る" : "← 戻る";
+  const onBack = (e: React.MouseEvent) => { e.preventDefault(); backToListOr(router, backHref); };
+
   if (loading) {
     return <main className="container chat-main"><Spinner label="読み込み中…" /></main>;
   }
   if (loadError || !idea) {
     return (
       <main className="container chat-main">
-        <Link className="backlink" href={`/ideas/${ideaId}`}>← 戻る</Link>
+        <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
         <div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError ?? "見つかりません。"}</div>
       </main>
     );
@@ -431,13 +443,13 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
               <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
             </div>
             <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>
-            <Link className="backlink" href={`/ideas/${ideaId}`}>← 戻る</Link>
+            <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
           </>
         ) : (
           // たたんだ状態＝コンパクトなタイトル（左）＋右端に戻るリンク。
           <>
             <span className="chat-context__mini">💬 {idea.title}</span>
-            <Link className="backlink chat-context__back" href={`/ideas/${ideaId}`}>← 戻る</Link>
+            <Link className="backlink chat-context__back" href={backHref} onClick={onBack}>{backLabel}</Link>
           </>
         )}
       </section>
