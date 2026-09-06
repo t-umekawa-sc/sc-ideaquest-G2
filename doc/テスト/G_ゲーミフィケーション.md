@@ -172,3 +172,10 @@
 
 | G-TC-160 | unit(front) | 実寸→セルグリッド（解像度） | 実寸 w×h／cell | `auraGrid(w, h, cell)` | gw/gh は整数／下限 1×1／`gw≈ceil(w/cell)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
 | G-TC-160 | unit(front) | 下辺の可読性フェード（最下行は控えめ） | 行 gy／最下行 botRow | `auraBotFade(gy, botRow)` | `gy>=botRow` は 0.32／それ以外 1／0 より大きく 1 以下（文字が完全に消えない）／決定的 | GF-AC-091／#10 |
+
+### 5-K. 魔法 canvas ハーネスの reduce-motion 分岐（reduceStatic か rAF 起動か）frontend 単体（Phase E・useSpellEngine・GF-AC-091／093）
+
+> 対象＝`impl/frontend/src/features/spells/useSpellEngine.ts` の純ロジック分。canvas 魔法エンジン（G-TC-155..160）はいずれも「reduce-motion はハーネスが `reduceStatic()` を呼び rAF を回さない」設計で、各エンジンの unit は決定的純関数のみ（reduce 分岐は対象外）。そこで**その分岐判定の正**をハーネス側で担保する（記憶 `animation-reduce-motion-standard`＝演出追加時は抑制 ON/OFF をテスト必須／デザイン標準 §4.9）。`planSpellLifecycle(reduce, hasIntersectionObserver)`＝実効抑制 reduce（＝`reduceMotion()`＝OS reduce OR ユーザー設定・`lib/motion` の正）が真なら `"static"`（rAF/IO を起動せず `reduceStatic()` 静止 1 枚）／偽なら IO があれば `"observe"`（可視で発射・画面外で停止）・無ければ（SSR/jsdom）`"immediate"`（即発射）を返す。実際の canvas 描画/rAF/IO 配線・後付け OS reduce の matchMedia 安全弁は GF-AC ブラウザ受入に委ねる。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-161）で担保。
+
+| G-TC-161 | unit(front) | reduce-motion は静止 1 枚（rAF/IO を起動しない） | 実効抑制 reduce=true | `planSpellLifecycle(true, hasIO)` | hasIO の真偽によらず `"static"`（`reduceStatic()` 経路・rAF/IO 不使用）／決定的 | GF-AC-091・093／#10 |
+| G-TC-161 | unit(front) | 非抑制は可視監視 or 即発射 | 実効抑制 reduce=false | `planSpellLifecycle(false, hasIO)` | IO あり（hasIO=true）は `"observe"`（可視で発射・画面外停止）／IO なし（false）は `"immediate"`（即発射）／決定的 | GF-AC-091・093／#10 |

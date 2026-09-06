@@ -31,6 +31,16 @@ function originFromScreen(container: HTMLElement, from: CastPoint | null | undef
   return { x: ((from.x - cr.left) / cr.width) * size.w, y: ((from.y - cr.top) / cr.height) * size.h };
 }
 
+// reduce-motion 分岐の純ロジック（G-TC-161）。実効抑制（reduce＝`reduceMotion()`＝OS reduce OR
+// ユーザー設定・`lib/motion` の正）なら rAF/IO を起動せず静止 1 枚（reduceStatic）へ。非抑制は
+// IO があれば可視監視（画面外で rAF 停止）・無ければ（SSR/jsdom）即発射。canvas/rAF/IO の実配線と
+// 後付け OS reduce の matchMedia 安全弁は GF-AC ブラウザ受入に委ねる。
+export type SpellLifecycle = "static" | "observe" | "immediate";
+export function planSpellLifecycle(reduce: boolean, hasIntersectionObserver: boolean): SpellLifecycle {
+  if (reduce) return "static";
+  return hasIntersectionObserver ? "observe" : "immediate";
+}
+
 export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params: Params) {
   const { effect, size } = params;
   const originSelectorRef = useRef(params.originSelector);
@@ -48,8 +58,11 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
     const engine = factory({ w: size.w, h: size.h, dpr });
     container.appendChild(engine.canvas);
 
+    // 分岐判定は純ロジックへ集約（G-TC-161）＝抑制なら静止・非抑制は IO 有無で可視監視/即発射。
+    const plan = planSpellLifecycle(reduceMotion(), typeof IntersectionObserver !== "undefined");
+
     // reduce-motion＝静止1枚（rAF/IO なし）。
-    if (reduceMotion()) {
+    if (plan === "static") {
       engine.reduceStatic();
       return () => {
         engine.stop();
@@ -78,7 +91,7 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
 
     let started = false;
     let io: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== "undefined") {
+    if (plan === "observe") {
       io = new IntersectionObserver(
         (entries) => {
           const e = entries[0];

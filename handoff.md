@@ -43,7 +43,7 @@
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
 - **魔法6種すべて canvas 化・実装完了**。虹/オーラ/キラキラ(ライト版)は headless smoke（start/startPersist/reduceStatic すべて pixel 描画・console/pageerror 0）実測。実ブラウザでもユーザーが `/spells`→チャットで発動して確認済み。本セッション末の明示的な "受入 ok" は**直近バッチ（オーラのはみ出し前面化＋編集モード引用）**に対するもの＝これは受入完了。虹/オーラ/キラキラの見た目自体への個別サインオフは、発動テスト中に出た不具合（オーラがリアクションを覆う等）を都度修正して収束した状態（＝実質受入済み・別途「この演出でOK」の明文確認は取っていない）。
-- **テスト（最終実測）**＝backend `pytest tests/`＝**513 passed**（既知 flaky `tests/auth/test_auth_email_verify.py::test_a_tc_106_confirm_is_public` はこの回は緑・単体でも緑）。frontend＝`npx tsc --noEmit` 緑／`npx vitest run` **149 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 419**。
+- **テスト（最終実測）**＝backend `pytest tests/`＝**513 passed**（既知 flaky `tests/auth/test_auth_email_verify.py::test_a_tc_106_confirm_is_public` はこの回は緑・単体でも緑／※本セッションは docker 未起動のため backend は未再実測）。frontend＝`npx tsc --noEmit` 緑／`npx vitest run` **152 passed**（reduce-motion 分岐 G-TC-161 の 3 件追加）／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 419**。
 - **QA スタック＝全起動中**（`docker compose ps`＝backend/frontend/db/worker/mail-worker/mailhog/minio/redis 全 Up・本セッションで backend/frontend 再ビルド済み）。次回もし止まっていれば §8 の起動コマンド。
 - **壊れているもの＝把握範囲で無し**。本セッションのユーザー報告不具合（アバター未反映・炎解放エラー・氷/虹/オーラのはみ出し重なり・編集中の引用）はすべて修正・受入済み。
 - 魔法→effect＝flame_1 炎=fire／flame_2 雷=thunder／flame_3 虹=rainbow／light_1 氷=ice／light_2 キラキラ=sparkle／light_3 オーラ=aura（migration 0013）。受入用 user@acme.example・user2@acme.example は SP 付与済み（現状 user@acme は炎解放済み・SP 108）。
@@ -67,7 +67,7 @@
 > **魔法 canvas 移植ループは完了**（全6種）。以下は未着手/未確認。
 
 1. **GF-AC 受入台帳の追随を確認**＝`doc/テスト/ゲーム感受入.md`（現状 GF-AC 行 117 件）に、本セッションの production 移植分（虹/オーラ/キラキラ・stacking 修正・編集引用）の受入行が要るか**未確認**。要すれば追記（`GF-AC-NNN`）。
-2. **新規 canvas エンジンの reduce-motion テストが未整備**＝engines の unit（`rainbow.test.ts`/`aura.test.ts`）は純関数のみで、reduce-motion（`reduceStatic()`）の明示テストは無い（ハーネス `useSpellEngine` が `reduceMotion()` で分岐・記憶 `animation-reduce-motion-standard` は「演出追加時は抑制ON/OFFをテスト必須」）。ハーネス側 or 実ブラウザで抑制の確認を検討。**未対応**。
+2. **新規 canvas エンジンの reduce-motion テスト＝ハーネス側の分岐判定を unit 化済み（本セッション）**＝`useSpellEngine.ts` に純関数 `planSpellLifecycle(reduce, hasIO)` を切り出し（抑制→`"static"`＝reduceStatic 静止/rAF・IO 起動せず／非抑制→IO 有 `"observe"`・無 `"immediate"`）、`useSpellEngine.test.ts`＝**G-TC-161**（3 ケース＝抑制 ON/OFF 網羅）。engines の unit（`*.test.ts`）は従来どおり決定的純関数のみ（設計＝reduce 分岐はハーネス責務・G_ゲーミフィケーション.md 5-K）。**残＝実 canvas の rAF/IO 停止・後付け OS reduce の matchMedia 安全弁は依然 GF-AC ブラウザ受入に委ねる**（jsdom/testing-library 未導入・vitest は node 環境方針のため hook マウントテストは未実施）。
 3. **ゲーム感フェーズの残タスク確認**＝`doc/フェーズ毎ルール/ゲーム感フェーズ.md` と記憶 `game-feel-8-xp-feedback-decision`（+XP/+コイン演出の段階ハイブリッド）を読み、魔法以外の juiciness 項目（獲得フィードバック等）で未実装が無いか**未確認**。着手前にコードで裏取り（記憶 `handoff-notes-often-stale`）。
 - **共通ルール**＝フロント検証は `npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。**push は都度確認**。全アニメは reduce-motion 尊重。テストは**先に md に TC 行(`根拠`列)→red-green→traceability ✅**（テスト規約 §5.1）。backend スキーマ（response_model）変更後は `cd impl/frontend && npm run codegen`（多くの form 追加は response 不変＝codegen 不要）。
 
