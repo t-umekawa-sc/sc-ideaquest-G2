@@ -16,7 +16,7 @@ import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { markQuestFromList } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
-import { listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
+import { getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
@@ -133,13 +133,15 @@ export function QuestListView() {
   }, [quests]);
 
   // 複製＝作成ダイアログ（SC-11）を追加モードで開き、入力項目を引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
-  // 件名/カラー/カテゴリー/グループ/期限日。クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
-  // 目的（theme/purpose）は一覧DTOに無い＝現状引き継げない（引き継ぐには C.1 詳細取得 or DTO 拡張が要る・follow-up）。
+  // 件名/カラー/カテゴリー/グループ/期限日/目的・テーマ。クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
+  // 目的・テーマ（purpose）は一覧DTOに無いので詳細（C.1 getQuest）を取得して引き継ぐ（編集プリフィルと同じ源）。
   // id・ステータス（→下書き）・アイコン画像・パーティー編成はサーバー生成/バイナリ/関係のため引き継がず新規入力。
   const questMenu = (x: Quest): RowMenuItem[] => [
     {
       label: "複製",
-      onClick: () =>
+      onClick: async () => {
+        // 目的・テーマは一覧に無い＝詳細を取得して載せる（取得失敗時は空でフォールバック）。
+        const detail = await getQuest(x.id).catch(() => null);
         router.push(
           buildDuplicateHref("/quests/new", {
             title: x.title,
@@ -147,8 +149,10 @@ export function QuestListView() {
             categories: x.cats,
             quest_group_id: x.groupId,
             deadline: x.deadlineRaw,
+            purpose: detail?.purpose ?? "",
           }),
-        ),
+        );
+      },
     },
   ];
 
