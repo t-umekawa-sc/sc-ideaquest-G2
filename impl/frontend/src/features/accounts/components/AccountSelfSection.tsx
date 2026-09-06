@@ -42,7 +42,8 @@ function statusBadge(status: string) {
   );
 }
 
-export function AccountSelfSection({ companyCode }: { companyCode: string }) {
+// children＝見出し/自社バナーの直後・アカウント表の前に差し込むスロット（SC-93 のクエストグループ管理を配置する）。
+export function AccountSelfSection({ companyCode, children }: { companyCode: string; children?: React.ReactNode }) {
   const router = useRouter();
   const { accounts, loading, loadError, reload } = useAllAccounts(listOwnAccounts);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -257,6 +258,9 @@ export function AccountSelfSection({ companyCode }: { companyCode: string }) {
         <span className="company-ctx__name">{companyCode}</span>
         <span className="company-ctx__note">自社のアカウントを管理しています（会社の切替はできません）。</span>
       </div>
+
+      {/* 見出し/自社バナーの直後に差し込むスロット（クエストグループ管理→アカウントの順・SC-92 と統一）。 */}
+      {children}
 
       <div className="section-head">
         <h2>アカウント</h2>
