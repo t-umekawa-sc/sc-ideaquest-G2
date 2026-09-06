@@ -4,6 +4,7 @@
 import { createSparkleEngine } from "./sparkle";
 import { createFireEngine } from "./fire";
 import { createThunderEngine } from "./thunder";
+import { createIceEngine } from "./ice";
 
 export type SpellEngine = {
   canvas: HTMLCanvasElement;
@@ -27,6 +28,7 @@ const ENGINES: Record<string, EngineFactory> = {
   sparkle: createSparkleEngine,
   fire: createFireEngine,
   thunder: createThunderEngine,
+  ice: createIceEngine,
 };
 
 // canvas エンジンへ寄せる effect か（混在期のゲート）。リテラル一致＝未知は CSS 側に残す。

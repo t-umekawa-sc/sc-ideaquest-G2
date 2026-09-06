@@ -150,3 +150,10 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | G-TC-157 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `thunderGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
 | G-TC-157 | unit(front) | 発雷フラッシュの水平減衰（中央明→端暗） | パネル幅 w／x 座標 | `flashBand(x, w)` | 中央 `x=w/2` で最大 1／中央から離れるほど単調非増加／0 未満にならない（範囲外 x でもクランプ）／決定的 | GF-AC-091／#10 |
+
+### 5-H. 氷 canvas エンジンの決定的部分（解像度/霜の可読性フェード）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/ice.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-e` の氷結 canvas+rAF エンジン）を production の canvas ハーネスへ移植。**canvas 本体（Voronoi 凍結セル・氷柱の生成/保持/破砕・ピカッ連鎖・雪/破片＝`rng` で非決定的・rAF 駆動）は §17L-e／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`iceGrid(w,h,scale)`＝実寸(CSS px)→低解像度グリッド(cols×rows)＝ドット絵の解像度（下限 140×20・約 scale px/セル・炎/雷と同契約）。`frostAlpha(bright,settle)`＝凍ったパネルの霜フィルの不透明度係数（明るいセルほど濃く／**全面凍結後は settle を下げて霜を薄くし文字を読みやすくする**＝可読性の担保）。視覚（氷塊の飛来/砕け/雪の結晶/氷柱の成長・キラッ・破砕/凍結の広がり）は §17L-e の GF-AC で受入。※production 版はマージン無しの枠ぴったり canvas（氷柱の枠外はみ出しは簡略化・follow-up）。reduce-motion はハーネスが `reduceStatic()`（凍結済み静止 1 枚）を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-158）で担保。
+
+| G-TC-158 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `iceGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
+| G-TC-158 | unit(front) | 霜フィルの可読性フェード（明るいほど濃く・settle で薄く） | セル明度 bright(0..1)／settle(0.6..1) | `frostAlpha(bright, settle)` | bright が増えるほど単調非減少／settle が下がるほど単調非減少（全面凍結後は薄くなる）／0 未満にならない／決定的 | GF-AC-091／#10 |
