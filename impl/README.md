@@ -33,9 +33,9 @@
 | SC-40 | 実績バッジ | ✅ | `(app)/achievements` | 実接続（`getAchievements`＝カタログ＋自分の獲得/進捗＋summary・シークレット未獲得は伏せる）。付与はサーバー（台帳フック）が自動判定＝表示のみ。DataTable（カテゴリー/ティア/状態） |
 | SC-41 | ランキング | ✅ | `(app)/ranking` | 実接続（`getRankings`＝期間×会社スコープ・獲得XP＋獲得コイン集計・me 常時同梱）。期間タブ（今週/先週/今月/通算）で再取得・表彰台/一覧/自分順位 |
 | SC-90 | クエストグループ管理 | ✅ | `(app)/admin/quest-groups` | メンバー管理含む |
-| SC-91 | システム管理 | ✅ | `(app)/admin/companies` | 会社一覧・手動プロビジョニング |
-| SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009） |
-| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み。**メール確認バッジ＋送信アクション**（ADR-0009） |
+| SC-91 | システム管理 | ✅ | `(app)/admin/companies` | 会社一覧・手動プロビジョニング。複製対応済み（会社=会社コード/DB識別子/名前/カラー・QG=コード/名前を引き継ぎ） |
+| SC-92 | 会社詳細 | ✅ | `(app)/admin/companies/[id]` | 会社プロビジョニングは MVP 手動。**メール確認バッジ（未確認/確認済み）＋⋯「確認メールを送信」**（ADR-0009）。アカウント複製対応（ログインID/メール/所属も引き継ぎ）・編集で現所属を読み取り専用表示 |
+| SC-93 | 会社アカウント管理 | ✅ | `(app)/admin/companies/[id]/accounts`・`admin/accounts` | 複製対応済み（ログインID/メール/所属も引き継ぎ）・編集で現所属を読み取り専用表示。**メール確認バッジ＋送信アクション**（ADR-0009） |
 
 **接続済み画面のフロント feature**＝`auth`・`profile`・`quests`・`ideas`・`evaluations`・`chat`・`spells`・`shop`・`avatar`・`ranking`・`achievements`・`notifications`・`accounts`・`companies`・`questgroups`・`qgadmin`（各 `api.ts` が backend を叩く）。
 **モック feature**（`api.ts` 無し）＝`dashboard`(一部)。
@@ -80,6 +80,8 @@
 | リアルタイム（L） | `tenant/realtime` | ✅ **WS `GET /api/v1/realtime`**（Cookie セッション認証＋Origin 検証）＝プロセス毎ハブ（`redis.asyncio` PSUBSCRIBE `notifications:*`/`chat:*`＋`realtime:revoke`・購読テーブル topic→接続・`company_id` フィルタで cross-tenant 遮断）。`notifications:{user_id}` 自動購読／`chat:{cg}` は動的購読（門番＝REST と同一・gate.py）。**発行＝H（notify post-commit）・E（chat post-commit）・C（除去で `publish_revoke`＝L.4 購読ドロップ）**。配信専用（書き込みは REST）。lifespan でハブ起動/停止。フロント＝`lib/realtime.ts`（単一 WS・再接続）＋`RealtimeProvider`（ベル）／SC-02・SC-24 は WS で再取得 |
 
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
+
+**複製プリフィル 全項目化（デザイン標準 §複製・2026-09-06 改定）**＝入力項目は一意キー/重複禁止項目も含めて全部プリフィル（例外＝サーバー自動採番/システム生成列のみ）。関連＝アカウント一覧応答 `AccountListItem.memberships`（有効所属 `[{group_id, role}]`・会社DB バッチ読取・API設計 B.2 既定分の実装・B-TC-171）を追加し、複製の所属引き継ぎ／編集画面の現所属表示に使用。コントロールは style-guide 準拠に統一（`.checkbox`/`.select`）＝フロント実装フロー規約 §2.1（コントロール実装前に style-guide.html のモック有無を確認）。
 
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
