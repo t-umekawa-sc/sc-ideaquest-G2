@@ -9,7 +9,7 @@
 | アクター | 判定 | 範囲 | パス接頭辞 |
 | --- | --- | --- | --- |
 | **システム管理者** | `session.system_role == system_admin` | **全会社・全アカウント・会社設定・所属/グループ内ロール・ロール付与** | `/admin/companies/...`（対象会社を `company_id` で明示＝クロステナント admin・§1.5） |
-| **会社アカウント管理者** | `session.system_role == company_account_admin` | **自社（セッション会社）全アカウント**の発行/無効化/identity 編集/PW 再設定＋**per-group `admin`（QG管理者）の任命/剥奪**（2026-08-02 改定）。**会社設定・プロビジョニング・`system_role` 付与は不可** | `/admin/accounts/...`（**セッション会社固定**・`company_id` を受けない） |
+| **会社アカウント管理者** | `session.system_role == company_account_admin` | **自社（セッション会社）全アカウント**の発行/無効化/identity 編集/PW 再設定＋**per-group `admin`（QG管理者）の任命/剥奪**（2026-08-02 改定）＋**自社クエストグループの CRUD**（作成/リネーム/削除・2026-09-06 委任）。**会社設定・プロビジョニング・`system_role` 付与は不可** | `/admin/accounts/...`・`/admin/company-quest-groups`（**セッション会社固定**・`company_id` を受けない） |
 | **クエストグループ管理者** | セッションユーザーが**対象グループに有効な `admin` 所属**（`quest_group_members.role=admin` かつ `removed_at IS NULL`）を持つ（会社DB判定・B案） | **参加選択専任**＝自社ディレクトリ参照＋**自分が `admin` のグループへ既存アカウントを参加追加/除外**（`quest_group_members` の per-group 操作のみ）。**発行/無効化/identity/PW・`admin` 付与は不可** | `/admin/quest-groups/{group_id}/...`・`/admin/company-directory`（`group_id` は**セッション会社**内・所属で門番） |
 
 - **職務分離（SoD・2026-08-01・データモデル §8-⑯）**: アカウントの**ライフサイクル管理（会社アカウント管理者）**と、QG への**参加管理（QG管理者）**を分離。**なぜ**＝QG管理者が会社DB内アカウントを参照可能（緩和）になると「任意の既存垢を自 QG に追加 → 無効化/identity 改変」で会社全体を破壊/乗っ取りできる権限昇格が生じるため、QG管理者から破壊系を取り上げる（B.7.2 も参照）。会社アカウント管理者は会社スコープ役割＝`system_role` に格納（B案の原則）。
@@ -102,9 +102,13 @@
 | `POST /admin/accounts/{account_id}/email-verification` | **現メール宛に確認リンクを送付**（opt-in・SC-93 ⋯「確認メールを送信」・ADR-0009） | — | `202`（B.2 の同名 EP と同挙動＝`purpose=email_verify`・72h・単回・現 `email` 宛・再送可） |
 | `POST /admin/accounts/{account_id}/disable` ／ `/enable` | 無効化⇄再有効化 | — | 状態更新（B.2 と同挙動＝全セッション破棄＋信頼端末失効） |
 | `POST /admin/accounts/{account_id}/password-reset` | 初回/再設定PWリンク再送 | — | 送信結果（A.7） |
-| `GET /admin/company-quest-groups` | 自社のクエストグループ一覧（**発行/編集の `memberships` 割当の候補**） | （セッション会社固定・パラメータなし） | `data`＝グループの配列（`group_id`/`quest_group_code`/`name`/`member_count`・`deleted_at IS NULL`） |
+| `GET /admin/company-quest-groups` | 自社のクエストグループ一覧（**発行/編集の `memberships` 割当の候補**＋管理一覧） | （セッション会社固定・パラメータなし） | `data`＝グループの配列（`group_id`/`quest_group_code`/`name`/`member_count`・`deleted_at IS NULL`） |
+| `POST /admin/company-quest-groups` | 自社のクエストグループを作成（SC-93・2026-09-06 委任） | （セッション会社固定）／ボディ: `quest_group_code`（会社内一意・大文字正規化・§5.4）,`name` | `201`＋作成グループ（`member_count=0`）。code 重複=**409 `conflict`**（field=`quest_group_code`）／形式違反=`422` |
+| `PATCH /admin/company-quest-groups/{group_id}` | 自社グループをリネーム | パス: `group_id`（セッション会社内）／ボディ（差分）: `name` | `200`＋更新後グループ。`quest_group_code` は不変。不明グループ=`404` |
+| `DELETE /admin/company-quest-groups/{group_id}` | 自社グループを削除（空グループのみ・トゥームストーン） | パス: `group_id`（セッション会社内） | `204`。有効所属や当該グループのクエストが1件でもあれば **409 `conflict`（in_use）**。不明=`404` |
 
-- **`GET /admin/company-quest-groups` の位置づけ（2026-08-11 追加）**: 会社アカウント管理者が発行/編集で `memberships` を指定するには**自社の全グループを候補として見る**必要がある。B.3 `GET /admin/companies/{id}/quest-groups` は system_admin 専用（クロステナント＝`company_id` を明示）、B.4 `GET /admin/quest-groups` は QG管理者の「自分が `admin` のグループのみ」で用途が違う。よって**セッション会社固定・会社アカウント管理者（＋system_admin 上位互換）向けの自社全グループ一覧**を本 EP として追加する（読み取りのみ・作成/変更は B.3＝system_admin 専用のまま）。
+- **`GET /admin/company-quest-groups` の位置づけ（2026-08-11 追加）**: 会社アカウント管理者が発行/編集で `memberships` を指定するには**自社の全グループを候補として見る**必要がある。B.3 `GET /admin/companies/{id}/quest-groups` は system_admin 専用（クロステナント＝`company_id` を明示）、B.4 `GET /admin/quest-groups` は QG管理者の「自分が `admin` のグループのみ」で用途が違う。よって**セッション会社固定・会社アカウント管理者（＋system_admin 上位互換）向けの自社全グループ一覧**を本 EP として追加する。
+- **クエストグループ CRUD を会社アカウント管理者へ委任（2026-09-06 改定・運用要件）**: グループの作成/リネーム/削除も**会社アカウント管理者が自社スコープで可能**にする（`POST/PATCH/DELETE /admin/company-quest-groups`・セッション会社固定）。**なぜ**＝実運用でグループ編成は会社側（アカウント管理者）が日常的に行うもので、その都度 system_admin（プラットフォーム運営）に依頼するのは非現実的だから。**当初は B.3.1 で system_admin 専用**だったが（「グループ作成＝会社構造の変更」とみなしていた）、会社アカウント管理者は既に自社の全アカウント・所属・per-group `admin` 任命を持ち、**自社スコープに閉じる**ため新たな越権にはならない（クロステナントや会社設定・プロビジョニングは引き続き system_admin 専用）。system_admin は B.3.1 のクロステナント経路（`/admin/companies/{id}/quest-groups`）で従来どおり全社を CRUD 可能（上位互換）。実装は同一サービス（会社DB `quest_groups`）を session `company_id` で呼ぶ。CRUD 変更系は Origin/CSRF 必須（P3）・監査記録。
 - **認可条件（B.2.1 全エンドポイント・共通）**: B.0.1 の P1〜P6＋`session.system_role == "company_account_admin"`（`system_admin` も上位互換で可）。対象は**セッション会社のアカウントのみ**（他会社は経路上そもそも不可＝`company_id` を受けない）。
 - **できる操作＝per-group `admin` の任命/剥奪（自社・2026-08-02 改定）**: `memberships` に **`role=admin` を含めてよい**（自社の任意アカウントを QG管理者にする/解除する）。**なぜ許すか**＝per-group `admin` は「特定グループの参加追加/除外だけ」の**下位権限**で、会社アカ管理者が既に持つ破壊系（発行/無効化/PW）より弱く、自社スコープに閉じるため**新たな越権にならない**（B.7.2）。付与/剥奪は `system_audit_logs` に記録。
 - **不可操作（＝system_admin との差・403/422）**: **`system_role` の変更（`company_account_admin`/`system_admin` の付与・降格）は不可**（＝“同格/上位を増やす”真の権限昇格は system_admin に集約）。よって発行/編集で作れる/変更できるのは **`system_role=general` のアカウントのみ**（`admin` は per-group ロールなので `system_role` ではなく `memberships` 側＝可）。会社設定（`/settings`）・会社作成/プロビジョニング（B.1）も不可。
@@ -125,7 +129,7 @@
 | `PATCH /admin/companies/{company_id}/quest-groups/{group_id}` | グループをリネーム | パス: `company_id`,`group_id`／ボディ（差分）: `name` | `200`＋更新後グループ。**`quest_group_code` は不変**（安定識別子）。不明会社/グループ=`404` |
 | `DELETE /admin/companies/{company_id}/quest-groups/{group_id}` | グループを削除（空グループのみ） | パス: `company_id`,`group_id` | `204`。有効所属（`quest_group_members.removed_at IS NULL`）や当該グループのクエストが 1 件でもあれば **409 `in_use`**。不明=`404` |
 
-- **権限（B.3.1・共通）**: 一覧/作成/リネーム/削除とも **system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。**グループそのものの作成/変更/削除は会社構造の変更**なので会社設定・会社作成（B.1）と同じ権限帯＝会社アカ管理者・QG管理者は不可（SoD＝アカ管理者は「人」、QG管理者は「参加」の管理に閉じる・§8-⑯）。想定外プロパティは拒否（Mass Assignment 防止・§2.2）。
+- **権限（B.3.1・共通）**: この**クロステナント経路（`/admin/companies/{company_id}/quest-groups`）は system_admin 専用**（B.0.1 P1〜P6＋`system_role==system_admin`）。**自社スコープの同 CRUD は会社アカウント管理者にも委任済み**＝別経路 `POST/PATCH/DELETE /admin/company-quest-groups`（B.2.1・セッション会社固定・2026-09-06 改定）。※当初は「グループ作成＝会社構造の変更」として会社アカ管理者も不可としていたが、実運用でグループ編成は会社側が日常的に行うため自社スコープに限って委任した（クロステナント・会社設定・プロビジョニングは引き続き system_admin 専用）。QG管理者（per-group）は依然 CRUD 不可（参加管理のみ・SoD §8-⑯）。想定外プロパティは拒否（Mass Assignment 防止・§2.2）。
 - **なぜ作成/リネーム/削除を B に追加したか（2026-08-11 決定）**: 従来 B は「グループは既存前提」で所属割当（B.2 `memberships`／B.4 参加追加）だけを定義し、**グループを新規作成/管理する経路が API に無かった**（会社DBプロビジョニングが MVP 手動なのと同じ空白）。SC-92 でグループの CRUD 動線を提供するため追加。**リネームは `name` のみ**（表示名は運用で変わりうるが、コード/ID は参照の安定性のため不変＝所属/クエストは `group_id` 参照なので安全）。
 - **削除の方式＝トゥームストーン（`quest_groups.deleted_at`・§5.4）**: 物理削除しない。理由＝(a) 稼働中グループ（有効所属・クエストあり）の削除は業務データを孤児化するので禁止（`in_use`）、(b) 解除済み所属（`quest_group_members.removed_at` 済）が FK で当該グループを参照し続けるため（監査保持・データモデル §5.1「原則物理削除しない」）。一覧/候補/所属追加は `deleted_at IS NULL` で除外。**同一 `quest_group_code` の再作成は可**（部分ユニーク `UNIQUE(quest_group_code) WHERE deleted_at IS NULL`）。
 

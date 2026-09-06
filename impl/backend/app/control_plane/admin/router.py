@@ -424,8 +424,45 @@ def send_email_verification_own(
 def list_own_company_quest_groups(
     request: Request, session: dict = Depends(require_company_account_admin),
 ) -> QuestGroupListResponse:
-    """自社のクエストグループ一覧（B.2.1・所属エディタの候補・セッション会社固定）。読み取りのみ。"""
+    """自社のクエストグループ一覧（B.2.1・所属エディタの候補＋管理一覧・セッション会社固定）。読み取りのみ。"""
     return QuestGroupListResponse(**company_service.list_company_quest_groups(_company_id(session)))
+
+
+@router.post("/company-quest-groups", response_model=QuestGroupListItem, status_code=201)
+def create_own_company_quest_group(
+    body: QuestGroupCreateRequest, request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> QuestGroupListItem:
+    """自社のクエストグループを作成（SC-93・B.2.1・2026-09-06 委任・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return QuestGroupListItem(**company_service.create_company_quest_group(
+        _company_id(session), quest_group_code=body.quest_group_code, name=body.name,
+    ))
+
+
+@router.patch("/company-quest-groups/{group_id}", response_model=QuestGroupListItem)
+def rename_own_company_quest_group(
+    group_id: uuid.UUID, body: QuestGroupRenameRequest, request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> QuestGroupListItem:
+    """自社のクエストグループをリネーム（SC-93・B.2.1・`name` のみ・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    return QuestGroupListItem(**company_service.rename_company_quest_group(
+        _company_id(session), group_id, name=body.name,
+    ))
+
+
+@router.delete("/company-quest-groups/{group_id}", status_code=204)
+def delete_own_company_quest_group(
+    group_id: uuid.UUID, request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> None:
+    """自社のクエストグループを削除（SC-93・B.2.1・空グループのみ・トゥームストーン・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    company_service.delete_company_quest_group(_company_id(session), group_id)
 
 
 # --- QG管理者（`/admin/quest-groups`・`/admin/company-directory`・セッション会社固定・B.4・SC-90） ---

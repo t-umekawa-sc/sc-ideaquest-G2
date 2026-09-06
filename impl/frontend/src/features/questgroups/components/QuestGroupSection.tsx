@@ -1,16 +1,25 @@
 "use client";
 
-// SC-92 クエストグループ（この会社・CRUD）。system_admin 専用（会社構造の変更・B.3.1）。
-// 一覧（DataTable client モード）＋作成＋リネーム＋削除（空グループのみ＝有効所属があれば 409 in_use）。
+// クエストグループ CRUD（一覧＋作成＋リネーム＋削除・空グループのみ＝有効所属があれば 409 in_use）。
+// 2 スコープを出し分け（DRY §2.3）＝scope="company"（SC-92・system_admin・クロステナント・companyId 明示・B.3.1）／
+// scope="own"（SC-93・会社アカウント管理者・セッション会社固定・2026-09-06 委任・B.2.1）。API だけ差し替え、UI は共通。
 // レイアウト/クラスの正＝doc/画面設計/mocks/SC-92_会社詳細.html（DoD＝モック一致）。
-// 一覧の操作標準は DataTable に委譲＝検索/絞込/ソート/列設定/CSV/ピン/カード（§4.5）。listQuestGroups は全件返す。
-import { useCallback, useEffect, useState } from "react";
+// 一覧の操作標準は DataTable に委譲＝検索/絞込/ソート/列設定/CSV/ピン/カード（§4.5）。一覧は全件返す。
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button, DataTable, Field, FormFooterError, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { createQuestGroup, deleteQuestGroup, listQuestGroups, renameQuestGroup, type QuestGroup } from "../api";
+import {
+  createOwnQuestGroup, createQuestGroup,
+  deleteOwnQuestGroup, deleteQuestGroup,
+  listOwnQuestGroups, listQuestGroups,
+  renameOwnQuestGroup, renameQuestGroup,
+  type QuestGroup,
+} from "../api";
 import "@/features/companies/companies.css";
+
+type QuestGroupSectionProps = { scope: "company"; companyId: string } | { scope: "own" };
 
 function createErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -21,7 +30,27 @@ function createErrorMessage(err: unknown): string {
   return "エラーが発生しました。時間をおいて再度お試しください。";
 }
 
-export function QuestGroupSection({ companyId }: { companyId: string }) {
+export function QuestGroupSection(props: QuestGroupSectionProps) {
+  const isOwn = props.scope === "own";
+  const companyId = props.scope === "company" ? props.companyId : "";
+  // scope で API 経路だけ差し替え（UI は共通・DRY）。own＝セッション会社固定（company_id を送らない）。
+  const api = useMemo(
+    () =>
+      isOwn
+        ? {
+            list: () => listOwnQuestGroups(),
+            create: (body: { quest_group_code: string; name: string }) => createOwnQuestGroup(body),
+            rename: (groupId: string, name: string) => renameOwnQuestGroup(groupId, name),
+            del: (groupId: string) => deleteOwnQuestGroup(groupId),
+          }
+        : {
+            list: () => listQuestGroups(companyId),
+            create: (body: { quest_group_code: string; name: string }) => createQuestGroup(companyId, body),
+            rename: (groupId: string, name: string) => renameQuestGroup(companyId, groupId, name),
+            del: (groupId: string) => deleteQuestGroup(companyId, groupId),
+          },
+    [isOwn, companyId],
+  );
   const confirm = useConfirm();
   const snack = useSnackbar();
   const { summaryRef: createErrRef, notify: notifyCreate } = useFormErrorNotice();
@@ -72,14 +101,14 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await listQuestGroups(companyId);
+      const res = await api.list();
       setGroups(res?.data ?? []);
     } catch {
       setLoadError("クエストグループ一覧の取得に失敗しました。");
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [api]);
 
   useEffect(() => {
     void reload();
@@ -90,7 +119,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     setFormError(null);
     setPending(true);
     try {
-      await createQuestGroup(companyId, { quest_group_code: code, name });
+      await api.create({ quest_group_code: code, name });
       setCode("");
       setName("");
       setDupMode(false);
@@ -120,7 +149,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     setEditPending(true);
     try {
       const changed = next !== editing.name;
-      if (changed) await renameQuestGroup(companyId, editing.group_id, next);
+      if (changed) await api.rename(editing.group_id, next);
       setEditing(null);
       if (changed) {
         snack({ type: "success", title: "グループ名を更新しました" });
@@ -146,7 +175,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
     if (!ok) return;
     setActionError(null);
     try {
-      await deleteQuestGroup(companyId, g.group_id);
+      await api.del(g.group_id);
       snack({ type: "success", title: "クエストグループを削除しました" });
       await reload();
     } catch (err) {
@@ -288,7 +317,7 @@ export function QuestGroupSection({ companyId }: { companyId: string }) {
         <p className="admin-muted">読み込み中…</p>
       ) : (
         <DataTable<QuestGroup>
-          storageKey={`sc92-groups-${companyId}`}
+          storageKey={isOwn ? "sc93-own-groups" : `sc92-groups-${companyId}`}
           data={groups}
           columns={columns}
           rowId={(g) => g.group_id}

@@ -597,15 +597,43 @@ export interface paths {
         };
         /**
          * List Own Company Quest Groups
-         * @description 自社のクエストグループ一覧（B.2.1・所属エディタの候補・セッション会社固定）。読み取りのみ。
+         * @description 自社のクエストグループ一覧（B.2.1・所属エディタの候補＋管理一覧・セッション会社固定）。読み取りのみ。
          */
         get: operations["list_own_company_quest_groups_api_v1_admin_company_quest_groups_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Own Company Quest Group
+         * @description 自社のクエストグループを作成（SC-93・B.2.1・2026-09-06 委任・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        post: operations["create_own_company_quest_group_api_v1_admin_company_quest_groups_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/company-quest-groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Own Company Quest Group
+         * @description 自社のクエストグループを削除（SC-93・B.2.1・空グループのみ・トゥームストーン・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        delete: operations["delete_own_company_quest_group_api_v1_admin_company_quest_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Own Company Quest Group
+         * @description 自社のクエストグループをリネーム（SC-93・B.2.1・`name` のみ・セッション会社固定）。変更系＝Origin/CSRF 必須（P3）。
+         */
+        patch: operations["rename_own_company_quest_group_api_v1_admin_company_quest_groups__group_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/quest-groups": {
@@ -5412,6 +5440,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestGroupListResponse"];
+                };
+            };
+        };
+    };
+    create_own_company_quest_group_api_v1_admin_company_quest_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestGroupCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_own_company_quest_group_api_v1_admin_company_quest_groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_own_company_quest_group_api_v1_admin_company_quest_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestGroupRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

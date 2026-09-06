@@ -220,6 +220,17 @@
 | B-TC-092 | api | 使用中グループ削除の拒否（孤児化防止） | system_admin・**有効所属を持つ**グループ | 同 DELETE | `409 conflict`（`in_use`）＝空グループのみ削除可（孤児化防止） | B.3.1／§5.5 |
 | B-TC-093 | api | グループ変更系の認証/CSRF/認可ガード | 非 system_admin／セッション無し／CSRF 無し | PATCH・DELETE | `general`＝`403`／未認証＝`401`／CSRF 無し＝`403 csrf_failed`（変更系・B.0.1 P1/P3/P6） | B.0.1 |
 
+### 4.7 会社アカウント管理者による自社クエストグループ CRUD（`/admin/company-quest-groups`・B.2.1・2026-09-06 委任）
+
+> 対象＝`POST/PATCH/DELETE /admin/company-quest-groups[/{group_id}]`（**セッション会社固定**・`require_company_account_admin`）。グループ編成を会社側に委任する運用要件（従来は B.3.1 system_admin 専用）。実体は B.3.1 と同一サービス（会社DB `quest_groups`）を session `company_id` で呼ぶ。system_admin のクロステナント経路（B.3.1）は不変。クロステナント遮断＝他社 `group_id` は自社DBで解決され `404`（IDOR）。ACME-01 会社DBに seed し teardown で物理削除。test-first（red＝EP 未実装で 404/405）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B-TC-172 | api | 会社アカ管理者が自社グループを作成 | company_account_admin（ACME-01） | `POST /admin/company-quest-groups`（小文字 code＋name） | `201`＋`quest_group_code` 大文字正規化・`member_count=0`・`GET /admin/company-quest-groups` 一覧に現れる／既存 code=`409 conflict`（field=`quest_group_code`）／形式違反=`422` | B.2.1（2026-09-06 委任）／§5.4 |
+| B-TC-173 | api | 自社グループのリネーム（name のみ・code 不変） | company_account_admin・自社グループ seed | `PATCH /admin/company-quest-groups/{group_id}`（`name`） | `200`＋`name` 更新・**`quest_group_code` 不変**／不明 group=`404` | B.2.1／§5.4 |
+| B-TC-174 | api | 空グループ削除（tombstone）と使用中拒否 | company_account_admin・空グループ／有効所属を持つグループ | `DELETE /admin/company-quest-groups/{group_id}` | 空=`204`＋一覧から消える（`deleted_at`）／有効所属あり=`409 conflict`（in_use） | B.2.1／§5.5 |
+| B-TC-175 | api | 認可・CSRF・クロステナント遮断（IDOR） | 未認証／general／CSRF 無し／他社の group_id | POST/PATCH/DELETE | 未認証=`401`／general=`403`／CSRF 無し=`403 csrf_failed`／**他社 group_id は自社DBで解決され `404`**（範囲外遮断） | B.0.1 P1/P3/P6／B.2.1 |
+
 ## 5. 認可の SoD 境界（system_admin 専用 EP の一括 403・B.0.1 P6・§8-⑯）
 
 > 対象＝**`require_system_admin` を課す全 EP**（B.1 会社 CRUD／B.2 クロステナント `/admin/companies/{id}/accounts` 系〔一覧/発行/編集/disable/enable/password-reset〕／B.3 `/admin/companies/{id}/quest-groups` CRUD）。範囲＝**職務分離（SoD・§8-⑯）の境界**＝「特権ロールである**会社アカウント管理者でも** system_admin 専用操作（会社設定・会社/グループ構造・クロステナント）には到達できない」ことを一括で保証する（`general` も同様に 403）。個別節（B-TC-012/055/087/089/093 等）は代表 EP の 403 を確認するが、本節は**全 system_admin 専用 EP × {general, company_account_admin}** を横断で塞ぐ（権限昇格のリグレッションガード）。認可 dep は CSRF/Origin より先に評価されるため、正当な CSRF を付けても 403 `forbidden` が返る。前提＝各ロールで seed アカウントを作りログイン。出典＝B.0.1 P6／§8-⑯。

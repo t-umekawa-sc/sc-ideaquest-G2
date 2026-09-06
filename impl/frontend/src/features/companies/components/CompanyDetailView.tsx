@@ -293,7 +293,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
         </div>
       </section>
 
-      <QuestGroupSection companyId={company.company_id} />
+      <QuestGroupSection scope="company" companyId={company.company_id} />
       <AccountSection companyId={company.company_id} />
     </section>
   );
