@@ -83,7 +83,7 @@ export function ActivityFeed({
         <ul className="feed__list">
           {items.map((a) => (
             <li key={a.id} className="feed__item">
-              <Avatar name={a.actor.name} size="sm" level={a.actor.level ?? undefined} />
+              <Avatar name={a.actor.name} imageUrl={a.actor.avatar ?? undefined} size="sm" level={a.actor.level ?? undefined} />
               <div className="feed__body">
                 <span><strong className="feed__actor">{a.actor.name}</strong>が{EVENT[a.reason] ?? "活動しました"}</span>
                 {showQuest && a.quest_title && <span className="feed__quest">🎯 {a.quest_title}</span>}

@@ -78,7 +78,7 @@ function RevisionItem({ ideaId, rev, isCurrent }: { ideaId: string; rev: IdeaRev
         {isCurrent && <span className="badge badge-muted">現在</span>}
         {isInitial && <span className="badge badge-muted">初版</span>}
         <span className="poster">
-          <Avatar name={rev.editor.display_name || "?"} size="sm" />
+          <Avatar name={rev.editor.display_name || "?"} imageUrl={rev.editor.avatar_image_url ?? undefined} size="sm" />
           <span className="name">{rev.editor.display_name || "?"}</span>
         </span>
       </div>

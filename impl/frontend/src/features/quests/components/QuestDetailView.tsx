@@ -32,7 +32,7 @@ import "../quests.css";
 
 // アイデアタブの行ビュー型（SC-12・D.1）。列/カードの描画に必要な最小射影。
 type Idea = {
-  id: string; title: string; poster: string; initial: string; iconUrl: string | null; agree: number; disagree: number;
+  id: string; title: string; poster: string; posterAvatar: string | null; initial: string; iconUrl: string | null; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
 };
 // IdeaCardDTO（D.1）→ 行ビュー。評価（F）＝`evaluation` 集計（評価済 overall_avg=n/5・可視0は null）。あなた
@@ -43,7 +43,7 @@ function toIdeaView(c: IdeaCard): Idea {
   const mystate: Idea["mystate"] = isDraft ? "draft" : c.my_vote ? "voted" : "unvoted";
   const name = c.author.display_name || "?";
   return {
-    id: c.id, title: c.title, poster: name, initial: name.slice(0, 1), iconUrl: c.icon_image_url ?? null,
+    id: c.id, title: c.title, poster: name, posterAvatar: c.author.avatar_image_url ?? null, initial: name.slice(0, 1), iconUrl: c.icon_image_url ?? null,
     agree: c.vote_summary.approve, disagree: c.vote_summary.oppose, comments: c.comment_count,
     ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
     mystate, created: days, draft: isDraft,
@@ -264,7 +264,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
     { key: "title", label: "件名", locked: true, width: 260, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
       render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</span> },
     { key: "poster", label: "投稿者", width: 150, sortable: true, filter: { type: "text" }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
-      render: (r) => <span className="poster"><Avatar name={r.poster} size="sm" />{r.poster}</span> },
+      render: (r) => <span className="poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" />{r.poster}</span> },
     { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),
       render: (r) => r.draft ? dash : <><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></> },
     { key: "comments", label: "💬", width: 72, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)), render: (r) => r.draft ? dash : String(r.comments) },
@@ -348,7 +348,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
                   ); })()}
                   <span>👥 パーティー {quest.member_count}人</span>
                   <span>💡 アイデア {quest.idea_count}件</span>
-                  <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} size="sm" /><span className="name">{ownerName}</span></span>
+                  <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span>
                   <span>🗂 グループ: {quest.quest_group.name}</span>
                 </div>
               </div>
@@ -403,7 +403,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               return (
                 <li key={r.user.id} className={me ? "is-me" : undefined}>
                   <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
-                  <Avatar name={r.user.name} size="sm" level={r.user.level ?? undefined} />
+                  <Avatar name={r.user.name} imageUrl={r.user.avatar ?? undefined} size="sm" level={r.user.level ?? undefined} />
                   <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
                   <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
                 </li>
@@ -527,7 +527,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
             <ul className="member-list">
               {party.map((m) => (
                 <li className="member-row" key={m.user.user_id}>
-                  <Avatar name={m.user.display_name} />
+                  <Avatar name={m.user.display_name} imageUrl={m.user.avatar_image_url ?? undefined} />
                   <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}</span>
                   <span className="member-perms">
                     {PERM_VIEW_ORDER.filter((p) => m.permissions.includes(p)).map((p) => (
@@ -552,7 +552,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
               <dt>目的・テーマ</dt><dd>{quest.purpose || "—"}</dd>
               <dt>期限日</dt><dd>{deadlineText(quest.deadline)}</dd>
               <dt>クエストグループ</dt><dd>{quest.quest_group.name}</dd>
-              <dt>所有者</dt><dd><span className="poster"><Avatar name={ownerName} size="sm" /><span className="name">{ownerName}</span></span></dd>
+              <dt>所有者</dt><dd><span className="poster"><Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span></dd>
               <dt>パーティー</dt><dd>{quest.member_count}名</dd>
               <dt>アイデア数</dt><dd>{quest.idea_count}件</dd>
             </dl>

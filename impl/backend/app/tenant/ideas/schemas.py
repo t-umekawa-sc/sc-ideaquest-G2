@@ -240,6 +240,7 @@ class IdeaDetailDTO(BaseModel):
     updated_at: datetime
     vote: dict  # {summary:{approve,oppose}, my_vote}
     following: bool = False
+    is_mine: bool = False  # 閲覧者＝投稿者本人か（SC-22 編集ボタンの表示可否・サーバー権威）。
     my_permissions: list[str] = []
     my_state: str
     # この応答が「初回公開」の結果である時のみ、実際に付与した投稿 XP（+50）を載せる＝獲得フィードバック（#8）。

@@ -30,7 +30,7 @@ const RESET_NOTE: Record<Period, string> = {
 };
 const MEDAL = ["🥇", "🥈", "🥉"];
 
-type Ranked = { n: string; lv: number | null; me: boolean; xp: number; coin: number; score: number; rank: number };
+type Ranked = { n: string; avatar: string | null; lv: number | null; me: boolean; xp: number; coin: number; score: number; rank: number };
 
 export function RankingView() {
   const [period, setPeriod] = useState<Period>("week");
@@ -45,7 +45,7 @@ export function RankingView() {
     if (r) {
       setMe(r.me);
       setList(r.data.map((row) => ({
-        n: row.user.name || "?", lv: row.user.level ?? null,
+        n: row.user.name || "?", avatar: row.user.avatar ?? null, lv: row.user.level ?? null,
         me: r.me.rank != null && row.rank === r.me.rank,
         xp: row.xp, coin: row.coin, score: row.score, rank: row.rank,
       })));
@@ -97,7 +97,7 @@ export function RankingView() {
         const myName = meRow?.n ?? "あなた";
         return (
           <section className="card card-accent myrank" style={{ ["--accent" as string]: "var(--color-primary)" } as React.CSSProperties} aria-label="あなたの順位">
-            <Avatar name={myName} size="sm" level={meRow?.lv ?? undefined} />
+            <Avatar name={myName} imageUrl={meRow?.avatar ?? undefined} size="sm" level={meRow?.lv ?? undefined} />
             <div>
               <div>
                 <strong>{myName}（あなた）</strong>
@@ -128,7 +128,7 @@ export function RankingView() {
           {podium.map((m) => (
             <div key={m.rank} className={`podium__col rank${m.rank}${m.me ? " is-me" : ""}`}>
               <span className="podium__medal">{MEDAL[m.rank - 1]}</span>
-              <Avatar name={m.n} size="sm" level={m.lv ?? undefined} />
+              <Avatar name={m.n} imageUrl={m.avatar ?? undefined} size="sm" level={m.lv ?? undefined} />
               <span className="podium__name">
                 {m.n}
                 {m.me ? "（あなた）" : ""}
@@ -147,7 +147,7 @@ export function RankingView() {
               <span className="rank-medal" aria-label={`${m.rank}位`}>
                 {m.rank <= 3 ? MEDAL[m.rank - 1] : ""}
               </span>
-              <Avatar name={m.n} size="sm" level={m.lv ?? undefined} />
+              <Avatar name={m.n} imageUrl={m.avatar ?? undefined} size="sm" level={m.lv ?? undefined} />
               <span className="rank-name">
                 {m.n}
                 {m.me && <span className="rank-you">（あなた）</span>}

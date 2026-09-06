@@ -175,6 +175,19 @@ def test_d_tc_107_detail_own(client, env):
     assert r.status_code == 200 and "vote" in r.json() and "my_permissions" in r.json()
 
 
+def test_d_tc_107b_detail_is_mine(client, env):
+    """D-TC-107b 詳細の is_mine＝投稿者本人 True／他人の公開アイデアは False（SC-22 編集ボタン表示可否・サーバー権威）。"""
+    _login_seed(client)
+    mine = env.make_quest()
+    my_idea = env.make_idea(quest_id=mine, status="published", author=env.user_id)
+    assert client.get(IDEA(my_idea)).json()["is_mine"] is True
+    # 他人の公開アイデア（ログインは一般メンバーで閲覧可＝200）は is_mine False。
+    q2 = env.make_quest(owner=env.other_id, seed_perms=["vote", "comment"])
+    others = env.make_idea(quest_id=q2, status="published", author=env.other_id)
+    r = client.get(IDEA(others))
+    assert r.status_code == 200 and r.json()["is_mine"] is False
+
+
 def test_d_tc_130_detail_has_quest_ref(client, env):
     """D-TC-130: 詳細に quest 参照（id/title/status/categories/deadline）が入る（SC-22 導線用）。"""
     _login_seed(client)

@@ -28,6 +28,13 @@ _MAX_PER_PAGE = 100
 _DEFAULT_PER_PAGE = 20
 
 
+def _image_url(path: str | None) -> str | None:
+    """アバター等の物理パス→短TTL 署名URL（K.4・§1.10）。未設定は None。"""
+    from app.infra.storage import get_storage
+
+    return get_storage().presigned_get(path) if path else None
+
+
 def _db_identifier(session: dict) -> str:
     """セッション会社の会社DB db_identifier を解決（QG系は company_id を受けず session 固定）。"""
     with control_session() as s:
@@ -116,7 +123,7 @@ def company_directory(session: dict, *, q: str | None = None,
             .offset((page - 1) * per_page).limit(per_page)
         ).scalars().all()
         data = [{"account_id": str(u.account_id), "display_name": u.display_name,
-                 "avatar_url": u.avatar_image_path} for u in rows]
+                 "avatar_url": _image_url(u.avatar_image_path)} for u in rows]
     return {"data": data, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 

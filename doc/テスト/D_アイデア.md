@@ -43,6 +43,7 @@
 | D-TC-163 | api | 公開応答に `xp_delta` を載せる（獲得フィードバック・#8） | 下書きアイデア | `POST /ideas/{id}/publish`／`GET /ideas/{id}` | 初回公開の応答は `xp_delta=50`（実付与額）・参照系（取得）は `xp_delta=0`（アクションでないため）。金額の正はサーバー（idea_post=+50） | D.2／§8-⑥／#8 |
 | D-TC-164 | api | 投票応答に `xp_delta` を載せる（獲得フィードバック・#8） | 参加クエストの公開アイデア | `POST /ideas/{id}/vote`（初回→切替） | 初回は `xp_delta=5`・`xp_awarded=true`／切替（2回目）は `xp_delta=0`・`xp_awarded=false`（`xp_awarded` と `xp_delta>0` が同値） | D.5／§8-⑥／#8 |
 | D-TC-107 | api | 詳細（自分の下書き/公開） | 自分の下書き／参加中の公開 | `GET /ideas/{id}` | 200・本体＋vote/following/my_permissions | D.1 |
+| D-TC-107b | api | 詳細の `is_mine`（編集ボタン表示可否・サーバー権威） | 自作の公開アイデア／他人の公開アイデア（一般メンバーで閲覧可） | `GET /ideas/{id}` | 自作＝`is_mine true`／他人＝200 かつ `is_mine false` | D.1／SC-22 §4.5 |
 | D-TC-108 | api | 詳細の可視性（他人下書き/非メンバー） | 他人の下書き／非パーティー | `GET /ideas/{id}` | 404 | D.1 |
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |
 | D-TC-143 | api | 公開アイデアの並行 PATCH は楽観ロックで 409 `edit_conflict`（500 にしない・D.2 line67） | 公開アイデア（`current_revision=1`）で、別編集者が既に `revision=2` を作成済み（自分の base は stale） | `PATCH /ideas/{id}`（title） | `next_rev=2` の INSERT が `UNIQUE(idea_id,revision)` 違反→**`409` `code=edit_conflict`**（`IntegrityError` を捕捉して翻訳・**500 にしない**）。クライアントは最新再取得へ誘導 | D.2（楽観ロック・方針A） |

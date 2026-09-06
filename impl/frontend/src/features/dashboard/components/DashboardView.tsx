@@ -353,7 +353,7 @@ export function DashboardView({
                   </div>
                   <div className="vote-card__quest">{v.quest.title}</div>
                   <div className="vote-card__value">{v.value}</div>
-                  <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
+                  <div className="vote-card__poster poster"><Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
                   {/* チャットへ直行（戻るはダッシュボードに戻る＝markChatFromDashboard でラベル出し分け）。 */}
                   <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
                   <div className="vote-actions">
@@ -428,7 +428,7 @@ export function DashboardView({
                     </div>
                     <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
                     <div className="follow-value">{f.value}</div>
-                    <div className="follow-card__poster poster"><Avatar name={f.poster.name} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>
+                    <div className="follow-card__poster poster"><Avatar name={f.poster.name} imageUrl={f.poster.avatar} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>
                     <div className="follow-stats">
                       <span className="vote-agree">▲ {f.vote_summary.approve}</span>
                       <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>

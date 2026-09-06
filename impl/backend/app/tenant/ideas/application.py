@@ -798,6 +798,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
             "stale": bool(my_vote and my_vote.voted_revision < idea.current_revision),
         },
         "following": repo.is_following(ts, viewer_id, idea.id),
+        "is_mine": str(idea.author_id) == str(viewer_id),
         "my_permissions": my_permissions,
         "my_state": "draft" if idea.status == "draft" and idea.author_id == viewer_id else "member",
     }

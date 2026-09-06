@@ -372,7 +372,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </div>
             <h1>{idea.title}</h1>
             <div className="poster">
-              <Avatar name={authorName} size="sm" level={idea.author.level ?? undefined} />
+              <Avatar name={authorName} imageUrl={idea.author.avatar_image_url ?? undefined} size="sm" level={idea.author.level ?? undefined} />
               <span className="name">投稿: {authorName}</span>
             </div>
           </div>
@@ -388,10 +388,13 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             >
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
-            {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。 */}
-            <button className="btn btn-outline" type="button" onClick={() => setEditOpen(true)}>
-              編集
-            </button>
+            {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。
+                ボタンは投稿者本人のみ表示（is_mine・サーバー権威／SC-22 §4.5・決定 2026-09-06）。 */}
+            {idea.is_mine && (
+              <button className="btn btn-outline" type="button" onClick={() => setEditOpen(true)}>
+                編集
+              </button>
+            )}
           </div>
         </div>
         <div className="idea-meta">
@@ -498,7 +501,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <div className="chat-preview">
                 {chatPreview.map((m) => (
                   <div className="chat-msg" key={m.id}>
-                    <Avatar name={m.author?.name || "?"} size="sm" />
+                    <Avatar name={m.author?.name || "?"} imageUrl={m.author?.avatar ?? undefined} size="sm" />
                     <div className="chat-msg__body">
                       <div className="chat-msg__head">
                         <span className="chat-msg__name">{m.author?.name}</span>
@@ -619,7 +622,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                       {evalAgg.evaluators.filter((e) => e.overall_comment).map((e) => (
                         <div className="eval-overall__item" key={e.evaluator.user_id}>
                           <div className="eval-comment__head">
-                            <Avatar name={e.evaluator.display_name || "?"} size="sm" />
+                            <Avatar name={e.evaluator.display_name || "?"} imageUrl={e.evaluator.avatar_image_url ?? undefined} size="sm" />
                             <span className="chat-msg__name">{e.evaluator.display_name || "?"}</span>
                           </div>
                           <p className="eval-comment__text">{e.overall_comment}</p>
@@ -638,7 +641,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
                         ASPECT_LABELS.filter(([k]) => e.comments?.[k]).map(([k, label]) => (
                           <div className="eval-comment" key={`${e.evaluator.user_id}-${k}`}>
                             <div className="eval-comment__head">
-                              <Avatar name={e.evaluator.display_name || "?"} size="sm" />
+                              <Avatar name={e.evaluator.display_name || "?"} imageUrl={e.evaluator.avatar_image_url ?? undefined} size="sm" />
                               <span className="chat-msg__name">{e.evaluator.display_name || "?"}</span>
                               <span className="badge badge-muted eval-comment__aspect">{label}</span>
                             </div>

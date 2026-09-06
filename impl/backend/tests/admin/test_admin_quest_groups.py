@@ -145,6 +145,23 @@ def test_b_tc_083_company_directory_minimal_projection(client, factory, qg):
     assert client.get(DIRECTORY).status_code == 403
 
 
+def test_b_tc_083b_company_directory_avatar_is_signed_url(client, factory, qg, storage):
+    """B-TC-083b ディレクトリの avatar_url は短TTL 署名URL（生の物理パスを漏らさない・K.4/§1.10）。"""
+    admin_acc = qg.new_account()
+    g1 = qg.make_group()
+    qg.seed_membership(g1, admin_acc["id"], "admin")
+    # 当人に物理パスを直接セット（画像本体は不要・presigned だけ検証）。
+    with get_tenant_session(qg.db_id) as ts:
+        u = get_user_by_account(ts, admin_acc["id"])
+        u.avatar_image_path = "avatars/xyz.png"
+        ts.commit()
+    qg.login(admin_acc)
+
+    row = next(i for i in client.get(DIRECTORY).json()["data"] if i["account_id"] == str(admin_acc["id"]))
+    assert row["avatar_url"].startswith("https://minio.test/avatars/xyz.png?")  # 署名URL（sig 付き）
+    assert row["avatar_url"] != "avatars/xyz.png"  # 生パスそのままではない
+
+
 # --- B-TC-084: 参加追加（role=member 固定・SoD・CSRF 必須） -----------------------------
 def test_b_tc_084_add_member(client, factory, qg):
     """B-TC-084 admin が既存アカウントを参加追加＝201・role=member 固定・有効所属に現れる。CSRF 無しは 403。"""

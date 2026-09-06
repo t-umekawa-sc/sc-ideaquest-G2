@@ -90,7 +90,7 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
           ) : (
             directory.map((d) => (
               <div className="dir-row" key={d.account_id}>
-                <Avatar name={d.display_name} size="sm" />
+                <Avatar name={d.display_name} imageUrl={d.avatar_url ?? undefined} size="sm" />
                 <span className="dir-row__name">{d.display_name}</span>
                 <Button type="button" variant="primary" onClick={() => onAdd(d.account_id)}>追加</Button>
               </div>

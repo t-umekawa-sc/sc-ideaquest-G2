@@ -3067,6 +3067,11 @@ export interface components {
              */
             following: boolean;
             /**
+             * Is Mine
+             * @default false
+             */
+            is_mine: boolean;
+            /**
              * My Permissions
              * @default []
              */
