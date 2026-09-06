@@ -165,3 +165,10 @@
 
 | G-TC-159 | unit(front) | 満遍ない飛散先（同心円にならずパネル内へ一様） | 実寸 w×h／pad／個数 n／seed 付き rng | `rainbowScatterTargets(w, h, pad, n, rng)` | n 個返す／すべて [pad, w-pad]×[pad, h-pad] 内／span 負（2*pad>w 等）は pad に張り付き範囲外を返さない／同 seed は同列・異 seed は異なる（決定的） | GF-AC-091／#10 |
 | G-TC-159 | unit(front) | 集結チャージ量（数に比例するエネルギー球） | 集まった粒子数 n | `rainbowChargeGrow(n)` | n≤0 は 0（球を描かない）／n が増えるほど単調増加／決定的 | GF-AC-091／#10 |
+
+### 5-J. オーラ canvas エンジンの決定的部分（セルグリッド解像度／下辺可読性フェード）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/aura.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-g` のドット絵オーラ canvas+rAF エンジン）を production の canvas ハーネスへ移植。**canvas 本体（縁から立ち上るドット絵オーラのセルオートマトン・波動/応援記号（♪↑ハート星＋）の中央への飛来・紫↔金↔青の色巡回＝`rng` で非決定的・rAF 駆動）は §17L-g／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`auraGrid(w,h,cell)`＝実寸(CSS px)→セルグリッド(gw×gh・約 cell px/セル・下限 1×1)＝canvas 全体（パネル＋非対称マージン）を覆う解像度。`auraBotFade(gy,botRow)`＝下辺のオーラ不透明度係数（最下行付近 `gy>=botRow` は控えめ 0.32／それ以外 1＝**下辺の文字が読める**可読性の担保）。※production 版は canvas を上に高く（`AURA_MARGIN_TOP_PX`）＋左右（`AURA_MARGIN_SIDE_PX`）に張り出す非対称マージン＋負オフセットで、オーラが枠上へ立ち上る（起点はコンテナ矩形基準の枠相対 px＋パネル offset で変換・`useSpellEngine`）。reduce-motion はハーネスが `reduceStatic()`（強化済みオーラ静止 1 枚・脈動なし）を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-160）で担保。
+
+| G-TC-160 | unit(front) | 実寸→セルグリッド（解像度） | 実寸 w×h／cell | `auraGrid(w, h, cell)` | gw/gh は整数／下限 1×1／`gw≈ceil(w/cell)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
+| G-TC-160 | unit(front) | 下辺の可読性フェード（最下行は控えめ） | 行 gy／最下行 botRow | `auraBotFade(gy, botRow)` | `gy>=botRow` は 0.32／それ以外 1／0 より大きく 1 以下（文字が完全に消えない）／決定的 | GF-AC-091／#10 |
