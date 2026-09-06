@@ -147,6 +147,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const mentionTaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollNextRef = useRef(false);
+  const initialScrollRef = useRef(false); // 画面遷移直後の初期スクロール（未読区切り or 最下部）を1回だけ実行
 
   const completed = idea?.quest?.status === "completed";
   const canPost = !completed && !!idea && (idea.my_permissions?.includes("comment") ?? false);
@@ -168,6 +169,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       setChatGroupId(chat.chat_group_id);
       setFirstUnread(chat.unread?.first_unread_message_id ?? null);
       setLoadError(null);
+      initialScrollRef.current = true; // 描画後に初期スクロール（未読区切りへ／全既読なら最下部へ）
       // メンション候補・魔法カタログ（非致命）。
       void getPartyMembers(d.quest.id).then((r) =>
         // 応答は `{ user: {user_id, display_name} }`（ネスト）。以前フラット想定で name が undefined になり @ でクラッシュしていた。
@@ -187,11 +189,24 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!scrollNextRef.current) return;
-    scrollNextRef.current = false;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: reduce ? "auto" : "smooth" });
-  }, [messages]);
+    // ① 送信直後の追従＝スムーズに最下部へ。
+    if (scrollNextRef.current) {
+      scrollNextRef.current = false;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+      return;
+    }
+    // ② 画面遷移直後の初期スクロール（1回）＝未読があれば「ここから未読」区切りへ、全既読なら最下部へ即時。
+    if (initialScrollRef.current && messages.length > 0) {
+      initialScrollRef.current = false;
+      // 描画反映後（アバター等の画像読込前でも高さは概ね確定）に実行。二重 rAF でレイアウト確定を待つ。
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const sep = firstUnread ? document.querySelector<HTMLElement>(".unread-sep") : null;
+        if (sep) sep.scrollIntoView({ block: "start", behavior: "auto" });
+        else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+      }));
+    }
+  }, [messages, firstUnread]);
 
   const refetch = useCallback(async () => {
     const chat = await getChat(ideaId);
