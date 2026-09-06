@@ -3,11 +3,13 @@
 // （Voronoi セルが達した所から一気にスナップ凍結＋白い光）→全面凍結後は霜を薄くして可読化＋ランダムセルの
 // ピカッが隣へ連鎖→尖った氷結晶クラスタが突然生え、一定保持後に根元→先端へキラッと光ってパリンと割れて破片飛散。
 // production 化＝(1) rng 注入、(2) startPersist()（発射なしで凍結済みから持続）、(3) resume()（state 保持で rAF 再開）。
-// ※production 版はマージン無しの枠ぴったり canvas（氷柱の枠外はみ出しは簡略化＝put の境界で自然にクリップ・follow-up）。
-// 決定的部分（解像度/霜の可読性フェード）は下部の純関数に分離（G-TC-158）。
+// ※canvas はパネル（メッセージ枠）より一回り大きく（MARGIN）＋負オフセットで張り出す＝氷柱が枠外へはみ出せる
+//   （`.spell-fx__layer`/`.msg` は overflow:hidden でない）。起点は枠相対 px（useSpellEngine がコンテナ矩形基準で算出）
+//   をマージン offset を足してグリッドへ変換する。決定的部分（解像度/霜の可読性フェード）は下部の純関数に分離（G-TC-158）。
 import type { EngineOpts, SpellEngine } from "./index";
 
 export const ICE_SCALE = 3;
+export const ICE_MARGIN_PX = 48; // canvas をパネルより張り出す量（CSS px・氷柱のはみ出し代・モック §17L-e と同値）
 
 // 実寸(CSS px)→低解像度グリッド（cols×rows）。ドット絵の解像度（炎/雷と同契約）。
 export function iceGrid(w: number, h: number, scale: number = ICE_SCALE): { cols: number; rows: number } {
@@ -37,24 +39,28 @@ const ICE_EDGE: [number, number, number] = [52, 112, 176];
 const GL_DUR = 10;
 
 export function createIceEngine(opts: EngineOpts): SpellEngine {
-  const PW = Math.max(80, opts.w || 320);
-  const PH = Math.max(24, opts.h || 110);
+  const PWpx = Math.max(80, opts.w || 320);   // パネル（メッセージ枠）の実寸 CSS px
+  const PHpx = Math.max(24, opts.h || 110);
   const rng = opts.rng ?? Math.random;
   const rnd = (n: number) => rng() * n;
-  // 枠ぴったり（マージン無し）＝canvas=パネル。PX0/PY0=0・PX1/PY1=cols/rows。
-  const { cols: W, rows: H } = iceGrid(PW, PH);
-  const PX0 = 0, PY0 = 0, PX1 = W, PY1 = H;
-  const CX = W >> 1, CY = H >> 1;
+  const { cols: PC, rows: PR } = iceGrid(PWpx, PHpx);  // パネルの低解像度グリッド
+  const MARG = Math.max(4, Math.round(ICE_MARGIN_PX / ICE_SCALE));  // マージン（グリッドセル）
+  const W = PC + 2 * MARG, H = PR + 2 * MARG;          // canvas（パネル＋マージン）
+  const PX0 = MARG, PY0 = MARG, PX1 = MARG + PC, PY1 = MARG + PR;   // パネル内領域（この外＝はみ出し領域）
+  const CX = MARG + (PC >> 1), CY = MARG + (PR >> 1);  // パネル中央（canvas 座標）
 
   const canvas = document.createElement("canvas");
   canvas.className = "spell-canvas";
   canvas.setAttribute("aria-hidden", "true");
   canvas.width = W;
   canvas.height = H;
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
-  canvas.style.top = "0";
-  canvas.style.left = "0";
+  // canvas をパネルより一回り大きく張り出す（負オフセット）＝氷柱が枠外へはみ出せる。
+  canvas.style.width = `calc(100% + ${2 * ICE_MARGIN_PX}px)`;
+  canvas.style.height = `calc(100% + ${2 * ICE_MARGIN_PX}px)`;
+  canvas.style.top = `-${ICE_MARGIN_PX}px`;
+  canvas.style.left = `-${ICE_MARGIN_PX}px`;
+  canvas.style.right = "auto";
+  canvas.style.bottom = "auto";
   canvas.style.display = "block";
   canvas.style.pointerEvents = "none";
   canvas.style.imageRendering = "pixelated";
@@ -84,13 +90,14 @@ export function createIceEngine(opts: EngineOpts): SpellEngine {
     for (let i = 0; i < n; i++) { const a = rnd(6.283), sp = 0.8 + rnd(2.6); snows.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.4, life: 1, size: rnd(1) < 0.5 ? 1 : 2 }); }
   }
   function spawnCluster() {
-    const inX = Math.min(W * 0.4, 10), inY = Math.min(H * 0.4, 8);
-    const bx = PX0 + inX + rnd(Math.max(1, W - 2 * inX)), by = PY0 + inY + rnd(Math.max(1, H - 2 * inY)), m = 2 + (rnd(3) | 0);
+    // 根元がパネル内に収まる範囲から生える（先端は四方八方へはみ出し可）。
+    const inX = Math.min(PC * 0.4, 10), inY = Math.min(PR * 0.4, 8);
+    const bx = PX0 + inX + rnd(Math.max(1, PC - 2 * inX)), by = PY0 + inY + rnd(Math.max(1, PR - 2 * inY)), m = 2 + (rnd(3) | 0);
     const baseAng = rnd(6.283);
     spawnSnowBurst(bx, by, 9 + (rnd(6) | 0));
     for (let c = 0; c < m; c++) {
       const ang = baseAng + (c - (m - 1) / 2) * 0.3 + (rnd(1) - 0.5) * 0.14;
-      const L = H * (0.5 + rnd(0.7)), w = 2.4 + rnd(3);
+      const L = PR * (0.5 + rnd(0.7)), w = 2.4 + rnd(3);
       const n = Math.max(4, (L / 3) | 0), jag: number[] = [];
       for (let i = 0; i <= n; i++) jag.push(0.7 + rnd(0.6));
       pillars.push({ bx: bx + (rnd(7) - 3.5), by: by + (rnd(4) - 2), ang, L, w, jag, grow: 0, phase: "grow", hold: 42 + (rnd(80) | 0), lit: rnd(1) < 0.5 ? 1 : -1, gl: 0 });
@@ -143,22 +150,23 @@ export function createIceEngine(opts: EngineOpts): SpellEngine {
     }
   }
   function buildFrost() {
-    const ns = Math.max(5, Math.round(W * H / 1050)), seeds: { x: number; y: number; ft: number }[] = [], cx = W / 2, cy = H / 2, maxD = Math.hypot(cx, cy) || 1;
-    for (let i = 0; i < ns; i++) { const sx = rnd(W), sy = rnd(H), ft = Math.hypot(sx - cx, sy - cy) / maxD + (rnd(1) - 0.5) * 0.18; seeds.push({ x: sx, y: sy, ft: Math.max(0, Math.min(1, ft)) }); }
+    // 凍結セル模様は「パネル内（PC×PR）」に作る（マージン部は氷柱のはみ出し用）。
+    const ns = Math.max(5, Math.round(PC * PR / 1050)), seeds: { x: number; y: number; ft: number }[] = [], cx = PC / 2, cy = PR / 2, maxD = Math.hypot(cx, cy) || 1;
+    for (let i = 0; i < ns; i++) { const sx = rnd(PC), sy = rnd(PR), ft = Math.hypot(sx - cx, sy - cy) / maxD + (rnd(1) - 0.5) * 0.18; seeds.push({ x: sx, y: sy, ft: Math.max(0, Math.min(1, ft)) }); }
     NCELLS = seeds.length;
-    frost = new Uint8Array(W * H * 4);
-    for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+    frost = new Uint8Array(PC * PR * 4);
+    for (let py = 0; py < PR; py++) for (let px = 0; px < PC; px++) {
       let f1 = 1e9, f2 = 1e9, s1 = 0;
       for (let k = 0; k < seeds.length; k++) { const dx = px - seeds[k].x, dy = py - seeds[k].y, d = dx * dx + dy * dy; if (d < f1) { f2 = f1; f1 = d; s1 = k; } else if (d < f2) f2 = d; }
       const edge = Math.sqrt(f2) - Math.sqrt(f1), vein = edge < 2.4 ? (1 - edge / 2.4) : 0, bright = Math.max(0, 1 - Math.sqrt(f1) / 18);
-      const idx = (py * W + px) * 4; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0; frost[idx + 2] = (seeds[s1].ft * 255) | 0; frost[idx + 3] = s1 & 255;
+      const idx = (py * PC + px) * 4; frost[idx] = (vein * 255) | 0; frost[idx + 1] = (bright * 255) | 0; frost[idx + 2] = (seeds[s1].ft * 255) | 0; frost[idx + 3] = s1 & 255;
     }
     const seen: Record<number, 1>[] = []; for (let c = 0; c < NCELLS; c++) seen.push({});
     cellAdj = []; for (let c2 = 0; c2 < NCELLS; c2++) cellAdj.push([]);
-    for (let py2 = 0; py2 < H; py2++) for (let px2 = 0; px2 < W; px2++) {
-      const c0 = frost[(py2 * W + px2) * 4 + 3];
-      if (px2 + 1 < W) { const cr = frost[(py2 * W + px2 + 1) * 4 + 3]; if (cr !== c0) { seen[c0][cr] = 1; seen[cr][c0] = 1; } }
-      if (py2 + 1 < H) { const cb = frost[((py2 + 1) * W + px2) * 4 + 3]; if (cb !== c0) { seen[c0][cb] = 1; seen[cb][c0] = 1; } }
+    for (let py2 = 0; py2 < PR; py2++) for (let px2 = 0; px2 < PC; px2++) {
+      const c0 = frost[(py2 * PC + px2) * 4 + 3];
+      if (px2 + 1 < PC) { const cr = frost[(py2 * PC + px2 + 1) * 4 + 3]; if (cr !== c0) { seen[c0][cr] = 1; seen[cr][c0] = 1; } }
+      if (py2 + 1 < PR) { const cb = frost[((py2 + 1) * PC + px2) * 4 + 3]; if (cb !== c0) { seen[c0][cb] = 1; seen[cb][c0] = 1; } }
     }
     for (let c3 = 0; c3 < NCELLS; c3++) { const ks = Object.keys(seen[c3]); for (let ki = 0; ki < ks.length; ki++) cellAdj[c3].push(Number(ks[ki])); }
   }
@@ -181,8 +189,8 @@ export function createIceEngine(opts: EngineOpts): SpellEngine {
     if (cold <= 0.005 || !frost) return;
     let gmap: Float32Array | null = null;
     if (glints.length) { gmap = new Float32Array(NCELLS); for (let gi = 0; gi < glints.length; gi++) { const gg = glints[gi]; if (gg.val > gmap[gg.cell]) gmap[gg.cell] = gg.val; } }
-    for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
-      const idx = (py * W + px) * 4, thr = frost[idx + 2] / 255;
+    for (let py = 0; py < PR; py++) for (let px = 0; px < PC; px++) {
+      const idx = (py * PC + px) * 4, thr = frost[idx + 2] / 255;
       if (cold < thr) continue;
       const vein = frost[idx] / 255, bright = frost[idx + 1] / 255, x = PX0 + px, y = PY0 + py;
       put(x, y, 214, 236, 252, frostAlpha(bright, settle) | 0);
@@ -235,7 +243,7 @@ export function createIceEngine(opts: EngineOpts): SpellEngine {
         glintTimer--; if (glintTimer <= 0 && NCELLS > 0) { startGlintChain(); glintTimer = 26 + (rnd(52) | 0); }
         pillarTimer--; if (pillarTimer <= 0 && pillars.length < 12) { spawnCluster(); pillarTimer = 16 + (rnd(40) | 0); }
       }
-      if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(W), PY1, (rnd(1) - 0.5) * 0.2, -(0.05 + rnd(0.14)), 1);
+      if (rnd(1) < 0.22) spawnSpeck(PX0 + rnd(PC), PY1, (rnd(1) - 0.5) * 0.2, -(0.05 + rnd(0.14)), 1);
     }
     for (let i = pillars.length - 1; i >= 0; i--) {
       const p = pillars[i];
@@ -271,9 +279,9 @@ export function createIceEngine(opts: EngineOpts): SpellEngine {
     canvas,
     start(ox?: number, oy?: number) {
       reset();
-      // origin は size.w/size.h(CSS px)で渡る＝低解像度グリッドへ変換（既定は枠の右上＝術者位置）。
-      const originX = ox == null ? W - 3 : (ox / PW) * W;
-      const originY = oy == null ? 0 : (oy / PH) * H;
+      // origin は枠相対 CSS px（0..PWpx/PHpx）で渡る＝マージン offset を足してグリッドへ変換。既定は枠の右上（術者位置）。
+      const originX = ox == null ? PX1 - 2 : PX0 + (ox / PWpx) * PC;
+      const originY = oy == null ? PY0 : PY0 + (oy / PHpx) * PR;
       const dx = CX - originX, dy = CY - originY, dd = Math.max(0.001, Math.hypot(dx, dy)); axX = dx / dd; axY = dy / dd;
       proj = { x: originX, y: originY, lit: rnd(1) < 0.5 ? 1 : -1 };
       state = "incoming"; draw(); runLoop();

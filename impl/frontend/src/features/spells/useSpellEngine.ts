@@ -19,10 +19,14 @@ type Params = {
   originSelector?: string | null;
 };
 
-// 画面座標 from を canvas 内の (w,h) 単位へ変換。
-function originFromScreen(canvas: HTMLCanvasElement, from: CastPoint | null | undefined, size: { w: number; h: number }) {
+// 画面座標 from を「メッセージ枠（コンテナ）」相対の (w,h) 単位へ変換。
+// ※canvas ではなくコンテナ（.spell-fx__layer＝枠 inset:0）矩形を基準にする＝canvas が枠より大きい
+//   （氷のはみ出しでマージン付き canvas を負オフセットで張り出す）場合も起点が枠相対で正しく出る。
+//   canvas が枠ぴったりの effect（炎/雷/キラキラ）は矩形が一致するため挙動不変。エンジン側は枠相対 px
+//   （0..size.w/h）を受け取り、必要ならマージン offset を足して自分のグリッドへ変換する。
+function originFromScreen(container: HTMLElement, from: CastPoint | null | undefined, size: { w: number; h: number }) {
   if (!from) return null;
-  const cr = canvas.getBoundingClientRect();
+  const cr = container.getBoundingClientRect();
   if (!cr.width || !cr.height) return null;
   return { x: ((from.x - cr.left) / cr.width) * size.w, y: ((from.y - cr.top) / cr.height) * size.h };
 }
@@ -67,7 +71,7 @@ export function useSpellEngine(ref: React.RefObject<HTMLElement | null>, params:
       let o: { x: number; y: number } | null = null;
       if (el) {
         const r = el.getBoundingClientRect();
-        if (r.width && r.height) o = originFromScreen(engine.canvas, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, size);
+        if (r.width && r.height) o = originFromScreen(container, { x: r.left + r.width / 2, y: r.top + r.height / 2 }, size);
       }
       engine.start(o?.x, o?.y); // 取得不能ならエンジン既定（枠の右上＝発動者位置）
     };
