@@ -530,7 +530,7 @@ def _attachment_dto(a) -> dict:
 
 
 def _reactions_dto(rs, viewer_id, users, spells) -> dict:
-    """{normal:[{emoji,count,reacted_by_me,users}], magic:{spell_id,effect,icon,actor}|null}（E.1）。"""
+    """{normal:[{emoji,count,reacted_by_me,users}], magic:{spell_id,effect,icon,actor,actor_avatar,mine}|null}（E.1）。"""
     normal: dict[str, dict] = {}
     magic = None
     for r in rs:
@@ -549,6 +549,7 @@ def _reactions_dto(rs, viewer_id, users, spells) -> dict:
                 "effect": sp.effect if sp else None,
                 "icon": sp.icon if sp else None,
                 "actor": actor.display_name if actor else "",
+                "actor_avatar": _image_url(actor.avatar_image_path) if actor else None,  # 発動者バッジのアイコン画像（署名URL・§1.10）
                 "mine": r.user_id == viewer_id,
             }
     return {"normal": list(normal.values()), "magic": magic}

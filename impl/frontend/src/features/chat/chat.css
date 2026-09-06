@@ -58,7 +58,7 @@
 .msg__name { font-weight: 700; font-size: var(--text-sm); }
 .msg__me { font-size: var(--text-xs); color: var(--color-primary); font-weight: 600; }
 .msg__time { font-size: var(--text-xs); color: var(--color-text-muted); }
-.msg__text { margin: 2px 0 0; font-size: var(--text-base); line-height: 1.75; word-break: break-word; }
+.msg__text { margin: 2px 0 0; font-size: var(--text-base); line-height: 1.75; word-break: break-word; white-space: pre-wrap; }  /* 改行を保持（アイデア本文と同流儀）＝ユーザーの改行をそのまま表示 */
 .msg__text .mention { color: var(--color-primary); font-weight: 600; background: var(--color-primary-soft); border-radius: var(--radius-sm); padding: 0 3px; }
 /* 自分宛メンションの強調 */
 .msg__text .mention.is-me { color: var(--color-warning); background: #FEF3C7; }

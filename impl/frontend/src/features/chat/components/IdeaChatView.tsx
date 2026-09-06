@@ -449,7 +449,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           const day = fmtDay(m.created_at);
           const showDay = day !== lastDay;
           lastDay = day;
-          const magic = (m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; mine?: boolean } })?.magic ?? null;
+          const magic = (m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; actor_avatar?: string | null; mine?: boolean } })?.magic ?? null;
           const normal = ((m.reactions as { normal?: Array<{ emoji: string; count: number; reacted_by_me: boolean; users?: string[] }> })?.normal) ?? [];
           // 自作自演＝発動者==作成者（§17 の4パターン④）。発動者バッジは出さず作成者アバターに✦。
           const selfCast = !!magic && (magic.mine ? m.is_mine : magic.actor != null && magic.actor === m.author?.name);
@@ -476,7 +476,11 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。新規発動は is-summoning で唱えるように出現。 */}
                 {magic && !selfCast && (
                   <span className={"msg__caster avatar sm" + (pendingCanvas[m.id] ? " is-summoning" : "")} data-name={casterName} title={`${casterName} が【${spellJa}】をかけました`} aria-hidden>
-                    <span className="avatar__img placeholder">{(casterName || "?").charAt(0)}</span>
+                    {magic.actor_avatar
+                      // 発動者のプロフィール画像（署名URL・§1.10）。無ければイニシャル。
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img className="avatar__img" src={magic.actor_avatar} alt="" />
+                      : <span className="avatar__img placeholder">{(casterName || "?").charAt(0)}</span>}
                   </span>
                 )}
                 <div className="msg__body">
