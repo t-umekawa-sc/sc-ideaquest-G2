@@ -466,7 +466,13 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {magic && (isCanvasEffect(magic.effect ?? "")
                   ? (!pendingCanvas[m.id] && <SpellCanvasFx effect={magic.effect ?? ""} originSelector={selfCast ? ".msg__author" : ".msg__caster"} />)
                   : <SpellPersistFx effect={magic.effect ?? ""} />)}
-                <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "") + (selfCast && pendingCanvas[m.id] ? " is-summoning" : "")}><span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span></span>
+                <span className={"avatar sm msg__author" + (selfCast ? " is-selfcast" : "") + (selfCast && pendingCanvas[m.id] ? " is-summoning" : "")} data-name={m.author?.name || undefined}>
+                  {m.author?.avatar
+                    // 署名URL（MinIO・§1.10）＝next/image ではなく素の img（unoptimized・QuestListView と同流儀）。
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img className="avatar__img" src={m.author.avatar} alt="" />
+                    : <span className="avatar__img placeholder">{(m.author?.name || "?").charAt(0)}</span>}
+                </span>
                 {/* 発動者アバターバッジ（§17 の「発動者→作成者」＝右上バッジ）。自作自演は出さない（作成者に✦）。新規発動は is-summoning で唱えるように出現。 */}
                 {magic && !selfCast && (
                   <span className={"msg__caster avatar sm" + (pendingCanvas[m.id] ? " is-summoning" : "")} data-name={casterName} title={`${casterName} が【${spellJa}】をかけました`} aria-hidden>

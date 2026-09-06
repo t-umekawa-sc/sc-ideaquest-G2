@@ -23,17 +23,19 @@
 .chat-context .backlink:hover { color: var(--color-text); }
 
 /* --- メッセージスレッド（フラットリスト） --- */
-.chat-thread { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4) 0; }
+.chat-thread { flex: 1; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; }  /* メッセージ間に余白（カードパネル化・2026-09-06） */
 .chat-day { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0 var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
 .chat-day::before, .chat-day::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
 .unread-sep { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0; color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; }
 .unread-sep::before, .unread-sep::after { content: ""; flex: 1; height: 1px; background: var(--color-danger); opacity: .5; }
 
-.msg { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); position: relative; }
-.msg:hover { background: var(--color-surface-alt); }
-/* 自分の投稿を分かりやすく: 淡い色地＋左アクセント帯＋名前を強調（フラットリストは維持）。
-   魔法エフェクト(box-shadow)と競合しないよう帯は border-left で表現（padding で位置補正）。 */
-.msg.is-me { background: var(--color-primary-soft); border-left: 3px solid var(--color-primary); padding-left: calc(var(--space-3) - 3px); }
+/* 全メッセージをカードパネル化（ユーザー選択 2026-09-06）＝淡い面＋細い枠＋角丸＋弱い影で区切りを明確に。
+   魔法メッセージは spell-fx--*（後勝ち）がテーマ色の枠/グローを上書きする（干渉しない）。 */
+.msg { display: flex; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); position: relative;
+  background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); }
+.msg:hover { background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+/* 自分の投稿を分かりやすく: 淡い青地＋左アクセント帯＋名前を強調。帯は border-left（魔法の box-shadow と競合しない）。 */
+.msg.is-me { background: var(--color-primary-soft); border-color: var(--color-primary-border); border-left: 3px solid var(--color-primary); padding-left: calc(var(--space-3) - 2px); }
 .msg.is-me:hover { background: #DCE8FE; }
 .msg.is-me .msg__name { color: var(--color-primary-active); }
 /* 発動者アバターバッジ（§17「受信/表示側の4パターン（発動者→作成者）」＝メッセージ右上に発動者）。
