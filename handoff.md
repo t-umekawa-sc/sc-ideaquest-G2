@@ -40,7 +40,9 @@
 - **モック（style-guide.html）＝ユーザー受入済み・動作OK**（各変更で headless console error 0 実測）。
 - **production 炎移植＝コード完了・全ゲート緑**（最後に実測: `npx tsc --noEmit` EXIT0／`npx vitest run` **124 passed**／`npm run build` 成功／traceability `python3 scripts/check_tc_traceability.py` **✅ code413**）。**実ブラウザ受入はユーザー確認中**（未完了）。※`51bfa4c`/`4f45229` は CSS のみで build 成功のみ確認、tsc/vitest は前回(`6b37ce7`)の緑が有効。
 - **炎エンジン単体は実ブラウザで描画確認済み**（esbuild でバンドル→playwright で `createFireEngine` を start/reduceStatic/startPersist＝いずれも炎ピクセル描画・error 0）。**バッジ起点の発射**も headless で「火の玉が右上バッジ→中央下部へ飛来」を実測。
-- **雷/氷/虹/オーラ＝production は未移植（CSS のまま）**。canvas は sparkle+fire のみ（`engines/index.ts` の `ENGINES`）。
+- **炎＝実アプリ受入 OK（2026-09-06）**。**雷（thunder）＝production 移植済み**（`engines/thunder.ts`・`createThunderEngine`・G-TC-157・`ENGINES` に `thunder` 登録済み）＝**実アプリ受入は未**。canvas は sparkle+fire+thunder。**氷/虹/オーラ＝未移植（CSS のまま）**。
+- **ブランチは main に統一済み（2026-09-06）**＝feature/game-feel は main に FF マージ後 削除。以降 main で作業（記憶 `game-feel-async-pipeline` 更新済み・push は都度確認）。
+- 魔法→effect＝flame_1 炎=fire／flame_2 雷=thunder／flame_3 虹=rainbow／light_1 氷=ice／light_2 キラキラ=sparkle／light_3 オーラ=aura（migration 0013）。受入用に user@acme.example・user2@acme.example へ各 SP 100 付与済み（`/spells` で解放→`/ideas/{id}/chat` で発動）。
 - **壊れているもの＝把握している範囲では無し**。ユーザー報告のUI不具合（リアクション背面・四角枠・フッター崩れ・バッジ重なり）は本セッションで各々修正済み。
 - **backend pytest は本セッション未実行**（frontend/mock のみの変更のため）。
 
@@ -60,9 +62,10 @@
 ## 7. 次にやること（優先順・具体的に）
 > `feature/game-feel` で継続。移植は**1スペルずつ・炎→雷→氷→虹→オーラ**。
 
-1. **炎の実アプリ受入待ち**＝ユーザーがチャットで【炎】を発動して確認中。もし追加調整が出たら `engines/fire.ts`／`chat.css`／`IdeaChatView.tsx` で対応。
-2. **②雷（§17L-d）を production 移植**＝新規 `impl/frontend/src/features/spells/engines/thunder.ts` に、モック `createPixelThunderLight`（style-guide.html §17L-d）を `SpellEngine` 契約(start/startPersist/resume/reduceStatic/stop・rng 注入・origin は size.w 単位→内部座標へ変換)で移植。`engines/index.ts` の `ENGINES` に `thunder` 追加。決定的部分があれば分離して `doc/テスト/G_ゲーミフィケーション.md` に **G-TC-157** を追記→**red-green**→`python3 scripts/check_tc_traceability.py` ✅。フロントゲート(tsc/vitest/build)。**炎移植(`afe9461`)を雛形にする**。
-3. **③氷 §17L-e → ④虹 §17L-f2 → ⑤オーラ §17L-g** を同様に移植（`createIceSpellLight`/`createRainbowScatterSpellLight`/`createAuraSpellLight`）。虹はライト版が放浪 §17L-f2 のみな点に注意。
+1. ~~炎の実アプリ受入~~＝**OK 済み（2026-09-06）**。~~②雷 production 移植~~＝**完了（thunder.ts・G-TC-157）**。
+2. **雷（thunder）の実アプリ受入待ち**＝チャットで flame_2【雷】を発動して確認。追加調整は `engines/thunder.ts`／`chat.css`／`IdeaChatView.tsx`。
+3. **③氷（§17L-e）を production 移植**＝新規 `impl/frontend/src/features/spells/engines/ice.ts` に、モック `createIceSpellLight`（style-guide.html §17L-e）を `SpellEngine` 契約(start/startPersist/resume/reduceStatic/stop・rng 注入・origin は size.w 単位→内部座標へ変換)で移植。`engines/index.ts` の `ENGINES` に `ice` 追加。決定的部分を分離して `doc/テスト/G_ゲーミフィケーション.md` に **G-TC-158** を追記→**red-green**→`python3 scripts/check_tc_traceability.py` ✅。フロントゲート(tsc/vitest/build)。**炎(afe9461)/雷(8c0ec95) を雛形に**。
+4. **④虹 §17L-f2 → ⑤オーラ §17L-g** を同様に移植（`createRainbowScatterSpellLight`/`createAuraSpellLight`）。虹はライト版が放浪 §17L-f2 のみな点に注意。
 4. **発動者バッジのアバター画像化（任意・要backend）**＝魔法リアクションに actor のアバターURLを載せれば `.msg__caster` を画像バッジにできる。現状イニシャル。
 5. **GF-AC 受入台帳の追随**＝`doc/テスト/ゲーム感受入.md`（`GF-AC-NNN`）に本セッションの production 移植分の受入行が要るか未確認。要すれば追記。
 6. **`feature/game-feel` → `main`**＝GF-AC 一通り受入後・ユーザー承認で。マージ時に `impl/README.md` と本 handoff を追随更新。
