@@ -93,7 +93,7 @@ export function LoginForm() {
         </div>
         <h1>ログイン</h1>
 
-        {error && <div className="form-error">{error}</div>}
+        {error && <div className="form-error" role="alert">{error}</div>}
 
         <form onSubmit={onSubmit} noValidate>
           <Field id="company_code" label="会社コード" required>

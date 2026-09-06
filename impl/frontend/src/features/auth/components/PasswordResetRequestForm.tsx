@@ -57,7 +57,7 @@ export function PasswordResetRequestForm() {
               会社コードとログインIDを入力すると、登録メールアドレスへ再設定用リンク（72時間有効）を送信します。
             </p>
 
-            {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
 
             <form onSubmit={onSubmit} noValidate>
               <Field id="company_code" label="会社コード" required>

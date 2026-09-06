@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, useSnackbar } from "@/components/ui";
+import { FormFooterError, FormSummary, Spinner, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 import { consumeEvalFromIdea } from "@/lib/nav";
@@ -53,6 +53,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const router = useRouter();
   const inModal = onClose != null;
   const snack = useSnackbar();
+  const { summaryRef, notify } = useFormErrorNotice(); // §4.7 上部サマリスクロール＋エラースナックバー（自動消滅）
   // アイデア詳細から開いた時は背後がアイデア詳細なので「アイデア詳細を見る」導線を隠す（冗長）。
   // 来歴（sessionStorage）をマウント時に1回だけ消費（ref ガードで StrictMode 二重実行も防ぐ）。
   const [openedFromIdea, setOpenedFromIdea] = useState(false);
@@ -116,6 +117,12 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const rated = ratedVals.length;
   const avg = rated ? ratedVals.reduce((s, v) => s + v, 0) / rated : 0;
 
+  // §4.7 上部サマリ／フッター用の検証エラー文言（インライン枠と同じ内容を集約）。
+  const evalErrors = [
+    ...(missingErr > 0 ? [`すべての観点（5つ）を採点してください（未採点 ${missingErr} 件）`] : []),
+    ...(overallErr ? ["総評（全体コメント）は必須です。"] : []),
+  ];
+
   const persist = useCallback(
     async (status: "draft" | "submitted") => {
       if (pending) return;
@@ -125,7 +132,15 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         const noOverall = !overall.trim();
         setMissingErr(missing);
         setOverallErr(noOverall);
-        if (missing || noOverall) return;
+        if (missing || noOverall) {
+          // §4.7＝インライン枠（下部）に加えて 上部サマリへスクロール＋エラースナックバー（自動消滅）を出す
+          //（スクロールで隠れて「押しても無反応」に見える問題の解消）。
+          notify([
+            ...(missing ? [`すべての観点（5つ）を採点してください（未採点 ${missing} 件）`] : []),
+            ...(noOverall ? ["総評（全体コメント）は必須です。"] : []),
+          ]);
+          return;
+        }
       }
       setPending(status === "submitted" ? "submit" : "draft");
       try {
@@ -156,9 +171,18 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
       } catch (err) {
         const st = err instanceof ApiError ? err.status : 0;
         if (st === 422) {
-          setMissingErr(ASPECTS.filter((a) => !scores[a.key]).length);
-          setOverallErr(!overall.trim());
-          snack({ type: "error", msg: "確定には全5観点の採点と総評が必要です。" });
+          const missing = ASPECTS.filter((a) => !scores[a.key]).length;
+          const noOverall = !overall.trim();
+          setMissingErr(missing);
+          setOverallErr(noOverall);
+          notify(
+            missing || noOverall
+              ? [
+                  ...(missing ? [`すべての観点（5つ）を採点してください（未採点 ${missing} 件）`] : []),
+                  ...(noOverall ? ["総評（全体コメント）は必須です。"] : []),
+                ]
+              : ["確定には全5観点の採点と総評が必要です。"],
+          );
         } else {
           snack({
             type: "error",
@@ -173,7 +197,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         setPending(null);
       }
     },
-    [ideaId, scores, comments, overall, visibility, avg, rated, pending, snack, router, onClose],
+    [ideaId, scores, comments, overall, visibility, avg, rated, pending, snack, notify, router, onClose],
   );
 
   if (loading) {
@@ -186,6 +210,8 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   // フッターのアクション行（キャンセル/下書き保存/評価を確定）＝標準 .modal__footer に載せる（右寄せ・区切り線）。
   const actions = (
     <>
+      {/* §4.7 足元ヒント＝スクロールで上部サマリが隠れても検証エラーが分かる（常時見えるフッター）。 */}
+      <FormFooterError show={evalErrors.length > 0} />
       {inModal ? (
         <button className="btn btn-outline" type="button" onClick={onClose}>キャンセル</button>
       ) : (
@@ -207,6 +233,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         <p className="role-note" style={{ marginTop: 0 }}>
           ▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。
         </p>
+
+        {/* §4.7 上部サマリ（スクロール先＝summaryRef・フォーカスは奪わない）。インライン枠と併用。 */}
+        <FormSummary title="入力内容をご確認ください" errors={evalErrors} innerRef={summaryRef} />
 
         {/* 対象アイデアの文脈（実データ・getIdea） */}
         <div className="eval-context card" style={{ padding: "var(--space-3) var(--space-4)" }}>

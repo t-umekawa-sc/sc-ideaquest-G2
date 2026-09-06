@@ -83,6 +83,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   const [replaceMemberships, setReplaceMemberships] = useState(false); // 編集時に所属を置き換えるか（B.3 一括設定）
   const [groups, setGroups] = useState<QuestGroup[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ display_name?: string; login_id?: string; email?: string }>({});
   const [pending, setPending] = useState(false);
   // 編集はプリフィルが要る＝取得完了まで loading。発行は即フォーム表示（所属候補は非同期で埋まる）。
   const [loading, setLoading] = useState(mode === "edit");
@@ -128,6 +129,17 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    // クライアント必須検証（§4.7＝インライン枠＋上部サマリ＋フッター＋スナックバー・空送信で無反応にしない）。
+    const fe: { display_name?: string; login_id?: string; email?: string } = {};
+    if (!displayName.trim()) fe.display_name = "氏名を入力してください。";
+    if (!loginId.trim()) fe.login_id = "ログインIDを入力してください。";
+    if (!email.trim()) fe.email = "メールアドレスを入力してください。";
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) {
+      setFormError("入力内容をご確認ください。");
+      notify(Object.values(fe));
+      return;
+    }
     setPending(true);
     try {
       if (mode === "issue") {
@@ -164,6 +176,13 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
     } catch (err) {
       const m = issueErrorMessage(err);
       setFormError(m);
+      // 409 conflict は該当フィールド（ログインID/メール）を赤く（§4b インライン）。
+      const field =
+        err instanceof ApiError && err.code === "conflict"
+          ? (err.body as { errors?: { field?: string }[] } | null)?.errors?.[0]?.field
+          : undefined;
+      if (field === "login_id") setFieldErrors({ login_id: "このログインID は既に使われています。" });
+      else if (field === "email") setFieldErrors({ email: "このメールアドレスは既に使われています。" });
       notify([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);
@@ -196,14 +215,14 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
         {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
-        <Field id={`${idPrefix}_name`} label="氏名" required>
-          <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+        <Field id={`${idPrefix}_name`} label="氏名" required error={fieldErrors.display_name}>
+          <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (fieldErrors.display_name) setFieldErrors((p) => ({ ...p, display_name: undefined })); }} required />
         </Field>
-        <Field id={`${idPrefix}_login`} label="ログインID" required>
-          <input id={`${idPrefix}_login`} className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required />
+        <Field id={`${idPrefix}_login`} label="ログインID" required error={fieldErrors.login_id}>
+          <input id={`${idPrefix}_login`} className="input" value={loginId} onChange={(e) => { setLoginId(e.target.value); if (fieldErrors.login_id) setFieldErrors((p) => ({ ...p, login_id: undefined })); }} required />
         </Field>
-        <Field id={`${idPrefix}_email`} label="メールアドレス" required>
-          <input id={`${idPrefix}_email`} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Field id={`${idPrefix}_email`} label="メールアドレス" required error={fieldErrors.email}>
+          <input id={`${idPrefix}_email`} className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined })); }} required />
         </Field>
         {showRole && (
           <Field id={`${idPrefix}_role`} label="システムロール">

@@ -260,7 +260,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
               </p>
             )}
             <Field id="g_code" label="クエストグループコード" required>
-              <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} required />
+              <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={formError ? true : undefined} required />
             </Field>
             <Field id="g_name" label="グループ名" required>
               <input id="g_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />

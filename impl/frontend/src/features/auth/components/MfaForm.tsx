@@ -104,7 +104,7 @@ export function MfaForm({ challenge, onRestart }: Props) {
           登録メールアドレス（{challenge.masked_to}）宛に認証コードを送信しました。メールに記載の6桁のコードを入力してください（10分間有効）。
         </p>
 
-        {error && <div className="form-error">{error}</div>}
+        {error && <div className="form-error" role="alert">{error}</div>}
         {info && !error && <div className="auth-confirm">{info}</div>}
 
         <form onSubmit={onSubmit} noValidate>
@@ -118,6 +118,7 @@ export function MfaForm({ challenge, onRestart }: Props) {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+              aria-invalid={error ? true : undefined}
               required
             />
           </Field>

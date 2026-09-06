@@ -52,6 +52,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
   const [iconFile, setIconFile] = useState<File | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; company_code?: string; db_identifier?: string }>({});
   const [pending, setPending] = useState(false);
 
   function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
@@ -71,6 +72,17 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    // クライアント必須検証（§4.7＝空送信で無反応にしない・インライン枠＋サマリ＋フッター＋スナックバー）。
+    const fe: { name?: string; company_code?: string; db_identifier?: string } = {};
+    if (!name.trim()) fe.name = "会社名を入力してください。";
+    if (!companyCode.trim()) fe.company_code = "会社コードを入力してください。";
+    if (!dbIdentifier.trim()) fe.db_identifier = "DB 識別子を入力してください。";
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) {
+      setFormError("入力内容をご確認ください。");
+      notify(Object.values(fe));
+      return;
+    }
     setPending(true);
     try {
       // 作成（会社は status=suspended で作られる）→ 画像が選択されていれば作成会社にアイコンを設定（2段・B.1）。
@@ -82,6 +94,13 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
     } catch (err) {
       const m = createErrorMessage(err);
       setFormError(m);
+      // 409 conflict は該当フィールド（会社コード/DB識別子）を赤く（§4b インライン）。
+      const field =
+        err instanceof ApiError && err.code === "conflict"
+          ? (err.body as { errors?: { field?: string }[] } | null)?.errors?.[0]?.field
+          : undefined;
+      if (field === "company_code") setFieldErrors({ company_code: "この会社コードは既に使われています。" });
+      else if (field === "db_identifier") setFieldErrors({ db_identifier: "この DB 識別子は既に使われています。" });
       notify([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);
@@ -97,13 +116,14 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
             複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子も引き継いでいます</strong>（いずれも一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
           </p>
         )}
-        <Field id="c_name" label="会社名" required>
-          <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Field id="c_name" label="会社名" required error={fieldErrors.name}>
+          <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => { setName(e.target.value); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined })); }} required />
         </Field>
         <Field
           id="c_code"
           label="会社コード"
           required
+          error={fieldErrors.company_code}
           hint="対人向けの会社識別コード。英大文字/数字/ハイフン・4〜20文字・全社で一意（大文字に正規化）。作成後は変更不可。"
         >
           <input
@@ -113,17 +133,17 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
             maxLength={20}
             style={{ textTransform: "uppercase" }}
             value={companyCode}
-            onChange={(e) => setCompanyCode(e.target.value)}
+            onChange={(e) => { setCompanyCode(e.target.value); if (fieldErrors.company_code) setFieldErrors((p) => ({ ...p, company_code: undefined })); }}
             required
           />
         </Field>
-        <Field id="c_db" label="DB 識別子" required hint="会社DBの参照キー。接続情報の実体は .env。">
+        <Field id="c_db" label="DB 識別子" required error={fieldErrors.db_identifier} hint="会社DBの参照キー。接続情報の実体は .env。">
           <input
             id="c_db"
             className="input"
             placeholder="例: db_sc"
             value={dbIdentifier}
-            onChange={(e) => setDbIdentifier(e.target.value)}
+            onChange={(e) => { setDbIdentifier(e.target.value); if (fieldErrors.db_identifier) setFieldErrors((p) => ({ ...p, db_identifier: undefined })); }}
             required
           />
         </Field>
