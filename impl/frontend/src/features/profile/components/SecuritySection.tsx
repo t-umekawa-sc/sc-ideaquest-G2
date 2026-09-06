@@ -29,19 +29,28 @@ export function SecuritySection() {
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
+  const [pwFieldErr, setPwFieldErr] = useState<{ cur?: string; next?: string; confirm?: string }>({});
   const [pwPending, setPwPending] = useState(false);
   // メール変更
   const [newEmail, setNewEmail] = useState("");
   const [emailCurPw, setEmailCurPw] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailFieldErr, setEmailFieldErr] = useState<{ email?: string; cur?: string }>({});
   const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const [emailPending, setEmailPending] = useState(false);
 
   async function onChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwError(null);
-    if (newPw !== confirmPw) {
-      setPwError("新しいパスワードと確認用が一致しません。");
+    // §4b クライアント検証＝必須＋不一致を該当フィールドへ（赤枠＋メッセージ）。
+    const fe: { cur?: string; next?: string; confirm?: string } = {};
+    if (!curPw) fe.cur = "現在のパスワードを入力してください。";
+    if (!newPw) fe.next = "新しいパスワードを入力してください。";
+    if (!confirmPw) fe.confirm = "確認用パスワードを入力してください。";
+    if (!fe.confirm && newPw !== confirmPw) fe.confirm = "新しいパスワードと確認用が一致しません。";
+    setPwFieldErr(fe);
+    if (Object.keys(fe).length > 0) {
+      setPwError("入力内容をご確認ください。");
       return;
     }
     setPwPending(true);
@@ -51,6 +60,7 @@ export function SecuritySection() {
       router.push("/login");
     } catch (err) {
       setPwError(reauthMessage(err, "パスワードの変更に失敗しました。"));
+      if (err instanceof ApiError && err.code === "reauth_failed") setPwFieldErr({ cur: "現在のパスワードが正しくありません。" });
     } finally {
       setPwPending(false);
     }
@@ -60,6 +70,15 @@ export function SecuritySection() {
     e.preventDefault();
     setEmailError(null);
     setEmailMsg(null);
+    // §4b クライアント検証＝必須を該当フィールドへ。
+    const fe: { email?: string; cur?: string } = {};
+    if (!newEmail.trim()) fe.email = "新しいメールアドレスを入力してください。";
+    if (!emailCurPw) fe.cur = "現在のパスワードを入力してください。";
+    setEmailFieldErr(fe);
+    if (Object.keys(fe).length > 0) {
+      setEmailError("入力内容をご確認ください。");
+      return;
+    }
     setEmailPending(true);
     try {
       await requestEmailChange({ new_email: newEmail, current_password: emailCurPw });
@@ -69,6 +88,10 @@ export function SecuritySection() {
       setEmailCurPw("");
     } catch (err) {
       setEmailError(reauthMessage(err, "メールアドレスの変更に失敗しました。"));
+      // サーバー側の該当フィールドを赤く（再認証失敗＝現PW／重複・形式＝メール）。
+      if (err instanceof ApiError && err.code === "reauth_failed") setEmailFieldErr({ cur: "現在のパスワードが正しくありません。" });
+      else if (err instanceof ApiError && (err.code === "conflict" || err.code === "validation_error"))
+        setEmailFieldErr({ email: err.code === "conflict" ? "このメールアドレスは既に使われています。" : "メールアドレスの形式をご確認ください（現在と同じアドレスは不可）。" });
     } finally {
       setEmailPending(false);
     }
@@ -85,14 +108,14 @@ export function SecuritySection() {
           </p>
           {pwError && <div className="form-error" role="alert">{pwError}</div>}
           <form onSubmit={onChangePassword} noValidate>
-            <Field id="cur_pw" label="現在のパスワード" required>
-              <input id="cur_pw" className="input" type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} required />
+            <Field id="cur_pw" label="現在のパスワード" required error={pwFieldErr.cur}>
+              <input id="cur_pw" className="input" type="password" autoComplete="current-password" value={curPw} onChange={(e) => { setCurPw(e.target.value); if (pwFieldErr.cur) setPwFieldErr((p) => ({ ...p, cur: undefined })); }} required />
             </Field>
-            <Field id="new_pw" label="新しいパスワード" required>
-              <input id="new_pw" className="input" type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required />
+            <Field id="new_pw" label="新しいパスワード" required error={pwFieldErr.next}>
+              <input id="new_pw" className="input" type="password" autoComplete="new-password" value={newPw} onChange={(e) => { setNewPw(e.target.value); if (pwFieldErr.next) setPwFieldErr((p) => ({ ...p, next: undefined })); }} required />
             </Field>
-            <Field id="confirm_pw" label="新しいパスワード（確認）" required>
-              <input id="confirm_pw" className="input" type="password" autoComplete="new-password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} required />
+            <Field id="confirm_pw" label="新しいパスワード（確認）" required error={pwFieldErr.confirm}>
+              <input id="confirm_pw" className="input" type="password" autoComplete="new-password" value={confirmPw} onChange={(e) => { setConfirmPw(e.target.value); if (pwFieldErr.confirm) setPwFieldErr((p) => ({ ...p, confirm: undefined })); }} required />
             </Field>
             <Button type="submit" variant="primary" disabled={pwPending}>
               {pwPending ? "変更中…" : "パスワードを変更（要再ログイン）"}
@@ -108,11 +131,11 @@ export function SecuritySection() {
           {emailError && <div className="form-error" role="alert">{emailError}</div>}
           {emailMsg && <p className="admin-muted" role="status">{emailMsg}</p>}
           <form onSubmit={onChangeEmail} noValidate>
-            <Field id="new_email" label="新しいメールアドレス" required>
-              <input id="new_email" className="input" type="email" placeholder="例: yamada.new@across.example" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
+            <Field id="new_email" label="新しいメールアドレス" required error={emailFieldErr.email}>
+              <input id="new_email" className="input" type="email" placeholder="例: yamada.new@across.example" value={newEmail} onChange={(e) => { setNewEmail(e.target.value); if (emailFieldErr.email) setEmailFieldErr((p) => ({ ...p, email: undefined })); }} required />
             </Field>
-            <Field id="email_cur_pw" label="現在のパスワード（確認）" required>
-              <input id="email_cur_pw" className="input" type="password" autoComplete="current-password" value={emailCurPw} onChange={(e) => setEmailCurPw(e.target.value)} required />
+            <Field id="email_cur_pw" label="現在のパスワード（確認）" required error={emailFieldErr.cur}>
+              <input id="email_cur_pw" className="input" type="password" autoComplete="current-password" value={emailCurPw} onChange={(e) => { setEmailCurPw(e.target.value); if (emailFieldErr.cur) setEmailFieldErr((p) => ({ ...p, cur: undefined })); }} required />
             </Field>
             <Button type="submit" variant="primary" disabled={emailPending}>
               {emailPending ? "送信中…" : "確認メールを送信"}

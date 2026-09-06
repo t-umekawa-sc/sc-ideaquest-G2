@@ -37,6 +37,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [mascotFollow, setMascotFollow] = useState(true); // アバター追従アニメ表示（accounts.mascot_follow・#20・既定 true）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameErr, setNameErr] = useState<string | null>(null); // §4b 表示名のインラインエラー（赤枠＋メッセージ）
   // プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO 署名URL）。
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [iconBusy, setIconBusy] = useState(false);
@@ -64,6 +65,13 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // §4b クライアント検証＝表示名は必須（空送信で無反応にせず該当フィールドを赤く）。
+    if (!displayName.trim()) {
+      setNameErr("表示名を入力してください。");
+      setError("入力内容をご確認ください。");
+      return;
+    }
+    setNameErr(null);
     setSaving(true);
     try {
       // mascot_follow は「動きを減らす」ON でも**保存値としては保持**（抑制解除で元の設定に戻る）。実効表示は
@@ -76,7 +84,12 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
       snack({ type: "success", title: "プロフィールを更新しました" }); // 他の更新系と同じ通知
       router.refresh(); // 共通ヘッダーの表示名を更新（次のセッション読取で反映）
     } catch (err) {
-      setError(err instanceof ApiError && err.code === "validation_error" ? "入力内容をご確認ください。" : "保存に失敗しました。");
+      if (err instanceof ApiError && err.code === "validation_error") {
+        setError("入力内容をご確認ください。");
+        setNameErr("表示名をご確認ください。");
+      } else {
+        setError("保存に失敗しました。");
+      }
     } finally {
       setSaving(false);
     }
@@ -181,8 +194,8 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
         </div>
 
         <form onSubmit={onSave} noValidate style={{ marginTop: "var(--space-4)" }}>
-          <Field id="p_name" label="表示名" required>
-            <input id="p_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+          <Field id="p_name" label="表示名" required error={nameErr}>
+            <input id="p_name" className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (nameErr) setNameErr(null); }} required />
           </Field>
           <Field id="p_locale" label="言語">
             <select id="p_locale" className="select" value={locale} onChange={(e) => setLocale(e.target.value as "ja" | "en")}>
