@@ -1,12 +1,12 @@
-// クエスト/会社アイコン（デザイン標準・shared.css .quest-icon）。カスタム画像 or 頭文字タイル（色＝--accent）。
-// 会社アイコン（SC-91/92）・クエストアイコン（SC-10/12）で共用。owner オーバーレイ（所有者アバター）は任意。
+// クエスト/会社/アイデアアイコン（デザイン標準・shared.css .quest-icon）。カスタム画像 or 頭文字タイル（色＝--accent）。
+// 会社アイコン（SC-91/92）・クエストアイコン（SC-10/12）・アイデアアイコン（SC-24/01/12・2026-09-06）で共用。owner オーバーレイは任意。
 import Image from "next/image";
 
 type Props = {
   name: string; // 頭文字フォールバック用
   color?: string | null; // タイル色（--accent）。未指定はプライマリ
   imageUrl?: string | null; // 署名URL 等（あれば画像）
-  size?: "sm" | "lg"; // 既定 56px / sm 40 / lg 72
+  size?: "xs" | "sm" | "lg"; // 既定 56px / xs 24 / sm 40 / lg 72
 };
 
 export function QuestIcon({ name, color, imageUrl, size }: Props) {

@@ -11,6 +11,7 @@ import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import { Avatar, CountUp, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout";
 import { DashboardFx, type DashboardFxHandle } from "./DashboardFx";
 import { getTeamFeed } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
@@ -343,7 +344,13 @@ export function DashboardView({
                   ref={(el) => { if (el) voteCardEls.current.set(v.id, el); else voteCardEls.current.delete(v.id); }}
                   className="card card-accent vote-card"
                 >
-                  <div className="between"><Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link><span className="badge badge-muted">未投票</span></div>
+                  <div className="between">
+                    <span className="idea-title-row">
+                      <QuestIcon name={v.title} color={v.quest.color} size="sm" />
+                      <Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link>
+                    </span>
+                    <span className="badge badge-muted">未投票</span>
+                  </div>
                   <div className="vote-card__quest">{v.quest.title}</div>
                   <div className="vote-card__value">{v.value}</div>
                   <div className="vote-card__poster poster"><Avatar name={v.poster.name} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
@@ -415,7 +422,10 @@ export function DashboardView({
                       ★（フォロー解除）は Link の外＝アンカー内 button を避け、クリックがカード遷移に伝播しないよう別要素にする
                       （QuestListView の cardRaw と同方針）。退場アニメは外側ラッパ（framer）＝リフト transform と衝突しない。 */}
                   <Link className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`} href={`/ideas/${f.id}`}>
-                    <div className="card-title">{f.title}</div>
+                    <div className="card-title idea-title-row">
+                      <QuestIcon name={f.title} color={f.quest.color} size="sm" />
+                      <span className="idea-title-row__txt">{f.title}</span>
+                    </div>
                     <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
                     <div className="follow-value">{f.value}</div>
                     <div className="follow-card__poster poster"><Avatar name={f.poster.name} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>

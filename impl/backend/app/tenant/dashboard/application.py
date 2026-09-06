@@ -66,7 +66,8 @@ def _poster(ts, user_id: uuid.UUID) -> dict:
 
 
 def _quest_ref_from(quest_id: uuid.UUID, q, *, with_status: bool = False) -> dict:
-    ref = {"id": str(quest_id), "title": q.title if q else "（削除されたクエスト）"}
+    ref = {"id": str(quest_id), "title": q.title if q else "（削除されたクエスト）",
+           "color": q.color if q else None}  # アイデアアイコンの頭文字タイル色（クエストアクセント・SC-01）
     if with_status:
         ref["quest_status"] = q.status if q else None
     return ref

@@ -18,6 +18,8 @@
 .chat-context__body { min-width: 0; flex: 1; }
 .chat-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
 .chat-context__title { font-weight: 700; font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 件名に添えるアイデアアイコン（QuestIcon 流用）＝テキストと縦中央で揃える（2026-09-06）。 */
+.chat-context__title .quest-icon, .chat-context__mini .quest-icon { vertical-align: middle; margin-right: 6px; }
 .chat-context__meta { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .chat-context .backlink { color: var(--color-text-muted); font-size: var(--text-sm); white-space: nowrap; }
 .chat-context .backlink:hover { color: var(--color-text); }

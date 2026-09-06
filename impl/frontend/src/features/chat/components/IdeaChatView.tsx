@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
 import { isCanvasEffect } from "@/features/spells/engines";
+import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
@@ -439,7 +440,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           <>
             <div className="chat-context__body">
               <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
-              <div className="chat-context__title">💬 {idea.title}</div>
+              <div className="chat-context__title"><QuestIcon name={idea.title} color={idea.quest.color} size="xs" /> {idea.title}</div>
               <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
             </div>
             <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>
@@ -448,7 +449,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         ) : (
           // たたんだ状態＝コンパクトなタイトル（左）＋右端に戻るリンク。
           <>
-            <span className="chat-context__mini">💬 {idea.title}</span>
+            <span className="chat-context__mini"><QuestIcon name={idea.title} color={idea.quest.color} size="xs" /> {idea.title}</span>
             <Link className="backlink chat-context__back" href={backHref} onClick={onBack}>{backLabel}</Link>
           </>
         )}

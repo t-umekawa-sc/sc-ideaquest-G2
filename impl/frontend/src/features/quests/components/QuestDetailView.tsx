@@ -262,7 +262,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
 
   const ideaColumns: DataTableColumn<Idea>[] = [
     { key: "title", label: "件名", locked: true, width: 260, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
-      render: (r) => <><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</> },
+      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} size="xs" /><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</span> },
     { key: "poster", label: "投稿者", width: 150, sortable: true, filter: { type: "text" }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
       render: (r) => <span className="poster"><Avatar name={r.poster} size="sm" />{r.poster}</span> },
     { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),

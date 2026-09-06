@@ -79,6 +79,9 @@
 .dash-page .vote-quick.disagree:hover { background: #FECACA; }
 .dash-page .vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
 .dash-page .vote-card.is-voted { opacity: .6; }
+/* アイデアアイコン＋件名の行（未投票/フォロー中カード・2026-09-06）＝アイコンと件名を縦中央で並べ、件名は省略表示。 */
+.dash-page .idea-title-row { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.dash-page .idea-title-row__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* チャット直行リンク（未投票カード）＝控えめな一行リンク。 */
 .dash-page .dash-chat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); }
 .dash-page .dash-chat-link:hover { text-decoration: underline; }

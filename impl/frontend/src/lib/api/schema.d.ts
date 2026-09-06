@@ -3102,6 +3102,8 @@ export interface components {
             categories: string[];
             /** Deadline */
             deadline?: string | null;
+            /** Color */
+            color?: string | null;
         };
         /**
          * IdeaRevisionDTO

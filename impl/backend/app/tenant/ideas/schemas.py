@@ -60,6 +60,7 @@ class IdeaQuestRefDTO(BaseModel):
     status: str
     categories: list[str] = []
     deadline: date | None = None
+    color: str | None = None  # クエストのアクセント色（アイデアアイコンの頭文字タイル色・SC-24/SC-22・2026-09-06）
 
 
 class IdeaVoteSummaryDTO(BaseModel):
