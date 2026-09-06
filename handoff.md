@@ -40,7 +40,7 @@
 - **モック（style-guide.html）＝ユーザー受入済み・動作OK**（各変更で headless console error 0 実測）。
 - **production 炎移植＝コード完了・全ゲート緑**（最後に実測: `npx tsc --noEmit` EXIT0／`npx vitest run` **124 passed**／`npm run build` 成功／traceability `python3 scripts/check_tc_traceability.py` **✅ code413**）。**実ブラウザ受入はユーザー確認中**（未完了）。※`51bfa4c`/`4f45229` は CSS のみで build 成功のみ確認、tsc/vitest は前回(`6b37ce7`)の緑が有効。
 - **炎エンジン単体は実ブラウザで描画確認済み**（esbuild でバンドル→playwright で `createFireEngine` を start/reduceStatic/startPersist＝いずれも炎ピクセル描画・error 0）。**バッジ起点の発射**も headless で「火の玉が右上バッジ→中央下部へ飛来」を実測。
-- **炎・雷＝実アプリ受入 OK（2026-09-06）**（雷＝`engines/thunder.ts`・`createThunderEngine`・G-TC-157・`ENGINES` 登録済み）。canvas は sparkle+fire+thunder。**氷/虹/オーラ＝未移植（CSS のまま）＝次は氷（§17L-e）**。
+- **炎・雷・氷＝実アプリ受入 OK（2026-09-06）**（雷＝`engines/thunder.ts`・G-TC-157／氷＝`engines/ice.ts`・G-TC-158・**canvas をパネルより大きく張り出し氷柱が枠外へはみ出す**＝`useSpellEngine` の起点変換をコンテナ矩形基準に変更済み）。canvas は sparkle+fire+thunder+ice。**虹/オーラ＝未移植（CSS のまま）＝次は虹（§17L-f2）→オーラ（§17L-g）**。
 - **ブランチは main に統一済み（2026-09-06）**＝feature/game-feel は main に FF マージ後 削除。以降 main で作業（記憶 `game-feel-async-pipeline` 更新済み・push は都度確認）。
 - 魔法→effect＝flame_1 炎=fire／flame_2 雷=thunder／flame_3 虹=rainbow／light_1 氷=ice／light_2 キラキラ=sparkle／light_3 オーラ=aura（migration 0013）。受入用に user@acme.example・user2@acme.example へ各 SP 100 付与済み（`/spells` で解放→`/ideas/{id}/chat` で発動）。
 - **壊れているもの＝把握している範囲では無し**。ユーザー報告のUI不具合（リアクション背面・四角枠・フッター崩れ・バッジ重なり）は本セッションで各々修正済み。
@@ -60,15 +60,12 @@
 - **リアクション/バッジ/✦ は演出canvasの前面**（z-index）＝操作可能・可読性優先。ホバー操作メニューはバッジ右上と衝突するため `:has` で左へ退避。
 
 ## 7. 次にやること（優先順・具体的に）
-> `feature/game-feel` で継続。移植は**1スペルずつ・炎→雷→氷→虹→オーラ**。
+> **main で継続**（ブランチは main 統一・feature/game-feel 廃止・push は都度確認）。移植は**1スペルずつ・炎→雷→氷→虹→オーラ**。
 
-1. ~~炎・雷の実アプリ受入~~＝**両方 OK 済み（2026-09-06）**。~~②雷 production 移植~~＝完了（thunder.ts・G-TC-157）。
-2. **③氷（§17L-e）を production 移植**＝新規 `impl/frontend/src/features/spells/engines/ice.ts` に、モック `createIceSpellLight`（style-guide.html §17L-e）を `SpellEngine` 契約(start/startPersist/resume/reduceStatic/stop・rng 注入・origin は size.w 単位→内部座標へ変換)で移植。`engines/index.ts` の `ENGINES` に `ice` 追加。決定的部分を分離して `doc/テスト/G_ゲーミフィケーション.md` に **G-TC-158** を追記→**red-green**→`python3 scripts/check_tc_traceability.py` ✅。フロントゲート(tsc/vitest/build)。**炎(afe9461)/雷(8c0ec95) を雛形に**。
-4. **④虹 §17L-f2 → ⑤オーラ §17L-g** を同様に移植（`createRainbowScatterSpellLight`/`createAuraSpellLight`）。虹はライト版が放浪 §17L-f2 のみな点に注意。
-4. **発動者バッジのアバター画像化（任意・要backend）**＝魔法リアクションに actor のアバターURLを載せれば `.msg__caster` を画像バッジにできる。現状イニシャル。
-5. **GF-AC 受入台帳の追随**＝`doc/テスト/ゲーム感受入.md`（`GF-AC-NNN`）に本セッションの production 移植分の受入行が要るか未確認。要すれば追記。
-6. **`feature/game-feel` → `main`**＝GF-AC 一通り受入後・ユーザー承認で。マージ時に `impl/README.md` と本 handoff を追随更新。
-- **共通ルール**＝フロント検証は `npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。push は standing 承認・`main` は承認後。全アニメは reduce-motion 尊重（記憶 `animation-reduce-motion-standard`／ハーネスが `reduceStatic()` を呼ぶ）。テストは**先に md に TC 行(`根拠`列)→red-green→traceability ✅**（記憶／テスト規約 §5.1）。
+1. ~~炎・雷・氷の実アプリ受入~~＝**全て OK 済み（2026-09-06）**。~~②雷・③氷 production 移植~~＝完了（thunder.ts/ice.ts・G-TC-157/158）。~~発動者バッジのアバター画像化~~＝完了（魔法リアクションに `actor_avatar` 追加・`.msg__caster` を画像化）。
+2. **④虹（§17L-f2）を production 移植**＝新規 `engines/rainbow.ts`（モック `createRainbowScatterSpellLight`・虹はライト版が放浪 §17L-f2 のみ）→ **⑤オーラ（§17L-g）** `engines/aura.ts`（`createAuraSpellLight`）。`ENGINES` に追加。決定的部分を分離して **G-TC-159/160** を追記→**red-green**→traceability ✅。フロントゲート(tsc/vitest/build)。**炎(afe9461)/雷(8c0ec95)/氷 を雛形に**。氷のように枠外はみ出しが要るなら `useSpellEngine`（コンテナ矩形基準の起点）＋マージン canvas を踏襲。
+3. **GF-AC 受入台帳の追随**＝`doc/テスト/ゲーム感受入.md`（`GF-AC-NNN`）に本セッションの production 移植分の受入行が要るか未確認。要すれば追記。
+- **共通ルール**＝フロント検証は `npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。push は都度確認。全アニメは reduce-motion 尊重（記憶 `animation-reduce-motion-standard`／ハーネスが `reduceStatic()` を呼ぶ）。テストは**先に md に TC 行(`根拠`列)→red-green→traceability ✅**（記憶／テスト規約 §5.1）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `feature/game-feel` を確認**。compose＝`impl/compose.yaml`（cwd=`impl`）。
