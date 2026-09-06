@@ -201,11 +201,15 @@
 /* ── ゲーム感 #17: チャットの手触り（SC-24・純CSS）───────────────────────────────────
    新着メッセージの登場（下からフェード）＋リアクション追加時のポップ。key=id により新着だけが
    mount するので、既存メッセージ/既存リアクションは再生されない。reduce-motion 尊重。 */
-.msg-row { animation: msg-enter .28s ease both; }
+/* fill は backwards（＝開始前の from だけ適用）。forwards/both だとアニメ終了後も「適用中」扱いで
+   .msg-row が恒久スタッキングコンテキストになり、行が DOM 順に重なって後発メッセージの魔法はみ出しが
+   前の行のリアクション/＋ボタンを覆ってしまう（オーラの上昇が顕著）。backwards なら終了後はコンテキスト化
+   しないので、リアクション(z-index:1)が魔法 canvas(z-index:0)より大域的に前面を保てる。 */
+.msg-row { animation: msg-enter .28s ease backwards; }
 @keyframes msg-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* 氷（氷柱）/虹（粒子）はパネルより大きい canvas を負オフセットで張り出す＝上下の隣接メッセージへはみ出す。
    はみ出しが DOM 後続（下側）メッセージの背面に回るのを防ぐため、当該行に明示 z-index を与えて隣接行より前面へ。
-   登場アニメ後の .msg-row は transform:none＝スタッキングコンテキストにならないので、行の z-index が有効。 */
+   （backwards によりアニメ後は行がコンテキスト化しないため、この明示 z-index が有効に効く。） */
 .msg-row:has(.spell-fx--ice), .msg-row:has(.spell-fx--rainbow) { position: relative; z-index: 3; }
 /* リアクション（通常＋魔法）の追加時ポップ。fill を付けない＝押下 :active の transform を潰さない。 */
 .reaction { animation: reaction-pop .3s cubic-bezier(.2,1.4,.4,1); }
