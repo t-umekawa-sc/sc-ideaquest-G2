@@ -252,7 +252,7 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="page-title">会社アカウント管理</h1>
       <p className="admin-sub">
-        自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>＋<strong>クエストグループ管理者（QG管理者）の任命</strong>ができます。（会社設定・システムロール付与は<strong>システム管理者</strong>の領分）
+        自社のアカウントの<strong>発行・編集・無効化・パスワード再設定</strong>＋<strong>クエストグループの作成・編集・削除</strong>＋<strong>クエストグループ管理者（QG管理者）の任命</strong>ができます。（会社設定・システムロール付与は<strong>システム管理者</strong>の領分）
       </p>
       <div className="company-ctx">
         <span className="company-ctx__name">{companyCode}</span>

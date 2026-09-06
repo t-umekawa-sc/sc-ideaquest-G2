@@ -256,7 +256,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
             {formError && <div className="form-error" role="alert" ref={createErrRef} tabIndex={-1}>{formError}</div>}
             {dupMode && (
               <p className="provision-note">
-                複製元の値を引き継いで新規作成します。<strong>コードは一意のため、別の値に変更してください</strong>（そのまま保存すると重複エラーになります）。
+                複製元の値を引き継いで新規作成します。<strong>クエストグループコードも引き継いでいます</strong>（一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
               </p>
             )}
             <Field id="g_code" label="クエストグループコード" required>

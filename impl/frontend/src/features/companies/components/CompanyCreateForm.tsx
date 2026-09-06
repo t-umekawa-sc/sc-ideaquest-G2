@@ -94,7 +94,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
         {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
         {dup && (
           <p className="provision-note">
-            複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子は新しい値を入力してください</strong>（一意のため引き継ぎません）。
+            複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子も引き継いでいます</strong>（いずれも一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
           </p>
         )}
         <Field id="c_name" label="会社名" required>
