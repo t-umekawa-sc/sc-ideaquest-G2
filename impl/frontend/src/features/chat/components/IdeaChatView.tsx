@@ -84,9 +84,9 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
   const [chatGroupId, setChatGroupId] = useState<string | null>(null);
-  const [ctxOpen, setCtxOpen] = useState(true); // 上部の文脈パネルの開閉（たたむと右に戻るリンクだけ残す）
+  const [ctxOpen, setCtxOpen] = useState(false); // 上部の文脈パネルの開閉。既定＝閉じる（ユーザー要望・▼で開く）
   const [hintOpen, setHintOpen] = useState(false);   // 使い方ヒントの開閉（SC-24 モック）
-  const [composerMin, setComposerMin] = useState(false); // 入力欄の最小化（SC-24 モック）
+  const [composerMin, setComposerMin] = useState(true); // 入力欄の最小化（SC-24 モック）。既定＝最小化（ユーザー要望・スリムバーをクリックで展開）
   const [emojiOpen, setEmojiOpen] = useState(false);  // コンポーザーの絵文字ピッカー
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [replyTargets, setReplyTargets] = useState<{ id: string; name: string; text: string }[]>([]);
