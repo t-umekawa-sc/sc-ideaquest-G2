@@ -185,7 +185,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
             <input id="p_name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
           </Field>
           <Field id="p_locale" label="言語">
-            <select id="p_locale" className="input" value={locale} onChange={(e) => setLocale(e.target.value as "ja" | "en")}>
+            <select id="p_locale" className="select" value={locale} onChange={(e) => setLocale(e.target.value as "ja" | "en")}>
               <option value="ja">日本語</option>
               <option value="en">English</option>
             </select>

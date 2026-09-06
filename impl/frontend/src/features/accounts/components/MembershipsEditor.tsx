@@ -79,7 +79,7 @@ export function MembershipsEditor({
         <div className="mrow-empty">所属グループはまだありません。下の「＋グループを追加…」から選択してください。</div>
       )}
       <select
-        className="input mrow-add"
+        className="select mrow-add"
         aria-label="所属グループを追加"
         value=""
         disabled={rest.length === 0}

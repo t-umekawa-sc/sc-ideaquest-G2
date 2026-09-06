@@ -121,7 +121,7 @@ export function MfaForm({ challenge, onRestart }: Props) {
               required
             />
           </Field>
-          <label className="auth-check">
+          <label className="checkbox auth-check">
             <input
               type="checkbox"
               checked={trustDevice}

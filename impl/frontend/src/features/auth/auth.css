@@ -91,20 +91,10 @@
   padding: var(--space-3);
   margin-bottom: var(--space-4);
 }
-/* 状態C: 「このデバイスを信頼する」チェック */
+/* 状態C: 「このデバイスを信頼する」チェック。見た目は共通の .checkbox（design-system）に統一（モック SC-00・style-guide 準拠）。
+   .auth-check は下方向の余白だけを足すレイアウトヘルパ（チェックボックスの描画は .checkbox が担う）。 */
 .auth-check {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  line-height: 1.6;
   margin-bottom: var(--space-4);
-  cursor: pointer;
-}
-.auth-check input {
-  margin-top: 2px;
-  flex-shrink: 0;
 }
 /* リンク風ボタン（再送信・別IDでログイン）。無効時はグレーアウト */
 .linklike {

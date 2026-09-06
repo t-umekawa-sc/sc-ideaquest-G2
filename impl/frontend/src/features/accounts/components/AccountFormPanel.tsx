@@ -207,7 +207,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         </Field>
         {showRole && (
           <Field id={`${idPrefix}_role`} label="システムロール">
-            <select id={`${idPrefix}_role`} className="input" value={systemRole} onChange={(e) => setSystemRole(e.target.value as SystemRole)}>
+            <select id={`${idPrefix}_role`} className="select" value={systemRole} onChange={(e) => setSystemRole(e.target.value as SystemRole)}>
               <option value="general">一般</option>
               <option value="company_account_admin">会社アカウント管理者</option>
               <option value="system_admin">システム管理者</option>
@@ -221,9 +221,18 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           </Field>
         )}
         {mode === "edit" && (
-          <label>
-            <input type="checkbox" checked={replaceMemberships} onChange={(e) => setReplaceMemberships(e.target.checked)} />{" "}
-            所属クエストグループを置き換える（チェック時のみ・指定した内容で全置換）
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={replaceMemberships}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setReplaceMemberships(on);
+                // 置き換えON＝現在の所属を初期セット（1グループ追加したいだけでも全部選び直す不便を解消）／OFF＝破棄。
+                setMemberships(on ? currentMemberships : []);
+              }}
+            />
+            所属クエストグループを置き換える（チェック時のみ・現在の所属を初期表示・指定した内容で全置換）
           </label>
         )}
         {(mode === "issue" || replaceMemberships) && (

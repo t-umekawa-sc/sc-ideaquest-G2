@@ -498,7 +498,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             // グループは不変（C.2）＝固定表示（変更 UI は出さない）。
             <input id="q_group" className="input" value={groupName} readOnly disabled />
           ) : (
-            <select id="q_group" className="input" value={groupId} onChange={(e) => onGroupChange(e.target.value)} onBlur={() => onBlurField("quest_group_id")} aria-invalid={fieldErrors.quest_group_id ? true : undefined}>
+            <select id="q_group" className="select" value={groupId} onChange={(e) => onGroupChange(e.target.value)} onBlur={() => onBlurField("quest_group_id")} aria-invalid={fieldErrors.quest_group_id ? true : undefined}>
               {groups.length === 0 && <option value="">（グループがありません）</option>}
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>{g.name}</option>
