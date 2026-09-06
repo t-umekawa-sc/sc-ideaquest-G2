@@ -3,78 +3,83 @@
 > 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。コードの塊は貼らず**ファイルパス＋関数名**で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-05 21:26 JST**（このセッション末）。
-- 作業ブランチ＝**`feature/game-feel`**（`origin/feature/game-feel` と同期・作業ツリー clean）。**`main` ではない・未マージ**。
-- 最新コミット＝**`4f45229`** `fix(chat): 発動者バッジとホバー操作メニューの右上での重なりを回避`。
-- 本セッションのコミットは **`fd0eb12`〜`4f45229`**（`git log --oneline` 参照）。**前半＝モック(style-guide.html)の作り込み／後半＝production への炎移植＋チャット魔法UXの整備**。
-- 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝`feature/game-feel` へ増分ごと commit+push 自走（standing 承認）／`main` は受入後にユーザー承認でマージ。
-- **モック→production の順**（記憶 `game-feel-mock-first-then-port`）＝演出はまず `doc/画面設計/mocks/style-guide.html` で受入→production 移植。**モックはユーザー受入済み（"style-guide.html ok"）**。
+- 最終更新: **2026-09-06 19:27 JST**（このセッション末）。
+- 作業ブランチ＝**`main`**（`origin/main` と同期・作業ツリー clean）。**feature/game-feel は廃止済み・以降 main で作業**。
+- 最新コミット＝**`5ea9b34`** `feat(chat): 編集モードでも引用を付けられるように`。
+- 本セッションのコミット（新しい順・抜粋）＝`5ea9b34`(編集引用)／`884276a`(オーラ前面化=行アニメfill)／`1f9d76a`(キラキラ ライト版再移植)／`cfd9d1e`(オーラ移植)／`e8ee77d`(氷/虹 前面化)／`84a7b8d`(魔法解放 冪等化)／`8a7a279`(虹移植)／`d3a966b`(チャット初期スクロール)／`90a0527`(アイデア詳細 件名アイコン)／`9d6dfe5`(管理系一覧アバター)／`1394f55`(アバター全画面+編集ボタンis_mine)／`24ea5b9`(ダッシュボード アイデアアイコン)。
+- 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝main へ増分ごと commit、**push は都度ユーザー確認**（standing 自走 push ではない）。QA はユーザーが一次受入。
+- **モック→production の順**（記憶 `game-feel-mock-first-then-port`）＝演出はまず `doc/画面設計/mocks/style-guide.html` で受入→production 移植。**モックは全種ユーザー受入済み**。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。全画面・全ドメイン接続済み。**現在は「ゲーム感（juiciness）向上」フェーズ**＝SC-24 チャットの魔法発動演出を、受入済みモック（`style-guide.html §17L`＝明色パネル向けライト版）から **production の canvas エンジンへ1スペルずつ移植**中。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。全画面・全ドメイン接続済み。**現在は「ゲーム感（juiciness）向上」フェーズ**＝正本 `doc/フェーズ毎ルール/ゲーム感フェーズ.md`。SC-24 チャットの魔法発動演出を受入済みモック（`style-guide.html §17L`＝明色パネル向けライト版）から production canvas エンジンへ移植する作業は**全6種完了**（下記）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### A. モック `doc/画面設計/mocks/style-guide.html`（前半・受入済み）
-- **§17L-f2（虹・放浪バリエーション）を反復調整**（`fd0eb12`〜`8fd425e`）＝`createRainbowScatterSpellLight`。虹ビーム中央着弾→虹粒子が満遍なく飛散→**飛散粒子の1つの位置へ**ゆらゆら＋開始ディレイのむらで**ゆっくり集結**→全集結後に溜め→中央へ再ビーム、を繰り返す。ビームは毎回**パネル中央**狙い。
-- **§17L-g（オーラ・ライト版）を新設**（`40b0a6d`）＝`createAuraSpellLight`。ダーク §17g の明色移植（波動＋応援記号→縁からドット絵オーラ上昇・紫↔金↔青巡回）。
-- **§17 整理**（`b1332ed`）＝旧CSSギャラリー(§17 の却下版)＋§17c(小ギャラリー)を削除。§17＝「受信/表示側の4パターン(発動者→作成者)」だけ残し、最新のライト版ピクセル炎(`createPixelFireLineLight`)で再構築。共有CSS(`.msg-avatar*`/`.fcast-caster`+`caster-kick`)は保持。
-- **全魔法アニメに B(演出の間引き)を導入**（`45a41ca`）＝グローバル関数 `whenSettledVisible(el,cb)`＝可視かつスクロール静止約180ms後に1回だけ発火／高速スクロール中は間引き。全14トリガを置換。A(着弾ずれ)は canvas を対象内に描く現行設計で担保（＝モック内の話。production では別途）。
-- **§17L-f(囲む虹)を削除**（`f5b2cf9`）＝放浪版 §17L-f2 のみ残す（ユーザー指示）。
-- 結果、ライト版ラインナップ＝炎(§17L-b)/雷(§17L-d)/氷(§17L-e)/**虹＝放浪 §17L-f2 のみ**/オーラ(§17L-g)/キラキラ(§17L-h)。
+### A. 魔法アニメの canvas 移植＝**全6種 完了**（`impl/frontend/src/features/spells/engines/`）
+> `SpellEngine` 契約＝`start/startPersist/resume/reduceStatic/stop`＋`opts.rng` 注入（`index.ts`）。`ENGINES` レジストリに登録すると `isCanvasEffect(effect)=true` になり `SpellCanvasFx` 経由で描画。未登録は CSS 経路（`SpellPersistFx`）。決定的部分のみ純関数へ分離し unit（`*.test.ts`／`doc/テスト/G_ゲーミフィケーション.md` 5-x）。canvas 本体（rng・rAF）は GF-AC ブラウザ受入に委ねる。
+- **虹＝`rainbow.ts`**（`createRainbowEngine`・`8a7a279`）＝モック §17L-f2「放浪型」の TS 化。純関数 `rainbowScatterTargets`/`rainbowChargeGrow`＝**G-TC-159**。氷と同様パネルより大きい canvas を負オフセットで張り出す（`RAINBOW_MARGIN_PX`・フル解像度 ctx 直描画）。
+- **オーラ＝`aura.ts`**（`createAuraEngine`・`cfd9d1e`）＝モック §17L-g ドット絵オーラ。純関数 `auraGrid`/`auraBotFade`＝**G-TC-160**。上へ大きく立ち上るため canvas を**上に高く＋左右**へ張り出す非対称マージン（`AURA_MARGIN_TOP/SIDE/BOTTOM_PX`）。
+- **キラキラ＝`sparkle.ts` をライト版（§17L-h）へ再移植**（`1f9d76a`）＝従来はダーク版（§17h＝天の川/オーロラ/白きらめき）で明色パネルに映えなかった。彩色（金/水色/桃/紫/翠）＋白い芯・金の流れ星・UFO軌跡から星が噴き出す `spawnTrailSparkle` を追加。`sprites.ts` の `UFO_COL` を明色パネル向け暗縁取り配色へ更新（`decodeSprite`/`ufoPosition`＝G-TC-155 は色を動的比較のため不変）。
+- 結果、`ENGINES`＝sparkle/fire/thunder/ice/rainbow/aura の**6種すべて canvas**（実確認済み）。
 
-### B. production 移植・チャット魔法UX（後半）
-> 移植方針＝**1スペルずつ・炎→雷→氷→虹→オーラ**（ユーザー選択）。**炎のみ完了**。参照実装＝`impl/frontend/src/features/spells/engines/sparkle.ts`。
-- **炎を canvas エンジンへ移植**（`afe9461`）＝新規 `impl/frontend/src/features/spells/engines/fire.ts` の `createFireEngine`（`SpellEngine` 契約: start/startPersist/resume/reduceStatic/stop）。モック §17L-b の延焼を TS 移植（低解像度ドット絵 pixelated＋暖色ハロー）。`engines/index.ts` の `ENGINES` に `fire` 登録＝`isCanvasEffect("fire")=true`。決定的部分 `fireGrid`/`fireFade` を分離し **G-TC-156**（`engines/fire.test.ts`／`doc/テスト/G_ゲーミフィケーション.md` 5-F）。
-- **リアクションを演出canvasの前面に**（`c59174c`）＝`.spell-fx__layer` に z-index:0、`.reaction-bar` を z-index:1（`styles/design-system.css`）。
-- **魔法発動の起点ポリシーを整理・実装**（`bd5220a`〜`6b37ce7`／正本＝`doc/画面設計/screens/SC-24_アイデアチャット.md` の 4.3b「魔法発動アニメの起点ポリシー」）。最終形＝**①②とも「メッセージ内の発動者アバターバッジ」起点で canvas 枠内完結**（ヘッダー起点は画面横断ゆえ発射レイヤが要り重いため**不採用**）:
-  - `IdeaChatView.tsx` に**発動者アバターバッジ `.msg__caster`**（右上・`actor` イニシャル＋hover）を新設。**自作自演**（`mine?is_mine:actor===author.name`）は右上バッジ無し＋**作成者アバター `.msg__author` に✦**。
-  - `SpellCanvasFx.tsx` は `originSelector`（非自作＝`.msg__caster`／自作＝`.msg__author`）を発射元に。`useSpellEngine.ts` は**初回表示で1回だけ**バッジ起点で発射→着弾→永続（再生成は `startPersist()`）。`justCast`/`castFrom`/`canvasCast`/`headerAvatarPoint`/`fireCanvasDelivery` は撤去済み。
-  - **① 新規発動**＝バッジ(自作は✦)を `is-summoning` で「唱える」ように出現（`chat.css` の `badge-summon`）→出現しきってから（`SUMMON_MS≈450ms`）着火。実装＝`IdeaChatView.summonThenCast(msgId)`＋`pendingCanvas` で出現前の着火を抑止。
-  - **canvas 魔法全種に適用**（sparkle 等も表示時に発射を再生）＝旧「リロード非再生」方針を本ポリシーで更新。
-- **四角枠バグ修正**（`246898e`）＝リングを丸い `.avatar__img` に付与（`.avatar` ラッパは四角）。
-- **SC-32 前提未達カードのフッター崩れ修正**（`51bfa4c`）＝`spells.css` で `.spell-cost` を nowrap・`.spell-card__foot` を flex-wrap・`.btn-pixel` を折返し可。
-- **発動者バッジとホバー操作メニューの重なり修正**（`4f45229`）＝`chat.css` の `.msg:has(.msg__caster) .msg__actions` を right:48px へ。
+### B. チャット魔法FXの stacking（重なり）修正
+- **氷/虹のはみ出しを下側メッセージの前面へ**（`e8ee77d`）＝`chat.css` に `.msg-row:has(.spell-fx--ice), .msg-row:has(.spell-fx--rainbow){position:relative; z-index:3}`。
+- **オーラ等のはみ出しが「上の」メッセージのリアクション/＋を覆う問題**（`884276a`）＝**真因は `.msg-row` の登場アニメの `animation-fill-mode:both`**。終了後も「適用中」扱いで各行が恒久スタッキングコンテキストになり、行が DOM 順に重なって後発（下側）メッセージのはみ出し canvas が上のメッセージのリアクション(z-index:1)を覆っていた。`chat.css` で `msg-row` の fill を **`both`→`backwards`** に変更（開始前の from だけ適用・終了後はコンテキスト化しない）→ リアクションが魔法 canvas(z-index:0)より大域的に前面を保つ。
+- **チャット遷移直後の初期スクロール**（`d3a966b`）＝`IdeaChatView.tsx` の load 後に二重 rAF で 1 回、未読あり=「ここから未読」区切りへ／全既読=最下部へ。
+
+### C. 魔法解放（SP消費）の冪等化・自己修復（`84a7b8d`）
+- `app/tenant/gamification/application.py` `unlock_spell`＝`user_spells` 欠落なのに消費台帳(`spell_unlock`)だけ残る乖離で**重複INSERT→500**していた。`repository.py` に `grant_exists_by_ref` を追加し、既に課金済みなら grant を再実行せず `user_spells` を補完して自己修復（二重課金しない）。テスト **G-TC-106b**。
+- **dev データ修復済み**＝会社DB `ideaquest_company_acme` の当該ユーザー（`d1496aa9-…`＝user@acme.example）で炎の孤立台帳を自己修復済み（`user_spells` 炎=1／台帳=1／SP=108・炎は解放済み）。
+
+### D. 編集モードでの引用（`5ea9b34`）
+- これまで編集中に💬を押すと引用が下の新規コンポーザーに入っていた。**編集中は💬が編集対象メッセージの引用に入る**（ユーザー選択の推奨案）。`IdeaChatView.tsx` に `editQuotes` state＋`startEdit`/`cancelEdit`、編集ボックス上に引用チップ（既存引用を初期表示・×除去・アクセント色＋「※編集中のメッセージに追加中」ヒント）。`chat.css` に `.reply-ctx--edit`/`.reply-ctx__hint`。
+- backend＝設計 E.2 の `PATCH /chat-messages/{id}` に `quoted_message_ids` を追加（`router.py`/`application.py edit_message`）。**メンションと同流儀＝None は不変／提供は置換**・同一 chat_group のみ・自己引用除外。`repository.py replace_quotes` 追加。**全消し**は multipart で「置換・空」を表すため**空文字センチネル1件**を送り backend で除外（`api.ts editMessage`）。テスト **E-TC-109b**。
+
+### E. アバター/アイコン系（本セッション前半）
+- **アバター画像を全画面反映**（`1394f55`/`9d6dfe5`）＝`<Avatar>` に `imageUrl` 未指定だった箇所へ DTO の署名URLを補完（ダッシュボード/フィード/版履歴/アイデア詳細/クエスト詳細/ランキング/QGディレクトリ）。管理系一覧は DTO に無かったため backend 追加＝`MemberListItem.avatar_url`（`admin/quest_group_application.py list_members`）／`AccountListItem.avatar_url`（`admin/application.py _attach_memberships` に相乗せ）＝いずれも短TTL署名URL（B-TC-082b/083b/171b）。company-directory の `avatar_url` が生パスを返すバグも修正。
+- **アイデア詳細ヘッダーの件名の左にアイデアアイコン**（`90a0527`）＝`IdeaDetailView.tsx` に `QuestIcon`（size sm・`idea.icon_image_url`/`idea.quest.color`）。
+- **アイデア編集ボタンを投稿者本人のみ表示**（`1394f55`）＝`IdeaDetailDTO.is_mine`（サーバー算出）を追加し `IdeaDetailView` で `idea.is_mine` 時だけ表示（D-TC-107b・SC-22 更新）。
+- **アイデアアイコン Phase 1〜3**（`e9947c9`/`e2608c9`/`880e395`/`24ea5b9`）＝優先順＝アイデア個別 → 作成者の既定（`User.idea_icon_image_path`）→ 件名先頭1文字タイル（クエストアクセント色）。ダッシュボードにも反映。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-- **モック（style-guide.html）＝ユーザー受入済み・動作OK**（各変更で headless console error 0 実測）。
-- **production 炎移植＝コード完了・全ゲート緑**（最後に実測: `npx tsc --noEmit` EXIT0／`npx vitest run` **124 passed**／`npm run build` 成功／traceability `python3 scripts/check_tc_traceability.py` **✅ code413**）。**実ブラウザ受入はユーザー確認中**（未完了）。※`51bfa4c`/`4f45229` は CSS のみで build 成功のみ確認、tsc/vitest は前回(`6b37ce7`)の緑が有効。
-- **炎エンジン単体は実ブラウザで描画確認済み**（esbuild でバンドル→playwright で `createFireEngine` を start/reduceStatic/startPersist＝いずれも炎ピクセル描画・error 0）。**バッジ起点の発射**も headless で「火の玉が右上バッジ→中央下部へ飛来」を実測。
-- **炎・雷・氷＝実アプリ受入 OK（2026-09-06）**（雷＝`engines/thunder.ts`・G-TC-157／氷＝`engines/ice.ts`・G-TC-158・**canvas をパネルより大きく張り出し氷柱が枠外へはみ出す**＝`useSpellEngine` の起点変換をコンテナ矩形基準に変更済み）。canvas は sparkle+fire+thunder+ice。**虹/オーラ＝未移植（CSS のまま）＝次は虹（§17L-f2）→オーラ（§17L-g）**。
-- **ブランチは main に統一済み（2026-09-06）**＝feature/game-feel は main に FF マージ後 削除。以降 main で作業（記憶 `game-feel-async-pipeline` 更新済み・push は都度確認）。
-- 魔法→effect＝flame_1 炎=fire／flame_2 雷=thunder／flame_3 虹=rainbow／light_1 氷=ice／light_2 キラキラ=sparkle／light_3 オーラ=aura（migration 0013）。受入用に user@acme.example・user2@acme.example へ各 SP 100 付与済み（`/spells` で解放→`/ideas/{id}/chat` で発動）。
-- **壊れているもの＝把握している範囲では無し**。ユーザー報告のUI不具合（リアクション背面・四角枠・フッター崩れ・バッジ重なり）は本セッションで各々修正済み。
-- **backend pytest は本セッション未実行**（frontend/mock のみの変更のため）。
+- **魔法6種すべて canvas 化・実装完了**。虹/オーラ/キラキラ(ライト版)は headless smoke（start/startPersist/reduceStatic すべて pixel 描画・console/pageerror 0）実測。実ブラウザでもユーザーが `/spells`→チャットで発動して確認済み。本セッション末の明示的な "受入 ok" は**直近バッチ（オーラのはみ出し前面化＋編集モード引用）**に対するもの＝これは受入完了。虹/オーラ/キラキラの見た目自体への個別サインオフは、発動テスト中に出た不具合（オーラがリアクションを覆う等）を都度修正して収束した状態（＝実質受入済み・別途「この演出でOK」の明文確認は取っていない）。
+- **テスト（最終実測）**＝backend `pytest tests/`＝**513 passed**（既知 flaky `tests/auth/test_auth_email_verify.py::test_a_tc_106_confirm_is_public` はこの回は緑・単体でも緑）。frontend＝`npx tsc --noEmit` 緑／`npx vitest run` **149 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 419**。
+- **QA スタック＝全起動中**（`docker compose ps`＝backend/frontend/db/worker/mail-worker/mailhog/minio/redis 全 Up・本セッションで backend/frontend 再ビルド済み）。次回もし止まっていれば §8 の起動コマンド。
+- **壊れているもの＝把握範囲で無し**。本セッションのユーザー報告不具合（アバター未反映・炎解放エラー・氷/虹/オーラのはみ出し重なり・編集中の引用）はすべて修正・受入済み。
+- 魔法→effect＝flame_1 炎=fire／flame_2 雷=thunder／flame_3 虹=rainbow／light_1 氷=ice／light_2 キラキラ=sparkle／light_3 オーラ=aura（migration 0013）。受入用 user@acme.example・user2@acme.example は SP 付与済み（現状 user@acme は炎解放済み・SP 108）。
 
 ## 5. 詰まっている点（試した/失敗と理由）
-- **ヘッダーのユーザーアバター起点（①）は不採用**＝canvas はメッセージ枠内に限定され、ヘッダー→メッセージの飛行の大半が枠外で見えない。CSS 発射レイヤ(`SpellDeliveryFx`)再利用で画面横断させる案も一度実装(`5ca4391`)したが、ユーザー要望で「処理的に無理のない枠内起点」に方針転換＝**発動者バッジ起点に統一**（`6b37ce7` で CSS 発射レイヤ経路は撤去）。
-- **発動者アバターの画像は出せない**＝魔法リアクションDTO（`components["schemas"]["ChatMessageDTO"].reactions` の magic）は `{spell_id,effect,icon,actor(表示名),mine}` のみで **actor のアバターURL/IDが無い**。バッジは**イニシャル表示**が現状の限界（画像化は backend 拡張が要る＝未対応）。
-- **headless での time依存演出の目視は不安定**（既知）＝canvas+rAF。検証は基本 console error 0＋ピクセル/配列のデータ整合＋短時間サンプルで担保。使い捨て `.mjs` は `impl/frontend` 直下に作り**使用後削除**（playwright の node_modules 解決）。
+- **headless で視覚スタッキングを測るには pixel か pointer-events**＝魔法 canvas は `pointer-events:none` のため `document.elementFromPoint` は canvas を返さず、**視覚的な重なりを測れない**（オーラ z-index 調査で最初ここで空振り）。検証は canvas を一時 `pointer-events:auto` にして elementFromPoint、または pixel 色で判定。使い捨て `.mjs` は `impl/frontend` 直下に作り**使用後削除**（playwright/esbuild の node_modules 解決）。
+- **`.msg-row` の登場アニメ `fill:both` が恒久スタッキングコンテキストを作る**（Chromium）＝終了後も「適用中」で行が DOM 順に重なる。`backwards` で解消（§3-B）。この知識は今後 chat の重なり系で再利用する。
+- **multipart で「空リスト」は送れない**（フィールド不在＝None と区別不能）＝引用の全消しは**空文字センチネル**で表現（backend で除外）。メンションは同種の理由で現状「全消し不可」のまま（未対応・必要になれば同手法で対応可）。
+- **headless の time 依存演出の目視は不安定**（既知・canvas+rAF）＝console error 0＋データ整合＋短時間サンプルで担保。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **魔法発動起点＝①②とも発動者アバターバッジ（自作自演は作成者アバター）**。ヘッダー起点・画面横断案は「構造的に重い」ため不採用。バッジ起点は canvas 枠内で完結し全飛行が見える・モック §17「4パターン(発動者→作成者)」に完全準拠。正本＝`SC-24_アイデアチャット.md` 4.3b。
-- **① 新規発動＝バッジを summon 表示→出現後に着火**（ユーザー要望「唱えている感じ」）。
-- **canvas 魔法は表示(リロード)時も発射を再生**＝旧 sparkle の「リロード非再生」方針を上書き（4パターン完全再現のため）。
-- **虹ライト版＝放浪 §17L-f2 のみ**（囲む §17L-f は削除）。
-- **炎移植＝モック §17L-b を忠実 TS 化**（延焼CAは rng 注入で非決定・GF-AC 受入／決定的な `fireGrid`(解像度)・`fireFade`(可読性フェード)のみ G-TC-156 で unit 担保）。sparkle と同じ contract。
-- **リアクション/バッジ/✦ は演出canvasの前面**（z-index）＝操作可能・可読性優先。ホバー操作メニューはバッジ右上と衝突するため `:has` で左へ退避。
+- **魔法解放の乖離は「自己修復（補完・二重課金しない）」**＝IntegrityError を単純に 409 にすると `user_spells` 欠落時に**永久に解放できず詰む**ため不採用。台帳の一意キーを冪等キーとして扱い補完する（§3-C）。
+- **キラキラはライト版（§17L-h）を採用**＝ダーク版（§17h）は夜空前提で明色チャットパネルに映えない。`UFO_COL` は明色パネルで輪郭が見える暗縁取りへ。
+- **編集中の引用 UI＝「編集中は💬が編集対象に入る」**（ユーザー選択・推奨案）＝専用ボタンを増やさず新規投稿と同じ操作感。置換セマンティクス。
+- **アイデア編集ボタンは投稿者本人のみ**（決定 2026-09-06）＝サーバーの編集認可（作成者 or クエスト管理）は不変だが SC-22 のボタンは本人限定。
+- **アイデアアイコンの優先順＝個別 > 作成者既定 > 件名タイル**（タイル色＝クエストアクセント）。作成者の既定アイコンは**アバターとは別**（`User.idea_icon_image_path`）。
+- **複製は重複禁止項目も含め全項目プリフィル**（サーバー自動採番のみ除外）＝方針転換済み（デザイン標準）。
+- 過去の確定（維持）＝魔法発動起点は①②とも発動者アバターバッジ（自作自演は作成者アバターに✦）／canvas 魔法は表示(リロード)時も発射を再生／虹ライト版は放浪 §17L-f2 のみ。
 
 ## 7. 次にやること（優先順・具体的に）
-> **main で継続**（ブランチは main 統一・feature/game-feel 廃止・push は都度確認）。移植は**1スペルずつ・炎→雷→氷→虹→オーラ**。
+> **魔法 canvas 移植ループは完了**（全6種）。以下は未着手/未確認。
 
-1. ~~炎・雷・氷の実アプリ受入~~＝**全て OK 済み（2026-09-06）**。~~②雷・③氷 production 移植~~＝完了（thunder.ts/ice.ts・G-TC-157/158）。~~発動者バッジのアバター画像化~~＝完了（魔法リアクションに `actor_avatar` 追加・`.msg__caster` を画像化）。
-2. **④虹（§17L-f2）を production 移植**＝新規 `engines/rainbow.ts`（モック `createRainbowScatterSpellLight`・虹はライト版が放浪 §17L-f2 のみ）→ **⑤オーラ（§17L-g）** `engines/aura.ts`（`createAuraSpellLight`）。`ENGINES` に追加。決定的部分を分離して **G-TC-159/160** を追記→**red-green**→traceability ✅。フロントゲート(tsc/vitest/build)。**炎(afe9461)/雷(8c0ec95)/氷 を雛形に**。氷のように枠外はみ出しが要るなら `useSpellEngine`（コンテナ矩形基準の起点）＋マージン canvas を踏襲。
-3. **GF-AC 受入台帳の追随**＝`doc/テスト/ゲーム感受入.md`（`GF-AC-NNN`）に本セッションの production 移植分の受入行が要るか未確認。要すれば追記。
-- **共通ルール**＝フロント検証は `npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。push は都度確認。全アニメは reduce-motion 尊重（記憶 `animation-reduce-motion-standard`／ハーネスが `reduceStatic()` を呼ぶ）。テストは**先に md に TC 行(`根拠`列)→red-green→traceability ✅**（記憶／テスト規約 §5.1）。
+1. **GF-AC 受入台帳の追随を確認**＝`doc/テスト/ゲーム感受入.md`（現状 GF-AC 行 117 件）に、本セッションの production 移植分（虹/オーラ/キラキラ・stacking 修正・編集引用）の受入行が要るか**未確認**。要すれば追記（`GF-AC-NNN`）。
+2. **新規 canvas エンジンの reduce-motion テストが未整備**＝engines の unit（`rainbow.test.ts`/`aura.test.ts`）は純関数のみで、reduce-motion（`reduceStatic()`）の明示テストは無い（ハーネス `useSpellEngine` が `reduceMotion()` で分岐・記憶 `animation-reduce-motion-standard` は「演出追加時は抑制ON/OFFをテスト必須」）。ハーネス側 or 実ブラウザで抑制の確認を検討。**未対応**。
+3. **ゲーム感フェーズの残タスク確認**＝`doc/フェーズ毎ルール/ゲーム感フェーズ.md` と記憶 `game-feel-8-xp-feedback-decision`（+XP/+コイン演出の段階ハイブリッド）を読み、魔法以外の juiciness 項目（獲得フィードバック等）で未実装が無いか**未確認**。着手前にコードで裏取り（記憶 `handoff-notes-often-stale`）。
+- **共通ルール**＝フロント検証は `npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。**push は都度確認**。全アニメは reduce-motion 尊重。テストは**先に md に TC 行(`根拠`列)→red-green→traceability ✅**（テスト規約 §5.1）。backend スキーマ（response_model）変更後は `cd impl/frontend && npm run codegen`（多くの form 追加は response 不変＝codegen 不要）。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `feature/game-feel` を確認**。compose＝`impl/compose.yaml`（cwd=`impl`）。
-- **モック確認（サーバー不要）**＝`doc/画面設計/mocks/style-guide.html` をブラウザ `file://` 直開き。ライト版＝§17L-b(炎)/§17L-d(雷)/§17L-e(氷)/§17L-f2(虹・放浪)/§17L-g(オーラ)/§17L-h(キラキラ)。§17＝受信/表示4パターン。
-- **production 魔法FXの要所**（`impl/frontend/src`）＝`features/spells/engines/index.ts`(レジストリ`ENGINES`＋`SpellEngine`型)／`engines/sparkle.ts`(参照実装)・`engines/fire.ts`(移植済)／`features/spells/useSpellEngine.ts`(ライフサイクル・origin は originSelector→バッジ)／`components/ui/SpellCanvasFx.tsx`(薄ラッパ・props＝effect/originSelector)／`features/chat/components/IdeaChatView.tsx`(castSpell/summonThenCast/発動者バッジ/自作自演判定)／`features/chat/chat.css`(バッジ/✦/summon/操作メニュー退避)／`styles/design-system.css`(spell-fx*/spell-cast*/spell-deliver*)。CSS未canvas化＝thunder/ice/rainbow/aura は `SpellPersistFx.tsx`＋`design-system.css` の CSS。
-- **フロントゲート**（cwd=`impl/frontend`）＝`npx tsc --noEmit`／`npx vitest run`（現状 124）／`npm run build`。backend スキーマ変更後は `npm run codegen`。
-- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`（現状 ✅ code413）。cwd ドリフト注意（frontend 系は `cd impl/frontend`、traceability は repo ルート）。
-- **エンジン単体の実ブラウザ検証**＝`cd impl/frontend && npx esbuild src/features/spells/engines/<eff>.ts --bundle --format=esm --outfile=/tmp/x.mjs` → playwright で `data:` import → `create<Eff>Engine({w,h,dpr:1})` を append→start。型のみ import なので単体バンドル可。使い捨て `.mjs` は削除。
-- **QA スタック起動**（実アプリ確認時／記憶 `game-feel-qa-parallel-ops`）＝`cd impl && docker compose --profile workers up -d --build`。フロント＝`localhost:3000`（本番ビルド焼き込み・push 反映は `docker compose build frontend && docker compose up -d frontend`）／MailHog＝`localhost:8025`／backend＝`localhost:8000`。
-- **ログイン（dev・MFAなし）**＝`/login` company_code=`ACME-01`／login_id=`user@acme.example`／password=`Passw0rd!`。チャット＝`/ideas/{ideaId}/chat`（例のアイデアIDは会話ごとに異なる・アイデア一覧から辿る）。魔法解放＝`/spells`（SC-32）。
-- **backend テスト**（cwd=`impl`）＝`docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest <path> -q`。
-- **記憶**（`~/.claude/projects/-home-t-umekawa-sc-ideaquest-G2/memory/`）＝特に本フェーズ＝`game-feel-async-pipeline`／`game-feel-mock-first-then-port`／`game-feel-qa-parallel-ops`／`frontend-build-gate-eslint`／`animation-reduce-motion-standard`／`handoff-notes-often-stale`（着手前にコードで裏取り）／`spec-is-source-of-truth`。
+- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `main` を確認**。compose＝`impl/compose.yaml`（cwd=`impl`・Postgres user/pass=`ideaquest`）。
+- **QA スタック起動**（記憶 `game-feel-qa-parallel-ops`）＝`cd impl && docker compose --profile workers up -d --build`。フロント=`localhost:3000`（本番ビルド焼込み）／backend=`localhost:8000`／MailHog=`localhost:8025`。**push/コード反映は再ビルド**＝`docker compose build frontend backend && docker compose up -d frontend backend`。
+- **ログイン（dev・MFAなし）**＝`/login` company_code=`ACME-01`／login_id=`user@acme.example`／password=`Passw0rd!`。魔法解放=`/spells`（SC-32）→ アイデアのチャット `/ideas/{ideaId}/chat` で発動（アイデアIDは一覧から辿る）。
+- **フロントゲート**（cwd=`impl/frontend`）＝`npx tsc --noEmit`／`npx vitest run`（現状 149）／`npm run build`／`npm run codegen`。
+- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`（現状 ✅ code419）。cwd ドリフト注意（frontend 系は `cd impl/frontend`、traceability は repo ルート）。
+- **backend テスト**（cwd=`impl`）＝`docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest <path> -q`（ソースをマウントするので再ビルド不要）。実アプリ反映は別途 `docker compose build backend`。
+- **エンジン単体の実ブラウザ検証**＝`cd impl/frontend`、esbuild で `src/features/spells/engines/<eff>.ts` を IIFE(globalName)へバンドル→playwright で `page.addScriptTag({content})`（`eval`だと globalName が window に付かないので**必ず addScriptTag**）→ `create<Eff>Engine({w,h,dpr,rng:Math.random})` を append→start/startPersist/reduceStatic。canvas は `pointer-events:none` なので視覚判定は pixel か一時 `pointer-events:auto`。使い捨て `.mjs` は削除。
+- **production 魔法FXの要所**（`impl/frontend/src`）＝`features/spells/engines/index.ts`(レジストリ`ENGINES`＋`SpellEngine`型)／`engines/{sparkle,fire,thunder,ice,rainbow,aura}.ts`／`engines/sprites.ts`(UFO・G-TC-155)／`features/spells/useSpellEngine.ts`(ライフサイクル・origin は originSelector→発動者バッジ・コンテナ矩形基準)／`components/ui/SpellCanvasFx.tsx`／`features/chat/components/IdeaChatView.tsx`(発動者バッジ/自作自演判定/編集/引用/初期スクロール)／`features/chat/chat.css`(バッジ/✦/summon/操作メニュー退避/`msg-row` fill/`reply-ctx--edit`)／`styles/design-system.css`(spell-fx*/reaction-bar z-index)。
+- **モック確認（サーバー不要）**＝`doc/画面設計/mocks/style-guide.html` を `file://` 直開き。ライト版＝§17L-b(炎)/§17L-d(雷)/§17L-e(氷)/§17L-f2(虹・放浪)/§17L-g(オーラ)/§17L-h(キラキラ)。§17＝受信/表示4パターン。
+- **設計正本**＝`CLAUDE.md` から各規約/正本を参照。魔法チャット=`doc/画面設計/screens/SC-24_アイデアチャット.md`／API=`doc/API設計/E_チャット・リアクション・魔法発動.md`・`G_*`／テスト台帳=`doc/テスト/{E_チャット,G_ゲーミフィケーション,D_アイデア,B_会社・アカウント}.md`。
+- **記憶**（`~/.claude/projects/-home-t-umekawa-sc-ideaquest-G2/memory/`）＝`game-feel-async-pipeline`(push都度確認)／`game-feel-mock-first-then-port`／`game-feel-qa-parallel-ops`／`game-feel-8-xp-feedback-decision`／`frontend-build-gate-eslint`／`animation-reduce-motion-standard`／`handoff-notes-often-stale`(着手前にコードで裏取り)／`spec-is-source-of-truth`／`fire-spell-pixel-campfire`。
