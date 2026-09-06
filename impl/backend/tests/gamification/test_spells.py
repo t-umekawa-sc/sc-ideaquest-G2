@@ -98,6 +98,30 @@ def test_g_tc_105_already_unlocked(client, factory):
     assert r.status_code == 409 and r.json()["errors"][0]["reason"] == "already_unlocked"
 
 
+def test_g_tc_106b_unlock_self_heals_orphan_spend(client, factory):
+    """G-TC-106b user_spells 欠落なのに消費台帳(spell_unlock)だけ残る乖離＝解放は 500 でなく成功し、
+    二重課金せず（残高不変）user_spells を補完して自己修復する（連打の敗者/DB復旧の取り残し耐性）。"""
+    import uuid
+    from app.tenant.gamification.orm import Activity as Act
+    acc = _login_new(client, factory)
+    sid = _spell("flame_1").id  # cost 1
+    # 乖離を作る＝消費台帳だけ挿入（＋残高は課金済みを想定して 2）・user_spells は無し。
+    with get_tenant_session(_db_identifier()) as s:
+        u = get_user_by_account(s, acc)
+        u.skill_point_balance = 2
+        s.add(Act(id=uuid.uuid4(), user_id=u.id, kind="sp_spend", amount=1, reason="spell_unlock", ref_type="spells", ref_id=sid))
+        s.commit()
+    r = _unlock(client, sid)
+    assert r.status_code == 200, r.text
+    assert r.json()["unlocked"] is True
+    assert r.json()["skill_point_balance"] == 2  # 二重課金しない（残高不変）
+    with get_tenant_session(_db_identifier()) as s:
+        u = get_user_by_account(s, acc)
+        assert s.execute(select(UserSpell).where(UserSpell.user_id == u.id, UserSpell.spell_id == sid)).scalars().first() is not None  # 補完された
+        spends = s.execute(select(Activity).where(Activity.user_id == u.id, Activity.reason == "spell_unlock", Activity.ref_id == sid)).scalars().all()
+        assert len(spends) == 1  # 消費台帳は増えていない（重複INSERTしない）
+
+
 def test_g_tc_106_csrf_and_unauth(client, factory):
     sid = _spell("flame_1").id
     assert client.post(f"{SPELLS}/{sid}/unlock").status_code == 401

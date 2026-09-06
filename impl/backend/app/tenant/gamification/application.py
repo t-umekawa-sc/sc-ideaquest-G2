@@ -85,10 +85,16 @@ def unlock_spell(account_id, company_id, spell_id) -> dict:
             raise AppError(409, "conflict", detail="すでに解放済みです", extra={"errors": [{"reason": "already_unlocked"}]})
         if spell.requires_spell_id is not None and not chat_repo.is_spell_unlocked(ts, user.id, spell.requires_spell_id):
             raise AppError(409, "conflict", detail="前提の魔法を先に解放してください", extra={"errors": [{"reason": "prerequisite_not_met"}]})
-        if user.skill_point_balance < spell.sp_cost:
-            raise AppError(409, "conflict", detail="スキルポイントが不足しています", extra={"errors": [{"reason": "insufficient_sp"}]})
-        ledger.grant(ts, user, kind=ledger.SP_SPEND, amount=spell.sp_cost, reason="spell_unlock",
-                     ref_type="spells", ref_id=spell.id)
+        # 冪等キー（uq_activities_grant_ref）で既に消費済みかを先に判定＝二重課金/重複INSERT（500）を回避。
+        # user_spells が無いのに消費台帳だけ残る乖離（連打の敗者/DB復旧の取り残し等）は、課金を再実行せず
+        # user_spells を補完して自己修復する（SP は既に引かれているため残高はそのまま）。
+        already_charged = gami_repo.grant_exists_by_ref(
+            ts, user.id, kind=ledger.SP_SPEND, reason="spell_unlock", ref_type="spells", ref_id=spell.id)
+        if not already_charged:
+            if user.skill_point_balance < spell.sp_cost:
+                raise AppError(409, "conflict", detail="スキルポイントが不足しています", extra={"errors": [{"reason": "insufficient_sp"}]})
+            ledger.grant(ts, user, kind=ledger.SP_SPEND, amount=spell.sp_cost, reason="spell_unlock",
+                         ref_type="spells", ref_id=spell.id)
         chat_repo.add_user_spell(ts, user.id, spell.id)
         sp = user.skill_point_balance
         ts.commit()

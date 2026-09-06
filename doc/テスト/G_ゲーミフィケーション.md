@@ -14,6 +14,7 @@
 | G-TC-104 | api | 前提未解放は拒否 | 上位 spell（requires あり）・前提未解放・SP 充足 | `POST /spells/{id}/unlock` | 409 `prerequisite_not_met` | §5.19 |
 | G-TC-105 | api | 二重解放は拒否 | 解放済み spell | `POST /spells/{id}/unlock` | 409 `already_unlocked`・SP 二重消費なし | §5.20 |
 | G-TC-106 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /spells/{id}/unlock` | 403 csrf_failed／401 | A.0 |
+| G-TC-106b | api | 乖離の自己修復（台帳だけ残り user_spells 欠落） | 消費台帳(spell_unlock)を1件だけ挿入＋残高は課金済み想定・user_spells 無し | `POST /spells/{id}/unlock` | 500 でなく 200・`unlocked=true`・**二重課金しない**（残高不変）・`user_spells` を補完・消費台帳は増えない（`uq_activities_grant_ref` 重複INSERT回避）＝連打の敗者/DB復旧の取り残し耐性 | §5.20／§7 |
 | G-TC-107 | int | 残高列は DB CHECK(>=0)（並行オーバースペンドの最終防御・M6） | seed 会社の実ユーザー | `users.coin_balance/skill_point_balance/xp` を -1 に更新→commit | いずれも `IntegrityError`（`ck_users_*_nonneg`）＝負残高を DB が拒否（アプリ層ガードの最終防御・migration 0020） | データモデル §5／G.0 |
 | G-TC-108 | int | 付与の冪等を DB で担保＝`activities` 部分ユニーク（並行二重付与の最終防御・M6） | 同上 | 同一 `(user,kind,reason,ref_type,ref_id)`（ref付き）を2件 INSERT／`ref_id NULL`（login）を2件 INSERT | ref付き＝`IntegrityError`（`uq_activities_grant_ref` WHERE ref_id IS NOT NULL）で後着拒否／`ref_id NULL` は重複可（login/levelup_sp）＝例外なし | API設計 F.4／migration 0020 |
 | G-TC-109 | api | クエスト内フィード＝公開種別のみ・actor 付き／非メンバーは 404（FR-36②・SC-12） | クエスト（owner=自分＋メンバー Bob）に Bob の `idea_post`（公開）・`vote`/`chat`（非公開）を付与 | `GET /quests/{id}/activities`（メンバー／非メンバー） | メンバー＝`200`・`idea_post` は出て `vote`/`chat` は出ない・`actor`（id/氏名）付き／非メンバー＝`404`（門番＝パーティー所属・存在秘匿） | G.5.1／FR-36 |

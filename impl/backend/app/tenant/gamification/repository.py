@@ -18,6 +18,23 @@ def add(session: Session, activity: Activity) -> Activity:
     return activity
 
 
+def grant_exists_by_ref(session: Session, user_id: uuid.UUID, *, kind: str, reason: str,
+                        ref_type: str, ref_id: uuid.UUID) -> bool:
+    """付与/消費の冪等キー（`uq_activities_grant_ref`＝user/kind/reason/ref_type/ref_id）で既存台帳の有無を返す。
+
+    解放の自己修復/連打耐性に使う＝既に同キーで課金済みなら二重課金/重複INSERT（500）を避ける。
+    """
+    return session.execute(
+        select(func.count()).select_from(Activity).where(
+            Activity.user_id == user_id,
+            Activity.kind == kind,
+            Activity.reason == reason,
+            Activity.ref_type == ref_type,
+            Activity.ref_id == ref_id,
+        )
+    ).scalar_one() > 0
+
+
 def aggregate_ranking(
     session: Session, *, start: datetime | None, end: datetime | None, quest_id: uuid.UUID | None = None
 ) -> list[tuple]:
