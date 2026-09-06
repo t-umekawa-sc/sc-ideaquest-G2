@@ -563,7 +563,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
       <div className={`composer${composerMin ? " is-collapsed" : ""}`} aria-label="メッセージ入力">
         {/* 最小化時のスリムバー（クリックで展開）＝SC-24 モック */}
         {canPost && (
-          <button className="composer__mini" type="button" onClick={() => setComposerMin(false)}>＋ メッセージを入力…</button>
+          <button className="composer__mini" type="button" onClick={() => { setComposerMin(false); requestAnimationFrame(() => boxRef.current?.focus()); }}>＋ メッセージを入力…</button>
         )}
         <div className="composer__full">
           {!canPost && (
