@@ -52,13 +52,13 @@
 | メソッド/パス | 概要 | リクエスト（パス/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `POST /chat-messages` | メッセージ投稿（**multipart**・本文/メンション/引用/添付を単一 UoW） | **`multipart/form-data`**: `idea_id`（server が `chat_groups` を解決）・`body?`（Markdown ライト）・`quoted_message_ids[]?`（**複数引用**・同一 chat_group 内）・`mentions[]?`（`user_id` の配列）・`files[]?`（添付・§1.10）。**`Idempotency-Key` 必須**（§1.9・XP 副作用） | 201＋作成メッセージ表現（E.1）。副作用＝投稿 XP+5（下記）・メンション/フォロワー/投稿者通知（E.6）・Redis event（E.7） |
-| `PATCH /chat-messages/{message_id}` | 自分のメッセージを編集（本文/添付追加・multipart） | パス: `message_id`／`multipart/form-data`: `body?`・`mentions[]?`（置換）・`files[]?`（追加）・`remove_attachment_ids[]?`（除去） | 200＋更新後メッセージ表現（`is_edited=true`）。Redis event（`chat.message.updated`・canonical＝E.7/L.3） |
+| `PATCH /chat-messages/{message_id}` | 自分のメッセージを編集（本文/添付追加・引用・multipart） | パス: `message_id`／`multipart/form-data`: `body?`・`mentions[]?`（置換）・`quoted_message_ids[]?`（**置換**・同一 chat_group 内・省略時は不変）・`files[]?`（追加）・`remove_attachment_ids[]?`（除去） | 200＋更新後メッセージ表現（`is_edited=true`）。Redis event（`chat.message.updated`・canonical＝E.7/L.3） |
 | `DELETE /chat-messages/{message_id}` | メッセージを論理削除（トゥームストーン） | パス: `message_id` | 200（`{id, is_deleted:true, deleted_at}`）。Redis event（`chat.message.deleted`・canonical＝E.7/L.3） |
 
 - **空メッセージ不可**: `body` が空**かつ** `files[]` も無い場合は **422 `empty_message`**（SC-24 §4.3・添付のみ〔本文空〕は可）。
 - **投稿 XP+5（各ユーザー日次初回のみ・日次上限=チャット10/日）**: `activities` に `kind=xp_gain`,`reason=chat`,`ref_type=chat_messages`,`ref_id=message_id` を**同一 UoW で記帳**（ドメイン G の gamification repo を呼ぶ・コーディング規約 §3.4）。上限到達後の投稿は XP 付与なしで成功（投稿自体は可）。canonical XP 表・日次上限は README §6／データモデル §8-⑥。
 - **メンション（`chat_mentions`）**: `mentions[]` は**当該パーティーのメンバーに限定**（非メンバー指定は 422 `invalid_mention`）。`UNIQUE(chat_message_id, mentioned_user_id)`（§5.17）。編集時は差し替え（増減した対象の通知整合は E.6/H）。
-- **引用返信（`quoted_message_ids[]`・複数可）**: 各引用元は同一 `chat_group` 内のメッセージのみ（他チャット/他アイデアは 422）。同一メッセージの重複引用は 1 件に集約（`UNIQUE(chat_message_id, quoted_message_id)`・§5.16b）。ネスト式スレッドは将来（SC-24 §9・MVP スコープ外）。
+- **引用返信（`quoted_message_ids[]`・複数可）**: 各引用元は同一 `chat_group` 内のメッセージのみ（他チャット/他アイデアは 422）。同一メッセージの重複引用は 1 件に集約（`UNIQUE(chat_message_id, quoted_message_id)`・§5.16b）。ネスト式スレッドは将来（SC-24 §9・MVP スコープ外）。**編集時も差し替え可**（`PATCH` の `quoted_message_ids[]`＝メンションと同流儀で**置換**・省略時は不変・自己引用は除外）。
 - **編集＝本人のみ・履歴なし**（`is_edited=true`・本文上書き）。他者の編集は **403**。**削除＝論理（トゥームストーン）**で**本人＋`owner`/`quest_admin`＋QG管理者/システム管理者**（`deleted_by_id` に実行者・モデレーション）。権限外の削除は 403。既に削除済みへの編集/削除は 409 `invalid_state`。§8-⑪。
 - **完了凍結**: 上記 3 EP は `quest_status=completed` で **409 `invalid_state`**（canonical C.5）。
 - **冪等（§1.9）**: `POST /chat-messages` は `Idempotency-Key` 必須（二重送信での重複投稿・二重 XP を防ぐ）。同一キー再送は保存済みレスポンスを再生。編集/削除は自然冪等（状態収束）につきキー任意。

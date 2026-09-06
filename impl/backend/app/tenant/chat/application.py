@@ -164,8 +164,11 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
     return payload
 
 
-def edit_message(account_id, company_id, message_id, *, body, mention_ids, files, remove_attachment_ids) -> dict:
-    """自分のメッセージを編集（E.2・本人のみ）。本文上書き＋is_edited・メンション置換・添付追加/除去。完了は 409。"""
+def edit_message(account_id, company_id, message_id, *, body, mention_ids, files, remove_attachment_ids, quoted_message_ids=None) -> dict:
+    """自分のメッセージを編集（E.2・本人のみ）。本文上書き＋is_edited・メンション/引用置換・添付追加/除去。完了は 409。
+
+    `quoted_message_ids`＝None は不変／リスト（空可）は置換（メンションと同流儀）。同一 chat_group 内のみ（他は 422）。
+    """
     from app.infra.storage import MAX_ATTACHMENTS_PER_IDEA, get_storage, validate_attachment_upload
 
     company = _resolve_company(company_id)
@@ -200,6 +203,11 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
             msg.body = new_body
         if mention_ids is not None:
             repo.replace_mentions(ts, msg.id, _validate_mentions(ts, quest, mention_ids))
+        if quoted_message_ids is not None:
+            # 引用の置換（E.2）。空文字センチネル（フロントが「全消し」を multipart で表現する手段）は除外し、
+            # 残りを検証して置換する。自己引用（自分自身を引用元）は除外。
+            ids = [q for q in quoted_message_ids if q]
+            repo.replace_quotes(ts, msg.id, [q for q in _validate_quotes(ts, cg.id, ids) if q != msg.id])
         if validated:
             storage = get_storage()
             for fn, data, mime in validated:

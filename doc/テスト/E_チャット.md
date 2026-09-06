@@ -18,6 +18,7 @@
 | E-TC-107 | api | メンション検証 | パーティー員＋非メンバー | `POST`（mentions=member）／（mentions=非member） | 前者 201・`mentions[]` 反映／後者 422 `invalid_mention` | E.2 |
 | E-TC-108 | api | 引用返信は複数可・同一チャットのみ | 同グループ2件／別アイデアのメッセージ | `POST`（quoted_message_ids[]） | 複数引用で 201・`quotes[]` に各抜粋／別アイデア引用は 422 | E.2／§5.16b |
 | E-TC-109 | api | 編集＝本人のみ・is_edited | 自分／他人のメッセージ | `PATCH /chat-messages/{id}`（body） | 本人 200・`is_edited=true`・本文更新／他人 403／削除済み 409 | E.2 |
+| E-TC-109b | api | 編集で引用を置換（省略時は不変・別アイデアは 422） | 自分のメッセージ（引用 [A]）＋同一グループの B／別アイデアのメッセージ | `PATCH /chat-messages/{id}`（`quoted_message_ids[]`） | `[A]`→`[A,B]` に置換（`quotes[]` 反映）／`quoted_message_ids` 省略時は引用不変／別アイデアの引用追加は 422 | E.2／§5.16b |
 | E-TC-110 | api | 削除＝本人＋owner/quest_admin・トゥームストーン | 自分／他人（一般）／他人（owner） | `DELETE /chat-messages/{id}` | 本人 200・`is_deleted`／一般が他人 403／owner が他人 200・一覧でトゥームストーン化 | E.2／§8-⑪ |
 | E-TC-111 | api | 既読更新→未読件数（後退防止） | メッセージ2件 | `POST .../chat/read`（1件目）→`GET chat` | `unread.first_unread_message_id`＝2件目・`unread_count=1`。古い id 再送で後退しない | E.5／§5.31 |
 | E-TC-112 | api | 活発度集計（日次＋版マーカー） | メッセージ数件＋公開後編集（版2） | `GET /ideas/{id}/chat-activity` | `daily[]`（日次件数）・`revision_markers[]`（版日時）・`total_messages` | E.1／D.4 |

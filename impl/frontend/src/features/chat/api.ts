@@ -39,16 +39,21 @@ export function postMessage(
   return apiFetch<ChatMessage>(`/chat-messages`, { method: "POST", body: fd });
 }
 
-// メッセージ編集（E.2・本人のみ・multipart）。body/mentions 置換・files 追加・remove_attachment_ids 除去。
+// メッセージ編集（E.2・本人のみ・multipart）。body/mentions/引用 置換・files 追加・remove_attachment_ids 除去。
+// quotedMessageIds を渡すと引用を置換（省略時は不変）。空配列＝全消し（multipart で「置換・空」を表すため空文字センチネルを1件送る）。
 export function editMessage(
   messageId: string,
-  input: { body?: string; mentions?: string[]; files?: File[]; removeAttachmentIds?: string[] },
+  input: { body?: string; mentions?: string[]; files?: File[]; removeAttachmentIds?: string[]; quotedMessageIds?: string[] },
 ): Promise<ChatMessage | null> {
   const fd = new FormData();
   if (input.body !== undefined) fd.append("body", input.body);
   for (const m of input.mentions ?? []) fd.append("mentions", m);
   for (const f of input.files ?? []) fd.append("files", f);
   for (const id of input.removeAttachmentIds ?? []) fd.append("remove_attachment_ids", id);
+  if (input.quotedMessageIds !== undefined) {
+    if (input.quotedMessageIds.length === 0) fd.append("quoted_message_ids", ""); // 全消しセンチネル（フィールドを存在させる）
+    else for (const q of input.quotedMessageIds) fd.append("quoted_message_ids", q);
+  }
   return apiFetch<ChatMessage>(`/chat-messages/${messageId}`, { method: "PATCH", body: fd });
 }
 

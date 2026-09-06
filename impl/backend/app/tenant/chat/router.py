@@ -87,15 +87,20 @@ async def edit_message(
     mentions: list[str] | None = Form(default=None),
     files: list[UploadFile] | None = File(default=None),
     remove_attachment_ids: list[str] | None = Form(default=None),
+    quoted_message_ids: list[str] | None = Form(default=None),
     session: dict = Depends(require_me),
 ) -> ChatMessageDTO:
-    """自分のメッセージを編集（E.2・本人のみ）。本文/添付/メンションを更新。完了は 409。"""
+    """自分のメッセージを編集（E.2・本人のみ）。本文/添付/メンション/引用を更新。完了は 409。
+
+    `quoted_message_ids` は None=不変／提供（空可）=置換（メンションと同流儀・同一 chat_group 内のみ）。
+    """
     verify_origin(request)
     verify_csrf(request)
     payloads = [((f.filename or ""), await f.read()) for f in (files or [])]
     result = chat_service.edit_message(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id,
         body=body, mention_ids=mentions, files=payloads, remove_attachment_ids=remove_attachment_ids,
+        quoted_message_ids=quoted_message_ids,
     )
     return ChatMessageDTO(**result)
 

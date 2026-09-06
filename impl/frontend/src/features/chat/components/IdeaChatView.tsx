@@ -101,6 +101,8 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const [canSend, setCanSend] = useState(false);
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 編集中メッセージの引用（新規コンポーザーの replyTargets とは別管理・保存で置換）。編集開始時に既存引用で初期化。
+  const [editQuotes, setEditQuotes] = useState<{ id: string; name: string; text: string }[]>([]);
   const [mention, setMention] = useState<{ pos: Pos; matches: Member[]; active: number } | null>(null);
   const [picker, setPicker] = useState<{ pos: Pos; msgId: string } | null>(null);
   // #10: 魔法発動の瞬間演出（対象メッセージ矩形に one-shot・自分の発動のみ・reduce-motion 尊重）。
@@ -315,11 +317,20 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   };
 
   // ---- 編集 / 削除 ----
+  // 編集開始＝既存引用をチップに載せて編集を開く（他メッセージの💬で追加・×で除去できる）。
+  const startEdit = (m: ChatMessage) => {
+    const quotes = (m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? [];
+    setEditQuotes(quotes.map((q) => ({ id: q.id, name: q.author_name || "", text: q.excerpt || "" })));
+    setEditingId(m.id);
+  };
+  const cancelEdit = () => { setEditingId(null); setEditQuotes([]); };
   const saveEdit = async (m: ChatMessage) => {
     const v = editRef.current?.value.trim() ?? "";
     try {
-      await editMessage(m.id, { body: v, mentions: extractMentionIds(v) });
+      // 引用は置換で送る（編集中に足した/外した集合）。省略ではなく常に現在の集合を送る＝全消しも反映。
+      await editMessage(m.id, { body: v, mentions: extractMentionIds(v), quotedMessageIds: editQuotes.map((q) => q.id) });
       setEditingId(null);
+      setEditQuotes([]);
       await refetch();
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
@@ -527,6 +538,18 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
 
                   {editingId === m.id ? (
                     <div className="msg__editwrap">
+                      {/* 編集中の引用チップ（既存引用を初期表示＋他メッセージの💬で追加・×で除去。保存で置換）。 */}
+                      {editQuotes.length > 0 && (
+                        <div className="reply-ctx is-on reply-ctx--edit">
+                          <div className="reply-ctx__head">引用返信（{editQuotes.length}件）<span className="reply-ctx__hint">※編集中のメッセージに追加中</span></div>
+                          {editQuotes.map((t, i) => (
+                            <div className="reply-ctx__item" key={t.id}>
+                              <span className="reply-ctx__body"><b>{t.name}</b> に返信：{t.text}</span>
+                              <button className="reply-ctx__cancel" type="button" aria-label="この引用をやめる" onClick={() => setEditQuotes((q) => q.filter((_, j) => j !== i))}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="composer__field" style={{ position: "relative" }}>
                         <textarea ref={editRef} className="msg__editbox" defaultValue={m.body ?? ""} onInput={(e) => { autoGrow(e.currentTarget, 200); updateMention(e.currentTarget); }} onKeyDown={handleMentionKeys}
                           // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -534,7 +557,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                       </div>
                       <div className="msg__editacts" style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <button className="btn btn-primary btn-sm" type="button" onClick={() => void saveEdit(m)}>保存</button>
-                        <button className="btn btn-outline btn-sm" type="button" onClick={() => setEditingId(null)}>キャンセル</button>
+                        <button className="btn btn-outline btn-sm" type="button" onClick={cancelEdit}>キャンセル</button>
                       </div>
                     </div>
                   ) : m.is_deleted ? (
@@ -576,10 +599,20 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 {!m.is_deleted && !completed && (
                   <div className="msg__actions">
                     <button className="msg__act" type="button" data-act="react" aria-label="リアクション" onClick={(e) => { e.stopPropagation(); openPicker(m.id, e.currentTarget); }}>🙂</button>
-                    <button className="msg__act" type="button" aria-label="引用返信" onClick={() => { setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, { id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) }])); boxRef.current?.focus(); }}>💬</button>
+                    <button className="msg__act" type="button" aria-label="引用返信" onClick={() => {
+                      const chip = { id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) };
+                      if (editingId) {
+                        // 編集中＝編集対象メッセージの引用に追加（自分自身の引用は不可）。
+                        if (m.id !== editingId) setEditQuotes((q) => (q.some((t) => t.id === m.id) ? q : [...q, chip]));
+                        editRef.current?.focus();
+                      } else {
+                        setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, chip]));
+                        boxRef.current?.focus();
+                      }
+                    }}>💬</button>
                     {m.is_mine && (
                       <>
-                        <button className="msg__act" type="button" aria-label="編集" onClick={() => setEditingId(m.id)}>✏️</button>
+                        <button className="msg__act" type="button" aria-label="編集" onClick={() => startEdit(m)}>✏️</button>
                         <button className="msg__act" type="button" aria-label="削除" onClick={() => void removeMsg(m)}>🗑</button>
                       </>
                     )}

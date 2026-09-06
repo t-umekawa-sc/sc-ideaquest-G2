@@ -185,6 +185,9 @@
 .reply-ctx__body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reply-ctx__cancel { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 16px; line-height: 1; padding: 0 2px; }
 .reply-ctx__cancel:hover { color: var(--color-danger); }
+/* 編集ボックス上の引用チップ＝アクセント（レア色）で「編集中の引用」であることを示す。 */
+.reply-ctx--edit { border-left-color: var(--rarity-rare); background: #F5F3FF; }
+.reply-ctx__hint { margin-left: var(--space-2); font-weight: 400; color: var(--rarity-rare); }
 
 /* --- 入力欄の最小化（折りたたみ） --- */
 .composer__toggle, .composer__info { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm); }

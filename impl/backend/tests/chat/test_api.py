@@ -236,6 +236,29 @@ def test_e_tc_109_edit(client, env):
     assert client.patch(f"{MSGS}/{oid}", data={"body": "z"}, headers=_csrf(client)).status_code == 403
 
 
+def test_e_tc_109b_edit_replaces_quotes(client, env):
+    """E-TC-109b: 編集で quoted_message_ids を渡すと引用を置換（省略時は不変・別アイデアは 422）。"""
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    a = _post(client, idea, body="親A").json()["id"]
+    b = _post(client, idea, body="親B").json()["id"]
+    mid = _post(client, idea, body="本文", quotes=[a]).json()["id"]  # 最初は A を引用
+    # 引用を [A] → [A,B] に置換。
+    r = client.patch(f"{MSGS}/{mid}", data={"body": "本文2", "quoted_message_ids": [a, b]}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert {q["excerpt"] for q in r.json()["quotes"]} == {"親A", "親B"}
+    # quoted_message_ids 省略の編集＝引用は不変（本文だけ更新）。
+    r2 = client.patch(f"{MSGS}/{mid}", data={"body": "本文3"}, headers=_csrf(client))
+    assert r2.status_code == 200 and {q["excerpt"] for q in r2.json()["quotes"]} == {"親A", "親B"}
+    # 別アイデアのメッセージを引用に足すと 422。
+    other = env.make_idea(quest_id=env.make_quest())
+    om = _post(client, other, body="別").json()["id"]
+    assert client.patch(f"{MSGS}/{mid}", data={"quoted_message_ids": [a, om]}, headers=_csrf(client)).status_code == 422
+    # 全消し＝空文字センチネルを送ると引用が空になる（フロントの「全部外して保存」）。
+    r3 = client.patch(f"{MSGS}/{mid}", data={"quoted_message_ids": [""]}, headers=_csrf(client))
+    assert r3.status_code == 200 and r3.json()["quotes"] == []
+
+
 def test_e_tc_110_delete(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())  # ACME-01 owner

@@ -91,6 +91,14 @@ def add_quotes(session: Session, message_id: uuid.UUID, quoted_message_ids: list
         session.add(ChatMessageQuote(id=uuid.uuid4(), chat_message_id=message_id, quoted_message_id=qid))
 
 
+def replace_quotes(session: Session, message_id: uuid.UUID, quoted_message_ids: list[uuid.UUID]) -> None:
+    """編集時の引用置換（E.2・メンション置換と同流儀）＝既存を全削除して与えられた集合で作り直す。"""
+    for row in session.execute(select(ChatMessageQuote).where(ChatMessageQuote.chat_message_id == message_id)).scalars().all():
+        session.delete(row)
+    session.flush()
+    add_quotes(session, message_id, quoted_message_ids)
+
+
 def get_quotes_for_messages(session: Session, message_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[uuid.UUID]]:
     result: dict[uuid.UUID, list[uuid.UUID]] = {}
     if not message_ids:
