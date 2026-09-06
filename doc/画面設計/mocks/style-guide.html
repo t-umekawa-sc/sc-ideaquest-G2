@@ -3147,6 +3147,151 @@
         whenSettledVisible(stage, play);   /* B＝スクロール静止後に1回だけ発火（高速な流し見中は間引き） */
       })();
     </script>
+
+    <h3 style="margin-top:var(--space-6)">17L-i. 魔法解放の共通「習得」アニメ（魔法陣・全魔法共通／SC-32・GF-AC-110）＝カードのアイコンから魔法陣（円＋内部で反射しながら引かれる線）が描かれ→光のバースト→アイコン浮上→アイコンの上に「✨ 習得！」</h3>
+    <p class="muted text-sm">#11 魔法解放（GF-AC-110）の演出モック。<strong>魔法ごとに変えず、全魔法で共通の「習得」演出</strong>にする方針（術者が“新しい魔法を覚えた”瞬間）。核モチーフ＝<strong>ドット絵の魔法陣</strong>＝アイコンを中心に<strong>円が広がり、その内側をランダムに走る線が円にぶつかると折れる…を繰り返して魔法陣を描く</strong>（現状 <code>BOUNCES=10</code> 本・サンプル確認後に調整）。描き上がると<strong>光のバースト→アイコンが淡いグローで浮上→アイコンの上に「✨ 習得！」</strong>が出て、カードが「✓ 解放済み」へ。配色は属性非依存の<strong>金＋アーカン紫＋白</strong>。<strong>アイコンを切り替えても演出は同一</strong>（＝共通であることの確認用）。<code>prefers-reduced-motion</code>／下のトグル ON では演出を出さず<strong>即「解放済み」</strong>（情報は残す）。</p>
+    <div class="sglearn-wrap">
+      <div class="sglearn-card" id="sglearnCard">
+        <span class="sglearn-icon" id="sglearnIcon">🔥</span>
+        <div class="sglearn-name" id="sglearnName">炎 <span class="sglearn-rarity" id="sglearnRarity">コモン</span></div>
+        <div class="sglearn-cost" id="sglearnCost">✦ 1 で解放</div>
+        <button class="btn btn-primary btn-sm sglearn-unlock" type="button" id="sglearnUnlock">解放する</button>
+        <canvas class="sglearn-fx" id="sglearnFx" aria-hidden="true"></canvas>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:var(--space-3)">
+        <label class="field" style="margin:0">魔法アイコン（共通演出の確認用に切替）
+          <select class="select" id="sglearnIconSel">
+            <option value="🔥|炎|コモン">🔥 炎（コモン）</option>
+            <option value="⚡|雷|標準">⚡ 雷（標準）</option>
+            <option value="🌈|虹|レア">🌈 虹（レア）</option>
+            <option value="❄|氷|コモン">❄ 氷（コモン）</option>
+            <option value="✨|キラキラ|標準">✨ キラキラ（標準）</option>
+            <option value="🔮|オーラ|レア">🔮 オーラ（レア）</option>
+          </select>
+        </label>
+        <label class="checkbox"><input type="checkbox" id="sglearnReduce"> 動きを減らす（疑似 reduce-motion）</label>
+        <button class="btn btn-outline btn-sm" type="button" id="sglearnReset">リセット（未解放に戻す）</button>
+      </div>
+    </div>
+
+    <style>
+      .sglearn-wrap{display:flex; gap:var(--space-5,24px); align-items:center; flex-wrap:wrap; margin-top:var(--space-3,12px)}
+      .sglearn-card{position:relative; width:200px; padding:var(--space-4,16px); border-radius:var(--radius-lg,12px); background:#fff; border:1px solid var(--border,#e5e7eb); box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,.08)); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; overflow:visible}
+      .sglearn-icon{font-size:44px; line-height:1}
+      .sglearn-name{font-weight:700}
+      .sglearn-rarity{font-size:.72em; color:#6b7280; font-weight:600}
+      .sglearn-cost{font-size:.82em; color:#6b7280}
+      .sglearn-unlock{margin-top:6px}
+      .sglearn-fx{position:absolute; pointer-events:none; z-index:3}
+      .sglearn-card.is-unlocked{border-color:rgba(150,95,230,.55); box-shadow:0 0 0 2px rgba(150,95,230,.18), 0 6px 18px rgba(150,95,230,.16)}
+      .sglearn-card.is-unlocked .sglearn-unlock{background:transparent; border:1px solid var(--border,#e5e7eb); color:#6b7280; cursor:default}
+    </style>
+
+    <script>
+      /* 魔法解放の共通「習得」アニメ（魔法陣・全魔法共通）。核＝ドット絵の魔法陣＝アイコン中心に円を広げ、
+         内側をランダムに走る線が円にぶつかると折れる…を BOUNCES 本くり返して描く→バースト→アイコン浮上→アイコンの上に「習得！」。属性非依存の共通演出。 */
+      (function(){
+        var card=document.getElementById('sglearnCard');
+        var canvas=document.getElementById('sglearnFx');
+        var iconEl=document.getElementById('sglearnIcon');
+        var nameEl=document.getElementById('sglearnName');
+        var rarityEl=document.getElementById('sglearnRarity');
+        var costEl=document.getElementById('sglearnCost');
+        var btn=document.getElementById('sglearnUnlock');
+        var sel=document.getElementById('sglearnIconSel');
+        var reduceCb=document.getElementById('sglearnReduce');
+        var resetBtn=document.getElementById('sglearnReset');
+        var ctx=canvas.getContext('2d');
+        var raf=null, running=false, DUR=1450;
+        var GOLD='250,200,80', PURP='150,95,230';
+        var COST={ 'コモン':1, '標準':2, 'レア':3 };
+        var BOUNCES=10;                                  /* 円内で反射しながら引く線の本数（サンプル確認後に調整） */
+        var path=null;
+        /* 円の内側をランダムに走り、円にぶつかると折れる線の経路（中心相対の頂点列＝BOUNCES+1 点）。 */
+        function genPath(R){
+          var pts=[], ang=Math.random()*6.2832, px=Math.cos(ang)*R, py=Math.sin(ang)*R;
+          pts.push({x:px,y:py});
+          for(var i=0;i<BOUNCES;i++){
+            var da=Math.random()*6.2832, dx=Math.cos(da), dy=Math.sin(da);
+            if(px*dx+py*dy>0){ dx=-dx; dy=-dy; }         /* 内向きに（中心 C=原点なので P·d<0 が内向き） */
+            var t=-2*(px*dx+py*dy);                       /* 円との再交点までの距離（|P|=R より） */
+            px=px+t*dx; py=py+t*dy; pts.push({x:px,y:py});
+          }
+          return pts;
+        }
+        function reduced(){ return reduceCb.checked || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+        function ease(p){ return 1-Math.pow(1-p,3); }                     /* easeOutCubic */
+        function back(p){ var s=1.70158; return 1+(s+1)*Math.pow(p-1,3)+s*Math.pow(p-1,2); }  /* easeOutBack（オーバーシュート） */
+        function fadeTail(p,from){ return p<from?1:Math.max(0,1-(p-from)/(1-from)); }
+        function metrics(){
+          var cr=card.getBoundingClientRect(), ir=iconEl.getBoundingClientRect();
+          var MS=40, MT=70, MB=20;                     /* canvas をカード外へ張り出す（魔法陣と「習得！」が上へはみ出せる） */
+          var W=cr.width+MS*2, H=cr.height+MT+MB;
+          var dpr=Math.min(2, window.devicePixelRatio||1);
+          canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+          canvas.style.width=W+'px'; canvas.style.height=H+'px'; canvas.style.left=(-MS)+'px'; canvas.style.top=(-MT)+'px';  /* 置換要素の auto 幅を避け、CSS px と描画座標を一致させる */
+          ctx.setTransform(dpr,0,0,dpr,0,0);
+          return { W:W, H:H, cx:ir.left-cr.left+MS+ir.width/2, cy:ir.top-cr.top+MT+ir.height/2, icon:iconEl.textContent };
+        }
+        function block(x,y,s,col,a){ if(a<=0) return; ctx.fillStyle='rgba('+col+','+a.toFixed(3)+')'; ctx.fillRect(Math.round(x-s/2),Math.round(y-s/2),Math.ceil(s),Math.ceil(s)); }
+        function draw(p,m){
+          var W=m.W,H=m.H,CX=m.cx,CY=m.cy; ctx.clearRect(0,0,W,H);
+          var R=46;
+          var grow=ease(Math.min(1,p/0.22)), rr=R*grow;
+          var fade=fadeTail(p,0.82);
+          /* 円の境界（ドット破線・ゆっくり回転） */
+          var rot=p*6.2832*0.5;
+          for(var i=0;i<30;i++){ var a=rot+i/30*6.2832; block(CX+Math.cos(a)*rr, CY+Math.sin(a)*rr, 3, GOLD, 0.65*fade); }
+          /* 内部：ランダムに反射しながら引かれる線（BOUNCES 本） */
+          if(path){
+            var pathT=(p-0.22)/0.42;                     /* 0.22..0.64 で描き上がる */
+            if(pathT>0){
+              var segF=Math.min(1,pathT)*BOUNCES, full=Math.floor(segF), frac=segF-full;
+              ctx.lineJoin='round'; ctx.lineCap='round';
+              for(var pass=0;pass<2;pass++){
+                ctx.strokeStyle = pass===0 ? 'rgba('+PURP+','+(0.35*fade).toFixed(3)+')' : 'rgba('+GOLD+','+(0.95*fade).toFixed(3)+')';
+                ctx.lineWidth = pass===0 ? 4 : 1.6;
+                ctx.beginPath(); ctx.moveTo(CX+path[0].x, CY+path[0].y);
+                var lim=Math.min(full,BOUNCES);
+                for(var s=1;s<=lim;s++){ ctx.lineTo(CX+path[s].x, CY+path[s].y); }
+                if(full<BOUNCES && frac>0){ var A=path[full], B=path[full+1]; ctx.lineTo(CX+A.x+(B.x-A.x)*frac, CY+A.y+(B.y-A.y)*frac); }
+                ctx.stroke();
+              }
+              /* 折れ点の小さな光 */
+              var lim2=Math.min(full,BOUNCES); for(var v=0;v<=lim2;v++){ block(CX+path[v].x, CY+path[v].y, 3, GOLD, 0.9*fade); }
+            }
+          }
+          /* 光のバースト（0.62..0.77） */
+          var lf=(p-0.62)/0.15; if(lf>0&&lf<1){ ctx.strokeStyle='rgba(255,255,255,'+((1-lf)*0.85).toFixed(3)+')'; ctx.lineWidth=3*(1-lf)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.5+lf*0.95),0,6.2832); ctx.stroke(); }
+          /* 外へ弾けるきらめき（0.64..1） */
+          var lo=(p-0.64)/0.36; if(lo>0&&lo<1){ for(var q=0;q<20;q++){ var qa=q/20*6.2832+0.35; var qd=R*1.3*ease(lo); block(CX+Math.cos(qa)*qd, CY+Math.sin(qa)*qd, (1-lo)*3+1, q%2?GOLD:PURP, (1-lo)); } }
+          /* アイコン浮上＋グロー（0.46..） */
+          var li=(p-0.46)/0.4; if(li>0){ var lic=Math.min(1,li); var sc=li<1?back(lic):1; var yo=-9*ease(lic)*(1-Math.min(1,Math.max(0,(p-0.74)/0.26))); var ia=Math.min(1,li*2);
+            ctx.save(); ctx.globalAlpha=ia;
+            var g=ctx.createRadialGradient(CX,CY+yo,0,CX,CY+yo,30); g.addColorStop(0,'rgba('+GOLD+',0.5)'); g.addColorStop(1,'rgba('+GOLD+',0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY+yo,30,0,6.2832); ctx.fill();
+            ctx.translate(CX,CY+yo); ctx.scale(sc,sc); ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(m.icon,0,0); ctx.restore(); }
+          /* 「✨ 習得！」アイコンの上（0.64..） */
+          var lt=(p-0.64)/0.36; if(lt>0){ var lta=Math.min(1,lt*2)*fadeTail(p,0.9); var ty=CY-R*1.05-6*ease(Math.min(1,lt));
+            ctx.save(); ctx.globalAlpha=lta; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 15px system-ui, sans-serif';
+            ctx.lineWidth=3; ctx.strokeStyle='rgba(60,40,10,0.55)'; ctx.strokeText('✨ 習得！',CX,ty); ctx.fillStyle='rgba('+GOLD+',1)'; ctx.fillText('✨ 習得！',CX,ty); ctx.restore(); }
+        }
+        function markUnlocked(){ card.classList.add('is-unlocked'); btn.textContent='✓ 解放済み'; btn.disabled=true; }
+        function run(){
+          if(running || card.classList.contains('is-unlocked')) return;
+          if(reduced()){ markUnlocked(); return; }
+          running=true; iconEl.style.visibility='hidden'; path=genPath(46);
+          var t0=performance.now();
+          (function frame(now){ var p=Math.min(1,(now-t0)/DUR); var m=metrics(); draw(p,m);
+            if(p<1){ raf=requestAnimationFrame(frame); }
+            else { ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; running=false; markUnlocked(); }
+          })(t0);
+        }
+        function reset(){ if(raf) cancelAnimationFrame(raf); running=false; path=null; var m=metrics(); ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; card.classList.remove('is-unlocked'); btn.textContent='解放する'; btn.disabled=false; }
+        btn.addEventListener('click', run);
+        resetBtn.addEventListener('click', reset);
+        sel.addEventListener('change', function(){ var v=sel.value.split('|'); iconEl.textContent=v[0]; nameEl.childNodes[0].nodeValue=v[1]+' '; rarityEl.textContent=v[2]; costEl.textContent='✦ '+COST[v[2]]+' で解放'; reset(); });
+      })();
+    </script>
   </div>
 
   <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
