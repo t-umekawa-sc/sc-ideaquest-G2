@@ -157,3 +157,10 @@
 
 | G-TC-158 | unit(front) | 実寸→低解像度グリッド（ドット絵の解像度） | 実寸 w×h／scale | `iceGrid(w, h, scale)` | cols/rows は整数／下限 140×20 でクランプ／十分大きい w では `cols≈round(w/scale)`（幅広ほどセル数↑・単調非減少）／決定的 | GF-AC-091／#10 |
 | G-TC-158 | unit(front) | 霜フィルの可読性フェード（明るいほど濃く・settle で薄く） | セル明度 bright(0..1)／settle(0.6..1) | `frostAlpha(bright, settle)` | bright が増えるほど単調非減少／settle が下がるほど単調非減少（全面凍結後は薄くなる）／0 未満にならない／決定的 | GF-AC-091／#10 |
+
+### 5-I. 虹 canvas エンジンの決定的部分（満遍ない飛散先／集結チャージ量）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
+
+> 対象＝`impl/frontend/src/features/spells/engines/rainbow.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-f2` の放浪型虹 canvas+rAF エンジン）を production の canvas ハーネスへ移植。**canvas 本体（虹ビームの発射/着弾・虹粒子の飛散・ゆらゆら集結・エネルギー球チャージ・中央への再発射＝`rng` で非決定的・rAF 駆動）は §17L-f2／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`rainbowScatterTargets(w,h,pad,n,rng)`＝着弾で粒子が飛ぶ先＝パネル内（パッド内）の一様ランダム n 座標（同心円にならず**満遍なく**散る・span 負は下限0でクランプ）。`rainbowChargeGrow(n)`＝集結点で溜まるエネルギー球の基準サイズ＝**集まった粒子数 n に比例**（n=0 は 0＝球を描かない・単調増加）。虹はフル解像度（ImageData グリッドではなく ctx 直描画）。※production 版は canvas をパネルより一回り大きく（`RAINBOW_MARGIN_PX`）＋負オフセットで張り出し、粒子/ビームが枠外へ少しはみ出す（起点はコンテナ矩形基準の枠相対 px＋マージン offset で変換・`useSpellEngine`）。reduce-motion はハーネスが `reduceStatic()`（中央の虹の輝き静止 1 枚）を呼び rAF を回さない（純ロジックは対象外）。rng 注入で決定的に検証。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-159）で担保。
+
+| G-TC-159 | unit(front) | 満遍ない飛散先（同心円にならずパネル内へ一様） | 実寸 w×h／pad／個数 n／seed 付き rng | `rainbowScatterTargets(w, h, pad, n, rng)` | n 個返す／すべて [pad, w-pad]×[pad, h-pad] 内／span 負（2*pad>w 等）は pad に張り付き範囲外を返さない／同 seed は同列・異 seed は異なる（決定的） | GF-AC-091／#10 |
+| G-TC-159 | unit(front) | 集結チャージ量（数に比例するエネルギー球） | 集まった粒子数 n | `rainbowChargeGrow(n)` | n≤0 は 0（球を描かない）／n が増えるほど単調増加／決定的 | GF-AC-091／#10 |
