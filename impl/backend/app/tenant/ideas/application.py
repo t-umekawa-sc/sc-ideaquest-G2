@@ -735,6 +735,9 @@ def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval
         "title": idea.title,
         "status": idea.status,
         "author": _author_dto(author, idea.author_id),
+        # アイデアアイコン＝作成者の既定アイデアアイコン（Phase 2）。未設定は None＝フロントが件名先頭1文字タイル。
+        # Phase 3 でアイデア個別 icon_image_path を優先する予定。
+        "icon_image_url": _image_url(author.idea_icon_image_path) if author else None,
         "vote_summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
         "comment_count": (comment_counts or {}).get(idea.id, 0),  # E 非削除チャット件数（💬・D.1）
         "is_selected": idea.is_selected,
@@ -780,6 +783,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "is_selected": idea.is_selected,
         "current_revision": idea.current_revision,
         "author": _author_dto(author, idea.author_id),
+        "icon_image_url": _image_url(author.idea_icon_image_path) if author else None,  # アイデアアイコン＝作成者の既定（Phase 2）
         "quest": quest_ref,
         "attachments": _attachments_payload(ts, repo.list_attachments(ts, idea.id)),
         "created_at": idea.created_at,

@@ -65,6 +65,11 @@ def _poster(ts, user_id: uuid.UUID) -> dict:
     return _poster_from(ts.get(User, user_id))
 
 
+def _idea_icon(u) -> str | None:
+    """アイデアアイコン＝作成者の既定アイデアアイコン（Phase 2）。未設定は None＝件名先頭1文字タイル。"""
+    return _image_url(u.idea_icon_image_path) if u else None
+
+
 def _quest_ref_from(quest_id: uuid.UUID, q, *, with_status: bool = False) -> dict:
     ref = {"id": str(quest_id), "title": q.title if q else "（削除されたクエスト）",
            "color": q.color if q else None}  # アイデアアイコンの頭文字タイル色（クエストアクセント・SC-01）
@@ -129,6 +134,7 @@ def _unvoted(ts, user: User) -> list[dict]:
     return [{
         "id": str(i.id), "title": i.title, "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id)),
         "poster": _poster_from(posters.get(i.author_id)), "value": i.value,
+        "icon_image_url": _idea_icon(posters.get(i.author_id)),  # 作成者の既定アイデアアイコン（Phase 2）
         "vote_summary": votes.get(i.id, {"approve": 0, "oppose": 0}),
         "deadline": i.time_limit.isoformat() if i.time_limit else None,
     } for i in ideas]
@@ -141,6 +147,7 @@ def _followed(ts, user: User) -> list[dict]:
         "id": str(i.id), "title": i.title,
         "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id), with_status=True),
         "poster": _poster_from(posters.get(i.author_id)), "value": i.value,
+        "icon_image_url": _idea_icon(posters.get(i.author_id)),  # 作成者の既定アイデアアイコン（Phase 2）
         "vote_summary": votes.get(i.id, {"approve": 0, "oppose": 0}),
         "updated_at": i.updated_at.isoformat() if i.updated_at else None, "following": True,
     } for i in ideas]

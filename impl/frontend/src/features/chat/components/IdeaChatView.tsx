@@ -440,7 +440,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
           <>
             <div className="chat-context__body">
               <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
-              <div className="chat-context__title"><QuestIcon name={idea.title} color={idea.quest.color} size="xs" /> {idea.title}</div>
+              <div className="chat-context__title"><QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /> {idea.title}</div>
               <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
             </div>
             <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>
@@ -449,7 +449,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
         ) : (
           // たたんだ状態＝コンパクトなタイトル（左）＋右端に戻るリンク。
           <>
-            <span className="chat-context__mini"><QuestIcon name={idea.title} color={idea.quest.color} size="xs" /> {idea.title}</span>
+            <span className="chat-context__mini"><QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /> {idea.title}</span>
             <Link className="backlink chat-context__back" href={backHref} onClick={onBack}>{backLabel}</Link>
           </>
         )}

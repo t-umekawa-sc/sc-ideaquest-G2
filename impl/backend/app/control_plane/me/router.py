@@ -20,6 +20,7 @@ from app.control_plane.me.schemas import (
     EmailChangeConfirmedResponse,
     EmailChangeConfirmRequest,
     EmailChangeRequest,
+    IdeaIconImageResponse,
     MeActivitiesResponse,
     MeResponse,
     MeUpdateRequest,
@@ -104,6 +105,29 @@ def delete_avatar_image(request: Request, session: dict = Depends(require_me)) -
     verify_origin(request)
     verify_csrf(request)
     me_service.delete_avatar_image(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.put("/me/idea-icon-image", response_model=IdeaIconImageResponse)
+async def put_idea_icon_image(
+    request: Request, file: UploadFile = File(...), session: dict = Depends(require_me),
+) -> IdeaIconImageResponse:
+    """アイデア用アイコン（既定）を設定（K.4 流儀・multipart・Phase 2）。会社DB users 直接更新＋短TTL 署名URL 返却。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    result = me_service.set_idea_icon_image(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        data=data, content_type=file.content_type or "",
+    )
+    return IdeaIconImageResponse(**result)
+
+
+@router.delete("/me/idea-icon-image", status_code=204)
+def delete_idea_icon_image(request: Request, session: dict = Depends(require_me)) -> None:
+    """アイデア用アイコン（既定）を削除（件名先頭1文字タイルに戻す・Phase 2）。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    me_service.delete_idea_icon_image(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
 
 
 @router.put("/me/avatar-base", response_model=MeResponse)

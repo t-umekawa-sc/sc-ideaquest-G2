@@ -66,6 +66,7 @@ def _me(account: Account, user: "User | None") -> dict:
         "profile": {
             "display_name": account.display_name,
             "avatar_image_url": _image_url(user.avatar_image_path if user else None),
+            "idea_icon_image_url": _image_url(user.idea_icon_image_path if user else None),  # アイデア用アイコン既定（Phase 2）
             "background_image_url": _image_url(user.background_image_path if user else None),
             "avatar_base": user.avatar_base if user else "male",  # 3D 男女2ベース（K.4.1・§5.3）
         },
@@ -155,6 +156,17 @@ def set_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: byte
 def delete_avatar_image(account_id: uuid.UUID, company_id: uuid.UUID) -> None:
     """アバター画像を削除（既定に戻す・K.4）。"""
     _delete_user_image(company_id, account_id, field="avatar_image_path")
+
+
+def set_idea_icon_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """アイデア用アイコン（既定）を設定（K.4 流儀・Phase 2）＝会社DB users.idea_icon_image_path 更新＋署名URL 返却。"""
+    return {"idea_icon_image_url": _set_user_image(
+        company_id, account_id, field="idea_icon_image_path", data=data, content_type=content_type, prefix="idea-icons")}
+
+
+def delete_idea_icon_image(account_id: uuid.UUID, company_id: uuid.UUID) -> None:
+    """アイデア用アイコン（既定）を削除（件名先頭1文字タイルに戻す・Phase 2）。"""
+    _delete_user_image(company_id, account_id, field="idea_icon_image_path")
 
 
 _ALLOWED_AVATAR_BASES = frozenset({"male", "female"})  # §5.3 avatar_base（将来 animal_*・SC-31 §9.6）

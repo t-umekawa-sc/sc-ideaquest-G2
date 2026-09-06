@@ -161,6 +161,7 @@ class IdeaCardDTO(BaseModel):
     title: str
     status: str
     author: IdeaAuthorDTO
+    icon_image_url: str | None = None  # アイデアアイコン（作成者の既定・Phase 2／未設定は件名先頭1文字タイル）
     vote_summary: IdeaVoteSummaryDTO
     evaluation: IdeaEvaluationDTO  # 評価集計（SC-12 評価列・F）
     comment_count: int  # E 非削除チャット件数（💬・SC-12）
@@ -231,6 +232,7 @@ class IdeaDetailDTO(BaseModel):
     is_selected: bool
     current_revision: int
     author: IdeaAuthorDTO
+    icon_image_url: str | None = None  # アイデアアイコン（作成者の既定・Phase 2／未設定は件名先頭1文字タイル）
     quest: IdeaQuestRefDTO
     attachments: list[IdeaAttachmentDTO] = []
     created_at: datetime

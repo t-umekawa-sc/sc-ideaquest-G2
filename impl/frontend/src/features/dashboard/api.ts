@@ -18,12 +18,14 @@ export type Draft = DraftQuest | DraftIdea | DraftEval;
 export type UnvotedIdea = {
   id: string; title: string; quest: { id: string; title: string; color?: string | null };
   poster: { name: string; avatar: string | null }; value: string;
+  icon_image_url?: string | null;
   vote_summary: VoteSummary; deadline: string | null;
 };
 
 export type FollowedIdea = {
   id: string; title: string; quest: { id: string; title: string; quest_status: string | null; color?: string | null };
   poster: { name: string; avatar: string | null }; value: string;
+  icon_image_url?: string | null;
   vote_summary: VoteSummary; updated_at: string | null; following: boolean;
 };
 

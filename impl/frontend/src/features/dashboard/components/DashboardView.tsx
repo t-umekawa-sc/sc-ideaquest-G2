@@ -346,7 +346,7 @@ export function DashboardView({
                 >
                   <div className="between">
                     <span className="idea-title-row">
-                      <QuestIcon name={v.title} color={v.quest.color} size="sm" />
+                      <QuestIcon name={v.title} color={v.quest.color} imageUrl={v.icon_image_url} size="sm" />
                       <Link className="card-title" href={`/ideas/${v.id}`}>{v.title}</Link>
                     </span>
                     <span className="badge badge-muted">未投票</span>
@@ -423,7 +423,7 @@ export function DashboardView({
                       （QuestListView の cardRaw と同方針）。退場アニメは外側ラッパ（framer）＝リフト transform と衝突しない。 */}
                   <Link className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`} href={`/ideas/${f.id}`}>
                     <div className="card-title idea-title-row">
-                      <QuestIcon name={f.title} color={f.quest.color} size="sm" />
+                      <QuestIcon name={f.title} color={f.quest.color} imageUrl={f.icon_image_url} size="sm" />
                       <span className="idea-title-row__txt">{f.title}</span>
                     </div>
                     <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>

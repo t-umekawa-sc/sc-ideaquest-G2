@@ -37,6 +37,16 @@ export function deleteAvatarImage(): Promise<null> {
   return apiFetch<null>("/me/avatar-image", { method: "DELETE" }) as Promise<null>;
 }
 
+// アイデア用アイコン（既定）＝会社DB users.idea_icon_image_path（K.4・MinIO・multipart・Phase 2）。アバターとは別。
+export function setIdeaIconImage(file: File): Promise<{ idea_icon_image_url: string } | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch<{ idea_icon_image_url: string }>("/me/idea-icon-image", { method: "PUT", body: fd });
+}
+export function deleteIdeaIconImage(): Promise<null> {
+  return apiFetch<null>("/me/idea-icon-image", { method: "DELETE" }) as Promise<null>;
+}
+
 // 背景画像（K.4・全認証画面に反映・FR-30）。
 export function setBackgroundImage(file: File): Promise<{ background_image_url: string } | null> {
   const fd = new FormData();

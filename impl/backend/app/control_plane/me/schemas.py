@@ -36,6 +36,7 @@ class MeProfileDTO(BaseModel):
     """プロフィール表示（K.1）。display_name は accounts 源泉。画像は署名URL（K.4・未設定は None）。"""
     display_name: str
     avatar_image_url: str | None = None
+    idea_icon_image_url: str | None = None  # アイデア用アイコンの既定（アバターとは別・Phase 2・未設定は None）
     background_image_url: str | None = None
     avatar_base: str = "male"  # 3D アバターの男女2ベース（K.4.1・§5.3・既定 male）
 
@@ -101,6 +102,11 @@ class MeActivitiesResponse(BaseModel):
 class AvatarImageResponse(BaseModel):
     """`PUT /me/avatar-image` の応答（K.4）＝設定後の短TTL 署名URL。"""
     avatar_image_url: str
+
+
+class IdeaIconImageResponse(BaseModel):
+    """`PUT /me/idea-icon-image` の応答（K.4 流儀）＝設定後の短TTL 署名URL（アイデア用アイコン既定・Phase 2）。"""
+    idea_icon_image_url: str
 
 
 class BackgroundImageResponse(BaseModel):

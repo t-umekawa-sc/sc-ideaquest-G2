@@ -32,7 +32,7 @@ import "../quests.css";
 
 // アイデアタブの行ビュー型（SC-12・D.1）。列/カードの描画に必要な最小射影。
 type Idea = {
-  id: string; title: string; poster: string; initial: string; agree: number; disagree: number;
+  id: string; title: string; poster: string; initial: string; iconUrl: string | null; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
 };
 // IdeaCardDTO（D.1）→ 行ビュー。評価（F）＝`evaluation` 集計（評価済 overall_avg=n/5・可視0は null）。あなた
@@ -43,7 +43,7 @@ function toIdeaView(c: IdeaCard): Idea {
   const mystate: Idea["mystate"] = isDraft ? "draft" : c.my_vote ? "voted" : "unvoted";
   const name = c.author.display_name || "?";
   return {
-    id: c.id, title: c.title, poster: name, initial: name.slice(0, 1),
+    id: c.id, title: c.title, poster: name, initial: name.slice(0, 1), iconUrl: c.icon_image_url ?? null,
     agree: c.vote_summary.approve, disagree: c.vote_summary.oppose, comments: c.comment_count,
     ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
     mystate, created: days, draft: isDraft,
@@ -262,7 +262,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
 
   const ideaColumns: DataTableColumn<Idea>[] = [
     { key: "title", label: "件名", locked: true, width: 260, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
-      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} size="xs" /><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</span> },
+      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</span> },
     { key: "poster", label: "投稿者", width: 150, sortable: true, filter: { type: "text" }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
       render: (r) => <span className="poster"><Avatar name={r.poster} size="sm" />{r.poster}</span> },
     { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),

@@ -13,7 +13,7 @@ import Link from "next/link";
 
 import { Button, Field, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { deleteAvatarImage, getMe, setAvatarImage, updateMe } from "../api";
+import { deleteAvatarImage, deleteIdeaIconImage, getMe, setAvatarImage, setIdeaIconImage, updateMe } from "../api";
 import type { MeProfile } from "../types";
 import "@/features/companies/companies.css";
 import "../profile.css";
@@ -43,6 +43,11 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [iconBusy, setIconBusy] = useState(false);
   const [iconError, setIconError] = useState<string | null>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
+  // アイデア用アイコン（既定・アバターとは別・Phase 2）＝会社DB users.idea_icon_image_path（K.4 署名URL）。
+  const [ideaIconUrl, setIdeaIconUrl] = useState<string | null>(null);
+  const [ideaIconBusy, setIdeaIconBusy] = useState(false);
+  const [ideaIconError, setIdeaIconError] = useState<string | null>(null);
+  const ideaIconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void (async () => {
@@ -55,6 +60,7 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setAnimOff(!!me.account.reduce_motion);
           setMascotFollow(me.account.mascot_follow ?? true);
           setAvatarUrl(me.profile.avatar_image_url ?? null);
+          setIdeaIconUrl(me.profile.idea_icon_image_url ?? null);
         }
       } catch {
         setLoadError("プロフィールの取得に失敗しました。");
@@ -129,6 +135,40 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     }
   }
 
+  async function onPickIdeaIcon(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (ideaIconInputRef.current) ideaIconInputRef.current.value = "";
+    if (!file) return;
+    setIdeaIconError(null);
+    setIdeaIconBusy(true);
+    try {
+      const res = await setIdeaIconImage(file);  // PUT /me/idea-icon-image（K.4・Phase 2）
+      if (res) setIdeaIconUrl(res.idea_icon_image_url);
+      snack({ type: "success", title: "アイデア用アイコンを更新しました" });
+      router.refresh();  // 一覧/カード/チャットのアイデアアイコンを更新
+    } catch (err) {
+      setIdeaIconError(err instanceof ApiError && err.status === 422
+        ? "画像の形式またはサイズをご確認ください（PNG/JPEG/WebP/GIF・5MB まで）。"
+        : "画像のアップロードに失敗しました。");
+    } finally {
+      setIdeaIconBusy(false);
+    }
+  }
+  async function onClearIdeaIcon() {
+    setIdeaIconError(null);
+    setIdeaIconBusy(true);
+    try {
+      await deleteIdeaIconImage();  // DELETE /me/idea-icon-image
+      setIdeaIconUrl(null);
+      snack({ type: "success", title: "アイデア用アイコンを削除しました", msg: "既定（件名の先頭1文字）に戻しました。" });
+      router.refresh();
+    } catch {
+      setIdeaIconError("画像の削除に失敗しました。");
+    } finally {
+      setIdeaIconBusy(false);
+    }
+  }
+
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
   if (!profile) return <p className="admin-muted">読み込み中…</p>;
 
@@ -189,6 +229,35 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               )}
               <input ref={iconInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={onPickIcon} />
               {iconError && <div className="form-error" role="alert" style={{ marginTop: "var(--space-2)" }}>{iconError}</div>}
+            </div>
+          </div>
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">アイデア用アイコン（既定）</div>
+            <div className="setting-row__desc">
+              あなたが作る<strong>アイデアの共通マーク</strong>です（<strong>プロフィール画像とは別</strong>）。チャット上部・ダッシュボード/クエストのカード・一覧に表示されます。未設定時は<strong>件名の先頭1文字＋クエストカラー</strong>で表示。個別のアイデアに別アイコンを付けたい場合はアイデア編集で設定します（今後対応）。
+            </div>
+          </div>
+          <div className="icon-field">
+            <span className="quest-icon lg" style={{ ["--accent" as string]: "#2563EB" } as React.CSSProperties}>
+              {ideaIconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="quest-icon__img" src={ideaIconUrl} alt="" />
+              ) : (
+                <span className="quest-icon__char">💡</span>
+              )}
+            </span>
+            <div className="icon-actions">
+              <Button type="button" variant="outline" onClick={() => ideaIconInputRef.current?.click()} disabled={ideaIconBusy}>
+                {ideaIconBusy ? "処理中…" : "画像を選ぶ"}
+              </Button>
+              {ideaIconUrl && (
+                <Button type="button" variant="outline" onClick={onClearIdeaIcon} disabled={ideaIconBusy}>削除（既定に戻す）</Button>
+              )}
+              <input ref={ideaIconInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={onPickIdeaIcon} />
+              {ideaIconError && <div className="form-error" role="alert" style={{ marginTop: "var(--space-2)" }}>{ideaIconError}</div>}
             </div>
           </div>
         </div>

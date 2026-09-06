@@ -808,6 +808,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/idea-icon-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Idea Icon Image
+         * @description アイデア用アイコン（既定）を設定（K.4 流儀・multipart・Phase 2）。会社DB users 直接更新＋短TTL 署名URL 返却。変更系＝Origin/CSRF 必須。
+         */
+        put: operations["put_idea_icon_image_api_v1_me_idea_icon_image_put"];
+        post?: never;
+        /**
+         * Delete Idea Icon Image
+         * @description アイデア用アイコン（既定）を削除（件名先頭1文字タイルに戻す・Phase 2）。変更系＝Origin/CSRF 必須。
+         */
+        delete: operations["delete_idea_icon_image_api_v1_me_idea_icon_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/avatar-base": {
         parameters: {
             query?: never;
@@ -2246,6 +2270,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_put_idea_icon_image_api_v1_me_idea_icon_image_put */
+        Body_put_idea_icon_image_api_v1_me_idea_icon_image_put: {
+            /** File */
+            file: string;
+        };
         /** Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put */
         Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
             /** File */
@@ -2891,6 +2920,8 @@ export interface components {
             /** Status */
             status: string;
             author: components["schemas"]["IdeaAuthorDTO"];
+            /** Icon Image Url */
+            icon_image_url?: string | null;
             vote_summary: components["schemas"]["IdeaVoteSummaryDTO"];
             evaluation: components["schemas"]["IdeaEvaluationDTO"];
             /** Comment Count */
@@ -2977,6 +3008,8 @@ export interface components {
             /** Current Revision */
             current_revision: number;
             author: components["schemas"]["IdeaAuthorDTO"];
+            /** Icon Image Url */
+            icon_image_url?: string | null;
             quest: components["schemas"]["IdeaQuestRefDTO"];
             /**
              * Attachments
@@ -3059,6 +3092,14 @@ export interface components {
              * @default 0
              */
             evaluator_count: number;
+        };
+        /**
+         * IdeaIconImageResponse
+         * @description `PUT /me/idea-icon-image` の応答（K.4 流儀）＝設定後の短TTL 署名URL（アイデア用アイコン既定・Phase 2）。
+         */
+        IdeaIconImageResponse: {
+            /** Idea Icon Image Url */
+            idea_icon_image_url: string;
         };
         /** IdeaListResponse */
         IdeaListResponse: {
@@ -3376,6 +3417,8 @@ export interface components {
             display_name: string;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
+            /** Idea Icon Image Url */
+            idea_icon_image_url?: string | null;
             /** Background Image Url */
             background_image_url?: string | null;
             /**
@@ -5846,6 +5889,57 @@ export interface operations {
         };
     };
     delete_avatar_image_api_v1_me_avatar_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_idea_icon_image_api_v1_me_idea_icon_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_idea_icon_image_api_v1_me_idea_icon_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaIconImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_idea_icon_image_api_v1_me_idea_icon_image_delete: {
         parameters: {
             query?: never;
             header?: never;

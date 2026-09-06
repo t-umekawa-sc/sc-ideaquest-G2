@@ -11,6 +11,7 @@ from tests.conftest import SEED_COMPANY_CODE
 ME = "/api/v1/me"
 AVATAR = "/api/v1/me/avatar-image"
 BACKGROUND = "/api/v1/me/background-image"
+IDEA_ICON = "/api/v1/me/idea-icon-image"
 
 # 最小の PNG（1x1・シグネチャ含む＝サーバーは MIME/サイズ＋マジックバイト §8 を検証）
 PNG = bytes.fromhex(
@@ -65,6 +66,35 @@ def test_k_tc_avatar_delete_resets(client, factory, storage):
     r = client.delete(AVATAR, headers=_csrf(client))
     assert r.status_code == 204
     assert client.get(ME).json()["profile"]["avatar_image_url"] is None
+    assert len(storage.objects) == 0
+
+
+def test_k_tc_idea_icon_put_sets_signed_url(client, factory, storage):
+    """K-TC-ideaicon-01 アイデア用アイコン設定＝200＋署名URL、GET /me profile にも署名URL（Phase 2）。"""
+    _login_seed(client, factory)
+    r = client.put(IDEA_ICON, files={"file": ("i.png", PNG, "image/png")}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    url = r.json()["idea_icon_image_url"]
+    assert url and url.startswith("https://minio.test/idea-icons/")
+    assert len(storage.objects) == 1
+    assert client.get(ME).json()["profile"]["idea_icon_image_url"].startswith("https://minio.test/idea-icons/")
+
+
+def test_k_tc_idea_icon_rejects_non_image(client, factory, storage):
+    """K-TC-ideaicon-02 画像以外は 422（MIME allowlist）＝保存されない。"""
+    _login_seed(client, factory)
+    r = client.put(IDEA_ICON, files={"file": ("i.txt", b"hello", "text/plain")}, headers=_csrf(client))
+    assert r.status_code == 422
+    assert len(storage.objects) == 0
+
+
+def test_k_tc_idea_icon_delete_resets(client, factory, storage):
+    """K-TC-ideaicon-03 削除＝204、GET /me の idea_icon_image_url は None、旧オブジェクトも消える。"""
+    _login_seed(client, factory)
+    client.put(IDEA_ICON, files={"file": ("i.png", PNG, "image/png")}, headers=_csrf(client))
+    r = client.delete(IDEA_ICON, headers=_csrf(client))
+    assert r.status_code == 204
+    assert client.get(ME).json()["profile"]["idea_icon_image_url"] is None
     assert len(storage.objects) == 0
 
 
