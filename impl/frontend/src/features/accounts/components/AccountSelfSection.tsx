@@ -262,7 +262,9 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
       {/* 見出し/自社バナーの直後に差し込むスロット（クエストグループ管理→アカウントの順・SC-92 と統一）。 */}
       {children}
 
-      <div className="section-head">
+      {/* 一覧セクションは白パネル（カード）で囲う＝複数一覧の区切りを明確にする横断標準（デザイン標準 §4.5・SC-92 と統一）。 */}
+      <section className="card admin-create admin-create--table" aria-label="自社のアカウント">
+      <div className="admin-toolbar">
         <h2>アカウント</h2>
         {/* 発行は URL 付きモーダル（別ルート /admin/accounts/new）。直アクセス/リロードはフルページ。 */}
         <Link href="/admin/accounts/new" className="btn btn-primary">
@@ -312,6 +314,7 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
       <p className="role-note" style={{ marginTop: "var(--space-6)" }}>
         アカウントは<strong>管理者による発行のみ</strong>です（自己新規登録はできません）。発行後、対象者は<strong>初回ログイン時にパスワードを設定</strong>します（メールのリンク・72時間有効）。<strong>無効化</strong>するとログインできなくなりますが、それまでの入力（アイデア／投票／評価／コメント）は残ります。この画面で発行・編集できるのは<strong>一般アカウント</strong>で、<strong>システムロールの付与（会社アカウント管理者／システム管理者）はシステム管理者が行います</strong>（システム管理者アカウントはこの画面では操作できません）。所属クエストグループは<strong>メンバー／管理者（QG管理者）を指定できます</strong>。
       </p>
+      </section>
     </section>
   );
 }
