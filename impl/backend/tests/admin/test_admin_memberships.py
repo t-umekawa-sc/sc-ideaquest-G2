@@ -242,3 +242,27 @@ def test_b_tc_171_list_includes_active_memberships(client, mem_env):
     assert lr2.status_code == 200, lr2.text
     row_without = next(x for x in lr2.json()["data"] if x["account_id"] == str(aid_without))
     assert row_without["memberships"] == []
+
+
+# --- B-TC-171b: 一覧応答の avatar_url は署名URL（会社DB ミラー・K.4/§1.10） ----------------
+def test_b_tc_171b_list_includes_signed_avatar_url(client, mem_env, storage):
+    """B-TC-171b 一覧応答の各行 avatar_url＝会社DB ミラーの物理パスを短TTL 署名URLに解決（生パスを漏らさない）。"""
+    _login_system_admin(client)
+    url = f"/api/v1/admin/companies/{mem_env.cid}/accounts"
+
+    body = _ident()
+    r = _issue(client, url, body)
+    assert r.status_code == 201, r.text
+    aid = uuid.UUID(r.json()["account_id"])
+    mem_env.track(aid)
+    process_outbox_once()  # 会社DB users ミラー生成
+
+    # ミラー行に物理パスを直接セット（画像本体は不要・presigned のみ検証）。
+    with get_tenant_session(mem_env.db_id) as ts:
+        u = get_user_by_account(ts, aid)
+        u.avatar_image_path = "avatars/acc.png"
+        ts.commit()
+
+    row = next(x for x in client.get(f"{url}?q={body['login_id']}").json()["data"] if x["account_id"] == str(aid))
+    assert row["avatar_url"].startswith("https://minio.test/avatars/acc.png?")  # 署名URL（sig 付き）
+    assert row["avatar_url"] != "avatars/acc.png"  # 生パスそのままではない

@@ -159,7 +159,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
       csvVal: (a) => a.display_name,
       render: (a) => (
         <span className="co">
-          <Avatar name={a.display_name} size="sm" />
+          <Avatar name={a.display_name} imageUrl={a.avatar_url ?? undefined} size="sm" />
           <strong>{a.display_name}</strong>
         </span>
       ),

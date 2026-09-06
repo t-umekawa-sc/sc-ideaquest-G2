@@ -2074,6 +2074,8 @@ export interface components {
             status: string;
             /** Last Login At */
             last_login_at?: string | null;
+            /** Avatar Url */
+            avatar_url?: string | null;
             /** Memberships */
             memberships?: components["schemas"]["MembershipInput"][];
         };
@@ -3507,6 +3509,8 @@ export interface components {
             display_name: string;
             /** Role */
             role: string;
+            /** Avatar Url */
+            avatar_url?: string | null;
         };
         /** MemberListResponse */
         MemberListResponse: {

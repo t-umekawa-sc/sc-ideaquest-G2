@@ -65,6 +65,7 @@
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | B-TC-171 | api | 一覧応答に有効所属（group_id/role）を付与 | ACME-01 にグループ seed・memberships 付き発行→`process_outbox_once()` で会社DB へ適用 | `GET /admin/companies/{ACME-01}/accounts`（当該アカウント行） | 行の `memberships` に `{group_id, role}` を含む（有効所属のみ・`removed_at IS NULL`）／所属の無いアカウント行は `memberships=[]` | API設計 B.2（一覧応答＝所属付き）／§5.5 |
+| B-TC-171b | api | 一覧応答の `avatar_url` は署名URL（会社DB ミラー・物理パス漏洩防止） | 発行→`process_outbox_once()` で users ミラー生成後、ミラーに `avatar_image_path` 設定・Fake storage | `GET /admin/companies/{ACME-01}/accounts`（当該行） | 行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | API設計 B.2／K.4／§1.10 |
 
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
 
@@ -201,6 +202,7 @@
 | B-TC-080 | api | per-group admin による QG管理者判定 | ACME-01 の `general` アカウントが G1 に有効 `admin` 所属（seed）・当人でログイン | `GET /admin/quest-groups` | `200`＋`data` に G1（`member_count` 付き）。**`system_role=general` でも per-group admin で QG管理者**（B案） | B.4／B.0.1 §1.6 |
 | B-TC-081 | api | admin 所属有無での到達可否分岐 | `admin` 所属を持たないアカウント／セッション無し | `GET /admin/quest-groups` | 所属ゼロ＝`403 forbidden`（QG管理者でない＝SC-90 到達不可）／未認証＝`401 unauthenticated` | B.4／B.0.1 P1/P6 |
 | B-TC-082 | api | 所属ベースのメンバー一覧と存在秘匿 | G1 の admin（当人ログイン）・別会社 or 不明 group・admin でない group | `GET /admin/quest-groups/{group_id}/members` | G1＝`200`＋メンバー配列（`removed_at IS NULL`・`users` join・role 付き）／不明・非 admin・他会社＝`404 not_found`（存在秘匿・所属ベース＝system_admin でも admin 所属無しは 404） | B.4／B.0.1 P6/§1.6 |
+| B-TC-082b | api | メンバー一覧の `avatar_url` は署名URL（物理パス漏洩防止） | G1 admin＋メンバーに `avatar_image_path` 設定・Fake storage | `GET /admin/quest-groups/{group_id}/members` | 当該メンバー行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | B.4／K.4／§1.10 |
 | B-TC-083 | api | ディレクトリ最小射影による PII 秘匿 | G1 admin（当人ログイン）／`admin` 所属ゼロのアカウント | `GET /admin/company-directory` | admin＝`200`＋**最小射影**（`account_id`/`display_name`/`avatar_url` のみ＝`email`/`system_role`/所属は**返さない**・`status=active`）／ゼロ admin＝`403` | B.4（ディレクトリ緩和・最小射影）／§8-⑯ |
 | B-TC-083b | api | ディレクトリ `avatar_url` は署名URL（物理パス漏洩防止） | G1 admin＋当人に `avatar_image_path` 設定・Fake storage | `GET /admin/company-directory` | 当該行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | B.4／K.4／§1.10 |
 | B-TC-084 | api | 参加追加の member 固定と SoD 境界 | G1 admin（当人ログイン）・別の既存アカウント target | `POST /admin/quest-groups/{G1}/members`（`{account_id: target}`） | `201`＋会社DB `quest_group_members` に target の有効所属（**`role=member` 固定**＝QG管理者は admin 任命不可）。**target の `accounts` は不変**（SoD）。CSRF 無しは `403 csrf_failed` | B.4（参加追加・member 固定・SoD） |

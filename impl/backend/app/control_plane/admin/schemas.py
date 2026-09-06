@@ -43,6 +43,7 @@ class AccountListItem(BaseModel):
     system_role: str
     status: str
     last_login_at: str | None = None
+    avatar_url: str | None = None  # プロフィール画像の短TTL 署名URL（会社DB ミラー・K.4・§1.10・未設定/未ミラーは None）
     memberships: list[MembershipInput] = Field(default_factory=list)  # 有効所属（group_id/role・B.2）
 
 
@@ -253,6 +254,7 @@ class MemberListItem(BaseModel):
     account_id: str
     display_name: str
     role: str
+    avatar_url: str | None = None  # プロフィール画像の短TTL 署名URL（K.4・§1.10・未設定 None）
 
 
 class MemberListResponse(BaseModel):

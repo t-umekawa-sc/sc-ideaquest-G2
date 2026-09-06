@@ -418,6 +418,13 @@ def list_company_accounts(
     return {"data": data, "pinned": pinned, "page_info": {"total": total, "page": page, "per_page": per_page}}
 
 
+def _image_url(path: str | None) -> str | None:
+    """アバターの物理パス→短TTL 署名URL（K.4・§1.10）。未設定は None。"""
+    from app.infra.storage import get_storage
+
+    return get_storage().presigned_get(path) if path else None
+
+
 def _account_item(a: Account) -> dict:
     return {
         "account_id": str(a.id),
@@ -428,6 +435,7 @@ def _account_item(a: Account) -> dict:
         "system_role": a.system_role,
         "status": a.status,
         "last_login_at": a.last_login_at.isoformat() if a.last_login_at else None,
+        "avatar_url": None,  # 既定＝未解決（下の _attach_memberships が会社DB ミラーから署名URLを付与）
         "memberships": [],  # 既定＝所属無し（下の _attach_memberships が会社DB から上書き）
     }
 
@@ -442,10 +450,13 @@ def _attach_memberships(db_identifier: str, items: list[dict]) -> None:
         return
     account_ids = list({uuid.UUID(it["account_id"]) for it in items})
     by_account: dict[str, list[dict]] = {}
+    avatar_by_account: dict[str, str | None] = {}
     try:
         with get_tenant_session(db_identifier) as tsession:
             users = user_repo.list_users_by_accounts(tsession, account_ids)
             user_to_account = {u.id: str(u.account_id) for u in users}
+            # 会社DB ミラーの avatar_image_path→署名URL（K.4・§1.10）。未ミラー/未設定は None。
+            avatar_by_account = {str(u.account_id): _image_url(u.avatar_image_path) for u in users}
             if user_to_account:
                 for user_id, group_id, role in qg_repo.list_active_memberships_for_users(
                     tsession, list(user_to_account.keys())
@@ -454,10 +465,12 @@ def _attach_memberships(db_identifier: str, items: list[dict]) -> None:
                         {"group_id": str(group_id), "role": role}
                     )
     except OperationalError:
-        # 会社DB が未プロビジョニング/到達不能＝所属は enrichment のため空で degrade（一覧自体は返す）。
+        # 会社DB が未プロビジョニング/到達不能＝所属/アバターは enrichment のため空で degrade（一覧自体は返す）。
         by_account = {}
+        avatar_by_account = {}
     for it in items:
         it["memberships"] = by_account.get(it["account_id"], [])
+        it["avatar_url"] = avatar_by_account.get(it["account_id"])
 
 
 # DataTable 契約（§1.8.1③）＝アカウント CSV の表示可能列とラベル（列順は ?columns= が正）。

@@ -108,7 +108,7 @@ export function QuestGroupAdminView() {
       csvVal: (m) => m.display_name,
       render: (m) => (
         <span className="co">
-          <Avatar name={m.display_name} size="sm" />
+          <Avatar name={m.display_name} imageUrl={m.avatar_url ?? undefined} size="sm" />
           <strong>{m.display_name}</strong>
         </span>
       ),

@@ -126,6 +126,24 @@ def test_b_tc_082_members_list_and_existence_hiding(client, factory, qg):
     assert client.get(f"{QG}/{g2}/members").status_code == 404
 
 
+def test_b_tc_082b_members_list_avatar_is_signed_url(client, factory, qg, storage):
+    """B-TC-082b QGメンバー一覧の avatar_url は短TTL 署名URL（生の物理パスを漏らさない・K.4/§1.10）。"""
+    admin_acc = qg.new_account()
+    g1 = qg.make_group()
+    qg.seed_membership(g1, admin_acc["id"], "admin")
+    member_acc = qg.new_account()
+    qg.seed_membership(g1, member_acc["id"], "member")
+    with get_tenant_session(qg.db_id) as ts:  # メンバーに物理パスを直接セット
+        u = get_user_by_account(ts, member_acc["id"])
+        u.avatar_image_path = "avatars/mem.png"
+        ts.commit()
+    qg.login(admin_acc)
+
+    row = next(m for m in client.get(f"{QG}/{g1}/members").json()["data"] if m["account_id"] == str(member_acc["id"]))
+    assert row["avatar_url"].startswith("https://minio.test/avatars/mem.png?")  # 署名URL（sig 付き）
+    assert row["avatar_url"] != "avatars/mem.png"  # 生パスそのままではない
+
+
 def test_b_tc_083_company_directory_minimal_projection(client, factory, qg):
     """B-TC-083 QG管理者はディレクトリ 200＋最小射影（email/system_role を出さない）／ゼロ admin は 403。"""
     admin_acc = qg.new_account()

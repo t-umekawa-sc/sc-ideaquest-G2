@@ -96,7 +96,8 @@ def list_members(session: dict, group_id: uuid.UUID, *, q: str | None = None) ->
             .where(*conds)
             .order_by(User.display_name)
         ).all()
-        data = [{"account_id": str(u.account_id), "display_name": u.display_name, "role": m.role}
+        data = [{"account_id": str(u.account_id), "display_name": u.display_name, "role": m.role,
+                 "avatar_url": _image_url(u.avatar_image_path)}
                 for m, u in rows]
     return {"data": data}
 
