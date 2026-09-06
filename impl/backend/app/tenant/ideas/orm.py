@@ -35,6 +35,7 @@ class Idea(CompanyBase):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     time_limit: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)  # アイデア個別アイコン（MinIO キー・migration 0022・Phase 3）
     # idea_status（draft/published・§3）。会社DBでも String で持つ。
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft", server_default="draft")
     # 選定フラグ（採用＝XP200/選定通知・F/G）。

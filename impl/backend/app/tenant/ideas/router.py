@@ -17,6 +17,7 @@ from app.tenant.ideas.schemas import (
     IdeaAttachmentsResponse,
     IdeaCreateRequest,
     IdeaDetailDTO,
+    IdeaIconImageResponse,
     IdeaListResponse,
     IdeaPublishRequest,
     IdeaRevisionDiffResponse,
@@ -149,6 +150,33 @@ def delete_idea(
     verify_origin(request)
     verify_csrf(request)
     idea_service.delete_idea(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+    )
+
+
+@router.put("/ideas/{idea_id}/icon-image", response_model=IdeaIconImageResponse)
+async def put_idea_icon(
+    idea_id: str, request: Request, file: UploadFile = File(...), session: dict = Depends(require_me),
+) -> IdeaIconImageResponse:
+    """アイデア個別アイコンを設定（SC-21・multipart・K.4 流儀・Phase 3）。投稿者本人 or owner/quest_admin。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    result = idea_service.set_idea_icon(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
+        data=data, content_type=file.content_type or "",
+    )
+    return IdeaIconImageResponse(**result)
+
+
+@router.delete("/ideas/{idea_id}/icon-image", status_code=204)
+def delete_idea_icon(
+    idea_id: str, request: Request, session: dict = Depends(require_me),
+) -> None:
+    """アイデア個別アイコンを削除（作成者の既定→件名先頭1文字タイルに戻す・Phase 3）。変更系＝Origin/CSRF 必須。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idea_service.delete_idea_icon(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
 

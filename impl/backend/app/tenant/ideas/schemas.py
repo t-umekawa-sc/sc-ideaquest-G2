@@ -232,7 +232,8 @@ class IdeaDetailDTO(BaseModel):
     is_selected: bool
     current_revision: int
     author: IdeaAuthorDTO
-    icon_image_url: str | None = None  # アイデアアイコン（作成者の既定・Phase 2／未設定は件名先頭1文字タイル）
+    icon_image_url: str | None = None  # 表示用に解決したアイデアアイコン（個別→作成者既定→null）。
+    own_icon_image_url: str | None = None  # このアイデア個別のアイコンのみ（未設定 null・編集フォームの現在値用・Phase 3）
     quest: IdeaQuestRefDTO
     attachments: list[IdeaAttachmentDTO] = []
     created_at: datetime
@@ -244,3 +245,8 @@ class IdeaDetailDTO(BaseModel):
     # この応答が「初回公開」の結果である時のみ、実際に付与した投稿 XP（+50）を載せる＝獲得フィードバック（#8）。
     # 参照系（取得/編集）や再公開・冪等スキップ時は 0。金額の正はサーバー（D 台帳 idea_post=+50）。
     xp_delta: int = 0
+
+
+class IdeaIconImageResponse(BaseModel):
+    """`PUT /ideas/{id}/icon-image` の応答（K.4 流儀・Phase 3）＝設定後の短TTL 署名URL（削除時は 204）。"""
+    icon_image_url: str

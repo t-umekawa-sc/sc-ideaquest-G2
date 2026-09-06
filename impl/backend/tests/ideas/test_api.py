@@ -825,3 +825,55 @@ def test_sec_tc_044_idempotency_in_progress(client, env):
         assert resp.headers.get("Retry-After") == "1"
     finally:
         r.delete(scope)
+
+
+# --- D-TC-221: アイデア個別アイコン（Phase 3）＝設定/削除＋解決優先順位（個別>作成者既定>タイル） ---
+_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d494844520000000100000001080600000"
+    "01f15c4890000000a49444154789c6360000002000154a24f0e0000000049454e44ae426082"
+)
+
+
+def test_d_tc_221_idea_icon_set_delete_and_priority(client, env, storage):
+    """D-TC-221 アイデア個別アイコン＝PUT で設定（icon-icons 署名URL）・own に反映／個別は作成者既定を上書き／DELETE で既定に戻る。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid, status="published", author=env.user_id)
+
+    # 作成者（＝ログインユーザー）の既定アイデアアイコンを設定（Phase 2）。
+    assert client.put("/api/v1/me/idea-icon-image", files={"file": ("d.png", _PNG, "image/png")}, headers=_csrf(client)).status_code == 200
+    # 個別未設定＝表示は作成者既定に解決／own は None。
+    d = client.get(IDEA(iid)).json()
+    assert d["own_icon_image_url"] is None
+    assert d["icon_image_url"] and d["icon_image_url"].startswith("https://minio.test/idea-icons/")
+    default_url = d["icon_image_url"]
+
+    # アイデア個別アイコンを設定＝own に入り、表示も個別（既定を上書き）。
+    r = client.put(f"{IDEA(iid)}/icon-image", files={"file": ("i.png", _PNG, "image/png")}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    own = r.json()["icon_image_url"]
+    assert own.startswith("https://minio.test/idea-icons/")
+    d2 = client.get(IDEA(iid)).json()
+    assert d2["own_icon_image_url"] == d2["icon_image_url"]  # 個別が表示値
+    assert d2["icon_image_url"] != default_url  # 既定を上書き
+
+    # 個別を削除＝own は None・表示は作成者既定に戻る。
+    assert client.delete(f"{IDEA(iid)}/icon-image", headers=_csrf(client)).status_code == 204
+    d3 = client.get(IDEA(iid)).json()
+    assert d3["own_icon_image_url"] is None
+    assert d3["icon_image_url"] and d3["icon_image_url"].startswith("https://minio.test/idea-icons/")
+
+    # cleanup: 作成者既定アイコンを消す（共有 seed 非破壊）。
+    client.delete("/api/v1/me/idea-icon-image", headers=_csrf(client))
+
+
+def test_d_tc_221b_idea_icon_authz(client, env, storage):
+    """D-TC-221b 非投稿者・非管理者は個別アイコンを設定できない（403）／未認証 401／CSRF 無し 403。"""
+    _login_seed(client)
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote", "comment"])  # owner は他人・ログインは一般メンバー（quest_admin なし）
+    iid = env.make_idea(quest_id=qid, status="published", author=env.other_id)  # 他人の公開アイデア
+
+    # ログインユーザーは投稿者でも owner/quest_admin でもない（member 権限のみ）＝403。
+    assert client.put(f"{IDEA(iid)}/icon-image", files={"file": ("i.png", _PNG, "image/png")}, headers=_csrf(client)).status_code == 403
+    # CSRF 無し＝403（変更系）。
+    assert client.put(f"{IDEA(iid)}/icon-image", files={"file": ("i.png", _PNG, "image/png")}).status_code == 403

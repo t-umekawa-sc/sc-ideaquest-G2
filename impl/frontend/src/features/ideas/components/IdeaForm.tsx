@@ -17,9 +17,11 @@ import { getQuest, type QuestDetail } from "@/features/quests/api";
 import {
   createIdea,
   deleteAttachment,
+  deleteIdeaIcon,
   getIdea,
   IDEAS_CHANGED_EVENT,
   publishIdea,
+  setIdeaIcon,
   updateIdea,
   uploadAttachments,
   type IdeaAttachment,
@@ -76,6 +78,12 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const [existingAttachments, setExistingAttachments] = useState<IdeaAttachment[]>([]); // 編集＝保存済みの添付（D.3）
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+  // アイデア個別アイコン（Phase 3）＝2段（本体保存→PUT /ideas/{id}/icon-image）。iconUrl は「このアイデア個別のみ」（own_icon_image_url）。
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [iconUrl, setIconUrl] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconRemoved, setIconRemoved] = useState(false);
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const [pendingKind, setPendingKind] = useState<null | "draft" | "publish" | "save">(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [summary, setSummary] = useState<string[]>([]);
@@ -116,6 +124,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           setStakeholders((idea.stakeholders ?? []).map((s) => s.label));
           setNote(idea.note ?? "");
           setExistingAttachments(idea.attachments ?? []); // 保存済み添付の管理（D.3・編集）
+          setIconUrl(idea.own_icon_image_url ?? null); // このアイデア個別のアイコン（既定は含めない・Phase 3）
         }
         setLoading(false);
       })
@@ -128,6 +137,23 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       alive = false;
     };
   }, [isEdit, ideaId]);
+
+  function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconPreview(URL.createObjectURL(file));
+    setIconFile(file);
+    setIconRemoved(false);
+  }
+  function onClearIcon() {
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconPreview(null);
+    setIconFile(null);
+    if (iconUrl) setIconRemoved(true); // 既存の個別アイコンがあった＝保存時に削除（作成者既定/件名タイルに戻す）
+    setIconUrl(null);
+    if (iconInputRef.current) iconInputRef.current.value = "";
+  }
 
   function addStake(v: string) {
     const t = v.trim();
@@ -251,6 +277,15 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           snack({ type: "error", msg: "一部の添付をアップロードできませんでした（サイズ/形式/件数をご確認ください）。" });
         }
       }
+      // アイデア個別アイコン（Phase 3）＝id 先行が必要なので保存後に送信（非致命）。設定→PUT／解除→DELETE。
+      if (targetId) {
+        try {
+          if (iconFile) await setIdeaIcon(targetId, iconFile);
+          else if (iconRemoved) await deleteIdeaIcon(targetId);
+        } catch {
+          snack({ type: "error", msg: "アイコンを保存できませんでした（サイズ/形式をご確認ください）。" });
+        }
+      }
       if (typeof window !== "undefined") window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
       if (kind === "save") {
         snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
@@ -344,6 +379,25 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             aria-invalid={fieldErrors.title ? true : undefined}
             required
           />
+        </Field>
+        <Field id="idea_icon" label="アイデアアイコン（任意）">
+          <div className="icon-field">
+            {iconPreview || iconUrl ? (
+              <span className="quest-icon lg">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="quest-icon__img" src={iconPreview ?? iconUrl ?? ""} alt="" />
+              </span>
+            ) : (
+              // 未設定＝件名先頭1文字タイル（クエスト色）。実表示は「個別→作成者の既定→このタイル」の順に解決。
+              <QuestIcon name={subject || "案"} color={quest?.color} size="lg" />
+            )}
+            <div className="icon-actions">
+              <Button type="button" variant="outline" onClick={() => iconInputRef.current?.click()}>画像をアップロード</Button>
+              {(iconPreview || iconUrl) && <Button type="button" variant="outline" onClick={onClearIcon}>未設定に戻す</Button>}
+              <input ref={iconInputRef} id="idea_icon" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={onPickIcon} />
+              <span className="hint">未設定なら「あなたのアイデア用アイコン（プロフィール）→ 件名の先頭1文字＋クエスト色」を自動表示。</span>
+            </div>
+          </div>
         </Field>
         <Field id="idea_value" label="価値" required error={fieldErrors.value}>
           <textarea

@@ -76,6 +76,7 @@
 | D-TC-135 | api | 添付追加は編集権限（本人/owner/quest_admin） | 他人の published（自分は vote のみ） | `POST attachments` | 403 | D.3 |
 | D-TC-136 | api | DL はパーティー所属→短TTL 署名URL | 添付1件 | `GET /attachments/{aid}/download` | 200・`{url}`（署名URL・生パス非露出） | D.3／§1.10 |
 | D-TC-137 | api | 完了クエストは添付追加を凍結 | completed クエストの published アイデア | `POST attachments` | 409 `conflict`（invalid_state） | D.3／C.5 |
+| D-TC-221 | api | アイデア個別アイコンの設定/削除＋解決優先順位（個別>作成者既定>タイル） | published アイデア（自作）・Fake storage・作成者の既定アイデアアイコン設定済み | `PUT/DELETE /ideas/{id}/icon-image`＋`GET /ideas/{id}` | PUT＝200＋`icon_image_url`（idea-icons/署名URL）・`own_icon_image_url` に反映・**個別が作成者既定を上書き**／DELETE＝204・`own` は None・表示は**作成者既定に戻る**。認可＝非投稿者/非管理者は 403・CSRF 無し 403（D-TC-221b） | デザイン標準「アイデアアイコン」Phase 3／K.4／§1.10 |
 | D-TC-142 | api | 公開処理で初版 revision=1 を記録（通知なし・D.4 line104） | 下書きを `POST publish`／`POST ideas`（published） | `GET /ideas/{id}/revisions` | 初版 revision=1 が1件・`current_revision=1`・`changed_fields=[]`（初版）・通知は発火しない | D.4／§5.14 |
 | D-TC-138 | api | 版タイムライン取得（新しい順） | published を2回編集（初版1＋編集2/3）| `GET /ideas/{id}/revisions` | `data` が `revision` 降順〔3,2,1〕・各行に `editor`〔氏名〕/`created_at`/`changed_fields[]`〔前版比の変更フィールド・初版は空〕/`memo?`・`page_info` | D.4 |
 | D-TC-139 | api | 版タイムラインの門番/可視性 | 非パーティーのアイデア／他人の下書き | `GET /ideas/{id}/revisions` | 404（存在秘匿・下書きは本人のみ・C.0） | D.4／C.0 |

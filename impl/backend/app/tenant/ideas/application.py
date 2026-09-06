@@ -19,6 +19,7 @@ from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.ideas import repository as repo
 from app.tenant.ideas.schemas import STATUS_VALUES
 from app.tenant.notifications import service as notify_svc
@@ -735,9 +736,8 @@ def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval
         "title": idea.title,
         "status": idea.status,
         "author": _author_dto(author, idea.author_id),
-        # アイデアアイコン＝作成者の既定アイデアアイコン（Phase 2）。未設定は None＝フロントが件名先頭1文字タイル。
-        # Phase 3 でアイデア個別 icon_image_path を優先する予定。
-        "icon_image_url": _image_url(author.idea_icon_image_path) if author else None,
+        # アイデアアイコン＝① アイデア個別（Phase 3）→ ② 作成者の既定（Phase 2）→ None（フロントが件名先頭1文字タイル）。
+        "icon_image_url": _image_url(idea.icon_image_path) or (_image_url(author.idea_icon_image_path) if author else None),
         "vote_summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
         "comment_count": (comment_counts or {}).get(idea.id, 0),  # E 非削除チャット件数（💬・D.1）
         "is_selected": idea.is_selected,
@@ -783,7 +783,9 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "is_selected": idea.is_selected,
         "current_revision": idea.current_revision,
         "author": _author_dto(author, idea.author_id),
-        "icon_image_url": _image_url(author.idea_icon_image_path) if author else None,  # アイデアアイコン＝作成者の既定（Phase 2）
+        # アイデアアイコン＝① アイデア個別（Phase 3）→ ② 作成者の既定（Phase 2）→ None（件名先頭1文字タイル）。
+        "icon_image_url": _image_url(idea.icon_image_path) or (_image_url(author.idea_icon_image_path) if author else None),
+        "own_icon_image_url": _image_url(idea.icon_image_path),  # 編集フォームの現在値＝このアイデア個別のみ（既定は含めない）
         "quest": quest_ref,
         "attachments": _attachments_payload(ts, repo.list_attachments(ts, idea.id)),
         "created_at": idea.created_at,
@@ -825,3 +827,62 @@ def _attachments_payload(ts, atts) -> list[dict]:
         }
         for a in atts
     ]
+
+
+def set_idea_icon(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str, *,
+                  data: bytes, content_type: str) -> dict:
+    """アイデア個別アイコンを設定（K.4 流儀の専用 multipart EP・Phase 3）。投稿者本人 or owner/quest_admin。旧画像は best-effort 削除。"""
+    validate_image_upload(content_type, data)
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    storage = get_storage()
+    old: str | None = None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        quest = quests_repo.get_quest(ts, idea.quest_id)
+        _authorize_edit_idea(ts, idea, quest, user)  # 投稿者/owner/quest_admin（下書きは本人のみ＝他人 404）
+        _guard_not_completed(quest)  # 完了クエストのアイデアは編集不可（409）
+        key = storage.put(data, content_type, prefix="idea-icons")
+        old = idea.icon_image_path
+        idea.icon_image_path = key
+        ts.commit()
+    if old:
+        try:
+            storage.remove(old)
+        except Exception:
+            pass
+    return {"icon_image_url": storage.presigned_get(key)}
+
+
+def delete_idea_icon(account_id: uuid.UUID, company_id: uuid.UUID, idea_id: str) -> None:
+    """アイデア個別アイコンを削除（作成者の既定→件名先頭1文字タイルに戻す・Phase 3）。投稿者本人 or owner/quest_admin。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    storage = get_storage()
+    old: str | None = None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        quest = quests_repo.get_quest(ts, idea.quest_id)
+        _authorize_edit_idea(ts, idea, quest, user)
+        old = idea.icon_image_path
+        idea.icon_image_path = None
+        ts.commit()
+    if old:
+        try:
+            storage.remove(old)
+        except Exception:
+            pass

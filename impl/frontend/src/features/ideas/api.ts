@@ -52,6 +52,16 @@ export function updateIdea(ideaId: string, input: IdeaUpdateInput): Promise<Idea
   return apiFetch<IdeaDetail>(`/ideas/${ideaId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
+// アイデア個別アイコン（SC-21・K.4・MinIO・multipart・Phase 3）。投稿者本人 or owner/quest_admin。
+export function setIdeaIcon(ideaId: string, file: File): Promise<{ icon_image_url: string } | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch<{ icon_image_url: string }>(`/ideas/${ideaId}/icon-image`, { method: "PUT", body: fd });
+}
+export function deleteIdeaIcon(ideaId: string): Promise<null> {
+  return apiFetch<null>(`/ideas/${ideaId}/icon-image`, { method: "DELETE" }) as Promise<null>;
+}
+
 // 下書きを公開（draft→published・D.2・アトミック）。作成者のみ・strict 検証。任意で内容も同時更新可。
 export function publishIdea(ideaId: string, input: IdeaPublishInput = {}): Promise<IdeaDetail | null> {
   return apiFetch<IdeaDetail>(`/ideas/${ideaId}/publish`, { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });

@@ -1273,6 +1273,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ideas/{idea_id}/icon-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Idea Icon
+         * @description アイデア個別アイコンを設定（SC-21・multipart・K.4 流儀・Phase 3）。投稿者本人 or owner/quest_admin。変更系＝Origin/CSRF 必須。
+         */
+        put: operations["put_idea_icon_api_v1_ideas__idea_id__icon_image_put"];
+        post?: never;
+        /**
+         * Delete Idea Icon
+         * @description アイデア個別アイコンを削除（作成者の既定→件名先頭1文字タイルに戻す・Phase 3）。変更系＝Origin/CSRF 必須。
+         */
+        delete: operations["delete_idea_icon_api_v1_ideas__idea_id__icon_image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/vote": {
         parameters: {
             query?: never;
@@ -2270,6 +2294,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_put_idea_icon_api_v1_ideas__idea_id__icon_image_put */
+        Body_put_idea_icon_api_v1_ideas__idea_id__icon_image_put: {
+            /** File */
+            file: string;
+        };
         /** Body_put_idea_icon_image_api_v1_me_idea_icon_image_put */
         Body_put_idea_icon_image_api_v1_me_idea_icon_image_put: {
             /** File */
@@ -3010,6 +3039,8 @@ export interface components {
             author: components["schemas"]["IdeaAuthorDTO"];
             /** Icon Image Url */
             icon_image_url?: string | null;
+            /** Own Icon Image Url */
+            own_icon_image_url?: string | null;
             quest: components["schemas"]["IdeaQuestRefDTO"];
             /**
              * Attachments
@@ -3092,14 +3123,6 @@ export interface components {
              * @default 0
              */
             evaluator_count: number;
-        };
-        /**
-         * IdeaIconImageResponse
-         * @description `PUT /me/idea-icon-image` の応答（K.4 流儀）＝設定後の短TTL 署名URL（アイデア用アイコン既定・Phase 2）。
-         */
-        IdeaIconImageResponse: {
-            /** Idea Icon Image Url */
-            idea_icon_image_url: string;
         };
         /** IdeaListResponse */
         IdeaListResponse: {
@@ -4303,6 +4326,22 @@ export interface components {
             next_cursor?: string | null;
             /** Has Next */
             has_next: boolean;
+        };
+        /**
+         * IdeaIconImageResponse
+         * @description `PUT /me/idea-icon-image` の応答（K.4 流儀）＝設定後の短TTL 署名URL（アイデア用アイコン既定・Phase 2）。
+         */
+        app__control_plane__me__schemas__IdeaIconImageResponse: {
+            /** Idea Icon Image Url */
+            idea_icon_image_url: string;
+        };
+        /**
+         * IdeaIconImageResponse
+         * @description `PUT /ideas/{id}/icon-image` の応答（K.4 流儀・Phase 3）＝設定後の短TTL 署名URL（削除時は 204）。
+         */
+        app__tenant__ideas__schemas__IdeaIconImageResponse: {
+            /** Icon Image Url */
+            icon_image_url: string;
         };
         /** CursorPageInfo */
         app__tenant__notifications__schemas__CursorPageInfo: {
@@ -5925,7 +5964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IdeaIconImageResponse"];
+                    "application/json": components["schemas"]["app__control_plane__me__schemas__IdeaIconImageResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6894,6 +6933,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IdeaDetailDTO"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_idea_icon_api_v1_ideas__idea_id__icon_image_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_idea_icon_api_v1_ideas__idea_id__icon_image_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__tenant__ideas__schemas__IdeaIconImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_idea_icon_api_v1_ideas__idea_id__icon_image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
