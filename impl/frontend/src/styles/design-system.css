@@ -1571,6 +1571,28 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .dt-pin-float:hover { opacity: 1; border-color: var(--color-primary); background: var(--color-primary-soft); }
 .dt-pin-float[aria-pressed="true"] { opacity: 1; background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft), var(--shadow); }  /* 固定＝青塗り＋光輪でひと目で分かる */
 .dt-cardraw.is-pinned > :first-child { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }  /* 固定カード＝太い青リング */
+
+/* ピン止め/解除の一過性フィードバック（§4.5・ユーザー要望 2026-09-06）＝移動先の行/カードを一度だけハイライト＋ピンをポップ。
+   ピン行は既定で primary-soft 背景のため、演出は視認できる別トーン（固定=青／解除=琥珀）でフラッシュする。
+   reduce-motion＝OS(prefers-reduced-motion) と ユーザー設定([data-anim-reduced] グローバルキルスイッチ)の双方で無効。 */
+.table tr.dt-pin-anim-in > td { animation: dt-pin-flash-in .5s ease; }
+.table tr.dt-pin-anim-out > td { animation: dt-pin-flash-out .5s ease; }
+.dt-card.dt-pin-anim-in, .dt-cardraw.dt-pin-anim-in { animation: dt-pin-pop-in .5s ease; }
+.dt-card.dt-pin-anim-out, .dt-cardraw.dt-pin-anim-out { animation: dt-pin-pop-out .5s ease; }
+.dt-pin-anim-in .dt-pin-toggle, .dt-pin-anim-out .dt-pin-toggle,
+.dt-pin-anim-in .dt-pin-float, .dt-pin-anim-out .dt-pin-float { animation: dt-pin-icon-pop .45s ease; }
+@keyframes dt-pin-flash-in { from { background-color: #BFDBFE; } to { background-color: transparent; } }   /* blue-200→透過 */
+@keyframes dt-pin-flash-out { from { background-color: #FDE68A; } to { background-color: transparent; } }  /* amber-200→透過 */
+@keyframes dt-pin-pop-in { 0% { transform: scale(.97); box-shadow: 0 0 0 3px var(--color-primary); } 100% { transform: scale(1); box-shadow: none; } }
+@keyframes dt-pin-pop-out { 0% { transform: scale(.97); box-shadow: 0 0 0 3px #F59E0B; } 100% { transform: scale(1); box-shadow: none; } }
+@keyframes dt-pin-icon-pop { 0% { transform: scale(1); } 35% { transform: scale(1.5); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .table tr.dt-pin-anim-in > td, .table tr.dt-pin-anim-out > td,
+  .dt-card.dt-pin-anim-in, .dt-card.dt-pin-anim-out,
+  .dt-cardraw.dt-pin-anim-in, .dt-cardraw.dt-pin-anim-out,
+  .dt-pin-anim-in .dt-pin-toggle, .dt-pin-anim-out .dt-pin-toggle,
+  .dt-pin-anim-in .dt-pin-float, .dt-pin-anim-out .dt-pin-float { animation: none; }
+}
 .dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 /* 表示密度=コンパクト（カード）＝間隔と余白を詰める。密度トグルはテーブル/カード共通。 */

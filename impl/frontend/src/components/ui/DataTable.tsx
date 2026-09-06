@@ -307,6 +307,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const [hidden, setHidden] = useState<string[]>(defaultHidden);
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [pins, setPins] = useState<string[]>([]);
+  // ピン止め/解除の一過性フィードバック（§4.5・reduce-motion 尊重）＝移動先の行/カードを一度だけハイライト＋ピンをポップ。
+  const [pinFx, setPinFx] = useState<{ id: string; kind: "in" | "out" } | null>(null);
   const [view, setView] = useState<View>(hasCard ? props.defaultView ?? "list" : "list");
   // UI
   const [sortOpen, setSortOpen] = useState(false);
@@ -488,6 +490,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
     });
   }, [pageRows, pinned, density, view, order, hidden, widths]);
 
+  // ピン演出は一度だけ＝アニメーション時間後にクラスを外す（連続トグルでも最新のみ演出）。
+  useEffect(() => {
+    if (!pinFx) return;
+    const t = setTimeout(() => setPinFx(null), 520);
+    return () => clearTimeout(t);
+  }, [pinFx]);
+
   // 列設定メニューの外側クリックで閉じる。
   useEffect(() => {
     if (!colMenuOpen) return;
@@ -518,14 +527,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
   }
 
   function togglePin(id: string) {
-    setPins((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= maxPins) {
-        alert(`固定できる行は最大 ${maxPins} 件です。`);
-        return prev;
-      }
-      return [...prev, id];
-    });
+    const willUnpin = pins.includes(id);
+    if (!willUnpin && pins.length >= maxPins) {
+      alert(`固定できる行は最大 ${maxPins} 件です。`);
+      return;
+    }
+    setPins((prev) => (willUnpin ? prev.filter((x) => x !== id) : [...prev, id]));
+    setPinFx({ id, kind: willUnpin ? "out" : "in" }); // 移動先で1回だけ演出（下の useEffect で解除）
   }
 
   // 行/カードのクリック標準（インタラクティブ要素上のクリックは主アクションにしない）。
@@ -680,7 +688,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   function renderRow(r: T, pinnedNow: boolean) {
     const id = String(rowId(r));
-    const trCls = [clickable ? "dt-row--link" : "", pinnedNow ? "is-pinned" : "", props.rowClass?.(r) ?? ""]
+    const fxCls = pinFx?.id === id ? (pinFx.kind === "in" ? "dt-pin-anim-in" : "dt-pin-anim-out") : "";
+    const trCls = [clickable ? "dt-row--link" : "", pinnedNow ? "is-pinned" : "", fxCls, props.rowClass?.(r) ?? ""]
       .filter(Boolean)
       .join(" ");
     return (
@@ -726,11 +735,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   function renderCard(r: T, pinnedNow: boolean) {
     const id = String(rowId(r));
+    const fxCls = pinFx?.id === id ? (pinFx.kind === "in" ? "dt-pin-anim-in" : "dt-pin-anim-out") : "";
     if (props.cardRaw) {
       const raw = props.cardRaw(r);
       if (!pinsEnabled) return <div key={id}>{raw}</div>;
       return (
-        <div key={id} className={`dt-cardraw${pinnedNow ? " is-pinned" : ""}`}>
+        <div key={id} className={`dt-cardraw${pinnedNow ? " is-pinned" : ""}${fxCls ? ` ${fxCls}` : ""}`}>
           {raw}
           {pinButton(id, pinnedNow, true)}
         </div>
@@ -741,6 +751,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
       pinnedNow ? "is-pinned" : "",
       clickable ? "dt-card--link" : "",
       actionsCol ? "dt-card--has-actions" : "",
+      fxCls,
       props.rowClass?.(r) ?? "",
     ]
       .filter(Boolean)
