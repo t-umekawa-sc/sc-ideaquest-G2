@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout/QuestIcon";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav";
@@ -370,7 +371,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               {questCompleted && <span className="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span>}
               {!questCompleted && voteClosedByDeadline && <span className="badge badge-muted" title="締切日を過ぎたため投票は締め切られています">🔒 投票締切</span>}
             </div>
-            <h1>{idea.title}</h1>
+            {/* アイデアアイコン（個別→作成者既定→件名先頭1文字タイル〔クエストアクセント色〕・デザイン標準 Phase 3）を件名の左に表示。 */}
+            <div className="idea-head__title">
+              <QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="sm" />
+              <h1>{idea.title}</h1>
+            </div>
             <div className="poster">
               <Avatar name={authorName} imageUrl={idea.author.avatar_image_url ?? undefined} size="sm" level={idea.author.level ?? undefined} />
               <span className="name">投稿: {authorName}</span>
