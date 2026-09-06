@@ -127,7 +127,7 @@
 
 ### 5-E. canvas エンジンの決定的部分（スプライト/軌道）frontend 単体（Phase E・SpellCanvasFx・GF-AC-091）
 
-> 対象＝`impl/frontend/src/features/spells/engines/sprites.ts`（純ロジック）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17b-h` の canvas+rAF エンジン）を production の canvas ハーネス（`components/ui/SpellCanvasFx.tsx`＋`features/spells/useSpellEngine.ts`）へ移植するにあたり、**canvas 本体（imperative＋`Math.random()` で非決定的）は GF-AC ブラウザ受入**に委ね、決定的に抽出できる「ドット絵スプライトのデコード」と「UFO のパターン別軌道（prog→座標）」のみ unit で担保する。`decodeSprite(art,colMap)`＝`.`透過を除外し各非透過セルを `{x,y,char,color}` に解決（未知文字＝色 null）。`ufoPosition(pat,prog,params)`＝進行 prog(0..1) から (x,y) を算出（両端で x=x0/x1・パターン別に y のうねり方が変わる）。視覚（きらめき/天の川/オーロラ/UFO の見た目）は §17h の GF-AC でブラウザ受入。reduce-motion はハーネスが `reduceStatic()` を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-155）で担保。
+> 対象＝`impl/frontend/src/features/spells/engines/sprites.ts`（純ロジック）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17b-h` の canvas+rAF エンジン）を production の canvas ハーネス（`components/ui/SpellCanvasFx.tsx`＋`features/spells/useSpellEngine.ts`）へ移植するにあたり、**canvas 本体（imperative＋`Math.random()` で非決定的）は GF-AC ブラウザ受入**に委ね、決定的に抽出できる「ドット絵スプライトのデコード」と「UFO のパターン別軌道（prog→座標）」のみ unit で担保する。`decodeSprite(art,colMap)`＝`.`透過を除外し各非透過セルを `{x,y,char,color}` に解決（未知文字＝色 null）。`ufoPosition(pat,prog,params)`＝進行 prog(0..1) から (x,y) を算出（両端で x=x0/x1・パターン別に y のうねり方が変わる）。視覚（彩色のきらめき/金の流れ星/UFO の見た目・推進排気）は §17L-h（ライト版）の GF-AC でブラウザ受入。※ダーク版（§17h＝夜空/天の川/オーロラ）は明色パネルで見えないため `sparkle.ts` はライト版へ再移植済み（`UFO_COL` も明色パネル向けの暗縁取り配色）。reduce-motion はハーネスが `reduceStatic()` を呼び rAF を回さない（純ロジックは対象外）。決定的（乱数なし）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-155）で担保。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |

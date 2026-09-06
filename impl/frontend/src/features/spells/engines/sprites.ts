@@ -1,4 +1,4 @@
-// canvas エンジンの決定的部分（Phase E・G-TC-155）。受入済みモック（style-guide.html §17h）の
+// canvas エンジンの決定的部分（Phase E・G-TC-155）。受入済みモック（style-guide.html §17L-h＝ライト版）の
 // ドット絵スプライトと UFO 軌道を production の canvas ハーネスへ移すにあたり、乱数を含まず
 // 決定的に検証できる「スプライトのデコード」と「パターン別軌道」だけをここに切り出す。
 // canvas 本体（描画/rAF/spawn の乱数）は非決定的なので GF-AC ブラウザ受入に委ねる。
@@ -15,13 +15,14 @@ export const UFO_ART = [
   ".....kkkkk.....",
 ] as const;
 
+// 明色パネル向け（§17L-h）＝暗めの縁取りで白背景でも輪郭が見える配色。
 export const UFO_COL: Record<string, string> = {
-  d: "#d6f2ff",
-  D: "#8fd7ff",
-  h: "#e8f4ff",
-  H: "#c9dcf0",
-  B: "#93a6c4",
-  k: "#5f7290",
+  d: "#9fd0f0",
+  D: "#5aa8d8",
+  h: "#b9d6ea",
+  H: "#8fb3cc",
+  B: "#5a7290",
+  k: "#33465f",
 };
 
 export type SpriteCell = { x: number; y: number; char: string; color: string | null };
