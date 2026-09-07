@@ -187,3 +187,10 @@
 | G-TC-162 | unit(front) | 魔法陣の頂点列（BOUNCES+1 点・すべて半径 R 上・seed 再現） | 半径 R／seed 付き rng | `genPath(R, mulberry32(seed))` | `LEARN_BOUNCES+1` 点／各頂点は半径 R 上（円で反射）／同 seed は同経路・異 seed は異なる（決定的） | GF-AC-110／#11 |
 | G-TC-162 | unit(front) | 決定的乱数（seed 再現） | seed | `mulberry32(seed)` | 同 seed は同数列／各値は `[0,1)` | GF-AC-110／#11 |
 | G-TC-162 | unit(front) | 選定済み seed 選択／reduce 分岐 | rand([0,1))／実効抑制 reduce | `pickLearnSeed(rand)`・`planLearn(reduce)` | `pickLearnSeed` は `LEARN_SEEDS` のいずれか（範囲端 0/≈1 も安全）／`planLearn(true)="static"`・`planLearn(false)="animate"`／決定的 | GF-AC-110／#11 |
+
+### 5-M. 残高のヒーロー／ヘッダー同期 e2e（購入＝コイン・解放＝SP）（GF-AC-111/121・回帰ガード）
+
+> **なぜ**＝残高チップは2箇所（画面のヒーロー ＋ 共通ヘッダー右上）にあり、ヘッダーはサーバー `layout.tsx` の `GET /me` 由来。アクション後に `router.refresh()` を忘れると**ヘッダーだけ更新されない**（実際に魔法解放 SP で発生・修正済み）。ゲーム感フェーズ §1.1「機能は Claude がテストで担保」に基づく回帰ガード。純ロジックは各 unit（`CountUp`/`learnFx` 等）で担保済みのため、ここは**アクション後の両表示の一致**という統合挙動を e2e で押さえる。対象＝`impl/frontend/e2e/sc-30-32-balance-sync.spec.ts`。テスト用ユーザー `user2@acme.example` を DB で baseline（SP100/コイン1000・未所有・台帳クリア）へリセットしてから実行し、後始末で再リセット（会社DB直操作＝`user_spells`/`user_items`/`activities` の `spell_unlock`・`shop_purchase`／`users` 残高）。docker QA スタック前提。
+
+| G-TC-163 | e2e(front) | 魔法解放で SP がヒーローとヘッダー両方で減る | user2（SP100）で炎（前提なし・1SP）を解放 | `/spells` の `.sp-hero__num`／`.app-header .pixel-stat.skill` | 開封後、**両方が 100→99**（ヒーローとヘッダーが一致して減る） | GF-AC-110/111／#11 |
+| G-TC-164 | e2e(front) | ショップ購入でコインがヒーロー(wallet)とヘッダー両方で減る | user2（コイン1000）で未所有アイテムを購入 | `/shop` の `.wallet__num`／`.app-header .pixel-stat.coin` | 購入後、**両方が 1000−価格**（wallet とヘッダーが一致して減る） | GF-AC-120/121／#12 |
