@@ -5,6 +5,7 @@
 // 解放した魔法は SC-24 チャットの魔法リアクションで発動。装飾/社交演出のみで XP/評価/投票に影響しない。
 // 正＝doc/画面設計/mocks/SC-32_魔法スキル.html・doc/画面設計/screens/SC-32_魔法スキル.md。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Spinner, CountUp, GameNav, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
@@ -35,6 +36,7 @@ const FLAVOR: Record<string, { preview: string; desc: string }> = {
 export function SpellsView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
+  const router = useRouter(); // 解放後にサーバー layout の /me を再取得＝ヘッダーの SP チップも更新（GF-AC-111）
   const [spells, setSpells] = useState<SpellDTO[]>([]);
   const [sp, setSp] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -98,10 +100,11 @@ export function SpellsView() {
       const started = startLearn("spell-" + s.id, s.icon, s.id);
       if (started) {
         pendingSpRef.current = newSp;
-        await load({ keepSp: true }); // 解放状態は最新化・SP は開封時まで据え置き
+        await load({ keepSp: true }); // 解放状態は最新化・SP は開封時まで据え置き（ヘッダーも開封時に router.refresh＝onReveal）
       } else {
         setSp(newSp); // reduce-motion 等で演出が無い＝即反映
         await load();
+        router.refresh();
       }
       snack({
         type: "reward",
@@ -145,7 +148,7 @@ export function SpellsView() {
           cardRect={learning.cardRect}
           iconRect={learning.iconRect}
           icon={learning.icon}
-          onReveal={() => { if (pendingSpRef.current != null) { setSp(pendingSpRef.current); pendingSpRef.current = null; } }}
+          onReveal={() => { if (pendingSpRef.current != null) { setSp(pendingSpRef.current); pendingSpRef.current = null; } router.refresh(); }}
           onDone={() => setLearning(null)}
         />
       )}

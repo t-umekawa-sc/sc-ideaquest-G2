@@ -83,7 +83,8 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
                 ◆ <CountUp value={balance.coin} format={(n) => `${n}`} />
               </Link>
               <Link className="pixel-stat skill" href="/spells" title="スキルポイント（魔法/スキル画面へ）">
-                ✦ SP {balance.sp}
+                {/* GF-AC-111: 残高変化時に数値がカウント（前値→新値へ補間・減少も可）。書式は現状維持（カンマ無し）。 */}
+                ✦ SP <CountUp value={balance.sp} format={(n) => `${n}`} />
               </Link>
             </>
           )}
@@ -124,7 +125,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
                 <li className="usermenu__m usermenu__status" role="none">
                   <span className="pixel-stat level">Lv.{balance.level}</span>
                   <span className="pixel-stat coin" data-bump={coinPulse ? "true" : undefined}>◆ <CountUp value={balance.coin} format={(n) => `${n}`} /></span>
-                  <span className="pixel-stat skill">✦ SP {balance.sp}</span>
+                  <span className="pixel-stat skill">✦ SP <CountUp value={balance.sp} format={(n) => `${n}`} /></span>
                 </li>
               )}
               <li className="usermenu__m" role="none">
