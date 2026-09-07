@@ -3152,7 +3152,7 @@
     <p class="muted text-sm">#11 魔法解放（GF-AC-110）の演出モック。<strong>魔法ごとに変えず、全魔法で共通の「習得」演出</strong>にする方針（術者が“新しい魔法を覚えた”瞬間）。核モチーフ＝<strong>ドット絵の魔法陣</strong>＝アイコンを中心に<strong>円が広がり、その内側をランダムに走る線が円にぶつかると折れる…を繰り返して魔法陣を描く</strong>（現状 <code>BOUNCES=10</code> 本・サンプル確認後に調整）。描き上がると<strong>光のバースト→アイコンが淡いグローで浮上→アイコンの上に「✨ 習得！」</strong>が出て、カードが「✓ 解放済み」へ。配色は属性非依存の<strong>金＋アーカン紫＋白</strong>。<strong>アイコンを切り替えても演出は同一</strong>（＝共通であることの確認用）。<code>prefers-reduced-motion</code>／下のトグル ON では演出を出さず<strong>即「解放済み」</strong>（情報は残す）。</p>
     <div class="sglearn-wrap">
       <div class="sglearn-card" id="sglearnCard">
-        <span class="sglearn-icon" id="sglearnIcon">🔥</span>
+        <span class="sglearn-icon" id="sglearnIcon">❓</span>
         <div class="sglearn-name" id="sglearnName">炎 <span class="sglearn-rarity" id="sglearnRarity">コモン</span></div>
         <div class="sglearn-cost" id="sglearnCost">✦ 1 で解放</div>
         <button class="btn btn-primary btn-sm sglearn-unlock" type="button" id="sglearnUnlock">解放する</button>
@@ -3174,14 +3174,33 @@
       </div>
     </div>
 
+    <h4 style="margin-top:var(--space-5)">サンプル・ギャラリー（魔法陣の形を選ぶ）</h4>
+    <p class="muted text-sm">ボタンを押すと<strong>ランダムな魔法陣を20個</strong>作って静止画で並べます。良いと思ったタイルを<strong>クリックで選択</strong>（複数可）→ 下の <code>seed</code> 配列を私に貼るか、画像で渡してください（各タイルの <code>#番号</code>＝seed。この番号があれば同じ魔法陣を正確に再現・再生できます）。選ばれた seed 群は「解放する」演出で<strong>ランダム再生</strong>する土台に入れます。</p>
+    <div class="sggal-wrap">
+      <div class="row" style="gap:var(--space-2); flex-wrap:wrap; align-items:center">
+        <button class="btn btn-primary btn-sm" type="button" id="sggalGen">▶ 20個の魔法陣サンプルを生成（ランダム）</button>
+        <button class="btn btn-outline btn-sm" type="button" id="sggalClear">選択をクリア</button>
+      </div>
+      <div class="sggal-grid" id="sggalGrid"></div>
+      <div class="sggal-readout">選択中の seed: <span id="sggalReadout">（「生成」を押してタイルをクリック）</span></div>
+    </div>
+
     <style>
       .sglearn-wrap{display:flex; gap:var(--space-5,24px); align-items:center; flex-wrap:wrap; margin-top:var(--space-3,12px)}
-      .sglearn-card{position:relative; width:200px; padding:var(--space-4,16px); border-radius:var(--radius-lg,12px); background:#fff; border:1px solid var(--border,#e5e7eb); box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,.08)); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; overflow:visible}
+      .sggal-wrap{margin-top:var(--space-3,12px)}
+      .sggal-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:10px; margin-top:var(--space-3,12px); max-width:780px}
+      .sggal-tile{position:relative; padding:6px 6px 4px; border:1px solid var(--border,#e5e7eb); border-radius:10px; background:#fff; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px}
+      .sggal-tile:hover{border-color:rgba(150,95,230,.5)}
+      .sggal-tile.is-sel{border-color:rgba(150,95,230,.9); box-shadow:0 0 0 2px rgba(150,95,230,.35)}
+      .sggal-tile canvas{display:block}
+      .sggal-seed{font:600 11px/1 var(--font-pixel, monospace); color:#6b7280}
+      .sggal-readout{margin-top:var(--space-2,8px); font:600 12px/1.4 monospace; color:#374151; word-break:break-all}
+      .sglearn-card{position:relative; width:200px; padding:var(--space-4,16px); border-radius:var(--radius-lg,12px); background:#fff; border:1px solid var(--border,#e5e7eb); box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,.08)); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; overflow:visible; transition:border-color .6s ease, box-shadow .6s ease}
       .sglearn-icon{font-size:44px; line-height:1}
       .sglearn-name{font-weight:700}
       .sglearn-rarity{font-size:.72em; color:#6b7280; font-weight:600}
       .sglearn-cost{font-size:.82em; color:#6b7280}
-      .sglearn-unlock{margin-top:6px}
+      .sglearn-unlock{margin-top:6px; transition:background-color .5s ease, color .5s ease, border-color .5s ease}
       .sglearn-fx{position:absolute; pointer-events:none; z-index:3}
       .sglearn-card.is-unlocked{border-color:rgba(150,95,230,.55); box-shadow:0 0 0 2px rgba(150,95,230,.18), 0 6px 18px rgba(150,95,230,.16)}
       .sglearn-card.is-unlocked .sglearn-unlock{background:transparent; border:1px solid var(--border,#e5e7eb); color:#6b7280; cursor:default}
@@ -3201,18 +3220,28 @@
         var sel=document.getElementById('sglearnIconSel');
         var reduceCb=document.getElementById('sglearnReduce');
         var resetBtn=document.getElementById('sglearnReset');
+        var realIcon='🔥';                               /* 本来のアイコン（習得後に表示）。未習得は「❓」。 */
         var ctx=canvas.getContext('2d');
-        var raf=null, running=false, DUR=1450;
+        var raf=null, running=false, DUR=4800;           /* 全体の再生時間（大きいほどゆっくり）。内部タイムラインは3500ms固定 */
         var GOLD='250,200,80', PURP='150,95,230';
+        var VEIL='24,16,46';                             /* 神秘の闇のヴェール（深い菫紺）＝周囲を暗くして光を浮かせる */
         var COST={ 'コモン':1, '標準':2, 'レア':3 };
         var BOUNCES=10;                                  /* 円内で反射しながら引く線の本数（サンプル確認後に調整） */
+        var FLAT=0.5;                                     /* 床パース＝円の縦つぶし率（1で正円・小さいほど寝る） */
+        var GND_DY=8;                                     /* 床の魔法陣の中心をアイコンより少し下へ */
+        var LW_GLOW=3, LW_BODY=1.4, LW_CORE=0.7;         /* 線の太さ（細め）：紫グロー幅／金の本体／白コア（エネルギー） */
         var path=null;
-        /* 円の内側をランダムに走り、円にぶつかると折れる線の経路（中心相対の頂点列＝BOUNCES+1 点）。 */
-        function genPath(R){
-          var pts=[], ang=Math.random()*6.2832, px=Math.cos(ang)*R, py=Math.sin(ang)*R;
+        /* ギャラリーで選んだ 10 個の魔法陣 seed（この中からランダムに 1 つ再生）。差し替えは配列を編集。 */
+        var CHOSEN_SEEDS=[278654891, 2685459059, 3800616262, 3980696776, 2477197827, 2658768710, 554453634, 2799077997, 2231076944, 944679795];
+        /* 決定的乱数（seed から再現可能）＝ギャラリーで選んだ魔法陣を後で正確に再生するため。mulberry32。 */
+        function mulberry32(seed){ var a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+        /* 円の内側をランダムに走り、円にぶつかると折れる線の経路（中心相対の頂点列＝BOUNCES+1 点）。rng を渡すと再現可能。 */
+        function genPath(R,rng){
+          rng=rng||Math.random;
+          var pts=[], ang=rng()*6.2832, px=Math.cos(ang)*R, py=Math.sin(ang)*R;
           pts.push({x:px,y:py});
           for(var i=0;i<BOUNCES;i++){
-            var da=Math.random()*6.2832, dx=Math.cos(da), dy=Math.sin(da);
+            var da=rng()*6.2832, dx=Math.cos(da), dy=Math.sin(da);
             if(px*dx+py*dy>0){ dx=-dx; dy=-dy; }         /* 内向きに（中心 C=原点なので P·d<0 が内向き） */
             var t=-2*(px*dx+py*dy);                       /* 円との再交点までの距離（|P|=R より） */
             px=px+t*dx; py=py+t*dy; pts.push({x:px,y:py});
@@ -3225,71 +3254,218 @@
         function fadeTail(p,from){ return p<from?1:Math.max(0,1-(p-from)/(1-from)); }
         function metrics(){
           var cr=card.getBoundingClientRect(), ir=iconEl.getBoundingClientRect();
-          var MS=40, MT=70, MB=20;                     /* canvas をカード外へ張り出す（魔法陣と「習得！」が上へはみ出せる） */
+          var MS=40, MT=130, MB=20;                    /* canvas をカード外へ張り出す（魔法陣・高い光の壁・「習得！」が上へはみ出せる） */
           var W=cr.width+MS*2, H=cr.height+MT+MB;
           var dpr=Math.min(2, window.devicePixelRatio||1);
           canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
           canvas.style.width=W+'px'; canvas.style.height=H+'px'; canvas.style.left=(-MS)+'px'; canvas.style.top=(-MT)+'px';  /* 置換要素の auto 幅を避け、CSS px と描画座標を一致させる */
           ctx.setTransform(dpr,0,0,dpr,0,0);
-          return { W:W, H:H, cx:ir.left-cr.left+MS+ir.width/2, cy:ir.top-cr.top+MT+ir.height/2, icon:iconEl.textContent };
+          return { W:W, H:H, cx:ir.left-cr.left+MS+ir.width/2, cy:ir.top-cr.top+MT+ir.height/2, icon:realIcon };
         }
         function block(x,y,s,col,a){ if(a<=0) return; ctx.fillStyle='rgba('+col+','+a.toFixed(3)+')'; ctx.fillRect(Math.round(x-s/2),Math.round(y-s/2),Math.ceil(s),Math.ceil(s)); }
         function draw(p,m){
           var W=m.W,H=m.H,CX=m.cx,CY=m.cy; ctx.clearRect(0,0,W,H);
           var R=46;
-          var grow=ease(Math.min(1,p/0.22)), rr=R*grow;
-          var fade=fadeTail(p,0.82);
-          /* 円の境界（ドット破線・ゆっくり回転） */
+          function clamp(v){ return v<0?0:(v>1?1:v); }
+          var t=p*3500;                                   /* 内部タイムライン(ms)は固定。全体の速さは DUR で調整（大きいほどゆっくり） */
+          /* ---- 拍（緩急）：描く→溜まる(加速)→満タン張り詰め→一気に解放→余韻 ---- */
+          var drawT   = clamp((t-200)/500);              /* 内側の反射線を描く 200–700ms（円周はこの後に一筆書き） */
+          var charge01= clamp((t-840)/1060);              /* エネルギーが溜まる 840–1660ms（円柱完成に合わせてゆっくり） */
+          var chargeE = charge01*charge01;               /* ease-in＝だんだん速く溜まる */
+          var holdT   = clamp((t-1900)/140);             /* 満タンの張り詰め 1660–1800ms（解放直前・円柱完成後の間） */
+          var rel     = clamp((t-2050)/450);             /* 解放 1800–2250ms */
+          var relE    = ease(rel);
+          var fade    = 1-clamp((t-2100)/450);           /* 魔法陣・床・塵が解放で消えていく（〜2300ms） */
+          var endFade = 1-clamp((t-3100)/380);           /* 余韻の最後にアイコン＋「習得！」がフェード（3100–3480ms） */
+          var after   = clamp((t-2400)/350)*endFade;     /* 解放後の余韻（漂うきらめき・やわらかいグロー・浮遊） */
+          var A0=-1.5708, perimT=clamp((t-700)/900);     /* 円周を最後に一筆書きする進捗 700–1400ms（ゆっくり）。A0＝描き始めの角度（真上） */
+          var grow=ease(clamp(t/220)), rr=R*grow;
           var rot=p*6.2832*0.5;
-          for(var i=0;i<30;i++){ var a=rot+i/30*6.2832; block(CX+Math.cos(a)*rr, CY+Math.sin(a)*rr, 3, GOLD, 0.65*fade); }
-          /* 内部：ランダムに反射しながら引かれる線（BOUNCES 本） */
-          if(path){
-            var pathT=(p-0.22)/0.42;                     /* 0.22..0.64 で描き上がる */
-            if(pathT>0){
-              var segF=Math.min(1,pathT)*BOUNCES, full=Math.floor(segF), frac=segF-full;
-              ctx.lineJoin='round'; ctx.lineCap='round';
-              for(var pass=0;pass<2;pass++){
-                ctx.strokeStyle = pass===0 ? 'rgba('+PURP+','+(0.35*fade).toFixed(3)+')' : 'rgba('+GOLD+','+(0.95*fade).toFixed(3)+')';
-                ctx.lineWidth = pass===0 ? 4 : 1.6;
-                ctx.beginPath(); ctx.moveTo(CX+path[0].x, CY+path[0].y);
-                var lim=Math.min(full,BOUNCES);
-                for(var s=1;s<=lim;s++){ ctx.lineTo(CX+path[s].x, CY+path[s].y); }
-                if(full<BOUNCES && frac>0){ var A=path[full], B=path[full+1]; ctx.lineTo(CX+A.x+(B.x-A.x)*frac, CY+A.y+(B.y-A.y)*frac); }
-                ctx.stroke();
-              }
-              /* 折れ点の小さな光 */
-              var lim2=Math.min(full,BOUNCES); for(var v=0;v<=lim2;v++){ block(CX+path[v].x, CY+path[v].y, 3, GOLD, 0.9*fade); }
-            }
+          /* 満タン直前の張り詰め＝細かなふるえ（溜まった力が抑えきれない）。解放で消える。 */
+          var tension=Math.max(chargeE*0.5, holdT)*(1-rel);
+          var GCX=CX+Math.sin(t*0.06)*tension*1.6, GCY=CY+GND_DY+Math.cos(t*0.055)*tension*1.2;
+          /* 神秘の闇のヴェール：周囲がすっと暗くなり（縁ほど濃いヴィネット）、金・紫の光が浮かび上がる。終盤で晴れる。 */
+          var veilA=0.60*clamp(t/440)*(1-relE);
+          if(veilA>0.001){ var vg=ctx.createRadialGradient(CX,CY,R*0.2,CX,CY,Math.max(W,H)*0.6);
+            vg.addColorStop(0,'rgba('+VEIL+','+(veilA*0.35).toFixed(3)+')'); vg.addColorStop(0.55,'rgba('+VEIL+','+(veilA*0.60).toFixed(3)+')'); vg.addColorStop(1,'rgba('+VEIL+','+veilA.toFixed(3)+')');
+            ctx.fillStyle=vg; ctx.fillRect(0,0,W,H); }
+          /* 床の光だまり（円の内側がうっすら光る＝床に描かれている感。エネルギーで増す） */
+          if(rr>2){
+            var gg=ctx.createRadialGradient(GCX,GCY,0,GCX,GCY,rr);
+            gg.addColorStop(0,'rgba('+GOLD+','+((0.10+0.28*charge01)*fade).toFixed(3)+')'); gg.addColorStop(1,'rgba('+GOLD+',0)');
+            ctx.fillStyle=gg; ctx.beginPath(); ctx.ellipse(GCX,GCY,rr,rr*FLAT,0,0,6.2832); ctx.fill();
           }
-          /* 光のバースト（0.62..0.77） */
-          var lf=(p-0.62)/0.15; if(lf>0&&lf<1){ ctx.strokeStyle='rgba(255,255,255,'+((1-lf)*0.85).toFixed(3)+')'; ctx.lineWidth=3*(1-lf)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.5+lf*0.95),0,6.2832); ctx.stroke(); }
-          /* 外へ弾けるきらめき（0.64..1） */
-          var lo=(p-0.64)/0.36; if(lo>0&&lo<1){ for(var q=0;q<20;q++){ var qa=q/20*6.2832+0.35; var qd=R*1.3*ease(lo); block(CX+Math.cos(qa)*qd, CY+Math.sin(qa)*qd, (1-lo)*3+1, q%2?GOLD:PURP, (1-lo)); } }
-          /* アイコン浮上＋グロー（0.46..） */
-          var li=(p-0.46)/0.4; if(li>0){ var lic=Math.min(1,li); var sc=li<1?back(lic):1; var yo=-9*ease(lic)*(1-Math.min(1,Math.max(0,(p-0.74)/0.26))); var ia=Math.min(1,li*2);
+          /* 円周のガイド＝点線（先に薄く出し、最後に太い実線で塗りつぶす）。床パースの楕円・ゆっくり回転。 */
+          for(var i=0;i<30;i++){ var a=rot+i/30*6.2832; block(GCX+Math.cos(a)*rr, GCY+Math.sin(a)*rr*FLAT, 3, GOLD, (0.45+0.3*charge01)*fade); }
+          /* 二重の同心円＋放射の刻印（溜まるほど速く回る＝力がめぐる） */
+          if(rr>6){ var rot2=-p*6.2832*(0.32+0.7*charge01);
+            for(var j=0;j<18;j++){ var ja=rot2+j/18*6.2832; block(GCX+Math.cos(ja)*rr*0.60, GCY+Math.sin(ja)*rr*0.60*FLAT, 2, PURP, 0.55*fade); }
+            ctx.strokeStyle='rgba('+GOLD+','+(0.30*fade).toFixed(3)+')'; ctx.lineWidth=1;
+            for(var t2=0;t2<12;t2++){ var ta=rot2+t2/12*6.2832, r1=rr*1.02, r2=rr*1.15;
+              ctx.beginPath(); ctx.moveTo(GCX+Math.cos(ta)*r1, GCY+Math.sin(ta)*r1*FLAT); ctx.lineTo(GCX+Math.cos(ta)*r2, GCY+Math.sin(ta)*r2*FLAT); ctx.stroke(); } }
+          /* 漂う光の塵（アンビエント・ゆっくり周回＋またたき） */
+          var amb=clamp(p/0.30)*fade*(1-rel*0.7);
+          if(amb>0){ for(var d=0;d<12;d++){ var da2=d/12*6.2832+p*6.2832*0.12*(d%2?1:-1), dr=rr*(1.12+0.28*((d*7)%5)/4), dy2=Math.sin(p*6.2832*0.5+d)*3;
+            block(GCX+Math.cos(da2)*dr, GCY+Math.sin(da2)*dr*FLAT+dy2-6, 1.5, d%2?GOLD:PURP, 0.35*amb*(0.55+0.45*Math.sin(p*7+d))); } }
+          /* 魔法陣の線（細め）。紫グロー→金の本体→白コア（溜まるほど白熱） */
+          if(path && drawT>0){
+            var segF=drawT*BOUNCES, full=Math.floor(segF), frac=segF-full;
+            ctx.lineJoin='round'; ctx.lineCap='round';
+            var passes=[
+              {col:PURP, w:LW_GLOW, a:0.28*fade},
+              {col:GOLD, w:LW_BODY, a:0.95*fade},
+              {col:'255,250,235', w:LW_CORE, a:(0.30+0.65*charge01)*fade}
+            ];
+            var hx=null, hy=null;
+            for(var pass=0;pass<passes.length;pass++){
+              ctx.strokeStyle='rgba('+passes[pass].col+','+passes[pass].a.toFixed(3)+')'; ctx.lineWidth=passes[pass].w;
+              ctx.shadowColor='rgba('+passes[pass].col+',0.85)'; ctx.shadowBlur=passes[pass].w*3;
+              ctx.beginPath(); ctx.moveTo(GCX+path[0].x, GCY+path[0].y*FLAT);
+              var lim=Math.min(full,BOUNCES);
+              for(var s=1;s<=lim;s++){ ctx.lineTo(GCX+path[s].x, GCY+path[s].y*FLAT); }
+              if(full<BOUNCES && frac>0){ var A=path[full], B=path[full+1]; hx=A.x+(B.x-A.x)*frac; hy=A.y+(B.y-A.y)*frac; ctx.lineTo(GCX+hx, GCY+hy*FLAT); }
+              ctx.stroke();
+            }
+            ctx.shadowBlur=0; ctx.shadowColor='transparent';
+            var lim2=Math.min(full,BOUNCES); for(var v=0;v<=lim2;v++){ block(GCX+path[v].x, GCY+path[v].y*FLAT, 2.5, GOLD, 0.9*fade); }
+            if(hx!==null){ block(GCX+hx, GCY+hy*FLAT, 3.5, '255,255,255', 0.95*fade); }
+          }
+          /* 円周（一筆書き）：内側の線のあと、金の実線（点線を塗りつぶす太さ）を A0 から perimT ぶん描き進める。 */
+          if(perimT>0 && rr>2){
+            ctx.save(); ctx.lineCap='round';
+            ctx.strokeStyle='rgba('+GOLD+','+(0.95*fade).toFixed(3)+')'; ctx.lineWidth=3.6;   /* 点線(3px)を塗りつぶせる太さ */
+            ctx.shadowColor='rgba('+GOLD+',0.8)'; ctx.shadowBlur=6;
+            ctx.beginPath(); ctx.ellipse(GCX,GCY,rr,rr*FLAT,0,A0,A0+perimT*6.2832); ctx.stroke();
+            if(perimT<1){ var pha=A0+perimT*6.2832; ctx.shadowBlur=0; block(GCX+Math.cos(pha)*rr, GCY+Math.sin(pha)*rr*FLAT, 3, '255,255,255', 0.95*fade); }  /* ペン先の白い光 */
+            ctx.restore();
+          }
+          /* （充填ゲージ＝白っぽい点線リングは廃止） */
+          /* 光の壁（発光）＋❓を包む：奥側の柱→❓→手前側の柱 の順で描き、❓を光の円柱の内側に閉じ込める。円周の実線の上に、線が通過した所から順に“下→上”へ立ち上がる（最後は円柱）。 */
+          var beamGate=(1-rel);
+          var wallH=70*beamGate;                                  /* 一定の壁高さ（全列そろう＝円柱・高め） */
+          function drawWall(back){                                /* back=true:奥側(楕円の上半分) / false:手前側(下半分) */
+            if(beamGate<=0.01 || rr<=6 || perimT<=0){ return; }
+            var DENS=110, M=Math.max(1, Math.round(DENS*perimT));
+            ctx.save(); ctx.globalCompositeOperation='lighter';   /* 加算合成＝光を放っている見え方 */
+            for(var si=0; si<=M; si++){
+              var frac=si/DENS, sang=A0+frac*6.2832, sn=Math.sin(sang);
+              if(back ? (sn>0) : (sn<=0)){ continue; }            /* 奥=sn<=0（上側・❓の後ろ）／手前=sn>0（下側・❓の前） */
+              var sbx=GCX+Math.cos(sang)*rr, sby=GCY+sn*rr*FLAT;
+              var tpass=700+frac*900, riseAmt=ease(clamp((t-tpass)/320));   /* 実線が通過してから320msかけて下→上へ伸びる */
+              if(riseAmt<=0.001){ continue; }
+              var colH=wallH*riseAmt;
+              var lg=ctx.createLinearGradient(sbx,sby,sbx,sby-colH);   /* 根元が明るく上へ透明 */
+              lg.addColorStop(0,'rgba('+GOLD+','+(0.32*beamGate).toFixed(3)+')'); lg.addColorStop(1,'rgba('+GOLD+',0)');
+              ctx.fillStyle=lg; ctx.fillRect(sbx-3.5, sby-colH, 7, colH);
+            }
+            ctx.restore();
+          }
+          drawWall(true);                                         /* 奥側の柱（❓の後ろ） */
+          /* 未習得アイコン＝❓（光の円柱の中）。円柱が出始めたら“ぐらぐら”揺れ（溜まるほど激しく）、習得の瞬間にフェードして本来のアイコンへ入れ替わる。 */
+          var qAlpha=(1-clamp((t-2050)/180))*endFade;
+          if(qAlpha>0.01){
+            var wob=clamp((t-800)/500)*(0.6+0.6*charge01);          /* 円柱が出始めたら揺れ、溜まるほど激しく */
+            var rotW=Math.sin(t*0.026)*0.20*wob;                    /* ぐらぐら回転 */
+            var dxW=Math.sin(t*0.041)*3.5*wob, dyW=Math.cos(t*0.05)*2.5*wob;  /* 小刻みに揺れる位置 */
+            ctx.save(); ctx.globalAlpha=qAlpha; ctx.translate(CX+dxW, CY+dyW); ctx.rotate(rotW);
+            ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('❓',0,0); ctx.restore();
+          }
+          drawWall(false);                                        /* 手前側の柱（❓の前）＝❓が円柱に包まれる */
+          /* 溜まったエネルギーの光球（中心の上に育つ）→解放で弾ける */
+          var orbL=Math.max(charge01,holdT)*(1-clamp(rel/0.15));
+          if(orbL>0.02){ var oy=GCY-30-12*orbL, orbR=4+18*orbL*(0.92+0.08*Math.sin(p*36));
+            var og=ctx.createRadialGradient(GCX,oy,0,GCX,oy,orbR); og.addColorStop(0,'rgba(255,255,255,'+(0.9*orbL).toFixed(3)+')'); og.addColorStop(0.5,'rgba('+GOLD+','+(0.7*orbL).toFixed(3)+')'); og.addColorStop(1,'rgba('+GOLD+',0)');
+            ctx.fillStyle=og; ctx.beginPath(); ctx.arc(GCX,oy,orbR,0,6.2832); ctx.fill(); }
+          /* ===== 解放：ここから一気に ===== */
+          /* 発動フラッシュ（解放直後に鋭く白→金） */
+          var flashT=clamp((t-2050)/180); if(flashT>0&&flashT<1){ var fa=Math.sin(flashT*Math.PI)*0.9;
+            var fg=ctx.createRadialGradient(CX,CY,0,CX,CY,R*2.1); fg.addColorStop(0,'rgba(255,255,255,'+fa.toFixed(3)+')'); fg.addColorStop(0.6,'rgba('+GOLD+','+(fa*0.5).toFixed(3)+')'); fg.addColorStop(1,'rgba('+GOLD+',0)');
+            ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(CX,CY,R*2.1,0,6.2832); ctx.fill(); }
+          /* 衝撃波リング（速く広がって消える・二重） */
+          if(rel>0&&rel<0.7){ var sw=ease(clamp(rel/0.7));
+            ctx.strokeStyle='rgba(255,255,255,'+((1-sw)*0.9).toFixed(3)+')'; ctx.lineWidth=4*(1-sw)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.4+2.2*sw),0,6.2832); ctx.stroke();
+            ctx.strokeStyle='rgba('+GOLD+','+((1-sw)*0.7).toFixed(3)+')'; ctx.lineWidth=3*(1-sw)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.2+1.6*sw),0,6.2832); ctx.stroke(); }
+          /* 外へ弾けるきらめき（解放） */
+          if(rel>0&&rel<1){ for(var q=0;q<24;q++){ var qa=q/24*6.2832+0.35, qd=R*(0.3+1.7*ease(rel)); block(CX+Math.cos(qa)*qd, CY+Math.sin(qa)*qd, (1-rel)*3.5+1, q%2?GOLD:PURP, (1-rel)*fade); } }
+          /* 余韻：解放後、アイコンのまわりをゆっくり漂うきらめき（余韻を長く感じさせる） */
+          if(after>0){ for(var w=0;w<8;w++){ var wa=w/8*6.2832+t*0.0009, wph=((t*0.0006+w*0.31)%1);
+            var wx=CX+Math.cos(wa)*(14+6*Math.sin(w*1.7)), wy=(CY-10)-wph*30;
+            block(wx, wy, (1-wph)*2+0.5, w%2?GOLD:PURP, (1-wph)*0.5*after); } }
+          /* （❓は上の「光の壁」ブロック内＝奥柱と手前柱の間で描画済み＝光の円柱に包む） */
+          /* アイコンが一気に飛び出す（解放でオーバーシュート＝ポン！）→余韻でふわっと浮遊→最後は静かに定位置(HTML)へ着地して受け渡し（“パッ”と切替を無くす） */
+          var settle=clamp((t-2900)/500);                /* 2900–3400ms：浮いたアイコンが定位置(yo=0)へ降り、グローが消える＝HTMLアイコンへ滑らかに橋渡し */
+          var li=clamp((t-2050)/260); if(li>0){ var sc=0.4+back(li)*0.6; var yo=((-12*ease(li))+Math.sin(t*0.004)*1.5*after)*(1-settle); var ia=Math.min(1,li*2.5);
             ctx.save(); ctx.globalAlpha=ia;
-            var g=ctx.createRadialGradient(CX,CY+yo,0,CX,CY+yo,30); g.addColorStop(0,'rgba('+GOLD+',0.5)'); g.addColorStop(1,'rgba('+GOLD+',0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY+yo,30,0,6.2832); ctx.fill();
+            var gr=(0.6*(1-rel*0.5)+0.18*after*(0.6+0.4*Math.sin(t*0.006)))*(1-settle);   /* 余韻中はやわらかく明滅→着地でグロー消灯 */
+            if(gr>0.001){ var g=ctx.createRadialGradient(CX,CY+yo,0,CX,CY+yo,34); g.addColorStop(0,'rgba('+GOLD+','+clamp(gr).toFixed(3)+')'); g.addColorStop(1,'rgba('+GOLD+',0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY+yo,34,0,6.2832); ctx.fill(); }
             ctx.translate(CX,CY+yo); ctx.scale(sc,sc); ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(m.icon,0,0); ctx.restore(); }
-          /* 「✨ 習得！」アイコンの上（0.64..） */
-          var lt=(p-0.64)/0.36; if(lt>0){ var lta=Math.min(1,lt*2)*fadeTail(p,0.9); var ty=CY-R*1.05-6*ease(Math.min(1,lt));
-            ctx.save(); ctx.globalAlpha=lta; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 15px system-ui, sans-serif';
-            ctx.lineWidth=3; ctx.strokeStyle='rgba(60,40,10,0.55)'; ctx.strokeText('✨ 習得！',CX,ty); ctx.fillStyle='rgba('+GOLD+',1)'; ctx.fillText('✨ 習得！',CX,ty); ctx.restore(); }
+          /* 「✨ 習得！」アイコンの上（解放後にポップ→余韻の間ずっと表示、最後にフェード） */
+          var lt=clamp((t-2200)/260); if(lt>0){ var lta=Math.min(1,lt*2.2)*endFade; var lsc=0.6+back(clamp(lt*1.3))*0.4; var ty=CY-R*1.05-8*ease(lt)+Math.sin(t*0.004)*1.5*after;
+            ctx.save(); ctx.globalAlpha=lta; ctx.translate(CX,ty); ctx.scale(lsc,lsc); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 15px system-ui, sans-serif';
+            ctx.lineWidth=3; ctx.strokeStyle='rgba(60,40,10,0.55)'; ctx.strokeText('✨ 習得！',0,0); ctx.fillStyle='rgba('+GOLD+',1)'; ctx.fillText('✨ 習得！',0,0); ctx.restore(); }
         }
-        function markUnlocked(){ card.classList.add('is-unlocked'); btn.textContent='✓ 解放済み'; btn.disabled=true; }
+        function markUnlocked(){ card.classList.add('is-unlocked'); btn.textContent='✓ 解放済み'; btn.disabled=true; iconEl.textContent=realIcon; }   /* 習得後は本来のアイコン */
         function run(){
           if(running || card.classList.contains('is-unlocked')) return;
           if(reduced()){ markUnlocked(); return; }
-          running=true; iconEl.style.visibility='hidden'; path=genPath(46);
+          running=true; iconEl.style.visibility='hidden';
+          var seed=CHOSEN_SEEDS.length?CHOSEN_SEEDS[Math.floor(Math.random()*CHOSEN_SEEDS.length)]:((Math.random()*4294967296)>>>0);
+          path=genPath(46, mulberry32(seed));
           var t0=performance.now();
           (function frame(now){ var p=Math.min(1,(now-t0)/DUR); var m=metrics(); draw(p,m);
             if(p<1){ raf=requestAnimationFrame(frame); }
             else { ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; running=false; markUnlocked(); }
           })(t0);
         }
-        function reset(){ if(raf) cancelAnimationFrame(raf); running=false; path=null; var m=metrics(); ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; card.classList.remove('is-unlocked'); btn.textContent='解放する'; btn.disabled=false; }
+        function reset(){ if(raf) cancelAnimationFrame(raf); running=false; path=null; var m=metrics(); ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; iconEl.textContent='❓'; card.classList.remove('is-unlocked'); btn.textContent='解放する'; btn.disabled=false; }   /* 未習得は「❓」 */
         btn.addEventListener('click', run);
         resetBtn.addEventListener('click', reset);
-        sel.addEventListener('change', function(){ var v=sel.value.split('|'); iconEl.textContent=v[0]; nameEl.childNodes[0].nodeValue=v[1]+' '; rarityEl.textContent=v[2]; costEl.textContent='✦ '+COST[v[2]]+' で解放'; reset(); });
+        sel.addEventListener('change', function(){ var v=sel.value.split('|'); realIcon=v[0]; nameEl.childNodes[0].nodeValue=v[1]+' '; rarityEl.textContent=v[2]; costEl.textContent='✦ '+COST[v[2]]+' で解放'; reset(); });   /* 本来のアイコンを差し替え・表示は未習得の❓に戻す */
+
+        /* ---- サンプル・ギャラリー：ランダムな魔法陣を 20 個・静止画で並べて選ぶ ---- */
+        var galGrid=document.getElementById('sggalGrid');
+        var galReadout=document.getElementById('sggalReadout');
+        var galGen=document.getElementById('sggalGen');
+        var galClear=document.getElementById('sggalClear');
+        var selectedSeeds={};                             /* seed(string)→true。表示順は挿入順（クリック順）。 */
+        /* 1 タイルに完成状態の魔法陣（本体演出の描き上がりと同じ描き方）を静止で描く。 */
+        function drawGalleryCircle(g,size,seed){
+          /* 形の一覧＝真上から（床パースなし）。色・太さは本体演出と同じ 3 パスで確認できる。 */
+          var CX=size/2, CY=size/2, R=size*0.40;
+          var pth=genPath(R, mulberry32(seed));
+          g.clearRect(0,0,size,size);
+          for(var i=0;i<30;i++){ var a=i/30*6.2832; g.fillStyle='rgba('+GOLD+',0.65)'; g.fillRect(Math.round(CX+Math.cos(a)*R-1.5),Math.round(CY+Math.sin(a)*R-1.5),3,3); }
+          g.lineJoin='round'; g.lineCap='round';
+          var gp=[{col:PURP,w:LW_GLOW,a:0.30},{col:GOLD,w:LW_BODY,a:0.95},{col:'255,250,235',w:LW_CORE,a:0.90}];
+          for(var pass=0;pass<gp.length;pass++){
+            g.strokeStyle='rgba('+gp[pass].col+','+gp[pass].a+')'; g.lineWidth=gp[pass].w;
+            g.beginPath(); g.moveTo(CX+pth[0].x, CY+pth[0].y);
+            for(var s=1;s<pth.length;s++){ g.lineTo(CX+pth[s].x, CY+pth[s].y); }
+            g.stroke();
+          }
+          for(var v=0;v<pth.length;v++){ g.fillStyle='rgba('+GOLD+',0.9)'; g.fillRect(Math.round(CX+pth[v].x-1.5),Math.round(CY+pth[v].y-1.5),3,3); }
+        }
+        function updateReadout(){ var arr=Object.keys(selectedSeeds); galReadout.textContent = arr.length ? '['+arr.join(', ')+']' : '（タイルをクリックして選択）'; }
+        function toggleTile(e){ var tile=e.currentTarget, seed=tile.getAttribute('data-seed');
+          if(selectedSeeds[seed]){ delete selectedSeeds[seed]; tile.classList.remove('is-sel'); }
+          else { selectedSeeds[seed]=true; tile.classList.add('is-sel'); }
+          updateReadout();
+        }
+        function buildGallery(){
+          galGrid.innerHTML=''; selectedSeeds={}; updateReadout();
+          var TS=120, dpr=Math.min(2, window.devicePixelRatio||1);
+          for(var i=0;i<20;i++){
+            var seed=(Math.random()*4294967296)>>>0;
+            var tile=document.createElement('button'); tile.type='button'; tile.className='sggal-tile'; tile.setAttribute('data-seed', String(seed));
+            var cv=document.createElement('canvas'); cv.width=TS*dpr; cv.height=TS*dpr; cv.style.width=TS+'px'; cv.style.height=TS+'px';
+            var g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); drawGalleryCircle(g, TS, seed);
+            var lab=document.createElement('span'); lab.className='sggal-seed'; lab.textContent='#'+seed;
+            tile.appendChild(cv); tile.appendChild(lab); tile.addEventListener('click', toggleTile);
+            galGrid.appendChild(tile);
+          }
+        }
+        galGen.addEventListener('click', buildGallery);
+        galClear.addEventListener('click', function(){ selectedSeeds={}; var tiles=galGrid.querySelectorAll('.sggal-tile.is-sel'); for(var i=0;i<tiles.length;i++){ tiles[i].classList.remove('is-sel'); } updateReadout(); });
       })();
     </script>
   </div>
