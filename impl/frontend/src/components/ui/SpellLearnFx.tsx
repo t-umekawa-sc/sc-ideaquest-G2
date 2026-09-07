@@ -31,12 +31,15 @@ const MOVE_IN = 420; // ❓ がパネル中央へ移動
 const MOVE_OUT_START = 3300; // 取得アイコンが定位置へ戻り始める
 const MOVE_OUT_END = 3800;
 
-type Props = { cardRect: CastRect; iconRect: CastRect; icon: string; seed?: number; onDone?: () => void };
+// onReveal＝取得アイコンが開封される瞬間（解放）に一度だけ発火。SP のカウント減算をこの瞬間に同期させ、演出と一緒に見せる（GF-AC-111）。
+type Props = { cardRect: CastRect; iconRect: CastRect; icon: string; seed?: number; onReveal?: () => void; onDone?: () => void };
 
-export function SpellLearnFx({ cardRect, iconRect, icon, seed, onDone }: Props) {
+export function SpellLearnFx({ cardRect, iconRect, icon, seed, onReveal, onDone }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const revealRef = useRef(onReveal);
+  revealRef.current = onReveal;
 
   useEffect(() => {
     // reduce-motion＝演出なしで即完了（親が「解放済み」を表示）。決定的分岐は learnFx.planLearn。
@@ -388,9 +391,15 @@ export function SpellLearnFx({ cardRect, iconRect, icon, seed, onDone }: Props) 
     };
 
     let raf = 0;
+    let revealed = false;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const frame = (now: number) => {
       const p = Math.min(1, (now - t0) / DUR);
+      // 開封（解放）の瞬間に一度だけ onReveal（SP 減算をここに同期）。MOVE_IN の後の rel 開始（rt=2050）。
+      if (!revealed && p * TL >= MOVE_IN + 2050) {
+        revealed = true;
+        revealRef.current?.();
+      }
       draw(p);
       if (p < 1) {
         raf = requestAnimationFrame(frame);

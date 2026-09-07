@@ -5,7 +5,7 @@
 // 解放した魔法は SC-24 チャットの魔法リアクションで発動。装飾/社交演出のみで XP/評価/投票に影響しない。
 // 正＝doc/画面設計/mocks/SC-32_魔法スキル.html・doc/画面設計/screens/SC-32_魔法スキル.md。
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Spinner, CountUp, GameNav, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -43,11 +43,13 @@ export function SpellsView() {
   // #11: 魔法解放の共通「習得」演出（GF-AC-110）。解放カードのアイコンに重ねて 魔法陣→光の円柱→アイコン開封（❓→本来アイコン）を再生する。
   // 全魔法共通（属性非依存）・reduce-motion 尊重（演出を出さず即「解放済み」）。決定的部分は features/spells/learnFx（G-TC-162）。
   const [learning, setLearning] = useState<{ id: string; cardRect: CastRect; iconRect: CastRect; icon: string } | null>(null);
-  const startLearn = (cardId: string, icon: string, spellId: string) => {
-    if (reduceMotion()) return;
+  // 解放で消費した後の SP 残高を保留し、演出の「開封（取得）」の瞬間に反映＝カウント減算を演出と同期（GF-AC-111）。
+  const pendingSpRef = useRef<number | null>(null);
+  const startLearn = (cardId: string, icon: string, spellId: string): boolean => {
+    if (reduceMotion()) return false;
     const card = typeof document !== "undefined" ? document.getElementById(cardId) : null;
     const iconEl = card?.querySelector<HTMLElement>(".spell-card__icon");
-    if (!card || !iconEl) return;
+    if (!card || !iconEl) return false;
     const cr = card.getBoundingClientRect();
     const ir = iconEl.getBoundingClientRect();
     setLearning({
@@ -56,14 +58,15 @@ export function SpellsView() {
       iconRect: { top: ir.top, left: ir.left, width: ir.width, height: ir.height },
       icon,
     });
+    return true;
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { keepSp?: boolean }) => {
     try {
       const r = await getSpells();
       if (!r) { setLoadError("魔法カタログの取得に失敗しました。"); return; }
       setSpells(r.data);
-      setSp(r.skill_point_balance);
+      if (!opts?.keepSp) setSp(r.skill_point_balance); // 解放演出中は SP を据え置き（開封時に減算＝GF-AC-111）
       setLoadError(null);
     } catch {
       setLoadError("魔法カタログの取得に失敗しました。");
@@ -90,9 +93,16 @@ export function SpellsView() {
     setBusyId(s.id);
     try {
       const res = await unlockSpell(s.id);
-      if (res) setSp(res.skill_point_balance);
-      startLearn("spell-" + s.id, s.icon, s.id); // 解放の瞬間演出（共通「習得」＝魔法陣→光の円柱→アイコン開封）
-      await load(); // unlocked/can_unlock を最新化
+      const newSp = res ? res.skill_point_balance : Math.max(0, sp - s.sp_cost);
+      // 解放の瞬間演出（共通「習得」）。SP の減算は演出の「開封」に同期（onReveal）＝カウントがはっきり見える（GF-AC-111）。
+      const started = startLearn("spell-" + s.id, s.icon, s.id);
+      if (started) {
+        pendingSpRef.current = newSp;
+        await load({ keepSp: true }); // 解放状態は最新化・SP は開封時まで据え置き
+      } else {
+        setSp(newSp); // reduce-motion 等で演出が無い＝即反映
+        await load();
+      }
       snack({
         type: "reward",
         title: "魔法を解放しました",
@@ -130,7 +140,15 @@ export function SpellsView() {
   return (
     <section aria-label="魔法 / スキル">
       {/* #11: 魔法解放の共通「習得」演出（解放カードのアイコンに固定オーバーレイ・自分の解放時のみ・reduce-motion 時は非生成） */}
-      {learning && <SpellLearnFx cardRect={learning.cardRect} iconRect={learning.iconRect} icon={learning.icon} onDone={() => setLearning(null)} />}
+      {learning && (
+        <SpellLearnFx
+          cardRect={learning.cardRect}
+          iconRect={learning.iconRect}
+          icon={learning.icon}
+          onReveal={() => { if (pendingSpRef.current != null) { setSp(pendingSpRef.current); pendingSpRef.current = null; } }}
+          onDone={() => setLearning(null)}
+        />
+      )}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
       <GameNav current="spells" />
