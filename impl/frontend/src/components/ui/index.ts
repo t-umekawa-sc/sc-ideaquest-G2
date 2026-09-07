@@ -3,6 +3,7 @@ export { Avatar } from "./Avatar";
 export { Button } from "./Button";
 export { CountUp } from "./CountUp";
 export { SpellCastFx, type CastRect } from "./SpellCastFx";
+export { SpellLearnFx } from "./SpellLearnFx";
 export { SpellDeliveryFx, type CastPoint } from "./SpellDeliveryFx";
 export { SpellPersistFx } from "./SpellPersistFx";
 export { SpellCanvasFx } from "./SpellCanvasFx";

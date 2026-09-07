@@ -179,3 +179,11 @@
 
 | G-TC-161 | unit(front) | reduce-motion は静止 1 枚（rAF/IO を起動しない） | 実効抑制 reduce=true | `planSpellLifecycle(true, hasIO)` | hasIO の真偽によらず `"static"`（`reduceStatic()` 経路・rAF/IO 不使用）／決定的 | GF-AC-091・093／#10 |
 | G-TC-161 | unit(front) | 非抑制は可視監視 or 即発射 | 実効抑制 reduce=false | `planSpellLifecycle(false, hasIO)` | IO あり（hasIO=true）は `"observe"`（可視で発射・画面外停止）／IO なし（false）は `"immediate"`（即発射）／決定的 | GF-AC-091・093／#10 |
+
+### 5-L. 魔法解放の共通「習得」演出の決定的部分（魔法陣の頂点列／seed 選択／reduce 分岐）frontend 単体（移植・SpellLearnFx・GF-AC-110）
+
+> 対象＝`impl/frontend/src/features/spells/learnFx.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17L-i` の共通「習得」演出＝床の魔法陣→円周の実線→光の円柱に包まれた❓（ぐらぐら揺れ）→溜め→解放でアイコン開封→余韻＝canvas+rAF）を production の canvas ハーネス（`impl/frontend/src/components/ui/SpellLearnFx.tsx`）へ移植。**canvas 本体（魔法陣の描画／光の円柱／溜め／解放／余韻＝rAF 駆動・視覚）は §17L-i／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 3 点のみ unit で担保する。`mulberry32(seed)`＝seed から再現可能な決定的乱数。`genPath(R,rng)`＝魔法陣＝円内で反射しながら引く線の頂点列（`LEARN_BOUNCES+1` 点・すべて半径 R 上）。`pickLearnSeed(rand)`＝選定済み魔法陣 seed（`LEARN_SEEDS`＝ユーザー選定 10 個・§17L-i と一致）から 1 つ選ぶ。`planLearn(reduce)`＝実効抑制（`reduceMotion()`＝OS reduce OR ユーザー設定・`lib/motion` の正）なら `"static"`（演出を出さず即「解放済み」＝情報は残す）／非抑制は `"animate"`。実際の canvas 描画/rAF・アイコン開封（❓→本来アイコンの受け渡し）・reduce 時の即解放配線は GF-AC ブラウザ受入に委ねる（記憶 `animation-reduce-motion-standard`／デザイン標準 §4.9）。決定的（rng 注入）。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-162）で担保。
+
+| G-TC-162 | unit(front) | 魔法陣の頂点列（BOUNCES+1 点・すべて半径 R 上・seed 再現） | 半径 R／seed 付き rng | `genPath(R, mulberry32(seed))` | `LEARN_BOUNCES+1` 点／各頂点は半径 R 上（円で反射）／同 seed は同経路・異 seed は異なる（決定的） | GF-AC-110／#11 |
+| G-TC-162 | unit(front) | 決定的乱数（seed 再現） | seed | `mulberry32(seed)` | 同 seed は同数列／各値は `[0,1)` | GF-AC-110／#11 |
+| G-TC-162 | unit(front) | 選定済み seed 選択／reduce 分岐 | rand([0,1))／実効抑制 reduce | `pickLearnSeed(rand)`・`planLearn(reduce)` | `pickLearnSeed` は `LEARN_SEEDS` のいずれか（範囲端 0/≈1 も安全）／`planLearn(true)="static"`・`planLearn(false)="animate"`／決定的 | GF-AC-110／#11 |
