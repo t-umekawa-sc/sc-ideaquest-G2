@@ -3149,24 +3149,34 @@
     </script>
 
     <h3 style="margin-top:var(--space-6)">17L-i. 魔法解放の共通「習得」アニメ（魔法陣・全魔法共通／SC-32・GF-AC-110）＝カードのアイコンから魔法陣（円＋内部で反射しながら引かれる線）が描かれ→光のバースト→アイコン浮上→アイコンの上に「✨ 習得！」</h3>
-    <p class="muted text-sm">#11 魔法解放（GF-AC-110）の演出モック。<strong>魔法ごとに変えず、全魔法で共通の「習得」演出</strong>にする方針（術者が“新しい魔法を覚えた”瞬間）。核モチーフ＝<strong>ドット絵の魔法陣</strong>＝アイコンを中心に<strong>円が広がり、その内側をランダムに走る線が円にぶつかると折れる…を繰り返して魔法陣を描く</strong>（現状 <code>BOUNCES=10</code> 本・サンプル確認後に調整）。描き上がると<strong>光のバースト→アイコンが淡いグローで浮上→アイコンの上に「✨ 習得！」</strong>が出て、カードが「✓ 解放済み」へ。配色は属性非依存の<strong>金＋アーカン紫＋白</strong>。<strong>アイコンを切り替えても演出は同一</strong>（＝共通であることの確認用）。<code>prefers-reduced-motion</code>／下のトグル ON では演出を出さず<strong>即「解放済み」</strong>（情報は残す）。</p>
+    <p class="muted text-sm">#11 魔法解放（GF-AC-110）の演出モック。<strong>魔法ごとに変えず、全魔法で共通の「習得」演出</strong>。解放クリックで <strong>①説明パネル（カード）が暗転</strong>し <strong>②❓ アイコンがパネル中央へ移動</strong>→ ③そこで<strong>魔法陣（円内で反射する線）→円周の実線→光の円柱に包まれた❓のぐらぐら揺れ→溜め→解放でアイコン開封</strong>→ ④<strong>取得したアイコンが元の位置（ヘッダー）へ戻り</strong>パネルが明転、カードが「✓ 解放済み」へ。配色は属性非依存の<strong>金＋アーカン紫＋白</strong>。<strong>アイコンを切り替えても演出は同一</strong>。<code>prefers-reduced-motion</code>／下のトグル ON では演出を出さず<strong>即「解放済み」</strong>（情報は残す）。</p>
+    <p class="muted text-sm"><strong>土台は production の <code>/spells</code> の spell-card を忠実に再現</strong>（features/spells/spells.css・アイコン 26px・同じ構造/クラス）＝移植先とデザインを一致させて演出を検討する（フロント実装フロー規約 §2.2）。</p>
     <div class="sglearn-wrap">
-      <div class="sglearn-card" id="sglearnCard">
-        <span class="sglearn-icon" id="sglearnIcon">❓</span>
-        <div class="sglearn-name" id="sglearnName">炎 <span class="sglearn-rarity" id="sglearnRarity">コモン</span></div>
-        <div class="sglearn-cost" id="sglearnCost">✦ 1 で解放</div>
-        <button class="btn btn-primary btn-sm sglearn-unlock" type="button" id="sglearnUnlock">解放する</button>
+      <article class="card spell-card rarity-common" id="sglearnCard">
+        <div class="spell-card__head">
+          <span class="spell-card__icon" id="sglearnIcon">❓</span>
+          <span class="spell-card__name" id="sglearnName">炎</span>
+          <span class="badge rarity-common spell-card__rarity" id="sglearnRarity">コモン</span>
+        </div>
+        <div class="spell-preview spell-fx spell-fx--fire" id="sglearnPreview">メッセージ枠が燃え上がる 🔥</div>
+        <p class="spell-desc" id="sglearnDesc">対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。</p>
+        <div class="spell-req" id="sglearnReq">前提なし（烈火系の起点）</div>
+        <div class="spell-card__foot">
+          <span class="spell-cost" id="sglearnCost">✦ 1 <span class="muted">SP</span></span>
+          <button class="btn-pixel btn-pixel--sm sglearn-unlock" type="button" id="sglearnUnlock">解放する</button>
+          <span class="spell-state" id="sglearnState" style="display:none">✓ 解放済み</span>
+        </div>
         <canvas class="sglearn-fx" id="sglearnFx" aria-hidden="true"></canvas>
-      </div>
+      </article>
       <div style="display:flex; flex-direction:column; gap:var(--space-3)">
         <label class="field" style="margin:0">魔法アイコン（共通演出の確認用に切替）
           <select class="select" id="sglearnIconSel">
-            <option value="🔥|炎|コモン">🔥 炎（コモン）</option>
-            <option value="⚡|雷|標準">⚡ 雷（標準）</option>
-            <option value="🌈|虹|レア">🌈 虹（レア）</option>
-            <option value="❄|氷|コモン">❄ 氷（コモン）</option>
-            <option value="✨|キラキラ|標準">✨ キラキラ（標準）</option>
-            <option value="🔮|オーラ|レア">🔮 オーラ（レア）</option>
+            <option value="🔥">🔥 炎（コモン）</option>
+            <option value="⚡">⚡ 雷（標準）</option>
+            <option value="🌈">🌈 虹（レア）</option>
+            <option value="❄️">❄️ 氷（コモン）</option>
+            <option value="✨">✨ キラキラ（標準）</option>
+            <option value="🔮">🔮 オーラ（レア）</option>
           </select>
         </label>
         <label class="checkbox"><input type="checkbox" id="sglearnReduce"> 動きを減らす（疑似 reduce-motion）</label>
@@ -3195,15 +3205,25 @@
       .sggal-tile canvas{display:block}
       .sggal-seed{font:600 11px/1 var(--font-pixel, monospace); color:#6b7280}
       .sggal-readout{margin-top:var(--space-2,8px); font:600 12px/1.4 monospace; color:#374151; word-break:break-all}
-      .sglearn-card{position:relative; width:200px; padding:var(--space-4,16px); border-radius:var(--radius-lg,12px); background:#fff; border:1px solid var(--border,#e5e7eb); box-shadow:var(--shadow-sm,0 1px 3px rgba(0,0,0,.08)); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; overflow:visible; transition:border-color .6s ease, box-shadow .6s ease}
-      .sglearn-icon{font-size:44px; line-height:1}
-      .sglearn-name{font-weight:700}
-      .sglearn-rarity{font-size:.72em; color:#6b7280; font-weight:600}
-      .sglearn-cost{font-size:.82em; color:#6b7280}
-      .sglearn-unlock{margin-top:6px; transition:background-color .5s ease, color .5s ease, border-color .5s ease}
+      /* production /spells の spell-card を忠実に再現（features/spells/spells.css より・移植先と土台を一致＝フロント実装フロー規約 §2.2） */
+      #sglearnCard{ width:300px; position:relative; overflow:visible; }
+      .spell-card{ display:flex; flex-direction:column; gap:var(--space-3); }
+      .spell-card__head{ display:flex; align-items:center; gap:var(--space-2); }
+      .spell-card__icon{ font-size:26px; line-height:1; }
+      .spell-card__name{ font-family:var(--font-pixel); font-size:var(--text-lg); }
+      .spell-card__rarity{ margin-left:auto; background:var(--color-surface); border:1px solid var(--color-border); font-weight:700; box-shadow:none; }
+      .spell-card__rarity.rarity-common{ color:var(--rarity-common); border-color:var(--rarity-common); }
+      .spell-card__rarity.rarity-standard{ color:var(--rarity-standard); border-color:var(--rarity-standard); }
+      .spell-card__rarity.rarity-rare{ color:var(--rarity-rare); border-color:var(--rarity-rare); box-shadow:none; }
+      .spell-preview{ background:var(--color-surface-alt); border-radius:var(--radius); padding:var(--space-3) var(--space-4); font-size:var(--text-sm); color:var(--color-text); }
+      .spell-desc{ font-size:var(--text-sm); color:var(--color-text-muted); line-height:1.7; min-height:2.6em; }
+      .spell-req{ font-size:var(--text-xs); color:var(--color-text-muted); }
+      .spell-card__foot{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) var(--space-3); margin-top:auto; flex-wrap:wrap; }
+      .spell-cost{ font-weight:700; color:var(--pixel-skill); font-variant-numeric:tabular-nums; white-space:nowrap; }
+      .spell-cost .muted{ color:var(--color-text-muted); font-weight:400; font-size:var(--text-xs); }
+      .spell-state{ display:inline-flex; align-items:center; gap:6px; font-weight:700; color:var(--color-success); font-size:var(--text-sm); }
+      .btn-pixel.btn-pixel--sm{ padding:6px 12px; padding-left:calc(12px + 1.1em); font-size:var(--text-sm); }
       .sglearn-fx{position:absolute; pointer-events:none; z-index:3}
-      .sglearn-card.is-unlocked{border-color:rgba(150,95,230,.55); box-shadow:0 0 0 2px rgba(150,95,230,.18), 0 6px 18px rgba(150,95,230,.16)}
-      .sglearn-card.is-unlocked .sglearn-unlock{background:transparent; border:1px solid var(--border,#e5e7eb); color:#6b7280; cursor:default}
     </style>
 
     <script>
@@ -3221,11 +3241,23 @@
         var reduceCb=document.getElementById('sglearnReduce');
         var resetBtn=document.getElementById('sglearnReset');
         var realIcon='🔥';                               /* 本来のアイコン（習得後に表示）。未習得は「❓」。 */
+        var stateEl=document.getElementById('sglearnState');
+        var previewEl=document.getElementById('sglearnPreview');
+        var descEl=document.getElementById('sglearnDesc');
+        var reqEl=document.getElementById('sglearnReq');
         var ctx=canvas.getContext('2d');
-        var raf=null, running=false, DUR=4800;           /* 全体の再生時間（大きいほどゆっくり）。内部タイムラインは3500ms固定 */
+        var raf=null, running=false, DUR=5200;           /* 全体の再生時間（大きいほどゆっくり）。内部タイムラインは3800ms固定（move-in→儀式→move-out） */
         var GOLD='250,200,80', PURP='150,95,230';
         var VEIL='24,16,46';                             /* 神秘の闇のヴェール（深い菫紺）＝周囲を暗くして光を浮かせる */
-        var COST={ 'コモン':1, '標準':2, 'レア':3 };
+        /* 魔法メタ（production /spells の FLAVOR/rarity/cost に対応）。アイコン切替で共通演出が不変なことの確認用。 */
+        var META={
+          '🔥':{name:'炎', rarity:'コモン', rc:'common', cost:1, fx:'fire', preview:'メッセージ枠が燃え上がる 🔥', desc:'対象メッセージの枠が炎に包まれる、熱意を示す定番の魔法。', req:'前提なし（烈火系の起点）'},
+          '⚡':{name:'雷', rarity:'標準', rc:'standard', cost:2, fx:'thunder', preview:'鋭い気づきに稲妻が走る ⚡', desc:'黄色い閃光が明滅。鋭い指摘・ハッとする気づきに。', req:'✓ 前提: 🔥 炎'},
+          '🌈':{name:'虹', rarity:'レア', rc:'rare', cost:3, fx:'rainbow', preview:'多彩な視点をたたえる虹 🌈', desc:'色相が回る多色グロー。斬新・多面的なアイデアへの最上級の賛辞。', req:'✓ 前提: ⚡ 雷'},
+          '❄️':{name:'氷', rarity:'コモン', rc:'common', cost:1, fx:'ice', preview:'冷静に、と伝える青い光 ❄️', desc:'冷たく澄んだ青のグロー。落ち着いた指摘・冷静な視点に。', req:'前提なし（静輝系の起点）'},
+          '✨':{name:'キラキラ', rarity:'標準', rc:'standard', cost:2, fx:'sparkle', preview:'素敵なアイデアに祝福を ✨', desc:'紫の柔らかな輝き。称賛・応援のニュアンスに。', req:'✓ 前提: ❄️ 氷'},
+          '🔮':{name:'オーラ', rarity:'レア', rc:'rare', cost:3, fx:'aura', preview:'神々しい光をまとう 🌟', desc:'エメラルドの光輪が脈動。特別なアイデアに、荘厳なオーラを。', req:'✓ 前提: ✨ キラキラ'}
+        };
         var BOUNCES=10;                                  /* 円内で反射しながら引く線の本数（サンプル確認後に調整） */
         var FLAT=0.5;                                     /* 床パース＝円の縦つぶし率（1で正円・小さいほど寝る） */
         var GND_DY=8;                                     /* 床の魔法陣の中心をアイコンより少し下へ */
@@ -3260,35 +3292,43 @@
           canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
           canvas.style.width=W+'px'; canvas.style.height=H+'px'; canvas.style.left=(-MS)+'px'; canvas.style.top=(-MT)+'px';  /* 置換要素の auto 幅を避け、CSS px と描画座標を一致させる */
           ctx.setTransform(dpr,0,0,dpr,0,0);
-          return { W:W, H:H, cx:ir.left-cr.left+MS+ir.width/2, cy:ir.top-cr.top+MT+ir.height/2, icon:realIcon };
+          return { W:W, H:H,
+            hx: ir.left-cr.left+MS+ir.width/2, hy: ir.top-cr.top+MT+ir.height/2,   /* アイコンの定位置（ヘッダー） */
+            cx: MS+cr.width/2, cy: MT+cr.height/2,                                  /* パネル（カード）の中央 */
+            card: { x:MS, y:MT, w:cr.width, h:cr.height },                          /* カード矩形（暗転用） */
+            iconPx: Math.max(20, Math.round(ir.height)),                            /* アイコン実寸（受け渡しのサイズ一致） */
+            icon: realIcon };
         }
         function block(x,y,s,col,a){ if(a<=0) return; ctx.fillStyle='rgba('+col+','+a.toFixed(3)+')'; ctx.fillRect(Math.round(x-s/2),Math.round(y-s/2),Math.ceil(s),Math.ceil(s)); }
         function draw(p,m){
-          var W=m.W,H=m.H,CX=m.cx,CY=m.cy; ctx.clearRect(0,0,W,H);
+          var W=m.W,H=m.H; ctx.clearRect(0,0,W,H);
           var R=46;
           function clamp(v){ return v<0?0:(v>1?1:v); }
-          var t=p*3500;                                   /* 内部タイムライン(ms)は固定。全体の速さは DUR で調整（大きいほどゆっくり） */
-          /* ---- 拍（緩急）：描く→溜まる(加速)→満タン張り詰め→一気に解放→余韻 ---- */
-          var drawT   = clamp((t-200)/500);              /* 内側の反射線を描く 200–700ms（円周はこの後に一筆書き） */
-          var charge01= clamp((t-840)/1060);              /* エネルギーが溜まる 840–1660ms（円柱完成に合わせてゆっくり） */
-          var chargeE = charge01*charge01;               /* ease-in＝だんだん速く溜まる */
-          var holdT   = clamp((t-1900)/140);             /* 満タンの張り詰め 1660–1800ms（解放直前・円柱完成後の間） */
-          var rel     = clamp((t-2050)/450);             /* 解放 1800–2250ms */
-          var relE    = ease(rel);
-          var fade    = 1-clamp((t-2100)/450);           /* 魔法陣・床・塵が解放で消えていく（〜2300ms） */
-          var endFade = 1-clamp((t-3100)/380);           /* 余韻の最後にアイコン＋「習得！」がフェード（3100–3480ms） */
-          var after   = clamp((t-2400)/350)*endFade;     /* 解放後の余韻（漂うきらめき・やわらかいグロー・浮遊） */
-          var A0=-1.5708, perimT=clamp((t-700)/900);     /* 円周を最後に一筆書きする進捗 700–1400ms（ゆっくり）。A0＝描き始めの角度（真上） */
-          var grow=ease(clamp(t/220)), rr=R*grow;
-          var rot=p*6.2832*0.5;
-          /* 満タン直前の張り詰め＝細かなふるえ（溜まった力が抑えきれない）。解放で消える。 */
+          function rrect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+          var TL=3800, t=p*TL;                            /* 内部タイムライン(ms)。全体の速さは DUR で調整 */
+          /* ---- 三段構成：move-in(❓がパネル中央へ)→ritual(魔法陣→円柱→開封)→move-out(取得アイコンが定位置へ戻る) ---- */
+          var MOVE_IN=420, MOVE_OUT_START=3300, MOVE_OUT_END=3800;
+          var mi=ease(clamp(t/MOVE_IN)), mo=ease(clamp((t-MOVE_OUT_START)/(MOVE_OUT_END-MOVE_OUT_START)));
+          var rt=t-MOVE_IN;                               /* 儀式内タイムライン（move-in の後） */
+          var PHx=m.hx, PHy=m.hy, PCx=m.cx, PCy=m.cy, ipx=m.iconPx;
+          var CX=PCx, CY=PCy;                             /* 儀式はパネル中央に描く */
+          /* アイコン（❓/取得アイコン）の現在位置＝ヘッダー→中央→ヘッダー */
+          var IX, IY;
+          if(t<MOVE_IN){ IX=PHx+(PCx-PHx)*mi; IY=PHy+(PCy-PHy)*mi; }
+          else if(t<MOVE_OUT_START){ IX=PCx; IY=PCy; }
+          else { IX=PCx+(PHx-PCx)*mo; IY=PCy+(PHy-PCy)*mo; }
+          /* パネル（説明カード）を暗転＝新パネルを作らず既存カード矩形を暗くする。move-in で暗く→儀式中は暗いまま→move-out で戻る。 */
+          var panelDim=clamp(t/MOVE_IN)*(1-mo);
+          if(panelDim>0.001){ var cb=m.card; ctx.save(); ctx.fillStyle='rgba('+VEIL+','+(0.62*panelDim).toFixed(3)+')'; rrect(cb.x,cb.y,cb.w,cb.h,12); ctx.fill(); ctx.restore(); }
+          /* ---- 儀式の拍（rt 基準）：描く→溜まる→張り詰め→解放 ---- */
+          var drawT=clamp((rt-200)/500), perimT=clamp((rt-700)/900);
+          var charge01=clamp((rt-840)/1060), chargeE=charge01*charge01;
+          var holdT=clamp((rt-1900)/140), rel=clamp((rt-2050)/450), relE=ease(rel);
+          var fade=1-clamp((rt-2100)/450);                /* 儀式ビジュアルは解放後フェード */
+          var A0=-1.5708, grow=ease(clamp(rt/220)), rr=R*grow, rot=rt*0.0009;
           var tension=Math.max(chargeE*0.5, holdT)*(1-rel);
-          var GCX=CX+Math.sin(t*0.06)*tension*1.6, GCY=CY+GND_DY+Math.cos(t*0.055)*tension*1.2;
-          /* 神秘の闇のヴェール：周囲がすっと暗くなり（縁ほど濃いヴィネット）、金・紫の光が浮かび上がる。終盤で晴れる。 */
-          var veilA=0.60*clamp(t/440)*(1-relE);
-          if(veilA>0.001){ var vg=ctx.createRadialGradient(CX,CY,R*0.2,CX,CY,Math.max(W,H)*0.6);
-            vg.addColorStop(0,'rgba('+VEIL+','+(veilA*0.35).toFixed(3)+')'); vg.addColorStop(0.55,'rgba('+VEIL+','+(veilA*0.60).toFixed(3)+')'); vg.addColorStop(1,'rgba('+VEIL+','+veilA.toFixed(3)+')');
-            ctx.fillStyle=vg; ctx.fillRect(0,0,W,H); }
+          var GCX=CX+Math.sin(rt*0.06)*tension*1.6, GCY=CY+GND_DY+Math.cos(rt*0.055)*tension*1.2;
+          if(rt>0){
           /* 床の光だまり（円の内側がうっすら光る＝床に描かれている感。エネルギーで増す） */
           if(rr>2){
             var gg=ctx.createRadialGradient(GCX,GCY,0,GCX,GCY,rr);
@@ -3298,15 +3338,15 @@
           /* 円周のガイド＝点線（先に薄く出し、最後に太い実線で塗りつぶす）。床パースの楕円・ゆっくり回転。 */
           for(var i=0;i<30;i++){ var a=rot+i/30*6.2832; block(GCX+Math.cos(a)*rr, GCY+Math.sin(a)*rr*FLAT, 3, GOLD, (0.45+0.3*charge01)*fade); }
           /* 二重の同心円＋放射の刻印（溜まるほど速く回る＝力がめぐる） */
-          if(rr>6){ var rot2=-p*6.2832*(0.32+0.7*charge01);
+          if(rr>6){ var rot2=-rt*0.0018*(0.32+0.7*charge01);
             for(var j=0;j<18;j++){ var ja=rot2+j/18*6.2832; block(GCX+Math.cos(ja)*rr*0.60, GCY+Math.sin(ja)*rr*0.60*FLAT, 2, PURP, 0.55*fade); }
             ctx.strokeStyle='rgba('+GOLD+','+(0.30*fade).toFixed(3)+')'; ctx.lineWidth=1;
             for(var t2=0;t2<12;t2++){ var ta=rot2+t2/12*6.2832, r1=rr*1.02, r2=rr*1.15;
               ctx.beginPath(); ctx.moveTo(GCX+Math.cos(ta)*r1, GCY+Math.sin(ta)*r1*FLAT); ctx.lineTo(GCX+Math.cos(ta)*r2, GCY+Math.sin(ta)*r2*FLAT); ctx.stroke(); } }
           /* 漂う光の塵（アンビエント・ゆっくり周回＋またたき） */
-          var amb=clamp(p/0.30)*fade*(1-rel*0.7);
-          if(amb>0){ for(var d=0;d<12;d++){ var da2=d/12*6.2832+p*6.2832*0.12*(d%2?1:-1), dr=rr*(1.12+0.28*((d*7)%5)/4), dy2=Math.sin(p*6.2832*0.5+d)*3;
-            block(GCX+Math.cos(da2)*dr, GCY+Math.sin(da2)*dr*FLAT+dy2-6, 1.5, d%2?GOLD:PURP, 0.35*amb*(0.55+0.45*Math.sin(p*7+d))); } }
+          var amb=clamp(rt/1000)*fade*(1-rel*0.7);
+          if(amb>0){ for(var d=0;d<12;d++){ var da2=d/12*6.2832+rt*0.0007*(d%2?1:-1), dr=rr*(1.12+0.28*((d*7)%5)/4), dy2=Math.sin(rt*0.003+d)*3;
+            block(GCX+Math.cos(da2)*dr, GCY+Math.sin(da2)*dr*FLAT+dy2-6, 1.5, d%2?GOLD:PURP, 0.35*amb*(0.55+0.45*Math.sin(rt*0.006+d))); } }
           /* 魔法陣の線（細め）。紫グロー→金の本体→白コア（溜まるほど白熱） */
           if(path && drawT>0){
             var segF=drawT*BOUNCES, full=Math.floor(segF), frac=segF-full;
@@ -3339,9 +3379,9 @@
             if(perimT<1){ var pha=A0+perimT*6.2832; ctx.shadowBlur=0; block(GCX+Math.cos(pha)*rr, GCY+Math.sin(pha)*rr*FLAT, 3, '255,255,255', 0.95*fade); }  /* ペン先の白い光 */
             ctx.restore();
           }
-          /* （充填ゲージ＝白っぽい点線リングは廃止） */
-          /* 光の壁（発光）＋❓を包む：奥側の柱→❓→手前側の柱 の順で描き、❓を光の円柱の内側に閉じ込める。円周の実線の上に、線が通過した所から順に“下→上”へ立ち上がる（最後は円柱）。 */
-          var beamGate=(1-rel);
+          } /* ← if(rt>0)：儀式ビジュアル（床/魔法陣/円周）ここまで（move-in 中は描かない） */
+          /* 光の壁（発光）＋❓を包む：奥側の柱→❓→手前側の柱。❓/取得アイコンは IX,IY（move-in/out で移動）に描く。 */
+          var beamGate=(rt>0?(1-rel):0);
           var wallH=70*beamGate;                                  /* 一定の壁高さ（全列そろう＝円柱・高め） */
           function drawWall(back){                                /* back=true:奥側(楕円の上半分) / false:手前側(下半分) */
             if(beamGate<=0.01 || rr<=6 || perimT<=0){ return; }
@@ -3351,7 +3391,7 @@
               var frac=si/DENS, sang=A0+frac*6.2832, sn=Math.sin(sang);
               if(back ? (sn>0) : (sn<=0)){ continue; }            /* 奥=sn<=0（上側・❓の後ろ）／手前=sn>0（下側・❓の前） */
               var sbx=GCX+Math.cos(sang)*rr, sby=GCY+sn*rr*FLAT;
-              var tpass=700+frac*900, riseAmt=ease(clamp((t-tpass)/320));   /* 実線が通過してから320msかけて下→上へ伸びる */
+              var tpass=700+frac*900, riseAmt=ease(clamp((rt-tpass)/320));   /* 実線が通過してから320msかけて下→上へ伸びる */
               if(riseAmt<=0.001){ continue; }
               var colH=wallH*riseAmt;
               var lg=ctx.createLinearGradient(sbx,sby,sbx,sby-colH);   /* 根元が明るく上へ透明 */
@@ -3361,52 +3401,45 @@
             ctx.restore();
           }
           drawWall(true);                                         /* 奥側の柱（❓の後ろ） */
-          /* 未習得アイコン＝❓（光の円柱の中）。円柱が出始めたら“ぐらぐら”揺れ（溜まるほど激しく）、習得の瞬間にフェードして本来のアイコンへ入れ替わる。 */
-          var qAlpha=(1-clamp((t-2050)/180))*endFade;
+          /* ❓（未習得アイコン）＝IX,IY（move-in 中も表示）。円柱が出始めたら“ぐらぐら”揺れ、解放でフェードして取得アイコンへ入れ替わる。 */
+          var qAlpha=(1-clamp((rt-2050)/180));
           if(qAlpha>0.01){
-            var wob=clamp((t-800)/500)*(0.6+0.6*charge01);          /* 円柱が出始めたら揺れ、溜まるほど激しく */
-            var rotW=Math.sin(t*0.026)*0.20*wob;                    /* ぐらぐら回転 */
-            var dxW=Math.sin(t*0.041)*3.5*wob, dyW=Math.cos(t*0.05)*2.5*wob;  /* 小刻みに揺れる位置 */
-            ctx.save(); ctx.globalAlpha=qAlpha; ctx.translate(CX+dxW, CY+dyW); ctx.rotate(rotW);
-            ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('❓',0,0); ctx.restore();
+            var wob=clamp((rt-800)/500)*(0.6+0.6*charge01);        /* 円柱が出始めたら揺れ、溜まるほど激しく */
+            var rotW=Math.sin(rt*0.026)*0.20*wob;                  /* ぐらぐら回転 */
+            var dxW=Math.sin(rt*0.041)*3.5*wob, dyW=Math.cos(rt*0.05)*2.5*wob;
+            ctx.save(); ctx.globalAlpha=qAlpha; ctx.translate(IX+dxW, IY+dyW); ctx.rotate(rotW);
+            ctx.font=ipx+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('❓',0,0); ctx.restore();
           }
           drawWall(false);                                        /* 手前側の柱（❓の前）＝❓が円柱に包まれる */
-          /* 溜まったエネルギーの光球（中心の上に育つ）→解放で弾ける */
-          var orbL=Math.max(charge01,holdT)*(1-clamp(rel/0.15));
-          if(orbL>0.02){ var oy=GCY-30-12*orbL, orbR=4+18*orbL*(0.92+0.08*Math.sin(p*36));
-            var og=ctx.createRadialGradient(GCX,oy,0,GCX,oy,orbR); og.addColorStop(0,'rgba(255,255,255,'+(0.9*orbL).toFixed(3)+')'); og.addColorStop(0.5,'rgba('+GOLD+','+(0.7*orbL).toFixed(3)+')'); og.addColorStop(1,'rgba('+GOLD+',0)');
-            ctx.fillStyle=og; ctx.beginPath(); ctx.arc(GCX,oy,orbR,0,6.2832); ctx.fill(); }
-          /* ===== 解放：ここから一気に ===== */
-          /* 発動フラッシュ（解放直後に鋭く白→金） */
-          var flashT=clamp((t-2050)/180); if(flashT>0&&flashT<1){ var fa=Math.sin(flashT*Math.PI)*0.9;
+          /* 溜まったエネルギーの光球（中央の上に育つ）→解放で弾ける */
+          if(rt>0){ var orbL=Math.max(charge01,holdT)*(1-clamp(rel/0.15));
+            if(orbL>0.02){ var oy=GCY-30-12*orbL, orbR=4+18*orbL*(0.92+0.08*Math.sin(rt*0.01));
+              var og=ctx.createRadialGradient(GCX,oy,0,GCX,oy,orbR); og.addColorStop(0,'rgba(255,255,255,'+(0.9*orbL).toFixed(3)+')'); og.addColorStop(0.5,'rgba('+GOLD+','+(0.7*orbL).toFixed(3)+')'); og.addColorStop(1,'rgba('+GOLD+',0)');
+              ctx.fillStyle=og; ctx.beginPath(); ctx.arc(GCX,oy,orbR,0,6.2832); ctx.fill(); } }
+          /* ===== 解放（中央 PC で一気に） ===== */
+          var flashT=clamp((rt-2050)/180); if(flashT>0&&flashT<1){ var fa=Math.sin(flashT*Math.PI)*0.9;
             var fg=ctx.createRadialGradient(CX,CY,0,CX,CY,R*2.1); fg.addColorStop(0,'rgba(255,255,255,'+fa.toFixed(3)+')'); fg.addColorStop(0.6,'rgba('+GOLD+','+(fa*0.5).toFixed(3)+')'); fg.addColorStop(1,'rgba('+GOLD+',0)');
             ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(CX,CY,R*2.1,0,6.2832); ctx.fill(); }
-          /* 衝撃波リング（速く広がって消える・二重） */
           if(rel>0&&rel<0.7){ var sw=ease(clamp(rel/0.7));
             ctx.strokeStyle='rgba(255,255,255,'+((1-sw)*0.9).toFixed(3)+')'; ctx.lineWidth=4*(1-sw)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.4+2.2*sw),0,6.2832); ctx.stroke();
             ctx.strokeStyle='rgba('+GOLD+','+((1-sw)*0.7).toFixed(3)+')'; ctx.lineWidth=3*(1-sw)+1; ctx.beginPath(); ctx.arc(CX,CY,R*(0.2+1.6*sw),0,6.2832); ctx.stroke(); }
-          /* 外へ弾けるきらめき（解放） */
           if(rel>0&&rel<1){ for(var q=0;q<24;q++){ var qa=q/24*6.2832+0.35, qd=R*(0.3+1.7*ease(rel)); block(CX+Math.cos(qa)*qd, CY+Math.sin(qa)*qd, (1-rel)*3.5+1, q%2?GOLD:PURP, (1-rel)*fade); } }
-          /* 余韻：解放後、アイコンのまわりをゆっくり漂うきらめき（余韻を長く感じさせる） */
-          if(after>0){ for(var w=0;w<8;w++){ var wa=w/8*6.2832+t*0.0009, wph=((t*0.0006+w*0.31)%1);
-            var wx=CX+Math.cos(wa)*(14+6*Math.sin(w*1.7)), wy=(CY-10)-wph*30;
-            block(wx, wy, (1-wph)*2+0.5, w%2?GOLD:PURP, (1-wph)*0.5*after); } }
-          /* （❓は上の「光の壁」ブロック内＝奥柱と手前柱の間で描画済み＝光の円柱に包む） */
-          /* アイコンが一気に飛び出す（解放でオーバーシュート＝ポン！）→余韻でふわっと浮遊→最後は静かに定位置(HTML)へ着地して受け渡し（“パッ”と切替を無くす） */
-          var settle=clamp((t-2900)/500);                /* 2900–3400ms：浮いたアイコンが定位置(yo=0)へ降り、グローが消える＝HTMLアイコンへ滑らかに橋渡し */
-          var li=clamp((t-2050)/260); if(li>0){ var sc=0.4+back(li)*0.6; var yo=((-12*ease(li))+Math.sin(t*0.004)*1.5*after)*(1-settle); var ia=Math.min(1,li*2.5);
+          /* 取得アイコン＝解放でポップ（中央）→そのまま IX,IY に乗って move-out で定位置（ヘッダー）へ戻る。最後に HTML アイコンへ受け渡し。 */
+          var li=clamp((rt-2050)/260);
+          if(li>0){ var sc=0.4+back(li)*0.6, yo=(-12*ease(li))*(1-clamp(rel)), ia=Math.min(1,li*2.5);
             ctx.save(); ctx.globalAlpha=ia;
-            var gr=(0.6*(1-rel*0.5)+0.18*after*(0.6+0.4*Math.sin(t*0.006)))*(1-settle);   /* 余韻中はやわらかく明滅→着地でグロー消灯 */
-            if(gr>0.001){ var g=ctx.createRadialGradient(CX,CY+yo,0,CX,CY+yo,34); g.addColorStop(0,'rgba('+GOLD+','+clamp(gr).toFixed(3)+')'); g.addColorStop(1,'rgba('+GOLD+',0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY+yo,34,0,6.2832); ctx.fill(); }
-            ctx.translate(CX,CY+yo); ctx.scale(sc,sc); ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(m.icon,0,0); ctx.restore(); }
-          /* 「✨ 習得！」アイコンの上（解放後にポップ→余韻の間ずっと表示、最後にフェード） */
-          var lt=clamp((t-2200)/260); if(lt>0){ var lta=Math.min(1,lt*2.2)*endFade; var lsc=0.6+back(clamp(lt*1.3))*0.4; var ty=CY-R*1.05-8*ease(lt)+Math.sin(t*0.004)*1.5*after;
+            var gr=(0.55*(1-rel*0.5))*(1-mo);
+            if(gr>0.001){ var g=ctx.createRadialGradient(IX,IY+yo,0,IX,IY+yo,34); g.addColorStop(0,'rgba('+GOLD+','+clamp(gr).toFixed(3)+')'); g.addColorStop(1,'rgba('+GOLD+',0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(IX,IY+yo,34,0,6.2832); ctx.fill(); }
+            ctx.translate(IX,IY+yo); ctx.scale(sc,sc); ctx.font=ipx+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(m.icon,0,0); ctx.restore(); }
+          /* 「✨ 習得！」＝中央のアイコンの上（解放後にポップ→move-out 前にフェード） */
+          var lt=clamp((rt-2200)/260), labFade=1-clamp((t-3050)/250);
+          if(lt>0 && labFade>0){ var lta=Math.min(1,lt*2.2)*labFade, lsc=0.6+back(clamp(lt*1.3))*0.4, ty=CY-R*1.05-8*ease(lt);
             ctx.save(); ctx.globalAlpha=lta; ctx.translate(CX,ty); ctx.scale(lsc,lsc); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 15px system-ui, sans-serif';
             ctx.lineWidth=3; ctx.strokeStyle='rgba(60,40,10,0.55)'; ctx.strokeText('✨ 習得！',0,0); ctx.fillStyle='rgba('+GOLD+',1)'; ctx.fillText('✨ 習得！',0,0); ctx.restore(); }
         }
-        function markUnlocked(){ card.classList.add('is-unlocked'); btn.textContent='✓ 解放済み'; btn.disabled=true; iconEl.textContent=realIcon; }   /* 習得後は本来のアイコン */
+        function markUnlocked(){ btn.style.display='none'; stateEl.style.display=''; iconEl.textContent=realIcon; }   /* 習得後＝ボタンを「✓ 解放済み」へ差し替え・本来のアイコン */
         function run(){
-          if(running || card.classList.contains('is-unlocked')) return;
+          if(running || stateEl.style.display!=='none') return;
           if(reduced()){ markUnlocked(); return; }
           running=true; iconEl.style.visibility='hidden';
           var seed=CHOSEN_SEEDS.length?CHOSEN_SEEDS[Math.floor(Math.random()*CHOSEN_SEEDS.length)]:((Math.random()*4294967296)>>>0);
@@ -3417,10 +3450,14 @@
             else { ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; running=false; markUnlocked(); }
           })(t0);
         }
-        function reset(){ if(raf) cancelAnimationFrame(raf); running=false; path=null; var m=metrics(); ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; iconEl.textContent='❓'; card.classList.remove('is-unlocked'); btn.textContent='解放する'; btn.disabled=false; }   /* 未習得は「❓」 */
+        function reset(){ if(raf) cancelAnimationFrame(raf); running=false; path=null; var m=metrics(); ctx.clearRect(0,0,m.W,m.H); iconEl.style.visibility=''; iconEl.textContent='❓'; btn.style.display=''; btn.disabled=false; stateEl.style.display='none'; }   /* 未習得は「❓」・ボタンを戻す */
         btn.addEventListener('click', run);
         resetBtn.addEventListener('click', reset);
-        sel.addEventListener('change', function(){ var v=sel.value.split('|'); realIcon=v[0]; nameEl.childNodes[0].nodeValue=v[1]+' '; rarityEl.textContent=v[2]; costEl.textContent='✦ '+COST[v[2]]+' で解放'; reset(); });   /* 本来のアイコンを差し替え・表示は未習得の❓に戻す */
+        sel.addEventListener('change', function(){ var mm=META[sel.value]; if(!mm) return; realIcon=sel.value;
+          nameEl.textContent=mm.name; rarityEl.textContent=mm.rarity; rarityEl.className='badge rarity-'+mm.rc+' spell-card__rarity';
+          card.className='card spell-card rarity-'+mm.rc; costEl.innerHTML='✦ '+mm.cost+' <span class="muted">SP</span>';
+          previewEl.textContent=mm.preview; previewEl.className='spell-preview spell-fx spell-fx--'+mm.fx; descEl.textContent=mm.desc; reqEl.textContent=mm.req;
+          reset(); });   /* 本来のアイコン/名前/レアリティ/コスト/説明を差し替え・表示は未習得の❓に戻す（共通演出は不変） */
 
         /* ---- サンプル・ギャラリー：ランダムな魔法陣を 20 個・静止画で並べて選ぶ ---- */
         var galGrid=document.getElementById('sggalGrid');
