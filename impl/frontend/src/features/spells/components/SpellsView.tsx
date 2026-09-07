@@ -42,14 +42,20 @@ export function SpellsView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   // #11: 魔法解放の共通「習得」演出（GF-AC-110）。解放カードのアイコンに重ねて 魔法陣→光の円柱→アイコン開封（❓→本来アイコン）を再生する。
   // 全魔法共通（属性非依存）・reduce-motion 尊重（演出を出さず即「解放済み」）。決定的部分は features/spells/learnFx（G-TC-162）。
-  const [learning, setLearning] = useState<{ id: string; iconRect: CastRect; icon: string } | null>(null);
+  const [learning, setLearning] = useState<{ id: string; cardRect: CastRect; iconRect: CastRect; icon: string } | null>(null);
   const startLearn = (cardId: string, icon: string, spellId: string) => {
     if (reduceMotion()) return;
     const card = typeof document !== "undefined" ? document.getElementById(cardId) : null;
     const iconEl = card?.querySelector<HTMLElement>(".spell-card__icon");
-    if (!iconEl) return;
-    const r = iconEl.getBoundingClientRect();
-    setLearning({ id: spellId, iconRect: { top: r.top, left: r.left, width: r.width, height: r.height }, icon });
+    if (!card || !iconEl) return;
+    const cr = card.getBoundingClientRect();
+    const ir = iconEl.getBoundingClientRect();
+    setLearning({
+      id: spellId,
+      cardRect: { top: cr.top, left: cr.left, width: cr.width, height: cr.height },
+      iconRect: { top: ir.top, left: ir.left, width: ir.width, height: ir.height },
+      icon,
+    });
   };
 
   const load = useCallback(async () => {
@@ -124,7 +130,7 @@ export function SpellsView() {
   return (
     <section aria-label="魔法 / スキル">
       {/* #11: 魔法解放の共通「習得」演出（解放カードのアイコンに固定オーバーレイ・自分の解放時のみ・reduce-motion 時は非生成） */}
-      {learning && <SpellLearnFx iconRect={learning.iconRect} icon={learning.icon} onDone={() => setLearning(null)} />}
+      {learning && <SpellLearnFx cardRect={learning.cardRect} iconRect={learning.iconRect} icon={learning.icon} onDone={() => setLearning(null)} />}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
       <GameNav current="spells" />
