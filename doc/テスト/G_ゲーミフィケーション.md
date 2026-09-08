@@ -209,3 +209,4 @@
 
 | G-TC-167 | e2e(front) | 期間タブ切替で表彰台が累積しない | `/ranking` で 今週→通算→今月→先週→今週 とタブ切替 | `/ranking` の `.podium`／`.rank-list` | どの切替後も `.podium` は**常に 1 個**（`.rank-list` も 1 個）＝旧タブの表彰台が残らない | GF-AC-130／#13 |
 | G-TC-168 | e2e(front) | 自分の行ハイライトが暗パネルで白潰れしない | `/ranking`（通算）で自分がランクイン | `/ranking` の `.rank-panel.full .rank-list li.is-me` 背景色 | 登場ハイライト終了後の背景が **`#EFF6FF`（near-white）でない**＝名前が読める（is-me 無い期間はスキップ） | GF-AC-131／#13 |
+| G-TC-169 | e2e(front) | reduce-motion で全演出が無効（#13） | `page.emulateMedia({reducedMotion:"reduce"})` で `/ranking` を表示 | `.podium__col`／`.podium__medal`／`.myrank`／`.myrank .avatar`／`.rank-list li.is-me .avatar` の computed `animationName` | 表彰台せり上がり・メダルきらめき・myrank グロー・自分アバターのジャンプが**すべて `none`**（`@media prefers-reduced-motion`）。CountUp は即最終値（unit で担保）＝実効抑制は OS reduce OR `[data-anim-reduced]` | GF-AC-133／#13 |

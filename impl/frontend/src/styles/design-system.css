@@ -2065,6 +2065,14 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   0% { background: rgba(34,211,238,.42); }
   100% { background: rgba(34,211,238,.14); }
 }
+/* 「自分」のアバターの周期ジャンプ（#13 ランキング／#30 ダッシュボード週間ランキングで共用）。適用側は各 feature CSS。 */
+@keyframes rank-me-jump {
+  0%, 58%, 100% { transform: translateY(0); }
+  66% { transform: translateY(-11px); }  /* 跳ね上がり */
+  74% { transform: translateY(0); }       /* 着地 */
+  82% { transform: translateY(-5px); }    /* 小さく2度目 */
+  90% { transform: translateY(0); }
+}
 
 /* ── 投票の押下フィードバック（横断・SparkBurst / XpFloat）─────────────────────
    クリック位置に固定表示する火花バーストと「+N XP」フロート。SC-01（ダッシュボードのクイック投票）と

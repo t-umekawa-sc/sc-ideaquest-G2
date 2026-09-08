@@ -49,11 +49,11 @@
 /* ── ゲーム感 #13: ランキングの登場演出（SC-41・純CSS）───────────────────────────────
    表彰台のせり上がり・メダルのきらめき・自分の順位カード/行の登場グロー。SC-41 固有に限定
    （`.rank-panel.full` 配下）＝ダッシュボードのミニランキングには波及させない。reduce-motion 尊重。 */
-.podium__col { animation: rank-podium-rise .5s cubic-bezier(.22,1,.36,1) both; }
-.podium__col:nth-child(1) { animation-delay: .10s; }  /* 2位 */
+.podium__col { animation: rank-podium-rise .9s cubic-bezier(.22,1,.36,1) both; }
+.podium__col:nth-child(1) { animation-delay: .22s; }  /* 2位 */
 .podium__col:nth-child(2) { animation-delay: 0s; }    /* 1位（中央・先に） */
-.podium__col:nth-child(3) { animation-delay: .18s; }  /* 3位 */
-@keyframes rank-podium-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.podium__col:nth-child(3) { animation-delay: .40s; }  /* 3位 */
+@keyframes rank-podium-rise { from { opacity: 0; transform: translateY(44px); } to { opacity: 1; transform: translateY(0); } }
 /* メダルのきらめき（周期的にポン＋輝度） */
 .podium__medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; transform-origin: 50% 60%; }
 .rank-panel.full .rank-list li .rank-medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; }
@@ -67,7 +67,16 @@
 }
 /* 自分の行の登場ハイライト（数回パルスして落ち着く・keyframe は design-system.css） */
 .rank-panel.full .rank-list li.is-me { animation: rank-me-row .7s ease-out both; }
+/* 「自分」のアバターは一定間隔でぴょんと跳ねる（存在の強調）＝あなたの順位カード／一覧の自分の行／表彰台の自分。
+   keyframe rank-me-jump は design-system.css（#30 ダッシュボードのミニ版と共用）。 */
+.myrank .avatar,
+.rank-panel.full .rank-list li.is-me .avatar,
+.podium__col.is-me .avatar {
+  animation: rank-me-jump 2.2s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
 @media (prefers-reduced-motion: reduce) {
   .podium__col, .podium__medal, .rank-panel.full .rank-list li .rank-medal,
-  .myrank, .rank-panel.full .rank-list li.is-me { animation: none; }
+  .myrank, .rank-panel.full .rank-list li.is-me,
+  .myrank .avatar, .rank-panel.full .rank-list li.is-me .avatar, .podium__col.is-me .avatar { animation: none; }
 }

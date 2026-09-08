@@ -229,9 +229,12 @@
    メダルのきらめき＋自分の行の登場ハイライト（keyframe は design-system.css で SC-41 と共用）。reduce-motion 尊重。 */
 .dash-page .rank-panel .rank-list li .rank-medal { display: inline-block; animation: rank-medal-shine 2.8s ease-in-out infinite; }
 .dash-page .rank-panel .rank-list li.is-me { animation: rank-me-row .7s ease-out both; }
+/* 「自分」のアバターは一定間隔でぴょんと跳ねる（SC-41 と共用の rank-me-jump）。 */
+.dash-page .rank-panel .rank-list li.is-me .avatar { animation: rank-me-jump 2.2s ease-in-out infinite; transform-origin: 50% 100%; }
 @media (prefers-reduced-motion: reduce) {
   .dash-page .rank-panel .rank-list li .rank-medal,
-  .dash-page .rank-panel .rank-list li.is-me { animation: none; }
+  .dash-page .rank-panel .rank-list li.is-me,
+  .dash-page .rank-panel .rank-list li.is-me .avatar { animation: none; }
 }
 /* 読み込み中のスケルトン行（枠高を実データと合わせてリロード時の高さジャンプを防ぐ）。
    行高は 32px アバター/スコア2行で決まるので、それに合わせた高さのプレースホルダを置く。 */

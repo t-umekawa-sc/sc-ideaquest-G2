@@ -58,3 +58,28 @@ test("G-TC-168 SC-41 own row highlight is not near-white on dark panel (#13)", a
   const bg = await meRow.first().evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(bg).not.toBe("rgb(239, 246, 255)"); // #EFF6FF（--color-primary-soft）で終わらない
 });
+
+// GF-AC-133（#13 reduce）＝reduce-motion で /ranking の全演出（表彰台せり上がり rank-podium-rise・メダルきらめき
+// rank-medal-shine・myrank グロー rank-myrank-in・自分の行 rank-me-row・自分のアバターのジャンプ rank-me-jump）が無効。
+// @media(prefers-reduced-motion) で animation:none になる（computed animationName === "none"）。CountUp は即最終値（unit で担保）。
+test.describe("reduce-motion #13", () => {
+  test("G-TC-169 SC-41 ranking entrance/idle animations are disabled under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" }); // OS reduce をエミュレート（prefers-reduced-motion: reduce）
+    await login(page);
+    await page.goto("/ranking");
+    await expect(page.locator(".rank-panel.full")).toBeVisible();
+    const animOff = async (sel: string) =>
+      expect.poll(() => page.locator(sel).first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+    await animOff(".podium__col");        // 表彰台せり上がり
+    await animOff(".podium__medal");      // メダルきらめき
+    await animOff(".myrank");             // あなたの順位カードのグロー
+    await animOff(".myrank .avatar");     // 自分のアバターのジャンプ
+    // 自分の行/アバター（通算で自分がランクインしていれば）
+    await page.getByRole("tab", { name: "通算", exact: true }).click();
+    await expect(page.locator(".rank-panel.full")).toBeVisible();
+    const meAvatar = page.locator(".rank-panel.full .rank-list li.is-me .avatar");
+    if (await meAvatar.count()) {
+      await expect.poll(() => meAvatar.first().evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+    }
+  });
+});
