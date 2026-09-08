@@ -223,3 +223,9 @@
 
 | G-TC-171 | e2e(front) | 選定成立で祝福が出る／解除では出ない（#16） | owner で recruiting クエスト＋published アイデアを作成→`/ideas/{id}` で選定→クリックで閉じ→解除 | `.select-celebrate`（SELECTED!/アイデア名）／「選定を解除しました。」 | 初回選定で `.select-celebrate` が出る（SELECTED!＋アイデア名）・クリックで `count 0`／解除では祝福 `count 0`（スナックバーのみ） | GF-AC-160/161／#16 |
 | G-TC-172 | e2e(front) | reduce-motion で祝福を出さない（#16） | `page.emulateMedia({reducedMotion:"reduce"})` で同様に選定 | `.select-celebrate`／成功スナックバー／選定済みボタン | 祝福オーバーレイ `.select-celebrate` は**`count 0`**／「アイデアを選定しました。投稿者に XP を付与しました。」＋「選定済み」は正常 | GF-AC-162／#16 |
+
+### 5-R. チャットの手触りの reduce（#17・SC-24・GF-AC-172）
+
+> 対象＝アイデアチャット（`/ideas/{id}/chat`）。新着メッセージの登場（`.msg-row`＝`msg-enter` 下からフェード・`key=id` で新着のみ）＋リアクション追加のポップ（`.reaction`＝`reaction-pop`）。GF-AC-170/171 の見た目はユーザー目視。ここは **reduce で登場/ポップが無効**（即表示）を e2e で押さえる（`@media prefers-reduced-motion` で `animation:none`／実効は OS reduce OR `[data-anim-reduced]`）。※入力欄は既定で最小化（`composerMin=true`・スリムバー `.composer__mini`）＝テストは展開してから投稿（`openComposer`）。対象＝`impl/frontend/e2e/sc-24-chat.spec.ts`。
+
+| G-TC-173 | e2e(front) | reduce-motion で登場/ポップが無効（#17） | `page.emulateMedia({reducedMotion:"reduce"})` でチャットに投稿→👍 リアクション | `.msg-row`／`.reaction` の computed `animationName` | 新着行（`.msg-row`）とリアクション（`.reaction`）の `animationName` が**`none`**／投稿・リアクション自体は正常 | GF-AC-172／#17 |

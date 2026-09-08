@@ -11,9 +11,19 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  // ログイン成立の判定＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯で変わり「ようこそ」は存在しないため使わない）。
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
+
+// 入力欄は既定で最小化（composerMin=true・スリムバー .composer__mini）。textarea .composer__box を使う前に展開する。
+async function openComposer(page: Page) {
+  const box = page.locator(".composer__box");
+  if (await box.isVisible().catch(() => false)) return; // 既に展開済み（送信では再最小化しない）
+  await page.locator(".composer__mini").click(); // click が mini の出現/操作可能を auto-wait（描画前の競合を回避）
+  await expect(box).toBeVisible();
+}
 
 async function createRecruiting(page: Page, title: string): Promise<string> {
   const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
@@ -46,7 +56,8 @@ test("E-TC-201 SC-24 post message appears and normal reaction", async ({ page })
     await page.goto(`/ideas/${ideaId}/chat`);
     await expect(page.getByText(`チャットアイデア_${stamp}`)).toBeVisible(); // 文脈が実データ
 
-    // 投稿→スレッドに出る（postMessage→getChat）。
+    // 投稿→スレッドに出る（postMessage→getChat）。入力欄は既定で最小化なので展開してから入力。
+    await openComposer(page);
     await page.locator(".composer__box").fill(body);
     await page.getByRole("button", { name: "送信", exact: true }).click();
     const msg = page.locator(".msg", { hasText: body });
@@ -84,6 +95,7 @@ test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}/chat`);
+    await openComposer(page); // 既定で最小化された入力欄を展開
     // 2件投稿。
     for (const t of [`親A_${stamp}`, `親B_${stamp}`]) {
       await page.locator(".composer__box").fill(t);
@@ -125,4 +137,39 @@ test("E-TC-202 SC-22 chat activity and preview render real data", async ({ page 
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
+});
+
+// #17 reduce（GF-AC-172）＝reduce-motion では新着メッセージの登場（msg-enter）とリアクションのポップ（reaction-pop）が無効
+// ＝即表示（投稿・受信・リアクション自体は正常）。実効抑制は OS reduce OR [data-anim-reduced]。
+test.describe("reduce-motion #17", () => {
+  test("G-TC-173 SC-24 message-enter and reaction-pop are disabled under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await login(page);
+    const stamp = Date.now().toString().slice(-8);
+    const questId = await createRecruiting(page, `E2E手触りR_${stamp}`);
+    const ideaId = await createPublishedIdea(page, questId, stamp);
+    const body = `テスト投稿R_${stamp}`;
+    try {
+      await page.goto(`/ideas/${ideaId}/chat`);
+      await openComposer(page); // 既定で最小化された入力欄を展開
+      // 投稿＝メッセージ行が出る／👍 でリアクションが出る（投稿・リアクションは reduce でも正常）。
+      await page.locator(".composer__box").fill(body);
+      await page.getByRole("button", { name: "送信", exact: true }).click();
+      const msg = page.locator(".msg", { hasText: body });
+      await expect(msg.locator(".msg__text")).toContainText(body);
+      await msg.locator(".reaction-add").click();
+      await page.locator(".reaction-picker .rp__emoji", { hasText: "👍" }).click();
+      const reaction = msg.locator(".reaction", { hasText: "👍" });
+      await expect(reaction).toBeVisible();
+
+      // reduce では登場/ポップの animation が none。
+      const rowAnim = await page.locator(".msg-row", { hasText: body }).first().evaluate((el) => getComputedStyle(el).animationName);
+      expect(rowAnim).toBe("none");
+      const reactAnim = await reaction.evaluate((el) => getComputedStyle(el).animationName);
+      expect(reactAnim).toBe("none");
+    } finally {
+      const c2 = csrfOf(await page.context().cookies());
+      await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+    }
+  });
 });
