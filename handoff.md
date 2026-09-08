@@ -5,7 +5,7 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-09-08（このセッション途中）**。
 - 作業ブランチ＝**`main`**（`origin/main` と同期）。feature/game-feel は廃止済み・main で作業。
-- 最新コミット＝**`41b9fa9`**（#12 production 移植）。本セッションで #12 を **2 コミット**＝`72c26ba`（§17M モック改訂＋受入台帳）／`41b9fa9`（production 移植＋テスト G-TC-165/166）。本 handoff コミットが 3 つ目。**push はユーザー確認後に実施**（都度確認）。
+- 最新コミット＝**`8986f86`**（SC-41 ランキング表示修正）。本セッションのコミット＝`72c26ba`/`41b9fa9`/`d957bc6`（#12 演出・**push 済み**）＋`a81ea3e`（ダッシュボード週間ランキングのアバター imageUrl 修正）＋`8986f86`（ランキング表彰台の累積＋自分の行の白潰れ修正）。**`a81ea3e`・`8986f86` の 2 コミットは未 push**（`origin/main` より ahead 2・都度確認）。
 - 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝main へ増分ごと commit・**push は都度ユーザー確認**。QA は §1.1 参照（機能＝私がテスト＋実起動確認／見た目＝ユーザー目視）。
 
 ## 2. ゴール
@@ -37,17 +37,23 @@
 - 規約＝フロントエンド実装フロー規約 §2.2／ゲーム感フェーズ §1.1（上記 §2.1）。
 - 記憶（`~/.claude/projects/-home-t-umekawa-sc-ideaquest-G2/memory/`）＝新規 `mock-match-impl-layout`・`spell-unlock-dev-reset`／更新 `animation-reduce-motion-standard`。
 
+### F. #13 ランキング＝実装済み確認＋表示不具合3件を修正（本セッション・未 push `a81ea3e`/`8986f86`）
+- **#13 演出は既に実装済み**＝`ranking.css`（表彰台せり上がり `rank-podium-rise`・メダルきらめき `rank-medal-shine`・myrank グロー `rank-myrank-in`・自分の行 `rank-me-row`・`jumpToMe`・`CountUp`）／reduce は OS `@media`＋グローバル `[data-anim-reduced]` キルスイッチ（design-system.css §4.9）で両対応。機能は担保済み・残りは GF-AC-130/131/132 の見た目目視。
+- **修正1（`a81ea3e`）**＝ダッシュボード週間ランキングの `<Avatar>` が `imageUrl` 未指定で生成デフォルトにフォールバック→設定画像が出なかった。`DashboardView.tsx` で `imageUrl={r.user.avatar}` 追加（backend は返している）。
+- **修正2（`8986f86`）**＝`/ranking` の(1)期間タブ切替で表彰台 `.podium` が累積（`podium`/`rank-list` 兄弟の `key={period}` 重複で reconciliation 破綻→`RankingView.tsx` で `podium-`/`list-` に一意化）(2)自分の行の `rank-me-row` 終了色が明色 `#EFF6FF` で暗パネル上の名前が白潰れ→`design-system.css` で半透明シアンへ。回帰 e2e＝G-TC-167/168（`sc-41-ranking.spec.ts`）。同 spec の login ヘルパが実在しない「ようこそ」待ちで赤だった（G-TC-206）のも URL＋`.app-header` 判定に修正。
+- **診断手法メモ**＝Playwright で `page.evaluate` して `.podium` 要素数を数え、タブ切替で 1→2→3 と累積するのを確認（一時 spec は削除済み）。
+
 ### E. dev データ（QA 準備・コード変更ではない）
 - `user2@acme.example`＝**SP100 / コイン1000 / 解放0 / 所有0**（e2e teardown 後の baseline・全カード ❓）。#11/#12 の受入・魔法習得アニメ確認はこのユーザーで行う。
 - `user@acme.example`＝**このセッションでは未変更**（旧 handoff では6種解放済み＝未習得カードが無い）。習得アニメ（❓→開封）を見るなら user2 を使う。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**（+3＝shopFx G-TC-165）／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 421**（G-TC-165 は front 単体＝走査対象外・md で追跡）。
+- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 424**（#12 の G-TC-166・#13 の G-TC-167/168 追加後）。
+- **e2e（本セッション実測・実 docker スタック）**＝`sc-30-32-balance-sync` 3 passed（G-TC-163/164/166）／`sc-41-ranking` 3 passed（G-TC-206/167/168）。他 e2e は未実行。
 - **e2e＝`sc-30-32-balance-sync`（G-TC-163/164/166）3 passed**（本セッション・実 docker スタック・#12 移植後）。164＝購入で両残高同期（タイミング変更後も実測 OK＝GF-AC-121）／**166＝reduce で `.item-get` 演出なし・残高即反映・即所有（GF-AC-122）**。実ブラウザで購入がフルアニメ経路（`ShopPayFx`→`handlePayDone`）を例外なく完走。traceability ✅ code **422**。
 - **backend pytest ＝本セッション未実行（未確認）**。前回既知＝513 passed 相当。必要なら §8。
 - **QA スタック＝全起動中**（`cd impl && docker compose --profile workers up -d --build` 済み・frontend:3000＝`/login`200／backend:8000＝`/healthz`200・#12 移植コードで再ビルド済み＝running=最新）。
-- **壊れているもの＝把握範囲で無し**（ゲート緑＋e2e 3 passed）。**#12 は GF-AC-120/121/122 すべて ✅ OK（2026-09-08）**＝受入完了。e2e teardown で user2 は baseline（coin1000・未所有）に戻り済み。
-- **壊れているもの＝把握範囲で無し**。§17M の所有済みデザインはモックのみ（production 未変更）。
+- **壊れているもの＝把握範囲で無し**（ゲート緑＋e2e 6 passed）。**#12 は GF-AC-120/121/122 すべて ✅ OK（2026-09-08）**＝受入完了。#13 は演出実装済み＋表示不具合3件修正済み（§3-F）＝残りは GF-AC-130/131/132 の見た目目視。e2e teardown で user2 は baseline（coin1000・未所有）に戻り済み。
 
 ## 5. 詰まっている点（試した/失敗と理由＝いずれも解決済み）
 - **GF-AC-111「SP が動かない」**＝2段階の原因。(1) 演出開始の一瞬に SP を変えていて 5.2 秒の演出中に見逃されていた→開封に同期（onReveal）。(2) ヘッダー SP はサーバー `/me` 由来で `router.refresh()` していなかった→ヒーローだけ更新・ヘッダー据え置き。**両方修正済み（§3-A）**。教訓＝残高チップは2箇所（ヒーロー＋ヘッダー）・ヘッダーはサーバー再取得が要る→e2e G-TC-163/164 でガード。
