@@ -123,8 +123,10 @@ export function RankingView() {
         <h3>★ 社内ランキング ★</h3>
         <div className="rank-panel__sub">{PERIOD_LABEL[period]}の獲得EXP＋コイン</div>
 
-        {/* 表彰台 TOP3（2・1・3 の順で中央を高く）。key に period を含め、期間切替で登場演出を再生。 */}
-        <div className="podium" key={period}>
+        {/* 表彰台 TOP3（2・1・3 の順で中央を高く）。key に period を含め、期間切替で登場演出を再生。
+            ※ key は兄弟間で一意にする（rank-list と同じ `period` を素で使うとキー重複で reconciliation が壊れ、
+               旧タブの .podium が消えず累積した＝接頭辞を付けて回避）。 */}
+        <div className="podium" key={`podium-${period}`}>
           {podium.map((m) => (
             <div key={m.rank} className={`podium__col rank${m.rank}${m.me ? " is-me" : ""}`}>
               <span className="podium__medal">{MEDAL[m.rank - 1]}</span>
@@ -139,8 +141,8 @@ export function RankingView() {
           ))}
         </div>
 
-        {/* 全件（key に period を含め、期間切替で自分の行の登場ハイライトを再生） */}
-        <ol className="rank-list" ref={listRef} key={period}>
+        {/* 全件（key に period を含め、期間切替で自分の行の登場ハイライトを再生。接頭辞で podium とキー重複を避ける） */}
+        <ol className="rank-list" ref={listRef} key={`list-${period}`}>
           {list.map((m) => (
             <li key={m.rank} className={m.me ? "is-me" : undefined}>
               <span className="rank-no">{m.rank}</span>

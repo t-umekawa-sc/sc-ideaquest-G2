@@ -2058,9 +2058,12 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   78% { transform: scale(1.22) rotate(-6deg); filter: brightness(1.5) drop-shadow(0 0 5px rgba(251,191,36,.8)); }
   86% { transform: scale(1.1) rotate(4deg); filter: brightness(1.2); }
 }
+/* 自分の行の登場ハイライト。適用先は暗いガラスパネル（.rank-panel.full＝#13／.dash-page .rank-panel＝#30）。
+   終了色は base の .is-me（rgba(34,211,238,.14)）に合わせる＝明色の不透明色（--color-primary-soft=#EFF6FF）で
+   終わると暗パネル上で行が白くなり明色の名前が読めなくなるため（both で終了状態が残る）。 */
 @keyframes rank-me-row {
-  0% { background: rgba(59,130,246,.28); }
-  100% { background: var(--color-primary-soft, rgba(59,130,246,.10)); }
+  0% { background: rgba(34,211,238,.42); }
+  100% { background: rgba(34,211,238,.14); }
 }
 
 /* ── 投票の押下フィードバック（横断・SparkBurst / XpFloat）─────────────────────

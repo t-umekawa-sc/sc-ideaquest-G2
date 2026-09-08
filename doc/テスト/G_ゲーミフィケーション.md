@@ -202,3 +202,10 @@
 | G-TC-163 | e2e(front) | 魔法解放で SP がヒーローとヘッダー両方で減る | user2（SP100）で炎（前提なし・1SP）を解放 | `/spells` の `.sp-hero__num`／`.app-header .pixel-stat.skill` | 開封後、**両方が 100→99**（ヒーローとヘッダーが一致して減る） | GF-AC-110/111／#11 |
 | G-TC-164 | e2e(front) | ショップ購入でコインがヒーロー(wallet)とヘッダー両方で減る | user2（コイン1000）で未所有アイテムを購入 | `/shop` の `.wallet__num`／`.app-header .pixel-stat.coin` | 購入後、**両方が 1000−価格**（wallet とヘッダーが一致して減る） | GF-AC-120/121／#12 |
 | G-TC-166 | e2e(front) | reduce-motion で購入＝演出なし・即・所有UI（#12 reduce 配線） | `reducedMotion:"reduce"` で user2 が未所有アイテムを購入 | `/shop` の `.item-get`（演出オーバーレイ）／`.wallet__num`／`.buy__price.is-owned-status` | 演出オーバーレイ `.item-get` は**出ない（count 0）**／コインは**即 1000−価格**／価格行が「✓ 所有済み」へ即遷移 | GF-AC-122／#12 |
+
+### 5-O. ランキング表彰台の非累積／自分の行の可読性（#13・SC-41・回帰ガード）
+
+> **なぜ**＝`/ranking` で **期間タブ切替のたびに表彰台 `.podium` が消えず累積**し（旧タブの列が浮いて画面が縦に間延び→ヘッダーが押し出され「何のランキングか分からない」）、さらに**自分の行の登場ハイライト（`rank-me-row`）が明色不透明（`--color-primary-soft=#EFF6FF`）で終わり、暗いガラスパネル上で名前（明色）が潰れて読めない**不具合があった。原因＝(1) `podium` と `rank-list` が兄弟で同じ `key={period}` を使い**兄弟間キー重複**で reconciliation が壊れて旧 `.podium` が残存（→ `key` を `podium-`/`list-` で一意化）／(2) `rank-me-row` の終了色を base `.is-me`（`rgba(34,211,238,.14)`）へ揃える。純ロジック無し＝構造/CSS の回帰を e2e で押さえる。対象＝`impl/frontend/e2e/sc-41-ranking.spec.ts`。
+
+| G-TC-167 | e2e(front) | 期間タブ切替で表彰台が累積しない | `/ranking` で 今週→通算→今月→先週→今週 とタブ切替 | `/ranking` の `.podium`／`.rank-list` | どの切替後も `.podium` は**常に 1 個**（`.rank-list` も 1 個）＝旧タブの表彰台が残らない | GF-AC-130／#13 |
+| G-TC-168 | e2e(front) | 自分の行ハイライトが暗パネルで白潰れしない | `/ranking`（通算）で自分がランクイン | `/ranking` の `.rank-panel.full .rank-list li.is-me` 背景色 | 登場ハイライト終了後の背景が **`#EFF6FF`（near-white）でない**＝名前が読める（is-me 無い期間はスキップ） | GF-AC-131／#13 |
