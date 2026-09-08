@@ -3,9 +3,9 @@
 > 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。コードの塊は貼らず**ファイルパス＋関数名**で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-07（このセッション末）**。
-- 作業ブランチ＝**`main`**（`origin/main` と同期・このセッション末に push する）。feature/game-feel は廃止済み・main で作業。
-- 最新コミット（このコミット直前）＝**`fd0132e`** `test(e2e): 残高のヒーロー/ヘッダー同期をe2eでガード（G-TC-163/164）`。本 handoff＋§17M モックを次コミットで push する。
+- 最終更新: **2026-09-08（このセッション途中）**。
+- 作業ブランチ＝**`main`**（`origin/main` と同期）。feature/game-feel は廃止済み・main で作業。
+- 最新コミット＝**`41b9fa9`**（#12 production 移植）。本セッションで #12 を **2 コミット**＝`72c26ba`（§17M モック改訂＋受入台帳）／`41b9fa9`（production 移植＋テスト G-TC-165/166）。本 handoff コミットが 3 つ目。**push はユーザー確認後に実施**（都度確認）。
 - 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝main へ増分ごと commit・**push は都度ユーザー確認**。QA は §1.1 参照（機能＝私がテスト＋実起動確認／見た目＝ユーザー目視）。
 
 ## 2. ゴール
@@ -27,9 +27,10 @@
 ### B. 検証分担の回帰ガード e2e（今回の再発防止）
 - `impl/frontend/e2e/sc-30-32-balance-sync.spec.ts`（**G-TC-163/164**）＝**解放(SP)・購入(コイン)後にヒーローとヘッダー右上の両方が同期して減る**ことを実ブラウザ検証。台帳＝`doc/テスト/G_ゲーミフィケーション.md §5-M`。テスト用 `user2@acme.example` を DB で baseline（SP100/コイン1000・未所有・台帳クリア）にリセットして実行し後始末で再リセット（docker QA 前提）。**実スタックで 2 passed 確認済み**。
 
-### C. #12 ショップ購入の演出＝既存実装の確認＋所有済みデザインの新提案（レビュー中・未受入）
-- 既存実装は完成済み＝`features/shop/components/ShopView.tsx` の `buy()`＝`purchaseItem`→`setCoins`（ヒーロー wallet CountUp）→owned 反映→`fireGet`（`components/ItemGetFx.tsx`＝アイコンpop＋きらめき＋◆−価格フロート）→`router.refresh`（ヘッダーコイン pulse GF-AC-061）。reduce＝`fireGet` が `reduceMotion()` で早期 return＋`shop.css` の `@media prefers-reduced-motion`。
-- **ユーザー要望＝購入前後の UI に明確な差＋購入後デザインへ遷移するアニメ**。→ モック `style-guide.html §17M`（production の `.buy` カードを忠実に再現）に**所有済みデザインを新提案**＝カードが金地＋金枠グロー／サムネ金縁／右上に金コーナーリボン「所有済み」／購入時に金の光沢スイープ＋リボン展開＋枠色を金へ遷移＋フットのクロスフェード。**この §17M の変更は本コミットに含む＝レビュー中（ユーザー受入前・production 未移植）**。
+### C. #12 ショップ購入の演出＝モック §17M 受入 OK → production 移植完了 → GF-AC-120/121/122 受入 OK（本セッション・コミット `72c26ba`/`41b9fa9`）
+- **モック `style-guide.html §17M` をユーザー受入 OK（2026-09-08）**。最終フロー＝**①支払い**＝右上（財布）から ◆ コインが**価格の位置へ降りて吸い込まれ**、価格が **price→0** と減る／**②支払い完了後**＝コイン数を**サムネ左上のバッジ**（枠にまたがる小バッジ）へ移し、価格行を「**✓ 所有済み**」・フットを「▶ きせかえで装備」に（**購入前後でパネル高さ不変**＝所有後フット高は購入前フット実測にコピー・行数を揃える）／金地＋金枠グロー・サムネ金縁・右上コーナーリボン「所有済み」（`z-index:3` で前面）・光沢スイープ／**紙吹雪＋金地ピル「〈名〉を手に入れた」**（祝福＋お礼）。中央大アイコンは廃止。
+- **production 移植（受入後）**＝純ロジック `impl/frontend/src/features/shop/shopFx.ts`（`PAY_MS`/`PAY_STEPS`/`payValues`/`planBuyFx`）＋テスト `shopFx.test.ts`（**G-TC-165**・md 先行→red-green）。演出コンポーネント `features/shop/components/ItemGetFx.tsx`＝**`ShopPayFx`**（価格矩形に重ね price→0＋コイン落下・`onDone`）／**`ItemCelebrateFx`**（紙吹雪＋「〈名〉を手に入れた」）。画面 `features/shop/components/ShopView.tsx`＝`buy()`（reduce/リスト表示は即所有・それ以外は `setPay`→`ShopPayFx`）＋`handlePayDone`（0到達で `setCoins`/owned反映/`setRevealId`/celebrate/snack/`router.refresh`）＋`cardRaw`（owned は `.buy__coin`バッジ・`.buy__price.is-owned-status`「✓所有済み」・`.buy__ribbon`・`is-owned`/`reveal`/`is-paying` クラス）。CSS `features/shop/shop.css`（`.buy__coin`/`.buy.is-owned`/`.buy__ribbon`/`.reveal` 入場アニメ/`.item-get__rain`/`__pay`/`__confetti`/`__thanks`・旧 `__icon`/`__ring`/`__cost`/`__flash` は削除）。
+- **検証分担（§1.1）**＝reduce は `planBuyFx`（G-TC-165）＋CSS `prefers-reduced-motion` で私が担保／残高同期は e2e G-TC-164（**要再実行＝購入フローのタイミングを変更＝支払い後に残高反映・約1.2秒**／8s poll のため通る見込みだが実測要）／**見た目/気持ちよさ＝GF-AC-120 ユーザー目視（実アプリ）**。
 
 ### D. 台帳・規約・記憶の更新
 - 台帳 `doc/テスト/ゲーム感受入.md`＝GF-AC-110/111/112 を ✅ OK（2026-09-07）。
@@ -41,10 +42,11 @@
 - `user@acme.example`＝**このセッションでは未変更**（旧 handoff では6種解放済み＝未習得カードが無い）。習得アニメ（❓→開封）を見るなら user2 を使う。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **157 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 421**（G-TC-163/164 e2e 追加分）。
-- **e2e**＝`sc-30-32-balance-sync`（G-TC-163/164）**2 passed**（実 docker スタックに対して）。他 e2e は本セッション未実行（未確認）。
+- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**（+3＝shopFx G-TC-165）／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 421**（G-TC-165 は front 単体＝走査対象外・md で追跡）。
+- **e2e＝`sc-30-32-balance-sync`（G-TC-163/164/166）3 passed**（本セッション・実 docker スタック・#12 移植後）。164＝購入で両残高同期（タイミング変更後も実測 OK＝GF-AC-121）／**166＝reduce で `.item-get` 演出なし・残高即反映・即所有（GF-AC-122）**。実ブラウザで購入がフルアニメ経路（`ShopPayFx`→`handlePayDone`）を例外なく完走。traceability ✅ code **422**。
 - **backend pytest ＝本セッション未実行（未確認）**。前回既知＝513 passed 相当。必要なら §8。
-- **QA スタック＝全起動中**（`cd impl && docker compose --profile workers up -d --build` 済み・frontend:3000＝`/login`200／backend:8000＝`/healthz`200）。frontend は最新アプリコード（`22d65d1` の SP 修正）で再ビルド済み＝`fd0132e` 以降のアプリコード変更は無い（e2e/doc/§17Mモックのみ）ので**running=最新**。
+- **QA スタック＝全起動中**（`cd impl && docker compose --profile workers up -d --build` 済み・frontend:3000＝`/login`200／backend:8000＝`/healthz`200・#12 移植コードで再ビルド済み＝running=最新）。
+- **壊れているもの＝把握範囲で無し**（ゲート緑＋e2e 3 passed）。**#12 は GF-AC-120/121/122 すべて ✅ OK（2026-09-08）**＝受入完了。e2e teardown で user2 は baseline（coin1000・未所有）に戻り済み。
 - **壊れているもの＝把握範囲で無し**。§17M の所有済みデザインはモックのみ（production 未変更）。
 
 ## 5. 詰まっている点（試した/失敗と理由＝いずれも解決済み）
@@ -58,11 +60,9 @@
 - **#12 所有済みデザイン＝金地＋コーナーリボン＋光沢スイープで遷移**（提案・レビュー中）。不採用検討＝サムネ中央の✓スタンプ（アイコンを覆うので不採用）。リボン＋金枠で所有を明示。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **#12 §17M の所有済みデザイン提案をユーザー受入**（最優先・レビュー中）＝`style-guide.html §17M` を見て「リボン文言/色・所有色・スイープ強弱・✓スタンプ追加・落ち着かせる」等の調整指示→反映。指示箇所＝`.buy.is-owned`／`.buy__ribbon`／`@keyframes ribbon-unfurl`・`owned-shine`（§17M の `<style>`）。
-2. **受入後に production 移植**＝`features/shop/shop.css`（`.buy.is-owned`/`.buy__ribbon`/`owned-shine`/`ribbon-unfurl` 等・`.buy` に `overflow:hidden` 追記）／`features/shop/components/ShopView.tsx` の `cardRaw`（リボン `<span class="buy__ribbon">` 追加・`is-owned` は `it.owned` で付与）／`buy()`（購入時に owned へ遷移。reduce は動きなしで即遷移）。reduce ゲート必須。純ロジックが出れば md 先行→vitest。
-3. **#12 GF-AC-120/121/122 の受入と台帳更新**＝`doc/テスト/ゲーム感受入.md` の #12。120＝入手ポップ＋所有デザイン遷移（ユーザー目視）／121＝コイン両表示同期（**e2e G-TC-164 で担保済み**）／122＝reduce（私の担保）。目視 OK で ✅。
-4. **積み残しの GF-AC バックログ**＝#13 ランキング(130..133)／#14 アバター装備(140..)／…ほぼ「未確認」。ID 順に、**機能は先に私がテスト＋実起動確認**してから見た目をユーザーへ。
-5. **backend pytest の再確認**（任意）＝§8 手順で 513 相当が緑か。
+1. **push 状態の確認**＝本セッションの 3 コミット（`72c26ba`/`41b9fa9`／本 handoff）は **push 済み**（ユーザー承認のうえ 2026-09-08 に main へ push）。`git status` が clean・`origin/main` と同期していることを再開時に確認。
+2. **積み残しの GF-AC バックログ**＝#13 ランキング(130..133)／#14 アバター装備(140..)／…ほぼ「未確認」。ID 順に、**機能は先に私がテスト＋実起動確認**してから見た目をユーザーへ。
+3. **backend pytest の再確認**（任意）＝§8 手順で 513 相当が緑か。
 - **共通ゲート**＝`npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint 込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。**push は都度確認**。テストは md に TC 行(`根拠`列)→red-green→traceability ✅。backend の response_model 変更後は `cd impl/frontend && npm run codegen`。
 
 ## 8. 再開に必要な環境情報
