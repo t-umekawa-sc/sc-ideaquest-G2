@@ -13,7 +13,7 @@ import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
 import { getItems, ITEM_ICON, purchaseItem } from "../api";
-import { ItemGetFx, type GetRect } from "./ItemGetFx";
+import { ItemCelebrateFx, ShopPayFx, type GetRect } from "./ItemGetFx";
 import "../shop.css";
 
 type Slot = "head" | "face" | "body" | "hand" | "bg";
@@ -45,17 +45,37 @@ export function ShopView() {
   const [coins, setCoins] = useState(0);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // #12: 購入成立の「アイテム入手」演出（購入カード矩形に one-shot・reduce-motion 尊重）。
-  const [gets, setGets] = useState<{ id: number; rect: GetRect; icon: string; cost: number }[]>([]);
-  const getId = useRef(0);
-  const fireGet = (itemId: string, icon: string, cost: number) => {
-    if (reduceMotion()) return;
-    const el = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-id="${itemId}"]`) : null;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const id = ++getId.current;
-    setGets((g) => [...g, { id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, icon, cost }]);
-    setTimeout(() => setGets((g) => g.filter((z) => z.id !== id)), 1000);
+  // #12: 購入成立の演出（受入済みモック style-guide.html §17M・reduce-motion 尊重）。
+  //  pay＝支払い（価格が price→0・コイン落下）／reveal＝所有UIへの入場アニメ（バッジ/リボン/光沢/フット）を今回購入したカードだけに付与／
+  //  celebrate＝支払い完了後の祝福＋お礼（紙吹雪＋「〈名〉を手に入れた」）。既存の owned カード（前回購入分）には入場アニメを付けない。
+  const [pay, setPay] = useState<{ id: string; rect: GetRect; price: number; coinBalance: number; name: string } | null>(null);
+  const [celebrates, setCelebrates] = useState<{ id: number; rect: GetRect; name: string }[]>([]);
+  const [revealId, setRevealId] = useState<string | null>(null);
+  const fxId = useRef(0);
+
+  // 支払いカウントダウン（ShopPayFx）が 0 到達したら＝所有反映・残高更新・祝福お礼・ヘッダー再取得。
+  const handlePayDone = () => {
+    const cur = pay;
+    if (!cur) return;
+    setCoins(cur.coinBalance); // ヒーロー wallet の CountUp
+    setItems((xs) => xs.map((x) => (x.id === cur.id ? { ...x, owned: true } : x)));
+    setRevealId(cur.id);
+    setTimeout(() => setRevealId((v) => (v === cur.id ? null : v)), 1200);
+    const cardEl = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-id="${cur.id}"]`) : null;
+    if (cardEl) {
+      const cr = cardEl.getBoundingClientRect();
+      const cid = ++fxId.current;
+      setCelebrates((g) => [...g, { id: cid, rect: { top: cr.top, left: cr.left, width: cr.width, height: cr.height }, name: cur.name }]);
+      setTimeout(() => setCelebrates((g) => g.filter((z) => z.id !== cid)), 2000);
+    }
+    snack({
+      type: "reward",
+      title: "装備を購入しました",
+      msg: `「${cur.name}」を入手！ きせかえで装備できます。`,
+      rewards: [{ k: "coin", t: `◆ -${cur.price}` }],
+    });
+    router.refresh(); // ヘッダーのコイン残高（getServerMe 由来）を再取得＝コインチップの pulse（GF-AC-061/121）
+    setPay(null);
   };
 
   const load = useCallback(async () => {
@@ -94,21 +114,26 @@ export function ShopView() {
     if (!ok) return; // キャンセル（処理なし）＝スナックバーは出さない
     try {
       const res = await purchaseItem(it.id);
-      if (res) setCoins(res.coin_balance);
-      setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
+      const coinBalance = res ? res.coin_balance : coins - it.price;
+      // 支払い演出＝カードの価格矩形に重ねて price→0 のカウントダウン＋コイン落下。0 到達後に handlePayDone で所有反映・残高更新・祝福お礼。
+      const priceEl = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-id="${it.id}"] .buy__price`) : null;
+      if (reduceMotion() || !priceEl) {
+        // reduce-motion／カード非表示（リスト表示）＝演出なしで即・所有反映（情報は残す）。
+        setCoins(coinBalance);
+        setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
+        snack({
+          type: "reward",
+          title: "装備を購入しました",
+          msg: `「${it.name}」を入手！ きせかえで装備できます。`,
+          rewards: [{ k: "coin", t: `◆ -${it.price}` }],
+        });
+        router.refresh();
+        return;
+      }
+      const r = priceEl.getBoundingClientRect();
       setFlashId(it.id);
       setTimeout(() => setFlashId((f) => (f === it.id ? null : f)), 500);
-      fireGet(it.id, it.icon, it.price); // 入手の瞬間演出（カードにアイコンポップ＋◆-N）
-
-      snack({
-        type: "reward",
-        title: "装備を購入しました",
-        msg: `「${it.name}」を入手！ きせかえで装備できます。`,
-        rewards: [{ k: "coin", t: `◆ -${it.price}` }],
-      });
-      // ヘッダーのコイン残高（レイアウトの getServerMe 由来）を再取得＝コインチップのパルス（GF-AC-061）を発火。
-      // AppHeader はマウント維持のまま coin prop が変わり、前回値比較で data-bump が立つ。
-      router.refresh();
+      setPay({ id: it.id, rect: { top: r.top, left: r.left, width: r.width, height: r.height }, price: it.price, coinBalance, name: it.name });
     } catch (err) {
       const reason = err instanceof ApiError ? (err.body as { errors?: { reason?: string }[] } | undefined)?.errors?.[0]?.reason : undefined;
       snack({
@@ -140,17 +165,27 @@ export function ShopView() {
 
   function cardRaw(it: Item) {
     const canAfford = it.price <= coins;
+    // 所有後はコイン数をサムネ左上バッジへ移し、価格行を「✓ 所有済み」・フットを「きせかえ」に（購入前後で行数＝高さ不変）。
+    // reveal＝今回購入したカードだけに入場アニメ（バッジ/リボン/光沢/フット）／is-paying＝支払い中は実価格を隠し ShopPayFx のカウンタを見せる。
+    const cls = `card buy rarity-${it.rarity}${it.owned ? " is-owned" : ""}${revealId === it.id ? " reveal" : ""}${flashId === it.id ? " just-bought" : ""}${pay?.id === it.id ? " is-paying" : ""}`;
     return (
-      <article className={`card buy rarity-${it.rarity}${flashId === it.id ? " just-bought" : ""}`} data-id={it.id}>
-        <div className="buy__thumb">{it.icon}</div>
+      <article className={cls} data-id={it.id}>
+        {it.owned && <span className="buy__ribbon">所有済み</span>}
+        <div className="buy__thumb">
+          {it.icon}
+          {it.owned && <span className="buy__coin">◆ {it.price}</span>}
+        </div>
         <div className="buy__meta">
           <span className="buy__slot">{SLOT_LABEL[it.slot]}</span>・<span className="buy__rarity">{RARITY_LABEL[it.rarity]}</span>
         </div>
         <div className="buy__name">{it.name}</div>
-        <div className={`buy__price${!it.owned && !canAfford ? " short" : ""}`}>◆ {it.price}</div>
+        {it.owned ? (
+          <div className="buy__price is-owned-status">✓ 所有済み</div>
+        ) : (
+          <div className={`buy__price${!canAfford ? " short" : ""}`}>◆ {it.price}</div>
+        )}
         {it.owned ? (
           <div className="buy__foot">
-            <span className="buy__owned">✓ 所有済み</span>
             <Link className="buy__equip" href="/avatar">▶ きせかえで装備</Link>
           </div>
         ) : (
@@ -167,8 +202,9 @@ export function ShopView() {
 
   return (
     <section aria-label="ショップ">
-      {/* #12: 購入成立の「アイテム入手」演出（購入カード矩形に固定オーバーレイ） */}
-      {gets.map((g) => <ItemGetFx key={g.id} rect={g.rect} icon={g.icon} cost={g.cost} />)}
+      {/* #12: 購入成立の演出（固定オーバーレイ）＝支払い（価格矩形・price→0＋コイン落下）／祝福お礼（カード矩形・紙吹雪＋「〈名〉を手に入れた」） */}
+      {pay && <ShopPayFx rect={pay.rect} price={pay.price} onDone={handlePayDone} />}
+      {celebrates.map((c) => <ItemCelebrateFx key={c.id} rect={c.rect} name={c.name} />)}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
       <GameNav current="shop" />

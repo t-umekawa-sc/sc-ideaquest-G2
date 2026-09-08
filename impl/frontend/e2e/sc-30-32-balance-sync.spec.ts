@@ -83,3 +83,25 @@ test("G-TC-164 purchase deducts coin in both wallet and header", async ({ page }
   await expect.poll(() => pollNum(wallet(page)), { timeout: 8000 }).toBe(expected);
   await expect.poll(() => pollNum(headCoin(page)), { timeout: 8000 }).toBe(expected);
 });
+
+// GF-AC-122（#12 reduce）＝OS reduce（prefers-reduced-motion: reduce）で購入すると、支払い/祝福の演出（.item-get オーバーレイ）は
+// 出ず・即・所有UIへ（コインは即最終値・所有反映・スナックバー正常）。reduceMotion()＝matchMedia を lib/motion が読む配線を実ブラウザで押さえる。
+test.describe("reduce-motion", () => {
+  test.use({ reducedMotion: "reduce" });
+  test("G-TC-166 purchase with reduced motion shows no fx overlay and updates instantly", async ({ page }) => {
+    await login(page);
+    await page.goto("/shop");
+    await expect.poll(() => pollNum(wallet(page))).toBe(1000);
+
+    const card = page.locator(".buy").filter({ has: page.getByRole("button", { name: "購入する" }) }).first();
+    const price = numOf(await card.locator(".buy__price").textContent());
+    expect(price).toBeGreaterThan(0);
+    await card.getByRole("button", { name: "購入する" }).click();
+    await page.getByRole("button", { name: "購入する" }).last().click();
+
+    // 演出オーバーレイは一度も出ない（reduce）／残高は即最終値／所有UI（✓所有済み）へ即遷移。
+    await expect.poll(() => pollNum(wallet(page)), { timeout: 8000 }).toBe(1000 - price);
+    await expect(page.locator(".item-get")).toHaveCount(0);
+    await expect(page.locator(".buy__price.is-owned-status").first()).toBeVisible();
+  });
+});

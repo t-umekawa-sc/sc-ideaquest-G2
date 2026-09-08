@@ -13,8 +13,8 @@
 
 /* 装備グリッド（DataTable のカード表示＝装備カードは cardRaw で描画。密度は shop 仕様の minmax(180)） */
 .shop-grid .dt-cards { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-.buy { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; }
-.buy__thumb { font-size: 46px; line-height: 1; padding: var(--space-4) 0; background: var(--color-surface-alt); border-radius: var(--radius); border: 2px solid transparent; }
+.buy { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); text-align: center; position: relative; overflow: hidden; transition: background .45s ease, border-color .45s ease, box-shadow .45s ease; }
+.buy__thumb { position: relative; font-size: 46px; line-height: 1; padding: var(--space-4) 0; background: var(--color-surface-alt); border-radius: var(--radius); border: 2px solid transparent; transition: border-color .45s ease, box-shadow .45s ease; }
 .buy.rarity-common .buy__thumb { border-color: var(--rarity-common); }
 .buy.rarity-standard .buy__thumb { border-color: var(--rarity-standard); }
 .buy.rarity-rare .buy__thumb { border-color: var(--rarity-rare); }
@@ -27,9 +27,15 @@
 .buy__name { font-size: var(--text-base); font-weight: 700; }
 .buy__price { font-family: var(--font-pixel); color: var(--pixel-coin); font-size: var(--text-lg); }
 .buy__price.short { color: var(--color-danger); }
-.buy__foot { margin-top: auto; padding-top: var(--space-2); }
-.buy__owned { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--color-success); font-size: var(--text-sm); }
-.buy__equip { display: block; margin-top: 4px; font-size: var(--text-xs); }
+/* 所有後は価格行（元のコイン位置）を「✓ 所有済み」（緑）に流用＝行を増やさない（購入前後で高さ不変）。 */
+.buy__price.is-owned-status { color: var(--color-success); }
+/* 支払い中は実価格を隠し、ShopPayFx（価格矩形に重ねるオーバーレイ）のカウンタを見せる。 */
+.buy.is-paying .buy__price { visibility: hidden; }
+/* 購入前後で高さを変えないため、フットは固定 min-height で中央寄せ（購入前=購入ボタン／所有後=きせかえリンク）。 */
+.buy__foot { margin-top: auto; padding-top: var(--space-2); min-height: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.buy__equip { font-size: var(--text-xs); }
+/* コイン数：購入前は価格行。購入後だけサムネ左上のバッジへ移す（枠にまたがる小バッジ・縦の流れから外して高さに影響させない）。 */
+.buy__coin { position: absolute; top: -10px; left: 10px; z-index: 2; font-family: var(--font-pixel); font-weight: 800; font-size: var(--text-xs); color: var(--pixel-coin, #f59e0b); background: rgba(2,6,23,.8); border: 1px solid rgba(245,158,11,.6); border-radius: 999px; padding: 1px 7px; line-height: 1.3; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 .btn-pixel.btn-pixel--sm { padding: 6px 12px; padding-left: calc(12px + 1.1em); font-size: var(--text-sm); } /* ▶ カーソル分の左余白を維持（基底の padding-left を打ち消さない） */
 .btn-pixel:disabled { opacity: .5; cursor: not-allowed; box-shadow: var(--shadow-pixel); }
 .btn-pixel:disabled::before { content: none; }
@@ -40,52 +46,74 @@
 @keyframes shop-pop { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .buy.just-bought { animation: none; } }
 
-/* ── ゲーム感 #12: 購入成立の「アイテム入手」演出（SC-30・one-shot）─────────────────────────
-   購入したカード矩形に重ねる固定オーバーレイ（ItemGetFx）。~1s で消える。純視覚・reduce-motion で無効。 */
+/* ── 所有済みデザイン（受入済みモック §17M）＝金地＋金枠グロー・サムネ金縁・コーナーリボン。静的スタイルは全 owned に適用。 ── */
+.buy.is-owned { background: linear-gradient(180deg, rgba(245,200,80,.16), rgba(245,200,80,.04)); border-color: var(--pixel-coin, #f59e0b); box-shadow: 0 0 0 2px rgba(245,158,11,.35), 0 8px 22px rgba(245,158,11,.18); }
+.buy.is-owned .buy__thumb { border-color: var(--pixel-coin, #f59e0b); box-shadow: inset 0 0 16px rgba(245,158,11,.35); }
+.buy__ribbon { position: absolute; top: 14px; right: -38px; z-index: 3; transform: rotate(45deg); background: var(--pixel-coin, #f59e0b); color: #3a2600; font-weight: 800; font-size: 11px; letter-spacing: .5px; padding: 3px 44px; box-shadow: 0 2px 6px rgba(0,0,0,.25); pointer-events: none; }
+/* 入場アニメ（今回購入したカードだけ .reveal）＝コインバッジ pop・リボン unfurl・光沢スイープ・フットのフェードイン。既存 owned には付けない。 */
+.buy.reveal .buy__coin { animation: owned-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+.buy.reveal .buy__ribbon { animation: ribbon-unfurl .5s cubic-bezier(.2,1.4,.4,1) both; }
+.buy.reveal .buy__price.is-owned-status { animation: owned-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+.buy.reveal .buy__foot { animation: owned-foot-in .45s ease .08s both; }
+.buy.reveal::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 32%, rgba(255,240,190,.7) 50%, transparent 68%); transform: translateX(-120%); animation: owned-shine .7s ease-out .05s 1; pointer-events: none; }
+@keyframes owned-pop { 0% { transform: scale(.5); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes ribbon-unfurl { 0% { opacity: 0; transform: rotate(45deg) translateY(-16px) scale(.5); } 60% { opacity: 1; } 100% { opacity: 1; transform: rotate(45deg) translateY(0) scale(1); } }
+@keyframes owned-foot-in { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes owned-shine { to { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) {
+  .buy.reveal .buy__coin, .buy.reveal .buy__ribbon, .buy.reveal .buy__price.is-owned-status, .buy.reveal .buy__foot, .buy.reveal::after { animation: none; }
+}
+
+/* ── ゲーム感 #12: 購入成立の演出（SC-30・受入済みモック §17M）─────────────────────────
+   ① ShopPayFx＝価格矩形に重ね、右上（財布）から ◆ コインが降りて吸い込まれ、価格が price→0 と減って支払い完了。
+   ② ItemCelebrateFx＝カード矩形に重ね、支払い完了後の祝福＋お礼＝紙吹雪＋「〈名〉を手に入れた」。純視覚・reduce-motion で無効。 */
 .item-get { position: fixed; z-index: 1000; pointer-events: none; }
 .item-get > * { position: absolute; }
-.item-get__flash {
-  inset: 0; border-radius: var(--radius);
-  background: radial-gradient(circle at 50% 45%, rgba(245,158,11,.5), transparent 72%);
-  opacity: 0; animation: itemget-flash .7s ease-out forwards;
+/* ① 支払いカウンタ（価格矩形の中央）＝price→0・0 で緑。 */
+.item-get__pay { left: 50%; top: 50%; transform: translate(-50%,-50%); white-space: nowrap; font-family: var(--font-pixel); font-weight: 800; font-size: var(--text-lg); color: var(--pixel-coin, #f59e0b); text-shadow: 0 2px 0 rgba(2,6,23,.4); }
+.item-get__pay.is-paid { color: var(--color-success); }
+/* コインは右上（財布）から価格の位置（中央）へ降りて吸い込まれる＝そこで枚数が減る。 */
+.item-get__rain { left: 50%; top: 50%; font-family: var(--font-pixel); font-weight: 800; color: var(--pixel-coin, #f59e0b); text-shadow: 0 2px 0 rgba(2,6,23,.35); opacity: 0; animation: itemget-rain .5s cubic-bezier(.35,.15,.5,1) forwards; }
+.item-get__rain--0 { --sx:  96px; --sy: -84px; animation-delay: .00s; }
+.item-get__rain--1 { --sx:  70px; --sy: -92px; animation-delay: .09s; }
+.item-get__rain--2 { --sx: 104px; --sy: -72px; animation-delay: .18s; }
+.item-get__rain--3 { --sx:  78px; --sy: -96px; animation-delay: .27s; }
+.item-get__rain--4 { --sx:  92px; --sy: -80px; animation-delay: .36s; }
+.item-get__rain--5 { --sx:  72px; --sy: -90px; animation-delay: .45s; }
+@keyframes itemget-rain {
+  0%   { transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(.6) rotate(0); opacity: 0; }
+  25%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(.95) rotate(180deg); opacity: 0; }
 }
-.item-get__ring {
-  left: 50%; top: 45%; width: 14px; height: 14px; border-radius: 50%;
-  transform: translate(-50%,-50%); border: 2px solid rgba(245,158,11,.7); opacity: 0;
-  animation: itemget-ring .8s ease-out forwards;
-}
-.item-get__icon {
-  left: 50%; top: 45%; font-size: 2.6rem; line-height: 1;
-  transform: translate(-50%,-50%) scale(.4); opacity: 0;
-  filter: drop-shadow(0 0 8px rgba(245,158,11,.7));
-  animation: itemget-pop .9s cubic-bezier(.2,1.4,.4,1) forwards;
-}
+/* ② 祝福（紙吹雪・上へ弾ける）＋きらめき。 */
 .item-get__spark { left: 50%; top: 45%; font-size: 1.1rem; color: var(--pixel-coin, #f59e0b); opacity: 0; animation: itemget-spark .8s ease-out forwards; }
 .item-get__spark--0 { --dx: -38px; --dy: -26px; animation-delay: .05s; }
 .item-get__spark--1 { --dx:  38px; --dy: -22px; animation-delay: .10s; }
 .item-get__spark--2 { --dx: -30px; --dy:  20px; animation-delay: .08s; }
 .item-get__spark--3 { --dx:  30px; --dy:  24px; animation-delay: .12s; }
-.item-get__cost {
-  left: 50%; top: 62%; transform: translate(-50%,0); white-space: nowrap;
-  font-family: var(--font-pixel); font-weight: 800; color: var(--pixel-coin, #f59e0b);
-  text-shadow: 0 2px 0 rgba(2,6,23,.35); opacity: 0;
-  animation: itemget-cost 1s ease-out forwards;
-}
-@keyframes itemget-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes itemget-ring { 0% { width: 14px; height: 14px; opacity: 0; } 20% { opacity: .85; } 100% { width: 170px; height: 170px; opacity: 0; } }
-@keyframes itemget-pop {
-  0%   { transform: translate(-50%,-50%) scale(.4);  opacity: 0; }
-  40%  { transform: translate(-50%,-52%) scale(1.55); opacity: 1; }
-  100% { transform: translate(-50%,-50%) scale(1);   opacity: 0; }
-}
+.item-get__confetti { left: 50%; top: 44%; font-size: 1.2rem; line-height: 1; opacity: 0; transform: translate(-50%,-50%) scale(.4); animation: itemget-confetti .95s cubic-bezier(.2,1,.4,1) forwards; }
+.item-get__confetti--0 { --fx: -48px; --fy: -42px; animation-delay: .20s; }
+.item-get__confetti--1 { --fx:  48px; --fy: -38px; animation-delay: .24s; }
+.item-get__confetti--2 { --fx: -20px; --fy: -54px; animation-delay: .28s; }
+.item-get__confetti--3 { --fx:  24px; --fy: -50px; animation-delay: .32s; }
+/* ② お礼＝金地ピルの「〈名〉を手に入れた」がふわっと出て少し上昇して消える。 */
+.item-get__thanks { left: 50%; top: 50%; white-space: nowrap; font-weight: 800; font-size: var(--text-sm); color: #3a2600; background: linear-gradient(180deg,#ffe9a8,#f7c948); border: 2px solid #fff3cf; border-radius: 999px; padding: 6px 14px; box-shadow: 0 6px 18px rgba(245,158,11,.4); opacity: 0; transform: translate(-50%,-50%) scale(.6); animation: itemget-thanks 1.5s cubic-bezier(.2,1.4,.4,1) .30s forwards; }
 @keyframes itemget-spark {
   0%   { transform: translate(-50%,-50%) scale(.4); opacity: 0; }
   30%  { opacity: 1; }
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
 }
-@keyframes itemget-cost {
-  0%   { transform: translate(-50%,0) scale(.9); opacity: 0; }
+@keyframes itemget-confetti {
+  0%   { transform: translate(-50%,-50%) scale(.4); opacity: 0; }
   25%  { opacity: 1; }
-  100% { transform: translate(-50%,-34px) scale(1); opacity: 0; }
+  100% { transform: translate(calc(-50% + var(--fx)), calc(-50% + var(--fy))) scale(1) rotate(24deg); opacity: 0; }
+}
+@keyframes itemget-thanks {
+  0%   { opacity: 0; transform: translate(-50%,-46%) scale(.6); }
+  16%  { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
+  28%  { transform: translate(-50%,-50%) scale(1); }
+  78%  { opacity: 1; transform: translate(-50%,-70%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-86%) scale(.98); }
 }
 @media (prefers-reduced-motion: reduce) { .item-get { display: none; } }

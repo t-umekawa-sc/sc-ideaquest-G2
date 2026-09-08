@@ -188,9 +188,17 @@
 | G-TC-162 | unit(front) | 決定的乱数（seed 再現） | seed | `mulberry32(seed)` | 同 seed は同数列／各値は `[0,1)` | GF-AC-110／#11 |
 | G-TC-162 | unit(front) | 選定済み seed 選択／reduce 分岐 | rand([0,1))／実効抑制 reduce | `pickLearnSeed(rand)`・`planLearn(reduce)` | `pickLearnSeed` は `LEARN_SEEDS` のいずれか（範囲端 0/≈1 も安全）／`planLearn(true)="static"`・`planLearn(false)="animate"`／決定的 | GF-AC-110／#11 |
 
+### 5-N. ショップ購入「支払い」演出の決定的部分（カウントダウン値列／reduce 分岐）frontend 単体（移植・#12・GF-AC-120）
+
+> 対象＝`impl/frontend/src/features/shop/shopFx.ts`（純ロジック分）。受入済みモック（`doc/画面設計/mocks/style-guide.html §17M` の購入演出＝右上（財布）から ◆ コインが価格へ降りて吸い込まれ、価格が `price→0` と減って支払い完了→コインはサムネ左上バッジへ移り、価格行は「✓ 所有済み」・フットは「▶ きせかえで装備」へ／金地・金枠・コーナーリボン・光沢スイープ・紙吹雪＋「〈名〉を手に入れた」）を production（`impl/frontend/src/features/shop/components/ItemGetFx.tsx`＝`ShopPayFx`/`ItemCelebrateFx`・`ShopView.tsx`・`shop.css`）へ移植。**コイン落下/カウンタ弾み/所有遷移/祝福・お礼＝DOM/CSS 駆動・視覚は §17M／実アプリの GF-AC ブラウザ受入**に委ね、決定的に抽出できる 2 点のみ unit で担保する。`payValues(price,steps)`＝支払いカウントダウンの各ステップの表示コイン数列（`PAY_STEPS` 個・単調非増加・末尾 0＝支払い完了）。`planBuyFx(reduce)`＝実効抑制（`reduceMotion()`＝OS reduce OR `accounts.reduce_motion`・`lib/motion` の正）なら `"static"`（演出を出さず即・所有UI＝情報は残す）／非抑制は `"animate"`（記憶 `animation-reduce-motion-standard`／デザイン標準 §4.9）。決定的。vitest（node 環境）で red-green。src 単体は TC 走査対象外のため追跡は本 md（G-TC-165）で担保。
+
+| G-TC-165 | unit(front) | 支払いカウントダウンの表示値列（price→0・単調非増加・末尾0） | 価格 price／刻み steps | `payValues(price, steps)` | `PAY_STEPS` 個／末尾 0／`[0,price]` 内で単調非増加／同入力は同出力（決定的）／price=0 は全 0 | GF-AC-120／#12 |
+| G-TC-165 | unit(front) | reduce 分岐（演出 static/animate） | 実効抑制 reduce | `planBuyFx(reduce)` | `planBuyFx(true)="static"`・`planBuyFx(false)="animate"` | GF-AC-122／#12 |
+
 ### 5-M. 残高のヒーロー／ヘッダー同期 e2e（購入＝コイン・解放＝SP）（GF-AC-111/121・回帰ガード）
 
 > **なぜ**＝残高チップは2箇所（画面のヒーロー ＋ 共通ヘッダー右上）にあり、ヘッダーはサーバー `layout.tsx` の `GET /me` 由来。アクション後に `router.refresh()` を忘れると**ヘッダーだけ更新されない**（実際に魔法解放 SP で発生・修正済み）。ゲーム感フェーズ §1.1「機能は Claude がテストで担保」に基づく回帰ガード。純ロジックは各 unit（`CountUp`/`learnFx` 等）で担保済みのため、ここは**アクション後の両表示の一致**という統合挙動を e2e で押さえる。対象＝`impl/frontend/e2e/sc-30-32-balance-sync.spec.ts`。テスト用ユーザー `user2@acme.example` を DB で baseline（SP100/コイン1000・未所有・台帳クリア）へリセットしてから実行し、後始末で再リセット（会社DB直操作＝`user_spells`/`user_items`/`activities` の `spell_unlock`・`shop_purchase`／`users` 残高）。docker QA スタック前提。
 
 | G-TC-163 | e2e(front) | 魔法解放で SP がヒーローとヘッダー両方で減る | user2（SP100）で炎（前提なし・1SP）を解放 | `/spells` の `.sp-hero__num`／`.app-header .pixel-stat.skill` | 開封後、**両方が 100→99**（ヒーローとヘッダーが一致して減る） | GF-AC-110/111／#11 |
 | G-TC-164 | e2e(front) | ショップ購入でコインがヒーロー(wallet)とヘッダー両方で減る | user2（コイン1000）で未所有アイテムを購入 | `/shop` の `.wallet__num`／`.app-header .pixel-stat.coin` | 購入後、**両方が 1000−価格**（wallet とヘッダーが一致して減る） | GF-AC-120/121／#12 |
+| G-TC-166 | e2e(front) | reduce-motion で購入＝演出なし・即・所有UI（#12 reduce 配線） | `reducedMotion:"reduce"` で user2 が未所有アイテムを購入 | `/shop` の `.item-get`（演出オーバーレイ）／`.wallet__num`／`.buy__price.is-owned-status` | 演出オーバーレイ `.item-get` は**出ない（count 0）**／コインは**即 1000−価格**／価格行が「✓ 所有済み」へ即遷移 | GF-AC-122／#12 |
