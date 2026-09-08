@@ -11,7 +11,9 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  // ログイン成立の判定＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯で変わり「ようこそ」は存在しないため使わない）。
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
 
@@ -106,7 +108,8 @@ test("F-TC-203 SC-22 select toggle by owner", async ({ page }) => {
     const selectBtn = page.getByRole("button", { name: /このアイデアを選定/ });
     await expect(selectBtn).toBeVisible();
     await selectBtn.click();
-    await expect(page.getByText("アイデアを選定しました。投稿者にコイン・XP を付与しました。")).toBeVisible();
+    // 選定は XP のみ付与（コインはクエスト確定時に平均点ベースで別途＝select_idea は _XP_SELECTION のみ）。
+    await expect(page.getByText("アイデアを選定しました。投稿者に XP を付与しました。")).toBeVisible();
     await expect(page.getByRole("button", { name: /選定済み/ })).toBeVisible();
     await expect(page.getByLabel("アイデア情報").getByText("選定候補", { exact: true })).toBeVisible();
 
@@ -117,4 +120,53 @@ test("F-TC-203 SC-22 select toggle by owner", async ({ page }) => {
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
+});
+
+// #16 クエスト選定の祝福（GF-AC-160/161）＝初回選定（XP付与）で中央に祝福オーバーレイ（.select-celebrate）が出る／クリックで閉じる／解除では出ない。
+test("G-TC-171 SC-22 selection celebration appears on award and not on unselect (#16)", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E祝福_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  try {
+    await page.goto(`/ideas/${ideaId}`);
+    await page.getByRole("button", { name: /このアイデアを選定/ }).click();
+    // 初回選定（XP付与）で祝福オーバーレイが出る（👑/SELECTED!/アイデア名/✦+200 XP）。
+    const cele = page.locator(".select-celebrate");
+    await expect(cele).toBeVisible();
+    await expect(cele.getByText("SELECTED!")).toBeVisible();
+    await expect(cele.getByText(`評価アイデア_${stamp}`)).toBeVisible();
+    // クリックで即閉じ。
+    await cele.click();
+    await expect(cele).toHaveCount(0);
+    // 解除では祝福を出さない（スナックバーのみ）。
+    await page.getByRole("button", { name: /選定済み/ }).click();
+    await expect(page.getByText("選定を解除しました。")).toBeVisible();
+    await expect(page.locator(".select-celebrate")).toHaveCount(0);
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
+
+// #16 reduce（GF-AC-162）＝reduce-motion では祝福オーバーレイを出さず、成功スナックバーで通知（選定自体は正常）。
+test.describe("reduce-motion #16", () => {
+  test("G-TC-172 SC-22 selection celebration is suppressed under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await login(page);
+    const stamp = Date.now().toString().slice(-8);
+    const questId = await createRecruiting(page, `E2E祝福R_${stamp}`);
+    const ideaId = await createPublishedIdea(page, questId, stamp);
+    try {
+      await page.goto(`/ideas/${ideaId}`);
+      await page.getByRole("button", { name: /このアイデアを選定/ }).click();
+      // reduce では祝福オーバーレイは出ない／成功スナックバー＋選定済みは正常。
+      await expect(page.getByText("アイデアを選定しました。投稿者に XP を付与しました。")).toBeVisible();
+      await expect(page.getByRole("button", { name: /選定済み/ })).toBeVisible();
+      await expect(page.locator(".select-celebrate")).toHaveCount(0);
+    } finally {
+      const c2 = csrfOf(await page.context().cookies());
+      await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+    }
+  });
 });

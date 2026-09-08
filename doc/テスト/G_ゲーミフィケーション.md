@@ -216,3 +216,10 @@
 > 対象＝共通ヘッダーのベル（`AppHeader` の `.bell`）。**新着（未読が増えた）瞬間**に `data-arrived` で**ポンと跳ねる**（`bell-arrive`＋バッジ `bell-badge-pop`・#15 の一撃演出）／未読>0 の間は常時わずかに揺れる（`bell-wiggle`・#7）。reduce（実効＝OS reduce OR `[data-anim-reduced]`）で**跳ね/揺れが無効**。新着 pop の発火自体（realtime `notification.created` で未読増→`data-arrived`）は L-TC-102/103＋`LiveAppHeader`／`RealtimeProvider` で担保・GF-AC-150/151 はユーザー目視。ここは **reduce で演出が止まる**ことを e2e で押さえる（`data-arrived` を立てても `animationName:none`）。対象＝`impl/frontend/e2e/sc-02-notifications.spec.ts`。
 
 | G-TC-170 | e2e(front) | reduce-motion でベルの新着 pop/常時 wiggle が無効（#15） | `page.emulateMedia({reducedMotion:"reduce"})` でログイン→`.bell` に `data-arrived="true"` を付与 | `.app-header .bell`／`.bell__icon` の computed `animationName` | `data-arrived` でも pop（`.bell`）と wiggle（`.bell__icon`）が**`none`**（`@media prefers-reduced-motion`）。未読数・遷移は正常 | GF-AC-152／#15 |
+
+### 5-Q. クエスト選定の祝福（#16・SC-22・GF-AC-160/161/162）
+
+> 対象＝アイデア詳細（`/ideas/{id}`）。選定権限（owner/quest_admin）が「☆ このアイデアを選定」で**初回選定が成立し投稿者 XP を付与した瞬間**に、中央へ祝福オーバーレイ（`.select-celebrate`＝👑＋「SELECTED!」＋アイデア名＋「投稿者へ ✦+200 XP」）を約2.8秒表示（クリックで即閉じ）。**選定成立時のみ**（解除・再選定〔冪等で再付与なし〕では出さない＝発火条件 `awarded = !prev && res.xp_awarded`）。純装飾のため **reduce では出さず**成功スナックバーで通知（JS ゲート `!reduceMotion()`）。※選定は **XP のみ付与**（`_XP_SELECTION=200`）＝コインはクエスト確定時に平均点ベースで別途（`_finalize_idea_coin`）。対象＝`impl/frontend/e2e/sc-25-eval.spec.ts`。
+
+| G-TC-171 | e2e(front) | 選定成立で祝福が出る／解除では出ない（#16） | owner で recruiting クエスト＋published アイデアを作成→`/ideas/{id}` で選定→クリックで閉じ→解除 | `.select-celebrate`（SELECTED!/アイデア名）／「選定を解除しました。」 | 初回選定で `.select-celebrate` が出る（SELECTED!＋アイデア名）・クリックで `count 0`／解除では祝福 `count 0`（スナックバーのみ） | GF-AC-160/161／#16 |
+| G-TC-172 | e2e(front) | reduce-motion で祝福を出さない（#16） | `page.emulateMedia({reducedMotion:"reduce"})` で同様に選定 | `.select-celebrate`／成功スナックバー／選定済みボタン | 祝福オーバーレイ `.select-celebrate` は**`count 0`**／「アイデアを選定しました。投稿者に XP を付与しました。」＋「選定済み」は正常 | GF-AC-162／#16 |
