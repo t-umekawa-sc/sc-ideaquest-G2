@@ -289,7 +289,7 @@ export function DashboardView({
                   return (
                     <li key={r.user.id} className={me ? "is-me" : undefined}>
                       <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
-                      <Avatar name={r.user.name} size="sm" level={r.user.level} />
+                      <Avatar name={r.user.name} imageUrl={r.user.avatar ?? undefined} size="sm" level={r.user.level} />
                       <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
                       <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
                     </li>
