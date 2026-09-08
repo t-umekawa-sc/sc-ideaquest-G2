@@ -3510,19 +3510,18 @@
   <!-- 17M. ショップ購入の入手演出（SC-30・#12・GF-AC-120） -->
   <div class="section">
     <h2>17M. ショップ購入の入手演出（SC-30・#12・GF-AC-120）</h2>
-    <p class="muted text-sm"><strong>土台は production の <code>/shop</code> の装備カード（<code>.buy</code>）を忠実に再現</strong>（features/shop/shop.css・アイコン46px・同じ構造/クラス／フロント実装フロー規約 §2.2）。<strong>提案＝購入前後で UI をはっきり変える</strong>：購入で <strong>①入手バースト</strong>（アイコンpop＋金フラッシュ/リング＋きらめき＋「◆ −価格」フロート）に加え、<strong>②所有済みデザインへ遷移</strong>＝カードが<strong>金地＋金枠グロー</strong>・サムネが<strong>金縁</strong>・右上に<strong>金のコーナーリボン「所有済み」</strong>が展開・<strong>金の光沢スイープ</strong>がカードを横切り・フットが「✓ 所有済み／きせかえで装備」へクロスフェード。<code>prefers-reduced-motion</code>／下のトグル ON では動きを出さず<strong>所有済みデザインへ即遷移</strong>（情報は残す）。</p>
+    <p class="muted text-sm"><strong>土台は production の <code>/shop</code> の装備カード（<code>.buy</code>）を忠実に再現</strong>（features/shop/shop.css・アイコン46px・同じ構造/クラス／フロント実装フロー規約 §2.2）。<strong>購入で「コインを払う→（間を置いて）祝福とお礼」の情感</strong>を順次で出す：<strong>購入前のパネルは元のまま</strong>（価格「◆ 120」＋「購入する」ボタン）。<strong>①コインを払う</strong>＝右上（財布）から <code>◆</code> コインが<strong>価格行（元のコイン位置）へ降りて吸い込まれ</strong>、着地するたび弾んで <code>◆ 120 → 0</code> と減り、<code>0</code>（緑）で支払い完了。<strong>②支払いが終わってから、コインの表示位置を移して所有済みへ（購入前後で高さは不変）</strong>＝<strong>コイン数はサムネ左上のバッジ</strong>へ移動し、空いた<strong>価格行に「✓ 所有済み」（緑）をポップ表示</strong>、フット（旧「購入する」ボタンの枠）は「<strong>▶ きせかえで装備</strong>」にフェードイン（所有後フットは JS で購入前フットと同じ高さに合わせる＝サムネ・メタ・名前・価格行・フットの同一構成で高さ一致）。カードは<strong>金地＋金枠グロー</strong>・サムネ<strong>金縁</strong>・右上に<strong>金のコーナーリボン「所有済み」</strong>展開・<strong>金の光沢スイープ</strong>。同時に 🎉🎊✨ の紙吹雪＋金地ピル「🎉 <em>〈アイテム名〉を手に入れた</em>」（祝福＋お礼）。<code>prefers-reduced-motion</code>／下のトグル ON では動きを出さず<strong>所有済みデザインへ即遷移</strong>（情報は残す）。</p>
     <div class="sgshop-wrap">
       <article class="card buy rarity-standard" id="sgshopCard">
         <span class="buy__ribbon">所有済み</span>
-        <div class="buy__thumb" id="sgshopThumb">🎩</div>
+        <div class="buy__thumb" id="sgshopThumb">🎩<span class="buy__coin" id="sgshopBadge">◆ 120</span></div>
         <div class="buy__meta"><span class="buy__slot">帽子</span>・<span class="buy__rarity">標準</span></div>
         <div class="buy__name">シルクハット</div>
-        <div class="buy__price">◆ 120</div>
+        <div class="buy__price" id="sgshopPrice">◆ 120</div>
         <div class="buy__foot buy__foot--buy" id="sgshopFootBuy">
           <button class="btn-pixel btn-pixel--sm" type="button" id="sgshopBuy">購入する</button>
         </div>
         <div class="buy__foot buy__foot--owned" id="sgshopFootOwned" style="display:none">
-          <span class="buy__owned">✓ 所有済み</span>
           <a class="buy__equip" href="#" onclick="return false">▶ きせかえで装備</a>
         </div>
       </article>
@@ -3546,7 +3545,7 @@
       .sgshop-wrap{display:flex; gap:var(--space-5,24px); align-items:flex-start; flex-wrap:wrap; margin-top:var(--space-3,12px)}
       #sgshopCard{ width:200px; }
       .buy{ display:flex; flex-direction:column; gap:var(--space-2); padding:var(--space-4); text-align:center; position:relative; }
-      .buy__thumb{ font-size:46px; line-height:1; padding:var(--space-4) 0; background:var(--color-surface-alt); border-radius:var(--radius); border:2px solid transparent; }
+      .buy__thumb{ position:relative; font-size:46px; line-height:1; padding:var(--space-4) 0; background:var(--color-surface-alt); border-radius:var(--radius); border:2px solid transparent; }
       .buy.rarity-common .buy__thumb{ border-color:var(--rarity-common); }
       .buy.rarity-standard .buy__thumb{ border-color:var(--rarity-standard); }
       .buy.rarity-rare .buy__thumb{ border-color:var(--rarity-rare); }
@@ -3556,9 +3555,16 @@
       .buy.rarity-standard .buy__rarity{ color:var(--rarity-standard); }
       .buy__name{ font-size:var(--text-base); font-weight:700; }
       .buy__price{ font-family:var(--font-pixel); color:var(--pixel-coin,#f59e0b); font-size:var(--text-lg); }
+      /* コイン数：購入前は価格行（.buy__price＝元のまま）。購入後だけサムネ左上のバッジへ移す（縦の流れから外して高さに影響させない）。 */
+      .buy__coin{ position:absolute; top:-10px; left:10px; z-index:2; font-family:var(--font-pixel); font-weight:800; font-size:var(--text-xs); color:var(--pixel-coin,#f59e0b); background:rgba(2,6,23,.8); border:1px solid rgba(245,158,11,.6); border-radius:999px; padding:1px 7px; line-height:1.3; box-shadow:0 1px 4px rgba(0,0,0,.35); display:none; }
+      .buy.is-owned .buy__coin{ display:inline-block; }
+      .buy.is-owned .buy__coin.reveal{ animation:owned-check-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+      /* 購入前フットは元のまま。所有後フットは JS で購入前フットと同じ高さにして中央寄せ＝パネル高さ不変。 */
       .buy__foot{ margin-top:auto; padding-top:var(--space-2); }
-      .buy__owned{ display:inline-flex; align-items:center; gap:6px; font-weight:700; color:var(--color-success); font-size:var(--text-sm); }
-      .buy__equip{ display:block; margin-top:4px; font-size:var(--text-xs); }
+      .buy__foot--owned{ display:flex; flex-direction:column; align-items:center; justify-content:center; }
+      /* 所有後は価格行（元のコイン位置）を「✓ 所有済み」（緑）に流用。font-size は据え置きで行高＝不変。 */
+      .buy__price.is-owned-status{ color:var(--color-success); }
+      .buy__equip{ font-size:var(--text-xs); }
       /* 購入フラッシュ（購入直後の軽いカードポップ） */
       .buy.just-bought{ animation:shop-pop .5s ease; }
       @keyframes shop-pop{ 0%{transform:scale(1);} 40%{transform:scale(1.04);} 100%{transform:scale(1);} }
@@ -3573,19 +3579,46 @@
       .item-get__spark--1{ --dx:38px; --dy:-22px; animation-delay:.10s; }
       .item-get__spark--2{ --dx:-30px; --dy:20px; animation-delay:.08s; }
       .item-get__spark--3{ --dx:30px; --dy:24px; animation-delay:.12s; }
-      .item-get__cost{ left:50%; top:62%; transform:translate(-50%,0); white-space:nowrap; font-family:var(--font-pixel); font-weight:800; color:var(--pixel-coin,#f59e0b); text-shadow:0 2px 0 rgba(2,6,23,.35); opacity:0; animation:itemget-cost 1s ease-out forwards; }
+      /* ① 支払い＝カードに元から出ている価格（.buy__price）の数字が 0 まで減る。着地ごとに弾む／0 で緑。 */
+      .buy__price{ transition:color .2s ease; }
+      .buy__price.is-tick{ animation:price-tick .18s ease; }
+      .buy__price.is-paid{ color:var(--color-success); }
+      @keyframes price-tick{ 0%{transform:scale(1);} 45%{transform:scale(1.2);} 100%{transform:scale(1);} }
+      /* コインは右上（財布）から価格（.buy__price）の位置へ降りて吸い込まれる＝そこで枚数が減る */
+      .item-get__rain{ left:50%; top:50%; font-family:var(--font-pixel); font-weight:800; color:var(--pixel-coin,#f59e0b); text-shadow:0 2px 0 rgba(2,6,23,.35); opacity:0; animation:itemget-rain .5s cubic-bezier(.35,.15,.5,1) forwards; }
+      .item-get__rain--0{ --sx:96px;  --sy:-84px; animation-delay:.00s; }
+      .item-get__rain--1{ --sx:70px;  --sy:-92px; animation-delay:.09s; }
+      .item-get__rain--2{ --sx:104px; --sy:-72px; animation-delay:.18s; }
+      .item-get__rain--3{ --sx:78px;  --sy:-96px; animation-delay:.27s; }
+      .item-get__rain--4{ --sx:92px;  --sy:-80px; animation-delay:.36s; }
+      .item-get__rain--5{ --sx:72px;  --sy:-90px; animation-delay:.45s; }
+      @keyframes itemget-rain{ 0%{transform:translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(.6) rotate(0);opacity:0;} 25%{opacity:1;} 80%{opacity:1;} 100%{transform:translate(-50%,-50%) scale(.95) rotate(180deg);opacity:0;} }
+      /* ③ 祝福＝紙吹雪が上へ弾ける */
+      .item-get__confetti{ left:50%; top:44%; font-size:1.2rem; line-height:1; opacity:0; transform:translate(-50%,-50%) scale(.4); animation:itemget-confetti .95s cubic-bezier(.2,1,.4,1) forwards; }
+      .item-get__confetti--0{ --fx:-48px; --fy:-42px; animation-delay:.20s; }
+      .item-get__confetti--1{ --fx:48px;  --fy:-38px; animation-delay:.24s; }
+      .item-get__confetti--2{ --fx:-20px; --fy:-54px; animation-delay:.28s; }
+      .item-get__confetti--3{ --fx:24px;  --fy:-50px; animation-delay:.32s; }
+      @keyframes itemget-confetti{ 0%{transform:translate(-50%,-50%) scale(.4);opacity:0;} 25%{opacity:1;} 100%{transform:translate(calc(-50% + var(--fx)), calc(-50% + var(--fy))) scale(1) rotate(24deg);opacity:0;} }
+      /* ③ お礼＝金地ピルの感謝メッセージがふわっと出て少し上昇して消える */
+      .item-get__thanks{ left:50%; top:50%; white-space:nowrap; font-weight:800; font-size:var(--text-sm); color:#3a2600; background:linear-gradient(180deg,#ffe9a8,#f7c948); border:2px solid #fff3cf; border-radius:999px; padding:6px 14px; box-shadow:0 6px 18px rgba(245,158,11,.4); opacity:0; transform:translate(-50%,-50%) scale(.6); animation:itemget-thanks 1.5s cubic-bezier(.2,1.4,.4,1) .30s forwards; }
+      @keyframes itemget-thanks{ 0%{opacity:0; transform:translate(-50%,-46%) scale(.6);} 16%{opacity:1; transform:translate(-50%,-50%) scale(1.08);} 28%{transform:translate(-50%,-50%) scale(1);} 78%{opacity:1; transform:translate(-50%,-70%) scale(1);} 100%{opacity:0; transform:translate(-50%,-86%) scale(.98);} }
       @keyframes itemget-flash{ 0%{opacity:0;} 25%{opacity:1;} 100%{opacity:0;} }
       @keyframes itemget-ring{ 0%{width:14px;height:14px;opacity:0;} 20%{opacity:.85;} 100%{width:170px;height:170px;opacity:0;} }
       @keyframes itemget-pop{ 0%{transform:translate(-50%,-50%) scale(.4);opacity:0;} 40%{transform:translate(-50%,-52%) scale(1.55);opacity:1;} 100%{transform:translate(-50%,-50%) scale(1);opacity:0;} }
       @keyframes itemget-spark{ 0%{transform:translate(-50%,-50%) scale(.4);opacity:0;} 30%{opacity:1;} 100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);opacity:0;} }
-      @keyframes itemget-cost{ 0%{transform:translate(-50%,0) scale(.9);opacity:0;} 25%{opacity:1;} 100%{transform:translate(-50%,-34px) scale(1);opacity:0;} }
       /* ── 購入後（所有済み）＝はっきり別UI＋購入時に遷移アニメ（金地・金枠グロー・サムネ金縁・コーナーリボン・光沢スイープ） ── */
       .buy{ transition:background .45s ease, border-color .45s ease, box-shadow .45s ease; overflow:hidden; }
       .buy__thumb{ transition:border-color .45s ease, box-shadow .45s ease; }
       .buy__foot{ transition:opacity .35s ease; }
+      /* 支払い完了後：価格行を「✓ 所有済み」へポップ、きせかえフットをフェードイン、コインバッジをポップ。高さは不変。 */
+      .buy__price.is-owned-status.reveal{ animation:owned-check-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+      .buy__foot--owned.reveal{ animation:owned-foot-in .45s ease .08s both; }
+      @keyframes owned-foot-in{ 0%{opacity:0; transform:translateY(6px);} 100%{opacity:1; transform:translateY(0);} }
+      @keyframes owned-check-pop{ 0%{transform:scale(.5);} 55%{transform:scale(1.18);} 100%{transform:scale(1);} }
       .buy.is-owned{ background:linear-gradient(180deg, rgba(245,200,80,.16), rgba(245,200,80,.04)); border-color:var(--pixel-coin,#f59e0b); box-shadow:0 0 0 2px rgba(245,158,11,.35), 0 8px 22px rgba(245,158,11,.18); }
       .buy.is-owned .buy__thumb{ border-color:var(--pixel-coin,#f59e0b); box-shadow:inset 0 0 16px rgba(245,158,11,.35); }
-      .buy__ribbon{ position:absolute; top:14px; right:-38px; transform:rotate(45deg); background:var(--pixel-coin,#f59e0b); color:#3a2600; font-weight:800; font-size:11px; letter-spacing:.5px; padding:3px 44px; box-shadow:0 2px 6px rgba(0,0,0,.25); opacity:0; pointer-events:none; }
+      .buy__ribbon{ position:absolute; top:14px; right:-38px; z-index:3; transform:rotate(45deg); background:var(--pixel-coin,#f59e0b); color:#3a2600; font-weight:800; font-size:11px; letter-spacing:.5px; padding:3px 44px; box-shadow:0 2px 6px rgba(0,0,0,.25); opacity:0; pointer-events:none; }
       .buy.is-owned .buy__ribbon{ opacity:1; animation:ribbon-unfurl .5s cubic-bezier(.2,1.4,.4,1) both; }
       @keyframes ribbon-unfurl{ 0%{opacity:0; transform:rotate(45deg) translateY(-16px) scale(.5);} 60%{opacity:1;} 100%{opacity:1; transform:rotate(45deg) translateY(0) scale(1);} }
       .buy.is-owned::after{ content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 32%, rgba(255,240,190,.7) 50%, transparent 68%); transform:translateX(-120%); animation:owned-shine .7s ease-out .05s 1; pointer-events:none; }
@@ -3599,35 +3632,76 @@
       /* ショップ購入の入手演出（ItemGetFx 相当）。production features/shop の buy()＝所有反映＋fireGet を忠実に再現。 */
       (function(){
         var card=document.getElementById('sgshopCard'), thumb=document.getElementById('sgshopThumb');
+        var nameEl=card.querySelector('.buy__name'), priceEl=card.querySelector('.buy__price'), badgeEl=document.getElementById('sgshopBadge');
         var footBuy=document.getElementById('sgshopFootBuy'), footOwned=document.getElementById('sgshopFootOwned');
         var buyBtn=document.getElementById('sgshopBuy'), sel=document.getElementById('sgshopIconSel');
         var reduceCb=document.getElementById('sgshopReduce'), resetBtn=document.getElementById('sgshopReset');
         var PRICE=120, owned=false;
         function reduced(){ return reduceCb.checked || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
-        function fireGet(icon, cost){
+        // ① 支払い＝右上（財布）から ◆ コインが価格（.buy__price）へ降りて吸い込まれ、元から出ている数字 120→0 が減る。着地ごとに弾む。
+        var PAY_MS=900;                                   // 価格が 0 に達するまで
+        function firePay(cost, done){
           card.classList.add('just-bought'); setTimeout(function(){ card.classList.remove('just-bought'); }, 500);
+          var pr=priceEl.getBoundingClientRect();         // コインの着地点＝価格の表示位置
+          var fx=document.createElement('div'); fx.className='item-get'; fx.setAttribute('aria-hidden','true');
+          fx.style.top=pr.top+'px'; fx.style.left=pr.left+'px'; fx.style.width=pr.width+'px'; fx.style.height=pr.height+'px';
+          var rain=''; for(var k=0;k<6;k++){ rain+='<span class="item-get__rain item-get__rain--'+k+'">◆</span>'; }
+          fx.innerHTML=rain; document.body.appendChild(fx);
+          var steps=18, i=0;
+          var timer=setInterval(function(){
+            i++;
+            priceEl.classList.remove('is-tick'); void priceEl.offsetWidth; priceEl.classList.add('is-tick'); // 減るたび弾む
+            if(i>=steps){ clearInterval(timer); priceEl.textContent='◆ 0'; priceEl.classList.add('is-paid');
+              setTimeout(function(){ if(fx.parentNode) fx.remove(); done(); }, 280);
+            } else { priceEl.textContent='◆ '+Math.max(0, Math.round(cost*(1 - i/steps))); }
+          }, PAY_MS/steps);
+        }
+        // ③ 祝福＋お礼＝支払いが終わってから。紙吹雪＋「〈アイテム名〉を手に入れた」。
+        function fireCelebrate(name){
           var r=card.getBoundingClientRect();
           var fx=document.createElement('div'); fx.className='item-get'; fx.setAttribute('aria-hidden','true');
           fx.style.top=r.top+'px'; fx.style.left=r.left+'px'; fx.style.width=r.width+'px'; fx.style.height=r.height+'px';
-          fx.innerHTML='<span class="item-get__flash"></span><span class="item-get__ring"></span>'
-            +'<span class="item-get__icon">'+icon+'</span>'
-            +'<span class="item-get__spark item-get__spark--0">✨</span><span class="item-get__spark item-get__spark--1">✦</span>'
+          fx.innerHTML='<span class="item-get__spark item-get__spark--0">✨</span><span class="item-get__spark item-get__spark--1">✦</span>'
             +'<span class="item-get__spark item-get__spark--2">✨</span><span class="item-get__spark item-get__spark--3">✦</span>'
-            +'<span class="item-get__cost">◆ -'+cost+'</span>';
+            +'<span class="item-get__confetti item-get__confetti--0">🎉</span><span class="item-get__confetti item-get__confetti--1">🎊</span>'
+            +'<span class="item-get__confetti item-get__confetti--2">✨</span><span class="item-get__confetti item-get__confetti--3">✦</span>'
+            +'<span class="item-get__thanks">🎉 '+name+'を手に入れた</span>';
           document.body.appendChild(fx);
-          setTimeout(function(){ if(fx.parentNode) fx.remove(); }, 1100);
+          setTimeout(function(){ if(fx.parentNode) fx.remove(); }, 2000);
+        }
+        // 所有UIへ切替（購入前は無改変・高さ不変）＝コイン数はサムネ左上バッジへ移し、価格行は「✓ 所有済み」に流用、フットは「きせかえ」。anim=true でアニメ付き。
+        function toOwned(anim){
+          var h=footBuy.offsetHeight; if(h) footOwned.style.minHeight=h+'px'; // 所有後フットを購入前フットと同じ高さに（高さ不変）
+          priceEl.textContent='✓ 所有済み'; priceEl.classList.remove('is-tick','is-paid'); priceEl.classList.add('is-owned-status');
+          badgeEl.textContent='◆ '+PRICE;               // コイン数はバッジへ（サムネ左上・is-owned で表示）
+          card.classList.add('is-owned');                // 金地・金枠・リボン・光沢スイープ
+          footBuy.style.display='none'; footOwned.style.display='';
+          if(anim){
+            priceEl.classList.remove('reveal'); void priceEl.offsetWidth; priceEl.classList.add('reveal');
+            footOwned.classList.remove('reveal'); void footOwned.offsetWidth; footOwned.classList.add('reveal');
+            badgeEl.classList.remove('reveal'); void badgeEl.offsetWidth; badgeEl.classList.add('reveal');
+            fireCelebrate(nameEl.textContent);
+          }
         }
         function buy(){
-          if(owned) return; owned=true;
-          card.classList.toggle('no-anim', reduced());   // reduce 時は所有UIへ即遷移（動きなし）
-          card.classList.add('is-owned');                // 金地・金枠・リボン・光沢スイープへ遷移
-          footBuy.style.display='none'; footOwned.style.display='';
-          if(!reduced()) fireGet(thumb.textContent, PRICE);  // 入手バースト（reduce 時は出さない）
+          if(owned) return; owned=true; buyBtn.disabled=true;
+          if(reduced()){ card.classList.add('no-anim'); toOwned(false); return; } // reduce 時は動きなしで即・所有UIへ
+          firePay(PRICE, function(){ toOwned(true); });   // ① 支払い（価格行の数字が 0 まで減る）→ 完了後に所有UI＋祝福お礼
         }
-        function reset(){ owned=false; card.classList.remove('is-owned','no-anim'); footBuy.style.display=''; footOwned.style.display='none'; }
+        function reset(){
+          owned=false; buyBtn.disabled=false;
+          card.classList.remove('is-owned','no-anim');
+          priceEl.textContent='◆ '+PRICE; priceEl.classList.remove('is-paid','is-tick','is-owned-status','reveal');
+          badgeEl.classList.remove('reveal'); footOwned.style.minHeight='';
+          footBuy.style.display=''; footOwned.style.display='none'; footOwned.classList.remove('reveal');
+        }
         buyBtn.addEventListener('click', buy);
         resetBtn.addEventListener('click', reset);
-        sel.addEventListener('change', function(){ thumb.textContent=sel.value; reset(); });
+        sel.addEventListener('change', function(){
+          thumb.firstChild.nodeValue=sel.value;          // 先頭の絵文字だけ差し替え（バッジ span は保持）
+          nameEl.textContent=sel.options[sel.selectedIndex].text.replace(/^\S+\s*/,''); // アイコンに合わせて名前も連動
+          reset();
+        });
       })();
     </script>
   </div>
