@@ -19,6 +19,7 @@ import { LevelUpWatcher } from "./LevelUpWatcher";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
 import { isMotionReduced } from "@/lib/motion";
+import { realtime } from "@/lib/realtime";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { markChatFromDashboard } from "@/lib/nav";
@@ -148,6 +149,14 @@ export function DashboardView({
     const onEval = () => { void getDashboard().then((d) => { if (d) setData(d); }); };
     window.addEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
     return () => window.removeEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
+  }, []);
+
+  // リアルタイム（L・notification.created）で「最近の通知」を追随更新＝ヘッダーのベル（LiveAppHeader）との体感を揃える。
+  // 真実は REST（GET /dashboard を再取得）。data のみ差し替え＝unvotedList は触らない（GF-AC-043 を壊さない）。
+  useEffect(() => {
+    realtime.start();
+    const off = realtime.on("notification.created", () => { void getDashboard().then((d) => { if (d) setData(d); }); });
+    return () => off();
   }, []);
 
   // ヒーロー＝集約 hero を優先、未取得は server の /me 残高で初回描画。
