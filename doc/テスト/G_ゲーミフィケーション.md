@@ -210,3 +210,9 @@
 | G-TC-167 | e2e(front) | 期間タブ切替で表彰台が累積しない | `/ranking` で 今週→通算→今月→先週→今週 とタブ切替 | `/ranking` の `.podium`／`.rank-list` | どの切替後も `.podium` は**常に 1 個**（`.rank-list` も 1 個）＝旧タブの表彰台が残らない | GF-AC-130／#13 |
 | G-TC-168 | e2e(front) | 自分の行ハイライトが暗パネルで白潰れしない | `/ranking`（通算）で自分がランクイン | `/ranking` の `.rank-panel.full .rank-list li.is-me` 背景色 | 登場ハイライト終了後の背景が **`#EFF6FF`（near-white）でない**＝名前が読める（is-me 無い期間はスキップ） | GF-AC-131／#13 |
 | G-TC-169 | e2e(front) | reduce-motion で全演出が無効（#13） | `page.emulateMedia({reducedMotion:"reduce"})` で `/ranking` を表示 | `.podium__col`／`.podium__medal`／`.myrank`／`.myrank .avatar`／`.rank-list li.is-me .avatar` の computed `animationName` | 表彰台せり上がり・メダルきらめき・myrank グロー・自分アバターのジャンプが**すべて `none`**（`@media prefers-reduced-motion`）。CountUp は即最終値（unit で担保）＝実効抑制は OS reduce OR `[data-anim-reduced]` | GF-AC-133／#13 |
+
+### 5-P. 通知ベルの新着 pop の reduce（#15・SC-02/共通ヘッダー・GF-AC-152）
+
+> 対象＝共通ヘッダーのベル（`AppHeader` の `.bell`）。**新着（未読が増えた）瞬間**に `data-arrived` で**ポンと跳ねる**（`bell-arrive`＋バッジ `bell-badge-pop`・#15 の一撃演出）／未読>0 の間は常時わずかに揺れる（`bell-wiggle`・#7）。reduce（実効＝OS reduce OR `[data-anim-reduced]`）で**跳ね/揺れが無効**。新着 pop の発火自体（realtime `notification.created` で未読増→`data-arrived`）は L-TC-102/103＋`LiveAppHeader`／`RealtimeProvider` で担保・GF-AC-150/151 はユーザー目視。ここは **reduce で演出が止まる**ことを e2e で押さえる（`data-arrived` を立てても `animationName:none`）。対象＝`impl/frontend/e2e/sc-02-notifications.spec.ts`。
+
+| G-TC-170 | e2e(front) | reduce-motion でベルの新着 pop/常時 wiggle が無効（#15） | `page.emulateMedia({reducedMotion:"reduce"})` でログイン→`.bell` に `data-arrived="true"` を付与 | `.app-header .bell`／`.bell__icon` の computed `animationName` | `data-arrived` でも pop（`.bell`）と wiggle（`.bell__icon`）が**`none`**（`@media prefers-reduced-motion`）。未読数・遷移は正常 | GF-AC-152／#15 |

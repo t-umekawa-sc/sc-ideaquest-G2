@@ -11,7 +11,9 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  // ログイン成立の判定＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯で変わり「ようこそ」は存在しないため使わない）。
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 test("H-TC-208 SC-02 notifications render real list and unread count", async ({ page }) => {
@@ -29,4 +31,21 @@ test("H-TC-208 SC-02 notifications render real list and unread count", async ({ 
   }
   // デモ固定文字列（モックのセキュリティ通知 IP）が出ない＝実接続の証跡。
   await expect(page.getByText("IP 203.0.113.42")).toHaveCount(0);
+});
+
+// GF-AC-152（#15 reduce）＝reduce-motion で新着ベルの pop（bell-arrive／bell-badge-pop）と常時 wiggle（bell-wiggle）が無効。
+// data-arrived を立てても reduce では animation:none（@media prefers-reduced-motion／実効は OS reduce OR [data-anim-reduced]）。未読数・遷移は正常。
+test.describe("reduce-motion #15", () => {
+  test("G-TC-170 SC-02 bell arrival pop/wiggle are disabled under reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await login(page);
+    const bell = page.locator(".app-header .bell").first();
+    await expect(bell).toBeVisible();
+    // 新着相当（data-arrived）を強制的に立てても pop は無効。
+    await bell.evaluate((el) => el.setAttribute("data-arrived", "true"));
+    await expect.poll(() => bell.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+    // ベルアイコンの常時 wiggle（未読>0 の時）も無効。
+    const iconAnim = await page.locator(".app-header .bell .bell__icon").first().evaluate((el) => getComputedStyle(el).animationName);
+    expect(iconAnim).toBe("none");
+  });
 });
