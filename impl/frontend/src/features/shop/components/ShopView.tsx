@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { EmptyState, LoadingOverlay, CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
@@ -208,7 +208,7 @@ export function ShopView() {
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
       <GameNav current="shop" />
-      {loading && <Spinner label="読み込み中…" />}
+      {loading && <LoadingOverlay />}
 
       {/* コイン残高（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="コイン残高">

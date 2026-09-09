@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, CountUp, GameNav, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
+import { LoadingOverlay, CountUp, GameNav, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
@@ -134,7 +134,7 @@ export function SpellsView() {
   };
 
   if (loading) {
-    return <section aria-label="魔法 / スキル"><Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link><Spinner label="読み込み中…" /></section>;
+    return <section aria-label="魔法 / スキル"><Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link><LoadingOverlay /></section>;
   }
   if (loadError) {
     return <section aria-label="魔法 / スキル"><Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link><div className="form-error" role="alert" style={{ marginTop: "var(--space-4)" }}>{loadError}</div></section>;

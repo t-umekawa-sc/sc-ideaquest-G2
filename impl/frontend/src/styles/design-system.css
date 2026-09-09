@@ -1711,6 +1711,20 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 .iq-loading-badge .dots::after { content: "▚"; animation: iq-dots 1s steps(1) infinite; }
 @keyframes iq-dots { 0% { content: "▚"; } 25% { content: "▚▚"; } 50% { content: "▚▚▚"; } 75% { content: "▚▚▚▚"; } 100% { content: "▚"; } }
 
+/* --- 全画面ローディングオーバーレイ（#18・デザイン標準 §13.5＝mocks/style-guide.html §13.5 より移植） ---
+   ダイアログ背面と同じ薄暗い全画面背景（rgba(15,23,42,.45)）＋中央にスピナー。画面全体の初期取得待ちに。
+   2 変種＝ゲーム層＝◆コインスピナー（.iq-spinner）／業務層＝コイン無しの中立スピナー（.iq-loading-clean・§0 二層／§13 業務層クリーン）。
+   reduce ではコイン/中立スピナーの回転が停止（@media＋[data-anim-reduced] キルスイッチ）・ラベルは表示（情報は残す）。 */
+.iq-loading-overlay { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+  background: rgba(15,23,42,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+.iq-loading-overlay.show { opacity: 1; pointer-events: auto; }
+.iq-loading-overlay .iq-spinner { flex-direction: column; gap: var(--space-3); }
+.iq-loading-overlay .iq-spinner__coin { font-size: 44px; }
+.iq-loading-overlay .iq-spinner__label { font-size: var(--text-base); color: #fff; letter-spacing: .06em; }
+.iq-loading-clean { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); color: #fff; }
+.iq-loading-clean .iq-dot-spin { width: 40px; height: 40px; border-width: 3px; margin: 0; }
+.iq-loading-clean__label { font-size: var(--text-base); letter-spacing: .06em; }
+
 /* --- スナックバー（完了通知・ゲーム要素入り） --- */
 .snackbar-stack { position: fixed; left: 50%; bottom: var(--space-6); transform: translateX(-50%);
   display: flex; flex-direction: column; gap: var(--space-2); z-index: 90; width: min(92vw, 460px); pointer-events: none; }
@@ -1765,6 +1779,7 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   .iq-loading-badge .dots::after, .progress.is-complete .progress__done,
   .snackbar, .snackbar.is-leaving, .snackbar--reward .snackbar__icon { animation: none; }
   .snackbar__timer, .snackbar-more__timer { animation-duration: 0s; }
+  .iq-loading-overlay { transition: none; }
 }
 
 /* =============================================================

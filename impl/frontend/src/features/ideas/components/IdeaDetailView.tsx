@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Spinner, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
+import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
@@ -112,8 +112,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const [selected, setSelected] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
   const [celebrateSelect, setCelebrateSelect] = useState(false); // #16: 選定成立の祝福オーバーレイ
-  const [voteBarReady, setVoteBarReady] = useState(false); // #23: 賛否バーをマウント後に 0→比率へ伸ばす
-  useEffect(() => setVoteBarReady(true), []);
+  const [voteBarReady, setVoteBarReady] = useState(false); // #23: 賛否バーを「バー描画後」に 0→比率へ伸ばす
+  // ローディング中はバー未描画（if (loading) return）ゆえ、マウント直後に立てると初回の 0→比率が再生されない。
+  // loading=false になってバーが width:0 で描画された次フレーム以降に立てる（二重 rAF で 0 のフレームを確実に描画）。
+  useEffect(() => {
+    if (loading) return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setVoteBarReady(true)); });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [loading]);
   // チャット（E）＝活発度集計＋直近プレビュー（SC-22 §4.4）。
   const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null);
   const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]);
@@ -285,7 +292,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   }, [ideaId, selected, selectBusy, snack]);
 
   if (loading) {
-    return <main className="container detail-main"><Spinner label="読み込み中…" /></main>;
+    return <main className="container detail-main"><LoadingOverlay /></main>;
   }
   if (loadError || !idea) {
     return (

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-import { FormFooterError, FormSummary, Spinner, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { FormFooterError, FormSummary, LoadingOverlay, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 import { consumeEvalFromIdea } from "@/lib/nav";
@@ -201,7 +201,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   );
 
   if (loading) {
-    return <EvalFrame inModal={inModal} ideaId={ideaId}><Spinner label="読み込み中…" /></EvalFrame>;
+    return <EvalFrame inModal={inModal} ideaId={ideaId}><LoadingOverlay /></EvalFrame>;
   }
   if (loadError) {
     return <EvalFrame inModal={inModal} ideaId={ideaId}><div className="form-error" role="alert" style={{ marginTop: inModal ? 0 : "var(--space-4)" }}>{loadError}</div></EvalFrame>;

@@ -621,6 +621,39 @@
       <p class="muted text-sm">重い再取得の間、対象パネルだけを覆う（CRTガラスの走査線＋ドット文字）。全画面を止めずに局所ブロック。</p>
       <button class="btn btn-outline btn-sm" type="button" id="sgBlockRun" style="margin-top:var(--space-2)">3秒ブロックして再取得（デモ）</button>
     </div>
+
+    <h3 style="margin-top:var(--space-6)">13.5 全画面ローディングオーバーレイ（薄暗い背景＋中央スピナー）</h3>
+    <style>
+      /* ダイアログ背面と同じ薄暗い全画面背景（rgba(15,23,42,.45)）＋中央にスピナー。画面全体の初期取得待ちに。
+         position:fixed で画面全体を覆い、ラベルはスピナーの下（縦積み）。reduce では回転停止（ラベルは表示）。
+         2 変種＝ゲーム層＝◆コインスピナー（.iq-spinner）／業務層＝コイン無しの中立スピナー（.iq-dot-spin・クリーン）。 */
+      .iq-loading-overlay { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+        background: rgba(15,23,42,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+      .iq-loading-overlay.show { opacity: 1; pointer-events: auto; }
+      /* ゲーム層＝コインスピナー */
+      .iq-loading-overlay .iq-spinner { flex-direction: column; gap: var(--space-3); }
+      .iq-loading-overlay .iq-spinner__coin { font-size: 44px; }
+      .iq-loading-overlay .iq-spinner__label { font-size: var(--text-base); color: #fff; letter-spacing: .06em; }
+      /* 業務層＝中立スピナー（コイン/CRT を使わないクリーン版・§0 二層／§13 業務層クリーン） */
+      .iq-loading-clean { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); color: #fff; }
+      .iq-loading-clean .iq-dot-spin { width: 40px; height: 40px; border-width: 3px; margin: 0; }
+      .iq-loading-clean__label { font-size: var(--text-base); letter-spacing: .06em; }
+      @media (prefers-reduced-motion: reduce) { .iq-loading-overlay { transition: none; } }
+    </style>
+    <div class="card">
+      <p class="muted text-sm">画面全体の初期取得待ちに、<strong>ダイアログ背面と同じ薄暗い背景</strong>で全面を覆い、<strong>中央にスピナー</strong>を出す。素の「読み込み中…」の置き換え。取得完了で消して通常表示へ。reduce では回転が止まる（ラベルは表示）。<br>
+        <strong>ゲーム層</strong>＝◆コインスピナー／<strong>業務層</strong>＝コイン無しの<strong>中立スピナー（クリーン）</strong>＝§0 二層／§13「業務層はクリーン」に従いコイン/CRT を使わない。</p>
+      <div class="row" style="gap:var(--space-2); flex-wrap:wrap; margin-top:var(--space-2)">
+        <button class="btn btn-outline btn-sm" type="button" id="sgOverlayRun">ゲーム層（コイン）を表示（2.5秒）</button>
+        <button class="btn btn-outline btn-sm" type="button" id="sgOverlayCleanRun">業務層（クリーン）を表示（2.5秒）</button>
+      </div>
+    </div>
+    <div class="iq-loading-overlay" id="sgOverlay" aria-hidden="true">
+      <span class="iq-spinner"><span class="iq-spinner__coin">◆</span><span class="iq-spinner__label">読み込み中…</span></span>
+    </div>
+    <div class="iq-loading-overlay" id="sgOverlayClean" aria-hidden="true">
+      <span class="iq-loading-clean"><span class="iq-dot-spin"></span><span class="iq-loading-clean__label">読み込み中…</span></span>
+    </div>
   </div>
 
   <!-- 14. 完了スナックバー（提案・ゲーム要素入り） -->
@@ -4042,6 +4075,17 @@
       card.appendChild(ov);
       setTimeout(() => { ov.remove(); window.iqSnack({ type: 'success', title: '再取得しました', msg: 'ランキングを更新。' }); }, 3000);
     });
+  })();
+
+  // --- 13.5 全画面ローディングオーバーレイ デモ（ゲーム＝コイン／業務＝クリーン）---
+  (function () {
+    const flash = (ov) => {
+      ov.classList.add('show');
+      ov.setAttribute('aria-hidden', 'false');
+      setTimeout(() => { ov.classList.remove('show'); ov.setAttribute('aria-hidden', 'true'); }, 2500);
+    };
+    document.getElementById('sgOverlayRun').addEventListener('click', () => flash(document.getElementById('sgOverlay')));
+    document.getElementById('sgOverlayCleanRun').addEventListener('click', () => flash(document.getElementById('sgOverlayClean')));
   })();
 </script>
 

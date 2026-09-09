@@ -31,7 +31,7 @@ export { useFormErrorNotice } from "./useFormErrorNotice";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
 export { RouteModal } from "./RouteModal";
 export { Pager } from "./Pager";
-export { Progress, Spinner, BlockOverlay } from "./Progress";
+export { Progress, Spinner, BlockOverlay, LoadingOverlay } from "./Progress";
 export { SnackbarProvider, useSnackbar } from "./Snackbar";
 export type { SnackType, SnackReward, SnackOptions } from "./Snackbar";
 export { GameNav } from "./GameNav";

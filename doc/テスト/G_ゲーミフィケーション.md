@@ -229,3 +229,9 @@
 > 対象＝アイデアチャット（`/ideas/{id}/chat`）。新着メッセージの登場（`.msg-row`＝`msg-enter` 下からフェード・`key=id` で新着のみ）＋リアクション追加のポップ（`.reaction`＝`reaction-pop`）。GF-AC-170/171 の見た目はユーザー目視。ここは **reduce で登場/ポップが無効**（即表示）を e2e で押さえる（`@media prefers-reduced-motion` で `animation:none`／実効は OS reduce OR `[data-anim-reduced]`）。※入力欄は既定で最小化（`composerMin=true`・スリムバー `.composer__mini`）＝テストは展開してから投稿（`openComposer`）。対象＝`impl/frontend/e2e/sc-24-chat.spec.ts`。
 
 | G-TC-173 | e2e(front) | reduce-motion で登場/ポップが無効（#17） | `page.emulateMedia({reducedMotion:"reduce"})` でチャットに投稿→👍 リアクション | `.msg-row`／`.reaction` の computed `animationName` | 新着行（`.msg-row`）とリアクション（`.reaction`）の `animationName` が**`none`**／投稿・リアクション自体は正常 | GF-AC-172／#17 |
+
+### 5-S. 取得中スピナーの reduce（#18・共通 Spinner／デザイン標準 §13・GF-AC-181）
+
+> 対象＝ゲーム層＋主要コンテンツ画面の「読み込み中…」表示を共通 `Spinner`（`impl/frontend/src/components/ui/Progress.tsx`＝`.iq-spinner`／◆コイン `.iq-spinner__coin` が `iq-coinspin` で回転＋ラベル・デザイン標準 §13）へ統一（対象＝shop/spells/avatar/achievements/ranking/idea詳細/chat/eval＝いずれも `<Spinner label="読み込み中…" />` を取得中に表示）。GF-AC-180（コインスピナー表示）の見た目はユーザー目視。ここは **reduce でコイン回転が停止**（ラベルは表示・取得完了で通常表示）を e2e で押さえる。抑制機構は共通（1コンポーネント＋グローバル CSS）ゆえ代表画面（`/ranking`）で担保＝OS reduce は `@media prefers-reduced-motion` で `.iq-spinner__coin { animation: none }`（`styles/design-system.css`）／ユーザー設定は `[data-anim-reduced="true"] *` のグローバルキルスイッチ。※スピナーは取得中のみ表示ゆえ、テストは `**/api/v1/rankings**` を遅延させて取得中を可視化してから観測する。対象＝`impl/frontend/e2e/sc-18-loading.spec.ts`。
+
+| G-TC-174 | e2e(front) | reduce-motion で取得中スピナーのコインが回らない（#18） | `page.emulateMedia({reducedMotion:"reduce"})` で `/api/v1/rankings` を遅延させ `/ranking` の取得中スピナーを表示 | `.iq-spinner__coin` の computed `animationName` | reduce ではコインの `animationName` が**`none`**（`@media prefers-reduced-motion`／`[data-anim-reduced]`）＝回転停止／ラベル「読み込み中…」は表示 | GF-AC-181／#18 |

@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, Avatar, CountUp } from "@/components/ui";
+import { EmptyState, LoadingOverlay, Avatar, CountUp } from "@/components/ui";
 
 import { getRankings, type RankingMe, type RankingPeriod } from "../api";
 import "../ranking.css";
@@ -115,7 +115,7 @@ export function RankingView() {
           </section>
         );
       })()}
-      {loading && <Spinner label="読み込み中…" />}
+      {loading && <LoadingOverlay />}
       {!loading && list.length === 0 && <EmptyState icon="📊" title="この期間のランキングデータがありません" />}
 
       {/* ランキング本体（ゲーム層・CRTガラス） */}

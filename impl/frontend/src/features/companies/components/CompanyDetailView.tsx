@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Button, Swatches, useSnackbar } from "@/components/ui";
+import { Button, Swatches, LoadingOverlay, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { AccountSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
@@ -149,7 +149,7 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
   const backToList = () => backToListOr(router, "/admin/companies");
 
   if (loadError) return <div className="form-error" role="alert">{loadError}</div>;
-  if (!company) return <p className="admin-muted">読み込み中…</p>;
+  if (!company) return <LoadingOverlay variant="clean" />;
 
   const [stLabel, stCls] = statusView(company.status);
 

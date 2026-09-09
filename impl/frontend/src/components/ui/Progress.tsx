@@ -12,6 +12,27 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
+// 全画面ローディングオーバーレイ（#18・デザイン標準 §13.5）。ダイアログ背面と同じ薄暗い全画面背景＋中央スピナー。
+// variant="game"（既定・◆コインスピナー＝ゲーム層）/"clean"（コイン無しの中立スピナー＝業務層クリーン・§0 二層／§13）。
+// 画面全体の初期取得待ちに条件レンダリングで使う（`{loading && <LoadingOverlay/>}`）。reduce は CSS 側で回転停止。
+export function LoadingOverlay({ label = "読み込み中…", variant = "game" }: { label?: string; variant?: "game" | "clean" }) {
+  return (
+    <div className="iq-loading-overlay show" role="status" aria-live="polite">
+      {variant === "clean" ? (
+        <span className="iq-loading-clean">
+          <span className="iq-dot-spin" />
+          <span className="iq-loading-clean__label">{label}</span>
+        </span>
+      ) : (
+        <span className="iq-spinner">
+          <span className="iq-spinner__coin">◆</span>
+          <span className="iq-spinner__label">{label}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function Progress({
   value,
   label,

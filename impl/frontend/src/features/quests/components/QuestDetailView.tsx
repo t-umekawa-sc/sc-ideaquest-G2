@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
@@ -315,7 +315,7 @@ export function QuestDetailView({ questId }: { questId: string }) {
     return (
       <section aria-label="クエスト詳細">
         <p><Link className="backlink" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link></p>
-        <p className="admin-muted" style={{ marginTop: "var(--space-4)" }}>読み込み中…</p>
+        <LoadingOverlay variant="clean" />
       </section>
     );
   }

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, Spinner, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
+import { EmptyState, LoadingOverlay, useConfirm, useSnackbar, SpellCastFx, SpellDeliveryFx, SpellPersistFx, SpellCanvasFx, type CastRect, type CastPoint } from "@/components/ui";
 import { isCanvasEffect } from "@/features/spells/engines";
 import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
@@ -431,7 +431,7 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
   const onBack = (e: React.MouseEvent) => { e.preventDefault(); backToListOr(router, backHref); };
 
   if (loading) {
-    return <main className="container chat-main"><Spinner label="読み込み中…" /></main>;
+    return <main className="container chat-main"><LoadingOverlay /></main>;
   }
   if (loadError || !idea) {
     return (
