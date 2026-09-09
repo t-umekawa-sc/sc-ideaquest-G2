@@ -42,7 +42,7 @@ const ASPECTS = ["新規性", "影響度", "実現度", "適合性", "コスト"
 
 async function rateAll(page: Page, n: number) {
   for (const label of ASPECTS) {
-    await page.getByRole("radiogroup", { name: `${label}の点数` }).getByRole("button", { name: `${n}点` }).click();
+    await page.getByRole("radiogroup", { name: `${label}の点数` }).getByRole("radio", { name: `${n}点` }).click();
   }
 }
 
@@ -79,15 +79,15 @@ test("F-TC-202 SC-25 draft is prefilled on revisit", async ({ page }) => {
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}/eval`);
-    await page.getByRole("radiogroup", { name: "新規性の点数" }).getByRole("button", { name: "3点" }).click();
+    await page.getByRole("radiogroup", { name: "新規性の点数" }).getByRole("radio", { name: "3点" }).click();
     await page.getByRole("button", { name: "下書き保存" }).click();
     await expect(page.getByText("下書きを保存しました")).toBeVisible();
 
     // 再訪＝getMyEvaluation でプリフィル（新規性3点が復元）。
     await page.goto(`/ideas/${ideaId}/eval`);
     await expect(
-      page.getByRole("radiogroup", { name: "新規性の点数" }).getByRole("button", { name: "3点" }),
-    ).toHaveAttribute("aria-pressed", "true");
+      page.getByRole("radiogroup", { name: "新規性の点数" }).getByRole("radio", { name: "3点" }),
+    ).toHaveAttribute("aria-checked", "true");
 
     // 確定していないので SC-22 は評価者0名（評価待ち）。
     await page.goto(`/ideas/${ideaId}`);
