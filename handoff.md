@@ -3,76 +3,69 @@
 > 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記する。コードの塊は貼らず**ファイルパス＋関数名**で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-08（このセッション末）**。
-- 作業ブランチ＝**`main`**（`origin/main` と**同期・作業ツリー clean**）。feature/game-feel は廃止済み・main で作業。
-- 最新コミット＝**`f405f54`** `docs(handoff): #17 チャットの手触り＝受入完了`。本 handoff 更新を次コミットで push する。
-- 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝main へ増分ごと commit・**push は都度ユーザー確認**（本セッションは毎回確認のうえ push 済み）。QA 分担は §6 参照（機能＝私がテストで担保／見た目＝ユーザー目視）。
+- 最終更新: **2026-09-09（このセッション末）**。
+- 作業ブランチ＝**`main`**（`origin/main` と同期・作業ツリー clean。本 handoff 更新を次コミットで push する）。
+- 最新コミット＝**`0236452`** `test(eval): #22 星採点の radiogroup/radio 化にテストを追随（F-TC-201/202 復活）`。その前が **`bee9216`** `feat(game-feel): #18 取得中ローディングを全画面オーバーレイに統一＋#23 賛否バー初回0→比率を修正`。
+- 運用＝**非同期パイプライン**（記憶 `game-feel-async-pipeline`）＝main へ増分ごと commit・**push は都度ユーザー確認**（本セッションは確認のうえ 2 本 push 済み）。検証分担＝機能（reduce・構造・データ整合）は私がテスト担保／見た目はユーザー目視（§6）。
 
 ## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。全画面・全ドメイン接続済み。**現在は「ゲーム感（juiciness）向上」フェーズ**＝正本 `doc/フェーズ毎ルール/ゲーム感フェーズ.md`（§1.1 検証分担）。GF-AC 受入台帳＝`doc/テスト/ゲーム感受入.md`。
+社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。全画面・全ドメイン接続済み。**現在は「ゲーム感（juiciness）向上」フェーズ**＝正本 `doc/フェーズ毎ルール/ゲーム感フェーズ.md`。受入台帳＝`doc/テスト/ゲーム感受入.md`（GF-AC-xxx）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### A. #12 ショップ購入の演出＝モック §17M 受入 → production 移植（受入完了）
-- モック `doc/画面設計/mocks/style-guide.html §17M` をユーザーと反復して受入。最終フロー＝**右上（財布）からコインが価格へ降りて吸い込まれ price→0**→**コインをサムネ左上バッジへ移し価格行「✓所有済み」・きせかえフット・金地/リボン/光沢**→**紙吹雪＋「〈名〉を手に入れた」**（購入前後でパネル高さ不変）。
-- production 移植＝純ロジック `impl/frontend/src/features/shop/shopFx.ts`（`PAY_MS`/`PAY_STEPS`/`payValues`/`planBuyFx`）＋`shopFx.test.ts`（**G-TC-165** md 先行→red-green）／演出コンポーネント `features/shop/components/ItemGetFx.tsx`（`ShopPayFx`＝価格矩形に重ね price→0＋コイン落下／`ItemCelebrateFx`＝紙吹雪＋入手）／画面 `features/shop/components/ShopView.tsx`（`buy`→`ShopPayFx`→`handlePayDone`＝残高/所有反映・祝福お礼・`router.refresh`／`cardRaw`＝`.buy__coin`バッジ・`.buy__price.is-owned-status`・`.buy__ribbon`・`is-owned`/`reveal`/`is-paying`）／CSS `features/shop/shop.css`。受入＝GF-AC-120/121/122 ✅。
+### A. #18 取得中のローディングを「全画面オーバーレイ」に統一（受入完了・push `bee9216`）
+- **背景**＝#18 の当初実装は各画面インラインの `<Spinner label="読み込み中…" />`（◆コインが回る `.iq-spinner`）。ユーザー要望で「**ダイアログ背面と同じ薄暗い全画面背景＋中央にスピナー**」へ変更。
+- **モック先行**（`game-feel-mock-first-then-port`）＝`doc/画面設計/mocks/style-guide.html §13.5` に2変種を追加しユーザー受入（**ゲーム層＝◆コインスピナー**／**業務層＝コイン無しの中立スピナー `.iq-dot-spin`**・いずれも `rgba(15,23,42,.45)` の全画面背景＝ダイアログ背面と同一・reduce で回転停止）。
+- **production 移植**＝共通部品 `impl/frontend/src/components/ui/Progress.tsx` に **`LoadingOverlay({label, variant})`** を新設（`variant="game"`＝コイン／`"clean"`＝中立）・`components/ui/index.ts` で export。CSS＝`impl/frontend/src/styles/design-system.css` に `.iq-loading-overlay`／`.iq-loading-clean`（`position:fixed inset:0`・z-index:90）を昇格＋reduce（`@media prefers-reduced-motion` に `.iq-loading-overlay{transition:none}`／既存 `.iq-spinner__coin`・`.iq-dot-spin` は `animation:none`。ユーザー設定は `[data-anim-reduced]` グローバル killswitch）。
+- **適用画面**＝ゲーム層8画面（`features/{shop,spells,avatar,achievements,ranking,ideas(IdeaDetailView),chat(IdeaChatView),evaluations}` の各 View の `if(loading)`/`{loading&&}` 箇所を `<Spinner…>`→`<LoadingOverlay />`）＋業務層2画面（`features/companies/components/CompanyDetailView.tsx` の `if(!company)return` と `features/quests/components/QuestDetailView.tsx` の `if(!quest)return` を `<LoadingOverlay variant="clean" />`）。**業務層の list系/セクション/タブ部分ロード（QuestListView・AccountSection・QuestGroupSection・QuestDetailView のアイデアタブ 等）は現行のインライン「読み込み中…」のまま**（§13.4 局所ロードの考え方・§6 決定）。
+- テスト＝**G-TC-174**（md 先行→red-green・`e2e/sc-18-loading.spec.ts`＝reduce で `.iq-spinner__coin` の `animationName:none`・rankings API を遅延させ取得中スピナーを可視化して観測）。md＝`doc/テスト/G_ゲーミフィケーション.md §5-S`。受入＝**GF-AC-180 ✅(目視)／181 ✅(e2e G-TC-174)**。
 
-### B. #13 週間ランキングの演出＝既実装の確認＋表示不具合3件修正＋演出追加（受入完了）
-- #13 演出は既に実装済み（`features/ranking/ranking.css`＝表彰台せり上がり `rank-podium-rise`・メダル `rank-medal-shine`・myrank グロー・自分の行 `rank-me-row`・`CountUp`）。
-- **表示不具合3件を修正**＝(1) ダッシュボード週間ランキングの `<Avatar>` が `imageUrl` 未指定で設定画像が出なかった→`features/dashboard/components/DashboardView.tsx` の `cardRaw` 相当に `imageUrl={r.user.avatar}` 追加（`a81ea3e`）。(2) `/ranking` の期間タブ切替で表彰台 `.podium` が累積（`podium` と `rank-list` が兄弟で同じ `key={period}`＝**兄弟間キー重複**で reconciliation 破綻）→`RankingView.tsx` で `key` を `podium-`/`list-` に一意化（`8986f86`）。(3) 自分の行の登場ハイライト `rank-me-row` の終了色が明色不透明 `#EFF6FF`（`--color-primary-soft`）で暗パネル上の名前が白潰れ→`styles/design-system.css` の keyframe を半透明シアン `rgba(34,211,238,.14)` に。
-- **演出調整（ユーザー要望）**＝表彰台せり上がりを 0.5s→0.9s・上昇量18→44px に減速／**自分のアバターが一定間隔でジャンプ**（`rank-me-jump`・keyframe は `design-system.css` で共用）を `/ranking`（myrank/自分の行/表彰台の自分）と**ダッシュのミニ週間ランキング**（`dashboard.css` の `.dash-page .rank-panel .rank-list li.is-me .avatar`）に適用（`306746c`）。
-- 回帰 e2e＝**G-TC-167**（表彰台が累積しない）／**G-TC-168**（自分の行が near-white で終わらない）／**G-TC-169**（reduce で全演出 `animationName:none`）＝`e2e/sc-41-ranking.spec.ts`。受入＝GF-AC-130/131/132/133 ✅。
+### B. #23 賛否バーの初回 0→比率が再生されない不具合を修正（GF-AC-230・push `bee9216`）
+- **症状**（ユーザー報告 GF-AC-230 NG「アニメーションされない」／231・233 は OK）＝アイデア詳細を開いた初回だけ賛否バーが 0→比率に伸びない（投票/解除での伸縮は動く）。
+- **原因**＝`features/ideas/components/IdeaDetailView.tsx` の `voteBarReady` を `useEffect(()=>setVoteBarReady(true),[])` で**マウント直後**に true 化していた。だが同 View は `if(loading) return <LoadingOverlay/>`（バー未描画）でマウント初回はローディング画面ゆえ、**バーが実際に描画される前に voteBarReady が true**→バーは最初から比率幅で出て 0→比率の transition が再生されない。
+- **修正**＝`useEffect(()=>{ if(loading)return; 二重 requestAnimationFrame で setVoteBarReady(true); },[loading])` に変更＝loading 完了後にバーを `width:0` で描画→次フレームで比率へ伸ばす（transition 再生）。reduce 時は CSS `transition:none`（`features/ideas/ideas.css` の `.vote-bar__agree/__disagree`）で即時。受入＝**GF-AC-230 ✅(ユーザー再確認)**。
 
-### C. ダッシュの「最近の通知」を realtime 追随（設計変更・ユーザー承認）
-- ヘッダーのベル（`features/notifications/LiveAppHeader.tsx`＝未読数 live＋新着 pop）だけが realtime で、ダッシュの「最近の通知」は初回スナップショットのままで不整合だった。ユーザー判断「A（繋ぐ）」で `DashboardView.tsx` に `realtime.on("notification.created")` 購読を追加し `GET /dashboard` 再取得（`data` のみ差し替え＝`unvotedList` は触らず GF-AC-043 維持）。設計メモを `doc/画面設計/screens/SC-01_ダッシュボード.md §4.8` に追記（`ef370f8`）。**実機ライブ検証済み**＝redis に `notifications:{user@acme uid}` へ `notification.created` を publish → `/dashboard` 再取得（リクエスト 1→2）。
+### C. 既存不具合 sc-25-eval F-TC-201/202 の解決＝テストの陳腐化を修正（push `0236452`）
+- **発見**＝#18 の回帰確認で `e2e/sc-25-eval.spec.ts` の **F-TC-201/202 が 30s timeout**。stash して私の変更前（main HEAD）コードでもビルドし直して再走→**同じく失敗**＝**私の #18/#23 変更とは無関係の既存不具合**と確定（handoff が「未再走」と警告していた箇所）。
+- **原因**＝評価画面の星採点は `EvaluationView.tsx` で `<button role="radio" aria-checked>`（radiogroup/roving tabindex＝**正しい単一選択 ARIA**・#22 で整備）。だがテスト helper `rateAll`（と下書き検証）が**古い `getByRole("button",{name:"N点"})`＋`aria-pressed`** のままでマッチせず、星を採点できず timeout していた（失敗時スクショで「星が未採点☆のまま評価画面停止」を確認＝red）。**製品は正・テストが未追随**。
+- **修正**＝`e2e/sc-25-eval.spec.ts` の3箇所を `getByRole("radio",…)`／assert を `aria-checked` に修正→**sc-25-eval 5 passed**（F-TC-201/202/203・G-TC-171/172、green）。
 
-### D. #15 通知の新着 pop（受入完了）／#16 クエスト選定の祝福（受入完了）／#17 チャットの手触り（受入完了）
-- いずれも**既に実装済み**（`handoff-notes-often-stale` どおり台帳「未確認」でも実装が進んでいた）。私は reduce を e2e で担保、見た目はユーザー目視。
-- **#15**（ベル pop・`design-system.css` の `.bell[data-arrived]`）＝**G-TC-170**（reduce で pop/wiggle が `animationName:none`・`e2e/sc-02-notifications.spec.ts`）。GF-AC-150/151/152 ✅。
-- **#16**（選定祝福・`features/ideas/components/IdeaDetailView.tsx` の `.select-celebrate`＝`awarded && !reduceMotion()` で発火・解除/再選定では出さない）＝**G-TC-171**（祝福が出る/クリックで閉じ/解除で出ない）／**G-TC-172**（reduce で `.select-celebrate` count 0）＝`e2e/sc-25-eval.spec.ts`。GF-AC-160/161/162 ✅。**選定は XP のみ付与**（`_XP_SELECTION=200`／コインはクエスト確定時に別途）なのに台帳/テストが「コイン・XP」と古かったのを「XP」に修正。
-- **#17**（チャット・`features/chat/chat.css` の `.msg-row`=`msg-enter`／`.reaction`=`reaction-pop`・`key=id` で新着のみ）＝**G-TC-173**（reduce で `.msg-row`/`.reaction` の `animationName:none`）＝`e2e/sc-24-chat.spec.ts`。GF-AC-170/171/172 ✅。
-
-### E. #14 アバター装備の演出＝仮OK（暫定）
-- `features/avatar` の装備演出は実装済みだが、**肝心の 3D アバターがまだモック状態**（本実装待ち）＝ユーザー判断で **仮OK**。台帳 #14（GF-AC-140/141/142）に「仮OK（3Dアバター未実装のため暫定）」と明記。3D 実装後に演出の載せ替え/再受入が必要。
-
-### F. e2e login ヘルパの共通不具合を修正
-- 複数 spec の login ヘルパが実在しない「ようこそ」表示を待って赤だった（`greeting.ts` は時間帯で おはよう/こんにちは/こんばんは＝「ようこそ」無し）。**`sc-41-ranking`/`sc-02-notifications`/`sc-25-eval`/`sc-24-chat` を URL 遷移＋`.app-header` 可視判定に修正**（既存 F-TC-201/202/203・E-TC-201/202/203・H-TC-208・G-TC-206 も復活）。**他 spec（sc-01 等）にも残存の可能性**＝赤ければ同修正。
+### D. 受入台帳の更新（`doc/テスト/ゲーム感受入.md`）
+- #18〜#23 の受入を記録。**視覚 AC はユーザー目視 OK**（GF-AC-180/190/200/201/210/211/220/221/230/231/233）。**reduce AC は私が担保**（181=e2e G-TC-174／191/202/212/222/232=**CSS 機構確認**〔各セレクタに `@media prefers-reduced-motion` の停止＋`[data-anim-reduced]` グローバル killswitch〕）。#14 は前セッションどおり仮OK（3Dアバター未実装）。
 
 ## 4. 現在の状態（動く / 壊れ / テスト）
-- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 429**。
-- **e2e（本セッション・実 docker スタック・実測）**＝`sc-30-32-balance-sync` 3 passed（G-TC-163/164/166）／`sc-41-ranking` 4 passed（G-TC-206/167/168/169）／`sc-02-notifications` 2 passed（H-TC-208/170）／`sc-25-eval` 3 passed（F-TC-203/G-TC-171/172、F-TC-201/202 は login 修正のみで未再走）／`sc-24-chat` 4 passed（E-TC-201/202/203/G-TC-173）。**他 e2e は本セッション未実行（未確認）**。
+- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**／`npm run build` 成功／`python3 scripts/check_tc_traceability.py` **✅ code 430**。
+- **e2e（本セッション・実 docker スタック・実測）**＝`sc-18-loading` 1 passed（G-TC-174）／`sc-25-eval` 5 passed（F-TC-201/202/203・G-TC-171/172）／`sc-41-ranking`・`sc-30-32-balance-sync`・`sc-24-chat` は #18 回帰で green（前セッションの G-TC 群）。**他 e2e は本セッション未実行（未確認）**。
 - **backend pytest ＝本セッション未実行（未確認）**。前回既知＝513 passed 相当。手順は §8。
-- **QA スタック＝全起動中**（frontend:3000＝`/login`200／backend:8000＝`/healthz`200）。frontend は #13（自分アバターのジャンプ）＋ダッシュ realtime（`ef370f8`）まで再ビルド済み。**`ef370f8` 以降のフロント“アプリコード”変更は無い**（#14〜#17 は既実装の確認＋e2e/doc のみ・ダッシュ realtime が最後のアプリコード変更）ので **running=最新**。
-- **壊れているもの＝把握範囲で無し**（ゲート緑＋主要 e2e 緑）。
+- **QA スタック＝全起動中**（`docker compose ps`＝backend/db/frontend/mail-worker/mailhog/minio/redis/worker いずれも running）。frontend は **`0236452` までの全変更を焼き込み済み**（#18＋#23 を含めて最後に再ビルド済み）。※コード変更後は再ビルド必須（§8）。
+- **壊れているもの＝把握範囲で無し**（ゲート緑＋主要 e2e 緑）。既存不具合だった sc-25-eval は解決済み。
 
 ## 5. 詰まっている点（試した/失敗と理由＝いずれも解決済み）
-- **reduce の e2e エミュレーション**＝`test.use({ reducedMotion: "reduce" })` は本プロジェクトの Playwright 設定では**効かなかった**（`matchMedia("(prefers-reduced-motion: reduce)")` が false のまま）。**`await page.emulateMedia({ reducedMotion: "reduce" })`** を各 reduce テスト先頭で明示すれば true になる（G-TC-169/170/172/173 はこの方式）。※`sc-30-32` の G-TC-166 は `test.use` 版のままだが緑（要注意・将来赤なら emulateMedia へ）。
-- **チャット e2e の composer fill が 30s timeout**＝入力欄が既定で最小化（`IdeaChatView.tsx` の `composerMin=useState(true)`・スリムバー `.composer__mini`）＝textarea `.composer__box` は DOM にあるが `is-collapsed` で非表示。**投稿前にスリムバーを click して展開**（ヘルパ `openComposer`＝box が見えていれば return／でなければ `.composer__mini` を click〔auto-wait〕）で解決。送信では再最小化しない（`setComposerMin(true)` は「⌄ 最小化」ボタンのみ）。
-- **表彰台が縦に累積**＝原因は兄弟間キー重複（§3-B(2)）。DOM 数を Playwright `page.evaluate` で数えて 1→2→3 と増えるのを実測して特定。
+- **初回アニメを mount effect で仕込むと再生されない**（#23）＝`useEffect(…,[])` は `if(loading) return` の**ローディング画面表示中**に発火し、本体（バー）描画前に状態が確定してしまう。**loading 完了を依存に入れ、描画後に rAF で仕込む**のが定石（記憶 `mount-effect-fires-during-loading`）。
+- **role 変更にテストが未追随で 30s timeout**（sc-25-eval）＝`role="button"→"radio"`／`aria-pressed→aria-checked` の齟齬。**症状が「timeout」だけで原因が分かりにくい**→`playwright.config.ts` に一時的に `screenshot:"only-on-failure"` を足し、`test-results/**/test-failed-1.png` を Read して停止状態を直接確認すると早い（確認後は config を戻す）。
+- **reduce の e2e エミュレーション**（前セッションからの継続注意）＝`test.use({reducedMotion:"reduce"})` は本 Playwright 設定では効かない。各 reduce テスト先頭で **`await page.emulateMedia({reducedMotion:"reduce"})`** を明示する（G-TC-174 もこの方式）。
 
 ## 6. 決定事項と根拠（不採用案も）
-- **検証分担（ゲーム感フェーズ §1.1）**＝機能（reduce・残高/表示同期・構造）は私が TC 先行→red-green＋実機/e2e で担保／見た目・気持ちよさはユーザー目視。不採用＝「一次QA を全部ユーザー」（機能不具合まで押し付け手戻り）。
-- **ダッシュの最近の通知を realtime 追随＝繋ぐ（案A）**（§3-C・2026-09-08）。不採用＝案B「ダッシュ＝ロード時スナップショットで統一・現状維持」。理由＝配管（realtime）が既存でベルとの体感不整合を安く解消できる。他のダッシュ集約パネル（下書き/未投票/フォロー中/クエスト/週間ランキング）はスナップショット維持＝本パネルのみ通知に追随。
-- **#14 は仮OK**＝3D アバター未実装のため本受入は保留（§3-E）。
-- **spec-is-source-of-truth**＝選定は XP のみ付与が正（backend `evaluations/application.py` `select_idea`＝`_XP_SELECTION=200` のみ・コインは `_finalize_idea_coin`）→台帳/テストの「コイン・XP」を修正。
+- **#18 ローディング＝全画面オーバーレイ**（薄暗い全画面背景＋中央スピナー）。不採用＝インライン `.iq-spinner`（当初実装）。理由＝ユーザー要望（ダイアログ背面と同じ見え方で統一感）。
+- **オーバーレイの覆う範囲＝ビューポート全体**（`position:fixed inset:0`・ヘッダー/ナビも覆う）。不採用＝コンテンツ領域のみ。ユーザー選択。
+- **業務系にもクリーン版オーバーレイを新設**（コイン無しの中立スピナー）。不採用＝業務系は素のテキストのまま据え置き。理由＝ユーザー選択（全画面読み込みの体験を統一）。ただし**適用は全画面 early-return の初期ロードのみ**（会社詳細・クエスト詳細）＝list系/セクション/タブ部分ロードは §13.4 局所表示の思想で現行維持（コイン/CRT はデザイン標準 §0/§13「業務層クリーン」に従い業務系に載せない）。
+- **sc-25-eval は製品ではなくテストを直す**＝星は radiogroup/radio/aria-checked が正しい ARIA（`spec-is-source-of-truth` の逆＝この件は設計/実装が正でテストが誤り）。
+- **reduce AC（191/202/212/222/232）は CSS 機構確認で確定扱い**（e2e は #18 のみ）。理由＝全アニメは `@media prefers-reduced-motion` の個別停止＋`[data-anim-reduced]` グローバル killswitch の二重で categorically 無効化される機構を各セレクタで確認済み。**e2e 追加は §7-1 の残タスク**。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **#18 取得中のゲーム化（ローディング表示）に着手**＝受入台帳 `doc/テスト/ゲーム感受入.md` の「## 増分 #18」を読む（GF-AC-18x）。**まず実装済みか裏取り**（#13/#15/#16/#17 と同様に既実装の可能性・記憶 `handoff-notes-often-stale`）＝ローディング/スケルトン系のコンポーネント（`components/ui` の `Spinner` 等・各 feature の skeleton）と CSS を grep。機能（reduce＝アニメ無効で即表示）は私が e2e で担保（**`page.emulateMedia({reducedMotion:"reduce"})`** で `animationName:none` 等）／見た目はユーザー目視。TC は空き番号（現在 e2e 最大 **G-TC-173**・次は **G-TC-174**〜）で md 先行→登録。
-2. **積み残しの GF-AC バックログ**＝#18／#19 以降（`ゲーム感受入.md` に一覧）。ID 順に、機能は先に私がテスト＋実起動確認してから見た目をユーザーへ。
-3. **（任意）他 e2e の login「ようこそ」残存チェック**＝`grep -rn 'ようこそ' impl/frontend/e2e` で残る spec を URL＋`.app-header` 判定へ統一（§3-F）。
-4. **（任意）backend pytest 再確認**＝§8 手順で 513 相当が緑か。
+1. **（任意）reduce AC の e2e 化**＝現状 CSS 確認のみの **191/202/212/222/232** を e2e で固める。到達可＝**#21 オーラ**（`/`＝`.dash-page .hero__avatar[data-tier]::after` の `getComputedStyle(el,'::after').animationName==="none"`）／**#22 星**（`/ideas/{id}/eval`＝`.star` の `transition`／`.stars[data-pop] .star.is-on` の `animationName` none）／**#23 賛否バー**（`/ideas/{id}`＝`.vote-bar__agree` の `transitionDuration` 実質0）。到達が不安定＝**#19 空状態**（EmptyState を空にする導線が要工夫）・**#20 マスコット追従**（hover＋設定 ON 前提）。方式＝`page.emulateMedia({reducedMotion:"reduce"})`。TC は空き番号（現在 e2e 最大 **G-TC-174**・次は **G-TC-175**〜）で md（`doc/テスト/G_ゲーミフィケーション.md`）先行→red-green。
+2. **積み残しの GF-AC バックログ**＝受入台帳 `doc/テスト/ゲーム感受入.md` に **#24〜#34** が定義済み（多くは「未確認」＝`handoff-notes-often-stale` どおり既実装の可能性大→着手前にコードで裏取り）。ID 順に、機能（reduce 等）は私がテスト＋実起動確認→見た目はユーザー目視。
+3. **（任意）backend pytest 再確認**＝§8 手順で 513 相当が緑か。
 - **共通ゲート**＝`npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint 込み）必須**（記憶 `frontend-build-gate-eslint`）。内部遷移は `<Link>`。**push は都度確認**。テストは md に TC 行(`根拠`列)→red-green→traceability ✅。backend の response_model 変更後は `cd impl/frontend && npm run codegen`。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `main` 確認**。compose＝`impl/compose.yaml`（cwd=`impl`・Postgres user/pass=`ideaquest`）。
-- **QA スタック起動**（記憶 `game-feel-qa-parallel-ops`）＝`cd impl && docker compose --profile workers up -d --build`。frontend=`localhost:3000`（本番ビルド焼込み）／backend=`localhost:8000`（`/healthz`）／MailHog=`localhost:8025`。**コード反映は再ビルド**＝`docker compose build frontend && docker compose up -d frontend`（push だけでは running に反映されない）。※**デモ等でスタックを触るなと言われたら再ビルド/再起動＋localhost への e2e 実行を止める**。
-- **ログイン（dev・MFAなし）**＝`/login` company_code=`ACME-01`。主要ユーザー＝`user@acme.example`/`Passw0rd!`（owner 権限・クエスト/アイデア多数）。ショップ/魔法の残高 QA 用＝`user2@acme.example`/`Passw0rd!`（コイン1000/SP100・`sc-30-32` の teardown で baseline に戻す）。
+- **QA スタック起動**（記憶 `game-feel-qa-parallel-ops`）＝`cd impl && docker compose --profile workers up -d --build`。frontend=`localhost:3000`／backend=`localhost:8000`（`/healthz`）／MailHog=`localhost:8025`。**コード反映は再ビルド**＝`docker compose build frontend && docker compose up -d frontend`（push だけでは running に反映されない）。※デモ等で「スタックを触るな」と言われたら再ビルド/再起動＋localhost への e2e を止める。
+- **ログイン（dev・MFAなし）**＝`/login` company_code=`ACME-01`。主要ユーザー＝`user@acme.example`/`Passw0rd!`（owner・クエスト/アイデア多数）。残高 QA 用＝`user2@acme.example`/`Passw0rd!`（コイン1000/SP100・`sc-30-32` の teardown で baseline に戻す）。
 - **フロントゲート**（cwd=`impl/frontend`）＝`npx tsc --noEmit`／`npx vitest run`（現状 160）／`npm run build`／`npm run codegen`。
-- **e2e**（cwd=`impl/frontend`・docker スタック起動中）＝`PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test <spec> --workers=1`。**reduce テストは `page.emulateMedia({reducedMotion:"reduce"})` を使う**（§5）。ゲーム感の e2e＝`sc-30-32-balance-sync`／`sc-41-ranking`／`sc-02-notifications`／`sc-25-eval`／`sc-24-chat`。
-- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`（現状 ✅ code 429）。走査対象＝`impl/backend/tests/**/*.py` と `impl/frontend/e2e/**/*.spec.ts` のみ＝frontend の vitest 単体（`src/**/*.test.ts`）は対象外＝domain md の TC 行で追跡（例 G-TC-165）。
+- **e2e**（cwd=`impl/frontend`・docker スタック起動中）＝`PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test <spec> --workers=1`。**reduce テストは `page.emulateMedia({reducedMotion:"reduce"})`**（§5）。失敗デバッグは `playwright.config.ts` に一時的に `screenshot:"only-on-failure"` を足し `test-results/**/test-failed-1.png` を確認（済んだら戻す）。ゲーム感の e2e＝`sc-18-loading`／`sc-30-32-balance-sync`／`sc-41-ranking`／`sc-02-notifications`／`sc-25-eval`／`sc-24-chat`。
+- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`（現状 ✅ code 430）。走査対象＝`impl/backend/tests/**/*.py` と `impl/frontend/e2e/**/*.spec.ts` のみ（frontend の vitest 単体 `src/**/*.test.ts` は対象外＝domain md の TC 行で追跡）。
 - **backend テスト**（cwd=`impl`）＝**pytest 前に `docker compose stop worker mail-worker`**（mail_outbox 競合）→ `docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest <path> -q` → 終わったら `docker compose start worker mail-worker`。
-- **DB 直接確認（会社DB）**＝`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c "<SQL>"`。会社メタ（company_id 等）は**別DB `ideaquest_control`** の `companies`（`company_code`）＝ACME-01 の id は `d8926d2a-82f1-4164-935b-0fee56e8953b`／user@acme の user_id は `d1496aa9-eac8-40db-b08b-a29eca26cd03`。DBは `ideaquest_control`/`ideaquest_ops`/`ideaquest_company_acme`/`ideaquest_company_acme2`。
-- **realtime 手動発火**（診断用）＝`docker compose exec -T redis redis-cli PUBLISH "notifications:{user_id}" '{"topic":"notifications:{user_id}","type":"notification.created","data":{},"id":"x","company_id":"{company_id}"}'`（ハブが company_id でフィルタ＝正しい会社 id が必要・§3-C で使用）。
-- **モック確認（サーバー不要）**＝`doc/画面設計/mocks/style-guide.html` を `file://` 直開き→`Ctrl+F` で節番号（例「17M」＝ショップ購入）。
-- **設計正本**＝`CLAUDE.md` から各規約/正本を参照。フェーズ運用＝`doc/フェーズ毎ルール/ゲーム感フェーズ.md`（§1.1 検証分担）。GF-AC 受入台帳＝`doc/テスト/ゲーム感受入.md`。ゲーム感の TC 一覧＝`doc/テスト/G_ゲーミフィケーション.md`（§5-N〜5-R が本セッション追加）。
-- **記憶**（要確認）＝`game-feel-async-pipeline`(push都度確認)／`game-feel-mock-first-then-port`／`game-feel-qa-parallel-ops`／`mock-match-impl-layout`／`animation-reduce-motion-standard`(reduce はユーザー目視外・私が担保)／`framer-reducemotion-null-flip`／`frontend-build-gate-eslint`／`handoff-notes-often-stale`(未確認は着手前にコードで裏取り＝実際 #13〜#17 は既実装だった)／`spec-is-source-of-truth`／`design-spec-working-style`(選択肢提示より本人イメージから仕様起こし)／`document-design-rationale`(なぜも併記)。
+- **モック確認（サーバー不要）**＝`doc/画面設計/mocks/style-guide.html` を `file://` 直開き→`Ctrl+F` で節番号（例「13.5」＝全画面ローディングオーバーレイ・「17M」＝ショップ購入）。
+- **設計正本**＝`CLAUDE.md` から各規約/正本を参照。フェーズ運用＝`doc/フェーズ毎ルール/ゲーム感フェーズ.md`。GF-AC 受入台帳＝`doc/テスト/ゲーム感受入.md`。ゲーム感の TC 一覧＝`doc/テスト/G_ゲーミフィケーション.md`（§5-S＝#18 の G-TC-174）。
+- **記憶**（要確認）＝`game-feel-async-pipeline`(push都度確認)／`game-feel-mock-first-then-port`／`game-feel-qa-parallel-ops`／`mock-match-impl-layout`／`animation-reduce-motion-standard`(reduce は私が担保)／`framer-reducemotion-null-flip`／`mount-effect-fires-during-loading`(#23 の教訓)／`frontend-build-gate-eslint`／`handoff-notes-often-stale`(未確認は着手前にコードで裏取り)／`spec-is-source-of-truth`／`design-spec-working-style`／`document-design-rationale`。
