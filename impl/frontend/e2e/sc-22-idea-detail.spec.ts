@@ -11,7 +11,9 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  // ログイン成立の判定＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯で変わり「ようこそ」は存在しないため使わない）。
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
 async function createRecruiting(page: Page, title: string): Promise<string> {
@@ -56,4 +58,38 @@ test("D-TC-207 SC-22 detail renders getIdea data", async ({ page }) => {
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
+});
+
+// #23 賛否バーの伸縮 reduce（GF-AC-232）＝reduce では width トランジションが無効で「即座に比率表示」。
+// 二方向ガード＝非 reduce では transitionDuration>0（伸縮が生きている）／reduce では 0s（transition:none）。
+// バーは票の有無に依らず常設（0-0 は空バー）ゆえ詳細を開くだけで観測。0% 幅で不可視ゆえ toBeVisible ではなく attached で待つ。
+// 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-V（G-TC-177）・GF-AC-232。
+test.describe("reduce-motion #23", () => {
+  test("G-TC-177 vote bar width transition disabled under reduced motion (#23)", async ({ page }) => {
+    await login(page);
+    const stamp = Date.now().toString().slice(-8);
+    const questId = await createRecruiting(page, `E2E賛否R_${stamp}`);
+    const csrf = csrfOf(await page.context().cookies());
+    const created = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
+      headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+      data: { title: `賛否R_${stamp}`, value: `v_${stamp}`, body: `b_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const ideaId = (await created.json()).id as string;
+    try {
+      await page.goto(`/ideas/${ideaId}`);
+      const agree = page.locator(".vote-bar__agree");
+      await agree.waitFor({ state: "attached" }); // 0-0 は width:0 で不可視ゆえ attached で待つ
+      const dur = () => agree.evaluate((el) => getComputedStyle(el).transitionDuration);
+      // 非 reduce＝幅の伸縮が生きている（transitionDuration>0）。
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await expect.poll(async () => parseFloat(await dur())).toBeGreaterThan(0);
+      // reduce＝伸縮無効（transition:none → 0s）。バー自体は表示（トラックは常設）。
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect.poll(dur).toBe("0s");
+    } finally {
+      const c2 = csrfOf(await page.context().cookies());
+      await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+    }
+  });
 });

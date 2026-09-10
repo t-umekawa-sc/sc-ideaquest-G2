@@ -149,6 +149,36 @@ test("G-TC-171 SC-22 selection celebration appears on award and not on unselect 
   }
 });
 
+// #22 星の拡大/確定ポップ reduce（GF-AC-222）＝reduce では拡大トランジションもポップも無効で「即座に点灯」。
+// 二重抑制＝(1) CSS `.star{transition:none;transform:none}`／`.stars[data-pop] .star.is-on{animation:none}`（@media reduced-motion）、
+// (2) JS が reduceMotion() 真のとき data-pop を張らない。ゆえに reduce 下では transitionDuration=0s／採点しても data-pop は出ない／星は即 is-on。
+// 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-U（G-TC-176）・GF-AC-222。
+test.describe("reduce-motion #22", () => {
+  test("G-TC-176 star hover-scale/pop suppressed under reduced motion, still lights up (#22)", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await login(page);
+    const stamp = Date.now().toString().slice(-8);
+    const questId = await createRecruiting(page, `E2E星R_${stamp}`);
+    const ideaId = await createPublishedIdea(page, questId, stamp);
+    try {
+      await page.goto(`/ideas/${ideaId}/eval`);
+      const group = page.getByRole("radiogroup", { name: "新規性の点数" });
+      await expect(group).toBeVisible();
+      // 拡大トランジションが無効（transition:none → transitionDuration 0s）。
+      const dur = await group.locator(".star").first().evaluate((el) => getComputedStyle(el).transitionDuration);
+      expect(dur).toBe("0s");
+      // 3点を採点＝ポップ（data-pop）は起こさず、星は即 is-on（点灯は正常）。
+      await group.getByRole("radio", { name: "3点" }).click();
+      await expect(group.getByRole("radio", { name: "3点" })).toHaveAttribute("aria-checked", "true");
+      await expect(group.locator(".star.is-on")).toHaveCount(3); // 選んだ点数まで即点灯
+      await expect(page.locator('.stars[data-pop="true"]')).toHaveCount(0); // ポップ抑制（data-pop を張らない）
+    } finally {
+      const c2 = csrfOf(await page.context().cookies());
+      await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+    }
+  });
+});
+
 // #16 reduce（GF-AC-162）＝reduce-motion では祝福オーバーレイを出さず、成功スナックバーで通知（選定自体は正常）。
 test.describe("reduce-motion #16", () => {
   test("G-TC-172 SC-22 selection celebration is suppressed under reduced motion", async ({ page }) => {

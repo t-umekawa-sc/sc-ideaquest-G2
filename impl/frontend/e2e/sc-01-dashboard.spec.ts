@@ -13,7 +13,9 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(OPS.loginId);
   await page.locator("#password").fill(OPS.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  // ログイン成立の判定＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯で変わり「ようこそ」は存在しないため使わない）。
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 // ヒーロー残高＝GET /me の balance と一致（接続の証明）。ヘッダー通貨も同値。
@@ -37,4 +39,31 @@ test("hero and header balance reflect GET /me", async ({ page }) => {
   // 共通ヘッダー通貨（バー・§4.1）＝同じ /me balance
   await expect(page.locator(".app-header .pixel-stat.level").first()).toHaveText(`Lv.${b.level}`);
   await expect(page.locator(".app-header .pixel-stat.coin").first()).toContainText(`◆ ${b.coin_balance}`);
+});
+
+// #21 レベルオーラの脈動 reduce（GF-AC-212）＝reduce でヒーローアバターのオーラ脈動（aura-pulse）が止まる。
+// 二方向ガード＝非 reduce では aura-pulse が生きている（装飾が有効）／reduce では animationName none（脈動停止・オーラ box-shadow と称号は表示）。
+// data-tier は levelRank(level).tier で全レベル付与ゆえ ::after は常設。ゲーム層ダッシュボード（.dash-page ヒーロー）を見る ACME ユーザーで観測。
+// 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-T（G-TC-175）・GF-AC-212。
+const GAME_USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+test.describe("reduce-motion #21", () => {
+  test("G-TC-175 hero level aura pulse stops under reduced motion (#21)", async ({ page }) => {
+    await page.goto("/login");
+    await page.locator("#company_code").fill(GAME_USER.company);
+    await page.locator("#login_id").fill(GAME_USER.loginId);
+    await page.locator("#password").fill(GAME_USER.password);
+    await page.getByRole("button", { name: "ログイン" }).click();
+    await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+    // ゲーム層ダッシュボードのヒーローアバター（オーラ ::after 常設）。
+    const avatar = page.locator(".dash-page .hero__avatar[data-tier]");
+    await expect(avatar).toBeVisible();
+    const auraAnim = () => avatar.evaluate((el) => getComputedStyle(el, "::after").animationName);
+    // 非 reduce（no-preference）＝オーラは aura-pulse で脈打つ（装飾が生きている＝アサートが有意味）。
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect.poll(auraAnim).toBe("aura-pulse");
+    // reduce＝脈動停止（animationName none）。オーラ box-shadow と称号チップは表示のまま。
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect.poll(auraAnim).toBe("none");
+    await expect(page.locator(".hero__title[data-tier]")).toBeVisible();
+  });
 });

@@ -235,3 +235,21 @@
 > 対象＝ゲーム層＋主要コンテンツ画面の「読み込み中…」表示を共通 `Spinner`（`impl/frontend/src/components/ui/Progress.tsx`＝`.iq-spinner`／◆コイン `.iq-spinner__coin` が `iq-coinspin` で回転＋ラベル・デザイン標準 §13）へ統一（対象＝shop/spells/avatar/achievements/ranking/idea詳細/chat/eval＝いずれも `<Spinner label="読み込み中…" />` を取得中に表示）。GF-AC-180（コインスピナー表示）の見た目はユーザー目視。ここは **reduce でコイン回転が停止**（ラベルは表示・取得完了で通常表示）を e2e で押さえる。抑制機構は共通（1コンポーネント＋グローバル CSS）ゆえ代表画面（`/ranking`）で担保＝OS reduce は `@media prefers-reduced-motion` で `.iq-spinner__coin { animation: none }`（`styles/design-system.css`）／ユーザー設定は `[data-anim-reduced="true"] *` のグローバルキルスイッチ。※スピナーは取得中のみ表示ゆえ、テストは `**/api/v1/rankings**` を遅延させて取得中を可視化してから観測する。対象＝`impl/frontend/e2e/sc-18-loading.spec.ts`。
 
 | G-TC-174 | e2e(front) | reduce-motion で取得中スピナーのコインが回らない（#18） | `page.emulateMedia({reducedMotion:"reduce"})` で `/api/v1/rankings` を遅延させ `/ranking` の取得中スピナーを表示 | `.iq-spinner__coin` の computed `animationName` | reduce ではコインの `animationName` が**`none`**（`@media prefers-reduced-motion`／`[data-anim-reduced]`）＝回転停止／ラベル「読み込み中…」は表示 | GF-AC-181／#18 |
+
+### 5-T. レベルオーラの脈動 reduce（#21・SC-01 ヒーロー・GF-AC-212）
+
+> 対象＝ダッシュボードのヒーローアバターに灯る色オーラ（`impl/frontend/src/features/dashboard/dashboard.css` の `.dash-page .hero__avatar[data-tier]::after`＝`box-shadow` の淡い光を `aura-pulse` でゆっくり脈打たせる純CSS装飾。ティア色は `--aura`）。表示・色・称号チップはユーザー目視（GF-AC-211）。ここは **reduce で脈動が止まる**（色・称号は表示）を e2e で押さえる＝OS reduce は `@media prefers-reduced-motion` で `::after { animation: none }`／ユーザー設定は `[data-anim-reduced]` グローバルキルスイッチ。`data-tier` は `levelRank(level).tier` で全レベル付与ゆえ `::after` は常設。非 reduce では `aura-pulse`（≠none）＝装飾が生きていることも同時に押さえる（regression 二方向ガード）。対象＝`impl/frontend/e2e/sc-01-dashboard.spec.ts`。
+
+| G-TC-175 | e2e(front) | reduce-motion でレベルオーラの脈動が止まる（#21） | `page.emulateMedia` で no-preference→reduce を切替えて `/`（ダッシュボード）のヒーローアバターを観測 | `.dash-page .hero__avatar[data-tier]::after` の computed `animationName` | 非 reduce では `aura-pulse`（脈動が生きている）／reduce では **`none`**（`@media prefers-reduced-motion`／`[data-anim-reduced]`）＝脈動停止・オーラ（`box-shadow`）自体と称号は表示 | GF-AC-212／#21 |
+
+### 5-U. 評価の星ホバー拡大／確定ポップの reduce（#22・SC-25 評価・GF-AC-222）
+
+> 対象＝評価画面の観点の星（`impl/frontend/src/features/evaluations/evaluations.css` の `.star`＝hover で `transform:scale` 拡大＋`.stars[data-pop="true"] .star.is-on` の `star-pop` 弾み）。拡大/点灯/ポップの見た目はユーザー目視（GF-AC-220/221）。ここは **reduce で拡大/ポップが無効＝即座に点灯**（採点・キーボードは正常）を e2e で押さえる。二重の抑制＝(1) CSS `@media prefers-reduced-motion` で `.star { transition:none; transform:none }`／`.stars[data-pop="true"] .star.is-on { animation:none }`、(2) JS `EvaluationView.tsx` が `reduceMotion()` 真のとき `data-pop` を張らない（ポップ自体を起こさない）。テストは reduce 下で採点し、`.star` の `transitionDuration` が実質 0（拡大の抑制）／採点しても `.stars[data-pop="true"]` が出ない（ポップ抑制）／星は即 `is-on`（点灯は正常）を観測。非 reduce では `.star` の `transitionDuration>0`（拡大が生きている）も押さえる。対象＝`impl/frontend/e2e/sc-25-eval.spec.ts`。
+
+| G-TC-176 | e2e(front) | reduce-motion で星の拡大/ポップが無効＝即点灯（#22） | `page.emulateMedia({reducedMotion:"reduce"})` で `/ideas/{id}/eval` の観点を採点 | `.star` の computed `transitionDuration`／採点後の `.stars[data-pop="true"]` 数／`.star.is-on` 数 | reduce では `.star` の `transitionDuration` が**`0s`**（拡大トランジション無効）／採点しても `.stars[data-pop="true"]` は**出ない（count 0）**＝ポップ抑制／選んだ点数まで星は即 `is-on`（点灯は正常）。非 reduce では `.star` の `transitionDuration>0` | GF-AC-222／#22 |
+
+### 5-V. 賛否バーの伸縮 reduce（#23・SC-22 アイデア詳細・GF-AC-232）
+
+> 対象＝アイデア詳細の賛否比率バー（`impl/frontend/src/features/ideas/ideas.css` の `.vote-bar__agree`/`.vote-bar__disagree`＝`transition:width .6s` で 0→比率へ伸縮）。表示・伸縮・解除の見た目はユーザー目視（GF-AC-230/231/233）。ここは **reduce で伸縮アニメが無効＝即座に比率表示**（0-0 は空バー・投票自体は正常）を e2e で押さえる＝OS reduce は `@media prefers-reduced-motion` で `.vote-bar__agree,.vote-bar__disagree { transition:none }`／ユーザー設定は `[data-anim-reduced]` グローバルキルスイッチ。バーは票の有無に依らず常設ゆえ、アイデア詳細を開くだけで観測できる。非 reduce では `transitionDuration>0`（伸縮が生きている）も押さえる。対象＝`impl/frontend/e2e/sc-22-idea-detail.spec.ts`。
+
+| G-TC-177 | e2e(front) | reduce-motion で賛否バーの伸縮が無効（#23） | `page.emulateMedia` で no-preference→reduce を切替えて `/ideas/{id}`（アイデア詳細）の賛否バーを観測 | `.vote-bar__agree` の computed `transitionDuration` | 非 reduce では `transitionDuration>0`（幅の伸縮が生きている）／reduce では **`0s`**（`@media prefers-reduced-motion`／`[data-anim-reduced]`）＝即座に比率表示・バー自体は表示 | GF-AC-232／#23 |
