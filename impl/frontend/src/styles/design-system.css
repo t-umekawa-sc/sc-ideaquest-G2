@@ -2035,21 +2035,45 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 [data-tier="mythic"] { --aura: #ef4444; }       /* 英雄 */
 [data-tier="legend"] { --aura: #eab308; }       /* 伝説 */
 
-/* ── ゲーム感 #27: レアリティの輝き（レアのカード枠が脈動）───────────────────────────────
-   .card.rarity-rare（ショップ/アバター/魔法のカード枠）を紫グローで脈動＝収集意欲。コモン/標準は
-   既存の枠色のまま（無地/控えめ）。レア inset リング（.rarity-rare 既存）は維持。reduce-motion で静止。 */
-.card.rarity-rare { animation: rarity-shine 2.4s ease-in-out infinite; }
-@keyframes rarity-shine {
-  0%, 100% { box-shadow: 0 0 0 2px var(--rarity-rare) inset, 0 0 6px -2px var(--rarity-rare); }
-  50%      { box-shadow: 0 0 0 2px var(--rarity-rare) inset, 0 0 16px 1px var(--rarity-rare); }
+/* ── ゲーム感 #27: レアリティの輝き（レアの「ラベル文字＋周辺」が脈動・GF-AC-270）─────────────
+   当初はカード枠（.card.rarity-rare）を脈動させていたが、ユーザー要望で「レア」のラベル文字自体＋周辺を
+   光らせる方針へ変更（style-guide §17N で受入＝強度「しっかり」）。カード枠は静的なレア紫リングのまま。
+   対象＝ショップ(.buy__rarity)/アバター(.item__rarity)/魔法(.spell-card__rarity)の各レアラベル。コモン/標準は静か。
+   効果3層＝①文字の紫テキストグロー脈動 ②ラベル背後の淡い紫ハロー（周辺） ③きらめき✦。reduce で静止（紫の文字色・枠は残す）。 */
+/* パネル枠（.card.rarity-rare）の脈動リングは撤去＝ユーザー要望（レアのパネル枠は不要）。レア識別は既存のラベル色＋サムネ枠（.buy__thumb 等）に委ねる。 */
+
+/* レアのラベル＝「文字自体」を紫グローで脈動（text-shadow のみ＝周辺の“四角い箱”は出さない）＋右上のきらめき✦。
+   本番のラベルは badge（spells）とプレーンテキスト（shop/avatar）が混在するため、box-shadow/背後ハローは矩形の箱に見える→使わず text-shadow に統一。 */
+.spell-card__rarity.rarity-rare,
+.buy.rarity-rare .buy__rarity,
+.item__rarity.rarity-rare { position: relative; animation: rare-label-glow 1.8s ease-in-out infinite; }
+@keyframes rare-label-glow {
+  0%, 100% { text-shadow: 0 0 1px rgba(168,85,247,.4); }
+  50%      { text-shadow: 0 0 5px rgba(168,85,247,.95), 0 0 12px rgba(168,85,247,.6); }
 }
-@media (prefers-reduced-motion: reduce) { .card.rarity-rare { animation: none; } }
+/* きらめき✦（ラベル右上で瞬く＝“周辺”の演出はこれだけ・箱は出さない） */
+.spell-card__rarity.rarity-rare::after,
+.buy.rarity-rare .buy__rarity::after,
+.item__rarity.rarity-rare::after {
+  content: "✦"; position: absolute; top: -9px; right: -7px; font-size: 11px; color: var(--rarity-rare);
+  text-shadow: 0 0 4px rgba(168,85,247,.8); pointer-events: none;
+  animation: rare-label-spark 1.8s ease-in-out infinite;
+}
+@keyframes rare-label-spark { 0%, 100% { opacity: 0; transform: scale(.3) rotate(-10deg); } 45% { opacity: 1; transform: scale(1) rotate(15deg); } 70% { opacity: .2; } }
+/* reduce（OS）＝グロー/きらめきを止める。レア紫の文字色は残す（[data-anim-reduced] のユーザー設定は §4.9 グローバルキルスイッチで別途無効化）。 */
+@media (prefers-reduced-motion: reduce) {
+  .spell-card__rarity.rarity-rare, .buy.rarity-rare .buy__rarity, .item__rarity.rarity-rare,
+  .spell-card__rarity.rarity-rare::after, .buy.rarity-rare .buy__rarity::after, .item__rarity.rarity-rare::after { animation: none; }
+  .spell-card__rarity.rarity-rare, .buy.rarity-rare .buy__rarity, .item__rarity.rarity-rare { text-shadow: none; }
+  .spell-card__rarity.rarity-rare::after, .buy.rarity-rare .buy__rarity::after, .item__rarity.rarity-rare::after { opacity: 0; }
+}
 
 /* ── ゲーム感 #28: ページ遷移の登場演出（(app)/template.tsx・ナビ毎に再生）─────────────────
    ページ本体が軽くフェードインする（chrome=ヘッダーは layout に残り遷移しない）。**opacity のみ**＝
    transform は fixed オーバーレイ（バースト/フロート/マスコット追従）の含みブロックを作るため使わない。
    OS reduce＋ユーザー設定（[data-anim-reduced] のキルスイッチ）で無効。 */
-.page-transition { animation: page-enter .28s ease-out both; }
+/* GF-AC-280: 「最初ゆっくり→最後速く」で“ふわっと”現れる＝ease-in（序盤は低い不透明度を保ち終盤で立ち上げる）。ease-out（序盤で一気に不透明化＝パッと出た印象）や linear（均等）より本要望に合う。尺 0.5s・opacity のみ（transform/filter は含みブロックを作り fixed オーバーレイの座標を壊すため不可）。 */
+.page-transition { animation: page-enter .5s ease-in both; }
 @keyframes page-enter { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .page-transition { animation: none; } }
 
@@ -2057,7 +2081,8 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
    現レベル内の XP 進捗（--pct 0..100）を conic-gradient の環で表示。border-radius:50% で角の滲みを回避
    （中央は円形アバターが覆い、2px の環だけ見える）。ほぼ満タン（data-near＝xpPct≧90）は脈動＝レベルアップ間近。 */
 .lvring {
-  display: inline-grid; place-items: center; border-radius: 50%; padding: 2px;
+  /* GF-AC-290: 環の見える幅＝padding。もう少しだけ太く（2px→3px→4px）。 */
+  display: inline-grid; place-items: center; border-radius: 50%; padding: 4px;
   background: conic-gradient(var(--pixel-xp) calc(var(--pct, 0) * 1%), var(--color-border) 0);
 }
 .lvring > .avatar { border-radius: 50%; }

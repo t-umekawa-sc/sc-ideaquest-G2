@@ -94,7 +94,8 @@
 }
 @keyframes prof-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 /* 称号チップ（レベル帯の色） */
-.profile-page .prof-head__title { margin-left: var(--space-2); font-family: var(--font-pixel); font-size: var(--text-xs); padding: 1px 8px; border-radius: 99px; border: 2px solid var(--aura); color: var(--aura); background: color-mix(in srgb, var(--aura) 15%, transparent); vertical-align: middle; }
+/* GF-AC-261: 透過背景だと暗い背景画像が透けて称号（青/紫等）が読めない→不透明ダーク背景＋白寄りに明るめのティア色テキストで全ティア可読に（dashboard の .hero__title と同方針）。 */
+.profile-page .prof-head__title { margin-left: var(--space-2); font-family: var(--font-pixel); font-size: var(--text-xs); font-weight: 700; padding: 1px 8px; border-radius: 99px; border: 2px solid var(--aura); color: color-mix(in srgb, var(--aura) 60%, #fff); background: rgba(15, 23, 42, .92); vertical-align: middle; }
 /* アバターのレベルオーラ */
 .profile-page .avatar3d[data-tier]::after { content: ""; position: absolute; inset: -3px; pointer-events: none; border-radius: inherit; box-shadow: 0 0 18px 4px var(--aura); opacity: .5; animation: aura-pulse 2s ease-in-out infinite; }
 /* XPバーの伸び（#25 と同流儀） */

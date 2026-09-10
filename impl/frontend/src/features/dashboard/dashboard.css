@@ -219,9 +219,10 @@
   box-shadow: 0 0 16px 3px var(--aura); opacity: .55; animation: aura-pulse 1.9s ease-in-out infinite;
 }
 .dash-page .hero__title {
-  align-self: center; font-family: var(--font-pixel); font-size: var(--text-xs); line-height: 1.5;
-  padding: 1px 8px; border-radius: 99px; border: 2px solid var(--aura); color: var(--aura);
-  background: color-mix(in srgb, var(--aura) 15%, transparent);
+  align-self: center; font-family: var(--font-pixel); font-size: var(--text-xs); line-height: 1.5; font-weight: 700;
+  padding: 1px 8px; border-radius: 99px; border: 2px solid var(--aura);
+  /* GF-AC-261: 透過背景だと暗い背景画像が透けて称号（青/紫等）が読めない→不透明ダーク背景＋白寄りに明るめのティア色テキストで全ティア可読に。 */
+  color: color-mix(in srgb, var(--aura) 60%, #fff); background: rgba(15, 23, 42, .92);
 }
 @media (prefers-reduced-motion: reduce) { .dash-page .hero__avatar[data-tier]::after { animation: none; } }
 

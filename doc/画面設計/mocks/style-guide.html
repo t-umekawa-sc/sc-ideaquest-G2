@@ -3739,6 +3739,103 @@
     </script>
   </div>
 
+  <!-- 17N. レアリティの輝き＝レア文字＋周辺（#27・GF-AC-270） -->
+  <div class="section">
+    <h2>17N. レアリティの輝き＝「レア」の文字自体＋周辺（SC-30/31/32・#27・GF-AC-270）</h2>
+    <p class="muted text-sm">当初 #27 は<strong>カードの枠（パネル外周）</strong>を紫グローで脈動させていたが、ユーザー要望で<strong>「レア」のラベル文字自体＋その周辺</strong>を光らせる方針へ変更。カード枠は<strong>静的なレア紫枠のまま</strong>（脈動しない）。<strong>コモン＝グレー・標準＝青は静か</strong>で、<strong>レアだけが際立つ</strong>。効果は3層＝①<strong>文字の紫テキストグロー脈動</strong>／②<strong>ラベル背後の淡い紫ハロー</strong>（周辺がふわっと光る）／③<strong>きらめき ✦</strong>（周辺で瞬く）。<code>prefers-reduced-motion</code>／下のトグル ON では脈動・ハロー・きらめきを止め、<strong>レア紫の文字色・枠は残す</strong>（情報は保持）。土台は production の spell-card（features/spells/spells.css・アイコン26px・同構造/クラス）を再現＝移植先とデザイン一致（フロント実装フロー規約 §2.2）。</p>
+    <div class="sgrare-wrap" id="sgrareWrap">
+      <div class="row" style="gap:var(--space-2); align-items:center; margin-bottom:var(--space-3); flex-wrap:wrap">
+        <label class="checkbox" style="margin:0"><input type="checkbox" id="sgrareReduce"> 動きを減らす（疑似 reduce-motion）</label>
+        <span class="muted text-sm">切替＝<strong>控えめ</strong>／<strong>しっかり</strong>（既定＝しっかり）</span>
+        <button class="btn btn-outline btn-sm" type="button" id="sgrareIntensity" style="margin:0">強度：しっかり</button>
+      </div>
+      <div class="sgrare-cards">
+        <!-- コモン（静か） -->
+        <article class="card spell-card sgrare-card rarity-common">
+          <div class="spell-card__head">
+            <span class="spell-card__icon">❄️</span>
+            <span class="spell-card__name">氷</span>
+            <span class="badge rarity-common spell-card__rarity sgrare-badge">コモン</span>
+          </div>
+          <p class="spell-desc">コモンは静か（グレー枠・演出なし）。</p>
+        </article>
+        <!-- 標準（静か） -->
+        <article class="card spell-card sgrare-card rarity-standard">
+          <div class="spell-card__head">
+            <span class="spell-card__icon">⚡</span>
+            <span class="spell-card__name">雷</span>
+            <span class="badge rarity-standard spell-card__rarity sgrare-badge">標準</span>
+          </div>
+          <p class="spell-desc">標準は静か（青枠・演出なし）。</p>
+        </article>
+        <!-- レア（文字＋周辺が光る／枠は静的） -->
+        <article class="card spell-card sgrare-card rarity-rare">
+          <div class="spell-card__head">
+            <span class="spell-card__icon">🔮</span>
+            <span class="spell-card__name">オーラ</span>
+            <span class="badge rarity-rare spell-card__rarity sgrare-badge">レア</span>
+          </div>
+          <p class="spell-desc">レアだけ「レア」の文字＋周辺が脈動して際立つ（枠は静的なレア紫のまま）。</p>
+        </article>
+      </div>
+    </div>
+
+    <style>
+      .sgrare-cards{ display:flex; gap:var(--space-4,16px); flex-wrap:wrap; align-items:flex-start; }
+      .sgrare-card{ width:240px; display:flex; flex-direction:column; gap:var(--space-3); position:relative; overflow:visible; }
+      /* spell-card 再現（§17L-i と同方針・移植先一致） */
+      .sgrare-card .spell-card__head{ display:flex; align-items:center; gap:var(--space-2); }
+      .sgrare-card .spell-card__icon{ font-size:26px; line-height:1; }
+      .sgrare-card .spell-card__name{ font-family:var(--font-pixel); font-size:var(--text-lg); }
+      .sgrare-card .spell-desc{ font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.7; }
+      .sgrare-badge{ margin-left:auto; background:var(--color-surface); border:1px solid var(--color-border); font-weight:700; box-shadow:none; position:relative; }
+      .sgrare-badge.rarity-common{ color:var(--rarity-common); border-color:var(--rarity-common); }
+      .sgrare-badge.rarity-standard{ color:var(--rarity-standard); border-color:var(--rarity-standard); }
+      /* レアのパネル枠は出さない（ユーザー要望＝レアのパネル枠は不要）。レア識別はラベル色に委ねる。 */
+      .sgrare-badge.rarity-rare{ color:var(--rarity-rare); border-color:var(--rarity-rare); }
+
+      /* ① 文字の紫テキストグロー脈動（text-shadow のみ＝周辺の“四角い箱”は出さない） */
+      .sgrare-badge.rarity-rare{ animation: sgrare-textglow 1.8s ease-in-out infinite; }
+      @keyframes sgrare-textglow{
+        0%,100%{ text-shadow:0 0 1px rgba(168,85,247,.4); }
+        50%    { text-shadow:0 0 5px rgba(168,85,247,.95), 0 0 12px rgba(168,85,247,.6); }
+      }
+      /* ② きらめき ✦（周辺で瞬く・位相ずらし） */
+      .sgrare-badge.rarity-rare::after{
+        content:"✦"; position:absolute; top:-9px; right:-7px; font-size:11px; color:var(--rarity-rare); pointer-events:none; text-shadow:0 0 4px rgba(168,85,247,.8);
+        animation: sgrare-spark 1.8s ease-in-out infinite;
+      }
+      @keyframes sgrare-spark{ 0%,100%{ opacity:0; transform:scale(.3) rotate(-10deg); } 45%{ opacity:1; transform:scale(1) rotate(15deg); } 70%{ opacity:.2; } }
+
+      /* 強度：控えめ（グロー弱め・ハロー小さめ・きらめき無し） */
+      .sgrare-wrap.is-soft .sgrare-badge.rarity-rare{ animation-duration:2.4s; }
+      .sgrare-wrap.is-soft .sgrare-badge.rarity-rare::after{ display:none; }
+      .sgrare-wrap.is-soft .sgrare-badge.rarity-rare::before{ animation-duration:2.4s; }
+
+      /* reduce（トグル or OS）＝脈動/ハロー/きらめきを止める。レア紫の文字色・枠は残す。 */
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare,
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare::before,
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare::after{ animation:none; }
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare{ text-shadow:none; box-shadow:none; }
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare::before{ opacity:.25; transform:none; }
+      .sgrare-wrap.is-reduced .sgrare-badge.rarity-rare::after{ opacity:0; }
+      @media (prefers-reduced-motion: reduce){
+        .sgrare-badge.rarity-rare, .sgrare-badge.rarity-rare::before, .sgrare-badge.rarity-rare::after{ animation:none; }
+        .sgrare-badge.rarity-rare{ text-shadow:none; box-shadow:none; }
+      }
+    </style>
+    <script>
+      (function(){
+        var wrap=document.getElementById('sgrareWrap');
+        var reduceCb=document.getElementById('sgrareReduce');
+        var intBtn=document.getElementById('sgrareIntensity');
+        reduceCb.addEventListener('change', function(){ wrap.classList.toggle('is-reduced', reduceCb.checked); });
+        var soft=false;
+        intBtn.addEventListener('click', function(){ soft=!soft; wrap.classList.toggle('is-soft', soft); intBtn.textContent='強度：'+(soft?'控えめ':'しっかり'); });
+      })();
+    </script>
+  </div>
+
   <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
   <div class="section">
     <h2>18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静）</h2>
