@@ -39,15 +39,7 @@ type Balance = {
   coin: number; sp: number;
 };
 
-const TILES = [
-  { href: "/quests", ico: "🗺️", label: "クエスト一覧" },
-  { href: "/shop", ico: "🛒", label: "ショップ" },
-  { href: "/avatar", ico: "🧍", label: "アバター" },
-  { href: "/spells", ico: "✦", label: "魔法 / スキル" },
-  { href: "/achievements", ico: "🏆", label: "実績 / バッジ" },
-  { href: "/ranking", ico: "📊", label: "ランキング" },
-  { href: "/notifications", ico: "🔔", label: "通知" },
-];
+// 旧ショートカットタイル（TILES）はグローバルナビ（☰→ドロワー・レビュー#1）へ集約したため撤去（画面遷移図 §4 集約 2026-09-10）。
 
 function hrefOfDraft(d: DashboardData["drafts"][number]): string {
   if (d.kind === "quest") return `/quests/${d.quest_id}`;
@@ -484,17 +476,6 @@ export function DashboardView({
           </ul>
         </section>
 
-        <section aria-label="ショートカット">
-          <div className="section-head"><h2 style={{ fontSize: "var(--text-lg)" }}>ショートカット</h2></div>
-          <div className="tiles">
-            {TILES.map((t) => (
-              <Link key={t.href} className="tile" href={t.href}>
-                <span className="tile__ico">{t.ico}</span>
-                <span className="tile__label">{t.label}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
       </motion.div>
 
       {/* ロール条件付き管理導線（サーバー権威 roles で出し分け） */}

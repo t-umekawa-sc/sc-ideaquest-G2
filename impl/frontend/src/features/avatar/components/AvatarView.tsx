@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { LoadingOverlay, CountUp, GameNav, useConfirm, useSnackbar } from "@/components/ui";
+import { LoadingOverlay, CountUp, useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { getItems, ITEM_ICON, updateEquipment } from "@/features/shop/api";
@@ -131,7 +131,6 @@ export function AvatarView({ initialAvatarBase = "male" }: { initialAvatarBase?:
     <section aria-label="アバター / 着せ替え">
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="dressup-title">アバター / 着せ替え</h1>
-      <GameNav current="avatar" />
 
       {/* コイン残高＋きせかえの概要（ショップ／魔法と同じ CRTガラスの概要パネル）。
           ショップへのリンクはショップ画面の「▶ きせかえへ」と同じ .btn-pixel で統一。 */}

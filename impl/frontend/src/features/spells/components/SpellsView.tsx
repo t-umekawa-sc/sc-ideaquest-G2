@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LoadingOverlay, CountUp, GameNav, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
+import { LoadingOverlay, CountUp, SpellLearnFx, useConfirm, useSnackbar, type CastRect } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
@@ -154,7 +154,6 @@ export function SpellsView() {
       )}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="spells-title">魔法 / スキル</h1>
-      <GameNav current="spells" />
 
       {/* SPステータス（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="スキルポイント">

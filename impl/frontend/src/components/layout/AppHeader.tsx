@@ -11,6 +11,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { Avatar, CountUp } from "@/components/ui";
 
+import { AppNav } from "./AppNav";
+
 type Props = {
   user: { display_name: string; avatar_url?: string | null };
   balance?: { level: number; coin: number; sp: number; xpPct?: number };
@@ -71,9 +73,13 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
   return (
     <header className="app-header">
       <div className="container between">
-        <Link href="/" className="brand" aria-label="ideaquest ホーム">
-          <Image className="brand-logo" src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={88} height={40} priority />
-        </Link>
+        <div className="header-left">
+          {/* グローバルナビ（☰→ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1） */}
+          <AppNav />
+          <Link href="/" className="brand" aria-label="ideaquest ホーム">
+            <Image className="brand-logo" src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={88} height={40} priority />
+          </Link>
+        </div>
         <div className="header-actions">
           {balance && (
             <>

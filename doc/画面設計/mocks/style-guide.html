@@ -560,6 +560,132 @@
     <p class="hint">メニューの「🖼️ 背景画像を変更／リセット」でこのページの背景（<code>.app-bg</code>）も切り替わります（localStorage 保存）。</p>
   </div>
 
+  <!-- 11b. グローバルナビ（ハンバーガー→ドロワー／ピン留めでサイドバー・レビュー#1） -->
+  <div class="section">
+    <h2>11b. グローバルナビ（ハンバーガー→左ドロワー／📌ピン留めでサイドバー・#1）</h2>
+    <p class="muted text-sm">分散していた行き先導線（ホームのタイル・ゲーム層 GameNav）を<strong>グローバルナビに集約</strong>。<code>☰</code> で左からドロワーがスライドイン（半透明背面）。<strong>📌 ピン留めで常設サイドバー化</strong>＝本文がその分右に寄る（オーバーレイ背面は消える・ページ遷移しても開いたまま）。ピン状態は <strong>localStorage で端末に記憶</strong>（広い画面のみピン可・狭幅は常にオーバーレイ）。項目ホバーは標準の ▶ 選択カーソル（<code>.menu-pixel</code>）。<strong>ゲーム群はゲームモードON時のみ</strong>表示（#2 連動）。アカウント/設定/管理/ログアウトは<strong>右上のアバターメニューに据え置き</strong>（ドロワーは行き先ナビに限定）。<code>prefers-reduced-motion</code>／下のトグルでスライド/ドックを抑制。</p>
+    <p class="muted text-sm">土台はミニ・アプリ枠（ヘッダー＋本文）で、ピン留め時の本文の寄りを再現。実装は <code>(app)</code> レイアウトの app-shell（<code>.appnav</code> 新設）に載せる想定。</p>
+    <div class="sgnav-demo" id="sgnavDemo">
+      <header class="sgnav-appheader">
+        <button class="sgnav-burger" id="sgnavBurger" aria-label="メニューを開閉" aria-expanded="false">☰</button>
+        <span class="brand" style="font-size:13px">IDEAQUEST</span>
+        <span class="sgnav-spacer"></span>
+        <span class="sgnav-stat sgnav-game-only">Lv.20</span>
+        <span class="sgnav-stat sgnav-game-only">◆ 992</span>
+        <span class="sgnav-stat sgnav-game-only">✦ 107</span>
+        <span class="sgnav-bell">🔔</span>
+        <span class="sgnav-avatar" title="アカウント（据え置き）">🙂</span>
+      </header>
+      <div class="sgnav-body">
+        <div class="sgnav-backdrop" id="sgnavBackdrop"></div>
+        <aside class="sgnav-drawer" id="sgnavDrawer" aria-label="グローバルナビ" role="dialog" aria-modal="true">
+          <div class="sgnav-drawer__head">
+            <span class="brand" style="font-size:12px">メニュー</span>
+            <span class="sgnav-spacer"></span>
+            <button class="sgnav-pin" id="sgnavPin" aria-pressed="false" title="ピン留め（サイドバー固定）">📌</button>
+            <button class="sgnav-x" id="sgnavX" aria-label="閉じる">✕</button>
+          </div>
+          <nav class="sgnav-menu menu-pixel">
+            <div class="sgnav-grp">業務</div>
+            <a class="sgnav-i" role="menuitem" tabindex="0">🏠 ホーム</a>
+            <a class="sgnav-i" role="menuitem" tabindex="0">📜 クエスト</a>
+            <a class="sgnav-i" role="menuitem" tabindex="0">🔔 通知</a>
+            <div class="sgnav-game">
+              <div class="sgnav-grp sgnav-grp--game">ゲーム <span class="sgnav-flag">モードON時のみ</span></div>
+              <a class="sgnav-i" role="menuitem" tabindex="0">🛒 ショップ</a>
+              <a class="sgnav-i" role="menuitem" tabindex="0">🧍 きせかえ</a>
+              <a class="sgnav-i" role="menuitem" tabindex="0">✦ 魔法・スキル</a>
+              <a class="sgnav-i" role="menuitem" tabindex="0">🏅 実績</a>
+              <a class="sgnav-i" role="menuitem" tabindex="0">🏆 ランキング</a>
+            </div>
+          </nav>
+          <div class="sgnav-foot">アカウント/設定/管理/ログアウトは右上のアバターメニュー（据え置き）</div>
+        </aside>
+        <main class="sgnav-content" id="sgnavContent">
+          <strong>ページ本体</strong>
+          <p class="muted text-sm" style="margin-top:6px">📌ピン留め中はサイドバー分だけ右に寄ります。<code>☰</code> で開閉、📌 でドック/オーバーレイ切替。</p>
+        </main>
+      </div>
+    </div>
+    <div class="row" style="gap:12px; margin-top:10px; flex-wrap:wrap; align-items:center">
+      <label class="checkbox" style="margin:0"><input type="checkbox" id="sgnavReduce"> 動きを減らす（疑似 reduce-motion）</label>
+      <label class="checkbox" style="margin:0"><input type="checkbox" id="sgnavGameoff"> ゲームモード OFF（ゲーム群＋ヘッダー通貨を隠す）</label>
+      <span class="muted text-sm" id="sgnavStateTxt"></span>
+    </div>
+
+    <style>
+      .sgnav-demo{ position:relative; border:1px solid var(--color-border); border-radius:var(--radius-lg,12px); overflow:hidden; height:360px; display:flex; flex-direction:column; background:var(--color-surface); }
+      .sgnav-appheader{ display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--color-border); background:var(--color-surface-alt,#f8fafc); flex:0 0 auto; }
+      .sgnav-appheader .sgnav-spacer{ flex:1; }
+      .sgnav-burger{ border:1px solid var(--color-border); background:var(--color-surface); border-radius:8px; width:32px; height:30px; cursor:pointer; font-size:15px; line-height:1; }
+      .sgnav-stat{ font-family:var(--font-pixel,monospace); font-size:12px; padding:1px 6px; border:1px solid var(--color-border); border-radius:6px; }
+      .sgnav-bell,.sgnav-avatar{ font-size:16px; }
+      .sgnav-body{ position:relative; flex:1; display:flex; overflow:hidden; min-height:0; }
+      .sgnav-backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.45); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:2; }
+      .sgnav-demo.is-open:not(.is-pinned) .sgnav-backdrop{ opacity:1; pointer-events:auto; }
+      .sgnav-drawer{ position:absolute; top:0; left:0; bottom:0; width:216px; background:var(--color-surface); border-right:1px solid var(--color-border); box-shadow:var(--shadow-lg,0 8px 30px rgba(2,6,23,.18)); transform:translateX(-100%); transition:transform .22s ease; z-index:3; display:flex; flex-direction:column; }
+      .sgnav-demo.is-open .sgnav-drawer{ transform:translateX(0); }
+      /* ピン留め＝ドロワーをフローに戻し（相対配置）、本文を右へ。背面/影は消す。 */
+      .sgnav-demo.is-pinned .sgnav-drawer{ position:relative; transform:none; z-index:auto; box-shadow:none; }
+      .sgnav-drawer__head{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--color-border); }
+      .sgnav-drawer__head .sgnav-spacer{ flex:1; }
+      .sgnav-pin,.sgnav-x{ border:1px solid var(--color-border); background:var(--color-surface); border-radius:6px; width:26px; height:24px; cursor:pointer; font-size:12px; line-height:1; }
+      .sgnav-demo.is-pinned .sgnav-pin{ background:var(--color-primary-soft,#e0e7ff); border-color:var(--color-primary,#6366f1); }
+      /* ピン中は✕を隠す（閉じるのではなく📌解除で戻す） */
+      .sgnav-demo.is-pinned .sgnav-x{ display:none; }
+      .sgnav-menu{ flex:1; overflow:auto; padding:8px 6px; display:flex; flex-direction:column; gap:2px; }
+      .sgnav-grp{ font-size:11px; color:var(--color-text-muted); font-weight:700; padding:8px 8px 2px; }
+      .sgnav-grp--game{ display:flex; align-items:center; gap:6px; }
+      .sgnav-flag{ font-size:9px; font-weight:700; color:var(--rarity-rare,#a855f7); border:1px solid var(--rarity-rare,#a855f7); border-radius:99px; padding:0 5px; }
+      .sgnav-i{ display:block; padding:6px 10px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--color-text); text-decoration:none; }
+      .sgnav-i:hover,.sgnav-i:focus-visible{ background:var(--color-surface-alt,#f1f5f9); outline:none; }
+      .sgnav-foot{ font-size:10px; color:var(--color-text-muted); padding:8px 10px; border-top:1px solid var(--color-border); }
+      .sgnav-content{ flex:1; padding:16px; overflow:auto; min-width:0; }
+      /* ゲームモード OFF＝ゲーム群とヘッダー通貨を隠す（#2 連動の擬似） */
+      .sgnav-demo.is-gameoff .sgnav-game{ display:none; }
+      .sgnav-demo.is-gameoff .sgnav-game-only{ display:none; }
+      /* reduce＝スライド/ドック/背面のアニメを止める */
+      .sgnav-demo.is-reduce .sgnav-drawer,
+      .sgnav-demo.is-reduce .sgnav-backdrop{ transition:none; }
+    </style>
+    <script>
+      (function(){
+        var demo=document.getElementById('sgnavDemo');
+        var burger=document.getElementById('sgnavBurger');
+        var pin=document.getElementById('sgnavPin');
+        var x=document.getElementById('sgnavX');
+        var backdrop=document.getElementById('sgnavBackdrop');
+        var reduceCb=document.getElementById('sgnavReduce');
+        var gameoffCb=document.getElementById('sgnavGameoff');
+        var stateTxt=document.getElementById('sgnavStateTxt');
+        function sync(){
+          var open=demo.classList.contains('is-open');
+          var pinned=demo.classList.contains('is-pinned');
+          burger.setAttribute('aria-expanded', open?'true':'false');
+          pin.setAttribute('aria-pressed', pinned?'true':'false');
+          stateTxt.textContent = pinned ? 'サイドバー固定中（📌解除でオーバーレイに戻る）' : (open ? 'オーバーレイ表示中' : '閉じています（☰で開く）');
+        }
+        function open(){ demo.classList.add('is-open'); sync(); }
+        function close(){ if(demo.classList.contains('is-pinned')) return; demo.classList.remove('is-open'); sync(); }
+        burger.addEventListener('click', function(){ demo.classList.contains('is-open') ? close() : open(); });
+        x.addEventListener('click', close);
+        backdrop.addEventListener('click', close);
+        pin.addEventListener('click', function(){
+          var pinned=demo.classList.toggle('is-pinned');
+          if(pinned) demo.classList.add('is-open');   // ピン＝常設で開いた状態
+          try{ localStorage.setItem('sgnav-pinned', pinned?'1':'0'); }catch(e){}
+          sync();
+        });
+        demo.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+        reduceCb.addEventListener('change', function(){ demo.classList.toggle('is-reduce', reduceCb.checked); });
+        gameoffCb.addEventListener('change', function(){ demo.classList.toggle('is-gameoff', gameoffCb.checked); });
+        // 復元＝端末に覚えたピン状態（localStorage）
+        try{ if(localStorage.getItem('sgnav-pinned')==='1'){ demo.classList.add('is-pinned','is-open'); } }catch(e){}
+        sync();
+      })();
+    </script>
+  </div>
+
   <div>
     <h2>12. メニューの選択カーソル（標準）</h2>
     <p class="muted text-sm"><strong>ドロップダウンメニューは標準で</strong>、項目ホバー/フォーカス時に

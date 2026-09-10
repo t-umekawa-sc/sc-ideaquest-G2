@@ -149,6 +149,62 @@ img { max-width: 100%; display: block; }
 /* ヘッダー内の .container は全幅に＝space-between でロゴ（左）とアクション（右）を端に寄せる。 */
 .app-header .container { width: 100%; }
 .app-header .brand { display: inline-flex; align-items: center; }
+.header-left { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* ── グローバルナビ（ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1）─────────────
+   ☰(.appnav-burger)で左ドロワー(.appnav)をオーバーレイ表示／📌でドック（本文右シフト・localStorage記憶）。
+   ピン可は広い画面のみ（狭幅は常にオーバーレイ）。prefers-reduced-motion／[data-anim-reduced] で動きを抑制。 */
+.appnav-burger {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 34px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-md, 8px);
+  background: var(--color-surface); color: var(--color-text); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.appnav-burger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+
+.appnav-root { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+.appnav-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .45); opacity: 0; transition: opacity .2s ease; }
+.appnav-root.is-open { pointer-events: auto; }
+.appnav-root.is-open .appnav-backdrop { opacity: 1; }
+.appnav {
+  position: absolute; top: 0; left: 0; bottom: 0; width: var(--appnav-w, 236px);
+  background: var(--color-surface); border-right: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg, 0 10px 40px rgba(2, 6, 23, .28));
+  transform: translateX(-100%); transition: transform .22s ease;
+  display: flex; flex-direction: column; pointer-events: auto;
+}
+.appnav-root.is-open .appnav { transform: translateX(0); }
+/* ドック（サイドバー固定）＝ヘッダー下から出し、背面・影は消す。本文は下の html.iq-nav-pinned で右シフト。 */
+.appnav-root.is-docked { pointer-events: none; }
+.appnav-root.is-docked .appnav-backdrop { display: none; }
+/* ドック＝サイドバーは左・全高（top:0）。 */
+.appnav-root.is-docked .appnav { top: 0; transform: none; box-shadow: none; }
+/* ピン時＝本文全体（ヘッダー＋main）をサイドバー分だけ右へ寄せる。body の padding-left で寄せる＝
+   ①padding は幅の内側なので窓は横スクロールしない（ヘッダー右の余白崩れが出ない）
+   ②各ページの中央寄せ（.container の margin:auto 等）はそのまま働き、拡幅した main で再センタリングして
+     「右に寄る」ことがない＝アイデア詳細/チャット等どの画面でも一様。広い部品（DataTable 等）は各自の
+     overflow-x で本文内スクロール＝横スクロールはコンテンツ領域に限定。 */
+html.iq-nav-pinned { overflow-x: hidden; }
+html.iq-nav-pinned body { padding-left: var(--appnav-w, 236px); }
+body.iq-nav-lock { overflow: hidden; }
+
+.appnav__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.appnav__title { font-family: var(--font-pixel); font-size: var(--text-sm); flex: 1; }
+.appnav-pin, .appnav-x {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px;
+  border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); cursor: pointer; font-size: 13px; line-height: 1;
+}
+.appnav-root.is-docked .appnav-pin { background: var(--color-primary-soft); border-color: var(--color-primary); }
+.appnav__menu { flex: 1; overflow: auto; padding: var(--space-2); display: flex; flex-direction: column; gap: 2px; }
+.appnav__grp { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 700; padding: var(--space-2) var(--space-2) 2px; }
+.appnav__item { display: flex; align-items: center; gap: var(--space-2); padding: 7px 10px; border-radius: 8px; color: var(--color-text); text-decoration: none; font-size: var(--text-sm); }
+.appnav__item:hover, .appnav__item:focus-visible { background: var(--color-surface-alt); outline: none; }
+.appnav__item.is-active { background: var(--color-primary-soft); color: var(--color-primary-active, var(--color-primary)); font-weight: 700; }
+.appnav__ico { width: 1.3em; text-align: center; }
+.appnav__foot { font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-border); }
+
+/* 狭幅はピン無効＝本文シフトしない（JS も docked を落とす）。念のため padding も戻す。 */
+@media (max-width: 1023.98px) { html.iq-nav-pinned body { padding-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .appnav, .appnav-backdrop { transition: none; } }
 /* ブランドロゴ（剣と盾の紋章＋IDEAQUESTワードマーク） */
 .brand-logo { height: 40px; width: auto; display: block; }
 .brand-logo.lg { height: 96px; }   /* ログイン画面など大きく見せる場面用 */

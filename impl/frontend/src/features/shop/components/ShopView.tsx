@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState, LoadingOverlay, CountUp, DataTable, GameNav, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { EmptyState, LoadingOverlay, CountUp, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
@@ -207,7 +207,6 @@ export function ShopView() {
       {celebrates.map((c) => <ItemCelebrateFx key={c.id} rect={c.rect} name={c.name} />)}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
-      <GameNav current="shop" />
       {loading && <LoadingOverlay />}
 
       {/* コイン残高（ゲーム層・CRTガラス） */}
