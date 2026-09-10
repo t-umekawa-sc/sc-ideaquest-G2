@@ -414,14 +414,17 @@ export function DashboardView({
             <span className="muted text-sm">動きがあると通知でお知らせ</span>
           </div>
           <div className="follow-grid">
-            {/* フォロー解除も投票カードと同じ＝その場で opacity フェード＋わずかに縮小して退場（layout/popLayout 不使用＝ドリフト防止）。reduce-motion 時は即時。 */}
-            <AnimatePresence initial={false}>
+            {/* GF-AC-341: フォロー解除は対象カードを opacity(+わずかに縮小)でフェード退場し、残りのフォローカードが滑らかに繰り上がる。
+                mode="popLayout"＝退場開始と同時に対象を流れから外す（穴が残らない）／layout="position"＝残りが新位置へスライド。
+                以前は layout 不使用でスナップ詰まり＝「単純に再表示」に見えて NG だった。reduce-motion 時は layout 無効＋即時。 */}
+            <AnimatePresence initial={false} mode="popLayout">
             {followed.map((f) => {
               const frozen = f.quest.quest_status === "completed";
               return (
                 <motion.div
                   key={f.id}
                   className="follow-card-wrap"
+                  layout={reduceAnim ? false : "position"}
                   initial={reduceAnim ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: "easeOut" } }}
