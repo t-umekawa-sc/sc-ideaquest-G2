@@ -397,6 +397,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">
+        {/* ヘッダー＋クエスト内アクティビティを2段組（レビュー#3＝ヘッダーの空白を活かす）。 */}
+        <div className="quest-head-row">
         <section className="card quest-head" aria-label="クエスト情報">
           <div className="quest-head__top">
             <div className="quest-head__main">
@@ -435,6 +437,13 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
             </div>
           </div>
         </section>
+
+        {/* クエスト内アクティビティ（ビジネス層カード・レビュー#3）＝ヘッダーと2段組。アイデア/実績へリンク。
+            ※更新/チャット/評価/引用など業務イベントへの本格刷新は次段階（現状は FR-36 成果系フィード）。 */}
+        <section className="card quest-activity" aria-label="クエスト内アクティビティ">
+          <ActivityFeed title="クエスト内アクティビティ" load={loadQuestFeed} emptyText="このクエストの活動はまだありません。" />
+        </section>
+        </div>{/* .quest-head-row */}
 
         {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}
         {gameEnabled && (
@@ -481,12 +490,6 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
         </div>
         )}{/* .quest-panels */}
-
-        {/* クエスト内アクティビティ（全幅・レビュー#3）。現状は FR-36 の成果系フィード（ゲーム由来）。
-            ※ビジネス層の活動（更新/チャット/評価/引用・リアクション＋リンク）への刷新は次イテレーション。 */}
-        <section className="pixel-panel" aria-label="クエスト内アクティビティ">
-          <ActivityFeed title="クエスト内アクティビティ" load={loadQuestFeed} emptyText="このクエストの活動はまだありません。" />
-        </section>
       </div>
 
       {/* タブ */}

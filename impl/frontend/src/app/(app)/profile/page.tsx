@@ -1,8 +1,8 @@
 // SC-03 プロフィールページ。認証済みユーザー本人のプロフィール（アカウント情報＋残高〔読取〕・編集・セキュリティ）。
 // 正＝doc/画面設計/mocks/SC-03_プロフィール.html・doc/画面設計/screens/SC-03_プロフィール.md。
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BackLink } from "@/components/ui";
 import { ActivityHistory, ProfileForm, ProfileHero, SecuritySection } from "@/features/profile";
 import { getServerActivities, getServerMe, heroBalance } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
@@ -19,7 +19,8 @@ export default async function ProfilePage() {
   const activities = await getServerActivities();
   return (
     <div className="profile-page">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
+      {/* 呼び出し元へ履歴戻り（無ければダッシュボード）＋フローティング（他画面と同じ・デザイン標準 §4.10）。 */}
+      <BackLink fallbackHref="/" label="← 戻る" />
       <h1 className="page-title">プロフィール</h1>
 
       {/* 最上部＝ゲーム風パネル：3Dアバター表示グループ＋獲得履歴をまとめて表示。 */}

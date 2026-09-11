@@ -1,5 +1,6 @@
 // 機能横断の共有UI（業務層）の公開API（§4.1 components）。
 export { Avatar } from "./Avatar";
+export { BackLink } from "./BackLink";
 export { Button } from "./Button";
 export { CountUp } from "./CountUp";
 export { SpellCastFx, type CastRect } from "./SpellCastFx";

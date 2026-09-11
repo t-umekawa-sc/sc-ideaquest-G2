@@ -4,6 +4,7 @@
 // 他者フィードは公開種別のみ（サーバー強制＝idea_post/selection/achievement_reward/levelup_sp）。
 // 行＝アクター（アバター＋氏名）＋人間可読イベント（reason から・ref リンクは D/E 依存で当面テキスト）＋
 // （チーム時）クエスト名＋相対時刻。カーソル「もっと見る」。
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState, Avatar } from "@/components/ui";
@@ -11,13 +12,20 @@ import { EmptyState, Avatar } from "@/components/ui";
 import type { FeedActivity } from "../api";
 import "../feed.css";
 
-// reason → 人間可読イベント（当面 ja 固定・ref 解決は D/E 実装後にリンク化）。
+// reason → 人間可読イベント（当面 ja 固定）。
 const EVENT: Record<string, string> = {
   idea_post: "アイデアを投稿しました",
   selection: "アイデアを選定しました",
   achievement_reward: "実績を獲得しました",
   levelup_sp: "レベルアップしました",
 };
+
+// ref から遷移先を解決（レビュー#3）＝アイデア（投稿/選定）はアイデア詳細（評価も見える）へ、実績は実績画面へ。
+function hrefOf(a: FeedActivity): string | null {
+  if (a.ref_type === "ideas" && a.ref_id) return `/ideas/${a.ref_id}`;
+  if (a.ref_type === "achievements") return "/achievements";
+  return null;
+}
 
 function timeAgo(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
@@ -81,16 +89,20 @@ export function ActivityFeed({
         <EmptyState icon="📣" title={emptyText} />
       ) : (
         <ul className="feed__list">
-          {items.map((a) => (
-            <li key={a.id} className="feed__item">
-              <Avatar name={a.actor.name} imageUrl={a.actor.avatar ?? undefined} size="sm" level={a.actor.level ?? undefined} />
-              <div className="feed__body">
-                <span><strong className="feed__actor">{a.actor.name}</strong>が{EVENT[a.reason] ?? "活動しました"}</span>
-                {showQuest && a.quest_title && <span className="feed__quest">🎯 {a.quest_title}</span>}
-              </div>
-              <time className="feed__time" dateTime={a.created_at}>{timeAgo(a.created_at)}</time>
-            </li>
-          ))}
+          {items.map((a) => {
+            const href = hrefOf(a);
+            const eventText = EVENT[a.reason] ?? "活動しました";
+            return (
+              <li key={a.id} className="feed__item">
+                <Avatar name={a.actor.name} imageUrl={a.actor.avatar ?? undefined} size="sm" level={a.actor.level ?? undefined} />
+                <div className="feed__body">
+                  <span><strong className="feed__actor">{a.actor.name}</strong>が{href ? <Link className="feed__link" href={href}>{eventText}</Link> : eventText}</span>
+                  {showQuest && a.quest_title && <span className="feed__quest">🎯 {a.quest_title}</span>}
+                </div>
+                <time className="feed__time" dateTime={a.created_at}>{timeAgo(a.created_at)}</time>
+              </li>
+            );
+          })}
         </ul>
       )}
       {hasNext && (

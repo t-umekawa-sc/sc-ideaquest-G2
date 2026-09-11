@@ -47,6 +47,11 @@
  * ============================================================= */
 /* レビュー#3＝縦積み＝ヘッダー(全幅)／KPI＋ランキング(同じ行)／クエスト内アクティビティ(全幅)。 */
 .quest-top { display: flex; flex-direction: column; gap: var(--space-4); }
+/* ヘッダー（概要）＋クエスト内アクティビティを2段組（ヘッダーの空白を活かす・レビュー#3）。狭幅で縦積み。 */
+.quest-head-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-4); align-items: stretch; }
+@media (max-width: 860px) { .quest-head-row { grid-template-columns: 1fr; } }
+/* クエスト内アクティビティ＝ビジネス層カード（.card）。フィードのスクロールに備え本文は縦に伸びる。 */
+.quest-activity { display: flex; flex-direction: column; }
 /* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（狭幅で縦積み）。ゲームモード OFF では非表示（§4.11）。 */
 .quest-panels { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); align-items: stretch; }
 @media (max-width: 860px) { .quest-panels { grid-template-columns: 1fr; } }
