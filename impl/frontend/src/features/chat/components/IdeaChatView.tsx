@@ -76,7 +76,7 @@ function renderTextHtml(raw: string, members: Member[]): string {
 
 type Pos = { top: number; left: number };
 
-export function IdeaChatView({ ideaId }: { ideaId: string }) {
+export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; gameEnabled?: boolean }) {
   const snack = useSnackbar();
   const confirm = useConfirm();
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
@@ -731,26 +731,31 @@ export function IdeaChatView({ ideaId }: { ideaId: string }) {
                 <button key={em} type="button" className="rp__emoji" onClick={() => void toggleReaction(pickerTarget, em)}>{em}</button>
               ))}
             </div>
-            <p className="rp__label">魔法 <span className="muted">（解放済み・1メッセージ1魔法・1チャット1回）</span></p>
-            <div className="rp__row">
-              {magic ? (
-                <p className="rp__occupied">✦ このメッセージには既に魔法が付いています（1メッセージ＝魔法1個）。</p>
-              ) : spells.filter((s) => s.unlocked).length === 0 ? (
-                <p className="rp__occupied">✦ 解放済みの魔法がありません（SC-32 で SP 解放）。</p>
-              ) : (
-                spells.filter((s) => unlockedSpellIds.has(s.id)).map((s) => {
-                  const used = myMagicSpellIds.has(s.id);
-                  return (
-                    <button key={s.id} type="button" className="rp__spell" disabled={used} onClick={(e) => {
-                      const b = e.currentTarget.getBoundingClientRect();
-                      void castSpell(pickerTarget, s, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
-                    }}>
-                      {s.icon} {s.name_ja}{used && <span className="cd">使用中</span>}
-                    </button>
-                  );
-                })
-              )}
-            </div>
+            {/* ゲームモード OFF（§4.11・レビュー#2）＝魔法キャストUIは出さない（使用無効）。通常リアクションと本文は残す。 */}
+            {gameEnabled && (
+              <>
+                <p className="rp__label">魔法 <span className="muted">（解放済み・1メッセージ1魔法・1チャット1回）</span></p>
+                <div className="rp__row">
+                  {magic ? (
+                    <p className="rp__occupied">✦ このメッセージには既に魔法が付いています（1メッセージ＝魔法1個）。</p>
+                  ) : spells.filter((s) => s.unlocked).length === 0 ? (
+                    <p className="rp__occupied">✦ 解放済みの魔法がありません（SC-32 で SP 解放）。</p>
+                  ) : (
+                    spells.filter((s) => unlockedSpellIds.has(s.id)).map((s) => {
+                      const used = myMagicSpellIds.has(s.id);
+                      return (
+                        <button key={s.id} type="button" className="rp__spell" disabled={used} onClick={(e) => {
+                          const b = e.currentTarget.getBoundingClientRect();
+                          void castSpell(pickerTarget, s, { x: b.left + b.width / 2, y: b.top + b.height / 2 });
+                        }}>
+                          {s.icon} {s.name_ja}{used && <span className="cd">使用中</span>}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
           </div>
         );
       })()}

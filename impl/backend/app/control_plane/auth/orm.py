@@ -30,6 +30,9 @@ class Company(ControlBase):
     vote_anonymized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     hide_voters_from_managers: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     mfa_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # ゲームモード会社既定（レビュー#2・デザイン標準 §4.11）。true＝ゲーム層UIあり（現行挙動）。
+    # 実効値は個人上書き優先＝accounts.game_mode_override ?? 本既定（未上書きユーザーは本既定に追従）。
+    game_mode_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -62,6 +65,9 @@ class Account(ControlBase):
     # ダッシュボードのアバター追従アニメの表示 ON/OFF（暫定マスコット #20・§4.9 系）。true＝表示（既定＝現行挙動）。
     # 実効表示 = 追従ON かつ 非抑制（reduce_motion＝OS reduce OR 個別設定 が立てば追従も出さない）。目立つ演出のため個別に切れる。
     mascot_follow: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # ゲームモード個人上書き（レビュー#2・§4.11）。三値＝NULL(=会社既定に従う)/True(ON)/False(OFF)。
+    # 実効値 = game_mode_override ?? companies.game_mode_default（個人が非NULLなら優先）。account-only（users へミラーしない）。
+    game_mode_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     system_role: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")  # active | disabled
     # ログイン成功時に更新（源泉）→ 会社DB users.last_login_at へ §4.6 outbox でミラー

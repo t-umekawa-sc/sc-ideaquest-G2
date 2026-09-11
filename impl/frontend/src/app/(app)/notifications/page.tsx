@@ -4,10 +4,14 @@
 import { redirect } from "next/navigation";
 
 import { NotificationsView } from "@/features/notifications";
+import { getServerMe } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function NotificationsPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <NotificationsView />;
+  // ゲームモード実効値（レビュー#2・§4.11）＝false でゲーム系通知（実績/魔法）を一覧から除外。
+  const me = await getServerMe();
+  const gameEnabled = me?.game_mode.effective ?? true;
+  return <NotificationsView gameEnabled={gameEnabled} />;
 }

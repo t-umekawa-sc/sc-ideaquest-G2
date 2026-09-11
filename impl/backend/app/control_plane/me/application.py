@@ -43,7 +43,14 @@ from app.tenant.gamification.level import level_progress
 from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
 
-_EDITABLE_FIELDS = ("display_name", "locale", "reduce_motion", "mascot_follow")  # allowlist（§2.2）
+# allowlist（§2.2）。reduce_motion/mascot_follow/game_mode_override は account-only（users へは _MIRROR_FIELDS
+# 外＝未知キーとして無視される＝ミラーしない）。game_mode_override は三値（True/False/None＝上書きクリア）。
+_EDITABLE_FIELDS = ("display_name", "locale", "reduce_motion", "mascot_follow", "game_mode_override")
+
+
+def _effective_game_mode(override: bool | None, company_default: bool) -> bool:
+    """ゲームモード実効値（§4.11）＝個人上書きが非 None ならそれ、None なら会社既定。"""
+    return override if override is not None else company_default
 
 
 def _image_url(path: str | None) -> str | None:
@@ -51,7 +58,7 @@ def _image_url(path: str | None) -> str | None:
     return get_storage().presigned_get(path) if path else None
 
 
-def _me(account: Account, user: "User | None") -> dict:
+def _me(account: Account, user: "User | None", company_default: bool = True) -> dict:
     """K.1 正準形（account／profile／balance／system_role）。
 
     identity・display_name の源泉は accounts（§4.2・K.6）。残高は会社DB `users`（読み取り専用・K.0）で
@@ -78,6 +85,11 @@ def _me(account: Account, user: "User | None") -> dict:
             "coin_balance": user.coin_balance if user else 0,
             "skill_point_balance": user.skill_point_balance if user else 0,
         },
+        "game_mode": {  # ゲームモード実効配信（§4.11）＝override ?? company_default
+            "effective": _effective_game_mode(account.game_mode_override, company_default),
+            "override": account.game_mode_override,
+            "company_default": company_default,
+        },
         "system_role": account.system_role,
     }
 
@@ -98,7 +110,9 @@ def get_me(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         account = session.get(Account, account_id)
         if account is None:
             raise AppError(401, "unauthenticated")  # セッション有効中の消失＝通常起きない
-    return _me(account, _tenant_user(company_id, account_id))
+        company = session.get(Company, company_id)
+        company_default = company.game_mode_default if company else True  # ゲームモード会社既定（§4.11）
+    return _me(account, _tenant_user(company_id, account_id), company_default)
 
 
 # --- プロフィール画像・背景画像（K.4・MinIO・§1.10）。会社DB users 直接更新（identity ではない＝outbox なし） ---
@@ -183,13 +197,15 @@ def set_avatar_base(account_id: uuid.UUID, company_id: uuid.UUID, *, base: str) 
         account = session.get(Account, account_id)
         if account is None:
             raise AppError(401, "unauthenticated")
+        company = session.get(Company, company_id)
+        company_default = company.game_mode_default if company else True  # ゲームモード会社既定（§4.11）
     with get_tenant_session(_company_db_identifier(company_id)) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
         user.avatar_base = base
         ts.commit()
-    return _me(account, _tenant_user(company_id, account_id))
+    return _me(account, _tenant_user(company_id, account_id), company_default)
 
 
 def set_background_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
@@ -271,9 +287,11 @@ def update_me(account_id: uuid.UUID, company_id: uuid.UUID, *, changes: dict) ->
             setattr(account, field, value)
         if payload:  # 変更があるときだけミラー enqueue（会社DB `users` はワーカが反映・§4.6）
             account_sync_repo.enqueue(session, account_id, company_id, "upsert", payload)
+        company = session.get(Company, company_id)
+        company_default = company.game_mode_default if company else True  # ゲームモード会社既定（§4.11）
         session.commit()
     # 返却は K.1 正準形（残高は会社DB users＝ミラーは非同期・display_name は accounts 源泉で即反映）
-    return _me(account, _tenant_user(company_id, account_id))
+    return _me(account, _tenant_user(company_id, account_id), company_default)
 
 
 def _require_current_password(account: Account | None, current_password: str) -> Account:

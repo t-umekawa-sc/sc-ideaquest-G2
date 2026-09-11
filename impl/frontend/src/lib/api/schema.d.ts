@@ -1552,7 +1552,9 @@ export interface paths {
         head?: never;
         /**
          * Edit Message
-         * @description 自分のメッセージを編集（E.2・本人のみ）。本文/添付/メンションを更新。完了は 409。
+         * @description 自分のメッセージを編集（E.2・本人のみ）。本文/添付/メンション/引用を更新。完了は 409。
+         *
+         *     `quoted_message_ids` は None=不変／提供（空可）=置換（メンションと同流儀・同一 chat_group 内のみ）。
          */
         patch: operations["edit_message_api_v1_chat_messages__message_id__patch"];
         trace?: never;
@@ -2267,6 +2269,8 @@ export interface components {
             files?: string[] | null;
             /** Remove Attachment Ids */
             remove_attachment_ids?: string[] | null;
+            /** Quoted Message Ids */
+            quoted_message_ids?: string[] | null;
         };
         /** Body_post_message_api_v1_chat_messages_post */
         Body_post_message_api_v1_chat_messages_post: {
@@ -2534,6 +2538,8 @@ export interface components {
             vote_anonymized: boolean;
             /** Hide Voters From Managers */
             hide_voters_from_managers: boolean;
+            /** Game Mode Default */
+            game_mode_default: boolean;
             /** Account Count */
             account_count: number;
         };
@@ -2595,6 +2601,8 @@ export interface components {
             hide_voters_from_managers?: boolean | null;
             /** Mfa Required */
             mfa_required?: boolean | null;
+            /** Game Mode Default */
+            game_mode_default?: boolean | null;
         };
         /**
          * DirectoryItem
@@ -3439,6 +3447,21 @@ export interface components {
             skill_point_balance: number;
         };
         /**
+         * MeGameModeDTO
+         * @description ゲームモードの実効配信（レビュー#2・§4.11・K.1）。
+         *
+         *     フロントは `effective` でゲーム層UIを gating し、SC-03 の3選セグメントは `override`（None=会社設定に従う）で
+         *     選択状態を、`company_default` で「会社設定に従う（現在：ON/OFF）」の補足を描く。
+         */
+        MeGameModeDTO: {
+            /** Effective */
+            effective: boolean;
+            /** Override */
+            override: boolean | null;
+            /** Company Default */
+            company_default: boolean;
+        };
+        /**
          * MeProfileDTO
          * @description プロフィール表示（K.1）。display_name は accounts 源泉。画像は署名URL（K.4・未設定は None）。
          */
@@ -3459,12 +3482,13 @@ export interface components {
         };
         /**
          * MeResponse
-         * @description `GET /me`（正準・K.1）＝identity＋プロフィール＋残高。ダッシュボード hero も同読取（I.1 と両立）。
+         * @description `GET /me`（正準・K.1）＝identity＋プロフィール＋残高＋ゲームモード。ダッシュボード hero も同読取（I.1 と両立）。
          */
         MeResponse: {
             account: components["schemas"]["MeAccountDTO"];
             profile: components["schemas"]["MeProfileDTO"];
             balance: components["schemas"]["MeBalanceDTO"];
+            game_mode: components["schemas"]["MeGameModeDTO"];
             /** System Role */
             system_role: string;
         };
@@ -3484,6 +3508,8 @@ export interface components {
             reduce_motion?: boolean | null;
             /** Mascot Follow */
             mascot_follow?: boolean | null;
+            /** Game Mode Override */
+            game_mode_override?: boolean | null;
         };
         /**
          * MemberAddRequest

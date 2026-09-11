@@ -17,6 +17,8 @@ export default async function HomePage() {
   const balance = me
     ? heroBalance(me.balance)
     : { level: 1, xpPct: 0, xpToNext: 100, xpInLevel: 0, levelSpan: 100, xp: 0, coin: 0, sp: 0 };
+  // ゲームモード実効値（レビュー#2・§4.11）＝false でヒーロー/週間ランキング/マスコット追従（ゲーム層）を非表示。
+  const gameEnabled = me?.game_mode.effective ?? true;
   return (
     <>
       <DashboardView
@@ -28,9 +30,12 @@ export default async function HomePage() {
           companyAdmin: session.system_role === "company_account_admin",
           qgAdmin: session.is_qg_admin,
         }}
+        gameEnabled={gameEnabled}
       />
-      {/* #20（暫定）: アバターアイコンのマスコット追従（SC-01 限定・3D VRM 整備までの代替） */}
-      <MascotFollower name={me?.profile.display_name ?? session.user.display_name} imageUrl={me?.profile.avatar_image_url} follow={me?.account.mascot_follow ?? true} />
+      {/* #20（暫定）: アバターアイコンのマスコット追従（SC-01 限定・3D VRM 整備までの代替）。ゲームモード OFF は出さない。 */}
+      {gameEnabled && (
+        <MascotFollower name={me?.profile.display_name ?? session.user.display_name} imageUrl={me?.profile.avatar_image_url} follow={me?.account.mascot_follow ?? true} />
+      )}
     </>
   );
 }

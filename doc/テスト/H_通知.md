@@ -20,6 +20,16 @@
 | H-TC-108 | api | カーソル（新着降順・ページング） | 通知3件 | `GET ?limit=2` → `?cursor=next` | 1ページ目2件（新しい順）・`has_next=true`・2ページ目に残り1件 | H.2／§1.8 |
 | H-TC-109 | api | 種別不正は 422 | — | `GET ?type=bogus` | 422（`field=type`） | H.2 |
 
+### 1d. ゲームモード OFF のゲーム系通知除外（レビュー#2・デザイン標準 §4.11）
+
+> 実効ゲームモード（`GET /me` の `game_mode.effective`＝`accounts.game_mode_override ?? companies.game_mode_default`）が **OFF** の受信者では、ゲーム系通知種別（`achievement`／`magic_reaction`）を **一覧の行・未読数・一括既読・ダッシュボード集約・ベル速報**から除外する（保存は据え置き＝ON で再表示）。切替はログインユーザーの `PATCH /me {game_mode_override:false/null}` で作る。`achievement`（`ref_achievement_id=None` でも描画可）を代表ゲーム種別に使う。対象＝`app/tenant/notifications/application.py`・`repository.py`（`exclude_types`）・`service.py`（速報）・`app/control_plane/game_mode.py`。ダッシュボード（I）の通知は同じ `get_notifications` 経由のため本除外を継承する。
+
+| ID | 種別 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| H-TC-110 | api | 未読数がゲーム系を除外（ベルのバッジ数・§4.11） | mention 1＋achievement 1（既定＝実効 ON） | `PATCH /me{game_mode_override:false}`→`GET /notifications/unread-count`／戻して ON | 既定（ON）＝`unread_count=2`。OFF＝**`unread_count=1`**（achievement を除外）。`null`（会社設定に従う＝会社既定 true）に戻すと再び `2` | H.2／§4.11 |
+| H-TC-111 | api | 一覧の行と未読数がゲーム系を除外（SC-02一覧・ダッシュボード通知一覧・§4.11） | mention 1＋achievement 1 | 実効 OFF で `GET /notifications` | `data` に **mention のみ**（achievement 行が出ない）・`unread_count=1`。ON では両方出る（ダッシュボードの `notifications` も同集約＝同挙動） | H.2／§4.11 |
+| H-TC-112 | api | 一括既読がゲーム系を対象外（§4.11） | mention 1＋achievement 1（未読） | 実効 OFF で `POST /read-all`（type 無し） | `updated=1`（mention のみ既読）・応答 `unread_count=0`（非ゲームの未読は 0＝ゲーム系は数えない）。その後 ON に戻すと `unread-count=1`＝**achievement は未読のまま**（既読化されていない） | H.3／§4.11 |
+
 ## 1e. 画面 e2e（SC-02 通知一覧・H）
 
 > 対象＝フロント接続済み SC-02（`features/notifications/components/NotificationsView.tsx`・`/(app)/notifications`）。e2e は契約の最終確認（画面↔API）。前提＝dev seed ACME-01。一覧/未読数は `GET /notifications` の実データを画面と照合（デモ固定 13 行でないこと）。

@@ -55,11 +55,15 @@ export function DashboardView({
   accountId,
   balance,
   admin,
+  gameEnabled = true,
 }: {
   displayName: string;
   accountId: string;
   balance: Balance;
   admin: { systemAdmin: boolean; companyAdmin: boolean; qgAdmin: boolean };
+  // ゲームモード実効値（レビュー#2・§4.11）。false でヒーロー/週間ランキング（ゲーム層）を非表示。
+  // 業務パネル（下書き/未投票/参加中/フォロー中）は残す。既定 true（現行挙動）。
+  gameEnabled?: boolean;
 }) {
   const snackbar = useSnackbar();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -233,7 +237,8 @@ export function DashboardView({
       <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
-      {/* 上部2カラム：ヒーロー＋週間ランキング */}
+      {/* 上部2カラム：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・業務パネルは残す） */}
+      {gameEnabled && (
       <motion.div className="dash-top" {...flowMotion(1)}>
         <section className="pixel-panel hero" aria-label="あなたのステータス">
           <div className="hero__avatar" data-tier={rank.tier}>
@@ -301,6 +306,7 @@ export function DashboardView({
           <div className="rank-panel__foot"><Link href="/ranking">ランキングをすべて見る →</Link></div>
         </section>
       </motion.div>
+      )}
 
       {/* 下書き（1件も無ければ非表示） */}
       {drafts.length > 0 && (

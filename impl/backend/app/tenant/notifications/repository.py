@@ -70,10 +70,12 @@ def list_for_recipient(
     *,
     state: str = "all",
     types: list[str] | None = None,
+    exclude_types: tuple[str, ...] | None = None,
     before: tuple[datetime, uuid.UUID] | None = None,
     limit: int = 30,
 ) -> tuple[list[Notification], bool]:
-    """新着降順の一覧（§1.8）。`state=unread` は未読のみ・`types` は種別 in 絞り込み。
+    """新着降順の一覧（§1.8）。`state=unread` は未読のみ・`types` は種別 in 絞り込み・
+    `exclude_types` は種別 not-in 除外（ゲームモード OFF でゲーム系通知を隠す・§4.11）。
 
     返り値＝(rows, has_more)。has_more は limit+1 件取得で判定。
     """
@@ -82,6 +84,8 @@ def list_for_recipient(
         stmt = stmt.where(Notification.is_read.is_(False))
     if types:
         stmt = stmt.where(Notification.type.in_(types))
+    if exclude_types:
+        stmt = stmt.where(Notification.type.notin_(exclude_types))
     if before is not None:
         b_created, b_id = before
         stmt = stmt.where(
@@ -94,23 +98,34 @@ def list_for_recipient(
     return rows[:limit], has_more
 
 
-def unread_count(session: Session, recipient_id: uuid.UUID) -> int:
-    return int(
-        session.execute(
-            select(func.count()).select_from(Notification).where(
-                Notification.recipient_id == recipient_id, Notification.is_read.is_(False)
-            )
-        ).scalar_one()
+def unread_count(
+    session: Session, recipient_id: uuid.UUID, *, exclude_types: tuple[str, ...] | None = None
+) -> int:
+    """未読数。`exclude_types`（ゲームモード OFF のゲーム系種別）を not-in で除外できる（§4.11）。"""
+    stmt = select(func.count()).select_from(Notification).where(
+        Notification.recipient_id == recipient_id, Notification.is_read.is_(False)
     )
+    if exclude_types:
+        stmt = stmt.where(Notification.type.notin_(exclude_types))
+    return int(session.execute(stmt).scalar_one())
 
 
-def mark_all_read(session: Session, recipient_id: uuid.UUID, *, types: list[str] | None = None) -> int:
-    """自分宛の未読をすべて既読化（type 絞り込み可）。更新件数を返す。"""
+def mark_all_read(
+    session: Session, recipient_id: uuid.UUID, *,
+    types: list[str] | None = None, exclude_types: tuple[str, ...] | None = None,
+) -> int:
+    """自分宛の未読をすべて既読化（type 絞り込み可・`exclude_types` で除外可）。更新件数を返す。
+
+    ゲームモード OFF では `exclude_types`（ゲーム系）を渡し、ゲーム系通知は既読化の対象外にする（§4.11）
+    ＝ON に戻したとき未読のまま見える。
+    """
     stmt = select(Notification).where(
         Notification.recipient_id == recipient_id, Notification.is_read.is_(False)
     )
     if types:
         stmt = stmt.where(Notification.type.in_(types))
+    if exclude_types:
+        stmt = stmt.where(Notification.type.notin_(exclude_types))
     updated = 0
     for n in session.execute(stmt).scalars().all():
         n.is_read = True

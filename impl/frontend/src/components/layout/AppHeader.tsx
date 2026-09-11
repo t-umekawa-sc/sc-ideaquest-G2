@@ -17,10 +17,13 @@ type Props = {
   user: { display_name: string; avatar_url?: string | null };
   balance?: { level: number; coin: number; sp: number; xpPct?: number };
   unreadCount?: number;
+  // ゲームモード実効値（レビュー#2・§4.11）。false でゲーム層UI（残高チップ Lv/コイン/SP・レベル円環・
+  // ナビのゲーム群）を非表示にする。アバター画像は本人識別のため残す。既定 true（現行挙動）。
+  gameEnabled?: boolean;
   children: React.ReactNode; // .usermenu__list の中身（<li>…</li>）
 };
 
-export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
+export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, children }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -74,14 +77,15 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
     <header className="app-header">
       <div className="container between">
         <div className="header-left">
-          {/* グローバルナビ（☰→ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1） */}
-          <AppNav />
+          {/* グローバルナビ（☰→ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1）。
+              gameEnabled でゲーム群の出し分け（§4.11・レビュー#2）。 */}
+          <AppNav gameEnabled={gameEnabled} />
           <Link href="/" className="brand" aria-label="ideaquest ホーム">
             <Image className="brand-logo" src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={88} height={40} priority />
           </Link>
         </div>
         <div className="header-actions">
-          {balance && (
+          {gameEnabled && balance && (
             <>
               <span className="pixel-stat level">Lv.{balance.level}</span>
               <Link className="pixel-stat coin" href="/shop" title="コイン残高（ショップへ）" data-bump={coinPulse ? "true" : undefined}>
@@ -106,15 +110,20 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
               aria-label={`${user.display_name} のメニュー`}
               onClick={() => setOpen((v) => !v)}
             >
-              {/* #29: レベルリング＝現レベル内 XP 進捗を円環で表示（レベルアップ間近は data-near で脈動）。 */}
-              <span
-                className="lvring"
-                data-near={balance && (balance.xpPct ?? 0) >= 90 ? "true" : undefined}
-                style={{ ["--pct" as string]: `${balance?.xpPct ?? 0}` }}
-                title={balance ? `Lv.${balance.level}・次のレベルまで ${100 - (balance.xpPct ?? 0)}%` : undefined}
-              >
-                <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
-              </span>
+              {/* #29: レベルリング＝現レベル内 XP 進捗を円環で表示（レベルアップ間近は data-near で脈動）。
+                  ゲームモード OFF（§4.11）ではリングを外し、アバター画像のみ（本人識別は残す）。 */}
+              {gameEnabled ? (
+                <span
+                  className="lvring"
+                  data-near={balance && (balance.xpPct ?? 0) >= 90 ? "true" : undefined}
+                  style={{ ["--pct" as string]: `${balance?.xpPct ?? 0}` }}
+                  title={balance ? `Lv.${balance.level}・次のレベルまで ${100 - (balance.xpPct ?? 0)}%` : undefined}
+                >
+                  <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
+                </span>
+              ) : (
+                <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" />
+              )}
             </button>
             <ul
               className="usermenu__list"
@@ -127,7 +136,7 @@ export function AppHeader({ user, balance, unreadCount = 0, children }: Props) {
             >
               {/* 狭幅ではヘッダーのステータス／通知をここに畳む（.usermenu__m は design-system.css の @media で表示切替・
                   広幅は非表示）。バー側のチップ/ベルは狭幅で display:none。 */}
-              {balance && (
+              {gameEnabled && balance && (
                 <li className="usermenu__m usermenu__status" role="none">
                   <span className="pixel-stat level">Lv.{balance.level}</span>
                   <span className="pixel-stat coin" data-bump={coinPulse ? "true" : undefined}>◆ <CountUp value={balance.coin} format={(n) => `${n}`} /></span>

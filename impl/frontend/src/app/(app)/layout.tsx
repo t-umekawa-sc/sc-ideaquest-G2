@@ -27,6 +27,9 @@ export default async function AppLayout({
   // 残高（Lv/コイン/SP）＝GET /me（K.1・接続済み）。通知未読数（H）は未接続のため 0（H 接続で差替）。
   const me = await getServerMe();
   const balance = me ? headerBalance(me.balance) : undefined;
+  // ゲームモード実効値（レビュー#2・§4.11）＝GET /me の game_mode.effective（= override ?? company_default）。
+  // false でゲーム層UI（ナビのゲーム群・ヘッダー残高/円環・ゲーム系通知/演出）を非表示。既定 true（me 取得不可時も）。
+  const gameEnabled = me?.game_mode.effective ?? true;
   const backgroundUrl = me?.profile.background_image_url ?? null;  // K.4・全認証画面に反映（FR-30）
   // ヘッダーのユーザーアイコン/表示名は GET /me を源泉にする（アバター/表示名の変更が router.refresh で即反映。
   // session.user はログイン時スナップショットで陳腐化するため）。me 取得不可時のみ session へフォールバック。
@@ -49,7 +52,7 @@ export default async function AppLayout({
         aria-hidden="true"
         style={backgroundUrl ? { backgroundImage: `url("${backgroundUrl}")` } : undefined}
       />
-      <LiveAppHeader user={headerUser} balance={balance}>
+      <LiveAppHeader user={headerUser} balance={balance} gameEnabled={gameEnabled}>
         {/* メニュー項目は app 層が features から差し込む */}
         <li role="none">
           <Link role="menuitem" href="/profile">プロフィール</Link>

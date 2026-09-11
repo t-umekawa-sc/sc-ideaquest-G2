@@ -61,6 +61,7 @@
 - **未読数**＝`notifications(recipient_id, is_read=false)` の集計（インデックス `(recipient_id, is_read, created_at)`・§5.24）。
 - **ページング**＝カーソル（§1.8・新着降順）。SC-02 の「今日/昨日/それ以前」グルーピングはフロントが `created_at` で行う。
 - **リアルタイム**＝新着・未読数は WS `notifications:{user_id}` で push（§1.12・配信は L）。WS 未接続時やベル初期表示は本 API（`GET /notifications`・`/unread-count`）で取得（§1.12 フォールバック）。
+- **ゲームモード OFF のゲーム系通知除外（レビュー#2・デザイン標準 §4.11）**＝受信者の**実効ゲームモード**（`accounts.game_mode_override ?? companies.game_mode_default`＝K.1 `GET /me` の `game_mode.effective`）が **OFF** のとき、ゲーム系種別（`achievement`／`magic_reaction`）を**一覧の行・未読数・`/unread-count`・一括既読・ベル速報（`notification.created` の `unread_count`）から除外**する（`type` not-in）。**一括既読はゲーム系を対象外**＝未読のまま残し、ON に戻すと未読で見える。**通知の生成・保存自体は据え置き**（フラグ非依存）＝ON に戻すと過去分も表示。ダッシュボード（I）の通知は本 `GET /notifications` を集約するため同挙動。判定の共有ロジック＝`app/control_plane/game_mode.py`。
 
 ## H.3 既読・未読（更新）
 

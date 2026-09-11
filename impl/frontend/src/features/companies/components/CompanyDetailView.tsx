@@ -288,6 +288,19 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           </label>
         </div>
 
+        {/* ゲームモード会社既定（レビュー#2・§4.11）＝会社全体のゲーム層UIの既定 ON/OFF。個人は SC-03 で上書き可。 */}
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">ゲームモード（会社既定）</div>
+            <div className="setting-row__desc">ON=ショップ/きせかえ/魔法・実績・ランキング・演出・ゲーム系通知を表示（既定）／OFF=ゲーム層を隠す。各メンバーはプロフィールで個別に上書きできます。ゲームのロジック（XP/コイン）は据え置きです。</div>
+          </div>
+          <label className="switch">
+            <input type="checkbox" aria-label="ゲームモード（会社既定）" checked={company.game_mode_default} onChange={(e) => toggle("game_mode_default", e.target.checked)} />
+            <span className="switch__track"><span className="switch__thumb" /></span>
+            <span className="switch__state">{company.game_mode_default ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+
         <div className="provision-note">
           <strong>DB接続識別子:</strong> <code>{company.db_identifier}</code>
         </div>

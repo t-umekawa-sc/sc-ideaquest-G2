@@ -21,6 +21,10 @@ class MeUpdateRequest(BaseModel):
     reduce_motion: bool | None = None
     # ダッシュボードのアバター追従アニメ表示 ON/OFF（#20・§4.9 系）。true＝表示。実効=追従ON かつ 非抑制。
     mascot_follow: bool | None = None
+    # ゲームモード個人上書き（レビュー#2・§4.11）。**三値**＝True(ON)/False(OFF)/None(=会社既定に従う)。
+    # None は「未指定（変更しない）」ではなく**明示的な上書きクリア**として受理する（router は exclude_unset で
+    # 送信キーのみ渡す＝キーが有れば None でも set 扱い）。実効値 = 本値 ?? companies.game_mode_default。
+    game_mode_override: bool | None = None
 
 
 class MeAccountDTO(BaseModel):
@@ -64,11 +68,23 @@ class MeBalanceDTO(BaseModel):
     skill_point_balance: int
 
 
+class MeGameModeDTO(BaseModel):
+    """ゲームモードの実効配信（レビュー#2・§4.11・K.1）。
+
+    フロントは `effective` でゲーム層UIを gating し、SC-03 の3選セグメントは `override`（None=会社設定に従う）で
+    選択状態を、`company_default` で「会社設定に従う（現在：ON/OFF）」の補足を描く。
+    """
+    effective: bool  # = override ?? company_default（gating の実効値）
+    override: bool | None  # 個人上書き（三値・None=会社既定継承）
+    company_default: bool  # 会社既定（companies.game_mode_default）
+
+
 class MeResponse(BaseModel):
-    """`GET /me`（正準・K.1）＝identity＋プロフィール＋残高。ダッシュボード hero も同読取（I.1 と両立）。"""
+    """`GET /me`（正準・K.1）＝identity＋プロフィール＋残高＋ゲームモード。ダッシュボード hero も同読取（I.1 と両立）。"""
     account: MeAccountDTO
     profile: MeProfileDTO
     balance: MeBalanceDTO
+    game_mode: MeGameModeDTO
     system_role: str
 
 

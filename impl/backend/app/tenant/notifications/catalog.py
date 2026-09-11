@@ -17,6 +17,10 @@ from app.tenant.ideas.orm import Idea
 from app.tenant.notifications.orm import Notification
 from app.tenant.quests.orm import Quest
 
+# ゲーム層の通知種別（レビュー#2・§4.11）＝実績解除／魔法受領。ゲームモード OFF の受信者では一覧・未読数・
+# 一括既読・ダッシュボード・ベル速報から除外する（保存は据え置き＝ON で再表示）。application/service で共有。
+GAME_NOTIFICATION_TYPES = ("achievement", "magic_reaction")
+
 TIER_LABEL_JA = {"bronze": "ブロンズ", "silver": "シルバー", "gold": "ゴールド"}
 TIER_LABEL_EN = {"bronze": "Bronze", "silver": "Silver", "gold": "Gold"}
 

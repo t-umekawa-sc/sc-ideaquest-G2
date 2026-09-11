@@ -61,6 +61,18 @@ def _mention(recipient, actor="鈴木 花子") -> dict:
     return notify_svc.entry(recipient, "mention", params={"actor_name": actor})
 
 
+def _achievement(recipient) -> dict:
+    """代表ゲーム種別＝achievement（ref_achievement_id=None でも catalog が描画可・§4.11）。"""
+    return notify_svc.entry(recipient, "achievement", refs={"ref_achievement_id": None},
+                            params={"tier": "bronze", "coin": 20})
+
+
+def _set_game(client, value: bool | None) -> None:
+    """自分の game_mode_override を設定（PATCH /me・三値）＝実効ゲームモードを切り替える（§4.11）。"""
+    r = client.patch("/api/v1/me", json={"game_mode_override": value}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+
+
 # ---- 1. 取得・未読数・既読/未読 ----
 
 def test_h_tc_101_empty_list(client, factory):
@@ -224,3 +236,48 @@ def test_h_tc_143_achievement_via_ledger_hook(client, factory):
     assert len(b["data"]) == 1
     n = b["data"][0]
     assert n["type"] == "achievement" and "評価者" in n["body"] and n["meta"]["coin"] == 20
+
+
+# ---- 1d. ゲームモード OFF のゲーム系通知除外（レビュー#2・§4.11・H-TC-110〜112）----
+
+def test_h_tc_110_unread_count_excludes_game_when_off(client, factory):
+    """H-TC-110 ベルの未読数がゲームモード OFF でゲーム系（achievement）を除外。既定 ON では含む。"""
+    uid = _login_new(client, factory)
+    _seed_each([_mention(uid), _achievement(uid)])
+    # 既定（実効 ON・会社既定 true）＝ゲーム系も数える
+    assert client.get(f"{NOTIF}/unread-count").json() == {"unread_count": 2}
+    # 個人 OFF ＝ achievement を除外
+    _set_game(client, False)
+    assert client.get(f"{NOTIF}/unread-count").json() == {"unread_count": 1}
+    # 会社設定に従う（null＝会社既定 true）へ戻すと再び 2
+    _set_game(client, None)
+    assert client.get(f"{NOTIF}/unread-count").json() == {"unread_count": 2}
+
+
+def test_h_tc_111_list_excludes_game_rows_when_off(client, factory):
+    """H-TC-111 一覧の行・未読数がゲームモード OFF でゲーム系を除外（SC-02一覧・ダッシュボード通知一覧が同集約）。"""
+    uid = _login_new(client, factory)
+    _seed_each([_mention(uid), _achievement(uid)])
+    _set_game(client, False)
+    b = client.get(NOTIF).json()
+    assert b["unread_count"] == 1
+    assert [n["type"] for n in b["data"]] == ["mention"]  # achievement 行は出ない
+    # ON（会社既定に従う）に戻すと両方出る
+    _set_game(client, None)
+    b2 = client.get(NOTIF).json()
+    assert b2["unread_count"] == 2
+    assert {n["type"] for n in b2["data"]} == {"mention", "achievement"}
+
+
+def test_h_tc_112_mark_all_excludes_game_when_off(client, factory):
+    """H-TC-112 一括既読がゲームモード OFF でゲーム系を対象外（未読のまま残す・ON で見える）。"""
+    uid = _login_new(client, factory)
+    _seed_each([_mention(uid), _achievement(uid)])
+    _set_game(client, False)
+    r = client.post(f"{NOTIF}/read-all", json={}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    # mention のみ既読化（updated=1）。応答の未読数はゲーム系除外＝非ゲームの未読は 0（achievement は数えない）。
+    assert r.json()["updated"] == 1 and r.json()["unread_count"] == 0
+    # ON（会社設定に従う）に戻すと achievement は未読のまま＝unread-count=1（既読化されていない＝対象外だった証拠）。
+    _set_game(client, None)
+    assert client.get(f"{NOTIF}/unread-count").json() == {"unread_count": 1}

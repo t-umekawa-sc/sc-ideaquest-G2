@@ -167,6 +167,7 @@ class CompanyDetail(BaseModel):
     mfa_required: bool
     vote_anonymized: bool
     hide_voters_from_managers: bool
+    game_mode_default: bool  # ゲームモード会社既定（レビュー#2・§4.11）
     account_count: int
 
 
@@ -205,6 +206,7 @@ class CompanySettingsUpdateRequest(BaseModel):
     vote_anonymized: bool | None = None
     hide_voters_from_managers: bool | None = None
     mfa_required: bool | None = None
+    game_mode_default: bool | None = None  # ゲームモード会社既定（レビュー#2・§4.11）
 
 
 # --- QG管理者 API（B.4・SC-90） ------------------------------------------------------------

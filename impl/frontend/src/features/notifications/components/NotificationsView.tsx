@@ -36,6 +36,9 @@ const CATEGORY: [string, string, string[]][] = [
   ["security", "セキュリティ", ["security_new_device", "security_password_changed"]],
 ];
 const CAT_TYPES: Record<string, string[]> = Object.fromEntries(CATEGORY.map(([k, , v]) => [k, v]));
+// ゲーム層の通知カテゴリ（レビュー#2・§4.11）＝実績解除/魔法受領。ゲームモード OFF では種別セレクトから外す。
+// 一覧の行の除外・未読数・一括既読は backend が実効ゲームモードで担保（§4.11・API H）＝ここは UI（タブ）だけ。
+const GAME_CATS = new Set(["achievement", "magic"]);
 
 // ref から遷移先を解決（種別非依存・ref の有無で判定・SC-02 §4.2）。セキュリティ等 ref 無しは遷移なし。
 function hrefOf(n: NotificationDTO): string | null {
@@ -71,7 +74,7 @@ function timeLabel(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export function NotificationsView() {
+export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolean }) {
   const [rows, setRows] = useState<NotificationDTO[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [fState, setFState] = useState<"" | "unread">("");
@@ -80,6 +83,7 @@ export function NotificationsView() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // 行の除外・未読数はサーバーが実効ゲームモードで担保（§4.11）＝ここは state/カテゴリ絞り込みのみ渡す。
     const r = await getNotifications({
       state: fState || undefined,
       type: fCat ? CAT_TYPES[fCat] : undefined,
@@ -202,7 +206,8 @@ export function NotificationsView() {
             種別
             <select className="select" value={fCat} onChange={(e) => setFCat(e.target.value)}>
               <option value="">すべて</option>
-              {CATEGORY.map(([k, label]) => (
+              {/* ゲームモード OFF（§4.11）＝ゲーム層カテゴリ（実績/魔法）は選択肢から外す。 */}
+              {CATEGORY.filter(([k]) => gameEnabled || !GAME_CATS.has(k)).map(([k, label]) => (
                 <option key={k} value={k}>{label}</option>
               ))}
             </select>

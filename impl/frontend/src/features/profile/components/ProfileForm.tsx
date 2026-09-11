@@ -35,6 +35,9 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [locale, setLocale] = useState<"ja" | "en">("ja");
   const [animOff, setAnimOff] = useState(false); // アニメ演出を抑制（accounts.reduce_motion・§4.9）
   const [mascotFollow, setMascotFollow] = useState(true); // アバター追従アニメ表示（accounts.mascot_follow・#20・既定 true）
+  // ゲームモード個人上書き（accounts.game_mode_override・§4.11・レビュー#2）。三値＝null(会社設定に従う)/true/false。
+  const [gameOverride, setGameOverride] = useState<boolean | null>(null);
+  const [gameCompanyDefault, setGameCompanyDefault] = useState(true); // 会社既定（補足表示用）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameErr, setNameErr] = useState<string | null>(null); // §4b 表示名のインラインエラー（赤枠＋メッセージ）
@@ -59,6 +62,8 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setLocale(me.account.locale === "en" ? "en" : "ja");
           setAnimOff(!!me.account.reduce_motion);
           setMascotFollow(me.account.mascot_follow ?? true);
+          setGameOverride(me.game_mode.override ?? null);
+          setGameCompanyDefault(me.game_mode.company_default);
           setAvatarUrl(me.profile.avatar_image_url ?? null);
           setIdeaIconUrl(me.profile.idea_icon_image_url ?? null);
         }
@@ -82,10 +87,16 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
     try {
       // mascot_follow は「動きを減らす」ON でも**保存値としては保持**（抑制解除で元の設定に戻る）。実効表示は
       // MascotFollower 側で「follow かつ 非抑制」で判定するため、ここでは disabled 表示に関わらず本人の設定値を送る。
-      const updated = await updateMe({ display_name: displayName, locale, reduce_motion: animOff, mascot_follow: mascotFollow });
+      // game_mode_override は三値（null＝会社設定に従う）を明示送信＝backend が上書きクリアとして受理（§4.11）。
+      const updated = await updateMe({
+        display_name: displayName, locale, reduce_motion: animOff, mascot_follow: mascotFollow,
+        game_mode_override: gameOverride,
+      });
       if (updated) {
         setProfile(updated);
         setDisplayName(updated.profile.display_name);
+        setGameOverride(updated.game_mode.override ?? null);
+        setGameCompanyDefault(updated.game_mode.company_default);
       }
       snack({ type: "success", title: "プロフィールを更新しました" }); // 他の更新系と同じ通知
       router.refresh(); // 共通ヘッダーの表示名を更新（次のセッション読取で反映）
@@ -297,6 +308,32 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
               ダッシュボードでアバターがカードに追従します。かなり目立つ演出です。
               {animOff && "「動きを減らす」が ON のため、自動的にオフになっています。"}
             </p>
+          </Field>
+          {/* ゲームモード（accounts.game_mode_override・§4.11・レビュー#2）。3選セグメント＝会社設定に従う/ON/OFF。
+              null＝会社設定に従う（会社既定を継承）／true＝ON／false＝OFF。実効値の補足を下に出す。 */}
+          <Field id="p_gamemode" label="ゲームモード">
+            <div className="segmented" role="radiogroup" aria-label="ゲームモード">
+              <label>
+                <input type="radio" name="game-mode" checked={gameOverride === null}
+                       onChange={() => setGameOverride(null)} />会社設定に従う
+              </label>
+              <label>
+                <input type="radio" name="game-mode" checked={gameOverride === true}
+                       onChange={() => setGameOverride(true)} />ON
+              </label>
+              <label>
+                <input type="radio" name="game-mode" checked={gameOverride === false}
+                       onChange={() => setGameOverride(false)} />OFF
+              </label>
+            </div>
+            <p className="segmented-note">
+              {gameOverride === null
+                ? `会社設定に従う（現在：${gameCompanyDefault ? "ON" : "OFF"}）`
+                : gameOverride
+                  ? "ゲーム層（ショップ・きせかえ・魔法・実績・ランキング・演出）を表示します。"
+                  : "ゲーム層を非表示にします（アバター画像は本人識別のため残ります）。"}
+            </p>
+            <p className="hint">OFF にするとゲーム要素（ショップ/きせかえ/魔法・実績・ランキング・演出・ゲーム系通知）が隠れます。獲得したXP/コインは保持され、ON に戻すと再び表示されます。</p>
           </Field>
           <Button type="submit" variant="primary" disabled={saving}>
             {saving ? "保存中…" : "保存する"}

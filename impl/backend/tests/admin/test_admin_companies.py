@@ -106,6 +106,30 @@ def test_b_tc_054_settings_integrity_and_profile(client, companies):
     assert r2.status_code == 200 and r2.json()["color"] == "#112233"
 
 
+def test_b_tc_176_settings_game_mode_default(client, companies):
+    """B-TC-176 ゲームモード会社既定 game_mode_default の更新＋永続（レビュー#2・§4.11）。根拠 B.1／§4.11。
+
+    未上書きユーザー（accounts.game_mode_override=None）の実効値が会社既定に追従することは K-TC-024
+    （GET /me の effective = override ?? company_default）が同機構を担保する。本 TC は会社設定側の契約
+    （PATCH /settings が game_mode_default を受理・保存し、GET 詳細へ反映・切替可）を確認する。
+    """
+    _login_system_admin(client)
+    created = client.post(COMPANIES, json=_new_company_body(), headers=_csrf(client)).json()
+    cid = created["company_id"]
+    companies.append(uuid.UUID(cid))
+
+    # 既定は true（ゲーム層あり＝現行挙動）
+    assert client.get(f"{COMPANIES}/{cid}").json()["game_mode_default"] is True
+    # false（会社全体でゲーム層 OFF）へ更新＝200＋応答/詳細に反映
+    r = client.patch(f"{COMPANIES}/{cid}/settings", json={"game_mode_default": False}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["game_mode_default"] is False
+    assert client.get(f"{COMPANIES}/{cid}").json()["game_mode_default"] is False  # 永続
+    # true に戻せる（他フラグと独立）
+    assert client.patch(f"{COMPANIES}/{cid}/settings", json={"game_mode_default": True},
+                        headers=_csrf(client)).json()["game_mode_default"] is True
+
+
 def test_b_tc_055_non_admin_forbidden(client, factory):
     """B-TC-055 会社管理 API は system_admin 専用＝general は 403。根拠 B.1。"""
     acc = factory.make_seed_company_account()

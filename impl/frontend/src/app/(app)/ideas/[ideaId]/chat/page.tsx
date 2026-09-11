@@ -4,11 +4,15 @@
 import { redirect } from "next/navigation";
 
 import { IdeaChatView } from "@/features/chat";
+import { getServerMe } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function IdeaChatPage({ params }: { params: Promise<{ ideaId: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { ideaId } = await params;
-  return <IdeaChatView ideaId={ideaId} />;
+  // ゲームモード実効値（レビュー#2・§4.11）＝false で魔法キャストUIを無効化（本文は残す）。
+  const me = await getServerMe();
+  const gameEnabled = me?.game_mode.effective ?? true;
+  return <IdeaChatView ideaId={ideaId} gameEnabled={gameEnabled} />;
 }

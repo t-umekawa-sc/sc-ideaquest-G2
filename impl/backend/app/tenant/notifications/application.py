@@ -9,6 +9,7 @@ import base64
 import uuid
 
 from app.control_plane.auth.orm import Company
+from app.control_plane.game_mode import resolve_effective_game_mode
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
@@ -19,6 +20,13 @@ from app.tenant.profile import repository as profile_repo
 from app.tenant.notifications.service import TYPE_PRIORITY
 
 _VALID_TYPES = set(TYPE_PRIORITY.keys())
+
+def _excluded_types(account_id, company_id) -> tuple[str, ...] | None:
+    """受信者の実効ゲームモードが OFF ならゲーム系種別（除外対象）、ON なら None（除外しない・§4.11）。
+
+    ゲーム層の通知種別＝`catalog.GAME_NOTIFICATION_TYPES`（実績/魔法・service とも共有）。
+    """
+    return None if resolve_effective_game_mode(account_id, company_id) else catalog.GAME_NOTIFICATION_TYPES
 
 
 def _resolve_company(company_id: uuid.UUID) -> Company | None:
@@ -84,26 +92,28 @@ def get_notifications(account_id, company_id, *, state="all", type_param=None, l
     limit = max(1, min(int(limit), 100))
     before = _decode_cursor(cursor) if cursor else None
     company = _company_and_user(account_id, company_id)
+    excl = _excluded_types(account_id, company_id)  # ゲームモード OFF＝ゲーム系を一覧/未読数から除外（§4.11）
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        rows, has_more = repo.list_for_recipient(ts, user.id, state=state, types=types, before=before, limit=limit)
+        rows, has_more = repo.list_for_recipient(ts, user.id, state=state, types=types, exclude_types=excl, before=before, limit=limit)
         repo.prime_refs(ts, rows)  # ページ分の ref を一括ロード（catalog.render の per-row get を N+1 回避）
         data = [_dto(ts, n, user.locale) for n in rows]  # 受信者＝本人の locale で描画（§2.1）
-        unread = repo.unread_count(ts, user.id)
+        unread = repo.unread_count(ts, user.id, exclude_types=excl)
         next_cursor = _encode_cursor(rows[-1]) if (has_more and rows) else None
         return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_more}, "unread_count": unread}
 
 
 def get_unread_count(account_id, company_id) -> dict:
-    """未読数のみ（ヘッダーベル・軽量・H.2）。"""
+    """未読数のみ（ヘッダーベル・軽量・H.2）。ゲームモード OFF はゲーム系を除外（§4.11）。"""
     company = _company_and_user(account_id, company_id)
+    excl = _excluded_types(account_id, company_id)
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        return {"unread_count": repo.unread_count(ts, user.id)}
+        return {"unread_count": repo.unread_count(ts, user.id, exclude_types=excl)}
 
 
 def _set_read(account_id, company_id, notif_id, is_read: bool) -> dict:
@@ -112,6 +122,7 @@ def _set_read(account_id, company_id, notif_id, is_read: bool) -> dict:
     except (ValueError, AttributeError):
         raise AppError(404, "not_found")
     company = _company_and_user(account_id, company_id)
+    excl = _excluded_types(account_id, company_id)  # ベル数はゲームモード OFF でゲーム系を除外（§4.11）
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
@@ -120,7 +131,7 @@ def _set_read(account_id, company_id, notif_id, is_read: bool) -> dict:
         if n is None:
             raise AppError(404, "not_found")  # 他人宛は存在秘匿（IDOR・H.4）
         n.is_read = is_read  # 冪等（既に同状態でも no-op で 200）
-        unread = repo.unread_count(ts, user.id)
+        unread = repo.unread_count(ts, user.id, exclude_types=excl)
         service.publish_unread_count(ts, user.id, unread)  # ベル同期（post-commit・L.3）
         ts.commit()
         return {"id": str(n.id), "is_read": is_read, "unread_count": unread}
@@ -135,15 +146,18 @@ def mark_unread(account_id, company_id, notif_id) -> dict:
 
 
 def mark_all_read(account_id, company_id, *, type_param=None) -> dict:
-    """すべて既読化（type 絞り込み可・H.3）。"""
+    """すべて既読化（type 絞り込み可・H.3）。ゲームモード OFF ではゲーム系を対象外にする（§4.11）
+    ＝ゲーム系通知は未読のまま残り、ON に戻すと未読で見える。未読数もゲーム系を除外して返す。
+    """
     types = _parse_types(type_param)
     company = _company_and_user(account_id, company_id)
+    excl = _excluded_types(account_id, company_id)
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        updated = repo.mark_all_read(ts, user.id, types=types)
-        unread = repo.unread_count(ts, user.id)
+        updated = repo.mark_all_read(ts, user.id, types=types, exclude_types=excl)
+        unread = repo.unread_count(ts, user.id, exclude_types=excl)
         service.publish_unread_count(ts, user.id, unread)  # ベル同期（post-commit・L.3）
         ts.commit()
         return {"updated": updated, "unread_count": unread}

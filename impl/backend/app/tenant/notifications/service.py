@@ -18,6 +18,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.control_plane.auth.orm import Company
+from app.control_plane.game_mode import resolve_effective_game_mode
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.notifications import catalog, repository as repo
@@ -136,10 +137,18 @@ def _created_data(session: Session, n: Notification, unread_count: int, locale: 
 
 
 def _queue_created(session: Session, created: list[Notification]) -> None:
+    company_id = _company_id_of(session)  # 会社DB→company_id（実効ゲームモードの解決に使う・§4.11）
     for n in created:
-        unread = repo.unread_count(session, n.recipient_id)  # INSERT 後（同一 Tx・未 commit）
-        recipient = session.get(User, n.recipient_id)  # 受信者 locale で速報を描画（§2.1・§4.6 ミラー）
+        recipient = session.get(User, n.recipient_id)  # 受信者 locale/account_id（§2.1・§4.6 ミラー）
         locale = recipient.locale if recipient else None
+        # ベル速報の未読数は受信者のゲームモード OFF ならゲーム系（実績/魔法）を除外（§4.11）＝
+        # ゲーム OFF の人にゲーム通知でベルが増えない（REST の unread-count と整合）。
+        excl = None
+        if recipient is not None and company_id is not None and not resolve_effective_game_mode(
+            recipient.account_id, uuid.UUID(company_id)
+        ):
+            excl = catalog.GAME_NOTIFICATION_TYPES
+        unread = repo.unread_count(session, n.recipient_id, exclude_types=excl)  # INSERT 後（同一 Tx・未 commit）
         _queue(session, notifications_topic(n.recipient_id), "notification.created",
                _created_data(session, n, unread, locale))
 

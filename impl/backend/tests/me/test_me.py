@@ -121,6 +121,41 @@ def test_k_tc_022_patch_me_mascot_follow(client, factory):
     assert client.patch(ME, json={"mascot_follow": True}, headers=_csrf(client)).json()["account"]["mascot_follow"] is True
 
 
+def test_k_tc_024_get_me_game_mode_effective(client, factory):
+    """K-TC-024 ゲームモード実効値の配信＝GET /me の game_mode（レビュー#2・§4.11）。
+
+    個人上書き未設定（override=None）・会社既定 true のとき、effective=true（override ?? company_default）。
+    """
+    _login_seed(client, factory)
+    gm = client.get(ME).json()["game_mode"]
+    assert set(gm.keys()) == {"effective", "override", "company_default"}
+    assert gm["override"] is None          # 個人上書き未設定（既定）
+    assert gm["company_default"] is True   # 会社既定（seed）
+    assert gm["effective"] is True         # override ?? company_default ＝ 会社既定を継承
+
+
+def test_k_tc_025_patch_me_game_mode_override_tristate(client, factory):
+    """K-TC-025 ゲームモード個人上書き game_mode_override の三値編集＋実効再計算（account-only）。
+
+    False（個人OFF・優先）→ True（個人ON）→ None（上書きクリア＝会社既定へ復帰）。会社既定は true。
+    """
+    acc = _login_seed(client, factory)
+    # False＝個人OFF（会社既定 true でも個人が優先）
+    r = client.patch(ME, json={"game_mode_override": False}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    gm = r.json()["game_mode"]
+    assert gm["override"] is False and gm["company_default"] is True and gm["effective"] is False
+    assert _account(acc["id"]).game_mode_override is False  # accounts 更新（account-only＝users へミラーしない）
+    assert client.get(ME).json()["game_mode"]["effective"] is False  # GET でも配信
+    # True＝個人ON
+    gm = client.patch(ME, json={"game_mode_override": True}, headers=_csrf(client)).json()["game_mode"]
+    assert gm["override"] is True and gm["effective"] is True
+    # None＝上書きクリア（明示 null）＝会社既定へ復帰（override=None・effective=会社既定 true）
+    gm = client.patch(ME, json={"game_mode_override": None}, headers=_csrf(client)).json()["game_mode"]
+    assert gm["override"] is None and gm["effective"] is True
+    assert _account(acc["id"]).game_mode_override is None
+
+
 def test_k_tc_002_allowlist_and_locale_validation(client, factory):
     """K-TC-002 allowlist 外は 422（Mass Assignment 防止）・locale は ja|en enum。"""
     _login_seed(client, factory)
@@ -145,8 +180,8 @@ def test_k_tc_004_get_me(client, factory):
     r = client.get(ME)
     assert r.status_code == 200, r.text
     body = r.json()
-    # K.1 正準形＝account/profile/balance/system_role のネスト
-    assert set(body.keys()) == {"account", "profile", "balance", "system_role"}
+    # K.1 正準形＝account/profile/balance/game_mode/system_role のネスト
+    assert set(body.keys()) == {"account", "profile", "balance", "game_mode", "system_role"}
     assert body["account"]["login_id"] == acc["login_id"]
     assert set(body["account"].keys()) == {"login_id", "email", "locale", "reduce_motion", "mascot_follow"}
     assert set(body["profile"].keys()) == {"display_name", "avatar_image_url", "idea_icon_image_url", "background_image_url", "avatar_base"}
