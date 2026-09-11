@@ -159,6 +159,7 @@ class IdeaCardDTO(BaseModel):
 
     id: str
     title: str
+    value: str  # 提案価値（一覧で中身を判断＝クイック投票の材料・SC-12・レビュー#3）
     status: str
     author: IdeaAuthorDTO
     icon_image_url: str | None = None  # アイデアアイコン（作成者の既定・Phase 2／未設定は件名先頭1文字タイル）

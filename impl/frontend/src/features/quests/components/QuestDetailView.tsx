@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
-import type { DataTableColumn } from "@/components/ui";
+import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
@@ -27,30 +27,32 @@ import {
   transitionQuest,
   type QuestDetail,
 } from "../api";
-import { IDEAS_CHANGED_EVENT, listIdeas, type IdeaCard } from "@/features/ideas/api";
+import { IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import "../quests.css";
 
 // アイデアタブの行ビュー型（SC-12・D.1）。列/カードの描画に必要な最小射影。
 type Idea = {
-  id: string; title: string; poster: string; posterAvatar: string | null; initial: string; iconUrl: string | null; agree: number; disagree: number;
+  id: string; title: string; value: string; poster: string; posterAvatar: string | null; initial: string; iconUrl: string | null; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
+  following: boolean; revision: number; myVote: "approve" | "oppose" | null;
 };
 // IdeaCardDTO（D.1）→ 行ビュー。評価（F）＝`evaluation` 集計（評価済 overall_avg=n/5・可視0は null）。あなた
 // バッジは status＋my_vote から導出（下書き＝draft／自分の投票あり＝voted／なし＝unvoted）。created＝更新からの経過日数。
+// value＝提案価値（一覧で中身を判断＝クイック投票の材料・レビュー#3）。following/revision＝フォロー/更新バッジ。
 function toIdeaView(c: IdeaCard): Idea {
   const isDraft = c.status === "draft";
   const days = Math.max(0, Math.floor((Date.now() - new Date(c.updated_at).getTime()) / 86400000));
-  const mystate: Idea["mystate"] = isDraft ? "draft" : c.my_vote ? "voted" : "unvoted";
+  const myVote = (c.my_vote === "approve" || c.my_vote === "oppose") ? c.my_vote : null;
+  const mystate: Idea["mystate"] = isDraft ? "draft" : myVote ? "voted" : "unvoted";
   const name = c.author.display_name || "?";
   return {
-    id: c.id, title: c.title, poster: name, posterAvatar: c.author.avatar_image_url ?? null, initial: name.slice(0, 1), iconUrl: c.icon_image_url ?? null,
+    id: c.id, title: c.title, value: c.value, poster: name, posterAvatar: c.author.avatar_image_url ?? null, initial: name.slice(0, 1), iconUrl: c.icon_image_url ?? null,
     agree: c.vote_summary.approve, disagree: c.vote_summary.oppose, comments: c.comment_count,
     ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
-    mystate, created: days, draft: isDraft,
+    mystate, created: days, draft: isDraft, following: c.following, revision: c.current_revision, myVote,
   };
 }
 const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
-const daysText = (r: Idea) => (r.created <= 0 ? "今日" : `${r.created}日前`);
 const dash = <span className="muted">—</span>;
 
 // quest_status（enum・§3）→ ラベル/バッジ。
@@ -69,7 +71,7 @@ const TABS = [
   { key: "ideas", label: "💡 アイデア" },
   { key: "party", label: "👥 パーティー" },
   { key: "search", label: "🔍 全文検索" },
-  { key: "about", label: "📋 概要" },
+  // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -90,7 +92,7 @@ function deadlineText(d: string | null | undefined): string {
 // クエスト詳細のスクロール位置保存キー（アイデア詳細へドリルイン→戻る での復元用・sessionStorage）。
 const QSCROLL_KEY = "iq_quest_detail_scroll:";
 
-export function QuestDetailView({ questId }: { questId: string }) {
+export function QuestDetailView({ questId, gameEnabled = true }: { questId: string; gameEnabled?: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
@@ -121,6 +123,8 @@ export function QuestDetailView({ questId }: { questId: string }) {
   const [busy, setBusy] = useState(false);
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
   const [ideasError, setIdeasError] = useState<string | null>(null);
+  // レビュー#3＝一覧上部のステータス絞り込み（動線＝すべて/未投票/フォロー中/自分の下書き）。DataTable の前段で data を絞る。
+  const [ideaFilter, setIdeaFilter] = useState<"all" | "unvoted" | "following" | "draft">("all");
   // アイデア詳細から戻った時のスクロール位置復元。Next の自動復元は本画面が戻り時に再取得＝高さ0で
   // クランプされ効かないため、行クリック時に保存した scrollY を「一覧描画で高さが出てから」rAF で復元する。
   const scrollRestored = useRef(false);
@@ -217,6 +221,40 @@ export function QuestDetailView({ questId }: { questId: string }) {
     return () => window.removeEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
   }, [loadIdeas]);
 
+  // レビュー#3＝一覧からのクイック投票（楽観・その場で投票状態を更新／失敗は再取得）。
+  const quickVote = async (id: string, type: IdeaVoteType) => {
+    setIdeas((xs) => xs && xs.map((i) => {
+      if (i.id !== id) return i;
+      let { agree, disagree } = i;
+      if (i.myVote === "approve") agree -= 1; else if (i.myVote === "oppose") disagree -= 1;
+      if (type === "approve") agree += 1; else disagree += 1;
+      return { ...i, myVote: type, mystate: "voted", agree, disagree };
+    }));
+    const res = await voteIdea(id, type).catch(() => null);
+    if (!res) { snack({ type: "error", title: "投票に失敗しました", msg: "時間をおいて再度お試しください。" }); void loadIdeas(); }
+  };
+  // レビュー#3＝一覧からのフォロー切替（楽観・失敗はロールバック）。
+  const toggleFollow = async (id: string, cur: boolean) => {
+    setIdeas((xs) => xs && xs.map((i) => (i.id === id ? { ...i, following: !cur } : i)));
+    const res = await (cur ? unfollowIdea(id) : followIdea(id)).catch(() => "err" as const);
+    if (res === "err") {
+      setIdeas((xs) => xs && xs.map((i) => (i.id === id ? { ...i, following: cur } : i)));
+      snack({ type: "error", title: "フォローを更新できませんでした" });
+    }
+  };
+  // ステータス絞り込みを適用した表示リスト（DataTable にはこれを data として渡す）。
+  const ideaCounts = {
+    all: ideas?.length ?? 0,
+    unvoted: (ideas ?? []).filter((i) => i.mystate === "unvoted").length,
+    following: (ideas ?? []).filter((i) => i.following).length,
+    draft: (ideas ?? []).filter((i) => i.draft).length,
+  };
+  const visibleIdeas = (ideas ?? []).filter((i) =>
+    ideaFilter === "all" ? true
+      : ideaFilter === "unvoted" ? i.mystate === "unvoted"
+        : ideaFilter === "following" ? i.following
+          : i.draft);
+
   const canEdit = !!quest && (quest.my_permissions.includes("owner") || quest.my_permissions.includes("quest_admin"));
   const nextStatus = quest ? STATUS_ORDER[STATUS_ORDER.indexOf(quest.status) + 1] : undefined;
 
@@ -260,20 +298,6 @@ export function QuestDetailView({ questId }: { questId: string }) {
     }
   }
 
-  const ideaColumns: DataTableColumn<Idea>[] = [
-    { key: "title", label: "件名", locked: true, width: 260, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => r.title, csvVal: (r) => r.title,
-      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title">{r.title}</span>{r.draft && <> <span className="badge badge-muted">下書き</span></>}</span> },
-    { key: "poster", label: "投稿者", width: 150, sortable: true, filter: { type: "text" }, sortVal: (r) => r.poster, searchVal: (r) => r.poster, csvVal: (r) => r.poster,
-      render: (r) => <span className="poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" />{r.poster}</span> },
-    { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),
-      render: (r) => r.draft ? dash : <><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></> },
-    { key: "comments", label: "💬", width: 72, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)), render: (r) => r.draft ? dash : String(r.comments) },
-    { key: "eval", label: "評価", width: 120, sortable: true, filter: { type: "enum", options: [["pending", "評価待ち"], ["done", "評価済"]] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate,
-      csvVal: (r) => (r.draft ? "" : r.evalstate === "done" ? (r.ev >= 0 ? `${r.ev}/5` : "評価済") : "評価待ち"),
-      render: (r) => r.draft ? dash : (r.evalstate === "done"
-        ? (r.ev >= 0 ? <span className={`badge ${r.ev >= 4 ? "badge-success" : "badge-muted"}`}>{r.ev}/5 評価</span> : <span className="badge badge-muted">評価済</span>)
-        : <span className="badge">評価待ち</span>) },
-  ];
 
   // クエスト内 週間ランキング（G・scope=quest:{id}・this_week・me 同梱）。
   useEffect(() => {
@@ -285,6 +309,46 @@ export function QuestDetailView({ questId }: { questId: string }) {
 
   // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティー所属）。
   const loadQuestFeed = useCallback((cursor?: string | null) => getQuestActivities(questId, cursor), [questId]);
+
+  // アイデア一覧の列（標準 DataTable にレビュー#3 の機能を追加）＝提案価値（中身の判断）・あなた/フォロー/評価の
+  // enum フィルタ（動線集約）・操作列（未投票=クイック投票／下書き=続き／投票済=チャット）。行/カードのボタンは
+  // DataTable が行クリックから除外（a,button,input,select,label）＝遷移と両立。
+  const ideaColumns: DataTableColumn<Idea>[] = [
+    { key: "title", label: "件名", locked: true, width: 220, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.value}`, csvVal: (r) => r.title,
+      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title">{r.title}</span>{r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}{r.draft && <span className="badge badge-muted">下書き</span>}</span> },
+    { key: "value", label: "提案価値", width: 320, searchVal: (r) => r.value, csvVal: (r) => r.value,
+      render: (r) => <span className="idea-value-cell" title={r.value}>{r.value}</span> },
+    { key: "you", label: "あなた", width: 100, sortable: true, sortVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
+      render: (r) => <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span> },
+    { key: "follow", label: "フォロー", width: 96, sortable: true, sortVal: (r) => (r.following ? 1 : 0), csvVal: (r) => (r.following ? "フォロー中" : ""),
+      render: (r) => r.draft ? dash : <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button> },
+    { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),
+      render: (r) => r.draft ? dash : <><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></> },
+    { key: "comments", label: "💬", width: 64, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)), render: (r) => r.draft ? dash : String(r.comments) },
+    { key: "eval", label: "評価", width: 110, sortable: true, filter: { type: "enum", options: [["pending", "評価待ち"], ["done", "評価済"]] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate,
+      csvVal: (r) => (r.draft ? "" : r.evalstate === "done" ? (r.ev >= 0 ? `${r.ev}/5` : "評価済") : "評価待ち"),
+      render: (r) => r.draft ? dash : (r.evalstate === "done"
+        ? (r.ev >= 0 ? <span className={`badge ${r.ev >= 4 ? "badge-success" : "badge-muted"}`}>{r.ev}/5</span> : <span className="badge badge-muted">評価済</span>)
+        : <span className="badge">評価待ち</span>) },
+    { key: "act", label: "操作", actions: true, width: 64, csvVal: () => "",
+      render: (r) => {
+        // リストの操作メニュー（⋯）。未投票は「賛成/反対」を選べる（レビュー#3）。下書きは続き、他はチャット/詳細。
+        const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
+        const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
+        const items: RowMenuItem[] = r.draft
+          ? [{ label: "下書きを続ける", onClick: goIdea }]
+          : [
+              ...(r.mystate === "unvoted"
+                ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
+                   { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
+                : []),
+              { label: "💬 チャットを開く", onClick: goChat },
+              { label: "詳細を開く", onClick: goIdea },
+            ];
+        return <RowMenu items={items} />;
+      } },
+  ];
+
   // クエリ/対象の変更でページを先頭へ戻す。
   useEffect(() => { setFtPage(1); }, [ftq, ftScope]);
   // 全文検索（J）＝デバウンス取得。空クエリ/検索タブ以外は何もしない。真実は REST。
@@ -372,7 +436,10 @@ export function QuestDetailView({ questId }: { questId: string }) {
           </div>
         </section>
 
-        {/* クエスト KPI（概要の隣＝一目でクエストの状態。1行目＝概要｜KPI） */}
+        {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}
+        {gameEnabled && (
+        <div className="quest-panels">
+        {/* クエスト KPI＝一目でクエストの状態 */}
         <section className="pixel-panel quest-kpi" aria-label="クエスト KPI">
           <h3>★ クエスト KPI ★</h3>
           <div className="quest-kpi__grid">
@@ -412,8 +479,11 @@ export function QuestDetailView({ questId }: { questId: string }) {
             {ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
           </ol>
         </section>
+        </div>
+        )}{/* .quest-panels */}
 
-        {/* クエスト内アクティビティ（SC-12 §4.1c・FR-36・実接続＝GET /quests/{id}/activities・公開種別のみ） */}
+        {/* クエスト内アクティビティ（全幅・レビュー#3）。現状は FR-36 の成果系フィード（ゲーム由来）。
+            ※ビジネス層の活動（更新/チャット/評価/引用・リアクション＋リンク）への刷新は次イテレーション。 */}
         <section className="pixel-panel" aria-label="クエスト内アクティビティ">
           <ActivityFeed title="クエスト内アクティビティ" load={loadQuestFeed} emptyText="このクエストの活動はまだありません。" />
         </section>
@@ -434,8 +504,17 @@ export function QuestDetailView({ questId }: { questId: string }) {
       {/* アイデア一覧（D.1 実接続・公開＋自分の下書き＝サーバー強制の可視性） */}
       {tab === "ideas" && (
         <section aria-label="アイデア一覧">
-          {/* アイデア追加＝SC-21（D.2・投稿成功で IDEAS_CHANGED→一覧再取得）。一覧の上に配置。 */}
+          {/* アイデア追加＝SC-21（D.2・投稿成功で IDEAS_CHANGED→一覧再取得）。一覧の上に配置。
+              ＋ステータス絞り込み（レビュー#3・すべて/未投票/フォロー中/自分の下書き）を標準一覧の前段に。 */}
           <div className="ideas-tab-toolbar">
+            <div className="segmented idea-filter" role="radiogroup" aria-label="アイデアの絞り込み">
+              {([["all", "すべて"], ["unvoted", "未投票"], ["following", "フォロー中"], ["draft", "自分の下書き"]] as const).map(([k, label]) => (
+                <label key={k}>
+                  <input type="radio" name="idea-filter" checked={ideaFilter === k} onChange={() => setIdeaFilter(k)} />
+                  {label} <span className="idea-filter__n">{ideaCounts[k]}</span>
+                </label>
+              ))}
+            </div>
             <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
           </div>
           {ideasError ? (
@@ -444,13 +523,13 @@ export function QuestDetailView({ questId }: { questId: string }) {
             <p className="admin-muted">読み込み中…</p>
           ) : (
             <DataTable<Idea>
-              storageKey="sc12-ideas"
-              data={ideas}
+              storageKey="sc12-ideas-v2"
+              data={visibleIdeas}
               columns={ideaColumns}
               rowId={(r) => r.id}
               unit="件"
               perPage={20}
-              searchFields="件名・投稿者"
+              searchFields="件名・提案価値"
               exportName="アイデア一覧"
               emptyText="まだアイデアがありません。「＋ アイデアを追加」から投稿できます。"
               onRowClick={(r) => {
@@ -458,12 +537,36 @@ export function QuestDetailView({ questId }: { questId: string }) {
                 try { sessionStorage.setItem(QSCROLL_KEY + questId, String(window.scrollY)); } catch { /* 無視 */ }
                 router.push(`/ideas/${r.id}`);
               }}
-              cardLayout={(r) => ({
-                title: r.title,
-                badges: [{ label: YOU[r.mystate][0], cls: YOU[r.mystate][1] }],
-                meta: [r.poster, daysText(r)],
-                stats: [`賛成 ${r.agree} / 反対 ${r.disagree}`, `💬 ${r.comments}`],
-              })}
+              cardRaw={(r) => (
+                // カード表示＝ダッシュボードの「未投票のアイデア」カード（vote-card）と共通の見た目（レビュー#3）。
+                // 未投票＝クイック投票▲/▼／投票済＝結果表示／下書き＝続き。中身（提案価値）を見て判断できる。
+                <article className={"card card-accent vote-card" + (r.mystate === "voted" ? " is-voted" : "")}>
+                  <div className="between">
+                    <span className="idea-title-row">
+                      <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
+                      <Link className="card-title" href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+                      {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
+                      <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
+                      {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
+                    </span>
+                  </div>
+                  {r.value && <div className="vote-card__value">{r.value}</div>}
+                  <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
+                  {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
+                  {r.draft ? (
+                    <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
+                  ) : r.mystate === "unvoted" ? (
+                    <div className="vote-actions">
+                      <button type="button" className="vote-quick agree" onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
+                      <button type="button" className="vote-quick disagree" onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                    </div>
+                  ) : (
+                    <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
+                  )}
+                </article>
+              )}
             />
           )}
         </section>
@@ -543,22 +646,6 @@ export function QuestDetailView({ questId }: { questId: string }) {
       )}
 
       {/* 概要（実接続・C.1） */}
-      {tab === "about" && (
-        <section aria-label="概要">
-          <div className="card">
-            <dl className="def-list">
-              <dt>ステータス</dt><dd><span className={statusBadgeClass(quest.status)}>{STATUS_LABEL[quest.status] ?? quest.status}</span></dd>
-              <dt>カテゴリー</dt><dd>{quest.categories.length ? quest.categories.join("、") : "—"}</dd>
-              <dt>目的・テーマ</dt><dd>{quest.purpose || "—"}</dd>
-              <dt>期限日</dt><dd>{deadlineText(quest.deadline)}</dd>
-              <dt>クエストグループ</dt><dd>{quest.quest_group.name}</dd>
-              <dt>所有者</dt><dd><span className="poster"><Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span></dd>
-              <dt>パーティー</dt><dd>{quest.member_count}名</dd>
-              <dt>アイデア数</dt><dd>{quest.idea_count}件</dd>
-            </dl>
-          </div>
-        </section>
-      )}
     </section>
   );
 }

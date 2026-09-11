@@ -734,6 +734,7 @@ def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval
         "evaluation": ev,  # SC-12 評価列（F 集計・D.1）＝state/overall_avg(n/5)/evaluator_count
         "id": str(idea.id),
         "title": idea.title,
+        "value": idea.value,  # 提案価値（一覧で中身を判断＝クイック投票の材料・レビュー#3）
         "status": idea.status,
         "author": _author_dto(author, idea.author_id),
         # アイデアアイコン＝① アイデア個別（Phase 3）→ ② 作成者の既定（Phase 2）→ None（フロントが件名先頭1文字タイル）。

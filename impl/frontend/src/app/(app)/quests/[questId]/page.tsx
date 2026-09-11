@@ -4,11 +4,15 @@
 import { redirect } from "next/navigation";
 
 import { QuestDetailView } from "@/features/quests";
+import { getServerMe } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function QuestDetailPage({ params }: { params: Promise<{ questId: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { questId } = await params;
-  return <QuestDetailView questId={questId} />;
+  // ゲームモード実効値（§4.11）＝false で KPI/週間ランキング（ゲーム層）を非表示。
+  const me = await getServerMe();
+  const gameEnabled = me?.game_mode.effective ?? true;
+  return <QuestDetailView questId={questId} gameEnabled={gameEnabled} />;
 }

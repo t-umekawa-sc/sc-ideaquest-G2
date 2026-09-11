@@ -2956,6 +2956,8 @@ export interface components {
             id: string;
             /** Title */
             title: string;
+            /** Value */
+            value: string;
             /** Status */
             status: string;
             author: components["schemas"]["IdeaAuthorDTO"];

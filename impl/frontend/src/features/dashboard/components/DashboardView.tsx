@@ -456,13 +456,13 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* チームアクティビティ（SC-01 §4.8b・FR-36・参加クエスト横断の場の活動＝自分宛の「通知」とは別物） */}
-      <motion.section className="card" aria-label="チームアクティビティ" {...flowMotion(6)}>
-        <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
-      </motion.section>
-
-      {/* 下段：最近の通知＋ショートカット */}
+      {/* 下段：チームアクティビティ＋最近の通知の2段組（横並び・情報量に合わせて幅を分割・レビュー寄り道）。
+          チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}
       <motion.div className="dash-bottom" {...flowMotion(6)}>
+        <section className="card" aria-label="チームアクティビティ">
+          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
+        </section>
+
         <section className="card" aria-label="最近の通知">
           <div className="section-head">
             <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>

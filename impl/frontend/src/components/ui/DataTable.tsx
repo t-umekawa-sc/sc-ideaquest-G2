@@ -68,6 +68,7 @@ export type CardLayout = {
   title?: ReactNode;
   badges?: ({ label: string; cls?: string } | null | false)[];
   meta?: (ReactNode | null | false)[];
+  summary?: ReactNode; // 本文の要約/内容（カードで中身を判断する用途・任意。例＝アイデアの提案価値）
   stats?: (ReactNode | null | false)[];
 };
 
@@ -654,6 +655,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             ))}
           </div>
         )}
+        {L.summary != null && L.summary !== "" && <div className="dt-card__summary">{L.summary}</div>}
         {stats.length > 0 && (
           <div className="dt-card__stats">
             {stats.map((s, i) => (

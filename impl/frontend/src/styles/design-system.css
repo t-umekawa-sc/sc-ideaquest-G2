@@ -609,6 +609,26 @@ body.modal-open { overflow: hidden; }
 .vote-agree    { color: var(--color-agree); font-weight: 700; }
 .vote-disagree { color: var(--color-disagree); font-weight: 700; }
 
+/* スピード投票カード（vote-card）＝未投票アイデアの中身を見て判断＋クイック投票。ダッシュボード（SC-01）と
+   クエスト詳細のアイデア一覧（SC-12・カード表示）で共有する標準（DRY・レビュー#3で共通化）。 */
+.vote-card { --accent: var(--color-primary); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block; transition: box-shadow .15s, border-color .15s; }
+.vote-card.is-voted { opacity: .6; }
+.vote-card__quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+.vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.vote-card__poster { margin-top: var(--space-3); }
+.idea-title-row { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.idea-title-row__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-chat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); }
+.dash-chat-link:hover { text-decoration: underline; }
+.vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
+.vote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.vote-quick { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: var(--space-2); border-radius: var(--radius); border: 1px solid; cursor: pointer; font: inherit; font-weight: 600; font-size: var(--text-sm); transition: background .12s, transform .05s; }
+.vote-quick:active { transform: translateY(1px); }
+.vote-quick.agree { color: var(--color-agree); border-color: var(--color-agree); background: var(--color-agree-bg); }
+.vote-quick.agree:hover { background: #BBF7D0; }
+.vote-quick.disagree { color: var(--color-disagree); border-color: var(--color-disagree); background: var(--color-disagree-bg); }
+.vote-quick.disagree:hover { background: #FECACA; }
+
 /* レアリティ枠 */
 .rarity-common   { border-color: var(--rarity-common); }
 .rarity-standard { border-color: var(--rarity-standard); }
@@ -1666,6 +1686,9 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
   .dt-pin-anim-in .dt-pin-float, .dt-pin-anim-out .dt-pin-float { animation: none; }
 }
 .dt-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+/* カード内容の要約（任意・中身を判断する用途）＝改行保持＋最大4行でクランプ。 */
+.dt-card__summary { margin-top: var(--space-2); color: var(--color-text); font-size: var(--text-sm); line-height: 1.6; white-space: pre-wrap;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .dt-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
 /* 表示密度=コンパクト（カード）＝間隔と余白を詰める。密度トグルはテーブル/カード共通。 */
 .dt-cards--compact { gap: var(--space-3); }

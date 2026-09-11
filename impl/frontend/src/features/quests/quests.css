@@ -45,17 +45,22 @@
  * SC-12 クエスト詳細＝ヒーロー＋クエスト内ランキング／タブ（アイデア/パーティー/全文検索/概要）。
  * 正＝doc/画面設計/mocks/SC-12_クエスト詳細.html。
  * ============================================================= */
-.quest-top { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: var(--space-4); align-items: stretch; }
+/* レビュー#3＝縦積み＝ヘッダー(全幅)／KPI＋ランキング(同じ行)／クエスト内アクティビティ(全幅)。 */
+.quest-top { display: flex; flex-direction: column; gap: var(--space-4); }
+/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（狭幅で縦積み）。ゲームモード OFF では非表示（§4.11）。 */
+.quest-panels { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); align-items: stretch; }
+@media (max-width: 860px) { .quest-panels { grid-template-columns: 1fr; } }
 .quest-head__top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .quest-head__main { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
-@media (max-width: 860px) { .quest-top { grid-template-columns: 1fr; } }
 .quest-head h1 { font-size: var(--text-2xl); margin: var(--space-1) 0 var(--space-2); }
-.quest-head__theme { color: var(--color-text); margin: 0; }
-.quest-meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-4); }
+.quest-head__theme { color: var(--color-text); margin: 0; white-space: pre-wrap; }  /* レビュー#5＝入力の改行を保持 */
+/* align-items:center＝アバターを含む「所有者」（.poster）と他のテキスト項目の縦位置を揃える（レビュー#3）。 */
+.quest-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-5); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-4); }
 .quest-meta .soon { color: var(--color-danger); font-weight: 600; }
 .quest-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-/* アイデアタブ：一覧の上に「＋ アイデアを追加」を右寄せで配置。 */
-.ideas-tab-toolbar { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
+/* アイデアタブ：一覧の上に「ステータス絞り込み（左）」＋「＋ アイデアを追加（右）」。 */
+.ideas-tab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.idea-filter__n { font-size: var(--text-xs); opacity: .8; margin-left: 2px; }
 
 /* クエスト KPI パネル（1行目＝概要の隣・pixel-panel 内）。2×2 の大きな数字タイル。 */
 .quest-kpi { display: flex; flex-direction: column; }
@@ -114,3 +119,9 @@
   .member-row { flex-wrap: nowrap; min-width: max-content; }
   .member-perms { flex-wrap: nowrap; margin-left: var(--space-5); }
 }
+
+/* レビュー#3＝標準 DataTable に足した機能のスタイル＝提案価値セル／フォロー★／クイック投票ボタン。 */
+/* 提案価値セル（テーブル列）＝2行でクランプ（改行は保持）。カードは .dt-card__summary（DataTable 標準）で表示。 */
+.idea-value-cell { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
+.idea-follow { border: none; background: none; cursor: pointer; font-size: var(--text-lg); line-height: 1; color: var(--color-border-strong); padding: 0 2px; }
+.idea-follow.is-on { color: var(--color-warning); }
