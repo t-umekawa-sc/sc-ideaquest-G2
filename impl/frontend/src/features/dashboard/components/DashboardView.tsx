@@ -460,13 +460,15 @@ export function DashboardView({
       )}
 
       {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
-          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。未読ゼロで非表示。 */}
-      {unreadChats.length > 0 && (
-        <motion.section className="card" aria-label="新着の議論" {...flowMotion(6)}>
-          <div className="section-head">
-            <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
+          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。**常設**（未読ゼロは空状態）。 */}
+      <motion.section className="card" aria-label="新着の議論" {...flowMotion(6)}>
+        <div className="section-head">
+          <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
+          {unreadChats.length > 0 && (
             <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
-          </div>
+          )}
+        </div>
+        {unreadChats.length > 0 ? (
           <ul className="unread-list">
             {unreadChats.map((c) => (
               <li key={c.id}>
@@ -479,8 +481,10 @@ export function DashboardView({
               </li>
             ))}
           </ul>
-        </motion.section>
-      )}
+        ) : (
+          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。参加クエストで他のメンバーの新しい投稿があるとここに表示されます。</p>
+        )}
+      </motion.section>
 
       {/* 下段：チームアクティビティ＋最近の通知の2段組（横並び・情報量に合わせて幅を分割・レビュー寄り道）。
           チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}

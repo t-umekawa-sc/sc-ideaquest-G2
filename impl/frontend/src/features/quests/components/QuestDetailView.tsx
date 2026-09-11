@@ -465,26 +465,32 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
         </div>{/* .quest-head-row */}
 
-        {/* 💬 新着の議論（ビジネス層・レビュー#3）＝自分の未読チャット（他ユーザー投稿）があるアイデア。
-            通知が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行する動線。未読が無ければ非表示。 */}
-        {unreadDiscussions.length > 0 && (
+        {/* 💬 新着の議論（ビジネス層・レビュー#3）＝このクエストで自分の未読チャット（他ユーザー投稿）があるアイデア。
+            通知が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行する動線。クエストでは**常設**（未読ゼロは空状態）。 */}
+        {ideas !== null && (
           <section className="card unread-panel" aria-label="新着の議論">
             <div className="section-head">
               <h2 className="unread-panel__title">💬 新着の議論</h2>
-              <span className="unread-panel__n">{unreadDiscussions.reduce((s, i) => s + i.unreadChat, 0)} 件の未読</span>
+              {unreadDiscussions.length > 0 && (
+                <span className="unread-panel__n">{unreadDiscussions.reduce((s, i) => s + i.unreadChat, 0)} 件の未読</span>
+              )}
             </div>
-            <ul className="unread-list">
-              {unreadDiscussions.map((i) => (
-                <li key={i.id}>
-                  <Link className="unread-item" href={`/ideas/${i.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>
-                    <QuestIcon name={i.title} color={quest.color} imageUrl={i.iconUrl ?? undefined} size="xs" />
-                    <span className="unread-item__title">{i.title}</span>
-                    <span className="badge badge-danger">💬 +{i.unreadChat}</span>
-                    {i.lastChatAt && <span className="unread-item__time">{chatAgo(i.lastChatAt)}</span>}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {unreadDiscussions.length > 0 ? (
+              <ul className="unread-list">
+                {unreadDiscussions.map((i) => (
+                  <li key={i.id}>
+                    <Link className="unread-item" href={`/ideas/${i.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>
+                      <QuestIcon name={i.title} color={quest.color} imageUrl={i.iconUrl ?? undefined} size="xs" />
+                      <span className="unread-item__title">{i.title}</span>
+                      <span className="badge badge-danger">💬 +{i.unreadChat}</span>
+                      {i.lastChatAt && <span className="unread-item__time">{chatAgo(i.lastChatAt)}</span>}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。ほかのメンバーの新しい投稿があるとここに表示されます。</p>
+            )}
           </section>
         )}
 
