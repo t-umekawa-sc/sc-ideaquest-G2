@@ -39,10 +39,16 @@ export function listQuests(params?: {
   return apiFetch<QuestListResponse>(`/quests?${qs.toString()}`);
 }
 
-// 自分が有効所属するクエストグループ一覧（SC-10 フィルタ・SC-11 グループ選択・C.4）。
+// 自分が有効所属するクエストグループ一覧（SC-10 フィルタ・SC-11 主グループ選択・C.4）。
 export function listQuestGroups(q?: string): Promise<QuestGroupsResponse | null> {
   const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
   return apiFetch<QuestGroupsResponse>(`/quest-groups${suffix}`);
+}
+
+// 会社内の全クエストグループ（部署ディレクトリ・SC-11 追加グループ選択・FR-38・C.4）。所属に依らず全件。
+export function listCompanyGroupDirectory(q?: string): Promise<QuestGroupsResponse | null> {
+  const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
+  return apiFetch<QuestGroupsResponse>(`/quest-group-directory${suffix}`);
 }
 
 // パーティー候補＝同一グループの有効メンバー（SC-11・C.4）。exclude_user_ids はサーバー側で除外
@@ -58,6 +64,22 @@ export function listGroupMemberCandidates(
   if (params?.cursor) qs.set("cursor", params.cursor);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiFetch<QuestCandidatesResponse>(`/quest-groups/${groupId}/members${suffix}`);
+}
+
+// 複数グループ横断のパーティー候補（FR-38・SC-11/SC-12・C.4 GET /quest-group-candidates）。
+// group_ids のいずれかに所属する候補を返し、各候補に所属 group_ids（部署バッジ用）が付く。
+// exclude_user_ids はサーバー側で除外（既参加/追加中/作成者本人）。
+export function listQuestGroupCandidates(
+  groupIds: string[],
+  params?: { q?: string; exclude_user_ids?: string[]; limit?: number; cursor?: string },
+): Promise<QuestCandidatesResponse | null> {
+  const qs = new URLSearchParams();
+  for (const g of groupIds) qs.append("group_ids", g);
+  if (params?.q) qs.set("q", params.q);
+  for (const id of params?.exclude_user_ids ?? []) qs.append("exclude_user_ids", id);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  return apiFetch<QuestCandidatesResponse>(`/quest-group-candidates?${qs.toString()}`);
 }
 
 // クエスト詳細（SC-12 概要／SC-11 編集プリフィル・C.1）。可視性はサーバー強制（範囲外は 404）。

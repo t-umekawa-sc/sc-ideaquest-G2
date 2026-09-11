@@ -190,6 +190,8 @@ html.iq-nav-pinned body { padding-left: var(--appnav-w, 236px); }
 body.iq-nav-lock { overflow: hidden; }
 
 .appnav__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+/* ドック時＝見出しの下罫線を共通ヘッダーの下端に揃える（高さを --header-h に合わせる・レビュー#1 追補）。 */
+.appnav-root.is-docked .appnav__head { height: var(--header-h); padding-block: 0; box-sizing: border-box; }
 .appnav__title { font-family: var(--font-pixel); font-size: var(--text-sm); flex: 1; }
 .appnav-pin, .appnav-x {
   display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px;

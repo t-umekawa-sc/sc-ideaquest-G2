@@ -11,14 +11,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Multiselect, Swatches, useFormErrorNotice, useSnackbar, type MultiselectOption } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
   createQuest,
   deleteQuestIcon,
   getQuest,
-  listGroupMemberCandidates,
+  listCompanyGroupDirectory,
+  listQuestGroupCandidates,
   listQuestGroups,
   publishQuest,
   setQuestIcon,
@@ -138,11 +140,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [deadline, setDeadline] = useState(dup?.deadline ?? "");
   const [theme, setTheme] = useState(dup?.purpose ?? "");
 
-  const [groups, setGroups] = useState<QuestGroup[]>([]);
+  const [groups, setGroups] = useState<QuestGroup[]>([]); // 自分の所属グループ（主グループ選択）
+  const [directory, setDirectory] = useState<QuestGroup[]>([]); // 会社内の全部署（追加グループ選択・FR-38）
   const [groupsLoaded, setGroupsLoaded] = useState(false);
   const [groupId, setGroupId] = useState(dup?.quest_group_id ?? "");
-  const [groupName, setGroupName] = useState(""); // 編集時の固定表示用
+  const [groupName, setGroupName] = useState(""); // 編集時の固定表示用（主グループ）
+  const [extraGroupIds, setExtraGroupIds] = useState<string[]>([]); // 追加グループ（複数部署横断・FR-38）
+  const [extraGroupNames, setExtraGroupNames] = useState<Record<string, string>>({}); // 編集時、自分の所属外グループ名の補完用
   const [candidates, setCandidates] = useState<QuestCandidate[]>([]);
+  const [candQuery, setCandQuery] = useState(""); // 候補の絞り込み（表示名部分一致）
   const [members, setMembers] = useState<Member[]>([]);
 
   const [ownerLabel, setOwnerLabel] = useState(ownerName);
@@ -160,16 +166,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const iconChar = name.trim().charAt(0) || "新";
   const frozen = status === "completed"; // 完了は書き込み凍結（編集不可・C.5）
 
-  // 作成モード＝グループ一覧を取得（編集はグループ不変＝取得不要）。
+  // 自分の所属グループ（主グループ選択）＋会社内の全部署（追加グループ選択・FR-38）を取得。
   useEffect(() => {
-    if (isEdit) return;
     let alive = true;
-    void listQuestGroups()
-      .then((res) => {
+    void Promise.all([listQuestGroups(), listCompanyGroupDirectory()])
+      .then(([mine, dir]) => {
         if (!alive) return;
-        const data = res?.data ?? [];
+        const data = mine?.data ?? [];
         setGroups(data);
-        setGroupId((cur) => cur || data[0]?.id || "");
+        setDirectory(dir?.data ?? []);
+        if (!isEdit) setGroupId((cur) => cur || data[0]?.id || ""); // 主グループの既定は作成時のみ
       })
       .catch(() => {})
       .finally(() => alive && setGroupsLoaded(true));
@@ -192,6 +198,10 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         setTheme(d.purpose ?? "");
         setGroupId(d.quest_group.id);
         setGroupName(d.quest_group.name);
+        // 追加グループ（主を除く）＝複数部署横断（FR-38）。名前は自分の所属外でも表示できるよう控える。
+        const linked = d.quest_groups ?? [];
+        setExtraGroupIds(linked.map((g) => g.id).filter((id) => id !== d.quest_group.id));
+        setExtraGroupNames(Object.fromEntries(linked.map((g) => [g.id, g.name])));
         setStatus(d.status);
         setOwnerLabel(d.owner.display_name);
         setOwnerId(d.owner.user_id);
@@ -214,24 +224,49 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     };
   }, [isEdit, questId]);
 
-  // 候補（同一グループの有効メンバー・自分＋作成者＋追加済みを exclude・C.4）。
+  // 候補＝関連グループ（主＋追加）のいずれかの有効メンバー。自分＋作成者＋追加済みを exclude（C.4/FR-38）。
   const excludeIds = useMemo(
     () => [ownerUserId, ownerId, ...members.map((m) => m.userId)].filter((x): x is string => !!x),
     [ownerUserId, ownerId, members],
   );
+  // 候補フェッチ対象＝主＋追加グループ（重複除去）。
+  const candidateGroupIds = useMemo(
+    () => Array.from(new Set([groupId, ...extraGroupIds].filter(Boolean))),
+    [groupId, extraGroupIds],
+  );
+  const candGroupsKey = candidateGroupIds.join(",");
   useEffect(() => {
-    if (!groupId || frozen) {
+    if (candidateGroupIds.length === 0 || frozen) {
       setCandidates([]);
       return;
     }
     let alive = true;
-    void listGroupMemberCandidates(groupId, { exclude_user_ids: excludeIds, limit: 100 })
-      .then((res) => alive && setCandidates(res?.data ?? []))
-      .catch(() => alive && setCandidates([]));
+    const timer = setTimeout(() => {
+      void listQuestGroupCandidates(candidateGroupIds, { exclude_user_ids: excludeIds, q: candQuery || undefined, limit: 100 })
+        .then((res) => alive && setCandidates(res?.data ?? []))
+        .catch(() => alive && setCandidates([]));
+    }, candQuery ? 200 : 0); // 検索語入力は軽くデバウンス
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
-  }, [groupId, excludeIds, frozen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candGroupsKey, excludeIds, frozen, candQuery]);
+
+  // 追加グループの選択肢＝会社ディレクトリから主グループを除く（候補のみの複数選択・FR-38）。
+  const extraGroupOptions = useMemo<MultiselectOption[]>(
+    () => directory.filter((g) => g.id !== groupId).map((g) => ({ value: g.id, label: g.name })),
+    [directory, groupId],
+  );
+
+  // グループ id → 表示名（追加グループのチップ／候補の部署バッジ）。会社ディレクトリ＋自分の所属＋編集時の補完名。
+  const groupNameById = useMemo(() => {
+    const map: Record<string, string> = { ...extraGroupNames };
+    for (const g of directory) map[g.id] = g.name;
+    for (const g of groups) map[g.id] = g.name;
+    if (groupId && groupName) map[groupId] = groupName;
+    return map;
+  }, [groups, directory, extraGroupNames, groupId, groupName]);
 
   function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -269,6 +304,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
   function addMember(c: QuestCandidate) {
     setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms() }]);
+  }
+  function addAllCandidates() {
+    setMembers((m) => {
+      const have = new Set(m.map((x) => x.userId));
+      const add = candidates
+        .filter((c) => !have.has(c.user_id))
+        .map((c) => ({ userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms() }));
+      return [...m, ...add];
+    });
   }
   function removeMember(userId: string) {
     setMembers((m) => m.filter((x) => x.userId !== userId));
@@ -351,13 +395,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         const created = await createQuest({
           ...contentPayload(),
           quest_group_id: groupId,
+          quest_group_ids: extraGroupIds, // 追加グループ（複数部署横断・FR-38）
           status: kind === "create-publish" ? "recruiting" : "draft",
         });
         if (created) await applyIcon(created.id);
       } else if (kind === "edit-save") {
-        await updateQuest(questId!, contentPayload());
+        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: extraGroupIds });
         await applyIcon(questId!);
       } else {
+        // edit-publish（draft→recruiting）＝関連グループの差分を先に反映してから公開。
+        await updateQuest(questId!, { quest_group_ids: extraGroupIds });
         await publishQuest(questId!, contentPayload());
         await applyIcon(questId!);
       }
@@ -370,6 +417,18 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       snack({ type: "success", title: doneTitle });
       onDone();
     } catch (err) {
+      // 追加グループ除外で孤立するパーティー員がいる（409 group_in_use・FR-38）＝分かりやすい文言を出す。
+      if (err instanceof ApiError && err.status === 409) {
+        const body = err.body as { errors?: { reason?: string; user_ids?: string[] }[] } | null;
+        const orphan = body?.errors?.find((e) => e.reason === "group_in_use");
+        if (orphan) {
+          const names = (orphan.user_ids ?? []).map((id) => members.find((m) => m.userId === id)?.name ?? id);
+          const line = `外そうとしたグループにしか所属していないメンバーがいます（${names.join("、")}）。先にパーティーから外すか、グループを残してください。`;
+          setSummary([line]);
+          notify([line]);
+          return;
+        }
+      }
       const mapped = mapServerErrors(err, locale, {
         title: msg.title,
         color: msg.color,
@@ -493,9 +552,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           <textarea id="q_theme" className="textarea" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか" value={theme} onChange={(e) => setTheme(e.target.value)} aria-invalid={fieldErrors.purpose ? true : undefined} disabled={frozen} />
         </Field>
 
-        <Field id="q_group" label="クエストグループ" required hint={isEdit ? "クエストグループは作成後は変更できません。" : "クエストは1つのグループに属します。パーティー候補は同一グループの所属者に限定されます。"} error={fieldErrors.quest_group_id}>
+        <Field id="q_group" label="クエストグループ（主）" required hint={isEdit ? "主グループは作成後は変更できません。" : "クエストが属する主となるグループ（部署）。パーティー候補は関連グループの所属者になります。"} error={fieldErrors.quest_group_id}>
           {isEdit ? (
-            // グループは不変（C.2）＝固定表示（変更 UI は出さない）。
+            // 主グループは不変（C.2）＝固定表示（変更 UI は出さない）。
             <input id="q_group" className="input" value={groupName} readOnly disabled />
           ) : (
             <select id="q_group" className="select" value={groupId} onChange={(e) => onGroupChange(e.target.value)} onBlur={() => onBlurField("quest_group_id")} aria-invalid={fieldErrors.quest_group_id ? true : undefined}>
@@ -506,6 +565,21 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             </select>
           )}
         </Field>
+
+        {/* 追加グループ（複数部署横断・FR-38）。複数部署でひとつのクエストに臨む場合に付与＝候補のみの複数選択。 */}
+        {!frozen && (
+          <Field id="q_extra_groups" label="追加グループ（他部署・任意）" hint="複数の部署（クエストグループ）で1つのクエストに取り組む場合に追加します。追加した部署の所属者もパーティー候補になります。">
+            <Multiselect
+              id="q_extra_groups"
+              options={extraGroupOptions}
+              value={extraGroupIds}
+              onChange={setExtraGroupIds}
+              placeholder="他部署のグループを検索…"
+              ariaLabel="追加グループ（他部署）"
+              emptyText="該当する部署がありません"
+            />
+          </Field>
+        )}
 
         {/* パーティー・権限 */}
         <Field id="q_party" label="参加メンバー（パーティー）・権限" required>
@@ -553,15 +627,37 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             </div>
             {!frozen && (
               <div className="party__add">
-                <label className="text-sm" style={{ fontWeight: 600 }}>メンバーを追加（同一グループの所属者）</label>
+                <div className="party__addhead">
+                  <label className="text-sm" style={{ fontWeight: 600 }}>メンバーを追加（関連グループの所属者）</label>
+                  {candidates.length > 0 && (
+                    <button type="button" className="party__addall" onClick={addAllCandidates}>候補をすべて追加（{candidates.length}）</button>
+                  )}
+                </div>
+                <input
+                  className="input"
+                  placeholder="名前で絞り込み…"
+                  value={candQuery}
+                  onChange={(e) => setCandQuery(e.target.value)}
+                  aria-label="候補を名前で絞り込み"
+                />
                 <div className="candlist">
-                  {candidates.map((c) => (
-                    <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
-                      <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>{c.display_name} ＋
-                    </button>
-                  ))}
-                  {groupId && candidates.length === 0 && <span className="hint">追加できる候補がいません（全員追加済み、またはグループに他の所属者がいません）。</span>}
-                  {!groupId && <span className="hint">先にクエストグループを選択してください。</span>}
+                  {candidates.map((c) => {
+                    const depts = (c.group_ids ?? []).map((g) => groupNameById[g]).filter(Boolean);
+                    return (
+                      <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
+                        <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
+                        <span className="cand__name">{c.display_name}</span>
+                        {candidateGroupIds.length > 1 && depts.length > 0 && (
+                          <span className="cand__depts">{depts.join("・")}</span>
+                        )}
+                        <span className="cand__plus" aria-hidden>＋</span>
+                      </button>
+                    );
+                  })}
+                  {candidateGroupIds.length > 0 && candidates.length === 0 && (
+                    <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または他の所属者がいません）。"}</span>
+                  )}
+                  {candidateGroupIds.length === 0 && <span className="hint">先にクエストグループを選択してください。</span>}
                 </div>
                 <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
               </div>

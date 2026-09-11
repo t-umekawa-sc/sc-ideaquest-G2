@@ -137,6 +137,26 @@ def get_quest_groups(account_id: uuid.UUID, company_id: uuid.UUID, *, q: str | N
     return {"data": data}
 
 
+def get_company_group_directory(account_id: uuid.UUID, company_id: uuid.UUID, *, q: str | None = None) -> dict:
+    """会社内の全クエストグループ（部署ディレクトリ・FR-38 SC-11 追加グループ選択）。所属に依らず全件。
+
+    複数部署横断のクエストに他部署を関連付ける選択肢。会社内は部署をこえて可視の確定方針に基づき、認証済み
+    一般ユーザーに会社内の全有効グループ（最小フィールド）を返す。実際の追加可否は作成/編集で再検証（C.2）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        return {"data": []}
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return {"data": []}
+        groups = repo.list_all_active_groups(ts, q=q)
+        data = [
+            {"id": str(g.id), "quest_group_code": g.quest_group_code, "name": g.name} for g in groups
+        ]
+    return {"data": data}
+
+
 def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts, idea_counts) -> dict:
     owner = owners.get(quest.owner_id)
     group = groups.get(quest.quest_group_id)

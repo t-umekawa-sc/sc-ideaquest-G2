@@ -116,6 +116,7 @@
 | C-TC-225 | api | 横断候補 EP の門番 | いずれの指定Gにも非所属 | `GET /quest-group-candidates?group_ids=他G` | 404（存在秘匿） | C.4 |
 | C-TC-226 | api | PATCH で追加グループを付与 | recruiting（単一G） | `PATCH`（quest_group_ids=[追加G]） | 200・`quest_groups` が2件になる | C.2／FR-38 |
 | C-TC-227 | api | 追加グループ除外で孤立パーティー員→409 | 追加Gのみ所属のパーティー員がいる状態 | `PATCH`（quest_group_ids=[]＝追加Gを外す） | 409 conflict・`errors[].reason=group_in_use`・`user_ids` に孤立者 | C.2／FR-38 |
+| C-TC-228 | api | 部署ディレクトリ＝会社内全グループ（非所属含む） | seed user は group_c 非所属 | `GET /quest-group-directory` | data に非所属の group_c が含まれる（追加グループ選択肢・会社内は部署をこえて可視） | C.4／FR-38 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

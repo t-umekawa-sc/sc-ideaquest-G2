@@ -364,6 +364,18 @@ def list_visible_groups(session: Session, user_id: uuid.UUID, *, q: str | None =
     return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
 
 
+def list_all_active_groups(session: Session, *, q: str | None = None) -> list[QuestGroup]:
+    """会社内の有効グループ全件（`deleted_at IS NULL`）を name 昇順で（部署ディレクトリ・FR-38 追加グループ選択）。
+
+    所属に依らず会社内の全部署を返す（複数部署横断で他部署を関連付けるための選択肢・確定方針＝会社内は部署をこえて可視）。
+    最小フィールド（id/code/name）のみ利用する前提。`q` 指定で name 部分一致。
+    """
+    stmt = select(QuestGroup).where(QuestGroup.deleted_at.is_(None))
+    if q:
+        stmt = stmt.where(QuestGroup.name.ilike(f"%{q}%"))
+    return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
+
+
 def get_active_group_ids(session: Session, group_ids: list[uuid.UUID]) -> set[uuid.UUID]:
     """指定 id のうち有効（`deleted_at IS NULL`）なグループ id 集合（追加グループ検証・FR-38/C.2）。"""
     if not group_ids:

@@ -6,7 +6,15 @@
 
 ## C.0 アクター・認可スコープ（クエスト内6権限）
 
-**アクセスの門番＝パーティー所属**。当該クエストの `quest_members`（`quest_id`×`user_id`）に**有効な行（`removed_at IS NULL`）が無い**ユーザーは、クエスト詳細・アイデア・チャット・全文検索いずれも **404**（存在秘匿・§1.6・可視範囲＝パーティー内のみ）。※パーティーから外れた人はトゥームストーン行（`removed_at` 設定済み）が残るが門番は `removed_at IS NULL` で判定するため 404（§5.8）。さらに、**複数部署横断（2026-09-11・FR-38）**＝クエストは**関連クエストグループ（`quest_group_links`・データモデル §5.6b）**に紐づき、**その関連グループの「いずれか」にユーザーが有効所属していない場合**（すべての関連グループについて `quest_group_members` に `removed_at IS NULL` の行が無い）は 404。※従来の「単一グループ所属」から「**いずれかの関連グループに所属**」へ拡張（部署をまたいで1クエストに参加できる）。パーティー候補も同様に関連グループのいずれかの有効所属者。
+**アクセスの門番＝「パーティー所属 ＋ 参加部署の現所属」**（複数部署横断・作成者別格・2026-09-11 再決定・FR-38）。当該クエストの詳細・アイデア・評価・チャット・全文検索・一覧は、次を満たさないユーザーに **404**（存在秘匿・§1.6）:
+
+- **作成者（`quests.owner_id`）は別格**＝常に全アクセス可（参加部署への所属は不要＝PM 的関与を許容）。
+- 非作成者は、当該クエストの `quest_members` に**有効な行（`removed_at IS NULL`）があり**、**かつ**次の**参加部署条件**を満たすこと:
+  - クエストの**参加部署（`quest_group_links`・データモデル §5.6b）が 0 件**なら**部署条件なし**（＝有効パーティー員なら可）。
+  - 参加部署が**1 件以上**なら、**そのいずれかに現在有効所属**（`quest_group_members.removed_at IS NULL`）していること。**アクセスの都度、現在の所属で再判定**＝異動で全参加部署を外れたら、名指しパーティー員でも **404**（動的失効）。
+- この門番は共通関数 `can_access_quest(quest, user)` として **詳細/一覧/アイデア(D)/評価(F)/チャット(E,L)/全文検索(J)** の全経路で同一に適用する。
+- **パーティー候補・追加可否も同一条件**（§C.3）＝参加部署 0 件なら会社の有効ユーザー全体、1 件以上ならその参加部署の有効所属者に限定（範囲外は 422）。
+- **主グループ（primary）の概念は廃止**（参加部署はフラットな 0..N・すべて同格）。トゥームストーン（`removed_at` 設定済み）は門番の判定対象外（§5.8）。
 
 | 権限（`permission_type`） | 代表アクション（本ドメイン） | 付与/剥奪できる者 |
 | --- | --- | --- |
@@ -28,12 +36,12 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属クエストグループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8）。**DataTable 契約（§1.8.1）**: 上記 `sort` キーは**複数指定可**（カンマ区切り・カーソルがソートタプルを内包）／フィルタ可能＝`status`・`group_id`（enum・多値可）／横断 `q` の全文検索は §1.11 の PGroonga（`GET /quests/{id}/search`）に委譲＝ここは簡易絞り／ページ方式＝**カーソル型**（「もっと見る」・番号ページャは使わない）／`?format=csv`・`?pin_ids=`＝SC-10 適用（ピンは list/card 共通・§4.5⑨） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_group`＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
+| `GET /quests` | 参加中クエスト＋自分の下書き一覧を取得（SC-10・FR-15） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`status`（`draft`〔自分の下書きのみ〕`\|recruiting\|in_progress\|evaluating\|completed`）・`group_id`（所属クエストグループ絞り）・`sort`（`-created_at`〔新着〕/`deadline`〔締切近い〕/`-idea_count`/`-member_count`）・`limit`/`cursor`（カーソル・§1.8）。**DataTable 契約（§1.8.1）**: 上記 `sort` キーは**複数指定可**（カンマ区切り・カーソルがソートタプルを内包）／フィルタ可能＝`status`・`group_id`（enum・多値可）／横断 `q` の全文検索は §1.11 の PGroonga（`GET /quests/{id}/search`）に委譲＝ここは簡易絞り／ページ方式＝**カーソル型**（「もっと見る」・番号ページャは使わない）／`?format=csv`・`?pin_ids=`＝SC-10 適用（ピンは list/card 共通・§4.5⑨） | `data`=クエストカードの配列（`id`/`title`/`color`/`icon_image_path`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/**`quest_groups`〔参加部署の配列・0..N〕**＋`my_state`〔`draft`〔本人の下書き〕/未投稿/投稿済み等〕）。`page_info.{next_cursor,has_next}` |
 | `GET /quests/{quest_id}` | クエスト詳細を取得（SC-12 ヘッダー/概要タブ） | パス: `quest_id` | クエスト詳細（上記＋`purpose`〔目的・テーマ全文〕/`created_at`）＋**`my_permissions`**（自分が持つ 6 権限の配列＝フロントの UX 出し分け用）＋集計 |
 | `GET /quests/{quest_id}/members` | パーティー＋各メンバーの権限を取得（SC-12 パーティータブ） | パス: `quest_id` | `data`=メンバーの配列（`user`〔アバター/氏名〕＋`permissions[]`＋`joined_at`＋`is_creator`）。権限バッジ描画に使用 |
 
 - **参照制限（サーバー強制・FR-15）**: `GET /quests` は次の **(A) OR (B)** を返す（いずれも `deleted_at IS NULL`・セッション会社内・`company_id` はクエリで受けない＝§1.5）:
-  - **(A) 公開系**: 「**関連クエストグループ（`quest_group_links`）のいずれかに有効所属**（`quest_group_members.removed_at IS NULL`）**× 自分がパーティー参加中**（`quest_members` に有効な行あり＝`removed_at IS NULL`）」かつ `status != draft`。
+  - **(A) 公開系**: 「**自分がパーティー参加中**（`quest_members` に有効な行あり＝`removed_at IS NULL`）**かつ 参加部署条件を満たす**（当該クエストの参加部署が 0 件なら条件なし／1 件以上なら**現在いずれかの参加部署に有効所属**）」かつ `status != draft`（＝C.0 門番 `can_access_quest` と同一）。**作成者は別格**＝自分の非下書きクエストは参加部署に居なくても一覧に出る。
   - **(B) 自分の下書き（2026-08-02 追加）**: `owner_id = 自分` かつ `status = draft`（作成者本人のみ可視）。※下書きは公開前なのでパーティー門番の対象外＝**本人だけに見える**。
 - **下書き（`draft`）を一覧にも表示（決定 2026-08-02・UX 改善）**: 従来「下書きは一覧に出さない（ダッシュボード集約のみ）」だったが、**一覧から下書き作成 → 戻ると消える**という不便を解消するため、**作成者本人の下書きは `GET /quests` にも含める**（`my_state=draft` で下書きバッジ表示・クリックで SC-11 編集モーダル）。**ダッシュボード（ドメイン I）にも引き続き集約**＝両導線に出る。他人の下書きは一切見えない（`GET /quests/{id}` は `draft` の場合 `owner_id` 本人のみ 200・それ以外は 404）。
 - **`idea_count` の定義（2026-08-24 確定）**＝当該クエストの**公開（`status='published'`）かつ未削除（`deleted_at IS NULL`）のアイデア数**（ドメイン D `ideas` を集計・`GET /quests` と `GET /quests/{id}` 双方に反映）。**下書きは件数に含めない**＝下書きは作成者本人のみ可視（D.1）で、件数に数えると**他人に下書きの存在が漏れる**ため。また**閲覧者非依存**にすることで `sort=-idea_count`（DataTable）が全員で安定する。SC-12 のアイデアタブ（`GET /quests/{id}/ideas` の可視性＝公開＋自分の下書き）とは母集合が異なるため、**自分の下書きがあるクエストではタブ件数がヘッダー `idea_count` を上回りうる**（仕様・下書きバッジで区別）。
@@ -45,25 +53,25 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `POST /quests` | クエストを作成（SC-11・作成者＝所有者） | ボディ: `title`（必須）,`color`（必須・既定色可）,`categories`（`[string]` 1件以上・事前定義＋自由入力）,`deadline`,`purpose`,`quest_group_id`（必須＝**主グループ**）,`quest_group_ids?`（任意・**追加の関連グループ**＝部署横断・FR-38）,`icon_image_path?`,`members`（`[{user_id, permissions?}]`）,`status`（`draft\|recruiting`）。`Idempotency-Key` 推奨（§1.9） | 作成されたクエスト（`draft` は本人のみ表示・`recruiting` は公開）。作成者を `owner_id`＋`owner` 権限で保存。**`quest_group_id`（主）に自分が有効所属**していることをサーバー検証。**`quest_group_links` に主（`is_primary=true`）＋追加グループを登録**（追加グループは会社内の有効グループであることを検証・重複は排除） |
-| `PATCH /quests/{quest_id}` | クエストを編集（`owner`/`quest_admin`） | パス: `quest_id`／ボディ（差分）: `title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`／**`quest_group_ids?`（任意・関連グループの「あるべき全体像」＝主グループを含めた集合で `quest_group_links` を差分適用。主グループは必ず含む・除外不可）**／**`members?`（任意・あるべき全体像＝送られたらパーティー差分を内容と同一 UoW で適用）** | 更新後のクエスト（`members`/`quest_group_ids` 同梱時はパーティー/関連グループも反映）。`categories` は**置換セット**。**主 `quest_group_id` は変更不可**（下記注記）。**関連グループを外すと、その部署にしか所属しないパーティー員は門番で参照不可になる**ため、サーバーは影響（残る関連グループへの所属有無）を判定し、参照不可になる有効パーティー員がいる場合は **409 `group_in_use`**（対象 user を `errors` に）で拒否（除外前に外す運用を促す）。**`status` は受け付けない** |
+| `POST /quests` | クエストを作成（SC-11・作成者＝所有者） | ボディ: `title`（必須）,`color`（必須・既定色可）,`categories`（`[string]` 1件以上・事前定義＋自由入力）,`deadline`,`purpose`,`quest_group_ids?`（任意・**参加部署＝アクセス条件**＝会社の有効グループの集合・0..N・FR-38）,`icon_image_path?`,`members`（`[{user_id, permissions?}]`）,`status`（`draft\|recruiting`）。`Idempotency-Key` 推奨（§1.9） | 作成されたクエスト（`draft` は本人のみ表示・`recruiting` は公開）。作成者を `owner_id`＋`owner` 権限で保存（**別格**＝参加部署への所属は不要）。**`quest_group_links` に `quest_group_ids` を登録**（会社内の有効グループであることを検証・重複排除。作成者の所属は不問）。`members` は**参加部署条件を満たす者のみ**（0 部署なら会社の有効ユーザー全体・§C.3）。**`quest_group_id`（主グループ）は廃止＝受け付けない** |
+| `PATCH /quests/{quest_id}` | クエストを編集（`owner`/`quest_admin`） | パス: `quest_id`／ボディ（差分）: `title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`／**`quest_group_ids?`（任意・参加部署の「あるべき全体像」＝会社の有効グループ集合で `quest_group_links` を差分適用・0..N・すべて同格）**／**`members?`（任意・あるべき全体像＝送られたらパーティー差分を内容と同一 UoW で適用）** | 更新後のクエスト（`members`/`quest_group_ids` 同梱時はパーティー/参加部署も反映）。`categories` は**置換セット**。**参加部署を外すのは許容**＝その部署にしか所属しないパーティー員は門番の**再判定で参照不可**になる（＝異動と同じ扱い・ブロックしない。UI が影響人数を警告）。`members` 差分の候補範囲は**編集後の参加部署条件**で判定（範囲外は 422）。**`status` は受け付けない** |
 | `DELETE /quests/{quest_id}` | クエストを論理削除（`owner`/`quest_admin`） | パス: `quest_id` | 204。`deleted_at`＋`deleted_by_id` を設定（トゥームストーン）。以後一覧/詳細/検索/集計から除外。子データ（カテゴリ/パーティー/アイデア/チャット/評価）は**物理削除せず監査保持**（§5.6・`ON DELETE RESTRICT`） |
 | `POST /quests/{quest_id}/publish` | 下書きを公開（`draft` → `recruiting`・**アトミック**） | パス: `quest_id`／ボディ: `content`（`PATCH` と同じ内容フィールド＝`title`/`color`/`categories`/`deadline`/`purpose`/`icon_image_path`。省略可＝未送信分は現在値を使用）／**`members?`（任意・あるべき全体像＝送られたらパーティー差分も同一 UoW で適用）** | 公開後のクエスト（`status=recruiting`）。**内容適用＋パーティー適用＋strict 検証（`validate_publishable`）＋`draft→recruiting`＋参加通知（ドメイン H）を単一トランザクション（UoW）で実行**＝**失敗すれば全ロールバック（何も保存されず・何も公開されない）**。`owner`（作成者）のみ |
 
-- **必須充足**（サーバー検証・§2.2 入力検証）: `title`・`color`・`categories`（1件以上）・`quest_group_id`。未充足は **422 `validation_error`**（`errors[].field` で返却）。`deadline`/`purpose` は任意（データモデル §5.6 は NULL 可＝SC-11 の「必須」表示はフロント UX 上の推奨で、権威はサーバーのこの規約）。
+- **必須充足**（サーバー検証・§2.2 入力検証）: `title`・`color`・`categories`（1件以上）。未充足は **422 `validation_error`**（`errors[].field` で返却）。`deadline`/`purpose`/`quest_group_ids` は任意（参加部署は 0..N＝0 件も可＝データモデル §5.6b）。SC-11 の「必須」表示はフロント UX 上の推奨で、権威はサーバーのこの規約。
 - **カテゴリー**: 配列で受け取り `quest_categories` に展開。**アプリでトリム＋大小文字/全半角を正規化**し `UNIQUE(quest_id, label)` で重複排除（§5.7）。事前定義候補に一致しないラベルは `is_custom=true`。
-- **クエストグループの不変性/可変性（複数部署対応・FR-38）**: **主グループ `quest_group_id` は作成時に確定・以後不変**（`PATCH` で受けても無視＝作成文脈/既定表示の安定。SC-11 §9 の「原則作成時のみ」を本方針で確定）。一方、**追加の関連グループ（`quest_group_links` の非 primary 行）は `quest_group_ids` で編集可**（部署の後追い参加/離脱）。`quest_group_ids` は**主グループを必ず含む「あるべき全体像」**で受け取り差分適用（主を含まない/主以外を主にしようとする指定は 422）。関連グループを外す際の門番影響は上表の `409 group_in_use` で保護。
+- **参加部署の可変性（複数部署対応・FR-38・2026-09-11 再決定）**: **主グループの概念は廃止**。参加部署（`quest_group_links`）はフラットな 0..N・すべて同格で、`quest_group_ids` の「あるべき全体像」で作成/編集とも差分適用（会社内の有効グループのみ・作成者所属不問）。**参加部署を外すのはブロックしない**（門番の再判定で失効を表現）＝**`409 group_in_use` は廃止**。参加部署を増減すると、以降の候補範囲とアクセス条件（C.0）がそれに追随する。
 - **クエスト公開に XP は付与しない（確定）**: 公canonical な XP 付与表（README §6）に**クエスト作成/公開の行は無い**（付与＝選定200/投稿50/評価30/ログイン10/投票5/チャット5 のみ）。よって `publish` は通知のみで XP を発生させない。※SC-11 本文の「作成 XP を付与」は画面ドキュメントの表現ゆらぎ＝**要修正**（C.7 に記録）。
 - **`publish` の状態前提**: `draft` 以外に対する `publish` は **409 `conflict`**（`invalid_state`）。冪等化のため同一 `Idempotency-Key` 再送は最初の結果を返す。
 - **`PATCH` は内容および任意でパーティーを編集＝`status` は変えない（決定・APIベストプラクティス）**: `PATCH /quests/{id}` は本文の内容（title/color/categories/deadline/purpose/icon）と、**任意で `members`（パーティー・権限）** を更新する（`members` 同梱時は内容＋パーティーを**同一 UoW でアトミックに**適用＝SC-11 全体編集の保存が1リクエストで完結）。ただし**`status` は受け付けない/変更しない**（状態遷移は publish/transition）。状態遷移は**専用アクション**（`POST .../publish`＝draft→recruiting、以降は `POST .../transition`＝C.5）に限定する。**なぜ**＝前進のみ・副作用あり（通知/必須再検証）の状態機械（C.5）を PATCH のフィールド書き換えで迂回させないため（状態遷移は「アクション・サブリソース」で表すのが定石）。**パーティーのみを編集する導線**（パーティー編集専用ダイアログ / SC-12 パーティータブ）は **C.3 の専用EP**（`PUT /party`・増分 `POST/DELETE /members`・`PUT .../permissions`）を使う。
   - **`PATCH` の検証は「現在の `status`」で分岐（サーバー権威・`status` はリクエストに含めない）**：対象クエストの現在の `status` はサーバーが DB を読めば分かるため、クライアントに `status` を送らせない（送らせると `completed` を `draft` と偽って緩い検証を通す等の偽装余地＝§2.2 Mass Assignment 対策）。PATCH は分岐に現在値を使うだけで **`status` 自体は変えない**（遷移は publish/transition 専任）。
     - 現在 `draft` → **緩い検証**（必須未充足でも保存可＝下書き）。
-    - 現在 `recruiting`/`in_progress`/`evaluating`（公開中）→ **strict 検証**（`validate_publishable`＝`title`/`color`/`categories`≥1/`quest_group_id`）。公開中のクエストを不正な状態へ落とせない＝未充足は **422**。
+    - 現在 `recruiting`/`in_progress`/`evaluating`（公開中）→ **strict 検証**（`validate_publishable`＝`title`/`color`/`categories`≥1）。公開中のクエストを不正な状態へ落とせない＝未充足は **422**。
     - 現在 `completed` → **書き込み凍結**（C.5）＝内容編集も **409 `invalid_state`**。
     - ＝**単一の PATCH で足りる**（内部状態で EP を割らない）。strict 検証は `POST /quests {status:recruiting}`・`publish` と**同一のドメイン関数 `validate_publishable` を共有**。
   - **下書きの内容を下書きのまま更新** ＝ `PATCH /quests/{id}`（`status=draft` のまま）。owner/quest_admin。
   - **下書きを編集してから公開** ＝ **`POST /quests/{id}/publish {content}` の1回でアトミック**（内容適用＋strict 検証＋遷移＋通知を単一 Tx）。SC-11 の「**公開**」ボタンはこの publish を1回呼ぶだけ（フロントで PATCH と分けて2回呼ばない）／「**下書き保存**」ボタンは `PATCH` のみ（内容のみ・遷移なし）。**`publish` はボディ（内容）を取る**＝「公開」を全か無かの1操作にするため（当初の「publish はボディを取らない・2ステップ」方針は、部分コミット〔`PATCH` コミット後に別 Tx の `publish` が失敗しても巻き戻せない〕を避けるため撤回・2026-08-05）。
-- **`publish` 時の必須再検証（アトミック）**: 公開時に必須項目（`title`/`color`/`categories`≥1/`quest_group_id`・パーティー要否）を**内容適用と同一 Tx 内で** strict 検証し、未充足は **422 `validation_error`**（＝この場合も内容は保存されない＝全ロールバック）。下書きは未充足でも `PATCH` で保存できるため、公開の関門で担保。draft で `members` 空を許すか（＝公開時にパーティー必須とするか）は C.7 の TBD。
+- **`publish` 時の必須再検証（アトミック）**: 公開時に必須項目（`title`/`color`/`categories`≥1・パーティー要否）を**内容適用と同一 Tx 内で** strict 検証し、未充足は **422 `validation_error`**（＝この場合も内容は保存されない＝全ロールバック）。下書きは未充足でも `PATCH` で保存できるため、公開の関門で担保。draft で `members` 空を許すか（＝公開時にパーティー必須とするか）は C.7 の TBD。
 - **アイコン画像**: `icon_image_path` は MinIO キー（§1.10・別途アップロード API で取得したキーを渡す）。物理名ハッシュ化はアップロード側の責務。
 
 ## C.3 パーティー・権限（SC-11 パーティー編集 / SC-12 パーティータブ）
@@ -84,7 +92,7 @@
 | `PUT /quests/{quest_id}/members/{user_id}/permissions` | あるメンバーの権限セットを置換 | パス: `quest_id`,`user_id`／ボディ: `permissions[]`（6 権限の部分集合） | 更新後の権限配列 |
 
 - **サーバー強制ルール**（全経路で再検証・コーディング規約 §1）:
-  - **候補制限（複数部署・FR-38）**: 追加できるのは**当該クエストの関連グループ（`quest_group_links`）のいずれかに有効所属**（`quest_group_members.removed_at IS NULL`）のユーザーのみ。範囲外は **422 `validation_error`**（`errors[].field=user_id`）。作成時（未保存）は「送られた `quest_group_ids` のいずれかの所属者」を範囲とする（＝選んだ部署群の所属者）。
+  - **候補制限（参加部署条件・FR-38・2026-09-11 再決定）**: 追加できるのは、**参加部署が 0 件なら会社の有効ユーザー全体**（`users.status='active'`）、**1 件以上なら当該参加部署（`quest_group_links`）のいずれかに有効所属**（`quest_group_members.removed_at IS NULL`）のユーザーのみ（＝C.0 アクセス条件と同一）。範囲外は **422 `validation_error`**（`errors[].field=user_id`）。作成時（未保存）/編集時とも「送られた `quest_group_ids`（あるべき全体像）」を参加部署として判定。**作成者は別格**＝候補判定の対象外（常に owner）。
   - **`owner` 付与は作成者のみ**: `permissions` に `owner` を含める操作は `quests.owner_id`＝リクエスト者本人のときのみ許可。他者による `owner` 付与は **403 `forbidden`**。
   - **作成者の保護**: 作成者行の `owner` 剥奪・作成者のパーティー除外は不可（**422 `last_owner`/`forbidden`**）。作成者は常に全権限。
   - **編集権限**: `POST/DELETE/PUT` いずれも `owner` または `quest_admin` が必要（`owner` 付与のみさらに作成者限定）。
@@ -97,12 +105,13 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /quest-groups` | 自分が有効所属するグループ一覧（SC-10 フィルタ・SC-11 グループ選択） | クエリ: `q?`（名前部分一致） | `data`=グループの配列（`id`/`quest_group_code`/`name`）。`removed_at IS NULL` のみ |
-| `GET /quest-groups/{group_id}/members` | パーティー候補（単一グループの有効メンバー）を取得（SC-11・後方互換） | パス: `group_id`／クエリ: `q?`・`exclude_user_ids?`（**除外する user_id 群＝既にパーティーに入っている/追加中/作成者本人**・CSV or 反復）・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター）。`quest_group_members.removed_at IS NULL`＋`users.status='active'`＋**`exclude_user_ids` に含まれない者**のみ |
-| `GET /quest-group-candidates` | **複数グループ横断のパーティー候補**（SC-11 パーティー編集ダイアログ・部署横断・FR-38） | クエリ: `group_ids`（必須・CSV or 反復＝クエストの関連グループ群）・`q?`・`exclude_user_ids?`・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター＋**`group_ids`**＝そのユーザーが所属する「照会グループのうちの」グループ群＝部署絞込/全選択の材料）。`removed_at IS NULL`＋`active`＋`exclude_user_ids` 除外・重複ユーザーは 1 行に集約（`group_ids` に複数入る） |
+| `GET /quest-groups` | 自分が有効所属するグループ一覧（SC-10 フィルタ用） | クエリ: `q?`（名前部分一致） | `data`=グループの配列（`id`/`quest_group_code`/`name`）。`removed_at IS NULL` のみ |
+| `GET /quest-group-directory` | **会社内の全クエストグループ**（SC-11 参加部署の選択・FR-38） | クエリ: `q?`（名前部分一致） | `data`=会社内の**有効な全グループ**（`deleted_at IS NULL`）の配列（`id`/`quest_group_code`/`name`）。所属に依らず全部署＝**作成者は別格で他部署も参加部署に選べる**（会社内は部署をこえて可視の確定方針） |
+| `GET /quest-groups/{group_id}/members` | パーティー候補（単一グループの有効メンバー）を取得（SC-11・部署絞込） | パス: `group_id`／クエリ: `q?`・`exclude_user_ids?`（**除外する user_id 群＝既にパーティー/追加中/作成者本人**・CSV or 反復）・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター）。`quest_group_members.removed_at IS NULL`＋`users.status='active'`＋**`exclude_user_ids` に含まれない者**のみ |
+| `GET /quest-group-candidates` | **参加部署内（または部署0件なら会社全体）のパーティー候補**（SC-11 パーティー編集・FR-38） | クエリ: `group_ids?`（CSV or 反復＝クエストの**参加部署**群。**省略/空なら会社の有効ユーザー全体**＝参加部署0件の場合）・`q?`・`exclude_user_ids?`・`limit`/`cursor` | `data`=候補ユーザーの配列（`user_id`/氏名/アバター＋**`group_ids`**＝そのユーザーが所属する「照会グループのうちの」グループ群＝部署絞込/全選択の材料）。`removed_at IS NULL`＋`active`＋`exclude_user_ids` 除外・重複ユーザーは 1 行に集約 |
 
 - **これはテナントAPI（一般ユーザー向け）**で、**ドメイン B の `/admin/quest-groups/*`（QG管理者のメンバー管理）とは別系統**。
-- **門番/可視性（複数部署・FR-38・決定 2026-09-11）**: 単一 `GET /quest-groups/{group_id}/members` は**リクエスト者自身がそのグループに有効所属**していること（非所属は 404・後方互換）。**複数 `GET /quest-group-candidates?group_ids=` は、部署横断のクエスト組成のため、リクエスト者が所属しない自社部署の候補も返す**（＝**会社内は部署をこえてディレクトリが見える**＝協働のため所属者の氏名/アバター程度は会社内可視）。門番＝**認証済みの同一会社ユーザー**（`group_ids` は自社の有効グループに限る＝会社スコープを越えない・他社は §1.5 のテナント分離で不可）。返す情報は候補選択に必要な最小（`user_id`/氏名/アバター/所属グループ）に限定し、機密（メール等）は含めない（§2.2）。
+- **門番/可視性（複数部署・作成者別格・FR-38・決定 2026-09-11）**: `GET /quest-group-directory`・`GET /quest-group-candidates`・`GET /quest-groups/{group_id}/members` はいずれも門番＝**認証済みの同一会社ユーザー**（会社スコープを越えない・他社は §1.5 のテナント分離で不可）。**作成者は別格で他部署を参加部署に選べる**ため、これらは**リクエスト者の所属を問わず自社の部署/候補を返す**（＝会社内は部署をこえて可視の確定方針＝協働のため所属者の氏名/アバター程度は会社内可視）。`GET /quest-group-candidates` は `group_ids` 省略時に**会社の有効ユーザー全体**を返す（参加部署 0 件のクエスト用）。返す情報は候補選択に必要な最小（`user_id`/氏名/アバター/所属グループ）に限定し、機密（メール等）は含めない（§2.2）。
 - `GET /quest-groups/{group_id}/members` は SC-11 の「候補から追加」用。大人数グループのための `q`/ページングを備える（SC-11 §9 の候補検索/ページングに対応）。
 - **既存メンバー等の除外（決定 2026-08-02）**: 候補から**既にパーティーに入っている人・モーダルで追加中の未保存分・作成者本人を出さない**。**サーバー側で `exclude_user_ids` を除外してからページング**する（クライアント側で取得後に間引くと、ページが既追加者で埋まり「候補が枯れたページ」になり得るため＝ページングと整合させるためサーバー除外を採用）。**モーダルは現在の選択済み全 user_id（サーバー保存分＋未保存の追加分＋owner=作成者本人）を `exclude_user_ids` に渡す**。作成時（クエスト未保存）も編集時も**同じ仕組み**で扱える（`quest_id` に依存しない）。クライアント側でも二重追加ガードを行う（サーバーが最終権威＝`PUT /party`/`POST /members` の候補制限 §C.3 で範囲外は 422）。
 - グループそのものの作成/改称は運営操作（将来・データモデル §5.4）＝本ドメインは参照のみ。

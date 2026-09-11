@@ -40,3 +40,4 @@ export type { ConfirmVariant, ConfirmCost, ConfirmOptions } from "./ConfirmDialo
 export { RowMenu } from "./RowMenu";
 export type { RowMenuItem } from "./RowMenu";
 export { Swatches, SWATCH_PRESETS } from "./Swatches";
+export { Multiselect, type MultiselectOption } from "./Multiselect";

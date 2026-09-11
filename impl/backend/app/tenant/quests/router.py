@@ -78,6 +78,19 @@ def list_quest_groups(
     return QuestGroupsResponse(**result)
 
 
+@router.get("/quest-group-directory", response_model=QuestGroupsResponse)
+def list_company_group_directory(
+    request: Request,
+    q: str | None = None,
+    session: dict = Depends(require_me),
+) -> QuestGroupsResponse:
+    """会社内の全クエストグループ（部署ディレクトリ・SC-11 追加グループ選択・FR-38・C.4）。所属に依らず全件。読取専用。"""
+    result = quest_service.get_company_group_directory(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), q=q,
+    )
+    return QuestGroupsResponse(**result)
+
+
 @router.get("/quest-groups/{group_id}/members", response_model=QuestCandidatesResponse)
 def list_group_member_candidates(
     request: Request,

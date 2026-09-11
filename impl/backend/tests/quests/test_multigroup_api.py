@@ -206,6 +206,15 @@ def test_c_tc_225_cross_group_candidates_gate(client, env):
     assert r.status_code == 404, r.text
 
 
+def test_c_tc_228_group_directory_includes_non_member(client, env):
+    """C-TC-228: 部署ディレクトリは会社内の全グループを返す（seed user 非所属の group_c を含む）。"""
+    _login_seed(client)
+    r = client.get("/api/v1/quest-group-directory")
+    assert r.status_code == 200, r.text
+    ids = {g["id"] for g in r.json()["data"]}
+    assert str(env.group_c) in ids  # 非所属でも会社内全部署が選択肢に出る
+
+
 def test_c_tc_226_patch_adds_extra_group(client, env):
     """C-TC-226: PATCH quest_group_ids で追加グループを付与＝quest_groups が2件になる。"""
     _login_seed(client)

@@ -993,6 +993,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quest-group-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Company Group Directory
+         * @description 会社内の全クエストグループ（部署ディレクトリ・SC-11 追加グループ選択・FR-38・C.4）。所属に依らず全件。読取専用。
+         */
+        get: operations["list_company_group_directory_api_v1_quest_group_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quest-groups/{group_id}/members": {
         parameters: {
             query?: never;
@@ -1005,6 +1025,28 @@ export interface paths {
          * @description パーティー候補＝同一グループの有効メンバー（SC-11・C.4）。`exclude_user_ids` はサーバー側で除外。読取専用。
          */
         get: operations["list_group_member_candidates_api_v1_quest_groups__group_id__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quest-group-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quest Group Candidates
+         * @description 複数グループ横断のパーティー候補（FR-38・SC-11/SC-12・C.4）。候補ごとに所属 group_id 配列を返す。
+         *
+         *     門番＝リクエスト者がいずれかの指定グループに有効所属（非所属は 404）。`exclude_user_ids` はサーバー側除外。読取専用。
+         */
+        get: operations["list_quest_group_candidates_api_v1_quest_group_candidates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3797,7 +3839,7 @@ export interface components {
         };
         /**
          * QuestCandidateDTO
-         * @description パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members）。
+         * @description パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members・GET /quest-group-candidates）。
          */
         QuestCandidateDTO: {
             /** User Id */
@@ -3806,6 +3848,11 @@ export interface components {
             display_name: string;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
+            /**
+             * Group Ids
+             * @default []
+             */
+            group_ids: string[];
         };
         /** QuestCandidatesResponse */
         QuestCandidatesResponse: {
@@ -3855,6 +3902,11 @@ export interface components {
             color: string;
             /** Quest Group Id */
             quest_group_id: string;
+            /**
+             * Quest Group Ids
+             * @default []
+             */
+            quest_group_ids: string[];
             /**
              * Categories
              * @default []
@@ -3921,6 +3973,11 @@ export interface components {
             idea_count: number;
             owner: components["schemas"]["QuestOwnerDTO"];
             quest_group: components["schemas"]["QuestGroupRefDTO"];
+            /**
+             * Quest Groups
+             * @default []
+             */
+            quest_groups: components["schemas"]["QuestGroupRefDTO"][];
             /** My State */
             my_state: string;
             /**
@@ -4165,6 +4222,8 @@ export interface components {
             icon_image_path?: string | null;
             /** Members */
             members?: components["schemas"]["QuestMemberInput"][] | null;
+            /** Quest Group Ids */
+            quest_group_ids?: string[] | null;
         };
         /** RankingCursorPageInfo */
         RankingCursorPageInfo: {
@@ -6384,6 +6443,37 @@ export interface operations {
             };
         };
     };
+    list_company_group_directory_api_v1_quest_group_directory_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestGroupsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_group_member_candidates_api_v1_quest_groups__group_id__members_get: {
         parameters: {
             query?: {
@@ -6396,6 +6486,41 @@ export interface operations {
             path: {
                 group_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestCandidatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quest_group_candidates_api_v1_quest_group_candidates_get: {
+        parameters: {
+            query?: {
+                group_ids?: string[];
+                q?: string | null;
+                exclude_user_ids?: string[] | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

@@ -1,82 +1,121 @@
-# handoff — ideaquest 開発引き継ぎ
+# handoff.md（セッション引き継ぎ・全文上書き運用）
 
-> 読者＝「このセッションの記憶が一切ない次回の自分」。会話ログは参照不可。**本ファイルだけで再開できるよう毎回全文を上書き**する（履歴は git）。実際に確認した事実だけを書き、未確認は「未確認」と明記。コードの塊は貼らず**ファイルパス＋関数名**で示す。
+> 読者＝このセッションの記憶が無い次回の自分。会話ログは参照不可。**本ファイルだけで再開できる**ことを目標に書く。
+> 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
+
+---
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-10（このセッション末）**。
-- 作業ブランチ＝**`main`**（`origin/main` と同期・本 handoff 更新を含め push 済み）。
-- 最新コミット＝**`d496d18`** `feat(shell): レビュー#1 グローバルナビ…`（その後に本 handoff 更新コミット）。
-- 運用＝**非同期パイプライン**＝main へ増分ごと commit・**push は都度ユーザー確認**。検証分担＝機能（reduce・構造・データ整合）は私がテスト担保／見た目はユーザー目視。
+- 最終更新: **2026-09-11 17:41 JST**
+- ブランチ: **main**（このプロジェクトは main に直接コミットする運用。`feature/game-feel` はゲーム感フェーズ用の別系統）
+- 直前の機能コミット: **1594af2** `feat(quests): FR-38 複数部署横断クエスト backend＝quest_group_links…`
+- 本 handoff を含むコミット: 直後に作成（ハッシュは `git log -1`）。**大量の未コミット作業を WIP としてまとめてコミット＋push する**。中身は「設計正本＝新モデル反映済み」「コード＝旧モデルのまま」の乖離を含む（→ 3・4・7 参照）。
 
-## 2. ゴール
-社内向けアイデア創出ゲーミフィケーション型マルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。全画面・全ドメイン接続済み。**このセッションで「ゲーム感向上フェーズ」を完了し、「社内レビュー反映フェーズ」に移行**。
+## 2. プロジェクトのゴール
+社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**社内レビュー反映フェーズ**（洗練フロー: ①要件→②設計反映→〈確認〉→③TC→④実装→〈確認〉）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### A. ゲーム感フェーズ 完了（reduce e2e 化＋バッチ #24〜#34 受入・すべて push 済み）
-- **reduce AC の e2e 化**＝#21 オーラ/#22 星/#23 賛否バーを **G-TC-175/176/177** で担保（`e2e/sc-01-dashboard.spec.ts`／`sc-25-eval.spec.ts`／`sc-22-idea-detail.spec.ts`）。方式＝`page.emulateMedia({reducedMotion})`（`test.use` は効かない）。md＝`doc/テスト/G_ゲーミフィケーション.md §5-T/U/V`。副次で既存 login ヘルパー陳腐化（`getByText("ようこそ")` timeout）を `waitForURL`＋`.app-header` に是正（sc-01/sc-22）。
-- **ゲーム感バッチ #24〜#34 の受入対応**（視覚調整＝私が実装／reduce 確認＝機構担保）：
-  - #26 GF-AC-261＝称号チップ可読化（`features/dashboard/dashboard.css` `.hero__title`／`features/profile/profile.css` `.prof-head__title` を不透明ダーク背景＋白寄りティア色テキストに）。
-  - #27 GF-AC-270＝レアの輝きをカード枠→**レアのラベル文字自体**（`styles/design-system.css` `.rarity-rare` に text-shadow グロー＋✦。box-shadow/背後ハロー/枠脈動は「四角い箱が出る」ため撤去）。モック＝`style-guide.html §17N`。
-  - #28 GF-AC-280＝ページ遷移フェードを `.page-transition` で **0.5s ease-in**（最初ゆっくり→最後速く・opacity のみ）。
-  - #29 GF-AC-290＝ヘッダー円環 `.lvring` の見え幅 2px→4px。
-  - #34 GF-AC-341＝`DashboardView.tsx` の「フォロー中のアイデア」の退場/繰り上がりを **`AnimatePresence mode="popLayout"`＋カードに `layout="position"`** へ（旧＝既定 sync＋layout 無しで退場中もスペースを保持し「単純再表示」に見えていた）。
-  - reduce 確認（242/251/262/271/281/291/301/332/343）＝各セレクタの `@media prefers-reduced-motion` 停止＋`[data-anim-reduced]` killswitch を機構確認。受入台帳 `doc/テスト/ゲーム感受入.md` は #24〜#34 を ✅ 済み。
+### (a) 直前コミット 1594af2 に入っている（＝コミット済み）＝**旧モデル**の実装
+- FR-38「クエスト複数部署横断」の backend。**主グループ（`is_primary`）＋追加グループ**モデル。
+- `impl/backend/app/tenant/quests/orm.py` に `QuestGroupLink`、`migrations/company/versions/0023_quest_group_links.py`（作成・**全3社DBに適用済み**・既存クエストを backfill）。
+- `repository.py`/`application.py`/`router.py`/`schemas.py` に横断可視性・横断候補（`GET /quest-group-candidates`）・`quest_group_ids`・409 `group_in_use`（部署除外で孤立するパーティー員を拒否）。
+- テスト `tests/quests/test_multigroup_api.py`（C-TC-220〜227）。
 
-### B. 社内レビュー反映フェーズ（新規・進行中）
-- **進め方を合意**＝**洗練フロー**（各項目＝①要件を1〜2問で確定→②設計書反映＋（見た目物は）style-guide にモック→**〈一次確認〉**→③テストパターン(TC)見直し→④実装→**〈実物で二次確認〉**）／順序＝**方針先決め→UI構築**。
-- **7指摘の影響マップ**を作成（下記 §7 に要約）。**#2 と #7 は方針を先に確定**：
-  - **#2 ゲームモード ON/OFF 方針（確定・§6 参照）**＝ゲーム層UIを丸ごと非表示（演出/チャット魔法含む）・アバター画像は残し導線だけ隠す・ゲーム系通知は非表示・backend はロジック据え置きで**フラグ保存のみ追加**・**会社既定＋個人上書き**。
-  - **#7 最終アウトプット方針（確定）**＝案A（選定結果サマリ＋総括コメント）を **ISO 56001/56007 のイノベーション創出フロー**に沿って構造化（①機会と意図＝quest purpose ②創出＝ideas ③評価検証＝評価5観点 ④選定＝`is_selected` ⑤総括・次アクション＝`quests` に総括テキスト列を新設）。実装は #7 フェーズ（UI項目の後）。
-- **#1 グローバルナビ 実装完了（commit `d496d18`・二次確認 OK・push 済み）**＝☰→左ドロワー／📌ピン留めで常設サイドバー。
-  - 新規 `impl/frontend/src/components/layout/AppNav.tsx`（client・ポータル描画・open/pinned/localStorage `iq_nav_pinned`/matchMedia ≥1024/フォーカストラップ/Esc/スクロールロック/`usePathname` で active。**`gameEnabled` prop（既定 true）＝#2 でゲーム群の表示を実効ゲームモードに接続する差込口**）。
-  - `AppHeader.tsx` 左端に `<AppNav/>` を `.header-left` で統合。CSS＝`design-system.css .appnav*`。
-  - **ピン時の本文シフトは `html.iq-nav-pinned body { padding-left }`＋全高サイドバー方式**（`main` 幅を上書きする方式は各ページの中央寄せが再センタリングして「右に寄る」不具合＝アイデア詳細/チャットで発生したため不採用）。窓は横スクロールしない（`overflow-x:hidden` 併用）。
-  - **分散導線を撤去**＝`DashboardView.tsx` の TILES／`ShopView`・`AvatarView`・`SpellsView` の `GameNav`（`components/ui/GameNav.tsx` はコンポーネント/export ごと削除）。
-  - 設計書＝デザイン標準 §4.1「グローバルナビ」・画面遷移図 §4「集約 2026-09-10」／モック `style-guide.html §11b`。
-  - テスト＝`doc/テスト/M_共通シェル・ナビ.md`（**新設ドメイン M**・M-TC-001〜004）＋`e2e/sc-99-appnav.spec.ts`（旧ビルドに対し **red 目視** → 再ビルドで **green 4 passed**・M-TC-003 に「ピン時 窓横スクロール無し」ガード込み）。
+### (b) 未コミット・**旧モデルのまま**の続き
+- backend: `GET /quest-group-directory`（会社内全グループ）を追加＝`repository.py:list_all_active_groups`・`application.py:get_company_group_directory`・`router.py:list_company_group_directory`・テスト C-TC-228。理由＝SC-11 で「追加グループを会社の全部署から選べる」ため。
+- frontend Phase 3（**旧モデル**）:
+  - `src/features/quests/components/QuestForm.tsx`＝「クエストグループ（主）」＋「追加グループ（他部署）」の複数選択、横断候補ピッカー（名前検索・すべて追加・部署バッジ）、`quest_group_ids` 結線、409 `group_in_use` の平易メッセージ。
+  - `src/components/ui/Multiselect.tsx`（**新規**）＝style-guide.html の `.multiselect`（候補のみ・自由入力なし）を React 化。CSS は既存 `design-system.css` の `.multiselect__*` 再利用。`ui/index.ts` で export。理由＝ユーザー要望で追加グループのコンボを .multiselect に差し替え。**選択後もリストが閉じないバグ**を修正済み（React18 の同期 flush で外側クリック判定が切り離しノードを誤検知→`target.isConnected` ガードを追加）。
+  - `src/features/quests/api.ts`＝`listCompanyGroupDirectory`・`listQuestGroupCandidates` 追加。
+  - `src/features/quests/components/QuestDetailView.tsx`＝🗂 グループを `quest_groups`（複数）表示。
+  - `src/lib/api/schema.d.ts`＝`npm run codegen` で再生成（旧モデルの新DTO）。
+  - `src/styles/design-system.css`＝**別件UX**: ピン留めサイドバーの「メニュー」見出し下罫線を共通ヘッダー下端に揃える（`.appnav-root.is-docked .appnav__head { height: var(--header-h) }`）。
+  - `src/features/quests/quests.css`＝候補ピッカーの軽微スタイル。
 
-## 4. 現在の状態（動く / 壊れ / テスト）
-- **フロントゲート（本セッション実測）**＝`npx tsc --noEmit` 緑／`npx vitest run` **160 passed**／`npm run build` 成功（docker build も exit0）／`python3 scripts/check_tc_traceability.py` **✅ code 437**。
-- **e2e（本セッション・実 docker・実測 green）**＝`sc-99-appnav`(M-TC-001〜004)／`sc-01-dashboard`(G-TC-175＋hero balance)／`sc-25-eval`(F-TC-201/202/203・G-TC-171/172/176)／`sc-22-idea-detail`(D-TC-207・G-TC-177)。**他 e2e は本セッション未実行（未確認）**。
-- **backend pytest ＝本セッション未実行（未確認）**。前回既知＝513 相当。
-- **QA スタック＝全起動中**。frontend は **`d496d18`（#1 込み・ピン修正込み）を焼き込み済み**（本セッションで複数回 `build frontend && up -d frontend`）。※コード変更後は再ビルド必須。
-- **壊れているもの＝把握範囲で無し**。
+### (c) 未コミット・**新モデル（＝再設計）**を反映した設計正本 ★ここが本題
+ユーザーとの対話で仕様を大きく再設計した。**コードは未追随（旧モデルのまま）**。以下の doc を**新モデル**に書き換え済み:
+- `doc/データモデル.md` §5.6（`quests.quest_group_id` 列**撤去**・可視性=パーティー∧参加部署の現所属）／§5.6b（`is_primary` **廃止**・参加部署=アクセス条件・0..N・作成者別格・動的化フック）／§5.8（候補=アクセス条件と同一）／ER図。
+- `doc/API設計/C_クエスト・パーティー・権限.md` C.0 門番／C.1 参照制限／C.2（`quest_group_id`/主/不変性/409 撤去）／C.3 候補=統一条件／C.4（`/quest-group-directory` 追記・`/quest-group-candidates` 空許容）。
+- `doc/要件定義/README.md` FR-38 全面改訂。
+- `doc/テスト/C_クエスト.md` は §7（C-TC-220〜228）が**旧モデルのまま**＝新モデルへの書き換えは**未着手**。
 
-## 5. 詰まっている点（試して失敗・いずれも解決済み）
-- **ピン時の本文レイアウト**＝当初 `html.iq-nav-pinned main.container { margin-left; width:calc(100%-サイドバー) }` にしたが、①窓ごと横スクロール（ヘッダー右に余白）②アイデア詳細/チャットは独自の中央寄せを持つため拡幅 main 内で再センタリングして「右に寄る」。**解決＝`body` の `padding-left` で本文全体（ヘッダー＋main）を右シフト＋サイドバー全高**（各ページの中央寄せをそのまま活かす・窓は横スクロールしない）。
-- **e2e 背面クリック**＝`.appnav-backdrop` を座標(5,5)でクリックするとドロワー（左端）に当たり actionability 失敗。**ドロワー外（右側 x:900）をクリック**で解決。
-- **連続ログインのバースト → 一時ロックアウト**（前セッションからの注意）＝red/green を続けて多数ログインすると login 全滅。間隔をあければ回復。
+## 4. 現在の状態
 
-## 6. 決定事項と根拠（不採用案も）
-- **#1 グローバルナビ＝☰→ドロワー＋📌ピンで常設サイドバー**（不採用＝左サイドバー常設のみ／ヘッダー展開ナビ）。ピン保存＝**localStorage（端末）**（不採用＝account 設定同期。理由＝レイアウト好みは端末別が自然・backend 追加不要）。ピン時レイアウト＝**body padding＋全高サイドバー**（不採用＝main 幅上書き。理由＝§5）。導線は**集約**（TILES/GameNav 撤去）。
-- **#2 ゲームモード OFF＝ゲーム層UIを丸ごと非表示**（不採用＝演出のみ OFF＝既存 reduce_motion と重複）。**アバター画像は残す**（業務画面の本人識別に使うため）。**適用＝会社既定＋個人上書き**（不採用＝個人のみ。会社統制ニーズ）。**backend はフラグ保存のみ**（ゲームロジックは据え置き）。**チャット魔法は使用無効＋既存エフェクトもベストエフォート非表示（本文は残す）**。
-- **#7 出力＝案A を ISO 56001/56007 フローで構造化**（不採用＝B 成果レポート／C 表示強化のみ）。理由＝成果が一箇所で見える最短形＋標準準拠、後から拡張可。
-- **テストの新ドメイン M（共通シェル・ナビ）を新設**＝TC-ID は単一大文字プレフィックスで `doc/テスト/*.md` を横断走査（`scripts/check_tc_traceability.py`）ゆえ文字とファイル名の対応は任意。共通シェルは既存 A〜L に無いため M を採番。
+### 動いているもの
+- コンテナは**全て稼働中**（`docker compose ps`＝backend/frontend/db/redis/minio/mailhog/worker/mail-worker が running）。backend=localhost:8000、frontend=localhost:3000。
+- backend は **1594af2＋directory endpoint（旧モデル）** をビルド済みで稼働（`GET /quest-group-directory`・`quest_groups` DTO は OpenAPI に反映済みを確認済み）。
+- frontend は Multiselect・directory 連携込みでビルド済み稼働。
 
-## 7. 次にやること（優先順・具体的に）
-> レビュー反映は**洗練フロー**で1項目ずつ・各項目で〈設計/モックの一次確認〉→〈実物の二次確認〉。順序＝#2→#3/#5→#4→#6→#7。**未確認は着手前にコードで裏取り**（`handoff-notes-often-stale`）。
+### 壊れている / 未整合なもの
+- **設計doc（新モデル）とコード（旧モデル）が乖離**。新モデル（参加部署=アクセス条件・作成者別格・都度再判定・主グループ廃止・0件=会社全体・409撤去）は**コード未実装**。
+- したがって「今動いている画面/挙動」は**旧モデル**（主グループ必須・作成者は主グループ所属必須・候補は関連グループ内・部署除外で409）。
 
-1. **#2 ゲームモード ON/OFF（着手中・方針確定済み §6）**。次の具体作業：
-   - **設計書反映**＝データモデル `doc/データモデル.md`（`accounts` に個人上書き列・`companies` に既定列。null 上書きは会社既定を継承＝実効値）／API `doc/API設計/K_プロフィール・背景画像.md`（`GET /me` で実効ゲームモード返却・`PATCH /me` で個人設定）＋会社設定は `doc/API設計/B_会社・アカウント.md` 系（会社既定の更新）／要件 `doc/要件定義/README.md`（新 FR）／デザイン標準（game-mode gating の横断規約）／画面 `SC-03_プロフィール.md`（個人トグル）・`SC-91`（会社既定）。
-   - **モック**＝トグルUI（個人＝`SC-03` の `ProfileForm.tsx` に reduce_motion と同型で追加／会社既定＝会社設定 `.switch`）。
-   - **実装（フロント表示制御）**＝`(app)/layout.tsx` で `me` から実効ゲームモードを算出し、`AppNav` の **既設 `gameEnabled` prop** へ渡す（ゲーム群の出し分け）／`AppHeader.tsx`（Lv/コイン/SP/`lvring` 非表示）／`DashboardView.tsx`（ヒーロー/週間ランキング）／通知（ゲーム系の間引き）／`features/chat`（魔法キャストUIの無効化・既存 `.spell-fx` レンダリング抑止）。backend＝フラグ保存列＋`GET /me` 返却のみ追加。
-   - テスト＝`doc/テスト/M_共通シェル・ナビ.md` にゲームモード gating の TC（**次は M-TC-005〜**）＋backend は該当ドメイン md。
-2. **#3 クエスト概要を右上**＝`features/quests/components/QuestDetailView.tsx`（`quest.purpose` は現在 `.quest-head`〔左カラム〕。`quests.css` の `.quest-top` は2カラム〔左1.7fr head／右1fr KPI〕。概要を右カラムへ）。設計＝`SC-12`。
-3. **#5 改行表示**＝`white-space:pre-wrap` 欠落2箇所＝`IdeaDetailView.tsx` のチャットプレビュー `.chat-msg__text`（`ideas.css`）・クエスト概要 `.quest-head__theme`（`quests.css`）。書式ルールを要件/データモデルに注記。
-4. **#4 参加メンバー一括選択**＝`features/quests/components/QuestForm.tsx` の候補（現在 `.candlist` で1人ずつ追加）を**絞込＋複数選択**へ。候補 API＝`features/quests/api.ts` `listGroupMemberCandidates()`。設計＝`SC-11`・デザイン標準 `.multiselect`・API C。
-5. **#6 評価ダイアログにクエスト内容**＝`features/evaluations/components/EvaluationView.tsx` の `.eval-context`（現在タイトル＋カテゴリ＋アイデア名）に**クエスト概要 purpose を追加**（`idea.quest` に取得済み＝**API 追加不要**）。設計＝`SC-25`。
-6. **#7 最終アウトプット**＝§6 の方針で実装（`quests` に総括テキスト列＋完了クエストの「成果」セクション/タブ＝選定アイデア一覧＋評価スコア＋総括）。要件/データモデル/`SC-12`/API C・F に反映。
-- **共通ゲート**＝`npx tsc --noEmit`＋`npx vitest run`＋**`npm run build`（ESLint 込み）必須**。テストは md に TC 行(`根拠`列)→red-green→traceability ✅。backend の response_model 変更後は `cd impl/frontend && npm run codegen`。**push は都度確認**。
+### テスト通過状況（実際に確認した範囲）
+- `tests/quests/test_multigroup_api.py`＝**9 passed**（C-TC-228 含む・ホストコードをマウントして実行・確認済み）。
+- `tests/quests`＋`tests/quest_group`＝**67 passed**、`tests/chat tests/dashboard tests/ideas tests/evaluations tests/search tests/realtime tests/gamification`＝**186 passed**。ただしこれは 1594af2 コミット時点（directory endpoint 追加**前**）。directory は追加のみだが**追加後の全スイート再実行は未確認**（multigroup 9 passed のみ再確認）。
+- frontend＝`npx tsc --noEmit` OK・`npm run build` OK（Multiselect 修正後に確認済み）。
+- TC トレーサビリティ `python3 scripts/check_tc_traceability.py`＝✅（459件・確認済み）。
+
+## 5. 詰まっている点（試して失敗した経緯）
+- 技術的ブロックは無い。**設計が3回転**したのが実態:
+  - ①旧: 主グループ（作成者所属・不変）＋追加グループ。→ 実装済み（1594af2）。
+  - ②中間案: 参加部署=保存プロパティ・候補=会社全体・可視性=パーティー一本化・作成者別格。→ データモデル doc に一度書いたが**ユーザーが訂正して破棄**（可視性一本化・候補会社全体は誤り）。
+  - ③最終: **参加部署=アクセス条件**（作成者除き、いずれかの参加部署に**現在**所属していないと参照不可＝都度再判定＝異動失効）。候補=参加部署内（0件なら会社全体）。→ doc 反映済み・コード未実装。
+- 失敗approach＝②の「可視性party一本化／候補=会社全体」。理由＝ユーザーの真意は「部署は参加条件（アクセス門番）」であり、可視性を緩めるのは逆だった。③の doc で上書き済み。
+
+## 6. 決定事項と根拠（最終モデル）
+- **参加部署（quest_group_links, 0..N, フラット・主グループ廃止）＝アクセス条件**。非作成者は「有効パーティー員 かつ（参加部署0件なら条件なし／1件以上なら現在いずれかに有効所属）」で参照可。**アクセスの都度、現所属で再判定**（異動即失効）。根拠＝異動連動のアクセス制御をユーザーが要望。
+- **作成者は別格**＝常に全参照可・参加部署所属不要（PM 的関与）。参加部署は会社全部署から選べる。
+- **候補判定＝アクセス条件と同一**（0件=会社の有効ユーザー全体、1件以上=参加部署の所属者、範囲外は422）。
+- **門番は全ドメイン共通**（詳細/一覧/アイデアD/評価F/チャットE,L/全文検索J）に `can_access_quest` を適用。
+- **409 `group_in_use` は撤去**（部署除外はブロックせず失効で表現・UIで影響人数を警告）。
+- 採用しなかった案:
+  - 「部署所属者=全員自動参加（動的メンバーシップ）」→ 却下。名指し選択と人ごと権限を維持したいため。**失効は本モデルで自動**、**自動追加は将来拡張フック**（`quest_members.source` 列を実装時に足す。今は投機的に置かない）。
+  - 「主グループを nullable で残す」→ 却下。混乱のもとなので `quests.quest_group_id` は列ごと削除（データは links に保全済み）。
+
+## 7. 次にやること（優先順・ファイル/関数レベル）
+
+### 【最優先】#7 backend 再設計②（新モデルをコードへ）
+1. **新 migration**（例 `0024_…`・company）: `quest_group_links.is_primary` 削除・主グループ部分UNIQUE削除・`quests.quest_group_id` 列削除（データは links に既存＝backfill 済み）。全3社DBへ適用（`docker compose run --rm -v "$(pwd)/backend:/app" backend python -m alembic … upgrade`／実際の alembic 起動方法は entrypoint の bootstrap を要確認）。
+2. `app/tenant/quests/orm.py`: `QuestGroupLink` から `is_primary` 削除・`Quest` から `quest_group_id` 削除。
+3. `app/tenant/quests/repository.py`:
+   - `create_group_links`/`reconcile_extra_links` を「参加部署の全体像を差分適用」する単純版へ（primary 概念を除去）。
+   - `list_linked_group_ids`（is_primary 並び順を撤去）。
+   - `list_quests_for_user` の可視性を「パーティー∧（参加部署0件 or 現所属）」へ（現状は `Quest.quest_group_id`+links の OR＝旧）。
+   - `list_cross_group_candidates` を **group_ids 空で全 active** を返す形へ拡張。
+   - **新設** `can_access_quest(session, quest, user_id) -> bool`（owner OR (active party ∧ (参加部署0 or 現所属)))。門番の単一ソース。
+4. `app/tenant/quests/application.py`:
+   - `get_quest_detail` の門番を `can_access_quest` へ。
+   - `_apply_party_diff` の候補制限を統一条件へ（`user_ids_in_any_group`＋0件時は active 全体）。
+   - `create_quest` から「作成者が主グループ所属」検証と primary 登録を撤去（`quest_group_ids` をそのまま links 化）。
+   - `update_quest` から 409 `group_in_use` と `_reconcile_quest_groups` の孤立チェックを撤去し、単純な全体差分へ。
+   - `get_quest_group_candidates` を group_ids 空許容・門番緩和（要求者所属チェックを外す＝認証済み同一会社なら可）。
+5. **他ドメインの門番**（要調査＝どこで party gate しているか未確認）:
+   - チャット `app/tenant/chat/application.py`（`quests_repo.get_active_member` を使う箇所・行番号は要再確認）に参加部署の現所属チェックを追加（`can_access_quest` 化）。
+   - アイデア（ドメインD）・評価（ドメインF）の詳細/一覧門番も同様に `can_access_quest` へ。**現状の gate 実装箇所は未確認＝要 grep（`get_active_member`／party 判定）**。
+6. **schemas**: `QuestDetailDTO`/`QuestCardDTO` から `quest_group`（単一）を廃止し `quest_groups` に統一。作成/編集の `quest_group_id` を廃止（`quest_group_ids` のみ）。
+7. **テスト**: `doc/テスト/C_クエスト.md` §7 と `tests/quests/test_multigroup_api.py` を新モデルへ書換え（作成者別格・0件=会社全体・都度再判定失効・候補統一条件）＋ **D/E/F/L の門番 red-green**（異動で全参加部署を外れたら404 を各ドメインで）。red-green は §5.1 厳守（実装前に落ちる red を目視・コミットメッセージに証跡）。
+
+### #8 frontend 再設計③（#7 の後）
+- `QuestForm.tsx`: 「主グループ」欄を撤去 →「**参加部署**（会社ディレクトリから複数選択・アクセス条件）」。メンバーピッカーは**参加部署内**（0件時は会社全体）を部署フィルタ＋名前検索。作成者は別枠で常に所有者表示。参加部署除外時の影響人数を警告。
+- `QuestDetailView.tsx`: 参加部署表示（済みだが新DTOに追随）。
+- `SC-11`/`SC-12` 画面正本（`doc/画面設計/screens/`）を新モデルへ反映（**未着手**）。
+- `/quests/{id}/party` メンバー限定ダイアログ（**未着手**・FR-38 に記載あり）。
+- 変更後 `npm run codegen`（新DTO）→ `tsc`/`build`。
+
+### 補足
+- `doc/実装計画.md`・`impl/README.md` は本再設計を未反映＝落ち着いたら追随更新。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝`/home/t-umekawa/sc-ideaquest-G2`。**まず `git branch --show-current` で `main` 確認**。compose＝`impl/compose.yaml`（cwd=`impl`・Postgres user/pass=`ideaquest`）。
-- **QA スタック起動**＝`cd impl && docker compose --profile workers up -d --build`。frontend=`localhost:3000`／backend=`localhost:8000`（`/healthz`）／MailHog=`localhost:8025`。**コード反映は再ビルド**＝`docker compose build frontend && docker compose up -d frontend`（push だけでは反映されない）。
-- **ログイン（dev・MFAなし）**＝`/login` company_code=`ACME-01`。主要＝`user@acme.example`/`Passw0rd!`（owner・ゲーム層ダッシュボード）。残高QA＝`user2@acme.example`/`Passw0rd!`。※`sc-01-dashboard` の hero balance のみ OPS（`admin@ops.example`/`Passw0rd!`）。
-- **フロントゲート**（cwd=`impl/frontend`）＝`npx tsc --noEmit`／`npx vitest run`（現状 160）／`npm run build`／`npm run codegen`。
-- **e2e**（cwd=`impl/frontend`・docker 起動中）＝`PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test <spec> --workers=1`。**reduce テストは `page.emulateMedia({reducedMotion:"reduce"})`**。連続ログインのバーストはロックアウトに触れるので間隔をあける。ゲーム感/シェルの e2e＝`sc-99-appnav`／`sc-01-dashboard`／`sc-25-eval`／`sc-22-idea-detail`／`sc-18-loading`／`sc-30-32-balance-sync`／`sc-41-ranking`／`sc-02-notifications`／`sc-24-chat`。
-- **トレーサビリティ**（repo ルート）＝`python3 scripts/check_tc_traceability.py`（現状 ✅ code 437）。走査＝`impl/backend/tests/**/*.py` と `impl/frontend/e2e/**/*.spec.ts` のみ。
-- **backend テスト**（cwd=`impl`）＝**pytest 前に `docker compose stop worker mail-worker`**→ `docker compose run --rm -v "$(pwd)/backend:/app" --entrypoint python backend -m pytest <path> -q` → 終わったら `docker compose start worker mail-worker`。
-- **モック確認（サーバー不要）**＝`doc/画面設計/mocks/style-guide.html` を `file://` 直開き→`Ctrl+F` で節番号（「11b」＝グローバルナビ・「17N」＝レア文字グロー）。
-- **設計正本**＝`CLAUDE.md` から各規約/正本を参照。GF-AC 受入台帳＝`doc/テスト/ゲーム感受入.md`。共通シェル TC＝`doc/テスト/M_共通シェル・ナビ.md`。
-- **記憶（要確認）**＝`design-spec-working-style`(仕様は本人イメージから起こす)／`backend-connection-per-screen-loop`(1画面単位＋受入ゲート)／`cross-cutting-standard-first`(横断標準を先に)／`game-feel-mock-first-then-port`(演出はstyle-guide先行)／`mock-match-impl-layout`(モックは実装レイアウトに一致・#27 は逆に production の多様な実体にモックを合わせた)／`animation-reduce-motion-standard`(reduce は私が担保)／`frontend-build-gate-eslint`／`handoff-notes-often-stale`(未確認は着手前にコードで裏取り)／`spec-is-source-of-truth`／`progress-tracking-single-source`(現況＝impl/README.md)／`game-feel-async-pipeline`(push都度確認)／`document-design-rationale`(なぜも併記).
+- **起動**: `cd impl && docker compose up -d --build`（db/redis/minio/mailhog/backend/frontend）。ワーカは `compose.yaml` で `profiles: ["workers"]` ＝既定 up に**含まれない**設計。QA でフル起動するなら `docker compose --profile workers up -d --build`（または `docker compose up -d --build backend worker mail-worker`）。※現在は worker/mail-worker も稼働中。
+- **ポート**: backend 8000 / frontend 3000 / db 5432 / minio 9000(API)・9001(console) / mailhog 8025(UI) / redis 6379。ブラウザ QA は http://localhost:3000 。
+- **重要な落とし穴（確認済み）**:
+  - backend/frontend コンテナは**ホストコードをマウントしない**＝ソース変更は**イメージ再ビルド必須**（`docker compose up -d --build backend`／`… frontend`）。
+  - **pytest はホストコードをマウントして実行**（イメージ再ビルド不要）＝`docker compose stop worker mail-worker` の上で `docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/… -q`。cwd は `impl`。
+  - **codegen は backend が新コードで稼働している必要**（先に `docker compose up -d --build backend` → `cd impl/frontend && npm run codegen`）。
+  - migration をホストの最新コードで適用するには `docker compose run --rm -v "$(pwd)/backend:/app" backend …`（イメージ内の古いコードで走らせない）。
+- **frontend 検証**: `cd impl/frontend && npm run codegen && npx tsc --noEmit && npm run build`（build も必須＝Next の lint を見逃さないため）。
+- **テスト md 先行 & トレーサビリティ**: TC は `doc/テスト/<ドメイン>_*.md` に先に行を足す → `python3 scripts/check_tc_traceability.py` で ✅（コミット前ゲート）。
+- **seed ログイン**: `tests/conftest.py` の `SEED_COMPANY_CODE`/`SEED_LOGIN`/`SEED_PASSWORD`。管理系ログインは `tests/admin/test_admin_accounts.py:_login`。
+- **規約の正本**: リポジトリ直下 `CLAUDE.md` から各規約を参照。ゲーム感フェーズの作法は `doc/フェーズ毎ルール/ゲーム感フェーズ.md`（本タスクはレビュー反映フェーズ＝main 直コミット）。
