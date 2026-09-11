@@ -23,7 +23,9 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale, reduce_motion, mascot_follow}, profile:{display_name, avatar_image_url?, background_image_url?, avatar_base}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, system_role}`（`reduce_motion`＝アニメ演出のユーザー別 OFF・§4.9・既定 false／`mascot_follow`＝アバター追従アニメ表示・#20・既定 true・実効=表示ON かつ 非抑制・いずれも `accounts` 源泉） |
+| `GET /me` | 自分のプロフィール＋残高（正準） | — | `{account:{login_id, email, locale, reduce_motion, mascot_follow}, profile:{display_name, avatar_image_url?, background_image_url?, avatar_base}, balance:{level, xp, xp_to_next, level_span, coin_balance, skill_point_balance}, game_mode:{effective, override, company_default}, system_role}`（`reduce_motion`＝アニメ演出のユーザー別 OFF・§4.9・既定 false／`mascot_follow`＝アバター追従アニメ表示・#20・既定 true・実効=表示ON かつ 非抑制・いずれも `accounts` 源泉／`game_mode`＝レビュー#2・下記） |
+
+- **`game_mode`（ゲーム層UIの出し分け・レビュー#2）**＝`{effective:boolean, override:boolean\|null, company_default:boolean}`。`override`＝`accounts.game_mode_override`（三値・NULL=会社既定に従う）／`company_default`＝`companies.game_mode_default`（`company_config` キャッシュ源泉）／**`effective = override ?? company_default`**（フロントの gating に使う実効値）。フロントは `effective` で `(app)` レイアウトのゲーム群（ナビ/ヘッダー残高/ダッシュボード/通知/チャット魔法）を出し分け、SC-03 の3選セグメントは `override`（NULL=「会社設定に従う」・true/false=ON/OFF）で選択状態を、`company_default` で「会社設定に従う（現在：ON/OFF）」の補足表示を描く。`override` は `reduce_motion` と同じく `accounts` 源泉（会社DB `users` へミラーしない）ゆえ本 EP はコントロールプレーンからも読む（`company_default` は各リクエストで既に載る `company_config` キャッシュから・追加往復なし）。
 
 - **会社DB `users`（ミラー＋残高＋画像）から読む**（管理DB 往復なし・§1.13）。`display_name`/`email`/`locale`/`login_id` はミラー、残高は `users`、画像は**署名URL（§1.10）**に解決して返す（パスを直接返さない）。`avatar_base`（3D アバターの男女2ベース・§5.3）も `users` からそのまま返す（enum 文字列・署名URL 化不要）。
 - **ヒーロー残高**は `GET /me` が正準。ダッシュボード（I）の `GET /dashboard` は 1 往復のため同じ `users` 読取から hero を**同梱し続ける**（両立・重複ではなく別用途＝I.1／G.0 と整合）。
@@ -33,11 +35,12 @@
 
 | メソッド/パス | 概要 | リクエスト（ボディ・allowlist） | レスポンス |
 | --- | --- | --- | --- |
-| `PATCH /me` | 表示名・ロケール・アニメ設定を編集 | `{display_name?, locale?, reduce_motion?, mascot_follow?}`（**この4つのみ**受理） | 200＋更新後の `/me`（K.1 形） |
+| `PATCH /me` | 表示名・ロケール・アニメ設定・ゲームモード個人上書きを編集 | `{display_name?, locale?, reduce_motion?, mascot_follow?, game_mode_override?}`（**この5つのみ**受理・`game_mode_override` は `true`/`false`/`null` の三値） | 200＋更新後の `/me`（K.1 形） |
 
 - **`display_name`・`locale` はいずれも `accounts` 源泉**＝**管理DB `accounts` を更新＋同一Tx で `account_sync_outbox` INSERT**（§1.13）。会社DB `users` ミラーはワーカが反映（応答は更新値を即返す＝楽観的表示・実ミラーは結果整合）。**PATCH /me は単一のコントロールプレーン Tx**（両フィールドとも accounts のため跨ぎ書き込みが起きない）。
 - **`reduce_motion`（アニメ演出 OFF・デザイン標準 §4.9）は `accounts` のみ更新**＝会社DB `users` へは**ミラーしない**（identity/認証系でない UI 個人設定・consumer は未知キーを無視）。フロントは `GET /me` の値で `(app)` 直下に `data-anim-reduced` を立て、CSS キルスイッチ＋JS `reduceMotion()` が全演出を抑制する。実効 = OS `prefers-reduced-motion` OR 本値（OS が最優先の下限）。
 - **`mascot_follow`（アバター追従アニメ表示・#20）も `accounts` のみ更新**（`reduce_motion` と同様ミラーしない）。フロントは `GET /me` の値をダッシュボードの `MascotFollower` に渡し、**実効表示 = `mascot_follow` AND NOT `reduceMotion()`**（抑制が最優先＝OS reduce OR `reduce_motion` が立てば追従は出さない）。プロフィール編集では「動きを減らす」ON 時は本設定を**操作不可（disabled）**にして「自動 OFF」を明示する（保存値としての `mascot_follow` は保持＝抑制解除で元の設定に戻る）。
+- **`game_mode_override`（ゲーム層UIの個人上書き・レビュー#2）も `accounts` のみ更新**（`reduce_motion` と同様ミラーしない）。三値を明示受理＝`true`（個人ON）/`false`（個人OFF）/`null`（会社設定に従う＝上書きクリア）。**ゲームのロジック（XP/コイン付与・レベル計算）は本値と無関係に据え置き**＝本値は UI 表示の出し分け（gating）のみ（§6）。応答 `game_mode.effective` は `override ?? company_default` で再計算して返す（会社既定を個人が上書きしていない間は会社既定に即追従）。
 - **email・password は本 EP では変更しない**（重い/再認証が要る＝K.3 の専用 EP）。`login_id` は変更不可（固定・§4.2）。
 - `locale` は `ja`/`en`（enum）を検証。`display_name` は文字数上限等をサーバー検証（具体値 K.6 TBD）。
 

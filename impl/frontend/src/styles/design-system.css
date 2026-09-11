@@ -160,6 +160,8 @@ img { max-width: 100%; display: block; }
   background: var(--color-surface); color: var(--color-text); font-size: 16px; line-height: 1; cursor: pointer;
 }
 .appnav-burger:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); }
+/* ドック中は☰を隠す＝ピン時サイドバー常設で☰は no-op（ピン解除は📌）。docked と厳密一致の html.iq-nav-pinned を使う。 */
+html.iq-nav-pinned .appnav-burger { display: none; }
 
 .appnav-root { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
 .appnav-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .45); opacity: 0; transition: opacity .2s ease; }

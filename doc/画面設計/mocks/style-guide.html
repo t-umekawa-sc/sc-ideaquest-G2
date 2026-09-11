@@ -258,6 +258,17 @@
         </div>
         <div class="hint">管理画面のON/OFF設定（会社設定＝MFA必須・投票匿名化 等）向け。ネイティブ checkbox を装飾。ラベル/トラック両方 pointer・focus-visible リング。状態語（ON/OFF）は任意で併記。</div>
       </div>
+
+      <div class="field">
+        <label>セグメント（.segmented・3選以上の単一選択）</label>
+        <div class="segmented" role="radiogroup" aria-label="ゲームモード">
+          <label><input type="radio" name="game-mode" checked>会社設定に従う</label>
+          <label><input type="radio" name="game-mode">ON</label>
+          <label><input type="radio" name="game-mode">OFF</label>
+        </div>
+        <div class="segmented-note">会社設定に従う（現在：ON）</div>
+        <div class="hint">トグル（ON/OFF の2値）で足りない<strong>3選以上の単一選択</strong>設定向け。例＝<strong>ゲームモード</strong>（会社設定に従う／ON／OFF＝デザイン標準 §4.11・SC-03）。ネイティブ radio を装飾（<code>role=radiogroup</code>・矢印/Space 操作）。選択の下に<strong>現在の実効値の補足</strong>（<code>.segmented-note</code>）を添えられる。</div>
+      </div>
     </div>
   </div>
 

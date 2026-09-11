@@ -55,6 +55,8 @@ test("M-TC-003 pin makes a persistent sidebar remembered across reload, and can 
   await page.locator(".appnav-pin").click();
   await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(true);
   expect(await page.evaluate(() => localStorage.getItem("iq_nav_pinned"))).toBe("1");
+  // ドック中はヘッダーの☰は隠す（no-op のため＝ピン解除は📌）。
+  await expect(page.locator(".appnav-burger")).toBeHidden();
   // ピン時にウィンドウ全体へ横スクロールを出さない（本文はビューポート内に収まる＝ヘッダー右の余白崩れ防止）。
   const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflowX).toBeLessThanOrEqual(1); // サブピクセル誤差のみ許容
@@ -66,6 +68,8 @@ test("M-TC-003 pin makes a persistent sidebar remembered across reload, and can 
   await page.locator(".appnav-pin").click();
   await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem("iq_nav_pinned"))).toBe("0");
+  // 解除で☰は再表示（オーバーレイ操作に戻せる）。
+  await expect(page.locator(".appnav-burger")).toBeVisible();
 });
 
 test.describe("reduce-motion #1", () => {
