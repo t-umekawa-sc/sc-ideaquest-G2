@@ -15,11 +15,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
-from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission
 
 # 新規参加メンバーの既定権限（サーバー自動付与・§5.9/C.3）。
 DEFAULT_MEMBER_PERMISSIONS: tuple[str, ...] = ("vote", "idea_create", "comment")
@@ -56,6 +56,76 @@ def create_quest(
     return quest
 
 
+# ---- クエスト×クエストグループ（複数部署横断・§5.6b・FR-38）----
+
+def create_group_links(session: Session, quest_id: uuid.UUID, primary_group_id: uuid.UUID,
+                       extra_group_ids: list[uuid.UUID]) -> None:
+    """作成時のリンク登録＝主（is_primary）＋追加グループ。重複/主の二重は除外。"""
+    session.add(QuestGroupLink(quest_id=quest_id, quest_group_id=primary_group_id, is_primary=True))
+    for gid in dict.fromkeys(extra_group_ids):  # 重複除去・順序保持
+        if gid != primary_group_id:
+            session.add(QuestGroupLink(quest_id=quest_id, quest_group_id=gid, is_primary=False))
+
+
+def list_linked_group_ids(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストの関連グループ id（主を先頭・以降 created_at 昇順）。"""
+    rows = session.execute(
+        select(QuestGroupLink.quest_group_id)
+        .where(QuestGroupLink.quest_id == quest_id)
+        .order_by(QuestGroupLink.is_primary.desc(), QuestGroupLink.created_at.asc())
+    ).scalars().all()
+    return list(rows)
+
+
+def linked_groups_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[uuid.UUID]]:
+    """複数クエストの関連グループ id を一括取得（一覧 DTO・N+1 回避）。主を先頭。"""
+    if not quest_ids:
+        return {}
+    rows = session.execute(
+        select(QuestGroupLink.quest_id, QuestGroupLink.quest_group_id, QuestGroupLink.is_primary, QuestGroupLink.created_at)
+        .where(QuestGroupLink.quest_id.in_(quest_ids))
+        .order_by(QuestGroupLink.is_primary.desc(), QuestGroupLink.created_at.asc())
+    ).all()
+    out: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for qid, gid, _p, _c in rows:
+        out.setdefault(qid, []).append(gid)
+    return out
+
+
+def reconcile_extra_links(session: Session, quest_id: uuid.UUID, primary_group_id: uuid.UUID,
+                          target_group_ids: list[uuid.UUID]) -> None:
+    """関連グループを「あるべき全体像」へ差分適用（主は不変・非 primary を追加/削除）。target は主を含む集合。"""
+    target = {g for g in target_group_ids if g != primary_group_id}
+    current = set(session.execute(
+        select(QuestGroupLink.quest_group_id)
+        .where(QuestGroupLink.quest_id == quest_id, QuestGroupLink.is_primary.is_(False))
+    ).scalars().all())
+    for gid in target - current:  # 追加
+        session.add(QuestGroupLink(quest_id=quest_id, quest_group_id=gid, is_primary=False))
+    to_remove = current - target
+    if to_remove:  # 削除（非 primary のみ）
+        session.execute(delete(QuestGroupLink).where(
+            QuestGroupLink.quest_id == quest_id, QuestGroupLink.is_primary.is_(False),
+            QuestGroupLink.quest_group_id.in_(to_remove)))
+
+
+def active_member_user_ids(session: Session, quest_id: uuid.UUID) -> set[uuid.UUID]:
+    """当該クエストの有効パーティー員 user_id 集合（門番影響判定・409）。"""
+    return set(session.execute(
+        select(QuestMember.user_id).where(QuestMember.quest_id == quest_id, QuestMember.removed_at.is_(None))
+    ).scalars().all())
+
+
+def user_ids_in_any_group(session: Session, group_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """指定グループ群のいずれかに有効所属する user_id 集合（候補範囲/門番影響の判定）。"""
+    if not group_ids:
+        return set()
+    return set(session.execute(
+        select(QuestGroupMember.user_id).where(
+            QuestGroupMember.quest_group_id.in_(group_ids), QuestGroupMember.removed_at.is_(None))
+    ).scalars().all())
+
+
 def get_quest(session: Session, quest_id: uuid.UUID) -> Quest | None:
     """有効なクエスト（`deleted_at IS NULL`）を1件取得。削除済み/不在は None。"""
     return session.execute(
@@ -76,8 +146,9 @@ def list_quests_for_user(
 ) -> list[Quest]:
     """参照制限（C.1・FR-15）を満たすクエストを新着順（created_at, id DESC）で取得。
 
-    (A) 公開系＝`status != 'draft'` かつ **所属グループ内**（`quest_group_id IN visible_group_ids`）
-        かつ **自分がパーティー参加中**（当該クエストに `quest_members.removed_at IS NULL` の自分の行あり）。
+    (A) 公開系＝`status != 'draft'` かつ **関連グループのいずれかに所属**（`quest_group_links` の
+        いずれかが `visible_group_ids` に含まれる・FR-38 複数部署横断）かつ **自分がパーティー参加中**
+        （当該クエストに `quest_members.removed_at IS NULL` の自分の行あり）。
         グループ門番とパーティー門番の**両方**（C.0）を満たす行のみ返す。
     (B) 自分の下書き＝`owner_id = user_id` かつ `status = 'draft'`（パーティー門番の対象外＝本人だけに見える）。
     どちらも `deleted_at IS NULL`。ソート系は §1.8.1 の複数指定に後で対応（本スライスは新着順のみ）。
@@ -89,9 +160,19 @@ def list_quests_for_user(
         QuestMember.user_id == user_id,
         QuestMember.removed_at.is_(None),
     )
+    # 主グループ（quest_group_id・不変・backfill 済み）または追加リンクグループのいずれかが可視範囲内。
+    # 主グループを常に含めることで link 行欠落にも頑健（FR-38 拡張前データ/直 seed も従来通り可視）。
+    in_visible_group = or_(
+        Quest.quest_group_id.in_(visible_group_ids or []),
+        exists().where(
+            QuestGroupLink.quest_id == Quest.id,
+            QuestGroupLink.is_primary.is_(False),
+            QuestGroupLink.quest_group_id.in_(visible_group_ids or []),
+        ),
+    )
     public_cond = and_(
         Quest.status != "draft",
-        Quest.quest_group_id.in_(visible_group_ids or []),
+        in_visible_group,
         is_party_member,
     )
     draft_cond = and_(Quest.status == "draft", Quest.owner_id == user_id)
@@ -104,7 +185,15 @@ def list_quests_for_user(
     if status:
         stmt = stmt.where(Quest.status.in_(status))
     if group_id is not None:
-        stmt = stmt.where(Quest.quest_group_id == group_id)
+        # 関連グループ絞込＝主グループ一致 or 追加リンク一致（FR-38）。
+        stmt = stmt.where(or_(
+            Quest.quest_group_id == group_id,
+            exists().where(
+                QuestGroupLink.quest_id == Quest.id,
+                QuestGroupLink.is_primary.is_(False),
+                QuestGroupLink.quest_group_id == group_id,
+            ),
+        ))
     if cursor is not None:
         stmt = stmt.where(tuple_(Quest.created_at, Quest.id) < tuple_(cursor[0], cursor[1]))
 
@@ -275,6 +364,26 @@ def list_visible_groups(session: Session, user_id: uuid.UUID, *, q: str | None =
     return list(session.execute(stmt.order_by(QuestGroup.name)).scalars().all())
 
 
+def get_active_group_ids(session: Session, group_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """指定 id のうち有効（`deleted_at IS NULL`）なグループ id 集合（追加グループ検証・FR-38/C.2）。"""
+    if not group_ids:
+        return set()
+    return set(session.execute(
+        select(QuestGroup.id).where(QuestGroup.id.in_(group_ids), QuestGroup.deleted_at.is_(None))
+    ).scalars().all())
+
+
+def get_groups_by_ids(session: Session, group_ids: list[uuid.UUID]) -> dict[uuid.UUID, QuestGroup]:
+    """id→QuestGroup（詳細の関連グループ DTO 組み立て・N+1 回避）。"""
+    if not group_ids:
+        return {}
+    return {
+        g.id: g for g in session.execute(
+            select(QuestGroup).where(QuestGroup.id.in_(group_ids))
+        ).scalars().all()
+    }
+
+
 def list_active_group_member_user_ids(session: Session, group_id: uuid.UUID) -> set[uuid.UUID]:
     """当該グループの有効メンバー（`quest_group_members.removed_at IS NULL`）の user_id 集合（候補制限・C.3）。"""
     return set(
@@ -320,6 +429,63 @@ def list_group_member_candidates(
         stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
     return list(session.execute(stmt).scalars().all())
+
+
+def list_cross_group_candidates(
+    session: Session,
+    group_ids: list[uuid.UUID],
+    *,
+    q: str | None = None,
+    exclude_user_ids: list[uuid.UUID] | None = None,
+    cursor: tuple[str, uuid.UUID] | None = None,
+    limit: int = 20,
+) -> list:
+    """複数グループ横断のパーティー候補（FR-38・C.4 GET /quest-group-candidates）。
+
+    指定グループ群のいずれかに有効所属する `users.status='active'` を display_name→id 昇順で1件ずつ返す
+    （EXISTS で重複ユーザを集約）。`exclude_user_ids`（既参加/追加中/作成者）はサーバー側で除外。
+    """
+    from sqlalchemy import exists as sa_exists
+
+    from app.tenant.profile.orm import User
+
+    if not group_ids:
+        return []
+    stmt = select(User).where(
+        User.status == "active",
+        sa_exists().where(
+            QuestGroupMember.user_id == User.id,
+            QuestGroupMember.quest_group_id.in_(group_ids),
+            QuestGroupMember.removed_at.is_(None),
+        ),
+    )
+    if exclude_user_ids:
+        stmt = stmt.where(User.id.not_in(list(exclude_user_ids)))
+    if q:
+        stmt = stmt.where(User.display_name.ilike(f"%{q}%"))
+    if cursor is not None:
+        stmt = stmt.where(tuple_(User.display_name, User.id) > tuple_(cursor[0], cursor[1]))
+    stmt = stmt.order_by(User.display_name.asc(), User.id.asc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
+
+
+def group_ids_by_user(
+    session: Session, user_ids: list[uuid.UUID], group_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[uuid.UUID]]:
+    """候補ユーザごとに、指定グループ群のうち有効所属する group_id 一覧（横断候補 DTO の所属バッジ表示用）。"""
+    if not user_ids or not group_ids:
+        return {}
+    rows = session.execute(
+        select(QuestGroupMember.user_id, QuestGroupMember.quest_group_id).where(
+            QuestGroupMember.user_id.in_(user_ids),
+            QuestGroupMember.quest_group_id.in_(group_ids),
+            QuestGroupMember.removed_at.is_(None),
+        )
+    ).all()
+    out: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for uid, gid in rows:
+        out.setdefault(uid, []).append(gid)
+    return out
 
 
 def get_users_by_ids(session: Session, ids) -> dict:

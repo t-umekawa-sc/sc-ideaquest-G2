@@ -96,6 +96,27 @@ def list_group_member_candidates(
     return QuestCandidatesResponse(**result)
 
 
+@router.get("/quest-group-candidates", response_model=QuestCandidatesResponse)
+def list_quest_group_candidates(
+    request: Request,
+    group_ids: list[str] = Query(default=None),
+    q: str | None = None,
+    exclude_user_ids: list[str] | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = None,
+    session: dict = Depends(require_me),
+) -> QuestCandidatesResponse:
+    """複数グループ横断のパーティー候補（FR-38・SC-11/SC-12・C.4）。候補ごとに所属 group_id 配列を返す。
+
+    門番＝リクエスト者がいずれかの指定グループに有効所属（非所属は 404）。`exclude_user_ids` はサーバー側除外。読取専用。
+    """
+    result = quest_service.get_quest_group_candidates(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        group_ids=group_ids or [], q=q, exclude_user_ids=exclude_user_ids, limit=limit, cursor=cursor,
+    )
+    return QuestCandidatesResponse(**result)
+
+
 # ---- 変更系（SC-11・C.2/C.3）。認可＝require_me＋Origin/CSRF（§2.2/A.0）。業務ルールは application 強制 ----
 
 

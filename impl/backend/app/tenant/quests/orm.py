@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -49,6 +49,25 @@ class Quest(CompanyBase):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class QuestGroupLink(CompanyBase):
+    """クエスト×クエストグループ（複数部署横断・データモデル §5.6b・FR-38）。
+
+    1クエスト＝主グループ（`is_primary=true`＝`quests.quest_group_id` と一致・作成後不変）＋任意の追加グループ。
+    門番（一覧可視性）とパーティー候補は本テーブルの全グループを対象にする（従来の単一グループから拡張）。
+    """
+    __tablename__ = "quest_group_links"
+    __table_args__ = (
+        UniqueConstraint("quest_id", "quest_group_id", name="uq_quest_group_links"),
+        # 主グループは高々1（部分 UNIQUE）はマイグレーションで作成（ORM の Index では partial を表しにくいため）。
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    quest_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quest_groups.id"), nullable=False)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class QuestCategory(CompanyBase):

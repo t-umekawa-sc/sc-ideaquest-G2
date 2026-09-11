@@ -102,6 +102,21 @@
 | C-TC-205 | e2e | 詳細の実データ描画 | 詳細を開く | ヘッダー/概要/パーティーが実データ（作成者バッジ） | C.1／SC-12 |
 | C-TC-206 | e2e | 遷移→削除 | ⋯ステータスを進める→⋯削除 | in_progress に更新／削除で一覧へ・タイトル消失 | C.5／C.2 |
 
+## 7. 複数クエストグループ（複数部署横断・FR-38・C.2/C.4）
+
+> 対象＝`POST /quests`（`quest_group_ids`）・`PATCH /quests/{id}`（`quest_group_ids` 差分＋孤立 409）・`GET /quest-detail`（`quest_groups`）・`GET /quest-group-candidates`（横断候補）。門番＝一覧可視性/候補は「主＋追加リンクのいずれか」、詳細/チャットは従来どおりパーティー所属で不変。主グループ（`quest_group_id`）は作成後不変。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C-TC-220 | api | 追加グループ付き作成→詳細に関連グループ | 主G＋追加G（seed user は主Gに所属） | `POST /quests`（quest_group_ids=[追加G]） | 201・`quest_groups`=[主,追加]（主が先頭）・`quest_group`=主 | C.2／FR-38 |
+| C-TC-221 | api | 横断候補＝追加グループのメンバーを追加できる | 追加Gのみ所属ユーザ（主G非所属） | 追加Gユーザを `members` で即公開作成 | 201・当該ユーザがパーティーに含まれる（単一G時は 422 だった） | C.3／FR-38 |
+| C-TC-222 | api | 存在しない追加グループは 422 | — | `POST /quests`（quest_group_ids=[乱数]） | 422・field `quest_group_ids` | C.2 |
+| C-TC-223 | int | 一覧可視性が追加グループで成立 | 追加Gのみ所属＋パーティー員の別ユーザ | `repository.list_quests_for_user(user=別ユーザ, visible_group_ids=[追加G])` | 当該クエストが結果に含まれる（主G非所属でも追加Gリンクで可視） | C.1／FR-38 |
+| C-TC-224 | api | 横断候補 EP＝和集合＋所属 group_ids | 主G/追加Gに跨るユーザ群 | `GET /quest-group-candidates?group_ids=主&group_ids=追加` | 両Gの有効メンバーを返し、各候補に所属 `group_ids` が付く | C.4／FR-38 |
+| C-TC-225 | api | 横断候補 EP の門番 | いずれの指定Gにも非所属 | `GET /quest-group-candidates?group_ids=他G` | 404（存在秘匿） | C.4 |
+| C-TC-226 | api | PATCH で追加グループを付与 | recruiting（単一G） | `PATCH`（quest_group_ids=[追加G]） | 200・`quest_groups` が2件になる | C.2／FR-38 |
+| C-TC-227 | api | 追加グループ除外で孤立パーティー員→409 | 追加Gのみ所属のパーティー員がいる状態 | `PATCH`（quest_group_ids=[]＝追加Gを外す） | 409 conflict・`errors[].reason=group_in_use`・`user_ids` に孤立者 | C.2／FR-38 |
+
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 
 > 対象＝`impl/frontend/src/lib/deadline.ts`（`deadlineUrgency`/`deadlineCountdown`＝締切表示の切迫度・純ロジック）。DOM 非依存のみ vitest（node）で担保・UI 結線（バッジ色/脈動・SC-01/10/11/12 の ⏳ 締切）は tsc＋ブラウザ受入（GF-AC）。**トレーサビリティ検査対象外**（`src/**/*.test.ts` は非走査）＝本 md で追跡。

@@ -20,7 +20,7 @@ from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests import repository as repo
-from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -114,6 +114,8 @@ def env():
                 ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
             ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id.in_(qids)))
             ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(qids)))
+            # FR-38: API 作成クエストは quest_group_links を持つ（FK）＝クエスト削除前に掃除。
+            ts.execute(QuestGroupLink.__table__.delete().where(QuestGroupLink.quest_id.in_(qids)))
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(qids)))
         ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id == group_id))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == group_id))

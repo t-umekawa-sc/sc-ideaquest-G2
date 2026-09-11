@@ -94,6 +94,8 @@ class QuestCreateRequest(BaseModel):
     title: str
     color: str
     quest_group_id: str
+    # 追加グループ（複数部署横断・FR-38）。主グループ（quest_group_id）以外を関連付ける。省略時は単一部署。
+    quest_group_ids: list[str] = []
     categories: list[str] = []
     deadline: date | None = None
     purpose: str | None = None
@@ -118,6 +120,9 @@ class QuestUpdateRequest(BaseModel):
     purpose: str | None = None
     icon_image_path: str | None = None
     members: list[QuestMemberInput] | None = None
+    # 関連グループの「あるべき全体像」（主グループを含む/含まない両方許容・主は不変・FR-38）。
+    # 送信時のみ差分適用。追加グループを除外してパーティー員が孤立する場合は 409 group_in_use。
+    quest_group_ids: list[str] | None = None
 
 
 class QuestPublishRequest(BaseModel):
@@ -158,6 +163,8 @@ class QuestDetailDTO(BaseModel):
     idea_count: int
     owner: QuestOwnerDTO
     quest_group: QuestGroupRefDTO
+    # 関連グループ全件（主を先頭・複数部署横断 FR-38）。単一部署なら quest_group と同一の1件。
+    quest_groups: list[QuestGroupRefDTO] = []
     my_state: str
     # 自分が持つ 6 権限（フロントの UX 出し分け・実アクションは各 EP で再検証・C.1）。
     my_permissions: list[str] = []
@@ -172,11 +179,14 @@ class QuestIconImageResponse(BaseModel):
 
 
 class QuestCandidateDTO(BaseModel):
-    """パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members）。"""
+    """パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members・GET /quest-group-candidates）。"""
 
     user_id: str
     display_name: str
     avatar_image_url: str | None = None
+    # 横断候補（FR-38）で、指定グループ群のうち本人が所属する group_id 一覧（所属バッジ表示用）。
+    # 単一グループ EP では空（クライアントは group_id 既知のため不要）。
+    group_ids: list[str] = []
 
 
 class QuestCandidatesResponse(BaseModel):
