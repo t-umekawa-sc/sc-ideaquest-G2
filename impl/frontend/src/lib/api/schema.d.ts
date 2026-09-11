@@ -2967,6 +2967,13 @@ export interface components {
             evaluation: components["schemas"]["IdeaEvaluationDTO"];
             /** Comment Count */
             comment_count: number;
+            /**
+             * Unread Chat Count
+             * @default 0
+             */
+            unread_chat_count: number;
+            /** Last Chat At */
+            last_chat_at?: string | null;
             /** Is Selected */
             is_selected: boolean;
             /** Current Revision */

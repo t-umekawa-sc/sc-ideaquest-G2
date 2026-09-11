@@ -101,8 +101,11 @@ def get_ideas(account_id, company_id, quest_id, *, status=None, limit, cursor=No
         from app.tenant.evaluations import application as evals_app  # 遅延 import（循環回避）
         from app.tenant.chat import repository as chat_repo
         eval_states = evals_app.eval_states_for_ideas(ts, quest, user, rows)  # F 評価集計（SC-12 評価列・D.1）
-        comment_counts = chat_repo.count_active_messages_for_ideas(ts, [r.id for r in rows])  # E コメント数（💬）
-        data = [_idea_card(ts, r, user.id, users, vote_counts, my_votes, followed, eval_states, comment_counts) for r in rows]
+        idea_ids = [r.id for r in rows]
+        comment_counts = chat_repo.count_active_messages_for_ideas(ts, idea_ids)  # E コメント数（💬）
+        unread_counts = chat_repo.unread_counts_for_ideas(ts, idea_ids, user.id)  # 💬 新着の議論＝自分の未読（他ユーザー）
+        last_chats = chat_repo.last_message_at_for_ideas(ts, idea_ids)  # 最終チャット時刻（ソート/表示）
+        data = [_idea_card(ts, r, user.id, users, vote_counts, my_votes, followed, eval_states, comment_counts, unread_counts, last_chats) for r in rows]
         next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
@@ -725,7 +728,7 @@ def _record_initial_revision(ts, idea, editor_id) -> None:
     repo.add_revision(ts, idea.id, revision=idea.current_revision, editor_id=editor_id, changes=_content_snapshot(ts, idea))
 
 
-def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval_states=None, comment_counts=None) -> dict:
+def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval_states=None, comment_counts=None, unread_counts=None, last_chats=None) -> dict:
     author = users.get(idea.author_id)
     my_vote = my_votes.get(idea.id)  # 一括取得済み（idea_id→type・N+1 回避）
     vc = vote_counts.get(idea.id, {"approve": 0, "oppose": 0})
@@ -741,6 +744,8 @@ def _idea_card(ts, idea, viewer_id, users, vote_counts, my_votes, followed, eval
         "icon_image_url": _image_url(idea.icon_image_path) or (_image_url(author.idea_icon_image_path) if author else None),
         "vote_summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
         "comment_count": (comment_counts or {}).get(idea.id, 0),  # E 非削除チャット件数（💬・D.1）
+        "unread_chat_count": (unread_counts or {}).get(idea.id, 0),  # 💬 新着の議論＝自分の未読（他ユーザー投稿）
+        "last_chat_at": (last_chats or {}).get(idea.id),  # 最終チャット時刻（新着の議論のソート/表示）
         "is_selected": idea.is_selected,
         "current_revision": idea.current_revision,
         "updated_at": idea.updated_at,

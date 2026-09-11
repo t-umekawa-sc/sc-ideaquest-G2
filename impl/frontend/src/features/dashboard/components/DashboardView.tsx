@@ -130,14 +130,15 @@ export function DashboardView({
       if (!alive || !d) return;
       setData(d);
       setUnvotedList(d.unvoted_ideas ?? []);
-      if (d.login_bonus && !bonusShown.current) {
+      // ゲームモード OFF（§4.11）ではログインボーナス（XP獲得）の演出トーストを出さない（backend の付与は据え置き）。
+      if (gameEnabled && d.login_bonus && !bonusShown.current) {
         bonusShown.current = true;
         snackbar({ type: "reward", title: "デイリーログインボーナス！",
                    rewards: [{ k: "xp", t: `+${d.login_bonus.xp}` }], icon: "🎁" });
       }
     });
     return () => { alive = false; };
-  }, [snackbar]);
+  }, [snackbar, gameEnabled]);
 
   // 評価確定（別ルートの評価モーダル）後にダッシュボードを再取得＝**下書きの評価**が消える（確定済みは下書きに出ない）。
   // data のみ差し替え＝unvotedList（継続投票の補充 state）には触れない（GF-AC-043 を壊さない）。
@@ -176,12 +177,13 @@ export function DashboardView({
   const followed = (data?.followed_ideas ?? []).filter((f) => !unfollowed[f.id]);
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
+  const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
   const roles = data?.roles ?? {
     is_qg_admin: admin.qgAdmin, is_company_account_admin: admin.companyAdmin, is_system_admin: admin.systemAdmin,
   };
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
-    if (e) fxRef.current?.burst(e);  // 押下の手応え（成否に関わらず即時・視覚のみ）
+    if (gameEnabled && e) fxRef.current?.burst(e);  // 押下の手応え（ゲーム層演出＝OFFでは出さない・§4.11）
     // 楽観＝即座にリストから除外（＝ずれない「即時削除」と同じ土台）。残りカードは FLIP effect が
     // 旧位置→新位置へスライド（absolute 化しない＝ドリフトの原因を排除）。
     setUnvotedList((l) => (l ?? []).filter((v) => v.id !== idea.id));
@@ -194,7 +196,7 @@ export function DashboardView({
     }
     // #8: server が実際に付与した XP 差分（res.xp_delta＝初回・日次上限内なら +5・それ以外 0）でフィードバック。
     // 金額の正はサーバー（step2 で backend delta に一本化＝frontend 定数を撤去）。
-    if (res.xp_delta > 0) {
+    if (gameEnabled && res.xp_delta > 0) {  // XP フィードバック（ゲーム層演出）＝OFFでは出さない（§4.11）
       setXpBump((x) => x + res.xp_delta);
       setAwardKey((k) => k + 1);
       if (e) fxRef.current?.xpFloat(e, `+${res.xp_delta} XP`);
@@ -233,7 +235,8 @@ export function DashboardView({
 
   return (
     <div className="dash-page stack">
-      <LevelUpWatcher accountId={accountId} level={level} />
+      {/* レベルアップ祝福（ゲーム層演出）＝ゲームモード OFF では出さない（§4.11・レビュー#2）。 */}
+      {gameEnabled && <LevelUpWatcher accountId={accountId} level={level} />}
       <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
@@ -453,6 +456,29 @@ export function DashboardView({
             })}
             </AnimatePresence>
           </div>
+        </motion.section>
+      )}
+
+      {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
+          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。未読ゼロで非表示。 */}
+      {unreadChats.length > 0 && (
+        <motion.section className="card" aria-label="新着の議論" {...flowMotion(6)}>
+          <div className="section-head">
+            <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
+            <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
+          </div>
+          <ul className="unread-list">
+            {unreadChats.map((c) => (
+              <li key={c.id}>
+                <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
+                  <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
+                  <span className="unread-item__title">{c.title}</span>
+                  <span className="unread-item__quest">🎯 {c.quest.title}</span>
+                  <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </motion.section>
       )}
 

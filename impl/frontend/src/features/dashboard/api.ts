@@ -29,6 +29,13 @@ export type FollowedIdea = {
   vote_summary: VoteSummary; updated_at: string | null; following: boolean;
 };
 
+// 💬 新着の議論＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア（レビュー#3）。
+export type UnreadChatIdea = {
+  id: string; title: string; quest: { id: string; title: string; color?: string | null };
+  poster: { name: string; avatar: string | null };
+  unread_chat_count: number; last_chat_at: string | null;
+};
+
 export type QuestCard = {
   id: string; title: string; color?: string; status: string; categories?: string[];
   deadline?: string | null; member_count?: number; idea_count?: number;
@@ -44,6 +51,7 @@ export type DashboardData = {
   unvoted_ideas: UnvotedIdea[];
   quests: QuestCard[];
   followed_ideas: FollowedIdea[];
+  unread_chats: UnreadChatIdea[];
   weekly_ranking: WeeklyRanking | null;
   notifications: { data: NotificationDTO[]; unread_count: number } | null;
   roles: { is_qg_admin: boolean; is_company_account_admin: boolean; is_system_admin: boolean };

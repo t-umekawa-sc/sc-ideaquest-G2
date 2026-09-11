@@ -55,6 +55,16 @@ def get_idea(session: Session, idea_id: uuid.UUID) -> Idea | None:
     ).scalars().first()
 
 
+def get_ideas_by_ids(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, Idea]:
+    """有効なアイデアを id 一括取得（💬 新着の議論の集約等・N+1 回避）。削除済みは含めない。"""
+    if not idea_ids:
+        return {}
+    rows = session.execute(
+        select(Idea).where(Idea.id.in_(idea_ids), Idea.deleted_at.is_(None))
+    ).scalars().all()
+    return {i.id: i for i in rows}
+
+
 def list_ideas_for_quest(
     session: Session,
     *,

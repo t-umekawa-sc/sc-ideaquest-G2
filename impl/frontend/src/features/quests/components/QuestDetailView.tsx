@@ -35,6 +35,7 @@ type Idea = {
   id: string; title: string; value: string; poster: string; posterAvatar: string | null; initial: string; iconUrl: string | null; agree: number; disagree: number;
   comments: number; ev: number; evalstate: "pending" | "done"; mystate: "unvoted" | "voted" | "mine" | "draft"; created: number; draft: boolean;
   following: boolean; revision: number; myVote: "approve" | "oppose" | null;
+  unreadChat: number; lastChatAt: string | null;  // 💬 新着の議論＝自分の未読（他ユーザー投稿）・最終チャット時刻
 };
 // IdeaCardDTO（D.1）→ 行ビュー。評価（F）＝`evaluation` 集計（評価済 overall_avg=n/5・可視0は null）。あなた
 // バッジは status＋my_vote から導出（下書き＝draft／自分の投票あり＝voted／なし＝unvoted）。created＝更新からの経過日数。
@@ -50,10 +51,23 @@ function toIdeaView(c: IdeaCard): Idea {
     agree: c.vote_summary.approve, disagree: c.vote_summary.oppose, comments: c.comment_count,
     ev: c.evaluation.overall_avg ?? -1, evalstate: c.evaluation.state === "done" ? "done" : "pending",
     mystate, created: days, draft: isDraft, following: c.following, revision: c.current_revision, myVote,
+    unreadChat: c.unread_chat_count ?? 0, lastChatAt: c.last_chat_at ?? null,
   };
 }
 const YOU: Record<string, [string, string]> = { draft: ["下書き", "badge-muted"], unvoted: ["未投票", "badge-danger"], voted: ["投票済", "badge-success"], mine: ["自分の投稿", "badge-muted"] };
 const dash = <span className="muted">—</span>;
+// 相対時刻（💬 新着の議論の最終チャット時刻表示・当面 ja）。
+function chatAgo(iso: string): string {
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "たった今";
+  if (m < 60) return `${m}分前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}時間前`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}日前`;
+  return new Date(iso).toLocaleDateString("ja-JP");
+}
 
 // quest_status（enum・§3）→ ラベル/バッジ。
 const STATUS_LABEL: Record<string, string> = { draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了" };
@@ -254,6 +268,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       : ideaFilter === "unvoted" ? i.mystate === "unvoted"
         : ideaFilter === "following" ? i.following
           : i.draft);
+  // 💬 新着の議論＝このクエストで自分の未読チャットがあるアイデア（最終時刻の新しい順）。一覧から導出（追加API不要）。
+  const unreadDiscussions = (ideas ?? [])
+    .filter((i) => i.unreadChat > 0)
+    .sort((a, b) => (b.lastChatAt ?? "").localeCompare(a.lastChatAt ?? ""))
+    .slice(0, 6);
 
   const canEdit = !!quest && (quest.my_permissions.includes("owner") || quest.my_permissions.includes("quest_admin"));
   const nextStatus = quest ? STATUS_ORDER[STATUS_ORDER.indexOf(quest.status) + 1] : undefined;
@@ -324,7 +343,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       render: (r) => r.draft ? dash : <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button> },
     { key: "votes", label: "賛成 / 反対", width: 120, align: "num", sortable: true, sortVal: (r) => r.agree, csvVal: (r) => (r.draft ? "" : `▲${r.agree} ▼${r.disagree}`),
       render: (r) => r.draft ? dash : <><span className="vote-agree">▲{r.agree}</span> / <span className="vote-disagree">▼{r.disagree}</span></> },
-    { key: "comments", label: "💬", width: 64, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : String(r.comments)), render: (r) => r.draft ? dash : String(r.comments) },
+    { key: "comments", label: "💬", width: 96, align: "num", sortable: true, sortVal: (r) => r.comments, csvVal: (r) => (r.draft ? "" : r.unreadChat > 0 ? `${r.comments}(+${r.unreadChat})` : String(r.comments)),
+      render: (r) => r.draft ? dash : <span className="idea-chat-cell">{r.comments}{r.unreadChat > 0 && <span className="badge badge-danger idea-unread" title={`未読 ${r.unreadChat} 件（新着の議論）`}>+{r.unreadChat}</span>}</span> },
     { key: "eval", label: "評価", width: 110, sortable: true, filter: { type: "enum", options: [["pending", "評価待ち"], ["done", "評価済"]] }, sortVal: (r) => r.ev, filterVal: (r) => r.evalstate,
       csvVal: (r) => (r.draft ? "" : r.evalstate === "done" ? (r.ev >= 0 ? `${r.ev}/5` : "評価済") : "評価待ち"),
       render: (r) => r.draft ? dash : (r.evalstate === "done"
@@ -444,6 +464,29 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <ActivityFeed title="クエスト内アクティビティ" load={loadQuestFeed} emptyText="このクエストの活動はまだありません。" />
         </section>
         </div>{/* .quest-head-row */}
+
+        {/* 💬 新着の議論（ビジネス層・レビュー#3）＝自分の未読チャット（他ユーザー投稿）があるアイデア。
+            通知が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行する動線。未読が無ければ非表示。 */}
+        {unreadDiscussions.length > 0 && (
+          <section className="card unread-panel" aria-label="新着の議論">
+            <div className="section-head">
+              <h2 className="unread-panel__title">💬 新着の議論</h2>
+              <span className="unread-panel__n">{unreadDiscussions.reduce((s, i) => s + i.unreadChat, 0)} 件の未読</span>
+            </div>
+            <ul className="unread-list">
+              {unreadDiscussions.map((i) => (
+                <li key={i.id}>
+                  <Link className="unread-item" href={`/ideas/${i.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>
+                    <QuestIcon name={i.title} color={quest.color} imageUrl={i.iconUrl ?? undefined} size="xs" />
+                    <span className="unread-item__title">{i.title}</span>
+                    <span className="badge badge-danger">💬 +{i.unreadChat}</span>
+                    {i.lastChatAt && <span className="unread-item__time">{chatAgo(i.lastChatAt)}</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}
         {gameEnabled && (

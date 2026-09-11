@@ -17,6 +17,7 @@ from app.db.tenant import get_tenant_session
 from app.infra.cache import get_redis
 from app.infra.storage import get_storage
 from app.tenant.dashboard import login_bonus
+from app.tenant.chat import repository as chat_repo
 from app.tenant.evaluations import repository as evals_repo
 from app.tenant.gamification import application as gami_app
 from app.tenant.gamification.level import level_progress
@@ -34,6 +35,7 @@ _EVAL_ASPECTS_TOTAL = 5   # 評価観点数（novelty/impact/feasibility/fit/cos
 _UNVOTED_LIMIT = 6
 _QUESTS_LIMIT = 6
 _FOLLOWED_LIMIT = 6
+_UNREAD_CHATS_LIMIT = 6
 _NOTIF_LIMIT = 5
 _NON_DRAFT_STATUS = ["recruiting", "in_progress", "evaluating", "completed"]
 
@@ -153,6 +155,31 @@ def _followed(ts, user: User) -> list[dict]:
     } for i in ideas]
 
 
+def _unread_chats(ts, user: User) -> list[dict]:
+    """💬 新着の議論＝参加クエスト横断で、自分の未読チャット（他ユーザー投稿）があるアイデア（最終時刻順・SC-01）。
+    通知（自分宛のみ）が拾わない「他ユーザー同士の会話」にも気付く動線（レビュー#3）。
+    """
+    quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+    rows = chat_repo.ideas_with_unread(ts, user.id, quest_ids, limit=_UNREAD_CHATS_LIMIT)
+    if not rows:
+        return []
+    ideas = ideas_repo.get_ideas_by_ids(ts, [iid for iid, _, _ in rows])
+    quests, posters, _ = _batch_refs(ts, list(ideas.values()))
+    out: list[dict] = []
+    for iid, unread, last_at in rows:
+        i = ideas.get(iid)
+        if i is None:
+            continue
+        out.append({
+            "id": str(i.id), "title": i.title,
+            "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id)),
+            "poster": _poster_from(posters.get(i.author_id)),
+            "unread_chat_count": unread,
+            "last_chat_at": last_at.isoformat() if last_at else None,
+        })
+    return out
+
+
 def get_dashboard(session: dict) -> dict:
     """SC-01 の全パネルを1レスポンスに集約（I.1）。session＝require_me の戻り（account/company/role/user）。"""
     account_id = uuid.UUID(session["account_id"])
@@ -168,6 +195,7 @@ def get_dashboard(session: dict) -> dict:
         drafts = _safe(lambda: _drafts(ts, account_id, company_id, user), default=[])
         unvoted = _safe(lambda: _unvoted(ts, user), default=[])
         followed = _safe(lambda: _followed(ts, user), default=[])
+        unread_chats = _safe(lambda: _unread_chats(ts, user), default=[])
 
     # リッチパネルは各ドメイン application を再利用（自前セッション・best-effort）。
     quests = _safe(
@@ -187,6 +215,6 @@ def get_dashboard(session: dict) -> dict:
 
     return {
         "hero": hero, "drafts": drafts, "unvoted_ideas": unvoted, "quests": quests,
-        "followed_ideas": followed, "weekly_ranking": weekly_ranking,
+        "followed_ideas": followed, "unread_chats": unread_chats, "weekly_ranking": weekly_ranking,
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
     }

@@ -166,6 +166,8 @@ class IdeaCardDTO(BaseModel):
     vote_summary: IdeaVoteSummaryDTO
     evaluation: IdeaEvaluationDTO  # 評価集計（SC-12 評価列・F）
     comment_count: int  # E 非削除チャット件数（💬・SC-12）
+    unread_chat_count: int = 0  # 自分の未読（他ユーザー投稿）＝💬 新着の議論・レビュー#3
+    last_chat_at: datetime | None = None  # 最終チャット時刻（新着の議論のソート/表示用）
     is_selected: bool
     current_revision: int
     updated_at: datetime

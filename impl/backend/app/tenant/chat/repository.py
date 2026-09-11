@@ -9,10 +9,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select, tuple_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, Reaction, ReactionEmoji, Spell, UserSpell
-from app.tenant.ideas.orm import Attachment
+from app.tenant.ideas.orm import Attachment, Idea
 
 
 # ---- チャットグループ（§5.15・publish で作成／アクセス時に遅延生成） ----
@@ -184,6 +184,85 @@ def count_active_messages_for_ideas(session: Session, idea_ids: list[uuid.UUID])
         .group_by(ChatGroup.idea_id)
     ).all()
     return {iid: int(n) for iid, n in rows}
+
+
+def unread_counts_for_ideas(session: Session, idea_ids: list[uuid.UUID], user_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """アイデアごとの「自分の未読（他ユーザー投稿）」件数（💬 新着の議論・レビュー#3）。
+
+    自分の既読カーソル（`chat_reads.last_read_message_id` の `(created_at, id)`）より後の、**自分以外**が投稿した
+    未削除メッセージ数。chat_reads 行が無ければ全件が未読。自分の投稿は数えない（他ユーザーのやり取りに気付く目的）。
+    未読なし/chat_group 未生成は結果に出ない（＝0）。
+    """
+    if not idea_ids:
+        return {}
+    last_read = aliased(ChatMessage)  # 既読カーソルのメッセージ（(created_at,id) 取得用）
+    rows = session.execute(
+        select(ChatGroup.idea_id, func.count(ChatMessage.id))
+        .select_from(ChatGroup)
+        .join(ChatMessage, and_(
+            ChatMessage.chat_group_id == ChatGroup.id,
+            ChatMessage.is_deleted.is_(False),
+            ChatMessage.author_id != user_id,  # 自分の投稿は未読に数えない
+        ))
+        .outerjoin(ChatRead, and_(ChatRead.chat_group_id == ChatGroup.id, ChatRead.user_id == user_id))
+        .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
+        .where(
+            ChatGroup.idea_id.in_(idea_ids),
+            or_(
+                ChatRead.last_read_message_id.is_(None),  # 既読カーソル無し＝全件未読
+                tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(last_read.created_at, last_read.id),
+            ),
+        )
+        .group_by(ChatGroup.idea_id)
+    ).all()
+    return {iid: int(n) for iid, n in rows}
+
+
+def last_message_at_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, datetime]:
+    """アイデアごとの最終チャット時刻（💬 新着の議論のソート/表示用）。非削除メッセージの max(created_at)。"""
+    if not idea_ids:
+        return {}
+    rows = session.execute(
+        select(ChatGroup.idea_id, func.max(ChatMessage.created_at))
+        .select_from(ChatGroup)
+        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
+        .where(ChatGroup.idea_id.in_(idea_ids))
+        .group_by(ChatGroup.idea_id)
+    ).all()
+    return {iid: dt for iid, dt in rows}
+
+
+def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID],
+                      limit: int = 8) -> list[tuple[uuid.UUID, int, datetime]]:
+    """参加クエスト（quest_ids）の公開アイデアのうち、自分の未読（他ユーザー投稿）があるものを
+    最終チャット時刻の新しい順に返す（💬 新着の議論・ダッシュボード横断）。返り＝[(idea_id, unread, last_at)]。
+
+    未読の定義は `unread_counts_for_ideas` と同じ（他ユーザー投稿・既読カーソル後）。last_at は全メッセージの
+    最終時刻（並び用）。unread が 0 のアイデアは返さない（HAVING）。
+    """
+    if not quest_ids:
+        return []
+    last_read = aliased(ChatMessage)
+    is_unread = and_(
+        ChatMessage.author_id != user_id,
+        or_(ChatRead.last_read_message_id.is_(None),
+            tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(last_read.created_at, last_read.id)),
+    )
+    unread_ct = func.count(ChatMessage.id).filter(is_unread)  # FILTER＝未読のみ計数（Postgres）
+    rows = session.execute(
+        select(ChatGroup.idea_id, unread_ct.label("unread"), func.max(ChatMessage.created_at).label("last_at"))
+        .select_from(ChatGroup)
+        .join(Idea, and_(Idea.id == ChatGroup.idea_id, Idea.status == "published", Idea.deleted_at.is_(None)))
+        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
+        .outerjoin(ChatRead, and_(ChatRead.chat_group_id == ChatGroup.id, ChatRead.user_id == user_id))
+        .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
+        .where(Idea.quest_id.in_(quest_ids))
+        .group_by(ChatGroup.idea_id)
+        .having(unread_ct > 0)
+        .order_by(func.max(ChatMessage.created_at).desc())
+        .limit(limit)
+    ).all()
+    return [(iid, int(u), last_at) for iid, u, last_at in rows]
 
 
 def count_messages_after(session: Session, chat_group_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> int:

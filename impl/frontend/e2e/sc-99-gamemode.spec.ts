@@ -116,3 +116,59 @@ test("M-TC-009 game mode OFF hides chat magic cast UI (normal reactions and body
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
+
+
+test("M-TC-010 quest screen game mode OFF hides KPI/ranking, keeps business panels (#2)", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `GM_Q_${stamp}`);
+  try {
+    await setGameOverride(page, false); // 実効 OFF
+    await page.goto(`/quests/${questId}`);
+    await expect(page.locator(".app-header")).toBeVisible();
+    await expect(page.getByRole("heading", { name: `GM_Q_${stamp}` })).toBeVisible();
+    // ゲーム層パネル（KPI／クエスト内ランキング／その行）は非表示。
+    await expect(page.locator(".quest-panels")).toHaveCount(0);
+    await expect(page.locator(".quest-kpi")).toHaveCount(0);
+    await expect(page.locator(".rank-panel")).toHaveCount(0);
+    // 業務要素は残る＝クエスト情報ヘッダー・タブ・アイデアタブのツールバー（追加ボタン）。
+    await expect(page.locator(".quest-head")).toBeVisible();
+    await expect(page.locator("#quest-tabs")).toBeVisible();
+    await expect(page.getByRole("button", { name: "＋ アイデアを追加" })).toBeVisible();
+  } finally {
+    await setGameOverride(page, null);
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
+
+test("M-TC-011 level-up celebration is suppressed when game mode is OFF (positive control on) (#2)", async ({ page }) => {
+  await login(page);
+  // 既定（ゲームON）でダッシュボードを開き、LevelUpWatcher に既観測レベルを書かせる（初回は祝福しない）。
+  await page.goto("/");
+  await expect(page.locator(".app-header")).toBeVisible();
+  const key = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith("iq:lastSeenLevel:"));
+    if (k) localStorage.setItem(k, "1"); // 既観測を下げる＝次回マウントで「上がった」＝祝福条件成立
+    return k ?? null;
+  });
+  expect(key, "ダッシュボード表示後に lastSeenLevel キーが存在するはず").toBeTruthy();
+  try {
+    // 陽性対照を先に＝ゲームON＋既観測 1 で祝福が「出る」ことを確認（トリガ成立＝以後の OFF 不在確認が有意になる）。
+    await page.evaluate((k) => localStorage.setItem(k as string, "1"), key);
+    await page.goto("/");
+    await expect(page.locator(".levelup-overlay")).toBeVisible();  // timeout 内で出現を待つ
+    // ゲームOFF＝LevelUpWatcher 自体が未マウント＝祝福オーバーレイは出ない。出るなら出ている猶予（1.5s）後に不在確認。
+    await setGameOverride(page, false);
+    await page.evaluate((k) => localStorage.setItem(k as string, "1"), key);
+    await page.goto("/");
+    await expect(page.locator(".app-header")).toBeVisible();
+    // 出るなら ~mount 直後に描画され 2.6s 表示される。1s 待った「時点」で不在を点検（非リトライの count()＝
+    // toHaveCount(0) だと自動消滅で 0 になり pass してしまうため使わない）。
+    await page.waitForTimeout(1000);
+    expect(await page.locator(".levelup-overlay").count(), "ゲームOFF では祝福オーバーレイが出ない").toBe(0);
+  } finally {
+    await setGameOverride(page, null);
+    await page.evaluate((k) => { try { localStorage.removeItem(k as string); } catch { /* noop */ } }, key);
+  }
+});

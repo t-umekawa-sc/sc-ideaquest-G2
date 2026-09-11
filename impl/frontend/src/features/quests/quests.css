@@ -128,5 +128,8 @@
 /* レビュー#3＝標準 DataTable に足した機能のスタイル＝提案価値セル／フォロー★／クイック投票ボタン。 */
 /* 提案価値セル（テーブル列）＝2行でクランプ（改行は保持）。カードは .dt-card__summary（DataTable 標準）で表示。 */
 .idea-value-cell { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
+/* 💬 列＝コメント数＋未読バッジ（+N）。 */
+.idea-chat-cell { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.idea-unread { font-size: var(--text-xs); padding: 0 6px; }
 .idea-follow { border: none; background: none; cursor: pointer; font-size: var(--text-lg); line-height: 1; color: var(--color-border-strong); padding: 0 2px; }
 .idea-follow.is-on { color: var(--color-warning); }
