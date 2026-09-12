@@ -223,17 +223,8 @@
           .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
           .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
           .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
-          /* 部署絞込＝検索付き複数選択コンボ（多数部署でもスクロールで対応）。 */
-          .mp__deptms { position: relative; flex: 1; min-width: 220px; }
-          .mp__deptctl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); padding: 4px 6px; cursor: text; }
-          .mp__deptchip { display: inline-flex; align-items: center; gap: 4px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 999px; font-size: var(--text-xs); padding: 2px 8px; }
-          .mp__deptchip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; line-height: 1; }
-          .mp__deptinput { flex: 1; min-width: 90px; border: none; outline: none; background: transparent; font-size: var(--text-sm); }
-          .mp__deptmenu { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 2px); max-height: 220px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,.12)); }
-          .mp__deptopt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: var(--text-sm); }
-          .mp__deptopt:hover, .mp__deptopt.is-active { background: var(--color-primary-soft); }
-          .mp__deptopt[aria-selected="true"]::after { content: "✓"; color: var(--color-primary); font-weight: 700; }
-          .mp__deptcount { font-size: var(--text-xs); color: var(--color-text-muted); }
+          /* 部署絞込＝標準の複数選択コンボ（.multiselect）。行内で伸ばす。 */
+          .mp__deptselect { flex: 1; min-width: 220px; }
           .mp__search { flex: 1; min-width: 160px; }
           .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
           .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; max-height: 180px; overflow-y: auto; }
@@ -255,11 +246,28 @@
           <div class="mp__filters">
             <div class="mp__row">
               <span class="mp__deptlabel">部署で絞込:</span>
-              <div class="mp__deptms" id="mpDeptMs">
-                <div class="mp__deptctl" id="mpDeptCtl">
-                  <input class="mp__deptinput" id="mpDeptInput" type="text" placeholder="部署を検索して複数選択…（未選択＝全部署）" aria-label="部署で絞り込み（複数選択）" role="combobox" aria-expanded="false">
+              <!-- 標準の複数選択コンボ（.multiselect・候補のみ／自由入力なし・shared.js が初期化）。 -->
+              <div class="multiselect mp__deptselect" data-multiselect id="mpDeptSelect">
+                <div class="multiselect__control">
+                  <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="部署を検索して複数選択…（未選択＝全部署）" aria-label="部署で絞り込み（複数選択）">
                 </div>
-                <div class="mp__deptmenu" id="mpDeptMenu" hidden></div>
+                <ul class="multiselect__list" role="listbox" hidden>
+                  <li class="multiselect__option" role="option" data-value="開発部">開発部</li>
+                  <li class="multiselect__option" role="option" data-value="開発部1課">開発部1課</li>
+                  <li class="multiselect__option" role="option" data-value="開発部2課">開発部2課</li>
+                  <li class="multiselect__option" role="option" data-value="営業部">営業部</li>
+                  <li class="multiselect__option" role="option" data-value="営業部 東日本">営業部 東日本</li>
+                  <li class="multiselect__option" role="option" data-value="営業部 西日本">営業部 西日本</li>
+                  <li class="multiselect__option" role="option" data-value="情シス">情シス</li>
+                  <li class="multiselect__option" role="option" data-value="経理部">経理部</li>
+                  <li class="multiselect__option" role="option" data-value="総務部">総務部</li>
+                  <li class="multiselect__option" role="option" data-value="人事部">人事部</li>
+                  <li class="multiselect__option" role="option" data-value="法務部">法務部</li>
+                  <li class="multiselect__option" role="option" data-value="物流部">物流部</li>
+                  <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+                  <li class="multiselect__option" role="option" data-value="広報部">広報部</li>
+                  <li class="multiselect__empty" role="presentation" hidden></li>
+                </ul>
               </div>
             </div>
             <div class="mp__row">
@@ -4389,9 +4397,7 @@
   (function () {
     const root = document.getElementById('mpDemo');
     if (!root) return;
-    // 大企業想定＝多数の部署（検索＋スクロールで選ぶ）。
-    const DEPTS = ['開発部', '開発部1課', '開発部2課', '営業部', '営業部 東日本', '営業部 西日本',
-      '情シス', '経理部', '総務部', '人事部', '法務部', '物流部', 'カスタマーサクセス', '広報部'];
+    // 大企業想定＝多数の部署（部署の選択肢は HTML の .multiselect に定義・shared.js が初期化）。候補デモ：
     const CANDS = [
       { name: '佐藤 花子', dept: '開発部1課' }, { name: '鈴木 一郎', dept: '営業部 東日本' },
       { name: '田中 みゆき', dept: '開発部2課' }, { name: '高橋 健', dept: '情シス' },
@@ -4400,8 +4406,7 @@
       { name: '加藤 舞', dept: '開発部1課' }, { name: '山本 涼', dept: 'カスタマーサクセス' },
     ];
     const added = new Set();            // 追加済みメンバー名
-    const selDepts = new Set();         // 絞込に選んだ部署（空＝全部署）
-    let deptQuery = '', active = -1;
+    let selDepts = new Set();           // 絞込に選んだ部署（空＝全部署）＝標準 .multiselect のチップから読む
 
     const cands = root.querySelector('#mpCands');
     const empty = root.querySelector('#mpEmpty');
@@ -4409,9 +4414,7 @@
     const count = root.querySelector('#mpCount');
     const clearBtn = root.querySelector('#mpClear');
     const search = root.querySelector('#mpSearch');
-    const ctl = root.querySelector('#mpDeptCtl');
-    const input = root.querySelector('#mpDeptInput');
-    const menu = root.querySelector('#mpDeptMenu');
+    const deptSelect = root.querySelector('#mpDeptSelect');
     const ini = (n) => n.trim().charAt(0);
 
     // --- 候補リスト描画（部署絞込〔和集合〕＋名前検索＋追加済み除外） ---
@@ -4462,44 +4465,13 @@
     });
     search.addEventListener('input', renderCands);
 
-    // --- 部署の複数選択コンボ（検索＋スクロール＋チップ） ---
-    function renderChips() {
-      ctl.querySelectorAll('.mp__deptchip').forEach((c) => c.remove());
-      [...selDepts].forEach((d) => {
-        const chip = document.createElement('span');
-        chip.className = 'mp__deptchip';
-        chip.innerHTML = d + '<button type="button" aria-label="' + d + ' を絞込から外す" data-dept="' + d + '">✕</button>';
-        ctl.insertBefore(chip, input);
-      });
+    // --- 部署絞込＝標準 .multiselect（shared.js が初期化・候補のみ／自由入力なし）。 ---
+    // 選択チップ（.multiselect__chip[data-value]）の増減を監視して、候補を再絞込（和集合／空＝全部署）。
+    function readSelDepts() {
+      selDepts = new Set([...deptSelect.querySelectorAll('.multiselect__chip')].map((c) => c.dataset.value));
     }
-    function openMenu() { menu.hidden = false; input.setAttribute('aria-expanded', 'true'); renderMenu(); }
-    function closeMenu() { menu.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; }
-    function visibleDepts() {
-      const q = deptQuery.trim();
-      return DEPTS.filter((d) => !selDepts.has(d) && (!q || d.includes(q)));
-    }
-    function renderMenu() {
-      const vis = visibleDepts();
-      menu.innerHTML = vis.length
-        ? vis.map((d, i) => '<div class="mp__deptopt' + (i === active ? ' is-active' : '') + '" role="option" data-dept="' + d + '">' + d + '</div>').join('')
-        : '<div class="mp__deptopt" aria-disabled="true" style="cursor:default;color:var(--color-text-muted)">該当する部署がありません</div>';
-    }
-    function pickDept(d) { selDepts.add(d); deptQuery = ''; input.value = ''; renderChips(); renderMenu(); renderCands(); input.focus(); }
-
-    ctl.addEventListener('click', () => { input.focus(); openMenu(); });
-    input.addEventListener('focus', openMenu);
-    input.addEventListener('input', () => { deptQuery = input.value; active = -1; if (menu.hidden) openMenu(); else renderMenu(); });
-    input.addEventListener('keydown', (e) => {
-      const vis = visibleDepts();
-      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, vis.length - 1); renderMenu(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); renderMenu(); }
-      else if (e.key === 'Enter') { e.preventDefault(); if (vis[active]) pickDept(vis[active]); else if (vis.length === 1) pickDept(vis[0]); }
-      else if (e.key === 'Backspace' && !input.value && selDepts.size) { const last = [...selDepts].pop(); selDepts.delete(last); renderChips(); renderMenu(); renderCands(); }
-      else if (e.key === 'Escape') { closeMenu(); }
-    });
-    menu.addEventListener('mousedown', (e) => { const o = e.target.closest('.mp__deptopt'); if (o && o.dataset.dept) { e.preventDefault(); pickDept(o.dataset.dept); } });
-    ctl.addEventListener('click', (e) => { const x = e.target.closest('.mp__deptchip button'); if (x) { selDepts.delete(x.dataset.dept); renderChips(); renderMenu(); renderCands(); } });
-    document.addEventListener('mousedown', (e) => { if (!root.querySelector('#mpDeptMs').contains(e.target)) closeMenu(); });
+    new MutationObserver(() => { readSelDepts(); renderCands(); })
+      .observe(deptSelect.querySelector('.multiselect__control'), { childList: true });
 
     renderCands(); recount();
   })();
