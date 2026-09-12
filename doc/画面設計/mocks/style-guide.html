@@ -227,7 +227,10 @@
           .mp__deptselect { flex: 1; min-width: 220px; }
           .mp__search { flex: 1; min-width: 160px; }
           .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
-          .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; max-height: 180px; overflow-y: auto; }
+          .mp__candmeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+          .mp__toomany { color: var(--color-warning, #b45309); }
+          .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; max-height: 200px; overflow-y: auto; }
+          .mp__more { margin: 0 12px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 4px 12px; cursor: pointer; }
           .mp-cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
           .mp-cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
           .mp-cand__dept { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 7px; }
@@ -236,7 +239,7 @@
           .mp__selhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
           .mp__clear { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; padding: 2px 10px; cursor: pointer; }
           .mp__clear:disabled { opacity: .45; cursor: default; }
-          .mp__sel { display: flex; flex-direction: column; }
+          .mp__sel { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
           .mp-sel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
           .mp-sel[data-out] { opacity: .62; }
           .mp-sel__name { font-weight: 600; flex: 1; }
@@ -272,17 +275,19 @@
             </div>
             <div class="mp__row">
               <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
-              <button type="button" class="mp__addall" id="mpAddAll">表示中を全員追加</button>
+              <button type="button" class="mp__addall" id="mpAddAll">該当をすべて追加</button>
             </div>
           </div>
+          <div class="mp__candmeta"><span id="mpCandMeta">候補 0 名</span><span id="mpCandHint" class="mp__toomany" hidden>絞り込んでください</span></div>
           <div class="mp__cands" id="mpCands"></div>
+          <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
           <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
           <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span><button type="button" class="mp__clear" id="mpClear" disabled>選択をすべて解除</button></div>
           <div class="mp__sel" id="mpSel">
             <div class="mp-sel"><span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span><span class="mp-sel__name">山田 太郎</span><span class="badge badge-muted">あなた・作成者</span></div>
           </div>
         </div>
-        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>「選択をすべて解除」</strong>で追加メンバーを一括削除（作成者は別格で残る）。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（本採用時は既存 <code>.multiselect</code> / Multiselect コンポーネントを流用）。</div>
+        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>「選択をすべて解除」</strong>で追加メンバーを一括削除（作成者は別格で残る）。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4397,14 +4402,18 @@
   (function () {
     const root = document.getElementById('mpDemo');
     if (!root) return;
-    // 大企業想定＝多数の部署（部署の選択肢は HTML の .multiselect に定義・shared.js が初期化）。候補デモ：
-    const CANDS = [
-      { name: '佐藤 花子', dept: '開発部1課' }, { name: '鈴木 一郎', dept: '営業部 東日本' },
-      { name: '田中 みゆき', dept: '開発部2課' }, { name: '高橋 健', dept: '情シス' },
-      { name: '伊藤 直子', dept: '営業部 西日本' }, { name: '渡辺 剛', dept: '経理部' },
-      { name: '中村 彩', dept: '人事部' }, { name: '小林 大輔', dept: '物流部' },
-      { name: '加藤 舞', dept: '開発部1課' }, { name: '山本 涼', dept: 'カスタマーサクセス' },
-    ];
+    // 大企業想定（〜1000人規模）＝候補が大量になるケースをデモ。部署の選択肢は HTML の .multiselect（shared.js 初期化）。
+    // 実装ではサーバー側キーセットページング（GET /quest-group-candidates?limit&cursor・q・group_ids）で取得する。
+    const DEPTS = ['開発部', '開発部1課', '開発部2課', '営業部', '営業部 東日本', '営業部 西日本',
+      '情シス', '経理部', '総務部', '人事部', '法務部', '物流部', 'カスタマーサクセス', '広報部'];
+    const SEI = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村', '小林', '山本', '加藤', '吉田', '山田', '松本', '井上'];
+    const MEI = ['花子', '一郎', '健', 'みゆき', '直子', '剛', '彩', '大輔', '舞', '涼', '翔', '結衣', '拓也', '愛'];
+    const CANDS = []; // 〜700 名のデモ（1000人規模の関係者を想定）
+    for (let i = 0; i < 700; i++) {
+      CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + (i)), dept: DEPTS[(i * 5) % DEPTS.length] });
+    }
+    const PAGE = 24;                    // 1ページの表示件数（もっと見る）
+    let shown = PAGE;                   // 現在の表示件数（絞込変更でリセット）
     const added = new Set();            // 追加済みメンバー名
     let selDepts = new Set();           // 絞込に選んだ部署（空＝全部署）＝標準 .multiselect のチップから読む
 
@@ -4415,20 +4424,37 @@
     const clearBtn = root.querySelector('#mpClear');
     const search = root.querySelector('#mpSearch');
     const deptSelect = root.querySelector('#mpDeptSelect');
+    const meta = root.querySelector('#mpCandMeta');
+    const hint = root.querySelector('#mpCandHint');
+    const moreBtn = root.querySelector('#mpMore');
+    const TOO_MANY = 200;               // これ以上は絞り込みを促す（サーバー側は limit+cursor で保護）
     const ini = (n) => n.trim().charAt(0);
 
-    // --- 候補リスト描画（部署絞込〔和集合〕＋名前検索＋追加済み除外） ---
-    function renderCands() {
+    // 現在の絞込（部署=和集合／名前）に一致する候補（追加済みは除外）。実装ではサーバーが返す。
+    function filtered() {
       const q = (search.value || '').trim();
-      const list = CANDS.filter((c) => !added.has(c.name)
+      return CANDS.filter((c) => !added.has(c.name)
         && (selDepts.size === 0 || selDepts.has(c.dept))
         && (!q || c.name.includes(q)));
-      cands.innerHTML = list.map((c) =>
+    }
+    // --- 候補リスト描画（ページング＝先頭 shown 件＋「もっと見る」・件数表示・絞り込み促し） ---
+    function renderCands() {
+      const list = filtered();
+      const page = list.slice(0, shown);
+      cands.innerHTML = page.map((c) =>
         '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">'
         + ini(c.name) + '</span></span><span>' + c.name + '</span><span class="mp-cand__dept">' + c.dept
         + '</span><span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
       empty.hidden = list.length > 0;
+      meta.textContent = '候補 ' + list.length + ' 名（表示 ' + Math.min(shown, list.length) + '）';
+      const remain = list.length - page.length;
+      moreBtn.hidden = remain <= 0;
+      if (remain > 0) moreBtn.textContent = 'もっと見る（残り ' + remain + '）';
+      // 関係者が多すぎる時は部署/名前での絞り込みを促す（1000人規模の考慮）。
+      hint.hidden = list.length <= TOO_MANY;
     }
+    function resetAndRender() { shown = PAGE; renderCands(); }
+    moreBtn.addEventListener('click', () => { shown += PAGE; renderCands(); });
     function recount() {
       const n = sel.querySelectorAll('.mp-sel').length;
       count.textContent = String(n);
@@ -4450,7 +4476,11 @@
       addMember(c.dataset.name); renderCands(); recount();
     });
     root.querySelector('#mpAddAll').addEventListener('click', () => {
-      [...cands.querySelectorAll('.mp-cand')].forEach((c) => addMember(c.dataset.name));
+      // 「該当をすべて追加」＝表示中だけでなく現在の絞込に一致する全員（大量時は確認）。実装はサーバーで一括解決。
+      const list = filtered();
+      if (list.length === 0) return;
+      if (list.length > 50 && !confirm('該当する ' + list.length + ' 名をすべてパーティーに追加します。よろしいですか？')) return;
+      list.forEach((c) => addMember(c.name));
       renderCands(); recount();
     });
     sel.addEventListener('click', (e) => {
@@ -4463,14 +4493,14 @@
       [...sel.querySelectorAll('.mp-sel')].slice(1).forEach((r) => r.remove());
       renderCands(); recount();
     });
-    search.addEventListener('input', renderCands);
+    search.addEventListener('input', resetAndRender);
 
     // --- 部署絞込＝標準 .multiselect（shared.js が初期化・候補のみ／自由入力なし）。 ---
     // 選択チップ（.multiselect__chip[data-value]）の増減を監視して、候補を再絞込（和集合／空＝全部署）。
     function readSelDepts() {
       selDepts = new Set([...deptSelect.querySelectorAll('.multiselect__chip')].map((c) => c.dataset.value));
     }
-    new MutationObserver(() => { readSelDepts(); renderCands(); })
+    new MutationObserver(() => { readSelDepts(); resetAndRender(); })
       .observe(deptSelect.querySelector('.multiselect__control'), { childList: true });
 
     renderCands(); recount();
