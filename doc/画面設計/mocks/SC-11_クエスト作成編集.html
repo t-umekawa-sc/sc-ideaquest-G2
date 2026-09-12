@@ -43,6 +43,45 @@
   .cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
   .cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
   .cand[hidden] { display: none; }
+
+  /* メンバー選択（新パーティーUI・FR-38 再設計）＝style-guide.html「メンバー選択」と同一の制御。候補スコープは上の #groupSelect（参加部署）。 */
+  .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+  .mp__scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-primary-soft); font-size: var(--text-xs); }
+  .mp__scope-label { font-weight: 700; color: var(--color-primary); }
+  .mp__scope-chip { background: var(--color-surface); border: 1px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; padding: 1px 8px; }
+  .mp__scope-all { color: var(--color-text-muted); font-weight: 700; }
+  .mp__scope-note { color: var(--color-text-muted); }
+  .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .mp__row--end { justify-content: flex-end; }
+  .mp__row--split { justify-content: space-between; }
+  .mp__search { flex: 1; min-width: 160px; }
+  .mp .btn:disabled { opacity: .5; cursor: default; }
+  .mp__candmeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .mp__toomany { color: var(--color-warning, #b45309); }
+  .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; max-height: 200px; overflow-y: auto; }
+  .mp__more { margin: 0 12px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 4px 12px; cursor: pointer; }
+  .mp-cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
+  .mp-cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
+  .mp-cand__dept { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 7px; }
+  .mp-cand__plus { color: var(--color-primary); font-weight: 700; }
+  .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
+  .mp__selhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .mp__selfilters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--color-surface-alt); border-top: 1px solid var(--color-border); }
+  .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+  .mp__seltoggle[aria-pressed="true"] { border-color: var(--color-danger); background: var(--color-disagree-bg); color: var(--color-danger); font-weight: 700; }
+  .mp__sel { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
+  .mp-sel { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
+  .mp-sel[data-out] { opacity: .62; }
+  .mp-sel__main { flex: 1; min-width: 0; }
+  .mp-sel__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mp-sel__name { font-weight: 600; }
+  .mp-sel__x { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 15px; padding: 2px 4px; }
+  .mp-perms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .mp-perm { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); padding: 2px 10px; cursor: pointer; }
+  .mp-perm.is-on { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
+  .mp-perm--owner.is-on { border-color: #b8860b; background: #fff7e6; color: #b8860b; }
+  .mp-perm[aria-disabled="true"] { cursor: default; }
 </style>
 </head>
 <body>
@@ -171,71 +210,50 @@
           <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="部署を検索…（未選択なら全社がアクセス可）">
         </div>
         <ul class="multiselect__list" role="listbox" hidden>
-          <li class="multiselect__option" role="option" data-value="プロダクト開発部" aria-selected="true">プロダクト開発部</li>
-          <li class="multiselect__option" role="option" data-value="全社改善プロジェクト">全社改善プロジェクト</li>
-          <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+          <li class="multiselect__option" role="option" data-value="開発部1課" aria-selected="true">開発部1課</li>
+          <li class="multiselect__option" role="option" data-value="営業部 東日本" aria-selected="true">営業部 東日本</li>
+          <li class="multiselect__option" role="option" data-value="情シス" aria-selected="true">情シス</li>
+          <li class="multiselect__option" role="option" data-value="経理部">経理部</li>
+          <li class="multiselect__option" role="option" data-value="人事部">人事部</li>
+          <li class="multiselect__option" role="option" data-value="物流部">物流部</li>
           <li class="multiselect__empty" role="presentation" hidden></li>
         </ul>
       </div>
       <div class="hint"><strong>参加部署＝アクセス条件</strong>（会社の全部署から複数選択・すべて同格）。非作成者は<strong>いずれかの参加部署に現在所属</strong>していないと参照できません（異動で失効）。<strong>作成者は別格</strong>で常に参照可。<strong>未選択（0件）なら全社</strong>がアクセス可＋候補になります。増減するとパーティー候補が入れ替わります。</div>
     </div>
 
-    <!-- パーティー・権限 -->
+    <!-- パーティー・権限（新メンバー選択UI・FR-38 再設計）＝候補スコープは上の #groupSelect（参加部署）。制御は style-guide.html「メンバー選択」と同一。 -->
     <div class="field">
       <label>参加メンバー（パーティー）・権限<span class="req">*</span></label>
-      <div class="party">
-        <div class="party__head">
-          <strong>メンバーと権限</strong>
-          <span class="party__count"><span id="pcount">1</span> 名</span>
-        </div>
-        <div class="party__list" id="plist">
-          <!-- 作成者（所有者・剥奪不可・削除不可） -->
-          <div class="pmember" data-owner="1">
-            <span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span>
-            <div class="pmember__main">
-              <div class="pmember__top">
-                <span class="pmember__name">山田 太郎</span>
-                <span class="badge badge-muted">あなた・作成者</span>
-              </div>
-              <div class="pmember__perms" data-perms>
-                <span class="perm perm-owner is-on" aria-disabled="true" title="作成者は既定で所有者・剥奪不可">所有者</span>
-                <span class="perm" data-perm="manage" aria-disabled="true">クエスト管理</span>
-                <span class="perm" data-perm="eval" aria-disabled="true">評価者</span>
-                <span class="perm" data-perm="vote" aria-disabled="true">投票</span>
-                <span class="perm" data-perm="idea" aria-disabled="true">作成</span>
-                <span class="perm" data-perm="comment" aria-disabled="true">コメント</span>
-              </div>
-            </div>
+      <div class="mp" id="mpDemo">
+        <!-- 参加クエストグループ（アクセス条件）＝上の参加部署欄の選択を反映（候補の範囲）。 -->
+        <div class="mp__scope" id="mpScope"></div>
+        <div class="mp__filters">
+          <div class="mp__row">
+            <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
           </div>
-          <!-- 参加部署外のメンバー（in_scope=false＝失効中・FR-38 再設計）。淡色＋「部署外・失効中」バッジで明示。 -->
-          <div class="pmember" data-out-of-scope="1" style="opacity:.62">
-            <span class="avatar sm" data-name="伊藤 直子"><span class="avatar__img placeholder">伊</span></span>
-            <div class="pmember__main">
-              <div class="pmember__top">
-                <span class="pmember__name">伊藤 直子</span>
-                <span class="badge badge-danger" title="どの参加部署にも所属していないため、このクエストを参照できません（異動などで失効）">部署外・失効中</span>
-              </div>
-              <div class="pmember__perms" data-perms>
-                <span class="perm" data-perm="vote">投票</span>
-                <span class="perm is-on" data-perm="idea">作成</span>
-                <span class="perm is-on" data-perm="comment">コメント</span>
-              </div>
-            </div>
-            <button class="pmember__remove" type="button" aria-label="伊藤 直子 をパーティーから外す">✕</button>
+          <div class="mp__row mp__row--end">
+            <button type="button" class="btn btn-outline btn-sm" id="mpAddAll">該当をすべて追加</button>
           </div>
         </div>
-        <!-- 候補からメンバー追加 -->
-        <div class="party__add">
-          <label class="text-sm" style="font-weight:600">メンバーを追加（参加部署の所属者／未選択なら全社）</label>
-          <div class="candlist" id="candlist">
-            <button class="cand" type="button" data-name="佐藤 花子" data-ini="佐"><span class="avatar sm" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤 花子 ＋</button>
-            <button class="cand" type="button" data-name="鈴木 一郎" data-ini="鈴"><span class="avatar sm" data-name="鈴木 一郎"><span class="avatar__img placeholder">鈴</span></span>鈴木 一郎 ＋</button>
-            <button class="cand" type="button" data-name="田中 みゆき" data-ini="田"><span class="avatar sm" data-name="田中 みゆき"><span class="avatar__img placeholder">田</span></span>田中 みゆき ＋</button>
-            <button class="cand" type="button" data-name="高橋 健" data-ini="高"><span class="avatar sm" data-name="高橋 健"><span class="avatar__img placeholder">高</span></span>高橋 健 ＋</button>
+        <div class="mp__candmeta"><span id="mpCandMeta">候補 0 名</span><span id="mpCandHint" class="mp__toomany" hidden>絞り込んでください</span></div>
+        <div class="mp__cands" id="mpCands"></div>
+        <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
+        <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
+        <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span></div>
+        <div class="mp__selfilters">
+          <div class="mp__row">
+            <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/グループ）" aria-label="選択中のメンバーを絞り込み">
           </div>
-          <div class="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。所有者の付与は作成者のみ可。</div>
+          <div class="mp__row mp__row--split">
+            <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">グループ外・失効中のみ</button>
+            <button type="button" class="btn btn-danger btn-sm" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
+          </div>
         </div>
+        <div class="mp__sel" id="mpSel"></div>
+        <button type="button" class="mp__more" id="mpSelMore" hidden>もっと見る</button>
       </div>
+      <div class="hint"><strong>候補は参加部署（アクセス条件）の所属者に限定</strong>（上の参加部署欄で指定・未指定なら全社）。名前検索＋<strong>「もっと見る」でページング</strong>（〜1000人規模）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（作成者は所有者＋全権限で固定）。<strong>選択中も絞り込み（名前／「グループ外・失効中のみ」）＋まとめて外す</strong>で、異動失効した人を一括削除できる。制御の詳細は style-guide.html「メンバー選択」を正とする。</div>
     </div>
 
     <p class="role-note" style="margin-top:var(--space-3)"><strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>作成</strong>で公開し、パーティーに通知します。</p>
@@ -289,55 +307,95 @@
 
   // カテゴリー（複数・自由入力）／クエストグループ（単一）は shared.js の [data-multiselect] が初期化。
 
-  // パーティー: メンバー追加 / 削除 / 権限トグル / 人数
-  const plist = document.getElementById('plist');
-  const candlist = document.getElementById('candlist');
-  const pcount = document.getElementById('pcount');
-  function recount() { pcount.textContent = plist.querySelectorAll('.pmember').length; }
+  // パーティー（新メンバー選択UI・FR-38 再設計）＝候補スコープは #groupSelect（参加部署）。制御の正＝style-guide.html。
+  (function () {
+    const root = document.getElementById('mpDemo');
+    if (!root) return;
+    const DEPTS = ['開発部1課', '開発部2課', '営業部 東日本', '営業部 西日本', '情シス', '経理部', '総務部', '人事部', '法務部', '物流部'];
+    const SEI = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村', '小林', '山本', '加藤', '吉田', '山田', '松本', '井上'];
+    const MEI = ['花子', '一郎', '健', 'みゆき', '直子', '剛', '彩', '大輔', '舞', '涼', '翔', '結衣', '拓也', '愛'];
+    const CANDS = [];
+    for (let i = 0; i < 700; i++) CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + i), dept: DEPTS[(i * 3) % DEPTS.length] });
+    const PAGE = 24; let shown = PAGE;
+    const PERMS = [['manage', 'クエスト管理'], ['eval', '評価者'], ['vote', '投票'], ['idea', '作成'], ['comment', 'コメント']];
+    const defPerms = () => ({ manage: false, eval: false, vote: true, idea: true, comment: true });
+    // 参加クエストグループ（アクセス条件）＝上の #groupSelect の選択チップから読む（0件=全社）。
+    const gsCtl = document.querySelector('#groupSelect .multiselect__control');
+    const readParticipating = () => gsCtl ? [...gsCtl.querySelectorAll('.multiselect__chip')].map((c) => c.dataset.value) : [];
+    let PARTICIPATING = readParticipating();
+    const party = [
+      { name: '山田 太郎', dept: '開発部1課', creator: true },
+      { name: '佐藤 花子', dept: '開発部1課', perms: defPerms() },
+      { name: '鈴木 一郎', dept: '営業部 東日本', perms: { manage: true, eval: false, vote: true, idea: true, comment: true } },
+      { name: '伊藤 直子', dept: '営業部 西日本', perms: defPerms() },
+      { name: '渡辺 剛', dept: '経理部', perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
+      { name: '中村 彩', dept: '人事部', perms: defPerms() },
+    ];
+    for (let i = 0; i < 24; i++) { const c = CANDS[100 + i * 7]; if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, perms: defPerms() }); }
 
-  function permChip(perm, on) {
-    return '<span class="perm' + (on ? ' is-on' : '') + '" data-perm="' + perm + '" role="button" tabindex="0" aria-pressed="' + (on?'true':'false') + '">' + PERM_LABEL[perm] + '</span>';
-  }
-  function addMember(name, ini) {
-    const perms = ['manage','eval','vote','idea','comment']
-      .map(p => permChip(p, DEFAULT_PERMS.includes(p))).join('');
-    const row = document.createElement('div');
-    row.className = 'pmember';
-    row.innerHTML =
-      '<span class="avatar sm" data-name="' + name + '"><span class="avatar__img placeholder">' + ini + '</span></span>' +
-      '<div class="pmember__main"><div class="pmember__top">' +
-        '<span class="pmember__name">' + name + '</span>' +
-        '<span class="perm perm-owner" data-perm="owner" role="button" tabindex="0" aria-pressed="false" title="所有者の付与は作成者のみ可">所有者</span>' +
-      '</div><div class="pmember__perms" data-perms>' + perms + '</div></div>' +
-      '<button class="pmember__remove" type="button" aria-label="パーティーから外す" title="パーティーから外す">✕</button>';
-    plist.appendChild(row);
-    recount();
-  }
+    const cands = root.querySelector('#mpCands'), empty = root.querySelector('#mpEmpty'), sel = root.querySelector('#mpSel');
+    const count = root.querySelector('#mpCount'), search = root.querySelector('#mpSearch'), meta = root.querySelector('#mpCandMeta');
+    const hint = root.querySelector('#mpCandHint'), moreBtn = root.querySelector('#mpMore');
+    const selSearch = root.querySelector('#mpSelSearch'), selOut = root.querySelector('#mpSelOut'), bulkBtn = root.querySelector('#mpBulk'), selMore = root.querySelector('#mpSelMore');
+    const SEL_PAGE = 8; let selShown = SEL_PAGE; const TOO_MANY = 200;
+    const ini = (n) => n.trim().charAt(0);
+    const inParty = (name) => party.some((p) => p.name === name);
+    const isIn = (p) => p.creator || PARTICIPATING.length === 0 || PARTICIPATING.includes(p.dept); // 参加部署に居る＝in_scope（動的）
 
-  candlist.addEventListener('click', e => {
-    const c = e.target.closest('.cand'); if (!c) return;
-    addMember(c.dataset.name, c.dataset.ini);
-    c.hidden = true;   // 追加済みは候補から消す
-  });
-
-  // 権限チップのトグル（作成者行は aria-disabled で不可） / 削除
-  plist.addEventListener('click', e => {
-    const rm = e.target.closest('.pmember__remove');
-    if (rm) {
-      const row = rm.closest('.pmember');
-      const name = row.querySelector('.pmember__name').textContent;
-      // 候補リストに戻す
-      [...candlist.querySelectorAll('.cand')].forEach(c => { if (c.dataset.name === name) c.hidden = false; });
-      row.remove(); recount(); return;
+    function filtered() {
+      const q = (search.value || '').trim();
+      return CANDS.filter((c) => !inParty(c.name) && (PARTICIPATING.length === 0 || PARTICIPATING.includes(c.dept)) && (!q || c.name.includes(q)));
     }
-    const chip = e.target.closest('.perm');
-    if (!chip || chip.getAttribute('aria-disabled') === 'true') return;
-    const on = chip.classList.toggle('is-on');
-    chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
-  plist.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('perm')) { e.preventDefault(); e.target.click(); }
-  });
+    function renderScope() {
+      const scope = root.querySelector('#mpScope');
+      if (PARTICIPATING.length === 0) scope.innerHTML = '<span class="mp__scope-label">参加クエストグループ（アクセス条件）:</span> <span class="mp__scope-all">全社（未指定）</span> <span class="mp__scope-note">＝会社全体が候補・アクセス可（作成者は別格）</span>';
+      else scope.innerHTML = '<span class="mp__scope-label">参加クエストグループ（アクセス条件）:</span> ' + PARTICIPATING.map((g) => '<span class="mp__scope-chip">' + g + '</span>').join(' ') + ' <span class="mp__scope-note">候補はこのグループの所属者に限定（作成者は別格・グループ外は失効）</span>';
+    }
+    function renderCands() {
+      const list = filtered(), page = list.slice(0, shown);
+      cands.innerHTML = page.map((c) => '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">' + ini(c.name) + '</span></span><span>' + c.name + '</span><span class="mp-cand__dept">' + c.dept + '</span><span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
+      empty.hidden = list.length > 0;
+      meta.textContent = '候補 ' + list.length + ' 名（表示 ' + Math.min(shown, list.length) + '）';
+      const remain = list.length - page.length; moreBtn.hidden = remain <= 0; if (remain > 0) moreBtn.textContent = 'もっと見る（残り ' + remain + '）';
+      hint.hidden = list.length <= TOO_MANY;
+    }
+    function resetAndRender() { shown = PAGE; renderCands(); }
+    moreBtn.addEventListener('click', () => { shown += PAGE; renderCands(); });
+
+    function selMatch(p) { if (p.creator) return false; const q = (selSearch.value || '').trim(); const outOnly = selOut.getAttribute('aria-pressed') === 'true'; return (!q || p.name.includes(q) || p.dept.includes(q)) && (!outOnly || !isIn(p)); }
+    function permChips(p) {
+      if (p.creator) return '<span class="mp-perm mp-perm--owner is-on" aria-disabled="true" title="作成者は所有者・剥奪不可">所有者</span>' + PERMS.map(([, l]) => '<span class="mp-perm is-on" aria-disabled="true">' + l + '</span>').join('');
+      return PERMS.map(([k, l]) => '<span class="mp-perm' + (p.perms[k] ? ' is-on' : '') + '" role="button" tabindex="0" data-name="' + p.name + '" data-perm="' + k + '">' + l + '</span>').join('');
+    }
+    function renderParty() {
+      const q = (selSearch.value || '').trim(); const outOnly = selOut.getAttribute('aria-pressed') === 'true'; const filtering = q !== '' || outOnly;
+      const visibleList = party.filter((p) => p.creator || (filtering ? selMatch(p) : true)); const page = visibleList.slice(0, selShown);
+      sel.innerHTML = page.map((p) => '<div class="mp-sel"' + (!isIn(p) ? ' data-out' : '') + '><span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span><div class="mp-sel__main"><div class="mp-sel__top"><span class="mp-sel__name">' + p.name + '</span>' + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '') + '<span class="mp-cand__dept">' + p.dept + '</span>' + (!isIn(p) ? '<span class="badge badge-danger" title="どの参加グループにも所属していないため参照できません（異動などで失効）">グループ外・失効中</span>' : '') + '</div><div class="mp-perms">' + permChips(p) + '</div></div>' + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>') + '</div>').join('');
+      count.textContent = String(party.length);
+      const remain = visibleList.length - page.length; selMore.hidden = remain <= 0; if (remain > 0) selMore.textContent = 'もっと見る（残り ' + remain + '）';
+      const targets = party.filter(selMatch).length; bulkBtn.disabled = targets === 0; bulkBtn.textContent = (q || outOnly) ? '絞り込み対象をまとめて外す（' + targets + '）' : 'すべて外す（' + targets + '）';
+    }
+    function resetParty() { selShown = SEL_PAGE; renderParty(); }
+    selMore.addEventListener('click', () => { selShown += SEL_PAGE; renderParty(); });
+    function addMember(name) { const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return; party.push({ name, dept: c.dept, perms: defPerms() }); }
+
+    cands.addEventListener('click', (e) => { const c = e.target.closest('.mp-cand'); if (!c) return; addMember(c.dataset.name); renderCands(); renderParty(); });
+    root.querySelector('#mpAddAll').addEventListener('click', () => { const list = filtered(); if (!list.length) return; if (list.length > 50 && !confirm('該当する ' + list.length + ' 名をすべて追加します。よろしいですか？')) return; list.forEach((c) => addMember(c.name)); renderCands(); renderParty(); });
+    sel.addEventListener('click', (e) => {
+      const perm = e.target.closest('.mp-perm[data-perm]');
+      if (perm) { const p = party.find((m) => m.name === perm.dataset.name && !m.creator); if (p) { p.perms[perm.dataset.perm] = !p.perms[perm.dataset.perm]; renderParty(); } return; }
+      const x = e.target.closest('.mp-sel__x'); if (!x) return; const i = party.findIndex((p) => p.name === x.dataset.name && !p.creator); if (i >= 0) party.splice(i, 1); renderCands(); renderParty();
+    });
+    bulkBtn.addEventListener('click', () => { const targets = party.filter(selMatch); if (!targets.length) return; const outOnly = selOut.getAttribute('aria-pressed') === 'true'; const label = outOnly ? 'グループ外・失効中の ' + targets.length + ' 名' : targets.length + ' 名'; if (targets.length > 1 && !confirm(label + ' をパーティーから外します。よろしいですか？')) return; const names = new Set(targets.map((p) => p.name)); for (let i = party.length - 1; i >= 0; i--) if (names.has(party[i].name) && !party[i].creator) party.splice(i, 1); renderCands(); renderParty(); });
+    selSearch.addEventListener('input', resetParty);
+    selOut.addEventListener('click', () => { selOut.setAttribute('aria-pressed', String(selOut.getAttribute('aria-pressed') !== 'true')); resetParty(); });
+    search.addEventListener('input', resetAndRender);
+
+    // 参加部署（#groupSelect）の選択チップ変化で候補スコープ・失効表示を再計算。
+    if (gsCtl) new MutationObserver(() => { PARTICIPATING = readParticipating(); renderScope(); resetAndRender(); renderParty(); }).observe(gsCtl, { childList: true });
+
+    renderScope(); renderCands(); renderParty();
+  })();
 
   // 作成（デモ）: 必須チェック
   document.getElementById('createBtn').addEventListener('click', () => {
@@ -348,10 +406,10 @@
     if (!document.querySelectorAll('#catSelect .multiselect__chip').length) bad(document.getElementById('catSelect'), 'カテゴリーを1つ以上選択してください');
     if (!document.getElementById('qDeadline').value) bad(document.getElementById('qDeadline'), '期限日を入力してください');
     if (!document.getElementById('qTheme').value.trim()) bad(document.getElementById('qTheme'), '目的・テーマを入力してください');
-    // 参加部署（アクセス条件）は任意（0..N・0件=全社）＝必須検証はしない（FR-38 再設計）。
-    if (plist.querySelectorAll('.pmember').length < 1) bad(document.getElementById('plist'), '参加メンバーを1名以上追加してください');
+    // 参加部署（アクセス条件）は任意（0..N・0件=全社）＝必須検証はしない（FR-38 再設計）。参加メンバーは作成者が常に居るため必須検証は不要。
     if (firstBad) { const f = firstBad.matches('input,textarea,select') ? firstBad : firstBad.querySelector('input,textarea,select,button'); if (f) f.focus(); return; }
-    alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\nパーティーに通知します（クエスト作成/公開に XP は付与しません）。');
+    const pn = document.getElementById('mpCount') ? document.getElementById('mpCount').textContent : '1';
+    alert('クエストを作成しました（デモ）\nパーティー: ' + pn + ' 名\nパーティーに通知します（クエスト作成/公開に XP は付与しません）。');
   });
   document.getElementById('draftBtn').addEventListener('click', () => {
     alert('下書きを保存しました（デモ）\n※ あなただけに表示。公開するまで XP・コインは付与されません。');
