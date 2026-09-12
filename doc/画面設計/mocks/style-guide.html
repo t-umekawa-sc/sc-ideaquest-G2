@@ -214,25 +214,37 @@
         <div class="hint"><strong>単一選択</strong>＝チップにせず入力欄に確定値を表示。フォーカスで全件、入力で絞り込み、選択で確定（1つだけ）。<strong>クエストグループ</strong>（1クエスト＝1グループ）向け。</div>
       </div>
 
-      <!-- メンバー選択（パーティー候補・部署絞込＋検索）＝SC-11 パーティー編集の候補UI（FR-38 再設計・調整用ドラフト） -->
+      <!-- メンバー選択（パーティー候補・部署絞込〔複数選択・検索〕＋名前検索）＝SC-11 パーティー編集の候補UI（FR-38 再設計・調整用ドラフト） -->
       <div class="field">
-        <label>メンバー選択（パーティー候補・<strong>部署（クエストグループ）で絞込</strong>＋名前検索）</label>
+        <label>メンバー選択（パーティー候補・<strong>部署（クエストグループ）で絞込＝複数選択・検索</strong>＋名前検索）</label>
         <style>
           /* 調整用スコープ（本採用時は quests.css / design-system.css へ移設）。 */
           .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
-          .mp__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
-          .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
-          .mp__dept { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 11px; cursor: pointer; }
-          .mp__dept[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
+          .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+          .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+          .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
+          /* 部署絞込＝検索付き複数選択コンボ（多数部署でもスクロールで対応）。 */
+          .mp__deptms { position: relative; flex: 1; min-width: 220px; }
+          .mp__deptctl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); padding: 4px 6px; cursor: text; }
+          .mp__deptchip { display: inline-flex; align-items: center; gap: 4px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 999px; font-size: var(--text-xs); padding: 2px 8px; }
+          .mp__deptchip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; line-height: 1; }
+          .mp__deptinput { flex: 1; min-width: 90px; border: none; outline: none; background: transparent; font-size: var(--text-sm); }
+          .mp__deptmenu { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 2px); max-height: 220px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,.12)); }
+          .mp__deptopt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: var(--text-sm); }
+          .mp__deptopt:hover, .mp__deptopt.is-active { background: var(--color-primary-soft); }
+          .mp__deptopt[aria-selected="true"]::after { content: "✓"; color: var(--color-primary); font-weight: 700; }
+          .mp__deptcount { font-size: var(--text-xs); color: var(--color-text-muted); }
           .mp__search { flex: 1; min-width: 160px; }
-          .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; }
-          .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+          .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+          .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; max-height: 180px; overflow-y: auto; }
           .mp-cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
           .mp-cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
           .mp-cand__dept { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 7px; }
           .mp-cand__plus { color: var(--color-primary); font-weight: 700; }
           .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
           .mp__selhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
+          .mp__clear { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; padding: 2px 10px; cursor: pointer; }
+          .mp__clear:disabled { opacity: .45; cursor: default; }
           .mp__sel { display: flex; flex-direction: column; }
           .mp-sel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
           .mp-sel[data-out] { opacity: .62; }
@@ -241,28 +253,28 @@
         </style>
         <div class="mp" id="mpDemo">
           <div class="mp__filters">
-            <span class="mp__deptlabel">部署で絞込:</span>
-            <button type="button" class="mp__dept" data-dept="" aria-pressed="true">すべて</button>
-            <button type="button" class="mp__dept" data-dept="開発部" aria-pressed="false">開発部</button>
-            <button type="button" class="mp__dept" data-dept="営業部" aria-pressed="false">営業部</button>
-            <button type="button" class="mp__dept" data-dept="情シス" aria-pressed="false">情シス</button>
-            <input class="input mp__search" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
-            <button type="button" class="mp__addall">候補をすべて追加</button>
+            <div class="mp__row">
+              <span class="mp__deptlabel">部署で絞込:</span>
+              <div class="mp__deptms" id="mpDeptMs">
+                <div class="mp__deptctl" id="mpDeptCtl">
+                  <input class="mp__deptinput" id="mpDeptInput" type="text" placeholder="部署を検索して複数選択…（未選択＝全部署）" aria-label="部署で絞り込み（複数選択）" role="combobox" aria-expanded="false">
+                </div>
+                <div class="mp__deptmenu" id="mpDeptMenu" hidden></div>
+              </div>
+            </div>
+            <div class="mp__row">
+              <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
+              <button type="button" class="mp__addall" id="mpAddAll">表示中を全員追加</button>
+            </div>
           </div>
-          <div class="mp__cands" id="mpCands">
-            <button type="button" class="mp-cand" data-name="佐藤 花子" data-dept="開発部"><span class="avatar sm" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span><span>佐藤 花子</span><span class="mp-cand__dept">開発部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
-            <button type="button" class="mp-cand" data-name="鈴木 一郎" data-dept="営業部"><span class="avatar sm" data-name="鈴木 一郎"><span class="avatar__img placeholder">鈴</span></span><span>鈴木 一郎</span><span class="mp-cand__dept">営業部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
-            <button type="button" class="mp-cand" data-name="田中 みゆき" data-dept="開発部"><span class="avatar sm" data-name="田中 みゆき"><span class="avatar__img placeholder">田</span></span><span>田中 みゆき</span><span class="mp-cand__dept">開発部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
-            <button type="button" class="mp-cand" data-name="高橋 健" data-dept="情シス"><span class="avatar sm" data-name="高橋 健"><span class="avatar__img placeholder">高</span></span><span>高橋 健</span><span class="mp-cand__dept">情シス</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
-            <button type="button" class="mp-cand" data-name="伊藤 直子" data-dept="営業部"><span class="avatar sm" data-name="伊藤 直子"><span class="avatar__img placeholder">伊</span></span><span>伊藤 直子</span><span class="mp-cand__dept">営業部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
-          </div>
+          <div class="mp__cands" id="mpCands"></div>
           <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
-          <div class="mp__selhead"><span>選択中のパーティー</span><span id="mpCount">1 名</span></div>
+          <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span><button type="button" class="mp__clear" id="mpClear" disabled>選択をすべて解除</button></div>
           <div class="mp__sel" id="mpSel">
             <div class="mp-sel"><span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span><span class="mp-sel__name">山田 太郎</span><span class="badge badge-muted">あなた・作成者</span></div>
           </div>
         </div>
-        <div class="hint"><strong>部署（クエストグループ）で絞込</strong>＝クエストの参加部署チップで候補を絞る（「すべて」で全参加部署の和集合／参加部署0件なら会社全体）。名前検索と併用。候補＋で選択、選択✕で候補に戻る。<strong>参加部署外のメンバーは「部署外・失効中」バッジ</strong>で表示（FR-38・C.0）。※これは調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植。</div>
+        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>「選択をすべて解除」</strong>で追加メンバーを一括削除（作成者は別格で残る）。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（本採用時は既存 <code>.multiselect</code> / Multiselect コンポーネントを流用）。</div>
       </div>
 
       <div class="field">
@@ -4373,68 +4385,123 @@
     document.getElementById('sgOverlayCleanRun').addEventListener('click', () => flash(document.getElementById('sgOverlayClean')));
   })();
 
-  // メンバー選択（部署絞込＋検索＋候補追加/解除）の調整用プロトタイプ。
+  // メンバー選択（部署=複数選択の絞込＋名前検索＋候補追加/一括解除）の調整用プロトタイプ。
   (function () {
     const root = document.getElementById('mpDemo');
     if (!root) return;
+    // 大企業想定＝多数の部署（検索＋スクロールで選ぶ）。
+    const DEPTS = ['開発部', '開発部1課', '開発部2課', '営業部', '営業部 東日本', '営業部 西日本',
+      '情シス', '経理部', '総務部', '人事部', '法務部', '物流部', 'カスタマーサクセス', '広報部'];
+    const CANDS = [
+      { name: '佐藤 花子', dept: '開発部1課' }, { name: '鈴木 一郎', dept: '営業部 東日本' },
+      { name: '田中 みゆき', dept: '開発部2課' }, { name: '高橋 健', dept: '情シス' },
+      { name: '伊藤 直子', dept: '営業部 西日本' }, { name: '渡辺 剛', dept: '経理部' },
+      { name: '中村 彩', dept: '人事部' }, { name: '小林 大輔', dept: '物流部' },
+      { name: '加藤 舞', dept: '開発部1課' }, { name: '山本 涼', dept: 'カスタマーサクセス' },
+    ];
+    const added = new Set();            // 追加済みメンバー名
+    const selDepts = new Set();         // 絞込に選んだ部署（空＝全部署）
+    let deptQuery = '', active = -1;
+
     const cands = root.querySelector('#mpCands');
     const empty = root.querySelector('#mpEmpty');
     const sel = root.querySelector('#mpSel');
     const count = root.querySelector('#mpCount');
-    const search = root.querySelector('.mp__search');
-    const deptBtns = [...root.querySelectorAll('.mp__dept')];
-    let dept = '';
+    const clearBtn = root.querySelector('#mpClear');
+    const search = root.querySelector('#mpSearch');
+    const ctl = root.querySelector('#mpDeptCtl');
+    const input = root.querySelector('#mpDeptInput');
+    const menu = root.querySelector('#mpDeptMenu');
+    const ini = (n) => n.trim().charAt(0);
 
-    function refilter() {
+    // --- 候補リスト描画（部署絞込〔和集合〕＋名前検索＋追加済み除外） ---
+    function renderCands() {
       const q = (search.value || '').trim();
-      let visible = 0;
-      cands.querySelectorAll('.mp-cand').forEach((c) => {
-        const okDept = !dept || c.dataset.dept === dept;
-        const okName = !q || c.dataset.name.includes(q);
-        const show = okDept && okName;
-        c.hidden = !show;
-        if (show) visible++;
-      });
-      empty.hidden = visible > 0;
+      const list = CANDS.filter((c) => !added.has(c.name)
+        && (selDepts.size === 0 || selDepts.has(c.dept))
+        && (!q || c.name.includes(q)));
+      cands.innerHTML = list.map((c) =>
+        '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">'
+        + ini(c.name) + '</span></span><span>' + c.name + '</span><span class="mp-cand__dept">' + c.dept
+        + '</span><span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
+      empty.hidden = list.length > 0;
     }
-    function recount() { count.textContent = (sel.querySelectorAll('.mp-sel').length) + ' 名'; }
-
-    deptBtns.forEach((b) => b.addEventListener('click', () => {
-      dept = b.dataset.dept;
-      deptBtns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      refilter();
-    }));
-    search.addEventListener('input', refilter);
-
-    cands.addEventListener('click', (e) => {
-      const c = e.target.closest('.mp-cand');
-      if (!c) return;
-      const name = c.dataset.name, d = c.dataset.dept, ini = name.trim().charAt(0);
+    function recount() {
+      const n = sel.querySelectorAll('.mp-sel').length;
+      count.textContent = String(n);
+      clearBtn.disabled = n <= 1; // 作成者のみは解除対象なし
+    }
+    function addMember(name) {
+      const c = CANDS.find((x) => x.name === name); if (!c) return;
+      added.add(name);
       const row = document.createElement('div');
       row.className = 'mp-sel';
-      row.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini + '</span></span>'
-        + '<span class="mp-sel__name">' + name + '</span>'
-        + '<span class="mp-cand__dept">' + d + '</span>'
-        + '<button type="button" class="mp-sel__x" aria-label="' + name + ' を外す" data-name="' + name + '" data-dept="' + d + '">✕</button>';
+      row.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini(name)
+        + '</span></span><span class="mp-sel__name">' + name + '</span><span class="mp-cand__dept">' + c.dept
+        + '</span><button type="button" class="mp-sel__x" aria-label="' + name + ' を外す" data-name="' + name + '">✕</button>';
       sel.appendChild(row);
-      c.remove();
-      refilter(); recount();
+    }
+
+    cands.addEventListener('click', (e) => {
+      const c = e.target.closest('.mp-cand'); if (!c) return;
+      addMember(c.dataset.name); renderCands(); recount();
     });
-    root.querySelector('.mp__addall').addEventListener('click', () => {
-      cands.querySelectorAll('.mp-cand:not([hidden])').forEach((c) => c.click());
+    root.querySelector('#mpAddAll').addEventListener('click', () => {
+      [...cands.querySelectorAll('.mp-cand')].forEach((c) => addMember(c.dataset.name));
+      renderCands(); recount();
     });
     sel.addEventListener('click', (e) => {
-      const x = e.target.closest('.mp-sel__x');
-      if (!x) return;
-      const name = x.dataset.name, d = x.dataset.dept, ini = name.trim().charAt(0);
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'mp-cand'; btn.dataset.name = name; btn.dataset.dept = d;
-      btn.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini + '</span></span>'
-        + '<span>' + name + '</span><span class="mp-cand__dept">' + d + '</span><span class="mp-cand__plus" aria-hidden>＋</span>';
-      cands.appendChild(btn);
-      x.closest('.mp-sel').remove();
-      refilter(); recount();
+      const x = e.target.closest('.mp-sel__x'); if (!x) return;
+      added.delete(x.dataset.name); x.closest('.mp-sel').remove(); renderCands(); recount();
     });
+    // 選択を一括解除（作成者＝先頭行は残す）。
+    clearBtn.addEventListener('click', () => {
+      added.clear();
+      [...sel.querySelectorAll('.mp-sel')].slice(1).forEach((r) => r.remove());
+      renderCands(); recount();
+    });
+    search.addEventListener('input', renderCands);
+
+    // --- 部署の複数選択コンボ（検索＋スクロール＋チップ） ---
+    function renderChips() {
+      ctl.querySelectorAll('.mp__deptchip').forEach((c) => c.remove());
+      [...selDepts].forEach((d) => {
+        const chip = document.createElement('span');
+        chip.className = 'mp__deptchip';
+        chip.innerHTML = d + '<button type="button" aria-label="' + d + ' を絞込から外す" data-dept="' + d + '">✕</button>';
+        ctl.insertBefore(chip, input);
+      });
+    }
+    function openMenu() { menu.hidden = false; input.setAttribute('aria-expanded', 'true'); renderMenu(); }
+    function closeMenu() { menu.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; }
+    function visibleDepts() {
+      const q = deptQuery.trim();
+      return DEPTS.filter((d) => !selDepts.has(d) && (!q || d.includes(q)));
+    }
+    function renderMenu() {
+      const vis = visibleDepts();
+      menu.innerHTML = vis.length
+        ? vis.map((d, i) => '<div class="mp__deptopt' + (i === active ? ' is-active' : '') + '" role="option" data-dept="' + d + '">' + d + '</div>').join('')
+        : '<div class="mp__deptopt" aria-disabled="true" style="cursor:default;color:var(--color-text-muted)">該当する部署がありません</div>';
+    }
+    function pickDept(d) { selDepts.add(d); deptQuery = ''; input.value = ''; renderChips(); renderMenu(); renderCands(); input.focus(); }
+
+    ctl.addEventListener('click', () => { input.focus(); openMenu(); });
+    input.addEventListener('focus', openMenu);
+    input.addEventListener('input', () => { deptQuery = input.value; active = -1; if (menu.hidden) openMenu(); else renderMenu(); });
+    input.addEventListener('keydown', (e) => {
+      const vis = visibleDepts();
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, vis.length - 1); renderMenu(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); renderMenu(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (vis[active]) pickDept(vis[active]); else if (vis.length === 1) pickDept(vis[0]); }
+      else if (e.key === 'Backspace' && !input.value && selDepts.size) { const last = [...selDepts].pop(); selDepts.delete(last); renderChips(); renderMenu(); renderCands(); }
+      else if (e.key === 'Escape') { closeMenu(); }
+    });
+    menu.addEventListener('mousedown', (e) => { const o = e.target.closest('.mp__deptopt'); if (o && o.dataset.dept) { e.preventDefault(); pickDept(o.dataset.dept); } });
+    ctl.addEventListener('click', (e) => { const x = e.target.closest('.mp__deptchip button'); if (x) { selDepts.delete(x.dataset.dept); renderChips(); renderMenu(); renderCands(); } });
+    document.addEventListener('mousedown', (e) => { if (!root.querySelector('#mpDeptMs').contains(e.target)) closeMenu(); });
+
+    renderCands(); recount();
   })();
 </script>
 
