@@ -8,13 +8,13 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-09-12 JST**
 - ブランチ: **main**（このプロジェクトは main に直接コミットする運用。`feature/game-feel` はゲーム感フェーズ用の別系統）
-- 直前の機能コミット: **9b245bc** `wip(review/FR-38): 参加部署=アクセス条件へ再設計（設計正本反映）＋旧モデルのdirectory/Phase3フロント＋handoff`
-- 本セッションで **#7 backend 再設計②（新モデルをコードへ）を完了**。コミットは未実施（＝作業ツリーに未コミットの変更あり・次にコミットする）。
+- 直前の機能コミット: **b66e3be** `feat(review/FR-38): frontend 参加部署UI本改修＋member in_scope（#8）`（その前＝c49b907＝#7 backend）。
+- 本セッションで **#7（backend 再設計②）と #8（frontend 参加部署UI本改修）を完了・コミット済み**。FR-38 はコード・doc・テストとも新モデルで一致。残タスクは §7（パーティー限定ダイアログ等）。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**社内レビュー反映フェーズ**（洗練フロー: ①要件→②設計反映→〈確認〉→③TC→④実装→〈確認〉）。
 
-## 3. 今回やったこと（#7 完了＝設計doc〔新モデル〕にコードを追随させた）
+## 3. 今回やったこと（#7 backend＋#8 frontend 完了＝FR-38 新モデルをコード・doc・テストで一致）
 FR-38「参加部署＝アクセス条件・作成者別格・動的失効・主グループ廃止・0件=会社全体・409撤去」を**コードへ実装**（従来は doc だけ新モデル・コードは旧モデルだった乖離を解消）。
 
 ### backend（quests ドメイン）
@@ -29,8 +29,8 @@ FR-38「参加部署＝アクセス条件・作成者別格・動的失効・主
 - 列削除で壊れる箇所を修正＝`search/application.py`（旧「パーティー∩グループ AND」を一本化）・`chat/repository.py:list_chat_group_ids_for_group_member`（`Quest.quest_group_id`→`QuestGroupLink` join）。
 - **設計正本 `C.0` に G章を門番対象として追記済み**（doc/API設計/C_…）。
 
-### frontend（#8 の本改修は別。今回は新DTOへの最小コンパイル追随のみ）
-- `QuestListView.tsx`/`QuestDetailView.tsx`/`QuestForm.tsx` を `quest_group`→`quest_groups`、作成/編集 body の `quest_group_id`→`quest_group_ids`（代表欄＋追加欄の和集合・空可）へ最小修正。`npm run codegen`→`tsc`→`build` すべて OK。**参加部署UIの本改修（主グループ欄撤去・参加部署の複数選択・作成者別枠・影響人数警告）は #8 で未着手**。
+### frontend（#7 は最小追随・#8 で本改修完了）
+- #7＝`QuestListView`/`QuestDetailView`/`QuestForm` を新DTOへ最小追随。#8（b66e3be）＝`QuestForm` を参加部署の単一 Multiselect に一本化・部署外メンバー表示・409/主グループ/必須検証撤去、`QuestDetailView` に部署外バッジ、backend に `member.in_scope`、SC-11/SC-12 設計正本を新モデルへ。`codegen`→`tsc`→`build` OK。
 
 ### テスト（TC md 先行＋実装・red-green 目視済み）
 - `doc/テスト/C_クエスト.md` §7 を新モデルへ全面書換え（C-TC-220〜232）。D/E/F/J/G の各 md に失効門番 TC（D-222/E-204/F-204/J-142/G-508）を追記。
@@ -40,8 +40,8 @@ FR-38「参加部署＝アクセス条件・作成者別格・動的失効・主
 
 ## 4. 現在の状態
 ### 動いているもの / 検証結果（実測）
-- **backend 全テスト＝534 passed**（`docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests -q`・クリーンDBで実測）。
-- TC トレーサビリティ `python3 scripts/check_tc_traceability.py`＝✅（code 468 件）。
+- **backend 全テスト＝535 passed**（`docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests -q`・クリーンDBで実測・#8 の C-TC-233 込み）。
+- TC トレーサビリティ `python3 scripts/check_tc_traceability.py`＝✅（code 469 件）。
 - frontend＝`npm run codegen`（新DTO）→ `npx tsc --noEmit` OK → `npm run build` OK。
 - backend コンテナは新コードで再ビルド済み・稼働（`docker compose up -d --build backend`）。frontend は再ビルド未（QA 時に `--build` 要）。
 
@@ -60,15 +60,18 @@ FR-38「参加部署＝アクセス条件・作成者別格・動的失効・主
 - 将来拡張フック＝動的メンバーシップ（`quest_members.source`）は今は置かない。
 
 ## 7. 次にやること（優先順）
-### 【最優先】#8 frontend 再設計③（参加部署UIの本改修）
-- `QuestForm.tsx`: 暫定の「代表グループ＋追加グループ」二欄を撤去し **「参加部署」の複数選択（会社ディレクトリ `GET /quest-group-directory`）** に一本化＝アクセス条件として明示。メンバーピッカーは **参加部署内（0件時は会社全体＝`GET /quest-group-candidates?group_ids=…`／空で全社）** を部署フィルタ＋名前検索。作成者は別枠で常に所有者表示。参加部署除外時の**影響人数を警告**（409は無いので UI で注意喚起）。
-- `QuestDetailView.tsx`: 参加部署表示は追随済み（🗂 参加部署・0件は「全社」）。SC-11/SC-12 の細部を新モデルへ。
-- `SC-11`/`SC-12` 画面正本（`doc/画面設計/screens/`）を新モデルへ反映（**未着手**）。
-- `/quests/{id}/party` メンバー限定ダイアログ（**未着手**・FR-38 記載）。
-- 変更後 `npm run codegen`（不要なら省略）→ `tsc`/`build`。
+### #8 で完了済み（b66e3be）
+- `QuestForm.tsx`＝主グループ/追加グループ二欄を撤去し **「参加部署」単一 Multiselect（会社ディレクトリ・0..N・任意）** に一本化。0件時は候補=会社全体。noGroups/quest_group_id必須/409ハンドリング撤去。パーティー一覧で **in_scope=false を「部署外・失効中」バッジ＋淡色＋影響人数警告**。
+- `QuestDetailView.tsx`＝パーティー表示で in_scope=false を同様に明示（🗂 参加部署・0件「全社」も追随済み）。
+- backend＝`QuestMemberDTO.in_scope`（作成者別格 or 参加部署0件 or 現所属）を追加（`_dept_scope`／C-TC-233）。
+- 設計正本＝SC-11(spec/mock)・SC-12(spec) を新モデルへ書換え済み。
+
+### 残タスク（次の最優先）
+- **`/quests/{id}/party` メンバー限定ダイアログ**（**未着手**・FR-38/SC-11 §3 記載）＝SC-12「パーティー・権限を編集」から URL モーダル（Parallel+Intercept）で**参加メンバー＋権限だけ**を編集（`PATCH /quests/{id}` に `members` のみ）。QuestForm のパーティー部を共通コンポーネント（PartyEditor）に切り出して再利用するのが設計（SC-11 §3.40）。現状は編集フォーム全体（`/quests/{id}/edit`）で代替中。
+- SC-12 のパーティータブ専用の細部（部署外バッジは実装済み）や、複製（duplicate）が参加部署を引き継ぐ必要があるかは要判断（現状 duplicate は参加部署を引き継がない＝アクセス設定は都度）。
 
 ### 補足
-- `doc/実装計画.md`・`impl/README.md` は本再設計の要点を追記済み（詳細な画面別状態は #8 完了後に精緻化）。
+- `doc/実装計画.md`・`impl/README.md` は本再設計の要点を追記済み。
 
 ## 8. 再開に必要な環境情報
 - **起動**: `cd impl && docker compose up -d --build`（db/redis/minio/mailhog/backend/frontend）。ワーカは `profiles: ["workers"]`＝既定 up に含まれない。QA フル起動は `docker compose --profile workers up -d --build`。
