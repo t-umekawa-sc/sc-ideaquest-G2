@@ -606,8 +606,13 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
             <div className="party__cols">
               <div className="party__col">
-            {/* 候補追加エリア（モック順＝先・左カラム）＝グループ絞込／名前検索／該当をすべて追加／件数／候補／もっと見る。 */}
+            {/* 候補追加エリア（モック順＝先・左カラム）＝見出し＋グループ絞込／名前検索／該当をすべて追加／件数／候補／もっと見る。 */}
             {!frozen && (
+              <>
+              <div className="party__head">
+                <strong>メンバーを追加</strong>
+                <span className="party__count">候補から選ぶ</span>
+              </div>
               <div className="party__add">
                 {deptIds.length > 1 && (
                   <div style={{ marginBottom: "var(--space-2)" }}>
@@ -658,6 +663,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 )}
                 <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
               </div>
+              </>
             )}
               </div>
               <div className="party__col">
