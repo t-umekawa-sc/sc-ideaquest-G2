@@ -308,8 +308,9 @@
             </div>
           </div>
           <div class="mp__sel" id="mpSel"></div>
+          <button type="button" class="mp__more" id="mpSelMore" hidden>もっと見る</button>
         </div>
-        <div class="hint"><strong>グループ（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（追加時の既定＝投票・作成・コメント。<strong>作成者は所有者＋全権限で固定・剥奪不可</strong>）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
+        <div class="hint"><strong>グループ（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＋<strong>多数選択時は「もっと見る」でページング</strong>＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（追加時の既定＝投票・作成・コメント。<strong>作成者は所有者＋全権限で固定・剥奪不可</strong>）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4449,6 +4450,11 @@
       { name: '渡辺 剛', dept: '経理部', inScope: false, perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
       { name: '中村 彩', dept: '人事部', inScope: false, perms: defPerms() },
     ];
+    // デモ用＝選択メンバーを増やして「もっと見る」ページングを確認できるようにする（一部は失効中）。
+    for (let i = 0; i < 24; i++) {
+      const c = CANDS[i * 3 + 5];
+      if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, inScope: i % 4 !== 0, perms: defPerms() });
+    }
 
     const cands = root.querySelector('#mpCands');
     const empty = root.querySelector('#mpEmpty');
@@ -4462,6 +4468,9 @@
     const selSearch = root.querySelector('#mpSelSearch');
     const selOut = root.querySelector('#mpSelOut');
     const bulkBtn = root.querySelector('#mpBulk');
+    const selMore = root.querySelector('#mpSelMore');
+    const SEL_PAGE = 20;               // 選択中パーティーの1ページ表示件数（もっと見る）
+    let selShown = SEL_PAGE;
     const TOO_MANY = 200;               // これ以上は絞り込みを促す（サーバー側は limit+cursor で保護）
     const ini = (n) => n.trim().charAt(0);
     const inParty = (name) => party.some((p) => p.name === name);
@@ -4508,13 +4517,14 @@
         + p.name + '" data-perm="' + k + '">' + l + '</span>').join('');
     }
     function renderParty() {
-      // 作成者は常に表示。非作成者は絞り込み一致のみ表示（＝まとめて外す対象を可視化）。
+      // 作成者は常に表示。非作成者は絞り込み一致のみ。多数選択に備え先頭 selShown 件＋「もっと見る」でページング。
       const q = (selSearch.value || '').trim();
       const outOnly = selOut.getAttribute('aria-pressed') === 'true';
       const filtering = q !== '' || outOnly;
-      sel.innerHTML = party.map((p) => {
-        const show = p.creator || (filtering ? selMatch(p) : true);
-        return '<div class="mp-sel"' + (show ? '' : ' hidden') + (!p.inScope ? ' data-out' : '') + '>'
+      const visibleList = party.filter((p) => p.creator || (filtering ? selMatch(p) : true));
+      const page = visibleList.slice(0, selShown);
+      sel.innerHTML = page.map((p) =>
+        '<div class="mp-sel"' + (!p.inScope ? ' data-out' : '') + '>'
           + '<span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span>'
           + '<div class="mp-sel__main">'
           + '<div class="mp-sel__top">'
@@ -4526,13 +4536,17 @@
           + '<div class="mp-perms">' + permChips(p) + '</div>'
           + '</div>'
           + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>')
-          + '</div>';
-      }).join('');
+          + '</div>').join('');
       count.textContent = String(party.length);
+      const remain = visibleList.length - page.length;
+      selMore.hidden = remain <= 0;
+      if (remain > 0) selMore.textContent = 'もっと見る（残り ' + remain + '）';
       const targets = party.filter(selMatch).length;
       bulkBtn.disabled = targets === 0;
       bulkBtn.textContent = (q || outOnly) ? '絞り込み対象をまとめて外す（' + targets + '）' : 'すべて外す（' + targets + '）';
     }
+    function resetParty() { selShown = SEL_PAGE; renderParty(); }
+    selMore.addEventListener('click', () => { selShown += SEL_PAGE; renderParty(); });
     function addMember(name) {
       const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return;
       party.push({ name, dept: c.dept, inScope: true, perms: defPerms() }); // 候補＝参加グループ内（0件なら全社）＝in_scope・既定権限
@@ -4573,8 +4587,8 @@
       for (let i = party.length - 1; i >= 0; i--) if (names.has(party[i].name) && !party[i].creator) party.splice(i, 1);
       renderCands(); renderParty();
     });
-    selSearch.addEventListener('input', renderParty);
-    selOut.addEventListener('click', () => { selOut.setAttribute('aria-pressed', String(selOut.getAttribute('aria-pressed') !== 'true')); renderParty(); });
+    selSearch.addEventListener('input', resetParty);
+    selOut.addEventListener('click', () => { selOut.setAttribute('aria-pressed', String(selOut.getAttribute('aria-pressed') !== 'true')); resetParty(); });
     search.addEventListener('input', resetAndRender);
 
     // --- 部署絞込＝標準 .multiselect（shared.js 初期化・候補のみ／自由入力なし）。チップ増減を監視して候補を再絞込。 ---
