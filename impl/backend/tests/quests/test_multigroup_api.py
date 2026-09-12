@@ -315,3 +315,16 @@ def test_c_tc_232_can_access_quest_truth_table(client, env):
         quest0 = repo.get_quest(ts, qid0)
         assert repo.can_access_quest(ts, quest0, env.b_user) is True    # 0 件＝部署条件なし（party なら可）
         assert repo.can_access_quest(ts, quest0, env.user_id) is False  # 非 party は不可
+
+
+def test_c_tc_233_member_in_scope_flag(client, env):
+    """C-TC-233: メンバー DTO の in_scope＝参加部署外メンバーを失効表示（作成者/部署内=true・部署外=false）。"""
+    # 参加部署 group_a・owner=seed user（別格）・member=ab_user（A所属=in_scope）＋b_user（B のみ=部署外）。
+    qid = env.seed_quest(groups=[env.group_a], owner=env.user_id, members=[env.ab_user, env.b_user])
+    _login_seed(client)
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 200, r.text
+    scope = {m["user"]["user_id"]: m["in_scope"] for m in r.json()["members"]}
+    assert scope[str(env.user_id)] is True    # 作成者は別格＝常に in_scope
+    assert scope[str(env.ab_user)] is True     # group_a に所属＝in_scope
+    assert scope[str(env.b_user)] is False     # group_b のみ＝参加部署外＝失効中

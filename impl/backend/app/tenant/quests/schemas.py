@@ -147,6 +147,8 @@ class QuestMemberDTO(BaseModel):
     permissions: list[str] = []
     joined_at: datetime
     is_creator: bool
+    # 参加部署アクセス可否（作成者別格 or 参加部署0件 or 参加部署に現所属）。false＝**参加部署外＝失効中**（FR-38・C.0）。
+    in_scope: bool = True
 
 
 class QuestDetailDTO(BaseModel):

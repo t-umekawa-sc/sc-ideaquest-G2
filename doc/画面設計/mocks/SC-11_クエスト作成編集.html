@@ -163,12 +163,12 @@
       <textarea class="textarea" id="qTheme" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか"></textarea>
     </div>
 
-    <!-- クエストグループ: 単一選択（オートコンプリート付き） -->
+    <!-- 参加部署: 複数選択（アクセス条件・任意 0..N・FR-38 再設計。主グループは廃止） -->
     <div class="field">
-      <label>クエストグループ<span class="req">*</span></label>
-      <div class="multiselect" data-multiselect data-single="true" id="groupSelect">
+      <label>参加部署（アクセス条件・任意）</label>
+      <div class="multiselect" data-multiselect id="groupSelect">
         <div class="multiselect__control">
-          <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループを検索…">
+          <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="部署を検索…（未選択なら全社がアクセス可）">
         </div>
         <ul class="multiselect__list" role="listbox" hidden>
           <li class="multiselect__option" role="option" data-value="プロダクト開発部" aria-selected="true">プロダクト開発部</li>
@@ -177,7 +177,7 @@
           <li class="multiselect__empty" role="presentation" hidden></li>
         </ul>
       </div>
-      <div class="hint">クエストは <strong>1 つのグループに属します</strong>（単一選択）。<strong>パーティー候補は同一グループの所属者に限定</strong>されます（変更すると下の候補が入れ替わります）。</div>
+      <div class="hint"><strong>参加部署＝アクセス条件</strong>（会社の全部署から複数選択・すべて同格）。非作成者は<strong>いずれかの参加部署に現在所属</strong>していないと参照できません（異動で失効）。<strong>作成者は別格</strong>で常に参照可。<strong>未選択（0件）なら全社</strong>がアクセス可＋候補になります。増減するとパーティー候補が入れ替わります。</div>
     </div>
 
     <!-- パーティー・権限 -->
@@ -207,10 +207,26 @@
               </div>
             </div>
           </div>
+          <!-- 参加部署外のメンバー（in_scope=false＝失効中・FR-38 再設計）。淡色＋「部署外・失効中」バッジで明示。 -->
+          <div class="pmember" data-out-of-scope="1" style="opacity:.62">
+            <span class="avatar sm" data-name="伊藤 直子"><span class="avatar__img placeholder">伊</span></span>
+            <div class="pmember__main">
+              <div class="pmember__top">
+                <span class="pmember__name">伊藤 直子</span>
+                <span class="badge badge-danger" title="どの参加部署にも所属していないため、このクエストを参照できません（異動などで失効）">部署外・失効中</span>
+              </div>
+              <div class="pmember__perms" data-perms>
+                <span class="perm" data-perm="vote">投票</span>
+                <span class="perm is-on" data-perm="idea">作成</span>
+                <span class="perm is-on" data-perm="comment">コメント</span>
+              </div>
+            </div>
+            <button class="pmember__remove" type="button" aria-label="伊藤 直子 をパーティーから外す">✕</button>
+          </div>
         </div>
         <!-- 候補からメンバー追加 -->
         <div class="party__add">
-          <label class="text-sm" style="font-weight:600">メンバーを追加（同一グループの所属者）</label>
+          <label class="text-sm" style="font-weight:600">メンバーを追加（参加部署の所属者／未選択なら全社）</label>
           <div class="candlist" id="candlist">
             <button class="cand" type="button" data-name="佐藤 花子" data-ini="佐"><span class="avatar sm" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤 花子 ＋</button>
             <button class="cand" type="button" data-name="鈴木 一郎" data-ini="鈴"><span class="avatar sm" data-name="鈴木 一郎"><span class="avatar__img placeholder">鈴</span></span>鈴木 一郎 ＋</button>
@@ -332,7 +348,7 @@
     if (!document.querySelectorAll('#catSelect .multiselect__chip').length) bad(document.getElementById('catSelect'), 'カテゴリーを1つ以上選択してください');
     if (!document.getElementById('qDeadline').value) bad(document.getElementById('qDeadline'), '期限日を入力してください');
     if (!document.getElementById('qTheme').value.trim()) bad(document.getElementById('qTheme'), '目的・テーマを入力してください');
-    if (!document.querySelector('#groupSelect .multiselect__input').value.trim()) bad(document.getElementById('groupSelect'), 'クエストグループを選択してください');
+    // 参加部署（アクセス条件）は任意（0..N・0件=全社）＝必須検証はしない（FR-38 再設計）。
     if (plist.querySelectorAll('.pmember').length < 1) bad(document.getElementById('plist'), '参加メンバーを1名以上追加してください');
     if (firstBad) { const f = firstBad.matches('input,textarea,select') ? firstBad : firstBad.querySelector('input,textarea,select,button'); if (f) f.focus(); return; }
     alert('クエストを作成しました（デモ）\nパーティー: ' + plist.querySelectorAll('.pmember').length + ' 名\nパーティーに通知します（クエスト作成/公開に XP は付与しません）。');

@@ -686,9 +686,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <div className="card tab-party-card" style={{ padding: 0 }}>
             <ul className="member-list">
               {party.map((m) => (
-                <li className="member-row" key={m.user.user_id}>
+                // 参加部署外（in_scope=false）＝失効中のメンバーは淡色＋バッジで明示（FR-38・C.0）。作成者は別格で常に有効。
+                <li className="member-row" key={m.user.user_id} data-out-of-scope={m.in_scope === false ? "1" : undefined} style={m.in_scope === false ? { opacity: 0.62 } : undefined}>
                   <Avatar name={m.user.display_name} imageUrl={m.user.avatar_image_url ?? undefined} />
-                  <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}</span>
+                  <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}{m.in_scope === false && <span className="badge badge-danger" style={{ marginLeft: 6 }} title="どの参加部署にも所属していないため参照できません（異動などで失効）">部署外・失効中</span>}</span>
                   <span className="member-perms">
                     {PERM_VIEW_ORDER.filter((p) => m.permissions.includes(p)).map((p) => (
                       <span key={p} className={`badge ${p === "owner" ? "" : "badge-muted"}`}>{PERM_BADGE[p]}</span>

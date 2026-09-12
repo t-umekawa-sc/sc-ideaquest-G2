@@ -122,6 +122,7 @@
 | C-TC-230 | api | 作成者は別格＝参加部署非所属でも自クエスト詳細を参照可 | 作成者は G1 に非所属 | `GET quest-detail`（owner） | 200（404 にならない） | C.0／§5.6b |
 | C-TC-231 | api | 動的失効＝非作成者パーティー員が全参加部署を離脱→詳細 404 | G1 のみ所属の非作成者パーティー員→G1 のグループ所属を除去 | `GET quest-detail`（当該員） | 404（都度再判定でアクセス失効） | C.0／§5.6b |
 | C-TC-232 | unit | `can_access_quest` 真偽表（門番の単一ソース） | owner／party+現所属／party+離脱／部署0件+party／非party の各ケース | `repository.can_access_quest(quest, user_id)` | owner=真・party+現所属=真・party+離脱=偽・部署0件+party=真・非party=偽 | C.0／§5.8 |
+| C-TC-233 | api | メンバー DTO の `in_scope`＝参加部署外メンバーの失効表示 | 参加部署 group_a・owner 別格・部署内メンバー・部署外の名指しメンバー | `GET /quest-detail`（owner）の `members` | owner=`in_scope:true`・部署内メンバー=`true`・部署外メンバー=`false`（失効中） | C.1／C.0／§5.6b |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

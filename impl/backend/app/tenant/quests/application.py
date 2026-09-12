@@ -582,7 +582,8 @@ def add_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             raise AppError(403, "forbidden", detail="owner 権限の付与は作成者のみ可能です")
         member = repo.add_member(ts, quest.id, uid, permissions=perms, granted_by_id=user.id)
         users = repo.get_users_by_ids(ts, {uid})
-        dto = _member_dto(ts, member, quest.owner_id, users.get(uid))
+        has_depts, dept_users = _dept_scope(ts, quest)
+        dto = _member_dto(ts, member, quest.owner_id, users.get(uid), has_depts=has_depts, dept_users=dept_users)
         ts.commit()
     return dto
 
@@ -910,8 +911,25 @@ def _authorize_edit(ts, quest, user) -> None:
         raise AppError(403, "forbidden")
 
 
-def _member_dto(ts, member, creator_id, user) -> dict:
-    """パーティーメンバー1件の DTO（C.1 GET .../members・SC-11/SC-12 共通形）。"""
+def _dept_scope(ts, quest) -> tuple[bool, set]:
+    """参加部署によるアクセス範囲＝(参加部署が1件以上あるか, 参加部署いずれかの有効所属者 user_id 集合)。
+
+    0 件なら (False, 空集合)＝部署条件なし（全員 in_scope）。門番 `can_access_quest` と同一定義（§5.6b/C.0）。
+    """
+    linked = repo.list_linked_group_ids(ts, quest.id)
+    if not linked:
+        return False, set()
+    return True, repo.user_ids_in_any_group(ts, linked)
+
+
+def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=frozenset()) -> dict:
+    """パーティーメンバー1件の DTO（C.1 GET .../members・SC-11/SC-12 共通形）。
+
+    `in_scope`＝当該メンバーが今このクエストを参照できるか（作成者別格 or 参加部署0件 or 参加部署に現所属）。
+    false＝**参加部署外＝失効中**（異動などで全参加部署を外れた名指しメンバー・UI で明示表示・C.0）。
+    """
+    is_creator = member.user_id == creator_id
+    in_scope = is_creator or (not has_depts) or (member.user_id in dept_users)
     return {
         "user": {
             "user_id": str(member.user_id),
@@ -920,15 +938,23 @@ def _member_dto(ts, member, creator_id, user) -> dict:
         },
         "permissions": repo.get_permissions(ts, member.id),
         "joined_at": member.joined_at,
-        "is_creator": member.user_id == creator_id,
+        "is_creator": is_creator,
+        "in_scope": in_scope,
     }
 
 
 def _members_payload(ts, quest) -> list[dict]:
-    """有効パーティーの DTO 配列（GET members・PUT party・詳細で共有）。N+1 回避で users を一括取得。"""
+    """有効パーティーの DTO 配列（GET members・PUT party・詳細で共有）。N+1 回避で users を一括取得。
+
+    各メンバーの `in_scope`（参加部署アクセス可否＝失効表示用）は参加部署スコープを一度だけ引いて付与。
+    """
     members = repo.list_active_members(ts, quest.id)
     users = repo.get_users_by_ids(ts, {m.user_id for m in members})
-    return [_member_dto(ts, m, quest.owner_id, users.get(m.user_id)) for m in members]
+    has_depts, dept_users = _dept_scope(ts, quest)
+    return [
+        _member_dto(ts, m, quest.owner_id, users.get(m.user_id), has_depts=has_depts, dept_users=dept_users)
+        for m in members
+    ]
 
 
 def _build_detail(ts, quest, viewer_id) -> dict:

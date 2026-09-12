@@ -4113,6 +4113,11 @@ export interface components {
             joined_at: string;
             /** Is Creator */
             is_creator: boolean;
+            /**
+             * In Scope
+             * @default true
+             */
+            in_scope: boolean;
         };
         /**
          * QuestMemberInput
