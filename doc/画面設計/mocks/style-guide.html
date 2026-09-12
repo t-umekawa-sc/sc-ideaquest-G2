@@ -236,9 +236,14 @@
           .mp-cand__dept { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 7px; }
           .mp-cand__plus { color: var(--color-primary); font-weight: 700; }
           .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
-          .mp__selhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
-          .mp__clear { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; padding: 2px 10px; cursor: pointer; }
+          .mp__selhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
+          .mp__selfilters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+          .mp__selsearch { font-size: var(--text-xs); padding: 3px 8px; min-width: 150px; }
+          .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; }
+          .mp__seltoggle[aria-pressed="true"] { border-color: var(--color-danger); background: var(--color-disagree-bg); color: var(--color-danger); font-weight: 700; }
+          .mp__clear { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; }
           .mp__clear:disabled { opacity: .45; cursor: default; }
+          .mp-sel[hidden] { display: none; }
           .mp__sel { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
           .mp-sel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
           .mp-sel[data-out] { opacity: .62; }
@@ -282,12 +287,17 @@
           <div class="mp__cands" id="mpCands"></div>
           <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
           <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
-          <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span><button type="button" class="mp__clear" id="mpClear" disabled>選択をすべて解除</button></div>
-          <div class="mp__sel" id="mpSel">
-            <div class="mp-sel"><span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span><span class="mp-sel__name">山田 太郎</span><span class="badge badge-muted">あなた・作成者</span></div>
+          <div class="mp__selhead">
+            <span>選択中のパーティー（<span id="mpCount">1</span> 名）</span>
+            <div class="mp__selfilters">
+              <input class="input mp__selsearch" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/部署）" aria-label="選択中のメンバーを絞り込み">
+              <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">部署外・失効中のみ</button>
+              <button type="button" class="mp__clear" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
+            </div>
           </div>
+          <div class="mp__sel" id="mpSel"></div>
         </div>
-        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>「選択をすべて解除」</strong>で追加メンバーを一括削除（作成者は別格で残る）。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
+        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/部署＋<strong>「部署外・失効中のみ」</strong>トグル）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4414,26 +4424,37 @@
     }
     const PAGE = 24;                    // 1ページの表示件数（もっと見る）
     let shown = PAGE;                   // 現在の表示件数（絞込変更でリセット）
-    const added = new Set();            // 追加済みメンバー名
     let selDepts = new Set();           // 絞込に選んだ部署（空＝全部署）＝標準 .multiselect のチップから読む
+    // 選択中のパーティー（データ駆動）。inScope=false＝部署異動などで失効中（参照不可）。creator は別格・削除不可。
+    const party = [
+      { name: '山田 太郎', dept: '開発部1課', inScope: true, creator: true },
+      { name: '佐藤 花子', dept: '開発部1課', inScope: true },
+      { name: '鈴木 一郎', dept: '営業部 東日本', inScope: true },
+      { name: '伊藤 直子', dept: '営業部 西日本', inScope: false },
+      { name: '渡辺 剛', dept: '経理部', inScope: false },
+      { name: '中村 彩', dept: '人事部', inScope: false },
+    ];
 
     const cands = root.querySelector('#mpCands');
     const empty = root.querySelector('#mpEmpty');
     const sel = root.querySelector('#mpSel');
     const count = root.querySelector('#mpCount');
-    const clearBtn = root.querySelector('#mpClear');
     const search = root.querySelector('#mpSearch');
     const deptSelect = root.querySelector('#mpDeptSelect');
     const meta = root.querySelector('#mpCandMeta');
     const hint = root.querySelector('#mpCandHint');
     const moreBtn = root.querySelector('#mpMore');
+    const selSearch = root.querySelector('#mpSelSearch');
+    const selOut = root.querySelector('#mpSelOut');
+    const bulkBtn = root.querySelector('#mpBulk');
     const TOO_MANY = 200;               // これ以上は絞り込みを促す（サーバー側は limit+cursor で保護）
     const ini = (n) => n.trim().charAt(0);
+    const inParty = (name) => party.some((p) => p.name === name);
 
     // 現在の絞込（部署=和集合／名前）に一致する候補（追加済みは除外）。実装ではサーバーが返す。
     function filtered() {
       const q = (search.value || '').trim();
-      return CANDS.filter((c) => !added.has(c.name)
+      return CANDS.filter((c) => !inParty(c.name)
         && (selDepts.size === 0 || selDepts.has(c.dept))
         && (!q || c.name.includes(q)));
     }
@@ -4450,60 +4471,84 @@
       const remain = list.length - page.length;
       moreBtn.hidden = remain <= 0;
       if (remain > 0) moreBtn.textContent = 'もっと見る（残り ' + remain + '）';
-      // 関係者が多すぎる時は部署/名前での絞り込みを促す（1000人規模の考慮）。
-      hint.hidden = list.length <= TOO_MANY;
+      hint.hidden = list.length <= TOO_MANY; // 関係者が多すぎる時は絞り込みを促す（1000人規模の考慮）
     }
     function resetAndRender() { shown = PAGE; renderCands(); }
     moreBtn.addEventListener('click', () => { shown += PAGE; renderCands(); });
-    function recount() {
-      const n = sel.querySelectorAll('.mp-sel').length;
-      count.textContent = String(n);
-      clearBtn.disabled = n <= 1; // 作成者のみは解除対象なし
+
+    // --- 選択中のパーティー描画（絞り込み〔名前/部署・失効中のみ〕＋まとめて外す） ---
+    function selMatch(p) {
+      if (p.creator) return false; // 作成者は削除対象外
+      const q = (selSearch.value || '').trim();
+      const outOnly = selOut.getAttribute('aria-pressed') === 'true';
+      return (!q || p.name.includes(q) || p.dept.includes(q)) && (!outOnly || !p.inScope);
+    }
+    function renderParty() {
+      // 作成者は常に表示。非作成者は絞り込み一致のみ表示（＝まとめて外す対象を可視化）。
+      const q = (selSearch.value || '').trim();
+      const outOnly = selOut.getAttribute('aria-pressed') === 'true';
+      const filtering = q !== '' || outOnly;
+      sel.innerHTML = party.map((p) => {
+        const show = p.creator || (filtering ? selMatch(p) : true);
+        return '<div class="mp-sel"' + (show ? '' : ' hidden') + (!p.inScope ? ' data-out' : '') + '>'
+          + '<span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span>'
+          + '<span class="mp-sel__name">' + p.name + '</span>'
+          + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '')
+          + '<span class="mp-cand__dept">' + p.dept + '</span>'
+          + (!p.inScope ? '<span class="badge badge-danger" title="どの参加部署にも所属していないため参照できません（異動などで失効）">部署外・失効中</span>' : '')
+          + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>')
+          + '</div>';
+      }).join('');
+      count.textContent = String(party.length);
+      const targets = party.filter(selMatch).length;
+      bulkBtn.disabled = targets === 0;
+      bulkBtn.textContent = (q || outOnly) ? '絞り込み対象をまとめて外す（' + targets + '）' : 'すべて外す（' + targets + '）';
     }
     function addMember(name) {
-      const c = CANDS.find((x) => x.name === name); if (!c) return;
-      added.add(name);
-      const row = document.createElement('div');
-      row.className = 'mp-sel';
-      row.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini(name)
-        + '</span></span><span class="mp-sel__name">' + name + '</span><span class="mp-cand__dept">' + c.dept
-        + '</span><button type="button" class="mp-sel__x" aria-label="' + name + ' を外す" data-name="' + name + '">✕</button>';
-      sel.appendChild(row);
+      const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return;
+      party.push({ name, dept: c.dept, inScope: true }); // 候補＝参加部署内（0件なら全社）＝in_scope
     }
 
     cands.addEventListener('click', (e) => {
       const c = e.target.closest('.mp-cand'); if (!c) return;
-      addMember(c.dataset.name); renderCands(); recount();
+      addMember(c.dataset.name); renderCands(); renderParty();
     });
     root.querySelector('#mpAddAll').addEventListener('click', () => {
-      // 「該当をすべて追加」＝表示中だけでなく現在の絞込に一致する全員（大量時は確認）。実装はサーバーで一括解決。
       const list = filtered();
       if (list.length === 0) return;
       if (list.length > 50 && !confirm('該当する ' + list.length + ' 名をすべてパーティーに追加します。よろしいですか？')) return;
       list.forEach((c) => addMember(c.name));
-      renderCands(); recount();
+      renderCands(); renderParty();
     });
     sel.addEventListener('click', (e) => {
       const x = e.target.closest('.mp-sel__x'); if (!x) return;
-      added.delete(x.dataset.name); x.closest('.mp-sel').remove(); renderCands(); recount();
+      const i = party.findIndex((p) => p.name === x.dataset.name && !p.creator);
+      if (i >= 0) party.splice(i, 1);
+      renderCands(); renderParty();
     });
-    // 選択を一括解除（作成者＝先頭行は残す）。
-    clearBtn.addEventListener('click', () => {
-      added.clear();
-      [...sel.querySelectorAll('.mp-sel')].slice(1).forEach((r) => r.remove());
-      renderCands(); recount();
+    // まとめて外す＝現在の絞り込み（名前/部署・失効中のみ）に一致する非作成者を一括削除（件数を確認）。
+    bulkBtn.addEventListener('click', () => {
+      const targets = party.filter(selMatch);
+      if (targets.length === 0) return;
+      const outOnly = selOut.getAttribute('aria-pressed') === 'true';
+      const label = outOnly ? '部署外・失効中の ' + targets.length + ' 名' : targets.length + ' 名';
+      if (targets.length > 1 && !confirm(label + ' をパーティーから外します。よろしいですか？')) return;
+      const names = new Set(targets.map((p) => p.name));
+      for (let i = party.length - 1; i >= 0; i--) if (names.has(party[i].name) && !party[i].creator) party.splice(i, 1);
+      renderCands(); renderParty();
     });
+    selSearch.addEventListener('input', renderParty);
+    selOut.addEventListener('click', () => { selOut.setAttribute('aria-pressed', String(selOut.getAttribute('aria-pressed') !== 'true')); renderParty(); });
     search.addEventListener('input', resetAndRender);
 
-    // --- 部署絞込＝標準 .multiselect（shared.js が初期化・候補のみ／自由入力なし）。 ---
-    // 選択チップ（.multiselect__chip[data-value]）の増減を監視して、候補を再絞込（和集合／空＝全部署）。
+    // --- 部署絞込＝標準 .multiselect（shared.js 初期化・候補のみ／自由入力なし）。チップ増減を監視して候補を再絞込。 ---
     function readSelDepts() {
       selDepts = new Set([...deptSelect.querySelectorAll('.multiselect__chip')].map((c) => c.dataset.value));
     }
     new MutationObserver(() => { readSelDepts(); resetAndRender(); })
       .observe(deptSelect.querySelector('.multiselect__control'), { childList: true });
 
-    renderCands(); recount();
+    renderCands(); renderParty();
   })();
 </script>
 
