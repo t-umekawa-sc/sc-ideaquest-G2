@@ -82,6 +82,19 @@
   .mp-perm.is-on { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
   .mp-perm--owner.is-on { border-color: #b8860b; background: #fff7e6; color: #b8860b; }
   .mp-perm[aria-disabled="true"] { cursor: default; }
+  /* 候補追加／選択中を広い画面で左右2カラム（狭い画面は縦積み）＋各カラムに見出し。 */
+  #questModal .modal__panel { max-width: 960px; }
+  .mp__cols { display: grid; grid-template-columns: 1fr; }
+  .mp__col { min-width: 0; display: flex; flex-direction: column; }
+  .mp__col + .mp__col { border-top: 1px solid var(--color-border); }
+  .mp__colhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 700; }
+  .mp__col .mp__selhead { border-top: 0; border-bottom: 1px solid var(--color-border); }
+  .mp__col .mp__filters { border-bottom: 0; }
+  .mp__col .mp__selfilters { border-top: 0; }
+  @media (min-width: 760px) {
+    .mp__cols { grid-template-columns: 1fr 1fr; align-items: start; }
+    .mp__col + .mp__col { border-top: 0; border-left: 1px solid var(--color-border); }
+  }
 </style>
 </head>
 <body>
@@ -228,30 +241,39 @@
       <div class="mp" id="mpDemo">
         <!-- 参加クエストグループ（アクセス条件）＝上の参加部署欄の選択を反映（候補の範囲）。 -->
         <div class="mp__scope" id="mpScope"></div>
-        <div class="mp__filters">
-          <div class="mp__row">
-            <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
+        <div class="mp__cols">
+          <!-- 左カラム：候補追加 -->
+          <div class="mp__col">
+            <div class="mp__colhead"><span>メンバーを追加</span><span>候補から選ぶ</span></div>
+            <div class="mp__filters">
+              <div class="mp__row">
+                <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
+              </div>
+              <div class="mp__row mp__row--end">
+                <button type="button" class="btn btn-outline btn-sm" id="mpAddAll">該当をすべて追加</button>
+              </div>
+            </div>
+            <div class="mp__candmeta"><span id="mpCandMeta">候補 0 名</span><span id="mpCandHint" class="mp__toomany" hidden>絞り込んでください</span></div>
+            <div class="mp__cands" id="mpCands"></div>
+            <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
+            <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
           </div>
-          <div class="mp__row mp__row--end">
-            <button type="button" class="btn btn-outline btn-sm" id="mpAddAll">該当をすべて追加</button>
+          <!-- 右カラム：選択中のパーティー -->
+          <div class="mp__col">
+            <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span></div>
+            <div class="mp__selfilters">
+              <div class="mp__row">
+                <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/グループ）" aria-label="選択中のメンバーを絞り込み">
+              </div>
+              <div class="mp__row mp__row--split">
+                <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">グループ外・失効中のみ</button>
+                <button type="button" class="btn btn-danger btn-sm" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
+              </div>
+            </div>
+            <div class="mp__sel" id="mpSel"></div>
+            <button type="button" class="mp__more" id="mpSelMore" hidden>もっと見る</button>
           </div>
         </div>
-        <div class="mp__candmeta"><span id="mpCandMeta">候補 0 名</span><span id="mpCandHint" class="mp__toomany" hidden>絞り込んでください</span></div>
-        <div class="mp__cands" id="mpCands"></div>
-        <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
-        <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
-        <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span></div>
-        <div class="mp__selfilters">
-          <div class="mp__row">
-            <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/グループ）" aria-label="選択中のメンバーを絞り込み">
-          </div>
-          <div class="mp__row mp__row--split">
-            <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">グループ外・失効中のみ</button>
-            <button type="button" class="btn btn-danger btn-sm" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
-          </div>
-        </div>
-        <div class="mp__sel" id="mpSel"></div>
-        <button type="button" class="mp__more" id="mpSelMore" hidden>もっと見る</button>
       </div>
       <div class="hint"><strong>候補は参加部署（アクセス条件）の所属者に限定</strong>（上の参加部署欄で指定・未指定なら全社）。名前検索＋<strong>「もっと見る」でページング</strong>（〜1000人規模）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（作成者は所有者＋全権限で固定）。<strong>選択中も絞り込み（名前／「グループ外・失効中のみ」）＋まとめて外す</strong>で、異動失効した人を一括削除できる。制御の詳細は style-guide.html「メンバー選択」を正とする。</div>
     </div>
