@@ -4450,9 +4450,9 @@
       { name: '渡辺 剛', dept: '経理部', inScope: false, perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
       { name: '中村 彩', dept: '人事部', inScope: false, perms: defPerms() },
     ];
-    // デモ用＝選択メンバーを増やして「もっと見る」ページングを確認できるようにする（一部は失効中）。
+    // デモ用＝選択メンバーを増やして「もっと見る」ページングを初期表示で確認できるようにする（一意名／一部は失効中）。
     for (let i = 0; i < 24; i++) {
-      const c = CANDS[i * 3 + 5];
+      const c = CANDS[100 + i * 7]; // 100 以降は連番サフィックス付き＝一意（重複除外で消えない）
       if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, inScope: i % 4 !== 0, perms: defPerms() });
     }
 
@@ -4469,7 +4469,7 @@
     const selOut = root.querySelector('#mpSelOut');
     const bulkBtn = root.querySelector('#mpBulk');
     const selMore = root.querySelector('#mpSelMore');
-    const SEL_PAGE = 20;               // 選択中パーティーの1ページ表示件数（もっと見る）
+    const SEL_PAGE = 8;                // 選択中パーティーの1ページ表示件数（もっと見る）
     let selShown = SEL_PAGE;
     const TOO_MANY = 200;               // これ以上は絞り込みを促す（サーバー側は limit+cursor で保護）
     const ini = (n) => n.trim().charAt(0);
