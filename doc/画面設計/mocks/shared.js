@@ -411,6 +411,11 @@ window.addEventListener('resize', () => applyCellClips());
   document.addEventListener('keydown', (e) => {
     if (!activeModal) return;
     if (e.key === 'Escape') {
+      // 開いているコンボボックス（候補表示中・aria-expanded=true）上の ESC は、その候補を閉じる方に委ねる＝
+      // モーダルは閉じない（候補が閉じている次の ESC でモーダルが閉じる）。role=combobox（.multiselect）と
+      // aria-haspopup=listbox（.combobox）の両方を対象にする。
+      const t = e.target;
+      if (t && t.closest && t.closest('[role="combobox"][aria-expanded="true"], [aria-haspopup="listbox"][aria-expanded="true"]')) return;
       const m = activeModal;
       m.classList.remove('show');
       setTimeout(() => { m.hidden = true; }, 200);   // 各モックの closeModal と同じ挙動
@@ -423,7 +428,7 @@ window.addEventListener('resize', () => applyCellClips());
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-  });
+  }, true); // キャプチャ段＝コンボボックスの ESC より先に判定し、開いた候補上の ESC はモーダルを閉じない
 })();
 
 /* --- 入力バリデーションのインラインエラー（alert() の代替・標準ヘルパー・デザイン標準 §4.7） ---

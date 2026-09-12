@@ -73,6 +73,10 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        // 開いているコンボボックス（候補表示中・role=combobox aria-expanded=true）上の ESC は、
+        // まず候補を閉じる方に委ねる＝モーダルは閉じない。候補が閉じている次の ESC でモーダルが閉じる。
+        const t = e.target as HTMLElement | null;
+        if (t && t.closest('[role="combobox"][aria-expanded="true"]')) return;
         e.stopPropagation();
         onCloseRef.current();
         return;
