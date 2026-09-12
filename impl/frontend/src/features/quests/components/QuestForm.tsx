@@ -645,9 +645,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                       <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
                         <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
                         <span className="cand__name">{c.display_name}</span>
-                        {deptIds.length > 1 && depts.length > 0 && (
-                          <span className="cand__depts">{depts.join("・")}</span>
-                        )}
+                        {deptIds.length > 1 && depts.map((d) => (
+                          <span key={d} className="cand__depts">{d}</span>
+                        ))}
                         <span className="cand__plus" aria-hidden>＋</span>
                       </button>
                     );
