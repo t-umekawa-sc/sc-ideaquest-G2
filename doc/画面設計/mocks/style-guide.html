@@ -4432,9 +4432,12 @@
       '情シス', '経理部', '総務部', '人事部', '法務部', '物流部', 'カスタマーサクセス', '広報部'];
     const SEI = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村', '小林', '山本', '加藤', '吉田', '山田', '松本', '井上'];
     const MEI = ['花子', '一郎', '健', 'みゆき', '直子', '剛', '彩', '大輔', '舞', '涼', '翔', '結衣', '拓也', '愛'];
-    const CANDS = []; // 〜700 名のデモ（1000人規模の関係者を想定）
+    const CANDS = []; // 〜700 名のデモ（1000人規模の関係者を想定）。depts＝所属グループ（複数所属あり）。
     for (let i = 0; i < 700; i++) {
-      CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + (i)), dept: DEPTS[(i * 5) % DEPTS.length] });
+      const depts = [DEPTS[(i * 5) % DEPTS.length]];
+      if (i % 3 === 0) depts.push(DEPTS[(i * 5 + 4) % DEPTS.length]); // 一部は 2 グループ所属
+      if (i % 9 === 0) depts.push(DEPTS[(i * 5 + 8) % DEPTS.length]); // ごく一部は 3 グループ所属
+      CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + (i)), depts: [...new Set(depts)] });
     }
     const PAGE = 24;                    // 1ページの表示件数（もっと見る）
     let shown = PAGE;                   // 現在の表示件数（絞込変更でリセット）
@@ -4445,18 +4448,19 @@
     // クエストの参加クエストグループ（アクセス条件・0..N）。空配列にすると「全社（未指定）」表現になる。
     const PARTICIPATING = ['開発部1課', '営業部 東日本', '情シス'];
     // 選択中のパーティー（データ駆動）。inScope=false＝グループ異動などで失効中（参照不可）。creator は別格・削除不可・全権限。
+    const inParticipating = (depts) => PARTICIPATING.length === 0 || depts.some((d) => PARTICIPATING.includes(d));
     const party = [
-      { name: '山田 太郎', dept: '開発部1課', inScope: true, creator: true },
-      { name: '佐藤 花子', dept: '開発部1課', inScope: true, perms: defPerms() },
-      { name: '鈴木 一郎', dept: '営業部 東日本', inScope: true, perms: { manage: true, eval: false, vote: true, idea: true, comment: true } },
-      { name: '伊藤 直子', dept: '営業部 西日本', inScope: false, perms: defPerms() },
-      { name: '渡辺 剛', dept: '経理部', inScope: false, perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
-      { name: '中村 彩', dept: '人事部', inScope: false, perms: defPerms() },
+      { name: '山田 太郎', depts: ['開発部1課'], inScope: true, creator: true },
+      { name: '佐藤 花子', depts: ['開発部1課', '情シス'], inScope: true, perms: defPerms() },              // 複数グループ所属
+      { name: '鈴木 一郎', depts: ['営業部 東日本', '開発部1課', '広報部'], inScope: true, perms: { manage: true, eval: false, vote: true, idea: true, comment: true } }, // 3 グループ所属
+      { name: '伊藤 直子', depts: ['営業部 西日本'], inScope: false, perms: defPerms() },
+      { name: '渡辺 剛', depts: ['経理部', '総務部'], inScope: false, perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
+      { name: '中村 彩', depts: ['人事部'], inScope: false, perms: defPerms() },
     ];
     // デモ用＝選択メンバーを増やして「もっと見る」ページングを初期表示で確認できるようにする（一意名／一部は失効中）。
     for (let i = 0; i < 24; i++) {
       const c = CANDS[100 + i * 7]; // 100 以降は連番サフィックス付き＝一意（重複除外で消えない）
-      if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, inScope: PARTICIPATING.includes(c.dept), perms: defPerms() });
+      if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, depts: c.depts, inScope: inParticipating(c.depts), perms: defPerms() });
     }
 
     const cands = root.querySelector('#mpCands');
@@ -4476,6 +4480,7 @@
     let selShown = SEL_PAGE;
     const TOO_MANY = 200;               // これ以上は絞り込みを促す（サーバー側は limit+cursor で保護）
     const ini = (n) => n.trim().charAt(0);
+    const deptBadges = (depts) => (depts || []).map((d) => '<span class="mp-cand__dept">' + d + '</span>').join(' '); // 所属グループ（複数所属は複数バッジ）
     const inParty = (name) => party.some((p) => p.name === name);
 
     // 現在の絞込（部署=和集合／名前）に一致する候補（追加済みは除外）。実装ではサーバーが返す。
@@ -4483,8 +4488,8 @@
       const q = (search.value || '').trim();
       return CANDS.filter((c) => !inParty(c.name)
         // 候補は参加クエストグループの所属者に限定（0件=全社なら制限なし）。グループ絞込はその範囲内の絞り込み。
-        && (PARTICIPATING.length === 0 || PARTICIPATING.includes(c.dept))
-        && (selDepts.size === 0 || selDepts.has(c.dept))
+        && (PARTICIPATING.length === 0 || c.depts.some((d) => PARTICIPATING.includes(d)))
+        && (selDepts.size === 0 || c.depts.some((d) => selDepts.has(d)))
         && (!q || c.name.includes(q)));
     }
     // 参加クエストグループ（アクセス条件）バナー＝候補の範囲を明示（指定あり＝グループのチップ／未指定＝全社）。
@@ -4504,8 +4509,8 @@
       const page = list.slice(0, shown);
       cands.innerHTML = page.map((c) =>
         '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">'
-        + ini(c.name) + '</span></span><span>' + c.name + '</span><span class="mp-cand__dept">' + c.dept
-        + '</span><span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
+        + ini(c.name) + '</span></span><span>' + c.name + '</span>' + deptBadges(c.depts)
+        + '<span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
       empty.hidden = list.length > 0;
       meta.textContent = '候補 ' + list.length + ' 名（表示 ' + Math.min(shown, list.length) + '）';
       const remain = list.length - page.length;
@@ -4521,7 +4526,7 @@
       if (p.creator) return false; // 作成者は削除対象外
       const q = (selSearch.value || '').trim();
       const outOnly = selOut.getAttribute('aria-pressed') === 'true';
-      return (!q || p.name.includes(q) || p.dept.includes(q)) && (!outOnly || !p.inScope);
+      return (!q || p.name.includes(q) || (p.depts || []).some((d) => d.includes(q))) && (!outOnly || !p.inScope);
     }
     // メンバー行の権限チップ。作成者＝所有者＋全権限（剥奪不可・aria-disabled）。他＝トグル（既定 投票/作成/コメント）。
     function permChips(p) {
@@ -4546,7 +4551,7 @@
           + '<div class="mp-sel__top">'
           + '<span class="mp-sel__name">' + p.name + '</span>'
           + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '')
-          + '<span class="mp-cand__dept">' + p.dept + '</span>'
+          + deptBadges(p.depts)
           + (!p.inScope ? '<span class="badge badge-danger" title="どの参加グループにも所属していないため参照できません（異動などで失効）">グループ外・失効中</span>' : '')
           + '</div>'
           + '<div class="mp-perms">' + permChips(p) + '</div>'
@@ -4565,7 +4570,7 @@
     selMore.addEventListener('click', () => { selShown += SEL_PAGE; renderParty(); });
     function addMember(name) {
       const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return;
-      party.push({ name, dept: c.dept, inScope: true, perms: defPerms() }); // 候補＝参加グループ内（0件なら全社）＝in_scope・既定権限
+      party.push({ name, depts: c.depts, inScope: true, perms: defPerms() }); // 候補＝参加グループ内（0件なら全社）＝in_scope・既定権限
     }
 
     cands.addEventListener('click', (e) => {

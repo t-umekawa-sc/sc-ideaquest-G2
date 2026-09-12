@@ -337,7 +337,7 @@
     const SEI = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '中村', '小林', '山本', '加藤', '吉田', '山田', '松本', '井上'];
     const MEI = ['花子', '一郎', '健', 'みゆき', '直子', '剛', '彩', '大輔', '舞', '涼', '翔', '結衣', '拓也', '愛'];
     const CANDS = [];
-    for (let i = 0; i < 700; i++) CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + i), dept: DEPTS[(i * 3) % DEPTS.length] });
+    for (let i = 0; i < 700; i++) { const dd = [DEPTS[(i * 3) % DEPTS.length]]; if (i % 3 === 0) dd.push(DEPTS[(i * 3 + 2) % DEPTS.length]); if (i % 9 === 0) dd.push(DEPTS[(i * 3 + 5) % DEPTS.length]); CANDS.push({ name: SEI[i % SEI.length] + ' ' + MEI[(i * 7) % MEI.length] + (i < 100 ? '' : ' ' + i), depts: [...new Set(dd)] }); }
     const PAGE = 24; let shown = PAGE;
     const PERMS = [['manage', 'クエスト管理'], ['eval', '評価者'], ['vote', '投票'], ['idea', '作成'], ['comment', 'コメント']];
     const defPerms = () => ({ manage: false, eval: false, vote: true, idea: true, comment: true });
@@ -346,14 +346,14 @@
     const readParticipating = () => gsCtl ? [...gsCtl.querySelectorAll('.multiselect__chip')].map((c) => c.dataset.value) : [];
     let PARTICIPATING = readParticipating();
     const party = [
-      { name: '山田 太郎', dept: '開発部1課', creator: true },
-      { name: '佐藤 花子', dept: '開発部1課', perms: defPerms() },
-      { name: '鈴木 一郎', dept: '営業部 東日本', perms: { manage: true, eval: false, vote: true, idea: true, comment: true } },
-      { name: '伊藤 直子', dept: '営業部 西日本', perms: defPerms() },
-      { name: '渡辺 剛', dept: '経理部', perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
-      { name: '中村 彩', dept: '人事部', perms: defPerms() },
+      { name: '山田 太郎', depts: ['開発部1課'], creator: true },
+      { name: '佐藤 花子', depts: ['開発部1課', '情シス'], perms: defPerms() },
+      { name: '鈴木 一郎', depts: ['営業部 東日本', '開発部1課'], perms: { manage: true, eval: false, vote: true, idea: true, comment: true } },
+      { name: '伊藤 直子', depts: ['営業部 西日本'], perms: defPerms() },
+      { name: '渡辺 剛', depts: ['経理部', '総務部'], perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
+      { name: '中村 彩', depts: ['人事部'], perms: defPerms() },
     ];
-    for (let i = 0; i < 24; i++) { const c = CANDS[100 + i * 7]; if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, perms: defPerms() }); }
+    for (let i = 0; i < 24; i++) { const c = CANDS[100 + i * 7]; if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, depts: c.depts, perms: defPerms() }); }
 
     const cands = root.querySelector('#mpCands'), empty = root.querySelector('#mpEmpty'), sel = root.querySelector('#mpSel');
     const count = root.querySelector('#mpCount'), search = root.querySelector('#mpSearch'), meta = root.querySelector('#mpCandMeta');
@@ -362,11 +362,12 @@
     const SEL_PAGE = 8; let selShown = SEL_PAGE; const TOO_MANY = 200;
     const ini = (n) => n.trim().charAt(0);
     const inParty = (name) => party.some((p) => p.name === name);
-    const isIn = (p) => p.creator || PARTICIPATING.length === 0 || PARTICIPATING.includes(p.dept); // 参加部署に居る＝in_scope（動的）
+    const deptBadges = (depts) => (depts || []).map((d) => '<span class="mp-cand__dept">' + d + '</span>').join(' '); // 所属グループ（複数所属は複数バッジ）
+    const isIn = (p) => p.creator || PARTICIPATING.length === 0 || (p.depts || []).some((d) => PARTICIPATING.includes(d)); // 参加部署に居る＝in_scope（動的）
 
     function filtered() {
       const q = (search.value || '').trim();
-      return CANDS.filter((c) => !inParty(c.name) && (PARTICIPATING.length === 0 || PARTICIPATING.includes(c.dept)) && (!q || c.name.includes(q)));
+      return CANDS.filter((c) => !inParty(c.name) && (PARTICIPATING.length === 0 || c.depts.some((d) => PARTICIPATING.includes(d))) && (!q || c.name.includes(q)));
     }
     function renderScope() {
       const scope = root.querySelector('#mpScope');
@@ -375,7 +376,7 @@
     }
     function renderCands() {
       const list = filtered(), page = list.slice(0, shown);
-      cands.innerHTML = page.map((c) => '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">' + ini(c.name) + '</span></span><span>' + c.name + '</span><span class="mp-cand__dept">' + c.dept + '</span><span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
+      cands.innerHTML = page.map((c) => '<button type="button" class="mp-cand" data-name="' + c.name + '"><span class="avatar sm"><span class="avatar__img placeholder">' + ini(c.name) + '</span></span><span>' + c.name + '</span>' + deptBadges(c.depts) + '<span class="mp-cand__plus" aria-hidden>＋</span></button>').join('');
       empty.hidden = list.length > 0;
       meta.textContent = '候補 ' + list.length + ' 名（表示 ' + Math.min(shown, list.length) + '）';
       const remain = list.length - page.length; moreBtn.hidden = remain <= 0; if (remain > 0) moreBtn.textContent = 'もっと見る（残り ' + remain + '）';
@@ -384,7 +385,7 @@
     function resetAndRender() { shown = PAGE; renderCands(); }
     moreBtn.addEventListener('click', () => { shown += PAGE; renderCands(); });
 
-    function selMatch(p) { if (p.creator) return false; const q = (selSearch.value || '').trim(); const outOnly = selOut.getAttribute('aria-pressed') === 'true'; return (!q || p.name.includes(q) || p.dept.includes(q)) && (!outOnly || !isIn(p)); }
+    function selMatch(p) { if (p.creator) return false; const q = (selSearch.value || '').trim(); const outOnly = selOut.getAttribute('aria-pressed') === 'true'; return (!q || p.name.includes(q) || (p.depts || []).some((d) => d.includes(q))) && (!outOnly || !isIn(p)); }
     function permChips(p) {
       if (p.creator) return '<span class="mp-perm mp-perm--owner is-on" aria-disabled="true" title="作成者は所有者・剥奪不可">所有者</span>' + PERMS.map(([, l]) => '<span class="mp-perm is-on" aria-disabled="true">' + l + '</span>').join('');
       return PERMS.map(([k, l]) => '<span class="mp-perm' + (p.perms[k] ? ' is-on' : '') + '" role="button" tabindex="0" data-name="' + p.name + '" data-perm="' + k + '">' + l + '</span>').join('');
@@ -392,14 +393,14 @@
     function renderParty() {
       const q = (selSearch.value || '').trim(); const outOnly = selOut.getAttribute('aria-pressed') === 'true'; const filtering = q !== '' || outOnly;
       const visibleList = party.filter((p) => p.creator || (filtering ? selMatch(p) : true)); const page = visibleList.slice(0, selShown);
-      sel.innerHTML = page.map((p) => '<div class="mp-sel"' + (!isIn(p) ? ' data-out' : '') + '><span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span><div class="mp-sel__main"><div class="mp-sel__top"><span class="mp-sel__name">' + p.name + '</span>' + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '') + '<span class="mp-cand__dept">' + p.dept + '</span>' + (!isIn(p) ? '<span class="badge badge-danger" title="どの参加グループにも所属していないため参照できません（異動などで失効）">グループ外・失効中</span>' : '') + '</div><div class="mp-perms">' + permChips(p) + '</div></div>' + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>') + '</div>').join('');
+      sel.innerHTML = page.map((p) => '<div class="mp-sel"' + (!isIn(p) ? ' data-out' : '') + '><span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span><div class="mp-sel__main"><div class="mp-sel__top"><span class="mp-sel__name">' + p.name + '</span>' + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '') + deptBadges(p.depts) + (!isIn(p) ? '<span class="badge badge-danger" title="どの参加グループにも所属していないため参照できません（異動などで失効）">グループ外・失効中</span>' : '') + '</div><div class="mp-perms">' + permChips(p) + '</div></div>' + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>') + '</div>').join('');
       count.textContent = String(party.length);
       const remain = visibleList.length - page.length; selMore.hidden = remain <= 0; if (remain > 0) selMore.textContent = 'もっと見る（残り ' + remain + '）';
       const targets = party.filter(selMatch).length; bulkBtn.disabled = targets === 0; bulkBtn.textContent = (q || outOnly) ? '絞り込み対象をまとめて外す（' + targets + '）' : 'すべて外す（' + targets + '）';
     }
     function resetParty() { selShown = SEL_PAGE; renderParty(); }
     selMore.addEventListener('click', () => { selShown += SEL_PAGE; renderParty(); });
-    function addMember(name) { const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return; party.push({ name, dept: c.dept, perms: defPerms() }); }
+    function addMember(name) { const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return; party.push({ name, depts: c.depts, perms: defPerms() }); }
 
     cands.addEventListener('click', (e) => { const c = e.target.closest('.mp-cand'); if (!c) return; addMember(c.dataset.name); renderCands(); renderParty(); });
     root.querySelector('#mpAddAll').addEventListener('click', () => { const list = filtered(); if (!list.length) return; if (list.length > 50 && !confirm('該当する ' + list.length + ' 名をすべて追加します。よろしいですか？')) return; list.forEach((c) => addMember(c.name)); renderCands(); renderParty(); });
