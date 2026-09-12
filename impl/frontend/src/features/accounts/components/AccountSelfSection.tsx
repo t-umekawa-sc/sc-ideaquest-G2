@@ -209,9 +209,22 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
       sortVal: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
       filterVal: (a) => a.system_role,
       csvVal: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
-      render: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
+      // 幅に収まらない値（例「会社アカウント管理者」）はホバーで全文（title 属性）。
+      render: (a) => { const v = ROLE_LABEL[a.system_role] ?? a.system_role; return <span className="cell-ellipsis" title={v}>{v}</span>; },
     },
-    { key: "groups", label: "所属クエストグループ", width: 220, render: () => <span className="muted">—</span>, csvVal: () => "—" },
+    // 所属クエストグループ（memberships.name・B.2）。複数は「・」連結、幅超過はホバーで全文（title）。
+    {
+      key: "groups",
+      label: "所属クエストグループ",
+      width: 220,
+      csvVal: (a) => (a.memberships ?? []).map((m) => m.name).filter(Boolean).join("・") || "—",
+      render: (a) => {
+        const names = (a.memberships ?? []).map((m) => m.name).filter(Boolean);
+        if (names.length === 0) return <span className="muted">—</span>;
+        const full = names.join("・");
+        return <span className="cell-ellipsis" title={full}>{full}</span>;
+      },
+    },
     {
       key: "status",
       label: "状態",
