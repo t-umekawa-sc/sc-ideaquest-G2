@@ -487,10 +487,11 @@ def list_quest_group_members(
 def company_directory(
     request: Request, q: str | None = None,
     page: int = Query(default=1, ge=1), per_page: int = Query(default=20, ge=1, le=100),
+    exclude_group_id: uuid.UUID | None = Query(default=None),  # メンバー追加ピッカーで既参加者を除外（SC-90）
     session: dict = Depends(require_qg_admin_actor),
 ) -> DirectoryResponse:
-    """自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。"""
-    return DirectoryResponse(**qg_service.company_directory(session, q=q, page=page, per_page=per_page))
+    """自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。`exclude_group_id` で既参加者を除外。"""
+    return DirectoryResponse(**qg_service.company_directory(session, q=q, page=page, per_page=per_page, exclude_group_id=exclude_group_id))
 
 
 @router.post("/quest-groups/{group_id}/members", response_model=MembershipResponse, status_code=201)

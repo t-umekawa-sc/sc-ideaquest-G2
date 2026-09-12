@@ -689,7 +689,7 @@ export interface paths {
         };
         /**
          * Company Directory
-         * @description 自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。
+         * @description 自社アカウント・ディレクトリ（最小射影・QG管理者のみ＝admin 所属ゼロは 403）。`exclude_group_id` で既参加者を除外。
          */
         get: operations["company_directory_api_v1_admin_company_directory_get"];
         put?: never;
@@ -5849,6 +5849,7 @@ export interface operations {
                 q?: string | null;
                 page?: number;
                 per_page?: number;
+                exclude_group_id?: string | null;
             };
             header?: never;
             path?: never;

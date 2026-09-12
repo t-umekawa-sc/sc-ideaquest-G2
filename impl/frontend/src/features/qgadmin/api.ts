@@ -34,8 +34,11 @@ export function removeMember(groupId: string, accountId: string): Promise<null> 
   return apiFetch<null>(`/admin/quest-groups/${groupId}/members/${accountId}`, { method: "DELETE" }) as Promise<null>;
 }
 
-// 自社ディレクトリ（参加追加の候補・最小射影）。
-export function companyDirectory(q?: string): Promise<DirectoryResponse | null> {
-  const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
+// 自社ディレクトリ（参加追加の候補・最小射影）。excludeGroupId＝当該グループの既参加者を候補から除外（SC-90）。
+export function companyDirectory(q?: string, excludeGroupId?: string): Promise<DirectoryResponse | null> {
+  const qs = new URLSearchParams();
+  if (q) qs.set("q", q);
+  if (excludeGroupId) qs.set("exclude_group_id", excludeGroupId);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiFetch<DirectoryResponse>(`/admin/company-directory${suffix}`);
 }

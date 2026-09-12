@@ -103,11 +103,17 @@ def list_members(session: dict, group_id: uuid.UUID, *, q: str | None = None) ->
 
 
 def company_directory(session: dict, *, q: str | None = None,
-                      page: int = 1, per_page: int = _DEFAULT_PER_PAGE) -> dict:
+                      page: int = 1, per_page: int = _DEFAULT_PER_PAGE,
+                      exclude_group_id: uuid.UUID | None = None) -> dict:
     """自社アカウント・ディレクトリ（最小射影・B.4）。少なくとも 1 グループで `admin` でなければ 403。
 
     返すのは `account_id`/`display_name`/`avatar_url` のみ（`email`/`system_role`/所属は出さない）。`status=active`。
+    `exclude_group_id` 指定時は、そのグループに**既に有効所属**するユーザーを候補から除外（メンバー追加ピッカー・SC-90）。
     """
+    from sqlalchemy import exists as sa_exists
+
+    from app.tenant.quest_group.orm import QuestGroupMember
+
     per_page = max(1, min(per_page, _MAX_PER_PAGE))
     page = max(1, page)
     with get_tenant_session(_db_identifier(session)) as ts:
@@ -118,6 +124,12 @@ def company_directory(session: dict, *, q: str | None = None,
         if q:
             like = f"%{q}%"
             conds.append(or_(User.display_name.ilike(like), User.login_id.ilike(like)))
+        if exclude_group_id is not None:  # 既に当該グループの有効メンバーは候補から除外（SC-90 メンバー追加）。
+            conds.append(~sa_exists().where(
+                QuestGroupMember.user_id == User.id,
+                QuestGroupMember.quest_group_id == exclude_group_id,
+                QuestGroupMember.removed_at.is_(None),
+            ))
         total = ts.execute(select(func.count()).select_from(User).where(*conds)).scalar_one()
         rows = ts.execute(
             select(User).where(*conds).order_by(User.display_name, User.id)

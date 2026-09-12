@@ -28,14 +28,15 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
 
   const fetchDirectory = useCallback(async () => {
     try {
-      const res = await companyDirectory(dirQuery || undefined);
+      // 既に当該グループに参加中のユーザーは候補から除外（サーバー除外＝ページング整合・SC-90）。
+      const res = await companyDirectory(dirQuery || undefined, groupId);
       setDirectory(res?.data ?? []);
     } catch {
       setError("ディレクトリの取得に失敗しました。");
     } finally {
       setLoading(false); // 初回で解除（以後は結果を差し替えるだけ＝リストのちらつき/高さジャンプ無し）
     }
-  }, [dirQuery]);
+  }, [dirQuery, groupId]);
 
   // ライブ検索（モック SC-90 準拠＝入力で即絞込・250ms デバウンス）。マウント時も取得。
   useEffect(() => {

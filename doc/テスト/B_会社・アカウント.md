@@ -206,6 +206,7 @@
 | B-TC-082b | api | メンバー一覧の `avatar_url` は署名URL（物理パス漏洩防止） | G1 admin＋メンバーに `avatar_image_path` 設定・Fake storage | `GET /admin/quest-groups/{group_id}/members` | 当該メンバー行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | B.4／K.4／§1.10 |
 | B-TC-083 | api | ディレクトリ最小射影による PII 秘匿 | G1 admin（当人ログイン）／`admin` 所属ゼロのアカウント | `GET /admin/company-directory` | admin＝`200`＋**最小射影**（`account_id`/`display_name`/`avatar_url` のみ＝`email`/`system_role`/所属は**返さない**・`status=active`）／ゼロ admin＝`403` | B.4（ディレクトリ緩和・最小射影）／§8-⑯ |
 | B-TC-083b | api | ディレクトリ `avatar_url` は署名URL（物理パス漏洩防止） | G1 admin＋当人に `avatar_image_path` 設定・Fake storage | `GET /admin/company-directory` | 当該行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | B.4／K.4／§1.10 |
+| B-TC-083c | api | ディレクトリ `exclude_group_id` で既参加者を候補から除外 | G1 admin＋G1 に member_acc を seed_membership | `GET /admin/company-directory?exclude_group_id=G1` | G1 の有効メンバー（admin_acc/member_acc）が候補から消える（除外なしなら含まれる）＝メンバー追加ピッカーで参加済みを出さない | B.4／SC-90 |
 | B-TC-084 | api | 参加追加の member 固定と SoD 境界 | G1 admin（当人ログイン）・別の既存アカウント target | `POST /admin/quest-groups/{G1}/members`（`{account_id: target}`） | `201`＋会社DB `quest_group_members` に target の有効所属（**`role=member` 固定**＝QG管理者は admin 任命不可）。**target の `accounts` は不変**（SoD）。CSRF 無しは `403 csrf_failed` | B.4（参加追加・member 固定・SoD） |
 | B-TC-085 | api | 除外のトゥームストーン化と冪等性 | G1 に target が有効所属 | `DELETE /admin/quest-groups/{G1}/members/{target}` を2回 | 1回目 `204`＋`removed_at` 設定（有効所属から消える）・`accounts` は不変／2回目も `204`（冪等） | B.4（除外＝トゥームストーン・§5.5） |
 
