@@ -214,16 +214,16 @@
         <div class="hint"><strong>単一選択</strong>＝チップにせず入力欄に確定値を表示。フォーカスで全件、入力で絞り込み、選択で確定（1つだけ）。<strong>クエストグループ</strong>（1クエスト＝1グループ）向け。</div>
       </div>
 
-      <!-- メンバー選択（パーティー候補・部署絞込〔複数選択・検索〕＋名前検索）＝SC-11 パーティー編集の候補UI（FR-38 再設計・調整用ドラフト） -->
+      <!-- メンバー選択（パーティー候補・クエストグループ絞込〔複数選択・検索〕＋名前検索）＝SC-11 パーティー編集の候補UI（FR-38 再設計・調整用ドラフト） -->
       <div class="field">
-        <label>メンバー選択（パーティー候補・<strong>部署（クエストグループ）で絞込＝複数選択・検索</strong>＋名前検索）</label>
+        <label>メンバー選択（パーティー候補・<strong>クエストグループで絞込＝複数選択・検索</strong>＋名前検索）</label>
         <style>
           /* 調整用スコープ（本採用時は quests.css / design-system.css へ移設）。 */
           .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
           .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
           .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
           .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
-          /* 部署絞込＝標準の複数選択コンボ（.multiselect）。行内で伸ばす。 */
+          /* クエストグループ絞込＝標準の複数選択コンボ（.multiselect）。行内で伸ばす。 */
           .mp__deptselect { flex: 1; min-width: 220px; }
           .mp__search { flex: 1; min-width: 160px; }
           .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
@@ -237,9 +237,9 @@
           .mp-cand__plus { color: var(--color-primary); font-weight: 700; }
           .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
           .mp__selhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
-          .mp__selfilters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-          .mp__selsearch { font-size: var(--text-xs); padding: 3px 8px; min-width: 150px; }
-          .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; }
+          /* 削除側（選択中の絞込）＝候補側 .mp__filters と同じ体裁（テキスト欄は候補側と同じ .input mp__search）。 */
+          .mp__selfilters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-surface-alt); border-top: 1px solid var(--color-border); }
+          .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; white-space: nowrap; }
           .mp__seltoggle[aria-pressed="true"] { border-color: var(--color-danger); background: var(--color-disagree-bg); color: var(--color-danger); font-weight: 700; }
           .mp__clear { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-danger); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; }
           .mp__clear:disabled { opacity: .45; cursor: default; }
@@ -253,11 +253,11 @@
         <div class="mp" id="mpDemo">
           <div class="mp__filters">
             <div class="mp__row">
-              <span class="mp__deptlabel">部署で絞込:</span>
+              <span class="mp__deptlabel">クエストグループで絞込:</span>
               <!-- 標準の複数選択コンボ（.multiselect・候補のみ／自由入力なし・shared.js が初期化）。 -->
               <div class="multiselect mp__deptselect" data-multiselect id="mpDeptSelect">
                 <div class="multiselect__control">
-                  <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="部署を検索して複数選択…（未選択＝全部署）" aria-label="部署で絞り込み（複数選択）">
+                  <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="クエストグループを検索して複数選択…（未選択＝全グループ）" aria-label="クエストグループで絞り込み（複数選択）">
                 </div>
                 <ul class="multiselect__list" role="listbox" hidden>
                   <li class="multiselect__option" role="option" data-value="開発部">開発部</li>
@@ -287,17 +287,15 @@
           <div class="mp__cands" id="mpCands"></div>
           <button type="button" class="mp__more" id="mpMore" hidden>もっと見る</button>
           <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
-          <div class="mp__selhead">
-            <span>選択中のパーティー（<span id="mpCount">1</span> 名）</span>
-            <div class="mp__selfilters">
-              <input class="input mp__selsearch" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/部署）" aria-label="選択中のメンバーを絞り込み">
-              <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">部署外・失効中のみ</button>
-              <button type="button" class="mp__clear" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
-            </div>
+          <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span></div>
+          <div class="mp__selfilters">
+            <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/クエストグループ）" aria-label="選択中のメンバーを絞り込み">
+            <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">クエストグループ外・失効中のみ</button>
+            <button type="button" class="mp__clear" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
           </div>
           <div class="mp__sel" id="mpSel"></div>
         </div>
-        <div class="hint"><strong>部署（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数部署でもスクロール＋検索で選べる／複数部署を同時に絞込＝和集合／未選択なら全部署）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/部署＋<strong>「部署外・失効中のみ」</strong>トグル）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加部署外のメンバーは「部署外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
+        <div class="hint"><strong>クエストグループで絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/クエストグループ＋<strong>「クエストグループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加クエストグループ外のメンバーは「クエストグループ外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4495,7 +4493,7 @@
           + '<span class="mp-sel__name">' + p.name + '</span>'
           + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '')
           + '<span class="mp-cand__dept">' + p.dept + '</span>'
-          + (!p.inScope ? '<span class="badge badge-danger" title="どの参加部署にも所属していないため参照できません（異動などで失効）">部署外・失効中</span>' : '')
+          + (!p.inScope ? '<span class="badge badge-danger" title="どの参加クエストグループにも所属していないため参照できません（異動などで失効）">クエストグループ外・失効中</span>' : '')
           + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>')
           + '</div>';
       }).join('');
@@ -4531,7 +4529,7 @@
       const targets = party.filter(selMatch);
       if (targets.length === 0) return;
       const outOnly = selOut.getAttribute('aria-pressed') === 'true';
-      const label = outOnly ? '部署外・失効中の ' + targets.length + ' 名' : targets.length + ' 名';
+      const label = outOnly ? 'クエストグループ外・失効中の ' + targets.length + ' 名' : targets.length + ' 名';
       if (targets.length > 1 && !confirm(label + ' をパーティーから外します。よろしいですか？')) return;
       const names = new Set(targets.map((p) => p.name));
       for (let i = party.length - 1; i >= 0; i--) if (names.has(party[i].name) && !party[i].creator) party.splice(i, 1);
