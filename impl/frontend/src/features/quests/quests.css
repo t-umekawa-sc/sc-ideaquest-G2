@@ -25,6 +25,15 @@
 .party__scope-note { color: var(--color-text-muted); }
 /* 候補の件数メタ（モック「候補 N 名（表示 M）」相当。サーバーはカーソル型のため総数は省き表示中＋続きの有無）。 */
 .party__candmeta { padding: var(--space-2) var(--space-4) 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 候補追加／選択中パーティー＝広い画面では左右2カラム、狭い画面では上下（縦積み）。 */
+.party__cols { display: grid; grid-template-columns: 1fr; }
+.party__col { min-width: 0; display: flex; flex-direction: column; }
+.party__col + .party__col { border-top: 1px solid var(--color-border); }
+.party__col > .party__add:first-child { border-top: 0; }
+@media (min-width: 900px) {
+  .party__cols { grid-template-columns: 1fr 1fr; align-items: start; }
+  .party__col + .party__col { border-top: 0; border-left: 1px solid var(--color-border); }
+}
 .party__list { display: flex; flex-direction: column; }
 .pmember { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); }
 .pmember:first-child { border-top: none; }

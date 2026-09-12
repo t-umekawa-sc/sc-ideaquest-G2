@@ -12,7 +12,7 @@ import { Modal } from "./Modal";
 
 type Props = {
   title: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   children: (close: () => void) => React.ReactNode;
 };
 

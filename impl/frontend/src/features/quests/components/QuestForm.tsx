@@ -604,7 +604,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               )}
             </div>
 
-            {/* 候補追加エリア（モック順＝先）＝グループ絞込／名前検索／該当をすべて追加／件数／候補／もっと見る。 */}
+            <div className="party__cols">
+              <div className="party__col">
+            {/* 候補追加エリア（モック順＝先・左カラム）＝グループ絞込／名前検索／該当をすべて追加／件数／候補／もっと見る。 */}
             {!frozen && (
               <div className="party__add">
                 {deptIds.length > 1 && (
@@ -657,8 +659,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
               </div>
             )}
-
-            {/* 選択中のパーティー（モック順＝後）＝ヘッダ／警告／絞込・まとめて外す／一覧／もっと見る。 */}
+              </div>
+              <div className="party__col">
+            {/* 選択中のパーティー（モック順＝後・右カラム）＝ヘッダ／警告／絞込・まとめて外す／一覧／もっと見る。 */}
             <div className="party__head">
               <strong>選択中のパーティー</strong>
               <span className="party__count">{members.length + 1} 名</span>
@@ -722,6 +725,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 <button type="button" className="party__addall" onClick={() => setSelShown((n) => n + SEL_PAGE)}>もっと見る（残り {filteredMembers.length - selShown}）</button>
               </div>
             )}
+              </div>
+            </div>
           </div>
         </Field>
 

@@ -19,7 +19,7 @@ export function QuestEditModal({
   locale: Locale;
 }) {
   return (
-    <RouteModal title="クエストを編集" size="lg">
+    <RouteModal title="クエストを編集" size="xl">
       {(close) => (
         <QuestForm
           mode="edit"

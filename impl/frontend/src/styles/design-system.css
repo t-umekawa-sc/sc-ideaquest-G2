@@ -398,6 +398,7 @@ body.iq-nav-lock { overflow: hidden; }
 .modal--sm .modal__panel { max-width: 480px; }
 .modal--md .modal__panel { max-width: 600px; }
 .modal--lg .modal__panel { max-width: 720px; }
+.modal--xl .modal__panel { max-width: 960px; } /* クエスト作成/編集＝パーティーを左右2カラムで配置するため広め */
 
 /* --- アニメ・モーダル（framer-motion で enter/exit＝デザイン標準 §113）。CRT 電源ON演出（縦に開く）--- */
 /* backdrop の opacity は framer が制御＝既存 CSS transition と二重になるため無効化 */

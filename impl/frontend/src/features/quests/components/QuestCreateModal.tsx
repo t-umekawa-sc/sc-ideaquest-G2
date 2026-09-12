@@ -16,7 +16,7 @@ export function QuestCreateModal({
   locale: Locale;
 }) {
   return (
-    <RouteModal title="クエストを作成" size="lg">
+    <RouteModal title="クエストを作成" size="xl">
       {(close) => (
         <QuestForm
           ownerName={ownerName}
