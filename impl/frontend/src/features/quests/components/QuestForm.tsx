@@ -143,9 +143,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   // 参加部署（アクセス条件・フラット 0..N・すべて同格）。主グループの概念は無い。
   const [deptIds, setDeptIds] = useState<string[]>(dup?.quest_group_ids ?? []);
   const [deptNamesPrefill, setDeptNamesPrefill] = useState<Record<string, string>>({}); // 編集時、所属外部署名の補完
-  const [candidates, setCandidates] = useState<QuestCandidate[]>([]);
-  const [candQuery, setCandQuery] = useState(""); // 候補の絞り込み（表示名部分一致）
+  const [candidates, setCandidates] = useState<QuestCandidate[]>([]); // 取得済みの候補（ページ累積）
+  const [candCursor, setCandCursor] = useState<string | null>(null); // 次ページカーソル（キーセット・C.4）
+  const [candHasNext, setCandHasNext] = useState(false);
+  const [candLoadingMore, setCandLoadingMore] = useState(false);
+  const [candQuery, setCandQuery] = useState(""); // 候補の名前絞り込み（サーバー q）
+  const [candGroupFilter, setCandGroupFilter] = useState<string[]>([]); // 参加部署内でのグループ絞込（空＝参加部署全て）
   const [members, setMembers] = useState<Member[]>([]);
+  const [selQuery, setSelQuery] = useState(""); // 選択中パーティーの名前絞込
+  const [selOutOnly, setSelOutOnly] = useState(false); // 参加部署外（失効中）のみ表示
+  const SEL_PAGE = 8;
+  const [selShown, setSelShown] = useState(SEL_PAGE);
 
   const [ownerLabel, setOwnerLabel] = useState(ownerName);
   const [ownerId, setOwnerId] = useState<string | null>(ownerUserId); // 候補除外に使う「作成者」
@@ -216,30 +224,71 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     };
   }, [isEdit, questId]);
 
-  // 候補＝参加部署のいずれかの有効メンバー（0 件なら会社全体）。自分＋作成者＋追加済みを exclude（C.4/FR-38）。
-  const excludeIds = useMemo(
-    () => [ownerUserId, ownerId, ...members.map((m) => m.userId)].filter((x): x is string => !!x),
-    [ownerUserId, ownerId, members],
+  // 候補フェッチの除外＝作成者のみ（安定）。追加済みメンバーは表示側でクライアント除外＝「もっと見る」のページングを維持する。
+  const fetchExclude = useMemo(
+    () => [ownerUserId, ownerId].filter((x): x is string => !!x),
+    [ownerUserId, ownerId],
   );
   const deptKey = deptIds.join(",");
+  const candGroupKey = candGroupFilter.join(",");
+  // 有効な絞込グループ＝候補内グループ絞込があればそれ、無ければ参加部署全て（0 件なら空＝会社全体・C.4）。
+  const effectiveGroupIds = candGroupFilter.length ? candGroupFilter : deptIds;
+  const CAND_PAGE = 30; // 候補の1ページ取得件数（keyset・もっと見る）
   useEffect(() => {
     if (frozen) {
-      setCandidates([]);
+      setCandidates([]); setCandCursor(null); setCandHasNext(false);
       return;
     }
     let alive = true;
     const timer = setTimeout(() => {
-      // deptIds 空なら group_ids 空＝会社の有効ユーザー全体（参加部署 0 件用・C.4）。
-      void listQuestGroupCandidates(deptIds, { exclude_user_ids: excludeIds, q: candQuery || undefined, limit: 100 })
-        .then((res) => alive && setCandidates(res?.data ?? []))
-        .catch(() => alive && setCandidates([]));
+      void listQuestGroupCandidates(effectiveGroupIds, { exclude_user_ids: fetchExclude, q: candQuery || undefined, limit: CAND_PAGE })
+        .then((res) => {
+          if (!alive) return;
+          setCandidates(res?.data ?? []);
+          setCandCursor(res?.page_info?.next_cursor ?? null);
+          setCandHasNext(!!res?.page_info?.has_next);
+        })
+        .catch(() => { if (alive) { setCandidates([]); setCandCursor(null); setCandHasNext(false); } });
     }, candQuery ? 200 : 0); // 検索語入力は軽くデバウンス
     return () => {
       alive = false;
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deptKey, excludeIds, frozen, candQuery]);
+  }, [deptKey, candGroupKey, frozen, candQuery]);
+
+  async function loadMoreCands() {
+    if (!candCursor || candLoadingMore || frozen) return;
+    setCandLoadingMore(true);
+    try {
+      const res = await listQuestGroupCandidates(effectiveGroupIds, { exclude_user_ids: fetchExclude, q: candQuery || undefined, limit: CAND_PAGE, cursor: candCursor });
+      setCandidates((cur) => [...cur, ...(res?.data ?? [])]);
+      setCandCursor(res?.page_info?.next_cursor ?? null);
+      setCandHasNext(!!res?.page_info?.has_next);
+    } catch {
+      /* 追加読込の失敗は握る（既存分は保持） */
+    } finally {
+      setCandLoadingMore(false);
+    }
+  }
+  // 表示候補＝取得済みから追加済みメンバーをクライアント除外（ページング維持）。
+  const displayedCandidates = useMemo(
+    () => candidates.filter((c) => !members.some((m) => m.userId === c.user_id)),
+    [candidates, members],
+  );
+  // 選択中パーティーの絞込（名前／参加部署外＝失効中のみ）＋ページング。
+  const filteredMembers = useMemo(
+    () => members.filter((m) => (!selQuery.trim() || m.name.includes(selQuery.trim())) && (!selOutOnly || !m.inScope)),
+    [members, selQuery, selOutOnly],
+  );
+  useEffect(() => { setSelShown(SEL_PAGE); }, [selQuery, selOutOnly]);
+  const pagedMembers = filteredMembers.slice(0, selShown);
+  function bulkRemoveMembers() {
+    const ids = new Set(filteredMembers.map((m) => m.userId));
+    if (ids.size === 0) return;
+    if (ids.size > 1 && !window.confirm(`${ids.size} 名をパーティーから外します。よろしいですか？`)) return;
+    setMembers((m) => m.filter((x) => !ids.has(x.userId)));
+  }
 
   // 参加部署の選択肢＝会社ディレクトリ全件（候補のみの複数選択・FR-38）。
   const deptOptions = useMemo<MultiselectOption[]>(
@@ -253,6 +302,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     for (const g of directory) map[g.id] = g.name;
     return map;
   }, [directory, deptNamesPrefill]);
+
+  // 候補内グループ絞込の選択肢＝クエストの参加部署（その範囲内で絞る・2件以上のとき表示）。
+  const candGroupOptions = useMemo<MultiselectOption[]>(
+    () => deptIds.map((id) => ({ value: id, label: groupNameById[id] ?? id })),
+    [deptIds, groupNameById],
+  );
 
   function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -288,9 +343,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: true }]);
   }
   function addAllCandidates() {
+    // 表示中（取得済み・未追加）の候補を一括追加。件数が多い時は確認（サーバーページングのため「表示中」が対象）。
+    if (displayedCandidates.length === 0) return;
+    if (displayedCandidates.length > 30 && !window.confirm(`表示中の ${displayedCandidates.length} 名をパーティーに追加します。よろしいですか？`)) return;
     setMembers((m) => {
       const have = new Set(m.map((x) => x.userId));
-      const add = candidates
+      const add = displayedCandidates
         .filter((c) => !have.has(c.user_id))
         .map((c) => ({ userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: true }));
       return [...m, ...add];
@@ -517,7 +575,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               id="q_depts"
               options={deptOptions}
               value={deptIds}
-              onChange={setDeptIds}
+              onChange={(v) => { setDeptIds(v); setCandGroupFilter((f) => f.filter((x) => v.includes(x))); }}
               placeholder="部署を検索…（未選択なら全社）"
               ariaLabel="参加部署（アクセス条件）"
               emptyText="該当する部署がありません"
@@ -537,6 +595,18 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 ⚠ 現在の参加部署の構成では<strong>{outOfScopeCount} 名</strong>が参照できません（部署外・失効中）。部署を追加するか、対象メンバーを外してください。
               </p>
             )}
+            {/* 選択中パーティーの絞込（名前／部署外・失効中のみ）＋まとめて外す（作成者は別格で残す）。多数選択に備える。 */}
+            {!frozen && members.length > 0 && (
+              <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <input className="input" placeholder="選択中を絞り込み（名前）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前で絞り込み" />
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-danger" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>部署外・失効中のみ</button>
+                  <button type="button" className="btn btn-sm btn-danger" disabled={filteredMembers.length === 0} onClick={bulkRemoveMembers}>
+                    {selQuery.trim() || selOutOnly ? `絞り込み対象をまとめて外す（${filteredMembers.length}）` : `すべて外す（${filteredMembers.length}）`}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="party__list">
               <div className="pmember">
                 <span className="avatar sm"><span className="avatar__img placeholder">{ownerInitial}</span></span>
@@ -553,7 +623,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   </div>
                 </div>
               </div>
-              {members.map((m) => (
+              {pagedMembers.map((m) => (
                 <div className="pmember" key={m.userId} data-out-of-scope={!m.inScope ? "1" : undefined} style={!m.inScope ? { opacity: 0.62 } : undefined}>
                   <span className="avatar sm"><span className="avatar__img placeholder">{m.ini}</span></span>
                   <div className="pmember__main">
@@ -575,12 +645,31 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 </div>
               ))}
             </div>
+            {filteredMembers.length > selShown && (
+              <div style={{ padding: "var(--space-2) var(--space-4)" }}>
+                <button type="button" className="party__addall" onClick={() => setSelShown((n) => n + SEL_PAGE)}>もっと見る（残り {filteredMembers.length - selShown}）</button>
+              </div>
+            )}
             {!frozen && (
               <div className="party__add">
+                {/* 参加部署が複数のときは、その範囲内でグループ絞込（候補を狭める）。0 件（全社）や単一部署なら不要。 */}
+                {deptIds.length > 1 && (
+                  <div style={{ marginBottom: "var(--space-2)" }}>
+                    <Multiselect
+                      id="q_cand_group"
+                      options={candGroupOptions}
+                      value={candGroupFilter}
+                      onChange={setCandGroupFilter}
+                      placeholder="参加部署内で絞込…（未選択＝参加部署すべて）"
+                      ariaLabel="候補を参加部署で絞り込み"
+                      emptyText="該当する部署がありません"
+                    />
+                  </div>
+                )}
                 <div className="party__addhead">
                   <label className="text-sm" style={{ fontWeight: 600 }}>メンバーを追加（参加部署の所属者／未選択なら全社）</label>
-                  {candidates.length > 0 && (
-                    <button type="button" className="party__addall" onClick={addAllCandidates}>候補をすべて追加（{candidates.length}）</button>
+                  {displayedCandidates.length > 0 && (
+                    <button type="button" className="party__addall" onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
                   )}
                 </div>
                 <input
@@ -591,7 +680,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   aria-label="候補を名前で絞り込み"
                 />
                 <div className="candlist">
-                  {candidates.map((c) => {
+                  {displayedCandidates.map((c) => {
                     const depts = (c.group_ids ?? []).map((g) => groupNameById[g]).filter(Boolean);
                     return (
                       <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
@@ -604,10 +693,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                       </button>
                     );
                   })}
-                  {candidates.length === 0 && (
+                  {displayedCandidates.length === 0 && (
                     <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または該当者がいません）。"}</span>
                   )}
                 </div>
+                {candHasNext && (
+                  <button type="button" className="party__addall" style={{ marginTop: "var(--space-2)" }} disabled={candLoadingMore} onClick={() => void loadMoreCands()}>
+                    {candLoadingMore ? "読み込み中…" : "もっと見る"}
+                  </button>
+                )}
                 <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
               </div>
             )}
