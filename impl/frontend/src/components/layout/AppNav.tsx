@@ -2,7 +2,7 @@
 
 // グローバルナビ（ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・画面遷移図 §4 集約 2026-09-10・レビュー#1）。
 // ☰(.appnav-burger)で左ドロワー(.appnav)をオーバーレイ表示／📌で常設サイドバー化（本文右シフト）。
-// ピン状態は localStorage(端末記憶・iq_nav_pinned)。ピン可は広い画面(≥1024px)のみ＝狭幅は常にオーバーレイ。
+// ピン状態は localStorage(端末記憶・iq_nav_pinned)。**既定はピン留め**（明示的に外した"0"のみ非ピン）。ピン可は広い画面(≥1024px)のみ＝狭幅は常にオーバーレイ。
 // ゲーム群はゲームモード(レビュー#2)ON 時のみ＝#2 実装までは既定 true（常時表示）。
 // components は features に依存しない（一方向依存・デザイン標準 §4.1）＝行き先は app ルートの静的リンク。
 import Link from "next/link";
@@ -44,9 +44,10 @@ export function AppNav({ gameEnabled = true }: { gameEnabled?: boolean }) {
     applyWide();
     mq.addEventListener("change", applyWide);
     try {
-      setPinned(localStorage.getItem(PIN_KEY) === "1");
+      // 既定はピン留め（広い画面では常設サイドバー）。ユーザーが明示的に外した("0")時のみ非ピン。
+      setPinned(localStorage.getItem(PIN_KEY) !== "0");
     } catch {
-      /* localStorage 不可時は既定 false */
+      setPinned(true); // localStorage 不可時も既定はピン留め
     }
     return () => mq.removeEventListener("change", applyWide);
   }, []);
