@@ -222,6 +222,8 @@
           .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
           .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
           .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+          .mp__row--end { justify-content: flex-end; }
+          .mp__row--split { justify-content: space-between; }
           .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
           /* クエストグループ絞込＝標準の複数選択コンボ（.multiselect）。行内で伸ばす。 */
           .mp__deptselect { flex: 1; min-width: 220px; }
@@ -238,7 +240,7 @@
           .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
           .mp__selhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
           /* 削除側（選択中の絞込）＝候補側 .mp__filters と同じ体裁（テキスト欄は候補側と同じ .input mp__search）。 */
-          .mp__selfilters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-surface-alt); border-top: 1px solid var(--color-border); }
+          .mp__selfilters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--color-surface-alt); border-top: 1px solid var(--color-border); }
           .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; white-space: nowrap; }
           .mp__seltoggle[aria-pressed="true"] { border-color: var(--color-danger); background: var(--color-disagree-bg); color: var(--color-danger); font-weight: 700; }
           .mp-sel[hidden] { display: none; }
@@ -278,6 +280,8 @@
             </div>
             <div class="mp__row">
               <input class="input mp__search" id="mpSearch" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
+            </div>
+            <div class="mp__row mp__row--end">
               <button type="button" class="btn btn-sm btn-outline" id="mpAddAll">該当をすべて追加</button>
             </div>
           </div>
@@ -287,9 +291,13 @@
           <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
           <div class="mp__selhead"><span>選択中のパーティー（<span id="mpCount">1</span> 名）</span></div>
           <div class="mp__selfilters">
-            <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/グループ）" aria-label="選択中のメンバーを絞り込み">
-            <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">グループ外・失効中のみ</button>
-            <button type="button" class="btn btn-sm btn-danger" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
+            <div class="mp__row">
+              <input class="input mp__search" id="mpSelSearch" type="text" placeholder="選択中を絞り込み（名前/グループ）" aria-label="選択中のメンバーを絞り込み">
+            </div>
+            <div class="mp__row mp__row--split">
+              <button type="button" class="mp__seltoggle" id="mpSelOut" aria-pressed="false">グループ外・失効中のみ</button>
+              <button type="button" class="btn btn-sm btn-danger" id="mpBulk" disabled>絞り込み対象をまとめて外す</button>
+            </div>
           </div>
           <div class="mp__sel" id="mpSel"></div>
         </div>
