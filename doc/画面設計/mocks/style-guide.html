@@ -220,6 +220,12 @@
         <style>
           /* 調整用スコープ（本採用時は quests.css / design-system.css へ移設）。 */
           .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+          /* 参加クエストグループ（アクセス条件）バナー＝候補の範囲を明示。 */
+          .mp__scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-primary-soft); font-size: var(--text-xs); }
+          .mp__scope-label { font-weight: 700; color: var(--color-primary); }
+          .mp__scope-chip { background: var(--color-surface); border: 1px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; padding: 1px 8px; }
+          .mp__scope-all { color: var(--color-text-muted); font-weight: 700; }
+          .mp__scope-note { color: var(--color-text-muted); }
           .mp__filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
           .mp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
           .mp__row--end { justify-content: flex-end; }
@@ -259,29 +265,21 @@
           .mp-perm[aria-disabled="true"] { cursor: default; }
         </style>
         <div class="mp" id="mpDemo">
+          <!-- 参加クエストグループ（アクセス条件）＝候補の範囲。SC-11 では上の「参加グループ」欄で指定した内容がここに反映される想定。 -->
+          <div class="mp__scope" id="mpScope"></div>
           <div class="mp__filters">
             <div class="mp__row">
               <span class="mp__deptlabel">グループで絞込:</span>
               <!-- 標準の複数選択コンボ（.multiselect・候補のみ／自由入力なし・shared.js が初期化）。 -->
               <div class="multiselect mp__deptselect" data-multiselect id="mpDeptSelect">
                 <div class="multiselect__control">
-                  <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループを検索して複数選択…（未選択＝全グループ）" aria-label="グループで絞り込み（複数選択）">
+                  <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="参加グループ内で絞込…（未選択＝参加グループ全て）" aria-label="グループで絞り込み（複数選択）">
                 </div>
+                <!-- 選択肢＝クエストの参加クエストグループのみ（この範囲内での絞込。0件=全社なら全グループ）。 -->
                 <ul class="multiselect__list" role="listbox" hidden>
-                  <li class="multiselect__option" role="option" data-value="開発部">開発部</li>
                   <li class="multiselect__option" role="option" data-value="開発部1課">開発部1課</li>
-                  <li class="multiselect__option" role="option" data-value="開発部2課">開発部2課</li>
-                  <li class="multiselect__option" role="option" data-value="営業部">営業部</li>
                   <li class="multiselect__option" role="option" data-value="営業部 東日本">営業部 東日本</li>
-                  <li class="multiselect__option" role="option" data-value="営業部 西日本">営業部 西日本</li>
                   <li class="multiselect__option" role="option" data-value="情シス">情シス</li>
-                  <li class="multiselect__option" role="option" data-value="経理部">経理部</li>
-                  <li class="multiselect__option" role="option" data-value="総務部">総務部</li>
-                  <li class="multiselect__option" role="option" data-value="人事部">人事部</li>
-                  <li class="multiselect__option" role="option" data-value="法務部">法務部</li>
-                  <li class="multiselect__option" role="option" data-value="物流部">物流部</li>
-                  <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
-                  <li class="multiselect__option" role="option" data-value="広報部">広報部</li>
                   <li class="multiselect__empty" role="presentation" hidden></li>
                 </ul>
               </div>
@@ -310,7 +308,7 @@
           <div class="mp__sel" id="mpSel"></div>
           <button type="button" class="mp__more" id="mpSelMore" hidden>もっと見る</button>
         </div>
-        <div class="hint"><strong>グループ（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＋<strong>多数選択時は「もっと見る」でページング</strong>＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（追加時の既定＝投票・作成・コメント。<strong>作成者は所有者＋全権限で固定・剥奪不可</strong>）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
+        <div class="hint"><strong>参加クエストグループ（アクセス条件）が指定されている場合</strong>、上部バナーにグループを表示し<strong>候補はその所属者に限定</strong>（未指定なら「全社」と表示＝会社全体が候補）。<strong>グループ絞込は参加グループ内の複数選択</strong>（検索付き・和集合／未選択なら参加グループ全て）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＋<strong>多数選択時は「もっと見る」でページング</strong>＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（追加時の既定＝投票・作成・コメント。<strong>作成者は所有者＋全権限で固定・剥奪不可</strong>）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4441,6 +4439,8 @@
     // メンバーごとの権限（クエスト内6権限）。所有者は作成者のみ（別格・剥奪不可）。
     const PERMS = [['manage', 'クエスト管理'], ['eval', '評価者'], ['vote', '投票'], ['idea', '作成'], ['comment', 'コメント']];
     const defPerms = () => ({ manage: false, eval: false, vote: true, idea: true, comment: true }); // 追加時の既定
+    // クエストの参加クエストグループ（アクセス条件・0..N）。空配列にすると「全社（未指定）」表現になる。
+    const PARTICIPATING = ['開発部1課', '営業部 東日本', '情シス'];
     // 選択中のパーティー（データ駆動）。inScope=false＝グループ異動などで失効中（参照不可）。creator は別格・削除不可・全権限。
     const party = [
       { name: '山田 太郎', dept: '開発部1課', inScope: true, creator: true },
@@ -4453,7 +4453,7 @@
     // デモ用＝選択メンバーを増やして「もっと見る」ページングを初期表示で確認できるようにする（一意名／一部は失効中）。
     for (let i = 0; i < 24; i++) {
       const c = CANDS[100 + i * 7]; // 100 以降は連番サフィックス付き＝一意（重複除外で消えない）
-      if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, inScope: i % 4 !== 0, perms: defPerms() });
+      if (c && !party.some((p) => p.name === c.name)) party.push({ name: c.name, dept: c.dept, inScope: PARTICIPATING.includes(c.dept), perms: defPerms() });
     }
 
     const cands = root.querySelector('#mpCands');
@@ -4479,8 +4479,21 @@
     function filtered() {
       const q = (search.value || '').trim();
       return CANDS.filter((c) => !inParty(c.name)
+        // 候補は参加クエストグループの所属者に限定（0件=全社なら制限なし）。グループ絞込はその範囲内の絞り込み。
+        && (PARTICIPATING.length === 0 || PARTICIPATING.includes(c.dept))
         && (selDepts.size === 0 || selDepts.has(c.dept))
         && (!q || c.name.includes(q)));
+    }
+    // 参加クエストグループ（アクセス条件）バナー＝候補の範囲を明示（指定あり＝グループのチップ／未指定＝全社）。
+    function renderScope() {
+      const scope = root.querySelector('#mpScope');
+      if (PARTICIPATING.length === 0) {
+        scope.innerHTML = '<span class="mp__scope-label">参加クエストグループ（アクセス条件）:</span> <span class="mp__scope-all">全社（未指定）</span> <span class="mp__scope-note">＝会社全体が候補・アクセス可（作成者は別格）</span>';
+      } else {
+        scope.innerHTML = '<span class="mp__scope-label">参加クエストグループ（アクセス条件）:</span> '
+          + PARTICIPATING.map((g) => '<span class="mp__scope-chip">' + g + '</span>').join(' ')
+          + ' <span class="mp__scope-note">候補はこのグループの所属者に限定（作成者は別格・グループ外は「グループ外・失効中」）</span>';
+      }
     }
     // --- 候補リスト描画（ページング＝先頭 shown 件＋「もっと見る」・件数表示・絞り込み促し） ---
     function renderCands() {
@@ -4598,7 +4611,7 @@
     new MutationObserver(() => { readSelDepts(); resetAndRender(); })
       .observe(deptSelect.querySelector('.multiselect__control'), { childList: true });
 
-    renderCands(); renderParty();
+    renderScope(); renderCands(); renderParty();
   })();
 </script>
 
