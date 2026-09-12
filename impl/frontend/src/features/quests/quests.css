@@ -17,6 +17,14 @@
 .party { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
 .party__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
 .party__count { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 参加クエストグループ（アクセス条件）バナー＝候補の範囲を明示（モック SC-11 と一致）。 */
+.party__scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-primary-soft); font-size: var(--text-xs); }
+.party__scope-label { font-weight: 700; color: var(--color-primary); }
+.party__scope-chip { background: var(--color-surface); border: 1px solid var(--color-primary); color: var(--color-primary); border-radius: 999px; padding: 1px 8px; }
+.party__scope-all { color: var(--color-text-muted); font-weight: 700; }
+.party__scope-note { color: var(--color-text-muted); }
+/* 候補の件数メタ（モック「候補 N 名（表示 M）」相当。サーバーはカーソル型のため総数は省き表示中＋続きの有無）。 */
+.party__candmeta { padding: var(--space-2) var(--space-4) 0; font-size: var(--text-xs); color: var(--color-text-muted); }
 .party__list { display: flex; flex-direction: column; }
 .pmember { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); }
 .pmember:first-child { border-top: none; }

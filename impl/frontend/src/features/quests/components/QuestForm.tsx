@@ -586,8 +586,81 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         {/* パーティー・権限 */}
         <Field id="q_party" label="参加メンバー（パーティー）・権限" required>
           <div className="party">
+            {/* 参加クエストグループ（アクセス条件）バナー＝候補の範囲（モック SC-11 と一致）。 */}
+            <div className="party__scope">
+              <span className="party__scope-label">参加クエストグループ（アクセス条件）:</span>
+              {deptIds.length === 0 ? (
+                <>
+                  <span className="party__scope-all">全社（未指定）</span>
+                  <span className="party__scope-note">＝会社全体が候補・アクセス可（作成者は別格）</span>
+                </>
+              ) : (
+                <>
+                  {deptIds.map((id) => (
+                    <span key={id} className="party__scope-chip">{groupNameById[id] ?? id}</span>
+                  ))}
+                  <span className="party__scope-note">候補はこのグループの所属者に限定（作成者は別格・グループ外は失効）</span>
+                </>
+              )}
+            </div>
+
+            {/* 候補追加エリア（モック順＝先）＝グループ絞込／名前検索／該当をすべて追加／件数／候補／もっと見る。 */}
+            {!frozen && (
+              <div className="party__add">
+                {deptIds.length > 1 && (
+                  <div style={{ marginBottom: "var(--space-2)" }}>
+                    <Multiselect
+                      id="q_cand_group"
+                      options={candGroupOptions}
+                      value={candGroupFilter}
+                      onChange={setCandGroupFilter}
+                      placeholder="参加部署内で絞込…（未選択＝参加部署すべて）"
+                      ariaLabel="候補を参加部署で絞り込み"
+                      emptyText="該当する部署がありません"
+                    />
+                  </div>
+                )}
+                <input
+                  className="input"
+                  placeholder="名前で絞り込み…"
+                  value={candQuery}
+                  onChange={(e) => setCandQuery(e.target.value)}
+                  aria-label="候補を名前で絞り込み"
+                />
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+                  <button type="button" className="btn btn-sm btn-outline" disabled={displayedCandidates.length === 0} onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
+                </div>
+                <div className="party__candmeta">候補（表示中）{displayedCandidates.length} 名{candHasNext ? "・さらに候補あり" : ""}</div>
+                <div className="candlist">
+                  {displayedCandidates.map((c) => {
+                    const depts = (c.group_ids ?? []).map((g) => groupNameById[g]).filter(Boolean);
+                    return (
+                      <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
+                        <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
+                        <span className="cand__name">{c.display_name}</span>
+                        {deptIds.length > 1 && depts.length > 0 && (
+                          <span className="cand__depts">{depts.join("・")}</span>
+                        )}
+                        <span className="cand__plus" aria-hidden>＋</span>
+                      </button>
+                    );
+                  })}
+                  {displayedCandidates.length === 0 && (
+                    <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または該当者がいません）。"}</span>
+                  )}
+                </div>
+                {candHasNext && (
+                  <button type="button" className="party__addall" style={{ marginTop: "var(--space-2)" }} disabled={candLoadingMore} onClick={() => void loadMoreCands()}>
+                    {candLoadingMore ? "読み込み中…" : "もっと見る"}
+                  </button>
+                )}
+                <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
+              </div>
+            )}
+
+            {/* 選択中のパーティー（モック順＝後）＝ヘッダ／警告／絞込・まとめて外す／一覧／もっと見る。 */}
             <div className="party__head">
-              <strong>メンバーと権限</strong>
+              <strong>選択中のパーティー</strong>
               <span className="party__count">{members.length + 1} 名</span>
             </div>
             {outOfScopeCount > 0 && (
@@ -595,7 +668,6 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 ⚠ 現在の参加部署の構成では<strong>{outOfScopeCount} 名</strong>が参照できません（部署外・失効中）。部署を追加するか、対象メンバーを外してください。
               </p>
             )}
-            {/* 選択中パーティーの絞込（名前／部署外・失効中のみ）＋まとめて外す（作成者は別格で残す）。多数選択に備える。 */}
             {!frozen && members.length > 0 && (
               <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 <input className="input" placeholder="選択中を絞り込み（名前）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前で絞り込み" />
@@ -648,61 +720,6 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             {filteredMembers.length > selShown && (
               <div style={{ padding: "var(--space-2) var(--space-4)" }}>
                 <button type="button" className="party__addall" onClick={() => setSelShown((n) => n + SEL_PAGE)}>もっと見る（残り {filteredMembers.length - selShown}）</button>
-              </div>
-            )}
-            {!frozen && (
-              <div className="party__add">
-                {/* 参加部署が複数のときは、その範囲内でグループ絞込（候補を狭める）。0 件（全社）や単一部署なら不要。 */}
-                {deptIds.length > 1 && (
-                  <div style={{ marginBottom: "var(--space-2)" }}>
-                    <Multiselect
-                      id="q_cand_group"
-                      options={candGroupOptions}
-                      value={candGroupFilter}
-                      onChange={setCandGroupFilter}
-                      placeholder="参加部署内で絞込…（未選択＝参加部署すべて）"
-                      ariaLabel="候補を参加部署で絞り込み"
-                      emptyText="該当する部署がありません"
-                    />
-                  </div>
-                )}
-                <div className="party__addhead">
-                  <label className="text-sm" style={{ fontWeight: 600 }}>メンバーを追加（参加部署の所属者／未選択なら全社）</label>
-                  {displayedCandidates.length > 0 && (
-                    <button type="button" className="party__addall" onClick={addAllCandidates}>表示中を全員追加（{displayedCandidates.length}）</button>
-                  )}
-                </div>
-                <input
-                  className="input"
-                  placeholder="名前で絞り込み…"
-                  value={candQuery}
-                  onChange={(e) => setCandQuery(e.target.value)}
-                  aria-label="候補を名前で絞り込み"
-                />
-                <div className="candlist">
-                  {displayedCandidates.map((c) => {
-                    const depts = (c.group_ids ?? []).map((g) => groupNameById[g]).filter(Boolean);
-                    return (
-                      <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
-                        <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
-                        <span className="cand__name">{c.display_name}</span>
-                        {deptIds.length > 1 && depts.length > 0 && (
-                          <span className="cand__depts">{depts.join("・")}</span>
-                        )}
-                        <span className="cand__plus" aria-hidden>＋</span>
-                      </button>
-                    );
-                  })}
-                  {displayedCandidates.length === 0 && (
-                    <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または該当者がいません）。"}</span>
-                  )}
-                </div>
-                {candHasNext && (
-                  <button type="button" className="party__addall" style={{ marginTop: "var(--space-2)" }} disabled={candLoadingMore} onClick={() => void loadMoreCands()}>
-                    {candLoadingMore ? "読み込み中…" : "もっと見る"}
-                  </button>
-                )}
-                <div className="hint">追加すると既定権限（<strong>投票・アイデア作成・コメント</strong>）が付与されます。評価者/クエスト管理は個別にオン。</div>
               </div>
             )}
           </div>
