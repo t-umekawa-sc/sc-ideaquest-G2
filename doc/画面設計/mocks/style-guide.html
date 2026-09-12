@@ -214,6 +214,57 @@
         <div class="hint"><strong>単一選択</strong>＝チップにせず入力欄に確定値を表示。フォーカスで全件、入力で絞り込み、選択で確定（1つだけ）。<strong>クエストグループ</strong>（1クエスト＝1グループ）向け。</div>
       </div>
 
+      <!-- メンバー選択（パーティー候補・部署絞込＋検索）＝SC-11 パーティー編集の候補UI（FR-38 再設計・調整用ドラフト） -->
+      <div class="field">
+        <label>メンバー選択（パーティー候補・<strong>部署（クエストグループ）で絞込</strong>＋名前検索）</label>
+        <style>
+          /* 調整用スコープ（本採用時は quests.css / design-system.css へ移設）。 */
+          .mp { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+          .mp__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+          .mp__deptlabel { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
+          .mp__dept { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 11px; cursor: pointer; }
+          .mp__dept[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
+          .mp__search { flex: 1; min-width: 160px; }
+          .mp__addall { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; padding: 3px 10px; cursor: pointer; }
+          .mp__cands { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+          .mp-cand { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); }
+          .mp-cand:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
+          .mp-cand__dept { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface-alt); border-radius: 999px; padding: 1px 7px; }
+          .mp-cand__plus { color: var(--color-primary); font-weight: 700; }
+          .mp__empty { color: var(--color-text-muted); font-size: var(--text-sm); padding: 10px 12px; }
+          .mp__selhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: var(--text-xs); color: var(--color-text-muted); }
+          .mp__sel { display: flex; flex-direction: column; }
+          .mp-sel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
+          .mp-sel[data-out] { opacity: .62; }
+          .mp-sel__name { font-weight: 600; flex: 1; }
+          .mp-sel__x { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 15px; }
+        </style>
+        <div class="mp" id="mpDemo">
+          <div class="mp__filters">
+            <span class="mp__deptlabel">部署で絞込:</span>
+            <button type="button" class="mp__dept" data-dept="" aria-pressed="true">すべて</button>
+            <button type="button" class="mp__dept" data-dept="開発部" aria-pressed="false">開発部</button>
+            <button type="button" class="mp__dept" data-dept="営業部" aria-pressed="false">営業部</button>
+            <button type="button" class="mp__dept" data-dept="情シス" aria-pressed="false">情シス</button>
+            <input class="input mp__search" type="text" placeholder="名前で絞り込み…" aria-label="候補を名前で絞り込み">
+            <button type="button" class="mp__addall">候補をすべて追加</button>
+          </div>
+          <div class="mp__cands" id="mpCands">
+            <button type="button" class="mp-cand" data-name="佐藤 花子" data-dept="開発部"><span class="avatar sm" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span><span>佐藤 花子</span><span class="mp-cand__dept">開発部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
+            <button type="button" class="mp-cand" data-name="鈴木 一郎" data-dept="営業部"><span class="avatar sm" data-name="鈴木 一郎"><span class="avatar__img placeholder">鈴</span></span><span>鈴木 一郎</span><span class="mp-cand__dept">営業部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
+            <button type="button" class="mp-cand" data-name="田中 みゆき" data-dept="開発部"><span class="avatar sm" data-name="田中 みゆき"><span class="avatar__img placeholder">田</span></span><span>田中 みゆき</span><span class="mp-cand__dept">開発部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
+            <button type="button" class="mp-cand" data-name="高橋 健" data-dept="情シス"><span class="avatar sm" data-name="高橋 健"><span class="avatar__img placeholder">高</span></span><span>高橋 健</span><span class="mp-cand__dept">情シス</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
+            <button type="button" class="mp-cand" data-name="伊藤 直子" data-dept="営業部"><span class="avatar sm" data-name="伊藤 直子"><span class="avatar__img placeholder">伊</span></span><span>伊藤 直子</span><span class="mp-cand__dept">営業部</span><span class="mp-cand__plus" aria-hidden>＋</span></button>
+          </div>
+          <div class="mp__empty" id="mpEmpty" hidden>一致する候補がいません。</div>
+          <div class="mp__selhead"><span>選択中のパーティー</span><span id="mpCount">1 名</span></div>
+          <div class="mp__sel" id="mpSel">
+            <div class="mp-sel"><span class="avatar sm" data-name="山田 太郎"><span class="avatar__img placeholder">山</span></span><span class="mp-sel__name">山田 太郎</span><span class="badge badge-muted">あなた・作成者</span></div>
+          </div>
+        </div>
+        <div class="hint"><strong>部署（クエストグループ）で絞込</strong>＝クエストの参加部署チップで候補を絞る（「すべて」で全参加部署の和集合／参加部署0件なら会社全体）。名前検索と併用。候補＋で選択、選択✕で候補に戻る。<strong>参加部署外のメンバーは「部署外・失効中」バッジ</strong>で表示（FR-38・C.0）。※これは調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植。</div>
+      </div>
+
       <div class="field">
         <label>カラースウォッチ（.swatch・プリセットパレット）</label>
         <div class="swatches" role="radiogroup" aria-label="クエストカラー">
@@ -4320,6 +4371,70 @@
     };
     document.getElementById('sgOverlayRun').addEventListener('click', () => flash(document.getElementById('sgOverlay')));
     document.getElementById('sgOverlayCleanRun').addEventListener('click', () => flash(document.getElementById('sgOverlayClean')));
+  })();
+
+  // メンバー選択（部署絞込＋検索＋候補追加/解除）の調整用プロトタイプ。
+  (function () {
+    const root = document.getElementById('mpDemo');
+    if (!root) return;
+    const cands = root.querySelector('#mpCands');
+    const empty = root.querySelector('#mpEmpty');
+    const sel = root.querySelector('#mpSel');
+    const count = root.querySelector('#mpCount');
+    const search = root.querySelector('.mp__search');
+    const deptBtns = [...root.querySelectorAll('.mp__dept')];
+    let dept = '';
+
+    function refilter() {
+      const q = (search.value || '').trim();
+      let visible = 0;
+      cands.querySelectorAll('.mp-cand').forEach((c) => {
+        const okDept = !dept || c.dataset.dept === dept;
+        const okName = !q || c.dataset.name.includes(q);
+        const show = okDept && okName;
+        c.hidden = !show;
+        if (show) visible++;
+      });
+      empty.hidden = visible > 0;
+    }
+    function recount() { count.textContent = (sel.querySelectorAll('.mp-sel').length) + ' 名'; }
+
+    deptBtns.forEach((b) => b.addEventListener('click', () => {
+      dept = b.dataset.dept;
+      deptBtns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      refilter();
+    }));
+    search.addEventListener('input', refilter);
+
+    cands.addEventListener('click', (e) => {
+      const c = e.target.closest('.mp-cand');
+      if (!c) return;
+      const name = c.dataset.name, d = c.dataset.dept, ini = name.trim().charAt(0);
+      const row = document.createElement('div');
+      row.className = 'mp-sel';
+      row.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini + '</span></span>'
+        + '<span class="mp-sel__name">' + name + '</span>'
+        + '<span class="mp-cand__dept">' + d + '</span>'
+        + '<button type="button" class="mp-sel__x" aria-label="' + name + ' を外す" data-name="' + name + '" data-dept="' + d + '">✕</button>';
+      sel.appendChild(row);
+      c.remove();
+      refilter(); recount();
+    });
+    root.querySelector('.mp__addall').addEventListener('click', () => {
+      cands.querySelectorAll('.mp-cand:not([hidden])').forEach((c) => c.click());
+    });
+    sel.addEventListener('click', (e) => {
+      const x = e.target.closest('.mp-sel__x');
+      if (!x) return;
+      const name = x.dataset.name, d = x.dataset.dept, ini = name.trim().charAt(0);
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'mp-cand'; btn.dataset.name = name; btn.dataset.dept = d;
+      btn.innerHTML = '<span class="avatar sm"><span class="avatar__img placeholder">' + ini + '</span></span>'
+        + '<span>' + name + '</span><span class="mp-cand__dept">' + d + '</span><span class="mp-cand__plus" aria-hidden>＋</span>';
+      cands.appendChild(btn);
+      x.closest('.mp-sel').remove();
+      refilter(); recount();
+    });
   })();
 </script>
 
