@@ -244,11 +244,19 @@
           .mp__seltoggle { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); font-size: var(--text-xs); padding: 3px 10px; cursor: pointer; white-space: nowrap; }
           .mp__seltoggle[aria-pressed="true"] { border-color: var(--color-danger); background: var(--color-disagree-bg); color: var(--color-danger); font-weight: 700; }
           .mp-sel[hidden] { display: none; }
-          .mp__sel { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
-          .mp-sel { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
+          .mp__sel { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
+          .mp-sel { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
           .mp-sel[data-out] { opacity: .62; }
-          .mp-sel__name { font-weight: 600; flex: 1; }
-          .mp-sel__x { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 15px; }
+          .mp-sel__main { flex: 1; min-width: 0; }
+          .mp-sel__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+          .mp-sel__name { font-weight: 600; }
+          .mp-sel__x { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 15px; padding: 2px 4px; }
+          /* メンバーごとの権限トグル（所有者/クエスト管理/評価者/投票/作成/コメント）。 */
+          .mp-perms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+          .mp-perm { border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); padding: 2px 10px; cursor: pointer; }
+          .mp-perm.is-on { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
+          .mp-perm--owner.is-on { border-color: #b8860b; background: #fff7e6; color: #b8860b; }
+          .mp-perm[aria-disabled="true"] { cursor: default; }
         </style>
         <div class="mp" id="mpDemo">
           <div class="mp__filters">
@@ -301,7 +309,7 @@
           </div>
           <div class="mp__sel" id="mpSel"></div>
         </div>
-        <div class="hint"><strong>グループ（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
+        <div class="hint"><strong>グループ（クエストグループ）で絞込＝検索付き複数選択</strong>（大企業の多数グループでもスクロール＋検索で選べる／複数グループを同時に絞込＝和集合／未選択なら全グループ）。名前検索と併用。<strong>候補は件数表示＋「もっと見る」でページング</strong>（〜1000人規模の関係者を想定。デモは 700 名／実装は <code>GET /quest-group-candidates</code> の <code>limit</code>+<code>cursor</code> キーセットページングで取得）。候補が多すぎる時は<strong>絞り込みを促す</strong>。<strong>「該当をすべて追加」</strong>は現在の絞込に一致する全員を対象（大量時は確認ダイアログ）。<strong>選択中のパーティーも絞り込み可</strong>（名前/グループ＋<strong>「グループ外・失効中のみ」</strong>トグル・入力欄は候補側と同じ体裁）＝<strong>絞り込み対象をまとめて外す</strong>（作成者は別格で残す・件数確認）。異動で失効した人を<strong>一名ずつでなく一括削除</strong>できる。参加グループ外のメンバーは「グループ外・失効中」バッジ表示（FR-38・C.0）。<strong>各メンバーの権限</strong>（所有者/クエスト管理/評価者/投票/作成/コメント）は行内チップでトグル（追加時の既定＝投票・作成・コメント。<strong>作成者は所有者＋全権限で固定・剥奪不可</strong>）。※調整用ドラフト＝合意後に SC-11 の PartyEditor へ移植（既存 <code>.multiselect</code> / Multiselect を流用）。</div>
       </div>
 
       <div class="field">
@@ -4429,14 +4437,17 @@
     const PAGE = 24;                    // 1ページの表示件数（もっと見る）
     let shown = PAGE;                   // 現在の表示件数（絞込変更でリセット）
     let selDepts = new Set();           // 絞込に選んだ部署（空＝全部署）＝標準 .multiselect のチップから読む
-    // 選択中のパーティー（データ駆動）。inScope=false＝部署異動などで失効中（参照不可）。creator は別格・削除不可。
+    // メンバーごとの権限（クエスト内6権限）。所有者は作成者のみ（別格・剥奪不可）。
+    const PERMS = [['manage', 'クエスト管理'], ['eval', '評価者'], ['vote', '投票'], ['idea', '作成'], ['comment', 'コメント']];
+    const defPerms = () => ({ manage: false, eval: false, vote: true, idea: true, comment: true }); // 追加時の既定
+    // 選択中のパーティー（データ駆動）。inScope=false＝グループ異動などで失効中（参照不可）。creator は別格・削除不可・全権限。
     const party = [
       { name: '山田 太郎', dept: '開発部1課', inScope: true, creator: true },
-      { name: '佐藤 花子', dept: '開発部1課', inScope: true },
-      { name: '鈴木 一郎', dept: '営業部 東日本', inScope: true },
-      { name: '伊藤 直子', dept: '営業部 西日本', inScope: false },
-      { name: '渡辺 剛', dept: '経理部', inScope: false },
-      { name: '中村 彩', dept: '人事部', inScope: false },
+      { name: '佐藤 花子', dept: '開発部1課', inScope: true, perms: defPerms() },
+      { name: '鈴木 一郎', dept: '営業部 東日本', inScope: true, perms: { manage: true, eval: false, vote: true, idea: true, comment: true } },
+      { name: '伊藤 直子', dept: '営業部 西日本', inScope: false, perms: defPerms() },
+      { name: '渡辺 剛', dept: '経理部', inScope: false, perms: { manage: false, eval: true, vote: true, idea: true, comment: true } },
+      { name: '中村 彩', dept: '人事部', inScope: false, perms: defPerms() },
     ];
 
     const cands = root.querySelector('#mpCands');
@@ -4487,6 +4498,15 @@
       const outOnly = selOut.getAttribute('aria-pressed') === 'true';
       return (!q || p.name.includes(q) || p.dept.includes(q)) && (!outOnly || !p.inScope);
     }
+    // メンバー行の権限チップ。作成者＝所有者＋全権限（剥奪不可・aria-disabled）。他＝トグル（既定 投票/作成/コメント）。
+    function permChips(p) {
+      if (p.creator) {
+        return '<span class="mp-perm mp-perm--owner is-on" aria-disabled="true" title="作成者は所有者・剥奪不可">所有者</span>'
+          + PERMS.map(([, l]) => '<span class="mp-perm is-on" aria-disabled="true">' + l + '</span>').join('');
+      }
+      return PERMS.map(([k, l]) => '<span class="mp-perm' + (p.perms[k] ? ' is-on' : '') + '" role="button" tabindex="0" data-name="'
+        + p.name + '" data-perm="' + k + '">' + l + '</span>').join('');
+    }
     function renderParty() {
       // 作成者は常に表示。非作成者は絞り込み一致のみ表示（＝まとめて外す対象を可視化）。
       const q = (selSearch.value || '').trim();
@@ -4496,10 +4516,15 @@
         const show = p.creator || (filtering ? selMatch(p) : true);
         return '<div class="mp-sel"' + (show ? '' : ' hidden') + (!p.inScope ? ' data-out' : '') + '>'
           + '<span class="avatar sm"><span class="avatar__img placeholder">' + ini(p.name) + '</span></span>'
+          + '<div class="mp-sel__main">'
+          + '<div class="mp-sel__top">'
           + '<span class="mp-sel__name">' + p.name + '</span>'
           + (p.creator ? '<span class="badge badge-muted">あなた・作成者</span>' : '')
           + '<span class="mp-cand__dept">' + p.dept + '</span>'
           + (!p.inScope ? '<span class="badge badge-danger" title="どの参加グループにも所属していないため参照できません（異動などで失効）">グループ外・失効中</span>' : '')
+          + '</div>'
+          + '<div class="mp-perms">' + permChips(p) + '</div>'
+          + '</div>'
           + (p.creator ? '' : '<button type="button" class="mp-sel__x" aria-label="' + p.name + ' を外す" data-name="' + p.name + '">✕</button>')
           + '</div>';
       }).join('');
@@ -4510,7 +4535,7 @@
     }
     function addMember(name) {
       const c = CANDS.find((x) => x.name === name); if (!c || inParty(name)) return;
-      party.push({ name, dept: c.dept, inScope: true }); // 候補＝参加部署内（0件なら全社）＝in_scope
+      party.push({ name, dept: c.dept, inScope: true, perms: defPerms() }); // 候補＝参加グループ内（0件なら全社）＝in_scope・既定権限
     }
 
     cands.addEventListener('click', (e) => {
@@ -4525,6 +4550,13 @@
       renderCands(); renderParty();
     });
     sel.addEventListener('click', (e) => {
+      // 権限チップのトグル（非作成者のみ）。
+      const perm = e.target.closest('.mp-perm[data-perm]');
+      if (perm) {
+        const p = party.find((m) => m.name === perm.dataset.name && !m.creator);
+        if (p) { p.perms[perm.dataset.perm] = !p.perms[perm.dataset.perm]; renderParty(); }
+        return;
+      }
       const x = e.target.closest('.mp-sel__x'); if (!x) return;
       const i = party.findIndex((p) => p.name === x.dataset.name && !p.creator);
       if (i >= 0) party.splice(i, 1);
