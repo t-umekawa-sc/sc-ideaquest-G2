@@ -76,9 +76,10 @@ def env():
         the_owner = owner or user_id
         with get_tenant_session(db_identifier) as ts:
             repo.create_quest(
-                ts, quest_id=qid, quest_group_id=group_id, owner_id=the_owner,
+                ts, quest_id=qid, owner_id=the_owner,
                 title="Seed", color="#3B82F6", status=status,
             )
+            repo.create_group_links(ts, qid, group_ids=[group_id])  # 参加部署（FR-38 再設計）
             repo.replace_categories(ts, qid, [("UX", False)])
             if with_owner_member:
                 repo.add_member(ts, qid, the_owner, permissions=["owner"])
@@ -97,9 +98,10 @@ def env():
     )
 
     with get_tenant_session(db_identifier) as ts:
-        # env が作った分＋API が作ったクエスト（seed user 所有・当該グループ）をまとめて掃除。
+        # env が作った分＋API が作ったクエスト（当該グループを参加部署に持つ＝quest_group_links 経由）を掃除。
         api_made = list(
-            ts.execute(select(Quest.id).where(Quest.quest_group_id == group_id)).scalars()
+            ts.execute(select(QuestGroupLink.quest_id).where(
+                QuestGroupLink.quest_group_id == group_id)).scalars()
         )
         qids = list(set(created_quests) | set(api_made))
         # 通知（H・quest_party_invited）は quest/user を参照するので、参照先削除の前に掃除。
@@ -127,7 +129,7 @@ def _base_body(env, **overrides) -> dict:
     body = {
         "title": "New Quest",
         "color": "#3B82F6",
-        "quest_group_id": str(env.group_id),
+        "quest_group_ids": [str(env.group_id)],
         "categories": ["UX"],
         "status": "draft",
     }
@@ -166,12 +168,12 @@ def test_c_tc_111_create_recruiting_with_member(client, env):
 
 
 def test_c_tc_112_create_invalid_group(client, env):
-    """C-TC-112: 自分が有効所属しないグループでの作成は 422（quest_group_id・IDOR 対策）。"""
+    """C-TC-112: 存在しない参加部署での作成は 422（quest_group_ids）。作成者の所属は不問（別格・FR-38 再設計）。"""
     _login_seed(client)
-    body = _base_body(env, quest_group_id=str(uuid.uuid4()))
+    body = _base_body(env, quest_group_ids=[str(uuid.uuid4())])
     r = client.post(QUESTS, json=body, headers=_csrf(client))
     assert r.status_code == 422, r.text
-    assert r.json()["errors"][0]["field"] == "quest_group_id"
+    assert any(e["field"] == "quest_group_ids" for e in r.json()["errors"])
 
 
 def test_c_tc_113_create_recruiting_requires_categories(client, env):
@@ -345,7 +347,7 @@ def test_c_tc_129_get_recruiting_detail_as_member(client, env):
     body = r.json()
     assert body["status"] == "recruiting"
     assert body["categories"] == ["UX"]
-    assert body["quest_group"]["id"] == str(env.group_id)
+    assert {g["id"] for g in body["quest_groups"]} == {str(env.group_id)}
 
 
 # ---- SC-12: パーティー粒度（C.3）／状態遷移（C.5）／削除（C-TC-130〜142） ----

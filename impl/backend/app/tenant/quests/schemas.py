@@ -52,7 +52,8 @@ class QuestCardDTO(BaseModel):
     member_count: int
     idea_count: int
     owner: QuestOwnerDTO
-    quest_group: QuestGroupRefDTO
+    # 参加部署（0..N・すべて同格・FR-38 再設計）。0 件なら空配列（単一 quest_group は廃止）。
+    quest_groups: list[QuestGroupRefDTO] = []
     # 自分の状態＝draft（本人の下書き）/ member（参加中）。未投稿/投稿済みはドメイン D 実装後に精緻化。
     my_state: str
 
@@ -93,8 +94,8 @@ class QuestCreateRequest(BaseModel):
 
     title: str
     color: str
-    quest_group_id: str
-    # 追加グループ（複数部署横断・FR-38）。主グループ（quest_group_id）以外を関連付ける。省略時は単一部署。
+    # 参加部署（アクセス条件・複数部署横断・FR-38 再設計）。フラット 0..N・すべて同格・省略/空も可（0 件＝会社全体）。
+    # 主グループ（quest_group_id）は廃止＝受け付けない。
     quest_group_ids: list[str] = []
     categories: list[str] = []
     deadline: date | None = None
@@ -108,7 +109,7 @@ class QuestCreateRequest(BaseModel):
 class QuestUpdateRequest(BaseModel):
     """PATCH /quests/{id}（C.2）。差分＝送られたフィールドのみ適用（`model_fields_set` で判定）。
 
-    `quest_group_id` は不変・`status` は受け付けない（状態遷移は publish/transition）＝フィールド自体を持たない。
+    `status` は受け付けない（状態遷移は publish/transition）＝フィールド自体を持たない。
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -120,8 +121,8 @@ class QuestUpdateRequest(BaseModel):
     purpose: str | None = None
     icon_image_path: str | None = None
     members: list[QuestMemberInput] | None = None
-    # 関連グループの「あるべき全体像」（主グループを含む/含まない両方許容・主は不変・FR-38）。
-    # 送信時のみ差分適用。追加グループを除外してパーティー員が孤立する場合は 409 group_in_use。
+    # 参加部署の「あるべき全体像」（フラット 0..N・すべて同格・FR-38 再設計）。送信時のみ差分適用。
+    # 参加部署を外すのはブロックしない（409 group_in_use 廃止）＝門番の都度再判定で失効を表現（C.0/C.2）。
     quest_group_ids: list[str] | None = None
 
 
@@ -162,8 +163,7 @@ class QuestDetailDTO(BaseModel):
     member_count: int
     idea_count: int
     owner: QuestOwnerDTO
-    quest_group: QuestGroupRefDTO
-    # 関連グループ全件（主を先頭・複数部署横断 FR-38）。単一部署なら quest_group と同一の1件。
+    # 参加部署（0..N・すべて同格・created_at 昇順・FR-38 再設計）。0 件なら空配列（単一 quest_group は廃止）。
     quest_groups: list[QuestGroupRefDTO] = []
     my_state: str
     # 自分が持つ 6 権限（フロントの UX 出し分け・実アクションは各 EP で再検証・C.1）。

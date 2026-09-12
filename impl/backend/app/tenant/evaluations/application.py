@@ -210,9 +210,9 @@ def _resolve_evaluable_idea(ts, iid, user):
     idea = ideas_repo.get_idea(ts, iid)
     if idea is None or idea.status != "published":
         raise AppError(404, "not_found")  # 下書き/不在＝評価対象外（存在秘匿）
-    if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
-        raise AppError(404, "not_found")  # 非パーティーは秘匿（C.0）
     quest = quests_repo.get_quest(ts, idea.quest_id)
+    if quest is None or not quests_repo.can_access_quest(ts, quest, user.id):
+        raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
     return idea, quest
 
 

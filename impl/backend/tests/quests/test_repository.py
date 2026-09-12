@@ -19,7 +19,7 @@ from app.db.tenant import get_tenant_session
 from app.tenant.profile.orm import User
 from app.tenant.quest_group.orm import QuestGroup
 from app.tenant.quests import repository as repo
-from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission
 from tests.conftest import SEED_COMPANY_CODE
 
 
@@ -49,9 +49,10 @@ def env():
         the_owner = owner or owner_id
         with get_tenant_session(db_identifier) as ts:
             repo.create_quest(
-                ts, quest_id=qid, quest_group_id=group or group_id, owner_id=the_owner,
+                ts, quest_id=qid, owner_id=the_owner,
                 title="Q", color="#3B82F6", status=status,
             )
+            repo.create_group_links(ts, qid, group_ids=[group or group_id])  # 参加部署（FR-38 再設計）
             if party:
                 repo.add_member(ts, qid, the_owner, permissions=["owner"])
             ts.commit()
@@ -76,6 +77,7 @@ def env():
                 )
             ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id.in_(qids)))
             ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(qids)))
+            ts.execute(QuestGroupLink.__table__.delete().where(QuestGroupLink.quest_id.in_(qids)))
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(qids)))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id.in_([group_id, other_group_id])))
         ts.execute(User.__table__.delete().where(User.id.in_([owner_id, member_id, outsider_id])))
@@ -99,7 +101,8 @@ def test_c_tc_002_list_visibility(env):
     public = env.new_quest(status="recruiting", group=env.group_id)
     my_draft = env.new_quest(status="draft", owner=env.owner_id)
     others_draft = env.new_quest(status="draft", owner=env.member_id)
-    out_of_scope = env.new_quest(status="recruiting", group=env.other_group_id)
+    # 範囲外＝他人所有・別グループで owner_id は非パーティー（作成者別格が効かない他者クエスト）＝除外。
+    out_of_scope = env.new_quest(status="recruiting", group=env.other_group_id, owner=env.member_id)
     with get_tenant_session(env.db_identifier) as ts:
         ids = {
             q.id

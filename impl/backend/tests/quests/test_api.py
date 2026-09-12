@@ -22,7 +22,7 @@ from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests import repository as repo
-from app.tenant.quests.orm import Quest, QuestCategory, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -66,9 +66,10 @@ def env():
         the_owner = owner or user_id
         with get_tenant_session(db_identifier) as ts:
             repo.create_quest(
-                ts, quest_id=qid, quest_group_id=group_id, owner_id=the_owner,
+                ts, quest_id=qid, owner_id=the_owner,
                 title=title, color="#3B82F6", status=status,
             )
+            repo.create_group_links(ts, qid, group_ids=[group_id])  # 参加部署（FR-38 再設計）
             repo.replace_categories(ts, qid, [("UX", False)])
             if party:
                 repo.add_member(ts, qid, the_owner, permissions=["owner"])
@@ -88,6 +89,7 @@ def env():
                 ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
             ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id.in_(created_quests)))
             ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(created_quests)))
+            ts.execute(QuestGroupLink.__table__.delete().where(QuestGroupLink.quest_id.in_(created_quests)))
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(created_quests)))
         ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id == group_id))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == group_id))
@@ -109,7 +111,7 @@ def test_c_tc_101_list_returns_joined_quest(client, env):
     assert card["idea_count"] == 0
     assert card["categories"] == ["UX"]
     assert card["owner"]["user_id"] == str(env.user_id)
-    assert card["quest_group"]["id"] == str(env.group_id)
+    assert {g["id"] for g in card["quest_groups"]} == {str(env.group_id)}
     assert card["my_state"] == "member"
     assert "next_cursor" in body["page_info"] and "has_next" in body["page_info"]
 

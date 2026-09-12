@@ -62,9 +62,11 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
   const dl = parseDeadline(c.deadline);
   const status = STATUS_LABEL[c.status] ?? c.status;
   const draft = c.my_state === "draft";
+  // 参加部署（0..N・すべて同格・FR-38 再設計）。一覧は先頭部署を代表表示（0 件なら空）。
+  const g0 = c.quest_groups[0];
   return {
     id: c.id, title: c.title, theme: "", cat: c.categories[0] ?? "", cats: c.categories,
-    status, group: c.quest_group.name, groupId: c.quest_group.id, owner: (c.owner.display_name || "?").slice(0, 1),
+    status, group: g0?.name ?? "", groupId: g0?.id ?? "", owner: (c.owner.display_name || "?").slice(0, 1),
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
     deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, deadlineRaw: (c.deadline ?? "").slice(0, 10), party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,

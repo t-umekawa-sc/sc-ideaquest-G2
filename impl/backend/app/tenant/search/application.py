@@ -12,7 +12,6 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.profile import repository as profile_repo
-from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as quests_repo
 from app.tenant.search import repository as search_repo
 
@@ -78,10 +77,9 @@ def search_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
         quest = quests_repo.get_quest(ts, qid)
         if quest is None:
             raise AppError(404, "not_found")
-        # 門番＝パーティー所属 かつ クエストグループ所属（AND・どちらか欠けても 404・存在秘匿・J.0/C.0）
-        if quests_repo.get_active_member(ts, qid, user.id) is None:
-            raise AppError(404, "not_found")
-        if qg_repo.get_active_membership(ts, quest.quest_group_id, user.id) is None:
+        # 門番＝C.0 共通（作成者別格・パーティー所属×参加部署の現所属・都度再判定・J.0/C.0）。
+        # 旧「パーティー∩グループ AND」を `can_access_quest` に一本化（FR-38 再設計・2026-09-11）。
+        if not quests_repo.can_access_quest(ts, quest, user.id):
             raise AppError(404, "not_found")
         for kind in kinds:
             try:

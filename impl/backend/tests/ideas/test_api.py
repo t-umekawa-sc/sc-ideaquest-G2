@@ -56,7 +56,7 @@ def env():
         qid = uuid.uuid4()
         the_owner = owner or user_id
         with get_tenant_session(db_identifier) as ts:
-            quests_repo.create_quest(ts, quest_id=qid, quest_group_id=group_id, owner_id=the_owner, title="Q", color="#3B82F6", status=status)
+            quests_repo.create_quest(ts, quest_id=qid, owner_id=the_owner, title="Q", color="#3B82F6", status=status)
             quests_repo.add_member(ts, qid, the_owner, permissions=["owner"])
             if seed_member and the_owner != user_id:
                 quests_repo.add_member(ts, qid, user_id, permissions=seed_perms or ["vote", "idea_create", "comment"])

@@ -108,14 +108,17 @@ def get_quests(
         rows = rows[:limit]
         # ページ分の付随情報を一括取得（N+1 回避）。
         owner_ids = list({r.owner_id for r in rows})
-        gids = list({r.quest_group_id for r in rows})
         qids = [r.id for r in rows]
+        links_by_quest = repo.linked_groups_for_quests(ts, qids)  # quest_id→[参加部署 id]（0..N）
+        gids = list({g for gl in links_by_quest.values() for g in gl})
         owners, groups = repo.get_owners_and_groups(ts, owner_ids, gids)
         cats = repo.list_categories_for_quests(ts, qids)
         member_counts = repo.count_active_members_for_quests(ts, qids)
         idea_counts = ideas_repo.count_published_ideas_for_quests(ts, qids)
         data = [
-            _quest_card_dto(r, user.id, owners, groups, cats, member_counts, idea_counts) for r in rows
+            _quest_card_dto(r, user.id, owners, groups, links_by_quest.get(r.id, []),
+                            cats, member_counts, idea_counts)
+            for r in rows
         ]
     next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
@@ -157,9 +160,21 @@ def get_company_group_directory(account_id: uuid.UUID, company_id: uuid.UUID, *,
     return {"data": data}
 
 
-def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts, idea_counts) -> dict:
+def _group_refs(group_ids, groups) -> list[dict]:
+    """参加部署 id 配列→グループ参照 DTO 配列（id/code/name・N+1 回避で groups マップを受け取る）。"""
+    out = []
+    for gid in group_ids:
+        g = groups.get(gid)
+        out.append({
+            "id": str(gid),
+            "quest_group_code": g.quest_group_code if g else "",
+            "name": g.name if g else "",
+        })
+    return out
+
+
+def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats, member_counts, idea_counts) -> dict:
     owner = owners.get(quest.owner_id)
-    group = groups.get(quest.quest_group_id)
     return {
         "id": str(quest.id),
         "title": quest.title,
@@ -176,11 +191,8 @@ def _quest_card_dto(quest, viewer_id, owners, groups, cats, member_counts, idea_
             "display_name": owner.display_name if owner else "",
             "avatar_image_url": _image_url(owner.avatar_image_path) if owner else None,
         },
-        "quest_group": {
-            "id": str(quest.quest_group_id),
-            "quest_group_code": group.quest_group_code if group else "",
-            "name": group.name if group else "",
-        },
+        # 参加部署（0..N・すべて同格・FR-38 再設計）。0 件なら空配列。
+        "quest_groups": _group_refs(group_ids, groups),
         # 本人の下書きは draft、それ以外は member。未投稿/投稿済みはドメイン D 実装後に精緻化（C.1）。
         "my_state": "draft" if quest.status == "draft" and quest.owner_id == viewer_id else "member",
     }
@@ -217,8 +229,8 @@ def get_quest_detail(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         if quest.status == "draft":
             if quest.owner_id != user.id:
                 raise AppError(404, "not_found")  # 下書きは本人だけに見える
-        elif quest.owner_id != user.id and repo.get_active_member(ts, quest.id, user.id) is None:
-            raise AppError(404, "not_found")  # 公開系もパーティー外には秘匿
+        elif not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # 公開系は C.0 門番（作成者別格・参加部署の都度再判定・§5.6b）
         return _build_detail(ts, quest, user.id)
 
 
@@ -231,8 +243,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
-    group_uuid = _parse_uuid(body.quest_group_id, field="quest_group_id")
-    extra_group_uuids = _parse_group_ids(body.quest_group_ids)
+    group_uuids = _parse_group_ids(body.quest_group_ids)
     title = _validate_title(body.title)
     color = _validate_color(body.color)
     cats = _normalize_categories(body.categories)
@@ -241,25 +252,19 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        # 作成者が主グループに有効所属していること（§C.6 IDOR・非所属は 422）。
-        if qg_repo.get_active_membership(ts, group_uuid, user.id) is None:
-            raise AppError(
-                422, "validation_error", detail="quest_group_id が不正です",
-                errors=[{"field": "quest_group_id"}],
-            )
-        # 追加グループは会社内の有効グループのみ許容（複数部署横断 FR-38・存在しない/削除済みは 422）。
-        extra_group_uuids = _validate_extra_groups(ts, extra_group_uuids, primary=group_uuid)
+        # 参加部署は会社内の有効グループのみ許容（0..N・作成者の所属は不問＝別格・FR-38 再設計）。
+        group_uuids = _validate_groups(ts, group_uuids)
         if body.status == "recruiting":
-            _validate_publishable(title=title, color=color, categories=cats, quest_group_id=group_uuid)
+            _validate_publishable(title=title, color=color, categories=cats)
         quest = repo.create_quest(
-            ts, quest_group_id=group_uuid, owner_id=user.id, title=title, color=color,
+            ts, owner_id=user.id, title=title, color=color,
             status=body.status, purpose=body.purpose, deadline=body.deadline,
             icon_image_path=body.icon_image_path,
         )
         ts.flush()  # quest.id 確定（カテゴリ/パーティー/リンクの FK に使う）
         repo.replace_categories(ts, quest.id, cats)
-        # 関連グループ（主＝is_primary＋追加）を確定＝候補和集合の材料（party 差分より先に書く）。
-        repo.create_group_links(ts, quest.id, primary_group_id=group_uuid, extra_group_ids=extra_group_uuids)
+        # 参加部署（フラット 0..N）を確定＝候補範囲の材料（party 差分より先に書く）。
+        repo.create_group_links(ts, quest.id, group_ids=group_uuids)
         # 作成者は常にパーティー員＝owner（C.0）。差分より先に投入して保護対象にする。
         repo.add_member(ts, quest.id, user.id, permissions=_ALL_PERMISSIONS, granted_by_id=user.id)
         _apply_party_diff(ts, quest, body.members, requester=user)
@@ -296,9 +301,11 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                 extra={"errors": [{"reason": "invalid_state"}]},
             )
         _apply_content(ts, quest, body)
-        # 関連グループの差分（複数部署横断 FR-38）＝主は不変・非 primary を追加/削除。party 差分より先に確定。
+        # 参加部署の差分（フラット 0..N・すべて同格・FR-38 再設計）＝あるべき全体像へ差分適用。party 差分より先に確定。
+        # 参加部署を外すのはブロックしない（409 group_in_use 廃止）＝門番の都度再判定で失効を表現する（C.0）。
         if "quest_group_ids" in body.model_fields_set and body.quest_group_ids is not None:
-            _reconcile_quest_groups(ts, quest, body.quest_group_ids)
+            target = _validate_groups(ts, _parse_group_ids(body.quest_group_ids))
+            repo.reconcile_group_links(ts, quest.id, target)
         removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
             removed = _apply_party_diff(ts, quest, body.members, requester=user)
@@ -307,7 +314,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
         if quest.status in _PUBLIC_STATUS:
             _validate_publishable(
                 title=quest.title, color=quest.color,
-                categories=repo.list_categories(ts, quest.id), quest_group_id=quest.quest_group_id,
+                categories=repo.list_categories(ts, quest.id),
             )
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
@@ -346,7 +353,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
         cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
         _validate_publishable(
             title=quest.title, color=quest.color,
-            categories=repo.list_categories(ts, quest.id), quest_group_id=quest.quest_group_id,
+            categories=repo.list_categories(ts, quest.id),
         )
         quest.status = "recruiting"
         detail = _build_detail(ts, quest, user.id)
@@ -462,14 +469,13 @@ def get_quest_group_candidates(
     q: str | None = None, exclude_user_ids: list[str] | None = None,
     limit: int, cursor: str | None = None,
 ) -> dict:
-    """複数グループ横断のパーティー候補（FR-38・C.4 GET /quest-group-candidates）。
+    """参加部署のパーティー候補（FR-38 再設計・C.4 GET /quest-group-candidates）。
 
-    指定グループ群のいずれかの有効メンバー×active を返す。各候補は所属 group_id 配列を併せて返す（部署バッジ）。
-    門番＝リクエスト者が**いずれかの指定グループに有効所属**（1つも所属しなければ 404 存在秘匿・C.4）。
+    指定した参加部署群のいずれかの有効メンバー×active を返す。**`group_ids` 省略/空なら会社の有効ユーザー全体**
+    （参加部署 0 件のクエスト用）。各候補は所属 group_id 配列を併せて返す（部署バッジ）。
+    門番＝**認証済みの同一会社ユーザー**（会社内は部署をこえて可視の確定方針・作成者別格で他部署も選べる・C.4）。
     """
     group_uuids = _parse_group_ids(group_ids)
-    if not group_uuids:
-        raise AppError(422, "validation_error", detail="group_ids は必須です", errors=[{"field": "group_ids"}])
     excl = _parse_exclude(exclude_user_ids)
     cur = _decode_candidate_cursor(cursor) if cursor else None
     company = _resolve_company(company_id)
@@ -479,10 +485,6 @@ def get_quest_group_candidates(
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        # いずれの指定グループにも属さなければ存在秘匿（他部署のメンバー列挙を防ぐ・C.4）。
-        my_groups = set(qg_repo.list_active_group_ids_for_user(ts, user.id))
-        if not (set(group_uuids) & my_groups):
-            raise AppError(404, "not_found")
         rows = repo.list_cross_group_candidates(
             ts, group_uuids, q=q, exclude_user_ids=excl, cursor=cur, limit=limit + 1,
         )
@@ -521,8 +523,8 @@ def list_party_members(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: s
         quest = repo.get_quest(ts, qid)
         if quest is None:
             raise AppError(404, "not_found")
-        if quest.owner_id != user.id and repo.get_active_member(ts, quest.id, user.id) is None:
-            raise AppError(404, "not_found")
+        if not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # C.0 門番（作成者別格・参加部署の都度再判定）
         return {"data": _members_payload(ts, quest)}
 
 
@@ -567,9 +569,14 @@ def add_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             raise AppError(404, "not_found")
         _authorize_edit(ts, quest, user)
         _guard_not_completed(quest)
-        # 候補＝関連グループ（主＋追加）の有効メンバーの和集合（複数部署横断 FR-38・主は常に含む）。
-        linked = list({quest.quest_group_id, *repo.list_linked_group_ids(ts, quest.id)})
-        if uid not in repo.user_ids_in_any_group(ts, linked):
+        # 候補＝参加部署の有効所属者（0 件なら会社の有効ユーザー全体＝アクセス条件と同一・FR-38 再設計・C.3）。
+        allowed = _candidate_user_ids(ts, quest)
+        if allowed is None:
+            u = repo.get_users_by_ids(ts, {uid}).get(uid)
+            in_range = u is not None and u.status == "active"
+        else:
+            in_range = uid in allowed
+        if not in_range:
             raise AppError(422, "validation_error", detail="候補外のユーザーは追加できません", errors=[{"field": "user_id"}])
         if perms and "owner" in perms and user.id != quest.owner_id:
             raise AppError(403, "forbidden", detail="owner 権限の付与は作成者のみ可能です")
@@ -669,7 +676,7 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         if to == "recruiting":  # draft→recruiting は公開＝strict 再検証（publish と同一関門）
             _validate_publishable(
                 title=quest.title, color=quest.color,
-                categories=repo.list_categories(ts, quest.id), quest_group_id=quest.quest_group_id,
+                categories=repo.list_categories(ts, quest.id),
             )
         quest.status = to
         if to == "completed":
@@ -718,8 +725,11 @@ def _finalize_completion(ts, quest) -> None:
 # ---- ドメイン関数（全経路で共有・C.2/C.3 サーバー強制ルール） ----
 
 
-def _validate_publishable(*, title, color, categories, quest_group_id) -> None:
-    """公開に必要な必須充足（title/color/categories≥1/quest_group_id）。未充足は 422（C.2）。"""
+def _validate_publishable(*, title, color, categories) -> None:
+    """公開に必要な必須充足（title/color/categories≥1）。未充足は 422（C.2）。
+
+    参加部署（quest_group_ids）は 0..N＝0 件も可のため必須ではない（FR-38 再設計・§5.6b）。
+    """
     errors = []
     if not title or not str(title).strip():
         errors.append({"field": "title"})
@@ -727,8 +737,6 @@ def _validate_publishable(*, title, color, categories, quest_group_id) -> None:
         errors.append({"field": "color"})
     if not categories:
         errors.append({"field": "categories"})
-    if quest_group_id is None:
-        errors.append({"field": "quest_group_id"})
     if errors:
         raise AppError(422, "validation_error", detail="公開に必要な項目が不足しています", errors=errors)
 
@@ -743,55 +751,47 @@ def _parse_group_ids(values) -> list[uuid.UUID]:
     return out
 
 
-def _validate_extra_groups(ts, extra_uuids: list[uuid.UUID], *, primary: uuid.UUID) -> list[uuid.UUID]:
-    """追加グループ（主を除く）が会社内の有効グループであることを検証し、正規化した配列を返す（FR-38・C.2）。
+def _validate_groups(ts, group_uuids: list[uuid.UUID]) -> list[uuid.UUID]:
+    """参加部署（quest_group_ids）が会社内の有効グループであることを検証し、正規化した配列を返す（FR-38・C.2）。
 
-    存在しない/削除済みグループの付与は 422（`quest_group_ids`）。主グループが混じっていても除外する。
+    フラット 0..N・すべて同格＝主グループの概念なし。存在しない/削除済みグループの付与は 422（`quest_group_ids`）。
+    作成者の所属は不問（別格）。0 件（空）はそのまま許容（部署条件なし＝会社全体）。
     """
-    extras = [g for g in extra_uuids if g != primary]
-    if not extras:
+    if not group_uuids:
         return []
-    active = repo.get_active_group_ids(ts, extras)
-    if len(active) != len(extras):
+    active = repo.get_active_group_ids(ts, group_uuids)
+    if len(active) != len(group_uuids):
         raise AppError(
             422, "validation_error", detail="quest_group_ids が不正です",
             errors=[{"field": "quest_group_ids"}],
         )
-    return extras
+    return group_uuids
 
 
-def _reconcile_quest_groups(ts, quest, group_ids_values) -> None:
-    """関連グループを「あるべき全体像」へ差分適用（主は不変・FR-38）。
+def _candidate_user_ids(ts, quest) -> set[uuid.UUID] | None:
+    """パーティー候補の許容 user_id 集合（C.3・FR-38 再設計＝アクセス条件と同一）。
 
-    追加グループ除外でパーティー員が**どの関連グループにも属さなくなる**場合は 409（`group_in_use`）で拒否
-    （孤立防止）。それ以外は非 primary リンクを追加/削除する。
+    参加部署が 1 件以上ならそのいずれかの有効所属者に限定、**0 件なら None**（＝会社の有効ユーザー全体＝
+    呼び出し側は範囲制限しない）を返す。作成者は別格で候補判定の対象外（呼び出し側で除外済み）。
     """
-    primary = quest.quest_group_id
-    target = _validate_extra_groups(ts, _parse_group_ids(group_ids_values), primary=primary)
-    new_linked = [primary, *target]
-    # 新しい関連グループの和集合に、現パーティー員（作成者除く）が全員含まれるか（孤立チェック）。
-    valid_users = repo.user_ids_in_any_group(ts, new_linked)
-    orphans = [u for u in repo.active_member_user_ids(ts, quest.id) if u != quest.owner_id and u not in valid_users]
-    if orphans:
-        raise AppError(
-            409, "conflict", detail="除外するグループに、他グループ未所属のパーティー員がいます",
-            extra={"errors": [{"reason": "group_in_use", "user_ids": [str(u) for u in orphans]}]},
-        )
-    repo.reconcile_extra_links(ts, quest.id, primary_group_id=primary, target_group_ids=new_linked)
+    linked = repo.list_linked_group_ids(ts, quest.id)
+    if not linked:
+        return None  # 参加部署 0 件＝会社全体（範囲制限なし）
+    return repo.user_ids_in_any_group(ts, linked)
 
 
 def _apply_party_diff(ts, quest, desired_members, *, requester) -> list:
     """パーティーの差分適用（あるべき全体像→追加/更新/除外）。全経路共有のサーバー強制ルール（C.3）。
 
-    - 候補制限＝追加/更新対象は**関連グループのいずれか**の有効メンバーのみ（複数部署横断 FR-38・範囲外は 422 user_id）。
+    - 候補制限＝追加/更新対象は**参加部署のいずれか**の有効所属者のみ（0 件なら会社の有効ユーザー全体＝範囲制限なし・
+      FR-38 再設計・範囲外は 422 user_id）。
     - owner 付与は作成者本人のみ（他者付与は 403）。
     - 作成者は保護＝差分対象から除外（除外/owner 剥奪不可・常に全権限）。
     - 既定権限（省略時 vote+idea_create+comment）は repository が付与。再追加はトゥームストーン再利用。
     """
     creator_id = quest.owner_id
-    # 候補＝関連グループ（主＋追加）の有効メンバーの和集合（主は不変・link 欠落にも頑健に常に含める）。
-    linked = list({quest.quest_group_id, *repo.list_linked_group_ids(ts, quest.id)})
-    valid_group_ids = repo.user_ids_in_any_group(ts, linked)
+    # 候補＝参加部署の有効所属者（0 件なら None＝会社全体・アクセス条件と同一・C.3）。
+    allowed = _candidate_user_ids(ts, quest)
 
     desired: dict[uuid.UUID, list[str] | None] = {}
     for m in desired_members:
@@ -800,8 +800,12 @@ def _apply_party_diff(ts, quest, desired_members, *, requester) -> list:
             continue  # 作成者は保護（常に owner・差分では触らない）
         desired[uid] = _validate_permissions(m.permissions)
 
+    if allowed is None:
+        # 参加部署 0 件＝会社の有効ユーザー全体。存在＋`status='active'` を検証（不正 uid は 422）。
+        allowed = {uid for uid, u in repo.get_users_by_ids(ts, set(desired)).items() if u.status == "active"}
+
     for uid, perms in desired.items():
-        if uid not in valid_group_ids:
+        if uid not in allowed:
             raise AppError(
                 422, "validation_error", detail="候補外のユーザーは追加できません",
                 errors=[{"field": "user_id"}],
@@ -929,23 +933,13 @@ def _members_payload(ts, quest) -> list[dict]:
 
 def _build_detail(ts, quest, viewer_id) -> dict:
     """作成/編集/公開の応答＝クエスト詳細（カード項目＋purpose/created_at＋my_permissions＋パーティー）。"""
-    owners, groups = repo.get_owners_and_groups(ts, [quest.owner_id], [quest.quest_group_id])
+    owners = repo.get_users_by_ids(ts, [quest.owner_id])
     cats = repo.list_categories(ts, quest.id)
     owner = owners.get(quest.owner_id)
-    group = groups.get(quest.quest_group_id)
-    # 関連グループ全件（主を先頭・複数部署横断 FR-38）。link 欠落時も主グループは必ず出す。
+    # 参加部署全件（フラット 0..N・created_at 昇順・複数部署横断 FR-38 再設計）。0 件なら空配列。
     linked_ids = repo.list_linked_group_ids(ts, quest.id)
-    if quest.quest_group_id not in linked_ids:
-        linked_ids = [quest.quest_group_id, *linked_ids]
     linked_groups = repo.get_groups_by_ids(ts, linked_ids)
-    quest_groups = [
-        {
-            "id": str(gid),
-            "quest_group_code": linked_groups[gid].quest_group_code if gid in linked_groups else "",
-            "name": linked_groups[gid].name if gid in linked_groups else "",
-        }
-        for gid in linked_ids
-    ]
+    quest_groups = _group_refs(linked_ids, linked_groups)
 
     member_dtos = _members_payload(ts, quest)
     my_permissions = next(
@@ -969,11 +963,6 @@ def _build_detail(ts, quest, viewer_id) -> dict:
             "user_id": str(quest.owner_id),
             "display_name": owner.display_name if owner else "",
             "avatar_image_url": _image_url(owner.avatar_image_path) if owner else None,
-        },
-        "quest_group": {
-            "id": str(quest.quest_group_id),
-            "quest_group_code": group.quest_group_code if group else "",
-            "name": group.name if group else "",
         },
         "quest_groups": quest_groups,
         "my_state": "draft" if quest.status == "draft" and quest.owner_id == viewer_id else "member",

@@ -25,10 +25,8 @@ class Quest(CompanyBase):
     __tablename__ = "quests"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # 所属クエストグループ（作成時に確定・以後不変・C.2）。
-    quest_group_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("quest_groups.id"), nullable=False
-    )
+    # 参加部署（クエストグループ）は `quest_group_links` に多対多（0..N）で保持＝クエスト本体は単一グループ FK を
+    # 持たない（FR-38 再設計・2026-09-11・§5.6/§5.6b。主グループ〔quest_group_id〕は撤去）。
     # 作成者＝既定で所有者（`owner` 権限・剥奪不可・§5.6/C.0）。
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -52,21 +50,19 @@ class Quest(CompanyBase):
 
 
 class QuestGroupLink(CompanyBase):
-    """クエスト×クエストグループ（複数部署横断・データモデル §5.6b・FR-38）。
+    """クエスト×クエストグループ＝参加部署（アクセス条件・複数部署横断・データモデル §5.6b・FR-38）。
 
-    1クエスト＝主グループ（`is_primary=true`＝`quests.quest_group_id` と一致・作成後不変）＋任意の追加グループ。
-    門番（一覧可視性）とパーティー候補は本テーブルの全グループを対象にする（従来の単一グループから拡張）。
+    フラットな 0..N・すべて同格（主グループ〔primary〕概念は廃止・2026-09-11 再設計）。門番（アクセス条件）と
+    パーティー候補は本テーブルの全グループを対象にする（0 件なら部署条件なし＝会社全体）。
     """
     __tablename__ = "quest_group_links"
     __table_args__ = (
         UniqueConstraint("quest_id", "quest_group_id", name="uq_quest_group_links"),
-        # 主グループは高々1（部分 UNIQUE）はマイグレーションで作成（ORM の Index では partial を表しにくいため）。
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
     quest_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quest_groups.id"), nullable=False)
-    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

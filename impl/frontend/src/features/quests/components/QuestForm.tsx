@@ -196,11 +196,11 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         setCategories(d.categories ?? []);
         setDeadline(d.deadline ?? "");
         setTheme(d.purpose ?? "");
-        setGroupId(d.quest_group.id);
-        setGroupName(d.quest_group.name);
-        // 追加グループ（主を除く）＝複数部署横断（FR-38）。名前は自分の所属外でも表示できるよう控える。
+        // 参加部署（0..N・すべて同格・FR-38 再設計）。暫定 UI は先頭を代表欄・残りを追加欄に写像（#8 で参加部署の複数選択に一本化予定）。
         const linked = d.quest_groups ?? [];
-        setExtraGroupIds(linked.map((g) => g.id).filter((id) => id !== d.quest_group.id));
+        setGroupId(linked[0]?.id ?? "");
+        setGroupName(linked[0]?.name ?? "");
+        setExtraGroupIds(linked.slice(1).map((g) => g.id));
         setExtraGroupNames(Object.fromEntries(linked.map((g) => [g.id, g.name])));
         setStatus(d.status);
         setOwnerLabel(d.owner.display_name);
@@ -394,13 +394,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       if (kind === "create-draft" || kind === "create-publish") {
         const created = await createQuest({
           ...contentPayload(),
-          quest_group_id: groupId,
-          quest_group_ids: extraGroupIds, // 追加グループ（複数部署横断・FR-38）
+          // 参加部署（フラット 0..N・すべて同格・FR-38 再設計）＝代表欄＋追加欄の和集合。空も可（0 件＝全社）。
+          quest_group_ids: [...new Set([groupId, ...extraGroupIds].filter(Boolean))],
           status: kind === "create-publish" ? "recruiting" : "draft",
         });
         if (created) await applyIcon(created.id);
       } else if (kind === "edit-save") {
-        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: extraGroupIds });
+        await updateQuest(questId!, {
+          ...contentPayload(),
+          quest_group_ids: [...new Set([groupId, ...extraGroupIds].filter(Boolean))],
+        });
         await applyIcon(questId!);
       } else {
         // edit-publish（draft→recruiting）＝関連グループの差分を先に反映してから公開。

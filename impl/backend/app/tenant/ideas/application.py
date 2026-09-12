@@ -87,8 +87,8 @@ def get_ideas(account_id, company_id, quest_id, *, status=None, limit, cursor=No
         if user is None:
             raise AppError(401, "unauthenticated")
         quest = quests_repo.get_quest(ts, qid)
-        if quest is None or quests_repo.get_active_member(ts, qid, user.id) is None:
-            raise AppError(404, "not_found")  # クエスト不在 or 非パーティー＝存在秘匿（C.0）
+        if quest is None or not quests_repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # クエスト不在 or アクセス条件外＝存在秘匿（C.0・作成者別格・参加部署の都度再判定）
         rows = repo.list_ideas_for_quest(
             ts, quest_id=qid, viewer_id=user.id, status=status, cursor=cur, limit=limit + 1,
         )
@@ -125,8 +125,8 @@ def get_idea_detail(account_id, company_id, idea_id) -> dict:
             raise AppError(404, "not_found")
         if idea.status == "draft" and idea.author_id != user.id:
             raise AppError(404, "not_found")  # 下書きは本人のみ
-        if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
-            raise AppError(404, "not_found")  # 非パーティーは秘匿
+        if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
+            raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
         return _build_detail(ts, idea, user.id)
 
 
@@ -190,12 +190,12 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
         if user is None:
             raise AppError(401, "unauthenticated")
         quest = quests_repo.get_quest(ts, qid)
+        if quest is None or not quests_repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
         member = quests_repo.get_active_member(ts, qid, user.id)
-        if quest is None or member is None:
-            raise AppError(404, "not_found")
         _guard_not_completed(quest)
-        # 作成権限＝idea_create（owner は全権限）。
-        perms = quests_repo.get_permissions(ts, member.id)
+        # 作成権限＝idea_create（owner は全権限）。作成者は別格でメンバー行が無くても可。
+        perms = quests_repo.get_permissions(ts, member.id) if member else []
         if user.id != quest.owner_id and "idea_create" not in perms:
             raise AppError(403, "forbidden", detail="アイデア作成の権限がありません")
         if body.status == "published":
@@ -307,9 +307,9 @@ def _resolve_visible_idea(ts, iid, user):
         raise AppError(404, "not_found")
     if idea.status == "draft" and idea.author_id != user.id:
         raise AppError(404, "not_found")  # 下書きは本人のみ
-    if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
-        raise AppError(404, "not_found")  # 非パーティーは秘匿（C.0）
     quest = quests_repo.get_quest(ts, idea.quest_id)
+    if quest is None or not quests_repo.can_access_quest(ts, quest, user.id):
+        raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
     return idea, quest
 
 
@@ -514,8 +514,8 @@ def download_attachment(account_id, company_id, attachment_id) -> dict:
             raise AppError(404, "not_found")
         if idea.status == "draft" and idea.author_id != user.id:
             raise AppError(404, "not_found")  # 下書きは本人のみ
-        if quests_repo.get_active_member(ts, idea.quest_id, user.id) is None:
-            raise AppError(404, "not_found")  # 非パーティーは秘匿（閲覧できる＝落とせる）
+        if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
+            raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0・参加部署の都度再判定）
         return {"url": get_storage().presigned_get(att.object_key)}
 
 
@@ -538,6 +538,9 @@ def _validate_publishable(*, title, value, body_text) -> None:
 def _authorize_edit_idea(ts, idea, quest, user) -> None:
     """編集/公開/削除の認可＝投稿者本人 or owner/quest_admin（D.2）。下書きは本人のみ可視＝他人は 404。"""
     if idea.status == "draft" and idea.author_id != user.id:
+        raise AppError(404, "not_found")
+    # アクセス門番（C.0）＝公開系はクエストにアクセスできない者（異動で全参加部署を外れた等）は編集不可＝404。
+    if idea.status != "draft" and quest is not None and not quests_repo.can_access_quest(ts, quest, user.id):
         raise AppError(404, "not_found")
     if idea.author_id == user.id:
         return

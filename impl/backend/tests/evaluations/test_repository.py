@@ -33,7 +33,7 @@ def env():
         for uid, name in ((e1, "E1"), (e2, "E2"), (e3, "E3")):
             ts.add(User(id=uid, account_id=uuid.uuid4(), display_name=name, locale="ja", status="active"))
         ts.flush()
-        ts.add(Quest(id=quest_id, quest_group_id=group_id, owner_id=e1, title="Q", color="#3B82F6", status="evaluating"))
+        ts.add(Quest(id=quest_id, owner_id=e1, title="Q", color="#3B82F6", status="evaluating"))
         ts.flush()  # Idea の FK(quest_id) 解決のため先に Quest を flush
         ts.add(Idea(id=idea_id, quest_id=quest_id, author_id=e1, title="I", body="b", value="v", status="published"))
         ts.commit()

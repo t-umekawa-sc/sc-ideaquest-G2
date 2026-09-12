@@ -49,3 +49,11 @@
 | E-TC-201 | e2e | メッセージ投稿→スレッド反映＋通常リアクション | ログイン・API で recruiting クエスト＋published アイデア（chat_group は公開で自動作成） | `/ideas/{id}/chat` で入力→送信→リアクション ＋→👍 | 送信メッセージが `.msg__text` に出る（`postMessage`→`getChat`）・「＋」→ピッカー→👍 で `.reaction` チップ（`addReaction`・`getChat` 実データ） | E.1/E.2/E.4／SC-24 |
 | E-TC-202 | e2e | SC-22 §4.4 チャット活発度/プレビューが実データ | published アイデア＋API でメッセージ投稿 | `/ideas/{id}` を表示 | チャットカードの件数バッジ＝実 `total_messages`・`.chat-preview` に投稿本文が出る（`getChatActivity`/`getChat`・デモ文言なし） | E.1／SC-22 §4.4 |
 | E-TC-203 | e2e | SC-24 複数引用返信 | published アイデア＋2メッセージ投稿 | 2件を💬で引用→本文入力→送信 | 送信メッセージに `.msg__quote` が**2件**（両方の抜粋）＝複数引用（`quoted_message_ids[]`・§5.16b） | E.2／SC-24 §3 |
+
+## 参加部署アクセス門番（FR-38 再設計・`can_access_quest`・C.0）
+
+> チャットの門番を `can_access_quest` へ統一（2026-09-11）。**アクセスの都度、現所属で再判定**＝異動で全参加部署を外れたら名指しパーティー員でもチャット参照は 404（動的失効）。作成者は別格。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| E-TC-204 | api | 動的失効＝全参加部署離脱でチャット参照が 404 | G1 のみ所属の非作成者パーティー員→G1 のグループ所属を除去（参加部署 1 件） | `GET /ideas/{id}/chat`（当該員） | 404（`can_access_quest` 失効） | C.0／E.1 |

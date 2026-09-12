@@ -436,9 +436,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                   <span>💡 アイデア {quest.idea_count}件</span>
                   <span className="poster" style={{ gap: 6 }}>👑 所有者: <Avatar name={ownerName} imageUrl={quest.owner.avatar_image_url ?? undefined} size="sm" /><span className="name">{ownerName}</span></span>
                   {(() => {
-                    // 関連グループ（複数部署横断・FR-38）＝主を先頭に全件。単一なら従来どおり1件。
-                    const gs = quest.quest_groups && quest.quest_groups.length > 0 ? quest.quest_groups : [quest.quest_group];
-                    return <span>🗂 グループ: {gs.map((g) => g.name).join("・")}{gs.length > 1 ? `（${gs.length}部署）` : ""}</span>;
+                    // 参加部署（複数部署横断・0..N・すべて同格・FR-38 再設計）。0 件なら「全社」。
+                    const gs = quest.quest_groups ?? [];
+                    if (gs.length === 0) return <span>🗂 参加部署: 全社（部署条件なし）</span>;
+                    return <span>🗂 参加部署: {gs.map((g) => g.name).join("・")}{gs.length > 1 ? `（${gs.length}部署）` : ""}</span>;
                   })()}
                 </div>
               </div>

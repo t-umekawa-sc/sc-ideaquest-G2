@@ -139,8 +139,8 @@ def get_rankings(account_id, company_id, *, period="this_week", scope="company",
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        if quest_id is not None and quests_repo.get_active_member(ts, quest_id, user.id) is None:
-            raise AppError(404, "not_found")  # クエスト内は門番（C.0）
+        if quest_id is not None and not quests_repo.can_access_quest_id(ts, quest_id, user.id):
+            raise AppError(404, "not_found")  # クエスト内は C.0 共通門番（作成者別格・参加部署の都度再判定）
         rows = gami_repo.aggregate_ranking(ts, start=start, end=end, quest_id=quest_id)  # DB 側で順位確定済み（§7）
         total = len(rows)  # 軽量タプルのみ（DTO/署名URL は生成しない）
         # me＝順位/スコア（圏外でも同梱）。全行走査は軽量（DTO 化しない）。
@@ -212,8 +212,8 @@ def get_quest_activities(account_id, company_id, quest_id, *, limit, cursor=None
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        if quests_repo.get_active_member(ts, qid, user.id) is None:
-            raise AppError(404, "not_found")  # 門番＝パーティー所属（範囲外は存在秘匿）
+        if not quests_repo.can_access_quest_id(ts, qid, user.id):
+            raise AppError(404, "not_found")  # 門番＝C.0 共通（作成者別格・参加部署の都度再判定・存在秘匿）
         rows, has_next, next_cursor = _paginate(gami_repo.list_quest_feed(ts, qid, cursor=cur, limit=limit + 1), limit)
         actors = quests_repo.get_users_by_ids(ts, {a.user_id for a in rows})
         data = [_feed_row_dto(a, actors.get(a.user_id)) for a in rows]

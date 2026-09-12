@@ -253,3 +253,11 @@
 > 対象＝アイデア詳細の賛否比率バー（`impl/frontend/src/features/ideas/ideas.css` の `.vote-bar__agree`/`.vote-bar__disagree`＝`transition:width .6s` で 0→比率へ伸縮）。表示・伸縮・解除の見た目はユーザー目視（GF-AC-230/231/233）。ここは **reduce で伸縮アニメが無効＝即座に比率表示**（0-0 は空バー・投票自体は正常）を e2e で押さえる＝OS reduce は `@media prefers-reduced-motion` で `.vote-bar__agree,.vote-bar__disagree { transition:none }`／ユーザー設定は `[data-anim-reduced]` グローバルキルスイッチ。バーは票の有無に依らず常設ゆえ、アイデア詳細を開くだけで観測できる。非 reduce では `transitionDuration>0`（伸縮が生きている）も押さえる。対象＝`impl/frontend/e2e/sc-22-idea-detail.spec.ts`。
 
 | G-TC-177 | e2e(front) | reduce-motion で賛否バーの伸縮が無効（#23） | `page.emulateMedia` で no-preference→reduce を切替えて `/ideas/{id}`（アイデア詳細）の賛否バーを観測 | `.vote-bar__agree` の computed `transitionDuration` | 非 reduce では `transitionDuration>0`（幅の伸縮が生きている）／reduce では **`0s`**（`@media prefers-reduced-motion`／`[data-anim-reduced]`）＝即座に比率表示・バー自体は表示 | GF-AC-232／#23 |
+
+## 参加部署アクセス門番（FR-38 再設計・`can_access_quest`・C.0）
+
+> クエスト単位のゲーミフィケーション参照（ランキング・クエストアクティビティ）の門番を `can_access_quest` へ統一（2026-09-11・C.0 の網羅性に合わせ D/E/F/J と同一化）。**アクセスの都度、現所属で再判定**＝異動で全参加部署を外れたら名指しパーティー員でも 404（動的失効）。作成者は別格。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| G-TC-508 | api | 動的失効＝全参加部署離脱でランキング/アクティビティが 404 | G1 のみ所属の非作成者パーティー員→G1 のグループ所属を除去（参加部署 1 件） | `GET /rankings?scope=quest:{id}`／`GET /quests/{id}/activities`（当該員） | いずれも 404（`can_access_quest` 失効） | C.0／G |

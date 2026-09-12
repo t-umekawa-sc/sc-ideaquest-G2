@@ -59,7 +59,7 @@ def _make_quest_with(me_id, members: list) -> tuple:
             ts.add(User(id=uid, account_id=uuid.uuid4(), display_name=name, locale="ja", status="active"))
             extra.append(uid)
         ts.flush()
-        quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=me_id, title="Q", color="#3B82F6", status="in_progress")
+        quests_repo.create_quest(ts, quest_id=qid, owner_id=me_id, title="Q", color="#3B82F6", status="in_progress")
         quests_repo.add_member(ts, qid, me_id, permissions=["owner"])
         for uid in extra:
             quests_repo.add_member(ts, qid, uid, permissions=["vote"])
@@ -140,7 +140,7 @@ def test_g_tc_404_quest_gate(client, factory):
         ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
         ts.add(User(id=other, account_id=uuid.uuid4(), display_name="Other", locale="ja", status="active"))
         ts.flush()
-        quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=other, title="Q", color="#3B82F6", status="in_progress")
+        quests_repo.create_quest(ts, quest_id=qid, owner_id=other, title="Q", color="#3B82F6", status="in_progress")
         quests_repo.add_member(ts, qid, other, permissions=["owner"])
         ts.commit()
     try:

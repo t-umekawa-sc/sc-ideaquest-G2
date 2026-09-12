@@ -102,21 +102,26 @@
 | C-TC-205 | e2e | 詳細の実データ描画 | 詳細を開く | ヘッダー/概要/パーティーが実データ（作成者バッジ） | C.1／SC-12 |
 | C-TC-206 | e2e | 遷移→削除 | ⋯ステータスを進める→⋯削除 | in_progress に更新／削除で一覧へ・タイトル消失 | C.5／C.2 |
 
-## 7. 複数クエストグループ（複数部署横断・FR-38・C.2/C.4）
+## 7. 複数部署横断＝参加部署（アクセス条件）・作成者別格・動的失効（FR-38 再設計・2026-09-11・C.0/C.2/C.4）
 
-> 対象＝`POST /quests`（`quest_group_ids`）・`PATCH /quests/{id}`（`quest_group_ids` 差分＋孤立 409）・`GET /quest-detail`（`quest_groups`）・`GET /quest-group-candidates`（横断候補）。門番＝一覧可視性/候補は「主＋追加リンクのいずれか」、詳細/チャットは従来どおりパーティー所属で不変。主グループ（`quest_group_id`）は作成後不変。
+> 対象＝`POST /quests`（`quest_group_ids`＝参加部署 0..N・**`quest_group_id` は廃止**）・`PATCH /quests/{id}`（`quest_group_ids` 差分＝**409 撤去**）・`GET /quest-detail`（`quest_groups` のみ・**単一 `quest_group` DTO 廃止**）・`GET /quest-group-candidates`（0 件=会社全体・門番=同一会社）・`can_access_quest`（門番の単一ソース）。
+> 新モデル（データモデル §5.6/§5.6b/§5.8・API設計 C.0）: **参加部署＝アクセス条件**＝非作成者は「有効パーティー員 かつ（参加部署 0 件なら条件なし／1 件以上なら現在いずれかに有効所属）」で参照可。**アクセスの都度、現所属で再判定**（異動失効）。**作成者は別格**＝常に全参照可・参加部署所属不要。**主グループ（primary）概念は廃止**（フラット 0..N・すべて同格）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| C-TC-220 | api | 追加グループ付き作成→詳細に関連グループ | 主G＋追加G（seed user は主Gに所属） | `POST /quests`（quest_group_ids=[追加G]） | 201・`quest_groups`=[主,追加]（主が先頭）・`quest_group`=主 | C.2／FR-38 |
-| C-TC-221 | api | 横断候補＝追加グループのメンバーを追加できる | 追加Gのみ所属ユーザ（主G非所属） | 追加Gユーザを `members` で即公開作成 | 201・当該ユーザがパーティーに含まれる（単一G時は 422 だった） | C.3／FR-38 |
-| C-TC-222 | api | 存在しない追加グループは 422 | — | `POST /quests`（quest_group_ids=[乱数]） | 422・field `quest_group_ids` | C.2 |
-| C-TC-223 | int | 一覧可視性が追加グループで成立 | 追加Gのみ所属＋パーティー員の別ユーザ | `repository.list_quests_for_user(user=別ユーザ, visible_group_ids=[追加G])` | 当該クエストが結果に含まれる（主G非所属でも追加Gリンクで可視） | C.1／FR-38 |
-| C-TC-224 | api | 横断候補 EP＝和集合＋所属 group_ids | 主G/追加Gに跨るユーザ群 | `GET /quest-group-candidates?group_ids=主&group_ids=追加` | 両Gの有効メンバーを返し、各候補に所属 `group_ids` が付く | C.4／FR-38 |
-| C-TC-225 | api | 横断候補 EP の門番 | いずれの指定Gにも非所属 | `GET /quest-group-candidates?group_ids=他G` | 404（存在秘匿） | C.4 |
-| C-TC-226 | api | PATCH で追加グループを付与 | recruiting（単一G） | `PATCH`（quest_group_ids=[追加G]） | 200・`quest_groups` が2件になる | C.2／FR-38 |
-| C-TC-227 | api | 追加グループ除外で孤立パーティー員→409 | 追加Gのみ所属のパーティー員がいる状態 | `PATCH`（quest_group_ids=[]＝追加Gを外す） | 409 conflict・`errors[].reason=group_in_use`・`user_ids` に孤立者 | C.2／FR-38 |
-| C-TC-228 | api | 部署ディレクトリ＝会社内全グループ（非所属含む） | seed user は group_c 非所属 | `GET /quest-group-directory` | data に非所属の group_c が含まれる（追加グループ選択肢・会社内は部署をこえて可視） | C.4／FR-38 |
+| C-TC-220 | api | 参加部署複数付き作成→詳細に `quest_groups`（全同格） | 作成者はどの参加部署にも非所属（別格） | `POST /quests`（quest_group_ids=[G1,G2]） | 201・`quest_groups`=[G1,G2]（created_at 昇順）・**単一 `quest_group` フィールドは無い** | C.2／§5.6b／FR-38 |
+| C-TC-221 | api | 候補＝参加部署いずれかの所属者を members 追加できる | G2 のみ所属ユーザ（G1 非所属） | G2 ユーザを `members` で即公開作成 | 201・当該ユーザがパーティーに含まれる | C.3／FR-38 |
+| C-TC-222 | api | 存在しない参加部署は 422 | — | `POST /quests`（quest_group_ids=[乱数]） | 422・field `quest_group_ids` | C.2 |
+| C-TC-223 | int | 一覧可視性＝パーティー員 ∧ 参加部署の現所属 | G2 所属＋パーティー員の別ユーザ | `repository.list_quests_for_user(user=別ユーザ, visible_group_ids=[G2])` | 当該クエストが結果に含まれる | C.1／§5.6b／FR-38 |
+| C-TC-224 | api | 横断候補 EP＝参加部署の和集合＋所属 group_ids | G1/G2 に跨るユーザ群 | `GET /quest-group-candidates?group_ids=G1&group_ids=G2` | 両 G の有効メンバーを返し、各候補に所属 `group_ids` が付く | C.4／FR-38 |
+| C-TC-225 | api | 候補 EP 門番＝同一会社なら非所属でも返す（旧 404 撤廃） | いずれの指定 G にも非所属の同一会社ユーザ | `GET /quest-group-candidates?group_ids=G` | 200・data を返す（会社内は部署をこえて可視・作成者別格で他部署選択可） | C.4 |
+| C-TC-226 | api | PATCH で参加部署を差分（増減）→`quest_groups` 反映 | recruiting（参加部署 1 件） | `PATCH`（quest_group_ids=[G1,G2]） | 200・`quest_groups` が 2 件になる | C.2／FR-38 |
+| C-TC-227 | api | 参加部署除外はブロックしない（409 撤去）＝失効で表現 | G2 のみ所属の非作成者パーティー員がいる | `PATCH`（quest_group_ids=[G1]＝G2 除外）→ 当該員で `GET quest-detail` | PATCH 200（409 にならない）・当該員は詳細 **404**（動的失効） | C.2／C.0／§5.6b |
+| C-TC-228 | api | 部署ディレクトリ＝会社内全グループ（非所属含む） | seed user は group_c 非所属 | `GET /quest-group-directory` | data に非所属の group_c が含まれる（会社内は部署をこえて可視） | C.4／FR-38 |
+| C-TC-229 | api | 参加部署 0 件＝候補は会社の有効ユーザー全体 | quest_group_ids=[]（0 件）・会社の任意 active ユーザ | 当該ユーザを `members` で作成 | 201・追加成功（0 件時は会社全体が候補・部署条件なし） | C.3／§5.6b／C.0 |
+| C-TC-230 | api | 作成者は別格＝参加部署非所属でも自クエスト詳細を参照可 | 作成者は G1 に非所属 | `GET quest-detail`（owner） | 200（404 にならない） | C.0／§5.6b |
+| C-TC-231 | api | 動的失効＝非作成者パーティー員が全参加部署を離脱→詳細 404 | G1 のみ所属の非作成者パーティー員→G1 のグループ所属を除去 | `GET quest-detail`（当該員） | 404（都度再判定でアクセス失効） | C.0／§5.6b |
+| C-TC-232 | unit | `can_access_quest` 真偽表（門番の単一ソース） | owner／party+現所属／party+離脱／部署0件+party／非party の各ケース | `repository.can_access_quest(quest, user_id)` | owner=真・party+現所属=真・party+離脱=偽・部署0件+party=真・非party=偽 | C.0／§5.8 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

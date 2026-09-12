@@ -58,7 +58,7 @@ def seeded(factory):
         with get_tenant_session(db) as ts:
             ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
             ts.add(User(id=other_id, account_id=uuid.uuid4(), display_name="Other", locale="ja", status="active"))
-            quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=user_id,
+            quests_repo.create_quest(ts, quest_id=qid, owner_id=user_id,
                                      title="集約クエスト", color="#3B82F6", status="recruiting")
             quests_repo.add_member(ts, qid, user_id, permissions=["owner", "comment", "vote"])
             qg_repo.upsert_membership(ts, gid, user_id, "member")  # get_quests (A) は所属グループ必須

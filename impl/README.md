@@ -9,6 +9,10 @@
 
 > 進捗の最終確認: **2026-08-27**。**tsc クリーン（Snackbar.tsx:122 の React19 useRef 型エラー修正済み）・frontend vitest 単体 19/19（`companies/api.test.ts` 9＋`search/snippet.test.ts` 6＋`avatar/avatar.test.ts` 4＝ベース正規化/WebGL・motion の SSR ガード）**・**backend `pytest tests/` 全体 468 passed（フラキー根治済み＝pytest 実行時はワーカ停止・8/8 green 実測）**（評価 F ＝23＋**SC-12 評価集計 D-TC-150／コメント数 D-TC-151／XP 結線 D-TC-160-162（投稿+50・投票+5）**＋**セキュリティ横断 SEC-TC-001-040＋J-TC-141（応答ヘッダ§10・マジックバイト§8・cross-tenant・機密ログ非出力・Mass Assignment・検索インジェクション）**／チャット E ＝22／魔法解放 G ＝6／ショップ/装備 G ＝8／ランキング G ＝5／実績 G ＝6／**通知 H ＝15＋security 6**／**リアルタイム L ＝8**／**ダッシュボード I ＝6**／**全文検索 J ＝8（PGroonga）**／**K アバターベース 4（K-TC-011-014＝`PUT /me/avatar-base`）**）・e2e sc-24（3）＋sc-32（1）＋sc-30（2）＋sc-41（1）＋sc-40（1）＋**sc-02（1＝通知実データ H-TC-208）**＋sc-25（3）＋sc-22（10）＋sc-21（6）＋sc-92d（1）＋**sc-31（1＝K-TC-015 ベース体切替の永続）**passed・TC-ID トレーサビリティ ✅（code 393）。**db は PGroonga 同梱のカスタムイメージ（`impl/db/Dockerfile`）**。**セキュリティ応答ヘッダ（nosniff/X-Frame/Referrer-Policy/CSP frame-ancestors・HSTS は TLS 時）を全応答に付与（main.py middleware・§10）／アップロードはマジックバイト検証（§8）**。
 > 開発方針＝**1画面単位で backend 接続ループ**（各画面でユーザー受入ゲート）。実装順の正本＝[`../doc/実装計画.md`](../doc/実装計画.md)＝アカウント→クエスト(C)→アイデア(D)→評価→その他。
+>
+> **FR-38 再設計（2026-09-12）＝backend 完了**: 参加部署（`quest_group_links`・フラット 0..N・主グループ廃止）＝**アクセス条件**（門番 `can_access_quest` を詳細/一覧/D/F/E,L/J/G に統一・作成者別格・異動で都度失効・0件=会社全体・409 group_in_use 撤去）。migration `0024_flatten_quest_groups` で `quests.quest_group_id`/`is_primary` を撤去（全3社DB適用済み）。**backend `pytest tests` = 534 passed／TC 468 ✅／frontend codegen+tsc+build OK**（frontend は新DTO最小追随のみ＝**参加部署UIの本改修は #8 で未着手**）。
+
+
 
 ## 画面実装進捗（SC-xx）
 

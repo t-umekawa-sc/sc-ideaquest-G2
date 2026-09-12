@@ -3887,7 +3887,11 @@ export interface components {
             /** Idea Count */
             idea_count: number;
             owner: components["schemas"]["QuestOwnerDTO"];
-            quest_group: components["schemas"]["QuestGroupRefDTO"];
+            /**
+             * Quest Groups
+             * @default []
+             */
+            quest_groups: components["schemas"]["QuestGroupRefDTO"][];
             /** My State */
             my_state: string;
         };
@@ -3900,8 +3904,6 @@ export interface components {
             title: string;
             /** Color */
             color: string;
-            /** Quest Group Id */
-            quest_group_id: string;
             /**
              * Quest Group Ids
              * @default []
@@ -3972,7 +3974,6 @@ export interface components {
             /** Idea Count */
             idea_count: number;
             owner: components["schemas"]["QuestOwnerDTO"];
-            quest_group: components["schemas"]["QuestGroupRefDTO"];
             /**
              * Quest Groups
              * @default []
@@ -4205,7 +4206,7 @@ export interface components {
          * QuestUpdateRequest
          * @description PATCH /quests/{id}（C.2）。差分＝送られたフィールドのみ適用（`model_fields_set` で判定）。
          *
-         *     `quest_group_id` は不変・`status` は受け付けない（状態遷移は publish/transition）＝フィールド自体を持たない。
+         *     `status` は受け付けない（状態遷移は publish/transition）＝フィールド自体を持たない。
          */
         QuestUpdateRequest: {
             /** Title */

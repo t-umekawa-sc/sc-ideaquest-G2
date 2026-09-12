@@ -41,7 +41,7 @@ def env():
         for uid, name in ((author_id, "Author"), (other_id, "Other")):
             ts.add(User(id=uid, account_id=uuid.uuid4(), display_name=name, locale="ja", status="active"))
         ts.flush()
-        ts.add(Quest(id=quest_id, quest_group_id=group_id, owner_id=author_id, title="Q", color="#3B82F6", status="recruiting"))
+        ts.add(Quest(id=quest_id, owner_id=author_id, title="Q", color="#3B82F6", status="recruiting"))
         ts.commit()
 
     def new_idea(*, status="published", author=None, quest=None, idea_id=None) -> uuid.UUID:

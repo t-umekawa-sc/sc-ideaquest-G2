@@ -38,8 +38,10 @@ def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, 
     グループ除去（control_plane）で対象ユーザーがグループ内で購読し得た chat のみを特定＝過剰失効を出さない。
     """
     from app.tenant.ideas.orm import Idea
-    from app.tenant.quests.orm import Quest, QuestMember
+    from app.tenant.quests.orm import Quest, QuestGroupLink, QuestMember
 
+    # 「グループ内クエスト」＝当該グループを参加部署に持つクエスト（quest_group_links・FR-38 再設計＝
+    # 旧 quests.quest_group_id 単一列を撤去したため links 経由で判定）。
     return list(
         session.execute(
             select(ChatGroup.id)
@@ -53,7 +55,8 @@ def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, 
                     QuestMember.removed_at.is_(None),
                 ),
             )
-            .where(Quest.quest_group_id == group_id)
+            .join(QuestGroupLink, QuestGroupLink.quest_id == Quest.id)
+            .where(QuestGroupLink.quest_group_id == group_id)
         ).scalars().all()
     )
 

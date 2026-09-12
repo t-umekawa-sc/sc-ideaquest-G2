@@ -20,9 +20,10 @@ from app.tenant.chat.orm import ChatGroup, ChatMessage, Reaction
 from app.tenant.ideas.orm import Idea
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
-from app.tenant.quest_group.orm import QuestGroup
+from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
+from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as quests_repo
-from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import Quest, QuestGroupLink, QuestMember, QuestMemberPermission
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -45,13 +46,14 @@ def chatenv(factory):
     gid, qid, iid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     with get_tenant_session(db) as ts:
         ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
-        quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=seed_uid,
+        quests_repo.create_quest(ts, quest_id=qid, owner_id=seed_uid,
                                  title="Q", color="#3B82F6", status="recruiting")
+        quests_repo.create_group_links(ts, qid, group_ids=[gid])  # 参加部署（L.4 グループ→chat 失効の検証に必要）
         quests_repo.add_member(ts, qid, seed_uid, permissions=["owner", "comment", "vote"])
         ts.add(Idea(id=iid, quest_id=qid, author_id=seed_uid, title="I", body="b", value="v", status="published"))
         ts.commit()
 
-    yield {"db": db, "seed_uid": seed_uid, "quest_id": qid, "idea_id": iid}
+    yield {"db": db, "seed_uid": seed_uid, "quest_id": qid, "idea_id": iid, "group_id": gid}
 
     with get_tenant_session(db) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, iid)
@@ -66,7 +68,10 @@ def chatenv(factory):
             QuestMemberPermission.quest_member_id.in_(
                 select(QuestMember.id).where(QuestMember.quest_id == qid))))
         ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id == qid))
+        ts.execute(QuestGroupLink.__table__.delete().where(QuestGroupLink.quest_id == qid))
         ts.execute(Quest.__table__.delete().where(Quest.id == qid))
+        # L-TC-121/122 が参加部署にメンバーを足すため、グループ削除前に所属を掃除（FK）。
+        ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id == gid))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == gid))
         ts.commit()
 
@@ -135,6 +140,7 @@ def test_l_tc_121_revoke_on_member_removal(chatenv, factory):
     with get_tenant_session(chatenv["db"]) as ts:
         muid = get_user_by_account(ts, member["id"]).id
         quests_repo.add_member(ts, chatenv["quest_id"], muid, permissions=["comment"])
+        qg_repo.upsert_membership(ts, chatenv["group_id"], muid)  # 参加部署に所属＝門番通過（FR-38 再設計）
         ts.commit()
 
     # owner は REST/publish 専用＝lifespan 不要の素の TestClient（ハブは mclient 側の1ループに集約）
@@ -172,6 +178,7 @@ def test_l_tc_122_revoke_on_bulk_party_removal(chatenv, factory, monkeypatch):
     with get_tenant_session(chatenv["db"]) as ts:
         muid = get_user_by_account(ts, member["id"]).id
         quests_repo.add_member(ts, chatenv["quest_id"], muid, permissions=["comment"])
+        qg_repo.upsert_membership(ts, chatenv["group_id"], muid)  # 参加部署に所属＝門番通過（FR-38 再設計）
         ts.commit()
 
     calls: list = []
@@ -195,7 +202,7 @@ def test_l_tc_123_group_removal_revoke_targets(chatenv):
     """
     cg = _cg_id(chatenv)
     with get_tenant_session(chatenv["db"]) as ts:
-        gid = quests_repo.get_quest(ts, chatenv["quest_id"]).quest_group_id
+        gid = chatenv["group_id"]
         # seed_uid は当該グループ内クエストの有効パーティー員＝失効対象に cg が含まれる
         ids = chat_repo.list_chat_group_ids_for_group_member(ts, gid, chatenv["seed_uid"])
         assert cg in {str(x) for x in ids}

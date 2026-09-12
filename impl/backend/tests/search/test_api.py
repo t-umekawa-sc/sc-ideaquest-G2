@@ -58,7 +58,7 @@ def env(factory):
         with get_tenant_session(db) as ts:
             ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
             ts.add(User(id=other, account_id=uuid.uuid4(), display_name="Other", locale="ja", status="active"))
-            quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=user_id,
+            quests_repo.create_quest(ts, quest_id=qid, owner_id=user_id,
                                      title="検索クエスト", color="#3B82F6", status="recruiting")
             quests_repo.add_member(ts, qid, user_id, permissions=["owner", "comment", "vote"])
             qg_repo.upsert_membership(ts, gid, user_id, "member")
@@ -167,7 +167,7 @@ def test_j_tc_131_snippet_highlight_and_escape(client, factory):
     acc, uid = _login_user(client, factory)
     with get_tenant_session(db) as ts:
         ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
-        quests_repo.create_quest(ts, quest_id=qid, quest_group_id=gid, owner_id=uid,
+        quests_repo.create_quest(ts, quest_id=qid, owner_id=uid,
                                  title="Q", color="#3B82F6", status="recruiting")
         quests_repo.add_member(ts, qid, uid, permissions=["owner"])
         qg_repo.upsert_membership(ts, gid, uid, "member")
