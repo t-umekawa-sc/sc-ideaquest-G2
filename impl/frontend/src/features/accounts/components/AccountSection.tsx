@@ -145,7 +145,7 @@ export function AccountSection({ companyId }: { companyId: string }) {
   }
 
   // 列定義（正＝mocks/SC-92 の DataTable columns）。render は ReactNode。
-  // 所属クエストグループは AccountListItem.memberships（group_id/role）で持つが一覧にグループ名が無い＝表示は「—」（複製プリフィルには使う）。
+  // 所属クエストグループは AccountListItem.memberships（group_id/role/name・B.2）＝name を「・」連結表示（幅超過はホバーで全文）。
   const columns: DataTableColumn<Account>[] = [
     {
       key: "name",
@@ -210,10 +210,22 @@ export function AccountSection({ companyId }: { companyId: string }) {
       sortVal: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
       filterVal: (a) => a.system_role,
       csvVal: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
-      render: (a) => ROLE_LABEL[a.system_role] ?? a.system_role,
+      // 幅に収まらない値（例「会社アカウント管理者」）はホバーで全文（title 属性）。
+      render: (a) => { const v = ROLE_LABEL[a.system_role] ?? a.system_role; return <span className="cell-ellipsis" title={v}>{v}</span>; },
     },
-    // 所属は memberships（group_id/role）で持つが一覧にグループ名が無い＝表示は「—」（複製プリフィルには memberships を使う）。
-    { key: "groups", label: "所属クエストグループ", width: 220, render: () => <span className="muted">—</span>, csvVal: () => "—" },
+    // 所属クエストグループ（memberships.name・B.2）。複数は「・」連結、幅超過はホバーで全文（title）。
+    {
+      key: "groups",
+      label: "所属クエストグループ",
+      width: 220,
+      csvVal: (a) => (a.memberships ?? []).map((m) => m.name).filter(Boolean).join("・") || "—",
+      render: (a) => {
+        const names = (a.memberships ?? []).map((m) => m.name).filter(Boolean);
+        if (names.length === 0) return <span className="muted">—</span>;
+        const full = names.join("・");
+        return <span className="cell-ellipsis" title={full}>{full}</span>;
+      },
+    },
     {
       key: "status",
       label: "状態",

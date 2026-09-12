@@ -458,11 +458,14 @@ def _attach_memberships(db_identifier: str, items: list[dict]) -> None:
             # 会社DB ミラーの avatar_image_path→署名URL（K.4・§1.10）。未ミラー/未設定は None。
             avatar_by_account = {str(u.account_id): _image_url(u.avatar_image_path) for u in users}
             if user_to_account:
-                for user_id, group_id, role in qg_repo.list_active_memberships_for_users(
+                rows = list(qg_repo.list_active_memberships_for_users(
                     tsession, list(user_to_account.keys())
-                ):
+                ))
+                # 表示用にグループ名を一括解決（会社DB `quest_groups`・N+1 回避・所属グループ列の表示に使う）。
+                group_names = _group_names_by_id(tsession, {group_id for _u, group_id, _r in rows})
+                for user_id, group_id, role in rows:
                     by_account.setdefault(user_to_account[user_id], []).append(
-                        {"group_id": str(group_id), "role": role}
+                        {"group_id": str(group_id), "role": role, "name": group_names.get(group_id, "")}
                     )
     except OperationalError:
         # 会社DB が未プロビジョニング/到達不能＝所属/アバターは enrichment のため空で degrade（一覧自体は返す）。
@@ -471,6 +474,23 @@ def _attach_memberships(db_identifier: str, items: list[dict]) -> None:
     for it in items:
         it["memberships"] = by_account.get(it["account_id"], [])
         it["avatar_url"] = avatar_by_account.get(it["account_id"])
+
+
+def _group_names_by_id(tsession, group_ids) -> dict:
+    """会社DB `quest_groups` の id→name（所属グループ列の表示名解決・N+1 回避）。空集合は空 dict。"""
+    from sqlalchemy import select
+
+    from app.tenant.quest_group.orm import QuestGroup
+
+    ids = [g for g in group_ids]
+    if not ids:
+        return {}
+    return {
+        gid: name
+        for gid, name in tsession.execute(
+            select(QuestGroup.id, QuestGroup.name).where(QuestGroup.id.in_(ids))
+        ).all()
+    }
 
 
 # DataTable 契約（§1.8.1③）＝アカウント CSV の表示可能列とラベル（列順は ?columns= が正）。

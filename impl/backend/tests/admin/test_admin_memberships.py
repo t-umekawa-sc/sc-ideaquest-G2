@@ -210,9 +210,9 @@ def test_b_tc_077_edit_without_memberships_untouched(client, factory, mem_env):
 
 # --- B-TC-171: 一覧応答に有効所属を付与（複製プリフィル・B.2・§1.8.1） ------------------
 def test_b_tc_171_list_includes_active_memberships(client, mem_env):
-    """B-TC-171 一覧応答の各行に有効所属 {group_id, role} を付与（複製プリフィル・API設計 B.2）。
+    """B-TC-171 一覧応答の各行に有効所属 {group_id, role, name} を付与（複製プリフィル＋所属列表示・API設計 B.2）。
 
-    memberships 付き発行→worker 適用後、一覧 GET の当該行に所属が載る。所属無しの行は空配列。
+    memberships 付き発行→worker 適用後、一覧 GET の当該行に所属が載る（表示用に group 名 `name` 同梱）。所属無しの行は空配列。
     """
     _login_system_admin(client)
     gid = mem_env.make_group()
@@ -236,7 +236,8 @@ def test_b_tc_171_list_includes_active_memberships(client, mem_env):
     lr1 = client.get(f"{url}?q={with_body['login_id']}")
     assert lr1.status_code == 200, lr1.text
     row_with = next(x for x in lr1.json()["data"] if x["account_id"] == str(aid_with))
-    assert row_with["memberships"] == [{"group_id": str(gid), "role": "admin"}]
+    # 一覧応答の所属は表示用に group 名 `name` を同梱（B.2・所属クエストグループ列の表示）。
+    assert row_with["memberships"] == [{"group_id": str(gid), "role": "admin", "name": "G"}]
 
     lr2 = client.get(f"{url}?q={without_body['login_id']}")
     assert lr2.status_code == 200, lr2.text

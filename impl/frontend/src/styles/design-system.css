@@ -495,6 +495,8 @@ body.modal-open { overflow: hidden; }
 .table .cell-wrap { white-space: normal; }
 /* 長い自由文セル（1行省略＋ホバーで全文＝title 属性を付ける） */
 .table .cell-clip { max-width: var(--cell-clip-max, 22rem); overflow: hidden; text-overflow: ellipsis; }
+/* 列幅に収める1行省略（ブロック・列 width で頭打ち）＋ホバーで全文（title 属性）。所属グループ/ロール等。 */
+.cell-ellipsis { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* --- 複数値セル（バッジ等）を1行に収め、はみ出しは末尾「…」＋ホバーで全件（title 属性） ---
    幅は --cell-tags-max（既定 16rem）。JS（shared.js applyCellClips）が overflow を検出し .is-clipped を付与。

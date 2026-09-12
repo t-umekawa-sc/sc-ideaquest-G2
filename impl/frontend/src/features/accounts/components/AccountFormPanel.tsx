@@ -112,7 +112,8 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           setLoginId(a.login_id);
           setEmail(a.email);
           setSystemRole(a.system_role as SystemRole);
-          setCurrentMemberships(a.memberships ?? []); // 現在の所属を読み取り専用表示に使う（B.2 一覧応答）
+          // 現在の所属を読み取り専用表示に使う（B.2 一覧応答＝group_id/role/name。role を local 型へ絞る）。
+          setCurrentMemberships((a.memberships ?? []).map((m) => ({ group_id: m.group_id, role: m.role === "admin" ? "admin" : "member" })));
         }
         setLoading(false);
       })

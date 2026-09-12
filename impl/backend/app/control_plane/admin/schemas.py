@@ -22,6 +22,17 @@ class MembershipInput(BaseModel):
     role: Literal["member", "admin"] = "member"
 
 
+class MembershipView(BaseModel):
+    """一覧応答の有効所属 1 要素（出力専用・B.2）。表示用に**グループ名 `name` を同梱**する。
+
+    `name` は会社DB `quest_groups.name`（未ミラー/取得不能時は空文字）。入力（`MembershipInput`）とは別型＝
+    入力は group_id/role のみ受ける（name は受けない）。
+    """
+    group_id: str
+    role: str = "member"
+    name: str = ""
+
+
 class PageInfo(BaseModel):
     """オフセットページングの page_info（README §1.8）。"""
     total: int
@@ -44,7 +55,7 @@ class AccountListItem(BaseModel):
     status: str
     last_login_at: str | None = None
     avatar_url: str | None = None  # プロフィール画像の短TTL 署名URL（会社DB ミラー・K.4・§1.10・未設定/未ミラーは None）
-    memberships: list[MembershipInput] = Field(default_factory=list)  # 有効所属（group_id/role・B.2）
+    memberships: list[MembershipView] = Field(default_factory=list)  # 有効所属（group_id/role/name・B.2）
 
 
 class AccountListResponse(BaseModel):

@@ -2121,7 +2121,7 @@ export interface components {
             /** Avatar Url */
             avatar_url?: string | null;
             /** Memberships */
-            memberships?: components["schemas"]["MembershipInput"][];
+            memberships?: components["schemas"]["MembershipView"][];
         };
         /** AccountListResponse */
         AccountListResponse: {
@@ -3624,6 +3624,27 @@ export interface components {
             group_id: string;
             /** Role */
             role: string;
+        };
+        /**
+         * MembershipView
+         * @description 一覧応答の有効所属 1 要素（出力専用・B.2）。表示用に**グループ名 `name` を同梱**する。
+         *
+         *     `name` は会社DB `quest_groups.name`（未ミラー/取得不能時は空文字）。入力（`MembershipInput`）とは別型＝
+         *     入力は group_id/role のみ受ける（name は受けない）。
+         */
+        MembershipView: {
+            /** Group Id */
+            group_id: string;
+            /**
+             * Role
+             * @default member
+             */
+            role: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
         };
         /**
          * MfaChallenge

@@ -1,8 +1,9 @@
 "use client";
 
-// 所属エディタ（B.2/B.3）＝選択済みグループを行表示＋役割セグメント（member/admin）＋削除、末尾に追加プルダウン。
+// 所属エディタ（B.2/B.3）＝グループ選択（複数選択コンボ・選んでも開いたまま）＋選択済みグループごとの役割セグメント（member/admin）。
 // `admin` 指定＝QG管理者の任命（system_admin＋会社アカウント管理者が可・B.2.1）。表示/UX のみ、判定はサーバー。
-// 役割は **セグメント切替（.seg／メンバー・管理者）**でモック SC-92 に一致させる（DoD＝モック一致・native select は使わない）。
+// グループ追加は `.multiselect`（候補が開いたまま複数追加できる＝native select だと選択で閉じるため差し替え）。
+import { Multiselect, type MultiselectOption } from "@/components/ui";
 import type { Membership, QuestGroup } from "../types";
 
 export function MembershipsEditor({
@@ -17,8 +18,6 @@ export function MembershipsEditor({
   // 読み取り専用（編集画面で現在の所属を編集不可表示する用途・B.3）。役割/削除/追加の操作は出さない。
   readOnly?: boolean;
 }) {
-  const used = new Set(value.map((m) => m.group_id));
-  const rest = groups.filter((g) => !used.has(g.group_id));
   const nameOf = (id: string) => groups.find((g) => g.group_id === id)?.name ?? id;
 
   if (readOnly) {
@@ -40,10 +39,26 @@ export function MembershipsEditor({
     );
   }
 
+  // グループ選択＝複数選択コンボ（選んでも開いたまま複数追加可）。選択集合の変更で memberships を再構成（既存の役割は保持）。
+  const options: MultiselectOption[] = groups.map((g) => ({ value: g.group_id, label: g.name }));
+  const selectedIds = value.map((m) => m.group_id);
+  const onSelectIds = (ids: string[]) => {
+    onChange(ids.map((id) => value.find((m) => m.group_id === id) ?? { group_id: id, role: "member" }));
+  };
+
   return (
     <div>
+      <Multiselect
+        options={options}
+        value={selectedIds}
+        onChange={onSelectIds}
+        placeholder="グループを検索して追加…（選択後も開いたまま）"
+        ariaLabel="所属グループを追加"
+        emptyText="追加できるグループがありません"
+      />
       {value.length > 0 ? (
-        <div className="mrows">
+        // 選択済みグループごとの役割（メンバー/管理者）。削除はコンボのチップ✕でも可。
+        <div className="mrows" style={{ marginTop: "var(--space-2)" }}>
           {value.map((m, i) => (
             <div className="mrow" key={m.group_id}>
               <span className="mrow__name">{nameOf(m.group_id)}</span>
@@ -76,22 +91,8 @@ export function MembershipsEditor({
           ))}
         </div>
       ) : (
-        <div className="mrow-empty">所属グループはまだありません。下の「＋グループを追加…」から選択してください。</div>
+        <div className="mrow-empty" style={{ marginTop: "var(--space-2)" }}>所属グループはまだありません。上のコンボから選択してください。</div>
       )}
-      <select
-        className="select mrow-add"
-        aria-label="所属グループを追加"
-        value=""
-        disabled={rest.length === 0}
-        onChange={(e) => {
-          if (e.target.value) onChange([...value, { group_id: e.target.value, role: "member" }]);
-        }}
-      >
-        <option value="">{rest.length === 0 ? "追加できるグループがありません" : "＋グループを追加…"}</option>
-        {rest.map((g) => (
-          <option key={g.group_id} value={g.group_id}>{g.name}</option>
-        ))}
-      </select>
     </div>
   );
 }

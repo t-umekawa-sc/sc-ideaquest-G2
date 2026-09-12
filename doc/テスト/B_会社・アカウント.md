@@ -64,7 +64,7 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B-TC-171 | api | 一覧応答に有効所属（group_id/role）を付与 | ACME-01 にグループ seed・memberships 付き発行→`process_outbox_once()` で会社DB へ適用 | `GET /admin/companies/{ACME-01}/accounts`（当該アカウント行） | 行の `memberships` に `{group_id, role}` を含む（有効所属のみ・`removed_at IS NULL`）／所属の無いアカウント行は `memberships=[]` | API設計 B.2（一覧応答＝所属付き）／§5.5 |
+| B-TC-171 | api | 一覧応答に有効所属（group_id/role/**name**）を付与 | ACME-01 にグループ seed・memberships 付き発行→`process_outbox_once()` で会社DB へ適用 | `GET /admin/companies/{ACME-01}/accounts`（当該アカウント行） | 行の `memberships` に `{group_id, role, name}` を含む（有効所属のみ・`removed_at IS NULL`・**name＝所属クエストグループ列の表示名**）／所属の無いアカウント行は `memberships=[]` | API設計 B.2（一覧応答＝所属付き・表示名同梱）／§5.5 |
 | B-TC-171b | api | 一覧応答の `avatar_url` は署名URL（会社DB ミラー・物理パス漏洩防止） | 発行→`process_outbox_once()` で users ミラー生成後、ミラーに `avatar_image_path` 設定・Fake storage | `GET /admin/companies/{ACME-01}/accounts`（当該行） | 行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | API設計 B.2／K.4／§1.10 |
 
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
