@@ -21,6 +21,19 @@ def get_chat_group_by_idea(session: Session, idea_id: uuid.UUID) -> ChatGroup | 
     return session.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
 
 
+def list_pinned_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, ChatMessage]]:
+    """指定アイデア群のチャットでピン留めされた非削除メッセージ（FR-39 (b)・pinned_at 昇順）。返り値＝[(idea_id, msg)]。"""
+    if not idea_ids:
+        return []
+    rows = session.execute(
+        select(ChatGroup.idea_id, ChatMessage)
+        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .where(ChatGroup.idea_id.in_(idea_ids), ChatMessage.is_pinned.is_(True), ChatMessage.is_deleted.is_(False))
+        .order_by(ChatMessage.pinned_at.asc().nullslast())
+    ).all()
+    return [(iid, msg) for iid, msg in rows]
+
+
 def list_chat_group_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
     """当該クエストの全アイデアの chat_group_id（L.4 購読失効の対象特定）。"""
     from app.tenant.ideas.orm import Idea

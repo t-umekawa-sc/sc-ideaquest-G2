@@ -28,6 +28,7 @@ import {
   markRead,
   postMessage,
   removeReaction,
+  setMessagePin,
   type ChatMessage,
   type Spell,
 } from "../api";
@@ -153,6 +154,14 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
 
   const completed = idea?.quest?.status === "completed";
   const canPost = !completed && !!idea && (idea.my_permissions?.includes("comment") ?? false);
+  // FR-39 (b) ピン留めは owner/quest_admin のみ（完了後も可＝最終結果のキュレーション）。
+  const canPin = !!idea && ((idea.my_permissions?.includes("owner") || idea.my_permissions?.includes("quest_admin")) ?? false);
+  const togglePin = async (m: ChatMessage) => {
+    const next = !m.is_pinned;
+    setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: next } : x)));  // 楽観
+    const res = await setMessagePin(m.id, next).catch(() => null);
+    if (!res) { setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: !next } : x))); }
+  };
   const unlockedSpellIds = new Set(spells.filter((s) => s.unlocked).map((s) => s.id));
   const myMagicSpellIds = new Set(
     messages.filter((m) => m.reactions && (m.reactions as { magic?: { mine?: boolean; spell_id?: string } }).magic?.mine)
@@ -528,6 +537,8 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
                     {m.is_mine && !m.is_deleted && <span className="msg__me">（あなた）</span>}
                     <span className="msg__time">{fmtTime(m.created_at)}</span>
                     {m.is_edited && <span className="msg__edited">（編集済み）</span>}
+                    {/* FR-39 (b) ピン留めバッジ＝最終結果の議論の要点に集約される重要発言 */}
+                    {m.is_pinned && !m.is_deleted && <span className="msg__pinned" title="重要（最終結果の議論の要点に表示）">📌 重要</span>}
                   </div>
 
                   {((m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? []).map((q, i) => (
@@ -610,6 +621,9 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
                         boxRef.current?.focus();
                       }
                     }}>💬</button>
+                    {canPin && !m.is_deleted && (
+                      <button className="msg__act" type="button" aria-pressed={m.is_pinned} aria-label={m.is_pinned ? "ピン留めを外す" : "ピン留め（重要）"} title={m.is_pinned ? "ピン留めを外す" : "ピン留め（最終結果の議論の要点に集約）"} onClick={() => void togglePin(m)}>📌</button>
+                    )}
                     {m.is_mine && (
                       <>
                         <button className="msg__act" type="button" aria-label="編集" onClick={() => startEdit(m)}>✏️</button>

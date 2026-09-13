@@ -157,6 +157,27 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </ul>
       </section>
 
+      {/* ④ 議論の要点(b)＝ピン留めされたチャット重要メッセージ */}
+      {result.pinned_messages.length > 0 && (
+        <section className="card" aria-label="議論の要点">
+          <div className="section-head"><h3 style={{ margin: 0 }}>📌 議論の要点</h3></div>
+          <ul className="qresult__pins">
+            {result.pinned_messages.map((pm) => (
+              <li key={pm.message_id} className="qresult__pin">
+                <Avatar name={pm.author.display_name} imageUrl={pm.author.avatar_image_url ?? undefined} size="sm" />
+                <div className="qresult__pin-main">
+                  <p className="qresult__pin-body" style={{ whiteSpace: "pre-wrap" }}>{pm.excerpt}</p>
+                  <div className="qresult__pin-meta">
+                    <span className="muted text-xs">{pm.author.display_name}</span>
+                    <Link className="qresult__chat" href={`/ideas/${pm.idea_id}/chat`}>💬 {pm.idea_title}</Link>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* ⑤ 振り返り・学び ＋ ⑥ 次アクション（owner/管理が編集） */}
       <section className="card" aria-label="振り返り・次アクション">
         <div className="section-head">

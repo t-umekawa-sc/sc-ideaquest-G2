@@ -130,6 +130,7 @@
 | C-TC-242 | api | 総括の保存と権限（owner/quest_admin のみ） | (1)owner (2)一般メンバー（vote のみ） | `PUT /quests/{id}/result`（summary/next_actions/metrics） | (1)200・GET に反映（summary/next_actions/metrics）(2)403 | C（FR-39）／§10 |
 | C-TC-243 | api | 完了で④通知＋成果フィード（quest_result_ready／quest_completed） | evaluating・owner=seed・パーティー員 other | `POST /quests/{id}/transition`（to=completed） | 200・`quest_completed` 活動1件（作成者・冪等）・作成者以外の員に `quest_result_ready` 通知（作成者には出さない） | C（FR-39）／H／FR-36 |
 | C-TC-244 | api | ⑥総括初回記入で owner に少額XP（冪等） | owner が result を2回保存 | `PUT /quests/{id}/result`×2 | `quest_result_summary` 活動1件・amount=20・本人1回（2回目は加算しない） | C（FR-39）／G／§10 |
+| C-TC-245 | api | 結果に④議論の要点(b)＝ピン留めチャットを集約 | 公開アイデアにピン留めメッセージ | `GET /quests/{id}/result` | `pinned_messages` に当該（idea_id/idea_title/excerpt/author） | C（FR-39 (b)）／E |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

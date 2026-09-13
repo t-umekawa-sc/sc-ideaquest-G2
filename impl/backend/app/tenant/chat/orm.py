@@ -32,6 +32,10 @@ class ChatMessage(CompanyBase):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # FR-39 (b) 議論の要点＝重要メッセージのピン留め（owner/quest_admin がキュレーション・監査で pinned_by/at）。
+    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    pinned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pinned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -17,6 +17,7 @@ from app.tenant.chat.schemas import (
     ChatDeleteResponse,
     ChatListResponse,
     ChatMessageDTO,
+    ChatPinResponse,
     ChatReactionRequest,
     ChatReactionsResponse,
     ChatReadRequest,
@@ -153,6 +154,36 @@ def remove_reaction(
         emoji=emoji, magic=(type == "magic"),
     )
     return ChatReactionsResponse(**result)
+
+
+@router.post("/chat-messages/{message_id}/pin", response_model=ChatPinResponse)
+def pin_message(
+    message_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> ChatPinResponse:
+    """メッセージをピン留め（FR-39 (b)・owner/quest_admin）＝最終結果の議論の要点に集約する重要発言。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.set_pin(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id, pinned=True,
+    )
+    return ChatPinResponse(**result)
+
+
+@router.delete("/chat-messages/{message_id}/pin", response_model=ChatPinResponse)
+def unpin_message(
+    message_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> ChatPinResponse:
+    """メッセージのピン留め解除（FR-39 (b)・owner/quest_admin）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.set_pin(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), message_id, pinned=False,
+    )
+    return ChatPinResponse(**result)
 
 
 @router.post("/ideas/{idea_id}/chat/read", response_model=ChatReadResponse)

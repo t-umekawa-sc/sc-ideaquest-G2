@@ -585,6 +585,25 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         vote_total = sum(sum(v.values()) for v in votes.values())
         asp = aspect["aspects"]
         cats = [c.label for c in repo.list_categories(ts, qid)]
+        # ④議論の要点(b)＝ピン留めメッセージ（アイデア横断・pinned_at 昇順）。抜粋＋投稿者＋所属アイデア名。
+        idea_titles = {i.id: i.title for i in ideas}
+        pinned_rows = chat_repo.list_pinned_for_idea_ids(ts, idea_ids)
+        pin_authors = repo.get_users_by_ids(ts, {m.author_id for _iid, m in pinned_rows})
+        pinned_messages = []
+        for iid, m in pinned_rows:
+            a = pin_authors.get(m.author_id)
+            pinned_messages.append({
+                "message_id": str(m.id),
+                "idea_id": str(iid),
+                "idea_title": idea_titles.get(iid, ""),
+                "author": {
+                    "user_id": str(m.author_id),
+                    "display_name": a.display_name if a else "",
+                    "avatar_image_url": _image_url(a.avatar_image_path) if a else None,
+                },
+                "excerpt": (m.body or "")[:160],
+                "created_at": m.created_at,
+            })
         return {
             "quest_id": str(quest.id),
             "title": quest.title,
@@ -601,6 +620,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
                 "evaluation_count": aspect["evaluation_count"],
                 "party_size": len(members),
             },
+            "pinned_messages": pinned_messages,
             "outcome": _outcome_dto(ts, repo.get_outcome(ts, qid)),
             "can_edit": _can_edit_outcome(ts, quest, user),
         }

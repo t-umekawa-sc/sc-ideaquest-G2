@@ -426,6 +426,42 @@ def _can_delete(ts, quest, msg, user) -> bool:
     return "quest_admin" in _perms_of(ts, quest, user)
 
 
+def _is_manager(ts, quest, user) -> bool:
+    """ピン留め（キュレーション）の権限＝owner または quest_admin（FR-39 (b)）。"""
+    if quest is not None and quest.owner_id == user.id:
+        return True
+    return "quest_admin" in _perms_of(ts, quest, user)
+
+
+def set_pin(account_id, company_id, message_id, *, pinned: bool) -> dict:
+    """メッセージのピン留め/解除（FR-39 (b)・owner/quest_admin）＝最終結果の「議論の要点」に集約する重要発言。
+
+    完了後も許可（結果のキュレーションは完了時/後に行うため）。削除済みはピン不可。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    mid = _parse_uuid(message_id, field="message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        msg, _idea, quest, cg = _resolve_message(ts, mid, user)
+        if not _is_manager(ts, quest, user):
+            raise AppError(403, "forbidden", detail="ピン留めは所有者/クエスト管理者のみ可能です")
+        if msg.is_deleted:
+            raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
+        msg.is_pinned = pinned
+        msg.pinned_at = datetime.now(timezone.utc) if pinned else None
+        msg.pinned_by = user.id if pinned else None
+        dto = {"message_id": str(msg.id), "is_pinned": msg.is_pinned}
+        ts.commit()
+    realtime_events.publish_event(
+        realtime_events.chat_topic(cg.id), "chat.pin.changed",
+        {"message_id": str(mid), "is_pinned": pinned}, company_id=company_id)  # L.3（他端末即時反映）
+    return dto
+
+
 def _guard_not_completed(quest) -> None:
     if quest is not None and quest.status == "completed":
         raise AppError(409, "conflict", detail="完了後は変更できません", extra={"errors": [{"reason": "invalid_state"}]})
@@ -518,6 +554,7 @@ def _messages_payload(ts, messages, *, viewer_id) -> list[dict]:
             "body": m.body,
             "created_at": m.created_at,
             "is_edited": m.is_edited,
+            "is_pinned": bool(m.is_pinned),  # FR-39 (b) 重要メッセージ
             "is_deleted": False,
             "quotes": quotes,
             "attachments": [_attachment_dto(a) for a in atts.get(m.id, [])],

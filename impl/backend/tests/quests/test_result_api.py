@@ -92,9 +92,23 @@ def env():
             ideas_repo.upsert_vote(ts, idea_id, voter or user_id, type="approve", voted_revision=1)
             ts.commit()
 
+    def pin_chat(*, idea_id, body="重要な論点", author=None) -> uuid.UUID:
+        """当該アイデアの chat_group を用意し、ピン留め済みメッセージを1件 seed（FR-39 (b)）。"""
+        from app.tenant.chat.orm import ChatGroup, ChatMessage
+        mid = uuid.uuid4()
+        with get_tenant_session(db_identifier) as ts:
+            cg = ts.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
+            if cg is None:
+                cg = ChatGroup(id=uuid.uuid4(), idea_id=idea_id)
+                ts.add(cg)
+                ts.flush()
+            ts.add(ChatMessage(id=mid, chat_group_id=cg.id, author_id=author or user_id, body=body, is_pinned=True))
+            ts.commit()
+        return mid
+
     yield SimpleNamespace(
         db_identifier=db_identifier, user_id=user_id, other_id=other_id,
-        make_quest=make_quest, make_idea=make_idea, submit_eval=submit_eval, add_vote=add_vote,
+        make_quest=make_quest, make_idea=make_idea, submit_eval=submit_eval, add_vote=add_vote, pin_chat=pin_chat,
     )
 
     with get_tenant_session(db_identifier) as ts:
@@ -107,7 +121,10 @@ def env():
             ts.execute(Evaluation.__table__.delete().where(Evaluation.idea_id.in_(iids)))
             ts.execute(Vote.__table__.delete().where(Vote.idea_id.in_(iids)))
             ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(iids)))
-            from app.tenant.chat.orm import ChatGroup
+            from app.tenant.chat.orm import ChatGroup, ChatMessage
+            cgids = list(ts.execute(select(ChatGroup.id).where(ChatGroup.idea_id.in_(iids))).scalars())
+            if cgids:
+                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cgids)))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(iids)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
         if quests:
@@ -171,6 +188,21 @@ def test_c_tc_242_result_put_and_permission(client, env):
     qid2 = env.make_quest(owner=env.other_id, seed_member=True, seed_perms=["vote"])
     r2 = client.put(RESULT(qid2), json={"summary": "x"}, headers=_csrf(client))
     assert r2.status_code == 403, r2.text
+
+
+def test_c_tc_245_result_includes_pinned_messages(client, env):
+    """C-TC-245: 結果の④議論の要点(b)＝ピン留めチャットが pinned_messages に集約（抜粋＋投稿者＋所属アイデア）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid, title="採用案")
+    env.pin_chat(idea_id=iid, body="この観点が決め手")
+    r = client.get(RESULT(qid))
+    assert r.status_code == 200, r.text
+    pins = r.json()["pinned_messages"]
+    assert len(pins) == 1
+    assert pins[0]["idea_id"] == str(iid)
+    assert pins[0]["idea_title"] == "採用案"
+    assert pins[0]["excerpt"] == "この観点が決め手"
 
 
 def test_c_tc_243_completion_notifies_party_and_feed(client, env):

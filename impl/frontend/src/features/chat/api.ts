@@ -62,6 +62,11 @@ export function deleteMessage(messageId: string): Promise<{ id: string; is_delet
   return apiFetch<{ id: string; is_deleted: boolean }>(`/chat-messages/${messageId}`, { method: "DELETE" }) as Promise<{ id: string; is_deleted: boolean } | null>;
 }
 
+// メッセージのピン留め/解除（FR-39 (b)・owner/quest_admin）＝最終結果の議論の要点に集約する重要発言。
+export function setMessagePin(messageId: string, pinned: boolean): Promise<{ message_id: string; is_pinned: boolean } | null> {
+  return apiFetch<{ message_id: string; is_pinned: boolean }>(`/chat-messages/${messageId}/pin`, { method: pinned ? "POST" : "DELETE" });
+}
+
 // 既読位置更新（E.5・後退防止）。完了後も許可。
 export function markRead(ideaId: string, lastReadMessageId: string): Promise<{ unread_count: number } | null> {
   return apiFetch<{ unread_count: number }>(`/ideas/${ideaId}/chat/read`, { method: "POST", body: JSON.stringify({ last_read_message_id: lastReadMessageId }) });

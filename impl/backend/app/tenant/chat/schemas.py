@@ -41,10 +41,18 @@ class ChatMessageDTO(BaseModel):
     author: ChatAuthorDTO | None = None
     body: str | None = None
     is_edited: bool | None = None
+    is_pinned: bool = False  # FR-39 (b) 重要メッセージ（最終結果の議論の要点に集約・owner/quest_admin がピン）
     quotes: list[dict] = []  # 引用返信（複数可）＝[{id, author_name, excerpt}]
     attachments: list[ChatAttachmentDTO] = []
     mentions: list[ChatMentionDTO] = []
     reactions: dict | None = None  # {normal:[...], magic:{...}|null}
+
+
+class ChatPinResponse(BaseModel):
+    """POST/DELETE /chat-messages/{id}/pin の応答（FR-39 (b)）。"""
+
+    message_id: str
+    is_pinned: bool
 
 
 class ChatCursorPageInfo(BaseModel):

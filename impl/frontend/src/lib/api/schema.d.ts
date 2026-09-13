@@ -1649,6 +1649,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat-messages/{message_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin Message
+         * @description メッセージをピン留め（FR-39 (b)・owner/quest_admin）＝最終結果の議論の要点に集約する重要発言。
+         */
+        post: operations["pin_message_api_v1_chat_messages__message_id__pin_post"];
+        /**
+         * Unpin Message
+         * @description メッセージのピン留め解除（FR-39 (b)・owner/quest_admin）。
+         */
+        delete: operations["unpin_message_api_v1_chat_messages__message_id__pin_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/chat/read": {
         parameters: {
             query?: never;
@@ -2499,6 +2523,11 @@ export interface components {
             /** Is Edited */
             is_edited?: boolean | null;
             /**
+             * Is Pinned
+             * @default false
+             */
+            is_pinned: boolean;
+            /**
              * Quotes
              * @default []
              */
@@ -2519,6 +2548,16 @@ export interface components {
             reactions?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * ChatPinResponse
+         * @description POST/DELETE /chat-messages/{id}/pin の応答（FR-39 (b)）。
+         */
+        ChatPinResponse: {
+            /** Message Id */
+            message_id: string;
+            /** Is Pinned */
+            is_pinned: boolean;
         };
         /** ChatReactionRequest */
         ChatReactionRequest: {
@@ -4357,6 +4396,11 @@ export interface components {
              *       "party_size": 0
              *     } */
             participation: components["schemas"]["QuestResultParticipationDTO"];
+            /**
+             * Pinned Messages
+             * @default []
+             */
+            pinned_messages: components["schemas"]["QuestResultPinnedMessageDTO"][];
             /** @default {
              *       "metrics": []
              *     } */
@@ -4422,6 +4466,26 @@ export interface components {
              * @default 0
              */
             party_size: number;
+        };
+        /**
+         * QuestResultPinnedMessageDTO
+         * @description ④議論の要点(b)＝ピン留めされたチャット重要メッセージ（アイデア横断・pinned_at 昇順）。
+         */
+        QuestResultPinnedMessageDTO: {
+            /** Message Id */
+            message_id: string;
+            /** Idea Id */
+            idea_id: string;
+            /** Idea Title */
+            idea_title: string;
+            author: components["schemas"]["QuestOwnerDTO"];
+            /** Excerpt */
+            excerpt: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * QuestTransitionRequest
@@ -8075,6 +8139,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatReactionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pin_message_api_v1_chat_messages__message_id__pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPinResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpin_message_api_v1_chat_messages__message_id__pin_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPinResponse"];
                 };
             };
             /** @description Validation Error */

@@ -303,6 +303,17 @@ class QuestOutcomeDTO(BaseModel):
     updated_at: datetime | None = None
 
 
+class QuestResultPinnedMessageDTO(BaseModel):
+    """④議論の要点(b)＝ピン留めされたチャット重要メッセージ（アイデア横断・pinned_at 昇順）。"""
+
+    message_id: str
+    idea_id: str
+    idea_title: str
+    author: QuestOwnerDTO
+    excerpt: str
+    created_at: datetime
+
+
 class QuestResultDTO(BaseModel):
     """クエスト最終結果（検証済みコンセプト票・GET /quests/{id}/result）＝既存集計の合成＋総括。"""
 
@@ -315,6 +326,7 @@ class QuestResultDTO(BaseModel):
     decisions: list[QuestResultDecisionDTO] = []  # 公開アイデア（評価平均降順）。is_selected で①を抽出
     aspect_averages: QuestResultAspectAveragesDTO = QuestResultAspectAveragesDTO()
     participation: QuestResultParticipationDTO = QuestResultParticipationDTO()
+    pinned_messages: list[QuestResultPinnedMessageDTO] = []  # ④議論の要点(b)＝ピン留めメッセージ
     outcome: QuestOutcomeDTO = QuestOutcomeDTO()
     can_edit: bool = False  # owner/quest_admin（④⑤の編集可否）
 

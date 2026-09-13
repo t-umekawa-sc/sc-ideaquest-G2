@@ -414,3 +414,23 @@ def test_e_tc_122_completed_frozen(client, env):
         quest.status = "completed"
         ts.commit()
     assert _react(client, mid, type="normal", emoji="👍").status_code == 409
+
+
+def test_e_tc_210_pin_by_manager_and_gate(client, env):
+    """E-TC-210: ピン留め＝owner/quest_admin のみ（FR-39 (b)）。付与/解除で is_pinned が反転し一覧DTOにも反映。権限なしは403。"""
+    _login_seed(client)  # seed user = owner
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid)
+    mid = _post(client, iid, body="重要な論点").json()["id"]
+    r = client.post(f"{MSGS}/{mid}/pin", headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["is_pinned"] is True
+    lst = client.get(f"/api/v1/ideas/{iid}/chat").json()["data"]
+    assert any(m["id"] == mid and m.get("is_pinned") for m in lst)
+    r2 = client.delete(f"{MSGS}/{mid}/pin", headers=_csrf(client))
+    assert r2.status_code == 200 and r2.json()["is_pinned"] is False
+    # 権限なし（他人所有・comment のみ＝管理者でない）は 403
+    q2 = env.make_quest(owner=env.other_id, seed_perms=["vote", "comment"])
+    i2 = env.make_idea(quest_id=q2)
+    m2 = _post(client, i2, body="x").json()["id"]
+    assert client.post(f"{MSGS}/{m2}/pin", headers=_csrf(client)).status_code == 403

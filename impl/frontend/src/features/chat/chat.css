@@ -145,6 +145,8 @@
   border: none; background: none; border-radius: var(--radius-full); cursor: pointer; font-size: 14px; color: var(--color-text-muted); }
 .msg__act:hover { background: var(--color-surface-alt); color: var(--color-text); }
 .msg__edited { font-size: var(--text-xs); color: var(--color-text-muted); margin-left: 6px; }
+/* FR-39 (b) 重要（ピン留め）バッジ＝最終結果の議論の要点に集約される発言。 */
+.msg__pinned { font-size: var(--text-xs); font-weight: 600; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 0 8px; margin-left: 6px; }
 
 /* インライン編集（下部コンポーザーと同じ見た目＋ツールバー） */
 .msg__editbox { width: 100%; min-height: 56px; max-height: 200px; resize: none; overflow-y: auto;

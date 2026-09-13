@@ -39,6 +39,7 @@
 | E-TC-120 | api | 1チャット1回（同一ユーザー×同一 spell） | msg1 に自分の魔法済み・同 spell | 別 msg2 に `POST reactions`（同 spell） | 409 `spell_already_used_in_chat`。取消すれば付け替え可 | E.4／§5.18 魔法① |
 | E-TC-121 | api | 魔法取消は本人のみ | 自分の魔法／他人の魔法 | `DELETE ?type=magic` | 本人＝除去（別メッセージへ付け替え可）／他人＝残る | E.4 |
 | E-TC-122 | api | 完了クエストはリアクション凍結 | completed クエスト | `POST/DELETE reactions` | 409（invalid_state） | E.4／C.5 |
+| E-TC-210 | api | ピン留めは owner/quest_admin のみ（FR-39 (b)） | owner／一般メンバー（comment のみ） | `POST/DELETE /chat-messages/{id}/pin` | owner=200・is_pinned 反転・一覧DTOに is_pinned／一般=403 | E（FR-39 (b)）／C.0 |
 
 ## 3. 画面 e2e（SC-24 アイデアチャット・E.1/E.2/E.4）
 
