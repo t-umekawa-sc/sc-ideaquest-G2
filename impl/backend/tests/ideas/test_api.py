@@ -189,11 +189,13 @@ def test_d_tc_107b_detail_is_mine(client, env):
 
 
 def test_d_tc_130_detail_has_quest_ref(client, env):
-    """D-TC-130: 詳細に quest 参照（id/title/status/categories/deadline）が入る（SC-22 導線用）。"""
+    """D-TC-130: 詳細に quest 参照（id/title/status/categories/deadline/purpose）が入る（SC-22 導線・SC-25 評価文脈用）。"""
     _login_seed(client)
     qid = env.make_quest()
     with get_tenant_session(env.db_identifier) as ts:
         quests_repo.replace_categories(ts, qid, [("UX", False), ("業務改善", False)])
+        q = quests_repo.get_quest(ts, qid)
+        q.purpose = "配送を効率化する"  # SC-25 評価画面の文脈（適合性採点の根拠）に出す目的・テーマ
         ts.commit()
     pub = env.make_idea(quest_id=qid, status="published")
     r = client.get(IDEA(pub))
@@ -204,6 +206,7 @@ def test_d_tc_130_detail_has_quest_ref(client, env):
     assert quest["status"] == "recruiting"
     assert set(quest["categories"]) == {"UX", "業務改善"}
     assert "deadline" in quest
+    assert quest["purpose"] == "配送を効率化する"  # 評価文脈にクエストの目的・テーマを表示（社内レビュー）
 
 
 def test_d_tc_108_detail_hidden(client, env):

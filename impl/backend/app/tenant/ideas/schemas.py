@@ -61,6 +61,7 @@ class IdeaQuestRefDTO(BaseModel):
     categories: list[str] = []
     deadline: date | None = None
     color: str | None = None  # クエストのアクセント色（アイデアアイコンの頭文字タイル色・SC-24/SC-22・2026-09-06）
+    purpose: str | None = None  # クエストの目的・テーマ（SC-25 評価画面の文脈＝適合性採点の根拠・社内レビュー 2026-09-13）
 
 
 class IdeaVoteSummaryDTO(BaseModel):

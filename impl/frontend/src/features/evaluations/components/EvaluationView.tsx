@@ -239,9 +239,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
 
         {/* 対象アイデアの文脈（実データ・getIdea） */}
         <div className="eval-context card" style={{ padding: "var(--space-3) var(--space-4)" }}>
-          <div className="eval-context__quest">
-            {idea?.quest?.title || "クエスト"}{idea?.quest?.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}
-          </div>
+          <div className="eval-context__quest">🎯 {idea?.quest?.title || "クエスト"}</div>
           <div className="eval-context__title">{idea?.title || "アイデア"}</div>
           {/* アイデア詳細から開いた評価モーダルは背後がアイデア詳細なので、この導線は冗長＝隠す。
               ダッシュボードの評価下書き経由・フルページ（直/リロード）では出す。 */}
@@ -260,6 +258,19 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
             </div>
           )}
         </div>
+
+        {/* 折りたたみ: クエストを確認（実データ・「アイデアを確認」と同一UI）＝適合性採点の根拠となる目的・テーマ等。 */}
+        <details className="eval-idea" open>
+          <summary>クエストを確認</summary>
+          <div className="eval-idea__body">
+            <div className="eval-idea__label">目的・テーマ</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{idea?.quest?.purpose || "—"}</p>
+            <div className="eval-idea__label">カテゴリー</div>
+            <p>{(idea?.quest?.categories ?? []).join(" ・ ") || "—"}</p>
+            <div className="eval-idea__label">締切</div>
+            <p>{idea?.quest?.deadline || "—"}</p>
+          </div>
+        </details>
 
         {/* 折りたたみ: アイデアを確認（実データ） */}
         <details className="eval-idea" open>

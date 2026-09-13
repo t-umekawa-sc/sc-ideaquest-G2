@@ -779,6 +779,7 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "categories": quest_cats,
         "deadline": quest.deadline if quest else None,
         "color": quest.color if quest else None,  # アイデアアイコンの頭文字タイル色（クエストアクセント・SC-24/SC-22）
+        "purpose": quest.purpose if quest else None,  # クエストの目的・テーマ（SC-25 評価文脈・社内レビュー）
     }
     return {
         "id": str(idea.id),

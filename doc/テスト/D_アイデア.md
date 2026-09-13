@@ -69,7 +69,7 @@
 | D-TC-127 | api | フォロー解除の冪等 | フォロー済み | `DELETE /ideas/{id}/follow` ×2 | 204／204（is_following False） | D.6 |
 | D-TC-128 | api | 完了後は新規フォロー不可・解除は可 | completed クエストのアイデア | `POST follow`／`DELETE follow` | POST=409（invalid_state）／DELETE=204 | D.6／C.5 |
 | D-TC-129 | api | フォローのパーティー門番 | 非パーティーのアイデア | `POST /ideas/{id}/follow` | 404（存在秘匿） | D.6／C.0 |
-| D-TC-130 | api | 詳細に quest 参照が入る（SC-22 導線用） | published アイデア（categories 付きクエスト） | `GET /ideas/{id}` | `quest.id`＝当該クエスト・`quest.title`/`quest.status`/`quest.categories[]`/`quest.deadline` が返る | D.1／SC-22 |
+| D-TC-130 | api | 詳細に quest 参照が入る（SC-22 導線・SC-25 評価文脈用） | published アイデア（categories＋purpose 付きクエスト） | `GET /ideas/{id}` | `quest.id`＝当該クエスト・`quest.title`/`quest.status`/`quest.categories[]`/`quest.deadline`／**`quest.purpose`（目的・テーマ）** が返る | D.1／SC-22／SC-25 |
 | D-TC-131 | api | 添付追加（複数）→ 詳細に反映 | published アイデア・Fake storage | `POST /ideas/{id}/attachments`（png+pdf の2件） | 201・`attachments` 2件（`id`/`original_name`/`size_bytes`/`mime_type`/`uploaded_by`/`uploaded_at`）・`GET /ideas/{id}` の `attachments` も2件 | D.3／§1.10 |
 | D-TC-132 | api | 添付は1アイデア10件まで | 既に9件添付 | `POST attachments`（2件） | 422 `validation_error`（`errors[].code=too_many`・既存＋今回で超過） | D.3／§5.12 |
 | D-TC-133 | api | 不許可 MIME は拒否 | published アイデア | `POST attachments`（`evil.exe`） | 422 `validation_error`（`mime_not_allowed`・拡張子/申告 Content-Type を信用しない） | D.3／§1.10 |

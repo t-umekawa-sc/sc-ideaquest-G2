@@ -3234,6 +3234,8 @@ export interface components {
             deadline?: string | null;
             /** Color */
             color?: string | null;
+            /** Purpose */
+            purpose?: string | null;
         };
         /**
          * IdeaRevisionDTO
