@@ -29,6 +29,7 @@ import {
   type QuestDetail,
 } from "../api";
 import { IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
+import { voteErrorMessage } from "@/features/ideas/voteError";
 import "../quests.css";
 
 // アイデアタブの行ビュー型（SC-12・D.1）。列/カードの描画に必要な最小射影。
@@ -247,8 +248,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       if (type === "approve") agree += 1; else disagree += 1;
       return { ...i, myVote: type, mystate: "voted", agree, disagree };
     }));
-    const res = await voteIdea(id, type).catch(() => null);
-    if (!res) { snack({ type: "error", title: "投票に失敗しました", msg: "時間をおいて再度お試しください。" }); void loadIdeas(); }
+    let res: Awaited<ReturnType<typeof voteIdea>> = null;
+    let voteErr: unknown = null;
+    try { res = await voteIdea(id, type); } catch (e) { voteErr = e; }
+    if (!res) { snack({ type: "error", title: "投票できませんでした", msg: voteErrorMessage(voteErr) }); void loadIdeas(); }
   };
   // レビュー#3＝一覧からのフォロー切替（楽観・失敗はロールバック）。
   const toggleFollow = async (id: string, cur: boolean) => {

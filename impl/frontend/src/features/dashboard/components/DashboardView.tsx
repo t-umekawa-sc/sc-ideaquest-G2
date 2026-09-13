@@ -24,6 +24,7 @@ import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { markChatFromDashboard } from "@/lib/nav";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
+import { voteErrorMessage } from "@/features/ideas/voteError";
 import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
 import {
   getDashboard,
@@ -182,11 +183,13 @@ export function DashboardView({
     // 楽観＝即座にリストから除外（＝ずれない「即時削除」と同じ土台）。残りカードは FLIP effect が
     // 旧位置→新位置へスライド（absolute 化しない＝ドリフトの原因を排除）。
     setUnvotedList((l) => (l ?? []).filter((v) => v.id !== idea.id));
-    const res = await voteIdea(idea.id, type).catch(() => null);
+    let res: Awaited<ReturnType<typeof voteIdea>> = null;
+    let voteErr: unknown = null;
+    try { res = await voteIdea(idea.id, type); } catch (e) { voteErr = e; }
     if (!res) {
-      // 失敗はロールバック（元の位置に戻す）
+      // 失敗はロールバック（元の位置に戻す）＋理由を明示（締切後/完了/権限など・サーバー detail）
       setUnvotedList((l) => { const cur = l ?? []; return cur.some((v) => v.id === idea.id) ? cur : [idea, ...cur]; });
-      snackbar({ type: "error", msg: "投票に失敗しました。時間をおいて再度お試しください。" });
+      snackbar({ type: "error", title: "投票できませんでした", msg: voteErrorMessage(voteErr) });
       return;
     }
     // #8: server が実際に付与した XP 差分（res.xp_delta＝初回・日次上限内なら +5・それ以外 0）でフィードバック。

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { ApiError } from "@/lib/api/client";
+import { voteErrorMessage } from "../voteError";
 import { reduceMotion } from "@/lib/motion";
 import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav";
 
@@ -199,15 +200,12 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     } catch (err) {
       setVote(prev); // ロールバック
       const status = err instanceof ApiError ? err.status : 0;
-      snack({
-        type: "error",
-        msg:
-          status === 409 ? "締切後・完了したクエストのアイデアには投票できません。"
-          : status === 403 ? "投票する権限がありません。"
-          : status === 404 ? "このアイデアは見つからないか、参照する権限がありません。"
-          : status === 401 ? "セッションが切れています。再ログインしてください。"
-          : "投票に失敗しました。時間をおいて再度お試しください。",
-      });
+      // 409/403 はサーバーの理由（締切後/完了/公開前/権限）を優先表示（voteErrorMessage）。404/401 は専用文言。
+      const msg =
+        status === 404 ? "このアイデアは見つからないか、参照する権限がありません。"
+        : status === 401 ? "セッションが切れています。再ログインしてください。"
+        : voteErrorMessage(err);
+      snack({ type: "error", msg });
     } finally {
       setVoteBusy(false);
     }
