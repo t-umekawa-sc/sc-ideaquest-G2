@@ -39,8 +39,9 @@ TYPE_PRIORITY = {
     "idea_updated": 6,
     "achievement": 7,
     "quest_party_invited": 8,
-    "security_new_device": 9,
-    "security_password_changed": 10,
+    "quest_result_ready": 9,
+    "security_new_device": 10,
+    "security_password_changed": 11,
 }
 
 _REF_KEYS = (

@@ -110,6 +110,10 @@ def env():
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(ideas)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(ideas)))
         if quests:
+            # completed 遷移で作られる完了通知/フィード活動（FR-39）＝quest_id 参照を先に掃除（FK）。
+            from app.tenant.notifications.orm import Notification as _Notif
+            ts.execute(_Notif.__table__.delete().where(_Notif.ref_quest_id.in_(quests)))
+            ts.execute(Activity.__table__.delete().where(Activity.quest_id.in_(quests)))
             member_ids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(quests))).scalars())
             if member_ids:
                 ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(member_ids)))

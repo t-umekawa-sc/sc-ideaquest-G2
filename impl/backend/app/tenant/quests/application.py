@@ -32,6 +32,9 @@ from app.tenant.quests.schemas import PERMISSION_VALUES
 # 有効な quest_status（§3）。フィルタの想定外値は 422（§C.6 入力検証）。
 _VALID_STATUS = {"draft", "recruiting", "in_progress", "evaluating", "completed"}
 
+# FR-39 ⑥ 総括の初回記入 XP（成果重視カーブ・初期値・調整可）。クエスト単位で本人1回・冪等。
+_XP_QUEST_RESULT = 20
+
 _EMPTY_PAGE = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}
 
 # 作成者に付与する全権限（作成者は常に全権限＝§5.6/C.0・剥奪不可）。
@@ -627,6 +630,12 @@ def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id:
         if body.metrics is not None:
             fields["metrics"] = [{"label": m.label, "value": m.value} for m in body.metrics]
         row = repo.upsert_outcome(ts, qid, fields=fields, updated_by=user.id)
+        # ⑥ 総括に実内容がある初回記入で少額XP（クエスト単位・本人1回・冪等・FR-39 §8-⑥）。局所 import で循環回避。
+        if row.summary or row.learnings or row.next_actions:
+            from app.tenant.gamification import ledger, repository as gami_repo
+            if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "quest_result_summary", "quests", qid):
+                ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_QUEST_RESULT,
+                             reason="quest_result_summary", ref_type="quests", ref_id=qid, quest_id=qid)
         dto = _outcome_dto(ts, row)
         ts.commit()
     return dto
@@ -812,10 +821,16 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
                 categories=repo.list_categories(ts, quest.id),
             )
         quest.status = to
+        result_recipients: list[uuid.UUID] = []
         if to == "completed":
             _finalize_completion(ts, quest)  # F.4 投稿者コイン一括確定（同一 UoW・冪等）
+            _record_quest_completed_feed(ts, quest, user)  # ④ チーム成果フィード（quest_completed・冪等・FR-39）
+            # ④ 完了通知の宛先＝作成者を除く有効パーティー員（post-commit で H に発行）。
+            result_recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
+    if to == "completed" and result_recipients:
+        _notify_quest_result_ready(company_id, qid, result_recipients, user.id)
     return detail
 
 
@@ -1152,6 +1167,36 @@ def _notify_party_invited(
         params = {"actor_name": owner.display_name if owner else None}
         refs = {"ref_quest_id": quest_id}
         return [notify_svc.entry(r, "quest_party_invited", refs=refs, params=params) for r in recipient_ids]
+
+    notify_svc.dispatch(company_id, _build)
+
+
+def _record_quest_completed_feed(ts, quest, user) -> None:
+    """完了＝チーム成果フィード（FR-36 成果系）に quest_completed を記帳（0XP マーカー・クエスト単位で冪等・FR-39 ④）。
+
+    フィードは Activity を reason で絞る方式（§8-㉑）＝完了マイルストーンを 0XP の活動として1件だけ残す。
+    実績エンジンは対象外（judge=False）。局所 import で循環回避。
+    """
+    from app.tenant.gamification import ledger, repository as gami_repo
+
+    if gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "quest_completed", "quests", quest.id):
+        return
+    ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=0, reason="quest_completed",
+                 ref_type="quests", ref_id=quest.id, quest_id=quest.id, judge=False)
+
+
+def _notify_quest_result_ready(
+    company_id: uuid.UUID, quest_id: uuid.UUID, recipient_ids: list[uuid.UUID], actor_id: uuid.UUID
+) -> None:
+    """完了＝結果確定をパーティーへ通知（`quest_result_ready`・宛先＝作成者以外の有効パーティー員・FR-39 ④）。post-commit。"""
+    if not recipient_ids:
+        return
+
+    def _build(ts):
+        actor = ts.get(User, actor_id)
+        params = {"actor_name": actor.display_name if actor else None}
+        refs = {"ref_quest_id": quest_id}
+        return [notify_svc.entry(r, "quest_result_ready", refs=refs, params=params) for r in recipient_ids]
 
     notify_svc.dispatch(company_id, _build)
 

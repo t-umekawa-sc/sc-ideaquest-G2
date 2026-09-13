@@ -20,6 +20,7 @@ const GROUP_ORDER: Group[] = ["today", "yesterday", "earlier"];
 const ICO: Record<string, string> = {
   mention: "@", idea_comment: "💬", follow_comment: "💬", follow_evaluation: "⭐", follow_selection: "🏆",
   idea_updated: "🔄", magic_reaction: "✨", achievement: "🎖️", quest_party_invited: "🎯",
+  quest_result_ready: "🏁",
   security_new_device: "🛡️", security_password_changed: "🔑",
 };
 
@@ -32,7 +33,7 @@ const CATEGORY: [string, string, string[]][] = [
   ["update", "アイデア更新", ["idea_updated"]],
   ["achievement", "実績", ["achievement"]],
   ["magic", "魔法", ["magic_reaction"]],
-  ["quest", "クエスト招集", ["quest_party_invited"]],
+  ["quest", "クエスト", ["quest_party_invited", "quest_result_ready"]],
   ["security", "セキュリティ", ["security_new_device", "security_password_changed"]],
 ];
 const CAT_TYPES: Record<string, string[]> = Object.fromEntries(CATEGORY.map(([k, , v]) => [k, v]));

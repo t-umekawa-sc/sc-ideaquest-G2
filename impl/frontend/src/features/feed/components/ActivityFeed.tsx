@@ -18,11 +18,13 @@ const EVENT: Record<string, string> = {
   selection: "アイデアを選定しました",
   achievement_reward: "実績を獲得しました",
   levelup_sp: "レベルアップしました",
+  quest_completed: "クエストを完了しました",
 };
 
 // ref から遷移先を解決（レビュー#3）＝アイデア（投稿/選定）はアイデア詳細（評価も見える）へ、実績は実績画面へ。
 function hrefOf(a: FeedActivity): string | null {
   if (a.ref_type === "ideas" && a.ref_id) return `/ideas/${a.ref_id}`;
+  if (a.ref_type === "quests" && a.ref_id) return `/quests/${a.ref_id}`;  // クエスト完了→詳細（結果タブ）
   if (a.ref_type === "achievements") return "/achievements";
   return null;
 }

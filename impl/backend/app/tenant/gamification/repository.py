@@ -135,7 +135,7 @@ def list_activities(
 # 他者フィード（SC-12 クエスト内 / SC-01 チーム）で公開する成果系のみ（初期値・調整可・G.5.1）。
 # 出さない＝vote（匿名化 FR-23）・chat（ノイズ）・login・shop_purchase/spell_unlock（私的経済）・
 # evaluation/evaluation_coin（評価公開範囲 F に従属）。自分の履歴（SC-03）は list_activities（全種別）。
-PUBLIC_FEED_REASONS = ("idea_post", "selection", "achievement_reward", "levelup_sp")
+PUBLIC_FEED_REASONS = ("idea_post", "selection", "achievement_reward", "levelup_sp", "quest_completed")
 
 
 def _feed_stmt(cursor: tuple[datetime, uuid.UUID] | None, limit: int):

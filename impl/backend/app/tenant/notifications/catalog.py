@@ -29,6 +29,7 @@ ICON = {
     "mention": "@", "idea_comment": "💬", "follow_comment": "💬",
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
+    "quest_result_ready": "🏁",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
 }
 
@@ -149,6 +150,12 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
             body = (f"{actor} invited you to the quest {qt}" if en
                     else f"{actor} さんがクエスト{qt}に招集しました")
             context = f"Quest {qt}" if en else f"クエスト{qt}"
+    elif t == "quest_result_ready":
+        quest = session.get(Quest, n.ref_quest_id) if n.ref_quest_id else None
+        qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")
+        body = (f'{actor} completed the quest "{qt}" — see the results' if en
+                else f"{actor} さんがクエスト「{qt}」を完了しました（結果を確認）")
+        context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
     elif t == "security_new_device":
         body = ("A sign-in from a new device was detected" if en
                 else "新しい端末からログインがありました")

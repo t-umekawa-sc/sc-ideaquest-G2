@@ -18,6 +18,8 @@ from app.tenant.evaluations import repository as eval_repo
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.ideas.orm import Idea, IdeaRevision, Vote
 from app.tenant.evaluations.orm import Evaluation, EvaluationScore
+from app.tenant.gamification.orm import Activity
+from app.tenant.notifications.orm import Notification
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quests import repository as quests_repo
@@ -35,6 +37,7 @@ def _login_seed(client) -> None:
 
 
 RESULT = lambda qid: f"/api/v1/quests/{qid}/result"  # noqa: E731
+TRANSITION = lambda qid: f"/api/v1/quests/{qid}/transition"  # noqa: E731
 
 
 @pytest.fixture
@@ -108,6 +111,8 @@ def env():
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(iids)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
         if quests:
+            ts.execute(Notification.__table__.delete().where(Notification.ref_quest_id.in_(quests)))
+            ts.execute(Activity.__table__.delete().where(Activity.quest_id.in_(quests)))
             ts.execute(QuestOutcome.__table__.delete().where(QuestOutcome.quest_id.in_(quests)))
             mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(quests))).scalars())
             if mids:
@@ -166,3 +171,36 @@ def test_c_tc_242_result_put_and_permission(client, env):
     qid2 = env.make_quest(owner=env.other_id, seed_member=True, seed_perms=["vote"])
     r2 = client.put(RESULT(qid2), json={"summary": "x"}, headers=_csrf(client))
     assert r2.status_code == 403, r2.text
+
+
+def test_c_tc_243_completion_notifies_party_and_feed(client, env):
+    """C-TC-243: evaluating→completed で ④パーティー（作成者以外）に quest_result_ready 通知＋quest_completed フィード活動（冪等）。"""
+    _login_seed(client)
+    qid = env.make_quest(status="evaluating")  # owner=seed
+    with get_tenant_session(env.db_identifier) as ts:
+        quests_repo.add_member(ts, qid, env.other_id, permissions=["vote", "comment"])  # 作成者以外のパーティー員
+        ts.commit()
+    r = client.post(TRANSITION(qid), json={"to": "completed"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "completed"
+    with get_tenant_session(env.db_identifier) as ts:
+        # ④ フィード＝quest_completed 活動が1件（作成者＝seed・冪等）。
+        acts = ts.execute(select(Activity).where(Activity.quest_id == qid, Activity.reason == "quest_completed")).scalars().all()
+        assert len(acts) == 1 and acts[0].user_id == env.user_id
+        # ④ 通知＝作成者以外のパーティー員（other）に quest_result_ready。作成者（seed）には出さない。
+        notes = ts.execute(select(Notification).where(Notification.ref_quest_id == qid, Notification.type == "quest_result_ready")).scalars().all()
+        recipients = {n.recipient_id for n in notes}
+        assert env.other_id in recipients
+        assert env.user_id not in recipients
+
+
+def test_c_tc_244_outcome_grants_xp_once(client, env):
+    """C-TC-244: ⑥ 総括の初回記入で owner に少額XP付与（quest_result_summary・クエスト単位で本人1回・冪等）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    client.put(RESULT(qid), json={"summary": "成果"}, headers=_csrf(client))
+    client.put(RESULT(qid), json={"learnings": "学び追記"}, headers=_csrf(client))  # 2回目は加算しない
+    with get_tenant_session(env.db_identifier) as ts:
+        acts = ts.execute(select(Activity).where(Activity.quest_id == qid, Activity.reason == "quest_result_summary")).scalars().all()
+        assert len(acts) == 1 and acts[0].user_id == env.user_id
+        assert acts[0].amount == 20
