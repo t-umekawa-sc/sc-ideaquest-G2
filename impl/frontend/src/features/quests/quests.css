@@ -115,9 +115,11 @@
 /* #quest-tabs への戻り時スクロールが sticky ヘッダー＋フローティング戻るピル（.backlink--float）に
    隠れないよう余白を確保（ヘッダー高＋ピル約3.5rem）。 */
 #quest-tabs { scroll-margin-top: calc(var(--header-h) + 3.5rem); }
-.tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
-.tab:hover { color: var(--color-text); }
-.tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
+.tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted); padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; transition: background .12s, color .12s; }
+.tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
+/* アクティブタブ＝どれが選択中か一目で分かるよう、プライマリ塗り＋太い下線アクセント＋太字。 */
+.tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
+.tab.is-active:hover { background: var(--color-primary-soft); }
 .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
 .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
 
