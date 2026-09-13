@@ -93,12 +93,19 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
 
   const selected = result.decisions.filter((d) => d.is_selected);
   const p = result.participation;
+  const provisional = result.status !== "completed";  // 完了前＝暫定の途中経過
 
   return (
     <section aria-label="クエストの最終結果" className="qresult stack">
-      <p className="role-note" style={{ marginTop: 0 }}>
-        クエスト完了時の<strong>検証済みコンセプト票</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
-      </p>
+      {provisional ? (
+        <p className="role-note" role="status" style={{ marginTop: 0 }}>
+          ⏳ このクエストは<strong>進行中</strong>です。以下は<strong>暫定の途中経過</strong>（検証済みコンセプト票の下書き）で、完了時に確定します（ISO 56002 の継続的モニタリング）。
+        </p>
+      ) : (
+        <p className="role-note" style={{ marginTop: 0 }}>
+          クエスト完了時の<strong>検証済みコンセプト票</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
+        </p>
+      )}
 
       {/* ① 検証済みコンセプト（選定アイデア） */}
       <section className="card" aria-label="検証済みコンセプト">

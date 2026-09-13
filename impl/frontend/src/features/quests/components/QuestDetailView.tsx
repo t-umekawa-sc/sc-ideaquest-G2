@@ -549,13 +549,15 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         )}{/* .quest-panels */}
       </div>
 
-      {/* タブ */}
+      {/* タブ（🏁 結果は常時表示＝途中経過も見られる。完了前は「暫定」を明示・FR-39） */}
       <div id="quest-tabs" className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
-        {TABS.filter((t) => t.key !== "result" || quest.status === "completed").map((t) => {
+        {TABS.map((t) => {
           const count = t.key === "party" ? party.length : t.key === "ideas" ? ideas?.length ?? null : null;
+          const provisional = t.key === "result" && quest.status !== "completed";  // 完了前＝暫定
           return (
             <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}{count != null && <span className="tab-count">{count}</span>}
+              {provisional && <span className="tab-count tab-count--wip" title="このクエストは進行中＝暫定の途中経過です">暫定</span>}
             </button>
           );
         })}
