@@ -626,6 +626,39 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         }
 
 
+def generate_chat_summary(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """FR-39 (c) 議論の要点＝チャットの自動要約（抽出型・オフライン・無料）を生成/再生成し保存（owner/quest_admin）。
+
+    当該クエストの公開アイデアのチャット本文（非削除・上限）を要約 seam（summarize）に渡し、結果を
+    quest_outcomes.chat_summary に保存。外部API/課金/外部送信なし（会社データを外部へ出さない）。
+    """
+    from app.tenant.quests import summarize
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)  # owner/quest_admin
+        idea_ids = [i.id for i in ideas_repo.list_published_ideas_for_quest(ts, qid)]
+        bodies = chat_repo.list_message_bodies_for_idea_ids(ts, idea_ids, limit=500)
+        summary = summarize.summarize_text("\n".join(bodies), max_sentences=5) if bodies else ""
+        row = repo.upsert_outcome(
+            ts, qid,
+            fields={"chat_summary": summary or None, "chat_summary_at": datetime.now(timezone.utc)},
+            updated_by=user.id,
+        )
+        dto = _outcome_dto(ts, row)
+        ts.commit()
+    return dto
+
+
 def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, body) -> dict:
     """総括（④振り返り・⑤次アクション・KPI）の保存（FR-39 PUT result・owner/quest_admin）。送られた項目のみ更新。"""
     company = _resolve_company(company_id)

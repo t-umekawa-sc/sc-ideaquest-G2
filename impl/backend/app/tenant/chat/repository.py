@@ -21,6 +21,23 @@ def get_chat_group_by_idea(session: Session, idea_id: uuid.UUID) -> ChatGroup | 
     return session.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
 
 
+def list_message_bodies_for_idea_ids(session: Session, idea_ids: list[uuid.UUID], *, limit: int = 500) -> list[str]:
+    """指定アイデア群のチャット本文（非削除・created_at 昇順・最大 limit 件）＝FR-39 (c) 自動要約の入力。
+
+    要約はオンデマンド同期処理のため入力を limit で上限。超過時は直近（新しい方）優先で拾い、時系列に戻す。
+    """
+    if not idea_ids:
+        return []
+    rows = session.execute(
+        select(ChatMessage.body, ChatMessage.created_at)
+        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .where(ChatGroup.idea_id.in_(idea_ids), ChatMessage.is_deleted.is_(False))
+        .order_by(ChatMessage.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [body for body, _at in reversed(rows) if body]
+
+
 def list_pinned_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, ChatMessage]]:
     """指定アイデア群のチャットでピン留めされた非削除メッセージ（FR-39 (b)・pinned_at 昇順）。返り値＝[(idea_id, msg)]。"""
     if not idea_ids:

@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { Avatar, Button, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
-import { getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+import { generateChatSummary, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
 
 const ASPECT_LABELS: [keyof QuestResult["aspect_averages"], string][] = [
   ["novelty", "新規性"],
@@ -32,6 +32,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
   const [nextActions, setNextActions] = useState("");
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [saving, setSaving] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -62,6 +63,16 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     setResult((r) => (r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
     setEditing(false);
     snack({ type: "success", title: "最終結果を保存しました" });
+  }
+
+  // (c) チャットの自動要約（抽出型・オフライン・無料）を生成/再生成。owner/quest_admin のみ。
+  async function runSummary() {
+    setSummarizing(true);
+    const res = await generateChatSummary(questId).catch(() => null);
+    setSummarizing(false);
+    if (!res) { snack({ type: "error", msg: "要約に失敗しました。" }); return; }
+    setResult((r) => (r ? { ...r, outcome: { ...r.outcome, chat_summary: res.chat_summary, chat_summary_at: res.chat_summary_at } } : r));
+    snack({ type: "success", title: "自動要約を更新しました" });
   }
 
   // 後続クエスト複製（⑥次アクション＝次サイクルへ）＝件名/カラー/カテゴリ/参加グループ/期限/目的＋パーティーを引き継ぐ。
@@ -157,24 +168,43 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </ul>
       </section>
 
-      {/* ④ 議論の要点(b)＝ピン留めされたチャット重要メッセージ */}
-      {result.pinned_messages.length > 0 && (
+      {/* ④ 議論の要点＝(b)ピン留め＋(c)自動要約（抽出型・オフライン・無料） */}
+      {(result.pinned_messages.length > 0 || result.can_edit || result.outcome.chat_summary) && (
         <section className="card" aria-label="議論の要点">
-          <div className="section-head"><h3 style={{ margin: 0 }}>📌 議論の要点</h3></div>
-          <ul className="qresult__pins">
-            {result.pinned_messages.map((pm) => (
-              <li key={pm.message_id} className="qresult__pin">
-                <Avatar name={pm.author.display_name} imageUrl={pm.author.avatar_image_url ?? undefined} size="sm" />
-                <div className="qresult__pin-main">
-                  <p className="qresult__pin-body" style={{ whiteSpace: "pre-wrap" }}>{pm.excerpt}</p>
-                  <div className="qresult__pin-meta">
-                    <span className="muted text-xs">{pm.author.display_name}</span>
-                    <Link className="qresult__chat" href={`/ideas/${pm.idea_id}/chat`}>💬 {pm.idea_title}</Link>
+          <div className="section-head">
+            <h3 style={{ margin: 0 }}>📌 議論の要点</h3>
+            {result.can_edit && (
+              <Button type="button" variant="outline" onClick={() => void runSummary()} loading={summarizing}>
+                {result.outcome.chat_summary ? "自動要約を再生成" : "チャットを自動要約"}
+              </Button>
+            )}
+          </div>
+          {/* (c) 自動要約＝無料・オフライン抽出型（外部送信なし・粗め）。 */}
+          {result.outcome.chat_summary && (
+            <div className="qresult__summary">
+              <div className="qresult__label">自動要約（抽出型・参考）</div>
+              <p style={{ whiteSpace: "pre-wrap", margin: "2px 0 0" }}>{result.outcome.chat_summary}</p>
+            </div>
+          )}
+          {/* (b) ピン留めした重要メッセージ */}
+          {result.pinned_messages.length > 0 ? (
+            <ul className="qresult__pins">
+              {result.pinned_messages.map((pm) => (
+                <li key={pm.message_id} className="qresult__pin">
+                  <Avatar name={pm.author.display_name} imageUrl={pm.author.avatar_image_url ?? undefined} size="sm" />
+                  <div className="qresult__pin-main">
+                    <p className="qresult__pin-body" style={{ whiteSpace: "pre-wrap" }}>{pm.excerpt}</p>
+                    <div className="qresult__pin-meta">
+                      <span className="muted text-xs">{pm.author.display_name}</span>
+                      <Link className="qresult__chat" href={`/ideas/${pm.idea_id}/chat`}>💬 {pm.idea_title}</Link>
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted text-sm" style={{ marginTop: "var(--space-2)" }}>チャットで重要な発言を <strong>📌</strong> ピン留めすると、ここに集約されます。</p>
+          )}
         </section>
       )}
 

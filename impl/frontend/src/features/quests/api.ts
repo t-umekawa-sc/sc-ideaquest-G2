@@ -116,6 +116,10 @@ export function getQuestResult(questId: string): Promise<QuestResult | null> {
 export function updateQuestResult(questId: string, input: QuestOutcomeInput): Promise<QuestOutcome | null> {
   return apiFetch<QuestOutcome>(`/quests/${questId}/result`, { method: "PUT", body: JSON.stringify(input) });
 }
+// (c) 議論の要点＝チャットの自動要約（抽出型・オフライン・無料）を生成/再生成（FR-39・owner/quest_admin）。
+export function generateChatSummary(questId: string): Promise<QuestOutcome | null> {
+  return apiFetch<QuestOutcome>(`/quests/${questId}/result/chat-summary`, { method: "POST" });
+}
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。
 export function publishQuest(questId: string, input: QuestPublishInput): Promise<QuestDetail | null> {

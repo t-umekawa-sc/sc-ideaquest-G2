@@ -260,6 +260,21 @@ def get_quest_result(
     return QuestResultDTO(**result)
 
 
+@router.post("/quests/{quest_id}/result/chat-summary", response_model=QuestOutcomeDTO)
+def post_quest_chat_summary(
+    quest_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestOutcomeDTO:
+    """議論の要点(c)＝チャットの自動要約（抽出型・オフライン・無料）を生成/再生成（FR-39・owner/quest_admin）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.generate_chat_summary(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+    return QuestOutcomeDTO(**result)
+
+
 @router.put("/quests/{quest_id}/result", response_model=QuestOutcomeDTO)
 def put_quest_result(
     quest_id: str,

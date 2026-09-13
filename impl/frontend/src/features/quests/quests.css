@@ -206,3 +206,5 @@
 .qresult__pin-main { flex: 1; min-width: 0; }
 .qresult__pin-body { margin: 0; }
 .qresult__pin-meta { display: flex; align-items: center; gap: var(--space-3); margin-top: 2px; flex-wrap: wrap; }
+/* (c) 自動要約ブロック（抽出型・参考）。 */
+.qresult__summary { margin-top: var(--space-2); padding: var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius); }
