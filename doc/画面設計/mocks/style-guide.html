@@ -199,6 +199,23 @@
       </div>
 
       <div class="field">
+        <label>複数選択（.multiselect・<strong>全選択解除は標準装備</strong>）</label>
+        <div class="multiselect" data-multiselect>
+          <div class="multiselect__control">
+            <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="グループで絞込…">
+          </div>
+          <ul class="multiselect__list" role="listbox" hidden>
+            <li class="multiselect__option" role="option" data-value="プロダクト開発部" aria-selected="true">プロダクト開発部</li>
+            <li class="multiselect__option" role="option" data-value="全社改善プロジェクト" aria-selected="true">全社改善プロジェクト</li>
+            <li class="multiselect__option" role="option" data-value="カスタマーサクセス">カスタマーサクセス</li>
+            <li class="multiselect__option" role="option" data-value="営業推進部">営業推進部</li>
+            <li class="multiselect__empty" role="presentation" hidden></li>
+          </ul>
+        </div>
+        <div class="hint"><strong>全選択解除</strong>は<strong>全 .multiselect の標準機能</strong>＝選択が1件以上あると control 末尾に丸い <strong>×</strong>（すべて解除）が出る。クリックで一括解除（単一選択は確定値をクリア）。無効化は <code>data-clearable="false"</code>。上の各サンプルでも動作する。</div>
+      </div>
+
+      <div class="field">
         <label>単一選択（.multiselect・<strong>data-single／オートコンプリート付き</strong>）</label>
         <div class="multiselect" data-multiselect data-single="true">
           <div class="multiselect__control">

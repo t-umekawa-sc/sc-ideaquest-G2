@@ -521,6 +521,27 @@ def group_ids_by_user(
     return out
 
 
+def all_active_group_ids_by_user(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[uuid.UUID]]:
+    """ユーザごとに有効所属する全クエストグループ id（照会条件で絞らない全件・C.1/C.4 DTO の所属バッジ用）。
+
+    候補/メンバー DTO の `group_ids`（チップ常時表示・参加グループ変更時のクライアント側スコープ再判定）に使う。
+    """
+    if not user_ids:
+        return {}
+    rows = session.execute(
+        select(QuestGroupMember.user_id, QuestGroupMember.quest_group_id).where(
+            QuestGroupMember.user_id.in_(user_ids),
+            QuestGroupMember.removed_at.is_(None),
+        )
+    ).all()
+    out: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for uid, gid in rows:
+        out.setdefault(uid, []).append(gid)
+    return out
+
+
 def get_users_by_ids(session: Session, ids) -> dict:
     """user_id→User の dict（詳細/メンバー DTO 組み立ての N+1 回避）。"""
     from app.tenant.profile.orm import User

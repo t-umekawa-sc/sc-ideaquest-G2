@@ -123,6 +123,8 @@
 | C-TC-231 | api | 動的失効＝非作成者パーティー員が全参加部署を離脱→詳細 404 | G1 のみ所属の非作成者パーティー員→G1 のグループ所属を除去 | `GET quest-detail`（当該員） | 404（都度再判定でアクセス失効） | C.0／§5.6b |
 | C-TC-232 | unit | `can_access_quest` 真偽表（門番の単一ソース） | owner／party+現所属／party+離脱／部署0件+party／非party の各ケース | `repository.can_access_quest(quest, user_id)` | owner=真・party+現所属=真・party+離脱=偽・部署0件+party=真・非party=偽 | C.0／§5.8 |
 | C-TC-233 | api | メンバー DTO の `in_scope`＝参加部署外メンバーの失効表示 | 参加部署 group_a・owner 別格・部署内メンバー・部署外の名指しメンバー | `GET /quest-detail`（owner）の `members` | owner=`in_scope:true`・部署内メンバー=`true`・部署外メンバー=`false`（失効中） | C.1／C.0／§5.6b |
+| C-TC-234 | api | 横断候補の `group_ids`＝**照会に限らず有効所属全件**（req2/5） | A/B 所属の ab_user・照会は group_a のみ | `GET /quest-group-candidates?group_ids=A` | ab_user の `group_ids`＝{A,B}（照会 A のみでも B を含む全所属） | C.4／FR-38 |
+| C-TC-235 | api | メンバー DTO の `group_ids`＝有効所属全件（チップ常時表示/スコープ再判定の材料・req2/3） | 参加部署 group_a・owner／A所属メンバー／B のみメンバー | `GET /quest-detail`（owner）の `members` | 各メンバーの `group_ids`＝その人の有効所属全件（A所属者は A を含む・B のみ者は B） | C.1／FR-38 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

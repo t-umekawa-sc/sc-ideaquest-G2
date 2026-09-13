@@ -749,6 +749,15 @@ body.modal-open { overflow: hidden; }
   border: none; outline: none; background: transparent;
   font-family: var(--font-base); font-size: var(--text-base); color: var(--color-text);
 }
+/* 全選択解除（data-clearable="true" のときだけ表示・選択が1件以上のとき）。control 末尾に付く丸い × ボタン。 */
+.multiselect__clear {
+  flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-left: auto; padding: 0;
+  border: none; border-radius: 50%; background: var(--color-surface-alt);
+  color: var(--color-text-muted); cursor: pointer; font-size: 15px; line-height: 1;
+}
+.multiselect__clear:hover { background: rgba(15,23,42,.14); color: var(--color-text); }
+.multiselect__clear[hidden] { display: none; }
 .multiselect__list {
   position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px);
   margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow: auto;

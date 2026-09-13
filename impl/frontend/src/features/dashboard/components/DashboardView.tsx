@@ -54,13 +54,11 @@ export function DashboardView({
   displayName,
   accountId,
   balance,
-  admin,
   gameEnabled = true,
 }: {
   displayName: string;
   accountId: string;
   balance: Balance;
-  admin: { systemAdmin: boolean; companyAdmin: boolean; qgAdmin: boolean };
   // ゲームモード実効値（レビュー#2・§4.11）。false でヒーロー/週間ランキング（ゲーム層）を非表示。
   // 業務パネル（下書き/未投票/参加中/フォロー中）は残す。既定 true（現行挙動）。
   gameEnabled?: boolean;
@@ -178,9 +176,6 @@ export function DashboardView({
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
-  const roles = data?.roles ?? {
-    is_qg_admin: admin.qgAdmin, is_company_account_admin: admin.companyAdmin, is_system_admin: admin.systemAdmin,
-  };
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (gameEnabled && e) fxRef.current?.burst(e);  // 押下の手応え（ゲーム層演出＝OFFでは出さない・§4.11）
@@ -240,76 +235,7 @@ export function DashboardView({
       <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
-      {/* 上部2カラム：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・業務パネルは残す） */}
-      {gameEnabled && (
-      <motion.div className="dash-top" {...flowMotion(1)}>
-        <section className="pixel-panel hero" aria-label="あなたのステータス">
-          <div className="hero__avatar" data-tier={rank.tier}>
-            <Image src="/assets/mascot-hero.png" alt="あなたのアバター" width={88} height={88} />
-          </div>
-          <div className="hero__status">
-            <div className="hero__name">{hero?.display_name ?? displayName}</div>
-            <div className="hero__lvline">
-              <span className="hero__lv">Lv.{level}</span>
-              <span className="hero__title" data-tier={rank.tier}>{rank.title}</span>
-              <span className="hero__next">NEXT {xpToNext} XP</span>
-            </div>
-            <div
-              className="xp-bar-wrap has-tip"
-              role="img"
-              tabIndex={0}
-              data-tip={`獲得 XP ${xpInLevelLive} / ${levelSpan}（累計 ${xpTotal}）`}
-              aria-label={`獲得 XP ${xpInLevelLive} / ${levelSpan}、累計 ${xpTotal}`}
-            >
-              <div className="xp-bar">
-                <span style={{ width: `${barFilled ? xpPct : 0}%` }} />
-                {/* #8: 付与のたびに一瞬グロー（awardKey で再マウントして one-shot 再生・reduce-motion 無効） */}
-                {awardKey > 0 && <i key={awardKey} className="xp-bar__pulse" aria-hidden />}
-              </div>
-            </div>
-            <div className="hero__coin">
-              <span className="pixel-stat coin">◆ <CountUp value={coin} /> コイン</span>
-              <span className="pixel-stat skill">✦ SP <CountUp value={sp} /></span>
-            </div>
-          </div>
-          <div className="hero__actions">
-            <Link className="btn-pixel" href="/shop">ショップ</Link>
-            <Link className="btn-pixel" href="/avatar">きせかえ</Link>
-            <Link className="btn-pixel" href="/spells">魔法・スキル</Link>
-          </div>
-        </section>
-
-        <section className="pixel-panel rank-panel" aria-label="週間ランキング">
-          <h3>★ 週間ランキング ★</h3>
-          <div className="rank-panel__sub">今週の獲得EXP＋コイン</div>
-          <ol className="rank-list">
-            {/* 読み込み前は 3行ぶんのスケルトンで枠高を確保＝データ到着時に高さがジャンプせずチラつかない。 */}
-            {!data
-              ? [0, 1, 2].map((i) => (
-                  <li key={`rk-skel-${i}`} className="rank-skel-row" aria-hidden>
-                    <span className="rank-medal">{["🥇", "🥈", "🥉"][i]}</span>
-                    <span className="rank-skel rank-skel--avatar" />
-                    <span className="rank-skel rank-skel--name" />
-                    <span className="rank-skel rank-skel--score" />
-                  </li>
-                ))
-              : (ranking?.data ?? []).slice(0, 3).map((r, i) => {
-                  const me = ranking?.me?.rank === r.rank;
-                  return (
-                    <li key={r.user.id} className={me ? "is-me" : undefined}>
-                      <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
-                      <Avatar name={r.user.name} imageUrl={r.user.avatar ?? undefined} size="sm" level={r.user.level} />
-                      <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
-                      <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
-                    </li>
-                  );
-                })}
-            {data && ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
-          </ol>
-          <div className="rank-panel__foot"><Link href="/ranking">ランキングをすべて見る →</Link></div>
-        </section>
-      </motion.div>
-      )}
+      {/* ヒーロー＋週間ランキングは最下部に移動（ユーザー要望・2026-09-13）＝下段の後に配置。 */}
 
       {/* 下書き（1件も無ければ非表示） */}
       {drafts.length > 0 && (
@@ -514,15 +440,77 @@ export function DashboardView({
 
       </motion.div>
 
-      {/* ロール条件付き管理導線（サーバー権威 roles で出し分け） */}
-      {(roles.is_qg_admin || roles.is_company_account_admin || roles.is_system_admin) && (
-        <motion.div className="admin-links" {...flowMotion(6)}>
-          <span className="role-note">▼ ロールに応じて表示</span>
-          {roles.is_qg_admin && <Link className="btn btn-outline btn-sm" href="/admin/quest-groups">クエストグループ管理</Link>}
-          {roles.is_company_account_admin && <Link className="btn btn-outline btn-sm" href="/admin/accounts">会社アカウント管理</Link>}
-          {roles.is_system_admin && <Link className="btn btn-outline btn-sm" href="/admin/companies">システム管理</Link>}
-        </motion.div>
+      {/* 最下部：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・業務パネルは上段に残す・ユーザー要望で末尾へ移動）。 */}
+      {gameEnabled && (
+      <motion.div className="dash-top" {...flowMotion(6)}>
+        <section className="pixel-panel hero" aria-label="あなたのステータス">
+          <div className="hero__avatar" data-tier={rank.tier}>
+            <Image src="/assets/mascot-hero.png" alt="あなたのアバター" width={88} height={88} />
+          </div>
+          <div className="hero__status">
+            <div className="hero__name">{hero?.display_name ?? displayName}</div>
+            <div className="hero__lvline">
+              <span className="hero__lv">Lv.{level}</span>
+              <span className="hero__title" data-tier={rank.tier}>{rank.title}</span>
+              <span className="hero__next">NEXT {xpToNext} XP</span>
+            </div>
+            <div
+              className="xp-bar-wrap has-tip"
+              role="img"
+              tabIndex={0}
+              data-tip={`獲得 XP ${xpInLevelLive} / ${levelSpan}（累計 ${xpTotal}）`}
+              aria-label={`獲得 XP ${xpInLevelLive} / ${levelSpan}、累計 ${xpTotal}`}
+            >
+              <div className="xp-bar">
+                <span style={{ width: `${barFilled ? xpPct : 0}%` }} />
+                {/* #8: 付与のたびに一瞬グロー（awardKey で再マウントして one-shot 再生・reduce-motion 無効） */}
+                {awardKey > 0 && <i key={awardKey} className="xp-bar__pulse" aria-hidden />}
+              </div>
+            </div>
+            <div className="hero__coin">
+              <span className="pixel-stat coin">◆ <CountUp value={coin} /> コイン</span>
+              <span className="pixel-stat skill">✦ SP <CountUp value={sp} /></span>
+            </div>
+          </div>
+          <div className="hero__actions">
+            <Link className="btn-pixel" href="/shop">ショップ</Link>
+            <Link className="btn-pixel" href="/avatar">きせかえ</Link>
+            <Link className="btn-pixel" href="/spells">魔法・スキル</Link>
+          </div>
+        </section>
+
+        <section className="pixel-panel rank-panel" aria-label="週間ランキング">
+          <h3>★ 週間ランキング ★</h3>
+          <div className="rank-panel__sub">今週の獲得EXP＋コイン</div>
+          <ol className="rank-list">
+            {/* 読み込み前は 3行ぶんのスケルトンで枠高を確保＝データ到着時に高さがジャンプせずチラつかない。 */}
+            {!data
+              ? [0, 1, 2].map((i) => (
+                  <li key={`rk-skel-${i}`} className="rank-skel-row" aria-hidden>
+                    <span className="rank-medal">{["🥇", "🥈", "🥉"][i]}</span>
+                    <span className="rank-skel rank-skel--avatar" />
+                    <span className="rank-skel rank-skel--name" />
+                    <span className="rank-skel rank-skel--score" />
+                  </li>
+                ))
+              : (ranking?.data ?? []).slice(0, 3).map((r, i) => {
+                  const me = ranking?.me?.rank === r.rank;
+                  return (
+                    <li key={r.user.id} className={me ? "is-me" : undefined}>
+                      <span className="rank-medal" aria-label={`${i + 1}位`}>{["🥇", "🥈", "🥉"][i]}</span>
+                      <Avatar name={r.user.name} imageUrl={r.user.avatar ?? undefined} size="sm" level={r.user.level} />
+                      <span className="rank-name">{r.user.name}{me && <span className="rank-you">（あなた）</span>}</span>
+                      <span className="rank-score"><span className="total">{r.score}</span><span className="brk"><span className="exp">EXP{r.xp}</span> <span className="coin">◆{r.coin}</span></span></span>
+                    </li>
+                  );
+                })}
+            {data && ranking && ranking.data.length === 0 && <li className="muted text-sm">今週の獲得はまだありません</li>}
+          </ol>
+          <div className="rank-panel__foot"><Link href="/ranking">ランキングをすべて見る →</Link></div>
+        </section>
+      </motion.div>
       )}
+      {/* 管理導線はグローバルサイドバー（AppNav）へ集約（ダッシュボード下のリンク／右上メニューからは撤去）。 */}
     </div>
   );
 }

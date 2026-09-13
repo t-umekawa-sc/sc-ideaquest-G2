@@ -25,11 +25,6 @@ export default async function HomePage() {
         displayName={session.user.display_name}
         accountId={session.account_id}
         balance={balance}
-        admin={{
-          systemAdmin: session.system_role === "system_admin",
-          companyAdmin: session.system_role === "company_account_admin",
-          qgAdmin: session.is_qg_admin,
-        }}
         gameEnabled={gameEnabled}
       />
       {/* #20（暫定）: アバターアイコンのマスコット追従（SC-01 限定・3D VRM 整備までの代替）。ゲームモード OFF は出さない。 */}

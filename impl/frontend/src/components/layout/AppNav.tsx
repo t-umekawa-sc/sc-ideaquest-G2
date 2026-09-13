@@ -24,10 +24,19 @@ const GAME: NavItem[] = [
   { href: "/ranking", label: "ランキング", icon: "🏆" },
 ];
 
+// 管理導線＝ロール保持者にのみ出す（app 層から admin フラグを props で受け取る＝features/session 非依存）。
+// 行き先は app ルートの静的リンク（右上メニュー・ダッシュボードのリンクからは撤去しサイドバーへ集約）。
+export type AdminFlags = { systemAdmin: boolean; companyAdmin: boolean; qgAdmin: boolean };
+const adminItems = (a: AdminFlags): NavItem[] => [
+  ...(a.systemAdmin ? [{ href: "/admin/companies", label: "システム管理（会社）", icon: "🏢" }] : []),
+  ...(a.companyAdmin ? [{ href: "/admin/accounts", label: "アカウント管理（自社）", icon: "👥" }] : []),
+  ...(a.qgAdmin ? [{ href: "/admin/quest-groups", label: "クエストグループ管理", icon: "🗂️" }] : []),
+];
+
 const PIN_KEY = "iq_nav_pinned";
 const WIDE = "(min-width: 1024px)";
 
-export function AppNav({ gameEnabled = true }: { gameEnabled?: boolean }) {
+export function AppNav({ gameEnabled = true, admin }: { gameEnabled?: boolean; admin?: AdminFlags }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -181,6 +190,12 @@ export function AppNav({ gameEnabled = true }: { gameEnabled?: boolean }) {
               <nav className="appnav__menu menu-pixel">
                 <div className="appnav__grp">業務</div>
                 {BIZ.map(renderItem)}
+                {admin && adminItems(admin).length > 0 && (
+                  <>
+                    <div className="appnav__grp">管理</div>
+                    {adminItems(admin).map(renderItem)}
+                  </>
+                )}
                 {gameEnabled && (
                   <>
                     <div className="appnav__grp appnav__grp--game">ゲーム</div>
@@ -188,7 +203,7 @@ export function AppNav({ gameEnabled = true }: { gameEnabled?: boolean }) {
                   </>
                 )}
               </nav>
-              <div className="appnav__foot">アカウント / 設定 / 管理 / ログアウトは右上のメニュー</div>
+              <div className="appnav__foot">アカウント / 設定 / ログアウトは右上のメニュー</div>
             </aside>
           </div>,
           document.body,

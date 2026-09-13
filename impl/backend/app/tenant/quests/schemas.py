@@ -149,6 +149,9 @@ class QuestMemberDTO(BaseModel):
     is_creator: bool
     # 参加部署アクセス可否（作成者別格 or 参加部署0件 or 参加部署に現所属）。false＝**参加部署外＝失効中**（FR-38・C.0）。
     in_scope: bool = True
+    # 当該メンバーが有効所属する全クエストグループ（会社内・照会条件に限らず全件）。SC-11 のメンバーチップに
+    # グループを常時表示し、フォームで参加グループを変更した際にクライアントが in_scope を即時再判定する材料（req2/3）。
+    group_ids: list[str] = []
 
 
 class QuestDetailDTO(BaseModel):
@@ -186,7 +189,8 @@ class QuestCandidateDTO(BaseModel):
     user_id: str
     display_name: str
     avatar_image_url: str | None = None
-    # 横断候補（FR-38）で、指定グループ群のうち本人が所属する group_id 一覧（所属バッジ表示用）。
+    # 横断候補（FR-38）で、本人が有効所属する全クエストグループ id（会社内・照会条件に限らず全件・所属バッジ常時表示用）。
+    # 全社（照会0件）や単一グループ照会でも所属を示せるよう「照会との積集合」ではなく全件に統一（req2/5）。
     # 単一グループ EP では空（クライアントは group_id 既知のため不要）。
     group_ids: list[str] = []
 

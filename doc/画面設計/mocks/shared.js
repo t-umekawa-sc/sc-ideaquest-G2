@@ -85,10 +85,32 @@
     const emptyEl = list.querySelector('.multiselect__empty');
     const single = root.dataset.single === 'true';
     const allowFree = !single && root.dataset.free === 'true'; // 単一選択は候補のみ
+    const clearable = root.dataset.clearable !== 'false'; // 選択を一括解除する × を標準装備（data-clearable="false" で opt-out）
     const options = Array.from(list.querySelectorAll('.multiselect__option'));
     options.forEach(o => { if (!o.dataset.value) o.dataset.value = o.textContent.trim(); });
     const selected = new Set(); // 値（小文字）で重複防止
     let chosenLabel = ''; // 単一選択の確定表示
+
+    // 全選択解除（clearable のときだけ control 末尾に置く。選択が1件以上のときのみ表示）。
+    let clearBtn = null;
+    if (clearable) {
+      clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'multiselect__clear';
+      clearBtn.setAttribute('aria-label', '選択をすべて解除');
+      clearBtn.title = 'すべて解除';
+      clearBtn.hidden = true;
+      clearBtn.textContent = '×';
+    }
+    function updateClear() {
+      if (!clearBtn) return;
+      clearBtn.hidden = !(single ? !!chosenLabel : selected.size > 0);
+    }
+    function clearAll() {
+      if (single) { selected.clear(); chosenLabel = ''; input.value = ''; }
+      else { control.querySelectorAll('.multiselect__chip').forEach(c => c.remove()); selected.clear(); input.value = ''; }
+      filter(); updateClear(); input.focus(); open();
+    }
 
     const visibleOptions = () => options.filter(o => !o.hidden);
     const activeOption = () => list.querySelector('.multiselect__option.is-active');
@@ -123,7 +145,7 @@
 
     function choose(value, label, custom) {
       const key = value.toLowerCase();
-      if (single) { selected.clear(); selected.add(key); chosenLabel = label; input.value = label; close(); return; }
+      if (single) { selected.clear(); selected.add(key); chosenLabel = label; input.value = label; updateClear(); close(); return; }
       if (selected.has(key)) return;
       selected.add(key);
       const chip = document.createElement('span');
@@ -133,12 +155,15 @@
         '<button type="button" class="multiselect__chip-remove" aria-label="「' + label + '」を解除">×</button>';
       chip.querySelector('.multiselect__chip-label').textContent = label;
       control.insertBefore(chip, input);
-      input.value = ''; filter();
+      input.value = ''; filter(); updateClear();
     }
     function removeChip(chip) {
       selected.delete(chip.dataset.value.toLowerCase());
-      chip.remove(); filter(); input.focus();
+      chip.remove(); filter(); updateClear(); input.focus();
     }
+
+    // 全選択解除ボタンは input の後（control 末尾）に置く＝チップ群→入力→×の順。
+    if (clearBtn) control.appendChild(clearBtn);
 
     // 初期選択
     options.forEach(o => {
@@ -146,8 +171,11 @@
         choose(o.dataset.value, o.textContent.trim(), false);
       }
     });
+    updateClear();
 
     control.addEventListener('click', (e) => {
+      const clr = e.target.closest('.multiselect__clear');
+      if (clr) { e.preventDefault(); clearAll(); return; }
       const rm = e.target.closest('.multiselect__chip-remove');
       if (rm) { removeChip(rm.closest('.multiselect__chip')); return; }
       input.focus(); if (single) input.select(); open();
@@ -180,7 +208,7 @@
         if (act && !act.hidden) { choose(act.dataset.value, act.textContent.trim(), false); }
         else if (allowFree) { const v = input.value.trim(); if (v && !selected.has(v.toLowerCase())) choose(v, v, true); }
       } else if (e.key === 'Backspace' && input.value === '') {
-        if (single) { selected.clear(); chosenLabel = ''; filter(); }
+        if (single) { selected.clear(); chosenLabel = ''; filter(); updateClear(); }
         else { const chips = control.querySelectorAll('.multiselect__chip'); if (chips.length) removeChip(chips[chips.length - 1]); }
       } else if (e.key === 'Escape') { close(); }
     });

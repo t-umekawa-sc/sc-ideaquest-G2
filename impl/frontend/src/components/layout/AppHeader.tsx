@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Avatar, CountUp } from "@/components/ui";
 
-import { AppNav } from "./AppNav";
+import { AppNav, type AdminFlags } from "./AppNav";
 
 type Props = {
   user: { display_name: string; avatar_url?: string | null };
@@ -20,10 +20,12 @@ type Props = {
   // ゲームモード実効値（レビュー#2・§4.11）。false でゲーム層UI（残高チップ Lv/コイン/SP・レベル円環・
   // ナビのゲーム群）を非表示にする。アバター画像は本人識別のため残す。既定 true（現行挙動）。
   gameEnabled?: boolean;
+  // 管理導線（ロール保持者のみ）をサイドバー（AppNav）に出すためのフラグ。app 層から供給。
+  admin?: AdminFlags;
   children: React.ReactNode; // .usermenu__list の中身（<li>…</li>）
 };
 
-export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, children }: Props) {
+export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, admin, children }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -79,7 +81,7 @@ export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, 
         <div className="header-left">
           {/* グローバルナビ（☰→ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・レビュー#1）。
               gameEnabled でゲーム群の出し分け（§4.11・レビュー#2）。 */}
-          <AppNav gameEnabled={gameEnabled} />
+          <AppNav gameEnabled={gameEnabled} admin={admin} />
           <Link href="/" className="brand" aria-label="ideaquest ホーム">
             <Image className="brand-logo" src="/assets/logo-ideaquest.png" alt="IDEAQUEST" width={88} height={40} priority />
           </Link>

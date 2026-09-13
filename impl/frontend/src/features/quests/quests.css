@@ -41,6 +41,10 @@
 .pmember__top { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .pmember__name { font-weight: 600; }
 .pmember__perms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+/* 所属グループ（氏名の一行下・先頭N件＋「+M」）。 */
+.pmember__depts { margin-top: 3px; }
+.grp-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.grp-badges__more { font-weight: 600; }
 .pmember__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; border-radius: var(--radius-sm); }
 .pmember__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
 

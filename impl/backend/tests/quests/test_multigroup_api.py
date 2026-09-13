@@ -328,3 +328,33 @@ def test_c_tc_233_member_in_scope_flag(client, env):
     assert scope[str(env.user_id)] is True    # 作成者は別格＝常に in_scope
     assert scope[str(env.ab_user)] is True     # group_a に所属＝in_scope
     assert scope[str(env.b_user)] is False     # group_b のみ＝参加部署外＝失効中
+
+
+def test_c_tc_234_candidate_group_ids_full_memberships(client, env):
+    """C-TC-234: 横断候補の group_ids＝照会に限らず有効所属全件（req2/5）。
+
+    group_a のみ照会でも、A/B 両所属の ab_user は {A,B} を返す（チップ常時表示/絞込の材料）。
+    """
+    _login_seed(client)
+    r = client.get(CANDIDATES, params={"group_ids": [str(env.group_a)]})
+    assert r.status_code == 200, r.text
+    data = {c["user_id"]: c for c in r.json()["data"]}
+    assert str(env.ab_user) in data  # ab_user は group_a に所属＝候補に出る
+    # ab_user は合成ユーザ＝テストが割り当てた {A,B} のみ（照会 A だけでも B を含む全所属）。
+    assert set(data[str(env.ab_user)]["group_ids"]) == {str(env.group_a), str(env.group_b)}
+    # seed user は group_a に加え seed 由来の既存所属も持ちうる＝A を含む（superset）で検証。
+    assert str(env.group_a) in set(data[str(env.user_id)]["group_ids"])
+
+
+def test_c_tc_235_member_group_ids_full_memberships(client, env):
+    """C-TC-235: メンバー DTO の group_ids＝その人の有効所属全件（チップ常時表示/スコープ再判定の材料・req2/3）。"""
+    qid = env.seed_quest(groups=[env.group_a], owner=env.user_id, members=[env.ab_user, env.b_user])
+    _login_seed(client)
+    r = client.get(f"{QUESTS}/{qid}")
+    assert r.status_code == 200, r.text
+    groups = {m["user"]["user_id"]: set(m["group_ids"]) for m in r.json()["members"]}
+    # 合成ユーザ（b_user/ab_user）はテスト割当のみ＝厳密一致で全所属を検証。
+    assert groups[str(env.ab_user)] == {str(env.group_a), str(env.group_b)}     # A/B 両所属
+    assert groups[str(env.b_user)] == {str(env.group_b)}                        # B のみ
+    # owner（seed user）は seed 由来の既存所属も持ちうる＝A を含む（superset）で検証。
+    assert str(env.group_a) in groups[str(env.user_id)]

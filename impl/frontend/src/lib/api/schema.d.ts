@@ -4139,6 +4139,11 @@ export interface components {
              * @default true
              */
             in_scope: boolean;
+            /**
+             * Group Ids
+             * @default []
+             */
+            group_ids: string[];
         };
         /**
          * QuestMemberInput

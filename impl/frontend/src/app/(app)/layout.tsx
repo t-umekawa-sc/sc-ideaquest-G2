@@ -52,7 +52,17 @@ export default async function AppLayout({
         aria-hidden="true"
         style={backgroundUrl ? { backgroundImage: `url("${backgroundUrl}")` } : undefined}
       />
-      <LiveAppHeader user={headerUser} balance={balance} gameEnabled={gameEnabled}>
+      {/* 管理導線（ロール保持者のみ）はサイドバー（AppNav）に集約。右上メニュー・ダッシュボードからは撤去。 */}
+      <LiveAppHeader
+        user={headerUser}
+        balance={balance}
+        gameEnabled={gameEnabled}
+        admin={{
+          systemAdmin: session.system_role === "system_admin",
+          companyAdmin: session.system_role === "company_account_admin",
+          qgAdmin: session.is_qg_admin,
+        }}
+      >
         {/* メニュー項目は app 層が features から差し込む */}
         <li role="none">
           <Link role="menuitem" href="/profile">プロフィール</Link>
@@ -63,31 +73,6 @@ export default async function AppLayout({
         {/* 背景画像の変更／リセット（K.4・FR-30・全認証画面に反映） */}
         <BackgroundImageMenuItem hasBackground={backgroundUrl !== null} />
         <li role="none"><div className="usermenu__sep" /></li>
-        {/* 管理導線は権限保持者にのみ出す。1つも該当しない一般ユーザーでは
-            区切り線ごと描画しない＝非表示項目の空きを作らない（高さ0）。 */}
-        {(session.system_role === "system_admin" ||
-          session.system_role === "company_account_admin" ||
-          session.is_qg_admin) && (
-          <>
-            {session.system_role === "system_admin" && (
-              <li role="none">
-                <Link role="menuitem" href="/admin/companies">システム管理（会社）</Link>
-              </li>
-            )}
-            {session.system_role === "company_account_admin" && (
-              <li role="none">
-                <Link role="menuitem" href="/admin/accounts">アカウント管理（自社）</Link>
-              </li>
-            )}
-            {/* QG管理者（会社DBの有効 admin 所属を1つ以上・ログイン時スナップショット is_qg_admin）にのみ出す */}
-            {session.is_qg_admin && (
-              <li role="none">
-                <Link role="menuitem" href="/admin/quest-groups">クエストグループ管理</Link>
-              </li>
-            )}
-            <li role="none"><div className="usermenu__sep" /></li>
-          </>
-        )}
         <li role="none">
           <LogoutMenuItem />
         </li>

@@ -17,9 +17,10 @@ type Props = {
   ariaLabel?: string;
   emptyText?: string; // 候補ゼロ時の文言
   disabled?: boolean;
+  clearable?: boolean; // 全選択解除（×）を出すか＝デザイン標準（既定 true）。false で無効化。
 };
 
-export function Multiselect({ id, options, value, onChange, placeholder, ariaLabel, emptyText = "候補がありません", disabled }: Props) {
+export function Multiselect({ id, options, value, onChange, placeholder, ariaLabel, emptyText = "候補がありません", disabled, clearable = true }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0); // 可視候補内のハイライト位置
@@ -69,6 +70,7 @@ export function Multiselect({ id, options, value, onChange, placeholder, ariaLab
     [selectedSet, onChange, value],
   );
   const removeAt = useCallback((v: string) => onChange(value.filter((x) => x !== v)), [onChange, value]);
+  const clearAll = useCallback(() => { onChange([]); setQuery(""); inputRef.current?.focus(); setOpen(true); }, [onChange]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -124,6 +126,18 @@ export function Multiselect({ id, options, value, onChange, placeholder, ariaLab
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
+        {/* 全選択解除（デザイン標準・選択が1件以上のとき control 末尾に表示）。 */}
+        {clearable && value.length > 0 && !disabled && (
+          <button
+            type="button"
+            className="multiselect__clear"
+            aria-label="選択をすべて解除"
+            title="すべて解除"
+            onClick={(e) => { e.stopPropagation(); clearAll(); }}
+          >
+            ×
+          </button>
+        )}
       </div>
       {open && !disabled && (
         <ul className="multiselect__list" id={listId} role="listbox">

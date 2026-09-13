@@ -490,7 +490,8 @@ def get_quest_group_candidates(
         )
         has_next = len(rows) > limit
         rows = rows[:limit]
-        membership = repo.group_ids_by_user(ts, [u.id for u in rows], group_uuids)
+        # 所属バッジは照会に限らず有効所属全件（全社/単一照会でも常時表示・req2/5）。
+        membership = repo.all_active_group_ids_by_user(ts, [u.id for u in rows])
         data = [
             {
                 "user_id": str(u.id),
@@ -583,7 +584,11 @@ def add_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         member = repo.add_member(ts, quest.id, uid, permissions=perms, granted_by_id=user.id)
         users = repo.get_users_by_ids(ts, {uid})
         has_depts, dept_users = _dept_scope(ts, quest)
-        dto = _member_dto(ts, member, quest.owner_id, users.get(uid), has_depts=has_depts, dept_users=dept_users)
+        memberships = repo.all_active_group_ids_by_user(ts, [uid])
+        dto = _member_dto(
+            ts, member, quest.owner_id, users.get(uid),
+            has_depts=has_depts, dept_users=dept_users, member_group_ids=memberships.get(uid, []),
+        )
         ts.commit()
     return dto
 
@@ -922,11 +927,12 @@ def _dept_scope(ts, quest) -> tuple[bool, set]:
     return True, repo.user_ids_in_any_group(ts, linked)
 
 
-def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=frozenset()) -> dict:
+def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=frozenset(), member_group_ids=()) -> dict:
     """パーティーメンバー1件の DTO（C.1 GET .../members・SC-11/SC-12 共通形）。
 
     `in_scope`＝当該メンバーが今このクエストを参照できるか（作成者別格 or 参加部署0件 or 参加部署に現所属）。
     false＝**参加部署外＝失効中**（異動などで全参加部署を外れた名指しメンバー・UI で明示表示・C.0）。
+    `group_ids`＝当該メンバーが有効所属する全クエストグループ（会社内全件）＝チップ常時表示/スコープ再判定の材料（req2/3）。
     """
     is_creator = member.user_id == creator_id
     in_scope = is_creator or (not has_depts) or (member.user_id in dept_users)
@@ -940,6 +946,7 @@ def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=fro
         "joined_at": member.joined_at,
         "is_creator": is_creator,
         "in_scope": in_scope,
+        "group_ids": [str(g) for g in member_group_ids],
     }
 
 
@@ -947,12 +954,17 @@ def _members_payload(ts, quest) -> list[dict]:
     """有効パーティーの DTO 配列（GET members・PUT party・詳細で共有）。N+1 回避で users を一括取得。
 
     各メンバーの `in_scope`（参加部署アクセス可否＝失効表示用）は参加部署スコープを一度だけ引いて付与。
+    `group_ids`（有効所属全件）も一括取得して付与（チップ常時表示/スコープ再判定・req2/3）。
     """
     members = repo.list_active_members(ts, quest.id)
     users = repo.get_users_by_ids(ts, {m.user_id for m in members})
     has_depts, dept_users = _dept_scope(ts, quest)
+    memberships = repo.all_active_group_ids_by_user(ts, [m.user_id for m in members])
     return [
-        _member_dto(ts, m, quest.owner_id, users.get(m.user_id), has_depts=has_depts, dept_users=dept_users)
+        _member_dto(
+            ts, m, quest.owner_id, users.get(m.user_id),
+            has_depts=has_depts, dept_users=dept_users, member_group_ids=memberships.get(m.user_id, []),
+        )
         for m in members
     ]
 

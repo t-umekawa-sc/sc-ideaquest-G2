@@ -19,6 +19,7 @@ import {
   deleteQuestIcon,
   getQuest,
   listCompanyGroupDirectory,
+  listQuestGroups,
   listQuestGroupCandidates,
   publishQuest,
   setQuestIcon,
@@ -65,8 +66,35 @@ function permsFromApi(perms: string[]): Record<PermKey, boolean> {
   return base;
 }
 
-// inScope=false＝参加部署外＝失効中（このクエストを参照できない・FR-38・C.0）。UI で明示表示する。
-type Member = { userId: string; name: string; ini: string; perms: Record<PermKey, boolean>; inScope: boolean };
+// inScope=false＝参加グループ外＝失効中（このクエストを参照できない・FR-38・C.0）。UI で明示表示する。
+// deptIds＝当該メンバーが有効所属する全クエストグループ（会社内全件・C.1 group_ids）＝チップ常時表示と
+// 参加グループ変更時のクライアント側 inScope 再判定に使う（req2/3）。
+type Member = { userId: string; name: string; ini: string; perms: Record<PermKey, boolean>; inScope: boolean; deptIds: string[] };
+
+// 参加グループ集合に対する当該メンバーの参照可否（作成者除く一般メンバー）。
+// 参加グループ 0 件＝全社（全員可）／1 件以上＝自分の所属グループがいずれか一致すれば可（C.0 と同一定義）。
+function memberInScope(memberDeptIds: string[], deptIds: string[]): boolean {
+  if (deptIds.length === 0) return true;
+  return memberDeptIds.some((g) => deptIds.includes(g));
+}
+
+// 所属グループのバッジ表示＝先頭 N 件のみチップ表示＋残りは「+M」。ホバー（title）で全件を表示。
+// チップが長くなり過ぎるのを防ぐ（req2 の運用フィードバック）。名前未解決（ディレクトリ未取得）分は除外。
+const GROUP_CHIP_MAX = 2;
+function GroupBadges({ ids, names }: { ids: string[]; names: Record<string, string> }) {
+  const labels = ids.map((id) => names[id]).filter((x): x is string => !!x);
+  if (labels.length === 0) return null;
+  const shown = labels.slice(0, GROUP_CHIP_MAX);
+  const rest = labels.length - shown.length;
+  return (
+    <span className="grp-badges" title={labels.join("・")}>
+      {shown.map((d) => (
+        <span key={d} className="cand__depts">{d}</span>
+      ))}
+      {rest > 0 && <span className="cand__depts grp-badges__more">+{rest}</span>}
+    </span>
+  );
+}
 
 type Props = {
   mode?: "create" | "edit";
@@ -88,7 +116,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       locale === "en"
         ? {
             title: "Title is required.",
-            quest_group_ids: "Select a valid department.",
+            quest_group_ids: "Select a valid group.",
             categories: "Add at least one category.",
             deadline: "Deadline is required.",
             purpose: "Purpose/theme is required.",
@@ -98,7 +126,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           }
         : {
             title: "件名は必須です。",
-            quest_group_ids: "有効な部署を選択してください。",
+            quest_group_ids: "有効なグループを選択してください。",
             categories: "カテゴリーを1つ以上指定してください。",
             deadline: "期限日は必須です。",
             purpose: "目的・テーマは必須です。",
@@ -157,6 +185,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
   const [ownerLabel, setOwnerLabel] = useState(ownerName);
   const [ownerId, setOwnerId] = useState<string | null>(ownerUserId); // 候補除外に使う「作成者」
+  const [ownerDeptIds, setOwnerDeptIds] = useState<string[]>([]); // 作成者の所属グループ（チップ表示用・req2）
   const [status, setStatus] = useState<string>("draft"); // 編集時は取得値
   const [loading, setLoading] = useState(isEdit); // 編集はプリフィル取得まで loading
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -185,6 +214,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     };
   }, []);
 
+  // 作成モード＝作成者（＝自分）の所属グループを取得（チップ表示用・req2）。GET /quest-groups＝自分の有効所属。
+  useEffect(() => {
+    if (isEdit) return;
+    let alive = true;
+    void listQuestGroups()
+      .then((res) => { if (alive) setOwnerDeptIds((res?.data ?? []).map((g) => g.id)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isEdit]);
+
   // 編集モード＝詳細を取得してプリフィル（参加部署・作成者/メンバー/内容を反映）。
   useEffect(() => {
     if (!isEdit || !questId) return;
@@ -205,6 +244,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         setOwnerLabel(d.owner.display_name);
         setOwnerId(d.owner.user_id);
         setIconUrl(d.icon_image_url ?? null);
+        // 作成者の所属グループ（チップ表示用・req2）＝is_creator メンバーの group_ids。
+        const creator = (d.members ?? []).find((m) => m.is_creator);
+        setOwnerDeptIds(creator?.group_ids ?? []);
         setMembers(
           (d.members ?? [])
             .filter((m) => !m.is_creator)
@@ -214,6 +256,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               ini: m.user.display_name.trim().charAt(0) || "?",
               perms: permsFromApi(m.permissions ?? []),
               inScope: m.in_scope ?? true,
+              deptIds: m.group_ids ?? [],
             })),
         );
       })
@@ -233,6 +276,23 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const candGroupKey = candGroupFilter.join(",");
   // 有効な絞込グループ＝候補内グループ絞込があればそれ、無ければ参加部署全て（0 件なら空＝会社全体・C.4）。
   const effectiveGroupIds = candGroupFilter.length ? candGroupFilter : deptIds;
+
+  // req3: 参加グループを変更したら、選択中メンバーの in_scope を各自の所属（deptIds）で即時再判定する。
+  // 変わったメンバーだけ差し替え（無変化なら同一参照を返して再描画を無駄に起こさない）。
+  useEffect(() => {
+    setMembers((cur) => {
+      let changed = false;
+      const next = cur.map((m) => {
+        const s = memberInScope(m.deptIds, deptIds);
+        if (s === m.inScope) return m;
+        changed = true;
+        return { ...m, inScope: s };
+      });
+      return changed ? next : cur;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deptKey]);
+
   const CAND_PAGE = 30; // 候補の1ページ取得件数（keyset・もっと見る）
   useEffect(() => {
     if (frozen) {
@@ -303,11 +363,11 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     return map;
   }, [directory, deptNamesPrefill]);
 
-  // 候補内グループ絞込の選択肢＝クエストの参加部署（その範囲内で絞る・2件以上のとき表示）。
-  const candGroupOptions = useMemo<MultiselectOption[]>(
-    () => deptIds.map((id) => ({ value: id, label: groupNameById[id] ?? id })),
-    [deptIds, groupNameById],
-  );
+  // 候補内グループ絞込の選択肢。参加グループ指定時はその範囲内、未選択（全社）時は会社の全グループを対象に絞れる（req5）。
+  const candGroupOptions = useMemo<MultiselectOption[]>(() => {
+    const source = deptIds.length ? deptIds : directory.map((g) => g.id);
+    return source.map((id) => ({ value: id, label: groupNameById[id] ?? id }));
+  }, [deptIds, directory, groupNameById]);
 
   function onPickIcon(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -339,8 +399,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   }
 
   function addMember(c: QuestCandidate) {
-    // 候補から追加＝現時点で参加部署内（または 0 件で全社）＝in_scope true。
-    setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: true }]);
+    // 候補から追加＝所属グループ（全件）を保持し、現在の参加グループで in_scope を判定（req2/3）。
+    const cd = c.group_ids ?? [];
+    setMembers((m) => [...m, { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }]);
   }
   function addAllCandidates() {
     // 表示中（取得済み・未追加）の候補を一括追加。件数が多い時は確認（サーバーページングのため「表示中」が対象）。
@@ -350,7 +411,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       const have = new Set(m.map((x) => x.userId));
       const add = displayedCandidates
         .filter((c) => !have.has(c.user_id))
-        .map((c) => ({ userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: true }));
+        .map((c) => { const cd = c.group_ids ?? []; return { userId: c.user_id, name: c.display_name, ini: c.display_name.trim().charAt(0) || "?", perms: defaultPerms(), inScope: memberInScope(cd, deptIds), deptIds: cd }; });
       return [...m, ...add];
     });
   }
@@ -570,15 +631,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
         {/* 参加部署（アクセス条件・フラット 0..N・すべて同格・FR-38 再設計。主グループは廃止）。 */}
         {!frozen && (
-          <Field id="q_depts" label="参加部署（アクセス条件・任意）" hint="会社の部署（クエストグループ）を複数選択できます。非作成者はいずれかの参加部署に現在所属していないと参照できません（作成者は別格で常に参照可）。未選択（0件）なら全社がアクセス可＋候補になります。">
+          <Field id="q_depts" label="参加グループ（アクセス条件・任意）" hint="会社のクエストグループを複数選択できます。非作成者はいずれかの参加グループに現在所属していないと参照できません（作成者は別格で常に参照可）。未選択（0件）なら全社がアクセス可＋候補になります。">
             <Multiselect
               id="q_depts"
               options={deptOptions}
               value={deptIds}
               onChange={(v) => { setDeptIds(v); setCandGroupFilter((f) => f.filter((x) => v.includes(x))); }}
-              placeholder="部署を検索…（未選択なら全社）"
-              ariaLabel="参加部署（アクセス条件）"
-              emptyText="該当する部署がありません"
+              placeholder="グループを検索…（未選択なら全社）"
+              ariaLabel="参加グループ（アクセス条件）"
+              emptyText="該当するグループがありません"
             />
           </Field>
         )}
@@ -614,16 +675,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 <span className="party__count">候補から選ぶ</span>
               </div>
               <div className="party__add">
-                {deptIds.length > 1 && (
+                {/* 絞込に意味がある（選択肢が2件以上）ときだけ表示。全社（未選択）時は会社の全グループが対象（req5）。 */}
+                {candGroupOptions.length > 1 && (
                   <div style={{ marginBottom: "var(--space-2)" }}>
                     <Multiselect
                       id="q_cand_group"
                       options={candGroupOptions}
                       value={candGroupFilter}
                       onChange={setCandGroupFilter}
-                      placeholder="参加部署内で絞込…（未選択＝参加部署すべて）"
-                      ariaLabel="候補を参加部署で絞り込み"
-                      emptyText="該当する部署がありません"
+                      placeholder={deptIds.length ? "参加グループ内で絞込…（未選択＝参加グループすべて）" : "グループで絞込…（未選択＝全社の全員）"}
+                      ariaLabel="候補をグループで絞り込み"
+                      emptyText="該当するグループがありません"
                     />
                   </div>
                 )}
@@ -640,14 +702,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                 <div className="party__candmeta">候補（表示中）{displayedCandidates.length} 名{candHasNext ? "・さらに候補あり" : ""}</div>
                 <div className="candlist">
                   {displayedCandidates.map((c) => {
-                    const depts = (c.group_ids ?? []).map((g) => groupNameById[g]).filter(Boolean);
                     return (
                       <button key={c.user_id} className="cand" type="button" onClick={() => addMember(c)}>
                         <span className="avatar sm"><span className="avatar__img placeholder">{c.display_name.trim().charAt(0) || "?"}</span></span>
                         <span className="cand__name">{c.display_name}</span>
-                        {deptIds.length > 1 && depts.map((d) => (
-                          <span key={d} className="cand__depts">{d}</span>
-                        ))}
+                        {/* 所属グループを常に表示（req2）。先頭N件＋「+M」・ホバーで全件（GroupBadges）。 */}
+                        <GroupBadges ids={c.group_ids ?? []} names={groupNameById} />
                         <span className="cand__plus" aria-hidden>＋</span>
                       </button>
                     );
@@ -674,14 +734,14 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             </div>
             {outOfScopeCount > 0 && (
               <p className="role-note" role="status" style={{ marginTop: 0 }}>
-                ⚠ 現在の参加部署の構成では<strong>{outOfScopeCount} 名</strong>が参照できません（部署外・失効中）。部署を追加するか、対象メンバーを外してください。
+                ⚠ 現在の参加グループの構成では<strong>{outOfScopeCount} 名</strong>が参照できません（グループ外・失効中）。グループを追加するか、対象メンバーを外してください。
               </p>
             )}
             {!frozen && members.length > 0 && (
               <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 <input className="input" placeholder="選択中を絞り込み（名前）" value={selQuery} onChange={(e) => setSelQuery(e.target.value)} aria-label="選択中のメンバーを名前で絞り込み" />
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-danger" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>部署外・失効中のみ</button>
+                  <button type="button" className={`btn btn-sm ${selOutOnly ? "btn-danger" : "btn-outline"}`} aria-pressed={selOutOnly} onClick={() => setSelOutOnly((v) => !v)}>グループ外・失効中のみ</button>
                   <button type="button" className="btn btn-sm btn-danger" disabled={filteredMembers.length === 0} onClick={bulkRemoveMembers}>
                     {selQuery.trim() || selOutOnly ? `絞り込み対象をまとめて外す（${filteredMembers.length}）` : `すべて外す（${filteredMembers.length}）`}
                   </button>
@@ -696,6 +756,10 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                     <span className="pmember__name">{ownerLabel}</span>
                     <span className="badge badge-muted">{isEdit ? "作成者" : "あなた・作成者"}</span>
                   </div>
+                  {/* 所属グループは氏名の一行下に表示（先頭N件＋「+M」・ホバーで全件）。 */}
+                  {ownerDeptIds.length > 0 && (
+                    <div className="pmember__depts"><GroupBadges ids={ownerDeptIds} names={groupNameById} /></div>
+                  )}
                   <div className="pmember__perms">
                     <span className="perm perm-owner is-on" aria-disabled="true" title="作成者は既定で所有者・剥奪不可">所有者</span>
                     {PERM_LABELS.map(([, label]) => (
@@ -710,8 +774,12 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
                   <div className="pmember__main">
                     <div className="pmember__top">
                       <span className="pmember__name">{m.name}</span>
-                      {!m.inScope && <span className="badge badge-danger" title="どの参加部署にも所属していないため、このクエストを参照できません（異動などで失効）">部署外・失効中</span>}
+                      {!m.inScope && <span className="badge badge-danger" title="どの参加グループにも所属していないため、このクエストを参照できません（異動などで失効）">グループ外・失効中</span>}
                     </div>
+                    {/* 所属グループは氏名の一行下に表示（先頭N件＋「+M」・ホバーで全件）。 */}
+                    {m.deptIds.length > 0 && (
+                      <div className="pmember__depts"><GroupBadges ids={m.deptIds} names={groupNameById} /></div>
+                    )}
                     <div className="pmember__perms">
                       {PERM_LABELS.map(([key, label]) => (
                         <span key={key} role="button" tabIndex={frozen ? -1 : 0} className={`perm${m.perms[key] ? " is-on" : ""}`}
