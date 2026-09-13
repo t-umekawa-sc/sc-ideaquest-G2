@@ -135,21 +135,27 @@ export function QuestListView() {
   }, [quests]);
 
   // 複製＝作成ダイアログ（SC-11）を追加モードで開き、入力項目を引き継ぐ（デザイン標準 §4.5 複製・2026-09-06 改定）＝
-  // 件名/カラー/カテゴリー/グループ/期限日/目的・テーマ。クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
-  // 目的・テーマ（purpose）は一覧DTOに無いので詳細（C.1 getQuest）を取得して引き継ぐ（編集プリフィルと同じ源）。
-  // id・ステータス（→下書き）・アイコン画像・パーティー編成はサーバー生成/バイナリ/関係のため引き継がず新規入力。
+  // 件名/カラー/カテゴリー/参加グループ/期限日/目的・テーマ＋**参加メンバー（パーティー）＋権限**（2026-09-13 決定）。
+  // クエストは一意キー（コード等）を持たないため一意衝突の心配は無い。
+  // 目的・テーマ（purpose）・参加グループ（quest_groups 0..N・FR-38）・パーティー（members）は一覧DTOに無いので
+  // 詳細（C.1 getQuest）を取得して引き継ぐ。作成者は新しい作成者（＝自分）に置き換わるため members からは除外。
+  // id・ステータス（→下書き）・アイコン画像はサーバー生成/バイナリのため引き継がず新規入力。
   const questMenu = (x: Quest): RowMenuItem[] => [
     {
       label: "複製",
       onClick: async () => {
-        // 目的・テーマは一覧に無い＝詳細を取得して載せる（取得失敗時は空でフォールバック）。
+        // 目的・テーマ／参加グループ／パーティーは一覧に無い＝詳細を取得して載せる（取得失敗時は空でフォールバック）。
         const detail = await getQuest(x.id).catch(() => null);
         router.push(
           buildDuplicateHref("/quests/new", {
             title: x.title,
             color: x.accent,
             categories: x.cats,
-            quest_group_id: x.groupId,
+            quest_group_ids: (detail?.quest_groups ?? []).map((g) => g.id), // 参加グループ（アクセス条件）を引き継ぐ（FR-38・0..N）
+            // パーティー＝作成者以外の参加メンバーを権限・所属グループ込みで引き継ぐ（新作成者はフォームが別途 owner で追加）。
+            members: (detail?.members ?? [])
+              .filter((m) => !m.is_creator)
+              .map((m) => ({ user_id: m.user.user_id, display_name: m.user.display_name, permissions: m.permissions, group_ids: m.group_ids ?? [] })),
             deadline: x.deadlineRaw,
             purpose: detail?.purpose ?? "",
           }),

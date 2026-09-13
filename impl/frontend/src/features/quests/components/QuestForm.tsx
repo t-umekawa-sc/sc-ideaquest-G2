@@ -153,6 +153,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             categories?: string[];
             purpose?: string;
             quest_group_ids?: string[];
+            // 複製で引き継ぐパーティー（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
+            members?: { user_id: string; display_name: string; permissions?: string[]; group_ids?: string[] }[];
             deadline?: string;
           }>(searchParams),
     [isEdit, searchParams],
@@ -181,7 +183,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [candLoadingMore, setCandLoadingMore] = useState(false);
   const [candQuery, setCandQuery] = useState(""); // 候補の名前絞り込み（サーバー q）
   const [candGroupFilter, setCandGroupFilter] = useState<string[]>([]); // 参加部署内でのグループ絞込（空＝参加部署全て）
-  const [members, setMembers] = useState<Member[]>([]);
+  // 複製時はプリフィルのメンバー（作成者以外・権限/所属グループ込み）で初期化。in_scope は複製した参加グループで判定。
+  const [members, setMembers] = useState<Member[]>(() =>
+    (dup?.members ?? []).map((m) => ({
+      userId: m.user_id,
+      name: m.display_name,
+      ini: m.display_name.trim().charAt(0) || "?",
+      perms: permsFromApi(m.permissions ?? []),
+      inScope: memberInScope(m.group_ids ?? [], dup?.quest_group_ids ?? []),
+      deptIds: m.group_ids ?? [],
+    })),
+  );
   const [selQuery, setSelQuery] = useState(""); // 選択中パーティーの名前絞込
   const [selOutOnly, setSelOutOnly] = useState(false); // 参加部署外（失効中）のみ表示
   const SEL_PAGE = 8;
