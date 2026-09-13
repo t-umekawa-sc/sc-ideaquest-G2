@@ -630,6 +630,9 @@ body.modal-open { overflow: hidden; }
 .vote-card { --accent: var(--color-primary); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block; transition: box-shadow .15s, border-color .15s; }
 .vote-card.is-voted { opacity: .6; }
 .vote-card__quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+/* クエスト名リンク（未投票カード等）＝パネル内の他リンク（.dash-chat-link）と同じ＝プライマリ色・下線はホバー時のみ。 */
+.vote-card__quest--link { display: block; width: fit-content; color: var(--color-primary); text-decoration: none; }
+.vote-card__quest--link:hover { text-decoration: underline; }
 .vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .vote-card__poster { margin-top: var(--space-3); }
 .idea-title-row { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }

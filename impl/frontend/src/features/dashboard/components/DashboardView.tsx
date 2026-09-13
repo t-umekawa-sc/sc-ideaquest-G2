@@ -287,7 +287,8 @@ export function DashboardView({
                     </span>
                     <span className="badge badge-muted">未投票</span>
                   </div>
-                  <div className="vote-card__quest">{v.quest.title}</div>
+                  {/* クエスト名＝クエスト詳細への動線（SC-12）。 */}
+                  <Link className="vote-card__quest vote-card__quest--link" href={`/quests/${v.quest.id}`}>{v.quest.title}</Link>
                   <div className="vote-card__value">{v.value}</div>
                   <div className="vote-card__poster poster"><Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
                   {/* チャットへ直行（戻るはダッシュボードに戻る＝markChatFromDashboard でラベル出し分け）。 */}
