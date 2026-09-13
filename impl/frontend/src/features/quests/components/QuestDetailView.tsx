@@ -281,7 +281,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
     .slice(0, 6);
 
   const canEdit = !!quest && (quest.my_permissions.includes("owner") || quest.my_permissions.includes("quest_admin"));
-  const nextStatus = quest ? STATUS_ORDER[STATUS_ORDER.indexOf(quest.status) + 1] : undefined;
+  const curStatusIdx = quest ? STATUS_ORDER.indexOf(quest.status) : -1;
+  const nextStatus = curStatusIdx >= 0 ? STATUS_ORDER[curStatusIdx + 1] : undefined;
+  // 後退＝隣接1段のみ・draft（0）へは戻さない＝下限 recruiting（curIdx>=2 のとき prev が recruiting 以上）。C.5。
+  const prevStatus = curStatusIdx >= 2 ? STATUS_ORDER[curStatusIdx - 1] : undefined;
 
   async function onTransition() {
     if (!quest || !nextStatus) return;
@@ -298,6 +301,28 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       snack({ type: "success", title: "ステータスを更新しました", msg: `${STATUS_LABEL[nextStatus]} に進めました。` });
     } catch (err) {
       snack({ type: "error", title: "更新できませんでした", msg: err instanceof ApiError && err.code === "validation_error" ? "公開に必要な項目が不足しています。" : "時間をおいて再度お試しください。" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onTransitionBack() {
+    if (!quest || !prevStatus) return;
+    const revertingCompletion = quest.status === "completed";
+    const ok = await confirm({
+      title: "ステータスを戻す",
+      msg: `「${STATUS_LABEL[quest.status]}」→「${STATUS_LABEL[prevStatus]}」に戻します。よろしいですか？（隣接1段のみ）`
+        + (revertingCompletion ? "\n※ 完了時に確定した投稿者コイン・通知・成果フィードは取り消されません。" : ""),
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const updated = await transitionQuest(questId, { to: prevStatus });
+      setQuest(updated);
+      window.dispatchEvent(new Event(QUESTS_CHANGED_EVENT));
+      snack({ type: "success", title: "ステータスを更新しました", msg: `${STATUS_LABEL[prevStatus]} に戻しました。` });
+    } catch {
+      snack({ type: "error", title: "更新できませんでした", msg: "時間をおいて再度お試しください。" });
     } finally {
       setBusy(false);
     }
@@ -459,6 +484,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                     items={[
                       ...(quest.status !== "completed" && nextStatus
                         ? [{ label: `ステータスを進める（→ ${STATUS_LABEL[nextStatus]}）`, onClick: () => void onTransition() }]
+                        : []),
+                      ...(prevStatus
+                        ? [{ label: `ステータスを戻す（→ ${STATUS_LABEL[prevStatus]}）`, onClick: () => void onTransitionBack() }]
                         : []),
                       { label: "クエストを削除", danger: true, onClick: () => void onDelete() },
                     ]}
