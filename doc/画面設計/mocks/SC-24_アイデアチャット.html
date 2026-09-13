@@ -120,6 +120,8 @@
     border: none; background: none; border-radius: var(--radius-full); cursor: pointer; font-size: 14px; color: var(--color-text-muted); }
   .msg__act:hover { background: var(--color-surface-alt); color: var(--color-text); }
   .msg__edited { font-size: var(--text-xs); color: var(--color-text-muted); margin-left: 6px; }
+  /* FR-39 (b) 重要（ピン留め）バッジ＝最終結果の議論の要点に集約される発言。 */
+  .msg__pinned { font-size: var(--text-xs); font-weight: 600; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 0 8px; margin-left: 6px; }
 
   /* インライン編集（下部コンポーザーと同じ見た目＋ツールバー） */
   .msg__editbox { width: 100%; min-height: 56px; max-height: 200px; resize: none; overflow-y: auto;
@@ -234,7 +236,7 @@
     <div class="msg" id="m2">
       <span class="avatar sm"><span class="avatar__img placeholder">鈴</span></span>
       <div class="msg__body">
-        <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">15:02</span></div>
+        <div class="msg__head"><span class="msg__name">鈴木 花子</span><span class="msg__time">15:02</span><span class="msg__pinned">📌 重要</span></div>
         <p class="msg__text"><span class="mention">@田中一郎</span> 平均62%です。集約後は80%超を見込んでいます。根拠は添付の試算シート参照。</p>
         <div class="msg__files">
           <span class="file-chip"><span class="file-icon">📄</span><a href="#">夜間配送_試算シート.xlsx</a><span class="muted">248KB</span></span>
@@ -717,6 +719,8 @@
     const acts = [
       { key:'react', icon:'🙂', title:'リアクション' },
       { key:'quote', icon:'💬', title:'引用返信' },
+      // FR-39 (b) ピン留め＝重要メッセージ（最終結果の議論の要点に集約）。実装は owner/quest_admin のみ表示。
+      { key:'pin', icon:'📌', title:'ピン留め（重要・最終結果に集約）' },
     ];
     if (isOwn(msg)) { acts.push({ key:'edit', icon:'✏️', title:'編集' }, { key:'delete', icon:'🗑', title:'削除' }); }
     bar.innerHTML = acts.map(a => '<button class="msg__act" type="button" data-act="' + a.key + '" title="' + a.title + '" aria-label="' + a.title + '">' + a.icon + '</button>').join('');
@@ -727,6 +731,12 @@
       else if (act === 'quote') startReply(msg);
       else if (act === 'edit') startEdit(msg);
       else if (act === 'delete') deleteMsg(msg);
+      else if (act === 'pin') {  // モック＝トグル表示（📌重要 バッジの付け外し）
+        const head = msg.querySelector('.msg__head'); if (!head) return;
+        const existing = head.querySelector('.msg__pinned');
+        if (existing) existing.remove();
+        else { const s = document.createElement('span'); s.className = 'msg__pinned'; s.textContent = '📌 重要'; head.appendChild(s); }
+      }
     });
     msg.appendChild(bar);
   }

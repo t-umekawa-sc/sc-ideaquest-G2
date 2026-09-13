@@ -83,8 +83,9 @@
 | C-TC-135 | api | 権限セット置換 | メンバー追加済み | `PUT .../permissions` | 送った集合で置換 | C.3 |
 | C-TC-136 | api | 作成者の権限は変更不可 | recruiting クエスト | `PUT .../{作成者}/permissions` | 422（owner 剥奪防止） | C.3 |
 | C-TC-137 | api | 前進遷移 | recruiting クエスト | `POST transition {to:in_progress}` | 200・in_progress | C.5 |
-| C-TC-138 | api | 飛び越え遷移の禁止 | recruiting クエスト | `POST transition {to:evaluating}` | 409 conflict | C.5 |
+| C-TC-138 | api | 飛び越え遷移の禁止（隣接1段のみ） | recruiting クエスト | `POST transition {to:evaluating}` | 409 conflict | C.5 |
 | C-TC-139 | api | draft→recruiting は strict 公開 | 充足済み draft | `POST transition {to:recruiting}` | 200・recruiting | C.5／C.2 |
+| C-TC-140 | api | 後退遷移＝隣接1段のみ許可（2026-09-13） | in_progress クエスト | `POST transition {to:recruiting}`／続けて {to:draft} | 200・recruiting／draft戻し（非公開化）は 409 | C.5 |
 | C-TC-140 | api | 論理削除 | recruiting クエスト | `DELETE /quests/{id}` | 204・以後 GET 詳細 404 | C.2 |
 | C-TC-141 | api | パーティー編集の認可 | 他人所有・自分は非 owner/admin | `PUT .../party` | 403 | C.3 |
 | C-TC-142 | api | 完了クエストのパーティー凍結 | completed クエスト | `POST .../members` | 409 conflict | C.5 |

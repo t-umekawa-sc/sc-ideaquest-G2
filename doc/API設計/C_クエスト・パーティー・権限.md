@@ -124,13 +124,15 @@
 | --- | --- | --- | --- |
 | `POST /quests/{quest_id}/transition` | ステータスを前進（`owner`/`quest_admin`） | ボディ: `to`（`recruiting\|in_progress\|evaluating\|completed`） | 更新後のクエスト |
 
-- **許可遷移（前進のみ・サーバーで強制）**: `draft→recruiting`（＝publish と等価）／`recruiting→in_progress`／`in_progress→evaluating`／`evaluating→completed`。**逆行・飛び越えは 409 `invalid_state`**（MVP。運用戻しは C.7）。
+- **許可遷移（隣接1段の前進・後退・サーバーで強制／2026-09-13 更新）**: 前進＝`draft→recruiting`（＝publish 等価・strict）／`recruiting→in_progress`／`in_progress→evaluating`／`evaluating→completed`。**後退も隣接1段のみ許可**（運用上の戻し・再検討）＝`completed→evaluating`／`evaluating→in_progress`／`in_progress→recruiting`。**ただし `recruiting→draft`（非公開化）は transition では不可**（下限＝recruiting・unpublish は別概念）。**飛び越え（2段以上）は 409 `invalid_state`**。
+  - **完了の副作用は初回のみ（冪等）**: `→completed` を後退→再前進で繰り返しても、投稿者コイン確定（F.4・冪等）／`quest_completed` フィード（冪等）／`quest_result_ready` 通知（**初回完了時のみ**）は二重発生させない。**一度発行した通知/確定は後退で取り消さない**（会計・通知の整合）。
 - **`→completed` の副作用＝投稿者コインの一括確定フックを起動**: `evaluating→completed` の遷移時に、**未確定の全 published アイデア**について評価連動コインを一括確定・付与する（**正は データモデル §7／API設計 F.4**・`reason=evaluation_coin`・アイデア単位に1回・冪等）。※本フックは完了遷移そのものの一部であり、C.5 の「完了後の書き込み凍結」対象（＝ユーザー操作）ではない。全員評価済みなら締切前でも F.4-(a) で早期確定済みの場合があり、その分は既確定として二重付与しない。
 - **`completed`（完了）で書き込み凍結（＝完了時の書き込み可否の canonical）**: 完了後は次を**サーバーが拒否**（`409 conflict`〔`invalid_state`〕・読み取り専用・データモデル §8-⑪/各ドメインで再掲）＝**アイデア投稿/編集/削除・アイデア添付の追加/削除・投票（登録/切替/取消）・チャット投稿/編集/削除/リアクション・評価**。
   - **唯一の例外＝フォロー（通知購読）は「解除のみ」可**（`DELETE /ideas/{id}/follow`＝残存購読の後片付け・状態を汚さない）。**新規フォロー（`POST`）は 409**（完了後は通知対象イベントが発生せず無意味・ドメイン D.6）。
   - 凍結の**具体的な EP 挙動は各ドメインが持つ**＝アイデア/添付/投票/フォロー＝D（D.0/D.2/D.3/D.5/D.6）、チャット/リアクション＝E、評価＝F。本節（C.5）が**全体像の単一正**、各ドメインは自 EP の 409 応答を再掲する。
 - **表示ラベル「選定」について**: SC 画面が示す「選定」は独立した enum 値では**なく**、`evaluating`〜`completed` の過程で行われる「アイデア選定」（＝選定アイデア投稿者へ XP200・ドメイン F/G）の**表示上の呼称**。ステータス機械は §3 の 5 値に従う（C.7 に整理項目として記録）。
 - **状態遷移 UI をどこに置くか**（SC-11 に持たせるか専用 UI か）は画面側 TBD（SC-11 §9）＝本 API はエンドポイントを提供し、UI 配置はフロント設計に委ねる。
+- **`→completed` の副作用（FR-39 追加・2026-09-13）**: 投稿者コイン確定に加え、**②チーム成果フィード**に `quest_completed`（0XP マイルストーン・冪等・`activities.reason`・`PUBLIC_FEED_REASONS`）を記帳し、**③作成者以外の有効パーティー員へ通知** `quest_result_ready`（H・SC-02→SC-12）を post-commit で発行する。
 
 ## C.6 セキュリティ対策マッピング（`doc/WEBアプリ開発時のセキュリティ対策一覧.md` 突合・§2認可/4入力/9API/18業務）
 
@@ -159,3 +161,16 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 - **論点2・クエストアイコン＝専用 multipart EP＋2段**: 会社アバターと同流儀で `PUT/DELETE /quests/{quest_id}/icon-image`（multipart・`validate_image_upload` 流用）。作成/編集は「本体保存→アイコン PUT」の2段（K.4 流儀）。作成レスポンスの `id` を使ってアイコンを PUT。
 - **論点3・publish 通知（H に結線済み・2026-08 実装）**: publish は内容適用＋strict 検証＋`draft→recruiting` を実装し、参加通知（`quest_party_invited`）を **post-commit で H に結線済み**（`_notify_party_invited`＝追加パーティーメンバーへ通知）。※以前の「H 実装まで no-op フック stub」から更新。種別は データモデル §3・§5.24・H.0 発火元表に登録済み。
 - **論点4・下書き members 空＝許容**（上記 TBD 参照）。
+
+## C.8 クエストの最終結果＝検証済みコンセプト票（FR-39・ISO 56002・SC-12「🏁 結果」タブ）
+
+> 意図・ISO 56002 マッピングは [設計意図メモ](../設計ドラフト/FR-39_ISO56002との関係と設計意図.md)／[FR-39 設計ドラフト](../設計ドラフト/FR-39_クエスト最終結果_ISO56002.md)。クエスト完了時の「検証済みコンセプト票」＝既存3成果物（アイデア＋議論＋評価）の凝縮。①検証済みコンセプト/②検証サマリ/③意思決定は**既存集計の合成**（新規列なし）、④振り返り・⑤次アクション・KPI・(c)要約キャッシュのみ `quest_outcomes`（データモデル §5.32）に保持。
+
+| メソッド/パス | 概要 | 入力 | 出力・ルール |
+|---|---|---|---|
+| `GET /quests/{quest_id}/result` | 最終結果の取得（読取合成・SC-12 結果タブ） | パス: `quest_id` | 門番＝`can_access_quest`（C.0・範囲外 404）。`decisions[]`（公開アイデア＝title/value/author/is_selected/overall_avg/evaluation_count・評価平均降順）／`aspect_averages`（5観点平均・**可視な submitted のみ**・F.1）／`participation`（idea/選定/投票/評価/party 数）／`pinned_messages[]`（(b)＝ピン留めチャットの抜粋/投稿者/所属アイデア）／`outcome`（summary/learnings/next_actions/metrics/chat_summary/updated_by/at）／`can_edit`（owner・quest_admin）。**タブは常時表示＝完了前は「暫定」明示**（表示制御はフロント・EP は status 非依存で返す） |
+| `PUT /quests/{quest_id}/result` | 総括の保存（④⑤・KPI） | パス: `quest_id`／ボディ: `summary?`/`learnings?`/`next_actions?`/`metrics?`（`[{label,value}]`）＝送られた項目のみ更新（extra=forbid） | `owner`/`quest_admin` のみ（他は 403）。範囲外 404。初回の実内容記入で **XP+20**（`reason=quest_result_summary`・クエスト単位で本人1回・冪等・G） |
+| `POST /quests/{quest_id}/result/chat-summary` | (c) 議論の自動要約を生成/再生成 | パス: `quest_id` | `owner`/`quest_admin` のみ。当該クエストの公開アイデアのチャット本文（非削除・**上限500件**）を**抽出型・オフライン（外部API/課金/外部送信なし・`janome`＋頻度ベース）**で要約し `quest_outcomes.chat_summary` に保存。応答＝`PUT` と同形の総括。将来 LLM 差し替えは要約 seam（`app/tenant/quests/summarize.py`）で局所化 |
+
+- (b) **ピン留め**（重要メッセージ＝議論の要点）の付与/解除はチャット（E ドメイン）の `POST/DELETE /chat-messages/{id}/pin`（owner/quest_admin・[E API](E_チャット.md)）。結果 EP はその集約を `pinned_messages` として返す。
+- **完了時の副作用**（C.5 参照）＝チーム成果フィード `quest_completed`＋パーティー通知 `quest_result_ready`。
