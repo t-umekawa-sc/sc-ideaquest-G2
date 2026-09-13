@@ -111,7 +111,9 @@
 
 /* タブ（横スクロール＝狭幅で縦書きにならない）。overflow-x を指定すると overflow-y が auto に強制されるため、
    overflow-y:hidden を明示＝タブの margin-bottom:-2px（アクティブ下線の重なり）で縦スクロールバーが出ないように。 */
-.tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+/* タブはスクロール時にヘッダー直下へ吸着（フローティング）＝長いアイデア/結果を見ながらタブ切替できる。
+   背景を敷いて配下コンテンツの透けを防ぎ、z-index はヘッダー(10)より下。上端の余白ぶんも塗る。 */
+.tabs { position: sticky; top: var(--header-h); z-index: 5; background: var(--color-bg); padding-top: var(--space-3); box-shadow: 0 6px 8px -8px rgba(15,23,42,.25); display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-6) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 /* #quest-tabs への戻り時スクロールが sticky ヘッダー＋フローティング戻るピル（.backlink--float）に
    隠れないよう余白を確保（ヘッダー高＋ピル約3.5rem）。 */
 #quest-tabs { scroll-margin-top: calc(var(--header-h) + 3.5rem); }
