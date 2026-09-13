@@ -9,6 +9,7 @@ export type QuestGroupsResponse = components["schemas"]["QuestGroupsResponse"];
 export type QuestDetail = components["schemas"]["QuestDetailDTO"];
 export type QuestMember = components["schemas"]["QuestMemberDTO"];
 export type QuestMemberInput = components["schemas"]["QuestMemberInput"];
+export type QuestMembersResponse = components["schemas"]["QuestMembersResponse"];
 export type QuestCreateInput = components["schemas"]["QuestCreateRequest"];
 export type QuestUpdateInput = components["schemas"]["QuestUpdateRequest"];
 export type QuestPublishInput = components["schemas"]["QuestPublishRequest"];
@@ -95,6 +96,12 @@ export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null
 // クエスト編集（SC-11・C.2）。差分＝送るフィールドのみ。status は変えない（遷移は publish/transition）。
 export function updateQuest(questId: string, input: QuestUpdateInput): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>(`/quests/${questId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+// パーティー（参加メンバー＋権限）だけを一括更新（C.3 PUT /quests/{id}/party・あるべき全体像で差分適用）。
+// SC-12「パーティー・権限を編集」＝URL モーダルから members のみ送る（参加グループ等の内容は触らない）。owner/quest_admin。
+export function updateParty(questId: string, members: QuestMemberInput[]): Promise<QuestMembersResponse | null> {
+  return apiFetch<QuestMembersResponse>(`/quests/${questId}/party`, { method: "PUT", body: JSON.stringify({ members }) });
 }
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。

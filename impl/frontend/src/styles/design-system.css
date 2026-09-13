@@ -366,6 +366,7 @@ body.iq-nav-lock { overflow: hidden; }
 .modal.show .modal__backdrop { opacity: 1; }
 .modal__panel {
   position: relative; width: 100%; max-width: 620px; max-height: 88vh; overflow: auto;
+  overscroll-behavior: contain;  /* 上端/下端でさらにスクロールしても呼び元（背景）に連鎖させない */
   background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   padding: var(--space-6); will-change: transform;
 }
@@ -385,7 +386,7 @@ body.iq-nav-lock { overflow: hidden; }
   padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--color-border); flex: 0 0 auto; }
 .modal__header h2 { margin: 0; font-size: var(--text-lg); }
 .modal__header .modal__close { position: static; flex: 0 0 auto; }   /* ヘッダー内では通常フロー（absolute を解除） */
-.modal__body { padding: var(--space-5) var(--space-6); overflow: auto; flex: 1 1 auto; min-height: 0; }  /* min-height:0＝flex 子が縮んで overflow が効く（本文スクロールの肝） */
+.modal__body { padding: var(--space-5) var(--space-6); overflow: auto; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; }  /* min-height:0＝flex 子が縮んで overflow が効く（本文スクロールの肝）／overscroll-behavior:contain＝上端/下端でさらにスクロールしても呼び元（背景）に連鎖させない */
 .modal__footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
   padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); flex: 0 0 auto;
   background: var(--color-surface); }
@@ -1458,7 +1459,8 @@ a.quest-card:active { transform: translateY(1px); }
 @keyframes deadline-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .deadline[data-urgency="urgent"] { animation: none; } }
 /* 一覧テーブルの主タイトルセル（クエスト/アイデア名） */
-.idea-title { font-weight: 600; }
+/* アイデア一覧の件名セル＝1行省略（…）＋ホバーで全文（title 属性・列幅内で切れる）。 */
+.idea-title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 前画面へ戻るリンク（画面上部） */
 .backlink { display: inline-block; margin-bottom: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
 .backlink:hover { color: var(--color-text); }

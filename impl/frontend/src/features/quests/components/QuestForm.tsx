@@ -23,6 +23,7 @@ import {
   listQuestGroupCandidates,
   publishQuest,
   setQuestIcon,
+  updateParty,
   updateQuest,
   type QuestCandidate,
   type QuestGroup,
@@ -102,11 +103,14 @@ type Props = {
   ownerName: string; // 作成=session ユーザー／編集=取得した owner で上書き
   ownerUserId: string | null; // 候補の自己除外（C.4）
   locale?: Locale;
+  // パーティー限定編集（SC-12「パーティー・権限を編集」）＝参加メンバー＋権限だけを編集し、C.3 PUT /party で保存。
+  // 内容（件名/カテゴリ/参加グループ等）のフィールドは出さない。edit モード前提（questId 必須）。
+  partyOnly?: boolean;
   onDone: () => void;
   onCancel: () => void;
 };
 
-export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, locale = "ja", onDone, onCancel }: Props) {
+export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, locale = "ja", partyOnly = false, onDone, onCancel }: Props) {
   const isEdit = mode === "edit";
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
@@ -472,10 +476,11 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     else if (iconRemoved) await deleteQuestIcon(id);
   }
 
-  type SaveKind = "create-draft" | "create-publish" | "edit-save" | "edit-publish";
+  type SaveKind = "create-draft" | "create-publish" | "edit-save" | "edit-publish" | "party-save";
   async function persist(kind: SaveKind) {
     const forPublish = kind === "create-publish" || kind === "edit-publish" || (kind === "edit-save" && status !== "draft");
-    const clientErrors = validate(forPublish);
+    // パーティー限定編集は内容（件名等）を触らないため内容検証はしない（C.3 members のみ）。
+    const clientErrors = kind === "party-save" ? {} : validate(forPublish);
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       const list = Object.values(clientErrors);
@@ -488,7 +493,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     setPending(true);
     setPendingKind(kind);
     try {
-      if (kind === "create-draft" || kind === "create-publish") {
+      if (kind === "party-save") {
+        await updateParty(questId!, buildMembers()); // C.3 PUT /party（あるべき全体像で差分適用）
+      } else if (kind === "create-draft" || kind === "create-publish") {
         const created = await createQuest({
           ...contentPayload(),
           quest_group_ids: deptIds, // 参加部署（フラット 0..N・空も可＝全社）
@@ -509,6 +516,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         kind === "create-draft" ? "下書きを保存しました"
         : kind === "create-publish" ? "クエストを作成・公開しました"
         : kind === "edit-publish" ? "クエストを公開しました"
+        : kind === "party-save" ? "パーティーを更新しました"
         : "クエストを保存しました";
       snack({ type: "success", title: doneTitle });
       onDone();
@@ -532,6 +540,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // パーティー限定編集＝members のみ保存（C.3）。以降は通常の作成/編集フロー。
+    if (partyOnly) { void persist("party-save"); return; }
     // 送信（Enter/主ボタン）＝作成は公開、編集の下書きは公開、編集の公開中は保存。
     if (!isEdit) void persist("create-publish");
     else if (status === "draft") void persist("edit-publish");
@@ -562,7 +572,9 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
         <p className="role-note" style={{ marginTop: 0 }}>
-          <strong>作成</strong>は認証済みなら誰でも（作成者＝所有者）。<strong>編集</strong>は所有者・クエスト管理権限者のみ。
+          {partyOnly
+            ? <><strong>パーティー・権限の編集</strong>＝参加メンバーと各権限だけを変更します（所有者・クエスト管理権限者のみ）。参加グループ等の内容はクエスト編集から変更してください。</>
+            : <><strong>作成</strong>は認証済みなら誰でも（作成者＝所有者）。<strong>編集</strong>は所有者・クエスト管理権限者のみ。</>}
         </p>
 
         <FormSummary title={t(locale, "summary.title")} errors={summary} innerRef={summaryRef} />
@@ -573,6 +585,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           </p>
         )}
 
+        {!partyOnly && (
+        <>
         <Field id="q_icon" label="クエストアイコン（任意）">
           <div className="icon-field">
             <span className="quest-icon lg" style={{ ["--accent" as string]: color } as React.CSSProperties}>
@@ -642,6 +656,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               emptyText="該当するグループがありません"
             />
           </Field>
+        )}
+        </>
         )}
 
         {/* パーティー・権限 */}
@@ -804,14 +820,18 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           </div>
         </Field>
 
-        <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-          <strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>作成/公開</strong>で公開し、パーティーに通知します。
-        </p>
+        {!partyOnly && (
+          <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
+            <strong>下書き保存</strong>すると本人だけに表示され、パーティーには公開されません。<strong>作成/公開</strong>で公開し、パーティーに通知します。
+          </p>
+        )}
       </ModalBody>
       <ModalFooter>
         <FormFooterError show={summary.length > 0} />
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>キャンセル</Button>
-        {!isEdit ? (
+        {partyOnly ? (
+          <Button type="submit" variant="primary" disabled={pending || frozen} loading={pendingKind === "party-save"}>{pendingKind === "party-save" ? "保存中…" : "保存する"}</Button>
+        ) : !isEdit ? (
           <>
             <Button type="button" variant="outline" onClick={() => void persist("create-draft")} disabled={pending} loading={pendingKind === "create-draft"}>下書き保存</Button>
             <Button type="submit" variant="primary" disabled={pending} loading={pendingKind === "create-publish"}>{pendingKind === "create-publish" ? "保存中…" : "クエストを作成"}</Button>

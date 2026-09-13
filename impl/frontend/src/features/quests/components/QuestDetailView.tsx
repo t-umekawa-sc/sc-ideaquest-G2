@@ -333,9 +333,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // enum フィルタ（動線集約）・操作列（未投票=クイック投票／下書き=続き／投票済=チャット）。行/カードのボタンは
   // DataTable が行クリックから除外（a,button,input,select,label）＝遷移と両立。
   const ideaColumns: DataTableColumn<Idea>[] = [
-    { key: "title", label: "件名", locked: true, width: 220, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.value}`, csvVal: (r) => r.title,
-      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title">{r.title}</span>{r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}{r.draft && <span className="badge badge-muted">下書き</span>}</span> },
-    { key: "value", label: "提案価値", width: 320, searchVal: (r) => r.value, csvVal: (r) => r.value,
+    { key: "title", label: "件名", locked: true, width: 320, sortable: true, filter: { type: "text" }, sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.value}`, csvVal: (r) => r.title,
+      render: (r) => <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}><QuestIcon name={r.title} color={quest?.color} imageUrl={r.iconUrl} size="xs" /><span className="idea-title" title={r.title}>{r.title}</span>{r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}{r.draft && <span className="badge badge-muted">下書き</span>}</span> },
+    { key: "value", label: "提案価値", width: 460, searchVal: (r) => r.value, csvVal: (r) => r.value,
       render: (r) => <span className="idea-value-cell" title={r.value}>{r.value}</span> },
     { key: "you", label: "あなた", width: 100, sortable: true, sortVal: (r) => r.mystate, csvVal: (r) => YOU[r.mystate][0],
       render: (r) => <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span> },
@@ -597,18 +597,18 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               cardRaw={(r) => (
                 // カード表示＝ダッシュボードの「未投票のアイデア」カード（vote-card）と共通の見た目（レビュー#3）。
                 // 未投票＝クイック投票▲/▼／投票済＝結果表示／下書き＝続き。中身（提案価値）を見て判断できる。
-                <article className={"card card-accent vote-card" + (r.mystate === "voted" ? " is-voted" : "")}>
-                  <div className="between">
-                    <span className="idea-title-row">
-                      <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
-                      <Link className="card-title" href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
-                    </span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+                <article className={"card card-accent vote-card idea-card" + (r.mystate === "voted" ? " is-voted" : "")}>
+                  {/* 上段＝アイコン（左）＋未投票/フォロー等のアクション（右）。件名は下の全幅行に（2段組にしない）。 */}
+                  <div className="idea-card__top">
+                    <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
+                    <span className="idea-card__actions">
                       {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
                       <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
                       {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
                     </span>
                   </div>
+                  {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
+                  <Link className="card-title idea-card__title" href={`/ideas/${r.id}`} title={r.title} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
                   {r.value && <div className="vote-card__value">{r.value}</div>}
                   <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
                   {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
@@ -680,7 +680,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <div className="list-toolbar">
             <div className="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
             {canEdit && (
-              <button className="btn btn-outline btn-sm" type="button" onClick={() => router.push(`/quests/${questId}/edit`)}>パーティー・権限を編集</button>
+              <button className="btn btn-outline btn-sm" type="button" onClick={() => router.push(`/quests/${questId}/party`)}>パーティー・権限を編集</button>
             )}
           </div>
           <div className="card tab-party-card" style={{ padding: 0 }}>
