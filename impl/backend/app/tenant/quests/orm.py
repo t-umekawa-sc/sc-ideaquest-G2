@@ -14,8 +14,8 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import CompanyBase
@@ -107,3 +107,24 @@ class QuestMemberPermission(CompanyBase):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class QuestOutcome(CompanyBase):
+    """クエスト最終結果の人手記入分（FR-39・検証済みコンセプト票の④振り返り・⑤次アクション・KPI・(c)要約キャッシュ）。
+
+    ①検証済みコンセプト/②検証サマリ/③意思決定は既存集計の合成で導出＝本テーブルには持たない（クエスト1件＝0..1）。
+    """
+
+    __tablename__ = "quest_outcomes"
+
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), primary_key=True)
+    summary: Mapped[str | None] = mapped_column(Text(), nullable=True)         # 成果（総括）
+    learnings: Mapped[str | None] = mapped_column(Text(), nullable=True)       # 学び・課題（ISO56002 §10）
+    next_actions: Mapped[str | None] = mapped_column(Text(), nullable=True)    # 次アクション
+    metrics: Mapped[list] = mapped_column(JSONB(), nullable=False, server_default="[]")  # 指標 [{label,value}]
+    chat_summary: Mapped[str | None] = mapped_column(Text(), nullable=True)    # (c) 抽出型自動要約のキャッシュ（Phase 3）
+    chat_summary_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

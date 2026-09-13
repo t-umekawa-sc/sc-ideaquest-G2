@@ -1,0 +1,211 @@
+"use client";
+
+// SC-12「🏁 結果」タブ＝クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時のみ）。
+// 既存3成果物（アイデア＋チャット＋評価）を1枚に凝縮＝①検証済みコンセプト/②検証サマリ/③意思決定/
+// ⑤振り返り・学び（owner/管理が編集）/⑥次アクション（後続クエスト複製導線）。④議論の要点(a)＝各案のチャットリンク。
+// 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56002.md・C（FR-39）。
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { Avatar, Button, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout";
+import { buildDuplicateHref } from "@/lib/forms/duplicate";
+import { getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+
+const ASPECT_LABELS: [keyof QuestResult["aspect_averages"], string][] = [
+  ["novelty", "新規性"],
+  ["impact", "影響度"],
+  ["feasibility", "実現度"],
+  ["fit", "適合性"],
+  ["cost", "コスト"],
+];
+
+type Metric = { label: string; value: string };
+
+export function QuestResultTab({ questId, quest }: { questId: string; quest: QuestDetail }) {
+  const snack = useSnackbar();
+  const [result, setResult] = useState<QuestResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [summary, setSummary] = useState("");
+  const [learnings, setLearnings] = useState("");
+  const [nextActions, setNextActions] = useState("");
+  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void getQuestResult(questId)
+      .then((r) => {
+        if (!alive || !r) return;
+        setResult(r);
+        setSummary(r.outcome.summary ?? "");
+        setLearnings(r.outcome.learnings ?? "");
+        setNextActions(r.outcome.next_actions ?? "");
+        setMetrics((r.outcome.metrics ?? []).map((m) => ({ label: m.label, value: m.value })));
+      })
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [questId]);
+
+  async function save() {
+    setSaving(true);
+    const cleanMetrics = metrics.filter((m) => m.label.trim() || m.value.trim());
+    const res = await updateQuestResult(questId, {
+      summary: summary.trim() || null,
+      learnings: learnings.trim() || null,
+      next_actions: nextActions.trim() || null,
+      metrics: cleanMetrics,
+    }).catch(() => null);
+    setSaving(false);
+    if (!res) { snack({ type: "error", msg: "保存に失敗しました。" }); return; }
+    setResult((r) => (r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
+    setEditing(false);
+    snack({ type: "success", title: "最終結果を保存しました" });
+  }
+
+  // 後続クエスト複製（⑥次アクション＝次サイクルへ）＝件名/カラー/カテゴリ/参加グループ/期限/目的＋パーティーを引き継ぐ。
+  const dupHref = buildDuplicateHref("/quests/new", {
+    title: `${quest.title}（続き）`,
+    color: quest.color,
+    categories: quest.categories ?? [],
+    quest_group_ids: (quest.quest_groups ?? []).map((g) => g.id),
+    members: (quest.members ?? []).filter((m) => !m.is_creator).map((m) => ({
+      user_id: m.user.user_id, display_name: m.user.display_name, permissions: m.permissions, group_ids: m.group_ids ?? [],
+    })),
+    deadline: quest.deadline ?? "",
+    purpose: quest.purpose ?? "",
+  });
+
+  if (loading) return <p className="admin-muted">読み込み中…</p>;
+  if (!result) return <p className="admin-muted">最終結果を取得できませんでした。</p>;
+
+  const selected = result.decisions.filter((d) => d.is_selected);
+  const p = result.participation;
+
+  return (
+    <section aria-label="クエストの最終結果" className="qresult stack">
+      <p className="role-note" style={{ marginTop: 0 }}>
+        クエスト完了時の<strong>検証済みコンセプト票</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
+      </p>
+
+      {/* ① 検証済みコンセプト（選定アイデア） */}
+      <section className="card" aria-label="検証済みコンセプト">
+        <div className="section-head"><h3 style={{ margin: 0 }}>✅ 検証済みコンセプト（選定 {selected.length}）</h3></div>
+        {selected.length === 0 ? (
+          <p className="muted text-sm">選定されたアイデアはありません（選定なしで完了）。</p>
+        ) : (
+          <ul className="qresult__list">
+            {selected.map((d) => (
+              <li key={d.idea_id} className="qresult__idea">
+                <QuestIcon name={d.title} color={quest.color} size="sm" />
+                <div className="qresult__idea-main">
+                  <div className="qresult__idea-top">
+                    <Link className="card-title" href={`/ideas/${d.idea_id}`}>{d.title}</Link>
+                    {d.overall_avg != null && <span className="badge">評価 {d.overall_avg}/5</span>}
+                  </div>
+                  {d.value && <div className="muted text-sm" style={{ whiteSpace: "pre-wrap" }}>{d.value}</div>}
+                  <div className="qresult__idea-meta">
+                    <Avatar name={d.author.display_name} imageUrl={d.author.avatar_image_url ?? undefined} size="sm" />
+                    <span className="muted text-sm">投稿: {d.author.display_name}</span>
+                    {/* ④(a) 議論の要点＝チャットへのリンク */}
+                    <Link className="qresult__chat" href={`/ideas/${d.idea_id}/chat`}>💬 議論を見る</Link>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ② 検証サマリ（参加指標＋観点別平均） */}
+      <section className="card" aria-label="検証サマリ">
+        <div className="section-head"><h3 style={{ margin: 0 }}>📊 検証サマリ</h3></div>
+        <div className="qresult__metrics">
+          <span className="qresult__kpi"><b>{p.idea_count}</b><span>アイデア</span></span>
+          <span className="qresult__kpi"><b>{p.selected_count}</b><span>選定</span></span>
+          <span className="qresult__kpi"><b>{p.vote_total}</b><span>投票</span></span>
+          <span className="qresult__kpi"><b>{p.evaluation_count}</b><span>評価</span></span>
+          <span className="qresult__kpi"><b>{p.party_size}</b><span>パーティー</span></span>
+        </div>
+        <div className="qresult__aspects">
+          {ASPECT_LABELS.map(([k, label]) => {
+            const v = result.aspect_averages[k];
+            return (
+              <div key={k} className="qresult__aspect">
+                <span className="qresult__aspect-label">{label}</span>
+                <span className="qresult__bar"><span style={{ width: `${((v ?? 0) / 5) * 100}%` }} /></span>
+                <span className="qresult__aspect-val">{v != null ? `${v}/5` : "—"}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ③ 意思決定の記録（公開アイデア＝評価平均順） */}
+      <section className="card" aria-label="意思決定の記録">
+        <div className="section-head"><h3 style={{ margin: 0 }}>🧭 意思決定の記録</h3></div>
+        <ul className="qresult__decisions">
+          {result.decisions.map((d) => (
+            <li key={d.idea_id}>
+              <span className={`badge ${d.is_selected ? "" : "badge-muted"}`}>{d.is_selected ? "採用" : "不採用"}</span>
+              <Link href={`/ideas/${d.idea_id}`}>{d.title}</Link>
+              <span className="muted text-sm">{d.overall_avg != null ? `評価 ${d.overall_avg}/5（${d.evaluation_count}件）` : "評価なし"}</span>
+            </li>
+          ))}
+          {result.decisions.length === 0 && <li className="muted text-sm">公開アイデアはありません。</li>}
+        </ul>
+      </section>
+
+      {/* ⑤ 振り返り・学び ＋ ⑥ 次アクション（owner/管理が編集） */}
+      <section className="card" aria-label="振り返り・次アクション">
+        <div className="section-head">
+          <h3 style={{ margin: 0 }}>📝 振り返り・学び / 次アクション</h3>
+          {result.can_edit && !editing && <Button type="button" variant="outline" onClick={() => setEditing(true)}>編集</Button>}
+        </div>
+        {!editing ? (
+          <div className="qresult__outcome">
+            <div className="qresult__label">成果（総括）</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.summary || "—"}</p>
+            <div className="qresult__label">学び・課題</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.learnings || "—"}</p>
+            <div className="qresult__label">成果の指標（KPI）</div>
+            {metrics.length > 0 ? (
+              <ul className="qresult__kpilist">{metrics.map((m, i) => <li key={i}><b>{m.label || "—"}</b>：{m.value || "—"}</li>)}</ul>
+            ) : <p className="muted text-sm">—</p>}
+            <div className="qresult__label">次アクション</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.next_actions || "—"}</p>
+            <div style={{ marginTop: "var(--space-3)" }}>
+              <Link className="btn btn-outline btn-sm" href={dupHref}>このクエストを複製して次を起票 →</Link>
+            </div>
+            {result.outcome.updated_by_name && (
+              <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
+            )}
+          </div>
+        ) : (
+          <div className="qresult__edit stack">
+            <label className="qresult__label" htmlFor="qr_summary">成果（総括）</label>
+            <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
+            <label className="qresult__label" htmlFor="qr_learn">学び・課題</label>
+            <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
+            <div className="qresult__label">成果の指標（KPI・任意）</div>
+            {metrics.map((m, i) => (
+              <div key={i} className="qresult__metric-row">
+                <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+                <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+            <button type="button" className="btn btn-sm btn-outline" style={{ alignSelf: "flex-start" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
+            <label className="qresult__label" htmlFor="qr_next">次アクション</label>
+            <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
+            <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+              <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>キャンセル</Button>
+              <Button type="button" variant="primary" onClick={() => void save()} loading={saving}>保存する</Button>
+            </div>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}

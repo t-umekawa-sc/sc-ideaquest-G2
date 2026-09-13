@@ -293,6 +293,25 @@ def eval_states_for_ideas(ts, quest, user, ideas) -> dict:
     return out
 
 
+def aspect_averages_for_quest(ts, quest, user, ideas) -> dict:
+    """クエスト全体の観点別平均＋可視 submitted 評価総数（FR-39 ②検証サマリ・ISO56002 §9）。
+
+    可視性（F.1 visibility）を尊重し、閲覧者に見える submitted 評価だけで観点別平均を算定（可視0は空）。
+    `eval_states_for_ideas`（per-idea）と同じ材料をクエスト横断で1度に集計する。
+    """
+    idea_list = list(ideas)
+    idea_ids = [i.id for i in idea_list]
+    if not idea_ids:
+        return {"aspects": {}, "evaluation_count": 0}
+    subs = repo.list_submitted_evaluations_for_ideas(ts, idea_ids)
+    scores = repo.get_scores_for_evaluations(ts, [e.id for e in subs]) if subs else {}
+    is_manager = _viewer_is_manager(ts, quest, user)
+    idea_by_id = {i.id: i for i in idea_list}
+    visible = [e for e in subs if e.idea_id in idea_by_id and _can_view_evaluation(idea_by_id[e.idea_id], user, e, is_manager)]
+    agg = _aggregate(visible, scores, ts) if visible else {"aspects": {}}
+    return {"aspects": agg.get("aspects", {}), "evaluation_count": len(visible)}
+
+
 def _viewer_is_manager(ts, quest, user) -> bool:
     """閲覧者が owner/quest_admin か（limited 評価の閲覧可否・**ページ内不変**＝呼出側でループ外に1回算出）。"""
     return _is_owner(quest, user) or "quest_admin" in _perms_of(ts, quest, user)

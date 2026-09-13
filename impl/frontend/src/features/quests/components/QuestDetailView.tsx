@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr, markIdeaFromQuest, consumeQuestFromList } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
+import { QuestResultTab } from "./QuestResultTab";
 import {
   deleteQuest,
   getQuest,
@@ -85,6 +86,8 @@ const TABS = [
   { key: "ideas", label: "💡 アイデア" },
   { key: "party", label: "👥 パーティー" },
   { key: "search", label: "🔍 全文検索" },
+  // 🏁 結果＝クエスト最終結果（FR-39・検証済みコンセプト票）。completed のときのみ表示（下の filter）。
+  { key: "result", label: "🏁 結果" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -548,7 +551,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
       {/* タブ */}
       <div id="quest-tabs" className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
-        {TABS.map((t) => {
+        {TABS.filter((t) => t.key !== "result" || quest.status === "completed").map((t) => {
           const count = t.key === "party" ? party.length : t.key === "ideas" ? ideas?.length ?? null : null;
           return (
             <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
@@ -702,6 +705,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <p className="hint" style={{ marginTop: "var(--space-3)" }}>※ 新規参加メンバーの既定権限＝投票＋アイデア作成＋コメント。評価者/クエスト管理などは所有者/管理権限者が付与。</p>
         </section>
       )}
+
+      {/* 🏁 結果（FR-39・検証済みコンセプト票・completed 時のみタブが出る） */}
+      {tab === "result" && <QuestResultTab questId={questId} quest={quest} />}
 
       {/* 概要（実接続・C.1） */}
     </section>

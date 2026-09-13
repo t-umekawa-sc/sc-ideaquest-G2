@@ -1143,6 +1143,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Result
+         * @description クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。
+         */
+        get: operations["get_quest_result_api_v1_quests__quest_id__result_get"];
+        /**
+         * Put Quest Result
+         * @description 総括（振り返り・次アクション・KPI）の保存（FR-39・owner/quest_admin）。送られた項目のみ更新。
+         */
+        put: operations["put_quest_result_api_v1_quests__quest_id__result_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/members/{user_id}": {
         parameters: {
             query?: never;
@@ -4176,6 +4200,61 @@ export interface components {
             /** Data */
             data: components["schemas"]["QuestMemberDTO"][];
         };
+        /**
+         * QuestOutcomeDTO
+         * @description 人手記入の総括（④振り返り・⑤次アクション・KPI・(c)要約キャッシュ）。未記入は各 None/空。
+         */
+        QuestOutcomeDTO: {
+            /** Summary */
+            summary?: string | null;
+            /** Learnings */
+            learnings?: string | null;
+            /** Next Actions */
+            next_actions?: string | null;
+            /**
+             * Metrics
+             * @default []
+             */
+            metrics: components["schemas"]["QuestOutcomeMetricDTO"][];
+            /** Chat Summary */
+            chat_summary?: string | null;
+            /** Chat Summary At */
+            chat_summary_at?: string | null;
+            /** Updated By Name */
+            updated_by_name?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * QuestOutcomeMetricDTO
+         * @description KPI/成果指標の1行（自由記述・⑤）。
+         */
+        QuestOutcomeMetricDTO: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Value
+             * @default
+             */
+            value: string;
+        };
+        /**
+         * QuestOutcomeUpdateRequest
+         * @description PUT /quests/{id}/result（FR-39）＝総括の保存（owner/quest_admin）。送られた項目のみ更新。
+         */
+        QuestOutcomeUpdateRequest: {
+            /** Summary */
+            summary?: string | null;
+            /** Learnings */
+            learnings?: string | null;
+            /** Next Actions */
+            next_actions?: string | null;
+            /** Metrics */
+            metrics?: components["schemas"]["QuestOutcomeMetricDTO"][] | null;
+        };
         /** QuestOwnerDTO */
         QuestOwnerDTO: {
             /** User Id */
@@ -4226,6 +4305,123 @@ export interface components {
             icon_image_path?: string | null;
             /** Members */
             members?: components["schemas"]["QuestMemberInput"][] | null;
+        };
+        /**
+         * QuestResultAspectAveragesDTO
+         * @description 観点別平均（②検証サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。
+         */
+        QuestResultAspectAveragesDTO: {
+            /** Novelty */
+            novelty?: number | null;
+            /** Impact */
+            impact?: number | null;
+            /** Feasibility */
+            feasibility?: number | null;
+            /** Fit */
+            fit?: number | null;
+            /** Cost */
+            cost?: number | null;
+        };
+        /**
+         * QuestResultDTO
+         * @description クエスト最終結果（検証済みコンセプト票・GET /quests/{id}/result）＝既存集計の合成＋総括。
+         */
+        QuestResultDTO: {
+            /** Quest Id */
+            quest_id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Purpose */
+            purpose?: string | null;
+            /** Deadline */
+            deadline?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /**
+             * Decisions
+             * @default []
+             */
+            decisions: components["schemas"]["QuestResultDecisionDTO"][];
+            /** @default {} */
+            aspect_averages: components["schemas"]["QuestResultAspectAveragesDTO"];
+            /** @default {
+             *       "idea_count": 0,
+             *       "selected_count": 0,
+             *       "vote_total": 0,
+             *       "evaluation_count": 0,
+             *       "party_size": 0
+             *     } */
+            participation: components["schemas"]["QuestResultParticipationDTO"];
+            /** @default {
+             *       "metrics": []
+             *     } */
+            outcome: components["schemas"]["QuestOutcomeDTO"];
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
+        };
+        /**
+         * QuestResultDecisionDTO
+         * @description 公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①検証済みコンセプトも本DTOの is_selected で抽出。
+         */
+        QuestResultDecisionDTO: {
+            /** Idea Id */
+            idea_id: string;
+            /** Title */
+            title: string;
+            /** Value */
+            value?: string | null;
+            author: components["schemas"]["QuestOwnerDTO"];
+            /**
+             * Is Selected
+             * @default false
+             */
+            is_selected: boolean;
+            /** Overall Avg */
+            overall_avg?: number | null;
+            /**
+             * Evaluation Count
+             * @default 0
+             */
+            evaluation_count: number;
+        };
+        /**
+         * QuestResultParticipationDTO
+         * @description 参加・評価サマリ（②・定量指標）。
+         */
+        QuestResultParticipationDTO: {
+            /**
+             * Idea Count
+             * @default 0
+             */
+            idea_count: number;
+            /**
+             * Selected Count
+             * @default 0
+             */
+            selected_count: number;
+            /**
+             * Vote Total
+             * @default 0
+             */
+            vote_total: number;
+            /**
+             * Evaluation Count
+             * @default 0
+             */
+            evaluation_count: number;
+            /**
+             * Party Size
+             * @default 0
+             */
+            party_size: number;
         };
         /**
          * QuestTransitionRequest
@@ -6767,6 +6963,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestMembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_result_api_v1_quests__quest_id__result_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestResultDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_quest_result_api_v1_quests__quest_id__result_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestOutcomeUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestOutcomeDTO"];
                 };
             };
             /** @description Validation Error */

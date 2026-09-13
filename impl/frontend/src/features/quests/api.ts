@@ -13,6 +13,10 @@ export type QuestMembersResponse = components["schemas"]["QuestMembersResponse"]
 export type QuestCreateInput = components["schemas"]["QuestCreateRequest"];
 export type QuestUpdateInput = components["schemas"]["QuestUpdateRequest"];
 export type QuestPublishInput = components["schemas"]["QuestPublishRequest"];
+export type QuestResult = components["schemas"]["QuestResultDTO"];
+export type QuestResultDecision = components["schemas"]["QuestResultDecisionDTO"];
+export type QuestOutcome = components["schemas"]["QuestOutcomeDTO"];
+export type QuestOutcomeInput = components["schemas"]["QuestOutcomeUpdateRequest"];
 export type QuestCandidate = components["schemas"]["QuestCandidateDTO"];
 export type QuestCandidatesResponse = components["schemas"]["QuestCandidatesResponse"];
 export type QuestIconImageResponse = components["schemas"]["QuestIconImageResponse"];
@@ -102,6 +106,15 @@ export function updateQuest(questId: string, input: QuestUpdateInput): Promise<Q
 // SC-12「パーティー・権限を編集」＝URL モーダルから members のみ送る（参加グループ等の内容は触らない）。owner/quest_admin。
 export function updateParty(questId: string, members: QuestMemberInput[]): Promise<QuestMembersResponse | null> {
   return apiFetch<QuestMembersResponse>(`/quests/${questId}/party`, { method: "PUT", body: JSON.stringify({ members }) });
+}
+
+// クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ・完了時）。既存集計の合成＋総括を取得。
+export function getQuestResult(questId: string): Promise<QuestResult | null> {
+  return apiFetch<QuestResult>(`/quests/${questId}/result`);
+}
+// 総括（振り返り/次アクション/KPI）の保存（FR-39・owner/quest_admin・送った項目のみ更新）。
+export function updateQuestResult(questId: string, input: QuestOutcomeInput): Promise<QuestOutcome | null> {
+  return apiFetch<QuestOutcome>(`/quests/${questId}/result`, { method: "PUT", body: JSON.stringify(input) });
 }
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。

@@ -246,3 +246,85 @@ class QuestTransitionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     to: str
+
+
+# ---- クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時）。 ----
+
+
+class QuestResultDecisionDTO(BaseModel):
+    """公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①検証済みコンセプトも本DTOの is_selected で抽出。"""
+
+    idea_id: str
+    title: str
+    value: str | None = None
+    author: QuestOwnerDTO
+    is_selected: bool = False
+    overall_avg: float | None = None  # 可視な submitted 評価の総合平均（可視0は None・F.1）
+    evaluation_count: int = 0         # 可視な submitted 評価数
+
+
+class QuestResultAspectAveragesDTO(BaseModel):
+    """観点別平均（②検証サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。"""
+
+    novelty: float | None = None
+    impact: float | None = None
+    feasibility: float | None = None
+    fit: float | None = None
+    cost: float | None = None
+
+
+class QuestResultParticipationDTO(BaseModel):
+    """参加・評価サマリ（②・定量指標）。"""
+
+    idea_count: int = 0        # 公開アイデア数
+    selected_count: int = 0    # 選定数
+    vote_total: int = 0        # 投票総数（公開アイデア横断）
+    evaluation_count: int = 0  # 可視な submitted 評価総数
+    party_size: int = 0        # 有効パーティー人数（作成者含む）
+
+
+class QuestOutcomeMetricDTO(BaseModel):
+    """KPI/成果指標の1行（自由記述・⑤）。"""
+
+    label: str = ""
+    value: str = ""
+
+
+class QuestOutcomeDTO(BaseModel):
+    """人手記入の総括（④振り返り・⑤次アクション・KPI・(c)要約キャッシュ）。未記入は各 None/空。"""
+
+    summary: str | None = None
+    learnings: str | None = None
+    next_actions: str | None = None
+    metrics: list[QuestOutcomeMetricDTO] = []
+    chat_summary: str | None = None
+    chat_summary_at: datetime | None = None
+    updated_by_name: str | None = None
+    updated_at: datetime | None = None
+
+
+class QuestResultDTO(BaseModel):
+    """クエスト最終結果（検証済みコンセプト票・GET /quests/{id}/result）＝既存集計の合成＋総括。"""
+
+    quest_id: str
+    title: str
+    status: str
+    purpose: str | None = None
+    deadline: date | None = None
+    categories: list[str] = []
+    decisions: list[QuestResultDecisionDTO] = []  # 公開アイデア（評価平均降順）。is_selected で①を抽出
+    aspect_averages: QuestResultAspectAveragesDTO = QuestResultAspectAveragesDTO()
+    participation: QuestResultParticipationDTO = QuestResultParticipationDTO()
+    outcome: QuestOutcomeDTO = QuestOutcomeDTO()
+    can_edit: bool = False  # owner/quest_admin（④⑤の編集可否）
+
+
+class QuestOutcomeUpdateRequest(BaseModel):
+    """PUT /quests/{id}/result（FR-39）＝総括の保存（owner/quest_admin）。送られた項目のみ更新。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str | None = None
+    learnings: str | None = None
+    next_actions: str | None = None
+    metrics: list[QuestOutcomeMetricDTO] | None = None

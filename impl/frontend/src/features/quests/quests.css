@@ -168,3 +168,29 @@
 .idea-unread { font-size: var(--text-xs); padding: 0 6px; }
 .idea-follow { border: none; background: none; cursor: pointer; font-size: var(--text-lg); line-height: 1; color: var(--color-border-strong); padding: 0 2px; }
 .idea-follow.is-on { color: var(--color-warning); }
+
+/* 🏁 クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ）。 */
+.qresult .section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.qresult__list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.qresult__idea { display: flex; gap: var(--space-3); align-items: flex-start; }
+.qresult__idea-main { flex: 1; min-width: 0; }
+.qresult__idea-top { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.qresult__idea-meta { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+.qresult__chat { font-size: var(--text-sm); }
+.qresult__metrics { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-2); }
+.qresult__kpi { display: inline-flex; flex-direction: column; align-items: center; min-width: 64px; }
+.qresult__kpi b { font-size: var(--text-xl); font-weight: 700; }
+.qresult__kpi span { font-size: var(--text-xs); color: var(--color-text-muted); }
+.qresult__aspects { margin-top: var(--space-3); display: flex; flex-direction: column; gap: 6px; }
+.qresult__aspect { display: grid; grid-template-columns: 72px 1fr 48px; align-items: center; gap: var(--space-2); }
+.qresult__aspect-label { font-size: var(--text-sm); color: var(--color-text-muted); }
+.qresult__aspect-val { font-size: var(--text-sm); text-align: right; }
+.qresult__bar { display: block; height: 8px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
+.qresult__bar > span { display: block; height: 100%; background: var(--color-primary); }
+.qresult__decisions { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.qresult__decisions li { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.qresult__label { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); margin-top: var(--space-3); }
+.qresult__outcome p { margin: 2px 0 0; }
+.qresult__kpilist { margin: 2px 0 0; padding-left: 1.2em; }
+.qresult__metric-row { display: flex; gap: var(--space-2); }
+.qresult__metric-row .input { flex: 1; }

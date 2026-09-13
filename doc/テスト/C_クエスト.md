@@ -125,6 +125,9 @@
 | C-TC-233 | api | メンバー DTO の `in_scope`＝参加部署外メンバーの失効表示 | 参加部署 group_a・owner 別格・部署内メンバー・部署外の名指しメンバー | `GET /quest-detail`（owner）の `members` | owner=`in_scope:true`・部署内メンバー=`true`・部署外メンバー=`false`（失効中） | C.1／C.0／§5.6b |
 | C-TC-234 | api | 横断候補の `group_ids`＝**照会に限らず有効所属全件**（req2/5） | A/B 所属の ab_user・照会は group_a のみ | `GET /quest-group-candidates?group_ids=A` | ab_user の `group_ids`＝{A,B}（照会 A のみでも B を含む全所属） | C.4／FR-38 |
 | C-TC-235 | api | メンバー DTO の `group_ids`＝有効所属全件（チップ常時表示/スコープ再判定の材料・req2/3） | 参加部署 group_a・owner／A所属メンバー／B のみメンバー | `GET /quest-detail`（owner）の `members` | 各メンバーの `group_ids`＝その人の有効所属全件（A所属者は A を含む・B のみ者は B） | C.1／FR-38 |
+| C-TC-240 | api | 最終結果＝既存集計の合成（FR-39・検証済みコンセプト票） | 公開2アイデア（1選定）・選定案に submitted 評価(全観点4)・投票1 | `GET /quests/{id}/result` | `participation`（idea 2/選定1/投票1/評価1）・`aspect_averages.fit=4.0`・選定案 `overall_avg=4.0`＋`is_selected`・`can_edit=true`（owner） | C（FR-39）／F.1／§9 |
+| C-TC-241 | api | 最終結果の門番（非パーティーは 404） | 他人所有・seed user は非メンバー | `GET /quests/{id}/result` | 404（存在秘匿・C.0） | C（FR-39）／C.0 |
+| C-TC-242 | api | 総括の保存と権限（owner/quest_admin のみ） | (1)owner (2)一般メンバー（vote のみ） | `PUT /quests/{id}/result`（summary/next_actions/metrics） | (1)200・GET に反映（summary/next_actions/metrics）(2)403 | C（FR-39）／§10 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

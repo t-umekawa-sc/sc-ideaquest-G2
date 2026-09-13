@@ -19,6 +19,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.chat import repository as chat_repo
+from app.tenant.evaluations import application as eval_app
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.notifications import service as notify_svc
 from app.tenant.realtime import events as realtime_events
@@ -503,6 +504,132 @@ def get_quest_group_candidates(
         ]
         next_cursor = _encode_candidate_cursor(rows[-1]) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+# ---- クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時）。 ----
+
+_RESULT_ASPECTS = ("novelty", "impact", "feasibility", "fit", "cost")
+
+
+def _outcome_dto(ts, row) -> dict:
+    """総括（人手記入）を DTO 化（未記入は各 None／metrics 空）。更新者は表示名に解決。"""
+    if row is None:
+        return {"metrics": []}
+    updater = repo.get_users_by_ids(ts, [row.updated_by]).get(row.updated_by) if row.updated_by else None
+    return {
+        "summary": row.summary,
+        "learnings": row.learnings,
+        "next_actions": row.next_actions,
+        "metrics": row.metrics or [],
+        "chat_summary": row.chat_summary,
+        "chat_summary_at": row.chat_summary_at,
+        "updated_by_name": updater.display_name if updater else None,
+        "updated_at": row.updated_at,
+    }
+
+
+def _can_edit_outcome(ts, quest, user) -> bool:
+    """総括（④⑤）の編集可否＝owner または quest_admin（_authorize_edit と同定義）。"""
+    if quest.owner_id == user.id:
+        return True
+    member = repo.get_active_member(ts, quest.id, user.id)
+    return member is not None and "quest_admin" in repo.get_permissions(ts, member.id)
+
+
+def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """検証済みコンセプト票（FR-39）＝既存集計（選定/評価/投票/パーティー）の合成＋総括。
+
+    可視性＝門番 C.0（範囲外 404）。評価の数値は閲覧者に可視な submitted のみ（F.1）。
+    「完了時のみ表示」はフロントのタブ出し分けで担保（本 EP は参照可能なパーティー員に status 込みで返す）。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # 存在秘匿（C.0）
+        ideas = ideas_repo.list_published_ideas_for_quest(ts, qid)
+        idea_ids = [i.id for i in ideas]
+        states = eval_app.eval_states_for_ideas(ts, quest, user, ideas)  # per-idea overall_avg/evaluator_count（可視のみ）
+        aspect = eval_app.aspect_averages_for_quest(ts, quest, user, ideas)  # クエスト横断の観点別平均（可視のみ）
+        votes = ideas_repo.count_votes_for_ideas(ts, idea_ids) if idea_ids else {}
+        authors = repo.get_users_by_ids(ts, {i.author_id for i in ideas})
+        decisions = []
+        for i in ideas:
+            st = states.get(i.id, {})
+            a = authors.get(i.author_id)
+            decisions.append({
+                "idea_id": str(i.id),
+                "title": i.title,
+                "value": i.value,
+                "author": {
+                    "user_id": str(i.author_id),
+                    "display_name": a.display_name if a else "",
+                    "avatar_image_url": _image_url(a.avatar_image_path) if a else None,
+                },
+                "is_selected": bool(i.is_selected),
+                "overall_avg": st.get("overall_avg"),
+                "evaluation_count": st.get("evaluator_count", 0),
+            })
+        # 評価平均の降順（未評価=None は末尾）。①検証済みコンセプトは is_selected で抽出。
+        decisions.sort(key=lambda d: (d["overall_avg"] is None, -(d["overall_avg"] or 0.0)))
+        members = repo.list_active_members(ts, quest.id)
+        vote_total = sum(sum(v.values()) for v in votes.values())
+        asp = aspect["aspects"]
+        cats = [c.label for c in repo.list_categories(ts, qid)]
+        return {
+            "quest_id": str(quest.id),
+            "title": quest.title,
+            "status": quest.status,
+            "purpose": quest.purpose,
+            "deadline": quest.deadline,
+            "categories": cats,
+            "decisions": decisions,
+            "aspect_averages": {a: asp.get(a) for a in _RESULT_ASPECTS},
+            "participation": {
+                "idea_count": len(ideas),
+                "selected_count": sum(1 for i in ideas if i.is_selected),
+                "vote_total": vote_total,
+                "evaluation_count": aspect["evaluation_count"],
+                "party_size": len(members),
+            },
+            "outcome": _outcome_dto(ts, repo.get_outcome(ts, qid)),
+            "can_edit": _can_edit_outcome(ts, quest, user),
+        }
+
+
+def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, body) -> dict:
+    """総括（④振り返り・⑤次アクション・KPI）の保存（FR-39 PUT result・owner/quest_admin）。送られた項目のみ更新。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)  # owner/quest_admin（それ以外は 403）
+        fields: dict = {}
+        if body.summary is not None:
+            fields["summary"] = body.summary.strip() or None
+        if body.learnings is not None:
+            fields["learnings"] = body.learnings.strip() or None
+        if body.next_actions is not None:
+            fields["next_actions"] = body.next_actions.strip() or None
+        if body.metrics is not None:
+            fields["metrics"] = [{"label": m.label, "value": m.value} for m in body.metrics]
+        row = repo.upsert_outcome(ts, qid, fields=fields, updated_by=user.id)
+        dto = _outcome_dto(ts, row)
+        ts.commit()
+    return dto
 
 
 # ---- パーティー粒度（C.3・SC-12 パーティータブ）／状態遷移（C.5）／削除 ----

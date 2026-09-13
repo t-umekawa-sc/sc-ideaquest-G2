@@ -24,8 +24,11 @@ from app.tenant.quests.schemas import (
     QuestMemberDTO,
     QuestMemberPermissionsRequest,
     QuestMembersResponse,
+    QuestOutcomeDTO,
+    QuestOutcomeUpdateRequest,
     QuestPartyUpdateRequest,
     QuestPermissionsResponse,
+    QuestResultDTO,
     QuestPublishRequest,
     QuestTransitionRequest,
     QuestUpdateRequest,
@@ -242,6 +245,35 @@ def set_quest_party(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, members=body.members,
     )
     return QuestMembersResponse(**result)
+
+
+@router.get("/quests/{quest_id}/result", response_model=QuestResultDTO)
+def get_quest_result(
+    quest_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestResultDTO:
+    """クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。"""
+    result = quest_service.get_quest_result(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+    return QuestResultDTO(**result)
+
+
+@router.put("/quests/{quest_id}/result", response_model=QuestOutcomeDTO)
+def put_quest_result(
+    quest_id: str,
+    body: QuestOutcomeUpdateRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> QuestOutcomeDTO:
+    """総括（振り返り・次アクション・KPI）の保存（FR-39・owner/quest_admin）。送られた項目のみ更新。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.update_quest_outcome(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, body=body,
+    )
+    return QuestOutcomeDTO(**result)
 
 
 @router.post("/quests/{quest_id}/members", response_model=QuestMemberDTO, status_code=201)

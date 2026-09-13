@@ -19,7 +19,14 @@ from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
-from app.tenant.quests.orm import Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission
+from app.tenant.quests.orm import (
+    Quest,
+    QuestCategory,
+    QuestGroupLink,
+    QuestMember,
+    QuestMemberPermission,
+    QuestOutcome,
+)
 
 # 新規参加メンバーの既定権限（サーバー自動付与・§5.9/C.3）。
 DEFAULT_MEMBER_PERMISSIONS: tuple[str, ...] = ("vote", "idea_create", "comment")
@@ -129,6 +136,25 @@ def get_quest(session: Session, quest_id: uuid.UUID) -> Quest | None:
     return session.execute(
         select(Quest).where(Quest.id == quest_id, Quest.deleted_at.is_(None))
     ).scalars().first()
+
+
+def get_outcome(session: Session, quest_id: uuid.UUID) -> QuestOutcome | None:
+    """クエスト最終結果の総括（FR-39・0..1）。未記入は None。"""
+    return session.get(QuestOutcome, quest_id)
+
+
+def upsert_outcome(session: Session, quest_id: uuid.UUID, *, fields: dict, updated_by: uuid.UUID) -> QuestOutcome:
+    """総括（summary/learnings/next_actions/metrics 等）を登録/更新（送られたキーのみ更新・FR-39 PUT result）。"""
+    row = session.get(QuestOutcome, quest_id)
+    if row is None:
+        row = QuestOutcome(quest_id=quest_id)
+        session.add(row)
+    for k, v in fields.items():
+        setattr(row, k, v)
+    row.updated_by = updated_by
+    row.updated_at = datetime.now(timezone.utc)
+    session.flush()
+    return row
 
 
 def can_access_quest(session: Session, quest: Quest, user_id: uuid.UUID) -> bool:
