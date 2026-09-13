@@ -428,11 +428,22 @@ def test_c_tc_137_transition_forward(client, env):
 
 
 def test_c_tc_138_transition_skip_conflicts(client, env):
-    """C-TC-138: 飛び越え遷移 recruiting→evaluating は 409（逆行/飛び越え禁止・C.5）。"""
+    """C-TC-138: 飛び越え遷移 recruiting→evaluating は 409（飛び越え禁止・隣接1段のみ・C.5）。"""
     _login_seed(client)
     qid = env.seed_quest(status="recruiting")
     r = client.post(f"{QUESTS}/{qid}/transition", json={"to": "evaluating"}, headers=_csrf(client))
     assert r.status_code == 409, r.text
+
+
+def test_c_tc_140_transition_backward_one_step(client, env):
+    """C-TC-140: 後退遷移は隣接1段のみ許可（2026-09-13）＝in_progress→recruiting は 200。recruiting→draft（非公開化）は 409。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="in_progress")
+    r = client.post(f"{QUESTS}/{qid}/transition", json={"to": "recruiting"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "recruiting"
+    r2 = client.post(f"{QUESTS}/{qid}/transition", json={"to": "draft"}, headers=_csrf(client))
+    assert r2.status_code == 409, r2.text  # draft への戻し（非公開化）は transition では不可
 
 
 def test_c_tc_139_transition_draft_publishes_with_strict(client, env):

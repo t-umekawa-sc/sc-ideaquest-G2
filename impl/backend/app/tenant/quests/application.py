@@ -849,7 +849,12 @@ def set_member_permissions(account_id: uuid.UUID, company_id: uuid.UUID, quest_i
 
 
 def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, to: str) -> dict:
-    """ステータスを前進（C.5・owner/quest_admin）。逆行・飛び越えは 409。draft→recruiting は strict 検証。"""
+    """ステータスを1ステップ遷移（C.5・owner/quest_admin）。**前進・後退とも隣接1段のみ**許可（2026-09-13）。
+
+    後退は運用上の戻し（誤って進めた/再検討）を許容。ただし **draft への戻し（非公開化）は transition では不可**
+    （下限＝recruiting・unpublish は別概念）。飛び越えは 409。draft→recruiting は publish 相当の strict 検証。
+    完了時の副作用（コイン確定/通知/フィード）は**初回完了時のみ**（再完了で重複させない・冪等）。
+    """
     if to not in _VALID_STATUS:
         raise AppError(422, "validation_error", detail="to が不正です", errors=[{"field": "to"}])
     company = _resolve_company(company_id)
@@ -865,10 +870,12 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             raise AppError(404, "not_found")
         _authorize_edit(ts, quest, user)
         cur_idx = _STATUS_ORDER.index(quest.status)
-        # 前進は「現在の次」のみ許可（逆行・飛び越えは 409・C.5）。
-        if not (cur_idx + 1 < len(_STATUS_ORDER) and to == _STATUS_ORDER[cur_idx + 1]):
-            raise AppError(409, "conflict", detail="許可されない状態遷移です", extra={"errors": [{"reason": "invalid_state"}]})
-        if to == "recruiting":  # draft→recruiting は公開＝strict 再検証（publish と同一関門）
+        to_idx = _STATUS_ORDER.index(to)
+        forward = to_idx == cur_idx + 1
+        backward = to_idx == cur_idx - 1 and to_idx >= 1  # 隣接1段の後退（draft〔0〕へは戻さない）
+        if not (forward or backward):
+            raise AppError(409, "conflict", detail="許可されない状態遷移です（前進/後退とも隣接1段のみ）", extra={"errors": [{"reason": "invalid_state"}]})
+        if to == "recruiting" and quest.status == "draft":  # draft→recruiting は公開＝strict 再検証（publish と同一関門）
             _validate_publishable(
                 title=quest.title, color=quest.color,
                 categories=repo.list_categories(ts, quest.id),
@@ -876,10 +883,13 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         quest.status = to
         result_recipients: list[uuid.UUID] = []
         if to == "completed":
+            from app.tenant.gamification import ledger, repository as gami_repo
+            # 初回完了か（quest_completed 活動の有無で判定）＝再完了で通知/フィードを重複させない。
+            first_completion = not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "quest_completed", "quests", quest.id)
             _finalize_completion(ts, quest)  # F.4 投稿者コイン一括確定（同一 UoW・冪等）
             _record_quest_completed_feed(ts, quest, user)  # ④ チーム成果フィード（quest_completed・冪等・FR-39）
-            # ④ 完了通知の宛先＝作成者を除く有効パーティー員（post-commit で H に発行）。
-            result_recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
+            if first_completion:  # ④ 完了通知は初回のみ（宛先＝作成者を除く有効パーティー員・post-commit）
+                result_recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
     if to == "completed" and result_recipients:
