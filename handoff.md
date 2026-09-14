@@ -5,82 +5,77 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-09-14 JST**
-- ブランチ: **main**（本プロジェクトは main に直接コミット。`feature/game-feel` はゲーム感フェーズ用の別系統）
-- 最新コミット: **a8a6581** `feat(quests/SC-12): ステータスを戻す導線を追加（後退遷移UI・隣接1段）`（**push 済み＝この handoff コミット後に再push要否は §7-0 で確認**）
-- 本セッションの成果（すべて push 済み）:
-  - 社内レビュー由来の **UI 一括改善**（管理メニューのサイドバー集約・メンバー選択のグループ表示強化・パーティー限定編集ダイアログ・アイデア一覧/カード調整・モーダルのスクロール連鎖抑制・複製の引き継ぎ強化・タブUI）。
-  - **FR-39「クエストの最終結果＝検証済みコンセプト票（ISO 56002）」を Phase 1〜3 実装＋正本正規化まで完了**。
-  - 評価画面（SC-25）にクエスト情報表示、**ステータス後退遷移（backend＋UI）**、**投票失敗の理由明示**。
+- ブランチ: **main**（本フェーズ＝社内レビュー反映/ブラウザ受入＝main 直コミット。`feature/game-feel` はゲーム感フェーズ用の別系統で今回は未使用）
+- 最新コミット（本 handoff コミット前の時点）: **af448c6** `feat(chat/dashboard): E群チャットのデモ＋game_mode/メンション/通知リンク修正`
+  - その前＝**1aed8ad** `feat(ideas/quests): 完了クエストの凍結UI統一＋添付の版管理（D群受入対応）`
+- **push 状況＝この handoff コミット後にまとめて push する（§7-0 で確認）。** 本セッション開始時は 1aed8ad が未push だった。
 
 ## 2. プロジェクトのゴール
-社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**社内レビュー反映フェーズ**（レビュー指摘を要件→設計→TC→実装で順に反映）。
+社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み（`impl/README.md` の SC-xx 表は全 ✅）で、**受入デモデータを `seed_demo.py` で群単位に用意→ユーザーがブラウザ受入→指摘を修正**、を実装順 **D→E→G→F→H** で回している。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### A. FR-39 クエストの最終結果＝検証済みコンセプト票（ISO 56002）＝**完了**
-> 思想の正＝[doc/設計ドラフト/FR-39_ISO56002との関係と設計意図.md]／仕様の正＝[doc/設計ドラフト/FR-39_クエスト最終結果_ISO56002.md]＋要件定義 FR-39＋API設計 C.8＋データモデル §5.32＋画面設計 SC-12 §4.5。
-- **考え方**: ideaquest は ISO 56002 の①機会特定〜③コンセプト検証を担う（アイデア=創造/チャット=精緻化/評価=検証）。最終結果＝③の締め＝④開発へ渡す「検証済みコンセプト票」＝既存3成果物（アイデア＋チャット＋評価）の凝縮。④開発はアプリ外＝将来拡張。
-- **画面**: SC-12 に「🏁 結果」タブ（`features/quests/components/QuestResultTab.tsx`）。**常時表示＝完了前は「暫定」明示**（タブに「暫定」チップ＋進行中バナー）。構成＝①検証済みコンセプト（選定＋評価平均＋(a)チャットリンク）②検証サマリ（観点別平均・参加指標）③意思決定④議論の要点〔(a)リンク＋(b)ピン留め＋(c)自動要約〕⑤振り返り・学び＋KPI（owner/管理が編集）⑥次アクション＋複製導線。
-- **backend**: テーブル `quest_outcomes`（migration 0025・ORM `quests/orm.py::QuestOutcome`）。`quests/application.py`＝`get_quest_result`（既存集計の合成＝門番 `repository.can_access_quest`・評価 visibility 尊重）／`update_quest_outcome`（総括保存＝owner/quest_admin・初回記入で XP+20〔reason=`quest_result_summary`・冪等〕）／`generate_chat_summary`（(c)要約）。集計補助＝`evaluations/application.py::aspect_averages_for_quest`。ルータ＝`quests/router.py`（GET/PUT `/quests/{id}/result`・POST `/quests/{id}/result/chat-summary`）。
-- **④通知/フィード**: `transition_quest` の `→completed` で作成者以外へ通知 `quest_result_ready`（`notifications/{service,catalog}.py` に種別追加・`NotificationsView.tsx` にカテゴリ追加）＋チーム成果フィード `quest_completed`（`gamification/repository.py::PUBLIC_FEED_REASONS` に追加・0XPマイルストーン・冪等・`features/feed/components/ActivityFeed.tsx` に文言/遷移追加）。
-- **(b)ピン留め**: `chat_messages.is_pinned/pinned_at/pinned_by`（migration 0026）。`chat/application.py::set_pin`＋ルータ `POST/DELETE /chat-messages/{id}/pin`（owner/quest_admin・完了後も可）。SC-24（`chat/components/IdeaChatView.tsx`）に📌トグル＋「📌重要」バッジ。結果に `pinned_messages` 集約（`chat/repository.py::list_pinned_for_idea_ids`）。
-- **(c)自動要約**: **無料・オフライン抽出型**（依存 `janome`・`quests/summarize.py::summarize_text`＝頻度ベース・将来 LLM 差し替え seam）。**同期処理**・入力上限500件（`chat/repository.py::list_message_bodies_for_idea_ids`）・外部送信なし。結果タブに「自動要約/再生成」（管理者）。
-- **TC**: C-TC-240〜246・E-TC-210・D-TC-130 拡張（`tests/quests/test_result_api.py`・`tests/chat/test_api.py`・`tests/ideas/test_api.py`）。
+### 前提: 受入デモデータ再生成スクリプト（新規・本セッションの土台）
+- **`impl/backend/scripts/seed_demo.py`**＝冪等・**HTTP API を実ユーザーで駆動**（DB直挿し禁止＝XP台帳/版/通知/realtime を本物どおり通す）。ホストの `python3`＋`requests` で実行（`[d|all|e]`）。当時の手動デモデータが失われた反省から**コード化して再生成可能**にした。件名で既存検索して重複作成しない。
 
-### B. ステータス後退遷移（commit cc1ee0e＋a8a6581・C.5 更新）
-- `quests/application.py::transition_quest`＝**前進＋後退の隣接1段のみ**許可。**`recruiting→draft`（非公開化）は不可**（下限 recruiting）。飛び越えは 409。**完了の確定物（投稿者コイン/総括XP/完了通知/成果フィード）は後退で取り消さない**・**再完了は冪等**（完了通知は初回完了のみ）。
-- UI＝`QuestDetailView.tsx`＝詳細ヘッダーの「⋯」`RowMenu` に「ステータスを戻す（→前状態）」（owner/quest_admin・`onTransitionBack`）。完了から戻す確認に「確定物は取り消されない」注記。TC＝C-TC-140。
+### A. D群（アイデア）受入対応＝**完了・受入クローズ**（commit 1aed8ad）
+> 経緯: ブラウザ受入で多数の指摘が出て、横断UI標準として「完了クエストの凍結UI」を統一し、さらに「添付の版管理」を新機能として実装した。
+- **完了クエストの凍結UIを統一**＝UI 側で**事前無効化＋ツールチップ**、見た目は案B（`is-frozen`＝グレー塗り＋斜線ハッチ・汎用 disabled の opacity とは別セマンティクス）。対象＝投票（SC-22 `IdeaDetailView`／SC-12 `QuestDetailView` のリスト⋯メニュー・カードの `.vote-quick`）・選定・編集・評価する（`<Link>`→無効ボタンに差替）・クエスト編集/アイデア追加/パーティー編集。**フォローは「解除のみ可」＝押下で info トースト**（無効化しない）。**チャットは完了で凍結**＝composer が最小化のまま空枠になる崩れを修正し `composer__frozen` バナー常時表示（`IdeaChatView`・chat.css）。定義＝`.btn.is-frozen`（components.css）・`.vote-btn.is-frozen`（ideas.css）・`.vote-quick.is-frozen`（design-system.css）。style-guide.html に「3b. 完了クエストの凍結UI」見本。
+- **添付ファイルの版管理（設計B）**＝版スナップショット `_content_snapshot`（`ideas/application.py`）に**添付名一覧**を追加し、差分・`changed_fields` に「📎 添付」を出す（`_diff_fields`/`_changed_fields`・旧スナップは None ガードで誤検知回避）。編集フォームの既存添付削除を**ステージ化**（× で削除予定→保存で確定・「元に戻す」可・`IdeaForm`）。**1保存1版**（保存順＝添付適用→`updateIdea`）／**無変更保存は版を作らない**（`originalRef` で内容比較・添付変更も無ければ `updateIdea` を呼ばない）／**作成時添付は初版に記録**（公開作成で添付ありは `下書き作成→添付→publish` に分岐）。更新履歴表示＝`RevisionHistory`（FIELD_LABELS に attachments 追加）。フォロワー通知は `_record_revision` 経由で発火。
+- **SC-12 idea_count 追随**＝アイデア投稿(IDEAS_CHANGED)でヘッダー/KPI も再取得（`QuestDetailView` の effect に `load()` 追加）。**ダッシュボードのフォロー中カード件名を折返し**（dashboard.css・`.idea-title-row__txt` を follow-card で上書き）。
+- **テスト**: backend **D-TC-145**（添付が版差分・changed_fields に出る）追加＝`tests/ideas/test_api.py`／e2e **D-TC-218** をステージ削除に更新＝`e2e/sc-22-attachments.spec.ts`。設計書＝データモデル §5.14・`doc/テスト/D_アイデア.md`。
 
-### C. 投票失敗の理由明示（commit ee5dc4f）
-- `features/ideas/voteError.ts::voteErrorMessage`＝サーバー `detail`（締切後/完了/公開前/権限）を優先表示。ダッシュボード（`DashboardView.tsx`）・クエスト詳細（`QuestDetailView.tsx`）・アイデア詳細（`IdeaDetailView.tsx`）の投票ハンドラに適用。
-
-### D. 評価画面のクエスト情報（commit c2f9fee）
-- `IdeaQuestRefDTO.purpose` 追加（`ideas/schemas.py`・`ideas/application.py`）。SC-25（`evaluations/components/EvaluationView.tsx`）に「クエストを確認」折りたたみ（目的・テーマ/カテゴリ/締切）。D-TC-130 拡張。
-
-### E. 前半のUI改善（commit 群・詳細は git ログ §1）
-- 管理メニュー→サイドバー集約（`components/layout/AppNav.tsx` ほか）／メンバー選択のグループ常時表示・スコープ再判定・全社時絞込（`QuestForm.tsx`・backend `QuestMemberDTO.group_ids`/`QuestCandidateDTO.group_ids`＝全所属）／パーティー限定編集 `/quests/{id}/party`（`QuestPartyModal/Panel`）／複製で参加グループ＋パーティー引き継ぎ（`QuestListView.tsx`）／未投票カードのクエスト名リンク（`DashboardView.tsx`）／SC-12 タブのアクティブ強調＋sticky＋「戻る」ピルと段差／アイデア一覧・カードの列幅/省略/レイアウト／モーダル `overscroll-behavior:contain`。
+### B. E群（チャット）デモ＋受入で出た指摘の修正（commit af448c6）
+- **`seed_demo.py` に E群追加**（`seed_e`）＝クエスト「【受入】D-アイデア」に「Eチャットデモ」を作り、**複数引用・@メンション・👍通常リアクション・魔法リアクション・📎添付・未読** を投入。
+- **指摘①メンションが素テキスト**→ 描画側（`IdeaChatView.renderTextHtml`）は composer と同じ**空白除去トークン**（例 `@テスト太郎`＝`display_name` の `\s` 除去）で一致判定するのに、seed が空白入り「@テスト 太郎」を入れていた。→ seed の Client に `nospace` を持たせ、メンション本文を空白除去トークンで投入（実ユーザーの入力は元々OK）。
+- **指摘②ゲームモードOFFなのに魔法アニメ発動**→ 「アニメモードOFF」＝**ゲームモードOFF**（`account.game_mode` override=false→effective=false）だった（reduce_motion ではない）。魔法リアクションはゲーム層の演出なのに `game_mode` を無視して描画・アニメしていた。→ `IdeaChatView` で **game_mode OFF 時は `magic` を null 化**しエフェクト/発動者バッジ/魔法ピルを非表示に。**通常絵文字リアクションは業務機能なので残す**。
+- **指摘③ダッシュボード「最近の通知」にリンク**→ `DashboardView` の通知一覧を `<Link>` 化。ref→URL 解決は **`notificationHref` を新設し SC-02 と共有**（DRY・`notifications/api.ts`。`NotificationsView` の局所 hrefOf を置換）。
+- **指摘④通知リンクのクリックで既読化**→ `DashboardView.markNotifRead` を追加（`markRead`＋楽観更新＋未読数減算・ヘッダーのベルは realtime で追随）。
 
 ## 4. 現在の状態
-- **動いている**: 上記すべて。全コンテナ `--profile workers` でフル起動しユーザーがブラウザQA実施済み（UI改善・FR-39 各所・後退遷移・投票文言・「戻す」導線を目視OK）。
-- **テスト**: backend フル **547 passed**（2026-09-13 実測）。TCトレーサビリティ **✅（479件）**。frontend `tsc --noEmit`／`npm run build` OK。
-  - ※「ステータスを戻す」UI（a8a6581・frontend のみ）追加後は `tsc`/`build` OK・frontend 再ビルド済み。backend 無変更のため pytest 再実行はしていない（未確認だが回帰リスクなし）。
-- **壊れているもの**: 無し（既知の失敗テストなし）。
-- **注意**: FR-39 で backend 依存 `janome` 追加＝**backend イメージ再ビルド必須**（`docker compose build backend` 実施済み）。
+- **動いている**: D群デモ・E群デモとも生成済み。上記の凍結UI/添付版管理/通知リンクは frontend で実装済み（**フル起動でブラウザ表示・ユーザー受入は D群のみ完了**）。全コンテナ `--profile workers` でフル起動中。
+- **テスト**:
+  - backend **548 passed**（2026-09-14 実測・D-TC-145 追加後）。**その後 backend の app/ コードは変更していない**（E群以降は seed スクリプト＋frontend のみ）ので 548 は有効。
+  - frontend `tsc --noEmit` OK／`npm run build` OK（②③④修正後も実測）。
+  - TCトレーサビリティ **✅（code 479）**（`python3 scripts/check_tc_traceability.py`）。
+  - **未追加テスト（要フォロー）**＝game_mode OFF での魔法非表示・ダッシュボード通知リンク/既読化 の自動テストは**未作成**（frontend 挙動・手動確認のみ）。
+- **受入の進捗**:
+  - **D群＝全項目 ✅受入クローズ**（217/209-212/213-214/idea_count/216/215/218）。README のD群チェックは全 [x]。
+  - **E群＝seed 済み・ブラウザ受入は途中**（メンション/魔法/通知の指摘を修正した直後にセッション終了。**②③④修正後の再確認は未実施＝未確認**）。README の E群は [ ]（🟡受入待ち）。
+- **壊れているもの**: 既知の失敗テストは無し。
+- **デモデータの注意**: 検証中に「会議室予約の自動化デモ」(`/ideas/683dc40e-...`) に note 変更で版を数回付けた（現 rev3・添付なし）＝投票デモとしては問題なし。**seed 再実行は冪等だが既存レコードの版は遡って直さない**。id は再seedで変わり得る＝**スクリプト出力の URL を正とする**。
 
 ## 5. 詰まっている点（試して失敗した経緯）
-- 技術的ブロックは**無い**。
-- 教訓1: **完了(completed)遷移の副作用（通知/フィード活動）を足したら、テスト teardown で quest_id 参照（`Notification.ref_quest_id`／`Activity.quest_id`）を Quest 削除前に掃除**しないと FK 違反で ERROR（`tests/evaluations/test_api.py` で顕在化・是正済み）。ChatMessage は ChatGroup 削除前に消す。
-- 教訓2: **新規 pip 依存（janome 等）はイメージに焼く必要**＝pytest はホストコードをマウントするが依存はイメージ側。先に `docker compose build backend`。
-- 教訓3: `git add -p` は当環境で対話不可（バックグラウンド化して固まる）。パス指定 add を使う。
+- 技術ブロックは無い。設計判断の試行錯誤が多かった（§6 に集約）。
+- 教訓1: **添付は独立EP（POST/DELETE attachments）でアップロードされ、それ単体では版を作らない**。版に載せるには「添付が存在する状態で保存(updateIdea)が走る」必要がある＝作成時添付は `draft→添付→publish` に分けないと初版に載らない（設計B の肝）。seed の既存デモ添付は `ensure_attachment_revision` の capture PATCH で版に載せている。
+- 教訓2: **backend/worker/mail-worker は同一 `./backend` イメージを共有**。`docker compose --profile workers up -d --build worker mail-worker` でも backend イメージが焼き直り、`up` で backend も新コードに入れ替わることがある。確実にするなら **`... up -d --build backend worker mail-worker`** を明示。backend はホストコードを**マウントしない**＝コード変更は再ビルド必須。
+- 教訓3: **魔法リアクションは SP 保有者しか付与できない**。seed の owner（user@）のみ SP26、**u2/u3 は SP 0**。seed では魔法を owner が担当。
+- 教訓4: seed の Bash 実行で `cd impl` を連発すると相対パスがずれる（cwd が持続）。**リポジトリ直下から `python3 impl/backend/scripts/seed_demo.py` で実行**が安全。
 
 ## 6. 決定事項と根拠（本セッション）
-- **最終結果＝検証済みコンセプト票**（ISO 56002 マッピング）。④開発のアプリ内実装は将来拡張（今回スコープ外）＝肥大化回避、次アクションから複製で後続クエストへ連結。
-- **(c)自動要約は無料 Python ライブラリのオフライン抽出型**（`janome`＋頻度ベース）＝外部API/課金/外部送信なし（会社データを外部に出さない）・同期・seam化。**不採用**＝Claude 等 LLM 生成要約（コスト/データ保護判断が要るため将来）。
-- **結果タブは常時表示＋未完了は暫定**（旧「完了後のみ」を上書き）＝ISO 56002 §9 の継続的モニタリングに整合。誤認防止に「暫定」明示。
-- **ステータスは隣接1段の前進＋後退**（旧「前進のみ」を上書き）。**draft戻し（非公開化）は不可**＝既存投票/アイデアが宙に浮く・可視性混乱を避ける（unpublish は別概念・未実装）。**完了確定物は非取り消し**＝会計/通知の整合。
-- **(b)ピン留めは owner/quest_admin のみ**（一般メンバー不可）＝検証の証跡を管理者がキュレーションし結果の信頼性を担保。
-- **複製はパーティーも引き継ぐ**（旧「引き継がない」を上書き）＝テンプレート的に使えるように。
-- **社内レビューの残指摘は memory に記録**（`internal-review-remaining-items.md`）＝以前チャットで受けた指摘を保存し損ねた反省から。
+- **完了クエストの凍結＝UI事前無効化＋ツールチップに統一（案B の見た目）**。サーバー 409 は防御的に維持。押せてから弾くより親切＝「押せない方が良い」（ユーザー明言）。フォローだけは「解除のみ可」なので押下で info 表示にした（例外）。詳細は memory `completed-quest-freeze-ui-standard.md`。
+- **添付の版管理＝設計B（1保存1版）を採用**。不採用＝設計A（添付操作ごとに1版）＝「本文編集＋添付追加」で3版になりユーザーが嫌った。設計Bは保存時に添付適用→updateIdea で1版に集約。
+- **空更新は版を作らない／作成時添付は初版に記録**＝ユーザー指摘（空版が増える・初版が添付0件に見える）への対応。
+- **game_mode OFF ではゲーム層の演出（魔法リアクション等）を非表示**＝ゲームモードの定義（layout の gameEnabled で「ゲーム層UI/演出を非表示」）に合わせた。通常絵文字リアクションは業務機能で残す。
+- **ref→通知リンクは共有関数 notificationHref に一本化**＝SC-01/SC-02 の重複を排除（DRY・コーディング規約 §2.3）。
+- **受入デモデータはコード化（seed_demo.py）**＝手動データが失われても復元でき、群単位で育てる。
 
 ## 7. 次にやること（優先順・具体）
-0. **push 確認**＝`git log origin/main..HEAD` が空か確認。残っていれば `git push origin main`（本 handoff コミットは要 push）。
-1. **実装計画の残ドメイン接続**＝`doc/実装計画.md` 順（アカウント→クエスト→アイデア→評価→その他）で**未接続画面が残っていれば backend 接続を1画面単位**で。着手前に **`impl/README.md`（実装現況の正）** で ✅/🟡/⬜ を確認。README の「受入待ち」チェックリスト（実装済み・ブラウザ受入未）も参照。
-2. **画面設計のドリフト整理（軽微）**＝SC-12 の screen doc（`doc/画面設計/screens/SC-12_クエスト詳細.md` §3/§4.4）と mock（`doc/画面設計/mocks/SC-12_クエスト詳細.html`）に旧「概要」タブが残る（production は レビュー#3 で撤去済み）。FR-39 とは別件の負債＝気づいた時に撤去。
-3. **UI/パラメータ微調整の余地**＝`QuestForm.tsx` の `GROUP_CHIP_MAX`（現2）、アイデア一覧の列幅、`quests/summarize.py` の `max_sentences=5`・要約入力上限500、結果KPIの定量化強化（ISO56002 §9）。
-4. **(c)要約の高品質化（任意・将来）**＝`quests/summarize.py::summarize_text` を LLM 生成要約に差し替え（seam・要データ保護/コスト方針）。
-5. **後退遷移の軽微な残**＝別管理者による再完了時の通知冪等はユーザー単位判定（`transition_quest` の `first_completion`＝`gami_repo.exists_ref(user…)`）。極端ケースで重複余地・実害小。必要なら quest 単位判定へ。
+0. **push 確認**＝`git log origin/main..HEAD` が空か確認。残っていれば `git push origin main`（1aed8ad・af448c6・本 handoff コミットを push）。
+1. **E群ブラウザ受入の完了**＝`seed_demo.py e` の出力URL（本セッション例＝`/ideas/0aafc731-eaa9-4826-a910-6f2fb8e22e05/chat`・**id は再seedで変わる**）で SC-24 を確認: 複数引用・@メンション（**②修正後の再確認・要**）・👍通常/**魔法リアクション（要ゲームモードON）**・📎添付DL・既読セパレータ・completed 凍結（`/ideas/bc577836-.../chat`）。魔法/ヒーロー等ゲーム層を見るには**プロフィール＞ゲームモードを ON**（user@ は現在 OFF）。OK なら README のE群 [x] 化。
+2. **G群の seed 追加**＝`seed_demo.py` に `seed_g` を実装（`main` の dispatch に `g` 追加）。SC-32 魔法解放/SC-30 ショップ購入/SC-31 アバター/SC-41 ランキング/SC-40 実績。**owner のみ SP/コイン保有**（u2/u3 は 0）に注意＝購入/解放は owner で。API＝`GET/POST /spells`・`GET /items`・`POST /items/{id}/purchase`・`PUT /me/avatar-base`/装備・`GET /rankings`・`GET /achievements`。
+3. **F群（評価）**＝seed で「提出済み評価（5観点＋総評＋公開範囲）」を複数評価者で投入＋owner の選定。API＝`PUT /ideas/{id}/evaluation`・`POST/DELETE /ideas/{id}/select`。評価者権限が要る＝クエストの member permissions に `evaluator` を付与。
+4. **H群（通知）**＝2ユーザー発火（メンション/フォロー中コメント/評価/選定/更新等）でSC-02に通知が出る通し。seed でフォロー/パーティー関係を用意。
+5. **その他**＝メール確認 ADR-0009（SC-92/93→MailHog `http://localhost:8025`）。
+6. **未追加テストの補完（任意）**＝game_mode 魔法非表示・通知リンク/既読 の e2e or unit（§4 参照）。
 
 ## 8. 再開に必要な環境情報
-- **起動**: `cd impl && docker compose up -d --build`（db/redis/minio/mailhog/backend/frontend）。ワーカは `profiles:["workers"]`＝QA フル起動は `docker compose --profile workers up -d --build`。
-- **ポート**: backend 8000 / frontend 3000 / db 5432 / minio 9000・9001 / mailhog 8025 / redis 6379。ブラウザ QA は http://localhost:3000 。
-- **落とし穴（確認済み）**:
-  - backend/frontend コンテナは**ホストコードをマウントしない**＝ソース変更は**イメージ再ビルド必須**（`docker compose up -d --build backend`／`… frontend`）。**依存追加時（例＝janome）も backend 再ビルド必須**。UI を直したら必ず frontend を `--build`。
-  - **pytest はホストコードをマウント**＝`docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests -q`（cwd=`impl`）。**新規 pip 依存はイメージ側に必要**＝先に `docker compose build backend`。ワーカ稼働中は `docker compose stop worker mail-worker` してから。`docker compose run backend …` は entrypoint が bootstrap（DB作成＋migrate＋seed・冪等）を先に走らせる。
-  - **codegen**＝先に `docker compose up -d --build backend` → `cd impl/frontend && npm run codegen`。
-  - **フラキー時のDBクリーン**＝会社DB drop（`docker compose exec -T db psql -U ideaquest -d postgres -c "DROP DATABASE IF EXISTS ideaquest_company_acme;"` 等）→ 次の bootstrap で再作成。psql ユーザ＝`ideaquest`。
-- **frontend 検証**: `cd impl/frontend && npm run codegen && npx tsc --noEmit && npm run build`（build 必須＝Next lint/`<Link>` を tsc/vitest だけだと見逃す）。
-- **TC先行 & トレーサビリティ**: TC を `doc/テスト/<ドメイン>_*.md` に先に足す → `python3 scripts/check_tc_traceability.py` ✅（**リポジトリ直下**で実行）。
-- **seed ログイン**: `tests/conftest.py` の `SEED_COMPANY_CODE`/`SEED_LOGIN`/`SEED_PASSWORD`（`ACME-01`/`user@acme.example`/`Passw0rd!`）。権限が要る操作（結果編集/ピン留め/要約/ステータス遷移）は owner/quest_admin で確認。system_admin＝`OPS`/`admin@ops.example`。
-- **規約の正本**: リポジトリ直下 `CLAUDE.md` から各規約を参照。レビュー反映フェーズ＝main 直コミット。**commit/push はユーザー明示時のみ**。
-- **正本の所在**: 要件＝`doc/要件定義/README.md`（FR-xx）／API＝`doc/API設計/{README,A..L}.md`／データモデル＝`doc/データモデル.md`／画面＝`doc/画面設計/screens/SC-xx_*.md`＋`mocks/*.html`／実装現況＝`impl/README.md`／実装順＝`doc/実装計画.md`。
-- **同種コンポーネントの重複に注意**: アカウント一覧は `AccountSection`（system_admin 横断 `/admin/companies/{id}`）と `AccountSelfSection`（自社 `/admin/accounts`）の2系統＝列を直すときは両方。
+- **起動**: `cd impl && docker compose --profile workers up -d --build`（db/redis/minio/mailhog/backend/frontend/worker/mail-worker）。コード変更後は**該当サービスを `--build` で再ビルド必須**（backend/worker/mail-worker は同一イメージ＝`... up -d --build backend worker mail-worker`）。
+- **ポート**: frontend 3000 / backend 8000(/healthz) / db 5432 / redis 6379 / minio 9000・9001 / mailhog 8025。ブラウザQA＝http://localhost:3000 。
+- **受入デモデータ生成**: リポジトリ直下から `python3 impl/backend/scripts/seed_demo.py [d|e|all]`（ホストの python3＋requests・稼働中 backend 必須・冪等）。**出力の URL を正とする**（id は再生成で変わり得る）。dev ログイン＝`ACME-01`/`user@acme.example`/`Passw0rd!`（他に user2/user3/kanri も同PW）。**owner=user@ のみ SP/コイン保有**。**user@ は game_mode OFF**（ゲーム層を見るならプロフィールで ON）。
+- **frontend 検証**: `cd impl/frontend && npx tsc --noEmit && npm run build`（build 必須＝Next lint/`<Link>` を tsc だけだと見逃す）。
+- **backend テスト**: `cd impl && docker compose stop worker mail-worker` →（cwd=impl）`docker compose run --rm -T -v "$PWD/backend:/app" backend python -m pytest tests -q` → 済んだら worker 再開。新規 pip 依存はイメージ側に必要（先に `docker compose build backend`）。
+- **TCトレーサビリティ**: TC を `doc/テスト/<ドメイン>_*.md` に先に足す → **リポジトリ直下**で `python3 scripts/check_tc_traceability.py` ✅。
+- **規約の正本**: リポジトリ直下 `CLAUDE.md` から各規約を参照。**commit/push はユーザー明示時のみ**。main 直コミット（本フェーズ）。
+- **正本の所在**: 要件＝`doc/要件定義/README.md`／API＝`doc/API設計/{README,A..L}.md`／データモデル＝`doc/データモデル.md`／画面＝`doc/画面設計/screens/SC-xx_*.md`＋`mocks/*.html`／実装現況＝`impl/README.md`（受入チェックリスト＝「ブラウザ受入状況」節）／実装順＝`doc/実装計画.md`。
+- **横断UI標準の memory**: `completed-quest-freeze-ui-standard.md`（完了クエストの凍結UI＝事前無効化＋is-frozen・フォローは info・チャット凍結バナー）。
