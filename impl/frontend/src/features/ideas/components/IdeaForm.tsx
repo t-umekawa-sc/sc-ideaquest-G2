@@ -9,7 +9,7 @@
 // 添付（関連資料・D.3）＝作成/編集の保存成功後に uploadAttachments で送信（id 先行が要るため保存後・§1.10）。投票/フォローは SC-22。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { ApiError } from "@/lib/api/client";
 import { mapServerErrors, t, type FieldErrors, type Locale } from "@/lib/forms/validation";
@@ -55,7 +55,6 @@ type Props = {
 
 export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCancel }: Props) {
   const snack = useSnackbar();
-  const confirm = useConfirm();
   const { summaryRef, notify } = useFormErrorNotice();
   const isEdit = mode === "edit";
 
@@ -76,7 +75,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const [note, setNote] = useState("");
   const [attachments, setAttachments] = useState<IdeaAttach[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<IdeaAttachment[]>([]); // 編集＝保存済みの添付（D.3）
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [removedIds, setRemovedIds] = useState<string[]>([]); // 削除予定にマークした既存添付（保存で確定・追加と同じくステージ方式）
   const [over, setOver] = useState(false);
   // アイデア個別アイコン（Phase 3）＝2段（本体保存→PUT /ideas/{id}/icon-image）。iconUrl は「このアイデア個別のみ」（own_icon_image_url）。
   const [iconPreview, setIconPreview] = useState<string | null>(null);
@@ -91,6 +90,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const [notFound, setNotFound] = useState(false);
   const [quest, setQuest] = useState<QuestDetail | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 編集開始時の内容（空更新＝無変更保存で版を増やさない判定用）。stakeholders はラベルを  連結で比較。
+  const originalRef = useRef<{ title: string; value: string; body: string; time_limit: string; note: string; stakeholders: string } | null>(null);
 
   const pending = pendingKind !== null;
   const canSave = Boolean(subject.trim() && value.trim() && body.trim());
@@ -124,6 +125,12 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           setStakeholders((idea.stakeholders ?? []).map((s) => s.label));
           setNote(idea.note ?? "");
           setExistingAttachments(idea.attachments ?? []); // 保存済み添付の管理（D.3・編集）
+          setRemovedIds([]); // 削除予定マークは読み込みでリセット
+          originalRef.current = {  // 無変更保存の検出用に編集開始時の内容を保持
+            title: idea.title, value: idea.value, body: idea.body,
+            time_limit: idea.time_limit ?? "", note: idea.note ?? "",
+            stakeholders: (idea.stakeholders ?? []).map((s) => s.label).join("\n"),
+          };
           setIconUrl(idea.own_icon_image_url ?? null); // このアイデア個別のアイコン（既定は含めない・Phase 3）
         }
         setLoading(false);
@@ -172,34 +179,10 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   }
 
   // 保存済み添付の削除（D.3・編集モード）。添付は本文編集と独立＝即時にサーバー削除（版を生まない・§D.3）。
-  // 破壊的操作のため確認ダイアログ→成功でリストから除去＋トースト。完了/権限/不在はサーバー権威で理由提示。
-  async function removeExisting(att: IdeaAttachment) {
-    if (deletingId || !ideaId) return;
-    const ok = await confirm({
-      variant: "danger",
-      title: "添付を削除",
-      msg: `「${att.original_name}」を削除します。この操作は取り消せません。`,
-      confirmLabel: "削除する",
-    });
-    if (!ok) return;
-    setDeletingId(att.id);
-    try {
-      await deleteAttachment(ideaId, att.id);
-      setExistingAttachments((cur) => cur.filter((a) => a.id !== att.id));
-      snack({ type: "success", msg: "添付を削除しました。" });
-    } catch (err) {
-      const status = err instanceof ApiError ? err.status : 0;
-      snack({
-        type: "error",
-        msg:
-          status === 409 ? "完了したクエストのアイデアは変更できません。"
-          : status === 403 ? "この添付を削除する権限がありません。"
-          : status === 404 ? "この添付は見つかりません（すでに削除済みの可能性があります）。"
-          : "削除に失敗しました。時間をおいて再度お試しください。",
-      });
-    } finally {
-      setDeletingId(null);
-    }
+  // 既存添付の削除は「保存で確定」のステージ方式（新規添付の追加と挙動を揃える）。
+  // × で削除予定にマーク／「元に戻す」で解除。実際の削除は保存時に適用（キャンセルなら無変更）。
+  function toggleRemoveExisting(att: IdeaAttachment) {
+    setRemovedIds((cur) => (cur.includes(att.id) ? cur.filter((x) => x !== att.id) : [...cur, att.id]));
   }
 
   // 利害関係者を API 入力へ（候補に無い＝手入力は is_custom=true・§正規化はサーバー）。
@@ -258,24 +241,67 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       };
       let targetId = ideaId;
       let publishXp = 0;  // #8: 初回公開で実際に付与された投稿 XP（server の xp_delta・金額の正はサーバー）
-      if (kind === "save") {
-        await updateIdea(ideaId!, content);
-      } else if (kind === "draft") {
+      const files = attachments.map((a) => a.file);
+      let attachmentsUploaded = false;
+      // 作成は先に id を採番（添付は id 先行が要る）。編集の内容更新（updateIdea）は添付適用の「後」に回す
+      // ＝公開中は保存で1版記録するため、添付の追加/削除を版スナップショット/差分に反映させる（D.4）。
+      if (kind === "draft") {
         const created = await createIdea(questId!, { ...content, status: "draft" });
         targetId = created?.id ?? undefined;
-      } else {
-        const created = await createIdea(questId!, { ...content, status: "published" });
-        targetId = created?.id ?? undefined;
-        publishXp = created?.xp_delta ?? 0;
+      } else if (kind === "publish") {
+        if (files.length > 0) {
+          // 作成時の添付を初版(rev1)に載せるため draft作成→添付→公開の順（publish 時にスナップショットへ取り込む・D.4）
+          // ＝更新履歴の初版が正しく「添付あり」になり、後続版の差分が (なし)→全件 に誤表示されない。
+          const draft = await createIdea(questId!, { ...content, status: "draft" });
+          targetId = draft?.id ?? undefined;
+          if (targetId) {
+            try {
+              await uploadAttachments(targetId, files);
+              attachmentsUploaded = true;
+            } catch {
+              snack({ type: "error", msg: "一部の添付をアップロードできませんでした（サイズ/形式/件数をご確認ください）。" });
+            }
+          }
+          const pub = targetId ? await publishIdea(targetId, {}) : null;
+          publishXp = pub?.xp_delta ?? 0;
+        } else {
+          const created = await createIdea(questId!, { ...content, status: "published" });
+          targetId = created?.id ?? undefined;
+          publishXp = created?.xp_delta ?? 0;
+        }
       }
-      // 添付は id 先行が必要なため保存成功後に送信（D.3）。検証エラー等は非致命＝本体は保存済み。
-      const files = attachments.map((a) => a.file);
-      if (targetId && files.length > 0) {
+      // 添付の追加（アップロード）＝保存/公開で確定（D.3）。公開時に先行アップロード済みならスキップ。検証エラー等は非致命。
+      if (targetId && files.length > 0 && !attachmentsUploaded) {
         try {
           await uploadAttachments(targetId, files);
         } catch {
           snack({ type: "error", msg: "一部の添付をアップロードできませんでした（サイズ/形式/件数をご確認ください）。" });
         }
+      }
+      // 削除予定の既存添付を確定（追加と同じくステージ→保存で反映・キャンセルなら無変更・D.3）。
+      if (targetId && removedIds.length > 0) {
+        let removeFailed = false;
+        for (const id of removedIds) {
+          try {
+            await deleteAttachment(targetId, id);
+          } catch (err) {
+            if (!(err instanceof ApiError && err.status === 404)) removeFailed = true;  // 既に無い(404)は成功扱い
+          }
+        }
+        if (removeFailed) snack({ type: "error", msg: "一部の添付を削除できませんでした。時間をおいて再度お試しください。" });
+      }
+      // 実際に変わったか＝本文いずれか or 添付（追加/削除）。無変更保存では版を作らない（空更新で版を進めない）。
+      const o = originalRef.current;
+      const contentChanged = !o || (
+        content.title !== o.title || content.value !== o.value || content.body !== o.body ||
+        (content.time_limit ?? "") !== o.time_limit || (content.note ?? "") !== o.note ||
+        stakeholders.join("\n") !== o.stakeholders
+      );
+      const attachmentsChanged = files.length > 0 || removedIds.length > 0;
+      // 編集の保存＝内容更新（公開中は版記録）。添付適用の「後」に呼ぶことで版差分に添付変更が載る（D.4）。
+      // 内容も添付も無変更なら updateIdea を呼ばない＝空の版を作らない。
+      if (kind === "save" && (contentChanged || attachmentsChanged)) {
+        await updateIdea(ideaId!, content);
       }
       // アイデア個別アイコン（Phase 3）＝id 先行が必要なので保存後に送信（非致命）。設定→PUT／解除→DELETE。
       if (targetId) {
@@ -286,9 +312,17 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           snack({ type: "error", msg: "アイコンを保存できませんでした（サイズ/形式をご確認ください）。" });
         }
       }
-      if (typeof window !== "undefined") window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+      const iconChanged = !!iconFile || iconRemoved;
+      const changedAnything = kind !== "save" || contentChanged || attachmentsChanged || iconChanged;
+      if (changedAnything && typeof window !== "undefined") window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
       if (kind === "save") {
-        snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
+        if (contentChanged || attachmentsChanged) {
+          snack({ type: "success", title: "変更を保存しました", msg: "投票者とフォロワーに通知しました。" });
+        } else if (iconChanged) {
+          snack({ type: "success", title: "変更を保存しました" });
+        } else {
+          snack({ type: "info", title: "変更はありません", msg: "内容・添付とも変更がなかったため、版は増やしていません。" });
+        }
       } else if (kind === "draft") {
         snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
       } else if (publishXp > 0) {
@@ -481,29 +515,32 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
 
         {/* 関連資料 添付（任意・複数可）。新規＝保存成功後にアップロード（D.3）／編集＝保存済みは即時削除可。 */}
         <Field id="idea_files" label="関連資料（任意・複数可）">
-          {/* 保存済みの添付（編集モードのみ・D.3）＝× で即時サーバー削除（本文編集と独立・版を生まない）。 */}
+          {/* 保存済みの添付（編集モードのみ・D.3）＝× で削除予定にマーク（保存で確定・版を生まない）。追加と同じくステージ方式。 */}
           {isEdit && existingAttachments.length > 0 && (
             <>
-              <p className="hint" style={{ marginTop: 0 }}>保存済みの添付（× で削除・すぐに反映されます）</p>
+              <p className="hint" style={{ marginTop: 0 }}>保存済みの添付（× で削除予定にマーク・<strong>保存で確定</strong>／キャンセルで元に戻ります）</p>
               <div className="attach-list" aria-label="保存済みの添付">
-                {existingAttachments.map((a) => (
-                  <div className="attach" key={a.id}>
-                    <span className="attach__icon">{iconFor(a.original_name)}</span>
-                    <div className="attach__meta">
-                      <div className="attach__name">{a.original_name}</div>
-                      <div className="attach__size">{fmtSize(a.size_bytes)}</div>
+                {existingAttachments.map((a) => {
+                  const staged = removedIds.includes(a.id);
+                  return (
+                    <div className={`attach${staged ? " is-removing" : ""}`} key={a.id}>
+                      <span className="attach__icon">{iconFor(a.original_name)}</span>
+                      <div className="attach__meta">
+                        <div className="attach__name">{a.original_name}</div>
+                        <div className="attach__size">{fmtSize(a.size_bytes)}{staged && <span className="attach__flag"> ・削除予定（保存で確定）</span>}</div>
+                      </div>
+                      <button
+                        className="attach__remove"
+                        type="button"
+                        aria-label={staged ? `${a.original_name} の削除を取り消す` : `${a.original_name} を削除予定にする`}
+                        disabled={pending}
+                        onClick={() => toggleRemoveExisting(a)}
+                      >
+                        {staged ? "元に戻す" : "✕"}
+                      </button>
                     </div>
-                    <button
-                      className="attach__remove"
-                      type="button"
-                      aria-label={`${a.original_name} を削除`}
-                      disabled={deletingId === a.id || pending}
-                      onClick={() => void removeExisting(a)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}

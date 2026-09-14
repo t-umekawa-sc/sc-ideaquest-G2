@@ -614,12 +614,14 @@ def _content_snapshot(ts, idea) -> dict:
         "time_limit": idea.time_limit.isoformat() if idea.time_limit else None,
         "note": idea.note,
         "stakeholders": [{"label": s.label, "is_custom": s.is_custom} for s in repo.list_stakeholders(ts, idea.id)],
+        # 添付も版で追跡（D.4・添付の追加/削除を履歴/差分に出し、フォロワーが気づけるように）。表示名の一覧（安定のため昇順）。
+        "attachments": sorted(a.original_name for a in repo.list_attachments(ts, idea.id)),
     }
 
 
 # 版で追跡する対象フィールド（D.4・§5.14）。テキスト系＝語句差分、その他＝{old,new}。
 _TEXT_FIELDS = ("title", "value", "body", "note")
-_TRACKED_FIELDS = ("title", "value", "body", "time_limit", "note", "stakeholders")
+_TRACKED_FIELDS = ("title", "value", "body", "time_limit", "note", "stakeholders", "attachments")
 
 
 def _encode_revision_cursor(revision: int) -> str:
@@ -653,7 +655,14 @@ def _changed_fields(old: dict | None, new: dict) -> list[str]:
     """前版スナップショット比較で変わったフィールド名（初版＝old None は空・D.4）。"""
     if old is None:
         return []
-    return [f for f in _TRACKED_FIELDS if old.get(f) != new.get(f)]
+    changed = []
+    for f in _TRACKED_FIELDS:
+        # attachments 未追跡の旧スナップショット（本機能導入前）は比較対象外＝誤検知を防ぐ（None は「不明」）。
+        if f == "attachments" and old.get("attachments") is None:
+            continue
+        if old.get(f) != new.get(f):
+            changed.append(f)
+    return changed
 
 
 def _diff_fields(old: dict, new: dict) -> dict:
@@ -665,12 +674,18 @@ def _diff_fields(old: dict, new: dict) -> dict:
     result: dict[str, dict] = {}
     for f in _TRACKED_FIELDS:
         ov, nv = old.get(f), new.get(f)
+        # attachments 未追跡の旧スナップショット（None）は差分を出さない（誤検知防止・_changed_fields と一致）。
+        if f == "attachments" and ov is None:
+            continue
         if ov == nv:
             continue
         if f in _TEXT_FIELDS:
             result[f] = {"kind": "text", "segments": _text_diff_segments(ov or "", nv or "")}
         elif f == "stakeholders":
             result[f] = {"kind": "scalar", "old": _stakeholders_str(ov), "new": _stakeholders_str(nv)}
+        elif f == "attachments":
+            # 添付は表示名の一覧を「・」連結で old→new（追加/削除が一目で分かる・D.4）。
+            result[f] = {"kind": "scalar", "old": "・".join(ov or []), "new": "・".join(nv or [])}
         else:  # time_limit
             result[f] = {"kind": "scalar", "old": ov, "new": nv}
     return result

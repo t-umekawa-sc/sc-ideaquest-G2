@@ -77,6 +77,9 @@
 .dash-page .follow-card { --accent: var(--color-info); position: relative; text-align: left; width: 100%; font: inherit; color: inherit; display: block;
   transition: transform .12s cubic-bezier(.22,1,.36,1), box-shadow .15s, border-color .15s; }
 .dash-page .follow-card .card-title { padding-right: 28px; }
+/* 件名は折り返す（1行省略 .idea-title-row__txt を上書き）＝カードは縦に伸びてよい。アイコンは1行目に揃える。 */
+.dash-page .follow-card .idea-title-row { align-items: flex-start; }
+.dash-page .follow-card .idea-title-row__txt { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dash-page .follow-quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .dash-page .follow-value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .dash-page .follow-card__poster { margin-top: var(--space-3); }

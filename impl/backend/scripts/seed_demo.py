@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""受入用デモデータ生成（冪等・再利用可能）。
+
+稼働中バックエンドの **HTTP API を実ユーザーで叩いて** 作る（DB 直挿し禁止）＝XP 台帳・版記録・
+通知・realtime publish 等の業務ロジックを本物どおり通す。ブラウザ受入（impl/README.md の受入待ち）
+で使うデモデータを、失われても再生成できるようにコード化する。
+
+前提:
+  - `cd impl && docker compose --profile workers up -d` 済み（backend :8000）。
+  - ACME-01 の seed アカウント user/user2/user3/kanri がいずれも Passw0rd!（bootstrap 既定）。
+
+実行（リポジトリ直下 or どこからでも・ホストの python3＋requests で可）:
+  python3 impl/backend/scripts/seed_demo.py           # 全群
+  python3 impl/backend/scripts/seed_demo.py d         # D 群のみ
+
+冪等性: クエスト/アイデアは件名で既存検索して再利用（重複作成しない）。版・添付・投票・遷移も
+現状を見て不足分だけ実施する。何度流しても同じ状態に収束する。
+
+群単位で育てる（フロント実装フロー規約 §1.1 の受入ゲート・実装順 D→E→G→F→H）。現状 = **D 群**。
+"""
+from __future__ import annotations
+
+import base64
+import sys
+
+import requests
+
+BASE = "http://localhost:8000/api/v1"
+COMPANY_CODE = "ACME-01"
+PASSWORD = "Passw0rd!"
+APP = "http://localhost:3000"  # 受入 URL の出力用（ブラウザ）
+
+LOGINS = {
+    "user": "user@acme.example",   # テスト 太郎（作成者=owner）
+    "user2": "user2@acme.example",  # チャット 太郎
+    "user3": "user3@acme.example",  # アイデア 出す像
+    "kanri": "kanri@acme.example",  # 管理者（company_account_admin）
+}
+
+# 1x1 透明 PNG（マジックバイト検証 §8 を通す最小の本物 PNG）。
+_PNG_1PX = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+
+class Client:
+    """1 ユーザーのログイン済みセッション（cookie 保持・CSRF 自動付与）。"""
+
+    def __init__(self, key: str):
+        self.key = key
+        self.s = requests.Session()
+        r = self.s.post(
+            f"{BASE}/auth/login",
+            json={"company_code": COMPANY_CODE, "login_id": LOGINS[key], "password": PASSWORD},
+        )
+        r.raise_for_status()
+        body = r.json()
+        if body.get("status") != "authenticated":
+            raise SystemExit(f"login({key}) failed: {body}")
+        self.user_id = body["session"]["user"]["user_id"]
+
+    def _headers(self) -> dict:
+        # ダブルサブミット CSRF（A.0）: iq_csrf cookie と一致する X-CSRF-Token を送る。Origin は省略（非ブラウザ許容）。
+        return {"X-CSRF-Token": self.s.cookies.get("iq_csrf", "")}
+
+    def get(self, path: str, **kw):
+        r = self.s.get(BASE + path, **kw)
+        r.raise_for_status()
+        return r.json()
+
+    def _send(self, method: str, path: str, *, ok, **kw):
+        r = self.s.request(method, BASE + path, headers=self._headers(), **kw)
+        if r.status_code not in ok:
+            raise RuntimeError(f"{method} {path} -> {r.status_code} {r.text}")
+        ct = r.headers.get("content-type", "")
+        return r.json() if r.content and ct.startswith("application/json") else None
+
+    def post(self, path, *, ok=(200, 201, 204), **kw):
+        return self._send("POST", path, ok=ok, **kw)
+
+    def patch(self, path, *, ok=(200,), **kw):
+        return self._send("PATCH", path, ok=ok, **kw)
+
+    def delete(self, path, *, ok=(200, 204), **kw):
+        return self._send("DELETE", path, ok=ok, **kw)
+
+
+# ---- 冪等ヘルパ（件名検索で再利用） ----
+
+def find_quest(c: Client, title: str):
+    data = c.get("/quests", params={"limit": 100}).get("data", [])
+    for q in data:
+        if q["title"] == title:
+            return q
+    return None
+
+
+def ensure_quest(c: Client, *, title: str, categories, purpose, deadline, members, status="recruiting"):
+    existing = find_quest(c, title)
+    if existing:
+        print(f"  = quest 既存: {title} ({existing['id']}) status={existing['status']}")
+        return c.get(f"/quests/{existing['id']}")
+    q = c.post(
+        "/quests",
+        json={
+            "title": title,
+            "color": "#3B82F6",
+            "quest_group_ids": [],  # 0 件 = 会社全体（FR-38・誰でもアクセス可＝受入を単純化）
+            "categories": categories,
+            "deadline": deadline,
+            "purpose": purpose,
+            "members": members,
+            "status": status,
+        },
+    )
+    print(f"  + quest 作成: {title} ({q['id']}) status={q['status']}")
+    return q
+
+
+def find_idea(c: Client, quest_id: str, title: str):
+    data = c.get(f"/quests/{quest_id}/ideas", params={"status": ["draft", "published"], "limit": 100}).get("data", [])
+    for i in data:
+        if i["title"] == title:
+            return i
+    return None
+
+
+def ensure_idea(c: Client, quest_id: str, *, title: str, value: str, body: str, time_limit=None, status="published"):
+    existing = find_idea(c, quest_id, title)
+    if existing:
+        print(f"    = idea 既存: {title} ({existing['id']}) rev={existing.get('current_revision')}")
+        return c.get(f"/ideas/{existing['id']}")
+    i = c.post(
+        f"/quests/{quest_id}/ideas",
+        json={"title": title, "value": value, "body": body, "time_limit": time_limit, "status": status},
+    )
+    print(f"    + idea 作成: {title} ({i['id']}) rev={i.get('current_revision')} status={i['status']}")
+    return i
+
+
+def ensure_revisions(c: Client, idea: dict, edits: list[dict]):
+    """公開アイデアに版を積む（D.4 更新履歴）。目標版数 = 1 + len(edits)。現状が足りない分だけ PATCH。"""
+    idea_id = idea["id"]
+    cur = c.get(f"/ideas/{idea_id}")["current_revision"]
+    target = 1 + len(edits)
+    for n in range(cur, target):  # cur..target-1: 次の版を作る PATCH を適用
+        patch = edits[n - 1]  # rev(n)->rev(n+1) を作る編集
+        c.patch(f"/ideas/{idea_id}", json=patch)
+        print(f"      ~ rev {n} -> {n + 1}: {list(patch.keys())}")
+    if cur >= target:
+        print(f"      = 版は既に {cur}（目標 {target}）")
+
+
+def ensure_attachments(c: Client, idea_id: str, names: list[str]):
+    """指定名の添付が無ければ追加（D.3・冪等 = 既存名はスキップ）。"""
+    have = {a["original_name"] for a in c.get(f"/ideas/{idea_id}").get("attachments", [])}
+    for name in names:
+        if name in have:
+            print(f"      = 添付既存: {name}")
+            continue
+        c.post(f"/ideas/{idea_id}/attachments", files=[("files", (name, _PNG_1PX, "image/png"))])
+        print(f"      + 添付追加: {name}")
+
+
+def ensure_attachment_revision(c: Client, idea_id: str, base_revisions: int):
+    """添付を版スナップショットに載せる（設計B＝保存で版に取り込む）。添付付与後の版がまだ無ければ1回 touch。
+
+    add/DELETE 添付は独立EPで版を作らないため、既存デモの添付は版に未記録＝削除しても差分に出ない。
+    受入で「添付削除が更新履歴に出る」を確認できるよう、添付付与後に content を1回 PATCH して現添付を版に記録する。
+    冪等＝版数が base_revisions を超えていれば記録済みとみなしスキップ。
+    """
+    detail = c.get(f"/ideas/{idea_id}")
+    revs = c.get(f"/ideas/{idea_id}/revisions").get("data", [])
+    if detail.get("attachments") and len(revs) <= base_revisions:
+        c.patch(f"/ideas/{idea_id}", json={"note": "受入デモ（添付を更新履歴に記録）"})
+        print(f"      ~ 添付を版に記録（capture PATCH）rev{len(revs)}→{len(revs) + 1}")
+    else:
+        print("      = 添付は既に版に記録済み（or 添付なし）")
+
+
+def try_vote(c: Client, idea_id: str, vote_type: str):
+    try:
+        c.post(f"/ideas/{idea_id}/vote", json={"type": vote_type})
+        print(f"      · {c.key} 投票 {vote_type}")
+    except RuntimeError as e:
+        print(f"      ! {c.key} 投票 skip: {e}")
+
+
+def try_follow(c: Client, idea_id: str):
+    try:
+        c.post(f"/ideas/{idea_id}/follow")
+        print(f"      · {c.key} フォロー")
+    except RuntimeError as e:
+        print(f"      ! {c.key} フォロー skip: {e}")
+
+
+_STATUS_ORDER = ["draft", "recruiting", "in_progress", "evaluating", "completed"]
+
+
+def advance_to(c: Client, quest_id: str, target: str):
+    """クエストを target まで隣接前進（冪等・既に到達なら何もしない）。"""
+    cur = c.get(f"/quests/{quest_id}")["status"]
+    ci, ti = _STATUS_ORDER.index(cur), _STATUS_ORDER.index(target)
+    while ci < ti:
+        nxt = _STATUS_ORDER[ci + 1]
+        c.post(f"/quests/{quest_id}/transition", json={"to": nxt})
+        print(f"    > {cur} -> {nxt}")
+        cur = nxt
+        ci += 1
+
+
+# ---- D 群 ----
+
+def seed_d(owner: Client, u2: Client, u3: Client):
+    print("[D群] アイデア（投票/フォロー/更新履歴/添付/完了凍結）")
+    party = [
+        {"user_id": u2.user_id, "permissions": ["vote", "idea_create", "comment"]},
+        {"user_id": u3.user_id, "permissions": ["vote", "idea_create", "comment"]},
+    ]
+
+    # --- Quest A（recruiting）= 投票/フォロー/更新履歴/添付 ---
+    qa = ensure_quest(
+        owner,
+        title="【受入】D-アイデア（投票/履歴/添付）",
+        categories=["業務改善", "DX"],
+        purpose="日々の業務の非効率をアイデアで解消する（受入デモ・編集可）。",
+        deadline="2027-01-31",
+        members=party,
+    )
+
+    # Idea 1: 更新履歴（3 版）＋添付 2 件（うち1件を編集モードで削除デモ D-TC-218）
+    i1 = ensure_idea(
+        owner, qa["id"],
+        title="夜間配送の集約デモ",
+        value="配送コストを10%削減",
+        body="夜間の個別配送を1便に集約し、積載率を上げてコストを下げる。",
+        time_limit="2026-12-15",
+    )
+    ensure_revisions(owner, i1, edits=[
+        {"value": "配送コストを15%削減", "body": "夜間の個別配送を1便に集約。加えて再配達を翌朝便へ寄せる。",
+         "time_limit": "2026-12-20"},
+        {"body": "夜間の個別配送を1便に集約。再配達を翌朝便へ寄せ、置き配の同意を既定化する。",
+         "time_limit": "2027-01-10"},
+    ])
+    ensure_attachments(owner, i1["id"], ["設計メモ.png", "コスト試算.png"])
+    ensure_attachment_revision(owner, i1["id"], base_revisions=3)  # 添付を版に記録＝削除が更新履歴の差分に出る（設計B）
+    try_vote(u2, i1["id"], "approve")
+    try_vote(u3, i1["id"], "oppose")
+    try_follow(u3, i1["id"])
+
+    # Idea 2: ユーザーが自分で投票/フォローを試すための素の公開アイデア（投票ゼロ始まり）
+    ensure_idea(
+        owner, qa["id"],
+        title="会議室予約の自動化デモ",
+        value="予約の重複と空予約を撲滅",
+        body="センサーで在室を検知し、無使用予約を自動解放。Slack から空き検索・予約。",
+        time_limit="2026-11-30",
+    )
+
+    # --- Quest B（completed）= 完了クエストの編集 409（D-TC-216）/ 凍結（D-TC-214） ---
+    qb = ensure_quest(
+        owner,
+        title="【受入】D-完了クエスト（編集409/凍結）",
+        categories=["DX"],
+        purpose="完了済みクエストの凍結挙動を確認する（受入デモ・編集不可）。",
+        deadline="2026-06-30",
+        members=party,
+    )
+    ib = ensure_idea(
+        owner, qb["id"],
+        title="請求書処理の電子化デモ",
+        value="経理の入力工数を半減",
+        body="OCR で請求書を取り込み、会計システムへ自動連携する。",
+        time_limit="2026-06-15",
+    )
+    advance_to(owner, qb["id"], "completed")
+
+    print("\n=== D 群 受入 URL ===")
+    print(f"  更新履歴(3版)/添付/添付削除  : {APP}/ideas/{i1['id']}")
+    print(f"    ↳ 完了クエスト「Q」ではなく上記アイデアで『版N(履歴)』と📎添付DL・編集→添付×を確認")
+    print(f"  投票/フォロー(素の公開)      : 上記クエスト『会議室予約の自動化デモ』")
+    print(f"  クエスト(recruiting)         : {APP}/quests/{qa['id']}")
+    print(f"  完了クエスト(編集409/凍結)   : {APP}/quests/{qb['id']}  → アイデア『請求書処理の電子化デモ』を編集")
+    print(f"  idea_count 連動              : {APP}/quests  で上記2クエストの💡件数")
+
+
+def main():
+    which = (sys.argv[1].lower() if len(sys.argv) > 1 else "all")
+    print(f"seed_demo: target={which} base={BASE}")
+    owner = Client("user")
+    u2 = Client("user2")
+    u3 = Client("user3")
+
+    if which in ("all", "d"):
+        seed_d(owner, u2, u3)
+
+    print("\n完了。")
+
+
+if __name__ == "__main__":
+    main()

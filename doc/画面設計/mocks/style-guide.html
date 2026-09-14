@@ -16,6 +16,29 @@
   .token .name { font-size: var(--text-xs); margin-top: 6px; }
   .token .val  { font-size: var(--text-xs); color: var(--color-text-muted); }
   .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: var(--space-4); }
+
+  /* 3b. 完了クエストの凍結UI 見本（実装同型の .vote-btn を再現＋disabled の見分け候補を比較）。
+     ※ ここは見本専用のスコープ付きスタイル。採用案が決まったら shared.css / 各 feature css へ移植する。 */
+  .sg-frozen-demo h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+  .sg-frozen-demo .card { display: flex; flex-direction: column; gap: var(--space-3); }
+  .sg-vote-btns { display: flex; gap: var(--space-2); }
+  .sg-vote-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: var(--space-3); border-radius: var(--radius); border: 2px solid var(--color-border-strong); background: var(--color-surface);
+    cursor: pointer; font: inherit; font-weight: 700; font-size: var(--text-base); color: var(--color-text); }
+  .sg-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  /* 基準（現状の実装）＝opacity のみ＝わかりづらい。 */
+  .frz-now:disabled { opacity: .55; cursor: not-allowed; }
+  /* 案A：グレー塗り（薄くせず「塗り」で非活性を示す）＋not-allowed。 */
+  .frz-a:disabled { background: var(--color-surface-alt); color: var(--color-text-muted); border-color: var(--color-border);
+    cursor: not-allowed; opacity: 1; box-shadow: none; }
+  /* 案B：グレー塗り＋斜線ハッチ（最も強い非活性シグナル）。 */
+  .frz-b:disabled { background-color: var(--color-surface-alt); color: var(--color-text-muted); border-color: var(--color-border);
+    cursor: not-allowed; opacity: 1; box-shadow: none;
+    background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgba(2,6,23,.06) 6px 12px); }
+  /* チャット入力欄（完了時）の凍結バナー見本＝現状の「空枠で壊れて見える」を置換する表示。 */
+  .sg-frozen-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: var(--space-4);
+    border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--color-surface-alt);
+    color: var(--color-text-muted); font-size: var(--text-sm); max-width: 520px; }
 </style>
 </head>
 <body>
@@ -131,6 +154,79 @@
     <p class="hint">押下（:active）＝業務層は<strong>1px 沈み込み＋内側の影＋塗りを一段濃く</strong>のクリーンな挙動。
        ゲーム層 <code>.btn-pixel</code> はハードシャドウで<strong>ガコッと沈む</strong>（別トーン）。
        <strong>ボタンを押しっぱなしにすると挙動を確認できる</strong>（<code>prefers-reduced-motion</code> 時は沈みを止め色変化のみ）。</p>
+  </div>
+
+  <!-- 3b. 完了クエストの凍結UI（disabled 見分け・検討中） -->
+  <div class="section sg-frozen-demo">
+    <h2>3b. 完了クエストの凍結UI（非活性の見分け・検討中）<span class="badge badge-muted">検討中</span></h2>
+    <p class="hint">完了(<code>completed</code>)クエストでは <strong>投票・編集・評価・選定</strong> を <strong>事前に非活性＋ホバーで理由</strong>に統一する（サーバー 409 も権威）。
+      現状は <code>opacity:.55</code> のみで「押せそうに見える／わかりづらい」ため、<strong>塗りで非活性を示す案</strong>を比較。
+      <strong>各ボタンにマウスを載せると理由ツールチップ</strong>が出ます。よい案を選んでください（OK なら実装へ移植）。</p>
+
+    <div class="demo-grid">
+      <!-- 現状（基準） -->
+      <div class="card">
+        <h3>現状（opacity .55）— わかりづらい</h3>
+        <div class="idea-head__badges"><span class="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span></div>
+        <div class="sg-vote-btns">
+          <button class="sg-vote-btn frz-now" disabled title="完了したクエストでは投票できません">▲ 賛成</button>
+          <button class="sg-vote-btn frz-now" disabled title="完了したクエストでは投票できません">▼ 反対</button>
+        </div>
+        <div class="sg-actions">
+          <button class="btn btn-primary btn-sm frz-now" disabled title="完了したクエストでは選定を変更できません">☆ このアイデアを選定</button>
+          <button class="btn btn-outline frz-now" disabled title="完了したクエストでは編集できません">編集</button>
+          <button class="btn btn-primary frz-now" disabled title="完了したクエストでは評価できません">評価する / 編集</button>
+        </div>
+      </div>
+
+      <!-- 案A：グレー塗り -->
+      <div class="card">
+        <h3>案A：グレー塗り</h3>
+        <div class="idea-head__badges"><span class="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span></div>
+        <div class="sg-vote-btns">
+          <button class="sg-vote-btn frz-a" disabled title="完了したクエストでは投票できません">▲ 賛成</button>
+          <button class="sg-vote-btn frz-a" disabled title="完了したクエストでは投票できません">▼ 反対</button>
+        </div>
+        <div class="sg-actions">
+          <button class="btn btn-primary btn-sm frz-a" disabled title="完了したクエストでは選定を変更できません">☆ このアイデアを選定</button>
+          <button class="btn btn-outline frz-a" disabled title="完了したクエストでは編集できません">編集</button>
+          <button class="btn btn-primary frz-a" disabled title="完了したクエストでは評価できません">評価する / 編集</button>
+        </div>
+      </div>
+
+      <!-- 案B：グレー塗り＋斜線ハッチ -->
+      <div class="card">
+        <h3>案B：グレー塗り＋斜線ハッチ</h3>
+        <div class="idea-head__badges"><span class="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span></div>
+        <div class="sg-vote-btns">
+          <button class="sg-vote-btn frz-b" disabled title="完了したクエストでは投票できません">▲ 賛成</button>
+          <button class="sg-vote-btn frz-b" disabled title="完了したクエストでは投票できません">▼ 反対</button>
+        </div>
+        <div class="sg-actions">
+          <button class="btn btn-primary btn-sm frz-b" disabled title="完了したクエストでは選定を変更できません">☆ このアイデアを選定</button>
+          <button class="btn btn-outline frz-b" disabled title="完了したクエストでは編集できません">編集</button>
+          <button class="btn btn-primary frz-b" disabled title="完了したクエストでは評価できません">評価する / 編集</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" style="margin-top:var(--space-4)">参考＝<strong>有効時（enabled）の見た目</strong>（比較用）:</p>
+    <div class="card" style="max-width:520px">
+      <div class="sg-vote-btns">
+        <button class="sg-vote-btn">▲ 賛成</button>
+        <button class="sg-vote-btn">▼ 反対</button>
+      </div>
+      <div class="sg-actions" style="margin-top:var(--space-3)">
+        <button class="btn btn-primary btn-sm">☆ このアイデアを選定</button>
+        <button class="btn btn-outline">編集</button>
+        <button class="btn btn-primary">評価する / 編集</button>
+      </div>
+    </div>
+
+    <h3 style="margin-top:var(--space-6)">チャット入力欄（完了クエスト）</h3>
+    <p class="hint"><strong>現状はバグ</strong>＝入力欄が最小化されたまま案内も出ず「空の細い枠」だけが残る（＝壊れて見える）。
+      完了時は下の<strong>凍結バナー</strong>を常時表示する（投稿不可の理由を明示）。</p>
+    <div class="sg-frozen-banner">⏸ このクエストは完了済みのため、投稿は締め切られています。</div>
   </div>
 
   <!-- フォーム -->

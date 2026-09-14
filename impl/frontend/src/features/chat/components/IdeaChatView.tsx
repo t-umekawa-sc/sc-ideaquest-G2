@@ -639,15 +639,17 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       </div>
 
       {/* 入力欄 */}
-      <div className={`composer${composerMin ? " is-collapsed" : ""}`} aria-label="メッセージ入力">
+      {/* 最小化は投稿可能なときだけ（!canPost で折りたたむと本文も出ず「空枠」に見える崩れになるため）。 */}
+      <div className={`composer${composerMin && canPost ? " is-collapsed" : ""}`} aria-label="メッセージ入力">
         {/* 最小化時のスリムバー（クリックで展開）＝SC-24 モック */}
         {canPost && (
           <button className="composer__mini" type="button" onClick={() => { setComposerMin(false); requestAnimationFrame(() => boxRef.current?.focus()); }}>＋ メッセージを入力…</button>
         )}
         <div className="composer__full">
           {!canPost && (
-            <p className="role-note" style={{ margin: 0 }}>
-              {completed ? "このクエストは完了済みのため投稿は締め切られています。" : "投稿するにはコメント作成権限が必要です。"}
+            // 完了クエスト＝チャット凍結。理由を明示した凍結バナーを常時表示（過去ログは閲覧のみ）。
+            <p className="composer__frozen">
+              {completed ? "⏸ このクエストは完了済みのため、投稿は締め切られています。" : "投稿するにはコメント作成権限が必要です。"}
             </p>
           )}
           {canPost && (

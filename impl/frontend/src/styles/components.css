@@ -34,6 +34,17 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+/* 「凍結」＝完了クエスト等で操作を事前無効化した状態。汎用 disabled（opacity）より強い非活性シグナル
+   （グレー塗り＋斜線ハッチ・案B）。凍結の意味を持つボタンにのみ .is-frozen を付ける（busy 等の一時 disabled には付けない）。 */
+.btn.is-frozen:disabled {
+  opacity: 1;
+  background-color: var(--color-surface-alt);
+  background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgba(2, 6, 23, 0.06) 6px 12px);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
 .btn-primary {
   background: var(--color-primary);
   color: var(--color-on-primary);

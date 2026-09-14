@@ -73,7 +73,7 @@ def env():
                 ts.flush()
                 repo.add_revision(
                     ts, iid, revision=idea.current_revision, editor_id=author or user_id,
-                    changes={"title": title, "value": value, "body": body, "time_limit": None, "note": None, "stakeholders": []},
+                    changes={"title": title, "value": value, "body": body, "time_limit": None, "note": None, "stakeholders": [], "attachments": []},
                 )
             ts.commit()
         ideas.append(iid)
@@ -621,6 +621,28 @@ def test_d_tc_141_revision_diff_from_explicit(client, env):
     assert "title" in body["fields"] and "body" in body["fields"]  # 初版からは title/body 両方変化
     # from > revision は 422。
     assert client.get(f"{DIFF(pub, 2)}?from=5").status_code == 422
+
+
+def test_d_tc_145_attachment_change_in_revision_diff(client, env, storage):
+    """D-TC-145: 添付の追加/削除が版差分・changed_fields に出る（保存で版記録＝フォロワーが気づける・D.4）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published")  # rev1（添付なし＝snapshot attachments=[]）
+    # 添付を追加 → 保存（PATCH）で rev2（この時点の添付を版に記録）。
+    r = client.post(ATTACH(pub), files=[("files", ("shiryo.png", PNG, "image/png"))], headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    aid = r.json()["attachments"][0]["id"]
+    assert client.patch(IDEA(pub), json={"body": "b2"}, headers=_csrf(client)).status_code == 200  # rev2
+    d2 = client.get(DIFF(pub, 2)).json()
+    assert d2["fields"]["attachments"]["kind"] == "scalar"
+    assert d2["fields"]["attachments"]["old"] == "" and d2["fields"]["attachments"]["new"] == "shiryo.png"
+    rev2 = next(x for x in client.get(REVS(pub)).json()["data"] if x["revision"] == 2)
+    assert "attachments" in rev2["changed_fields"]  # タイムラインにも「📎 添付」が出る
+    # 添付を削除 → 保存（PATCH）で rev3。差分に「削除」（new が空）が出る。
+    assert client.delete(f"{ATTACH(pub)}/{aid}", headers=_csrf(client)).status_code == 204
+    assert client.patch(IDEA(pub), json={"body": "b3"}, headers=_csrf(client)).status_code == 200  # rev3
+    d3 = client.get(DIFF(pub, 3)).json()
+    assert d3["fields"]["attachments"]["old"] == "shiryo.png" and d3["fields"]["attachments"]["new"] == ""
 
 
 def test_d_tc_151_ideas_list_comment_count(client, env):

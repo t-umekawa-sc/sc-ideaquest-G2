@@ -82,8 +82,8 @@ async function createIdeaWithAttachment(page: Page, questId: string, stamp: stri
   return ideaId;
 }
 
-// D-TC-218 SC-21 編集モードで既存添付の一覧＋削除（確認ダイアログ→即時サーバー削除・版を生まない）。
-test("D-TC-218 SC-21 edit mode lists existing attachment and deletes it", async ({ page }) => {
+// D-TC-218 SC-21 編集モードで既存添付のステージ削除（× で削除予定→保存で確定・版が増える＝設計B）。
+test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", async ({ page }) => {
   await login(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E既存添付_${stamp}`);
@@ -97,16 +97,21 @@ test("D-TC-218 SC-21 edit mode lists existing attachment and deletes it", async 
     const attachRow = page.locator(".attach", { hasText: fileName });
     await expect(attachRow).toBeVisible();
 
-    // × → 確認ダイアログ「削除する」で即時サーバー削除。
-    await attachRow.getByRole("button", { name: `${fileName} を削除` }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "削除する" }).click();
-    await expect(page.getByText("添付を削除しました。")).toBeVisible();
-    await expect(page.locator(".attach", { hasText: fileName })).toHaveCount(0);
+    // × で「削除予定」にマーク＝即時削除しない（確認ダイアログ無し）。行は残り is-removing＋「元に戻す」。
+    await attachRow.getByRole("button", { name: `${fileName} を削除予定にする` }).click();
+    await expect(page.locator(".attach.is-removing", { hasText: fileName })).toBeVisible();
+    await expect(attachRow.getByRole("button", { name: `${fileName} の削除を取り消す` })).toBeVisible();
+    // 保存前はサーバーにまだ残っている（ステージのみ）。
+    const before = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
+    expect(before.attachments).toHaveLength(1);
 
-    // サーバー側でも消えている（版は増えない＝current_revision は 1 のまま）。
+    // 「変更を保存」で確定＝サーバー削除＋公開中は版が増える（添付削除が更新履歴の差分に出る＝D-TC-145）。
+    await page.getByRole("button", { name: "変更を保存" }).click();
+    await expect(page.getByText("変更を保存しました")).toBeVisible();
+
     const detail = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
     expect(detail.attachments).toHaveLength(0);
-    expect(detail.current_revision).toBe(1);
+    expect(detail.current_revision).toBe(2); // 保存で版記録（1保存1版・設計B）
   } finally {
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });

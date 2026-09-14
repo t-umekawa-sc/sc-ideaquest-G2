@@ -647,6 +647,11 @@ body.modal-open { overflow: hidden; }
 .vote-quick.agree:hover { background: #BBF7D0; }
 .vote-quick.disagree { color: var(--color-disagree); border-color: var(--color-disagree); background: var(--color-disagree-bg); }
 .vote-quick.disagree:hover { background: #FECACA; }
+/* 凍結（完了クエスト）＝グレー塗り＋斜線ハッチに統一（.btn.is-frozen と同トーン・SC-12 カードのクイック投票）。 */
+.vote-quick.is-frozen:disabled { opacity: 1; cursor: not-allowed; color: var(--color-text-muted); border-color: var(--color-border);
+  background-color: var(--color-surface-alt);
+  background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgba(2,6,23,.06) 6px 12px); }
+.vote-quick.is-frozen:disabled:hover { background-color: var(--color-surface-alt); }
 
 /* レアリティ枠 */
 .rarity-common   { border-color: var(--rarity-common); }

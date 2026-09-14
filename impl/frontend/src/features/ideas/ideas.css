@@ -61,6 +61,15 @@
   transition: background .12s, border-color .12s, transform .05s; }
 .vote-btn:hover { background: var(--color-surface-alt); }
 .vote-btn:active { transform: translateY(1px); }
+/* 一時 disabled（送信中など）＝控えめに。 */
+.vote-btn:disabled { opacity: .55; cursor: not-allowed; }
+.vote-btn:disabled:hover { background: var(--color-surface-alt); }
+.vote-btn:disabled:active { transform: none; }
+/* 凍結（完了/締切後）＝事前無効化。選定/編集ボタン（.btn.is-frozen）と同じグレー塗り＋斜線ハッチに統一（押せない＋理由は title）。 */
+.vote-btn.is-frozen:disabled { opacity: 1; background-color: var(--color-surface-alt);
+  background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgba(2,6,23,.06) 6px 12px);
+  color: var(--color-text-muted); border-color: var(--color-border); box-shadow: none; }
+.vote-btn.is-frozen:disabled:hover { background-color: var(--color-surface-alt); }
 .vote-btn.agree.is-on { color: #fff; background: var(--color-agree); border-color: var(--color-agree); }
 .vote-btn.disagree.is-on { color: #fff; background: var(--color-disagree); border-color: var(--color-disagree); }
 .vote-note { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; }
@@ -174,8 +183,12 @@
 .attach__meta { flex: 1; min-width: 0; }
 .attach__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
-.attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-sm); }
+.attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: var(--radius-sm); white-space: nowrap; }
 .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+/* 削除予定にマークした既存添付（保存で確定・追加と同じステージ方式）＝取り消し線＋破線で明示。 */
+.attach.is-removing { opacity: .7; border-style: dashed; }
+.attach.is-removing .attach__name { text-decoration: line-through; color: var(--color-text-muted); }
+.attach__flag { color: var(--color-danger); font-weight: 700; }
 
 /* ── ゲーム感 #16: 選定成立の祝福（SC-22・中央オーバーレイ）─────────────────────────────
    owner/quest_admin がアイデアを選定した瞬間の祝福。~2.8s で自動消滅・クリックで即閉じ。純視覚。

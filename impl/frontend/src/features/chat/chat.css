@@ -201,6 +201,10 @@
 .composer.is-collapsed .composer__full { display: none; }
 .composer.is-collapsed .composer__toggle { display: none; }
 .composer.is-collapsed .composer__mini { display: block; }
+/* 完了クエスト等でチャット凍結（!canPost）＝投稿不可の理由を示すバナー（style-guide 3b・案B と同トーン）。 */
+.composer__frozen { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0;
+  padding: var(--space-4); border: 1px dashed var(--color-border-strong); border-radius: var(--radius);
+  background: var(--color-surface-alt); color: var(--color-text-muted); font-size: var(--text-sm); text-align: center; }
 
 
 /* ── ゲーム感 #17: チャットの手触り（SC-24・純CSS）───────────────────────────────────

@@ -21,7 +21,7 @@ import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav"
 import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 
-import { followIdea, getAttachmentDownloadUrl, getIdea, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
+import { followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { isVotingClosed, todayISODate, votePercents } from "../voting";
 import { IdeaForm } from "./IdeaForm";
 import { RevisionHistory } from "./RevisionHistory";
@@ -168,6 +168,14 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     return () => window.removeEventListener(EVALUATIONS_CHANGED_EVENT, onEval);
   }, [load]);
 
+  // 添付の即時削除（SC-21 編集フォーム）等を跨いで反映＝保存/キャンセルに関わらず詳細を再取得（D.3）。
+  // 削除は取り消せない副作用なので、編集をキャンセルしても詳細から消えるようにする。
+  useEffect(() => {
+    const onIdeas = () => void load();
+    window.addEventListener(IDEAS_CHANGED_EVENT, onIdeas);
+    return () => window.removeEventListener(IDEAS_CHANGED_EVENT, onIdeas);
+  }, [load]);
+
   // 投票（賛成/反対の登録・切替・同ボタン再クリックで取消）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
   const handleVote = useCallback(async (type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (voteBusy) return;
@@ -228,6 +236,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   // フォロー（ウォッチ）トグル。楽観更新＋サーバー権威（completed 後の新規は 409）。
   const handleFollow = useCallback(async () => {
     if (followBusy) return;
+    // 完了クエストは新規フォロー不可（解除のみ可・D.6）。ボタンは押せるが押下時に理由を明示（無反応にしない）。
+    if (idea?.quest?.status === "completed" && !following) {
+      snack({ type: "info", msg: "完了したクエストには新規フォローできません（フォロー解除のみ可能です）。" });
+      return;
+    }
     const prev = following;
     setFollowBusy(true);
     setFollowing(!prev);
@@ -248,7 +261,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
     } finally {
       setFollowBusy(false);
     }
-  }, [ideaId, following, followBusy, snack]);
+  }, [ideaId, following, followBusy, snack, idea?.quest?.status]);
 
   // 選定/選定解除（F.3・owner/quest_admin）。楽観更新＋サーバー権威（409/403 でロールバック＋理由トースト）。
   const handleSelect = useCallback(async () => {
@@ -315,7 +328,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const voteClosedByDeadline = voteClose.reason === "deadline";
   const voteCloseTitle = questCompleted ? "完了したクエストでは投票できません" : voteClosedByDeadline ? "締切日を過ぎたため投票できません" : undefined;
   const voteDisabled = voteBusy || voteClose.closed;
-  const followDisabled = followBusy || (questCompleted && !following);
+  // フォローは「解除のみ可」＝完了&未フォローでも押下は許可し、handleFollow が理由を info 表示する（無反応にしない）。disabled は送信中のみ。
+  const followDisabled = followBusy;
   const authorName = idea.author.display_name || "?";
   const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
   // 評価結果（F.1 集計）＝サーバー算出の my_permissions で UX 出し分け。
@@ -399,9 +413,16 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               {following ? "★ フォロー中" : "☆ フォロー"}
             </button>
             {/* 編集＝SC-21 フォーム編集モード（D.2 PATCH・本人/管理のみサーバー強制）。
-                ボタンは投稿者本人のみ表示（is_mine・サーバー権威／SC-22 §4.5・決定 2026-09-06）。 */}
+                ボタンは投稿者本人のみ表示（is_mine・サーバー権威／SC-22 §4.5・決定 2026-09-06）。
+                完了クエストは事前無効化＝入力後に「保存できません」を避ける（選定/投票と同じ凍結UXに統一・サーバー 409 も権威）。 */}
             {idea.is_mine && (
-              <button className="btn btn-outline" type="button" onClick={() => setEditOpen(true)}>
+              <button
+                className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`}
+                type="button"
+                disabled={questCompleted}
+                title={questCompleted ? "完了したクエストでは編集できません" : undefined}
+                onClick={() => setEditOpen(true)}
+              >
                 編集
               </button>
             )}
@@ -559,10 +580,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             </div>
             <div className="vote-btns">
               {/* 投票（D.5・1人1票・締切まで変更可・同ボタン再クリックで取消）。completed/締切後は事前無効化＋サーバー権威（権限なしは 403→理由トースト）。 */}
-              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("approve", e)}>
+              <button className={`vote-btn agree${myVote === "agree" ? " is-on" : ""}${voteClose.closed ? " is-frozen" : ""}`} type="button" aria-pressed={myVote === "agree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("approve", e)}>
                 ▲ 賛成
               </button>
-              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("oppose", e)}>
+              <button className={`vote-btn disagree${myVote === "disagree" ? " is-on" : ""}${voteClose.closed ? " is-frozen" : ""}`} type="button" aria-pressed={myVote === "disagree"} disabled={voteDisabled} title={voteCloseTitle} onClick={(e) => void handleVote("oppose", e)}>
                 ▼ 反対
               </button>
             </div>
@@ -583,7 +604,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               </h2>
               {canSelect && (
                 <button
-                  className={`btn btn-sm ${selected ? "btn-primary" : "btn-outline"}`}
+                  className={`btn btn-sm ${selected ? "btn-primary" : "btn-outline"}${questCompleted ? " is-frozen" : ""}`}
                   type="button"
                   aria-pressed={selected}
                   disabled={selectBusy || questCompleted}
@@ -672,9 +693,16 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
             {/* 評価者向けアクション（評価者権限がある場合のみ・サーバー算出 my_permissions） */}
             {canEvaluate && (
               <div className="modal__foot" style={{ marginTop: "var(--space-4)" }}>
-                <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`} onClick={() => markEvalFromIdea()}>
-                  評価する / 編集
-                </Link>
+                {questCompleted ? (
+                  // 完了クエストは評価も凍結（サーバー 409）＝事前無効化＋理由ツールチップに統一（選定/投票/編集と同型）。
+                  <button className="btn btn-primary is-frozen" type="button" disabled title="完了したクエストでは評価できません">
+                    評価する / 編集
+                  </button>
+                ) : (
+                  <Link className="btn btn-primary" href={`/ideas/${ideaId}/eval`} onClick={() => markEvalFromIdea()}>
+                    評価する / 編集
+                  </Link>
+                )}
               </div>
             )}
           </section>

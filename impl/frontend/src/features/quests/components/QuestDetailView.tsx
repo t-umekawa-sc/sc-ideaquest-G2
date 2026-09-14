@@ -234,10 +234,12 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
   useEffect(() => {
     void loadIdeas();
-    const onIdeasChanged = () => void loadIdeas();
+    // 投稿/公開/削除で公開アイデア数が変わる＝ヘッダー「💡 アイデア N件」/KPI の idea_count も
+    // 追随させるため、一覧だけでなくクエスト本体（GET /quests＝idea_count 保持）も再取得する。
+    const onIdeasChanged = () => { void loadIdeas(); void load(); };
     window.addEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
     return () => window.removeEventListener(IDEAS_CHANGED_EVENT, onIdeasChanged);
-  }, [loadIdeas]);
+  }, [loadIdeas, load]);
 
   // レビュー#3＝一覧からのクイック投票（楽観・その場で投票状態を更新／失敗は再取得）。
   const quickVote = async (id: string, type: IdeaVoteType) => {
@@ -255,6 +257,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   };
   // レビュー#3＝一覧からのフォロー切替（楽観・失敗はロールバック）。
   const toggleFollow = async (id: string, cur: boolean) => {
+    // 完了クエストは新規フォロー不可（解除のみ可）＝SC-22 アイデア詳細と同じ info 文言に統一（無反応/汎用エラーにしない・D.6）。
+    if (quest?.status === "completed" && !cur) {
+      snack({ type: "info", msg: "完了したクエストには新規フォローできません（フォロー解除のみ可能です）。" });
+      return;
+    }
     setIdeas((xs) => xs && xs.map((i) => (i.id === id ? { ...i, following: !cur } : i)));
     const res = await (cur ? unfollowIdea(id) : followIdea(id)).catch(() => "err" as const);
     if (res === "err") {
@@ -389,7 +396,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         const items: RowMenuItem[] = r.draft
           ? [{ label: "下書きを続ける", onClick: goIdea }]
           : [
-              ...(r.mystate === "unvoted"
+              // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
+              ...(r.mystate === "unvoted" && quest?.status !== "completed"
                 ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
                    { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
                 : []),
@@ -437,6 +445,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
   const ownerName = quest.owner.display_name || "?";
   const party = quest.members;
+  // 完了クエストは書き込み凍結（サーバー 409）＝編集/アイデア追加/パーティー編集を事前無効化（is-frozen・SC-22 と統一）。
+  const questCompleted = quest.status === "completed";
 
   return (
     <section aria-label="クエスト詳細">
@@ -479,7 +489,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               {/* 「＋ アイデアを追加」はアイデアタブの一覧上部へ移動（下記 tab==="ideas"）。編集/遷移/削除は C 接続済み。 */}
               {canEdit && (
                 <>
-                  <button className="btn btn-outline" type="button" onClick={() => router.push(`/quests/${questId}/edit`)}>クエスト編集</button>
+                  <button className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストは編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/edit`)}>クエスト編集</button>
                   <RowMenu
                     items={[
                       ...(quest.status !== "completed" && nextStatus
@@ -608,7 +618,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                 </label>
               ))}
             </div>
-            <button className="btn btn-primary" type="button" onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
+            <button className={`btn btn-primary${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストにはアイデアを追加できません" : undefined} onClick={() => router.push(`/quests/${questId}/ideas/new`)}>＋ アイデアを追加</button>
           </div>
           {ideasError ? (
             <p className="form-error" role="alert">{ideasError}</p>
@@ -652,8 +662,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                     <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
                   ) : r.mystate === "unvoted" ? (
                     <div className="vote-actions">
-                      <button type="button" className="vote-quick agree" onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
-                      <button type="button" className="vote-quick disagree" onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                      {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}
+                      <button type="button" className={`vote-quick agree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
+                      <button type="button" className={`vote-quick disagree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
                     </div>
                   ) : (
                     <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
@@ -716,7 +727,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           <div className="list-toolbar">
             <div className="muted text-sm">クエストの参加メンバーと権限（所有者/管理権限者が編集可）</div>
             {canEdit && (
-              <button className="btn btn-outline btn-sm" type="button" onClick={() => router.push(`/quests/${questId}/party`)}>パーティー・権限を編集</button>
+              <button className={`btn btn-outline btn-sm${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティー・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティー・権限を編集</button>
             )}
           </div>
           <div className="card tab-party-card" style={{ padding: 0 }}>

@@ -17,6 +17,7 @@ const FIELD_LABELS: Record<string, string> = {
   note: "備考 / 特記事項",
   time_limit: "タイムリミット",
   stakeholders: "利害関係者",
+  attachments: "📎 添付",
 };
 
 // ISO → YYYY/MM/DD HH:MM（版の記録日時・表示用）。
