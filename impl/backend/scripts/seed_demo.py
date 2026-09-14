@@ -58,6 +58,9 @@ class Client:
         if body.get("status") != "authenticated":
             raise SystemExit(f"login({key}) failed: {body}")
         self.user_id = body["session"]["user"]["user_id"]
+        self.display_name = body["session"]["user"].get("display_name", "")
+        # メンションのインライン強調は composer と同じ「空白除去トークン」で一致する（frontend の @token 正規化）。
+        self.nospace = "".join(self.display_name.split())
 
     def _headers(self) -> dict:
         # ダブルサブミット CSRF（A.0）: iq_csrf cookie と一致する X-CSRF-Token を送る。Origin は省略（非ブラウザ許容）。
@@ -284,6 +287,95 @@ def seed_d(owner: Client, u2: Client, u3: Client):
     print(f"  idea_count 連動              : {APP}/quests  で上記2クエストの💡件数")
 
 
+# ---- E 群（チャット） ----
+
+def post_message(c: Client, idea_id: str, *, body=None, quotes=None, mentions=None, files=None):
+    """チャット投稿（E・multipart Form）。body/引用/メンション/添付を1メッセージで送る。返り値＝ChatMessageDTO。"""
+    form = [("idea_id", idea_id)]
+    if body is not None:
+        form.append(("body", body))
+    for q in (quotes or []):
+        form.append(("quoted_message_ids", q))
+    for m in (mentions or []):
+        form.append(("mentions", m))
+    files_param = [("files", (n, d, mt)) for (n, d, mt) in (files or [])] or None
+    r = c.s.post(BASE + "/chat-messages", data=form, files=files_param, headers=c._headers())
+    if r.status_code != 201:
+        raise RuntimeError(f"POST /chat-messages -> {r.status_code} {r.text}")
+    return r.json()
+
+
+def spell_to_use(c: Client):
+    """魔法リアクション用スペルID。解放済みがあればそれ、無ければ can_unlock を1つ解放（SP不足は None）。"""
+    cat = c.get("/spells")
+    for s in cat.get("data", []):
+        if s.get("unlocked"):
+            return s["id"]
+    sp = cat.get("skill_point_balance", 0)
+    for s in cat.get("data", []):
+        if s.get("can_unlock") and sp >= s.get("sp_cost", 1):
+            c.post(f"/spells/{s['id']}/unlock")
+            return s["id"]
+    return None
+
+
+def seed_e(owner: Client, u2: Client, u3: Client):
+    print("[E群] チャット（投稿/引用/メンション/リアクション/魔法/添付/既読）")
+    qa = find_quest(owner, "【受入】D-アイデア（投票/履歴/添付）")
+    if not qa:
+        print("  ! 先に D 群が必要です（python3 impl/backend/scripts/seed_demo.py d）")
+        return
+    idea = ensure_idea(
+        owner, qa["id"],
+        title="Eチャットデモ",
+        value="議論の見本",
+        body="このアイデアのチャットで 投稿/引用/メンション/リアクション/魔法/添付/既読 を確認します。",
+        time_limit="2027-01-31",
+    )
+    iid = idea["id"]
+    alive = [m for m in owner.get(f"/ideas/{iid}/chat").get("data", []) if not m.get("is_deleted")]
+    if alive:
+        print("    = チャット既存（投稿済み）→ skip")
+    else:
+        # m1（リアクション対象・u2 の投稿）
+        m1 = post_message(u2, iid, body="この案、いいですね。夜間便の集約に賛成です。")
+        m2 = post_message(u3, iid, body=f"@{owner.nospace} 積載率の想定値は？", mentions=[owner.user_id])
+        # owner が m1・m2 を複数引用して返信＋メンション
+        post_message(owner, iid, body="ありがとうございます。積載率は現状60%→85%を想定しています。",
+                     quotes=[m1["id"], m2["id"]], mentions=[u2.user_id, u3.user_id])
+        # 通常リアクション（u3）＋魔法リアクション（owner＝SP保有者。u2/u3 はSP0のため）を m1 に付与
+        try:
+            u3.post(f"/chat-messages/{m1['id']}/reactions", json={"type": "normal", "emoji": "👍"})
+            print("      · u3 通常リアクション 👍")
+        except RuntimeError as e:
+            print(f"      ! 通常リアクション skip: {e}")
+        spell = spell_to_use(owner)
+        if spell:
+            try:
+                owner.post(f"/chat-messages/{m1['id']}/reactions", json={"type": "magic", "spell_id": spell})
+                print("      · owner 魔法リアクション（SP保有者）")
+            except RuntimeError as e:
+                print(f"      ! 魔法リアクション skip: {e}")
+        else:
+            print("      ! SP不足で魔法リアクションは skip")
+        # owner の最終投稿より後に他ユーザーの発言＝owner に未読が残り既読セパレータが出る
+        post_message(u2, iid, body="参考資料を添付します。", files=[("議事メモ.png", _PNG_1PX, "image/png")])
+        post_message(u3, iid, body="承知しました。集計は私が対応します。")
+        print("    + チャット投稿一式（引用/メンション/添付/リアクション/魔法/未読）")
+
+    # 完了クエストのチャット凍結（請求書処理の電子化デモ）の URL を具体化。
+    frozen_url = "（先に D 群を実行）"
+    qb = find_quest(owner, "【受入】D-完了クエスト（編集409/凍結）")
+    if qb:
+        fib = find_idea(owner, qb["id"], "請求書処理の電子化デモ")
+        if fib:
+            frozen_url = f"{APP}/ideas/{fib['id']}/chat"
+    print("\n=== E 群 受入 URL ===")
+    print(f"  チャット（SC-24）           : {APP}/ideas/{iid}/chat")
+    print(f"    ↳ 引用/メンション/👍・魔法リアクション/📎添付DL/既読セパレータ（初回オープンで未読区切り）")
+    print(f"  完了クエストのチャット凍結  : {frozen_url}  → 入力欄が凍結バナー")
+
+
 def main():
     which = (sys.argv[1].lower() if len(sys.argv) > 1 else "all")
     print(f"seed_demo: target={which} base={BASE}")
@@ -293,6 +385,8 @@ def main():
 
     if which in ("all", "d"):
         seed_d(owner, u2, u3)
+    if which in ("all", "e"):
+        seed_e(owner, u2, u3)
 
     print("\n完了。")
 

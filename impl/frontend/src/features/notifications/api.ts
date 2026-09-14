@@ -32,3 +32,14 @@ export function markUnread(id: string): Promise<{ id: string; is_read: boolean; 
 export function markAllRead(type?: string): Promise<{ updated: number; unread_count: number } | null> {
   return apiFetch(`/notifications/read-all`, { method: "POST", body: JSON.stringify(type ? { type } : {}) });
 }
+
+// ref から遷移先URLを解決（種別非依存・ref の有無で判定・SC-02 §4.2）。ref 無し（security 等）は null＝遷移なし。
+// SC-02 一覧とダッシュボードの「最近の通知」で共有（DRY・コーディング規約 §2.3）。
+export function notificationHref(n: NotificationDTO): string | null {
+  const r = n.ref ?? {};
+  if (r.chat_message_id && r.idea_id) return `/ideas/${r.idea_id}/chat`;
+  if (r.idea_id) return `/ideas/${r.idea_id}`;
+  if (r.achievement_id) return "/achievements";
+  if (r.quest_id) return `/quests/${r.quest_id}`;
+  return null;
+}

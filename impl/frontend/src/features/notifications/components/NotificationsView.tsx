@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/ui";
 import { realtime } from "@/lib/realtime";
 
-import { getNotifications, markAllRead, markRead, markUnread, type NotificationDTO } from "../api";
+import { getNotifications, markAllRead, markRead, markUnread, notificationHref, type NotificationDTO } from "../api";
 import "../notifications.css";
 
 type Group = "today" | "yesterday" | "earlier";
@@ -41,15 +41,7 @@ const CAT_TYPES: Record<string, string[]> = Object.fromEntries(CATEGORY.map(([k,
 // 一覧の行の除外・未読数・一括既読は backend が実効ゲームモードで担保（§4.11・API H）＝ここは UI（タブ）だけ。
 const GAME_CATS = new Set(["achievement", "magic"]);
 
-// ref から遷移先を解決（種別非依存・ref の有無で判定・SC-02 §4.2）。セキュリティ等 ref 無しは遷移なし。
-function hrefOf(n: NotificationDTO): string | null {
-  const r = n.ref ?? {};
-  if (r.chat_message_id && r.idea_id) return `/ideas/${r.idea_id}/chat`;
-  if (r.idea_id) return `/ideas/${r.idea_id}`;
-  if (r.achievement_id) return "/achievements";
-  if (r.quest_id) return `/quests/${r.quest_id}`;
-  return null;
-}
+// ref→遷移先の解決は `notificationHref`（../api・SC-01 ダッシュボードと共有・DRY）。
 
 function groupOf(iso: string): Group {
   const d = new Date(iso);
@@ -128,7 +120,7 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
   };
 
   function Row({ n }: { n: NotificationDTO }) {
-    const href = hrefOf(n);
+    const href = notificationHref(n);
     const inner = (
       <>
         <span className="n__ico">{n.icon || ICO[n.type] || "🔔"}</span>

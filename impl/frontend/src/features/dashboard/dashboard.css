@@ -103,6 +103,11 @@
 .dash-page .notif-list .unread { position: relative; }
 .dash-page .notif-list .unread .notif-ico::after { content: ""; position: absolute; left: 20px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); border: 2px solid var(--color-surface); }
 .dash-page .notif-body { min-width: 0; font-size: var(--text-sm); }
+/* 通知をクリックで参照先へ（SC-02 と同じ ref 解決）。アイコン＋本文の並びは Link 側で保持。 */
+.dash-page .notif-link { display: flex; gap: var(--space-3); align-items: flex-start; flex: 1; min-width: 0;
+  color: inherit; text-decoration: none; border-radius: var(--radius); margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1);
+  padding: var(--space-2); }
+.dash-page .notif-link:hover { background: var(--color-surface-alt); }
 .dash-page .notif-time { color: var(--color-text-subtle); font-size: var(--text-xs); }
 
 /* ショートカットタイル */

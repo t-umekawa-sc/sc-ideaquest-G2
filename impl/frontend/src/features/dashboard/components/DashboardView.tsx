@@ -6,6 +6,7 @@
 // 取得後は集約 hero を優先。クイック投票＝POST /ideas/{id}/vote・フォロー★＝D follow EP。空パネルは非表示（§7）。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { markRead, notificationHref } from "@/features/notifications/api";
 import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -177,6 +178,23 @@ export function DashboardView({
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
+
+  // 最近の通知をクリック＝SC-02 と同様に既読化（楽観更新＋サーバー・未読数も減算）。realtime でベルも追随。
+  const markNotifRead = (id: string, wasRead: boolean) => {
+    if (wasRead) return;
+    void markRead(id);
+    setData((d) => {
+      if (!d?.notifications) return d;
+      return {
+        ...d,
+        notifications: {
+          ...d.notifications,
+          data: d.notifications.data.map((x) => (x.id === id ? { ...x, is_read: true } : x)),
+          unread_count: Math.max(0, d.notifications.unread_count - 1),
+        },
+      };
+    });
+  };
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {
     if (gameEnabled && e) fxRef.current?.burst(e);  // 押下の手応え（ゲーム層演出＝OFFでは出さない・§4.11）
@@ -430,15 +448,25 @@ export function DashboardView({
           </div>
           <ul className="notif-list">
             {notifs.length === 0 && <li className="muted text-sm">新しい通知はありません</li>}
-            {notifs.map((n) => (
-              <li key={n.id} className={n.is_read ? undefined : "unread"}>
-                <span className="notif-ico">{n.icon ?? "🔔"}</span>
-                <div className="notif-body">
-                  <div>{n.body}</div>
-                  {n.context && <div className="muted">{n.context}</div>}
-                </div>
-              </li>
-            ))}
+            {notifs.map((n) => {
+              const href = notificationHref(n);
+              const inner = (
+                <>
+                  <span className="notif-ico">{n.icon ?? "🔔"}</span>
+                  <div className="notif-body">
+                    <div>{n.body}</div>
+                    {n.context && <div className="muted">{n.context}</div>}
+                  </div>
+                </>
+              );
+              return (
+                <li key={n.id} className={n.is_read ? undefined : "unread"}>
+                  {href ? (
+                    <Link className="notif-link" href={href} onClick={() => markNotifRead(n.id, n.is_read)}>{inner}</Link>
+                  ) : inner}
+                </li>
+              );
+            })}
           </ul>
         </section>
 

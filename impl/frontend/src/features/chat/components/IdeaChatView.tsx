@@ -497,7 +497,9 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
           const day = fmtDay(m.created_at);
           const showDay = day !== lastDay;
           lastDay = day;
-          const magic = (m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; actor_avatar?: string | null; mine?: boolean } })?.magic ?? null;
+          // 魔法リアクションはゲーム層の演出＝game_mode OFF では表示しない（エフェクト/バッジ/ピルとも非表示・§4.11）。
+          // 通常の絵文字リアクション（normal）は業務機能なので game_mode に依らず残す。
+          const magic = gameEnabled ? ((m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; actor_avatar?: string | null; mine?: boolean } })?.magic ?? null) : null;
           const normal = ((m.reactions as { normal?: Array<{ emoji: string; count: number; reacted_by_me: boolean; users?: string[] }> })?.normal) ?? [];
           // 自作自演＝発動者==作成者（§17 の4パターン④）。発動者バッジは出さず作成者アバターに✦。
           const selfCast = !!magic && (magic.mine ? m.is_mine : magic.actor != null && magic.actor === m.author?.name);
