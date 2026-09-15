@@ -179,18 +179,19 @@ test("D-TC-216 SC-21 server 409 (completed quest edit) fires §4.7 three channel
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2Eサーバエラー_${stamp}`);
   const ideaId = await createIdeaApi(page, questId, `凍結編集_${stamp}`, "published");
-  // 公開後にクエストを完了へ前進（編集は 409 invalid_state で凍結）。
-  await transition(page, questId, "in_progress");
-  await transition(page, questId, "evaluating");
-  await transition(page, questId, "completed");
   try {
     await page.goto(`/ideas/${ideaId}`);
-    // 完了でも編集ボタンは出る（凍結はサーバー権威）。編集モーダル→プリフィルを待つ。
+    // recruiting のうちに編集フォームを開く（編集ボタンは活性）。※完了クエストの編集は事前無効化に変更されたため、
+    // 「フォームを開いた後に別経路(API)でクエストを完了→保存」で 409 invalid_state（サーバー権威）を再現する。
     await page.getByRole("button", { name: "編集", exact: true }).click();
     const subject = page.locator("#idea_subject");
     await expect(subject).toHaveValue(`凍結編集_${stamp}`);
-    // 件名を変更（canSave 維持）→ 保存で PATCH 409。
+    // 件名を変更（canSave 維持・client 検証は通過）。
     await subject.fill(`凍結編集_更新_${stamp}`);
+    // フォームを開いた後にクエストを完了へ前進（API）＝保存時に PATCH 409（invalid_state）。
+    await transition(page, questId, "in_progress");
+    await transition(page, questId, "evaluating");
+    await transition(page, questId, "completed");
     await page.getByRole("button", { name: "変更を保存" }).click();
 
     // ① 上部サマリ（.form-summary）に conflict 文言。
@@ -200,11 +201,12 @@ test("D-TC-216 SC-21 server 409 (completed quest edit) fires §4.7 three channel
     // ② 足元ヒント（.form-footer-error）。
     await expect(page.locator(".form-footer-error")).toBeVisible();
     await expect(page.locator(".form-footer-error")).toContainText("入力エラーがあります");
-    // ③ エラースナックバー（.snackbar--error）＝duration:0＝自動消滅しない（timer バー無し）。
+    // ③ エラースナックバー（.snackbar--error）＝2026-09-06 改定で時間経過により自動消滅（timer バーあり）。
+    //    持続表示は ①上部サマリ / ②足元ヒント が担う（useFormErrorNotice.ts）。
     const snack = page.locator(".snackbar--error");
     await expect(snack).toBeVisible();
     await expect(snack.locator(".snackbar__msg")).toHaveText("現在の状態では実行できません。");
-    await expect(snack.locator(".snackbar__timer")).toHaveCount(0);
+    await expect(snack.locator(".snackbar__timer")).toHaveCount(1);
   } finally {
     await deleteQuestQuiet(page, questId);
   }

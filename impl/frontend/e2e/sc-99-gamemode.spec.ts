@@ -65,15 +65,14 @@ test("M-TC-005/006/007/008 game mode OFF hides nav game group / header balance /
     await expect(page.locator(".usermenu__trigger")).toBeVisible(); // 本人識別（アバター）は残す
 
     // M-TC-005 グローバルナビ＝業務群は出るがゲーム群（ショップ/きせかえ/魔法/実績/ランキング）が出ない。
-    await page.locator(".appnav-burger").click();
-    await expect(page.locator(".appnav-root.is-open")).toBeVisible();
+    // ナビは既定でピン留め＝広い画面(≥1024)では常設サイドバー（.is-docked）＝drawer は常時可視（burger 不要）。
     const drawer = page.locator("#appnav-drawer");
+    await expect(drawer).toBeVisible();
     await expect(drawer.getByRole("menuitem", { name: /ホーム/ })).toBeVisible();
     await expect(drawer.getByRole("menuitem", { name: /クエスト/ })).toBeVisible();
     await expect(drawer.getByRole("menuitem", { name: /ショップ/ })).toHaveCount(0);
     await expect(drawer.getByRole("menuitem", { name: /きせかえ/ })).toHaveCount(0);
     await expect(drawer.getByRole("menuitem", { name: /ランキング/ })).toHaveCount(0);
-    await page.keyboard.press("Escape");
 
     // M-TC-008 通知＝種別セレクトからゲーム系（実績/魔法）が消える（業務系は残る）。
     await page.goto("/notifications");
