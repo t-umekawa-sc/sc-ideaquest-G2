@@ -248,11 +248,11 @@ class QuestTransitionRequest(BaseModel):
     to: str
 
 
-# ---- クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時）。 ----
+# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時）。 ----
 
 
 class QuestResultDecisionDTO(BaseModel):
-    """公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①検証済みコンセプトも本DTOの is_selected で抽出。"""
+    """公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①選定アイデアも本DTOの is_selected で抽出。"""
 
     idea_id: str
     title: str
@@ -264,7 +264,7 @@ class QuestResultDecisionDTO(BaseModel):
 
 
 class QuestResultAspectAveragesDTO(BaseModel):
-    """観点別平均（②検証サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。"""
+    """観点別平均（②評価・選別サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。"""
 
     novelty: float | None = None
     impact: float | None = None
@@ -315,7 +315,7 @@ class QuestResultPinnedMessageDTO(BaseModel):
 
 
 class QuestResultDTO(BaseModel):
-    """クエスト最終結果（検証済みコンセプト票・GET /quests/{id}/result）＝既存集計の合成＋総括。"""
+    """クエスト最終結果（アイデア選別の申し送り・GET /quests/{id}/result）＝既存集計の合成＋総括。"""
 
     quest_id: str
     title: str

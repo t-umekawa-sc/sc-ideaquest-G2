@@ -1,4 +1,4 @@
-"""C-TC-240〜242: クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・SC-12 結果タブ）。
+"""C-TC-240〜242: クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・SC-12 結果タブ）。
 
 seed 一般ユーザー（ACME-01）でログインし、会社DB にクエスト＋公開アイデア＋選定＋submitted 評価＋投票を seed。
 GET /quests/{id}/result（合成）・門番（非パーティー 404）・PUT /quests/{id}/result（総括保存・owner/quest_admin）を検証。

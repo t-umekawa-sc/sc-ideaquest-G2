@@ -509,7 +509,7 @@ def get_quest_group_candidates(
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
-# ---- クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時）。 ----
+# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時）。 ----
 
 _RESULT_ASPECTS = ("novelty", "impact", "feasibility", "fit", "cost")
 
@@ -540,7 +540,7 @@ def _can_edit_outcome(ts, quest, user) -> bool:
 
 
 def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
-    """検証済みコンセプト票（FR-39）＝既存集計（選定/評価/投票/パーティー）の合成＋総括。
+    """アイデア選別の申し送り（FR-39）＝既存集計（選定/評価/投票/パーティー）の合成＋総括。
 
     可視性＝門番 C.0（範囲外 404）。評価の数値は閲覧者に可視な submitted のみ（F.1）。
     「完了時のみ表示」はフロントのタブ出し分けで担保（本 EP は参照可能なパーティー員に status 込みで返す）。
@@ -579,7 +579,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
                 "overall_avg": st.get("overall_avg"),
                 "evaluation_count": st.get("evaluator_count", 0),
             })
-        # 評価平均の降順（未評価=None は末尾）。①検証済みコンセプトは is_selected で抽出。
+        # 評価平均の降順（未評価=None は末尾）。①選定アイデアは is_selected で抽出。
         decisions.sort(key=lambda d: (d["overall_avg"] is None, -(d["overall_avg"] or 0.0)))
         members = repo.list_active_members(ts, quest.id)
         vote_total = sum(sum(v.values()) for v in votes.values())

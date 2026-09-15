@@ -294,7 +294,7 @@ def eval_states_for_ideas(ts, quest, user, ideas) -> dict:
 
 
 def aspect_averages_for_quest(ts, quest, user, ideas) -> dict:
-    """クエスト全体の観点別平均＋可視 submitted 評価総数（FR-39 ②検証サマリ・ISO56002 §9）。
+    """クエスト全体の観点別平均＋可視 submitted 評価総数（FR-39 ②評価・選別サマリ・ISO56002 §9）。
 
     可視性（F.1 visibility）を尊重し、閲覧者に見える submitted 評価だけで観点別平均を算定（可視0は空）。
     `eval_states_for_ideas`（per-idea）と同じ材料をクエスト横断で1度に集計する。

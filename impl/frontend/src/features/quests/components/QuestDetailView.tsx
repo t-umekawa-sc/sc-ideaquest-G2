@@ -87,7 +87,7 @@ const TABS = [
   { key: "ideas", label: "💡 アイデア" },
   { key: "party", label: "👥 パーティー" },
   { key: "search", label: "🔍 全文検索" },
-  // 🏁 結果＝クエスト最終結果（FR-39・検証済みコンセプト票）。completed のときのみ表示（下の filter）。
+  // 🏁 結果＝クエスト最終結果（FR-39・アイデア選別の申し送り）。completed のときのみ表示（下の filter）。
   { key: "result", label: "🏁 結果" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
@@ -750,7 +750,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
       )}
 
-      {/* 🏁 結果（FR-39・検証済みコンセプト票・completed 時のみタブが出る） */}
+      {/* 🏁 結果（FR-39・アイデア選別の申し送り・completed 時のみタブが出る） */}
       {tab === "result" && <QuestResultTab questId={questId} quest={quest} />}
 
       {/* 概要（実接続・C.1） */}

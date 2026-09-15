@@ -108,7 +108,7 @@ export function updateParty(questId: string, members: QuestMemberInput[]): Promi
   return apiFetch<QuestMembersResponse>(`/quests/${questId}/party`, { method: "PUT", body: JSON.stringify({ members }) });
 }
 
-// クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ・完了時）。既存集計の合成＋総括を取得。
+// クエスト最終結果＝アイデア選別の申し送り（FR-39・SC-12 結果タブ・完了時）。既存集計の合成＋総括を取得。
 export function getQuestResult(questId: string): Promise<QuestResult | null> {
   return apiFetch<QuestResult>(`/quests/${questId}/result`);
 }

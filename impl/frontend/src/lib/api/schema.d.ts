@@ -1152,7 +1152,7 @@ export interface paths {
         };
         /**
          * Get Quest Result
-         * @description クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。
+         * @description クエスト最終結果＝アイデア選別の申し送り（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。
          */
         get: operations["get_quest_result_api_v1_quests__quest_id__result_get"];
         /**
@@ -4347,7 +4347,7 @@ export interface components {
         };
         /**
          * QuestResultAspectAveragesDTO
-         * @description 観点別平均（②検証サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。
+         * @description 観点別平均（②評価・選別サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。
          */
         QuestResultAspectAveragesDTO: {
             /** Novelty */
@@ -4363,7 +4363,7 @@ export interface components {
         };
         /**
          * QuestResultDTO
-         * @description クエスト最終結果（検証済みコンセプト票・GET /quests/{id}/result）＝既存集計の合成＋総括。
+         * @description クエスト最終結果（アイデア選別の申し送り・GET /quests/{id}/result）＝既存集計の合成＋総括。
          */
         QuestResultDTO: {
             /** Quest Id */
@@ -4413,7 +4413,7 @@ export interface components {
         };
         /**
          * QuestResultDecisionDTO
-         * @description 公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①検証済みコンセプトも本DTOの is_selected で抽出。
+         * @description 公開アイデア1件の意思決定行（③）＝選定/不選定＋検証（評価集計）。①選定アイデアも本DTOの is_selected で抽出。
          */
         QuestResultDecisionDTO: {
             /** Idea Id */

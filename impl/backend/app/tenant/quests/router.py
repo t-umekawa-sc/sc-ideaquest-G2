@@ -253,7 +253,7 @@ def get_quest_result(
     request: Request,
     session: dict = Depends(require_me),
 ) -> QuestResultDTO:
-    """クエスト最終結果＝検証済みコンセプト票（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。"""
+    """クエスト最終結果＝アイデア選別の申し送り（FR-39・SC-12 結果タブ）。可視性はサーバー強制（範囲外 404）。読取専用。"""
     result = quest_service.get_quest_result(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )

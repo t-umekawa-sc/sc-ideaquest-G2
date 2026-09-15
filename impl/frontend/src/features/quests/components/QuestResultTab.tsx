@@ -1,7 +1,7 @@
 "use client";
 
-// SC-12「🏁 結果」タブ＝クエスト最終結果＝検証済みコンセプト票（FR-39・ISO 56002・完了時のみ）。
-// 既存3成果物（アイデア＋チャット＋評価）を1枚に凝縮＝①検証済みコンセプト/②検証サマリ/③意思決定/
+// SC-12「🏁 結果」タブ＝クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時のみ）。
+// 既存3成果物（アイデア＋チャット＋評価）を1枚に凝縮＝①選定アイデア/②評価・選別サマリ/③意思決定/
 // ⑤振り返り・学び（owner/管理が編集）/⑥次アクション（後続クエスト複製導線）。④議論の要点(a)＝各案のチャットリンク。
 // 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56002.md・C（FR-39）。
 import Link from "next/link";
@@ -99,17 +99,17 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     <section aria-label="クエストの最終結果" className="qresult stack">
       {provisional ? (
         <p className="role-note" role="status" style={{ marginTop: 0 }}>
-          ⏳ このクエストは<strong>進行中</strong>です。以下は<strong>暫定の途中経過</strong>（検証済みコンセプト票の下書き）で、完了時に確定します（ISO 56002 の継続的モニタリング）。
+          ⏳ このクエストは<strong>進行中</strong>です。以下は<strong>暫定の途中経過</strong>（アイデア選別の申し送りの下書き）で、完了時に確定します（ISO 56002 の継続的モニタリング）。
         </p>
       ) : (
         <p className="role-note" style={{ marginTop: 0 }}>
-          クエスト完了時の<strong>検証済みコンセプト票</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
+          クエスト完了時の<strong>アイデア選別の申し送り</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
         </p>
       )}
 
-      {/* ① 検証済みコンセプト（選定アイデア） */}
-      <section className="card" aria-label="検証済みコンセプト">
-        <div className="section-head"><h3 style={{ margin: 0 }}>✅ 検証済みコンセプト（選定 {selected.length}）</h3></div>
+      {/* ① 選定アイデア */}
+      <section className="card" aria-label="選定アイデア">
+        <div className="section-head"><h3 style={{ margin: 0 }}>✅ 選定アイデア（{selected.length}）</h3></div>
         {selected.length === 0 ? (
           <p className="muted text-sm">選定されたアイデアはありません（選定なしで完了）。</p>
         ) : (
@@ -136,9 +136,9 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         )}
       </section>
 
-      {/* ② 検証サマリ（参加指標＋観点別平均） */}
-      <section className="card" aria-label="検証サマリ">
-        <div className="section-head"><h3 style={{ margin: 0 }}>📊 検証サマリ</h3></div>
+      {/* ② 評価・選別サマリ（参加指標＋観点別平均） */}
+      <section className="card" aria-label="評価・選別サマリ">
+        <div className="section-head"><h3 style={{ margin: 0 }}>📊 評価・選別サマリ</h3></div>
         <div className="qresult__metrics">
           <span className="qresult__kpi"><b>{p.idea_count}</b><span>アイデア</span></span>
           <span className="qresult__kpi"><b>{p.selected_count}</b><span>選定</span></span>
