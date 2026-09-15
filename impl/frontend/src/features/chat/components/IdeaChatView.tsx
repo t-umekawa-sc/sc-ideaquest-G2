@@ -16,6 +16,7 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
+import { renderTextHtml, resolveMagic, type Member } from "../render";
 import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import {
@@ -41,8 +42,6 @@ const FX: Record<string, string> = { fire: "spell-fx--fire", ice: "spell-fx--ice
 // 発動者バッジの hover ツールチップ用の属性和名（style-guide.html §17 の「…が【炎】をかけました」に合わせる）。
 const SPELL_JA: Record<string, string> = { fire: "炎", ice: "氷", thunder: "雷", sparkle: "キラキラ", rainbow: "虹", aura: "オーラ" };
 
-type Member = { user_id: string; name: string; nospace: string };
-
 function iconFor(name: string) {
   const ext = (name.split(".").pop() || "").toLowerCase();
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "🖼️";
@@ -64,17 +63,6 @@ function autoGrow(ta: HTMLTextAreaElement | null, max = 180) {
   ta.style.height = "auto";
   ta.style.height = Math.min(ta.scrollHeight, max) + "px";
 }
-// エスケープ→簡易書式（太字/コード/リンク）→メンション（members に一致する @token を強調）。
-function renderTextHtml(raw: string, members: Member[]): string {
-  let s = (raw || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  const names = members.map((m) => m.nospace);
-  s = s.replace(/@([^\s@]+)/g, (m, name) => (names.includes(name) ? `<span class="mention">@${name}</span>` : m));
-  return s;
-}
-
 type Pos = { top: number; left: number };
 
 export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; gameEnabled?: boolean }) {
@@ -497,9 +485,9 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
           const day = fmtDay(m.created_at);
           const showDay = day !== lastDay;
           lastDay = day;
-          // 魔法リアクションはゲーム層の演出＝game_mode OFF では表示しない（エフェクト/バッジ/ピルとも非表示・§4.11）。
+          // 魔法リアクションはゲーム層の演出＝game_mode OFF では表示しない（resolveMagic が null 化＝エフェクト/バッジ/ピルとも非表示・§4.11）。
           // 通常の絵文字リアクション（normal）は業務機能なので game_mode に依らず残す。
-          const magic = gameEnabled ? ((m.reactions as { magic?: { spell_id: string; effect?: string; icon?: string; actor?: string; actor_avatar?: string | null; mine?: boolean } })?.magic ?? null) : null;
+          const magic = resolveMagic(m.reactions, gameEnabled);
           const normal = ((m.reactions as { normal?: Array<{ emoji: string; count: number; reacted_by_me: boolean; users?: string[] }> })?.normal) ?? [];
           // 自作自演＝発動者==作成者（§17 の4パターン④）。発動者バッジは出さず作成者アバターに✦。
           const selfCast = !!magic && (magic.mine ? m.is_mine : magic.actor != null && magic.actor === m.author?.name);

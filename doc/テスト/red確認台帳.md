@@ -706,3 +706,17 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（cast.ts 未作成 actual） |
 | --- | --- |
 | G-TC-151 | テスト（`src/features/spells/cast.test.ts`）を先行作成し vitest＝`Failed to load url ./cast`（モジュール未存在で 0 test・suite fail）で red。実装（`castEffect`/`castTier`/`castParticleCount`＝common4<standard6<rare9／`castParticles`＝放射状・先頭真上・rare ほど広半径・決定的）で 11 passed green（全体 88 passed）。src 単体は TC 走査対象外＝追跡は `G_ゲーミフィケーション.md` G-TC-151 |
+
+## 受入不具合の回帰テスト（E群フロント修正・DFT-E-001..004・2026-09-15）
+
+> テスト規約 **§5.3 新設に伴う初適用**。E群ブラウザ受入で不具合認定された4件（`af448c6` で修正済み＝後追い）を、中核ロジックを純関数へ抽出（`features/chat/render.ts`＝`renderTextHtml`/`resolveMagic`・`features/notifications/api.ts`＝`markNotificationRead`）して単体化。後追いだが §5.3 の強い証跡＝**修正を一時 revert して behavior-red を観測**→復元して green。
+> **本変更から vitest（`src/**/*.test.ts`・`*.test.tsx`）を `scripts/check_tc_traceability.py` の走査対象に追加**したため、以降これらの unit TC は md 突合ゲートに載る（従来「src 単体は TC 走査対象外」だった穴を塞いだ）。
+
+| TC-ID | defect | 観測 red（修正 revert 時の actual）→ green |
+| --- | --- | --- |
+| E-TC-211 | DFT-E-001 メンションが素テキスト | `names` を `nospace`→`name` に戻すと `@テスト太郎 おはよう` が mention span 化されず（expected `<span class="mention">@テスト太郎</span>` / received `@テスト太郎 おはよう`）→ nospace 一致に復元で green |
+| E-TC-212 | DFT-E-002 game_mode OFF でも魔法発動 | `if(!gameEnabled) return null` を除くと false でも magic を返す（expected null / received `{spell_id,…}`）→ ガード復元で green |
+| H-TC-209 | DFT-E-003 ダッシュボード通知が非リンク | ref 分岐前に `return null` を挿すと全 ref で null（expected `/ideas/i1/chat` 等 / received null）→ 分岐復元で green |
+| H-TC-210 | DFT-E-004 通知クリックで既読化 | reducer を no-op に戻すと既読化されず（expected `is_read=true` / received `false`・unread_count 不変）→ 楽観反映復元で green |
+
+復元後＝対象2ファイル `vitest run` で 16 passed（全体数は同コミットの検証ログ参照）。

@@ -6,7 +6,7 @@
 // 取得後は集約 hero を優先。クイック投票＝POST /ideas/{id}/vote・フォロー★＝D follow EP。空パネルは非表示（§7）。
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { markRead, notificationHref } from "@/features/notifications/api";
+import { markNotificationRead, markRead, notificationHref } from "@/features/notifications/api";
 import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -183,17 +183,7 @@ export function DashboardView({
   const markNotifRead = (id: string, wasRead: boolean) => {
     if (wasRead) return;
     void markRead(id);
-    setData((d) => {
-      if (!d?.notifications) return d;
-      return {
-        ...d,
-        notifications: {
-          ...d.notifications,
-          data: d.notifications.data.map((x) => (x.id === id ? { ...x, is_read: true } : x)),
-          unread_count: Math.max(0, d.notifications.unread_count - 1),
-        },
-      };
-    });
+    setData((d) => (d?.notifications ? { ...d, notifications: markNotificationRead(d.notifications, id) } : d));
   };
 
   const quickVote = async (idea: UnvotedIdea, type: IdeaVoteType, e?: { clientX: number; clientY: number }) => {

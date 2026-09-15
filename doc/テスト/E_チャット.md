@@ -24,6 +24,7 @@
 | E-TC-112 | api | 活発度集計（日次＋版マーカー） | メッセージ数件＋公開後編集（版2） | `GET /ideas/{id}/chat-activity` | `daily[]`（日次件数）・`revision_markers[]`（版日時）・`total_messages` | E.1／D.4 |
 | E-TC-113 | api | チャット添付→DL 署名URL | comment 権限・Fake storage | `POST`（files=png）→`GET /attachments/{aid}/download` | 201・メッセージ `attachments[]`（kind=image）・DL EP が `{url}`（チャット添付も共通 EP で解決） | E.3／§1.10 |
 | E-TC-114 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /chat-messages` | 403 csrf_failed／401 | A.0 |
+| E-TC-211 | unit | メンション強調は nospace トークン一致のみ（受入不具合 DFT-E-001 再発防止＝描画側と composer の nospace 契約固定） | `renderTextHtml`・members に nospace=`テスト太郎` | `("@テスト太郎 …")`／`("@テスト 太郎 …")`／`<script>` | 前者＝`<span class="mention">@テスト太郎</span>`／空白入りは full name 強調なし（素テキスト）／`<script>`→`&lt;script&gt;`（XSS 無害化） | E.2 |
 
 ## 2. リアクション（通常＋魔法・E.4）
 
@@ -38,6 +39,7 @@
 | E-TC-119 | api | 1メッセージ1魔法（早い者勝ち） | 他ユーザーが魔法付与済みのメッセージ・自分は別 spell 解放済み | `POST reactions`（magic） | 409 `message_already_has_magic` | E.4／§5.18 魔法② |
 | E-TC-120 | api | 1チャット1回（同一ユーザー×同一 spell） | msg1 に自分の魔法済み・同 spell | 別 msg2 に `POST reactions`（同 spell） | 409 `spell_already_used_in_chat`。取消すれば付け替え可 | E.4／§5.18 魔法① |
 | E-TC-121 | api | 魔法取消は本人のみ | 自分の魔法／他人の魔法 | `DELETE ?type=magic` | 本人＝除去（別メッセージへ付け替え可）／他人＝残る | E.4 |
+| E-TC-212 | unit | 魔法リアクションは game_mode OFF で非表示（`resolveMagic`・受入不具合 DFT-E-002 再発防止＝OFF でも既存魔法が描画/発動していた） | `reactions.magic` あり | `resolveMagic(reactions, false)`／`(…, true)`／魔法なし | false＝`null`（表示しない・エフェクト/バッジ/ピルとも非表示）／true＝magic 保持／魔法なし＝`null` | E.4／§4.11 |
 | E-TC-122 | api | 完了クエストはリアクション凍結 | completed クエスト | `POST/DELETE reactions` | 409（invalid_state） | E.4／C.5 |
 | E-TC-210 | api | ピン留めは owner/quest_admin のみ（FR-39 (b)） | owner／一般メンバー（comment のみ） | `POST/DELETE /chat-messages/{id}/pin` | owner=200・is_pinned 反転・一覧DTOに is_pinned／一般=403 | E（FR-39 (b)）／C.0 |
 

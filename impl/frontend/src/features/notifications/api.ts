@@ -43,3 +43,19 @@ export function notificationHref(n: NotificationDTO): string | null {
   if (r.quest_id) return `/quests/${r.quest_id}`;
   return null;
 }
+
+// 通知の既読化を通知一覧へ楽観反映する純ロジック（SC-01/SC-02 共有・テスト規約 unit 層）。
+// 対象を is_read=true にし未読数を -1（0 下限）。対象が既読 or 不在なら同一参照を返す＝冪等
+// （二重デクリメント防止）。server 権威は次ロードで整合。
+export function markNotificationRead<L extends { data: Array<{ id: string; is_read: boolean }>; unread_count: number }>(
+  notifs: L,
+  id: string,
+): L {
+  const target = notifs.data.find((x) => x.id === id);
+  if (!target || target.is_read) return notifs;
+  return {
+    ...notifs,
+    data: notifs.data.map((x) => (x.id === id ? { ...x, is_read: true } : x)),
+    unread_count: Math.max(0, notifs.unread_count - 1),
+  } as L;
+}

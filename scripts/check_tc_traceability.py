@@ -24,6 +24,8 @@ TC_RE = re.compile(r"\b([A-Z])-TC-(\d{3})\b")
 CODE_GLOBS = [
     ("impl/backend/tests", "*.py"),
     ("impl/frontend/e2e", "*.spec.ts"),
+    ("impl/frontend/src", "*.test.ts"),
+    ("impl/frontend/src", "*.test.tsx"),
 ]
 PATTERN_DIR = ROOT / "doc" / "テスト"
 
