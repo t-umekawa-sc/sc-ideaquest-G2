@@ -50,24 +50,24 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await page.locator("#g_code").fill(code);
   await page.locator("#g_name").fill(name);
   await page.getByRole("button", { name: "作成する" }).click();
+  // 多数グループでもページングに左右されないよう、コードで絞り込んでから検証（client 検索＝全行対象）。
+  await page.getByRole("searchbox", { name: "グループ名・コード を検索" }).fill(code);
   await expect(page.getByText(code)).toBeVisible();
 
-  // 一覧は DataTable＝操作は RowMenu（⋯）。RowMenu は position:fixed だが下端では上へフリップして
-  // 常にビューポート内に収まる（RowMenu.computePos）ため、素直に可視待機→クリックで良い。
+  // 一覧は DataTable＝操作は RowMenu（⋯）。リネームは「編集」→編集モーダルに変更（旧 native prompt から）。
   const renameRow = page.getByRole("row", { name: new RegExp(code) });
   await renameRow.scrollIntoViewIfNeeded();
   await renameRow.getByRole("button", { name: "操作" }).click();
-  await expect(page.getByRole("menuitem", { name: "リネーム" })).toBeVisible();
-  page.once("dialog", (d) => d.accept(renamed));
-  await page.getByRole("menuitem", { name: "リネーム" }).click();
+  await page.getByRole("menuitem", { name: "編集" }).click();
+  await page.locator("#g_edit_name").fill(renamed);
+  await page.getByRole("button", { name: "保存する" }).click();
   await expect(page.getByText(renamed)).toBeVisible();
 
-  // 削除（confirm・空グループ→204）
+  // 削除＝カスタム確認ダイアログ（§15・native confirm ではない）＝「削除する」で確定（空グループ→204）。
   const deleteRow = page.getByRole("row", { name: new RegExp(code) });
   await deleteRow.scrollIntoViewIfNeeded();
   await deleteRow.getByRole("button", { name: "操作" }).click();
-  await expect(page.getByRole("menuitem", { name: "削除" })).toBeVisible();
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("menuitem", { name: "削除" }).click();
+  await page.getByRole("button", { name: "削除する" }).click();
   await expect(page.getByText(code)).toHaveCount(0);
 });

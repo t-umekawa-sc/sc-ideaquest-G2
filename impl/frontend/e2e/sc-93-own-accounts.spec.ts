@@ -36,7 +36,7 @@ test("B-TC-117 own-company account issue appears", async ({ page }) => {
   // 一覧は DataTable（client モード・ライブ検索）。発行後 reload の再マウント競合は toPass で吸収。
   const region = page.getByRole("region", { name: "自社アカウント管理" });
   await expect(async () => {
-    await region.getByRole("searchbox").fill(loginId);
+    await region.getByRole("searchbox", { name: "氏名・ログインID・メール を検索" }).fill(loginId);
     await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible({ timeout: 1000 });
   }).toPass();
 });
@@ -68,7 +68,7 @@ test("B-TC-124 own-account list: search, email column, clear", async ({ page }) 
 
   // DataTable ライブ検索＝一意スタンプで絞ると当該行のみ（1 件）・seed 管理者は消える
   await expect(async () => {
-    await region.getByRole("searchbox").fill(stamp);
+    await region.getByRole("searchbox", { name: "氏名・ログインID・メール を検索" }).fill(stamp);
     await expect(region.getByRole("cell", { name: loginId })).toBeVisible({ timeout: 1000 });
   }).toPass();
   await expect(region.getByRole("cell", { name: emailAddr })).toBeVisible();
@@ -101,12 +101,16 @@ test("B-TC-122 self issue with membership picker", async ({ page }) => {
   await page.locator("#s_name").fill("自社所属太郎");
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(loginId);
-  await page.getByLabel("所属グループを追加").selectOption({ label: gname }); // EP が候補を返す＝ピッカー機能
+  // メンバーシップピッカーは native select→カスタム Multiselect（combobox）へ変更＝click→検索→option 選択（EP が候補を返す＝ピッカー機能）。
+  const groupCombo = page.getByRole("combobox", { name: "所属グループを追加" });
+  await groupCombo.click();
+  await groupCombo.fill(gname);
+  await page.getByRole("option", { name: gname }).click();
   await page.getByRole("button", { name: /発行する/ }).click();
   // 一覧は DataTable（client モード・ライブ検索）。発行後 reload の再マウント競合は toPass で吸収。
   const region = page.getByRole("region", { name: "自社アカウント管理" });
   await expect(async () => {
-    await region.getByRole("searchbox").fill(loginId);
+    await region.getByRole("searchbox", { name: "氏名・ログインID・メール を検索" }).fill(loginId);
     await expect(region.getByRole("row", { name: new RegExp(loginId) })).toBeVisible({ timeout: 1000 });
   }).toPass();
 });

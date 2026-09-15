@@ -57,7 +57,7 @@ test("B-TC-125 company account list: search, email column, clear", async ({ page
   await page.locator("#a_login").fill(loginId);
   await page.locator("#a_email").fill(emailAddr);
   await page.getByRole("button", { name: /発行する/ }).click(); // 送信ボタンは modal（body 直下に portal）＝region 外
-  await expect(page.getByText("アカウントを発行")).toHaveCount(0); // フォームが閉じる＝発行成功
+  await expect(page.locator("#a_name")).toHaveCount(0); // フォーム（モーダル）が閉じる＝発行成功（成功トースト「アカウントを発行しました」との部分一致を避け安定判定）
 
   // 検索＝一意スタンプで絞ると当該行のみ（1 件）。login と email が別セルに出る＝メール列が email 表示
   await expect(async () => {

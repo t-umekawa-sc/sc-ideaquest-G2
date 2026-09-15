@@ -24,7 +24,7 @@ test("K-TC-006 edit own profile persists", async ({ page }) => {
   const newName = `プロフ_${Date.now().toString().slice(-8)}`;
   await page.locator("#p_name").fill(newName);
   await page.getByRole("button", { name: "保存する" }).click();
-  await expect(page.getByText("保存しました。")).toBeVisible();
+  await expect(page.getByText("プロフィールを更新しました")).toBeVisible();
 
   await page.reload();
   await expect(page.locator("#p_name")).toHaveValue(newName); // GET /me が更新値を返す
@@ -45,7 +45,7 @@ test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
   await page.locator("#confirm_pw").fill("NewPassw0rd1");
   await page.locator("#cur_pw").fill("WRONGpw1");
   await page.getByRole("button", { name: /パスワードを変更/ }).click();
-  await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
+  await expect(page.getByText("現在のパスワードが正しくありません。").first()).toBeVisible(); // §4.7 で複数チャネル表示（サマリ＋足元等）
   await expect(page.getByRole("heading", { name: "プロフィール", exact: true })).toBeVisible(); // 変更なし＝画面維持
 });
 
@@ -59,7 +59,7 @@ test("K-TC-009 email change request paths (double opt-in)", async ({ page }) => 
   await page.locator("#new_email").fill(`e2e-${Date.now()}@ops.example`);
   await page.locator("#email_cur_pw").fill("WRONGpw1");
   await page.getByRole("button", { name: "確認メールを送信" }).click();
-  await expect(page.getByText("現在のパスワードが正しくありません。")).toBeVisible();
+  await expect(page.getByText("現在のパスワードが正しくありません。").first()).toBeVisible(); // §4.7 で複数チャネル表示（サマリ＋足元等）
   // 正しいPW＝202＝「確認メールを送信しました」の文言（この時点では未反映＝確定は新メールのリンク）
   await page.locator("#new_email").fill(`e2e-${Date.now()}@ops.example`);
   await page.locator("#email_cur_pw").fill(OPS.password);
