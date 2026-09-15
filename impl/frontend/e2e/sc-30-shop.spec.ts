@@ -20,8 +20,8 @@ test("G-TC-202 SC-30 shop renders real catalog and coin balance", async ({ page 
   const cat = await page.request.get("/api/v1/items").then((r) => r.json());
   await page.goto("/shop");
   await expect(page.getByRole("heading", { name: "ショップ" })).toBeVisible();
-  // コイン残高が実データ（デモ固定 ◆320 でない）。
-  await expect(page.locator(".wallet__num")).toHaveText(`◆ ${cat.coin_balance}`);
+  // コイン残高が実データ（デモ固定 ◆320 でない）。UI は3桁区切り（toLocaleString）で表示。
+  await expect(page.locator(".wallet__num")).toHaveText(`◆ ${cat.coin_balance.toLocaleString()}`);
   // 装備カードが 19 点（DataTable の perPage=24 で全件表示）。
   await expect(page.locator(".card.buy")).toHaveCount(19);
 });
