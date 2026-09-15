@@ -75,7 +75,7 @@ test("C-TC-204 SC-11 create draft persists and appears in list", async ({ page }
     await page.getByRole("button", { name: "＋ 業務改善" }).click(); // カテゴリ候補を1件追加
     await page.locator("#q_deadline").fill("2026-12-31");
     await page.locator("#q_theme").fill("E2E テスト用の目的・テーマ");
-    await expect(page.locator("#q_group")).not.toHaveValue(""); // 実データのグループが既定選択
+    // 参加部署は FR-38 で Multiselect（0件=全社）＝単一既定選択の #q_group は廃止。未選択（全社）のまま下書き保存できる。
     await page.getByRole("button", { name: "下書き保存" }).click();
 
     await expect(page).toHaveURL(/\/quests$/);

@@ -7,7 +7,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 // トークン消費は起きるが、他テストが使うログイン資格情報（Passw0rd!）は保たれる（共有状態を壊さない）。
 const SEED = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 // e2e は frontend コンテナ内で実行＝MailHog はサービス名で解決。ホスト実行時は env で上書き。
-const MAILHOG = process.env.MAILHOG_URL ?? "http://mailhog:8025";
+const MAILHOG = process.env.MAILHOG_URL ?? "http://localhost:8025"; // 既定はホスト実行（baseURL と同じ localhost）。docker 内実行は MAILHOG_URL=http://mailhog:8025 で上書き。
 
 async function clearMailbox(request: APIRequestContext) {
   await request.delete(`${MAILHOG}/api/v1/messages`);

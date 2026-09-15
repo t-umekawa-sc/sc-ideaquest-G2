@@ -4,7 +4,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 // ACME-02（mfa_required=true）で login→OTP メール→状態C 入力→ダッシュボード到達。
 // backend の詳細分岐は pytest（A-TC-060〜070）が正。ここは実ブラウザで縦に通ることだけ薄く確認する。
 const MFA = { company: "ACME-02", loginId: "mfa@acme2.example", password: "Passw0rd!" };
-const MAILHOG = process.env.MAILHOG_URL ?? "http://mailhog:8025";
+const MAILHOG = process.env.MAILHOG_URL ?? "http://localhost:8025"; // 既定はホスト実行（baseURL と同じ localhost）。docker 内実行は MAILHOG_URL=http://mailhog:8025 で上書き。
 
 async function clearMailbox(request: APIRequestContext) {
   await request.delete(`${MAILHOG}/api/v1/messages`);
