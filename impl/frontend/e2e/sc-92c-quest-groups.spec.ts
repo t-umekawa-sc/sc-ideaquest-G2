@@ -9,7 +9,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(OPS.loginId);
   await page.locator("#password").fill(OPS.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 // B-TC-117: 作成ダイアログのフォーカス保持（Modal の初期フォーカス effect が入力のたびに再実行され

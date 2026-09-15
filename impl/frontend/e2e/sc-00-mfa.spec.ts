@@ -50,5 +50,6 @@ test("SC-00 状態C: MFA会社で login→OTP→認証コード入力→ダッ�
   await page.getByRole("button", { name: "認証してログイン" }).click();
 
   // ダッシュボード（保護ページ）到達
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 });

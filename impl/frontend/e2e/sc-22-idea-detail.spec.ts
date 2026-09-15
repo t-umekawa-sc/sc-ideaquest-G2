@@ -21,7 +21,7 @@ async function createRecruiting(page: Page, title: string): Promise<string> {
   const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.post("/api/v1/quests", {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_id: groups.data[0].id, categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
+    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
   });
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()).id as string;

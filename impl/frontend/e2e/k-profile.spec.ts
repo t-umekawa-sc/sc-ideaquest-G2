@@ -10,7 +10,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(OPS.loginId);
   await page.locator("#password").fill(OPS.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 // K-TC-006: 自分のプロフィール（表示名）を編集→保存→GET /me で永続。

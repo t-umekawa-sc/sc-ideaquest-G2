@@ -11,7 +11,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(OPS.loginId);
   await page.locator("#password").fill(OPS.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 // B-TC-114: ACME-01 の会社詳細でアカウント発行→一覧に現れる（発行 EP＋一覧）。

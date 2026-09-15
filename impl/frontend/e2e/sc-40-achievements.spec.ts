@@ -11,7 +11,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 test("G-TC-207 SC-40 achievements render real catalog and summary", async ({ page }) => {

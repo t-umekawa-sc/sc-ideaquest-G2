@@ -12,7 +12,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(USER.loginId);
   await page.locator("#password").fill(USER.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 // 実 DB に作ったクエストを API で後片付け（title 前方一致・同一 Cookie の CSRF を載せる）。

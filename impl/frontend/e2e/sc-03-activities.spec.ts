@@ -12,7 +12,8 @@ async function login(page: Page) {
   await page.locator("#login_id").fill(U.loginId);
   await page.locator("#password").fill(U.password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByText("ようこそ")).toBeVisible();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await expect(page.locator(".app-header")).toBeVisible();
 }
 
 test("SC-03 activity history reflects GET /me/activities and paginates", async ({ page }) => {
