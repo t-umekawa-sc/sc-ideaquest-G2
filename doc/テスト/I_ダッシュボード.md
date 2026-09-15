@@ -41,6 +41,12 @@
 | I-TC-142 | int | D 横断 read＝未投票（参加クエスト・自票なし・締切内） | 参加/非参加・投票済/未投票混在 | `list_unvoted_published_ideas` | 参加クエストの published で自票なしのみ | I.3 |
 | I-TC-143 | int | F 横断 read＝本人下書き評価（進捗 scored/5） | 下書き評価（scored 2）＋確定評価 | `list_draft_evaluations_by_evaluator` | 下書きのみ・progress scored=2/total=5 | I.3 |
 
+## 5. 画面 e2e（SC-01・最近の通知）
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| I-TC-144 | e2e | 「最近の通知」の未読に「既読にする」ボタン（参照先を開かず既読化・ユーザー要望） | owner 宛の未読通知を1件用意（会社DBへ直挿入） | ダッシュボードで当該通知の「既読にする」を押す | 未読通知に「既読にする」ボタンが出る／押すと**遷移せず**既読化（`unread` クラス解除・ボタン消滅）／サーバーでも `is_read=true`（`markRead`・楽観更新は `markNotificationRead`） | SC-01 §4.8b／H.2 |
+
 ## ゲーム感（SC-01 ヒーローの数値演出・frontend vitest）
 
 > フロント純ロジックの単体（vitest・node）。視覚（XPバー充填・カウントアップの見た目）はブラウザ操作で受入。

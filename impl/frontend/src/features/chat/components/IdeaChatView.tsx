@@ -17,6 +17,7 @@ import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
 import { renderTextHtml, resolveMagic, type Member } from "../render";
+import { flashClassFor, scrollTopForTarget } from "../jump";
 import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
 
 import {
@@ -139,6 +140,8 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   const mentionTaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollNextRef = useRef(false);
   const initialScrollRef = useRef(false); // 画面遷移直後の初期スクロール（未読区切り or 最下部）を1回だけ実行
+  const messagesRef = useRef<ChatMessage[]>([]); // 最新 messages（スクロール/可視ハンドラから参照＝再バインド不要）
+  const readMaxRef = useRef(-1); // このセッションで既読化した最大インデックス（既読の重複送信を避ける）
 
   const completed = idea?.quest?.status === "completed";
   const canPost = !completed && !!idea && (idea.my_permissions?.includes("comment") ?? false);
@@ -148,6 +151,28 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   // reduce 時は付与しない（＝演出なし・即反映）。演出は onAnimationEnd で後片付け。
   const [pinFx, setPinFx] = useState<Record<string, "stamp" | "peel">>({});
   const clearPinFx = (id: string) => setPinFx((f) => { const n = { ...f }; delete n[id]; return n; });
+
+  // 引用クリック→引用元へジャンプ（受入不具合 DFT-E-006）。
+  // ①フローティング文脈バー（.chat-context--float）に隠れない位置へ手動スクロール（native アンカーはバー下に潜る）、
+  // ②「どこへ飛んだか」を一時ハイライトで示す（reduce は静止ハイライト＝jump.ts の flashClassFor）。
+  const jumpToQuote = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    const el = document.getElementById(targetId);
+    if (!el) return;  // 元発言が取得範囲外（未ロード）等＝native の href フォールバックに任せる
+    e.preventDefault();
+    const reduce = reduceMotion();
+    const bar = document.querySelector<HTMLElement>(".chat-context--float");
+    const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+    const top = scrollTopForTarget(el.getBoundingClientRect().top, window.scrollY, barBottom, 8);
+    window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+    // 参照可能な URL を維持（履歴を汚さない replaceState）。
+    window.history.replaceState(null, "", `#${targetId}`);
+    // ハイライトを一時付与＝再クリックでも再発火するよう remove→reflow→add。
+    const cls = flashClassFor(reduce);
+    el.classList.remove("msg--flash", "msg--flash-static");
+    void el.offsetWidth;
+    el.classList.add(cls);
+    window.setTimeout(() => el.classList.remove(cls), reduce ? 1400 : 1700);
+  };
   const togglePin = async (m: ChatMessage) => {
     const next = !m.is_pinned;
     const animate = !reduceMotion();
@@ -192,9 +217,9 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
         setMembers((r?.data ?? []).map((m) => ({ user_id: m.user.user_id, name: m.user.display_name ?? "", nospace: (m.user.display_name || "").replace(/\s/g, "") }))),
       ).catch(() => {});
       void getSpells().then((r) => setSpells(r?.data ?? [])).catch(() => {});
-      // 既読を最新まで前進。
-      const last = chat.data[chat.data.length - 1];
-      if (last) void markRead(ideaId, last.id).catch(() => {});
+      // 既読は「画面に見えたら既読」（markReadUpToVisible）で進める＝入室時に一律全既読にはしない（DFT-E-011・ユーザー選択）。
+      // このセッションの既読済みインデックスをリセット（新規ロード）。
+      readMaxRef.current = -1;
     } catch (err) {
       setLoadError(err instanceof ApiError && err.status === 401 ? "セッションが切れています。再ログインしてください。" : "チャットの取得に失敗しました。");
     } finally {
@@ -204,12 +229,51 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
 
   useEffect(() => { void load(); }, [load]);
 
+  // messages を ref に同期（スクロール/可視ハンドラは ref を読む＝毎回の再バインドを避ける）。
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  // 「画面に見えたメッセージまで既読を進める」（DFT-E-011・ユーザー選択＝実際に表示されたら既読）。
+  // 可読領域＝フローティング文脈バー下端〜ビューポート下端。そこに一部でも入っているメッセージのうち最下位（最新方向）まで既読。
+  // markRead は後退しない（§5.31）＝見えた最下位を渡せば途中も既読になる。背面タブ（document.hidden）では進めない（見ていない）。
+  const markReadUpToVisible = useCallback(() => {
+    if (typeof document === "undefined" || document.hidden) return;
+    const msgs = messagesRef.current;
+    if (msgs.length === 0) return;
+    const bar = document.querySelector<HTMLElement>(".chat-context--float");
+    const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+    const vh = window.innerHeight;
+    let maxIdx = readMaxRef.current;
+    document.querySelectorAll<HTMLElement>(".chat-thread .msg[id]").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > barBottom && r.top < vh) { // 可読領域に一部でも入っている＝見えた
+        const idx = msgs.findIndex((m) => m.id === el.id);
+        if (idx > maxIdx) maxIdx = idx;
+      }
+    });
+    if (maxIdx > readMaxRef.current) {
+      readMaxRef.current = maxIdx;
+      const id = msgs[maxIdx]?.id;
+      if (id) void markRead(ideaId, id).catch(() => {});
+    }
+  }, [ideaId]);
+
+  // ユーザーのスクロール（rAF スロットル）とタブ可視化で既読を再評価。
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; markReadUpToVisible(); }); };
+    const onVis = () => { if (!document.hidden) markReadUpToVisible(); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.removeEventListener("scroll", onScroll); document.removeEventListener("visibilitychange", onVis); if (raf) cancelAnimationFrame(raf); };
+  }, [markReadUpToVisible]);
+
   useEffect(() => {
     // ① 送信直後の追従＝スムーズに最下部へ。
     if (scrollNextRef.current) {
       scrollNextRef.current = false;
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+      requestAnimationFrame(() => markReadUpToVisible()); // 送信後に見えた分を既読化（スクロールが起きない短いスレッド向け）。
       return;
     }
     // ② 画面遷移直後の初期スクロール（1回）＝未読があれば「ここから未読」区切りへ、全既読なら最下部へ即時。
@@ -218,15 +282,25 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       // 描画反映後（アバター等の画像読込前でも高さは概ね確定）に実行。二重 rAF でレイアウト確定を待つ。
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const sep = firstUnread ? document.querySelector<HTMLElement>(".unread-sep") : null;
-        if (sep) sep.scrollIntoView({ block: "start", behavior: "auto" });
-        else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+        if (sep) {
+          // 「ここから未読」区切りをフローティング文脈バーの下に着地させる（DFT-E-006 と同様）。
+          // block:"start" だと全件未読時に区切り＋先頭メッセージがバー背後に潜り込むため offset 付きで手動スクロール。
+          const bar = document.querySelector<HTMLElement>(".chat-context--float");
+          const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+          const top = scrollTopForTarget(sep.getBoundingClientRect().top, window.scrollY, barBottom, 8);
+          window.scrollTo({ top, behavior: "auto" });
+        } else {
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+        }
+        markReadUpToVisible(); // 初期スクロール後に「見えた分」を既読化（DFT-E-011）。
       }));
     }
-  }, [messages, firstUnread]);
+  }, [messages, firstUnread, markReadUpToVisible]);
 
   const refetch = useCallback(async () => {
     const chat = await getChat(ideaId);
     if (chat) setMessages(chat.data);
+    return chat;
   }, [ideaId]);
 
   // リアルタイム（L）＝chat:{chat_group_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
@@ -235,9 +309,13 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     realtime.start();
     const topic = `chat:${chatGroupId}`;
     realtime.subscribe(topic);
-    const off = realtime.onTopic(topic, () => { void refetch(); });
+    const off = realtime.onTopic(topic, () => {
+      // 新着/編集/削除/リアクションで再取得し、反映後に「見えた分」を既読化（DFT-E-011）。
+      // 画面に見えている（＝下端付近で追従中）新着だけが既読になり、上を読んでいる最中の未表示新着は未読のまま。
+      void refetch().then(() => requestAnimationFrame(() => markReadUpToVisible()));
+    });
     return () => { off(); realtime.unsubscribe(topic); };
-  }, [chatGroupId, refetch]);
+  }, [chatGroupId, refetch, markReadUpToVisible]);
 
   const updateSendState = useCallback(() => {
     setCanSend((boxRef.current?.value.trim().length ?? 0) > 0 || pendingFiles.length > 0);
@@ -322,6 +400,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       setCanSend(false);
       scrollNextRef.current = true;
       await refetch();
+      // 送信後は最下部へスクロール（scrollNextRef）→ スクロールハンドラが「見えた分」を既読化する（DFT-E-011/009）。
     } catch (err) {
       const st = err instanceof ApiError ? err.status : 0;
       snack({ type: "error", msg: st === 403 ? "投稿する権限がありません。" : st === 409 ? "完了したクエストには投稿できません。" : st === 422 ? "本文か添付が必要です。" : "送信に失敗しました。" });
@@ -457,6 +536,18 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   }
 
   const pickerTarget = picker ? messages.find((m) => m.id === picker.msgId) : null;
+  // 「ここから未読」の実効位置＝自分のメッセージは既読扱い（受入不具合 DFT-E-009）。
+  // backend の first_unread が自分の送信メッセージを指しても、そこから最初の「自分以外」のメッセージまで区切りを送る
+  // （残りが全部自分なら区切りは出さない＝自分の投稿の上に「ここから未読」が出ない）。
+  const effectiveFirstUnread = (() => {
+    if (!firstUnread) return null;
+    const idx = messages.findIndex((m) => m.id === firstUnread);
+    if (idx < 0) return null;
+    for (let i = idx; i < messages.length; i++) {
+      if (!messages[i].is_mine) return messages[i].id;
+    }
+    return null;
+  })();
   let lastDay = "";
 
   return (
@@ -510,11 +601,15 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
           const selfCast = !!magic && (magic.mine ? m.is_mine : magic.actor != null && magic.actor === m.author?.name);
           const casterName = magic?.actor || (magic?.mine ? "あなた" : "");
           const spellJa = SPELL_JA[magic?.effect ?? ""] ?? "魔法";
+          // アクションメニューの「使用中」表示＝自分が今そのアクションを使っている状態（アクティブ表示＋ツールチップに反映）。
+          const hasMyReaction = normal.some((n) => n.reacted_by_me) || !!magic?.mine;
+          const quotedHere = editingId ? editQuotes.some((t) => t.id === m.id) : replyTargets.some((t) => t.id === m.id);
+          const editingHere = editingId === m.id;
           return (
             // #17: key=id なので新着メッセージだけが mount＝CSS で登場（既存は再利用され再生しない）。
             <div key={m.id} className="msg-row">
               {showDay && <div className="chat-day">{day}</div>}
-              {firstUnread === m.id && <div className="unread-sep">ここから未読</div>}
+              {effectiveFirstUnread === m.id && <div className="unread-sep">ここから未読</div>}
               <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : "", pinFx[m.id] === "stamp" ? "msg--pinflash" : ""].filter(Boolean).join(" ")}>
                 {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
                     canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
@@ -561,7 +656,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
                   </div>
 
                   {((m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? []).map((q, i) => (
-                    <a className="msg__quote" href={`#${q.id}`} key={i}>
+                    <a className="msg__quote" href={`#${q.id}`} key={i} onClick={(e) => jumpToQuote(e, q.id)}>
                       <b>{q.author_name}</b> {q.excerpt}
                     </a>
                   ))}
@@ -628,8 +723,8 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
 
                 {!m.is_deleted && !completed && (
                   <div className="msg__actions">
-                    <button className="msg__act" type="button" data-act="react" aria-label="リアクション" onClick={(e) => { e.stopPropagation(); openPicker(m.id, e.currentTarget); }}>🙂</button>
-                    <button className="msg__act" type="button" aria-label="引用返信" onClick={() => {
+                    <button className={"msg__act" + (hasMyReaction ? " is-active" : "")} type="button" data-act="react" aria-pressed={hasMyReaction} aria-label="リアクション" title={hasMyReaction ? "リアクション済み（絵文字・魔法を追加/変更）" : "リアクションを付ける（絵文字・魔法）"} onClick={(e) => { e.stopPropagation(); openPicker(m.id, e.currentTarget); }}>🙂</button>
+                    <button className={"msg__act" + (quotedHere ? " is-active" : "")} type="button" aria-pressed={quotedHere} aria-label="引用返信" title={quotedHere ? "引用中（このメッセージを返信に引用しています）" : "このメッセージを引用して返信"} onClick={() => {
                       const chip = { id: m.id, name: m.author?.name || "", text: (m.body || "").slice(0, 60) };
                       if (editingId) {
                         // 編集中＝編集対象メッセージの引用に追加（自分自身の引用は不可）。
@@ -637,16 +732,19 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
                         editRef.current?.focus();
                       } else {
                         setReplyTargets((rt) => (rt.some((t) => t.id === m.id) ? rt : [...rt, chip]));
-                        boxRef.current?.focus();
+                        // 受入不具合 DFT-E-008＝最小化中は composer__full（reply-ctx/textarea）が非表示で
+                        // 引用チップが見えず「何も起きない」ため、引用追加時は入力欄を展開してからフォーカスする。
+                        setComposerMin(false);
+                        requestAnimationFrame(() => boxRef.current?.focus());
                       }
                     }}>💬</button>
                     {canPin && !m.is_deleted && (
-                      <button className="msg__act" type="button" aria-pressed={m.is_pinned} aria-label={m.is_pinned ? "ピン留めを外す" : "ピン留め（重要）"} title={m.is_pinned ? "ピン留めを外す" : "ピン留め（最終結果の議論の要点に集約）"} onClick={() => void togglePin(m)}>📌</button>
+                      <button className={"msg__act" + (m.is_pinned ? " is-active" : "")} type="button" aria-pressed={m.is_pinned} aria-label={m.is_pinned ? "ピン留めを外す" : "ピン留め（重要）"} title={m.is_pinned ? "ピン留め中（クリックで解除・最終結果の要点から外す）" : "ピン留め（最終結果の議論の要点に集約）"} onClick={() => void togglePin(m)}>📌</button>
                     )}
                     {m.is_mine && (
                       <>
-                        <button className="msg__act" type="button" aria-label="編集" onClick={() => startEdit(m)}>✏️</button>
-                        <button className="msg__act" type="button" aria-label="削除" onClick={() => void removeMsg(m)}>🗑</button>
+                        <button className={"msg__act" + (editingHere ? " is-active" : "")} type="button" aria-pressed={editingHere} aria-label="編集" title={editingHere ? "編集中" : "メッセージを編集"} onClick={() => startEdit(m)}>✏️</button>
+                        <button className="msg__act" type="button" aria-label="削除" title="メッセージを削除" onClick={() => void removeMsg(m)}>🗑</button>
                       </>
                     )}
                   </div>
@@ -758,13 +856,21 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       {/* リアクションピッカー */}
       {picker && pickerTarget && (() => {
         const magic = (pickerTarget.reactions as { magic?: { mine?: boolean } })?.magic ?? null;
+        // 自分が既にリアクション済みの絵文字＝ピッカー内でアクティブ表示（ピン等と同様に「使用中」が分かる・ユーザー要望）。
+        const myEmojis = new Set(
+          ((pickerTarget.reactions as { normal?: Array<{ emoji: string; reacted_by_me: boolean }> })?.normal ?? [])
+            .filter((n) => n.reacted_by_me).map((n) => n.emoji),
+        );
         return (
           <div className="reaction-picker" role="menu" aria-label="リアクションを選ぶ" style={{ left: picker.pos.left, top: picker.pos.top }}>
             <p className="rp__label">リアクション</p>
             <div className="rp__row">
-              {NORMAL_EMOJIS.map((em) => (
-                <button key={em} type="button" className="rp__emoji" onClick={() => void toggleReaction(pickerTarget, em)}>{em}</button>
-              ))}
+              {NORMAL_EMOJIS.map((em) => {
+                const mineEm = myEmojis.has(em);
+                return (
+                  <button key={em} type="button" className={"rp__emoji" + (mineEm ? " is-active" : "")} aria-pressed={mineEm} title={mineEm ? "リアクション済み（クリックで取消）" : undefined} onClick={() => void toggleReaction(pickerTarget, em)}>{em}</button>
+                );
+              })}
             </div>
             {/* ゲームモード OFF（§4.11・レビュー#2）＝魔法キャストUIは出さない（使用無効）。通常リアクションと本文は残す。 */}
             {gameEnabled && (

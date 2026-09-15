@@ -246,34 +246,81 @@ export function DashboardView({
       <DashboardFx ref={fxRef} />
       {/* #31: 時間帯の挨拶（mount 後に算出＝ハイドレーション不一致回避） */}
       {greet && <motion.div className="dash-greeting" {...flowMotion(0)}>{greet.text}、{hero?.display_name ?? displayName} さん ・ {greet.date}</motion.div>}
-      {/* ヒーロー＋週間ランキングは最下部に移動（ユーザー要望・2026-09-13）＝下段の後に配置。 */}
+      {/* 並び順（ユーザー要望・2026-09-15）＝新着の議論 → チームアクティビティ＋最近の通知 → 未投票 → フォロー中 → 下書き → 参加中クエスト。
+          ヒーロー＋週間ランキング（ゲーム層）は §4.11 で最下部（2026-09-13）。空パネルは §7 で非表示。 */}
 
-      {/* 下書き（1件も無ければ非表示） */}
-      {drafts.length > 0 && (
-        <motion.section aria-label="下書き" {...flowMotion(2)}>
-          <div className="section-head">
-            <h2>下書き</h2>
-            <span className="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
-          </div>
-          <div className="draft-grid">
-            {drafts.map((d, i) => (
-              <Link key={i} className="card card-accent draft-card" href={hrefOfDraft(d)}>
-                <div className="draft-card__head">
-                  <span className="badge badge-draft">下書き</span>
-                  <span className="badge badge-muted">{d.kind === "quest" ? "クエスト" : d.kind === "idea" ? "アイデア" : "⭐ 評価"}</span>
-                </div>
-                <div className="draft-card__title">{d.kind === "evaluation" ? d.idea.title : d.title}</div>
-                <div className="draft-card__meta">
-                  {d.kind === "idea" && <span>{d.quest.title}</span>}
-                  {d.kind === "evaluation" && <><span>{d.quest?.title}</span><span>採点 {d.progress.scored}/{d.progress.total} 観点</span></>}
-                  {d.kind === "quest" && d.categories.map((c) => <span key={c}>{c}</span>)}
-                </div>
-                <div className="draft-card__cta">{d.kind === "evaluation" ? "採点を続ける ✎" : "続きを書く ✎"}</div>
-              </Link>
+      {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
+          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。**常設**（未読ゼロは空状態）。 */}
+      <motion.section className="card" aria-label="新着の議論" {...flowMotion(1)}>
+        <div className="section-head">
+          <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
+          {unreadChats.length > 0 && (
+            <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
+          )}
+        </div>
+        {unreadChats.length > 0 ? (
+          <ul className="unread-list">
+            {unreadChats.map((c) => (
+              <li key={c.id}>
+                <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
+                  <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
+                  <span className="unread-item__title">{c.title}</span>
+                  <span className="unread-item__quest">🎯 {c.quest.title}</span>
+                  <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                </Link>
+              </li>
             ))}
+          </ul>
+        ) : (
+          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。参加クエストで他のメンバーの新しい投稿があるとここに表示されます。</p>
+        )}
+      </motion.section>
+
+      {/* 下段：チームアクティビティ＋最近の通知の2段組（横並び・情報量に合わせて幅を分割・レビュー寄り道）。
+          チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}
+      <motion.div className="dash-bottom" {...flowMotion(2)}>
+        <section className="card" aria-label="チームアクティビティ">
+          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
+        </section>
+
+        <section className="card" aria-label="最近の通知">
+          <div className="section-head">
+            <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>
+            <Link href="/notifications">すべての通知 →</Link>
           </div>
-        </motion.section>
-      )}
+          <ul className="notif-list">
+            {notifs.length === 0 && <li className="muted text-sm">新しい通知はありません</li>}
+            {notifs.map((n) => {
+              const href = notificationHref(n);
+              // 件名＝body（参照先があればリンク）。メッセージ＝context はパネル全幅で下に表示（ユーザー要望）。
+              const title = href ? (
+                <Link className="notif-subject" href={href} onClick={() => markNotifRead(n.id, n.is_read)}>{n.body}</Link>
+              ) : <span className="notif-subject">{n.body}</span>;
+              return (
+                <li key={n.id} className={n.is_read ? undefined : "unread"}>
+                  <span className="notif-ico">{n.icon ?? "🔔"}</span>
+                  <div className="notif-body">
+                    <div className="notif-head">
+                      {title}
+                      {/* 未読のみ「既読にする」を件名の横に（参照先を開かず既読化＝SC-02 の n__read と同趣旨）。 */}
+                      {!n.is_read && (
+                        <button
+                          className="notif-read"
+                          type="button"
+                          title="既読にする"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); markNotifRead(n.id, false); }}
+                        >既読にする</button>
+                      )}
+                    </div>
+                    {n.context && <div className="notif-ctx muted">{n.context}</div>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+      </motion.div>
 
       {/* 未投票のアイデア（0件なら非表示） */}
       {unvoted.length > 0 && (
@@ -314,40 +361,9 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* 参加中クエスト（0件なら非表示） */}
-      {quests.length > 0 && (
-        <motion.section aria-label="参加中クエスト" {...flowMotion(4)}>
-          <div className="section-head">
-            <h2>参加中クエスト</h2>
-            <Link href="/quests">すべて見る →</Link>
-          </div>
-          <div className="quest-grid">
-            {quests.map((q) => {
-              const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
-              return (
-              <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
-                <div className="between">
-                  <span className="card-title">{q.title}</span>
-                  <span className="badge">{q.status}</span>
-                </div>
-                <div className="quest-card__meta">
-                  {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
-                  {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
-                </div>
-                <div className="quest-card__stats">
-                  <span>👥 パーティー{q.member_count ?? 0}</span>
-                  <span>💡 アイデア{q.idea_count ?? 0}</span>
-                </div>
-              </Link>
-              );
-            })}
-          </div>
-        </motion.section>
-      )}
-
       {/* フォロー中のアイデア（0件なら非表示） */}
       {followed.length > 0 && (
-        <motion.section aria-label="フォロー中のアイデア" {...flowMotion(5)}>
+        <motion.section aria-label="フォロー中のアイデア" {...flowMotion(4)}>
           <div className="section-head">
             <h2>フォロー中のアイデア</h2>
             <span className="muted text-sm">動きがあると通知でお知らせ</span>
@@ -397,70 +413,63 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
-          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。**常設**（未読ゼロは空状態）。 */}
-      <motion.section className="card" aria-label="新着の議論" {...flowMotion(6)}>
-        <div className="section-head">
-          <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
-          {unreadChats.length > 0 && (
-            <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
-          )}
-        </div>
-        {unreadChats.length > 0 ? (
-          <ul className="unread-list">
-            {unreadChats.map((c) => (
-              <li key={c.id}>
-                <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
-                  <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
-                  <span className="unread-item__title">{c.title}</span>
-                  <span className="unread-item__quest">🎯 {c.quest.title}</span>
-                  <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。参加クエストで他のメンバーの新しい投稿があるとここに表示されます。</p>
-        )}
-      </motion.section>
-
-      {/* 下段：チームアクティビティ＋最近の通知の2段組（横並び・情報量に合わせて幅を分割・レビュー寄り道）。
-          チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}
-      <motion.div className="dash-bottom" {...flowMotion(6)}>
-        <section className="card" aria-label="チームアクティビティ">
-          <ActivityFeed title="チームアクティビティ" load={loadTeamFeed} showQuest emptyText="参加中クエストの新しい活動はまだありません。" />
-        </section>
-
-        <section className="card" aria-label="最近の通知">
+      {/* 下書き（1件も無ければ非表示） */}
+      {drafts.length > 0 && (
+        <motion.section aria-label="下書き" {...flowMotion(5)}>
           <div className="section-head">
-            <h2 style={{ fontSize: "var(--text-lg)" }}>最近の通知</h2>
-            <Link href="/notifications">すべての通知 →</Link>
+            <h2>下書き</h2>
+            <span className="muted text-sm">あなただけに表示（公開/投稿するまで非公開）</span>
           </div>
-          <ul className="notif-list">
-            {notifs.length === 0 && <li className="muted text-sm">新しい通知はありません</li>}
-            {notifs.map((n) => {
-              const href = notificationHref(n);
-              const inner = (
-                <>
-                  <span className="notif-ico">{n.icon ?? "🔔"}</span>
-                  <div className="notif-body">
-                    <div>{n.body}</div>
-                    {n.context && <div className="muted">{n.context}</div>}
-                  </div>
-                </>
-              );
+          <div className="draft-grid">
+            {drafts.map((d, i) => (
+              <Link key={i} className="card card-accent draft-card" href={hrefOfDraft(d)}>
+                <div className="draft-card__head">
+                  <span className="badge badge-draft">下書き</span>
+                  <span className="badge badge-muted">{d.kind === "quest" ? "クエスト" : d.kind === "idea" ? "アイデア" : "⭐ 評価"}</span>
+                </div>
+                <div className="draft-card__title">{d.kind === "evaluation" ? d.idea.title : d.title}</div>
+                <div className="draft-card__meta">
+                  {d.kind === "idea" && <span>{d.quest.title}</span>}
+                  {d.kind === "evaluation" && <><span>{d.quest?.title}</span><span>採点 {d.progress.scored}/{d.progress.total} 観点</span></>}
+                  {d.kind === "quest" && d.categories.map((c) => <span key={c}>{c}</span>)}
+                </div>
+                <div className="draft-card__cta">{d.kind === "evaluation" ? "採点を続ける ✎" : "続きを書く ✎"}</div>
+              </Link>
+            ))}
+          </div>
+        </motion.section>
+      )}
+
+      {/* 参加中クエスト（0件なら非表示） */}
+      {quests.length > 0 && (
+        <motion.section aria-label="参加中クエスト" {...flowMotion(6)}>
+          <div className="section-head">
+            <h2>参加中クエスト</h2>
+            <Link href="/quests">すべて見る →</Link>
+          </div>
+          <div className="quest-grid">
+            {quests.map((q) => {
+              const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
               return (
-                <li key={n.id} className={n.is_read ? undefined : "unread"}>
-                  {href ? (
-                    <Link className="notif-link" href={href} onClick={() => markNotifRead(n.id, n.is_read)}>{inner}</Link>
-                  ) : inner}
-                </li>
+              <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
+                <div className="between">
+                  <span className="card-title">{q.title}</span>
+                  <span className="badge">{q.status}</span>
+                </div>
+                <div className="quest-card__meta">
+                  {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
+                  {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
+                </div>
+                <div className="quest-card__stats">
+                  <span>👥 パーティー{q.member_count ?? 0}</span>
+                  <span>💡 アイデア{q.idea_count ?? 0}</span>
+                </div>
+              </Link>
               );
             })}
-          </ul>
-        </section>
-
-      </motion.div>
+          </div>
+        </motion.section>
+      )}
 
       {/* 最下部：ヒーロー＋週間ランキング（ゲームモード OFF＝§4.11 で非表示・業務パネルは上段に残す・ユーザー要望で末尾へ移動）。 */}
       {gameEnabled && (

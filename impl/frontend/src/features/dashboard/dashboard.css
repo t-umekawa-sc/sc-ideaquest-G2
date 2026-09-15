@@ -95,20 +95,27 @@
 .dash-page .follow-frozen-note { margin-top: var(--space-2); }
 
 /* 下段：通知＋ショートカット */
-.dash-page .dash-bottom { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
+.dash-page .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
 .dash-page .notif-list { list-style: none; margin: 0; padding: 0; }
 .dash-page .notif-list li { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
 .dash-page .notif-list li:first-child { border-top: 0; }
 .dash-page .notif-ico { flex: 0 0 auto; width: 28px; height: 28px; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 14px; background: var(--color-primary-soft); }
 .dash-page .notif-list .unread { position: relative; }
 .dash-page .notif-list .unread .notif-ico::after { content: ""; position: absolute; left: 20px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger); border: 2px solid var(--color-surface); }
-.dash-page .notif-body { min-width: 0; font-size: var(--text-sm); }
-/* 通知をクリックで参照先へ（SC-02 と同じ ref 解決）。アイコン＋本文の並びは Link 側で保持。 */
-.dash-page .notif-link { display: flex; gap: var(--space-3); align-items: flex-start; flex: 1; min-width: 0;
-  color: inherit; text-decoration: none; border-radius: var(--radius); margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1);
-  padding: var(--space-2); }
-.dash-page .notif-link:hover { background: var(--color-surface-alt); }
+.dash-page .notif-body { min-width: 0; flex: 1; font-size: var(--text-sm); }
+/* 件名行＝件名（body）を左・「既読にする」を右。メッセージ（context）は下段でパネル全幅（ユーザー要望）。 */
+.dash-page .notif-head { display: flex; align-items: flex-start; gap: var(--space-2); }
+/* 件名＝参照先があればリンク（SC-02 と同じ ref 解決）。ビジネスフォント（既定 sans を継承）＋業務パネル準拠サイズ。
+   ※クラス名は SC-02 の見出し `.notif-title`（未スコープ・font-pixel/text-2xl）と衝突するため `notif-subject` に分離。 */
+.dash-page .notif-subject { flex: 1; min-width: 0; color: inherit; text-decoration: none; font-weight: 600; font-size: var(--text-sm); }
+.dash-page a.notif-subject:hover { color: var(--color-primary); text-decoration: underline; }
+.dash-page .notif-ctx { margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-muted); } /* メッセージ本文＝全幅・業務パネルの副題サイズ */
 .dash-page .notif-time { color: var(--color-text-subtle); font-size: var(--text-xs); }
+/* 「既読にする」＝未読通知を参照先を開かずに既読化（件名の横・小さな outline ボタン）。 */
+.dash-page .notif-read { flex: 0 0 auto; white-space: nowrap;
+  background: transparent; border: 1px solid var(--color-border-strong); color: var(--color-text-muted);
+  border-radius: var(--radius-sm); padding: 2px var(--space-2); font-size: var(--text-xs); cursor: pointer; }
+.dash-page .notif-read:hover { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-text); }
 
 /* ショートカットタイル */
 .dash-page .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
