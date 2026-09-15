@@ -17,6 +17,8 @@ async function login(page: Page) {
 }
 
 test("M-TC-001 global nav drawer opens with items and closes on Esc/backdrop (#1)", async ({ page }) => {
+  // ナビ既定はピン留め（docked）に変更＝burger 非表示。オーバーレイ挙動は明示的に非ピン（iq_nav_pinned=0）で検証する。
+  await page.addInitScript(() => { try { localStorage.setItem("iq_nav_pinned", "0"); } catch { /* ignore */ } });
   await login(page);
   const burger = page.locator(".appnav-burger");
   await expect(burger).toBeVisible();
@@ -41,6 +43,7 @@ test("M-TC-001 global nav drawer opens with items and closes on Esc/backdrop (#1
 });
 
 test("M-TC-002 selecting a nav item navigates and closes the drawer (#1)", async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.setItem("iq_nav_pinned", "0"); } catch { /* ignore */ } });
   await login(page);
   await page.locator(".appnav-burger").click();
   await page.locator("#appnav-drawer").getByRole("menuitem", { name: "ショップ" }).click();
@@ -49,27 +52,27 @@ test("M-TC-002 selecting a nav item navigates and closes the drawer (#1)", async
 });
 
 test("M-TC-003 pin makes a persistent sidebar remembered across reload, and can be unpinned (#1)", async ({ page }) => {
-  await login(page); // 既定 viewport 1280px（≥1024）＝ピン可
-  await page.locator(".appnav-burger").click();
-  // 📌ピン→ドック（本文右シフト＝html.iq-nav-pinned）。
-  await page.locator(".appnav-pin").click();
+  await login(page); // 既定＝ピン留め（docked・localStorage 未設定でも既定 ON）。viewport 1280px（≥1024）＝ピン可。
+  // 既定でドック（本文右シフト＝html.iq-nav-pinned）＝☰は隠れる。
   await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(true);
-  expect(await page.evaluate(() => localStorage.getItem("iq_nav_pinned"))).toBe("1");
-  // ドック中はヘッダーの☰は隠す（no-op のため＝ピン解除は📌）。
   await expect(page.locator(".appnav-burger")).toBeHidden();
-  // ピン時にウィンドウ全体へ横スクロールを出さない（本文はビューポート内に収まる＝ヘッダー右の余白崩れ防止）。
+  // ピン時にウィンドウ全体へ横スクロールを出さない（本文はビューポート内・ヘッダー右の余白崩れ防止）。
   const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflowX).toBeLessThanOrEqual(1); // サブピクセル誤差のみ許容
-  // リロード後も維持（localStorage 記憶）。
-  await page.reload();
-  await expect(page.locator(".app-header")).toBeVisible();
-  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(true);
-  // もう一度 📌 で解除。
+  // 📌 で解除→非ドック・☰復活・localStorage="0"。
   await page.locator(".appnav-pin").click();
   await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem("iq_nav_pinned"))).toBe("0");
-  // 解除で☰は再表示（オーバーレイ操作に戻せる）。
   await expect(page.locator(".appnav-burger")).toBeVisible();
+  // リロード後も「解除」を維持（localStorage 記憶）。
+  await page.reload();
+  await expect(page.locator(".app-header")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(false);
+  // もう一度 📌 でピン（☰→overlay→pin）→ docked・localStorage="1"。
+  await page.locator(".appnav-burger").click();
+  await page.locator(".appnav-pin").click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("iq-nav-pinned"))).toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem("iq_nav_pinned"))).toBe("1");
 });
 
 test.describe("reduce-motion #1", () => {
