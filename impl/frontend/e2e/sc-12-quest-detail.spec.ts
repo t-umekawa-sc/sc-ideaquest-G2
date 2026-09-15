@@ -46,11 +46,12 @@ test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page 
   try {
     await page.goto(`/quests/${id}`);
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
-    await expect(page.getByText(/グループ: デモグループ/)).toBeVisible();
+    // 参加部署（FR-38 再設計）＝作成に使った先頭グループ名が「🗂 参加部署: …」に出る（旧「グループ: デモグループ」から変更）。
+    const groupName = (await page.request.get("/api/v1/quest-groups").then((r) => r.json())).data[0].name;
+    await expect(page.getByText(new RegExp(`参加部署: .*${groupName}`))).toBeVisible();
 
-    // 概要タブ＝カテゴリ/グループ等の実データ（ヘッダーにも同カテゴリが出るため概要セクションにスコープ）。
-    await page.getByRole("tab", { name: /概要/ }).click();
-    await expect(page.getByLabel("概要").getByText("業務改善")).toBeVisible();
+    // カテゴリはヘッダー（クエスト情報）に badge 表示（「概要」タブはレビュー#3で廃止＝ヘッダーと重複のため）。
+    await expect(page.getByLabel("クエスト情報").getByText("業務改善", { exact: true })).toBeVisible();
 
     // パーティータブ＝作成者（テスト 太郎）が「作成者」バッジ付きで出る。
     await page.getByRole("tab", { name: /パーティー/ }).click();

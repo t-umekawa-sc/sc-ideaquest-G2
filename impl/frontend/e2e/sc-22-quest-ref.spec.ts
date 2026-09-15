@@ -52,8 +52,8 @@ test("D-TC-213 SC-22 back link targets the quest and shows category badge", asyn
   const ideaId = await createPublishedIdea(page, questId, stamp);
   try {
     await page.goto(`/ideas/${ideaId}`);
-    // 「クエストへ戻る」が一覧固定でなく当該クエストを指す。
-    const back = page.getByRole("link", { name: /へ戻る/ });
+    // 「クエストへ戻る」が一覧固定でなく当該クエストを指す（ラベルは履歴有無で動的＝安定クラスで特定）。
+    const back = page.locator("a.backlink--float");
     await expect(back).toHaveAttribute("href", `/quests/${questId}`);
     // クエストのカテゴリーバッジがヘッダーに出る。
     await expect(page.getByLabel("アイデア情報").getByText("業務改善", { exact: true })).toBeVisible();
@@ -63,7 +63,7 @@ test("D-TC-213 SC-22 back link targets the quest and shows category badge", asyn
   }
 });
 
-test("D-TC-214 SC-22 completed quest disables vote and new follow", async ({ page }) => {
+test("D-TC-214 SC-22 completed quest disables vote; new follow shows info (not disabled)", async ({ page }) => {
   await login(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E凍結_${stamp}`, ["業務改善"]);
@@ -78,7 +78,10 @@ test("D-TC-214 SC-22 completed quest disables vote and new follow", async ({ pag
     await expect(page.getByText("⏸ 完了（凍結）")).toBeVisible();
     await expect(page.getByRole("button", { name: "▲ 賛成" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "▼ 反対" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "☆ フォロー" })).toBeDisabled();
+    // フォローは無効化しない＝新規は押下で info（解除のみ可・memory: completed-quest-freeze-ui-standard）。
+    const follow = page.getByRole("button", { name: "☆ フォロー" });
+    await expect(follow).toBeEnabled();
+    await expect(follow).toHaveAttribute("title", /新規フォローできません/);
   } finally {
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
