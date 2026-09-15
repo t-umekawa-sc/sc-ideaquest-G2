@@ -11,17 +11,18 @@
 
 実行（リポジトリ直下 or どこからでも・ホストの python3＋requests で可）:
   python3 impl/backend/scripts/seed_demo.py           # 全群
-  python3 impl/backend/scripts/seed_demo.py d         # D 群のみ
+  python3 impl/backend/scripts/seed_demo.py d         # D 群のみ（e / g も同様）
 
 冪等性: クエスト/アイデアは件名で既存検索して再利用（重複作成しない）。版・添付・投票・遷移も
 現状を見て不足分だけ実施する。何度流しても同じ状態に収束する。
 
-群単位で育てる（フロント実装フロー規約 §1.1 の受入ゲート・実装順 D→E→G→F→H）。現状 = **D 群**。
+群単位で育てる（フロント実装フロー規約 §1.1 の受入ゲート・実装順 D→E→G→F→H）。実装済み = **D / E / G 群**（F/H は未実装）。
 """
 from __future__ import annotations
 
 import base64
 import sys
+import uuid
 
 import requests
 
@@ -83,6 +84,9 @@ class Client:
 
     def patch(self, path, *, ok=(200,), **kw):
         return self._send("PATCH", path, ok=ok, **kw)
+
+    def put(self, path, *, ok=(200,), **kw):
+        return self._send("PUT", path, ok=ok, **kw)
 
     def delete(self, path, *, ok=(200, 204), **kw):
         return self._send("DELETE", path, ok=ok, **kw)
@@ -376,6 +380,75 @@ def seed_e(owner: Client, u2: Client, u3: Client):
     print(f"  完了クエストのチャット凍結  : {frozen_url}  → 入力欄が凍結バナー")
 
 
+# ---- G 群（ゲーミフィケーション：魔法解放/ショップ/アバター/ランキング/実績） ----
+
+def purchase(c: Client, item_id: str):
+    """アイテム購入（G.1・Idempotency-Key 付き＝二重送信でもコインは一度だけ消費）。返り値＝PurchaseResponse。"""
+    r = c.s.post(
+        BASE + f"/items/{item_id}/purchase",
+        headers={**c._headers(), "Idempotency-Key": str(uuid.uuid4())},
+    )
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"POST /items/{item_id}/purchase -> {r.status_code} {r.text}")
+    return r.json()
+
+
+def seed_g(owner: Client, u2: Client, u3: Client):
+    print("[G群] 魔法解放/ショップ/アバター/ランキング/実績")
+
+    # --- SC-32 魔法解放：解放済みを1つ用意（無ければ1つ解放）。残りは受入で解放を試せるよう残す。 ---
+    cat = owner.get("/spells")
+    sp = cat.get("skill_point_balance", 0)
+    unlocked = [s for s in cat.get("data", []) if s.get("unlocked")]
+    if unlocked:
+        print(f"    = 魔法 解放済み {len(unlocked)} 件／SP残 {sp}")
+    elif spell_to_use(owner):  # 1つ解放（SP不足なら None）
+        print(f"    + 魔法 1つ解放（SP残 {owner.get('/spells').get('skill_point_balance', 0)}）")
+    else:
+        print(f"    ! SP不足で解放できず（SP残 {sp}）")
+    can_unlock = [s for s in owner.get("/spells").get("data", []) if s.get("can_unlock")]
+    print(f"      ↳ 受入で解放を試せる（can_unlock）: {len(can_unlock)} 件")
+
+    # --- SC-30 ショップ購入 ＋ SC-31 装備：未所有の手頃なアイテムを1つ購入して装備。残コインは受入用に残す。 ---
+    resp = owner.get("/items")
+    coin = resp.get("coin_balance", 0)
+    items = resp.get("data", [])
+    target = next((it for it in items if it.get("owned")), None)
+    if target:
+        print(f"    = アイテム所有済み: {target['name_ja']}（slot={target['slot']}・コイン残 {coin}）")
+    else:
+        affordable = sorted(
+            (it for it in items if not it.get("owned") and it.get("price_coin", 0) <= coin),
+            key=lambda it: it.get("price_coin", 0),
+        )
+        if affordable:
+            target = affordable[0]
+            res = purchase(owner, target["id"])
+            print(f"    + 購入: {target['name_ja']}（{target['price_coin']}コイン → 残 {res.get('coin_balance')}）")
+        else:
+            print(f"    ! 購入可能な未所有アイテムなし（コイン残 {coin}）")
+    if target and not target.get("is_equipped"):
+        owner.put("/me/equipment", json={target["slot"]: target["id"]})
+        print(f"      · 装備: slot={target['slot']} ← {target['name_ja']}")
+    elif target:
+        print(f"      = 既に装備済み: {target['name_ja']}")
+
+    # --- SC-41 ランキング / SC-40 実績：D/E 群の XP・行動から既にデータあり。件数を出して確認。 ---
+    try:
+        summ = owner.get("/achievements").get("summary", {})
+        print(f"    = 実績: 獲得 {summ.get('unlocked')}／全 {summ.get('total')}（獲得コイン {summ.get('coin_earned')}）")
+    except RuntimeError as e:
+        print(f"    ! 実績取得 skip: {e}")
+
+    print("\n=== G 群 受入 URL ===")
+    print(f"  魔法 解放/SP残高（SC-32）        : {APP}/spells")
+    print(f"  ショップ 購入/コイン残（SC-30）  : {APP}/shop")
+    print(f"  アバター 装備/ベース切替（SC-31）: {APP}/avatar")
+    print(f"  ランキング（SC-41）              : {APP}/ranking")
+    print(f"  実績（SC-40）                    : {APP}/achievements")
+    print("  ※owner は game_mode OFF。ゲーム層UI（ショップ/魔法/実績/ランキング）を見るには プロフィール>ゲームモード を ON。")
+
+
 def main():
     which = (sys.argv[1].lower() if len(sys.argv) > 1 else "all")
     print(f"seed_demo: target={which} base={BASE}")
@@ -387,6 +460,8 @@ def main():
         seed_d(owner, u2, u3)
     if which in ("all", "e"):
         seed_e(owner, u2, u3)
+    if which in ("all", "g"):
+        seed_g(owner, u2, u3)
 
     print("\n完了。")
 
