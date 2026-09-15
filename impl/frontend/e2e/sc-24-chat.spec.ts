@@ -205,4 +205,30 @@ test.describe("reduce-motion #17", () => {
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });
+
+  // G-TC-178 ピン留めアニメ（§17P 移植）の抑制＝reduce では stamp 押印アニメを付けない（ピル＝情報は残る）。
+  test("G-TC-178 SC-24 pin stamp animation is disabled under reduced motion (pill still shows)", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await login(page);
+    const stamp = Date.now().toString().slice(-8);
+    const questId = await createRecruiting(page, `E2Eピン抑制_${stamp}`);
+    const ideaId = await createPublishedIdea(page, questId, stamp);
+    const body = `ピン抑制_${stamp}`;
+    try {
+      await postMsg(page, ideaId, body);
+      await page.goto(`/ideas/${ideaId}/chat`);
+      const msg = page.locator(".msg", { hasText: body });
+      await expect(msg.locator(".msg__text")).toContainText(body);
+      // 📌 ピン留め（owner）→ ピルは出る（情報は残る）が、reduce では stamp アニメ class は付かない＝animation none。
+      await msg.hover();
+      await msg.getByRole("button", { name: /ピン留め/ }).click();
+      const pill = msg.locator(".msg__pinned");
+      await expect(pill).toBeVisible();
+      const pillAnim = await pill.evaluate((el) => getComputedStyle(el).animationName);
+      expect(pillAnim).toBe("none");
+    } finally {
+      const c2 = csrfOf(await page.context().cookies());
+      await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+    }
+  });
 });

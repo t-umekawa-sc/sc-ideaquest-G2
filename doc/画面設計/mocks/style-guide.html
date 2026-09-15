@@ -4209,7 +4209,7 @@
       </div>
     </div>
     <button class="btn" type="button" id="pinToggle" style="margin-top:var(--space-3)">ピン留めする / 外す</button>
-    <p class="hint">実装移植先＝チャット（<code>IdeaChatView</code>）の 📌 <code>togglePin</code>・ピル <code>.msg__pinned</code>。演出は受入後に production へ移す（モック先行）。</p>
+    <p class="hint"><strong>production 移植済み（2026-09-15）</strong>＝チャット（<code>IdeaChatView.togglePin</code>＋<code>chat.css</code> の <code>pin-stamp</code>/<code>pin-unstamp</code>/<code>pin-flash</code>）。reduce は <code>reduceMotion()</code> で付与ガード＋<code>@media</code> backstop。抑制 e2e＝G-TC-178。</p>
 
     <style>
       #pinDemoWrap { max-width: 560px; }

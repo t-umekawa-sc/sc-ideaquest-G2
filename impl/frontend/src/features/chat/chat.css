@@ -173,6 +173,18 @@
 .msg.msg--flash { animation: msg-flash 1.6s ease-out; }
 @media (prefers-reduced-motion: reduce) { .msg.msg--flash { animation-duration: .01ms; } }
 
+/* FR-39 (b) ピン留めのアニメ（style-guide §17P 由来・移植）＝📌ピルのスタンプ押印/peel-off＋枠の一瞬ハイライト。
+   付与は JS 側で reduceMotion()（OS reduce or ユーザー設定）を尊重してから＝reduce 時はクラス自体を付けない。
+   下の @media は OS reduce の backstop。 */
+.msg__pinned { transform-origin: 12px 50%; }
+.msg__pinned.is-stamping { animation: pin-stamp .42s cubic-bezier(.2,.9,.3,1.4) both; }
+.msg__pinned.is-unstamping { animation: pin-unstamp .3s ease-in both; }
+.msg.msg--pinflash { animation: pin-flash .42s ease-out; }
+@keyframes pin-stamp { 0% { transform: scale(1.8) rotate(-14deg); opacity: 0; } 55% { transform: scale(.9) rotate(5deg); opacity: 1; } 78% { transform: scale(1.05) rotate(-2deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes pin-unstamp { 0% { transform: translateY(0) scale(1) rotate(0); opacity: 1; } 30% { transform: translateY(-2px) scale(1.1) rotate(-6deg); opacity: 1; } 100% { transform: translateY(-10px) scale(.55) rotate(14deg); opacity: 0; } }
+@keyframes pin-flash { 0% { box-shadow: 0 0 0 3px var(--color-warning-soft, #fef3c7); background: var(--color-warning-soft, #fef3c7); } 100% { box-shadow: 0 0 0 0 transparent; background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .msg__pinned.is-stamping, .msg__pinned.is-unstamping, .msg.msg--pinflash { animation: none; } }
+
 /* 添付：画像のインラインプレビュー（ギャラリー＋ライトボックス） */
 .msg__gallery { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 .msg__thumb { width: 170px; height: 116px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--color-border); cursor: zoom-in; display: block; }

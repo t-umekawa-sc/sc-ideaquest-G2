@@ -229,6 +229,7 @@
 > 対象＝アイデアチャット（`/ideas/{id}/chat`）。新着メッセージの登場（`.msg-row`＝`msg-enter` 下からフェード・`key=id` で新着のみ）＋リアクション追加のポップ（`.reaction`＝`reaction-pop`）。GF-AC-170/171 の見た目はユーザー目視。ここは **reduce で登場/ポップが無効**（即表示）を e2e で押さえる（`@media prefers-reduced-motion` で `animation:none`／実効は OS reduce OR `[data-anim-reduced]`）。※入力欄は既定で最小化（`composerMin=true`・スリムバー `.composer__mini`）＝テストは展開してから投稿（`openComposer`）。対象＝`impl/frontend/e2e/sc-24-chat.spec.ts`。
 
 | G-TC-173 | e2e(front) | reduce-motion で登場/ポップが無効（#17） | `page.emulateMedia({reducedMotion:"reduce"})` でチャットに投稿→👍 リアクション | `.msg-row`／`.reaction` の computed `animationName` | 新着行（`.msg-row`）とリアクション（`.reaction`）の `animationName` が**`none`**／投稿・リアクション自体は正常 | GF-AC-172／#17 |
+| G-TC-178 | e2e(front) | reduce-motion でピン留めアニメ（§17P 移植）が無効 | `emulateMedia({reducedMotion:"reduce"})` で 📌 ピン留め（owner） | `.msg__pinned` の可視＋computed `animationName` | ピル（📌 重要＝情報）は**出る**が stamp 押印アニメの class が付かず `animationName`＝**`none`**（reduce では JS が付与しない・§4.9） | FR-39(b)／§4.9 |
 
 ### 5-S. 取得中スピナーの reduce（#18・共通 Spinner／デザイン標準 §13・GF-AC-181）
 

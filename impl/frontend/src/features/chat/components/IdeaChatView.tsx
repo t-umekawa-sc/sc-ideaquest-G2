@@ -144,11 +144,28 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   const canPost = !completed && !!idea && (idea.my_permissions?.includes("comment") ?? false);
   // FR-39 (b) ピン留めは owner/quest_admin のみ（完了後も可＝最終結果のキュレーション）。
   const canPin = !!idea && ((idea.my_permissions?.includes("owner") || idea.my_permissions?.includes("quest_admin")) ?? false);
+  // ピン留めアニメ（style-guide §17P 移植）＝msgId→"stamp"（📌押印＋枠フラッシュ）/"peel"（外す時の退場）。
+  // reduce 時は付与しない（＝演出なし・即反映）。演出は onAnimationEnd で後片付け。
+  const [pinFx, setPinFx] = useState<Record<string, "stamp" | "peel">>({});
+  const clearPinFx = (id: string) => setPinFx((f) => { const n = { ...f }; delete n[id]; return n; });
   const togglePin = async (m: ChatMessage) => {
     const next = !m.is_pinned;
-    setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: next } : x)));  // 楽観
-    const res = await setMessagePin(m.id, next).catch(() => null);
-    if (!res) { setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: !next } : x))); }
+    const animate = !reduceMotion();
+    if (next) {
+      setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: true } : x)));  // 楽観＝ピル出現
+      if (animate) setPinFx((f) => ({ ...f, [m.id]: "stamp" }));
+      const res = await setMessagePin(m.id, true).catch(() => null);
+      if (!res) { setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: false } : x))); clearPinFx(m.id); }
+    } else if (!animate) {
+      setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: false } : x)));
+      const res = await setMessagePin(m.id, false).catch(() => null);
+      if (!res) setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: true } : x)));
+    } else {
+      // 外す＝peel-off を再生（ピルは is_pinned=true のまま描画し、pin-unstamp 終了で除去）。
+      setPinFx((f) => ({ ...f, [m.id]: "peel" }));
+      const res = await setMessagePin(m.id, false).catch(() => null);
+      if (!res) clearPinFx(m.id);  // 失敗＝ピン維持・退場取消（is_pinned は true のまま）
+    }
   };
   const unlockedSpellIds = new Set(spells.filter((s) => s.unlocked).map((s) => s.id));
   const myMagicSpellIds = new Set(
@@ -498,7 +515,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
             <div key={m.id} className="msg-row">
               {showDay && <div className="chat-day">{day}</div>}
               {firstUnread === m.id && <div className="unread-sep">ここから未読</div>}
-              <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : ""].filter(Boolean).join(" ")}>
+              <div id={m.id} className={["msg", m.is_mine ? "is-me" : "", m.is_deleted ? "is-deleted" : "", magic ? "spell-fx " + (FX[magic.effect ?? ""] ?? "") : "", pinFx[m.id] === "stamp" ? "msg--pinflash" : ""].filter(Boolean).join(" ")}>
                 {/* Phase D/E: 属性別の永続装飾を枠に重ねる。基調グロー/ボーダーは spell-fx--* クラスが担う。
                     canvas 化済み effect（sparkle 等）は SpellCanvasFx（発射→着弾→永続を1枚）、それ以外は従来 CSS の SpellPersistFx。 */}
                 {magic && (isCanvasEffect(magic.effect ?? "")
@@ -528,7 +545,19 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
                     <span className="msg__time">{fmtTime(m.created_at)}</span>
                     {m.is_edited && <span className="msg__edited">（編集済み）</span>}
                     {/* FR-39 (b) ピン留めバッジ＝最終結果の議論の要点に集約される重要発言 */}
-                    {m.is_pinned && !m.is_deleted && <span className="msg__pinned" title="重要（最終結果の議論の要点に表示）">📌 重要</span>}
+                    {(m.is_pinned || pinFx[m.id] === "peel") && !m.is_deleted && (
+                      <span
+                        className={"msg__pinned" + (pinFx[m.id] === "stamp" ? " is-stamping" : pinFx[m.id] === "peel" ? " is-unstamping" : "")}
+                        title="重要（最終結果の議論の要点に表示）"
+                        onAnimationEnd={(e) => {
+                          if (e.animationName === "pin-stamp") clearPinFx(m.id);
+                          if (e.animationName === "pin-unstamp") {
+                            setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, is_pinned: false } : x)));
+                            clearPinFx(m.id);
+                          }
+                        }}
+                      >📌 重要</span>
+                    )}
                   </div>
 
                   {((m.quotes as Array<{ id: string; author_name?: string; excerpt?: string }> | undefined) ?? []).map((q, i) => (
