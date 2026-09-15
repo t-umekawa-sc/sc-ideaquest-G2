@@ -4186,6 +4186,119 @@
     </script>
   </div>
 
+  <!-- 17P. チャットのピン留めアニメ（📌 スタンプ＋メッセージのハイライト・SC-24） -->
+  <div class="section">
+    <h2>17P. チャットのピン留めアニメ（📌 スタンプ＋ハイライト・SC-24）</h2>
+    <p class="muted text-sm">チャットメッセージを「重要（ピン留め）」にした瞬間の演出。<strong>📌 ピルがスタンプのように押印</strong>（拡大→回転して収まる）され、<strong>メッセージ枠が一瞬ハイライト</strong>する。<strong>外す時は 📌 ピルが浮き上がって回転しながら消える</strong>（peel-off）。ホバーの操作メニュー内 📌 か、下のボタンで切替。<code>prefers-reduced-motion</code>／「動きを減らす」で<strong>動きを止め、ピルの表示だけ</strong>に落とす（演出抑制の横断標準・§4.9）。</p>
+    <label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:var(--space-3);font-size:.9rem">
+      <input type="checkbox" id="pinReduce"> 動きを減らす（reduce）
+    </label>
+    <div id="pinDemoWrap">
+      <div class="pin-msg" id="pinMsg">
+        <div class="pin-msg__head">
+          <span class="pin-msg__ava" aria-hidden="true">チ</span>
+          <span class="pin-msg__name">チャット　太郎</span>
+          <span class="pin-msg__time">18:48</span>
+          <span class="pin-msg__pinned" id="pinPill">📌 重要</span>
+          <div class="pin-msg__actions">
+            <button class="pin-msg__act" type="button" title="リアクション">😀</button>
+            <button class="pin-msg__act pin-btn" type="button" id="pinBtn" aria-pressed="false" title="ピン留め（重要）">📌</button>
+          </div>
+        </div>
+        <div class="pin-msg__text">この案、いいですね。夜間便の集約に賛成です。</div>
+      </div>
+    </div>
+    <button class="btn" type="button" id="pinToggle" style="margin-top:var(--space-3)">ピン留めする / 外す</button>
+    <p class="hint">実装移植先＝チャット（<code>IdeaChatView</code>）の 📌 <code>togglePin</code>・ピル <code>.msg__pinned</code>。演出は受入後に production へ移す（モック先行）。</p>
+
+    <style>
+      #pinDemoWrap { max-width: 560px; }
+      .pin-msg { position: relative; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: 10px 12px; }
+      .pin-msg__head { display: flex; align-items: center; gap: 8px; }
+      .pin-msg__ava { width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--color-primary-soft); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; }
+      .pin-msg__name { font-weight: 700; }
+      .pin-msg__time { color: var(--color-text-muted); font-size: .8rem; }
+      .pin-msg__text { margin-top: 4px; }
+      /* 📌 ピルは「ピン留め中」だけ表示。押印アニメは .is-stamping の時だけ再生（reduce では非再生）。 */
+      .pin-msg__pinned { display: none; align-items: center; gap: 2px; margin-left: 4px; padding: 1px 8px; border-radius: var(--radius-full);
+        background: var(--color-warning-soft, #fef3c7); color: var(--color-warning, #b45309); font-size: .78rem; font-weight: 700; transform-origin: 12px 50%; }
+      .pin-msg.is-pinned .pin-msg__pinned { display: inline-flex; }
+      .pin-msg__pinned.is-stamping { animation: pin-stamp .42s cubic-bezier(.2,.9,.3,1.4) both; }
+      .pin-msg__pinned.is-unstamping { animation: pin-unstamp .3s ease-in both; }
+      /* ハイライト＝一瞬の枠グロー＋薄い塗り。 */
+      .pin-msg.is-flash { animation: pin-flash .6s ease-out both; }
+      /* ホバー操作メニュー（実装 .msg__actions 相当）。 */
+      .pin-msg__actions { position: absolute; top: -12px; right: 8px; display: none; gap: 2px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); box-shadow: var(--shadow); padding: 2px; }
+      .pin-msg:hover .pin-msg__actions, .pin-msg:has(:focus-visible) .pin-msg__actions { display: inline-flex; }
+      .pin-msg__act { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: var(--radius-full); cursor: pointer; }
+      .pin-msg__act:hover { background: var(--color-surface-alt); }
+      .pin-btn[aria-pressed="true"] { background: var(--color-warning-soft, #fef3c7); }
+      @keyframes pin-stamp {
+        0%   { transform: scale(1.8) rotate(-14deg); opacity: 0; }
+        55%  { transform: scale(.9) rotate(5deg); opacity: 1; }
+        78%  { transform: scale(1.05) rotate(-2deg); }
+        100% { transform: scale(1) rotate(0); opacity: 1; }
+      }
+      @keyframes pin-flash {
+        0%   { box-shadow: 0 0 0 3px var(--color-warning-soft, #fef3c7); background: var(--color-warning-soft, #fef3c7); }
+        100% { box-shadow: 0 0 0 0 transparent; background: var(--color-surface); }
+      }
+      /* 外す＝めくれて消える（浮き上がり→回転→フェード）。 */
+      @keyframes pin-unstamp {
+        0%   { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
+        30%  { transform: translateY(-2px) scale(1.1) rotate(-6deg); opacity: 1; }
+        100% { transform: translateY(-10px) scale(.55) rotate(14deg); opacity: 0; }
+      }
+      /* 抑制＝OS reduce or トグル。動きは止め、ピルの表示だけ残す（情報は消さない）。 */
+      @media (prefers-reduced-motion: reduce) {
+        .pin-msg__pinned.is-stamping, .pin-msg__pinned.is-unstamping { animation: none; }
+        .pin-msg.is-flash { animation: none; }
+      }
+      #pinDemoWrap.is-reduced .pin-msg__pinned.is-stamping,
+      #pinDemoWrap.is-reduced .pin-msg__pinned.is-unstamping { animation: none; }
+      #pinDemoWrap.is-reduced .pin-msg.is-flash { animation: none; }
+    </style>
+    <script>
+      (function(){
+        var wrap=document.getElementById('pinDemoWrap');
+        var msg=document.getElementById('pinMsg');
+        var pill=document.getElementById('pinPill');
+        var btn=document.getElementById('pinBtn');
+        var toggle=document.getElementById('pinToggle');
+        var reduce=document.getElementById('pinReduce');
+        reduce.addEventListener('change', function(){ wrap.classList.toggle('is-reduced', reduce.checked); });
+        function setPinned(on){
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          if (on) {
+            pill.classList.remove('is-unstamping');
+            msg.classList.add('is-pinned');
+            if (!reduce.checked) {
+              pill.classList.remove('is-stamping'); msg.classList.remove('is-flash');
+              void pill.offsetWidth; // reflow＝毎回アニメを再生
+              pill.classList.add('is-stamping'); msg.classList.add('is-flash');
+            }
+          } else if (reduce.checked) {
+            msg.classList.remove('is-pinned'); pill.classList.remove('is-stamping', 'is-unstamping');
+          } else {
+            // 外す：退場アニメ（peel-off）を再生し、終わってから非表示にする。
+            pill.classList.remove('is-stamping');
+            void pill.offsetWidth;
+            pill.classList.add('is-unstamping');
+          }
+        }
+        pill.addEventListener('animationend', function(e){
+          if (e.animationName === 'pin-stamp') pill.classList.remove('is-stamping');
+          if (e.animationName === 'pin-unstamp') { pill.classList.remove('is-unstamping'); msg.classList.remove('is-pinned'); }
+        });
+        msg.addEventListener('animationend', function(e){ if (e.animationName === 'pin-flash') msg.classList.remove('is-flash'); });
+        // 状態の真＝aria-pressed（退場アニメ中も破綻しない）。
+        function flip(){ setPinned(btn.getAttribute('aria-pressed') !== 'true'); }
+        btn.addEventListener('click', flip);
+        toggle.addEventListener('click', flip);
+      })();
+    </script>
+  </div>
+
   <!-- 18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静） -->
   <div class="section">
     <h2>18. 発動タイミングの実験（スクロール座標系アンカー / スクロール沈静）</h2>

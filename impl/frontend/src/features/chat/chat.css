@@ -137,10 +137,13 @@
 /* --- メッセージのホバーアクション（編集/削除/引用/リアクション） --- */
 .msg__actions { position: absolute; top: -12px; right: 8px; display: none; gap: 2px;
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); box-shadow: var(--shadow); padding: 2px; }
-.msg:hover .msg__actions, .msg:focus-within .msg__actions { display: inline-flex; }
+/* 表示条件＝ホバー、またはキーボードフォーカス（:focus-visible）のみ。マウスのクリック（例：📌 ピン）で
+   ボタンにフォーカスが残っても、それは :focus-visible ではないため、ホバーが外れればメニューは隠れる
+   （旧 :focus-within はクリック後にメニューが出っぱなしになる不具合＝DFT-E-005）。 */
+.msg:hover .msg__actions, .msg:has(:focus-visible) .msg__actions { display: inline-flex; }
 /* 発動者バッジ（右上・.msg__caster）がある魔法メッセージは、ホバー操作メニューをバッジ幅ぶん左へ寄せて重なりを回避
    （バッジ＝avatar sm 32px＋右余白8px＝右端から約40px を空ける）。自作自演はバッジ無し（✦は左）なので対象外。 */
-.msg:has(.msg__caster):hover .msg__actions, .msg:has(.msg__caster):focus-within .msg__actions { right: 48px; }
+.msg:has(.msg__caster):hover .msg__actions, .msg:has(.msg__caster):has(:focus-visible) .msg__actions { right: 48px; }
 .msg__act { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
   border: none; background: none; border-radius: var(--radius-full); cursor: pointer; font-size: 14px; color: var(--color-text-muted); }
 .msg__act:hover { background: var(--color-surface-alt); color: var(--color-text); }

@@ -52,6 +52,7 @@
 | E-TC-201 | e2e | メッセージ投稿→スレッド反映＋通常リアクション | ログイン・API で recruiting クエスト＋published アイデア（chat_group は公開で自動作成） | `/ideas/{id}/chat` で入力→送信→リアクション ＋→👍 | 送信メッセージが `.msg__text` に出る（`postMessage`→`getChat`）・「＋」→ピッカー→👍 で `.reaction` チップ（`addReaction`・`getChat` 実データ） | E.1/E.2/E.4／SC-24 |
 | E-TC-202 | e2e | SC-22 §4.4 チャット活発度/プレビューが実データ | published アイデア＋API でメッセージ投稿 | `/ideas/{id}` を表示 | チャットカードの件数バッジ＝実 `total_messages`・`.chat-preview` に投稿本文が出る（`getChatActivity`/`getChat`・デモ文言なし） | E.1／SC-22 §4.4 |
 | E-TC-203 | e2e | SC-24 複数引用返信 | published アイデア＋2メッセージ投稿 | 2件を💬で引用→本文入力→送信 | 送信メッセージに `.msg__quote` が**2件**（両方の抜粋）＝複数引用（`quoted_message_ids[]`・§5.16b） | E.2／SC-24 §3 |
+| E-TC-213 | e2e | SC-24 ピン留め後にホバー操作メニューが残らない（受入不具合 DFT-E-005 の回帰） | published アイデア＋1メッセージ（owner＝ピン権限） | メッセージを hover→📌ピン留め→マウスを外へ移動 | ホバー時 `.msg__actions` 表示／ピン後にホバーを外すと `.msg__actions` は**非表示**（クリックのフォーカスは `:focus-visible` でないため残らない・旧 `:focus-within` では出っぱなし） | SC-24／§4.9 |
 
 ## 参加部署アクセス門番（FR-38 再設計・`can_access_quest`・C.0）
 

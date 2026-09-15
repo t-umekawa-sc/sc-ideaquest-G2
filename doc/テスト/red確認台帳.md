@@ -720,3 +720,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | H-TC-210 | DFT-E-004 通知クリックで既読化 | reducer を no-op に戻すと既読化されず（expected `is_read=true` / received `false`・unread_count 不変）→ 楽観反映復元で green |
 
 復元後＝対象2ファイル `vitest run` で 16 passed（全体数は同コミットの検証ログ参照）。
+
+## 受入不具合 DFT-E-005（ピン後にホバー操作メニューが残る）e2e 回帰（E-TC-213・2026-09-15）
+
+> ブラウザ受入で検出＝チャットメッセージを 📌 ピン留めするとマウスホバーが外れても `.msg__actions` が消えない。原因＝`chat.css` の `.msg:focus-within .msg__actions{display:inline-flex}` ＝クリックでボタンにフォーカスが残り出っぱなし。修正＝`:focus-within` → `:has(:focus-visible)`（キーボード操作の可視性は維持・マウスクリックのフォーカスは残さない）。純ロジック無しの表示ガード＝e2e で担保（テスト規約 §5.3）。
+
+| TC-ID | 観測 red（修正 revert 時の actual）→ green |
+| --- | --- |
+| E-TC-213 | `chat.css` を `:focus-within` に戻して frontend 再ビルド → `.msg__actions` が `visible` のまま（Playwright: `unexpected value "visible"` で `toBeHidden` 失敗）＝DFT-E-005 再現。`:has(:focus-visible)` に復元・再ビルドで **1 passed（5.1s）**。副次＝`createRecruiting` の `quest_group_id`（単数・現行 API で `extra_forbidden` 422）を `quest_group_ids: []` に修正して e2e を通した。 |

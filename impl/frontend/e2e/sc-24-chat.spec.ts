@@ -26,11 +26,11 @@ async function openComposer(page: Page) {
 }
 
 async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
   const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.post("/api/v1/quests", {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_id: groups.data[0].id, categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
+    // quest_group_ids は複数・0件＝会社全体（FR-38）。旧 API の quest_group_id（単数）は現行スキーマで extra_forbidden。
+    data: { title, color: "#0D9488", quest_group_ids: [], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
   });
   expect(res.status(), await res.text()).toBe(201);
   return (await res.json()).id as string;
@@ -86,6 +86,39 @@ async function postMsg(page: Page, ideaId: string, body: string) {
   });
   expect(res.status(), await res.text()).toBe(201);
 }
+
+// E-TC-213 SC-24 ピン留め後にホバー操作メニューが残らない（受入不具合 DFT-E-005 の回帰）。
+// クリックで📌ボタンにフォーカスが残っても :focus-visible ではないため、ホバーが外れれば .msg__actions は隠れる
+// （旧 .msg:focus-within .msg__actions ではクリック後にメニューが出っぱなしだった）。owner＝ピン権限あり。
+test("E-TC-213 SC-24 action menu hides after pinning when hover leaves (DFT-E-005)", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2Eピン_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  const body = `ピン対象_${stamp}`;
+  try {
+    await postMsg(page, ideaId, body);
+    await page.goto(`/ideas/${ideaId}/chat`);
+    const msg = page.locator(".msg", { hasText: body });
+    await expect(msg.locator(".msg__text")).toContainText(body);
+
+    // ホバーで操作メニューが出る。
+    await msg.hover();
+    await expect(msg.locator(".msg__actions")).toBeVisible();
+
+    // 📌 ピン留め（owner 権限）→ ピルが出る。
+    await msg.getByRole("button", { name: /ピン留め/ }).click();
+    await expect(msg.locator(".msg__pinned")).toBeVisible();
+
+    // マウスをメッセージ外へ＝ホバー解除。フォーカスはボタンに残るが :focus-visible ではないので
+    // メニューは隠れる（この assert が DFT-E-005 の回帰＝旧実装では表示のまま）。
+    await page.mouse.move(2, 2);
+    await expect(msg.locator(".msg__actions")).toBeHidden();
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
 
 // E-TC-203 SC-24 複数引用返信＝2件を引用して1つの返信に積む。
 test("E-TC-203 SC-24 multiple quotes in one reply", async ({ page }) => {
