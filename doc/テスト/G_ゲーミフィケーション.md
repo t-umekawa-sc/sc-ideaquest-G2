@@ -73,6 +73,10 @@
 | G-TC-505 | api | 全種系（all_spells） | user_spells 6件を seed→spell_unlock 付与 | `GET /achievements` | `spellmaster` unlocked・coin 150 | G.4 |
 | G-TC-506 | api | 自分の獲得実績 | evaluator_3 獲得済み | `GET /me/achievements` | evaluator_3 が unlocked_at 付きで返る | G.4 |
 | G-TC-507 | api | 実績一覧のマスタ名/説明 locale 出し分けの担保（i18n 結線） | evaluator_3（ja=評価者/en=Evaluator・説明も en 有り）。`users.locale` を ja→en に切替 | `GET /achievements` を各 locale で | ja は `name`=「評価者」/`description`=`condition_label`=「評価を3件確定する」・en は `name`=「Evaluator」/`description`=`condition_label`=「Submit 3 evaluations」（受信者 locale で選択・§2.1） | コーディング規約 §2.1／G.4 |
+| G-TC-509 | api | **count の他理由が閾値ちょうどで解除**（reason ルーティング＝vote/selection/chat・積み上げタイミング） | 投票5/選定2/チャット9→10 を付与 | `GET /achievements` | `voter_5`（vote×5）・`selector_2`（selection×2）解除／`chatty_10` は 9 件で未解除（progress 9/10）・10 件目で解除＝**閾値手前は積みあがらない** | G.4／§8-⑲ |
+| G-TC-510 | api | **level 条件が到達レベルで解除**（積み上げタイミング・境界） | XP 累計 650→700→2700（§7 累積：Lv5=700/Lv10=2700） | `GET /achievements` | 650(Lv4)＝`level_5` 未解除／700(Lv5)＝`level_5` 解除・`level_10` 未解除／2700(Lv10)＝`level_10` 解除 | G.4／データモデル §7 |
+| G-TC-511 | api | **streak_login が連続日数で解除**（積み上げタイミング・境界） | login 活動を 6 日連続→7 日連続（JST 日） | `GET /achievements` | 6 日連続＝`streak_7` 未解除（progress 6/7）／7 日連続で解除＝**連続が切れず積みあがる** | G.4／§7 |
+| G-TC-512 | api | **all_items が全所有で解除**（collector） | 全 items を user_items に seed→shop_purchase 付与で判定 | `GET /achievements` | `collector` unlocked・報酬コイン1回のみ | G.4 |
 
 ## 6. ゲーム感フロント単体（実績アンロック祝福・#6・SC-40）
 

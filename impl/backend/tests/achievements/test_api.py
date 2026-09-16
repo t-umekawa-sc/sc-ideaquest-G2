@@ -6,6 +6,7 @@ throwaway アカウントでログイン（決定性）。付与は ledger.grant
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -16,12 +17,14 @@ from app.tenant.achievements.orm import Achievement
 from app.tenant.gamification import ledger
 from app.tenant.gamification.orm import Activity
 from app.tenant.chat.orm import Spell, UserSpell
+from app.tenant.shop.orm import Item, UserItem
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE
 
 ACH = "/api/v1/achievements"
+_JST = timezone(timedelta(hours=9))
 
 
 def _db() -> str:
@@ -118,6 +121,87 @@ def test_g_tc_506_my_achievements(client, factory):
     assert r.status_code == 200, r.text
     codes = {d["code"] for d in r.json()["data"]}
     assert "evaluator_3" in codes
+
+
+def _grant(user_id, *, reason: str, kind=ledger.XP_GAIN, amount: int = 1, n: int = 1):
+    """任意 reason/kind の付与を n 回（engine 後フックで当該実績を再判定）。"""
+    for _ in range(n):
+        with get_tenant_session(_db()) as s:
+            u = s.get(User, user_id)
+            ledger.grant(s, u, kind=kind, amount=amount, reason=reason, ref_type="t", ref_id=uuid.uuid4())
+            s.commit()
+
+
+def _code_row(body, code):
+    return next(d for d in body["data"] if d.get("code") == code)
+
+
+# G-TC-509: count 条件の他理由（vote/selection/chat）＝各理由が閾値ちょうどで解除される（reason ルーティング）。
+# 評価カウントは G-TC-502 済み。ここは投票/選定/チャットの reason 配線＋閾値到達を担保。
+def test_g_tc_509_count_reasons_unlock_at_threshold(client, factory):
+    acc = _login_new(client, factory)
+    _grant(acc, reason="vote", n=5)       # voter_5（target 5）
+    _grant(acc, reason="selection", n=2)  # selector_2（target 2）
+    _grant(acc, reason="chat", n=9)       # chatty_10（target 10）＝9 では未達
+    body = client.get(ACH).json()
+    assert _code_row(body, "voter_5")["unlocked"] is True
+    assert _code_row(body, "selector_2")["unlocked"] is True
+    chatty = _code_row(body, "chatty_10")
+    assert chatty["unlocked"] is False and chatty["progress"] == {"current": 9, "target": 10}  # 閾値手前は未解除
+    _grant(acc, reason="chat", n=1)       # 10 件目でちょうど解除
+    assert _code_row(client.get(ACH).json(), "chatty_10")["unlocked"] is True
+
+
+# G-TC-510: level 条件＝XP 付与で到達レベルに応じて解除（level_5=Lv5・level_10=Lv10）。境界（Lv4 では未解除）。
+# レベル必要 XP（§7 累積）＝Lv5:700 / Lv10:2700。
+def test_g_tc_510_level_unlock_at_threshold(client, factory):
+    acc = _login_new(client, factory)
+    _grant(acc, reason="idea_post", amount=650)  # Lv4（<700）＝level_5 未達
+    b1 = client.get(ACH).json()
+    assert _code_row(b1, "level_5")["unlocked"] is False
+    _grant(acc, reason="idea_post", amount=50)   # 累計 700＝Lv5 到達で level_5 解除・level_10 は未達
+    b2 = client.get(ACH).json()
+    assert _code_row(b2, "level_5")["unlocked"] is True
+    assert _code_row(b2, "level_10")["unlocked"] is False
+    _grant(acc, reason="idea_post", amount=2000)  # 累計 2700＝Lv10 到達で level_10 解除
+    assert _code_row(client.get(ACH).json(), "level_10")["unlocked"] is True
+
+
+# G-TC-511: streak_login 条件＝連続ログイン日数で解除（streak_7）。6 日連続では未解除・7 日目で解除。
+def _seed_login(user_id, days_ago: int):
+    with get_tenant_session(_db()) as s:
+        s.add(Activity(id=uuid.uuid4(), user_id=user_id, kind=ledger.XP_GAIN, amount=5, reason="login",
+                       created_at=datetime.now(timezone.utc) - timedelta(days=days_ago)))
+        s.commit()
+
+
+def test_g_tc_511_streak_login_unlock_at_threshold(client, factory):
+    acc = _login_new(client, factory)
+    for d in range(1, 6):  # 昨日〜5日前＝5日分を先に seed（今日を足すと 6 日連続＝streak_7 未達）
+        _seed_login(acc, d)
+    _grant(acc, reason="login", amount=5)  # 今日のログイン＝計6日連続 → 未解除
+    b1 = client.get(ACH).json()
+    s7 = _code_row(b1, "streak_7")
+    assert s7["unlocked"] is False and s7["progress"] == {"current": 6, "target": 7}
+    _seed_login(acc, 6)  # 6日前を追加＝7日連続（6日前〜今日）
+    _grant(acc, reason="login", amount=5)  # 再ログイン付与で再判定 → 解除
+    assert _code_row(client.get(ACH).json(), "streak_7")["unlocked"] is True
+
+
+# G-TC-512: all_items 条件＝全装備所有で解除（collector）。shop_purchase 付与で判定。
+def test_g_tc_512_all_items_unlock(client, factory):
+    acc = _login_new(client, factory)
+    with get_tenant_session(_db()) as s:
+        items = s.execute(select(Item)).scalars().all()
+        assert len(items) > 0  # カタログに装備がある前提（0016 相当の seed）
+        for it in items:
+            s.add(UserItem(id=uuid.uuid4(), user_id=acc, item_id=it.id, slot=it.slot))
+        s.get(User, acc).coin_balance = 100  # shop_purchase（COIN_SPEND）の残高
+        s.commit()
+    _grant(acc, reason="shop_purchase", kind=ledger.COIN_SPEND, amount=1)  # 判定トリガー
+    col = _code_row(client.get(ACH).json(), "collector")
+    assert col["unlocked"] is True
+    assert _reward_count(acc, _ach_id("collector")) == 1
 
 
 def _set_locale(user_id, locale: str) -> None:
