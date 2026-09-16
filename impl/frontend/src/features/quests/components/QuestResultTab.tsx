@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Avatar, Button, useSnackbar } from "@/components/ui";
+import { Avatar, Button, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { generateChatSummary, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
@@ -61,8 +61,20 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     setSaving(false);
     if (!res) { snack({ type: "error", msg: "保存に失敗しました。" }); return; }
     setResult((r) => (r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
+    setMetrics(cleanMetrics);  // 空行を落とした保存後の集合へ読み取りビューを同期
     setEditing(false);
     snack({ type: "success", title: "最終結果を保存しました" });
+  }
+
+  // 編集ダイアログのキャンセル＝未保存の編集を破棄して直近の保存値へ戻す（モーダル化に伴い明示リセット）。
+  function cancelEdit() {
+    if (result) {
+      setSummary(result.outcome.summary ?? "");
+      setLearnings(result.outcome.learnings ?? "");
+      setNextActions(result.outcome.next_actions ?? "");
+      setMetrics((result.outcome.metrics ?? []).map((m) => ({ label: m.label, value: m.value })));
+    }
+    setEditing(false);
   }
 
   // (c) チャットの自動要約（抽出型・オフライン・無料）を生成/再生成。owner/quest_admin のみ。
@@ -215,55 +227,60 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </section>
       )}
 
-      {/* ⑤ 振り返り・学び ＋ ⑥ 次アクション（owner/管理が編集） */}
+      {/* ⑤ 振り返り・学び ＋ ⑥ 次アクション（owner/管理が編集）＝読み取りは常時表示・編集はダイアログ（ユーザー要望） */}
       <section className="card" aria-label="振り返り・次アクション">
         <div className="section-head">
           <h3 style={{ margin: 0 }}>📝 振り返り・学び / 次アクション</h3>
-          {result.can_edit && !editing && <Button type="button" variant="outline" onClick={() => setEditing(true)}>編集</Button>}
+          {result.can_edit && <Button type="button" variant="outline" onClick={() => setEditing(true)}>編集</Button>}
         </div>
-        {!editing ? (
-          <div className="qresult__outcome">
-            <div className="qresult__label">成果（総括）</div>
-            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.summary || "—"}</p>
-            <div className="qresult__label">学び・課題</div>
-            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.learnings || "—"}</p>
-            <div className="qresult__label">成果の指標（KPI）</div>
-            {metrics.length > 0 ? (
-              <ul className="qresult__kpilist">{metrics.map((m, i) => <li key={i}><b>{m.label || "—"}</b>：{m.value || "—"}</li>)}</ul>
-            ) : <p className="muted text-sm">—</p>}
-            <div className="qresult__label">次アクション</div>
-            <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.next_actions || "—"}</p>
-            <div style={{ marginTop: "var(--space-3)" }}>
-              <Link className="btn btn-outline btn-sm" href={dupHref}>このクエストを複製して次を起票 →</Link>
-            </div>
-            {result.outcome.updated_by_name && (
-              <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
-            )}
+        <div className="qresult__outcome">
+          <div className="qresult__label">成果（総括）</div>
+          <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.summary || "—"}</p>
+          <div className="qresult__label">学び・課題</div>
+          <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.learnings || "—"}</p>
+          <div className="qresult__label">成果の指標（KPI）</div>
+          {metrics.length > 0 ? (
+            <ul className="qresult__kpilist">{metrics.map((m, i) => <li key={i}><b>{m.label || "—"}</b>：{m.value || "—"}</li>)}</ul>
+          ) : <p className="muted text-sm">—</p>}
+          <div className="qresult__label">次アクション</div>
+          <p style={{ whiteSpace: "pre-wrap" }}>{result.outcome.next_actions || "—"}</p>
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <Link className="btn btn-outline btn-sm" href={dupHref}>このクエストを複製して次を起票 →</Link>
           </div>
-        ) : (
-          <div className="qresult__edit stack">
-            <label className="qresult__label" htmlFor="qr_summary">成果（総括）</label>
-            <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
-            <label className="qresult__label" htmlFor="qr_learn">学び・課題</label>
-            <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
-            <div className="qresult__label">成果の指標（KPI・任意）</div>
-            {metrics.map((m, i) => (
-              <div key={i} className="qresult__metric-row">
-                <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-                <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
-                <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
-              </div>
-            ))}
-            <button type="button" className="btn btn-sm btn-outline" style={{ alignSelf: "flex-start" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
-            <label className="qresult__label" htmlFor="qr_next">次アクション</label>
-            <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
-            <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-              <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>キャンセル</Button>
-              <Button type="button" variant="primary" onClick={() => void save()} loading={saving}>保存する</Button>
-            </div>
-          </div>
-        )}
+          {result.outcome.updated_by_name && (
+            <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
+          )}
+        </div>
       </section>
+
+      {/* 編集ダイアログ（デザイン標準 §103-107＝登録/編集は原則モーダル。旧インライン展開を廃止） */}
+      <Modal open={editing} onClose={cancelEdit} title="振り返り・学び / 次アクションを編集" size="lg">
+        <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
+          <ModalBody>
+            <div className="qresult__edit stack">
+              <label className="qresult__label" htmlFor="qr_summary">成果（総括）</label>
+              <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
+              <label className="qresult__label" htmlFor="qr_learn">学び・課題</label>
+              <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
+              <div className="qresult__label">成果の指標（KPI・任意）</div>
+              {metrics.map((m, i) => (
+                <div key={i} className="qresult__metric-row">
+                  <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+                  <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                  <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              <button type="button" className="btn btn-sm btn-outline" style={{ alignSelf: "flex-start" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
+              <label className="qresult__label" htmlFor="qr_next">次アクション</label>
+              <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={cancelEdit} disabled={saving}>キャンセル</Button>
+            <Button type="submit" variant="primary" loading={saving}>保存する</Button>
+          </ModalFooter>
+        </form>
+      </Modal>
     </section>
   );
 }
