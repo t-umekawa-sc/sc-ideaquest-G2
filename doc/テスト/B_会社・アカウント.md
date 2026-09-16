@@ -76,6 +76,7 @@
 | B-TC-022 | api | 発行の認証・認可ガード | 未認証／general | `POST .../accounts` | 未認証＝`401 unauthenticated`／general＝`403 forbidden`（B.0.1 P1/P6） | B.0.1 |
 | B-TC-023 | api | 変更系の CSRF 必須担保 | system_admin・CSRF トークン無し | `POST .../accounts` | `403 {code:"csrf_failed"}`（変更系＝CSRF 必須・B.0.1 P3） | B.0.1 P3 |
 | B-TC-024 | api | Mass Assignment と enum 外入力の遮断 | system_admin | 不明 `company_id`／不正 `system_role`（`quest_group_admin`）／想定外プロパティ | 不明会社＝`404 not_found`／enum 外・extra＝`422`（Mass Assignment 防止・§B.6） | B.2／§B.6 |
+| B-TC-025 | api | 発行の Idempotency（同一キー再送は再生・別内容422・横断MW §1.9） | system_admin | `POST .../accounts`（同キー2回→別内容） | 1回目201・2回目 `Idempotency-Replayed:true`・同 account_id／accounts/outbox/mail 各1件（副作用1回）／別内容は422 `idempotency_key_reuse` | §1.9／B.5 |
 
 **状態管理（disable/enable/password-reset・`POST .../accounts/{id}/{op}`・system_admin・B.2）**。
 

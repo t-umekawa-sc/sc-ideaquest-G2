@@ -92,6 +92,33 @@ def test_b_tc_020_issue_account_full_flow(client, issued):
     assert user is not None and user.display_name == ident["display_name"]
 
 
+def test_b_tc_025_issue_idempotent_replay(client, issued):
+    """B-TC-025 発行の Idempotency＝同一キー再送は最初の結果を再生し副作用は1回・別内容は 422（§1.9・横断MW）。
+
+    SEC-TC-041/042 はアイデア作成を検体にしたが、発行（accounts/outbox/mail の副作用を伴う）でも横断MW が効くことを担保。"""
+    _login_system_admin(client)
+    cid, _ = _company(SEED_COMPANY_CODE)
+    ident = _ident()
+    key = str(uuid.uuid4())
+    hdr = {**_csrf(client), "Idempotency-Key": key}
+    r1 = client.post(_url(cid), json=ident, headers=hdr)
+    assert r1.status_code == 201, r1.text
+    aid = uuid.UUID(r1.json()["account_id"])
+    issued.append(aid)
+    # 同一キー・同一内容の再送＝最初の結果を再生（同 account_id・Replayed）
+    r2 = client.post(_url(cid), json=ident, headers=hdr)
+    assert r2.status_code == 201 and r2.headers.get("Idempotency-Replayed") == "true"
+    assert r2.json()["account_id"] == str(aid)
+    # 副作用は1回＝accounts/outbox/mail が各1件のまま（再実行されない）
+    with control_session() as s:
+        assert s.query(Account).filter_by(id=aid).count() == 1
+        assert s.query(OutboxEntry).filter_by(account_id=aid).count() == 1
+        assert s.query(MailOutboxEntry).filter_by(account_id=aid).count() == 1
+    # 同一キー・別内容は 422 idempotency_key_reuse（別操作には別キー）
+    r3 = client.post(_url(cid), json=_ident(), headers=hdr)
+    assert r3.status_code == 422 and r3.json()["code"] == "idempotency_key_reuse"
+
+
 def test_b_tc_021_duplicate_identity_conflict(client):
     """B-TC-021 会社内で login_id/email 重複は 409 conflict（field 明示）。根拠 B.2。"""
     _login_system_admin(client)

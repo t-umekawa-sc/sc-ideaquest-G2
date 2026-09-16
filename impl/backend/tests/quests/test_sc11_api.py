@@ -556,6 +556,25 @@ def test_c_tc_253_create_idempotent_replay(client, env):
     assert r3.status_code == 422 and r3.json()["code"] == "idempotency_key_reuse"
 
 
+def test_c_tc_255_member_tombstone_reuse_via_api(client, env):
+    """C-TC-255: API 経路の DELETE→再 POST はトゥームストーン行を再利用＝行が増えない・joined_at 更新・既定権限復活（§5.8）。
+
+    C-TC-006 は repo 直のみ。POST /members→DELETE→POST /members で quest_members が2行に増えず1行のまま。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    # 追加→削除（removed_at セット）→再追加（トゥームストーン再利用）
+    assert client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client)).status_code == 201
+    assert client.delete(f"{QUESTS}/{qid}/members/{env.other_user_id}", headers=_csrf(client)).status_code == 204
+    r = client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    assert set(r.json()["permissions"]) == {"vote", "idea_create", "comment"}  # 既定権限が復活
+    # 物理行は1つのまま（トゥームストーン再利用＝重複行を作らない）
+    with get_tenant_session(env.db_identifier) as ts:
+        rows = list(ts.execute(select(QuestMember).where(
+            QuestMember.quest_id == qid, QuestMember.user_id == env.other_user_id)).scalars())
+    assert len(rows) == 1 and rows[0].removed_at is None
+
+
 def test_c_tc_254_recruiting_patch_strict_categories(client, env):
     """C-TC-254: 公開中クエストの PATCH は strict＝recruiting に categories:[] は 422（C.2）。
 
