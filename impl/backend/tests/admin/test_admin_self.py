@@ -10,7 +10,8 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from app.control_plane.auth.orm import Account
+from app.control_plane.auth.orm import Account, OtpChallenge
+from app.control_plane.mail_outbox.orm import MailOutboxEntry
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.main import app
@@ -97,3 +98,79 @@ def test_b_tc_043_authz_general_forbidden_sysadmin_ok(client, factory):
     tclient = TestClient(app)
     _login_system_admin(tclient)
     assert tclient.get(ACCOUNTS).status_code == 200  # 上位互換（session 会社=OPS）
+
+
+# --- セルフ経路の編集/状態管理（B.2.1・`/admin/accounts/{id}`・セッション会社固定） -----------------
+# 変更系ロジックは B.2 の system_admin 経路（B-TC-025〜034）と service 層を共有するが、
+# **会社を URL でなくセッションから取る**認可境界（他社 IDOR・B-TC-048）はこの経路固有＝別途担保する。
+
+
+def test_b_tc_045_company_admin_edits_own(client, factory):
+    """B-TC-045 セルフ経路の編集＝差分 PATCH 200＋反映。email 変更で email_verified リセット（ADR-0009 §2.3）。根拠 B.2.1。"""
+    from datetime import datetime, timezone
+
+    target = factory.make_seed_company_account()  # ACME-01 general
+    with control_session() as s:  # 事前に確認済みへ（DB 直更新）
+        acc = s.query(Account).filter_by(id=target["id"]).one()
+        acc.email_verified_at = datetime.now(timezone.utc)
+        s.commit()
+    _login_company_admin(client, factory)
+    new_email = f"self-{uuid.uuid4().hex[:8]}@acme.example"
+
+    r = client.patch(f"{ACCOUNTS}/{target['id']}",
+                     json={"display_name": "SelfRenamed", "email": new_email}, headers=_csrf(client))
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["display_name"] == "SelfRenamed" and body["email"] == new_email
+    assert body["email_verified"] is False  # 新アドレスは未確認へリセット
+
+
+def test_b_tc_046_company_admin_disable_enable_own(client, factory):
+    """B-TC-046 セルフ経路の disable/enable＝status 遷移（セッション会社固定）。根拠 B.2.1。"""
+    target = factory.make_seed_company_account()  # ACME-01 general
+    _login_company_admin(client, factory)
+
+    r_dis = client.post(f"{ACCOUNTS}/{target['id']}/disable", headers=_csrf(client))
+    assert r_dis.status_code == 200 and r_dis.json()["status"] == "disabled", r_dis.text
+
+    r_en = client.post(f"{ACCOUNTS}/{target['id']}/enable", headers=_csrf(client))
+    assert r_en.status_code == 200 and r_en.json()["status"] == "active", r_en.text
+
+
+def test_b_tc_047_company_admin_password_reset_own(client, factory):
+    """B-TC-047 セルフ経路の password-reset＝200 sent＋password_setup チャレンジ＋mail_outbox 1行（A.7）。根拠 B.2.1。"""
+    target = factory.make_seed_company_account()  # ACME-01
+    _login_company_admin(client, factory)
+
+    r = client.post(f"{ACCOUNTS}/{target['id']}/password-reset", headers=_csrf(client))
+
+    assert r.status_code == 200 and r.json()["status"] == "sent", r.text
+    with control_session() as s:
+        challenges = s.query(OtpChallenge).filter_by(account_id=target["id"], purpose="password_setup").all()
+        mail = s.query(MailOutboxEntry).filter_by(account_id=target["id"]).all()
+    assert len(challenges) >= 1
+    assert len(mail) == 1 and mail[0].category == "password_setup" and mail[0].secret
+
+
+def test_b_tc_048_company_admin_cross_company_idor_404(client, factory):
+    """B-TC-048 セルフ経路は他社アカウントを操作不可＝404（セッション会社固定・§1.6）。根拠 B.2.1。"""
+    other_co = factory.make_company()               # ACME-01 とは別会社
+    other_acc = factory.make_account(other_co)      # 別会社配下のアカウント
+    _login_company_admin(client, factory)           # ACME-01 の会社アカ管理者
+
+    aid = other_acc["id"]
+    assert client.patch(f"{ACCOUNTS}/{aid}", json={"display_name": "X"}, headers=_csrf(client)).status_code == 404
+    assert client.post(f"{ACCOUNTS}/{aid}/disable", headers=_csrf(client)).status_code == 404
+    assert client.post(f"{ACCOUNTS}/{aid}/enable", headers=_csrf(client)).status_code == 404
+    assert client.post(f"{ACCOUNTS}/{aid}/password-reset", headers=_csrf(client)).status_code == 404
+
+
+def test_b_tc_049_company_admin_edit_duplicate_identity_409(client, factory):
+    """B-TC-049 セルフ経路 編集の一意再検証＝自社の別アカウントと login_id 衝突は 409（自己除外）。根拠 B.2.1。"""
+    target = factory.make_seed_company_account()  # ACME-01
+    _login_company_admin(client, factory)
+
+    # seed の user@acme.example と衝突させる（自社スコープの一意検証）
+    r = client.patch(f"{ACCOUNTS}/{target['id']}", json={"login_id": "user@acme.example"}, headers=_csrf(client))
+    assert r.status_code == 409 and r.json()["errors"][0]["field"] == "login_id", r.text

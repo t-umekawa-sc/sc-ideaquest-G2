@@ -108,6 +108,11 @@
 | B-TC-042 | api | system_role 付与不可と system_admin 保護の担保 | company_account_admin | ボディに `system_role`／system_admin を `disable` | `system_role` は受け取らない＝`422`（付与不可）／system_admin の disable は `403`（B.2.1・§8-⑯） | B.2.1 |
 | B-TC-043 | api | 会社アカ管理 API の権限帯と上位互換 | general／system_admin | `GET /admin/accounts` | general＝`403`／system_admin＝`200`（上位互換） | B.2.1／B.0.1 |
 | B-TC-044 | api | 発行候補となる自社グループ一覧の提供 | company_account_admin（ACME-01）・ACME-01 にグループ seed | `GET /admin/company-quest-groups` | `200`＋**セッション会社（ACME-01）の全グループ**（`group_id`/`quest_group_code`/`name`/`member_count`）。所属エディタの候補。general＝`403` | B.2.1（2026-08-11 追加） |
+| B-TC-045 | api | セルフ経路の編集＋email 変更で verified リセット | company_account_admin（ACME-01）・確認済み自社アカウント | `PATCH /admin/accounts/{id}`（display_name＋email 変更） | `200`＋反映（display_name/email）＋**`email_verified=false`**（新アドレスは未確認・セッション会社固定・`company_id` を受けない） | B.2.1／ADR-0009 §2.3 |
+| B-TC-046 | api | セルフ経路の disable/enable 正常系 | company_account_admin（ACME-01）・自社 general | `POST /admin/accounts/{id}/disable`→`.../enable` | disable＝`200`＋`status=disabled`／enable＝`200`＋`status=active`（セッション会社固定） | B.2.1／B.2 |
+| B-TC-047 | api | セルフ経路の password-reset 正常系 | company_account_admin（ACME-01）・自社アカウント | `POST /admin/accounts/{id}/password-reset` | `200 {status:"sent"}`＋新 `password_setup` チャレンジ＋`mail_outbox` 1行（旧リンク失効・A.7） | B.2.1／A.7 |
+| B-TC-048 | api | セルフ経路の他社 IDOR 秘匿（セッション会社固定の実効） | company_account_admin（ACME-01）・**別会社**のアカウント | 別会社 account_id で `PATCH`／`disable`／`enable`／`password-reset` | いずれも `404 not_found`（セッション会社＝ACME-01 に無い＝存在秘匿・§1.6。URL で会社を受けないため他社操作が原理的に不可） | B.2.1／§1.6 |
+| B-TC-049 | api | セルフ経路 編集の一意再検証（自己除外） | company_account_admin（ACME-01）・自社に既存の別アカウント | 既存の `login_id` と重複する `PATCH` | `409 conflict`＋`errors[].field=login_id`（自分は一意検証から除外・自社スコープ） | B.2.1／B.2 |
 
 - **red 確認（後追い）**＝ガード無効化で B-TC-011/012（200）・`verify_csrf` 無効化で B-TC-023（201）・`delete_account_sessions` 無効化で B-TC-025（session 401 にならない）・B-TC-028/033 は反転で 422 発火・`forbid_system_admin_target` 無効化で B-TC-042 が 200（system_admin を disable できてしまう）を確認。証跡＝[`red確認台帳.md`](red確認台帳.md)。
 
