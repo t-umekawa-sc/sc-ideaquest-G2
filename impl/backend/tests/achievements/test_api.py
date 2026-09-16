@@ -224,3 +224,16 @@ def test_g_tc_507_achievement_name_locale(client, factory):
     r_en = _row()  # 受信者 locale=en
     assert r_en["name"] == "Evaluator"
     assert r_en["description"] == "Submit 3 evaluations" and r_en["condition_label"] == "Submit 3 evaluations"
+
+
+def test_g_tc_513_list_state_and_category_filters(client, factory):
+    """G-TC-513: GET /achievements の state（unlocked/locked）・category 絞り込み＋不正 state は 422（SC-40/G.4）。"""
+    acc = _login_new(client, factory)
+    _grant_evaluation(acc, 3)  # evaluator_3（category=評価）を解除
+    un = client.get(f"{ACH}?state=unlocked").json()["data"]
+    assert un and all(d["unlocked"] for d in un) and any(d.get("code") == "evaluator_3" for d in un)
+    lo = client.get(f"{ACH}?state=locked").json()["data"]
+    assert lo and all(not d["unlocked"] for d in lo) and not any(d.get("code") == "evaluator_3" for d in lo)
+    ev = client.get(f"{ACH}?category=評価").json()["data"]
+    assert ev and all(d.get("category") == "評価" for d in ev)
+    assert client.get(f"{ACH}?state=bogus").status_code == 422

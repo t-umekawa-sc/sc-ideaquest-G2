@@ -215,3 +215,18 @@ def test_c_tc_247_card_is_owner_flag(client, env):
     cards = {c["id"]: c for c in client.get(QUESTS).json()["data"]}
     assert cards[str(own)]["is_owner"] is True    # 作成者＝自分のクエスト
     assert cards[str(other)]["is_owner"] is False  # 他者作成で参加中
+
+
+def test_c_tc_251_list_q_and_group_filters(client, env):
+    """C-TC-251: GET /quests の q（件名部分一致）・group_id（所属グループ絞り）フィルタ（C.1）。"""
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    uniq = f"ズンドコ{_uuid.uuid4().hex[:6]}"
+    hit = env.make_quest(status="recruiting", title=uniq)
+    other = env.make_quest(status="recruiting", title="別件クエスト")
+    # q＝件名部分一致（ヒットのみ返り、別件は出ない）
+    ids = {c["id"] for c in client.get(QUESTS, params={"q": uniq}).json()["data"]}
+    assert str(hit) in ids and str(other) not in ids
+    # group_id＝所属グループのクエストが返る
+    ids2 = {c["id"] for c in client.get(QUESTS, params={"group_id": str(env.group_id)}).json()["data"]}
+    assert str(hit) in ids2

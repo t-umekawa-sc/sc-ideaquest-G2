@@ -79,6 +79,7 @@
 | G-TC-510 | api | **level 条件が到達レベルで解除**（積み上げタイミング・境界） | XP 累計 650→700→2700（§7 累積：Lv5=700/Lv10=2700） | `GET /achievements` | 650(Lv4)＝`level_5` 未解除／700(Lv5)＝`level_5` 解除・`level_10` 未解除／2700(Lv10)＝`level_10` 解除 | G.4／データモデル §7 |
 | G-TC-511 | api | **streak_login が連続日数で解除**（積み上げタイミング・境界） | login 活動を 6 日連続→7 日連続（JST 日） | `GET /achievements` | 6 日連続＝`streak_7` 未解除（progress 6/7）／7 日連続で解除＝**連続が切れず積みあがる** | G.4／§7 |
 | G-TC-512 | api | **all_items が全所有で解除**（collector） | 全 items を user_items に seed→shop_purchase 付与で判定 | `GET /achievements` | `collector` unlocked・報酬コイン1回のみ | G.4 |
+| G-TC-513 | api | `GET /achievements` の state/category 絞り込み＋不正 state は 422 | evaluator_3 を解除 | `?state=unlocked`／`?state=locked`／`?category=評価`／`?state=bogus` | unlocked＝解除済のみ（evaluator_3 含む）／locked＝未解除のみ（evaluator_3 出ない）／category=評価のみ／bogus は 422 | G.4／SC-40 |
 
 ## 6. ゲーム感フロント単体（実績アンロック祝福・#6・SC-40）
 
