@@ -360,7 +360,10 @@ body.iq-nav-lock { overflow: hidden; }
  *   カード/パネル→モーダルの拡大は framer-motion(layoutId)。
  *   ※ モックは各ページで JS(FLIP等)により開閉/アニメーションを付ける。
  * ============================================================= */
-.modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: var(--space-6); }
+/* isolation: isolate＝モーダル（バックドロップ＋パネル）を1つの独立した合成/スタッキング
+   コンテキストに閉じ込める。半透明バックドロップと transform を持つパネルが別々の合成レイヤに
+   なって背後と毎 vsync ブレンドし直され「チカチカ」する Chromium の合成フリッカーを抑える。DFT-E-012。 */
+.modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: var(--space-6); isolation: isolate; }
 .modal[hidden] { display: none; }
 .modal__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.45); opacity: 0; transition: opacity .25s ease; }
 .modal.show .modal__backdrop { opacity: 1; }
@@ -368,7 +371,9 @@ body.iq-nav-lock { overflow: hidden; }
   position: relative; width: 100%; max-width: 620px; max-height: 88vh; overflow: auto;
   overscroll-behavior: contain;  /* 上端/下端でさらにスクロールしても呼び元（背景）に連鎖させない */
   background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  padding: var(--space-6); will-change: transform;
+  padding: var(--space-6);
+  /* 恒久 will-change は付けない（MDN 非推奨のアンチパターン＝合成レイヤが常駐しバックドロップと競合し
+     チカチカの一因になる）。framer-motion が enter/exit/ドラッグのアニメ実行中だけ will-change を付与する。 */
 }
 .modal__close {
   position: absolute; top: var(--space-3); right: var(--space-3); width: 32px; height: 32px;
@@ -401,12 +406,20 @@ body.iq-nav-lock { overflow: hidden; }
 .modal--lg .modal__panel { max-width: 720px; }
 .modal--xl .modal__panel { max-width: 960px; } /* クエスト作成/編集＝パーティーを左右2カラムで配置するため広め */
 
-/* --- アニメ・モーダル（framer-motion で enter/exit＝デザイン標準 §113）。CRT 電源ON演出（縦に開く）--- */
-/* backdrop の opacity は framer が制御＝既存 CSS transition と二重になるため無効化 */
-.modal--anim .modal__backdrop { transition: none; }
-/* 昔のブラウン管の電源ON＝細い横線が一瞬光ってから縦に開く。縦展開(scaleY)は framer が担当し、
-   ここでは開いた瞬間の「白い発光フラッシュ」を重ねて“通電感”を出す（縦展開中のスクイーズも覆って隠す）。
-   ゲーム層 CRTガラスに整合・意図的クロスオーバー §117/§120。reduced-motion で静止（下記）。 */
+/* --- アニメ・モーダル（**CSS のみ**で enter/exit。Modal.tsx が `.show` をトグルする）。CRT 電源ON演出（縦に開く）---
+   framer-motion は使わない：静止後も frameloop が毎フレーム合成を触り、半透明バックドロップが Chromium で
+   チカつく回帰（DFT-E-012）を招いたため。CSS アニメ/トランジションは再生後に停止し、この問題を起こさない。
+   mock（shared.css）と同方式＝`.modal.show .modal__backdrop{opacity:1}` の CSS フェード。 */
+.modal .modal__panel { opacity: 0; transition: opacity .2s ease; }   /* パネルは .show で表示（confirm は .iq-confirm 側で別管理） */
+.modal.show .modal__panel { opacity: 1; }
+/* 昔のブラウン管の電源ON＝細い横線が一瞬光って（`::after` フラッシュ）から縦に開く（`modal-crt-open`）。
+   縦展開(scaleY)も CSS keyframe で行う（旧: framer 担当）。reduced-motion では reduce を JS で見て crt-in クラスを
+   付けない＋下記 @media でも無効化。 */
+.modal.show .modal__panel--crt-in { animation: modal-crt-open .28s cubic-bezier(.16, 1, .3, 1); }
+@keyframes modal-crt-open {
+  0%   { opacity: .15; transform: scaleY(.04); }
+  100% { opacity: 1;   transform: scaleY(1); }
+}
 .modal__panel--crt-in::after {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
   background: radial-gradient(130% 80% at 50% 50%, rgba(255,255,255,.95), rgba(190,225,255,.5) 45%, transparent 72%);
@@ -419,6 +432,8 @@ body.iq-nav-lock { overflow: hidden; }
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .modal .modal__panel { transition: none; }
+  .modal.show .modal__panel--crt-in { animation: none; }
   .modal__panel--crt-in::after { display: none; animation: none; }
 }
 
@@ -436,6 +451,21 @@ body.iq-nav-lock { overflow: hidden; }
 
 /* モーダル表示中の背景スクロールロック（shared.js が body に付与） */
 body.modal-open { overflow: hidden; }
+
+/* モーダル/確認ダイアログ表示中は、バックドロップ背後の (1)CSS 無限アニメ と (2)backdrop-filter を無効化する。
+   ＝バックドロップ「チカチカ」の根本原因の修正。半透明バックドロップ(45%)の背後で
+     ・transform 系の無限アニメ（未読ベル bell-wiggle 等）が動き続ける
+     ・backdrop-filter: blur（ゲーム風ガラスパネル .pixel-panel＝KPI/ランキング等）が背後をぼかし続ける
+   と、Chrome が固定バックドロップ/ぼかし領域を毎フレーム再合成し「チカチカ」する（合成レイヤ重畳・
+   backdrop-filter の既知フリッカー）。DOM/スタイルは不変・20fps 録画では 60Hz 合成にエイリアスして
+   静止に見えるが実機では見える。背後は暗転して見えないので無効化して実害なし＋描画コスト減。
+   ダイアログ内の演出（framer は WAAPI＝animation-play-state 影響外／CRT フラッシュ等の CSS アニメと
+   ダイアログ自身の backdrop-filter は .modal/.iq-confirm 配下を除外）は維持。DFT-E-012。 */
+body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
+  animation-play-state: paused !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 
 /* --- ドラッグ移動（.modal--draggable：ヘッダーを掴んで移動。shared.js が処理・共通部品） ---
    ハンドル＝.modal__header（または旧 .modal__drag）。中のボタン（×/最大化）はドラッグ起点にしない。 */

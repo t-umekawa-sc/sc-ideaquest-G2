@@ -4,18 +4,21 @@
 // 標準構造＝.modal__panel.sectioned > .modal__header（タイトル＋⤢最大化＋×）／本文＋アクションは呼び出し側が children で渡す。
 // 挙動（全入力モーダル共通）＝Esc/バックドロップ/×で閉じる・フォーカストラップ・本文先頭へ初期フォーカス・起動要素へ復帰・
 // 背景スクロールロック・aria-modal/aria-labelledby・**本文スクロール**（modal__body）・**ヘッダードラッグ移動（§105）**・
-// **最大化/復元（§106）**。狭幅は CSS で自動フルスクリーン＝ドラッグ/最大化は無効。portal で body 直下に描画。
-// 後続（§111）＝本番形の URL 付きモーダル（Parallel/Intercept Routes・共有要素アニメ）へ載せ替え予定。
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+// **最大化/復元（§106）**。portal で body 直下に描画。
+// アニメは **CSS**（`.modal.show` で backdrop フェード＋パネル CRT 登場）で行う＝mock（shared.css）と同方式。
+// ※ framer-motion は使わない：静止後も frameloop が毎フレーム合成を触り、半透明バックドロップが Chromium で
+//   チカつく回帰（DFT-E-012）を招いたため。CSS アニメは再生後に停止し、この問題を起こさない。
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+import { reduceMotion } from "@/lib/motion";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
 type Props = {
   open: boolean;
   onClose: () => void; // 閉じる要求（Esc/バックドロップ/×）。呼び出し側が open を false にする。
-  onClosed?: () => void; // 閉じアニメ完了後（AnimatePresence onExitComplete）。URL モーダルの router.back 用。
+  onClosed?: () => void; // 閉じアニメ完了後。URL モーダルの router.back 用。
   title: string;
   size?: Size;
   draggable?: boolean; // ヘッダーを掴んで移動（既定 on・§105「全入力モーダルで有効」）
@@ -27,32 +30,53 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 const NARROW = 640; // これ以下は自動フルスクリーン＝ドラッグ/最大化しない（shared.css と一致）
+const ANIM_MS = 300; // enter/exit の最大尺（CSS と一致）。閉じアニメ後に unmount＋onClosed する。
 
 export function Modal({ open, onClose, onClosed, title, size = "md", draggable = true, maximizable = true, children }: Props) {
-  const reduce = useReducedMotion();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // 中央からのオフセット（ドラッグ）
   const [maximized, setMaximized] = useState(false);
 
-  // 開くたびに中央・等倍へリセット（§105「開くたびに中央へリセット」）
+  // 表示状態機械（framer/AnimatePresence の置換）＝mounted で DOM 有無・visible(.show) で CSS フェード発火。
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (open) {
+      if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+      setMounted(true);
       setPos({ x: 0, y: 0 });
       setMaximized(false);
+      // mount 直後に .show を付けると transition が発火しない＝二重 rAF で次フレームに付ける。
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => setVisible(true));
+      });
+      return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     }
+    // 閉じる＝.show を外して CSS フェードアウト→尺後に unmount＋onClosed。
+    setVisible(false);
+    if (mounted) {
+      closeTimer.current = window.setTimeout(() => {
+        setMounted(false);
+        closeTimer.current = null;
+        onClosed?.();
+      }, ANIM_MS);
+    }
+    return () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
+    // onClosed/mounted は依存に入れない（open の遷移でのみ動かす＝入力毎の再実行を避ける）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // 初期フォーカス／スクロールロック／復帰は **open の遷移時のみ**（依存は [open] だけ）。
-  // ※ ここに onClose を依存させると、呼び出し側のインライン onClose が毎レンダで別関数になり、
-  //   入力のたびに effect が再実行されて先頭フィールドへフォーカスが飛ぶ（フォーカス喪失バグ）。
+  // 初期フォーカス／スクロールロック／復帰は **mounted の遷移時のみ**。
   useEffect(() => {
-    if (!open) return;
+    if (!mounted) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
     document.body.classList.add("modal-open");
     const panel = panelRef.current;
-    // 開いたら先頭フィールドへ（本文優先・無ければパネル先頭＝× 等）
     const first =
       panel?.querySelector<HTMLElement>(`.modal__body ${FOCUSABLE.split(",").join(", .modal__body ")}`) ??
       panel?.querySelector<HTMLElement>(FOCUSABLE);
@@ -61,20 +85,17 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
       document.body.classList.remove("modal-open");
       restoreRef.current?.focus?.();
     };
-  }, [open]);
+  }, [mounted]);
 
-  // Esc/フォーカストラップの keydown。onClose は ref 経由で最新を参照＝依存に入れず再購読しない
-  // （リスナー再登録でフォーカスを動かさない）。
+  // Esc/フォーカストラップの keydown。onClose は ref 経由で最新を参照＝依存に入れず再購読しない。
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
-    if (!open) return;
+    if (!mounted) return;
     const panel = panelRef.current;
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        // 開いているコンボボックス（候補表示中・role=combobox aria-expanded=true）上の ESC は、
-        // まず候補を閉じる方に委ねる＝モーダルは閉じない。候補が閉じている次の ESC でモーダルが閉じる。
         const t = e.target as HTMLElement | null;
         if (t && t.closest('[role="combobox"][aria-expanded="true"]')) return;
         e.stopPropagation();
@@ -97,7 +118,7 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
 
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open]);
+  }, [mounted]);
 
   // ヘッダードラッグ（§105）＝画面外に出さないよう clamp。ボタン/入力からは開始しない。
   function onHeaderPointerDown(e: React.PointerEvent) {
@@ -116,7 +137,6 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
     function move(ev: PointerEvent) {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // panel の left/top は startRect + (現デルタ) で移動する。viewport 内に clamp。
       const rawDx = ev.clientX - startX;
       const rawDy = ev.clientY - startY;
       const minLeft = margin;
@@ -135,79 +155,49 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
     document.addEventListener("pointerup", up);
   }
 
-  if (typeof document === "undefined") return null;
+  if (typeof document === "undefined" || !mounted) return null;
 
   const canDrag = draggable && !maximized;
+  const reduce = reduceMotion();
+  const dragged = !maximized && (pos.x !== 0 || pos.y !== 0);
 
   return createPortal(
-    <AnimatePresence onExitComplete={onClosed}>
-      {open && (
-        <div
-          key="modal"
-          className={`modal modal--${size} modal--anim${canDrag ? " modal--draggable" : ""}`}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-        >
-          <motion.div
-            className="modal__backdrop"
-            onClick={onClose}
-            aria-hidden="true"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0 : 0.3 }}
-          />
-          <motion.div
-            // CRT 電源ON＝細い横線（scaleY≈0）が一瞬光って（CSS フラッシュ）縦に開く。
-            // 閉じ＝CRT 電源OFF＝いったん細い横線に潰れ（scaleY→0）、その線が青白く発光しながら中央の点へ収束して消える（scaleX→0）。
-            // 開く/閉じるがハッキリ対になるよう、閉じは2段キーフレーム＋発光（enter フラッシュと同色）。
-            className={`modal__panel sectioned${maximized ? " is-max" : ""}${reduce ? "" : " modal__panel--crt-in"}`}
-            ref={panelRef}
-            style={{ x: maximized ? 0 : pos.x, y: maximized ? 0 : pos.y, transformOrigin: "center center" }}
-            initial={{ opacity: reduce ? 1 : 0.15, scaleY: reduce ? 1 : 0.04 }}
-            animate={{ opacity: 1, scaleY: 1, scaleX: 1 }}
-            exit={
-              reduce
-                ? { opacity: 0 }
-                : {
-                    scaleY: [1, 0.05, 0.05],
-                    scaleX: [1, 1, 0],
-                    opacity: [1, 1, 0],
-                    boxShadow: [
-                      "0 24px 48px -12px rgba(15,23,42,.25)",
-                      "0 0 28px 8px rgba(190,225,255,.95)",
-                      "0 0 48px 14px rgba(190,225,255,0)",
-                    ],
-                    transition: { duration: 0.34, ease: "easeIn", times: [0, 0.5, 1] },
-                  }
-            }
-            transition={{ duration: reduce ? 0 : 0.26, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div className="modal__header" onPointerDown={onHeaderPointerDown}>
-              <h2 id={titleId}>{title}</h2>
-              <span className="modal__header__tools">
-                {maximizable && window.innerWidth > NARROW && (
-                  <button
-                    type="button"
-                    className="modal__maxbtn"
-                    aria-label={maximized ? "元のサイズに戻す" : "最大化"}
-                    aria-pressed={maximized}
-                    onClick={() => setMaximized((v) => !v)}
-                  >
-                    {maximized ? "⤡" : "⤢"}
-                  </button>
-                )}
-                <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>
-                  ✕
-                </button>
-              </span>
-            </div>
-            {children}
-          </motion.div>
+    <div
+      className={`modal modal--${size}${visible ? " show" : ""}${canDrag ? " modal--draggable" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <div className="modal__backdrop" onClick={onClose} aria-hidden="true" />
+      <div
+        // CRT 電源ON＝細い横線が一瞬光って（`::after` フラッシュ）縦に開く（`modal-crt-open`）。CSS で再生し
+        // 尺後に停止する＝framer のような常時フレームループを起こさない（DFT-E-012 の回帰対策）。
+        className={`modal__panel sectioned${maximized ? " is-max" : ""}${reduce ? "" : " modal__panel--crt-in"}`}
+        ref={panelRef}
+        style={dragged ? { transform: `translate(${pos.x}px, ${pos.y}px)`, transformOrigin: "center center" } : undefined}
+      >
+        <div className="modal__header" onPointerDown={onHeaderPointerDown}>
+          <h2 id={titleId}>{title}</h2>
+          <span className="modal__header__tools">
+            {maximizable && window.innerWidth > NARROW && (
+              <button
+                type="button"
+                className="modal__maxbtn"
+                aria-label={maximized ? "元のサイズに戻す" : "最大化"}
+                aria-pressed={maximized}
+                onClick={() => setMaximized((v) => !v)}
+              >
+                {maximized ? "⤡" : "⤢"}
+              </button>
+            )}
+            <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>
+              ✕
+            </button>
+          </span>
         </div>
-      )}
-    </AnimatePresence>,
+        {children}
+      </div>
+    </div>,
     document.body,
   );
 }
