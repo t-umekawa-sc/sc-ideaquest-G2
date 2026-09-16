@@ -202,3 +202,16 @@ def test_c_tc_144_list_idea_count_published_only(client, env):
         assert card["idea_count"] == 2
     finally:
         _delete_ideas(env.db_identifier, idea_ids)
+
+
+def test_c_tc_247_card_is_owner_flag(client, env):
+    """C-TC-247: クエストカードの is_owner＝閲覧者が作成者か（SC-01 で「自分のクエスト」を参加中と分離）。"""
+    own = env.make_quest(status="recruiting", title="自分のクエスト")  # owner=user_id
+    other = env.make_quest(status="recruiting", owner=env.other_user_id, title="他人のクエスト")  # owner=other
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, other, env.user_id, permissions=["comment"])  # seed を参加させて可視に
+        ts.commit()
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    cards = {c["id"]: c for c in client.get(QUESTS).json()["data"]}
+    assert cards[str(own)]["is_owner"] is True    # 作成者＝自分のクエスト
+    assert cards[str(other)]["is_owner"] is False  # 他者作成で参加中

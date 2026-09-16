@@ -199,6 +199,8 @@ def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats, member_co
         "quest_groups": _group_refs(group_ids, groups),
         # 本人の下書きは draft、それ以外は member。未投稿/投稿済みはドメイン D 実装後に精緻化（C.1）。
         "my_state": "draft" if quest.status == "draft" and quest.owner_id == viewer_id else "member",
+        # 閲覧者が作成者か（SC-01 ダッシュボードで「自分のクエスト」を参加中と分離・SC-10 でも利用可）。
+        "is_owner": quest.owner_id == viewer_id,
     }
 
 

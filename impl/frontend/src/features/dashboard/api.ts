@@ -39,7 +39,7 @@ export type UnreadChatIdea = {
 export type QuestCard = {
   id: string; title: string; color?: string; status: string; categories?: string[];
   deadline?: string | null; member_count?: number; idea_count?: number;
-  owner?: { name?: string } | null; my_state?: string;
+  owner?: { name?: string } | null; my_state?: string; is_owner?: boolean;
 };
 
 export type RankRow = { rank: number; user: { id: string; name: string; avatar?: string | null; level?: number }; score: number; xp: number; coin: number };

@@ -56,6 +56,8 @@ class QuestCardDTO(BaseModel):
     quest_groups: list[QuestGroupRefDTO] = []
     # 自分の状態＝draft（本人の下書き）/ member（参加中）。未投稿/投稿済みはドメイン D 実装後に精緻化。
     my_state: str
+    # 閲覧者が作成者か（SC-01 で「自分のクエスト」を参加中と分離）。
+    is_owner: bool = False
 
 
 class QuestListResponse(BaseModel):

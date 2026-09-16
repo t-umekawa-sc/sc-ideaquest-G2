@@ -46,8 +46,10 @@ type Balance = {
 // 旧ショートカットタイル（TILES）はグローバルナビ（☰→ドロワー・レビュー#1）へ集約したため撤去（画面遷移図 §4 集約 2026-09-10）。
 
 function hrefOfDraft(d: DashboardData["drafts"][number]): string {
-  if (d.kind === "quest") return `/quests/${d.quest_id}`;
-  if (d.kind === "idea") return `/ideas/${d.idea_id}`;
+  // 下書きは「続きを編集」導線＝編集ダイアログを直接開く（ユーザー要望）。
+  // クエスト＝編集モーダル（Parallel+Intercept）／アイデア＝詳細で ?edit=1 で編集モーダル自動オープン／評価＝評価モーダル。
+  if (d.kind === "quest") return `/quests/${d.quest_id}/edit`;
+  if (d.kind === "idea") return `/ideas/${d.idea_id}?edit=1`;
   return `/ideas/${d.idea.id}/eval`;
 }
 
@@ -178,6 +180,28 @@ export function DashboardView({
   const drafts = data?.drafts ?? [];
   const unvoted = unvotedList ?? [];
   const quests = data?.quests ?? [];
+  // 「自分のクエスト」（作成/運営）を参加中と分離（ユーザー要望・2026-09-16）。is_owner は backend が付与。
+  const ownQuests = quests.filter((q) => q.is_owner);
+  const joinedQuests = quests.filter((q) => !q.is_owner);
+  const renderQuestCard = (q: DashboardData["quests"][number]) => {
+    const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
+    return (
+      <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
+        <div className="between">
+          <span className="card-title">{q.title}</span>
+          <span className="badge">{q.status}</span>
+        </div>
+        <div className="quest-card__meta">
+          {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
+          {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
+        </div>
+        <div className="quest-card__stats">
+          <span>👥 パーティー{q.member_count ?? 0}</span>
+          <span>💡 アイデア{q.idea_count ?? 0}</span>
+        </div>
+      </Link>
+    );
+  };
   const followed = (data?.followed_ideas ?? []).filter((f) => !unfollowed[f.id]);
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
@@ -448,34 +472,25 @@ export function DashboardView({
         </motion.section>
       )}
 
-      {/* 参加中クエスト（0件なら非表示） */}
-      {quests.length > 0 && (
-        <motion.section aria-label="参加中クエスト" {...flowMotion(6)}>
+      {/* 自分のクエスト（作成/運営・0件なら非表示・ユーザー要望で参加中と分離） */}
+      {ownQuests.length > 0 && (
+        <motion.section aria-label="自分のクエスト" {...flowMotion(6)}>
+          <div className="section-head">
+            <h2>自分のクエスト</h2>
+            <Link href="/quests">すべて見る →</Link>
+          </div>
+          <div className="quest-grid">{ownQuests.map(renderQuestCard)}</div>
+        </motion.section>
+      )}
+
+      {/* 参加中クエスト（他者作成で参加・0件なら非表示） */}
+      {joinedQuests.length > 0 && (
+        <motion.section aria-label="参加中クエスト" {...flowMotion(7)}>
           <div className="section-head">
             <h2>参加中クエスト</h2>
             <Link href="/quests">すべて見る →</Link>
           </div>
-          <div className="quest-grid">
-            {quests.map((q) => {
-              const du = deadlineUrgency(q.deadline, today); // #24: 締切の切迫度
-              return (
-              <Link key={q.id} className="card card-accent quest-card" href={`/quests/${q.id}`} style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
-                <div className="between">
-                  <span className="card-title">{q.title}</span>
-                  <span className="badge">{q.status}</span>
-                </div>
-                <div className="quest-card__meta">
-                  {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
-                  {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
-                </div>
-                <div className="quest-card__stats">
-                  <span>👥 パーティー{q.member_count ?? 0}</span>
-                  <span>💡 アイデア{q.idea_count ?? 0}</span>
-                </div>
-              </Link>
-              );
-            })}
-          </div>
+          <div className="quest-grid">{joinedQuests.map(renderQuestCard)}</div>
         </motion.section>
       )}
 

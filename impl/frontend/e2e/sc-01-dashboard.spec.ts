@@ -67,3 +67,32 @@ test.describe("reduce-motion #21", () => {
     await expect(page.locator(".hero__title[data-tier]")).toBeVisible();
   });
 });
+
+// I-TC-157 SC-01 ダッシュボードで「自分のクエスト」を参加中と分離＋下書きカードは編集ダイアログ導線（ユーザー要望・2026-09-16）。
+// is_owner（backend C-TC-247）でクエストを二分し、下書き（アイデア）は ?edit=1、クエスト下書きは /edit へ。
+const ACME = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator("#company_code").fill(ACME.company);
+  await page.locator("#login_id").fill(ACME.loginId);
+  await page.locator("#password").fill(ACME.password);
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
+  // 自分の作成クエストがあるので「自分のクエスト」セクションが出る（参加中とは別枠）。
+  await expect(page.locator('section[aria-label="自分のクエスト"]')).toBeVisible({ timeout: 8000 });
+  // API が is_owner を返し、参加中(=is_owner:false)と自作(=true)が混在する。
+  const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
+  const qs: Array<{ is_owner?: boolean }> = dash.quests ?? [];
+  expect(qs.every((q) => typeof q.is_owner === "boolean")).toBe(true);
+  expect(qs.some((q) => q.is_owner)).toBe(true);
+  // 下書きカード（アイデア）は編集ダイアログ導線＝?edit=1（存在すれば）。
+  const draftHrefs = await page
+    .locator('section[aria-label="下書き"] a.draft-card')
+    .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute("href") || ""));
+  for (const h of draftHrefs) {
+    // idea 下書き→ ?edit=1／quest 下書き→ /edit／評価下書き→ /eval のいずれか（詳細ページ直リンクは廃止）。
+    expect(h.includes("?edit=1") || h.includes("/edit") || h.includes("/eval")).toBe(true);
+  }
+});

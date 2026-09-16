@@ -8,7 +8,7 @@
 // チャット（E・§4.4）も実接続＝議論アクティビティ（chat-activity）＋直近3件プレビュー（getChat）。
 // 投票の事前無効化＝completed 凍結＋締切後（quest.deadline < 今日・D.5 の isVotingClosed でサーバー _guard_votable と一致）。最終権威はサーバー 409。
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
@@ -100,6 +100,15 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   }, []);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // ダッシュボードの下書きカード等から `?edit=1` で来たら編集ダイアログを自動オープン（ユーザー要望・2026-09-16）。
+  // 開いたら URL からパラメータを除去し、閉じた後に再オープンしないようにする。
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("edit") === "1") {
+      setEditOpen(true);
+      router.replace(`/ideas/${ideaId}`);
+    }
+  }, [searchParams, ideaId, router]);
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
