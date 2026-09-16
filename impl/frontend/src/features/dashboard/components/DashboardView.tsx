@@ -46,10 +46,10 @@ type Balance = {
 // 旧ショートカットタイル（TILES）はグローバルナビ（☰→ドロワー・レビュー#1）へ集約したため撤去（画面遷移図 §4 集約 2026-09-10）。
 
 function hrefOfDraft(d: DashboardData["drafts"][number]): string {
-  // 下書きは「続きを編集」導線＝編集ダイアログを直接開く（ユーザー要望）。
-  // クエスト＝編集モーダル（Parallel+Intercept）／アイデア＝詳細で ?edit=1 で編集モーダル自動オープン／評価＝評価モーダル。
+  // 下書きは「続きを編集」導線＝編集ダイアログをダッシュボード上に重ねて開く（Parallel+Intercept・詳細へフル遷移しない）。
+  // クエスト＝編集モーダル／アイデア＝編集モーダル／評価＝評価モーダル（いずれも intercepting route）。
   if (d.kind === "quest") return `/quests/${d.quest_id}/edit`;
-  if (d.kind === "idea") return `/ideas/${d.idea_id}?edit=1`;
+  if (d.kind === "idea") return `/ideas/${d.idea_id}/edit`;
   return `/ideas/${d.idea.id}/eval`;
 }
 

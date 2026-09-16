@@ -96,3 +96,35 @@ test("I-TC-157 dashboard splits own quests and draft cards link to edit dialog",
     expect(h.includes("?edit=1") || h.includes("/edit") || h.includes("/eval")).toBe(true);
   }
 });
+
+// I-TC-158 SC-01 アイデア下書きカードは「編集ダイアログをダッシュボード上に重ねて」開く（詳細ページへフル遷移しない）。
+// ユーザー指摘＝?edit=1 だと詳細画面へ移動してからダイアログが出る（クエスト/評価の下書きと不整合）→ 専用 intercept モーダルに統一。
+test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (no full nav)", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator("#company_code").fill(ACME.company);
+  await page.locator("#login_id").fill(ACME.loginId);
+  await page.locator("#password").fill(ACME.password);
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
+  const own = (dash.quests ?? []).find((q: { is_owner?: boolean }) => q.is_owner);
+  expect(own).toBeTruthy();
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const created = await page.request
+    .post(`/api/v1/quests/${own.id}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "I-TC-158 draft", value: "v", body: "b", status: "draft" } })
+    .then((r) => r.json());
+  const ideaId = created.id as string;
+  try {
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /すべての通知/ })).toBeVisible();
+    const card = page.locator(`section[aria-label="下書き"] a.draft-card[href="/ideas/${ideaId}/edit"]`);
+    await expect(card).toBeVisible({ timeout: 8000 }); // href が /edit（詳細直リンク/?edit=1 でない）
+    await card.click();
+    await page.waitForURL(new RegExp(`/ideas/${ideaId}/edit`), { timeout: 8000 });
+    await expect(page.getByRole("heading", { name: "アイデアを編集" })).toBeVisible({ timeout: 8000 }); // 編集ダイアログ
+    expect(await page.getByRole("link", { name: /すべての通知/ }).count()).toBeGreaterThan(0); // 背景はダッシュボード（フル遷移していない）
+  } finally {
+    const csrf2 = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+    await page.request.delete(`/api/v1/ideas/${ideaId}`, { headers: { "X-CSRF-Token": csrf2 } }).catch(() => {});
+  }
+});

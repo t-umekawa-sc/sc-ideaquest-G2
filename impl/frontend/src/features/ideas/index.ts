@@ -4,3 +4,5 @@ export { IdeaForm } from "./components/IdeaForm";
 export type { IdeaAttach } from "./components/IdeaForm";
 export { IdeaCreateModal } from "./components/IdeaCreateModal";
 export { IdeaCreatePanel } from "./components/IdeaCreatePanel";
+export { IdeaEditModal } from "./components/IdeaEditModal";
+export { IdeaEditPanel } from "./components/IdeaEditPanel";
