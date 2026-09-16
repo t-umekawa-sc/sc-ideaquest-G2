@@ -24,6 +24,7 @@
 | E-TC-226 | api | 投稿→フォロワーに follow_comment 生成・投稿者除外 | user 著者アイデア＋other=フォロワー | user が投稿 | **フォロワー(other)に `follow_comment` 1件**・投稿者(user・著者)は0 | E.6／H.0 |
 | E-TC-109b | api | 編集で引用を置換（省略時は不変・別アイデアは 422） | 自分のメッセージ（引用 [A]）＋同一グループの B／別アイデアのメッセージ | `PATCH /chat-messages/{id}`（`quoted_message_ids[]`） | `[A]`→`[A,B]` に置換（`quotes[]` 反映）／`quoted_message_ids` 省略時は引用不変／別アイデアの引用追加は 422 | E.2／§5.16b |
 | E-TC-110 | api | 削除＝本人＋owner/quest_admin・トゥームストーン | 自分／他人（一般）／他人（owner） | `DELETE /chat-messages/{id}` | 本人 200・`is_deleted`／一般が他人 403／owner が他人 200・一覧でトゥームストーン化 | E.2／§8-⑪ |
+| E-TC-227 | api | 引用元削除で引用 excerpt がトゥームストーン文言 | メッセージ A ＋ A を引用するメッセージ B | A を `DELETE`→チャット一覧を再取得 | 削除前は B の `quotes[0].excerpt`＝A 本文／**削除後は「このメッセージは削除されました」**（引用側は都度解決・E.1） | E.1／E.2 |
 | E-TC-111 | api | 既読更新→未読件数（後退防止） | メッセージ2件 | `POST .../chat/read`（1件目）→`GET chat` | `unread.first_unread_message_id`＝2件目・`unread_count=1`。古い id 再送で後退しない | E.5／§5.31 |
 | E-TC-112 | api | 活発度集計（日次＋版マーカー） | メッセージ数件＋公開後編集（版2） | `GET /ideas/{id}/chat-activity` | `daily[]`（日次件数）・`revision_markers[]`（版日時）・`total_messages` | E.1／D.4 |
 | E-TC-113 | api | チャット添付→DL 署名URL | comment 権限・Fake storage | `POST`（files=png）→`GET /attachments/{aid}/download` | 201・メッセージ `attachments[]`（kind=image）・DL EP が `{url}`（チャット添付も共通 EP で解決） | E.3／§1.10 |

@@ -97,6 +97,8 @@
 | C-TC-140 | api | 論理削除 | recruiting クエスト | `DELETE /quests/{id}` | 204・以後 GET 詳細 404 | C.2 |
 | C-TC-141 | api | パーティー編集の認可 | 他人所有・自分は非 owner/admin | `PUT .../party` | 403 | C.3 |
 | C-TC-142 | api | 完了クエストのパーティー凍結 | completed クエスト | `POST .../members` | 409 conflict | C.5 |
+| C-TC-145 | api | 完了クエストの PUT /party 凍結（PUT 経路） | completed クエスト | `PUT .../party`（members） | `409 conflict`（C-TC-142 の POST 経路と対称・書き込み凍結） | C.5 |
+| C-TC-146 | api | PUT /party の原子性（検証先行・部分適用しない） | recruiting・owner が編集 | 先頭に有効ユーザー・末尾に候補外 uuid を含む差分を PUT | `422`（`field=user_id`）＋**先頭の有効追加も未適用**（GET members に現れない＝全体が原子的） | C.3 |
 
 ## 6. e2e（SC-11/12・実接続・Playwright）
 

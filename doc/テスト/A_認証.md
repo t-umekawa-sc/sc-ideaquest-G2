@@ -225,3 +225,4 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-104 | api | 無効/期限切れ/使用済トークンは一律 410 | 使用済み（confirm 済み）トークン | 同 EP を再実行／不正 token | 410 `token_expired`（列挙耐性・状態を変えない） | ADR-0009 §2.1/§2.5 |
 | A-TC-105 | api | 送信後に email 変更されたら 409 stale | 送信後に管理者が別アドレスへ `PATCH email` | 旧トークンで confirm | 409 `stale`（`email_verified_at` は変えずやり直しを促す） | ADR-0009 §2.1 |
 | A-TC-106 | api | 未認証＝トークンが認可（セッション不要・CSRF 免除・Origin 検証） | 有効トークン・セッション無し | 同 EP（Origin 付き） | 200（`password-setup/complete` と同型） | ADR-0009 §2.5／A.7 |
+| A-TC-110 | api | confirm は不正 Origin を拒否（Origin 検証が token 判定に先行） | 有効トークン | 同 EP に `Origin: http://evil.example` を付与 | `403 forbidden`（cross-site 拒否）。トークンは未消費＝正 Origin で再送すると 200（origin が token 消費に先行） | A.0／A.7.1 |

@@ -313,6 +313,25 @@ def test_e_tc_110_delete(client, env):
     assert client.delete(f"{MSGS}/{oid}", headers=_csrf(client)).status_code == 200
 
 
+def test_e_tc_227_quote_excerpt_tombstone_on_source_delete(client, env):
+    """E-TC-227: 引用元メッセージを削除すると引用側の excerpt がトゥームストーン文言になる（E.1・引用は都度解決）。"""
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    src = _post(client, idea, body="引用される本文").json()["id"]
+    _post(client, idea, body="これを引用", quotes=[src])
+
+    # 削除前＝excerpt は引用元の本文。
+    quoting = next(m for m in client.get(CHAT(idea)).json()["data"] if m.get("quotes"))
+    assert quoting["quotes"][0]["excerpt"] == "引用される本文"
+
+    # 引用元を論理削除。
+    assert client.delete(f"{MSGS}/{src}", headers=_csrf(client)).status_code == 200
+
+    # 削除後＝引用側 excerpt がトゥームストーン文言に置き換わる。
+    quoting2 = next(m for m in client.get(CHAT(idea)).json()["data"] if m.get("quotes"))
+    assert quoting2["quotes"][0]["excerpt"] == "このメッセージは削除されました"
+
+
 def test_e_tc_111_read_unread(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())

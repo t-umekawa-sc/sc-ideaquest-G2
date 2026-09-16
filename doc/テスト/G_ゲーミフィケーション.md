@@ -62,6 +62,8 @@
 | G-TC-404 | api | クエスト内は門番（非パーティー404） | 非パーティーのクエスト | `GET /rankings?scope=quest:{id}` | 404（存在秘匿・C.0） | G.5／C.0 |
 | G-TC-405 | api | period 不正は 422 | — | `GET /rankings?period=xxx` | 422（`field=period`） | G.5 |
 | G-TC-406 | api | scope=company＝会社全体を集計（quest スコープと別経路） | 会社全体（quest_id=None）で大きく獲得した新規ユーザー | `GET /rankings?scope=company&period=this_week` | 当該ユーザーが `data` に現れ `score`=獲得額・`me.total_users≥2`（会社母数）＝全社集計（G-TC-401〜405 は quest スコープのみ） | G.5／SC-41 |
+| G-TC-407 | api | タイブレーク＝同スコアは XP→先着（§7 の多段） | 同スコアで XP 差のユーザー／同スコア・同 XP で先着差のユーザー | `GET /rankings?scope=quest:{id}` | 高 XP が上位／同 XP は `first_at` 昇順（先着）が上位（G-TC-401 のスコア降順の先の多段を明示） | G.5／§7 |
+| G-TC-408 | api | 期間 this_month/all の集計境界 | 今週分＋当月外(60日前 backdate)の付与 | `GET /rankings?period=this_month` / `all` | this_month は今週分のみ・all は両方を合算（G-TC-402 の週境界に対する月/全期間の担保） | G.5／§7 期間 |
 
 ## 5. 実績 API（SC-40・G.4・§8-⑲）
 

@@ -176,3 +176,46 @@ def test_g_tc_406_company_scope_aggregates_all_users(client, factory):
             s.execute(Activity.__table__.delete().where(Activity.user_id == top_id))
             s.execute(User.__table__.delete().where(User.id == top_id))
             s.commit()
+
+
+def test_g_tc_407_tiebreak_xp_then_first(client, factory):
+    """G-TC-407: 同スコアのタイブレーク＝XP 降順→先着（first_at 昇順）（§7 の多段・G-TC-401 の先）。"""
+    me = _login_new(client, factory)
+    qid, gid, (u1, u2) = _make_quest_with(me, ["U1", "U2"])
+    try:
+        # 今週内で先着差を作る（早い＝月曜01:00 JST／遅い＝月曜02:00 JST）。
+        JST = timezone(timedelta(hours=9))
+        now_jst = datetime.now(JST)
+        this_mon = now_jst.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=now_jst.weekday())
+        early = (this_mon + timedelta(hours=1)).astimezone(timezone.utc)
+        late = (this_mon + timedelta(hours=2)).astimezone(timezone.utc)
+        # 全員 score=50。me は XP 最大（30）で首位。u1/u2 は同スコア・同 XP（25）＝先着で分ける。
+        _grant(me, kind="xp_gain", amount=30, quest_id=qid)
+        _grant(me, kind="coin_gain", amount=20, quest_id=qid)
+        _grant(u1, kind="xp_gain", amount=25, quest_id=qid, when=early)
+        _grant(u1, kind="coin_gain", amount=25, quest_id=qid, when=early)
+        _grant(u2, kind="xp_gain", amount=25, quest_id=qid, when=late)
+        _grant(u2, kind="coin_gain", amount=25, quest_id=qid, when=late)
+
+        data = client.get(f"{RANK}?scope=quest:{qid}").json()["data"]
+        assert [row["score"] for row in data] == [50, 50, 50]            # 全員同スコア
+        assert [row["xp"] for row in data] == [30, 25, 25]               # XP 降順（第1タイブレーク）
+        assert [row["user"]["id"] for row in data] == [str(me), str(u1), str(u2)]  # 同 XP は先着（u1<u2）
+    finally:
+        _cleanup(qid, gid, [u1, u2])
+
+
+def test_g_tc_408_period_month_and_all(client, factory):
+    """G-TC-408: 期間 this_month/all の集計境界＝当月外(60日前)は this_month 除外・all は合算（G-TC-402 の週境界に対する担保）。"""
+    me = _login_new(client, factory)
+    qid, gid, extra = _make_quest_with(me, [])
+    try:
+        old = datetime.now(timezone.utc) - timedelta(days=60)  # 当月外（>1ヶ月前）＝all のみ対象
+        _grant(me, kind="xp_gain", amount=10, quest_id=qid)             # 今（this_month/all）
+        _grant(me, kind="xp_gain", amount=99, quest_id=qid, when=old)   # 60日前（all のみ）
+        tm = client.get(f"{RANK}?scope=quest:{qid}&period=this_month").json()
+        assert tm["me"]["xp"] == 10   # 当月分のみ
+        al = client.get(f"{RANK}?scope=quest:{qid}&period=all").json()
+        assert al["me"]["xp"] == 109  # 全期間＝両方合算
+    finally:
+        _cleanup(qid, gid, extra)

@@ -480,6 +480,32 @@ def test_c_tc_142_completed_party_frozen(client, env):
     assert r.status_code == 409, r.text
 
 
+def test_c_tc_145_completed_put_party_frozen(client, env):
+    """C-TC-145: 完了クエストの PUT /party も 409（POST 経路 C-TC-142 と対称・書き込み凍結・C.5）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="completed")
+    r = client.put(f"{QUESTS}/{qid}/party", json={"members": [{"user_id": str(env.other_user_id)}]},
+                   headers=_csrf(client))
+    assert r.status_code == 409, r.text
+
+
+def test_c_tc_146_put_party_atomic_on_invalid(client, env):
+    """C-TC-146: PUT /party は原子的＝末尾に候補外 uuid を含む差分は 422 で先頭の有効追加も適用しない（検証先行・C.3）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")
+    bad = uuid.uuid4()  # 候補外（グループ非所属・非アクティブ）
+    r = client.put(
+        f"{QUESTS}/{qid}/party",
+        json={"members": [{"user_id": str(env.other_user_id)}, {"user_id": str(bad)}]},
+        headers=_csrf(client),
+    )
+    assert r.status_code == 422, r.text
+    assert any(e["field"] == "user_id" for e in r.json()["errors"])
+    # 先頭の有効な other_user_id も適用されていない（全体が原子的にロールバック）。
+    ids = {m["user"]["user_id"] for m in client.get(f"{QUESTS}/{qid}/members").json()["data"]}
+    assert str(env.other_user_id) not in ids
+
+
 def test_c_tc_249_owner_grant_via_increment_eps_forbidden(client, env):
     """C-TC-249: 増分EP（POST /members・PUT permissions）経由でも owner 付与は作成者のみ＝非作成者(quest_admin)は 403（PATCH 経路 C-TC-122 と対称・権限昇格防止）。"""
     _login_seed(client)

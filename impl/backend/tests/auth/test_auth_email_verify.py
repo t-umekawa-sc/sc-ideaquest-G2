@@ -81,3 +81,13 @@ def test_a_tc_106_confirm_is_public(client, factory, mail):
     pub = TestClient(app)  # セッション Cookie 無し
     assert pub.get("/api/v1/auth/session").status_code == 401
     assert pub.post(CONFIRM, json={"token": ctx["token"]}).status_code == 200
+
+
+def test_a_tc_110_confirm_rejects_bad_origin(client, factory, mail):
+    """A-TC-110 confirm は不正 Origin を 403 で拒否・token は未消費（Origin 検証が token 判定に先行・A.7.1）。"""
+    ctx = _send_and_get_token(client, mail, factory)
+    pub = TestClient(app)
+    bad = pub.post(CONFIRM, json={"token": ctx["token"]}, headers={"Origin": "http://evil.example"})
+    assert bad.status_code == 403 and bad.json()["code"] == "forbidden", bad.text
+    # 不正 Origin 拒否は token を消費しない＝正 Origin で再送すると成立（200）。
+    assert pub.post(CONFIRM, json={"token": ctx["token"]}).status_code == 200
