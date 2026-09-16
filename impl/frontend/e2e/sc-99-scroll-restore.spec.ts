@@ -53,3 +53,32 @@ test("M-TC-013 dashboard restores scroll after a push-style back link (and no fa
   const restoredY = await page.evaluate(() => window.scrollY);
   expect(Math.abs(restoredY - savedY)).toBeLessThanOrEqual(80); // 復元は近傍（クランプ差を許容）
 });
+
+// M-TC-014: pop 帰還（router.back＝ブラウザ戻る）でもスクロール位置を復元（ユーザー報告の回帰）。
+// 症状＝ダッシュボードの参加中クエスト等のリンク→詳細→戻る（router.back）で「かなり上」に落ちた。
+// 原因＝pop 帰還の再マウント時に Next ネイティブ復元が古い位置へ飛ばし、その scroll を onScroll が保存して
+// 良い値を潰していた。修正＝保存位置を初回レンダーで確定キャプチャし、そこへ復元（§4.12）。
+// 根拠＝doc/テスト/M_共通シェル・ナビ.md M-TC-014／デザイン標準 §4.12。
+test("M-TC-014 dashboard restores scroll after a card link and browser Back (pop navigation)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await login(page);
+  await page.goto("/");
+  // データ描画で参加中クエストのカードが出るのを待つ（縦に長い位置にある詳細リンク）。
+  const card = page.locator("a.quest-card").first();
+  await expect(card).toBeVisible({ timeout: 12000 });
+  await card.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  const savedY = await page.evaluate(() => window.scrollY);
+  expect(savedY).toBeGreaterThan(50); // 復元を検証できる程度に下方向へ来ている
+  // クエスト詳細へ遷移（push）→ ブラウザ戻る（pop＝アイデア/クエスト詳細の「戻る」= router.back と同じ）。
+  await card.click();
+  await page.waitForURL(/\/quests\//, { timeout: 10000 });
+  await page.goBack();
+  await page.waitForURL((u) => u.pathname === "/");
+  // pop 帰還でも保存位置の近傍へ復元（「かなり上」に落ちない）。
+  await expect
+    .poll(async () => page.evaluate(() => window.scrollY), { timeout: 6000 })
+    .toBeGreaterThan(savedY - 100);
+  const restoredY = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(restoredY - savedY)).toBeLessThanOrEqual(100);
+});

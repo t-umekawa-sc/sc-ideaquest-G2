@@ -44,4 +44,5 @@
 | ID | 種別 | 目的/対象 | 前提 | 対象セレクタ | 期待 | 根拠 |
 |---|---|---|---|---|---|---|
 | M-TC-012 | unit(front) | 純ロジック＝キー生成/TTL判定/クランプ | `scrollRestore.ts`（`storageKey`/`readSaved`/`clampScroll`） | 関数戻り値 | `storageKey("/")==="scroll:/"`／`readSaved(JSON.stringify({y:800,t:now}),now,ttl)===800`・**TTL超過は `null`**・**壊れたJSON/欠損は `null`**／`clampScroll(9999,1200)===1200`・`clampScroll(-5,1200)===0`・`clampScroll(300,1200)===300` | デザイン標準 §4.12 |
-| M-TC-013 | e2e(front) | 一覧→遷移→戻るでスクロール位置が復元（先頭に飛ばない） | ダッシュボードを下方向にスクロール（`window.scrollTo(0,Y)` で Y>0）→「最近の通知」等のリンクで詳細へ遷移→ブラウザ戻る | `window.scrollY`／通知/カードのリンク | 戻った後の `window.scrollY` が **0 ではなく離脱前 Y の近傍**（±数十px・restore-after-load）／リロード直後の初回訪問（保存なし）は 0（誤復元しない） | デザイン標準 §4.12 |
+| M-TC-013 | e2e(front) | 一覧→遷移→戻る（push型戻る）でスクロール位置が復元（先頭に飛ばない） | ダッシュボードを下方向にスクロール（`window.scrollTo(0,Y)` で Y>0）→通知一覧へ→push型「← ダッシュボードへ戻る」で戻る | `window.scrollY`／通知/カードのリンク | 戻った後の `window.scrollY` が **0 ではなく離脱前 Y の近傍**（±数十px・restore-after-load）／初回訪問（保存なし）は 0（誤復元しない） | デザイン標準 §4.12 |
+| M-TC-014 | e2e(front) | pop 帰還（router.back＝ブラウザ戻る）でも復元（ユーザー報告の回帰＝カードリンク→詳細→戻るで「かなり上」に落ちた） | ダッシュボードで参加中クエストのカード（下方向）へスクロール→クエスト詳細へ遷移→**ブラウザ戻る（pop）** | `a.quest-card`／`window.scrollY` | pop 帰還後も `window.scrollY` が離脱前 Y の近傍（±100px）＝Next ネイティブ pop 復元が古い位置へ飛ばしても上書き（保存位置は初回レンダーで確定キャプチャし onScroll の潰しを回避） | デザイン標準 §4.12 |
