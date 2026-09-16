@@ -52,6 +52,8 @@
 | C-TC-120 | api | 非所属グループの候補は 404 | ログイン済 | `GET /quest-groups/{別id}/members` | 404（存在秘匿） | C.4 |
 | C-TC-121 | api | 候補制限（グループ外は追加不可） | recruiting クエスト | `PATCH members`（グループ外 user_id） | 422（user_id） | C.3 候補制限 |
 | C-TC-122 | api | owner 付与は作成者のみ | 作成者≠自分・自分は quest_admin | `PATCH members`（他者に owner 付与） | 403 | C.3 |
+| C-TC-249 | api | 増分EPでも owner 付与は作成者のみ（PATCH 経路 C-TC-122 と対称） | 作成者=other・自分は quest_admin | `POST /members`（owner）／`PUT .../permissions`（owner） | いずれも 403（権限昇格防止） | C.3 |
+| C-TC-250 | api | evaluator 付与は有効パーティー員限定 | 作成者=seed | `PUT .../permissions`（非メンバーへ evaluator／メンバーへ evaluator） | 非メンバー 404／メンバー 200・`permissions` に evaluator 反映 | C.0 |
 | C-TC-123 | api | 作成者保護（差分で外れない） | 作成者＋メンバーのパーティー | `PATCH members=[]` | 作成者は残り・指定外は外れる | C.3 |
 | C-TC-124 | api | 変更系の CSRF 必須 | ログイン済・CSRF ヘッダ無し | `POST /quests` | 403 csrf_failed | A.0 |
 | C-TC-125 | api | アイコン設定/削除（2段） | recruiting クエスト・Fake storage | `PUT/DELETE .../icon-image` | PUT 200＋署名URL（quest-icons/）／DELETE 204 | 論点2／K.4 |

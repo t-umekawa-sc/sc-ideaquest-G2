@@ -199,3 +199,13 @@ def test_j_tc_141_query_injection_safe(client, factory, env):
         r = _search(client, env["qid"], q=q)
         assert r.status_code == 200, f"q={q!r} -> {r.status_code} {r.text}"
         assert isinstance(r.json().get("data"), list)
+
+
+def test_j_tc_123_tombstone_chat_excluded(client, factory, env):
+    """J-TC-123: 論理削除（is_deleted）のチャットは検索結果に出ない（漏洩防止・J.0）。"""
+    _acc, uid = _login_user(client, factory)
+    env["build"](uid)
+    b = _search(client, env["qid"]).json()
+    chats = [r for r in b["data"] if r["type"] == "chat"]
+    assert len(chats) == 1  # 非削除の1件のみ（削除済み「消済…」は出ない）
+    assert all("消済" not in (r.get("snippet_html") or "") for r in b["data"])

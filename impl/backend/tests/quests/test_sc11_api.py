@@ -478,3 +478,43 @@ def test_c_tc_142_completed_party_frozen(client, env):
     qid = env.seed_quest(status="completed")
     r = client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
     assert r.status_code == 409, r.text
+
+
+def test_c_tc_249_owner_grant_via_increment_eps_forbidden(client, env):
+    """C-TC-249: 増分EP（POST /members・PUT permissions）経由でも owner 付与は作成者のみ＝非作成者(quest_admin)は 403（PATCH 経路 C-TC-122 と対称・権限昇格防止）。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting", owner=env.other_user_id)  # 作成者=other
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, qid, env.user_id, permissions=["quest_admin"])  # seed=quest_admin（作成者でない）
+        ts.commit()
+    # POST /members で owner 付与 → 403
+    r1 = client.post(f"{QUESTS}/{qid}/members",
+                     json={"user_id": str(env.third_user_id), "permissions": ["owner"]}, headers=_csrf(client))
+    assert r1.status_code == 403, r1.text
+    # third を通常メンバーで追加してから PUT permissions で owner 付与 → 403
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, qid, env.third_user_id, permissions=["comment"])
+        ts.commit()
+    r2 = client.put(f"{QUESTS}/{qid}/members/{env.third_user_id}/permissions",
+                    json={"permissions": ["owner"]}, headers=_csrf(client))
+    assert r2.status_code == 403, r2.text
+
+
+def test_c_tc_250_evaluator_grant_requires_member(client, env):
+    """C-TC-250: evaluator 付与は有効パーティー員限定＝非メンバーへは 404・メンバーへは 200 で反映（C.0）。"""
+    _login_seed(client)  # seed=作成者(owner)
+    qid = env.seed_quest(status="recruiting")  # owner=seed
+    # 非メンバー other へ evaluator 付与 → 404
+    r1 = client.put(f"{QUESTS}/{qid}/members/{env.other_user_id}/permissions",
+                    json={"permissions": ["evaluator"]}, headers=_csrf(client))
+    assert r1.status_code == 404, r1.text
+    # メンバーにしてから付与 → 200
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, qid, env.other_user_id, permissions=["comment"])
+        ts.commit()
+    r2 = client.put(f"{QUESTS}/{qid}/members/{env.other_user_id}/permissions",
+                    json={"permissions": ["evaluator"]}, headers=_csrf(client))
+    assert r2.status_code == 200, r2.text
+    members = client.get(f"{QUESTS}/{qid}/members").json()["data"]
+    other = next(m for m in members if m["user"]["user_id"] == str(env.other_user_id))
+    assert "evaluator" in other["permissions"]
