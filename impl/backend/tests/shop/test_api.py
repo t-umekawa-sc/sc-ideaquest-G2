@@ -157,3 +157,15 @@ def test_g_tc_309_my_items_name_locale(client, factory):
     assert _crown_name() == "王冠"  # 既定 ja
     _set_locale(acc, "en")
     assert _crown_name() == "Crown"  # 受信者 locale=en で英語名
+
+
+def test_g_tc_307_equip_idempotent(client, factory):
+    """G-TC-307: 同じ item を再 PUT しても no-op＝装備維持・二重装備しない（G.2 冪等）。"""
+    acc = _login_new(client, factory)
+    _own(acc, "cap")
+    cap = str(_item("cap").id)
+    assert client.put("/api/v1/me/equipment", json={"head": cap}, headers=_csrf(client)).json()["equipped"]["head"] == cap
+    r = client.put("/api/v1/me/equipment", json={"head": cap}, headers=_csrf(client))  # 同じ item 再PUT
+    assert r.status_code == 200 and r.json()["equipped"]["head"] == cap  # no-op・装備維持
+    cap_item = next(d for d in client.get(ITEMS).json()["data"] if d["id"] == cap)
+    assert cap_item["is_equipped"] is True  # 解除や重複になっていない

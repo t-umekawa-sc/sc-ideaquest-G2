@@ -421,3 +421,12 @@ def test_f_tc_206_follow_selection_notifies_follower_not_selector(client, env):
             ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == idea))
             ts.execute(Follow.__table__.delete().where(Follow.idea_id == idea))
             ts.commit()
+
+
+def test_f_tc_208_select_non_party_404(client, env):
+    """F-TC-208: 非パーティー員の選定/解除は 404（存在秘匿・F.0 門番・IDOR）。"""
+    _login_seed(client)  # seed=非メンバー
+    qid = env.make_quest(owner=env.other_id, seed_member=False)  # 作成者=other・seed は非メンバー
+    idea = env.make_idea(quest_id=qid, author=env.other_id)
+    assert client.post(SELECT(idea), headers=_csrf(client)).status_code == 404
+    assert client.delete(SELECT(idea), headers=_csrf(client)).status_code == 404

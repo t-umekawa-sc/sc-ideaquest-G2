@@ -70,3 +70,4 @@
 | F-TC-205 | api | 評価確定→フォロワーに follow_evaluation 生成・評価者除外（生成テスト新設） | user=evaluator（提出者）／other=フォロワー | `PUT /ideas/{id}/evaluation`(submitted) | **フォロワー(other)に `follow_evaluation` 1件**・評価者(user)は0 | F.5／H.0 |
 | F-TC-206 | api | 選定→フォロワーに follow_selection 生成・選定者除外（生成テスト新設） | user=owner（選定者）／other=フォロワー | `POST /ideas/{id}/select` | **フォロワー(other)に `follow_selection` 1件**・選定者(user)は0 | F.5／H.0 |
 | F-TC-207 | e2e | 評価の下書き保存後は評価ビューを閉じる（モーダル=close／フルページ=詳細へ・ユーザー要望） | recruiting＋公開アイデア／`/ideas/[id]/eval`（フルページ） | 新規性3点→「下書き保存」 | 保存後に `/ideas/[id]`（詳細）へ遷移＝評価ビューを離れる | SC-25／F.2 |
+| F-TC-208 | api | 非パーティー員の選定/解除は 404（存在秘匿・IDOR） | 作成者=other・seed は非メンバー・公開アイデア | `POST/DELETE /ideas/{id}/select`（seed） | いずれも 404（`_resolve_evaluable_idea` の門番） | F.0 |

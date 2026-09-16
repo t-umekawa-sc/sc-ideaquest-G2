@@ -45,6 +45,7 @@
 | G-TC-304 | api | 所有済みは 409 | 所有済み | `POST purchase` | 409 `already_owned`・二重消費なし | G.1／§5.26 |
 | G-TC-305 | api | 自分の所有装備（スロット別） | 数点所有 | `GET /me/items` | `slots`（head/face/body/hand/background）＋`equipped` | G.2 |
 | G-TC-306 | api | 装備更新（各スロット1点・切替/解除） | 同スロット2点所有 | `PUT /me/equipment`（装備→別装備→null） | 装備で `equipped[slot]`＝item・切替で1点のみ（部分ユニーク）・null で解除 | G.2／§8-⑩ |
+| G-TC-307 | api | 装備 PUT の冪等（同一 item 再PUTは no-op） | item 所有・装備済み | `PUT /me/equipment`（同一 item を再指定） | 200・装備維持（`equipped[slot]` 不変・items 一覧で is_equipped=true・二重装備しない） | G.2 |
 | G-TC-307 | api | 未所有/スロット不一致は 422 | 未所有 item / 別スロット item | `PUT /me/equipment` | 422（`field`＝slot） | G.2 |
 | G-TC-308 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST purchase`／`PUT equipment` | 403 csrf_failed／401 | A.0 |
 | G-TC-309 | api | 所有装備一覧のマスタ名 locale 出し分けの担保（i18n 結線） | `crown`（ja=王冠/en=Crown）を装備した実ユーザー。`users.locale` を ja→en に切替 | `GET /me/items` を各 locale で | ja は `name`=「王冠」・en は `name`=「Crown」（受信者 locale で選択・§2.1・既定 ja） | コーディング規約 §2.1／G.2 |
