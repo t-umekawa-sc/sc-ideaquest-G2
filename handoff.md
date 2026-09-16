@@ -4,81 +4,78 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-16 JST**（テストカバレッジ埋め＋クエスト参加リクエスト設計ドラフト＋結果タブUI改修セッション）
+- 最終更新: **2026-09-16 JST**（テストカバレッジ [A] Med/Low 完走＋設計の実態化＋TC-ID 重複解消セッション）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **4cda621** `test(coverage): ［A］Med＝発行の冪等(B-TC-025)・members API経路トゥームストーン再利用(C-TC-255)`
-- **push 済み・未 push 0**（`main...origin/main` は同期。確認済み）
-- 本セッションのコミット（古い順・すべて push 済み）＝ `6ed46e7`→`57826f0`→`ee83da5`(テスト[A])→`85ac4a8`(設計ドラフト§2.5)→`ed751aa`(結果タブ Modal化)→`d56f7ba`(可視範囲§3)→`c1e8b38`(フォローscope§2.6)→`9b140fe`(フォロー確定)→`4cda621`(テスト[A]発行冪等/members再利用)。
+- 最新コミット: **f7d8cc9** `docs+test: 設計を実態化(me/spells不採用・chat_preview未実装明示)＋B-TC-025重複ID解消(発行冪等→035)`
+- **push 済み・未 push 0**（`main...origin/main` 同期。確認済み）
+- 本セッションのコミット（古い順・すべて push 済み）＝ `be138e2`([A]Med完了)→`079fb62`([A]Low完了)→`f7d8cc9`(設計実態化＋ID重複解消)。
 
 ## 2. プロジェクトのゴール
-社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。群単位（D→E→G→F→H）に seed→受入→指摘修正を回している。並行で**テストパターンの網羅レビュー（[A]純テストギャップ埋め）**と**次機能の設計ドラフト**を進行中。
+社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。並行で**テストパターンの網羅レビュー**と**次機能の設計ドラフト**を進行中。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-3系統を並行で進めた＝**(A) テスト[A]埋め**・**(B) クエスト参加リクエスト設計ドラフト**・**(C) 結果タブUI改修**。**backend プロダクションコードは未変更**（[A]はすべて既存実装への純テスト追加＝実装済みの振る舞いを担保するだけ）。
+**standing task「残り［A］Med/Low を最後まで埋めて」を完走**した。**backend プロダクションコードは未変更**（テスト追加はすべて既存実装の振る舞い担保＝純テスト）。加えてユーザー承認のもと**設計を実態に合わせる修正**と**TC-ID 重複の解消**を実施。
 
-### A. テストカバレッジ [A]（純テストギャップ）を追加
-台帳＝`doc/テスト/カバレッジギャップ.md`（[A]純テスト/[B]実装ギャップ/[C]設計乖離に分類）。追加した TC（すべて green 確認済み）:
-- **C-TC-252/253/254/255**（`impl/backend/tests/quests/test_sc11_api.py`）＝members専用EPの in_scope+group_ids／POST /quests の Idempotency／公開中PATCH strict（categories:[]→422）／members のAPI経路トゥームストーン再利用。
-- **B-TC-025**（`impl/backend/tests/admin/test_admin_issue.py`）＝アカウント発行の Idempotency（再送再生・副作用1回・別内容422）。
-- **D-TC-227/228**（`tests/ideas/test_api.py`）＝添付DLの非パーティー404(IDOR)／複数フィールド同時変更の changed_fields 複数。
-- **F-TC-209**（`tests/evaluations/test_api.py`）＝提出0件の評価集計は空。
-- 台帳追記＝`doc/テスト/{B_会社・アカウント,C_クエスト,D_アイデア,F_評価}.md`。**Idempotency は横断MW（`app/core/idempotency.py`）がグローバルに効く**＝POST /quests も発行も実装済み、テストだけが不足だった。
+### 重要な前提＝台帳（`doc/テスト/カバレッジギャップ.md`）は実態と乖離していた
+着手前にコードで裏取りした結果、**残り項目の多くが既に担保済み or 純テスト不可**と判明（メモリ「handoff/テスト md の未実装は着手前にコードで裏取り」の実証）。台帳は都度、実態に合わせて訂正した。
 
-### B. クエスト「発見＋フォロー＋参加リクエスト」設計ドラフトを大幅具体化
-ファイル＝**`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`**（正規化先＝要件定義/データモデル/API設計C/H/screens）。ユーザーが口頭でイメージを提示→私が仕様に起こした。**まだドラフト（実装未着手）**。決定事項は §6 参照。ドラフト内の節＝§2.5＝参加リクエストのユーザーフロー、§2.6＝フォロー仕様、§3＝可視範囲、§4＝データモデル案、§8＝論点の決着状況。
+### A. テスト [A] Med（`be138e2`）
+- **本物のギャップは `/admin/accounts`（company_account_admin セルフ経路）のみ**＝ **B-TC-045〜049**（`tests/admin/test_admin_self.py`）を追加。編集＋email変更verifiedリセット／disable・enable／password-reset の各正常系／**他社 IDOR 404（セッション会社固定の実効境界＝本経路固有）**／identity 重複409。変更系ロジックは system_admin 経路（B-TC-025〜034）と service 共有。
+- **他 Med 3件は既存担保を確認し台帳訂正（テスト追加せず）**＝ ①permission 実効境界（vote会員が評価403 等）＝F-TC-107/E-TC-104/D-TC-103/D-TC-122 が既済。③メール確認再送で旧トークン失効＝B-TC-165/166・A-TC-104・B-TC-167 が既済（台帳の「password_setup と非対称」は**事実誤認**＝実装は対称・`invalidate_email_verify_challenges`）。④`GET /me` 署名URL＝`tests/me/test_me_images.py::test_k_tc_avatar_put_sets_signed_url` が既済（台帳の「K側未担保」は誤り）。
 
-### C. クエスト結果タブの編集をインライン展開→モーダル化（プロダクション変更・唯一）
-- ファイル＝**`impl/frontend/src/features/quests/components/QuestResultTab.tsx`**。⑤「振り返り・学び / 次アクション」の編集が**インライン展開**だったのを、ユーザー要望で**`Modal`（`@/components/ui`）**に変更。読み取りビューは常時表示・編集はダイアログ。`cancelEdit()` で未保存編集を破棄し直近保存値へリセット、`save()` 後は空KPI行を掃除。デザイン標準 §103-107（登録/編集は原則モーダル）に合致。
-- **e2e 依存なし**（旧インライン挙動をテストする e2e は存在しないことを grep で確認）。回帰テストは未追加（UI改善であり不具合ではないため。要否は次回判断）。
+### B. テスト [A] Low（`079fb62`）
+本物のギャップ4系統に純テスト追加（すべて green）:
+- **A-TC-110**（`tests/auth/test_auth_email_verify.py`）＝email-verify/confirm は不正 Origin で 403・token 未消費（Origin 検証が token 判定に先行・A.7.1）。
+- **C-TC-145/146**（`tests/quests/test_sc11_api.py`）＝完了クエストの `PUT /party` 409（POST 経路 C-142 と対称）／`PUT /party` の原子性（末尾に候補外 uuid を含む差分は 422 かつ先頭の有効追加も未適用＝検証先行）。
+- **E-TC-227**（`tests/chat/test_api.py`）＝引用元 delete で `quotes[].excerpt` がトゥームストーン文言「このメッセージは削除されました」に置換。
+- **G-TC-407/408**（`tests/gamification/test_rankings.py`）＝ランキング多段タイブレーク（同スコア→XP→先着）／期間 this_month・all の集計境界。
+
+### C. 設計の実態化＋ID重複解消（`f7d8cc9`）※ユーザー承認済み
+- **`GET /me/spells` を不採用化**（API設計 G.3）＝`GET /spells` が `unlocked`/`can_unlock` を同梱しピッカー（SC-24）も賄えるため重複EP。デッドスペック解消。
+- **`chat_preview` を「現状未実装・将来対応」と明示**（API設計 D.1／E.1）＝現行実装は idea 詳細に内包しない（`IdeaDetailDTO` 非搭載・`repository.list_recent_messages` 未配線）。意図は残しつつ docs を正直化。
+- **B-TC-025 の ID 重複を解消**＝コードで二重定義だった（発行の冪等＝`test_admin_issue.py` と 無効化＝`test_admin_lifecycle.py`）。`red確認台帳` が参照する **disable 側を原典**とし、発行の冪等を **B-TC-035** へ改番。
 
 ## 4. 現在の状態（動作/テスト）
-- **動いているもの**: フロント全画面 backend 接続済み。今回の結果タブ Modal 化は **frontend コンテナを再ビルド済み（`impl-frontend-1` は約10分前起動）＝ブラウザ受入可能**。
-- **テスト通過状況**: 今回追加の8 TC（C-252/253/254/255・B-025・D-227/228・F-209）は個別実行で **all green**（確認済み）。**全体スイートは今回未実行（未確認）**＝次回コミット前に回すこと。
-- **トレーサビリティ**: `python3 scripts/check_tc_traceability.py` ＝ **✅ code 562 件すべて md 記載**（確認済み）。
+- **動いているもの**: フロント全画面 backend 接続済み。**backend プロダクションコードは今セッション未変更**。
+- **テスト通過状況**: 今回追加/改番した TC（B-045〜049・A-110・C-145/146・E-227・G-407/408・B-035改番）は**個別実行で all green**（`-v` マウント実行・確認済み）。**全体スイートは今回未実行（未確認）**＝次回まとまった変更のコミット前に回すこと。
+- **トレーサビリティ**: `python3 scripts/check_tc_traceability.py` ＝ **✅ code 575 件すべて md 記載**（確認済み）。
 - **壊れているもの**: 認識している範囲では無し。
-- **注意（重要）**: **backend コンテナ（`impl-backend-1`・約2時間前起動）は source を再ビルドしていない＝今回の新テストファイルを含まない**。ただし backend プロダクションコードは未変更なので**再ビルド不要**。pytest は後述の `-v` マウントで最新 source を反映して実行する。
+- **コンテナ**: テスト用に **db/redis のみ起動したまま**（`cd impl && docker compose up -d db redis` で起こした）。frontend/backend/worker は未起動。ブラウザ受入をするなら §8 の手順でフル起動が要る。
 
 ## 5. 詰まっている点（試して失敗した点）
-- **`docker compose run` が古いベイクを使う**: `impl/compose.yaml` の backend/frontend は `build:` のみで **source の volumes マウントが無い**（イメージにベイク）。そのため `docker compose run --rm backend pytest ...` は**古いコードを実行**し、新テストが「not found / deselected」になる。→ **解決＝`-v "$(pwd)/backend:/app"` で source をマウント**して実行（§8 参照）。frontend の改修をブラウザ反映するには **`docker compose build frontend && docker compose up -d frontend`** が要る（今回実施済み）。
-- **`docker compose run` の entrypoint が `-k` のクォートを壊す**: `-k "a or b"` を渡すと entrypoint が再構成して分割し 0 件 deselected になることがある。**`-v` マウント経由だと `-k "a or b"` が正しく効いた**（実績あり）。node ID 直接指定（`file.py::test_x`）は古いベイクだと「not found」になるので `-v` マウント必須。
+- **`docker compose run` が古いベイクを使う**: `impl/compose.yaml` の backend/frontend は `build:` のみで source の volumes マウントが無い（イメージにベイク）。pytest は **`-v "$(pwd)/backend:/app"` で source をマウント**して実行する（付けないと新テストが not found/deselected）。frontend 改修のブラウザ反映は **`docker compose build frontend && docker compose up -d frontend`** が要る。
+- **`docker compose run` の entrypoint が `-k` を分割**することがあるが、**`-v` マウント経由なら `-k "a or b"` が正しく効く**（今回も実績あり）。
 
 ## 6. 決定事項と根拠（採用しなかった案も）
-設計ドラフト（クエスト参加リクエスト）でユーザーが決めた事項:
-1. **掲示板の可視範囲＝部署フィルタ ＋ discoverable フラグ ON の AND**（ドラフト§3）。作成者が opt-in した & 閲覧者の所属部署が参加部署と交差するクエストだけ掲示板に出る。**参加部署0件（全社クエスト）は discoverable ON で社内全員に表示**。→ 採用しなかった案＝「会社全体に無条件公開」（部署の壁を無視するため却下）・「部署既定＋会社デフォルト切替」（複雑すぎるため却下）。門番は二層＝発見用 `can_discover_quest`（メタのみ）と中身用 `can_access_quest`（現状維持・参加後）。
-2. **承認者＝作成者 or quest_admin**。承認で付与する既定権限＝comment/vote/idea_create。
-3. **承認UIは新タブを作らず既存パーティータブに統合**＝申請者(pending)を上位・却下者(rejected)を下部に表示。行クリックでユーザープロフィールをダイアログ表示し「承諾」/「拒否」。→ 却下は**終端にしない**＝`quest_join_requests` は `UNIQUE(quest_id,user_id)` の**1行を status 遷移**（pending→rejected→approved で後日承諾可）。部分ユニークで却下行を消す案は「後で承諾」が作れず却下。
-4. **フォロー（watch）はスコープ内**。F1通知＝ステータス変化/結果確定/締切/新着アイデア(件数のみ) の**4種すべて既定ON・すべてメタ級**（フォロワーは非メンバー＝中身不可視のため本文/リンクは開かない）。F2＝member 昇格時は**自動で「参加中」に昇格**（follow 無効化）。F5＝**フォロー自体に報酬なし**（watch は貢献でないため）。
-5. **段階実装＝①掲示板（発見）→②参加リクエスト／③フォロー**（②③は①の後なら順不同）。
-6. **設計ドラフトの残・技術推奨（未決だが実装時判断でよい）**＝F3動的失効・F4フォロー可能条件（can_discover_quest 流用）・F6ダッシュボード・§8-6却下後の再申請可否・§8-7プロフィールダイアログ流用の可否。
+今セッションの決定:
+1. **台帳の残項目は「テストを増やす」より先に「実態で done か」を確認する**＝既存担保済みなら重複テストを書かず台帳を訂正する（メモリの方針＝設計/台帳が誤りなら台帳側を直す）。今回 Med4件中3件・Low の一部がこれに該当。
+2. **セルフ経路（`/admin/accounts`）の他社 IDOR は system_admin 経路の担保では代替されない**＝会社を URL でなくセッションから取る認可境界が別物のため、B-TC-048 を本経路固有として追加。
+3. **`GET /me/spells` と `chat_preview` は設計を実態に合わせる**（ユーザー承認）＝実装を増やすのでなく docs を正直化。me/spells は不採用（`/spells` 一本化）、chat_preview は将来対応と明示。
+4. **TC-ID の一意性は red 確認台帳の参照側を原典**とする＝重複時は後から足した側を改番（今回 発行の冪等 025→035）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **[A] Med/Low の残りを埋める**（standing task「残り［A］Med/Low を最後まで埋めて」）。台帳＝`doc/テスト/カバレッジギャップ.md` の未チェック `[ ]`。残（確認済みリスト）:
-   - **Med** 各 permission の実効可否（`vote`のみ会員が評価不可＝403 等の境界）を D/E/F 側で明示（要 red 確認）。
-   - **Med** 会社アカウント管理者ルート `/admin/accounts` の編集/disable/enable/password-reset 正常系＋他社IDOR404＋identity重複409＋email変更でverifiedリセット（`tests/admin/test_admin_accounts.py`・B-TC-040〜044 は一覧/発行/authz のみ）。**規模やや大**。
-   - **Med** メール確認リンク再送で旧トークン失効（送信→再送→旧confirm 410・新のみ200）。password_setup(A-TC-040) と非対称。
-   - **Med** `GET /me` の画像署名URL解決（生パス非露出・K.1）。
-   - **Low** email-verify/confirm 不正Origin拒否／`PUT /party` owner検証＋原子性＋completed409／ランキングtiebreak・this_month/all／引用元削除でexcerptトゥームストーン／chat_preview api／`GET /me/spells`（デッドスペック＝設計を「E代替」に正すか実装）。
-   - 手順＝**コードより先に `doc/テスト/<ドメイン>_*.md` に TC 行（`根拠`列付き）を追加**→テスト作成→`-v`マウントで green 確認→台帳・gap doc 更新→`check_tc_traceability.py` ✅→commit→push。
-2. **[B]/[C] は実装/仕様確定が要る**ので [A] とは別扱い（`GET /items` フィルタ未実装＝[B]・メンション差し替え通知整合 no-op＝[C]・要仕様確定）。
-3. **設計ドラフトの次段**＝ユーザーが実装着手を指示したら、正規化（要件定義FR新規・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C の新EP・H通知新種別・screens）へ展開。**現時点は実装着手指示なし**。
-4. **結果タブ Modal 化の受入**＝ユーザーがブラウザで確認する想定（`/quests/{id}` の🏁結果タブ→編集ボタン→モーダル）。回帰テスト要否は受入後に判断。
+1. **[A] はもう残っていない**＝`doc/テスト/カバレッジギャップ.md` の [A] セクションに未対応の純テスト項目は無い（残る `[ ]` は [B] 実装ギャップと [C] 乖離のみ）。
+2. **[B] 実装ギャップ（実装＋テストが要る・要ユーザー着手指示）**＝ ①認証イベントの監査ログ（`audit.record` が1箇所のみ・A.9-⑥）②`GET /quests` の `sort`（router に引数無し・C.1/§1.8.1）③ダッシュボード I-TC-107/108 ほか（台帳にIDあるが未実装）④リアルタイム L-TC-103/131 ⑤`GET /items` フィルタ（`get_items` に filter 引数なし）⑥`chat_preview` 実装（将来・設計は §3-C で「未実装」明示済み）。
+3. **[C] 設計・実装の乖離（要判断）**＝ ①無変更保存＝版なし（backend `update_idea` はサーバーガード無し・frontend 専任か判断）②メンション差し替え通知整合（`_notify_message_updated` は no-op・仕様確定要）。
+4. **結果タブ Modal 化の受入（前セッションからの未受入・持ち越し）**＝`impl/frontend/src/features/quests/components/QuestResultTab.tsx` の⑤編集をインライン→Modal 化した件。ユーザーがブラウザで `/quests/{id}` の🏁結果タブ→編集ボタン→モーダルを確認する想定。回帰テスト要否は受入後判断。**frontend 未起動なので §8 でビルド起動が要る**。
+5. **クエスト参加リクエスト設計ドラフト**（`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`）＝**まだドラフト・実装着手指示なし**。着手指示が出たら正規化（要件定義FR・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C/H・screens）へ展開。決定事項は当ドラフト §6/§8 参照。
 
 ## 8. 再開に必要な環境情報
-- **作業ディレクトリ**: リポジトリルート `/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から（`impl/backend` から実行するとマウントパスが `backend/backend` になり壊れる）。
+- **作業ディレクトリ**: リポジトリルート `/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から。
 - **コンテナ起動（フル・受入用）**: `cd impl && docker compose --profile workers up -d`（backend/frontend/db/redis/mailhog/minio/worker/mail-worker）。ポート＝frontend **3000**・backend **8000**・MailHog UI **8025**・MinIO **9000**。
 - **frontend 改修の反映**: `cd impl && docker compose build frontend && docker compose up -d frontend`（source 無マウントのため再ビルド必須）。
-- **backend pytest（最新 source を反映）**: `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウントを付けないと古いベイクを実行する**。複数選択は `-k "a or b"`（`-v` マウント経由なら効く）。**pytest 実行時は mail-worker を止める**（`docker compose stop mail-worker` 推奨・多重 mail sender 競合回避。ゲーム感QA作法に準拠）。
+- **backend pytest（最新 source を反映）**: `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウント必須**。**pytest 実行時は mail-worker を止める**（`docker compose stop mail-worker`・多重 sender 競合回避）。db/redis は依存で自動起動する。
 - **トレーサビリティゲート**: リポジトリルートで `python3 scripts/check_tc_traceability.py`（コミット前に ✅ 必須）。
-- **frontend ビルドゲート**: `cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint。内部遷移は `<Link>`。tsc/vitest だけだと Next の lint を見逃す）。
+- **frontend ビルドゲート**: `cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint。内部遷移は `<Link>`）。
 - **コミット規約**: 末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。受入/レビュー反映は main 直コミット可。ゲーム感作業のみ `feature/game-feel`。
 - **正本の場所**: 実装現況＝`impl/README.md`／実装順＝`doc/実装計画.md`／規約＝`doc/規約/*`／設計ドラフト＝`doc/設計ドラフト/*`／テスト台帳＝`doc/テスト/*`（カバレッジ backlog＝`カバレッジギャップ.md`）。
 
 ---
 ### 自己チェック（これだけで再開できるか）
 - ✅ 最新コミット・push 状態・ブランチ明記。
-- ✅ 3系統の変更（テスト/設計/UI）と理由をファイル/関数で明記。
-- ✅ テスト状況＝今回追加8TCは green、**全体スイートは未実行（未確認）**と明記。
-- ✅ コンテナ落とし穴（source 無マウント＝`-v` 必須・frontend 再ビルド必須・`-k` クォート）を §5/§8 に明記。
-- ✅ 次アクションを台帳の残 `[ ]` とファイル/手順まで具体化。
-- ⚠️ 未確認事項＝(1) 全体テストスイートの通過（未実行）(2) 結果タブ Modal 化のユーザー受入（未実施）(3) 設計ドラフトの実装着手指示（現時点なし）。
+- ✅ 今回の変更（テスト[A]Med/Low・設計実態化・ID重複解消）と理由をファイル/TC-ID で明記。
+- ✅ テスト状況＝追加分は green、**全体スイートは未実行（未確認）**と明記。
+- ✅ [A] は完走・残は [B]/[C] のみ、と次アクションを台帳の分類に沿って具体化。
+- ✅ コンテナ落とし穴（source 無マウント＝`-v` 必須・frontend 再ビルド・db/redis のみ起動中）を §4/§5/§8 に明記。
+- ⚠️ 未確認/持ち越し事項＝(1) 全体テストスイートの通過（未実行）(2) 結果タブ Modal 化のユーザー受入（未実施・前セッションから持ち越し）(3) 設計ドラフトの実装着手指示（現時点なし）。
