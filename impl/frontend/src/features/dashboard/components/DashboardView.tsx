@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { markNotificationRead, markRead, notificationHref } from "@/features/notifications/api";
+import { timeLabel } from "@/features/notifications/time";
 import Image from "next/image";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -305,6 +306,8 @@ export function DashboardView({
                   <div className="notif-body">
                     <div className="notif-head">
                       {title}
+                      {/* 通知日時（相対ラベル・SC-02 と同フォーマット＝`timeLabel`・ユーザー要望）。 */}
+                      <span className="notif-time muted">{timeLabel(n.created_at)}</span>
                       {/* 未読のみ「既読にする」を件名の横に（参照先を開かず既読化＝SC-02 の n__read と同趣旨）。 */}
                       {!n.is_read && (
                         <button

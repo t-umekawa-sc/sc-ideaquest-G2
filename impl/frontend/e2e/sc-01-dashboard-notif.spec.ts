@@ -71,3 +71,27 @@ test("I-TC-144 dashboard recent notification has a mark-read button that marks r
     psql(`DELETE FROM notifications WHERE id='${id}';`);
   }
 });
+
+// I-TC-155 SC-01 ダッシュボード「最近の通知」に通知日時（相対ラベル）を表示（ユーザー要望）。
+// created_at=now の未読通知を直挿入し、当該行に `.notif-time` の相対ラベル（たった今/○分前/○時間前）が出ることを確認。
+// 根拠＝doc/テスト/I_ダッシュボード.md I-TC-155・SC-01／相対ラベルの純ロジックは I-TC-156（time.test.ts）。
+test("I-TC-155 dashboard recent notification shows a relative timestamp", async ({ page }) => {
+  const id = randomUUID();
+  const stamp = `日時付き通知${Date.now().toString().slice(-8)}`;
+  psql(
+    `INSERT INTO notifications (id, recipient_id, type, params, is_read, created_at) VALUES ` +
+      `('${id}', (SELECT id FROM users WHERE login_id='${OWNER.loginId}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
+  );
+  try {
+    await login(page);
+    await page.goto("/");
+    const li = page.locator(".notif-list li").filter({ hasText: stamp });
+    await expect(li).toHaveClass(/unread/);
+    // 件名の横（.notif-head 内）に通知日時＝相対ラベルが出る。
+    const time = li.locator(".notif-time");
+    await expect(time).toHaveCount(1);
+    await expect(time).toHaveText(/たった今|分前|時間前/); // now 挿入なので直近ラベル
+  } finally {
+    psql(`DELETE FROM notifications WHERE id='${id}';`);
+  }
+});

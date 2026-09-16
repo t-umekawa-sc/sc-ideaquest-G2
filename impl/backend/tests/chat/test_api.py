@@ -259,6 +259,42 @@ def test_e_tc_109b_edit_replaces_quotes(client, env):
     assert r3.status_code == 200 and r3.json()["quotes"] == []
 
 
+def test_e_tc_223_quote_no_notify_mention_notifies(client, env):
+    """E-TC-223: 引用は通知しない・メンションは通知する（決定 2026-09-16・ユーザー確認）。
+
+    引用（自分のメッセージが引用された）だけでは対人通知を発火しない＝人を呼ぶのは @メンション のみ。
+    引用された本人が idea 著者/フォロワー/被メンションでもない状況で単離して確認する。
+    """
+    from app.tenant.notifications.orm import Notification as _Notif
+
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, author=env.user_id)  # 著者=投稿者本人＝idea_comment は自分宛で除外
+    with get_tenant_session(env.db_identifier) as ts:
+        quests_repo.add_member(ts, qid, env.other_id, permissions=["comment"])  # メンション先はパーティー員が要件
+        ts.commit()
+    _post(client, idea, body="口火")  # 先にグループを作る（idea_comment は user 自身宛→除外）
+    # other の発言（＝この後 user に引用される「他人のメッセージ」）を直接 seed。
+    with get_tenant_session(env.db_identifier) as ts:
+        cg = chat_repo.get_chat_group_by_idea(ts, idea)
+        mx_id = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="other の発言").id
+        ts.commit()
+
+    def _types(recipient, ref_msg):
+        with get_tenant_session(env.db_identifier) as ts:
+            rows = ts.execute(
+                select(_Notif).where(_Notif.recipient_id == recipient, _Notif.ref_chat_message_id == ref_msg)
+            ).scalars().all()
+            return sorted(n.type for n in rows)
+
+    # user が mx を引用（メンション無し）＝引用された other には通知が飛ばない。
+    m_quote = _post(client, idea, body="これのことですね", quotes=[mx_id]).json()["id"]
+    assert _types(env.other_id, m_quote) == []  # 引用は通知しない（決定）
+    # user が other をメンション＝other に mention 通知が飛ぶ（対人通知はメンションのみ）。
+    m_mention = _post(client, idea, body="確認お願いします", mentions=[env.other_id]).json()["id"]
+    assert _types(env.other_id, m_mention) == ["mention"]
+
+
 def test_e_tc_110_delete(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())  # ACME-01 owner

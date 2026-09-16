@@ -33,6 +33,7 @@
 | `security_new_device` | A（ログイン成功） | 本人 | —（本文のみ） | `device`,`ip`,`at` |
 | `security_password_changed` | A/K（PW変更完了） | 本人 | —（本文のみ・メールも） | `at` |
 
+- **引用返信は通知を発火しない（決定 2026-09-16・ユーザー確認）**＝チャットの引用（`quoted_message_ids[]`）は**文脈提示**であって対人通知の手段ではない。引用された本人（自分のメッセージが引用された人）への通知種別は設けない（catalog に `quote` は無い）。**人を呼ぶ＝ @メンション（`mention`）のみ**（役割分離）。引用元の投稿者が同時に mention/idea 投稿者/フォロワーに該当すれば、その種別で通常どおり通知される（引用ゆえの追加通知はしない）。検証＝E-TC-223。
 - **`security_*` はオプトアウト不可**（A.9-⑧・将来の種別 ON/OFF 対象外）。`security_password_changed` のメール実送信は認証/セキュリティ基盤（A 経路＝初回設定/再設定・K 経路＝プロフィールでの自己PW変更のいずれも／H は会社DBの通知行を担当）。**`security_password_changed` は A（初回設定/再設定）に加え K（プロフィールでの自己PW変更・A.9-⑧(b)）も発火元**＝どちらの application も post-commit で `notify()` を呼ぶ（K は確定済み・K.3 と整合）。
 - **`quest_party_invited`（C→H・実装は H フェーズ）**: クエスト publish（`draft→recruiting`・C.2）成功時に、追加されたパーティーメンバー（作成者=owner 除く）へ post-commit で `notify()` を呼ぶ。**H 未実装フェーズでは C 側は notify() を no-op フックとして置く**（C.2・SC-11 実装時に stub＋TODO を残す）＝H 実装時に本表の行を拾って結線する（発火元台帳に登録済みなので実装漏れしない）。参照＝`ref_quest_id`（SC-02→SC-12 遷移・データモデル §5.24）。**TBD**＝公開済みクエストへのパーティー増分追加（C.3 の `POST /members` 等）でも同種別を出すか（現状は publish 時のみ規定・C.7 で継続検討）。
 

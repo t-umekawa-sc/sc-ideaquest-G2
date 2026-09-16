@@ -11,9 +11,10 @@ import { realtime } from "@/lib/realtime";
 import { useScrollRestore } from "@/lib/scrollRestore";
 
 import { getNotifications, markAllRead, markRead, markUnread, notificationHref, type NotificationDTO } from "../api";
+import { groupOf, timeLabel, type NotifGroup } from "../time";
 import "../notifications.css";
 
-type Group = "today" | "yesterday" | "earlier";
+type Group = NotifGroup;
 const GROUP_LABEL: Record<Group, string> = { today: "今日", yesterday: "昨日", earlier: "それ以前" };
 const GROUP_ORDER: Group[] = ["today", "yesterday", "earlier"];
 
@@ -42,31 +43,8 @@ const CAT_TYPES: Record<string, string[]> = Object.fromEntries(CATEGORY.map(([k,
 // 一覧の行の除外・未読数・一括既読は backend が実効ゲームモードで担保（§4.11・API H）＝ここは UI（タブ）だけ。
 const GAME_CATS = new Set(["achievement", "magic"]);
 
-// ref→遷移先の解決は `notificationHref`（../api・SC-01 ダッシュボードと共有・DRY）。
-
-function groupOf(iso: string): Group {
-  const d = new Date(iso);
-  const now = new Date();
-  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startYesterday = new Date(startToday);
-  startYesterday.setDate(startToday.getDate() - 1);
-  if (d >= startToday) return "today";
-  if (d >= startYesterday) return "yesterday";
-  return "earlier";
-}
-
-function timeLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
-  if (diff < 60) return "たった今";
-  if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
-  if (diff < 86400 && groupOf(iso) === "today") return `${Math.floor(diff / 3600)}時間前`;
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  if (groupOf(iso) === "yesterday") return `昨日 ${hh}:${mm}`;
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
+// ref→遷移先の解決は `notificationHref`（../api）／相対時刻 `timeLabel`・グループ `groupOf` は `../time`
+// に集約（SC-01 ダッシュボードと共有・DRY）。
 
 export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolean }) {
   const [rows, setRows] = useState<NotificationDTO[]>([]);
