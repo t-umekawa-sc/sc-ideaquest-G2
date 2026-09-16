@@ -48,6 +48,7 @@
 | D-TC-109 | api | 編集＝下書きは版なし/公開は版記録 | 下書き／公開アイデア（公開時に初版 revision=1 記録済み・D-TC-142）| `PATCH /ideas/{id}`（title） | draft=200 版増えない／published=200 current_revision=2・版2件（初版1＋編集2） | D.2/D.4 |
 | D-TC-143 | api | 公開アイデアの並行 PATCH は楽観ロックで 409 `edit_conflict`（500 にしない・D.2 line67） | 公開アイデア（`current_revision=1`）で、別編集者が既に `revision=2` を作成済み（自分の base は stale） | `PATCH /ideas/{id}`（title） | `next_rev=2` の INSERT が `UNIQUE(idea_id,revision)` 違反→**`409` `code=edit_conflict`**（`IntegrityError` を捕捉して翻訳・**500 にしない**）。クライアントは最新再取得へ誘導 | D.2（楽観ロック・方針A） |
 | D-TC-144 | api | 投票後に版が進むと `vote.stale=true`（投票見直し導線・D.1/D.5） | 公開アイデアに投票（`voted_revision=1`）→ 公開中編集で `current_revision=2` | `GET /ideas/{id}`（投票直後／編集後） | 投票直後＝`vote.my_vote=approve`・**`vote.stale=false`**（同版）／編集後＝`vote.my_vote=approve`・**`vote.stale=true`**（`voted_revision < current_revision`）。押し直しで解消 | D.1／D.5 |
+| D-TC-225 | api | 再投票（押し直し）で stale 解消＝`voted_revision` が current に追随（D.5・逆向き） | stale=true（版2）の投票済みアイデア | `POST /ideas/{id}/vote`（切替）→ `GET` | 再投票後＝`vote.my_vote=oppose`・**`vote.stale=false`**（`voted_revision`=current に更新） | D.5 |
 | D-TC-145 | api | 下書きの公開は投稿者のみ＝代理公開は不可（他人 owner でも 404） | owner（seed・投稿者でない）が他ユーザー（Other）の下書きを `POST publish` | 応答＋`activities` | **404**（下書きは本人のみ可視・`_authorize_edit_idea`）＝公開が起きず `idea_post` は誰にも付与されない。ゆえに投稿 XP+50 の受給者は常に投稿者本人（監査 M3「公開者に付く」は本ガードにより発生しない誤検知・将来この経路を開くなら本テスト赤化で再検討を促す） | D.2／§8-⑥ |
 | D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
 | D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
@@ -73,6 +74,7 @@
 | D-TC-131 | api | 添付追加（複数）→ 詳細に反映 | published アイデア・Fake storage | `POST /ideas/{id}/attachments`（png+pdf の2件） | 201・`attachments` 2件（`id`/`original_name`/`size_bytes`/`mime_type`/`uploaded_by`/`uploaded_at`）・`GET /ideas/{id}` の `attachments` も2件 | D.3／§1.10 |
 | D-TC-132 | api | 添付は1アイデア10件まで | 既に9件添付 | `POST attachments`（2件） | 422 `validation_error`（`errors[].code=too_many`・既存＋今回で超過） | D.3／§5.12 |
 | D-TC-133 | api | 不許可 MIME は拒否 | published アイデア | `POST attachments`（`evil.exe`） | 422 `validation_error`（`mime_not_allowed`・拡張子/申告 Content-Type を信用しない） | D.3／§1.10 |
+| D-TC-224 | api | 添付 1ファイル 20MB 超は拒否 | published アイデア | `POST attachments`（20MB+1 の画像） | 422 `validation_error`・`errors[].code=too_large`（§5.12 上限） | D.3／§5.12 |
 | D-TC-134 | api | 添付削除＝DB＋MinIO 削除 | 添付1件 | `DELETE /ideas/{id}/attachments/{aid}` | 204・`GET /ideas/{id}` の `attachments` から消える・storage からも remove | D.3 |
 | D-TC-135 | api | 添付追加は編集権限（本人/owner/quest_admin） | 他人の published（自分は vote のみ） | `POST attachments` | 403 | D.3 |
 | D-TC-136 | api | DL はパーティー所属→短TTL 署名URL | 添付1件 | `GET /attachments/{aid}/download` | 200・`{url}`（署名URL・生パス非露出） | D.3／§1.10 |

@@ -957,3 +957,26 @@ def test_d_tc_223_idea_updated_targets_voters_and_followers_except_editor(client
             ts.execute(Follow.__table__.delete().where(Follow.idea_id == iid))
             ts.execute(User.__table__.delete().where(User.id == voter_id))
             ts.commit()
+
+
+def test_d_tc_224_attachment_too_large(client, env, storage):
+    """D-TC-224: 添付 1ファイル 20MB 超は 422 `too_large`（D.3/§5.12）。"""
+    _login_seed(client)
+    idea = env.make_idea(quest_id=env.make_quest())
+    big = b"0" * (20 * 1024 * 1024 + 1)  # 20MB 超
+    r = client.post(ATTACH(idea), files=[("files", ("big.png", big, "image/png"))], headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("code") == "too_large" for e in r.json().get("errors", []))
+
+
+def test_d_tc_225_revote_clears_stale(client, env):
+    """D-TC-225: 版が進んで stale=true の後、押し直し（再投票）で voted_revision が current に追随＝stale 解消（D.5）。"""
+    _login_seed(client)
+    pub = env.make_idea(quest_id=env.make_quest(), status="published")  # rev1
+    assert client.post(VOTE(pub), json={"type": "approve"}, headers=_csrf(client)).status_code == 200
+    assert client.patch(IDEA(pub), json={"title": "updated"}, headers=_csrf(client)).status_code == 200  # rev2
+    assert client.get(IDEA(pub)).json()["vote"]["stale"] is True  # 版が進んで stale
+    # 再投票（押し直し）＝voted_revision が current(2) に更新され stale=false に戻る
+    assert client.post(VOTE(pub), json={"type": "oppose"}, headers=_csrf(client)).status_code == 200
+    d = client.get(IDEA(pub)).json()
+    assert d["vote"]["my_vote"] == "oppose" and d["vote"]["stale"] is False

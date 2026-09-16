@@ -131,6 +131,7 @@
 | C-TC-241 | api | 最終結果の門番（非パーティーは 404） | 他人所有・seed user は非メンバー | `GET /quests/{id}/result` | 404（存在秘匿・C.0） | C（FR-39）／C.0 |
 | C-TC-242 | api | 総括の保存と権限（owner/quest_admin のみ） | (1)owner (2)一般メンバー（vote のみ） | `PUT /quests/{id}/result`（summary/next_actions/metrics） | (1)200・GET に反映（summary/next_actions/metrics）(2)403 | C（FR-39）／§10 |
 | C-TC-243 | api | 完了で④通知＋成果フィード（quest_result_ready／quest_completed） | evaluating・owner=seed・パーティー員 other | `POST /quests/{id}/transition`（to=completed） | 200・`quest_completed` 活動1件（作成者・冪等）・作成者以外の員に `quest_result_ready` 通知（作成者には出さない） | C（FR-39）／H／FR-36 |
+| C-TC-248 | api | 完了の副作用が後退→再前進で二重発生しない（C.5 初回完了時のみ） | evaluating・owner=seed・員 other・公開アイデア＋提出済み評価 | `POST transition` を completed→evaluating→completed | `quest_completed` 活動1件・`quest_result_ready` は宛先ごと1件（other に1・作成者0）・`evaluation_coin` も1件（二重確定なし） | C.5／H／F.4 |
 | C-TC-244 | api | ⑥総括初回記入で owner に少額XP（冪等） | owner が result を2回保存 | `PUT /quests/{id}/result`×2 | `quest_result_summary` 活動1件・amount=20・本人1回（2回目は加算しない） | C（FR-39）／G／§10 |
 | C-TC-245 | api | 結果に④議論の要点(b)＝ピン留めチャットを集約 | 公開アイデアにピン留めメッセージ | `GET /quests/{id}/result` | `pinned_messages` に当該（idea_id/idea_title/excerpt/author） | C（FR-39 (b)）／E |
 | C-TC-246 | api | (c)自動要約＝抽出型・オフライン（外部API不使用）生成/保存＋権限 | (1)owner・チャット複数 (2)一般メンバー（comment のみ） | `POST /quests/{id}/result/chat-summary` | (1)200・`chat_summary` 非空・GET に反映 (2)403 | C（FR-39 (c)）／E |

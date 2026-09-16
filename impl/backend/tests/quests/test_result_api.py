@@ -271,3 +271,28 @@ def test_c_tc_244_outcome_grants_xp_once(client, env):
         acts = ts.execute(select(Activity).where(Activity.quest_id == qid, Activity.reason == "quest_result_summary")).scalars().all()
         assert len(acts) == 1 and acts[0].user_id == env.user_id
         assert acts[0].amount == 20
+
+
+def test_c_tc_248_completion_side_effects_idempotent_on_reforward(client, env):
+    """C-TC-248: completed の副作用（quest_result_ready 通知・quest_completed フィード・evaluation_coin）が
+    後退→再前進で二重発生しない（C.5 line128・初回完了時のみ）。"""
+    _login_seed(client)
+    qid = env.make_quest(status="evaluating")  # owner=seed
+    with get_tenant_session(env.db_identifier) as ts:
+        quests_repo.add_member(ts, qid, env.other_id, permissions=["vote", "comment"])  # 作成者以外のパーティー員
+        ts.commit()
+    iid = env.make_idea(quest_id=qid, author=env.user_id)  # coin は seed へ（teardown 非対象ユーザーのレベルアップ副活動を避ける）
+    env.submit_eval(idea_id=iid, evaluator=env.user_id)     # 提出済み評価（未確定）→ completed で確定
+    # evaluating→completed→evaluating→completed（後退→再前進）
+    for to in ["completed", "evaluating", "completed"]:
+        assert client.post(TRANSITION(qid), json={"to": to}, headers=_csrf(client)).status_code == 200, to
+    with get_tenant_session(env.db_identifier) as ts:
+        acts = ts.execute(select(Activity).where(Activity.quest_id == qid, Activity.reason == "quest_completed")).scalars().all()
+        assert len(acts) == 1  # フィードは二重発生しない
+        notes = ts.execute(select(Notification).where(
+            Notification.ref_quest_id == qid, Notification.type == "quest_result_ready")).scalars().all()
+        assert sum(1 for n in notes if n.recipient_id == env.other_id) == 1  # 宛先ごと1件
+        assert all(n.recipient_id != env.user_id for n in notes)             # 作成者は除外
+        coins = ts.execute(select(Activity).where(
+            Activity.reason == "evaluation_coin", Activity.ref_id == iid)).scalars().all()
+        assert len(coins) == 1  # 投稿者コインも二重確定しない
