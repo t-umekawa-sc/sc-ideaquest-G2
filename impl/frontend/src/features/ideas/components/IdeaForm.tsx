@@ -95,7 +95,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const originalRef = useRef<{ title: string; value: string; body: string; time_limit: string; note: string; stakeholders: string } | null>(null);
 
   const pending = pendingKind !== null;
-  const canSave = Boolean(subject.trim() && value.trim() && body.trim());
+  // 送信ボタンは常に押せる＝押下時に検証（§4.7 上部サマリ＋インライン）で不足を伝える（評価/クエストと統一・
+  // 旧「必須が揃うまで disabled」は §4.7 逸脱でユーザー指摘）。
   // 下書きアイデアの編集＝作成と同じく「下書き保存」「投稿する」を出す（公開中の編集は「変更を保存」）。
   const isDraft = isEdit && ideaStatus === "draft";
 
@@ -638,7 +639,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             下書き保存
           </Button>
         )}
-        <Button type="submit" variant="primary" disabled={!canSave || pending} loading={pendingKind === "publish" || pendingKind === "save"}>
+        <Button type="submit" variant="primary" disabled={pending} loading={pendingKind === "publish" || pendingKind === "save"}>
           {isEdit && !isDraft
             ? pendingKind === "save"
               ? "保存中…"

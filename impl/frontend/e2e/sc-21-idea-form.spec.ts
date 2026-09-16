@@ -145,23 +145,29 @@ test("D-TC-203 SC-21 edit updates title", async ({ page }) => {
   }
 });
 
-// D-TC-204 §4.7 前段ガード＝主ボタンは 3 必須が揃うまで無効・件名 blur でインライン検証が出る。
-test("D-TC-204 SC-21 submit gated by required + blur inline validation", async ({ page }) => {
+// D-TC-204 §4.7 入力検証＝主ボタンは常に押せる（評価/クエストと統一・旧「必須が揃うまで disabled」を撤廃）。
+// 押下で不足を上部サマリ＋インラインに出す／件名 blur でもインライン検証。
+test("D-TC-204 SC-21 submit is clickable and validates on click (§4.7・評価/クエストと統一)", async ({ page }) => {
   await login(page);
   const qtitle = `E2Eアイデア検証_${Date.now().toString().slice(-8)}`;
   const questId = await createRecruiting(page, qtitle);
   try {
     await page.goto(`/quests/${questId}/ideas/new`);
     const submit = page.getByRole("button", { name: "投稿する" });
-    await expect(submit).toBeDisabled();
+    await expect(submit).toBeEnabled(); // 必須未充足でも押せる（disabled で無音にしない）
 
-    // 件名にフォーカス→空のまま blur（次項目へ）＝インライン検証（aria-invalid＋文言）。
+    // 押下＝§4.7 検証が働き、不足が**上部サマリ＋インライン**の両方に出る（評価/クエストと統一）。
+    await submit.click();
+    await expect(page.locator("#idea_subject")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#idea_subject-error")).toHaveText("件名は必須です。"); // インライン
+    await expect(page.locator(".form-summary")).toContainText("件名は必須です。");    // 上部サマリ
+
+    // 件名 blur でもインライン検証（フォーカスは奪わない・§4.7）。
     await page.locator("#idea_subject").click();
     await page.locator("#idea_value").click();
     await expect(page.locator("#idea_subject")).toHaveAttribute("aria-invalid", "true");
-    await expect(page.getByText("件名は必須です。")).toBeVisible();
 
-    // 3 必須を充足すると活性化する。
+    // 3 必須を充足しても押せる（充足後の投稿成功は D-TC-201 で担保）。
     await page.locator("#idea_subject").fill("件名");
     await page.locator("#idea_value").fill("価値");
     await page.locator("#idea_body").fill("本文");

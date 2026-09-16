@@ -524,13 +524,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         await applyIcon(questId!);
       }
       if (iconPreview) URL.revokeObjectURL(iconPreview);
-      const doneTitle =
-        kind === "create-draft" ? "下書きを保存しました"
-        : kind === "create-publish" ? "クエストを作成・公開しました"
-        : kind === "edit-publish" ? "クエストを公開しました"
-        : kind === "party-save" ? "パーティーを更新しました"
-        : "クエストを保存しました";
-      snack({ type: "success", title: doneTitle });
+      if (kind === "create-draft") {
+        // 下書き完了は評価/アイデアに合わせて info（処理済みアイコン＋緑にしない・横断で統一）。
+        snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
+      } else {
+        const doneTitle =
+          kind === "create-publish" ? "クエストを作成・公開しました"
+          : kind === "edit-publish" ? "クエストを公開しました"
+          : kind === "party-save" ? "パーティーを更新しました"
+          : "クエストを保存しました";
+        snack({ type: "success", title: doneTitle });
+      }
       onDone();
     } catch (err) {
       const mapped = mapServerErrors(err, locale, {
