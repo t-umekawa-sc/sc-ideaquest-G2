@@ -44,6 +44,30 @@ test("G-TC-167 SC-41 podium does not accumulate on period switch (#13)", async (
   }
 });
 
+// G-TC-171 SC-41 は先頭で開く（自分の順位へ自動スクロールしない・ユーザー報告）。
+// 自動スクロール実装は無く「▼ 自分の順位へ」ボタンのみ（SC-41 §5）。実ブラウザ/Next のスクロール復元が
+// 前回の手動ジャンプ位置を再現しても、マウントで先頭へ戻す（RankingView の mount effect）。
+test("G-TC-171 SC-41 opens at the top and does not auto-scroll to own rank", async ({ page }) => {
+  await login(page);
+  await page.goto("/ranking");
+  await expect(page.getByRole("heading", { name: "ランキング", exact: true })).toBeVisible();
+  // 開いた直後は先頭（自分の順位＝画面中央に自動スクロールしていない）。
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(2);
+  // 「▼ 自分の順位へ」で明示ジャンプ→別画面→戻る（pop）でも、再訪は先頭で開く（復元を打ち消す）。
+  const jump = page.getByRole("button", { name: /自分の順位へ/ });
+  if ((await jump.count()) && (await jump.isEnabled())) {
+    await jump.click();
+    await page.waitForTimeout(700);
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0); // ボタンでは下へ行く（機能は維持）
+  }
+  await page.goto("/quests");
+  await page.waitForURL(/\/quests/);
+  await page.goBack();
+  await page.waitForURL(/\/ranking/);
+  await expect(page.getByRole("heading", { name: "ランキング", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(2); // 再訪も先頭
+});
+
 // #13 回帰ガード＝自分の行の登場ハイライト（rank-me-row）が暗いガラスパネル上で明色不透明背景（#EFF6FF）で終わらない
 // ＝名前（明色）が潰れないこと。終了色は base .is-me の半透明シアンに揃える。is-me 行が無い期間はスキップ。
 test("G-TC-168 SC-41 own row highlight is not near-white on dark panel (#13)", async ({ page }) => {

@@ -54,6 +54,16 @@ export function RankingView() {
   }, []);
   useEffect(() => { void load(period); }, [load, period]);
 
+  // ランキングは常に先頭で開く（自分の順位は「▼ 自分の順位へ」で明示ジャンプ＝SC-41 §5・自動スクロールしない）。
+  // 実ブラウザ/Next のスクロール復元（前回の手動ジャンプ位置を覚えて再現）を打ち消すため、
+  // マウント時に先頭へ＋次フレームでも再適用（復元がこの後に走っても上書き）。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    const raf = window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+    return () => window.cancelAnimationFrame(raf);
+  }, []);
+
   const totalUsers = me?.total_users ?? list.length;
   const top3 = list.slice(0, 3);
   const podium = [top3[1], top3[0], top3[2]].filter(Boolean) as Ranked[]; // 2・1・3
