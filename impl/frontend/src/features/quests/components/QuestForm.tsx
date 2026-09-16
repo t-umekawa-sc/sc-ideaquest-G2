@@ -524,7 +524,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         await applyIcon(questId!);
       }
       if (iconPreview) URL.revokeObjectURL(iconPreview);
-      if (kind === "create-draft") {
+      // 下書きの保存＝作成の下書き（create-draft）／下書きクエストの編集保存（edit-save かつ status=draft）。
+      if (kind === "create-draft" || (kind === "edit-save" && status === "draft")) {
         // 下書き完了は評価/アイデアに合わせて info（処理済みアイコン＋緑にしない・横断で統一）。
         snack({ type: "info", title: "下書きを保存しました", msg: "あなただけに表示されます。" });
       } else {
