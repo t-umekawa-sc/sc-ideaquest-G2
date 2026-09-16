@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/ui";
 import { realtime } from "@/lib/realtime";
+import { useScrollRestore } from "@/lib/scrollRestore";
 
 import { getNotifications, markAllRead, markRead, markUnread, notificationHref, type NotificationDTO } from "../api";
 import "../notifications.css";
@@ -73,6 +74,8 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
   const [fState, setFState] = useState<"" | "unread">("");
   const [fCat, setFCat] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // 一覧のスクロール位置復元（§4.12）＝初回ロード完了後に復元（通知を上から順にクリック→戻る）。
+  useScrollRestore(!loading);
 
   const load = useCallback(async () => {
     setLoading(true);

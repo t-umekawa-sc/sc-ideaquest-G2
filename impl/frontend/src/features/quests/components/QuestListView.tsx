@@ -15,6 +15,7 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { markQuestFromList } from "@/lib/nav";
+import { useScrollRestore } from "@/lib/scrollRestore";
 import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
 import { getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
@@ -96,6 +97,8 @@ export function QuestListView() {
   const router = useRouter();
   const [quests, setQuests] = useState<Quest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 一覧のスクロール位置復元（§4.12）＝取得完了（quests!==null）後に復元。
+  useScrollRestore(quests !== null);
 
   useEffect(() => {
     let alive = true;

@@ -36,3 +36,12 @@
 | M-TC-009 | e2e(front) | game OFF でチャット魔法キャストUIが非表示（使用無効） | 実効 OFF でアイデアチャットを開き、メッセージの＋リアクションでピッカーを開く | リアクションピッカー（`.reaction-picker`）の「魔法」セクション（`.rp__spell`）／通常絵文字（`.rp__emoji`）／チャット本文 | ピッカーに**「魔法」ラベル/魔法ボタン（`.rp__spell`）が出ない**（＝新規キャスト不可）・**通常リアクションとチャット本文は残る**。※既存メッセージの永続 `.spell-fx` 装飾のベストエフォート非表示は follow-up（本 TC 範囲外） | デザイン標準 §4.11／#2 |
 | M-TC-010 | e2e(front) | game OFF でクエスト画面の KPI/クエスト内ランキングが非表示（業務パネルは残る） | 実効 OFF でクエスト詳細を開く（recruiting を作成して遷移） | `.quest-panels`／`.quest-kpi`／`.rank-panel`／`.quest-head`／`#quest-tabs`／「＋ アイデアを追加」 | ゲーム層（`.quest-panels`＝KPI＋ランキング）は**非表示**（count 0）・**クエスト情報ヘッダー/タブ/アイデア追加ボタンは残る**（消しすぎ防止の陽性確認） | デザイン標準 §4.11／#2 |
 | M-TC-011 | e2e(front) | game OFF でレベルアップ祝福オーバーレイが出ない（＋陽性対照） | ゲームON でダッシュボードを開き `iq:lastSeenLevel:*` を 1 に下げる（祝福条件成立）→ OFF/ON で再訪 | `.levelup-overlay`（`LevelUpWatcher`）／localStorage `iq:lastSeenLevel:{accountId}` | **OFF＝`.levelup-overlay` が出ない**（`LevelUpWatcher` 自体が未マウント）。**陽性対照＝ON に戻すと同条件で祝福が出る**（gate が効いている証拠・自動消滅2.6s前に検出）。※ログインボーナストーストはサーバ日次依存で e2e 対象外＝マウント条件 `gameEnabled &&` でカバー | デザイン標準 §4.11／#2 |
+
+### 2-C. 一覧のスクロール位置復元（デザイン標準 §4.12・決定 2026-09-16）
+
+> 縦長の一覧/ダッシュボードから詳細へ遷移し戻ったとき、離脱直前の `window.scrollY` を復元する（restore-after-load＝`ready` 後に1回だけ `window.scrollTo`・瞬間移動）。保存は `sessionStorage`（`scroll:<pathname>`・値 `{y,t}`）＋30分TTL＋`[0,maxScroll]` クランプ。純ロジック（キー/TTL/クランプ）は unit、戻りでの復元は e2e。対象フック＝`src/lib/scrollRestore.ts`（`useScrollRestore`）。適用画面＝ダッシュボード（`ready=data!==null`）・通知一覧（`ready=!loading`）・クエスト一覧。
+
+| ID | 種別 | 目的/対象 | 前提 | 対象セレクタ | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| M-TC-012 | unit(front) | 純ロジック＝キー生成/TTL判定/クランプ | `scrollRestore.ts`（`storageKey`/`readSaved`/`clampScroll`） | 関数戻り値 | `storageKey("/")==="scroll:/"`／`readSaved(JSON.stringify({y:800,t:now}),now,ttl)===800`・**TTL超過は `null`**・**壊れたJSON/欠損は `null`**／`clampScroll(9999,1200)===1200`・`clampScroll(-5,1200)===0`・`clampScroll(300,1200)===300` | デザイン標準 §4.12 |
+| M-TC-013 | e2e(front) | 一覧→遷移→戻るでスクロール位置が復元（先頭に飛ばない） | ダッシュボードを下方向にスクロール（`window.scrollTo(0,Y)` で Y>0）→「最近の通知」等のリンクで詳細へ遷移→ブラウザ戻る | `window.scrollY`／通知/カードのリンク | 戻った後の `window.scrollY` が **0 ではなく離脱前 Y の近傍**（±数十px・restore-after-load）／リロード直後の初回訪問（保存なし）は 0（誤復元しない） | デザイン標準 §4.12 |

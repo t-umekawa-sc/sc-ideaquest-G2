@@ -20,6 +20,7 @@ import { LevelUpWatcher } from "./LevelUpWatcher";
 import { bumpedXpPct } from "../xpAward";
 import { levelRank } from "@/lib/levelTitle";
 import { isMotionReduced } from "@/lib/motion";
+import { useScrollRestore } from "@/lib/scrollRestore";
 import { realtime } from "@/lib/realtime";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
@@ -67,6 +68,8 @@ export function DashboardView({
 }) {
   const snackbar = useSnackbar();
   const [data, setData] = useState<DashboardData | null>(null);
+  // 一覧のスクロール位置復元（§4.12）＝取得完了（data!==null）でコンテンツ実寸になってから復元。
+  useScrollRestore(data !== null);
   // 未投票の表示リストはローカルで持つ（投票で1件除去→サーバー再取得で末尾に次の1件を追記＝常に満杯を保つ）。
   const [unvotedList, setUnvotedList] = useState<UnvotedIdea[] | null>(null);
   const [unfollowed, setUnfollowed] = useState<Record<string, boolean>>({});
