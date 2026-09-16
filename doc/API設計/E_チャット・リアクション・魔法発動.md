@@ -42,6 +42,7 @@
 - **削除済み（`is_deleted=true`）はトゥームストーン化して返す**＝`{id, is_deleted:true, deleted_at, created_at}` のみ（`body`・`attachments`・`mentions`・`reactions` は返さない＝UI 非表示。本文は監査用に DB 保持）。§8-⑪。
 
 - **`chat_preview`（D の `GET /ideas/{id}` が内包）は E が形を定義**＝**直近 3 件**のメッセージ表現の抜粋（`body` は先頭数十字に切詰め・`attachments` は件数のみ・削除済みはトゥームストーン）＋`total_count`。D はこの構造をそのまま埋め込む（境界分離＝D は本文を持たない）。
+  - **【現状未実装・将来対応】（2026-09-16 実態反映）**: 上記は設計上の形を定義するのみで、**現行実装は `GET /ideas/{id}` に `chat_preview` を内包しない**（`IdeaDetailDTO` に該当フィールド無し。抜粋生成 `repository.list_recent_messages` は定義済みだが未配線）。アイデア詳細のチャットは `GET /ideas/{id}/chat` で取得する。埋め込みプレビューは将来対応（実装時に本節の形へ準拠）。
 - **ページング（§1.8）**: チャットは**カーソル方式**（`limit`/`before`/`after`）。新着は末尾に増えるため、初期表示は末尾 `limit` 件＋上スクロールで `before` 遡上、WS 切断後は `after` で差分再同期（§1.12「WS は速報・REST は真実」）。
 - **未読情報**: `unread.first_unread_message_id` は `chat_reads.last_read_message_id`（§5.31）の直後のメッセージ＝SC-24 の「ここから未読」セパレータ位置。`chat_reads` 行が無い（初回閲覧）＝全件未読。算出はサーバー（フロントは表示のみ）。
 

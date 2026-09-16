@@ -49,8 +49,9 @@
 | メソッド/パス | 概要 | リクエスト（パス） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `GET /spells` | 魔法マスタ＋自分の解放状況（SC-32） | — | `data`=魔法行（`id`/`code`/`name`〔locale〕/`icon`/`effect`/`rarity`/`line`/`sp_cost`/`requires_spell_id`/`description`/`unlocked`〔bool〕/`can_unlock`〔前提達成かつSP十分〕）＋`skill_point_balance`。系統（`line`）順・段階順 |
-| `GET /me/spells` | 自分の解放済み魔法（SC-24 の魔法ピッカー用） | — | `data`=解放済み `{spell_id, code, effect, icon, name}` の配列 |
 | `POST /spells/{spell_id}/unlock` | 魔法を解放（SP 消費・恒久） | パス: `spell_id`／`Idempotency-Key` 必須 | 200（`{spell_id, unlocked:true, skill_point_balance}`〔更新後残高〕） |
+
+> **不採用: `GET /me/spells`（旧・SC-24 ピッカー用の解放済みのみ）** — `GET /spells` が各行に `unlocked`／`can_unlock` を同梱するため、ピッカー（SC-24）も `GET /spells` を `unlocked=true` で絞れば賄える。専用 EP は重複のため**設ける必要がない**と判断（実装も `GET /spells` に一本化・未実装のまま確定）。
 
 - **解放のサーバー検証**（SC-32 §2・§7）: (1) **前提**＝`requires_spell_id` が NULL（起点）または既に `user_spells` にある、(2) `skill_point_balance` ≥ `sp_cost`、(3) 未解放。満たさなければ **409**＝`prerequisite_not_met`／`insufficient_sp`／`already_unlocked`。
 - **副作用（同一 UoW）**: `skill_point_balance` 減算＋`user_spells` 作成（`UNIQUE(user_id, spell_id)`）＋`activities`（`kind=sp_spend`,`reason=spell_unlock`,`ref_type=spells`,`ref_id=spell_id`）。**恒久・取消/SP返還なし**（SC-32 §9）。

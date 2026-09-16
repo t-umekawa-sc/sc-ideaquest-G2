@@ -92,8 +92,8 @@ def test_b_tc_020_issue_account_full_flow(client, issued):
     assert user is not None and user.display_name == ident["display_name"]
 
 
-def test_b_tc_025_issue_idempotent_replay(client, issued):
-    """B-TC-025 発行の Idempotency＝同一キー再送は最初の結果を再生し副作用は1回・別内容は 422（§1.9・横断MW）。
+def test_b_tc_035_issue_idempotent_replay(client, issued):
+    """B-TC-035 発行の Idempotency＝同一キー再送は最初の結果を再生し副作用は1回・別内容は 422（§1.9・横断MW）。
 
     SEC-TC-041/042 はアイデア作成を検体にしたが、発行（accounts/outbox/mail の副作用を伴う）でも横断MW が効くことを担保。"""
     _login_system_admin(client)
