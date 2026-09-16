@@ -359,3 +359,65 @@ def test_d_tc_150_ideas_list_eval_aggregate(client, env):
     assert cards[str(evaluated)]["evaluation"] == {"state": "done", "overall_avg": 4.0, "evaluator_count": 1}
     assert cards[str(pending)]["evaluation"]["state"] == "pending"
     assert cards[str(pending)]["evaluation"]["overall_avg"] is None
+
+
+# ---- 通知生成（F→H）＝カバレッジギャップ［A］の消化（生成テスト新設） ----
+
+def test_f_tc_205_follow_evaluation_notifies_follower_not_evaluator(client, env):
+    """F-TC-205: 評価確定→フォロワーに follow_evaluation 生成・評価者本人は除外。根拠 F.5/H.0。"""
+    from app.tenant.ideas import repository as ideas_repo
+    from app.tenant.ideas.orm import Follow
+    from app.tenant.notifications.orm import Notification as _Notif
+    _login_seed(client)  # 評価者/提出者 = user_id
+    qid = env.make_quest(owner=env.other_id, seed_perms=["evaluator"])  # user_id=evaluator, owner=other
+    idea = env.make_idea(quest_id=qid, author=env.other_id)
+    with get_tenant_session(env.db_identifier) as ts:
+        ideas_repo.add_follow(ts, env.other_id, idea)  # フォロワー = other
+        ts.commit()
+
+    def n(recipient):
+        with get_tenant_session(env.db_identifier) as ts:
+            return ts.execute(select(_Notif).where(
+                _Notif.recipient_id == recipient, _Notif.ref_idea_id == idea, _Notif.type == "follow_evaluation",
+            )).scalars().all()
+
+    try:
+        r = client.put(EVAL(idea), json={"scores": FULL, "overall_comment": "総評", "status": "submitted"}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert len(n(env.other_id)) == 1  # フォロワーへ
+        assert len(n(env.user_id)) == 0   # 評価者本人は除外
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == idea))
+            ts.execute(Follow.__table__.delete().where(Follow.idea_id == idea))
+            ts.commit()
+
+
+def test_f_tc_206_follow_selection_notifies_follower_not_selector(client, env):
+    """F-TC-206: 選定→フォロワーに follow_selection 生成・選定者本人は除外。根拠 F.5/H.0。"""
+    from app.tenant.ideas import repository as ideas_repo
+    from app.tenant.ideas.orm import Follow
+    from app.tenant.notifications.orm import Notification as _Notif
+    _login_seed(client)  # 選定者 = user_id（owner）
+    qid = env.make_quest()  # owner=user_id
+    idea = env.make_idea(quest_id=qid, author=env.user_id)  # 著者=seed（選定XPは seed へ＝teardown 非対象ユーザーの副活動/レベルアップを避ける）
+    with get_tenant_session(env.db_identifier) as ts:
+        ideas_repo.add_follow(ts, env.other_id, idea)  # フォロワー = other
+        ts.commit()
+
+    def n(recipient):
+        with get_tenant_session(env.db_identifier) as ts:
+            return ts.execute(select(_Notif).where(
+                _Notif.recipient_id == recipient, _Notif.ref_idea_id == idea, _Notif.type == "follow_selection",
+            )).scalars().all()
+
+    try:
+        r = client.post(SELECT(idea), headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert len(n(env.other_id)) == 1  # フォロワーへ
+        assert len(n(env.user_id)) == 0   # 選定者本人は除外
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == idea))
+            ts.execute(Follow.__table__.delete().where(Follow.idea_id == idea))
+            ts.commit()

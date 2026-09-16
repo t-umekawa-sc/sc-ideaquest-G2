@@ -470,3 +470,70 @@ def test_e_tc_210_pin_by_manager_and_gate(client, env):
     i2 = env.make_idea(quest_id=q2)
     m2 = _post(client, i2, body="x").json()["id"]
     assert client.post(f"{MSGS}/{m2}/pin", headers=_csrf(client)).status_code == 403
+
+
+# ---- 通知生成（E→H）＝カバレッジギャップ［A］の消化（生成テスト新設） ----
+
+def _notif_msg(env, recipient, ref_msg, type_):
+    from app.tenant.notifications.orm import Notification as _Notif
+    with get_tenant_session(env.db_identifier) as ts:
+        return ts.execute(select(_Notif).where(
+            _Notif.recipient_id == recipient, _Notif.ref_chat_message_id == ref_msg, _Notif.type == type_,
+        )).scalars().all()
+
+
+def test_e_tc_224_magic_reaction_notifies_author_not_self(client, env):
+    """E-TC-224: 魔法リアクション付与→対象メッセージ投稿者に magic_reaction 生成（spell_id 凍結）。
+    自分のメッセージへ自分で付与＝非通知（actor 除外）。根拠 E.6/H.0。"""
+    _login_seed(client)  # reactor = user_id
+    with get_tenant_session(env.db_identifier) as ts:
+        sid = ts.execute(select(Spell.id)).scalars().first()
+        ts.add(UserSpell(id=uuid.uuid4(), user_id=env.user_id, spell_id=sid))
+        ts.commit()
+    # (1) 他人（other）のメッセージへ魔法 → 投稿者 other に通知・reactor 本人には出ない。
+    idea_a = env.make_idea(quest_id=env.make_quest())
+    _post(client, idea_a, body="口火")  # チャットグループ生成
+    with get_tenant_session(env.db_identifier) as ts:
+        cg = chat_repo.get_chat_group_by_idea(ts, idea_a)
+        m_other = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="other の発言").id
+        ts.commit()
+    r = client.post(f"{MSGS}/{m_other}/reactions", json={"type": "magic", "spell_id": str(sid)}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    got = _notif_msg(env, env.other_id, m_other, "magic_reaction")
+    assert len(got) == 1 and got[0].params.get("spell_id") == str(sid)  # 投稿者へ・識別子凍結
+    assert len(_notif_msg(env, env.user_id, m_other, "magic_reaction")) == 0  # reactor 本人には出ない
+    # (2) 自分のメッセージへ自分で魔法（別グループ＝同 spell 再利用可）→ 通知0（自己付与除外）。
+    idea_b = env.make_idea(quest_id=env.make_quest())
+    m_self = _post(client, idea_b, body="自分の発言").json()["id"]
+    r2 = client.post(f"{MSGS}/{m_self}/reactions", json={"type": "magic", "spell_id": str(sid)}, headers=_csrf(client))
+    assert r2.status_code == 200, r2.text
+    assert len(_notif_msg(env, env.user_id, m_self, "magic_reaction")) == 0
+
+
+def test_e_tc_225_idea_comment_notifies_author_not_poster(client, env):
+    """E-TC-225: 投稿→アイデア著者に idea_comment 生成・投稿者本人は除外。根拠 E.6/H.0。"""
+    _login_seed(client)  # 投稿者 = user_id
+    qid = env.make_quest(owner=env.other_id)  # user_id は既定権限(comment)で member
+    idea = env.make_idea(quest_id=qid, author=env.other_id)  # 著者 = other
+    m = _post(client, idea, body="コメントします").json()["id"]
+    assert len(_notif_msg(env, env.other_id, m, "idea_comment")) == 1  # 著者へ
+    assert len(_notif_msg(env, env.user_id, m, "idea_comment")) == 0   # 投稿者本人は除外
+
+
+def test_e_tc_226_follow_comment_notifies_follower_not_poster(client, env):
+    """E-TC-226: 投稿→フォロワーに follow_comment 生成・投稿者本人は除外。根拠 E.6/H.0。"""
+    from app.tenant.ideas.orm import Follow
+    _login_seed(client)  # 投稿者 = user_id
+    qid = env.make_quest()  # owner=user_id
+    idea = env.make_idea(quest_id=qid, author=env.user_id)  # 著者=user_id（投稿者＝除外）
+    with get_tenant_session(env.db_identifier) as ts:
+        ideas_repo.add_follow(ts, env.other_id, idea)  # フォロワー = other
+        ts.commit()
+    try:
+        m = _post(client, idea, body="コメントします").json()["id"]
+        assert len(_notif_msg(env, env.other_id, m, "follow_comment")) == 1  # フォロワーへ
+        assert len(_notif_msg(env, env.user_id, m, "follow_comment")) == 0   # 投稿者本人は除外
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(Follow.__table__.delete().where(Follow.idea_id == idea))  # teardown が Follow 未掃除のため
+            ts.commit()

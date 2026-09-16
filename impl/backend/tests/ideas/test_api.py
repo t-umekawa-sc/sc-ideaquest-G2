@@ -915,3 +915,45 @@ def test_d_tc_221b_idea_icon_authz(client, env, storage):
     assert client.put(f"{IDEA(iid)}/icon-image", files={"file": ("i.png", _PNG, "image/png")}, headers=_csrf(client)).status_code == 403
     # CSRF 無し＝403（変更系）。
     assert client.put(f"{IDEA(iid)}/icon-image", files={"file": ("i.png", _PNG, "image/png")}).status_code == 403
+
+
+# ---- 通知生成（D→H）＝カバレッジギャップ［A］の消化（生成テスト新設） ----
+
+def test_d_tc_223_idea_updated_targets_voters_and_followers_except_editor(client, env):
+    """D-TC-223: 版追加→**投票者∪フォロワー−編集者**に idea_updated 生成（params.revision・ref_idea_revision_id）。
+    フォロワーと投票者を別ユーザーにして和集合を担保し、編集者は投票者でも除外されることを確認。根拠 D.4/FR-34/H.0。"""
+    from app.tenant.notifications.orm import Notification as _Notif
+    _login_seed(client)  # 編集者 = user_id
+    qid = env.make_quest()  # owner=user_id
+    iid = env.make_idea(quest_id=qid, author=env.user_id)  # published rev1
+    voter_id = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(User(id=voter_id, account_id=uuid.uuid4(), display_name="Voter", locale="ja", status="active"))
+        repo.add_follow(ts, env.other_id, iid)  # フォロワー = other（投票者ではない）
+        repo.upsert_vote(ts, iid, voter_id, type="approve", voted_revision=1)      # 投票者 = voter（フォロワーではない）
+        repo.upsert_vote(ts, iid, env.user_id, type="approve", voted_revision=1)   # 編集者も投票（それでも除外される）
+        ts.commit()
+
+    def n(recipient):
+        with get_tenant_session(env.db_identifier) as ts:
+            return ts.execute(select(_Notif).where(
+                _Notif.recipient_id == recipient, _Notif.ref_idea_id == iid, _Notif.type == "idea_updated",
+            )).scalars().all()
+
+    try:
+        r = client.patch(IDEA(iid), json={"body": "更新後の本文"}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        rev = r.json()["current_revision"]
+        assert rev == 2  # 公開中の保存で版が上がる
+        assert len(n(env.other_id)) == 1   # フォロワー
+        assert len(n(voter_id)) == 1       # 投票者（フォロワーと別ユーザー＝和集合を担保）
+        assert len(n(env.user_id)) == 0    # 編集者は除外（投票者であっても）
+        got = n(env.other_id)[0]
+        assert got.params.get("revision") == rev and got.ref_idea_revision_id is not None  # revision 凍結・版参照
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == iid))
+            ts.execute(Vote.__table__.delete().where(Vote.idea_id == iid))
+            ts.execute(Follow.__table__.delete().where(Follow.idea_id == iid))
+            ts.execute(User.__table__.delete().where(User.id == voter_id))
+            ts.commit()
