@@ -128,3 +128,30 @@ test("I-TC-158 idea draft card opens edit dialog as a modal over the dashboard (
     await page.request.delete(`/api/v1/ideas/${ideaId}`, { headers: { "X-CSRF-Token": csrf2 } }).catch(() => {});
   }
 });
+
+// D-TC-226 SC-21 下書きアイデアの編集ダイアログは「下書き保存」「投稿する」を出す（公開中の「変更を保存」ではない・ユーザー指摘）。
+test("D-TC-226 draft idea edit dialog shows 下書き保存 and 投稿する (not 変更を保存)", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator("#company_code").fill(ACME.company);
+  await page.locator("#login_id").fill(ACME.loginId);
+  await page.locator("#password").fill(ACME.password);
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  const dash = await page.request.get("/api/v1/dashboard").then((r) => r.json());
+  const own = (dash.quests ?? []).find((q: { is_owner?: boolean }) => q.is_owner);
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const created = await page.request
+    .post(`/api/v1/quests/${own.id}/ideas`, { headers: { "X-CSRF-Token": csrf }, data: { title: "D-TC-226 draft", value: "v", body: "b", status: "draft" } })
+    .then((r) => r.json());
+  const ideaId = created.id as string;
+  try {
+    await page.goto(`/ideas/${ideaId}/edit`);
+    await expect(page.getByRole("heading", { name: "アイデアを編集" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("button", { name: "下書き保存" })).toBeVisible(); // 下書きには下書き保存が出る
+    await expect(page.getByRole("button", { name: "投稿する" })).toBeVisible();   // 公開導線も出る
+    await expect(page.getByRole("button", { name: "変更を保存" })).toHaveCount(0); // 公開中の保存ボタンではない
+  } finally {
+    const c2 = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+    await page.request.delete(`/api/v1/ideas/${ideaId}`, { headers: { "X-CSRF-Token": c2 } }).catch(() => {});
+  }
+});

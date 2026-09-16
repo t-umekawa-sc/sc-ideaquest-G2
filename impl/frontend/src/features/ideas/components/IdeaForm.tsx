@@ -75,6 +75,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
   const [note, setNote] = useState("");
   const [attachments, setAttachments] = useState<IdeaAttach[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<IdeaAttachment[]>([]); // 編集＝保存済みの添付（D.3）
+  const [ideaStatus, setIdeaStatus] = useState<string>("published"); // 編集対象の状態（draft/published）＝ボタン出し分け用
   const [removedIds, setRemovedIds] = useState<string[]>([]); // 削除予定にマークした既存添付（保存で確定・追加と同じくステージ方式）
   const [over, setOver] = useState(false);
   // アイデア個別アイコン（Phase 3）＝2段（本体保存→PUT /ideas/{id}/icon-image）。iconUrl は「このアイデア個別のみ」（own_icon_image_url）。
@@ -95,6 +96,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
 
   const pending = pendingKind !== null;
   const canSave = Boolean(subject.trim() && value.trim() && body.trim());
+  // 下書きアイデアの編集＝作成と同じく「下書き保存」「投稿する」を出す（公開中の編集は「変更を保存」）。
+  const isDraft = isEdit && ideaStatus === "draft";
 
   // 投稿先クエストの文脈カード（作成時）＝getQuest で取得。取得失敗は非致命（カードを出さない）。
   useEffect(() => {
@@ -125,6 +128,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           setStakeholders((idea.stakeholders ?? []).map((s) => s.label));
           setNote(idea.note ?? "");
           setExistingAttachments(idea.attachments ?? []); // 保存済み添付の管理（D.3・編集）
+          setIdeaStatus(idea.status ?? "published"); // 下書き/公開でボタンを出し分け
           setRemovedIds([]); // 削除予定マークは読み込みでリセット
           originalRef.current = {  // 無変更保存の検出用に編集開始時の内容を保持
             title: idea.title, value: idea.value, body: idea.body,
@@ -245,9 +249,13 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       let attachmentsUploaded = false;
       // 作成は先に id を採番（添付は id 先行が要る）。編集の内容更新（updateIdea）は添付適用の「後」に回す
       // ＝公開中は保存で1版記録するため、添付の追加/削除を版スナップショット/差分に反映させる（D.4）。
-      if (kind === "draft") {
+      if (kind === "draft" && isEdit) {
+        targetId = ideaId;  // 下書きの編集＝既存アイデアを更新（updateIdea は添付適用の後・版なし/通知なし D.2）
+      } else if (kind === "draft") {
         const created = await createIdea(questId!, { ...content, status: "draft" });
         targetId = created?.id ?? undefined;
+      } else if (kind === "publish" && isEdit) {
+        targetId = ideaId;  // 既存下書きの公開（publishIdea は添付適用の後で content ごと確定）
       } else if (kind === "publish") {
         if (files.length > 0) {
           // 作成時の添付を初版(rev1)に載せるため draft作成→添付→公開の順（publish 時にスナップショットへ取り込む・D.4）
@@ -300,8 +308,12 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       const attachmentsChanged = files.length > 0 || removedIds.length > 0;
       // 編集の保存＝内容更新（公開中は版記録）。添付適用の「後」に呼ぶことで版差分に添付変更が載る（D.4）。
       // 内容も添付も無変更なら updateIdea を呼ばない＝空の版を作らない。
-      if (kind === "save" && (contentChanged || attachmentsChanged)) {
-        await updateIdea(ideaId!, content);
+      if ((kind === "save" || (kind === "draft" && isEdit)) && (contentChanged || attachmentsChanged)) {
+        await updateIdea(ideaId!, content);  // 下書きの編集は status 不変＝版なし/通知なし（D.2）
+      }
+      if (kind === "publish" && isEdit) {
+        const pub = await publishIdea(ideaId!, content);  // draft→published＋内容確定（アトミック・D.2）
+        publishXp = pub?.xp_delta ?? 0;
       }
       // アイデア個別アイコン（Phase 3）＝id 先行が必要なので保存後に送信（非致命）。設定→PUT／解除→DELETE。
       if (targetId) {
@@ -344,8 +356,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // 送信（Enter/主ボタン）＝作成は公開、編集は保存。
-    if (isEdit) void persist("save");
+    // 送信（Enter/主ボタン）＝公開中の編集は保存（版記録）、作成・下書きの編集は公開（投稿する）。
+    if (isEdit && !isDraft) void persist("save");
     else void persist("publish");
   }
 
@@ -603,7 +615,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         </Field>
 
         <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
-          {isEdit ? (
+          {isEdit && !isDraft ? (
             <>
               必須3項目がそろうと「変更を保存」が押せます。保存すると更新履歴に記録され、
               <strong>投票者とフォロワーに通知</strong>されます。
@@ -621,13 +633,13 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           キャンセル
         </Button>
-        {!isEdit && (
+        {(!isEdit || isDraft) && (
           <Button type="button" variant="outline" onClick={() => void persist("draft")} disabled={pending} loading={pendingKind === "draft"}>
             下書き保存
           </Button>
         )}
         <Button type="submit" variant="primary" disabled={!canSave || pending} loading={pendingKind === "publish" || pendingKind === "save"}>
-          {isEdit
+          {isEdit && !isDraft
             ? pendingKind === "save"
               ? "保存中…"
               : "変更を保存"

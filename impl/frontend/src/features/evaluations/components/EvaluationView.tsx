@@ -167,6 +167,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);  // モーダルは close・フルページは詳細へ
         } else {
           snack({ type: "info", title: "下書きを保存しました", msg: `採点 ${rated}/5 観点・あなただけに表示されます。` });
+          // 下書き保存後もダイアログを閉じる（ユーザー要望・確定時と同じ後処理＝背後へ再取得を促し close）。
+          if (typeof window !== "undefined") window.dispatchEvent(new Event(EVALUATIONS_CHANGED_EVENT));
+          if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);
         }
       } catch (err) {
         const st = err instanceof ApiError ? err.status : 0;

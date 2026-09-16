@@ -69,3 +69,4 @@
 | F-TC-204 | api | 動的失効＝全参加部署離脱で評価対象アイデア参照が 404 | G1 のみ所属の非作成者パーティー員（evaluator 権限あり）→G1 のグループ所属を除去（参加部署 1 件） | `GET /ideas/{id}/evaluation`（当該員） | 404（`can_access_quest` 失効） | C.0／F.1 |
 | F-TC-205 | api | 評価確定→フォロワーに follow_evaluation 生成・評価者除外（生成テスト新設） | user=evaluator（提出者）／other=フォロワー | `PUT /ideas/{id}/evaluation`(submitted) | **フォロワー(other)に `follow_evaluation` 1件**・評価者(user)は0 | F.5／H.0 |
 | F-TC-206 | api | 選定→フォロワーに follow_selection 生成・選定者除外（生成テスト新設） | user=owner（選定者）／other=フォロワー | `POST /ideas/{id}/select` | **フォロワー(other)に `follow_selection` 1件**・選定者(user)は0 | F.5／H.0 |
+| F-TC-207 | e2e | 評価の下書き保存後は評価ビューを閉じる（モーダル=close／フルページ=詳細へ・ユーザー要望） | recruiting＋公開アイデア／`/ideas/[id]/eval`（フルページ） | 新規性3点→「下書き保存」 | 保存後に `/ideas/[id]`（詳細）へ遷移＝評価ビューを離れる | SC-25／F.2 |

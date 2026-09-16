@@ -200,3 +200,21 @@ test.describe("reduce-motion #16", () => {
     }
   });
 });
+
+// F-TC-207 SC-25 評価の下書き保存後は評価ビューを閉じる（モーダル=close／フルページ=詳細へ・ユーザー要望）。
+test("F-TC-207 SC-25 saving evaluation draft closes the view", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E下書き閉じ_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  try {
+    await page.goto(`/ideas/${ideaId}/eval`);
+    await page.getByRole("radiogroup", { name: "新規性の点数" }).getByRole("radio", { name: "3点" }).click();
+    await page.getByRole("button", { name: "下書き保存" }).click();
+    // 下書き保存で評価ビューを離れる（フルページ＝詳細 /ideas/{id} へ遷移＝閉じる）。
+    await page.waitForURL((u) => u.pathname === `/ideas/${ideaId}`, { timeout: 8000 });
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});
