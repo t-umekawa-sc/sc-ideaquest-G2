@@ -17,6 +17,7 @@
 | G-TC-106b | api | 乖離の自己修復（台帳だけ残り user_spells 欠落） | 消費台帳(spell_unlock)を1件だけ挿入＋残高は課金済み想定・user_spells 無し | `POST /spells/{id}/unlock` | 500 でなく 200・`unlocked=true`・**二重課金しない**（残高不変）・`user_spells` を補完・消費台帳は増えない（`uq_activities_grant_ref` 重複INSERT回避）＝連打の敗者/DB復旧の取り残し耐性 | §5.20／§7 |
 | G-TC-107 | int | 残高列は DB CHECK(>=0)（並行オーバースペンドの最終防御・M6） | seed 会社の実ユーザー | `users.coin_balance/skill_point_balance/xp` を -1 に更新→commit | いずれも `IntegrityError`（`ck_users_*_nonneg`）＝負残高を DB が拒否（アプリ層ガードの最終防御・migration 0020） | データモデル §5／G.0 |
 | G-TC-108 | int | 付与の冪等を DB で担保＝`activities` 部分ユニーク（並行二重付与の最終防御・M6） | 同上 | 同一 `(user,kind,reason,ref_type,ref_id)`（ref付き）を2件 INSERT／`ref_id NULL`（login）を2件 INSERT | ref付き＝`IntegrityError`（`uq_activities_grant_ref` WHERE ref_id IS NOT NULL）で後着拒否／`ref_id NULL` は重複可（login/levelup_sp）＝例外なし | API設計 F.4／migration 0020 |
+| G-TC-109 | int | 主要 reason の付与が G.6 対応表どおり（kind/reason/amount/ref_type） | seed アカウント | `ledger.grant` を selection(200)/evaluation(30)/evaluation_coin/achievement_reward で発行 | `selection=(xp_gain,200,ideas)`・`evaluation=(xp_gain,30,evaluations)`・`evaluation_coin=(coin_gain,_,ideas)`・`achievement_reward=(coin_gain,_,achievements)` | G.6／§7 |
 | G-TC-109 | api | クエスト内フィード＝公開種別のみ・actor 付き／非メンバーは 404（FR-36②・SC-12） | クエスト（owner=自分＋メンバー Bob）に Bob の `idea_post`（公開）・`vote`/`chat`（非公開）を付与 | `GET /quests/{id}/activities`（メンバー／非メンバー） | メンバー＝`200`・`idea_post` は出て `vote`/`chat` は出ない・`actor`（id/氏名）付き／非メンバー＝`404`（門番＝パーティー所属・存在秘匿） | G.5.1／FR-36 |
 | G-TC-110 | api | チームフィード＝参加クエスト横断の公開種別のみ・各行 quest 付き・不参加は除外（FR-36③・SC-01） | 参加 qid1(Bob idea_post/vote)・qid2(Carol selection)＋不参加 qid3(Frank idea_post) | `GET /me/feed` | `data` に `(qid1,idea_post)`・`(qid2,selection)` を含み、**qid3 は出ない**（`quest_id ∈ 参加集合`）・`vote` 等非公開は出ない・各行に `quest_title` | G.5.1／FR-36 |
 
@@ -59,6 +60,7 @@
 | G-TC-403 | api | me は圏外でも同梱 | quest 内に他ユーザーのみ付与・自分は0 | `GET /rankings?scope=quest:{id}` | `me.rank=null`・`me.score=0`・`total_users` は他ユーザー数 | G.5 |
 | G-TC-404 | api | クエスト内は門番（非パーティー404） | 非パーティーのクエスト | `GET /rankings?scope=quest:{id}` | 404（存在秘匿・C.0） | G.5／C.0 |
 | G-TC-405 | api | period 不正は 422 | — | `GET /rankings?period=xxx` | 422（`field=period`） | G.5 |
+| G-TC-406 | api | scope=company＝会社全体を集計（quest スコープと別経路） | 会社全体（quest_id=None）で大きく獲得した新規ユーザー | `GET /rankings?scope=company&period=this_week` | 当該ユーザーが `data` に現れ `score`=獲得額・`me.total_users≥2`（会社母数）＝全社集計（G-TC-401〜405 は quest スコープのみ） | G.5／SC-41 |
 
 ## 5. 実績 API（SC-40・G.4・§8-⑲）
 

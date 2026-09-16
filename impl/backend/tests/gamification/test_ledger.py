@@ -123,3 +123,23 @@ def test_grant_daily_login_is_idempotent_per_jst_day(factory):
         third = ledger.grant_daily_login(s, user, now=now + timedelta(days=1))  # 翌 JST 日＝再付与
         s.commit()
         assert third is not None and user.xp == 20
+
+
+def test_g_tc_109_grant_reasons_match_catalog(factory):
+    """G-TC-109: 主要 reason の (kind, reason, amount, ref_type) が G.6 対応表どおり付与される
+    （選定XP=200／評価XP=30／評価コイン／実績報酬コイン）。ledger 層で直接突合。"""
+    acc = factory.make_seed_company_account()
+    dbid = _db_identifier()
+    with get_tenant_session(dbid) as s:
+        user = get_user_by_account(s, acc["id"])
+        ledger.grant(s, user, kind=ledger.XP_GAIN, amount=200, reason="selection", ref_type="ideas", ref_id=uuid.uuid4())
+        ledger.grant(s, user, kind=ledger.XP_GAIN, amount=30, reason="evaluation", ref_type="evaluations", ref_id=uuid.uuid4())
+        ledger.grant(s, user, kind=ledger.COIN_GAIN, amount=40, reason="evaluation_coin", ref_type="ideas", ref_id=uuid.uuid4())
+        ledger.grant(s, user, kind=ledger.COIN_GAIN, amount=20, reason="achievement_reward", ref_type="achievements", ref_id=uuid.uuid4(), judge=False)
+        s.commit()
+        uid = user.id
+    acts = {a.reason: (a.kind, a.amount, a.ref_type) for a in _activities(dbid, uid)}
+    assert acts["selection"] == ("xp_gain", 200, "ideas")
+    assert acts["evaluation"] == ("xp_gain", 30, "evaluations")
+    assert acts["evaluation_coin"] == ("coin_gain", 40, "ideas")
+    assert acts["achievement_reward"] == ("coin_gain", 20, "achievements")

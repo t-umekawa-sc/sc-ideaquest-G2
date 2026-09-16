@@ -184,3 +184,16 @@ def test_a_tc_079_otp_failure_does_not_lock_login(client, factory, mail):
     assert r2.status_code == 200
     assert r2.json()["status"] == "mfa_required"    # ロックの 401 にならない
     assert get_redis().exists(f"login_lock:testclient:{acc['login_id']}") == 0
+
+
+def test_a_tc_050_login_rate_limit_429(client, factory):
+    """A-TC-050: (IP+login_id) 単位のログインレート制限＝上限超過で 429（第一層・ロックとは別）。
+    レート枠は成功ログインでも消費（fail 計数のロックと別キー）。上限内は 200・超過は 429 rate_limited。"""
+    MAX = get_settings().login_rate_limit_max  # 既定 10
+    acc = factory.make_seed_company_account()
+    cl = _client("203.0.113.50")
+    for _ in range(MAX):
+        assert _login(cl, acc, acc["password"]).status_code == 200  # 上限内は成功（枠を消費）
+    r = _login(cl, acc, acc["password"])  # MAX+1 回目＝レート超過
+    assert r.status_code == 429, r.text
+    assert r.json()["code"] == "rate_limited"

@@ -152,3 +152,27 @@ def test_g_tc_404_quest_gate(client, factory):
 def test_g_tc_405_invalid_period(client, factory):
     _login_new(client, factory)
     assert client.get(f"{RANK}?period=xxx").status_code == 422
+
+
+def test_g_tc_406_company_scope_aggregates_all_users(client, factory):
+    """G-TC-406: scope=company＝会社全体を集計（quest スコープと別経路・G-TC-401〜405 は quest のみ）。
+    会社全体（quest_id=None）で大きく獲得した新規ユーザーが scope=company の一覧に順位付きで現れ、me も同梱。"""
+    me = _login_new(client, factory)
+    top_id = uuid.uuid4()
+    with get_tenant_session(_db()) as s:
+        s.add(User(id=top_id, account_id=uuid.uuid4(), display_name="CompanyTop", locale="ja", status="active"))
+        s.flush()
+        top = s.get(User, top_id)
+        ledger.grant(s, top, kind=ledger.COIN_GAIN, amount=99999, reason="evaluation_coin",
+                     ref_type="ideas", ref_id=uuid.uuid4(), quest_id=None)  # 会社全体の獲得
+        s.commit()
+    try:
+        body = client.get(f"{RANK}?scope=company&period=this_week&limit=100").json()
+        top_rows = [r for r in body["data"] if r["user"]["name"] == "CompanyTop"]
+        assert len(top_rows) == 1 and top_rows[0]["score"] == 99999  # 会社集計に現れ、スコア=獲得コイン
+        assert body["me"]["total_users"] >= 2  # 少なくとも me + CompanyTop を含む会社母数
+    finally:
+        with get_tenant_session(_db()) as s:
+            s.execute(Activity.__table__.delete().where(Activity.user_id == top_id))
+            s.execute(User.__table__.delete().where(User.id == top_id))
+            s.commit()
