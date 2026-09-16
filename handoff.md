@@ -4,10 +4,10 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-15 24:00 JST 前後**
+- 最終更新: **2026-09-16 JST（README 追随更新セッション）**
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット（本 handoff コミット前）: **69a2417** `docs(handoff): セッション末・全文更新（ピンアニメ移植を反映）`（origin と同期済み）
-- **本セッションの変更は全て未コミット**（frontend 実装＋doc/テスト md＋新規3ファイル）。**本 handoff と一緒にまとめて 1 コミットして push する**。
+- 最新コミット: **5c5b539** `fix(chat,dashboard): E群受入指摘 DFT-E-006〜011＋SC-01 UI要望（回帰テスト同梱）`（origin と同期済み）。**E群受入対応（frontend＋doc/テスト md＋新規 `jump.ts`/`jump.test.ts`/e2e）はこのコミットで確定済み**（前 handoff の「未コミット」は当時の記述＝既に commit 済み）。
+- 本セッションの変更＝**`impl/README.md` の受入状況追随＋本 handoff の stale 修正**（次コミット予定）。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。群単位（D→E→G→F→H）に seed→受入→指摘修正を回している。
@@ -35,13 +35,13 @@
 - **並び替え**（`DashboardView.tsx`・`flowMotion` 再採番）＝**新着の議論 → チームアクティビティ＋最近の通知 → 未投票のアイデア → フォロー中のアイデア → 下書き → 参加中クエスト →（ゲーム層：ヒーロー＋週間ランキング）**。並び順の正＝`DashboardView` 冒頭コメント。
 
 ## 4. 現在の状態
-- **動いている**: 全コンテナ `--profile workers` でフル起動中（healthz 200・login 200）。frontend は本セッションで**複数回 `up -d --build frontend` 済み＝最新実装が反映済み**。
-- **テスト（実測・本セッション末）**:
-  - frontend **vitest 26 files / 181 passed**（chat `jump.test.ts` 5 含む）／`tsc --noEmit` OK／`npm run build` OK。**いずれも cwd=`impl/frontend` で実行**。
-  - **SC-24 e2e＝14 passed**（`sc-24-chat.spec.ts` フル・E-TC-215〜222 含む）。dashboard 通知 e2e（`sc-01-dashboard-notif.spec.ts` I-TC-144）green。
+- **コンテナは停止中**（本セッションでは未起動＝`curl healthz/login` は 000）。e2e/backend/ブラウザ受入を再開するには §8 の `docker compose --profile workers up -d --build` が必要。frontend の docker なし検証（vitest/tsc）は下記のとおり再実行して green を確認済み。
+- **テスト（実測・本セッション 2026-09-16 再実行）**:
+  - frontend **vitest 26 files / 181 passed**（chat `jump.test.ts` 5 含む）／`tsc --noEmit` OK。**いずれも cwd=`impl/frontend` で実行**。`npm run build` は今回未実行（前セッションで OK・frontend ソース未変更）。
   - **TCトレーサビリティ ✅ code 520**（`python3 scripts/check_tc_traceability.py`・リポジトリ直下）。
+  - **SC-24 e2e＝14 passed**／dashboard 通知 e2e（I-TC-144）green は**前セッション実測値**（今回はコンテナ停止のため未再実行）。
   - backend＝**未変更のため未実行（未確認）**。前回値は 548 passed。
-- **受入の進捗**（正＝`impl/README.md`「ブラウザ受入状況」・**本セッションでは README 未更新＝要追随**）:
+- **受入の進捗**（正＝`impl/README.md`「ブラウザ受入状況」・**本セッションで追随更新済み**＝E群を「受入中」に・DFT-E-006〜011＋SC-01 UI要望を反映・G群は受入待ちのまま）:
   - **D群＝✅完了**（前セッション）。
   - **E群（チャット）＝受入中**。DFT-E-006〜011＋アクションメニュー改善を修正・全て green。**ユーザーの再確認が残**。
   - **G群＝seed 済み・受入待ち**（未着手のまま）。
@@ -65,8 +65,8 @@
 - **DFT-E-009 は表示側（effectiveFirstUnread）で担保**＝自分の投稿の上には未読区切りを出さない。DFT-E-011 の可視ベース既読と二重に効く（堅牢）。
 
 ## 7. 次にやること（優先順・具体）
-1. **本セッションのコミット＆プッシュ**（本 handoff 含む）＝このセッションで実施予定。
-2. **`impl/README.md` の「ブラウザ受入状況」を追随更新**（E群の DFT-E-006〜011＋UI要望を反映・G群は受入待ちのまま）。**本セッションで未更新**。
+1. ~~本セッションのコミット＆プッシュ~~ **✅完了**（E群受入対応＝`5c5b539`／README追随＋本 handoff stale 修正＝本コミット）。
+2. ~~`impl/README.md` の「ブラウザ受入状況」を追随更新~~ **✅完了**（E群を「受入中」・DFT-E-006〜011＋SC-01 UI要望を反映・G群は受入待ちのまま）。
 3. **E群/G群のユーザー受入継続**＝今回の可視ベース既読・引用ジャンプ・入力欄z-index・最小化引用・ダッシュボード並び/通知フォント・アクションメニューを再確認。OK なら README を [x]。ゲーム層UIは owner のプロフィールで game_mode を ON（ピンは不要）。
 4. **F群 seed（`seed_f`）を `impl/backend/scripts/seed_demo.py` に追加**＝提出済み評価（5観点＋総評＋公開範囲）を複数評価者で＋owner 選定。evaluator 権限付与（`seed_d` の party permissions 参考）。dispatch に `f`。
 5. **H群 seed（`seed_h`）追加**＝2ユーザー発火（メンション/フォロー中コメント/評価/選定/更新）で SC-02 通知の通し。フォロー/パーティー関係を seed。dispatch に `h`。
