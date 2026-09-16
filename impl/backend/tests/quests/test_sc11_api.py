@@ -518,3 +518,50 @@ def test_c_tc_250_evaluator_grant_requires_member(client, env):
     members = client.get(f"{QUESTS}/{qid}/members").json()["data"]
     other = next(m for m in members if m["user"]["user_id"] == str(env.other_user_id))
     assert "evaluator" in other["permissions"]
+
+
+def test_c_tc_252_members_in_scope_and_group_ids(client, env):
+    """C-TC-252: 専用EP GET /quests/{id}/members が各員に in_scope＋group_ids を載せる（C.1・詳細EP と対称）。
+
+    参加部署（group_id）に現所属するメンバーは in_scope=true・group_ids に当該グループを含む。
+    C-TC-233/235（詳細EP）は担保するが専用EPの in_scope/group_ids は未担保だった純テストギャップ。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")  # 参加部署＝group_id
+    client.post(f"{QUESTS}/{qid}/members", json={"user_id": str(env.other_user_id)}, headers=_csrf(client))
+    members = client.get(f"{QUESTS}/{qid}/members").json()["data"]
+    other = next(m for m in members if m["user"]["user_id"] == str(env.other_user_id))
+    assert other["in_scope"] is True  # 現所属が参加部署と交差
+    assert str(env.group_id) in other["group_ids"]  # 有効所属グループを常時同梱
+
+
+def test_c_tc_253_create_idempotent_replay(client, env):
+    """C-TC-253: POST /quests の Idempotency＝同一キー再送は最初の結果を再生・別内容は 422（§1.9・横断MW）。
+
+    SEC-TC-041/042 はアイデア作成を検体にしたが、クエスト作成経路でも横断MW が効くことを担保。"""
+    _login_seed(client)
+    key = str(uuid.uuid4())
+    hdr = {**_csrf(client), "Idempotency-Key": key}
+    body = _base_body(env, title="Idem Quest")
+    r1 = client.post(QUESTS, json=body, headers=hdr)
+    assert r1.status_code == 201, r1.text
+    qid = r1.json()["id"]
+    env.track(uuid.UUID(qid))
+    # 同一キー・同一内容の再送＝最初の結果を再生（副作用1回・同じ id）
+    r2 = client.post(QUESTS, json=body, headers=hdr)
+    assert r2.status_code == 201
+    assert r2.headers.get("Idempotency-Replayed") == "true"
+    assert r2.json()["id"] == qid
+    # 同一キー・別内容は 422 idempotency_key_reuse
+    r3 = client.post(QUESTS, json=_base_body(env, title="DIFFERENT"), headers=hdr)
+    assert r3.status_code == 422 and r3.json()["code"] == "idempotency_key_reuse"
+
+
+def test_c_tc_254_recruiting_patch_strict_categories(client, env):
+    """C-TC-254: 公開中クエストの PATCH は strict＝recruiting に categories:[] は 422（C.2）。
+
+    C-TC-113 は作成時のみ。公開中に空カテゴリへ落とせない（現在 status で分岐）ことを担保。"""
+    _login_seed(client)
+    qid = env.seed_quest(status="recruiting")  # 公開中（strict 対象）
+    r = client.patch(f"{QUESTS}/{qid}", json={"categories": []}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e["field"] == "categories" for e in r.json()["errors"])
