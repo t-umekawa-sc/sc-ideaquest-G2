@@ -430,3 +430,11 @@ def test_f_tc_208_select_non_party_404(client, env):
     idea = env.make_idea(quest_id=qid, author=env.other_id)
     assert client.post(SELECT(idea), headers=_csrf(client)).status_code == 404
     assert client.delete(SELECT(idea), headers=_csrf(client)).status_code == 404
+
+
+def test_f_tc_209_aggregate_empty(client, env):
+    """F-TC-209: 提出済み評価0件の集計は空（evaluator_count=0／overall_avg=null／coin.projected=0）。F.1。"""
+    _login_seed(client)  # seed=owner（party）
+    idea = env.make_idea(quest_id=env.make_quest())
+    body = client.get(EVAL(idea)).json()
+    assert body["evaluator_count"] == 0 and body["overall_avg"] is None and body["coin"]["projected"] == 0

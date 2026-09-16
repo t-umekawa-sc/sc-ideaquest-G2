@@ -980,3 +980,27 @@ def test_d_tc_225_revote_clears_stale(client, env):
     assert client.post(VOTE(pub), json={"type": "oppose"}, headers=_csrf(client)).status_code == 200
     d = client.get(IDEA(pub)).json()
     assert d["vote"]["my_vote"] == "oppose" and d["vote"]["stale"] is False
+
+
+def test_d_tc_227_attachment_download_non_party_404(client, env):
+    """D-TC-227: 非パーティー員の添付ダウンロードは 404（存在秘匿・IDOR・D.3）。"""
+    _login_seed(client)  # seed=非メンバー
+    qid = env.make_quest(owner=env.other_id, seed_member=False)
+    iid = env.make_idea(quest_id=qid, author=env.other_id)
+    aid = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(Attachment(id=aid, idea_id=iid, object_key="k/x.png", original_name="x.png",
+                          size_bytes=10, mime_type="image/png", uploaded_by_id=env.other_id))
+        ts.commit()
+    assert client.get(DOWNLOAD(aid)).status_code == 404
+
+
+def test_d_tc_228_changed_fields_multiple(client, env):
+    """D-TC-228: 1回の PATCH で複数本文フィールドを変えた版の changed_fields が複数（D.4）。"""
+    _login_seed(client)
+    pub = env.make_idea(quest_id=env.make_quest(), status="published")  # rev1
+    r = client.patch(IDEA(pub), json={"title": "新T", "value": "新V", "body": "新B"}, headers=_csrf(client))
+    assert r.status_code == 200 and r.json()["current_revision"] == 2
+    revs = client.get(f"/api/v1/ideas/{pub}/revisions").json()["data"]
+    rev2 = next(rv for rv in revs if rv["revision"] == 2)
+    assert set(rev2["changed_fields"]) == {"title", "value", "body"}
