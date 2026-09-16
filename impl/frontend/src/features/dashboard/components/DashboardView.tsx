@@ -314,6 +314,8 @@ export function DashboardView({
                           className="notif-read"
                           type="button"
                           title="既読にする"
+                          // マウス押下でフォーカスを取らせない＝sticky 下の行でのフォーカス可視化スクロールを防ぐ（§4.12 と同趣旨）。
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); markNotifRead(n.id, false); }}
                         >既読にする</button>
                       )}

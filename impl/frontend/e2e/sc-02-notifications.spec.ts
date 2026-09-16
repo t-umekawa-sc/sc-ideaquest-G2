@@ -1,9 +1,20 @@
+import { execSync } from "node:child_process";
+import path from "node:path";
+
 import { expect, test, type Page } from "@playwright/test";
 
 // SC-02 通知一覧（H 実接続）＝一覧/未読数が実データ（getNotifications）で描画される。ACME-01 で確認。
 // 生成はサーバー（発火ドメイン）＝backend H-TC-101〜143 で担保。e2e は実データ照合＋デモ排除に限定。
 // 根拠＝doc/テスト/H_通知.md §1e（H-TC-208）・API設計 H.2・SC-02。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
+
+function psql(sql: string) {
+  execSync(`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c ${JSON.stringify(sql)}`, {
+    cwd: IMPL_DIR,
+    stdio: "pipe",
+  });
+}
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -31,6 +42,51 @@ test("H-TC-208 SC-02 notifications render real list and unread count", async ({ 
   }
   // デモ固定文字列（モックのセキュリティ通知 IP）が出ない＝実接続の証跡。
   await expect(page.getByText("IP 203.0.113.42")).toHaveCount(0);
+});
+
+// H-TC-211 SC-02 既読ボタンを押しても上へスクロールしない（ユーザー報告の回帰）。
+// 原因＝sticky の「← ダッシュボードへ戻る」(.backlink--float) の直下にある行のボタンを押すと、ブラウザが
+// フォーカス要素を可視化しようとページを上へスクロールさせていた。修正＝ボタンの onMouseDown で focus を奪わせない。
+// 決定的な核＝クリックでボタンにフォーカスが移らない（activeElement != .n__read）／症状＝scrollY が動かない。
+// 根拠＝doc/テスト/H_通知.md H-TC-211・デザイン標準 §4.12（sticky 戻るバー §4.10 との併用）。
+test("H-TC-211 marking read under the sticky back-link does not steal focus or scroll", async ({ page }) => {
+  const stamp = `フォーカス検証${Date.now().toString().slice(-8)}`;
+  psql(
+    `INSERT INTO notifications (id, recipient_id, type, params, is_read, created_at) ` +
+      `SELECT gen_random_uuid(), (SELECT id FROM users WHERE login_id='${USER.loginId}'), 'mention', ` +
+      `('{"actor_name":"${stamp}"}')::jsonb, false, now() - (g||' minutes')::interval FROM generate_series(1,25) g;`,
+  );
+  try {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await login(page);
+    await page.goto("/notifications");
+    await expect(page.locator("button.n__read").first()).toBeVisible();
+    // 縦に長くしてから中ほどへスクロール＝sticky 戻るバー直下に行のボタンが来る状態を作る。
+    await page.evaluate(() => window.scrollTo(0, Math.floor((document.documentElement.scrollHeight - window.innerHeight) * 0.5)));
+    await page.waitForTimeout(200);
+    const barBottom = await page.locator(".backlink--float").evaluate((el) => el.getBoundingClientRect().bottom);
+    // バー下端の直下（フォーカス可視化スクロールが起きやすい位置）にある「既読にする」を選ぶ。
+    const btns = page.locator("button.n__read", { hasText: "既読にする" });
+    const cntBefore = await btns.count();
+    let target = btns.first();
+    for (let i = 0; i < cntBefore; i++) {
+      const box = await btns.nth(i).boundingBox();
+      if (box && box.y > barBottom - 30 && box.y < barBottom + 60) { target = btns.nth(i); break; }
+    }
+    const yBefore = await page.evaluate(() => window.scrollY);
+    await target.click();
+    await page.waitForTimeout(400);
+    // 修正の核＝クリックでボタンにフォーカスを移さない（→ ブラウザのフォーカス可視化スクロールが起きない）。
+    const focusedIsButton = await page.evaluate(() => document.activeElement?.classList?.contains("n__read") ?? false);
+    expect(focusedIsButton).toBe(false);
+    // 症状＝スクロール位置が動かない（上へ飛ばない）。
+    const yAfter = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(yAfter - yBefore)).toBeLessThanOrEqual(4);
+    // 既読化自体は成立（「既読にする」ボタンが1件減る）。
+    await expect(btns).toHaveCount(cntBefore - 1);
+  } finally {
+    psql(`DELETE FROM notifications WHERE params->>'actor_name'='${stamp}';`);
+  }
 });
 
 // GF-AC-152（#15 reduce）＝reduce-motion で新着ベルの pop（bell-arrive／bell-badge-pop）と常時 wiggle（bell-wiggle）が無効。

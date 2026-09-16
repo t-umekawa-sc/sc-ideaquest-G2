@@ -127,6 +127,9 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
             className="n__read"
             type="button"
             title={!n.is_read ? "既読にする" : "未読に戻す"}
+            // マウス押下でフォーカスを取らせない＝sticky の戻るバー下にある行のボタンを押すと、ブラウザが
+            // フォーカス要素を可視化しようとページを上へスクロールさせる挙動を防ぐ（キーボード操作は不変）。
+            onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
