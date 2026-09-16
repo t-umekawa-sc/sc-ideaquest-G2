@@ -4,89 +4,81 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-16 JST（UX 改善セッション＝スクロール復元・通知日時・既読/戻る不具合）**
+- 最終更新: **2026-09-16 JST**（テストカバレッジ埋め＋クエスト参加リクエスト設計ドラフト＋結果タブUI改修セッション）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **bbc59db** `fix(nav): 戻る(pop)でスクロール位置が復元されない不具合（§4.12・M-TC-014）`（**origin と同期済み・未 push 0**）
-- 本セッションのコミット（すべて push 済み）＝ `84c43dc`(README追随＋handoff stale修正)→`6973b16`(E群/SC-01 受入OK 反映)→`0a0a6a4`(スクロール位置復元 §4.12)→`cc9a6ce`(通知日時表示＋引用非通知の決定/テスト)→`d30a2af`(既読ボタンの focus 奪取スクロール修正)→`bbc59db`(pop 帰還のスクロール復元)。
+- 最新コミット: **4cda621** `test(coverage): ［A］Med＝発行の冪等(B-TC-025)・members API経路トゥームストーン再利用(C-TC-255)`
+- **push 済み・未 push 0**（`main...origin/main` は同期。確認済み）
+- 本セッションのコミット（古い順・すべて push 済み）＝ `6ed46e7`→`57826f0`→`ee83da5`(テスト[A])→`85ac4a8`(設計ドラフト§2.5)→`ed751aa`(結果タブ Modal化)→`d56f7ba`(可視範囲§3)→`c1e8b38`(フォローscope§2.6)→`9b140fe`(フォロー確定)→`4cda621`(テスト[A]発行冪等/members再利用)。
 
 ## 2. プロジェクトのゴール
-社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。群単位（D→E→G→F→H）に seed→受入→指摘修正を回している。
+社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。群単位（D→E→G→F→H）に seed→受入→指摘修正を回している。並行で**テストパターンの網羅レビュー（[A]純テストギャップ埋め）**と**次機能の設計ドラフト**を進行中。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-前半＝**E群受入クローズの反映**、後半＝**ユーザーからの UX 相談/不具合を都度対応**（横断標準の新設＋回帰テスト同梱）。**backend は E-TC-223 テスト追加のみ（プロダクションコードは未変更）**。
+3系統を並行で進めた＝**(A) テスト[A]埋め**・**(B) クエスト参加リクエスト設計ドラフト**・**(C) 結果タブUI改修**。**backend プロダクションコードは未変更**（[A]はすべて既存実装への純テスト追加＝実装済みの振る舞いを担保するだけ）。
 
-### A. E群/SC-01 の受入クローズを README に反映（`impl/README.md`）
-- 前セッションの **E群 DFT-E-006〜011＋ホバー操作メニュー（E-TC-214〜222/218）＝✅受入OK（2026-09-16・ユーザー確認）**、**SC-01 ダッシュボード UI要望（I-TC-144）＝✅受入OK**。**G群は受入待ちのまま据え置き**。E群残＝SC-24 基本（E-TC-201/203）・completed 凍結の受入。
+### A. テストカバレッジ [A]（純テストギャップ）を追加
+台帳＝`doc/テスト/カバレッジギャップ.md`（[A]純テスト/[B]実装ギャップ/[C]設計乖離に分類）。追加した TC（すべて green 確認済み）:
+- **C-TC-252/253/254/255**（`impl/backend/tests/quests/test_sc11_api.py`）＝members専用EPの in_scope+group_ids／POST /quests の Idempotency／公開中PATCH strict（categories:[]→422）／members のAPI経路トゥームストーン再利用。
+- **B-TC-025**（`impl/backend/tests/admin/test_admin_issue.py`）＝アカウント発行の Idempotency（再送再生・副作用1回・別内容422）。
+- **D-TC-227/228**（`tests/ideas/test_api.py`）＝添付DLの非パーティー404(IDOR)／複数フィールド同時変更の changed_fields 複数。
+- **F-TC-209**（`tests/evaluations/test_api.py`）＝提出0件の評価集計は空。
+- 台帳追記＝`doc/テスト/{B_会社・アカウント,C_クエスト,D_アイデア,F_評価}.md`。**Idempotency は横断MW（`app/core/idempotency.py`）がグローバルに効く**＝POST /quests も発行も実装済み、テストだけが不足だった。
 
-### B. 一覧のスクロール位置復元（横断標準 §4.12・`impl/frontend/src/lib/scrollRestore.ts` 新規）
-- ユーザー要望＝「最近の通知」を上から順にクリック→戻る、で毎回先頭に飛び使いづらい。**restore-after-load** 方式（クライアント取得で空 mount の瞬間に走る標準復元は効かないため、`ready` 後に保存位置へ復元）。適用＝`useScrollRestore(ready,key?)` を **Dashboard(`data!==null`)/Notifications(`!loading`)/Quests(`quests!==null`)** に差し込み。
-- 保存＝`sessionStorage`（`scroll:<pathname>`）＋30分TTL＋`[0,maxScroll]`クランプ。**保存の要点**＝スクロール継続保存は遷移リセット(0)で良い値を潰すので、**クリック時点で確定保存＋直後 800ms のリセット保存を抑止**。
-- 純ロジック unit **M-TC-012**（`storageKey`/`readSaved`(TTL)/`clampScroll`）・e2e **M-TC-013**（push型戻る）。
+### B. クエスト「発見＋フォロー＋参加リクエスト」設計ドラフトを大幅具体化
+ファイル＝**`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`**（正規化先＝要件定義/データモデル/API設計C/H/screens）。ユーザーが口頭でイメージを提示→私が仕様に起こした。**まだドラフト（実装未着手）**。決定事項は §6 参照。ドラフト内の節＝§2.5＝参加リクエストのユーザーフロー、§2.6＝フォロー仕様、§3＝可視範囲、§4＝データモデル案、§8＝論点の決着状況。
 
-### C. ダッシュボード「最近の通知」に通知日時（`features/dashboard/DashboardView.tsx`・`features/notifications/time.ts` 新規）
-- ユーザー要望。相対ラベル（たった今/○分前/○時間前/昨日 hh:mm/M/D）を件名横に表示。`timeLabel`/`groupOf` を **`features/notifications/time.ts` に集約**（SC-02 と DRY・now 引数化でテスト可能）。`NotificationsView` は共有 time.ts を利用（挙動不変のリファクタ）。unit **I-TC-156**・e2e **I-TC-155**。
+### C. クエスト結果タブの編集をインライン展開→モーダル化（プロダクション変更・唯一）
+- ファイル＝**`impl/frontend/src/features/quests/components/QuestResultTab.tsx`**。⑤「振り返り・学び / 次アクション」の編集が**インライン展開**だったのを、ユーザー要望で**`Modal`（`@/components/ui`）**に変更。読み取りビューは常時表示・編集はダイアログ。`cancelEdit()` で未保存編集を破棄し直近保存値へリセット、`save()` 後は空KPI行を掃除。デザイン標準 §103-107（登録/編集は原則モーダル）に合致。
+- **e2e 依存なし**（旧インライン挙動をテストする e2e は存在しないことを grep で確認）。回帰テストは未追加（UI改善であり不具合ではないため。要否は次回判断）。
 
-### D. 引用は通知しない（決定の明文化＋テスト・`doc/API設計/H_通知.md`・`impl/backend/tests/chat/test_api.py`）
-- ユーザー相談＝「自分のメッセージが引用されても通知が飛ばない、これで良いか」。**事実＝チャット投稿の通知は `mention`/`idea_comment`/`follow_comment` の3種のみ。引用に対応する通知種別は存在しない**（catalog に無い）。宛先ごとに最具体1件へ dedup（`mention`>`idea_comment`>`follow_comment`）。生成は `app/tenant/chat/application.py::_notify_message_posted`。
-- 実機検証（seed_demo の Client を流用した一時スクリプト）＝owner を引用＋u3 をメンションで、**引用された owner=通知0件・メンションされた u3=`mention`1件**。
-- **ユーザー決定＝現状維持（引用は通知しない・人を呼ぶのは @メンションのみ）**。H_通知.md に明文化＋回帰 **E-TC-223**（引用=0・メンション=1）。
+## 4. 現在の状態（動作/テスト）
+- **動いているもの**: フロント全画面 backend 接続済み。今回の結果タブ Modal 化は **frontend コンテナを再ビルド済み（`impl-frontend-1` は約10分前起動）＝ブラウザ受入可能**。
+- **テスト通過状況**: 今回追加の8 TC（C-252/253/254/255・B-025・D-227/228・F-209）は個別実行で **all green**（確認済み）。**全体スイートは今回未実行（未確認）**＝次回コミット前に回すこと。
+- **トレーサビリティ**: `python3 scripts/check_tc_traceability.py` ＝ **✅ code 562 件すべて md 記載**（確認済み）。
+- **壊れているもの**: 認識している範囲では無し。
+- **注意（重要）**: **backend コンテナ（`impl-backend-1`・約2時間前起動）は source を再ビルドしていない＝今回の新テストファイルを含まない**。ただし backend プロダクションコードは未変更なので**再ビルド不要**。pytest は後述の `-v` マウントで最新 source を反映して実行する。
 
-### E. 既読ボタンで上へスクロールする不具合（`NotificationsView.tsx`・`DashboardView.tsx`）
-- ユーザー報告＝通知一覧で「既読にする」を押すと上へスクロールが走る。**headless では非再現**（実 Chrome 固有）。原因＝sticky の「← ダッシュボードへ戻る」(`.backlink--float`) 直下にある行のボタンを押すと、ブラウザがフォーカス要素を可視化しようとページを上へスクロールさせていた（**スクロール復元フックは無関係**＝復元はマウント時1回で mark-read では発火しない、と論証＋headless で確認）。
-- 修正＝既読/未読ボタンに **`onMouseDown` で focus 奪取を防止**（キーボード Tab/Enter は不変＝a11y 維持）。回帰 **H-TC-211**（クリックで `activeElement` がボタンにならない／scrollY 不動／既読は成立）。
+## 5. 詰まっている点（試して失敗した点）
+- **`docker compose run` が古いベイクを使う**: `impl/compose.yaml` の backend/frontend は `build:` のみで **source の volumes マウントが無い**（イメージにベイク）。そのため `docker compose run --rm backend pytest ...` は**古いコードを実行**し、新テストが「not found / deselected」になる。→ **解決＝`-v "$(pwd)/backend:/app"` で source をマウント**して実行（§8 参照）。frontend の改修をブラウザ反映するには **`docker compose build frontend && docker compose up -d frontend`** が要る（今回実施済み）。
+- **`docker compose run` の entrypoint が `-k` のクォートを壊す**: `-k "a or b"` を渡すと entrypoint が再構成して分割し 0 件 deselected になることがある。**`-v` マウント経由だと `-k "a or b"` が正しく効いた**（実績あり）。node ID 直接指定（`file.py::test_x`）は古いベイクだと「not found」になるので `-v` マウント必須。
 
-### F. 戻る(pop)でスクロール位置が復元されない不具合（`scrollRestore.ts`・§4.12 追補）
-- ユーザー報告＝参加中クエスト/未投票カード→詳細→**戻る(`router.back`＝pop)** で「かなり上」に落ちる（push型戻る=B は復元されるのに pop だけ未対応）。
-- 原因＝pop 帰還の再マウント時、**Next のネイティブ pop 復元が古い位置(0/81 等)へ飛ばし、その scroll を onScroll が保存＝良い値(2761)を潰す**。復元がその潰れた値を読んでいた。
-- 修正＝**保存位置を初回レンダー時（scroll リスナ装着＝潰しが起きる前）に確定キャプチャ**し、そこへ復元。さらに **~500ms だけ毎フレーム再適用**で Next ネイティブ復元/遅延レイアウトを上書き（ホイール/タッチ/キー/ポインタで即中断＝ユーザーと喧嘩しない）＋popstate 保険。実測＝savedY 2761→finalY 2761（修正前 81）。回帰 **M-TC-014**。
+## 6. 決定事項と根拠（採用しなかった案も）
+設計ドラフト（クエスト参加リクエスト）でユーザーが決めた事項:
+1. **掲示板の可視範囲＝部署フィルタ ＋ discoverable フラグ ON の AND**（ドラフト§3）。作成者が opt-in した & 閲覧者の所属部署が参加部署と交差するクエストだけ掲示板に出る。**参加部署0件（全社クエスト）は discoverable ON で社内全員に表示**。→ 採用しなかった案＝「会社全体に無条件公開」（部署の壁を無視するため却下）・「部署既定＋会社デフォルト切替」（複雑すぎるため却下）。門番は二層＝発見用 `can_discover_quest`（メタのみ）と中身用 `can_access_quest`（現状維持・参加後）。
+2. **承認者＝作成者 or quest_admin**。承認で付与する既定権限＝comment/vote/idea_create。
+3. **承認UIは新タブを作らず既存パーティータブに統合**＝申請者(pending)を上位・却下者(rejected)を下部に表示。行クリックでユーザープロフィールをダイアログ表示し「承諾」/「拒否」。→ 却下は**終端にしない**＝`quest_join_requests` は `UNIQUE(quest_id,user_id)` の**1行を status 遷移**（pending→rejected→approved で後日承諾可）。部分ユニークで却下行を消す案は「後で承諾」が作れず却下。
+4. **フォロー（watch）はスコープ内**。F1通知＝ステータス変化/結果確定/締切/新着アイデア(件数のみ) の**4種すべて既定ON・すべてメタ級**（フォロワーは非メンバー＝中身不可視のため本文/リンクは開かない）。F2＝member 昇格時は**自動で「参加中」に昇格**（follow 無効化）。F5＝**フォロー自体に報酬なし**（watch は貢献でないため）。
+5. **段階実装＝①掲示板（発見）→②参加リクエスト／③フォロー**（②③は①の後なら順不同）。
+6. **設計ドラフトの残・技術推奨（未決だが実装時判断でよい）**＝F3動的失効・F4フォロー可能条件（can_discover_quest 流用）・F6ダッシュボード・§8-6却下後の再申請可否・§8-7プロフィールダイアログ流用の可否。
 
-## 4. 現在の状態
-- **動いている**: 全コンテナ `--profile workers` でフル起動中（`curl healthz/login`＝200）。frontend は本セッションで**複数回 `up -d --build frontend` 済み＝最新実装が反映済み**。
-- **テスト（実測・本セッション末）**:
-  - frontend **vitest 28 files / 188 passed**（`scrollRestore.test.ts` 4・`time.test.ts` 3 含む）／`tsc --noEmit` OK。**cwd=`impl/frontend`**。`npm run build` は docker ビルド（`next build`）で成功＝OK。
-  - **TCトレーサビリティ ✅ code 527**（`python3 scripts/check_tc_traceability.py`・リポジトリ直下）。
-  - e2e（個別）green＝**M-TC-013/014**（スクロール復元 push/pop）・**I-TC-144/155**（ダッシュボード通知）・**H-TC-208/211**（SC-02）・**G-TC-170**（reduce）。
-  - backend＝**チャット `test_api.py` の E-TC-223(+107/108) 3 passed** を確認。**フル pytest は本セッション未実行（未確認）**。前回値 548 passed（+E-TC-223）。
-- **受入の進捗**（正＝`impl/README.md`「ブラウザ受入状況」・本セッションで反映済み）:
-  - **D群＝✅完了**（前セッション）。
-  - **E群（チャット）＝受入中**。DFT-E-006〜011＋メニュー改善＝✅受入OK。**残＝SC-24 基本（E-TC-201/203）・completed 凍結の受入**。
-  - **SC-01 ダッシュボード（UI要望）＝✅受入OK**。加えて本セッションで日時表示・スクロール復元・既読/戻る不具合を対応（ユーザー実機確認済み）。
-  - **G群＝seed 済み・受入待ち**（未着手のまま）。
-  - **F群（評価）・H群（通知）・その他（メール ADR-0009）＝未着手**（seed_f/seed_h 未実装）。
-- **壊れているもの**: 既知の失敗テストは無し（e2e フルランのフレークは §5 の別タスク）。
-
-## 5. 詰まっている点（試して失敗した経緯）
-- **実 Chrome 固有の挙動は headless で非再現**＝既読ボタンの focus 可視化スクロール（E）は headless Chromium（Playwright）では delta=0 で再現できず、**ユーザーの実機スクショで sticky 直下のボタンと判明**。実機再現が難しい時は「原因の仮説→決定的な副次シグナルを headless で検証」（例＝`document.activeElement` がボタンか）に切り替えるのが有効。
-- **pop 帰還のスクロール clobber**（F）＝再マウント時に Next ネイティブ復元→onScroll 保存で良い値が潰れる、を **e2e で `sessionStorage` 値をログして特定**（savedY=2761 が保存後 81 に化ける）。**保存値は初回レンダーで確定キャプチャ**が定石。
-- **vitest を repo ルートから実行すると誤検知**＝必ず cwd=`impl/frontend`（`vitest.config.ts` がそこ）。正しい cwd で 28 files/188 passed。
-- **ダッシュボードの `.quest-card` 等は data 描画後に出る**＝e2e で即 `count()` すると 0。`await expect(locator).toBeVisible({timeout})` で待つ。
-- **e2e フルラン（99本）full green は未達**（hermeticity＝共有テナント直列＋負荷でフレーク）。本セッションは関係する spec を個別 green で確認。§7 の別タスク。
-
-## 6. 決定事項と根拠（本セッション）
-- **一覧のスクロール位置復元を横断標準に（§4.12）**＝restore-after-load＋保存値の初回レンダー確定キャプチャ＋短時間再適用（ユーザー操作で中断）。対象＝ダッシュボード/通知一覧/クエスト一覧。push/pop 両対応。
-- **引用は通知しない（現状維持・ユーザー決定）**＝引用は文脈提示、人を呼ぶのは @メンションのみ（役割分離）。将来「引用でも通知」に転じるなら新種別 `quote`＋mention と dedup（H_通知.md に方針記載）。
-- **既読ボタンの focus 奪取スクロールは `onMouseDown` preventDefault で解決**＝sticky 戻るバー(§4.10)直下のボタンでブラウザが可視化スクロールする問題。キーボード操作は不変。
-- **受入不具合/ユーザー報告は必ず回帰テスト同梱**（§5.3）。可能なら red→green（M-TC-014・H-TC-211・I-TC-155 は red を旧ビルドで目視→修正→再ビルドで green）。
-
-## 7. 次にやること（優先順・具体）
-1. **E群残のユーザー受入**＝SC-24 基本（E-TC-201/203＝投稿/編集/削除・引用/メンション/リアクション/魔法/添付/既読セパレータ）・completed 凍結。OK なら `impl/README.md` の該当 [ ] を [x]。ゲーム層UIは owner のプロフィールで game_mode を ON。
-2. **G群のユーザー受入継続**（魔法/ショップ/アバター/ランキング/実績）＝`seed_demo.py g`・game_mode ON。
-3. **F群 seed（`seed_f`）を `impl/backend/scripts/seed_demo.py` に追加**＝提出済み評価（5観点＋総評＋公開範囲）を複数評価者で＋owner 選定。evaluator 権限付与（`seed_d` の party permissions 参考）。dispatch に `f`。
-4. **H群 seed（`seed_h`）追加**＝2ユーザー発火（メンション/フォロー中コメント/評価/選定/更新）で SC-02 通知の通し。フォロー/パーティー関係を seed。dispatch に `h`。
-5. **その他**＝メール確認 ADR-0009（SC-92/93 → MailHog `http://localhost:8025`）。
-6. **【別タスク】e2e スイートの hermeticity 対応（full green 化）**＝専用テナント/自データ cleanup・timeout 引き上げ・累積データ定期クリーンアップ・シャーディング。現状は個別/ファイル単位 green・フルランはフレーク。
-7. **【将来機能の実装】** コンセプト機能・情報インプット機能＝`doc/設計ドラフト/` を実体化（データモデル/API/画面 SC-xx・新規 FR 起票）。
+## 7. 次にやること（優先順・具体的に）
+1. **[A] Med/Low の残りを埋める**（standing task「残り［A］Med/Low を最後まで埋めて」）。台帳＝`doc/テスト/カバレッジギャップ.md` の未チェック `[ ]`。残（確認済みリスト）:
+   - **Med** 各 permission の実効可否（`vote`のみ会員が評価不可＝403 等の境界）を D/E/F 側で明示（要 red 確認）。
+   - **Med** 会社アカウント管理者ルート `/admin/accounts` の編集/disable/enable/password-reset 正常系＋他社IDOR404＋identity重複409＋email変更でverifiedリセット（`tests/admin/test_admin_accounts.py`・B-TC-040〜044 は一覧/発行/authz のみ）。**規模やや大**。
+   - **Med** メール確認リンク再送で旧トークン失効（送信→再送→旧confirm 410・新のみ200）。password_setup(A-TC-040) と非対称。
+   - **Med** `GET /me` の画像署名URL解決（生パス非露出・K.1）。
+   - **Low** email-verify/confirm 不正Origin拒否／`PUT /party` owner検証＋原子性＋completed409／ランキングtiebreak・this_month/all／引用元削除でexcerptトゥームストーン／chat_preview api／`GET /me/spells`（デッドスペック＝設計を「E代替」に正すか実装）。
+   - 手順＝**コードより先に `doc/テスト/<ドメイン>_*.md` に TC 行（`根拠`列付き）を追加**→テスト作成→`-v`マウントで green 確認→台帳・gap doc 更新→`check_tc_traceability.py` ✅→commit→push。
+2. **[B]/[C] は実装/仕様確定が要る**ので [A] とは別扱い（`GET /items` フィルタ未実装＝[B]・メンション差し替え通知整合 no-op＝[C]・要仕様確定）。
+3. **設計ドラフトの次段**＝ユーザーが実装着手を指示したら、正規化（要件定義FR新規・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C の新EP・H通知新種別・screens）へ展開。**現時点は実装着手指示なし**。
+4. **結果タブ Modal 化の受入**＝ユーザーがブラウザで確認する想定（`/quests/{id}` の🏁結果タブ→編集ボタン→モーダル）。回帰テスト要否は受入後に判断。
 
 ## 8. 再開に必要な環境情報
-- **起動**: `cd impl && docker compose --profile workers up -d --build`（db/redis/minio/mailhog/backend/frontend/worker/mail-worker）。**フロント変更後は必ず `docker compose up -d --build frontend`＋`curl localhost:3000/login` が 200 になるまで待つ（warmup）**。backend/worker/mail-worker は同一イメージ＝`... up -d --build backend worker mail-worker`。
-- **ポート**: frontend 3000 / backend 8000(/healthz) / db 5432 / redis 6379 / minio 9000・9001 / mailhog 8025。
-- **受入デモデータ**: リポジトリ直下から `python3 impl/backend/scripts/seed_demo.py [d|e|g|all]`（ホスト python3＋requests・稼働中 backend 必須・冪等）。dev ログイン＝`ACME-01`/`user@acme.example`(owner・game_mode OFF)／`user2@acme.example`(チャット太郎)／`user3@acme.example`(アイデア出す像)／`kanri@acme.example`(会社管理者)、いずれも `Passw0rd!`。system_admin＝`OPS`/`admin@ops.example`/`Passw0rd!`。
-- **frontend 検証（必ず cwd=`impl/frontend`）**: `npx tsc --noEmit && npx vitest run && npm run build`。**vitest/e2e を repo ルートから叩かない**（e2e spec を拾って誤検知）。
-- **e2e（cwd=`impl/frontend`・Playwright 導入済み）**: `npx playwright test e2e/xxx.spec.ts [-g "TC-ID"] --reporter=line`。**red は再ビルド前の旧コンテナに対して先に確認**。2ユーザー系は `browser.newContext()`＋`loginAs`。DB 直操作＝`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme`（cwd=impl）。**実機のみ再現する挙動は `document.activeElement`/`getComputedStyle`/`sessionStorage` 値を headless で測って原因を掴む**。
-- **backend テスト**: `cd impl && docker compose stop worker mail-worker` →（cwd=impl）`docker compose run --rm -T -v "$PWD/backend:/app" backend python -m pytest tests -q`（部分＝`-k "e_tc_223"`・`tests/chat/test_api.py`）→ 済んだら `docker compose start worker mail-worker`。
-- **TCトレーサビリティ**: TC を `doc/テスト/<ドメイン>_*.md` に先に足す →**リポジトリ直下**で `python3 scripts/check_tc_traceability.py` ✅（backend py＋e2e spec＋vitest を走査）。
-- **受入チャットの既読リセット**（未読状態で確認したい時）: `cd impl && docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c "DELETE FROM chat_reads WHERE chat_group_id=(SELECT id FROM chat_groups WHERE idea_id='0aafc731-eaa9-4826-a910-6f2fb8e22e05');"`。**チャットを開くと見えた分は既読になる**（DFT-E-011）ので都度リセット。
-- **規約の正本**: リポジトリ直下 `CLAUDE.md` から各規約。**commit/push はユーザー明示時のみ**。main 直コミット。
-- **正本の所在**: 要件＝`doc/要件定義/README.md`／API＝`doc/API設計/{README,A..L}.md`（通知の発火種別＝`H_通知.md`・引用非通知の決定を明記）／データモデル＝`doc/データモデル.md`／画面＝`doc/画面設計/screens/SC-xx_*.md`＋`mocks/*.html`／横断UI標準＝`doc/画面設計/デザイン標準.md`（§4.12＝一覧スクロール復元）／実装現況＝`impl/README.md`／実装順＝`doc/実装計画.md`／将来機能＝`doc/設計ドラフト/`。
-- **本セッションの新規モジュール**: `impl/frontend/src/lib/scrollRestore.ts`（`useScrollRestore`＝§4.12）・`impl/frontend/src/features/notifications/time.ts`（`timeLabel`/`groupOf`＝SC-01/SC-02 共有）。
+- **作業ディレクトリ**: リポジトリルート `/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から（`impl/backend` から実行するとマウントパスが `backend/backend` になり壊れる）。
+- **コンテナ起動（フル・受入用）**: `cd impl && docker compose --profile workers up -d`（backend/frontend/db/redis/mailhog/minio/worker/mail-worker）。ポート＝frontend **3000**・backend **8000**・MailHog UI **8025**・MinIO **9000**。
+- **frontend 改修の反映**: `cd impl && docker compose build frontend && docker compose up -d frontend`（source 無マウントのため再ビルド必須）。
+- **backend pytest（最新 source を反映）**: `cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウントを付けないと古いベイクを実行する**。複数選択は `-k "a or b"`（`-v` マウント経由なら効く）。**pytest 実行時は mail-worker を止める**（`docker compose stop mail-worker` 推奨・多重 mail sender 競合回避。ゲーム感QA作法に準拠）。
+- **トレーサビリティゲート**: リポジトリルートで `python3 scripts/check_tc_traceability.py`（コミット前に ✅ 必須）。
+- **frontend ビルドゲート**: `cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint。内部遷移は `<Link>`。tsc/vitest だけだと Next の lint を見逃す）。
+- **コミット規約**: 末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。受入/レビュー反映は main 直コミット可。ゲーム感作業のみ `feature/game-feel`。
+- **正本の場所**: 実装現況＝`impl/README.md`／実装順＝`doc/実装計画.md`／規約＝`doc/規約/*`／設計ドラフト＝`doc/設計ドラフト/*`／テスト台帳＝`doc/テスト/*`（カバレッジ backlog＝`カバレッジギャップ.md`）。
+
+---
+### 自己チェック（これだけで再開できるか）
+- ✅ 最新コミット・push 状態・ブランチ明記。
+- ✅ 3系統の変更（テスト/設計/UI）と理由をファイル/関数で明記。
+- ✅ テスト状況＝今回追加8TCは green、**全体スイートは未実行（未確認）**と明記。
+- ✅ コンテナ落とし穴（source 無マウント＝`-v` 必須・frontend 再ビルド必須・`-k` クォート）を §5/§8 に明記。
+- ✅ 次アクションを台帳の残 `[ ]` とファイル/手順まで具体化。
+- ⚠️ 未確認事項＝(1) 全体テストスイートの通過（未実行）(2) 結果タブ Modal 化のユーザー受入（未実施）(3) 設計ドラフトの実装着手指示（現時点なし）。
