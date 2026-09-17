@@ -56,6 +56,7 @@
 | G-TC-314 | api | 固定行（pin_ids）を送信順で解決＋非固定母集合から除外（§1.8.1④） | ログイン済 | `GET /items?pin_ids=<id>,<id>` | `pinned`＝送信順で解決・`data`/`total` から除外（total＝全件−ピン数） | G.1／§1.8.1 |
 | G-TC-315 | api | 未知の sort キー/enum 値は 422（ホワイトリスト・§2.2） | ログイン済 | `GET /items?sort=bogus`／`?slot=wing`／`?rarity=legendary` | いずれも 422 `validation_error` | G.1／§1.8.1 |
 | G-TC-316 | api | CSV エクスポート（同一絞込/ソートの全件・UTF-8 BOM・§1.8.1③） | ログイン済 | `GET /items?format=csv` | 200・`text/csv; charset=utf-8`・UTF-8 BOM・ヘッダ行（名称/スロット/…） | G.1／§1.8.1 |
+| G-TC-317 | api | 状態列（state）多値 enum＝各述語の OR（所有/購入可/コイン不足・§1.8.1②） | 残高25・`cap`(20) 所有 | `GET /items?state=owned`／`?state=short`／`?state=owned,short` | owned＝所有のみ／short＝未所有かつ price>25／owned,short＝その OR（所有 ∪ 未所有かつ不足）・未知値は 422 | G.1／§1.8.1 |
 
 ## 4. ランキング API（SC-41 全社／SC-12 クエスト内・G.5）
 

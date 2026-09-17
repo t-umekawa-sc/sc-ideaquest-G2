@@ -30,6 +30,7 @@ def list_items(
     rarity: str | None = None,    # enum 多値（`common,rare`）
     owned: bool | None = None,
     affordable: bool | None = None,
+    state: str | None = None,     # enum 多値（`owned,affordable,short`）＝SC-30 状態列（§1.8.1②）
     price_min: int | None = Query(default=None, ge=0),
     price_max: int | None = Query(default=None, ge=0),
     sort: str | None = None,
@@ -46,12 +47,12 @@ def list_items(
     if format == "csv":  # 同一フィルタ/ソートの全件を CSV で（§1.8.1③）
         content, filename = shop_service.export_items_csv(
             account_id, company_id, q=q, slot=slot, rarity=rarity, owned=owned, affordable=affordable,
-            price_min=price_min, price_max=price_max, sort=sort, columns=columns)
+            state=state, price_min=price_min, price_max=price_max, sort=sort, columns=columns)
         return Response(content=content, media_type="text/csv; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
     result = shop_service.query_items(
         account_id, company_id, q=q, slot=slot, rarity=rarity, owned=owned, affordable=affordable,
-        price_min=price_min, price_max=price_max, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page)
+        state=state, price_min=price_min, price_max=price_max, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page)
     return ItemListResponse(**result)
 
 

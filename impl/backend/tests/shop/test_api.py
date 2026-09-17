@@ -266,3 +266,19 @@ def test_g_tc_316_csv_export(client, factory):
     assert r.headers["content-type"].startswith("text/csv")
     assert r.content.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM（Excel 互換）
     assert "名称" in r.content.decode("utf-8-sig").splitlines()[0]  # ヘッダ行
+
+
+def test_g_tc_317_state_multi_enum(client, factory):
+    """G-TC-317: 状態列（state）多値 enum＝各述語の OR（所有／未所有かつ購入可／未所有かつ不足・§1.8.1②）。"""
+    acc = _login_new(client, factory)
+    _set_coins(acc, 25)
+    _own(acc, "cap")  # price 20 ≤ 25
+    cap_id = str(_item("cap").id)
+    owned = {d["id"] for d in client.get(ITEMS, params={"state": "owned"}).json()["data"]}
+    assert owned == {cap_id}
+    short = client.get(ITEMS, params={"state": "short"}).json()["data"]
+    assert short and all((not d["owned"]) and d["price_coin"] > 25 for d in short)
+    both = client.get(ITEMS, params={"state": "owned,short"}).json()["data"]
+    ids = {d["id"] for d in both}
+    assert cap_id in ids and all(d["owned"] or d["price_coin"] > 25 for d in both)  # 所有 ∪ 不足
+    assert client.get(ITEMS, params={"state": "bogus"}).status_code == 422
