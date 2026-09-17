@@ -84,9 +84,8 @@
 .dash-page .follow-value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .dash-page .follow-card__poster { margin-top: var(--space-3); }
 .dash-page .follow-stats { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
-.dash-page .follow-star { position: absolute; top: var(--space-4); right: var(--space-4); background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--pixel-xp); padding: 2px; border-radius: var(--radius-sm); }
-.dash-page .follow-star:hover { background: var(--color-surface-alt); }
-.dash-page .follow-star[aria-pressed="false"] { color: var(--color-text-subtle); }
+/* 見た目は共有 `.follow-star`（styles/components.css）。ここではカード内の絶対配置だけ上書き。 */
+.dash-page .follow-star { position: absolute; top: var(--space-4); right: var(--space-4); }
 /* チャット直行（フォロー中カード）＝カードLink の外＝右下に配置（star は右上）。 */
 .dash-page .follow-chat { position: absolute; right: var(--space-4); bottom: var(--space-4); font-size: 16px; line-height: 1; text-decoration: none; padding: 2px; border-radius: var(--radius-sm); z-index: 1; }
 .dash-page .follow-chat:hover { background: var(--color-surface-alt); }

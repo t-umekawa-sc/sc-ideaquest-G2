@@ -216,6 +216,12 @@
 
 /* モーダルの見た目は design-system.css（＝mock shared.css）が正。ここでは定義しない（段階移行で撤去済み）。 */
 
+/* --- フォロー★トグル（共有・SC-01 ダッシュボードのフォロー中カード／SC-13 発見カタログ ダイアログ） ---
+   金★＝フォロー中（aria-pressed=true・--pixel-xp）／淡★＝未フォロー（aria-pressed=false）。配置は使用側で指定。 */
+.follow-star { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--pixel-xp); padding: 2px; border-radius: var(--radius-sm); }
+.follow-star:hover { background: var(--color-surface-alt); }
+.follow-star[aria-pressed="false"] { color: var(--color-text-subtle); }
+
 /* --- 活発度スパーク（共有 ActivitySpark・SC-22 アイデア詳細／SC-13 発見カタログ） --- */
 .activity { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); background: var(--color-surface-alt); }
 .activity__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }

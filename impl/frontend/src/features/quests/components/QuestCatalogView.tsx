@@ -209,15 +209,29 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
   return (
     <Modal open={open} onClose={onClose} onClosed={onClosed} title="クエストの詳細（参加前）" size="lg">
       <ModalBody>
-        <div className="row-center" style={{ gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
-          <QuestIcon name={row.title} color={row.color} imageUrl={row.icon_image_url ?? undefined} size="lg" />
-          <div style={{ minWidth: 0 }}>
-            <div className="card-title" style={{ fontSize: "var(--text-lg)" }}>{row.title}</div>
-            <div className="row-center" style={{ gap: "var(--space-2)" }}>
-              <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
-              {STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
+        <div className="row-center" style={{ gap: "var(--space-2)", marginBottom: "var(--space-2)", justifyContent: "space-between" }}>
+          <div className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
+            <QuestIcon name={row.title} color={row.color} imageUrl={row.icon_image_url ?? undefined} size="lg" />
+            <div style={{ minWidth: 0 }}>
+              <div className="card-title" style={{ fontSize: "var(--text-lg)" }}>{row.title}</div>
+              <div className="row-center" style={{ gap: "var(--space-2)" }}>
+                <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
+                {/* フォロー中は右上の★で表す（緑バッジは出さない）。他状態はバッジ表示。 */}
+                {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
+              </div>
             </div>
           </div>
+          {/* フォロー＝ダッシュボードのフォロー中カードと同じ★トグル（右上・共有 .follow-star）。 */}
+          {st !== "member" && (
+            <button
+              type="button"
+              className="follow-star"
+              aria-pressed={st === "following"}
+              aria-label={st === "following" ? "フォロー解除" : "フォロー"}
+              title={st === "following" ? "フォロー中（クリックで解除）" : "フォロー"}
+              onClick={() => onFollow(row)}
+            >★</button>
+          )}
         </div>
         {row.purpose ? <p style={{ whiteSpace: "pre-wrap" }}>{row.purpose}</p> : <p className="muted">（テーマの記載はありません）</p>}
         <dl className="detail-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-1) var(--space-3)", marginTop: "var(--space-2)" }}>
@@ -243,18 +257,14 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
         </p>
       </ModalBody>
       <ModalFooter>
-        {st !== "member" && (
-          <button type="button" className="btn" aria-pressed={st === "following"} onClick={() => onFollow(row)}>
-            {st === "following" ? "★ フォロー中" : "☆ フォロー"}
-          </button>
-        )}
+        {/* 並びはクエスト編集ダイアログと同順＝閉じる（左）→ 状態別アクション → 主要アクション（右）。フォローは右上の★へ。 */}
+        <button type="button" className="btn" onClick={onClose}>閉じる</button>
+        {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
+        {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary" onClick={() => { onRequest(row); }}>参加をリクエスト</button>
         )}
-        {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
-        {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "member" && <Link className="btn btn-primary" href={`/quests/${row.id}`}>クエストへ</Link>}
-        <button type="button" className="btn" onClick={onClose}>閉じる</button>
       </ModalFooter>
     </Modal>
   );
