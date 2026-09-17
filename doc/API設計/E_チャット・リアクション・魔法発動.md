@@ -58,7 +58,7 @@
 
 - **空メッセージ不可**: `body` が空**かつ** `files[]` も無い場合は **422 `empty_message`**（SC-24 §4.3・添付のみ〔本文空〕は可）。
 - **投稿 XP+5（各ユーザー日次初回のみ・日次上限=チャット10/日）**: `activities` に `kind=xp_gain`,`reason=chat`,`ref_type=chat_messages`,`ref_id=message_id` を**同一 UoW で記帳**（ドメイン G の gamification repo を呼ぶ・コーディング規約 §3.4）。上限到達後の投稿は XP 付与なしで成功（投稿自体は可）。canonical XP 表・日次上限は README §6／データモデル §8-⑥。
-- **メンション（`chat_mentions`）**: `mentions[]` は**当該パーティーのメンバーに限定**（非メンバー指定は 422 `invalid_mention`）。`UNIQUE(chat_message_id, mentioned_user_id)`（§5.17）。編集時は差し替え（増減した対象の通知整合は E.6/H）。
+- **メンション（`chat_mentions`）**: `mentions[]` は**当該パーティーのメンバーに限定**（非メンバー指定は 422 `invalid_mention`）。`UNIQUE(chat_message_id, mentioned_user_id)`（§5.17）。編集時は差し替え。**通知整合＝追加分のみ通知（決定A・2026-09-17）**＝編集で**新規に追加された被メンションにのみ** `mention` 通知を発火し、**不変（同一）メンションは再通知しない**（編集のたびのスパム防止）／**外された被メンションは通知も取消もしない**（通知は at-most-once・H に取消プリミティブを設けない MVP 方針）。詳細は E.6。
 - **引用返信（`quoted_message_ids[]`・複数可）**: 各引用元は同一 `chat_group` 内のメッセージのみ（他チャット/他アイデアは 422）。同一メッセージの重複引用は 1 件に集約（`UNIQUE(chat_message_id, quoted_message_id)`・§5.16b）。ネスト式スレッドは将来（SC-24 §9・MVP スコープ外）。**編集時も差し替え可**（`PATCH` の `quoted_message_ids[]`＝メンションと同流儀で**置換**・省略時は不変・自己引用は除外）。
 - **編集＝本人のみ・履歴なし**（`is_edited=true`・本文上書き）。他者の編集は **403**。**削除＝論理（トゥームストーン）**で**本人＋`owner`/`quest_admin`＋QG管理者/システム管理者**（`deleted_by_id` に実行者・モデレーション）。権限外の削除は 403。既に削除済みへの編集/削除は 409 `invalid_state`。§8-⑪。
 - **完了凍結**: 上記 3 EP は `quest_status=completed` で **409 `invalid_state`**（canonical C.5）。
@@ -116,6 +116,7 @@
 | 契機 | 通知種別（`notification_type`・§3） | 宛先 |
 | --- | --- | --- |
 | メッセージ投稿（メンションあり） | `mention` | `mentions[]` の各ユーザー（自分宛は除外） |
+| メッセージ**編集**（メンション差し替え） | `mention` | **新規に追加された被メンションのみ**（＝編集後−編集前・自分宛除外・決定A）。不変は再通知せず・外した分は取消しない |
 | メッセージ投稿 | `idea_comment` | アイデア投稿者（`ideas.author_id`・自分の投稿は除外） |
 | メッセージ投稿 | `follow_comment` | 当該アイデアのフォロワー（`follows`・投稿者/メンション済みと重複排除） |
 | 魔法リアクション付与 | `magic_reaction` | 対象メッセージの投稿者（自分への付与は除外） |

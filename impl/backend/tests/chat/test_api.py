@@ -295,6 +295,60 @@ def test_e_tc_223_quote_no_notify_mention_notifies(client, env):
     assert _types(env.other_id, m_mention) == ["mention"]
 
 
+def test_e_tc_228_edit_notifies_only_added_mentions(client, env):
+    """E-TC-228: メッセージ編集のメンション通知整合＝追加分のみ通知（[C]②・決定A・E.2/E.6）。
+
+    追加された被メンションにだけ mention 通知／不変（同一）は再通知しない／外した分は通知も取消もしない。
+    """
+    from app.tenant.notifications.orm import Notification as _Notif
+
+    _login_seed(client)  # 投稿者 = env.user_id
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid, author=env.user_id)
+    u1, u2 = uuid.uuid4(), uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(User(id=u1, account_id=uuid.uuid4(), display_name="U1", locale="ja", status="active"))
+        ts.add(User(id=u2, account_id=uuid.uuid4(), display_name="U2", locale="ja", status="active"))
+        quests_repo.add_member(ts, qid, u1, permissions=["comment"])  # メンションはパーティー員に限定
+        quests_repo.add_member(ts, qid, u2, permissions=["comment"])
+        ts.commit()
+
+    def mentions_of(recipient, ref_msg):
+        with get_tenant_session(env.db_identifier) as ts:
+            return len(ts.execute(select(_Notif).where(
+                _Notif.recipient_id == recipient, _Notif.ref_chat_message_id == ref_msg, _Notif.type == "mention",
+            )).scalars().all())
+
+    mid = None
+    try:
+        # 投稿時に U1 のみメンション → U1 に mention 1件。
+        mid = _post(client, idea, body="初回", mentions=[u1]).json()["id"]
+        assert mentions_of(u1, mid) == 1 and mentions_of(u2, mid) == 0
+
+        # 編集で [U1, U2] へ差し替え → 追加 U2 に 1件・不変 U1 は再通知なし。
+        r = client.patch(f"{MSGS}/{mid}", data={"body": "編集1", "mentions": [str(u1), str(u2)]}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert mentions_of(u2, mid) == 1  # 追加分に通知
+        assert mentions_of(u1, mid) == 1  # 不変は再通知しない（編集スパム防止）
+
+        # 編集で [U2] のみ（U1 を外す）→ 外した U1 は通知増えず取消もされない・U2 は不変で増えない。
+        r2 = client.patch(f"{MSGS}/{mid}", data={"body": "編集2", "mentions": [str(u2)]}, headers=_csrf(client))
+        assert r2.status_code == 200, r2.text
+        assert mentions_of(u1, mid) == 1  # 外しても取消しない（決定A・1件のまま）
+        assert mentions_of(u2, mid) == 1  # 不変は再通知しない
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            if mid is not None:
+                ts.execute(_Notif.__table__.delete().where(_Notif.ref_chat_message_id == mid))
+            ts.execute(ChatMention.__table__.delete().where(ChatMention.mentioned_user_id.in_([u1, u2])))
+            member_ids = list(ts.execute(select(QuestMember.id).where(QuestMember.user_id.in_([u1, u2]))).scalars())
+            if member_ids:
+                ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(member_ids)))
+            ts.execute(QuestMember.__table__.delete().where(QuestMember.user_id.in_([u1, u2])))
+            ts.execute(User.__table__.delete().where(User.id.in_([u1, u2])))
+            ts.commit()
+
+
 def test_e_tc_110_delete(client, env):
     _login_seed(client)
     idea = env.make_idea(quest_id=env.make_quest())  # ACME-01 owner

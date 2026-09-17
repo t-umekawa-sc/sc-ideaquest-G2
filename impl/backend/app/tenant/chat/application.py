@@ -201,8 +201,14 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
             if not new_body and not repo.list_attachments_for_message(ts, msg.id) and not validated:
                 raise AppError(422, "validation_error", detail="本文か添付が必要です", errors=[{"field": "body", "code": "empty_message"}])
             msg.body = new_body
+        added_mentions: list[uuid.UUID] = []
         if mention_ids is not None:
-            repo.replace_mentions(ts, msg.id, _validate_mentions(ts, quest, mention_ids))
+            before_mentions = set(repo.get_mentions_for_messages(ts, [msg.id]).get(msg.id, []))
+            new_mentions = _validate_mentions(ts, quest, mention_ids)
+            repo.replace_mentions(ts, msg.id, new_mentions)
+            # 編集整合（E.2/E.6・決定A）＝新規に追加された被メンションのみ通知（不変は再通知しない・
+            # 外した分は通知も取消もしない）。自分宛/重複は除外。
+            added_mentions = [u for u in dict.fromkeys(new_mentions) if u not in before_mentions and u != msg.author_id]
         if quoted_message_ids is not None:
             # 引用の置換（E.2）。空文字センチネル（フロントが「全消し」を multipart で表現する手段）は除外し、
             # 残りを検証して置換する。自己引用（自分自身を引用元）は除外。
@@ -218,7 +224,7 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
         msg.updated_at = datetime.now(timezone.utc)
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
-    _notify_message_updated(idea.id, msg.id)
+    _notify_message_updated(company_id, idea.id, msg.id, added_mentions)
     realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.updated",
                                   payload, company_id=company_id)  # 即時反映（L.3）
     return payload
@@ -638,8 +644,26 @@ def _notify_message_posted(company_id, idea_id, message_id) -> None:
     notify_svc.dispatch(company_id, _build)
 
 
-def _notify_message_updated(idea_id, message_id) -> None:
-    return None
+def _notify_message_updated(company_id, idea_id, message_id, added_mention_ids) -> None:
+    """編集時のメンション通知整合（E.2/E.6・決定A）＝**新規に追加された被メンションのみ** `mention` 通知（post-commit）。
+
+    不変（同一）メンションは再通知しない・外された分は通知も取消もしない（at-most-once・H に取消なし）。
+    投稿者本人宛は除外。追加が無ければ何もしない。
+    """
+    recipients = list(dict.fromkeys(added_mention_ids or []))
+    if not recipients:
+        return
+
+    def _build(ts):
+        msg = repo.get_message(ts, message_id)
+        if msg is None:
+            return []
+        actor = ts.get(User, msg.author_id)
+        params = {"actor_name": actor.display_name if actor else None}
+        refs = {"ref_idea_id": idea_id, "ref_chat_message_id": message_id}
+        return [notify_svc.entry(r, "mention", refs=refs, params=params) for r in recipients if r != msg.author_id]
+
+    notify_svc.dispatch(company_id, _build)
 
 
 def _notify_message_deleted(idea_id, message_id) -> None:
