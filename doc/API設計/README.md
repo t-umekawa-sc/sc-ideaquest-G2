@@ -115,6 +115,7 @@
   - **「もっと見る」＝カーソル型**（`?limit=`/`?cursor=`＋`page_info.{next_cursor,has_next}`）。件数無制限・新着安定が要る**ユーザーフィード（SC-10 クエスト・SC-12 アイデア）**はこちら（`.pagination--more`）。
 - **表示状態（列順/表示・非表示/幅/密度/ビュー）はサーバーに送らない**＝`localStorage` のクライアント専管（デザイン標準 §4.5⑨）。サーバーに渡すのは**クエリ（検索/フィルタ/ソート/ページ/ピン ID/エクスポート列）**のみ。各一覧 EP は本契約のうち**自身が満たす項目（ソート可能キー・フィルタ可能フィールド・CSV 可否・ページ方式）を EP 行に明記**する。
 - **クライアントは検索/フィルタ/ソート/ページを URL クエリに同期**（`<storageKey>.q/.sort/.f/.page`・2026-08-20 改定・詳細はデザイン標準 §4.5⑨）＝ドリルイン→戻る/再読込/共有で復元。EP 側の契約（本 §1.8.1）は不変＝URL は同じクエリを SoT として持つだけ。
+- **共通ヘルパ（実装・DRY・§2.3・2026-09-17）**: パラメータ解析（複数ソート/enum 多値/pin_ids/CSV 列のホワイトリスト検証）と CSV 直列化は **`impl/backend/app/core/list_query.py`** に集約し、**新規の一覧 EP は本ヘルパを用いて実装**する（各 EP 固有の ORM カラム/集計式・クエリ組み立て・行射影のみ呼び出し側に残す）。**参照実装＝`/admin/companies`（`company_application.py`）と `/items`（`shop/application.py`）**（enum/number/owned 等の閲覧者依存フィルタ・rarity 序列ソート・offset+total+pinned・CSV を含む完成形）。フロント側の「QueryState → クエリ」変換は `queryCompanies`/`itemsQueryParams` が雛形（列の `sortable`/`filter` フラグ＝本ホワイトリストに一致させる）。
 
 ### 1.9 冪等性・共通ヘッダ
 
