@@ -135,6 +135,7 @@ def login(
         raise AppError(401, "unauthenticated")
 
     lock_notify: tuple[uuid.UUID, str] | None = None  # ロック発火時に通知すべき (account_id, email)
+    locked = False  # 当該試行でロックが発火したか（監査 auth.account_locked・A.9-⑥）
     with control_session() as session:
         account, company = account_repo.find_account_and_company(session, company_code, login_id)
 
@@ -154,7 +155,8 @@ def login(
         if decision is LoginDecision.INVALID:
             # 認証失敗を計数。閾値到達でロック発火＝実在 active のときだけ本人へ通知（§2.4）。
             # メール送信は列挙耐性のため session を閉じてから（§2.4・下記）。
-            if register_login_failure(r, client_ip, login_id) and account is not None and account.status == "active":
+            locked = register_login_failure(r, client_ip, login_id)
+            if locked and account is not None and account.status == "active":
                 lock_notify = (account.id, account.email)
         else:
             # PROCEED＝資格照合成功。失敗計数とロックを解除する（§2.2 成功で streak と lock 削除）。
@@ -187,6 +189,9 @@ def login(
                     result.trust_token = new_trust
                 nd = {"company_id": company.id, "account_id": account.id,
                       "email": account.email, "locale": account.locale} if new_trust else None
+                audit.record("auth.login.success",  # 監査（A.9-⑥）＝ログイン成功（MFA スキップ）。同一Tx。
+                             {"account_id": str(account.id), "company_id": str(company.id), "mfa": False},
+                             session=session)
                 session.commit()  # last_login_at 更新＋outbox（＋trusted_device）を確定（同一Tx）
                 if nd is not None:  # post-commit＝新端末通知（MFA-OFF はメールも前倒し・A.9-⑧(a)）
                     security_events.fire_new_device(
@@ -207,6 +212,11 @@ def login(
 
     # ここに到達するのは INVALID か 要MFA のいずれか
     if decision is LoginDecision.INVALID:
+        # 監査（A.9-⑥）＝失敗（＋発火時はロック）。PW 等の機密は入れない（§15）。actor は未認証＝None・IP/UA は自動。
+        audit.record("auth.login.failure",
+                     {"login_id": login_id, "company_code": company_code, "reason": "invalid_credentials"})
+        if locked:
+            audit.record("auth.account_locked", {"login_id": login_id, "company_code": company_code})
         # session を閉じてから通知（SMTP 中に DB 接続を保持しない）。宛先無し/クールダウン中は無送信
         if lock_notify is not None:
             account_id, email = lock_notify
@@ -222,6 +232,8 @@ def login(
     csrf = generate_token()
     _enqueue_mail(mfa_email, CATEGORY_OTP, secret=otp, locale=mfa_locale,
                   account_id=mfa_account_uuid, company_id=mfa_company_uuid)
+    audit.record("auth.mfa.issued",  # 監査（A.9-⑥）＝OTP 発行。OTP 値は入れない（§15）。
+                 {"account_id": mfa_account_id, "company_id": mfa_company_id, "channel": "email", "resend": False})
     mfa = {
         "delivery": "email",
         "masked_to": mask_email(mfa_email),
@@ -264,6 +276,7 @@ def verify_mfa(
     s = get_settings()
     now = int(time.time())
     if now > preauth["otp_expires_at"]:
+        audit.record("auth.mfa.verify", {"account_id": preauth["account_id"], "result": "failure", "reason": "otp_expired"})
         raise AppError(401, "otp_expired")
 
     if hash_token(code) != preauth["otp_hash"]:
@@ -273,6 +286,7 @@ def verify_mfa(
             delete_preauth(r, preauth_token)  # 上限到達＝pre-auth 破棄（login やり直し）
         else:
             save_preauth(r, preauth_token, preauth)
+        audit.record("auth.mfa.verify", {"account_id": preauth["account_id"], "result": "failure", "reason": "otp_invalid"})
         raise AppError(401, "otp_invalid", extra={"attempts_left": attempts_left})
 
     # OTP 一致: 本セッション発行。account/company を引き直す（pre-auth は id のみ保持）
@@ -291,6 +305,10 @@ def verify_mfa(
             result.trust_token = trust_token
         nd_company_id = account.company_id  # post-commit 発火用に退避（session を閉じてから）
         nd_account_id = account.id
+        # 監査（A.9-⑥）＝MFA 検証成功＋ログイン成功（MFA 経由）。同一Tx。OTP は入れない（§15）。
+        audit.record("auth.mfa.verify", {"account_id": str(account.id), "result": "success"}, session=session)
+        audit.record("auth.login.success",
+                     {"account_id": str(account.id), "company_id": str(company.id), "mfa": True}, session=session)
         session.commit()  # last_login_at 更新＋outbox（＋trusted_device）を確定（同一Tx）
 
     delete_preauth(r, preauth_token)  # pre-auth 消費（固定化対策・A.0-③）
@@ -329,6 +347,9 @@ def resend_mfa(r: redis.Redis, preauth_token: str, preauth: dict) -> dict:
         if account is not None:
             _enqueue_mail(account.email, CATEGORY_OTP, secret=otp, locale=account.locale,
                           account_id=account.id, company_id=account.company_id, session=session)
+            audit.record("auth.mfa.issued",  # 監査（A.9-⑥）＝OTP 再送。OTP 値は入れない。
+                         {"account_id": str(account.id), "company_id": str(account.company_id),
+                          "channel": "email", "resend": True}, session=session)
             session.commit()
     return {"expires_in": s.otp_ttl_seconds, "resend_available_in": s.otp_resend_cooldown_seconds}
 
@@ -343,6 +364,7 @@ def logout_all(r: redis.Redis, token: str | None) -> None:
     with control_session() as session:
         account_repo.revoke_all_trusted_devices(session, account_id)
         session.commit()
+    audit.record("auth.logout_all", {"account_id": account_id})  # 監査（A.9-⑥）＝全端末ログアウト＋信頼端末失効
 
 
 # GET /auth/session で外部に返す A.6 のキー（内部管理フィールド created_at 等は返さない）
@@ -358,7 +380,10 @@ def get_session(r: redis.Redis, token: str | None) -> dict:
 
 def logout(r: redis.Redis, token: str | None) -> None:
     if token:
+        session_data = read_session(r, token)  # 監査の対象 account_id 用（破棄前に読む）
         delete_session(r, token)
+        audit.record("auth.logout",  # 監査（A.9-⑥）＝現端末ログアウト
+                     {"account_id": session_data["account_id"]} if session_data else None)
 
 
 # --- 初回・再設定パスワード（A.7・状態B/D・ADR-0002） ------------------------------------
@@ -391,6 +416,8 @@ def request_password_setup(
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=s.password_setup_ttl_seconds)
         account_repo.invalidate_password_setup_challenges(session, account.id)  # 最新のみ有効
         account_repo.create_password_setup_challenge(session, account.id, hash_token(token), expires_at)
+        audit.record("auth.password_setup.request",  # 監査（A.9-⑥）＝自己サービス再設定要求（管理者起点と区別）。token は入れない。
+                     {"account_id": str(account.id), "origin": "self_service"}, session=session)
         _enqueue_mail(account.email, CATEGORY_PASSWORD_SETUP, secret=token, locale=account.locale,
                       account_id=account.id, company_id=company.id, session=session)
         session.commit()

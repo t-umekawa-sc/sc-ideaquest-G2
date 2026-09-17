@@ -226,3 +226,15 @@ pre-auth/OTP は Redis、信頼端末は DB（`trusted_devices`）。OTP は `ma
 | A-TC-105 | api | 送信後に email 変更されたら 409 stale | 送信後に管理者が別アドレスへ `PATCH email` | 旧トークンで confirm | 409 `stale`（`email_verified_at` は変えずやり直しを促す） | ADR-0009 §2.1 |
 | A-TC-106 | api | 未認証＝トークンが認可（セッション不要・CSRF 免除・Origin 検証） | 有効トークン・セッション無し | 同 EP（Origin 付き） | 200（`password-setup/complete` と同型） | ADR-0009 §2.5／A.7 |
 | A-TC-110 | api | confirm は不正 Origin を拒否（Origin 検証が token 判定に先行） | 有効トークン | 同 EP に `Origin: http://evil.example` を付与 | `403 forbidden`（cross-site 拒否）。トークンは未消費＝正 Origin で再送すると 200（origin が token 消費に先行） | A.0／A.7.1 |
+
+## 9. テストパターン（認証イベントの監査ログ・A.9-⑥）
+
+> 仕様の正＝[`../API設計/A_認証・セッション.md`](../API設計/A_認証・セッション.md) §A.9-⑥（ログイン成功/失敗・MFA 発行/検証・一時ロック・logout/logout-all・PW 設定/変更・PW再設定リクエスト〔自己/管理者・起点区別〕・ロール変更を、操作者/日時/対象/結果/IP・UA とともに `system_audit_logs` に記録。**PW/セッションID/OTP/各種トークンは出力しない**）。基盤＝`AuditContextMiddleware` が actor/IP/UA を自動付与し `audit.record(action, detail)` が記録。既存＝`auth.login.new_device`／`auth.password_changed`（PW 設定/変更）／管理者 `account.password_reset`・ロール変更 `account.edit`。本節は**認証フローの欠落分**を担保。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A-TC-111 | api | ログイン成功を監査記録（IP/UA 付き・機密なし） | 実アカウント | `POST /auth/login`（正資格・MFA-OFF） | `system_audit_logs` に `auth.login.success`（detail に account_id・`mfa=false`／IP・UA 記録／password/token を含まない） | A.9-⑥ |
+| A-TC-112 | api | ログイン失敗＋一時ロック発火を監査記録 | 実アカウント | 誤 PW で `login` を上限回数（5）試行 | 各失敗で `auth.login.failure`（detail に login_id・PW を含まない）／5回目で `auth.account_locked` が1件 | A.9-⑥／ADR-0005 |
+| A-TC-113 | api | MFA 発行と検証結果を監査記録 | MFA 必須会社のアカウント | `login`→OTP メール→`mfa/verify`（誤コード→正コード） | `login` 時 `auth.mfa.issued`／誤コードで `auth.mfa.verify`(result=failure)／正コードで `auth.mfa.verify`(result=success)＋`auth.login.success`(mfa=true)。OTP はどの detail にも含まない | A.9-⑥／ADR-0004 |
+| A-TC-114 | api | logout / logout-all を監査記録 | ログイン済み | `POST /auth/logout`／別セッションで `logout-all` | `auth.logout`（account_id）／`auth.logout_all`（account_id） | A.9-⑥ |
+| A-TC-115 | api | PW 再設定リクエスト（自己サービス）を監査記録＝管理者起点と区別 | 実アカウント（active） | `POST /auth/password-setup/request` | `auth.password_setup.request`（detail に account_id・`origin=self_service`／token を含まない）。列挙耐性の 202 は不変・非適格は無記録 | A.9-⑥／A.7 |
