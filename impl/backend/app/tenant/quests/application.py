@@ -12,7 +12,7 @@ import json
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core import list_query as lq
@@ -1423,7 +1423,20 @@ def get_catalog_detail(account_id, company_id, quest_id) -> dict:
         visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
         if not repo.can_discover_quest(ts, quest, visible):
             raise AppError(404, "not_found")  # 存在秘匿（発見不可）
-        return _catalog_dtos(ts, [quest], user.id)[0]
+        dto = _catalog_dtos(ts, [quest], user.id)[0]
+        dto["activity"] = _quest_activity(ts, quest.id)  # C.9.1 活発度スパーク（メタ限定・本文なし）
+        return dto
+
+
+_ACTIVITY_DAYS = 14
+
+
+def _quest_activity(ts, quest_id, *, days=_ACTIVITY_DAYS) -> dict:
+    """発見カタログの活発度スパーク（C.9.1）＝クエスト横断の日次メッセージ数（メタのみ）。"""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    daily = [{"date": d.date().isoformat(), "count": n}
+             for d, n in chat_repo.daily_message_counts_for_quest(ts, quest_id, since)]
+    return {"daily": daily, "total": sum(d["count"] for d in daily), "days": days}
 
 
 def _load_discoverable(ts, account_id, quest_id):

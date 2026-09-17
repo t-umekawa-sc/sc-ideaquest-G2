@@ -6,6 +6,7 @@ seed 一般ユーザー（ACME-01・viewer）でログインし、他ユーザ�
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,8 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.chat.orm import ChatGroup, ChatMessage
+from app.tenant.ideas.orm import Idea
 from app.tenant.notifications.orm import Notification
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
@@ -72,6 +75,14 @@ def env():
 
     with get_tenant_session(db) as ts:
         qids = list(quests)
+        # C-TC-265 で作った公開アイデア＋チャット（横断活発度）の後始末（Quest 削除前に FK 解消）。
+        iids = list(ts.execute(select(Idea.id).where(Idea.quest_id.in_(qids))).scalars())
+        if iids:
+            cgids = list(ts.execute(select(ChatGroup.id).where(ChatGroup.idea_id.in_(iids))).scalars())
+            if cgids:
+                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cgids)))
+                ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id.in_(cgids)))
+            ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
         ts.execute(Notification.__table__.delete().where(Notification.ref_quest_id.in_(qids)))
         ts.execute(QuestFollow.__table__.delete().where(QuestFollow.quest_id.in_(qids)))
         ts.execute(QuestJoinRequest.__table__.delete().where(QuestJoinRequest.quest_id.in_(qids)))
@@ -176,3 +187,39 @@ def test_c_tc_264_catalog_detail_and_sort_422(client, env):
     assert paged.status_code == 200, paged.text
     pi = paged.json()["page_info"]
     assert pi["page"] == 1 and pi["per_page"] == 5 and "total" in pi
+
+
+def test_c_tc_265_catalog_detail_activity(client, env):
+    """C-TC-265 catalog-detail の活発度スパーク＝クエスト横断（公開アイデアのチャット合算）・メタのみ・本文非返却。"""
+    qid = env.new_quest(discoverable=True)
+    now = datetime.now(timezone.utc)
+    # 公開アイデア2件＋各チャット群にメッセージ（別日）を seed。合計 3 件（2件目に2メッセージ・別日）。
+    with get_tenant_session(env.db) as ts:
+        secret = "SECRET_CHAT_BODY_SHOULD_NOT_LEAK"
+        for n in range(2):
+            iid = uuid.uuid4()
+            ts.add(Idea(id=iid, quest_id=qid, author_id=env.owner_id, title=f"I{n}",
+                        body="b", value="v", status="published"))
+            ts.flush()
+            cgid = uuid.uuid4()
+            ts.add(ChatGroup(id=cgid, idea_id=iid))
+            ts.flush()
+            # アイデア0＝1メッセージ(今日)／アイデア1＝2メッセージ(今日・昨日)。
+            ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id,
+                               body=secret, created_at=now))
+            if n == 1:
+                ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id,
+                                   body=secret, created_at=now - timedelta(days=1)))
+        ts.commit()
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(f"/api/v1/quests/{qid}/catalog-detail")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    act = body["activity"]
+    # 横断合算＝総数3・日別に集計（今日2・昨日1）。
+    assert act["total"] == 3
+    counts = {d["date"]: d["count"] for d in act["daily"]}
+    assert counts.get(now.date().isoformat()) == 2
+    assert counts.get((now - timedelta(days=1)).date().isoformat()) == 1
+    # メタのみ＝チャット本文は応答に一切含まれない。
+    assert "SECRET_CHAT_BODY_SHOULD_NOT_LEAK" not in r.text

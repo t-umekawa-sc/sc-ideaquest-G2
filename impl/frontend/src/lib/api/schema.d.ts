@@ -974,7 +974,7 @@ export interface paths {
         };
         /**
          * Quest Catalog Detail
-         * @description 掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）。発見門番のみ・中身は返さない。読取専用。
+         * @description 掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）＝カード＋活発度スパーク。発見門番のみ・中身は返さない。読取専用。
          */
         get: operations["quest_catalog_detail_api_v1_quests__quest_id__catalog_detail_get"];
         put?: never;
@@ -4062,6 +4062,37 @@ export interface components {
             coin_balance: number;
         };
         /**
+         * QuestActivityDTO
+         * @description 発見カタログ活発度スパーク（C.9.1）＝クエスト横断の日次メッセージ数（メタ限定・本文は含まない）。
+         */
+        QuestActivityDTO: {
+            /**
+             * Daily
+             * @default []
+             */
+            daily: components["schemas"]["QuestActivityDailyDTO"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Days
+             * @default 14
+             */
+            days: number;
+        };
+        /**
+         * QuestActivityDailyDTO
+         * @description 発見カタログ活発度の1日分（メタのみ＝件数）。
+         */
+        QuestActivityDailyDTO: {
+            /** Date */
+            date: string;
+            /** Count */
+            count: number;
+        };
+        /**
          * QuestCandidateDTO
          * @description パーティー候補ユーザー1件（C.4 GET /quest-groups/{id}/members・GET /quest-group-candidates）。
          */
@@ -4165,6 +4196,49 @@ export interface components {
             is_owner: boolean;
             /** Purpose */
             purpose?: string | null;
+        };
+        /**
+         * QuestCatalogDetailDTO
+         * @description 発見カタログの詳細（SC-13 ダイアログ）＝カード＋メタ＋活発度スパーク。中身（本文/チャット/評価）は返さない。
+         */
+        QuestCatalogDetailDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Status */
+            status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Idea Count */
+            idea_count: number;
+            owner: components["schemas"]["QuestOwnerDTO"];
+            /**
+             * Quest Groups
+             * @default []
+             */
+            quest_groups: components["schemas"]["QuestGroupRefDTO"][];
+            /** My State */
+            my_state: string;
+            /**
+             * Is Owner
+             * @default false
+             */
+            is_owner: boolean;
+            /** Purpose */
+            purpose?: string | null;
+            activity?: components["schemas"]["QuestActivityDTO"] | null;
         };
         /** QuestCatalogResponse */
         QuestCatalogResponse: {
@@ -6866,7 +6940,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuestCatalogCardDTO"];
+                    "application/json": components["schemas"]["QuestCatalogDetailDTO"];
                 };
             };
             /** @description Validation Error */

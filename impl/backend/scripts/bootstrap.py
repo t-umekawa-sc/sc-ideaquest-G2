@@ -202,6 +202,68 @@ def seed_company_users() -> None:
                 print(f"[bootstrap] seeded user mirror for {account.login_id} in {company.db_identifier}")
 
 
+# 発見カタログ（SC-13・FR-40）デモ用の固定 seed（非prod のみ）。固定 UUID＝冪等・DB リセットでも安定再現。
+# ゼロ部署＝全社公開（`can_discover_quest` は 0 部署を全社として可視）＝seed 一般ユーザーが非メンバーで発見できる。
+# owner は合成ユーザー（seed 一般ユーザーとは別）＝seed ユーザーの `my_state=none`。公開アイデア＋直近チャットで活発度スパークを見せる。
+DEMO_DISCOVERY_OWNER_ID = uuid.UUID("d15c0000-0000-4000-a000-000000000001")
+DEMO_DISCOVERY_QUEST_ID = uuid.UUID("d15c0000-0000-4000-a000-000000000002")
+DEMO_DISCOVERY_IDEA_IDS = (
+    uuid.UUID("d15c0000-0000-4000-a000-000000000101"),
+    uuid.UUID("d15c0000-0000-4000-a000-000000000102"),
+)
+
+
+def seed_demo_discovery() -> None:
+    """ACME-01 に発見デモの discoverable クエスト（全社公開）＋活発度用の公開アイデア/チャットを seed（冪等・非prod）。"""
+    from datetime import datetime, timedelta, timezone
+
+    from app.tenant.chat.orm import ChatGroup, ChatMessage
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests import repository as quest_repo
+    from app.tenant.quests.orm import Quest
+
+    s = get_settings()
+    if not _seed_demo_enabled(s.app_env):
+        return
+    with control_session() as session:
+        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+        db_identifier = company.db_identifier if company else None
+    if db_identifier is None:
+        return
+    with get_tenant_session(db_identifier) as ts:
+        if ts.get(Quest, DEMO_DISCOVERY_QUEST_ID) is not None:
+            return  # 冪等＝既に seed 済み
+        if ts.query(User).filter_by(id=DEMO_DISCOVERY_OWNER_ID).one_or_none() is None:
+            ts.add(User(id=DEMO_DISCOVERY_OWNER_ID, account_id=uuid.uuid4(),
+                        display_name="発見 デモ太郎", locale="ja", status="active"))
+            ts.flush()
+        quest = quest_repo.create_quest(
+            ts, quest_id=DEMO_DISCOVERY_QUEST_ID, owner_id=DEMO_DISCOVERY_OWNER_ID,
+            title="【発見デモ】部署横断アイデア募集", color="#3B82F6", status="recruiting",
+            purpose="部署をまたいで課題とアイデアを持ち寄る発見デモ用クエストです。参加すると議論・アイデア・評価が見られます。")
+        quest.discoverable = True  # 参加部署リンクは張らない＝ゼロ部署＝全社公開
+        quest_repo.add_member(ts, DEMO_DISCOVERY_QUEST_ID, DEMO_DISCOVERY_OWNER_ID, permissions=["owner"])
+        # 活発度スパーク用＝公開アイデア2件＋各チャット群に直近の日次メッセージ（offset 日前→件数）。
+        now = datetime.now(timezone.utc)
+        groups = []
+        for iid, title in zip(DEMO_DISCOVERY_IDEA_IDS,
+                              ["部署間の情報共有を自動化する", "オンボーディングを1日で終える"]):
+            ts.add(Idea(id=iid, quest_id=DEMO_DISCOVERY_QUEST_ID, author_id=DEMO_DISCOVERY_OWNER_ID,
+                        title=title, body="（発見デモ用）", value="（発見デモ用）", status="published"))
+            ts.flush()
+            cgid = uuid.uuid4()
+            ts.add(ChatGroup(id=cgid, idea_id=iid))
+            ts.flush()
+            groups.append(cgid)
+        for off, cnt in {0: 4, 1: 2, 2: 5, 3: 1, 5: 3, 7: 2, 9: 1}.items():
+            for k in range(cnt):
+                ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=groups[(off + k) % len(groups)],
+                                   author_id=DEMO_DISCOVERY_OWNER_ID, body="（発見デモ・議論サンプル）",
+                                   created_at=now - timedelta(days=off, hours=k)))
+        ts.commit()
+        print(f"[bootstrap] seeded discovery demo quest in {db_identifier}")
+
+
 def main() -> None:
     s = get_settings()
     # 1. 管理DB
@@ -215,6 +277,7 @@ def main() -> None:
         create_database(db_identifier)
         migrate_company(db_identifier)
     seed_company_users()
+    seed_demo_discovery()  # 発見カタログ（SC-13）デモ（非prod・冪等）
     print("[bootstrap] done")
 
 

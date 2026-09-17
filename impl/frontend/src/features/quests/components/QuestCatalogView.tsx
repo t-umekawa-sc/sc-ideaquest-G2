@@ -8,16 +8,17 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { QuestIcon } from "@/components/layout";
-import { DataTable, EmptyState, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, DataTable, EmptyState, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import {
-  fetchQuestCatalog, followQuest, requestJoinQuest, unfollowQuest, withdrawJoinQuest,
-  type QuestCatalogCard,
+  fetchQuestCatalog, followQuest, getCatalogDetail, requestJoinQuest, unfollowQuest, withdrawJoinQuest,
+  type QuestCatalogCard, type QuestCatalogDetail,
 } from "../api";
 
 type Row = QuestCatalogCard;
+type Detail = QuestCatalogDetail;  // カード＋活発度スパーク（catalog-detail）
 
 const STATUS_LABEL: Record<string, string> = { recruiting: "募集中", in_progress: "進行中", evaluating: "評価中" };
 const STATE_LABEL: Record<string, string> = { member: "参加中", pending: "リクエスト中", rejected: "却下", following: "フォロー中" };
@@ -32,12 +33,22 @@ export function QuestCatalogView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
   const [reload, setReload] = useState(0);
-  const [detail, setDetail] = useState<Row | null>(null);  // 詳細ダイアログ（開いているクエスト）
+  const [detail, setDetail] = useState<Detail | null>(null);  // 詳細ダイアログの中身（開いているクエスト）
+  const [dialogOpen, setDialogOpen] = useState(false);        // open 駆動（閉じアニメを見せてから detail を外す）
 
   const serverQuery = useCallback(async (state: QueryState, signal: AbortSignal): Promise<ServerResult<Row>> => {
     const res = await fetchQuestCatalog(state, signal);
     if (!res) return { rows: [], total: 0, pinned: [] };
     return { rows: res.data, total: res.page_info.total, pinned: [] };
+  }, []);
+
+  // ダイアログを開く＝一覧カードで即描画し、活発度スパーク付きの詳細（catalog-detail）を後追いで結合。
+  const openDetail = useCallback((r: Row) => {
+    setDetail(r);
+    setDialogOpen(true);
+    void getCatalogDetail(r.id)
+      .then((d) => { if (d) setDetail((cur) => (cur && cur.id === d.id ? { ...cur, ...d } : cur)); })
+      .catch(() => {});
   }, []);
 
   // アクション後は一覧を再取得（絞込維持）＋開いているダイアログの my_state を楽観更新。
@@ -87,7 +98,7 @@ export function QuestCatalogView() {
 
   // フォロー/参加リクエストの行アクション（リスト表示の ⋯・カード/ダイアログと同じ操作）。
   const menuItems = (r: Row): RowMenuItem[] => {
-    const items: RowMenuItem[] = [{ label: "詳細を見る", onClick: () => setDetail(r) }];
+    const items: RowMenuItem[] = [{ label: "詳細を見る", onClick: () => openDetail(r) }];
     if (r.my_state === "member") { items.push({ label: "クエストへ", onClick: () => { window.location.href = `/quests/${r.id}`; } }); return items; }
     items.push({ label: r.my_state === "following" ? "★ フォロー解除" : "☆ フォロー", onClick: () => void toggleFollow(r) });
     if (r.my_state === "pending") items.push({ label: "申請を取り消す", onClick: () => void withdraw(r) });
@@ -127,8 +138,8 @@ export function QuestCatalogView() {
     const st = r.my_state;
     return (
       <article className="card card-accent quest-card is-clickable" data-id={r.id} role="button" tabIndex={0}
-        onClick={() => setDetail(r)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(r); } }}
+        onClick={() => openDetail(r)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(r); } }}
         style={{ ["--accent" as string]: r.color, cursor: "pointer" } as React.CSSProperties}>
         <div className="between">
           <span className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
@@ -170,23 +181,33 @@ export function QuestCatalogView() {
         perPageOptions={[12, 24, 48]}
         defaultView="card"
         searchFields="件名・テーマ・カテゴリー"
-        onRowClick={(r) => setDetail(r)}
+        onRowClick={(r) => openDetail(r)}
         emptyText={<EmptyState icon="🔎" title="公開中のクエストがありません" hint="部署内で公開されたクエストがここに並びます。" />}
         cardRaw={cardRaw}
       />
 
-      {detail && <CatalogDialog row={detail} onClose={() => setDetail(null)} onFollow={toggleFollow} onRequest={request} onWithdraw={withdraw} />}
+      {detail && (
+        <CatalogDialog
+          row={detail}
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}  // 閉じ要求＝exit アニメ開始
+          onClosed={() => setDetail(null)}       // アニメ完了＝アンマウント
+          onFollow={toggleFollow}
+          onRequest={request}
+          onWithdraw={withdraw}
+        />
+      )}
     </section>
   );
 }
 
-function CatalogDialog({ row, onClose, onFollow, onRequest, onWithdraw }: {
-  row: Row; onClose: () => void;
+function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWithdraw }: {
+  row: Detail; open: boolean; onClose: () => void; onClosed: () => void;
   onFollow: (r: Row) => void; onRequest: (r: Row) => void; onWithdraw: (r: Row) => void;
 }) {
   const st = row.my_state;
   return (
-    <Modal open onClose={onClose} title="クエストの詳細（参加前）" size="lg" maximizable={false}>
+    <Modal open={open} onClose={onClose} onClosed={onClosed} title="クエストの詳細（参加前）" size="lg">
       <ModalBody>
         <div className="row-center" style={{ gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
           <QuestIcon name={row.title} color={row.color} imageUrl={row.icon_image_url ?? undefined} size="lg" />
@@ -207,6 +228,16 @@ function CatalogDialog({ row, onClose, onFollow, onRequest, onWithdraw }: {
           <dt className="muted">カテゴリー</dt><dd>{(row.categories ?? []).join("、") || "—"}</dd>
           <dt className="muted">参加部署</dt><dd>{(row.quest_groups ?? []).map((g) => g.name).join("、") || "全社"}</dd>
         </dl>
+        {row.activity ? (
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <ActivitySpark
+              daily={(row.activity.daily ?? []).map((d) => ({ date: d.date, count: d.count }))}
+              label={`活動の活発さ（直近${row.activity.days}日・💬 合計 ${row.activity.total} 件）`}
+              legend="棒＝日次コメント数（クエスト内の公開アイデア横断・直近3日を強調）。件数のみ＝本文は参加後。"
+              emptyText="まだ活動の記録はありません。"
+            />
+          </div>
+        ) : null}
         <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>
           ※ アイデアの本文・議論（チャット）・評価は<strong>参加後</strong>に見られます。ここでは概要（メタ情報）のみ表示しています。
         </p>

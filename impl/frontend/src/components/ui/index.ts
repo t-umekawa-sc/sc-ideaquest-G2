@@ -9,6 +9,7 @@ export { SpellDeliveryFx, type CastPoint } from "./SpellDeliveryFx";
 export { SpellPersistFx } from "./SpellPersistFx";
 export { SpellCanvasFx } from "./SpellCanvasFx";
 export { SparkBurst } from "./SparkBurst";
+export { ActivitySpark, type ActivityDaily } from "./ActivitySpark";
 export { XpFloat } from "./XpFloat";
 export { EmptyState } from "./EmptyState";
 export { Card, CardTitle } from "./Card";

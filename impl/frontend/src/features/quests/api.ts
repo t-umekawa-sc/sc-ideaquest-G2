@@ -5,6 +5,7 @@ import type { components } from "@/lib/api/schema";
 
 export type QuestCard = components["schemas"]["QuestCardDTO"];
 export type QuestCatalogCard = components["schemas"]["QuestCatalogCardDTO"];
+export type QuestCatalogDetail = components["schemas"]["QuestCatalogDetailDTO"];
 export type QuestCatalogResponse = components["schemas"]["QuestCatalogResponse"];
 
 // 発見カタログ（SC-13・C.9）＝DataTable サーバー契約（§1.8.1・list_query・番号ページャ）。
@@ -37,8 +38,8 @@ export function fetchQuestCatalog(state: QueryState, signal?: AbortSignal): Prom
   return apiFetch<QuestCatalogResponse>(`/quest-catalog?${catalogQueryParams(state).toString()}`, { signal });
 }
 
-export function getCatalogDetail(questId: string): Promise<QuestCatalogCard | null> {
-  return apiFetch<QuestCatalogCard>(`/quests/${questId}/catalog-detail`);
+export function getCatalogDetail(questId: string): Promise<QuestCatalogDetail | null> {
+  return apiFetch<QuestCatalogDetail>(`/quests/${questId}/catalog-detail`);
 }
 
 export function followQuest(questId: string): Promise<{ following: boolean } | null> {

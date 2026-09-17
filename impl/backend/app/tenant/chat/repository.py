@@ -329,6 +329,26 @@ def daily_message_counts(session: Session, chat_group_id: uuid.UUID, since: date
     return [(d, int(n)) for d, n in rows]
 
 
+def daily_message_counts_for_quest(session: Session, quest_id: uuid.UUID, since: datetime) -> list[tuple]:
+    """クエスト横断の日次メッセージ数（発見カタログ活発度・C.9.1）。
+
+    当該クエストの公開アイデア（`status='published'`・未削除）のチャット群を横断合算（削除メッセージ除外）。
+    返り値＝[(date, count)]（メタのみ＝本文は返さない）。
+    """
+    day = func.date_trunc("day", ChatMessage.created_at)
+    rows = session.execute(
+        select(day.label("d"), func.count())
+        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .join(Idea, ChatGroup.idea_id == Idea.id)
+        .where(
+            Idea.quest_id == quest_id, Idea.status == "published", Idea.deleted_at.is_(None),
+            ChatMessage.is_deleted.is_(False), ChatMessage.created_at >= since,
+        )
+        .group_by(day).order_by(day)
+    ).all()
+    return [(d, int(n)) for d, n in rows]
+
+
 # ---- メンション（§5.17） ----
 
 def replace_mentions(session: Session, message_id: uuid.UUID, user_ids: list[uuid.UUID]) -> None:

@@ -19,6 +19,7 @@ from app.tenant.quests.schemas import (
     JoinRequestResponse,
     QuestCandidatesResponse,
     QuestCatalogCardDTO,
+    QuestCatalogDetailDTO,
     QuestCatalogResponse,
     QuestCreateRequest,
     QuestDetailDTO,
@@ -82,12 +83,12 @@ def quest_catalog(
     return QuestCatalogResponse(**result)
 
 
-@router.get("/quests/{quest_id}/catalog-detail", response_model=QuestCatalogCardDTO)
-def quest_catalog_detail(quest_id: str, request: Request, session: dict = Depends(require_me)) -> QuestCatalogCardDTO:
-    """掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）。発見門番のみ・中身は返さない。読取専用。"""
+@router.get("/quests/{quest_id}/catalog-detail", response_model=QuestCatalogDetailDTO)
+def quest_catalog_detail(quest_id: str, request: Request, session: dict = Depends(require_me)) -> QuestCatalogDetailDTO:
+    """掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）＝カード＋活発度スパーク。発見門番のみ・中身は返さない。読取専用。"""
     result = quest_service.get_catalog_detail(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
-    return QuestCatalogCardDTO(**result)
+    return QuestCatalogDetailDTO(**result)
 
 
 @router.post("/quests/{quest_id}/follow", response_model=FollowResponse)

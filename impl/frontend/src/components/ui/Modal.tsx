@@ -30,7 +30,7 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 const NARROW = 640; // これ以下は自動フルスクリーン＝ドラッグ/最大化しない（shared.css と一致）
-const ANIM_MS = 300; // enter/exit の最大尺（CSS と一致）。閉じアニメ後に unmount＋onClosed する。
+const ANIM_MS = 340; // enter/exit の最大尺（CSS と一致）。閉じ＝CRT 電源OFF(.34s) 後に unmount＋onClosed する。
 
 export function Modal({ open, onClose, onClosed, title, size = "md", draggable = true, maximizable = true, children }: Props) {
   const titleId = useId();
@@ -39,9 +39,10 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
   const [pos, setPos] = useState({ x: 0, y: 0 }); // 中央からのオフセット（ドラッグ）
   const [maximized, setMaximized] = useState(false);
 
-  // 表示状態機械（framer/AnimatePresence の置換）＝mounted で DOM 有無・visible(.show) で CSS フェード発火。
+  // 表示状態機械（framer/AnimatePresence の置換）＝mounted で DOM 有無・visible(.show) で CSS 発火・closing(.is-closing) で閉じアニメ。
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -49,6 +50,7 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
     if (open) {
       if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
       setMounted(true);
+      setClosing(false);   // 開く前フレームに is-closing を残さない（閉じアニメの誤発火防止）
       setPos({ x: 0, y: 0 });
       setMaximized(false);
       // mount 直後に .show を付けると transition が発火しない＝二重 rAF で次フレームに付ける。
@@ -57,14 +59,17 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
       });
       return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     }
-    // 閉じる＝.show を外して CSS フェードアウト→尺後に unmount＋onClosed。
+    // 閉じる＝.show を外し .is-closing を付けて CRT 電源OFF→尺後に unmount＋onClosed。reduce では尺ゼロ（即時）。
     setVisible(false);
     if (mounted) {
+      setClosing(true);
+      const exitMs = reduceMotion() ? 0 : ANIM_MS;
       closeTimer.current = window.setTimeout(() => {
         setMounted(false);
+        setClosing(false);
         closeTimer.current = null;
         onClosed?.();
-      }, ANIM_MS);
+      }, exitMs);
     }
     return () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
     // onClosed/mounted は依存に入れない（open の遷移でのみ動かす＝入力毎の再実行を避ける）。
@@ -163,7 +168,7 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
 
   return createPortal(
     <div
-      className={`modal modal--${size}${visible ? " show" : ""}${canDrag ? " modal--draggable" : ""}`}
+      className={`modal modal--${size}${visible ? " show" : ""}${closing ? " is-closing" : ""}${canDrag ? " modal--draggable" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

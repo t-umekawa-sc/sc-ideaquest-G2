@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, useSnackbar } from "@/components/ui";
+import { LoadingOverlay, Avatar, Modal, ModalBody, ModalFooter, SparkBurst, XpFloat, ActivitySpark, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { ApiError } from "@/lib/api/client";
 import { voteErrorMessage } from "../voteError";
@@ -337,11 +337,10 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const canSelect = !!evalAgg?.my_permissions?.includes("select");
   const evalCount = evalAgg?.evaluator_count ?? 0;
   const evalCoin = evalAgg?.coin?.finalized ?? evalAgg?.coin?.projected ?? 0;
-  // 活発度バー（E.1 daily を正規化・版マーカー日は has-update）。
+  // 活発度スパーク（E.1 daily・版マーカー日は ◆）＝共有 ActivitySpark へデータ整形。
   const chatTotal = chatActivity?.total_messages ?? 0;
-  const revDays = new Set((chatActivity?.revision_markers ?? []).map((m) => m.date));
-  const dailyMax = Math.max(1, ...(chatActivity?.daily ?? []).map((d) => d.message_count));
-  const sparkBars = (chatActivity?.daily ?? []).map((d) => ({ date: d.date, h: Math.round((d.message_count / dailyMax) * 100), update: revDays.has(d.date) }));
+  const sparkDaily = (chatActivity?.daily ?? []).map((d) => ({ date: d.date, count: d.message_count }));
+  const revMarkers = (chatActivity?.revision_markers ?? []).map((m) => m.date);
 
   return (
     <main className="container detail-main">
@@ -505,27 +504,12 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               </h2>
             </div>
 
-            {/* 議論アクティビティ・グラフ（E.1 chat-activity 実データ） */}
-            {sparkBars.length > 0 && (
-              <div className="activity" aria-label="議論の活発度">
-                <div className="activity__head">
-                  <span className="activity__label">議論の活発度</span>
-                </div>
-                <div className="spark" role="img" aria-label={`直近${sparkBars.length}日の日次メッセージ数の棒グラフ`}>
-                  {sparkBars.map((b, i) => (
-                    <span
-                      key={i}
-                      className={["spark__bar", b.update ? "has-update" : "", i >= sparkBars.length - 3 ? "is-recent" : ""].filter(Boolean).join(" ")}
-                      style={{ height: `${Math.max(6, b.h)}%` }}
-                      title={b.update ? `${b.date}（アイデア更新）` : b.date}
-                    />
-                  ))}
-                </div>
-                <div className="activity__legend">
-                  ◆ = アイデア更新の記録された日。棒＝日次メッセージ数（直近3日を強調）。
-                </div>
-              </div>
-            )}
+            {/* 議論アクティビティ・グラフ（E.1 chat-activity 実データ）＝共有 ActivitySpark */}
+            <ActivitySpark
+              daily={sparkDaily}
+              markers={revMarkers}
+              legend="◆ = アイデア更新の記録された日。棒＝日次メッセージ数（直近3日を強調）。"
+            />
 
             {/* 直近メッセージのプレビュー（E.1・最新3件） */}
             {chatPreview.length > 0 ? (

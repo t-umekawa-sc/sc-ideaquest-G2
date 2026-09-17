@@ -431,10 +431,25 @@ body.iq-nav-lock { overflow: hidden; }
   25% { opacity: .9; }
   100% { opacity: 0; }
 }
+/* 閉じる＝ブラウン管の電源OFF＝縦に一本線へ収束（scaleY→0付近）→ 横に一点へ消灯（scaleX→0）＋一瞬輝度が上がる。
+   `.is-closing` は Modal が open=false→unmount の間だけ付ける（開く前フレーム〔show 前〕には付かない＝誤発火しない）。
+   framer は使わない（DFT-E-012）＝CSS keyframe のみ。ANIM_MS（Modal.tsx）は本尺 .34s 以上に合わせる。 */
+.modal.is-closing { pointer-events: none; }
+.modal.is-closing .modal__panel--crt-in { animation: modal-crt-close .34s cubic-bezier(.4, 0, .2, 1) forwards; }
+.modal.is-closing .modal__backdrop { opacity: 0; transition: opacity .34s ease; }
+@keyframes modal-crt-close {
+  0%   { opacity: 1; transform: scaleY(1)   scaleX(1); filter: brightness(1); }
+  55%  { opacity: 1; transform: scaleY(.02) scaleX(1); filter: brightness(1.9) contrast(1.3); }
+  68%  { opacity: 1; transform: scaleY(.02) scaleX(1); filter: brightness(2.6) contrast(1.4); }
+  100% { opacity: 0; transform: scaleY(.02) scaleX(0); filter: brightness(3.2); }
+}
 @media (prefers-reduced-motion: reduce) {
   .modal .modal__panel { transition: none; }
   .modal.show .modal__panel--crt-in { animation: none; }
   .modal__panel--crt-in::after { display: none; animation: none; }
+  /* reduce＝閉じアニメも無効（即時に消す）。 */
+  .modal.is-closing .modal__panel--crt-in { animation: none; }
+  .modal.is-closing .modal__backdrop { transition: none; }
 }
 
 /* 入力バリデーションのインラインエラー（フィールド標準。alert() の代替） */

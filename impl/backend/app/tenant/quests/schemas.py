@@ -73,6 +73,27 @@ class QuestCatalogCardDTO(QuestCardDTO):
     purpose: str | None = None
 
 
+class QuestActivityDailyDTO(BaseModel):
+    """発見カタログ活発度の1日分（メタのみ＝件数）。"""
+
+    date: str
+    count: int
+
+
+class QuestActivityDTO(BaseModel):
+    """発見カタログ活発度スパーク（C.9.1）＝クエスト横断の日次メッセージ数（メタ限定・本文は含まない）。"""
+
+    daily: list[QuestActivityDailyDTO] = []
+    total: int = 0
+    days: int = 14
+
+
+class QuestCatalogDetailDTO(QuestCatalogCardDTO):
+    """発見カタログの詳細（SC-13 ダイアログ）＝カード＋メタ＋活発度スパーク。中身（本文/チャット/評価）は返さない。"""
+
+    activity: QuestActivityDTO | None = None
+
+
 class QuestOffsetPageInfo(BaseModel):
     total: int
     page: int

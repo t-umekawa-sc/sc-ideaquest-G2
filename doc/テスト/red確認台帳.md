@@ -728,3 +728,12 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（修正 revert 時の actual）→ green |
 | --- | --- |
 | E-TC-213 | `chat.css` を `:focus-within` に戻して frontend 再ビルド → `.msg__actions` が `visible` のまま（Playwright: `unexpected value "visible"` で `toBeHidden` 失敗）＝DFT-E-005 再現。`:has(:focus-visible)` に復元・再ビルドで **1 passed（5.1s）**。副次＝`createRecruiting` の `quest_group_id`（単数・現行 API で `extra_forbidden` 422）を `quest_group_ids: []` に修正して e2e を通した。 |
+
+## 受入不具合 DFT-E-013/014（SC-13 掲示板ダイアログの標準機能欠落）e2e 回帰（C-TC-266/267・2026-09-17）
+
+> ブラウザ受入で検出＝発見カタログ（SC-13）のメタ詳細ダイアログで (13) 最大化(⤢)が出ない・(14) 閉じアニメが出ない。原因＝(13) `QuestCatalogView.tsx` の `CatalogDialog` が `Modal` に `maximizable={false}` を明示（標準は既定 on・§106）／(14) `{detail && <Dialog>}` の条件描画で閉じ要求時に `setDetail(null)` 即アンマウント＝Modal の exit アニメ（`open` false → `ANIM_MS` 後 unmount）が発火しない。修正＝(13) 上書き撤去／(14) `open` 駆動＋`onClosed` でアンマウント遅延（`RouteModal` と同じ正パターン）。表示/挙動ガード＝e2e で担保（テスト規約 §5.3）。土台＝bootstrap `seed_demo_discovery`（発見デモ discoverable クエストを自動 seed・CI/デモ両安定）。
+
+| TC-ID | 観測 red（修正 revert 時の actual）→ green |
+| --- | --- |
+| C-TC-266 | `maximizable={false}` に戻して frontend 再ビルド → ダイアログに「最大化」ボタンが出ず `toBeVisible` タイムアウト＝DFT-E-013 再現。上書き撤去で復元。 |
+| C-TC-267 | 閉じ要求を `onClose={() => setDetail(null)}`（即アンマウント）に戻して再ビルド → × クリック後 `.modal:not(.show)` が attach せず `toBeAttached` タイムアウト（中間の exit 状態が観測不可）＝DFT-E-014 再現。`open`駆動＋`onClosed` に復元。両復元・再ビルドで **2 passed（6.5s）**。 |
