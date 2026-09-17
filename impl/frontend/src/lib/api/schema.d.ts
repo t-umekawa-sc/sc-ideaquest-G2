@@ -1167,6 +1167,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/result/chat-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Quest Chat Summary
+         * @description 議論の要点(c)＝チャットの自動要約（抽出型・オフライン・無料）を生成/再生成（FR-39・owner/quest_admin）。
+         */
+        post: operations["post_quest_chat_summary_api_v1_quests__quest_id__result_chat_summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/members/{user_id}": {
         parameters: {
             query?: never;
@@ -1802,7 +1822,7 @@ export interface paths {
         };
         /**
          * List Items
-         * @description 装備マスタ＋自分の所有/装備＋コイン残高（SC-30/SC-31・G.1）。読取専用。
+         * @description 装備マスタ＋自分の所有/装備＋コイン残高（SC-30/SC-31・G.1・DataTable サーバー契約）。読取専用。
          */
         get: operations["list_items_api_v1_items_get"];
         put?: never;
@@ -3465,8 +3485,23 @@ export interface components {
         ItemListResponse: {
             /** Data */
             data: components["schemas"]["ItemDTO"][];
+            /**
+             * Pinned
+             * @default []
+             */
+            pinned: components["schemas"]["ItemDTO"][];
+            page_info: components["schemas"]["ItemPageInfo"];
             /** Coin Balance */
             coin_balance: number;
+        };
+        /** ItemPageInfo */
+        ItemPageInfo: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -3980,6 +4015,11 @@ export interface components {
             quest_groups: components["schemas"]["QuestGroupRefDTO"][];
             /** My State */
             my_state: string;
+            /**
+             * Is Owner
+             * @default false
+             */
+            is_owner: boolean;
         };
         /**
          * QuestCreateRequest
@@ -6550,6 +6590,7 @@ export interface operations {
                 q?: string | null;
                 status?: string[] | null;
                 group_id?: string | null;
+                sort?: string | null;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -7085,6 +7126,37 @@ export interface operations {
                 "application/json": components["schemas"]["QuestOutcomeUpdateRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestOutcomeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_quest_chat_summary_api_v1_quests__quest_id__result_chat_summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -8402,7 +8474,22 @@ export interface operations {
     };
     list_items_api_v1_items_get: {
         parameters: {
-            query?: never;
+            query?: {
+                q?: string | null;
+                slot?: string | null;
+                rarity?: string | null;
+                owned?: boolean | null;
+                affordable?: boolean | null;
+                state?: string | null;
+                price_min?: number | null;
+                price_max?: number | null;
+                sort?: string | null;
+                pin_ids?: string | null;
+                page?: number | null;
+                per_page?: number | null;
+                format?: string | null;
+                columns?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8416,6 +8503,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -5,14 +5,14 @@
 // G 実接続＝getItems（マスタ＋所有＋残高）／purchaseItem（コイン消費・残高不足/所有済みはサーバー権威 409）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import { EmptyState, LoadingOverlay, CountUp, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
-import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { EmptyState, CountUp, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { reduceMotion } from "@/lib/motion";
 
-import { getItems, ITEM_ICON, purchaseItem } from "../api";
+import { fetchItemsPage, ITEM_ICON, itemsCsvUrl, purchaseItem, type ItemDTO } from "../api";
 import { ItemCelebrateFx, ShopPayFx, type GetRect } from "./ItemGetFx";
 import "../shop.css";
 
@@ -23,6 +23,14 @@ type Item = { id: string; slot: Slot; name: string; icon: string; rarity: Rarity
 // backend slot（background）→ 表示スロット（bg）。
 function toSlot(s: string): Slot {
   return (s === "background" ? "bg" : s) as Slot;
+}
+
+// backend DTO → 表示 Item（アイコンは code で presentation・§5.25）。
+function toItem(d: ItemDTO): Item {
+  return {
+    id: d.id, slot: toSlot(d.slot), name: d.name_ja, icon: ITEM_ICON[d.code] ?? "❔",
+    rarity: d.rarity as Rarity, price: d.price_coin, owned: d.owned,
+  };
 }
 
 const SLOT_LABEL: Record<Slot, string> = { head: "頭", face: "顔", body: "体", hand: "手持ち", bg: "背景" };
@@ -41,10 +49,10 @@ export function ShopView() {
   const snack = useSnackbar();
   const confirm = useConfirm();
   const router = useRouter();
-  const [items, setItems] = useState<Item[]>([]);
   const [coins, setCoins] = useState(0);
   const [flashId, setFlashId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 購入後の再クエリトリガ（絞込/ソート/ページを保ったまま DataTable を再取得＝refreshToken）。
+  const [reload, setReload] = useState(0);
   // #12: 購入成立の演出（受入済みモック style-guide.html §17M・reduce-motion 尊重）。
   //  pay＝支払い（価格が price→0・コイン落下）／reveal＝所有UIへの入場アニメ（バッジ/リボン/光沢/フット）を今回購入したカードだけに付与／
   //  celebrate＝支払い完了後の祝福＋お礼（紙吹雪＋「〈名〉を手に入れた」）。既存の owned カード（前回購入分）には入場アニメを付けない。
@@ -58,7 +66,7 @@ export function ShopView() {
     const cur = pay;
     if (!cur) return;
     setCoins(cur.coinBalance); // ヒーロー wallet の CountUp
-    setItems((xs) => xs.map((x) => (x.id === cur.id ? { ...x, owned: true } : x)));
+    setReload((r) => r + 1);   // 所有反映＋残高変化に伴う affordable/state を再クエリで整合
     setRevealId(cur.id);
     setTimeout(() => setRevealId((v) => (v === cur.id ? null : v)), 1200);
     const cardEl = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-id="${cur.id}"]`) : null;
@@ -78,20 +86,14 @@ export function ShopView() {
     setPay(null);
   };
 
-  const load = useCallback(async () => {
-    const r = await getItems().catch(() => null);
-    if (r) {
-      setItems(
-        r.data.map((d) => ({
-          id: d.id, slot: toSlot(d.slot), name: d.name_ja, icon: ITEM_ICON[d.code] ?? "❔",
-          rarity: d.rarity as Rarity, price: d.price_coin, owned: d.owned,
-        })),
-      );
-      setCoins(r.coin_balance);
-    }
-    setLoading(false);
+  // 装備一覧＝DataTable のサーバーモードが取得（検索/絞込/複数ソート/番号ページャ/固定/CSV をサーバー委譲・§1.8.1）。
+  // 応答の coin_balance をヒーロー wallet／購入可否（affordable）に反映する。
+  const serverQuery = useCallback(async (state: QueryState, signal: AbortSignal): Promise<ServerResult<Item>> => {
+    const res = await fetchItemsPage(state, signal);
+    if (!res) return { rows: [], total: 0, pinned: [] };
+    setCoins(res.coin_balance);
+    return { rows: res.data.map(toItem), total: res.page_info.total, pinned: (res.pinned ?? []).map(toItem) };
   }, []);
-  useEffect(() => { void load(); }, [load]);
 
   const stateOf = (it: Item): State => (it.owned ? "owned" : it.price <= coins ? "affordable" : "short");
 
@@ -120,7 +122,7 @@ export function ShopView() {
       if (reduceMotion() || !priceEl) {
         // reduce-motion／カード非表示（リスト表示）＝演出なしで即・所有反映（情報は残す）。
         setCoins(coinBalance);
-        setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, owned: true } : x)));
+        setReload((r) => r + 1);  // 所有反映＋affordable/state 整合（絞込維持で再クエリ）
         snack({
           type: "reward",
           title: "装備を購入しました",
@@ -140,7 +142,7 @@ export function ShopView() {
         type: "error",
         msg: reason === "insufficient_balance" ? "コインが不足しています。" : reason === "already_owned" ? "すでに所有しています。" : "購入に失敗しました。",
       });
-      void load(); // サーバー権威に整合
+      setReload((r) => r + 1); // サーバー権威に整合（再クエリ）
     }
   }
 
@@ -207,7 +209,6 @@ export function ShopView() {
       {celebrates.map((c) => <ItemCelebrateFx key={c.id} rect={c.rect} name={c.name} />)}
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <h1 className="shop-title">ショップ</h1>
-      {loading && <LoadingOverlay />}
 
       {/* コイン残高（ゲーム層・CRTガラス） */}
       <section className="pixel-panel" aria-label="コイン残高">
@@ -237,7 +238,11 @@ export function ShopView() {
       <div className="shop-grid">
         <DataTable<Item>
           storageKey="sc30-shop"
-          data={items}
+          server={{
+            query: serverQuery,
+            onExport: (state, cols) => { window.location.href = itemsCsvUrl(state, cols); },
+          }}
+          refreshToken={reload}
           columns={columns}
           rowId={(i) => i.id}
           unit="件"

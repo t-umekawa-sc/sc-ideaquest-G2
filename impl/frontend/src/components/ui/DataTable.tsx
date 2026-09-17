@@ -94,6 +94,7 @@ export type DataTableProps<T> = {
   storageKey: string;
   data?: T[]; // client モード＝全件。server モードでは不要（省略可）。
   server?: DataTableServer<T>; // 指定時＝サーバー駆動（computeRows/ローカルページングをバイパス）。
+  refreshToken?: number; // server モード＝値が変わると絞込/ソート/ページを保ったまま再クエリ（例＝購入後の再取得）。
   columns: DataTableColumn<T>[];
   rowId?: (r: T) => string | number;
   unit?: string; // 件数の単位（既定「件」）
@@ -438,7 +439,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
         setSrvLoading(false);
       });
     return () => ac.abort();
-  }, [hasServer, ready, serverState]);
+    // refreshToken＝serverState を変えずに再クエリを促す外部トリガ（絞込/ページ維持・購入後の再取得等）。
+  }, [hasServer, ready, serverState, props.refreshToken]);
 
   // client モードのパイプライン（server モードでは母集合として未使用＝空 data で軽量）。
   const clientResult = useMemo(
