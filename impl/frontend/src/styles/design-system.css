@@ -679,10 +679,13 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
 .vote-card__quest--link { display: block; width: fit-content; color: var(--color-primary); text-decoration: none; }
 .vote-card__quest--link:hover { text-decoration: underline; }
 .vote-card__value { font-size: var(--text-sm); margin-top: var(--space-2); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.vote-card__poster { margin-top: var(--space-3); }
+.vote-card__poster { margin-top: var(--space-3); display: flex; }
+/* 作成者行に横並びのチャット動線を入れるため、名前は縮めて省略（チャットは縮めない）。 */
+.vote-card__poster .name, .follow-card__poster .name { min-width: 0; }
 .idea-title-row { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .idea-title-row__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-chat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); }
+/* チャット動線＝作成者行（.poster）の中に横並び配置（未投票/フォロー中カードで統一）。名前が長い時は名前側を省略し本リンクは縮めない。 */
+.dash-chat-link { display: inline-flex; align-items: center; gap: 4px; margin-left: var(--space-3); flex-shrink: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); text-decoration: none; }
 .dash-chat-link:hover { text-decoration: underline; }
 .vote-voted-note { margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
 .vote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }

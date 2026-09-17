@@ -216,11 +216,18 @@
 
 /* モーダルの見た目は design-system.css（＝mock shared.css）が正。ここでは定義しない（段階移行で撤去済み）。 */
 
-/* --- フォロー★トグル（共有・SC-01 ダッシュボードのフォロー中カード／SC-13 発見カタログ ダイアログ） ---
-   金★＝フォロー中（aria-pressed=true・--pixel-xp）／淡★＝未フォロー（aria-pressed=false）。配置は使用側で指定。 */
+/* --- フォロー表現（共有・2形態） ---
+   金＝フォロー中（aria-pressed=true・--pixel-xp）／淡＝未フォロー（aria-pressed=false）。
+   `.follow-star`＝アイコンのみ（SC-01 ダッシュボードのフォロー中カード／SC-13 探すカード）。配置は使用側で指定。
+   `.follow-toggle`＝枠付き 星＋テキスト ボタン（SC-22 アイデア詳細／SC-13 発見カタログ ダイアログ）。 */
 .follow-star { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--pixel-xp); padding: 2px; border-radius: var(--radius-sm); }
 .follow-star:hover { background: var(--color-surface-alt); }
 .follow-star[aria-pressed="false"] { color: var(--color-text-subtle); }
+.follow-toggle { background: none; border: 1px solid var(--color-border); cursor: pointer; border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3); font: inherit; font-weight: 600; color: var(--pixel-xp); display: inline-flex; align-items: center; gap: 6px; }
+.follow-toggle:hover { background: var(--color-surface-alt); }
+.follow-toggle[aria-pressed="false"] { color: var(--color-text-muted); }
+.follow-toggle:disabled { opacity: .55; cursor: not-allowed; }
 
 /* --- 活発度スパーク（共有 ActivitySpark・SC-22 アイデア詳細／SC-13 発見カタログ） --- */
 .activity { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); background: var(--color-surface-alt); }

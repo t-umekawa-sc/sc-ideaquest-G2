@@ -118,12 +118,8 @@ export function QuestCatalogView() {
   function cardActions(r: Row) {
     const st = r.my_state;
     return (
-      <div className="row-center" style={{ gap: "var(--space-2)", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
-        {st !== "member" && (
-          <button type="button" className="btn btn-sm" aria-pressed={st === "following"} onClick={() => void toggleFollow(r)}>
-            {st === "following" ? "★ フォロー中" : "☆ フォロー"}
-          </button>
-        )}
+      <div className="row-center" style={{ gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
+        {/* フォロー★はカード右上（ヘッダー）へ移動済み。ここは参加/申請アクションのみ・右寄せ。 */}
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void request(r)}>参加をリクエスト</button>
         )}
@@ -141,11 +137,20 @@ export function QuestCatalogView() {
         onClick={() => openDetail(r)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(r); } }}
         style={{ ["--accent" as string]: r.color, cursor: "pointer" } as React.CSSProperties}>
+        {/* フォロー★＝カード右上角に絶対配置（ステータスより上・ダッシュボードのフォロー中カードと同方針・共有 .follow-star）。 */}
+        {st !== "member" && (
+          <button type="button" className="follow-star" style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)", zIndex: 1 }}
+            aria-pressed={st === "following"}
+            aria-label={st === "following" ? "フォロー解除" : "フォロー"}
+            title={st === "following" ? "フォロー中（クリックで解除）" : "フォロー"}
+            onClick={(e) => { e.stopPropagation(); void toggleFollow(r); }}>★</button>
+        )}
         <div className="between">
           <span className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
             <QuestIcon name={r.title} color={r.color} imageUrl={r.icon_image_url ?? undefined} size="sm" />
             <span className="card-title">{r.title}</span>
           </span>
+          {/* ステータスはタイトル行と上下中央（.between の align-items:center）。★はその上（右上角・絶対配置）。 */}
           <span className="badge">{STATUS_LABEL[r.status] ?? r.status}</span>
         </div>
         {r.purpose ? <div className="muted text-sm line-clamp-2" style={{ margin: "var(--space-1) 0" }}>{r.purpose}</div> : null}
@@ -154,9 +159,11 @@ export function QuestCatalogView() {
           {r.deadline ? <span className="deadline">⏳ 締切 {r.deadline}</span> : null}
         </div>
         <div className="quest-card__stats">
-          <span>👥 {r.member_count}</span>
-          <span>💡 {r.idea_count}</span>
-          {STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
+          {/* ダッシュボードの参加中クエストカードと表記統一（👥 パーティーN／💡 アイデアN）。 */}
+          <span>👥 パーティー{r.member_count}</span>
+          <span>💡 アイデア{r.idea_count}</span>
+          {/* フォロー中は★アイコンで表す（バッジ重複を避ける）。他状態はバッジ表示。 */}
+          {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
         </div>
         {cardActions(r)}
       </article>
@@ -216,21 +223,16 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
               <div className="card-title" style={{ fontSize: "var(--text-lg)" }}>{row.title}</div>
               <div className="row-center" style={{ gap: "var(--space-2)" }}>
                 <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
-                {/* フォロー中は右上の★で表す（緑バッジは出さない）。他状態はバッジ表示。 */}
+                {/* フォロー中は右上の follow-toggle が表す（緑バッジは出さない）。他状態はバッジ表示。 */}
                 {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
               </div>
             </div>
           </div>
-          {/* フォロー＝ダッシュボードのフォロー中カードと同じ★トグル（右上・共有 .follow-star）。 */}
+          {/* フォロー＝アイデア詳細（SC-22）と同じ位置＝ヘッダー右上（枠付き follow-toggle）。 */}
           {st !== "member" && (
-            <button
-              type="button"
-              className="follow-star"
-              aria-pressed={st === "following"}
-              aria-label={st === "following" ? "フォロー解除" : "フォロー"}
-              title={st === "following" ? "フォロー中（クリックで解除）" : "フォロー"}
-              onClick={() => onFollow(row)}
-            >★</button>
+            <button type="button" className="follow-toggle" style={{ flexShrink: 0 }} aria-pressed={st === "following"} onClick={() => onFollow(row)}>
+              {st === "following" ? "★ フォロー中" : "☆ フォロー"}
+            </button>
           )}
         </div>
         {row.purpose ? <p style={{ whiteSpace: "pre-wrap" }}>{row.purpose}</p> : <p className="muted">（テーマの記載はありません）</p>}
@@ -257,7 +259,7 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
         </p>
       </ModalBody>
       <ModalFooter>
-        {/* 並びはクエスト編集ダイアログと同順＝閉じる（左）→ 状態別アクション → 主要アクション（右）。フォローは右上の★へ。 */}
+        {/* フォローはヘッダー右上へ移動（アイデア詳細と同位置）。フッターは 閉じる（左）→ 状態別 → 主要アクション（右）。 */}
         <button type="button" className="btn" onClick={onClose}>閉じる</button>
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}

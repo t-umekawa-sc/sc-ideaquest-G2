@@ -402,7 +402,7 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           <div className="idea-actions">
             {/* フォロー（D.6・トグル）。completed は新規フォロー不可＝事前無効化（解除は可）＋サーバー 409 も権威。 */}
             <button
-              className="follow-star"
+              className="follow-toggle"
               type="button"
               aria-pressed={following}
               disabled={followDisabled}

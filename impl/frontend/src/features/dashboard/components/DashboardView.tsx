@@ -380,9 +380,12 @@ export function DashboardView({
                   {/* クエスト名＝クエスト詳細への動線（SC-12）。 */}
                   <Link className="vote-card__quest vote-card__quest--link" href={`/quests/${v.quest.id}`}>{v.quest.title}</Link>
                   <div className="vote-card__value">{v.value}</div>
-                  <div className="vote-card__poster poster"><Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" /><span className="name text-sm muted">投稿: {v.poster.name}</span></div>
-                  {/* チャットへ直行（戻るはダッシュボードに戻る＝markChatFromDashboard でラベル出し分け）。 */}
-                  <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
+                  {/* 作成者名の横にチャット動線を統一配置（戻るはダッシュボード＝markChatFromDashboard でラベル出し分け）。 */}
+                  <div className="vote-card__poster poster">
+                    <Avatar name={v.poster.name} imageUrl={v.poster.avatar} size="sm" />
+                    <span className="name text-sm muted">投稿: {v.poster.name}</span>
+                    <Link className="dash-chat-link" href={`/ideas/${v.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
+                  </div>
                   <div className="vote-actions">
                     <button type="button" className="vote-quick agree" aria-label="賛成する" onClick={(e) => quickVote(v, "approve", e)}>▲ 賛成</button>
                     <button type="button" className="vote-quick disagree" aria-label="反対する" onClick={(e) => quickVote(v, "oppose", e)}>▼ 反対</button>
@@ -417,26 +420,27 @@ export function DashboardView({
                   exit={reduceAnim ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: "easeOut" } }}
                   transition={{ duration: reduceAnim ? 0 : 0.3, ease: "easeOut" }}
                 >
-                  {/* カード全体をアイデア詳細への遷移対象に（クリックで自然に開ける）＝a.card の hover リフトが効く。
-                      ★（フォロー解除）は Link の外＝アンカー内 button を避け、クリックがカード遷移に伝播しないよう別要素にする
-                      （QuestListView の cardRaw と同方針）。退場アニメは外側ラッパ（framer）＝リフト transform と衝突しない。 */}
-                  <Link className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`} href={`/ideas/${f.id}`}>
+                  {/* 未投票カードと同構造に統一＝カードは div、タイトルが詳細への Link。作成者行にチャット動線をインライン配置。
+                      ★（フォロー解除）は Link 入れ子回避のため別要素（絶対配置・右上）。退場アニメは外側ラッパ（framer）。 */}
+                  <div className={`card card-accent follow-card${frozen ? " is-frozen" : ""}`}>
                     <div className="card-title idea-title-row">
                       <QuestIcon name={f.title} color={f.quest.color} imageUrl={f.icon_image_url} size="sm" />
-                      <span className="idea-title-row__txt">{f.title}</span>
+                      <Link className="idea-title-row__txt follow-card__titlelink" href={`/ideas/${f.id}`}>{f.title}</Link>
                     </div>
                     <div className="follow-quest">{f.quest.title}{frozen && <> <span className="badge badge-muted" title="クエスト完了で凍結。以後の通知はありません（解除のみ可・再フォロー不可）">⏸ 完了（凍結）</span></>}</div>
                     <div className="follow-value">{f.value}</div>
-                    <div className="follow-card__poster poster"><Avatar name={f.poster.name} imageUrl={f.poster.avatar} size="sm" /><span className="name text-sm muted">投稿: {f.poster.name}</span></div>
+                    <div className="follow-card__poster poster">
+                      <Avatar name={f.poster.name} imageUrl={f.poster.avatar} size="sm" />
+                      <span className="name text-sm muted">投稿: {f.poster.name}</span>
+                      <Link className="dash-chat-link" href={`/ideas/${f.id}/chat`} onClick={() => markChatFromDashboard()}>💬 チャットで議論</Link>
+                    </div>
                     <div className="follow-stats">
                       <span className="vote-agree">▲ {f.vote_summary.approve}</span>
                       <span className="vote-disagree">▼ {f.vote_summary.oppose}</span>
                     </div>
                     {frozen && <div className="follow-frozen-note text-xs muted">⏸ 完了済み＝以後の通知なし。★で<strong>解除</strong>のみ可（再フォロー不可）。</div>}
-                  </Link>
+                  </div>
                   <button type="button" className="follow-star" aria-pressed={true} aria-label="フォロー解除" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFollow(f); }}>★</button>
-                  {/* チャットへ直行＝カードLink（詳細）の外に置く（アンカー入れ子回避・star と同方針）。戻るはダッシュボードへ。 */}
-                  <Link className="follow-chat" href={`/ideas/${f.id}/chat`} onClick={() => markChatFromDashboard()} aria-label="チャットで議論" title="チャットで議論">💬</Link>
                 </motion.div>
               );
             })}

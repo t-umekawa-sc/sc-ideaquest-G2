@@ -82,13 +82,13 @@
 .dash-page .follow-card .idea-title-row__txt { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dash-page .follow-quest { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .dash-page .follow-value { font-size: var(--text-sm); margin-top: var(--space-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.dash-page .follow-card__poster { margin-top: var(--space-3); }
+.dash-page .follow-card__poster { margin-top: var(--space-3); display: flex; }
 .dash-page .follow-stats { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+/* タイトルはアイデア詳細への Link（未投票カードと同構造）＝見出し色を継ぐ（青リンクにしない）。 */
+.dash-page .follow-card__titlelink { color: inherit; text-decoration: none; }
+.dash-page .follow-card__titlelink:hover { text-decoration: underline; }
 /* 見た目は共有 `.follow-star`（styles/components.css）。ここではカード内の絶対配置だけ上書き。 */
 .dash-page .follow-star { position: absolute; top: var(--space-4); right: var(--space-4); }
-/* チャット直行（フォロー中カード）＝カードLink の外＝右下に配置（star は右上）。 */
-.dash-page .follow-chat { position: absolute; right: var(--space-4); bottom: var(--space-4); font-size: 16px; line-height: 1; text-decoration: none; padding: 2px; border-radius: var(--radius-sm); z-index: 1; }
-.dash-page .follow-chat:hover { background: var(--color-surface-alt); }
 .dash-page .follow-card.is-frozen { opacity: .92; }
 .dash-page .follow-card.is-frozen .card-title { color: var(--color-text-muted); }
 .dash-page .follow-frozen-note { margin-top: var(--space-2); }
