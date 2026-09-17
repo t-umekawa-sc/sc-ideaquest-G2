@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.ideas.orm import Idea
 from app.tenant.profile.orm import User
 from app.tenant.quest_group.orm import QuestGroup
 from app.tenant.quests import repository as repo
@@ -236,3 +237,94 @@ def test_c_tc_009_count_active_members(env):
         ts.commit()
     with get_tenant_session(env.db_identifier) as ts:
         assert repo.count_active_members(ts, qid) == 1
+
+
+def _seed_published_ideas(db_identifier, quest_id, author_id, n) -> list[uuid.UUID]:
+    """公開アイデアを n 件 seed（idea_count ソート検証用）。返り値＝cleanup 用 id。"""
+    ids: list[uuid.UUID] = []
+    with get_tenant_session(db_identifier) as ts:
+        for _ in range(n):
+            iid = uuid.uuid4()
+            ts.add(Idea(id=iid, quest_id=quest_id, author_id=author_id,
+                        title="t", body="b", value="v", status="published"))
+            ids.append(iid)
+        ts.commit()
+    return ids
+
+
+def _delete_ideas(db_identifier, ids) -> None:
+    if not ids:
+        return
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(Idea.__table__.delete().where(Idea.id.in_(ids)))
+        ts.commit()
+
+
+def _set_deadline(db_identifier, quest_id, dt) -> None:
+    with get_tenant_session(db_identifier) as ts:
+        q = ts.get(Quest, quest_id)
+        q.deadline = dt
+        ts.commit()
+
+
+def test_c_tc_010_sort_by_idea_count_keyset(env):
+    """C-TC-010: sort=-idea_count は idea_count 降順＝[2,1,0]／cursor 続きも重複なく降順継続（§1.8.1）。"""
+    q0 = env.new_quest(status="recruiting", group=env.group_id)  # 0 件
+    q1 = env.new_quest(status="recruiting", group=env.group_id)  # 1 件
+    q2 = env.new_quest(status="recruiting", group=env.group_id)  # 2 件
+    idea_ids = _seed_published_ideas(env.db_identifier, q1, env.owner_id, 1)
+    idea_ids += _seed_published_ideas(env.db_identifier, q2, env.owner_id, 2)
+    sort = [("idea_count", True)]
+    try:
+        with get_tenant_session(env.db_identifier) as ts:
+            ordered = repo.list_quests_for_user(
+                ts, user_id=env.owner_id, visible_group_ids=[env.group_id], sort=sort, limit=50
+            )
+            assert [q.id for q in ordered] == [q2, q1, q0]
+            # keyset: limit=2 → cursor → 続き（重複なく降順継続）
+            page1 = repo.list_quests_for_user(
+                ts, user_id=env.owner_id, visible_group_ids=[env.group_id], sort=sort, limit=2
+            )
+            assert [q.id for q in page1] == [q2, q1]
+            cur = repo.keyset_of(page1[-1], sort)
+            page2 = repo.list_quests_for_user(
+                ts, user_id=env.owner_id, visible_group_ids=[env.group_id], sort=sort, cursor=cur, limit=2
+            )
+            assert [q.id for q in page2] == [q0]
+    finally:
+        _delete_ideas(env.db_identifier, idea_ids)
+
+
+def test_c_tc_011_sort_by_deadline_nulls_last(env):
+    """C-TC-011: sort=deadline（昇順）は締切なしを末尾に置く（NULLS LAST・§1.8.1）。"""
+    d1 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    d2 = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    q_early = env.new_quest(status="recruiting", group=env.group_id)
+    q_late = env.new_quest(status="recruiting", group=env.group_id)
+    q_none = env.new_quest(status="recruiting", group=env.group_id)  # 締切なし
+    _set_deadline(env.db_identifier, q_early, d1)
+    _set_deadline(env.db_identifier, q_late, d2)
+    with get_tenant_session(env.db_identifier) as ts:
+        ordered = repo.list_quests_for_user(
+            ts, user_id=env.owner_id, visible_group_ids=[env.group_id],
+            sort=[("deadline", False)], limit=50,
+        )
+    assert [q.id for q in ordered] == [q_early, q_late, q_none]
+
+
+def test_c_tc_012_multi_key_sort_tiebreak(env):
+    """C-TC-012: 複数キー sort=-member_count,-created_at＝先頭 member2／同数は新しい方が先（§1.8.1）。"""
+    q_two = env.new_quest(status="recruiting", group=env.group_id)  # owner のみ→後で+1
+    q_one_old = env.new_quest(status="recruiting", group=env.group_id)  # member=1（owner）
+    q_one_new = env.new_quest(status="recruiting", group=env.group_id)  # member=1（owner・後発）
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, q_two, env.member_id)  # q_two を member=2 に
+        ts.commit()
+    with get_tenant_session(env.db_identifier) as ts:
+        ordered = repo.list_quests_for_user(
+            ts, user_id=env.owner_id, visible_group_ids=[env.group_id],
+            sort=[("member_count", True), ("created_at", True)], limit=50,
+        )
+    ids = [q.id for q in ordered]
+    assert ids[0] == q_two                       # member2 が先頭
+    assert ids.index(q_one_new) < ids.index(q_one_old)  # 同数は created_at 降順で新しい方が先

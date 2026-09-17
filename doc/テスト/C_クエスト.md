@@ -20,6 +20,9 @@
 | C-TC-007 | int | 除外で権限行も失う | 有効メンバー | `remove_member` | `removed_at` 設定＋権限行削除（門番/候補から外れる） | C.3／§5.8 |
 | C-TC-008 | int | 権限セット置換 | 既定3権限のメンバー | `set_member_permissions` | 送った集合で置換（追加/削除の差分適用） | C.3／§5.9 |
 | C-TC-009 | int | 有効パーティー人数の計上 | 追加2名→1名除外 | `count_active_members` | 有効参加のみ計上（除外者は含めない） | C.1 |
+| C-TC-010 | int | 集計列ソート（`-idea_count`）＋keyset の安定 | 公開アイデア 0/1/2 件のクエスト3件 | `list_quests_for_user(sort=[("idea_count",True)])`（limit=50／limit=2→cursor） | idea_count 降順 [2,1,0]・cursor 続きも重複なく降順継続 | C.1／§1.8.1 |
+| C-TC-011 | int | `deadline` 昇順は NULLS LAST | 締切 d1<d2 と締切なし の3件 | `list_quests_for_user(sort=[("deadline",False)])` | [d1,d2,NULL] の順（締切なしは末尾） | C.1／§1.8.1 |
+| C-TC-012 | int | 複数キーソート＋二次キーの tiebreak | member=2 の1件・member=1 の2件（作成順） | `list_quests_for_user(sort=[("member_count",True),("created_at",True)])` | 先頭=member2／同数は created_at 降順で新しい方が先 | C.1／§1.8.1 |
 
 ## 2. 一覧 API（SC-10・C.1/C.4）
 
@@ -32,6 +35,9 @@
 | C-TC-103 | api | status enum の入力検証 | ログイン済 | `GET /quests?status=bogus` | 422 `validation_error` | §C.6／§1.7 |
 | C-TC-104 | api | 所属グループ一覧 | seed user がグループ所属 | `GET /quest-groups` | 自分の有効所属グループを返す | C.4 |
 | C-TC-105 | api | 未認証遮断 | セッション無し | `GET /quests` | 401 | require_me（P1） |
+| C-TC-106 | api | `sort=-idea_count` でカードが idea_count 降順 | 公開アイデア 2件/0件 の2クエスト（同一グループ） | `GET /quests?group_id=<g>&sort=-idea_count` | アイデア多いカードが少ないカードより前 | C.1／§1.8.1 |
+| C-TC-107 | api | 未知ソートキーは 422 | ログイン済 | `GET /quests?sort=bogus` | 422 `validation_error`・`errors[].field="sort"` | §1.8.1（ホワイトリスト） |
+| C-TC-108 | api | ソート指定時も keyset ページングが安定 | idea_count 差のある2クエスト（同一グループ） | `GET /quests?group_id=<g>&sort=-idea_count&limit=1`→cursor | page1/page2 が重複なく降順継続 | C.1／§1.8.1 |
 
 ## 3. 作成・編集・公開・候補・アイコン API（SC-11・C.2/C.3/C.4）
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import re
 import unicodedata
 import uuid
@@ -55,17 +56,60 @@ def _image_url(path: str | None) -> str | None:
     return get_storage().presigned_get(path) if path else None
 
 
-def _encode_cursor(quest) -> str:
-    """(created_at, id) を不透明カーソルにエンコード（§1.8・me._encode_cursor と同方式）。"""
-    raw = f"{quest.created_at.isoformat()}|{quest.id}".encode()
+# ソート可能キー（§1.8.1 ホワイトリスト・C.1）＝repository の集計列/列に対応。
+_SORTABLE_KEYS = {"created_at", "deadline", "idea_count", "member_count"}
+# カーソルで datetime として符号化するキー（他は int）。
+_DATETIME_SORT_KEYS = {"created_at", "deadline"}
+
+
+def _parse_sort(sort: str | None) -> list[tuple[str, bool]]:
+    """`?sort=` を `[(key, descending)]` に解析（左が最優先・`-`接頭辞で降順・§1.8.1）。
+
+    未知キーは 422 `validation_error`（`errors[].field="sort"`＝任意列ソートの情報漏れ防止）。
+    省略/空は新着（`-created_at`）を既定にする（現行挙動を維持）。
+    """
+    if not sort:
+        return [("created_at", True)]
+    specs: list[tuple[str, bool]] = []
+    for token in sort.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        descending = token.startswith("-")
+        key = token[1:] if descending else token
+        if key not in _SORTABLE_KEYS:
+            raise AppError(422, "validation_error", detail="sort が不正です", errors=[{"field": "sort"}])
+        specs.append((key, descending))
+    return specs or [("created_at", True)]
+
+
+def _encode_cursor(keyset: tuple, sort: list[tuple[str, bool]]) -> str:
+    """ソートキー値タプル（末尾 id）を不透明カーソルにエンコード（§1.8.1・タプル内包）。"""
+    vals = []
+    for (key, _), v in zip(sort, keyset[:-1]):
+        if key in _DATETIME_SORT_KEYS:
+            vals.append(v.isoformat() if v is not None else None)
+        else:
+            vals.append(v)
+    payload = {"s": [[k, d] for k, d in sort], "v": vals, "id": str(keyset[-1])}
+    raw = json.dumps(payload, separators=(",", ":")).encode()
     return base64.urlsafe_b64encode(raw).decode()
 
 
-def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+def _decode_cursor(cursor: str, sort: list[tuple[str, bool]]) -> tuple:
+    """カーソルを keyset タプルに復号（現在のソートと不一致なら 422・§1.8.1）。"""
     try:
-        created_str, id_str = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
-        return datetime.fromisoformat(created_str), uuid.UUID(id_str)
-    except (binascii.Error, ValueError, UnicodeDecodeError):
+        payload = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+        if payload["s"] != [[k, d] for k, d in sort]:
+            raise ValueError("sort mismatch")  # 途中でソートを変えたカーソルは無効
+        vals = []
+        for (key, _), v in zip(sort, payload["v"]):
+            if key in _DATETIME_SORT_KEYS:
+                vals.append(datetime.fromisoformat(v) if v is not None else None)
+            else:
+                vals.append(int(v))
+        return tuple(vals) + (uuid.UUID(payload["id"]),)
+    except (binascii.Error, ValueError, KeyError, TypeError, UnicodeDecodeError):
         raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
 
 
@@ -81,20 +125,22 @@ def get_quests(
     q: str | None = None,
     status: list[str] | None = None,
     group_id: str | None = None,
+    sort: str | None = None,
     limit: int,
     cursor: str | None = None,
 ) -> dict:
-    """参加中クエスト＋自分の下書き一覧（SC-10・C.1・FR-15）。新着順・カーソル §1.8。
+    """参加中クエスト＋自分の下書き一覧（SC-10・C.1・FR-15）。ソート/カーソル §1.8.1。
 
     参照制限（(A) 非draft×所属グループ×パーティー参加中 ／ (B) 自分の下書き）は repository が強制。
-    会社/ユーザー未解決（通常起きない）は空ページ。
+    ソート＝`?sort=`（既定 `-created_at`・未知キーは 422）。会社/ユーザー未解決（通常起きない）は空ページ。
     """
     if status is not None:
         invalid = [s for s in status if s not in _VALID_STATUS]
         if invalid:
             raise AppError(422, "validation_error", detail="status が不正です", errors=[{"field": "status"}])
+    sort_specs = _parse_sort(sort)  # 未知キーは query 前に 422（field=sort）
     group_uuid = _parse_uuid(group_id, field="group_id") if group_id else None
-    cur = _decode_cursor(cursor) if cursor else None  # 不正カーソルは query 前に 422
+    cur = _decode_cursor(cursor, sort_specs) if cursor else None  # 不正カーソルは query 前に 422
 
     company = _resolve_company(company_id)
     if company is None:
@@ -106,25 +152,22 @@ def get_quests(
         visible_group_ids = qg_repo.list_active_group_ids_for_user(ts, user.id)
         rows = repo.list_quests_for_user(
             ts, user_id=user.id, visible_group_ids=visible_group_ids,
-            q=q, status=status, group_id=group_uuid, cursor=cur, limit=limit + 1,
+            q=q, status=status, group_id=group_uuid, sort=sort_specs, cursor=cur, limit=limit + 1,
         )
         has_next = len(rows) > limit
         rows = rows[:limit]
-        # ページ分の付随情報を一括取得（N+1 回避）。
+        # ページ分の付随情報を一括取得（N+1 回避）。member_count/idea_count は list 側が各行に付与済み。
         owner_ids = list({r.owner_id for r in rows})
         qids = [r.id for r in rows]
         links_by_quest = repo.linked_groups_for_quests(ts, qids)  # quest_id→[参加部署 id]（0..N）
         gids = list({g for gl in links_by_quest.values() for g in gl})
         owners, groups = repo.get_owners_and_groups(ts, owner_ids, gids)
         cats = repo.list_categories_for_quests(ts, qids)
-        member_counts = repo.count_active_members_for_quests(ts, qids)
-        idea_counts = ideas_repo.count_published_ideas_for_quests(ts, qids)
         data = [
-            _quest_card_dto(r, user.id, owners, groups, links_by_quest.get(r.id, []),
-                            cats, member_counts, idea_counts)
+            _quest_card_dto(r, user.id, owners, groups, links_by_quest.get(r.id, []), cats)
             for r in rows
         ]
-    next_cursor = _encode_cursor(rows[-1]) if has_next and rows else None
+    next_cursor = _encode_cursor(repo.keyset_of(rows[-1], sort_specs), sort_specs) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
@@ -177,7 +220,7 @@ def _group_refs(group_ids, groups) -> list[dict]:
     return out
 
 
-def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats, member_counts, idea_counts) -> dict:
+def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats) -> dict:
     owner = owners.get(quest.owner_id)
     return {
         "id": str(quest.id),
@@ -187,9 +230,9 @@ def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats, member_co
         "categories": [c.label for c in cats.get(quest.id, [])],
         "status": quest.status,
         "deadline": quest.deadline,
-        "member_count": member_counts.get(quest.id, 0),
-        # 公開アイデア数（C.1・下書き/削除は除外・N+1 回避＝一括集計を受け取る）。
-        "idea_count": idea_counts.get(quest.id, 0),
+        # 有効パーティー人数／公開アイデア数（C.1・下書き/削除は除外）＝list 側が集計列として各行に付与。
+        "member_count": quest.member_count,
+        "idea_count": quest.idea_count,
         "owner": {
             "user_id": str(quest.owner_id),
             "display_name": owner.display_name if owner else "",

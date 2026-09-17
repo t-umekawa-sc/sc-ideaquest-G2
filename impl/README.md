@@ -24,7 +24,7 @@
 | SC-01 | ダッシュボード | ✅ | `(app)/` | **実接続（`GET /dashboard`＝I 集約1本）**＝ヒーロー（残高＋level）・週間ランキング・下書き（quest/idea/eval 進捗）・未投票・参加中クエスト・フォロー中・最近の通知・roles・login_bonus。クイック投票（POST /ideas/{id}/vote）・フォロー解除（D follow EP）実接続・login_bonus トースト。空パネル非表示 |
 | SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ**。**リアルタイム(L) 接続済み＝WS で新着/未読数を即時反映（ヘッダーベル＋一覧）** |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
-| SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動 |
+| SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動。**backend `GET /quests?sort=` 実装済み（2026-09-17・§1.8.1＝`-created_at`/`deadline`/`-idea_count`/`-member_count`・複数キー・keyset・未知キー422）**＝frontend DataTable への結線は未（backend 側は契約充足） |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
 | SC-12 | クエスト詳細 | ✅ | `(app)/quests/[questId]` | 本体＋**アイデアタブ（D.1・評価列 F 実接続＝`evaluation` 集計 n/5・評価待ち/評価済・可視のみ）**＋**全文検索タブ（J・PGroonga・種別/スニペット/ページング/遷移）**＋**クエスト内週間ランキング（G 実接続＝`GET /rankings?scope=quest:{id}&period=this_week`）**。ヘッダー💡件数は `idea_count` 連動。**💬 コメント数も実接続（E 非削除チャット件数）**。残 demo なし |
 | SC-21 | アイデア登録/編集 | ✅ | `(app)/quests/[questId]/ideas/new`（＋モーダル） | §4.7 入力検証（**サーバエラー経由の 3 チャネル e2e D-TC-216**＝完了クエスト編集 409）・登録モーダル初期誤検証 fix 済み・**添付アップロード**（D.3・保存後に送信）・**編集での既存添付の一覧＋削除**（D-TC-218・確認ダイアログ→即時削除・版を生まない） |

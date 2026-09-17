@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, delete, func, or_, select, tuple_
+from sqlalchemy import and_, delete, false as sa_false, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
@@ -184,6 +184,45 @@ def can_access_quest_id(session: Session, quest_id: uuid.UUID, user_id: uuid.UUI
     return can_access_quest(session, quest, user_id)
 
 
+# ソート可能キー（§1.8.1 ホワイトリスト・C.1）。`idea_count`/`member_count` は集計列（相関サブクエリ）。
+QUEST_SORT_KEYS = ("created_at", "deadline", "idea_count", "member_count")
+_NULLABLE_SORT_KEYS = frozenset({"deadline"})  # NULLS LAST で決定的にする
+_DEFAULT_QUEST_SORT: list[tuple[str, bool]] = [("created_at", True)]  # 新着（-created_at）
+
+
+def keyset_of(quest: Quest, sort: list[tuple[str, bool]]) -> tuple:
+    """ページ末尾クエストのソートキー値タプル（末尾に id）＝次カーソルの素。
+
+    `idea_count`/`member_count` は `list_quests_for_user` が各行に付与した属性を読む（集計列）。
+    """
+    return tuple(getattr(quest, key) for key, _ in sort) + (quest.id,)
+
+
+def _after_one(col, descending: bool, nullable: bool, value):
+    """keyset 述語の単一キー分＝「カーソル値 value より後ろ」（NULLS LAST・mixed direction）。"""
+    if not nullable:
+        return col < value if descending else col > value
+    # NULLS LAST（昇順/降順とも NULL は末尾）。
+    if value is None:
+        return sa_false()  # NULL 行より後ろは無い（同点は後続キー/id が担う）
+    base = col < value if descending else col > value
+    return or_(base, col.is_(None))
+
+
+def _keyset_after(order_specs: list[tuple], cursor: tuple):
+    """カーソル行より後ろの行を選ぶ keyset 述語（複数キー・mixed direction・NULLS LAST・§1.8.1）。"""
+    ors = []
+    for i, (col_i, desc_i, null_i) in enumerate(order_specs):
+        ands = []
+        for j in range(i):
+            col_j, _desc_j, _null_j = order_specs[j]
+            v_j = cursor[j]
+            ands.append(col_j.is_(None) if v_j is None else (col_j == v_j))
+        ands.append(_after_one(col_i, desc_i, null_i, cursor[i]))
+        ors.append(and_(*ands))
+    return or_(*ors)
+
+
 def list_quests_for_user(
     session: Session,
     *,
@@ -192,10 +231,11 @@ def list_quests_for_user(
     q: str | None = None,
     status: list[str] | None = None,
     group_id: uuid.UUID | None = None,
-    cursor: tuple[datetime, uuid.UUID] | None = None,
+    sort: list[tuple[str, bool]] | None = None,
+    cursor: tuple | None = None,
     limit: int = 20,
 ) -> list[Quest]:
-    """参照制限（C.1・FR-15・C.0 門番）を満たすクエストを新着順（created_at, id DESC）で取得。
+    """参照制限（C.1・FR-15・C.0 門番）を満たすクエストを指定ソート（既定＝新着）で取得。
 
     (A) 公開系＝`status != 'draft'` かつ **C.0 アクセス条件**を満たす＝
         - **作成者は別格**＝自分の非下書きは参加部署に居なくても出す（`owner_id = user_id`）／
@@ -203,9 +243,37 @@ def list_quests_for_user(
           **参加部署条件**（`quest_group_links` が 0 件なら条件なし／1 件以上なら `visible_group_ids` の
           いずれかに現在有効所属＝異動失効を都度反映・§5.6b）。
     (B) 自分の下書き＝`owner_id = user_id` かつ `status = 'draft'`（本人だけに見える）。
-    どちらも `deleted_at IS NULL`。ソート系は §1.8.1 の複数指定に後で対応（本スライスは新着順のみ）。
+    どちらも `deleted_at IS NULL`。
+
+    ソート（§1.8.1）＝`sort`＝`[(key, descending)]`（左が最優先・末尾に `id` DESC を暗黙付与）。
+    `idea_count`/`member_count` は相関スカラサブクエリを SELECT に載せて SQL でソート/keyset し、各行に
+    `idea_count`/`member_count` 属性として付与する（DTO 集計を兼ねる・N+1 回避）。`cursor` は
+    `keyset_of` が返すソートキー値＋id のタプル（既定ソートでは `(created_at, id)` で後方互換）。
     """
-    from sqlalchemy import and_, exists, not_, or_
+    from sqlalchemy import exists, not_
+
+    sort = list(sort) if sort else list(_DEFAULT_QUEST_SORT)
+
+    # 集計列＝相関スカラサブクエリ（idea_count/member_count を SQL でソート/keyset 可能に）。
+    from app.tenant.ideas.orm import Idea
+    member_count_col = (
+        select(func.count())
+        .select_from(QuestMember)
+        .where(QuestMember.quest_id == Quest.id, QuestMember.removed_at.is_(None))
+        .scalar_subquery()
+    )
+    idea_count_col = (
+        select(func.count())
+        .select_from(Idea)
+        .where(Idea.quest_id == Quest.id, Idea.status == "published", Idea.deleted_at.is_(None))
+        .scalar_subquery()
+    )
+    sort_cols = {
+        "created_at": Quest.created_at,
+        "deadline": Quest.deadline,
+        "idea_count": idea_count_col,
+        "member_count": member_count_col,
+    }
 
     is_party_member = exists().where(
         QuestMember.quest_id == Quest.id,
@@ -227,7 +295,11 @@ def list_quests_for_user(
         ),
     )
     draft_cond = and_(Quest.status == "draft", Quest.owner_id == user_id)
-    stmt = select(Quest).where(Quest.deleted_at.is_(None), or_(public_cond, draft_cond))
+    stmt = select(
+        Quest,
+        idea_count_col.label("idea_count"),
+        member_count_col.label("member_count"),
+    ).where(Quest.deleted_at.is_(None), or_(public_cond, draft_cond))
 
     if q:
         # 簡易絞り＝件名/目的の部分一致（横断全文検索は §1.11 PGroonga に委譲・C.1）。カテゴリ一致は後続。
@@ -241,11 +313,30 @@ def list_quests_for_user(
             QuestGroupLink.quest_id == Quest.id,
             QuestGroupLink.quest_group_id == group_id,
         ))
-    if cursor is not None:
-        stmt = stmt.where(tuple_(Quest.created_at, Quest.id) < tuple_(cursor[0], cursor[1]))
 
-    stmt = stmt.order_by(Quest.created_at.desc(), Quest.id.desc()).limit(limit)
-    return list(session.execute(stmt).scalars().all())
+    # 並び順＝指定キー＋末尾に id DESC（一意化・§1.8.1）。集計列/NULL 可を含む。
+    order_specs = [
+        (sort_cols[key], descending, key in _NULLABLE_SORT_KEYS) for key, descending in sort
+    ] + [(Quest.id, True, False)]
+
+    if cursor is not None:
+        stmt = stmt.where(_keyset_after(order_specs, cursor))
+
+    for col, descending, nullable in order_specs:
+        clause = col.desc() if descending else col.asc()
+        if nullable:
+            clause = clause.nulls_last()
+        stmt = stmt.order_by(clause)
+    stmt = stmt.limit(limit)
+
+    quests: list[Quest] = []
+    for row in session.execute(stmt).all():
+        quest = row[0]
+        # 集計列を各行に付与（DTO の idea_count/member_count＋keyset カーソル素を兼ねる）。
+        quest.idea_count = int(row.idea_count)
+        quest.member_count = int(row.member_count)
+        quests.append(quest)
+    return quests
 
 
 # ---- カテゴリ（C.2・§5.7） ----

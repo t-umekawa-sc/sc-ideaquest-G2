@@ -43,6 +43,7 @@ def list_quests(
     q: str | None = None,
     status: list[str] | None = Query(default=None),
     group_id: str | None = None,
+    sort: str | None = None,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = None,
     session: dict = Depends(require_me),
@@ -50,7 +51,7 @@ def list_quests(
     """参加中クエスト＋自分の下書き一覧（SC-10・C.1・FR-15）。参照制限はサーバー強制。読取専用。"""
     result = quest_service.get_quests(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-        q=q, status=status, group_id=group_id, limit=limit, cursor=cursor,
+        q=q, status=status, group_id=group_id, sort=sort, limit=limit, cursor=cursor,
     )
     return QuestListResponse(**result)
 

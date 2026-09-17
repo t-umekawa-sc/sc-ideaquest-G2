@@ -230,3 +230,66 @@ def test_c_tc_251_list_q_and_group_filters(client, env):
     # group_id＝所属グループのクエストが返る
     ids2 = {c["id"] for c in client.get(QUESTS, params={"group_id": str(env.group_id)}).json()["data"]}
     assert str(hit) in ids2
+
+
+def _seed_n_published(db_identifier, quest_id, author_id, n) -> list[uuid.UUID]:
+    """公開アイデアを n 件 seed（sort=-idea_count 検証用）。返り値＝cleanup 用 id。"""
+    ids: list[uuid.UUID] = []
+    with get_tenant_session(db_identifier) as ts:
+        for _ in range(n):
+            iid = uuid.uuid4()
+            ts.add(Idea(id=iid, quest_id=quest_id, author_id=author_id,
+                        title="t", body="b", value="v", status="published"))
+            ids.append(iid)
+        ts.commit()
+    return ids
+
+
+def test_c_tc_106_sort_by_idea_count_desc(client, env):
+    """C-TC-106: GET /quests?sort=-idea_count でカードが idea_count 降順（アイデア多い方が前・§1.8.1）。"""
+    rich = env.make_quest(status="recruiting", title="rich")
+    poor = env.make_quest(status="recruiting", title="poor")
+    idea_ids = _seed_n_published(env.db_identifier, rich, env.user_id, 2)
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.get(QUESTS, params={"group_id": str(env.group_id), "sort": "-idea_count"})
+        assert r.status_code == 200, r.text
+        ids = [c["id"] for c in r.json()["data"]]
+        assert ids.index(str(rich)) < ids.index(str(poor))
+    finally:
+        _delete_ideas(env.db_identifier, idea_ids)
+
+
+def test_c_tc_107_unknown_sort_key_422(client, env):
+    """C-TC-107: 未知ソートキーは 422 validation_error・errors[].field=sort（ホワイトリスト・§1.8.1）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(QUESTS, params={"sort": "bogus"})
+    assert r.status_code == 422, r.text
+    body = r.json()
+    assert body["code"] == "validation_error"
+    assert any(e.get("field") == "sort" for e in body.get("errors", []))
+
+
+def test_c_tc_108_sort_cursor_stable(client, env):
+    """C-TC-108: ソート指定時も keyset ページングが重複なく降順継続（§1.8.1）。"""
+    rich = env.make_quest(status="recruiting", title="rich")
+    poor = env.make_quest(status="recruiting", title="poor")
+    idea_ids = _seed_n_published(env.db_identifier, rich, env.user_id, 2)
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        base = {"group_id": str(env.group_id), "sort": "-idea_count", "limit": 1}
+        p1 = client.get(QUESTS, params=base)
+        assert p1.status_code == 200, p1.text
+        d1 = p1.json()
+        ids1 = [c["id"] for c in d1["data"]]
+        assert ids1 == [str(rich)]                    # idea_count 最大が先頭
+        assert d1["page_info"]["has_next"] is True
+        cursor = d1["page_info"]["next_cursor"]
+        assert cursor
+        p2 = client.get(QUESTS, params={**base, "cursor": cursor})
+        assert p2.status_code == 200, p2.text
+        ids2 = [c["id"] for c in p2.json()["data"]]
+        assert ids2 == [str(poor)]                    # 続きは重複なく次の順位
+        assert set(ids1).isdisjoint(ids2)
+    finally:
+        _delete_ideas(env.db_identifier, idea_ids)
