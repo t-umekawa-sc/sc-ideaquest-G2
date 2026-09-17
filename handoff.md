@@ -4,11 +4,11 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-17 JST**（backend 全体確認＋[B]② sort 実装＋一覧状態復元の回帰テスト＋[C]① 無変更ガードのセッション）
+- 最終更新: **2026-09-17 JST**（backend 全体確認＋[B]② sort＋一覧状態復元テスト＋[C]①無変更ガード＋[C]②メンション整合のセッション）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **a57da50** `feat(ideas): 無変更保存はサーバーでも版/通知を作らない（[C]① サーバーガード・D-TC-229）`（この後の handoff コミットが実 HEAD）
+- 最新コミット: **a25d1b3** `feat(chat): メッセージ編集のメンション通知整合＝追加分のみ通知（[C]②・決定A・E-TC-228）`（この後の handoff コミットが実 HEAD）
 - **push 済み・未 push 0**（`main...origin/main` 同期・確認済み）
-- 本セッションのコミット（古い順・すべて push 済み）＝ `2a7c373`(handoff:592確認)→`9aaeec9`([B]② sort 実装)→`7da69ee`(handoff:598)→`3944c16`(一覧状態復元の回帰テスト M-TC-016/017)→`a57da50`([C]① 無変更ガード)。
+- 本セッションのコミット（古い順・すべて push 済み）＝ `2a7c373`(handoff:592)→`9aaeec9`([B]② sort)→`7da69ee`(handoff:598)→`3944c16`(一覧状態復元 M-TC-016/017)→`a57da50`([C]① 無変更ガード)→`a4d6e8b`(handoff:599)→`a25d1b3`([C]② メンション整合)。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。
@@ -23,6 +23,7 @@
   - 台帳＝`doc/テスト/カバレッジギャップ.md` [B]② を [x]／`doc/テスト/C_クエスト.md` に TC 行／`impl/README` SC-10 に注記。**frontend DataTable への `?sort=` 結線は未**（backend 契約は充足）。
 - **一覧の操作状態（検索/ソート/絞込/ページ）の URL 復元を回帰テストで担保**（`3944c16`・§4.5⑨）。判明＝**復元は既に共通 `DataTable.tsx` に実装済み**（session状態=URL `?<storageKey>.q/.sort/.f/.page`・表示設定=localStorage・スクロール=§4.12）だが URL 状態復元の e2e が無かった。SC-10 で **M-TC-016**（ヘッダソート→詳細→戻るで復元）・**M-TC-017**（sort+絞込を URL 適用→戻るで復元）を追加＝**プロダクションコード無変更**（既存挙動を確認・2 passed）。恒久メモリ `list-state-restore-unified`。ユーザー方針＝一覧共通機能は共有 DataTable に統一。
 - **[C]① 無変更保存ガードを実装**（`a57da50`・D.2/D.4）。`update_idea` が公開中 PATCH で `_apply_content` の前後の `_content_snapshot` を比較し、**差分ゼロなら版/通知（`_record_revision`）をスキップ**（frontend 抑制と対称・§1 サーバー権威）。テスト＝**D-TC-229**（同一内容 PATCH=版据え置き+通知0／実変更は版2+通知1）。設計 D「編集と版」/D.4 に明記。red→green 目視。
+- **[C]② メンション差し替え通知整合を実装**（`a25d1b3`・E.2/E.6・**決定A＝追加分のみ通知**）。no-op だった `_notify_message_updated` を実装＝`edit_message` が `replace_mentions` 前後の被メンション集合を比較し **added（編集後−編集前・自分/重複除外）にのみ** `mention` 通知（不変は再通知せず・外した分は通知も取消もしない＝at-most-once・H に取消プリミティブなし）。テスト＝**E-TC-228**。設計 E.2/E.6 に反映。red→green 目視。**これで [C] 乖離は残なし**。
 
 
 ### A. モーダル・バックドロップのチカチカ修正（`8e95e32`・前セッションの主作業）
@@ -45,7 +46,7 @@
 
 ## 4. 現在の状態（動作/テスト）
 - **動いているもの**＝フロント全画面 backend 接続済み。**モーダルのチカチカは解消**（ユーザー目視で確認済み）。
-- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝無変更ガード後 `599 passed`**（推移＝592→sort実装 598→[C]①無変更ガード 599）。フロント e2e は一覧状態復元2件（M-TC-016/017・`sc-10-list-state`）も green。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
+- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝`600 passed`**（推移＝592→sort 598→[C]①無変更ガード 599→[C]②メンション整合 600）。フロント e2e は一覧状態復元2件（M-TC-016/017・`sc-10-list-state`）も green。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
 - **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 582 件すべて md 記載**（確認済み）。
 - **壊れているもの**＝認識している範囲では無し。
 - **コンテナ**＝本セッション末時点でフル起動中（frontend/backend/db/redis/minio/mailhog/worker/mail-worker）。次セッションでは落ちている想定＝§8 で再起動。
@@ -68,7 +69,7 @@
 1. **結果タブ Modal 化の受入＝完了扱い**（当初セッションの目的）。ダイアログのチカつき修正込みで正常動作を確認済み。回帰テスト要否は不要と判断（M-TC-015＋C-TC-201/202 でカバー）。
 2. **[A] 純テストは残ゼロ**＝`doc/テスト/カバレッジギャップ.md` の [A] セクションに未対応の純テストは無い（残る `[ ]` は [B] 実装ギャップ・[C] 乖離のみ）。
 3. **[B] 実装ギャップ（実装＋テスト・要ユーザー着手指示）**＝ ①認証イベントの監査ログ（**要精査**＝A.9-⑥。`audit.record` は auth 2種＋admin 多数で既に記録済み＝handoff 旧記述「1箇所のみ」は誤り。欠落イベントの有無を先に精査）②~~`GET /quests` の `sort`~~＝**2026-09-17 実装済み（`9aaeec9`・§3-0）** ③ダッシュボード I-TC-107/108 ほか ④リアルタイム L-TC-103/131 ⑤`GET /items` フィルタ（**要確認**＝そもそも G.1 でフィルタ仕様があるか。`get_items` に filter 引数なし）⑥`chat_preview` 実装（将来）。
-4. **[C] 設計・実装の乖離（要判断）**＝ ①~~無変更保存＝版なし~~＝**2026-09-17 実装済み（`a57da50`）**＝`update_idea` が差分ゼロなら版/通知をスキップ（D-TC-229・設計 D.4 反映） ②メンション差し替え通知整合（`_notify_message_updated` は no-op・未対応）。
+4. **[C] 設計・実装の乖離＝両方 2026-09-17 実装済み**＝ ①~~無変更保存＝版なし~~（`a57da50`・`update_idea` が差分ゼロなら版/通知スキップ・D-TC-229・D.4 反映） ②~~メンション差し替え通知整合~~（`a25d1b3`・決定A＝編集で追加された被メンションのみ通知・E-TC-228・E.2/E.6 反映）。**[C] 残なし**。
 5. **クエスト参加リクエスト設計ドラフト**（`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`）＝**まだドラフト・実装着手指示なし**。着手指示が出たら正規化（要件定義FR・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C/H・screens）へ展開。決定事項は当ドラフト §6/§8。
 6. **backend 全体スイートは 2026-09-17 に確認済み**（無変更ガード後 599 passed・§4）。まとまった変更のたびに §8 の pytest コマンドで再確認する。
 
