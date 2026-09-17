@@ -7,13 +7,18 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy.orm import aliased
+
 from app.control_plane.auth.orm import Company
+from app.core import list_query as lq
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.gamification import ledger
 from app.tenant.profile import repository as profile_repo
 from app.tenant.shop import repository as repo
+from app.tenant.shop.orm import Item, UserItem
 from app.tenant.shop.repository import SLOTS
 
 
@@ -29,18 +34,140 @@ def _parse_uuid(value: str, *, field: str) -> uuid.UUID:
         raise AppError(422, "validation_error", detail=f"{field} が不正です", errors=[{"field": field}])
 
 
-def get_items(account_id, company_id) -> dict:
-    """装備マスタ＋自分の所有/装備状況＋コイン残高（SC-30／SC-31・G.1）。"""
+# ---- 一覧サーバー契約（G.1・§1.8.1・DataTable サーバーモード） ----
+# ソート可能キー→ORDER BY 式（rarity/slot はレアリティ/スロット序列・§1.8.1①ホワイトリスト）。
+_RARITY_RANK = case((Item.rarity == "common", 0), (Item.rarity == "standard", 1), (Item.rarity == "rare", 2), else_=99)
+_SLOT_RANK = case(
+    (Item.slot == "head", 0), (Item.slot == "face", 1), (Item.slot == "body", 2),
+    (Item.slot == "hand", 3), (Item.slot == "background", 4), else_=99,
+)
+_ITEM_SORT_COLUMNS = {"rarity": _RARITY_RANK, "price": Item.price_coin, "slot": _SLOT_RANK, "name": Item.name_ja}
+ITEM_RARITIES = ("common", "standard", "rare")
+# CSV 表示可能列とラベル（§1.8.1③・列順は ?columns= が正）。
+_CSV_COLUMNS = {"name": "名称", "slot": "スロット", "rarity": "レアリティ", "price_coin": "価格", "owned": "所有"}
+_CSV_DEFAULT_ORDER = ["name", "slot", "rarity", "price_coin", "owned"]
+
+
+def _items_query(*, user_id, coin_balance, q, slots, rarities, owned, affordable,
+                 price_min, price_max, sort, exclude_ids):
+    """(rows_stmt〔order 済み・offset/limit 未適用〕, count_stmt) を返す（companies と同型・§1.8.1）。
+
+    `owned`/`affordable` は閲覧者依存＝`user_items`（所有）と価格≤残高で解決。`sort` は _ITEM_SORT_COLUMNS の
+    ホワイトリスト（未知は 422）。`exclude_ids`＝固定行（ピン）を非固定母集合から除外（§1.8.1④）。
+    """
+    uitem = aliased(UserItem)
+    owned_expr = uitem.id.isnot(None)
+    conds = []
+    if slots:
+        conds.append(Item.slot.in_(slots))
+    if rarities:
+        conds.append(Item.rarity.in_(rarities))
+    if q:
+        like = f"%{q}%"
+        conds.append(or_(Item.name_ja.ilike(like), Item.name_en.ilike(like)))
+    if price_min is not None:
+        conds.append(Item.price_coin >= price_min)
+    if price_max is not None:
+        conds.append(Item.price_coin <= price_max)
+    if owned is True:
+        conds.append(owned_expr)
+    elif owned is False:
+        conds.append(~owned_expr)
+    if affordable is True:
+        conds.append(Item.price_coin <= coin_balance)
+    elif affordable is False:
+        conds.append(Item.price_coin > coin_balance)
+    if exclude_ids:
+        conds.append(Item.id.notin_(exclude_ids))
+
+    def _join(stmt):
+        return stmt.outerjoin(uitem, and_(uitem.item_id == Item.id, uitem.user_id == user_id)).where(*conds)
+
+    order = lq.parse_sort(sort, _ITEM_SORT_COLUMNS)
+    rows_stmt = _join(select(Item, uitem))
+    # 明示ソートはキー順＋末尾 id で一意化／無指定は rarity→slot→sort_order の決定的順序（G.1 既定＝rarity）。
+    rows_stmt = (rows_stmt.order_by(*order, Item.id) if order
+                 else rows_stmt.order_by(_RARITY_RANK, _SLOT_RANK, Item.sort_order, Item.id))
+    count_stmt = _join(select(func.count()).select_from(Item))
+    return rows_stmt, count_stmt
+
+
+def _fetch_pinned_items(ts, user_id, ids):
+    """固定行（ピン）を絞込/ページに関係なく解決（送信 ID 順を保持・§1.8.1④）。"""
+    if not ids:
+        return []
+    uitem = aliased(UserItem)
+    rows = ts.execute(
+        select(Item, uitem).outerjoin(uitem, and_(uitem.item_id == Item.id, uitem.user_id == user_id))
+        .where(Item.id.in_(ids))
+    ).all()
+    by_id = {it.id: (it, ui) for it, ui in rows}
+    return [_item_dto(*by_id[i]) for i in ids if i in by_id]
+
+
+def query_items(account_id, company_id, *, q=None, slot=None, rarity=None, owned=None, affordable=None,
+                price_min=None, price_max=None, sort=None, pin_ids=None, page=None, per_page=None) -> dict:
+    """装備一覧（SC-30／SC-31・G.1・DataTable サーバー契約）＝絞込/複数ソート/番号ページャ/固定行/残高。
+
+    `page`/`per_page` 未指定＝全件（client モード後方互換・小カタログ）／指定時は offset ページング。
+    """
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
+    slots = lq.parse_enum(slot, "slot", SLOTS)      # 未知値は 422（ホワイトリスト・§1.8.1②）
+    rarities = lq.parse_enum(rarity, "rarity", ITEM_RARITIES)
+    pins = lq.parse_pin_ids(pin_ids)
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        owned = {ui.item_id: ui for ui in repo.list_user_items(ts, user.id)}
-        data = [_item_dto(it, owned.get(it.id)) for it in repo.list_items(ts)]
-        return {"data": data, "coin_balance": user.coin_balance}
+        bal = user.coin_balance
+        pinned = _fetch_pinned_items(ts, user.id, pins)  # 絞込/ページに関係なく解決・§1.8.1④
+        rows_stmt, count_stmt = _items_query(
+            user_id=user.id, coin_balance=bal, q=q, slots=slots, rarities=rarities,
+            owned=owned, affordable=affordable, price_min=price_min, price_max=price_max,
+            sort=sort, exclude_ids=pins)
+        total = ts.execute(count_stmt).scalar_one()
+        if page is None and per_page is None:  # ページ指定なし＝全件（後方互換）
+            rows = ts.execute(rows_stmt).all()
+            eff_page, eff_per = 1, total or 1
+        else:
+            eff_page = max(1, page or 1)
+            eff_per = max(1, min(per_page or lq.DEFAULT_PER_PAGE, lq.MAX_PER_PAGE))
+            rows = ts.execute(rows_stmt.offset((eff_page - 1) * eff_per).limit(eff_per)).all()
+        data = [_item_dto(it, ui) for it, ui in rows]
+    return {"data": data, "pinned": pinned,
+            "page_info": {"total": total, "page": eff_page, "per_page": eff_per}, "coin_balance": bal}
+
+
+def _csv_cell(key, item, ui) -> str:
+    if key == "owned":
+        return "1" if ui is not None else "0"
+    if key == "name":
+        return item.name_ja
+    return str(getattr(item, key))
+
+
+def export_items_csv(account_id, company_id, *, q=None, slot=None, rarity=None, owned=None, affordable=None,
+                     price_min=None, price_max=None, sort=None, columns=None) -> tuple[bytes, str]:
+    """同一フィルタ/ソートの全件を CSV で出力（ページング無視・§1.8.1③・UTF-8 BOM）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    slots = lq.parse_enum(slot, "slot", SLOTS)
+    rarities = lq.parse_enum(rarity, "rarity", ITEM_RARITIES)
+    keys = lq.parse_columns(columns, _CSV_COLUMNS, _CSV_DEFAULT_ORDER)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        rows_stmt, _ = _items_query(
+            user_id=user.id, coin_balance=user.coin_balance, q=q, slots=slots, rarities=rarities,
+            owned=owned, affordable=affordable, price_min=price_min, price_max=price_max, sort=sort, exclude_ids=None)
+        rows = ts.execute(rows_stmt).all()
+    header = [_CSV_COLUMNS[k] for k in keys]
+    body = ([_csv_cell(k, it, ui) for k in keys] for it, ui in rows)
+    return lq.to_csv_bytes(header, body), "items.csv"
 
 
 def purchase_item(account_id, company_id, item_id) -> dict:

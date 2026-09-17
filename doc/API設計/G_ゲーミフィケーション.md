@@ -22,12 +22,13 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /items` | 装備マスタ＋自分の所有/装備状況（SC-30／SC-31 共用） | クエリ（任意フィルタ）: `slot?`・`rarity?`・`owned?`（bool）・`affordable?`（bool＝価格≤残高）・`sort?`（`rarity`〔既定〕/`price`/`-price`/`slot`）・`limit`/`cursor`（§1.8） | `data`=アイテム行（`id`/`code`/`name`〔locale〕/`slot`/`rarity`/`price_coin`/`owned`〔bool〕/`is_equipped`〔bool〕）＋`coin_balance`（自分）。`page_info` |
+| `GET /items` | 装備マスタ＋自分の所有/装備状況（SC-30／SC-31 共用） | **DataTable サーバー契約（§1.8.1）**。クエリ: `q?`（名前部分一致）・`slot?`・`rarity?`（**enum 多値**・カンマ区切り）・`owned?`（bool）・`affordable?`（bool＝価格≤残高。`owned`＋`affordable` の組合せで SC-30 の状態〔所有/購入可/コイン不足〕を全表現）・`price_min?`/`price_max?`（価格レンジ）・`sort?`（`rarity`〔既定〕/`price`/`-price`/`slot`/`name`/`-name`・複数キーはカンマ区切り左優先・末尾 `id` で一意化）・`page`/`per_page`（**番号ページャ**・§1.8.1）・`pin_ids?`（固定行）・`format=csv`＋`columns?`（CSV）。**ソート可能キー/フィルタ可能フィールドはこのホワイトリスト**（未知は 422 `validation_error`） | `data`=アイテム行（`id`/`code`/`name`〔locale〕/`slot`/`rarity`/`price_coin`/`owned`〔bool〕/`is_equipped`〔bool〕）＋`pinned`（固定行・ページ/絞込跨ぎで解決）＋`page_info.{total,page,per_page}`＋`coin_balance`（自分） |
 | `POST /items/{item_id}/purchase` | 装備を購入（コイン消費・恒久） | パス: `item_id`／`Idempotency-Key` 必須 | 200（`{item_id, owned:true, coin_balance}`〔更新後残高〕） |
 
 - **購入のサーバー検証**（§2.2・不正入手防止）: (1) 残高 ≥ `price_coin`、(2) 未所有（`user_items` に無い）。満たさなければ **409**＝`insufficient_balance`／`already_owned`。
 - **副作用（同一 UoW）**: `coin_balance` 減算＋`user_items` 作成（`slot` は `items.slot` を購入時に非正規化コピー・§5.26）＋`activities`（`kind=coin_spend`,`reason=shop_purchase`,`ref_type=items`,`ref_id=item_id`）。購入直後は未装備（`is_equipped=false`）＝着せ替えは G.2。
 - **入手はコイン購入のみ**（レベル解放・実績での装備直接付与はしない＝実績報酬はコインに統一・§5.25/SC-40）。
+- **一覧はサーバー委譲（§1.8.1・DataTable サーバーモード）＝決定 2026-09-17**: `GET /items` は SC-30 のツールバー（横断検索・複数ソート・項目別フィルタ・番号ページャ・CSV・ピン）を**無改造でサーバー委譲**できる形にする（admin 一覧と同じ共通契約＝`app/core/list_query` を共用）。**ページングは番号ページャ（offset `page`/`per_page`＋`page_info.total`）**＝旧「`limit`/`cursor`」から変更（DataTable サーバーモードは件数バッジ/番号ページャに `total` を要するため。装備マスタは固定の小カタログで安定順のため offset で十分・カーソルの利点〔追記が増えても安定〕は不要）。**`owned`/`affordable` は閲覧者依存**＝`user_items`（所有）と `users.coin_balance`（価格≤残高）で都度判定するため、フィルタもソートもサーバーが自分のコンテキストで解決する。`rarity` ソートはレアリティ序列（`equipment_rarity` の enum 順）で並べる。**フロントは列の `sortable`/`filter` フラグを本ホワイトリストに一致**させる（`ShopView` は DataTable サーバーモード）。
 
 ---
 

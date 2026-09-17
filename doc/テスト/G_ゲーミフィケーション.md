@@ -49,6 +49,13 @@
 | G-TC-307 | api | 未所有/スロット不一致は 422 | 未所有 item / 別スロット item | `PUT /me/equipment` | 422（`field`＝slot） | G.2 |
 | G-TC-308 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST purchase`／`PUT equipment` | 403 csrf_failed／401 | A.0 |
 | G-TC-309 | api | 所有装備一覧のマスタ名 locale 出し分けの担保（i18n 結線） | `crown`（ja=王冠/en=Crown）を装備した実ユーザー。`users.locale` を ja→en に切替 | `GET /me/items` を各 locale で | ja は `name`=「王冠」・en は `name`=「Crown」（受信者 locale で選択・§2.1・既定 ja） | コーディング規約 §2.1／G.2 |
+| G-TC-310 | api | 一覧の slot/rarity（enum多値）・q（名前部分一致）フィルタ（§1.8.1②） | ログイン済 | `GET /items?slot=`／`?rarity=common,rare`／`?q=<名>` | slot＝当該スロットのみ・total 一致／rarity＝指定集合のみ／q＝名前一致（name_ja/name_en） | G.1／§1.8.1 |
+| G-TC-311 | api | owned/affordable は閲覧者依存（所有・価格≤残高） | 残高25・`cap`(20) を所有 | `GET /items?owned=true\|false`／`?affordable=true\|false` | owned=true＝所有のみ（cap）／false＝未所有・非cap／affordable=true＝price≤25 のみ／false＝price>25 のみ（owned+affordable で状態を全表現） | G.1／§1.8.1 |
+| G-TC-312 | api | 価格レンジ＋ソート（price/-price/既定 rarity 序列・§1.8.1①） | ログイン済 | `GET /items?price_min=&price_max=`／`?sort=price\|-price`／sort無し | レンジ内のみ／price 昇順・降順／既定は rarity 序列（common→standard→rare）昇順 | G.1／§1.8.1 |
+| G-TC-313 | api | 番号ページャ（offset＋total）／未指定は全件（後方互換） | ログイン済 | `GET /items?page=&per_page=`／パラメータ無し | page/per_page で分割・重複なし・`page_info.total`＝全件／未指定は全19件（client モード維持） | G.1／§1.8.1 |
+| G-TC-314 | api | 固定行（pin_ids）を送信順で解決＋非固定母集合から除外（§1.8.1④） | ログイン済 | `GET /items?pin_ids=<id>,<id>` | `pinned`＝送信順で解決・`data`/`total` から除外（total＝全件−ピン数） | G.1／§1.8.1 |
+| G-TC-315 | api | 未知の sort キー/enum 値は 422（ホワイトリスト・§2.2） | ログイン済 | `GET /items?sort=bogus`／`?slot=wing`／`?rarity=legendary` | いずれも 422 `validation_error` | G.1／§1.8.1 |
+| G-TC-316 | api | CSV エクスポート（同一絞込/ソートの全件・UTF-8 BOM・§1.8.1③） | ログイン済 | `GET /items?format=csv` | 200・`text/csv; charset=utf-8`・UTF-8 BOM・ヘッダ行（名称/スロット/…） | G.1／§1.8.1 |
 
 ## 4. ランキング API（SC-41 全社／SC-12 クエスト内・G.5）
 

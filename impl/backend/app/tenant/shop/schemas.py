@@ -16,8 +16,16 @@ class ItemDTO(BaseModel):
     is_equipped: bool = False
 
 
+class ItemPageInfo(BaseModel):
+    total: int
+    page: int
+    per_page: int
+
+
 class ItemListResponse(BaseModel):
     data: list[ItemDTO]
+    pinned: list[ItemDTO] = []
+    page_info: ItemPageInfo
     coin_balance: int
 
 

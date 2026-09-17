@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
@@ -23,9 +23,35 @@ router = APIRouter(prefix="/api/v1", tags=["shop"])
 
 
 @router.get("/items", response_model=ItemListResponse)
-def list_items(request: Request, session: dict = Depends(require_me)) -> ItemListResponse:
-    """装備マスタ＋自分の所有/装備＋コイン残高（SC-30/SC-31・G.1）。読取専用。"""
-    result = shop_service.get_items(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+def list_items(
+    request: Request,
+    q: str | None = None,
+    slot: str | None = None,      # enum 多値（`head,face`）＝値検証は application（§1.8.1②）
+    rarity: str | None = None,    # enum 多値（`common,rare`）
+    owned: bool | None = None,
+    affordable: bool | None = None,
+    price_min: int | None = Query(default=None, ge=0),
+    price_max: int | None = Query(default=None, ge=0),
+    sort: str | None = None,
+    pin_ids: str | None = None,   # 固定行（ピン）＝ページ/絞込跨ぎで解決（§1.8.1④）
+    page: int | None = Query(default=None, ge=1),      # 未指定＝全件（client モード後方互換）
+    per_page: int | None = Query(default=None, ge=1, le=100),
+    format: str | None = None,    # `csv` で CSV エクスポート（§1.8.1③）
+    columns: str | None = None,   # CSV の表示列・列順
+    session: dict = Depends(require_me),
+):
+    """装備マスタ＋自分の所有/装備＋コイン残高（SC-30/SC-31・G.1・DataTable サーバー契約）。読取専用。"""
+    account_id = uuid.UUID(session["account_id"])
+    company_id = uuid.UUID(session["company_id"])
+    if format == "csv":  # 同一フィルタ/ソートの全件を CSV で（§1.8.1③）
+        content, filename = shop_service.export_items_csv(
+            account_id, company_id, q=q, slot=slot, rarity=rarity, owned=owned, affordable=affordable,
+            price_min=price_min, price_max=price_max, sort=sort, columns=columns)
+        return Response(content=content, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    result = shop_service.query_items(
+        account_id, company_id, q=q, slot=slot, rarity=rarity, owned=owned, affordable=affordable,
+        price_min=price_min, price_max=price_max, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page)
     return ItemListResponse(**result)
 
 

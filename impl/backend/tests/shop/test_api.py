@@ -169,3 +169,100 @@ def test_g_tc_307_equip_idempotent(client, factory):
     assert r.status_code == 200 and r.json()["equipped"]["head"] == cap  # no-op・装備維持
     cap_item = next(d for d in client.get(ITEMS).json()["data"] if d["id"] == cap)
     assert cap_item["is_equipped"] is True  # 解除や重複になっていない
+
+
+# ---- G-TC-310〜316: GET /items サーバー契約（DataTable・§1.8.1・G.1 拡張・2026-09-17） ----
+
+def _all_items(client):
+    return client.get(ITEMS).json()["data"]
+
+
+def test_g_tc_310_filter_slot_rarity_q(client, factory):
+    """G-TC-310: slot/rarity（enum 多値）・q（名前部分一致）フィルタ（§1.8.1②）。"""
+    _login_new(client, factory)
+    alld = _all_items(client)
+    slot = alld[0]["slot"]
+    r = client.get(ITEMS, params={"slot": slot}).json()
+    assert r["data"] and all(d["slot"] == slot for d in r["data"])
+    assert r["page_info"]["total"] == sum(1 for d in alld if d["slot"] == slot)
+    r2 = client.get(ITEMS, params={"rarity": "common,rare"}).json()["data"]
+    assert r2 and all(d["rarity"] in ("common", "rare") for d in r2)
+    name = alld[0]["name_ja"]
+    r3 = client.get(ITEMS, params={"q": name}).json()["data"]
+    assert any(d["id"] == alld[0]["id"] for d in r3)
+    assert all((name in d["name_ja"]) or (name in d["name_en"]) for d in r3)
+
+
+def test_g_tc_311_filter_owned_affordable(client, factory):
+    """G-TC-311: owned/affordable は閲覧者依存（所有・価格≤残高）。SC-30 の状態は owned+affordable で全表現。"""
+    acc = _login_new(client, factory)
+    _set_coins(acc, 25)
+    _own(acc, "cap")
+    cap_id = str(_item("cap").id)
+    owned = client.get(ITEMS, params={"owned": "true"}).json()["data"]
+    assert {d["id"] for d in owned} == {cap_id} and all(d["owned"] for d in owned)
+    not_owned = client.get(ITEMS, params={"owned": "false"}).json()["data"]
+    assert cap_id not in {d["id"] for d in not_owned} and all(not d["owned"] for d in not_owned)
+    aff = client.get(ITEMS, params={"affordable": "true"}).json()["data"]
+    assert aff and all(d["price_coin"] <= 25 for d in aff)
+    short = client.get(ITEMS, params={"affordable": "false"}).json()["data"]
+    assert all(d["price_coin"] > 25 for d in short)
+
+
+def test_g_tc_312_price_range_and_sort(client, factory):
+    """G-TC-312: 価格レンジ＋ソート（price/-price/既定 rarity 序列・§1.8.1①）。"""
+    _login_new(client, factory)
+    prices = sorted(d["price_coin"] for d in _all_items(client))
+    lo, hi = prices[1], prices[-2]
+    ranged = client.get(ITEMS, params={"price_min": lo, "price_max": hi}).json()["data"]
+    assert ranged and all(lo <= d["price_coin"] <= hi for d in ranged)
+    asc = [d["price_coin"] for d in client.get(ITEMS, params={"sort": "price"}).json()["data"]]
+    assert asc == sorted(asc)
+    desc = [d["price_coin"] for d in client.get(ITEMS, params={"sort": "-price"}).json()["data"]]
+    assert desc == sorted(desc, reverse=True)
+    rank = {"common": 0, "standard": 1, "rare": 2}
+    default_ranks = [rank[d["rarity"]] for d in _all_items(client)]  # 既定＝rarity 昇順
+    assert default_ranks == sorted(default_ranks)
+
+
+def test_g_tc_313_offset_pagination(client, factory):
+    """G-TC-313: 番号ページャ（offset page/per_page＋page_info.total）／未指定は全件（後方互換）。"""
+    _login_new(client, factory)
+    total = len(_all_items(client))
+    p1 = client.get(ITEMS, params={"page": 1, "per_page": 5}).json()
+    assert len(p1["data"]) == 5 and p1["page_info"] == {"total": total, "page": 1, "per_page": 5}
+    p2 = client.get(ITEMS, params={"page": 2, "per_page": 5}).json()
+    assert len(p2["data"]) == 5
+    assert {d["id"] for d in p1["data"]}.isdisjoint({d["id"] for d in p2["data"]})
+    allr = client.get(ITEMS).json()  # 未指定＝全件
+    assert allr["page_info"]["total"] == total and len(allr["data"]) == total
+
+
+def test_g_tc_314_pinned_resolved_and_excluded(client, factory):
+    """G-TC-314: 固定行（pin_ids）は送信順で解決＋非固定母集合（data/total）から除外（§1.8.1④）。"""
+    _login_new(client, factory)
+    alld = _all_items(client)
+    p1, p2 = alld[0]["id"], alld[1]["id"]
+    r = client.get(ITEMS, params={"pin_ids": f"{p1},{p2}"}).json()
+    assert [d["id"] for d in r["pinned"]] == [p1, p2]
+    ids = {d["id"] for d in r["data"]}
+    assert p1 not in ids and p2 not in ids
+    assert r["page_info"]["total"] == len(alld) - 2
+
+
+def test_g_tc_315_validation_422(client, factory):
+    """G-TC-315: 未知の sort キー/enum 値はホワイトリスト検証で 422（§1.8.1・§2.2）。"""
+    _login_new(client, factory)
+    assert client.get(ITEMS, params={"sort": "bogus"}).status_code == 422
+    assert client.get(ITEMS, params={"slot": "wing"}).status_code == 422
+    assert client.get(ITEMS, params={"rarity": "legendary"}).status_code == 422
+
+
+def test_g_tc_316_csv_export(client, factory):
+    """G-TC-316: format=csv で同一絞込/ソートの全件を CSV（UTF-8 BOM・ヘッダ・§1.8.1③）。"""
+    _login_new(client, factory)
+    r = client.get(ITEMS, params={"format": "csv"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.content.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM（Excel 互換）
+    assert "名称" in r.content.decode("utf-8-sig").splitlines()[0]  # ヘッダ行
