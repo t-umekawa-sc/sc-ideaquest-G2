@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import func, or_, select
 
-from app.control_plane.admin import list_query as lq
+from app.core import list_query as lq
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth.orm import Account, Company
 from app.core.errors import AppError

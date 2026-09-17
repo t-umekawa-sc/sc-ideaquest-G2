@@ -14,7 +14,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import OperationalError
 
 from app.control_plane.account_sync import repository as account_sync_repo
-from app.control_plane.admin import list_query as lq
+from app.core import list_query as lq
 from app.control_plane.audit import repository as audit
 from app.control_plane.auth import repository as account_repo
 from app.control_plane.auth.orm import Account, Company
