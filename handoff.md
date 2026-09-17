@@ -4,96 +4,86 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-17 JST**（[B]② sort＋一覧状態復元＋[C]①②＋[B]③ダッシュボード＋[B]⑤ shop 完全サーバー委譲＋一覧規約化のセッション）
+- 最終更新: **2026-09-17 JST**（FR-40 発見カタログ SC-13 の設計正規化＋申請者側スライス実装を行ったセッション。手前で [B]①〜⑤・[C]①②・一覧規約化も完了）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **3542e9c** `feat(auth): 認証イベントの監査ログを補完（[B]①・A.9-⑥・A-TC-111〜115）`（＋[B]④ realtime テスト・この後の handoff コミットが実 HEAD）
+- 最新コミット: **afc61f2** `feat(quests): SC-13 カタログにメタ詳細ダイアログ＋リスト RowMenu を追加`（この後の handoff コミットが実 HEAD）
 - **push 済み・未 push 0**（`main...origin/main` 同期・確認済み）
-- 本セッションのコミット（古い順・すべて push 済み）＝ `9aaeec9`([B]② sort)→`3944c16`(一覧状態復元)→`a57da50`([C]①)→`a25d1b3`([C]②)→`894a3fb`([B]③)→`78fb955`(list_query→core)→`002f0d8`([B]⑤ backend契約)→`0870d53`(state多値)→`d3b2de3`([B]⑤ frontend server)→`3bb7c73`(一覧規約化)→`3542e9c`([B]① 認証監査ログ)→[B]④ realtime テスト＋各 handoff。
+- 本セッションの主なコミット（古い順・すべて push 済み）＝
+  `9aaeec9`([B]② GET /quests sort)→`3944c16`(一覧状態復元テスト M-TC-016/017)→`a57da50`([C]① 無変更ガード)→`a25d1b3`([C]② メンション整合)→`894a3fb`([B]③ ダッシュボード純テスト)→`78fb955`(list_query→app/core 移動)→`002f0d8`/`0870d53`/`d3b2de3`([B]⑤ shop 完全サーバー委譲 B2+)→`3bb7c73`(一覧規約化)→`3542e9c`([B]① 認証監査ログ)→`ec95ca7`([B]④ realtime テスト)→`3d10969`/`b6f5d67`(FR-40 設計正規化)→`0bdf1a8`/`7cad686`/`afc61f2`(FR-40 SC-13 実装)。
 
 ## 2. プロジェクトのゴール
-社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。
+社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`・会社ごと物理分離DB）。全画面 backend 接続済みで、現在は**新機能の縦スライス実装フェーズ**（FR-40 クエスト発見/フォロー/参加リクエスト）。
 
 ## 3. 今回やったこと（変更ファイルと理由）
 
-### 0. 本セッション（2026-09-17）＝backend 全体スイート確認 ＋ [B]② `GET /quests` の sort 実装
-- **backend 全体スイート green を確認**（592 passed／後述 §4）＝§7-6 の未確認を解消。
-- **[B]② `GET /quests` の `sort` を実装**（`9aaeec9`・§1.8.1／C.1）。router に `sort` 追加／application で whitelist 検証（未知キー→`422 validation_error`・`field="sort"`）・sort 解析・**カーソルをソートタプル内包形式へ再設計**（旧形式カーソルは 422＝仕様どおり）／repository で `idea_count`/`member_count` を**相関スカラサブクエリ**として SELECT に載せ SQL でソート/keyset（各行に属性付与＝DTO 集計も兼ね N+1 回避）・**mixed-direction keyset**（末尾 `id` DESC で一意化）・`deadline` は **NULLS LAST**。既定は `-created_at`（新着）維持。
-  - 変更ファイル＝`app/tenant/quests/{router,application,repository}.py`・テスト `tests/quests/test_{repository,api}.py`。
-  - テスト＝**C-TC-010/011/012**（int: 集計列ソート+keyset・deadline NULLS LAST・複数キー tiebreak）・**C-TC-106/107/108**（api: idea_count 降順・未知キー422・ソート指定時のカーソル安定）。red→green を目視（実装前6件 red）。
-  - 台帳＝`doc/テスト/カバレッジギャップ.md` [B]② を [x]／`doc/テスト/C_クエスト.md` に TC 行／`impl/README` SC-10 に注記。**frontend DataTable への `?sort=` 結線は未**（backend 契約は充足）。
-- **一覧の操作状態（検索/ソート/絞込/ページ）の URL 復元を回帰テストで担保**（`3944c16`・§4.5⑨）。判明＝**復元は既に共通 `DataTable.tsx` に実装済み**（session状態=URL `?<storageKey>.q/.sort/.f/.page`・表示設定=localStorage・スクロール=§4.12）だが URL 状態復元の e2e が無かった。SC-10 で **M-TC-016**（ヘッダソート→詳細→戻るで復元）・**M-TC-017**（sort+絞込を URL 適用→戻るで復元）を追加＝**プロダクションコード無変更**（既存挙動を確認・2 passed）。恒久メモリ `list-state-restore-unified`。ユーザー方針＝一覧共通機能は共有 DataTable に統一。
-- **[C]① 無変更保存ガードを実装**（`a57da50`・D.2/D.4）。`update_idea` が公開中 PATCH で `_apply_content` の前後の `_content_snapshot` を比較し、**差分ゼロなら版/通知（`_record_revision`）をスキップ**（frontend 抑制と対称・§1 サーバー権威）。テスト＝**D-TC-229**（同一内容 PATCH=版据え置き+通知0／実変更は版2+通知1）。設計 D「編集と版」/D.4 に明記。red→green 目視。
-- **[C]② メンション差し替え通知整合を実装**（`a25d1b3`・E.2/E.6・**決定A＝追加分のみ通知**）。no-op だった `_notify_message_updated` を実装＝`edit_message` が `replace_mentions` 前後の被メンション集合を比較し **added（編集後−編集前・自分/重複除外）にのみ** `mention` 通知（不変は再通知せず・外した分は通知も取消もしない＝at-most-once・H に取消プリミティブなし）。テスト＝**E-TC-228**。設計 E.2/E.6 に反映。red→green 目視。**これで [C] 乖離は残なし**。
-- **[B]⑤ `GET /items` を完全サーバー委譲（B2+）＋一覧作り直しを規約化**（2026-09-17）。仕様確認＝G.1 はフィルタ/ソートを規定・frontend は client 充足だったが、ユーザー判断で**完全サーバー委譲**へ。P0＝`list_query` を `app/core` へ移動（`78fb955`）。P1/P2＝G.1 拡張＋backend `query_items`（q/slot/rarity/owned/affordable/state多値/price範囲/sort/番号ページャ/pin/CSV・閲覧者依存・rarity序列・後方互換=未指定は全件）＋TC G-TC-310〜317（`002f0d8`/`0870d53`）。P3＝ShopView を DataTable サーバーモード化（`itemsQueryParams`・`refreshToken` で購入後の絞込維持再取得・DataTable に `refreshToken` prop 追加）＋G-TC-318 e2e（`d3b2de3`）。P4＝**フロントエンド実装フロー規約 §4.1 新設**（新規一覧は最初からサーバー委譲契約で作る）＋API設計§1.8.1/デザイン標準§4.5 補強（`3bb7c73`）。恒久メモリ `list-server-delegation-standard`。
-- **[B]③ ダッシュボード populated 系の純テストを追加**（`894a3fb`）。裏取りの結果 **`get_dashboard` は全パネル合成済み＝実装ギャップではなく純テスト不足**だった（production 無変更）。追加＝**I-TC-107/108/122**（api・`tests/dashboard/test_api.py`）＝週間ランキング(data≤3＋me)・通知(data≤5＋unread_count)・IDOR(自スコープのみ)／**I-TC-131/141/142/143**（int・`tests/dashboard/test_cross_domain.py`＝新規）＝best-effort(1パネル例外で当該 null)・D/F 横断 read(下書きアイデア/未投票/下書き評価 scored=2)。台帳 I-TC-107 の期待キーを実装(`data`)に訂正。カバレッジギャップ [B]③ を [x]。
+### 0. FR-40「クエスト発見/フォロー/参加リクエスト」＝設計正規化 → SC-13 申請者側スライス実装（今セッションの主軸・**再開の起点**）
+- **設計正規化（`3d10969`/`b6f5d67`）**＝`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md` を各正本へ展開。未確定2点をユーザー決定＝**発見カタログは新規画面 SC-13**／**却下後は作成者側の再承諾のみ**（`rejected→approved`・申請者の再申請は当面不可）。反映先＝要件定義 FR-40／データモデル（`quests.discoverable`・`quest_join_requests`§5.8b・`quest_follows`§5.8c・enum `join_request_status`・`notification_type` に3種）／API設計 C.9（門番 `can_discover_quest`＋発見/フォロー/参加リクエスト EP）／H（通知3種）／画面 `SC-13_発見カタログ.md` 新設＋SC-01 §4.6b/c・SC-12 §4.3・画面遷移図。ドラフトは「正規化済み」に更新。
+- **backend 実装（`0bdf1a8`・申請者側スライス）**：
+  - migration **`0027_quest_discovery.py`**（`migrations/company/versions/`）＝`quests.discoverable` 列＋`quest_join_requests`/`quest_follows` テーブル。ORM＝`app/tenant/quests/orm.py`（`Quest.discoverable`・`QuestJoinRequest`・`QuestFollow`）。
+  - `app/tenant/quests/repository.py`＝`can_discover_quest`（discoverable ∧ 部署交差／0件=全社・status∈{recruiting,in_progress,evaluating}・中身門番 `can_access_quest` と別のメタ専用）・`build_catalog_query`（list_query の sort ホワイトリスト・offset）・my_state 用の一括参照（`member_quest_ids`/`followed_quest_ids`/`join_request_status_map`）・follow/join-request プリミティブ・`list_owner_and_admin_ids`（通知先）。
+  - `app/tenant/quests/application.py`＝`get_quest_catalog`（DataTable サーバー契約・`my_state`＝member/pending/rejected/following/none・メタのみ）・`get_catalog_detail`・`follow_quest`/`unfollow_quest`・`request_join`/`withdraw_join_request`＋`_notify_join_request_received`。
+  - `app/tenant/quests/router.py`＝`GET /quest-catalog`・`GET /quests/{id}/catalog-detail`・`POST/DELETE /quests/{id}/follow`・`POST/DELETE /quests/{id}/join-request`。schemas＝`app/tenant/quests/schemas.py`（`QuestCatalogCardDTO`/`QuestCatalogResponse`/`FollowResponse`/`JoinRequestBody`/`JoinRequestResponse`）。通知テンプレ＝`app/tenant/notifications/catalog.py` に `join_request_received`。
+  - テスト＝`tests/quests/test_catalog.py`（**C-TC-260〜264**・門番/my_state/フォロー/参加リクエスト＋通知/409/404/sort422/番号ページャ）。台帳＝`doc/テスト/C_クエスト.md` §7。
+- **frontend 実装（`7cad686`＋`afc61f2`）**：ルート `impl/frontend/src/app/(app)/quest-catalog/page.tsx`・`src/features/quests/components/QuestCatalogView.tsx`（DataTable **サーバーモード**＝一覧規約 §4.1／`refreshToken` でアクション後再取得／`my_state` バッジ／★フォロー／参加をリクエスト）。**カードクリック→詳細ダイアログ `CatalogDialog`**（作成者/締切/参加人数/アイデア数/カテゴリー/参加部署/テーマ全文＋アクション・中身は参加後の旨明示）＋**リスト表示の RowMenu**（`menuItems`）。api＝`src/features/quests/api.ts`（`catalogQueryParams`/`fetchQuestCatalog`/`getCatalogDetail`/`followQuest`/`unfollowQuest`/`requestJoinQuest`/`withdrawJoinQuest`）。ナビ導線＝`src/components/layout/AppNav.tsx` に「🔎 クエストを探す」。
 
-
-### A. モーダル・バックドロップのチカチカ修正（`8e95e32`・前セッションの主作業）
-- **症状**＝モーダル/ダイアログの薄いグレーのバックドロップが常時チカチカ（Chrome/Edge 共通・ゲームOFF/HWアクセラOFFでも出る）。
-- **根本原因**＝共通モーダル `impl/frontend/src/components/ui/Modal.tsx` の開閉アニメが **framer-motion**（`motion.div`＋`AnimatePresence`）実装で、**静止後も framer の frameloop が毎フレーム合成レイヤを触り**、半透明バックドロップ（`rgba(...,.45)`）が Chromium で再合成されてチラつく。**確定手順＝mock `style-guide.html`（CSS のみ・framer 無し）と実装を同一ブラウザで A/B**（mock は出ず実装だけ出た＝framer 起因を確定）。
-- **修正**＝`Modal.tsx` から framer を撤去し **CSS アニメに置換**（`.modal` に `.show` トグル→`design-system.css` の backdrop opacity トランジション＋`@keyframes modal-crt-open`＋`::after` フラッシュ）。focus/Esc/ドラッグ/最大化/スクロールロック/`onClosed`(URLモーダルの戻る) は維持。reduce-motion は `src/lib/motion.ts` の `reduceMotion()`(OS＋ユーザー設定)で CRT を出し分け。
-- **併発の別要因も対処**＝背後の `backdrop-filter: blur`（ゲーム風パネル `.pixel-panel`）が半透明バックドロップ越しに**全面再描画**（DevTools Paint flashing で全面緑）する現象を、`design-system.css` の `body.modal-open :not(.modal)...{ backdrop-filter:none; animation-play-state:paused }` で無効化。
-- **記録・回帰防止**＝経緯と診断法の正は `doc/画面設計/デザイン標準.md` §4.1（「モーダルのアニメは framer で実装しない・DFT-E-012」）。回帰テスト＝`M-TC-015`（`impl/frontend/e2e/sc-99-modal-backdrop.spec.ts`）。モーダル開閉/Esc は既存 `C-TC-201/202`（`sc-11-quest-create-modal.spec.ts`）が担保。
-- **付随**＝`.gitignore` に `*.mp4/mov/webm` 追加（不具合調査の録画は追跡外）。
-
-### B. テストカバレッジ [A] Med/Low を完走（`be138e2`・`079fb62`）
-台帳＝`doc/テスト/カバレッジギャップ.md`。**backend プロダクションコードは未変更**（実装済みの振る舞いへの純テスト追加）。**着手前にコードで裏取りした結果、多くが既存担保済み or 純テスト不可**と判明し台帳を実態に訂正。
-- 追加した TC（すべて green）＝ **B-TC-045〜049**（`/admin/accounts` セルフ経路の編集/disable/enable/password-reset/他社IDOR404/identity409・`tests/admin/test_admin_self.py`）・**A-TC-110**（email-verify 不正Origin403）・**C-TC-145/146**（PUT /party completed409・原子性）・**E-TC-227**（引用元delete で excerpt トゥームストーン）・**G-TC-407/408**（ランキング多段tiebreak・this_month/all）。
-- 既存担保を確認し台帳訂正（テスト追加せず）＝ permission境界(F-107/E-104/D-103/D-122)・メール再送失効(B-165/166/A-104/B-167)・GET /me署名URL(K-TC avatar)。
-
-### C. 設計を実態化＋TC-ID 重複解消（`f7d8cc9`）※ユーザー承認済み
-- `GET /me/spells`＝不採用化（API設計 G.3・`GET /spells` に一本化）。
-- `chat_preview`＝「現状未実装・将来対応」と明示（API設計 D.1/E.1）。
-- **B-TC-025 の二重定義**（発行の冪等 と disable）を解消＝発行の冪等を **B-TC-035** へ改番（disable 側 025 が `red確認台帳` 参照の原典）。
+### 1. 手前で完了した backlog（`doc/テスト/カバレッジギャップ.md` 参照）
+- **[B] 実装ギャップ**＝ ①認証イベント監査ログ（`3542e9c`・A-TC-111〜115）②`GET /quests` sort（`9aaeec9`）③ダッシュボード populated 純テスト（`894a3fb`・I-TC-107/108/122/131/141〜143）④リアルタイム L-TC-103/131（`ec95ca7`）⑤`GET /items` 完全サーバー委譲 B2+（shop 一覧を DataTable サーバーモード化・`d3b2de3` ほか）＝**すべて完了**。残は⑥`chat_preview`（将来）のみ。
+- **[C] 設計乖離**＝ ①無変更保存ガード（`a57da50`・D-TC-229）②メンション整合（`a25d1b3`・E-TC-228）＝**残なし**。
+- **一覧サーバー委譲の規約化**（`3bb7c73`）＝作り直し防止。`list_query` を `app/core` へ移動。恒久メモリ `list-server-delegation-standard`。
 
 ## 4. 現在の状態（動作/テスト）
-- **動いているもの**＝フロント全画面 backend 接続済み。**モーダルのチカチカは解消**（ユーザー目視で確認済み）。
-- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝`622 passed`**（推移＝592→…→[B]⑤ 614→[B]① 認証監査+5=620→[B]④ realtime+2=622）。フロント e2e＝一覧状態復元2件（M-TC-016/017）＋shop 6件（`sc-30-shop`/`sc-30-shop-server`＝G-TC-202/203/318・balance-sync）green。`npm run build` 通過。**注意＝pytest 全体実行時は `worker`＋`mail-worker` 両方を止める**（`docker compose stop worker mail-worker`）＝稼働のままだと outbox 系（`test_b_tc_005`）がリトライ競合でまれに落ちる（フレーク・単独 green・§8）。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
-- **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 582 件すべて md 記載**（確認済み）。
+- **動いているもの**＝SC-13 発見カタログ（申請者側＝カタログ閲覧・詳細ダイアログ・フォロー・参加リクエスト作成/取消）が backend＋frontend で通し動作（実機スモークで確認済み・下記 §5 の落とし穴は解決済み）。
+- **テスト通過状況**＝**backend 全体スイート `627 passed`**（最後に確認したのは `7cad686`〔`lq` 修正後〕。最新 `afc61f2` は frontend のみの変更＝backend 未変更のため 627 のまま・**再確認は未実施**）。`tests/quests/test_catalog.py` = **catalog 5 passed**（個別確認済み）。フロント `npm run build`（tsc＋ESLint＋Next lint）通過。**pytest 全体実行時は `worker`＋`mail-worker` 両方を止める**（`docker compose stop worker mail-worker`）＝稼働のままだと outbox 系（`test_b_tc_005`）がリトライ競合でまれに落ちる（フレーク・単独 green・§8）。
+- **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 614 件すべて md 記載**（catalog 追加後に確認）。
+- **受入デモ**＝ACME-01 の seed 会社DBに**発見デモの discoverable クエストを1件 seed 済み**（「【発見デモ】部署横断アイデア募集」・owner=別ユーザー・seed ユーザーは非メンバー＝`/quest-catalog` に `my_state=none` で表示）。seed ユーザーの follow/join は**リセット済み（クリーン）**。※DB リセットで消える一時データ。
+- **コンテナ**＝本セッション末時点でフル起動中（frontend/backend は本 slice のコードで再ビルド済み・codegen 済み）。次セッションでは落ちている想定＝§8 で再起動。
 - **壊れているもの**＝認識している範囲では無し。
-- **コンテナ**＝本セッション末時点でフル起動中（frontend/backend/db/redis/minio/mailhog/worker/mail-worker）。次セッションでは落ちている想定＝§8 で再起動。
 
-## 5. 詰まっている点（試して失敗したアプローチ＝チカつき調査の記録）
-モーダルのチカつきは**環境（GPU/Chromium 合成）依存でヘッドレスでは再現しない**ため、確定まで回り道した。次回同種の問題での近道用に失敗も残す:
-- **CSS アニメの停止**（`animation-play-state: paused`）→ 効かず。原因は CSS `@keyframes` ではなかった（背後の `bell-wiggle` は在ったが主因でない）。
-- **backdrop-filter の無効化**→ 「全面緑（全面再描画）」は消えたが**チカつきは残った**（これは別の併発現象だった）。
-- **backdrop に `translateZ(0)`/`isolation: isolate`**→ 効かず（半透明要素の独立レイヤ化はむしろ逆効果になりうる・撤回済み）。
-- **HW アクセラ OFF / ゲームモード OFF**→ どちらでも出る＝GPU単独/ゲーム層ではないと確定。
-- **決め手＝mock（`style-guide.html`＝framer 無しの CSS のみ）と実装の A/B**。mock は出ず実装だけ出た→framer 起因を確定。診断に効いたツール＝**DevTools「Rendering→Paint flashing／Layer borders」**・`document.getAnimations()`・要素の computed `backdrop-filter` 列挙・rAF での opacity サンプリング。**教訓＝ヘッドレス計測で「DOM/CSS はクリーン」と出ても、合成レベルの回帰はあり得る。framer 有無の A/B が最短**。
+## 5. 詰まっている点（試して失敗したアプローチ＝次回の近道用）
+FR-40 SC-13 実装中に嵌った点（すべて解決済み）:
+- **alembic「Multiple heads」**＝新 migration の `down_revision` を `0024` にしたら、既存 `0025_quest_outcomes`→`0026_chat_message_pin` と分岐して head が2つに。→ **現 head（`0026_chat_message_pin`）の後に繋ぐ**＝`0027_quest_discovery`（revision チェーンは `grep -h "revision" migrations/company/versions/*.py` で確認する）。
+- **`GET /quest-catalog?page&per_page` が 500（NameError: lq）**＝`get_quest_catalog` の offset 分岐で `list_query` 未 import。テストは page 未指定分岐しか叩かず見逃した。→ `app/tenant/quests/application.py` に `from app.core import list_query as lq` を追加。**教訓＝offset ページャの EP は「page/per_page 指定あり」のケースも必ずテストする**（`test_catalog.py` C-TC-264 に追加済み）。
+- **成功ログイン系テストで `database "ideaquest_test_XXXX" does not exist`**＝`factory.make_company()` はテナントDBを**プロビジョニングしない**ため、成功ログイン（`_issue_session` がテナント user を解決）が落ちる。→ **成功ログイン/カタログ系テストは seed 会社アカウント**（`factory.make_seed_company_account()`＝ACME-01／`make_seed_mfa_account()`＝ACME-02）を使う。失敗/未セッション系は make_company で可。
+- **受入デモの状態リセットが効かない**＝`delete where user_id==me` で消えず（seed user id の解決差異？未確定）。→ **デモ会社DBの `quest_join_requests`/`quest_follows` を全削除**して確実にリセット（下記 §8 のスニペット）。
+- **Modal/QuestIcon の `size="md"` は型エラー**＝`Size` は `xs|sm|lg` のみ（"md" 不可）。→ `lg` を使う。
 
 ## 6. 決定事項と根拠（採用しなかった案も）
-1. **モーダルのアニメは framer-motion で実装しない＝CSS のみ**（DFT-E-012）。framer の frameloop が半透明バックドロップをチカつかせるため。CSS アニメは再生後に停止し frameloop を持たない。→ 採用しなかった案＝framer のまま `translateZ`/`isolation` 等で合成を安定化（いずれも効かず）。正＝デザイン標準 §4.1・恒久メモリ `modal-no-framer-css-only`。
-2. **モーダル表示中は背後の backdrop-filter/CSS無限アニメを無効化**（暗転して見えないので実害なし＋全面再描画を防ぐ）。
-3. **台帳の残項目は「テスト追加」より先に「実態で done か」をコードで確認**し、既済なら重複テストを書かず台帳を訂正する。
-4. `GET /me/spells`/`chat_preview` は実装を増やさず**設計を実態に合わせる**（ユーザー承認）。
+1. **発見カタログは新規画面 SC-13**（SC-10 タブ追加ではない）＝可視範囲（`can_discover_quest` vs `can_access_quest`）と責務が別のため分ける（ユーザー決定）。
+2. **却下は非終端だが再申請は作成者側の再承認のみ**（`rejected→approved`・`rejected→pending` 不可）＝仕様単純・スパム防止（ユーザー決定）。`withdrawn`（自己取消）からの再申請は許可。
+3. **一覧は最初からサーバー委譲契約で作る**（`list_query`＋DataTable サーバーモード・列 flags=backend ホワイトリスト一致）＝client→server の作り直し回避。正＝フロントエンド実装フロー規約 §4.1・恒久メモリ `list-server-delegation-standard`。SC-13 一覧もこれに準拠（cursor でなく offset＝shop/companies と同型）。
+4. **発見はメタのみ**（件数・作成者・締切・カテゴリ・参加部署まで）＝中身〔アイデア本文/チャット/評価〕は参加後（`can_access_quest` は現状維持）。フォロー通知も「新着は件数のみ」。
+5. **【要決定・未決】活発度スパークライン**＝ユーザーから「ダイアログに活動の活発さをグラフで／それをクエスト画面に流用できるか」と相談があり、**「共有 UI 部品＋クエスト単位の同一形状データで作れば SC-12/SC-22 に流用可」**と回答済み。進め方 A（共有 `ActivitySpark` 部品を抽出＋既存 SC-22 の inline 活発度バーも置換＋クエスト単位活動集計を `catalog-detail` に追加＋SC-13 にグラフ）／B（まず数値＋ラベルのみ・グラフは後）を提示したが、**ユーザーの選択は未回答のままセッション終了**（§7-2 参照）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **結果タブ Modal 化の受入＝完了扱い**（当初セッションの目的）。ダイアログのチカつき修正込みで正常動作を確認済み。回帰テスト要否は不要と判断（M-TC-015＋C-TC-201/202 でカバー）。
-2. **[A] 純テストは残ゼロ**＝`doc/テスト/カバレッジギャップ.md` の [A] セクションに未対応の純テストは無い（残る `[ ]` は [B] 実装ギャップ・[C] 乖離のみ）。
-3. **[B] 実装ギャップ**＝ ①~~認証イベントの監査ログ~~＝**2026-09-17 完了（`3542e9c`・A.9-⑥・A-TC-111〜115）**＝login成功/失敗・account_locked・mfa issued/verify・logout/logout_all・password_setup.request(自己) を補完（既存の new_device/password_changed/管理者reset/role変更に追加） ②~~`GET /quests` sort~~＝**実装済み（`9aaeec9`）** ③~~ダッシュボード populated~~＝**テスト追加済み（`894a3fb`・I-TC-107/108/122/131/141〜143）** ④~~リアルタイム L-TC-103/131~~＝**2026-09-17 テスト追加済み（`3542e9c` 後・両挙動は本番実装済みで純テスト不足＝rollback非配信・WS Origin拒否）** ⑤~~`GET /items` フィルタ~~＝**完了（B2+ 完全サーバー委譲・`d3b2de3`ほか）** ⑥`chat_preview` 実装（将来）。**→ [B] 残は ⑥（将来）のみ**。
-4. **[C] 設計・実装の乖離＝両方 2026-09-17 実装済み**＝ ①~~無変更保存＝版なし~~（`a57da50`・`update_idea` が差分ゼロなら版/通知スキップ・D-TC-229・D.4 反映） ②~~メンション差し替え通知整合~~（`a25d1b3`・決定A＝編集で追加された被メンションのみ通知・E-TC-228・E.2/E.6 反映）。**[C] 残なし**。
-5. **クエスト発見/フォロー/参加リクエスト＝2026-09-17 正規化完了**（`3d10969` ほか）＝FR-40／データモデル（`quest_follows`/`quest_join_requests`/`quests.discoverable`・enum `join_request_status`）／API設計 C.9（`can_discover_quest`＋発見/フォロー/参加リクエスト EP）／H（通知3種）／画面 SC-13 新設＋SC-01/SC-12＋遷移図。決定＝発見カタログは新規画面 SC-13／却下後は作成者側の再承諾のみ。**設計のみ（実装は未着手）＝着手指示が出たら正本を正に4層＋TC で実装**（backend `list_query` サーバー契約で SC-13 一覧を作る＝一覧規約 §4.1）。
-6. **backend 全体スイートは 2026-09-17 に確認済み**（無変更ガード後 599 passed・§4）。まとまった変更のたびに §8 の pytest コマンドで再確認する。
+1. **SC-13 の再受入待ち**＝カードクリック→詳細ダイアログ＋リスト RowMenu を実装済み（`QuestCatalogView.tsx`）。ユーザーのブラウザ受入（OK/NG）が未回答。再開時にまず受入可否を確認する。
+2. **【未回答の質問】活発度スパークラインの進め方 A/B**（§6-5）＝再開時にユーザーに A（共有部品＋グラフ・SC-22 も共有化）か B（数値＋ラベルのみ）を確認してから着手。既存資産＝backend `GET /ideas/{id}/chat-activity`（`app/tenant/chat/application.py get_chat_activity`・`ChatActivityResponse{daily:[{date,message_count}],...}`・**アイデア単位**）／frontend は `src/features/ideas/components/IdeaDetailView.tsx` が「活発度バー」を **inline** で描画（`sparkBars`・未部品化）。A の場合＝①`components/ui` に共有 `ActivitySpark`（`daily:[{date,count}]`＋任意マーカー）を抽出し IdeaDetailView を置換 ②backend に**クエスト単位活動集計**（そのクエストの公開アイデア群の日次件数を横断集計・chat repo 流用）を `catalog-detail` 応答に追加（メタ限定・+TC）③SC-13 ダイアログに数値+ラベル+スパークライン。**メタ限定＝本文は出さない**は共通前提。
+3. **FR-40 残スライス（受信側・作成者/quest_admin）＝未実装**：`GET /quests/{id}/join-requests`・`POST /quests/{id}/join-requests/{uid}/approve`・`.../reject`（C.9.1 に仕様あり）。承認で `quest_members` 追加＋通知 `join_request_decided`（`app/tenant/notifications/catalog.py` にテンプレ追加要）。repo に `list_join_requests`・`list_owner_and_admin_ids` は用意済み。UI＝SC-12 パーティータブ（`QuestPartyPanel`／`QuestPartyModal`）に pending 上位・rejected 下部・行クリックでプロフィールダイアログ→承諾/拒否（SC-12 §4.3）。
+4. **FR-40 残スライス（作成者が discoverable を立てる）＝未実装**：SC-11 に discoverable トグル。backend＝C.2 の create/update（`application.py create_quest_flow`/`update_quest` ＋ `QuestCreateRequest`/`QuestUpdateRequest` schema に `discoverable`）／frontend＝`QuestForm.tsx` にトグル。※現状は seed か直 DB でしか立てられない。
+5. **FR-40 残スライス（フォロー通知 `quest_watch_update`）＝未実装**：クエストのステータス変化/締切/新着件数でフォロワーへ post-commit 通知（メタ級）。発火点＝クエスト状態遷移（C.5）・締切変更・アイデア公開。catalog テンプレ追加要。
+6. **FR-40 残スライス（ダッシュボード SC-01）＝未結線**：§4.6b フォロー中クエスト・§4.6c 参加リクエスト状況の frontend 結線（backend は `quest_follows`／`my_state` あり・集約 EP は要検討）。
+7. **推奨：まとまった変更の前に backend 全体スイートを一度回す**（`afc61f2` 後の再確認は未実施＝§4）。
 
 ## 8. 再開に必要な環境情報
 - **作業ディレクトリ**＝リポジトリルート `/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から。
 - **コンテナ起動（フル・受入用）**＝`cd impl && docker compose --profile workers up -d`。ポート＝frontend **3000**・backend **8000**・MailHog UI **8025**・MinIO **9000**。
-- **frontend 改修の反映**＝`cd impl && docker compose build frontend && docker compose up -d frontend`（source 無マウントのため再ビルド必須。**ブラウザ側は DevTools「Disable cache」でリロードしないと古い CSS/JS が残る**＝今回のチカつき確認で実際に嵌った）。
-- **frontend ビルドゲート**＝`cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint）。
-- **frontend e2e（Playwright・要 frontend 3000 稼働）**＝`cd impl/frontend && npx playwright test <spec> --project=chromium --reporter=line`。モーダル関連＝`sc-11-quest-create-modal`・`sc-99-modal-backdrop`。
-- **backend pytest（最新 source を反映）**＝`cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウント必須**（付けないと古いベイクを実行）。全体は `<path>` 省略。**pytest 実行時は mail-worker を止める**（`docker compose stop mail-worker`）。
+- **backend 改修の反映**＝`cd impl && docker compose build backend && docker compose up -d backend`（source 無マウントのためベイク＝再ビルド必須）。**OpenAPI 変更時は frontend の型再生成**＝`cd impl/frontend && npm run codegen`（稼働 backend:8000 の openapi.json を引く＝先に backend を再ビルド起動しておく）。
+- **frontend 改修の反映**＝`cd impl && docker compose build frontend && docker compose up -d frontend`（**ブラウザは DevTools「Disable cache」でリロード**しないと古い JS/CSS が残る）。
+- **frontend ビルドゲート**＝`cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint）。frontend e2e＝`npx playwright test <spec> --project=chromium --reporter=line`（要 frontend:3000）。
+- **backend pytest（最新 source 反映）**＝`cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウント必須**。**全体実行時は先に `docker compose stop worker mail-worker`**（§4 のフレーク回避）。新 migration は本コマンド起動時の bootstrap で seed 会社DBに適用される。
 - **トレーサビリティゲート**＝リポジトリルートで `python3 scripts/check_tc_traceability.py`（コミット前に ✅ 必須）。
-- **seed ログイン**＝会社コード `ACME-01`／ログインID `user@acme.example`／パスワード `Passw0rd!`。
-- **モーダル/結果タブ受入に使える完了クエスト**＝`ff846bae-fa9f-4ed9-a025-e1c97133dc49`（「【受入】D-完了クエスト」・owner=seed ユーザー＝結果タブ編集可・未削除）。※他の E2E 生成完了クエストは削除済み(404)が多い。DB は `ideaquest_control`（accounts/companies）・`ideaquest_company_acme`（テナント）・接続ユーザー `ideaquest`。
+- **seed ログイン**＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`（MFA 会社は `ACME-02`）。
+- **発見カタログ確認**＝ログイン→左ドロワー「🔎 クエストを探す」（`/quest-catalog`）。デモ discoverable クエストが1件出る。
+- **受入デモの状態リセット（follow/join を消してクリーンに）**＝`cd impl && docker compose run --rm -T backend python -c "from app.control_plane.auth.orm import Company; from app.db.control import control_session; from app.db.tenant import get_tenant_session; from app.tenant.quests.orm import QuestFollow, QuestJoinRequest; from app.tenant.notifications.orm import Notification; \nwith control_session() as s: db=s.query(Company).filter_by(company_code='ACME-01').one().db_identifier\nwith get_tenant_session(db) as ts: ts.execute(QuestJoinRequest.__table__.delete()); ts.execute(QuestFollow.__table__.delete()); ts.execute(Notification.__table__.delete().where(Notification.type=='join_request_received')); ts.commit()"`（複数行のため実行時は python スクリプト化推奨）。
+- **discoverable 発見デモの再 seed**（DB リセット後）＝`app/tenant/quests/repository.py create_quest`＋`create_group_links`＋`add_member` で他ユーザー owner の recruiting クエストを作り、`Quest.discoverable=True` を立て、seed ユーザーの所属グループ（`qg_repo.list_active_group_ids_for_user`）に link する（会話の seed スクリプト参照・本文は貼らない）。
 - **コミット規約**＝末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。受入/レビュー反映は main 直コミット可。
-- **正本の場所**＝実装現況 `impl/README.md`／実装順 `doc/実装計画.md`／規約 `doc/規約/*`／設計ドラフト `doc/設計ドラフト/*`／テスト台帳 `doc/テスト/*`（カバレッジ backlog＝`カバレッジギャップ.md`）／横断UI標準 `doc/画面設計/デザイン標準.md`。
+- **正本の場所**＝実装現況 `impl/README.md`／実装順 `doc/実装計画.md`／規約 `doc/規約/*`（一覧サーバー委譲＝フロントエンド実装フロー規約 §4.1）／設計ドラフト `doc/設計ドラフト/*`／テスト台帳 `doc/テスト/*`（backlog＝`カバレッジギャップ.md`）／横断UI標準 `doc/画面設計/デザイン標準.md`。FR-40 の正＝FR-40／データモデル §5.6/§5.8b/§5.8c／API設計 C.9／H／`SC-13_発見カタログ.md`。
 
 ---
 ### 自己チェック（これだけで再開できるか）
-- ✅ 最新実装コミット `9aaeec9`（[B]② sort）・push 状態・ブランチ明記。
-- ✅ 本セッションの主作業（backend 全体確認＋[B]② `GET /quests` sort 実装）を §3-0 に原因・設計判断・テストまで明記。
-- ✅ 前セッションのモーダルチカつき修正（framer→CSS）・[A] テスト完走・設計実態化も §3 に残置。
-- ✅ テスト状況＝追加6件/既存一覧TC green、**backend 全体スイートは sort 実装後 598 passed で確認済み**と明記。
-- ✅ 失敗アプローチ（CSSアニメ停止/backdrop-filter/translateZ/HWアクセラ/ゲームOFF）と、確定手順（mock A/B・Paint flashing）を §5 に記録＝次回同種問題の近道。
-- ✅ 再起動/ビルド/テストコマンド・**Disable cache の落とし穴**・seed 認証・受入用クエストID を §8 に明記。
-- ⚠️ 未確認事項＝(1) 設計ドラフトの実装着手指示（現時点なし）(2) frontend DataTable への `?sort=` 結線は未着手（backend 契約は充足）。
+- ✅ 最新コミット `afc61f2`・push 状態・ブランチ・本セッションのコミット列を明記。
+- ✅ 再開の起点＝FR-40 SC-13（申請者側 backend＋frontend 実装済み・受信側/discoverable トグル/フォロー通知/ダッシュボード結線は未実装）を §3/§7 にファイル・関数レベルで明記。
+- ✅ **未回答の質問**（スパークライン A/B・SC-13 再受入）を §6-5/§7-1/§7-2 に明記＝再開時にまずユーザーへ確認。
+- ✅ テスト状況＝backend 627 passed（`afc61f2` 後は未再確認）・catalog 5 passed・traceability ✅(614)・build 通過を明記。
+- ✅ 詰まった点（alembic head/lq 未import/make_company のテナントDB無/リセット/Modal size）と近道を §5 に記録。
+- ✅ 起動/再ビルド/codegen/pytest（worker 停止）・受入デモの seed/リセット・seed 認証を §8 に明記。
+- ⚠️ 未確認事項＝(1) `afc61f2`（frontend のみ）後の backend 全体スイート再実行（未実施・627 のはず）(2) 受入デモのリセットが `user_id` 絞りで効かなかった根本原因（全削除で回避済み・未究明）。
