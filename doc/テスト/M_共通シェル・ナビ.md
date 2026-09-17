@@ -47,3 +47,12 @@
 | M-TC-013 | e2e(front) | 一覧→遷移→戻る（push型戻る）でスクロール位置が復元（先頭に飛ばない） | ダッシュボードを下方向にスクロール（`window.scrollTo(0,Y)` で Y>0）→通知一覧へ→push型「← ダッシュボードへ戻る」で戻る | `window.scrollY`／通知/カードのリンク | 戻った後の `window.scrollY` が **0 ではなく離脱前 Y の近傍**（±数十px・restore-after-load）／初回訪問（保存なし）は 0（誤復元しない） | デザイン標準 §4.12 |
 | M-TC-014 | e2e(front) | pop 帰還（router.back＝ブラウザ戻る）でも復元（ユーザー報告の回帰＝カードリンク→詳細→戻るで「かなり上」に落ちた） | ダッシュボードで参加中クエストのカード（下方向）へスクロール→クエスト詳細へ遷移→**ブラウザ戻る（pop）** | `a.quest-card`／`window.scrollY` | pop 帰還後も `window.scrollY` が離脱前 Y の近傍（±100px）＝Next ネイティブ pop 復元が古い位置へ飛ばしても上書き（保存位置は初回レンダーで確定キャプチャし onScroll の潰しを回避） | デザイン標準 §4.12 |
 | M-TC-015 | e2e(front) | モーダル/確認ダイアログ表示中はバックドロップ背後の CSS 無限アニメ**と backdrop-filter を無効化**（受入不具合 **DFT-E-012** の回帰＝半透明バックドロップ越しに背後の `backdrop-filter: blur`〔ゲーム風ガラスパネル `.pixel-panel`〕・無限アニメ〔bell-wiggle 等〕が毎フレーム再合成されバックドロップがチカついた） | `/quests` で背景に無限アニメ＋`backdrop-filter` を持つ要素を注入→クエスト作成 URL モーダルを開く | 背景要素の `animation-play-state`/`backdrop-filter`／`getAnimations()` running・`backdrop-filter≠none` 要素数（`.modal`/`.iq-confirm` 外） | モーダル表示中は背景の アニメ**`paused`**・`backdrop-filter``none`・ダイアログ外の running アニメ **0 件**・`backdrop-filter` 要素 **0 件**。閉じると再開 | デザイン標準 §モーダル／DFT-E-012 |
+
+### 2-D. 一覧の操作状態（検索/ソート/絞込/ページ）の URL 復元（デザイン標準 §4.5⑨・横断標準）
+
+> 一覧（`DataTable`）の**検索/ソート/絞込/ページ**は `?<storageKey>.q/.sort/.f/.page` として URL に同期（`router.replace`＝現在履歴に畳み込み）し、詳細へ遷移して**戻る（push型/pop型とも）**と離脱前の操作状態を復元する。仕組みは共通コンポーネント `src/components/ui/DataTable.tsx`（`decodeUrlState`/`encodeUrlState`・マウント時 `urlInit` で復元）に一元化＝**全一覧で同一挙動**（client/server モード共通）。SC-10 クエスト一覧で代表検証。表示状態（列順/幅/密度/ビュー/ピン/perPage）は `localStorage` 専管・スクロールは §4.12（M-TC-013/014）＝役割分担。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| M-TC-016 | e2e(front) | ユーザー操作のソートが URL に載り、詳細→戻る（pop）で復元 | SC-10 一覧・リスト表示・クエスト1件以上 | 「☰ リスト」→ソート可能ヘッダ（締切）click→先頭行で詳細へ→ブラウザ戻る | 戻り後 URL に `sc10-quests.sort=` が残り「並び替えを解除」チップが表示（＝ソート状態が復元） | デザイン標準 §4.5⑨ |
+| M-TC-017 | e2e(front) | ソート＋絞込を URL から適用し、詳細→戻る（pop）で両方復元 | SC-10 一覧・クエスト1件以上（可視状態でフィルタ） | `/quests?sc10-quests.sort=-ideas&sc10-quests.f=<status enum>` を直接開く→先頭カードで詳細へ→ブラウザ戻る | 適用時に「並び替えを解除」「絞込を解除」チップ表示・戻り後も両チップ表示＋URL に `sort`/`f` が残る（＝ソート/絞込が復元） | デザイン標準 §4.5⑨ |
