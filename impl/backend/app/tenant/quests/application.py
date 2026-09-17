@@ -1336,3 +1336,194 @@ def _decode_candidate_cursor(cursor: str) -> tuple[str, uuid.UUID]:
         return name, uuid.UUID(id_str)
     except (binascii.Error, ValueError, UnicodeDecodeError):
         raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
+
+
+# ==== 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13/SC-12） ====
+
+_EMPTY_CATALOG = {"data": [], "page_info": {"total": 0, "page": 1, "per_page": 20}}
+
+
+def _catalog_state(qid, members, jr_map, follows) -> str:
+    """カタログ行の my_state（member > pending/rejected > following > none）。"""
+    if qid in members:
+        return "member"
+    st = jr_map.get(qid)
+    if st in ("pending", "rejected"):
+        return st
+    if qid in follows:
+        return "following"
+    return "none"
+
+
+def _catalog_dtos(ts, rows, viewer_id) -> list[dict]:
+    qids = [r.id for r in rows]
+    links_by_quest = repo.linked_groups_for_quests(ts, qids)
+    gids = list({g for gl in links_by_quest.values() for g in gl})
+    owners, groups = repo.get_owners_and_groups(ts, list({r.owner_id for r in rows}), gids)
+    cats = repo.list_categories_for_quests(ts, qids)
+    member_counts = repo.count_active_members_for_quests(ts, qids)
+    idea_counts = ideas_repo.count_published_ideas_for_quests(ts, qids)
+    members = repo.member_quest_ids(ts, viewer_id, qids)
+    follows = repo.followed_quest_ids(ts, viewer_id, qids)
+    jr_map = repo.join_request_status_map(ts, viewer_id, qids)
+    out = []
+    for r in rows:
+        r.member_count = member_counts.get(r.id, 0)  # _quest_card_dto は行属性を読む
+        r.idea_count = idea_counts.get(r.id, 0)
+        dto = _quest_card_dto(r, viewer_id, owners, groups, links_by_quest.get(r.id, []), cats)
+        dto["my_state"] = _catalog_state(r.id, members, jr_map, follows)  # カタログ用に上書き
+        dto["purpose"] = r.purpose  # メタ（ダイアログ/カードの一言）
+        out.append(dto)
+    return out
+
+
+def get_quest_catalog(account_id, company_id, *, q=None, category=None, group_id=None,
+                      sort=None, page=None, per_page=None) -> dict:
+    """発見カタログ（SC-13・C.9.1）＝`can_discover_quest` を満たすクエストのメタ一覧＋自分の my_state。
+
+    DataTable サーバー契約（§1.8.1・番号ページャ）。`page`/`per_page` 未指定＝全件（後方互換）。中身は返さない。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        return _EMPTY_CATALOG
+    cats_filter = [c.strip() for c in category.split(",") if c.strip()] if category else None
+    group_uuid = _parse_uuid(group_id, field="group_id") if group_id else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return _EMPTY_CATALOG
+        visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
+        rows_stmt, count_stmt = repo.build_catalog_query(
+            viewer_id=user.id, visible_group_ids=visible, q=q, categories=cats_filter,
+            group_id=group_uuid, sort=sort)  # 未知 sort キーは 422（list_query）
+        total = ts.execute(count_stmt).scalar_one()
+        if page is None and per_page is None:
+            rows = list(ts.execute(rows_stmt).scalars().all())
+            eff_page, eff_per = 1, total or 1
+        else:
+            eff_page = max(1, page or 1)
+            eff_per = max(1, min(per_page or lq.DEFAULT_PER_PAGE, lq.MAX_PER_PAGE))
+            rows = list(ts.execute(rows_stmt.offset((eff_page - 1) * eff_per).limit(eff_per)).scalars().all())
+        data = _catalog_dtos(ts, rows, user.id)
+    return {"data": data, "page_info": {"total": total, "page": eff_page, "per_page": eff_per}}
+
+
+def get_catalog_detail(account_id, company_id, quest_id) -> dict:
+    """掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）＝発見門番のみ・中身は返さない。"""
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
+        if not repo.can_discover_quest(ts, quest, visible):
+            raise AppError(404, "not_found")  # 存在秘匿（発見不可）
+        return _catalog_dtos(ts, [quest], user.id)[0]
+
+
+def _load_discoverable(ts, account_id, quest_id):
+    """(user, quest, visible) を返す。発見不可は 404（存在秘匿）。フォロー/申請の共通門番。"""
+    user = profile_repo.get_user_by_account(ts, account_id)
+    if user is None:
+        raise AppError(401, "unauthenticated")
+    quest = repo.get_quest(ts, quest_id)
+    visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
+    if not repo.can_discover_quest(ts, quest, visible):
+        raise AppError(404, "not_found")
+    return user, quest, visible
+
+
+def follow_quest(account_id, company_id, quest_id) -> dict:
+    """フォロー（watch）を付ける（C.9・発見可能なクエストのみ・冪等）。"""
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user, _quest, _visible = _load_discoverable(ts, account_id, iid)
+        repo.add_quest_follow(ts, iid, user.id)
+        ts.commit()
+    return {"following": True}
+
+
+def unfollow_quest(account_id, company_id, quest_id) -> dict:
+    """フォロー解除（冪等・解除は常に許可＝発見不可になった後でも外せる）。"""
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        repo.remove_quest_follow(ts, iid, user.id)
+        ts.commit()
+    return {"following": False}
+
+
+def request_join(account_id, company_id, quest_id, *, message=None) -> dict:
+    """参加をリクエスト（C.9・pending 作成）。既 member は 409・重複 pending は 409・却下済みは再申請不可(409)。"""
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user, quest, _visible = _load_discoverable(ts, account_id, iid)
+        if repo.get_active_member(ts, iid, user.id) is not None:
+            raise AppError(409, "conflict", detail="すでに参加中です", extra={"errors": [{"reason": "already_member"}]})
+        existing = repo.get_join_request(ts, iid, user.id)
+        if existing is not None:
+            if existing.status == "pending":
+                raise AppError(409, "conflict", detail="すでに申請中です", extra={"errors": [{"reason": "already_requested"}]})
+            if existing.status == "approved":
+                raise AppError(409, "conflict", detail="すでに参加中です", extra={"errors": [{"reason": "already_member"}]})
+            if existing.status == "rejected":
+                # 却下は作成者側の再承諾のみ＝申請者からの再申請は当面不可（§8-6）。
+                raise AppError(409, "conflict", detail="この申請は却下されています", extra={"errors": [{"reason": "rejected"}]})
+            # withdrawn（自分で取り下げ）→ 再申請は許可＝行を再利用して pending に戻す。
+            existing.status = "pending"
+            existing.message = message
+            existing.decided_at = None
+            existing.decided_by_id = None
+            jr = existing
+        else:
+            jr = repo.create_join_request(ts, iid, user.id, message)
+        recipients = repo.list_owner_and_admin_ids(ts, quest)
+        actor_name = user.display_name
+        ts.commit()
+    _notify_join_request_received(company_id, iid, recipients, [user.id], actor_name)
+    return {"status": jr.status}
+
+
+def withdraw_join_request(account_id, company_id, quest_id) -> None:
+    """自分の申請を取り下げ（pending→withdrawn・C.9）。承認済みは 409。"""
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        jr = repo.get_join_request(ts, iid, user.id)
+        if jr is None or jr.status != "pending":
+            if jr is not None and jr.status == "approved":
+                raise AppError(409, "conflict", detail="承認済みのため取り下げできません", extra={"errors": [{"reason": "already_member"}]})
+            raise AppError(404, "not_found")
+        jr.status = "withdrawn"
+        ts.commit()
+
+
+def _notify_join_request_received(company_id, quest_id, recipients, exclude, actor_name) -> None:
+    """参加リクエスト受信通知（H `join_request_received`・作成者+quest_admin・申請者除外・post-commit）。"""
+    targets = [r for r in dict.fromkeys(recipients) if r not in set(exclude)]
+    if not targets:
+        return
+    def _build(ts):
+        refs = {"ref_quest_id": quest_id}
+        return [notify_svc.entry(r, "join_request_received", refs=refs, params={"actor_name": actor_name}) for r in targets]
+    notify_svc.dispatch(company_id, _build)

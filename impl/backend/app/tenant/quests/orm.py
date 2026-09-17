@@ -38,6 +38,9 @@ class Quest(CompanyBase):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft", server_default="draft")
     # MinIO キー・任意（§1.10）。未設定時は「件名頭文字＋所有者アバター」（フロント表示）。
     icon_image_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    # 発見公開フラグ（掲示板 SC-13 に出すか・per-quest opt-in・既定 OFF・FR-40／§5.6）。
+    # ON でも中身は非公開＝メタのみ（発見門番 can_discover_quest）。
+    discoverable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # 論理削除（トゥームストーン）。NULL＝有効。値あり＝削除済み（一覧/参照から除外・§5.6）。
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -63,6 +66,37 @@ class QuestGroupLink(CompanyBase):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
     quest_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quest_groups.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QuestJoinRequest(CompanyBase):
+    """クエスト参加リクエスト（FR-40・データモデル §5.8b）。
+
+    1ユーザー1行（`UNIQUE(quest_id, user_id)`）＝却下（rejected）は非終端で行を残し後日承諾（rejected→approved）。
+    承認で `quest_members` に追加（application）。
+    """
+    __tablename__ = "quest_join_requests"
+    __table_args__ = (UniqueConstraint("quest_id", "user_id", name="uq_quest_join_requests"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # join_request_status（pending/approved/rejected/withdrawn・§3）。会社DBでも String で持つ。
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    message: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+
+class QuestFollow(CompanyBase):
+    """クエストフォロー＝watch（FR-40・データモデル §5.8c）。アイデアの follows とは別テーブル（対象/通知の混線回避）。"""
+    __tablename__ = "quest_follows"
+    __table_args__ = (UniqueConstraint("quest_id", "user_id", name="uq_quest_follows"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

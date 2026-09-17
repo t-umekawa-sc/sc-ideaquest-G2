@@ -158,3 +158,15 @@
 | TC-ID | 階層 | 目的 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- |
 | C-TC-210 | unit | 締切→切迫度と残日表示の決定（#24） | `deadlineUrgency(deadline, todayISO)`／`deadlineCountdown(days)` | 締切なし=none/null／過去=over（days<0）／当日〜2日=urgent／3〜7日=soon／8日以上=safe／不正日付=none。`deadlineCountdown`＝null→""・負→「締切超過」・0→「今日締切」・正→「残りN日」 | SC-01/10/11/12（⏳ 締切）／ゲーム感 #24 |
+
+## 7. 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13）
+
+> 対象＝`app/tenant/quests/{router,application,repository}.py`（`GET /quest-catalog`・`catalog-detail`・`follow`・`join-request`）。発見門番 `can_discover_quest`（discoverable ∧ 部署交差／0件=全社・メタ専用）・`my_state`・フォロー/参加リクエスト（申請/取消・通知）を検証。前提＝seed 一般ユーザー（viewer）＋他ユーザー owner の discoverable クエストを seed。対象＝`tests/quests/test_catalog.py`。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C-TC-260 | api | 発見門番＝discoverable ∧ 部署交差（0件=全社）・メタのみ | discoverable×自部署／非discoverable／別部署／参加部署0件 の4クエスト | `GET /quest-catalog` | 自部署 discoverable と 全社(0件)discoverable が出る／非discoverable・別部署は出ない／`my_state=none`・`purpose` あり（中身は返さない）・`page_info.total` | C.9.0／FR-40 |
+| C-TC-261 | api | フォロー トグル（my_state 追随） | discoverable クエスト | `POST /follow`→`GET`→`DELETE /follow` | follow で `following:true`＋カタログ `my_state=following`／解除で `following:false`＋`none`（冪等） | C.9 |
+| C-TC-262 | api | 参加リクエスト＋通知＋重複/取消 | discoverable クエスト | `POST /join-request`→`GET`→重複`POST`→`DELETE` | 201 `pending`＋`my_state=pending`＋作成者へ `join_request_received` 通知1件／重複は 409／取消(204)で `my_state=none` | C.9／H |
+| C-TC-263 | api | 門番/既member ガード | 非discoverable／viewer が member の discoverable | `POST follow/join-request`（非discoverable）／`POST join-request`（member） | 非discoverable は 404（存在秘匿）／既 member への申請は 409 `already_member`／カタログで member は `my_state=member` | C.9.0／C.9 |
+| C-TC-264 | api | catalog-detail 門番＋sort 422 | discoverable／非discoverable | `GET /catalog-detail`（各）／`GET /quest-catalog?sort=bogus\|-created_at` | discoverable=200／非discoverable=404／未知 sort=422／`-created_at`=200（§1.8.1 ホワイトリスト） | C.9.1／§1.8.1 |

@@ -65,6 +65,38 @@ class QuestListResponse(BaseModel):
     page_info: QuestCursorPageInfo
 
 
+# ---- 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13） ----
+
+class QuestCatalogCardDTO(QuestCardDTO):
+    """発見カタログの1件＝カード＋メタ（`purpose`）。`my_state`＝member/pending/rejected/following/none。"""
+
+    purpose: str | None = None
+
+
+class QuestOffsetPageInfo(BaseModel):
+    total: int
+    page: int
+    per_page: int
+
+
+class QuestCatalogResponse(BaseModel):
+    data: list[QuestCatalogCardDTO]
+    page_info: QuestOffsetPageInfo
+
+
+class FollowResponse(BaseModel):
+    following: bool
+
+
+class JoinRequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str | None = None
+
+
+class JoinRequestResponse(BaseModel):
+    status: str
+
+
 class QuestGroupDTO(BaseModel):
     id: str
     quest_group_code: str

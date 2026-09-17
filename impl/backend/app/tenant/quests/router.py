@@ -14,7 +14,12 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.quests import application as quest_service
 from app.tenant.quests.schemas import (
+    FollowResponse,
+    JoinRequestBody,
+    JoinRequestResponse,
     QuestCandidatesResponse,
+    QuestCatalogCardDTO,
+    QuestCatalogResponse,
     QuestCreateRequest,
     QuestDetailDTO,
     QuestGroupsResponse,
@@ -54,6 +59,76 @@ def list_quests(
         q=q, status=status, group_id=group_id, sort=sort, limit=limit, cursor=cursor,
     )
     return QuestListResponse(**result)
+
+
+# ---- 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13） ----
+
+@router.get("/quest-catalog", response_model=QuestCatalogResponse)
+def quest_catalog(
+    request: Request,
+    q: str | None = None,
+    category: str | None = None,   # enum 多値（カンマ）＝UGC ラベル（ホワイトリスト検証なし）
+    group_id: str | None = None,
+    sort: str | None = None,       # -created_at〔既定〕/deadline/-member_count（未知は 422）
+    page: int | None = Query(default=None, ge=1),
+    per_page: int | None = Query(default=None, ge=1, le=100),
+    session: dict = Depends(require_me),
+) -> QuestCatalogResponse:
+    """発見カタログ＝発見可能クエストのメタ一覧＋自分の my_state（SC-13・C.9.1）。中身は返さない。読取専用。"""
+    result = quest_service.get_quest_catalog(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        q=q, category=category, group_id=group_id, sort=sort, page=page, per_page=per_page,
+    )
+    return QuestCatalogResponse(**result)
+
+
+@router.get("/quests/{quest_id}/catalog-detail", response_model=QuestCatalogCardDTO)
+def quest_catalog_detail(quest_id: str, request: Request, session: dict = Depends(require_me)) -> QuestCatalogCardDTO:
+    """掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）。発見門番のみ・中身は返さない。読取専用。"""
+    result = quest_service.get_catalog_detail(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+    return QuestCatalogCardDTO(**result)
+
+
+@router.post("/quests/{quest_id}/follow", response_model=FollowResponse)
+def follow_quest(quest_id: str, request: Request, session: dict = Depends(require_me)) -> FollowResponse:
+    """クエストをフォロー（watch・C.9）。発見可能なクエストのみ。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.follow_quest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+    return FollowResponse(**result)
+
+
+@router.delete("/quests/{quest_id}/follow", response_model=FollowResponse)
+def unfollow_quest(quest_id: str, request: Request, session: dict = Depends(require_me)) -> FollowResponse:
+    """フォロー解除（C.9・冪等）。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.unfollow_quest(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+    return FollowResponse(**result)
+
+
+@router.post("/quests/{quest_id}/join-request", response_model=JoinRequestResponse, status_code=201)
+def create_join_request(
+    quest_id: str, body: JoinRequestBody, request: Request, session: dict = Depends(require_me),
+) -> JoinRequestResponse:
+    """参加をリクエスト（C.9・pending 作成→作成者/quest_admin へ通知）。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.request_join(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, message=body.message)
+    return JoinRequestResponse(**result)
+
+
+@router.delete("/quests/{quest_id}/join-request", status_code=204)
+def withdraw_join_request(quest_id: str, request: Request, session: dict = Depends(require_me)) -> None:
+    """自分の申請を取り下げ（pending→withdrawn・C.9）。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    quest_service.withdraw_join_request(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
 
 
 @router.get("/quests/{quest_id}", response_model=QuestDetailDTO)

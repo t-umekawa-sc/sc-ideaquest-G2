@@ -22,11 +22,16 @@ from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests.orm import (
     Quest,
     QuestCategory,
+    QuestFollow,
     QuestGroupLink,
+    QuestJoinRequest,
     QuestMember,
     QuestMemberPermission,
     QuestOutcome,
 )
+
+# 発見カタログの対象 status（募集中〜評価中＝参加者募集の意味がある間・C.9.0）。completed/draft は対象外。
+DISCOVERABLE_STATUS: tuple[str, ...] = ("recruiting", "in_progress", "evaluating")
 
 # 新規参加メンバーの既定権限（サーバー自動付与・§5.9/C.3）。
 DEFAULT_MEMBER_PERMISSIONS: tuple[str, ...] = ("vote", "idea_create", "comment")
@@ -766,3 +771,168 @@ def _replace_permissions(
                     granted_by_id=granted_by_id,
                 )
             )
+
+# ---- 発見・フォロー・参加リクエスト（FR-40・C.9） ---------------------------------------
+
+def _discoverable_conds(user_id: uuid.UUID, visible_group_ids: list[uuid.UUID]):
+    """`can_discover_quest`（C.9.0）の WHERE 条件群を返す＝discoverable ∧ 部署交差(0件=全社) ∧
+    status∈発見対象 ∧ 未削除。中身門番 `can_access_quest` とは別（メタ専用・パーティー員か否かは問わない）。"""
+    from sqlalchemy import and_, exists, not_, or_
+
+    has_any_link = exists().where(QuestGroupLink.quest_id == Quest.id)
+    link_in_visible = exists().where(
+        QuestGroupLink.quest_id == Quest.id,
+        QuestGroupLink.quest_group_id.in_(visible_group_ids or []),
+    )
+    dept_ok = or_(not_(has_any_link), link_in_visible)  # 参加部署0件＝全社に開く（discoverable ON 前提）
+    return [
+        Quest.discoverable.is_(True),
+        Quest.deleted_at.is_(None),
+        Quest.status.in_(DISCOVERABLE_STATUS),
+        dept_ok,
+    ]
+
+
+def can_discover_quest(session: Session, quest: Quest, visible_group_ids: list[uuid.UUID]) -> bool:
+    """単一クエストの発見可否（ダイアログ/フォロー/申請の門番・C.9.0）。"""
+    if quest is None or quest.deleted_at is not None:
+        return False
+    if not quest.discoverable or quest.status not in DISCOVERABLE_STATUS:
+        return False
+    link_gids = list_group_ids_for_quest(session, quest.id)
+    if not link_gids:  # 参加部署0件＝全社に開く
+        return True
+    return bool(set(link_gids) & set(visible_group_ids or []))
+
+
+def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None, group_id=None, sort=None):
+    """発見カタログの (rows_stmt, count_stmt)（§1.8.1・list_query の sort をホワイトリスト適用）。
+
+    自分が作成者/有効パーティー員のクエストも「発見可能」なら出す（my_state=member/owner で区別＝申請ボタンは出さない）。
+    """
+    from app.core import list_query as lq
+    from sqlalchemy import func, or_, select
+
+    conds = _discoverable_conds(viewer_id, visible_group_ids)
+    if q:
+        like = f"%{q}%"
+        cat_hit = exists_category_like(like)
+        conds.append(or_(Quest.title.ilike(like), Quest.purpose.ilike(like), cat_hit))
+    if categories:
+        conds.append(exists_category_in(categories))
+    if group_id is not None:
+        from sqlalchemy import exists as _exists
+        conds.append(_exists().where(QuestGroupLink.quest_id == Quest.id,
+                                     QuestGroupLink.quest_group_id == group_id))
+
+    member_count_col = (
+        select(func.count()).select_from(QuestMember)
+        .where(QuestMember.quest_id == Quest.id, QuestMember.removed_at.is_(None)).scalar_subquery()
+    )
+    sort_cols = {"created_at": Quest.created_at, "deadline": Quest.deadline, "member_count": member_count_col}
+    order = lq.parse_sort(sort, sort_cols)
+    rows_stmt = select(Quest).where(*conds)
+    if order:
+        rows_stmt = rows_stmt.order_by(*order, Quest.id)
+    else:
+        rows_stmt = rows_stmt.order_by(Quest.created_at.desc(), Quest.id.desc())  # 既定＝新着
+    count_stmt = select(func.count()).select_from(Quest).where(*conds)
+    return rows_stmt, count_stmt
+
+
+def exists_category_like(like: str):
+    from sqlalchemy import exists
+    return exists().where(QuestCategory.quest_id == Quest.id, QuestCategory.label.ilike(like))
+
+
+def exists_category_in(labels: list[str]):
+    from sqlalchemy import exists
+    return exists().where(QuestCategory.quest_id == Quest.id, QuestCategory.label.in_(labels))
+
+
+def list_group_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    return list(session.execute(
+        select(QuestGroupLink.quest_group_id).where(QuestGroupLink.quest_id == quest_id)
+    ).scalars().all())
+
+
+# --- my_state 用の一括参照（カタログ行のバッジ） ---
+
+def member_quest_ids(session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    if not quest_ids:
+        return set()
+    return set(session.execute(
+        select(QuestMember.quest_id).where(
+            QuestMember.quest_id.in_(quest_ids), QuestMember.user_id == user_id, QuestMember.removed_at.is_(None))
+    ).scalars().all())
+
+
+def followed_quest_ids(session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    if not quest_ids:
+        return set()
+    return set(session.execute(
+        select(QuestFollow.quest_id).where(QuestFollow.quest_id.in_(quest_ids), QuestFollow.user_id == user_id)
+    ).scalars().all())
+
+
+def join_request_status_map(session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID]) -> dict:
+    if not quest_ids:
+        return {}
+    rows = session.execute(
+        select(QuestJoinRequest.quest_id, QuestJoinRequest.status).where(
+            QuestJoinRequest.quest_id.in_(quest_ids), QuestJoinRequest.user_id == user_id)
+    ).all()
+    return {qid: st for qid, st in rows}
+
+
+# --- フォロー（watch） ---
+
+def get_quest_follow(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestFollow | None:
+    return session.execute(
+        select(QuestFollow).where(QuestFollow.quest_id == quest_id, QuestFollow.user_id == user_id)
+    ).scalars().first()
+
+
+def add_quest_follow(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    if get_quest_follow(session, quest_id, user_id) is None:  # 冪等
+        session.add(QuestFollow(id=uuid.uuid4(), quest_id=quest_id, user_id=user_id))
+
+
+def remove_quest_follow(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    row = get_quest_follow(session, quest_id, user_id)
+    if row is not None:
+        session.delete(row)
+
+
+# --- 参加リクエスト ---
+
+def get_join_request(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestJoinRequest | None:
+    return session.execute(
+        select(QuestJoinRequest).where(
+            QuestJoinRequest.quest_id == quest_id, QuestJoinRequest.user_id == user_id)
+    ).scalars().first()
+
+
+def create_join_request(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID, message: str | None) -> QuestJoinRequest:
+    jr = QuestJoinRequest(id=uuid.uuid4(), quest_id=quest_id, user_id=user_id, status="pending", message=message)
+    session.add(jr)
+    return jr
+
+
+def list_join_requests(session: Session, quest_id: uuid.UUID, statuses: list[str]) -> list[QuestJoinRequest]:
+    return list(session.execute(
+        select(QuestJoinRequest).where(
+            QuestJoinRequest.quest_id == quest_id, QuestJoinRequest.status.in_(statuses))
+        .order_by(QuestJoinRequest.created_at.asc())
+    ).scalars().all())
+
+
+def list_owner_and_admin_ids(session: Session, quest) -> list[uuid.UUID]:
+    """参加リクエスト通知の宛先＝作成者＋有効な quest_admin メンバー（C.9・重複排除）。"""
+    admins = session.execute(
+        select(QuestMember.user_id)
+        .join(QuestMemberPermission, QuestMemberPermission.quest_member_id == QuestMember.id)
+        .where(QuestMember.quest_id == quest.id, QuestMember.removed_at.is_(None),
+               QuestMemberPermission.permission == "quest_admin")
+    ).scalars().all()
+    return list(dict.fromkeys([quest.owner_id, *admins]))
