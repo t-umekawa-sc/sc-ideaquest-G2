@@ -171,3 +171,8 @@ def test_c_tc_264_catalog_detail_and_sort_422(client, env):
     assert client.get(f"/api/v1/quests/{hidden}/catalog-detail").status_code == 404
     assert client.get(CATALOG, params={"sort": "bogus"}).status_code == 422
     assert client.get(CATALOG, params={"sort": "-created_at"}).status_code == 200
+    # 番号ページャ分岐（page/per_page 指定）＝offset パス（未指定=全件とは別経路）。
+    paged = client.get(CATALOG, params={"page": 1, "per_page": 5})
+    assert paged.status_code == 200, paged.text
+    pi = paged.json()["page_info"]
+    assert pi["page"] == 1 and pi["per_page"] == 5 and "total" in pi

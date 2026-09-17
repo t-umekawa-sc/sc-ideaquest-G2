@@ -945,6 +945,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quest-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quest Catalog
+         * @description 発見カタログ＝発見可能クエストのメタ一覧＋自分の my_state（SC-13・C.9.1）。中身は返さない。読取専用。
+         */
+        get: operations["quest_catalog_api_v1_quest_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/catalog-detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quest Catalog Detail
+         * @description 掲示板ダイアログ用のメタ詳細（SC-13・C.9.1）。発見門番のみ・中身は返さない。読取専用。
+         */
+        get: operations["quest_catalog_detail_api_v1_quests__quest_id__catalog_detail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Follow Quest
+         * @description クエストをフォロー（watch・C.9）。発見可能なクエストのみ。変更系＝Origin/CSRF。
+         */
+        post: operations["follow_quest_api_v1_quests__quest_id__follow_post"];
+        /**
+         * Unfollow Quest
+         * @description フォロー解除（C.9・冪等）。変更系＝Origin/CSRF。
+         */
+        delete: operations["unfollow_quest_api_v1_quests__quest_id__follow_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/join-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Join Request
+         * @description 参加をリクエスト（C.9・pending 作成→作成者/quest_admin へ通知）。変更系＝Origin/CSRF。
+         */
+        post: operations["create_join_request_api_v1_quests__quest_id__join_request_post"];
+        /**
+         * Withdraw Join Request
+         * @description 自分の申請を取り下げ（pending→withdrawn・C.9）。変更系＝Origin/CSRF。
+         */
+        delete: operations["withdraw_join_request_api_v1_quests__quest_id__join_request_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}": {
         parameters: {
             query?: never;
@@ -3017,6 +3105,11 @@ export interface components {
              */
             created_at: string;
         };
+        /** FollowResponse */
+        FollowResponse: {
+            /** Following */
+            following: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3502,6 +3595,16 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
+        };
+        /** JoinRequestBody */
+        JoinRequestBody: {
+            /** Message */
+            message?: string | null;
+        };
+        /** JoinRequestResponse */
+        JoinRequestResponse: {
+            /** Status */
+            status: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -4022,6 +4125,54 @@ export interface components {
             is_owner: boolean;
         };
         /**
+         * QuestCatalogCardDTO
+         * @description 発見カタログの1件＝カード＋メタ（`purpose`）。`my_state`＝member/pending/rejected/following/none。
+         */
+        QuestCatalogCardDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Color */
+            color: string;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Status */
+            status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Idea Count */
+            idea_count: number;
+            owner: components["schemas"]["QuestOwnerDTO"];
+            /**
+             * Quest Groups
+             * @default []
+             */
+            quest_groups: components["schemas"]["QuestGroupRefDTO"][];
+            /** My State */
+            my_state: string;
+            /**
+             * Is Owner
+             * @default false
+             */
+            is_owner: boolean;
+            /** Purpose */
+            purpose?: string | null;
+        };
+        /** QuestCatalogResponse */
+        QuestCatalogResponse: {
+            /** Data */
+            data: components["schemas"]["QuestCatalogCardDTO"][];
+            page_info: components["schemas"]["QuestOffsetPageInfo"];
+        };
+        /**
          * QuestCreateRequest
          * @description POST /quests（C.2）。`owner_id`/`status` 以外の内部列は受けない（§1.4/C.6）。
          */
@@ -4278,6 +4429,15 @@ export interface components {
         QuestMembersResponse: {
             /** Data */
             data: components["schemas"]["QuestMemberDTO"][];
+        };
+        /** QuestOffsetPageInfo */
+        QuestOffsetPageInfo: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
         };
         /**
          * QuestOutcomeDTO
@@ -6641,6 +6801,199 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuestDetailDTO"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quest_catalog_api_v1_quest_catalog_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                category?: string | null;
+                group_id?: string | null;
+                sort?: string | null;
+                page?: number | null;
+                per_page?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestCatalogResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quest_catalog_detail_api_v1_quests__quest_id__catalog_detail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestCatalogCardDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    follow_quest_api_v1_quests__quest_id__follow_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unfollow_quest_api_v1_quests__quest_id__follow_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_join_request_api_v1_quests__quest_id__join_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_join_request_api_v1_quests__quest_id__join_request_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

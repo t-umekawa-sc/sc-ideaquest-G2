@@ -14,6 +14,7 @@ type NavItem = { href: string; label: string; icon: string };
 const BIZ: NavItem[] = [
   { href: "/", label: "ホーム", icon: "🏠" },
   { href: "/quests", label: "クエスト", icon: "📜" },
+  { href: "/quest-catalog", label: "クエストを探す", icon: "🔎" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
 const GAME: NavItem[] = [

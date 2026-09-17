@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.control_plane.auth.orm import Company
+from app.core import list_query as lq
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session

@@ -1,8 +1,61 @@
-// quests 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/C_クエスト・パーティー・権限.md C.1〜C.4。
+// quests 機能の API 呼び出し（§4.1・lib/api 経由・業務計算はしない）。正＝doc/API設計/C_クエスト・パーティー・権限.md C.1〜C.4/C.9。
 import { apiFetch, idempotencyHeader } from "@/lib/api/client";
+import type { QueryState } from "@/components/ui";
 import type { components } from "@/lib/api/schema";
 
 export type QuestCard = components["schemas"]["QuestCardDTO"];
+export type QuestCatalogCard = components["schemas"]["QuestCatalogCardDTO"];
+export type QuestCatalogResponse = components["schemas"]["QuestCatalogResponse"];
+
+// 発見カタログ（SC-13・C.9）＝DataTable サーバー契約（§1.8.1・list_query・番号ページャ）。
+// ソート可能キー＝backend ホワイトリスト（-created_at〔既定〕/deadline/-member_count）に一致。
+const CATALOG_SORTABLE = new Set(["created_at", "deadline", "member_count"]);
+
+export function catalogQueryParams(state: QueryState): URLSearchParams {
+  const qs = new URLSearchParams();
+  const q = state.search.trim();
+  if (q) qs.set("q", q);
+  const sort = state.sort
+    .filter((s) => CATALOG_SORTABLE.has(s.key))
+    .map((s) => (s.dir === "desc" ? `-${s.key}` : s.key));
+  if (sort.length) qs.set("sort", sort.join(","));
+  for (const key of Object.keys(state.filters)) {
+    const c = state.filters[key];
+    if (c.type === "enum") {
+      if (c.values.length) qs.set(key, c.values.join(",")); // category（UGC 多値）
+    } else if (c.type === "text") {
+      const t = c.q.trim();
+      if (t && !qs.has("q")) qs.set("q", t);
+    }
+  }
+  qs.set("page", String(state.page));
+  qs.set("per_page", String(state.perPage));
+  return qs;
+}
+
+export function fetchQuestCatalog(state: QueryState, signal?: AbortSignal): Promise<QuestCatalogResponse | null> {
+  return apiFetch<QuestCatalogResponse>(`/quest-catalog?${catalogQueryParams(state).toString()}`, { signal });
+}
+
+export function getCatalogDetail(questId: string): Promise<QuestCatalogCard | null> {
+  return apiFetch<QuestCatalogCard>(`/quests/${questId}/catalog-detail`);
+}
+
+export function followQuest(questId: string): Promise<{ following: boolean } | null> {
+  return apiFetch<{ following: boolean }>(`/quests/${questId}/follow`, { method: "POST" });
+}
+export function unfollowQuest(questId: string): Promise<{ following: boolean } | null> {
+  return apiFetch<{ following: boolean }>(`/quests/${questId}/follow`, { method: "DELETE" });
+}
+export function requestJoinQuest(questId: string, message?: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/quests/${questId}/join-request`, {
+    method: "POST", headers: idempotencyHeader(), body: JSON.stringify({ message: message ?? null }),
+  });
+}
+export function withdrawJoinQuest(questId: string): Promise<null> {
+  return apiFetch<null>(`/quests/${questId}/join-request`, { method: "DELETE" }) as Promise<null>;
+}
+
 export type QuestListResponse = components["schemas"]["QuestListResponse"];
 export type QuestGroup = components["schemas"]["QuestGroupDTO"];
 export type QuestGroupsResponse = components["schemas"]["QuestGroupsResponse"];
