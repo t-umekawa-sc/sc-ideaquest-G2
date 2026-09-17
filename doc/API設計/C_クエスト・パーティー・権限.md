@@ -174,3 +174,34 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 
 - (b) **ピン留め**（重要メッセージ＝議論の要点）の付与/解除はチャット（E ドメイン）の `POST/DELETE /chat-messages/{id}/pin`（owner/quest_admin・[E API](E_チャット.md)）。結果 EP はその集約を `pinned_messages` として返す。
 - **完了時の副作用**（C.5 参照）＝チーム成果フィード `quest_completed`＋パーティー通知 `quest_result_ready`。
+
+## C.9 クエストの発見・フォロー・参加リクエスト（FR-40・SC-13/SC-01/SC-12）
+
+> 参加していないクエストを**発見**し、**フォロー（watch）**または**参加を申請**する機能群。正規化元＝[設計ドラフト](../設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md)。データ＝`quest_follows`/`quest_join_requests`/`quests.discoverable`（データモデル §5.6/§5.8b/§5.8c・enum `join_request_status` §3）。通知＝H（`join_request_received`/`join_request_decided`/`quest_watch_update`）。
+
+### C.9.0 発見の門番 `can_discover_quest`（中身門番 `can_access_quest`〔C.0〕とは別・メタ専用）
+
+`can_discover_quest(viewer, quest) :=` **`quest.discoverable = true`** ∧ (**`quest` の参加部署が ∅** ∨ **viewer の有効所属グループ ∩ `quest` の参加部署 ≠ ∅**) ∧ **`quest.status ∈ {recruiting, in_progress, evaluating}`** ∧ **`quest.deleted_at IS NULL`**。
+
+- **`can_access_quest`（C.0）との差分は「パーティー員か否か」と「discoverable フラグ」だけ**＝参加部署条件（§5.6b）を流用でき実装コスト小。**発見はメタのみ許可**（件名/テーマ/カテゴリ/作成者/締切/参加人数/アイデア件数）。**中身（アイデア本文/チャット/評価）は参加後**＝`can_access_quest` は現状維持で中身の門番に徹する。
+- 参加部署 0 件（全社クエスト）は discoverable ON で**社内全員が発見可**（`can_access_quest` の「参加部署0件＝全員可」と対称）。`draft` は発見対象外（作成者のみ）。`completed` も掲示板の一覧対象外（結果メタはフォロー通知で伝える）。
+- **フォロー/参加リクエストの入口はすべて本門番でガード**（発見できないクエストへの follow / join-request は 404〔存在秘匿〕）。既に有効パーティー員のクエストには join-request 不可（409 `already_member`）。
+
+### C.9.1 発見カタログ・フォロー・参加リクエスト EP
+
+| メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
+| --- | --- | --- | --- |
+| `GET /quest-catalog` | 発見カタログ＝発見可能クエストのメタ一覧（SC-13） | クエリ: `q`（件名/テーマ/カテゴリ部分一致）・`category?`・`group_id?`・`sort`（`-created_at`〔新着〕/`deadline`/`-member_count`）・`limit`/`cursor`（§1.8）。**§1.8.1 DataTable サーバー契約**（ソート/フィルタ可能キーは本表のホワイトリスト） | `data`=クエストメタカード（`id`/`title`/`purpose?`/`color`/`icon_image_url`/`categories[]`/`status`/`deadline`/`member_count`/`idea_count`/`owner`〔アバター〕/`quest_groups[]`＋**`my_state`**〔`member`〔既に参加中〕/`pending`〔申請中〕/`rejected`〔却下済み〕/`following`〔フォロー中〕/`none`〕）＋`page_info`。**`can_discover_quest` を満たす行のみ**（メタのみ・中身は返さない） |
+| `GET /quests/{quest_id}/catalog-detail` | 掲示板ダイアログ用のメタ詳細（SC-13 ダイアログ・非参加者） | パス: `quest_id` | 門番＝`can_discover_quest`（範囲外 404）。メタ（上記＋`purpose` 全文）＋自分の `my_state`。**中身（アイデア/チャット/評価）は含まない** |
+| `POST /quests/{quest_id}/follow` | フォロー（watch）を付ける | パス: `quest_id`／`Idempotency-Key?` | 門番＝`can_discover_quest`（範囲外 404）。`quest_follows` に upsert（`UNIQUE(quest_id,user_id)`・冪等）。200 `{following:true}` |
+| `DELETE /quests/{quest_id}/follow` | フォロー解除 | パス: `quest_id` | `quest_follows` 行削除（冪等）。204 |
+| `POST /quests/{quest_id}/join-request` | 参加をリクエスト（pending 作成） | パス: `quest_id`／ボディ: `message?` | 門番＝`can_discover_quest`（範囲外 404）。既に有効 member は 409 `already_member`。`quest_join_requests` を `pending` で作成（`UNIQUE(quest_id,user_id)`＝既存 `pending` は 409 `already_requested`／既存 `rejected/withdrawn` は再申請不可のため 409〔`rejected` は作成者側の再承諾のみ〕）。post-commit で作成者/`quest_admin` へ通知＋メール（H `join_request_received`）。201 `{status:"pending"}` |
+| `DELETE /quests/{quest_id}/join-request` | 自分の申請を取り下げ（`pending→withdrawn`） | パス: `quest_id` | 申請者本人のみ。`pending` を `withdrawn` に（承認済みは 409）。204 |
+| `GET /quests/{quest_id}/join-requests` | 参加リクエスト一覧（SC-12 パーティータブ） | パス: `quest_id`／クエリ: `status?`（既定＝`pending,rejected`） | `owner`/`quest_admin` のみ（他は 403・範囲外 404）。`data`=申請行（`user`〔アバター/氏名/所属グループ〕/`status`/`message?`/`created_at`/`decided_at?`）。**pending を上位・rejected を下部**（表示はフロント） |
+| `POST /quests/{quest_id}/join-requests/{user_id}/approve` | 承認＝member 追加 | パス: `quest_id`,`user_id`／`Idempotency-Key?` | `owner`/`quest_admin` のみ。`pending`（または `rejected`＝後日承諾）を `approved` に＋**同一 UoW で `quest_members` 追加**（既定権限 comment/vote/idea_create・トゥームストーン再利用）＋`decided_at`/`decided_by_id`。post-commit で申請者へ通知＋メール（H `join_request_decided`・result=approved）。200 |
+| `POST /quests/{quest_id}/join-requests/{user_id}/reject` | 却下（非終端） | パス: `quest_id`,`user_id` | `owner`/`quest_admin` のみ。`pending` を `rejected` に（行は残す・後日 approve 可）＋`decided_at`/`decided_by_id`。post-commit で申請者へ通知（H `join_request_decided`・result=rejected）。200 |
+
+- **承認/却下は既存パーティータブに統合**（新タブは作らない・SC-12 §）。申請者はパーティー一覧の上位、却下者は下部に表示し、行クリックでプロフィールダイアログ→「承諾」/「拒否」。承諾後は通常メンバー表示（リクエスト経由マーク併記可）。
+- **フォロー×参加リクエストの昇格（F2）**＝フォロー中に承認で member になったら**自動「参加中」化**（`quest_follows` 行は残すがダッシュボードは参加中を優先表示・★併記・SC-01 §7）。明示 unfollow は `DELETE /follow`。
+- **動的失効（F3/F4）**＝`can_discover_quest` が偽になったフォロー/申請は掲示板・通知から動的に外す（行は残す・復活で再表示）。
+- **Mass Assignment 防止**＝`status`/`decided_*`/`quest_members` の内部列はクライアント入力を受けない（サーバー設定・§1.4）。承認/却下・取消の状態遷移は本 EP でのみ表現（`join_request_status` の規則・データモデル §3）。

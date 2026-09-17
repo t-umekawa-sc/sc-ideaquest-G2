@@ -30,6 +30,9 @@
 | `magic_reaction` | E（魔法付与） | 対象メッセージの投稿者 | `ref_idea_id`＋`ref_chat_message_id` | `actor_name`,`spell`〔`spell_id`/`code`〕 |
 | `achievement` | G（実績フック） | 本人 | `ref_achievement_id` | `tier`,`coin` |
 | `quest_party_invited` | **C（publish・C.2）** | 公開されたクエストに追加されたパーティーメンバー（作成者=owner 除く） | `ref_quest_id` | `actor_name`〔公開者=owner の表示名〕 |
+| `join_request_received` | **C（参加リクエスト・C.9）** | クエストの作成者＋`quest_admin`（申請者は除く） | `ref_quest_id` | `actor_name`〔申請者の表示名〕（＋メール実送信） |
+| `join_request_decided` | **C（承認/却下・C.9）** | 申請者本人 | `ref_quest_id` | `result`〔`approved`/`rejected`〕（＋メール実送信） |
+| `quest_watch_update` | **C（フォロー更新・C.9・FR-40）** | フォロワー（`quest_follows`・発見可能な間のみ・動的失効） | `ref_quest_id` | `event`〔`status_changed`/`completed`/`deadline`/`new_ideas`〕・種別ごとの補足〔新旧 status・締切・件数〕。**すべてメタ級**（本文/リンクは非メンバーに開かない） |
 | `security_new_device` | A（ログイン成功） | 本人 | —（本文のみ） | `device`,`ip`,`at` |
 | `security_password_changed` | A/K（PW変更完了） | 本人 | —（本文のみ・メールも） | `at` |
 
