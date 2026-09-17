@@ -231,20 +231,25 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
         quest = quests_repo.get_quest(ts, idea.quest_id)
         _authorize_edit_idea(ts, idea, quest, user)
         _guard_not_completed(quest)
+        # 無変更保存（差分ゼロ）を検出するため、公開中は適用前スナップショットを取る（[C]①・D.4）。
+        before = _content_snapshot(ts, idea) if idea.status == "published" else None
         _apply_content(ts, idea, body)
         if idea.status == "published":
             _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
-            try:
-                _record_revision(ts, idea, user.id)  # 公開中は保存ごとに1版＋通知（H）
-                ts.flush()  # 版INSERTを確定＝並行編集の UNIQUE(idea_id,revision) 違反をここで検出（D.2 楽観ロック・方針A）
-            except IntegrityError as e:
-                ts.rollback()
-                # 版番号の一意制約違反＝並行編集の後着＝409 edit_conflict（最新を再取得して編集し直し）。
-                # 他の想定外の整合性違反は握り潰さず 500 のまま再送出する。
-                if "uq_idea_revisions_idea_revision" in str(getattr(e, "orig", e)):
-                    raise AppError(409, "edit_conflict",
-                                   detail="他の編集と競合しました。最新を取得してから編集し直してください。")
-                raise
+            # 差分ゼロ（追跡フィールドが完全一致）なら版/通知を作らない＝frontend の空更新抑制と対称・
+            # サーバー権威（コーディング規約 §1・通知スパム防止）。実変更のみ 1 版＋通知（D.4）。
+            if _content_snapshot(ts, idea) != before:
+                try:
+                    _record_revision(ts, idea, user.id)  # 公開中は内容が変わった保存ごとに1版＋通知（H）
+                    ts.flush()  # 版INSERTを確定＝並行編集の UNIQUE(idea_id,revision) 違反をここで検出（D.2 楽観ロック・方針A）
+                except IntegrityError as e:
+                    ts.rollback()
+                    # 版番号の一意制約違反＝並行編集の後着＝409 edit_conflict（最新を再取得して編集し直し）。
+                    # 他の想定外の整合性違反は握り潰さず 500 のまま再送出する。
+                    if "uq_idea_revisions_idea_revision" in str(getattr(e, "orig", e)):
+                        raise AppError(409, "edit_conflict",
+                                       detail="他の編集と競合しました。最新を取得してから編集し直してください。")
+                    raise
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail

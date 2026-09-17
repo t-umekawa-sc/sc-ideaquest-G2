@@ -1004,3 +1004,43 @@ def test_d_tc_228_changed_fields_multiple(client, env):
     revs = client.get(f"/api/v1/ideas/{pub}/revisions").json()["data"]
     rev2 = next(rv for rv in revs if rv["revision"] == 2)
     assert set(rev2["changed_fields"]) == {"title", "value", "body"}
+
+
+def test_d_tc_229_no_change_patch_skips_revision_and_notification(client, env):
+    """D-TC-229: 公開アイデアを同一内容で PATCH しても版/通知を作らない（サーバー無変更ガード・[C]①・D.2/D.4）。
+
+    frontend の空更新抑制（IdeaForm.persist）と対称に、backend でも差分ゼロなら _record_revision（版＋
+    idea_updated 通知）をスキップ。対照＝実変更 PATCH は従来どおり版＋通知（ガードが過抑制しないこと）。
+    """
+    from app.tenant.notifications.orm import Notification as _Notif
+    _login_seed(client)  # 編集者 = user_id
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid, author=env.user_id)  # published rev1（title=I/value=v/body=b）
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_follow(ts, env.other_id, iid)  # 通知先候補（フォロワー）
+        ts.commit()
+
+    def notifs():
+        with get_tenant_session(env.db_identifier) as ts:
+            return ts.execute(select(_Notif).where(
+                _Notif.recipient_id == env.other_id, _Notif.ref_idea_id == iid, _Notif.type == "idea_updated",
+            )).scalars().all()
+
+    try:
+        # 同一内容（title=I/value=v/body=b）＝実質無変更 → 版も通知も作らない。
+        r = client.patch(IDEA(iid), json={"title": "I", "value": "v", "body": "b"}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert r.json()["current_revision"] == 1  # 版は据え置き
+        with get_tenant_session(env.db_identifier) as ts:
+            assert [rr.revision for rr in repo.list_revisions(ts, iid)] == [1]  # 初版のみ
+        assert len(notifs()) == 0  # フォロワーへ idea_updated は発火しない
+
+        # 対照＝実変更は従来どおり版＋通知（ガードが過抑制しない）。
+        r2 = client.patch(IDEA(iid), json={"body": "本当に変えた本文"}, headers=_csrf(client))
+        assert r2.status_code == 200 and r2.json()["current_revision"] == 2
+        assert len(notifs()) == 1
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == iid))
+            ts.execute(Follow.__table__.delete().where(Follow.idea_id == iid))
+            ts.commit()

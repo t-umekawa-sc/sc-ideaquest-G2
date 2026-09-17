@@ -52,6 +52,7 @@
 | D-TC-226 | e2e | 下書きアイデアの編集ダイアログは「下書き保存」「投稿する」を出す（公開中の「変更を保存」でない・ユーザー指摘） | ACME owner・下書きアイデアを1件作成→`/ideas/[id]/edit` | ボタン表示 | 「下書き保存」「投稿する」が出る／「変更を保存」は出ない（下書きは版なし/通知なし・publish 導線あり） | SC-21／D.2 |
 | D-TC-227 | api | 非パーティー員の添付ダウンロードは 404（存在秘匿・IDOR） | 作成者=other・seed 非メンバー・添付を ORM seed | `GET /attachments/{aid}/download`（seed） | 404（`can_access` 門番） | D.3 |
 | D-TC-228 | api | 1回の PATCH で複数フィールド変更の版 changed_fields が複数 | 公開アイデア（rev1） | `PATCH`（title+value+body）→`GET /revisions` | rev2 の `changed_fields`＝{title,value,body} | D.4 |
+| D-TC-229 | api | 無変更保存（差分ゼロ）はサーバーでも版/通知を作らない（[C]① サーバーガード） | 公開アイデア（rev1・フォロワー1名） | 同一内容で `PATCH`（title/value/body 据え置き）→続けて実変更 `PATCH` | 無変更＝200・`current_revision=1` 据え置き・版は初版1件のまま・フォロワーへ `idea_updated` 通知0／対照の実変更は `current_revision=2`＋通知1（過抑制しない） | D.2／D.4 |
 | D-TC-145 | api | 下書きの公開は投稿者のみ＝代理公開は不可（他人 owner でも 404） | owner（seed・投稿者でない）が他ユーザー（Other）の下書きを `POST publish` | 応答＋`activities` | **404**（下書きは本人のみ可視・`_authorize_edit_idea`）＝公開が起きず `idea_post` は誰にも付与されない。ゆえに投稿 XP+50 の受給者は常に投稿者本人（監査 M3「公開者に付く」は本ガードにより発生しない誤検知・将来この経路を開くなら本テスト赤化で再検討を促す） | D.2／§8-⑥ |
 | D-TC-110 | api | 公開中の編集は strict | 公開アイデア | `PATCH /ideas/{id}`（body 空） | 422 | D.2 |
 | D-TC-111 | api | 完了後の編集凍結 | completed クエストのアイデア | `PATCH /ideas/{id}` | 409（invalid_state） | D.0/C.5 |
