@@ -4,16 +4,24 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-17 JST**（backend 全体スイートの通過を確認したセッション。コード変更なし）
+- 最終更新: **2026-09-17 JST**（backend 全体スイート通過の確認＋[B]② `GET /quests` の sort を実装したセッション）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **4656844** `docs(handoff): セッション末・全文更新（モーダルのチカつき修正=framer→CSS/DFT-E-012・[A]テスト完走・設計実態化）`（実装コミットの直上は `8e95e32` モーダル修正）
+- 最新コミット: **9aaeec9** `feat(quests): GET /quests に sort を実装（§1.8.1・複数キー・keyset）[B]②`（この後の handoff コミットが実 HEAD）
 - **push 済み・未 push 0**（`main...origin/main` 同期・確認済み）
-- 本セッションのコミット（古い順・すべて push 済み）＝ `be138e2`([A]Med完了)→`079fb62`([A]Low完了)→`f7d8cc9`(設計実態化＋ID重複解消)→`fb22cc3`(handoff更新)→`8e95e32`(モーダルチカつき修正)。
+- 本セッションのコミット（古い順・すべて push 済み）＝ `2a7c373`(handoff: backend全体592確認)→`9aaeec9`([B]② sort 実装)。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。
 
 ## 3. 今回やったこと（変更ファイルと理由）
+
+### 0. 本セッション（2026-09-17）＝backend 全体スイート確認 ＋ [B]② `GET /quests` の sort 実装
+- **backend 全体スイート green を確認**（592 passed／後述 §4）＝§7-6 の未確認を解消。
+- **[B]② `GET /quests` の `sort` を実装**（`9aaeec9`・§1.8.1／C.1）。router に `sort` 追加／application で whitelist 検証（未知キー→`422 validation_error`・`field="sort"`）・sort 解析・**カーソルをソートタプル内包形式へ再設計**（旧形式カーソルは 422＝仕様どおり）／repository で `idea_count`/`member_count` を**相関スカラサブクエリ**として SELECT に載せ SQL でソート/keyset（各行に属性付与＝DTO 集計も兼ね N+1 回避）・**mixed-direction keyset**（末尾 `id` DESC で一意化）・`deadline` は **NULLS LAST**。既定は `-created_at`（新着）維持。
+  - 変更ファイル＝`app/tenant/quests/{router,application,repository}.py`・テスト `tests/quests/test_{repository,api}.py`。
+  - テスト＝**C-TC-010/011/012**（int: 集計列ソート+keyset・deadline NULLS LAST・複数キー tiebreak）・**C-TC-106/107/108**（api: idea_count 降順・未知キー422・ソート指定時のカーソル安定）。red→green を目視（実装前6件 red）。
+  - 台帳＝`doc/テスト/カバレッジギャップ.md` [B]② を [x]／`doc/テスト/C_クエスト.md` に TC 行／`impl/README` SC-10 に注記。**frontend DataTable への `?sort=` 結線は未**（backend 契約は充足）。
+
 
 ### A. モーダル・バックドロップのチカチカ修正（`8e95e32`・今回の主作業）
 - **症状**＝モーダル/ダイアログの薄いグレーのバックドロップが常時チカチカ（Chrome/Edge 共通・ゲームOFF/HWアクセラOFFでも出る）。
@@ -35,8 +43,8 @@
 
 ## 4. 現在の状態（動作/テスト）
 - **動いているもの**＝フロント全画面 backend 接続済み。**モーダルのチカチカは解消**（ユーザー目視で確認済み）。
-- **テスト通過状況**＝**backend 全体スイート green を確認済み（2026-09-17）＝`592 passed, 3 warnings in ~74s`**（docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`）。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過。
-- **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 576 件すべて md 記載**（確認済み）。
+- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝sort 実装後 `598 passed, 3 warnings in ~84s`**（実装前の確認は 592 passed／+6=新規 sort TC）。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
+- **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 582 件すべて md 記載**（確認済み）。
 - **壊れているもの**＝認識している範囲では無し。
 - **コンテナ**＝本セッション末時点でフル起動中（frontend/backend/db/redis/minio/mailhog/worker/mail-worker）。次セッションでは落ちている想定＝§8 で再起動。
 
@@ -57,10 +65,10 @@
 ## 7. 次にやること（優先順・具体的に）
 1. **結果タブ Modal 化の受入＝完了扱い**（当初セッションの目的）。ダイアログのチカつき修正込みで正常動作を確認済み。回帰テスト要否は不要と判断（M-TC-015＋C-TC-201/202 でカバー）。
 2. **[A] 純テストは残ゼロ**＝`doc/テスト/カバレッジギャップ.md` の [A] セクションに未対応の純テストは無い（残る `[ ]` は [B] 実装ギャップ・[C] 乖離のみ）。
-3. **[B] 実装ギャップ（実装＋テスト・要ユーザー着手指示）**＝ ①認証イベントの監査ログ（`audit.record` が1箇所のみ・A.9-⑥）②`GET /quests` の `sort`（router に引数無し・C.1/§1.8.1）③ダッシュボード I-TC-107/108 ほか ④リアルタイム L-TC-103/131 ⑤`GET /items` フィルタ（`get_items` に filter 引数なし）⑥`chat_preview` 実装（将来）。
+3. **[B] 実装ギャップ（実装＋テスト・要ユーザー着手指示）**＝ ①認証イベントの監査ログ（**要精査**＝A.9-⑥。`audit.record` は auth 2種＋admin 多数で既に記録済み＝handoff 旧記述「1箇所のみ」は誤り。欠落イベントの有無を先に精査）②~~`GET /quests` の `sort`~~＝**2026-09-17 実装済み（`9aaeec9`・§3-0）** ③ダッシュボード I-TC-107/108 ほか ④リアルタイム L-TC-103/131 ⑤`GET /items` フィルタ（**要確認**＝そもそも G.1 でフィルタ仕様があるか。`get_items` に filter 引数なし）⑥`chat_preview` 実装（将来）。
 4. **[C] 設計・実装の乖離（要判断）**＝ ①無変更保存＝版なし（backend `update_idea` にサーバーガード無し）②メンション差し替え通知整合（`_notify_message_updated` は no-op）。
 5. **クエスト参加リクエスト設計ドラフト**（`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`）＝**まだドラフト・実装着手指示なし**。着手指示が出たら正規化（要件定義FR・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C/H・screens）へ展開。決定事項は当ドラフト §6/§8。
-6. **backend 全体スイートは 2026-09-17 に 592 passed を確認済み**（§4）。まとまった変更のたびに §8 の pytest コマンドで再確認する。
+6. **backend 全体スイートは 2026-09-17 に確認済み**（sort 実装後 598 passed・§4）。まとまった変更のたびに §8 の pytest コマンドで再確認する。
 
 ## 8. 再開に必要な環境情報
 - **作業ディレクトリ**＝リポジトリルート `/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から。
@@ -77,10 +85,10 @@
 
 ---
 ### 自己チェック（これだけで再開できるか）
-- ✅ 最新コミット `8e95e32`・push 状態・ブランチ明記。
-- ✅ 今回の主作業（モーダルチカつき修正＝framer→CSS）を原因・修正・記録先まで明記。
-- ✅ 併走の [A] テスト完走・設計実態化・ID重複解消も記録。
-- ✅ テスト状況＝追加分/e2e は green、**backend 全体スイートも 2026-09-17 に 592 passed で確認済み**と明記。
+- ✅ 最新実装コミット `9aaeec9`（[B]② sort）・push 状態・ブランチ明記。
+- ✅ 本セッションの主作業（backend 全体確認＋[B]② `GET /quests` sort 実装）を §3-0 に原因・設計判断・テストまで明記。
+- ✅ 前セッションのモーダルチカつき修正（framer→CSS）・[A] テスト完走・設計実態化も §3 に残置。
+- ✅ テスト状況＝追加6件/既存一覧TC green、**backend 全体スイートは sort 実装後 598 passed で確認済み**と明記。
 - ✅ 失敗アプローチ（CSSアニメ停止/backdrop-filter/translateZ/HWアクセラ/ゲームOFF）と、確定手順（mock A/B・Paint flashing）を §5 に記録＝次回同種問題の近道。
 - ✅ 再起動/ビルド/テストコマンド・**Disable cache の落とし穴**・seed 認証・受入用クエストID を §8 に明記。
-- ⚠️ 未確認事項＝(1) 設計ドラフトの実装着手指示（現時点なし）。※旧「backend 全体スイート未実行」は 2026-09-17 に 592 passed で解消済み。
+- ⚠️ 未確認事項＝(1) 設計ドラフトの実装着手指示（現時点なし）(2) frontend DataTable への `?sort=` 結線は未着手（backend 契約は充足）。
