@@ -151,6 +151,59 @@ def test_i_tc_110_login_bonus_one_shot(client, factory):
     assert second["login_bonus"] is None  # 消費済み
 
 
+def test_i_tc_107_weekly_ranking_populated(client, factory):
+    """I-TC-107 週間ランキング＝上位≤3（data）＋me（rank/score≥1）。ログインで当週 XP が入る（G.5 の read）。"""
+    _login_dash(client, factory)  # ログイン XP で当週スコア > 0
+    wr = client.get(DASH).json()["weekly_ranking"]
+    assert wr is not None
+    assert isinstance(wr["data"], list) and len(wr["data"]) <= 3  # 上位≤3（実装は get_rankings の data）
+    assert wr["me"] is not None and wr["me"]["rank"] >= 1 and wr["me"]["score"] >= 1
+
+
+def test_i_tc_108_notifications_populated(client, factory):
+    """I-TC-108 通知パネル＝data（≤5・新着降順）＋unread_count。未読を1件 seed（mention は ref 不要で描画可）。"""
+    acc, uid = _login_dash(client, factory)
+    with get_tenant_session(_db()) as ts:
+        ts.add(Notification(id=uuid.uuid4(), recipient_id=uid, type="mention",
+                            params={"actor_name": "テスト"}, is_read=False))
+        ts.commit()
+    try:
+        n = client.get(DASH).json()["notifications"]
+        assert n is not None
+        assert 1 <= len(n["data"]) <= 5
+        assert n["unread_count"] >= 1
+    finally:
+        with get_tenant_session(_db()) as ts:
+            ts.query(Notification).filter_by(recipient_id=uid).delete()
+            ts.commit()
+
+
+def test_i_tc_122_scoped_to_self_no_idor(client, factory, seeded):
+    """I-TC-122 他人の下書き/フォローが在っても自分の drafts/followed のみ（自スコープ＝§1.5／§2.2・IDOR面を増やさない）。"""
+    acc, uid = _login_dash(client, factory)
+    seeded["build"](uid)  # 自分の下書き「下書きアイデア」・フォロー「公開B」
+    ids = seeded["ids"]
+    other_draft = uuid.uuid4()
+    with get_tenant_session(_db()) as ts:
+        ts.add(Idea(id=other_draft, quest_id=ids["qid"], author_id=ids["other_id"],
+                    title="他人の下書き", body="b", value="v", status="draft"))
+        ts.add(Follow(id=uuid.uuid4(), user_id=ids["other_id"], idea_id=ids["pub_a"]))  # 他人のフォロー
+        ts.commit()
+    try:
+        b = client.get(DASH).json()
+        draft_titles = {d["title"] for d in b["drafts"] if d["kind"] == "idea"}
+        assert "下書きアイデア" in draft_titles       # 自分の下書きは出る
+        assert "他人の下書き" not in draft_titles      # 他人の下書きは出ない（author スコープ）
+        followed_titles = {i["title"] for i in b["followed_ideas"]}
+        assert followed_titles == {"公開B"}            # 自分のフォローのみ（他人の pub_a フォローは出ない）
+    finally:
+        with get_tenant_session(_db()) as ts:
+            ts.execute(Follow.__table__.delete().where(
+                Follow.idea_id == ids["pub_a"], Follow.user_id == ids["other_id"]))
+            ts.execute(Idea.__table__.delete().where(Idea.id == other_draft))
+            ts.commit()
+
+
 def test_i_tc_121_unauthenticated(client):
     """I-TC-121 未認証は 401。"""
     client.cookies.clear()
