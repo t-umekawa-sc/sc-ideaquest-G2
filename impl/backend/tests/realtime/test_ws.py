@@ -85,6 +85,35 @@ def test_l_tc_104_read_publishes_unread_count(factory):
             assert evt["data"]["unread_count"] == 0
 
 
+def test_l_tc_103_rollback_not_delivered(factory):
+    """L-TC-103 notify() は post-commit のみ配信＝rollback したセッションの通知は届かない（after_rollback で drop）。
+
+    post-commit 配信の肯定は L-TC-102/103（上）。本テストは否定側＝rollback 分が来ないことを、
+    続く commit 分だけが届く順序（L-TC-105 と同技法）で確認する。
+    """
+    with TestClient(app) as client:
+        _acc, uid = _login_ws_user(client, factory)
+        with client.websocket_connect(REALTIME) as ws:
+            # rollback するセッションで notify（after_rollback で保留配信を捨てる）→ 配信されない
+            with get_tenant_session(_db()) as s:
+                notify_svc.notify(s, [notify_svc.entry(uid, "mention", params={"actor_name": "ロールバック"})])
+                s.rollback()
+            # 続けて commit する notify → こちらは届く（rollback 分が先に来ないことを順序で担保）
+            _seed_notify(uid, actor="コミット")
+            evt = ws.receive_json()
+            assert evt["type"] == "notification.created"
+            assert "コミット" in evt["data"]["body"]  # rollback 分は届かず、commit 分だけ受信
+
+
+def test_l_tc_131_bad_origin_rejected(factory):
+    """L-TC-131 WS ハンドシェイクの Origin 検証＝許可外 Origin は accept せずクローズ（1008・§1.4/A.0）。"""
+    with TestClient(app) as client:
+        _login_ws_user(client, factory)  # 認証済みでも Origin 検証が先行し弾く（router L.1）
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(REALTIME, headers={"origin": "http://evil.example"}):
+                pass
+
+
 def test_l_tc_105_cross_tenant_filtered(factory):
     """L-TC-105 company_id 不一致の event は届かない（一致 event のみ受信＝順序で検証）。"""
     with TestClient(app) as client:

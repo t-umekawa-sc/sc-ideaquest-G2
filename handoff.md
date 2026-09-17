@@ -6,9 +6,9 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-09-17 JST**（[B]② sort＋一覧状態復元＋[C]①②＋[B]③ダッシュボード＋[B]⑤ shop 完全サーバー委譲＋一覧規約化のセッション）
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット。`feature/game-feel` は今回未使用）
-- 最新コミット: **3bb7c73** `docs(convention): 新規一覧は最初からサーバー委譲契約で作る（作り直し回避）`（この後の handoff コミットが実 HEAD）
+- 最新コミット: **3542e9c** `feat(auth): 認証イベントの監査ログを補完（[B]①・A.9-⑥・A-TC-111〜115）`（＋[B]④ realtime テスト・この後の handoff コミットが実 HEAD）
 - **push 済み・未 push 0**（`main...origin/main` 同期・確認済み）
-- 本セッションのコミット（古い順・すべて push 済み）＝ `9aaeec9`([B]② sort)→`3944c16`(一覧状態復元)→`a57da50`([C]①)→`a25d1b3`([C]②)→`894a3fb`([B]③)→`78fb955`(list_query→core)→`002f0d8`([B]⑤ backend契約)→`0870d53`(state多値)→`d3b2de3`([B]⑤ frontend server)→`3bb7c73`(一覧規約化)＋各 handoff。
+- 本セッションのコミット（古い順・すべて push 済み）＝ `9aaeec9`([B]② sort)→`3944c16`(一覧状態復元)→`a57da50`([C]①)→`a25d1b3`([C]②)→`894a3fb`([B]③)→`78fb955`(list_query→core)→`002f0d8`([B]⑤ backend契約)→`0870d53`(state多値)→`d3b2de3`([B]⑤ frontend server)→`3bb7c73`(一覧規約化)→`3542e9c`([B]① 認証監査ログ)→[B]④ realtime テスト＋各 handoff。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`）。現在は**ブラウザ受入フェーズ**＝全画面 backend 接続済み。
@@ -48,7 +48,7 @@
 
 ## 4. 現在の状態（動作/テスト）
 - **動いているもの**＝フロント全画面 backend 接続済み。**モーダルのチカチカは解消**（ユーザー目視で確認済み）。
-- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝`614 passed`**（推移＝592→sort 598→[C]①599→[C]②600→[B]③+7=607→[B]⑤ shop server契約+7=614）。フロント e2e＝一覧状態復元2件（M-TC-016/017）＋shop 6件（`sc-30-shop`/`sc-30-shop-server`＝G-TC-202/203/318・balance-sync）green。`npm run build` 通過。**注意＝pytest 全体実行時は `worker`＋`mail-worker` 両方を止める**（`docker compose stop worker mail-worker`）＝稼働のままだと outbox 系（`test_b_tc_005`）がリトライ競合でまれに落ちる（フレーク・単独 green・§8）。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
+- **テスト通過状況**＝**backend 全体スイート green（2026-09-17）＝`622 passed`**（推移＝592→…→[B]⑤ 614→[B]① 認証監査+5=620→[B]④ realtime+2=622）。フロント e2e＝一覧状態復元2件（M-TC-016/017）＋shop 6件（`sc-30-shop`/`sc-30-shop-server`＝G-TC-202/203/318・balance-sync）green。`npm run build` 通過。**注意＝pytest 全体実行時は `worker`＋`mail-worker` 両方を止める**（`docker compose stop worker mail-worker`）＝稼働のままだと outbox 系（`test_b_tc_005`）がリトライ競合でまれに落ちる（フレーク・単独 green・§8）。実行＝docker フル起動→mail-worker停止→`docker compose run --rm -T -v backend:/app backend python -m pytest -q`。warning 3 件は依存の Deprecation（httpx/anyio/alembic）で結果に影響なし。フロント e2e はモーダル5件 green（`sc-11` C-TC-201〜204・`sc-99-modal-backdrop` M-TC-015）。`npm run build`（tsc＋ESLint＋Next lint）通過（今回 frontend 未変更）。
 - **トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` = **✅ code 582 件すべて md 記載**（確認済み）。
 - **壊れているもの**＝認識している範囲では無し。
 - **コンテナ**＝本セッション末時点でフル起動中（frontend/backend/db/redis/minio/mailhog/worker/mail-worker）。次セッションでは落ちている想定＝§8 で再起動。
@@ -70,7 +70,7 @@
 ## 7. 次にやること（優先順・具体的に）
 1. **結果タブ Modal 化の受入＝完了扱い**（当初セッションの目的）。ダイアログのチカつき修正込みで正常動作を確認済み。回帰テスト要否は不要と判断（M-TC-015＋C-TC-201/202 でカバー）。
 2. **[A] 純テストは残ゼロ**＝`doc/テスト/カバレッジギャップ.md` の [A] セクションに未対応の純テストは無い（残る `[ ]` は [B] 実装ギャップ・[C] 乖離のみ）。
-3. **[B] 実装ギャップ（実装＋テスト・要ユーザー着手指示）**＝ ①認証イベントの監査ログ（**要精査**＝A.9-⑥。`audit.record` は auth 2種＋admin 多数で既に記録済み＝handoff 旧記述「1箇所のみ」は誤り。欠落イベントの有無を先に精査）②~~`GET /quests` の `sort`~~＝**実装済み（`9aaeec9`）** ③~~ダッシュボード populated~~＝**2026-09-17 テスト追加済み（`894a3fb`・I-TC-107/108/122/131/141〜143・実装は既済で純テスト不足だった）** ④リアルタイム L-TC-103/131（未対応・台帳にIDあるが未実装） ⑤~~`GET /items` フィルタ~~＝**2026-09-17 完了（B2+ 完全サーバー委譲）**＝backend G.1拡張（q/slot/rarity/owned/affordable/state/price範囲/sort/番号ページャ/pin/CSV・`list_query`共用）＋ShopView を DataTable サーバーモード化（`d3b2de3`ほか・G-TC-310〜318）。⑥`chat_preview` 実装（将来）。
+3. **[B] 実装ギャップ**＝ ①~~認証イベントの監査ログ~~＝**2026-09-17 完了（`3542e9c`・A.9-⑥・A-TC-111〜115）**＝login成功/失敗・account_locked・mfa issued/verify・logout/logout_all・password_setup.request(自己) を補完（既存の new_device/password_changed/管理者reset/role変更に追加） ②~~`GET /quests` sort~~＝**実装済み（`9aaeec9`）** ③~~ダッシュボード populated~~＝**テスト追加済み（`894a3fb`・I-TC-107/108/122/131/141〜143）** ④~~リアルタイム L-TC-103/131~~＝**2026-09-17 テスト追加済み（`3542e9c` 後・両挙動は本番実装済みで純テスト不足＝rollback非配信・WS Origin拒否）** ⑤~~`GET /items` フィルタ~~＝**完了（B2+ 完全サーバー委譲・`d3b2de3`ほか）** ⑥`chat_preview` 実装（将来）。**→ [B] 残は ⑥（将来）のみ**。
 4. **[C] 設計・実装の乖離＝両方 2026-09-17 実装済み**＝ ①~~無変更保存＝版なし~~（`a57da50`・`update_idea` が差分ゼロなら版/通知スキップ・D-TC-229・D.4 反映） ②~~メンション差し替え通知整合~~（`a25d1b3`・決定A＝編集で追加された被メンションのみ通知・E-TC-228・E.2/E.6 反映）。**[C] 残なし**。
 5. **クエスト参加リクエスト設計ドラフト**（`doc/設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md`）＝**まだドラフト・実装着手指示なし**。着手指示が出たら正規化（要件定義FR・データモデル `quest_follows`/`quest_join_requests`/`quests.discoverable`・API設計C/H・screens）へ展開。決定事項は当ドラフト §6/§8。
 6. **backend 全体スイートは 2026-09-17 に確認済み**（無変更ガード後 599 passed・§4）。まとまった変更のたびに §8 の pytest コマンドで再確認する。
