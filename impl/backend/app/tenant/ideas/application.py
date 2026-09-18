@@ -211,7 +211,12 @@ def create_idea(account_id, company_id, quest_id, *, body) -> dict:
             xp_delta = _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
+        published = body.status == "published"
+        actor_id = user.id
         ts.commit()
+    if published:  # フォロワーへ new_ideas 通知（H quest_watch_update・C.9/FR-40・post-commit・公開者除外）
+        from app.tenant.quests import application as quests_app
+        quests_app.notify_quest_watch_new_ideas(company_id, qid, actor_id=actor_id)
     return detail
 
 
@@ -278,7 +283,12 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         xp_delta = _publish_processing(ts, idea, user)
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
+        q_id = idea.quest_id
+        actor_id = user.id
         ts.commit()
+    # フォロワーへ new_ideas 通知（H quest_watch_update・C.9/FR-40・post-commit・公開者除外）
+    from app.tenant.quests import application as quests_app
+    quests_app.notify_quest_watch_new_ideas(company_id, q_id, actor_id=actor_id)
     return detail
 
 

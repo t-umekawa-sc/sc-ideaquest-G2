@@ -30,6 +30,7 @@ ICON = {
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
     "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
+    "quest_watch_update": "👀",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
 }
 
@@ -163,6 +164,26 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
                 else f"{actor} さんがクエスト「{qt}」への参加をリクエストしました")
         context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
         tag = "Join request" if en else "参加リクエスト"
+    elif t == "quest_watch_update":
+        # フォロー中クエストのメタ更新（C.9・FR-40）＝すべてメタ級（本文/中身は非メンバーに開かない）。
+        quest = session.get(Quest, n.ref_quest_id) if n.ref_quest_id else None
+        qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")
+        ev = p.get("event")
+        if ev == "completed":
+            body = (f'A quest you follow, "{qt}", was completed' if en
+                    else f"フォロー中のクエスト「{qt}」が完了しました")
+        elif ev == "deadline":
+            dl = p.get("deadline")
+            body = (f'The deadline of a quest you follow, "{qt}", changed{f" to {dl}" if dl else ""}' if en
+                    else f"フォロー中のクエスト「{qt}」の締切が変更されました{f'（{dl}）' if dl else ''}")
+        elif ev == "new_ideas":
+            body = (f'New ideas were posted in a quest you follow, "{qt}"' if en
+                    else f"フォロー中のクエスト「{qt}」に新しいアイデアが投稿されました")
+        else:  # status_changed
+            body = (f'The status of a quest you follow, "{qt}", changed' if en
+                    else f"フォロー中のクエスト「{qt}」の状態が変わりました")
+        context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
+        tag = "Follow" if en else "フォロー"
     elif t == "join_request_decided":
         quest = session.get(Quest, n.ref_quest_id) if n.ref_quest_id else None
         qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")

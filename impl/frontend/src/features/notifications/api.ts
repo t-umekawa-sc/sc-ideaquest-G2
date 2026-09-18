@@ -40,6 +40,9 @@ export function notificationHref(n: NotificationDTO): string | null {
   if (r.chat_message_id && r.idea_id) return `/ideas/${r.idea_id}/chat`;
   if (r.idea_id) return `/ideas/${r.idea_id}`;
   if (r.achievement_id) return "/achievements";
+  // フォロー更新（quest_watch_update）＝宛先はフォロワー＝非メンバー。メンバー内容（/quests/{id}）は開かず
+  // 発見カタログ（SC-13）へ誘導（メタ級・C.9/FR-40）。他の quest 系（結果/招集）はメンバー宛なので従来どおり。
+  if (n.type === "quest_watch_update") return "/quest-catalog";
   if (r.quest_id) return `/quests/${r.quest_id}`;
   return null;
 }

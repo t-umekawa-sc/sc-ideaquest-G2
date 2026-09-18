@@ -16,7 +16,8 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat.orm import ChatGroup, ChatMessage
-from app.tenant.ideas.orm import Idea
+from app.tenant.gamification.orm import Activity
+from app.tenant.ideas.orm import Idea, IdeaRevision
 from app.tenant.notifications.orm import Notification
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
@@ -84,11 +85,13 @@ def env():
             if cgids:
                 ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cgids)))
                 ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id.in_(cgids)))
+            ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(iids)))  # 公開時の版（C-TC-281）
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
         ts.execute(Notification.__table__.delete().where(Notification.ref_quest_id.in_(qids)))
         ts.execute(QuestFollow.__table__.delete().where(QuestFollow.quest_id.in_(qids)))
         ts.execute(QuestJoinRequest.__table__.delete().where(QuestJoinRequest.quest_id.in_(qids)))
         ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(qids)))  # API 作成分（C-TC-276）
+        ts.execute(Activity.__table__.delete().where(Activity.quest_id.in_(qids)))  # 完了/公開のゲーム活動（C-TC-281）
         mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(qids))).scalars())
         if mids:
             ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
@@ -481,3 +484,63 @@ def test_c_tc_277_update_discoverable_toggles_catalog(client, factory, env):
     assert down.status_code == 200 and down.json()["discoverable"] is False
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     assert qid not in _catalog_ids(client)
+
+
+def _watch_events(env, qid):
+    """viewer に届いた quest_watch_update の event 一覧（テスト補助）。"""
+    with get_tenant_session(env.db) as ts:
+        ns = ts.execute(select(Notification).where(
+            Notification.recipient_id == env.viewer_id, Notification.ref_quest_id == uuid.UUID(qid),
+            Notification.type == "quest_watch_update")).scalars().all()
+        return [n.params.get("event") for n in ns]
+
+
+def _create_discoverable_via_api(client, owner_acc, env, title):
+    """owner が recruiting・全社・discoverable のクエストを API 作成し id を返す（env.quests に登録）。"""
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    r = client.post("/api/v1/quests", json={
+        "title": title, "color": "#3B82F6", "categories": ["改善"], "status": "recruiting", "discoverable": True,
+    }, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]
+    env.quests.append(uuid.UUID(qid))
+    return qid
+
+
+def test_c_tc_280_watch_status_deadline_and_expiry(client, factory, env):
+    """C-TC-280 quest_watch_update＝フォロワーへ status_changed/deadline／非discoverable 化で動的失効。"""
+    owner_acc, _ouid = _make_owner(env, factory)
+    qid = _create_discoverable_via_api(client, owner_acc, env, "Watch対象1")
+    # viewer がフォロー。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{qid}/follow", headers=_csrf(client)).status_code == 200
+    # owner が状態遷移＋締切変更。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/transition", json={"to": "in_progress"}, headers=_csrf(client)).status_code == 200
+    assert client.patch(f"/api/v1/quests/{qid}", json={"deadline": "2027-01-31"}, headers=_csrf(client)).status_code == 200
+    ev = _watch_events(env, qid)
+    assert "status_changed" in ev and "deadline" in ev, ev
+    n_before = len(ev)
+    # 非discoverable 化 → 以降の遷移はフォロワーに通知しない（発見可能な間のみ・動的失効）。
+    assert client.patch(f"/api/v1/quests/{qid}", json={"discoverable": False}, headers=_csrf(client)).status_code == 200
+    assert client.post(f"/api/v1/quests/{qid}/transition", json={"to": "evaluating"}, headers=_csrf(client)).status_code == 200
+    assert len(_watch_events(env, qid)) == n_before  # 失効後は増えない
+
+
+def test_c_tc_281_watch_new_ideas_and_completed(client, factory, env):
+    """C-TC-281 quest_watch_update＝フォロワーへ new_ideas（公開者除外）と completed。"""
+    owner_acc, _ouid = _make_owner(env, factory)
+    qid = _create_discoverable_via_api(client, owner_acc, env, "Watch対象2")
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{qid}/follow", headers=_csrf(client)).status_code == 200
+    # owner が公開アイデアを投稿 → new_ideas。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    ir = client.post(f"/api/v1/quests/{qid}/ideas", json={
+        "title": "I1", "body": "本文テキスト", "value": "提供価値", "status": "published",
+    }, headers=_csrf(client))
+    assert ir.status_code == 201, ir.text
+    # completed まで前進（recruiting→in_progress→evaluating→completed）。
+    for to in ("in_progress", "evaluating", "completed"):
+        assert client.post(f"/api/v1/quests/{qid}/transition", json={"to": to}, headers=_csrf(client)).status_code == 200, to
+    ev = _watch_events(env, qid)
+    assert "new_ideas" in ev and "completed" in ev, ev

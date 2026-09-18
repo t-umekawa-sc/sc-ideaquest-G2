@@ -7,8 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { markNotificationRead, notificationHref, type NotificationDTO } from "./api";
 
-function notif(ref: Record<string, string>): NotificationDTO {
-  return { ref } as unknown as NotificationDTO;
+function notif(ref: Record<string, string>, type?: string): NotificationDTO {
+  return { ref, type } as unknown as NotificationDTO;
 }
 
 describe("H-TC-209 notificationHref", () => {
@@ -23,6 +23,11 @@ describe("H-TC-209 notificationHref", () => {
   });
   it("quest_id → クエストURL", () => {
     expect(notificationHref(notif({ quest_id: "q1" }))).toBe("/quests/q1");
+  });
+  it("quest_watch_update（フォロー更新＝非メンバー）→ 発見カタログ（メンバー内容は開かない）", () => {
+    expect(notificationHref(notif({ quest_id: "q1" }, "quest_watch_update"))).toBe("/quest-catalog");
+    // 結果/招集などメンバー宛の quest 系は従来どおり /quests/{id}。
+    expect(notificationHref(notif({ quest_id: "q1" }, "quest_result_ready"))).toBe("/quests/q1");
   });
   it("ref 無し → null（遷移なし）", () => {
     expect(notificationHref({} as unknown as NotificationDTO)).toBeNull();

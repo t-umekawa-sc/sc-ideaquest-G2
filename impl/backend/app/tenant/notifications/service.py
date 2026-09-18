@@ -42,8 +42,9 @@ TYPE_PRIORITY = {
     "quest_result_ready": 9,
     "join_request_received": 10,
     "join_request_decided": 11,
-    "security_new_device": 12,
-    "security_password_changed": 13,
+    "quest_watch_update": 12,
+    "security_new_device": 13,
+    "security_password_changed": 14,
 }
 
 _REF_KEYS = (

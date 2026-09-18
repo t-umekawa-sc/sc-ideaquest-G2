@@ -350,7 +350,9 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                 409, "conflict", detail="完了後は編集できません",
                 extra={"errors": [{"reason": "invalid_state"}]},
             )
+        prev_deadline = quest.deadline  # watch 通知（deadline 変更）の判定用に適用前を保持
         _apply_content(ts, quest, body)
+        deadline_changed = "deadline" in body.model_fields_set and quest.deadline != prev_deadline
         # 参加部署の差分（フラット 0..N・すべて同格・FR-38 再設計）＝あるべき全体像へ差分適用。party 差分より先に確定。
         # 参加部署を外すのはブロックしない（409 group_in_use 廃止）＝門番の都度再判定で失効を表現する（C.0）。
         if "quest_group_ids" in body.model_fields_set and body.quest_group_ids is not None:
@@ -366,9 +368,12 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                 title=quest.title, color=quest.color,
                 categories=repo.list_categories(ts, quest.id),
             )
+        new_deadline = quest.deadline.isoformat() if quest.deadline else None
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
     _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・全体編集での除外も失効）
+    if deadline_changed:  # フォロワーへ watch 更新（締切変更・メタ級・発見可能な間のみ・行為者除外）
+        _notify_quest_watch_update(company_id, qid, {"event": "deadline", "deadline": new_deadline}, exclude=(user.id,))
     return detail
 
 
@@ -926,6 +931,7 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
                 title=quest.title, color=quest.color,
                 categories=repo.list_categories(ts, quest.id),
             )
+        from_status = quest.status  # watch 通知（status_changed）の補足用に遷移前を保持
         quest.status = to
         result_recipients: list[uuid.UUID] = []
         if to == "completed":
@@ -940,6 +946,10 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         ts.commit()
     if to == "completed" and result_recipients:
         _notify_quest_result_ready(company_id, qid, result_recipients, user.id)
+    # フォロワーへ watch 更新（H quest_watch_update・メタ級・発見可能な間のみ・行為者除外）。
+    watch_params = ({"event": "completed"} if to == "completed"
+                    else {"event": "status_changed", "from_status": from_status, "to_status": to})
+    _notify_quest_watch_update(company_id, qid, watch_params, exclude=(user.id,))
     return detail
 
 
@@ -1467,6 +1477,45 @@ def get_quest_activity(account_id, company_id, quest_id) -> dict:
         if not repo.can_access_quest(ts, quest, user.id):
             raise AppError(404, "not_found")  # C.0 門番（作成者別格・参加部署の都度再判定）
         return _quest_activity(ts, quest.id)
+
+
+def _discoverable_follower_ids(ts, quest, *, exclude=()) -> list[uuid.UUID]:
+    """quest_watch_update の宛先＝**発見可能な間のみ**のフォロワー（C.9・動的失効）。
+
+    discoverable フラグが OFF なら空（watch は休眠）。参加部署0件＝全社→全フォロワー／部署指定→その参加部署に
+    現所属のフォロワーのみ（異動で部署外になった人は自然に失効）。exclude は除外（行為者等）。status は問わない
+    ＝完了（completed＝非 DISCOVERABLE_STATUS）への遷移でも「完了した」ことはフォロワーへ通知する（FR-40）。
+    """
+    if quest is None or not quest.discoverable:
+        return []
+    followers = [f for f in repo.list_follower_ids(ts, quest.id) if f not in set(exclude)]
+    if not followers:
+        return []
+    link_gids = repo.list_group_ids_for_quest(ts, quest.id)
+    if not link_gids:
+        return followers  # 全社公開＝全フォロワーが発見可能
+    gset = set(link_gids)
+    ok = {uid for uid, gid, _role in qg_repo.list_active_memberships_for_users(ts, followers) if gid in gset}
+    return [f for f in followers if f in ok]
+
+
+def _notify_quest_watch_update(company_id, quest_id, params, *, exclude=()) -> None:
+    """フォロー中クエストのメタ更新通知（H `quest_watch_update`・post-commit・メタ級）。
+
+    宛先は post-commit のセッションで解決（コミット済みの最新状態で発見可否＝動的失効を判定）。
+    """
+    def _build(ts):
+        quest = repo.get_quest(ts, quest_id)
+        targets = _discoverable_follower_ids(ts, quest, exclude=exclude)
+        refs = {"ref_quest_id": quest_id}
+        return [notify_svc.entry(r, "quest_watch_update", refs=refs, params=params) for r in targets]
+    notify_svc.dispatch(company_id, _build)
+
+
+def notify_quest_watch_new_ideas(company_id, quest_id, *, actor_id=None) -> None:
+    """アイデア公開でフォロワーへ new_ideas 通知（D ドメインから呼ぶ・C.9/FR-40）。公開者は除外。"""
+    _notify_quest_watch_update(company_id, quest_id, {"event": "new_ideas"},
+                               exclude=(actor_id,) if actor_id else ())
 
 
 def _load_discoverable(ts, account_id, quest_id):

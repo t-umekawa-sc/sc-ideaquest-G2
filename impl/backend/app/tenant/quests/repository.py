@@ -906,6 +906,13 @@ def remove_quest_follow(session: Session, quest_id: uuid.UUID, user_id: uuid.UUI
         session.delete(row)
 
 
+def list_follower_ids(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストのフォロワー user_id 一覧（quest_watch_update 通知の宛先候補・C.9/FR-40）。"""
+    return list(session.execute(
+        select(QuestFollow.user_id).where(QuestFollow.quest_id == quest_id)
+    ).scalars().all())
+
+
 # --- 参加リクエスト ---
 
 def get_join_request(session: Session, quest_id: uuid.UUID, user_id: uuid.UUID) -> QuestJoinRequest | None:
