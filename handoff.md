@@ -4,13 +4,20 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-18 JST**（本セッション＝**FR-40 ダッシュボード「未処理の参加リクエスト」領域＋通知ディープリンク**と、**参照系/入力系ダイアログのデザイン統一**まで）。
+- 最終更新: **2026-09-18 JST**（本セッション＝**FR-40 ダッシュボード「未処理の参加リクエスト」領域＋通知ディープリンク**／**参照系・入力系ダイアログのデザイン統一**〔実装〕／**情報インプット機能の設計を実体化**〔ドキュメントのみ・未実装〕まで）。
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット可）。`feature/game-feel` は今回未使用。working tree clean。
-- 最新コミット: **cca6129**（push 済み・`origin/main` と同期）。
+- 最新コミット: **74652ec**（push 済み・`origin/main` と同期）。
 - **本セッションのコミット（古い順・push 済み）**＝
-  - `3f96300` feat(quests/ui) ダッシュボード未処理リクエスト領域＋通知ディープリンク＋参照/入力ダイアログのデザイン統一
+  - `3f96300` feat(quests/ui) ダッシュボード未処理リクエスト領域＋通知ディープリンク＋参照/入力ダイアログのデザイン統一（不具合修正込み＝パーティー中央線 stretch／参加リクエスト行の focus リング／振り返り編集の Field 統一・display:block／任意項目 `.optional` の枠・件名上罫／`.dialog-section` 上下対称余白）
   - `cca6129` docs(design) フッター「キャンセル/閉じる」使い分け規則の明文化＋§4.1 記述の最新化
-- 前セッション末＝`ed81199`（FR-40 完走の handoff）。FR-40 の各機能（受信側 SC-12／discoverable／活発度／フォロー通知／SC-01 結線／業務通知メール）は前セッションで完了済み（詳細は git 履歴 `8248f06`〜`1d4d56a`）。
+  - `d5620fe` docs(handoff,readme) 前半セッション分の追随
+  - `4331bf7` docs(design) 情報インプットドラフトをレビュー完了（残論点①〜⑥確定）
+  - `67761b0` docs(datamodel) 情報インプットをデータモデルへ実体化（§5.33-5.37＋enum）
+  - `5707f95` docs(api) 情報インプットを API 設計へ実体化（新ドメイン N・N-TC）
+  - `c3a45f1` docs(screen) 情報インプットの画面設計（SC-50/51/52＋関連情報パネル＋遷移図）
+  - `d9f75b8` docs(req) 情報インプットを FR-41 として起票（実体化4点完了）
+  - `74652ec` fix(quest-result) KPI 明細の削除ボタンを赤（btn-danger）に
+- 前セッション末＝`ed81199`（FR-40 完走の handoff）。FR-40 の各機能（受信側 SC-12／discoverable／活発度／フォロー通知／SC-01 結線／業務通知メール）は前セッションで完了済み（git 履歴 `8248f06`〜`1d4d56a`）。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`・会社ごと物理分離DB）。全画面 backend 接続済み。FR-40（クエスト発見/フォロー/参加リクエスト）は完了。
@@ -36,6 +43,16 @@
 - **パーティー2カラムの中央仕切り線が途中で切れる**＝`quests.css .party__cols` を `align-items: stretch`（既定 start だと短い側の `border-left` が content 高さ止まり）。
 - **参加リクエスト行の黒アウトライン**＝モーダルを閉じてフォーカスが起動行（`role=button tabIndex=0`）へ戻る際の既定アウトライン → `.join-req-row:focus-visible` をアプリ標準の内側リングに。
 - **振り返り編集（QuestResultTab）の「次アクション」ラベル被り**＝`.qresult__label` が `display` 未指定で `<label>` がインライン化しボタン隣に流れていた → `display:block`。さらに編集モーダルを**標準 `Field` に統一**（独自 `.qresult__label`＋`.stack` はラベル書式・余白が他と不一致だった）。結果**表示**ビューの `.qresult__label` は小見出し用途で維持。
+- **KPI 明細の削除ボタン（`74652ec`）**＝`btn-outline`→`btn-danger`（一覧明細の削除＝赤基調の流儀・パーティー一括除外と同じ）。
+
+### D. 情報インプット機能の設計を実体化（**ドキュメントのみ・未実装**・`4331bf7`〜`d9f75b8`）
+- **これはコードではなく設計ドキュメント**（外部WEB情報を手動貼付→属性→アイデア/コンセプト/クエストへ動的リンク＝差別化の核・FR-41）。実装は未着手。
+- **残論点①〜⑥を確定**（`4331bf7`・設計ドラフト §11）＝①権限 `info_curator`（会社単位・付与=会社アカウント管理者）②enum は MVP 固定/会社拡張 Phase2 ③削除=本人 raw のみ/判定後は info_curator アーカイブ（論理・監査保持）④期限日=対応/有効期限（影響発生時期とは別軸）⑤影響分類(本体)×リンク種別(per-link)併用・**反証発火は per-link のみ**⑥重複=MVP 警告のみ。
+- **データモデル**（`67761b0`）＝`doc/データモデル.md` §5.33 `info_items`／§5.34 `info_item_categories`（#8 M:N）／§5.35 `info_links`（多態 target・kind 関連/裏付け/反証・origin auto/manual・score）／§5.36 `info_tokens`（janome 派生）／§5.37 `info_curators`（会社権限）＋§3 に `info_*` enum 14種。
+- **API**（`5707f95`）＝新ドメイン **N**（`doc/API設計/N_情報インプット.md`・README 索引 N・テスト接頭辞 **N-TC**）。登録=全員／属性・判定・アーカイブ=info_curator／リンク自動(内部トリガ)・手動追加/種別変更/棄却／SSRF対象外・URL http(s)・本文サニタイズ。
+- **画面**（`c3a45f1`）＝`SC-50 情報インプット.md`（一覧=SC-50 DataTableサーバー委譲＋ワードクラウド／登録編集=SC-51 モーダル／詳細=SC-52 モーダル＋関連リンク／§8 関連情報パネルを SC-22/SC-12/コンセプトへ内包）＋画面遷移図に反映。
+- **FR**（`d9f75b8`）＝要件定義 README **FR-41**（Should）。
+- **実装時の入口**＝正＝設計ドラフト §10（実体化4点✅・残は実装のみ）／モック先行（`mocks/SC-50_*.html`）→ backend 新ドメイン `tenant/info`（4層・janome 再利用）→ frontend `features/info-input`（一覧は最初からサーバー委譲契約）。`info_link_target=concepts/assumptions` はコンセプト段で実体化。
 
 ## 4. 現在の状態（動作/テスト）
 - **動いているもの**＝ダッシュボード未処理リクエスト領域→ダイアログ承認/却下（seed `user@acme` で実機確認）／通知リンク（新規通知のみ deep-link）／ダイアログ統一（参加リクエスト・クエスト作成・アイデア作成の任意項目 開/閉・を実機スクショ確認）。
@@ -64,8 +81,9 @@
 2. **社内レビュー残**（memory）＝①評価ダイアログのクエスト情報（**既に「クエストを確認」で表示あり＝実装済みの可能性大・要裏取り**）②クエスト最終結果の機能実装（FR-39・SC-12 結果タブ）。着手前にコードで現況裏取り（handoff/テストmd の「未実装」は既に done が多い）。
 3. **SC-12 受信側の通し e2e**（owner がパーティータブで承諾→メンバー化＋バッジ）＝`doc/テスト/カバレッジギャップ.md ［A］` に登録済み。owner＋申請者の2ユーザー（`owner2@acme.example`）。
 4. **（任意）通知 `join_request_received` の applicant_id backfill**＝既存通知もディープリンク化したい場合、各通知を ref_quest_id のクエストの pending 申請に紐付けて params.applicant_id を補填（ヒューリスティック＝クエスト+通知で申請者1名想定）。
-5. **コンセプト機能／情報インプット機能の設計**（差別化の核・memory `concept-feature-design-split`/`info-input-feature-design`）＝FR-39 置換後の②③段。大物・別フェーズ。設計ドラフト `doc/設計ドラフト/`。
-6. **推奨**＝まとまった変更の前に backend 全体スイートを一度回す。メール系を触ったら mail-worker 再ビルド（§8）。
+5. **情報インプット機能の実装**（設計は §3-D で4点実体化済み＝FR-41／データモデル §5.33-5.37／API N／SC-50-52）＝**次段は実装フェーズ**。モック先行（`mocks/SC-50_*.html`）→ backend 新ドメイン `tenant/info`（4層・janome 再利用・migration で `info_*` テーブル/enum）→ frontend `features/info-input`（一覧は最初からサーバー委譲契約）。実装順は `doc/実装計画.md` に位置づけ要（現状は未記載）。
+6. **コンセプト機能の設計**（差別化の核・memory `concept-feature-design-split`）＝FR-39 置換後の②③段。情報インプットと対（`info_link_target=concepts/assumptions`・「前提1件=1スレッド」§3.5）。設計ドラフト `コンセプト機能_ISO56002_再設計.md` の実体化（データモデル/API/画面/FR）が残。
+7. **推奨**＝まとまった変更の前に backend 全体スイートを一度回す。メール系を触ったら mail-worker 再ビルド（§8）。
 
 ## 8. 再開に必要な環境情報
 - **作業ディレクトリ**＝`/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から。

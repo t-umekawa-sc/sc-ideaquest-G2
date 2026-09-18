@@ -113,6 +113,8 @@
 
 **ダイアログ内コンテンツ標準（デザイン標準 §4.1・2026-09-18）**＝参照系＋入力系で本文を「囲まない＋項目ごとの薄い仕切り線」に統一（共通 `.dialog-*`＝`design-system.css`／mock `style-guide.html`「10b」）。装飾枠は撤去（評価 `.eval-idea`／評価フォーム外周 `.card`〔モーダル時〕／アイデア文脈 `.card`）・機能枠は維持（`.vis-opt`/`.eval-summary`）。`Field` に任意 `className`（項目先頭に `.dialog-section`）。横並び `.field-row` は廃止して1行ずつ。アイデア「任意項目」（`.optional`）は開閉とも枠線で囲う。フッター文言＝フォーム「キャンセル」／参照・その場アクション・エラー「閉じる」。適用＝JoinRequestDialog／QuestCatalogView（参加前詳細）／QuestForm／IdeaForm／EvaluationView／AccountFormPanel／CompanyCreateForm／QuestGroupSection／MemberAddPanel／QuestResultTab。**管理系/評価/振り返り編集の実機受入は管理者アカウントで要確認（seed は非管理者）**。
 
+**情報インプット機能＝設計完了・未実装（2026-09-18・FR-41）**＝外部WEB情報を手動貼付→属性→アイデア/コンセプト/クエストへ動的リンク（差別化の核）。**実装は未着手**。設計4点は実体化済み＝要件[FR-41](../doc/要件定義/README.md#6-機能要件)／データモデル[§5.33-5.37](../doc/データモデル.md)（`info_items`/`info_item_categories`/`info_links`/`info_tokens`/`info_curators`＋`info_*` enum）／API [ドメイン N](../doc/API設計/N_情報インプット.md)（N-TC）／画面[SC-50/51/52](../doc/画面設計/screens/SC-50_情報インプット.md)。実装時＝モック先行→backend 新ドメイン `tenant/info`（4層・janome 再利用）→frontend `features/info-input`（一覧はサーバー委譲契約）。`info_link_target=concepts/assumptions` はコンセプト段で実体化。
+
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。
