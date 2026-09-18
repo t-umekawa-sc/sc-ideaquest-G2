@@ -65,7 +65,7 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
             {groupName ? `${groupName}（あなたが管理するグループ・参加ロールはメンバー固定）` : "—"}
           </div>
         </div>
-        <div className="form-row">
+        <div className="form-row dialog-section">
           <label htmlFor="dir_search">会社ディレクトリを検索</label>
           <input
             id="dir_search"

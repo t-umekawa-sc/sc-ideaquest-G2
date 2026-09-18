@@ -34,6 +34,15 @@ describe("H-TC-209 notificationHref", () => {
   });
 });
 
+describe("H-TC-211 notificationHref join_request_received（申請者ダイアログ直開き）", () => {
+  it("quest_id＋user_id → /quests/{id}?joinreq={applicant}", () => {
+    expect(notificationHref(notif({ quest_id: "q1", user_id: "u9" }, "join_request_received"))).toBe("/quests/q1?joinreq=u9");
+  });
+  it("user_id 欠落 → /quests/{id} にフォールバック", () => {
+    expect(notificationHref(notif({ quest_id: "q1" }, "join_request_received"))).toBe("/quests/q1");
+  });
+});
+
 describe("H-TC-210 markNotificationRead", () => {
   const base = () => ({
     data: [

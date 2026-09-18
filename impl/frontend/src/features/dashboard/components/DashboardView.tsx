@@ -36,6 +36,8 @@ import {
   type FollowedIdea,
   type UnvotedIdea,
 } from "../api";
+import { JoinRequestDialog, type JoinRequestQuestSummary } from "@/features/quests";
+import type { JoinRequestRow } from "@/features/quests/api";
 import "../dashboard.css";
 
 type Balance = {
@@ -208,6 +210,35 @@ export function DashboardView({
   // §4.6b フォロー中のクエスト（★解除は即時にリストから外す）／§4.6c 参加リクエスト状況。
   const followedQuests = (data?.followed_quests ?? []).filter((q) => !unfollowedQuests[q.id]);
   const joinRequests = data?.join_requests ?? [];
+  // 未処理の受信参加リクエスト（owner/quest_admin）＝処理済みは即リストから外す（楽観）。
+  const [processedIncoming, setProcessedIncoming] = useState<Record<string, boolean>>({});
+  const incomingJoinRequests = (data?.incoming_join_requests ?? []).filter(
+    (it) => !processedIncoming[`${it.quest.id}:${it.user.user_id}`],
+  );
+  const [incomingSel, setIncomingSel] = useState<{ questId: string; request: JoinRequestRow; quest: JoinRequestQuestSummary } | null>(null);
+  const [incomingOpen, setIncomingOpen] = useState(false);
+  const openIncoming = (it: NonNullable<DashboardData["incoming_join_requests"]>[number]) => {
+    setIncomingSel({
+      questId: it.quest.id,
+      request: {
+        user: {
+          user_id: it.user.user_id,
+          display_name: it.user.display_name,
+          avatar_image_url: it.user.avatar_image_url ?? null,
+          group_ids: [],
+        },
+        status: "pending",
+        message: it.message ?? null,
+        created_at: it.created_at ?? new Date().toISOString(),
+      },
+      quest: { title: it.quest.title, status: it.quest.status, color: it.quest.color, categories: it.quest.categories, deadline: it.quest.deadline },
+    });
+    setIncomingOpen(true);
+  };
+  const onIncomingDecided = (userId: string) => {
+    if (incomingSel) setProcessedIncoming((m) => ({ ...m, [`${incomingSel.questId}:${userId}`]: true }));
+    void getDashboard().then((d) => { if (d) setData(d); });
+  };
   const unfollowQuestCard = async (id: string) => {
     setUnfollowedQuests((m) => ({ ...m, [id]: true })); // 楽観
     const res = await unfollowQuest(id).catch(() => null);
@@ -512,6 +543,36 @@ export function DashboardView({
         </motion.section>
       )}
 
+      {/* 未処理の参加リクエスト（自分が owner/quest_admin・0件なら非表示・FR-40）＝カードクリックで承認/却下ダイアログ。 */}
+      {incomingJoinRequests.length > 0 && (
+        <motion.section aria-label="未処理の参加リクエスト" {...flowMotion(7)}>
+          <div className="section-head">
+            <h2>未処理の参加リクエスト<span className="badge badge-danger" style={{ marginLeft: "var(--space-2)" }}>{incomingJoinRequests.length}</span></h2>
+          </div>
+          <div className="quest-grid">
+            {incomingJoinRequests.map((it) => (
+              <button
+                key={`${it.quest.id}:${it.user.user_id}`}
+                type="button"
+                className="card card-accent quest-card incoming-jr-card"
+                style={{ ["--accent" as string]: it.quest.color ?? "#3B82F6" } as React.CSSProperties}
+                onClick={() => openIncoming(it)}
+              >
+                <div className="between">
+                  <span className="card-title">{it.quest.title}</span>
+                  <span className="badge badge-danger">未処理</span>
+                </div>
+                <div className="incoming-jr-card__applicant">
+                  <Avatar name={it.user.display_name} imageUrl={it.user.avatar_image_url ?? undefined} size="sm" noTooltip />
+                  <span className="incoming-jr-card__name">{it.user.display_name} さんが参加を希望</span>
+                </div>
+                {it.message && <p className="incoming-jr-card__msg">{it.message}</p>}
+              </button>
+            ))}
+          </div>
+        </motion.section>
+      )}
+
       {/* §4.6b フォロー中のクエスト（非参加・watch・0件なら非表示・FR-40）＝メタカード。カードは発見カタログへ・★で解除。 */}
       {followedQuests.length > 0 && (
         <motion.section aria-label="フォロー中のクエスト" {...flowMotion(7)}>
@@ -642,6 +703,19 @@ export function DashboardView({
       </motion.div>
       )}
       {/* 管理導線はグローバルサイドバー（AppNav）へ集約（ダッシュボード下のリンク／右上メニューからは撤去）。 */}
+
+      {/* 未処理の参加リクエスト＝承認/却下ダイアログ（クエスト詳細/通知と共有・FR-40）。 */}
+      {incomingSel && (
+        <JoinRequestDialog
+          questId={incomingSel.questId}
+          request={incomingSel.request}
+          quest={incomingSel.quest}
+          open={incomingOpen}
+          onClose={() => setIncomingOpen(false)}
+          onClosed={() => setIncomingSel(null)}
+          onDecided={onIncomingDecided}
+        />
+      )}
     </div>
   );
 }

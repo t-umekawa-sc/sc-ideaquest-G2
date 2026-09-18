@@ -135,12 +135,15 @@
 @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
 
 /* 任意項目の折りたたみ（投稿ハードルを下げる） */
-.optional { border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-4); background: var(--color-surface); }
+/* 任意項目の折りたたみ＝「入力グループ」として常に外側を枠線で囲う（開閉どちらも同じ枠・ユーザー要望）。
+   開閉ラベルはヘッダー内で縦中央（summary の上下対称パディング）。中の各項目は .dialog-section の仕切り線で区切る。 */
+.optional { border: 1px solid var(--color-border); border-radius: var(--radius); margin: var(--space-3) 0; }
 .optional > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
 .optional > summary::-webkit-details-marker { display: none; }
 .optional > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
 .optional[open] > summary::before { transform: rotate(90deg); }
-.optional__body { padding: 0 var(--space-4) var(--space-2); border-top: 1px solid var(--color-border); }
+.optional[open] > summary { border-bottom: 1px solid var(--color-border); }
+.optional__body { padding: var(--space-1) var(--space-4) var(--space-3); }
 
 /* 利害関係者（簡易マルチセレクト＝選択チップ＋自由入力＋定義済み候補） */
 .tagselect__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-2); }

@@ -259,36 +259,42 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
   return (
     <Modal open={open} onClose={onClose} onClosed={onClosed} title="クエストの詳細（参加前）" size="lg">
       <ModalBody>
-        <div className="row-center" style={{ gap: "var(--space-2)", marginBottom: "var(--space-2)", justifyContent: "space-between" }}>
-          <div className="row-center" style={{ gap: "var(--space-2)", minWidth: 0 }}>
-            <QuestIcon name={row.title} color={row.color} imageUrl={row.icon_image_url ?? undefined} size="lg" />
-            <div style={{ minWidth: 0 }}>
-              <div className="card-title" style={{ fontSize: "var(--text-lg)" }}>{row.title}</div>
-              <div className="row-center" style={{ gap: "var(--space-2)" }}>
-                <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
-                {/* フォロー中は右上の follow-toggle が表す（緑バッジは出さない）。他状態はバッジ表示。 */}
-                {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
+        {/* ダイアログ内コンテンツ標準（囲みなし＋薄い仕切り線・§4.1）。対象＝クエスト自身なのでラベルは付けず hero を出す。 */}
+        <div className="dialog-section">
+          <div className="between" style={{ gap: "var(--space-2)", alignItems: "flex-start" }}>
+            <div className="dialog-subject">
+              <QuestIcon name={row.title} color={row.color} imageUrl={row.icon_image_url ?? undefined} size="lg" />
+              <div style={{ minWidth: 0 }}>
+                <div className="dialog-subject__title">{row.title}</div>
+                <div className="dialog-subject__meta">
+                  <span className="badge">{STATUS_LABEL[row.status] ?? row.status}</span>
+                  {/* フォロー中は右上の follow-toggle が表す（緑バッジは出さない）。他状態はバッジ表示。 */}
+                  {st !== "following" && STATE_LABEL[st] ? <span className="badge badge-success">{STATE_LABEL[st]}</span> : null}
+                </div>
               </div>
             </div>
+            {/* フォロー＝アイデア詳細（SC-22）と同じ位置＝ヘッダー右上（枠付き follow-toggle）。 */}
+            {st !== "member" && (
+              <button type="button" className="follow-toggle" style={{ flexShrink: 0 }} aria-pressed={st === "following"} onClick={() => onFollow(row)}>
+                {st === "following" ? "★ フォロー中" : "☆ フォロー"}
+              </button>
+            )}
           </div>
-          {/* フォロー＝アイデア詳細（SC-22）と同じ位置＝ヘッダー右上（枠付き follow-toggle）。 */}
-          {st !== "member" && (
-            <button type="button" className="follow-toggle" style={{ flexShrink: 0 }} aria-pressed={st === "following"} onClick={() => onFollow(row)}>
-              {st === "following" ? "★ フォロー中" : "☆ フォロー"}
-            </button>
-          )}
+          {row.purpose ? <p style={{ whiteSpace: "pre-wrap", margin: "var(--space-3) 0 0" }}>{row.purpose}</p> : <p className="muted" style={{ margin: "var(--space-3) 0 0" }}>（テーマの記載はありません）</p>}
         </div>
-        {row.purpose ? <p style={{ whiteSpace: "pre-wrap" }}>{row.purpose}</p> : <p className="muted">（テーマの記載はありません）</p>}
-        <dl className="detail-grid" style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-1) var(--space-3)", marginTop: "var(--space-2)" }}>
-          <dt className="muted">作成者</dt><dd>{row.owner?.display_name ?? "—"}</dd>
-          <dt className="muted">締切</dt><dd>{row.deadline ?? "—"}</dd>
-          <dt className="muted">参加人数</dt><dd>👥 {row.member_count}</dd>
-          <dt className="muted">アイデア</dt><dd>💡 {row.idea_count}</dd>
-          <dt className="muted">カテゴリー</dt><dd>{(row.categories ?? []).join("、") || "—"}</dd>
-          <dt className="muted">参加部署</dt><dd>{(row.quest_groups ?? []).map((g) => g.name).join("、") || "全社"}</dd>
-        </dl>
+        <div className="dialog-section">
+          <div className="dialog-label">クエスト情報</div>
+          <dl className="dialog-grid">
+            <dt>作成者</dt><dd>{row.owner?.display_name ?? "—"}</dd>
+            <dt>締切</dt><dd>{row.deadline ?? "—"}</dd>
+            <dt>参加人数</dt><dd>👥 {row.member_count}</dd>
+            <dt>アイデア</dt><dd>💡 {row.idea_count}</dd>
+            <dt>カテゴリー</dt><dd>{(row.categories ?? []).join("、") || "—"}</dd>
+            <dt>参加部署</dt><dd>{(row.quest_groups ?? []).map((g) => g.name).join("、") || "全社"}</dd>
+          </dl>
+        </div>
         {row.activity ? (
-          <div style={{ marginTop: "var(--space-3)" }}>
+          <div className="dialog-section">
             <ActivitySpark
               daily={(row.activity.daily ?? []).map((d) => ({ date: d.date, count: d.count }))}
               label={`活動の活発さ（直近${row.activity.days}日・💬 合計 ${row.activity.total} 件）`}
@@ -297,13 +303,15 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
             />
           </div>
         ) : null}
-        <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>
-          ※ アイデアの本文・議論（チャット）・評価は<strong>参加後</strong>に見られます。ここでは概要（メタ情報）のみ表示しています。
-        </p>
+        <div className="dialog-section">
+          <p className="muted text-xs" style={{ margin: 0 }}>
+            ※ アイデアの本文・議論（チャット）・評価は<strong>参加後</strong>に見られます。ここでは概要（メタ情報）のみ表示しています。
+          </p>
+        </div>
       </ModalBody>
       <ModalFooter>
         {/* フォローはヘッダー右上へ移動（アイデア詳細と同位置）。フッターは 閉じる（左）→ 状態別 → 主要アクション（右）。 */}
-        <button type="button" className="btn" onClick={onClose}>閉じる</button>
+        <button type="button" className="btn dialog-close-left" onClick={onClose}>閉じる</button>
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
         {(st === "none" || st === "following") && (

@@ -231,7 +231,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
 
   return (
     <EvalFrame inModal={inModal} ideaId={ideaId} footer={inModal ? <div className="modal__footer">{actions}</div> : null}>
-      <section className="card">
+      {/* モーダル時は .modal__body 自体が枠（パネル）なので内側 .card を付けない（二重枠回避・§4.1 ダイアログ内コンテンツ標準）。
+          フルページ時のみ .card でページ内カードとして囲う。 */}
+      <section className={inModal ? undefined : "card"}>
         {!inModal && <h1 style={{ fontSize: "var(--text-xl)", margin: "0 0 var(--space-2)" }}>アイデアを評価</h1>}
         <p className="role-note" style={{ marginTop: 0 }}>
           ▲ この画面は<strong>評価者権限</strong>を持つ人のみ表示。1アイデアに複数の評価者が評価できます。
@@ -240,8 +242,8 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         {/* §4.7 上部サマリ（スクロール先＝summaryRef・フォーカスは奪わない）。インライン枠と併用。 */}
         <FormSummary title="入力内容をご確認ください" errors={evalErrors} innerRef={summaryRef} />
 
-        {/* 対象アイデアの文脈（実データ・getIdea） */}
-        <div className="eval-context card" style={{ padding: "var(--space-3) var(--space-4)" }}>
+        {/* 対象アイデアの文脈（実データ・getIdea）＝ダイアログ内コンテンツ標準（囲みなし＝旧 .card 枠を撤去・§4.1）。 */}
+        <div className="eval-context">
           <div className="eval-context__quest">🎯 {idea?.quest?.title || "クエスト"}</div>
           <div className="eval-context__title">{idea?.title || "アイデア"}</div>
           {/* アイデア詳細から開いた評価モーダルは背後がアイデア詳細なので、この導線は冗長＝隠す。
@@ -263,7 +265,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         </div>
 
         {/* 折りたたみ: クエストを確認（実データ・「アイデアを確認」と同一UI）＝適合性採点の根拠となる目的・テーマ等。 */}
-        <details className="eval-idea" open>
+        <details className="eval-idea dialog-section" open>
           <summary>クエストを確認</summary>
           <div className="eval-idea__body">
             <div className="eval-idea__label">目的・テーマ</div>
@@ -276,7 +278,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         </details>
 
         {/* 折りたたみ: アイデアを確認（実データ） */}
-        <details className="eval-idea" open>
+        <details className="eval-idea dialog-section" open>
           <summary>アイデアを確認</summary>
           <div className="eval-idea__body">
             <div className="eval-idea__label">価値</div>
@@ -296,8 +298,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </div>
         </details>
 
-        {/* 5観点の採点 */}
-        <div>
+        {/* 5観点の採点＝入力グループ「評価点」（§4.1・上に仕切り線＋見出し）。 */}
+        <div className="dialog-section">
+          <div className="dialog-label">評価点</div>
           {ASPECTS.map((a) => {
             const filled = hover[a.key] ?? scores[a.key] ?? 0;
             const val = scores[a.key];
@@ -373,8 +376,8 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           })}
         </div>
 
-        {/* 総評（必須） */}
-        <div className="field" style={{ marginTop: "var(--space-4)" }}>
+        {/* 総評（必須）＝コスト（最終観点）との間に薄い仕切り線（§4.1 ダイアログ内コンテンツ標準）。 */}
+        <div className="field dialog-section">
           <label htmlFor="evalOverall">
             総評（全体コメント）<span className="req">*</span>
           </label>
@@ -416,8 +419,8 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </p>
         )}
 
-        {/* 公開範囲 */}
-        <div className="field">
+        {/* 公開範囲＝上に薄い仕切り線で採点/集計と区切る（§4.1 ダイアログ内コンテンツ標準）。 */}
+        <div className="field dialog-section">
           <label>評価結果の公開範囲</label>
           <div className="visibility">
             <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>

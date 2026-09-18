@@ -4142,6 +4142,8 @@ export interface components {
             achievement_id?: string | null;
             /** Quest Id */
             quest_id?: string | null;
+            /** User Id */
+            user_id?: string | null;
         };
         /** NotificationDTO */
         NotificationDTO: {

@@ -9,3 +9,4 @@ export { QuestEditModal } from "./components/QuestEditModal";
 export { QuestEditPanel } from "./components/QuestEditPanel";
 export { QuestPartyModal } from "./components/QuestPartyModal";
 export { QuestPartyPanel } from "./components/QuestPartyPanel";
+export { JoinRequestDialog, type JoinRequestQuestSummary } from "./components/JoinRequestDialog";

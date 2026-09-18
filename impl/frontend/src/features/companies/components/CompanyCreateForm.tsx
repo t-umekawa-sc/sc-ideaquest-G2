@@ -120,6 +120,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
           <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => { setName(e.target.value); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined })); }} required />
         </Field>
         <Field
+          className="dialog-section"
           id="c_code"
           label="会社コード"
           required
@@ -137,7 +138,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
             required
           />
         </Field>
-        <Field id="c_db" label="DB 識別子" required error={fieldErrors.db_identifier} hint="会社DBの参照キー。接続情報の実体は .env。">
+        <Field className="dialog-section" id="c_db" label="DB 識別子" required error={fieldErrors.db_identifier} hint="会社DBの参照キー。接続情報の実体は .env。">
           <input
             id="c_db"
             className="input"
@@ -148,7 +149,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
           />
         </Field>
 
-        <Field id="c_icon" label="会社アバター / アイコン">
+        <Field className="dialog-section" id="c_icon" label="会社アバター / アイコン">
           <div className="icon-field">
             <span className="quest-icon lg" style={{ ["--accent" as string]: color } as React.CSSProperties}>
               {iconPreview ? (
@@ -174,7 +175,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
           </div>
         </Field>
 
-        <Field id="c_color" label="会社カラー">
+        <Field className="dialog-section" id="c_color" label="会社カラー">
           <Swatches value={color} onChange={setColor} ariaLabel="会社カラー" />
         </Field>
 

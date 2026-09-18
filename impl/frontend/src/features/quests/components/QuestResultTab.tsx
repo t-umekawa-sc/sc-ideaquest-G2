@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Avatar, Button, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { Avatar, Button, Field, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { generateChatSummary, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
@@ -257,22 +257,27 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
       <Modal open={editing} onClose={cancelEdit} title="振り返り・学び / 次アクションを編集" size="lg">
         <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <ModalBody>
-            <div className="qresult__edit stack">
-              <label className="qresult__label" htmlFor="qr_summary">成果（総括）</label>
-              <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
-              <label className="qresult__label" htmlFor="qr_learn">学び・課題</label>
-              <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
-              <div className="qresult__label">成果の指標（KPI・任意）</div>
-              {metrics.map((m, i) => (
-                <div key={i} className="qresult__metric-row">
-                  <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
-                  <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
-                  <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
-                </div>
-              ))}
-              <button type="button" className="btn btn-sm btn-outline" style={{ alignSelf: "flex-start" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
-              <label className="qresult__label" htmlFor="qr_next">次アクション</label>
-              <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
+            {/* 標準の Field（.field＝ラベル書式・ラベル↔入力の余白・項目間の仕切り線）に統一＝他ダイアログと同じ見た目。 */}
+            <div className="qresult__edit">
+              <Field id="qr_summary" label="成果（総括）">
+                <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
+              </Field>
+              <Field className="dialog-section" id="qr_learn" label="学び・課題">
+                <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
+              </Field>
+              <Field className="dialog-section" id="qr_metrics" label="成果の指標（KPI・任意）">
+                {metrics.map((m, i) => (
+                  <div key={i} className="qresult__metric-row">
+                    <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
+                    <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                    <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                ))}
+                <button type="button" className="btn btn-sm btn-outline" style={{ marginTop: "var(--space-2)" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
+              </Field>
+              <Field className="dialog-section" id="qr_next" label="次アクション">
+                <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
+              </Field>
             </div>
           </ModalBody>
           <ModalFooter>

@@ -43,6 +43,8 @@ export function notificationHref(n: NotificationDTO): string | null {
   // フォロー更新（quest_watch_update）＝宛先はフォロワー＝非メンバー。メンバー内容（/quests/{id}）は開かず
   // 発見カタログ（SC-13）へ誘導（メタ級・C.9/FR-40）。他の quest 系（結果/招集）はメンバー宛なので従来どおり。
   if (n.type === "quest_watch_update") return "/quest-catalog";
+  // 参加リクエスト受信＝クエスト詳細を開き、当該申請者の承認/却下ダイアログを直接表示（?joinreq=申請者id・FR-40）。
+  if (n.type === "join_request_received" && r.quest_id && r.user_id) return `/quests/${r.quest_id}?joinreq=${r.user_id}`;
   if (r.quest_id) return `/quests/${r.quest_id}`;
   return null;
 }

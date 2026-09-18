@@ -564,6 +564,30 @@ def test_i_tc_159_dashboard_follows_and_join_requests(client, env):
     assert jr[str(pending_q)]["my_state"] == "pending"
 
 
+def test_i_tc_160_dashboard_incoming_join_requests(client, factory, env):
+    """I-TC-160 SC-01・FR-40＝owner/quest_admin の dashboard に未処理(pending)受信リクエスト（クエスト概要＋申請者）。承認で消える。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    # viewer が申請（pending）。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{qid}/join-request", json={"message": "入れて"}, headers=_csrf(client)).status_code == 201
+    # owner のダッシュボードに未処理リクエストが1件＝クエスト概要＋申請者メタ＋メッセージ。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    inc = [x for x in client.get("/api/v1/dashboard").json()["incoming_join_requests"] if x["quest"]["id"] == str(qid)]
+    assert len(inc) == 1
+    item = inc[0]
+    assert item["quest"]["title"] == "Cat" and item["quest"]["status"] == "recruiting"  # 概要（どのクエストか）
+    assert item["user"]["user_id"] == str(env.viewer_id) and "display_name" in item["user"]
+    assert item["message"] == "入れて"
+    # 非 owner（viewer）のダッシュボードには出ない（受信側は owner/quest_admin のみ）。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert all(x["quest"]["id"] != str(qid) for x in client.get("/api/v1/dashboard").json()["incoming_join_requests"])
+    # owner が承認したら未処理から消える。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve", headers=_csrf(client)).status_code == 200
+    assert all(x["quest"]["id"] != str(qid) for x in client.get("/api/v1/dashboard").json()["incoming_join_requests"])
+
+
 def test_c_tc_282_join_request_emails(client, factory, env):
     """C-TC-282 参加リクエスト受信/結果で業務通知メールを mail_outbox に enqueue（会社トグル ON・既定）。"""
     from app.control_plane.auth.orm import Account

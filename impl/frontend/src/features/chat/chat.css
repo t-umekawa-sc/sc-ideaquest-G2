@@ -5,23 +5,29 @@
 .chat-main { padding-block: var(--space-5) 0; display: flex; flex-direction: column; min-height: calc(100vh - var(--header-h)); }
 
 /* --- 上部の文脈バー（アイデアの件名・クエスト・戻る） --- */
-.chat-context { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+/* 左＝戻る（+開いた時は下にアイデア詳細）／右＝件名・クエスト情報（右寄せ）／トグルは右端。上下中央で揃える（戻るが上に寄らない）。 */
+.chat-context { display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap; padding: var(--space-3) var(--space-4); }
 /* 文脈パネル自体をフローティング（sticky ヘッダー直下・デザイン標準 §4.10）＝スクロールしても常時上部に表示。 */
 .chat-context--float { position: sticky; top: calc(var(--header-h) + var(--space-2)); z-index: 9; }
-/* 折りたたみトグル（左端・両状態で同じ位置）。 */
-.chat-context__toggle { flex: 0 0 auto; background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: var(--radius-sm); }
+/* 左ナビ列＝戻る（他画面と揃えて左上）＋開いた時のみその1行下に「アイデア詳細を開く」。 */
+.chat-context__nav { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-2); }
+/* 右メイン＝件名/クエスト情報を右寄せ（左のものを右へ移動）。 */
+.chat-context__main { flex: 1; min-width: 0; text-align: right; }
+/* 折りたたみトグル（右端）。 */
+.chat-context__toggle { flex: 0 0 auto; align-self: center; background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: var(--radius-sm); }
 .chat-context__toggle:hover { color: var(--color-text); background: var(--color-surface-alt); }
-/* たたんだ状態＝薄いバー。左にコンパクトなタイトル、右端に戻るリンク。 */
-.chat-context.is-collapsed { padding: var(--space-2) var(--space-4); }
-.chat-context__mini { flex: 1; min-width: 0; font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-context__back { margin-left: auto; }
-.chat-context__body { min-width: 0; flex: 1; }
+/* たたんだ状態＝薄いバー。左に戻る、右にコンパクトな件名。 */
+.chat-context.is-collapsed { padding: var(--space-2) var(--space-4); align-items: center; }
+.chat-context__mini { min-width: 0; font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-context__body { min-width: 0; }
 .chat-context__quest { font-size: var(--text-xs); color: var(--color-text-muted); }
 .chat-context__title { font-weight: 700; font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 件名に添えるアイデアアイコン（QuestIcon 流用）＝テキストと縦中央で揃える（2026-09-06）。 */
-.chat-context__title .quest-icon, .chat-context__mini .quest-icon { vertical-align: middle; margin-right: 6px; }
+/* 件名に添えるアイデアアイコン（QuestIcon 流用）＝テキストと縦中央で揃える。件名の後ろ（右寄せ）に置く。 */
+.chat-context__title .quest-icon, .chat-context__mini .quest-icon { vertical-align: middle; margin-left: 6px; }
 .chat-context__meta { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 .chat-context .backlink { color: var(--color-text-muted); font-size: var(--text-sm); white-space: nowrap; }
+/* グローバル .backlink の margin-bottom(8px) を無効化＝nav 列内で上寄せに見える原因（間隔は nav の gap で取る）。 */
+.chat-context__nav .backlink { margin: 0; }
 .chat-context .backlink:hover { color: var(--color-text); }
 
 /* --- メッセージスレッド（フラットリスト） --- */

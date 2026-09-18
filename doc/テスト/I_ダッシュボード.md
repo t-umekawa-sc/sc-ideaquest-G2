@@ -16,6 +16,7 @@
 | I-TC-105 | api | 参加中クエスト（C カード） | 参加中クエスト1 | `GET /dashboard` | `quests` に当該カード（`my_state`/`member_count`/`idea_count` 等・C 形） | I.1／SC-01 §4.6 |
 | I-TC-106 | api | フォロー中アイデア（follows×ideas） | published アイデアをフォロー | `GET /dashboard` | `followed_ideas` に当該（`following:true`・`quest.quest_status` 同梱） | I.1／SC-01 §4.7 |
 | I-TC-159 | api | フォロー中クエスト／参加リクエスト状況（FR-40・§4.6b/§4.6c） | discoverable クエストを1つフォロー・別の1つに参加リクエスト（pending） | `GET /dashboard` | `followed_quests` に following のクエスト（join_requests には出ない）／`join_requests` に pending のクエスト（followed_quests には出ない）＝発見カタログ my_state 由来（発見不可は動的に非表示） | I.1／SC-01 §4.6b/§4.6c／C.9 |
+| I-TC-160 | api | 未処理の受信参加リクエスト（FR-40・受信側＝owner/quest_admin） | owner のクエストへ viewer が pending 申請 | `GET /dashboard` | `incoming_join_requests` に1件＝クエスト概要（title/status 等・どのクエストか）＋申請者メタ（user_id/display_name）＋message／非 owner には出ない／承認後は消える | I.1／SC-01／FR-40／C.9.1 |
 | I-TC-107 | api | 週間ランキング（上位≤3＋me） | 週内に XP 獲得（ログインXP） | `GET /dashboard` | `weekly_ranking.data[]`（上位≤3＝実装は get_rankings の `data`）＋`weekly_ranking.me`（rank/score≥1）＝G.5 の read | I.1／G.5 |
 | I-TC-108 | api | 最近の通知（limit＋未読数） | 未読通知あり | `GET /dashboard` | `notifications.data`（≤5・新着降順・取得時レンダリング body）＋`unread_count` | I.1／H.2 |
 | I-TC-109 | api | roles（管理導線出し分け） | 一般ユーザー | `GET /dashboard` | `roles={is_qg_admin:false,is_company_account_admin:false,is_system_admin:false}`（サーバー権威） | I.1／§8-⑯ |

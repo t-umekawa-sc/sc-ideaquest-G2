@@ -555,9 +555,24 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       {/* #10/Phase B: 発射元→対象へ飛ぶデリバリー（属性別）＋着弾の瞬間演出（固定オーバーレイ・自分の発動時のみ） */}
       {delivers.map((d) => <SpellDeliveryFx key={d.id} from={d.from} to={d.to} effect={d.effect} rarity={d.rarity} />)}
       {casts.map((c) => <SpellCastFx key={c.id} rect={c.rect} effect={c.effect} rarity={c.rarity} />)}
-      {/* 文脈パネル（戻るリンク含む）自体をフローティング（sticky）で常時上部に表示（デザイン標準 §4.10）。
-          折りたたみ可能＝たたむと薄いバーになり、右側に戻るリンクだけ残す。 */}
+      {/* 文脈パネル（sticky・§4.10）。左＝戻る（他画面と揃えて左上・開いた時はその下に「アイデア詳細を開く」）／
+          右＝対象アイデアの件名・クエスト情報（右寄せ）。トグル(▲/▼)は右端。 */}
       <section className={`card chat-context chat-context--float${ctxOpen ? "" : " is-collapsed"}`} aria-label="対象アイデア">
+        <div className="chat-context__nav">
+          <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
+          {ctxOpen && <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>}
+        </div>
+        <div className="chat-context__main">
+          {ctxOpen ? (
+            <div className="chat-context__body">
+              <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
+              <div className="chat-context__title">{idea.title} <QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /></div>
+              <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
+            </div>
+          ) : (
+            <span className="chat-context__mini">{idea.title} <QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /></span>
+          )}
+        </div>
         <button
           type="button"
           className="chat-context__toggle"
@@ -567,23 +582,6 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
         >
           {ctxOpen ? "▲" : "▼"}
         </button>
-        {ctxOpen ? (
-          <>
-            <div className="chat-context__body">
-              <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
-              <div className="chat-context__title"><QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /> {idea.title}</div>
-              <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
-            </div>
-            <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>
-            <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
-          </>
-        ) : (
-          // たたんだ状態＝コンパクトなタイトル（左）＋右端に戻るリンク。
-          <>
-            <span className="chat-context__mini"><QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /> {idea.title}</span>
-            <Link className="backlink chat-context__back" href={backHref} onClick={onBack}>{backLabel}</Link>
-          </>
-        )}
       </section>
 
       {/* スレッド */}

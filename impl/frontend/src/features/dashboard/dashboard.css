@@ -49,6 +49,12 @@
 /* 参加中クエスト（quest-card 系は design-system.css の共有クラス＝SC-01/SC-10/SC-12 一貫） */
 .dash-page .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
 
+/* 未処理の参加リクエスト（owner/quest_admin・クリックで承認/却下ダイアログ・FR-40） */
+.dash-page .incoming-jr-card { cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit; }
+.dash-page .incoming-jr-card__applicant { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.dash-page .incoming-jr-card__name { font-size: var(--text-sm); font-weight: 600; }
+.dash-page .incoming-jr-card__msg { margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
 /* 下書き */
 .dash-page .draft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
 .dash-page .draft-card { --accent: var(--color-text-subtle); position: relative; cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit; display: block; text-decoration: none;

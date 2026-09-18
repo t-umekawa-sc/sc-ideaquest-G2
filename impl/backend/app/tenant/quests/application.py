@@ -1623,7 +1623,7 @@ def request_join(account_id, company_id, quest_id, *, message=None) -> dict:
         recips = [r for r in dict.fromkeys(recipients) if r != user.id]
         recipient_account_ids = [u.account_id for u in profile_repo.list_users_by_ids(ts, recips)]
         ts.commit()
-    _notify_join_request_received(company_id, iid, recipients, [user.id], actor_name)
+    _notify_join_request_received(company_id, iid, recipients, [user.id], actor_name, user.id)
     _email_business_notify(company_id, recipient_account_ids, "join_request_received",
                            {"quest_title": quest_title, "actor_name": actor_name})
     return {"status": jr.status}
@@ -1648,14 +1648,18 @@ def withdraw_join_request(account_id, company_id, quest_id) -> None:
         ts.commit()
 
 
-def _notify_join_request_received(company_id, quest_id, recipients, exclude, actor_name) -> None:
-    """参加リクエスト受信通知（H `join_request_received`・作成者+quest_admin・申請者除外・post-commit）。"""
+def _notify_join_request_received(company_id, quest_id, recipients, exclude, actor_name, applicant_id) -> None:
+    """参加リクエスト受信通知（H `join_request_received`・作成者+quest_admin・申請者除外・post-commit）。
+
+    `applicant_id`＝申請者 user_id を params に含める＝通知クリックで当該申請者の承認/却下ダイアログを直接開くため。
+    """
     targets = [r for r in dict.fromkeys(recipients) if r not in set(exclude)]
     if not targets:
         return
+    params = {"actor_name": actor_name, "applicant_id": str(applicant_id)}
     def _build(ts):
         refs = {"ref_quest_id": quest_id}
-        return [notify_svc.entry(r, "join_request_received", refs=refs, params={"actor_name": actor_name}) for r in targets]
+        return [notify_svc.entry(r, "join_request_received", refs=refs, params=params) for r in targets]
     notify_svc.dispatch(company_id, _build)
 
 

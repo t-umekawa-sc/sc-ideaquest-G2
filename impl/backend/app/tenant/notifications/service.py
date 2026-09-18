@@ -135,6 +135,7 @@ def _created_data(session: Session, n: Notification, unread_count: int, locale: 
             "idea_revision_id": str(n.ref_idea_revision_id) if n.ref_idea_revision_id else None,
             "achievement_id": str(n.ref_achievement_id) if n.ref_achievement_id else None,
             "quest_id": str(n.ref_quest_id) if n.ref_quest_id else None,
+            "user_id": (n.params or {}).get("applicant_id"),  # params 由来（DBカラム外）＝申請者ダイアログ直開き用
         },
         "unread_count": unread_count,
     }

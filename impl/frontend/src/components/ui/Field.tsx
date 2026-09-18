@@ -10,9 +10,11 @@ type Props = {
   hint?: string;
   error?: string | null;
   children: ReactNode;
+  // 入力グループの先頭に `.dialog-section`（薄い仕切り線）を付ける等、外側 `.field` に追加クラスを渡す（§4.1）。
+  className?: string;
 };
 
-export function Field({ id, label, required, hint, error, children }: Props) {
+export function Field({ id, label, required, hint, error, children, className }: Props) {
   const hintId = hint && !error ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = errorId ?? hintId;
@@ -34,7 +36,7 @@ export function Field({ id, label, required, hint, error, children }: Props) {
       : children;
 
   return (
-    <div className="field">
+    <div className={className ? `field ${className}` : "field"}>
       <label htmlFor={id}>
         {label}
         {required && <span className="req">*</span>}

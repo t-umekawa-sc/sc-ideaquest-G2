@@ -42,6 +42,14 @@ export type QuestCard = {
   owner?: { name?: string } | null; my_state?: string; is_owner?: boolean;
 };
 
+// 未処理の受信参加リクエスト（owner/quest_admin・FR-40）＝クエスト概要＋申請者。カードクリックで承認/却下ダイアログ。
+export type IncomingJoinRequest = {
+  quest: { id: string; title: string; color?: string | null; status?: string | null; categories?: string[] | null; deadline?: string | null };
+  user: { user_id: string; display_name: string; avatar_image_url?: string | null };
+  message?: string | null;
+  created_at?: string | null;
+};
+
 // フォロー中クエスト（§4.6b）／参加リクエスト状況（§4.6c）＝発見カタログのメタカード（my_state 由来・FR-40）。
 export type WatchQuestCard = {
   id: string; title: string; purpose?: string | null; color?: string; icon_image_url?: string | null;
@@ -66,6 +74,7 @@ export type DashboardData = {
   login_bonus: { xp: number } | null;
   followed_quests: WatchQuestCard[];  // §4.6b フォロー中のクエスト（非参加・following）
   join_requests: WatchQuestCard[];    // §4.6c 参加リクエスト状況（pending/rejected）
+  incoming_join_requests: IncomingJoinRequest[];  // 未処理の受信参加リクエスト（owner/quest_admin）
 };
 
 export function getDashboard(): Promise<DashboardData | null> {

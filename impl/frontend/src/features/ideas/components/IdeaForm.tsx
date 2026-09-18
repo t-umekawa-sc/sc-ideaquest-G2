@@ -389,13 +389,13 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       <ModalBody>
         <FormSummary title={t(locale, "summary.title")} errors={summary} innerRef={summaryRef} />
 
-        {/* 投稿先クエストの文脈（作成時・取得できた場合のみ） */}
+        {/* 投稿先クエストの文脈（作成時・取得できた場合のみ）＝囲みなし（§4.1・旧 .card 枠を撤去）。 */}
         {!isEdit && quest && (
-          <div className="card" style={{ padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)" }}>
+          <div style={{ marginBottom: "var(--space-3)" }}>
             <div className="text-xs muted">投稿先クエスト</div>
-            <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="dialog-subject" style={{ gap: "var(--space-2)" }}>
               <QuestIcon name={quest.title} color={quest.color} imageUrl={quest.icon_image_url ?? undefined} size="sm" />
-              {quest.title}
+              <span style={{ fontWeight: 700 }}>{quest.title}</span>
               {quest.categories[0] && <span className="badge badge-muted">{quest.categories[0]}</span>}
             </div>
           </div>
@@ -414,8 +414,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           )}
         </p>
 
-        {/* 必須 3 項目 */}
-        <Field id="idea_subject" label="件名" required error={fieldErrors.title}>
+        {/* 必須 3 項目。件名の上にも仕切り線＝ヘッダー（投稿先クエスト＋説明）と入力項目を区切る（ユーザー要望）。 */}
+        <Field className="dialog-section" id="idea_subject" label="件名" required error={fieldErrors.title}>
           <input
             id="idea_subject"
             className="input"
@@ -427,7 +427,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             required
           />
         </Field>
-        <Field id="idea_icon" label="アイデアアイコン（任意）">
+        <Field className="dialog-section" id="idea_icon" label="アイデアアイコン（任意）">
           <div className="icon-field">
             {iconPreview || iconUrl ? (
               <span className="quest-icon lg">
@@ -446,7 +446,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             </div>
           </div>
         </Field>
-        <Field id="idea_value" label="価値" required error={fieldErrors.value}>
+        <Field className="dialog-section" id="idea_value" label="価値" required error={fieldErrors.value}>
           <textarea
             id="idea_value"
             className="textarea"
@@ -459,7 +459,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             required
           />
         </Field>
-        <Field id="idea_body" label="アイデア本文" required error={fieldErrors.body}>
+        <Field className="dialog-section" id="idea_body" label="アイデア本文" required error={fieldErrors.body}>
           <textarea
             id="idea_body"
             className="textarea"
@@ -473,47 +473,46 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           />
         </Field>
 
-        {/* 任意項目（登録は投稿ハードルを下げるため閉／編集は既存値があるため開） */}
+        {/* 任意項目（登録は投稿ハードルを下げるため閉／編集は既存値があるため開）。開＝枠線で囲む／閉＝上下罫の中央にラベル（.optional）。 */}
         <details className="optional" open={isEdit}>
           <summary>任意項目（タイムリミット・利害関係者・備考）</summary>
           <div className="optional__body">
-            <div className="field-row">
-              <Field id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
-                <input id="idea_limit" className="input" type="date" value={limit} onChange={(e) => setLimit(e.target.value)} />
-              </Field>
-              <Field id="idea_stake" label="利害関係者" hint="複数選択可。候補に無ければ入力して Enter で追加。">
-                {stakeholders.length > 0 && (
-                  <div className="tagselect__chips">
-                    {stakeholders.map((s) => (
-                      <span key={s} className="tagselect__chip">
-                        {s}
-                        <button type="button" aria-label={`${s} を外す`} onClick={() => setStakeholders((cur) => cur.filter((x) => x !== s))}>
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <input
-                  id="idea_stake"
-                  className="input"
-                  role="combobox"
-                  aria-expanded={false}
-                  placeholder="関係する人・部署を選択または入力…"
-                  value={stakeInput}
-                  onChange={(e) => setStakeInput(e.target.value)}
-                  onKeyDown={onStakeKeyDown}
-                />
-                <div className="tagselect__sug">
-                  {STAKE_SUGGESTIONS.filter((s) => !stakeholders.includes(s)).map((s) => (
-                    <button key={s} type="button" className="tagselect__sugbtn" onClick={() => addStake(s)}>
-                      ＋ {s}
-                    </button>
+            {/* 任意項目の中も項目ごとに区切る（ユーザー判断）＝タイムリミット/利害関係者は横並びをやめ1行ずつ＋各項目間に仕切り線。 */}
+            <Field id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
+              <input id="idea_limit" className="input" type="date" value={limit} onChange={(e) => setLimit(e.target.value)} />
+            </Field>
+            <Field className="dialog-section" id="idea_stake" label="利害関係者" hint="複数選択可。候補に無ければ入力して Enter で追加。">
+              {stakeholders.length > 0 && (
+                <div className="tagselect__chips">
+                  {stakeholders.map((s) => (
+                    <span key={s} className="tagselect__chip">
+                      {s}
+                      <button type="button" aria-label={`${s} を外す`} onClick={() => setStakeholders((cur) => cur.filter((x) => x !== s))}>
+                        ✕
+                      </button>
+                    </span>
                   ))}
                 </div>
-              </Field>
-            </div>
-            <Field id="idea_note" label="備考 / 特記事項">
+              )}
+              <input
+                id="idea_stake"
+                className="input"
+                role="combobox"
+                aria-expanded={false}
+                placeholder="関係する人・部署を選択または入力…"
+                value={stakeInput}
+                onChange={(e) => setStakeInput(e.target.value)}
+                onKeyDown={onStakeKeyDown}
+              />
+              <div className="tagselect__sug">
+                {STAKE_SUGGESTIONS.filter((s) => !stakeholders.includes(s)).map((s) => (
+                  <button key={s} type="button" className="tagselect__sugbtn" onClick={() => addStake(s)}>
+                    ＋ {s}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field className="dialog-section" id="idea_note" label="備考 / 特記事項">
               <textarea
                 id="idea_note"
                 className="textarea"
@@ -526,7 +525,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           </div>
         </details>
 
-        {/* 関連資料 添付（任意・複数可）。新規＝保存成功後にアップロード（D.3）／編集＝保存済みは即時削除可。 */}
+        {/* 関連資料 添付（任意・複数可）。直前の「任意項目」は枠線ボックスで区切られているため、上の仕切り線は付けない（二重回避・ユーザー要望）。 */}
         <Field id="idea_files" label="関連資料（任意・複数可）">
           {/* 保存済みの添付（編集モードのみ・D.3）＝× で削除予定にマーク（保存で確定・版を生まない）。追加と同じくステージ方式。 */}
           {isEdit && existingAttachments.length > 0 && (

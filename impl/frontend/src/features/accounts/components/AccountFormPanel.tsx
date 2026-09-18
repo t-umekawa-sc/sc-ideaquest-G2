@@ -219,14 +219,14 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         <Field id={`${idPrefix}_name`} label="氏名" required error={fieldErrors.display_name}>
           <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (fieldErrors.display_name) setFieldErrors((p) => ({ ...p, display_name: undefined })); }} required />
         </Field>
-        <Field id={`${idPrefix}_login`} label="ログインID" required error={fieldErrors.login_id}>
+        <Field className="dialog-section" id={`${idPrefix}_login`} label="ログインID" required error={fieldErrors.login_id}>
           <input id={`${idPrefix}_login`} className="input" value={loginId} onChange={(e) => { setLoginId(e.target.value); if (fieldErrors.login_id) setFieldErrors((p) => ({ ...p, login_id: undefined })); }} required />
         </Field>
-        <Field id={`${idPrefix}_email`} label="メールアドレス" required error={fieldErrors.email}>
+        <Field className="dialog-section" id={`${idPrefix}_email`} label="メールアドレス" required error={fieldErrors.email}>
           <input id={`${idPrefix}_email`} className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined })); }} required />
         </Field>
         {showRole && (
-          <Field id={`${idPrefix}_role`} label="システムロール">
+          <Field className="dialog-section" id={`${idPrefix}_role`} label="システムロール">
             <select id={`${idPrefix}_role`} className="select" value={systemRole} onChange={(e) => setSystemRole(e.target.value as SystemRole)}>
               <option value="general">一般</option>
               <option value="company_account_admin">会社アカウント管理者</option>
@@ -235,7 +235,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           </Field>
         )}
         {mode === "edit" && (
-          <Field id={`${idPrefix}_current_groups`} label="現在の所属クエストグループ">
+          <Field className="dialog-section" id={`${idPrefix}_current_groups`} label="現在の所属クエストグループ">
             {/* 現在の所属を編集不可で常時表示（置き換えチェックの前後を問わず・置き換え時は下の全置換エディタと並ぶ参照用）。 */}
             <MembershipsEditor value={currentMemberships} groups={groups} onChange={() => {}} readOnly />
           </Field>
@@ -256,7 +256,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           </label>
         )}
         {(mode === "issue" || replaceMemberships) && (
-          <Field id={`${idPrefix}_groups`} label="所属クエストグループ">
+          <Field className={mode === "issue" ? "dialog-section" : undefined} id={`${idPrefix}_groups`} label="所属クエストグループ">
             <MembershipsEditor value={memberships} groups={groups} onChange={setMemberships} />
           </Field>
         )}

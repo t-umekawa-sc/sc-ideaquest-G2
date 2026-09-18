@@ -181,6 +181,44 @@ def _unread_chats(ts, user: User) -> list[dict]:
     return out
 
 
+def _incoming_join_requests(ts, user) -> list[dict]:
+    """自分が owner/quest_admin のクエストの未処理（pending）参加リクエスト（SC-01・FR-40）。
+
+    カード＝クエスト概要（件名/状態/カテゴリ/締切/色）＋申請者（氏名/アバター）＋メッセージ/申請日。
+    クリックで承認/却下ダイアログを開くための素材（管理者がどのクエストの申請か分かるようクエスト概要を同梱）。
+    """
+    out: list[dict] = []
+    for qid in quests_repo.list_member_quest_ids(ts, user.id):
+        quest = quests_repo.get_quest(ts, qid)
+        if quest is None:
+            continue
+        member = quests_repo.get_active_member(ts, qid, user.id)
+        perms = quests_repo.get_permissions(ts, member.id) if member else []
+        if quest.owner_id != user.id and "quest_admin" not in perms:
+            continue  # owner/quest_admin のみ
+        reqs = quests_repo.list_join_requests(ts, qid, ["pending"])
+        if not reqs:
+            continue
+        users = {u.id: u for u in profile_repo.list_users_by_ids(ts, [r.user_id for r in reqs])}
+        cats = [c.label for c in quests_repo.list_categories(ts, qid)]
+        for r in reqs:
+            u = users.get(r.user_id)
+            out.append({
+                "quest": {
+                    "id": str(qid), "title": quest.title, "color": quest.color, "status": quest.status,
+                    "categories": cats, "deadline": quest.deadline.isoformat() if quest.deadline else None,
+                },
+                "user": {
+                    "user_id": str(r.user_id),
+                    "display_name": u.display_name if u else "（不明）",
+                    "avatar_image_url": _image_url(u.avatar_image_path) if u else None,
+                },
+                "message": r.message,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            })
+    return out
+
+
 def get_dashboard(session: dict) -> dict:
     """SC-01 の全パネルを1レスポンスに集約（I.1）。session＝require_me の戻り（account/company/role/user）。"""
     account_id = uuid.UUID(session["account_id"])
@@ -197,6 +235,7 @@ def get_dashboard(session: dict) -> dict:
         unvoted = _safe(lambda: _unvoted(ts, user), default=[])
         followed = _safe(lambda: _followed(ts, user), default=[])
         unread_chats = _safe(lambda: _unread_chats(ts, user), default=[])
+        incoming_join_requests = _safe(lambda: _incoming_join_requests(ts, user), default=[])
 
     # リッチパネルは各ドメイン application を再利用（自前セッション・best-effort）。
     quests = _safe(
@@ -225,4 +264,5 @@ def get_dashboard(session: dict) -> dict:
         "followed_ideas": followed, "unread_chats": unread_chats, "weekly_ranking": weekly_ranking,
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
         "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
+        "incoming_join_requests": incoming_join_requests,  # FR-40（未処理の受信参加リクエスト・owner/quest_admin）
     }

@@ -2,13 +2,13 @@
    共通クラス（.card/.field/.textarea/.req/.hint/.badge/.btn/.field__error）は design-system.css。
    ここは SC-25 固有（アイデア要約の折りたたみ・5観点採点行・スター・集計プレビュー・公開範囲）のみ。 */
 
-/* 折りたたみのアイデア要約（評価しながら内容を確認） */
-.eval-idea { border: 1px solid var(--color-border); border-radius: var(--radius); margin: var(--space-3) 0; background: var(--color-surface); }
-.eval-idea > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
+/* 折りたたみのアイデア要約（評価しながら内容を確認）＝ダイアログ内コンテンツ標準（§4.1）に統一＝
+   全周ボーダー箱をやめ、区切りは .dialog-section（design-system.css）の薄い仕切り線に任せる。 */
+.eval-idea > summary { cursor: pointer; padding: var(--space-1) 0; font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
 .eval-idea > summary::-webkit-details-marker { display: none; }
 .eval-idea > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
 .eval-idea[open] > summary::before { transform: rotate(90deg); }
-.eval-idea__body { padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--color-border); }
+.eval-idea__body { padding: var(--space-2) 0 0; }
 .eval-idea__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin: var(--space-3) 0 var(--space-1); }
 .eval-idea__body p { margin: 0; line-height: 1.75; }
 
@@ -22,6 +22,8 @@
 
 /* 5観点の採点行 */
 .eval-row { padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+/* 「評価点」見出し直後の先頭行は、見出し＋グループ仕切り線があるので二重罫を避ける。 */
+.dialog-label + .eval-row { border-top: none; padding-top: var(--space-2); }
 .eval-row__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .eval-aspect { font-weight: 700; }
 .eval-desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
