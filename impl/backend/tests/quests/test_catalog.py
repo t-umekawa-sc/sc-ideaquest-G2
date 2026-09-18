@@ -588,6 +588,33 @@ def test_i_tc_160_dashboard_incoming_join_requests(client, factory, env):
     assert all(x["quest"]["id"] != str(qid) for x in client.get("/api/v1/dashboard").json()["incoming_join_requests"])
 
 
+def test_i_tc_161_recent_chats(client, env):
+    """I-TC-161 🕒 最近の議論＝更新順・既読/未読問わず・自分投稿含む（新着=未読のみ とは別動線・SC-01 §4.8c）。"""
+    qid = env.new_quest(discoverable=True)
+    now = datetime.now(timezone.utc)
+    ia, ib = uuid.uuid4(), uuid.uuid4()
+    with get_tenant_session(env.db) as ts:
+        repo.add_member(ts, qid, env.viewer_id, permissions=["comment"])  # viewer を member に
+        # A＝自分(viewer)の投稿だけ・最新（新着には出ない／最近には出る）。
+        ts.add(Idea(id=ia, quest_id=qid, author_id=env.viewer_id, title="自分議論", body="b", value="v", status="published"))
+        # B＝他ユーザー(owner)の未読投稿・やや古い（新着にも最近にも出る）。
+        ts.add(Idea(id=ib, quest_id=qid, author_id=env.owner_id, title="他人議論", body="b", value="v", status="published"))
+        ts.flush()
+        cga, cgb = uuid.uuid4(), uuid.uuid4()
+        ts.add(ChatGroup(id=cga, idea_id=ia)); ts.add(ChatGroup(id=cgb, idea_id=ib)); ts.flush()
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cga, author_id=env.viewer_id, body="mine", created_at=now))
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgb, author_id=env.owner_id, body="theirs", created_at=now - timedelta(hours=1)))
+        ts.commit()
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    d = client.get("/api/v1/dashboard").json()
+    recent = [c["id"] for c in d["recent_chats"]]
+    unread = [c["id"] for c in d["unread_chats"]]
+    # 最近＝更新順（A=now が先・B=now-1h が後）・**自分投稿(A)も含む**。
+    assert recent[:2] == [str(ia), str(ib)]
+    # 新着＝未読(他ユーザー)のみ＝B だけ・自分投稿だけの A は出ない（別動線）。
+    assert str(ib) in unread and str(ia) not in unread
+
+
 def test_c_tc_282_join_request_emails(client, factory, env):
     """C-TC-282 参加リクエスト受信/結果で業務通知メールを mail_outbox に enqueue（会社トグル ON・既定）。"""
     from app.control_plane.auth.orm import Account

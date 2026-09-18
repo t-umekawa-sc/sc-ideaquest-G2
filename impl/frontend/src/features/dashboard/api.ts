@@ -30,6 +30,7 @@ export type FollowedIdea = {
 };
 
 // 💬 新着の議論＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア（レビュー#3）。
+// 🕒 最近の議論（recent_chats）＝同じ形だが**未読フィルタなし・更新順**（既読/未読・自分投稿問わず）＝新着とは別動線（SC-01 §4.8c）。
 export type UnreadChatIdea = {
   id: string; title: string; quest: { id: string; title: string; color?: string | null };
   poster: { name: string; avatar: string | null };
@@ -68,6 +69,7 @@ export type DashboardData = {
   quests: QuestCard[];
   followed_ideas: FollowedIdea[];
   unread_chats: UnreadChatIdea[];
+  recent_chats: UnreadChatIdea[];  // 🕒 最近の議論（更新順・既読/未読問わず・別動線）
   weekly_ranking: WeeklyRanking | null;
   notifications: { data: NotificationDTO[]; unread_count: number } | null;
   roles: { is_qg_admin: boolean; is_company_account_admin: boolean; is_system_admin: boolean };

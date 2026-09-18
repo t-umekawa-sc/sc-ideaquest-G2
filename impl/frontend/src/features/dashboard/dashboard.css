@@ -101,6 +101,8 @@
 
 /* 下段：通知＋ショートカット */
 .dash-page .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
+/* 議論の2カラム行＝💬新着の議論（左）＋🕒最近の議論（右・更新順の別動線・SC-01 §4.8c） */
+.dash-page .dash-discuss { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); align-items: start; }
 .dash-page .notif-list { list-style: none; margin: 0; padding: 0; }
 .dash-page .notif-list li { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
 .dash-page .notif-list li:first-child { border-top: 0; }
@@ -143,6 +145,7 @@
 @media (max-width: 860px) {
   .dash-page .dash-top { grid-template-columns: 1fr; }
   .dash-page .dash-bottom { grid-template-columns: 1fr; }
+  .dash-page .dash-discuss { grid-template-columns: 1fr; }
 }
 
 /* ── レベルアップ祝福オーバーレイ（ゲーム感・LevelUpWatcher）─────────────────

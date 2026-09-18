@@ -36,6 +36,7 @@ _UNVOTED_LIMIT = 6
 _QUESTS_LIMIT = 6
 _FOLLOWED_LIMIT = 6
 _UNREAD_CHATS_LIMIT = 6
+_RECENT_CHATS_LIMIT = 7  # 🕒 最近の議論（更新順・既読/未読問わず）＝新着とは別動線（SC-01 §4.8c）
 _NOTIF_LIMIT = 5
 _CATALOG_LIMIT = 100  # FR-40 SC-01（フォロー中/参加リクエスト）＝発見カタログから my_state で抽出（1ページで十分）
 _NON_DRAFT_STATUS = ["recruiting", "in_progress", "evaluating", "completed"]
@@ -181,6 +182,32 @@ def _unread_chats(ts, user: User) -> list[dict]:
     return out
 
 
+def _recent_chats(ts, user: User) -> list[dict]:
+    """🕒 最近の議論＝参加クエスト横断で、チャットがあるアイデアを**最終更新の新しい順**に返す（既読/未読・自分投稿問わず）。
+    新着の議論（未読のみ・既読で消える）とは別動線＝「だいたい直近で更新されている議論に戻る」恒久リンク（SC-01 §4.8c）。
+    `unread_chat_count` は右パネルの小インジケータ用（未読の有無表示）。
+    """
+    quest_ids = quests_repo.list_member_quest_ids(ts, user.id)
+    rows = chat_repo.ideas_with_unread(ts, user.id, quest_ids, limit=_RECENT_CHATS_LIMIT, only_unread=False)
+    if not rows:
+        return []
+    ideas = ideas_repo.get_ideas_by_ids(ts, [iid for iid, _, _ in rows])
+    quests, posters, _ = _batch_refs(ts, list(ideas.values()))
+    out: list[dict] = []
+    for iid, unread, last_at in rows:
+        i = ideas.get(iid)
+        if i is None:
+            continue
+        out.append({
+            "id": str(i.id), "title": i.title,
+            "quest": _quest_ref_from(i.quest_id, quests.get(i.quest_id)),
+            "poster": _poster_from(posters.get(i.author_id)),
+            "unread_chat_count": unread,
+            "last_chat_at": last_at.isoformat() if last_at else None,
+        })
+    return out
+
+
 def _incoming_join_requests(ts, user) -> list[dict]:
     """自分が owner/quest_admin のクエストの未処理（pending）参加リクエスト（SC-01・FR-40）。
 
@@ -235,6 +262,7 @@ def get_dashboard(session: dict) -> dict:
         unvoted = _safe(lambda: _unvoted(ts, user), default=[])
         followed = _safe(lambda: _followed(ts, user), default=[])
         unread_chats = _safe(lambda: _unread_chats(ts, user), default=[])
+        recent_chats = _safe(lambda: _recent_chats(ts, user), default=[])
         incoming_join_requests = _safe(lambda: _incoming_join_requests(ts, user), default=[])
 
     # リッチパネルは各ドメイン application を再利用（自前セッション・best-effort）。
@@ -261,7 +289,7 @@ def get_dashboard(session: dict) -> dict:
 
     return {
         "hero": hero, "drafts": drafts, "unvoted_ideas": unvoted, "quests": quests,
-        "followed_ideas": followed, "unread_chats": unread_chats, "weekly_ranking": weekly_ranking,
+        "followed_ideas": followed, "unread_chats": unread_chats, "recent_chats": recent_chats, "weekly_ranking": weekly_ranking,
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
         "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
         "incoming_join_requests": incoming_join_requests,  # FR-40（未処理の受信参加リクエスト・owner/quest_admin）

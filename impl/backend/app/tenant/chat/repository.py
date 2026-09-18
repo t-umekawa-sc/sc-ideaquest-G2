@@ -274,12 +274,14 @@ def last_message_at_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> di
 
 
 def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid.UUID],
-                      limit: int = 8) -> list[tuple[uuid.UUID, int, datetime]]:
-    """参加クエスト（quest_ids）の公開アイデアのうち、自分の未読（他ユーザー投稿）があるものを
-    最終チャット時刻の新しい順に返す（💬 新着の議論・ダッシュボード横断）。返り＝[(idea_id, unread, last_at)]。
+                      limit: int = 8, only_unread: bool = True) -> list[tuple[uuid.UUID, int, datetime]]:
+    """参加クエスト（quest_ids）の公開アイデアで**チャットがあるもの**を最終チャット時刻の新しい順に返す。
+    返り＝[(idea_id, unread, last_at)]。last_at は全メッセージの最終時刻（並び用）・unread は自分の未読数。
 
-    未読の定義は `unread_counts_for_ideas` と同じ（他ユーザー投稿・既読カーソル後）。last_at は全メッセージの
-    最終時刻（並び用）。unread が 0 のアイデアは返さない（HAVING）。
+    - `only_unread=True`（既定・💬 新着の議論）＝**自分の未読（他ユーザー投稿）が 1 件以上**のアイデアのみ（HAVING）。
+    - `only_unread=False`（🕒 最近の議論）＝**未読フィルタを掛けない**＝既読も自分投稿だけの議論も含めて更新順で返す
+      （unread は右パネルの小インジケータ用に併せて返す）。**両者は用途違いの別動線**（SC-01 §4.8c）。
+    未読の定義は `unread_counts_for_ideas` と同じ（他ユーザー投稿・既読カーソル後）。
     """
     if not quest_ids:
         return []
@@ -290,7 +292,7 @@ def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid
             tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(last_read.created_at, last_read.id)),
     )
     unread_ct = func.count(ChatMessage.id).filter(is_unread)  # FILTER＝未読のみ計数（Postgres）
-    rows = session.execute(
+    stmt = (
         select(ChatGroup.idea_id, unread_ct.label("unread"), func.max(ChatMessage.created_at).label("last_at"))
         .select_from(ChatGroup)
         .join(Idea, and_(Idea.id == ChatGroup.idea_id, Idea.status == "published", Idea.deleted_at.is_(None)))
@@ -299,10 +301,12 @@ def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid
         .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
         .where(Idea.quest_id.in_(quest_ids))
         .group_by(ChatGroup.idea_id)
-        .having(unread_ct > 0)
         .order_by(func.max(ChatMessage.created_at).desc())
         .limit(limit)
-    ).all()
+    )
+    if only_unread:
+        stmt = stmt.having(unread_ct > 0)  # 新着の議論＝未読があるものだけ
+    rows = session.execute(stmt).all()
     return [(iid, int(u), last_at) for iid, u, last_at in rows]
 
 

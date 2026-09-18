@@ -251,6 +251,7 @@ export function DashboardView({
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
+  const recentChats = data?.recent_chats ?? [];  // 🕒 最近の議論（更新順・既読/未読問わず・別動線）
 
   // 最近の通知をクリック＝SC-02 と同様に既読化（楽観更新＋サーバー・未読数も減算）。realtime でベルも追随。
   const markNotifRead = (id: string, wasRead: boolean) => {
@@ -322,32 +323,61 @@ export function DashboardView({
       {/* 並び順（ユーザー要望・2026-09-15）＝新着の議論 → チームアクティビティ＋最近の通知 → 未投票 → フォロー中 → 下書き → 参加中クエスト。
           ヒーロー＋週間ランキング（ゲーム層）は §4.11 で最下部（2026-09-13）。空パネルは §7 で非表示。 */}
 
-      {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
-          通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。**常設**（未読ゼロは空状態）。 */}
-      <motion.section className="card" aria-label="新着の議論" {...flowMotion(1)}>
-        <div className="section-head">
-          <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
-          {unreadChats.length > 0 && (
-            <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
+      {/* 議論の2カラム行＝💬新着の議論（左・未読のみ・既読で消える）＋🕒最近の議論（右・更新順の恒久導線・SC-01 §4.8c）。 */}
+      <motion.div className="dash-discuss" {...flowMotion(1)}>
+        {/* 💬 新着の議論（レビュー#3）＝参加クエスト横断で自分の未読チャット（他ユーザー投稿）があるアイデア。
+            通知（自分宛のみ）が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行。**常設**（未読ゼロは空状態）。 */}
+        <section className="card" aria-label="新着の議論">
+          <div className="section-head">
+            <h2 style={{ fontSize: "var(--text-lg)" }}>💬 新着の議論</h2>
+            {unreadChats.length > 0 && (
+              <span className="unread-panel__n">{unreadChats.reduce((s, c) => s + c.unread_chat_count, 0)} 件の未読</span>
+            )}
+          </div>
+          {unreadChats.length > 0 ? (
+            <ul className="unread-list">
+              {unreadChats.map((c) => (
+                <li key={c.id}>
+                  <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
+                    <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
+                    <span className="unread-item__title">{c.title}</span>
+                    <span className="unread-item__quest">🎯 {c.quest.title}</span>
+                    <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。参加クエストで他のメンバーの新しい投稿があるとここに表示されます。</p>
           )}
-        </div>
-        {unreadChats.length > 0 ? (
-          <ul className="unread-list">
-            {unreadChats.map((c) => (
-              <li key={c.id}>
-                <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
-                  <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
-                  <span className="unread-item__title">{c.title}</span>
-                  <span className="unread-item__quest">🎯 {c.quest.title}</span>
-                  <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。参加クエストで他のメンバーの新しい投稿があるとここに表示されます。</p>
-        )}
-      </motion.section>
+        </section>
+
+        {/* 🕒 最近の議論＝更新順（既読/未読・自分投稿問わず）。新着が既読で消えても「直近で動いている議論」へ戻れる恒久導線。既読化しない。 */}
+        <section className="card" aria-label="最近の議論">
+          <div className="section-head">
+            <h2 style={{ fontSize: "var(--text-lg)" }}>🕒 最近の議論</h2>
+            <span className="muted text-xs">更新順</span>
+          </div>
+          {recentChats.length > 0 ? (
+            <ul className="unread-list">
+              {recentChats.map((c) => (
+                <li key={c.id}>
+                  <Link className="unread-item" href={`/ideas/${c.id}/chat`} onClick={() => markChatFromDashboard()}>
+                    <QuestIcon name={c.title} color={c.quest.color ?? undefined} size="xs" />
+                    <span className="unread-item__title">{c.title}</span>
+                    <span className="unread-item__quest">🎯 {c.quest.title}</span>
+                    {c.unread_chat_count > 0
+                      ? <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                      : <span className="notif-time muted">{c.last_chat_at ? timeLabel(c.last_chat_at) : ""}</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>最近更新された議論はありません。参加クエストのアイデアにチャットがあるとここに更新順で並びます。</p>
+          )}
+        </section>
+      </motion.div>
 
       {/* 下段：チームアクティビティ＋最近の通知の2段組（横並び・情報量に合わせて幅を分割・レビュー寄り道）。
           チームアクティビティ＝SC-01 §4.8b・FR-36（参加クエスト横断の場の活動）／最近の通知＝自分宛（別物）。 */}
