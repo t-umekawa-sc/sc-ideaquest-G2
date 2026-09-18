@@ -345,3 +345,59 @@ def test_c_tc_272_receiver_authz_and_state_guards(client, factory, env):
     rj = client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/reject", headers=_csrf(client))
     assert rj.status_code == 409, rj.text
     assert rj.json()["errors"][0]["reason"] == "invalid_state"
+
+
+def test_c_tc_273_rejoin_after_removal_and_via_request(client, factory, env):
+    """C-TC-273 承認→除外→再申請の整合＝再申請 201（回帰）＋「リクエスト経由」via_request 表示。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    # viewer 申請→owner 承認。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client))
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve",
+                       headers=_csrf(client)).status_code == 200
+    # メンバー一覧＝viewer は via_request=true、owner（手動 owner）は false。
+    by = {m["user"]["user_id"]: m for m in client.get(f"/api/v1/quests/{qid}/members").json()["data"]}
+    assert by[str(env.viewer_id)]["via_request"] is True
+    assert by[str(ouid)]["via_request"] is False
+    # パーティーから除外（jr は approved のまま残る＝remove_member は jr に触れない）。
+    with get_tenant_session(env.db) as ts:
+        repo.remove_member(ts, qid, env.viewer_id)
+        ts.commit()
+    # 除外後の再申請＝201 pending（旧＝approved jr で 409 already_member を弾いていた回帰）。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(f"/api/v1/quests/{qid}/join-request", json={"message": "また入りたい"}, headers=_csrf(client))
+    assert r.status_code == 201 and r.json()["status"] == "pending", r.text
+    # 再承認で member 復活＋via_request=true。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve",
+                       headers=_csrf(client)).status_code == 200
+    with get_tenant_session(env.db) as ts:
+        assert repo.get_active_member(ts, qid, env.viewer_id) is not None
+    by2 = {m["user"]["user_id"]: m for m in client.get(f"/api/v1/quests/{qid}/members").json()["data"]}
+    assert by2[str(env.viewer_id)]["via_request"] is True
+
+
+def test_c_tc_275_join_request_profile(client, factory, env):
+    """C-TC-275 申請者プロフィール（承認判断材料）＝owner のみ／申請なし user は 404／中核指標＋ゲーム層ゲート。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client))  # viewer pending
+    # 非 owner（viewer 本人）は 403。
+    assert client.get(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/profile").status_code == 403
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    # 申請のない user のプロフィールは覗けない（存在秘匿 404）。
+    assert client.get(f"/api/v1/quests/{qid}/join-requests/{uuid.uuid4()}/profile").status_code == 404
+    # 申請者プロフィール＝中核指標（int）＋game は null か {avatar_base,...}（viewer=owner のゲームモード次第）。
+    r = client.get(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/profile")
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert isinstance(p["active_quest_count"], int) and p["active_quest_count"] >= 0
+    assert isinstance(p["published_idea_count"], int)
+    assert isinstance(p["chat_message_count"], int)
+    assert "game" in p and "評価" not in r.text  # 受けた評価平均は出さない（出しすぎ回避）
+    if p["game"] is not None:
+        assert p["game"]["avatar_base"] in ("male", "female")
+        assert isinstance(p["game"]["achievement_count"], int) and "rank" in p["game"]

@@ -147,6 +147,29 @@ class JoinRequestDecisionResponse(BaseModel):
     status: str
 
 
+class JoinRequestProfileGameDTO(BaseModel):
+    """申請者プロフィールのゲーム層（viewer のゲームモード ON 時のみ・C.9.1）＝3Dアバター/レベル/実績/ランキング。"""
+
+    avatar_base: str          # "male"/"female"＝3D アバターのベース体
+    level: int
+    xp: int
+    rank: int | None = None   # 総合ランキング順位（獲得 XP＋コイン・圏外/活動なしは null）
+    rank_total: int = 0       # ランキング母数
+    achievement_count: int = 0
+
+
+class JoinRequestProfileDTO(BaseModel):
+    """申請者プロフィール＝参加リクエスト承認の判断材料（C.9.1・owner/quest_admin のみ）。
+
+    レピュテーション露出になりやすい「受けた評価の平均」は含めない（設計判断・出しすぎ回避）。
+    """
+
+    active_quest_count: int      # 現在有効参加中のクエスト数
+    published_idea_count: int    # 投稿した公開アイデア数
+    chat_message_count: int      # チャット投稿数
+    game: JoinRequestProfileGameDTO | None = None  # viewer がゲームモード OFF なら null
+
+
 class QuestGroupDTO(BaseModel):
     id: str
     quest_group_code: str
@@ -236,6 +259,8 @@ class QuestMemberDTO(BaseModel):
     # 当該メンバーが有効所属する全クエストグループ（会社内・照会条件に限らず全件）。SC-11 のメンバーチップに
     # グループを常時表示し、フォームで参加グループを変更した際にクライアントが in_scope を即時再判定する材料（req2/3）。
     group_ids: list[str] = []
+    # 参加リクエスト経由で参加したメンバー（承認済み jr が存在）＝SC-12 で「リクエスト経由」バッジ表示（FR-40・C.9）。
+    via_request: bool = False
 
 
 class QuestDetailDTO(BaseModel):

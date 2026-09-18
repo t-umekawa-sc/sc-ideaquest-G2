@@ -927,6 +927,14 @@ def list_join_requests(session: Session, quest_id: uuid.UUID, statuses: list[str
     ).scalars().all())
 
 
+def approved_join_request_user_ids(session: Session, quest_id: uuid.UUID) -> set[uuid.UUID]:
+    """当該クエストで参加リクエストが承認済み(approved)のユーザ id 集合（メンバー一覧の「リクエスト経由」表示用・C.9）。"""
+    return set(session.execute(
+        select(QuestJoinRequest.user_id).where(
+            QuestJoinRequest.quest_id == quest_id, QuestJoinRequest.status == "approved")
+    ).scalars().all())
+
+
 def list_owner_and_admin_ids(session: Session, quest) -> list[uuid.UUID]:
     """参加リクエスト通知の宛先＝作成者＋有効な quest_admin メンバー（C.9・重複排除）。"""
     admins = session.execute(

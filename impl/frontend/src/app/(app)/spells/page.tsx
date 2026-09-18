@@ -4,10 +4,12 @@
 import { redirect } from "next/navigation";
 
 import { SpellsView } from "@/features/spells";
+import { requireGameEnabled } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function SpellsPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
+  await requireGameEnabled(); // ゲームモード OFF は / へ（§4.11・URL 直アクセス防止）
   return <SpellsView />;
 }

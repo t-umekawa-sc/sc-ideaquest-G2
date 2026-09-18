@@ -1093,6 +1093,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/join-requests/{user_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Join Request Profile
+         * @description 申請者プロフィール（承認判断材料・C.9.1・owner/quest_admin のみ）。ゲーム層は viewer のゲームモード ON 時のみ。読取専用。
+         */
+        get: operations["get_join_request_profile_api_v1_quests__quest_id__join_requests__user_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}": {
         parameters: {
             query?: never;
@@ -3674,6 +3694,45 @@ export interface components {
             /** Data */
             data: components["schemas"]["JoinRequestRowDTO"][];
         };
+        /**
+         * JoinRequestProfileDTO
+         * @description 申請者プロフィール＝参加リクエスト承認の判断材料（C.9.1・owner/quest_admin のみ）。
+         *
+         *     レピュテーション露出になりやすい「受けた評価の平均」は含めない（設計判断・出しすぎ回避）。
+         */
+        JoinRequestProfileDTO: {
+            /** Active Quest Count */
+            active_quest_count: number;
+            /** Published Idea Count */
+            published_idea_count: number;
+            /** Chat Message Count */
+            chat_message_count: number;
+            game?: components["schemas"]["JoinRequestProfileGameDTO"] | null;
+        };
+        /**
+         * JoinRequestProfileGameDTO
+         * @description 申請者プロフィールのゲーム層（viewer のゲームモード ON 時のみ・C.9.1）＝3Dアバター/レベル/実績/ランキング。
+         */
+        JoinRequestProfileGameDTO: {
+            /** Avatar Base */
+            avatar_base: string;
+            /** Level */
+            level: number;
+            /** Xp */
+            xp: number;
+            /** Rank */
+            rank?: number | null;
+            /**
+             * Rank Total
+             * @default 0
+             */
+            rank_total: number;
+            /**
+             * Achievement Count
+             * @default 0
+             */
+            achievement_count: number;
+        };
         /** JoinRequestResponse */
         JoinRequestResponse: {
             /** Status */
@@ -4582,6 +4641,11 @@ export interface components {
              * @default []
              */
             group_ids: string[];
+            /**
+             * Via Request
+             * @default false
+             */
+            via_request: boolean;
         };
         /**
          * QuestMemberInput
@@ -7272,6 +7336,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinRequestDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_join_request_profile_api_v1_quests__quest_id__join_requests__user_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestProfileDTO"];
                 };
             };
             /** @description Validation Error */

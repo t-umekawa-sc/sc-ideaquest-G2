@@ -3,6 +3,7 @@
 import { cache } from "react";
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import type { components } from "@/lib/api/schema";
 
@@ -18,6 +19,16 @@ export const getServerMe = cache(async (): Promise<Me | null> => {
   if (!res.ok) return null;
   return (await res.json()) as Me;
 });
+
+// ゲーム専用画面（SC-30 ショップ/SC-31 きせかえ/SC-32 魔法/SC-41 ランキング）のサーバーガード（§4.11）。
+// ゲームモード OFF ではナビから外れるが URL 直アクセスは描画されてしまうため、ダッシュボードへ強制リダイレクト。
+// 実効値＝GET /me の game_mode.effective（= override ?? company_default）。me 取得不可時は既定 true（既存挙動を壊さない）。
+// 呼び出し側（Server Component）が me を再利用できるよう me を返す（getServerMe は cache 済み＝二重呼び出し無コスト）。
+export async function requireGameEnabled(): Promise<Me | null> {
+  const me = await getServerMe();
+  if (!(me?.game_mode.effective ?? true)) redirect("/");
+  return me;
+}
 
 // 活動履歴（G.6・GET /me/activities）の初回ページをサーバ側取得。続き（もっと見る）は
 // クライアントで next rewrite 経由に fetch する（ActivityHistory）。

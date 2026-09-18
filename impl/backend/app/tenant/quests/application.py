@@ -1178,12 +1178,14 @@ def _dept_scope(ts, quest) -> tuple[bool, set]:
     return True, repo.user_ids_in_any_group(ts, linked)
 
 
-def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=frozenset(), member_group_ids=()) -> dict:
+def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=frozenset(),
+                member_group_ids=(), via_request=False) -> dict:
     """パーティーメンバー1件の DTO（C.1 GET .../members・SC-11/SC-12 共通形）。
 
     `in_scope`＝当該メンバーが今このクエストを参照できるか（作成者別格 or 参加部署0件 or 参加部署に現所属）。
     false＝**参加部署外＝失効中**（異動などで全参加部署を外れた名指しメンバー・UI で明示表示・C.0）。
     `group_ids`＝当該メンバーが有効所属する全クエストグループ（会社内全件）＝チップ常時表示/スコープ再判定の材料（req2/3）。
+    `via_request`＝参加リクエスト経由（承認済み jr あり）＝SC-12 の「リクエスト経由」バッジ用（FR-40・C.9）。
     """
     is_creator = member.user_id == creator_id
     in_scope = is_creator or (not has_depts) or (member.user_id in dept_users)
@@ -1198,6 +1200,7 @@ def _member_dto(ts, member, creator_id, user, *, has_depts=False, dept_users=fro
         "is_creator": is_creator,
         "in_scope": in_scope,
         "group_ids": [str(g) for g in member_group_ids],
+        "via_request": via_request,
     }
 
 
@@ -1211,10 +1214,12 @@ def _members_payload(ts, quest) -> list[dict]:
     users = repo.get_users_by_ids(ts, {m.user_id for m in members})
     has_depts, dept_users = _dept_scope(ts, quest)
     memberships = repo.all_active_group_ids_by_user(ts, [m.user_id for m in members])
+    via_request_ids = repo.approved_join_request_user_ids(ts, quest.id)
     return [
         _member_dto(
             ts, m, quest.owner_id, users.get(m.user_id),
             has_depts=has_depts, dept_users=dept_users, member_group_ids=memberships.get(m.user_id, []),
+            via_request=m.user_id in via_request_ids,
         )
         for m in members
     ]
@@ -1493,12 +1498,12 @@ def request_join(account_id, company_id, quest_id, *, message=None) -> dict:
         if existing is not None:
             if existing.status == "pending":
                 raise AppError(409, "conflict", detail="すでに申請中です", extra={"errors": [{"reason": "already_requested"}]})
-            if existing.status == "approved":
-                raise AppError(409, "conflict", detail="すでに参加中です", extra={"errors": [{"reason": "already_member"}]})
             if existing.status == "rejected":
                 # 却下は作成者側の再承諾のみ＝申請者からの再申請は当面不可（§8-6）。
                 raise AppError(409, "conflict", detail="この申請は却下されています", extra={"errors": [{"reason": "rejected"}]})
-            # withdrawn（自分で取り下げ）→ 再申請は許可＝行を再利用して pending に戻す。
+            # ここに来る approved は「承認後にパーティーから外された＝現在は非メンバー」（有効 member は上の
+            # get_active_member ガードで 409 済み）。withdrawn（自分で取り下げ）と同様、行を再利用して
+            # pending に戻す＝再申請には再承認が必要（remove_member は jr に触れないため・データフロー整合）。
             existing.status = "pending"
             existing.message = message
             existing.decided_at = None
@@ -1668,3 +1673,51 @@ def _notify_join_request_decided(company_id, quest_id, recipient_id, result, act
         return [notify_svc.entry(recipient_id, "join_request_decided", refs=refs,
                                  params={"actor_name": actor_name, "result": result})]
     notify_svc.dispatch(company_id, _build)
+
+
+def get_join_request_profile(account_id, company_id, quest_id, user_id) -> dict:
+    """申請者プロフィール＝参加リクエスト承認の判断材料（C.9.1・owner/quest_admin のみ）。
+
+    当該クエストに（pending/rejected の）申請がある user に限る（無ければ 404＝存在秘匿）。中核指標は常時、
+    ゲーム層（3Dアバター/レベル/実績/ランキング）は **viewer のゲームモード ON 時のみ** 付与。
+    """
+    from app.control_plane.game_mode import resolve_effective_game_mode
+    from app.tenant.achievements import repository as ach_repo
+    from app.tenant.gamification import repository as gami_repo
+
+    iid = _parse_uuid(quest_id, field="quest_id")
+    target_uid = _parse_uuid(user_id, field="user_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, actor)  # owner/quest_admin のみ
+        jr = repo.get_join_request(ts, iid, target_uid)
+        if jr is None or jr.status == "withdrawn":
+            raise AppError(404, "not_found")  # 申請のない user のプロフィールは覗けない（存在秘匿）
+        out = {
+            "active_quest_count": len(repo.list_member_quest_ids(ts, target_uid)),
+            "published_idea_count": ideas_repo.count_published_ideas_by_author(ts, target_uid),
+            "chat_message_count": chat_repo.count_messages_by_author(ts, target_uid),
+            "game": None,
+        }
+        if resolve_effective_game_mode(account_id, company_id):
+            tu = next(iter(profile_repo.list_users_by_ids(ts, [target_uid])), None)
+            # 総合ランキング（獲得 XP＋コイン・期間なし）での順位。全行走査は軽量（DTO/署名URL は作らない）。
+            rows = gami_repo.aggregate_ranking(ts, start=None, end=None)
+            idx = next((i for i, r in enumerate(rows) if r[0] == target_uid), None)
+            out["game"] = {
+                "avatar_base": (tu.avatar_base if tu else "male"),
+                "level": (tu.level if tu else 1),
+                "xp": (tu.xp if tu else 0),
+                "rank": (idx + 1) if idx is not None else None,
+                "rank_total": len(rows),
+                "achievement_count": len(ach_repo.list_user_achievements(ts, target_uid)),
+            }
+    return out

@@ -6,10 +6,11 @@
 // 編集導線（SC-11 /quests/{id}/edit）＋**アイデアタブ（D.1 GET /quests/{id}/ideas・IDEAS_CHANGED 購読）**。
 // アイデアタブ/全文検索(J)/評価列(F)/クエスト内週間ランキング(G) すべて実接続。
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
+import { Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
@@ -22,12 +23,23 @@ import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import { QuestResultTab } from "./QuestResultTab";
 import {
+  approveJoinRequest,
   deleteQuest,
+  getJoinRequestProfile,
   getQuest,
+  listCompanyGroupDirectory,
+  listJoinRequests,
   QUESTS_CHANGED_EVENT,
+  rejectJoinRequest,
   transitionQuest,
+  type JoinRequestProfile,
+  type JoinRequestRow,
   type QuestDetail,
 } from "../api";
+import { supportsWebGL } from "@/features/avatar/webgl";
+
+// 3Dビューアは WebGL/DOM 依存＝SSR 不可。client でのみ動的ロード（AvatarView と同方針・§9.3）。
+const AvatarViewer3D = dynamic(() => import("@/features/avatar/components/AvatarViewer3D").then((m) => m.AvatarViewer3D), { ssr: false });
 import { IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import "../quests.css";
@@ -292,6 +304,71 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const nextStatus = curStatusIdx >= 0 ? STATUS_ORDER[curStatusIdx + 1] : undefined;
   // 後退＝隣接1段のみ・draft（0）へは戻さない＝下限 recruiting（curIdx>=2 のとき prev が recruiting 以上）。C.5。
   const prevStatus = curStatusIdx >= 2 ? STATUS_ORDER[curStatusIdx - 1] : undefined;
+
+  // --- FR-40 受信側＝参加リクエストの承認/却下（SC-12 §4.3 パーティータブ・owner/quest_admin のみ・C.9.1）---
+  const [joinReqs, setJoinReqs] = useState<JoinRequestRow[] | null>(null);   // null=未取得
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});  // 部署 id→名（バッジ装飾）
+  const [reqSel, setReqSel] = useState<JoinRequestRow | null>(null);         // プロフィールダイアログ対象
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqBusy, setReqBusy] = useState(false);
+  const [reqProfile, setReqProfile] = useState<JoinRequestProfile | null>(null);  // 申請者プロフィール（承認判断材料）
+  const [webgl, setWebgl] = useState(false);                                 // 3Dアバター描画可否（client のみ）
+  useEffect(() => { setWebgl(supportsWebGL()); }, []);
+
+  // プロフィールダイアログを開いたら申請者の判断材料（参加中クエスト/アイデア/チャット＋ゲーム層）を取得。
+  useEffect(() => {
+    if (!reqOpen || !reqSel) return;
+    setReqProfile(null);
+    void getJoinRequestProfile(questId, reqSel.user.user_id)
+      .then((p) => setReqProfile(p))
+      .catch(() => setReqProfile(null));
+  }, [reqOpen, reqSel, questId]);
+
+  const loadJoinReqs = useCallback(async () => {
+    try {
+      const r = await listJoinRequests(questId);   // 既定 pending+rejected
+      setJoinReqs(r?.data ?? []);
+    } catch {
+      setJoinReqs([]);  // 取得失敗はセクション非表示（受信側は装飾的・本体のメンバー一覧は別取得）
+    }
+  }, [questId]);
+
+  // owner/quest_admin なら（タブに依らず）参加リクエストを取得＝パーティータブの未処理バッジを常時表示するため。
+  useEffect(() => {
+    if (!canEdit) return;
+    void loadJoinReqs();
+  }, [canEdit, loadJoinReqs]);
+
+  // 部署名は装飾（行/ダイアログのバッジ）＝パーティータブを開いた時に一度だけ取得。
+  useEffect(() => {
+    if (tab !== "party" || !canEdit || Object.keys(groupNames).length > 0) return;
+    void listCompanyGroupDirectory()
+      .then((r) => { if (r) setGroupNames(Object.fromEntries(r.data.map((g) => [g.id, g.name]))); })
+      .catch(() => { /* 部署名は装飾＝失敗しても続行 */ });
+  }, [tab, canEdit, groupNames]);
+
+  const decideJoinReq = async (userId: string, action: "approve" | "reject") => {
+    setReqBusy(true);
+    try {
+      if (action === "approve") await approveJoinRequest(questId, userId);
+      else await rejectJoinRequest(questId, userId);
+      setReqOpen(false);
+      snack({ type: "success", msg: action === "approve" ? "パーティーに追加しました。" : "参加リクエストを却下しました。" });
+      await loadJoinReqs();
+      if (action === "approve") await load();  // メンバー一覧を再取得（member 化＋リクエスト経由バッジを反映）
+    } catch (err) {
+      snack({
+        type: "error",
+        title: action === "approve" ? "承諾できませんでした" : "却下できませんでした",
+        msg: err instanceof ApiError && err.status === 403 ? "権限がありません。" : "時間をおいて再度お試しください。",
+      });
+    } finally {
+      setReqBusy(false);
+    }
+  };
+
+  const pendingReqs = (joinReqs ?? []).filter((r) => r.status === "pending");
+  const rejectedReqs = (joinReqs ?? []).filter((r) => r.status === "rejected");
 
   async function onTransition() {
     if (!quest || !nextStatus) return;
@@ -598,6 +675,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           return (
             <button key={t.key} className={`tab${tab === t.key ? " is-active" : ""}`} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}{count != null && <span className="tab-count">{count}</span>}
+              {t.key === "party" && canEdit && pendingReqs.length > 0 && (
+                <span className="tab-count tab-count--req" title={`未処理の参加リクエスト ${pendingReqs.length} 件`}>📩{pendingReqs.length}</span>
+              )}
               {provisional && <span className="tab-count tab-count--wip" title="このクエストは進行中＝暫定の途中経過です">暫定</span>}
             </button>
           );
@@ -721,7 +801,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
       )}
 
-      {/* パーティー（実接続・C.1/C.3） */}
+      {/* パーティー（実接続・C.1/C.3＋FR-40 受信側＝参加リクエスト承認/却下・C.9.1） */}
       {tab === "party" && (
         <section aria-label="パーティー">
           <div className="list-toolbar">
@@ -730,13 +810,44 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               <button className={`btn btn-outline btn-sm${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストではパーティー・権限を編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/party`)}>パーティー・権限を編集</button>
             )}
           </div>
+
+          {/* 参加リクエスト（pending・上位）＝owner/quest_admin のみ。行クリックでプロフィールダイアログ→承諾/拒否。 */}
+          {canEdit && pendingReqs.length > 0 && (
+            <div className="join-req-block">
+              <h3 className="join-req-title">📩 参加リクエスト<span className="tab-count">{pendingReqs.length}</span></h3>
+              <div className="card" style={{ padding: 0 }}>
+                <ul className="member-list">
+                  {pendingReqs.map((r) => (
+                    <li key={r.user.user_id} className="member-row join-req-row" role="button" tabIndex={0}
+                        onClick={() => { setReqSel(r); setReqOpen(true); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setReqSel(r); setReqOpen(true); } }}>
+                      <Avatar name={r.user.display_name} imageUrl={r.user.avatar_image_url ?? undefined} />
+                      <span className="member-name">
+                        {r.user.display_name}
+                        {r.user.group_ids.map((id) => groupNames[id]).filter(Boolean).map((n) => (
+                          <span key={n} className="badge badge-muted" style={{ marginLeft: 6 }}>{n}</span>
+                        ))}
+                        {r.message && <span className="join-req-msg" title={r.message}>「{r.message}」</span>}
+                      </span>
+                      <span className="muted text-sm">{new Date(r.created_at).toLocaleDateString("ja-JP")}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* 参加リクエストのセクションがある時は「参加中メンバー」見出しで区分け（申請/却下行との同化を防ぐ）。 */}
+          {canEdit && (pendingReqs.length > 0 || rejectedReqs.length > 0) && (
+            <h3 className="join-req-title" style={{ marginTop: "var(--space-4)" }}>👥 参加中メンバー<span className="tab-count">{party.length}</span></h3>
+          )}
           <div className="card tab-party-card" style={{ padding: 0 }}>
             <ul className="member-list">
               {party.map((m) => (
                 // 参加部署外（in_scope=false）＝失効中のメンバーは淡色＋バッジで明示（FR-38・C.0）。作成者は別格で常に有効。
                 <li className="member-row" key={m.user.user_id} data-out-of-scope={m.in_scope === false ? "1" : undefined} style={m.in_scope === false ? { opacity: 0.62 } : undefined}>
                   <Avatar name={m.user.display_name} imageUrl={m.user.avatar_image_url ?? undefined} />
-                  <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}{m.in_scope === false && <span className="badge badge-danger" style={{ marginLeft: 6 }} title="どの参加部署にも所属していないため参照できません（異動などで失効）">部署外・失効中</span>}</span>
+                  <span className="member-name">{m.user.display_name}{m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }}>作成者</span>}{m.via_request && !m.is_creator && <span className="badge badge-muted" style={{ marginLeft: 6 }} title="参加リクエストの承認を経て参加したメンバー">リクエスト経由</span>}{m.in_scope === false && <span className="badge badge-danger" style={{ marginLeft: 6 }} title="どの参加部署にも所属していないため参照できません（異動などで失効）">部署外・失効中</span>}</span>
                   <span className="member-perms">
                     {PERM_VIEW_ORDER.filter((p) => m.permissions.includes(p)).map((p) => (
                       <span key={p} className={`badge ${p === "owner" ? "" : "badge-muted"}`}>{PERM_BADGE[p]}</span>
@@ -747,6 +858,81 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
             </ul>
           </div>
           <p className="hint" style={{ marginTop: "var(--space-3)" }}>※ 新規参加メンバーの既定権限＝投票＋アイデア作成＋コメント。評価者/クエスト管理などは所有者/管理権限者が付与。</p>
+
+          {/* 却下済み（rejected・下部・非終端＝後日「承諾」で復活）＝owner/quest_admin のみ。 */}
+          {canEdit && rejectedReqs.length > 0 && (
+            <div className="join-req-block join-req-block--rejected">
+              <h3 className="join-req-title muted">却下済み<span className="tab-count">{rejectedReqs.length}</span></h3>
+              <div className="card" style={{ padding: 0 }}>
+                <ul className="member-list">
+                  {rejectedReqs.map((r) => (
+                    <li key={r.user.user_id} className="member-row join-req-row" role="button" tabIndex={0} style={{ opacity: 0.7 }}
+                        onClick={() => { setReqSel(r); setReqOpen(true); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setReqSel(r); setReqOpen(true); } }}>
+                      <Avatar name={r.user.display_name} imageUrl={r.user.avatar_image_url ?? undefined} />
+                      <span className="member-name">{r.user.display_name}<span className="badge badge-muted" style={{ marginLeft: 6 }}>却下済み</span></span>
+                      <span className="muted text-sm">{r.decided_at ? new Date(r.decided_at).toLocaleDateString("ja-JP") : ""}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* 申請者プロフィールダイアログ（行クリック）＝承諾/拒否（確認モーダルは付けない＝本ボタンが確認相当）。 */}
+          {reqSel && (
+            <Modal open={reqOpen} onClose={() => setReqOpen(false)} onClosed={() => setReqSel(null)} title="参加リクエスト" size="sm">
+              <ModalBody>
+                <div className="join-req-profile">
+                  <Avatar name={reqSel.user.display_name} imageUrl={reqSel.user.avatar_image_url ?? undefined} size="lg" noTooltip />
+                  <div className="join-req-profile__body">
+                    <div className="join-req-profile__name">{reqSel.user.display_name}</div>
+                    <div className="join-req-profile__depts">
+                      {reqSel.user.group_ids.map((id) => groupNames[id]).filter(Boolean).map((n) => (
+                        <span key={n} className="badge badge-muted">{n}</span>
+                      ))}
+                    </div>
+                    <div className="muted text-sm">申請日: {new Date(reqSel.created_at).toLocaleString("ja-JP")}{reqSel.status === "rejected" && "（却下済み）"}</div>
+                  </div>
+                </div>
+                {reqSel.message && <p className="join-req-profile__msg">{reqSel.message}</p>}
+                {/* 承認判断材料（C.9.1）＝中核指標。ゲーム層は viewer のゲームモード ON 時のみ backend が game を返す。 */}
+                <div className="join-req-stats">
+                  <div className="join-req-stat"><span className="join-req-stat__num">{reqProfile?.active_quest_count ?? "—"}</span><span className="join-req-stat__label">👥 参加中クエスト</span></div>
+                  <div className="join-req-stat"><span className="join-req-stat__num">{reqProfile?.published_idea_count ?? "—"}</span><span className="join-req-stat__label">💡 投稿アイデア</span></div>
+                  <div className="join-req-stat"><span className="join-req-stat__num">{reqProfile?.chat_message_count ?? "—"}</span><span className="join-req-stat__label">💬 チャット</span></div>
+                </div>
+                {reqProfile?.game && (
+                  <div className="join-req-game">
+                    <div className="join-req-game__avatar">
+                      {webgl
+                        ? <AvatarViewer3D base={reqProfile.game.avatar_base === "female" ? "female" : "male"} />
+                        : <Avatar name={reqSel.user.display_name} imageUrl={reqSel.user.avatar_image_url ?? undefined} size="lg" noTooltip />}
+                    </div>
+                    <div className="join-req-game__badges">
+                      <span className="badge">Lv.{reqProfile.game.level}</span>
+                      <span className="badge badge-muted">🏆 {reqProfile.game.rank != null ? `${reqProfile.game.rank}位 / ${reqProfile.game.rank_total}人` : "ランキング圏外"}</span>
+                      <span className="badge badge-muted">🎖️ 実績 {reqProfile.game.achievement_count}個</span>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                {reqSel.status === "pending" ? (
+                  <>
+                    <button type="button" className="btn" disabled={reqBusy} onClick={() => setReqOpen(false)}>閉じる</button>
+                    <button type="button" className="btn btn-outline" disabled={reqBusy} onClick={() => reqSel && decideJoinReq(reqSel.user.user_id, "reject")}>拒否</button>
+                    <button type="button" className="btn btn-primary" disabled={reqBusy} onClick={() => reqSel && decideJoinReq(reqSel.user.user_id, "approve")}>承諾</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="btn" disabled={reqBusy} onClick={() => setReqOpen(false)}>閉じる</button>
+                    <button type="button" className="btn btn-primary" disabled={reqBusy} onClick={() => reqSel && decideJoinReq(reqSel.user.user_id, "approve")}>承諾（復活）</button>
+                  </>
+                )}
+              </ModalFooter>
+            </Modal>
+          )}
         </section>
       )}
 

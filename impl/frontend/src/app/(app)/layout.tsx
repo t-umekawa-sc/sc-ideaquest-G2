@@ -67,9 +67,12 @@ export default async function AppLayout({
         <li role="none">
           <Link role="menuitem" href="/profile">プロフィール</Link>
         </li>
-        <li role="none">
-          <Link role="menuitem" href="/avatar">アバター / 着せ替え</Link>
-        </li>
+        {/* アバター/着せ替えはゲーム層＝ゲームモード OFF では非表示（§4.11・ナビのゲーム群と整合）。 */}
+        {gameEnabled && (
+          <li role="none">
+            <Link role="menuitem" href="/avatar">アバター / 着せ替え</Link>
+          </li>
+        )}
         {/* 背景画像の変更／リセット（K.4・FR-30・全認証画面に反映） */}
         <BackgroundImageMenuItem hasBackground={backgroundUrl !== null} />
         <li role="none"><div className="usermenu__sep" /></li>

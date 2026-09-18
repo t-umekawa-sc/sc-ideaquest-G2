@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { QuestIcon } from "@/components/layout";
-import { ActivitySpark, DataTable, EmptyState, Modal, ModalBody, ModalFooter, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, DataTable, EmptyState, Modal, ModalBody, ModalFooter, RowMenu, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
@@ -31,10 +31,14 @@ function reasonOf(err: unknown): string | undefined {
 
 export function QuestCatalogView() {
   const snack = useSnackbar();
-  const confirm = useConfirm();
   const [reload, setReload] = useState(0);
   const [detail, setDetail] = useState<Detail | null>(null);  // 詳細ダイアログの中身（開いているクエスト）
   const [dialogOpen, setDialogOpen] = useState(false);        // open 駆動（閉じアニメを見せてから detail を外す）
+  // 参加リクエストの理由入力モーダル（メニュー/カード/詳細ダイアログの3経路で共通）。
+  const [reqTarget, setReqTarget] = useState<Row | null>(null);
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqMsg, setReqMsg] = useState("");
+  const [reqBusy, setReqBusy] = useState(false);
 
   const serverQuery = useCallback(async (state: QueryState, signal: AbortSignal): Promise<ServerResult<Row>> => {
     const res = await fetchQuestCatalog(state, signal);
@@ -67,11 +71,21 @@ export function QuestCatalogView() {
     }
   };
 
-  const request = async (r: Row) => {
-    const ok = await confirm({ title: "参加をリクエスト", msg: `「${r.title}」への参加を申請します。作成者/管理者に通知されます。` });
-    if (!ok) return;
+  // 参加をリクエスト＝理由（任意）を入力するモーダルを開く（3経路共通）。
+  const request = (r: Row) => {
+    setReqTarget(r);
+    setReqMsg("");
+    setReqOpen(true);
+  };
+
+  // 理由入力モーダルから送信＝希望理由（任意・作成者/管理者に表示される）を添えて申請。
+  const submitRequest = async () => {
+    const r = reqTarget;
+    if (!r) return;
+    setReqBusy(true);
     try {
-      await requestJoinQuest(r.id);
+      await requestJoinQuest(r.id, reqMsg.trim() || undefined);
+      setReqOpen(false);
       snack({ type: "success", title: "参加をリクエストしました", msg: "作成者の承認をお待ちください。" });
       afterAction(r.id, "pending");
     } catch (err) {
@@ -83,7 +97,10 @@ export function QuestCatalogView() {
           : reason === "rejected" ? "この申請は却下されています。"
           : "リクエストに失敗しました。",
       });
+      setReqOpen(false);
       setReload((k) => k + 1);
+    } finally {
+      setReqBusy(false);
     }
   };
 
@@ -118,7 +135,7 @@ export function QuestCatalogView() {
   function cardActions(r: Row) {
     const st = r.my_state;
     return (
-      <div className="row-center" style={{ gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
+      <div className="row-center" style={{ gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end", marginTop: "var(--space-3)" }} onClick={(e) => e.stopPropagation()}>
         {/* フォロー★はカード右上（ヘッダー）へ移動済み。ここは参加/申請アクションのみ・右寄せ。 */}
         {(st === "none" || st === "following") && (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => void request(r)}>参加をリクエスト</button>
@@ -203,6 +220,32 @@ export function QuestCatalogView() {
           onRequest={request}
           onWithdraw={withdraw}
         />
+      )}
+
+      {/* 参加リクエストの希望理由入力（任意・作成者/管理者の承認判断材料として表示される・FR-40）。 */}
+      {reqTarget && (
+        <Modal open={reqOpen} onClose={() => setReqOpen(false)} onClosed={() => setReqTarget(null)} title="参加をリクエスト" size="sm">
+          <ModalBody>
+            <p className="text-sm" style={{ marginTop: 0 }}>「{reqTarget.title}」への参加を申請します。作成者・管理者に通知されます。</p>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="join-req-reason">希望理由（任意）</label>
+              <textarea
+                id="join-req-reason"
+                className="textarea"
+                rows={4}
+                maxLength={500}
+                placeholder="例）業務改善の視点で貢献したいです。ぜひ参加させてください。"
+                value={reqMsg}
+                onChange={(e) => setReqMsg(e.target.value)}
+              />
+              <p className="muted text-xs" style={{ margin: "4px 0 0" }}>作成者・管理者が承認を判断する際に表示されます（{reqMsg.length}/500）。</p>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn" disabled={reqBusy} onClick={() => setReqOpen(false)}>キャンセル</button>
+            <button type="button" className="btn btn-primary" disabled={reqBusy} onClick={() => void submitRequest()}>リクエストを送信</button>
+          </ModalFooter>
+        </Modal>
       )}
     </section>
   );

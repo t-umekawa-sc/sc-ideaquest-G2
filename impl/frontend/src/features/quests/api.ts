@@ -57,6 +57,34 @@ export function withdrawJoinQuest(questId: string): Promise<null> {
   return apiFetch<null>(`/quests/${questId}/join-request`, { method: "DELETE" }) as Promise<null>;
 }
 
+// 参加リクエスト 受信側（SC-12 パーティータブ・C.9.1・owner/quest_admin のみ）。
+export type JoinRequestRow = components["schemas"]["JoinRequestRowDTO"];
+export type JoinRequestListResponse = components["schemas"]["JoinRequestListResponse"];
+
+// 参加リクエスト一覧（既定 pending+rejected）。status で絞り込み可（pending/rejected）。
+export function listJoinRequests(questId: string, status?: string[]): Promise<JoinRequestListResponse | null> {
+  const qs = new URLSearchParams();
+  for (const s of status ?? []) qs.append("status", s);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<JoinRequestListResponse>(`/quests/${questId}/join-requests${suffix}`);
+}
+// 承認＝member 追加（既定権限）。冪等は Idempotency-Key。
+export function approveJoinRequest(questId: string, userId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/quests/${questId}/join-requests/${userId}/approve`, {
+    method: "POST", headers: idempotencyHeader(),
+  });
+}
+// 却下（非終端＝後日 approve で復活可）。
+export function rejectJoinRequest(questId: string, userId: string): Promise<{ status: string } | null> {
+  return apiFetch<{ status: string }>(`/quests/${questId}/join-requests/${userId}/reject`, { method: "POST" });
+}
+
+// 申請者プロフィール（承認判断材料・C.9.1・owner/quest_admin のみ）。ゲーム層は viewer のゲームモード ON 時のみ。
+export type JoinRequestProfile = components["schemas"]["JoinRequestProfileDTO"];
+export function getJoinRequestProfile(questId: string, userId: string): Promise<JoinRequestProfile | null> {
+  return apiFetch<JoinRequestProfile>(`/quests/${questId}/join-requests/${userId}/profile`);
+}
+
 export type QuestListResponse = components["schemas"]["QuestListResponse"];
 export type QuestGroup = components["schemas"]["QuestGroupDTO"];
 export type QuestGroupsResponse = components["schemas"]["QuestGroupsResponse"];

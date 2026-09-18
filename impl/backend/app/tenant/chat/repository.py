@@ -206,6 +206,14 @@ def count_active_messages(session: Session, chat_group_id: uuid.UUID) -> int:
     ).scalar_one())
 
 
+def count_messages_by_author(session: Session, author_id: uuid.UUID) -> int:
+    """当該ユーザのチャット投稿数（削除除外・会社横断）。参加リクエスト承認の判断材料（C.9.1）。"""
+    return int(session.execute(
+        select(func.count()).select_from(ChatMessage)
+        .where(ChatMessage.author_id == author_id, ChatMessage.is_deleted.is_(False))
+    ).scalar() or 0)
+
+
 def count_active_messages_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     """複数アイデアの非削除チャット件数（SC-12 一覧の 💬 コメント数・D.1）。chat_group 未生成は 0（結果に出ない）。"""
     if not idea_ids:

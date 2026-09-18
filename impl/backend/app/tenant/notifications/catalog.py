@@ -29,7 +29,7 @@ ICON = {
     "mention": "@", "idea_comment": "💬", "follow_comment": "💬",
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
-    "quest_result_ready": "🏁", "join_request_received": "🙋", "join_request_decided": "✅",
+    "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
 }
 

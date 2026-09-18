@@ -18,6 +18,7 @@ from app.tenant.quests.schemas import (
     JoinRequestBody,
     JoinRequestDecisionResponse,
     JoinRequestListResponse,
+    JoinRequestProfileDTO,
     JoinRequestResponse,
     QuestCandidatesResponse,
     QuestCatalogCardDTO,
@@ -169,6 +170,16 @@ def reject_join_request(
     result = quest_service.reject_join_request(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id)
     return JoinRequestDecisionResponse(**result)
+
+
+@router.get("/quests/{quest_id}/join-requests/{user_id}/profile", response_model=JoinRequestProfileDTO)
+def get_join_request_profile(
+    quest_id: str, user_id: str, request: Request, session: dict = Depends(require_me),
+) -> JoinRequestProfileDTO:
+    """申請者プロフィール（承認判断材料・C.9.1・owner/quest_admin のみ）。ゲーム層は viewer のゲームモード ON 時のみ。読取専用。"""
+    result = quest_service.get_join_request_profile(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id)
+    return JoinRequestProfileDTO(**result)
 
 
 @router.get("/quests/{quest_id}", response_model=QuestDetailDTO)

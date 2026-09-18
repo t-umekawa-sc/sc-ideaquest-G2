@@ -5,12 +5,12 @@ import { redirect } from "next/navigation";
 
 import { AvatarView } from "@/features/avatar";
 import { toAvatarBase } from "@/features/avatar/base";
-import { getServerMe } from "@/lib/me";
+import { requireGameEnabled } from "@/lib/me";
 import { getServerSession } from "@/lib/session";
 
 export default async function AvatarPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  const me = await getServerMe(); // K.1 正準＝profile.avatar_base をベース初期値に
+  const me = await requireGameEnabled(); // ゲームモード OFF は / へ（§4.11）＋ K.1 正準の avatar_base をベース初期値に
   return <AvatarView initialAvatarBase={toAvatarBase(me?.profile.avatar_base)} />;
 }

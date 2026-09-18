@@ -254,6 +254,14 @@ def list_published_ideas_for_quest(session: Session, quest_id: uuid.UUID) -> lis
     )
 
 
+def count_published_ideas_by_author(session: Session, author_id: uuid.UUID) -> int:
+    """当該ユーザが投稿した公開アイデア数（会社横断・下書き/削除は除外）。参加リクエスト承認の判断材料（C.9.1）。"""
+    return int(session.execute(
+        select(func.count()).select_from(Idea).where(
+            Idea.author_id == author_id, Idea.status == "published", Idea.deleted_at.is_(None))
+    ).scalar() or 0)
+
+
 def count_published_ideas_for_quests(session: Session, quest_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     """クエストごとの公開アイデア数（C.1 `idea_count`・下書き/削除は除外・N+1 回避）。
 
