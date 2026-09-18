@@ -270,7 +270,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
                   <div key={i} className="qresult__metric-row">
                     <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
                     <input className="input" placeholder="値（例: 20h/月）" value={m.value} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
-                    <button type="button" className="btn btn-sm btn-outline" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+                    <button type="button" className="btn btn-sm btn-danger" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
                   </div>
                 ))}
                 <button type="button" className="btn btn-sm btn-outline" style={{ marginTop: "var(--space-2)" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
