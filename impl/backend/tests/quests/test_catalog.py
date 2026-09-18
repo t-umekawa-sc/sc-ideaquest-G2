@@ -24,7 +24,7 @@ from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests import repository as repo
 from app.tenant.quests.orm import (
-    Quest, QuestFollow, QuestGroupLink, QuestJoinRequest, QuestMember, QuestMemberPermission,
+    Quest, QuestCategory, QuestFollow, QuestGroupLink, QuestJoinRequest, QuestMember, QuestMemberPermission,
 )
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
@@ -88,6 +88,7 @@ def env():
         ts.execute(Notification.__table__.delete().where(Notification.ref_quest_id.in_(qids)))
         ts.execute(QuestFollow.__table__.delete().where(QuestFollow.quest_id.in_(qids)))
         ts.execute(QuestJoinRequest.__table__.delete().where(QuestJoinRequest.quest_id.in_(qids)))
+        ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id.in_(qids)))  # API 作成分（C-TC-276）
         mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(qids))).scalars())
         if mids:
             ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(mids)))
@@ -401,3 +402,54 @@ def test_c_tc_275_join_request_profile(client, factory, env):
     if p["game"] is not None:
         assert p["game"]["avatar_base"] in ("male", "female")
         assert isinstance(p["game"]["achievement_count"], int) and "rank" in p["game"]
+
+
+def test_c_tc_276_create_discoverable(client, factory, env):
+    """C-TC-276 作成時に discoverable を指定＝応答/GET detail に反映／未指定は既定 false。"""
+    owner_acc, _ouid = _make_owner(env, factory)
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    # discoverable=true（recruiting・全社）で作成。
+    r = client.post("/api/v1/quests", json={
+        "title": "発見可能クエスト", "color": "#3B82F6", "categories": ["改善"],
+        "status": "recruiting", "discoverable": True,
+    }, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]; env.quests.append(uuid.UUID(qid))
+    assert r.json()["discoverable"] is True
+    assert client.get(f"/api/v1/quests/{qid}").json()["discoverable"] is True  # GET detail にも反映
+    # discoverable 未指定＝既定 false（サーバー設定・§1.4）。
+    r2 = client.post("/api/v1/quests", json={
+        "title": "非公開クエスト", "color": "#3B82F6", "categories": ["改善"], "status": "recruiting",
+    }, headers=_csrf(client))
+    assert r2.status_code == 201 and r2.json()["discoverable"] is False, r2.text
+    env.quests.append(uuid.UUID(r2.json()["id"]))
+
+
+def test_c_tc_277_update_discoverable_toggles_catalog(client, factory, env):
+    """C-TC-277 編集の discoverable トグル＝発見カタログ出没が連動＋detail 反映（owner/quest_admin）。"""
+    owner_acc, _ouid = _make_owner(env, factory)
+    # recruiting・全社（部署0件）・discoverable=false を API 作成。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    r = client.post("/api/v1/quests", json={
+        "title": "トグル検証クエスト", "color": "#3B82F6", "categories": ["改善"],
+        "status": "recruiting", "discoverable": False,
+    }, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]; env.quests.append(uuid.UUID(qid))
+    # viewer（seed・非メンバー）＝false のうちは catalog に出ない。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert qid not in _catalog_ids(client)
+    # owner が discoverable=true に。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    up = client.patch(f"/api/v1/quests/{qid}", json={"discoverable": True}, headers=_csrf(client))
+    assert up.status_code == 200 and up.json()["discoverable"] is True, up.text
+    # viewer catalog に出る（my_state=none）。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    card = next((c for c in client.get(CATALOG).json()["data"] if c["id"] == qid), None)
+    assert card is not None and card["my_state"] == "none"
+    # owner が false に戻す→ catalog から消える＋detail 反映。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    down = client.patch(f"/api/v1/quests/{qid}", json={"discoverable": False}, headers=_csrf(client))
+    assert down.status_code == 200 and down.json()["discoverable"] is False
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert qid not in _catalog_ids(client)

@@ -4449,6 +4449,11 @@ export interface components {
              * @enum {string}
              */
             status: "draft" | "recruiting";
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
         };
         /**
          * QuestCursorPageInfo
@@ -4514,6 +4519,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
         };
         /**
          * QuestFeedResponse
@@ -4964,6 +4974,8 @@ export interface components {
             members?: components["schemas"]["QuestMemberInput"][] | null;
             /** Quest Group Ids */
             quest_group_ids?: string[] | null;
+            /** Discoverable */
+            discoverable?: boolean | null;
         };
         /** RankingCursorPageInfo */
         RankingCursorPageInfo: {

@@ -49,6 +49,7 @@ def create_quest(
     purpose: str | None = None,
     deadline=None,
     icon_image_path: str | None = None,
+    discoverable: bool = False,
     quest_id: uuid.UUID | None = None,
 ) -> Quest:
     """クエストを1件作成（カテゴリ/パーティー/参加部署は別プリミティブ）。作成者を owner_id に保存。
@@ -64,6 +65,7 @@ def create_quest(
         purpose=purpose,
         deadline=deadline,
         icon_image_path=icon_image_path,
+        discoverable=discoverable,
     )
     session.add(quest)
     return quest

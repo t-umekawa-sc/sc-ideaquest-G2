@@ -309,7 +309,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         quest = repo.create_quest(
             ts, owner_id=user.id, title=title, color=color,
             status=body.status, purpose=body.purpose, deadline=body.deadline,
-            icon_image_path=body.icon_image_path,
+            icon_image_path=body.icon_image_path, discoverable=body.discoverable,
         )
         ts.flush()  # quest.id 確定（カテゴリ/パーティー/リンクの FK に使う）
         repo.replace_categories(ts, quest.id, cats)
@@ -1152,6 +1152,8 @@ def _apply_content(ts, quest, body) -> None:
         quest.deadline = body.deadline
     if "icon_image_path" in provided:
         quest.icon_image_path = body.icon_image_path
+    if "discoverable" in provided and body.discoverable is not None:
+        quest.discoverable = body.discoverable  # 発見カタログ掲載トグル（FR-40・C.9.0・owner/quest_admin）
     if "categories" in provided:
         repo.replace_categories(ts, quest.id, _normalize_categories(body.categories or []))
 
@@ -1263,6 +1265,7 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         "my_permissions": my_permissions,
         "members": member_dtos,
         "created_at": quest.created_at,
+        "discoverable": bool(quest.discoverable),
     }
 
 

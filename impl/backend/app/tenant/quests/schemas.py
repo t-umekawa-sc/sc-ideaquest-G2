@@ -211,6 +211,8 @@ class QuestCreateRequest(BaseModel):
     members: list[QuestMemberInput] = []
     # 作成＝下書き or 即公開。状態機械の前進は publish/transition のみ（recruiting 以降は不可）。
     status: Literal["draft", "recruiting"] = "draft"
+    # 発見カタログ（SC-13）に載せて他部署から発見/フォロー/参加リクエストを許可するか（FR-40・C.9.0）。既定 false。
+    discoverable: bool = False
 
 
 class QuestUpdateRequest(BaseModel):
@@ -231,6 +233,8 @@ class QuestUpdateRequest(BaseModel):
     # 参加部署の「あるべき全体像」（フラット 0..N・すべて同格・FR-38 再設計）。送信時のみ差分適用。
     # 参加部署を外すのはブロックしない（409 group_in_use 廃止）＝門番の都度再判定で失効を表現（C.0/C.2）。
     quest_group_ids: list[str] | None = None
+    # 発見カタログ（SC-13）への掲載可否のトグル（FR-40・C.9.0）。送信時のみ更新（owner/quest_admin）。
+    discoverable: bool | None = None
 
 
 class QuestPublishRequest(BaseModel):
@@ -284,6 +288,8 @@ class QuestDetailDTO(BaseModel):
     my_permissions: list[str] = []
     members: list[QuestMemberDTO] = []
     created_at: datetime
+    # 発見カタログ掲載可否（SC-11 編集フォームのトグル プリフィル・FR-40・C.9.0）。
+    discoverable: bool = False
 
 
 class QuestIconImageResponse(BaseModel):

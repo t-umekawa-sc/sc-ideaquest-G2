@@ -203,6 +203,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [ownerId, setOwnerId] = useState<string | null>(ownerUserId); // 候補除外に使う「作成者」
   const [ownerDeptIds, setOwnerDeptIds] = useState<string[]>([]); // 作成者の所属グループ（チップ表示用・req2）
   const [status, setStatus] = useState<string>("draft"); // 編集時は取得値
+  const [discoverable, setDiscoverable] = useState<boolean>(false); // 発見カタログ掲載（FR-40・編集時は取得値）
   const [loading, setLoading] = useState(isEdit); // 編集はプリフィル取得まで loading
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -257,6 +258,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         setDeptIds(linked.map((g) => g.id));
         setDeptNamesPrefill(Object.fromEntries(linked.map((g) => [g.id, g.name])));
         setStatus(d.status);
+        setDiscoverable(d.discoverable ?? false);
         setOwnerLabel(d.owner.display_name);
         setOwnerId(d.owner.user_id);
         setIconUrl(d.icon_image_url ?? null);
@@ -512,14 +514,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           ...contentPayload(),
           quest_group_ids: deptIds, // 参加部署（フラット 0..N・空も可＝全社）
           status: kind === "create-publish" ? "recruiting" : "draft",
+          discoverable, // 発見カタログ掲載トグル（FR-40・C.9.0）
         });
         if (created) await applyIcon(created.id);
       } else if (kind === "edit-save") {
-        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: deptIds });
+        await updateQuest(questId!, { ...contentPayload(), quest_group_ids: deptIds, discoverable });
         await applyIcon(questId!);
       } else {
         // edit-publish（draft→recruiting）＝参加部署の差分を先に反映してから公開。
-        await updateQuest(questId!, { quest_group_ids: deptIds });
+        await updateQuest(questId!, { quest_group_ids: deptIds, discoverable });
         await publishQuest(questId!, contentPayload());
         await applyIcon(questId!);
       }
@@ -672,6 +675,18 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               ariaLabel="参加グループ（アクセス条件）"
               emptyText="該当するグループがありません"
             />
+          </Field>
+        )}
+
+        {/* 発見カタログ掲載トグル（FR-40・C.9.0）＝ON で「クエストを探す」に載り、他部署から発見/フォロー/参加リクエスト可。 */}
+        {!frozen && (
+          <Field id="q_discoverable" label="発見カタログに載せる（任意）" hint="ON にすると「クエストを探す」に表示され、参加していないユーザーがフォローや参加リクエストをできます（公開中のクエストのみ対象・参加グループ条件は維持）。">
+            <label className="switch">
+              {/* id は Field の <label for="q_discoverable"> と一致させる（未一致だと a11y エラー＝ラベル未関連の違和感）。 */}
+              <input id="q_discoverable" type="checkbox" checked={discoverable} onChange={(e) => setDiscoverable(e.target.checked)} disabled={frozen} />
+              <span className="switch__track"><span className="switch__thumb" /></span>
+              <span className="switch__state">{discoverable ? "ON（発見可能）" : "OFF（非公開）"}</span>
+            </label>
           </Field>
         )}
         </>

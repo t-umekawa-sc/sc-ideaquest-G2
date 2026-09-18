@@ -737,3 +737,11 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | C-TC-266 | `maximizable={false}` に戻して frontend 再ビルド → ダイアログに「最大化」ボタンが出ず `toBeVisible` タイムアウト＝DFT-E-013 再現。上書き撤去で復元。 |
 | C-TC-267 | 閉じ要求を `onClose={() => setDetail(null)}`（即アンマウント）に戻して再ビルド → × クリック後 `.modal:not(.show)` が attach せず `toBeAttached` タイムアウト（中間の exit 状態が観測不可）＝DFT-E-014 再現。`open`駆動＋`onClosed` に復元。両復元・再ビルドで **2 passed（6.5s）**。 |
+
+## 受入不具合 DFT（SC-11 作成モーダルの `.switch` トグルでレイアウト崩れ）e2e 回帰（C-TC-278・2026-09-18）
+
+> ブラウザ受入で検出＝短ビューポート（DevTools 併用等）で SC-11 作成モーダルの「発見カタログに載せる」トグル（共有 `.switch`）を押すと、モーダル本文が大きくスクロールしフッターが上方へ飛び、下に大きな空白が出る（パーティー等は潰れていないが本文が短く見える）。原因＝`.switch` に `position: relative` が無く、視覚隠しの `input[type=checkbox]{position:absolute}` が位置指定祖先を失って別位置に配置→クリック/フォーカスで**ブラウザの scroll-into-view がモーダル `.modal__body` を大きくスクロール**させ、フッター（`flex:0 0 auto` 下端固定）との相対位置が崩れて見えた。修正＝`.switch{position:relative}`＋`input` を `left:0;top:0;margin:0` で `.switch` 内に封じ込め（共有部品＝全スイッチに有効な改善）。純表示/挙動ガード＝e2e（テスト規約 §5.3）。
+
+| TC-ID | 観測 red（修正 revert 時の actual）→ green |
+| --- | --- |
+| C-TC-278 | `.switch` を修正前（`position:relative`／input の `left/top` なし）へ戻して frontend 再ビルド → 短VP（1440×640）でトグル押下後に `.modal__footer` 下端が `.modal__panel` 下端と乖離（`pinned=false`）＝崩れ再現で `toBe(true)` 失敗。修正（position:relative＋input 封じ込め）復元・再ビルドで **1 passed（4.1s）**。 |

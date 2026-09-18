@@ -833,6 +833,9 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
 /* .checkbox（それ自体が <label>）を .field 直下に置いても崩れない＝上の .field>label(display:block・太字・下余白)に
    負けて flex(gap/align)が壊れるのを防ぐ明示リセット。specificity 0,1,2 で上書き。 */
 .field > label.checkbox { display: inline-flex; font-weight: 400; margin-bottom: 0; }
+/* .switch（それ自体が <label>）も .field 直下で `.field>label{display:block}` に負けると
+   inline-flex が壊れ、トラック（flex item の width:42px）が inline 化して幅0に潰れる。明示的に戻す。 */
+.field > label.switch { display: inline-flex; font-weight: 400; margin-bottom: 0; }
 .field .req { color: var(--color-danger); margin-left: 2px; }
 .input, .textarea, .select {
   width: 100%; font-family: var(--font-base); font-size: var(--text-base);
@@ -1005,8 +1008,11 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
    使い方: <label class="switch"><input type="checkbox"><span class="switch__track">
              <span class="switch__thumb"></span></span><span class="switch__text">ラベル</span></label>
    管理画面の会社設定（MFA 必須・投票匿名化 等）などで使用。ラベル/トラック両方 pointer。 */
-.switch { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; user-select: none; }
-.switch > input[type="checkbox"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+/* position:relative＝中の視覚隠し checkbox(position:absolute) を .switch 内に封じ込める。
+   これが無いと checkbox が位置指定祖先を失って別位置へ飛び、クリック/フォーカス時にブラウザの
+   scroll-into-view がモーダル本文を大きくスクロールさせフッターがずれる（レイアウト崩れの原因）。 */
+.switch { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; user-select: none; }
+.switch > input[type="checkbox"] { position: absolute; left: 0; top: 0; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .switch__track {
   position: relative; flex: 0 0 auto; width: 42px; height: 24px; border-radius: var(--radius-full);
   background: var(--color-border-strong); transition: background .15s;

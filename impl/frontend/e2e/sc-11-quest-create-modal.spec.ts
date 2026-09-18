@@ -84,3 +84,28 @@ test("C-TC-204 SC-11 create draft persists and appears in list", async ({ page }
     await cleanupByTitlePrefix(page, title);
   }
 });
+
+// C-TC-278（回帰）SC-11 作成モーダルの発見トグルを押してもレイアウトが崩れない（フッターが下端固定のまま）。
+// 受入不具合＝短ビューポートで .switch のトグルを押すとモーダル本文が大きくスクロールしフッターが上へ飛び
+// 下に大きな空白が出た。原因＝`.switch` に position:relative が無く視覚隠しの checkbox(position:absolute) が
+// 位置指定祖先を失って画面外へ→クリック/フォーカスでブラウザの scroll-into-view がモーダルをスクロール。
+// 修正＝`.switch{position:relative}`＋input を left/top:0 で封じ込め。表示/挙動ガード＝e2e（テスト規約 §5.3）。
+test("C-TC-278 SC-11 discoverable toggle keeps modal footer pinned (no layout jump)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 640 }); // フッターが見えるまでスクロールが要る高さ
+  await login(page);
+  await page.goto("/quests");
+  await page.getByRole("link", { name: /クエストを作成/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  const toggle = page.locator("label.switch");
+  await toggle.scrollIntoViewIfNeeded();
+  await toggle.click(); // 発見カタログ ON
+
+  // フッターがパネル下端に固定されたまま（崩れると footer が上方へ飛び panel 下端と乖離する）。
+  const pinned = await page.evaluate(() => {
+    const foot = document.querySelector(".modal__footer")!.getBoundingClientRect();
+    const panel = document.querySelector(".modal__panel")!.getBoundingClientRect();
+    return Math.abs(foot.bottom - panel.bottom) < 3;
+  });
+  expect(pinned).toBe(true);
+});
