@@ -37,6 +37,7 @@ _QUESTS_LIMIT = 6
 _FOLLOWED_LIMIT = 6
 _UNREAD_CHATS_LIMIT = 6
 _NOTIF_LIMIT = 5
+_CATALOG_LIMIT = 100  # FR-40 SC-01（フォロー中/参加リクエスト）＝発見カタログから my_state で抽出（1ページで十分）
 _NON_DRAFT_STATUS = ["recruiting", "in_progress", "evaluating", "completed"]
 
 
@@ -205,6 +206,12 @@ def get_dashboard(session: dict) -> dict:
         account_id, company_id, period="this_week", scope="company", limit=3))
     notifications = _safe(lambda: notif_app.get_notifications(
         account_id, company_id, limit=_NOTIF_LIMIT))
+    # FR-40（SC-01 §4.6b/§4.6c）＝発見カタログの my_state を再利用（発見不可になったものは自然に非表示＝動的失効）。
+    # following＝参加していないフォロー中／pending・rejected＝自分の参加リクエスト状況。
+    _catalog = _safe(lambda: quests_app.get_quest_catalog(
+        account_id, company_id, per_page=_CATALOG_LIMIT)["data"], default=[])
+    followed_quests = [c for c in _catalog if c.get("my_state") == "following"]
+    join_requests = [c for c in _catalog if c.get("my_state") in ("pending", "rejected")]
     roles = {
         "is_qg_admin": bool(session.get("is_qg_admin")),
         "is_company_account_admin": session.get("system_role") == "company_account_admin",
@@ -217,4 +224,5 @@ def get_dashboard(session: dict) -> dict:
         "hero": hero, "drafts": drafts, "unvoted_ideas": unvoted, "quests": quests,
         "followed_ideas": followed, "unread_chats": unread_chats, "weekly_ranking": weekly_ranking,
         "notifications": notifications, "roles": roles, "login_bonus": bonus,
+        "followed_quests": followed_quests, "join_requests": join_requests,  # FR-40（SC-01 §4.6b/§4.6c）
     }

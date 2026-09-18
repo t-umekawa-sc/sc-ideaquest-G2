@@ -544,3 +544,21 @@ def test_c_tc_281_watch_new_ideas_and_completed(client, factory, env):
         assert client.post(f"/api/v1/quests/{qid}/transition", json={"to": to}, headers=_csrf(client)).status_code == 200, to
     ev = _watch_events(env, qid)
     assert "new_ideas" in ev and "completed" in ev, ev
+
+
+def test_i_tc_159_dashboard_follows_and_join_requests(client, env):
+    """I-TC-159 SC-01 §4.6b/§4.6c＝dashboard に followed_quests（following）と join_requests（pending/rejected）。"""
+    followed_q = env.new_quest(discoverable=True)
+    pending_q = env.new_quest(discoverable=True)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{followed_q}/follow", headers=_csrf(client)).status_code == 200
+    assert client.post(f"/api/v1/quests/{pending_q}/join-request", json={}, headers=_csrf(client)).status_code == 201
+    d = client.get("/api/v1/dashboard").json()
+    fq = {c["id"]: c for c in d["followed_quests"]}
+    jr = {c["id"]: c for c in d["join_requests"]}
+    # フォロー中は followed_quests のみ（following）。
+    assert str(followed_q) in fq and str(followed_q) not in jr
+    assert fq[str(followed_q)]["my_state"] == "following"
+    # 参加リクエスト（pending）は join_requests のみ。
+    assert str(pending_q) in jr and str(pending_q) not in fq
+    assert jr[str(pending_q)]["my_state"] == "pending"

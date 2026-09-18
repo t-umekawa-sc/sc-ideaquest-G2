@@ -42,6 +42,14 @@ export type QuestCard = {
   owner?: { name?: string } | null; my_state?: string; is_owner?: boolean;
 };
 
+// フォロー中クエスト（§4.6b）／参加リクエスト状況（§4.6c）＝発見カタログのメタカード（my_state 由来・FR-40）。
+export type WatchQuestCard = {
+  id: string; title: string; purpose?: string | null; color?: string; icon_image_url?: string | null;
+  categories?: string[]; status: string; deadline?: string | null;
+  member_count?: number; idea_count?: number; my_state?: string;
+  owner?: { display_name?: string } | null;
+};
+
 export type RankRow = { rank: number; user: { id: string; name: string; avatar?: string | null; level?: number }; score: number; xp: number; coin: number };
 export type WeeklyRanking = { data: RankRow[]; me: { rank: number | null; score: number; xp: number; coin: number; total_users: number } };
 
@@ -56,6 +64,8 @@ export type DashboardData = {
   notifications: { data: NotificationDTO[]; unread_count: number } | null;
   roles: { is_qg_admin: boolean; is_company_account_admin: boolean; is_system_admin: boolean };
   login_bonus: { xp: number } | null;
+  followed_quests: WatchQuestCard[];  // §4.6b フォロー中のクエスト（非参加・following）
+  join_requests: WatchQuestCard[];    // §4.6c 参加リクエスト状況（pending/rejected）
 };
 
 export function getDashboard(): Promise<DashboardData | null> {

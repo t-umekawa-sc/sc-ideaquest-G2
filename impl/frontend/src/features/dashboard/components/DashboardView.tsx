@@ -27,6 +27,7 @@ import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { greetingFor } from "@/lib/greeting";
 import { markChatFromDashboard } from "@/lib/nav";
 import { followIdea, unfollowIdea, voteIdea, type IdeaVoteType } from "@/features/ideas/api";
+import { unfollowQuest } from "@/features/quests/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import { EVALUATIONS_CHANGED_EVENT } from "@/features/evaluations";
 import {
@@ -76,6 +77,7 @@ export function DashboardView({
   // 未投票の表示リストはローカルで持つ（投票で1件除去→サーバー再取得で末尾に次の1件を追記＝常に満杯を保つ）。
   const [unvotedList, setUnvotedList] = useState<UnvotedIdea[] | null>(null);
   const [unfollowed, setUnfollowed] = useState<Record<string, boolean>>({});
+  const [unfollowedQuests, setUnfollowedQuests] = useState<Record<string, boolean>>({}); // §4.6b ★解除の即時反映
   const bonusShown = useRef(false);
   // XP バーはマウント後に 0→現在値へ充填（CSS transition で演出・ゲーム感）。
   const [barFilled, setBarFilled] = useState(false);
@@ -203,6 +205,18 @@ export function DashboardView({
     );
   };
   const followed = (data?.followed_ideas ?? []).filter((f) => !unfollowed[f.id]);
+  // §4.6b フォロー中のクエスト（★解除は即時にリストから外す）／§4.6c 参加リクエスト状況。
+  const followedQuests = (data?.followed_quests ?? []).filter((q) => !unfollowedQuests[q.id]);
+  const joinRequests = data?.join_requests ?? [];
+  const unfollowQuestCard = async (id: string) => {
+    setUnfollowedQuests((m) => ({ ...m, [id]: true })); // 楽観
+    const res = await unfollowQuest(id).catch(() => null);
+    if (!res) {
+      setUnfollowedQuests((m) => ({ ...m, [id]: false }));
+      snackbar({ type: "error", msg: "フォロー解除に失敗しました。" });
+    }
+  };
+  const JR_LABEL: Record<string, string> = { pending: "申請中", rejected: "却下" };
   const ranking = data?.weekly_ranking;
   const notifs = data?.notifications?.data ?? [];
   const unreadChats = data?.unread_chats ?? [];  // 💬 新着の議論（参加クエスト横断・自分の未読チャット）
@@ -495,6 +509,65 @@ export function DashboardView({
             <Link href="/quests">すべて見る →</Link>
           </div>
           <div className="quest-grid">{joinedQuests.map(renderQuestCard)}</div>
+        </motion.section>
+      )}
+
+      {/* §4.6b フォロー中のクエスト（非参加・watch・0件なら非表示・FR-40）＝メタカード。カードは発見カタログへ・★で解除。 */}
+      {followedQuests.length > 0 && (
+        <motion.section aria-label="フォロー中のクエスト" {...flowMotion(7)}>
+          <div className="section-head">
+            <h2>フォロー中のクエスト</h2>
+            <Link href="/quest-catalog">クエストを探す →</Link>
+          </div>
+          <div className="quest-grid">
+            {followedQuests.map((q) => {
+              const du = deadlineUrgency(q.deadline ?? null, today);
+              return (
+                <Link key={q.id} className="card card-accent quest-card" href="/quest-catalog" style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
+                  {/* ★＝フォロー中（クリックで解除）＝発見カタログのカードと同方針（.follow-star）。 */}
+                  <button type="button" className="follow-star" style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)", zIndex: 1 }}
+                    aria-pressed={true} aria-label="フォロー解除" title="フォロー中（クリックで解除）"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void unfollowQuestCard(q.id); }}>★</button>
+                  <div className="between">
+                    <span className="card-title">{q.title}</span>
+                    <span className="badge">{q.status}</span>
+                  </div>
+                  <div className="quest-card__meta">
+                    {(q.categories ?? []).slice(0, 1).map((c) => <span key={c} className="badge badge-muted">{c}</span>)}
+                    {q.deadline && <span className="deadline" data-urgency={du.level}>⏳ {q.deadline}{du.level !== "safe" && du.level !== "none" ? ` ・${deadlineCountdown(du.days)}` : ""}</span>}
+                  </div>
+                  <div className="quest-card__stats">
+                    <span>👥 パーティー{q.member_count ?? 0}</span>
+                    <span>💡 アイデア{q.idea_count ?? 0}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {/* §4.6c 参加リクエストの状況（自分の申請・pending/rejected・0件なら非表示・FR-40）。 */}
+      {joinRequests.length > 0 && (
+        <motion.section aria-label="参加リクエストの状況" {...flowMotion(7)}>
+          <div className="section-head">
+            <h2>参加リクエストの状況</h2>
+            <Link href="/quest-catalog">クエストを探す →</Link>
+          </div>
+          <div className="quest-grid">
+            {joinRequests.map((q) => (
+              <Link key={q.id} className="card card-accent quest-card" href="/quest-catalog" style={{ ["--accent" as string]: q.color ?? "#3B82F6" } as React.CSSProperties}>
+                <div className="between">
+                  <span className="card-title">{q.title}</span>
+                  <span className={`badge ${q.my_state === "rejected" ? "badge-danger" : "badge-muted"}`}>{JR_LABEL[q.my_state ?? ""] ?? q.my_state}</span>
+                </div>
+                <div className="quest-card__stats">
+                  <span>👥 パーティー{q.member_count ?? 0}</span>
+                  <span>💡 アイデア{q.idea_count ?? 0}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </motion.section>
       )}
 

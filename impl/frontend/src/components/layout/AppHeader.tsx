@@ -119,7 +119,7 @@ export function AppHeader({ user, balance, unreadCount = 0, gameEnabled = true, 
                   className="lvring"
                   data-near={balance && (balance.xpPct ?? 0) >= 90 ? "true" : undefined}
                   style={{ ["--pct" as string]: `${balance?.xpPct ?? 0}` }}
-                  title={balance ? `Lv.${balance.level}・次のレベルまで ${100 - (balance.xpPct ?? 0)}%` : undefined}
+                  title={`${user.display_name}${balance ? ` ・ Lv.${balance.level}・次のレベルまで ${100 - (balance.xpPct ?? 0)}%` : ""}`}
                 >
                   <Avatar name={user.display_name} imageUrl={user.avatar_url} size="sm" level={balance?.level} />
                 </span>
