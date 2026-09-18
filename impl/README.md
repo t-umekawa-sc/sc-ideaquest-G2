@@ -21,8 +21,8 @@
 | 画面 | 名称 | 状態 | ルート | 備考 |
 |---|---|---|---|---|
 | SC-00 | ログイン | ✅ | `(auth)/login` | 401→`/login?reason=…` セッション終了通知（デザイン標準 §14）。password-reset/-setup・email-change・**email-verify/confirm**（ADR-0009）も配置 |
-| SC-01 | ダッシュボード | ✅ | `(app)/` | **実接続（`GET /dashboard`＝I 集約1本）**＝ヒーロー（残高＋level）・週間ランキング・下書き（quest/idea/eval 進捗）・未投票・参加中クエスト・フォロー中・最近の通知・roles・login_bonus。クイック投票（POST /ideas/{id}/vote）・フォロー解除（D follow EP）実接続・login_bonus トースト。空パネル非表示 |
-| SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ**。**リアルタイム(L) 接続済み＝WS で新着/未読数を即時反映（ヘッダーベル＋一覧）** |
+| SC-01 | ダッシュボード | ✅ | `(app)/` | **実接続（`GET /dashboard`＝I 集約1本）**＝ヒーロー（残高＋level）・週間ランキング・下書き（quest/idea/eval 進捗）・未投票・参加中クエスト・フォロー中・最近の通知・roles・login_bonus。クイック投票（POST /ideas/{id}/vote）・フォロー解除（D follow EP）実接続・login_bonus トースト。空パネル非表示。**FR-40＝フォロー中クエスト/参加リクエスト状況／`incoming_join_requests`（owner/quest_admin の未処理リクエスト・カードクリックで承認/却下ダイアログ＝共有 `JoinRequestDialog`）（2026-09-18・I-TC-159/160）** |
+| SC-02 | 通知一覧 | ✅ | `(app)/notifications` | 実接続（`getNotifications`＝一覧＋未読数・取得時レンダリング済み body・`markRead`/`markUnread`/`markAllRead`）。状態/種別（9カテゴリー）絞り込み・日付グループ・クリックで既読化＋ref 遷移。生成はサーバー（発火ドメイン）。**security_* も実データ**。**リアルタイム(L) 接続済み＝WS で新着/未読数を即時反映（ヘッダーベル＋一覧）**。**`join_request_received` は `/quests/{id}?joinreq={申請者}` へディープリンク＝該当申請者の承認/却下ダイアログを直接オープン（`ref.user_id`＝params 由来・H-TC-211）** |
 | SC-03 | プロフィール | ✅ | `(app)/profile` | K.1（`/me`）接続済み |
 | SC-10 | クエスト一覧 | ✅ | `(app)/quests` | 複製対応済み。💡件数列は `idea_count`（公開アイデア数）に連動。**backend `GET /quests?sort=` 実装済み（2026-09-17・§1.8.1＝`-created_at`/`deadline`/`-idea_count`/`-member_count`・複数キー・keyset・未知キー422）**＝frontend DataTable への結線は未（backend 側は契約充足） |
 | SC-11 | クエスト作成/編集 | ✅ | `(app)/quests/new`・`[questId]/edit` | URL 付きモーダル（Parallel＋Intercept） |
@@ -110,6 +110,8 @@
 **メール確認フロー（ADR-0009）実装済み**＝送信 EP（B.2/B.2.1）・公開 confirm（`/auth/email-verify/confirm`）・`accounts.email_verified_at`・SC-92/93 バッジ＋アクション。
 
 **複製プリフィル 全項目化（デザイン標準 §複製・2026-09-06 改定）**＝入力項目は一意キー/重複禁止項目も含めて全部プリフィル（例外＝サーバー自動採番/システム生成列のみ）。関連＝アカウント一覧応答 `AccountListItem.memberships`（有効所属 `[{group_id, role}]`・会社DB バッチ読取・API設計 B.2 既定分の実装・B-TC-171）を追加し、複製の所属引き継ぎ／編集画面の現所属表示に使用。コントロールは style-guide 準拠に統一（`.checkbox`/`.select`）＝フロント実装フロー規約 §2.1（コントロール実装前に style-guide.html のモック有無を確認）。
+
+**ダイアログ内コンテンツ標準（デザイン標準 §4.1・2026-09-18）**＝参照系＋入力系で本文を「囲まない＋項目ごとの薄い仕切り線」に統一（共通 `.dialog-*`＝`design-system.css`／mock `style-guide.html`「10b」）。装飾枠は撤去（評価 `.eval-idea`／評価フォーム外周 `.card`〔モーダル時〕／アイデア文脈 `.card`）・機能枠は維持（`.vis-opt`/`.eval-summary`）。`Field` に任意 `className`（項目先頭に `.dialog-section`）。横並び `.field-row` は廃止して1行ずつ。アイデア「任意項目」（`.optional`）は開閉とも枠線で囲う。フッター文言＝フォーム「キャンセル」／参照・その場アクション・エラー「閉じる」。適用＝JoinRequestDialog／QuestCatalogView（参加前詳細）／QuestForm／IdeaForm／EvaluationView／AccountFormPanel／CompanyCreateForm／QuestGroupSection／MemberAddPanel／QuestResultTab。**管理系/評価/振り返り編集の実機受入は管理者アカウントで要確認（seed は非管理者）**。
 
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
