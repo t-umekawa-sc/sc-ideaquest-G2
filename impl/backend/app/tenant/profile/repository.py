@@ -25,6 +25,15 @@ def list_users_by_accounts(session: Session, account_ids: list[uuid.UUID]) -> li
     ).scalars())
 
 
+def list_users_by_ids(session: Session, user_ids: list[uuid.UUID]) -> list[User]:
+    """user_id 群に対応する users ミラーを一括取得（参加リクエスト一覧などの申請者メタ付与・N+1 回避）。"""
+    if not user_ids:
+        return []
+    return list(session.execute(
+        select(User).where(User.id.in_(user_ids))
+    ).scalars())
+
+
 # accounts → users にミラーしてよい列（源泉=accounts・§4.6）。存在しない列は無視（前方互換）。
 _MIRROR_FIELDS = (
     "display_name", "locale", "status", "password_set", "last_login_at",

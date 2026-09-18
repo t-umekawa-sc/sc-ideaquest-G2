@@ -118,6 +118,35 @@ class JoinRequestResponse(BaseModel):
     status: str
 
 
+class JoinRequestUserDTO(BaseModel):
+    """参加リクエスト行の申請者メタ（C.9.1 GET /join-requests・アバター/氏名/所属バッジ）。"""
+
+    user_id: str
+    display_name: str
+    avatar_image_url: str | None = None
+    group_ids: list[str] = []
+
+
+class JoinRequestRowDTO(BaseModel):
+    """参加リクエスト1件（受信側＝SC-12 パーティータブ・C.9.1）。並びはフロント（pending 上位/rejected 下部）。"""
+
+    user: JoinRequestUserDTO
+    status: str
+    message: str | None = None
+    created_at: datetime
+    decided_at: datetime | None = None
+
+
+class JoinRequestListResponse(BaseModel):
+    data: list[JoinRequestRowDTO]
+
+
+class JoinRequestDecisionResponse(BaseModel):
+    """承認/却下の応答（C.9.1）＝遷移後の状態。"""
+
+    status: str
+
+
 class QuestGroupDTO(BaseModel):
     id: str
     quest_group_code: str

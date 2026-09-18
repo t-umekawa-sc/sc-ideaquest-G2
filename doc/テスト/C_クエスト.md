@@ -161,7 +161,7 @@
 
 ## 7. 発見カタログ・フォロー・参加リクエスト（FR-40・C.9・SC-13）
 
-> 対象＝`app/tenant/quests/{router,application,repository}.py`（`GET /quest-catalog`・`catalog-detail`・`follow`・`join-request`）。発見門番 `can_discover_quest`（discoverable ∧ 部署交差／0件=全社・メタ専用）・`my_state`・フォロー/参加リクエスト（申請/取消・通知）を検証。前提＝seed 一般ユーザー（viewer）＋他ユーザー owner の discoverable クエストを seed。対象＝`tests/quests/test_catalog.py`。
+> 対象＝`app/tenant/quests/{router,application,repository}.py`（`GET /quest-catalog`・`catalog-detail`・`follow`・`join-request`・`join-requests`〔受信側＝承認/却下・SC-12〕）。発見門番 `can_discover_quest`（discoverable ∧ 部署交差／0件=全社・メタ専用）・`my_state`・フォロー/参加リクエスト（申請/取消・通知）・受信側（一覧/承認/却下・認可 owner/quest_admin・通知 `join_request_decided`）を検証。前提＝seed 一般ユーザー（viewer）＋他ユーザー owner の discoverable クエストを seed。対象＝`tests/quests/test_catalog.py`。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -174,3 +174,7 @@
 | C-TC-266 | e2e | 掲示板ダイアログに標準の最大化(⤢)が出る（DFT-E-013） | dev seed の発見デモ discoverable クエスト | `/quest-catalog` → カード → ダイアログ → ⤢ | 「最大化」ボタンが可視・押すとパネル `.is-max`＋「元のサイズに戻す」へ（`maximizable` 既定 on の上書き禁止・§106） | SC-13／デザイン標準 §106／DFT-E-013 |
 | C-TC-267 | e2e | 掲示板ダイアログの閉じアニメ（DFT-E-014）＝CRT 電源OFF | dev seed の発見デモ discoverable クエスト | `/quest-catalog` → カード → ダイアログ → × | 閉じ要求後に `.modal:not(.show)`（=`.is-closing`）が一瞬 attach（CRT 電源OFF アニメ中＝マウント保持）→ 最終的に `.modal` が unmount。即アンマウント（旧不具合）では中間状態が観測できず red | SC-13／Modal 閉じアニメ契約（CRT 電源OFF）／DFT-E-014 |
 | C-TC-268 | e2e | モーダル CRT 演出の reduce 抑制（ON＝出ない・情報/挙動は残る） | reduce ON（`emulateMedia`）＋発見デモ discoverable クエスト | `/quest-catalog` → カード → ダイアログ → × | `--crt-in` クラスが付かない（open/close の CRT 演出抑制）／`.modal__panel` は可視（情報は残る）／× で即閉じ（挙動は保つ） | デザイン標準 §4.9／テスト規約 §6／全モーダル共通 |
+| C-TC-269 | api | 参加リクエスト一覧（受信側・owner・pending 上位/rejected 下部・user メタ） | discoverable クエスト＋viewer が pending・別ユーザーが rejected | owner ログインで `GET /quests/{id}/join-requests` | `data` に pending と rejected 行・各 `user`（`display_name`/`avatar_image_url`/`group_ids`）・`status`/`message`/`created_at`・pending が rejected より上／非 owner/admin は 403 | C.9.1／SC-12 §4.3 |
+| C-TC-270 | api | 承認＝member 追加＋通知＋my_state=member | viewer が pending のクエスト（owner 別） | owner が `POST .../join-requests/{viewer}/approve` | 200＋jr `approved`・`decided_at`/`decided_by_id` 設定・`quest_members` に viewer 追加（既定権限 vote/idea_create/comment）・申請者へ `join_request_decided`(approved) 通知1件・カタログで viewer `my_state=member` | C.9.1／H |
+| C-TC-271 | api | 却下＝非終端（行残す）＋通知＋後日 approve で復活 | viewer が pending | owner が `reject`→`GET(status=rejected)`→`approve` | reject 200＋jr `rejected`（行残・`my_state=rejected`）・申請者へ `join_request_decided`(rejected) 通知／その後 `approve` 200 で `approved`＋member 追加（rejected→approved 復活） | C.9.1／H |
+| C-TC-272 | api | 受信側の認可/状態ガード | discoverable クエスト・viewer 非 owner/admin | viewer が `GET`/`approve`/`reject`／owner が未申請 user を `approve`／approved を `reject` | viewer の一覧/承認/却下は 403／未申請 user への approve は 404（存在秘匿）／approved 済みを reject は 409 `invalid_state` | C.9.1／§1.4 |

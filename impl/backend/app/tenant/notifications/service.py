@@ -40,8 +40,10 @@ TYPE_PRIORITY = {
     "achievement": 7,
     "quest_party_invited": 8,
     "quest_result_ready": 9,
-    "security_new_device": 10,
-    "security_password_changed": 11,
+    "join_request_received": 10,
+    "join_request_decided": 11,
+    "security_new_device": 12,
+    "security_password_changed": 13,
 }
 
 _REF_KEYS = (

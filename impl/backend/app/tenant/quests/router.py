@@ -16,6 +16,8 @@ from app.tenant.quests import application as quest_service
 from app.tenant.quests.schemas import (
     FollowResponse,
     JoinRequestBody,
+    JoinRequestDecisionResponse,
+    JoinRequestListResponse,
     JoinRequestResponse,
     QuestCandidatesResponse,
     QuestCatalogCardDTO,
@@ -130,6 +132,43 @@ def withdraw_join_request(quest_id: str, request: Request, session: dict = Depen
     verify_csrf(request)
     quest_service.withdraw_join_request(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+
+
+@router.get("/quests/{quest_id}/join-requests", response_model=JoinRequestListResponse)
+def list_join_requests(
+    quest_id: str,
+    request: Request,
+    status: list[str] | None = Query(default=None),
+    session: dict = Depends(require_me),
+) -> JoinRequestListResponse:
+    """参加リクエスト一覧（受信側・SC-12 パーティータブ・C.9.1）＝owner/quest_admin のみ。読取専用。"""
+    result = quest_service.list_join_requests(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, statuses=status)
+    return JoinRequestListResponse(**result)
+
+
+@router.post("/quests/{quest_id}/join-requests/{user_id}/approve", response_model=JoinRequestDecisionResponse)
+def approve_join_request(
+    quest_id: str, user_id: str, request: Request, session: dict = Depends(require_me),
+) -> JoinRequestDecisionResponse:
+    """参加リクエストを承認＝member 追加（C.9.1・owner/quest_admin）。変更系＝Origin/CSRF（冪等は Idempotency-Key）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.approve_join_request(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id)
+    return JoinRequestDecisionResponse(**result)
+
+
+@router.post("/quests/{quest_id}/join-requests/{user_id}/reject", response_model=JoinRequestDecisionResponse)
+def reject_join_request(
+    quest_id: str, user_id: str, request: Request, session: dict = Depends(require_me),
+) -> JoinRequestDecisionResponse:
+    """参加リクエストを却下（非終端・C.9.1・owner/quest_admin）。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.reject_join_request(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id)
+    return JoinRequestDecisionResponse(**result)
 
 
 @router.get("/quests/{quest_id}", response_model=QuestDetailDTO)

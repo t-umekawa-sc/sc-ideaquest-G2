@@ -29,7 +29,7 @@ ICON = {
     "mention": "@", "idea_comment": "💬", "follow_comment": "💬",
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
-    "quest_result_ready": "🏁", "join_request_received": "🙋",
+    "quest_result_ready": "🏁", "join_request_received": "🙋", "join_request_decided": "✅",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
 }
 
@@ -161,6 +161,18 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
         qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")
         body = (f'{actor} requested to join the quest "{qt}"' if en
                 else f"{actor} さんがクエスト「{qt}」への参加をリクエストしました")
+        context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
+        tag = "Join request" if en else "参加リクエスト"
+    elif t == "join_request_decided":
+        quest = session.get(Quest, n.ref_quest_id) if n.ref_quest_id else None
+        qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")
+        approved = p.get("result") == "approved"
+        if approved:
+            body = (f'Your request to join the quest "{qt}" was approved' if en
+                    else f"クエスト「{qt}」への参加リクエストが承認されました")
+        else:
+            body = (f'Your request to join the quest "{qt}" was declined' if en
+                    else f"クエスト「{qt}」への参加リクエストが却下されました")
         context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
         tag = "Join request" if en else "参加リクエスト"
     elif t == "security_new_device":

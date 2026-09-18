@@ -47,14 +47,16 @@ def env():
     g_in, g_out = uuid.uuid4(), uuid.uuid4()   # viewer が所属する部署 / しない部署
     owner_id = uuid.uuid4()
     quests: list[uuid.UUID] = []
+    extra_users: list[uuid.UUID] = []          # テスト内で足した申請者などの掃除対象
 
-    def new_quest(*, discoverable, group=None, status="recruiting", zero_dept=False) -> uuid.UUID:
+    def new_quest(*, discoverable, group=None, status="recruiting", zero_dept=False, owner=None) -> uuid.UUID:
         qid = uuid.uuid4()
+        oid = owner or owner_id
         with get_tenant_session(db) as ts:
-            repo.create_quest(ts, quest_id=qid, owner_id=owner_id, title="Cat", color="#3B82F6", status=status)
+            repo.create_quest(ts, quest_id=qid, owner_id=oid, title="Cat", color="#3B82F6", status=status)
             if not zero_dept:
                 repo.create_group_links(ts, qid, group_ids=[group or g_in])
-            repo.add_member(ts, qid, owner_id, permissions=["owner"])
+            repo.add_member(ts, qid, oid, permissions=["owner"])
             q = ts.get(Quest, qid)
             q.discoverable = discoverable
             ts.commit()
@@ -71,7 +73,7 @@ def env():
         ts.commit()
 
     yield SimpleNamespace(db=db, viewer_id=viewer_id, owner_id=owner_id, g_in=g_in, g_out=g_out,
-                          new_quest=new_quest, quests=quests)
+                          new_quest=new_quest, quests=quests, extra_users=extra_users)
 
     with get_tenant_session(db) as ts:
         qids = list(quests)
@@ -94,7 +96,7 @@ def env():
         ts.execute(Quest.__table__.delete().where(Quest.id.in_(qids)))
         ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id.in_([g_in, g_out])))
         ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id.in_([g_in, g_out])))
-        ts.execute(User.__table__.delete().where(User.id == owner_id))
+        ts.execute(User.__table__.delete().where(User.id.in_([owner_id, *extra_users])))
         ts.commit()
 
 
@@ -223,3 +225,123 @@ def test_c_tc_265_catalog_detail_activity(client, env):
     assert counts.get((now - timedelta(days=1)).date().isoformat()) == 1
     # メタのみ＝チャット本文は応答に一切含まれない。
     assert "SECRET_CHAT_BODY_SHOULD_NOT_LEAK" not in r.text
+
+
+# --- C-TC-269〜272: 受信側（参加リクエストの一覧/承認/却下・SC-12・C.9.1）---
+
+def _make_owner(env, factory):
+    """ACME-01 の実アカウント owner を1人作り (account, user_id) を返す（承認/却下のログイン用）。"""
+    acc = factory.make_seed_company_account()
+    with get_tenant_session(env.db) as ts:
+        ouid = get_user_by_account(ts, acc["id"]).id
+    return acc, ouid
+
+
+def test_c_tc_269_join_requests_list(client, factory, env):
+    """C-TC-269 参加リクエスト一覧（owner）＝pending 上位/rejected 下部・申請者メタ・非 owner は 403。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    other = uuid.uuid4()
+    env.extra_users.append(other)
+    with get_tenant_session(env.db) as ts:
+        ts.add(User(id=other, account_id=uuid.uuid4(), display_name="Rejected One", locale="ja", status="active"))
+        repo.create_join_request(ts, qid, env.viewer_id, "参加したい")   # pending
+        jr2 = repo.create_join_request(ts, qid, other, "let me in")
+        jr2.status = "rejected"
+        ts.commit()
+    # 非 owner（viewer）は 403。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.get(f"/api/v1/quests/{qid}/join-requests").status_code == 403
+    # owner は一覧を取得＝pending 上位・rejected 下部、申請者メタ付き。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    r = client.get(f"/api/v1/quests/{qid}/join-requests")
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert [row["status"] for row in data] == ["pending", "rejected"]  # pending 上位
+    pend = data[0]
+    assert pend["user"]["user_id"] == str(env.viewer_id)
+    assert "display_name" in pend["user"] and "group_ids" in pend["user"]
+    assert pend["message"] == "参加したい" and "created_at" in pend
+
+
+def test_c_tc_270_approve_adds_member_and_notifies(client, factory, env):
+    """C-TC-270 承認＝pending→approved＋member 追加（既定権限）＋申請者へ通知＋my_state=member。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{qid}/join-request", json={"message": "入りたい"},
+                       headers=_csrf(client)).status_code == 201
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    a = client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve", headers=_csrf(client))
+    assert a.status_code == 200 and a.json()["status"] == "approved", a.text
+    with get_tenant_session(env.db) as ts:
+        m = repo.get_active_member(ts, qid, env.viewer_id)
+        assert m is not None
+        assert set(repo.get_permissions(ts, m.id)) == {"vote", "idea_create", "comment"}  # 既定権限
+        jr = repo.get_join_request(ts, qid, env.viewer_id)
+        assert jr.status == "approved" and jr.decided_at is not None and jr.decided_by_id == ouid
+        n = ts.execute(select(Notification).where(
+            Notification.recipient_id == env.viewer_id, Notification.ref_quest_id == qid,
+            Notification.type == "join_request_decided")).scalars().all()
+        assert len(n) == 1 and n[0].params.get("result") == "approved"
+    # 申請者側カタログ＝my_state=member。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    card = next(c for c in client.get(CATALOG).json()["data"] if c["id"] == str(qid))
+    assert card["my_state"] == "member"
+
+
+def test_c_tc_271_reject_is_non_terminal(client, factory, env):
+    """C-TC-271 却下＝行を残し（my_state=rejected）＋通知／後日 approve で復活（rejected→approved＋member）。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client))
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    rj = client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/reject", headers=_csrf(client))
+    assert rj.status_code == 200 and rj.json()["status"] == "rejected", rj.text
+    with get_tenant_session(env.db) as ts:
+        jr = repo.get_join_request(ts, qid, env.viewer_id)
+        assert jr.status == "rejected" and jr.decided_at is not None      # 行は残る（非終端）
+        assert repo.get_active_member(ts, qid, env.viewer_id) is None     # member にはしない
+        n = ts.execute(select(Notification).where(
+            Notification.recipient_id == env.viewer_id, Notification.ref_quest_id == qid,
+            Notification.type == "join_request_decided")).scalars().all()
+        assert len(n) == 1 and n[0].params.get("result") == "rejected"
+    # 申請者側カタログ＝my_state=rejected。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    card = next(c for c in client.get(CATALOG).json()["data"] if c["id"] == str(qid))
+    assert card["my_state"] == "rejected"
+    # owner: 却下者は status=rejected 一覧に出る＋後日 approve で復活。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    lst = client.get(f"/api/v1/quests/{qid}/join-requests", params={"status": "rejected"})
+    assert lst.status_code == 200 and any(
+        row["user"]["user_id"] == str(env.viewer_id) for row in lst.json()["data"])
+    ap = client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve", headers=_csrf(client))
+    assert ap.status_code == 200 and ap.json()["status"] == "approved"
+    with get_tenant_session(env.db) as ts:
+        assert repo.get_active_member(ts, qid, env.viewer_id) is not None  # 復活で member 化
+
+
+def test_c_tc_272_receiver_authz_and_state_guards(client, factory, env):
+    """C-TC-272 認可/状態ガード＝非 owner は 403／未申請 approve は 404／approved を reject は 409 invalid_state。"""
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    # viewer（非 owner/admin）の一覧/承認/却下は 403。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.get(f"/api/v1/quests/{qid}/join-requests").status_code == 403
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{ouid}/approve",
+                       headers=_csrf(client)).status_code == 403
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{ouid}/reject",
+                       headers=_csrf(client)).status_code == 403
+    # owner: 未申請 user への approve は 404（存在秘匿）。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve",
+                       headers=_csrf(client)).status_code == 404
+    # approved 済みを reject は 409 invalid_state。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client))
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve", headers=_csrf(client))
+    rj = client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/reject", headers=_csrf(client))
+    assert rj.status_code == 409, rj.text
+    assert rj.json()["errors"][0]["reason"] == "invalid_state"

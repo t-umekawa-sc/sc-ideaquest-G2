@@ -1541,3 +1541,130 @@ def _notify_join_request_received(company_id, quest_id, recipients, exclude, act
         refs = {"ref_quest_id": quest_id}
         return [notify_svc.entry(r, "join_request_received", refs=refs, params={"actor_name": actor_name}) for r in targets]
     notify_svc.dispatch(company_id, _build)
+
+
+# ---- 受信側＝参加リクエストの承認/却下（C.9.1・SC-12 パーティータブ・owner/quest_admin）----
+
+# 一覧の既定状態＝申請中（pending）＋却下済み（rejected）。承認済み(approved)は通常メンバー表示に統合。
+_JOIN_REQUEST_DEFAULT_STATUSES = ("pending", "rejected")
+# 表示順の並び＝pending 上位・rejected 下部（同状態内は申請日時 昇順）。
+_JOIN_REQUEST_STATUS_RANK = {"pending": 0, "rejected": 1}
+
+
+def list_join_requests(account_id, company_id, quest_id, *, statuses=None) -> dict:
+    """参加リクエスト一覧（C.9.1・SC-12）＝owner/quest_admin のみ。申請者メタ（氏名/アバター/所属）付き。
+
+    既定は pending+rejected。`statuses` 指定時はその状態のみ。並びは pending 上位→rejected 下部（申請日時昇順）。
+    """
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    wanted = list(statuses) if statuses else list(_JOIN_REQUEST_DEFAULT_STATUSES)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, user)  # owner/quest_admin のみ（他は 403・下書き他人は 404）
+        rows = repo.list_join_requests(ts, iid, wanted)
+        uids = [r.user_id for r in rows]
+        users = {u.id: u for u in profile_repo.list_users_by_ids(ts, uids)}
+        membership = repo.all_active_group_ids_by_user(ts, uids)
+        rows = sorted(rows, key=lambda r: (_JOIN_REQUEST_STATUS_RANK.get(r.status, 99), r.created_at))
+        data = []
+        for r in rows:
+            u = users.get(r.user_id)
+            data.append({
+                "user": {
+                    "user_id": str(r.user_id),
+                    "display_name": u.display_name if u else "(unknown)",
+                    "avatar_image_url": _image_url(u.avatar_image_path) if u else None,
+                    "group_ids": [str(g) for g in membership.get(r.user_id, [])],
+                },
+                "status": r.status,
+                "message": r.message,
+                "created_at": r.created_at,
+                "decided_at": r.decided_at,
+            })
+    return {"data": data}
+
+
+def approve_join_request(account_id, company_id, quest_id, user_id) -> dict:
+    """参加リクエストを承認（C.9.1）＝`pending`/`rejected`→`approved`＋同一 UoW で member 追加（既定権限）。
+
+    認可＝owner/quest_admin。申請なし/取り下げ済みは 404（存在秘匿）。既に承認済みは 409 `already_member`。
+    """
+    iid = _parse_uuid(quest_id, field="quest_id")
+    target_uid = _parse_uuid(user_id, field="user_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, actor)
+        jr = repo.get_join_request(ts, iid, target_uid)
+        if jr is None or jr.status == "withdrawn":
+            raise AppError(404, "not_found")
+        if jr.status == "approved":
+            raise AppError(409, "conflict", detail="すでに参加中です", extra={"errors": [{"reason": "already_member"}]})
+        jr.status = "approved"
+        jr.decided_at = datetime.now(timezone.utc)
+        jr.decided_by_id = actor.id
+        repo.add_member(ts, iid, target_uid, granted_by_id=actor.id)  # 既定権限（vote/idea_create/comment）
+        actor_name = actor.display_name
+        ts.commit()
+    _notify_join_request_decided(company_id, iid, target_uid, "approved", actor_name)
+    return {"status": "approved"}
+
+
+def reject_join_request(account_id, company_id, quest_id, user_id) -> dict:
+    """参加リクエストを却下（C.9.1・非終端）＝`pending`→`rejected`（行は残し後日 approve 可）。
+
+    認可＝owner/quest_admin。申請なし/取り下げ済みは 404。承認済みは 409 `invalid_state`。既に却下済みは冪等 200。
+    """
+    iid = _parse_uuid(quest_id, field="quest_id")
+    target_uid = _parse_uuid(user_id, field="user_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        actor = profile_repo.get_user_by_account(ts, account_id)
+        if actor is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        _authorize_edit(ts, quest, actor)
+        jr = repo.get_join_request(ts, iid, target_uid)
+        if jr is None or jr.status == "withdrawn":
+            raise AppError(404, "not_found")
+        if jr.status == "approved":
+            raise AppError(409, "conflict", detail="承認済みのため却下できません", extra={"errors": [{"reason": "invalid_state"}]})
+        if jr.status == "rejected":
+            return {"status": "rejected"}  # 冪等（既に却下済み＝通知しない）
+        jr.status = "rejected"
+        jr.decided_at = datetime.now(timezone.utc)
+        jr.decided_by_id = actor.id
+        actor_name = actor.display_name
+        ts.commit()
+    _notify_join_request_decided(company_id, iid, target_uid, "rejected", actor_name)
+    return {"status": "rejected"}
+
+
+def _notify_join_request_decided(company_id, quest_id, recipient_id, result, actor_name) -> None:
+    """参加リクエスト結果通知（H `join_request_decided`・申請者へ・`result`=approved/rejected・post-commit）。"""
+    if recipient_id is None:
+        return
+    def _build(ts):
+        refs = {"ref_quest_id": quest_id}
+        return [notify_svc.entry(recipient_id, "join_request_decided", refs=refs,
+                                 params={"actor_name": actor_name, "result": result})]
+    notify_svc.dispatch(company_id, _build)

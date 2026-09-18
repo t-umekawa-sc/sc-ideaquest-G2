@@ -1033,6 +1033,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Join Requests
+         * @description 参加リクエスト一覧（受信側・SC-12 パーティータブ・C.9.1）＝owner/quest_admin のみ。読取専用。
+         */
+        get: operations["list_join_requests_api_v1_quests__quest_id__join_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/join-requests/{user_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Join Request
+         * @description 参加リクエストを承認＝member 追加（C.9.1・owner/quest_admin）。変更系＝Origin/CSRF（冪等は Idempotency-Key）。
+         */
+        post: operations["approve_join_request_api_v1_quests__quest_id__join_requests__user_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/join-requests/{user_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Join Request
+         * @description 参加リクエストを却下（非終端・C.9.1・owner/quest_admin）。変更系＝Origin/CSRF。
+         */
+        post: operations["reject_join_request_api_v1_quests__quest_id__join_requests__user_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}": {
         parameters: {
             query?: never;
@@ -3601,10 +3661,58 @@ export interface components {
             /** Message */
             message?: string | null;
         };
+        /**
+         * JoinRequestDecisionResponse
+         * @description 承認/却下の応答（C.9.1）＝遷移後の状態。
+         */
+        JoinRequestDecisionResponse: {
+            /** Status */
+            status: string;
+        };
+        /** JoinRequestListResponse */
+        JoinRequestListResponse: {
+            /** Data */
+            data: components["schemas"]["JoinRequestRowDTO"][];
+        };
         /** JoinRequestResponse */
         JoinRequestResponse: {
             /** Status */
             status: string;
+        };
+        /**
+         * JoinRequestRowDTO
+         * @description 参加リクエスト1件（受信側＝SC-12 パーティータブ・C.9.1）。並びはフロント（pending 上位/rejected 下部）。
+         */
+        JoinRequestRowDTO: {
+            user: components["schemas"]["JoinRequestUserDTO"];
+            /** Status */
+            status: string;
+            /** Message */
+            message?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at?: string | null;
+        };
+        /**
+         * JoinRequestUserDTO
+         * @description 参加リクエスト行の申請者メタ（C.9.1 GET /join-requests・アバター/氏名/所属バッジ）。
+         */
+        JoinRequestUserDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+            /**
+             * Group Ids
+             * @default []
+             */
+            group_ids: string[];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -7068,6 +7176,103 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_join_requests_api_v1_quests__quest_id__join_requests_get: {
+        parameters: {
+            query?: {
+                status?: string[] | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_join_request_api_v1_quests__quest_id__join_requests__user_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_join_request_api_v1_quests__quest_id__join_requests__user_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestDecisionResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
