@@ -20,7 +20,7 @@ from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default")
+_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled")
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
 
@@ -60,6 +60,7 @@ def _detail(c: Company, account_count: int) -> dict:
         "vote_anonymized": c.vote_anonymized,
         "hide_voters_from_managers": c.hide_voters_from_managers,
         "game_mode_default": c.game_mode_default,  # ゲームモード会社既定（レビュー#2・§4.11）
+        "notify_email_enabled": c.notify_email_enabled,  # 業務通知メール会社既定（FR-40・§4）
     }
 
 

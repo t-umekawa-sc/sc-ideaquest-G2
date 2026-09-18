@@ -301,6 +301,19 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
           </label>
         </div>
 
+        {/* 業務通知メール（FR-40・§4）＝参加リクエスト等の業務通知メールの会社既定。セキュリティ系メールは対象外＝常時送信。 */}
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">業務通知メール</div>
+            <div className="setting-row__desc">ON=参加リクエストなどの業務通知をメールでも送る（既定）／OFF=アプリ内通知のみ。パスワード/セキュリティのメールは本設定に関わらず常に送信します。</div>
+          </div>
+          <label className="switch">
+            <input type="checkbox" aria-label="業務通知メール" checked={company.notify_email_enabled} onChange={(e) => toggle("notify_email_enabled", e.target.checked)} />
+            <span className="switch__track"><span className="switch__thumb" /></span>
+            <span className="switch__state">{company.notify_email_enabled ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+
         <div className="provision-note">
           <strong>DB接続識別子:</strong> <code>{company.db_identifier}</code>
         </div>

@@ -562,3 +562,54 @@ def test_i_tc_159_dashboard_follows_and_join_requests(client, env):
     # 参加リクエスト（pending）は join_requests のみ。
     assert str(pending_q) in jr and str(pending_q) not in fq
     assert jr[str(pending_q)]["my_state"] == "pending"
+
+
+def test_c_tc_282_join_request_emails(client, factory, env):
+    """C-TC-282 参加リクエスト受信/結果で業務通知メールを mail_outbox に enqueue（会社トグル ON・既定）。"""
+    from app.control_plane.auth.orm import Account
+    from app.control_plane.mail_outbox.orm import MailOutboxEntry
+    owner_acc, ouid = _make_owner(env, factory)  # 実アカウント（Account+email あり）
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    # viewer が申請 → owner（作成者）にメール。
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client)).status_code == 201
+    with control_session() as cs:
+        recv = cs.execute(select(MailOutboxEntry).where(
+            MailOutboxEntry.category == "join_request_received",
+            MailOutboxEntry.account_id == owner_acc["id"])).scalars().all()
+        assert len(recv) == 1 and recv[0].to_email == owner_acc["email"]
+        assert recv[0].params.get("quest_title") == "Cat"  # env.new_quest の title
+    # owner が承認 → 申請者（viewer）にメール。
+    _login(client, SEED_COMPANY_CODE, owner_acc["login_id"], owner_acc["password"])
+    assert client.post(f"/api/v1/quests/{qid}/join-requests/{env.viewer_id}/approve", headers=_csrf(client)).status_code == 200
+    with control_session() as cs:
+        viewer_acc = cs.execute(select(Account).where(Account.login_id == SEED_LOGIN)).scalars().one()
+        dec = cs.execute(select(MailOutboxEntry).where(
+            MailOutboxEntry.category == "join_request_decided",
+            MailOutboxEntry.account_id == viewer_acc.id)).scalars().all()
+        assert any(e.params.get("result") == "approved" for e in dec)
+
+
+def test_c_tc_283_join_request_email_company_toggle_off(client, factory, env):
+    """C-TC-283 会社トグル OFF なら業務通知メールを積まない（notify_email_enabled=false）。"""
+    from app.control_plane.auth.orm import Company as _Company
+    from app.control_plane.mail_outbox.orm import MailOutboxEntry
+    owner_acc, ouid = _make_owner(env, factory)
+    qid = env.new_quest(discoverable=True, owner=ouid, group=env.g_in)
+    with control_session() as cs:
+        co = cs.query(_Company).filter_by(company_code=SEED_COMPANY_CODE).one()
+        co.notify_email_enabled = False
+        cs.commit()
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.post(f"/api/v1/quests/{qid}/join-request", json={}, headers=_csrf(client)).status_code == 201
+        with control_session() as cs:
+            n = cs.execute(select(MailOutboxEntry).where(
+                MailOutboxEntry.category == "join_request_received",
+                MailOutboxEntry.account_id == owner_acc["id"])).scalars().all()
+            assert len(n) == 0  # 会社 OFF＝業務通知メールは積まれない
+    finally:
+        with control_session() as cs:  # seed 会社の設定を元に戻す（他テストへ波及させない）
+            co = cs.query(_Company).filter_by(company_code=SEED_COMPANY_CODE).one()
+            co.notify_email_enabled = True
+            cs.commit()

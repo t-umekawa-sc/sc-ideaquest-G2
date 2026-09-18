@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import logging
 import re
 import unicodedata
 import uuid
@@ -30,6 +31,8 @@ from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as repo
 from app.tenant.quests.schemas import PERMISSION_VALUES
+
+logger = logging.getLogger(__name__)
 
 # 有効な quest_status（§3）。フィルタの想定外値は 422（§C.6 入力検証）。
 _VALID_STATUS = {"draft", "recruiting", "in_progress", "evaluating", "completed"}
@@ -1518,6 +1521,34 @@ def notify_quest_watch_new_ideas(company_id, quest_id, *, actor_id=None) -> None
                                exclude=(actor_id,) if actor_id else ())
 
 
+def _email_business_notify(company_id, recipient_account_ids, category, params) -> None:
+    """業務通知メールを mail_outbox に積む（post-commit・control plane・会社トグルでゲート・FR-40/§4）。
+
+    会社の `notify_email_enabled`（既定 true）が OFF なら送らない（セキュリティ系メールは別経路＝常時）。
+    宛先メール/locale は管理DB の Account（正）から解決。best-effort（失敗は本処理を壊さない）。
+    """
+    aids = [a for a in dict.fromkeys(recipient_account_ids) if a]
+    if not aids:
+        return
+    try:
+        from app.control_plane.auth.orm import Account, Company as _Company
+        from app.control_plane.mail_outbox import repository as mail_repo
+        from app.db.control import control_session
+        with control_session() as cs:
+            co = cs.get(_Company, company_id)
+            if co is None or not co.notify_email_enabled:
+                return  # 会社が業務通知メールを OFF（既定 ON）
+            for aid in aids:
+                acc = cs.get(Account, aid)
+                if acc is None or not acc.email:
+                    continue
+                mail_repo.enqueue(cs, acc.email, category, locale=acc.locale, params=params,
+                                  account_id=aid, company_id=company_id)
+            cs.commit()
+    except Exception:  # noqa: BLE001  post-commit の best-effort（通知メールで本処理を壊さない）
+        logger.warning("join-request email enqueue failed", exc_info=True)
+
+
 def _load_discoverable(ts, account_id, quest_id):
     """(user, quest, visible) を返す。発見不可は 404（存在秘匿）。フォロー/申請の共通門番。"""
     user = profile_repo.get_user_by_account(ts, account_id)
@@ -1587,8 +1618,14 @@ def request_join(account_id, company_id, quest_id, *, message=None) -> dict:
             jr = repo.create_join_request(ts, iid, user.id, message)
         recipients = repo.list_owner_and_admin_ids(ts, quest)
         actor_name = user.display_name
+        quest_title = quest.title
+        # メール宛先＝作成者/quest_admin の account_id（申請者は除外）。管理DB の Account からメール解決。
+        recips = [r for r in dict.fromkeys(recipients) if r != user.id]
+        recipient_account_ids = [u.account_id for u in profile_repo.list_users_by_ids(ts, recips)]
         ts.commit()
     _notify_join_request_received(company_id, iid, recipients, [user.id], actor_name)
+    _email_business_notify(company_id, recipient_account_ids, "join_request_received",
+                           {"quest_title": quest_title, "actor_name": actor_name})
     return {"status": jr.status}
 
 
@@ -1699,8 +1736,13 @@ def approve_join_request(account_id, company_id, quest_id, user_id) -> dict:
         jr.decided_by_id = actor.id
         repo.add_member(ts, iid, target_uid, granted_by_id=actor.id)  # 既定権限（vote/idea_create/comment）
         actor_name = actor.display_name
+        quest_title = quest.title
+        applicant = next(iter(profile_repo.list_users_by_ids(ts, [target_uid])), None)
+        applicant_account_id = applicant.account_id if applicant else None
         ts.commit()
     _notify_join_request_decided(company_id, iid, target_uid, "approved", actor_name)
+    _email_business_notify(company_id, [applicant_account_id], "join_request_decided",
+                           {"quest_title": quest_title, "result": "approved"})
     return {"status": "approved"}
 
 
@@ -1733,8 +1775,13 @@ def reject_join_request(account_id, company_id, quest_id, user_id) -> dict:
         jr.decided_at = datetime.now(timezone.utc)
         jr.decided_by_id = actor.id
         actor_name = actor.display_name
+        quest_title = quest.title
+        applicant = next(iter(profile_repo.list_users_by_ids(ts, [target_uid])), None)
+        applicant_account_id = applicant.account_id if applicant else None
         ts.commit()
     _notify_join_request_decided(company_id, iid, target_uid, "rejected", actor_name)
+    _email_business_notify(company_id, [applicant_account_id], "join_request_decided",
+                           {"quest_title": quest_title, "result": "rejected"})
     return {"status": "rejected"}
 
 

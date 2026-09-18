@@ -2853,6 +2853,8 @@ export interface components {
             hide_voters_from_managers: boolean;
             /** Game Mode Default */
             game_mode_default: boolean;
+            /** Notify Email Enabled */
+            notify_email_enabled: boolean;
             /** Account Count */
             account_count: number;
         };
@@ -2916,6 +2918,8 @@ export interface components {
             mfa_required?: boolean | null;
             /** Game Mode Default */
             game_mode_default?: boolean | null;
+            /** Notify Email Enabled */
+            notify_email_enabled?: boolean | null;
         };
         /**
          * DirectoryItem

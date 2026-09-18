@@ -179,6 +179,7 @@ class CompanyDetail(BaseModel):
     vote_anonymized: bool
     hide_voters_from_managers: bool
     game_mode_default: bool  # ゲームモード会社既定（レビュー#2・§4.11）
+    notify_email_enabled: bool  # 業務通知メール会社既定（FR-40・§4）
     account_count: int
 
 
@@ -218,6 +219,7 @@ class CompanySettingsUpdateRequest(BaseModel):
     hide_voters_from_managers: bool | None = None
     mfa_required: bool | None = None
     game_mode_default: bool | None = None  # ゲームモード会社既定（レビュー#2・§4.11）
+    notify_email_enabled: bool | None = None  # 業務通知メール会社既定（FR-40・§4）
 
 
 # --- QG管理者 API（B.4・SC-90） ------------------------------------------------------------

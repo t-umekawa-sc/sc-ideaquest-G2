@@ -85,6 +85,7 @@
 - **コンテナ起動（フル・受入用）**＝`cd impl && docker compose --profile workers up -d`。ポート＝frontend **3000**・backend **8000**・MailHog **8025**・MinIO **9000**。
 - **backend 反映**＝`cd impl && docker compose build backend && docker compose up -d backend`（source 無マウント＝再ビルド必須）。**OpenAPI 変更時は frontend 型再生成**＝`cd impl/frontend && npm run codegen`（稼働 backend:8000 を引く）。
 - **frontend 反映**＝`cd impl && docker compose build frontend && docker compose up -d frontend`（ブラウザは DevTools「Disable cache」でリロード）。ビルドゲート＝`cd impl/frontend && npm run build`（tsc＋ESLint＋Next lint）。vitest＝`npx vitest run`。e2e＝`npx playwright test <spec> --project=chromium --reporter=line`。
+- **メール反映（重要）**＝mail-worker/worker は backend と同イメージだが**別プロセス**。メールテンプレ（`mail_outbox/templates.py`）や送信ロジックを変えたら **`cd impl && docker compose build worker mail-worker && docker compose --profile workers up -d worker mail-worker`** で再ビルド必須（旧イメージだと未知カテゴリで送信失敗→`mail_outbox.status=failed`＝以後リトライされない）。dev の受信箱＝MailHog（http://localhost:8025・API `/api/v2/messages`）。業務通知メールは会社設定 `companies.notify_email_enabled`（既定 ON）でゲート・セキュリティ系は常時送信。
 - **backend pytest（最新 source 反映）**＝`cd impl && docker compose run --rm -T -v "$(pwd)/backend:/app" backend python -m pytest <path> -k "<expr>" -q`。**`-v` マウント必須**。**全体実行時は先に `docker compose stop worker mail-worker`**（outbox フレーク回避）→ 実行後に受入なら再起動。
 - **トレーサビリティゲート**＝リポジトリルートで `python3 scripts/check_tc_traceability.py`（コミット前に ✅ 必須）。
 - **seed ログイン**＝会社 `ACME-01`／`user@acme.example`／`Passw0rd!`（2人目＝`owner2@acme.example`／`Passw0rd!`・本セッションで dev 投入）。MFA 会社＝`ACME-02`／`mfa@acme2.example`。

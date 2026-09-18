@@ -33,6 +33,9 @@ class Company(ControlBase):
     # ゲームモード会社既定（レビュー#2・デザイン標準 §4.11）。true＝ゲーム層UIあり（現行挙動）。
     # 実効値は個人上書き優先＝accounts.game_mode_override ?? 本既定（未上書きユーザーは本既定に追従）。
     game_mode_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # 業務通知メールの会社既定（FR-40／SC-92・§4）。true＝送る（既定）。参加リクエスト等の業務メールをゲート。
+    # セキュリティ系メール（PW/新端末/ロック・A.9-⑧）は本トグルの対象外＝常時送信。
+    notify_email_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

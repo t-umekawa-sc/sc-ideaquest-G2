@@ -17,6 +17,8 @@ CATEGORY_EMAIL_CHANGE_NOTICE = "email_change_notice"      # メール変更通�
 CATEGORY_EMAIL_VERIFY_LINK = "email_verify_link"          # メールアドレス確認リンク（現メール宛・ADR-0009）
 CATEGORY_NEW_DEVICE = "new_device"                        # 新端末ログイン通知（本人宛・MFA-OFF 前倒し・A.9-⑧(a)）
 CATEGORY_PASSWORD_CHANGED = "password_changed"            # パスワード変更完了通知（本人宛・A.9-⑧(b)）
+CATEGORY_JOIN_REQUEST_RECEIVED = "join_request_received"  # 参加リクエスト受信（作成者/quest_admin 宛・FR-40・業務通知）
+CATEGORY_JOIN_REQUEST_DECIDED = "join_request_decided"    # 参加リクエスト結果（申請者宛・FR-40・業務通知）
 
 
 def render(
@@ -148,5 +150,37 @@ def render(
                 "この操作により、すべての端末からログアウトされています（再ログインが必要です）。\n"
                 "心当たりがない場合は、速やかに管理者にご連絡ください。\n\n"
                 "このメールに心当たりがない場合は破棄してください。")
+
+    if category == CATEGORY_JOIN_REQUEST_RECEIVED:
+        # 参加リクエスト受信（作成者/quest_admin 宛・FR-40・業務通知）。params＝quest_title/actor_name。
+        qt = p.get("quest_title") or ("(quest)" if en else "（クエスト）")
+        actor = p.get("actor_name") or ("Someone" if en else "ある社員")
+        link = f"{s.app_base_url}/quests"
+        if en:
+            return (f'[ideaquest] New join request for "{qt}"',
+                    f'{actor} requested to join your quest "{qt}".\n\n'
+                    "Review and approve/decline it on the quest's Party tab.\n"
+                    f"{link}\n")
+        return (f"【ideaquest】クエスト「{qt}」に参加リクエストが届きました",
+                f"{actor} さんがクエスト「{qt}」への参加をリクエストしました。\n\n"
+                "クエストの「パーティー」タブで承諾/却下を確認できます。\n"
+                f"{link}\n")
+
+    if category == CATEGORY_JOIN_REQUEST_DECIDED:
+        # 参加リクエスト結果（申請者宛・FR-40・業務通知）。params＝quest_title/result（approved/rejected）。
+        qt = p.get("quest_title") or ("(quest)" if en else "（クエスト）")
+        approved = p.get("result") == "approved"
+        link = f"{s.app_base_url}/quest-catalog"
+        if en:
+            if approved:
+                return (f'[ideaquest] Your join request was approved: "{qt}"',
+                        f'Your request to join the quest "{qt}" was approved. You are now a member.\n\n{link}\n')
+            return (f'[ideaquest] Your join request was declined: "{qt}"',
+                    f'Your request to join the quest "{qt}" was declined.\n\n{link}\n')
+        if approved:
+            return (f"【ideaquest】参加リクエストが承認されました：「{qt}」",
+                    f"クエスト「{qt}」への参加リクエストが承認されました。メンバーになりました。\n\n{link}\n")
+        return (f"【ideaquest】参加リクエストが却下されました：「{qt}」",
+                f"クエスト「{qt}」への参加リクエストが却下されました。\n\n{link}\n")
 
     raise ValueError(f"unknown mail category: {category}")
