@@ -4,9 +4,9 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-18 JST**（**FR-40 を完走**したセッション＝受信側 SC-12／discoverable トグル SC-11／フォロー通知 `quest_watch_update`／活動の活発さ／ダッシュボード SC-01 結線、まで）。
+- 最終更新: **2026-09-18 JST**（**FR-40 を完走**＝受信側 SC-12／discoverable トグル SC-11／フォロー通知 `quest_watch_update`／活動の活発さ／ダッシュボード SC-01 結線／**参加リクエストの業務通知メール＋会社トグル**、まで）。
 - ブランチ: **main**（受入/レビュー反映＝main 直コミット可）。`feature/game-feel` は今回未使用。
-- 最新コミット: **a2bd695**（push 済み・`origin/main` と同期・working tree clean）。
+- 最新コミット: **1d4d56a**（push 済み・`origin/main` と同期・working tree clean）。※`4eb44b1` は本 handoff の前回全文更新。
 - **本セッションのコミット列（古い順・すべて push 済み）**＝
   - `8248f06` FR-40 受信側 backend（参加リクエスト一覧/承認/却下・C.9.1）
   - `8477f4e` FR-40 受信側 SC-12 UI＋除外→再参加のデータフロー修正＋「リクエスト経由」バッジ
@@ -14,6 +14,8 @@
   - `c3f13b1` SC-12 クエスト詳細に「活動の活発さ」スパーク追加（新着の議論の右）
   - `955b538` フォロー通知 `quest_watch_update`（状態遷移/締切/新着/完了）
   - `a2bd695` ダッシュボード SC-01 結線（フォロー中/参加リクエスト状況）＋ヘッダー氏名ツールチップ
+  - `4eb44b1` docs(handoff) 全文更新
+  - `1d4d56a` 参加リクエストの業務通知メール＋会社トグル `notify_email_enabled`
 
 ## 2. プロジェクトのゴール
 社内アイデア創出をゲーミフィケーションするマルチテナント SaaS「ideaquest」。フロント＝Next.js App Router（`impl/frontend`）、バック＝FastAPI 4層（`impl/backend`・会社ごと物理分離DB）。全画面 backend 接続済み。**FR-40（クエスト発見/フォロー/参加リクエスト）は本セッションで完了**。
@@ -47,14 +49,24 @@
 - **frontend**＝`DashboardView.tsx` に §4.6b フォロー中のクエスト（★解除・カード→/quest-catalog・0件非表示）／§4.6c 参加リクエスト状況（0件非表示）。api `DashboardData` に追加。
 - **ヘッダー**＝`AppHeader.tsx` の `.lvring` title を「氏名 ・ Lv.X…」に（ゲーム ON 時のツールチップに氏名）。
 
-### F. dev seed（コード外・DB 操作・DBリセットで消える）
-- `owner2@acme.example` / `Passw0rd!`（ACME-01 の2人目・手動2ユーザー確認用）。
+### F. 参加リクエストの業務通知メール＋会社トグル（`1d4d56a`）
+- **メール**＝`join_request_received`（作成者/quest_admin 宛）／`join_request_decided`（申請者宛・承認/却下）を `mail_outbox`（管理DB）に enqueue → mail-worker が送信。テンプレ＝`app/control_plane/mail_outbox/templates.py`（`CATEGORY_JOIN_REQUEST_RECEIVED`/`_DECIDED`・JA/EN・params `quest_title`/`actor_name`/`result`）。
+- **会社トグル**＝`companies.notify_email_enabled`（control migration `0016`・NOT NULL 既定 true）で**業務通知メールをゲート**。OFF なら送らない。**セキュリティ系メール（PW/新端末/ロック・A.9-⑧）は対象外＝常時送信**。会社設定 schema（`CompanyDetail`/`CompanySettingsUpdateRequest`・`_SETTINGS_FIELDS`/`_detail`）に追加。
+- **結線**＝`app/tenant/quests/application.py` の `request_join`/`approve_join_request`/`reject_join_request` の post-commit で `_email_business_notify(company_id, account_ids, category, params)` を呼ぶ（control_session で会社トグル確認＋Account からメール/locale 解決・**best-effort**＝失敗は本処理を壊さない）。宛先 account_id はテナント `User.account_id` から解決。
+- **frontend**＝`CompanyDetailView.tsx`（SC-92 会社設定）に「業務通知メール」トグル（既存 `.switch`）。
+- テスト＝**C-TC-282**（受信/承認でメール enqueue・会社トグル ON）／**C-TC-283**（OFF で不送信）。MailHog で実配信確認済み。
+- **運用注意**＝mail テンプレ変更時は **mail-worker/worker の再ビルド必須**（§8）。旧イメージだと未知カテゴリで `mail_outbox.status=failed`＝以後リトライされない。
+- **決定**＝メール ON/OFF は**会社単位**（既存の会社設定パターン踏襲・低コスト）。個人単位オプトアウトは将来拡張（設定モデル＋プロフィールUI＋種別別が要るため今回は見送り・ユーザー承認）。既定 ON＝「参加リクエストは既定で必ず飛ぶ／会社が任意で停止」。
+
+### G. dev seed（コード外・DB 操作・DBリセットで消える）
+- `owner2@acme.example` / `Passw0rd!`（ACME-01 の2人目＝**実 Account＋メールあり**・手動2ユーザー確認＆メール検証用）。
 - 受信デモ discoverable クエスト `d15c0000-0000-4000-a000-0000000000a1`（**seed 一般ユーザーが owner**）＋申請者 `申請 花子`(pending)/`却下 次郎`(rejected)。SC-12 受信側の手動確認用。
 - 発見デモ クエスト `d15c…0002`（bootstrap `seed_demo_discovery`・全社公開）。seed 一般ユーザーは手動確認でこれをフォロー済み（ダッシュボードのフォロー中に出る）。
+- メール検証で owner2 が作った「メール確認クエスト」（discoverable）が数件残存（無害・DBリセットで消える）。
 
 ## 4. 現在の状態（動作/テスト）
-- **動いているもの**＝FR-40 全機能（発見/フォロー/申請＝SC-13、受信側承認/却下＋申請者プロフィール＝SC-12、discoverable トグル＝SC-11、フォロー通知、ダッシュボード結線）。実機で通知4イベント・ダッシュボードのフォロー中セクション・トグル表示/挙動を確認済み。
-- **テスト**＝**backend 全体 640 passed**（本セッション末に全体実行）／frontend **vitest 全通過**（notifications/quests api・xpAward 等）／`npm run build` 通過／e2e `sc-11 C-TC-278` passed／トレーサビリティ **`python3 scripts/check_tc_traceability.py` ✅632**。
+- **動いているもの**＝FR-40 全機能（発見/フォロー/申請＝SC-13、受信側承認/却下＋申請者プロフィール＝SC-12、discoverable トグル＝SC-11、フォロー通知、ダッシュボード結線、**参加リクエストの業務通知メール**）。実機で通知4イベント・ダッシュボードのフォロー中セクション・トグル表示/挙動・**MailHog へのメール実配信**を確認済み。
+- **テスト**＝**backend 全体 642 passed**（本セッション末に全体実行）／frontend **vitest 全通過**（notifications/quests/companies api・xpAward 等）／`npm run build` 通過／e2e `sc-11 C-TC-278` passed／トレーサビリティ **`python3 scripts/check_tc_traceability.py` ✅634**。
 - **コンテナ**＝本セッション末はフル起動中（backend/frontend 再ビルド済み・codegen 済み）。次セッションは落ちている想定＝§8 で再起動。
 - **壊れているもの**＝認識範囲では無し。注意＝`G-TC-175`（ゲーム層ヒーロー）は seed の `game_mode_override=False` で落ちる既知事項（DB リセットで再発しうる・§8 参照）。
 
@@ -78,7 +90,8 @@
 1. **社内レビュー残**（memory）＝①評価ダイアログにクエスト情報追加 ②クエスト最終結果の機能実装（FR-39・SC-12 結果タブの本格実装）。着手前にコードで現況裏取り（handoff/テストmd の「未実装」は既に done が多い）。
 2. **SC-12 受信側の通し e2e**（owner がパーティータブで承諾→メンバー化＋バッジ）＝`doc/テスト/カバレッジギャップ.md ［A］` に登録済みの follow-up。owner＋申請者の2ユーザーが要る（`owner2@acme.example` を使えば手動/自動とも組める。seed 化するなら bootstrap へ）。
 3. **コンセプト機能（FR-39 の②③・新コンセプト段）**＝設計ドラフト `doc/設計ドラフト/コンセプト機能_ISO56002_再設計.md` の実装（大物・別フェーズ）。
-4. **推奨**＝まとまった変更の前に backend 全体スイートを一度回す。
+4. **（任意）通知メールの個人単位オプトアウト**＝現状は会社単位（`notify_email_enabled`）のみ。要望が出たら個人設定（種別別）を追加（設定モデル＋プロフィールUI）。フォロー通知 `quest_watch_update` のメール化も未対応（今回は参加リクエストのみメール）。
+5. **推奨**＝まとまった変更の前に backend 全体スイートを一度回す。メール系を触ったら mail-worker 再ビルド（§8）。
 
 ## 8. 再開に必要な環境情報
 - **作業ディレクトリ**＝`/home/t-umekawa/sc-ideaquest-G2`。docker 操作は必ず **`impl/`** から。
@@ -96,9 +109,9 @@
 
 ---
 ### 自己チェック（これだけで再開できるか）
-- ✅ 最新コミット `a2bd695`・本セッションのコミット6本・push 済みを §1 に明記。
-- ✅ FR-40 の5系統（受信側/discoverable/活発度/フォロー通知/ダッシュボード）を §3 にファイル・関数レベルで明記。
-- ✅ テスト＝backend 640・vitest 全通過・build 通過・traceability ✅632・e2e C-TC-278 を §4 に明記。
-- ✅ 詰まり所（.switch モーダル切り分け／除外→再参加／completed 失効／teardown FK／mp4 復号不可）を §5 に記録。
-- ✅ 次アクション（社内レビュー残・SC-12 e2e follow-up・コンセプト機能）を §7 に明記。
-- ⚠️ 未確認/注意＝(1) dev seed（owner2・受信デモ）は DB リセットで消える (2) `G-TC-175` は game_mode_override=False で再発しうる (3) SC-12 受信側の通し e2e は未実装（カバレッジギャップ登録済み）。
+- ✅ 最新コミット `1d4d56a`・本セッションのコミット8本・push 済みを §1 に明記。
+- ✅ FR-40 の6系統（受信側/discoverable/活発度/フォロー通知/ダッシュボード/**業務通知メール**）を §3 にファイル・関数レベルで明記。
+- ✅ テスト＝backend 642・vitest 全通過・build 通過・traceability ✅634・e2e C-TC-278・MailHog 実配信 を §4 に明記。
+- ✅ 詰まり所（.switch モーダル切り分け／除外→再参加／completed 失効／teardown FK／mp4 復号不可／**mail-worker 旧イメージで failed**）を §5 と §3-F に記録。
+- ✅ 次アクション（社内レビュー残・SC-12 e2e follow-up・コンセプト機能・個人単位メール設定）を §7 に明記。
+- ⚠️ 未確認/注意＝(1) dev seed（owner2・受信デモ・メール確認クエスト）は DB リセットで消える (2) `G-TC-175` は game_mode_override=False で再発しうる (3) SC-12 受信側の通し e2e は未実装（カバレッジギャップ登録済み） (4) メール系変更時は mail-worker 再ビルド必須（§8）。
