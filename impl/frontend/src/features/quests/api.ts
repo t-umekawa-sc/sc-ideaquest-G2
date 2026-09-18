@@ -174,6 +174,12 @@ export function getQuest(questId: string): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>(`/quests/${questId}`);
 }
 
+// クエスト内の活発度スパーク（SC-12・C.1・メンバー可視）＝日次メッセージ数（公開アイデア横断）。
+export type QuestActivity = components["schemas"]["QuestActivityDTO"];
+export function getQuestActivity(questId: string): Promise<QuestActivity | null> {
+  return apiFetch<QuestActivity>(`/quests/${questId}/activity`);
+}
+
 // クエスト作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
 export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });

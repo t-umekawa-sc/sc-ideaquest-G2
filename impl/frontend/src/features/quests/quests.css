@@ -80,6 +80,9 @@
 /* ヘッダー（概要）＋クエスト内アクティビティを2段組（ヘッダーの空白を活かす・レビュー#3）。狭幅で縦積み。 */
 .quest-head-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-4); align-items: stretch; }
 @media (max-width: 860px) { .quest-head-row { grid-template-columns: 1fr; } }
+/* 💬 新着の議論（左）＋ 📈 活動の活発さ（右）＝2段組（SC-12）。狭幅は縦積み。 */
+.discuss-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-4); align-items: start; }
+@media (max-width: 860px) { .discuss-row { grid-template-columns: 1fr; } }
 /* クエスト内アクティビティ＝ビジネス層カード（.card）。フィードのスクロールに備え本文は縦に伸びる。 */
 .quest-activity { display: flex; flex-direction: column; }
 /* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（狭幅で縦積み）。ゲームモード OFF では非表示（§4.11）。 */

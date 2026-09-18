@@ -20,6 +20,7 @@ from app.tenant.quests.schemas import (
     JoinRequestListResponse,
     JoinRequestProfileDTO,
     JoinRequestResponse,
+    QuestActivityDTO,
     QuestCandidatesResponse,
     QuestCatalogCardDTO,
     QuestCatalogDetailDTO,
@@ -170,6 +171,14 @@ def reject_join_request(
     result = quest_service.reject_join_request(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, user_id)
     return JoinRequestDecisionResponse(**result)
+
+
+@router.get("/quests/{quest_id}/activity", response_model=QuestActivityDTO)
+def get_quest_activity(quest_id: str, request: Request, session: dict = Depends(require_me)) -> QuestActivityDTO:
+    """クエスト内の活発度スパーク（SC-12・C.1）＝メンバー可視・日次メッセージ数。読取専用。"""
+    result = quest_service.get_quest_activity(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+    return QuestActivityDTO(**result)
 
 
 @router.get("/quests/{quest_id}/join-requests/{user_id}/profile", response_model=JoinRequestProfileDTO)

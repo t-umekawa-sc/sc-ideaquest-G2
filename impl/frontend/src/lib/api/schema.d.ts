@@ -1093,6 +1093,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Activity
+         * @description クエスト内の活発度スパーク（SC-12・C.1）＝メンバー可視・日次メッセージ数。読取専用。
+         */
+        get: operations["get_quest_activity_api_v1_quests__quest_id__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/join-requests/{user_id}/profile": {
         parameters: {
             query?: never;
@@ -7348,6 +7368,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinRequestDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_activity_api_v1_quests__quest_id__activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestActivityDTO"];
                 };
             };
             /** @description Validation Error */

@@ -1447,6 +1447,28 @@ def _quest_activity(ts, quest_id, *, days=_ACTIVITY_DAYS) -> dict:
     return {"daily": daily, "total": sum(d["count"] for d in daily), "days": days}
 
 
+def get_quest_activity(account_id, company_id, quest_id) -> dict:
+    """クエスト内の活発度スパーク（SC-12・C.1）＝メンバー可視。日次メッセージ数（公開アイデア横断）。
+
+    可視性＝owner か有効メンバー（`can_access_quest`・範囲外は 404 存在秘匿）。データは `_quest_activity` を共有
+    （発見カタログ SC-13 と同じ集計＝クエスト横断の公開アイデアのチャット日次件数）。
+    """
+    iid = _parse_uuid(quest_id, field="quest_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, iid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # C.0 門番（作成者別格・参加部署の都度再判定）
+        return _quest_activity(ts, quest.id)
+
+
 def _load_discoverable(ts, account_id, quest_id):
     """(user, quest, visible) を返す。発見不可は 404（存在秘匿）。フォロー/申請の共通門番。"""
     user = profile_repo.get_user_by_account(ts, account_id)

@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
@@ -27,6 +27,7 @@ import {
   deleteQuest,
   getJoinRequestProfile,
   getQuest,
+  getQuestActivity,
   listCompanyGroupDirectory,
   listJoinRequests,
   QUESTS_CHANGED_EVENT,
@@ -34,6 +35,7 @@ import {
   transitionQuest,
   type JoinRequestProfile,
   type JoinRequestRow,
+  type QuestActivity,
   type QuestDetail,
 } from "../api";
 import { supportsWebGL } from "@/features/avatar/webgl";
@@ -149,6 +151,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const [ranking, setRanking] = useState<RankingResponse | null>(null);
 
   const [quest, setQuest] = useState<QuestDetail | null>(null);
+  const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（SC-12・日次スパーク）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
@@ -226,6 +229,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
     window.addEventListener(QUESTS_CHANGED_EVENT, onChanged);
     return () => window.removeEventListener(QUESTS_CHANGED_EVENT, onChanged);
   }, [load]);
+
+  // 活動の活発さ（SC-12・メンバー可視・日次メッセージ数）＝新着の議論の隣に表示。取得失敗は非表示。
+  useEffect(() => {
+    void getQuestActivity(questId).then(setActivity).catch(() => setActivity(null));
+  }, [questId]);
 
   // アイデアタブ（D.1）＝マウント時に一覧取得。SC-21 の投稿/下書き/編集・削除成功で発火する
   // IDEAS_CHANGED_EVENT（跨ルート・window）を購読して再取得＝投稿後に一覧へ反映する。
@@ -591,9 +599,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </section>
         </div>{/* .quest-head-row */}
 
-        {/* 💬 新着の議論（ビジネス層・レビュー#3）＝このクエストで自分の未読チャット（他ユーザー投稿）があるアイデア。
-            通知が拾わない「他ユーザー同士の会話」に気付いてチャットへ直行する動線。クエストでは**常設**（未読ゼロは空状態）。 */}
+        {/* 💬 新着の議論（左）＋ 📈 活動の活発さ（右）を2段組（レビュー#3＋活発度・SC-12）。 */}
         {ideas !== null && (
+          <div className="discuss-row">
           <section className="card unread-panel" aria-label="新着の議論">
             <div className="section-head">
               <h2 className="unread-panel__title">💬 新着の議論</h2>
@@ -618,6 +626,20 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>未読のチャットはありません。ほかのメンバーの新しい投稿があるとここに表示されます。</p>
             )}
           </section>
+
+          {/* 📈 活動の活発さ（SC-12・メンバー可視）＝クエスト内の公開アイデア横断の日次コメント数スパーク。 */}
+          <section className="card" aria-label="活動の活発さ">
+            <div className="section-head">
+              <h2 className="unread-panel__title">📈 活動の活発さ</h2>
+            </div>
+            <ActivitySpark
+              daily={(activity?.daily ?? []).map((d) => ({ date: d.date, count: d.count }))}
+              label={`直近${activity?.days ?? 14}日・💬 合計 ${activity?.total ?? 0} 件`}
+              legend="棒＝日次コメント数（クエスト内の公開アイデア横断・直近3日を強調）。"
+              emptyText="まだ活動の記録はありません。メンバーの投稿があるとここに表示されます。"
+            />
+          </section>
+          </div>
         )}
 
         {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}

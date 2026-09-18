@@ -404,6 +404,34 @@ def test_c_tc_275_join_request_profile(client, factory, env):
         assert isinstance(p["game"]["achievement_count"], int) and "rank" in p["game"]
 
 
+def test_c_tc_279_quest_activity_member(client, env):
+    """C-TC-279 クエスト内活発度（SC-12）＝メンバーは daily/total 取得／非メンバーは 404（存在秘匿）。"""
+    qid = env.new_quest(discoverable=False)  # viewer は既定で非メンバー
+    now = datetime.now(timezone.utc)
+    with get_tenant_session(env.db) as ts:
+        repo.add_member(ts, qid, env.viewer_id, permissions=["comment"])  # viewer をメンバーに
+        iid = uuid.uuid4()
+        ts.add(Idea(id=iid, quest_id=qid, author_id=env.owner_id, title="I", body="b", value="v", status="published"))
+        ts.flush()
+        cgid = uuid.uuid4()
+        ts.add(ChatGroup(id=cgid, idea_id=iid))
+        ts.flush()
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id, body="m1", created_at=now))
+        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id, body="m2", created_at=now - timedelta(days=1)))
+        ts.commit()
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(f"/api/v1/quests/{qid}/activity")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 2 and body["days"] == 14
+    counts = {d["date"]: d["count"] for d in body["daily"]}
+    assert counts.get(now.date().isoformat()) == 1
+    assert counts.get((now - timedelta(days=1)).date().isoformat()) == 1
+    # 非メンバー（viewer が入っていない別クエスト）は 404。
+    other = env.new_quest(discoverable=False)
+    assert client.get(f"/api/v1/quests/{other}/activity").status_code == 404
+
+
 def test_c_tc_276_create_discoverable(client, factory, env):
     """C-TC-276 作成時に discoverable を指定＝応答/GET detail に反映／未指定は既定 false。"""
     owner_acc, _ouid = _make_owner(env, factory)
