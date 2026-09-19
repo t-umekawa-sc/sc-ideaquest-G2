@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { Avatar, DataTable, RowMenu, useConfirm } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
@@ -28,13 +29,44 @@ const WORD_CLOUD: [string, number][] = [
 const summaryText = (r: InfoItem) =>
   r.summary || r.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 
+// --- 全文検索タブ（クエスト SC-12 の全文検索と同じ体裁＝対象フィルタ＋件数＋ハイライトスニペット） ---
+const plainBody = (r: InfoItem) => r.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+type FtScope = "" | "title" | "body" | "summary";
+const FT_SCOPE: [FtScope, string][] = [["", "対象: すべて"], ["title", "タイトル"], ["body", "本文"], ["summary", "要約"]];
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// 一致箇所の周辺を切り出し、キーワードを <mark> でハイライト（dangerouslySetInnerHTML は使わない・§2.2④）。
+function snippetNodes(text: string, q: string, span = 140): ReactNode {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(q.toLowerCase());
+  let start = 0, body = text;
+  if (idx >= 0) {
+    start = Math.max(0, idx - 40);
+    body = text.slice(start, start + span);
+  } else {
+    body = text.slice(0, span);
+  }
+  const prefix = start > 0 ? "…" : "";
+  const suffix = start + span < text.length ? "…" : "";
+  const parts = body.split(new RegExp(`(${escapeRe(q)})`, "ig"));
+  return (
+    <>
+      {prefix}
+      {parts.map((seg, i) => (seg.toLowerCase() === q.toLowerCase() ? <mark key={i} className="keyword">{seg}</mark> : <span key={i}>{seg}</span>))}
+      {suffix}
+    </>
+  );
+}
+
 export function InfoListView() {
   const router = useRouter();
   const confirm = useConfirm();
   const [items, setItems] = useState<InfoItem[]>([]);
   const [status, setStatus] = useState<InfoStatusFilter>("all");
   const [rootsOnly, setRootsOnly] = useState(false);
-  const [fts, setFts] = useState(""); // 全文検索（タイトル＋本文＋要約）＝標準の横断検索/絞込とは別建て（本番は ?q= PGroonga §N）
+  const [tab, setTab] = useState<"list" | "search">("list"); // 一覧／全文検索（クエスト SC-12 と同じタブ構成）
+  const [fts, setFts] = useState(""); // 全文検索クエリ（タイトル＋本文＋要約）＝標準の一覧絞込とは別タブ（本番は ?q= PGroonga §N）
+  const [ftScope, setFtScope] = useState<FtScope>(""); // 検索対象（すべて/タイトル/本文/要約）
   const [followMap, setFollowMap] = useState<Record<string, number>>({});
 
   const reload = useCallback(async () => {
@@ -65,10 +97,27 @@ export function InfoListView() {
     let data = active;
     if (status !== "all") data = data.filter((x) => x.status === status);
     if (rootsOnly) data = data.filter((x) => !x.parent_info_id);
-    const q = fts.trim().toLowerCase();
-    if (q) data = data.filter((x) => `${x.title} ${x.summary ?? ""} ${x.body_html.replace(/<[^>]+>/g, " ")}`.toLowerCase().includes(q));
     return data;
-  }, [active, status, rootsOnly, fts]);
+  }, [active, status, rootsOnly]);
+
+  // 全文検索タブの結果（対象スコープで title/body/summary を検索・一致フィールドからスニペット）。
+  const ftResults = useMemo(() => {
+    const q = fts.trim();
+    if (!q) return [] as { r: InfoItem; field: string; text: string }[];
+    const ql = q.toLowerCase();
+    const fieldsFor = (r: InfoItem): [string, string][] => {
+      if (ftScope === "title") return [["タイトル", r.title]];
+      if (ftScope === "body") return [["本文", plainBody(r)]];
+      if (ftScope === "summary") return [["要約", r.summary ?? ""]];
+      return [["タイトル", r.title], ["要約", r.summary ?? ""], ["本文", plainBody(r)]];
+    };
+    return active
+      .map((r) => {
+        const hit = fieldsFor(r).find(([, v]) => v.toLowerCase().includes(ql));
+        return hit ? { r, field: hit[0], text: hit[1] } : null;
+      })
+      .filter((x): x is { r: InfoItem; field: string; text: string } => x !== null);
+  }, [active, fts, ftScope]);
 
   const titleById = useCallback((id: string) => items.find((x) => x.id === id)?.title ?? "—", [items]);
 
@@ -217,63 +266,102 @@ export function InfoListView() {
       <h1 className="page-title">情報インプット</h1>
       <p className="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
-      <div className="info-fts" role="search">
-        <label className="info-fts__label" htmlFor="info-fts-input">🔍 全文検索</label>
-        <div className="info-fts__box">
-          <input id="info-fts-input" className="input" type="search" value={fts} onChange={(e) => setFts(e.target.value)}
-            placeholder="タイトル・本文・要約を横断検索…（例: ガイドライン）" aria-describedby="info-fts-hint" />
-          {fts ? <button type="button" className="info-fts__clear" onClick={() => setFts("")} aria-label="全文検索をクリア">✕</button> : null}
-        </div>
-        <span id="info-fts-hint" className="info-fts__hint">本文テキストまで対象の全文検索（本番は PGroonga <code>?q=</code>）。表の<strong>検索・列フィルタ</strong>は表示項目に対する標準の絞込です。</span>
+      {/* タブ＝クエスト SC-12 と同じ体裁（情報インプット＝一覧／全文検索）。全文検索の結果表示も SC-12 に揃える。 */}
+      <div className="tabs" role="tablist" aria-label="情報インプットのセクション">
+        <button className={`tab${tab === "list" ? " is-active" : ""}`} role="tab" aria-selected={tab === "list"} onClick={() => setTab("list")}>
+          🧭 情報インプット<span className="tab-count">{counts.all}</span>
+        </button>
+        <button className={`tab${tab === "search" ? " is-active" : ""}`} role="tab" aria-selected={tab === "search"} onClick={() => setTab("search")}>
+          🔍 全文検索{fts.trim() ? <span className="tab-count">{ftResults.length}</span> : null}
+        </button>
       </div>
 
-      <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
-        <div className="wordcloud__title">☁️ よく出る語</div>
-        {WORD_CLOUD.map(([w, c]) => {
-          const max = Math.max(...WORD_CLOUD.map((x) => x[1]));
-          return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 1.1).toFixed(2)}rem`, opacity: (0.55 + (c / max) * 0.45).toFixed(2) }} title={`${w}（${c}）`}>{w}</span>;
-        })}
-      </div>
+      {tab === "list" && (
+        <>
+          <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
+            <div className="wordcloud__title">☁️ よく出る語</div>
+            {WORD_CLOUD.map(([w, c]) => {
+              const max = Math.max(...WORD_CLOUD.map((x) => x[1]));
+              return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 1.1).toFixed(2)}rem`, opacity: (0.55 + (c / max) * 0.45).toFixed(2) }} title={`${w}（${c}）`}>{w}</span>;
+            })}
+          </div>
 
-      <div className="section-head">
-        <h2>情報一覧</h2>
-        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-          <label className="checkbox" style={{ fontSize: "var(--text-sm)" }}>
-            <input type="checkbox" checked={rootsOnly} onChange={(e) => setRootsOnly(e.target.checked)} /><span>続報を束ねる</span>
-          </label>
-          <Link className="btn btn-primary" href="/info-items/new">＋ 情報を登録</Link>
-        </div>
-      </div>
+          <div className="section-head">
+            <h2>情報一覧</h2>
+            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+              <label className="checkbox" style={{ fontSize: "var(--text-sm)" }}>
+                <input type="checkbox" checked={rootsOnly} onChange={(e) => setRootsOnly(e.target.checked)} /><span>続報を束ねる</span>
+              </label>
+              <Link className="btn btn-primary" href="/info-items/new">＋ 情報を登録</Link>
+            </div>
+          </div>
 
-      <div className="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" style={{ marginBottom: "var(--space-3)" }}>
-        {([["all", "すべて", counts.all], ["raw", "未判定", counts.raw], ["curated", "判定済", counts.curated]] as const).map(([k, label, n]) => (
-          <label key={k}>
-            <input type="radio" name="info-status" checked={status === k} onChange={() => setStatus(k)} />
-            {label} <span className="idea-filter__n">{n}</span>
-          </label>
-        ))}
-      </div>
+          <div className="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" style={{ marginBottom: "var(--space-3)" }}>
+            {([["all", "すべて", counts.all], ["raw", "未判定", counts.raw], ["curated", "判定済", counts.curated]] as const).map(([k, label, n]) => (
+              <label key={k}>
+                <input type="radio" name="info-status" checked={status === k} onChange={() => setStatus(k)} />
+                {label} <span className="idea-filter__n">{n}</span>
+              </label>
+            ))}
+          </div>
 
-      <DataTable<InfoItem>
-        storageKey="sc50-info"
-        data={rows}
-        rowId={(r) => r.id}
-        unit="件"
-        perPage={10}
-        perPageOptions={[10, 20, 50]}
-        searchFields="タイトル・要約・作成者"
-        searchPlaceholder="一覧を絞り込み（タイトル・要約・作成者）…"
-        exportName="情報インプット"
-        emptyText="該当する情報がありません。"
-        onRowClick={(r) => router.push(`/info-items/${r.id}`)}
-        subRow={subRow}
-        card={card}
-        columns={columns}
-      />
+          <DataTable<InfoItem>
+            storageKey="sc50-info"
+            data={rows}
+            rowId={(r) => r.id}
+            unit="件"
+            perPage={10}
+            perPageOptions={[10, 20, 50]}
+            searchFields="タイトル・要約・作成者"
+            searchPlaceholder="一覧を絞り込み（タイトル・要約・作成者）…"
+            exportName="情報インプット"
+            emptyText="該当する情報がありません。"
+            onRowClick={(r) => router.push(`/info-items/${r.id}`)}
+            subRow={subRow}
+            card={card}
+            columns={columns}
+          />
 
-      <p className="role-note" style={{ marginTop: "var(--space-6)", color: "var(--color-text-muted)", fontSize: "var(--text-xs)" }}>
-        低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>属性付与・環境スキャン・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。
-      </p>
+          <p className="role-note" style={{ marginTop: "var(--space-6)", color: "var(--color-text-muted)", fontSize: "var(--text-xs)" }}>
+            低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>属性付与・環境スキャン・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。
+          </p>
+        </>
+      )}
+
+      {tab === "search" && (
+        <section aria-label="全文検索">
+          <p className="admin-sub" style={{ marginTop: 0 }}>
+            <strong>タイトル・本文・要約</strong>を対象とした全文検索（本番は PGroonga <code>?q=</code>）。一覧タブの検索・列フィルタは<strong>表示項目に対する標準の絞込</strong>です。
+          </p>
+          <div className="list-toolbar">
+            <div className="filters">
+              <input className="input ft-q" type="search" placeholder="キーワードで全文検索（例: ガイドライン）" aria-label="全文検索" value={fts} onChange={(e) => setFts(e.target.value)} />
+              <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value as FtScope)}>
+                {FT_SCOPE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            {fts.trim() ? <span className="list-count">{ftResults.length} 件</span> : null}
+          </div>
+          {!fts.trim() ? (
+            <div className="list-empty">キーワードを入力してください（会社横断の情報のタイトル・本文・要約を全文検索します）。</div>
+          ) : ftResults.length === 0 ? (
+            <div className="list-empty">「{fts.trim()}」に一致する結果がありません。</div>
+          ) : (
+            <div className="stack">
+              {ftResults.map(({ r, field, text }) => (
+                <Link key={r.id} className="card card-accent ft-result" href={`/info-items/${r.id}`}>
+                  <div className="ft-result__head">
+                    <span className={`badge ${STATUS_LABEL[r.status][1]}`}>{STATUS_LABEL[r.status][0]}</span>
+                    {r.impact_class ? <span className={`badge ${IMPACT_CLASS_LABEL[r.impact_class][1]}`}>{IMPACT_CLASS_LABEL[r.impact_class][0]}</span> : null}
+                    <span className="ft-result__ctx">{r.title}</span>
+                  </div>
+                  <p className="ft-result__snippet"><span className="muted" style={{ marginRight: 6 }}>{field}</span>{snippetNodes(text, fts.trim())}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

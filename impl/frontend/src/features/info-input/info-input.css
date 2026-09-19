@@ -4,16 +4,27 @@
 .info-page .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
 .info-page .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
 
-/* 全文検索バー（タイトル＋本文＋要約＝差別化の核・標準の横断検索/列フィルタとは別建て・本番は ?q= PGroonga §N） */
-.info-fts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-bottom: var(--space-4); }
-.info-fts__label { font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }
-.info-fts__box { position: relative; }
-.info-fts__box .input { width: 100%; padding-right: 36px; }
-.info-fts__clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer;
-  color: var(--color-text-muted); font-size: 14px; line-height: 1; padding: 6px; border-radius: var(--radius-sm); }
-.info-fts__clear:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
-.info-fts__hint { grid-column: 2; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
-@media (max-width: 640px) { .info-fts { grid-template-columns: 1fr; } .info-fts__hint { grid-column: 1; } }
+/* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁（.info-page スコープで独立定義）。 */
+.info-page .tabs { position: sticky; top: var(--header-h); z-index: 5; background: var(--color-bg); padding-top: var(--space-3);
+  box-shadow: 0 6px 8px -8px rgba(15,23,42,.25); display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border);
+  margin: var(--space-4) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.info-page .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
+  padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  border-radius: var(--radius) var(--radius) 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; transition: background .12s, color .12s; }
+.info-page .tab:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.info-page .tab.is-active { color: var(--color-primary); background: var(--color-primary-soft); border-bottom-color: var(--color-primary); font-weight: 700; }
+.info-page .tab.is-active:hover { background: var(--color-primary-soft); }
+.info-page .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+.info-page .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
+
+/* 全文検索の結果（SC-12 と同じ＝検索ボックス幅・カードリンク・ハイライトスニペット） */
+.info-page .ft-q { width: 360px; max-width: 100%; }
+.info-page .ft-result { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, border-color .15s, transform .05s; }
+.info-page .ft-result:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+.info-page .ft-result__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.info-page .ft-result__ctx { font-size: var(--text-sm); font-weight: 600; }
+.info-page .ft-result__snippet { margin: 0; font-size: var(--text-sm); line-height: 1.7; }
+.info-page .ft-result mark { background: #FEF08A; color: inherit; padding: 0 1px; border-radius: 2px; }
 
 /* ワードクラウド（一覧上部・語頻度の可視化） */
 .info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
