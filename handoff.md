@@ -72,12 +72,12 @@
 - **動いているもの（実機確認済み・seed `user@acme` でログイン）**＝ダッシュボード未処理リクエスト領域→承認/却下ダイアログ／参照・入力ダイアログの統一（参加リクエスト・クエスト作成・アイデア作成の任意項目 開/閉）／🕒最近の議論パネル（新着が空でも更新順で表示・両パネル同高 401px 実測）。
 - **テスト**＝frontend **vitest 全通過（195）**／`npm run build` 通過（複数回）／backend **notifications 26 passed**・**I-TC-159/160/161 passed**（いずれも targeted 実行）／トレーサビリティ **`python3 scripts/check_tc_traceability.py` ✅636**。
 - **⚠️ backend 全体スイートは本セッション未実行**（対象テストのみ）＝まとまった実装の前に一度回すこと（§8）。
-- **未受入（自動確認できず）**＝**管理系ダイアログ（アカウント発行/編集・会社作成・クエストグループ作成/編集・メンバー追加）／評価ダイアログ／振り返り編集**は、seed 検証アカウント `user@acme` の権限（**非管理者**・対象クエスト非所有）で全モーダルに到達できずスクショ未取得。共通 `.dialog-*` 機構のため見た目は整う想定だが、**管理者アカウントでの実機受入が必要**。
+- **管理系/評価/振り返り編集ダイアログの実機受入＝2026-09-19 に完了**（Playwright スクショ8枚・目視で崩れ無し）。アカウント発行/編集・クエストグループ作成/編集・メンバー追加は `kanri@acme.example`（company_account_admin）、会社作成は `admin@ops.example`（system_admin）、振り返り編集/評価は `user@acme`（owner/評価者）で到達。全ダイアログで「囲みなし＋薄い仕切り線／ヘッダ＝タイトル＋⤢＋×／フォーム=キャンセル・参照系=閉じる」が一貫。**評価ダイアログは「▼ クエストを確認（目的・テーマ/カテゴリー/締切）」を既に内包**＝社内レビュー残①は実装済みを裏取り。
 - **壊れているもの**＝認識範囲では無し。コンテナは本セッション末に frontend/backend 再ビルド済みで起動中（次セッションは落ちている想定＝§8 で起動）。
 
 ## 5. 詰まっている点（試して失敗したアプローチ）
 - **仕切り線の余白デグレ**＝`.dialog-section` の padding を「上のみ」にしたら `.field` 以外の自作セクション（`JoinRequestDialog` 等）が下罫に密着して崩れた。→ **上下対称 padding＋`.field.dialog-section{margin-bottom:0}`** で両立（`.field` は自前の下余白を持つため二重取り回避）。
-- **モーダル実機確認の権限**＝seed `user@acme` は**非管理者**＝`/admin/*`（アカウント/会社/グループ/メンバー追加）へ行くと `/` にリダイレクト。評価/振り返り編集も対象クエストの評価者/所有者でないと導線が出ない。`owner2@acme.example` も一般権限＝管理系の実機確認は**管理者権限のアカウントが要る**（seed には無い）。
+- **モーダル実機確認の権限**＝seed `user@acme`/`owner2@acme` は**非管理者**＝`/admin/*`（アカウント/会社/グループ/メンバー追加）へ行くと `/` にリダイレクト。評価/振り返り編集も対象クエストの評価者/所有者でないと導線が出ない。**ただし管理者 seed は実在**（前セッションの「seed に管理者無し」は誤り・2026-09-19 訂正）＝`kanri@acme.example`（ACME-01・company_account_admin）＋`admin@ops.example`（会社コード **OPS**・system_admin＝company_account_admin 上位互換）がいずれも `Passw0rd!` で稼働。`kanri`/`user2`/`user3` は bootstrap の `_SEEDS` には無いが DB に存在（`seed_demo.py` 経由で作られ volume に永続）。管理系ダイアログはこれで到達可能。
 - **frontend は本番ビルド（`npm run start`）をベイク**＝コンテナ内 `.next` に焼くため、変更反映は毎回 `docker compose up -d --build frontend`。ソースマウント無し。backend も source 無マウント＝OpenAPI 反映には `--build`。
 - **`timeLabel` は string 必須**＝`last_chat_at` が `string|null` なので `c.last_chat_at ? timeLabel(...) : ""` でガード（ビルド型エラーで気付いた）。
 
@@ -91,10 +91,10 @@
 7. **情報インプットは設計を先に4点実体化**（データモデル/API/画面/FR）してから実装（正＝設計ドラフト §11 の確定）。enum は会社拡張を Phase2 に（MVP を軽く）。反証の揺さぶりは per-link のみ（影響分類=脅威で自動発火しない＝誤爆防止）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **管理系/評価/振り返り編集ダイアログの実機受入**（§4 未受入）＝**管理者アカウント**で見た目確認（ダイアログ統一の残受入）。崩れがあれば `.dialog-*` の共通調整で対応。
-2. **情報インプット機能の実装**（設計は §3-B で4点実体化済み）＝**実装フェーズ**。①モック先行＝`doc/画面設計/mocks/SC-50_情報インプット.html`（一覧=DataTable・登録/詳細モーダル・ワードクラウド・関連情報パネル）→受入 ②backend 新ドメイン `app/tenant/info`（4層＝router/application/domain/repository）＋migration（`info_items`/`info_item_categories`/`info_links`/`info_tokens`/`info_curators`＋`info_*` enum・データモデル §5.33-5.37）＋`janome` 再利用（`info_tokens`/類似度）③frontend `features/info-input`（一覧は**最初からサーバー委譲契約**＝`GET /info-items` の DataTable クエリ・列 flags=backend ホワイトリスト一致）。API は `doc/API設計/N_情報インプット.md`。実装順は `doc/実装計画.md` に位置づけ要（現状未記載）。
+1. ~~管理系/評価/振り返り編集ダイアログの実機受入~~ ＝**2026-09-19 完了**（§4・崩れ無し）。
+2. **情報インプット機能の実装**（設計は §3-B で4点実体化済み）＝**実装フェーズ**。※2026-09-19 のユーザー方針＝実装前に**情報インプット設計へ追加機能を入れる**（内容は次セッションで具体化）→その後に実装。①モック先行＝`doc/画面設計/mocks/SC-50_情報インプット.html`（一覧=DataTable・登録/詳細モーダル・ワードクラウド・関連情報パネル）→受入 ②backend 新ドメイン `app/tenant/info`（4層＝router/application/domain/repository）＋migration（`info_items`/`info_item_categories`/`info_links`/`info_tokens`/`info_curators`＋`info_*` enum・データモデル §5.33-5.37）＋`janome` 再利用（`info_tokens`/類似度）③frontend `features/info-input`（一覧は**最初からサーバー委譲契約**＝`GET /info-items` の DataTable クエリ・列 flags=backend ホワイトリスト一致）。API は `doc/API設計/N_情報インプット.md`。実装順は `doc/実装計画.md` に位置づけ要（現状未記載）。
 3. **コンセプト機能の設計**（差別化の核・情報インプットと対）＝設計ドラフト `doc/設計ドラフト/コンセプト機能_ISO56002_再設計.md` の実体化（データモデル/API/画面/FR）。`info_link_target=concepts/assumptions`（データモデル §3）と「前提1件=1スレッド」（同ドラフト §3.5）を実体化。
-4. **社内レビュー残**（memory）＝①評価ダイアログのクエスト情報（**既に評価ダイアログの「クエストを確認」で目的・テーマ/カテゴリー/締切を表示＝実装済みの可能性大・要コード裏取り**）②クエスト最終結果（FR-39・SC-12 結果タブ）の残実装有無を裏取り。
+4. **社内レビュー残**（memory）＝①評価ダイアログのクエスト情報＝**実装済みを 2026-09-19 に実機裏取り済み**（「▼ クエストを確認」で目的・テーマ/カテゴリー/締切を表示）＝クローズ。②クエスト最終結果（FR-39・SC-12 結果タブ）の残実装有無を裏取り＝**未着手**。
 5. **SC-12 受信側の通し e2e**（owner がパーティータブで承諾→メンバー化＋バッジ）＝`doc/テスト/カバレッジギャップ.md ［A］` 登録済み。owner＋申請者の2ユーザー（`owner2@acme.example`）。
 6. **（任意）通知 `join_request_received` の applicant_id backfill**＝既存通知（params に applicant_id 無し）はディープリンクせず `/quests/{id}` に落ちる。既存分も直したいなら各通知を ref_quest_id のクエストの pending 申請に紐付けて補填（ヒューリスティック・テストデータ）。
 7. **推奨**＝まとまった実装の前に backend 全体スイートを一度回す。メール系を触ったら mail-worker 再ビルド（§8）。
@@ -108,7 +108,7 @@
 - **red 目視の裏技**＝`-v` マウントは live source を反映するので、production コードを一時改変→pytest→revert で red を再ビルドなしに目視できる（今回 I-TC-161 の red 確認で使用）。
 - **メール反映**＝mail-worker/worker は backend と同イメージだが別プロセス。メールテンプレ/送信ロジックを変えたら `cd impl && docker compose build worker mail-worker && docker compose --profile workers up -d worker mail-worker`。dev 受信箱＝MailHog（http://localhost:8025・API `/api/v2/messages`）。業務通知は `companies.notify_email_enabled`（既定 ON）でゲート・セキュリティ系は常時。
 - **トレーサビリティゲート**＝リポジトリルートで `python3 scripts/check_tc_traceability.py`（コミット前に ✅ 必須）。
-- **seed ログイン**＝会社 `ACME-01`／`user@acme.example`／`Passw0rd!`（一般権限・**非管理者**）。2人目＝`owner2@acme.example`／`Passw0rd!`（一般権限）。MFA 会社＝`ACME-02`／`mfa@acme2.example`。※管理系ダイアログの実機確認には**会社アカウント管理者/システム管理者**アカウントが要る（seed には無い＝dev で付与するか既存管理者を使う）。
+- **seed ログイン**＝会社 `ACME-01`／`user@acme.example`／`Passw0rd!`（一般権限・**非管理者**）。2人目＝`owner2@acme.example`／`Passw0rd!`（一般権限）。MFA 会社＝`ACME-02`／`mfa@acme2.example`。**管理者アカウント（実在・2026-09-19 確認）**＝`kanri@acme.example`（`ACME-01`・**company_account_admin**・自社スコープ／`/admin/accounts`=自社アカウント管理＝グループ作成/編集・アカウント発行/編集・メンバー追加）／`admin@ops.example`（会社コード **OPS**・**system_admin**＝会社作成など横断管理も可）。いずれも `Passw0rd!`。デモデータ再生成＝`python3 impl/backend/scripts/seed_demo.py`（稼働 backend:8000 前提）。
 - **Playwright（実機/モックのスクショ確認）**＝`node_modules/playwright` を CommonJS で `require`（`const {chromium}=require('.../playwright')`）。実機はログイン（`#company_code`/`#login_id`/`#password`→submit）後に対象 URL へ。モーダルはソフト遷移（一覧リンク click）で intercept 表示。
 - **コミット規約**＝末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。受入/レビュー反映は main 直コミット可。コミット/プッシュはユーザー指示があった時のみ。
 - **正本の場所**＝実装現況 `impl/README.md`／実装順 `doc/実装計画.md`／規約 `doc/規約/*`／設計ドラフト `doc/設計ドラフト/*`／テスト台帳 `doc/テスト/*`（backlog＝`カバレッジギャップ.md`・red 証跡＝`red確認台帳.md`）／横断UI標準 `doc/画面設計/デザイン標準.md`（**§4.1 にダイアログ内コンテンツ標準＋フッター使い分け**）。情報インプットの正＝FR-41／データモデル §5.33-5.37／API N／SC-50-52／設計ドラフト。
@@ -120,4 +120,4 @@
 - ✅ テスト＝vitest195・build通過・notifications26・I-TC-159/160/161・traceability✅636 を §4 に明記（**backend 全体は未実行**と明記）。
 - ✅ 詰まり所（余白デグレの二重取り／seed 非管理者でモーダル未到達／frontend 本番ビルドのベイク／timeLabel null）を §5 に記録。
 - ✅ 次アクションを §7 にファイル/関数レベル（情報インプット実装の3手順・コンセプト設計・社内レビュー残の裏取り）で明記。
-- ⚠️ 未確認/注意＝(1) 管理系/評価/振り返り編集ダイアログは自動確認できず＝管理者アカウントで実機受入 (2) 既存 join_request_received 通知は applicant_id 無し＝deep-link しない（新規のみ・backfill は §7-6） (3) **backend 全体スイートは本セッション未実行** (4) 情報インプットは設計のみ・実装ゼロ。
+- ⚠️ 未確認/注意＝(1) ~~管理系/評価/振り返り編集ダイアログ受入~~＝**2026-09-19 完了・崩れ無し**（管理者 seed `kanri@acme`/`admin@ops` は実在＝前記「seed に管理者無し」は訂正済み） (2) 既存 join_request_received 通知は applicant_id 無し＝deep-link しない（新規のみ・backfill は §7-6） (3) **backend 全体スイートは本セッション未実行** (4) 情報インプットは設計のみ・実装ゼロ＝実装前に「設計への追加機能」を入れる方針（§7-2）。
