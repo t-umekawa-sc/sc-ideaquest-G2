@@ -473,10 +473,10 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           />
         </Field>
 
-        {/* 任意項目（登録は投稿ハードルを下げるため閉／編集は既存値があるため開）。開＝枠線で囲む／閉＝上下罫の中央にラベル（.optional）。 */}
-        <details className="optional" open={isEdit}>
+        {/* 任意項目（登録は投稿ハードルを下げるため閉／編集は既存値があるため開）。入力用の折り畳み＝disclosure 標準（枠＋キャレット・白背景・§4.1）。 */}
+        <details className="disclosure" open={isEdit}>
           <summary>任意項目（タイムリミット・利害関係者・備考）</summary>
-          <div className="optional__body">
+          <div className="disclosure__body">
             {/* 任意項目の中も項目ごとに区切る（ユーザー判断）＝タイムリミット/利害関係者は横並びをやめ1行ずつ＋各項目間に仕切り線。 */}
             <Field id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
               <input id="idea_limit" className="input" type="date" value={limit} onChange={(e) => setLimit(e.target.value)} />

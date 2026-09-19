@@ -423,6 +423,20 @@ body.iq-nav-lock { overflow: hidden; }
 .dialog-grid dd { margin: 0; }
 .dialog-close-left { margin-right: auto; }   /* footer の「閉じる」を左端へ（順＝閉じる〔左〕→副→主要〔右〕） */
 
+/* ダイアログ内の折り畳み（disclosure）標準（改定 2026-09-19・デザイン標準 §4.1／見本 mocks/style-guide.html「10c」）。
+   静的な参照ブロックは「囲まない＋薄い仕切り線」だが、折り畳み（=対話的）は枠＋キャレット（▸→▾）が
+   開閉の affordance になるため“枠あり”を標準とする。2系統＝入力用（.disclosure・白）／参照用（.disclosure--ref・背景色あり）。
+   旧 .optional（アイデア任意項目）／.eval-idea（評価の確認）を一本化。 */
+.disclosure { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+/* align-items:flex-start＝summary が長文（例＝参照用の元タイトル併記）で折り返しても caret を先頭行に揃える（中身は1つの span にまとめて自然に折り返す）。 */
+.disclosure > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: flex-start; gap: var(--space-2); }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; flex: 0 0 auto; }
+.disclosure[open] > summary::before { transform: rotate(90deg); }
+.disclosure > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: var(--radius); }
+.disclosure__body { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); }
+.disclosure--ref { background: var(--color-surface-alt); }
+
 /* --- アニメ・モーダル（**CSS のみ**で enter/exit。Modal.tsx が `.show` をトグルする）。CRT 電源ON演出（縦に開く）---
    framer-motion は使わない：静止後も frameloop が毎フレーム合成を触り、半透明バックドロップが Chromium で
    チカつく回帰（DFT-E-012）を招いたため。CSS アニメ/トランジションは再生後に停止し、この問題を起こさない。

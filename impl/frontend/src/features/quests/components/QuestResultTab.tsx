@@ -273,7 +273,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
                     <button type="button" className="btn btn-sm btn-danger" aria-label="指標を削除" onClick={() => setMetrics((ms) => ms.filter((_, j) => j !== i))}>✕</button>
                   </div>
                 ))}
-                <button type="button" className="btn btn-sm btn-outline" style={{ marginTop: "var(--space-2)" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
+                <button type="button" className="btn btn-sm btn-primary" style={{ marginTop: "var(--space-2)" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
               </Field>
               <Field className="dialog-section" id="qr_next" label="次アクション">
                 <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
