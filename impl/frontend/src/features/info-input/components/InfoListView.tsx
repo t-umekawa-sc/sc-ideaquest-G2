@@ -34,6 +34,7 @@ export function InfoListView() {
   const [items, setItems] = useState<InfoItem[]>([]);
   const [status, setStatus] = useState<InfoStatusFilter>("all");
   const [rootsOnly, setRootsOnly] = useState(false);
+  const [fts, setFts] = useState(""); // 全文検索（タイトル＋本文＋要約）＝標準の横断検索/絞込とは別建て（本番は ?q= PGroonga §N）
   const [followMap, setFollowMap] = useState<Record<string, number>>({});
 
   const reload = useCallback(async () => {
@@ -64,8 +65,10 @@ export function InfoListView() {
     let data = active;
     if (status !== "all") data = data.filter((x) => x.status === status);
     if (rootsOnly) data = data.filter((x) => !x.parent_info_id);
+    const q = fts.trim().toLowerCase();
+    if (q) data = data.filter((x) => `${x.title} ${x.summary ?? ""} ${x.body_html.replace(/<[^>]+>/g, " ")}`.toLowerCase().includes(q));
     return data;
-  }, [active, status, rootsOnly]);
+  }, [active, status, rootsOnly, fts]);
 
   const titleById = useCallback((id: string) => items.find((x) => x.id === id)?.title ?? "—", [items]);
 
@@ -104,7 +107,8 @@ export function InfoListView() {
     () => [
       {
         key: "title", label: "タイトル / 要約", locked: true, width: 720, sortable: true, filter: { type: "text" },
-        sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.summary ?? ""} ${r.body_html.replace(/<[^>]+>/g, "")}`,
+        // 標準の横断検索は表示テキスト（タイトル・要約）まで。本文は上部の「全文検索」バー（q）で別建て。
+        sortVal: (r) => r.title, searchVal: (r) => `${r.title} ${r.summary ?? ""}`,
         csvVal: (r) => r.title,
         render: (r) => {
           const fu = followMap[r.id] ?? 0;
@@ -213,6 +217,16 @@ export function InfoListView() {
       <h1 className="page-title">情報インプット</h1>
       <p className="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
+      <div className="info-fts" role="search">
+        <label className="info-fts__label" htmlFor="info-fts-input">🔍 全文検索</label>
+        <div className="info-fts__box">
+          <input id="info-fts-input" className="input" type="search" value={fts} onChange={(e) => setFts(e.target.value)}
+            placeholder="タイトル・本文・要約を横断検索…（例: ガイドライン）" aria-describedby="info-fts-hint" />
+          {fts ? <button type="button" className="info-fts__clear" onClick={() => setFts("")} aria-label="全文検索をクリア">✕</button> : null}
+        </div>
+        <span id="info-fts-hint" className="info-fts__hint">本文テキストまで対象の全文検索（本番は PGroonga <code>?q=</code>）。表の<strong>検索・列フィルタ</strong>は表示項目に対する標準の絞込です。</span>
+      </div>
+
       <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
         <div className="wordcloud__title">☁️ よく出る語</div>
         {WORD_CLOUD.map(([w, c]) => {
@@ -247,8 +261,8 @@ export function InfoListView() {
         unit="件"
         perPage={10}
         perPageOptions={[10, 20, 50]}
-        searchFields="タイトル・本文"
-        searchPlaceholder="タイトル・本文を全文検索…"
+        searchFields="タイトル・要約・作成者"
+        searchPlaceholder="一覧を絞り込み（タイトル・要約・作成者）…"
         exportName="情報インプット"
         emptyText="該当する情報がありません。"
         onRowClick={(r) => router.push(`/info-items/${r.id}`)}
