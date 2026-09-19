@@ -17,7 +17,7 @@
 // ブラウザ戻る/再読込/ブックマークで復元（デザイン標準 §4.5⑨・API設計 README §1.8.1）。URL 名前空間は
 // storageKey なので 1 画面に複数 DataTable があっても衝突しない。SSR ハイドレーション不整合を避けるため
 // localStorage 由来（列/密度/ビュー等）はマウント後に復元（ready フラグ）。
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReadonlyURLSearchParams } from "next/navigation";
@@ -112,6 +112,7 @@ export type DataTableProps<T> = {
   card?: (r: T) => ReactNode; // カード本文（自由）
   cardLayout?: (r: T) => CardLayout; // カード本文（標準構造）
   cardRaw?: (r: T) => ReactNode; // カード外側まで含む完全制御
+  subRow?: (r: T) => ReactNode; // 行の下に全幅の補足行（1レコード2行＝要約等）。null/空で非表示（opt-in）。
 };
 
 const LS = "ideaquest_dt_";
@@ -693,47 +694,60 @@ export function DataTable<T>(props: DataTableProps<T>) {
   function renderRow(r: T, pinnedNow: boolean) {
     const id = String(rowId(r));
     const fxCls = pinFx?.id === id ? (pinFx.kind === "in" ? "dt-pin-anim-in" : "dt-pin-anim-out") : "";
-    const trCls = [clickable ? "dt-row--link" : "", pinnedNow ? "is-pinned" : "", fxCls, props.rowClass?.(r) ?? ""]
+    // subRow（opt-in）＝1レコードを「見出し行＋全幅の補足行」で表示。ピン中は sticky と干渉するため主行のみ。
+    const sub = !pinnedNow ? props.subRow?.(r) : null;
+    const hasSub = sub != null && sub !== false && sub !== "";
+    const trCls = [clickable ? "dt-row--link" : "", pinnedNow ? "is-pinned" : "", fxCls, hasSub ? "has-subrow" : "", props.rowClass?.(r) ?? ""]
       .filter(Boolean)
       .join(" ");
     return (
-      <tr
-        key={id}
-        data-dt-row={id}
-        className={trCls || undefined}
-        tabIndex={clickable ? 0 : undefined}
-        onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
-        onKeyDown={
-          clickable
-            ? (e) => {
-                // 行のキーボード発火（Enter/Space）＝カード表示と同等（デザイン標準 §4.5 F3）。
-                if (e.key !== "Enter" && e.key !== " ") return;
-                if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
-                e.preventDefault();
-                props.onRowClick?.(r);
-              }
-            : undefined
-        }
-      >
-        {visibleCols.map((c, i) => {
-          const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
-            .filter(Boolean)
-            .join(" ");
-          const inner = c.render ? c.render(r) : c.sortVal ? String(c.sortVal(r)) : "";
-          return (
-            <td key={c.key} className={cellCls || undefined}>
-              {i === 0 && pinsEnabled ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  {pinButton(id, pinnedNow, false)}
-                  {inner}
-                </span>
-              ) : (
-                inner
-              )}
-            </td>
-          );
-        })}
-      </tr>
+      <Fragment key={id}>
+        <tr
+          data-dt-row={id}
+          className={trCls || undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
+          onKeyDown={
+            clickable
+              ? (e) => {
+                  // 行のキーボード発火（Enter/Space）＝カード表示と同等（デザイン標準 §4.5 F3）。
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
+                  e.preventDefault();
+                  props.onRowClick?.(r);
+                }
+              : undefined
+          }
+        >
+          {visibleCols.map((c, i) => {
+            const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
+              .filter(Boolean)
+              .join(" ");
+            const inner = c.render ? c.render(r) : c.sortVal ? String(c.sortVal(r)) : "";
+            return (
+              <td key={c.key} className={cellCls || undefined}>
+                {i === 0 && pinsEnabled ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {pinButton(id, pinnedNow, false)}
+                    {inner}
+                  </span>
+                ) : (
+                  inner
+                )}
+              </td>
+            );
+          })}
+        </tr>
+        {hasSub ? (
+          <tr
+            data-dt-row={id}
+            className={["dt-subrow", clickable ? "dt-row--link" : ""].filter(Boolean).join(" ")}
+            onClick={clickable ? (e) => onRowActivate(r, e) : undefined}
+          >
+            <td colSpan={visibleCols.length}>{sub}</td>
+          </tr>
+        ) : null}
+      </Fragment>
     );
   }
 

@@ -27,7 +27,7 @@ test("M-TC-001 global nav drawer opens with items and closes on Esc/backdrop (#1
   await expect(page.locator(".appnav-root.is-open")).toHaveCount(1);
   const drawer = page.locator("#appnav-drawer");
   await expect(drawer.getByRole("menuitem", { name: "ホーム" })).toBeVisible();
-  await expect(drawer.getByRole("menuitem", { name: "クエスト" })).toBeVisible();
+  await expect(drawer.locator('a.appnav__item[href="/quests"]')).toBeVisible(); // 「クエスト」は「クエストを探す」等と名前が部分一致するため href で一意に狙う
   await expect(drawer.getByRole("menuitem", { name: "通知" })).toBeVisible();
   await expect(drawer.getByRole("menuitem", { name: "ショップ" })).toBeVisible();
   await expect(drawer.getByRole("menuitem", { name: "魔法・スキル" })).toBeVisible();

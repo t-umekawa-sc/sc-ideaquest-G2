@@ -15,6 +15,7 @@ const BIZ: NavItem[] = [
   { href: "/", label: "ホーム", icon: "🏠" },
   { href: "/quests", label: "クエスト", icon: "📜" },
   { href: "/quest-catalog", label: "クエストを探す", icon: "🔎" },
+  { href: "/info-items", label: "情報インプット", icon: "🧭" },
   { href: "/notifications", label: "通知", icon: "🔔" },
 ];
 const GAME: NavItem[] = [

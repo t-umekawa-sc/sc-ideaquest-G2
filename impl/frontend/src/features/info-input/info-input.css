@@ -1,0 +1,21 @@
+/* SC-50 情報インプット固有スタイル（正＝doc/画面設計/mocks/SC-50_情報インプット.html）。
+   共通クラス（.badge / .segmented / .idea-filter__n / .cell-tags / .cell-clip / dt-card 系 / .checkbox / .backlink）は design-system.css。 */
+.info-page { }
+.info-page .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+.info-page .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+
+/* ワードクラウド（一覧上部・語頻度の可視化） */
+.info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
+  padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
+.info-page .wordcloud__title { width: 100%; font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
+.wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); }
+
+/* 状態・影響のバッジ色 */
+.st-raw { background: var(--color-surface-alt); color: var(--color-text-muted); }
+.st-curated { background: var(--color-agree-bg); color: var(--color-success); }
+.st-archived { background: var(--color-disagree-bg); color: var(--color-text-muted); }
+.ic-opportunity { background: var(--color-agree-bg); color: var(--color-success); }
+.ic-threat { background: var(--color-disagree-bg); color: var(--color-danger); }
+.ic-other { background: var(--color-surface-alt); color: var(--color-text-muted); }
+
+.thread-badge { color: var(--color-text-muted); font-size: var(--text-xs); }
