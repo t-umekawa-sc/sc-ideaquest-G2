@@ -1723,10 +1723,12 @@ th.dt-sortable.is-locked-sort .dt-sort-ind { opacity: .3; }
 /* クリック可の行＝ホバーで指カーソル＋薄い背景（§4.5 ⑪ クリックの標準挙動）。固定行は自前背景を優先。 */
 .table tr.dt-row--link { cursor: pointer; }
 .table tr.dt-row--link:hover:not(.is-pinned) td { background: var(--color-surface-alt); }
-/* フォーカス＝キーボード時のみリング表示。マウス/プログラム復帰（URLモーダルを行から開き閉じてフォーカスが
-   行へ戻る時）に UA 既定の黒アウトラインが出る不具合を防ぐ＝:focus は消し :focus-visible だけ primary リング。 */
-.table tr.dt-row--link:focus { outline: none; }
-.table tr.dt-row--link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+/* フォーカスは「線（アウトライン枠）」を出さない＝URLモーダルを行から開き閉じてフォーカスが行へ戻った時に
+   黒/青の枠が残るのを防ぐ。キーボード操作（:focus-visible）だけ hover と同じ淡い背景で位置を示す（a11y）。
+   マウス操作時は :focus-visible が立たず何も出ない。 */
+.table tr.dt-row--link:focus,
+.table tr.dt-row--link:focus-visible { outline: none; }
+.table tr.dt-row--link:focus-visible:not(.is-pinned) td { background: var(--color-surface-alt); }
 
 /* DataTable サブ行（props.subRow）＝1レコードを「見出し行＋全幅の補足行」で2行表示。主行↔サブ行の間には罫線を引かない。 */
 .table tr.has-subrow > td { border-bottom: 0; }
