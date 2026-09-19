@@ -56,6 +56,7 @@ export interface InfoInput {
   triaged_on?: string | null;
   triage?: string | null;
   triage_reason?: string | null;
+  due_date?: string | null;
   links?: InfoLink[];
 }
 
@@ -73,7 +74,7 @@ export function createInfoItem(input: InfoInput): InfoItem {
     body_html: input.body_html,
     summary: input.summary ?? "",
     source_url: input.source_url ?? "",
-    due_date: null,
+    due_date: input.due_date ?? null,
     status: isCurated(input) ? "curated" : "raw",
     priority: input.priority ?? null,
     source: input.source ?? null,
@@ -105,7 +106,7 @@ export function updateInfoItem(id: string, input: InfoInput): InfoItem | undefin
     classification: input.classification ?? null, scope: input.scope ?? null, target_business: input.target_business ?? null,
     categories: input.categories ?? [], impact_level: input.impact_level ?? null, impact_class: input.impact_class ?? null,
     impact_timing: input.impact_timing ?? null, triaged_on: input.triaged_on ?? null, triage: input.triage ?? null,
-    triage_reason: input.triage_reason ?? null, links: (input.links ?? item.links).map((l) => clone(l)),
+    triage_reason: input.triage_reason ?? null, due_date: input.due_date ?? null, links: (input.links ?? item.links).map((l) => clone(l)),
     status: isCurated(input) ? "curated" : item.status,
   });
   emit();

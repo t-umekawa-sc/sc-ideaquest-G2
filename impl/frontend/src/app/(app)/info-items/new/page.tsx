@@ -1,16 +1,13 @@
-// 情報の登録（暫定・次の実装増分で SC-51 登録モーダル＋本フォームに置換）。
-import Link from "next/link";
+// SC-51 情報の登録（フルページ＝直アクセス/リロード）。一覧「＋ 新規登録」・詳細「続報を登録」からの
+// ソフト遷移は @modal intercept。?parent=<id> 指定時は続報として親を引き継ぐ。
 import { redirect } from "next/navigation";
 
+import { InfoFormModal } from "@/features/info-input";
 import { getServerSession } from "@/lib/session";
 
-export default async function InfoNewPage() {
+export default async function InfoNewPage({ searchParams }: { searchParams: Promise<{ parent?: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return (
-    <main className="container" style={{ paddingBlock: "var(--space-6)" }}>
-      <Link className="backlink" href="/info-items">← 情報インプットへ戻る</Link>
-      <p className="muted" style={{ marginTop: "var(--space-4)" }}>登録ダイアログ（SC-51）は次の実装増分で作成します。モック＝<code>doc/画面設計/mocks/SC-50_情報インプット.html</code>。</p>
-    </main>
-  );
+  const { parent } = await searchParams;
+  return <InfoFormModal mode="new" parentId={parent} standalone />;
 }

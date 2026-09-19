@@ -1,16 +1,13 @@
-// 情報の編集（暫定・次の実装増分で SC-51 編集モーダル/フルページに置換）。
-import Link from "next/link";
+// SC-51 情報の編集（フルページ＝直アクセス/リロード）。一覧アクションメニュー「編集」からの
+// ソフト遷移は @modal intercept。中身は InfoFormModal（編集モード）共通。
 import { redirect } from "next/navigation";
 
+import { InfoFormModal } from "@/features/info-input";
 import { getServerSession } from "@/lib/session";
 
-export default async function InfoEditPage() {
+export default async function InfoEditPage({ params }: { params: Promise<{ infoId: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return (
-    <main className="container" style={{ paddingBlock: "var(--space-6)" }}>
-      <Link className="backlink" href="/info-items">← 情報インプットへ戻る</Link>
-      <p className="muted" style={{ marginTop: "var(--space-4)" }}>編集ダイアログ（SC-51）は次の実装増分で作成します。モック＝<code>doc/画面設計/mocks/SC-50_情報インプット.html</code>。</p>
-    </main>
-  );
+  const { infoId } = await params;
+  return <InfoFormModal mode="edit" infoId={infoId} standalone />;
 }
