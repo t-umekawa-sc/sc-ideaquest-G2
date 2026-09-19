@@ -80,3 +80,6 @@
 .attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
 .attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: var(--radius-sm); }
 .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+
+/* デモ注記（この情報からクエスト作成＝実装は SC-11 本フォーム＋API C の説明帯） */
+.field-note { margin-top: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }

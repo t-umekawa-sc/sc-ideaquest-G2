@@ -116,7 +116,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">この情報から（機会特定→行動）</div>
-          <button className="btn btn-primary" type="button" onClick={() => go(`/quests/new?from_info=${r.id}`)}>＋ この情報からクエストを作成</button>
+          <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
           <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
         </div>
 
