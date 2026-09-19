@@ -24,9 +24,10 @@
 
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `GET /info-items` | 情報一覧（会社横断の知識プール） | クエリ: `q`（title/body 全文＝PGroonga §1.11）／`status`（`raw\|curated\|archived`・既定は `archived` 除外）／分類フィルタ（多値可）＝`priority`/`source`/`classification`/`scope`/`target_business`/`impact_class`/`impact_level`/`impact_timing`/`triage`／`category`（#8・多値）／`sort`（`-created_at`〔新着〕/`priority`/`-impact_level`/`due_date`）／`limit`/`cursor`。**DataTable 契約（§1.8.1）**＝列 flags は backend ホワイトリスト一致・カーソル型・`?format=csv`/`?pin_ids=` 対応 | `data`=情報カード配列（`id`/`title`/`status`/`priority`/`impact_class`/`categories[]`/`source`/`source_url`/`due_date`/`created_by`/`created_at`＋`link_count`）。`page_info.{next_cursor,has_next}` |
-| `GET /info-items/{id}` | 情報詳細（全属性＋カテゴリ＋関連リンク） | パス: `info_id` | 全属性（§5.33）＋`categories[]`（#8）＋`links[]`（`id`/`target_type`/`target_id`/`target_title`/`kind`/`origin`/`score`/`rejected`）＋`tokens_top[]`（ワードクラウド上位）＋`can`（編集/判定/アーカイブ可否＝サーバー算出） |
-| `GET /info-items/word-cloud` | ワードクラウド（トークン頻度集計・§5.36） | クエリ: 上記の分類フィルタ（絞り込み後の集計）／`limit`（上位語数） | `tokens[]`（`token`/`count`/`weight`）。会社全体 or 絞り込み範囲 |
+| `GET /info-items` | 情報一覧（会社横断の知識プール） | クエリ: `q`（title/body_text 全文＝PGroonga §1.11・平文を索引）／`status`（`raw\|curated\|archived`・既定は `archived` 除外）／分類フィルタ（多値可）＝`priority`/`source`/`classification`/`scope`/`target_business`/`impact_class`/`impact_level`/`impact_timing`/`triage`／`category`（#8・多値）／`roots_only`（続報を束ねて根のみ表示・§12-1）／`sort`（`-created_at`〔新着〕/`priority`/`-impact_level`/`due_date`）／`limit`/`cursor`。**DataTable 契約（§1.8.1）**＝列 flags は backend ホワイトリスト一致・カーソル型・`?format=csv`/`?pin_ids=` 対応 | `data`=情報カード配列（`id`/`title`/`summary`〔一覧の抜粋・§12-3〕/`status`/`priority`/`impact_class`/`categories[]`/`source`/`source_url`/`due_date`/`created_by`/`created_at`＋`link_count`＋`parent_info_id`/`follow_up_count`〔続報スレッド・§12-1〕）。`page_info.{next_cursor,has_next}` |
+| `GET /info-items/{id}` | 情報詳細（全属性＋カテゴリ＋関連リンク＋続報スレッド） | パス: `info_id` | 全属性（§5.33・`body_html`〔サニタイズ済リッチ〕/`summary`）＋`categories[]`（#8）＋`links[]`（`id`/`target_type`/`target_id`/`target_title`/`kind`/`origin`/`score`/`rejected`）＋`tokens_top[]`（ワードクラウド上位）＋`thread`（`parent`〔続報元・あれば〕/`follow_ups[]`〔続報・時系列・§12-1〕）＋`can`（編集/判定/アーカイブ/続報登録の可否＝サーバー算出） |
+| `GET /info-items/word-cloud` | ワードクラウド（保存済みトークン頻度集計・§5.36） | クエリ: 上記の分類フィルタ（絞り込み後の集計）／`limit`（上位語数） | `tokens[]`（`token`/`count`/`weight`）。会社全体 or 絞り込み範囲 |
+| `POST /info-items/word-cloud-preview` | **入力ダイアログ内プレビュー**（草稿本文の同期トークン化・§12-2） | ボディ: `body_html`（草稿・サニタイズ後の平文抽出で janome）／`limit` | `tokens[]`（`token`/`count`）。**永続しない ephemeral**＝保存前の可視化用（トリガ＝本文 blur/ボタン） |
 
 - **成果物→関連情報パネル**（動的リンクの表示）は各ドメインに委譲＝`GET /ideas/{id}/related-info`（D）・`GET /quests/{id}/related-info`（C）・`GET /concepts/{id}/related-info`（コンセプト段）。一致度上位 N＋`kind` バッジ／`rejected` は除外。**別個の横断 EP を N に増やさない**（成果物側の read として実装・I ダッシュボード §I.3 と同方針）。
 
@@ -34,8 +35,9 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `POST /info-items` | 低摩擦登録（全ユーザー） | ボディ: `title`（必須）・`body?`・`source_url?`（http/https のみ＝422 `invalid_url`）。ヘッダ `Idempotency-Key`（§1.9） | 作成した情報（`status=raw`）。保存時に `info_tokens` 再生成＋類似度で **auto `info_links`（既定 `kind=related`）**を生成（§N.6） |
-| `PATCH /info-items/{id}` | 属性付与・編集 | ボディ（部分更新）＝raw の本人＝`title`/`body`/`source_url` のみ／`info_curator`＝全属性（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_level`/`impact_class`/`impact_timing`/`triaged_on`/`triage`/`triage_reason`＋`categories[]`〔#8 全置換〕）。curated 属性を付けると `status=raw→curated` | 更新後の情報。`body`/`title` 変更時は `info_tokens`＋関連 `score` を再計算（§N.6） |
+| `POST /info-items` | 低摩擦登録（全ユーザー）／**続報登録** | ボディ: `title`（必須）・`body_html?`（リッチ＝保存時に nh3 サニタイズ・§N.7）・`source_url?`（http/https のみ＝422 `invalid_url`）・`parent_info_id?`（**続報＝§12-1**）。ヘッダ `Idempotency-Key`（§1.9） | 作成した情報（`status=raw`）。保存時に **`body_html` サニタイズ→`body_text` 派生→`info_tokens` 再生成→抽出要約 `summary` 生成（すべて同期・§12-2/12-3）**＋類似度で auto `info_links`（既定 `kind=related`）を生成（§N.6）。**`parent_info_id` 指定時は親の未棄却 `info_links` を `origin=auto` でスナップショット複製**（§12-1） |
+| `POST /info-items/images` | **貼付画像の再ホスト**（リッチテキスト・§12-4） | multipart: `file`（画像・マジックバイト検証＝§1.10/§N.7）。エディタの paste ハンドラが blob を送る | `{ url }`＝自社ホスト（MinIO）署名 URL。エディタが `img src` をこの URL に置換（外部参照を持ち込まない） |
+| `PATCH /info-items/{id}` | 属性付与・編集 | ボディ（部分更新）＝raw の本人＝`title`/`body_html`/`source_url` のみ／`info_curator`＝全属性（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_level`/`impact_class`/`impact_timing`/`triaged_on`/`triage`/`triage_reason`＋`categories[]`〔#8 全置換〕）。curated 属性を付けると `status=raw→curated` | 更新後の情報。`body_html`/`title` 変更時は **サニタイズ→`body_text` 派生→`info_tokens`→要約 `summary` 再生成→関連 `score` 再計算**（同期・§N.6・§12-3） |
 | `POST /info-items/{id}/archive` | アーカイブ（論理削除） | — | `status=archived`＋`archived_at`。**`info_curator` のみ**・物理削除なし（監査保持） |
 | `POST /info-items/{id}/unarchive` | アーカイブ解除 | — | `status` を curated（or raw）へ戻す。`info_curator` のみ |
 | `DELETE /info-items/{id}` | 削除（本人の未判定のみ） | — | **`status=raw` かつ登録者本人**のみ物理削除可（casual 登録の取消）。curated 済みは 409 `invalid_state`（→ archive を使う） |
@@ -70,7 +72,8 @@
 
 ## N.6 類似度・ワードクラウド（派生・内部処理）
 
-- **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。ストップワード除去→`info_tokens`（§5.36）。
+- **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。**`body_text`（平文）**をストップワード除去→`info_tokens`（§5.36）。**保存時に同期**（単一情報は軽量＝バックグラウンド不要・§12-2）。一覧ワードクラウド＝保存済みトークンの集計／入力ダイアログのプレビュー＝`POST /info-items/word-cloud-preview`（草稿を同期トークン化・永続しない）。
+- **要約＝抽出型 `summarize_text`（`app/tenant/quests/summarize.py`・janome・オフライン・無料・決定的）を再利用**（§12-3）。`body_text` から**保存時に同期生成**し `summary` へ。外部送信ゼロ＝内部情報でも privacy 問題なし。LLM 生成は将来 seam（`summarize_text` 差替え・要約用途は `claude-haiku-4-5` 適・内部データ外部送信ポリシーは Phase2）。
 - **一致度（類似度）**＝情報本文と アイデア/コンセプト本文の**キーワード重なり／TF-IDF**。**閾値＋上位 N**。**事前計算して `info_links.score` に保存**（都度計算しない・§5.35）。
 - **再計算トリガ**＝情報の追加/更新（`POST`/`PATCH /info-items`）／アイデア・コンセプトの保存（D/コンセプト段）。auto リンクは upsert（既定 `kind=related`・人が変えた種別は保持）。
 - **反証の揺さぶり**＝`info_links.kind=refuting`（manual）への遷移で post-commit＝対象成果物の作成者＋評価者へ H 通知（`notification_type` は要追加検討＝`idea_updated` 相当 or 新設）＋「要再評価」フラグ（コンセプト機能 §3.5）。1 情報の反証 → 1 前提 → 複数コンセプトへ波及。
@@ -79,7 +82,9 @@
 ## N.7 エラー・セキュリティ
 
 - **SSRF＝対象外**（サーバフェッチ無し・手動貼付のみ）。
-- **`source_url` は http/https のみ**（それ以外は 422 `invalid_url`）。**本文は表示時サニタイズ**（XSS・コーディング規約 §2.2・[セキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)）。
+- **`source_url` は http/https のみ**（それ以外は 422 `invalid_url`）。
+- **リッチテキストのサニタイズ（最重要・§12-4）**＝`body_html` は**保存時＋表示時に許可リスト方式で無害化**（`nh3`〔Rust製〕推奨・新規依存）。許可タグ例＝p/br/h1-3/strong/em/ul/ol/li/a(href http(s))/blockquote/code/table 系/img（**自社ホスト src のみ**）。on* 属性・style・script・`javascript:` は全弾き。派生 `body_text` は平文（表示は素の HTML でなくサニタイズ済 `body_html`）。（XSS・コーディング規約 §2.2・[セキュリティ対策一覧](../WEBアプリ開発時のセキュリティ対策一覧.md)）。
+- **画像＝MinIO 再ホスト**（§12-4）＝`POST /info-items/images` で自社ホストへアップロード（マジックバイト検証＝§1.10）。外部 `img src` はサニタイズで除去/再ホスト（許可 src は自社ホストのみ＝トラッキング/referer 漏れ防止）。
 - **削除ガード**＝curated 済みの物理削除は 409 `invalid_state`（archive を使う）。
 - **著作権/PII**＝外部本文の保存・保持期間の方針は運用で定める（出典 URL 明記で引用性・トレーサビリティ）。
 - **テナント分離**＝会社DB（会社横断の知識プール・他テナント参照不可＝404）。
@@ -92,5 +97,5 @@
 
 ## N.9 MVP 境界・Phase2
 
-- **MVP**＝手動貼付＋属性（低摩擦=全ユーザー／curated=`info_curator`）／キーワード類似の**自動リンク（既定=related）**／手動種別変更＋手動追加/棄却／**反証→通知＋要再評価（per-link）**／XSS・URL 検証／ワードクラウド。
-- **Phase2**＝埋め込み類似・矛盾の自動検出・LLM 支援・enum の会社ごと拡張（#7/#8）・重複統合（MVP は同一 URL 警告のみ）。
+- **MVP**＝手動貼付＋属性（低摩擦=全ユーザー／curated=`info_curator`）／キーワード類似の**自動リンク（既定=related）**／手動種別変更＋手動追加/棄却／**反証→通知＋要再評価（per-link）**／XSS・URL 検証／ワードクラウド。**＋2026-09-19 追加（§12）**＝続報（`parent_info_id`・親リンクをスナップショット複製）／ワードクラウド同期化＋ダイアログ内プレビュー（`POST /info-items/word-cloud-preview`）／要約（抽出型 `summarize_text` を保存時同期生成）／リッチテキスト（`body_html`+`body_text`・nh3 サニタイズ・画像 `POST /info-items/images` で MinIO 再ホスト）。
+- **Phase2**＝埋め込み類似・矛盾の自動検出・**LLM 生成要約**（`summarize_text` 差替え・内部データ外部送信ポリシー要）・enum の会社ごと拡張（#7/#8）・重複統合（MVP は同一 URL 警告のみ）。
