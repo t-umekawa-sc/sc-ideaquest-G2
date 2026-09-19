@@ -544,6 +544,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
   function onRowActivate(r: T, e: React.MouseEvent | React.KeyboardEvent) {
     if ((e.target as HTMLElement).closest("a,button,input,select,label")) return;
     props.onRowClick?.(r);
+    // マウスクリックでの主アクション後は行にフォーカスを残さない＝URLモーダル（行→詳細）を閉じた後に
+    // クリック行の :focus-visible 背景が居座るのを防ぐ。キーボード発火は onKeyDown 側の別経路で処理する
+    // ため本 blur の影響を受けず、フォーカス可視は維持される。
+    const el = e.currentTarget as HTMLElement | null;
+    el?.blur?.();
   }
 
   function startResize(key: string, e: React.PointerEvent) {
