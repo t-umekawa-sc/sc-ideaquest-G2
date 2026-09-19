@@ -13,16 +13,28 @@
   .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
   .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
 
-  /* 全文検索バー（タイトル＋本文＋要約・標準の横断検索/列フィルタとは別建て・本番は ?q= PGroonga） */
-  .info-fts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-bottom: var(--space-4); }
-  .info-fts__label { font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }
-  .info-fts__box { position: relative; }
-  .info-fts__box .input { width: 100%; padding-right: 36px; }
-  .info-fts__clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer;
-    color: var(--color-text-muted); font-size: 14px; line-height: 1; padding: 6px; border-radius: var(--radius-sm); }
-  .info-fts__clear:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
-  .info-fts__hint { grid-column: 2; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
-  @media (max-width: 640px) { .info-fts { grid-template-columns: 1fr; } .info-fts__hint { grid-column: 1; } }
+  /* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁。 */
+  .tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border); margin: var(--space-4) 0 var(--space-5);
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
+    padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
+  .tab:hover { color: var(--color-text); }
+  .tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 700; }
+  .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-soft); border-radius: var(--radius-sm); }
+  .tab-count { font-size: var(--text-xs); background: var(--color-surface-alt); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 0 8px; }
+  .tab.is-active .tab-count { background: var(--color-primary-soft); color: var(--color-primary-active); }
+  .tab-panel[hidden] { display: none; }
+
+  /* 全文検索（タイトル＋本文＋要約・SC-12 と同じ結果表示）。本番は GET /info-items?q= の PGroonga。 */
+  #ftq { width: 360px; max-width: 100%; }
+  .ft-result { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, border-color .15s, transform .05s; }
+  .ft-result:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
+  .ft-result:active { transform: translateY(1px); }
+  .ft-result__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+  .ft-result__ctx { font-size: var(--text-sm); font-weight: 600; }
+  .ft-result__snippet { margin: 0; font-size: var(--text-sm); line-height: 1.7; }
+  mark { background: #FEF08A; color: inherit; padding: 0 1px; border-radius: 2px; }
 
   /* ワードクラウド（一覧上部＝現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む） */
   .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
@@ -141,40 +153,57 @@
   <h1 class="page-title">情報インプット</h1>
   <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
-  <!-- 全文検索（タイトル＋本文＋要約）＝差別化の核。表の標準の横断検索/列フィルタとは別建て（本番は GET /info-items?q= の PGroonga 全文検索）。 -->
-  <div class="info-fts" role="search">
-    <label class="info-fts__label" for="ftsInput">🔍 全文検索</label>
-    <div class="info-fts__box">
-      <input id="ftsInput" class="input" type="search" placeholder="タイトル・本文・要約を横断検索…（例: ガイドライン）" aria-describedby="ftsHint">
-      <button type="button" class="info-fts__clear" id="ftsClear" aria-label="全文検索をクリア" hidden>✕</button>
+  <!-- タブ＝クエスト SC-12 と同じ体裁（情報インプット＝一覧／全文検索）。全文検索の結果表示も SC-12 に揃える。 -->
+  <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
+    <button class="tab is-active" role="tab" id="tabListBtn" aria-controls="panelList" aria-selected="true" data-tab="list">🧭 情報インプット<span class="tab-count" id="tabListCount">0</span></button>
+    <button class="tab" role="tab" id="tabSearchBtn" aria-controls="panelSearch" aria-selected="false" data-tab="search">🔍 全文検索<span class="tab-count" id="tabSearchCount" hidden>0</span></button>
+  </div>
+
+  <!-- 情報インプットタブ＝一覧（ワードクラウド＋状態タブ＋DataTable） -->
+  <div class="tab-panel" id="panelList" role="tabpanel" aria-labelledby="tabListBtn">
+    <!-- ワードクラウド（現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む・GET /info-items/word-cloud） -->
+    <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
+      <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
     </div>
-    <span id="ftsHint" class="info-fts__hint">本文テキストまで対象の全文検索（本番は PGroonga <code>?q=</code>）。表の<strong>検索・列フィルタ</strong>は表示項目に対する標準の絞込です。</span>
-  </div>
 
-  <!-- ワードクラウド（現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む・GET /info-items/word-cloud） -->
-  <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
-    <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
-  </div>
-
-  <div class="section-head">
-    <h2>情報一覧</h2>
-    <div style="display:flex;gap:var(--space-2);align-items:center">
-      <label class="checkbox" style="font-size:var(--text-sm)"><input type="checkbox" id="rootsOnly"><span>続報を束ねる</span></label>
-      <button class="btn btn-primary" type="button" id="newInfo">＋ 情報を登録</button>
+    <div class="section-head">
+      <h2>情報一覧</h2>
+      <div style="display:flex;gap:var(--space-2);align-items:center">
+        <label class="checkbox" style="font-size:var(--text-sm)"><input type="checkbox" id="rootsOnly"><span>続報を束ねる</span></label>
+        <button class="btn btn-primary" type="button" id="newInfo">＋ 情報を登録</button>
+      </div>
     </div>
-  </div>
-  <!-- 判定状態のモード切替（すべて/未判定/判定済）＝クエストのアイデア一覧のような状態タブ。DataTable の絞込とは別の主要導線。 -->
-  <div class="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" id="statusSeg" style="margin-bottom:var(--space-3)">
-    <label><input type="radio" name="info-status" value="all" checked>すべて <span class="idea-filter__n" id="cntAll">0</span></label>
-    <label><input type="radio" name="info-status" value="raw">未判定 <span class="idea-filter__n" id="cntRaw">0</span></label>
-    <label><input type="radio" name="info-status" value="curated">判定済 <span class="idea-filter__n" id="cntCurated">0</span></label>
-  </div>
-  <!-- 一覧操作標準（DataTable＝検索/ソート/絞込/番号ページャ/列幅/表示・並べ替え/CSV/密度/行固定/カード）。サーバー委譲契約（§4.1）。 -->
-  <div id="infoTable"></div>
+    <!-- 判定状態のモード切替（すべて/未判定/判定済）＝クエストのアイデア一覧のような状態タブ。DataTable の絞込とは別の主要導線。 -->
+    <div class="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" id="statusSeg" style="margin-bottom:var(--space-3)">
+      <label><input type="radio" name="info-status" value="all" checked>すべて <span class="idea-filter__n" id="cntAll">0</span></label>
+      <label><input type="radio" name="info-status" value="raw">未判定 <span class="idea-filter__n" id="cntRaw">0</span></label>
+      <label><input type="radio" name="info-status" value="curated">判定済 <span class="idea-filter__n" id="cntCurated">0</span></label>
+    </div>
+    <!-- 一覧操作標準（DataTable＝検索/ソート/絞込/番号ページャ/列幅/表示・並べ替え/CSV/密度/行固定/カード）。サーバー委譲契約（§4.1）。標準の横断検索は表示項目のみ（本文は全文検索タブ）。 -->
+    <div id="infoTable"></div>
 
-  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-    低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>優先度・情報ソース・各分類・影響評価（環境スキャン）・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。本文は<strong>リッチテキスト</strong>で貼付でき（保存時＋表示時にサニタイズ）、貼付画像は自社ストレージに再ホストします。<strong>続報</strong>は元情報に紐づけて時系列で追え、<strong>要約</strong>で長文を読まずに選別できます。
-  </p>
+    <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+      低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>優先度・情報ソース・各分類・影響評価（環境スキャン）・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。本文は<strong>リッチテキスト</strong>で貼付でき（保存時＋表示時にサニタイズ）、貼付画像は自社ストレージに再ホストします。<strong>続報</strong>は元情報に紐づけて時系列で追え、<strong>要約</strong>で長文を読まずに選別できます。
+    </p>
+  </div>
+
+  <!-- 全文検索タブ＝クエスト SC-12 と同じ（入力＋対象セレクト＋件数＋結果カード・ハイライトスニペット）。タイトル＋本文＋要約が対象（本番 GET /info-items?q= PGroonga）。 -->
+  <div class="tab-panel" id="panelSearch" role="tabpanel" aria-labelledby="tabSearchBtn" hidden>
+    <p class="admin-sub" style="margin-top:0"><strong>タイトル・本文・要約</strong>を対象とした全文検索（本番は PGroonga <code>?q=</code>）。一覧タブの検索・列フィルタは<strong>表示項目に対する標準の絞込</strong>です。</p>
+    <div class="list-toolbar">
+      <div class="filters">
+        <input id="ftq" class="input" type="search" placeholder="キーワードで全文検索（例: ガイドライン）" aria-label="全文検索">
+        <select id="ftScope" class="select" style="width:auto" aria-label="検索対象">
+          <option value="">対象: すべて</option>
+          <option value="title">タイトル</option>
+          <option value="body">本文</option>
+          <option value="summary">要約</option>
+        </select>
+      </div>
+      <span class="list-count" id="ftCount" hidden></span>
+    </div>
+    <div id="ftResults"></div>
+  </div>
 </main>
 
 <!-- ===== SC-51 情報 登録・編集モーダル ===== -->
@@ -461,20 +490,19 @@
       { key: '_actions', label: '', actions: true, locked: true, width: 80, render: actionsCell },
     ],
   });
-  // 判定状態モード（すべて/未判定=raw/判定済=curated）＋続報束ね＋全文検索(fts)を合成して表示データを算出。
-  let infoFilter = { status: 'all', rootsOnly: false, fts: '' };
+  // 判定状態モード（すべて/未判定=raw/判定済=curated）＋続報束ねを合成して表示データを算出（全文検索は別タブ）。
+  let infoFilter = { status: 'all', rootsOnly: false };
   function updateStatusCounts() {
     const active = INFO.filter(x => x.status !== 'archived');   // 件数は状態タブごとの総数（他フィルタに依存しない＝クエストのアイデア一覧と同方針）
     document.getElementById('cntAll').textContent = active.length;
     document.getElementById('cntRaw').textContent = active.filter(x => x.status === 'raw').length;
     document.getElementById('cntCurated').textContent = active.filter(x => x.status === 'curated').length;
+    document.getElementById('tabListCount').textContent = active.length;
   }
   function applyInfoFilter() {
     let data = INFO.filter(x => x.status !== 'archived');   // 一覧の既定＝アーカイブ除外
     if (infoFilter.status !== 'all') data = data.filter(x => x.status === infoFilter.status);
     if (infoFilter.rootsOnly) data = data.filter(x => !x.parent);
-    const q = infoFilter.fts.trim().toLowerCase();          // 全文検索＝タイトル＋本文＋要約（本番は ?q= PGroonga）
-    if (q) data = data.filter(x => (x.title + ' ' + (x.summary || '') + ' ' + x.body_html.replace(/<[^>]+>/g, ' ')).toLowerCase().includes(q));
     dt.setData(data);
     updateStatusCounts();
   }
@@ -488,18 +516,71 @@
   document.getElementById('rootsOnly').addEventListener('change', (e) => {
     infoFilter.rootsOnly = e.target.checked; applyInfoFilter();
   });
-  // 全文検索（タイトル＋本文＋要約）＝標準の横断検索/列フィルタとは別建て（本番は GET /info-items?q= PGroonga）。
-  const ftsInput = document.getElementById('ftsInput');
-  const ftsClear = document.getElementById('ftsClear');
-  ftsInput.addEventListener('input', (e) => {
-    infoFilter.fts = e.target.value;
-    ftsClear.hidden = !e.target.value;
-    applyInfoFilter();
-  });
-  ftsClear.addEventListener('click', () => {
-    ftsInput.value = ''; infoFilter.fts = ''; ftsClear.hidden = true; applyInfoFilter(); ftsInput.focus();
-  });
   updateStatusCounts();   // 初期表示の件数
+
+  // ---- タブ切替（情報インプット＝一覧／全文検索）＝クエスト SC-12 と同じ体裁 ----
+  const panels = { list: document.getElementById('panelList'), search: document.getElementById('panelSearch') };
+  document.querySelectorAll('.tabs .tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.tab;
+      document.querySelectorAll('.tabs .tab').forEach(b => { const on = b === btn; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      Object.entries(panels).forEach(([k, el]) => { el.hidden = k !== key; });
+      if (key === 'search') document.getElementById('ftq').focus();
+    });
+  });
+
+  // ---- 全文検索（タイトル＋本文＋要約・SC-12 と同じ結果表示。本番は GET /info-items?q= PGroonga） ----
+  const escapeHtml = (s) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const plainBody = (r) => r.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  function snippetHtml(text, q, span = 140) {
+    if (!text) return '';
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    let start = 0, body = text;
+    if (idx >= 0) { start = Math.max(0, idx - 40); body = text.slice(start, start + span); }
+    else { body = text.slice(0, span); }
+    const pre = start > 0 ? '…' : '', suf = start + span < text.length ? '…' : '';
+    const safe = escapeHtml(body).replace(new RegExp('(' + escapeRe(escapeHtml(q)) + ')', 'ig'), '<mark>$1</mark>');
+    return pre + safe + suf;
+  }
+  const ftq = document.getElementById('ftq');
+  const ftScope = document.getElementById('ftScope');
+  const ftCount = document.getElementById('ftCount');
+  const ftResults = document.getElementById('ftResults');
+  const tabSearchCount = document.getElementById('tabSearchCount');
+  function fieldsFor(r, scope) {
+    if (scope === 'title') return [['タイトル', r.title]];
+    if (scope === 'body') return [['本文', plainBody(r)]];
+    if (scope === 'summary') return [['要約', r.summary || '']];
+    return [['タイトル', r.title], ['要約', r.summary || ''], ['本文', plainBody(r)]];
+  }
+  function renderFt() {
+    const q = ftq.value.trim();
+    const active = INFO.filter(x => x.status !== 'archived');
+    if (!q) {
+      tabSearchCount.hidden = true; ftCount.hidden = true;
+      ftResults.innerHTML = '<div class="list-empty">キーワードを入力してください（会社横断の情報のタイトル・本文・要約を全文検索します）。</div>';
+      return;
+    }
+    const scope = ftScope.value, ql = q.toLowerCase();
+    const hits = active.map(r => {
+      const hit = fieldsFor(r, scope).find(([, v]) => v.toLowerCase().includes(ql));
+      return hit ? { r, field: hit[0], text: hit[1] } : null;
+    }).filter(Boolean);
+    tabSearchCount.hidden = false; tabSearchCount.textContent = hits.length;
+    ftCount.hidden = false; ftCount.textContent = hits.length + ' 件';
+    if (!hits.length) { ftResults.innerHTML = '<div class="list-empty">「' + escapeHtml(q) + '」に一致する結果がありません。</div>'; return; }
+    ftResults.innerHTML = '<div class="stack">' + hits.map(({ r, field, text }) => {
+      const impact = r.impactClass ? '<span class="badge ' + L.impactClass[r.impactClass][1] + '">' + L.impactClass[r.impactClass][0] + '</span>' : '';
+      return '<a class="card card-accent ft-result" href="#" data-open="' + r.id + '">'
+        + '<div class="ft-result__head"><span class="badge ' + L.status[r.status][1] + '">' + L.status[r.status][0] + '</span>' + impact + '<span class="ft-result__ctx">' + escapeHtml(r.title) + '</span></div>'
+        + '<p class="ft-result__snippet"><span class="muted" style="margin-right:6px">' + field + '</span>' + snippetHtml(text, q) + '</p></a>';
+    }).join('') + '</div>';
+  }
+  ftq.addEventListener('input', renderFt);
+  ftScope.addEventListener('change', renderFt);
+  ftResults.addEventListener('click', (e) => { const a = e.target.closest('[data-open]'); if (a) { e.preventDefault(); openDetail(a.dataset.open); } });
+  renderFt();   // 初期＝空状態
 
   // ---- モーダル共通 ----
   function openModal(id) {
