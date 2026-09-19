@@ -153,19 +153,19 @@
   <h1 class="page-title">情報インプット</h1>
   <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
+  <!-- ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰。語クリックで全文検索へ（本番）。GET /info-items/word-cloud。 -->
+  <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
+    <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
+  </div>
+
   <!-- タブ＝クエスト SC-12 と同じ体裁（情報インプット＝一覧／全文検索）。全文検索の結果表示も SC-12 に揃える。 -->
   <div class="tabs" role="tablist" aria-label="情報インプットのセクション">
     <button class="tab is-active" role="tab" id="tabListBtn" aria-controls="panelList" aria-selected="true" data-tab="list">🧭 情報インプット<span class="tab-count" id="tabListCount">0</span></button>
     <button class="tab" role="tab" id="tabSearchBtn" aria-controls="panelSearch" aria-selected="false" data-tab="search">🔍 全文検索<span class="tab-count" id="tabSearchCount" hidden>0</span></button>
   </div>
 
-  <!-- 情報インプットタブ＝一覧（ワードクラウド＋状態タブ＋DataTable） -->
+  <!-- 情報インプットタブ＝一覧（状態タブ＋DataTable） -->
   <div class="tab-panel" id="panelList" role="tabpanel" aria-labelledby="tabListBtn">
-    <!-- ワードクラウド（現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む・GET /info-items/word-cloud） -->
-    <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
-      <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
-    </div>
-
     <div class="section-head">
       <h2>情報一覧</h2>
       <div style="display:flex;gap:var(--space-2);align-items:center">

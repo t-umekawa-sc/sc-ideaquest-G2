@@ -266,6 +266,15 @@ export function InfoListView() {
       <h1 className="page-title">情報インプット</h1>
       <p className="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
+      {/* ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰。語クリックで全文検索へ（本番）。 */}
+      <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
+        <div className="wordcloud__title">☁️ よく出る語</div>
+        {WORD_CLOUD.map(([w, c]) => {
+          const max = Math.max(...WORD_CLOUD.map((x) => x[1]));
+          return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 1.1).toFixed(2)}rem`, opacity: (0.55 + (c / max) * 0.45).toFixed(2) }} title={`${w}（${c}）`}>{w}</span>;
+        })}
+      </div>
+
       {/* タブ＝クエスト SC-12 と同じ体裁（情報インプット＝一覧／全文検索）。全文検索の結果表示も SC-12 に揃える。 */}
       <div className="tabs" role="tablist" aria-label="情報インプットのセクション">
         <button className={`tab${tab === "list" ? " is-active" : ""}`} role="tab" aria-selected={tab === "list"} onClick={() => setTab("list")}>
@@ -278,14 +287,6 @@ export function InfoListView() {
 
       {tab === "list" && (
         <>
-          <div className="wordcloud" aria-label="ワードクラウド（語で絞り込み）">
-            <div className="wordcloud__title">☁️ よく出る語</div>
-            {WORD_CLOUD.map(([w, c]) => {
-              const max = Math.max(...WORD_CLOUD.map((x) => x[1]));
-              return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 1.1).toFixed(2)}rem`, opacity: (0.55 + (c / max) * 0.45).toFixed(2) }} title={`${w}（${c}）`}>{w}</span>;
-            })}
-          </div>
-
           <div className="section-head">
             <h2>情報一覧</h2>
             <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
