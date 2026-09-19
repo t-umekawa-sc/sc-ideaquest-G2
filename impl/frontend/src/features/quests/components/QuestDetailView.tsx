@@ -817,7 +817,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                 <ul className="member-list">
                   {pendingReqs.map((r) => (
                     <li key={r.user.user_id} className="member-row join-req-row" role="button" tabIndex={0}
-                        onClick={() => { openReqDialog(r); }}
+                        // マウスクリック時は開き元を blur＝ダイアログ（Modal）がフォーカス復帰先に行を捕捉せず、
+                        // Escape 閉じ後に :focus-visible の青枠が行へ残るのを防ぐ（キーボード発火は blur せず a11y 維持）。
+                        onClick={(e) => { openReqDialog(r); (e.currentTarget as HTMLElement).blur(); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openReqDialog(r); } }}>
                       <Avatar name={r.user.display_name} imageUrl={r.user.avatar_image_url ?? undefined} />
                       <span className="member-name">
@@ -865,7 +867,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                 <ul className="member-list">
                   {rejectedReqs.map((r) => (
                     <li key={r.user.user_id} className="member-row join-req-row" role="button" tabIndex={0} style={{ opacity: 0.7 }}
-                        onClick={() => { openReqDialog(r); }}
+                        onClick={(e) => { openReqDialog(r); (e.currentTarget as HTMLElement).blur(); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openReqDialog(r); } }}>
                       <Avatar name={r.user.display_name} imageUrl={r.user.avatar_image_url ?? undefined} />
                       <span className="member-name">{r.user.display_name}<span className="badge badge-muted" style={{ marginLeft: 6 }}>却下済み</span></span>
