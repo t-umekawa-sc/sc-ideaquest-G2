@@ -10,7 +10,9 @@
      外部WEB情報を手動貼付→属性→アイデア/コンセプト/クエストへ動的リンク→反証で揺さぶる会社横断の知識レイヤ。
      正＝doc/設計ドラフト/情報インプット機能_設計.md（§12=続報/要約/WC同期/リッチテキスト）・データモデル §5.33-5.37・API N・FR-41。
      固有の見た目で共通化すべきものは shared.css へ昇格する。 */
-  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+  /* 画面名・戻る導線はクエスト一覧（SC-10）と統一＝h1 は既定フォント（.page-head h1・pixel にしない）。 */
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-3); }
+  .page-head h1 { font-size: var(--text-2xl); margin: 0; }
   .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
 
   /* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁。 */
@@ -150,7 +152,7 @@
 
 <main class="container" style="padding-block: var(--space-6) var(--space-16)">
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
-  <h1 class="page-title">情報インプット</h1>
+  <div class="page-head"><h1>情報インプット</h1></div>
   <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
   <!-- ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰。語クリックで全文検索へ（本番）。GET /info-items/word-cloud。 -->

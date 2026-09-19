@@ -262,8 +262,8 @@ export function InfoListView() {
 
   return (
     <div className="info-page">
-      <Link className="backlink" href="/">← ダッシュボードへ戻る</Link>
-      <h1 className="page-title">情報インプット</h1>
+      <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
+      <div className="page-head"><h1>情報インプット</h1></div>
       <p className="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
       {/* ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰。語クリックで全文検索へ（本番）。 */}
