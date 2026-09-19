@@ -52,6 +52,7 @@
 | I-TC-155 | e2e | 「最近の通知」に通知日時（相対ラベル）を表示（ユーザー要望） | owner 宛の未読通知を `created_at=now` で直挿入 | ダッシュボードで当該行を見る | 当該行に `.notif-time` が1つ・相対ラベル（たった今/○分前/○時間前）を表示（SC-02 と同 `timeLabel`・純ロジックは I-TC-156） | SC-01 §4.8／H.2 |
 | I-TC-157 | e2e | 「自分のクエスト」を参加中と分離＋下書きカードは編集ダイアログ導線（ユーザー要望） | ACME owner（自作クエストあり）でダッシュボード | 表示／`GET /dashboard`／下書きカードの href | `section[自分のクエスト]` が出る・`quests[].is_owner` が真偽で自作/参加中が混在（C-TC-247）・下書きカード href が `/ideas/[id]/edit`（アイデア）/`/quests/[id]/edit`（クエスト）/`/eval`（評価）＝詳細直リンク廃止 | SC-01／C.1 |
 | I-TC-158 | e2e | アイデア下書きカードは編集ダイアログを**ダッシュボード上に重ねて**開く（詳細へフル遷移しない・ユーザー指摘の是正） | ACME owner・自作クエストに下書きアイデアを1件作成 | 下書きカード（`/ideas/[id]/edit`）をクリック | URL が `/ideas/[id]/edit`・「アイデアを編集」ダイアログが出る・**背景はダッシュボードのまま**（intercept モーダル＝`@modal/(.)ideas/[ideaId]/edit`）。後始末で下書き削除 | SC-21／フロント実装フロー規約 §（URL付きモーダル） |
+| I-TC-162 | e2e | 議論2カラム（💬新着／🕒最近）が狭幅で**横スクロールを生まない**（レスポンシブ回帰・受入不具合） | 狭幅ビューポート（375px＝iPhone SE 相当）でダッシュボード表示 | 375px でダッシュボード（`/`）を開く | `document.documentElement.scrollWidth ≤ clientWidth`（横オーバーフローなし）／`.dash-discuss` は1カラムで各カードがビューポート内に収まる（長い `.unread-item__title` は nowrap+ellipsis で切詰め）。原因＝グリッド `1fr` の暗黙 `min-width:auto` が nowrap 子でトラックを膨張＝`minmax(0,1fr)` でガード。ヘッダーは `position:sticky;top:0` で残る（消えない） | SC-01 §4.8c／`dashboard.css .dash-discuss`／デザイン標準 |
 
 ## ゲーム感（SC-01 ヒーローの数値演出・frontend vitest）
 

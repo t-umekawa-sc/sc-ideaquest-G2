@@ -102,8 +102,10 @@
 /* 下段：通知＋ショートカット */
 .dash-page .dash-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-top: var(--space-10); }
 /* 議論の2カラム行＝💬新着の議論（左）＋🕒最近の議論（右・更新順の別動線・SC-01 §4.8c）。
-   align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。 */
-.dash-page .dash-discuss { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); align-items: stretch; }
+   align-items: stretch＝両カードを同じ高さに揃える（新着が空でも右の高さに合わせる）。
+   minmax(0,1fr)＝1fr の暗黙 min-width:auto が nowrap 子（.unread-item__title 等）で
+   トラックを content 幅まで膨張させ横スクロール（狭幅で切れる）を生む問題を防ぐガード。 */
+.dash-page .dash-discuss { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); align-items: stretch; }
 .dash-page .notif-list { list-style: none; margin: 0; padding: 0; }
 .dash-page .notif-list li { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
 .dash-page .notif-list li:first-child { border-top: 0; }
@@ -146,7 +148,7 @@
 @media (max-width: 860px) {
   .dash-page .dash-top { grid-template-columns: 1fr; }
   .dash-page .dash-bottom { grid-template-columns: 1fr; }
-  .dash-page .dash-discuss { grid-template-columns: 1fr; }
+  .dash-page .dash-discuss { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── レベルアップ祝福オーバーレイ（ゲーム感・LevelUpWatcher）─────────────────
