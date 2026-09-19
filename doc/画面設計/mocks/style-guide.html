@@ -793,6 +793,43 @@
     <p class="hint">対象クエスト／申請者／希望理由／これまでの活動 を、囲みなし＋薄い仕切り線で区切っています。</p>
   </div>
 
+  <!-- 10c. ダイアログ内の折り畳み（disclosure）標準 -->
+  <div class="section">
+    <h2>10c. ダイアログ内の折り畳み（disclosure）標準（2026-09-19 統一）</h2>
+    <p class="muted text-sm">
+      ダイアログ内の折り畳みは <code>&lt;details class="disclosure"&gt;</code> に統一する
+      ＝<strong>枠＋カスタムキャレット（▸→▾）</strong>のヘッダー（<code>&lt;summary&gt;</code>）＋本文（<code>.disclosure__body</code>・上罫で区切る）。
+      静的な参照ブロックは「囲まない＋薄い仕切り線」（10b）だが、<strong>折り畳みは対話的なので枠が開閉の affordance</strong> になる＝“枠あり”を標準とする。
+      旧 <code>.optional</code>（アイデア登録の任意項目）／<code>.eval-idea</code>（評価の「クエスト/アイデアを確認」）を本クラスへ一本化。<strong>ブラウザ標準の三角マーカーは使わない</strong>。
+    </p>
+    <p class="muted text-sm">
+      <strong>2種類を使い分ける</strong>：<br>
+      ① <strong>入力・セクション用</strong>（<code>.disclosure</code>）＝白背景。例＝アイデア登録の任意項目・情報登録の「属性を付与」。<br>
+      ② <strong>他レコードの参照情報用</strong>（<code>.disclosure.disclosure--ref</code>）＝<strong>背景色あり</strong>で“参照”を区別。例＝続報登録の「続報元の情報」・評価の「クエスト/アイデアを確認」。
+    </p>
+    <div style="max-width:560px;display:flex;flex-direction:column;gap:var(--space-3)">
+      <details class="disclosure" open>
+        <summary>🧭 属性を付与（① 入力用・白背景・開）</summary>
+        <div class="disclosure__body">
+          <p class="muted text-sm" style="margin:0">本文は <code>.disclosure__body</code>（上罫で区切る）。中の項目は1行1項目・入力欄は幅いっぱいが基本。</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>任意項目（① 入力用・白背景・閉）</summary>
+        <div class="disclosure__body">
+          <p class="muted text-sm" style="margin:0">閉じている時も枠があるので「ここを開ける」ことが一目で分かる。</p>
+        </div>
+      </details>
+      <details class="disclosure disclosure--ref" open>
+        <summary>🧾 クエストを確認（② 参照用・背景色あり・開）</summary>
+        <div class="disclosure__body">
+          <p class="muted text-sm" style="margin:0">他レコード（クエスト/アイデア/続報元）の内容を<strong>参照</strong>するための折り畳み。背景色で入力用と区別する。</p>
+        </div>
+      </details>
+    </div>
+    <p class="hint">キャレットはヘッダー左（▸ 閉／▾ 開・回転）。<code>summary</code> はフォーカスリング対応。見本＝アイデア登録の任意項目（入力）／続報元の情報・評価の確認（参照）。</p>
+  </div>
+
   <div>
     <h2>11. ヘッダー / ユーザーメニュー</h2>
     <p class="muted text-sm">共通ヘッダー右側の <code>.header-actions</code>（ステータス <code>.pixel-stat</code>／通知ベル <code>.bell</code>／

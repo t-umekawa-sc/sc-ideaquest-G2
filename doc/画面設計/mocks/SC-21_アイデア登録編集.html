@@ -13,13 +13,9 @@
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
   @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
 
-  /* 任意項目の折りたたみ（投稿ハードルを下げる: 必須3項目を上に、任意はまとめて開閉） */
-  .optional { border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: var(--space-4); background: var(--color-surface); }
-  .optional > summary { cursor: pointer; padding: var(--space-3) var(--space-4); font-weight: 600; list-style: none; display: flex; align-items: center; gap: var(--space-2); }
-  .optional > summary::-webkit-details-marker { display: none; }
-  .optional > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform .15s; }
-  .optional[open] > summary::before { transform: rotate(90deg); }
-  .optional__body { padding: 0 var(--space-4) var(--space-2); border-top: 1px solid var(--color-border); }
+  /* 任意項目の折りたたみ＝ダイアログ内 disclosure 標準（入力用・白背景）＝shared.css .disclosure に一本化（2026-09-19）。
+     余白のみ画面文脈で上書き（旧 .optional の margin-bottom を踏襲）。 */
+  .disclosure { margin-bottom: var(--space-4); }
 
   /* 添付ドロップゾーン＋チップ（SC-24 のチャット添付と将来共通化候補） */
   .dropzone { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
@@ -99,9 +95,9 @@
     </div>
 
     <!-- 任意項目（折りたたみ・投稿ハードルを下げる） -->
-    <details class="optional">
+    <details class="disclosure">
       <summary>任意項目（タイムリミット・利害関係者・備考）</summary>
-      <div class="optional__body">
+      <div class="disclosure__body">
         <div class="field-row">
           <div class="field">
             <label>タイムリミット</label>

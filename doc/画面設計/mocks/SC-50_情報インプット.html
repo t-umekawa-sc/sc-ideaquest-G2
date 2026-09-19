@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情報インプット — ideaquest</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* SC-50 情報インプット（一覧）／SC-51 登録・編集（モーダル）／SC-52 詳細（モーダル）。
+     外部WEB情報を手動貼付→属性→アイデア/コンセプト/クエストへ動的リンク→反証で揺さぶる会社横断の知識レイヤ。
+     正＝doc/設計ドラフト/情報インプット機能_設計.md（§12=続報/要約/WC同期/リッチテキスト）・データモデル §5.33-5.37・API N・FR-41。
+     固有の見た目で共通化すべきものは shared.css へ昇格する。 */
+  .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
+  .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+
+  /* ワードクラウド（一覧上部＝現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む） */
+  .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
+    padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
+  .wordcloud__title { width: 100%; font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
+  .wc-word { border: 0; background: transparent; cursor: pointer; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); }
+  .wc-word:hover { background: var(--color-primary-soft); }
+  .wc-word:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+  /* 状態・影響のバッジ色 */
+  .st-raw { background: var(--color-surface-alt); color: var(--color-text-muted); }
+  .st-curated { background: var(--color-agree-bg); color: var(--color-success); }
+  .st-archived { background: var(--color-disagree-bg); color: var(--color-text-muted); }
+  .ic-opportunity { background: var(--color-agree-bg); color: var(--color-success); }
+  .ic-threat { background: var(--color-disagree-bg); color: var(--color-danger); }
+  .ic-other { background: var(--color-surface-alt); color: var(--color-text-muted); }
+  .cell-summary { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .thread-badge { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+  /* SC-51 リッチテキストエディタ（本文貼付）＝実装フェーズでは Tiptap 等に置換。画像は貼付時に MinIO 再ホスト（§12-4）。 */
+  .rt { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .rt__bar { display: flex; gap: 2px; flex-wrap: wrap; padding: 6px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
+  .rt__bar button { border: 1px solid transparent; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: var(--text-sm); color: var(--color-text); }
+  .rt__bar button:hover { background: var(--color-surface); border-color: var(--color-border); }
+  .rt__area { min-height: 140px; max-height: 320px; overflow: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; }
+  .rt__area:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .rt__area img { max-width: 100%; border-radius: 6px; }
+  .rt__area:empty::before { content: attr(data-placeholder); color: var(--color-text-subtle); }
+
+  /* 語プレビュー（草稿の同期トークン化・ephemeral） */
+  /* 語抽出プレビュー＝この情報の主要語（ワードクラウド）を出すパネル。抽出中は .iq-block__overlay で遮蔽（13.4）。 */
+  .wc-preview { margin-top: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); min-height: 60px; }
+
+  /* SC-52 詳細＝要約・属性グリッド・関連リンク・続報スレッド */
+  .summary-box { background: var(--color-primary-soft); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); line-height: 1.7; }
+  .summary-box__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); margin-bottom: 2px; }
+  .rt-view { font-size: var(--text-sm); line-height: 1.8; }
+  .wc-mini { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .wc-mini .wc-word { cursor: default; }
+  .rt-view img { max-width: 100%; border-radius: 6px; }
+  .attr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-5); }
+  .attr-grid dt { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .attr-grid dd { margin: 0 0 6px; font-size: var(--text-sm); }
+
+  .link-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .link-item { display: flex; align-items: center; gap: var(--space-2); padding: 8px 10px; background: var(--color-surface-alt); border-radius: var(--radius); }
+  .link-item__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .lk-related { background: var(--color-surface); color: var(--color-text-muted); }
+  .lk-supporting { background: var(--color-agree-bg); color: var(--color-success); }
+  .lk-refuting { background: var(--color-disagree-bg); color: var(--color-danger); }
+  /* 編集ダイアログの関連リンク（種別select＋削除・追加行） */
+  .link-item .link-kind { width: auto; flex: 0 0 auto; }
+  .link-item__rm { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); line-height: 1; padding: 4px; border-radius: var(--radius); }
+  .link-item__rm:hover { color: var(--color-danger); }
+  /* 追加行＝縦積み。対象（タイトル）のコンボボックスはタイトルが長くなり得るのでダイアログ幅いっぱいに。
+     入力エリアは枠線で囲って「ここで追加する」まとまりを明示（ユーザー要望）。 */
+  .link-add { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); }
+  .link-add__field { display: block; }
+  .link-add__field .select, .link-add__field .multiselect { width: 100%; }
+  .link-add__lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 2px; }
+  .link-add__bottom { display: flex; gap: 8px; align-items: flex-end; }
+  .link-add__bottom .btn { flex: 0 0 auto; }
+
+  .thread { list-style: none; margin: 0; padding: 0 0 0 var(--space-4); border-left: 2px solid var(--color-border); display: flex; flex-direction: column; gap: 10px; }
+  .thread li { position: relative; }
+  .thread li::before { content: ""; position: absolute; left: calc(-1 * var(--space-4) - 5px); top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); }
+  .thread__title { font-weight: 600; font-size: var(--text-sm); }
+  .thread__meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  .req::after { content: " *"; color: var(--color-danger); }
+  .field-note { background: var(--color-surface-alt); border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.7; }
+
+  /* 参考資料の添付＝アイデア登録ダイアログ（SC-21）と同じ dropzone＋attach 行（実装＝info_attachments へ・§設計追記） */
+  .dropzone { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
+    color: var(--color-text-muted); cursor: pointer; background: var(--color-surface-alt); transition: border-color .15s, background .15s; }
+  .dropzone:hover, .dropzone.is-over { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+  .attach-list { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }
+  .attach { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+  .attach__icon { font-size: 18px; }
+  .attach__meta { flex: 1; min-width: 0; }
+  .attach__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attach__size { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-sm); }
+  .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+</style>
+</head>
+<body>
+
+<div class="app-bg" id="appBg"></div>
+
+<header class="app-header">
+  <div class="container between">
+    <a class="brand" href="SC-01_ダッシュボード.html"><img class="brand-logo" src="assets/logo-ideaquest.png" alt="IDEAQUEST"></a>
+    <div class="header-actions">
+      <span class="badge badge-muted" title="情報判定権限（info_curator）">🧭 情報判定権限</span>
+      <a class="bell" href="SC-02_通知一覧.html" aria-label="通知（未読3件）">🔔<span class="bell__badge">3</span></a>
+      <div class="usermenu">
+        <button class="usermenu__trigger" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar sm" data-name="情報 花子"><span class="avatar__img placeholder">情</span></span>
+        </button>
+        <ul class="usermenu__list" role="menu" hidden>
+          <li role="none"><a role="menuitem" href="SC-03_プロフィール.html">プロフィール</a></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-set>🖼️ 背景画像を変更</button></li>
+          <li role="none"><button role="menuitem" type="button" data-bg-reset>背景画像をリセット</button></li>
+          <li role="none"><div class="usermenu__sep"></div></li>
+          <li role="none"><button role="menuitem" type="button">ログアウト</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-block: var(--space-6) var(--space-16)">
+  <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
+  <h1 class="page-title">情報インプット</h1>
+  <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
+
+  <!-- ワードクラウド（現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む・GET /info-items/word-cloud） -->
+  <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
+    <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
+  </div>
+
+  <div class="section-head">
+    <h2>情報一覧</h2>
+    <div style="display:flex;gap:var(--space-2);align-items:center">
+      <label class="checkbox" style="font-size:var(--text-sm)"><input type="checkbox" id="rootsOnly"><span>続報を束ねる</span></label>
+      <button class="btn btn-primary" type="button" id="newInfo">＋ 情報を登録</button>
+    </div>
+  </div>
+  <!-- 判定状態のモード切替（すべて/未判定/判定済）＝クエストのアイデア一覧のような状態タブ。DataTable の絞込とは別の主要導線。 -->
+  <div class="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" id="statusSeg" style="margin-bottom:var(--space-3)">
+    <label><input type="radio" name="info-status" value="all" checked>すべて <span class="idea-filter__n" id="cntAll">0</span></label>
+    <label><input type="radio" name="info-status" value="raw">未判定 <span class="idea-filter__n" id="cntRaw">0</span></label>
+    <label><input type="radio" name="info-status" value="curated">判定済 <span class="idea-filter__n" id="cntCurated">0</span></label>
+  </div>
+  <!-- 一覧操作標準（DataTable＝検索/ソート/絞込/番号ページャ/列幅/表示・並べ替え/CSV/密度/行固定/カード）。サーバー委譲契約（§4.1）。 -->
+  <div id="infoTable"></div>
+
+  <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
+    低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>優先度・情報ソース・各分類・影響評価（環境スキャン）・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。本文は<strong>リッチテキスト</strong>で貼付でき（保存時＋表示時にサニタイズ）、貼付画像は自社ストレージに再ホストします。<strong>続報</strong>は元情報に紐づけて時系列で追え、<strong>要約</strong>で長文を読まずに選別できます。
+  </p>
+</main>
+
+<!-- ===== SC-51 情報 登録・編集モーダル ===== -->
+<div class="modal modal--xl modal--draggable modal--maximizable" id="infoModal" role="dialog" aria-modal="true" aria-labelledby="imTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="imTitle">情報を登録</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
+      <!-- 続報の文脈（parent_info_id 指定時＝親を prefill・親リンクを origin=auto でスナップショット複製）。
+           元の情報（タイトル/内容/出典URL）を開閉パネルで参照できる。 -->
+      <details class="disclosure disclosure--ref" id="imParentNote" hidden open style="margin-bottom:var(--space-3)">
+        <summary><span>🧵 続報元の情報を表示：<strong id="imParentTitle"></strong></span></summary>
+        <div class="disclosure__body">
+          <div id="imParentBody" class="rt-view"></div>
+          <div id="imParentUrl" style="margin-top:6px"></div>
+          <div class="hint" style="margin-top:8px">この情報の<strong>続報</strong>として登録します。親の関連リンク（アイデア/コンセプト/クエスト）は自動で引き継がれます（後で編集可）。</div>
+        </div>
+      </details>
+
+      <!-- 基本（全ユーザー・低摩擦）。新規登録は先頭項目=仕切り線なし（.field のみ）／続報は親パネルの下に仕切り線を出す（JS で dialog-section を付与）。 -->
+      <div class="field" id="imTitleField">
+        <label class="dialog-label req" for="imTitleInput">タイトル</label>
+        <input class="input" id="imTitleInput" placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）">
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label" for="imBody">内容・説明（WEBページを書式・画像込みで貼付できます）</label>
+        <div class="rt">
+          <div class="rt__bar" role="toolbar" aria-label="書式">
+            <button type="button" data-cmd="bold" title="太字"><b>B</b></button>
+            <button type="button" data-cmd="italic" title="斜体"><i>I</i></button>
+            <button type="button" data-cmd="insertUnorderedList" title="箇条書き">• リスト</button>
+            <button type="button" data-cmd="formatBlock" data-arg="h3" title="見出し">見出し</button>
+            <button type="button" data-cmd="createLink" title="リンク">🔗 リンク</button>
+            <button type="button" id="rtImage" title="画像を挿入（MinIO 再ホスト）">🖼️ 画像</button>
+          </div>
+          <div class="rt__area" id="imBody" contenteditable="true" data-placeholder="ここに記事本文を貼り付け（Ctrl+V）…"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);margin-top:6px">
+          <div class="hint">画像は貼付時に自社ストレージへ再ホストします（外部参照は持ち込みません）。</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" type="button" id="wcPreviewBtn" title="本文から主要な語を抽出して確認します">🔑 キーワードを抽出</button>
+            <button class="btn btn-outline btn-sm" type="button" id="summaryBtn" title="本文から要約を生成します">📝 要約を生成</button>
+          </div>
+        </div>
+        <div class="wc-preview" id="wcPreview"></div>
+        <div class="wc-preview" id="summaryPanel" style="margin-top:8px"></div>
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label" for="imUrl">出典URL</label>
+        <input class="input" id="imUrl" type="url" placeholder="https://…（http/https のみ）">
+        <div class="hint">出典を明記すると引用性・信頼性の重み付けに使えます。</div>
+      </div>
+      <div class="field dialog-section">
+        <label class="dialog-label">参考資料（任意・複数可）</label>
+        <input type="file" id="imFiles" multiple hidden>
+        <div class="dropzone" id="imDropzone" tabindex="0" role="button" aria-label="ファイルを添付">📎 クリックまたはドラッグ＆ドロップで添付</div>
+        <div class="attach-list" id="imFileList"></div>
+        <div class="hint">本文とは別に、PDF・画像・資料ファイルを添付できます（出典の裏付け・引用元の保全）。</div>
+      </div>
+      <!-- 関連リンク（この情報 ↔ 成果物）＝情報側から串刺しでメンテ（全ユーザー・手動追加/棄却／種別変更＝§N.3・§5.35）。
+           クエスト/アイデア/コンセプト側でも操作できるが、1情報の関係を1画面でまとめて管理したい時にここで行う。 -->
+      <div class="field dialog-section">
+        <label class="dialog-label">関連リンク（アイデア／クエスト／コンセプト）</label>
+        <ul class="link-list" id="imLinks"></ul>
+        <div class="hint" id="imLinksEmpty">関連リンクはまだありません。下から追加できます（保存すると類似度で<strong>自動リンク</strong>も生成されます）。</div>
+        <div class="link-add">
+          <label class="link-add__field"><span class="link-add__lbl">対象（アイデア／クエスト／コンセプトをタイトルで検索）</span>
+            <!-- 単一選択＋オートコンプリート（style-guide「単一選択（.multiselect・data-single）」）。タイトルが長くても幅いっぱいで検索/選択できる。 -->
+            <div class="multiselect" data-multiselect data-single="true" id="imLinkMs">
+              <div class="multiselect__control">
+                <input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="タイトルで検索して選択…">
+              </div>
+              <ul class="multiselect__list" role="listbox" hidden id="imLinkMsList">
+                <li class="multiselect__empty" role="presentation" hidden></li>
+              </ul>
+            </div>
+          </label>
+          <div class="link-add__bottom">
+            <label class="link-add__field" style="flex:1"><span class="link-add__lbl">種別</span><select class="select" id="imLinkKind" aria-label="種別"></select></label>
+            <button class="btn btn-primary" type="button" id="imLinkAdd">＋ 追加</button>
+          </div>
+        </div>
+        <div class="hint">種別を<strong>「反証」</strong>にすると、対象の作成者＋評価者へ<strong>通知＋要再評価</strong>が発火します（根底を揺さぶる）。</div>
+      </div>
+
+      <!-- 属性付与（情報判定権限・info_curator）＝折りたたみ（ダイアログ内 disclosure 標準＝枠＋キャレット・shared.css）。
+           枠が区切りになるため dialog-section の上罫は付けない（SC-21 .optional と同様）。一般ユーザーには非表示 or 読取。 -->
+      <div class="field dialog-section">
+      <details class="disclosure" id="curatorBox">
+        <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定</summary>
+        <!-- 各項目は1行1項目・入力欄は幅いっぱい（.input/.select は既定 width:100%）。 -->
+        <div class="disclosure__body" style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <div><label class="dialog-label" for="imPriority">優先度</label><select class="select" id="imPriority"></select></div>
+          <div><label class="dialog-label" for="imSource">情報ソース</label><select class="select" id="imSource"></select></div>
+          <div><label class="dialog-label" for="imClass">情報分類</label><select class="select" id="imClass"></select></div>
+          <div><label class="dialog-label" for="imScope">大分類</label><select class="select" id="imScope"></select></div>
+          <div><label class="dialog-label" for="imBiz">対象事業</label><select class="select" id="imBiz"></select></div>
+          <div><label class="dialog-label">情報カテゴリ（複数可）</label><div id="imCats" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
+          <div><label class="dialog-label" for="imImpact">影響度</label><select class="select" id="imImpact"></select></div>
+          <div><label class="dialog-label" for="imImpactClass">影響分類</label><select class="select" id="imImpactClass"></select></div>
+          <div><label class="dialog-label" for="imTiming">影響発生時期</label><select class="select" id="imTiming"></select></div>
+          <div><label class="dialog-label" for="imDue">期限日（対応/有効期限）</label><input class="input" id="imDue" type="date"></div>
+          <div><label class="dialog-label" for="imTriageOn">情報判定日</label><input class="input" id="imTriageOn" type="date"></div>
+          <div><label class="dialog-label" for="imTriage">情報判定</label><select class="select" id="imTriage"></select></div>
+          <div><label class="dialog-label" for="imReason">判定理由</label><textarea class="input" id="imReason" rows="3" placeholder="この判定に至った理由（任意・改行可）"></textarea></div>
+        </div>
+      </details>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="imSave">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SC-52 情報 詳細モーダル ===== -->
+<div class="modal modal--xl modal--draggable modal--maximizable" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="dmTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="dmTitle">情報の詳細</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body" id="dmBody"><!-- JS で描画 --></div>
+    <div class="modal__footer" id="dmFooter"><!-- JS で描画 --></div>
+  </div>
+</div>
+
+<!-- ===== この情報からクエストを作成（機会特定→行動の動線）＝実装は SC-11 本フォーム＋API C from_info_id ===== -->
+<div class="modal modal--xl modal--draggable modal--maximizable" id="questFromInfoModal" role="dialog" aria-modal="true" aria-labelledby="qfiTitle" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel sectioned">
+    <div class="modal__header">
+      <h2 id="qfiTitle">この情報からクエストを作成</h2>
+      <button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button>
+    </div>
+    <div class="modal__body">
+      <details class="disclosure disclosure--ref" open style="margin-bottom:var(--space-3)">
+        <summary><span>🧭 元情報：<strong id="qfiFrom"></strong></span></summary>
+        <div class="disclosure__body">
+          <div id="qfiFromBody" class="rt-view"></div>
+          <div class="hint" style="margin-top:8px">作成するクエストにこの情報が<strong>関連リンク（関連）</strong>として自動で紐づきます（`info_link`・origin=manual・API C の `from_info_id`）。</div>
+        </div>
+      </details>
+      <div class="field"><label class="dialog-label req" for="qfiName">クエスト件名</label><input class="input" id="qfiName"></div>
+      <div class="field dialog-section"><label class="dialog-label" for="qfiPurpose">目的・テーマ</label><textarea class="input" id="qfiPurpose" rows="3"></textarea><div class="hint">元情報の要約から下書きしています（編集可）。</div></div>
+      <div class="field dialog-section"><label class="dialog-label" for="qfiCat">カテゴリー</label><input class="input" id="qfiCat" placeholder="例: 業務改善 / 新規事業"></div>
+      <div class="field dialog-section"><label class="dialog-label" for="qfiDue">締切</label><input class="input" id="qfiDue" type="date"></div>
+      <div class="field-note">デモです。実装では <strong>SC-11 クエスト作成の本フォーム</strong>（参加部署・パーティー・6権限 等）を開き、保存時にサーバーが info_link を作成します。</div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" type="button" data-close>キャンセル</button>
+      <button class="btn btn-primary" type="button" id="qfiCreate">クエストを作成</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const savedBg = localStorage.getItem('ideaquest_content_bg');
+  if (savedBg) { const el = document.getElementById('appBg'); el.style.backgroundImage = 'url("' + savedBg + '")'; el.classList.add('is-set'); }
+
+  // ---- enum ラベル（データモデル §3 info_* enum） ----
+  const L = {
+    status: { raw:['未判定','st-raw'], curated:['判定済','st-curated'], archived:['アーカイブ','st-archived'] },
+    priority: { highest:'最高', high:'高い', normal:'普通', low:'低い', lowest:'最低' },
+    source: { public_data:'公的機関', market_research:'民間調査/企業データ', news:'新聞・ネットニュース', event:'展示会・セミナー', customer:'取引先・顧客', personal:'親族・友人', competitor:'競合', investor:'株主・投資家', org_decision:'組織の決定事項', employee:'従業員', legal:'弁護士・法律専門家', research:'研究機関・コミュニティ', other:'その他' },
+    classification: { information:'情報', idea:'アイデア', request:'要望・要求', knowledge:'ナレッジ', proposal:'提案', other:'その他' },
+    scope: { external:'外部', internal:'内部', other:'その他' },
+    biz: { innovation:'イノベーション', bpo:'BPO', generative_provider:'ジェネレーティブ・プロバイダー', it_infra_network:'ITインフラ・NW', software_dev:'ソフトウェア開発', it_service_ops:'ITサービス運用支援', other:'その他' },
+    category: { ext_economy:'外部｜経済', ext_politics_law:'外部｜政治法律', ext_society_culture:'外部｜社会文化', ext_industry:'外部｜業界', ext_competitor:'外部｜競合', ext_technology:'外部｜技術', ext_geography:'外部｜自然地理', ext_other:'外部｜その他', internal_tech:'内部｜技術', internal_capability:'内部｜能力', internal_process:'内部｜業務プロセス', internal_people:'内部｜従業員役員', internal_customer:'内部｜顧客', internal_partner:'内部｜取引先', internal_finance:'内部｜財務実績', internal_culture:'内部｜文化価値', internal_hr:'内部｜人事組織' },
+    impact: { unknown:'判断できない', none:'影響なし', minor:'軽度', moderate:'中度', major:'重度', severe:'過大' },
+    impactClass: { opportunity:['機会','ic-opportunity'], threat:['脅威','ic-threat'], other:['その他','ic-other'] },
+    timing: { unknown:'不明', within_3y:'3年以内', within_1y:'1年以内', within_6m:'6カ月以内', within_3m:'3カ月以内', already:'すでに発生' },
+    triage: { innovation:'イノベーション活動', improve_business:'カイゼン（ビジネス）', improve_ops:'カイゼン（業務事務）', task:'タスク活動', share:'情報共有活動', other:'その他', no_action:'対応不要' },
+    linkKind: { related:['関連','lk-related'], supporting:['裏付け','lk-supporting'], refuting:['反証','lk-refuting'] },
+    linkTarget: { ideas:'💡アイデア', concepts:'🧩コンセプト', quests:'📜クエスト', assumptions:'📌前提' },
+  };
+  const opt = (map) => Object.entries(map).map(([v, l]) => `<option value="${v}">${Array.isArray(l) ? l[0] : l}</option>`).join('');
+
+  // ---- デモデータ（会社横断の知識プール）。型は OpenAPI（info_items）想定。 ----
+  let SEQ = 100;
+  let INFO = [
+    { id:'i1', parent:null, title:'生成AIの業務利用が急拡大（○○総研レポート）', summary:'国内企業の生成AI導入率が前年比2.4倍。特に文書作成・要約・コード支援での定着が進む。', body_html:'<p>国内企業の<strong>生成AI導入率</strong>が前年比 <strong>2.4倍</strong>。文書作成・要約・コード支援での定着が進む。現場主導の PoC から全社展開フェーズへ。</p><ul><li>導入部門トップ＝情報システム・企画</li><li>課題＝ガバナンス・情報漏えい対策</li></ul>', source_url:'https://example.com/genai-report', due:'2026-12-31', status:'curated', priority:'high', source:'market_research', classification:'information', scope:'external', biz:'software_dev', cats:['ext_technology','ext_industry'], impact:'major', impactClass:'opportunity', timing:'within_1y', triageOn:'2026-09-17', triage:'innovation', reason:'新規事業の機会。社内AI活用支援サービスに接続可能。', by:'情報 花子', at:'2026-09-16', links:[{target:'ideas', title:'社内向けAIアシスタント', kind:'supporting', origin:'auto', score:0.82},{target:'quests', title:'DX推進クエスト', kind:'related', origin:'auto', score:0.61}] },
+    { id:'i2', parent:'i1', title:'生成AI 社内ガイドライン整備の動き（続報）', summary:'大手数社が生成AI利用ガイドラインを公開。情報分類と入力禁止データの線引きが論点。', body_html:'<p>大手数社が<strong>生成AI利用ガイドライン</strong>を相次いで公開。<em>入力禁止データ</em>の線引きと監査が論点。</p>', source_url:'https://example.com/genai-guideline', due:null, status:'raw', priority:null, source:'news', classification:null, scope:'external', biz:null, cats:[], impact:null, impactClass:null, timing:null, triageOn:null, triage:null, reason:null, by:'開発 太郎', at:'2026-09-18', links:[{target:'ideas', title:'社内向けAIアシスタント', kind:'related', origin:'auto', score:0.74}] },
+    { id:'i3', parent:null, title:'競合A社が類似SaaSを大幅値下げ', summary:'競合A社が同カテゴリSaaSを30%値下げ。既存商談の失注リスクと採算見直しが必要。', body_html:'<p><strong>競合A社</strong>が同カテゴリSaaSを <strong>30%</strong> 値下げ。価格競争が加速する見込み。</p>', source_url:'https://example.com/competitor-price', due:'2026-10-15', status:'curated', priority:'highest', source:'competitor', classification:'information', scope:'external', biz:'software_dev', cats:['ext_competitor','ext_economy'], impact:'severe', impactClass:'threat', timing:'within_3m', triageOn:'2026-09-15', triage:'improve_business', reason:'採算前提を揺さぶる。価格戦略コンセプトの再評価が必要。', by:'情報 花子', at:'2026-09-14', links:[{target:'concepts', title:'新料金プランのコンセプト', kind:'refuting', origin:'manual', score:0.68}] },
+    { id:'i4', parent:null, title:'展示会メモ：ノーコード需要の高まり', summary:'', body_html:'<p>展示会での聞き取り。中小の情シス人材不足でノーコード需要が強い。</p>', source_url:'', due:null, status:'raw', priority:null, source:'event', classification:null, scope:'external', biz:null, cats:[], impact:null, impactClass:null, timing:null, triageOn:null, triage:null, reason:null, by:'営業 次郎', at:'2026-09-13', links:[] },
+    { id:'i5', parent:null, title:'自社の画像処理基盤は横展開の余地あり', summary:'既存の画像処理基盤（社内資産）は他事業へ転用可能。実現可能性ヒントとして有望。', body_html:'<p>既存の<strong>画像処理基盤</strong>は他事業へ転用可能。実現可能性のヒント。</p>', source_url:'', due:null, status:'curated', priority:'normal', source:'employee', classification:'knowledge', scope:'internal', biz:'software_dev', cats:['internal_tech','internal_capability'], impact:'moderate', impactClass:'opportunity', timing:'within_1y', triageOn:'2026-09-12', triage:'innovation', reason:'自社技術知見（内部｜技術・能力）。アイデアの実現可能性根拠。', by:'開発 太郎', at:'2026-09-11', links:[{target:'ideas', title:'画像自動タグ付けサービス', kind:'supporting', origin:'auto', score:0.79}] },
+  ];
+  const followUps = (id) => INFO.filter(x => x.parent === id);
+  const findInfo = (id) => INFO.find(x => x.id === id);
+
+  // ---- ワードクラウド（デモ＝トークン頻度） ----
+  const WC = [['生成AI',24],['ガイドライン',9],['競合',14],['値下げ',7],['ノーコード',6],['画像処理',11],['DX',8],['採算',5],['導入率',6],['要約',4]];
+  function renderWordCloud() {
+    const box = document.getElementById('wordCloud');
+    box.querySelectorAll('.wc-word').forEach(n => n.remove());
+    const max = Math.max(...WC.map(w => w[1]));
+    WC.forEach(([w, c]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'wc-word'; b.textContent = w;
+      b.style.fontSize = (0.85 + (c / max) * 1.1).toFixed(2) + 'rem';
+      b.style.opacity = (0.55 + (c / max) * 0.45).toFixed(2);
+      b.title = w + '（' + c + '）';
+      b.addEventListener('click', () => { dt.setSearch ? dt.setSearch(w) : alert('「' + w + '」で絞り込み（デモ）'); });
+      box.appendChild(b);
+    });
+  }
+
+  // ---- 一覧（DataTable） ----
+  const catsCell = (r) => r.cats.length ? `<span class="cell-tags">` + r.cats.map(c => `<span class="badge badge-muted">${L.category[c]}</span>`).join('') + `</span>` : '<span class="muted">—</span>';
+  const titleCell = (r) => {
+    const fu = followUps(r.id).length;
+    const thread = fu ? ` <span class="thread-badge">🧵${fu}</span>` : '';
+    const parent = r.parent ? `<span class="thread-badge">↳続報 </span>` : '';
+    return `<strong>${parent}${r.title}</strong>${thread}`;
+  };
+  // 要約は全幅サブ行（1レコード=見出し行＋要約行・罫線なしで一体表示・cfg.subRow）。
+  // 続報は「親子」でなく「時系列」なので一覧はフラット独立行のまま、サブ行に元情報名を併記して系譜を示す（インデントしない）。
+  const summaryText = (r) => r.summary || r.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+  const subRow = (r) => {
+    const lineage = r.parent ? `<span style="color:var(--color-primary);margin-right:8px">↳ 元：${(findInfo(r.parent) || {}).title || '—'} の続報</span>` : '';
+    const s = summaryText(r);
+    const sum = s ? `<span style="color:var(--color-text-subtle);margin-right:6px">要約</span>${s}` : '';
+    return (lineage || sum) ? lineage + sum : '';
+  };
+  const rootOf = (r) => { let cur = r; while (cur.parent) { const p = findInfo(cur.parent); if (!p) break; cur = p; } return cur; };
+  function actionsCell(r) {
+    const inThread = r.parent || followUps(r.id).length > 0;
+    return `<div class="rowmenu">
+      <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
+      <ul class="rowmenu__list" role="menu" hidden>
+        <li role="none"><button role="menuitem" type="button" data-detail="${r.id}">詳細を開く</button></li>
+        ${inThread ? `<li role="none"><button role="menuitem" type="button" data-thread="${r.id}">🧵 スレッドを見る（時系列）</button></li>` : ''}
+        <li role="none"><button role="menuitem" type="button" data-followup="${r.id}">続報を登録</button></li>
+        <li role="none"><button role="menuitem" type="button" data-edit="${r.id}">属性を編集</button></li>
+        ${r.status === 'raw' ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-delete="${r.id}">削除（未判定）</button></li>` : `<li role="none"><button role="menuitem" type="button" data-archive="${r.id}">アーカイブ</button></li>`}
+      </ul>
+    </div>`;
+  }
+  const infoTable = document.getElementById('infoTable');
+  const dt = window.DataTable.init(infoTable, {
+    storageKey: 'sc50-info-2',   // 旧 'sc50-info' の永続列幅（localStorage）が既定 width を上書きしていたため採番変更で無効化
+    data: INFO,
+    rowId: (r) => r.id,
+    unit: '件',
+    perPage: 10,
+    perPageOptions: [10, 20, 50],
+    searchFields: 'タイトル・本文',
+    exportName: '情報インプット',
+    emptyText: '該当する情報がありません。',
+    onRowClick: (r) => openDetail(r.id),
+    subRow,
+    // カードもリスト形式に寄せる＝続報の表現（↳続報マーカー／🧵N／「↳ 元：〇〇 の続報」系譜／要約）を再現。
+    card: (r) => {
+      const fu = followUps(r.id).length;
+      const thread = fu ? ` <span class="thread-badge">🧵${fu}</span>` : '';
+      const followMark = r.parent ? `<span class="thread-badge">↳続報 </span>` : '';
+      const lineage = r.parent ? `<div class="thread-badge" style="color:var(--color-primary);margin-bottom:4px">↳ 元：${(findInfo(r.parent) || {}).title || '—'} の続報</div>` : '';
+      const badges = `<span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>`
+        + (r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}">${L.impactClass[r.impactClass][0]}</span>` : '')
+        + (r.priority ? `<span class="badge badge-muted">優先度 ${L.priority[r.priority]}</span>` : '');
+      const s = summaryText(r);
+      return `<div class="dt-card__title">${followMark}${r.title}${thread}</div>`
+        + lineage
+        + `<div class="dt-card__meta">${badges}<span>${r.by}</span><span>${r.at}</span></div>`
+        + (s ? `<div class="dt-card__stats"><span><span style="color:var(--color-text-subtle);margin-right:6px">要約</span>${s}</span></div>` : '');
+    },
+    columns: [
+      { key: 'title', label: 'タイトル / 要約', locked: true, width: 720, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.title, searchVal: (r) => r.title + ' ' + (r.summary || '') + ' ' + r.body_html.replace(/<[^>]+>/g, ''), csvVal: (r) => r.title, render: titleCell },
+      { key: 'status', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: Object.entries(L.status).map(([v, l]) => [v, l[0]]) }, sortVal: (r) => r.status, filterVal: (r) => r.status, csvVal: (r) => L.status[r.status][0], render: (r) => `<span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>` },
+      { key: 'priority', label: '優先度', width: 120, sortable: true, filter: { type: 'enum', options: Object.entries(L.priority) }, sortVal: (r) => r.priority || '', filterVal: (r) => r.priority || '', csvVal: (r) => r.priority ? L.priority[r.priority] : '', render: (r) => r.priority ? `<span title="${L.priority[r.priority]}">${L.priority[r.priority]}</span>` : '<span class="muted">—</span>' },
+      { key: 'impactClass', label: '影響分類', width: 140, sortable: true, filter: { type: 'enum', options: Object.entries(L.impactClass).map(([v, l]) => [v, l[0]]) }, sortVal: (r) => r.impactClass || '', filterVal: (r) => r.impactClass || '', csvVal: (r) => r.impactClass ? L.impactClass[r.impactClass][0] : '', render: (r) => r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}" title="${L.impactClass[r.impactClass][0]}">${L.impactClass[r.impactClass][0]}</span>` : '<span class="muted">—</span>' },
+      { key: 'cats', label: '情報カテゴリ', width: 260, csvVal: (r) => r.cats.map(c => L.category[c]).join('、'), render: catsCell },
+      { key: 'source', label: '情報ソース', width: 220, sortable: true, filter: { type: 'enum', options: Object.entries(L.source) }, sortVal: (r) => r.source || '', filterVal: (r) => r.source || '', csvVal: (r) => r.source ? L.source[r.source] : '', render: (r) => r.source ? `<span class="cell-clip" title="${L.source[r.source]}">${L.source[r.source]}</span>` : '<span class="muted">—</span>' },
+      { key: 'due', label: '期限日', width: 140, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.due || '', filterVal: (r) => r.due || '', csvVal: (r) => r.due || '', render: (r) => r.due ? `<span title="${r.due}">${r.due}</span>` : '<span class="muted">—</span>' },
+      { key: 'links', label: '💡', width: 84, sortable: true, sortVal: (r) => r.links.length, csvVal: (r) => r.links.length, render: (r) => r.links.length ? `<span class="badge badge-muted" title="関連リンク ${r.links.length} 件">${r.links.length}</span>` : '<span class="muted">0</span>' },
+      { key: 'by', label: '登録者', width: 180, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.by, searchVal: (r) => r.by, csvVal: (r) => r.by, render: (r) => `<span class="cell-clip" style="display:inline-flex;align-items:center;gap:6px;min-width:0" title="${r.by}"><span class="avatar sm" data-name="${r.by}"><span class="avatar__img placeholder">${r.by.slice(0,1)}</span></span>${r.by}</span>` },
+      { key: 'at', label: '登録日', width: 150, sortable: true, filter: { type: 'date' }, sortVal: (r) => r.at, filterVal: (r) => r.at, csvVal: (r) => r.at, render: (r) => `<span title="${r.at}">${r.at}</span>` },
+      { key: '_actions', label: '', actions: true, locked: true, width: 80, render: actionsCell },
+    ],
+  });
+  // 判定状態モード（すべて/未判定=raw/判定済=curated）＋続報束ねを合成して表示データを算出。
+  let infoFilter = { status: 'all', rootsOnly: false };
+  function updateStatusCounts() {
+    const active = INFO.filter(x => x.status !== 'archived');   // 件数は状態タブごとの総数（他フィルタに依存しない＝クエストのアイデア一覧と同方針）
+    document.getElementById('cntAll').textContent = active.length;
+    document.getElementById('cntRaw').textContent = active.filter(x => x.status === 'raw').length;
+    document.getElementById('cntCurated').textContent = active.filter(x => x.status === 'curated').length;
+  }
+  function applyInfoFilter() {
+    let data = INFO.filter(x => x.status !== 'archived');   // 一覧の既定＝アーカイブ除外
+    if (infoFilter.status !== 'all') data = data.filter(x => x.status === infoFilter.status);
+    if (infoFilter.rootsOnly) data = data.filter(x => !x.parent);
+    dt.setData(data);
+    updateStatusCounts();
+  }
+  function refresh() { applyInfoFilter(); }   // 編集/削除後も現在のフィルタを維持して再描画
+
+  // 判定状態モード切替（すべて/未判定/判定済）＝クエストのアイデア一覧のような状態タブ（本番は GET /info-items?status=）。
+  document.getElementById('statusSeg').addEventListener('change', (e) => {
+    if (e.target.name === 'info-status') { infoFilter.status = e.target.value; applyInfoFilter(); }
+  });
+  // 続報を束ねる（roots_only）＝ON で続報（親ありの行）を隠し、元情報（根）だけを表示（本番は GET /info-items?roots_only=true）。
+  document.getElementById('rootsOnly').addEventListener('change', (e) => {
+    infoFilter.rootsOnly = e.target.checked; applyInfoFilter();
+  });
+  updateStatusCounts();   // 初期表示の件数
+
+  // ---- モーダル共通 ----
+  function openModal(id) {
+    const m = document.getElementById(id); m.hidden = false; requestAnimationFrame(() => m.classList.add('show'));
+    // 本文スクロールを必ず先頭へ（開いた直後・rAF・遅延後＝focus 等で下に飛ぶケースも戻す）。
+    const body = m.querySelector('.modal__body');
+    if (body) { body.scrollTop = 0; requestAnimationFrame(() => { body.scrollTop = 0; }); setTimeout(() => { body.scrollTop = 0; }, 30); }
+  }
+  function closeModal(m) { m.classList.remove('show'); setTimeout(() => m.hidden = true, 200); }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { const m = e.target.closest('.modal'); if (m) closeModal(m); } });
+
+  // ---- SC-51 登録・編集 ----
+  const $ = (id) => document.getElementById(id);
+  // セレクトを埋める（先頭は空＝未設定）
+  function fillSelects() {
+    $('imPriority').innerHTML = '<option value="">—</option>' + opt(L.priority);
+    $('imSource').innerHTML = '<option value="">—</option>' + opt(L.source);
+    $('imClass').innerHTML = '<option value="">—</option>' + opt(L.classification);
+    $('imScope').innerHTML = '<option value="">—</option>' + opt(L.scope);
+    $('imBiz').innerHTML = '<option value="">—</option>' + opt(L.biz);
+    $('imImpact').innerHTML = '<option value="">—</option>' + opt(L.impact);
+    $('imImpactClass').innerHTML = '<option value="">—</option>' + opt(L.impactClass);
+    $('imTiming').innerHTML = '<option value="">—</option>' + opt(L.timing);
+    $('imTriage').innerHTML = '<option value="">—</option>' + opt(L.triage);
+    $('imCats').innerHTML = Object.entries(L.category).map(([v, l]) => `<label class="checkbox" style="font-size:var(--text-xs)"><input type="checkbox" value="${v}"><span>${l}</span></label>`).join('');
+  }
+  fillSelects();
+
+  // リッチテキスト ツールバー（デモ＝execCommand。実装は Tiptap 等に置換） ----
+  document.querySelectorAll('.rt__bar [data-cmd]').forEach(btn => btn.addEventListener('click', () => {
+    $('imBody').focus();
+    const cmd = btn.dataset.cmd;
+    if (cmd === 'createLink') { const u = prompt('リンク先URL（http/https）'); if (u) document.execCommand(cmd, false, u); }
+    else if (cmd === 'formatBlock') document.execCommand(cmd, false, btn.dataset.arg);
+    else document.execCommand(cmd, false, null);
+  }));
+  $('rtImage').addEventListener('click', () => {
+    // 実装＝paste/選択画像を blob で POST /info-items/images（MinIO 再ホスト）→ 返却URLを挿入。ここはデモの placeholder。
+    $('imBody').focus();
+    document.execCommand('insertHTML', false, '<img src="assets/logo-ideaquest.png" alt="貼付画像（デモ＝MinIO再ホスト想定）">');
+  });
+  // 語プレビュー（草稿の同期トークン化・ephemeral・POST /info-items/word-cloud-preview） ----
+  // 簡易トークン化（デモ＝実装は janome）。頻度上位 [[word,count],…] を返す（語プレビュー・詳細ミニワードクラウド共通）。
+  function simpleTokens(text, limit = 20) {
+    const stop = new Set(['の','に','は','を','が','と','で','も','や','へ','から','まで','する','なる','ある','いる','こと','ため','よう','これ','それ','など']);
+    const freq = {};
+    (text || '').replace(/[、。・（）()「」\[\]{}<>:;,.\n\r\t]/g, ' ').split(/\s+/).forEach(w => { w = w.trim(); if (w.length >= 2 && !stop.has(w)) freq[w] = (freq[w] || 0) + 1; });
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  }
+  // 詳細用ミニ・ワードクラウド（この情報の主要語＝本文＋タイトル・SC-50 §7 の `tokens_top`）。
+  // デモ＝日本語は分かち書きが無く素朴分割だと「文」になるため、デモ語彙との一致で単語らしく見せる（実装は janome 形態素解析）。
+  const WC_VOCAB = ['生成AI', 'ガイドライン', '競合', '値下げ', 'ノーコード', '画像処理', 'DX', '採算', '導入率', '要約', '情報漏えい', 'ガバナンス', 'コスト', 'SaaS', '展示会', '需要', '企業', 'リスク', '市場', 'コンセプト', '配送', 'ルート', '積載', '技術', '業務', '効率', '支援', '運用'];
+  function cloudHtml(text) {
+    let hits = WC_VOCAB.map(w => [w, (text || '').split(w).length - 1]).filter(([, c]) => c > 0);
+    if (!hits.length) hits = simpleTokens(text, 12);   // 語彙に当たらなければ素朴分割にフォールバック
+    hits.sort((a, b) => b[1] - a[1]); hits = hits.slice(0, 24);
+    if (!hits.length) return '<p class="muted">主要語がありません（本文が短い等）。</p>';
+    const max = Math.max(...hits.map(t => t[1]), 1);
+    return `<div class="wc-mini">` + hits.map(([w, c]) => `<span class="wc-word" style="font-size:${(0.85 + (c / max) * 0.9).toFixed(2)}rem;opacity:${(0.6 + (c / max) * 0.4).toFixed(2)}" title="${w}（${c}）">${w}</span>`).join('') + `</div>`;
+  }
+  const miniCloudHtml = (r) => cloudHtml(r.title + ' ' + r.body_html.replace(/<[^>]+>/g, ' ') + ' ' + (r.summary || ''));
+  // 「この情報の主要語」は抽出前から空状態で常時表示（ユーザー要望）。
+  function resetCloudPreview() {
+    const box = $('wcPreview');
+    box.classList.remove('iq-block');
+    box.innerHTML = '<div class="dialog-label">☁️ この情報の主要語（ワードクラウド）</div><div id="wcPreviewCloud" style="min-height:44px"><span class="hint">「🔑 キーワードを抽出」を押すと、本文から主要語を抽出して表示します。</span></div>';
+  }
+  resetCloudPreview();
+  // キーワードを抽出＝この情報の主要語（ワードクラウド）を表示。抽出処理中はパネル遮蔽オーバーレイ（style-guide 13.4）。
+  // 実装＝POST /info-items/word-cloud-preview（同期・ephemeral）呼び出し中を遮蔽する想定（§12-2）。
+  $('wcPreviewBtn').addEventListener('click', () => {
+    const text = ($('imTitleInput').value + ' ' + $('imBody').textContent).trim();
+    const box = $('wcPreview');
+    box.hidden = false;
+    box.classList.add('iq-block');
+    box.innerHTML = '<div class="dialog-label">☁️ この情報の主要語（ワードクラウド）</div><div id="wcPreviewCloud" style="min-height:44px"></div>';
+    const ov = document.createElement('div');
+    ov.className = 'iq-block__overlay';
+    ov.innerHTML = '<span class="iq-loading-badge">抽出中 <span class="dots"></span></span>';
+    box.appendChild(ov);
+    setTimeout(() => {
+      ov.remove();
+      $('wcPreviewCloud').innerHTML = text ? cloudHtml(text) : '<span class="hint">本文が空です。記事を貼り付けてから抽出してください。</span>';
+    }, 800);
+  });
+
+  // 要約＝ワードクラウドと同じ構成（表示パネル＋実行ボタン＋抽出中の遮蔽オーバーレイ）。抽出前は空状態で常時表示。
+  // 実装＝抽出型 summarize_text（janome・オフライン・同期・§12-3）。保存時にも自動生成される。
+  function demoSummary(text) {
+    const sents = text.replace(/\s+/g, '').split(/。/).filter(Boolean);
+    let s = sents.slice(0, 2).join('。'); if (s) s += '。';
+    if (s.length > 120) s = s.slice(0, 120) + '…';
+    return s || text.slice(0, 100);
+  }
+  function resetSummaryPanel() {
+    const box = $('summaryPanel');
+    box.classList.remove('iq-block');
+    box.innerHTML = '<div class="dialog-label">📝 要約（選別用・自動生成）</div><div id="summaryText" style="min-height:36px"><span class="hint">「📝 要約を生成」を押すと、本文から要約を作成します（保存時にも自動生成されます）。</span></div>';
+  }
+  resetSummaryPanel();
+  $('summaryBtn').addEventListener('click', () => {
+    const text = $('imBody').textContent.trim();
+    const box = $('summaryPanel');
+    box.classList.add('iq-block');
+    box.innerHTML = '<div class="dialog-label">📝 要約（選別用・自動生成）</div><div id="summaryText" style="min-height:36px"></div>';
+    const ov = document.createElement('div');
+    ov.className = 'iq-block__overlay';
+    ov.innerHTML = '<span class="iq-loading-badge">要約生成中 <span class="dots"></span></span>';
+    box.appendChild(ov);
+    setTimeout(() => {
+      ov.remove();
+      $('summaryText').innerHTML = text ? demoSummary(text) : '<span class="hint">本文が空です。記事を貼り付けてから生成してください。</span>';
+    }, 800);
+  });
+
+  // 参考資料ファイル添付＝アイデア登録ダイアログ（SC-21）と同じ dropzone UI（実装＝info_attachments へアップロード） ----
+  const imFiles = $('imFiles'), imDropzone = $('imDropzone'), imFileList = $('imFileList');
+  function iconFor(name) { const ext = (name.split('.').pop() || '').toLowerCase(); if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) return '🖼️'; if (['xls','xlsx','csv'].includes(ext)) return '📊'; if (['pdf'].includes(ext)) return '📕'; if (['doc','docx'].includes(ext)) return '📄'; return '📎'; }
+  function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(0) + ' KB' : (b/1048576).toFixed(1) + ' MB'; }
+  function addFiles(files) {
+    [...files].forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'attach';
+      row.innerHTML = '<span class="attach__icon">' + iconFor(f.name) + '</span>' +
+        '<div class="attach__meta"><div class="attach__name">' + f.name + '</div><div class="attach__size">' + fmtSize(f.size) + '</div></div>' +
+        '<button class="attach__remove" type="button" aria-label="削除">✕</button>';
+      row.querySelector('.attach__remove').addEventListener('click', () => row.remove());
+      imFileList.appendChild(row);
+    });
+  }
+  imDropzone.addEventListener('click', () => imFiles.click());
+  imDropzone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); imFiles.click(); } });
+  imFiles.addEventListener('change', () => { addFiles(imFiles.files); imFiles.value = ''; });
+  ['dragover','dragenter'].forEach(ev => imDropzone.addEventListener(ev, e => { e.preventDefault(); imDropzone.classList.add('is-over'); }));
+  ['dragleave','drop'].forEach(ev => imDropzone.addEventListener(ev, e => { e.preventDefault(); imDropzone.classList.remove('is-over'); }));
+  imDropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+  // 関連リンク（情報側から串刺しメンテ）＝候補・追加/削除/種別変更（§N.3・実装は POST/PATCH/reject /info-links） ----
+  const LINK_CANDIDATES = {
+    ideas: ['社内向けAIアシスタント', '画像自動タグ付けサービス', '配送ルート最適化', '請求書処理の電子化'],
+    quests: ['DX推進クエスト', 'コスト削減チャレンジ'],
+    concepts: ['新料金プランのコンセプト', 'AI活用支援サービス構想'],
+  };
+  let linkDraft = [];
+  // 対象＝単一選択オートコンプリート（.multiselect data-single）。候補（全種別）をタイプ併記のラベルで用意し、
+  // オプションは DOMContentLoaded の自動初期化前（＝この inline script 実行時）に流し込む。ラベル→{title,type} を逆引き。
+  const linkLabelToCand = {};
+  const linkInput = () => $('imLinkMs').querySelector('.multiselect__input');
+  function buildLinkMsOptions() {
+    const typeLabel = { ideas: 'アイデア', quests: 'クエスト', concepts: 'コンセプト' };
+    const opts = ['ideas', 'quests', 'concepts'].flatMap(type => (LINK_CANDIDATES[type] || []).map(title => {
+      const label = `${L.linkTarget[type]}｜${title}`;
+      linkLabelToCand[label] = { title, type };
+      return `<li class="multiselect__option" role="option" data-value="${label}">${label}</li>`;
+    }));
+    $('imLinkMsList').insertAdjacentHTML('afterbegin', opts.join(''));
+    $('imLinkKind').innerHTML = Object.entries(L.linkKind).map(([v, lab]) => `<option value="${v}">${lab[0]}</option>`).join('');
+  }
+  function resetLinkMs() {
+    const ms = $('imLinkMs'); if (!ms) return;
+    const c = ms.querySelector('.multiselect__clear'); if (c) c.click();
+    const i = ms.querySelector('.multiselect__input'); if (i) { i.value = ''; i.setAttribute('aria-expanded', 'false'); i.blur(); }
+    const l = ms.querySelector('.multiselect__list'); if (l) l.hidden = true;   // ダイアログ起動時に開いた状態にならないよう確実に閉じる
+  }
+  function renderLinks() {
+    // 自動リンクの✕＝棄却（rejected_at・行は残す＝再計算で復活しない・§N.6）／手動リンクの✕＝削除。
+    $('imLinks').innerHTML = linkDraft.map((l, i) => {
+      if (l.rejected) return `
+      <li class="link-item is-rejected" data-i="${i}">
+        <span>${L.linkTarget[l.target]}</span>
+        <span class="link-item__title" style="text-decoration:line-through;color:var(--color-text-subtle)">${l.title}</span>
+        <span class="badge badge-muted">棄却済み・再リンクされません</span>
+        <button type="button" class="btn btn-outline btn-sm" data-unrej="${i}">戻す</button>
+      </li>`;
+      return `
+      <li class="link-item" data-i="${i}">
+        <span>${L.linkTarget[l.target]}</span>
+        <span class="link-item__title">${l.title}</span>
+        <span class="badge badge-muted">${l.origin === 'auto' ? '自動' : '手動'}</span>
+        <select class="select link-kind" data-i="${i}" aria-label="種別">${Object.entries(L.linkKind).map(([v, lab]) => `<option value="${v}"${l.kind === v ? ' selected' : ''}>${lab[0]}</option>`).join('')}</select>
+        <button type="button" class="link-item__rm" data-rm="${i}" data-origin="${l.origin}" aria-label="${l.origin === 'auto' ? '棄却' : '削除'}" title="${l.origin === 'auto' ? '棄却（今後この情報から自動リンクしない・復活しない）' : '削除'}">✕</button>
+      </li>`;
+    }).join('');
+    $('imLinksEmpty').hidden = linkDraft.length > 0;
+  }
+  $('imLinkAdd').addEventListener('click', () => {
+    const label = (linkInput().value || '').trim();
+    const cand = linkLabelToCand[label];
+    if (!cand) { linkInput().focus(); return; }
+    if (linkDraft.some(l => l.target === cand.type && l.title === cand.title)) { alert('その対象はすでに追加済みです。'); return; }
+    linkDraft.push({ target: cand.type, title: cand.title, kind: $('imLinkKind').value, origin: 'manual', score: null });
+    renderLinks(); resetLinkMs();
+  });
+  $('imLinks').addEventListener('change', (e) => { const s = e.target.closest('.link-kind'); if (s) linkDraft[+s.dataset.i].kind = s.value; });
+  $('imLinks').addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-rm]');
+    if (rm) { const i = +rm.dataset.rm; if (rm.dataset.origin === 'auto') linkDraft[i].rejected = true; else linkDraft.splice(i, 1); renderLinks(); return; }
+    const un = e.target.closest('[data-unrej]');
+    if (un) { linkDraft[+un.dataset.unrej].rejected = false; renderLinks(); }
+  });
+  buildLinkMsOptions();
+
+  let editTarget = null, parentForNew = null;
+  function openInfoForm(mode, rec, parent) {
+    editTarget = mode === 'edit' ? rec : null;
+    parentForNew = parent || null;
+    $('imTitle').textContent = mode === 'edit' ? '情報を編集' : (parent ? '続報を登録' : '情報を登録');
+    $('imSave').textContent = mode === 'edit' ? '保存する' : '登録する';
+    // 続報の親パネル（元の情報を開閉表示）
+    const pn = $('imParentNote');
+    if (parent) {
+      $('imParentTitle').textContent = parent.title;
+      $('imParentBody').innerHTML = parent.body_html || '<span class="muted">（本文なし）</span>';
+      $('imParentUrl').innerHTML = parent.source_url ? `<a href="${parent.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${parent.source_url}）</span>` : '<span class="muted">出典URLなし</span>';
+      pn.hidden = false; pn.open = true;
+    } else pn.hidden = true;
+    // 続報（親パネルあり）はタイトル上に仕切り線／新規登録は先頭のため仕切り線なし。
+    $('imTitleField').classList.toggle('dialog-section', !!parent);
+    // 値のプリフィル（編集＝rec／続報＝親の属性を初期値・本文/URLは空）
+    const src = mode === 'edit' ? rec : (parent || {});
+    $('imTitleInput').value = mode === 'edit' ? rec.title : '';
+    $('imBody').innerHTML = mode === 'edit' ? rec.body_html : '';
+    $('imUrl').value = mode === 'edit' ? (rec.source_url || '') : '';
+    $('imPriority').value = src.priority || ''; $('imSource').value = src.source || ''; $('imClass').value = src.classification || '';
+    $('imScope').value = src.scope || ''; $('imBiz').value = src.biz || ''; $('imDue').value = src.due || '';
+    $('imImpact').value = src.impact || ''; $('imImpactClass').value = src.impactClass || ''; $('imTiming').value = src.timing || '';
+    $('imTriageOn').value = src.triageOn || ''; $('imTriage').value = src.triage || ''; $('imReason').value = src.reason || '';
+    const cats = new Set(src.cats || []);
+    $('imCats').querySelectorAll('input').forEach(cb => cb.checked = cats.has(cb.value));
+    resetCloudPreview(); resetSummaryPanel();
+    imFileList.innerHTML = ''; imFiles.value = '';
+    // 関連リンク＝編集は既存リンク／続報は親から origin=auto でスナップショット複製／新規は空。
+    linkDraft = (mode === 'edit' ? (rec.links || []) : (parent ? parent.links.map(l => ({ ...l, origin: 'auto' })) : [])).map(l => ({ ...l }));
+    renderLinks(); resetLinkMs();
+    clearFieldErrors($('infoModal'));
+    openModal('infoModal');
+    setTimeout(resetLinkMs, 0);   // モーダル表示後の focus 等で開くケースも閉じる
+  }
+  $('newInfo').addEventListener('click', () => openInfoForm('new', null, null));
+
+  $('imSave').addEventListener('click', () => {
+    const title = $('imTitleInput').value.trim();
+    clearFieldErrors($('infoModal'));
+    if (!title) { setFieldError($('imTitleInput'), 'タイトルを入力してください'); $('imTitleInput').focus(); return; }
+    const url = $('imUrl').value.trim();
+    if (url && !/^https?:\/\//i.test(url)) { setFieldError($('imUrl'), 'http/https の URL を入力してください'); $('imUrl').focus(); return; }
+    const cats = [...$('imCats').querySelectorAll('input:checked')].map(cb => cb.value);
+    const attrs = { source_url:url, priority:$('imPriority').value||null, source:$('imSource').value||null, classification:$('imClass').value||null, scope:$('imScope').value||null, biz:$('imBiz').value||null, due:$('imDue').value||null, impact:$('imImpact').value||null, impactClass:$('imImpactClass').value||null, timing:$('imTiming').value||null, triageOn:$('imTriageOn').value||null, triage:$('imTriage').value||null, reason:$('imReason').value||null, cats };
+    const curated = attrs.priority || attrs.impactClass || attrs.triage || cats.length; // curated 属性が付けば raw→curated（デモ）
+    const body_html = $('imBody').innerHTML;
+    const summary = $('imBody').textContent.trim().slice(0, 60); // デモ＝先頭を要約（実装は summarize_text）
+    const links = linkDraft.map(l => ({ ...l }));   // 関連リンク（編集ダイアログで手動メンテした結果）
+    if (editTarget) {
+      Object.assign(editTarget, { title, body_html, summary, ...attrs, status: curated ? 'curated' : editTarget.status, links });
+      refresh(); closeModal($('infoModal'));
+      alert('情報を更新しました（デモ）。保存時に本文サニタイズ→body_text→トークン化→要約を再生成／関連リンクの変更を保存します。');
+    } else {
+      const id = 'i' + (++SEQ);
+      const inherited = parentForNew ? links.length : 0;   // 続報＝親リンクを origin=auto でスナップショット複製済み（§12-1）
+      INFO.push({ id, parent: parentForNew ? parentForNew.id : null, title, body_html, summary, ...attrs, status: curated ? 'curated' : 'raw', by:'情報 花子', at:'今日', links });
+      refresh(); closeModal($('infoModal'));
+      alert((parentForNew ? '続報' : '情報') + 'を登録しました（デモ）。' + (parentForNew ? '\n親の関連リンク ' + inherited + ' 件を自動で引き継ぎました。' : '') + '\n類似度で自動リンク（既定=関連）も生成します。');
+    }
+  });
+
+  // ---- SC-52 詳細 ----
+  function openDetail(id) {
+    const r = findInfo(id);
+    $('dmTitle').textContent = '情報の詳細';
+    const parent = r.parent ? findInfo(r.parent) : null;
+    const fus = followUps(id);
+    const attr = (label, val) => `<dt>${label}</dt><dd>${val ?? '<span class="muted">—</span>'}</dd>`;
+    const activeLinks = r.links.filter(l => !l.rejected);   // 棄却済み（rejected）は非表示（§N.3 パネル非表示・再計算で復活しない）
+    const linkHtml = activeLinks.length ? `<ul class="link-list">` + activeLinks.map(l => `
+        <li class="link-item">
+          <span>${L.linkTarget[l.target]}</span>
+          <span class="link-item__title">${l.title}</span>
+          <span class="badge ${L.linkKind[l.kind][1]}">${L.linkKind[l.kind][0]}</span>
+          <span class="badge badge-muted">${l.origin === 'auto' ? '自動' : '手動'}</span>
+          ${l.score != null ? `<span class="thread__meta">一致 ${(l.score*100|0)}%</span>` : ''}
+        </li>`).join('') + `</ul>` : '<p class="muted">関連リンクはまだありません。</p>';
+    const threadHtml = fus.length ? `<ul class="thread">` + fus.map(f => `<li><div class="thread__title">${f.title}</div><div class="thread__meta">${f.by}・${f.at}　<a href="#" data-detail="${f.id}">開く</a></div></li>`).join('') + `</ul>` : '<p class="muted">続報はまだありません。</p>';
+
+    $('dmBody').innerHTML = `
+      ${parent ? `<div class="field dialog-section"><div class="dialog-label">元情報（続報元）</div><div class="thread__meta">🧵 <strong>${parent.title}</strong> の続報　<a href="#" data-detail="${parent.id}">元情報を開く</a></div></div>` : ''}
+      <div class="field dialog-section">
+        <div class="dialog-label">タイトル</div>
+        <h3 style="margin:0 0 6px">${r.title}</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>
+          ${r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}">${L.impactClass[r.impactClass][0]}</span>` : ''}
+          ${r.priority ? `<span class="badge badge-muted">優先度 ${L.priority[r.priority]}</span>` : ''}
+          ${r.cats.map(c => `<span class="badge badge-muted">${L.category[c]}</span>`).join('')}
+        </div>
+      </div>
+      ${r.summary ? `<div class="field dialog-section"><div class="summary-box"><div class="summary-box__label">要約（選別用・自動生成）</div>${r.summary}</div></div>` : ''}
+      <div class="field dialog-section">
+        <div class="dialog-label">内容・説明</div>
+        <div class="rt-view">${r.body_html}</div>
+        ${r.source_url ? `<div style="margin-top:6px"><a href="${r.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${r.source_url}）</span></div>` : ''}
+      </div>
+      <div class="field dialog-section">
+        <div class="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
+        ${miniCloudHtml(r)}
+        <div class="hint" style="margin-top:6px">本文から抽出した語（頻度で大小）。関連づけ・一覧のワードクラウドに使われます。</div>
+      </div>
+      <div class="field dialog-section">
+        <div class="dialog-label">属性（環境スキャン・判定）</div>
+        <dl class="attr-grid">
+          ${attr('情報ソース', r.source ? L.source[r.source] : null)}
+          ${attr('情報分類', r.classification ? L.classification[r.classification] : null)}
+          ${attr('大分類', r.scope ? L.scope[r.scope] : null)}
+          ${attr('対象事業', r.biz ? L.biz[r.biz] : null)}
+          ${attr('影響度', r.impact ? L.impact[r.impact] : null)}
+          ${attr('影響発生時期', r.timing ? L.timing[r.timing] : null)}
+          ${attr('情報判定', r.triage ? L.triage[r.triage] : null)}
+          ${attr('期限日', r.due)}
+          ${r.reason ? attr('判定理由', r.reason) : ''}
+        </dl>
+      </div>
+      <div class="field dialog-section">
+        <div class="dialog-label">この情報から（機会特定→行動）</div>
+        <button class="btn btn-primary" type="button" data-newquest="${r.id}">＋ この情報からクエストを作成</button>
+        <div class="hint" style="margin-top:6px">判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
+      </div>
+      <div class="field dialog-section">
+        <div class="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
+        ${linkHtml}
+        <div class="hint" style="margin-top:6px">種別を「反証」に変えると、対象の作成者＋評価者へ通知＋要再評価が発火します（根底を揺さぶる）。</div>
+      </div>
+      <div class="field dialog-section">
+        <div class="dialog-label">🧵 続報スレッド</div>
+        ${threadHtml}
+      </div>
+    `;
+    $('dmFooter').innerHTML = `
+      <button class="btn btn-outline" type="button" data-close>閉じる</button>
+      <button class="btn btn-outline" type="button" data-followup="${r.id}">続報を登録</button>
+      ${r.status === 'raw' ? '' : `<button class="btn btn-outline" type="button" data-archive="${r.id}">アーカイブ</button>`}
+      <button class="btn btn-primary" type="button" data-edit="${r.id}">属性を編集</button>
+    `;
+    openModal('detailModal');
+  }
+
+  // ---- 行アクション・詳細内アクション（委譲） ----
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-archive],[data-delete],[data-newquest]');
+    if (!t) return;
+    if (t.dataset.newquest != null) { e.preventDefault(); const r = findInfo(t.dataset.newquest); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openQuestFromInfo(r), d.hidden ? 0 : 210); return; }
+    if (t.dataset.detail != null) { e.preventDefault(); const openDetailModal = document.getElementById('detailModal'); if (!openDetailModal.hidden) closeModal(openDetailModal); setTimeout(() => openDetail(t.dataset.detail), openDetailModal.hidden ? 0 : 210); }
+    else if (t.dataset.thread != null) { e.preventDefault(); const root = rootOf(findInfo(t.dataset.thread)); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openDetail(root.id), d.hidden ? 0 : 210); }
+    else if (t.dataset.followup != null) { const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('new', null, findInfo(t.dataset.followup)), d.hidden ? 0 : 210); }
+    else if (t.dataset.edit != null) { const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('edit', findInfo(t.dataset.edit), null), d.hidden ? 0 : 210); }
+    else if (t.dataset.archive != null) { const r = findInfo(t.dataset.archive); if (confirm('「' + r.title + '」をアーカイブしますか？（論理削除・監査保持）')) { r.status = 'archived'; refresh(); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); } }
+    else if (t.dataset.delete != null) { const r = findInfo(t.dataset.delete); if (confirm('未判定の「' + r.title + '」を削除しますか？（登録者本人の raw のみ物理削除可）')) { INFO = INFO.filter(x => x.id !== r.id); refresh(); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); } }
+  });
+
+  // ---- この情報からクエストを作成（機会特定→行動） ----
+  let qfiInfoId = null;
+  function openQuestFromInfo(r) {
+    qfiInfoId = r.id;
+    $('qfiFrom').textContent = r.title;
+    $('qfiFromBody').innerHTML = (r.summary ? `<p style="margin:0 0 6px"><strong>要約：</strong>${r.summary}</p>` : '') + r.body_html;
+    $('qfiName').value = r.title;
+    $('qfiPurpose').value = r.summary || r.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+    $('qfiCat').value = ''; $('qfiDue').value = '';
+    clearFieldErrors($('questFromInfoModal'));
+    openModal('questFromInfoModal');
+  }
+  $('qfiCreate').addEventListener('click', () => {
+    const name = $('qfiName').value.trim();
+    clearFieldErrors($('questFromInfoModal'));
+    if (!name) { setFieldError($('qfiName'), 'クエスト件名を入力してください'); $('qfiName').focus(); return; }
+    const r = findInfo(qfiInfoId);
+    if (r) { r.links.push({ target: 'quests', title: name, kind: 'related', origin: 'manual', score: null }); refresh(); }
+    closeModal($('questFromInfoModal'));
+    alert('クエスト「' + name + '」を作成しました（デモ）。\nこの情報を関連リンク（関連）として自動で紐づけました。\n実装では SC-11 の本フォームを開き、保存時に info_link を作成します（API C＝from_info_id）。');
+  });
+
+  renderWordCloud();
+</script>
+</body>
+</html>

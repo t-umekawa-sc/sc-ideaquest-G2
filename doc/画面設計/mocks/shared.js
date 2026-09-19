@@ -700,7 +700,7 @@ window.DataTable = (function () {
         const style = pct ? ` style="width:${pct.toFixed(4)}%"` : '';
         const ind = c.sortable ? '<span class="dt-sort-ind"></span>' : '';
         const resizer = c.resizable ? `<span class="dt-resizer" data-dt-resizer="${esc(c.key)}"></span>` : '';
-        return `<th scope="col" class="${cls}"${aria}${style} data-key="${esc(c.key)}"><div class="dt-th"><span class="dt-th__label">${esc(c.label)}</span>${ind}</div>${resizer}</th>`;
+        return `<th scope="col" class="${cls}"${aria}${style} data-key="${esc(c.key)}" title="${esc(c.label)}"><div class="dt-th"><span class="dt-th__label">${esc(c.label)}</span>${ind}</div>${resizer}</th>`;
       }).join('') + '</tr>';
     }
 
@@ -718,8 +718,18 @@ window.DataTable = (function () {
         return `<td class="${cls}">${inner}</td>`;
       }).join('');
       // クリック可（onRowClick 定義時）の行は .dt-row--link＝ホバーで指カーソル（§4.5 ⑪ クリックの標準挙動）。
-      const trCls = [typeof cfg.onRowClick === 'function' ? 'dt-row--link' : '', pinned ? 'is-pinned' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
-      return `<tr data-dt-row="${id}"${trCls ? ` class="${trCls}"` : ''}>${tds}</tr>`;
+      const linkCls = typeof cfg.onRowClick === 'function' ? 'dt-row--link' : '';
+      // サブ行（cfg.subRow）＝1レコードを「見出し行＋全幅の補足行（要約等）」で2行表示する（罫線は主行↔サブ行の間に引かない）。
+      // ピン中の行は sticky と干渉するため主行のみ表示。opt-in（未定義の画面は従来どおり1行）。
+      const sub = (!pinned && typeof cfg.subRow === 'function') ? cfg.subRow(r) : '';
+      const hasSub = sub != null && sub !== '';
+      const trCls = [linkCls, pinned ? 'is-pinned' : '', hasSub ? 'has-subrow' : '', cfg.rowClass ? cfg.rowClass(r) : ''].filter(Boolean).join(' ');
+      let out = `<tr data-dt-row="${id}"${trCls ? ` class="${trCls}"` : ''}>${tds}</tr>`;
+      if (hasSub) {
+        const subCls = ['dt-subrow', linkCls].filter(Boolean).join(' ');
+        out += `<tr data-dt-row="${id}" class="${subCls}"><td colspan="${vc.length}">${sub}</td></tr>`;
+      }
+      return out;
     }
 
     // カード本文。cfg.card（自由HTML）優先。無ければ cfg.cardLayout（標準構造ヘルパ）で組み立てる。
@@ -1064,7 +1074,8 @@ window.DataTable = (function () {
     }
 
     render();
-    return { render: render, state: st };
+    // setData＝表示データセットを差し替えて再描画（例＝一覧の「続報を束ねる」で根のみ/全件を切替）。
+    return { render: render, state: st, setData: (d) => { cfg.data = d; render(); } };
   }
   return { init: init };
 })();
