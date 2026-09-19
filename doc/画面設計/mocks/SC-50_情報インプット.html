@@ -13,6 +13,17 @@
   .page-title { font-family: var(--font-pixel); font-size: var(--text-2xl); margin: var(--space-6) 0 var(--space-2); }
   .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-4); }
 
+  /* 全文検索バー（タイトル＋本文＋要約・標準の横断検索/列フィルタとは別建て・本番は ?q= PGroonga） */
+  .info-fts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-bottom: var(--space-4); }
+  .info-fts__label { font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }
+  .info-fts__box { position: relative; }
+  .info-fts__box .input { width: 100%; padding-right: 36px; }
+  .info-fts__clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; cursor: pointer;
+    color: var(--color-text-muted); font-size: 14px; line-height: 1; padding: 6px; border-radius: var(--radius-sm); }
+  .info-fts__clear:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
+  .info-fts__hint { grid-column: 2; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
+  @media (max-width: 640px) { .info-fts { grid-template-columns: 1fr; } .info-fts__hint { grid-column: 1; } }
+
   /* ワードクラウド（一覧上部＝現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む） */
   .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
     padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
@@ -129,6 +140,16 @@
   <a class="backlink" href="SC-01_ダッシュボード.html" style="display:inline-block;margin-bottom:var(--space-2);color:var(--color-text-muted);font-size:var(--text-sm)">← ダッシュボードへ戻る</a>
   <h1 class="page-title">情報インプット</h1>
   <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
+
+  <!-- 全文検索（タイトル＋本文＋要約）＝差別化の核。表の標準の横断検索/列フィルタとは別建て（本番は GET /info-items?q= の PGroonga 全文検索）。 -->
+  <div class="info-fts" role="search">
+    <label class="info-fts__label" for="ftsInput">🔍 全文検索</label>
+    <div class="info-fts__box">
+      <input id="ftsInput" class="input" type="search" placeholder="タイトル・本文・要約を横断検索…（例: ガイドライン）" aria-describedby="ftsHint">
+      <button type="button" class="info-fts__clear" id="ftsClear" aria-label="全文検索をクリア" hidden>✕</button>
+    </div>
+    <span id="ftsHint" class="info-fts__hint">本文テキストまで対象の全文検索（本番は PGroonga <code>?q=</code>）。表の<strong>検索・列フィルタ</strong>は表示項目に対する標準の絞込です。</span>
+  </div>
 
   <!-- ワードクラウド（現在の絞り込み範囲のトークン頻度・語クリックで q に流し込む・GET /info-items/word-cloud） -->
   <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
@@ -406,7 +427,7 @@
     unit: '件',
     perPage: 10,
     perPageOptions: [10, 20, 50],
-    searchFields: 'タイトル・本文',
+    searchFields: 'タイトル・要約・作成者',
     exportName: '情報インプット',
     emptyText: '該当する情報がありません。',
     onRowClick: (r) => openDetail(r.id),
@@ -427,7 +448,7 @@
         + (s ? `<div class="dt-card__stats"><span><span style="color:var(--color-text-subtle);margin-right:6px">要約</span>${s}</span></div>` : '');
     },
     columns: [
-      { key: 'title', label: 'タイトル / 要約', locked: true, width: 720, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.title, searchVal: (r) => r.title + ' ' + (r.summary || '') + ' ' + r.body_html.replace(/<[^>]+>/g, ''), csvVal: (r) => r.title, render: titleCell },
+      { key: 'title', label: 'タイトル / 要約', locked: true, width: 720, sortable: true, filter: { type: 'text' }, sortVal: (r) => r.title, searchVal: (r) => r.title + ' ' + (r.summary || ''), csvVal: (r) => r.title, render: titleCell },
       { key: 'status', label: '状態', width: 110, sortable: true, filter: { type: 'enum', options: Object.entries(L.status).map(([v, l]) => [v, l[0]]) }, sortVal: (r) => r.status, filterVal: (r) => r.status, csvVal: (r) => L.status[r.status][0], render: (r) => `<span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>` },
       { key: 'priority', label: '優先度', width: 120, sortable: true, filter: { type: 'enum', options: Object.entries(L.priority) }, sortVal: (r) => r.priority || '', filterVal: (r) => r.priority || '', csvVal: (r) => r.priority ? L.priority[r.priority] : '', render: (r) => r.priority ? `<span title="${L.priority[r.priority]}">${L.priority[r.priority]}</span>` : '<span class="muted">—</span>' },
       { key: 'impactClass', label: '影響分類', width: 140, sortable: true, filter: { type: 'enum', options: Object.entries(L.impactClass).map(([v, l]) => [v, l[0]]) }, sortVal: (r) => r.impactClass || '', filterVal: (r) => r.impactClass || '', csvVal: (r) => r.impactClass ? L.impactClass[r.impactClass][0] : '', render: (r) => r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}" title="${L.impactClass[r.impactClass][0]}">${L.impactClass[r.impactClass][0]}</span>` : '<span class="muted">—</span>' },
@@ -440,8 +461,8 @@
       { key: '_actions', label: '', actions: true, locked: true, width: 80, render: actionsCell },
     ],
   });
-  // 判定状態モード（すべて/未判定=raw/判定済=curated）＋続報束ねを合成して表示データを算出。
-  let infoFilter = { status: 'all', rootsOnly: false };
+  // 判定状態モード（すべて/未判定=raw/判定済=curated）＋続報束ね＋全文検索(fts)を合成して表示データを算出。
+  let infoFilter = { status: 'all', rootsOnly: false, fts: '' };
   function updateStatusCounts() {
     const active = INFO.filter(x => x.status !== 'archived');   // 件数は状態タブごとの総数（他フィルタに依存しない＝クエストのアイデア一覧と同方針）
     document.getElementById('cntAll').textContent = active.length;
@@ -452,6 +473,8 @@
     let data = INFO.filter(x => x.status !== 'archived');   // 一覧の既定＝アーカイブ除外
     if (infoFilter.status !== 'all') data = data.filter(x => x.status === infoFilter.status);
     if (infoFilter.rootsOnly) data = data.filter(x => !x.parent);
+    const q = infoFilter.fts.trim().toLowerCase();          // 全文検索＝タイトル＋本文＋要約（本番は ?q= PGroonga）
+    if (q) data = data.filter(x => (x.title + ' ' + (x.summary || '') + ' ' + x.body_html.replace(/<[^>]+>/g, ' ')).toLowerCase().includes(q));
     dt.setData(data);
     updateStatusCounts();
   }
@@ -464,6 +487,17 @@
   // 続報を束ねる（roots_only）＝ON で続報（親ありの行）を隠し、元情報（根）だけを表示（本番は GET /info-items?roots_only=true）。
   document.getElementById('rootsOnly').addEventListener('change', (e) => {
     infoFilter.rootsOnly = e.target.checked; applyInfoFilter();
+  });
+  // 全文検索（タイトル＋本文＋要約）＝標準の横断検索/列フィルタとは別建て（本番は GET /info-items?q= PGroonga）。
+  const ftsInput = document.getElementById('ftsInput');
+  const ftsClear = document.getElementById('ftsClear');
+  ftsInput.addEventListener('input', (e) => {
+    infoFilter.fts = e.target.value;
+    ftsClear.hidden = !e.target.value;
+    applyInfoFilter();
+  });
+  ftsClear.addEventListener('click', () => {
+    ftsInput.value = ''; infoFilter.fts = ''; ftsClear.hidden = true; applyInfoFilter(); ftsInput.focus();
   });
   updateStatusCounts();   // 初期表示の件数
 
