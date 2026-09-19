@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ConfirmProvider, SnackbarProvider } from "@/components/ui";
+import { BlurBlockActivatorOnPointer } from "@/components/util/BlurBlockActivatorOnPointer";
 import { LogoutAllMenuItem, LogoutMenuItem } from "@/features/auth";
 import { LiveAppHeader, RealtimeProvider } from "@/features/notifications";
 import { BackgroundImageMenuItem } from "@/features/profile";
@@ -83,6 +84,8 @@ export default async function AppLayout({
           <LogoutAllMenuItem />
         </li>
       </LiveAppHeader>
+      {/* 横断＝行/カード/検索結果など「ブロック活性要素」をマウスで開いた後の残留フォーカス枠を一括で解消（a11y のキーボード焦点は維持）。 */}
+      <BlurBlockActivatorOnPointer />
       <main className="container" style={{ paddingBlock: "var(--space-8)" }}>
         {children}
       </main>
