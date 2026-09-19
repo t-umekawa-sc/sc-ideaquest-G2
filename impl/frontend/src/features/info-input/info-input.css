@@ -4,8 +4,9 @@
 /* 画面名・戻る導線はクエスト一覧（SC-10）と統一＝h1 は既定フォント（.page-head h1）・backlink--float。 */
 .info-page .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 
-/* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁（.info-page スコープで独立定義）。 */
-.info-page .tabs { position: sticky; top: var(--header-h); z-index: 5; background: var(--color-bg); padding-top: var(--space-3);
+/* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁（.info-page スコープで独立定義）。
+   sticky top は sticky の戻るピル（backlink--float＝header-h+space-2）の下に来るよう +46px オフセット（重なり回避・クエストと同値）。 */
+.info-page .tabs { position: sticky; top: calc(var(--header-h) + 46px); z-index: 5; background: var(--color-bg); padding-top: var(--space-3);
   box-shadow: 0 6px 8px -8px rgba(15,23,42,.25); display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border);
   margin: var(--space-4) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .info-page .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
