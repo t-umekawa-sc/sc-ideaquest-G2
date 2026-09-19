@@ -50,7 +50,7 @@
 | --- | --- | --- | --- |
 | `POST /info-links` | 手動リンク追加 | ボディ: `info_item_id`・`target_type`（`ideas\|concepts\|quests\|assumptions`）・`target_id`・`kind?`（既定 `related`）。`origin=manual` | 作成した `info_link`。同一 `(info,target)` 重複は 409 `conflict`（既存を返す/更新に誘導） |
 | `PATCH /info-links/{id}` | 種別変更（関連↔裏付け↔反証） | ボディ: `kind`（`related\|supporting\|refuting`） | 更新後の `info_link`。**`kind=refuting` へ変更（manual）で post-commit＝「根底を揺さぶる」通知＋要再評価 flag**（成果物の作成者＋評価者・§N.6・コンセプト機能 §3.5） |
-| `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・行は残す）。auto リンクを人が「不要」と判断 |
+| `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・**行は残す**）。auto リンクを人が「不要」と判断＝**以後の再計算でも復活しない**（§N.6 の upsert が既存行の `rejected_at` を尊重）。棄却は物理削除でなく論理（監査・再学習の材料に残す） |
 | `POST /info-links/{id}/unreject` | 棄却の取消 | — | `rejected_at` を NULL に |
 
 - **自動リンク生成は EP を持たない**＝情報保存/成果物保存の内部トリガでサーバーが類似度計算し `info_links(origin=auto, kind=related, score)` を upsert（§N.6）。**通知は出さない**（低コミット・閾値＋上位 N）。
@@ -75,7 +75,7 @@
 - **トークン化＝`janome`**（FR-39 チャット要約で導入済み・純Python・MIT を再利用＝DRY）。**`body_text`（平文）**をストップワード除去→`info_tokens`（§5.36）。**保存時に同期**（単一情報は軽量＝バックグラウンド不要・§12-2）。一覧ワードクラウド＝保存済みトークンの集計／入力ダイアログのプレビュー＝`POST /info-items/word-cloud-preview`（草稿を同期トークン化・永続しない）。
 - **要約＝抽出型 `summarize_text`（`app/tenant/quests/summarize.py`・janome・オフライン・無料・決定的）を再利用**（§12-3）。`body_text` から**保存時に同期生成**し `summary` へ。外部送信ゼロ＝内部情報でも privacy 問題なし。LLM 生成は将来 seam（`summarize_text` 差替え・要約用途は `claude-haiku-4-5` 適・内部データ外部送信ポリシーは Phase2）。
 - **一致度（類似度）**＝情報本文と アイデア/コンセプト本文の**キーワード重なり／TF-IDF**。**閾値＋上位 N**。**事前計算して `info_links.score` に保存**（都度計算しない・§5.35）。
-- **再計算トリガ**＝情報の追加/更新（`POST`/`PATCH /info-items`）／アイデア・コンセプトの保存（D/コンセプト段）。auto リンクは upsert（既定 `kind=related`・人が変えた種別は保持）。
+- **再計算トリガ**＝情報の追加/更新（`POST`/`PATCH /info-items`）／アイデア・コンセプトの保存（D/コンセプト段）。auto リンクは **upsert（既存行を尊重）**＝既定 `kind=related`・**人が変えた種別（`kind`）を保持**し、**棄却（`rejected_at`）も保持する**。すなわち **一度棄却した auto リンクは再計算で復活しない**（`(info_item_id, target_type, target_id)` UNIQUE の既存行に対し `score` だけ更新し、`rejected_at`/`kind` は上書きしない）。新規の (info,target) 組だけ新たに auto 生成する。
 - **反証の揺さぶり**＝`info_links.kind=refuting`（manual）への遷移で post-commit＝対象成果物の作成者＋評価者へ H 通知（`notification_type` は要追加検討＝`idea_updated` 相当 or 新設）＋「要再評価」フラグ（コンセプト機能 §3.5）。1 情報の反証 → 1 前提 → 複数コンセプトへ波及。
 - **MVP＝キーワード/TF-IDF**／**Phase2＝埋め込みベクトル（意味的類似）・矛盾の自動検出（LLM 支援は別途コスト/データ保護判断）**。
 
