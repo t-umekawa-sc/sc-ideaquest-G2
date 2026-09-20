@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.me.deps import require_me
 from app.tenant.info import application as info_service
-from app.tenant.info.schemas import InfoListResponse, WordCloudResponse
+from app.tenant.info.schemas import InfoDetailDTO, InfoListResponse, WordCloudResponse
 
 router = APIRouter(prefix="/api/v1", tags=["info"])
 
@@ -52,3 +52,18 @@ def list_info_items(
         roots_only=roots_only, sort=sort, page=page, per_page=per_page,
     )
     return InfoListResponse(**result)
+
+
+@router.get("/info-items/{info_id}", response_model=InfoDetailDTO)
+def get_info_item_detail(
+    info_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> InfoDetailDTO:
+    """情報詳細（SC-52・N.1）＝全属性＋関連リンク＋続報スレッド＋ミニ・ワードクラウド＋`can`。読取専用。
+
+    静的パス `/info-items/word-cloud` より後に定義（動的パスに優先させる）。不在/他テナントは 404。
+    """
+    result = info_service.get_info_detail(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
+    return InfoDetailDTO(**result)

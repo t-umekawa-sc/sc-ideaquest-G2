@@ -21,6 +21,8 @@
 | N-TC-007 | int | ソートのホワイトリスト（`priority`／未知キー） | priority 差の情報 | `list_info_items(sort=[("priority",False)])`／未知キー | priority 昇順で返す／未知キーは呼び出し側で 422（下記 api） | N.1／§1.8.1① |
 | N-TC-008 | int | ワードクラウド集計（token GROUP BY・count 降順・limit） | info_tokens に token/count を seed | `word_cloud(limit=3)` | count 降順の上位3 token を `{token,count,weight}` で返す | N.6／§5.36 |
 | N-TC-009 | int | 続報を束ねる（roots_only＝根のみ） | 根＋続報を seed | `build_info_list_query(roots_only=True)` | `parent_info_id IS NULL` の根のみ返す（続報は除外） | N.1／§12-1 |
+| N-TC-010 | int | 詳細集計（categories/links〔target_title 解決・rejected 含む〕/thread/tokens_top） | 情報＋カテゴリ＋リンク（実 idea/quest＋棄却）＋続報＋トークン | `get_info_item`／`links_for_item`／`resolve_link_titles`／`follow_up_items`／`tokens_top` | 各集計が正（棄却リンクは rejected=true・target_title は idea/quest から解決・続報は時系列） | N.1／§5.33-5.36 |
+| N-TC-011 | int | 情報判定権限の判定（is_curator） | curator 付与／未付与／剥奪(revoked) | `is_curator(user_id)` | 付与=true・未付与/剥奪=false | N.0／§5.37 |
 
 ## 2. 一覧・ワードクラウド API（SC-50・N.1）
 
@@ -35,6 +37,10 @@
 | N-TC-105 | api | 全文検索タブ（`q`）でヒット行のみ | 本文に語を含む/含まない情報 | `GET /info-items?q=<語>` | 該当語を含む情報のみ返る | N.1／§1.11 |
 | N-TC-106 | api | ワードクラウドが tokens[] を返す | info_tokens を seed | `GET /info-items/word-cloud` | `tokens[]`＝`{token,count,weight}`（count 降順） | N.6／SC-50 |
 | N-TC-107 | api | 状態 facet 件数（すべて/未判定/判定済） | raw/curated/archived を seed | `GET /info-items` | `facets.status`＝`{all,raw,curated}`（archived 除外・現行フィルタ反映・タブ件数バッジ用） | N.1／SC-50 |
+| N-TC-108 | api | 詳細が DTO 形状（全属性＋links target_title＋thread＋tokens_top＋can） | 情報＋関連 seed | `GET /info-items/{id}` | 全属性・`links[].target_title`・`thread`（parent/follow_ups）・`tokens_top`・`can` を返す | N.1／SC-52 |
+| N-TC-109 | api | can フラグ（作成者/curator/全員） | 作成者本人でログイン／curator 付与有無 | `GET /info-items/{id}` | `can.edit_content`＝作成者のみ true／`can.curate`＝curator のみ true／`can.add_link`＝常に true | N.0／SC-50 |
+| N-TC-110 | api | 不在/他テナントは 404 | ログイン済 | `GET /info-items/<不在id>` | 404 `not_found`（存在秘匿） | N.0 |
+| N-TC-111 | api | 未認証遮断 | セッション無し | `GET /info-items/{id}` | 401 `unauthenticated` | require_me（N.0） |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

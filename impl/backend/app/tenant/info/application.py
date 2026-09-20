@@ -140,6 +140,96 @@ def get_info_items(
             "facets": facets}
 
 
+def _parse_uuid(value: str, *, field: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(value)
+    except (ValueError, AttributeError):
+        raise AppError(422, "validation_error", detail=f"{field} が不正です", errors=[{"field": field}])
+
+
+def _thread_item_dto(item, creators) -> dict:
+    u = creators.get(item.created_by_id)
+    return {"id": str(item.id), "title": item.title,
+            "created_by": u.display_name if u else None, "created_at": item.created_at}
+
+
+def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, can) -> dict:
+    return {
+        "id": str(item.id),
+        "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
+        "title": item.title,
+        "body_html": item.body_html,
+        "summary": item.summary,
+        "source_url": item.source_url,
+        "due_date": item.due_date,
+        "status": item.status,
+        "priority": item.priority,
+        "source": item.source,
+        "classification": item.classification,
+        "scope": item.scope,
+        "target_business": item.target_business,
+        "impact_level": item.impact_level,
+        "impact_class": item.impact_class,
+        "impact_timing": item.impact_timing,
+        "triaged_on": item.triaged_on,
+        "triage": item.triage,
+        "triage_reason": item.triage_reason,
+        "categories": categories,
+        "created_by": _creator_dto(creators.get(item.created_by_id)),
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+        "links": [{
+            "id": str(l.id), "target_type": l.target_type, "target_id": str(l.target_id),
+            "target_title": title_map.get(l.target_id),
+            "kind": l.kind, "origin": l.origin,
+            "score": float(l.score) if l.score is not None else None,
+            "rejected": l.rejected_at is not None,
+        } for l in links],
+        "thread": {
+            "parent": _thread_item_dto(parent, creators) if parent else None,
+            "follow_ups": [_thread_item_dto(f, creators) for f in follow_ups],
+        },
+        "tokens_top": tokens,
+        "can": can,
+    }
+
+
+def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) -> dict:
+    """情報詳細（SC-52・N.1）＝全属性＋categories＋links〔target_title 解決〕＋thread＋tokens_top＋can。
+
+    会社内 active ユーザーは閲覧可（N.0）。不在/他テナントは 404（存在秘匿）。`can` はサーバー算出
+    （内容=作成者／キュレーション=curator／リンク=全員）＝フロントは反映のみ・変更系で再検証。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        categories = repo.categories_for_items(ts, [item.id]).get(item.id, [])
+        links = repo.links_for_item(ts, item.id)
+        title_map = repo.resolve_link_titles(ts, links)
+        follow_ups = repo.follow_up_items(ts, item.id)
+        parent = repo.get_info_item(ts, item.parent_info_id) if item.parent_info_id else None
+        uids = {item.created_by_id} | {f.created_by_id for f in follow_ups}
+        if parent:
+            uids.add(parent.created_by_id)
+        creators = repo.users_by_ids(ts, list(uids))
+        tokens = repo.tokens_top(ts, item.id, limit=30)
+        can = {
+            "edit_content": item.created_by_id == user.id,  # 内容＝作成者のみ（status 非依存）
+            "curate": repo.is_curator(ts, user.id),          # 属性/triage/status/archive＝curator
+            "add_link": True,                                # 関連リンク＝会社内 active 全員
+        }
+        return _detail_dto(item, categories=categories, links=links, title_map=title_map,
+                           parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens, can=can)
+
+
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:
     """ワードクラウド（SC-50・N.6・§5.36）＝保存済みトークンの頻度集計（archived 除外・count 降順）。"""
     if limit < 1:

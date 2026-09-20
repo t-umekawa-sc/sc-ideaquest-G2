@@ -78,6 +78,48 @@ def test_n_tc_107_status_facets(client, info_env):
     assert facets["all"] >= 1 and facets["raw"] >= 1 and facets["curated"] >= 1
 
 
+def test_n_tc_108_detail_shape(client, info_env):
+    """N-TC-108: 詳細が DTO 形状（全属性＋links＋thread＋tokens_top＋can）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(f"{INFO}/{info_env.ids.a}")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["id"] == str(info_env.ids.a)
+    assert d["status"] == "curated" and d["impact_class"] == "opportunity"
+    assert set(d["categories"]) == {"ext_technology", "ext_industry"}
+    assert "body_html" in d and "summary" in d
+    assert len(d["links"]) == 3 and any(l["rejected"] for l in d["links"])  # 棄却1件含む
+    assert d["thread"]["parent"] is None
+    assert {t["id"] for t in d["thread"]["follow_ups"]} == {str(info_env.ids.fu1), str(info_env.ids.fu2)}
+    assert d["tokens_top"] and d["tokens_top"][0]["token"] == "生成ai"
+    assert set(d["can"].keys()) == {"edit_content", "curate", "add_link"}
+
+
+def test_n_tc_109_can_flags(client, info_env):
+    """N-TC-109: can＝作成者(edit_content)／curator(curate)／全員(add_link)。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # info_env は seed 一般ユーザーを作成者にしているので edit_content=true・curate=false・add_link=true。
+    d = client.get(f"{INFO}/{info_env.ids.a}").json()
+    assert d["can"]["edit_content"] is True   # 本人が作成者
+    assert d["can"]["curate"] is False        # curator 未付与
+    assert d["can"]["add_link"] is True       # 全員
+
+
+def test_n_tc_110_not_found_404(client, info_env):
+    """N-TC-110: 不在/他テナントは 404（存在秘匿）。"""
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(f"{INFO}/{_uuid.uuid4()}")
+    assert r.status_code == 404, r.text
+    assert r.json()["code"] == "not_found"
+
+
+def test_n_tc_111_detail_unauthenticated_401(client, info_env):
+    """N-TC-111: 未認証は 401。"""
+    r = client.get(f"{INFO}/{info_env.ids.a}")
+    assert r.status_code == 401, r.text
+
+
 def test_n_tc_106_word_cloud(client, info_env):
     """N-TC-106: ワードクラウドが tokens[] を count 降順で返す。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)

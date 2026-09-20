@@ -15,7 +15,7 @@ from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
-from app.tenant.info.orm import InfoItem, InfoLink, InfoToken
+from app.tenant.info.orm import InfoCurator, InfoItem, InfoLink, InfoToken
 from app.tenant.profile.orm import User
 
 # 全文検索の対象式＝FTS 索引（idx_info_items_fts）と一致（title＋body_text・§1.11）。
@@ -162,6 +162,61 @@ def users_by_ids(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, User
         return {}
     rows = session.execute(select(User).where(User.id.in_(ids))).scalars().all()
     return {u.id: u for u in rows}
+
+
+# ---- 詳細（GET /info-items/{id}・N.1）----
+
+def get_info_item(session: Session, info_id: uuid.UUID) -> InfoItem | None:
+    """情報を1件取得（不在は None）。"""
+    return session.get(InfoItem, info_id)
+
+
+def links_for_item(session: Session, info_id: uuid.UUID) -> list[InfoLink]:
+    """当該情報の関連リンク（棄却済みも含む＝DTO で rejected を返す・§N.3）。"""
+    return list(session.execute(
+        select(InfoLink).where(InfoLink.info_item_id == info_id)
+    ).scalars().all())
+
+
+def resolve_link_titles(session: Session, links: list[InfoLink]) -> dict[uuid.UUID, str]:
+    """関連リンクの target_title を成果物から解決（ideas/quests＝実装済ドメイン）。未実装/不在は含めない。"""
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest
+    out: dict[uuid.UUID, str] = {}
+    idea_ids = [l.target_id for l in links if l.target_type == "ideas"]
+    quest_ids = [l.target_id for l in links if l.target_type == "quests"]
+    if idea_ids:
+        for iid, title in session.execute(select(Idea.id, Idea.title).where(Idea.id.in_(idea_ids))).all():
+            out[iid] = title
+    if quest_ids:
+        for qid, title in session.execute(select(Quest.id, Quest.title).where(Quest.id.in_(quest_ids))).all():
+            out[qid] = title
+    return out
+
+
+def follow_up_items(session: Session, info_id: uuid.UUID) -> list[InfoItem]:
+    """続報（子）の情報を時系列（created_at 昇順）で（§12-1）。"""
+    return list(session.execute(
+        select(InfoItem).where(InfoItem.parent_info_id == info_id).order_by(InfoItem.created_at.asc())
+    ).scalars().all())
+
+
+def tokens_top(session: Session, info_id: uuid.UUID, *, limit: int) -> list[dict]:
+    """当該情報のトークン上位（ミニ・ワードクラウド・count 降順・§5.36）。"""
+    rows = session.execute(
+        select(InfoToken.token, InfoToken.count)
+        .where(InfoToken.info_item_id == info_id)
+        .order_by(InfoToken.count.desc(), InfoToken.token.asc()).limit(limit)
+    ).all()
+    max_c = int(rows[0].count) if rows else 0
+    return [{"token": t, "count": int(c), "weight": round(int(c) / max_c, 4) if max_c else None} for t, c in rows]
+
+
+def is_curator(session: Session, user_id: uuid.UUID) -> bool:
+    """情報判定権限（info_curator・未剥奪）を持つか（§5.37）。"""
+    return session.execute(
+        select(InfoCurator.id).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None)).limit(1)
+    ).first() is not None
 
 
 def word_cloud(session: Session, *, limit: int) -> list[dict]:

@@ -55,7 +55,7 @@
 - コンテナ＝backend/frontend/db running（他は未確認だが起動済のはず）。
 
 ### 未実装 / 未結線
-- **Phase B**＝`GET /info-items/{id}`（詳細＝全属性＋categories＋links〔target_title 解決〕＋thread＋tokens_top＋can）→ SC-52 詳細モーダル結線（現状 fixtures）。
+- **Phase B＝完了（2026-09-21）**＝`GET /info-items/{id}`（全属性＋categories＋links〔target_title を ideas/quests から解決〕＋thread＋tokens_top＋`can`〔edit_content=作成者／curate=curator／add_link=全員〕）＋`InfoDetailView` 結線（読み取り）。`seed_demo_info` のリンクを実 idea/quest（発見デモ）へ。pytest tests/info=22 green。**注意**＝ログイン seed ユーザー（テスト太郎）はデモ情報の作成者でも curator でもないので `can` は edit_content/curate=false（＝閲覧のみ）。編集モードの実機確認には curator 付与か本人作成情報が要る。
 - **Phase C**＝`POST`/`PATCH`/`archive`/`delete`＋`POST /info-links`＋画像（nh3 追加・janome トークン・要約 `summarize_text` 流用・自動リンク・親スナップショット）→ SC-51 フォーム結線。**着手前に §7 の仕様整理フェーズ必須**。
 - **Phase D**＝`POST /quests {from_info_id}` 逆リンク・`kind=refuting` 再評価通知・`info-curators` 権限 EP。
 - frontend の詳細/フォームは fixtures のまま。`nh3` は backend 依存未追加。
@@ -83,8 +83,9 @@
 ### 仕様整理フェーズ（Phase C 前ゲート）＝**完了（2026-09-21）**
 2. **情報の編集権限・画面制御を確定**（正本反映済＝API N.0/N.1/N.2/N.3・SC-50 §2/§7/§8/§11-0・データモデル §5.33・メモリ `info-edit-control-spec-phase`）。要点＝**内容(タイトル/本文/URL/参考資料)=作成者のみ(status非依存)＋編集履歴／キュレーション(属性/triage/status/archive)=curator／関連リンク(情報側)=会社内 active 全員・採否は成果物側の管理権限者に委任(別スコープ)／管理者=curator 付与のみ**。画面=**詳細1枚＋能力フラグ(can.edit_content/curate/add_link)でセクション別出し分け(3画面は作らない)**。Phase C 実装項目＝参考資料(`info_attachments`)・内容 revisions(`info_item_revisions`)。
 
-### Phase B＝詳細結線
-3. `doc/テスト/N_情報インプット.md` に詳細 TC 追記→`GET /info-items/{id}`（application/repository 追加・`can` 算出）→ `features/info-input/api.ts` の `getInfoItem` を実 API へ→ SC-52 詳細モーダル受入。
+### Phase B＝詳細結線＝**完了**（上記）。次は Phase C。
+### Phase C＝登録/編集/続報の write 結線（**着手前に仕様整理は完了済＝API N.0/SC-50/データモデル**）
+3. `POST /info-items`（低摩擦登録＝全員・`body_html` nh3 サニタイズ→`body_text`→`info_tokens`〔janome〕→`summary`〔`quests/summarize.py` 流用〕→auto `info_links`／`parent_info_id` で続報＝親リンクをスナップショット複製）。`PATCH /info-items/{id}`（内容=作成者〔status非依存〕＋内容 revisions／キュレーション=curator）。リンク `POST`/`PATCH`/reject `/info-links`（情報側=全員）。`nh3` を backend 依存へ追加。参考資料 `info_attachments`＋`POST /info-items/images`（MinIO）。データモデル追加＝`info_attachments`・`info_item_revisions`（migration 0029 想定）。TC md 先行・red-green。frontend＝SC-51 フォーム＋詳細のインライン編集（内容/属性/リンク）を実 API へ（モック SC-50 のロール別1画面編集・関連リンクのインライン編集が設計の正）。
 
 ### Phase C/D は §4 の通り。
 

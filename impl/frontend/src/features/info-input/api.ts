@@ -4,7 +4,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import { INFO_FIXTURES } from "./fixtures";
-import type { InfoCard, InfoItem, InfoLink, InfoListResult, InfoStatusFilter, WordCloudToken } from "./types";
+import type { InfoCard, InfoDetail, InfoItem, InfoLink, InfoListResult, InfoStatusFilter, WordCloudToken } from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
 
@@ -54,6 +54,11 @@ export async function searchInfoItems(q: string, signal?: AbortSignal): Promise<
 export async function fetchWordCloud(limit = 40, signal?: AbortSignal): Promise<WordCloudToken[]> {
   const res = await apiFetch<{ tokens: WordCloudToken[] }>(`/info-items/word-cloud?limit=${limit}`, { signal });
   return res?.tokens ?? [];
+}
+
+// 詳細（GET /info-items/{id}）＝全属性＋links〔target_title 解決〕＋thread＋tokens_top＋can（Phase B）。
+export function fetchInfoDetail(id: string, signal?: AbortSignal): Promise<InfoDetail | null> {
+  return apiFetch<InfoDetail>(`/info-items/${encodeURIComponent(id)}`, { signal });
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));

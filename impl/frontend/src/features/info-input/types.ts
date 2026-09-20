@@ -88,3 +88,59 @@ export interface WordCloudToken {
   count: number;
   weight?: number | null;
 }
+
+// --- 詳細 DTO（GET /info-items/{id}）＝backend InfoDetailDTO と一致。 ---
+export interface InfoLinkResolved {
+  id: string;
+  target_type: InfoLinkTarget;
+  target_id: string;
+  target_title?: string | null; // ideas/quests から解決（未実装ドメイン/不在は null）
+  kind: InfoLinkKind;
+  origin: InfoLinkOrigin;
+  score?: number | null;
+  rejected: boolean;
+}
+export interface InfoThreadItem {
+  id: string;
+  title: string;
+  created_by?: string | null;
+  created_at: string;
+}
+export interface InfoThread {
+  parent?: InfoThreadItem | null;
+  follow_ups: InfoThreadItem[];
+}
+export interface InfoCan {
+  edit_content: boolean; // 内容＝作成者のみ
+  curate: boolean; // 属性/triage/status/archive＝curator
+  add_link: boolean; // 関連リンク＝全員
+}
+export interface InfoDetail {
+  id: string;
+  parent_info_id?: string | null;
+  title: string;
+  body_html?: string | null;
+  summary?: string | null;
+  source_url?: string | null;
+  due_date?: string | null;
+  status: InfoStatus;
+  priority?: string | null;
+  source?: string | null;
+  classification?: string | null;
+  scope?: string | null;
+  target_business?: string | null;
+  impact_level?: string | null;
+  impact_class?: string | null;
+  impact_timing?: string | null;
+  triaged_on?: string | null;
+  triage?: string | null;
+  triage_reason?: string | null;
+  categories: string[];
+  created_by: InfoCreator;
+  created_at: string;
+  updated_at: string;
+  links: InfoLinkResolved[];
+  thread: InfoThread;
+  tokens_top: WordCloudToken[];
+  can: InfoCan;
+}

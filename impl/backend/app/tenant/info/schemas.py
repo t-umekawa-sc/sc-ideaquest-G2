@@ -79,3 +79,65 @@ class WordCloudTokenDTO(BaseModel):
 
 class WordCloudResponse(BaseModel):
     tokens: list[WordCloudTokenDTO]
+
+
+# ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------
+class InfoCanDTO(BaseModel):
+    """閲覧者の編集能力（サーバー算出・N.0）。内容=作成者／キュレーション=curator／リンク=全員。"""
+
+    edit_content: bool
+    curate: bool
+    add_link: bool
+
+
+class InfoLinkDTO(BaseModel):
+    id: str
+    target_type: str
+    target_id: str
+    target_title: str | None = None  # ideas/quests から解決（未実装ドメイン/不在は None）
+    kind: str
+    origin: str
+    score: float | None = None
+    rejected: bool = False
+
+
+class InfoThreadItemDTO(BaseModel):
+    id: str
+    title: str
+    created_by: str | None = None
+    created_at: datetime
+
+
+class InfoThreadDTO(BaseModel):
+    parent: InfoThreadItemDTO | None = None
+    follow_ups: list[InfoThreadItemDTO] = []
+
+
+class InfoDetailDTO(BaseModel):
+    id: str
+    parent_info_id: str | None = None
+    title: str
+    body_html: str | None = None
+    summary: str | None = None
+    source_url: str | None = None
+    due_date: date | None = None
+    status: str
+    priority: str | None = None
+    source: str | None = None
+    classification: str | None = None
+    scope: str | None = None
+    target_business: str | None = None
+    impact_level: str | None = None
+    impact_class: str | None = None
+    impact_timing: str | None = None
+    triaged_on: date | None = None
+    triage: str | None = None
+    triage_reason: str | None = None
+    categories: list[str] = []
+    created_by: InfoCreatorDTO
+    created_at: datetime
+    updated_at: datetime
+    links: list[InfoLinkDTO] = []
+    thread: InfoThreadDTO
+    tokens_top: list[WordCloudTokenDTO] = []
+    can: InfoCanDTO

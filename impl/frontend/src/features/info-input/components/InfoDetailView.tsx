@@ -1,18 +1,17 @@
 "use client";
 
-// SC-52 情報の詳細。正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。
-// モーダル（RouteModal）／フルページ双方から使う。データ源は api.ts（当面 fixtures）。
-import { useCallback, useEffect, useMemo, useState } from "react";
+// SC-52 情報の詳細（Phase B＝backend GET /info-items/{id} に結線・読み取り）。
+// 正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。モーダル/フルページ双方から使う。
+// 編集/属性/続報/アーカイブ（PATCH・リンクEP）は Phase C で結線＝ここでは can フラグで導線を出し分けるのみ。
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { useConfirm } from "@/components/ui";
-import { archiveInfoItem, followUps, getInfoItem, INFO_CHANGED_EVENT, rootOf } from "../api";
+import { fetchInfoDetail } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoItem } from "../types";
-import { cloudTokens } from "../wordcloud";
+import type { InfoDetail } from "../types";
 import "../info-input.css";
 
 function Attr({ label, value }: { label: string; value?: string | null }) {
@@ -26,35 +25,34 @@ function Attr({ label, value }: { label: string; value?: string | null }) {
 
 export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: () => void }) {
   const router = useRouter();
-  const confirm = useConfirm();
-  const [item, setItem] = useState<InfoItem | undefined>(() => getInfoItem(infoId));
+  const [item, setItem] = useState<InfoDetail | undefined>(undefined);
+  const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
 
-  const reload = useCallback(() => setItem(getInfoItem(infoId)), [infoId]);
   useEffect(() => {
-    reload();
-    window.addEventListener(INFO_CHANGED_EVENT, reload);
-    return () => window.removeEventListener(INFO_CHANGED_EVENT, reload);
-  }, [reload]);
-
-  const parent = useMemo(() => (item?.parent_info_id ? getInfoItem(item.parent_info_id) : undefined), [item]);
-  const fus = useMemo(() => (item ? followUps(item.id) : []), [item]);
-  const cloud = useMemo(() => (item ? cloudTokens(`${item.title} ${item.body_html.replace(/<[^>]+>/g, " ")} ${item.summary ?? ""}`) : []), [item]);
-
-  if (!item) return <p className="muted">情報が見つかりません。</p>;
-  const r = item;
-  const activeLinks = r.links.filter((l) => !l.rejected);
-  const cloudMax = Math.max(...cloud.map((t) => t[1]), 1);
+    const ac = new AbortController();
+    setState("loading");
+    fetchInfoDetail(infoId, ac.signal)
+      .then((d) => { if (d) { setItem(d); setState("ok"); } else { setState("notfound"); } })
+      .catch(() => setState("notfound"));
+    return () => ac.abort();
+  }, [infoId]);
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
+
+  if (state === "loading") return <div className="modal__body"><p className="muted">読み込み中…</p></div>;
+  if (state === "notfound" || !item) return <div className="modal__body"><p className="muted">情報が見つかりません。</p></div>;
+  const r = item;
+  const activeLinks = r.links.filter((l) => !l.rejected);
+  const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
 
   return (
     <>
       <div className="modal__body">
-        {parent ? (
+        {r.thread.parent ? (
           <div className="field dialog-section">
             <div className="dialog-label">元情報（続報元）</div>
             <div className="info-thread__meta">
-              🧵 <strong>{parent.title}</strong> の続報　<a href={`/info-items/${parent.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${parent.id}`); }}>元情報を開く</a>
+              🧵 <strong>{r.thread.parent.title}</strong> の続報　<a href={`/info-items/${r.thread.parent.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${r.thread.parent!.id}`); }}>元情報を開く</a>
             </div>
           </div>
         ) : null}
@@ -66,7 +64,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
             <span className={`badge ${STATUS_LABEL[r.status][1]}`}>{STATUS_LABEL[r.status][0]}</span>
             {r.impact_class ? <span className={`badge ${IMPACT_CLASS_LABEL[r.impact_class][1]}`}>{IMPACT_CLASS_LABEL[r.impact_class][0]}</span> : null}
             {r.priority ? <span className="badge badge-muted">優先度 {PRIORITY_LABEL[r.priority]}</span> : null}
-            {r.categories.map((c) => <span key={c} className="badge badge-muted">{CATEGORY_LABEL[c]}</span>)}
+            {r.categories.map((c) => <span key={c} className="badge badge-muted">{CATEGORY_LABEL[c] ?? c}</span>)}
           </div>
         </div>
 
@@ -78,8 +76,8 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">内容・説明</div>
-          {/* body_html は保存時＋表示時に nh3 サニタイズ済み（§12-4）。fixtures は信頼済み。 */}
-          <div className="rt-view" dangerouslySetInnerHTML={{ __html: r.body_html }} />
+          {/* body_html は保存時＋表示時に nh3 サニタイズ済み（§12-4・サーバー側で無害化）。 */}
+          <div className="rt-view" dangerouslySetInnerHTML={{ __html: r.body_html ?? "" }} />
           {r.source_url ? (
             <div style={{ marginTop: 6 }}>
               <a href={r.source_url} target="_blank" rel="noopener noreferrer">🔗 出典を開く</a>{" "}
@@ -90,10 +88,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
-          {cloud.length ? (
+          {r.tokens_top.length ? (
             <div className="wc-mini">
-              {cloud.map(([w, c]) => (
-                <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / cloudMax) * 0.9).toFixed(2)}rem`, opacity: (0.6 + (c / cloudMax) * 0.4).toFixed(2) }} title={`${w}（${c}）`}>{w}</span>
+              {r.tokens_top.map((t) => (
+                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + (t.count / cloudMax) * 0.9).toFixed(2)}rem`, opacity: (0.6 + (t.count / cloudMax) * 0.4).toFixed(2) }} title={`${t.token}（${t.count}）`}>{t.token}</span>
               ))}
             </div>
           ) : <p className="muted">主要語がありません。</p>}
@@ -124,10 +122,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
           {activeLinks.length ? (
             <ul className="link-list">
-              {activeLinks.map((l, i) => (
-                <li key={i} className="link-item">
+              {activeLinks.map((l) => (
+                <li key={l.id} className="link-item">
                   <span>{LINK_TARGET_LABEL[l.target_type]}</span>
-                  <span className="link-item__title">{l.target_title}</span>
+                  <span className="link-item__title">{l.target_title ?? <span className="muted">（対象未解決）</span>}</span>
                   <span className={`badge ${LINK_KIND_LABEL[l.kind][1]}`}>{LINK_KIND_LABEL[l.kind][0]}</span>
                   <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
                   {l.score != null ? <span className="info-thread__meta">一致 {Math.round(l.score * 100)}%</span> : null}
@@ -135,17 +133,17 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               ))}
             </ul>
           ) : <p className="muted">関連リンクはまだありません。</p>}
-          <div className="hint" style={{ marginTop: 6 }}>種別を「反証」に変えると、対象の作成者＋評価者へ通知＋要再評価が発火します（根底を揺さぶる）。</div>
+          <div className="hint" style={{ marginTop: 6 }}>情報側のリンク編集は会社内の全員が可能（編集は Phase C で結線）。採否・統制は成果物側の管理者に委ねます。</div>
         </div>
 
         <div className="field dialog-section">
           <div className="dialog-label">🧵 続報スレッド</div>
-          {fus.length ? (
+          {r.thread.follow_ups.length ? (
             <ul className="info-thread">
-              {fus.map((f) => (
+              {r.thread.follow_ups.map((f) => (
                 <li key={f.id}>
                   <div className="info-thread__title">{f.title}</div>
-                  <div className="info-thread__meta">{f.created_by}・{f.created_at}　<a href={`/info-items/${f.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${f.id}`); }}>開く</a></div>
+                  <div className="info-thread__meta">{f.created_by ?? ""}・{f.created_at.slice(0, 10)}　<a href={`/info-items/${f.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${f.id}`); }}>開く</a></div>
                 </li>
               ))}
             </ul>
@@ -155,11 +153,9 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
       <div className="modal__footer">
         <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose}>閉じる</button>
-        <button className="btn btn-outline" type="button" onClick={() => go(`/info-items/new?parent=${r.id}`)}>続報を登録</button>
-        {r.status !== "raw" ? (
-          <button className="btn btn-outline" type="button" onClick={async () => { const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（論理削除・監査保持）` }); if (ok) { archiveInfoItem(r.id); onClose(); } }}>アーカイブ</button>
-        ) : null}
-        <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/edit`)}>属性を編集</button>
+        {/* 続報登録・内容/属性編集・アーカイブ（PATCH/リンクEP）は Phase C で結線。can フラグで導線を出し分ける。 */}
+        {r.can.edit_content ? <button className="btn btn-outline" type="button" disabled title="Phase C で結線">内容を編集</button> : null}
+        {r.can.curate ? <button className="btn btn-outline" type="button" disabled title="Phase C で結線">属性を編集</button> : null}
       </div>
     </>
   );

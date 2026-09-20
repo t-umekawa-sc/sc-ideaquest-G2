@@ -362,15 +362,16 @@ def seed_demo_info() -> None:
             for cat in cats:
                 ts.add(InfoItemCategory(info_item_id=iid, category=cat))
         # 関連リンク（未棄却＝link_count に計上／棄却は除外）。target_id は多態参照（物理FKなし）。
-        ts.add(InfoLink(info_item_id=ids["i1"], target_type="ideas", target_id=uuid.uuid4(),
+        # 詳細で target_title を解決できるよう ideas/quests は実 seed（発見デモ）を指す。concepts は未実装ドメイン。
+        ts.add(InfoLink(info_item_id=ids["i1"], target_type="ideas", target_id=DEMO_DISCOVERY_IDEA_IDS[0],
                         kind="supporting", origin="auto", score=Decimal("0.82")))
-        ts.add(InfoLink(info_item_id=ids["i1"], target_type="quests", target_id=uuid.uuid4(),
+        ts.add(InfoLink(info_item_id=ids["i1"], target_type="quests", target_id=DEMO_DISCOVERY_QUEST_ID,
                         kind="related", origin="auto", score=Decimal("0.61")))
-        ts.add(InfoLink(info_item_id=ids["i2"], target_type="ideas", target_id=uuid.uuid4(),
+        ts.add(InfoLink(info_item_id=ids["i2"], target_type="ideas", target_id=DEMO_DISCOVERY_IDEA_IDS[0],
                         kind="related", origin="auto", score=Decimal("0.74")))
         ts.add(InfoLink(info_item_id=ids["i3"], target_type="concepts", target_id=uuid.uuid4(),
                         kind="refuting", origin="manual", score=Decimal("0.68")))
-        ts.add(InfoLink(info_item_id=ids["i5"], target_type="ideas", target_id=uuid.uuid4(),
+        ts.add(InfoLink(info_item_id=ids["i5"], target_type="ideas", target_id=DEMO_DISCOVERY_IDEA_IDS[1],
                         kind="supporting", origin="auto", score=Decimal("0.79")))
         # ワードクラウド用トークン（保存済み集計・§5.36）。
         tokens = {

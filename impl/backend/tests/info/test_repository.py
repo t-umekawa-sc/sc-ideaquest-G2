@@ -103,6 +103,44 @@ def test_n_tc_009_roots_only(info_env):
         assert {info_env.ids.a, info_env.ids.d, info_env.ids.b} <= set(ids)
 
 
+def test_n_tc_010_detail_aggregates(info_env):
+    """N-TC-010: 詳細集計＝links（target_title 解決・rejected 含む）/follow_ups（時系列）/tokens_top。"""
+    with get_tenant_session(info_env.db_identifier) as ts:
+        item = repo.get_info_item(ts, info_env.ids.a)
+        assert item is not None
+        links = repo.links_for_item(ts, info_env.ids.a)
+        assert len(links) == 3  # 未棄却2＋棄却1
+        assert sum(1 for l in links if l.rejected_at is not None) == 1
+        titles = repo.resolve_link_titles(ts, links)
+        # info_env は target_id をランダム UUID で seed（実 idea/quest 不在）＝解決は空でも落ちない。
+        assert isinstance(titles, dict)
+        fus = repo.follow_up_items(ts, info_env.ids.a)
+        assert [f.id for f in fus] == [info_env.ids.fu1, info_env.ids.fu2]  # created_at 昇順
+        tokens = repo.tokens_top(ts, info_env.ids.a, limit=10)
+        assert tokens and tokens[0]["token"] == "生成ai" and tokens[0]["weight"] == 1.0
+        assert repo.get_info_item(ts, __import__("uuid").uuid4()) is None  # 不在は None
+
+
+def test_n_tc_011_is_curator(info_env):
+    """N-TC-011: is_curator＝付与=true／未付与・剥奪(revoked)=false。"""
+    from datetime import datetime, timezone
+
+    from app.tenant.info.orm import InfoCurator
+    with get_tenant_session(info_env.db_identifier) as ts:
+        assert repo.is_curator(ts, info_env.user_id) is False  # 未付与
+        grant = InfoCurator(user_id=info_env.user_id)
+        ts.add(grant); ts.commit()
+    try:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            assert repo.is_curator(ts, info_env.user_id) is True  # 付与
+            row = ts.get(InfoCurator, grant.id); row.revoked_at = datetime(2026, 9, 20, tzinfo=timezone.utc); ts.commit()
+        with get_tenant_session(info_env.db_identifier) as ts:
+            assert repo.is_curator(ts, info_env.user_id) is False  # 剥奪
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(InfoCurator.__table__.delete().where(InfoCurator.user_id == info_env.user_id)); ts.commit()
+
+
 def test_n_tc_008_word_cloud(info_env):
     """N-TC-008: ワードクラウド集計（token GROUP BY・count 降順・limit・archived 除外）。"""
     # 会社全体集計のため bootstrap デモ token も混ざる＝構造（降順・正規化・archived 除外）で検証する。
