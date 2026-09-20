@@ -15,6 +15,9 @@ from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
     InfoCreateRequest,
     InfoDetailDTO,
+    InfoLinkCreateRequest,
+    InfoLinkDTO,
+    InfoLinkKindRequest,
     InfoListResponse,
     InfoUpdateRequest,
     WordCloudResponse,
@@ -106,3 +109,55 @@ def update_info_item(
     result = info_service.update_info_item(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, body=body)
     return InfoDetailDTO(**result)
+
+
+# ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）----
+
+
+@router.post("/info-links", response_model=InfoLinkDTO, status_code=201)
+def add_info_link(
+    body: InfoLinkCreateRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> InfoLinkDTO:
+    """手動リンク追加（SC-52・N.3）＝会社内 active 全員・origin=manual。同一 (info,target) は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.add_link(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
+    return InfoLinkDTO(**result)
+
+
+@router.patch("/info-links/{link_id}", response_model=InfoLinkDTO)
+def change_info_link_kind(
+    link_id: str,
+    body: InfoLinkKindRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> InfoLinkDTO:
+    """種別変更（関連↔裏付け↔反証・N.3）。全員。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.change_link_kind(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), link_id, kind=body.kind)
+    return InfoLinkDTO(**result)
+
+
+@router.post("/info-links/{link_id}/reject", response_model=InfoLinkDTO)
+def reject_info_link(link_id: str, request: Request, session: dict = Depends(require_me)) -> InfoLinkDTO:
+    """棄却（rejected_at セット・行は残す・N.3/§N.6）。全員。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.reject_link(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), link_id)
+    return InfoLinkDTO(**result)
+
+
+@router.post("/info-links/{link_id}/unreject", response_model=InfoLinkDTO)
+def unreject_info_link(link_id: str, request: Request, session: dict = Depends(require_me)) -> InfoLinkDTO:
+    """棄却の取消（rejected_at を NULL）。全員。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.unreject_link(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), link_id)
+    return InfoLinkDTO(**result)

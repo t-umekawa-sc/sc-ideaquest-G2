@@ -11,6 +11,16 @@ from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
 INFO = "/api/v1/info-items"
 WORD_CLOUD = "/api/v1/info-items/word-cloud"
+LINKS = "/api/v1/info-links"
+
+
+def _new_link(client, info_env):
+    """ids.d に手動リンクを1件作成して link id を返す（teardown が created_items のリンクを削除）。"""
+    import uuid as _uuid
+    r = client.post(LINKS, json={"info_item_id": str(info_env.ids.d), "target_type": "ideas",
+                                 "target_id": str(_uuid.uuid4())}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
 
 
 def _csrf(client) -> dict:
@@ -169,6 +179,57 @@ def test_n_tc_117_patch_forbidden(client, info_env):
     finally:
         _delete_info(info_env.db_identifier, str(other_id))
         _delete_user(info_env.db_identifier, other_uid)
+
+
+def test_n_tc_119_add_link(client, info_env):
+    """N-TC-119: 手動リンク追加（全員・201・origin=manual・kind=related）。"""
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(LINKS, json={"info_item_id": str(info_env.ids.d), "target_type": "quests",
+                                 "target_id": str(_uuid.uuid4())}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["origin"] == "manual" and d["kind"] == "related" and d["target_type"] == "quests"
+
+
+def test_n_tc_120_duplicate_link_409(client, info_env):
+    """N-TC-120: 同一 (info,target,type) の重複は 409。"""
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    body = {"info_item_id": str(info_env.ids.d), "target_type": "ideas", "target_id": str(_uuid.uuid4())}
+    assert client.post(LINKS, json=body, headers=_csrf(client)).status_code == 201
+    r2 = client.post(LINKS, json=body, headers=_csrf(client))
+    assert r2.status_code == 409, r2.text
+    assert r2.json()["code"] == "conflict"
+
+
+def test_n_tc_121_change_link_kind(client, info_env):
+    """N-TC-121: 種別変更（related→refuting）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    lid = _new_link(client, info_env)
+    r = client.patch(f"{LINKS}/{lid}", json={"kind": "refuting"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "refuting"
+
+
+def test_n_tc_122_reject_unreject(client, info_env):
+    """N-TC-122: 棄却／棄却解除（rejected_at セット→NULL）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    lid = _new_link(client, info_env)
+    assert client.post(f"{LINKS}/{lid}/reject", headers=_csrf(client)).json()["rejected"] is True
+    assert client.post(f"{LINKS}/{lid}/unreject", headers=_csrf(client)).json()["rejected"] is False
+
+
+def test_n_tc_123_link_enum_validation(client, info_env):
+    """N-TC-123: enum 検証（target_type/kind）。"""
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(LINKS, json={"info_item_id": str(info_env.ids.d), "target_type": "bogus",
+                                 "target_id": str(_uuid.uuid4())}, headers=_csrf(client))
+    assert r.status_code == 422 and any(e.get("field") == "target_type" for e in r.json().get("errors", []))
+    lid = _new_link(client, info_env)
+    r2 = client.patch(f"{LINKS}/{lid}", json={"kind": "bogus"}, headers=_csrf(client))
+    assert r2.status_code == 422 and any(e.get("field") == "kind" for e in r2.json().get("errors", []))
 
 
 def test_n_tc_112_create(client, info_env):

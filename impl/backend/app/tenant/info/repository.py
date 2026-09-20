@@ -232,6 +232,32 @@ def snapshot_parent_links(session: Session, parent_id: uuid.UUID, new_info_id: u
     return len(parent_links)
 
 
+# ---- 関連リンク（/info-links・N.3）----
+
+def find_link(session: Session, info_item_id: uuid.UUID, target_type: str, target_id: uuid.UUID) -> InfoLink | None:
+    """同一 (info, target_type, target_id) のリンクを検索（重複検出・棄却済みも含む・§5.35 UNIQUE）。"""
+    return session.execute(
+        select(InfoLink).where(
+            InfoLink.info_item_id == info_item_id,
+            InfoLink.target_type == target_type,
+            InfoLink.target_id == target_id,
+        )
+    ).scalars().first()
+
+
+def create_link(session: Session, *, info_item_id: uuid.UUID, target_type: str, target_id: uuid.UUID,
+                kind: str = "related", origin: str = "manual") -> InfoLink:
+    """手動リンクを1件作成（origin=manual・既定 kind=related・§N.3）。重複検出は呼び出し側で。"""
+    link = InfoLink(info_item_id=info_item_id, target_type=target_type, target_id=target_id,
+                    kind=kind, origin=origin)
+    session.add(link)
+    return link
+
+
+def get_link(session: Session, link_id: uuid.UUID) -> InfoLink | None:
+    return session.get(InfoLink, link_id)
+
+
 # ---- 詳細（GET /info-items/{id}・N.1）----
 
 def get_info_item(session: Session, info_id: uuid.UUID) -> InfoItem | None:

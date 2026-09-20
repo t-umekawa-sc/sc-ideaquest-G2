@@ -18,6 +18,8 @@ SOURCE_VALUES: frozenset[str] = frozenset({
     "competitor", "investor", "org_decision", "employee", "legal", "research", "other",
 })
 IMPACT_CLASS_VALUES: frozenset[str] = frozenset({"opportunity", "threat", "other"})
+LINK_TARGET_VALUES: frozenset[str] = frozenset({"ideas", "concepts", "quests", "assumptions"})
+LINK_KIND_VALUES: frozenset[str] = frozenset({"related", "supporting", "refuting"})
 
 
 class InfoCreatorDTO(BaseModel):
@@ -113,6 +115,20 @@ class InfoUpdateRequest(BaseModel):
     triage: str | None = None
     triage_reason: str | None = None
     categories: list[str] | None = None
+
+
+# ---- 関連リンク（/info-links・N.3）-----------------------------------------
+class InfoLinkCreateRequest(BaseModel):
+    """手動リンク追加（情報側＝会社内 active 全員・origin=manual）。"""
+
+    info_item_id: str
+    target_type: str
+    target_id: str
+    kind: str | None = None  # 既定 related
+
+
+class InfoLinkKindRequest(BaseModel):
+    kind: str  # related / supporting / refuting
 
 
 # ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------

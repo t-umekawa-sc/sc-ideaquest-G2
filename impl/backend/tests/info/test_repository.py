@@ -161,6 +161,20 @@ def test_n_tc_015_revisions_and_categories(info_env):
         ts.commit()  # teardown（conftest）が revisions/categories/items を物理削除
 
 
+def test_n_tc_016_create_find_link(info_env):
+    """N-TC-016: create_link（origin=manual・kind=related 既定）／find_link の重複検出。"""
+    import uuid as _uuid
+    tgt = _uuid.uuid4()
+    with get_tenant_session(info_env.db_identifier) as ts:
+        link = repo.create_link(ts, info_item_id=info_env.ids.d, target_type="ideas", target_id=tgt)
+        ts.flush()
+        assert link.origin == "manual" and link.kind == "related"
+        found = repo.find_link(ts, info_env.ids.d, "ideas", tgt)
+        assert found is not None and found.id == link.id
+        assert repo.find_link(ts, info_env.ids.d, "ideas", _uuid.uuid4()) is None  # 別 target は不検出
+        ts.commit()  # teardown（conftest）が created_items のリンクを物理削除
+
+
 def test_n_tc_010_detail_aggregates(info_env):
     """N-TC-010: 詳細集計＝links（target_title 解決・rejected 含む）/follow_ups（時系列）/tokens_top。"""
     with get_tenant_session(info_env.db_identifier) as ts:

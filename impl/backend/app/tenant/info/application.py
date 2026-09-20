@@ -19,6 +19,8 @@ from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.info.schemas import (
     IMPACT_CLASS_VALUES,
+    LINK_KIND_VALUES,
+    LINK_TARGET_VALUES,
     PRIORITY_VALUES,
     SOURCE_VALUES,
     STATUS_VALUES,
@@ -356,6 +358,84 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
         item.updated_at = datetime.now(timezone.utc)
         ts.commit()
     return get_info_detail(account_id, company_id, info_id)
+
+
+# ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）------------------
+
+def _link_dto(link, title: str | None) -> dict:
+    return {
+        "id": str(link.id), "target_type": link.target_type, "target_id": str(link.target_id),
+        "target_title": title, "kind": link.kind, "origin": link.origin,
+        "score": float(link.score) if link.score is not None else None,
+        "rejected": link.rejected_at is not None,
+    }
+
+
+def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
+    """手動リンク追加（SC-52・N.3）＝会社内 active 全員・origin=manual。同一組は 409。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if body.target_type not in LINK_TARGET_VALUES:
+        raise AppError(422, "validation_error", detail="target_type が不正です", errors=[{"field": "target_type"}])
+    kind = body.kind or "related"
+    if kind not in LINK_KIND_VALUES:
+        raise AppError(422, "validation_error", detail="kind が不正です", errors=[{"field": "kind"}])
+    info_id = _parse_uuid(body.info_item_id, field="info_item_id")
+    target_id = _parse_uuid(body.target_id, field="target_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if repo.get_info_item(ts, info_id) is None:
+            raise AppError(422, "validation_error", detail="情報が見つかりません", errors=[{"field": "info_item_id"}])
+        if repo.find_link(ts, info_id, body.target_type, target_id) is not None:
+            raise AppError(409, "conflict", detail="既に関連付け済みです")
+        link = repo.create_link(ts, info_item_id=info_id, target_type=body.target_type,
+                                target_id=target_id, kind=kind, origin="manual")
+        ts.flush()
+        title = repo.resolve_link_titles(ts, [link]).get(target_id)
+        dto = _link_dto(link, title)
+        ts.commit()
+    return dto
+
+
+def _mutate_link(account_id, company_id, link_id, mutate) -> dict:
+    """リンクの取得→変更→DTO 返却の共通処理（種別変更/棄却/解除）。不在は 404。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    lid = _parse_uuid(link_id, field="link_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        link = repo.get_link(ts, lid)
+        if link is None:
+            raise AppError(404, "not_found")
+        mutate(link)
+        title = repo.resolve_link_titles(ts, [link]).get(link.target_id)
+        dto = _link_dto(link, title)
+        ts.commit()
+    return dto
+
+
+def change_link_kind(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str, *, kind: str) -> dict:
+    """種別変更（関連↔裏付け↔反証・N.3）。※`refuting` の「揺さぶり」通知/要再評価は Phase D で発火。"""
+    if kind not in LINK_KIND_VALUES:
+        raise AppError(422, "validation_error", detail="kind が不正です", errors=[{"field": "kind"}])
+    return _mutate_link(account_id, company_id, link_id, lambda l: setattr(l, "kind", kind))
+
+
+def reject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) -> dict:
+    """棄却（rejected_at セット・行は残す・再計算で復活しない・N.3/§N.6）。"""
+    return _mutate_link(account_id, company_id, link_id,
+                        lambda l: setattr(l, "rejected_at", datetime.now(timezone.utc)))
+
+
+def unreject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) -> dict:
+    """棄却の取消（rejected_at を NULL）。"""
+    return _mutate_link(account_id, company_id, link_id, lambda l: setattr(l, "rejected_at", None))
 
 
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:
