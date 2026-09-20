@@ -4,106 +4,70 @@
 > 履歴は git に任せる。事実のみ・未確認は「未確認」と明記・コードは貼らずファイル/関数で示す。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: **2026-09-20 JST**
-- ブランチ: **main**。**本セッションの変更は未コミット**（ユーザー承認待ち）。`git status` に新規/変更多数（下記 §3）。`tmp_shots/` は `.gitignore` 追加済で追跡外。
-- 最新コミット（push 済・本セッション着手前）: **`33b0a49`**（docs(handoff)）。
-- **コミット方針**＝ユーザーが「コミットして」と言うまで**コミットしない**。まとめると1コミット＝「feat(info backend): Phase A 一覧サーバー委譲（4層＋migration 済ORM 結線）＋frontend 結線＋TC/seed」。gitignore は別コミット可。
+- 最終更新: **2026-09-20 21:57 JST**
+- ブランチ: **main**（この handoff 更新をコミット＆push した直後の想定＝作業ツリー clean）
+- 機能の最新コミット: **`2cc7137`** `refactor(info front): 編集導線を詳細インライン編集に一本化＋fixtures 全撤去`。この上に本 handoff 更新コミットが tip として載る（`git log --oneline -3` で確認）。
+- 本セッションのコミット列（古→新）: `022ab1b`(画像再ホスト) → `6cd4ae5`(参考資料) → `179d6d9`(アーカイブ) → `cf20de0`(続報登録UI) → `80f87b7`(この情報からクエスト作成) → `837a993`(raw物理削除) → `c8e139e`(curator付与EP+管理UI) → `f2c947b`(反証通知) → `2cc7137`(編集導線一本化)
+- コミット方針: ユーザーが「コミットして/プッシュして」と言うまでコミットしない。1スライス=1コミット。コミット末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
 
 ## 2. プロジェクトのゴール
-社内アイデア創出をゲーミフィケーションする Web アプリ「IDEAQUEST」。現行フェーズ＝**情報インプット機能（FR-41）**の実装。設計完備・frontend 移植完了。**backend は Phase A（一覧＝サーバー委譲）まで結線完了**。残＝詳細（B）→登録/編集/続報（C）→仕上げ（D）。
+社内アイデア創出のゲーミフィケーション Web アプリ **IdeaQuest**（マルチテナント＝会社ごとに会社DB）。バック=FastAPI 4層（schemas/repository/application/router）、フロント=Next.js App Router（feature 構成）。設計の正本は `doc/` 配下（要件 FR-xx・データモデル・API設計 A..N・画面 SC-xx）。実装は `impl/`。**直近フォーカス＝FR-41 情報インプット（外部WEB情報を手動貼付→属性→アイデア/クエストへ動的リンク＋反証で揺さぶる）＝差別化の核**。
 
 ## 3. 今回やったこと（変更ファイルと理由）
-### (a) 情報インプット backend Phase A＝一覧サーバー委譲（新規4層・`app/tenant/info/`）
-- `schemas.py`＝`InfoItemCardDTO`（id/parent_info_id/title/summary/status/priority/source/classification/scope/impact_class/categories[]/source_url/due_date/`created_by`〔InfoCreatorDTO=user_id/display_name/avatar_image_url〕/created_at/`link_count`/`follow_up_count`）＋`InfoOffsetPageInfo{total,page,per_page}`＋`InfoStatusFacets{all,raw,curated}`＋`InfoListResponse{data,page_info,facets}`＋`WordCloud*`。enum ホワイトリスト定数も同居。
-- `repository.py`＝`build_info_list_query`（archived 既定除外・status/priority/source/impact_class 多値 OR・`roots_only`＝根のみ・q は PGroonga `&@~`〔`_FTS_EXPR`＝`(title|| ' ' ||coalesce(body_text,'')) &@~ :q`・バインド変数〕・sort は `list_query.parse_sort` でホワイトリスト〔created_at/title/status/priority/due_date/link_count〕）＋`status_counts`（facet）＋`link_counts_for_items`（未棄却のみ）＋`follow_up_counts_for_items`＋`categories_for_items`＋`users_by_ids`＋`word_cloud`（info_tokens GROUP BY・count 降順・weight 正規化・archived 除外）。
-- `application.py`＝`get_info_items`（quest-catalog パターン＝`_resolve_company`+`get_tenant_session`+`get_user_by_account`・enum/sort 検証で 422・番号ページャ・DTO 組立・facets 同梱）＋`get_word_cloud`。
-- `router.py`＝`GET /info-items`（require_me・q/status/priority/source/impact_class/roots_only/sort/page/per_page）・`GET /info-items/word-cloud`（word-cloud は `/{id}` より前に定義＝将来の動的パス回避）。
-- `app/main.py`＝`info_router` を include（search の後）。
-- **migration 0028＋orm.py は前セッションで作成済**（`info_items` ほか5表＋PGroonga FTS 索引 `idx_info_items_fts`）。今回はそれに結線しただけ。
+FR-41 情報インプットの **Phase C 残り＋Phase D 全部＋後片付け**を実装。ドメイン=`app/tenant/info/`。
 
-### (b) frontend 一覧をサーバー委譲へ（`features/info-input/`）
-- `types.ts`＝`InfoCard`/`InfoCreator`/`InfoStatusFacets`/`InfoListResult`/`WordCloudToken` を追加（backend DTO と一致・手書き。将来 OpenAPI codegen）。
-- `api.ts`＝`fetchInfoItems(state,extra,signal)`（`infoListParams`＝DataTable state→クエリ・sort/enum フィルタは backend ホワイトリスト一致・status タブと roots_only は `extra`）／`searchInfoItems(q)`（全文検索タブ）／`fetchWordCloud()`。既存 fixtures 関数（getInfoItem/createInfoItem 等）は**詳細/フォームがまだ fixtures なので残置**。
-- `components/InfoListView.tsx`＝**全面改修**＝DataTable を `server={{query}}` に。状態タブ件数は facets、続報束ねは roots_only、ワードクラウドは API 取得（語クリックで全文検索タブへ）、全文検索タブは server `q`（title＋本文）。`created_by` はオブジェクト（display_name/avatar）。列 flags を backend 能力に一致（impact_class/source は filter のみ・created_by/due_date/created_at の client filter は撤去・横断検索＝q）。
-- **注意（既知の割り切り）**＝一覧/詳細/登録/続報/内容編集/キュレーション/関連リンク/貼付画像再ホスト/参考資料は**backend 接続済（Phase A/B/C 完了）**。**まだ fixtures**＝「この情報からクエスト作成」（Phase D の `from_info_id`）・行メニューの archive/削除（EP 未実装＝Phase D）・InfoFormPanel の edit モード（詳細のインライン編集に移行済のため deprecated）。
-
-### (c) テスト（テスト規約 §5・red→green 実施）
-- `doc/テスト/N_情報インプット.md` 新規＝repository int（N-TC-001〜009）＋api（N-TC-101〜107）。`check_tc_traceability.py` ✅。
-- `impl/backend/tests/info/`＝`conftest.py`（会社DB へ直接 seed・teardown 物理削除・author=seed user で hermetic 化）＋`test_repository.py`＋`test_api.py`。**red 目視**＝実装前イメージに tests だけ mount で api が 404（証跡）→ 実装後 **16 passed**。quests api も 12 passed（回帰なし）。
-- **重要**＝bootstrap の `seed_demo_info`（下記 d）が ACME に info を常駐 seed するため、repository int テストは**フィクスチャ author に絞って**検証（`_own()`）。word_cloud テストは会社全体集計ゆえ構造（降順/正規化/archived 除外）で検証。
-
-### (d) デモ seed（`scripts/bootstrap.py`）
-- `seed_demo_info()`＝frontend fixtures i1〜i5 相当（続報 i2＝i1 の子・機会/脅威・カテゴリ・関連リンク〔未棄却/棄却〕・ワードクラウド用トークン）を DB 直挿し（**書き込み API が無い Phase A のため**）。冪等（i1 存在で skip）・非prod・`main()` で `seed_demo_discovery()` の後に呼ぶ。author 用デモ user（情報 花子/開発 太郎/営業 次郎）も作成。
-- `seed_demo.py`（HTTP 版）は info 用 write API が無いため未変更。
-
-### (e-2) 一覧ヘッダー（列見出し行）のフローティング標準化（横断・ユーザー要望）
-- **タブの sticky を解除**（`info-input.css` の `.info-page .tabs`）＝フローティングは一覧ヘッダーに一本化。
-- **共有 DataTable の列見出し行（thead）をページ縦スクロールで上部固定**＝`components/ui/DataTable.tsx` に JS 効果（`wrapRef`／`theadRef` を測って `thead` を `translateY`・`--dt-head-top` 既定 `--header-h`・最終行で clamp 解除・`.dt-head--floating` で z:9＋影）。`design-system.css` に `.dt-scroll thead` 標準を追加。**CSS `position:sticky` は不採用**＝`.table-wrap` の `overflow-x:auto` が縦スクロールコンテナ化（coercion）し page-sticky が壊れる／操作列 sticky も両立不可のため（メモリ `datatable-list-header-floating`）。
-- デザイン標準 `§4.5⑨-b` を新設（旧⑨「固定ヘッダーは持たない」を上書き）。回帰＝e2e `N-TC-203`。
-- **別途考慮**＝文脈バナー等がある画面は `--dt-head-top` を上書き。カード表示は対象外。
-
-### (e) その他
-- `.gitignore`＝`tmp_shots/`（先頭スラッシュ無し＝ルート・`impl/frontend/` 双方）を追加（ユーザー要望＝VSCode 変更件数対策）。
-- `impl/README.md`＝情報インプットを「一覧＝backend 接続済（Phase A）」に更新。
-- **仕様整理フェーズを追加**（下記 §7・ユーザー要望）＝「属性を編集」導線の画面制御・認可を Phase C 前に整理。
+- **貼付画像の MinIO 再ホスト**（§12-4）: `info/application.py::rehost_image`、`info/router.py POST /info-items/images`。理由=外部 img src を持ち込まない（自社ホスト署名URL に置換）。frontend=`features/info-input/api.ts::uploadInfoImageApi`＋`components/InfoFormPanel.tsx`（🖼️ボタン＋onPaste ハンドラ）。
+- **参考資料 添付**（§5.33・migration `0030_info_attachments`）: ORM `info/orm.py::InfoAttachment`、repo `list/count/get/add/remove_attachment`＋`delete_info_item`（cascade）、app `add_attachments`/`remove_attachment`、router `POST/DELETE /info-items/{id}/attachments`。作成者のみ・拡張子/サイズ/マジックバイト検証（`app/infra/storage.py::validate_attachment_upload`）。詳細 DTO に `attachments[]`。frontend=`api.ts::addAttachmentsApi/deleteAttachmentApi`＋`InfoDetailView.tsx`（参考資料セクション）＋`InfoFormPanel.tsx`（登録後に添付 POST）。
+- **アーカイブ/解除**: app `archive_info_item`/`unarchive_info_item`（curator のみ）、repo `status_counts` に `archived` 追加、schema `InfoStatusFacets.archived`、router `POST /info-items/{id}/archive`・`/unarchive`。frontend=一覧に「アーカイブ」状態タブ＋行⋯メニュー＋詳細の curator ブロック（フッターは「閉じる/保存」に維持＝SC-50 §8）。
+- **続報登録UI**: `InfoFormPanel.tsx` の親プレビューを fixtures→実 API（`fetchInfoDetail`）へ。`InfoDetailView.tsx` 🧵続報スレッドに「＋続報を登録」（スレッド根に紐づけ）。backend `POST /info-items {parent_info_id}` は既存（親の未棄却リンクを origin=auto で複製）。
+- **この情報からクエスト作成（逆リンク）**: `quests/schemas.py::QuestCreateRequest.from_info_id` 追加、`quests/application.py::create_quest` が同UoWで info_link（quests/related/manual）を自動生成（不在は422）。frontend=`info-input/api.ts::createQuestFromInfo`＋`components/QuestFromInfoPanel.tsx`（実API化・下書き作成→`/quests/{id}`遷移）。
+- **raw 物理削除**: app `delete_info_item`（登録者本人・raw のみ・curated は409 invalid_state・続報ありは409 has_follow_ups・従属行削除＋MinIO 除去）、router `DELETE /info-items/{id}`。frontend=行⋯メニューを実API化（`api.ts::deleteInfoItemApi`）。
+- **情報判定権限（info_curator）付与/剥奪**（N.5）: repo `list/grant/revoke_curator`、app `list/grant/revoke_info_curator`（account_id→会社DB user 解決・会社外404・二重付与409）、router `GET/POST /info-curators`・`DELETE /info-curators/{account_id}`（`Depends(require_company_account_admin)`）。frontend=`features/accounts/components/InfoCuratorSection.tsx`（SC-93 `/admin/accounts` に配置）＋`accounts/api.ts` に list/grant/revoke。
+- **反証→揺さぶり通知**（§N.6・通知のみ MVP）: `notifications/catalog.py` に型 `info_refuting_raised`、`info/application.py::_notify_refuting`（post-commit dispatch）を `add_link`（refuting起票）と `change_link_kind`（related/supporting→refuting 遷移）にフック。宛先解決 repo helper=`ideas/repository.py::voter_ids`、`quests/repository.py::admin_user_ids`。frontend 変更なし（既存 H 基盤で generic 表示・href は ref_idea_id/ref_quest_id で既存ルーティング）。
+- **編集導線の一本化＋fixtures 撤去**: `/info-items/[infoId]/edit` ルート（フル＋intercept）削除。`InfoFormModal.tsx`/`InfoFormPanel.tsx` を新規/続報専用に簡素化（`mode` prop 廃止）。行⋯「内容・属性を編集」→詳細へ遷移。`info-input/api.ts` のインメモリ fixtures（store＋get/update/create/archive/delete/linkQuestFromInfo/listInfoItems/followUps/rootOf/isCurated）を全撤去（`emit`/`InfoInput` は存置）。理由=編集は詳細インライン編集(PATCH)に統一済で fixtures が死にコード化。
+- docs 追随: `doc/API設計/N_情報インプット.md`（N.1/N.2/N.3/N.5/N.6）、`doc/データモデル.md §5.33`、`doc/テスト/N_情報インプット.md`（N-TC-125〜139）、`impl/README.md`（SC-50 行=🟩）、OpenAPI 型 `impl/frontend/src/lib/api/schema.d.ts` 再生成。
 
 ## 4. 現在の状態
-### 動いているもの（確認済み）
-- **backend 一覧 API**＝`docker compose run --rm backend pytest tests/info` で **16 passed**。live でも確認＝seed user ログイン→`GET /info-items`（total=5・link_count/follow_up_count/created_by 正）・`/word-cloud`（count 降順・weight）・`?q=競合`（該当1件）・`?status=bogus`/`?sort=bogus`（422）。
-- **frontend 一覧**＝frontend コンテナ再ビルド後、Playwright アドホックで `/info-items` が実データ描画（状態タブ「5」＝facets・ワードクラウド12語・全文検索「競合」→1件・info 関連の JS エラー無し）。スクショ＝`impl/frontend/tmp_shots/info_list_server.png`・`info_search_server.png`（未追跡）。
-- `npm run build`（tsc＋next lint＋build）＝通過。
-- コンテナ＝backend/frontend/db running（他は未確認だが起動済のはず）。
+- **FR-41 情報インプット＝Phase A〜D 完了・fixtures 残渣ゼロ・全経路 実API結線**。一覧/詳細/登録/続報/内容編集(版履歴)/キュレーション/関連リンク(追加·種別·棄却)/貼付画像再ホスト/参考資料/アーカイブ/この情報からクエスト作成/raw物理削除/curator付与/反証通知 が動作（backend＋frontend）。
+- **テスト通過（本セッションで実行し確認したもの）**: `docker compose run --rm backend pytest tests/info` = **55 passed**。回帰確認=`tests/notifications`＋`tests/ideas`=105 passed、`tests/quests`=115 passed。frontend=`npm run build` 通過・`npx vitest run src/features/info-input/`=7 passed。`python3 scripts/check_tc_traceability.py`=✅ 697件。
+- **未確認**: backend の**全**テストスイート（info/notifications/ideas/quests 以外）は本セッションで未実行。frontend の**全** vitest（info-input 以外）は未実行。**Playwright e2e は本セッションで未実行**。**情報インプットのブラウザ実機受入（ユーザーの動作確認ゲート）は未実施**。
+- **壊れているもの**: 認識している範囲では無し。
+- 稼働コンテナ（`docker compose ps`で確認済）: backend/db/redis/mailhog/minio/frontend/worker/mail-worker が Up。backend は本セッションで複数回 `--build` 再ビルド済（最新コードを反映）。
 
-### 未実装 / 未結線
-- **Phase B＝完了（2026-09-21）**＝`GET /info-items/{id}`（全属性＋categories＋links〔target_title を ideas/quests から解決〕＋thread＋tokens_top＋`can`〔edit_content=作成者／curate=curator／add_link=全員〕）＋`InfoDetailView` 結線（読み取り）。`seed_demo_info` のリンクを実 idea/quest（発見デモ）へ。pytest tests/info=22 green。**注意**＝ログイン seed ユーザー（テスト太郎）はデモ情報の作成者でも curator でもないので `can` は edit_content/curate=false（＝閲覧のみ）。編集モードの実機確認には curator 付与か本人作成情報が要る。
-- **Phase C**＝`POST`/`PATCH`/`archive`/`delete`＋`POST /info-links`＋画像（nh3 追加・janome トークン・要約 `summarize_text` 流用・自動リンク・親スナップショット）→ SC-51 フォーム結線。**着手前に §7 の仕様整理フェーズ必須**。
-- **Phase D**＝`POST /quests {from_info_id}` 逆リンク・`kind=refuting` 再評価通知・`info-curators` 権限 EP。
-- frontend の詳細/フォームは fixtures のまま。`nh3` は backend 依存未追加。
+## 5. 詰まっている点（試して失敗した手と理由）
+- **Edit ツールがテンプレートリテラル/特殊文字を含む行を一致できない**: `` `${x.name}` `` や全角 `✕` を含む old_string が「not found」になった。**回避=`perl -0777 -i -pe` で置換**（`InfoFormPanel.tsx` の attach 一覧修正で使用）。次回も特殊文字行の編集は perl/sed を先に検討。
+- **テスト seed の FK 違反**: `tests/info/test_api.py::_seed_quest_idea_vote` で User→Quest→Idea→Vote を1回の flush でまとめたら `ideas_quest_id_fkey` 違反。**回避=各段で `ts.flush()` を刻む**（依存順に確定）。
+- **管理者 seed の所在**: `company_account_admin` は `bootstrap.py` の `_SEEDS`（user@acme・mfa@acme2 のみ）には**無い**が、`scripts/seed_demo.py` 由来で **`kanri@acme.example` が DB volume に永続実在**（`docker compose exec backend python` で確認済）。過去に「管理者 seed 無し」と誤認しかけた＝実在する。
 
-### テスト
-- pytest 全体は本セッションで未実行（info＋quests api のみ green 確認）。frontend vitest/e2e は build のみ（info の e2e 未追加＝Playwright アドホックのみ）。
+## 6. 決定事項と根拠（不採用案も）
+- **反証通知の宛先＝成果物の作成者/所有者＋評価者(投票者)＋クエスト管理者**、**要再評価は通知のみ(MVP)**。理由=ユーザー選択。不採用=成果物側に「要再評価フラグ/評価リセット」を今回入れる案→アイデア/評価ドメイン改修が重く、コンセプト段の設計（§3.5）と併せて後回し。
+- **info-curators EP の識別子＝`account_id`**（N.5 の当初 `user_id` を実装で更新）。理由=会社アカウント管理画面は account 中心。サーバーが `account_id→会社DB user` に解決。
+- **編集は詳細のインライン編集(PATCH)に一本化**（登録フォームは新規/続報専用）。理由=二重導線と fixtures を排除。不採用=SC-11 相当のフル編集フォーム流用→重複。
+- **この情報からクエスト作成＝軽量パネルで下書き作成→SC-11 で仕上げ**。理由=クエスト作成フォーム(参加部署/パーティー/権限)をこの動線で完結させると重い。`from_info_id` で逆リンクだけ確実に張る。
+- **フッターは「閉じる/保存する」に限定**（アーカイブ等は本文/⋯メニュー）＝SC-50 §8・ユーザーの明示ルール。
+- **参考資料/画像は自社 MinIO 再ホスト**＝外部参照(トラッキング/referer)を持ち込まない（§N.7/§12-4）。
 
-## 5. 詰まっている点
-- **seed 常駐が int テストを汚染**＝`seed_demo_info` で ACME に info 5件が常駐→exact-match の repository テストが落ちた。→ フィクスチャ author 絞り（`_own`）＋word_cloud は構造検証で解決。以後 info の DB 依存テストは会社全体データ前提で書くこと。
-- 大きな行き詰まりは他に無し。
-
-## 6. 決定事項と根拠
-- **一覧は最初からサーバー委譲**（採用・ユーザー選択）＝前 handoff §6 の「Phase A は client 割り切り」を**上書き**。DataTable server モードは**番号ページャ**（`page`/`per_page`/`total`・quest-catalog と同形。`GET /quests` のカーソルとは別）。メモリ `list-server-delegation-standard` に整合。
-- **状態タブは維持＋件数はサーバー facet**（採用・ユーザー選択）＝`InfoListResponse.facets{all,raw,curated}`（archived 除外・status 以外の現行フィルタ反映）。
-- **続報束ね（roots_only）は backend パラメータ**（採用・ユーザー選択）＝`parent_info_id IS NULL`。
-- **横断検索（DataTable 検索ボックス）＝server `q`＝title＋body_text（全文）**（採用）。前 handoff の「標準検索＝表示項目のみ／全文は別」は backend が単一 `q` のため統合。全文検索タブは SC-12 体裁のスニペット表示を維持（本文未返却ゆえ要約でハイライト）。**将来 display 限定検索パラメータを足す余地あり＝要再検討**。
-- **enum は sa.String**（既存踏襲）。**created_by は DTO オブジェクト**（quests owner と同方針・frontend も追随）。
-
-## 7. 次にやること（優先順・具体）
-> 方針＝backend を1画面ループで結線・各画面で受入ゲート（メモリ `backend-connection-per-screen-loop`）。テストは md 先行・red-green。
-
-### 最優先: ユーザー受入（Phase A）
-1. **`/info-items` をブラウザで受入**（一覧/状態タブ件数/続報束ね/ソート/列フィルタ/全文検索タブ/ワードクラウド語クリック）。不具合は再現テスト同梱で修正（メモリ `defect-regression-test-policy`）。
-
-### 仕様整理フェーズ（Phase C 前ゲート）＝**完了（2026-09-21）**
-2. **情報の編集権限・画面制御を確定**（正本反映済＝API N.0/N.1/N.2/N.3・SC-50 §2/§7/§8/§11-0・データモデル §5.33・メモリ `info-edit-control-spec-phase`）。要点＝**内容(タイトル/本文/URL/参考資料)=作成者のみ(status非依存)＋編集履歴／キュレーション(属性/triage/status/archive)=curator／関連リンク(情報側)=会社内 active 全員・採否は成果物側の管理権限者に委任(別スコープ)／管理者=curator 付与のみ**。画面=**詳細1枚＋能力フラグ(can.edit_content/curate/add_link)でセクション別出し分け(3画面は作らない)**。Phase C 実装項目＝参考資料(`info_attachments`)・内容 revisions(`info_item_revisions`)。
-
-### Phase B＝詳細結線＝**完了**（上記）。
-### Phase C＝登録/編集/続報の write 結線＝**完了（2026-09-21）**
-3. 実装済＝`POST /info-items`（低摩擦登録/続報＝全員・nh3→`body_text`→`info_tokens`〔janome〕→`summary`〔`quests/summarize.py` 流用〕→auto `info_links`／`parent_info_id` で親リンクをスナップショット複製）／`PATCH /info-items/{id}`（内容=作成者〔status非依存〕・再派生＋版履歴 `info_item_revisions`＝migration `0029`／キュレーション=curator・raw→curated）／関連リンク `POST`/`PATCH`/reject/unreject `/info-links`＋候補検索 `GET /info-link-candidates`（情報側=全員）／**貼付画像の MinIO 再ホスト `POST /info-items/images`（paste ハンドラ・§12-4・Slice 4a）**／**参考資料 `POST`/`DELETE /info-items/{id}/attachments`＝作成者・`info_attachments`＝migration `0030`・§5.33・Slice 4b**。`nh3` は backend 依存へ追加済。frontend＝SC-51 フォーム＋SC-52 詳細のインライン編集（内容/属性/リンク/参考資料）を実 API へ結線・`can` で出し分け。テスト＝pytest `tests/info` 46 green＋front unit（api.test.ts 7）・TC トレーサビリティ✅。
-### Phase D＝仕上げ（**アーカイブ＝完了 2026-09-21**）
-- **アーカイブ/解除＝完了**＝`POST /info-items/{id}/archive`・`/unarchive`（curator のみ・論理削除〔監査保持〕・解除は curated〔属性あれば〕or raw へ復帰・`archived_at`）。facets に `archived` 追加／一覧に「アーカイブ」状態タブ／詳細フッター（curator）＋行メニューから操作。test N-TC-131〜133（pytest tests/info 49 green）。
-- **続報登録UI＝完了（2026-09-21）**＝続報フォームは親を**実 API（fetchInfoDetail）でプレビュー**（fixtures 廃止）・`POST /info-items {parent_info_id}` で登録＝backend が親の未棄却リンクを origin=auto で自動複製（N-TC-014 済）。続報は**スレッドの根に紐づけ**（詳細の🧵続報スレッドに「＋続報を登録」・一覧行 ⋯ メニューも根 parent へ）。属性/リンクは create 非送信のため続報フォームでは事前投入しない（curator の PATCH 管轄・note で明示）。live smoke でリンク複製確認。
-- **この情報からクエスト作成＝完了（2026-09-21）**＝`QuestCreateRequest.from_info_id`（`extra=forbid` なので schema 追加）＋`create_quest` が同 UoW で info_link（quests・related・manual）を自動生成（不在 from_info_id は 422）。frontend＝QuestFromInfoPanel を実 API 化（fixtures 廃止・親情報は fetchInfoDetail でプレビュー・下書きクエスト作成→`/quests/{id}` へ遷移＝参加部署/パーティー/権限/カラー/公開は SC-11 で仕上げ）。OpenAPI 型は `npm run codegen` 再生成済。test N-TC-134（pytest tests/info 50 green・quests 115 回帰なし）。live smoke で逆リンク確認。C.2 は from_info_id を既に spec 済（実装が仕様に追いついた）。
-- **raw 物理削除＝完了（2026-09-21）**＝`DELETE /info-items/{id}`（登録者本人・raw のみ・curated は 409 invalid_state〔archive 誘導〕・続報ありは 409 has_follow_ups・従属行〔attachments/tokens/links/categories/revisions〕削除＋参考資料 MinIO 除去）。frontend 行 ⋯ メニューを実 API 化（fixtures deleteInfoItem 廃止・snackbar で成否）。test N-TC-135/136（pytest tests/info 52 green）。
-- **curator 付与 EP＋管理UI＝完了（2026-09-21）**＝`GET/POST /info-curators`・`DELETE /info-curators/{account_id}`（会社アカウント管理者/system_admin・`require_company_account_admin`・セッション会社固定）。**識別子は account_id**（管理面の自然キー＝サーバーが account_id→会社DB user に解決・N.5 を account_id へ更新）。付与後の一覧を返す／二重付与 409／会社外 account は 404。frontend＝SC-93 `/admin/accounts` に `InfoCuratorSection`（付与セレクト＝有効アカウントの Multiselect＋剥奪）。test N-TC-137（pytest tests/info 53 green・factory の company_account_admin 使用）。live HTTP smoke 済。**実機の管理者ログイン＝`kanri@acme.example`/`ACME-01`/`Passw0rd!`（company_account_admin・seed_demo.py 由来で volume 永続）**＝bootstrap の `_SEEDS` には無いが実在（メモリ [[admin-seed-accounts-exist]] 参照）。SC-93 で InfoCuratorSection の実機確認に使える。
-- **反証→揺さぶり通知＝完了（2026-09-21・通知のみ MVP）**＝`POST /info-links`（kind=refuting 起票）／`PATCH`（related/supporting→refuting 遷移）で post-commit `notify_svc.dispatch`＝`info_refuting_raised`（catalog 追加）。宛先＝ideas なら作成者＋評価者〔投票者〕＋クエスト管理者（owner/quest_admin）／quests なら owner＋quest_admin／concepts・assumptions は未実装＝no-op。本人除外・棄却済みは対象外。repo helper＝`ideas_repo.voter_ids`／`quests_repo.admin_user_ids`。frontend 変更なし（generic 表示＝icon⚠️・href は ref_idea_id/ref_quest_id で既存ルーティング）。test N-TC-138/139（pytest tests/info 55 green・notifications/ideas 105 回帰なし）。**要再評価フラグ/リセットは成果物側（コンセプト段）の今後スコープ**。
-- **FR-41（情報インプット）＝Phase A〜D 完了＋編集導線一本化＝完了（2026-09-21）**＝編集は詳細（SC-52）のインライン編集（PATCH）に一本化。`/info-items/[infoId]/edit`（フル＋intercept）ルート削除・`InfoFormModal`/`InfoFormPanel` を新規/続報専用に簡素化（`mode` prop 廃止）・行 ⋯ メニューは「内容・属性を編集」→詳細へ遷移。**info-input/api.ts の fixtures（インメモリ store＋getInfoItem/updateInfoItem/createInfoItem/archiveInfoItem/deleteInfoItem/linkQuestFromInfo/listInfoItems/followUps/rootOf/isCurated）を全撤去**＝全経路が実 API 結線（`emit`/`InfoInput` は存置）。build/vitest7 green。**FR-41 は fixtures 残渣ゼロ**。
-
-### Phase C/D は §4 の通り。
+## 7. 次にやること（優先順・具体的に）
+1. **情報インプットの実機受入**（未実施の受入ゲート）＝`http://localhost:3000/info-items` を `user@acme.example`（一般）と `kanri@acme.example`（curator/管理者）でブラウザ確認。特に: 登録フォームの画像 paste 再ホスト・参考資料 D&D・詳細インライン編集(内容/属性/リンク)・アーカイブ/解除タブ・続報登録・この情報からクエスト作成・raw削除・`/admin/accounts` の `InfoCuratorSection`・反証リンクで通知ベル。不具合は再現テスト同梱で修正（テスト規約 §5.3・メモリ defect-regression-test-policy）。
+2. **メモリ `internal-review-remaining-items`（社内レビュー未実施2件）**: ①評価ダイアログにクエスト情報を追加、②クエスト最終結果の機能実装。着手前に該当 SC/API 設計を確認。
+3. **要再評価フラグ/リセット**（反証の続き・§3.5）＝成果物(アイデア/評価)側とコンセプト段の設計判断が要るので、コンセプト機能設計と併走で。
+4. **コンセプト機能の設計**（メモリ `concept-feature-design-split`・`fr39-iso-mapping-superseded`）＝FR-39 の真の②③段。
+5. **実装順の正本 `doc/実装計画.md`** を確認し、上記と突き合わせて次ドメインを決める。
 
 ## 8. 再開に必要な環境情報
-- 作業ルート＝`/home/t-umekawa/sc-ideaquest-G2`。実装＝`impl/`（`docker compose` はここ）。
-- **起動/リビルド**（`cd impl`）: `docker compose up -d --build backend`／`... frontend`。**backend はソースをベイク（volumes 無）＝コード/migration/seed 変更は必ず --build**（メモリ `backend-no-source-mount`）。bootstrap（entrypoint）が全会社DB に migrate＋非prod seed（`seed_demo_discovery`/`seed_demo_info`）。
-- **pytest**（`cd impl`）: `docker compose run --rm backend pytest tests/info`。**未コミット/編集中のテストを反映するには tests を mount**＝`docker compose run --rm -v "$(pwd)/backend/tests:/app/tests" backend pytest tests/info`（アプリ本体の編集は --build が要る）。red 目視も同手法（tests だけ mount＝旧イメージで 404）。
-- **traceability**（ルート）: `python3 scripts/check_tc_traceability.py`（✅ 必須ゲート）。
-- **frontend 検証**: `cd impl/frontend && npm run build`（必須ゲート）。Playwright アドホック＝`node tmp_shots/*.mjs`（`playwright` は frontend node_modules・ログインは `#company_code`/`#login_id`/`#password`＋「ログイン」ボタン）。
-- **ポート**: frontend `http://localhost:3000`／backend `:8000`。
-- **ログイン seed**: `ACME-01`／`user@acme.example`／`Passw0rd!`（テスト太郎）。管理者＝`kanri@acme`（会社管理者）・`admin@ops`（system_admin）＝`Passw0rd!`。
-- **DB 確認**（`cd impl`）: `docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c "select count(*) from info_items;"`（ロール＝ideaquest）。
-- **参照の正本**: 現況＝`impl/README.md`／実装順＝`doc/実装計画.md`／API＝`doc/API設計/N_情報インプット.md`＋`README.md`§1.8.1／テスト＝`doc/テスト/N_情報インプット.md`／データモデル＝`doc/データモデル.md`§5.33-5.37／画面＝`doc/画面設計/screens/SC-50_情報インプット.md`＋モック `mocks/SC-50_情報インプット.html`（DoD＝モック一致）。
+- **リポジトリ直下**=`/home/t-umekawa/sc-ideaquest-G2`。compose ファイル=**`impl/compose.yaml`**（`docker-compose.yml` は無い）。全 docker コマンドは **cwd=`impl/`** で実行。
+- **起動**: `cd impl && docker compose up -d`（コード変更を backend に反映するには **`docker compose up -d --build backend`**＝backend はソースをベイクしボリューム無・メモリ `backend-no-source-mount`）。frontend も docker（3000）で常駐。
+- **ポート**: frontend 3000 / backend 8000（`/api/v1`・health=`/api/v1/health`）/ db 5432 / redis 6379 / minio 9000(API)・9001(console) / mailhog 1025・8025。
+- **backend テスト**: `cd impl && docker compose run --rm backend pytest tests/info -q`（cwd は暗黙 `/app`）。**未コミットのテストだけ**を反映して回すには `-v "$(pwd)/backend/tests:/app/tests"` をマウント（app 本体の変更は再ビルドが必要）。
+- **frontend 検証**: `cd impl/frontend && npm run build`（**必須ゲート**＝Next lint 含む・メモリ frontend-build-gate-eslint）／`npx vitest run <path>`／`npm run codegen`（OpenAPI 型再生成＝backend:8000 稼働が前提）。
+- **TC トレーサビリティ**: `cd <repo root> && python3 scripts/check_tc_traceability.py`（コミット前に ✅ を確認）。
+- **ログイン（確認済）**: `user@acme.example` / 会社 `ACME-01` / `Passw0rd!`＝一般。`kanri@acme.example` / `ACME-01` / `Passw0rd!`＝company_account_admin（curator 付与/管理画面用）。`admin@ops`（会社 OPS）＝system_admin（メモリ記載・本セッションでは未再確認）。
+- **DB 直接操作**（seed 後始末等）: `docker compose exec -T backend python -c "..."`。会社 ACME の会社DB識別子=`ideaquest_company_acme`。テナントセッション=`app.db.tenant.get_tenant_session(db_identifier)`、管理DB=`app.db.control.control_session`。
+- **migration**（会社DB）: `impl/backend/migrations/company/versions/`＝情報インプット関連は `0028_info_input`／`0029_info_revisions`／`0030_info_attachments`。起動時 `scripts/bootstrap.py` が全会社DBへ migrate＋非本番 seed。
+
+---
+### 自己チェック（本ファイルだけで再開できるか）
+- 起動/テスト/ログイン/ポート/DB操作=記載済。compose ファイル名の罠(`compose.yaml`)も明記。
+- FR-41 の全機能と対応ファイル/関数=記載済。次アクションはファイル/画面レベルまで具体化。
+- 未確認事項（全スイート/e2e/実機受入）を明記＝過信を防止。
+- 設計正本の在処（`doc/`・CLAUDE.md 経由）とメモリ参照キーを明記。
