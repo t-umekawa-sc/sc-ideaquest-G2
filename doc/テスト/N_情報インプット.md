@@ -74,6 +74,7 @@
 | N-TC-137 | api | 情報判定権限の付与/剥奪（管理者のみ） | 会社アカウント管理者でログイン | `POST`/`GET`/`DELETE /info-curators` | 付与 201＋一覧に出現／二重付与 409／剥奪 204＋一覧から消える／未付与の剥奪は 404／**非管理者（一般）は 403** | N.5／§5.37 |
 | N-TC-138 | api | 反証リンク作成で揺さぶり通知（作成者/評価者/クエスト管理者） | idea＋quest＋vote を seed | `POST /info-links`（`kind=refuting`・ideas 宛て） | idea 作成者・評価者（投票者）・クエスト所有者に `info_refuting_raised` 通知が届く（付けた本人は除外） | N.3／§N.6 |
 | N-TC-139 | api | 種別変更 refuting への遷移で通知 | related リンク＋idea seed | `PATCH /info-links/{id}`（`kind=refuting`） | related→refuting の遷移で宛先に通知が届く（related のままなら通知しない） | N.3／§N.6 |
+| N-TC-140 | api | 続報を開くと root 基準の続報スレッドを返す | 続報 fu1/fu2 を持つ根 a | `GET /info-items/{fu1}` | `thread.parent`=根 a・`thread.follow_ups`=根の全続報（fu1/fu2）＝続報からも 根→続報… を辿れる（SC-50 §80） | N.1／§12-1 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

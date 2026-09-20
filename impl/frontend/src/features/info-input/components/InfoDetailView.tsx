@@ -15,7 +15,7 @@ import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget, InfoThreadItem } from "../types";
 import "../info-input.css";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
@@ -139,6 +139,21 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setLinkBusy(false);
   };
 
+  // 反証（refuting）化は確認ダイアログ（SC-50 §84＝根底を揺さぶる＝作成者/評価者/クエスト管理者へ通知が飛ぶ）。
+  const REFUTE_CONFIRM = { title: "反証として設定", msg: "反証は「根底を揺さぶる」シグナルです。対象の作成者・評価者・クエスト管理者へ通知が飛びます。反証として設定しますか？", variant: "danger" as const };
+  const changeKind = async (linkId: string, prevKind: InfoLinkKind, next: InfoLinkKind) => {
+    if (next === prevKind) return;
+    if (next === "refuting" && !(await confirm(REFUTE_CONFIRM))) {
+      const d = await fetchInfoDetail(infoId); if (d) setItem(d); // 取消＝select を現状へ戻す
+      return;
+    }
+    await linkOp(() => changeLinkKindApi(linkId, next));
+  };
+  const addLinkConfirmed = async () => {
+    if (addKind === "refuting" && !(await confirm(REFUTE_CONFIRM))) return;
+    await linkOp(async () => { await addLinkApi(infoId, addType, addSel, addKind); setAddQ(""); setAddSel(""); setAddCands([]); });
+  };
+
   // 参考資料の追加/削除（作成者のみ・即時コミット→詳細再取得）。
   const addAtts = async (fl: FileList | null) => {
     if (!item || !fl || !fl.length) return;
@@ -180,19 +195,18 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const r = item;
   const activeLinks = r.links.filter((l) => !l.rejected);
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
+  // 続報スレッド＝根→続報1→続報2… の時系列（SC-50 §80）。根＝続報を開いていれば thread.parent、根を開いていれば自身。
+  // 開いているアイテムは「表示中」で強調（リンクにしない）。thread.follow_ups は根の子（backend が root 基準で返す）。
+  const threadRoot: InfoThreadItem = r.thread.parent ?? {
+    id: r.id, title: r.title, created_by: r.created_by.display_name, created_at: r.created_at,
+  };
+  const threadItems: InfoThreadItem[] = [threadRoot, ...r.thread.follow_ups];
+  const hasThread = r.thread.follow_ups.length > 0 || r.thread.parent != null;
 
   return (
     <>
       <div className="modal__body">
-        {r.thread.parent ? (
-          <div className="field dialog-section">
-            <div className="dialog-label">元情報（続報元）</div>
-            <div className="info-thread__meta">
-              🧵 <strong>{r.thread.parent.title}</strong> の続報　<a href={`/info-items/${r.thread.parent.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${r.thread.parent!.id}`); }}>元情報を開く</a>
-            </div>
-          </div>
-        ) : null}
-
+        {/* 元情報（続報元）＝下部の「続報スレッド」タイムラインに根として統合表示（SC-50 §80）＝ここには別掲しない。 */}
         <div className="field dialog-section">
           <div className="dialog-label">タイトル</div>
           {r.can.edit_content ? (
@@ -392,7 +406,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
                     <span>{LINK_TARGET_LABEL[l.target_type]}</span>
                     <span className="link-item__title">{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
-                    <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => linkOp(() => changeLinkKindApi(l.id, e.target.value as InfoLinkKind))}>
+                    <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => changeKind(l.id, l.kind, e.target.value as InfoLinkKind)}>
                       {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                     </select>
                     <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id))}>✕</button>
@@ -423,7 +437,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
                     </select>
                   </label>
                   <button className="btn btn-outline" type="button" disabled={!addSel || linkBusy}
-                    onClick={() => linkOp(async () => { await addLinkApi(r.id, addType, addSel, addKind); setAddQ(""); setAddSel(""); setAddCands([]); })}>＋ 追加</button>
+                    onClick={addLinkConfirmed}>＋ 追加</button>
                 </div>
               </div>
               <div className="hint" style={{ marginTop: 6 }}>その場で編集し即時反映します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
@@ -434,19 +448,28 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">🧵 続報スレッド</div>
-          {r.thread.follow_ups.length ? (
+          {hasThread ? (
             <ul className="info-thread">
-              {r.thread.follow_ups.map((f) => (
-                <li key={f.id}>
-                  <div className="info-thread__title">{f.title}</div>
-                  <div className="info-thread__meta">{f.created_by ?? ""}・{f.created_at.slice(0, 10)}　<a href={`/info-items/${f.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${f.id}`); }}>開く</a></div>
-                </li>
-              ))}
+              {threadItems.map((t, i) => {
+                const current = t.id === r.id;
+                return (
+                  <li key={t.id}>
+                    <div className="info-thread__title">
+                      {i === 0 ? "🧭 " : "↳ "}{t.title}
+                      {current ? <span className="badge badge-muted" style={{ marginLeft: 6 }}>表示中</span> : null}
+                    </div>
+                    <div className="info-thread__meta">
+                      {(t.created_by ?? "")}・{t.created_at.slice(0, 10)}
+                      {current ? null : <>　<a href={`/info-items/${t.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${t.id}`); }}>開く</a></>}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : <p className="muted">続報はまだありません。</p>}
           <div style={{ marginTop: 8 }}>
             {/* 続報は常にスレッドの根に紐づける（§12-1・フラットなスレッド）。登録時に親の未棄却リンクを自動複製。 */}
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${r.thread.parent?.id ?? r.id}`)}>＋ 続報を登録</button>
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${threadRoot.id}`)}>＋ 続報を登録</button>
           </div>
         </div>
       </div>

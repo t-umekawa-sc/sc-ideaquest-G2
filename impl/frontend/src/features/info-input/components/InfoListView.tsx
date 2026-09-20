@@ -104,12 +104,11 @@ export function InfoListView() {
 
   const menuItems = useCallback(
     (r: InfoCard): RowMenuItem[] => {
-      const inThread = Boolean(r.parent_info_id) || r.follow_up_count > 0;
+      // 「スレッドを見る」は廃止（SC-50 §80＝詳細ダイアログの続報スレッドで根→続報を辿れる）。続報登録は根に紐づける。
       const rootId = r.parent_info_id ?? r.id;
       const list: RowMenuItem[] = [
         { label: "詳細を開く", onClick: () => router.push(`/info-items/${r.id}`) },
       ];
-      if (inThread) list.push({ label: "🧵 スレッドを見る（時系列）", onClick: () => router.push(`/info-items/${rootId}`) });
       list.push({ label: "続報を登録", onClick: () => router.push(`/info-items/new?parent=${rootId}`) });
       list.push({ label: "内容・属性を編集", onClick: () => router.push(`/info-items/${r.id}`) }); // 詳細でインライン編集（作成者=内容／curator=属性）
       if (r.status === "raw") {

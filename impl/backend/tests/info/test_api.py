@@ -392,6 +392,15 @@ def test_n_tc_108_detail_shape(client, info_env):
     assert set(d["can"].keys()) == {"edit_content", "curate", "add_link"}
 
 
+def test_n_tc_140_follow_up_detail_thread_root_based(client, info_env):
+    """N-TC-140: 続報を開くと root 基準の続報スレッド（parent=根・follow_ups=根の全続報）を返す（SC-50 §80）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    d = client.get(f"{INFO}/{info_env.ids.fu1}").json()  # 続報 fu1 を開く
+    assert d["thread"]["parent"] and d["thread"]["parent"]["id"] == str(info_env.ids.a)  # 元情報＝根 a
+    # 続報から開いても根の全続報（fu1/fu2）が時系列で返る＝続報側で「続報スレッドが空」にならない。
+    assert {t["id"] for t in d["thread"]["follow_ups"]} == {str(info_env.ids.fu1), str(info_env.ids.fu2)}
+
+
 def test_n_tc_109_can_flags(client, info_env):
     """N-TC-109: can＝作成者(edit_content)／curator(curate)／全員(add_link)。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)

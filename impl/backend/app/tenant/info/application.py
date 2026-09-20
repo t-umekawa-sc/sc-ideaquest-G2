@@ -235,8 +235,18 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         categories = repo.categories_for_items(ts, [item.id]).get(item.id, [])
         links = repo.links_for_item(ts, item.id)
         title_map = repo.resolve_link_titles(ts, links)
-        follow_ups = repo.follow_up_items(ts, item.id)
-        parent = repo.get_info_item(ts, item.parent_info_id) if item.parent_info_id else None
+        # 続報スレッドは「根」基準で組む（続報を開いても 根→続報1→続報2… の全体を返す・SC-50 §80）。
+        # 続報はフラット（通常 depth-1）だが安全に上限付きで根を辿る。
+        root = item
+        _seen = {root.id}
+        while root.parent_info_id is not None:
+            p = repo.get_info_item(ts, root.parent_info_id)
+            if p is None or p.id in _seen:
+                break
+            _seen.add(p.id)
+            root = p
+        follow_ups = repo.follow_up_items(ts, root.id)
+        parent = root if item.id != root.id else None  # 開いているのが続報のとき root を「元情報」として返す
         atts = repo.list_attachments(ts, item.id)
         uids = {item.created_by_id} | {f.created_by_id for f in follow_ups} | {a.uploaded_by_id for a in atts}
         if parent:
