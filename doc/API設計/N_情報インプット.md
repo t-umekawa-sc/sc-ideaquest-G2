@@ -7,15 +7,17 @@
 
 ## N.0 アクター・認可スコープ
 
-**情報プールは会社（テナント）横断の知識レイヤ**＝クエスト門番（`can_access_quest`）ではなく、**会社内の active ユーザーなら閲覧可**。書き込みは段階権限:
+**情報プールは会社（テナント）横断の知識レイヤ**＝クエスト門番（`can_access_quest`）ではなく、**会社内の active ユーザーなら閲覧可**。書き込みは**フィールド群ごとにオーナーが違う**（2026-09-21 確定・従来の「curated 後は curator のみ編集」を上書き）:
 
-| アクター | できること |
-| --- | --- |
-| 会社内の active ユーザー全員 | **低摩擦登録**（`title`＋任意 `body`/`source_url`＝`status=raw`）／一覧・詳細の閲覧／**自分視点の手動リンク追加・棄却**（成果物への関連付け） |
-| `info_curator`（データモデル §5.37） | 上記に加え **属性付与・情報判定（triage）・`status` 遷移（raw→curated→archived）・アーカイブ**／自動リンクの種別変更（関連↔裏付け↔反証） |
-| 会社アカウント管理者（`company_account_admin`）／`system_admin` | **`info_curator` の付与/剥奪**（§N.5） |
+| フィールド群 | 編集できる人 | 備考 |
+| --- | --- | --- |
+| **内容**（`title`/`body_html`/`source_url`/参考資料） | **作成者のみ**（`status` 非依存・**curator も不可**） | raw/curated 問わず作成者が編集可。**内容の編集履歴を保持**（版・編集者・日時＝Phase C）。低摩擦登録も作成者＝会社内 active 全員が新規作成可 |
+| **キュレーション**（属性値・情報判定 `triage`/`triaged_on`/`triage_reason`・`status` 遷移 raw→curated→archived・アーカイブ/解除・カテゴリ #8） | **`info_curator` のみ** | 属性/triage 付与で raw→curated。archive/unarchive も curator（物理削除なし・監査保持） |
+| **関連リンク（情報側）** | **会社内 active ユーザー全員**（`status` 非依存・**curator 管轄外**） | 追加（`POST /info-links`）・種別変更（関連/裏付け/反証）・自分が付けた分の棄却。低摩擦で関連を“発生”させる層 |
+| **リンクの採否・統制** | **成果物側の管理権限者**（quest_admin／アイデア作成者／コンセプト所有者 等） | 貼られたリンクをどう取り込む/却下するかは成果物側で判断（成果物側の採否ワークフロー＝各ドメイン C/D/コンセプトの別スコープ）。反証の要再評価の受領も成果物側 |
+| **`info_curator` の付与/剥奪** | 会社アカウント管理者（`company_account_admin`）／`system_admin` | §N.5。**管理者に情報の上書き編集権は無い**（必要なら自分に curator を付与） |
 
-- 低摩擦登録の属性（title/body/source_url）以外の**属性付与・判定・アーカイブは `info_curator` のみ**（サーバー再検証・raw→curated）。**登録者本人は自分の raw を編集/削除**できるが、curated 後は `info_curator` のみ編集可（設計 §3/§11-③）。
+- **編集可否はサーバーが `can` で返す**（`can.edit_content`＝作成者／`can.curate`＝curator／`can.add_link`＝全員）＝フロントは表示/UX 出し分けのみ・`PATCH`/リンク EP で**必ず再検証**（越権は 403）。
 - 認可失敗＝**403 `forbidden`**／他テナントは**404**（存在秘匿）／未認証＝**401 `unauthenticated`**。
 
 ---
@@ -25,7 +27,7 @@
 | メソッド/パス | 概要 | リクエスト（パス/クエリ/ボディ） | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
 | `GET /info-items` | 情報一覧（会社横断の知識プール） | クエリ: `q`（title/body_text 全文＝PGroonga §1.11・平文を索引。**画面 SC-50 では「🔍 全文検索」タブ由来**〔クエスト SC-12 と同じ体裁・対象セレクト=すべて/タイトル/本文/要約〕＝一覧タブ DataTable の標準横断検索/列フィルタとは別建て・本文まで探すのは `q` の役割）／`status`（`raw\|curated\|archived`・既定は `archived` 除外）／分類フィルタ（多値可）＝`priority`/`source`/`classification`/`scope`/`target_business`/`impact_class`/`impact_level`/`impact_timing`/`triage`／`category`（#8・多値）／`roots_only`（続報を束ねて根のみ表示・§12-1）／`sort`（`-created_at`〔新着〕/`priority`/`-impact_level`/`due_date`）／`limit`/`cursor`。**DataTable 契約（§1.8.1）**＝列 flags は backend ホワイトリスト一致・カーソル型・`?format=csv`/`?pin_ids=` 対応 | `data`=情報カード配列（`id`/`title`/`summary`〔一覧の抜粋・§12-3〕/`status`/`priority`/`impact_class`/`categories[]`/`source`/`source_url`/`due_date`/`created_by`/`created_at`＋`link_count`＋`parent_info_id`/`follow_up_count`〔続報スレッド・§12-1〕）。`page_info.{next_cursor,has_next}` |
-| `GET /info-items/{id}` | 情報詳細（全属性＋カテゴリ＋関連リンク＋続報スレッド） | パス: `info_id` | 全属性（§5.33・`body_html`〔サニタイズ済リッチ〕/`summary`）＋`categories[]`（#8）＋`links[]`（`id`/`target_type`/`target_id`/`target_title`/`kind`/`origin`/`score`/`rejected`）＋`tokens_top[]`（ワードクラウド上位）＋`thread`（`parent`〔続報元・あれば〕/`follow_ups[]`〔続報・時系列・§12-1〕）＋`can`（編集/判定/アーカイブ/続報登録の可否＝サーバー算出） |
+| `GET /info-items/{id}` | 情報詳細（全属性＋カテゴリ＋関連リンク＋続報スレッド） | パス: `info_id` | 全属性（§5.33・`body_html`〔サニタイズ済リッチ〕/`summary`）＋`categories[]`（#8）＋`links[]`（`id`/`target_type`/`target_id`/`target_title`/`kind`/`origin`/`score`/`rejected`）＋`tokens_top[]`（ワードクラウド上位）＋`thread`（`parent`〔続報元・あれば〕/`follow_ups[]`〔続報・時系列・§12-1〕）＋`can`（`edit_content`〔作成者＝内容編集〕/`curate`〔curator＝属性/triage/status/archive〕/`add_link`〔全員＝関連リンク〕/`follow_up`〔続報登録〕の可否＝サーバー算出）＋`content_revisions[]`〔内容の編集履歴・版/編集者/日時・Phase C〕 |
 | `GET /info-items/word-cloud` | ワードクラウド（保存済みトークン頻度集計・§5.36） | クエリ: 上記の分類フィルタ（絞り込み後の集計）／`limit`（上位語数） | `tokens[]`（`token`/`count`/`weight`）。会社全体 or 絞り込み範囲 |
 | `POST /info-items/word-cloud-preview` | **入力ダイアログ内プレビュー**（草稿本文の同期トークン化・§12-2） | ボディ: `body_html`（草稿・サニタイズ後の平文抽出で janome）／`limit` | `tokens[]`（`token`/`count`）。**永続しない ephemeral**＝保存前の可視化用（トリガ＝本文 blur/ボタン） |
 
@@ -37,7 +39,7 @@
 | --- | --- | --- | --- |
 | `POST /info-items` | 低摩擦登録（全ユーザー）／**続報登録** | ボディ: `title`（必須）・`body_html?`（リッチ＝保存時に nh3 サニタイズ・§N.7）・`source_url?`（http/https のみ＝422 `invalid_url`）・`parent_info_id?`（**続報＝§12-1**）。ヘッダ `Idempotency-Key`（§1.9） | 作成した情報（`status=raw`）。保存時に **`body_html` サニタイズ→`body_text` 派生→`info_tokens` 再生成→抽出要約 `summary` 生成（すべて同期・§12-2/12-3）**＋類似度で auto `info_links`（既定 `kind=related`）を生成（§N.6）。**`parent_info_id` 指定時は親の未棄却 `info_links` を `origin=auto` でスナップショット複製**（§12-1） |
 | `POST /info-items/images` | **貼付画像の再ホスト**（リッチテキスト・§12-4） | multipart: `file`（画像・マジックバイト検証＝§1.10/§N.7）。エディタの paste ハンドラが blob を送る | `{ url }`＝自社ホスト（MinIO）署名 URL。エディタが `img src` をこの URL に置換（外部参照を持ち込まない） |
-| `PATCH /info-items/{id}` | 属性付与・編集 | ボディ（部分更新）＝raw の本人＝`title`/`body_html`/`source_url` のみ／`info_curator`＝全属性（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_level`/`impact_class`/`impact_timing`/`triaged_on`/`triage`/`triage_reason`＋`categories[]`〔#8 全置換〕）。curated 属性を付けると `status=raw→curated` | 更新後の情報。`body_html`/`title` 変更時は **サニタイズ→`body_text` 派生→`info_tokens`→要約 `summary` 再生成→関連 `score` 再計算**（同期・§N.6・§12-3） |
+| `PATCH /info-items/{id}` | 内容編集（作成者）／キュレーション（curator） | ボディ（部分更新・**フィールド群でオーナー別**）＝**内容＝作成者のみ**（`title`/`body_html`/`source_url`／`status` 非依存・curator も不可）／**キュレーション＝`info_curator` のみ**（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_level`/`impact_class`/`impact_timing`/`triaged_on`/`triage`/`triage_reason`＋`categories[]`〔#8 全置換〕）。curated 属性を付けると `status=raw→curated`。越権フィールドは 403 | 更新後の情報。`body_html`/`title` 変更時は **サニタイズ→`body_text` 派生→`info_tokens`→要約 `summary` 再生成→関連 `score` 再計算**（同期・§N.6・§12-3）＋**内容変更は編集履歴に記録**（Phase C） |
 | `POST /info-items/{id}/archive` | アーカイブ（論理削除） | — | `status=archived`＋`archived_at`。**`info_curator` のみ**・物理削除なし（監査保持） |
 | `POST /info-items/{id}/unarchive` | アーカイブ解除 | — | `status` を curated（or raw）へ戻す。`info_curator` のみ |
 | `DELETE /info-items/{id}` | 削除（本人の未判定のみ） | — | **`status=raw` かつ登録者本人**のみ物理削除可（casual 登録の取消）。curated 済みは 409 `invalid_state`（→ archive を使う） |
@@ -53,6 +55,7 @@
 | `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・**行は残す**）。auto リンクを人が「不要」と判断＝**以後の再計算でも復活しない**（§N.6 の upsert が既存行の `rejected_at` を尊重）。棄却は物理削除でなく論理（監査・再学習の材料に残す） |
 | `POST /info-links/{id}/unreject` | 棄却の取消 | — | `rejected_at` を NULL に |
 
+- **情報側のリンク操作（追加/種別変更/棄却）は会社内 active ユーザー全員**（`can.add_link`・`info_curator` 管轄外・`status` 非依存・N.0）＝低摩擦で関連を“発生”させる層。**貼られたリンクの採否・統制は成果物側の管理権限者に委任**（成果物側の採否ワークフロー＝各ドメイン C/D/コンセプトの別スコープ・反証の要再評価の受領も成果物側）。
 - **自動リンク生成は EP を持たない**＝情報保存/成果物保存の内部トリガでサーバーが類似度計算し `info_links(origin=auto, kind=related, score)` を upsert（§N.6）。**通知は出さない**（低コミット・閾値＋上位 N）。
 - **`impact_class=threat` は per-link `kind` の初期サジェスト**に使うだけ（自動発火しない）。**要再評価の発火は per-link `refuting`（manual）のみ**（誤爆防止・設計 §11-⑤）。
 
