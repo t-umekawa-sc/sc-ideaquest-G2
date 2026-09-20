@@ -77,6 +77,24 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
   return res as InfoDetail;
 }
 
+// 部分更新（PATCH /info-items/{id}・Phase C slice5.2）＝内容=作成者／キュレーション=curator（越権はサーバーが403）。
+// 送るキーだけが更新対象（内容変更は再派生＋版履歴・キュレーションは raw→curated）。成功で一覧を再取得。
+export interface InfoPatch {
+  title?: string; body_html?: string; source_url?: string | null;
+  priority?: string | null; source?: string | null; classification?: string | null; scope?: string | null;
+  target_business?: string | null; impact_level?: string | null; impact_class?: string | null;
+  impact_timing?: string | null; triaged_on?: string | null; triage?: string | null; triage_reason?: string | null;
+  categories?: string[];
+}
+export async function updateInfoItemApi(id: string, patch: InfoPatch): Promise<InfoDetail> {
+  const res = await apiFetch<InfoDetail>(`/info-items/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  emit();
+  return res as InfoDetail;
+}
+
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 let store: InfoItem[] = INFO_FIXTURES.map((x) => clone(x));
 let seq = 100;

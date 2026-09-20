@@ -2,11 +2,11 @@
 
 // SC-52 情報の詳細（Phase B＝backend GET /info-items/{id} に結線・読み取り）。
 // 正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。モーダル/フルページ双方から使う。
-// 編集/属性/続報/アーカイブ（PATCH・リンクEP）は Phase C で結線＝ここでは can フラグで導線を出し分けるのみ。
-import { useEffect, useState } from "react";
+// 内容編集（作成者・PATCH）は結線済（Slice 5.2）。属性=curator インライン／リンク／続報/アーカイブは後続スライス。can フラグで出し分け。
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { fetchInfoDetail } from "../api";
+import { fetchInfoDetail, updateInfoItemApi } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
@@ -27,6 +27,12 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const router = useRouter();
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
+  // 内容インライン編集（作成者・can.edit_content）。属性=curator インラインは後続（5.2b）。
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [title, setTitle] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [contentDirty, setContentDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -36,6 +42,29 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       .catch(() => setState("notfound"));
     return () => ac.abort();
   }, [infoId]);
+
+  // 取得/保存のたびに編集初期値を同期（内容編集可のとき本文 contenteditable も初期化）。
+  useEffect(() => {
+    if (!item) return;
+    setTitle(item.title);
+    setSourceUrl(item.source_url ?? "");
+    setContentDirty(false);
+    if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
+  }, [item]);
+
+  const saveContent = async () => {
+    if (!item) return;
+    const t = title.trim();
+    if (!t) return;
+    setSaving(true);
+    try {
+      const updated = await updateInfoItemApi(item.id, {
+        title: t, body_html: bodyRef.current?.innerHTML ?? "", source_url: sourceUrl.trim() || null,
+      });
+      setItem(updated); // 再取得＝再派生（要約/トークン）と版反映
+    } catch { /* 失敗時は編集内容を保持（再試行可） */ }
+    setSaving(false);
+  };
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
   // スレッド内の移動（元情報/続報）は現在のモーダルURLを replace で差し替え＝履歴を積まない。
@@ -62,7 +91,11 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">タイトル</div>
-          <h3 style={{ margin: "0 0 6px" }}>{r.title}</h3>
+          {r.can.edit_content ? (
+            <input className="input" value={title} onChange={(e) => { setTitle(e.target.value); setContentDirty(true); }} style={{ marginBottom: 6 }} />
+          ) : (
+            <h3 style={{ margin: "0 0 6px" }}>{r.title}</h3>
+          )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <span className={`badge ${STATUS_LABEL[r.status][1]}`}>{STATUS_LABEL[r.status][0]}</span>
             {r.impact_class ? <span className={`badge ${IMPACT_CLASS_LABEL[r.impact_class][1]}`}>{IMPACT_CLASS_LABEL[r.impact_class][0]}</span> : null}
@@ -71,7 +104,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         </div>
 
-        {r.summary ? (
+        {!r.can.edit_content && r.summary ? (
           <div className="field dialog-section">
             <div className="summary-box"><div className="summary-box__label">要約（選別用・自動生成）</div>{r.summary}</div>
           </div>
@@ -79,14 +112,28 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">内容・説明</div>
-          {/* body_html は保存時＋表示時に nh3 サニタイズ済み（§12-4・サーバー側で無害化）。 */}
-          <div className="rt-view" dangerouslySetInnerHTML={{ __html: r.body_html ?? "" }} />
-          {r.source_url ? (
-            <div style={{ marginTop: 6 }}>
-              <a href={r.source_url} target="_blank" rel="noopener noreferrer">🔗 出典を開く</a>{" "}
-              <span style={{ color: "var(--color-text-muted)", wordBreak: "break-all" }}>（{r.source_url}）</span>
-            </div>
-          ) : null}
+          {r.can.edit_content ? (
+            <>
+              {/* 内容は作成者のみ編集可（status 非依存）。保存時にサーバーがサニタイズ→再派生（body_text/要約/トークン）＋版記録。 */}
+              <div className="rt">
+                <div className="rt__area" ref={bodyRef} contentEditable suppressContentEditableWarning
+                  onInput={() => setContentDirty(true)} data-placeholder="内容・説明を編集…" />
+              </div>
+              <label className="dialog-label" htmlFor="dm-url" style={{ marginTop: 8 }}>出典URL（http/https）</label>
+              <input className="input" id="dm-url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setContentDirty(true); }} placeholder="https://…" />
+            </>
+          ) : (
+            <>
+              {/* body_html はサーバー側で nh3 サニタイズ済み（§12-4）。 */}
+              <div className="rt-view" dangerouslySetInnerHTML={{ __html: r.body_html ?? "" }} />
+              {r.source_url ? (
+                <div style={{ marginTop: 6 }}>
+                  <a href={r.source_url} target="_blank" rel="noopener noreferrer">🔗 出典を開く</a>{" "}
+                  <span style={{ color: "var(--color-text-muted)", wordBreak: "break-all" }}>（{r.source_url}）</span>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="field dialog-section">
@@ -155,10 +202,11 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       </div>
 
       <div className="modal__footer">
-        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose}>閉じる</button>
-        {/* 続報登録・内容/属性編集・アーカイブ（PATCH/リンクEP）は Phase C で結線。can フラグで導線を出し分ける。 */}
-        {r.can.edit_content ? <button className="btn btn-outline" type="button" disabled title="Phase C で結線">内容を編集</button> : null}
-        {r.can.curate ? <button className="btn btn-outline" type="button" disabled title="Phase C で結線">属性を編集</button> : null}
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving}>閉じる</button>
+        {/* 内容編集＝作成者（実 API・PATCH）。属性=curator インライン編集は 5.2b で結線。 */}
+        {r.can.edit_content ? (
+          <button className="btn btn-primary" type="button" onClick={saveContent} disabled={!contentDirty || saving}>{saving ? "保存中…" : "保存する"}</button>
+        ) : null}
       </div>
     </>
   );
