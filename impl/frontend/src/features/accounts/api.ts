@@ -125,6 +125,18 @@ export function listOwnCompanyQuestGroups(): Promise<QuestGroupListResponse | nu
   return apiFetch<QuestGroupListResponse>("/admin/company-quest-groups");
 }
 
+// 情報判定権限（info_curator・N.5）＝会社アカウント管理者/system_admin。SC-93 に同居。account_id で識別。
+export interface InfoCurator { account_id: string; display_name: string; granted_by: string | null; granted_at: string; }
+export function listInfoCurators(): Promise<{ data: InfoCurator[] } | null> {
+  return apiFetch<{ data: InfoCurator[] }>("/info-curators");
+}
+export function grantInfoCurator(accountId: string): Promise<{ data: InfoCurator[] } | null> {
+  return apiFetch<{ data: InfoCurator[] }>("/info-curators", { method: "POST", body: JSON.stringify({ account_id: accountId }) });
+}
+export async function revokeInfoCurator(accountId: string): Promise<void> {
+  await apiFetch(`/info-curators/${encodeURIComponent(accountId)}`, { method: "DELETE" });
+}
+
 export function disableOwnAccount(accountId: string): Promise<AccountResponse | null> {
   return apiFetch<AccountResponse>(`/admin/accounts/${accountId}/disable`, { method: "POST" });
 }

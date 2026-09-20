@@ -2323,7 +2323,11 @@ export interface paths {
         get: operations["get_info_item_detail_api_v1_info_items__info_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Info Item
+         * @description 未判定（raw）の物理削除（N.2）＝登録者本人のみ。curated 済みは 409（archive へ誘導）。
+         */
+        delete: operations["delete_info_item_api_v1_info_items__info_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -2430,6 +2434,50 @@ export interface paths {
          * @description 参考資料を削除（N.2）＝作成者のみ。DB 行＋MinIO オブジェクト削除。
          */
         delete: operations["remove_info_attachment_api_v1_info_items__info_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-curators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Info Curators
+         * @description 情報判定権限の一覧（N.5）＝会社アカウント管理者/system_admin。セッション会社スコープ固定。読取専用。
+         */
+        get: operations["list_info_curators_api_v1_info_curators_get"];
+        put?: never;
+        /**
+         * Grant Info Curator
+         * @description 情報判定権限を付与（N.5）＝会社アカウント管理者/system_admin。二重付与は 409。
+         */
+        post: operations["grant_info_curator_api_v1_info_curators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-curators/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Info Curator
+         * @description 情報判定権限を剥奪（N.5・論理）＝会社アカウント管理者/system_admin。
+         */
+        delete: operations["revoke_info_curator_api_v1_info_curators__account_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4004,6 +4052,42 @@ export interface components {
             display_name: string;
             /** Avatar Image Url */
             avatar_image_url?: string | null;
+        };
+        /**
+         * InfoCuratorDTO
+         * @description 情報判定権限（info_curator）の付与ユーザー（N.5）。管理面＝account_id で識別。
+         */
+        InfoCuratorDTO: {
+            /** Account Id */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Granted By */
+            granted_by?: string | null;
+            /**
+             * Granted At
+             * Format: date-time
+             */
+            granted_at: string;
+        };
+        /**
+         * InfoCuratorGrantRequest
+         * @description POST /info-curators（付与・N.5）。対象は会社内アカウント（account_id）。
+         */
+        InfoCuratorGrantRequest: {
+            /** Account Id */
+            account_id: string;
+        };
+        /**
+         * InfoCuratorsResponse
+         * @description GET/POST /info-curators の応答（未剥奪の一覧・N.5）。
+         */
+        InfoCuratorsResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["InfoCuratorDTO"][];
         };
         /** InfoDetailDTO */
         InfoDetailDTO: {
@@ -10456,6 +10540,35 @@ export interface operations {
             };
         };
     };
+    delete_info_item_api_v1_info_items__info_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_info_item_api_v1_info_items__info_id__patch: {
         parameters: {
             query?: never;
@@ -10628,6 +10741,88 @@ export interface operations {
             path: {
                 info_id: string;
                 attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_info_curators_api_v1_info_curators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoCuratorsResponse"];
+                };
+            };
+        };
+    };
+    grant_info_curator_api_v1_info_curators_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoCuratorGrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoCuratorsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_info_curator_api_v1_info_curators__account_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
             };
             cookie?: never;
         };

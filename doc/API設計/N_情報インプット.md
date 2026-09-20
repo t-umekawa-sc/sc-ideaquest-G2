@@ -69,11 +69,11 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /info-curators` | 情報判定権限の一覧 | — | `data`=`{user_id, display_name, granted_by, granted_at}` の配列。**会社アカウント管理者/system_admin のみ** |
-| `POST /info-curators` | 付与 | ボディ: `user_id` | 付与済み（`UNIQUE(user_id) WHERE revoked_at IS NULL`＝二重付与は 409）。会社アカウント管理者/system_admin |
-| `DELETE /info-curators/{user_id}` | 剥奪 | — | `revoked_at` セット（論理剥奪・行は残す・監査） |
+| `GET /info-curators` | 情報判定権限の一覧 | — | `data`=`{account_id, display_name, granted_by, granted_at}` の配列（未剥奪のみ・付与日時降順）。**会社アカウント管理者/system_admin のみ**・セッション会社スコープ固定 |
+| `POST /info-curators` | 付与 | ボディ: `account_id` | 付与後の一覧 `data`（`UNIQUE(user_id) WHERE revoked_at IS NULL`＝二重付与は 409／会社にいない account は 404 存在秘匿）。会社アカウント管理者/system_admin |
+| `DELETE /info-curators/{account_id}` | 剥奪 | — | 204・`revoked_at` セット（論理剥奪・行は残す・監査）。未付与/会社外は 404 |
 
-- スコープ＝**会社（テナント）単位**（設計 §11-①）。quest 系権限（C.0 の6権限）とは別軸。付与導線は会社アカウント管理（SC-90 系）に同居させる想定（画面は §N.8）。
+- **識別子＝`account_id`（管理面の自然キー・2026-09-21 実装）**＝会社アカウント管理は account 中心（`info_curators.user_id` へはサーバーが `account_id→会社DB users` で解決）。スコープ＝**会社（テナント）単位**（設計 §11-①）＝`company_id` は受けずセッション会社固定。quest 系権限（C.0 の6権限）とは別軸。**付与導線＝会社アカウント管理（SC-93 `/admin/accounts`）に同居**＝`InfoCuratorSection`（付与セレクト＋剥奪）。
 
 ## N.6 類似度・ワードクラウド（派生・内部処理）
 

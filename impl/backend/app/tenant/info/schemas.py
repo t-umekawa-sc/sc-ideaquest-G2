@@ -235,5 +235,23 @@ class InfoAttachmentsResponse(BaseModel):
     attachments: list[InfoAttachmentDTO] = []
 
 
+class InfoCuratorDTO(BaseModel):
+    """情報判定権限（info_curator）の付与ユーザー（N.5）。管理面＝account_id で識別。"""
+    account_id: str
+    display_name: str
+    granted_by: str | None = None
+    granted_at: datetime
+
+
+class InfoCuratorsResponse(BaseModel):
+    """GET/POST /info-curators の応答（未剥奪の一覧・N.5）。"""
+    data: list[InfoCuratorDTO] = []
+
+
+class InfoCuratorGrantRequest(BaseModel):
+    """POST /info-curators（付与・N.5）。対象は会社内アカウント（account_id）。"""
+    account_id: str
+
+
 # InfoDetailDTO.attachments は前方参照（InfoAttachmentDTO は後方定義）＝解決を明示。
 InfoDetailDTO.model_rebuild()

@@ -9,12 +9,15 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
+from app.control_plane.admin.deps import require_company_account_admin
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
     InfoAttachmentsResponse,
     InfoCreateRequest,
+    InfoCuratorGrantRequest,
+    InfoCuratorsResponse,
     InfoDetailDTO,
     InfoImageUploadResponse,
     InfoLinkCandidatesResponse,
@@ -196,6 +199,42 @@ def remove_info_attachment(
     info_service.remove_attachment(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, attachment_id,
     )
+
+
+# ---- 情報判定権限（info_curator）の付与/剥奪（N.5・会社アカウント管理者/system_admin・SC-90 系に同居）----
+
+
+@router.get("/info-curators", response_model=InfoCuratorsResponse)
+def list_info_curators(request: Request, session: dict = Depends(require_company_account_admin)) -> InfoCuratorsResponse:
+    """情報判定権限の一覧（N.5）＝会社アカウント管理者/system_admin。セッション会社スコープ固定。読取専用。"""
+    result = info_service.list_info_curators(uuid.UUID(session["company_id"]))
+    return InfoCuratorsResponse(**result)
+
+
+@router.post("/info-curators", response_model=InfoCuratorsResponse, status_code=201)
+def grant_info_curator(
+    body: InfoCuratorGrantRequest,
+    request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> InfoCuratorsResponse:
+    """情報判定権限を付与（N.5）＝会社アカウント管理者/system_admin。二重付与は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.grant_info_curator(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body.account_id)
+    return InfoCuratorsResponse(**result)
+
+
+@router.delete("/info-curators/{account_id}", status_code=204)
+def revoke_info_curator(
+    account_id: str,
+    request: Request,
+    session: dict = Depends(require_company_account_admin),
+) -> None:
+    """情報判定権限を剥奪（N.5・論理）＝会社アカウント管理者/system_admin。"""
+    verify_origin(request)
+    verify_csrf(request)
+    info_service.revoke_info_curator(uuid.UUID(session["company_id"]), account_id)
 
 
 # ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）----

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import bindparam, delete, func, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy import bindparam, delete, func, select, text, update
+from sqlalchemy.orm import Session, aliased
 
 from app.core import list_query as lq
 from app.tenant.info.orm import InfoAttachment, InfoCurator, InfoItem, InfoLink, InfoToken
@@ -333,6 +333,36 @@ def is_curator(session: Session, user_id: uuid.UUID) -> bool:
     return session.execute(
         select(InfoCurator.id).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None)).limit(1)
     ).first() is not None
+
+
+def list_curators(session: Session) -> list[dict]:
+    """情報判定権限の一覧（未剥奪のみ・N.5）＝付与ユーザー＋付与者名＋付与日時。account_id で識別（管理面）。"""
+    grantor = aliased(User)
+    rows = session.execute(
+        select(User.account_id, User.display_name, grantor.display_name, InfoCurator.granted_at)
+        .join(User, User.id == InfoCurator.user_id)
+        .join(grantor, grantor.id == InfoCurator.granted_by_id, isouter=True)
+        .where(InfoCurator.revoked_at.is_(None))
+        .order_by(InfoCurator.granted_at.desc())
+    ).all()
+    return [
+        {"account_id": str(acc_id), "display_name": name, "granted_by": gname, "granted_at": granted_at}
+        for acc_id, name, gname, granted_at in rows
+    ]
+
+
+def grant_curator(session: Session, user_id: uuid.UUID, granted_by_id: uuid.UUID) -> None:
+    """情報判定権限を付与（N.5）＝未剥奪の重複は呼び出し側が 409 判定（is_curator）。行を追加。"""
+    session.add(InfoCurator(user_id=user_id, granted_by_id=granted_by_id))
+
+
+def revoke_curator(session: Session, user_id: uuid.UUID) -> bool:
+    """情報判定権限を剥奪（N.5・論理＝revoked_at セット・行は残す）。剥奪した行があれば True。"""
+    result = session.execute(
+        update(InfoCurator).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None))
+        .values(revoked_at=func.now())
+    )
+    return result.rowcount > 0
 
 
 # ---- 参考資料（info_attachments・N.2・§5.33）----

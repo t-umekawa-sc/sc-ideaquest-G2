@@ -13,6 +13,23 @@ INFO = "/api/v1/info-items"
 WORD_CLOUD = "/api/v1/info-items/word-cloud"
 IMAGES = "/api/v1/info-items/images"
 LINKS = "/api/v1/info-links"
+CURATORS = "/api/v1/info-curators"
+
+
+def _seed_member_account_id() -> str:
+    """seed 一般ユーザー（SEED_LOGIN）の account_id（curator 付与の対象）。"""
+    from app.control_plane.auth.orm import Account
+    from app.db.control import control_session
+    from sqlalchemy import select as _select
+    with control_session() as s:
+        return str(s.execute(_select(Account).where(Account.login_id == SEED_LOGIN)).scalars().one().id)
+
+
+def _purge_curators(db_identifier):
+    """info_curators を全削除（テスト間の権限漏れ防止）。"""
+    from app.tenant.info.orm import InfoCurator
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoCurator.__table__.delete()); ts.commit()
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 有効な PNG シグネチャ（validate_image_upload はシグネチャ検証）
 
@@ -552,3 +569,28 @@ def test_n_tc_136_delete_blocked_by_follow_ups(client, info_env):
         assert any(e.get("reason") == "has_follow_ups" for e in r.json().get("errors", []))
     finally:
         _delete_info(info_env.db_identifier, fid); _delete_info(info_env.db_identifier, pid)
+
+
+def test_n_tc_137_curator_grant_revoke(client, info_env, factory):
+    """N-TC-137: 情報判定権限の付与/剥奪（会社アカウント管理者のみ）＝付与201/一覧/二重409/剥奪204/未付与404/一般403。"""
+    acc_id = _seed_member_account_id()
+    try:
+        # 一般ユーザーは付与不可（403）。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.post(CURATORS, json={"account_id": acc_id}, headers=_csrf(client)).status_code == 403
+        # 会社アカウント管理者でログインし直して付与。
+        admin = factory.make_seed_company_account(system_role="company_account_admin")
+        _login(client, admin["company_code"], admin["login_id"], admin["password"])
+        r = client.post(CURATORS, json={"account_id": acc_id}, headers=_csrf(client))
+        assert r.status_code == 201, r.text
+        assert any(c["account_id"] == acc_id for c in r.json()["data"])
+        # 二重付与は 409。
+        assert client.post(CURATORS, json={"account_id": acc_id}, headers=_csrf(client)).status_code == 409
+        # 一覧に出現。
+        assert any(c["account_id"] == acc_id for c in client.get(CURATORS).json()["data"])
+        # 剥奪 204 → 一覧から消える → 未付与の再剥奪は 404。
+        assert client.delete(f"{CURATORS}/{acc_id}", headers=_csrf(client)).status_code == 204
+        assert all(c["account_id"] != acc_id for c in client.get(CURATORS).json()["data"])
+        assert client.delete(f"{CURATORS}/{acc_id}", headers=_csrf(client)).status_code == 404
+    finally:
+        _purge_curators(info_env.db_identifier)  # 権限漏れ防止（他テスト保護）

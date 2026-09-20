@@ -71,6 +71,7 @@
 | N-TC-134 | api | この情報からクエスト作成＝逆リンク自動生成 | ログイン済＋情報 | `POST /quests`（`from_info_id` 指定） | 201・当該情報の詳細 `links[]` に quests への関連リンク（`kind=related`・`origin=manual`・`target_title`=作成クエスト名）が現れる／不在 `from_info_id` は 422 | N.3／C.2／§FR-41 |
 | N-TC-135 | api | 未判定の物理削除（本人・raw のみ） | raw 情報の登録者本人 | `DELETE /info-items/{id}` | 204・一覧/詳細から消える（従属行も削除）／非本人は 403／curated 済みは 409 `invalid_state`（archive 誘導） | N.2 |
 | N-TC-136 | api | 続報がある情報は削除不可 | raw 情報＋続報あり | `DELETE /info-items/{id}` | 409 `conflict`（`has_follow_ups`）＝孤児化防止 | N.2／§12-1 |
+| N-TC-137 | api | 情報判定権限の付与/剥奪（管理者のみ） | 会社アカウント管理者でログイン | `POST`/`GET`/`DELETE /info-curators` | 付与 201＋一覧に出現／二重付与 409／剥奪 204＋一覧から消える／未付与の剥奪は 404／**非管理者（一般）は 403** | N.5／§5.37 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

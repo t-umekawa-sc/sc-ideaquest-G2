@@ -552,6 +552,50 @@ def delete_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str)
             pass
 
 
+# ---- 情報判定権限（info_curator）の付与/剥奪（N.5・会社アカウント管理者/system_admin）------------
+
+def list_info_curators(company_id: uuid.UUID) -> dict:
+    """情報判定権限の一覧（N.5）＝未剥奪のみ。account_id で識別（管理面＝会社アカウント管理に同居）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        return {"data": repo.list_curators(ts)}
+
+
+def grant_info_curator(actor_account_id: uuid.UUID, company_id: uuid.UUID, target_account_id: str) -> dict:
+    """情報判定権限を付与（N.5）＝対象は会社内アカウント（account_id→会社DB ユーザーに解決）。二重付与は 409。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(target_account_id, field="account_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        target = profile_repo.get_user_by_account(ts, tid)
+        if target is None:
+            raise AppError(404, "not_found")  # 会社にいない account は存在秘匿（404）
+        if repo.is_curator(ts, target.id):
+            raise AppError(409, "conflict", detail="既に情報判定権限が付与されています")
+        actor = profile_repo.get_user_by_account(ts, actor_account_id)  # 付与者（会社DB ミラー・無ければ NULL）
+        repo.grant_curator(ts, target.id, actor.id if actor else None)
+        ts.commit()
+        return {"data": repo.list_curators(ts)}
+
+
+def revoke_info_curator(company_id: uuid.UUID, target_account_id: str) -> None:
+    """情報判定権限を剥奪（N.5・論理＝revoked_at）。対象が会社にいない/未付与でも 404。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    tid = _parse_uuid(target_account_id, field="account_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        target = profile_repo.get_user_by_account(ts, tid)
+        if target is None:
+            raise AppError(404, "not_found")
+        if not repo.revoke_curator(ts, target.id):
+            raise AppError(404, "not_found")  # 未付与＝存在しない権限（冪等ではなく明示）
+        ts.commit()
+
+
 # ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）------------------
 
 def _link_dto(link, title: str | None) -> dict:

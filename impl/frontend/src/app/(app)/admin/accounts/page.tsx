@@ -1,7 +1,7 @@
 // SC-93 会社アカウント管理者（自社アカウント管理）ページ。company_account_admin 専用＋system_admin 上位互換。
 import { redirect } from "next/navigation";
 
-import { AccountSelfSection } from "@/features/accounts";
+import { AccountSelfSection, InfoCuratorSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { getServerSession } from "@/lib/session";
 
@@ -16,6 +16,7 @@ export default async function OwnAccountsPage() {
   return (
     <AccountSelfSection companyCode={session.company_code}>
       <QuestGroupSection scope="own" />
+      <InfoCuratorSection />
     </AccountSelfSection>
   );
 }
