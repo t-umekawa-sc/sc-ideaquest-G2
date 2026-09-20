@@ -23,6 +23,9 @@
 | N-TC-009 | int | 続報を束ねる（roots_only＝根のみ） | 根＋続報を seed | `build_info_list_query(roots_only=True)` | `parent_info_id IS NULL` の根のみ返す（続報は除外） | N.1／§12-1 |
 | N-TC-010 | int | 詳細集計（categories/links〔target_title 解決・rejected 含む〕/thread/tokens_top） | 情報＋カテゴリ＋リンク（実 idea/quest＋棄却）＋続報＋トークン | `get_info_item`／`links_for_item`／`resolve_link_titles`／`follow_up_items`／`tokens_top` | 各集計が正（棄却リンクは rejected=true・target_title は idea/quest から解決・続報は時系列） | N.1／§5.33-5.36 |
 | N-TC-011 | int | 情報判定権限の判定（is_curator） | curator 付与／未付与／剥奪(revoked) | `is_curator(user_id)` | 付与=true・未付与/剥奪=false | N.0／§5.37 |
+| N-TC-012 | int | 派生（サニタイズ／平文／トークン抽出） | script/on*/javascript: を含む body_html | `derive.sanitize_html`／`to_plain_text`／`extract_tokens` | script/on*/javascript: を除去・平文抽出・内容語トークン（頻度） | N.6／N.7／§12-2/12-4 |
+| N-TC-013 | int | 低摩擦登録（create_info_item＋派生保存） | ユーザー seed | `create_info_item`（title＋body_html） | status=raw・created_by 正・body_text/summary 派生・info_tokens 保存 | N.2／§12-2/12-3 |
+| N-TC-014 | int | 続報＝親リンクのスナップショット複製 | 親（未棄却/棄却リンク）＋続報登録 | `create_info_item(parent_info_id=…)` | 親の**未棄却**リンクを `origin=auto` で複製・棄却は複製しない | N.2／§12-1 |
 
 ## 2. 一覧・ワードクラウド API（SC-50・N.1）
 
@@ -41,6 +44,9 @@
 | N-TC-109 | api | can フラグ（作成者/curator/全員） | 作成者本人でログイン／curator 付与有無 | `GET /info-items/{id}` | `can.edit_content`＝作成者のみ true／`can.curate`＝curator のみ true／`can.add_link`＝常に true | N.0／SC-50 |
 | N-TC-110 | api | 不在/他テナントは 404 | ログイン済 | `GET /info-items/<不在id>` | 404 `not_found`（存在秘匿） | N.0 |
 | N-TC-111 | api | 未認証遮断 | セッション無し | `GET /info-items/{id}` | 401 `unauthenticated` | require_me（N.0） |
+| N-TC-112 | api | 低摩擦登録（全員・201・派生） | ログイン済 | `POST /info-items`（title＋body_html） | 201・`status=raw`・body サニタイズ→body_text→tokens→summary・詳細 DTO を返す | N.2／§12 |
+| N-TC-113 | api | 出典URL 検証（http/https のみ） | ログイン済 | `POST /info-items`（`source_url=javascript:...`） | 422 `validation_error`（`errors[].field="source_url"`） | N.7 |
+| N-TC-114 | api | title 必須 | ログイン済 | `POST /info-items`（title 空） | 422 `validation_error`（`errors[].field="title"`） | N.2／§C.6 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

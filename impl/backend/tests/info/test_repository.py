@@ -103,6 +103,50 @@ def test_n_tc_009_roots_only(info_env):
         assert {info_env.ids.a, info_env.ids.d, info_env.ids.b} <= set(ids)
 
 
+def test_n_tc_013_create_info_item(info_env):
+    """N-TC-013: create_info_item＝status=raw・created_by 正・info_tokens 保存。"""
+    from app.tenant.info.orm import InfoItem, InfoToken
+    with get_tenant_session(info_env.db_identifier) as ts:
+        item = repo.create_info_item(ts, created_by_id=info_env.user_id, title="新規メモ",
+                                     body_html="<p>本文</p>", body_text="本文", summary="本文")
+        ts.flush()
+        repo.replace_tokens(ts, item.id, [("本文", 2), ("テスト", 1)])
+        ts.commit()
+        iid = item.id
+    try:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            got = repo.get_info_item(ts, iid)
+            assert got.status == "raw" and got.created_by_id == info_env.user_id and got.summary == "本文"
+            assert {t["token"] for t in repo.tokens_top(ts, iid, limit=10)} == {"本文", "テスト"}
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
+            ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
+            ts.commit()
+
+
+def test_n_tc_014_snapshot_parent_links(info_env):
+    """N-TC-014: 続報登録＝親の未棄却リンクのみ origin=auto で複製（棄却は複製しない）。"""
+    from app.tenant.info.orm import InfoItem, InfoLink
+    with get_tenant_session(info_env.db_identifier) as ts:
+        child = repo.create_info_item(ts, created_by_id=info_env.user_id, title="続報",
+                                      parent_info_id=info_env.ids.a)
+        ts.flush()
+        n = repo.snapshot_parent_links(ts, info_env.ids.a, child.id)  # ids.a=未棄却2＋棄却1
+        ts.commit()
+        cid = child.id
+    try:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            links = repo.links_for_item(ts, cid)
+            assert n == 2 and len(links) == 2  # 未棄却2のみ複製・棄却は除外
+            assert all(l.origin == "auto" for l in links)
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == cid))
+            ts.execute(InfoItem.__table__.delete().where(InfoItem.id == cid))
+            ts.commit()
+
+
 def test_n_tc_010_detail_aggregates(info_env):
     """N-TC-010: 詳細集計＝links（target_title 解決・rejected 含む）/follow_ups（時系列）/tokens_top。"""
     with get_tenant_session(info_env.db_identifier) as ts:

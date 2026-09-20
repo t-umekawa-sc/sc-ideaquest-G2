@@ -14,7 +14,8 @@ dependencies = [
     "pydantic-settings>=2.4",
     "minio>=7.2",               # オブジェクトストレージ（画像/添付・§1.10）
     "python-multipart>=0.0.9",  # multipart/form-data（画像アップロード・FastAPI UploadFile）
-    "janome>=0.5",              # 日本語形態素解析（純Python・データDL不要）＝FR-39 (c) オフライン抽出型要約
+    "janome>=0.5",              # 日本語形態素解析（純Python・データDL不要）＝FR-39 (c) オフライン抽出型要約／情報インプットのトークン抽出（N.6）
+    "nh3>=0.2",                 # HTML サニタイズ（Rust製・許可リスト方式）＝情報インプットのリッチ本文 XSS 無害化（N.7・§12-4）
 ]
 
 [project.optional-dependencies]

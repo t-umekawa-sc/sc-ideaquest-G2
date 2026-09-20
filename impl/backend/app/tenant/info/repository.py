@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import bindparam, func, select, text
+from sqlalchemy import bindparam, delete, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
@@ -162,6 +162,48 @@ def users_by_ids(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, User
         return {}
     rows = session.execute(select(User).where(User.id.in_(ids))).scalars().all()
     return {u.id: u for u in rows}
+
+
+# ---- 登録（POST /info-items・N.2）----
+
+def create_info_item(
+    session: Session,
+    *,
+    created_by_id: uuid.UUID,
+    title: str,
+    body_html: str | None = None,
+    body_text: str | None = None,
+    summary: str | None = None,
+    source_url: str | None = None,
+    parent_info_id: uuid.UUID | None = None,
+    info_id: uuid.UUID | None = None,
+) -> InfoItem:
+    """情報を1件作成（低摩擦登録＝status=raw・N.2）。派生（body_text/summary）は呼び出し側が算出して渡す。"""
+    item = InfoItem(
+        id=info_id or uuid.uuid4(), created_by_id=created_by_id, title=title,
+        body_html=body_html, body_text=body_text, summary=summary, source_url=source_url,
+        parent_info_id=parent_info_id, status="raw",
+    )
+    session.add(item)
+    return item
+
+
+def replace_tokens(session: Session, info_id: uuid.UUID, tokens: list[tuple[str, int]]) -> None:
+    """当該情報の info_tokens を全置換（保存時に再生成・§5.36）。"""
+    session.execute(delete(InfoToken).where(InfoToken.info_item_id == info_id))
+    for tok, cnt in tokens:
+        session.add(InfoToken(info_item_id=info_id, token=tok, count=cnt))
+
+
+def snapshot_parent_links(session: Session, parent_id: uuid.UUID, new_info_id: uuid.UUID) -> int:
+    """続報登録時＝親の**未棄却**リンクを `origin=auto` で複製（§12-1）。複製件数を返す。"""
+    parent_links = session.execute(
+        select(InfoLink).where(InfoLink.info_item_id == parent_id, InfoLink.rejected_at.is_(None))
+    ).scalars().all()
+    for l in parent_links:
+        session.add(InfoLink(info_item_id=new_info_id, target_type=l.target_type, target_id=l.target_id,
+                             kind=l.kind, origin="auto", score=l.score))
+    return len(parent_links)
 
 
 # ---- 詳細（GET /info-items/{id}・N.1）----

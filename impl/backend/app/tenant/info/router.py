@@ -10,8 +10,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.me.deps import require_me
+from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info import application as info_service
-from app.tenant.info.schemas import InfoDetailDTO, InfoListResponse, WordCloudResponse
+from app.tenant.info.schemas import InfoCreateRequest, InfoDetailDTO, InfoListResponse, WordCloudResponse
 
 router = APIRouter(prefix="/api/v1", tags=["info"])
 
@@ -66,4 +67,21 @@ def get_info_item_detail(
     """
     result = info_service.get_info_detail(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
+    return InfoDetailDTO(**result)
+
+
+# ---- 変更系（SC-51・N.2）。認可＝require_me＋Origin/CSRF（§2.2）。業務ルールは application 強制 ----
+
+
+@router.post("/info-items", response_model=InfoDetailDTO, status_code=201)
+def create_info_item(
+    body: InfoCreateRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> InfoDetailDTO:
+    """低摩擦登録／続報登録（SC-51・N.2）＝全ユーザー。保存時にサニタイズ→body_text→要約→トークン再生成。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.create_info_item(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
     return InfoDetailDTO(**result)

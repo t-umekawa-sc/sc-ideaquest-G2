@@ -81,6 +81,16 @@ class WordCloudResponse(BaseModel):
     tokens: list[WordCloudTokenDTO]
 
 
+# ---- 登録（POST /info-items・N.2）-------------------------------------------
+class InfoCreateRequest(BaseModel):
+    """低摩擦登録（全ユーザー）／続報登録。属性は登録後に curator が PATCH（Phase C 後続）。"""
+
+    title: str
+    body_html: str | None = None
+    source_url: str | None = None
+    parent_info_id: str | None = None  # 続報＝親情報ID（§12-1）
+
+
 # ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------
 class InfoCanDTO(BaseModel):
     """閲覧者の編集能力（サーバー算出・N.0）。内容=作成者／キュレーション=curator／リンク=全員。"""

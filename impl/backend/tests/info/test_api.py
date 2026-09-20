@@ -5,11 +5,28 @@ DTO 形状・全文検索・入力検証・認可を検証する。情報プー�
 """
 from __future__ import annotations
 
+from app.db.tenant import get_tenant_session
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
 INFO = "/api/v1/info-items"
 WORD_CLOUD = "/api/v1/info-items/word-cloud"
+
+
+def _csrf(client) -> dict:
+    return {"X-CSRF-Token": client.cookies.get("iq_csrf")}
+
+
+def _delete_info(db_identifier, info_id):
+    """作成した情報の後始末（tokens/links/item を物理削除）。"""
+    from app.tenant.info.orm import InfoItem, InfoLink, InfoToken
+    import uuid as _uuid
+    iid = _uuid.UUID(info_id)
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
+        ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == iid))
+        ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
+        ts.commit()
 
 
 def test_n_tc_101_list_card_shape(client, info_env):
@@ -76,6 +93,40 @@ def test_n_tc_107_status_facets(client, info_env):
     assert facets["all"] == facets["raw"] + facets["curated"]
     # seed（info_env）は raw(3: fu1,fu2,b と d?) 実際の内訳に依らず archived は含めない → all>=4。
     assert facets["all"] >= 1 and facets["raw"] >= 1 and facets["curated"] >= 1
+
+
+def test_n_tc_112_create(client, info_env):
+    """N-TC-112: 低摩擦登録（全員・201・サニタイズ→body_text→tokens→summary）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={
+        "title": "新規情報（テスト）",
+        "body_html": "<p>生成AIの<strong>導入</strong>が拡大している。<script>alert(1)</script></p>",
+    }, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        assert d["status"] == "raw" and d["title"] == "新規情報（テスト）"
+        assert "<script" not in (d["body_html"] or "")   # サニタイズ済み
+        assert d["can"]["edit_content"] is True           # 作成者本人
+        assert d["tokens_top"]                            # トークンが生成される
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
+
+
+def test_n_tc_113_source_url_validation(client, info_env):
+    """N-TC-113: 出典URL は http/https のみ（422・field=source_url）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={"title": "x", "source_url": "javascript:evil()"}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("field") == "source_url" for e in r.json().get("errors", []))
+
+
+def test_n_tc_114_title_required(client, info_env):
+    """N-TC-114: title 必須（422・field=title）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={"title": "   "}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    assert any(e.get("field") == "title" for e in r.json().get("errors", []))
 
 
 def test_n_tc_108_detail_shape(client, info_env):

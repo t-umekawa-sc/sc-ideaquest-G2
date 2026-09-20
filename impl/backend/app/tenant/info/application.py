@@ -14,6 +14,7 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage
+from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.info.schemas import (
     IMPACT_CLASS_VALUES,
@@ -22,6 +23,9 @@ from app.tenant.info.schemas import (
     STATUS_VALUES,
 )
 from app.tenant.profile import repository as profile_repo
+from app.tenant.quests.summarize import summarize_text
+
+_MAX_TITLE = 255
 
 _EMPTY_PAGE = {
     "data": [],
@@ -228,6 +232,51 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         }
         return _detail_dto(item, categories=categories, links=links, title_map=title_map,
                            parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens, can=can)
+
+
+def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
+    """低摩擦登録／続報登録（SC-51・N.2）＝全ユーザー・status=raw。
+
+    保存時に **body_html サニタイズ→body_text 派生→要約 summary→info_tokens 再生成**（同期・§12）。
+    `parent_info_id` 指定時は親の未棄却リンクを `origin=auto` でスナップショット複製（§12-1）。返却＝作成した詳細 DTO。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    title = (body.title or "").strip()
+    if not title:
+        raise AppError(422, "validation_error", detail="タイトルは必須です", errors=[{"field": "title"}])
+    if len(title) > _MAX_TITLE:
+        raise AppError(422, "validation_error", detail="タイトルが長すぎます", errors=[{"field": "title"}])
+    if not derive.is_valid_source_url(body.source_url):
+        raise AppError(422, "validation_error", detail="出典URLは http/https のみです", errors=[{"field": "source_url"}])
+    parent_uuid = _parse_uuid(body.parent_info_id, field="parent_info_id") if body.parent_info_id else None
+
+    # 派生（外部送信ゼロ・オフライン）。サニタイズ→平文→要約→トークン。
+    body_html = derive.sanitize_html(body.body_html)
+    body_text = derive.to_plain_text(body_html)
+    summary = summarize_text(body_text) if body_text else None
+    tokens = derive.extract_tokens(body_text)
+
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if parent_uuid is not None and repo.get_info_item(ts, parent_uuid) is None:
+            raise AppError(422, "validation_error", detail="親情報が見つかりません", errors=[{"field": "parent_info_id"}])
+        item = repo.create_info_item(
+            ts, created_by_id=user.id, title=title, body_html=body_html or None,
+            body_text=body_text or None, summary=summary, source_url=(body.source_url or None),
+            parent_info_id=parent_uuid,
+        )
+        ts.flush()
+        repo.replace_tokens(ts, item.id, tokens)
+        if parent_uuid is not None:
+            repo.snapshot_parent_links(ts, parent_uuid, item.id)  # 親の未棄却リンクを auto 複製（§12-1）
+        ts.commit()
+        new_id = item.id
+    # 作成直後の詳細（作成者視点＝can.edit_content=true）を返す。
+    return get_info_detail(account_id, company_id, str(new_id))
 
 
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:
