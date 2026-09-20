@@ -26,6 +26,7 @@
 | N-TC-012 | int | 派生（サニタイズ／平文／トークン抽出） | script/on*/javascript: を含む body_html | `derive.sanitize_html`／`to_plain_text`／`extract_tokens` | script/on*/javascript: を除去・平文抽出・内容語トークン（頻度） | N.6／N.7／§12-2/12-4 |
 | N-TC-013 | int | 低摩擦登録（create_info_item＋派生保存） | ユーザー seed | `create_info_item`（title＋body_html） | status=raw・created_by 正・body_text/summary 派生・info_tokens 保存 | N.2／§12-2/12-3 |
 | N-TC-014 | int | 続報＝親リンクのスナップショット複製 | 親（未棄却/棄却リンク）＋続報登録 | `create_info_item(parent_info_id=…)` | 親の**未棄却**リンクを `origin=auto` で複製・棄却は複製しない | N.2／§12-1 |
+| N-TC-015 | int | 版スナップショット／カテゴリ置換 | 情報1件 | `add_revision` ×2／`replace_categories` ×2 | revision が 1→2 の連番／categories は後の集合で全置換（重複なし） | N.2／§5.34／§12 |
 
 ## 2. 一覧・ワードクラウド API（SC-50・N.1）
 
@@ -47,6 +48,9 @@
 | N-TC-112 | api | 低摩擦登録（全員・201・派生） | ログイン済 | `POST /info-items`（title＋body_html） | 201・`status=raw`・body サニタイズ→body_text→tokens→summary・詳細 DTO を返す | N.2／§12 |
 | N-TC-113 | api | 出典URL 検証（http/https のみ） | ログイン済 | `POST /info-items`（`source_url=javascript:...`） | 422 `validation_error`（`errors[].field="source_url"`） | N.7 |
 | N-TC-114 | api | title 必須 | ログイン済 | `POST /info-items`（title 空） | 422 `validation_error`（`errors[].field="title"`） | N.2／§C.6 |
+| N-TC-115 | api | 内容編集（作成者・再派生＋履歴） | 作成者本人でログイン | `PATCH /info-items/{id}`（body_html 変更） | body 再サニタイズ→body_text/summary/tokens 再生成・内容の版が1件増える | N.2／§12 |
+| N-TC-116 | api | キュレーション（curator・raw→curated） | curator 付与＋raw 情報 | `PATCH /info-items/{id}`（priority/categories） | 属性/カテゴリ反映・`status` raw→curated | N.2 |
+| N-TC-117 | api | 越権は 403 | 非作成者が内容／非curator が属性 | `PATCH /info-items/{id}` | 403 `forbidden`（内容=作成者のみ／属性=curator のみ） | N.0／§2.2 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

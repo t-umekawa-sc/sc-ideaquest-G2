@@ -91,6 +91,30 @@ class InfoCreateRequest(BaseModel):
     parent_info_id: str | None = None  # 続報＝親情報ID（§12-1）
 
 
+class InfoUpdateRequest(BaseModel):
+    """部分更新（PATCH）。**内容＝作成者のみ**（title/body_html/source_url）／**キュレーション＝curator のみ**。
+
+    どのフィールドが送られたかは `model_fields_set` で判定（null 明示とキー未送信を区別）。越権フィールドは 403。
+    """
+    # 内容（作成者・status 非依存）
+    title: str | None = None
+    body_html: str | None = None
+    source_url: str | None = None
+    # キュレーション（info_curator）
+    priority: str | None = None
+    source: str | None = None
+    classification: str | None = None
+    scope: str | None = None
+    target_business: str | None = None
+    impact_level: str | None = None
+    impact_class: str | None = None
+    impact_timing: str | None = None
+    triaged_on: str | None = None
+    triage: str | None = None
+    triage_reason: str | None = None
+    categories: list[str] | None = None
+
+
 # ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------
 class InfoCanDTO(BaseModel):
     """閲覧者の編集能力（サーバー算出・N.0）。内容=作成者／キュレーション=curator／リンク=全員。"""

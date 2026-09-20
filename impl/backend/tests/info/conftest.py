@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.tenant.info.orm import InfoItem, InfoItemCategory, InfoLink, InfoToken
+from app.tenant.info.orm import InfoItem, InfoItemCategory, InfoItemRevision, InfoLink, InfoToken
 from app.tenant.profile.repository import get_user_by_account
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN
 
@@ -88,6 +88,7 @@ def info_env():
     yield SimpleNamespace(db_identifier=db_identifier, user_id=user_id, ids=ids)
 
     with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoItemRevision.__table__.delete().where(InfoItemRevision.info_item_id.in_(created_items)))
         ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id.in_(created_items)))
         ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(created_items)))
         ts.execute(InfoItemCategory.__table__.delete().where(InfoItemCategory.info_item_id.in_(created_items)))

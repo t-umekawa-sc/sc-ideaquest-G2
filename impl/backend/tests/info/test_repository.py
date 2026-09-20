@@ -147,6 +147,20 @@ def test_n_tc_014_snapshot_parent_links(info_env):
             ts.commit()
 
 
+def test_n_tc_015_revisions_and_categories(info_env):
+    """N-TC-015: add_revision の版連番／replace_categories の全置換。"""
+    with get_tenant_session(info_env.db_identifier) as ts:
+        r1 = repo.add_revision(ts, info_env.ids.a, info_env.user_id, {"title": "v1"})
+        r2 = repo.add_revision(ts, info_env.ids.a, info_env.user_id, {"title": "v2"})
+        assert (r1, r2) == (1, 2)
+        assert repo.revision_count(ts, info_env.ids.a) == 2
+        repo.replace_categories(ts, info_env.ids.a, ["ext_economy", "ext_economy", "ext_industry"])
+        ts.flush()
+        cats = repo.categories_for_items(ts, [info_env.ids.a]).get(info_env.ids.a, [])
+        assert set(cats) == {"ext_economy", "ext_industry"}  # 重複除去・置換
+        ts.commit()  # teardown（conftest）が revisions/categories/items を物理削除
+
+
 def test_n_tc_010_detail_aggregates(info_env):
     """N-TC-010: 詳細集計＝links（target_title 解決・rejected 含む）/follow_ups（時系列）/tokens_top。"""
     with get_tenant_session(info_env.db_identifier) as ts:

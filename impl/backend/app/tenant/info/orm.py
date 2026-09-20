@@ -18,7 +18,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import CompanyBase
@@ -90,6 +90,20 @@ class InfoToken(CompanyBase):
     token: Mapped[str] = mapped_column(Text, nullable=False)
     weight: Mapped[Decimal | None] = mapped_column(Numeric(6, 4), nullable=True)
     count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+
+class InfoItemRevision(CompanyBase):
+    """内容（title/body_html/source_url/参考資料）の版スナップショット（N.2・§12）。判定後も作成者が
+    内容を編集できるため、triage 時点の内容を追跡できるよう版を残す（idea_revisions と同型）。"""
+    __tablename__ = "info_item_revisions"
+    __table_args__ = (UniqueConstraint("info_item_id", "revision", name="uq_info_item_revisions"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    info_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("info_items.id"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # {title, body_html, source_url} のスナップショット
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class InfoCurator(CompanyBase):

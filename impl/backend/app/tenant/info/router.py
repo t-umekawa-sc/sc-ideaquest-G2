@@ -12,7 +12,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info import application as info_service
-from app.tenant.info.schemas import InfoCreateRequest, InfoDetailDTO, InfoListResponse, WordCloudResponse
+from app.tenant.info.schemas import (
+    InfoCreateRequest,
+    InfoDetailDTO,
+    InfoListResponse,
+    InfoUpdateRequest,
+    WordCloudResponse,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["info"])
 
@@ -84,4 +90,19 @@ def create_info_item(
     verify_csrf(request)
     result = info_service.create_info_item(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
+    return InfoDetailDTO(**result)
+
+
+@router.patch("/info-items/{info_id}", response_model=InfoDetailDTO)
+def update_info_item(
+    info_id: str,
+    body: InfoUpdateRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> InfoDetailDTO:
+    """情報の部分更新（SC-52/SC-51・N.2）＝内容は作成者／キュレーションは curator（越権 403）。内容変更は履歴に記録。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.update_info_item(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, body=body)
     return InfoDetailDTO(**result)

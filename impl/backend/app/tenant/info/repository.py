@@ -195,6 +195,32 @@ def replace_tokens(session: Session, info_id: uuid.UUID, tokens: list[tuple[str,
         session.add(InfoToken(info_item_id=info_id, token=tok, count=cnt))
 
 
+def replace_categories(session: Session, info_id: uuid.UUID, categories: list[str]) -> None:
+    """情報カテゴリ（#8）を全置換（差分ではなく置換・§5.34）。重複は除去。"""
+    from app.tenant.info.orm import InfoItemCategory
+    session.execute(delete(InfoItemCategory).where(InfoItemCategory.info_item_id == info_id))
+    for cat in dict.fromkeys(categories):
+        session.add(InfoItemCategory(info_item_id=info_id, category=cat))
+
+
+def add_revision(session: Session, info_id: uuid.UUID, editor_id: uuid.UUID, changes: dict) -> int:
+    """内容の版スナップショットを追加（版番号は info_item ごとに連番・§12）。付与した版番号を返す。"""
+    from app.tenant.info.orm import InfoItemRevision
+    nxt = (session.execute(
+        select(func.coalesce(func.max(InfoItemRevision.revision), 0)).where(InfoItemRevision.info_item_id == info_id)
+    ).scalar_one()) + 1
+    session.add(InfoItemRevision(info_item_id=info_id, revision=nxt, editor_id=editor_id, changes=changes))
+    return nxt
+
+
+def revision_count(session: Session, info_id: uuid.UUID) -> int:
+    """内容編集履歴の版数（テスト/表示補助）。"""
+    from app.tenant.info.orm import InfoItemRevision
+    return int(session.execute(
+        select(func.count()).select_from(InfoItemRevision).where(InfoItemRevision.info_item_id == info_id)
+    ).scalar_one())
+
+
 def snapshot_parent_links(session: Session, parent_id: uuid.UUID, new_info_id: uuid.UUID) -> int:
     """続報登録時＝親の**未棄却**リンクを `origin=auto` で複製（§12-1）。複製件数を返す。"""
     parent_links = session.execute(

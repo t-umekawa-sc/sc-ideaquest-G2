@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core import list_query as lq
@@ -277,6 +278,84 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         new_id = item.id
     # 作成直後の詳細（作成者視点＝can.edit_content=true）を返す。
     return get_info_detail(account_id, company_id, str(new_id))
+
+
+_CONTENT_FIELDS = {"title", "body_html", "source_url"}
+_CURATION_FIELDS = {
+    "priority", "source", "classification", "scope", "target_business", "impact_level",
+    "impact_class", "impact_timing", "triaged_on", "triage", "triage_reason", "categories",
+}
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        raise AppError(422, "validation_error", detail="日付が不正です", errors=[{"field": "triaged_on"}])
+
+
+def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, *, body) -> dict:
+    """情報の部分更新（SC-52/SC-51・N.2）。内容＝作成者のみ／キュレーション＝curator のみ（越権 403）。
+
+    内容変更時は サニタイズ→body_text→要約→トークン再生成＋**内容の版スナップショット**を記録（§12）。
+    キュレーション（属性/triage/categories）を付けると `status=raw→curated`。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    provided = set(body.model_fields_set)
+    content = provided & _CONTENT_FIELDS
+    curation = provided & _CURATION_FIELDS
+    if "title" in content and (body.title is None or not body.title.strip()):
+        raise AppError(422, "validation_error", detail="タイトルは必須です", errors=[{"field": "title"}])
+    if "source_url" in content and not derive.is_valid_source_url(body.source_url):
+        raise AppError(422, "validation_error", detail="出典URLは http/https のみです", errors=[{"field": "source_url"}])
+
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        # 認可＝内容は作成者のみ／キュレーションは curator のみ（フィールド群でオーナーが違う・N.0）。
+        if content and item.created_by_id != user.id:
+            raise AppError(403, "forbidden", detail="内容の編集は作成者のみです")
+        if curation and not repo.is_curator(ts, user.id):
+            raise AppError(403, "forbidden", detail="属性の編集は情報判定権限（info_curator）が必要です")
+
+        if content:
+            if "title" in content:
+                item.title = body.title.strip()
+            if "body_html" in content:
+                item.body_html = derive.sanitize_html(body.body_html) or None
+                item.body_text = derive.to_plain_text(item.body_html) or None
+                item.summary = summarize_text(item.body_text) if item.body_text else None
+                repo.replace_tokens(ts, item.id, derive.extract_tokens(item.body_text or ""))
+            if "source_url" in content:
+                item.source_url = body.source_url or None
+            # 内容の版スナップショット（判定後も追跡できるよう毎回の内容変更で1版・§12）。
+            repo.add_revision(ts, item.id, user.id,
+                              {"title": item.title, "body_html": item.body_html, "source_url": item.source_url})
+
+        if curation:
+            for f in ("priority", "source", "classification", "scope", "target_business",
+                      "impact_level", "impact_class", "impact_timing", "triage", "triage_reason"):
+                if f in curation:
+                    setattr(item, f, getattr(body, f) or None)
+            if "triaged_on" in curation:
+                item.triaged_on = _parse_date(body.triaged_on)
+            if "categories" in curation and body.categories is not None:
+                repo.replace_categories(ts, item.id, body.categories)
+            if item.status == "raw":
+                item.status = "curated"  # curator が属性を付与＝判定済みへ
+
+        item.updated_at = datetime.now(timezone.utc)
+        ts.commit()
+    return get_info_detail(account_id, company_id, info_id)
 
 
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:

@@ -95,6 +95,82 @@ def test_n_tc_107_status_facets(client, info_env):
     assert facets["all"] >= 1 and facets["raw"] >= 1 and facets["curated"] >= 1
 
 
+def _grant_curator(db_identifier, user_id):
+    from app.tenant.info.orm import InfoCurator
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(InfoCurator(user_id=user_id)); ts.commit()
+
+
+def _revoke_curators(db_identifier, user_id):
+    from app.tenant.info.orm import InfoCurator
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoCurator.__table__.delete().where(InfoCurator.user_id == user_id)); ts.commit()
+
+
+def _seed_other_item(db_identifier):
+    """他ユーザーが作成した情報を1件 seed（越権テスト用）。(info_id, user_id) を返す。"""
+    import uuid as _uuid
+    from app.tenant.info.orm import InfoItem
+    from app.tenant.profile.orm import User
+    other_uid, iid = _uuid.uuid4(), _uuid.uuid4()
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(User(id=other_uid, account_id=_uuid.uuid4(), display_name="別ユーザー", locale="ja", status="active"))
+        ts.flush()
+        ts.add(InfoItem(id=iid, created_by_id=other_uid, title="他者の情報", status="raw"))
+        ts.commit()
+    return iid, other_uid
+
+
+def _delete_user(db_identifier, user_id):
+    from app.tenant.profile.orm import User
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(User.__table__.delete().where(User.id == user_id)); ts.commit()
+
+
+def test_n_tc_115_patch_content(client, info_env):
+    """N-TC-115: 内容編集（作成者・再派生＋版履歴+1）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # info_env.ids.a は seed 一般ユーザー（＝ログイン本人）が作成者＝内容編集可。
+    r = client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新後の<strong>本文</strong><script>x()</script></p>"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "<script" not in (d["body_html"] or "") and "更新後" in (d["body_html"] or "")  # 再サニタイズ
+    assert d["summary"] and d["tokens_top"]  # 要約/トークン再生成
+    from app.tenant.info import repository as repo
+    with get_tenant_session(info_env.db_identifier) as ts:
+        assert repo.revision_count(ts, info_env.ids.a) == 1  # 内容変更で1版
+
+
+def test_n_tc_116_patch_curation(client, info_env):
+    """N-TC-116: キュレーション（curator・raw→curated）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    _grant_curator(info_env.db_identifier, info_env.user_id)
+    try:
+        r = client.patch(f"{INFO}/{info_env.ids.b}", json={"priority": "high", "categories": ["ext_competitor"]}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["priority"] == "high" and d["status"] == "curated"  # 属性付与で raw→curated
+        assert set(d["categories"]) == {"ext_competitor"}
+    finally:
+        _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
+def test_n_tc_117_patch_forbidden(client, info_env):
+    """N-TC-117: 越権は 403（非curator が属性／非作成者が内容）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # 非 curator が属性を編集 → 403
+    r = client.patch(f"{INFO}/{info_env.ids.a}", json={"priority": "high"}, headers=_csrf(client))
+    assert r.status_code == 403, r.text
+    # 非作成者が内容を編集 → 403
+    other_id, other_uid = _seed_other_item(info_env.db_identifier)
+    try:
+        r2 = client.patch(f"{INFO}/{other_id}", json={"title": "書き換え"}, headers=_csrf(client))
+        assert r2.status_code == 403, r2.text
+    finally:
+        _delete_info(info_env.db_identifier, str(other_id))
+        _delete_user(info_env.db_identifier, other_uid)
+
+
 def test_n_tc_112_create(client, info_env):
     """N-TC-112: 低摩擦登録（全員・201・サニタイズ→body_text→tokens→summary）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
