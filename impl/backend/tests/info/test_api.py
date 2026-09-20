@@ -156,10 +156,11 @@ def test_n_tc_116_patch_curation(client, info_env):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     _grant_curator(info_env.db_identifier, info_env.user_id)
     try:
-        r = client.patch(f"{INFO}/{info_env.ids.b}", json={"priority": "high", "categories": ["ext_competitor"]}, headers=_csrf(client))
+        r = client.patch(f"{INFO}/{info_env.ids.b}", json={"priority": "high", "due_date": "2026-12-31", "categories": ["ext_competitor"]}, headers=_csrf(client))
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["priority"] == "high" and d["status"] == "curated"  # 属性付与で raw→curated
+        assert d["due_date"] == "2026-12-31"
         assert set(d["categories"]) == {"ext_competitor"}
     finally:
         _revoke_curators(info_env.db_identifier, info_env.user_id)

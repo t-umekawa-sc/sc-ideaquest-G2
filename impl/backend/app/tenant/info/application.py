@@ -285,17 +285,17 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
 _CONTENT_FIELDS = {"title", "body_html", "source_url"}
 _CURATION_FIELDS = {
     "priority", "source", "classification", "scope", "target_business", "impact_level",
-    "impact_class", "impact_timing", "triaged_on", "triage", "triage_reason", "categories",
+    "impact_class", "impact_timing", "triaged_on", "triage", "triage_reason", "due_date", "categories",
 }
 
 
-def _parse_date(value: str | None) -> date | None:
+def _parse_date(value: str | None, field: str) -> date | None:
     if not value:
         return None
     try:
         return date.fromisoformat(value[:10])
     except ValueError:
-        raise AppError(422, "validation_error", detail="日付が不正です", errors=[{"field": "triaged_on"}])
+        raise AppError(422, "validation_error", detail="日付が不正です", errors=[{"field": field}])
 
 
 def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, *, body) -> dict:
@@ -349,7 +349,9 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
                 if f in curation:
                     setattr(item, f, getattr(body, f) or None)
             if "triaged_on" in curation:
-                item.triaged_on = _parse_date(body.triaged_on)
+                item.triaged_on = _parse_date(body.triaged_on, "triaged_on")
+            if "due_date" in curation:
+                item.due_date = _parse_date(body.due_date, "due_date")
             if "categories" in curation and body.categories is not None:
                 repo.replace_categories(ts, item.id, body.categories)
             if item.status == "raw":

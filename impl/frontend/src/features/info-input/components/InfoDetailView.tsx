@@ -2,7 +2,7 @@
 
 // SC-52 情報の詳細（Phase B＝backend GET /info-items/{id} に結線・読み取り）。
 // 正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。モーダル/フルページ双方から使う。
-// 内容編集（作成者・PATCH）は結線済（Slice 5.2）。属性=curator インライン／リンク／続報/アーカイブは後続スライス。can フラグで出し分け。
+// 内容編集（作成者）＋属性編集（curator）のインラインを PATCH へ結線済（Slice 5.2/5.2b・can で出し分け）。リンク／続報/アーカイブは後続。
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -23,6 +23,20 @@ function Attr({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function AttrSelect({ label, k, map, attrs, onSet }: {
+  label: string; k: string; map: Record<string, string>; attrs: Record<string, string>; onSet: (k: string, v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="dialog-label" htmlFor={`dm-${k}`}>{label}</label>
+      <select className="select" id={`dm-${k}`} value={attrs[k] ?? ""} onChange={(e) => onSet(k, e.target.value)}>
+        <option value="">—</option>
+        {Object.entries(map).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </div>
+  );
+}
+
 export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: () => void }) {
   const router = useRouter();
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
@@ -33,6 +47,13 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [sourceUrl, setSourceUrl] = useState("");
   const [contentDirty, setContentDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // キュレーション（属性）インライン編集（curator・can.curate）。
+  const EMPTY_ATTRS = { priority: "", source: "", classification: "", scope: "", target_business: "", impact_level: "", impact_class: "", impact_timing: "", triaged_on: "", triage: "", triage_reason: "", due_date: "" };
+  const [attrs, setAttrs] = useState<Record<string, string>>(EMPTY_ATTRS);
+  const [cats, setCats] = useState<string[]>([]);
+  const [curationDirty, setCurationDirty] = useState(false);
+  const setAttr = (k: string, v: string) => { setAttrs((a) => ({ ...a, [k]: v })); setCurationDirty(true); };
+  const toggleCat = (c: string) => { setCats((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c])); setCurationDirty(true); };
 
   useEffect(() => {
     const ac = new AbortController();
@@ -49,19 +70,34 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setTitle(item.title);
     setSourceUrl(item.source_url ?? "");
     setContentDirty(false);
+    setAttrs({
+      priority: item.priority ?? "", source: item.source ?? "", classification: item.classification ?? "",
+      scope: item.scope ?? "", target_business: item.target_business ?? "", impact_level: item.impact_level ?? "",
+      impact_class: item.impact_class ?? "", impact_timing: item.impact_timing ?? "", triaged_on: item.triaged_on ?? "",
+      triage: item.triage ?? "", triage_reason: item.triage_reason ?? "", due_date: item.due_date ?? "",
+    });
+    setCats(item.categories);
+    setCurationDirty(false);
     if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
   }, [item]);
 
-  const saveContent = async () => {
+  const save = async () => {
     if (!item) return;
-    const t = title.trim();
-    if (!t) return;
+    const patch: Record<string, unknown> = {};
+    if (contentDirty) {
+      const t = title.trim();
+      if (!t) return;
+      patch.title = t; patch.body_html = bodyRef.current?.innerHTML ?? ""; patch.source_url = sourceUrl.trim() || null;
+    }
+    if (curationDirty) {
+      for (const k of Object.keys(EMPTY_ATTRS)) patch[k] = attrs[k] || null;
+      patch.categories = cats;
+    }
+    if (!contentDirty && !curationDirty) return;
     setSaving(true);
     try {
-      const updated = await updateInfoItemApi(item.id, {
-        title: t, body_html: bodyRef.current?.innerHTML ?? "", source_url: sourceUrl.trim() || null,
-      });
-      setItem(updated); // 再取得＝再派生（要約/トークン）と版反映
+      const updated = await updateInfoItemApi(item.id, patch);
+      setItem(updated); // 再取得＝再派生（要約/トークン）・版・raw→curated を反映
     } catch { /* 失敗時は編集内容を保持（再試行可） */ }
     setSaving(false);
   };
@@ -147,20 +183,49 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           ) : <p className="muted">主要語がありません。</p>}
         </div>
 
-        <div className="field dialog-section">
-          <div className="dialog-label">属性（環境スキャン・判定）</div>
-          <dl className="attr-grid">
-            <Attr label="情報ソース" value={r.source ? SOURCE_LABEL[r.source] : null} />
-            <Attr label="情報分類" value={r.classification ? CLASSIFICATION_LABEL[r.classification] : null} />
-            <Attr label="大分類" value={r.scope ? SCOPE_LABEL[r.scope] : null} />
-            <Attr label="対象事業" value={r.target_business ? BUSINESS_LABEL[r.target_business] : null} />
-            <Attr label="影響度" value={r.impact_level ? IMPACT_LABEL[r.impact_level] : null} />
-            <Attr label="影響発生時期" value={r.impact_timing ? TIMING_LABEL[r.impact_timing] : null} />
-            <Attr label="情報判定" value={r.triage ? TRIAGE_LABEL[r.triage] : null} />
-            <Attr label="期限日" value={r.due_date} />
-            {r.triage_reason ? <Attr label="判定理由" value={r.triage_reason} /> : null}
-          </dl>
-        </div>
+        {r.can.curate ? (
+          <div className="field dialog-section">
+            <div className="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              <AttrSelect label="優先度" k="priority" map={PRIORITY_LABEL} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="情報ソース" k="source" map={SOURCE_LABEL} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="情報分類" k="classification" map={CLASSIFICATION_LABEL} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="大分類" k="scope" map={SCOPE_LABEL} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="対象事業" k="target_business" map={BUSINESS_LABEL} attrs={attrs} onSet={setAttr} />
+              <div>
+                <div className="dialog-label">情報カテゴリ（複数可）</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
+                    <label key={v} className="checkbox" style={{ fontSize: "var(--text-xs)" }}><input type="checkbox" checked={cats.includes(v)} onChange={() => toggleCat(v)} /><span>{l}</span></label>
+                  ))}
+                </div>
+              </div>
+              <AttrSelect label="影響度" k="impact_level" map={IMPACT_LABEL} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="影響分類" k="impact_class" map={Object.fromEntries(Object.entries(IMPACT_CLASS_LABEL).map(([v, l]) => [v, l[0]]))} attrs={attrs} onSet={setAttr} />
+              <AttrSelect label="影響発生時期" k="impact_timing" map={TIMING_LABEL} attrs={attrs} onSet={setAttr} />
+              <div><label className="dialog-label" htmlFor="dm-due">期限日（対応/有効期限）</label><input className="input" id="dm-due" type="date" value={attrs.due_date} onChange={(e) => setAttr("due_date", e.target.value)} /></div>
+              <div><label className="dialog-label" htmlFor="dm-tron">情報判定日</label><input className="input" id="dm-tron" type="date" value={attrs.triaged_on} onChange={(e) => setAttr("triaged_on", e.target.value)} /></div>
+              <AttrSelect label="情報判定" k="triage" map={TRIAGE_LABEL} attrs={attrs} onSet={setAttr} />
+              <div><label className="dialog-label" htmlFor="dm-reason">判定理由</label><textarea className="input" id="dm-reason" rows={3} value={attrs.triage_reason} onChange={(e) => setAttr("triage_reason", e.target.value)} /></div>
+            </div>
+          </div>
+        ) : (
+          <div className="field dialog-section">
+            <div className="dialog-label">属性（環境スキャン・判定）</div>
+            <dl className="attr-grid">
+              <Attr label="情報ソース" value={r.source ? SOURCE_LABEL[r.source] : null} />
+              <Attr label="情報分類" value={r.classification ? CLASSIFICATION_LABEL[r.classification] : null} />
+              <Attr label="大分類" value={r.scope ? SCOPE_LABEL[r.scope] : null} />
+              <Attr label="対象事業" value={r.target_business ? BUSINESS_LABEL[r.target_business] : null} />
+              <Attr label="影響度" value={r.impact_level ? IMPACT_LABEL[r.impact_level] : null} />
+              <Attr label="影響発生時期" value={r.impact_timing ? TIMING_LABEL[r.impact_timing] : null} />
+              <Attr label="情報判定" value={r.triage ? TRIAGE_LABEL[r.triage] : null} />
+              <Attr label="期限日" value={r.due_date} />
+              {r.triage_reason ? <Attr label="判定理由" value={r.triage_reason} /> : null}
+            </dl>
+            <div className="hint" style={{ marginTop: 6 }}>属性の付与・情報判定は<strong>情報判定権限（info_curator）</strong>の領分です。</div>
+          </div>
+        )}
 
         <div className="field dialog-section">
           <div className="dialog-label">この情報から（機会特定→行動）</div>
@@ -203,9 +268,9 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
       <div className="modal__footer">
         <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving}>閉じる</button>
-        {/* 内容編集＝作成者（実 API・PATCH）。属性=curator インライン編集は 5.2b で結線。 */}
-        {r.can.edit_content ? (
-          <button className="btn btn-primary" type="button" onClick={saveContent} disabled={!contentDirty || saving}>{saving ? "保存中…" : "保存する"}</button>
+        {/* 内容=作成者／属性=curator のインライン編集（実 API・PATCH）。dirty のセクションだけ送る。 */}
+        {(r.can.edit_content || r.can.curate) ? (
+          <button className="btn btn-primary" type="button" onClick={save} disabled={(!contentDirty && !curationDirty) || saving}>{saving ? "保存中…" : "保存する"}</button>
         ) : null}
       </div>
     </>

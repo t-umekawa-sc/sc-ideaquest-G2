@@ -114,6 +114,7 @@ class InfoUpdateRequest(BaseModel):
     triaged_on: str | None = None
     triage: str | None = None
     triage_reason: str | None = None
+    due_date: str | None = None
     categories: list[str] | None = None
 
 
