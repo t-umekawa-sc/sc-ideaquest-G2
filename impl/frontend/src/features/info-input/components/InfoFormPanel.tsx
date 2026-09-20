@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Field, Multiselect } from "@/components/ui";
 import type { MultiselectOption } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { createInfoItemApi, getInfoItem, updateInfoItem, uploadInfoImageApi } from "../api";
+import { addAttachmentsApi, createInfoItemApi, getInfoItem, updateInfoItem, uploadInfoImageApi } from "../api";
 import { LINK_CANDIDATES } from "../fixtures";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
@@ -65,7 +65,7 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   const [links, setLinks] = useState<InfoLink[]>(() =>
     (editing?.links ?? (parent ? parent.links.map((l) => ({ ...l, origin: "auto" as const })) : [])).map((l) => ({ ...l })),
   );
-  const [files, setFiles] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickTarget, setPickTarget] = useState<string[]>([]);
   const [linkKind, setLinkKind] = useState<InfoLinkKind>("related");
   const [cloud, setCloud] = useState<[string, number][] | null>(null);
@@ -151,7 +151,7 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   });
   const unrejectLink = (i: number) => setLinks((ls) => ls.map((x, j) => (j === i ? { ...x, rejected: false } : x)));
 
-  const addFiles = (fl: FileList | null) => { if (fl) setFiles((f) => [...f, ...Array.from(fl).map((x) => `${x.name} ${x.size}`)]); };
+  const addFiles = (fl: FileList | null) => { if (fl) setFiles((f) => [...f, ...Array.from(fl)]); };
 
   const [saving, setSaving] = useState(false);
   const save = async () => {
@@ -178,7 +178,12 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
     // 新規/続報＝実 API（POST /info-items）＝内容（title/body_html/source_url/parent）。属性/リンクは後続スライス。
     setSaving(true);
     try {
-      await createInfoItemApi(input);
+      const created = await createInfoItemApi(input);
+      // 参考資料（info_attachments・§5.33）＝作成後に追加（本人が作成者＝内容群を編集可）。
+      if (files.length) {
+        try { await addAttachmentsApi(created.id, files); }
+        catch { setTitleErr("情報は登録しましたが、参考資料の一部を添付できませんでした。詳細から再添付してください。"); }
+      }
       onDone();
     } catch (e) {
       if (e instanceof ApiError) {
@@ -265,13 +270,13 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
             onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("is-over"); }} onDragLeave={(e) => e.currentTarget.classList.remove("is-over")}
             onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove("is-over"); addFiles(e.dataTransfer.files); }}>📎 クリックまたはドラッグ＆ドロップで添付</div>
           <div className="attach-list">
-            {files.map((f, i) => { const [name, size] = f.split(" "); return (
+            {files.map((f, i) => (
               <div key={i} className="attach">
-                <span className="attach__icon">{iconFor(name)}</span>
-                <div className="attach__meta"><div className="attach__name">{name}</div><div className="attach__size">{fmtSize(Number(size))}</div></div>
+                <span className="attach__icon">{iconFor(f.name)}</span>
+                <div className="attach__meta"><div className="attach__name">{f.name}</div><div className="attach__size">{fmtSize(f.size)}</div></div>
                 <button type="button" className="attach__remove" onClick={() => setFiles((fs) => fs.filter((_, j) => j !== i))}>✕</button>
               </div>
-            ); })}
+            ))}
           </div>
           <div className="hint">本文とは別に、PDF・画像・資料ファイルを添付できます（出典の裏付け・引用元の保全）。</div>
         </div>

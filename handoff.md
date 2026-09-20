@@ -25,7 +25,7 @@
 - `types.ts`＝`InfoCard`/`InfoCreator`/`InfoStatusFacets`/`InfoListResult`/`WordCloudToken` を追加（backend DTO と一致・手書き。将来 OpenAPI codegen）。
 - `api.ts`＝`fetchInfoItems(state,extra,signal)`（`infoListParams`＝DataTable state→クエリ・sort/enum フィルタは backend ホワイトリスト一致・status タブと roots_only は `extra`）／`searchInfoItems(q)`（全文検索タブ）／`fetchWordCloud()`。既存 fixtures 関数（getInfoItem/createInfoItem 等）は**詳細/フォームがまだ fixtures なので残置**。
 - `components/InfoListView.tsx`＝**全面改修**＝DataTable を `server={{query}}` に。状態タブ件数は facets、続報束ねは roots_only、ワードクラウドは API 取得（語クリックで全文検索タブへ）、全文検索タブは server `q`（title＋本文）。`created_by` はオブジェクト（display_name/avatar）。列 flags を backend 能力に一致（impact_class/source は filter のみ・created_by/due_date/created_at の client filter は撤去・横断検索＝q）。
-- **注意（既知の割り切り）**＝詳細/登録/編集/続報/この情報からクエスト作成は**まだ fixtures**（Phase B/C）。よって一覧（server）で見えるのは seed データ。デモ登録フォームで作っても一覧（server）には出ない（Phase C で解消）。行メニューの archive/削除も fixtures デモ＝server 一覧には反映しない。
+- **注意（既知の割り切り）**＝一覧/詳細/登録/続報/内容編集/キュレーション/関連リンク/貼付画像再ホスト/参考資料は**backend 接続済（Phase A/B/C 完了）**。**まだ fixtures**＝「この情報からクエスト作成」（Phase D の `from_info_id`）・行メニューの archive/削除（EP 未実装＝Phase D）・InfoFormPanel の edit モード（詳細のインライン編集に移行済のため deprecated）。
 
 ### (c) テスト（テスト規約 §5・red→green 実施）
 - `doc/テスト/N_情報インプット.md` 新規＝repository int（N-TC-001〜009）＋api（N-TC-101〜107）。`check_tc_traceability.py` ✅。
@@ -83,9 +83,10 @@
 ### 仕様整理フェーズ（Phase C 前ゲート）＝**完了（2026-09-21）**
 2. **情報の編集権限・画面制御を確定**（正本反映済＝API N.0/N.1/N.2/N.3・SC-50 §2/§7/§8/§11-0・データモデル §5.33・メモリ `info-edit-control-spec-phase`）。要点＝**内容(タイトル/本文/URL/参考資料)=作成者のみ(status非依存)＋編集履歴／キュレーション(属性/triage/status/archive)=curator／関連リンク(情報側)=会社内 active 全員・採否は成果物側の管理権限者に委任(別スコープ)／管理者=curator 付与のみ**。画面=**詳細1枚＋能力フラグ(can.edit_content/curate/add_link)でセクション別出し分け(3画面は作らない)**。Phase C 実装項目＝参考資料(`info_attachments`)・内容 revisions(`info_item_revisions`)。
 
-### Phase B＝詳細結線＝**完了**（上記）。次は Phase C。
-### Phase C＝登録/編集/続報の write 結線（**着手前に仕様整理は完了済＝API N.0/SC-50/データモデル**）
-3. `POST /info-items`（低摩擦登録＝全員・`body_html` nh3 サニタイズ→`body_text`→`info_tokens`〔janome〕→`summary`〔`quests/summarize.py` 流用〕→auto `info_links`／`parent_info_id` で続報＝親リンクをスナップショット複製）。`PATCH /info-items/{id}`（内容=作成者〔status非依存〕＋内容 revisions／キュレーション=curator）。リンク `POST`/`PATCH`/reject `/info-links`（情報側=全員）。`nh3` を backend 依存へ追加。参考資料 `info_attachments`＋`POST /info-items/images`（MinIO）。データモデル追加＝`info_attachments`・`info_item_revisions`（migration 0029 想定）。TC md 先行・red-green。frontend＝SC-51 フォーム＋詳細のインライン編集（内容/属性/リンク）を実 API へ（モック SC-50 のロール別1画面編集・関連リンクのインライン編集が設計の正）。
+### Phase B＝詳細結線＝**完了**（上記）。
+### Phase C＝登録/編集/続報の write 結線＝**完了（2026-09-21）**
+3. 実装済＝`POST /info-items`（低摩擦登録/続報＝全員・nh3→`body_text`→`info_tokens`〔janome〕→`summary`〔`quests/summarize.py` 流用〕→auto `info_links`／`parent_info_id` で親リンクをスナップショット複製）／`PATCH /info-items/{id}`（内容=作成者〔status非依存〕・再派生＋版履歴 `info_item_revisions`＝migration `0029`／キュレーション=curator・raw→curated）／関連リンク `POST`/`PATCH`/reject/unreject `/info-links`＋候補検索 `GET /info-link-candidates`（情報側=全員）／**貼付画像の MinIO 再ホスト `POST /info-items/images`（paste ハンドラ・§12-4・Slice 4a）**／**参考資料 `POST`/`DELETE /info-items/{id}/attachments`＝作成者・`info_attachments`＝migration `0030`・§5.33・Slice 4b**。`nh3` は backend 依存へ追加済。frontend＝SC-51 フォーム＋SC-52 詳細のインライン編集（内容/属性/リンク/参考資料）を実 API へ結線・`can` で出し分け。テスト＝pytest `tests/info` 46 green＋front unit（api.test.ts 7）・TC トレーサビリティ✅。
+### Phase D（次）＝続報登録UI・アーカイブ/アンアーカイブUI（`POST .../archive`・`/unarchive`＝curator・EP 未実装）／`kind=refuting`→対象の作成者+評価者へ通知＋要再評価（per-link・§N.6）／`POST /quests {from_info_id}` 逆リンク／`info-curators` 権限付与 EP（管理者）／`DELETE /info-items/{id}`（raw+本人）。
 
 ### Phase C/D は §4 の通り。
 

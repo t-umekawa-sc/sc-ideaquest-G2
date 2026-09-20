@@ -2,7 +2,7 @@
 // N-TC-204: 貼付画像の再ホスト（POST /info-items/images・multipart）＝FormData 送信・url 返却。
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { infoListParams, uploadInfoImageApi } from "./api";
+import { addAttachmentsApi, infoListParams, uploadInfoImageApi } from "./api";
 import type { QueryState } from "@/components/ui";
 
 function state(over: Partial<QueryState> = {}): QueryState {
@@ -64,5 +64,28 @@ describe("uploadInfoImageApi（N-TC-204）", () => {
     // multipart は Content-Type をブラウザに委ねる（boundary 自動付与）＝手で application/json を付けない。
     const headers = calls[0].init.headers as Headers;
     expect(headers.get("Content-Type")).toBeNull();
+  });
+});
+
+describe("addAttachmentsApi（N-TC-205）", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("参考資料を multipart（複数 files）で POST /info-items/{id}/attachments し一覧を返す", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return { ok: true, status: 201, json: async () => ({ attachments: [{ id: "a1", original_name: "r.pdf" }] }) } as Response;
+    }));
+    const files = [
+      new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "r.pdf", { type: "application/pdf" }),
+      new File([new Uint8Array([0x89, 0x50])], "p.png", { type: "image/png" }),
+    ];
+    const atts = await addAttachmentsApi("info-1", files);
+    expect(atts).toHaveLength(1);
+    expect(calls[0].url).toBe("/api/v1/info-items/info-1/attachments");
+    expect(calls[0].init.method).toBe("POST");
+    const body = calls[0].init.body as FormData;
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.getAll("files")).toHaveLength(2); // 複数ファイルを同一キー files で送る
   });
 });

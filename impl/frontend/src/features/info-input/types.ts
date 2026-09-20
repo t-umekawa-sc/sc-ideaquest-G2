@@ -115,8 +115,17 @@ export interface InfoLinkCandidate {
   target_id: string;
   title: string;
 }
+export interface InfoAttachment {
+  id: string;
+  original_name: string;
+  size_bytes: number;
+  mime_type: string;
+  uploaded_by: InfoCreator;
+  uploaded_at: string;
+  url: string; // 短TTL 署名URL（閲覧/ダウンロード用）
+}
 export interface InfoCan {
-  edit_content: boolean; // 内容＝作成者のみ
+  edit_content: boolean; // 内容（title/body/url/参考資料）＝作成者のみ
   curate: boolean; // 属性/triage/status/archive＝curator
   add_link: boolean; // 関連リンク＝全員
 }
@@ -147,5 +156,6 @@ export interface InfoDetail {
   links: InfoLinkResolved[];
   thread: InfoThread;
   tokens_top: WordCloudToken[];
+  attachments: InfoAttachment[];
   can: InfoCan;
 }

@@ -160,7 +160,20 @@ def _thread_item_dto(item, creators) -> dict:
             "created_by": u.display_name if u else None, "created_at": item.created_at}
 
 
-def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, can) -> dict:
+def _attachment_dto(att, uploader) -> dict:
+    """参考資料メタを DTO 化（N.2・§5.33）＝uploaded_by は表示用ユーザー・url は短TTL 署名（object_key 非露出）。"""
+    return {
+        "id": str(att.id),
+        "original_name": att.original_name,
+        "size_bytes": att.size_bytes,
+        "mime_type": att.mime_type,
+        "uploaded_by": _creator_dto(uploader),
+        "uploaded_at": att.uploaded_at,
+        "url": get_storage().presigned_get(att.object_key),
+    }
+
+
+def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, attachments, can) -> dict:
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
@@ -197,6 +210,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
             "follow_ups": [_thread_item_dto(f, creators) for f in follow_ups],
         },
         "tokens_top": tokens,
+        "attachments": attachments,
         "can": can,
     }
 
@@ -223,18 +237,21 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         title_map = repo.resolve_link_titles(ts, links)
         follow_ups = repo.follow_up_items(ts, item.id)
         parent = repo.get_info_item(ts, item.parent_info_id) if item.parent_info_id else None
-        uids = {item.created_by_id} | {f.created_by_id for f in follow_ups}
+        atts = repo.list_attachments(ts, item.id)
+        uids = {item.created_by_id} | {f.created_by_id for f in follow_ups} | {a.uploaded_by_id for a in atts}
         if parent:
             uids.add(parent.created_by_id)
         creators = repo.users_by_ids(ts, list(uids))
         tokens = repo.tokens_top(ts, item.id, limit=30)
+        attachments = [_attachment_dto(a, creators.get(a.uploaded_by_id)) for a in atts]
         can = {
             "edit_content": item.created_by_id == user.id,  # 内容＝作成者のみ（status 非依存）
             "curate": repo.is_curator(ts, user.id),          # 属性/triage/status/archive＝curator
             "add_link": True,                                # 関連リンク＝会社内 active 全員
         }
         return _detail_dto(item, categories=categories, links=links, title_map=title_map,
-                           parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens, can=can)
+                           parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens,
+                           attachments=attachments, can=can)
 
 
 def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
@@ -298,6 +315,76 @@ def rehost_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, c
     storage = get_storage()
     key = storage.put(data, content_type, prefix="info-images")
     return {"url": storage.presigned_get(key)}
+
+
+_MAX_INFO_ATTACHMENTS = 10  # 1情報あたり参考資料の上限（idea 添付＝§5.12 と同値）
+
+
+def add_attachments(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, *, files) -> dict:
+    """参考資料を追加（SC-51/SC-52・N.2・§5.33）＝内容群＝**作成者のみ**（curator も不可）・multipart。
+
+    files＝[(filename, data)]。全ファイルを先に検証（不正1件で保存しない）→ 件数上限（既存＋今回≤10）→
+    MinIO put＋DB 記帳。返り値＝追加後の参考資料一覧（DTO）。
+    """
+    from app.infra.storage import validate_attachment_upload
+
+    iid = _parse_uuid(info_id, field="info_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if not files:
+        raise AppError(422, "validation_error", detail="ファイルがありません", errors=[{"field": "files", "code": "empty"}])
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        if item.created_by_id != user.id:  # 参考資料＝内容群（作成者のみ・N.0）
+            raise AppError(403, "forbidden", detail="参考資料は作成者のみ編集できます")
+        # 先に全件検証（不正で部分保存しない）＝拡張子 allowlist・サイズ・非空・マジックバイト。mime は拡張子から導出。
+        validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in files]
+        if repo.count_attachments(ts, item.id) + len(validated) > _MAX_INFO_ATTACHMENTS:
+            raise AppError(422, "validation_error", detail=f"参考資料は1情報{_MAX_INFO_ATTACHMENTS}件までです",
+                           errors=[{"field": "files", "code": "too_many"}])
+        storage = get_storage()
+        for fn, data, mime in validated:
+            key = storage.put(data, mime, prefix="info-attachments")
+            repo.add_attachment(ts, info_item_id=item.id, object_key=key, original_name=fn,
+                                size_bytes=len(data), mime_type=mime, uploaded_by_id=user.id)
+        ts.flush()
+        atts = repo.list_attachments(ts, item.id)
+        creators = repo.users_by_ids(ts, [a.uploaded_by_id for a in atts])
+        result = {"attachments": [_attachment_dto(a, creators.get(a.uploaded_by_id)) for a in atts]}
+        ts.commit()
+    return result
+
+
+def remove_attachment(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, attachment_id: str) -> None:
+    """参考資料を削除（N.2・§5.33）＝作成者のみ。DB 行削除＋MinIO オブジェクト削除（同一 UoW）。"""
+    iid = _parse_uuid(info_id, field="info_id")
+    aid = _parse_uuid(attachment_id, field="attachment_id")
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        if item.created_by_id != user.id:
+            raise AppError(403, "forbidden", detail="参考資料は作成者のみ編集できます")
+        att = repo.get_attachment(ts, aid)
+        if att is None or att.info_item_id != item.id:
+            raise AppError(404, "not_found")
+        key = att.object_key
+        repo.remove_attachment(ts, att)
+        ts.flush()
+        get_storage().remove(key)  # 失敗時は例外で UoW ロールバック（DB 行は残る）
+        ts.commit()
 
 
 _CONTENT_FIELDS = {"title", "body_html", "source_url"}

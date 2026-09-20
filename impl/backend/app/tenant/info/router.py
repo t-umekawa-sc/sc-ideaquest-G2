@@ -13,6 +13,7 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
+    InfoAttachmentsResponse,
     InfoCreateRequest,
     InfoDetailDTO,
     InfoImageUploadResponse,
@@ -131,6 +132,41 @@ def update_info_item(
     result = info_service.update_info_item(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, body=body)
     return InfoDetailDTO(**result)
+
+
+# ---- 参考資料（info_attachments・N.2・§5.33＝内容群＝作成者のみ）----
+
+
+@router.post("/info-items/{info_id}/attachments", response_model=InfoAttachmentsResponse, status_code=201)
+async def add_info_attachments(
+    info_id: str,
+    request: Request,
+    files: list[UploadFile] = File(...),
+    session: dict = Depends(require_me),
+) -> InfoAttachmentsResponse:
+    """参考資料を追加（SC-51/SC-52・N.2・multipart）＝作成者のみ。検証はサーバー強制（§1.10・拡張子/サイズ/マジックバイト）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    payloads = [((f.filename or ""), await f.read()) for f in files]
+    result = info_service.add_attachments(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, files=payloads,
+    )
+    return InfoAttachmentsResponse(**result)
+
+
+@router.delete("/info-items/{info_id}/attachments/{attachment_id}", status_code=204)
+def remove_info_attachment(
+    info_id: str,
+    attachment_id: str,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> None:
+    """参考資料を削除（N.2）＝作成者のみ。DB 行＋MinIO オブジェクト削除。"""
+    verify_origin(request)
+    verify_csrf(request)
+    info_service.remove_attachment(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, attachment_id,
+    )
 
 
 # ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）----

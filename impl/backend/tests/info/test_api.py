@@ -31,11 +31,12 @@ def _csrf(client) -> dict:
 
 
 def _delete_info(db_identifier, info_id):
-    """作成した情報の後始末（tokens/links/item を物理削除）。"""
-    from app.tenant.info.orm import InfoItem, InfoLink, InfoToken
+    """作成した情報の後始末（attachments/tokens/links/item を物理削除）。"""
+    from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoToken
     import uuid as _uuid
     iid = _uuid.UUID(info_id)
     with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoAttachment.__table__.delete().where(InfoAttachment.info_item_id == iid))
         ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
         ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == iid))
         ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
@@ -360,3 +361,68 @@ def test_n_tc_126_rehost_image_signature_mismatch(client, info_env):
     body = r.json()
     assert body["code"] == "validation_error"
     assert any(e.get("field") == "file" for e in body.get("errors", []))
+
+
+# 有効な PDF（%PDF- シグネチャ）＝validate_attachment_upload は拡張子→MIME＋マジックバイトを検証。
+PDF = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n" + b"0" * 64
+
+
+def test_n_tc_127_add_attachment(client, info_env):
+    """N-TC-127: 参考資料の追加（作成者・201）＝詳細の attachments[] に署名 url 付きで現れる。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # info_env.ids.a は seed 一般ユーザー（ログイン本人）が作成者＝内容群を編集可。
+    r = client.post(f"{INFO}/{info_env.ids.a}/attachments",
+                    files={"files": ("ref.pdf", PDF, "application/pdf")}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    atts = r.json()["attachments"]
+    assert any(a["original_name"] == "ref.pdf" and a["url"] for a in atts)
+    # 詳細にも反映（署名 url・uploaded_by）。
+    d = client.get(f"{INFO}/{info_env.ids.a}").json()
+    got = next((a for a in d["attachments"] if a["original_name"] == "ref.pdf"), None)
+    assert got is not None and got["url"] and got["mime_type"] == "application/pdf"
+    assert got["uploaded_by"]["user_id"] == str(info_env.user_id)
+
+
+def test_n_tc_128_add_attachment_forbidden(client, info_env):
+    """N-TC-128: 参考資料は作成者のみ（非作成者の情報へ添付は 403）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    other_id, other_uid = _seed_other_item(info_env.db_identifier)
+    try:
+        r = client.post(f"{INFO}/{other_id}/attachments",
+                        files={"files": ("ref.pdf", PDF, "application/pdf")}, headers=_csrf(client))
+        assert r.status_code == 403, r.text
+        assert r.json()["code"] == "forbidden"
+    finally:
+        _delete_info(info_env.db_identifier, str(other_id))
+        _delete_user(info_env.db_identifier, other_uid)
+
+
+def test_n_tc_129_remove_attachment(client, info_env):
+    """N-TC-129: 参考資料の削除（作成者・204）＝詳細から消える／他情報の aid は 404。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(f"{INFO}/{info_env.ids.a}/attachments",
+                    files={"files": ("del.pdf", PDF, "application/pdf")}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    aid = next(a["id"] for a in r.json()["attachments"] if a["original_name"] == "del.pdf")
+    # 別情報配下の aid は 404（所属チェック）。
+    r404 = client.delete(f"{INFO}/{info_env.ids.d}/attachments/{aid}", headers=_csrf(client))
+    assert r404.status_code == 404, r404.text
+    # 正しい情報配下なら 204。
+    r204 = client.delete(f"{INFO}/{info_env.ids.a}/attachments/{aid}", headers=_csrf(client))
+    assert r204.status_code == 204, r204.text
+    d = client.get(f"{INFO}/{info_env.ids.a}").json()
+    assert all(a["id"] != aid for a in d["attachments"])
+
+
+def test_n_tc_130_add_attachment_validation(client, info_env):
+    """N-TC-130: 参考資料の検証（拡張子外/シグネチャ不一致は 422・field=files・部分保存しない）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(f"{INFO}/{info_env.ids.a}/attachments",
+                    files={"files": ("evil.exe", b"MZ\x90\x00malware", "application/octet-stream")}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    body = r.json()
+    assert body["code"] == "validation_error"
+    assert any(e.get("field") == "files" for e in body.get("errors", []))
+    # 部分保存しない＝詳細に混入していない。
+    d = client.get(f"{INFO}/{info_env.ids.a}").json()
+    assert all(a["original_name"] != "evil.exe" for a in d["attachments"])

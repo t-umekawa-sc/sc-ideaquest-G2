@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import { INFO_FIXTURES } from "./fixtures";
 import type {
-  InfoCard, InfoDetail, InfoItem, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
+  InfoAttachment, InfoCard, InfoDetail, InfoItem, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
   InfoListResult, InfoStatusFilter, WordCloudToken,
 } from "./types";
 
@@ -87,6 +87,21 @@ export async function uploadInfoImageApi(file: File): Promise<string> {
   form.append("file", file);
   const res = await apiFetch<{ url: string }>("/info-items/images", { method: "POST", body: form });
   return (res as { url: string }).url;
+}
+
+// 参考資料（info_attachments・Phase C slice4b・§5.33）＝内容群＝作成者のみ。追加（multipart）／削除。
+// 追加＝追加後の一覧を返す。成功で一覧を再取得（link_count 等は不変だが詳細鮮度のため emit）。
+export async function addAttachmentsApi(infoId: string, files: File[]): Promise<InfoAttachment[]> {
+  const form = new FormData();
+  for (const f of files) form.append("files", f);
+  const res = await apiFetch<{ attachments: InfoAttachment[] }>(
+    `/info-items/${encodeURIComponent(infoId)}/attachments`, { method: "POST", body: form });
+  emit();
+  return (res as { attachments: InfoAttachment[] }).attachments;
+}
+export async function deleteAttachmentApi(infoId: string, attachmentId: string): Promise<void> {
+  await apiFetch(`/info-items/${encodeURIComponent(infoId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: "DELETE" });
+  emit();
 }
 
 // 部分更新（PATCH /info-items/{id}・Phase C slice5.2）＝内容=作成者／キュレーション=curator（越権はサーバーが403）。

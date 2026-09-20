@@ -61,6 +61,10 @@
 | N-TC-124 | api | リンク候補検索 | quest を seed | `GET /info-link-candidates?target_type=quests&q=…` | 該当候補を返す／不正 target_type は 422 | N.3 |
 | N-TC-125 | api | 貼付画像の再ホスト（自社 MinIO・署名URL） | ログイン済＋PNG バイト | `POST /info-items/images`（multipart `file`） | 201・`{url}`＝自社ホスト署名URL（外部参照を持ち込まない） | N.2／§12-4／§N.7 |
 | N-TC-126 | api | 画像検証（非画像/シグネチャ不一致は 422） | ログイン済＋非画像バイト | `POST /info-items/images`（`file`＝text） | 422 `validation_error`（`errors[].field="file"`） | §1.10／§N.7 |
+| N-TC-127 | api | 参考資料の追加（作成者・201・詳細に反映） | 作成者本人でログイン＋PDF/画像 | `POST /info-items/{id}/attachments`（multipart `files`） | 201・追加後の一覧を返す・`GET /info-items/{id}` の `attachments[]` に署名 `url` 付きで現れる | N.2／§5.33 |
+| N-TC-128 | api | 参考資料は作成者のみ（越権 403） | 非作成者でログイン | `POST /info-items/{id}/attachments` | 403 `forbidden`（内容群＝作成者のみ・curator も不可） | N.0／§5.33 |
+| N-TC-129 | api | 参考資料の削除（作成者・204） | 作成者＋添付1件 | `DELETE /info-items/{id}/attachments/{aid}` | 204・詳細の `attachments[]` から消える／他情報の aid は 404 | N.2／§5.33 |
+| N-TC-130 | api | 参考資料の検証（拡張子外/シグネチャ不一致は 422） | 作成者＋不正ファイル | `POST /info-items/{id}/attachments`（`.exe` 等） | 422 `validation_error`（`errors[].field="files"`）・部分保存しない | §1.10／§5.12 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 
@@ -72,3 +76,4 @@
 | N-TC-202 | e2e | 「続報を束ねる」で再クエリ（回帰） | seed（続報 i2 あり） | `/info-items` で 続報束ねをチェック | 状態タブ件数が減る（続報が除外・DataTable server 再クエリが発火）＝DFT 再発防止 | N.1／§12-1 |
 | N-TC-203 | e2e | 一覧ヘッダーのフローティング（列見出し固定） | 低い viewport で `/info-items` | ページを下方向へスクロール | 列見出し行（thead）が画面上部（≈--header-h）に貼り付く＝デザイン標準 §4.5⑨-b | デザイン標準 §4.5⑨-b |
 | N-TC-204 | unit | 貼付画像の再ホスト（multipart 送信） | 画像 File | `uploadInfoImageApi(file)` | `POST /info-items/images` に FormData を送り（Content-Type は自動）`url` を返す | N.2／§12-4 |
+| N-TC-205 | unit | 参考資料の追加（multipart 複数ファイル） | 複数 File | `addAttachmentsApi(id, files)` | `POST /info-items/{id}/attachments` に同一キー `files` で複数を送り一覧を返す | N.2／§5.33 |

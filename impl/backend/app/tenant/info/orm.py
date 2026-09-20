@@ -17,7 +17,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -104,6 +104,21 @@ class InfoItemRevision(CompanyBase):
     editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # {title, body_html, source_url} のスナップショット
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class InfoAttachment(CompanyBase):
+    """参考資料（info 添付・N.2・§5.33）＝内容群の一部（作成者が編集）。本文と別に PDF/画像/資料を添付し
+    出典の裏付け/引用元を保全する。物理は MinIO（object_key＝ハッシュ名）＝attachments と同型。"""
+    __tablename__ = "info_attachments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    info_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("info_items.id"), nullable=False)
+    object_key: Mapped[str] = mapped_column(Text, nullable=False)  # MinIO 物理名（ハッシュ・元名非露出）
+    original_name: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class InfoCurator(CompanyBase):

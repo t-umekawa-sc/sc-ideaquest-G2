@@ -15,7 +15,7 @@ from sqlalchemy import bindparam, delete, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
-from app.tenant.info.orm import InfoCurator, InfoItem, InfoLink, InfoToken
+from app.tenant.info.orm import InfoAttachment, InfoCurator, InfoItem, InfoLink, InfoToken
 from app.tenant.profile.orm import User
 
 # 全文検索の対象式＝FTS 索引（idx_info_items_fts）と一致（title＋body_text・§1.11）。
@@ -333,6 +333,45 @@ def is_curator(session: Session, user_id: uuid.UUID) -> bool:
     return session.execute(
         select(InfoCurator.id).where(InfoCurator.user_id == user_id, InfoCurator.revoked_at.is_(None)).limit(1)
     ).first() is not None
+
+
+# ---- 参考資料（info_attachments・N.2・§5.33）----
+
+
+def list_attachments(session: Session, info_id: uuid.UUID) -> list[InfoAttachment]:
+    """当該情報の参考資料（アップロード時系列＝uploaded_at 昇順）。"""
+    return list(session.execute(
+        select(InfoAttachment).where(InfoAttachment.info_item_id == info_id)
+        .order_by(InfoAttachment.uploaded_at.asc())
+    ).scalars().all())
+
+
+def count_attachments(session: Session, info_id: uuid.UUID) -> int:
+    """当該情報の参考資料件数（上限チェック用）。"""
+    return int(session.execute(
+        select(func.count(InfoAttachment.id)).where(InfoAttachment.info_item_id == info_id)
+    ).scalar() or 0)
+
+
+def get_attachment(session: Session, attachment_id: uuid.UUID) -> InfoAttachment | None:
+    """参考資料を1件取得（不在は None）。"""
+    return session.get(InfoAttachment, attachment_id)
+
+
+def add_attachment(session: Session, *, info_item_id: uuid.UUID, object_key: str, original_name: str,
+                   size_bytes: int, mime_type: str, uploaded_by_id: uuid.UUID) -> InfoAttachment:
+    """参考資料を記帳（物理は application で MinIO put 済み）。"""
+    att = InfoAttachment(
+        info_item_id=info_item_id, object_key=object_key, original_name=original_name,
+        size_bytes=size_bytes, mime_type=mime_type, uploaded_by_id=uploaded_by_id,
+    )
+    session.add(att)
+    return att
+
+
+def remove_attachment(session: Session, att: InfoAttachment) -> None:
+    """参考資料の行を削除（MinIO オブジェクト削除は application 側）。"""
+    session.delete(att)
 
 
 def word_cloud(session: Session, *, limit: int) -> list[dict]:

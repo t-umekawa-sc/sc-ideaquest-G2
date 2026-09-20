@@ -203,6 +203,7 @@ class InfoDetailDTO(BaseModel):
     links: list[InfoLinkDTO] = []
     thread: InfoThreadDTO
     tokens_top: list[WordCloudTokenDTO] = []
+    attachments: list["InfoAttachmentDTO"] = []
     can: InfoCanDTO
 
 
@@ -212,3 +213,26 @@ class InfoImageUploadResponse(BaseModel):
     エディタの paste ハンドラが blob を送り、返った `url` で `img src` を置換する（外部参照を持ち込まない）。
     """
     url: str
+
+
+class InfoAttachmentDTO(BaseModel):
+    """参考資料（info 添付）のメタ（N.2・§5.33）＝内容群の一部。object_key/uploader_id 等の内部値は非露出（§3.2）。
+
+    `url`＝短TTL 署名 URL（§1.10・詳細を閲覧できるユーザーが参照/ダウンロード可）。
+    """
+    id: str
+    original_name: str
+    size_bytes: int
+    mime_type: str
+    uploaded_by: InfoCreatorDTO
+    uploaded_at: datetime
+    url: str
+
+
+class InfoAttachmentsResponse(BaseModel):
+    """POST /info-items/{id}/attachments の応答（追加後の添付一覧・N.2）。"""
+    attachments: list[InfoAttachmentDTO] = []
+
+
+# InfoDetailDTO.attachments は前方参照（InfoAttachmentDTO は後方定義）＝解決を明示。
+InfoDetailDTO.model_rebuild()

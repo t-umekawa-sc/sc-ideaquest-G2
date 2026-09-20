@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-  addLinkApi, changeLinkKindApi, fetchInfoDetail, fetchLinkCandidates, rejectLinkApi, unrejectLinkApi, updateInfoItemApi,
+  addAttachmentsApi, addLinkApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail, fetchLinkCandidates,
+  rejectLinkApi, unrejectLinkApi, updateInfoItemApi,
 } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
@@ -15,6 +16,11 @@ import {
 } from "../labels";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
 import "../info-input.css";
+
+const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
+const iconForMime = (mime: string) => (mime.startsWith("image/") ? "🖼️" : mime === "application/pdf" ? "📕"
+  : mime.includes("spreadsheet") || mime.includes("excel") || mime === "text/csv" ? "📊"
+  : mime.includes("word") ? "📄" : "📎");
 
 function Attr({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -64,6 +70,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [addCands, setAddCands] = useState<InfoLinkCandidate[]>([]);
   const [addSel, setAddSel] = useState("");
   const [addKind, setAddKind] = useState<InfoLinkKind>("related");
+  // 参考資料（内容群・作成者のみ・§5.33）＝追加/削除は即時コミット→詳細再取得。
+  const attInputRef = useRef<HTMLInputElement>(null);
+  const [attBusy, setAttBusy] = useState(false);
+  const [attErr, setAttErr] = useState<string | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -125,6 +135,21 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setLinkBusy(true);
     try { await fn(); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
     setLinkBusy(false);
+  };
+
+  // 参考資料の追加/削除（作成者のみ・即時コミット→詳細再取得）。
+  const addAtts = async (fl: FileList | null) => {
+    if (!item || !fl || !fl.length) return;
+    setAttErr(null); setAttBusy(true);
+    try { await addAttachmentsApi(item.id, Array.from(fl)); const d = await fetchInfoDetail(infoId); if (d) setItem(d); }
+    catch { setAttErr("参考資料を追加できませんでした（形式・サイズ・件数〔1情報10件まで〕をご確認ください）。"); }
+    setAttBusy(false);
+  };
+  const delAtt = async (id: string) => {
+    if (!item) return;
+    setAttBusy(true);
+    try { await deleteAttachmentApi(item.id, id); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
+    setAttBusy(false);
   };
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
@@ -196,6 +221,41 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
             </>
           )}
         </div>
+
+        {(r.attachments.length || r.can.edit_content) ? (
+          <div className="field dialog-section">
+            <div className="dialog-label">参考資料（出典の裏付け・引用元の保全）</div>
+            {r.attachments.length ? (
+              <div className="attach-list">
+                {r.attachments.map((a) => (
+                  <div key={a.id} className="attach">
+                    <span className="attach__icon">{iconForMime(a.mime_type)}</span>
+                    <div className="attach__meta">
+                      <div className="attach__name"><a href={a.url} target="_blank" rel="noopener noreferrer">{a.original_name}</a></div>
+                      <div className="attach__size">{fmtSize(a.size_bytes)}</div>
+                    </div>
+                    {r.can.edit_content ? (
+                      <button type="button" className="attach__remove" aria-label="削除" title="削除" disabled={attBusy} onClick={() => delAtt(a.id)}>✕</button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : <p className="muted">参考資料はまだありません。</p>}
+            {r.can.edit_content ? (
+              <>
+                <input ref={attInputRef} type="file" multiple hidden onChange={(e) => { void addAtts(e.target.files); e.target.value = ""; }} />
+                <div className="dropzone" role="button" tabIndex={0} aria-disabled={attBusy}
+                  onClick={() => { if (!attBusy) attInputRef.current?.click(); }}
+                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !attBusy) { e.preventDefault(); attInputRef.current?.click(); } }}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("is-over"); }} onDragLeave={(e) => e.currentTarget.classList.remove("is-over")}
+                  onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove("is-over"); void addAtts(e.dataTransfer.files); }}>
+                  {attBusy ? "アップロード中…" : "📎 クリックまたはドラッグ＆ドロップで参考資料を追加"}
+                </div>
+                {attErr ? <div className="hint" style={{ color: "var(--color-danger)" }}>{attErr}</div> : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="field dialog-section">
           <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
