@@ -132,6 +132,18 @@ class InfoLinkKindRequest(BaseModel):
     kind: str  # related / supporting / refuting
 
 
+class InfoLinkCandidateDTO(BaseModel):
+    """リンク候補（成果物をタイトル検索して target_id を解決）。ideas/quests＝実装済ドメイン。"""
+
+    target_type: str
+    target_id: str
+    title: str
+
+
+class InfoLinkCandidatesResponse(BaseModel):
+    candidates: list[InfoLinkCandidateDTO]
+
+
 # ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------
 class InfoCanDTO(BaseModel):
     """閲覧者の編集能力（サーバー算出・N.0）。内容=作成者／キュレーション=curator／リンク=全員。"""

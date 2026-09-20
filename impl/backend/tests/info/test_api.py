@@ -182,6 +182,26 @@ def test_n_tc_117_patch_forbidden(client, info_env):
         _delete_user(info_env.db_identifier, other_uid)
 
 
+def test_n_tc_124_link_candidates(client, info_env):
+    """N-TC-124: リンク候補検索（quests）／不正 target_type は 422。"""
+    import uuid as _uuid
+    from app.tenant.quests.orm import Quest
+    qid = _uuid.uuid4()
+    with get_tenant_session(info_env.db_identifier) as ts:
+        ts.add(Quest(id=qid, owner_id=info_env.user_id, title="候補EPテストQ", color="#3B82F6", status="recruiting"))
+        ts.commit()
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    try:
+        r = client.get("/api/v1/info-link-candidates", params={"target_type": "quests", "q": "候補EPテストQ"})
+        assert r.status_code == 200, r.text
+        assert any(c["target_id"] == str(qid) and c["target_type"] == "quests" for c in r.json()["candidates"])
+        r2 = client.get("/api/v1/info-link-candidates", params={"target_type": "bogus", "q": "x"})
+        assert r2.status_code == 422, r2.text
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(Quest.__table__.delete().where(Quest.id == qid)); ts.commit()
+
+
 def test_n_tc_119_add_link(client, info_env):
     """N-TC-119: 手動リンク追加（全員・201・origin=manual・kind=related）。"""
     import uuid as _uuid

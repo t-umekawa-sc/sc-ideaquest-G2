@@ -440,6 +440,22 @@ def unreject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) ->
     return _mutate_link(account_id, company_id, link_id, lambda l: setattr(l, "rejected_at", None))
 
 
+def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,
+                        target_type: str, q: str | None, limit: int = 20) -> dict:
+    """リンク候補の検索（SC-52 リンク追加・N.3）＝会社内 active ユーザー。ideas/quests をタイトル検索。"""
+    if target_type not in LINK_TARGET_VALUES:
+        raise AppError(422, "validation_error", detail="target_type が不正です", errors=[{"field": "target_type"}])
+    company = _resolve_company(company_id)
+    if company is None:
+        return {"candidates": []}
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return {"candidates": []}
+        cands = repo.search_link_candidates(ts, target_type=target_type, q=q or "", limit=limit)
+    return {"candidates": cands}
+
+
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:
     """ワードクラウド（SC-50・N.6・§5.36）＝保存済みトークンの頻度集計（archived 除外・count 降順）。"""
     if limit < 1:

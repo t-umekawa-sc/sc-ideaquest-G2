@@ -175,6 +175,24 @@ def test_n_tc_016_create_find_link(info_env):
         ts.commit()  # teardown（conftest）が created_items のリンクを物理削除
 
 
+def test_n_tc_017_search_link_candidates(info_env):
+    """N-TC-017: リンク候補のタイトル検索（quests）／未実装ドメインは空。"""
+    import uuid as _uuid
+    from app.tenant.quests.orm import Quest
+    qid = _uuid.uuid4()
+    with get_tenant_session(info_env.db_identifier) as ts:
+        ts.add(Quest(id=qid, owner_id=info_env.user_id, title="候補クエストZZZ", color="#3B82F6", status="recruiting"))
+        ts.commit()
+    try:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            cands = repo.search_link_candidates(ts, target_type="quests", q="候補クエストZZZ", limit=10)
+            assert any(c["target_id"] == str(qid) and c["title"] == "候補クエストZZZ" for c in cands)
+            assert repo.search_link_candidates(ts, target_type="concepts", q="x", limit=10) == []
+    finally:
+        with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(Quest.__table__.delete().where(Quest.id == qid)); ts.commit()
+
+
 def test_n_tc_010_detail_aggregates(info_env):
     """N-TC-010: 詳細集計＝links（target_title 解決・rejected 含む）/follow_ups（時系列）/tokens_top。"""
     with get_tenant_session(info_env.db_identifier) as ts:

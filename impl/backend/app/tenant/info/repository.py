@@ -258,6 +258,28 @@ def get_link(session: Session, link_id: uuid.UUID) -> InfoLink | None:
     return session.get(InfoLink, link_id)
 
 
+def search_link_candidates(session: Session, *, target_type: str, q: str, limit: int = 20) -> list[dict]:
+    """リンク候補をタイトル検索（ideas=published・非削除／quests=非削除）。未実装ドメインは空（§N.3）。"""
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest
+    like = f"%{q}%"
+    if target_type == "ideas":
+        rows = session.execute(
+            select(Idea.id, Idea.title).where(
+                Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like)
+            ).order_by(Idea.title.asc()).limit(limit)
+        ).all()
+    elif target_type == "quests":
+        rows = session.execute(
+            select(Quest.id, Quest.title).where(
+                Quest.deleted_at.is_(None), Quest.title.ilike(like)
+            ).order_by(Quest.title.asc()).limit(limit)
+        ).all()
+    else:
+        return []  # concepts/assumptions＝未実装ドメイン
+    return [{"target_type": target_type, "target_id": str(i), "title": t} for i, t in rows]
+
+
 # ---- 詳細（GET /info-items/{id}・N.1）----
 
 def get_info_item(session: Session, info_id: uuid.UUID) -> InfoItem | None:

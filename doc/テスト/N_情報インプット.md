@@ -28,6 +28,7 @@
 | N-TC-014 | int | 続報＝親リンクのスナップショット複製 | 親（未棄却/棄却リンク）＋続報登録 | `create_info_item(parent_info_id=…)` | 親の**未棄却**リンクを `origin=auto` で複製・棄却は複製しない | N.2／§12-1 |
 | N-TC-015 | int | 版スナップショット／カテゴリ置換 | 情報1件 | `add_revision` ×2／`replace_categories` ×2 | revision が 1→2 の連番／categories は後の集合で全置換（重複なし） | N.2／§5.34／§12 |
 | N-TC-016 | int | 手動リンク作成／重複検出 | 情報1件 | `create_link`／`find_link`（同一 (info,target,type)） | 作成＝origin=manual・既定 kind=related／同一組は既存を検出 | N.3／§5.35 |
+| N-TC-017 | int | リンク候補のタイトル検索 | quest/idea を seed | `search_link_candidates(target_type,q)` | 該当成果物を `{target_type,target_id,title}` で返す／未実装ドメイン(concepts)は空 | N.3 |
 
 ## 2. 一覧・ワードクラウド API（SC-50・N.1）
 
@@ -57,6 +58,7 @@
 | N-TC-121 | api | 種別変更（関連↔裏付け↔反証） | 作成済リンク | `PATCH /info-links/{id}`（kind=refuting） | kind 更新 | N.3／§5.35 |
 | N-TC-122 | api | 棄却／棄却解除 | 作成済リンク | `POST /info-links/{id}/reject`／`/unreject` | `rejected_at` セット→NULL（詳細で rejected 反映） | N.3 |
 | N-TC-123 | api | enum 検証（target_type/kind） | ログイン済 | `POST /info-links`（不正 target_type）／`PATCH`（不正 kind） | 422 `validation_error` | N.3／§1.7 |
+| N-TC-124 | api | リンク候補検索 | quest を seed | `GET /info-link-candidates?target_type=quests&q=…` | 該当候補を返す／不正 target_type は 422 | N.3 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

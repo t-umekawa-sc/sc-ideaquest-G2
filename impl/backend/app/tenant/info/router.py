@@ -15,6 +15,7 @@ from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
     InfoCreateRequest,
     InfoDetailDTO,
+    InfoLinkCandidatesResponse,
     InfoLinkCreateRequest,
     InfoLinkDTO,
     InfoLinkKindRequest,
@@ -112,6 +113,21 @@ def update_info_item(
 
 
 # ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）----
+
+
+@router.get("/info-link-candidates", response_model=InfoLinkCandidatesResponse)
+def link_candidates(
+    request: Request,
+    target_type: str,
+    q: str | None = None,
+    limit: int = Query(default=20, ge=1, le=50),
+    session: dict = Depends(require_me),
+) -> InfoLinkCandidatesResponse:
+    """リンク候補（成果物をタイトル検索して target_id 解決・SC-52・N.3）。会社内 active ユーザー。読取専用。"""
+    result = info_service.get_link_candidates(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        target_type=target_type, q=q, limit=limit)
+    return InfoLinkCandidatesResponse(**result)
 
 
 @router.post("/info-links", response_model=InfoLinkDTO, status_code=201)
