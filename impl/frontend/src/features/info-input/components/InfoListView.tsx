@@ -109,7 +109,7 @@ export function InfoListView() {
         { label: "詳細を開く", onClick: () => router.push(`/info-items/${r.id}`) },
       ];
       if (inThread) list.push({ label: "🧵 スレッドを見る（時系列）", onClick: () => router.push(`/info-items/${rootId}`) });
-      list.push({ label: "続報を登録", onClick: () => router.push(`/info-items/new?parent=${r.id}`) });
+      list.push({ label: "続報を登録", onClick: () => router.push(`/info-items/new?parent=${rootId}`) });
       list.push({ label: "属性を編集", onClick: () => router.push(`/info-items/${r.id}/edit`) });
       if (r.status === "raw") {
         list.push({

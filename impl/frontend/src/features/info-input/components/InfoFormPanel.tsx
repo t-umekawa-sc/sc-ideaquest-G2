@@ -2,19 +2,19 @@
 
 // SC-51 情報 登録・編集フォーム。正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Field, Multiselect } from "@/components/ui";
 import type { MultiselectOption } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { addAttachmentsApi, createInfoItemApi, getInfoItem, updateInfoItem, uploadInfoImageApi } from "../api";
+import { addAttachmentsApi, createInfoItemApi, fetchInfoDetail, getInfoItem, updateInfoItem, uploadInfoImageApi } from "../api";
 import { LINK_CANDIDATES } from "../fixtures";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoInput } from "../api";
-import type { InfoLink, InfoLinkKind, InfoLinkTarget } from "../types";
+import type { InfoDetail, InfoLink, InfoLinkKind, InfoLinkTarget } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
 import "../info-input.css";
 
@@ -43,9 +43,17 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState<string | null>(null);
-  const parent = useMemo(() => (parentId ? getInfoItem(parentId) : undefined), [parentId]);
+  // 続報の親は実 API から取得（プレビュー用・fixtures 不使用）。属性は create で保存されない（curator の PATCH 管轄）ため
+  // 続報でも親属性は事前投入しない＝初期値は編集時（自身）のみ。親の関連リンクは backend が登録時に自動複製（§12-1）。
+  const [parent, setParent] = useState<InfoDetail | undefined>(undefined);
+  useEffect(() => {
+    if (!parentId) { setParent(undefined); return; }
+    const ac = new AbortController();
+    fetchInfoDetail(parentId, ac.signal).then((d) => { if (d) setParent(d); }).catch(() => {});
+    return () => ac.abort();
+  }, [parentId]);
   const editing = mode === "edit" && infoId ? getInfoItem(infoId) : undefined;
-  const src = editing ?? parent; // 編集は自身／続報は親を初期値
+  const src = editing; // 初期値は編集時（自身）のみ＝続報は空から
 
   const [title, setTitle] = useState(editing?.title ?? "");
   const [sourceUrl, setSourceUrl] = useState(editing?.source_url ?? "");
@@ -62,9 +70,8 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   const [triage, setTriage] = useState(src?.triage ?? "");
   const [reason, setReason] = useState(src?.triage_reason ?? "");
   const [dueDate, setDueDate] = useState(src?.due_date ?? "");
-  const [links, setLinks] = useState<InfoLink[]>(() =>
-    (editing?.links ?? (parent ? parent.links.map((l) => ({ ...l, origin: "auto" as const })) : [])).map((l) => ({ ...l })),
-  );
+  // 続報の親リンクは backend が登録時に自動複製するためフォームでは事前投入しない（編集時のみ自身のリンク）。
+  const [links, setLinks] = useState<InfoLink[]>(() => (editing?.links ?? []).map((l) => ({ ...l })));
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickTarget, setPickTarget] = useState<string[]>([]);
   const [linkKind, setLinkKind] = useState<InfoLinkKind>("related");
@@ -209,13 +216,13 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
           <details className="disclosure disclosure--ref" open style={{ marginBottom: "var(--space-3)" }}>
             <summary><span>🧵 続報元の情報を表示：<strong>{parent.title}</strong></span></summary>
             <div className="disclosure__body">
-              <div className="rt-view" dangerouslySetInnerHTML={{ __html: parent.body_html }} />
+              <div className="rt-view" dangerouslySetInnerHTML={{ __html: parent.body_html ?? "" }} />
               <div style={{ marginTop: 6 }}>
                 {parent.source_url ? (
                   <><a href={parent.source_url} target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style={{ color: "var(--color-text-muted)", wordBreak: "break-all" }}>（{parent.source_url}）</span></>
                 ) : <span className="muted">出典URLなし</span>}
               </div>
-              <div className="hint" style={{ marginTop: 8 }}>この情報の<strong>続報</strong>として登録します。親の関連リンクは <code>origin=auto</code> で引き継ぎ済み（後で編集可）。</div>
+              <div className="hint" style={{ marginTop: 8 }}>この情報の<strong>続報</strong>として登録します。親の<strong>未棄却の関連リンク</strong>は登録時に <code>origin=auto</code> で自動的に引き継がれます（登録後に詳細から編集可）。</div>
             </div>
           </details>
         ) : null}

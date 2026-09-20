@@ -444,6 +444,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               ))}
             </ul>
           ) : <p className="muted">続報はまだありません。</p>}
+          <div style={{ marginTop: 8 }}>
+            {/* 続報は常にスレッドの根に紐づける（§12-1・フラットなスレッド）。登録時に親の未棄却リンクを自動複製。 */}
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${r.thread.parent?.id ?? r.id}`)}>＋ 続報を登録</button>
+          </div>
         </div>
       </div>
 

@@ -88,7 +88,8 @@
 3. 実装済＝`POST /info-items`（低摩擦登録/続報＝全員・nh3→`body_text`→`info_tokens`〔janome〕→`summary`〔`quests/summarize.py` 流用〕→auto `info_links`／`parent_info_id` で親リンクをスナップショット複製）／`PATCH /info-items/{id}`（内容=作成者〔status非依存〕・再派生＋版履歴 `info_item_revisions`＝migration `0029`／キュレーション=curator・raw→curated）／関連リンク `POST`/`PATCH`/reject/unreject `/info-links`＋候補検索 `GET /info-link-candidates`（情報側=全員）／**貼付画像の MinIO 再ホスト `POST /info-items/images`（paste ハンドラ・§12-4・Slice 4a）**／**参考資料 `POST`/`DELETE /info-items/{id}/attachments`＝作成者・`info_attachments`＝migration `0030`・§5.33・Slice 4b**。`nh3` は backend 依存へ追加済。frontend＝SC-51 フォーム＋SC-52 詳細のインライン編集（内容/属性/リンク/参考資料）を実 API へ結線・`can` で出し分け。テスト＝pytest `tests/info` 46 green＋front unit（api.test.ts 7）・TC トレーサビリティ✅。
 ### Phase D＝仕上げ（**アーカイブ＝完了 2026-09-21**）
 - **アーカイブ/解除＝完了**＝`POST /info-items/{id}/archive`・`/unarchive`（curator のみ・論理削除〔監査保持〕・解除は curated〔属性あれば〕or raw へ復帰・`archived_at`）。facets に `archived` 追加／一覧に「アーカイブ」状態タブ／詳細フッター（curator）＋行メニューから操作。test N-TC-131〜133（pytest tests/info 49 green）。
-- **残**＝続報登録UI（backend `POST` は対応済＝親リンク複製・フォーム導線のみ）／`kind=refuting`→対象の作成者+評価者へ通知＋要再評価（per-link・§N.6・他ドメイン連携で重い）／`POST /quests {from_info_id}` 逆リンク（この情報からクエスト作成）／`info-curators` 権限付与 EP（管理者）／`DELETE /info-items/{id}`（raw+本人の物理削除・現状フロントは fixtures deleteInfoItem）。
+- **続報登録UI＝完了（2026-09-21）**＝続報フォームは親を**実 API（fetchInfoDetail）でプレビュー**（fixtures 廃止）・`POST /info-items {parent_info_id}` で登録＝backend が親の未棄却リンクを origin=auto で自動複製（N-TC-014 済）。続報は**スレッドの根に紐づけ**（詳細の🧵続報スレッドに「＋続報を登録」・一覧行 ⋯ メニューも根 parent へ）。属性/リンクは create 非送信のため続報フォームでは事前投入しない（curator の PATCH 管轄・note で明示）。live smoke でリンク複製確認。
+- **残**＝`kind=refuting`→対象の作成者+評価者へ通知＋要再評価（per-link・§N.6・他ドメイン連携で重い）／`POST /quests {from_info_id}` 逆リンク（この情報からクエスト作成・現状フロントは new-quest 画面へ遷移）／`info-curators` 権限付与 EP（管理者）／`DELETE /info-items/{id}`（raw+本人の物理削除・現状フロントは fixtures deleteInfoItem）。**「属性を編集」行メニューは fixtures な /edit フォームへ飛ぶ＝詳細インライン編集に寄せる整理が別途必要**。
 
 ### Phase C/D は §4 の通り。
 
