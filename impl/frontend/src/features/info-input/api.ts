@@ -4,7 +4,10 @@
 import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import { INFO_FIXTURES } from "./fixtures";
-import type { InfoCard, InfoDetail, InfoItem, InfoLink, InfoListResult, InfoStatusFilter, WordCloudToken } from "./types";
+import type {
+  InfoCard, InfoDetail, InfoItem, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
+  InfoListResult, InfoStatusFilter, WordCloudToken,
+} from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
 
@@ -93,6 +96,25 @@ export async function updateInfoItemApi(id: string, patch: InfoPatch): Promise<I
   });
   emit();
   return res as InfoDetail;
+}
+
+// 関連リンク（/info-links・Phase C slice5.3・情報側=全員）。候補検索＋追加/種別変更/棄却（即時コミット）。
+export async function fetchLinkCandidates(targetType: InfoLinkTarget, q: string, signal?: AbortSignal): Promise<InfoLinkCandidate[]> {
+  const qs = new URLSearchParams({ target_type: targetType, q, limit: "20" });
+  const res = await apiFetch<{ candidates: InfoLinkCandidate[] }>(`/info-link-candidates?${qs.toString()}`, { signal });
+  return res?.candidates ?? [];
+}
+export function addLinkApi(infoItemId: string, targetType: InfoLinkTarget, targetId: string, kind: InfoLinkKind) {
+  return apiFetch("/info-links", { method: "POST", body: JSON.stringify({ info_item_id: infoItemId, target_type: targetType, target_id: targetId, kind }) });
+}
+export function changeLinkKindApi(linkId: string, kind: InfoLinkKind) {
+  return apiFetch(`/info-links/${encodeURIComponent(linkId)}`, { method: "PATCH", body: JSON.stringify({ kind }) });
+}
+export function rejectLinkApi(linkId: string) {
+  return apiFetch(`/info-links/${encodeURIComponent(linkId)}/reject`, { method: "POST" });
+}
+export function unrejectLinkApi(linkId: string) {
+  return apiFetch(`/info-links/${encodeURIComponent(linkId)}/unreject`, { method: "POST" });
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));

@@ -110,6 +110,11 @@ export interface InfoThread {
   parent?: InfoThreadItem | null;
   follow_ups: InfoThreadItem[];
 }
+export interface InfoLinkCandidate {
+  target_type: InfoLinkTarget;
+  target_id: string;
+  title: string;
+}
 export interface InfoCan {
   edit_content: boolean; // 内容＝作成者のみ
   curate: boolean; // 属性/triage/status/archive＝curator

@@ -2,16 +2,18 @@
 
 // SC-52 情報の詳細（Phase B＝backend GET /info-items/{id} に結線・読み取り）。
 // 正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。モーダル/フルページ双方から使う。
-// 内容編集（作成者）＋属性編集（curator）のインラインを PATCH へ結線済（Slice 5.2/5.2b・can で出し分け）。リンク／続報/アーカイブは後続。
+// 内容(作成者)＋属性(curator)＋関連リンク(全員)のインライン編集を実 API へ結線済（Slice 5.2/5.2b/5.3b・can で出し分け）。続報/アーカイブは後続。
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { fetchInfoDetail, updateInfoItemApi } from "../api";
+import {
+  addLinkApi, changeLinkKindApi, fetchInfoDetail, fetchLinkCandidates, rejectLinkApi, unrejectLinkApi, updateInfoItemApi,
+} from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoDetail } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
 import "../info-input.css";
 
 function Attr({ label, value }: { label: string; value?: string | null }) {
@@ -54,6 +56,14 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [curationDirty, setCurationDirty] = useState(false);
   const setAttr = (k: string, v: string) => { setAttrs((a) => ({ ...a, [k]: v })); setCurationDirty(true); };
   const toggleCat = (c: string) => { setCats((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c])); setCurationDirty(true); };
+  // 関連リンクのインライン編集（全員・即時コミット→詳細再取得）。
+  const [linkEditing, setLinkEditing] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [addType, setAddType] = useState<InfoLinkTarget>("ideas");
+  const [addQ, setAddQ] = useState("");
+  const [addCands, setAddCands] = useState<InfoLinkCandidate[]>([]);
+  const [addSel, setAddSel] = useState("");
+  const [addKind, setAddKind] = useState<InfoLinkKind>("related");
 
   useEffect(() => {
     const ac = new AbortController();
@@ -100,6 +110,21 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       setItem(updated); // 再取得＝再派生（要約/トークン）・版・raw→curated を反映
     } catch { /* 失敗時は編集内容を保持（再試行可） */ }
     setSaving(false);
+  };
+
+  // リンク候補のインクリメンタル検索（編集モード時のみ・デバウンス）。
+  useEffect(() => {
+    if (!linkEditing) { setAddCands([]); return; }
+    const ac = new AbortController();
+    const t = setTimeout(() => { void fetchLinkCandidates(addType, addQ, ac.signal).then(setAddCands).catch(() => {}); }, 300);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [linkEditing, addType, addQ]);
+
+  // リンク操作＝即時コミット→詳細を再取得して反映。
+  const linkOp = async (fn: () => Promise<unknown>) => {
+    setLinkBusy(true);
+    try { await fn(); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
+    setLinkBusy(false);
   };
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
@@ -235,20 +260,80 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         <div className="field dialog-section">
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
-          {activeLinks.length ? (
-            <ul className="link-list">
-              {activeLinks.map((l) => (
-                <li key={l.id} className="link-item">
-                  <span>{LINK_TARGET_LABEL[l.target_type]}</span>
-                  <span className="link-item__title">{l.target_title ?? <span className="muted">（対象未解決）</span>}</span>
-                  <span className={`badge ${LINK_KIND_LABEL[l.kind][1]}`}>{LINK_KIND_LABEL[l.kind][0]}</span>
-                  <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
-                  {l.score != null ? <span className="info-thread__meta">一致 {Math.round(l.score * 100)}%</span> : null}
-                </li>
-              ))}
-            </ul>
-          ) : <p className="muted">関連リンクはまだありません。</p>}
-          <div className="hint" style={{ marginTop: 6 }}>情報側のリンク編集は会社内の全員が可能（編集は Phase C で結線）。採否・統制は成果物側の管理者に委ねます。</div>
+          {!linkEditing ? (
+            <>
+              {activeLinks.length ? (
+                <ul className="link-list">
+                  {activeLinks.map((l) => (
+                    <li key={l.id} className="link-item">
+                      <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                      <span className="link-item__title">{l.target_title ?? <span className="muted">（対象未解決）</span>}</span>
+                      <span className={`badge ${LINK_KIND_LABEL[l.kind][1]}`}>{LINK_KIND_LABEL[l.kind][0]}</span>
+                      <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
+                      {l.score != null ? <span className="info-thread__meta">一致 {Math.round(l.score * 100)}%</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">関連リンクはまだありません。</p>}
+              {r.can.add_link ? (
+                <div style={{ marginTop: 8 }}><button className="btn btn-outline" type="button" onClick={() => setLinkEditing(true)}>🔗 リンクを編集（追加・種別変更・棄却）</button></div>
+              ) : null}
+              <div className="hint" style={{ marginTop: 6 }}>情報側のリンク編集は会社内の全員が可能。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
+            </>
+          ) : (
+            <>
+              {/* インライン編集＝各操作は即時 API（/info-links）→ 詳細を再取得。マークアップは実装クラスに一致。 */}
+              <ul className="link-list">
+                {r.links.map((l) => l.rejected ? (
+                  <li key={l.id} className="link-item is-rejected">
+                    <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                    <span className="link-item__title" style={{ textDecoration: "line-through", color: "var(--color-text-subtle)" }}>{l.target_title ?? "（対象未解決）"}</span>
+                    <span className="badge badge-muted">棄却済み・再リンクされません</span>
+                    <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id))}>戻す</button>
+                  </li>
+                ) : (
+                  <li key={l.id} className="link-item">
+                    <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+                    <span className="link-item__title">{l.target_title ?? "（対象未解決）"}</span>
+                    <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
+                    <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => linkOp(() => changeLinkKindApi(l.id, e.target.value as InfoLinkKind))}>
+                      {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+                    </select>
+                    <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id))}>✕</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="link-add">
+                <label className="link-add__field"><span className="link-add__lbl">対象（アイデア／クエストをタイトルで検索）</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <select className="select" style={{ width: "auto" }} value={addType} onChange={(e) => { setAddType(e.target.value as InfoLinkTarget); setAddSel(""); }}>
+                      {Object.entries(LINK_TARGET_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <input className="input" id="dm-linkq" value={addQ} onChange={(e) => setAddQ(e.target.value)} placeholder="タイトルで検索…" />
+                  </div>
+                </label>
+                {addCands.length ? (
+                  <label className="link-add__field"><span className="link-add__lbl">候補</span>
+                    <select className="select" id="dm-cand" value={addSel} onChange={(e) => setAddSel(e.target.value)}>
+                      <option value="">— 選択 —</option>
+                      {addCands.map((c) => <option key={c.target_id} value={c.target_id}>{c.title}</option>)}
+                    </select>
+                  </label>
+                ) : addQ ? <div className="hint">候補がありません（ideas は公開済み・quests は非削除が対象）。</div> : null}
+                <div className="link-add__bottom">
+                  <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別</span>
+                    <select className="select" value={addKind} onChange={(e) => setAddKind(e.target.value as InfoLinkKind)}>
+                      {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+                    </select>
+                  </label>
+                  <button className="btn btn-outline" type="button" disabled={!addSel || linkBusy}
+                    onClick={() => linkOp(async () => { await addLinkApi(r.id, addType, addSel, addKind); setAddQ(""); setAddSel(""); setAddCands([]); })}>＋ 追加</button>
+                </div>
+              </div>
+              <div className="hint" style={{ marginTop: 6 }}>その場で編集し即時反映します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
+              <div style={{ marginTop: 8 }}><button className="btn btn-outline btn-sm" type="button" onClick={() => setLinkEditing(false)}>編集を終える</button></div>
+            </>
+          )}
         </div>
 
         <div className="field dialog-section">
