@@ -154,6 +154,15 @@ def unarchive_info_item(info_id: str, request: Request, session: dict = Depends(
     return InfoDetailDTO(**result)
 
 
+@router.delete("/info-items/{info_id}", status_code=204)
+def delete_info_item(info_id: str, request: Request, session: dict = Depends(require_me)) -> None:
+    """未判定（raw）の物理削除（N.2）＝登録者本人のみ。curated 済みは 409（archive へ誘導）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    info_service.delete_info_item(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
+
+
 # ---- 参考資料（info_attachments・N.2・§5.33＝内容群＝作成者のみ）----
 
 

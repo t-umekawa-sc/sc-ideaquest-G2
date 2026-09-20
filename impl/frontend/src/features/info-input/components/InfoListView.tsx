@@ -9,10 +9,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { Avatar, DataTable, RowMenu, useConfirm } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import {
-  archiveInfoItemApi, deleteInfoItem, fetchInfoItems, fetchWordCloud, INFO_CHANGED_EVENT, searchInfoItems,
+  archiveInfoItemApi, deleteInfoItemApi, fetchInfoItems, fetchWordCloud, INFO_CHANGED_EVENT, searchInfoItems,
   unarchiveInfoItemApi,
 } from "../api";
 import {
@@ -54,6 +54,7 @@ const EMPTY_FACETS: InfoStatusFacets = { all: 0, raw: 0, curated: 0, archived: 0
 export function InfoListView() {
   const router = useRouter();
   const confirm = useConfirm();
+  const snack = useSnackbar();
   const [status, setStatus] = useState<InfoStatusFilter>("all");
   const [rootsOnly, setRootsOnly] = useState(false);
   const [tab, setTab] = useState<"list" | "search">("list"); // 一覧／全文検索（クエスト SC-12 と同じタブ構成）
@@ -115,8 +116,15 @@ export function InfoListView() {
         list.push({
           label: "削除（未判定）", danger: true,
           onClick: async () => {
-            const ok = await confirm({ title: "情報を削除", msg: `未判定の「${r.title}」を削除しますか？（登録者本人の raw のみ物理削除可）`, variant: "danger" });
-            if (ok) { deleteInfoItem(r.id); setRefreshToken((n) => n + 1); }
+            const ok = await confirm({ title: "情報を削除", msg: `未判定の「${r.title}」を削除しますか？（登録者本人の raw のみ物理削除・取り消せません）`, variant: "danger" });
+            if (!ok) return;
+            try {
+              await deleteInfoItemApi(r.id);
+              snack({ type: "success", title: "削除しました", msg: `「${r.title}」を削除しました。` });
+            } catch {
+              snack({ type: "error", title: "削除できませんでした", msg: "登録者本人の未判定（raw）のみ削除できます。判定済みはアーカイブをご利用ください。" });
+            }
+            setRefreshToken((n) => n + 1);
           },
         });
       } else if (r.status === "archived") {

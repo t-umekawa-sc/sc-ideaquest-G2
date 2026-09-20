@@ -119,6 +119,12 @@ export async function unarchiveInfoItemApi(id: string): Promise<InfoDetail> {
   return res as InfoDetail;
 }
 
+// 未判定（raw）の物理削除（Phase D・N.2）＝登録者本人のみ（curated 済みは 409・非本人は 403）。成功で一覧を再取得。
+export async function deleteInfoItemApi(id: string): Promise<void> {
+  await apiFetch(`/info-items/${encodeURIComponent(id)}`, { method: "DELETE" });
+  emit();
+}
+
 // 参考資料（info_attachments・Phase C slice4b・§5.33）＝内容群＝作成者のみ。追加（multipart）／削除。
 // 追加＝追加後の一覧を返す。成功で一覧を再取得（link_count 等は不変だが詳細鮮度のため emit）。
 export async function addAttachmentsApi(infoId: string, files: File[]): Promise<InfoAttachment[]> {

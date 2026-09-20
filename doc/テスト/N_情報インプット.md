@@ -69,6 +69,8 @@
 | N-TC-132 | api | アーカイブ解除（curator・curated/raw へ復帰） | curator＋archived 情報 | `POST /info-items/{id}/unarchive` | 属性があれば `curated`・無ければ `raw` に戻る・`status=archived` タブから消える | N.2 |
 | N-TC-133 | api | 状態 facet に archived 件数／archived タブ取得 | archived を含む seed | `GET /info-items`（facets）／`?status=archived` | `facets.archived` を返す（all=raw+curated＝非archived）・`status=archived` で archived 行のみ返る | N.1／§5.33 |
 | N-TC-134 | api | この情報からクエスト作成＝逆リンク自動生成 | ログイン済＋情報 | `POST /quests`（`from_info_id` 指定） | 201・当該情報の詳細 `links[]` に quests への関連リンク（`kind=related`・`origin=manual`・`target_title`=作成クエスト名）が現れる／不在 `from_info_id` は 422 | N.3／C.2／§FR-41 |
+| N-TC-135 | api | 未判定の物理削除（本人・raw のみ） | raw 情報の登録者本人 | `DELETE /info-items/{id}` | 204・一覧/詳細から消える（従属行も削除）／非本人は 403／curated 済みは 409 `invalid_state`（archive 誘導） | N.2 |
+| N-TC-136 | api | 続報がある情報は削除不可 | raw 情報＋続報あり | `DELETE /info-items/{id}` | 409 `conflict`（`has_follow_ups`）＝孤児化防止 | N.2／§12-1 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

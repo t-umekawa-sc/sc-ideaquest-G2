@@ -517,3 +517,38 @@ def test_n_tc_134_create_quest_from_info(client, info_env):
     r422 = client.post(quests, json={"title": "x", "color": "#0D9488", "from_info_id": str(_uuid.uuid4())}, headers=_csrf(client))
     assert r422.status_code == 422, r422.text
     assert any(e.get("field") == "from_info_id" for e in r422.json().get("errors", []))
+
+
+def test_n_tc_135_delete_raw_owner(client, info_env):
+    """N-TC-135: 未判定の物理削除＝本人・raw のみ 204／非本人 403／curated 済みは 409 invalid_state。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    rid = client.post(INFO, json={"title": "削除対象raw"}, headers=_csrf(client)).json()["id"]
+    try:
+        # 非本人（他者の情報）は 403。
+        other_id, other_uid = _seed_other_item(info_env.db_identifier)
+        try:
+            assert client.delete(f"{INFO}/{other_id}", headers=_csrf(client)).status_code == 403
+        finally:
+            _delete_info(info_env.db_identifier, str(other_id)); _delete_user(info_env.db_identifier, other_uid)
+        # curated 済み（ids.a＝本人作成・curated）は 409 invalid_state。
+        r409 = client.delete(f"{INFO}/{info_env.ids.a}", headers=_csrf(client))
+        assert r409.status_code == 409, r409.text
+        assert any(e.get("reason") == "invalid_state" for e in r409.json().get("errors", []))
+        # 本人の raw は 204・詳細から消える。
+        assert client.delete(f"{INFO}/{rid}", headers=_csrf(client)).status_code == 204
+        assert client.get(f"{INFO}/{rid}").status_code == 404
+    finally:
+        _delete_info(info_env.db_identifier, rid)  # 保険（204 済みなら no-op 相当）
+
+
+def test_n_tc_136_delete_blocked_by_follow_ups(client, info_env):
+    """N-TC-136: 続報がある raw 情報は削除不可（409 has_follow_ups・孤児化防止）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    pid = client.post(INFO, json={"title": "raw親"}, headers=_csrf(client)).json()["id"]
+    fid = client.post(INFO, json={"title": "続報", "parent_info_id": pid}, headers=_csrf(client)).json()["id"]
+    try:
+        r = client.delete(f"{INFO}/{pid}", headers=_csrf(client))
+        assert r.status_code == 409, r.text
+        assert any(e.get("reason") == "has_follow_ups" for e in r.json().get("errors", []))
+    finally:
+        _delete_info(info_env.db_identifier, fid); _delete_info(info_env.db_identifier, pid)

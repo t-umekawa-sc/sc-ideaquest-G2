@@ -374,6 +374,21 @@ def remove_attachment(session: Session, att: InfoAttachment) -> None:
     session.delete(att)
 
 
+def delete_info_item(session: Session, info_id: uuid.UUID) -> list[str]:
+    """情報を物理削除（未判定 raw の取消・N.2）＝従属行（attachments/tokens/links/categories/revisions）を
+    先に削除してから本体を削除。返り値＝削除した参考資料の object_key 一覧（application が MinIO から除去）。"""
+    from app.tenant.info.orm import InfoItemCategory, InfoItemRevision
+    keys = [k for (k,) in session.execute(
+        select(InfoAttachment.object_key).where(InfoAttachment.info_item_id == info_id)).all()]
+    session.execute(delete(InfoAttachment).where(InfoAttachment.info_item_id == info_id))
+    session.execute(delete(InfoToken).where(InfoToken.info_item_id == info_id))
+    session.execute(delete(InfoLink).where(InfoLink.info_item_id == info_id))
+    session.execute(delete(InfoItemCategory).where(InfoItemCategory.info_item_id == info_id))
+    session.execute(delete(InfoItemRevision).where(InfoItemRevision.info_item_id == info_id))
+    session.execute(delete(InfoItem).where(InfoItem.id == info_id))
+    return keys
+
+
 def word_cloud(session: Session, *, limit: int) -> list[dict]:
     """ワードクラウド＝保存済み info_tokens の頻度集計（archived 除外・count 降順・N.6/§5.36）。
 

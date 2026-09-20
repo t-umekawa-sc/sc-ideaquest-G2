@@ -90,7 +90,8 @@
 - **アーカイブ/解除＝完了**＝`POST /info-items/{id}/archive`・`/unarchive`（curator のみ・論理削除〔監査保持〕・解除は curated〔属性あれば〕or raw へ復帰・`archived_at`）。facets に `archived` 追加／一覧に「アーカイブ」状態タブ／詳細フッター（curator）＋行メニューから操作。test N-TC-131〜133（pytest tests/info 49 green）。
 - **続報登録UI＝完了（2026-09-21）**＝続報フォームは親を**実 API（fetchInfoDetail）でプレビュー**（fixtures 廃止）・`POST /info-items {parent_info_id}` で登録＝backend が親の未棄却リンクを origin=auto で自動複製（N-TC-014 済）。続報は**スレッドの根に紐づけ**（詳細の🧵続報スレッドに「＋続報を登録」・一覧行 ⋯ メニューも根 parent へ）。属性/リンクは create 非送信のため続報フォームでは事前投入しない（curator の PATCH 管轄・note で明示）。live smoke でリンク複製確認。
 - **この情報からクエスト作成＝完了（2026-09-21）**＝`QuestCreateRequest.from_info_id`（`extra=forbid` なので schema 追加）＋`create_quest` が同 UoW で info_link（quests・related・manual）を自動生成（不在 from_info_id は 422）。frontend＝QuestFromInfoPanel を実 API 化（fixtures 廃止・親情報は fetchInfoDetail でプレビュー・下書きクエスト作成→`/quests/{id}` へ遷移＝参加部署/パーティー/権限/カラー/公開は SC-11 で仕上げ）。OpenAPI 型は `npm run codegen` 再生成済。test N-TC-134（pytest tests/info 50 green・quests 115 回帰なし）。live smoke で逆リンク確認。C.2 は from_info_id を既に spec 済（実装が仕様に追いついた）。
-- **残**＝`kind=refuting`→対象の作成者+評価者へ通知＋要再評価（per-link・§N.6・他ドメイン連携で重い）／`info-curators` 権限付与 EP（管理者）／`DELETE /info-items/{id}`（raw+本人の物理削除・現状フロントは fixtures deleteInfoItem）。**「属性を編集」行メニューは fixtures な /edit フォームへ飛ぶ＝詳細インライン編集に寄せる整理が別途必要**。
+- **raw 物理削除＝完了（2026-09-21）**＝`DELETE /info-items/{id}`（登録者本人・raw のみ・curated は 409 invalid_state〔archive 誘導〕・続報ありは 409 has_follow_ups・従属行〔attachments/tokens/links/categories/revisions〕削除＋参考資料 MinIO 除去）。frontend 行 ⋯ メニューを実 API 化（fixtures deleteInfoItem 廃止・snackbar で成否）。test N-TC-135/136（pytest tests/info 52 green）。
+- **残**＝`info-curators` 権限付与 EP（`GET/POST /info-curators`・`DELETE /info-curators/{user_id}`＝会社アカウント管理者/system_admin・N.5）＋管理UI（会社アカウント管理 SC-90 系に同居＝`/admin/accounts` 近辺）／`kind=refuting`→対象の作成者+評価者へ通知＋要再評価（per-link・§N.6・他ドメイン連携で重い）。**「属性を編集」行メニューは fixtures な /edit フォームへ飛ぶ＝詳細インライン編集に寄せる整理が別途必要**。
 
 ### Phase C/D は §4 の通り。
 

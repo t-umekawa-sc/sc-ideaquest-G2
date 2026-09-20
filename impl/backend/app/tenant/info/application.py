@@ -517,6 +517,41 @@ def unarchive_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: s
     return get_info_detail(account_id, company_id, info_id)
 
 
+def delete_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) -> None:
+    """未判定（raw）の物理削除（N.2）＝**登録者本人のみ**（casual 登録の取消）。curated 済みは 409（archive へ誘導）。
+
+    続報（子）がある場合は 409（孤児化を防ぐ）。従属行を削除し、参考資料の MinIO オブジェクトも除去する。
+    """
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    keys: list[str] = []
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        if item.created_by_id != user.id:
+            raise AppError(403, "forbidden", detail="削除できるのは登録者本人のみです")
+        if item.status != "raw":
+            raise AppError(409, "conflict", detail="判定済みの情報は削除できません（アーカイブしてください）",
+                           errors=[{"reason": "invalid_state"}])
+        if repo.follow_up_items(ts, iid):
+            raise AppError(409, "conflict", detail="続報があるため削除できません",
+                           errors=[{"reason": "has_follow_ups"}])
+        keys = repo.delete_info_item(ts, iid)
+        ts.commit()
+    storage = get_storage()
+    for k in keys:  # DB コミット後に MinIO 実体を除去（best-effort）。
+        try:
+            storage.remove(k)
+        except Exception:
+            pass
+
+
 # ---- 関連リンク（/info-links・N.3・情報側＝会社内 active 全員）------------------
 
 def _link_dto(link, title: str | None) -> dict:
