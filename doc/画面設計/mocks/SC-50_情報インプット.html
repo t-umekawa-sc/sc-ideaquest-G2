@@ -457,12 +457,10 @@
       <button class="btn btn-outline btn-sm rowmenu__trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="操作">⋯</button>
       <ul class="rowmenu__list" role="menu" hidden>
         <li role="none"><button role="menuitem" type="button" data-detail="${r.id}">詳細を開く</button></li>
-        ${inThread ? `<li role="none"><button role="menuitem" type="button" data-thread="${r.id}">🧵 スレッドを見る（時系列）</button></li>` : ''}
         <li role="none"><button role="menuitem" type="button" data-followup="${r.id}">続報を登録</button></li>
-        ${canEditContent(r) ? `<li role="none"><button role="menuitem" type="button" data-edit="${r.id}" data-mode="content">内容を編集</button></li>` : ''}
-        ${canCurate() ? `<li role="none"><button role="menuitem" type="button" data-edit="${r.id}" data-mode="curate">属性を編集</button></li>` : ''}
-        ${(r.status === 'raw' && canEditContent(r)) ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-delete="${r.id}">削除（未判定）</button></li>` : ''}
+        <li role="none"><button role="menuitem" type="button" data-editlinks="${r.id}">リンクを編集</button></li>
         ${(r.status !== 'raw' && canCurate()) ? `<li role="none"><button role="menuitem" type="button" data-archive="${r.id}">アーカイブ</button></li>` : ''}
+        ${(r.status === 'raw' && canEditContent(r)) ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-delete="${r.id}">削除（未判定）</button></li>` : ''}
       </ul>
     </div>`;
   }
@@ -801,7 +799,7 @@
   });
   buildLinkMsOptions();
 
-  let editTarget = null, parentForNew = null, currentDetailId = null;
+  let editTarget = null, parentForNew = null, currentDetailId = null, dmDirty = false;
   // 編集ダイアログのセクション出し分け（内容=作成者／属性=curator／リンク=全員）。em＝'content'|'curate'|'links'|'all'。
   function applyEditMode(em) {
     const contentOn = (em === 'content' || em === 'all');
@@ -888,14 +886,27 @@
   });
 
   // ---- SC-52 詳細 ----
+  // 詳細/編集は「行をクリックした人の権限」で起動モードを決める（詳細1枚・能力フラグでセクション別に編集可）。
+  // その他＝参照のみ／作成者＝内容編集／curator＝属性編集／両方＝内容＋属性。関連リンクは全員だが別導線（リンクを編集）。
+  function editModeFor(r) {
+    const c = canEditContent(r), k = canCurate();
+    return c && k ? 'all' : c ? 'content' : k ? 'curate' : 'view';
+  }
   function openDetail(id) {
     const r = findInfo(id);
-    currentDetailId = id;   // 権限トグル切替時に再描画するため保持
-    $('dmTitle').textContent = '情報の詳細';
-    const parent = r.parent ? findInfo(r.parent) : null;
-    const fus = followUps(id);
+    currentDetailId = id; dmDirty = false;   // 権限トグル切替時に再描画／未保存フラグ
+    const em = editModeFor(r);
+    const editContent = (em === 'content' || em === 'all');
+    const editAttr = (em === 'curate' || em === 'all');
+    $('dmTitle').textContent = em === 'view' ? '情報の詳細' : '情報を編集';
     const attr = (label, val) => `<dt>${label}</dt><dd>${val ?? '<span class="muted">—</span>'}</dd>`;
-    const activeLinks = r.links.filter(l => !l.rejected);   // 棄却済み（rejected）は非表示（§N.3 パネル非表示・再計算で復活しない）
+    const selOpt = (map, val) => `<option value="">—</option>` + Object.entries(map).map(([v, l]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${Array.isArray(l) ? l[0] : l}</option>`).join('');
+    const badges = `<div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>
+      ${r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}">${L.impactClass[r.impactClass][0]}</span>` : ''}
+      ${r.priority ? `<span class="badge badge-muted">優先度 ${L.priority[r.priority]}</span>` : ''}
+      ${r.cats.map(c => `<span class="badge badge-muted">${L.category[c]}</span>`).join('')}</div>`;
+    const activeLinks = r.links.filter(l => !l.rejected);   // 棄却済み（rejected）は非表示（§N.3）
     const linkHtml = activeLinks.length ? `<ul class="link-list">` + activeLinks.map(l => `
         <li class="link-item">
           <span>${L.linkTarget[l.target]}</span>
@@ -904,53 +915,83 @@
           <span class="badge badge-muted">${l.origin === 'auto' ? '自動' : '手動'}</span>
           ${l.score != null ? `<span class="thread__meta">一致 ${(l.score*100|0)}%</span>` : ''}
         </li>`).join('') + `</ul>` : '<p class="muted">関連リンクはまだありません。</p>';
-    const threadHtml = fus.length ? `<ul class="thread">` + fus.map(f => `<li><div class="thread__title">${f.title}</div><div class="thread__meta">${f.by}・${f.at}　<a href="#" data-detail="${f.id}">開く</a></div></li>`).join('') + `</ul>` : '<p class="muted">続報はまだありません。</p>';
+    // 続報スレッド＝根＋続報の時系列。開いているアイテムを「表示中」で強調（自位置）。続報側からも全体を確認できる。
+    const root = r.parent ? findInfo(r.parent) : r;
+    const tItems = [root, ...followUps(root.id)];
+    const threadHtml = tItems.length > 1 ? `<ul class="thread">` + tItems.map(it => `
+        <li${it.id === r.id ? ' style="background:var(--color-primary-soft);border-radius:var(--radius);padding:4px 8px"' : ''}>
+          <div class="thread__title">${it.id === r.id ? '▶ ' : ''}${it.title}${it.id === r.id ? ' <span class="badge badge-muted">表示中</span>' : ''}</div>
+          <div class="thread__meta">${it.by}・${it.at}${it.id !== r.id ? `　<a href="#" data-detail="${it.id}">開く</a>` : ''}</div>
+        </li>`).join('') + `</ul>` : '';
 
     $('dmBody').innerHTML = `
-      ${parent ? `<div class="field dialog-section"><div class="dialog-label">元情報（続報元）</div><div class="thread__meta">🧵 <strong>${parent.title}</strong> の続報　<a href="#" data-detail="${parent.id}">元情報を開く</a></div></div>` : ''}
-      <div class="field dialog-section">
-        <div class="dialog-label">タイトル</div>
-        <h3 style="margin:0 0 6px">${r.title}</h3>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <span class="badge ${L.status[r.status][1]}">${L.status[r.status][0]}</span>
-          ${r.impactClass ? `<span class="badge ${L.impactClass[r.impactClass][1]}">${L.impactClass[r.impactClass][0]}</span>` : ''}
-          ${r.priority ? `<span class="badge badge-muted">優先度 ${L.priority[r.priority]}</span>` : ''}
-          ${r.cats.map(c => `<span class="badge badge-muted">${L.category[c]}</span>`).join('')}
+      ${threadHtml ? `<div class="field dialog-section"><div class="dialog-label">🧵 続報スレッド（時系列）</div>${threadHtml}</div>` : ''}
+      ${editContent ? `
+        <div class="field dialog-section">
+          <label class="dialog-label" for="dmTitleInput">タイトル</label>
+          <input class="input" id="dmTitleInput" value="${(r.title || '').replace(/"/g, '&quot;')}">
+          <div style="margin-top:8px">${badges}</div>
         </div>
-      </div>
-      ${r.summary ? `<div class="field dialog-section"><div class="summary-box"><div class="summary-box__label">要約（選別用・自動生成）</div>${r.summary}</div></div>` : ''}
-      <div class="field dialog-section">
-        <div class="dialog-label">内容・説明</div>
-        <div class="rt-view">${r.body_html}</div>
-        ${r.source_url ? `<div style="margin-top:6px"><a href="${r.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${r.source_url}）</span></div>` : ''}
-        <div style="margin-top:8px;display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
-          ${canEditContent(r) ? `<button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="content">✏ 内容を編集</button>` : ''}
-          <button class="btn btn-outline" type="button" data-history="${r.id}">🕘 更新履歴</button>
-          ${canEditContent(r) ? '' : '<span class="hint" style="margin:0">内容の編集は<strong>作成者のみ</strong>（あなたは作成者ではありません）。</span>'}
+        <div class="field dialog-section">
+          <label class="dialog-label">内容・説明</label>
+          <div class="rt-view" id="dmBodyEdit" contenteditable="true" style="min-height:110px;border:1px solid var(--color-border);border-radius:var(--radius);padding:var(--space-3)">${r.body_html}</div>
+          <label class="dialog-label" for="dmUrl" style="margin-top:8px">出典URL（http/https）</label>
+          <input class="input" id="dmUrl" value="${r.source_url || ''}" placeholder="https://…">
+          <div style="margin-top:8px"><button class="btn btn-outline" type="button" data-history="${r.id}">🕘 更新履歴</button></div>
+        </div>` : `
+        <div class="field dialog-section">
+          <div class="dialog-label">タイトル</div>
+          <h3 style="margin:0 0 6px">${r.title}</h3>
+          ${badges}
         </div>
-      </div>
+        ${r.summary ? `<div class="field dialog-section"><div class="summary-box"><div class="summary-box__label">要約（選別用・自動生成）</div>${r.summary}</div></div>` : ''}
+        <div class="field dialog-section">
+          <div class="dialog-label">内容・説明</div>
+          <div class="rt-view">${r.body_html}</div>
+          ${r.source_url ? `<div style="margin-top:6px"><a href="${r.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${r.source_url}）</span></div>` : ''}
+          <div style="margin-top:8px;display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
+            <button class="btn btn-outline" type="button" data-history="${r.id}">🕘 更新履歴</button>
+            ${em === 'view' ? '<span class="hint" style="margin:0">内容の編集は<strong>作成者のみ</strong>です。</span>' : ''}
+          </div>
+        </div>`}
       <div class="field dialog-section">
         <div class="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
         ${miniCloudHtml(r)}
         <div class="hint" style="margin-top:6px">本文から抽出した語（頻度で大小）。関連づけ・一覧のワードクラウドに使われます。</div>
       </div>
-      <div class="field dialog-section">
-        <div class="dialog-label">属性（環境スキャン・判定）</div>
-        <dl class="attr-grid">
-          ${attr('情報ソース', r.source ? L.source[r.source] : null)}
-          ${attr('情報分類', r.classification ? L.classification[r.classification] : null)}
-          ${attr('大分類', r.scope ? L.scope[r.scope] : null)}
-          ${attr('対象事業', r.biz ? L.biz[r.biz] : null)}
-          ${attr('影響度', r.impact ? L.impact[r.impact] : null)}
-          ${attr('影響発生時期', r.timing ? L.timing[r.timing] : null)}
-          ${attr('情報判定', r.triage ? L.triage[r.triage] : null)}
-          ${attr('期限日', r.due)}
-          ${r.reason ? attr('判定理由', r.reason) : ''}
-        </dl>
-        <div style="margin-top:8px">
-          ${canCurate() ? `<button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="curate">🧭 属性を編集</button>` : '<span class="hint" style="margin:0">属性の付与・情報判定は<strong>情報判定権限（curator）</strong>の領分です。</span>'}
-        </div>
-      </div>
+      ${editAttr ? `
+        <div class="field dialog-section">
+          <div class="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
+          <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+            <div><label class="dialog-label" for="dmPriority">優先度</label><select class="select" id="dmPriority">${selOpt(L.priority, r.priority)}</select></div>
+            <div><label class="dialog-label" for="dmSource">情報ソース</label><select class="select" id="dmSource">${selOpt(L.source, r.source)}</select></div>
+            <div><label class="dialog-label" for="dmClass">情報分類</label><select class="select" id="dmClass">${selOpt(L.classification, r.classification)}</select></div>
+            <div><label class="dialog-label" for="dmScope">大分類</label><select class="select" id="dmScope">${selOpt(L.scope, r.scope)}</select></div>
+            <div><label class="dialog-label" for="dmBiz">対象事業</label><select class="select" id="dmBiz">${selOpt(L.biz, r.biz)}</select></div>
+            <div><label class="dialog-label">情報カテゴリ（複数可）</label><div style="display:flex;flex-wrap:wrap;gap:6px">${Object.entries(L.category).map(([v, l]) => `<label class="badge badge-muted" style="cursor:pointer"><input type="checkbox" class="dmCat" value="${v}" ${r.cats.includes(v) ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+            <div><label class="dialog-label" for="dmImpact">影響度</label><select class="select" id="dmImpact">${selOpt(L.impact, r.impact)}</select></div>
+            <div><label class="dialog-label" for="dmImpactClass">影響分類</label><select class="select" id="dmImpactClass">${selOpt(L.impactClass, r.impactClass)}</select></div>
+            <div><label class="dialog-label" for="dmTiming">影響発生時期</label><select class="select" id="dmTiming">${selOpt(L.timing, r.timing)}</select></div>
+            <div><label class="dialog-label" for="dmDue">期限日</label><input class="input" id="dmDue" type="date" value="${r.due || ''}"></div>
+            <div><label class="dialog-label" for="dmTriage">情報判定</label><select class="select" id="dmTriage">${selOpt(L.triage, r.triage)}</select></div>
+            <div><label class="dialog-label" for="dmReason">判定理由</label><textarea class="input" id="dmReason" rows="3">${r.reason || ''}</textarea></div>
+          </div>
+        </div>` : `
+        <div class="field dialog-section">
+          <div class="dialog-label">属性（環境スキャン・判定）</div>
+          <dl class="attr-grid">
+            ${attr('情報ソース', r.source ? L.source[r.source] : null)}
+            ${attr('情報分類', r.classification ? L.classification[r.classification] : null)}
+            ${attr('大分類', r.scope ? L.scope[r.scope] : null)}
+            ${attr('対象事業', r.biz ? L.biz[r.biz] : null)}
+            ${attr('影響度', r.impact ? L.impact[r.impact] : null)}
+            ${attr('影響発生時期', r.timing ? L.timing[r.timing] : null)}
+            ${attr('情報判定', r.triage ? L.triage[r.triage] : null)}
+            ${attr('期限日', r.due)}
+            ${r.reason ? attr('判定理由', r.reason) : ''}
+          </dl>
+          <div class="hint" style="margin-top:6px">属性の付与・情報判定・アーカイブは<strong>情報判定権限（curator）</strong>の領分です。</div>
+        </div>`}
       <div class="field dialog-section">
         <div class="dialog-label">この情報から（機会特定→行動）</div>
         <button class="btn btn-primary" type="button" data-newquest="${r.id}">＋ この情報からクエストを作成</button>
@@ -959,29 +1000,48 @@
       <div class="field dialog-section">
         <div class="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
         ${linkHtml}
-        <div style="margin-top:8px"><button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="links">🔗 リンクを追加・種別変更・棄却</button></div>
-        <div class="hint" style="margin-top:6px">情報側のリンク編集は<strong>会社内の全員</strong>が可能。<strong>採否・統制は成果物側の管理者</strong>（クエスト/アイデア/コンセプト）に委ねます。種別を「反証」に変えると、対象の作成者＋評価者へ通知＋要再評価が発火します（根底を揺さぶる）。</div>
-      </div>
-      <div class="field dialog-section">
-        <div class="dialog-label">🧵 続報スレッド</div>
-        ${threadHtml}
+        <div style="margin-top:8px"><button class="btn btn-outline" type="button" data-editlinks="${r.id}">🔗 リンクを編集（追加・種別変更・棄却）</button></div>
+        <div class="hint" style="margin-top:6px">情報側のリンク編集は<strong>会社内の全員</strong>が可能（別導線）。<strong>採否・統制は成果物側の管理者</strong>に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
       </div>
     `;
     $('dmFooter').innerHTML = `
       <button class="btn btn-outline" type="button" data-close>閉じる</button>
-      <button class="btn btn-outline" type="button" data-followup="${r.id}">続報を登録</button>
-      ${(r.status !== 'raw' && canCurate()) ? `<button class="btn btn-outline" type="button" data-archive="${r.id}">アーカイブ</button>` : ''}
-      ${canEditContent(r) ? `<button class="btn btn-primary" type="button" data-edit="${r.id}" data-mode="content">内容を編集</button>` : ''}
-      ${canCurate() ? `<button class="btn btn-primary" type="button" data-edit="${r.id}" data-mode="curate">属性を編集</button>` : ''}
+      ${em !== 'view' ? `<button class="btn btn-primary" type="button" id="dmSave" data-savedetail="${r.id}" disabled>保存する</button>` : ''}
     `;
     openModal('detailModal');
+    // dirty 追跡＝編集可セクションを触ったら保存を活性化（未保存で閉じる時は破棄確認）。
+    const mark = () => { dmDirty = true; const s = $('dmSave'); if (s) s.disabled = false; };
+    $('dmBody').oninput = mark; $('dmBody').onchange = mark;
   }
+  function saveDetail(id) {
+    const r = findInfo(id);
+    if ($('dmTitleInput')) { const tv = $('dmTitleInput').value.trim(); if (!tv) { alert('タイトルを入力してください'); return; } r.title = tv; }
+    if ($('dmBodyEdit')) { r.body_html = $('dmBodyEdit').innerHTML; r.summary = $('dmBodyEdit').textContent.trim().slice(0, 60); }
+    if ($('dmUrl')) { const uv = $('dmUrl').value.trim(); if (uv && !/^https?:\/\//i.test(uv)) { alert('http/https の URL を入力してください'); return; } r.source_url = uv; }
+    if ($('dmPriority')) {   // curator が属性編集
+      r.priority = $('dmPriority').value || null; r.source = $('dmSource').value || null; r.classification = $('dmClass').value || null;
+      r.scope = $('dmScope').value || null; r.biz = $('dmBiz').value || null; r.impact = $('dmImpact').value || null;
+      r.impactClass = $('dmImpactClass').value || null; r.timing = $('dmTiming').value || null; r.triage = $('dmTriage').value || null;
+      r.due = $('dmDue').value || null; r.reason = $('dmReason').value || null;
+      r.cats = [...document.querySelectorAll('.dmCat:checked')].map(c => c.value);
+      if ((r.priority || r.impactClass || r.triage || r.cats.length) && r.status === 'raw') r.status = 'curated';   // 属性付与で raw→curated
+    }
+    dmDirty = false; refresh(); closeModal($('detailModal'));
+    alert('保存しました（デモ）。実装＝内容は作成者/属性は curator の権限をサーバー再検証。内容変更は編集履歴（info_item_revisions）に記録。');
+  }
+  // 未保存で閉じる時の破棄確認（dirty 時のみ・capture で shared.js の close より先に判定）。
+  document.getElementById('detailModal').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-close]');
+    if (c && dmDirty) { if (!confirm('変更が保存されていません。破棄して閉じますか？')) { e.stopPropagation(); e.preventDefault(); } else { dmDirty = false; } }
+  }, true);
 
   // ---- 行アクション・詳細内アクション（委譲） ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-archive],[data-delete],[data-newquest],[data-history]');
+    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-editlinks],[data-savedetail],[data-archive],[data-delete],[data-newquest],[data-history]');
     if (!t) return;
     if (t.dataset.history != null) { e.preventDefault(); alert('更新履歴（デモ）＝この情報の内容（タイトル/本文/出典URL/参考資料）の版履歴を表示します。\n実装＝info_item_revisions（版・編集者・日時）。判定後も作成者が内容を編集できるため、判定時点の内容を追跡できます。'); return; }
+    if (t.dataset.savedetail != null) { saveDetail(t.dataset.savedetail); return; }
+    if (t.dataset.editlinks != null) { const r = findInfo(t.dataset.editlinks); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('edit', r, null, 'links'), d.hidden ? 0 : 210); return; }
     if (t.dataset.newquest != null) { e.preventDefault(); const r = findInfo(t.dataset.newquest); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openQuestFromInfo(r), d.hidden ? 0 : 210); return; }
     if (t.dataset.detail != null) { e.preventDefault(); const openDetailModal = document.getElementById('detailModal'); if (!openDetailModal.hidden) closeModal(openDetailModal); setTimeout(() => openDetail(t.dataset.detail), openDetailModal.hidden ? 0 : 210); }
     else if (t.dataset.thread != null) { e.preventDefault(); const root = rootOf(findInfo(t.dataset.thread)); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openDetail(root.id), d.hidden ? 0 : 210); }
