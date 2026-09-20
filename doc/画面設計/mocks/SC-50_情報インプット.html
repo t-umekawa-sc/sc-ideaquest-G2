@@ -800,6 +800,7 @@
   buildLinkMsOptions();
 
   let editTarget = null, parentForNew = null, currentDetailId = null, dmDirty = false;
+  let dmLinksEditing = false, dmLinkDraft = [];   // 詳細内の関連リンク欄のインライン編集状態
   // 編集ダイアログのセクション出し分け（内容=作成者／属性=curator／リンク=全員）。em＝'content'|'curate'|'links'|'all'。
   function applyEditMode(em) {
     const contentOn = (em === 'content' || em === 'all');
@@ -895,6 +896,7 @@
   function openDetail(id) {
     const r = findInfo(id);
     currentDetailId = id; dmDirty = false;   // 権限トグル切替時に再描画／未保存フラグ
+    dmLinksEditing = false; dmLinkDraft = r.links.map(l => ({ ...l }));   // 関連リンクのインライン編集ドラフト
     const em = editModeFor(r);
     const editContent = (em === 'content' || em === 'all');
     const editAttr = (em === 'curate' || em === 'all');
@@ -997,22 +999,49 @@
         <button class="btn btn-primary" type="button" data-newquest="${r.id}">＋ この情報からクエストを作成</button>
         <div class="hint" style="margin-top:6px">判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
       </div>
-      <div class="field dialog-section">
-        <div class="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
-        ${linkHtml}
-        <div style="margin-top:8px"><button class="btn btn-outline" type="button" data-editlinks="${r.id}">🔗 リンクを編集（追加・種別変更・棄却）</button></div>
-        <div class="hint" style="margin-top:6px">情報側のリンク編集は<strong>会社内の全員</strong>が可能（別導線）。<strong>採否・統制は成果物側の管理者</strong>に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
-      </div>
+      <div class="field dialog-section" id="dmLinksSection"></div>
     `;
+    // 関連リンクは全員編集可＝どのモードでも保存ボタンを出す（dirty 時のみ活性）。
     $('dmFooter').innerHTML = `
       <button class="btn btn-outline" type="button" data-close>閉じる</button>
-      ${em !== 'view' ? `<button class="btn btn-primary" type="button" id="dmSave" data-savedetail="${r.id}" disabled>保存する</button>` : ''}
+      <button class="btn btn-primary" type="button" id="dmSave" data-savedetail="${r.id}" disabled>保存する</button>
     `;
     openModal('detailModal');
+    renderDmLinks(r);   // 関連リンク欄（read／インライン編集）を描画
     // dirty 追跡＝編集可セクションを触ったら保存を活性化（未保存で閉じる時は破棄確認）。
-    const mark = () => { dmDirty = true; const s = $('dmSave'); if (s) s.disabled = false; };
-    $('dmBody').oninput = mark; $('dmBody').onchange = mark;
+    $('dmBody').oninput = markDmDirty; $('dmBody').onchange = markDmDirty;
   }
+  function markDmDirty() { dmDirty = true; const s = document.getElementById('dmSave'); if (s) s.disabled = false; }
+  // 関連リンク欄＝read（一覧＋「リンクを編集」ボタン）／編集（種別変更・棄却・追加をその場で）。別ダイアログは開かない。
+  function renderDmLinks(r) {
+    const box = document.getElementById('dmLinksSection'); if (!box) return;
+    if (!dmLinksEditing) {
+      const active = dmLinkDraft.filter(l => !l.rejected);
+      const list = active.length ? `<ul class="link-list">` + active.map(l => `<li class="link-item"><span>${L.linkTarget[l.target]}</span><span class="link-item__title">${l.title}</span><span class="badge ${L.linkKind[l.kind][1]}">${L.linkKind[l.kind][0]}</span><span class="badge badge-muted">${l.origin === 'auto' ? '自動' : '手動'}</span>${l.score != null ? `<span class="thread__meta">一致 ${(l.score*100|0)}%</span>` : ''}</li>`).join('') + `</ul>` : '<p class="muted">関連リンクはまだありません。</p>';
+      box.innerHTML = `<div class="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>${list}<div style="margin-top:8px"><button class="btn btn-outline" type="button" data-dmlinkedit>🔗 リンクを編集（追加・種別変更・棄却）</button></div><div class="hint" style="margin-top:6px">情報側のリンク編集は<strong>会社内の全員</strong>が可能。<strong>採否・統制は成果物側の管理者</strong>に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>`;
+    } else {
+      // 行/追加のマークアップは実装（features/info-input／info-input.css の .link-item/.link-kind/.link-item__rm/.link-add*）に合わせる。
+      // ※ このモックの暫定デザインを実装へ移植しないこと（実装の既存デザインが正）。
+      const rows = dmLinkDraft.map((l, i) => l.rejected
+        ? `<li class="link-item is-rejected" data-i="${i}"><span>${L.linkTarget[l.target]}</span><span class="link-item__title" style="text-decoration:line-through;color:var(--color-text-subtle)">${l.title}</span><span class="badge badge-muted">棄却済み・再リンクされません</span><button type="button" class="btn btn-outline btn-sm" data-linkunrej="${i}">戻す</button></li>`
+        : `<li class="link-item" data-i="${i}"><span>${L.linkTarget[l.target]}</span><span class="link-item__title">${l.title}</span><span class="badge badge-muted">${l.origin === 'auto' ? '自動' : '手動'}</span><select class="select link-kind dm-link-kind" data-i="${i}" aria-label="種別">${Object.entries(L.linkKind).map(([v, lab]) => `<option value="${v}"${l.kind === v ? ' selected' : ''}>${lab[0]}</option>`).join('')}</select><button type="button" class="link-item__rm" data-linkrm="${i}" data-origin="${l.origin}" aria-label="${l.origin === 'auto' ? '棄却' : '削除'}" title="${l.origin === 'auto' ? '棄却（今後この情報から自動リンクしない・復活しない）' : '削除'}">✕</button></li>`).join('');
+      const cand = ['ideas', 'quests', 'concepts'].flatMap(type => (LINK_CANDIDATES[type] || []).map(title => `<option value="${type}|${title}">${L.linkTarget[type]}｜${title}</option>`)).join('');
+      box.innerHTML = `<div class="dialog-label">関連リンクを編集（種別変更・棄却・追加）</div>
+        <ul class="link-list">${rows}</ul>
+        ${dmLinkDraft.length ? '' : '<div class="hint" id="dmLinksEmpty">関連リンクはまだありません。下から追加できます。</div>'}
+        <div class="link-add">
+          <label class="link-add__field"><span class="link-add__lbl">対象（アイデア／クエスト／コンセプトをタイトルで選択）</span>
+            <select class="select" id="dmNewLink"><option value="">— 選択 —</option>${cand}</select>
+          </label>
+          <div class="link-add__bottom">
+            <label class="link-add__field" style="flex:1"><span class="link-add__lbl">種別</span><select class="select" id="dmNewKind">${Object.entries(L.linkKind).map(([v, lab]) => `<option value="${v}">${lab[0]}</option>`).join('')}</select></label>
+            <button class="btn btn-outline" type="button" data-linkadd>＋ 追加</button>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:6px">その場で編集し、フッターの<strong>保存する</strong>で確定します。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。<strong>採否・統制は成果物側の管理者</strong>に委ねます。</div>`;
+    }
+  }
+  function enterLinkEdit() { dmLinksEditing = true; renderDmLinks(findInfo(currentDetailId)); }
   function saveDetail(id) {
     const r = findInfo(id);
     if ($('dmTitleInput')) { const tv = $('dmTitleInput').value.trim(); if (!tv) { alert('タイトルを入力してください'); return; } r.title = tv; }
@@ -1026,6 +1055,7 @@
       r.cats = [...document.querySelectorAll('.dmCat:checked')].map(c => c.value);
       if ((r.priority || r.impactClass || r.triage || r.cats.length) && r.status === 'raw') r.status = 'curated';   // 属性付与で raw→curated
     }
+    r.links = dmLinkDraft.map(l => ({ ...l }));   // 関連リンク（インライン編集の結果・全員）
     dmDirty = false; refresh(); closeModal($('detailModal'));
     alert('保存しました（デモ）。実装＝内容は作成者/属性は curator の権限をサーバー再検証。内容変更は編集履歴（info_item_revisions）に記録。');
   }
@@ -1034,14 +1064,25 @@
     const c = e.target.closest('[data-close]');
     if (c && dmDirty) { if (!confirm('変更が保存されていません。破棄して閉じますか？')) { e.stopPropagation(); e.preventDefault(); } else { dmDirty = false; } }
   }, true);
+  // 関連リンクの種別変更（インライン編集）＝ドラフトに反映。
+  document.addEventListener('change', (e) => {
+    const s = e.target.closest('.dm-link-kind');
+    if (s) { dmLinkDraft[+s.dataset.i].kind = s.value; markDmDirty(); }
+  });
 
   // ---- 行アクション・詳細内アクション（委譲） ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-editlinks],[data-savedetail],[data-archive],[data-delete],[data-newquest],[data-history]');
+    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-editlinks],[data-dmlinkedit],[data-linkrm],[data-linkunrej],[data-linkadd],[data-savedetail],[data-archive],[data-delete],[data-newquest],[data-history]');
     if (!t) return;
     if (t.dataset.history != null) { e.preventDefault(); alert('更新履歴（デモ）＝この情報の内容（タイトル/本文/出典URL/参考資料）の版履歴を表示します。\n実装＝info_item_revisions（版・編集者・日時）。判定後も作成者が内容を編集できるため、判定時点の内容を追跡できます。'); return; }
     if (t.dataset.savedetail != null) { saveDetail(t.dataset.savedetail); return; }
-    if (t.dataset.editlinks != null) { const r = findInfo(t.dataset.editlinks); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('edit', r, null, 'links'), d.hidden ? 0 : 210); return; }
+    // 関連リンクの「その場」編集（別ダイアログは開かない）＝欄だけ入力モードに切替。
+    if (t.dataset.dmlinkedit != null) { enterLinkEdit(); return; }
+    if (t.dataset.linkrm != null) { const i = +t.dataset.linkrm; if (dmLinkDraft[i].origin === 'auto') dmLinkDraft[i].rejected = true; else dmLinkDraft.splice(i, 1); markDmDirty(); renderDmLinks(findInfo(currentDetailId)); return; }
+    if (t.dataset.linkunrej != null) { dmLinkDraft[+t.dataset.linkunrej].rejected = false; markDmDirty(); renderDmLinks(findInfo(currentDetailId)); return; }
+    if (t.dataset.linkadd != null) { const sel = document.getElementById('dmNewLink'); const v = sel && sel.value; if (!v) { if (sel) sel.focus(); return; } const idx = v.indexOf('|'); const target = v.slice(0, idx), title = v.slice(idx + 1); const kind = (document.getElementById('dmNewKind') || {}).value || 'related'; dmLinkDraft.push({ target, title, kind, origin: 'manual', score: null }); markDmDirty(); renderDmLinks(findInfo(currentDetailId)); return; }
+    // ⋯メニューの「リンクを編集」＝詳細を開いてから関連リンク欄を編集モードに（別ダイアログにしない）。
+    if (t.dataset.editlinks != null) { const id = t.dataset.editlinks; const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => { openDetail(id); enterLinkEdit(); }, d.hidden ? 0 : 210); return; }
     if (t.dataset.newquest != null) { e.preventDefault(); const r = findInfo(t.dataset.newquest); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openQuestFromInfo(r), d.hidden ? 0 : 210); return; }
     if (t.dataset.detail != null) { e.preventDefault(); const openDetailModal = document.getElementById('detailModal'); if (!openDetailModal.hidden) closeModal(openDetailModal); setTimeout(() => openDetail(t.dataset.detail), openDetailModal.hidden ? 0 : 210); }
     else if (t.dataset.thread != null) { e.preventDefault(); const root = rootOf(findInfo(t.dataset.thread)); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openDetail(root.id), d.hidden ? 0 : 210); }
