@@ -1,7 +1,8 @@
 // N-TC-201: 情報一覧のクエリ組立（サーバー委譲・§1.8.1）。roots_only/status/ホワイトリストの検証。
-import { describe, expect, it } from "vitest";
+// N-TC-204: 貼付画像の再ホスト（POST /info-items/images・multipart）＝FormData 送信・url 返却。
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { infoListParams } from "./api";
+import { infoListParams, uploadInfoImageApi } from "./api";
 import type { QueryState } from "@/components/ui";
 
 function state(over: Partial<QueryState> = {}): QueryState {
@@ -42,5 +43,26 @@ describe("infoListParams（N-TC-201）", () => {
   it("横断検索はサーバー q（全文）へ", () => {
     const qs = infoListParams(state({ search: "  半導体 " }));
     expect(qs.get("q")).toBe("半導体");
+  });
+});
+
+describe("uploadInfoImageApi（N-TC-204）", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("画像 blob を multipart（FormData）で POST /info-items/images し url を返す", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return { ok: true, status: 200, json: async () => ({ url: "https://minio.test/info-images/x.png?sig=1" }) } as Response;
+    }));
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "p.png", { type: "image/png" });
+    const url = await uploadInfoImageApi(file);
+    expect(url).toBe("https://minio.test/info-images/x.png?sig=1");
+    expect(calls[0].url).toBe("/api/v1/info-items/images");
+    expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.body).toBeInstanceOf(FormData);
+    // multipart は Content-Type をブラウザに委ねる（boundary 自動付与）＝手で application/json を付けない。
+    const headers = calls[0].init.headers as Headers;
+    expect(headers.get("Content-Type")).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
@@ -15,6 +15,7 @@ from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
     InfoCreateRequest,
     InfoDetailDTO,
+    InfoImageUploadResponse,
     InfoLinkCandidatesResponse,
     InfoLinkCreateRequest,
     InfoLinkDTO,
@@ -95,6 +96,26 @@ def create_info_item(
     result = info_service.create_info_item(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), body=body)
     return InfoDetailDTO(**result)
+
+
+@router.post("/info-items/images", response_model=InfoImageUploadResponse, status_code=201)
+async def rehost_info_image(
+    request: Request,
+    file: UploadFile = File(...),
+    session: dict = Depends(require_me),
+) -> InfoImageUploadResponse:
+    """貼付画像の再ホスト（SC-51・N.2・§12-4）＝multipart・全ユーザー。自社ホスト署名URL を返す。
+
+    静的パス（`/info-items/images`）＝動的 `/info-items/{info_id}` より前に定義（優先ルーティング）。
+    """
+    verify_origin(request)
+    verify_csrf(request)
+    data = await file.read()
+    result = info_service.rehost_image(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+        data=data, content_type=file.content_type or "",
+    )
+    return InfoImageUploadResponse(**result)
 
 
 @router.patch("/info-items/{info_id}", response_model=InfoDetailDTO)

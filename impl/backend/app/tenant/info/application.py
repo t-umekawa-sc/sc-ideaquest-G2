@@ -14,7 +14,7 @@ from app.core import list_query as lq
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.infra.storage import get_storage
+from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.info.schemas import (
@@ -280,6 +280,24 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         new_id = item.id
     # 作成直後の詳細（作成者視点＝can.edit_content=true）を返す。
     return get_info_detail(account_id, company_id, str(new_id))
+
+
+def rehost_image(account_id: uuid.UUID, company_id: uuid.UUID, *, data: bytes, content_type: str) -> dict:
+    """貼付画像を自社ホスト（MinIO）へ再ホスト（SC-51・N.2・§12-4/§N.7）＝会社内 active 全員。
+
+    マジックバイト検証（§1.10・validate_image_upload 共用）→ 保存 → 短TTL 署名URL を返す。
+    外部 `img src` を持ち込まない（トラッキング/referer 漏れ防止）ためエディタが返却 URL に置換する。
+    """
+    validate_image_upload(content_type, data)  # MIME allowlist＋サイズ＋シグネチャ（申告を信用しない）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        if profile_repo.get_user_by_account(ts, account_id) is None:
+            raise AppError(401, "unauthenticated")  # 会社内 active ユーザーのみ（N.0）
+    storage = get_storage()
+    key = storage.put(data, content_type, prefix="info-images")
+    return {"url": storage.presigned_get(key)}
 
 
 _CONTENT_FIELDS = {"title", "body_html", "source_url"}

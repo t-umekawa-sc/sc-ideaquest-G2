@@ -204,3 +204,11 @@ class InfoDetailDTO(BaseModel):
     thread: InfoThreadDTO
     tokens_top: list[WordCloudTokenDTO] = []
     can: InfoCanDTO
+
+
+class InfoImageUploadResponse(BaseModel):
+    """貼付画像の再ホスト結果（POST /info-items/images・§12-4）＝自社ホスト（MinIO）署名URL。
+
+    エディタの paste ハンドラが blob を送り、返った `url` で `img src` を置換する（外部参照を持ち込まない）。
+    """
+    url: str

@@ -11,7 +11,10 @@ from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
 INFO = "/api/v1/info-items"
 WORD_CLOUD = "/api/v1/info-items/word-cloud"
+IMAGES = "/api/v1/info-items/images"
 LINKS = "/api/v1/info-links"
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 有効な PNG シグネチャ（validate_image_upload はシグネチャ検証）
 
 
 def _new_link(client, info_env):
@@ -338,3 +341,22 @@ def test_n_tc_106_word_cloud(client, info_env):
     assert tokens and tokens[0]["token"] == "生成ai"
     counts = [t["count"] for t in tokens]
     assert counts == sorted(counts, reverse=True)
+
+
+def test_n_tc_125_rehost_image(client, info_env):
+    """N-TC-125: 貼付画像を自社ホスト（MinIO）へ再ホスト＝201・自社署名URL（外部参照を持ち込まない）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(IMAGES, files={"file": ("p.png", PNG, "image/png")}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    url = r.json()["url"]
+    assert url and "info-images/" in url  # 自社ホスト（prefix=info-images）へ保存された署名URL
+
+
+def test_n_tc_126_rehost_image_signature_mismatch(client, info_env):
+    """N-TC-126: 申告 image/png だが中身が非画像→422 validation_error（field=file・MIME 偽装拒否）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(IMAGES, files={"file": ("p.png", b"not really a png", "image/png")}, headers=_csrf(client))
+    assert r.status_code == 422, r.text
+    body = r.json()
+    assert body["code"] == "validation_error"
+    assert any(e.get("field") == "file" for e in body.get("errors", []))

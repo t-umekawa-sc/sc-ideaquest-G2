@@ -80,6 +80,15 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
   return res as InfoDetail;
 }
 
+// 貼付画像の再ホスト（POST /info-items/images・Phase C slice4・§12-4）＝multipart。
+// エディタの paste/挿入ハンドラが blob を送り、返った自社ホスト署名 URL で img src を置換する（外部参照を持ち込まない）。
+export async function uploadInfoImageApi(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch<{ url: string }>("/info-items/images", { method: "POST", body: form });
+  return (res as { url: string }).url;
+}
+
 // 部分更新（PATCH /info-items/{id}・Phase C slice5.2）＝内容=作成者／キュレーション=curator（越権はサーバーが403）。
 // 送るキーだけが更新対象（内容変更は再派生＋版履歴・キュレーションは raw→curated）。成功で一覧を再取得。
 export interface InfoPatch {

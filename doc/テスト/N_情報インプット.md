@@ -59,6 +59,8 @@
 | N-TC-122 | api | 棄却／棄却解除 | 作成済リンク | `POST /info-links/{id}/reject`／`/unreject` | `rejected_at` セット→NULL（詳細で rejected 反映） | N.3 |
 | N-TC-123 | api | enum 検証（target_type/kind） | ログイン済 | `POST /info-links`（不正 target_type）／`PATCH`（不正 kind） | 422 `validation_error` | N.3／§1.7 |
 | N-TC-124 | api | リンク候補検索 | quest を seed | `GET /info-link-candidates?target_type=quests&q=…` | 該当候補を返す／不正 target_type は 422 | N.3 |
+| N-TC-125 | api | 貼付画像の再ホスト（自社 MinIO・署名URL） | ログイン済＋PNG バイト | `POST /info-items/images`（multipart `file`） | 201・`{url}`＝自社ホスト署名URL（外部参照を持ち込まない） | N.2／§12-4／§N.7 |
+| N-TC-126 | api | 画像検証（非画像/シグネチャ不一致は 422） | ログイン済＋非画像バイト | `POST /info-items/images`（`file`＝text） | 422 `validation_error`（`errors[].field="file"`） | §1.10／§N.7 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 
@@ -69,3 +71,4 @@
 | N-TC-201 | unit | クエリ組立（roots_only/status/sort ホワイトリスト） | QueryState＋extra | `infoListParams(state,{status,rootsOnly})` | `roots_only=true`・`status`・ホワイトリスト sort/enum のみをクエリに載せる | §1.8.1／N.1 |
 | N-TC-202 | e2e | 「続報を束ねる」で再クエリ（回帰） | seed（続報 i2 あり） | `/info-items` で 続報束ねをチェック | 状態タブ件数が減る（続報が除外・DataTable server 再クエリが発火）＝DFT 再発防止 | N.1／§12-1 |
 | N-TC-203 | e2e | 一覧ヘッダーのフローティング（列見出し固定） | 低い viewport で `/info-items` | ページを下方向へスクロール | 列見出し行（thead）が画面上部（≈--header-h）に貼り付く＝デザイン標準 §4.5⑨-b | デザイン標準 §4.5⑨-b |
+| N-TC-204 | unit | 貼付画像の再ホスト（multipart 送信） | 画像 File | `uploadInfoImageApi(file)` | `POST /info-items/images` に FormData を送り（Content-Type は自動）`url` を返す | N.2／§12-4 |
