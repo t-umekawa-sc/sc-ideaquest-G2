@@ -31,6 +31,52 @@ def _purge_curators(db_identifier):
     with get_tenant_session(db_identifier) as ts:
         ts.execute(InfoCurator.__table__.delete()); ts.commit()
 
+
+def _seed_quest_idea_vote(db_identifier):
+    """反証通知の宛先解決用に quest（所有者）＋idea（作成者）＋vote（評価者）を seed。namespace を返す。"""
+    import uuid as _uuid
+    from types import SimpleNamespace
+    from app.tenant.ideas.orm import Idea, Vote
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+    owner, author, voter = _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4()
+    qid, iid = _uuid.uuid4(), _uuid.uuid4()
+    with get_tenant_session(db_identifier) as ts:
+        for u, nm in [(owner, "所有者"), (author, "起案者"), (voter, "評価者")]:
+            ts.add(User(id=u, account_id=_uuid.uuid4(), display_name=nm, locale="ja", status="active"))
+        ts.flush()  # users を先に確定（FK: quests.owner_id / ideas.author_id）
+        ts.add(Quest(id=qid, owner_id=owner, title="反証対象クエスト", color="#0D9488", status="recruiting"))
+        ts.flush()  # quest を先に確定（FK: ideas.quest_id）
+        ts.add(Idea(id=iid, quest_id=qid, author_id=author, title="反証対象アイデア", body="b", value="v", status="published"))
+        ts.flush()  # idea を先に確定（FK: votes.idea_id）
+        ts.add(Vote(id=_uuid.uuid4(), idea_id=iid, user_id=voter, type="approve", voted_revision=1))
+        ts.commit()
+    return SimpleNamespace(quest_id=qid, idea_id=iid, owner=owner, author=author, voter=voter, users=[owner, author, voter])
+
+
+def _cleanup_refuting_seed(db_identifier, seed):
+    """N-TC-138/139 の seed 後始末（notifications〔FK ref_idea_id〕→vote→idea→quest→users）。"""
+    from app.tenant.ideas.orm import Idea, Vote
+    from app.tenant.notifications.orm import Notification
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(Notification.__table__.delete().where(Notification.recipient_id.in_(seed.users)))
+        ts.execute(Vote.__table__.delete().where(Vote.idea_id == seed.idea_id))
+        ts.execute(Idea.__table__.delete().where(Idea.id == seed.idea_id))
+        ts.execute(Quest.__table__.delete().where(Quest.id == seed.quest_id))
+        ts.execute(User.__table__.delete().where(User.id.in_(seed.users)))
+        ts.commit()
+
+
+def _notified(db_identifier, ntype, among):
+    """among（user_id 群）のうち type=ntype の通知を受け取った recipient_id 集合。"""
+    from sqlalchemy import select as _select
+    from app.tenant.notifications.orm import Notification
+    with get_tenant_session(db_identifier) as ts:
+        return set(ts.execute(_select(Notification.recipient_id)
+                              .where(Notification.type == ntype, Notification.recipient_id.in_(among))).scalars().all())
+
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64  # 有効な PNG シグネチャ（validate_image_upload はシグネチャ検証）
 
 
@@ -594,3 +640,37 @@ def test_n_tc_137_curator_grant_revoke(client, info_env, factory):
         assert client.delete(f"{CURATORS}/{acc_id}", headers=_csrf(client)).status_code == 404
     finally:
         _purge_curators(info_env.db_identifier)  # 権限漏れ防止（他テスト保護）
+
+
+def test_n_tc_138_refuting_link_notifies(client, info_env):
+    """N-TC-138: 反証リンク作成で作成者/評価者/クエスト管理者へ info_refuting_raised（本人は除外）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    seed = _seed_quest_idea_vote(info_env.db_identifier)
+    try:
+        # 本人（member）が ids.d（member 作成）→ idea へ反証リンクを作成。
+        r = client.post(LINKS, json={"info_item_id": str(info_env.ids.d), "target_type": "ideas",
+                                     "target_id": str(seed.idea_id), "kind": "refuting"}, headers=_csrf(client))
+        assert r.status_code == 201, r.text
+        notified = _notified(info_env.db_identifier, "info_refuting_raised", seed.users)
+        assert {seed.owner, seed.author, seed.voter} <= notified  # 3者全員に通知
+    finally:
+        _cleanup_refuting_seed(info_env.db_identifier, seed)
+
+
+def test_n_tc_139_change_to_refuting_notifies(client, info_env):
+    """N-TC-139: related→refuting の遷移で通知が発火（related のままなら通知しない）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    seed = _seed_quest_idea_vote(info_env.db_identifier)
+    try:
+        # まず related で作成＝この時点では通知なし。
+        r = client.post(LINKS, json={"info_item_id": str(info_env.ids.b), "target_type": "ideas",
+                                     "target_id": str(seed.idea_id), "kind": "related"}, headers=_csrf(client))
+        assert r.status_code == 201, r.text
+        assert not _notified(info_env.db_identifier, "info_refuting_raised", seed.users)  # related は通知しない
+        # refuting へ変更＝遷移で通知が飛ぶ。
+        link_id = r.json()["id"]
+        r2 = client.patch(f"{LINKS}/{link_id}", json={"kind": "refuting"}, headers=_csrf(client))
+        assert r2.status_code == 200, r2.text
+        assert {seed.owner, seed.author, seed.voter} <= _notified(info_env.db_identifier, "info_refuting_raised", seed.users)
+    finally:
+        _cleanup_refuting_seed(info_env.db_identifier, seed)

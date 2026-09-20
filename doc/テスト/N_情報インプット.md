@@ -72,6 +72,8 @@
 | N-TC-135 | api | 未判定の物理削除（本人・raw のみ） | raw 情報の登録者本人 | `DELETE /info-items/{id}` | 204・一覧/詳細から消える（従属行も削除）／非本人は 403／curated 済みは 409 `invalid_state`（archive 誘導） | N.2 |
 | N-TC-136 | api | 続報がある情報は削除不可 | raw 情報＋続報あり | `DELETE /info-items/{id}` | 409 `conflict`（`has_follow_ups`）＝孤児化防止 | N.2／§12-1 |
 | N-TC-137 | api | 情報判定権限の付与/剥奪（管理者のみ） | 会社アカウント管理者でログイン | `POST`/`GET`/`DELETE /info-curators` | 付与 201＋一覧に出現／二重付与 409／剥奪 204＋一覧から消える／未付与の剥奪は 404／**非管理者（一般）は 403** | N.5／§5.37 |
+| N-TC-138 | api | 反証リンク作成で揺さぶり通知（作成者/評価者/クエスト管理者） | idea＋quest＋vote を seed | `POST /info-links`（`kind=refuting`・ideas 宛て） | idea 作成者・評価者（投票者）・クエスト所有者に `info_refuting_raised` 通知が届く（付けた本人は除外） | N.3／§N.6 |
+| N-TC-139 | api | 種別変更 refuting への遷移で通知 | related リンク＋idea seed | `PATCH /info-links/{id}`（`kind=refuting`） | related→refuting の遷移で宛先に通知が届く（related のままなら通知しない） | N.3／§N.6 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

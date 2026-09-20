@@ -128,6 +128,21 @@ def active_member_user_ids(session: Session, quest_id: uuid.UUID) -> set[uuid.UU
     ).scalars().all())
 
 
+def admin_user_ids(session: Session, quest_id: uuid.UUID) -> set[uuid.UUID]:
+    """当該クエストの管理権限者 user_id 集合＝owner＋有効メンバーのうち `quest_admin` 権限保持者（§N.6 通知宛先）。"""
+    quest = session.get(Quest, quest_id)
+    if quest is None:
+        return set()
+    ids = {quest.owner_id}
+    ids.update(session.execute(
+        select(QuestMember.user_id)
+        .join(QuestMemberPermission, QuestMemberPermission.quest_member_id == QuestMember.id)
+        .where(QuestMember.quest_id == quest_id, QuestMember.removed_at.is_(None),
+               QuestMemberPermission.permission == "quest_admin")
+    ).scalars().all())
+    return ids
+
+
 def user_ids_in_any_group(session: Session, group_ids: list[uuid.UUID]) -> set[uuid.UUID]:
     """指定グループ群のいずれかに有効所属する user_id 集合（候補範囲/門番影響の判定）。"""
     if not group_ids:

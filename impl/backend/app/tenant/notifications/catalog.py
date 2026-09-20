@@ -30,7 +30,7 @@ ICON = {
     "follow_evaluation": "⭐", "follow_selection": "🏆", "idea_updated": "🔄",
     "magic_reaction": "✨", "achievement": "🎖️", "quest_party_invited": "🎯",
     "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
-    "quest_watch_update": "👀",
+    "quest_watch_update": "👀", "info_refuting_raised": "⚠️",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
 }
 
@@ -196,6 +196,27 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
                     else f"クエスト「{qt}」への参加リクエストが却下されました")
         context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
         tag = "Join request" if en else "参加リクエスト"
+    elif t == "info_refuting_raised":
+        # 反証（refuting）が成果物に提示された（§N.6・「根底を揺さぶる」）。宛先＝作成者/所有者・評価者・クエスト管理者。
+        info_title = p.get("info_title") or ("(information)" if en else "（情報）")
+        if n.ref_idea_id:
+            it = _idea_title(session, n.ref_idea_id, en)
+            body = (f'{actor} raised a refutation against the idea "{it}" — re-evaluation suggested' if en
+                    else f"{actor} さんがアイデア「{it}」に反証を提示しました（要再評価）")
+            context = _quest_context(session, n.ref_idea_id, en)
+        elif n.ref_quest_id:
+            quest = session.get(Quest, n.ref_quest_id)
+            qt = quest.title if quest else ("(deleted quest)" if en else "（削除されたクエスト）")
+            body = (f'{actor} raised a refutation against the quest "{qt}" — re-evaluation suggested' if en
+                    else f"{actor} さんがクエスト「{qt}」に反証を提示しました（要再評価）")
+            context = f'Quest "{qt}"' if en else f"クエスト「{qt}」"
+        else:
+            body = (f"{actor} raised a refutation — re-evaluation suggested" if en
+                    else f"{actor} さんが反証を提示しました（要再評価）")
+        # 根拠となった情報（反証の出所）を context 末尾に併記。
+        ev = f'based on "{info_title}"' if en else f"根拠情報「{info_title}」"
+        context = f"{context} ・ {ev}" if context else ev
+        tag = "Refutation" if en else "反証"
     elif t == "security_new_device":
         body = ("A sign-in from a new device was detected" if en
                 else "新しい端末からログインがありました")

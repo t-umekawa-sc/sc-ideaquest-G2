@@ -55,6 +55,11 @@ def get_idea(session: Session, idea_id: uuid.UUID) -> Idea | None:
     ).scalars().first()
 
 
+def voter_ids(session: Session, idea_id: uuid.UUID) -> set[uuid.UUID]:
+    """当該アイデアを評価（投票）したユーザー id 集合（反証の要再評価通知の宛先・§N.6）。"""
+    return set(session.execute(select(Vote.user_id).where(Vote.idea_id == idea_id)).scalars().all())
+
+
 def get_ideas_by_ids(session: Session, idea_ids: list[uuid.UUID]) -> dict[uuid.UUID, Idea]:
     """有効なアイデアを id 一括取得（💬 新着の議論の集約等・N+1 回避）。削除済みは含めない。"""
     if not idea_ids:

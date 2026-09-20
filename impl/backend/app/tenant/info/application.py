@@ -607,8 +607,44 @@ def _link_dto(link, title: str | None) -> dict:
     }
 
 
+def _notify_refuting(company_id: uuid.UUID, actor_account_id: uuid.UUID, *,
+                     target_type: str, target_id: uuid.UUID, info_title: str) -> None:
+    """反証（refuting）提示の「揺さぶり」通知（§N.6・通知のみ MVP）＝post-commit・best-effort。
+
+    宛先＝成果物の作成者/所有者＋評価者（投票者）＋クエスト管理者（owner/quest_admin）。actor は除外。
+    ideas→`ref_idea_id`／quests→`ref_quest_id`。concepts/assumptions（未実装ドメイン）は宛先なし＝no-op。
+    """
+    from app.tenant.ideas import repository as ideas_repo
+    from app.tenant.notifications import service as notify_svc
+    from app.tenant.quests import repository as quests_repo
+
+    def _build(ts):
+        actor = profile_repo.get_user_by_account(ts, actor_account_id)
+        actor_uid = actor.id if actor else None
+        recipients: set[uuid.UUID] = set()
+        refs: dict = {}
+        if target_type == "ideas":
+            idea = ideas_repo.get_idea(ts, target_id)
+            if idea is None:
+                return []
+            recipients |= {idea.author_id}
+            recipients |= ideas_repo.voter_ids(ts, target_id)              # 評価者（投票者）
+            recipients |= quests_repo.admin_user_ids(ts, idea.quest_id)    # クエスト管理者（owner/quest_admin）
+            refs = {"ref_idea_id": target_id}
+        elif target_type == "quests":
+            recipients |= quests_repo.admin_user_ids(ts, target_id)        # 所有者＋quest_admin
+            refs = {"ref_quest_id": target_id}
+        else:
+            return []  # concepts/assumptions は未実装＝宛先なし
+        recipients.discard(actor_uid)  # 反証を付けた本人には通知しない
+        params = {"actor_name": actor.display_name if actor else None, "info_title": info_title}
+        return [notify_svc.entry(r, "info_refuting_raised", refs=refs, params=params) for r in recipients if r]
+
+    notify_svc.dispatch(company_id, _build)
+
+
 def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
-    """手動リンク追加（SC-52・N.3）＝会社内 active 全員・origin=manual。同一組は 409。"""
+    """手動リンク追加（SC-52・N.3）＝会社内 active 全員・origin=manual。`refuting` は揺さぶり通知を発火（§N.6）。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
@@ -632,7 +668,12 @@ def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         ts.flush()
         title = repo.resolve_link_titles(ts, [link]).get(target_id)
         dto = _link_dto(link, title)
+        info_item = repo.get_info_item(ts, info_id)
+        info_title = info_item.title if info_item else ""
         ts.commit()
+    if kind == "refuting":  # 反証で起票＝post-commit で揺さぶり通知（§N.6）
+        _notify_refuting(company_id, account_id, target_type=body.target_type,
+                         target_id=target_id, info_title=info_title)
     return dto
 
 
@@ -657,10 +698,36 @@ def _mutate_link(account_id, company_id, link_id, mutate) -> dict:
 
 
 def change_link_kind(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str, *, kind: str) -> dict:
-    """種別変更（関連↔裏付け↔反証・N.3）。※`refuting` の「揺さぶり」通知/要再評価は Phase D で発火。"""
+    """種別変更（関連↔裏付け↔反証・N.3）。related/supporting→`refuting` への遷移で揺さぶり通知を発火（§N.6）。"""
     if kind not in LINK_KIND_VALUES:
         raise AppError(422, "validation_error", detail="kind が不正です", errors=[{"field": "kind"}])
-    return _mutate_link(account_id, company_id, link_id, lambda l: setattr(l, "kind", kind))
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    lid = _parse_uuid(link_id, field="link_id")
+    fire = False
+    target_type = target_id = info_title = None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        link = repo.get_link(ts, lid)
+        if link is None:
+            raise AppError(404, "not_found")
+        # refuting への遷移のみ通知（既に refuting は再通知しない）。棄却済みは揺さぶらない。
+        fire = kind == "refuting" and link.kind != "refuting" and link.rejected_at is None
+        target_type, target_id = link.target_type, link.target_id
+        link.kind = kind
+        title = repo.resolve_link_titles(ts, [link]).get(link.target_id)
+        dto = _link_dto(link, title)
+        if fire:
+            info_item = repo.get_info_item(ts, link.info_item_id)
+            info_title = info_item.title if info_item else ""
+        ts.commit()
+    if fire:
+        _notify_refuting(company_id, account_id, target_type=target_type,
+                         target_id=target_id, info_title=info_title or "")
+    return dto
 
 
 def reject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) -> dict:
