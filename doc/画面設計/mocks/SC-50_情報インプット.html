@@ -155,6 +155,13 @@
   <div class="page-head"><h1>情報インプット</h1></div>
   <p class="admin-sub">外部WEB情報を<strong>手動で貼り付けて登録</strong>し、属性を付け、アイデア／コンセプト／クエストへ<strong>動的に関連づけ</strong>る会社横断の知識レイヤ。登録は<strong>全員</strong>／属性付与・判定は<strong>情報判定権限（info_curator）</strong>。</p>
 
+  <!-- デモ視点の権限トグル＝確定した編集権限モデルの「能力フラグでセクション別に編集導線を出し分け」を体感するための擬似ロール。実装＝backend が can.edit_content/can.curate/can.add_link を算出し、フロントは出し分けるだけ。 -->
+  <div class="field-note" id="demoRoleBar" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-3)">
+    <strong>デモ視点</strong>：あなた＝<strong>情報 花子</strong>（＝一部の情報の作成者）
+    <label class="checkbox" style="font-size:var(--text-sm)"><input type="checkbox" id="demoCuratorToggle"><span>🧭 情報判定権限（curator）を持つ</span></label>
+    <span class="muted" style="font-size:var(--text-xs)">内容＝作成者のみ／属性＝curator／関連リンク＝全員（切替で編集導線の出し分けを確認）</span>
+  </div>
+
   <!-- ワードクラウドはタブの外（常時表示）＝会社横断の語の俯瞰。語クリックで全文検索へ（本番）。GET /info-items/word-cloud。 -->
   <div class="wordcloud" id="wordCloud" aria-label="ワードクラウド（語で絞り込み）">
     <div class="wordcloud__title">☁️ よく出る語（クリックで絞り込み）</div>
@@ -185,7 +192,7 @@
     <div id="infoTable"></div>
 
     <p class="role-note" style="margin-top:var(--space-6);color:var(--color-text-muted);font-size:var(--text-xs)">
-      低摩擦登録（タイトル＋本文＋出典URL）は<strong>会社内の全員</strong>ができます（状態＝未判定 raw）。<strong>優先度・情報ソース・各分類・影響評価（環境スキャン）・トリアージ判定・アーカイブ</strong>は<strong>情報判定権限（info_curator）</strong>の領分です。本文は<strong>リッチテキスト</strong>で貼付でき（保存時＋表示時にサニタイズ）、貼付画像は自社ストレージに再ホストします。<strong>続報</strong>は元情報に紐づけて時系列で追え、<strong>要約</strong>で長文を読まずに選別できます。
+      <strong>編集権限（確定）</strong>＝<strong>内容</strong>（タイトル／本文／出典URL／参考資料）は<strong>作成者のみ</strong>（判定後も作成者・<strong>編集履歴を保持</strong>）。<strong>属性値・情報判定（triage）・状態遷移・アーカイブ</strong>＝<strong>情報判定権限（info_curator）</strong>。<strong>関連リンク（情報側）</strong>＝<strong>会社内の全員</strong>が追加／種別変更／棄却でき、<strong>採否・統制は成果物側の管理者</strong>（クエスト/アイデア/コンセプト）に委ねます。管理者は curator の付与／剥奪のみ（情報の上書き編集はしない）。画面は<strong>詳細1枚＋能力フラグでセクション別に編集導線を出し分け</strong>（権限外は導線を出さず参照表示）。本文はリッチテキスト（保存＋表示でサニタイズ・貼付画像は自社再ホスト）。
     </p>
   </div>
 
@@ -402,6 +409,13 @@
   const followUps = (id) => INFO.filter(x => x.parent === id);
   const findInfo = (id) => INFO.find(x => x.id === id);
 
+  // ---- デモ視点の権限（実装＝backend の can.* 算出）。内容=作成者のみ／属性=curator／リンク=全員。 ----
+  const DEMO_ME = '情報 花子';
+  let demoCurator = false;
+  const canEditContent = (r) => r.by === DEMO_ME;   // 内容（タイトル/本文/URL/参考資料）＝作成者のみ・status 非依存
+  const canCurate = () => demoCurator;              // 属性/triage/status/アーカイブ＝info_curator
+  // 関連リンク（情報側）＝会社内 active 全員＝常に可（can.add_link）。
+
   // ---- ワードクラウド（デモ＝トークン頻度） ----
   const WC = [['生成AI',24],['ガイドライン',9],['競合',14],['値下げ',7],['ノーコード',6],['画像処理',11],['DX',8],['採算',5],['導入率',6],['要約',4]];
   function renderWordCloud() {
@@ -445,8 +459,10 @@
         <li role="none"><button role="menuitem" type="button" data-detail="${r.id}">詳細を開く</button></li>
         ${inThread ? `<li role="none"><button role="menuitem" type="button" data-thread="${r.id}">🧵 スレッドを見る（時系列）</button></li>` : ''}
         <li role="none"><button role="menuitem" type="button" data-followup="${r.id}">続報を登録</button></li>
-        <li role="none"><button role="menuitem" type="button" data-edit="${r.id}">属性を編集</button></li>
-        ${r.status === 'raw' ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-delete="${r.id}">削除（未判定）</button></li>` : `<li role="none"><button role="menuitem" type="button" data-archive="${r.id}">アーカイブ</button></li>`}
+        ${canEditContent(r) ? `<li role="none"><button role="menuitem" type="button" data-edit="${r.id}" data-mode="content">内容を編集</button></li>` : ''}
+        ${canCurate() ? `<li role="none"><button role="menuitem" type="button" data-edit="${r.id}" data-mode="curate">属性を編集</button></li>` : ''}
+        ${(r.status === 'raw' && canEditContent(r)) ? `<li role="none"><button role="menuitem" type="button" class="is-danger" data-delete="${r.id}">削除（未判定）</button></li>` : ''}
+        ${(r.status !== 'raw' && canCurate()) ? `<li role="none"><button role="menuitem" type="button" data-archive="${r.id}">アーカイブ</button></li>` : ''}
       </ul>
     </div>`;
   }
@@ -785,11 +801,24 @@
   });
   buildLinkMsOptions();
 
-  let editTarget = null, parentForNew = null;
-  function openInfoForm(mode, rec, parent) {
+  let editTarget = null, parentForNew = null, currentDetailId = null;
+  // 編集ダイアログのセクション出し分け（内容=作成者／属性=curator／リンク=全員）。em＝'content'|'curate'|'links'|'all'。
+  function applyEditMode(em) {
+    const contentOn = (em === 'content' || em === 'all');
+    const curateOn = (em === 'curate' || em === 'all');
+    ['imTitleInput', 'imUrl', 'imFiles'].forEach(id => { const el = $(id); if (el) el.disabled = !contentOn; });
+    const body = $('imBody'); if (body) body.contentEditable = contentOn ? 'true' : 'false';
+    [['imDropzone'], ['rtbar', '#infoModal .rt__bar']].forEach(([id, sel]) => {
+      const el = sel ? document.querySelector(sel) : $(id);
+      if (el) { el.style.opacity = contentOn ? '' : '.5'; el.style.pointerEvents = contentOn ? '' : 'none'; }
+    });
+    const cb = $('curatorBox'); if (cb) cb.hidden = !curateOn;
+  }
+  const EDIT_TITLE = { content: '内容を編集', curate: '属性を編集', links: '関連リンクを編集' };
+  function openInfoForm(mode, rec, parent, editMode) {
     editTarget = mode === 'edit' ? rec : null;
     parentForNew = parent || null;
-    $('imTitle').textContent = mode === 'edit' ? '情報を編集' : (parent ? '続報を登録' : '情報を登録');
+    $('imTitle').textContent = mode === 'edit' ? (EDIT_TITLE[editMode || 'content']) : (parent ? '続報を登録' : '情報を登録');
     $('imSave').textContent = mode === 'edit' ? '保存する' : '登録する';
     // 続報の親パネル（元の情報を開閉表示）
     const pn = $('imParentNote');
@@ -818,10 +847,20 @@
     linkDraft = (mode === 'edit' ? (rec.links || []) : (parent ? parent.links.map(l => ({ ...l, origin: 'auto' })) : [])).map(l => ({ ...l }));
     renderLinks(); resetLinkMs();
     clearFieldErrors($('infoModal'));
+    // 能力に応じてセクションを出し分け。編集＝クリックした導線の mode／新規・続報＝内容+リンク（属性は curator のみ）。
+    applyEditMode(mode === 'edit' ? (editMode || 'content') : (canCurate() ? 'all' : 'content'));
     openModal('infoModal');
     setTimeout(resetLinkMs, 0);   // モーダル表示後の focus 等で開くケースも閉じる
   }
   $('newInfo').addEventListener('click', () => openInfoForm('new', null, null));
+
+  // デモ視点の権限トグル＝能力フラグ切替→一覧の⋯メニュー・詳細の編集導線を出し分け（実装＝backend can.*）。
+  $('demoCuratorToggle').addEventListener('change', (e) => {
+    demoCurator = e.target.checked;
+    refresh();
+    const d = document.getElementById('detailModal');
+    if (!d.hidden && currentDetailId) openDetail(currentDetailId);   // 詳細を開いていれば再描画
+  });
 
   $('imSave').addEventListener('click', () => {
     const title = $('imTitleInput').value.trim();
@@ -851,6 +890,7 @@
   // ---- SC-52 詳細 ----
   function openDetail(id) {
     const r = findInfo(id);
+    currentDetailId = id;   // 権限トグル切替時に再描画するため保持
     $('dmTitle').textContent = '情報の詳細';
     const parent = r.parent ? findInfo(r.parent) : null;
     const fus = followUps(id);
@@ -883,6 +923,11 @@
         <div class="dialog-label">内容・説明</div>
         <div class="rt-view">${r.body_html}</div>
         ${r.source_url ? `<div style="margin-top:6px"><a href="${r.source_url}" target="_blank" rel="noopener noreferrer">🔗 出典を開く</a> <span style="color:var(--color-text-muted);word-break:break-all">（${r.source_url}）</span></div>` : ''}
+        <div style="margin-top:8px;display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
+          ${canEditContent(r) ? `<button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="content">✏ 内容を編集</button>` : ''}
+          <button class="btn btn-outline" type="button" data-history="${r.id}">🕘 更新履歴</button>
+          ${canEditContent(r) ? '' : '<span class="hint" style="margin:0">内容の編集は<strong>作成者のみ</strong>（あなたは作成者ではありません）。</span>'}
+        </div>
       </div>
       <div class="field dialog-section">
         <div class="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
@@ -902,6 +947,9 @@
           ${attr('期限日', r.due)}
           ${r.reason ? attr('判定理由', r.reason) : ''}
         </dl>
+        <div style="margin-top:8px">
+          ${canCurate() ? `<button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="curate">🧭 属性を編集</button>` : '<span class="hint" style="margin:0">属性の付与・情報判定は<strong>情報判定権限（curator）</strong>の領分です。</span>'}
+        </div>
       </div>
       <div class="field dialog-section">
         <div class="dialog-label">この情報から（機会特定→行動）</div>
@@ -911,7 +959,8 @@
       <div class="field dialog-section">
         <div class="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
         ${linkHtml}
-        <div class="hint" style="margin-top:6px">種別を「反証」に変えると、対象の作成者＋評価者へ通知＋要再評価が発火します（根底を揺さぶる）。</div>
+        <div style="margin-top:8px"><button class="btn btn-outline" type="button" data-edit="${r.id}" data-mode="links">🔗 リンクを追加・種別変更・棄却</button></div>
+        <div class="hint" style="margin-top:6px">情報側のリンク編集は<strong>会社内の全員</strong>が可能。<strong>採否・統制は成果物側の管理者</strong>（クエスト/アイデア/コンセプト）に委ねます。種別を「反証」に変えると、対象の作成者＋評価者へ通知＋要再評価が発火します（根底を揺さぶる）。</div>
       </div>
       <div class="field dialog-section">
         <div class="dialog-label">🧵 続報スレッド</div>
@@ -921,21 +970,23 @@
     $('dmFooter').innerHTML = `
       <button class="btn btn-outline" type="button" data-close>閉じる</button>
       <button class="btn btn-outline" type="button" data-followup="${r.id}">続報を登録</button>
-      ${r.status === 'raw' ? '' : `<button class="btn btn-outline" type="button" data-archive="${r.id}">アーカイブ</button>`}
-      <button class="btn btn-primary" type="button" data-edit="${r.id}">属性を編集</button>
+      ${(r.status !== 'raw' && canCurate()) ? `<button class="btn btn-outline" type="button" data-archive="${r.id}">アーカイブ</button>` : ''}
+      ${canEditContent(r) ? `<button class="btn btn-primary" type="button" data-edit="${r.id}" data-mode="content">内容を編集</button>` : ''}
+      ${canCurate() ? `<button class="btn btn-primary" type="button" data-edit="${r.id}" data-mode="curate">属性を編集</button>` : ''}
     `;
     openModal('detailModal');
   }
 
   // ---- 行アクション・詳細内アクション（委譲） ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-archive],[data-delete],[data-newquest]');
+    const t = e.target.closest('[data-detail],[data-thread],[data-followup],[data-edit],[data-archive],[data-delete],[data-newquest],[data-history]');
     if (!t) return;
+    if (t.dataset.history != null) { e.preventDefault(); alert('更新履歴（デモ）＝この情報の内容（タイトル/本文/出典URL/参考資料）の版履歴を表示します。\n実装＝info_item_revisions（版・編集者・日時）。判定後も作成者が内容を編集できるため、判定時点の内容を追跡できます。'); return; }
     if (t.dataset.newquest != null) { e.preventDefault(); const r = findInfo(t.dataset.newquest); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openQuestFromInfo(r), d.hidden ? 0 : 210); return; }
     if (t.dataset.detail != null) { e.preventDefault(); const openDetailModal = document.getElementById('detailModal'); if (!openDetailModal.hidden) closeModal(openDetailModal); setTimeout(() => openDetail(t.dataset.detail), openDetailModal.hidden ? 0 : 210); }
     else if (t.dataset.thread != null) { e.preventDefault(); const root = rootOf(findInfo(t.dataset.thread)); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openDetail(root.id), d.hidden ? 0 : 210); }
     else if (t.dataset.followup != null) { const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('new', null, findInfo(t.dataset.followup)), d.hidden ? 0 : 210); }
-    else if (t.dataset.edit != null) { const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('edit', findInfo(t.dataset.edit), null), d.hidden ? 0 : 210); }
+    else if (t.dataset.edit != null) { const mode = t.dataset.mode || 'content'; const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); setTimeout(() => openInfoForm('edit', findInfo(t.dataset.edit), null, mode), d.hidden ? 0 : 210); }
     else if (t.dataset.archive != null) { const r = findInfo(t.dataset.archive); if (confirm('「' + r.title + '」をアーカイブしますか？（論理削除・監査保持）')) { r.status = 'archived'; refresh(); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); } }
     else if (t.dataset.delete != null) { const r = findInfo(t.dataset.delete); if (confirm('未判定の「' + r.title + '」を削除しますか？（登録者本人の raw のみ物理削除可）')) { INFO = INFO.filter(x => x.id !== r.id); refresh(); const d = document.getElementById('detailModal'); if (!d.hidden) closeModal(d); } }
   });
