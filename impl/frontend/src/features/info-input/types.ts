@@ -45,7 +45,7 @@ export interface InfoItem {
   follow_up_count?: number; // 続報件数（一覧の 🧵N 用・サーバー算出）
 }
 
-export type InfoStatusFilter = "all" | "raw" | "curated";
+export type InfoStatusFilter = "all" | "raw" | "curated" | "archived";
 
 // --- 一覧カード DTO（GET /info-items・サーバー委譲）＝backend InfoItemCardDTO と一致。 ---
 // 本文（body_html/links 明細）は含めない＝一覧は軽量カード（詳細は Phase B の GET /info-items/{id}）。
@@ -77,6 +77,7 @@ export interface InfoStatusFacets {
   all: number;
   raw: number;
   curated: number;
+  archived: number;
 }
 export interface InfoListResult {
   data: InfoCard[];

@@ -134,6 +134,26 @@ def update_info_item(
     return InfoDetailDTO(**result)
 
 
+@router.post("/info-items/{info_id}/archive", response_model=InfoDetailDTO)
+def archive_info_item(info_id: str, request: Request, session: dict = Depends(require_me)) -> InfoDetailDTO:
+    """アーカイブ（論理削除・N.2）＝curator のみ。物理削除なし（監査保持）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.archive_info_item(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
+    return InfoDetailDTO(**result)
+
+
+@router.post("/info-items/{info_id}/unarchive", response_model=InfoDetailDTO)
+def unarchive_info_item(info_id: str, request: Request, session: dict = Depends(require_me)) -> InfoDetailDTO:
+    """アーカイブ解除（N.2）＝curator のみ。curated（or raw）へ戻す。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = info_service.unarchive_info_item(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
+    return InfoDetailDTO(**result)
+
+
 # ---- 参考資料（info_attachments・N.2・§5.33＝内容群＝作成者のみ）----
 
 

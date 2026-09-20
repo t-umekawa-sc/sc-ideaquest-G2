@@ -12,7 +12,8 @@ import type { ReactNode } from "react";
 import { Avatar, DataTable, RowMenu, useConfirm } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 import {
-  archiveInfoItem, deleteInfoItem, fetchInfoItems, fetchWordCloud, INFO_CHANGED_EVENT, searchInfoItems,
+  archiveInfoItemApi, deleteInfoItem, fetchInfoItems, fetchWordCloud, INFO_CHANGED_EVENT, searchInfoItems,
+  unarchiveInfoItemApi,
 } from "../api";
 import {
   CATEGORY_LABEL, IMPACT_CLASS_LABEL, PRIORITY_LABEL, SOURCE_LABEL, STATUS_LABEL,
@@ -48,7 +49,7 @@ function snippetNodes(text: string, q: string, span = 140): ReactNode {
   );
 }
 
-const EMPTY_FACETS: InfoStatusFacets = { all: 0, raw: 0, curated: 0 };
+const EMPTY_FACETS: InfoStatusFacets = { all: 0, raw: 0, curated: 0, archived: 0 };
 
 export function InfoListView() {
   const router = useRouter();
@@ -118,12 +119,20 @@ export function InfoListView() {
             if (ok) { deleteInfoItem(r.id); setRefreshToken((n) => n + 1); }
           },
         });
+      } else if (r.status === "archived") {
+        list.push({
+          label: "アーカイブ解除",
+          onClick: async () => {
+            const ok = await confirm({ title: "アーカイブ解除", msg: `「${r.title}」をアーカイブ解除して一覧に戻しますか？（情報判定権限）` });
+            if (ok) { try { await unarchiveInfoItemApi(r.id); } catch { /* 403/失敗時は無視＝一覧は不変 */ } setRefreshToken((n) => n + 1); }
+          },
+        });
       } else {
         list.push({
           label: "アーカイブ",
           onClick: async () => {
-            const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（論理削除・監査保持）` });
-            if (ok) { archiveInfoItem(r.id); setRefreshToken((n) => n + 1); }
+            const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（論理削除・監査保持・情報判定権限）` });
+            if (ok) { try { await archiveInfoItemApi(r.id); } catch { /* 403/失敗時は無視 */ } setRefreshToken((n) => n + 1); }
           },
         });
       }
@@ -272,7 +281,7 @@ export function InfoListView() {
           </div>
 
           <div className="segmented idea-filter" role="radiogroup" aria-label="判定状態で絞り込み" style={{ marginBottom: "var(--space-3)" }}>
-            {([["all", "すべて", facets.all], ["raw", "未判定", facets.raw], ["curated", "判定済", facets.curated]] as const).map(([k, label, n]) => (
+            {([["all", "すべて", facets.all], ["raw", "未判定", facets.raw], ["curated", "判定済", facets.curated], ["archived", "アーカイブ", facets.archived]] as const).map(([k, label, n]) => (
               <label key={k}>
                 <input type="radio" name="info-status" checked={status === k} onChange={() => { setStatus(k); setRefreshToken((n) => n + 1); }} />
                 {label} <span className="idea-filter__n">{n}</span>

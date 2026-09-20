@@ -60,11 +60,12 @@ class InfoOffsetPageInfo(BaseModel):
 
 
 class InfoStatusFacets(BaseModel):
-    """状態タブの件数バッジ（SC-50・archived 除外・status 以外の現行フィルタ反映）。"""
+    """状態タブの件数バッジ（SC-50・status 以外の現行フィルタ反映）。all=raw+curated（非archived）／archived は別枠。"""
 
     all: int
     raw: int
     curated: int
+    archived: int = 0
 
 
 class InfoListResponse(BaseModel):

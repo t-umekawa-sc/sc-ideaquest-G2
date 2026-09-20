@@ -103,7 +103,7 @@ def test_n_tc_107_status_facets(client, info_env):
     r = client.get(INFO)
     assert r.status_code == 200, r.text
     facets = r.json()["facets"]
-    assert {"all", "raw", "curated"} == set(facets.keys())
+    assert {"all", "raw", "curated"} <= set(facets.keys())
     assert facets["all"] == facets["raw"] + facets["curated"]
     # seed（info_env）は raw(3: fu1,fu2,b と d?) 実際の内訳に依らず archived は含めない → all>=4。
     assert facets["all"] >= 1 and facets["raw"] >= 1 and facets["curated"] >= 1
@@ -426,3 +426,49 @@ def test_n_tc_130_add_attachment_validation(client, info_env):
     # 部分保存しない＝詳細に混入していない。
     d = client.get(f"{INFO}/{info_env.ids.a}").json()
     assert all(a["original_name"] != "evil.exe" for a in d["attachments"])
+
+
+def test_n_tc_131_archive(client, info_env):
+    """N-TC-131: アーカイブ（curator・論理削除）＝status=archived・既定一覧から消える・非curator は 403。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # 非 curator は 403。
+    r403 = client.post(f"{INFO}/{info_env.ids.a}/archive", headers=_csrf(client))
+    assert r403.status_code == 403, r403.text
+    _grant_curator(info_env.db_identifier, info_env.user_id)
+    try:
+        r = client.post(f"{INFO}/{info_env.ids.a}/archive", headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "archived"
+        # 既定一覧（archived 除外）から消える。
+        ids = {c["id"] for c in client.get(INFO).json()["data"]}
+        assert str(info_env.ids.a) not in ids
+    finally:
+        _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
+def test_n_tc_132_unarchive(client, info_env):
+    """N-TC-132: アーカイブ解除（curator）＝属性があれば curated へ戻る。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    _grant_curator(info_env.db_identifier, info_env.user_id)
+    try:
+        client.post(f"{INFO}/{info_env.ids.a}/archive", headers=_csrf(client))
+        r = client.post(f"{INFO}/{info_env.ids.a}/unarchive", headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "curated"  # ids.a は priority/impact_class/categories あり＝curated へ
+        ids = {c["id"] for c in client.get(INFO).json()["data"]}
+        assert str(info_env.ids.a) in ids  # 既定一覧に復帰
+    finally:
+        _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
+def test_n_tc_133_archived_facet_and_tab(client, info_env):
+    """N-TC-133: facets に archived 件数／status=archived で archived 行のみ返る。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    body = client.get(INFO).json()
+    facets = body["facets"]
+    assert "archived" in facets and facets["archived"] >= 1  # seed の ids.c が archived
+    assert facets["all"] == facets["raw"] + facets["curated"]  # all は非archived
+    # archived タブ＝archived のみ。
+    arch = client.get(INFO, params={"status": "archived"}).json()["data"]
+    assert arch and all(c["status"] == "archived" for c in arch)
+    assert str(info_env.ids.c) in {c["id"] for c in arch}

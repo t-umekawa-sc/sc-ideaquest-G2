@@ -102,19 +102,19 @@ def status_counts(
 ) -> dict[str, int]:
     """状態タブの件数バッジ（facet・SC-50）＝archived 除外・status 以外の現行フィルタを反映。
 
-    返り値＝`{all, raw, curated}`（all=raw+curated＝非archived の総数）。status フィルタは含めない
-    （タブを切り替えたときの各件数を表すため）。
+    返り値＝`{all, raw, curated, archived}`（all=raw+curated＝非archived の総数／archived は別枠＝
+    アーカイブ タブ用）。status フィルタは含めない（タブを切り替えたときの各件数を表すため）。
     """
     conds = _non_status_conds(q=q, priorities=priorities, sources=sources,
                               impact_classes=impact_classes, roots_only=roots_only)
     rows = session.execute(
-        select(InfoItem.status, func.count()).where(InfoItem.status != "archived", *conds)
-        .group_by(InfoItem.status)
+        select(InfoItem.status, func.count()).where(*conds).group_by(InfoItem.status)
     ).all()
-    by_status = {st: c for st, c in rows}
-    raw = int(by_status.get("raw", 0))
-    curated = int(by_status.get("curated", 0))
-    return {"all": raw + curated, "raw": raw, "curated": curated}
+    by_status = {st: int(c) for st, c in rows}
+    raw = by_status.get("raw", 0)
+    curated = by_status.get("curated", 0)
+    archived = by_status.get("archived", 0)
+    return {"all": raw + curated, "raw": raw, "curated": curated, "archived": archived}
 
 
 def link_counts_for_items(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:

@@ -33,7 +33,7 @@ _MAX_TITLE = 255
 _EMPTY_PAGE = {
     "data": [],
     "page_info": {"total": 0, "page": 1, "per_page": lq.DEFAULT_PER_PAGE},
-    "facets": {"all": 0, "raw": 0, "curated": 0},
+    "facets": {"all": 0, "raw": 0, "curated": 0, "archived": 0},
 }
 
 
@@ -464,6 +464,56 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
 
         item.updated_at = datetime.now(timezone.utc)
         ts.commit()
+    return get_info_detail(account_id, company_id, info_id)
+
+
+def archive_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) -> dict:
+    """アーカイブ（論理削除・N.2）＝curator のみ。`status=archived`＋`archived_at`。物理削除しない（監査保持）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        if not repo.is_curator(ts, user.id):
+            raise AppError(403, "forbidden", detail="アーカイブは情報判定権限（info_curator）が必要です")
+        if item.status != "archived":  # 冪等（既にアーカイブ済なら no-op）
+            item.status = "archived"
+            item.archived_at = datetime.now(timezone.utc)
+            item.updated_at = item.archived_at
+            ts.commit()
+    return get_info_detail(account_id, company_id, info_id)
+
+
+def unarchive_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) -> dict:
+    """アーカイブ解除（N.2）＝curator のみ。`status` を curated（キュレーション属性があれば）or raw へ戻し `archived_at`=NULL。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")
+        if not repo.is_curator(ts, user.id):
+            raise AppError(403, "forbidden", detail="アーカイブ解除は情報判定権限（info_curator）が必要です")
+        if item.status == "archived":
+            has_cat = bool(repo.categories_for_items(ts, [item.id]).get(item.id))
+            curated = has_cat or any((item.priority, item.source, item.classification, item.scope,
+                                      item.target_business, item.impact_level, item.impact_class,
+                                      item.impact_timing, item.triage, item.triaged_on))
+            item.status = "curated" if curated else "raw"
+            item.archived_at = None
+            item.updated_at = datetime.now(timezone.utc)
+            ts.commit()
     return get_info_detail(account_id, company_id, info_id)
 
 

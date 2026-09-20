@@ -65,6 +65,9 @@
 | N-TC-128 | api | 参考資料は作成者のみ（越権 403） | 非作成者でログイン | `POST /info-items/{id}/attachments` | 403 `forbidden`（内容群＝作成者のみ・curator も不可） | N.0／§5.33 |
 | N-TC-129 | api | 参考資料の削除（作成者・204） | 作成者＋添付1件 | `DELETE /info-items/{id}/attachments/{aid}` | 204・詳細の `attachments[]` から消える／他情報の aid は 404 | N.2／§5.33 |
 | N-TC-130 | api | 参考資料の検証（拡張子外/シグネチャ不一致は 422） | 作成者＋不正ファイル | `POST /info-items/{id}/attachments`（`.exe` 等） | 422 `validation_error`（`errors[].field="files"`）・部分保存しない | §1.10／§5.12 |
+| N-TC-131 | api | アーカイブ（curator・論理削除） | curator 付与＋curated 情報 | `POST /info-items/{id}/archive` | `status=archived`・既定一覧（archived 除外）から消える・非 curator は 403 | N.2／§5.33 |
+| N-TC-132 | api | アーカイブ解除（curator・curated/raw へ復帰） | curator＋archived 情報 | `POST /info-items/{id}/unarchive` | 属性があれば `curated`・無ければ `raw` に戻る・`status=archived` タブから消える | N.2 |
+| N-TC-133 | api | 状態 facet に archived 件数／archived タブ取得 | archived を含む seed | `GET /info-items`（facets）／`?status=archived` | `facets.archived` を返す（all=raw+curated＝非archived）・`status=archived` で archived 行のみ返る | N.1／§5.33 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

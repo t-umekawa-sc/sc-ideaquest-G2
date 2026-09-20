@@ -6,9 +6,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useConfirm } from "@/components/ui";
 import {
-  addAttachmentsApi, addLinkApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail, fetchLinkCandidates,
-  rejectLinkApi, unrejectLinkApi, updateInfoItemApi,
+  addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
+  fetchLinkCandidates, rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
 } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
@@ -47,6 +48,7 @@ function AttrSelect({ label, k, map, attrs, onSet }: {
 
 export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: () => void }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
   // 内容インライン編集（作成者・can.edit_content）。属性=curator インラインは後続（5.2b）。
@@ -150,6 +152,22 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setAttBusy(true);
     try { await deleteAttachmentApi(item.id, id); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
     setAttBusy(false);
+  };
+
+  // アーカイブ／解除（curator・N.2）＝確認→即時コミット。アーカイブは一覧から消えるので閉じて一覧へ戻す。
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const doArchive = async () => {
+    if (!item) return;
+    const ok = await confirm({ title: "アーカイブ", msg: `「${item.title}」をアーカイブしますか？（論理削除・監査保持）` });
+    if (!ok) return;
+    setArchiveBusy(true);
+    try { await archiveInfoItemApi(item.id); onClose(); } catch { setArchiveBusy(false); }
+  };
+  const doUnarchive = async () => {
+    if (!item) return;
+    setArchiveBusy(true);
+    try { await unarchiveInfoItemApi(item.id); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
+    setArchiveBusy(false);
   };
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
@@ -318,6 +336,24 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
         </div>
 
+        {/* アーカイブ／解除＝curator のみ（論理削除・監査保持・N.2）。フッターは閉じる/保存に絞るため本文に置く（SC-50 §8）。 */}
+        {r.can.curate ? (
+          <div className="field dialog-section">
+            <div className="dialog-label">アーカイブ（情報判定権限）</div>
+            {r.status === "archived" ? (
+              <>
+                <button className="btn btn-outline" type="button" onClick={doUnarchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "↩ アーカイブを解除する"}</button>
+                <div className="hint" style={{ marginTop: 6 }}>解除すると一覧（既定表示）に戻ります（属性があれば判定済み、無ければ未判定へ）。</div>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-outline btn-danger" type="button" onClick={doArchive} disabled={archiveBusy || saving}>{archiveBusy ? "処理中…" : "🗄 アーカイブする"}</button>
+                <div className="hint" style={{ marginTop: 6 }}>論理削除です（監査のため保持・物理削除はしません）。既定の一覧から外れ、「アーカイブ」タブから解除できます。</div>
+              </>
+            )}
+          </div>
+        ) : null}
+
         <div className="field dialog-section">
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
           {!linkEditing ? (
@@ -412,10 +448,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       </div>
 
       <div className="modal__footer">
-        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving}>閉じる</button>
-        {/* 内容=作成者／属性=curator のインライン編集（実 API・PATCH）。dirty のセクションだけ送る。 */}
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving || archiveBusy}>閉じる</button>
+        {/* フッターは「閉じる／保存する」に絞る（SC-50 §8・ボタン過多の解消）。アーカイブ/解除は本文の curator ブロックへ。 */}
         {(r.can.edit_content || r.can.curate) ? (
-          <button className="btn btn-primary" type="button" onClick={save} disabled={(!contentDirty && !curationDirty) || saving}>{saving ? "保存中…" : "保存する"}</button>
+          <button className="btn btn-primary" type="button" onClick={save} disabled={(!contentDirty && !curationDirty) || saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>
         ) : null}
       </div>
     </>
