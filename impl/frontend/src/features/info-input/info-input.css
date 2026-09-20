@@ -5,9 +5,10 @@
 .info-page .admin-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
 
 /* タブ（情報インプット＝一覧／全文検索）＝クエスト詳細 SC-12 と同じ体裁（.info-page スコープで独立定義）。
-   sticky top は sticky の戻るピル（backlink--float＝header-h+space-2）の下に来るよう +46px オフセット（重なり回避・クエストと同値）。 */
-.info-page .tabs { position: sticky; top: calc(var(--header-h) + 46px); z-index: 5; background: var(--color-bg); padding-top: var(--space-3);
-  box-shadow: 0 6px 8px -8px rgba(15,23,42,.25); display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border);
+   タブは sticky にしない（フローティングは一覧ヘッダー＝thead に一本化・デザイン標準 §4.5⑨-b）。
+   quests.css のグローバル `.tabs { position: sticky }` を上書きするため position:static/影/padding を明示リセット。 */
+.info-page .tabs { position: static; z-index: auto; box-shadow: none; padding-top: 0; background: transparent;
+  display: flex; gap: var(--space-1); border-bottom: 2px solid var(--color-border);
   margin: var(--space-4) 0 var(--space-5); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .info-page .tab { appearance: none; background: none; border: none; font: inherit; font-weight: 500; color: var(--color-text-muted);
   padding: var(--space-3) var(--space-4); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px;

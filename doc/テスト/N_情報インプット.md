@@ -1,0 +1,47 @@
+# テストパターン N. 情報インプット（外部情報の知識レイヤ・SC-50）
+
+> 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../API設計/N_情報インプット.md`](../API設計/N_情報インプット.md)（N.1〜N.9）・[`../データモデル.md`](../データモデル.md) §5.33〜§5.37・§3（`info_*` enum）・[`../画面設計/screens/SC-50_情報インプット.md`](../画面設計/screens/SC-50_情報インプット.md)。エラー code の網羅は OpenAPI が SoT（API設計 README §1.7）。
+> 対象＝ドメイン N（情報インプット）の縦スライス。repository（永続化・一覧クエリ）＋ application/router（API）を TC-ID（`N-TC-<連番>`）で結ぶ。
+> **本 md は先行（テスト規約 §5.2）**＝Phase A（一覧サーバー委譲＋ワードクラウド）を先に記載し、実装済みテストと TC-ID を一致させる（`scripts/check_tc_traceability.py` で双方向照合）。Phase B（詳細）・C（登録/編集/続報）・D（仕上げ）は実装スライスごとに TC 行を追記する。
+> 前提フィクスチャ＝seed 会社 ACME-01（会社DB あり）／一般ユーザー `user@acme.example`。repository テストは前提（ユーザー/情報/トークン）を ORM で直接 seed し teardown で物理削除。API テストは seed 一般ユーザーでログインし会社DB に直接 seed。
+> 認可メモ＝情報プールは**会社内 active ユーザーなら閲覧可**（クエスト門番ではない・N.0）。一覧/ワードクラウドは読み取り＝`require_me` のみ。
+
+## 1. repository（一覧クエリ・ワードクラウド集計・N.1/N.6・§5.33-5.36）
+
+> 対象＝`app/tenant/info/repository.py`。既定の可視範囲（archived 除外）・status/分類フィルタ・全文検索（PGroonga `&@~`）・keyset カーソル・派生集計（`link_count`/`follow_up_count`）・ソートのホワイトリスト・ワードクラウド集計を検証。呼び出し側 Tx 相乗（自身では commit しない）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-001 | int | 一覧の既定＝archived 除外・新着降順 | raw/curated/archived を各1件＋created_at 差 | `list_info_items`（フィルタ無し） | archived を除外し raw/curated のみ・`created_at DESC` | N.1／§5.33 |
+| N-TC-002 | int | status フィルタ（多値 OR・archived 明示は含む） | raw/curated/archived を seed | `list_info_items(status=["curated"])`／`["archived"]` | 指定 status のみ返す（archived 明示時のみ archived を含む） | N.1／§1.8.1② |
+| N-TC-003 | int | 分類フィルタ（impact_class 多値 OR） | impact_class=opportunity/threat/None を seed | `list_info_items(impact_class=["threat"])` | threat のみ返す | N.1／§1.8.1② |
+| N-TC-004 | int | 全文検索 `q`（title＋body_text・PGroonga `&@~`） | 本文にキーワードを含む/含まない情報 | `list_info_items(q="半導体")` | 該当語を含む行のみ（バインド変数・§2.2③） | N.1／§1.11 |
+| N-TC-005 | int | 番号ページャ（offset/limit・`-created_at,id`） | 情報 raw/curated 5件（created_at 差） | `build_info_list_query` に offset/limit を適用 | 重複なく `created_at DESC` で続きを返す（DataTable サーバー委譲＝番号ページャ・§1.8.1） | N.1／§1.8.1 |
+| N-TC-006 | int | 派生集計（`link_count`＝未棄却のみ・`follow_up_count`） | 情報に未棄却/棄却リンク＋続報2件 | `list_info_items` | `link_count`=未棄却リンク数・`follow_up_count`=続報数 | N.1／§5.35／§12-1 |
+| N-TC-007 | int | ソートのホワイトリスト（`priority`／未知キー） | priority 差の情報 | `list_info_items(sort=[("priority",False)])`／未知キー | priority 昇順で返す／未知キーは呼び出し側で 422（下記 api） | N.1／§1.8.1① |
+| N-TC-008 | int | ワードクラウド集計（token GROUP BY・count 降順・limit） | info_tokens に token/count を seed | `word_cloud(limit=3)` | count 降順の上位3 token を `{token,count,weight}` で返す | N.6／§5.36 |
+| N-TC-009 | int | 続報を束ねる（roots_only＝根のみ） | 根＋続報を seed | `build_info_list_query(roots_only=True)` | `parent_info_id IS NULL` の根のみ返す（続報は除外） | N.1／§12-1 |
+
+## 2. 一覧・ワードクラウド API（SC-50・N.1）
+
+> 対象＝`GET /info-items`・`GET /info-items/word-cloud`（`app/tenant/info/router.py`・`application.py`）。DTO 形状・全文検索・入力検証・認可・テナント分離を検証。DataTable 契約＝§1.8.1（sort ホワイトリスト・カーソル）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-101 | api | 一覧が card DTO 形状で返る | seed 会社に情報を seed | `GET /info-items` | `data[]` に id/title/summary/status/priority/impact_class/categories/source/source_url/due_date/created_by/created_at/link_count/parent_info_id/follow_up_count・`page_info` 正 | N.1／SC-50 |
+| N-TC-102 | api | status enum の入力検証 | ログイン済 | `GET /info-items?status=bogus` | 422 `validation_error`・`errors[].field="status"` | N.1／§1.7 |
+| N-TC-103 | api | 未知ソートキーは 422 | ログイン済 | `GET /info-items?sort=bogus` | 422 `validation_error`・`errors[].field="sort"` | §1.8.1（ホワイトリスト） |
+| N-TC-104 | api | 未認証遮断 | セッション無し | `GET /info-items` | 401 `unauthenticated` | require_me（N.0） |
+| N-TC-105 | api | 全文検索タブ（`q`）でヒット行のみ | 本文に語を含む/含まない情報 | `GET /info-items?q=<語>` | 該当語を含む情報のみ返る | N.1／§1.11 |
+| N-TC-106 | api | ワードクラウドが tokens[] を返す | info_tokens を seed | `GET /info-items/word-cloud` | `tokens[]`＝`{token,count,weight}`（count 降順） | N.6／SC-50 |
+| N-TC-107 | api | 状態 facet 件数（すべて/未判定/判定済） | raw/curated/archived を seed | `GET /info-items` | `facets.status`＝`{all,raw,curated}`（archived 除外・現行フィルタ反映・タブ件数バッジ用） | N.1／SC-50 |
+
+## 3. frontend（一覧の結線・サーバー委譲・SC-50）
+
+> 対象＝`features/info-input/api.ts`（クエリ組立）・`components/InfoListView.tsx`（DataTable server モード）。frontend の unit＝`*.test.ts`（vitest）／e2e＝`e2e/*.spec.ts`（Playwright・seed 会社 ACME-01）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-201 | unit | クエリ組立（roots_only/status/sort ホワイトリスト） | QueryState＋extra | `infoListParams(state,{status,rootsOnly})` | `roots_only=true`・`status`・ホワイトリスト sort/enum のみをクエリに載せる | §1.8.1／N.1 |
+| N-TC-202 | e2e | 「続報を束ねる」で再クエリ（回帰） | seed（続報 i2 あり） | `/info-items` で 続報束ねをチェック | 状態タブ件数が減る（続報が除外・DataTable server 再クエリが発火）＝DFT 再発防止 | N.1／§12-1 |
+| N-TC-203 | e2e | 一覧ヘッダーのフローティング（列見出し固定） | 低い viewport で `/info-items` | ページを下方向へスクロール | 列見出し行（thead）が画面上部（≈--header-h）に貼り付く＝デザイン標準 §4.5⑨-b | デザイン標準 §4.5⑨-b |

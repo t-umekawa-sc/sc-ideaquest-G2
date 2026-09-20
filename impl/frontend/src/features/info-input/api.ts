@@ -1,10 +1,60 @@
 // 情報インプットのデータ源 seam（フロント実装フロー規約 §4）。
 // 現状＝インメモリ（fixtures 由来）でクリッカブル・プロトタイプを成立させる。跨ルート更新は INFO_CHANGED_EVENT を購読。
 // backend `tenant/info`（API ドメイン N）実装後、本ファイルの実装だけを実 API 呼び出しへ差し替える（呼び出し側は不変）。
+import { apiFetch } from "@/lib/api/client";
+import type { QueryState } from "@/components/ui";
 import { INFO_FIXTURES } from "./fixtures";
-import type { InfoItem, InfoLink } from "./types";
+import type { InfoCard, InfoItem, InfoLink, InfoListResult, InfoStatusFilter, WordCloudToken } from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
+
+// --- 一覧＝サーバー委譲（GET /info-items・DataTable §1.8.1・番号ページャ）。 ---
+// ソート可能キー＝backend ホワイトリスト（created_at〔既定 -created_at〕/title/status/priority/due_date/link_count）に一致。
+const INFO_SORTABLE = new Set(["created_at", "title", "status", "priority", "due_date", "link_count"]);
+// 列フィルタ（enum）＝backend が受けるキーのみ（status はタブが担うので列フィルタからは除外）。
+const INFO_ENUM_FILTERS = new Set(["priority", "source", "impact_class"]);
+
+export interface InfoListExtra {
+  status?: InfoStatusFilter; // 状態タブ（all/raw/curated）＝server の status フィルタ
+  rootsOnly?: boolean; // 続報を束ねる＝roots_only
+}
+
+export function infoListParams(state: QueryState, extra: InfoListExtra = {}): URLSearchParams {
+  const qs = new URLSearchParams();
+  const q = state.search.trim();
+  if (q) qs.set("q", q); // 横断検索＝全文（title＋body_text・PGroonga）
+  const sort = state.sort
+    .filter((s) => INFO_SORTABLE.has(s.key))
+    .map((s) => (s.dir === "desc" ? `-${s.key}` : s.key));
+  if (sort.length) qs.set("sort", sort.join(","));
+  for (const key of Object.keys(state.filters)) {
+    const c = state.filters[key];
+    if (c.type === "enum" && INFO_ENUM_FILTERS.has(key) && c.values.length) qs.set(key, c.values.join(","));
+  }
+  if (extra.status && extra.status !== "all") qs.set("status", extra.status);
+  if (extra.rootsOnly) qs.set("roots_only", "true");
+  qs.set("page", String(state.page));
+  qs.set("per_page", String(state.perPage));
+  return qs;
+}
+
+export function fetchInfoItems(
+  state: QueryState, extra: InfoListExtra = {}, signal?: AbortSignal,
+): Promise<InfoListResult | null> {
+  return apiFetch<InfoListResult>(`/info-items?${infoListParams(state, extra).toString()}`, { signal });
+}
+
+// 全文検索タブ（🔍）＝server q（title＋body_text）。上位 50 件を取得（表示は title＋要約スニペット）。
+export async function searchInfoItems(q: string, signal?: AbortSignal): Promise<InfoCard[]> {
+  const qs = new URLSearchParams({ q, per_page: "50", page: "1", sort: "-created_at" });
+  const res = await apiFetch<InfoListResult>(`/info-items?${qs.toString()}`, { signal });
+  return res?.data ?? [];
+}
+
+export async function fetchWordCloud(limit = 40, signal?: AbortSignal): Promise<WordCloudToken[]> {
+  const res = await apiFetch<{ tokens: WordCloudToken[] }>(`/info-items/word-cloud?limit=${limit}`, { signal });
+  return res?.tokens ?? [];
+}
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 let store: InfoItem[] = INFO_FIXTURES.map((x) => clone(x));

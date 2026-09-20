@@ -46,3 +46,45 @@ export interface InfoItem {
 }
 
 export type InfoStatusFilter = "all" | "raw" | "curated";
+
+// --- 一覧カード DTO（GET /info-items・サーバー委譲）＝backend InfoItemCardDTO と一致。 ---
+// 本文（body_html/links 明細）は含めない＝一覧は軽量カード（詳細は Phase B の GET /info-items/{id}）。
+export interface InfoCreator {
+  user_id: string;
+  display_name: string;
+  avatar_image_url?: string | null;
+}
+export interface InfoCard {
+  id: string;
+  parent_info_id?: string | null;
+  title: string;
+  summary?: string | null;
+  status: InfoStatus;
+  priority?: string | null;
+  source?: string | null;
+  classification?: string | null;
+  scope?: string | null;
+  impact_class?: string | null;
+  categories: string[];
+  source_url?: string | null;
+  due_date?: string | null;
+  created_by: InfoCreator;
+  created_at: string;
+  link_count: number;
+  follow_up_count: number;
+}
+export interface InfoStatusFacets {
+  all: number;
+  raw: number;
+  curated: number;
+}
+export interface InfoListResult {
+  data: InfoCard[];
+  page_info: { total: number; page: number; per_page: number };
+  facets: InfoStatusFacets;
+}
+export interface WordCloudToken {
+  token: string;
+  count: number;
+  weight?: number | null;
+}

@@ -1685,6 +1685,15 @@ a.quest-card:active { transform: translateY(1px); }
    長い時はページ側がスクロールする）。max-height を課さないので内側の縦スクロールは出ない。 --- */
 .table-wrap.dt-scroll { overflow-x: auto; overflow-y: visible; }
 .dt-scroll .table thead th.col-actions { z-index: 4; }
+/* 一覧ヘッダー（列見出し行）のフローティング標準（デザイン標準 §4.5/§4.10）。
+   横スクロール（.dt-scroll の overflow-x:auto）と操作列の sticky を保ったまま、ページ縦スクロール中は
+   列見出しを画面上部（app-header 直下＝--dt-head-top 既定 --header-h）へ JS で translateY 固定する
+   （DataTable の floatHead 効果）。sticky/overflow の CSS 制約を回避しつつ、自テーブル内で完結＝最終行で
+   自然に解除・複数一覧でも重ならない。文脈バナー等がある画面は --dt-head-top を上書き（別途考慮ケース）。 */
+.dt-scroll thead { position: relative; z-index: 3; will-change: transform; }
+/* フローティング中は戻るピル(§4.10・z:9)の「下」に固定する（JS が --dt-head-top にピル高を加算）ため
+   重ならない。z-index はピルより下（8）＝万一の接触時もピルを前面に保つ（app-header z:10 の下）。 */
+.dt-scroll thead.dt-head--floating { z-index: 8; box-shadow: 0 6px 10px -8px rgba(15, 23, 42, .35); }
 
 /* --- 列幅手動調整（table-layout:fixed＋見出し右端ハンドル） --- */
 .table.dt-fixed { table-layout: fixed; }

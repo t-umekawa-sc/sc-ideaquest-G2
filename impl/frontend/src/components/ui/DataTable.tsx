@@ -331,6 +331,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const colBtnRef = useRef<HTMLButtonElement>(null);
   const colMenuRef = useRef<HTMLDivElement>(null);
 
@@ -493,6 +494,47 @@ export function DataTable<T>(props: DataTableProps<T>) {
       top += tr.offsetHeight;
     });
   }, [pageRows, pinned, density, view, order, hidden, widths]);
+
+  // 一覧ヘッダー（列見出し行）のフローティング（デザイン標準 §4.5/§4.10）。
+  // 横スクロール（.dt-scroll overflow-x）と操作列 sticky を保つため CSS sticky ではなく JS で thead を
+  // translateY 固定＝ページ縦スクロール中は列見出しを画面上部（--dt-head-top 既定 --header-h）へ。
+  // 自テーブル内で clamp＝最終行を過ぎると自然に解除・複数一覧でも次表に被らない。
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const thead = theadRef.current;
+    if (!wrap || !thead) return;
+    const stickyTop = () => {
+      const cs = getComputedStyle(document.documentElement);
+      const raw = cs.getPropertyValue("--dt-head-top").trim() || cs.getPropertyValue("--header-h").trim();
+      let top = parseFloat(raw) || 0;
+      // ページ上部にフローティングする「戻る」ピル（.backlink--float・§4.10）がある場合は、その高さぶん
+      // 見出しを下げてピルの下へ固定する（重ならない＝ユーザー要望 2026-09-20）。ピルが無いページは加算なし。
+      const pill = document.querySelector(".backlink--float") as HTMLElement | null;
+      if (pill) top += pill.offsetHeight + 16; // ピル高＋上下余白（space-2*2 相当）
+      return top;
+    };
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = wrap.getBoundingClientRect();
+      const theadH = thead.offsetHeight;
+      const max = Math.max(0, rect.height - theadH);           // 最終行を越えない＝自然解除
+      const offset = Math.min(Math.max(stickyTop() - rect.top, 0), max);
+      thead.style.transform = offset > 0 ? `translateY(${offset}px)` : "";
+      thead.classList.toggle("dt-head--floating", offset > 0);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      thead.style.transform = "";
+      thead.classList.remove("dt-head--floating");
+    };
+  }, [pageRows, pinned, view, density, order, hidden, widths]);
 
   // ピン演出は一度だけ＝アニメーション時間後にクラスを外す（連続トグルでも最新のみ演出）。
   useEffect(() => {
@@ -934,7 +976,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
       )}
 
       {!useCard && !isEmpty && !showLoading && (
-        <div className="table-wrap dt-scroll">
+        <div className="table-wrap dt-scroll" ref={wrapRef}>
           <table
             className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
             style={{ minWidth: `${minWidthPx}px` }}
