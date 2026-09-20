@@ -213,6 +213,9 @@ class QuestCreateRequest(BaseModel):
     status: Literal["draft", "recruiting"] = "draft"
     # 発見カタログ（SC-13）に載せて他部署から発見/フォロー/参加リクエストを許可するか（FR-40・C.9.0）。既定 false。
     discoverable: bool = False
+    # 「この情報からクエストを作成」（SC-50・API N/C）＝指定時、作成したクエストへ info_link（関連・manual）を
+    # 自動生成し「情報→機会特定→行動」の逆リンクを張る（§FR-41）。不在/他テナントは 422。
+    from_info_id: str | None = None
 
 
 class QuestUpdateRequest(BaseModel):

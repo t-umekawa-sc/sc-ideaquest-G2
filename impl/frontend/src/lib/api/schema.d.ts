@@ -2261,6 +2261,280 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/info-items/word-cloud": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Word Cloud
+         * @description ワードクラウド＝保存済みトークンの頻度集計（SC-50・N.6）。読取専用。
+         *
+         *     `/info-items/{id}`（Phase B）より前に定義＝静的パスを動的パスに優先させる。
+         */
+        get: operations["get_word_cloud_api_v1_info_items_word_cloud_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Info Items
+         * @description 情報一覧（SC-50・N.1）＝DataTable サーバー委譲（番号ページャ・§1.8.1）。会社内 active ユーザーは閲覧可。読取専用。
+         */
+        get: operations["list_info_items_api_v1_info_items_get"];
+        put?: never;
+        /**
+         * Create Info Item
+         * @description 低摩擦登録／続報登録（SC-51・N.2）＝全ユーザー。保存時にサニタイズ→body_text→要約→トークン再生成。
+         */
+        post: operations["create_info_item_api_v1_info_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Info Item Detail
+         * @description 情報詳細（SC-52・N.1）＝全属性＋関連リンク＋続報スレッド＋ミニ・ワードクラウド＋`can`。読取専用。
+         *
+         *     静的パス `/info-items/word-cloud` より後に定義（動的パスに優先させる）。不在/他テナントは 404。
+         */
+        get: operations["get_info_item_detail_api_v1_info_items__info_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Info Item
+         * @description 情報の部分更新（SC-52/SC-51・N.2）＝内容は作成者／キュレーションは curator（越権 403）。内容変更は履歴に記録。
+         */
+        patch: operations["update_info_item_api_v1_info_items__info_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/info-items/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rehost Info Image
+         * @description 貼付画像の再ホスト（SC-51・N.2・§12-4）＝multipart・全ユーザー。自社ホスト署名URL を返す。
+         *
+         *     静的パス（`/info-items/images`）＝動的 `/info-items/{info_id}` より前に定義（優先ルーティング）。
+         */
+        post: operations["rehost_info_image_api_v1_info_items_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Info Item
+         * @description アーカイブ（論理削除・N.2）＝curator のみ。物理削除なし（監査保持）。
+         */
+        post: operations["archive_info_item_api_v1_info_items__info_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Info Item
+         * @description アーカイブ解除（N.2）＝curator のみ。curated（or raw）へ戻す。
+         */
+        post: operations["unarchive_info_item_api_v1_info_items__info_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Info Attachments
+         * @description 参考資料を追加（SC-51/SC-52・N.2・multipart）＝作成者のみ。検証はサーバー強制（§1.10・拡張子/サイズ/マジックバイト）。
+         */
+        post: operations["add_info_attachments_api_v1_info_items__info_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Info Attachment
+         * @description 参考資料を削除（N.2）＝作成者のみ。DB 行＋MinIO オブジェクト削除。
+         */
+        delete: operations["remove_info_attachment_api_v1_info_items__info_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-link-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Link Candidates
+         * @description リンク候補（成果物をタイトル検索して target_id 解決・SC-52・N.3）。会社内 active ユーザー。読取専用。
+         */
+        get: operations["link_candidates_api_v1_info_link_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Info Link
+         * @description 手動リンク追加（SC-52・N.3）＝会社内 active 全員・origin=manual。同一 (info,target) は 409。
+         */
+        post: operations["add_info_link_api_v1_info_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change Info Link Kind
+         * @description 種別変更（関連↔裏付け↔反証・N.3）。全員。
+         */
+        patch: operations["change_info_link_kind_api_v1_info_links__link_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/info-links/{link_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Info Link
+         * @description 棄却（rejected_at セット・行は残す・N.3/§N.6）。全員。
+         */
+        post: operations["reject_info_link_api_v1_info_links__link_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/info-links/{link_id}/unreject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unreject Info Link
+         * @description 棄却の取消（rejected_at を NULL）。全員。
+         */
+        post: operations["unreject_info_link_api_v1_info_links__link_id__unreject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -2557,6 +2831,11 @@ export interface components {
             /** Files */
             files: string[];
         };
+        /** Body_add_info_attachments_api_v1_info_items__info_id__attachments_post */
+        Body_add_info_attachments_api_v1_info_items__info_id__attachments_post: {
+            /** Files */
+            files: string[];
+        };
         /** Body_edit_message_api_v1_chat_messages__message_id__patch */
         Body_edit_message_api_v1_chat_messages__message_id__patch: {
             /** Body */
@@ -2610,6 +2889,11 @@ export interface components {
         };
         /** Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put */
         Body_put_quest_icon_api_v1_quests__quest_id__icon_image_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_rehost_info_image_api_v1_info_items_images_post */
+        Body_rehost_info_image_api_v1_info_items_images_post: {
             /** File */
             file: string;
         };
@@ -3651,6 +3935,368 @@ export interface components {
              */
             oppose: number;
         };
+        /**
+         * InfoAttachmentDTO
+         * @description 参考資料（info 添付）のメタ（N.2・§5.33）＝内容群の一部。object_key/uploader_id 等の内部値は非露出（§3.2）。
+         *
+         *     `url`＝短TTL 署名 URL（§1.10・詳細を閲覧できるユーザーが参照/ダウンロード可）。
+         */
+        InfoAttachmentDTO: {
+            /** Id */
+            id: string;
+            /** Original Name */
+            original_name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Mime Type */
+            mime_type: string;
+            uploaded_by: components["schemas"]["InfoCreatorDTO"];
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * InfoAttachmentsResponse
+         * @description POST /info-items/{id}/attachments の応答（追加後の添付一覧・N.2）。
+         */
+        InfoAttachmentsResponse: {
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["InfoAttachmentDTO"][];
+        };
+        /**
+         * InfoCanDTO
+         * @description 閲覧者の編集能力（サーバー算出・N.0）。内容=作成者／キュレーション=curator／リンク=全員。
+         */
+        InfoCanDTO: {
+            /** Edit Content */
+            edit_content: boolean;
+            /** Curate */
+            curate: boolean;
+            /** Add Link */
+            add_link: boolean;
+        };
+        /**
+         * InfoCreateRequest
+         * @description 低摩擦登録（全ユーザー）／続報登録。属性は登録後に curator が PATCH（Phase C 後続）。
+         */
+        InfoCreateRequest: {
+            /** Title */
+            title: string;
+            /** Body Html */
+            body_html?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Parent Info Id */
+            parent_info_id?: string | null;
+        };
+        /** InfoCreatorDTO */
+        InfoCreatorDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+        };
+        /** InfoDetailDTO */
+        InfoDetailDTO: {
+            /** Id */
+            id: string;
+            /** Parent Info Id */
+            parent_info_id?: string | null;
+            /** Title */
+            title: string;
+            /** Body Html */
+            body_html?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Status */
+            status: string;
+            /** Priority */
+            priority?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Classification */
+            classification?: string | null;
+            /** Scope */
+            scope?: string | null;
+            /** Target Business */
+            target_business?: string | null;
+            /** Impact Level */
+            impact_level?: string | null;
+            /** Impact Class */
+            impact_class?: string | null;
+            /** Impact Timing */
+            impact_timing?: string | null;
+            /** Triaged On */
+            triaged_on?: string | null;
+            /** Triage */
+            triage?: string | null;
+            /** Triage Reason */
+            triage_reason?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            created_by: components["schemas"]["InfoCreatorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Links
+             * @default []
+             */
+            links: components["schemas"]["InfoLinkDTO"][];
+            thread: components["schemas"]["InfoThreadDTO"];
+            /**
+             * Tokens Top
+             * @default []
+             */
+            tokens_top: components["schemas"]["WordCloudTokenDTO"][];
+            /**
+             * Attachments
+             * @default []
+             */
+            attachments: components["schemas"]["InfoAttachmentDTO"][];
+            can: components["schemas"]["InfoCanDTO"];
+        };
+        /**
+         * InfoImageUploadResponse
+         * @description 貼付画像の再ホスト結果（POST /info-items/images・§12-4）＝自社ホスト（MinIO）署名URL。
+         *
+         *     エディタの paste ハンドラが blob を送り、返った `url` で `img src` を置換する（外部参照を持ち込まない）。
+         */
+        InfoImageUploadResponse: {
+            /** Url */
+            url: string;
+        };
+        /**
+         * InfoItemCardDTO
+         * @description 一覧カード/行の1件（N.1・SC-50）。本文は含めない（要約のみ）。
+         */
+        InfoItemCardDTO: {
+            /** Id */
+            id: string;
+            /** Parent Info Id */
+            parent_info_id?: string | null;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary?: string | null;
+            /** Status */
+            status: string;
+            /** Priority */
+            priority?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Classification */
+            classification?: string | null;
+            /** Scope */
+            scope?: string | null;
+            /** Impact Class */
+            impact_class?: string | null;
+            /**
+             * Categories
+             * @default []
+             */
+            categories: string[];
+            /** Source Url */
+            source_url?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            created_by: components["schemas"]["InfoCreatorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Link Count
+             * @default 0
+             */
+            link_count: number;
+            /**
+             * Follow Up Count
+             * @default 0
+             */
+            follow_up_count: number;
+        };
+        /**
+         * InfoLinkCandidateDTO
+         * @description リンク候補（成果物をタイトル検索して target_id を解決）。ideas/quests＝実装済ドメイン。
+         */
+        InfoLinkCandidateDTO: {
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string;
+            /** Title */
+            title: string;
+        };
+        /** InfoLinkCandidatesResponse */
+        InfoLinkCandidatesResponse: {
+            /** Candidates */
+            candidates: components["schemas"]["InfoLinkCandidateDTO"][];
+        };
+        /**
+         * InfoLinkCreateRequest
+         * @description 手動リンク追加（情報側＝会社内 active 全員・origin=manual）。
+         */
+        InfoLinkCreateRequest: {
+            /** Info Item Id */
+            info_item_id: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string;
+            /** Kind */
+            kind?: string | null;
+        };
+        /** InfoLinkDTO */
+        InfoLinkDTO: {
+            /** Id */
+            id: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string;
+            /** Target Title */
+            target_title?: string | null;
+            /** Kind */
+            kind: string;
+            /** Origin */
+            origin: string;
+            /** Score */
+            score?: number | null;
+            /**
+             * Rejected
+             * @default false
+             */
+            rejected: boolean;
+        };
+        /** InfoLinkKindRequest */
+        InfoLinkKindRequest: {
+            /** Kind */
+            kind: string;
+        };
+        /** InfoListResponse */
+        InfoListResponse: {
+            /** Data */
+            data: components["schemas"]["InfoItemCardDTO"][];
+            page_info: components["schemas"]["InfoOffsetPageInfo"];
+            facets: components["schemas"]["InfoStatusFacets"];
+        };
+        /**
+         * InfoOffsetPageInfo
+         * @description 番号ページャの共通エンベロープ（§1.8.1・quest-catalog と同形）。
+         */
+        InfoOffsetPageInfo: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+        };
+        /**
+         * InfoStatusFacets
+         * @description 状態タブの件数バッジ（SC-50・status 以外の現行フィルタ反映）。all=raw+curated（非archived）／archived は別枠。
+         */
+        InfoStatusFacets: {
+            /** All */
+            all: number;
+            /** Raw */
+            raw: number;
+            /** Curated */
+            curated: number;
+            /**
+             * Archived
+             * @default 0
+             */
+            archived: number;
+        };
+        /** InfoThreadDTO */
+        InfoThreadDTO: {
+            parent?: components["schemas"]["InfoThreadItemDTO"] | null;
+            /**
+             * Follow Ups
+             * @default []
+             */
+            follow_ups: components["schemas"]["InfoThreadItemDTO"][];
+        };
+        /** InfoThreadItemDTO */
+        InfoThreadItemDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Created By */
+            created_by?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * InfoUpdateRequest
+         * @description 部分更新（PATCH）。**内容＝作成者のみ**（title/body_html/source_url）／**キュレーション＝curator のみ**。
+         *
+         *     どのフィールドが送られたかは `model_fields_set` で判定（null 明示とキー未送信を区別）。越権フィールドは 403。
+         */
+        InfoUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Body Html */
+            body_html?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Priority */
+            priority?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Classification */
+            classification?: string | null;
+            /** Scope */
+            scope?: string | null;
+            /** Target Business */
+            target_business?: string | null;
+            /** Impact Level */
+            impact_level?: string | null;
+            /** Impact Class */
+            impact_class?: string | null;
+            /** Impact Timing */
+            impact_timing?: string | null;
+            /** Triaged On */
+            triaged_on?: string | null;
+            /** Triage */
+            triage?: string | null;
+            /** Triage Reason */
+            triage_reason?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Categories */
+            categories?: string[] | null;
+        };
         /** ItemDTO */
         ItemDTO: {
             /** Id */
@@ -4480,6 +5126,8 @@ export interface components {
              * @default false
              */
             discoverable: boolean;
+            /** From Info Id */
+            from_info_id?: string | null;
         };
         /**
          * QuestCursorPageInfo
@@ -5197,6 +5845,20 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WordCloudResponse */
+        WordCloudResponse: {
+            /** Tokens */
+            tokens: components["schemas"]["WordCloudTokenDTO"][];
+        };
+        /** WordCloudTokenDTO */
+        WordCloudTokenDTO: {
+            /** Token */
+            token: string;
+            /** Count */
+            count: number;
+            /** Weight */
+            weight?: number | null;
         };
         /**
          * CursorPageInfo
@@ -9647,6 +10309,498 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_word_cloud_api_v1_info_items_word_cloud_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WordCloudResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_info_items_api_v1_info_items_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                status?: string | null;
+                priority?: string | null;
+                source?: string | null;
+                impact_class?: string | null;
+                roots_only?: boolean;
+                sort?: string | null;
+                page?: number | null;
+                per_page?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_info_item_api_v1_info_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_info_item_detail_api_v1_info_items__info_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_info_item_api_v1_info_items__info_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rehost_info_image_api_v1_info_items_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_rehost_info_image_api_v1_info_items_images_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoImageUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_info_item_api_v1_info_items__info_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_info_item_api_v1_info_items__info_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_info_attachments_api_v1_info_items__info_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_info_attachments_api_v1_info_items__info_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoAttachmentsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_info_attachment_api_v1_info_items__info_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                info_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_candidates_api_v1_info_link_candidates_get: {
+        parameters: {
+            query: {
+                target_type: string;
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoLinkCandidatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_info_link_api_v1_info_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoLinkCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoLinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_info_link_kind_api_v1_info_links__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InfoLinkKindRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoLinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_info_link_api_v1_info_links__link_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoLinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unreject_info_link_api_v1_info_links__link_id__unreject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoLinkDTO"];
                 };
             };
             /** @description Validation Error */

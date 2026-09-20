@@ -68,6 +68,7 @@
 | N-TC-131 | api | アーカイブ（curator・論理削除） | curator 付与＋curated 情報 | `POST /info-items/{id}/archive` | `status=archived`・既定一覧（archived 除外）から消える・非 curator は 403 | N.2／§5.33 |
 | N-TC-132 | api | アーカイブ解除（curator・curated/raw へ復帰） | curator＋archived 情報 | `POST /info-items/{id}/unarchive` | 属性があれば `curated`・無ければ `raw` に戻る・`status=archived` タブから消える | N.2 |
 | N-TC-133 | api | 状態 facet に archived 件数／archived タブ取得 | archived を含む seed | `GET /info-items`（facets）／`?status=archived` | `facets.archived` を返す（all=raw+curated＝非archived）・`status=archived` で archived 行のみ返る | N.1／§5.33 |
+| N-TC-134 | api | この情報からクエスト作成＝逆リンク自動生成 | ログイン済＋情報 | `POST /quests`（`from_info_id` 指定） | 201・当該情報の詳細 `links[]` に quests への関連リンク（`kind=related`・`origin=manual`・`target_title`=作成クエスト名）が現れる／不在 `from_info_id` は 422 | N.3／C.2／§FR-41 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

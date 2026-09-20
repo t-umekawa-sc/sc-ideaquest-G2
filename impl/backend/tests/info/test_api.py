@@ -43,6 +43,27 @@ def _delete_info(db_identifier, info_id):
         ts.commit()
 
 
+def _delete_quest(db_identifier, quest_id):
+    """テスト作成クエストの後始末（info_links〔逆リンク〕＋パーティー/権限/部署/カテゴリ→本体を物理削除）。"""
+    import uuid as _uuid
+    from app.tenant.info.orm import InfoLink
+    from app.tenant.quests.orm import (
+        Quest, QuestCategory, QuestGroupLink, QuestMember, QuestMemberPermission,
+    )
+    qid = _uuid.UUID(quest_id)
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoLink.__table__.delete().where(InfoLink.target_type == "quests", InfoLink.target_id == qid))
+        member_ids = [m.id for m in ts.execute(
+            QuestMember.__table__.select().where(QuestMember.quest_id == qid)).all()]
+        if member_ids:
+            ts.execute(QuestMemberPermission.__table__.delete().where(QuestMemberPermission.quest_member_id.in_(member_ids)))
+        ts.execute(QuestMember.__table__.delete().where(QuestMember.quest_id == qid))
+        ts.execute(QuestGroupLink.__table__.delete().where(QuestGroupLink.quest_id == qid))
+        ts.execute(QuestCategory.__table__.delete().where(QuestCategory.quest_id == qid))
+        ts.execute(Quest.__table__.delete().where(Quest.id == qid))
+        ts.commit()
+
+
 def test_n_tc_101_list_card_shape(client, info_env):
     """N-TC-101: 一覧が card DTO 形状で返る（派生集計・created_by・page_info）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
@@ -472,3 +493,27 @@ def test_n_tc_133_archived_facet_and_tab(client, info_env):
     arch = client.get(INFO, params={"status": "archived"}).json()["data"]
     assert arch and all(c["status"] == "archived" for c in arch)
     assert str(info_env.ids.c) in {c["id"] for c in arch}
+
+
+def test_n_tc_134_create_quest_from_info(client, info_env):
+    """N-TC-134: この情報からクエスト作成＝逆リンク（quests/related/manual）を自動生成・不在は 422。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    quests = "/api/v1/quests"
+    # 正常＝from_info_id 指定でクエスト作成 → 当該情報の links に quests への関連リンクが現れる。
+    r = client.post(quests, json={"title": "この情報からのクエスト", "color": "#0D9488",
+                                  "from_info_id": str(info_env.ids.a)}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]
+    try:
+        links = client.get(f"{INFO}/{info_env.ids.a}").json()["links"]
+        got = next((l for l in links if l["target_type"] == "quests" and l["target_id"] == qid), None)
+        assert got is not None
+        assert got["kind"] == "related" and got["origin"] == "manual"
+        assert got["target_title"] == "この情報からのクエスト"
+    finally:
+        _delete_quest(info_env.db_identifier, qid)
+    # 不在の from_info_id は 422（field=from_info_id）。
+    import uuid as _uuid
+    r422 = client.post(quests, json={"title": "x", "color": "#0D9488", "from_info_id": str(_uuid.uuid4())}, headers=_csrf(client))
+    assert r422.status_code == 422, r422.text
+    assert any(e.get("field") == "from_info_id" for e in r422.json().get("errors", []))

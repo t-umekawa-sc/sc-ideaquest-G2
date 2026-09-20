@@ -321,6 +321,17 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         # 作成者は常にパーティー員＝owner（C.0）。差分より先に投入して保護対象にする。
         repo.add_member(ts, quest.id, user.id, permissions=_ALL_PERMISSIONS, granted_by_id=user.id)
         _apply_party_diff(ts, quest, body.members, requester=user)
+        # 「この情報からクエストを作成」＝逆リンク（info_link・関連・manual）を自動生成（SC-50・§FR-41）。
+        # 同一テナント（同 UoW）で info_items を参照。不在/他テナントは 422（クエスト作成ごとロールバック）。
+        if body.from_info_id:
+            from app.tenant.info import repository as info_repo
+            info_uuid = _parse_uuid(body.from_info_id, field="from_info_id")
+            if info_repo.get_info_item(ts, info_uuid) is None:
+                raise AppError(422, "validation_error", detail="元情報が見つかりません",
+                               errors=[{"field": "from_info_id"}])
+            if info_repo.find_link(ts, info_uuid, "quests", quest.id) is None:
+                info_repo.create_link(ts, info_item_id=info_uuid, target_type="quests",
+                                      target_id=quest.id, kind="related", origin="manual")
         detail = _build_detail(ts, quest, user.id)
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         quest_id = quest.id

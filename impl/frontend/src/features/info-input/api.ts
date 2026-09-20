@@ -89,6 +89,24 @@ export async function uploadInfoImageApi(file: File): Promise<string> {
   return (res as { url: string }).url;
 }
 
+// この情報からクエストを作成（Phase D・SC-50・C.2＝from_info_id）＝下書きクエストを作成し、サーバーが
+// 逆リンク（info_link・関連・manual）を自動生成する。返り値＝作成クエスト（id で詳細へ遷移）。
+export interface QuestFromInfoInput {
+  title: string; color: string; purpose?: string | null; categories?: string[]; deadline?: string | null; from_info_id: string;
+}
+export async function createQuestFromInfo(input: QuestFromInfoInput): Promise<{ id: string }> {
+  const res = await apiFetch<{ id: string }>("/quests", {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title, color: input.color, purpose: input.purpose || null,
+      categories: input.categories ?? [], deadline: input.deadline || null,
+      status: "draft", from_info_id: input.from_info_id,
+    }),
+  });
+  emit(); // 情報側の link_count/詳細を最新化
+  return res as { id: string };
+}
+
 // アーカイブ／解除（Phase D・N.2）＝curator のみ（越権はサーバーが403）。論理削除・監査保持。成功で一覧を再取得。
 export async function archiveInfoItemApi(id: string): Promise<InfoDetail> {
   const res = await apiFetch<InfoDetail>(`/info-items/${encodeURIComponent(id)}/archive`, { method: "POST" });
