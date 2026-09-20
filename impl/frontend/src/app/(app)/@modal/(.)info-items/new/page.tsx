@@ -10,5 +10,5 @@ export default async function InfoNewInterceptModal({ searchParams }: { searchPa
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { parent } = await searchParams;
-  return <InfoFormModal mode="new" parentId={parent} />;
+  return <InfoFormModal parentId={parent} />;
 }

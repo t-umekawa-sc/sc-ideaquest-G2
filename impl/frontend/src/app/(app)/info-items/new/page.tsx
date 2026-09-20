@@ -9,5 +9,5 @@ export default async function InfoNewPage({ searchParams }: { searchParams: Prom
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { parent } = await searchParams;
-  return <InfoFormModal mode="new" parentId={parent} standalone />;
+  return <InfoFormModal parentId={parent} standalone />;
 }

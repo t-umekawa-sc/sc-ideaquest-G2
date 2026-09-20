@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Field, Multiselect } from "@/components/ui";
 import type { MultiselectOption } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { addAttachmentsApi, createInfoItemApi, fetchInfoDetail, getInfoItem, updateInfoItem, uploadInfoImageApi } from "../api";
+import { addAttachmentsApi, createInfoItemApi, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import { LINK_CANDIDATES } from "../fixtures";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
@@ -18,7 +18,6 @@ import type { InfoDetail, InfoLink, InfoLinkKind, InfoLinkTarget } from "../type
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
 import "../info-input.css";
 
-type Mode = "new" | "edit";
 const OPT = (m: Record<string, string>) => Object.entries(m).map(([v, l]) => ({ v, l }));
 const iconFor = (name: string) => {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -35,8 +34,8 @@ const LINK_OPTIONS: MultiselectOption[] = (["ideas", "quests", "concepts"] as In
   (LINK_CANDIDATES[t] ?? []).map((title) => ({ value: `${t}:${title}`, label: `${LINK_TARGET_LABEL[t]}｜${title}` })),
 );
 
-export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
-  mode: Mode; infoId?: string; parentId?: string; onCancel: () => void; onDone: () => void;
+export function InfoFormPanel({ parentId, onCancel, onDone }: {
+  parentId?: string; onCancel: () => void; onDone: () => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +43,7 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState<string | null>(null);
   // 続報の親は実 API から取得（プレビュー用・fixtures 不使用）。属性は create で保存されない（curator の PATCH 管轄）ため
-  // 続報でも親属性は事前投入しない＝初期値は編集時（自身）のみ。親の関連リンクは backend が登録時に自動複製（§12-1）。
+  // 続報でも親属性は事前投入しない＝空から。親の関連リンクは backend が登録時に自動複製（§12-1）。編集は詳細のインライン編集に一本化。
   const [parent, setParent] = useState<InfoDetail | undefined>(undefined);
   useEffect(() => {
     if (!parentId) { setParent(undefined); return; }
@@ -52,26 +51,23 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
     fetchInfoDetail(parentId, ac.signal).then((d) => { if (d) setParent(d); }).catch(() => {});
     return () => ac.abort();
   }, [parentId]);
-  const editing = mode === "edit" && infoId ? getInfoItem(infoId) : undefined;
-  const src = editing; // 初期値は編集時（自身）のみ＝続報は空から
 
-  const [title, setTitle] = useState(editing?.title ?? "");
-  const [sourceUrl, setSourceUrl] = useState(editing?.source_url ?? "");
-  const [priority, setPriority] = useState(src?.priority ?? "");
-  const [source, setSource] = useState(src?.source ?? "");
-  const [classification, setClassification] = useState(src?.classification ?? "");
-  const [scope, setScope] = useState(src?.scope ?? "");
-  const [business, setBusiness] = useState(src?.target_business ?? "");
-  const [categories, setCategories] = useState<string[]>(src?.categories ?? []);
-  const [impact, setImpact] = useState(src?.impact_level ?? "");
-  const [impactClass, setImpactClass] = useState(src?.impact_class ?? "");
-  const [timing, setTiming] = useState(src?.impact_timing ?? "");
-  const [triagedOn, setTriagedOn] = useState(src?.triaged_on ?? "");
-  const [triage, setTriage] = useState(src?.triage ?? "");
-  const [reason, setReason] = useState(src?.triage_reason ?? "");
-  const [dueDate, setDueDate] = useState(src?.due_date ?? "");
-  // 続報の親リンクは backend が登録時に自動複製するためフォームでは事前投入しない（編集時のみ自身のリンク）。
-  const [links, setLinks] = useState<InfoLink[]>(() => (editing?.links ?? []).map((l) => ({ ...l })));
+  const [title, setTitle] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [priority, setPriority] = useState("");
+  const [source, setSource] = useState("");
+  const [classification, setClassification] = useState("");
+  const [scope, setScope] = useState("");
+  const [business, setBusiness] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [impact, setImpact] = useState("");
+  const [impactClass, setImpactClass] = useState("");
+  const [timing, setTiming] = useState("");
+  const [triagedOn, setTriagedOn] = useState("");
+  const [triage, setTriage] = useState("");
+  const [reason, setReason] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [links, setLinks] = useState<InfoLink[]>([]);
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickTarget, setPickTarget] = useState<string[]>([]);
   const [linkKind, setLinkKind] = useState<InfoLinkKind>("related");
@@ -81,12 +77,6 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [urlErr, setUrlErr] = useState<string | null>(null);
-
-  // 編集時のみ本文を初期挿入（contenteditable は非制御＝マウント後に一度だけ）。
-  useEffect(() => {
-    if (bodyRef.current && editing) bodyRef.current.innerHTML = editing.body_html;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const exec = useCallback((cmd: string, arg?: string) => {
     bodyRef.current?.focus();
@@ -176,13 +166,7 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
       impact_timing: timing || null, triaged_on: triagedOn || null, triage: triage || null, triage_reason: reason || null,
       due_date: dueDate || null, links,
     };
-    if (editing) {
-      // 編集は詳細ダイアログのインライン編集（PATCH）へ移行予定＝当面 fixtures（Slice 5 後続）。
-      updateInfoItem(editing.id, input);
-      onDone();
-      return;
-    }
-    // 新規/続報＝実 API（POST /info-items）＝内容（title/body_html/source_url/parent）。属性/リンクは後続スライス。
+    // 新規/続報＝実 API（POST /info-items）＝内容（title/body_html/source_url/parent）。編集は詳細のインライン編集に一本化。
     setSaving(true);
     try {
       const created = await createInfoItemApi(input);
@@ -357,7 +341,7 @@ export function InfoFormPanel({ mode, infoId, parentId, onCancel, onDone }: {
 
       <div className="modal__footer">
         <button className="btn btn-outline" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
-        <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? "登録中…" : editing ? "保存する" : parentId ? "続報を登録する" : "登録する"}</button>
+        <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? "登録中…" : parentId ? "続報を登録する" : "登録する"}</button>
       </div>
     </>
   );
