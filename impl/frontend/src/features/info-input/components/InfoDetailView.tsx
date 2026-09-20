@@ -38,6 +38,9 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   }, [infoId]);
 
   const go = (path: string) => { onClose(); setTimeout(() => router.push(path), 0); };
+  // スレッド内の移動（元情報/続報）は現在のモーダルURLを replace で差し替え＝履歴を積まない。
+  // これで「閉じる」は常に一覧へ戻る（詳細を渡り歩いても呼び元の詳細に戻らない・ユーザー要望）。
+  const swap = (path: string) => router.replace(path);
 
   if (state === "loading") return <div className="modal__body"><p className="muted">読み込み中…</p></div>;
   if (state === "notfound" || !item) return <div className="modal__body"><p className="muted">情報が見つかりません。</p></div>;
@@ -52,7 +55,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           <div className="field dialog-section">
             <div className="dialog-label">元情報（続報元）</div>
             <div className="info-thread__meta">
-              🧵 <strong>{r.thread.parent.title}</strong> の続報　<a href={`/info-items/${r.thread.parent.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${r.thread.parent!.id}`); }}>元情報を開く</a>
+              🧵 <strong>{r.thread.parent.title}</strong> の続報　<a href={`/info-items/${r.thread.parent.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${r.thread.parent!.id}`); }}>元情報を開く</a>
             </div>
           </div>
         ) : null}
@@ -143,7 +146,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               {r.thread.follow_ups.map((f) => (
                 <li key={f.id}>
                   <div className="info-thread__title">{f.title}</div>
-                  <div className="info-thread__meta">{f.created_by ?? ""}・{f.created_at.slice(0, 10)}　<a href={`/info-items/${f.id}`} onClick={(e) => { e.preventDefault(); go(`/info-items/${f.id}`); }}>開く</a></div>
+                  <div className="info-thread__meta">{f.created_by ?? ""}・{f.created_at.slice(0, 10)}　<a href={`/info-items/${f.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${f.id}`); }}>開く</a></div>
                 </li>
               ))}
             </ul>
