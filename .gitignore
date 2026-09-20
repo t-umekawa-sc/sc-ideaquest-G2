@@ -10,6 +10,10 @@
 # 環境変数（実値）
 .env
 
+# スクショ作業ディレクトリ（Playwright アドホック検証の出力・コミット不要）。
+# 先頭スラッシュ無し＝どの階層の tmp_shots/ もマッチ（ルート・impl/frontend/ 双方）。
+tmp_shots/
+
 # Python
 __pycache__/
 *.py[cod]
