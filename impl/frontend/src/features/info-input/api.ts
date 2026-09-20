@@ -61,6 +61,22 @@ export function fetchInfoDetail(id: string, signal?: AbortSignal): Promise<InfoD
   return apiFetch<InfoDetail>(`/info-items/${encodeURIComponent(id)}`, { signal });
 }
 
+// 低摩擦登録／続報（POST /info-items・Phase C slice5）＝内容のみ（title/body_html/source_url/parent）。
+// 属性は curator の PATCH・リンクは /info-links（候補ID解決の EP 実装後）＝後続スライス。成功で一覧を再取得。
+export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
+  const res = await apiFetch<InfoDetail>("/info-items", {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      body_html: input.body_html || null,
+      source_url: input.source_url || null,
+      parent_info_id: input.parent_info_id ?? null,
+    }),
+  });
+  emit(); // 一覧（サーバー委譲）を INFO_CHANGED_EVENT で再取得
+  return res as InfoDetail;
+}
+
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 let store: InfoItem[] = INFO_FIXTURES.map((x) => clone(x));
 let seq = 100;
