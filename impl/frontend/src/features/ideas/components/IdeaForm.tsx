@@ -415,7 +415,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
         </p>
 
         {/* 必須 3 項目。件名の上にも仕切り線＝ヘッダー（投稿先クエスト＋説明）と入力項目を区切る（ユーザー要望）。 */}
-        <Field className="dialog-section" id="idea_subject" label="件名" required error={fieldErrors.title}>
+        <Field className="dialog-section is-quiet" id="idea_subject" label="件名" required error={fieldErrors.title}>
           <input
             id="idea_subject"
             className="input"
@@ -427,7 +427,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             required
           />
         </Field>
-        <Field className="dialog-section" id="idea_icon" label="アイデアアイコン（任意）">
+        <Field className="dialog-section is-quiet" id="idea_icon" label="アイデアアイコン（任意）">
           <div className="icon-field">
             {iconPreview || iconUrl ? (
               <span className="quest-icon lg">
@@ -446,7 +446,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             </div>
           </div>
         </Field>
-        <Field className="dialog-section" id="idea_value" label="価値" required error={fieldErrors.value}>
+        <Field className="dialog-section is-quiet" id="idea_value" label="価値" required error={fieldErrors.value}>
           <textarea
             id="idea_value"
             className="textarea"
@@ -459,7 +459,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             required
           />
         </Field>
-        <Field className="dialog-section" id="idea_body" label="アイデア本文" required error={fieldErrors.body}>
+        <Field className="dialog-section is-quiet" id="idea_body" label="アイデア本文" required error={fieldErrors.body}>
           <textarea
             id="idea_body"
             className="textarea"
@@ -481,7 +481,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
             <Field id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
               <input id="idea_limit" className="input" type="date" value={limit} onChange={(e) => setLimit(e.target.value)} />
             </Field>
-            <Field className="dialog-section" id="idea_stake" label="利害関係者" hint="複数選択可。候補に無ければ入力して Enter で追加。">
+            <Field className="dialog-section is-quiet" id="idea_stake" label="利害関係者" hint="複数選択可。候補に無ければ入力して Enter で追加。">
               {stakeholders.length > 0 && (
                 <div className="tagselect__chips">
                   {stakeholders.map((s) => (
@@ -512,7 +512,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
                 ))}
               </div>
             </Field>
-            <Field className="dialog-section" id="idea_note" label="備考 / 特記事項">
+            <Field className="dialog-section is-quiet" id="idea_note" label="備考 / 特記事項">
               <textarea
                 id="idea_note"
                 className="textarea"

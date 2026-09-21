@@ -262,10 +262,10 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
               <Field id="qr_summary" label="成果（総括）">
                 <textarea id="qr_summary" className="textarea" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="このクエストで何を得たか" />
               </Field>
-              <Field className="dialog-section" id="qr_learn" label="学び・課題">
+              <Field className="dialog-section is-quiet" id="qr_learn" label="学び・課題">
                 <textarea id="qr_learn" className="textarea" value={learnings} onChange={(e) => setLearnings(e.target.value)} placeholder="うまくいった点・課題・次に活かすこと" />
               </Field>
-              <Field className="dialog-section" id="qr_metrics" label="成果の指標（KPI・任意）">
+              <Field className="dialog-section is-quiet" id="qr_metrics" label="成果の指標（KPI・任意）">
                 {metrics.map((m, i) => (
                   <div key={i} className="qresult__metric-row">
                     <input className="input" placeholder="指標名（例: 削減工数）" value={m.label} onChange={(e) => setMetrics((ms) => ms.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} />
@@ -275,7 +275,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
                 ))}
                 <button type="button" className="btn btn-sm btn-primary" style={{ marginTop: "var(--space-2)" }} onClick={() => setMetrics((ms) => [...ms, { label: "", value: "" }])}>＋ 指標を追加</button>
               </Field>
-              <Field className="dialog-section" id="qr_next" label="次アクション">
+              <Field className="dialog-section is-quiet" id="qr_next" label="次アクション">
                 <textarea id="qr_next" className="textarea" value={nextActions} onChange={(e) => setNextActions(e.target.value)} placeholder="次にやること・後続クエストの方針" />
               </Field>
             </div>

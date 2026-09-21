@@ -262,7 +262,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
             <Field id="g_code" label="クエストグループコード" required>
               <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={formError ? true : undefined} required />
             </Field>
-            <Field className="dialog-section" id="g_name" label="グループ名" required>
+            <Field className="dialog-section is-quiet" id="g_name" label="グループ名" required>
               <input id="g_name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
             </Field>
           </ModalBody>
@@ -286,7 +286,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
             <Field id="g_edit_code" label="クエストグループコード" hint="コードは作成後は変更できません。">
               <input id="g_edit_code" className="input db-id" value={editing?.quest_group_code ?? ""} readOnly disabled />
             </Field>
-            <Field className="dialog-section" id="g_edit_name" label="グループ名" required>
+            <Field className="dialog-section is-quiet" id="g_edit_name" label="グループ名" required>
               <input
                 id="g_edit_name"
                 className="input"

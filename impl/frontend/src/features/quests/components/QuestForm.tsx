@@ -629,16 +629,16 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           </div>
         </Field>
 
-        <Field className="dialog-section" id="q_color" label="クエストカラー" required error={fieldErrors.color}>
+        <Field className="dialog-section is-quiet" id="q_color" label="クエストカラー" required error={fieldErrors.color}>
           <Swatches value={color} onChange={setColor} ariaLabel="クエストカラー" />
         </Field>
 
-        <Field className="dialog-section" id="q_name" label="件名" required hint="クエストの名前。一覧・詳細・アイコンの頭文字に使われます。" error={fieldErrors.title}>
+        <Field className="dialog-section is-quiet" id="q_name" label="件名" required hint="クエストの名前。一覧・詳細・アイコンの頭文字に使われます。" error={fieldErrors.title}>
           <input id="q_name" className="input" placeholder="例: 配送ルート最適化" value={name} onChange={(e) => setName(e.target.value)} onBlur={onBlurTitle} aria-invalid={fieldErrors.title ? true : undefined} disabled={frozen} />
         </Field>
 
         {/* カテゴリー・期限日は各項目1行ずつ（field-row の横並びを廃止・ユーザー要望）＝各項目間に仕切り線。 */}
-        <Field className="dialog-section" id="q_cat" label="カテゴリー" required hint="複数選択可。定義済みから選択、なければ入力して Enter で追加。" error={fieldErrors.categories}>
+        <Field className="dialog-section is-quiet" id="q_cat" label="カテゴリー" required hint="複数選択可。定義済みから選択、なければ入力して Enter で追加。" error={fieldErrors.categories}>
           {categories.length > 0 && (
             <div className="tagselect__chips">
               {categories.map((c) => (
@@ -654,17 +654,17 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
           </div>
         </Field>
 
-        <Field className="dialog-section" id="q_deadline" label="期限日" required hint="アイデア募集/クエストの締切日。" error={fieldErrors.deadline}>
+        <Field className="dialog-section is-quiet" id="q_deadline" label="期限日" required hint="アイデア募集/クエストの締切日。" error={fieldErrors.deadline}>
           <input id="q_deadline" className="input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} aria-invalid={fieldErrors.deadline ? true : undefined} disabled={frozen} />
         </Field>
 
-        <Field className="dialog-section" id="q_theme" label="目的・テーマ" required error={fieldErrors.purpose}>
+        <Field className="dialog-section is-quiet" id="q_theme" label="目的・テーマ" required error={fieldErrors.purpose}>
           <textarea id="q_theme" className="textarea" placeholder="このクエストで何を達成したいか、どんなアイデアを募るか" value={theme} onChange={(e) => setTheme(e.target.value)} aria-invalid={fieldErrors.purpose ? true : undefined} disabled={frozen} />
         </Field>
 
         {/* 参加部署（アクセス条件・フラット 0..N・すべて同格・FR-38 再設計。主グループは廃止）。 */}
         {!frozen && (
-          <Field className="dialog-section" id="q_depts" label="参加グループ（アクセス条件・任意）" hint="会社のクエストグループを複数選択できます。非作成者はいずれかの参加グループに現在所属していないと参照できません（作成者は別格で常に参照可）。未選択（0件）なら全社がアクセス可＋候補になります。">
+          <Field className="dialog-section is-quiet" id="q_depts" label="参加グループ（アクセス条件・任意）" hint="会社のクエストグループを複数選択できます。非作成者はいずれかの参加グループに現在所属していないと参照できません（作成者は別格で常に参照可）。未選択（0件）なら全社がアクセス可＋候補になります。">
             <Multiselect
               id="q_depts"
               options={deptOptions}
@@ -679,7 +679,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
         {/* 発見カタログ掲載トグル（FR-40・C.9.0）＝ON で「クエストを探す」に載り、他部署から発見/フォロー/参加リクエスト可。 */}
         {!frozen && (
-          <Field className="dialog-section" id="q_discoverable" label="発見カタログに載せる（任意）" hint="ON にすると「クエストを探す」に表示され、参加していないユーザーがフォローや参加リクエストをできます（公開中のクエストのみ対象・参加グループ条件は維持）。">
+          <Field className="dialog-section is-quiet" id="q_discoverable" label="発見カタログに載せる（任意）" hint="ON にすると「クエストを探す」に表示され、参加していないユーザーがフォローや参加リクエストをできます（公開中のクエストのみ対象・参加グループ条件は維持）。">
             <label className="switch">
               {/* id は Field の <label for="q_discoverable"> と一致させる（未一致だと a11y エラー＝ラベル未関連の違和感）。 */}
               <input id="q_discoverable" type="checkbox" checked={discoverable} onChange={(e) => setDiscoverable(e.target.checked)} disabled={frozen} />
@@ -692,7 +692,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
         )}
 
         {/* パーティー・権限＝入力グループの区切り（§4.1 ダイアログ内コンテンツ標準）。 */}
-        <Field className="dialog-section" id="q_party" label="参加メンバー（パーティー）・権限" required>
+        <Field className="dialog-section is-quiet" id="q_party" label="参加メンバー（パーティー）・権限" required>
           <div className="party">
             {/* 参加クエストグループ（アクセス条件）バナー＝候補の範囲（モック SC-11 と一致）。 */}
             <div className="party__scope">

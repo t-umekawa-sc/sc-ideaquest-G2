@@ -4638,11 +4638,11 @@
   <div class="modal__panel sectioned modal__panel--crt-in">
     <div class="modal__header"><h2 id="sgDlgTitle">サンプルダイアログ</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>
     <div class="modal__body">
-      <div class="field"><label for="sgDlgName">名称</label><input class="input" id="sgDlgName" placeholder="例: 新しい項目"></div>
-      <div class="field"><label for="sgDlgKind">種別</label>
+      <div class="field dialog-section is-quiet"><label for="sgDlgName">名称</label><input class="input" id="sgDlgName" placeholder="例: 新しい項目"></div>
+      <div class="field dialog-section is-quiet"><label for="sgDlgKind">種別</label>
         <select class="select" id="sgDlgKind"><option>種別A</option><option>種別B</option><option>種別C</option></select></div>
-      <div class="field"><label for="sgDlgMemo">メモ</label><textarea class="textarea" id="sgDlgMemo" rows="3" placeholder="補足を入力"></textarea></div>
-      <p class="muted text-sm">※ 入力項目は仕切り線を使わず <code>.field</code> のマージン（余白）だけで区切ります（決定 2026-09-21）。本文が長い場合はこの領域だけがスクロールし、フッターは下端に固定されます。</p>
+      <div class="field dialog-section is-quiet"><label for="sgDlgMemo">メモ</label><textarea class="textarea" id="sgDlgMemo" rows="3" placeholder="補足を入力"></textarea></div>
+      <p class="muted text-sm dialog-section is-quiet">※ 入力項目は仕切り線の<strong>間隔</strong>は保ちつつ<strong>線は消す</strong>（<code>.dialog-section.is-quiet</code>・改定 2026-09-21b）＝入力欄の枠と二重線にしない。参照系は線あり（<code>.dialog-section</code>）。</p>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>

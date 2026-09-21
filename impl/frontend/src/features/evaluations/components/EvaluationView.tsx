@@ -299,7 +299,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         </details>
 
         {/* 5観点の採点＝入力グループ「評価点」（§4.1・上に仕切り線＋見出し）。 */}
-        <div className="dialog-section">
+        <div className="dialog-section is-quiet">
           <div className="dialog-label">評価点</div>
           {ASPECTS.map((a) => {
             const filled = hover[a.key] ?? scores[a.key] ?? 0;
@@ -377,7 +377,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         </div>
 
         {/* 総評（必須）＝コスト（最終観点）との間に薄い仕切り線（§4.1 ダイアログ内コンテンツ標準）。 */}
-        <div className="field dialog-section">
+        <div className="field dialog-section is-quiet">
           <label htmlFor="evalOverall">
             総評（全体コメント）<span className="req">*</span>
           </label>
@@ -420,7 +420,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
         )}
 
         {/* 公開範囲＝上に薄い仕切り線で採点/集計と区切る（§4.1 ダイアログ内コンテンツ標準）。 */}
-        <div className="field dialog-section">
+        <div className="field dialog-section is-quiet">
           <label>評価結果の公開範囲</label>
           <div className="visibility">
             <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
