@@ -26,6 +26,7 @@ type Quest = {
   urgency: DeadlineLevel; days: number | null;
   deadlineRaw: string; // 生の期限日（YYYY-MM-DD）＝複製プリフィル用（表示は deadline の整形版）
   party: number; ideas: number; my: string; order: number; draft?: boolean;
+  discoverable: boolean; // 発見カタログ掲載（FR-40・C.9.0）＝列/ソート/絞込・複製プリフィル
 };
 
 // quest_status（enum・§3）→ 画面ラベル。"選定" は enum でなく evaluating〜completed の選定行為の呼称（C.5）。
@@ -71,6 +72,7 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
     char: (c.title || "?").slice(0, 1), accent: c.color, iconUrl: c.icon_image_url ?? null,
     deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, deadlineRaw: (c.deadline ?? "").slice(0, 10), party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
+    discoverable: c.discoverable ?? false,
   };
 }
 
@@ -92,6 +94,9 @@ function QuestIcon({ q }: { q: Quest }) {
 
 const STATUS_OPTIONS: [string, string][] = [["下書き", "下書き"], ["募集中", "募集中"], ["進行中", "進行中"], ["評価中", "評価中"], ["完了", "完了"]];
 const MY_OPTIONS: [string, string][] = [["未投稿", "未投稿"], ["投稿済み", "投稿済み"], ["下書き", "下書き"]];
+// 発見カタログ掲載（FR-40・C.9.0）の列/ソート/絞込ラベル。値＝表示ラベルと一致（enum filter の filterVal と揃える）。
+const DISCOVERABLE_OPTIONS: [string, string][] = [["掲載", "掲載"], ["非掲載", "非掲載"]];
+const discoverableLabel = (x: Quest): string => (x.discoverable ? "掲載" : "非掲載");
 
 export function QuestListView() {
   const router = useRouter();
@@ -161,6 +166,7 @@ export function QuestListView() {
               .map((m) => ({ user_id: m.user.user_id, display_name: m.user.display_name, permissions: m.permissions, group_ids: m.group_ids ?? [] })),
             deadline: x.deadlineRaw,
             purpose: detail?.purpose ?? "",
+            discoverable: x.discoverable, // 発見カタログ掲載を引き継ぐ（FR-40・C.9.0・一覧DTOに含む）
           }),
         );
       },
@@ -183,6 +189,7 @@ export function QuestListView() {
     { key: "deadline", label: "締切", width: 120, sortable: true, sortVal: (x) => x.dl, filter: { type: "text" }, filterVal: (x) => x.deadline, csvVal: (x) => x.deadline, render: (x) => <span className="deadline" data-urgency={x.urgency}>{x.deadline}</span> },
     { key: "party", label: "👥", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.party, filterVal: (x) => x.party, render: (x) => x.party },
     { key: "ideas", label: "💡", width: 80, align: "num", sortable: true, filter: { type: "number" }, sortVal: (x) => x.ideas, filterVal: (x) => x.ideas, render: (x) => x.ideas },
+    { key: "discoverable", label: "発見カタログ", width: 130, sortable: true, filter: { type: "enum", options: DISCOVERABLE_OPTIONS }, sortVal: (x) => (x.discoverable ? 1 : 0), filterVal: (x) => discoverableLabel(x), csvVal: (x) => discoverableLabel(x), render: (x) => <span className={x.discoverable ? "badge badge-success" : "badge badge-muted"}>{discoverableLabel(x)}</span> },
     { key: "my", label: "あなた", width: 110, sortable: true, filter: { type: "enum", options: MY_OPTIONS }, sortVal: (x) => x.my, filterVal: (x) => x.my, render: (x) => <span className={myBadge(x.my)}>{x.my}</span> },
     { key: "_actions", label: "", actions: true, locked: true, width: 64, render: (x) => <RowMenu items={questMenu(x)} /> },
   ];

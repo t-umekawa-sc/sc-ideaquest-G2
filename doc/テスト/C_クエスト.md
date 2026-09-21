@@ -82,6 +82,7 @@
 | C-TC-143 | api | 詳細の idea_count は公開アイデア数（下書き/削除は除外） | recruiting クエスト＋published 2件・自分の下書き 1件・削除済み 1件 | `GET /quests/{id}` | idea_count=2（published・deleted_at IS NULL のみ／draft・削除は数えない） | C.1／D.1／SC-12 |
 | C-TC-144 | api | 一覧の idea_count も公開アイデア数を反映 | 同上のクエスト | `GET /quests` | 当該カードの idea_count=2（batch 集計・N+1 回避） | C.1／D.1／SC-10 |
 | C-TC-247 | api | クエストカードの is_owner（閲覧者=作成者か・SC-01 で「自分のクエスト」を参加中と分離） | seed 作成クエスト／他者作成で seed が参加中のクエスト | `GET /quests` | 自作カード `is_owner=true`／他者作成カード `is_owner=false` | C.1／SC-01 |
+| C-TC-252 | api | クエストカードに discoverable（発見カタログ掲載）を含む＝一覧の列/ソート/絞込・複製プリフィルに使う | discoverable=ON／OFF の2クエスト | `GET /quests` | ON カード `discoverable=true`／OFF カード `discoverable=false` | C.1／C.9.0／FR-40 |
 
 ## 5. パーティー粒度・状態遷移・削除 API（SC-12・C.3/C.5/C.2）
 

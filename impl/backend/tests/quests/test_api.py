@@ -61,13 +61,13 @@ def env():
             created_group_member_ids.append(m.id)
         ts.commit()
 
-    def make_quest(*, status="recruiting", party=True, owner=None, title="C-TC Quest") -> uuid.UUID:
+    def make_quest(*, status="recruiting", party=True, owner=None, title="C-TC Quest", discoverable=False) -> uuid.UUID:
         qid = uuid.uuid4()
         the_owner = owner or user_id
         with get_tenant_session(db_identifier) as ts:
             repo.create_quest(
                 ts, quest_id=qid, owner_id=the_owner,
-                title=title, color="#3B82F6", status=status,
+                title=title, color="#3B82F6", status=status, discoverable=discoverable,
             )
             repo.create_group_links(ts, qid, group_ids=[group_id])  # 参加部署（FR-38 再設計）
             repo.replace_categories(ts, qid, [("UX", False)])
@@ -215,6 +215,16 @@ def test_c_tc_247_card_is_owner_flag(client, env):
     cards = {c["id"]: c for c in client.get(QUESTS).json()["data"]}
     assert cards[str(own)]["is_owner"] is True    # 作成者＝自分のクエスト
     assert cards[str(other)]["is_owner"] is False  # 他者作成で参加中
+
+
+def test_c_tc_252_card_discoverable_flag(client, env):
+    """C-TC-252: クエストカードに discoverable（発見カタログ掲載）を含む＝一覧の列/ソート/絞込・複製プリフィルに使う（FR-40・C.9.0）。"""
+    on = env.make_quest(status="recruiting", title="発見ON クエスト", discoverable=True)
+    off = env.make_quest(status="recruiting", title="発見OFF クエスト", discoverable=False)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    cards = {c["id"]: c for c in client.get(QUESTS).json()["data"]}
+    assert cards[str(on)]["discoverable"] is True
+    assert cards[str(off)]["discoverable"] is False
 
 
 def test_c_tc_251_list_q_and_group_filters(client, env):

@@ -248,6 +248,8 @@ def _quest_card_dto(quest, viewer_id, owners, groups, group_ids, cats) -> dict:
         "my_state": "draft" if quest.status == "draft" and quest.owner_id == viewer_id else "member",
         # 閲覧者が作成者か（SC-01 ダッシュボードで「自分のクエスト」を参加中と分離・SC-10 でも利用可）。
         "is_owner": quest.owner_id == viewer_id,
+        # 発見カタログ掲載（FR-40・C.9.0）＝一覧の列/ソート/絞込・複製プリフィルに使う。
+        "discoverable": bool(quest.discoverable),
     }
 
 

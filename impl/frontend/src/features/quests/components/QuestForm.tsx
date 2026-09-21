@@ -156,6 +156,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
             // 複製で引き継ぐパーティー（作成者以外・権限/所属グループ込み・2026-09-13 決定）。
             members?: { user_id: string; display_name: string; permissions?: string[]; group_ids?: string[] }[];
             deadline?: string;
+            discoverable?: boolean; // 発見カタログ掲載（FR-40・C.9.0）＝複製で引き継ぐ
           }>(searchParams),
     [isEdit, searchParams],
   );
@@ -203,7 +204,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [ownerId, setOwnerId] = useState<string | null>(ownerUserId); // 候補除外に使う「作成者」
   const [ownerDeptIds, setOwnerDeptIds] = useState<string[]>([]); // 作成者の所属グループ（チップ表示用・req2）
   const [status, setStatus] = useState<string>("draft"); // 編集時は取得値
-  const [discoverable, setDiscoverable] = useState<boolean>(false); // 発見カタログ掲載（FR-40・編集時は取得値）
+  const [discoverable, setDiscoverable] = useState<boolean>(dup?.discoverable ?? false); // 発見カタログ掲載（FR-40・編集時は取得値／複製は元の値を継承）
   const [loading, setLoading] = useState(isEdit); // 編集はプリフィル取得まで loading
   const [loadError, setLoadError] = useState<string | null>(null);
 

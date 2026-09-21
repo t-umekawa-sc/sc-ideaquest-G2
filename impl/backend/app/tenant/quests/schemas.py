@@ -58,6 +58,8 @@ class QuestCardDTO(BaseModel):
     my_state: str
     # 閲覧者が作成者か（SC-01 で「自分のクエスト」を参加中と分離）。
     is_owner: bool = False
+    # 発見カタログ掲載（FR-40・C.9.0）＝一覧の列/ソート/絞込・複製プリフィルに使う。
+    discoverable: bool = False
 
 
 class QuestListResponse(BaseModel):

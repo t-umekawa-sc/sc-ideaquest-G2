@@ -5166,6 +5166,11 @@ export interface components {
              * @default false
              */
             is_owner: boolean;
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
         };
         /**
          * QuestCatalogCardDTO
@@ -5206,6 +5211,11 @@ export interface components {
              * @default false
              */
             is_owner: boolean;
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
             /** Purpose */
             purpose?: string | null;
         };
@@ -5248,6 +5258,11 @@ export interface components {
              * @default false
              */
             is_owner: boolean;
+            /**
+             * Discoverable
+             * @default false
+             */
+            discoverable: boolean;
             /** Purpose */
             purpose?: string | null;
             activity?: components["schemas"]["QuestActivityDTO"] | null;
