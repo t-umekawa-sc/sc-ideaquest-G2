@@ -525,8 +525,8 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           </div>
         </details>
 
-        {/* 関連資料 添付（任意・複数可）。直前の「任意項目」は枠線ボックスで区切られているため、上の仕切り線は付けない（二重回避・ユーザー要望）。 */}
-        <Field id="idea_files" label="関連資料（任意・複数可）">
+        {/* 関連資料 添付（任意・複数可）。他項目と同じ間隔（.dialog-section）＋線なし（is-quiet）＝直前の「任意項目」枠と等間隔にならないよう離す（線は二重回避で付けない）。 */}
+        <Field className="dialog-section is-quiet" id="idea_files" label="関連資料（任意・複数可）">
           {/* 保存済みの添付（編集モードのみ・D.3）＝× で削除予定にマーク（保存で確定・版を生まない）。追加と同じくステージ方式。 */}
           {isEdit && existingAttachments.length > 0 && (
             <>
