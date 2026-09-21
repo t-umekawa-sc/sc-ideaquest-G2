@@ -86,7 +86,8 @@
 .rt__area:empty::before { content: attr(data-placeholder); color: var(--color-text-subtle); }
 
 /* 生成プレビュー（キーワード/要約）＝この情報の主要語/要約を出すパネル。抽出中は .iq-block__overlay で遮蔽（13.4）。 */
-.wc-preview { margin-top: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); min-height: 60px; }
+/* サブブロック間は広め（16px）＝見出し→入力(8px)より大きくして近接で境界を示す。 */
+.wc-preview { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); min-height: 60px; }
 .wc-preview .badge { cursor: default; }
 
 /* 関連リンク＝編集行（種別select＋削除）と追加行 */

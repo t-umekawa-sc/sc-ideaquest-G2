@@ -286,14 +286,17 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
                     : <span className="hint">本文が空です。記事を貼り付けてから抽出してください。</span>}
                 {cloudBusy ? <div className="iq-block__overlay"><span className="iq-loading-badge">抽出中 <span className="dots" /></span></div> : null}
               </div>
-              <div className={`wc-preview${summaryBusy ? " iq-block" : ""}`} style={{ marginTop: 8 }}>
+              <div className={`wc-preview${summaryBusy ? " iq-block" : ""}`}>
                 <div className="dialog-label">📝 要約（選別用・自動生成）</div>
                 {summaryPrev === null ? <span className="hint">「📝 要約を生成」を押すと、本文から要約を作成します（保存時にも自動生成されます）。</span>
                   : summaryPrev ? <span>{summaryPrev}</span> : <span className="hint">本文が空です。記事を貼り付けてから生成してください。</span>}
                 {summaryBusy ? <div className="iq-block__overlay"><span className="iq-loading-badge">要約生成中 <span className="dots" /></span></div> : null}
               </div>
-              <label className="dialog-label" htmlFor="dm-url" style={{ marginTop: 8 }}>出典URL（http/https）</label>
-              <input className="input" id="dm-url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setContentDirty(true); }} placeholder="https://…" />
+              {/* label を div でラップ＝.field 直下の label への `.field > label`(text-sm) 上書きを避け、他見出しと同じ .dialog-label(text-xs) に揃える。上余白は広めにして近接で境界を示す。 */}
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <label className="dialog-label" htmlFor="dm-url">出典URL（http/https）</label>
+                <input className="input" id="dm-url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setContentDirty(true); }} placeholder="https://…" />
+              </div>
             </>
           ) : (
             <>
@@ -359,7 +362,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         ) : null}
 
         {r.can.curate ? (
-          <div className="field">
+          <div className="field dialog-section">
             <div className="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               <AttrSelect label="優先度" k="priority" map={PRIORITY_LABEL} attrs={attrs} onSet={setAttr} />
@@ -403,7 +406,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         )}
 
-        <div className="field">
+        <div className="field dialog-section">
           <div className="dialog-label">この情報から（機会特定→行動）</div>
           <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
           <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
@@ -411,7 +414,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {/* アーカイブ／解除＝curator のみ（論理削除・監査保持・N.2）。フッターは閉じる/保存に絞るため本文に置く（SC-50 §8）。 */}
         {r.can.curate ? (
-          <div className="field">
+          <div className="field dialog-section">
             <div className="dialog-label">アーカイブ（情報判定権限）</div>
             {r.status === "archived" ? (
               <>
@@ -427,7 +430,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         ) : null}
 
-        <div className="field">
+        <div className="field dialog-section">
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
           {!linkEditing ? (
             <>

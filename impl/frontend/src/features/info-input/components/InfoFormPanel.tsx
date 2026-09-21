@@ -247,7 +247,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
                 : <span className="hint">本文が空です。記事を貼り付けてから抽出してください。</span>}
             {cloudBusy ? <div className="iq-block__overlay"><span className="iq-loading-badge">抽出中 <span className="dots" /></span></div> : null}
           </div>
-          <div className={`wc-preview${summaryBusy ? " iq-block" : ""}`} style={{ marginTop: 8 }}>
+          <div className={`wc-preview${summaryBusy ? " iq-block" : ""}`}>
             <div className="dialog-label">📝 要約（選別用・自動生成）</div>
             {summary === null ? <span className="hint">「📝 要約を生成」を押すと、本文から要約を作成します（保存時にも自動生成されます）。</span>
               : summary ? <span>{summary}</span> : <span className="hint">本文が空です。記事を貼り付けてから生成してください。</span>}
