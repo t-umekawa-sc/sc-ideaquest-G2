@@ -4245,6 +4245,8 @@ export interface components {
             status?: string | null;
             /** Due */
             due?: string | null;
+            /** Created At */
+            created_at?: string | null;
         };
         /** InfoLinkCandidatesResponse */
         InfoLinkCandidatesResponse: {

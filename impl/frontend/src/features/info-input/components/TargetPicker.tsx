@@ -108,8 +108,8 @@ export function TargetPicker({ open, onClose, onConfirm }: {
             {cands.map((c) => {
               const on = sel.has(uid(c));
               const ctx = c.target_type === "ideas"
-                ? [c.quest_title ? `📜${c.quest_title}` : null, c.owner_name, c.status].filter(Boolean).join("・")
-                : [c.owner_name, c.status].filter(Boolean).join("・");
+                ? [c.quest_title ? `📜${c.quest_title}` : null, c.owner_name, c.status, c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・")
+                : [c.owner_name, c.status, c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・");
               return (
                 <li key={uid(c)} className={`pick-row${on ? " is-sel" : ""}`} role="option" aria-selected={on} onClick={() => toggleSel(c)}>
                   <input type="checkbox" className="pick-row__check" checked={on} readOnly aria-label="選択" />

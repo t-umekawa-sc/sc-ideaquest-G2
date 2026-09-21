@@ -334,8 +334,10 @@ def test_n_tc_141_candidate_context_meta(client, info_env):
         idea = by_id[str(s.i1)]
         assert idea["quest_title"] == "候補ピッカーQ_ZZ" and idea["owner_name"] == "候補起票者ZZ"
         assert idea["status"] == "published" and idea["due"] == "2026-11-30"
+        assert idea["created_at"]  # 同名識別用の作成日（非null）
         quest = by_id[str(s.qid)]
         assert quest["owner_name"] == "候補起票者ZZ" and quest["due"] == "2026-12-31"
+        assert quest["created_at"]
         assert str(s.i3) not in by_id  # draft アイデアは候補に出ない
     finally:
         _cleanup_link_targets(info_env.db_identifier, s)

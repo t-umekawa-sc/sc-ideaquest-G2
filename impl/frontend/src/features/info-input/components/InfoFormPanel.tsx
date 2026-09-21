@@ -67,6 +67,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const [links, setLinks] = useState<StagedLink[]>([]);
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pending, setPending] = useState<InfoLinkCandidate[]>([]); // ピッカーで選びストックした候補（種別を選んで追加）
   const [linkKind, setLinkKind] = useState<InfoLinkKind>("related");
   const [cloud, setCloud] = useState<[string, number][] | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -128,17 +129,22 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
 
   const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
 
-  // 対象ピッカーで選んだ対象（複数可）を、選択中の種別でステージ（重複は除外）。保存後に /info-links へ POST。
+  // 対象ピッカーで選んだ対象（複数可）を呼び元にストック（種別は後で選ぶ・モック 10d 準拠）。既存/ストックと重複は除外。
   const addPicked = (picked: InfoLinkCandidate[]) => {
     setPickerOpen(false);
-    setLinks((ls) => {
-      const seen = new Set(ls.map((l) => `${l.target_type}:${l.target_id}`));
-      const add = picked
-        .filter((c) => !seen.has(`${c.target_type}:${c.target_id}`))
-        .map((c) => ({ target_type: c.target_type, target_id: c.target_id, target_title: c.title, kind: linkKind }));
-      return [...ls, ...add];
+    setPending((ps) => {
+      const seen = new Set([...ps, ...links].map((l) => `${l.target_type}:${l.target_id}`));
+      return [...ps, ...picked.filter((c) => !seen.has(`${c.target_type}:${c.target_id}`))];
     });
   };
+  // ストックした候補を、選択中の種別でステージ（保存後に /info-links へ POST）→ ストック解消。
+  const commitStaged = () => {
+    if (!pending.length) return;
+    setLinks((ls) => [...ls, ...pending.map((c) => ({ target_type: c.target_type, target_id: c.target_id, target_title: c.title, kind: linkKind }))]);
+    setPending([]);
+  };
+  const removePending = (c: InfoLinkCandidate) =>
+    setPending((ps) => ps.filter((x) => !(x.target_type === c.target_type && x.target_id === c.target_id)));
   const setLinkKindAt = (i: number, kind: InfoLinkKind) => setLinks((ls) => ls.map((l, j) => (j === i ? { ...l, kind } : l)));
   const removeLink = (i: number) => setLinks((ls) => ls.filter((_, j) => j !== i));
 
@@ -289,13 +295,27 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             </ul>
           ) : <div className="hint">関連リンクはまだありません。下から追加できます（保存すると類似度で<strong>自動リンク</strong>も生成されます）。</div>}
           <div className="link-add">
+            <div className="linkpick">
+              <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
+              {pending.length ? (
+                <div className="linkpick__chips">
+                  {pending.map((c) => (
+                    <span key={`${c.target_type}:${c.target_id}`} className="linkpick__chip">
+                      <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[c.target_type]}</span>
+                      <span className="linkpick__chip-title">{c.title}</span>
+                      <button type="button" className="linkpick__chip-rm" aria-label="解除" title="解除" onClick={() => removePending(c)}>✕</button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div className="link-add__bottom">
-              <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別（選ぶ対象すべてに適用）</span>
+              <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別（選んだ対象すべてに適用）</span>
                 <select className="select" value={linkKind} onChange={(e) => setLinkKind(e.target.value as InfoLinkKind)}>
                   {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                 </select>
               </label>
-              <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選んで追加…</button>
+              <button className="btn btn-outline" type="button" disabled={!pending.length} onClick={commitStaged}>＋ 追加</button>
             </div>
           </div>
           <div className="hint">種別を<strong>「反証」</strong>にすると、対象の作成者＋評価者へ<strong>通知＋要再評価</strong>が発火します（根底を揺さぶる）。</div>

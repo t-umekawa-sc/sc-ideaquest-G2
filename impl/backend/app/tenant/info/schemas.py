@@ -145,6 +145,7 @@ class InfoLinkCandidateDTO(BaseModel):
     owner_name: str | None = None
     status: str | None = None
     due: str | None = None  # ISO(YYYY-MM-DD)。アイデア=タイムリミット／クエスト=期限日。
+    created_at: str | None = None  # ISO(YYYY-MM-DD)。同名・同一文脈でも作成日で識別できるように。
 
 
 class InfoLinkCandidatesResponse(BaseModel):

@@ -119,6 +119,7 @@ export interface InfoLinkCandidate {
   owner_name?: string | null;  // 起票者/所有者
   status?: string | null;      // published/draft/recruiting 等
   due?: string | null;         // ISO 期限（アイデア=タイムリミット／クエスト=期限日）
+  created_at?: string | null;  // ISO 作成日（同名・同一文脈の識別用）
 }
 export interface InfoAttachment {
   id: string;

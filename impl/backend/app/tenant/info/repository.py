@@ -284,7 +284,7 @@ def search_link_candidates(
 
     if "ideas" in types:
         stmt = (
-            select(Idea.id, Idea.title, Quest.title, User.display_name, Idea.status, Idea.time_limit)
+            select(Idea.id, Idea.title, Quest.title, User.display_name, Idea.status, Idea.time_limit, Idea.created_at)
             .join(Quest, Quest.id == Idea.quest_id)
             .join(User, User.id == Idea.author_id)
             .where(Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like))
@@ -297,16 +297,17 @@ def search_link_candidates(
             stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit >= df)
         if due_to:
             stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit <= dt)
-        for i, title, qtitle, owner, status, due in session.execute(
+        for i, title, qtitle, owner, status, due, created in session.execute(
             stmt.order_by(Idea.title.asc(), Idea.id.asc()).limit(want)
         ).all():
             rows.append({"target_type": "ideas", "target_id": str(i), "title": title,
                          "quest_title": qtitle, "owner_name": owner, "status": status,
-                         "due": due.isoformat() if due else None})
+                         "due": due.isoformat() if due else None,
+                         "created_at": created.date().isoformat() if created else None})
 
     if "quests" in types:
         stmt = (
-            select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline)
+            select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline, Quest.created_at)
             .join(User, User.id == Quest.owner_id)
             .where(Quest.deleted_at.is_(None), Quest.title.ilike(like))
         )
@@ -318,12 +319,13 @@ def search_link_candidates(
             stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline >= df)
         if due_to:
             stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline <= dt)
-        for i, title, owner, status, due in session.execute(
+        for i, title, owner, status, due, created in session.execute(
             stmt.order_by(Quest.title.asc(), Quest.id.asc()).limit(want)
         ).all():
             rows.append({"target_type": "quests", "target_id": str(i), "title": title,
                          "quest_title": None, "owner_name": owner, "status": status,
-                         "due": due.isoformat() if due else None})
+                         "due": due.isoformat() if due else None,
+                         "created_at": created.date().isoformat() if created else None})
 
     # 種類横断でタイトル順に整列 → offset/limit で切り出し（over-fetch 分で has_more 判定）。
     rows.sort(key=lambda r: (r["title"], r["target_type"], r["target_id"]))
