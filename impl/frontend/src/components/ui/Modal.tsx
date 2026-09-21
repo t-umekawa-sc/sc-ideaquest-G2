@@ -189,10 +189,11 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
                 type="button"
                 className="modal__maxbtn"
                 aria-label={maximized ? "元のサイズに戻す" : "最大化"}
+                title={maximized ? "元のサイズに戻す" : "最大化"}
                 aria-pressed={maximized}
                 onClick={() => setMaximized((v) => !v)}
               >
-                {maximized ? "⤡" : "⤢"}
+                {maximized ? "❐" : "⤢"}
               </button>
             )}
             <button type="button" className="modal__close" aria-label="閉じる" onClick={onClose}>

@@ -497,15 +497,16 @@ window.setFieldError = setFieldError;
     let tools = header.querySelector('.modal__header__tools');
     if (!tools) { tools = document.createElement('div'); tools.className = 'modal__header__tools'; header.appendChild(tools); }
     const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'modal__maxbtn'; btn.setAttribute('aria-label', '最大化'); btn.textContent = '⤢';
+    btn.type = 'button'; btn.className = 'modal__maxbtn'; btn.setAttribute('aria-label', '最大化'); btn.title = '最大化'; btn.textContent = '⤢';
     tools.appendChild(btn);
     if (close) tools.appendChild(close);   // ×をツール群の末尾へ移動（⤢ の右）
     btn.addEventListener('click', () => {
       const p = panelOf(m); if (!p) return;
       const max = p.classList.toggle('is-max');
       p.style.position = ''; p.style.left = ''; p.style.top = ''; p.style.margin = ''; p.style.width = '';  // 位置・幅リセット
-      btn.textContent = max ? '⤡' : '⤢';
+      btn.textContent = max ? '❐' : '⤢';   // 縮小＝「元に戻す」標準記号（⤡ は ⤢ と紛らわしいため変更）
       btn.setAttribute('aria-label', max ? '元のサイズに戻す' : '最大化');
+      btn.title = max ? '元のサイズに戻す' : '最大化';
     });
   }
   document.addEventListener('DOMContentLoaded', () => {
