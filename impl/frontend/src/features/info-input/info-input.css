@@ -102,7 +102,7 @@
 .link-add__bottom .btn { flex: 0 0 auto; }
 
 /* 参考資料の添付（アイデア登録 SC-21 と同じ dropzone＋attach） */
-.dropzone { border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
+.dropzone { margin-top: var(--space-3); border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius); padding: var(--space-4); text-align: center;
   color: var(--color-text-muted); cursor: pointer; background: var(--color-surface-alt); transition: border-color .15s, background .15s; }
 .dropzone:hover, .dropzone.is-over { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
 .attach-list { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }

@@ -229,9 +229,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const r = item;
   const activeLinks = r.links.filter((l) => !l.rejected);
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
-  // 項目区切り＝デザイン標準 §4.1: 参照系（このユーザーが編集できない項目）は仕切り線／入力・操作系は余白。
-  const refCls = "field dialog-section";                       // 常に参照＝要約/主要語/属性(read)/続報スレッド
-  const contentCls = r.can.edit_content ? "field" : refCls;    // 作成者が編集する項目＝タイトル/内容/参考資料
+  // 項目区切り＝デザイン標準 §4.1: 全セクションで仕切り線の"間隔"を統一。参照/操作は線あり（dialog-section）、
+  // 入力用（タイトル/内容の編集）は線を消して間隔だけ維持（is-quiet）＝入力欄と線の二重感を避ける。
+  const refCls = "field dialog-section";                                        // 参照＝要約/主要語/属性(read)/続報スレッド
+  const contentCls = r.can.edit_content ? "field dialog-section is-quiet" : refCls; // タイトル/内容＝編集時は線なし・間隔は維持
   // 続報スレッド＝根→続報1→続報2… の時系列（SC-50 §80）。根＝続報を開いていれば thread.parent、根を開いていれば自身。
   // 開いているアイテムは「表示中」で強調（リンクにしない）。thread.follow_ups は根の子（backend が root 基準で返す）。
   const threadRoot: InfoThreadItem = r.thread.parent ?? {
@@ -313,6 +314,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         </div>
 
         {(r.attachments.length || r.can.edit_content) ? (
+          // 参考資料は作成者の入力項目＝編集時は線なし・間隔維持（contentCls）／読み取りは線あり。
           <div className={contentCls}>
             <div className="dialog-label">参考資料（出典の裏付け・引用元の保全）</div>
             {r.attachments.length ? (
