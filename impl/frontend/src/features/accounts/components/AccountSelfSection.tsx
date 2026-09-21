@@ -24,6 +24,7 @@ import {
   sendOwnEmailVerification,
 } from "../api";
 import type { Account } from "../types";
+import { toMembershipInputs } from "../memberships";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css";
 
@@ -87,7 +88,9 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
           display_name: a.display_name,
           login_id: a.login_id,
           email: a.email,
-          memberships: a.memberships ?? [],
+          // MembershipView（name 含む）→ 入力スキーマ（group_id/role のみ）へ絞る＝name を載せたまま複製すると
+          // 発行時 422 になるため（toMembershipInputs で一元化・AccountSection と同じ・DRY §2.3）。
+          memberships: toMembershipInputs(a.memberships),
         }),
       ),
   });

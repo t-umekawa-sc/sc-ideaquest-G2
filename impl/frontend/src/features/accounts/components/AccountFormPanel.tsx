@@ -22,10 +22,25 @@ import {
   listQuestGroups,
 } from "../api";
 import type { AccountCreateInput, Membership, QuestGroup } from "../types";
+import { toMembershipInputs } from "../memberships";
 import { MembershipsEditor } from "./MembershipsEditor";
 import "@/features/companies/companies.css";
 
 type SystemRole = AccountCreateInput["system_role"];
+
+// 422 validation_error の field パス（例＝`memberships.0.name`）を業務ラベルへ寄せる（先頭セグメントで判定）。
+function fieldLabel(field?: string): string {
+  if (!field) return "";
+  const base = field.split(".")[0];
+  const map: Record<string, string> = {
+    display_name: "氏名",
+    login_id: "ログインID",
+    email: "メールアドレス",
+    system_role: "システムロール",
+    memberships: "所属クエストグループ",
+  };
+  return map[base] ?? field;
+}
 
 function issueErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -35,7 +50,13 @@ function issueErrorMessage(err: unknown): string {
       if (field === "email") return "このメールアドレスは既に使われています。";
       return "指定された値は既に使われています。";
     }
-    if (err.code === "validation_error") return "入力内容をご確認ください。";
+    if (err.code === "validation_error") {
+      // サーバーが返す errors[].field を画面に出す（原因不明の汎用文言で潰さない・§4.7）。
+      const errs = (err.body as { errors?: { field?: string; message?: string }[] } | null)?.errors ?? [];
+      const labels = Array.from(new Set(errs.map((e) => fieldLabel(e.field)).filter(Boolean)));
+      if (labels.length) return `入力内容をご確認ください（${labels.join("・")}）。`;
+      return "入力内容をご確認ください。";
+    }
     if (err.code === "forbidden") return "この操作を行う権限がありません。";
   }
   return "エラーが発生しました。時間をおいて再度お試しください。";
@@ -112,8 +133,8 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           setLoginId(a.login_id);
           setEmail(a.email);
           setSystemRole(a.system_role as SystemRole);
-          // 現在の所属を読み取り専用表示に使う（B.2 一覧応答＝group_id/role/name。role を local 型へ絞る）。
-          setCurrentMemberships((a.memberships ?? []).map((m) => ({ group_id: m.group_id, role: m.role === "admin" ? "admin" : "member" })));
+          // 現在の所属を読み取り専用表示に使う（B.2 一覧応答＝group_id/role/name。入力スキーマへ絞る＝toMembershipInputs）。
+          setCurrentMemberships(toMembershipInputs(a.memberships));
         }
         setLoading(false);
       })
@@ -184,6 +205,18 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           : undefined;
       if (field === "login_id") setFieldErrors({ login_id: "このログインID は既に使われています。" });
       else if (field === "email") setFieldErrors({ email: "このメールアドレスは既に使われています。" });
+      // 422 validation_error は該当する入力フィールドがあればインライン赤字に反映（§4b・§4.7）。
+      else if (err instanceof ApiError && err.code === "validation_error") {
+        const errs = (err.body as { errors?: { field?: string; message?: string }[] } | null)?.errors ?? [];
+        const fe: { display_name?: string; login_id?: string; email?: string } = {};
+        for (const e of errs) {
+          const base = (e.field ?? "").split(".")[0];
+          if (base === "display_name") fe.display_name = "この値は使用できません。";
+          else if (base === "login_id") fe.login_id = "この値は使用できません。";
+          else if (base === "email") fe.email = "この値は使用できません。";
+        }
+        if (Object.keys(fe).length) setFieldErrors(fe);
+      }
       notify([m]); // スクロール＋エラースナックバー（§4.7）
     } finally {
       setPending(false);

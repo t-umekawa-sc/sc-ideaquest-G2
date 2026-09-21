@@ -66,6 +66,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | B-TC-171 | api | 一覧応答に有効所属（group_id/role/**name**）を付与 | ACME-01 にグループ seed・memberships 付き発行→`process_outbox_once()` で会社DB へ適用 | `GET /admin/companies/{ACME-01}/accounts`（当該アカウント行） | 行の `memberships` に `{group_id, role, name}` を含む（有効所属のみ・`removed_at IS NULL`・**name＝所属クエストグループ列の表示名**）／所属の無いアカウント行は `memberships=[]` | API設計 B.2（一覧応答＝所属付き・表示名同梱）／§5.5 |
 | B-TC-171b | api | 一覧応答の `avatar_url` は署名URL（会社DB ミラー・物理パス漏洩防止） | 発行→`process_outbox_once()` で users ミラー生成後、ミラーに `avatar_image_path` 設定・Fake storage | `GET /admin/companies/{ACME-01}/accounts`（当該行） | 行の `avatar_url` が**短TTL 署名URL**（`https://minio.test/...`）＝生の物理パスをそのまま返さない | API設計 B.2／K.4／§1.10 |
+| B-TC-177 | unit | 複製プリフィルの memberships を入力スキーマへ絞る（`name` 落とし・422 回帰防止） | 一覧応答由来の memberships（`{group_id, role, name}` を含む・`role='admin'`/`role` 欠落 混在） | `toMembershipInputs(memberships)`（`features/accounts/memberships.ts`） | 各要素が `{group_id, role}` のみ（`name` 等の余分キーを含まない）・`role` は `member\|admin` に正規化（`admin`→`admin`／未指定→`member`）＝発行 `MembershipInput`（`extra="forbid"`）で 422 にならない | B.2（一覧応答は name 同梱）／B-TC-074（extra=forbid）／デザイン標準 §4.5 複製 |
 
 **発行（`POST /admin/companies/{company_id}/accounts`・system_admin・B.2/B.5）**。memberships（会社DB `quest_group_members`）は本スライス非対応（別スライス）。
 

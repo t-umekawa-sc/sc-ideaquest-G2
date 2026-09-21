@@ -18,6 +18,7 @@ import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { ACCOUNTS_CHANGED_EVENT, disableAccount, enableAccount, listAccounts, resetPassword, sendEmailVerification } from "../api";
 import type { Account } from "../types";
+import { toMembershipInputs } from "../memberships";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css";
 
@@ -90,7 +91,9 @@ export function AccountSection({ companyId }: { companyId: string }) {
           login_id: a.login_id,
           email: a.email,
           system_role: a.system_role,
-          memberships: a.memberships ?? [],
+          // 一覧応答の memberships（MembershipView・name 含む）を入力スキーマ（group_id/role のみ）へ絞る＝
+          // name を載せたまま複製すると発行時に 422 になるため（toMembershipInputs で一元化・DRY §2.3）。
+          memberships: toMembershipInputs(a.memberships),
         }),
       ),
   });
