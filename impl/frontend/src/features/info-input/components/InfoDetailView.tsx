@@ -9,14 +9,15 @@ import { useRouter } from "next/navigation";
 import { useConfirm, useSnackbar } from "@/components/ui";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
-  fetchLinkCandidates, rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
+  rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
 } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget, InfoThreadItem } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoThreadItem } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
+import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
@@ -72,13 +73,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [curationDirty, setCurationDirty] = useState(false);
   const setAttr = (k: string, v: string) => { setAttrs((a) => ({ ...a, [k]: v })); setCurationDirty(true); };
   const toggleCat = (c: string) => { setCats((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c])); setCurationDirty(true); };
-  // 関連リンクのインライン編集（全員・即時コミット→詳細再取得）。
+  // 関連リンクのインライン編集（全員・即時コミット→詳細再取得）。対象選択は共通 TargetPicker。
   const [linkEditing, setLinkEditing] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
-  const [addType, setAddType] = useState<InfoLinkTarget>("ideas");
-  const [addQ, setAddQ] = useState("");
-  const [addCands, setAddCands] = useState<InfoLinkCandidate[]>([]);
-  const [addSel, setAddSel] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [addKind, setAddKind] = useState<InfoLinkKind>("related");
   // 参考資料（内容群・作成者のみ・§5.33）＝追加/削除は即時コミット→詳細再取得。
   const attInputRef = useRef<HTMLInputElement>(null);
@@ -154,14 +152,6 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setSaving(false);
   };
 
-  // リンク候補のインクリメンタル検索（編集モード時のみ・デバウンス）。
-  useEffect(() => {
-    if (!linkEditing) { setAddCands([]); return; }
-    const ac = new AbortController();
-    const t = setTimeout(() => { void fetchLinkCandidates(addType, addQ, ac.signal).then(setAddCands).catch(() => {}); }, 300);
-    return () => { clearTimeout(t); ac.abort(); };
-  }, [linkEditing, addType, addQ]);
-
   // リンク操作＝即時コミット→詳細を再取得して反映。
   const linkOp = async (fn: () => Promise<unknown>) => {
     setLinkBusy(true);
@@ -179,9 +169,14 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     }
     await linkOp(() => changeLinkKindApi(linkId, next));
   };
-  const addLinkConfirmed = async () => {
+  // 対象ピッカーで選んだ対象（複数可）を、選択中の種別でまとめて追加（反証はまとめて1回確認）。
+  const addPicked = async (picked: InfoLinkCandidate[]) => {
+    setPickerOpen(false);
+    if (!picked.length) return;
     if (addKind === "refuting" && !(await confirm(REFUTE_CONFIRM))) return;
-    await linkOp(async () => { await addLinkApi(infoId, addType, addSel, addKind); setAddQ(""); setAddSel(""); setAddCands([]); });
+    await linkOp(async () => {
+      for (const c of picked) await addLinkApi(infoId, c.target_type, c.target_id, addKind);
+    });
   };
 
   // 参考資料の追加/削除（作成者のみ・即時コミット→詳細再取得）。
@@ -253,7 +248,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         </div>
 
         {!r.can.edit_content && r.summary ? (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="summary-box"><div className="summary-box__label">要約（選別用・自動生成）</div>{r.summary}</div>
           </div>
         ) : null}
@@ -303,7 +298,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         </div>
 
         {(r.attachments.length || r.can.edit_content) ? (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="dialog-label">参考資料（出典の裏付け・引用元の保全）</div>
             {r.attachments.length ? (
               <div className="attach-list">
@@ -339,7 +334,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {/* 主要語は編集不可（参照）モードだけ下部に表示。作成者（編集）は内容欄の直下にインライン表示（登録ダイアログと同位置）。 */}
         {!r.can.edit_content ? (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
             {r.tokens_top.length ? (
               <div className="wc-mini">
@@ -352,7 +347,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         ) : null}
 
         {r.can.curate ? (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               <AttrSelect label="優先度" k="priority" map={PRIORITY_LABEL} attrs={attrs} onSet={setAttr} />
@@ -378,7 +373,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
             </div>
           </div>
         ) : (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="dialog-label">属性（環境スキャン・判定）</div>
             <dl className="attr-grid">
               <Attr label="情報ソース" value={r.source ? SOURCE_LABEL[r.source] : null} />
@@ -395,7 +390,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         )}
 
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">この情報から（機会特定→行動）</div>
           <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
           <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
@@ -403,7 +398,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {/* アーカイブ／解除＝curator のみ（論理削除・監査保持・N.2）。フッターは閉じる/保存に絞るため本文に置く（SC-50 §8）。 */}
         {r.can.curate ? (
-          <div className="field dialog-section">
+          <div className="field">
             <div className="dialog-label">アーカイブ（情報判定権限）</div>
             {r.status === "archived" ? (
               <>
@@ -419,7 +414,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         ) : null}
 
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
           {!linkEditing ? (
             <>
@@ -465,30 +460,13 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
                 ))}
               </ul>
               <div className="link-add">
-                <label className="link-add__field"><span className="link-add__lbl">対象（アイデア／クエストをタイトルで検索）</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <select className="select" style={{ width: "auto" }} value={addType} onChange={(e) => { setAddType(e.target.value as InfoLinkTarget); setAddSel(""); }}>
-                      {Object.entries(LINK_TARGET_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                    <input className="input" id="dm-linkq" value={addQ} onChange={(e) => setAddQ(e.target.value)} placeholder="タイトルで検索…" />
-                  </div>
-                </label>
-                {addCands.length ? (
-                  <label className="link-add__field"><span className="link-add__lbl">候補</span>
-                    <select className="select" id="dm-cand" value={addSel} onChange={(e) => setAddSel(e.target.value)}>
-                      <option value="">— 選択 —</option>
-                      {addCands.map((c) => <option key={c.target_id} value={c.target_id}>{c.title}</option>)}
-                    </select>
-                  </label>
-                ) : addQ ? <div className="hint">候補がありません（ideas は公開済み・quests は非削除が対象）。</div> : null}
                 <div className="link-add__bottom">
-                  <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別</span>
+                  <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別（選ぶ対象すべてに適用）</span>
                     <select className="select" value={addKind} onChange={(e) => setAddKind(e.target.value as InfoLinkKind)}>
                       {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                     </select>
                   </label>
-                  <button className="btn btn-outline" type="button" disabled={!addSel || linkBusy}
-                    onClick={addLinkConfirmed}>＋ 追加</button>
+                  <button className="btn btn-outline" type="button" disabled={linkBusy} onClick={() => setPickerOpen(true)}>🔍 対象を選んで追加…</button>
                 </div>
               </div>
               <div className="hint" style={{ marginTop: 6 }}>その場で編集し即時反映します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
@@ -497,7 +475,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           )}
         </div>
 
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">🧵 続報スレッド</div>
           {hasThread ? (
             <ul className="info-thread">
@@ -532,6 +510,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           <button className="btn btn-primary" type="button" onClick={save} disabled={saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>
         ) : null}
       </div>
+      <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} />
     </>
   );
 }

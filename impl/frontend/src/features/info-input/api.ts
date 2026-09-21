@@ -157,10 +157,25 @@ export async function updateInfoItemApi(id: string, patch: InfoPatch): Promise<I
 }
 
 // 関連リンク（/info-links・Phase C slice5.3・情報側=全員）。候補検索＋追加/種別変更/棄却（即時コミット）。
-export async function fetchLinkCandidates(targetType: InfoLinkTarget, q: string, signal?: AbortSignal): Promise<InfoLinkCandidate[]> {
-  const qs = new URLSearchParams({ target_type: targetType, q, limit: "20" });
-  const res = await apiFetch<{ candidates: InfoLinkCandidate[] }>(`/info-link-candidates?${qs.toString()}`, { signal });
-  return res?.candidates ?? [];
+// 対象ピッカー用＝種類横断＋文脈メタ＋クエスト/状態/期限で絞込＋cursor ページング。
+export interface LinkCandidateQuery {
+  types?: InfoLinkTarget[]; q?: string;
+  questIds?: string[]; statuses?: string[];
+  dueFrom?: string; dueTo?: string;
+  limit?: number; cursor?: string | null;
+}
+export async function fetchLinkCandidates(query: LinkCandidateQuery, signal?: AbortSignal): Promise<{ candidates: InfoLinkCandidate[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  qs.set("types", (query.types ?? ["ideas", "quests"]).join(","));
+  if (query.q) qs.set("q", query.q);
+  if (query.questIds?.length) qs.set("quest_ids", query.questIds.join(","));
+  if (query.statuses?.length) qs.set("statuses", query.statuses.join(","));
+  if (query.dueFrom) qs.set("due_from", query.dueFrom);
+  if (query.dueTo) qs.set("due_to", query.dueTo);
+  qs.set("limit", String(query.limit ?? 20));
+  if (query.cursor) qs.set("cursor", query.cursor);
+  const res = await apiFetch<{ candidates: InfoLinkCandidate[]; next_cursor: string | null }>(`/info-link-candidates?${qs.toString()}`, { signal });
+  return { candidates: res?.candidates ?? [], nextCursor: res?.next_cursor ?? null };
 }
 export function addLinkApi(infoItemId: string, targetType: InfoLinkTarget, targetId: string, kind: InfoLinkKind) {
   return apiFetch("/info-links", { method: "POST", body: JSON.stringify({ info_item_id: infoItemId, target_type: targetType, target_id: targetId, kind }) });

@@ -4,19 +4,21 @@
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Field, Multiselect } from "@/components/ui";
-import type { MultiselectOption } from "@/components/ui";
+import { Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { addAttachmentsApi, createInfoItemApi, fetchInfoDetail, uploadInfoImageApi } from "../api";
-import { LINK_CANDIDATES } from "../fixtures";
+import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoInput } from "../api";
-import type { InfoDetail, InfoLink, InfoLinkKind, InfoLinkTarget } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
+import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
+
+// 登録時にステージするリンク（保存後に /info-links へ POST）。対象は共通 TargetPicker で選ぶ。
+interface StagedLink { target_type: InfoLinkTarget; target_id: string; target_title: string; kind: InfoLinkKind; }
 
 const OPT = (m: Record<string, string>) => Object.entries(m).map(([v, l]) => ({ v, l }));
 const iconFor = (name: string) => {
@@ -28,11 +30,6 @@ const iconFor = (name: string) => {
   return "📎";
 };
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
-
-// 関連リンクの追加候補＝全種別をタイプ併記ラベルで（value="type:title"）。
-const LINK_OPTIONS: MultiselectOption[] = (["ideas", "quests", "concepts"] as InfoLinkTarget[]).flatMap((t) =>
-  (LINK_CANDIDATES[t] ?? []).map((title) => ({ value: `${t}:${title}`, label: `${LINK_TARGET_LABEL[t]}｜${title}` })),
-);
 
 export function InfoFormPanel({ parentId, onCancel, onDone }: {
   parentId?: string; onCancel: () => void; onDone: () => void;
@@ -67,9 +64,9 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const [triage, setTriage] = useState("");
   const [reason, setReason] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [links, setLinks] = useState<InfoLink[]>([]);
+  const [links, setLinks] = useState<StagedLink[]>([]);
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
-  const [pickTarget, setPickTarget] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [linkKind, setLinkKind] = useState<InfoLinkKind>("related");
   const [cloud, setCloud] = useState<[string, number][] | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -131,22 +128,19 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
 
   const toggleCategory = (c: string) => setCategories((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]));
 
-  const addLink = () => {
-    const picked = pickTarget[0];
-    if (!picked) return;
-    const [t, ...rest] = picked.split(":");
-    const targetTitle = rest.join(":");
-    if (links.some((l) => l.target_type === t && l.target_title === targetTitle)) return;
-    setLinks((ls) => [...ls, { target_type: t as InfoLinkTarget, target_title: targetTitle, kind: linkKind, origin: "manual", score: null }]);
-    setPickTarget([]);
+  // 対象ピッカーで選んだ対象（複数可）を、選択中の種別でステージ（重複は除外）。保存後に /info-links へ POST。
+  const addPicked = (picked: InfoLinkCandidate[]) => {
+    setPickerOpen(false);
+    setLinks((ls) => {
+      const seen = new Set(ls.map((l) => `${l.target_type}:${l.target_id}`));
+      const add = picked
+        .filter((c) => !seen.has(`${c.target_type}:${c.target_id}`))
+        .map((c) => ({ target_type: c.target_type, target_id: c.target_id, target_title: c.title, kind: linkKind }));
+      return [...ls, ...add];
+    });
   };
   const setLinkKindAt = (i: number, kind: InfoLinkKind) => setLinks((ls) => ls.map((l, j) => (j === i ? { ...l, kind } : l)));
-  const removeLink = (i: number) => setLinks((ls) => {
-    const l = ls[i];
-    if (l.origin === "auto") return ls.map((x, j) => (j === i ? { ...x, rejected: true } : x)); // 自動＝棄却（残す・復活しない）
-    return ls.filter((_, j) => j !== i); // 手動＝削除
-  });
-  const unrejectLink = (i: number) => setLinks((ls) => ls.map((x, j) => (j === i ? { ...x, rejected: false } : x)));
+  const removeLink = (i: number) => setLinks((ls) => ls.filter((_, j) => j !== i));
 
   const addFiles = (fl: FileList | null) => { if (fl) setFiles((f) => [...f, ...Array.from(fl)]); };
 
@@ -164,7 +158,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       priority: priority || null, source: source || null, classification: classification || null, scope: scope || null,
       target_business: business || null, categories, impact_level: impact || null, impact_class: impactClass || null,
       impact_timing: timing || null, triaged_on: triagedOn || null, triage: triage || null, triage_reason: reason || null,
-      due_date: dueDate || null, links,
+      due_date: dueDate || null,
     };
     // 新規/続報＝実 API（POST /info-items）＝内容（title/body_html/source_url/parent）。編集は詳細のインライン編集に一本化。
     setSaving(true);
@@ -174,6 +168,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       if (files.length) {
         try { await addAttachmentsApi(created.id, files); }
         catch { setTitleErr("情報は登録しましたが、参考資料の一部を添付できませんでした。詳細から再添付してください。"); }
+      }
+      // 関連リンク＝作成後に /info-links へ POST（create は links を持たない＝id 先行が必要）。
+      if (links.length) {
+        try { for (const l of links) await addLinkApi(created.id, l.target_type, l.target_id, l.kind); }
+        catch { setTitleErr("情報は登録しましたが、関連リンクの一部を追加できませんでした。詳細から再設定してください。"); }
       }
       onDone();
     } catch (e) {
@@ -211,11 +210,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           </details>
         ) : null}
 
-        <Field id="im-title" label="タイトル" required error={titleErr} className={parentId ? "dialog-section" : undefined}>
+        <Field id="im-title" label="タイトル" required error={titleErr}>
           <input className="input" id="im-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例: 生成AIの業務利用が急拡大（○○社レポート）" />
         </Field>
 
-        <Field id="im-body" label="内容・説明（WEBページを書式・画像込みで貼付できます）" className="dialog-section">
+        <Field id="im-body" label="内容・説明（WEBページを書式・画像込みで貼付できます）">
           <div className="rt">
             <div className="rt__bar" role="toolbar" aria-label="書式">
               <button type="button" onClick={() => exec("bold")} title="太字"><b>B</b></button>
@@ -250,11 +249,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           </div>
         </Field>
 
-        <Field id="im-url" label="出典URL" hint="出典を明記すると引用性・信頼性の重み付けに使えます。" error={urlErr} className="dialog-section">
+        <Field id="im-url" label="出典URL" hint="出典を明記すると引用性・信頼性の重み付けに使えます。" error={urlErr}>
           <input className="input" id="im-url" type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://…（http/https のみ）" />
         </Field>
 
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">参考資料（任意・複数可）</div>
           <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
           <div className="dropzone" role="button" tabIndex={0} onClick={() => fileInputRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
@@ -272,47 +271,38 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           <div className="hint">本文とは別に、PDF・画像・資料ファイルを添付できます（出典の裏付け・引用元の保全）。</div>
         </div>
 
-        <div className="field dialog-section">
-          <div className="dialog-label">関連リンク（アイデア／クエスト／コンセプト）</div>
+        <div className="field">
+          <div className="dialog-label">関連リンク（アイデア／クエスト）</div>
           {links.length ? (
             <ul className="link-list">
-              {links.map((l, i) => l.rejected ? (
-                <li key={i} className="link-item">
-                  <span>{LINK_TARGET_LABEL[l.target_type]}</span>
-                  <span className="link-item__title" style={{ textDecoration: "line-through", color: "var(--color-text-subtle)" }}>{l.target_title}</span>
-                  <span className="badge badge-muted">棄却済み・再リンクされません</span>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => unrejectLink(i)}>戻す</button>
-                </li>
-              ) : (
-                <li key={i} className="link-item">
-                  <span>{LINK_TARGET_LABEL[l.target_type]}</span>
+              {links.map((l, i) => (
+                <li key={`${l.target_type}:${l.target_id}`} className={`link-item${l.kind === "refuting" ? " is-refuting" : ""}`}>
+                  <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[l.target_type]}</span>
                   <span className="link-item__title">{l.target_title}</span>
-                  <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
+                  <span className="badge badge-muted">手動</span>
                   <select className="select link-kind" value={l.kind} aria-label="種別" onChange={(e) => setLinkKindAt(i, e.target.value as InfoLinkKind)}>
                     {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                   </select>
-                  <button type="button" className="link-item__rm" aria-label={l.origin === "auto" ? "棄却" : "削除"} title={l.origin === "auto" ? "棄却（今後この情報から自動リンクしない・復活しない）" : "削除"} onClick={() => removeLink(i)}>✕</button>
+                  <button type="button" className="link-item__rm" aria-label="削除" title="削除" onClick={() => removeLink(i)}>✕</button>
                 </li>
               ))}
             </ul>
           ) : <div className="hint">関連リンクはまだありません。下から追加できます（保存すると類似度で<strong>自動リンク</strong>も生成されます）。</div>}
           <div className="link-add">
-            <label className="link-add__field"><span className="link-add__lbl">対象（アイデア／クエスト／コンセプトをタイトルで検索）</span>
-              <Multiselect options={LINK_OPTIONS} value={pickTarget} onChange={(next) => setPickTarget(next.slice(-1))} placeholder="タイトルで検索して選択…" ariaLabel="対象" />
-            </label>
             <div className="link-add__bottom">
-              <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別</span>
+              <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別（選ぶ対象すべてに適用）</span>
                 <select className="select" value={linkKind} onChange={(e) => setLinkKind(e.target.value as InfoLinkKind)}>
                   {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                 </select>
               </label>
-              <button className="btn btn-primary" type="button" onClick={addLink}>＋ 追加</button>
+              <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選んで追加…</button>
             </div>
           </div>
           <div className="hint">種別を<strong>「反証」</strong>にすると、対象の作成者＋評価者へ<strong>通知＋要再評価</strong>が発火します（根底を揺さぶる）。</div>
+          <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} />
         </div>
 
-        <details className="disclosure field dialog-section">
+        <details className="disclosure field">
           <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定{curated ? "" : ""}</summary>
           <div className="disclosure__body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
             <Field id="im-priority" label="優先度"><select className="select" id="im-priority" value={priority} onChange={(e) => setPriority(e.target.value)}><option value="">—</option>{OPT(PRIORITY_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>

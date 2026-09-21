@@ -115,6 +115,10 @@ export interface InfoLinkCandidate {
   target_type: InfoLinkTarget;
   target_id: string;
   title: string;
+  quest_title?: string | null; // 所属クエスト名（アイデア）
+  owner_name?: string | null;  // 起票者/所有者
+  status?: string | null;      // published/draft/recruiting 等
+  due?: string | null;         // ISO 期限（アイデア=タイムリミット／クエスト=期限日）
 }
 export interface InfoAttachment {
   id: string;

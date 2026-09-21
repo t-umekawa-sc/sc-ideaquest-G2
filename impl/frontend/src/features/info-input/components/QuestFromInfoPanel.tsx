@@ -78,13 +78,13 @@ export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: strin
         <Field id="qfi-name" label="クエスト件名" required error={nameErr}>
           <input className="input" id="qfi-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例: 生成AIの社内活用を推進する" />
         </Field>
-        <Field id="qfi-purpose" label="目的・テーマ" hint="元情報の要約から下書きしています（編集可）。" className="dialog-section">
+        <Field id="qfi-purpose" label="目的・テーマ" hint="元情報の要約から下書きしています（編集可）。">
           <textarea className="input" id="qfi-purpose" rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} />
         </Field>
-        <Field id="qfi-cat" label="カテゴリー（任意・「/」区切りで複数）" className="dialog-section">
+        <Field id="qfi-cat" label="カテゴリー（任意・「/」区切りで複数）">
           <input className="input" id="qfi-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="例: 業務改善 / 新規事業" />
         </Field>
-        <Field id="qfi-due" label="締切（任意）" className="dialog-section">
+        <Field id="qfi-due" label="締切（任意）">
           <input className="input" id="qfi-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
         <div className="field-note">下書きクエストとして作成します。<strong>参加部署・パーティー・6権限・カラー・公開</strong>は、作成後のクエスト編集（SC-11）で設定してください。</div>

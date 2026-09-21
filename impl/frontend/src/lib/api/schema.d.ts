@@ -2492,7 +2492,7 @@ export interface paths {
         };
         /**
          * Link Candidates
-         * @description リンク候補（成果物をタイトル検索して target_id 解決・SC-52・N.3）。会社内 active ユーザー。読取専用。
+         * @description リンク候補（対象ピッカー・SC-52・N.3）＝種類横断のタイトル検索＋文脈メタ＋絞込＋ページング。読取専用。
          */
         get: operations["link_candidates_api_v1_info_link_candidates_get"];
         put?: never;
@@ -4227,6 +4227,8 @@ export interface components {
         /**
          * InfoLinkCandidateDTO
          * @description リンク候補（成果物をタイトル検索して target_id を解決）。ideas/quests＝実装済ドメイン。
+         *     対象ピッカー用に文脈メタ（同名識別）を付す＝所属クエスト名/起票者名/状態/期限
+         *     （アイデア=time_limit・クエスト=deadline）。concepts/assumptions は未実装＝候補ゼロ。
          */
         InfoLinkCandidateDTO: {
             /** Target Type */
@@ -4235,11 +4237,21 @@ export interface components {
             target_id: string;
             /** Title */
             title: string;
+            /** Quest Title */
+            quest_title?: string | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Due */
+            due?: string | null;
         };
         /** InfoLinkCandidatesResponse */
         InfoLinkCandidatesResponse: {
             /** Candidates */
             candidates: components["schemas"]["InfoLinkCandidateDTO"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /**
          * InfoLinkCreateRequest
@@ -10848,10 +10860,16 @@ export interface operations {
     };
     link_candidates_api_v1_info_link_candidates_get: {
         parameters: {
-            query: {
-                target_type: string;
+            query?: {
+                target_type?: string | null;
+                types?: string | null;
                 q?: string | null;
+                quest_ids?: string | null;
+                statuses?: string | null;
+                due_from?: string | null;
+                due_to?: string | null;
                 limit?: number;
+                cursor?: string | null;
             };
             header?: never;
             path?: never;

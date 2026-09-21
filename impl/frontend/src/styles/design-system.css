@@ -886,6 +886,8 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
   border-color: var(--color-primary-border); /* 薄い青（blue-200）＝focus の強い枠より控えめ＝階層を付ける */
   background: rgba(37, 99, 235, .07); /* 面に薄い青 wash（無効時の slate 面と紛れないよう青側へ） */
 }
+/* 日付入力のカレンダーアイコンはクリックで開くので指ポインター。 */
+.input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 /* 編集不可（無効/読み取り専用）＝一目で「編集できない」と分かる標準（デザイン標準 §4.8）。
    muted な塗り＋文字色＋弱いボーダーで、編集可能フィールド（白面・濃いボーダー）と明確に区別する。 */
 .input:disabled, .input[readonly],
