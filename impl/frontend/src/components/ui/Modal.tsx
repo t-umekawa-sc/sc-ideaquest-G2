@@ -32,6 +32,9 @@ const FOCUSABLE =
 const NARROW = 640; // これ以下は自動フルスクリーン＝ドラッグ/最大化しない（shared.css と一致）
 const ANIM_MS = 340; // enter/exit の最大尺（CSS と一致）。閉じ＝CRT 電源OFF(.34s) 後に unmount＋onClosed する。
 
+// 開いているモーダルのスタック（後入れが最前面）。Esc は最前面の1つだけ閉じる＝ネスト時に呼び元まで閉じない。
+const openModalStack: symbol[] = [];
+
 export function Modal({ open, onClose, onClosed, title, size = "md", draggable = true, maximizable = true, children }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -95,6 +98,14 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
   // Esc/フォーカストラップの keydown。onClose は ref 経由で最新を参照＝依存に入れず再購読しない。
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // このモーダルのスタック識別子。マウント中だけスタックに載せ、Esc は最前面のみ反応させる。
+  const stackId = useRef<symbol>(Symbol("modal"));
+  useEffect(() => {
+    if (!mounted) return;
+    const id = stackId.current;
+    openModalStack.push(id);
+    return () => { const i = openModalStack.indexOf(id); if (i >= 0) openModalStack.splice(i, 1); };
+  }, [mounted]);
   useEffect(() => {
     if (!mounted) return;
     const panel = panelRef.current;
@@ -103,7 +114,10 @@ export function Modal({ open, onClose, onClosed, title, size = "md", draggable =
       if (e.key === "Escape") {
         const t = e.target as HTMLElement | null;
         if (t && t.closest('[role="combobox"][aria-expanded="true"]')) return;
+        // 最前面のモーダルだけが閉じる（同一 document capture の他リスナーも止める）。
+        if (openModalStack[openModalStack.length - 1] !== stackId.current) return;
         e.stopPropagation();
+        e.stopImmediatePropagation();
         onCloseRef.current();
         return;
       }
