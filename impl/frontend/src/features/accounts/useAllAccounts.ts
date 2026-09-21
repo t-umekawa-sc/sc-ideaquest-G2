@@ -16,8 +16,10 @@ export function useAllAccounts(
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  // silent=true＝ローディング表示に切り替えず背後で再取得（既存行を表示したまま差し替え）。
+  // 非同期同期（所属の outbox 反映）への追随で使う＝毎回テーブルがローディングへ切り替わるチラつき/カクつきを防ぐ。
+  const reload = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setLoadError(null);
     try {
       const all: Account[] = [];
@@ -38,7 +40,7 @@ export function useAllAccounts(
           : "アカウント一覧の取得に失敗しました。",
       );
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [fetcher]);
 
