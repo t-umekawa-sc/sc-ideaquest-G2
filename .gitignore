@@ -14,6 +14,9 @@
 # 先頭スラッシュ無し＝どの階層の tmp_shots/ もマッチ（ルート・impl/frontend/ 双方）。
 tmp_shots/
 
+# 一時作業フォルダ（受入チェックリスト等のセッション用メモ・コミット不要）。
+/temp/
+
 # Python
 __pycache__/
 *.py[cod]
