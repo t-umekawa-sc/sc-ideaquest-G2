@@ -207,7 +207,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     // Fragment で modal__body / modal__footer を panel 直下の flex 子にする（余分な div を挟むと
     // body の flex:1/min-height:0 が効かず本文がスクロールしない）。詳細ビュー・クエスト作成と同方式。
     <>
-      <div className="modal__body">
+      <div className="modal__body info-dlg">
         {parent ? (
           <details className="disclosure disclosure--ref" open style={{ marginBottom: "var(--space-3)" }}>
             <summary><span>🧵 続報元の情報を表示：<strong>{parent.title}</strong></span></summary>

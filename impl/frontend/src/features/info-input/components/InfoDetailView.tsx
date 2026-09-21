@@ -244,7 +244,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
   return (
     <>
-      <div className="modal__body">
+      <div className="modal__body info-dlg">
         {/* 元情報（続報元）＝下部の「続報スレッド」タイムラインに根として統合表示（SC-50 §80）＝ここには別掲しない。 */}
         <div className={contentCls}>
           <div className="dialog-label">タイトル</div>

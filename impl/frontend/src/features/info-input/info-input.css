@@ -114,6 +114,10 @@
 .attach__remove { background: none; border: none; color: var(--color-text-subtle); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: var(--radius-sm); }
 .attach__remove:hover { color: var(--color-danger); background: var(--color-disagree-bg); }
 
+/* 情報の登録/詳細は見出し（.dialog-label）を入力ラベル（.field > label）と同じフォントに統一
+   （参照系の薄目・小さめにせず、登録↔詳細で揃える・ユーザー要望）。 */
+.info-dlg .dialog-label { font-size: var(--text-sm); font-weight: 500; color: var(--color-text); letter-spacing: normal; }
+
 /* 🕘 更新履歴（内容の版一覧・§85） */
 .rev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .rev-item { display: flex; align-items: baseline; gap: var(--space-3); font-size: var(--text-sm); }
