@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { useConfirm } from "@/components/ui";
+import { useConfirm, useSnackbar } from "@/components/ui";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
   fetchLinkCandidates, rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
@@ -16,6 +16,7 @@ import {
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget, InfoThreadItem } from "../types";
+import { cloudTokens, demoSummary, plainText } from "../wordcloud";
 import "../info-input.css";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
@@ -49,6 +50,7 @@ function AttrSelect({ label, k, map, attrs, onSet }: {
 export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: () => void }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const snack = useSnackbar();
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
   // 内容インライン編集（作成者・can.edit_content）。属性=curator インラインは後続（5.2b）。
@@ -57,6 +59,12 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [sourceUrl, setSourceUrl] = useState("");
   const [contentDirty, setContentDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // 主要語（ワードクラウド）／要約のインラインプレビュー＝登録ダイアログ（InfoFormPanel）と同位置・同 UI。
+  // クライアント派生（../wordcloud）。初期値はサーバー派生済みの tokens_top/summary で埋め、ボタンで本文から再抽出/生成できる。
+  const [cloud, setCloud] = useState<[string, number][] | null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [summaryPrev, setSummaryPrev] = useState<string | null>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
   // キュレーション（属性）インライン編集（curator・can.curate）。
   const EMPTY_ATTRS = { priority: "", source: "", classification: "", scope: "", target_business: "", impact_level: "", impact_class: "", impact_timing: "", triaged_on: "", triage: "", triage_reason: "", due_date: "" };
   const [attrs, setAttrs] = useState<Record<string, string>>(EMPTY_ATTRS);
@@ -100,8 +108,26 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     });
     setCats(item.categories);
     setCurationDirty(false);
+    // 主要語/要約プレビューの初期値＝サーバー派生済みの値（tokens_top / summary）。
+    setCloud(item.tokens_top.length ? item.tokens_top.map((t) => [t.token, t.count] as [string, number]) : null);
+    setSummaryPrev(item.summary ?? null);
     if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
   }, [item]);
+
+  // 主要語を本文から再抽出（登録ダイアログと同じ＝クライアント派生・保存時はサーバーが再派生する）。
+  const runCloud = () => {
+    setCloudBusy(true);
+    const text = `${title} ${plainText(bodyRef.current?.innerHTML ?? "")}`.trim();
+    setCloud(text ? cloudTokens(text) : []);
+    setCloudBusy(false);
+  };
+  // 要約を本文から生成（同上・クライアント派生プレビュー）。
+  const runSummary = () => {
+    setSummaryBusy(true);
+    const text = plainText(bodyRef.current?.innerHTML ?? "");
+    setSummaryPrev(text ? demoSummary(text) : "");
+    setSummaryBusy(false);
+  };
 
   const save = async () => {
     if (!item) return;
@@ -115,7 +141,11 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       for (const k of Object.keys(EMPTY_ATTRS)) patch[k] = attrs[k] || null;
       patch.categories = cats;
     }
-    if (!contentDirty && !curationDirty) return;
+    // 無変更で保存＝グレースフルに処理（API を呼ばず版を増やさない・IdeaForm と同じ体裁／style-guide §10）。
+    if (!contentDirty && !curationDirty) {
+      snack({ type: "info", title: "変更はありません", msg: "内容・属性とも変更がなかったため、保存しませんでした。" });
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateInfoItemApi(item.id, patch);
@@ -207,7 +237,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     <>
       <div className="modal__body">
         {/* 元情報（続報元）＝下部の「続報スレッド」タイムラインに根として統合表示（SC-50 §80）＝ここには別掲しない。 */}
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">タイトル</div>
           {r.can.edit_content ? (
             <input className="input" value={title} onChange={(e) => { setTitle(e.target.value); setContentDirty(true); }} style={{ marginBottom: 6 }} />
@@ -228,7 +258,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         ) : null}
 
-        <div className="field dialog-section">
+        <div className="field">
           <div className="dialog-label">内容・説明</div>
           {r.can.edit_content ? (
             <>
@@ -236,6 +266,24 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               <div className="rt">
                 <div className="rt__area" ref={bodyRef} contentEditable suppressContentEditableWarning
                   onInput={() => setContentDirty(true)} data-placeholder="内容・説明を編集…" />
+              </div>
+              {/* 抽出/生成ボタン＋主要語/要約プレビュー＝登録ダイアログ（InfoFormPanel）と同位置・同 UI。 */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
+                <button className="btn btn-outline btn-sm" type="button" onClick={runSummary}>📝 要約を生成</button>
+              </div>
+              <div className={`wc-preview${cloudBusy ? " iq-block" : ""}`}>
+                <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
+                {cloud === null ? <span className="hint">「🔑 キーワードを抽出」を押すと、本文から主要語を抽出して表示します。</span>
+                  : cloud.length ? <div className="wc-mini">{cloud.map(([w, c]) => { const max = Math.max(...cloud.map((x) => x[1]), 1); return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 0.9).toFixed(2)}rem` }} title={`${w}（${c}）`}>{w}</span>; })}</div>
+                    : <span className="hint">本文が空です。記事を貼り付けてから抽出してください。</span>}
+                {cloudBusy ? <div className="iq-block__overlay"><span className="iq-loading-badge">抽出中 <span className="dots" /></span></div> : null}
+              </div>
+              <div className={`wc-preview${summaryBusy ? " iq-block" : ""}`} style={{ marginTop: 8 }}>
+                <div className="dialog-label">📝 要約（選別用・自動生成）</div>
+                {summaryPrev === null ? <span className="hint">「📝 要約を生成」を押すと、本文から要約を作成します（保存時にも自動生成されます）。</span>
+                  : summaryPrev ? <span>{summaryPrev}</span> : <span className="hint">本文が空です。記事を貼り付けてから生成してください。</span>}
+                {summaryBusy ? <div className="iq-block__overlay"><span className="iq-loading-badge">要約生成中 <span className="dots" /></span></div> : null}
               </div>
               <label className="dialog-label" htmlFor="dm-url" style={{ marginTop: 8 }}>出典URL（http/https）</label>
               <input className="input" id="dm-url" value={sourceUrl} onChange={(e) => { setSourceUrl(e.target.value); setContentDirty(true); }} placeholder="https://…" />
@@ -289,16 +337,19 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         ) : null}
 
-        <div className="field dialog-section">
-          <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
-          {r.tokens_top.length ? (
-            <div className="wc-mini">
-              {r.tokens_top.map((t) => (
-                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + (t.count / cloudMax) * 0.9).toFixed(2)}rem`, opacity: (0.6 + (t.count / cloudMax) * 0.4).toFixed(2) }} title={`${t.token}（${t.count}）`}>{t.token}</span>
-              ))}
-            </div>
-          ) : <p className="muted">主要語がありません。</p>}
-        </div>
+        {/* 主要語は編集不可（参照）モードだけ下部に表示。作成者（編集）は内容欄の直下にインライン表示（登録ダイアログと同位置）。 */}
+        {!r.can.edit_content ? (
+          <div className="field dialog-section">
+            <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
+            {r.tokens_top.length ? (
+              <div className="wc-mini">
+                {r.tokens_top.map((t) => (
+                  <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + (t.count / cloudMax) * 0.9).toFixed(2)}rem`, opacity: (0.6 + (t.count / cloudMax) * 0.4).toFixed(2) }} title={`${t.token}（${t.count}）`}>{t.token}</span>
+                ))}
+              </div>
+            ) : <p className="muted">主要語がありません。</p>}
+          </div>
+        ) : null}
 
         {r.can.curate ? (
           <div className="field dialog-section">
@@ -478,7 +529,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving || archiveBusy}>閉じる</button>
         {/* フッターは「閉じる／保存する」に絞る（SC-50 §8・ボタン過多の解消）。アーカイブ/解除は本文の curator ブロックへ。 */}
         {(r.can.edit_content || r.can.curate) ? (
-          <button className="btn btn-primary" type="button" onClick={save} disabled={(!contentDirty && !curationDirty) || saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>
+          <button className="btn btn-primary" type="button" onClick={save} disabled={saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>
         ) : null}
       </div>
     </>

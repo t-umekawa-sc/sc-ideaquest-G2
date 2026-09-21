@@ -21,6 +21,7 @@
 
 /* 全文検索の結果（SC-12 と同じ＝検索ボックス幅・カードリンク・ハイライトスニペット） */
 .info-page .ft-q { width: 360px; max-width: 100%; }
+.info-page .ft-q::-webkit-search-cancel-button { cursor: pointer; }
 .info-page .ft-result { display: block; color: inherit; text-decoration: none; transition: box-shadow .15s, border-color .15s, transform .05s; }
 .info-page .ft-result:hover { box-shadow: var(--shadow-lg); border-color: var(--color-primary-border); text-decoration: none; }
 .info-page .ft-result:focus { outline: none; }
@@ -34,7 +35,7 @@
 .info-page .wordcloud { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
   padding: var(--space-4); border-radius: var(--radius); background: var(--color-surface); border: 1px solid var(--color-border); margin-bottom: var(--space-5); }
 .info-page .wordcloud__title { width: 100%; font-size: var(--text-sm); font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
-.wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); }
+.wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); cursor: pointer; }
 
 /* 状態・影響のバッジ色 */
 .st-raw { background: var(--color-surface-alt); color: var(--color-text-muted); }
@@ -70,12 +71,17 @@
 
 /* --- SC-51 登録・編集フォーム --- */
 /* リッチテキストエディタ（デモ＝contenteditable＋execCommand。実装は Tiptap 等・画像は MinIO 再ホスト §12-4）。 */
-.rt { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+/* リッチテキスト枠も入力欄扱い＝.input と同じホバー/フォーカス標準（枠色/リング/軽量アニメ）。 */
+.rt { border: 1px solid var(--color-border-strong); border-radius: var(--radius); overflow: hidden; transition: border-color .12s, box-shadow .12s; }
+.rt:hover:not(:focus-within) { border-color: var(--color-primary-border); }
+.rt:hover:not(:focus-within) .rt__area { background: rgba(37, 99, 235, .07); }
+.rt:focus-within { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary), 0 0 0 3px var(--color-primary-soft); animation: iq-field-focus .16s ease-out; }
 .rt__bar { display: flex; gap: 2px; flex-wrap: wrap; padding: 6px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
 .rt__bar button { border: 1px solid transparent; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: var(--text-sm); color: var(--color-text); }
 .rt__bar button:hover { background: var(--color-surface); border-color: var(--color-border); }
-.rt__area { min-height: 140px; max-height: 320px; overflow: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; }
-.rt__area:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.rt__area { min-height: 140px; max-height: 320px; overflow: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; transition: background-color .12s; }
+.rt__area:focus { outline: none; } /* フォーカスの見せ方は wrapper .rt:focus-within に一本化（二重枠を避ける） */
+@media (prefers-reduced-motion: reduce) { .rt { transition: none; } .rt:focus-within { animation: none; } .rt__area { transition: none; } }
 .rt__area img { max-width: 100%; border-radius: 6px; }
 .rt__area:empty::before { content: attr(data-placeholder); color: var(--color-text-subtle); }
 

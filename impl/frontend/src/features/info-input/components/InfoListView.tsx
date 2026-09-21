@@ -305,7 +305,6 @@ export function InfoListView() {
             perPage={10}
             perPageOptions={[10, 20, 50]}
             searchFields="タイトル・本文（全文）"
-            searchPlaceholder="全文で絞り込み（タイトル・本文）…"
             exportName="情報インプット"
             emptyText="該当する情報がありません。"
             onRowClick={(r) => router.push(`/info-items/${r.id}`)}
