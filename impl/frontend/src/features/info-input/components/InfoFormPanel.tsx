@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Field } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
-import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoDetail, uploadInfoImageApi } from "../api";
+import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
@@ -64,6 +64,13 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const [triage, setTriage] = useState("");
   const [reason, setReason] = useState("");
   const [dueDate, setDueDate] = useState("");
+  // 属性（キュレーション）は curator のみ登録時に付与できる（§85）＝非curator には属性セクションを出さない。
+  const [canCurate, setCanCurate] = useState(false);
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchInfoCapabilities(ac.signal).then((c) => setCanCurate(c.can_curate)).catch(() => {});
+    return () => ac.abort();
+  }, []);
   const [links, setLinks] = useState<StagedLink[]>([]);
   const [files, setFiles] = useState<File[]>([]); // 参考資料＝登録成功後に POST /info-items/{id}/attachments へ送る
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -322,6 +329,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} />
         </div>
 
+        {canCurate ? (
         <details className="disclosure field">
           <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定{curated ? "" : ""}</summary>
           <div className="disclosure__body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -347,6 +355,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             <Field id="im-reason" label="判定理由"><textarea className="input" id="im-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="この判定に至った理由（任意・改行可）" /></Field>
           </div>
         </details>
+        ) : null}
       </div>
 
       <div className="modal__footer">

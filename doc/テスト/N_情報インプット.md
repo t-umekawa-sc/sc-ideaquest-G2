@@ -79,6 +79,8 @@
 | N-TC-142 | api | 候補をクエスト/状態/期限で絞込（対象ピッカー） | 複数 idea/quest を seed | `GET /info-link-candidates`（`quest_ids`/`statuses`/`due_from`/`due_to`） | 指定条件に合致する候補のみ返る（AND・期限未設定は範囲指定時に除外） | N.3／SC-50 §関連リンク |
 | N-TC-143 | api | 候補のページング（cursor・対象ピッカー） | limit 超の候補を seed | `GET /info-link-candidates?limit=N` → `?cursor=…` | `next_cursor` を返し、`cursor` 指定で続きが重複なく取れる／最終ページは `next_cursor=null` | N.3／SC-50 §関連リンク |
 | N-TC-144 | api | 内容編集で更新履歴を返す（🕘 更新履歴） | 作成者の情報を2回内容編集 | `PATCH /info-items/{id}`×2 → `GET /info-items/{id}` | `content_revisions[]` が版降順で返る（各＝revision/editor_name/created_at）＝編集回数ぶんの版 | N.1／SC-50 §85 |
+| N-TC-145 | api | 登録時の属性付与は curator のみ | 一般ユーザー（非curator）／curator 付与 | `POST /info-items`（属性つき＝priority 等） | 非curator＝403 `forbidden`（属性は情報判定権限）／curator＝201・`status=curated` で属性反映。属性なしは全員 201・raw | N.2／SC-50 §85 |
+| N-TC-146 | api | 現ユーザーの curator 判定（登録フォーム出し分け） | 一般／curator 付与 | `GET /info-capabilities` | `can_curate` を返す（非curator=false／付与後=true） | N.0／SC-50 §85 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

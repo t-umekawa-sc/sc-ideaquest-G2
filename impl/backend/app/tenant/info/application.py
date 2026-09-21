@@ -271,6 +271,18 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
                            attachments=attachments, can=can, content_revisions=content_revisions)
 
 
+def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        return {"can_curate": False}
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            return {"can_curate": False}
+        return {"can_curate": repo.is_curator(ts, user.id)}
+
+
 def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     """低摩擦登録／続報登録（SC-51・N.2）＝全ユーザー・status=raw。
 
@@ -289,6 +301,17 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         raise AppError(422, "validation_error", detail="出典URLは http/https のみです", errors=[{"field": "source_url"}])
     parent_uuid = _parse_uuid(body.parent_info_id, field="parent_info_id") if body.parent_info_id else None
 
+    # 属性（キュレーション）＝curator のみ。送られた項目だけ付与（§85）。
+    _cur_scalar = ("priority", "source", "classification", "scope", "target_business",
+                   "impact_level", "impact_class", "impact_timing", "triage", "triage_reason")
+    curation = {f: getattr(body, f) for f in _cur_scalar if getattr(body, f, None)}
+    if getattr(body, "triaged_on", None):
+        curation["triaged_on"] = body.triaged_on
+    if getattr(body, "due_date", None):
+        curation["due_date"] = body.due_date
+    cats = getattr(body, "categories", None)
+    has_curation = bool(curation) or bool(cats)
+
     # 派生（外部送信ゼロ・オフライン）。サニタイズ→平文→要約→トークン。
     body_html = derive.sanitize_html(body.body_html)
     body_text = derive.to_plain_text(body_html)
@@ -299,6 +322,9 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
+        # 属性を付けるのは curator のみ（非curator が属性を送ったら 403・§85）。
+        if has_curation and not repo.is_curator(ts, user.id):
+            raise AppError(403, "forbidden", detail="属性の付与は情報判定権限（info_curator）が必要です")
         if parent_uuid is not None and repo.get_info_item(ts, parent_uuid) is None:
             raise AppError(422, "validation_error", detail="親情報が見つかりません", errors=[{"field": "parent_info_id"}])
         item = repo.create_info_item(
@@ -308,6 +334,17 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         )
         ts.flush()
         repo.replace_tokens(ts, item.id, tokens)
+        if has_curation:  # curator が登録時に属性を付与＝判定済みへ
+            for f in _cur_scalar:
+                if f in curation:
+                    setattr(item, f, curation[f] or None)
+            if "triaged_on" in curation:
+                item.triaged_on = _parse_date(body.triaged_on, "triaged_on")
+            if "due_date" in curation:
+                item.due_date = _parse_date(body.due_date, "due_date")
+            if cats:
+                repo.replace_categories(ts, item.id, cats)
+            item.status = "curated"
         if parent_uuid is not None:
             repo.snapshot_parent_links(ts, parent_uuid, item.id)  # 親の未棄却リンクを auto 複製（§12-1）
         ts.commit()

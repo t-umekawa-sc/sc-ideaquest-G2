@@ -72,10 +72,22 @@ export async function createInfoItemApi(input: InfoInput): Promise<InfoDetail> {
       body_html: input.body_html || null,
       source_url: input.source_url || null,
       parent_info_id: input.parent_info_id ?? null,
+      // 属性（curator が登録時に付与＝§85）。非curator は null のまま＝送っても付与されない。
+      priority: input.priority ?? null, source: input.source ?? null, classification: input.classification ?? null,
+      scope: input.scope ?? null, target_business: input.target_business ?? null, impact_level: input.impact_level ?? null,
+      impact_class: input.impact_class ?? null, impact_timing: input.impact_timing ?? null,
+      triaged_on: input.triaged_on ?? null, triage: input.triage ?? null, triage_reason: input.triage_reason ?? null,
+      due_date: input.due_date ?? null, categories: input.categories ?? null,
     }),
   });
   emit(); // 一覧（サーバー委譲）を INFO_CHANGED_EVENT で再取得
   return res as InfoDetail;
+}
+
+// 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。
+export async function fetchInfoCapabilities(signal?: AbortSignal): Promise<{ can_curate: boolean }> {
+  const res = await apiFetch<{ can_curate: boolean }>("/info-capabilities", { signal });
+  return res ?? { can_curate: false };
 }
 
 // 貼付画像の再ホスト（POST /info-items/images・Phase C slice4・§12-4）＝multipart。

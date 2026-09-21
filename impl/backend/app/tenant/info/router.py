@@ -15,6 +15,7 @@ from app.core.deps import verify_csrf, verify_origin
 from app.tenant.info import application as info_service
 from app.tenant.info.schemas import (
     InfoAttachmentsResponse,
+    InfoCapabilitiesResponse,
     InfoCreateRequest,
     InfoCuratorGrantRequest,
     InfoCuratorsResponse,
@@ -45,6 +46,14 @@ def get_word_cloud(
     result = info_service.get_word_cloud(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), limit=limit)
     return WordCloudResponse(**result)
+
+
+@router.get("/info-capabilities", response_model=InfoCapabilitiesResponse)
+def get_capabilities(request: Request, session: dict = Depends(require_me)) -> InfoCapabilitiesResponse:
+    """現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。読取専用。"""
+    result = info_service.get_capabilities(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+    return InfoCapabilitiesResponse(**result)
 
 
 @router.get("/info-items", response_model=InfoListResponse)

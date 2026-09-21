@@ -2283,6 +2283,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/info-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Capabilities
+         * @description 現ユーザーの情報インプット権限（登録フォームの属性セクション出し分け用）＝curator か。読取専用。
+         */
+        get: operations["get_capabilities_api_v1_info_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/info-items": {
         parameters: {
             query?: never;
@@ -4031,8 +4051,17 @@ export interface components {
             add_link: boolean;
         };
         /**
+         * InfoCapabilitiesResponse
+         * @description 現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。
+         */
+        InfoCapabilitiesResponse: {
+            /** Can Curate */
+            can_curate: boolean;
+        };
+        /**
          * InfoCreateRequest
-         * @description 低摩擦登録（全ユーザー）／続報登録。属性は登録後に curator が PATCH（Phase C 後続）。
+         * @description 低摩擦登録（全ユーザー・タイトル/本文/出典）／続報登録。
+         *     属性（キュレーション）は **登録者が info_curator の時のみ** 付与可（非curator が送ると 403・§85）。
          */
         InfoCreateRequest: {
             /** Title */
@@ -4043,6 +4072,32 @@ export interface components {
             source_url?: string | null;
             /** Parent Info Id */
             parent_info_id?: string | null;
+            /** Priority */
+            priority?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Classification */
+            classification?: string | null;
+            /** Scope */
+            scope?: string | null;
+            /** Target Business */
+            target_business?: string | null;
+            /** Impact Level */
+            impact_level?: string | null;
+            /** Impact Class */
+            impact_class?: string | null;
+            /** Impact Timing */
+            impact_timing?: string | null;
+            /** Triaged On */
+            triaged_on?: string | null;
+            /** Triage */
+            triage?: string | null;
+            /** Triage Reason */
+            triage_reason?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Categories */
+            categories?: string[] | null;
         };
         /** InfoCreatorDTO */
         InfoCreatorDTO: {
@@ -10467,6 +10522,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_capabilities_api_v1_info_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoCapabilitiesResponse"];
                 };
             };
         };

@@ -390,6 +390,37 @@ def test_n_tc_144_content_revisions(client, info_env):
     assert all(("editor_name" in x and x.get("created_at")) for x in revs)
 
 
+def test_n_tc_145_create_with_curation_requires_curator(client, info_env):
+    """N-TC-145: 登録時の属性付与は curator のみ（非curator=403／curator=201・curated）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # 非curator が属性つきで登録 → 403。
+    r = client.post(INFO, json={"title": "属性つき登録X", "priority": "high"}, headers=_csrf(client))
+    assert r.status_code == 403, r.text
+    # curator に昇格して登録 → 201・status=curated で属性反映。
+    _grant_curator(info_env.db_identifier, info_env.user_id)
+    try:
+        r2 = client.post(INFO, json={"title": "属性つき登録Y", "priority": "high", "impact_class": "opportunity"}, headers=_csrf(client))
+        assert r2.status_code == 201, r2.text
+        d = r2.json()
+        try:
+            assert d["status"] == "curated" and d["priority"] == "high" and d["impact_class"] == "opportunity"
+        finally:
+            _delete_info(info_env.db_identifier, d["id"])
+    finally:
+        _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
+def test_n_tc_146_capabilities(client, info_env):
+    """N-TC-146: 現ユーザーの curator 判定（登録フォーム出し分け用）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.get("/api/v1/info-capabilities").json()["can_curate"] is False
+    _grant_curator(info_env.db_identifier, info_env.user_id)
+    try:
+        assert client.get("/api/v1/info-capabilities").json()["can_curate"] is True
+    finally:
+        _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
 def test_n_tc_119_add_link(client, info_env):
     """N-TC-119: 手動リンク追加（全員・201・origin=manual・kind=related）。"""
     import uuid as _uuid

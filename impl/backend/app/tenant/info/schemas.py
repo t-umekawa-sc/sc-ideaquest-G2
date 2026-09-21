@@ -86,12 +86,27 @@ class WordCloudResponse(BaseModel):
 
 # ---- 登録（POST /info-items・N.2）-------------------------------------------
 class InfoCreateRequest(BaseModel):
-    """低摩擦登録（全ユーザー）／続報登録。属性は登録後に curator が PATCH（Phase C 後続）。"""
+    """低摩擦登録（全ユーザー・タイトル/本文/出典）／続報登録。
+    属性（キュレーション）は **登録者が info_curator の時のみ** 付与可（非curator が送ると 403・§85）。"""
 
     title: str
     body_html: str | None = None
     source_url: str | None = None
     parent_info_id: str | None = None  # 続報＝親情報ID（§12-1）
+    # 属性（curator のみ・任意）＝送られた時だけ付与。付与すると status=raw→curated。
+    priority: str | None = None
+    source: str | None = None
+    classification: str | None = None
+    scope: str | None = None
+    target_business: str | None = None
+    impact_level: str | None = None
+    impact_class: str | None = None
+    impact_timing: str | None = None
+    triaged_on: str | None = None
+    triage: str | None = None
+    triage_reason: str | None = None
+    due_date: str | None = None
+    categories: list[str] | None = None
 
 
 class InfoUpdateRequest(BaseModel):
@@ -160,6 +175,11 @@ class InfoCanDTO(BaseModel):
     edit_content: bool
     curate: bool
     add_link: bool
+
+
+class InfoCapabilitiesResponse(BaseModel):
+    """現ユーザーの情報インプット権限（登録フォームの出し分け用）＝curator かどうか。"""
+    can_curate: bool
 
 
 class InfoLinkDTO(BaseModel):
