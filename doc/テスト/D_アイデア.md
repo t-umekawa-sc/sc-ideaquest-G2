@@ -90,6 +90,7 @@
 | D-TC-140 | api | 差分取得（既定＝前版比較） | published を編集（本文/価値/タイムリミット変更）| `GET /ideas/{id}/revisions/{rev}/diff` | `from_revision=rev-1`・`to_revision=rev`・`fields` にテキスト系（title/value/body/note）は add/del セグメント・その他（time_limit/stakeholders）は `{old,new}`。存在しない版は 404 | D.4 |
 | D-TC-141 | api | 差分の from 明示（投票時点からの差分）| revision=3 のアイデア | `GET .../revisions/3/diff?from=1` | `from_revision=1`・`to_revision=3`・初版からの累積差分。`from>to`/範囲外は 422/404 | D.4／D.5 |
 | D-TC-145 | api | **添付の追加/削除が版差分・changed_fields に出る**（保存で版記録＝フォロワーが気づける） | published アイデア（rev1・添付なし）→ 添付追加→`PATCH`（rev2）→ 添付削除→`PATCH`（rev3） | `GET .../revisions/{rev}/diff`・`GET .../revisions` | rev2 diff＝`attachments`（kind=scalar・`old=""`→`new="shiryo.png"`）・rev2 の `changed_fields` に `attachments`／rev3 diff＝`old="shiryo.png"`→`new=""`。版スナップショットに添付名一覧（昇順）を含める（`_content_snapshot`）。旧スナップ（`attachments` 無し=None）は誤検知回避で差分を出さない | D.4／§5.14 |
+| D-TC-234 | api | **添付だけ変更（本文無変更）でも保存で版が増える**（a57da50 回帰防止） | published アイデア（rev1・添付なし）→ 添付追加（別API）→ **本文同値で** `PATCH` → 続けて添付も本文も無変更で `PATCH` | `GET .../revisions`・`GET .../revisions/2/diff`・`GET /ideas/{id}` | 添付だけでも `current_revision=2`＋diff に `attachments`（`old=""`→`new="only.png"`）＝**無変更判定の基準を『適用前ライブ状態』でなく『直近版スナップショット』にする**（添付は保存前に別APIで適用済み＝ライブ before だと差分が出ない）／完全無変更の2回目 `PATCH` は `current_revision=2` 据え置き（D-TC-229 非回帰）。**D-TC-145 は添付と同時に body も変えていたため本ケースを素通ししていたギャップを閉じる** | D.4／§5.14 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 

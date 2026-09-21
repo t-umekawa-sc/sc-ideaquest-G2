@@ -645,6 +645,32 @@ def test_d_tc_145_attachment_change_in_revision_diff(client, env, storage):
     assert d3["fields"]["attachments"]["old"] == "shiryo.png" and d3["fields"]["attachments"]["new"] == ""
 
 
+def test_d_tc_234_attachment_only_change_creates_revision(client, env, storage):
+    """D-TC-234: 公開中アイデアで「添付だけ」変更（本文は無変更）でも保存で版が1つ増える（D.4）。
+
+    回帰防止（a57da50）＝添付は保存の前に別 API（POST/DELETE attachments）で適用されるため、無変更判定を
+    『適用前ライブ状態』で行うと before に新添付が入り、本文無変更だと before==after で版が付かなかった。
+    判定基準を『直近版スナップショット』に変えた修正の担保。D-TC-145 は添付追加と同時に body も変えて
+    いた（版は body で作られる）ため本ケースを検知できなかった＝そのギャップを閉じる専用テスト。
+    併せて「添付も本文も無変更」の保存では版を増やさない（D-TC-229 非回帰）ことも確認する。
+    """
+    _login_seed(client)
+    qid = env.make_quest()
+    pub = env.make_idea(quest_id=qid, status="published", body="b")  # rev1（添付なし）
+    assert client.get(IDEA(pub)).json()["current_revision"] == 1
+    # 添付を追加（別 API）→ 本文は同値のまま保存（PATCH）→ 添付だけでも rev2 が付く。
+    r = client.post(ATTACH(pub), files=[("files", ("only.png", PNG, "image/png"))], headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    r2 = client.patch(IDEA(pub), json={"body": "b"}, headers=_csrf(client))  # body は同値＝内容は無変更
+    assert r2.status_code == 200 and r2.json()["current_revision"] == 2  # 添付だけでも版+1
+    d2 = client.get(DIFF(pub, 2)).json()
+    assert d2["fields"]["attachments"]["old"] == "" and d2["fields"]["attachments"]["new"] == "only.png"
+    assert "attachments" in next(x for x in client.get(REVS(pub)).json()["data"] if x["revision"] == 2)["changed_fields"]
+    # 添付も本文も無変更の保存は版を増やさない（D-TC-229 非回帰＝過抑制の逆で過剰生成もしない）。
+    r3 = client.patch(IDEA(pub), json={"body": "b"}, headers=_csrf(client))
+    assert r3.status_code == 200 and r3.json()["current_revision"] == 2
+
+
 def test_d_tc_151_ideas_list_comment_count(client, env):
     """D-TC-151 一覧カードのコメント数（E・非削除のみ・SC-12 💬）。"""
     from app.tenant.chat.orm import ChatGroup, ChatMessage

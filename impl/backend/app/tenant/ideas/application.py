@@ -236,8 +236,15 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
         quest = quests_repo.get_quest(ts, idea.quest_id)
         _authorize_edit_idea(ts, idea, quest, user)
         _guard_not_completed(quest)
-        # 無変更保存（差分ゼロ）を検出するため、公開中は適用前スナップショットを取る（[C]①・D.4）。
-        before = _content_snapshot(ts, idea) if idea.status == "published" else None
+        # 無変更保存（差分ゼロ）の判定基準＝**直近の記録済み版のスナップショット**（[C]①・D.4）。
+        # ライブの「適用前」状態を基準にすると、添付は保存の前に別 API（POST/DELETE attachments）で
+        # 既に適用済みのため before に新添付が入り、「添付だけ変更」で before==after となり版が付かない
+        # （a57da50 の回帰・D-TC-234）。直近版と比較すれば本文/添付いずれの変更も確実に検知できる
+        # （publish が rev1 を必ず記録＝公開中は基準が常に存在する）。
+        before = None
+        if idea.status == "published":
+            last_rev = repo.get_revision(ts, idea.id, idea.current_revision)
+            before = last_rev.changes if last_rev else None
         _apply_content(ts, idea, body)
         if idea.status == "published":
             _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
