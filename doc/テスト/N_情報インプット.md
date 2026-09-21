@@ -75,6 +75,9 @@
 | N-TC-138 | api | 反証リンク作成で揺さぶり通知（作成者/評価者/クエスト管理者） | idea＋quest＋vote を seed | `POST /info-links`（`kind=refuting`・ideas 宛て） | idea 作成者・評価者（投票者）・クエスト所有者に `info_refuting_raised` 通知が届く（付けた本人は除外） | N.3／§N.6 |
 | N-TC-139 | api | 種別変更 refuting への遷移で通知 | related リンク＋idea seed | `PATCH /info-links/{id}`（`kind=refuting`） | related→refuting の遷移で宛先に通知が届く（related のままなら通知しない） | N.3／§N.6 |
 | N-TC-140 | api | 続報を開くと root 基準の続報スレッドを返す | 続報 fu1/fu2 を持つ根 a | `GET /info-items/{fu1}` | `thread.parent`=根 a・`thread.follow_ups`=根の全続報（fu1/fu2）＝続報からも 根→続報… を辿れる（SC-50 §80） | N.1／§12-1 |
+| N-TC-141 | api | 候補に文脈メタを付けて返す（対象ピッカー） | idea(quest所属・起票者・status・time_limit)＋quest(deadline・status) を seed | `GET /info-link-candidates?types=ideas,quests&q=…` | 各候補に `quest_title`/`owner_name`/`status`/`due`（アイデア=time_limit・クエスト=deadline）を付けて返す＝同名でも識別できる | N.3／SC-50 §関連リンク |
+| N-TC-142 | api | 候補をクエスト/状態/期限で絞込（対象ピッカー） | 複数 idea/quest を seed | `GET /info-link-candidates`（`quest_ids`/`statuses`/`due_from`/`due_to`） | 指定条件に合致する候補のみ返る（AND・期限未設定は範囲指定時に除外） | N.3／SC-50 §関連リンク |
+| N-TC-143 | api | 候補のページング（cursor・対象ピッカー） | limit 超の候補を seed | `GET /info-link-candidates?limit=N` → `?cursor=…` | `next_cursor` を返し、`cursor` 指定で続きが重複なく取れる／最終ページは `next_cursor=null` | N.3／SC-50 §関連リンク |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

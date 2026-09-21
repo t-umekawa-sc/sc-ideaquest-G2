@@ -258,26 +258,78 @@ def get_link(session: Session, link_id: uuid.UUID) -> InfoLink | None:
     return session.get(InfoLink, link_id)
 
 
-def search_link_candidates(session: Session, *, target_type: str, q: str, limit: int = 20) -> list[dict]:
-    """リンク候補をタイトル検索（ideas=published・非削除／quests=非削除）。未実装ドメインは空（§N.3）。"""
+def search_link_candidates(
+    session: Session, *, types: list[str], q: str = "",
+    quest_ids: list[uuid.UUID] | None = None, statuses: list[str] | None = None,
+    due_from: str | None = None, due_to: str | None = None,
+    limit: int = 20, offset: int = 0,
+) -> tuple[list[dict], bool]:
+    """リンク候補を種類横断でタイトル検索（対象ピッカー・§N.3）。
+    ideas=published・非削除／quests=非削除。concepts/assumptions は未実装ドメイン＝候補ゼロ
+    （コンセプト段実装時に分岐追加＝コンセプト設計書 §4 の実装漏れ防止に対応）。
+    文脈メタ（quest_title/owner_name/status/due）を付し、種類/クエスト/状態/期限で AND 絞込。
+    ページング＝offset ベース（over-fetch して has_more 判定）。戻り値＝(候補, has_more)。"""
     from app.tenant.ideas.orm import Idea
     from app.tenant.quests.orm import Quest
+    from app.tenant.profile.orm import User
+
+    from datetime import date as _date
     like = f"%{q}%"
-    if target_type == "ideas":
-        rows = session.execute(
-            select(Idea.id, Idea.title).where(
-                Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like)
-            ).order_by(Idea.title.asc()).limit(limit)
-        ).all()
-    elif target_type == "quests":
-        rows = session.execute(
-            select(Quest.id, Quest.title).where(
-                Quest.deleted_at.is_(None), Quest.title.ilike(like)
-            ).order_by(Quest.title.asc()).limit(limit)
-        ).all()
-    else:
-        return []  # concepts/assumptions＝未実装ドメイン
-    return [{"target_type": target_type, "target_id": str(i), "title": t} for i, t in rows]
+    qids = list(quest_ids or [])
+    sts = list(statuses or [])
+    df = _date.fromisoformat(due_from) if due_from else None  # 文字列→date（Postgres の型不一致回避）
+    dt = _date.fromisoformat(due_to) if due_to else None
+    want = offset + limit + 1  # over-fetch＝has_more 判定用に1件多く取る
+    rows: list[dict] = []
+
+    if "ideas" in types:
+        stmt = (
+            select(Idea.id, Idea.title, Quest.title, User.display_name, Idea.status, Idea.time_limit)
+            .join(Quest, Quest.id == Idea.quest_id)
+            .join(User, User.id == Idea.author_id)
+            .where(Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like))
+        )
+        if qids:
+            stmt = stmt.where(Idea.quest_id.in_(qids))
+        if sts:
+            stmt = stmt.where(Idea.status.in_(sts))
+        if due_from:
+            stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit >= df)
+        if due_to:
+            stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit <= dt)
+        for i, title, qtitle, owner, status, due in session.execute(
+            stmt.order_by(Idea.title.asc(), Idea.id.asc()).limit(want)
+        ).all():
+            rows.append({"target_type": "ideas", "target_id": str(i), "title": title,
+                         "quest_title": qtitle, "owner_name": owner, "status": status,
+                         "due": due.isoformat() if due else None})
+
+    if "quests" in types:
+        stmt = (
+            select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline)
+            .join(User, User.id == Quest.owner_id)
+            .where(Quest.deleted_at.is_(None), Quest.title.ilike(like))
+        )
+        if qids:
+            stmt = stmt.where(Quest.id.in_(qids))
+        if sts:
+            stmt = stmt.where(Quest.status.in_(sts))
+        if due_from:
+            stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline >= df)
+        if due_to:
+            stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline <= dt)
+        for i, title, owner, status, due in session.execute(
+            stmt.order_by(Quest.title.asc(), Quest.id.asc()).limit(want)
+        ).all():
+            rows.append({"target_type": "quests", "target_id": str(i), "title": title,
+                         "quest_title": None, "owner_name": owner, "status": status,
+                         "due": due.isoformat() if due else None})
+
+    # 種類横断でタイトル順に整列 → offset/limit で切り出し（over-fetch 分で has_more 判定）。
+    rows.sort(key=lambda r: (r["title"], r["target_type"], r["target_id"]))
+    page = rows[offset:offset + limit]
+    has_more = len(rows) > offset + limit
+    return page, has_more
 
 
 # ---- 詳細（GET /info-items/{id}・N.1）----

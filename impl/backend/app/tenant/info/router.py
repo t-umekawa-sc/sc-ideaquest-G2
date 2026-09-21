@@ -243,15 +243,25 @@ def revoke_info_curator(
 @router.get("/info-link-candidates", response_model=InfoLinkCandidatesResponse)
 def link_candidates(
     request: Request,
-    target_type: str,
+    target_type: str | None = None,   # 後方互換（旧＝単一種別）
+    types: str | None = None,          # 新＝カンマ区切りの種類（ideas,quests）
     q: str | None = None,
+    quest_ids: str | None = None,      # カンマ区切りのクエストID（絞込）
+    statuses: str | None = None,       # カンマ区切りの状態（絞込）
+    due_from: str | None = None,       # 期限（以降・YYYY-MM-DD）
+    due_to: str | None = None,         # 期限（以前・YYYY-MM-DD）
     limit: int = Query(default=20, ge=1, le=50),
+    cursor: str | None = None,         # ページング（offset の不透明トークン）
     session: dict = Depends(require_me),
 ) -> InfoLinkCandidatesResponse:
-    """リンク候補（成果物をタイトル検索して target_id 解決・SC-52・N.3）。会社内 active ユーザー。読取専用。"""
+    """リンク候補（対象ピッカー・SC-52・N.3）＝種類横断のタイトル検索＋文脈メタ＋絞込＋ページング。読取専用。"""
+    def _split(s: str | None) -> list[str]:
+        return [x for x in (s or "").split(",") if x]
+    type_list = _split(types) or ([target_type] if target_type else ["ideas", "quests"])
     result = info_service.get_link_candidates(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-        target_type=target_type, q=q, limit=limit)
+        types=type_list, q=q, quest_ids=_split(quest_ids), statuses=_split(statuses),
+        due_from=due_from, due_to=due_to, limit=limit, cursor=cursor)
     return InfoLinkCandidatesResponse(**result)
 
 

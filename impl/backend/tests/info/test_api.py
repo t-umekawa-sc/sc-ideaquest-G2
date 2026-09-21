@@ -290,6 +290,91 @@ def test_n_tc_124_link_candidates(client, info_env):
             ts.execute(Quest.__table__.delete().where(Quest.id == qid)); ts.commit()
 
 
+def _seed_link_targets(db_identifier):
+    """対象ピッカーの候補（quest＋idea 複数・文脈メタ/期限あり）を seed。namespace を返す。"""
+    import uuid as _uuid
+    from datetime import date
+    from types import SimpleNamespace
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+    owner = _uuid.uuid4()
+    qid, i1, i2, i3 = _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4()
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(User(id=owner, account_id=_uuid.uuid4(), display_name="候補起票者ZZ", locale="ja", status="active"))
+        ts.flush()
+        ts.add(Quest(id=qid, owner_id=owner, title="候補ピッカーQ_ZZ", color="#0D9488", status="recruiting", deadline=date(2026, 12, 31)))
+        ts.flush()
+        ts.add(Idea(id=i1, quest_id=qid, author_id=owner, title="候補ピッカーI_ZZ_A", body="b", value="v", status="published", time_limit=date(2026, 11, 30)))
+        ts.add(Idea(id=i2, quest_id=qid, author_id=owner, title="候補ピッカーI_ZZ_B", body="b", value="v", status="published"))
+        ts.add(Idea(id=i3, quest_id=qid, author_id=owner, title="候補ピッカーI_ZZ_C", body="b", value="v", status="draft"))  # draft は候補に出ない
+        ts.commit()
+    return SimpleNamespace(owner=owner, qid=qid, i1=i1, i2=i2, i3=i3)
+
+
+def _cleanup_link_targets(db_identifier, s):
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(Idea.__table__.delete().where(Idea.id.in_([s.i1, s.i2, s.i3])))
+        ts.execute(Quest.__table__.delete().where(Quest.id == s.qid))
+        ts.execute(User.__table__.delete().where(User.id == s.owner))
+        ts.commit()
+
+
+def test_n_tc_141_candidate_context_meta(client, info_env):
+    """N-TC-141: 候補に文脈メタ（quest_title/owner_name/status/due）を付けて返す。"""
+    s = _seed_link_targets(info_env.db_identifier)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    try:
+        r = client.get("/api/v1/info-link-candidates", params={"types": "ideas,quests", "q": "候補ピッカー"})
+        assert r.status_code == 200, r.text
+        by_id = {c["target_id"]: c for c in r.json()["candidates"]}
+        idea = by_id[str(s.i1)]
+        assert idea["quest_title"] == "候補ピッカーQ_ZZ" and idea["owner_name"] == "候補起票者ZZ"
+        assert idea["status"] == "published" and idea["due"] == "2026-11-30"
+        quest = by_id[str(s.qid)]
+        assert quest["owner_name"] == "候補起票者ZZ" and quest["due"] == "2026-12-31"
+        assert str(s.i3) not in by_id  # draft アイデアは候補に出ない
+    finally:
+        _cleanup_link_targets(info_env.db_identifier, s)
+
+
+def test_n_tc_142_candidate_filters(client, info_env):
+    """N-TC-142: 候補をクエスト/状態/期限で絞込（AND・期限未設定は範囲指定時に除外）。"""
+    s = _seed_link_targets(info_env.db_identifier)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    try:
+        # クエスト絞込＝当該 quest 配下の idea＋quest 自身のみ。
+        r = client.get("/api/v1/info-link-candidates", params={"types": "ideas,quests", "q": "候補ピッカー", "quest_ids": str(s.qid)})
+        ids = {c["target_id"] for c in r.json()["candidates"]}
+        assert {str(s.i1), str(s.i2), str(s.qid)} <= ids and str(s.i3) not in ids
+        # 期限範囲＝time_limit を持つ i1 のみ（i2 は未設定で除外）。
+        r2 = client.get("/api/v1/info-link-candidates", params={"types": "ideas", "q": "候補ピッカーI_ZZ", "due_from": "2026-11-01", "due_to": "2026-12-31"})
+        ids2 = {c["target_id"] for c in r2.json()["candidates"]}
+        assert ids2 == {str(s.i1)}
+    finally:
+        _cleanup_link_targets(info_env.db_identifier, s)
+
+
+def test_n_tc_143_candidate_pagination(client, info_env):
+    """N-TC-143: 候補のページング（limit＋cursor）で重複なく続きが取れる。"""
+    s = _seed_link_targets(info_env.db_identifier)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    try:
+        # published idea は i1/i2 の2件。limit=1 で 1件＋next_cursor→続きで残り1件。
+        r1 = client.get("/api/v1/info-link-candidates", params={"types": "ideas", "q": "候補ピッカーI_ZZ", "limit": 1})
+        b1 = r1.json()
+        assert len(b1["candidates"]) == 1 and b1["next_cursor"] is not None
+        r2 = client.get("/api/v1/info-link-candidates", params={"types": "ideas", "q": "候補ピッカーI_ZZ", "limit": 1, "cursor": b1["next_cursor"]})
+        b2 = r2.json()
+        assert len(b2["candidates"]) == 1 and b2["next_cursor"] is None
+        assert b1["candidates"][0]["target_id"] != b2["candidates"][0]["target_id"]  # 重複なし
+    finally:
+        _cleanup_link_targets(info_env.db_identifier, s)
+
+
 def test_n_tc_119_add_link(client, info_env):
     """N-TC-119: 手動リンク追加（全員・201・origin=manual・kind=related）。"""
     import uuid as _uuid

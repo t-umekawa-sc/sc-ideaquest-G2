@@ -134,15 +134,22 @@ class InfoLinkKindRequest(BaseModel):
 
 
 class InfoLinkCandidateDTO(BaseModel):
-    """リンク候補（成果物をタイトル検索して target_id を解決）。ideas/quests＝実装済ドメイン。"""
+    """リンク候補（成果物をタイトル検索して target_id を解決）。ideas/quests＝実装済ドメイン。
+    対象ピッカー用に文脈メタ（同名識別）を付す＝所属クエスト名/起票者名/状態/期限
+    （アイデア=time_limit・クエスト=deadline）。concepts/assumptions は未実装＝候補ゼロ。"""
 
     target_type: str
     target_id: str
     title: str
+    quest_title: str | None = None
+    owner_name: str | None = None
+    status: str | None = None
+    due: str | None = None  # ISO(YYYY-MM-DD)。アイデア=タイムリミット／クエスト=期限日。
 
 
 class InfoLinkCandidatesResponse(BaseModel):
     candidates: list[InfoLinkCandidateDTO]
+    next_cursor: str | None = None  # ページング（もっと見る）。次が無ければ null。
 
 
 # ---- 詳細（GET /info-items/{id}・N.1・SC-52）---------------------------------

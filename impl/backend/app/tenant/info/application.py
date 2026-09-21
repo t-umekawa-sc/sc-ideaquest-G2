@@ -752,19 +752,39 @@ def unreject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) ->
 
 
 def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,
-                        target_type: str, q: str | None, limit: int = 20) -> dict:
-    """リンク候補の検索（SC-52 リンク追加・N.3）＝会社内 active ユーザー。ideas/quests をタイトル検索。"""
-    if target_type not in LINK_TARGET_VALUES:
-        raise AppError(422, "validation_error", detail="target_type が不正です", errors=[{"field": "target_type"}])
+                        types: list[str], q: str | None,
+                        quest_ids: list[str] | None = None, statuses: list[str] | None = None,
+                        due_from: str | None = None, due_to: str | None = None,
+                        limit: int = 20, cursor: str | None = None) -> dict:
+    """リンク候補の検索（対象ピッカー・SC-52・N.3）＝会社内 active ユーザー。
+    種類横断（ideas/quests）でタイトル検索＋文脈メタ＋クエスト/状態/期限で絞込＋ページング。"""
+    for t in types:
+        if t not in LINK_TARGET_VALUES:
+            raise AppError(422, "validation_error", detail="types が不正です", errors=[{"field": "types"}])
+    # cursor＝offset の文字列表現（不正は 0 扱い＝壊さない）。
+    offset = 0
+    if cursor:
+        try:
+            offset = max(0, int(cursor))
+        except ValueError:
+            offset = 0
+    qids: list[uuid.UUID] = []
+    for qid in (quest_ids or []):
+        try:
+            qids.append(uuid.UUID(qid))
+        except (ValueError, AttributeError):
+            continue  # 不正な id は無視（絞込がゆるくなるだけ）
     company = _resolve_company(company_id)
     if company is None:
-        return {"candidates": []}
+        return {"candidates": [], "next_cursor": None}
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
-            return {"candidates": []}
-        cands = repo.search_link_candidates(ts, target_type=target_type, q=q or "", limit=limit)
-    return {"candidates": cands}
+            return {"candidates": [], "next_cursor": None}
+        cands, has_more = repo.search_link_candidates(
+            ts, types=types, q=q or "", quest_ids=qids, statuses=statuses or [],
+            due_from=due_from, due_to=due_to, limit=limit, offset=offset)
+    return {"candidates": cands, "next_cursor": str(offset + limit) if has_more else None}
 
 
 def get_word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, *, limit: int = 40) -> dict:

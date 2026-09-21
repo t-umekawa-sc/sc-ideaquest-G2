@@ -185,9 +185,11 @@ def test_n_tc_017_search_link_candidates(info_env):
         ts.commit()
     try:
         with get_tenant_session(info_env.db_identifier) as ts:
-            cands = repo.search_link_candidates(ts, target_type="quests", q="候補クエストZZZ", limit=10)
+            cands, _more = repo.search_link_candidates(ts, types=["quests"], q="候補クエストZZZ", limit=10)
             assert any(c["target_id"] == str(qid) and c["title"] == "候補クエストZZZ" for c in cands)
-            assert repo.search_link_candidates(ts, target_type="concepts", q="x", limit=10) == []
+            # 未実装ドメイン（concepts）は候補ゼロ。
+            empty, _m2 = repo.search_link_candidates(ts, types=["concepts"], q="x", limit=10)
+            assert empty == []
     finally:
         with get_tenant_session(info_env.db_identifier) as ts:
             ts.execute(Quest.__table__.delete().where(Quest.id == qid)); ts.commit()
