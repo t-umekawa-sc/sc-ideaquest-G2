@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 
 import { Button, Swatches, LoadingOverlay, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout";
-import { AccountSection } from "@/features/accounts";
+import { AccountSection, InfoCuratorSection } from "@/features/accounts";
 import { QuestGroupSection } from "@/features/questgroups";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
@@ -26,7 +26,7 @@ function statusView(status: string): [string, string] {
   return status === "active" ? ["有効", "st-active"] : ["停止", "st-suspended"];
 }
 
-export function CompanyDetailView({ companyId }: { companyId: string }) {
+export function CompanyDetailView({ companyId, isOwnCompany = false }: { companyId: string; isOwnCompany?: boolean }) {
   const router = useRouter();
   const snack = useSnackbar();
   const [company, setCompany] = useState<CompanyDetail | null>(null);
@@ -321,6 +321,9 @@ export function CompanyDetailView({ companyId }: { companyId: string }) {
 
       <QuestGroupSection scope="company" companyId={company.company_id} />
       <AccountSection companyId={company.company_id} />
+      {/* 情報判定権限（info_curator）＝自社（セッション会社＝表示中会社）のときのみ。
+          info-curators API はセッション会社固定なので自社詳細でのみ正しく効く（他社はクロステナント未対応）。 */}
+      {isOwnCompany && <InfoCuratorSection />}
     </section>
   );
 }

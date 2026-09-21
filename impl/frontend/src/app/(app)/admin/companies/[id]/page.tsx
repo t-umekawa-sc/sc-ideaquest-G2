@@ -9,5 +9,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   if (!session) redirect("/login");
   if (session.system_role !== "system_admin") redirect("/"); // 認可はサーバー強制（API も 403 で二重防御）
   const { id } = await params;
-  return <CompanyDetailView companyId={id} />;
+  // 自社（セッション会社＝表示中の会社）のときだけ情報判定権限セクションを出す（B）＝
+  // info-curators API はセッション会社固定のため、自社詳細でのみ正しく効く（他社はクロステナント未対応）。
+  return <CompanyDetailView companyId={id} isOwnCompany={session.company_id === id} />;
 }
