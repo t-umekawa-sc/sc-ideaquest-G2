@@ -229,8 +229,9 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const r = item;
   const activeLinks = r.links.filter((l) => !l.rejected);
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
-  // 項目区切り＝デザイン標準 §4.1: 参照系（編集権なし＝読み取り）は仕切り線／入力系（編集/curate）は余白。
-  const secCls = (r.can.edit_content || r.can.curate) ? "field" : "field dialog-section";
+  // 項目区切り＝デザイン標準 §4.1: 参照系（このユーザーが編集できない項目）は仕切り線／入力・操作系は余白。
+  const refCls = "field dialog-section";                       // 常に参照＝要約/主要語/属性(read)/続報スレッド
+  const contentCls = r.can.edit_content ? "field" : refCls;    // 作成者が編集する項目＝タイトル/内容/参考資料
   // 続報スレッド＝根→続報1→続報2… の時系列（SC-50 §80）。根＝続報を開いていれば thread.parent、根を開いていれば自身。
   // 開いているアイテムは「表示中」で強調（リンクにしない）。thread.follow_ups は根の子（backend が root 基準で返す）。
   const threadRoot: InfoThreadItem = r.thread.parent ?? {
@@ -243,7 +244,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     <>
       <div className="modal__body">
         {/* 元情報（続報元）＝下部の「続報スレッド」タイムラインに根として統合表示（SC-50 §80）＝ここには別掲しない。 */}
-        <div className={secCls}>
+        <div className={contentCls}>
           <div className="dialog-label">タイトル</div>
           {r.can.edit_content ? (
             <input className="input" value={title} onChange={(e) => { setTitle(e.target.value); setContentDirty(true); }} style={{ marginBottom: 6 }} />
@@ -259,12 +260,12 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         </div>
 
         {!r.can.edit_content && r.summary ? (
-          <div className={secCls}>
+          <div className={refCls}>
             <div className="summary-box"><div className="summary-box__label">要約（選別用・自動生成）</div>{r.summary}</div>
           </div>
         ) : null}
 
-        <div className={secCls}>
+        <div className={contentCls}>
           <div className="dialog-label">内容・説明</div>
           {r.can.edit_content ? (
             <>
@@ -309,7 +310,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         </div>
 
         {(r.attachments.length || r.can.edit_content) ? (
-          <div className={secCls}>
+          <div className={contentCls}>
             <div className="dialog-label">参考資料（出典の裏付け・引用元の保全）</div>
             {r.attachments.length ? (
               <div className="attach-list">
@@ -345,7 +346,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {/* 主要語は編集不可（参照）モードだけ下部に表示。作成者（編集）は内容欄の直下にインライン表示（登録ダイアログと同位置）。 */}
         {!r.can.edit_content ? (
-          <div className={secCls}>
+          <div className={refCls}>
             <div className="dialog-label">☁️ この情報の主要語（ワードクラウド）</div>
             {r.tokens_top.length ? (
               <div className="wc-mini">
@@ -358,7 +359,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         ) : null}
 
         {r.can.curate ? (
-          <div className={secCls}>
+          <div className="field">
             <div className="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               <AttrSelect label="優先度" k="priority" map={PRIORITY_LABEL} attrs={attrs} onSet={setAttr} />
@@ -384,7 +385,8 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
             </div>
           </div>
         ) : (
-          <div className={secCls}>
+          // 非 curator の属性は「参照」＝常に仕切り線（編集モードの作成者でも属性は編集不可＝参照扱い）。
+          <div className="field dialog-section">
             <div className="dialog-label">属性（環境スキャン・判定）</div>
             <dl className="attr-grid">
               <Attr label="情報ソース" value={r.source ? SOURCE_LABEL[r.source] : null} />
@@ -401,7 +403,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         )}
 
-        <div className={secCls}>
+        <div className="field">
           <div className="dialog-label">この情報から（機会特定→行動）</div>
           <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
           <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
@@ -409,7 +411,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {/* アーカイブ／解除＝curator のみ（論理削除・監査保持・N.2）。フッターは閉じる/保存に絞るため本文に置く（SC-50 §8）。 */}
         {r.can.curate ? (
-          <div className={secCls}>
+          <div className="field">
             <div className="dialog-label">アーカイブ（情報判定権限）</div>
             {r.status === "archived" ? (
               <>
@@ -425,7 +427,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           </div>
         ) : null}
 
-        <div className={secCls}>
+        <div className="field">
           <div className="dialog-label">関連リンク（成果物との関係・per-link 種別）</div>
           {!linkEditing ? (
             <>
@@ -501,7 +503,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
           )}
         </div>
 
-        <div className={secCls}>
+        <div className={refCls}>
           <div className="dialog-label">🧵 続報スレッド</div>
           {hasThread ? (
             <ul className="info-thread">
