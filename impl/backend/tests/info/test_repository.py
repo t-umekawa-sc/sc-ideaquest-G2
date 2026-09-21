@@ -61,7 +61,9 @@ def test_n_tc_005_offset_paging_stable(info_env):
     """N-TC-005: 番号ページャ（offset/limit）で重複なく続きを返す（既定 -created_at）。"""
     with get_tenant_session(info_env.db_identifier) as ts:
         rows_stmt, _ = repo.build_info_list_query(statuses=["raw", "curated"])  # archived 除外
-        rows_stmt = _own(rows_stmt, info_env.user_id)  # フィクスチャ author に限定（5件）
+        # フィクスチャの item id に限定＝共有DBに他ユーザー/受入で増えた info でページ順が崩れないよう hermetic に。
+        fx = [info_env.ids.a, info_env.ids.b, info_env.ids.c, info_env.ids.d, info_env.ids.fu1, info_env.ids.fu2]
+        rows_stmt = rows_stmt.where(InfoItem.id.in_(fx))
         page1 = _ids(ts, rows_stmt.offset(0).limit(2))
         page2 = _ids(ts, rows_stmt.offset(2).limit(2))
         assert page1 == [info_env.ids.fu2, info_env.ids.fu1]
