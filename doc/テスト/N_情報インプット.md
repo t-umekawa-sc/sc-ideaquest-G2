@@ -81,6 +81,8 @@
 | N-TC-144 | api | 内容編集で更新履歴を返す（🕘 更新履歴） | 作成者の情報を2回内容編集 | `PATCH /info-items/{id}`×2 → `GET /info-items/{id}` | `content_revisions[]` が版降順で返る（各＝revision/editor_name/created_at）＝編集回数ぶんの版 | N.1／SC-50 §85 |
 | N-TC-145 | api | 登録時の属性付与は curator のみ | 一般ユーザー（非curator）／curator 付与 | `POST /info-items`（属性つき＝priority 等） | 非curator＝403 `forbidden`（属性は情報判定権限）／curator＝201・`status=curated` で属性反映。属性なしは全員 201・raw | N.2／SC-50 §85 |
 | N-TC-146 | api | 現ユーザーの curator 判定（登録フォーム出し分け） | 一般／curator 付与 | `GET /info-capabilities` | `can_curate` を返す（非curator=false／付与後=true） | N.0／SC-50 §85 |
+| N-TC-147 | api | 登録直後に初版（版1）を記録＝更新履歴が作成時から出る（内容編集を待たない） | 情報を登録 | `POST /info-items` | 応答 `content_revisions` が1件・`revision=1`（内容 title/body_html/source_url のスナップショット） | N.1／SC-50 §85 |
+| N-TC-148 | api | 選別用要約は約150字で丸める（長文でも一目・末尾…） | 6文以上の長文 body で登録 | `POST /info-items` | `summary` が非空かつ `len<=151`（150字＋末尾…）・句点境界優先で丸め＝`summarize_text(max_chars=150)`。短い本文は無改変（…付けない） | N.6／§12-3／SC-50 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

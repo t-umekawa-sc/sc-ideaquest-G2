@@ -29,6 +29,8 @@ from app.tenant.profile import repository as profile_repo
 from app.tenant.quests.summarize import summarize_text
 
 _MAX_TITLE = 255
+# 選別用要約の字数上限（§12-3・2026-09-21 ユーザー要望＝約150字）。長い記事でも一覧/選別で一目で読める長さに。
+_SUMMARY_MAX_CHARS = 150
 
 _EMPTY_PAGE = {
     "data": [],
@@ -315,7 +317,7 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
     # 派生（外部送信ゼロ・オフライン）。サニタイズ→平文→要約→トークン。
     body_html = derive.sanitize_html(body.body_html)
     body_text = derive.to_plain_text(body_html)
-    summary = summarize_text(body_text) if body_text else None
+    summary = summarize_text(body_text, max_chars=_SUMMARY_MAX_CHARS) if body_text else None
     tokens = derive.extract_tokens(body_text)
 
     with get_tenant_session(company.db_identifier) as ts:
@@ -334,6 +336,10 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         )
         ts.flush()
         repo.replace_tokens(ts, item.id, tokens)
+        # 初版（版1）を記録＝作成直後から更新履歴に「版1」が出る（内容編集を待たない・§85/N.1）。
+        # スナップショットは内容フィールド（title/body_html/source_url）。以降の内容編集で版2..が積まれる。
+        repo.add_revision(ts, item.id, user.id,
+                          {"title": item.title, "body_html": item.body_html, "source_url": item.source_url})
         if has_curation:  # curator が登録時に属性を付与＝判定済みへ
             for f in _cur_scalar:
                 if f in curation:
@@ -494,7 +500,7 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
             if "body_html" in content:
                 item.body_html = derive.sanitize_html(body.body_html) or None
                 item.body_text = derive.to_plain_text(item.body_html) or None
-                item.summary = summarize_text(item.body_text) if item.body_text else None
+                item.summary = summarize_text(item.body_text, max_chars=_SUMMARY_MAX_CHARS) if item.body_text else None
                 repo.replace_tokens(ts, item.id, derive.extract_tokens(item.body_text or ""))
             if "source_url" in content:
                 item.source_url = body.source_url or None

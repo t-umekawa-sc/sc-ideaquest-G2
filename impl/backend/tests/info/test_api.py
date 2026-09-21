@@ -94,14 +94,16 @@ def _csrf(client) -> dict:
 
 
 def _delete_info(db_identifier, info_id):
-    """作成した情報の後始末（attachments/tokens/links/item を物理削除）。"""
-    from app.tenant.info.orm import InfoAttachment, InfoItem, InfoLink, InfoToken
+    """作成した情報の後始末（attachments/tokens/links/revisions/item を物理削除）。"""
+    from app.tenant.info.orm import InfoAttachment, InfoItem, InfoItemRevision, InfoLink, InfoToken
     import uuid as _uuid
     iid = _uuid.UUID(info_id)
     with get_tenant_session(db_identifier) as ts:
         ts.execute(InfoAttachment.__table__.delete().where(InfoAttachment.info_item_id == iid))
         ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id == iid))
         ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id == iid))
+        # 版1を作成時に必ず記録するようになった（N-TC-147）＝FK 順序で revisions を先に消す。
+        ts.execute(InfoItemRevision.__table__.delete().where(InfoItemRevision.info_item_id == iid))
         ts.execute(InfoItem.__table__.delete().where(InfoItem.id == iid))
         ts.commit()
 
@@ -419,6 +421,41 @@ def test_n_tc_146_capabilities(client, info_env):
         assert client.get("/api/v1/info-capabilities").json()["can_curate"] is True
     finally:
         _revoke_curators(info_env.db_identifier, info_env.user_id)
+
+
+def test_n_tc_147_create_records_initial_revision(client, info_env):
+    """N-TC-147: 登録直後に初版（版1）が記録され更新履歴に出る（内容編集を待たない・§85/N.1）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={"title": "初版記録テスト", "body_html": "<p>本文です。</p>"}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        assert len(d["content_revisions"]) == 1 and d["content_revisions"][0]["revision"] == 1
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
+
+
+def test_n_tc_148_summary_capped(client, info_env):
+    """N-TC-148: 選別用要約は約150字で丸める（長い記事でも一覧/選別で一目・末尾…・§12-3）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    sents = [
+        "生成AIの業務利用が急速に拡大しており各社が対応を迫られている状況にあります。",
+        "特にカスタマーサポート領域での自動応答の導入が顕著に進んでいると報告されています。",
+        "一方で情報漏洩や品質のばらつきといった無視できないリスクも同時に指摘されています。",
+        "各社はガイドライン整備と社内教育の両輪で慎重に対応を進める必要があるとされています。",
+        "競合他社の先行事例では現場の生産性が大幅に向上したとする調査結果も出てきています。",
+        "今後は規制動向を注視しつつ段階的な展開を図ることが現実的な選択肢になるでしょう。",
+    ]
+    body = "<p>" + "".join(sents) + "</p>"
+    r = client.post(INFO, json={"title": "要約長テスト", "body_html": body}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        assert d["summary"], "要約が空"
+        assert len(d["summary"]) <= 151, f"要約が長すぎる（{len(d['summary'])}字）: {d['summary']}"
+        assert d["summary"].endswith("…"), "丸めた要約は末尾…"
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
 
 
 def test_n_tc_119_add_link(client, info_env):
