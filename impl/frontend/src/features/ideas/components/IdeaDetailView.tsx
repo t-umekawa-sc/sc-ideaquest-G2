@@ -437,6 +437,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           </span>
           {idea.time_limit && <span>⏳ タイムリミット {fmtDate(idea.time_limit)}</span>}
           <span>🤝 利害関係者: {stakeText}</span>
+          {/* 所属クエストへの動線（ダッシュボード等から直接アイデアに来た時にクエストへ辿れるように）。 */}
+          <span>🧭 所属クエスト: <Link href={`/quests/${idea.quest.id}`}>{idea.quest.title || "クエスト"}</Link></span>
         </div>
       </section>
 
