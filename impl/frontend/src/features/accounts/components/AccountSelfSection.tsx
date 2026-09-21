@@ -8,7 +8,7 @@
 // データ供給は全件クライアント処理（useAllAccounts）。発行/編集の成功は別ルートで起き、
 // ACCOUNTS_CHANGED_EVENT（window）を購読して一覧を再取得する（跨ルート更新・handoff §5）。
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
@@ -25,6 +25,7 @@ import {
 } from "../api";
 import type { Account } from "../types";
 import { toMembershipInputs } from "../memberships";
+import { useAccountsChangedReload } from "../useAccountsChangedReload";
 import { useAllAccounts } from "../useAllAccounts";
 import "@/features/companies/companies.css";
 
@@ -52,11 +53,8 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
   const snack = useSnackbar();
 
   // 発行/編集は別ルート（URL モーダル）で行う＝成功時の ACCOUNTS_CHANGED_EVENT を購読して一覧を再取得。
-  useEffect(() => {
-    const onChanged = () => void reload();
-    window.addEventListener(ACCOUNTS_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, onChanged);
-  }, [reload]);
+  // 所属は outbox ワーカが非同期適用（B.5）＝即時＋数回の遅延再取得で追随（useAccountsChangedReload）。
+  useAccountsChangedReload(ACCOUNTS_CHANGED_EVENT, reload);
 
   const editHref = (a: Account) => `/admin/accounts/${a.account_id}/edit`;
 
