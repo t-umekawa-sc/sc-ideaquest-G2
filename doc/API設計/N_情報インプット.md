@@ -73,7 +73,7 @@
 | `POST /info-curators` | 付与 | ボディ: `account_id` | 付与後の一覧 `data`（`UNIQUE(user_id) WHERE revoked_at IS NULL`＝二重付与は 409／会社にいない account は 404 存在秘匿）。会社アカウント管理者/system_admin |
 | `DELETE /info-curators/{account_id}` | 剥奪 | — | 204・`revoked_at` セット（論理剥奪・行は残す・監査）。未付与/会社外は 404 |
 
-- **識別子＝`account_id`（管理面の自然キー・2026-09-21 実装）**＝会社アカウント管理は account 中心（`info_curators.user_id` へはサーバーが `account_id→会社DB users` で解決）。スコープ＝**会社（テナント）単位**（設計 §11-①）＝`company_id` は受けずセッション会社固定。quest 系権限（C.0 の6権限）とは別軸。**付与導線＝会社アカウント管理（SC-93 `/admin/accounts`）に同居**＝`InfoCuratorSection`（付与セレクト＋剥奪）。**加えて、system_admin が“自社”を SC-92 会社詳細（`/admin/companies/{id}`）で開いたとき（セッション会社＝表示中会社）にも同セクションを表示する（2026-09-21 B 対応）**＝session-scoped API がそのまま自社に効くため新 EP 不要。**他社（表示中会社≠セッション会社）では非表示**（クロステナント付与は未対応）。
+- **識別子＝`account_id`（管理面の自然キー・2026-09-21 実装）**＝会社アカウント管理は account 中心（`info_curators.user_id` へはサーバーが `account_id→会社DB users` で解決）。スコープ＝**会社（テナント）単位**（設計 §11-①）＝`company_id` は受けずセッション会社固定。quest 系権限（C.0 の6権限）とは別軸。**付与導線＝会社アカウント管理（SC-93 `/admin/accounts`）に同居**＝`InfoCuratorSection`。**UI はクエストグループ管理（SC-90）と同構成**＝付与済みユーザーの**一覧（DataTable・行の ⋯ メニューから「情報判定権限を剥奪」）**＋**「＋ 権限を付与する」ボタン→ メンバー追加ダイアログ風**（会社ディレクトリ検索＋もっと見る＋各行の「付与」で連続付与）。**配置＝アカウント一覧の次**（SC-92 と統一）。**加えて、system_admin が“自社”を SC-92 会社詳細（`/admin/companies/{id}`）で開いたとき（セッション会社＝表示中会社）にも同セクションを表示する（2026-09-21 B 対応）**＝session-scoped API がそのまま自社に効くため新 EP 不要。**他社（表示中会社≠セッション会社）では非表示**（クロステナント付与は未対応）。
 
 ## N.6 類似度・ワードクラウド（派生・内部処理）
 

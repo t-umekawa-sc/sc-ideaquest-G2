@@ -45,7 +45,8 @@ function statusBadge(status: string) {
 }
 
 // children＝見出し/自社バナーの直後・アカウント表の前に差し込むスロット（SC-93 のクエストグループ管理を配置する）。
-export function AccountSelfSection({ companyCode, children }: { companyCode: string; children?: React.ReactNode }) {
+// after＝アカウント表の後に差し込むスロット（情報判定権限を配置＝SC-92 会社詳細と同じ「一覧の次」順）。
+export function AccountSelfSection({ companyCode, children, after }: { companyCode: string; children?: React.ReactNode; after?: React.ReactNode }) {
   const router = useRouter();
   const { accounts, loading, loadError, reload } = useAllAccounts(listOwnAccounts);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -329,6 +330,9 @@ export function AccountSelfSection({ companyCode, children }: { companyCode: str
         アカウントは<strong>管理者による発行のみ</strong>です（自己新規登録はできません）。発行後、対象者は<strong>初回ログイン時にパスワードを設定</strong>します（メールのリンク・72時間有効）。<strong>無効化</strong>するとログインできなくなりますが、それまでの入力（アイデア／投票／評価／コメント）は残ります。この画面で発行・編集できるのは<strong>一般アカウント</strong>で、<strong>システムロールの付与（会社アカウント管理者／システム管理者）はシステム管理者が行います</strong>（システム管理者アカウントはこの画面では操作できません）。所属クエストグループは<strong>メンバー／管理者（QG管理者）を指定できます</strong>。
       </p>
       </section>
+
+      {/* アカウント表の後に差し込むスロット（情報判定権限＝一覧の次・SC-92 と統一）。 */}
+      {after}
     </section>
   );
 }

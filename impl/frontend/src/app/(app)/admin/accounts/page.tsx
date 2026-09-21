@@ -12,11 +12,10 @@ export default async function OwnAccountsPage() {
   if (session.system_role !== "company_account_admin" && session.system_role !== "system_admin") redirect("/");
   // 自社コンテキスト表示用に会社コードを渡す（会社表示名は session 未提供＝将来拡張。当面はコード）。
   // クエストグループ CRUD は会社アカ管理者へ委任（B.2.1・2026-09-06）＝自社スコープ（scope="own"）で同画面に配置。
-  // 並び＝見出し/自社バナー（AccountSelfSection 冒頭）→ クエストグループ → アカウント表（children スロットで差し込み）。
+  // 並び＝見出し/自社バナー → クエストグループ（children＝表の前）→ アカウント表 → 情報判定権限（after＝表の後・SC-92 と統一）。
   return (
-    <AccountSelfSection companyCode={session.company_code}>
+    <AccountSelfSection companyCode={session.company_code} after={<InfoCuratorSection />}>
       <QuestGroupSection scope="own" />
-      <InfoCuratorSection />
     </AccountSelfSection>
   );
 }
