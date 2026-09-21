@@ -478,7 +478,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
           <summary>任意項目（タイムリミット・利害関係者・備考）</summary>
           <div className="disclosure__body">
             {/* 任意項目の中も項目ごとに区切る（ユーザー判断）＝タイムリミット/利害関係者は横並びをやめ1行ずつ＋各項目間に仕切り線。 */}
-            <Field id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
+            <Field className="dialog-section is-quiet" id="idea_limit" label="タイムリミット" hint="実施/検討の想定期限。">
               <input id="idea_limit" className="input" type="date" value={limit} onChange={(e) => setLimit(e.target.value)} />
             </Field>
             <Field className="dialog-section is-quiet" id="idea_stake" label="利害関係者" hint="複数選択可。候補に無ければ入力して Enter で追加。">

@@ -259,7 +259,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
                 複製元の値を引き継いで新規作成します。<strong>クエストグループコードも引き継いでいます</strong>（一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
               </p>
             )}
-            <Field id="g_code" label="クエストグループコード" required>
+            <Field className="dialog-section is-quiet" id="g_code" label="クエストグループコード" required>
               <input id="g_code" className="input" placeholder="例: PLAN" value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={formError ? true : undefined} required />
             </Field>
             <Field className="dialog-section is-quiet" id="g_name" label="グループ名" required>
@@ -283,7 +283,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
         <form onSubmit={onEditSubmit} noValidate>
           <ModalBody>
             {editError && <div className="form-error" role="alert" ref={editErrRef} tabIndex={-1}>{editError}</div>}
-            <Field id="g_edit_code" label="クエストグループコード" hint="コードは作成後は変更できません。">
+            <Field className="dialog-section is-quiet" id="g_edit_code" label="クエストグループコード" hint="コードは作成後は変更できません。">
               <input id="g_edit_code" className="input db-id" value={editing?.quest_group_code ?? ""} readOnly disabled />
             </Field>
             <Field className="dialog-section is-quiet" id="g_edit_name" label="グループ名" required>

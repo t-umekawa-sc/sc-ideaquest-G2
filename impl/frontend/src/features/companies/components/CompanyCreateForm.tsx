@@ -116,7 +116,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
             複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子も引き継いでいます</strong>（いずれも一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
           </p>
         )}
-        <Field id="c_name" label="会社名" required error={fieldErrors.name}>
+        <Field className="dialog-section is-quiet" id="c_name" label="会社名" required error={fieldErrors.name}>
           <input id="c_name" className="input" placeholder="例: システムコンシェルジュ" value={name} onChange={(e) => { setName(e.target.value); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined })); }} required />
         </Field>
         <Field

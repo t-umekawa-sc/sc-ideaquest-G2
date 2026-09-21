@@ -607,7 +607,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
 
         {!partyOnly && (
         <>
-        <Field id="q_icon" label="クエストアイコン（任意）">
+        <Field className="dialog-section is-quiet" id="q_icon" label="クエストアイコン（任意）">
           <div className="icon-field">
             <span className="quest-icon lg" style={{ ["--accent" as string]: color } as React.CSSProperties}>
               {iconPreview || iconUrl ? (

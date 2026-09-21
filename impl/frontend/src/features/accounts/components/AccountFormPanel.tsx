@@ -216,7 +216,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
         {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
-        <Field id={`${idPrefix}_name`} label="氏名" required error={fieldErrors.display_name}>
+        <Field className="dialog-section is-quiet" id={`${idPrefix}_name`} label="氏名" required error={fieldErrors.display_name}>
           <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (fieldErrors.display_name) setFieldErrors((p) => ({ ...p, display_name: undefined })); }} required />
         </Field>
         <Field className="dialog-section is-quiet" id={`${idPrefix}_login`} label="ログインID" required error={fieldErrors.login_id}>
