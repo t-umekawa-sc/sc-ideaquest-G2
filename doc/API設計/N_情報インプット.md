@@ -41,6 +41,8 @@
 | `POST /info-items/images` | **貼付画像の再ホスト**（リッチテキスト・§12-4） | multipart: `file`（画像・マジックバイト検証＝§1.10/§N.7）。エディタの paste ハンドラが blob を送る | `{ url }`＝自社ホスト（MinIO）署名 URL。エディタが `img src` をこの URL に置換（外部参照を持ち込まない） |
 | `POST /info-items/{id}/attachments` | **参考資料の追加**（内容群・§5.33） | multipart: `files`（複数可・拡張子 allowlist＋サイズ〔1件20MB〕＋マジックバイト検証＝§1.10/§5.12）。**作成者のみ**（curator も不可）・1情報10件まで | 追加後の `attachments[]`（`id`/`original_name`/`size_bytes`/`mime_type`/`uploaded_by`/`uploaded_at`/`url`〔短TTL 署名〕）。不正1件で部分保存しない（先行全件検証） |
 | `DELETE /info-items/{id}/attachments/{attachment_id}` | **参考資料の削除**（内容群・§5.33） | — | 204。**作成者のみ**。DB 行＋MinIO オブジェクトを削除（同一 UoW）。他情報配下の id は 404 |
+
+> **フロント UX（登録/詳細とも「保存でまとめて反映」・2026-09-21・アイデア D.3 と同仕様）**＝参考資料の追加/削除は**その場で即時コミットせず**、追加は未アップロードでステージ・既存削除は「削除予定」マーク（元に戻せる）とし、**「保存する」/「登録する」で確定**（追加=`POST attachments`／削除=`DELETE`）。**参考資料の変更も「変更あり」に含める**＝内容/属性が無変更でも添付だけ変えれば保存が走り、完了でダイアログを閉じる。キャンセルなら無変更。※本 EP 自体は単発の add/remove として不変（バッチ化はフロントのまとめ送信）。
 | `PATCH /info-items/{id}` | 内容編集（作成者）／キュレーション（curator） | ボディ（部分更新・**フィールド群でオーナー別**）＝**内容＝作成者のみ**（`title`/`body_html`/`source_url`／`status` 非依存・curator も不可）／**キュレーション＝`info_curator` のみ**（`priority`/`source`/`classification`/`scope`/`target_business`/`impact_level`/`impact_class`/`impact_timing`/`triaged_on`/`triage`/`triage_reason`＋`categories[]`〔#8 全置換〕）。curated 属性を付けると `status=raw→curated`。越権フィールドは 403 | 更新後の情報。`body_html`/`title` 変更時は **サニタイズ→`body_text` 派生→`info_tokens`→要約 `summary` 再生成→関連 `score` 再計算**（同期・§N.6・§12-3）＋**内容変更は編集履歴に記録**（Phase C） |
 | `POST /info-items/{id}/archive` | アーカイブ（論理削除） | — | `status=archived`＋`archived_at`。**`info_curator` のみ**・物理削除なし（監査保持） |
 | `POST /info-items/{id}/unarchive` | アーカイブ解除 | — | `status` を curated（or raw）へ戻す。`info_curator` のみ |

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useConfirm, useSnackbar } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
   rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
@@ -80,10 +81,12 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pending, setPending] = useState<InfoLinkCandidate[]>([]); // ピッカーで選び呼び元にストックした候補（種別を選んで追加）
   const [addKind, setAddKind] = useState<InfoLinkKind>("related");
-  // 参考資料（内容群・作成者のみ・§5.33）＝追加/削除は即時コミット→詳細再取得。
+  // 参考資料（内容群・作成者のみ・§5.33）＝アイデア(D.3)と同仕様＝追加/削除は「保存する」でまとめて反映
+  // （新規はステージ→保存でアップロード／既存削除は removedAttIds にマーク→保存で確定）。キャンセルなら無変更。
   const attInputRef = useRef<HTMLInputElement>(null);
-  const [attBusy, setAttBusy] = useState(false);
   const [attErr, setAttErr] = useState<string | null>(null);
+  const [newFiles, setNewFiles] = useState<File[]>([]); // 追加予定（未アップロード）
+  const [removedAttIds, setRemovedAttIds] = useState<string[]>([]); // 削除予定にマークした既存添付
 
   useEffect(() => {
     const ac = new AbortController();
@@ -108,6 +111,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     });
     setCats(item.categories);
     setCurationDirty(false);
+    setNewFiles([]); setRemovedAttIds([]); setAttErr(null); // 添付ステージも初期化（再取得/保存後）
     // 主要語/要約プレビューの初期値＝サーバー派生済みの値（tokens_top / summary）。
     setCloud(item.tokens_top.length ? item.tokens_top.map((t) => [t.token, t.count] as [string, number]) : null);
     setSummaryPrev(item.summary ?? null);
@@ -141,17 +145,28 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       for (const k of Object.keys(EMPTY_ATTRS)) patch[k] = attrs[k] || null;
       patch.categories = cats;
     }
+    const contentOrCuration = contentDirty || curationDirty;
     // 無変更で保存＝グレースフルに処理（API を呼ばず版を増やさない・IdeaForm と同じ体裁／style-guide §10）。
-    if (!contentDirty && !curationDirty) {
-      snack({ type: "info", title: "変更はありません", msg: "内容・属性とも変更がなかったため、保存しませんでした。" });
+    // 参考資料の追加/削除も「変更」に含める（アイデア D.3 と同仕様＝保存でまとめて反映）。
+    if (!contentOrCuration && !attachmentsDirty) {
+      snack({ type: "info", title: "変更はありません", msg: "内容・属性・参考資料とも変更がなかったため、保存しませんでした。" });
       return;
     }
+    setAttErr(null);
     setSaving(true);
     try {
-      const updated = await updateInfoItemApi(item.id, patch);
-      setItem(updated); // 再取得＝再派生（要約/トークン）・版・raw→curated を反映
-    } catch { /* 失敗時は編集内容を保持（再試行可） */ }
-    setSaving(false);
+      // 参考資料＝保存でまとめて反映（新規アップロード→既存の削除確定）。id 先行が要る add 系は既存 item に対して実行。
+      if (newFiles.length) await addAttachmentsApi(item.id, newFiles);
+      for (const id of removedAttIds) {
+        try { await deleteAttachmentApi(item.id, id); }
+        catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; } // 既に無い(404)は成功扱い
+      }
+      if (contentOrCuration) await updateInfoItemApi(item.id, patch); // 内容/属性＝再派生・版・raw→curated
+      onClose(); // 保存完了＝ダイアログを閉じる（他ダイアログと統一）。一覧は emit で再取得済み。
+    } catch {
+      setAttErr("保存に失敗しました（形式・サイズ・件数〔1情報10件まで〕をご確認のうえ再度お試しください）。");
+      setSaving(false); // 失敗時は閉じずに編集内容を保持（再試行可）
+    }
   };
 
   // リンク操作＝即時コミット→詳細を再取得して反映。
@@ -189,20 +204,12 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
     setPending([]);
   };
 
-  // 参考資料の追加/削除（作成者のみ・即時コミット→詳細再取得）。
-  const addAtts = async (fl: FileList | null) => {
-    if (!item || !fl || !fl.length) return;
-    setAttErr(null); setAttBusy(true);
-    try { await addAttachmentsApi(item.id, Array.from(fl)); const d = await fetchInfoDetail(infoId); if (d) setItem(d); }
-    catch { setAttErr("参考資料を追加できませんでした（形式・サイズ・件数〔1情報10件まで〕をご確認ください）。"); }
-    setAttBusy(false);
-  };
-  const delAtt = async (id: string) => {
-    if (!item) return;
-    setAttBusy(true);
-    try { await deleteAttachmentApi(item.id, id); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
-    setAttBusy(false);
-  };
+  // 参考資料＝追加はステージ（未アップロード）、既存削除はマーク（保存で確定・アイデア D.3 と同仕様）。
+  const stageFiles = (fl: FileList | null) => { if (fl?.length) { setAttErr(null); setNewFiles((f) => [...f, ...Array.from(fl)]); } };
+  const removeNewFile = (i: number) => setNewFiles((f) => f.filter((_, j) => j !== i));
+  const toggleRemoveExisting = (id: string) =>
+    setRemovedAttIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const attachmentsDirty = newFiles.length > 0 || removedAttIds.length > 0;
 
   // アーカイブ／解除（curator・N.2）＝確認→即時コミット。アーカイブは一覧から消えるので閉じて一覧へ戻す。
   const [archiveBusy, setArchiveBusy] = useState(false);
@@ -333,34 +340,53 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
 
         {(r.attachments.length || r.can.edit_content) ? (
           // 参考資料は作成者の入力項目＝編集時は線なし・間隔維持（contentCls）／読み取りは線あり。
+          // 追加/削除は「保存する」でまとめて反映（アイデア D.3 と同仕様＝新規はステージ・既存削除はマーク）。
           <div className={contentCls}>
             <div className="dialog-label">参考資料（出典の裏付け・引用元の保全）</div>
-            {r.attachments.length ? (
+            {(r.attachments.length || newFiles.length) ? (
               <div className="attach-list">
-                {r.attachments.map((a) => (
-                  <div key={a.id} className="attach">
-                    <span className="attach__icon">{iconForMime(a.mime_type)}</span>
-                    <div className="attach__meta">
-                      <div className="attach__name"><a href={a.url} target="_blank" rel="noopener noreferrer">{a.original_name}</a></div>
-                      <div className="attach__size">{fmtSize(a.size_bytes)}</div>
+                {r.attachments.map((a) => {
+                  const marked = removedAttIds.includes(a.id);
+                  return (
+                    <div key={a.id} className="attach">
+                      <span className="attach__icon">{iconForMime(a.mime_type)}</span>
+                      <div className="attach__meta">
+                        <div className="attach__name" style={marked ? { textDecoration: "line-through", color: "var(--color-text-subtle)" } : undefined}>
+                          <a href={a.url} target="_blank" rel="noopener noreferrer">{a.original_name}</a>
+                        </div>
+                        <div className="attach__size">{fmtSize(a.size_bytes)}{marked ? "・削除予定（保存で確定）" : ""}</div>
+                      </div>
+                      {r.can.edit_content ? (
+                        marked
+                          ? <button type="button" className="btn btn-outline btn-sm" onClick={() => toggleRemoveExisting(a.id)}>元に戻す</button>
+                          : <button type="button" className="attach__remove" aria-label="削除予定にする" title="削除予定にする（保存で確定）" onClick={() => toggleRemoveExisting(a.id)}>✕</button>
+                      ) : null}
                     </div>
-                    {r.can.edit_content ? (
-                      <button type="button" className="attach__remove" aria-label="削除" title="削除" disabled={attBusy} onClick={() => delAtt(a.id)}>✕</button>
-                    ) : null}
+                  );
+                })}
+                {newFiles.map((f, i) => (
+                  <div key={`new-${i}`} className="attach">
+                    <span className="attach__icon">{iconForMime(f.type)}</span>
+                    <div className="attach__meta">
+                      <div className="attach__name">{f.name} <span className="badge badge-muted">追加予定</span></div>
+                      <div className="attach__size">{fmtSize(f.size)}</div>
+                    </div>
+                    <button type="button" className="attach__remove" aria-label="取り消し" title="追加を取り消し" onClick={() => removeNewFile(i)}>✕</button>
                   </div>
                 ))}
               </div>
             ) : <p className="muted">参考資料はまだありません。</p>}
             {r.can.edit_content ? (
               <>
-                <input ref={attInputRef} type="file" multiple hidden onChange={(e) => { void addAtts(e.target.files); e.target.value = ""; }} />
-                <div className="dropzone" role="button" tabIndex={0} aria-disabled={attBusy}
-                  onClick={() => { if (!attBusy) attInputRef.current?.click(); }}
-                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !attBusy) { e.preventDefault(); attInputRef.current?.click(); } }}
+                <input ref={attInputRef} type="file" multiple hidden onChange={(e) => { stageFiles(e.target.files); e.target.value = ""; }} />
+                <div className="dropzone" role="button" tabIndex={0}
+                  onClick={() => attInputRef.current?.click()}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); attInputRef.current?.click(); } }}
                   onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("is-over"); }} onDragLeave={(e) => e.currentTarget.classList.remove("is-over")}
-                  onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove("is-over"); void addAtts(e.dataTransfer.files); }}>
-                  {attBusy ? "アップロード中…" : "📎 クリックまたはドラッグ＆ドロップで参考資料を追加"}
+                  onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove("is-over"); stageFiles(e.dataTransfer.files); }}>
+                  📎 クリックまたはドラッグ＆ドロップで参考資料を追加
                 </div>
+                <div className="hint">追加・削除は<strong>「保存する」で確定</strong>します（キャンセルすれば無変更）。</div>
                 {attErr ? <div className="hint" style={{ color: "var(--color-danger)" }}>{attErr}</div> : null}
               </>
             ) : null}
@@ -382,9 +408,10 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
         ) : null}
 
         {r.can.curate ? (
-          <div className="field dialog-section">
-            <div className="dialog-label">属性（環境スキャン・判定）＝情報判定権限</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          // 登録ダイアログの「属性を付与」と同じ折り畳み（disclosure）に統一（既定は開いた状態＝ユーザー要望）。
+          <details className="disclosure field dialog-section" open>
+            <summary>🧭 属性（環境スキャン・判定）＝情報判定権限</summary>
+            <div className="disclosure__body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               <AttrSelect label="優先度" k="priority" map={PRIORITY_LABEL} attrs={attrs} onSet={setAttr} />
               <AttrSelect label="情報ソース" k="source" map={SOURCE_LABEL} attrs={attrs} onSet={setAttr} />
               <AttrSelect label="情報分類" k="classification" map={CLASSIFICATION_LABEL} attrs={attrs} onSet={setAttr} />
@@ -406,7 +433,7 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               <AttrSelect label="情報判定" k="triage" map={TRIAGE_LABEL} attrs={attrs} onSet={setAttr} />
               <div><label className="dialog-label" htmlFor="dm-reason">判定理由</label><textarea className="input" id="dm-reason" rows={3} value={attrs.triage_reason} onChange={(e) => setAttr("triage_reason", e.target.value)} /></div>
             </div>
-          </div>
+          </details>
         ) : (
           // 非 curator の属性は「参照」＝常に仕切り線（編集モードの作成者でも属性は編集不可＝参照扱い）。
           <div className="field dialog-section">
