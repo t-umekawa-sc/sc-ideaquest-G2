@@ -35,10 +35,12 @@ export function removeMember(groupId: string, accountId: string): Promise<null> 
 }
 
 // 自社ディレクトリ（参加追加の候補・最小射影）。excludeGroupId＝当該グループの既参加者を候補から除外（SC-90）。
-export function companyDirectory(q?: string, excludeGroupId?: string): Promise<DirectoryResponse | null> {
+// page/perPage＝「もっと見る」ページング（page_info.total で次ページ有無を判定）。
+export function companyDirectory(q?: string, excludeGroupId?: string, page = 1, perPage = 20): Promise<DirectoryResponse | null> {
   const qs = new URLSearchParams();
   if (q) qs.set("q", q);
   if (excludeGroupId) qs.set("exclude_group_id", excludeGroupId);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetch<DirectoryResponse>(`/admin/company-directory${suffix}`);
+  qs.set("page", String(page));
+  qs.set("per_page", String(perPage));
+  return apiFetch<DirectoryResponse>(`/admin/company-directory?${qs.toString()}`);
 }

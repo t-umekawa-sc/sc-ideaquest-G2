@@ -43,13 +43,12 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* 高さを固定（min=max）＝取得中/空/結果ありで領域が変わらず、モーダルの高さジャンプ（ちらつき）を防ぐ。 */
-  height: 340px;
-  min-height: 340px;
-  max-height: 340px;
-  overflow-y: auto;
+  /* 内部スクロールにせず縦に伸ばす（対象ピッカー10d と統一・件数は「もっと見る」で制御）。
+     取得中/空はこの min-height 領域の中央に表示＝初回取得での高さジャンプを抑える。 */
+  min-height: 200px;
   margin-top: var(--space-2);
 }
+.dir-more { display: flex; justify-content: center; margin-top: var(--space-2); }
 /* リスト領域内の状態表示（読み込み中／候補なし）＝確保した高さの中央に置く */
 .dir-list__status {
   margin: auto;

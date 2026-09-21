@@ -16,8 +16,12 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
   const [groupName, setGroupName] = useState<string | null>(null);
   const [dirQuery, setDirQuery] = useState("");
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
-  const [loading, setLoading] = useState(true); // 初回取得完了まで＝リスト領域内でローディング表示（高さは常に確保）
+  const [total, setTotal] = useState(0);   // page_info.total＝「もっと見る」の残り判定
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true); // 初回取得完了まで＝リスト領域内でローディング表示
+  const [moreLoading, setMoreLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const PER = 20;
 
   // 追加先グループ名の表示用（自分が admin のグループから id 一致を解決）。取得失敗は表示のみ影響。
   useEffect(() => {
@@ -26,30 +30,52 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
       .catch(() => {});
   }, [groupId]);
 
-  const fetchDirectory = useCallback(async () => {
+  // 先頭ページ取得（検索変更/マウント/追加後にリセット）。既参加者はサーバー除外（SC-90）。
+  const loadFirst = useCallback(async () => {
+    setLoading(true);
     try {
-      // 既に当該グループに参加中のユーザーは候補から除外（サーバー除外＝ページング整合・SC-90）。
-      const res = await companyDirectory(dirQuery || undefined, groupId);
+      const res = await companyDirectory(dirQuery || undefined, groupId, 1, PER);
       setDirectory(res?.data ?? []);
+      setTotal(res?.page_info?.total ?? 0);
+      setPage(1);
     } catch {
       setError("ディレクトリの取得に失敗しました。");
     } finally {
-      setLoading(false); // 初回で解除（以後は結果を差し替えるだけ＝リストのちらつき/高さジャンプ無し）
+      setLoading(false);
     }
   }, [dirQuery, groupId]);
 
+  // もっと見る＝次ページを取得して末尾に追加（対象ピッカーと同じ＝内部スクロールにしない）。
+  const loadMore = async () => {
+    setMoreLoading(true);
+    try {
+      const next = page + 1;
+      const res = await companyDirectory(dirQuery || undefined, groupId, next, PER);
+      setDirectory((prev) => [...prev, ...(res?.data ?? [])]);
+      setPage(next);
+    } catch {
+      setError("ディレクトリの取得に失敗しました。");
+    } finally {
+      setMoreLoading(false);
+    }
+  };
+
   // ライブ検索（モック SC-90 準拠＝入力で即絞込・250ms デバウンス）。マウント時も取得。
   useEffect(() => {
-    const t = setTimeout(() => void fetchDirectory(), 250);
+    const t = setTimeout(() => void loadFirst(), 250);
     return () => clearTimeout(t);
-  }, [fetchDirectory]);
+  }, [loadFirst]);
+
+  const hasNext = directory.length < total;
 
   async function onAdd(accountId: string) {
     setError(null);
     try {
       await addMember(groupId, accountId);
       window.dispatchEvent(new Event(GROUP_MEMBERS_CHANGED_EVENT)); // 背景の一覧が購読して再取得
-      void fetchDirectory(); // 追加済みは候補から消す（モック挙動）
+      // 追加済みは候補から即除去（再取得せず表示位置を維持＝もっと見るで読み込んだ分を保つ）。
+      setDirectory((prev) => prev.filter((d) => d.account_id !== accountId));
+      setTotal((t) => Math.max(0, t - 1));
     } catch {
       setError("参加追加に失敗しました。");
     }
@@ -79,8 +105,8 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
             自社の有効アカウントから選択。既にこのグループに参加中の人は表示されません。氏名・アバターのみ表示（メール・ロール・他グループ所属は非開示）。
           </div>
         </div>
-        {/* リスト領域は高さを常に確保（qgadmin.css .dir-list min-height）＝取得完了で伸びてモーダルが
-            再センタリングするちらつきを防ぐ。ローディング/空/行はすべてこの領域内で切り替える。 */}
+        {/* 候補リスト＝内部スクロールにせず縦に伸ばす（対象ピッカー10d と統一）。件数は「もっと見る」で制御。
+            ローディング/空は min-height の領域で中央表示（取得直後の高さジャンプを抑える）。 */}
         <div className="dir-list" aria-busy={loading}>
           {loading ? (
             <div className="dir-list__status">読み込み中…</div>
@@ -98,6 +124,13 @@ export function MemberAddPanel({ groupId, onClose }: { groupId: string; onClose:
             ))
           )}
         </div>
+        {hasNext ? (
+          <div className="dir-more">
+            <Button type="button" variant="outline" size="sm" disabled={moreLoading} onClick={() => void loadMore()}>
+              {moreLoading ? "読み込み中…" : `もっと見る（残り ${total - directory.length}）`}
+            </Button>
+          </div>
+        ) : null}
       </ModalBody>
       <ModalFooter>
         <Button type="button" variant="outline" onClick={onClose}>閉じる</Button>
