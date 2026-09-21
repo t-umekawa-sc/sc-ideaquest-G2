@@ -714,6 +714,8 @@ body.modal-open { overflow: hidden; }
   border-color: var(--color-primary-border); /* 薄い青（blue-200）＝focus の強い枠より控えめ＝階層を付ける */
   background: rgba(37, 99, 235, .07); /* 面に薄い青 wash（無効時の slate 面と紛れないよう青側へ） */
 }
+/* 日付入力のカレンダーアイコンはクリックで開くので指ポインター。 */
+.input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 /* 編集不可（無効/読み取り専用）＝一目で「編集できない」と分かる標準（デザイン標準 §4.8）。
    muted な塗り＋文字色＋弱いボーダーで、編集可能フィールド（白面・濃いボーダー）と明確に区別する。 */
 .input:disabled, .input[readonly],
@@ -830,6 +832,81 @@ body.modal-open { overflow: hidden; }
 /* 候補なし / 自由入力での追加を促すメッセージ */
 .multiselect__empty { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); cursor: default; }
 .multiselect[data-free="true"] .multiselect__empty { color: var(--color-primary-active); cursor: pointer; }
+
+/* --- 関連リンク設定（アイデア/クエスト/コンセプト/前提への per-link 種別リンク・提案 2026-09-21） ---
+   単一の対象ピッカー（種類横断のタイトル検索→型バッジ付き候補→選択チップ）＋種別＋追加。既存リンクは
+   型バッジ＋タイトル＋出所(自動/手動)＋種別セレクト＋✕。反証は赤系で強調＋警告を出す。実体は
+   design-system.css .link-*（impl）／サーバー検索で候補を引く（mock は静的デモ）。 */
+.link-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.link-item { display: flex; align-items: center; gap: var(--space-2); padding: 8px 10px; background: var(--color-surface-alt); border-radius: var(--radius); border-left: 3px solid transparent; }
+.link-item.is-refuting { background: var(--color-disagree-bg); border-left-color: var(--color-danger); }
+.link-item__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.link-item .link-kind { width: auto; flex: 0 0 auto; }
+.link-item__rm { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); line-height: 1; padding: 4px; border-radius: var(--radius); }
+.link-item__rm:hover { color: var(--color-danger); }
+/* 型バッジ（💡アイデア/📜クエスト/🧩コンセプト/📌前提）＝中立色。 */
+.lk-type { flex: 0 0 auto; }
+/* 種別バッジ色（一覧の見出し等で使う静的表示用）。 */
+.lk-related { background: var(--color-surface); color: var(--color-text-muted); }
+.lk-supporting { background: var(--color-agree-bg); color: var(--color-success); }
+.lk-refuting { background: var(--color-disagree-bg); color: var(--color-danger); }
+/* 追加エリア＝1枠にまとめる（対象ピッカー→種別＋追加）。 */
+.link-add { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); }
+.link-add__lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 2px; }
+.link-add__bottom { display: flex; gap: 8px; align-items: flex-end; }
+.link-add__bottom .link-add__field { flex: 1; }
+.link-add__field { display: block; }
+.link-add__field .select { width: 100%; }
+/* 対象ピッカー＝「対象を選ぶ…」ボタン→専用ダイアログ。選んだ対象（複数可）は下にチップで並べる。 */
+.linkpick { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.linkpick__chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.linkpick__chips[hidden] { display: none; }
+/* 選択済みの対象＝チップ（型バッジ＋タイトル＋開いて確認＋解除✕）。複数を横並び（折返し）。 */
+.linkpick__chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 6px 8px; background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border); border-radius: var(--radius); max-width: 100%; }
+.linkpick__chip[hidden] { display: none; }
+.linkpick__chip-title { min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.linkpick__chip-open { flex: 0 0 auto; font-size: var(--text-xs); }
+.linkpick__chip-rm { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); line-height: 1; padding: 2px 4px; }
+.linkpick__chip-rm:hover { color: var(--color-danger); }
+/* 反証を選んだ時の警告バナー。 */
+.link-warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: var(--radius);
+  background: var(--color-disagree-bg); color: var(--color-danger); font-size: var(--text-sm); }
+.link-warn[hidden] { display: none; }
+/* 対象ピッカー・ダイアログ内＝フィルタ行／検索＋件数／候補リスト（文脈メタ＋開く）／もっと見る。 */
+/* 絞込条件＝各条件を1行（ラベル＋コントロール）で縦に並べ、結果との間に仕切り線を引く。 */
+.pick-filters { display: flex; flex-direction: column; gap: var(--space-2);
+  border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-3); margin-bottom: var(--space-3); }
+.pick-filters__title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); margin-bottom: 2px; }
+.pick-filter-row { display: flex; align-items: center; gap: var(--space-3); }
+.pick-filter-lbl { flex: 0 0 96px; font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); }
+.pick-filter-row .multiselect { flex: 1; }
+.pick-filter-row .dt-search { flex: 1; }
+.pick-filter-row .dt-search .input { width: 100%; }
+.pick-checks { display: flex; flex-wrap: wrap; gap: 4px var(--space-4); flex: 1; }
+.pick-daterange { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 1; }
+.pick-daterange__inputs { display: flex; align-items: center; gap: var(--space-2); }
+.pick-daterange .input[type="date"] { flex: 0 0 auto; width: auto; }
+.pick-daterange__sep { color: var(--color-text-muted); }
+.pick-daterange .hint { margin-top: 0; }
+.pick-count-row { margin-bottom: var(--space-2); }
+.pick-count { font-size: var(--text-sm); color: var(--color-text-muted); }
+/* もっと見るで件数を制御するので、リスト自体はスクロールさせず縦に伸ばす（内側スクロールを二重に作らない）。 */
+.pick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pick-row { display: flex; align-items: center; gap: var(--space-2); padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius);
+  background: var(--color-surface); cursor: pointer; }
+.pick-row:hover { border-color: var(--color-primary-border); background: rgba(37,99,235,.05); }
+.pick-row.is-sel { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); background: var(--color-primary-soft); }
+.pick-row__check { flex: 0 0 auto; width: 16px; height: 16px; cursor: pointer; }
+.pick-row__body { flex: 1; min-width: 0; }
+.pick-row__title { display: flex; align-items: center; gap: var(--space-2); font-weight: 500; }
+.pick-row__title-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row__title-t { flex: 1; min-width: 0; }
+.pick-row__due { flex: 0 0 auto; }
+.pick-row__ctx { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row__open { flex: 0 0 auto; font-size: var(--text-xs); }
+.pick-more-wrap { display: flex; justify-content: center; margin-top: var(--space-2); }
+.pick-empty { padding: var(--space-4); text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
 
 /* --- カラースウォッチ（プリセットパレット選択・単一選択のラジオ相当） ---
    用途: クエストカラー（カード左帯＋クエストアイコンのタイル色 `--accent` を駆動）など。

@@ -834,6 +834,145 @@
     <p class="hint">キャレットはヘッダー左（▸ 閉／▾ 開・回転）。<code>summary</code> はフォーカスリング対応。見本＝アイデア登録の任意項目（入力）／続報元の情報・評価の確認（参照）。</p>
   </div>
 
+  <!-- 10d. 関連リンク設定（提案） -->
+  <div class="section">
+    <h2>10d. 関連リンク設定（アイデア／クエスト／コンセプト／前提・提案 2026-09-21）</h2>
+    <p class="muted text-sm">
+      情報インプットを<strong>成果物（アイデア/クエスト/コンセプト/前提）へ per-link 種別で結び付ける</strong>共通コンポーネント。
+      登録ダイアログ（<code>InfoFormPanel</code>）と詳細ダイアログ（<code>InfoDetailView</code>）で<strong>UI・データ経路を統一</strong>する狙い。
+      現状は登録＝静的候補（fixtures）＋詳細＝サーバー検索で<strong>バラバラ</strong>だったのを、<strong>1つの対象ピッカー（種類横断のタイトル検索）</strong>に寄せる。
+    </p>
+    <p class="muted text-sm">
+      <strong>要点</strong>：① 対象は<strong>1つの検索ボックス</strong>で種類横断に探す（候補に<strong>型バッジ</strong>💡/📜/🧩/📌を付ける・実装はサーバー増分検索）。
+      ② 選ぶと<strong>選択チップ</strong>で確定を明示→ ③ <strong>種別</strong>（関連/裏付け/反証）＋<strong>追加</strong>。
+      ④ 既存リンクは型バッジ＋タイトル（リンク）＋出所（自動/手動）＋種別セレクト＋✕。<strong>反証</strong>は赤系で強調し、選ぶと<strong>警告</strong>（対象の作成者・評価者へ通知＋要再評価）。
+    </p>
+    <div style="max-width:600px">
+      <div class="dialog-label">関連リンク（アイデア／クエスト／コンセプト／前提）</div>
+      <ul class="link-list" id="sgLinkList">
+        <li class="link-item" data-kind="related">
+          <span class="badge badge-muted lk-type">💡アイデア</span>
+          <a class="link-item__title" href="#" onclick="return false">配送ルート最適化</a>
+          <span class="badge badge-muted">自動</span>
+          <select class="select link-kind" aria-label="種別"><option value="related" selected>関連</option><option value="supporting">裏付け</option><option value="refuting">反証</option></select>
+          <button type="button" class="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない）">✕</button>
+        </li>
+        <li class="link-item" data-kind="supporting">
+          <span class="badge badge-muted lk-type">📜クエスト</span>
+          <a class="link-item__title" href="#" onclick="return false">在庫最適化プロジェクト</a>
+          <span class="badge badge-muted">手動</span>
+          <select class="select link-kind" aria-label="種別"><option value="related">関連</option><option value="supporting" selected>裏付け</option><option value="refuting">反証</option></select>
+          <button type="button" class="link-item__rm" aria-label="削除" title="削除">✕</button>
+        </li>
+        <li class="link-item is-refuting" data-kind="refuting">
+          <span class="badge badge-muted lk-type">💡アイデア</span>
+          <a class="link-item__title" href="#" onclick="return false">旧手法を継続する案</a>
+          <span class="badge badge-muted">手動</span>
+          <select class="select link-kind" aria-label="種別"><option value="related">関連</option><option value="supporting">裏付け</option><option value="refuting" selected>反証</option></select>
+          <button type="button" class="link-item__rm" aria-label="削除" title="削除">✕</button>
+        </li>
+      </ul>
+
+      <div class="link-add">
+        <div class="link-add__field">
+          <span class="link-add__lbl">対象（アイデア／クエスト／コンセプト／前提・複数可）</span>
+          <div class="linkpick" id="sgLinkPick">
+            <button type="button" class="btn btn-outline" id="sgPickOpen">🔍 対象を選ぶ…</button>
+            <div class="linkpick__chips" id="sgLinkChips" hidden></div>
+          </div>
+        </div>
+        <div class="link-add__bottom">
+          <label class="link-add__field"><span class="link-add__lbl">種別（選択した対象すべてに適用）</span>
+            <select class="select" id="sgLinkKind"><option value="related">関連</option><option value="supporting">裏付け</option><option value="refuting">反証</option></select>
+          </label>
+          <button class="btn btn-primary" type="button" id="sgLinkAdd">＋ 追加</button>
+        </div>
+        <div class="link-warn" id="sgLinkWarn" hidden>⚠️ <span>種別を<strong>「反証」</strong>にすると、対象の<strong>作成者・評価者・クエスト管理者へ通知＋要再評価</strong>が発火します（根底を揺さぶるシグナル）。</span></div>
+      </div>
+      <p class="hint">対象は<strong>専用ピッカー</strong>で選ぶ＝件数が増えても<strong>型/クエスト/状態で絞込（複数選択）＋タイトル検索＋文脈メタ＋もっと見る</strong>で辿れる。<strong>候補はチェックで複数選択でき、絞込を変えても選択は保持</strong>。各候補は「開く」で中身を確認。選んだ対象は種別を付けて<strong>まとめて追加</strong>（反証は §15 の確認）。実装はサーバー増分検索（<code>limit</code>+<code>cursor</code>）。</p>
+    </div>
+  </div>
+
+  <!-- 10d. 対象ピッカー（専用ダイアログ）＝件数増・識別・確認に耐える候補選択。 -->
+  <div class="modal modal--lg modal--draggable modal--maximizable" id="sgPickModal" role="dialog" aria-modal="true" aria-labelledby="sgPickTitle" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__panel sectioned">
+      <div class="modal__header"><h2 id="sgPickTitle">対象を選ぶ</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>
+      <div class="modal__body">
+        <div class="pick-filters">
+          <div class="pick-filters__title">🔍 絞り込み</div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">種類</span>
+            <div class="pick-checks" id="sgPickType">
+              <label class="checkbox"><input type="checkbox" value="ideas"><span>💡アイデア</span></label>
+              <label class="checkbox"><input type="checkbox" value="quests"><span>📜クエスト</span></label>
+              <label class="checkbox"><input type="checkbox" value="concepts"><span>🧩コンセプト</span></label>
+              <label class="checkbox"><input type="checkbox" value="assumptions"><span>📌前提</span></label>
+            </div>
+          </div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">状態</span>
+            <div class="pick-checks" id="sgPickStatus">
+              <label class="checkbox"><input type="checkbox" value="選定"><span>選定</span></label>
+              <label class="checkbox"><input type="checkbox" value="公開"><span>公開</span></label>
+              <label class="checkbox"><input type="checkbox" value="却下"><span>却下</span></label>
+              <label class="checkbox"><input type="checkbox" value="進行中"><span>進行中</span></label>
+              <label class="checkbox"><input type="checkbox" value="完了"><span>完了</span></label>
+            </div>
+          </div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">クエスト</span>
+            <div class="multiselect" data-multiselect id="sgPickQuest">
+              <div class="multiselect__control"><input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="クエスト名で検索・複数選択…（未選択＝すべて）"></div>
+              <ul class="multiselect__list" role="listbox" hidden>
+                <li class="multiselect__option" role="option" data-value="在庫最適化PJ">在庫最適化PJ</li>
+                <li class="multiselect__option" role="option" data-value="物流DX推進">物流DX推進</li>
+                <li class="multiselect__option" role="option" data-value="需要予測改革">需要予測改革</li>
+                <li class="multiselect__empty" role="presentation" hidden></li>
+              </ul>
+            </div>
+          </div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">コンセプト</span>
+            <div class="multiselect" data-multiselect id="sgPickConcept">
+              <div class="multiselect__control"><input class="multiselect__input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="コンセプト名で検索・複数選択…（未選択＝すべて）"></div>
+              <ul class="multiselect__list" role="listbox" hidden>
+                <li class="multiselect__option" role="option" data-value="需要予測基盤">需要予測基盤</li>
+                <li class="multiselect__option" role="option" data-value="ラストワンマイル">ラストワンマイル</li>
+                <li class="multiselect__empty" role="presentation" hidden></li>
+              </ul>
+            </div>
+          </div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">タイトル</span>
+            <div class="dt-search">
+              <span class="dt-search__ic" aria-hidden="true">🔍</span>
+              <input class="input" id="sgPickSearch" type="search" placeholder="タイトルで検索…" aria-label="タイトル検索">
+            </div>
+          </div>
+          <div class="pick-filter-row">
+            <span class="pick-filter-lbl">期限</span>
+            <div class="pick-daterange">
+              <div class="pick-daterange__inputs">
+                <input class="input" type="date" id="sgPickDueFrom" aria-label="期限（以降）">
+                <span class="pick-daterange__sep">〜</span>
+                <input class="input" type="date" id="sgPickDueTo" aria-label="期限（以前）">
+              </div>
+              <span class="hint">クエスト＝期限日／アイデア＝タイムリミット（未設定は範囲指定時に除外）</span>
+            </div>
+          </div>
+        </div>
+        <div class="pick-count-row"><span class="pick-count" id="sgPickCount">該当 0 件</span></div>
+        <ul class="pick-list" id="sgPickList" role="listbox" aria-label="対象候補"></ul>
+        <div class="pick-more-wrap"><button type="button" class="btn btn-outline btn-sm" id="sgPickMore" hidden>もっと見る</button></div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-outline dialog-close-left" type="button" data-close>キャンセル</button>
+        <button class="btn btn-primary" type="button" id="sgPickConfirm" disabled>選択を確定</button>
+      </div>
+    </div>
+  </div>
+
   <div>
     <h2>11. ヘッダー / ユーザーメニュー</h2>
     <p class="muted text-sm">共通ヘッダー右側の <code>.header-actions</code>（ステータス <code>.pixel-stat</code>／通知ベル <code>.bell</code>／
@@ -4712,6 +4851,165 @@
     document.getElementById('sgOpenDialog').addEventListener('click', () => open('md'));
     document.getElementById('sgOpenDialogLg').addEventListener('click', () => open('lg'));
     document.getElementById('sgDlgSave').addEventListener('click', () => { alert('保存しました（デモ）'); close(); });
+  })();
+
+  // --- 10d. 関連リンク設定（提案）デモ。対象は専用ピッカーダイアログ（型/クエスト/状態で絞込＋タイトル検索＋文脈メタ＋もっと見る）。 ---
+  (function () {
+    const TYPE = { ideas: '💡アイデア', quests: '📜クエスト', concepts: '🧩コンセプト', assumptions: '📌前提' };
+    // デモ候補（実装ではサーバー増分検索の結果）。文脈メタ(quest/status/ctx)で同名でも識別できる。
+    // due＝期限日（クエスト）/ タイムリミット（アイデア）。空＝期限なし。カードに表示＋期限フィルタに使う。
+    // concept＝関連コンセプト（クエストと同様の「所属/由来」軸で絞込）。空＝なし。
+    const CANDS = [
+      { type: 'ideas', title: '配送ルート最適化', quest: '在庫最適化PJ', concept: 'ラストワンマイル', status: '選定', due: '2026-11-30', ctx: '📜在庫最適化PJ・山田・選定' },
+      { type: 'ideas', title: '配送ルート最適化', quest: '物流DX推進', concept: '', status: '却下', due: '', ctx: '📜物流DX推進・佐藤・却下（別クエストの同名）' },
+      { type: 'ideas', title: '在庫アラート自動化', quest: '在庫最適化PJ', concept: '', status: '公開', due: '2026-10-20', ctx: '📜在庫最適化PJ・鈴木・公開' },
+      { type: 'ideas', title: '需要予測モデル改善', quest: '需要予測改革', concept: '需要予測基盤', status: '公開', due: '', ctx: '📜需要予測改革・田中・公開' },
+      { type: 'ideas', title: '旧手法を継続する案', quest: '物流DX推進', concept: '', status: '却下', due: '', ctx: '📜物流DX推進・高橋・却下' },
+      { type: 'ideas', title: 'ピッキング動線改善', quest: '物流DX推進', concept: 'ラストワンマイル', status: '公開', due: '2026-12-10', ctx: '📜物流DX推進・伊藤・公開' },
+      { type: 'quests', title: '在庫最適化PJ', quest: '在庫最適化PJ', concept: '', status: '進行中', due: '2026-12-31', ctx: '進行中' },
+      { type: 'quests', title: '物流DX推進', quest: '物流DX推進', concept: '', status: '進行中', due: '2026-10-15', ctx: '進行中' },
+      { type: 'quests', title: '需要予測改革', quest: '需要予測改革', concept: '', status: '完了', due: '2026-09-30', ctx: '完了' },
+      { type: 'concepts', title: '需要予測基盤', quest: '需要予測改革', concept: '需要予測基盤', status: '', due: '', ctx: '由来クエスト: 需要予測改革' },
+      { type: 'concepts', title: 'ラストワンマイル', quest: '物流DX推進', concept: 'ラストワンマイル', status: '', due: '', ctx: '由来クエスト: 物流DX推進' },
+      { type: 'assumptions', title: '配送料は今後上昇する', quest: '物流DX推進', concept: 'ラストワンマイル', status: '', due: '', ctx: '関連: 物流DX推進' },
+      { type: 'assumptions', title: '生成AI導入は加速する', quest: '', concept: '', status: '', due: '', ctx: '関連: —' },
+      { type: 'assumptions', title: 'ノーコード需要が強い', quest: '', concept: '', status: '', due: '', ctx: '関連: —' },
+    ];
+    const PAGE = 6;
+    const KIND_LABEL = { related: '関連', supporting: '裏付け', refuting: '反証' };
+    const uid = (c) => c.type + '|' + c.title + '|' + c.ctx;
+    // 追加エリア側。
+    const chips = document.getElementById('sgLinkChips');
+    const pickOpenBtn = document.getElementById('sgPickOpen');
+    const kind = document.getElementById('sgLinkKind');
+    const warn = document.getElementById('sgLinkWarn');
+    const list = document.getElementById('sgLinkList');
+    let pending = [];    // 追加待ちの対象（複数）。ピッカーで確定した集合。
+    // ピッカーダイアログ側。
+    const modal = document.getElementById('sgPickModal');
+    const fType = document.getElementById('sgPickType');
+    const fQuest = document.getElementById('sgPickQuest');
+    const fConcept = document.getElementById('sgPickConcept');
+    const fStatus = document.getElementById('sgPickStatus');
+    const search = document.getElementById('sgPickSearch');
+    const dueFrom = document.getElementById('sgPickDueFrom');
+    const dueTo = document.getElementById('sgPickDueTo');
+    const countEl = document.getElementById('sgPickCount');
+    const listEl = document.getElementById('sgPickList');
+    const moreBtn = document.getElementById('sgPickMore');
+    const confirmBtn = document.getElementById('sgPickConfirm');
+    let shown = PAGE;        // もっと見るで増える表示件数
+    let selMap = new Map();  // ダイアログ内のチェック集合（uid→cand）。絞込を変えても保持。
+
+    // 種類/状態＝チェックボックス群、クエスト＝複数選択コンボ（[data-multiselect]・チップ）。未選択＝すべて。
+    const checkVals = (root) => Array.from(root.querySelectorAll('input:checked')).map((i) => i.value);
+    const msVals = (root) => Array.from(root.querySelectorAll('.multiselect__chip')).map((c) => c.dataset.value);
+    function hits() {
+      const q = search.value.trim().toLowerCase();
+      const types = checkVals(fType), quests = msVals(fQuest), concepts = msVals(fConcept), statuses = checkVals(fStatus);
+      const df = dueFrom.value, dt = dueTo.value; // ISO(YYYY-MM-DD)は文字列比較で日付順になる
+      return CANDS.filter((c) =>
+        (!types.length || types.includes(c.type)) &&
+        (!quests.length || quests.includes(c.quest)) &&
+        (!concepts.length || concepts.includes(c.concept)) &&
+        (!statuses.length || statuses.includes(c.status)) &&
+        (!(df || dt) || (c.due && (!df || c.due >= df) && (!dt || c.due <= dt))) && // 期限範囲（未設定は範囲指定時に除外）
+        (!q || c.title.toLowerCase().includes(q)));
+    }
+    function renderPick() {
+      const all = hits();
+      countEl.textContent = '該当 ' + all.length + ' 件 ・ 選択 ' + selMap.size + ' 件';
+      confirmBtn.disabled = selMap.size === 0;
+      confirmBtn.textContent = '選択を確定' + (selMap.size ? '（' + selMap.size + '件）' : '');
+      listEl.innerHTML = '';
+      if (!all.length) { listEl.innerHTML = '<li class="pick-empty">該当する対象がありません。絞り込みを調整してください。</li>'; moreBtn.hidden = true; return; }
+      all.slice(0, shown).forEach((c) => {
+        const li = document.createElement('li');
+        const on = selMap.has(uid(c));
+        li.className = 'pick-row' + (on ? ' is-sel' : ''); li.setAttribute('role', 'option'); li.setAttribute('aria-selected', on ? 'true' : 'false');
+        const dueBadge = c.due ? '<span class="badge badge-muted pick-row__due">⏳ ' + c.due + '</span>' : '';
+        li.innerHTML = '<input type="checkbox" class="pick-row__check" aria-label="選択"' + (on ? ' checked' : '') + '>'
+          + '<div class="pick-row__body"><div class="pick-row__title"><span class="badge badge-muted lk-type">' + TYPE[c.type] + '</span>'
+          + '<span class="pick-row__title-t">' + c.title + '</span>' + dueBadge + '</div><div class="pick-row__ctx">' + c.ctx + '</div></div>'
+          + '<a class="pick-row__open" href="#" onclick="return false">🔍 開く</a>';
+        li.addEventListener('click', (e) => {
+          if (e.target.closest('.pick-row__open')) { alert('対象を別タブで開く（デモ）：' + c.title); return; }
+          const k = uid(c);
+          if (selMap.has(k)) selMap.delete(k); else selMap.set(k, c);
+          renderPick(); // 絞込を変えても selMap は保持されるので、チェック状態は維持される
+        });
+        listEl.appendChild(li);
+      });
+      moreBtn.hidden = all.length <= shown;
+      if (!moreBtn.hidden) moreBtn.textContent = 'もっと見る（残り ' + (all.length - shown) + ' 件）';
+    }
+    function openModal() {
+      // 追加待ち（pending）を選択状態として引き継いで開く＝再度開いても選択が続く。
+      selMap = new Map(pending.map((c) => [uid(c), c]));
+      shown = PAGE; search.value = '';
+      renderPick();
+      modal.classList.remove('is-closing'); modal.hidden = false; requestAnimationFrame(() => modal.classList.add('show'));
+    }
+    function closeModal() {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      modal.classList.remove('show'); modal.classList.add('is-closing');
+      setTimeout(() => { modal.hidden = true; modal.classList.remove('is-closing'); }, reduce ? 0 : 340);
+    }
+    pickOpenBtn.addEventListener('click', openModal);
+    modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+    // 種類/状態＝チェックボックスの change で再描画。クエスト＝コンボは change を出さないのでチップ増減を監視。
+    [fType, fStatus].forEach((f) => f.addEventListener('change', () => { shown = PAGE; renderPick(); }));
+    [fQuest, fConcept].forEach((f) => new MutationObserver(() => { shown = PAGE; renderPick(); }).observe(f.querySelector('.multiselect__control'), { childList: true }));
+    search.addEventListener('input', () => { shown = PAGE; renderPick(); });
+    [dueFrom, dueTo].forEach((d) => d.addEventListener('change', () => { shown = PAGE; renderPick(); }));
+    moreBtn.addEventListener('click', () => { shown += PAGE; renderPick(); });
+    confirmBtn.addEventListener('click', () => { pending = Array.from(selMap.values()); renderChips(); closeModal(); });
+
+    // 追加待ちの対象をチップで表示（複数・各チップに開く/解除）。
+    function renderChips() {
+      chips.innerHTML = '';
+      chips.hidden = pending.length === 0;
+      pending.forEach((c, i) => {
+        const el = document.createElement('span');
+        el.className = 'linkpick__chip';
+        el.innerHTML = '<span class="badge badge-muted lk-type">' + TYPE[c.type] + '</span>'
+          + '<span class="linkpick__chip-title">' + c.title + '</span>'
+          + '<a href="#" onclick="return false" class="linkpick__chip-open">🔍</a>'
+          + '<button type="button" class="linkpick__chip-rm" aria-label="解除" title="解除">✕</button>';
+        el.querySelector('.linkpick__chip-open').addEventListener('click', () => alert('対象を別タブで開く（デモ）：' + c.title));
+        el.querySelector('.linkpick__chip-rm').addEventListener('click', () => { pending.splice(i, 1); renderChips(); });
+        chips.appendChild(el);
+      });
+    }
+
+    function refreshWarn() { warn.hidden = kind.value !== 'refuting'; }
+    kind.addEventListener('change', refreshWarn);
+
+    document.getElementById('sgLinkAdd').addEventListener('click', () => {
+      if (!pending.length) { pickOpenBtn.focus(); return; }
+      if (kind.value === 'refuting' && !confirm(pending.length + ' 件を「反証」として設定します。対象の作成者・評価者・クエスト管理者へ通知が飛びます。よろしいですか？（デモ）')) return;
+      const opts = ['related', 'supporting', 'refuting'].map((v) => '<option value="' + v + '"' + (v === kind.value ? ' selected' : '') + '>' + KIND_LABEL[v] + '</option>').join('');
+      pending.forEach((c) => {
+        const li = document.createElement('li');
+        li.className = 'link-item' + (kind.value === 'refuting' ? ' is-refuting' : ''); li.dataset.kind = kind.value;
+        li.innerHTML = '<span class="badge badge-muted lk-type">' + TYPE[c.type] + '</span>'
+          + '<a class="link-item__title" href="#" onclick="return false">' + c.title + '</a>'
+          + '<span class="badge badge-muted">手動</span>'
+          + '<select class="select link-kind" aria-label="種別">' + opts + '</select>'
+          + '<button type="button" class="link-item__rm" aria-label="削除" title="削除">✕</button>';
+        list.prepend(li);
+      });
+      pending = []; renderChips(); kind.value = 'related'; refreshWarn();
+    });
+
+    // 既存行＝種別変更で反証強調をトグル／✕で削除（デモ）。イベント委譲。
+    list.addEventListener('change', (e) => {
+      const s = e.target.closest('.link-kind'); if (!s) return;
+      const li = s.closest('.link-item'); li.classList.toggle('is-refuting', s.value === 'refuting'); li.dataset.kind = s.value;
+    });
+    list.addEventListener('click', (e) => {
+      const rm = e.target.closest('.link-item__rm'); if (!rm) return; rm.closest('.link-item').remove();
+    });
   })();
 
   // --- 10b. 参照系ダイアログ（ダイアログ内コンテンツ標準）デモ。開閉は 10. と同じ .show/hidden＋CRT 演出。 ---
