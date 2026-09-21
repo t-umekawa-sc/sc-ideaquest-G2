@@ -768,6 +768,10 @@
       <strong>ドラッグ移動</strong>（<code>.modal--draggable</code>＝ヘッダーを掴む）・<strong>最大化</strong>（<code>.modal--maximizable</code>＝ヘッダーの ⤢）・
       <strong>Esc/バックドロップ/×で閉じる</strong>・背景スクロールロック・初期フォーカス・フォーカストラップは
       <code>shared.js</code> が共通適用。各画面は <code>.show</code>/<code>hidden</code> をトグルするだけ。</p>
+    <p class="muted text-sm"><strong>入力フォームの項目区切り＝余白（決定 2026-09-21）</strong>：入力系フォームの項目間は
+      <strong>仕切り線を使わず <code>.field</code> のマージン（余白）だけ</strong>で区切る。入力欄はそれ自体が枠線を持つため、
+      仕切り線を足すと「セクション境界か・フィールド枠か」が混ざって見えるのを避ける。
+      仕切り線（<code>.dialog-section</code>）は<strong>枠を持たない参照系</strong>（定義リスト・read テキスト）で使う。</p>
     <div class="row" style="gap:var(--space-2)">
       <button class="btn btn-primary" type="button" id="sgOpenDialog">サンプルダイアログを開く</button>
       <button class="btn btn-outline" type="button" id="sgOpenDialogLg">大サイズ（.modal--lg）で開く</button>
@@ -4499,7 +4503,7 @@
       <div class="field"><label for="sgDlgKind">種別</label>
         <select class="select" id="sgDlgKind"><option>種別A</option><option>種別B</option><option>種別C</option></select></div>
       <div class="field"><label for="sgDlgMemo">メモ</label><textarea class="textarea" id="sgDlgMemo" rows="3" placeholder="補足を入力"></textarea></div>
-      <p class="muted text-sm">※ 本文が長い場合はこの領域だけがスクロールし、フッターは下端に固定されます（最大化・小サイズでも確認できます）。</p>
+      <p class="muted text-sm">※ 入力項目は仕切り線を使わず <code>.field</code> のマージン（余白）だけで区切ります（決定 2026-09-21）。本文が長い場合はこの領域だけがスクロールし、フッターは下端に固定されます。</p>
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" type="button" data-close>キャンセル</button>
