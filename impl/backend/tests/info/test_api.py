@@ -377,6 +377,19 @@ def test_n_tc_143_candidate_pagination(client, info_env):
         _cleanup_link_targets(info_env.db_identifier, s)
 
 
+def test_n_tc_144_content_revisions(client, info_env):
+    """N-TC-144: 内容編集で更新履歴（content_revisions）を版降順で返す。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # 作成者本人（ids.a）が内容を2回編集＝2版増える。
+    before = len(client.get(f"{INFO}/{info_env.ids.a}").json()["content_revisions"])
+    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新履歴テスト1</p>"}, headers=_csrf(client)).status_code == 200
+    assert client.patch(f"{INFO}/{info_env.ids.a}", json={"body_html": "<p>更新履歴テスト2</p>"}, headers=_csrf(client)).status_code == 200
+    revs = client.get(f"{INFO}/{info_env.ids.a}").json()["content_revisions"]
+    assert len(revs) == before + 2
+    assert revs[0]["revision"] > revs[1]["revision"]  # 版降順（新しい版が先頭）
+    assert all(("editor_name" in x and x.get("created_at")) for x in revs)
+
+
 def test_n_tc_119_add_link(client, info_env):
     """N-TC-119: 手動リンク追加（全員・201・origin=manual・kind=related）。"""
     import uuid as _uuid

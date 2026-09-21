@@ -78,6 +78,7 @@
 | N-TC-141 | api | 候補に文脈メタを付けて返す（対象ピッカー） | idea(quest所属・起票者・status・time_limit)＋quest(deadline・status) を seed | `GET /info-link-candidates?types=ideas,quests&q=…` | 各候補に `quest_title`/`owner_name`/`status`/`due`（アイデア=time_limit・クエスト=deadline）を付けて返す＝同名でも識別できる | N.3／SC-50 §関連リンク |
 | N-TC-142 | api | 候補をクエスト/状態/期限で絞込（対象ピッカー） | 複数 idea/quest を seed | `GET /info-link-candidates`（`quest_ids`/`statuses`/`due_from`/`due_to`） | 指定条件に合致する候補のみ返る（AND・期限未設定は範囲指定時に除外） | N.3／SC-50 §関連リンク |
 | N-TC-143 | api | 候補のページング（cursor・対象ピッカー） | limit 超の候補を seed | `GET /info-link-candidates?limit=N` → `?cursor=…` | `next_cursor` を返し、`cursor` 指定で続きが重複なく取れる／最終ページは `next_cursor=null` | N.3／SC-50 §関連リンク |
+| N-TC-144 | api | 内容編集で更新履歴を返す（🕘 更新履歴） | 作成者の情報を2回内容編集 | `PATCH /info-items/{id}`×2 → `GET /info-items/{id}` | `content_revisions[]` が版降順で返る（各＝revision/editor_name/created_at）＝編集回数ぶんの版 | N.1／SC-50 §85 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

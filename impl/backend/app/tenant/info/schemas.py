@@ -214,6 +214,14 @@ class InfoDetailDTO(BaseModel):
     tokens_top: list[WordCloudTokenDTO] = []
     attachments: list["InfoAttachmentDTO"] = []
     can: InfoCanDTO
+    content_revisions: list["InfoRevisionDTO"] = []  # 内容の更新履歴（版/編集者/日時・§85・N.1）
+
+
+class InfoRevisionDTO(BaseModel):
+    """内容編集の版（🕘 更新履歴）＝版番号・編集者名・日時。新しい版が先頭。"""
+    revision: int
+    editor_name: str | None = None
+    created_at: datetime
 
 
 class InfoImageUploadResponse(BaseModel):

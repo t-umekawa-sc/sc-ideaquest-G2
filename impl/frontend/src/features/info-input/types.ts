@@ -164,4 +164,10 @@ export interface InfoDetail {
   tokens_top: WordCloudToken[];
   attachments: InfoAttachment[];
   can: InfoCan;
+  content_revisions: InfoRevision[]; // 内容の更新履歴（版/編集者/日時・§85）
+}
+export interface InfoRevision {
+  revision: number;
+  editor_name?: string | null;
+  created_at: string;
 }

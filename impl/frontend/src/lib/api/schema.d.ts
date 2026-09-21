@@ -4162,6 +4162,11 @@ export interface components {
              */
             attachments: components["schemas"]["InfoAttachmentDTO"][];
             can: components["schemas"]["InfoCanDTO"];
+            /**
+             * Content Revisions
+             * @default []
+             */
+            content_revisions: components["schemas"]["InfoRevisionDTO"][];
         };
         /**
          * InfoImageUploadResponse
@@ -4314,6 +4319,21 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
+        };
+        /**
+         * InfoRevisionDTO
+         * @description 内容編集の版（🕘 更新履歴）＝版番号・編集者名・日時。新しい版が先頭。
+         */
+        InfoRevisionDTO: {
+            /** Revision */
+            revision: number;
+            /** Editor Name */
+            editor_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * InfoStatusFacets

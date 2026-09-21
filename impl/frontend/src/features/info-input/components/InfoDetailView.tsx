@@ -21,6 +21,7 @@ import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
+const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 const iconForMime = (mime: string) => (mime.startsWith("image/") ? "🖼️" : mime === "application/pdf" ? "📕"
   : mime.includes("spreadsheet") || mime.includes("excel") || mime === "text/csv" ? "📊"
   : mime.includes("word") ? "📄" : "📎");
@@ -311,6 +312,23 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
               ) : null}
             </>
           )}
+          {/* 🕘 更新履歴（内容の版・§85・N.1 content_revisions）＝内容セクション内に折り畳みで。 */}
+          {r.content_revisions.length ? (
+            <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
+              <summary>🕘 更新履歴（{r.content_revisions.length} 版）</summary>
+              <div className="disclosure__body">
+                <ul className="rev-list">
+                  {r.content_revisions.map((rv) => (
+                    <li key={rv.revision} className="rev-item">
+                      <span className="rev-item__ver">版 {rv.revision}</span>
+                      <span className="rev-item__who">{rv.editor_name ?? "—"}</span>
+                      <span className="rev-item__at">{fmtDateTime(rv.created_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          ) : null}
         </div>
 
         {(r.attachments.length || r.can.edit_content) ? (

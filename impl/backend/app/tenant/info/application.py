@@ -173,7 +173,7 @@ def _attachment_dto(att, uploader) -> dict:
     }
 
 
-def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, attachments, can) -> dict:
+def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creators, tokens, attachments, can, content_revisions) -> dict:
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
@@ -212,6 +212,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
         "tokens_top": tokens,
         "attachments": attachments,
         "can": can,
+        "content_revisions": content_revisions,
     }
 
 
@@ -248,12 +249,18 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         follow_ups = repo.follow_up_items(ts, root.id)
         parent = root if item.id != root.id else None  # 開いているのが続報のとき root を「元情報」として返す
         atts = repo.list_attachments(ts, item.id)
-        uids = {item.created_by_id} | {f.created_by_id for f in follow_ups} | {a.uploaded_by_id for a in atts}
+        revisions = repo.list_revisions(ts, item.id)  # 更新履歴（§85・N.1 content_revisions）
+        uids = {item.created_by_id} | {f.created_by_id for f in follow_ups} | {a.uploaded_by_id for a in atts} | {rv.editor_id for rv in revisions}
         if parent:
             uids.add(parent.created_by_id)
         creators = repo.users_by_ids(ts, list(uids))
         tokens = repo.tokens_top(ts, item.id, limit=30)
         attachments = [_attachment_dto(a, creators.get(a.uploaded_by_id)) for a in atts]
+        content_revisions = [{
+            "revision": rv.revision,
+            "editor_name": (creators.get(rv.editor_id).display_name if creators.get(rv.editor_id) else None),
+            "created_at": rv.created_at,
+        } for rv in revisions]
         can = {
             "edit_content": item.created_by_id == user.id,  # 内容＝作成者のみ（status 非依存）
             "curate": repo.is_curator(ts, user.id),          # 属性/triage/status/archive＝curator
@@ -261,7 +268,7 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         }
         return _detail_dto(item, categories=categories, links=links, title_map=title_map,
                            parent=parent, follow_ups=follow_ups, creators=creators, tokens=tokens,
-                           attachments=attachments, can=can)
+                           attachments=attachments, can=can, content_revisions=content_revisions)
 
 
 def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:

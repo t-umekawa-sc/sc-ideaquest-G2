@@ -221,6 +221,15 @@ def revision_count(session: Session, info_id: uuid.UUID) -> int:
     ).scalar_one())
 
 
+def list_revisions(session: Session, info_id: uuid.UUID):
+    """内容編集履歴の版一覧（新しい版が先頭・SC-50 §85「🕘 更新履歴」・N.1 content_revisions）。"""
+    from app.tenant.info.orm import InfoItemRevision
+    return session.execute(
+        select(InfoItemRevision).where(InfoItemRevision.info_item_id == info_id)
+        .order_by(InfoItemRevision.revision.desc())
+    ).scalars().all()
+
+
 def snapshot_parent_links(session: Session, parent_id: uuid.UUID, new_info_id: uuid.UUID) -> int:
     """続報登録時＝親の**未棄却**リンクを `origin=auto` で複製（§12-1）。複製件数を返す。"""
     parent_links = session.execute(
