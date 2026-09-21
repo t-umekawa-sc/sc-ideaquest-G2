@@ -266,7 +266,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           <input className="input" id="im-url" type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://…（http/https のみ）" />
         </Field>
 
-        <div className="field">
+        <div className="field dialog-section is-quiet">
           <div className="dialog-label">参考資料（任意・複数可）</div>
           <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
           <div className="dropzone" role="button" tabIndex={0} onClick={() => fileInputRef.current?.click()} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
@@ -284,7 +284,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
           <div className="hint">本文とは別に、PDF・画像・資料ファイルを添付できます（出典の裏付け・引用元の保全）。</div>
         </div>
 
-        <div className="field">
+        <div className="field dialog-section is-quiet">
           <div className="dialog-label">関連リンク（アイデア／クエスト）</div>
           {links.length ? (
             <ul className="link-list">
@@ -330,7 +330,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
         </div>
 
         {canCurate ? (
-        <details className="disclosure field">
+        <details className="disclosure field dialog-section is-quiet">
           <summary>🧭 属性を付与（情報判定権限）＝分類・環境スキャン・判定{curated ? "" : ""}</summary>
           <div className="disclosure__body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
             <Field className="dialog-section is-quiet" id="im-priority" label="優先度"><select className="select" id="im-priority" value={priority} onChange={(e) => setPriority(e.target.value)}><option value="">—</option>{OPT(PRIORITY_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
@@ -338,7 +338,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             <Field className="dialog-section is-quiet" id="im-class" label="情報分類"><select className="select" id="im-class" value={classification} onChange={(e) => setClassification(e.target.value)}><option value="">—</option>{OPT(CLASSIFICATION_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
             <Field className="dialog-section is-quiet" id="im-scope" label="大分類"><select className="select" id="im-scope" value={scope} onChange={(e) => setScope(e.target.value)}><option value="">—</option>{OPT(SCOPE_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
             <Field className="dialog-section is-quiet" id="im-biz" label="対象事業"><select className="select" id="im-biz" value={business} onChange={(e) => setBusiness(e.target.value)}><option value="">—</option>{OPT(BUSINESS_LABEL).map(({ v, l }) => <option key={v} value={v}>{l}</option>)}</select></Field>
-            <div className="field">
+            <div className="field dialog-section is-quiet">
               <div className="dialog-label">情報カテゴリ（複数可）</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
