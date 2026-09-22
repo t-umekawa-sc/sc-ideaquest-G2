@@ -40,6 +40,9 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
   const [gameCompanyDefault, setGameCompanyDefault] = useState(true); // 会社既定（補足表示用）
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 無変更保存の標準（デザイン標準 §14）＝読込時の値をスナップショットし、保存時に無変更なら API を呼ばず
+  // info「変更はありません」で応答する（IdeaForm/InfoDetailView と統一）。
+  const initialRef = useRef<{ displayName: string; locale: "ja" | "en"; animOff: boolean; mascotFollow: boolean; gameOverride: boolean | null } | null>(null);
   const [nameErr, setNameErr] = useState<string | null>(null); // §4b 表示名のインラインエラー（赤枠＋メッセージ）
   // プロフィール画像（アイコン）＝会社DB users.avatar_image_path（K.4・MinIO 署名URL）。
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -66,6 +69,14 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
           setGameCompanyDefault(me.game_mode.company_default);
           setAvatarUrl(me.profile.avatar_image_url ?? null);
           setIdeaIconUrl(me.profile.idea_icon_image_url ?? null);
+          // 無変更判定の基準（保存対象フィールドのみ）を記録。
+          initialRef.current = {
+            displayName: me.profile.display_name,
+            locale: me.account.locale === "en" ? "en" : "ja",
+            animOff: !!me.account.reduce_motion,
+            mascotFollow: me.account.mascot_follow ?? true,
+            gameOverride: me.game_mode.override ?? null,
+          };
         }
       } catch {
         setLoadError("プロフィールの取得に失敗しました。");
@@ -83,6 +94,15 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
       return;
     }
     setNameErr(null);
+    // 無変更なら API を呼ばず版を増やさず、info「変更はありません」で応答（デザイン標準 §14）。
+    const init = initialRef.current;
+    if (
+      init && displayName === init.displayName && locale === init.locale && animOff === init.animOff
+      && mascotFollow === init.mascotFollow && gameOverride === init.gameOverride
+    ) {
+      snack({ type: "info", title: "変更はありません", msg: "プロフィールに変更がなかったため、保存しませんでした。" });
+      return;
+    }
     setSaving(true);
     try {
       // mascot_follow は「動きを減らす」ON でも**保存値としては保持**（抑制解除で元の設定に戻る）。実効表示は
@@ -98,6 +118,12 @@ export function ProfileForm({ companyCode }: { companyCode: string }) {
         setGameOverride(updated.game_mode.override ?? null);
         setGameCompanyDefault(updated.game_mode.company_default);
       }
+      // 保存後は基準を更新＝直後にもう一度押したら「変更はありません」になる。
+      initialRef.current = {
+        displayName: updated?.profile.display_name ?? displayName,
+        locale, animOff, mascotFollow,
+        gameOverride: updated?.game_mode.override ?? gameOverride,
+      };
       snack({ type: "success", title: "プロフィールを更新しました" }); // 他の更新系と同じ通知
       router.refresh(); // 共通ヘッダーの表示名を更新（次のセッション読取で反映）
     } catch (err) {

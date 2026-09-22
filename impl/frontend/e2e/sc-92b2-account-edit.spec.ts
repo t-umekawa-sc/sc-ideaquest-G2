@@ -47,3 +47,28 @@ test("B-TC-115 edit account display name", async ({ page }) => {
     await expect(region.getByRole("row", { name: new RegExp(loginId) }).getByText(after)).toBeVisible({ timeout: 1000 });
   }).toPass();
 });
+
+// B-TC-178: 編集で無変更保存＝更新 API を呼ばず info「変更はありません」（成功通知を誤発火しない・デザイン標準 §14）。
+// 既存 seed アカウント（user@acme.example）を編集で開き、何も変えず保存＝mutation なし＝共有 seed を壊さない。
+test("B-TC-178 no-change edit save shows info toast (no success, no mutation)", async ({ page }) => {
+  await login(page);
+  await page.goto("/admin/companies");
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click();
+  await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
+
+  const region = page.getByRole("region", { name: "この会社のアカウント管理" });
+  const seedLogin = "user@acme.example";
+  await expect(async () => {
+    await region.getByRole("searchbox").fill(seedLogin);
+    await expect(region.getByRole("row", { name: new RegExp(seedLogin) })).toBeVisible({ timeout: 1000 });
+  }).toPass();
+
+  await region.getByRole("row", { name: new RegExp(seedLogin) }).getByRole("button", { name: "操作" }).click();
+  await page.getByRole("menuitem", { name: "所属・編集" }).click();
+  await expect(page.locator("#a_name")).toHaveValue(/.+/); // プリフィル完了＝スナップショット確定
+
+  // 何も編集せず保存＝無変更判定で PATCH を呼ばず info トースト。
+  await page.getByRole("button", { name: "保存する" }).click();
+  await expect(page.getByText("変更はありません")).toBeVisible();
+  await expect(page.getByText("アカウントを更新しました")).toHaveCount(0);
+});

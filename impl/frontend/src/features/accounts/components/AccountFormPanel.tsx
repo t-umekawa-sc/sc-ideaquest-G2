@@ -5,7 +5,7 @@
 // 内部で出し分け（DRY §2.3）。業務層クリーン＝表示/UX のみ、判定はサーバー（409/422/403 を文言化）。
 // レイアウト/コピー/フィールド id の正＝mocks/SC-92・SC-93（DoD＝モック一致・field id は #a_*／#s_* を保持）。
 // 成功時は onDone() を呼ぶ（呼び出し側が「モーダルを閉じて一覧更新」or「一覧へ遷移」を担う）。
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button, Field, FormFooterError, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -27,6 +27,14 @@ import { MembershipsEditor } from "./MembershipsEditor";
 import "@/features/companies/companies.css";
 
 type SystemRole = AccountCreateInput["system_role"];
+
+// 所属集合の同値判定（順序非依存・group_id:role）＝編集の無変更判定に使う（デザイン標準 §14）。
+const _mkey = (m: Membership) => `${m.group_id}:${m.role}`;
+function sameMembershipSet(a: Membership[], b: Membership[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = new Set(a.map(_mkey));
+  return b.every((m) => sa.has(_mkey(m)));
+}
 
 // 422 validation_error の field パス（例＝`memberships.0.name`）を業務ラベルへ寄せる（先頭セグメントで判定）。
 function fieldLabel(field?: string): string {
@@ -109,6 +117,8 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   // 編集はプリフィルが要る＝取得完了まで loading。発行は即フォーム表示（所属候補は非同期で埋まる）。
   const [loading, setLoading] = useState(mode === "edit");
   const [notFound, setNotFound] = useState(false);
+  // 編集の無変更判定＝プリフィル時の identity をスナップショット（memberships は currentMemberships が基準）。
+  const initialIdentityRef = useRef<{ displayName: string; loginId: string; email: string; systemRole: SystemRole } | null>(null);
 
   // 所属エディタの候補（この会社／自社のグループ）。一覧の検索/ページングに依存しない＝マウント時に一度だけ取得。
   useEffect(() => {
@@ -135,6 +145,9 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
           setSystemRole(a.system_role as SystemRole);
           // 現在の所属を読み取り専用表示に使う（B.2 一覧応答＝group_id/role/name。入力スキーマへ絞る＝toMembershipInputs）。
           setCurrentMemberships(toMembershipInputs(a.memberships));
+          initialIdentityRef.current = {
+            displayName: a.display_name, loginId: a.login_id, email: a.email, systemRole: a.system_role as SystemRole,
+          };
         }
         setLoading(false);
       })
@@ -161,6 +174,19 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
       setFormError("入力内容をご確認ください。");
       notify(Object.values(fe));
       return;
+    }
+    // 編集で無変更なら API を呼ばず info「変更はありません」で閉じる（発行=新規は対象外・デザイン標準 §14）。
+    if (mode === "edit" && accountId) {
+      const idInit = initialIdentityRef.current;
+      const identitySame = !!idInit && displayName === idInit.displayName && loginId === idInit.loginId
+        && email === idInit.email && systemRole === idInit.systemRole;
+      // memberships は「置き換える」時のみ送る＝置き換え OFF なら所属は無変更。ON なら集合の同値で判定。
+      const membershipsSame = !replaceMemberships || sameMembershipSet(memberships, currentMemberships);
+      if (identitySame && membershipsSame) {
+        snack({ type: "info", title: "変更はありません", msg: "アカウント情報に変更がなかったため、保存しませんでした。" });
+        onDone();
+        return;
+      }
     }
     setPending(true);
     try {

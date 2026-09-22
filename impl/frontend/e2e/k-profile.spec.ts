@@ -30,6 +30,19 @@ test("K-TC-006 edit own profile persists", async ({ page }) => {
   await expect(page.locator("#p_name")).toHaveValue(newName); // GET /me が更新値を返す
 });
 
+// K-TC-026: 無変更で保存＝更新 API を呼ばず info「変更はありません」（成功通知を誤発火しない・デザイン標準 §14）。
+// 何も編集しないので OPS の値は変わらない＝共有資格情報を壊さない。
+test("K-TC-026 no-change save shows info toast (no success)", async ({ page }) => {
+  await login(page);
+  await page.goto("/profile");
+  await expect(page.locator("#p_name")).toBeVisible(); // GET /me 読込済＝スナップショット確定
+
+  await page.getByRole("button", { name: "保存する" }).click();
+  await expect(page.getByText("変更はありません")).toBeVisible();
+  // 無変更なので成功トーストは出ない（誤って「更新しました」と通知しない）。
+  await expect(page.getByText("プロフィールを更新しました")).toHaveCount(0);
+});
+
 // K-TC-009: PW変更の error-path（確認不一致＝クライアント／現在PW不一致＝403 reauth_failed）。
 // 共有 OPS の資格情報を壊さないため成功パスは踏まない（happy path は backend K-TC-007 が担保）。
 test("K-TC-009 password change error paths (no mutation)", async ({ page }) => {
