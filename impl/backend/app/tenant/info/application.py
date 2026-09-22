@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import difflib
 import uuid
 from datetime import date, datetime, timezone
 
@@ -59,12 +60,33 @@ def _creator_dto(user) -> dict:
     }
 
 
-def _card_dto(item, *, creator, categories, link_count, follow_up_count) -> dict:
+_SNIPPET_SPAN = 160
+
+
+def _match_snippet(title: str | None, body_text: str | None, q: str | None) -> str | None:
+    """全文検索の一致箇所の抜粋（§1.11）＝title＋本文からキーワード周辺を切り出す（plain text・両端 … 付き）。
+    要約に出ない語での一致でも「どこで一致したか」を必ず見せる（例＝『コメ』が本文の『コメント』に一致）。
+    q が title/本文に literal で無い（正規化のみの一致）場合は None＝呼び元は要約にフォールバック。"""
+    term = (q or "").strip()
+    if not term:
+        return None
+    hay = f"{title or ''} {body_text or ''}".strip()
+    i = hay.lower().find(term.lower())
+    if i < 0:
+        return None
+    start = max(0, i - 50)
+    end = min(len(hay), start + _SNIPPET_SPAN)
+    return ("…" if start > 0 else "") + hay[start:end] + ("…" if end < len(hay) else "")
+
+
+def _card_dto(item, *, creator, categories, link_count, follow_up_count, q=None) -> dict:
     return {
         "id": str(item.id),
         "parent_info_id": str(item.parent_info_id) if item.parent_info_id else None,
         "title": item.title,
         "summary": item.summary,
+        # 全文検索（q あり）時のみ＝一致箇所の抜粋（要約に無い語での一致も可視化・§1.11）。
+        "match_snippet": _match_snippet(item.title, item.body_text, q),
         "status": item.status,
         "priority": item.priority,
         "source": item.source,
@@ -142,6 +164,7 @@ def get_info_items(
                 categories=cats.get(r.id, []),
                 link_count=link_counts.get(r.id, 0),
                 follow_up_count=follow_counts.get(r.id, 0),
+                q=q,
             )
             for r in rows
         ]
@@ -258,10 +281,13 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
         creators = repo.users_by_ids(ts, list(uids))
         tokens = repo.tokens_top(ts, item.id, limit=30)
         attachments = [_attachment_dto(a, creators.get(a.uploaded_by_id)) for a in atts]
+        rev_changes = {rv.revision: rv.changes for rv in revisions}
         content_revisions = [{
             "revision": rv.revision,
             "editor_name": (creators.get(rv.editor_id).display_name if creators.get(rv.editor_id) else None),
             "created_at": rv.created_at,
+            # 前版比の変更フィールド（初版=前版なしは空・§85＝変更内容を見せる）。
+            "changed_fields": _changed_fields(rev_changes.get(rv.revision - 1), rv.changes),
         } for rv in revisions]
         can = {
             "edit_content": item.created_by_id == user.id,  # 内容＝作成者のみ（status 非依存）
@@ -337,9 +363,8 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
         ts.flush()
         repo.replace_tokens(ts, item.id, tokens)
         # 初版（版1）を記録＝作成直後から更新履歴に「版1」が出る（内容編集を待たない・§85/N.1）。
-        # スナップショットは内容フィールド（title/body_html/source_url）。以降の内容編集で版2..が積まれる。
-        repo.add_revision(ts, item.id, user.id,
-                          {"title": item.title, "body_html": item.body_html, "source_url": item.source_url})
+        # スナップショットは内容フィールド（title/body_html/source_url/参考資料）。以降の内容編集で版2..が積まれる。
+        repo.add_revision(ts, item.id, user.id, _content_snapshot(ts, item))
         if has_curation:  # curator が登録時に属性を付与＝判定済みへ
             for f in _cur_scalar:
                 if f in curation:
@@ -447,6 +472,100 @@ def remove_attachment(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str
         ts.commit()
 
 
+# ---- 更新履歴の変更内容（§85＝アイデア D.4 と同型の版差分）----
+
+def get_info_revision_diff(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str, revision: int,
+                           *, from_revision: int | None = None) -> dict:
+    """版差分（§85）。既定＝前版（revision-1）と比較。テキスト系（title/body_html）は語句差分・その他は {old,new}。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(info_id, field="info_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        item = repo.get_info_item(ts, iid)
+        if item is None:
+            raise AppError(404, "not_found")  # 情報が無い（会社内 active 全員が閲覧可・N.0）
+        to_rev = repo.get_revision(ts, item.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")  # 対象版が無い
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_revision(ts, item.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": _diff_fields(old, to_rev.changes)}
+
+
+def _content_snapshot(ts, item) -> dict:
+    """版に保存する内容フィールドのスナップショット（§12/§85）。参考資料も追跡（追加/削除を履歴/差分に出す・DFT-N-002）。
+    参考資料は表示名の一覧（安定のため昇順）。"""
+    return {
+        "title": item.title, "body_html": item.body_html, "source_url": item.source_url,
+        "attachments": sorted(a.original_name for a in repo.list_attachments(ts, item.id)),
+    }
+
+
+# 版で追跡する対象フィールド（§85）。テキスト系＝語句差分、その他＝{old,new}。
+_INFO_TEXT_FIELDS = ("title", "body_html")
+_INFO_TRACKED_FIELDS = ("title", "body_html", "source_url", "attachments")
+
+
+def _changed_fields(old: dict | None, new: dict) -> list[str]:
+    """前版スナップショット比較で変わったフィールド名（初版＝old None は空・§85）。"""
+    if old is None:
+        return []
+    changed = []
+    for f in _INFO_TRACKED_FIELDS:
+        # attachments 未追跡の旧スナップショット（本機能導入前）は比較対象外＝誤検知を防ぐ（None は「不明」）。
+        if f == "attachments" and old.get("attachments") is None:
+            continue
+        if old.get(f) != new.get(f):
+            changed.append(f)
+    return changed
+
+
+def _diff_fields(old: dict, new: dict) -> dict:
+    """2版のスナップショットから変わったフィールドの差分を算出（§85）。
+    title/body_html＝語句差分（body_html はタグを外しプレーンテキストで）・source_url/attachments＝{old,new}。"""
+    result: dict[str, dict] = {}
+    for f in _INFO_TRACKED_FIELDS:
+        ov, nv = old.get(f), new.get(f)
+        if f == "attachments" and ov is None:  # 未追跡の旧版は差分を出さない（誤検知防止・_changed_fields と一致）
+            continue
+        if ov == nv:
+            continue
+        if f == "body_html":  # 本文は表示用にプレーンテキスト化して差分（タグのノイズを出さない）
+            result[f] = {"kind": "text",
+                         "segments": _text_diff_segments(derive.to_plain_text(ov or "") or "", derive.to_plain_text(nv or "") or "")}
+        elif f == "title":
+            result[f] = {"kind": "text", "segments": _text_diff_segments(ov or "", nv or "")}
+        elif f == "attachments":  # 参考資料は表示名一覧を「・」連結で old→new（追加/削除が一目で分かる）
+            result[f] = {"kind": "scalar", "old": "・".join(ov or []), "new": "・".join(nv or [])}
+        else:  # source_url
+            result[f] = {"kind": "scalar", "old": ov, "new": nv}
+    return result
+
+
+def _text_diff_segments(old: str, new: str) -> list[dict]:
+    """文字単位の差分セグメント（equal/add/del）。日本語対応のため文字レベル SequenceMatcher（§85・アイデア D.4 と同）。"""
+    sm = difflib.SequenceMatcher(a=old, b=new, autojunk=False)
+    segments: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            segments.append({"op": "equal", "text": old[i1:i2]})
+        elif op == "delete":
+            segments.append({"op": "del", "text": old[i1:i2]})
+        elif op == "insert":
+            segments.append({"op": "add", "text": new[j1:j2]})
+        elif op == "replace":
+            segments.append({"op": "del", "text": old[i1:i2]})
+            segments.append({"op": "add", "text": new[j1:j2]})
+    return segments
+
+
 _CONTENT_FIELDS = {"title", "body_html", "source_url"}
 _CURATION_FIELDS = {
     "priority", "source", "classification", "scope", "target_business", "impact_level",
@@ -505,8 +624,8 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
             if "source_url" in content:
                 item.source_url = body.source_url or None
             # 内容の版スナップショット（判定後も追跡できるよう毎回の内容変更で1版・§12）。
-            repo.add_revision(ts, item.id, user.id,
-                              {"title": item.title, "body_html": item.body_html, "source_url": item.source_url})
+            # 参考資料は別 EP で先に確定済み＝ここで現状を取り込む（保存単位で1版・変更内容表示・§85）。
+            repo.add_revision(ts, item.id, user.id, _content_snapshot(ts, item))
 
         if curation:
             for f in ("priority", "source", "classification", "scope", "target_business",

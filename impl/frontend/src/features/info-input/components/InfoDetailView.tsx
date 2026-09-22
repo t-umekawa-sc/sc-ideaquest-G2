@@ -18,11 +18,11 @@ import {
 } from "../labels";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoThreadItem } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
+import { InfoRevisionHistory } from "./InfoRevisionHistory";
 import { TargetPicker } from "./TargetPicker";
 import "../info-input.css";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`);
-const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 const iconForMime = (mime: string) => (mime.startsWith("image/") ? "🖼️" : mime === "application/pdf" ? "📕"
   : mime.includes("spreadsheet") || mime.includes("excel") || mime === "text/csv" ? "📊"
   : mime.includes("word") ? "📄" : "📎");
@@ -141,7 +141,9 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const save = async () => {
     if (!item) return;
     const patch: Record<string, unknown> = {};
-    if (contentDirty) {
+    // 参考資料は「内容」の一部（§17）＝参考資料だけ変更した場合も現内容をスナップショットして PATCH を1回だけ送り、
+    // 版（info_item_revisions）を保存単位で1つ刻む（内容も同時変更なら合わせて1版・決定 2026-09-22・DFT-N-002）。
+    if (contentDirty || attachmentsDirty) {
       const t = title.trim();
       if (!t) return;
       patch.title = t; patch.body_html = bodyRef.current?.innerHTML ?? ""; patch.source_url = sourceUrl.trim() || null;
@@ -167,7 +169,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
         try { await deleteAttachmentApi(item.id, id); }
         catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; } // 既に無い(404)は成功扱い
       }
-      if (contentOrCuration) await updateInfoItemApi(item.id, patch); // 内容/属性＝再派生・版・raw→curated
+      // patch には内容（contentDirty/attachmentsDirty 時）または属性（curationDirty 時）が入る＝保存単位で版を1回だけ刻む。
+      if (Object.keys(patch).length) await updateInfoItemApi(item.id, patch); // 内容/属性＝再派生・版・raw→curated
       onClose(); // 保存完了＝ダイアログを閉じる（他ダイアログと統一）。一覧は emit で再取得済み。
     } catch {
       setAttErr("保存に失敗しました（形式・サイズ・件数〔1情報10件まで〕をご確認のうえ再度お試しください）。");
@@ -328,20 +331,12 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
               ) : null}
             </>
           )}
-          {/* 🕘 更新履歴（内容の版・§85・N.1 content_revisions）＝内容セクション内に折り畳みで。 */}
+          {/* 🕘 更新履歴（内容の版・§85・N.1 content_revisions）＝各版に変更フィールドのバッジ＋差分（遅延取得）。 */}
           {r.content_revisions.length ? (
             <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
               <summary>🕘 更新履歴（{r.content_revisions.length} 版）</summary>
               <div className="disclosure__body">
-                <ul className="rev-list">
-                  {r.content_revisions.map((rv) => (
-                    <li key={rv.revision} className="rev-item">
-                      <span className="rev-item__ver">版 {rv.revision}</span>
-                      <span className="rev-item__who">{rv.editor_name ?? "—"}</span>
-                      <span className="rev-item__at">{fmtDateTime(rv.created_at)}</span>
-                    </li>
-                  ))}
-                </ul>
+                <InfoRevisionHistory infoId={infoId} revisions={r.content_revisions} />
               </div>
             </details>
           ) : null}

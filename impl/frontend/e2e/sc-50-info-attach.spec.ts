@@ -66,3 +66,32 @@ test("N-TC-209: 詳細編集の参考資料ファイル選択が一覧に載る�
     await deleteInfoItem(page, id);
   }
 });
+
+// N-TC-210: 参考資料だけ変更して保存すると版が1つ増える（保存単位で1版・DFT-N-002）。
+test("N-TC-210: 参考資料だけの変更で版が1つ増える（DFT-N-002）", async ({ page }) => {
+  await login(page);
+  const id = await createInfoItem(page, `版回帰 ${Date.now()}`);
+  try {
+    await page.goto(`/info-items/${id}`);
+    // 登録直後は版1（§85＝作成時に初版を記録）。
+    await expect(page.locator(".info-rev")).toHaveCount(1);
+
+    // 内容は一切触らず、参考資料だけ1件添付。
+    const attachInput = page.locator('.info-dlg input[type="file"]:not([accept])').first();
+    await attachInput.setInputFiles({ name: "ref.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 dummy") });
+    await expect(page.locator(".attach-list .attach").filter({ hasText: "ref.pdf" })).toHaveCount(1);
+
+    // 保存＝添付 POST と 版を作る PATCH（updateInfoItemApi）が走り、ダイアログが閉じる。
+    await Promise.all([
+      page.waitForResponse((r) => /\/attachments$/.test(new URL(r.url()).pathname) && r.request().method() === "POST"),
+      page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/info-items/${id}`) && r.request().method() === "PATCH"),
+      page.getByRole("button", { name: "保存する" }).click(),
+    ]);
+
+    // 再度開くと版が2（参考資料変更で保存単位に1版だけ増える）。
+    await page.goto(`/info-items/${id}`);
+    await expect(page.locator(".info-rev")).toHaveCount(2);
+  } finally {
+    await deleteInfoItem(page, id);
+  }
+});

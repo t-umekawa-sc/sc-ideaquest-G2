@@ -105,11 +105,33 @@
 | N-TC-206 | e2e | 未保存で閉じる時の破棄確認（全経路ガード・黙って破棄しない） | 作成者が新規情報を開きタイトルを編集して dirty | footer「閉じる」→確認で「編集に戻る」→再度「閉じる」→「破棄して閉じる」 | 1回目は破棄確認（「編集を破棄しますか？」）が出て「編集に戻る」で詳細が残る／「破棄して閉じる」で閉じる＝dirty を黙って捨てない | SC-50 §78 |
 | N-TC-207 | e2e | 無変更で保存＝版を増やさず閉じて通知（他フォームと統一） | 作成者が新規情報を開く（未編集） | フッター「保存する」を押す | ダイアログが閉じ、「変更はありません」トースト（info）が出る＝早期 return で開いたまま残さない | SC-50 §78 |
 
-### 3.2 参考資料ファイル添付＝クリック選択でリストに載る（DFT-N-001 再発防止）
+### 3.2 参考資料ファイル添付＝クリック選択でリストに載る（DFT-N-001）／変更で版が増える（DFT-N-002）
 
 > 対象＝`components/InfoFormPanel.tsx`（登録ダイアログの参考資料）＋`components/InfoDetailView.tsx`（詳細インライン編集の参考資料ステージ）。不具合＝`<input type=file>` の onChange で `addFiles/stageFiles(e.target.files)` を呼んだ直後に `e.target.value = ""` で入力をクリアするが、state 更新関数の中で `Array.from(fl)` を**遅延**評価していたため、更新が走る頃には live な `FileList` が空になり**選んだファイルが 1 件もリストに載らない**（クリック選択経路が全滅・D&D は `value` 未リセットで偶然動作）。修正＝ハンドラ内で **`Array.from` を同期的に materialize** してから setState に渡す（貼付画像側 `insertImageFiles(Array.from(...))` と同作法）。前提＝ACME-01・`user@acme.example`（一般＝作成者）。テストは作成した情報を DELETE で後始末。
+>
+> **DFT-N-002（版が増えない）**＝詳細で参考資料だけ変更して保存しても版（`info_item_revisions`）が増えなかった。原因＝`InfoDetailView.save` が版を作る `updateInfoItemApi`（PATCH）を内容/属性変更時しか呼ばず、参考資料だけの変更は添付 API のみで PATCH が走らなかった。正＝参考資料は「内容」の一部（§17）で版管理対象・**保存単位で1版**（決定 2026-09-22）。修正＝save で `attachmentsDirty` の時も現内容をスナップショットする PATCH を1回だけ送り、参考資料変更でも版を1つ刻む（内容も同時変更なら合わせて1版）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | N-TC-208 | e2e | 登録ダイアログで参考資料をファイル選択すると一覧に載る（DFT-N-001） | `user@acme.example` が `/info-items/new` を開く | 参考資料の file input にファイルを選択（onChange＋value リセット経路） | `.attach-list` にファイル名付きの行が 1 件出る＝選択が黙って捨てられない | N.2／§5.33 |
 | N-TC-209 | e2e | 詳細インライン編集で参考資料をファイル選択すると一覧に載る（DFT-N-001） | 作成者が自分の情報詳細を開き編集する | 参考資料の file input にファイルを選択（onChange＋value リセット経路） | 追加候補（新規ステージ）にファイル名付きの行が 1 件出る | N.2／§5.33 |
+| N-TC-210 | e2e | 参考資料だけ変更して保存すると版が1つ増える（保存単位で1版・DFT-N-002） | 作成者が自分の情報詳細を開く（更新履歴=版1） | 内容は触らず参考資料を1件添付→「保存する」 | 🕘 更新履歴が「1 版」→「2 版」＝参考資料は内容の一部（§17）として版管理され、保存単位で1版だけ増える | SC-50 §17／§79／§85 |
+
+### 3.3 更新履歴で変更内容を見せる（アイデアSC-22相当・§85拡張）
+
+> 対象＝backend `tenant/info/application.py`（`_content_snapshot`＝版スナップショットに参考資料の表示名一覧を追加／`_changed_fields`＝前版比の変更フィールド／`_diff_fields`＋`_text_diff_segments`＝差分算出／`get_info_revision_diff`）・`repository.get_revision`・`schemas`（`InfoRevisionDTO.changed_fields`／`InfoDiffField`／`InfoRevisionDiffResponse`）・`router`（`GET /info-items/{id}/revisions/{revision}/diff`）。frontend `components/InfoRevisionHistory.tsx`（変更フィールドのバッジ＋「差分を表示」で遅延取得）を `InfoDetailView` の 🕘 更新履歴に差し込む。追跡フィールド＝タイトル/本文（HTMLはプレーン化して差分）/出典URL/参考資料。アイデア D.4 の版差分機構と同型（`difflib` 文字差分）。前提＝ACME-01・`user@acme.example`（作成者）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-211 | api | 更新履歴に changed_fields（前版比の変更項目）を付与 | 作成者が既存情報を PATCH で本文更新 | `GET /info-items/{id}` の `content_revisions[]` | 新しい版の `changed_fields` に `body_html` が入る（初版は空）＝どの項目が変わったか分かる | SC-50 §85／N.1 |
+| N-TC-212 | api | 版差分 EP＝テキスト差分＋参考資料 old→new | 作成者がタイトル/本文/参考資料を変更して版を積む | `GET /info-items/{id}/revisions/{rev}/diff` | 変わったフィールドのみ返し、title/body_html は `kind=text` の add/del/equal セグメント、attachments は `kind=scalar` の old→new（「・」連結） | SC-50 §85／N.1 |
+| N-TC-213 | e2e | 更新履歴が変更内容を見せる（バッジ＋差分展開） | 作成者が自分の情報詳細でタイトルを編集して保存→再度開く | 🕘 更新履歴の最新版を確認し「差分を表示」を展開 | 最新版に変更フィールドのバッジ「タイトル」が付き、展開すると差分（`.diff-add`/`.diff-del`）が出る | SC-50 §85 |
+
+### 3.4 全文検索＝一致箇所を必ず表示（match_snippet・DFT-N-003）
+
+> 不具合＝全文検索は title＋本文（body_text）を対象に一致するのに、結果は要約（先頭抜粋）しか表示せず要約内でしかハイライトしなかった＝要約に出ない箇所（例＝『コメ』が本文の『コメント』にバイグラム一致）で一致すると「該当なしなのに表示」に見えた。修正＝backend `_match_snippet`（title＋本文からキーワード周辺を切り出し `match_snippet` として q あり時のみ返す・両端 …・literal 不在時は None）＋`InfoItemCardDTO.match_snippet`。frontend `InfoListView.highlightNodes`（窓切り出し無しで全一致を `<mark>`）＝検索結果はタイトルを強調し、`match_snippet` があればそれを優先表示（無ければ要約にフォールバック）。前提＝ACME-01・`user@acme.example`。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-214 | api | 全文検索は一致箇所の抜粋 match_snippet を返す（要約外の一致も可視化） | 要約に出ない特徴語を本文末尾に持つ情報を作成 | `GET /info-items?q=<特徴語>` と q 無し `GET /info-items` | q あり＝ヒット行の `match_snippet` に特徴語が含まれる／q 無し＝`match_snippet` は null | §1.11 |
+| N-TC-215 | e2e | 全文検索結果で一致箇所のハイライトが必ず出る（本文一致・DFT-N-003） | `user@acme.example` が要約外の語を含む情報を作成し全文検索タブでその語を検索 | 全文検索タブでキーワード入力 | ヒットカードの「一致」抜粋に `mark.keyword`（ハイライト）が出る＝該当箇所が見える | §1.11 |

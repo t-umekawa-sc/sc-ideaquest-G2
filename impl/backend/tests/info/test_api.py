@@ -435,6 +435,77 @@ def test_n_tc_147_create_records_initial_revision(client, info_env):
         _delete_info(info_env.db_identifier, d["id"])
 
 
+def test_n_tc_211_revision_changed_fields(client, info_env):
+    """N-TC-211: 更新履歴 content_revisions に前版比の changed_fields が付く（初版は空・§85）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={"title": "変更履歴X", "body_html": "<p>旧本文</p>"}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        # 初版（版1）は changed_fields 空。
+        assert d["content_revisions"][0]["revision"] == 1
+        assert d["content_revisions"][0]["changed_fields"] == []
+        # 本文だけ変更 → 版2 の changed_fields=["body_html"]。
+        assert client.patch(f"{INFO}/{d['id']}", json={"body_html": "<p>新本文</p>"}, headers=_csrf(client)).status_code == 200
+        revs = client.get(f"{INFO}/{d['id']}").json()["content_revisions"]
+        assert revs[0]["revision"] == 2
+        assert revs[0]["changed_fields"] == ["body_html"]
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
+
+
+def test_n_tc_212_revision_diff(client, info_env):
+    """N-TC-212: 版差分 EP＝テキスト差分（add/del/equal セグメント）を変わったフィールドのみ返す（§85）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.post(INFO, json={"title": "差分タイトルA", "body_html": "<p>本文</p>"}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        # タイトルを変更 → 版2。
+        assert client.patch(f"{INFO}/{d['id']}", json={"title": "差分タイトルB"}, headers=_csrf(client)).status_code == 200
+        diff = client.get(f"{INFO}/{d['id']}/revisions/2/diff")
+        assert diff.status_code == 200, diff.text
+        body = diff.json()
+        assert body["from_revision"] == 1 and body["to_revision"] == 2
+        # 変わったのは title のみ（body_html は不変＝差分に出ない）。
+        assert set(body["fields"].keys()) == {"title"}
+        title_diff = body["fields"]["title"]
+        assert title_diff["kind"] == "text"
+        ops = {s["op"] for s in title_diff["segments"]}
+        assert "del" in ops and "add" in ops  # A→B の置換＝削除+追加セグメント
+        # 範囲外の版は 404。
+        assert client.get(f"{INFO}/{d['id']}/revisions/99/diff").status_code == 404
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
+
+
+def test_n_tc_214_search_match_snippet(client, info_env):
+    """N-TC-214: 全文検索（q）は一致箇所の抜粋 match_snippet を返す＝要約に出ない語での一致も可視化（§1.11）。
+    q 無しの一覧では match_snippet は None（検索時のみの付加情報）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # 要約（先頭約150字）に一致語を含めないため、フィラー文を先に並べ、末尾の文に特徴語を置く。
+    filler = "".join([
+        "これは全文検索の一致抜粋を確認するためのダミー本文の説明文になります。",
+        "本文は要約の対象となる先頭部分に特徴語を含めないよう十分に長くしてあります。",
+        "検索の対象はタイトルと本文（body_text）で要約ではないことを確かめます。",
+        "したがって要約抜粋に出ない語で一致しても抜粋で該当箇所を見せる必要があります。",
+    ])
+    body = f"<p>{filler}末尾の一文にだけ特徴語ゾルタンネスビットが登場します。</p>"
+    r = client.post(INFO, json={"title": "抜粋テスト", "body_html": body}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    try:
+        assert "ゾルタンネスビット" not in (d.get("summary") or ""), "前提崩れ＝一致語が要約に入ってしまった"
+        hit = next((c for c in client.get(INFO, params={"q": "ゾルタンネスビット"}).json()["data"] if c["id"] == d["id"]), None)
+        assert hit is not None, "全文検索でヒットしない"
+        assert hit["match_snippet"] and "ゾルタンネスビット" in hit["match_snippet"], f"抜粋に一致語が無い: {hit.get('match_snippet')!r}"
+        # q 無しの一覧では match_snippet は付かない。
+        hit2 = next((c for c in client.get(INFO).json()["data"] if c["id"] == d["id"]), None)
+        assert hit2 is not None and hit2["match_snippet"] is None
+    finally:
+        _delete_info(info_env.db_identifier, d["id"])
+
+
 def test_n_tc_148_summary_capped(client, info_env):
     """N-TC-148: 選別用要約は約150字で丸める（長い記事でも一覧/選別で一目・末尾…・§12-3）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)

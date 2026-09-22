@@ -59,6 +59,7 @@ export interface InfoCard {
   parent_info_id?: string | null;
   title: string;
   summary?: string | null;
+  match_snippet?: string | null; // 全文検索（q）時の一致箇所抜粋＝要約に無い語での一致も可視化（§1.11）
   status: InfoStatus;
   priority?: string | null;
   source?: string | null;
@@ -170,4 +171,22 @@ export interface InfoRevision {
   revision: number;
   editor_name?: string | null;
   created_at: string;
+  changed_fields: string[]; // 前版比で変わったフィールド（初版は空・§85）
+}
+
+// 版差分（§85＝更新履歴の変更内容・アイデア D.4 と同型）。
+export interface InfoDiffSegment {
+  op: "equal" | "add" | "del";
+  text: string;
+}
+export interface InfoDiffField {
+  kind: "text" | "scalar";
+  segments?: InfoDiffSegment[] | null;
+  old?: string | null;
+  new?: string | null;
+}
+export interface InfoRevisionDiff {
+  from_revision: number;
+  to_revision: number;
+  fields: Record<string, InfoDiffField>;
 }

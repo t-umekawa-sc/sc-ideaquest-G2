@@ -118,12 +118,27 @@
    （参照系の薄目・小さめにせず、登録↔詳細で揃える・ユーザー要望）。 */
 .info-dlg .dialog-label { font-size: var(--text-sm); font-weight: 500; color: var(--color-text); letter-spacing: normal; }
 
-/* 🕘 更新履歴（内容の版一覧・§85） */
-.rev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.rev-item { display: flex; align-items: baseline; gap: var(--space-3); font-size: var(--text-sm); }
-.rev-item__ver { flex: 0 0 auto; font-weight: 700; color: var(--color-text-muted); }
-.rev-item__who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rev-item__at { flex: 0 0 auto; font-size: var(--text-xs); color: var(--color-text-muted); }
+/* 🕘 更新履歴（内容の版一覧・§85）＝各版に変更フィールドのバッジ＋差分（アイデア SC-22 と同型の見た目）。 */
+.info-rev-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.info-rev { border-left: 2px solid var(--color-border); padding: 0 0 var(--space-3) var(--space-4); margin-left: 6px; position: relative; }
+.info-rev::before { content: ""; position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-primary); border: 2px solid var(--color-surface); }
+.info-rev.is-current::before { background: var(--color-warning); }
+.info-rev:last-child { border-left-color: transparent; padding-bottom: 0; }
+.info-rev__head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); }
+.info-rev__ver { font-weight: 700; color: var(--color-text-muted); }
+.info-rev__who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-rev__at { font-size: var(--text-xs); color: var(--color-text-muted); }
+.info-rev__fields { display: flex; gap: 4px; flex-wrap: wrap; margin: var(--space-1) 0; }
+.info-rev__note { font-size: var(--text-xs); color: var(--color-text-muted); }
+.info-rev__diff { margin-top: var(--space-2); }
+.diff-field { margin-bottom: var(--space-3); }
+.diff-field__label { font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); margin-bottom: 2px; }
+.diff-text { font-size: var(--text-sm); line-height: 1.8; background: var(--color-surface-alt); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); white-space: pre-wrap; }
+.diff-add { background: var(--color-agree-bg); color: var(--color-success); border-radius: 3px; padding: 0 2px; }
+.diff-del { background: var(--color-disagree-bg); color: var(--color-danger); border-radius: 3px; padding: 0 2px; text-decoration: line-through; }
+.diff-oldnew { font-size: var(--text-sm); word-break: break-all; }
+.diff-oldnew .old { color: var(--color-danger); text-decoration: line-through; }
+.diff-oldnew .new { color: var(--color-success); font-weight: 600; }
 
 /* デモ注記（この情報からクエスト作成＝実装は SC-11 本フォーム＋API C の説明帯） */
 .field-note { margin-top: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius); font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }

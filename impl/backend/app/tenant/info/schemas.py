@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -35,6 +36,7 @@ class InfoItemCardDTO(BaseModel):
     parent_info_id: str | None = None
     title: str
     summary: str | None = None
+    match_snippet: str | None = None  # 全文検索（q）時の一致箇所抜粋＝要約に無い語での一致も可視化（§1.11）
     status: str
     priority: str | None = None
     source: str | None = None
@@ -238,10 +240,33 @@ class InfoDetailDTO(BaseModel):
 
 
 class InfoRevisionDTO(BaseModel):
-    """内容編集の版（🕘 更新履歴）＝版番号・編集者名・日時。新しい版が先頭。"""
+    """内容編集の版（🕘 更新履歴）＝版番号・編集者名・日時。新しい版が先頭。
+    changed_fields＝前版比で変わったフィールド（初版は空・§85＝変更内容を見せる・アイデア D.4 と同型）。"""
     revision: int
     editor_name: str | None = None
     created_at: datetime
+    changed_fields: list[str] = []
+
+
+class InfoDiffSegment(BaseModel):
+    """テキスト差分の1セグメント（§85）。op＝equal/add/del。"""
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class InfoDiffField(BaseModel):
+    """フィールドごとの差分（§85）。kind=text は segments・kind=scalar は old/new。"""
+    kind: Literal["text", "scalar"]
+    segments: list[InfoDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class InfoRevisionDiffResponse(BaseModel):
+    """版差分（§85・N.1）。fields＝変わったフィールドのみ（field 名→差分）。"""
+    from_revision: int
+    to_revision: int
+    fields: dict[str, InfoDiffField]
 
 
 class InfoImageUploadResponse(BaseModel):

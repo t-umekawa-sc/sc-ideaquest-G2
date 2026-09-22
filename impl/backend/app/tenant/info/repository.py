@@ -213,6 +213,15 @@ def add_revision(session: Session, info_id: uuid.UUID, editor_id: uuid.UUID, cha
     return nxt
 
 
+def get_revision(session: Session, info_id: uuid.UUID, revision: int):
+    """特定版のスナップショットを取得（版差分の算出用・§85）。無ければ None。"""
+    from app.tenant.info.orm import InfoItemRevision
+    return session.execute(
+        select(InfoItemRevision).where(
+            InfoItemRevision.info_item_id == info_id, InfoItemRevision.revision == revision)
+    ).scalars().first()
+
+
 def revision_count(session: Session, info_id: uuid.UUID) -> int:
     """内容編集履歴の版数（テスト/表示補助）。"""
     from app.tenant.info.orm import InfoItemRevision

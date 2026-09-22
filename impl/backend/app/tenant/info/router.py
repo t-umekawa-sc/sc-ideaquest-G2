@@ -26,6 +26,7 @@ from app.tenant.info.schemas import (
     InfoLinkDTO,
     InfoLinkKindRequest,
     InfoListResponse,
+    InfoRevisionDiffResponse,
     InfoUpdateRequest,
     WordCloudResponse,
 )
@@ -92,6 +93,20 @@ def get_info_item_detail(
     result = info_service.get_info_detail(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id)
     return InfoDetailDTO(**result)
+
+
+@router.get("/info-items/{info_id}/revisions/{revision}/diff", response_model=InfoRevisionDiffResponse)
+def get_info_revision_diff(
+    info_id: str,
+    revision: int,
+    request: Request,
+    from_: int | None = Query(None, alias="from"),
+    session: dict = Depends(require_me),
+) -> InfoRevisionDiffResponse:
+    """版差分（SC-50 §85＝更新履歴の変更内容）＝既定は前版比較・読取専用。会社内 active 全員が閲覧可（N.0）。"""
+    result = info_service.get_info_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), info_id, revision, from_revision=from_)
+    return InfoRevisionDiffResponse(**result)
 
 
 # ---- 変更系（SC-51・N.2）。認可＝require_me＋Origin/CSRF（§2.2）。業務ルールは application 強制 ----

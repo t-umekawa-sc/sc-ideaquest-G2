@@ -49,6 +49,15 @@ function snippetNodes(text: string, q: string, span = 140): ReactNode {
   );
 }
 
+// 与えたテキスト全体のキーワード出現箇所を <mark> でハイライト（窓切り出しはしない）。
+// サーバーが返す一致抜粋 match_snippet（既に該当箇所を中心に切り出し済み・両端 …）や、タイトルの強調に使う。
+function highlightNodes(text: string, q: string): ReactNode {
+  if (!text) return null;
+  if (!q) return <span>{text}</span>;
+  const parts = text.split(new RegExp(`(${escapeRe(q)})`, "ig"));
+  return <>{parts.map((seg, i) => (seg.toLowerCase() === q.toLowerCase() ? <mark key={i} className="keyword">{seg}</mark> : <span key={i}>{seg}</span>))}</>;
+}
+
 const EMPTY_FACETS: InfoStatusFacets = { all: 0, raw: 0, curated: 0, archived: 0 };
 
 export function InfoListView() {
@@ -343,9 +352,16 @@ export function InfoListView() {
                   <div className="ft-result__head">
                     <span className={`badge ${STATUS_LABEL[r.status][1]}`}>{STATUS_LABEL[r.status][0]}</span>
                     {r.impact_class ? <span className={`badge ${IMPACT_CLASS_LABEL[r.impact_class][1]}`}>{IMPACT_CLASS_LABEL[r.impact_class][0]}</span> : null}
-                    <span className="ft-result__ctx">{r.title}</span>
+                    {/* タイトルの一致語も強調（タイトルで一致した時に該当箇所が分かる）。 */}
+                    <span className="ft-result__ctx">{highlightNodes(r.title, fts.trim())}</span>
                   </div>
-                  <p className="ft-result__snippet"><span className="muted" style={{ marginRight: 6 }}>要約</span>{snippetNodes(r.summary ?? "", fts.trim())}</p>
+                  {/* 一致箇所は本文にもあり得るため、サーバーの一致抜粋 match_snippet（該当箇所中心・両端 …）を優先表示。
+                      抜粋が無い（タイトルのみ一致 等）時だけ要約にフォールバック＝必ず「該当箇所」を見せる。 */}
+                  {r.match_snippet ? (
+                    <p className="ft-result__snippet"><span className="muted" style={{ marginRight: 6 }}>一致</span>{highlightNodes(r.match_snippet, fts.trim())}</p>
+                  ) : (
+                    <p className="ft-result__snippet"><span className="muted" style={{ marginRight: 6 }}>要約</span>{snippetNodes(r.summary ?? "", fts.trim())}</p>
+                  )}
                 </Link>
               ))}
             </div>

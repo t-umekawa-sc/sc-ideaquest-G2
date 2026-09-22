@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import type {
   InfoAttachment, InfoCard, InfoDetail, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
-  InfoListResult, InfoStatusFilter, WordCloudToken,
+  InfoListResult, InfoRevisionDiff, InfoStatusFilter, WordCloudToken,
 } from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
@@ -166,6 +166,13 @@ export async function updateInfoItemApi(id: string, patch: InfoPatch): Promise<I
   });
   emit();
   return res as InfoDetail;
+}
+
+// 版差分（§85＝更新履歴の変更内容）＝既定は前版比較。更新履歴の各版を展開したときに遅延取得する。
+export async function getInfoRevisionDiff(infoId: string, revision: number, signal?: AbortSignal): Promise<InfoRevisionDiff> {
+  const res = await apiFetch<InfoRevisionDiff>(
+    `/info-items/${encodeURIComponent(infoId)}/revisions/${revision}/diff`, { signal });
+  return res as InfoRevisionDiff;
 }
 
 // 関連リンク（/info-links・Phase C slice5.3・情報側=全員）。候補検索＋追加/種別変更/棄却（即時コミット）。
