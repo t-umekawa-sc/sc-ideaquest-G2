@@ -72,3 +72,4 @@
 | F-TC-207 | e2e | 評価の下書き保存後は評価ビューを閉じる（モーダル=close／フルページ=詳細へ・ユーザー要望） | recruiting＋公開アイデア／`/ideas/[id]/eval`（フルページ） | 新規性3点→「下書き保存」 | 保存後に `/ideas/[id]`（詳細）へ遷移＝評価ビューを離れる | SC-25／F.2 |
 | F-TC-208 | api | 非パーティー員の選定/解除は 404（存在秘匿・IDOR） | 作成者=other・seed は非メンバー・公開アイデア | `POST/DELETE /ideas/{id}/select`（seed） | いずれも 404（`_resolve_evaluable_idea` の門番） | F.0 |
 | F-TC-209 | api | 提出済み評価0件の集計は空 | party・提出0のアイデア | `GET /ideas/{id}/evaluation` | `evaluator_count=0`・`overall_avg=null`・`coin.projected=0` | F.1 |
+| F-TC-210 | e2e | 既存評価を無変更で再確定＝API を呼ばず info「変更はありません」（保存ボタン統一・再確定の誤通知防止） | API で submitted 評価を作成→`/ideas/{id}/eval`（プリフィル済） | 何も変えず「評価を確定」 | `info`「変更はありません」が出て「評価を更新しました」は出ない＝無変更の再確定で putEvaluation を呼ばない（状態=submitted・内容不変）。draft→submitted 等の状態遷移は対象外 | デザイン標準 §14／F.2 |

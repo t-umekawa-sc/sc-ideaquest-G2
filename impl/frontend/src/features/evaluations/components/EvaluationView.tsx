@@ -28,6 +28,25 @@ const ASPECTS: Aspect[] = [
   { key: "cost", label: "コスト", desc: "💡 低コストほど高得点（★5＝非常に低コスト）", cost: true },
 ];
 
+// 無変更判定用＝評価内容の正規化シグネチャ（putEvaluation が送る形に合わせる・デザイン標準 §14）。
+// 空コメントは除外・総評は trim。順序非依存。既存評価と同状態・同内容なら API を呼ばない。
+function evalSig(o: {
+  scores: Partial<Record<AspectKey, number>>;
+  comments: Partial<Record<AspectKey, string>>;
+  overall: string;
+  visibility: string;
+}): string {
+  const so = (a: [string, unknown], b: [string, unknown]) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+  return JSON.stringify({
+    scores: (Object.entries(o.scores).filter(([, v]) => !!v) as [string, number][]).sort(so),
+    comments: (Object.entries(o.comments)
+      .filter(([, v]) => v && v.trim())
+      .map(([k, v]) => [k, (v as string).trim()] as [string, string])).sort(so),
+    overall: o.overall.trim(),
+    visibility: o.visibility,
+  });
+}
+
 // 枠（モーダル＝.modal__body／フルページ＝container＋backlink）。**モジュールレベルで定義**すること。
 // コンポーネント内で定義すると再描画のたびに関数 identity が変わり、React が別コンポーネント扱いで
 // 本文 DOM を作り直す＝スクロール位置が先頭にリセットされる（★ホバー等で上部へ自動スクロールの原因）。
@@ -81,6 +100,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState<null | "draft" | "submit">(null);
+  // 無変更判定の基準＝既存評価の状態と内容シグネチャ（デザイン標準 §14）。未評価（新規）は null＝常に保存。
+  const initialEvalStatusRef = useRef<string | null>(null);
+  const initialEvalSigRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -94,6 +116,14 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           setComments((me.comments ?? {}) as Partial<Record<AspectKey, string>>);
           setOverall(me.overall_comment ?? "");
           setVisibility(me.visibility ?? "party");
+          // 既存評価＝無変更判定の基準（状態＋内容）を記録。
+          initialEvalStatusRef.current = me.status;
+          initialEvalSigRef.current = evalSig({
+            scores: (me.scores ?? {}) as Partial<Record<AspectKey, number>>,
+            comments: (me.comments ?? {}) as Partial<Record<AspectKey, string>>,
+            overall: me.overall_comment ?? "",
+            visibility: me.visibility ?? "party",
+          });
         }
         setIdea(d);
         setLoadError(null);
@@ -141,6 +171,16 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           ]);
           return;
         }
+      }
+      // 既存評価と同じ状態・同じ内容で押されたら API を呼ばず info「変更はありません」（デザイン標準 §14）。
+      // draft→submitted など状態が変わる保存は「変更あり」＝通常どおり実行する。
+      if (
+        initialEvalStatusRef.current === status
+        && initialEvalSigRef.current === evalSig({ scores, comments, overall, visibility })
+      ) {
+        snack({ type: "info", title: "変更はありません", msg: "評価に変更がなかったため、保存しませんでした。" });
+        if (onClose) onClose(); else router.push(`/ideas/${ideaId}`);
+        return;
       }
       setPending(status === "submitted" ? "submit" : "draft");
       try {

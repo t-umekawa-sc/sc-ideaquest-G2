@@ -218,3 +218,35 @@ test("F-TC-207 SC-25 saving evaluation draft closes the view", async ({ page }) 
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
+
+// F-TC-210: 既存評価を無変更で再確定＝putEvaluation を呼ばず info「変更はありません」（保存ボタン統一・デザイン標準 §14）。
+// API で submitted 評価を作成しておき、評価ビューを開いて（プリフィル済）何も変えず「評価を確定」を押す。
+test("F-TC-210 no-change re-submit shows info toast (no success)", async ({ page }) => {
+  await login(page);
+  const stamp = Date.now().toString().slice(-8);
+  const questId = await createRecruiting(page, `E2E無変更確定_${stamp}`);
+  const ideaId = await createPublishedIdea(page, questId, stamp);
+  try {
+    // 事前に submitted 評価を作成（この後の再確定が「無変更」になる基準）。
+    const csrf = csrfOf(await page.context().cookies());
+    const put = await page.request.put(`/api/v1/ideas/${ideaId}/evaluation`, {
+      headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+      data: {
+        scores: { novelty: 4, impact: 4, feasibility: 4, fit: 4, cost: 4 },
+        comments: {}, overall_comment: "総評コメント", visibility: "party", status: "submitted",
+      },
+    });
+    expect([200, 201]).toContain(put.status());
+
+    await page.goto(`/ideas/${ideaId}/eval`);
+    const confirm = page.getByRole("button", { name: "評価を確定" });
+    await expect(confirm).toBeVisible(); // プリフィル済（getMyEvaluation で submitted を読込＝基準確定）
+
+    await confirm.click(); // 何も変えずに再確定＝無変更
+    await expect(page.getByText("変更はありません")).toBeVisible();
+    await expect(page.getByText("評価を更新しました")).toHaveCount(0);
+  } finally {
+    const c2 = csrfOf(await page.context().cookies());
+    await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
+  }
+});

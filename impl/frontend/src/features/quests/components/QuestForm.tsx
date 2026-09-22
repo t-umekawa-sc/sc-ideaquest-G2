@@ -66,6 +66,27 @@ function permsFromApi(perms: string[]): Record<PermKey, boolean> {
   }
   return base;
 }
+const uiPermsToApi = (perms: Record<PermKey, boolean>): string[] =>
+  (Object.keys(PERM_UI_TO_API) as PermKey[]).filter((k) => perms[k]).map((k) => PERM_UI_TO_API[k]);
+
+// 編集の無変更判定用＝内容の正規化シグネチャ（順序非依存・デザイン標準 §14）。同値なら edit-save で API を呼ばない。
+function questContentSig(o: {
+  title: string; color: string; categories: string[]; deadline: string; purpose: string;
+  deptIds: string[]; discoverable: boolean; members: { user_id: string; permissions?: string[] | null }[];
+}): string {
+  return JSON.stringify({
+    title: o.title.trim(),
+    color: o.color,
+    categories: [...o.categories].sort(),
+    deadline: o.deadline || null,
+    purpose: o.purpose.trim() || null,
+    deptIds: [...o.deptIds].sort(),
+    discoverable: o.discoverable,
+    members: o.members
+      .map((m) => ({ u: m.user_id, p: [...(m.permissions ?? [])].sort() }))
+      .sort((a, b) => (a.u < b.u ? -1 : a.u > b.u ? 1 : 0)),
+  });
+}
 
 // inScope=false＝参加グループ外＝失効中（このクエストを参照できない・FR-38・C.0）。UI で明示表示する。
 // deptIds＝当該メンバーが有効所属する全クエストグループ（会社内全件・C.1 group_ids）＝チップ常時表示と
@@ -207,6 +228,8 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
   const [discoverable, setDiscoverable] = useState<boolean>(dup?.discoverable ?? false); // 発見カタログ掲載（FR-40・編集時は取得値／複製は元の値を継承）
   const [loading, setLoading] = useState(isEdit); // 編集はプリフィル取得まで loading
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 編集の無変更判定＝プリフィル時の内容シグネチャ（デザイン標準 §14）。edit-save 時に現在値と比較。
+  const initialSigRef = useRef<string | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [summary, setSummary] = useState<string[]>([]);
@@ -278,6 +301,15 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
               deptIds: m.group_ids ?? [],
             })),
         );
+        // 無変更判定の基準シグネチャ（buildMembers と同じ perms 正規化で不変を保証）。
+        initialSigRef.current = questContentSig({
+          title: d.title, color: d.color || DEFAULT_COLOR, categories: d.categories ?? [],
+          deadline: d.deadline ?? "", purpose: d.purpose ?? "", deptIds: linked.map((g) => g.id),
+          discoverable: d.discoverable ?? false,
+          members: (d.members ?? []).filter((m) => !m.is_creator).map((m) => ({
+            user_id: m.user.user_id, permissions: uiPermsToApi(permsFromApi(m.permissions ?? [])),
+          })),
+        });
       })
       .catch(() => alive && setLoadError("クエストの取得に失敗しました。"))
       .finally(() => alive && setLoading(false));
@@ -505,6 +537,18 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
     }
     setFieldErrors({});
     setSummary([]);
+    // 編集の内容保存で無変更なら API を呼ばず info「変更はありません」（発行/公開/パーティーは対象外・デザイン標準 §14）。
+    if (kind === "edit-save") {
+      const sig = questContentSig({
+        title: name, color, categories, deadline, purpose: theme, deptIds, discoverable, members: buildMembers(),
+      });
+      const iconChanged = !!iconFile || iconRemoved;
+      if (initialSigRef.current !== null && sig === initialSigRef.current && !iconChanged) {
+        snack({ type: "info", title: "変更はありません", msg: "クエストに変更がなかったため、保存しませんでした。" });
+        onDone();
+        return;
+      }
+    }
     setPending(true);
     setPendingKind(kind);
     try {

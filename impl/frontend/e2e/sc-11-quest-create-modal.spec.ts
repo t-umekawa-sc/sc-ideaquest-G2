@@ -109,3 +109,32 @@ test("C-TC-278 SC-11 discoverable toggle keeps modal footer pinned (no layout ju
   });
   expect(pinned).toBe(true);
 });
+
+// C-TC-284: 編集で無変更保存＝updateQuest を呼ばず info「変更はありません」（保存ボタン統一・デザイン標準 §14）。
+// API で recruiting クエストを作成（作成者=user@acme＝編集可）→編集ページを開き、何も変えず「保存する」。
+test("C-TC-284 no-change edit save shows info toast (no success)", async ({ page }) => {
+  await login(page);
+  const prefix = "E2E無変更編集_";
+  const title = `${prefix}${Date.now().toString().slice(-8)}`;
+  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const created = await page.request.post("/api/v1/quests", {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: {
+      title, color: "#0D9488", quest_group_ids: [groups.data[0].id],
+      categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E目的", status: "recruiting",
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const id = (await created.json()).id as string;
+  try {
+    await page.goto(`/quests/${id}/edit`);
+    await expect(page.locator("#q_name")).toHaveValue(title); // プリフィル完了＝シグネチャ確定
+
+    await page.getByRole("button", { name: "保存する", exact: true }).click(); // edit-save（recruiting）
+    await expect(page.getByText("変更はありません")).toBeVisible();
+    await expect(page.getByText("クエストを保存しました")).toHaveCount(0);
+  } finally {
+    await cleanupByTitlePrefix(page, prefix);
+  }
+});
