@@ -756,3 +756,13 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | --- | --- |
 | O-TC-003 | `_scrub` のマスク分岐を外す（`return {k: _scrub(v) ...}`）と、秘匿キーがそのまま出力＝`assert parsed["password"] == "***"` が **actual `'hunter2'`** で失敗。マスク分岐を復元で green。 |
 | O-TC-005 | `getFilesToDelete` を `return []`（決して削除しない）に壊すと、保持超過の古い2件を返さず＝`assert names == ["...2026-09-01.gz","...2026-09-02"]` が **actual `[]`** で失敗。prefix 一致＋backupCount ロジックを復元で green（6 passed）。 |
+
+## 保存ボタン統一（無変更通知）＝QuestGroupSection リネーム（B-TC-179・2026-09-22）
+
+> デザイン標準 §14 の残項目＝グループ名リネームの無変更保存が「無音」だったのを info「変更はありません」に是正。
+> 後追い（実装同時）のため §5.1 反転手技で behavior-red を目視（実装の else 分岐の snack を一時コメントアウト→frontend 再ビルド）。
+> 注意＝ACME のクエストグループ一覧はテスト作成の空グループが累積すると重くなり timeout でフレーク化する（[[admin-directory-tests-flaky]] と同系）。実行前に空の QG/QGN/SCDEV グループを掃除して安定実行した。
+
+| TC-ID | 観測 red（else の info トーストを無効化した時の actual）→ green |
+| --- | --- |
+| B-TC-179 | 無変更保存で info を出さない（無音）に戻すと、`getByText('変更はありません')` が **element(s) not found**（line 101・toBeVisible 5s timeout）で失敗＝旧「無音」を再現。else 分岐の `snack(info)` を復元・再ビルドで **1 passed（6.2s）**。 |

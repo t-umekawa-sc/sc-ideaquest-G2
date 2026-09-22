@@ -154,6 +154,9 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
       if (changed) {
         snack({ type: "success", title: "グループ名を更新しました" });
         await reload();
+      } else {
+        // 無変更＝API を呼ばず info「変更はありません」で応答（無音にしない・デザイン標準 §14）。
+        snack({ type: "info", title: "変更はありません", msg: "グループ名に変更がなかったため、保存しませんでした。" });
       }
     } catch (err) {
       const m = createErrorMessage(err);

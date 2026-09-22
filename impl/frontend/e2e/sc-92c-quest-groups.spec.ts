@@ -71,3 +71,40 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await page.getByRole("button", { name: "削除する" }).click();
   await expect(page.getByText(code)).toHaveCount(0);
 });
+
+// B-TC-179: グループ名の無変更保存＝rename API を呼ばず info「変更はありません」（無音にしない・デザイン標準 §14）。
+test("B-TC-179 no-change rename shows info toast (no success)", async ({ page }) => {
+  await login(page);
+  await page.goto("/admin/companies");
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click();
+  await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
+
+  const stamp = Date.now().toString().slice(-8);
+  const code = `QGN${stamp}`;
+  const name = `無変更_${stamp}`;
+  await page.getByRole("button", { name: "＋ グループ作成" }).click();
+  await page.locator("#g_code").fill(code);
+  await page.locator("#g_name").fill(name);
+  await page.getByRole("button", { name: "作成する" }).click();
+  await page.getByRole("searchbox", { name: "グループ名・コード を検索" }).fill(code);
+  await expect(page.getByText(code)).toBeVisible();
+
+  try {
+    const row = page.getByRole("row", { name: new RegExp(code) });
+    await row.scrollIntoViewIfNeeded();
+    await row.getByRole("button", { name: "操作" }).click();
+    await page.getByRole("menuitem", { name: "編集" }).click();
+    await expect(page.locator("#g_edit_name")).toHaveValue(name); // プリフィル完了
+
+    // 何も変えずに保存＝無変更判定で rename を呼ばず info トースト（旧＝無音）。
+    await page.getByRole("button", { name: "保存する" }).click();
+    await expect(page.getByText("変更はありません")).toBeVisible();
+    await expect(page.getByText("グループ名を更新しました")).toHaveCount(0);
+  } finally {
+    // 後始末＝作成した空グループを削除。
+    const row = page.getByRole("row", { name: new RegExp(code) });
+    await row.getByRole("button", { name: "操作" }).click();
+    await page.getByRole("menuitem", { name: "削除" }).click();
+    await page.getByRole("button", { name: "削除する" }).click();
+  }
+});
