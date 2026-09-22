@@ -95,3 +95,12 @@
 | N-TC-203 | e2e | 一覧ヘッダーのフローティング（列見出し固定） | 低い viewport で `/info-items` | ページを下方向へスクロール | 列見出し行（thead）が画面上部（≈--header-h）に貼り付く＝デザイン標準 §4.5⑨-b | デザイン標準 §4.5⑨-b |
 | N-TC-204 | unit | 貼付画像の再ホスト（multipart 送信） | 画像 File | `uploadInfoImageApi(file)` | `POST /info-items/images` に FormData を送り（Content-Type は自動）`url` を返す | N.2／§12-4 |
 | N-TC-205 | unit | 参考資料の追加（multipart 複数ファイル） | 複数 File | `addAttachmentsApi(id, files)` | `POST /info-items/{id}/attachments` に同一キー `files` で複数を送り一覧を返す | N.2／§5.33 |
+
+### 3.1 詳細ダイアログの閉じるガードと無変更保存（SC-52・SC-50 §78）
+
+> 対象＝`components/InfoDetailView.tsx`（dirty 判定・footer「閉じる」）＋`components/InfoDetailModal.tsx`（破棄確認ガード）＋`components/ui/RouteModal.tsx`（`beforeClose`）。範囲＝(1) 未保存（dirty）で閉じる全経路（footer/背景/Esc/×）で破棄確認が出てキャンセルなら残り確定なら閉じる、(2) 無変更で「保存する」を押すと版を増やさず閉じて通知。非対象＝保存成功後の閉じ（ガードしない・§78）・属性/curator 経路（作成者の内容編集で dirty を代表検証）。前提＝seed 会社 ACME-01・`user@acme.example`（一般）が**自分で情報を新規登録**して作成者になる（seed 情報の作成者はデモ user のため編集不可＝自己完結フィクスチャ）。§5.4 に従い「dirty→破棄確認」と「無変更→通知して閉じる」を別トリガとして単独検証する。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-206 | e2e | 未保存で閉じる時の破棄確認（全経路ガード・黙って破棄しない） | 作成者が新規情報を開きタイトルを編集して dirty | footer「閉じる」→確認で「編集に戻る」→再度「閉じる」→「破棄して閉じる」 | 1回目は破棄確認（「編集を破棄しますか？」）が出て「編集に戻る」で詳細が残る／「破棄して閉じる」で閉じる＝dirty を黙って捨てない | SC-50 §78 |
+| N-TC-207 | e2e | 無変更で保存＝版を増やさず閉じて通知（他フォームと統一） | 作成者が新規情報を開く（未編集） | フッター「保存する」を押す | ダイアログが閉じ、「変更はありません」トースト（info）が出る＝早期 return で開いたまま残さない | SC-50 §78 |

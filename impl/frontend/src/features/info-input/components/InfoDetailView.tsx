@@ -50,7 +50,12 @@ function AttrSelect({ label, k, map, attrs, onSet }: {
   );
 }
 
-export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: () => void }) {
+export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange }: {
+  infoId: string;
+  onClose: () => void; // 確定済みの閉じ（保存成功/アーカイブ/画面遷移）＝破棄確認は通さない。
+  onRequestClose?: () => void; // footer「閉じる」＝未保存なら破棄確認を通す（親が dirty を見て判定）。既定は onClose。
+  onDirtyChange?: (dirty: boolean) => void; // 未保存（内容/属性/参考資料）の有無を親へ通知＝閉じるガード用。
+}) {
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
@@ -146,10 +151,11 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       patch.categories = cats;
     }
     const contentOrCuration = contentDirty || curationDirty;
-    // 無変更で保存＝グレースフルに処理（API を呼ばず版を増やさない・IdeaForm と同じ体裁／style-guide §10）。
+    // 無変更で保存＝API を呼ばず版を増やさず、ダイアログを閉じてから通知（アイデア D.3 の無変更保存と統一・SC-50 §78）。
     // 参考資料の追加/削除も「変更」に含める（アイデア D.3 と同仕様＝保存でまとめて反映）。
     if (!contentOrCuration && !attachmentsDirty) {
-      snack({ type: "info", title: "変更はありません", msg: "内容・属性・参考資料とも変更がなかったため、保存しませんでした。" });
+      snack({ type: "info", title: "変更はありません", msg: "内容・属性・参考資料とも変更がなかったため、版は増やしていません。" });
+      onClose(); // 早期 return で開いたまま残さない（他フォームと統一＝閉じてから通知）。
       return;
     }
     setAttErr(null);
@@ -210,6 +216,9 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
   const toggleRemoveExisting = (id: string) =>
     setRemovedAttIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const attachmentsDirty = newFiles.length > 0 || removedAttIds.length > 0;
+  // 未保存（内容/属性/参考資料のいずれか）を親へ通知＝閉じるガード（破棄確認）の判定に使う（SC-50 §78）。
+  const dirty = contentDirty || curationDirty || attachmentsDirty;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   // アーカイブ／解除（curator・N.2）＝確認→即時コミット。アーカイブは一覧から消えるので閉じて一覧へ戻す。
   const [archiveBusy, setArchiveBusy] = useState(false);
@@ -582,7 +591,8 @@ export function InfoDetailView({ infoId, onClose }: { infoId: string; onClose: (
       </div>
 
       <div className="modal__footer">
-        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose} disabled={saving || archiveBusy}>閉じる</button>
+        {/* 「閉じる」＝未保存なら破棄確認を通す（onRequestClose）。保存成功/アーカイブ/画面遷移の閉じは onClose 直呼び（ガード無し）。 */}
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onRequestClose ?? onClose} disabled={saving || archiveBusy}>閉じる</button>
         {/* フッターは「閉じる／保存する」に絞る（SC-50 §8・ボタン過多の解消）。アーカイブ/解除は本文の curator ブロックへ。 */}
         {(r.can.edit_content || r.can.curate) ? (
           <button className="btn btn-primary" type="button" onClick={save} disabled={saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>

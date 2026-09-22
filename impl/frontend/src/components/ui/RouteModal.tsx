@@ -13,17 +13,22 @@ import { Modal } from "./Modal";
 type Props = {
   title: string;
   size?: "sm" | "md" | "lg" | "xl";
+  // 背景クリック/Esc/× での閉じをガードする（false を返したら閉じない）。未保存の破棄確認などに使う。
+  // 子に渡す close はガード無し（保存成功など「確定済み」の閉じ用）＝呼び出し側が必要なら別途ガードする。
+  beforeClose?: () => boolean | Promise<boolean>;
   children: (close: () => void) => React.ReactNode;
 };
 
-export function RouteModal({ title, size = "md", children }: Props) {
+export function RouteModal({ title, size = "md", beforeClose, children }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
-  const close = () => setOpen(false); // 閉じ要求＝exit アニメ開始
+  const close = () => setOpen(false); // 閉じ要求（確定済み・ガード無し）＝exit アニメ開始
+  // 背景/Esc/× は beforeClose を通す（未保存なら破棄確認→キャンセルで閉じない）。
+  const requestClose = async () => { if (!beforeClose || (await beforeClose())) setOpen(false); };
   return (
     <Modal
       open={open}
-      onClose={close}
+      onClose={requestClose}
       onClosed={() => router.back()} // exit 完了＝URL を戻す（モーダルを外す）
       title={title}
       size={size}
