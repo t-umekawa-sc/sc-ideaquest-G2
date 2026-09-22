@@ -155,7 +155,9 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const setLinkKindAt = (i: number, kind: InfoLinkKind) => setLinks((ls) => ls.map((l, j) => (j === i ? { ...l, kind } : l)));
   const removeLink = (i: number) => setLinks((ls) => ls.filter((_, j) => j !== i));
 
-  const addFiles = (fl: FileList | null) => { if (fl) setFiles((f) => [...f, ...Array.from(fl)]); };
+  // Array.from を同期 materialize してから setState に渡す＝onChange 直後の `e.target.value=""` が
+  // live FileList を空にしても取りこぼさない（遅延評価だとクリック選択が全滅・DFT-N-001）。
+  const addFiles = (fl: FileList | null) => { if (fl) { const arr = Array.from(fl); setFiles((f) => [...f, ...arr]); } };
 
   const [saving, setSaving] = useState(false);
   const save = async () => {

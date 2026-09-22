@@ -211,7 +211,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   };
 
   // 参考資料＝追加はステージ（未アップロード）、既存削除はマーク（保存で確定・アイデア D.3 と同仕様）。
-  const stageFiles = (fl: FileList | null) => { if (fl?.length) { setAttErr(null); setNewFiles((f) => [...f, ...Array.from(fl)]); } };
+  const stageFiles = (fl: FileList | null) => { if (fl?.length) { const arr = Array.from(fl); setAttErr(null); setNewFiles((f) => [...f, ...arr]); } }; // Array.from を同期 materialize＝onChange の value リセットで取りこぼさない（DFT-N-001）
   const removeNewFile = (i: number) => setNewFiles((f) => f.filter((_, j) => j !== i));
   const toggleRemoveExisting = (id: string) =>
     setRemovedAttIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
