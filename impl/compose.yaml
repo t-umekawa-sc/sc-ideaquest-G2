@@ -123,6 +123,15 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-ideaquest}
       MINIO_SECURE: ${MINIO_SECURE:-false}
       MINIO_URL_TTL_SECONDS: ${MINIO_URL_TTL_SECONDS:-300}
+      # システムログ（JSONL・ファイル日次ローテーション・doc/本番デプロイ要件.md §6.6）。
+      # dev は ./logs バインドマウント（gitignore・消えて可）。prod は永続ボリューム/ホストパスに差し替える。
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_TO_FILE: ${LOG_TO_FILE:-true}
+      LOG_DIR: ${LOG_DIR:-/var/log/ideaquest}
+      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-30}
+    volumes:
+      - ./logs:/var/log/ideaquest   # ホスト impl/logs にログを出力（gitignore・解析用）。prod は永続先へ。
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -142,6 +151,8 @@ services:
     profiles: ["workers"]   # 既定 up からは除外（理由＝冒頭コメント）。`--profile workers up` で起動。
     environment: *backend_env
     entrypoint: ["python", "-m", "app.worker"]
+    volumes:
+      - ./logs:/var/log/ideaquest   # worker.jsonl を出力（backend と同一ディレクトリ）。
     depends_on:
       db:
         condition: service_healthy
@@ -155,6 +166,8 @@ services:
     profiles: ["workers"]   # 既定 up からは除外（理由＝冒頭コメント）。`--profile workers up` で起動。
     environment: *backend_env
     entrypoint: ["python", "-m", "app.mail_worker"]
+    volumes:
+      - ./logs:/var/log/ideaquest   # mail-worker.jsonl を出力（backend と同一ディレクトリ）。
     depends_on:
       db:
         condition: service_healthy

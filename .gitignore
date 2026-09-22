@@ -17,6 +17,9 @@ tmp_shots/
 # 一時作業フォルダ（受入チェックリスト等のセッション用メモ・コミット不要）。
 /temp/
 
+# システムログ（JSONL・ローカル出力・doc/本番デプロイ要件.md §6.6）。追跡しない（dev は消えて可）。
+impl/logs/
+
 # Python
 __pycache__/
 *.py[cod]

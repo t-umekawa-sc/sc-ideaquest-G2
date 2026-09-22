@@ -16,8 +16,9 @@ from app.control_plane.mail_outbox.application import (
     process_mail_outbox_once,
 )
 from app.core.config import get_settings
+from app.core.logging_config import configure_logging
 
-logging.basicConfig(level=logging.INFO)
+configure_logging("mail-worker")  # JSONL/ファイル/相関＝backend と同一設定（別ファイル mail-worker.jsonl）。
 logger = logging.getLogger("mail_worker")
 
 # 掃除の間引き＝この回数の送信パスごとに 1 回 done 行のクリーンアップを走らせる。
@@ -34,22 +35,23 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle)
     signal.signal(signal.SIGINT, _handle)
 
-    logger.info("mail_outbox worker started (interval=%ss)", interval)
+    logger.info("mail_outbox worker started (interval=%ss)", interval, extra={"event": "worker_start", "interval": interval})
     passes = 0
     while not stop["requested"]:
         try:
             stats = process_mail_outbox_once()
             if stats.get("sent") or stats.get("failed") or stats.get("reclaimed"):
-                logger.info("mail pass: %s", stats)
+                level = logging.WARNING if stats.get("failed") else logging.INFO
+                logger.log(level, "mail pass: %s", stats, extra={"event": "mail_pass", **stats})
             passes += 1
             if passes % _CLEANUP_EVERY_N_PASSES == 0:
                 deleted = cleanup_done_mail_outbox()
                 if deleted:
-                    logger.info("mail cleanup: deleted %s done rows", deleted)
+                    logger.info("mail cleanup: deleted %s done rows", deleted, extra={"event": "mail_cleanup", "deleted": deleted})
         except Exception:  # noqa: BLE001  (1巡失敗で常駐を落とさない・次巡で再試行)
-            logger.exception("mail pass failed")
+            logger.exception("mail pass failed", extra={"event": "mail_pass_failed"})
         time.sleep(interval)
-    logger.info("mail_outbox worker stopped")
+    logger.info("mail_outbox worker stopped", extra={"event": "worker_stop"})
 
 
 if __name__ == "__main__":

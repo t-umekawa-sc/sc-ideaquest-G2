@@ -4,11 +4,15 @@
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.core.locale import resolve_request_locale
+
+logger = logging.getLogger("app.error")
 
 # code -> 既定 title（人間可読・表示用の当たり）。locale 別（§2.1）。機械可読の正は `code`（§1.7）。
 _TITLES_EN = {
@@ -26,6 +30,7 @@ _TITLES_EN = {
     "otp_invalid": "OTP Invalid",
     "otp_expired": "OTP Expired",
     "preauth_expired": "Pre-auth Expired",
+    "internal_error": "Internal Server Error",
 }
 _TITLES_JA = {
     "unauthenticated": "未認証",
@@ -42,6 +47,7 @@ _TITLES_JA = {
     "otp_invalid": "認証コードが不正です",
     "otp_expired": "認証コードの有効期限が切れています",
     "preauth_expired": "認証の有効期限が切れています",
+    "internal_error": "サーバー内部エラー",
 }
 
 
@@ -96,6 +102,12 @@ def _problem(
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError):  # noqa: ANN202
+        # 5xx は障害＝スタック込みで error 記録／4xx は業務エラー＝info（正常系を error で埋もれさせない・§15）。
+        meta = {"event": "app_error", "status": exc.status, "code": exc.code, "path": request.url.path}
+        if exc.status >= 500:
+            logger.error("AppError %s %s", exc.status, exc.code, exc_info=exc, extra=meta)
+        else:
+            logger.info("AppError %s %s", exc.status, exc.code, extra=meta)
         return _problem(request, exc.status, exc.code, exc.detail, exc.errors, exc.extra, exc.headers)
 
     @app.exception_handler(RequestValidationError)
@@ -110,3 +122,11 @@ def install_error_handlers(app: FastAPI) -> None:
         ]
         detail = "Invalid input" if resolve_request_locale(request) == "en" else "入力値が不正です"
         return _problem(request, 422, "validation_error", detail, errors)
+
+    @app.exception_handler(Exception)
+    async def _unhandled(request: Request, exc: Exception):  # noqa: ANN202
+        # 未捕捉例外＝追跡用 request_id とともにスタックをサーバーログへ（画面/レスポンスには出さない・§14）。
+        logger.exception(
+            "unhandled exception", extra={"event": "unhandled", "path": request.url.path, "exc_type": type(exc).__name__},
+        )
+        return _problem(request, 500, "internal_error", None, None)

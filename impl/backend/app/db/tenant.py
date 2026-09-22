@@ -12,6 +12,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
+from app.core.log_context import reset_tenant, set_tenant
 
 _tenant_engines: dict[str, Engine] = {}
 _tenant_sessionmakers: dict[str, sessionmaker[Session]] = {}
@@ -27,5 +28,10 @@ def _tenant_sessionmaker(db_identifier: str) -> sessionmaker[Session]:
 
 @contextmanager
 def get_tenant_session(db_identifier: str) -> Iterator[Session]:
-    with _tenant_sessionmaker(db_identifier)() as session:
-        yield session
+    # テナント処理中のログに会社DB識別子を相関付与（データ不整合をテナント単位で追える・ログ相関）。
+    token = set_tenant(db_identifier)
+    try:
+        with _tenant_sessionmaker(db_identifier)() as session:
+            yield session
+    finally:
+        reset_tenant(token)

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.control_plane.audit.orm import SystemAuditLog
 from app.core.audit_context import current_audit_context
+from app.core.logging_config import log_mutation
 from app.db.control import control_session
 
 
@@ -40,3 +41,6 @@ def record(action: str, detail: dict | None = None, *, session: Session | None =
         with control_session() as s:  # 独立記録（テナントのみの操作の後・best-effort append）
             s.add(row)
             s.commit()
+    # 監査DBと併せてシステムログにも1行残す＝ログ側だけを見ても状態変更が追える（データ不整合の追跡・§6.6）。
+    # detail は監査規約上すでに機密を含まない前提だが、formatter 側でもキー名マスクする（二重防御）。
+    log_mutation(action, entity="system_audit", detail=_json_safe(detail))

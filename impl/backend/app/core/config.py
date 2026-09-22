@@ -11,6 +11,15 @@ class Settings(BaseSettings):
 
     app_env: str = "dev"
 
+    # システムログ（本番の問題/データ不整合の追跡・JSONL ファイル出力・doc/本番デプロイ要件.md §6.6）。
+    # 出力先はデプロイで永続化を決める（dev=消えてよい／prod=永続ボリューム）。保持日数は env で調整可（既定30日）。
+    log_level: str = "INFO"                 # ルートログレベル（dev は DEBUG も可）
+    log_format: str = "json"                # "json"（JSONL・機械解析用）/"plain"（人間可読）
+    log_to_file: bool = True                # ファイル出力の ON/OFF（stdout は常時）
+    log_dir: str = "/var/log/ideaquest"     # ログファイルの出力ディレクトリ（コンテナ内・マウント先）
+    log_retention_days: int = 30            # 日次ローテーションの保持日数（超過分は削除・アーカイブは §6.6）
+    log_utc: bool = False                   # ローテーション境界を UTC にするか（既定=コンテナ現地時刻）
+
     # Postgres 接続（管理DB・会社DB は同一サーバの別データベース＝§1.5 動的ルーティング）
     postgres_host: str = "localhost"
     postgres_port: int = 5432

@@ -34,9 +34,12 @@ from app.core.audit_context import AuditContextMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.idempotency import idempotency_middleware
+from app.core.log_context import reset_request_id, set_request_id
+from app.core.logging_config import configure_logging
 from app.db.control import control_session
 from app.infra.cache import get_redis
 
+configure_logging("backend")  # システムログ集中設定（JSONL/ファイル/相関）＝最初のログ前に一度だけ。
 logger = logging.getLogger("app")
 
 
@@ -107,7 +110,11 @@ app.middleware("http")(idempotency_middleware)
 async def add_request_id(request: Request, call_next):  # noqa: ANN001, ANN201
     request_id = f"req_{uuid.uuid4().hex}"
     request.state.request_id = request_id
-    response = await call_next(request)
+    token = set_request_id(request_id)  # 全ログへ相関付与（call_next 前に set＝内側の処理/アクセスログから見える）
+    try:
+        response = await call_next(request)
+    finally:
+        reset_request_id(token)
     response.headers["X-Request-ID"] = request_id
     # セキュリティ応答ヘッダ（セキュリティ対策一覧 §10）。API は JSON 応答のため CSP は最小（default-src 'none'）で
     # 十分＋クリックジャッキング対策に frame-ancestors/X-Frame。HSTS は TLS 環境（cookie_secure=本番）でのみ付与。

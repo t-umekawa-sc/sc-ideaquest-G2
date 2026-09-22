@@ -745,3 +745,14 @@ login spec は `login()` を共有するため2状態に分けて実施（A-TC-0
 | TC-ID | 観測 red（修正 revert 時の actual）→ green |
 | --- | --- |
 | C-TC-278 | `.switch` を修正前（`position:relative`／input の `left/top` なし）へ戻して frontend 再ビルド → 短VP（1440×640）でトグル押下後に `.modal__footer` 下端が `.modal__panel` 下端と乖離（`pinned=false`）＝崩れ再現で `toBe(true)` 失敗。修正（position:relative＋input 封じ込め）復元・再ビルドで **1 passed（4.1s）**。 |
+
+## O ドメイン新設（システムログ基盤）後追い red 確認（O-TC-003 / O-TC-005・2026-09-22）
+
+> 新規実装（`app/core/logging_config.py`）に対する unit テスト。test-first ではなく実装と同時に書いた後追いのため、
+> 代表2件（秘匿マスク／保持超過の削除）を §5.1 の反転手技（実装を一時的に壊す）で behavior-red を目視した。
+> 反転の実体はコミットに含めない（`/tmp` バックアップから復元済み・`grep -c BROKEN`=0 で確認）。他4件（O-TC-001/002/004/006）は同ファイルの green と併せ 6 passed。
+
+| TC-ID | 観測 red（実装を一時破壊した時の actual）→ green |
+| --- | --- |
+| O-TC-003 | `_scrub` のマスク分岐を外す（`return {k: _scrub(v) ...}`）と、秘匿キーがそのまま出力＝`assert parsed["password"] == "***"` が **actual `'hunter2'`** で失敗。マスク分岐を復元で green。 |
+| O-TC-005 | `getFilesToDelete` を `return []`（決して削除しない）に壊すと、保持超過の古い2件を返さず＝`assert names == ["...2026-09-01.gz","...2026-09-02"]` が **actual `[]`** で失敗。prefix 一致＋backupCount ロジックを復元で green（6 passed）。 |

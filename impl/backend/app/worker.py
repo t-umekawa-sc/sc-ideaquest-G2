@@ -12,8 +12,9 @@ import time
 
 from app.control_plane.account_sync.application import process_outbox_once
 from app.core.config import get_settings
+from app.core.logging_config import configure_logging
 
-logging.basicConfig(level=logging.INFO)
+configure_logging("worker")  # JSONL/ファイル/相関＝backend と同一設定（別ファイル worker.jsonl）。
 logger = logging.getLogger("worker")
 
 
@@ -27,16 +28,18 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle)
     signal.signal(signal.SIGINT, _handle)
 
-    logger.info("account_sync outbox worker started (interval=%ss)", interval)
+    logger.info("account_sync outbox worker started (interval=%ss)", interval, extra={"event": "worker_start", "interval": interval})
     while not stop["requested"]:
         try:
             stats = process_outbox_once()
+            # データ整合の要（管理DB→会社DB ミラー）＝1件でも処理があれば件数を構造化記録（不整合追跡・full）。
             if stats.get("done") or stats.get("failed") or stats.get("blocked"):
-                logger.info("outbox pass: %s", stats)
+                level = logging.WARNING if stats.get("failed") else logging.INFO
+                logger.log(level, "outbox pass: %s", stats, extra={"event": "outbox_pass", **stats})
         except Exception:  # noqa: BLE001  (1巡失敗で常駐を落とさない・次巡で再試行)
-            logger.exception("outbox pass failed")
+            logger.exception("outbox pass failed", extra={"event": "outbox_pass_failed"})
         time.sleep(interval)
-    logger.info("account_sync outbox worker stopped")
+    logger.info("account_sync outbox worker stopped", extra={"event": "worker_stop"})
 
 
 if __name__ == "__main__":
