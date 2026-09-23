@@ -3,16 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 // レビュー#1 グローバルナビ（☰→左ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・画面遷移図 §4 集約）。
 // 分散導線（ホームタイル・GameNav）を集約したドロワーの開閉・遷移・ピン留め永続・reduce を e2e で担保。
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md §2-A（M-TC-001〜004）。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
 async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(USER.company);
-  await page.locator("#login_id").fill(USER.loginId);
-  await page.locator("#password").fill(USER.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  // ログイン成立＝/login を抜けて共通ヘッダーが出る（挨拶文は時間帯依存のため使わない）。
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
+  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
+  await page.goto("/");
   await expect(page.locator(".app-header")).toBeVisible();
 }
 

@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// 認証フロー spec＝未認証で開始する（既定 storageState を使わない・e2e/auth.setup.ts）。
+test.use({ storageState: { cookies: [], origins: [] } });
+
 // セッション終了時の通知（デザイン標準 §14・A-TC-023〜025）。ログイン画面に戻された理由を info スナックバーで伝える。
 // セキュリティ＝reason は固定文言 enum（生値は描画しない）・リダイレクト先は固定 /login。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };

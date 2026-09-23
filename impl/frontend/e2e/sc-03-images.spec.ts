@@ -13,12 +13,9 @@ const PNG = Buffer.from(
 );
 
 async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(U.company);
-  await page.locator("#login_id").fill(U.loginId);
-  await page.locator("#password").fill(U.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
+  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
+  await page.goto("/");
   await expect(page.locator(".app-header")).toBeVisible();
 }
 

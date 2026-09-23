@@ -1,11 +1,16 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
+// 認証フロー spec＝未認証で開始する（既定 storageState を使わない・e2e/auth.setup.ts）。
+test.use({ storageState: { cookies: [], origins: [] } });
+
 // SC-00 状態D→メール→状態B のハッピーパス（画面配線の疎通）。
 // backend の詳細分岐は pytest（A-TC-030〜051）が正。ここは実ブラウザで縦に通ることだけ薄く確認する。
 //
-// 注意: complete の new_password は seed と同一（Passw0rd!）にする。こうすると全セッション破棄と
-// トークン消費は起きるが、他テストが使うログイン資格情報（Passw0rd!）は保たれる（共有状態を壊さない）。
-const SEED = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+// complete_password_setup は当該アカウントの全セッションを破棄する（delete_account_sessions）。
+// storageState 方式では共有 user@acme のセッションを全 spec が再利用するため、ここで user@acme を
+// 使うと共有セッションを壊す（→他 spec が session_expired）。専用の隔離垢（bootstrap の
+// SEED_E2E_PWRESET_ACCOUNT）を使い、new_password も seed と同値にしてログイン資格情報を保つ。
+const SEED = { company: "ACME-01", loginId: "e2e-pwreset@acme.example", password: "Passw0rd!" };
 // e2e は frontend コンテナ内で実行＝MailHog はサービス名で解決。ホスト実行時は env で上書き。
 const MAILHOG = process.env.MAILHOG_URL ?? "http://localhost:8025"; // 既定はホスト実行（baseURL と同じ localhost）。docker 内実行は MAILHOG_URL=http://mailhog:8025 で上書き。
 

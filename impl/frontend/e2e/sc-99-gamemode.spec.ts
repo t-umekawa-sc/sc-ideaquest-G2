@@ -7,12 +7,9 @@ import { expect, test, type Page } from "@playwright/test";
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
-  await page.goto("/login");
-  await page.locator("#company_code").fill(USER.company);
-  await page.locator("#login_id").fill(USER.loginId);
-  await page.locator("#password").fill(USER.password);
-  await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15000 });
+  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
+  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
+  await page.goto("/");
   await expect(page.locator(".app-header")).toBeVisible();
 }
 function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
@@ -69,7 +66,8 @@ test("M-TC-005/006/007/008 game mode OFF hides nav game group / header balance /
     const drawer = page.locator("#appnav-drawer");
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole("menuitem", { name: /ホーム/ })).toBeVisible();
-    await expect(drawer.getByRole("menuitem", { name: /クエスト/ })).toBeVisible();
+    // 「クエスト」は「クエストを探す」と名前が部分一致するため href で一意に狙う（M-TC-001 と同様）。
+    await expect(drawer.locator('a.appnav__item[href="/quests"]')).toBeVisible();
     await expect(drawer.getByRole("menuitem", { name: /ショップ/ })).toHaveCount(0);
     await expect(drawer.getByRole("menuitem", { name: /きせかえ/ })).toHaveCount(0);
     await expect(drawer.getByRole("menuitem", { name: /ランキング/ })).toHaveCount(0);

@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// 認証フロー spec＝ログイン/ログアウトそのものを検証するため、既定の storageState（認証済み）を使わず
+// 未認証で開始する（storageState 方式・playwright.config.ts / e2e/auth.setup.ts）。
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 // 全端末ログアウト（A-TC-022）は logout_all で当該アカウントの全セッションを破棄するため、
 // 共有 user@acme を使うと並列ワーカ（同アカウントでログイン中の他 spec）を巻き込み

@@ -67,9 +67,23 @@ SEED_E2E_SESSION_ACCOUNT = {
     "status": "active",
 }
 
+# パスワード再設定フロー e2e（SC-00 状態D→B）専用の隔離アカウント。complete_password_setup は
+# 当該アカウントの全セッションを破棄する（delete_account_sessions）ため、共有 user@acme を使うと
+# storageState 方式で全 spec が再利用する共有セッションを壊してしまう。専用垢に分離＝共有を守る。
+SEED_E2E_PWRESET_ACCOUNT = {
+    "login_id": "e2e-pwreset@acme.example",
+    "email": "e2e-pwreset@acme.example",
+    "display_name": "E2E パス再設定",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "general",
+    "status": "active",
+}
+
 _SEEDS = [
     (SEED_COMPANY, SEED_ACCOUNT),
     (SEED_COMPANY, SEED_E2E_SESSION_ACCOUNT),
+    (SEED_COMPANY, SEED_E2E_PWRESET_ACCOUNT),
     (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT),
 ]
 

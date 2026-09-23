@@ -1,5 +1,8 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
+// 認証フロー spec＝未認証で開始する（既定 storageState を使わない・e2e/auth.setup.ts）。
+test.use({ storageState: { cookies: [], origins: [] } });
+
 // SC-00 状態C（MFA 認証コード入力）のハッピーパス（画面配線の疎通）。
 // ACME-02（mfa_required=true）で login→OTP メール→状態C 入力→ダッシュボード到達。
 // backend の詳細分岐は pytest（A-TC-060〜070）が正。ここは実ブラウザで縦に通ることだけ薄く確認する。
