@@ -224,3 +224,4 @@
 .ri-empty { padding: 16px; text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
 .ri-panel--rail .ri-shelf__item { flex-basis: 240px; }
 @media (prefers-reduced-motion: reduce) { .ri-shelf { scroll-behavior: auto; } }
+.ri-head__btn--add { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }

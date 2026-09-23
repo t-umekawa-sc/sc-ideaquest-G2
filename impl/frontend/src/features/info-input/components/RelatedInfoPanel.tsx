@@ -11,6 +11,7 @@ import { Avatar, Modal, ModalBody } from "@/components/ui";
 import { fetchRelatedInfo, INFO_CHANGED_EVENT } from "../api";
 import { IMPACT_CLASS_LABEL, LINK_KIND_LABEL } from "../labels";
 import type { RelatedInfoItem } from "../types";
+import { AddRelatedInfoDialog } from "./AddRelatedInfoDialog";
 import "../info-input.css";
 
 const KIND_ICON: Record<string, string> = { related: "🔗", supporting: "✅", refuting: "⚠" };
@@ -45,6 +46,7 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
 }) {
   const [items, setItems] = useState<RelatedInfoItem[] | null>(null);
   const [maxi, setMaxi] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -61,6 +63,7 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
     return [...xs].sort((a, b) => (a.kind === "refuting" ? 0 : 1) - (b.kind === "refuting" ? 0 : 1));
   }, [items]);
   const refuteCount = sorted.filter((x) => x.kind === "refuting").length;
+  const existingInfoIds = useMemo(() => new Set((items ?? []).map((x) => x.info_id)), [items]);
 
   if (items === null) return null; // 初回読込中は描画しない（チラつき防止）
 
@@ -71,6 +74,7 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
           {refuteCount > 0 && <span className="ri-head__alert">⚠ 反証 {refuteCount}</span>}
         </span>
         <span className="ri-head__spacer" />
+        <button type="button" className="ri-head__btn ri-head__btn--add" onClick={() => setAddOpen(true)}>＋ 関連情報を追加</button>
         {sorted.length > 0 && <button type="button" className="ri-head__btn" onClick={() => setMaxi(true)}>⤢ 全画面で一覧</button>}
       </div>
 
@@ -88,6 +92,15 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
             <div className="ri-grid">{sorted.map((x) => <RelatedInfoCard key={x.link_id} x={x} />)}</div>
           </ModalBody>
         </Modal>
+      )}
+
+      {addOpen && (
+        <AddRelatedInfoDialog
+          open onClose={() => setAddOpen(false)}
+          targetType={targetType} targetId={targetId}
+          existingInfoIds={existingInfoIds}
+          onAdded={() => { /* AddRelatedInfoDialog が INFO_CHANGED_EVENT を発火→本パネルが再取得 */ }}
+        />
       )}
     </section>
   );
