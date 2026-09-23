@@ -99,6 +99,20 @@ export function TargetPicker({ open, onClose, onConfirm }: {
           </div>
         </div>
 
+        <hr className="pick-divider" />
+        <div className="pick-kindsel">
+          <div className="pick-kindsel__title">🏷️ 設定する種別</div>
+          <div className="pick-filter-row">
+            <span className="pick-filter-lbl">種別</span>
+            <select className="select pick-kindsel__select" value={kind} onChange={(e) => setKind(e.target.value as InfoLinkKind)} aria-label="関連付ける種別">
+              {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+            </select>
+          </div>
+          <span className="hint">選択した対象すべてにこの種別で関連付けます（「反証」は対象の作成者＋評価者へ通知＋要再評価）。</span>
+        </div>
+
+        <hr className="pick-divider" />
+        <div className="pick-results-title">📋 絞り込み結果</div>
         <div className="pick-count-row">
           <span className="pick-count">{loading ? "検索中…" : `該当 ${cands.length}${nextCursor ? "+" : ""} 件 ・ 選択 ${sel.size} 件`}</span>
         </div>
@@ -136,12 +150,6 @@ export function TargetPicker({ open, onClose, onConfirm }: {
       </ModalBody>
       <ModalFooter>
         <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
-        <label className="pick-kind">
-          <span className="pick-kind__lbl">種別</span>
-          <select className="select" value={kind} onChange={(e) => setKind(e.target.value as InfoLinkKind)} aria-label="関連付ける種別">
-            {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
-          </select>
-        </label>
         <button type="button" className="btn btn-primary" disabled={sel.size === 0} onClick={() => onConfirm(Array.from(sel.values()), kind)}>
           選択を確定{sel.size ? `（${sel.size}件）` : ""}
         </button>
