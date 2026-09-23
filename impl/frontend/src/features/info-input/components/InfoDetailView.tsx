@@ -12,6 +12,7 @@ import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
   rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
 } from "../api";
+import { attachGrowableResize } from "../growableResize";
 import {
   BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
@@ -122,6 +123,13 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     setSummaryPrev(item.summary ?? null);
     if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
   }, [item]);
+
+  // 内容欄の手動リサイズ（固定 height）を min-height に付け替え、自動伸長を保つ（DFT-N-004）。
+  // 編集可（作成者）時のみ .rt__area が描画されるため、その表示に合わせて attach する。
+  useEffect(() => {
+    const el = bodyRef.current;
+    return el && item?.can.edit_content ? attachGrowableResize(el) : undefined;
+  }, [item?.can.edit_content]);
 
   // 主要語を本文から再抽出（登録ダイアログと同じ＝クライアント派生・保存時はサーバーが再派生する）。
   const runCloud = () => {

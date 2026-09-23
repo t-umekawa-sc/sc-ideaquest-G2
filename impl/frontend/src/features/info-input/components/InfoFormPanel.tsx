@@ -12,6 +12,7 @@ import {
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
 import type { InfoInput } from "../api";
+import { attachGrowableResize } from "../growableResize";
 import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
 import { TargetPicker } from "./TargetPicker";
@@ -39,6 +40,11 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgErr, setImgErr] = useState<string | null>(null);
+  // 内容欄の手動リサイズ（固定 height）を min-height に付け替え、自動伸長を保つ（DFT-N-004）。
+  useEffect(() => {
+    const el = bodyRef.current;
+    return el ? attachGrowableResize(el) : undefined;
+  }, []);
   // 続報の親は実 API から取得（プレビュー用・fixtures 不使用）。属性は create で保存されない（curator の PATCH 管轄）ため
   // 続報でも親属性は事前投入しない＝空から。親の関連リンクは backend が登録時に自動複製（§12-1）。編集は詳細のインライン編集に一本化。
   const [parent, setParent] = useState<InfoDetail | undefined>(undefined);

@@ -79,7 +79,10 @@
 .rt__bar { display: flex; gap: 2px; flex-wrap: wrap; padding: 6px; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
 .rt__bar button { border: 1px solid transparent; background: transparent; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: var(--text-sm); color: var(--color-text); }
 .rt__bar button:hover { background: var(--color-surface); border-color: var(--color-border); }
-.rt__area { min-height: 140px; max-height: 320px; overflow: auto; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; transition: background-color .12s; }
+/* 最低高さは保ちつつ内容に応じて縦に伸びる＋ユーザーが縦幅を手動ドラッグ変更できる（登録/詳細共通）。
+   resize は overflow:visible だと無効なため overflow:auto にする＝高さ未固定の間は内容に収まりスクロールは出ない
+   （自動伸長を維持）／手動で縮めた時のみ内部スクロール。max-height は付けない。 */
+.rt__area { box-sizing: border-box; min-height: 140px; overflow: auto; resize: vertical; padding: 10px 12px; font-size: var(--text-sm); line-height: 1.8; transition: background-color .12s; }
 .rt__area:focus { outline: none; } /* フォーカスの見せ方は wrapper .rt:focus-within に一本化（二重枠を避ける） */
 @media (prefers-reduced-motion: reduce) { .rt { transition: none; } .rt:focus-within { animation: none; } .rt__area { transition: none; } }
 .rt__area img { max-width: 100%; border-radius: 6px; }

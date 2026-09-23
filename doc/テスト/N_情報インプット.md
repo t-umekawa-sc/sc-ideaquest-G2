@@ -135,3 +135,13 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | N-TC-214 | api | 全文検索は一致箇所の抜粋 match_snippet を返す（要約外の一致も可視化） | 要約に出ない特徴語を本文末尾に持つ情報を作成 | `GET /info-items?q=<特徴語>` と q 無し `GET /info-items` | q あり＝ヒット行の `match_snippet` に特徴語が含まれる／q 無し＝`match_snippet` は null | §1.11 |
 | N-TC-215 | e2e | 全文検索結果で一致箇所のハイライトが必ず出る（本文一致・DFT-N-003） | `user@acme.example` が要約外の語を含む情報を作成し全文検索タブでその語を検索 | 全文検索タブでキーワード入力 | ヒットカードの「一致」抜粋に `mark.keyword`（ハイライト）が出る＝該当箇所が見える | §1.11 |
+
+### 3.5 内容・説明の入力欄＝縦に伸びる＋手動リサイズ（登録/詳細）
+
+> 要望＝情報の登録ダイアログ・詳細ダイアログの「内容・説明」（リッチテキスト `.rt__area`）は、最低高さ（`min-height:140px`）は維持しつつ、`max-height`＋内部スクロールをやめて**内容に応じて縦に伸びる**。加えて**ユーザーが縦幅を手動でドラッグ変更できる**（`resize: vertical`＝右下グリップ）。`resize` は `overflow:visible` だと無効なため `overflow:auto` にする。ただし resize のドラッグは固定 `height` を設定するため、そのままだとリサイズ後に内容が超えるとスクロールになる（DFT-N-004）＝`attachGrowableResize`（ResizeObserver）で**ドラッグ高さを `min-height` に付け替え `height` は `auto` に戻す**ことで、手動で広げた高さを下限に自動伸長を維持する。対象＝`info-input.css .rt__area`＋`growableResize.ts`（両ダイアログ共通・`InfoFormPanel`/`InfoDetailView` で attach）。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-216 | e2e | 内容・説明は内部スクロールせず縦に伸びる（登録ダイアログ・最低高さは維持） | `user@acme.example` が `/info-items/new` を開く | 内容欄（`.rt__area`）に高さ 320px を超える長い内容を挿入 | `.rt__area` に内部スクロールが出ない（`scrollHeight ≈ clientHeight`）＝内容に応じて縦に伸びる／空時は最低高さ ≥140px を保つ | SC-50（内容欄の高さ挙動） |
+| N-TC-217 | e2e | 内容・説明は手動で縦幅をドラッグ変更できる（登録ダイアログ） | `user@acme.example` が `/info-items/new` を開く | 内容欄（`.rt__area`）の計算スタイルを確認 | `resize: vertical`（縦方向リサイズ可＝右下グリップ）が有効＝ユーザーが縦幅を変更できる | SC-50（内容欄の高さ挙動） |
+| N-TC-218 | e2e | 手動リサイズ後も内容で伸びてスクロールが出ない（DFT-N-004） | `user@acme.example` が `/info-items/new` を開く | 内容欄の inline `height` を設定（＝グリップのドラッグ相当）→ その高さを超える長い内容を挿入 | ドラッグ高さが `min-height` に付け替わり `height` は `auto` に戻る（`attachGrowableResize`）→ 下限を超える内容でも内部スクロールが出ず縦に伸びる（`scrollHeight ≈ clientHeight`） | SC-50（内容欄の高さ挙動） |
