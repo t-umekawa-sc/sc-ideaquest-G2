@@ -49,18 +49,34 @@ test("N-TC-218: 手動リサイズ後も内容で伸びてスクロールが出�
   const area = page.locator(".rt__area");
   await expect(area).toBeVisible();
 
-  // 手動リサイズを模擬＝inline height を 600px に設定（ネイティブ resize グリップのドラッグ相当）。
+  // 手動リサイズ（拡大）を模擬＝inline height を 600px に設定（ネイティブ resize グリップのドラッグ相当）。
   await area.evaluate((el) => { (el as HTMLElement).style.height = "600px"; });
-  // ResizeObserver が height→min-height に変換し height は auto に戻す。
-  await expect.poll(async () => area.evaluate((el) => (el as HTMLElement).style.height)).toBe("auto");
-  // ドラッグした高さ（描画値・モーダル内で 600 未満にクランプされ得る）が下限（min-height）に付け替わる＝
-  // 初期の最低高さ（140px 相当）より十分大きい。
-  const minH = await area.evaluate((el) => parseInt((el as HTMLElement).style.minHeight || "0", 10));
-  expect(minH, `minH=${minH}`).toBeGreaterThan(300);
+  await expect.poll(async () => area.evaluate((el) => el.clientHeight)).toBeGreaterThan(300); // 拡大が反映
 
-  // 付け替わった下限を超える長い内容を挿入 → 内部スクロールが出ず縦に伸びる（モーダル側がスクロールする）。
+  // 拡大値を超える長い内容を挿入 → fit() が内容まで伸ばし、内部スクロールが出ない。
   await area.evaluate((el) => { el.innerHTML = Array.from({ length: 80 }, (_, i) => `<p>本文の行 ${i + 1} 目です。</p>`).join(""); });
+  await expect.poll(async () => area.evaluate((el) => el.clientHeight)).toBeGreaterThan(600); // 内容で更に伸びた
   const { scrollH, clientH } = await area.evaluate((el) => ({ scrollH: el.scrollHeight, clientH: el.clientHeight }));
-  expect(clientH).toBeGreaterThan(minH); // 下限より内容が長ければ更に伸びる
   expect(scrollH - clientH).toBeLessThanOrEqual(2); // 内部スクロール無し
+});
+
+test("N-TC-219: 拡大後に縮小できる／元サイズ(140px)より下げない（DFT-N-005）", async ({ page }) => {
+  await login(page);
+  await page.goto("/info-items/new");
+  const area = page.locator(".rt__area");
+  await expect(area).toBeVisible();
+
+  // 一度拡大（500px）。
+  await area.evaluate((el) => { (el as HTMLElement).style.height = "500px"; });
+  await expect.poll(async () => area.evaluate((el) => el.clientHeight)).toBeGreaterThan(300);
+
+  // 縮小（200px）＝内容が短いので 200px まで縮む（min-height を付け替えないので縮められる＝DFT-N-005 回帰防止）。
+  await area.evaluate((el) => { (el as HTMLElement).style.height = "200px"; });
+  await expect.poll(async () => area.evaluate((el) => el.clientHeight)).toBeLessThan(260);
+
+  // 元サイズ(min-height:140px)より小さくはしない＝40px 指定でも 140px 付近で下げ止まる。
+  await area.evaluate((el) => { (el as HTMLElement).style.height = "40px"; });
+  await expect.poll(async () => area.evaluate((el) => el.clientHeight)).toBeGreaterThanOrEqual(140);
+  const clamped = await area.evaluate((el) => el.clientHeight);
+  expect(clamped, `clamped=${clamped}`).toBeLessThan(200); // 140px（元サイズ）付近まで縮み、それ以下にはならない
 });

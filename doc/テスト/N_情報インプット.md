@@ -138,10 +138,11 @@
 
 ### 3.5 内容・説明の入力欄＝縦に伸びる＋手動リサイズ（登録/詳細）
 
-> 要望＝情報の登録ダイアログ・詳細ダイアログの「内容・説明」（リッチテキスト `.rt__area`）は、最低高さ（`min-height:140px`）は維持しつつ、`max-height`＋内部スクロールをやめて**内容に応じて縦に伸びる**。加えて**ユーザーが縦幅を手動でドラッグ変更できる**（`resize: vertical`＝右下グリップ）。`resize` は `overflow:visible` だと無効なため `overflow:auto` にする。ただし resize のドラッグは固定 `height` を設定するため、そのままだとリサイズ後に内容が超えるとスクロールになる（DFT-N-004）＝`attachGrowableResize`（ResizeObserver）で**ドラッグ高さを `min-height` に付け替え `height` は `auto` に戻す**ことで、手動で広げた高さを下限に自動伸長を維持する。対象＝`info-input.css .rt__area`＋`growableResize.ts`（両ダイアログ共通・`InfoFormPanel`/`InfoDetailView` で attach）。
+> 要望＝情報の登録ダイアログ・詳細ダイアログの「内容・説明」（リッチテキスト `.rt__area`）は、最低高さ（`min-height:140px`）は維持しつつ、`max-height`＋内部スクロールをやめて**内容に応じて縦に伸びる**。加えて**ユーザーが縦幅を手動でドラッグ変更できる**（`resize: vertical`＝右下グリップ）。`resize` は `overflow:visible` だと無効なため `overflow:auto` にする。ただし resize のドラッグは固定 `height` を設定するため、そのままだとリサイズ後に内容が超えるとスクロールになる（DFT-N-004）。当初は「ドラッグ高さを min-height に付け替える」方式にしたが、min-height が上方向にしか効かず**一度広げると縮められない**不具合（DFT-N-005）になった。現行方式＝`attachGrowableResize`（`growableResize.ts`・ResizeObserver＋MutationObserver）で **`fit()`＝はみ出す時だけ内容の高さまで伸ばす（縮小はユーザーのドラッグに委ね、内容/`min-height:140px` まで）**。overflow は `hidden`（はみ出しは fit で防ぐ＝スクロールバーを出さない）。対象＝`info-input.css .rt__area`＋`growableResize.ts`（両ダイアログ共通・`InfoFormPanel`/`InfoDetailView` で attach）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | N-TC-216 | e2e | 内容・説明は内部スクロールせず縦に伸びる（登録ダイアログ・最低高さは維持） | `user@acme.example` が `/info-items/new` を開く | 内容欄（`.rt__area`）に高さ 320px を超える長い内容を挿入 | `.rt__area` に内部スクロールが出ない（`scrollHeight ≈ clientHeight`）＝内容に応じて縦に伸びる／空時は最低高さ ≥140px を保つ | SC-50（内容欄の高さ挙動） |
 | N-TC-217 | e2e | 内容・説明は手動で縦幅をドラッグ変更できる（登録ダイアログ） | `user@acme.example` が `/info-items/new` を開く | 内容欄（`.rt__area`）の計算スタイルを確認 | `resize: vertical`（縦方向リサイズ可＝右下グリップ）が有効＝ユーザーが縦幅を変更できる | SC-50（内容欄の高さ挙動） |
-| N-TC-218 | e2e | 手動リサイズ後も内容で伸びてスクロールが出ない（DFT-N-004） | `user@acme.example` が `/info-items/new` を開く | 内容欄の inline `height` を設定（＝グリップのドラッグ相当）→ その高さを超える長い内容を挿入 | ドラッグ高さが `min-height` に付け替わり `height` は `auto` に戻る（`attachGrowableResize`）→ 下限を超える内容でも内部スクロールが出ず縦に伸びる（`scrollHeight ≈ clientHeight`） | SC-50（内容欄の高さ挙動） |
+| N-TC-218 | e2e | 手動リサイズ後も内容で伸びてスクロールが出ない（DFT-N-004） | `user@acme.example` が `/info-items/new` を開く | 内容欄の inline `height` を拡大（＝グリップのドラッグ相当）→ その高さを超える長い内容を挿入 | 拡大値を超える内容でも `fit()` が内容の高さまで伸ばし内部スクロールが出ない（`scrollHeight ≈ clientHeight`・`clientHeight` が拡大値超に伸びる） | SC-50（内容欄の高さ挙動） |
+| N-TC-219 | e2e | 拡大後に縮小できる／元サイズ(140px)より下げない（DFT-N-005） | `user@acme.example` が `/info-items/new` を開く | 内容欄を拡大(500px)→縮小(200px)→極小(40px) | 200px まで縮む（`min-height` を付け替えないので縮小可）／40px 指定でも元サイズ `min-height:140px` 付近で下げ止まる | SC-50（内容欄の高さ挙動） |
