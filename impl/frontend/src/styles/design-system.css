@@ -510,11 +510,14 @@ body.modal-open { overflow: hidden; }
    静止に見えるが実機では見える。背後は暗転して見えないので無効化して実害なし＋描画コスト減。
    ダイアログ内の演出（framer は WAAPI＝animation-play-state 影響外／CRT フラッシュ等の CSS アニメと
    ダイアログ自身の backdrop-filter は .modal/.iq-confirm 配下を除外）は維持。DFT-E-012。 */
-body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *) {
+body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):not(.snackbar-stack):not(.snackbar-stack *) {
   animation-play-state: paused !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+/* 完了トースト（スナックバー）は最前面の通知レイヤ＝モーダル表示中でも登場アニメ（opacity 0→1）と
+   タイマーゲージを止めない（DFT＝modal-open で snackbar の iq-snack-in が paused になり opacity 0 のまま
+   裏に隠れ、ダイアログを閉じた時だけ見えていた不具合の修正）。上の :not(.snackbar-stack *) で除外済み。 */
 
 /* --- ドラッグ移動（.modal--draggable：ヘッダーを掴んで移動。shared.js が処理・共通部品） ---
    ハンドル＝.modal__header（または旧 .modal__drag）。中のボタン（×/最大化）はドラッグ起点にしない。 */

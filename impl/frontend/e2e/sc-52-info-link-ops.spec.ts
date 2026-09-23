@@ -47,6 +47,9 @@ test("N-TC-220 リンク種別変更で完了トーストが最前面に出る�
     // 最前面＝スナックバー z-index がモーダル(80)より十分上（回帰防止）。
     const z = await page.locator(".snackbar-stack").evaluate((el) => Number(getComputedStyle(el).zIndex));
     expect(z).toBeGreaterThan(100);
+    // モーダル表示中でも「実際に見える」こと＝computed opacity>0（body.modal-open の背景アニメ停止で
+    // 登場アニメが paused になり opacity 0 のまま裏に隠れる回帰を防ぐ・toBeVisible は opacity0 を検出しない）。
+    await expect.poll(async () => Number(await snack.evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0.5);
   } finally {
     await cleanup(page, infoId);
   }
