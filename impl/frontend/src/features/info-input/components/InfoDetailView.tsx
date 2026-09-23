@@ -85,8 +85,6 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const [linkEditing, setLinkEditing] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pending, setPending] = useState<InfoLinkCandidate[]>([]); // ピッカーで選び呼び元にストックした候補（種別を選んで追加）
-  const [addKind, setAddKind] = useState<InfoLinkKind>("related");
   // 参考資料（内容群・作成者のみ・§5.33）＝アイデア(D.3)と同仕様＝追加/削除は「保存する」でまとめて反映
   // （新規はステージ→保存でアップロード／既存削除は removedAttIds にマーク→保存で確定）。キャンセルなら無変更。
   const attInputRef = useRef<HTMLInputElement>(null);
@@ -203,22 +201,14 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     }
     await linkOp(() => changeLinkKindApi(linkId, next));
   };
-  // 対象ピッカーで選んだ対象（複数可）を呼び元にストック（種別は後で選ぶ・モック 10d 準拠）。重複除外。
-  const addPicked = (picked: InfoLinkCandidate[]) => {
+  // 対象ピッカーで対象（複数可）と種別を選び「選択を確定」→ 選んだ種別のまま即追加（反証はまとめて1回確認）。
+  const addPicked = async (picked: InfoLinkCandidate[], kind: InfoLinkKind) => {
     setPickerOpen(false);
-    setPending((ps) => {
-      const seen = new Set(ps.map((c) => `${c.target_type}:${c.target_id}`));
-      return [...ps, ...picked.filter((c) => !seen.has(`${c.target_type}:${c.target_id}`))];
-    });
-  };
-  // ストックした候補を、選択中の種別でまとめて追加（反証はまとめて1回確認）→ 詳細再取得・ストック解消。
-  const commitLinks = async () => {
-    if (!pending.length) return;
-    if (addKind === "refuting" && !(await confirm(REFUTE_CONFIRM))) return;
+    if (!picked.length) return;
+    if (kind === "refuting" && !(await confirm(REFUTE_CONFIRM))) return;  // 反証＝対象の作成者/評価者へ通知＋要再評価
     await linkOp(async () => {
-      for (const c of pending) await addLinkApi(infoId, c.target_type, c.target_id, addKind);
+      for (const c of picked) await addLinkApi(infoId, c.target_type, c.target_id, kind);
     });
-    setPending([]);
   };
 
   // 参考資料＝追加はステージ（未アップロード）、既存削除はマーク（保存で確定・アイデア D.3 と同仕様）。
@@ -535,31 +525,9 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                 ))}
               </ul>
               <div className="link-add">
-                <div className="linkpick">
-                  <button className="btn btn-outline" type="button" disabled={linkBusy} onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
-                  {pending.length ? (
-                    <div className="linkpick__chips">
-                      {pending.map((c) => (
-                        <span key={`${c.target_type}:${c.target_id}`} className="linkpick__chip">
-                          <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[c.target_type]}</span>
-                          <span className="linkpick__chip-title">{c.title}</span>
-                          <button type="button" className="linkpick__chip-rm" aria-label="解除" title="解除"
-                            onClick={() => setPending((ps) => ps.filter((x) => !(x.target_type === c.target_type && x.target_id === c.target_id)))}>✕</button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="link-add__bottom">
-                  <label className="link-add__field" style={{ flex: 1 }}><span className="link-add__lbl">種別（選んだ対象すべてに適用）</span>
-                    <select className="select" value={addKind} onChange={(e) => setAddKind(e.target.value as InfoLinkKind)}>
-                      {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
-                    </select>
-                  </label>
-                  <button className="btn btn-outline" type="button" disabled={!pending.length || linkBusy} onClick={commitLinks}>＋ 追加</button>
-                </div>
+                <button className="btn btn-outline" type="button" disabled={linkBusy} onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
               </div>
-              <div className="hint" style={{ marginTop: 6 }}>その場で編集し即時反映します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
+              <div className="hint" style={{ marginTop: 6 }}>「対象を選ぶ」で対象と<strong>種別</strong>を選び「選択を確定」で即追加します。採否・統制は成果物側の管理者に委ねます。種別「反証」で対象の作成者＋評価者へ通知＋要再評価。</div>
               <div style={{ marginTop: 8 }}><button className="btn btn-outline btn-sm" type="button" onClick={() => setLinkEditing(false)}>編集を終える</button></div>
             </>
           )}

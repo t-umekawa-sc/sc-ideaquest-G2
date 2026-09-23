@@ -98,6 +98,10 @@
 .link-item__rm { border: 0; background: transparent; cursor: pointer; color: var(--color-text-muted); line-height: 1; padding: 4px; border-radius: var(--radius); }
 .link-item__rm:hover { color: var(--color-danger); }
 .link-add { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); }
+/* 対象ピッカーのフッター＝関連付ける種別セレクタ（選択を確定で適用・FR-41） */
+.pick-kind { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
+.pick-kind__lbl { font-size: var(--text-sm); color: var(--color-text-muted); }
+.pick-kind .select { min-width: 8em; }
 .link-add__field { display: block; }
 .link-add__field .select, .link-add__field .multiselect { width: 100%; }
 .link-add__lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 2px; }

@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 
 import { Modal, ModalBody, ModalFooter } from "@/components/ui";
 import { fetchLinkCandidates } from "../api";
-import { LINK_TARGET_LABEL } from "../labels";
-import type { InfoLinkCandidate, InfoLinkTarget } from "../types";
+import { LINK_KIND_LABEL, LINK_TARGET_LABEL } from "../labels";
+import type { InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
 import "../info-input.css";
 
 const TYPES: { v: InfoLinkTarget; label: string }[] = [
@@ -21,7 +21,7 @@ const openHref = (c: InfoLinkCandidate) =>
   c.target_type === "ideas" ? `/ideas/${c.target_id}` : c.target_type === "quests" ? `/quests/${c.target_id}` : "#";
 
 export function TargetPicker({ open, onClose, onConfirm }: {
-  open: boolean; onClose: () => void; onConfirm: (selected: InfoLinkCandidate[]) => void;
+  open: boolean; onClose: () => void; onConfirm: (selected: InfoLinkCandidate[], kind: InfoLinkKind) => void;
 }) {
   const [types, setTypes] = useState<InfoLinkTarget[]>(["ideas", "quests"]);
   const [q, setQ] = useState("");
@@ -31,9 +31,10 @@ export function TargetPicker({ open, onClose, onConfirm }: {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sel, setSel] = useState<Map<string, InfoLinkCandidate>>(new Map());
+  const [kind, setKind] = useState<InfoLinkKind>("related"); // 追加する種別（ダイアログ内で選ぶ・確定で適用）
 
-  // 開くたびに選択をリセット。
-  useEffect(() => { if (open) setSel(new Map()); }, [open]);
+  // 開くたびに選択・種別をリセット。
+  useEffect(() => { if (open) { setSel(new Map()); setKind("related"); } }, [open]);
 
   // 絞込/検索が変わったら先頭ページから取り直し（デバウンス）。選択(sel)は保持する。
   useEffect(() => {
@@ -135,7 +136,13 @@ export function TargetPicker({ open, onClose, onConfirm }: {
       </ModalBody>
       <ModalFooter>
         <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
-        <button type="button" className="btn btn-primary" disabled={sel.size === 0} onClick={() => onConfirm(Array.from(sel.values()))}>
+        <label className="pick-kind">
+          <span className="pick-kind__lbl">種別</span>
+          <select className="select" value={kind} onChange={(e) => setKind(e.target.value as InfoLinkKind)} aria-label="関連付ける種別">
+            {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+          </select>
+        </label>
+        <button type="button" className="btn btn-primary" disabled={sel.size === 0} onClick={() => onConfirm(Array.from(sel.values()), kind)}>
           選択を確定{sel.size ? `（${sel.size}件）` : ""}
         </button>
       </ModalFooter>
