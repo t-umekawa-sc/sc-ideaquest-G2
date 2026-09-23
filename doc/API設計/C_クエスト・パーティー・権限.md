@@ -175,6 +175,14 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 - (b) **ピン留め**（重要メッセージ＝議論の要点）の付与/解除はチャット（E ドメイン）の `POST/DELETE /chat-messages/{id}/pin`（owner/quest_admin・[E API](E_チャット.md)）。結果 EP はその集約を `pinned_messages` として返す。
 - **完了時の副作用**（C.5 参照）＝チーム成果フィード `quest_completed`＋パーティー通知 `quest_result_ready`。
 
+## C.8b クエストの関連情報パネル（成果物→情報・ドメイン N 連携・FR-41・SC-12 上部の関連情報ストリップ）
+
+> 情報インプット（N）で貼られた `info_links` の**成果物側 read**。横断 EP を N に増やさず本ドメインの read として実装（N.1 委譲・I ダッシュボード §I.3 と同方針）。**Phase 1＝表示のみ**（リンクの追加/種別変更/棄却は情報側 N.3＝会社内 active 全員／貼られたリンクの**採否・処理は成果物側の別スコープ＝Phase 2**）。
+
+| メソッド/パス | 概要 | 入力 | 出力・ルール |
+|---|---|---|---|
+| `GET /quests/{quest_id}/related-info` | このクエストに関連づいた情報の一覧（SC-12 上部の関連情報ストリップ） | パス: `quest_id`／クエリ: `limit?`（既定＝上位 N・例 50） | 門番＝`can_access_quest`（C.0・範囲外 404）。`info_links`（`target_type='quests'` ∧ `target_id=quest_id` ∧ `rejected_at IS NULL`）を **`score` 降順**（NULL 最後・末尾 `info_item_id` で一意化）。`data[]`=`{link_id, info_id, title, kind〔related/supporting/refuting〕, origin〔auto/manual〕, score, source_url?, impact_class?, summary?, linked_by?〔manual のみ＝`info_links.created_by_id` を氏名/アバターに解決＝**手動で関連付けた人**を表示。auto は system 生成＝null〕}`（archived 情報は除外）。カードクリックで情報詳細（SC-52）へ。**反証（`refuting`）は⚠バッジ**（要再評価は通知のみ・MVP・N.6）。読取専用 |
+
 ## C.9 クエストの発見・フォロー・参加リクエスト（FR-40・SC-13/SC-01/SC-12）
 
 > 参加していないクエストを**発見**し、**フォロー（watch）**または**参加を申請**する機能群。正規化元＝[設計ドラフト](../設計ドラフト/クエスト発見_フォロー_参加リクエスト_設計.md)。データ＝`quest_follows`/`quest_join_requests`/`quests.discoverable`（データモデル §5.6/§5.8b/§5.8c・enum `join_request_status` §3）。通知＝H（`join_request_received`/`join_request_decided`/`quest_watch_update`）。

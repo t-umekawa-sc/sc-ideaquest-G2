@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>関連情報パネル（横スクロール棚→最大化一覧→詳細）モック</title>
+<link rel="stylesheet" href="shared.css" />
+<!--
+  FR-41 情報インプット連携＝成果物（クエスト/アイデア）に紐づく info_links の「関連情報」パネル。
+  方針（レビュー確定）：
+   - 目立たせる＝目立つヘッダー（件数＋⚠反証バッジ）＋⚠反証を先頭固定（隠れない）。
+   - 横スライドの魅せ＝“ユーザー操作の横スクロール棚(shelf)”（自動送りしない＝reduce-motion 安全・見逃し防止）。
+   - 「⤢ 全画面で一覧」＝SC-13 発見カタログと同じ最大化ダイアログを流用（新規の全画面モードは作らない）。
+   - カードクリック＝情報詳細（SC-52）。入れ子モーダルを避け、最大化一覧内はカードで SC-52 へ置換遷移。
+   - アニメは CSS のみ・prefers-reduced-motion で自動スクロール挙動を無効化。
+  データ＝GET /quests/{id}/related-info（C.8b）・GET /ideas/{id}/related-info（D）。score 降順・rejected/archived 除外。
+  Phase 1＝表示のみ（追加/種別変更/棄却は情報側 SC-50/52＝会社内全員／採否・「処理済み」は Phase 2）。
+-->
+<style>
+  .demo-wrap { max-width: 1080px; margin: 24px auto; padding: 0 16px; display: grid; gap: 28px; }
+  .demo-note { color: var(--color-text-muted); font-size: var(--text-xs); margin: 2px 0 10px; }
+  .demo-cols { display: grid; grid-template-columns: 1fr 320px; gap: 22px; align-items: start; }
+  @media (max-width: 880px){ .demo-cols { grid-template-columns: 1fr; } }
+
+  /* ===== パネル共通 ===== */
+  .ri-panel { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); overflow: hidden; }
+  .ri-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: color-mix(in srgb, var(--color-primary, #0d9488) 8%, var(--color-surface));
+    border-bottom: 1px solid var(--color-border);
+  }
+  .ri-head__title { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .ri-head__count { font-variant-numeric: tabular-nums; color: var(--color-text-muted); font-size: var(--text-sm); }
+  .ri-head__alert { color: #fff; background: var(--color-danger, #dc2626); border-radius: 999px; padding: 1px 9px; font-size: var(--text-xs); font-weight: 700; }
+  .ri-head__spacer { flex: 1; }
+  .ri-head__btn { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius); padding: 4px 10px; cursor: pointer; font-size: var(--text-sm); }
+  .ri-head__btn:hover { border-color: var(--color-primary); }
+
+  /* ===== 横スクロール棚（shelf・ユーザー操作） ===== */
+  .ri-shelf-wrap { position: relative; padding: 12px; }
+  .ri-shelf {
+    display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+    scroll-behavior: smooth; padding-bottom: 4px; scrollbar-width: thin;
+  }
+  @media (prefers-reduced-motion: reduce) { .ri-shelf { scroll-behavior: auto; } }
+  .ri-shelf > .ri-card { scroll-snap-align: start; flex: 0 0 300px; }
+  .ri-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+    width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--color-border);
+    background: var(--color-surface); cursor: pointer; box-shadow: var(--shadow-sm); font-size: 16px;
+  }
+  .ri-arrow.prev { left: 2px; } .ri-arrow.next { right: 2px; }
+  .ri-arrow:hover { border-color: var(--color-primary); }
+
+  /* ===== カード ===== */
+  .ri-card {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-content: start;
+    padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius);
+    background: var(--color-surface); cursor: pointer; transition: box-shadow .12s, border-color .12s;
+  }
+  .ri-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+  .ri-card.is-refuting { border-left: 4px solid var(--color-danger, #dc2626); background: color-mix(in srgb, var(--color-danger, #dc2626) 6%, var(--color-surface)); }
+  .ri-title { font-weight: 600; grid-column: 1; line-height: 1.35; }
+  .ri-title a { color: inherit; text-decoration: none; }
+  .ri-badges { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .ri-summary { grid-column: 1 / -1; color: var(--color-text-muted); font-size: var(--text-sm); margin-top: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ri-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--color-text-muted); font-size: var(--text-xs); }
+  .ri-score { font-variant-numeric: tabular-nums; }
+  .ri-src { color: var(--color-primary); text-decoration: none; }
+  /* 手動で関連付けた人＝ユーザーアバター＋氏名（自動は system＝🤖バッジ） */
+  .ri-by { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; }
+  .ri-empty { padding: 18px; text-align: center; color: var(--color-text-muted); }
+
+  /* 右レール（コンパクト） */
+  .rail .ri-shelf > .ri-card { flex-basis: 240px; }
+
+  /* ===== 最大化ダイアログ（SC-13 流用イメージ） ===== */
+  .maxi { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; z-index: 50; }
+  .maxi.is-open { display: grid; place-items: center; }
+  .maxi__panel { width: min(1100px, 94vw); height: min(88vh, 900px); background: var(--color-surface); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg, 0 20px 60px rgba(0,0,0,.35)); }
+  .maxi__head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+  .maxi__grid { padding: 16px; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .maxi__x { margin-left: auto; border: none; background: transparent; font-size: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="demo-wrap">
+
+  <h1 style="font-size:var(--text-xl)">関連情報パネル モック — 横スクロール棚 → 最大化一覧 → 詳細</h1>
+  <p class="demo-note">
+    目立つヘッダー（件数＋⚠反証）＋<strong>⚠反証を先頭固定</strong>／横は<strong>ユーザー操作のスクロール棚</strong>（自動送りなし＝reduce-motion 安全）／
+    <strong>「⤢ 全画面で一覧」</strong>で最大化ダイアログ（SC-13 流用）→カードで<strong>情報詳細（SC-52）</strong>。Phase 1＝表示のみ。
+    由来＝🤖自動（system）／手動は<strong>関連付けた人のユーザーアバター＋氏名</strong>を表示（`info_links.created_by_id` を解決）。
+  </p>
+
+  <div class="demo-cols">
+    <!-- ===== SC-12: 詳細画面の上部ストリップ（タブではない・全幅）＝横スクロール棚 ===== -->
+    <section class="ri-panel">
+      <div class="ri-head">
+        <span class="ri-head__title">🔗 関連情報 <span class="ri-head__count">5件</span> <span class="ri-head__alert">⚠ 反証 1</span></span>
+        <span class="ri-head__spacer"></span>
+        <button class="ri-head__btn" onclick="openMaxi()">⤢ 全画面で一覧</button>
+      </div>
+      <div class="ri-shelf-wrap">
+        <button class="ri-arrow prev" aria-label="前へ" onclick="scrollShelf(-1)">‹</button>
+        <div class="ri-shelf" id="shelf">
+          <!-- ⚠反証を先頭固定 -->
+          <article class="ri-card is-refuting" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">競合A社が同等機能を無料提供開始</a></div>
+            <div class="ri-badges"><span class="badge badge-danger">⚠ 反証</span><span class="badge badge-muted">🤖 自動</span></div>
+            <div class="ri-summary">前提「有償でも需要がある」を揺さぶる。価格前提の見直しが必要。</div>
+            <div class="ri-meta"><span class="ri-score">一致度 0.82</span><span>🔴 脅威</span><a class="ri-src" href="#" onclick="event.stopPropagation()">🔗 出典</a></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">経産省 DX 推進補助金 2026 要件緩和</a></div>
+            <div class="ri-badges"><span class="badge badge-success">✅ 裏付け</span><span class="ri-by" title="手動で関連付けた人"><span class="avatar" style="--avatar-size:20px" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤花子</span></div>
+            <div class="ri-summary">補助対象が中小の業務改善SaaSに拡大。導入コスト前提を後押し。</div>
+            <div class="ri-meta"><span class="ri-score">一致度 0.74</span><span>🟢 機会</span><a class="ri-src" href="#" onclick="event.stopPropagation()">🔗 出典</a></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">社内アンケート：情報共有に課題（120名）</a></div>
+            <div class="ri-badges"><span class="badge">🔗 関連</span><span class="badge badge-muted">🤖 自動</span></div>
+            <div class="ri-summary">情報の分断が業務効率のボトルネック、という一次情報。</div>
+            <div class="ri-meta"><span class="ri-score">一致度 0.61</span></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">業界レポート：SaaS 導入率の伸長</a></div>
+            <div class="ri-badges"><span class="badge">🔗 関連</span><span class="ri-by" title="手動で関連付けた人"><span class="avatar" style="--avatar-size:20px" data-name="田中 一郎"><span class="avatar__img placeholder">田</span></span>田中一郎</span></div>
+            <div class="ri-summary">市場全体の追い風を示す外部データ。</div>
+            <div class="ri-meta"><span class="ri-score">一致度 0.55</span><span>🟢 機会</span></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">顧客ヒアリング：現行運用の不満点</a></div>
+            <div class="ri-badges"><span class="badge badge-success">✅ 裏付け</span><span class="badge badge-muted">🤖 自動</span></div>
+            <div class="ri-summary">課題仮説を裏付ける顧客の生声。</div>
+            <div class="ri-meta"><span class="ri-score">一致度 0.52</span></div>
+          </article>
+        </div>
+        <button class="ri-arrow next" aria-label="次へ" onclick="scrollShelf(1)">›</button>
+      </div>
+    </section>
+
+    <!-- ===== SC-22: 右レール（評価結果の下）＝同じ棚のコンパクト ===== -->
+    <aside class="ri-panel rail">
+      <div class="ri-head">
+        <span class="ri-head__title">🔗 関連情報 <span class="ri-head__count">5件</span> <span class="ri-head__alert">⚠ 1</span></span>
+        <span class="ri-head__spacer"></span>
+        <button class="ri-head__btn" onclick="openMaxi()">⤢</button>
+      </div>
+      <div class="ri-shelf-wrap">
+        <button class="ri-arrow prev" aria-label="前へ" onclick="scrollShelf(-1,'shelf2')">‹</button>
+        <div class="ri-shelf" id="shelf2">
+          <article class="ri-card is-refuting" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">競合A社が同等機能を無料提供</a></div>
+            <div class="ri-badges"><span class="badge badge-danger">⚠ 反証</span></div>
+            <div class="ri-meta"><span class="ri-score">0.82</span><span class="badge badge-muted">🤖</span></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">DX 推進補助金 要件緩和</a></div>
+            <div class="ri-badges"><span class="badge badge-success">✅ 裏付け</span></div>
+            <div class="ri-meta"><span class="ri-score">0.74</span><span class="ri-by" title="手動で関連付けた人"><span class="avatar" style="--avatar-size:20px" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤花子</span></div>
+          </article>
+          <article class="ri-card" onclick="location.href='SC-50_情報インプット.html'">
+            <div class="ri-title"><a href="SC-50_情報インプット.html">社内アンケート：情報共有に課題</a></div>
+            <div class="ri-badges"><span class="badge">🔗 関連</span></div>
+            <div class="ri-meta"><span class="ri-score">0.61</span><span class="badge badge-muted">🤖</span></div>
+          </article>
+        </div>
+        <button class="ri-arrow next" aria-label="次へ" onclick="scrollShelf(1,'shelf2')">›</button>
+      </div>
+    </aside>
+  </div>
+
+  <p class="demo-note">空状態（0件）＝「この成果物に関連づいた情報はまだありません。情報インプット（SC-50）から関連づけできます。」</p>
+</div>
+
+<!-- ===== 最大化ダイアログ（SC-13 発見カタログの最大化を流用） ===== -->
+<div class="maxi" id="maxi" role="dialog" aria-modal="true" aria-label="関連情報 一覧">
+  <div class="maxi__panel">
+    <div class="maxi__head">
+      <strong>🔗 関連情報 一覧 <span class="ri-head__count">5件</span> <span class="ri-head__alert">⚠ 反証 1</span></strong>
+      <button class="maxi__x" aria-label="閉じる" onclick="closeMaxi()">✕</button>
+    </div>
+    <div class="maxi__grid">
+      <article class="ri-card is-refuting" onclick="location.href='SC-50_情報インプット.html'">
+        <div class="ri-title">競合A社が同等機能を無料提供開始</div>
+        <div class="ri-badges"><span class="badge badge-danger">⚠ 反証</span><span class="badge badge-muted">🤖 自動</span></div>
+        <div class="ri-summary">前提「有償でも需要がある」を揺さぶる。価格前提の見直しが必要。</div>
+        <div class="ri-meta"><span class="ri-score">一致度 0.82</span><span>🔴 脅威</span><a class="ri-src" href="#" onclick="event.stopPropagation()">🔗 出典</a></div>
+      </article>
+      <article class="ri-card"><div class="ri-title">経産省 DX 推進補助金 2026 要件緩和</div><div class="ri-badges"><span class="badge badge-success">✅ 裏付け</span><span class="ri-by" title="手動で関連付けた人"><span class="avatar" style="--avatar-size:20px" data-name="佐藤 花子"><span class="avatar__img placeholder">佐</span></span>佐藤花子</span></div><div class="ri-summary">補助対象が中小の業務改善SaaSに拡大。</div><div class="ri-meta"><span class="ri-score">一致度 0.74</span><span>🟢 機会</span></div></article>
+      <article class="ri-card"><div class="ri-title">社内アンケート：情報共有に課題（120名）</div><div class="ri-badges"><span class="badge">🔗 関連</span><span class="badge badge-muted">🤖 自動</span></div><div class="ri-summary">情報の分断が業務効率のボトルネック。</div><div class="ri-meta"><span class="ri-score">一致度 0.61</span></div></article>
+      <article class="ri-card"><div class="ri-title">業界レポート：SaaS 導入率の伸長</div><div class="ri-badges"><span class="badge">🔗 関連</span><span class="ri-by" title="手動で関連付けた人"><span class="avatar" style="--avatar-size:20px" data-name="田中 一郎"><span class="avatar__img placeholder">田</span></span>田中一郎</span></div><div class="ri-summary">市場全体の追い風。</div><div class="ri-meta"><span class="ri-score">一致度 0.55</span><span>🟢 機会</span></div></article>
+      <article class="ri-card"><div class="ri-title">顧客ヒアリング：現行運用の不満点</div><div class="ri-badges"><span class="badge badge-success">✅ 裏付け</span><span class="badge badge-muted">🤖 自動</span></div><div class="ri-summary">課題仮説を裏付ける顧客の生声。</div><div class="ri-meta"><span class="ri-score">一致度 0.52</span></div></article>
+    </div>
+    <p class="demo-note" style="padding:0 16px 12px">カードクリック＝情報詳細（SC-52）。※入れ子モーダル回避＝一覧内はカードで SC-52 へ置換遷移（またはこの一覧を閉じて SC-52 を開く）。</p>
+  </div>
+</div>
+
+<script>
+  function scrollShelf(dir, id){ const el = document.getElementById(id || 'shelf'); el.scrollBy({ left: dir * 320, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
+  function openMaxi(){ document.getElementById('maxi').classList.add('is-open'); }
+  function closeMaxi(){ document.getElementById('maxi').classList.remove('is-open'); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMaxi(); });
+  document.getElementById('maxi').addEventListener('click', e => { if (e.target.id === 'maxi') closeMaxi(); });
+</script>
+</body>
+</html>
