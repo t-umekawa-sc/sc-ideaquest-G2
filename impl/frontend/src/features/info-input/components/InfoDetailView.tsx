@@ -184,10 +184,22 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     }
   };
 
-  // リンク操作＝即時コミット→詳細を再取得して反映。
-  const linkOp = async (fn: () => Promise<unknown>) => {
+  // リンク操作＝即時コミット（保存する前に反映）→ 詳細を再取得して反映。完了メッセージを表示。
+  // 並び順は維持＝再取得で backend 並びが変わっても、元の表示順（既存 id 順）を保ち新規は末尾に足す
+  // （種別変更で行が飛ばないように・ユーザー要望）。
+  const linkOp = async (fn: () => Promise<unknown>, doneMsg?: string) => {
     setLinkBusy(true);
-    try { await fn(); const d = await fetchInfoDetail(infoId); if (d) setItem(d); } catch { /* 再試行可 */ }
+    const prevOrder = new Map((item?.links ?? []).map((l, i) => [l.id, i]));
+    try {
+      await fn();
+      const d = await fetchInfoDetail(infoId);
+      if (d) {
+        const ordered = [...d.links].sort((a, b) =>
+          (prevOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (prevOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+        setItem({ ...d, links: ordered });
+      }
+      if (doneMsg) snack({ type: "success", title: doneMsg });
+    } catch { /* 再試行可 */ }
     setLinkBusy(false);
   };
 
@@ -199,7 +211,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
       const d = await fetchInfoDetail(infoId); if (d) setItem(d); // 取消＝select を現状へ戻す
       return;
     }
-    await linkOp(() => changeLinkKindApi(linkId, next));
+    await linkOp(() => changeLinkKindApi(linkId, next), "関連リンクの種別を更新しました（保存前に反映済み）");
   };
   // 対象ピッカーで対象（複数可）と種別を選び「選択を確定」→ 選んだ種別のまま即追加（反証はまとめて1回確認）。
   const addPicked = async (picked: InfoLinkCandidate[], kind: InfoLinkKind) => {
@@ -208,7 +220,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     if (kind === "refuting" && !(await confirm(REFUTE_CONFIRM))) return;  // 反証＝対象の作成者/評価者へ通知＋要再評価
     await linkOp(async () => {
       for (const c of picked) await addLinkApi(infoId, c.target_type, c.target_id, kind);
-    });
+    }, `関連リンクを追加しました（${picked.length}件・保存前に反映済み）`);
   };
 
   // 参考資料＝追加はステージ（未アップロード）、既存削除はマーク（保存で確定・アイデア D.3 と同仕様）。
@@ -510,7 +522,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                     <span>{LINK_TARGET_LABEL[l.target_type]}</span>
                     <span className="link-item__title" style={{ textDecoration: "line-through", color: "var(--color-text-subtle)" }}>{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">棄却済み・再リンクされません</span>
-                    <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id))}>戻す</button>
+                    <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id), "関連リンクを戻しました（保存前に反映済み）")}>戻す</button>
                   </li>
                 ) : (
                   <li key={l.id} className="link-item">
@@ -520,7 +532,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                     <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => changeKind(l.id, l.kind, e.target.value as InfoLinkKind)}>
                       {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
                     </select>
-                    <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id))}>✕</button>
+                    <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id), "関連リンクを棄却しました（保存前に反映済み）")}>✕</button>
                   </li>
                 ))}
               </ul>
@@ -569,7 +581,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           <button className="btn btn-primary" type="button" onClick={save} disabled={saving || archiveBusy}>{saving ? "保存中…" : "保存する"}</button>
         ) : null}
       </div>
-      <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} />
+      <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked}
+        existing={(item?.links ?? []).filter((l) => !l.rejected)} />
     </>
   );
 }

@@ -305,7 +305,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
             <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(true)}>🔍 対象を選ぶ…</button>
           </div>
           <div className="hint">「対象を選ぶ」で対象と<strong>種別</strong>を選び「選択を確定」でステージします（保存で確定）。種別を<strong>「反証」</strong>にすると、対象の作成者＋評価者へ<strong>通知＋要再評価</strong>が発火します。</div>
-          <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} />
+          <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked} existing={links} />
         </div>
 
         {canCurate ? (

@@ -20,8 +20,10 @@ const uid = (c: InfoLinkCandidate) => `${c.target_type}:${c.target_id}`;
 const openHref = (c: InfoLinkCandidate) =>
   c.target_type === "ideas" ? `/ideas/${c.target_id}` : c.target_type === "quests" ? `/quests/${c.target_id}` : "#";
 
-export function TargetPicker({ open, onClose, onConfirm }: {
+export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
   open: boolean; onClose: () => void; onConfirm: (selected: InfoLinkCandidate[], kind: InfoLinkKind) => void;
+  // 呼び元で既に関連付け済みの対象（結果から除外＋折り畳みで一覧表示）＝重複追加（409）を防ぐ。
+  existing?: { target_type: InfoLinkTarget; target_id: string; target_title?: string | null }[];
 }) {
   const [types, setTypes] = useState<InfoLinkTarget[]>(["ideas", "quests"]);
   const [q, setQ] = useState("");
@@ -63,6 +65,10 @@ export function TargetPicker({ open, onClose, onConfirm }: {
     setTypes((ts) => (ts.includes(v) ? ts.filter((x) => x !== v) : [...ts, v]));
   const toggleSel = (c: InfoLinkCandidate) =>
     setSel((m) => { const n = new Map(m); const k = uid(c); if (n.has(k)) n.delete(k); else n.set(k, c); return n; });
+
+  // 既に関連付け済みは絞り込み結果から除外（重複追加＝409 を防ぐ）。
+  const existingKeys = new Set(existing.map((e) => `${e.target_type}:${e.target_id}`));
+  const shown = cands.filter((c) => !existingKeys.has(uid(c)));
 
   return (
     <Modal open={open} onClose={onClose} title="対象を選ぶ" size="lg">
@@ -111,16 +117,33 @@ export function TargetPicker({ open, onClose, onConfirm }: {
           <span className="hint">選択した対象すべてにこの種別で関連付けます（「反証」は対象の作成者＋評価者へ通知＋要再評価）。</span>
         </div>
 
+        {existing.length > 0 ? (
+          <>
+            <hr className="pick-divider" />
+            <details className="pick-existing">
+              <summary className="pick-existing__sum">既に関連付け済み（{existing.length}件）— 絞り込み結果から除外中</summary>
+              <ul className="pick-existing__list">
+                {existing.map((e) => (
+                  <li key={`${e.target_type}:${e.target_id}`} className="pick-existing__item">
+                    <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[e.target_type]}</span>
+                    <span className="pick-existing__title">{e.target_title || e.target_id}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </>
+        ) : null}
+
         <hr className="pick-divider" />
         <div className="pick-results-title">📋 絞り込み結果</div>
         <div className="pick-count-row">
-          <span className="pick-count">{loading ? "検索中…" : `該当 ${cands.length}${nextCursor ? "+" : ""} 件 ・ 選択 ${sel.size} 件`}</span>
+          <span className="pick-count">{loading ? "検索中…" : `該当 ${shown.length}${nextCursor ? "+" : ""} 件 ・ 選択 ${sel.size} 件`}</span>
         </div>
-        {cands.length === 0 && !loading ? (
+        {shown.length === 0 && !loading ? (
           <div className="pick-empty">該当する対象がありません。絞り込みを調整してください。</div>
         ) : (
           <ul className="pick-list" role="listbox" aria-label="対象候補">
-            {cands.map((c) => {
+            {shown.map((c) => {
               const on = sel.has(uid(c));
               const ctx = c.target_type === "ideas"
                 ? [c.quest_title ? `📜${c.quest_title}` : null, c.owner_name, c.status, c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・")
