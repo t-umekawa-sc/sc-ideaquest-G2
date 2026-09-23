@@ -20,12 +20,14 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    // setup（認証状態を作る）→ chromium（本体）→ cleanup（末尾でテストデータを掃除・§7-2c）。
+    { name: "setup", testMatch: /auth\.setup\.ts/, teardown: "cleanup" },
+    { name: "cleanup", testMatch: /auth\.cleanup\.ts/ },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], storageState: USER_STATE },
       dependencies: ["setup"],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: /auth\.(setup|cleanup)\.ts/,
     },
   ],
 });

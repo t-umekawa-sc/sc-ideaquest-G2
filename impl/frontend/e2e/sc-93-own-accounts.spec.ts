@@ -64,7 +64,9 @@ test("B-TC-124 own-account list: search, email column, clear", async ({ page }) 
   await page.locator("#s_login").fill(loginId);
   await page.locator("#s_email").fill(emailAddr);
   await page.getByRole("button", { name: /発行する/ }).click();
-  await expect(page.getByText("アカウントを発行")).toHaveCount(0); // フォームが閉じる＝発行成功
+  // フォームが閉じる＝発行成功。見出し（role=heading）で判定する＝成功トースト「アカウントを発行しました」を
+  // getByText の部分一致で拾ってしまうと、トーストが残る間 count>0 になり並列負荷で不安定になる（本フレークの実体）。
+  await expect(page.getByRole("heading", { name: "アカウントを発行", exact: true })).toHaveCount(0);
 
   // DataTable ライブ検索＝一意スタンプで絞ると当該行のみ（1 件）・seed 管理者は消える
   await expect(async () => {
