@@ -87,6 +87,18 @@ test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", a
   const questId = await createRecruiting(page, `E2E既存添付_${stamp}`);
   const fileName = `shiryo_${stamp}.png`;
   const ideaId = await createIdeaWithAttachment(page, questId, stamp, fileName);
+  // 添付を版に確定させる（実UIでは編集フォームで添付追加→保存が1版＝D-TC-234）。ヘルパは添付を
+  // 別API直POSTで足すだけ＝版に載らないため、このまま削除すると公開時rev1（添付なし）と正味同値で
+  // 版が増えない。ここで同値PATCHすると直近版スナップ基準の差分（添付追加）で rev2 になり、
+  // 続く削除保存が rev3 として版差分に出る（本テストの主眼＝削除が版に記録される）。
+  {
+    const c0 = csrfOf(await page.context().cookies());
+    const commit = await page.request.patch(`/api/v1/ideas/${ideaId}`, {
+      headers: { "X-CSRF-Token": c0, "Content-Type": "application/json" },
+      data: { title: `添付編集_${stamp}` },
+    });
+    expect(commit.status(), await commit.text()).toBe(200);
+  }
   try {
     await page.goto(`/ideas/${ideaId}`);
     await page.getByRole("button", { name: "編集", exact: true }).click();
@@ -109,7 +121,8 @@ test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", a
 
     const detail = await page.request.get(`/api/v1/ideas/${ideaId}`).then((r) => r.json());
     expect(detail.attachments).toHaveLength(0);
-    expect(detail.current_revision).toBe(2); // 保存で版記録（1保存1版・設計B）
+    // rev1（公開・添付なし）→ rev2（添付確定 PATCH）→ rev3（添付削除の保存）。削除が版に記録される。
+    expect(detail.current_revision).toBe(3);
   } finally {
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });

@@ -44,11 +44,10 @@ test("M-TC-013 dashboard restores scroll after a push-style back link (and no fa
   await page.waitForURL((u) => u.pathname === "/");
 
   // restore-after-load＝ready 後に復元。先頭(0)ではなく savedY 近傍へ着地する。
+  // 復元は非同期（レイアウト確定後）＝単発読みだと着地前の値を拾い得るため、近傍(±80)に収まるまで poll で待つ。
   await expect
-    .poll(async () => page.evaluate(() => window.scrollY), { timeout: 6000 })
-    .toBeGreaterThan(savedY - 80);
-  const restoredY = await page.evaluate(() => window.scrollY);
-  expect(Math.abs(restoredY - savedY)).toBeLessThanOrEqual(80); // 復元は近傍（クランプ差を許容）
+    .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - savedY), { timeout: 6000 })
+    .toBeLessThanOrEqual(80);
 });
 
 // M-TC-014: pop 帰還（router.back＝ブラウザ戻る）でもスクロール位置を復元（ユーザー報告の回帰）。
@@ -72,10 +71,9 @@ test("M-TC-014 dashboard restores scroll after a card link and browser Back (pop
   await page.waitForURL(/\/quests\//, { timeout: 10000 });
   await page.goBack();
   await page.waitForURL((u) => u.pathname === "/");
-  // pop 帰還でも保存位置の近傍へ復元（「かなり上」に落ちない）。
+  // pop 帰還でも保存位置の近傍へ復元（「かなり上」に落ちない）。復元は非同期＝近傍(±100)に
+  // 収まるまで poll で待つ（単発読みは着地前の値を拾い得る＝並列負荷で不安定）。失敗＝上に落ちたまま。
   await expect
-    .poll(async () => page.evaluate(() => window.scrollY), { timeout: 6000 })
-    .toBeGreaterThan(savedY - 100);
-  const restoredY = await page.evaluate(() => window.scrollY);
-  expect(Math.abs(restoredY - savedY)).toBeLessThanOrEqual(100);
+    .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - savedY), { timeout: 6000 })
+    .toBeLessThanOrEqual(100);
 });

@@ -51,8 +51,9 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await page.locator("#g_name").fill(name);
   await page.getByRole("button", { name: "作成する" }).click();
   // 多数グループでもページングに左右されないよう、コードで絞り込んでから検証（client 検索＝全行対象）。
+  // 検証は行セル（role=cell）で行う＝検索チップ「🔍 "code"✕」が getByText(code) に二重一致するのを避ける。
   await page.getByRole("searchbox", { name: "グループ名・コード を検索" }).fill(code);
-  await expect(page.getByText(code)).toBeVisible();
+  await expect(page.getByRole("cell", { name: code })).toBeVisible();
 
   // 一覧は DataTable＝操作は RowMenu（⋯）。リネームは「編集」→編集モーダルに変更（旧 native prompt から）。
   const renameRow = page.getByRole("row", { name: new RegExp(code) });
@@ -61,7 +62,7 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await page.getByRole("menuitem", { name: "編集" }).click();
   await page.locator("#g_edit_name").fill(renamed);
   await page.getByRole("button", { name: "保存する" }).click();
-  await expect(page.getByText(renamed)).toBeVisible();
+  await expect(page.getByRole("cell", { name: renamed })).toBeVisible();
 
   // 削除＝カスタム確認ダイアログ（§15・native confirm ではない）＝「削除する」で確定（空グループ→204）。
   const deleteRow = page.getByRole("row", { name: new RegExp(code) });
@@ -69,7 +70,7 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await deleteRow.getByRole("button", { name: "操作" }).click();
   await page.getByRole("menuitem", { name: "削除" }).click();
   await page.getByRole("button", { name: "削除する" }).click();
-  await expect(page.getByText(code)).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: code })).toHaveCount(0); // 行セルで判定（検索チップに影響されない）
 });
 
 // B-TC-179: グループ名の無変更保存＝rename API を呼ばず info「変更はありません」（無音にしない・デザイン標準 §14）。

@@ -40,6 +40,7 @@ test("M-TC-002 selecting a nav item navigates and closes the drawer (#1)", async
   await page.addInitScript(() => { try { localStorage.setItem("iq_nav_pinned", "0"); } catch { /* ignore */ } });
   await login(page);
   await page.locator(".appnav-burger").click();
+  await expect(page.locator(".appnav-root.is-open")).toHaveCount(1); // ドロワーが開くのを待ってから項目クリック（開閉アニメ中の空振り防止）
   await page.locator("#appnav-drawer").getByRole("menuitem", { name: "ショップ" }).click();
   await expect(page).toHaveURL(/\/shop$/);
   await expect(page.locator(".appnav-root.is-open")).toHaveCount(0);
