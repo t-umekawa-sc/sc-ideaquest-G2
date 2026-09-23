@@ -162,8 +162,7 @@
 .linkpick__chip-rm:hover { color: var(--color-danger); }
 
 /* --- 関連リンク対象ピッカー（TargetPicker・見本＝style-guide.html「10d」）＝絞込＋候補カード＋もっと見る。 --- */
-.pick-filters { display: flex; flex-direction: column; gap: var(--space-2);
-  border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-3); margin-bottom: var(--space-3); }
+.pick-filters { display: flex; flex-direction: column; gap: var(--space-2); }
 .pick-filters__title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); margin-bottom: 2px; }
 .pick-filter-row { display: flex; align-items: center; gap: var(--space-3); }
 .pick-filter-lbl { flex: 0 0 96px; font-size: var(--text-xs); font-weight: 700; color: var(--color-text-muted); }
