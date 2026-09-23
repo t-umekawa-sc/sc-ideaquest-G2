@@ -16,6 +16,7 @@ import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
 import { getQuestActivities } from "@/features/feed/api";
 import { ActivityFeed } from "@/features/feed/components/ActivityFeed";
+import { RelatedInfoPanel } from "@/features/info-input";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr, markIdeaFromQuest, consumeQuestFromList } from "@/lib/nav";
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
@@ -664,6 +665,9 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </div>
         )}{/* .quest-panels */}
       </div>
+
+      {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝タブの上に全幅で常時表示。 */}
+      <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
 
       {/* タブ（🏁 結果は常時表示＝途中経過も見られる。完了前は「暫定」を明示・FR-39） */}
       <div id="quest-tabs" className="tabs" role="tablist" aria-label="クエスト詳細のセクション">

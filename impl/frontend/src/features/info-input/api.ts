@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import type {
   InfoAttachment, InfoCard, InfoDetail, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
-  InfoListResult, InfoRevisionDiff, InfoStatusFilter, WordCloudToken,
+  InfoListResult, InfoRevisionDiff, InfoStatusFilter, RelatedInfoItem, WordCloudToken,
 } from "./types";
 
 export const INFO_CHANGED_EVENT = "info-items-changed";
@@ -236,4 +236,12 @@ export interface InfoInput {
   triage_reason?: string | null;
   due_date?: string | null;
   links?: InfoLink[];
+}
+
+// 成果物→関連情報（SC-12 上部ストリップ／SC-22 右レール・C.8b／D）＝各ドメインの read（新規横断EPなし）。
+export async function fetchRelatedInfo(
+  targetType: "quests" | "ideas", targetId: string, signal?: AbortSignal,
+): Promise<RelatedInfoItem[]> {
+  const r = await apiFetch<{ data: RelatedInfoItem[] }>(`/${targetType}/${targetId}/related-info`, { signal });
+  return r?.data ?? [];
 }

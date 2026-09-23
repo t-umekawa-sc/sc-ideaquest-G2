@@ -190,3 +190,17 @@ export interface InfoRevisionDiff {
   to_revision: number;
   fields: Record<string, InfoDiffField>;
 }
+
+// 成果物→関連情報パネル（SC-12 上部ストリップ／SC-22 右レール・FR-41）＝GET /{quests,ideas}/{id}/related-info。
+export interface RelatedInfoItem {
+  link_id: string;
+  info_id: string;
+  title: string;
+  kind: InfoLinkKind;
+  origin: InfoLinkOrigin;
+  score: number | null;
+  source_url?: string | null;
+  impact_class?: string | null;
+  summary?: string | null;
+  linked_by?: InfoCreator | null; // manual のみ＝関連付けた人（auto は null）
+}
