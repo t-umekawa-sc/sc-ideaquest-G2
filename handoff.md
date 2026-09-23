@@ -6,81 +6,91 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: **2026-09-23 JST**
 - ブランチ: **main**（作業ツリー clean・`origin/main` と同期＝全 push 済）。
-- 本セッションのコミット列（古→新・すべて push 済）＝**e2e フレーク恒久対処（§7-2）**:
-  - `1aba983` test(flake): e2e並列セッション衝突とadmin company-directoryのフレーク恒久対処
-  - `5000a75` test(e2e): 並列フル実行のログイン衝突をstorageState認証で恒久対処（62failed→解消）
-  - `5b5b72d` test(e2e): データ蓄積の後始末をteardown projectに集約＋SC-93発行フォーム閉判定の実バグ修正
-  - `58e5799` test(e2e): 並列実行の残タイミング分散を retries=2 で吸収
-  - `8d4e1a4` test(e2e): retries でも残る決定的3件＋D-TC-218 の実バグ/脆さを修正
-  - （＋本 handoff コミット）
-- 前セッションの末尾＝`4bddd60`（情報インプット受入・ドメインN）。
-- コミット方針: ユーザーが「コミットして/プッシュして」と言うまで実行しない。**1スライス=1コミット**。末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
+- 最新コミット（新→古の要点）:
+  - `70a9635` feat(info-links): 成果物側「＋ 関連情報を追加」逆向きピッカー（RelatedInfoPanel・SC-12・slice③）
+  - `07bbc03` / `a95a263` 関連情報ストリップの配置調整（最終＝新着の議論/活動の活発さ の下・KPI/ランキングの上）
+  - `ba73df2` RelatedInfoPanel を SC-12 上部に結線（FR-41 Phase1・slice①）
+  - `ad6dc43`〜`23049c2` 情報リンク編集の不具合修正群（棄却の除外／トースト最前面／並び順維持 等）
+  - `d1529b1`〜`fd1debc` 関連情報の backend read EP（C.8b/D）＋`info_links.created_by_id`＋設計/モック
+  - `c7c5e38` 前半＝e2e フレーク恒久対処の handoff（本コミット群 `1aba983`〜`8d4e1a4` の記録）
+- コミット方針: ユーザーが「コミット/プッシュして」と言うまで実行しない。**1スライス=1コミット**。末尾に `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`。
 
 ## 2. プロジェクトのゴール
 社内アイデア創出のゲーミフィケーション Web アプリ **IdeaQuest**（マルチテナント＝会社ごとに会社DB）。バック=FastAPI 4層（schemas/repository/application/router）、フロント=Next.js App Router（feature 構成）。設計の正本は `doc/` 配下（要件 FR-xx・データモデル・API設計 A..N・画面 SC-xx）。実装は `impl/`。
 
-## 3. 今回やったこと（e2e 並列フル実行のフレーク恒久対処・全て検証済み）
-**動機**＝Playwright 全 e2e 一括（workers=7・約146件）が **78 passed / 67 failed** だった。原因を段階的に特定し恒久対処、**138 passed / 6 flaky(retry回復) / 3 failed** まで改善。残3件は負荷依存の非決定（§5）。
+## 3. 今回やったこと（2アーク。**再開の主対象は B＝FR-41 関連情報**）
 
-### A. 全端末ログアウトの共有アカウント衝突（`1aba983`）
-- `sc-00-login.spec.ts` の **A-TC-022「全端末からログアウト」**が共有 `user@acme` に `logout_all`（backend `delete_account_sessions`）を叩き、同アカウントで並列実行中の他ワーカを一斉に session_expired へ巻き込んでいた。→ 破棄系専用の隔離シード垢 **`e2e-session@acme.example`**（`bootstrap.py` の `_SEEDS`・非prodのみ）を新設し A-TC-022 をそれでログイン。
-- 同コミットで backend `B-TC-083b/083c`（`tests/admin/test_admin_quest_groups.py`）のフル実行フレークも恒久対処＝conftest factory `make_seed_company_account` に `display_name` 引数追加、083b/083c は一意タグで `company-directory?q=<tag>` を絞り、ページング蓄積に依存しないように。メモリ `admin-directory-tests-flaky`（解消済）。
+### アーク A（前半・完了）＝e2e 並列フル実行のフレーク恒久対処（§7-2）
+- 詳細は前 handoff（`c7c5e38`）に記録済み。要点だけ再掲＝**e2e は storageState 認証方式に転換済み**（`impl/frontend/e2e/auth.setup.ts`＝共有 user@acme を1回ログイン→`playwright/.auth/user.json` 再利用）／末尾に **cleanup teardown project**（`e2e/auth.cleanup.ts`＝テスト専用データを psql 掃除）／**`retries: 2`**（`playwright.config.ts`）。破棄系 spec（`sc-00-*`）は `test.use({storageState:{cookies:[],origins:[]}})` で未認証。専用 seed 垢＝`e2e-session@acme.example`（全端末ログアウト用）・`e2e-pwreset@acme.example`（パス再設定用）を `impl/backend/scripts/bootstrap.py` の `_SEEDS` に追加済み。全 e2e 並列＝**137 passed / 数件は負荷依存の非決定フレーク**（実バグではない）。
 
-### B. ログインのレート制限バケット共有（主因~62件・`5000a75`）
-- 真因＝backend `check_login_rate_limit`＝**(IP+login_id) 固定窓**（dev 既定 `LOGIN_RATE_LIMIT_MAX=50/300s`・成功ログインも枠消費）。全 Playwright ワーカが同一 frontend コンテナIP＋同一 `user@acme` で毎テスト再ログイン→窓内で超過→429→ログイン画面から進めず大量 fail。
-- 対処＝**Playwright storageState 方式**。`e2e/auth.setup.ts`（setup project）で `user@acme` を1回ログイン→`playwright/.auth/user.json` 保存。`playwright.config.ts` の chromium project は `dependencies:['setup']`＋既定 `storageState`。各 spec の `login()` は `goto('/')` だけ（再ログイン廃止）。user@acme 既定 spec 35本＋sc-24-chat を変換。
-- 認証フロー spec（`sc-00-login/session-expiry/mfa/password-setup`）は `test.use({storageState:{cookies:[],origins:[]}})` で**未認証 opt-out**し自前ログイン。
-- **落とし穴**＝`sc-00-password-setup` は complete で当該垢の全セッションを破棄する→共有 user@acme を使うと storageState セッションを壊す→専用垢 **`e2e-pwreset@acme.example`**（`_SEEDS`）に分離。
-- 付随＝`sc-99-gamemode` の曖昧ロケータ `/クエスト/`（「クエストを探す」と二重一致）を href 一意化。`.gitignore` に `**/playwright/.auth/`（session Cookie を含むので追跡しない・中間スラッシュ anchor 罠を回避）。
-- メモリ `e2e-storagestate-auth`・`shared-account-logout-all-e2e-cascade`。
+### アーク B（後半・進行中）＝FR-41 情報インプット↔成果物の「関連付け（related-info）」Phase 1
+**目的**＝情報インプット（`info_links`）を成果物（クエスト/アイデア）側でも表示・追加できる双方向連携。設計正本＝`doc/画面設計/screens/SC-12_*`（§4.1d）・`SC-22_*`（§4.6b）・`doc/API設計/C_*`（C.8b）・`D_*`（related-info 行）・`N_*`（N.3 追記）・`doc/データモデル.md`（§5.35 `created_by_id`）・モック `doc/画面設計/mocks/SC-12-22_関連情報パネル.html`。
 
-### C. admin データ蓄積の後始末（`5b5b72d`）
-- 永続DB（db_data ボリューム）にテストが作るクエストグループ/アカウント/会社が実行ごと累積（実測 ACME 空グループ21・OPS 発行垢16・E2E 会社24）＝admin 一覧の件数/ページング/検索を不安定化。
-- **`e2e/auth.cleanup.ts`（teardown project）**を追加＝実行末に psql で「テスト専用パターンのみ」削除（QG/QGN/SCDEV グループ＋所属／OPS の `e2e-l-*@ops.example` 垢を FK 順〔otp_challenges・trusted_devices・account_sync_outbox・mail_outbox・system_audit_logs→accounts〕／アカウント無しの `E2E-*` 会社）。seed は不可侵。config で setup→chromium→cleanup に配線。
-- 同コミットで **SC-93 B-TC-124 の実バグ**修正＝発行フォーム閉判定 `getByText("アカウントを発行")` が成功トースト「アカウントを発行しました」に部分一致してトーストが残る間 count>0（並列負荷でフレーク）→ `getByRole("heading",{exact})` に。
+- **backend read EP（C.8b/D）**: `GET /quests/{id}/related-info`・`GET /ideas/{id}/related-info`＝各ドメインの read（新規横断EPなし・N.1 委譲）。
+  - `impl/backend/app/tenant/info/repository.py`＝`list_links_for_target()`（target で info_links を引く・rejected/archived 除外・score 降順）／`create_link()` に `created_by_id` 追加。
+  - `impl/backend/app/tenant/info/application.py`＝`related_info_for_target()`（DTO 整形・manual は `created_by_id` を氏名/アバターに解決＝linked_by）／`add_link()` が actor.id を渡す。
+  - `impl/backend/app/tenant/info/schemas.py`＝`RelatedInfoItemDTO`/`RelatedInfoResponse`。
+  - `impl/backend/app/tenant/info/orm.py`＝`InfoLink.created_by_id`（NULL可・FK users）を追加。**migration `impl/backend/migrations/company/versions/0031_info_link_created_by.py`**。
+  - `impl/backend/app/tenant/quests/{application,router}.py`＝`get_quest_related_info`＋route（門番＝`get_quest_detail` と同一）。`ideas/{application,router}.py`＝`get_idea_related_info`＋route。**遅延 import で info application を呼ぶ（循環回避）**。
+- **「対象を選ぶ」ダイアログ（情報側の関連付け＝TargetPicker）改善**（`impl/frontend/src/features/info-input/components/TargetPicker.tsx`）:
+  - 種別セレクタを**フッターから本文へ移動**＝`🔍絞り込み → 🏷️設定する種別 → 📋絞り込み結果` の3セクション（仕切り線 `.pick-divider`）。`onConfirm(selected, kind)`。
+  - `existing` を受け取り「既に関連付け済み」を**折り畳み表示＋絞り込み結果から除外**（重複 409 防止）。**棄却済みも existing に含めて除外**（find_link が棄却行も 409 にするため・復活は詳細の「戻す」）。
+  - 呼び元＝`InfoDetailView.tsx`（`existing={item.links}` 全件）・`InfoFormPanel.tsx`（ステージ済み `links`）。両者の `addPicked(picked, kind)` は選んだ種別で即追加/ステージ。
+- **リンク操作の UX 修正**（`impl/frontend/src/features/info-input/components/InfoDetailView.tsx`）:
+  - `linkOp(fn, doneMsg?)`＝再取得で**表示順を維持**（既存 id 順・新規は末尾。`InfoLink` に created_at が無いためフロントで順序保持）＋**完了トースト**（保存前に反映済みと明記）。
+- **成果物側パネル（RelatedInfoPanel）＝SC-12 に結線**（新規 `impl/frontend/src/features/info-input/components/RelatedInfoPanel.tsx`・`index.ts` で export）:
+  - 横スクロール棚＋ヘッダー（件数・⚠反証数・**＋ 関連情報を追加**・⤢全画面）＋カード（種別バッジ・由来〔🤖自動／✋アバター+氏名〕・一致度・機会/脅威・出典・要約）。⚠反証を先頭固定。カードクリックで `/info-items/{id}`（SC-52）。「⤢全画面」は Modal でグリッド。`INFO_CHANGED_EVENT` で再取得。
+  - `impl/frontend/src/features/info-input/api.ts`＝`fetchRelatedInfo(targetType,id)`。`types.ts`＝`RelatedInfoItem`。CSS＝`info-input.css` の `.ri-*`。
+  - `impl/frontend/src/features/quests/components/QuestDetailView.tsx`＝`.quest-top` 内で `.discuss-row`（新着の議論/活動の活発さ）の直後・`.quest-panels`（KPI/ランキング）の直前に `<RelatedInfoPanel targetType="quests" .../>` を配置（ゲームモード非依存）。
+- **「＋ 関連情報を追加」逆向きピッカー**（新規 `impl/frontend/src/features/info-input/components/AddRelatedInfoDialog.tsx`）:
+  - 既存情報を検索（`searchInfoItems`＝`GET /info-items?q`）→種別選択→`addLinkApi()`（`POST /info-links`・target=当該成果物・**新規EPなし**）。既に関連付け済みは検索結果から除外。反証は確認ダイアログ。確定後 `INFO_CHANGED_EVENT`＋完了トースト。
+- **UI 基盤の実バグ修正**（`impl/frontend/src/styles/design-system.css`）:
+  - 完了トーストがモーダル表示中に見えなかった真因＝`body.modal-open :not(.modal)...` の背景アニメ一時停止（DFT-E-012）が **snackbar の登場アニメ（opacity0→1）まで止めていた**。→ 一時停止セレクタに `:not(.snackbar-stack):not(.snackbar-stack *)` を追加。併せて `.snackbar-stack` の z-index を 90→2000（最前面）。
 
-### D. 残タイミング分散＋決定的3件（`58e5799`・`8d4e1a4`）
-- `retries: 2`（`playwright.config.ts`）＝各テスト単体 green・実行毎に落ちる顔ぶれが変わる非決定分散を吸収（実バグは全試行で落ちマスクされない）。
-- retries でも残る決定的3件を個別修正＝**sc-92c B-TC-116**（曖昧ロケータ→検索チップ「🔍 "code"✕」と二重一致→`getByRole("cell")`）／**sc-99-appnav M-TC-002**（ドロワー開閉アニメ中の空振り→`is-open` 待ち）／**sc-99-scroll-restore M-TC-013/014**（復元位置の単発読み→近傍まで poll）。
-- **sc-22-attachments D-TC-218**（実は test setup バグ）＝ヘルパが添付を別API直POSTで足すだけで版に載らず、公開時 rev1（添付なし）と正味同値で削除しても版が増えなかった。設計は「添付だけの変更でも保存で版が増える」（D-TC-145/D-TC-234・**product は正**）。同値PATCHで添付を rev2 に確定→削除保存=rev3 とし、削除が版差分に出ることを正しく検証。メモリ `idea-attachment-revision-versioning`。
+## 4. 現在の状態（本セッションで確認）
+- **稼働コンテナ**＝backend/db/redis/mailhog/minio/frontend/worker/mail-worker **すべて running**（frontend は本セッション最終コードで `--build` 済）。
+- **backend**＝`tests/info` 67 passed／`tests/admin` 107 passed／新規 api テスト（C-TC-285/286・D-TC-235/236）4 passed（いずれも `-v` マウントで確認）。
+- **frontend `npm run build`**＝Compiled successfully（必須ゲート・都度通過）。
+- **e2e（targeted）**＝`sc-52-info-link-ops.spec.ts`（N-TC-220/221/222）・`sc-12-related-info.spec.ts`（C-TC-287/288）＝各 green。
+- **TC トレーサビリティ**＝`python3 scripts/check_tc_traceability.py` ✅ **742件**。
+- **壊れているもの**＝認識範囲で無し。**未確認**＝FR-41 の**ブラウザ実機受入は SC-12 まで**（ユーザーは slice ごとに確認する運用）／全 vitest／全 e2e 一括（アーク A の非決定フレークが残る想定）。
 
-## 4. 現在の状態（本セッションで実行・確認）
-- **全 e2e 並列(workers=7)**＝**138 passed / 6 flaky(retryで回復) / 3 failed**（前=78/67）。TC トレーサビリティ ✅ 733（新規TC-IDなし＝既存テストの隔離強化）。
-- **backend**＝`tests/admin` フル 107 passed（083b/083c 含む・-v マウント）。
-- 稼働コンテナ＝backend/db/redis/mailhog/minio/frontend/worker/mail-worker とも Up（backend は `e2e-session`/`e2e-pwreset` seed 済で `--build` 済）。
-- 壊れているもの＝認識範囲で無し（§5 の負荷依存フレークを除く）。
+## 5. 詰まっている点 / 試して失敗したこと（＝次回同じ轍を踏まない）
+- **完了トーストが見えない**＝最初 z-index を疑い 90→2000 にしたが**直らなかった**。真因は §3B の「modal-open の背景アニメ停止が snackbar の登場アニメ(opacity0→1)を止め、opacity0 のまま裏に居た」。**教訓＝Playwright の `toBeVisible()` は opacity:0 を「見える」と判定する**ので見逃す→ **computed opacity>0 を assert**（N-TC-220 で追加済み）。
+- **棄却リンクが「選択済0件」**＝`existing` を `!rejected` でフィルタしていたため。だが `find_link` は棄却行も 409 にする→ピッカーから再追加すると矛盾。→ 棄却も除外対象に含め、折り畳みに「棄却済み・戻すで復活」表示（N-TC-222）。
+- **`info_links.created_by_id` は当初「共通監査列で装備済み」と誤認**＝実際は `InfoLink` に無く、migration `0031` で追加した（`CompanyBase` は素の DeclarativeBase で監査列を自動付与しない）。
+- **cwd の罠（再掲・実際に2回踏んだ）**＝`docker compose up`（cwd=impl）の直後に `npx playwright test` を同じ Bash で叩くと「No tests found」。**Playwright は必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl/frontend` から**。
 
-## 5. 詰まっている点 / 未確認
-- **残 3 failed は全て負荷依存の非決定フレーク**＝実行毎に顔ぶれが変わり（今回は `sc-01-dashboard-notif I-TC-144/I-TC-155`・`sc-01-dashboard D-TC-226`）、**いずれも単体（--workers=1/2）では 100% green**＝7ワーカ CPU 競合で重いダッシュボード描画が retry も含めタイムアウトする現象。**実バグではない**。ユーザー判断で「ここで区切る」＝これ以上の per-test 追い込みはしない方針（移動標的）。
-- 日常は従来通り **targeted 実行**（`npx playwright test e2e/<spec> --workers=1 --grep <TC>`）または全並列を回すなら **workers を 4〜5 に落とす**と重いページも安定する（未コミットの運用ノウハウ・必要なら config 化）。次に green を厳密に詰めるなら `retries:3` か workers 抑制が候補（§7）。
-- **未確認**＝frontend 全 vitest（本セッション未実行）。
+## 6. 決定事項と根拠（不採用案も）
+- **関連情報パネルの UI＝自動カルーセルは不採用**（reduce-motion 停止で無意味化／見逃し／⚠反証が隠れる／入れ子モーダル）。→ **ユーザー操作の横スクロール棚＋⚠反証先頭固定＋⤢最大化（SC-13 流用の Modal）**。
+- **配置**＝SC-12 は「新着の議論/活動の活発さ の下・KPI/ランキングの上（全幅ストリップ・ゲーム非依存）」（ユーザー確定）。SC-22 は「評価結果の下（右レール・`variant="rail"`）」＝**未実装（次の主タスク）**。
+- **種別選択はダイアログ本文の3セクション**（絞り込み→設定する種別→絞り込み結果）。「選択を確定」で選んだ種別のまま追加。
+- **追加/種別変更/棄却＝会社内 active 全員**（情報側 N.3）。「＋追加」は逆向きピッカー（`GET /info-items`＋`POST /info-links`）で**新規EPなし**。**採否・「処理済み」入力（管理権限者）は Phase 2**（別スコープ）。**割り振り＋議論チャットも Phase 2**（コンセプト機能のチャット一般化と統合＝チャット乱立を避けるため単独実装しない）。
+- **手動リンクは「関連付けた人」をアバター＋氏名で表示**（`info_links.created_by_id`・auto は system＝表示なし）。
 
-## 6. 決定事項と根拠
-- **e2e 認証は storageState 方式**（共有 user@acme を1回ログイン再利用）＝レート制限バケット共有の根絶。破棄系（全端末ログアウト/パス再設定完了/権限変更）は必ず**専用垢**で（`e2e-session`/`e2e-pwreset`）＝共有セッションを壊さない。
-- **データ後始末は teardown project に集約**（各 spec 個別の finally は UI 操作自体がフレークになりやすいため）。テスト専用パターンのみ削除・seed 不可侵。
-- **残る負荷依存分散は retries=2 で吸収**（実バグはマスクされない）。ノイズ隠しではない＝systemic 要因は解消済み、という判断。
-- **添付だけの編集で版が増える**のは設計（D-TC-145/D-TC-234）＝product は正。D-TC-218 の失敗はテスト setup が添付を版に確定していなかったバグ。
-
-## 7. 次にやること（優先順）
-1. **（任意）全並列を厳密 green にするなら**＝`playwright.config.ts` を `retries:3` か、全並列運用を workers=4〜5 に。重い sc-01 ダッシュボード群の CPU 競合タイムアウトが主因。着手前に §5 の「単体では green」を再確認。
-2. **前セッション由来の残**＝SC-50 ⑥作成者モードで要約 read 非表示（§79 解釈をユーザー確認・メモリ `internal-review-remaining-items`）／反証の要再評価フラグ（§3.5）／コンセプト機能設計（メモリ `concept-feature-design-split`・`fr39-iso-mapping-superseded`）。`doc/実装計画.md` で次ドメイン確認。
-3. **システムログ フェーズ2**（`doc/本番デプロイ要件.md §6.6` TODO・持ち越し）＝集約基盤転送/長期アーカイブ(WORM)/異常検知。メモリ `system-logging-mechanism`。
+## 7. 次にやること（優先順・具体的に）
+1. **slice②＝SC-22（アイデア詳細）に RelatedInfoPanel を結線**（FR-41 Phase1 の最後）:
+   - `impl/frontend/src/features/ideas/components/IdeaDetailView.tsx` の**右レール「評価結果」パネル（§4.6・`evalAgg` 描画箇所）の下**に `import { RelatedInfoPanel } from "@/features/info-input";` して `<RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="rail" />` を追加（`ideaId` は既存の prop/変数を確認して使用）。
+   - e2e 追加＝`e2e/sc-22-related-info.spec.ts`（**D-TC-2xx**・SC-12 の `sc-12-related-info.spec.ts` を雛形に／API で quest+idea 作成→情報を related-info でリンク→`/ideas/{id}` で `.ri-panel` 表示＋「＋追加」）。TC 行を `doc/テスト/D_アイデア.md` に先行追記→`check_tc_traceability.py` ✅。
+   - `npm run build`→`docker compose up -d --build frontend`→targeted e2e→**ユーザーに実機受入**（backend-connection-per-screen-loop）。
+2. **（任意）「一致度 0.82」表記の見直し**＝ユーザーは以前 OK と回答済み（現状維持で可）。
+3. **Phase 2（別スコープ・要ユーザー着手判断）**＝成果物側の採否・「処理済み」入力（管理権限者）／割り振り＋議論チャット（コンセプト機能のチャット一般化と統合）。
+4. **前セッション由来の残**＝コンセプト機能設計（正本ドラフト `doc/設計ドラフト/コンセプト機能_ISO56002_再設計.md`・メモリ `concept-feature-design-split`/`fr39-iso-mapping-superseded`＝FR-39 の ISO 対応は「置換済み」＝要件定義 README で反映済み）／システムログ フェーズ2（`doc/本番デプロイ要件.md §6.6`・メモリ `system-logging-mechanism`）。`doc/実装計画.md` で次ドメイン確認。
 
 ## 8. 再開に必要な環境情報
 - **リポジトリ直下**=`/home/t-umekawa/sc-ideaquest-G2`。compose=**`impl/compose.yaml`**（`docker-compose.yml` は無い＝罠）。docker は **cwd=`impl/`**。
-- **起動**: `cd impl && docker compose up -d`。**frontend/backend はソースをベイク（volumes 無）**＝コード反映は **`docker compose up -d --build frontend`**（または backend）。**bootstrap は backend の entrypoint で毎起動実行（冪等）**＝`_SEEDS` 追加後は `--build backend` で再 seed（本セッションで `e2e-session`/`e2e-pwreset` を追加済）。
-- **e2e（Playwright）**: host で実行し `http://localhost:3000`＝frontend コンテナを叩く（メモリ `frontend-baked-e2e-needs-build`）。**認証は storageState**＝`e2e/auth.setup.ts`（setup project）が `playwright/.auth/user.json` を作り、末尾に `e2e/auth.cleanup.ts`（cleanup project）がテストデータを掃除。各 Bash は絶対パスで `cd impl/frontend` から始める（repo ルートに cd 済だと `npx playwright` が「No tests found」＝罠）。
-  - 全並列＝`cd impl/frontend && npx playwright test --workers=7`（重いなら 4〜5）。targeted＝`npx playwright test e2e/<spec> --workers=1 --grep "<TC-ID>"`。
-  - 破棄系 e2e（パス変更成功/全端末ログアウト/権限変更）を新規追加するなら**専用垢**を使う（共有 user@acme を壊さない）。作成系はテスト専用の識別パターン（接頭辞/一意タグ）を付け cleanup が拾えるように。フォーム閉/行存在の判定は `getByText` 部分一致を避け role/exact で（トースト/検索チップ二重一致の罠）。
-- **backend テスト**: `cd impl && docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/<domain> -q`（`-v` で未コミット反映）。**pytest 前に `docker compose stop worker mail-worker`**（共有 control DB の *_outbox 競合回避）→終わったら start。
+- **起動**: `cd impl && docker compose up -d`。**frontend/backend はソースをベイク（volumes 無）**＝コード反映は **`docker compose up -d --build frontend`**（または backend）。**backend の `_SEEDS`/migration 追加後は `--build backend`**（entrypoint が bootstrap＝DB作成/migrate/seed を毎起動・冪等）。
+- **frontend 検証**: `cd impl/frontend && npm run build`（必須ゲート＝Next lint 含む）。
+- **e2e（Playwright）**: **必ず `cd /home/t-umekawa/sc-ideaquest-G2/impl/frontend` から** `npx playwright test e2e/<spec> --workers=1`（フルスタック起動＋frontend `--build` が前提。host の Playwright が `http://localhost:3000` のコンテナを叩く）。認証は **storageState 方式**（`e2e/auth.setup.ts` が既定・spec 側は再ログイン不要）／破棄系は `test.use({storageState:{cookies:[],origins:[]}})`／末尾で `e2e/auth.cleanup.ts` がテストデータを掃除／`retries:2`。作成系 e2e は必ず後始末（try/finally で DELETE）。
+- **backend テスト**: `cd impl && docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/<domain> -q`（`-v` で未コミット反映）。**pytest 前に `docker compose stop worker mail-worker`**（*_outbox 競合回避）→終わったら start。
+- **TC トレーサビリティ**: `cd <repo root> && python3 scripts/check_tc_traceability.py`（現在 742件・TC-ID＝`[A-Z]-TC-\d{3}`）。コミット前に ✅ を確認。**TC はコードより先に `doc/テスト/<ドメイン>_*.md` に行追加**（`根拠` 列付き）。
 - **ポート**: frontend 3000 / backend 8000（`/api/v1`・health=`/healthz`）/ db 5432 / redis 6379 / minio 9000・9001 / mailhog 1025・8025。
-- **ログイン**: `user@acme.example`/`ACME-01`/`Passw0rd!`＝一般（多くの e2e の owner・storageState の主体）。`kanri@acme.example`＝company_account_admin。`admin@ops.example`/`OPS`＝system_admin。`e2e-session@acme.example`＝全端末ログアウト e2e 専用。`e2e-pwreset@acme.example`＝パス再設定 e2e 専用。認証は Cookie セッション、状態変更 API は `iq_csrf` Cookie を `X-CSRF-Token` に載せる。
-- **DB 名の会社別命名（罠）**: control=`ideaquest_control`／ops=`ideaquest_ops`／ACME=`ideaquest_company_acme`／ACME2=`ideaquest_company_acme2`／システムコンシェルジュ=`db_systemcon`。ユーザー/パス=ideaquest。
-- **TC トレーサビリティ**: `cd <repo root> && python3 scripts/check_tc_traceability.py`（733件）。コミット前に ✅。
-- **設計正本**: `CLAUDE.md`（毎回自動ロード）から各規約・正本へ。メモリ index=`~/.claude/projects/-home-t-umekawa-sc-ideaquest-G2/memory/MEMORY.md`（本セッションで `e2e-storagestate-auth`・`shared-account-logout-all-e2e-cascade`・`idea-attachment-revision-versioning` を追加・`admin-directory-tests-flaky` を解消済に更新）。
+- **ログイン**: `user@acme.example`/`ACME-01`/`Passw0rd!`＝一般（多くの e2e の owner・storageState の主体）。`kanri@acme.example`＝company_account_admin。`admin@ops.example`/`OPS`＝system_admin。`e2e-session@acme.example`＝全端末ログアウト e2e 専用。`e2e-pwreset@acme.example`＝パス再設定 e2e 専用。認証は Cookie セッション、状態変更 API は `iq_csrf` Cookie を `X-CSRF-Token` に載せる（`page.request`/curl 検証時）。
+- **DB 名（罠）**: control=`ideaquest_control`／ops=`ideaquest_ops`／ACME=`ideaquest_company_acme`／ACME2=`ideaquest_company_acme2`／システムコンシェルジュ=`db_systemcon`。ユーザー/パス=ideaquest。
+- **設計正本/メモリ**: `CLAUDE.md`（毎回自動ロード）から各規約・正本へ。メモリ index=`~/.claude/projects/-home-t-umekawa-sc-ideaquest-G2/memory/MEMORY.md`（本セッションで `e2e-storagestate-auth`・`shared-account-logout-all-e2e-cascade`・`idea-attachment-revision-versioning` を追加・`admin-directory-tests-flaky` を解消済に更新）。
 
 ---
 ### 自己チェック（本ファイルだけで再開できるか）
-- 起動/再ビルド（bootstrap は entrypoint 毎起動・_SEEDS 追加は --build backend）/e2e（storageState 認証・cleanup project・cwd 絶対パス罠）/backend テスト（-v＋worker 停止）/ログイン（専用垢2つ含む・Cookie+CSRF）/ポート/DB名罠/compose ファイル名罠＝記載済。
-- 本セッションの全スライス（A 全端末ログアウト衝突＋083／B storageState／C teardown＋SC-93／D retries＋決定的3件＋D-TC-218）＝対応ファイル/関数/TC-ID/コミット付きで記載。
-- 残 3 failed の性質（負荷依存・単体green・実バグでない）と、厳密 green の手段（retries:3 / workers 抑制）＝明記＝過信防止。
+- 起動/再ビルド（frontend/backend ベイク＝--build・_SEEDS/migration 後は --build backend）/e2e（storageState 認証・cleanup teardown・retries・**cd impl/frontend の罠**）/backend テスト（-v＋worker 停止）/TC 先行＋トレーサビリティ/ログイン（専用垢2つ含む・Cookie+CSRF）/ポート/DB名罠/compose ファイル名罠＝記載済。
+- FR-41 の到達点（backend read EP＋created_by_id migration／TargetPicker 改善／RelatedInfoPanel を SC-12 に結線＋AddRelatedInfoDialog／トースト・棄却・並び順の各修正）と**次の主タスク＝SC-22 右レール結線**をファイル/関数レベルで記載。
+- 失敗した診断（トースト z-index 誤診→真因は modal-open のアニメ停止・toBeVisible は opacity0 を拾わない／created_by_id 未装備の誤認）を §5 に記録＝再発防止。
