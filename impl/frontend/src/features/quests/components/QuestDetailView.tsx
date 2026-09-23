@@ -518,10 +518,6 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
       <Link className="backlink backlink--float" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link>
 
-      {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝詳細の最上部（クエストKPI/
-          クエスト内ランキングの上）に全幅で常時表示（ユーザー要望）。 */}
-      <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
-
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">
         {/* ヘッダー＋クエスト内アクティビティを2段組（レビュー#3＝ヘッダーの空白を活かす）。 */}
@@ -622,6 +618,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           </section>
           </div>
         )}
+
+        {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝新着の議論／活動の活発さ の下・
+            クエストKPI／クエスト内ランキング の上に全幅で常時表示（ユーザー要望）。ゲームモードに依らず表示。 */}
+        <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
 
         {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}
         {gameEnabled && (
