@@ -518,6 +518,10 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
           href は右クリック/新規タブ/JS 無効時のフォールバック（クエリなしの素の一覧）。 */}
       <Link className="backlink backlink--float" href="/quests" onClick={(e) => { e.preventDefault(); backToListOr(router, "/quests"); }}>{questBackLabel}</Link>
 
+      {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝詳細の最上部（クエストKPI/
+          クエスト内ランキングの上）に全幅で常時表示（ユーザー要望）。 */}
+      <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
+
       {/* ヘッダー＋クエスト内週間ランキング */}
       <div className="quest-top">
         {/* ヘッダー＋クエスト内アクティビティを2段組（レビュー#3＝ヘッダーの空白を活かす）。 */}
@@ -665,9 +669,6 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         </div>
         )}{/* .quest-panels */}
       </div>
-
-      {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝タブの上に全幅で常時表示。 */}
-      <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
 
       {/* タブ（🏁 結果は常時表示＝途中経過も見られる。完了前は「暫定」を明示・FR-39） */}
       <div id="quest-tabs" className="tabs" role="tablist" aria-label="クエスト詳細のセクション">
