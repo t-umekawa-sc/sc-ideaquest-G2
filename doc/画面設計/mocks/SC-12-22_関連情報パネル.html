@@ -35,6 +35,16 @@
   .ri-head__spacer { flex: 1; }
   .ri-head__btn { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius); padding: 4px 10px; cursor: pointer; font-size: var(--text-sm); }
   .ri-head__btn:hover { border-color: var(--color-primary); }
+  .ri-head__btn--add { border-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
+  .mk-divider { border: 0; border-top: 1px solid var(--color-border); margin: 12px 0; }
+  .mk-sec-title { font-size: var(--text-sm); font-weight: 700; margin-bottom: 6px; }
+  .addm__body { padding: 16px; overflow: auto; }
+  .addm__foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--color-border); }
+  .info-pick { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+  .info-pick li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius); cursor: pointer; }
+  .info-pick li:hover { border-color: var(--color-primary); }
+  .info-pick__t { font-weight: 600; }
+  .info-pick__m { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 2px; }
 
   /* ===== 横スクロール棚（shelf・ユーザー操作） ===== */
   .ri-shelf-wrap { position: relative; padding: 12px; }
@@ -90,8 +100,10 @@
   <h1 style="font-size:var(--text-xl)">関連情報パネル モック — 横スクロール棚 → 最大化一覧 → 詳細</h1>
   <p class="demo-note">
     目立つヘッダー（件数＋⚠反証）＋<strong>⚠反証を先頭固定</strong>／横は<strong>ユーザー操作のスクロール棚</strong>（自動送りなし＝reduce-motion 安全）／
-    <strong>「⤢ 全画面で一覧」</strong>で最大化ダイアログ（SC-13 流用）→カードで<strong>情報詳細（SC-52）</strong>。Phase 1＝表示のみ。
+    <strong>「⤢ 全画面で一覧」</strong>で最大化ダイアログ（SC-13 流用）→カードで<strong>情報詳細（SC-52）</strong>。
+    <strong>「＋ 関連情報を追加」</strong>で既存情報を選んで種別付きで関連付け（成果物→情報の逆向き＝双方向・<strong>会社内 active 全員</strong>可）。
     由来＝🤖自動（system）／手動は<strong>関連付けた人のユーザーアバター＋氏名</strong>を表示（`info_links.created_by_id` を解決）。
+    ※表示・追加はここで、<strong>採否・処理（管理者の「処理済み」入力）は Phase 2</strong>。
   </p>
 
   <div class="demo-cols">
@@ -100,6 +112,7 @@
       <div class="ri-head">
         <span class="ri-head__title">🔗 関連情報 <span class="ri-head__count">5件</span> <span class="ri-head__alert">⚠ 反証 1</span></span>
         <span class="ri-head__spacer"></span>
+        <button class="ri-head__btn ri-head__btn--add" onclick="openAdd()">＋ 関連情報を追加</button>
         <button class="ri-head__btn" onclick="openMaxi()">⤢ 全画面で一覧</button>
       </div>
       <div class="ri-shelf-wrap">
@@ -146,7 +159,8 @@
       <div class="ri-head">
         <span class="ri-head__title">🔗 関連情報 <span class="ri-head__count">5件</span> <span class="ri-head__alert">⚠ 1</span></span>
         <span class="ri-head__spacer"></span>
-        <button class="ri-head__btn" onclick="openMaxi()">⤢</button>
+        <button class="ri-head__btn ri-head__btn--add" onclick="openAdd()" title="関連情報を追加">＋</button>
+        <button class="ri-head__btn" onclick="openMaxi()" title="全画面で一覧">⤢</button>
       </div>
       <div class="ri-shelf-wrap">
         <button class="ri-arrow prev" aria-label="前へ" onclick="scrollShelf(-1,'shelf2')">‹</button>
@@ -198,12 +212,76 @@
   </div>
 </div>
 
+<!-- ===== 関連情報を追加ダイアログ（成果物→情報＝逆向きピッカー・情報側の対象ピッカーと同じ体裁） ===== -->
+<div class="maxi" id="addm" role="dialog" aria-modal="true" aria-label="関連情報を追加">
+  <div class="maxi__panel" style="width:min(720px,92vw); height:min(82vh,780px)">
+    <div class="maxi__head">
+      <strong>＋ 関連情報を追加</strong>
+      <button class="maxi__x" aria-label="閉じる" onclick="closeAdd()">✕</button>
+    </div>
+    <div class="addm__body">
+      <!-- 1) 情報を絞り込み -->
+      <div class="mk-sec-title">🔍 情報を絞り込み</div>
+      <input class="input" type="search" placeholder="🔍 情報のタイトル・本文で検索…" style="width:100%" aria-label="情報を検索" />
+      <div style="display:flex; gap:14px; margin-top:8px; flex-wrap:wrap; color:var(--color-text-muted); font-size:var(--text-xs)">
+        <label class="checkbox"><input type="checkbox" checked /><span>🟢 機会</span></label>
+        <label class="checkbox"><input type="checkbox" checked /><span>🔴 脅威</span></label>
+        <label class="checkbox"><input type="checkbox" checked /><span>その他</span></label>
+      </div>
+
+      <hr class="mk-divider" />
+      <!-- 2) 設定する種別 -->
+      <div class="mk-sec-title">🏷️ 設定する種別</div>
+      <select class="select" style="min-width:10em" aria-label="関連付ける種別">
+        <option>関連</option><option>裏付け</option><option>反証</option>
+      </select>
+      <div class="demo-note">選んだ情報をこの成果物に、この種別で関連付けます（「反証」は情報/成果物の作成者＋評価者へ通知＋要再評価）。</div>
+
+      <hr class="mk-divider" />
+      <!-- 3) 絞り込み結果（情報一覧・チェックで選択） -->
+      <div class="mk-sec-title">📋 絞り込み結果 <span class="demo-note">該当 12+ 件 ・ 選択 1 件</span></div>
+      <ul class="info-pick">
+        <li onclick="this.querySelector('input').checked=!this.querySelector('input').checked">
+          <input type="checkbox" checked aria-label="選択" />
+          <div>
+            <div class="info-pick__t">競合A社が同等機能を無料提供開始（プレスリリース）</div>
+            <div class="info-pick__m">🔴 脅威 ・ 出典あり ・ 2026-09-20 登録 ・ 情報 花子</div>
+          </div>
+        </li>
+        <li onclick="this.querySelector('input').checked=!this.querySelector('input').checked">
+          <input type="checkbox" aria-label="選択" />
+          <div>
+            <div class="info-pick__t">経産省 DX 推進補助金 2026 要件緩和</div>
+            <div class="info-pick__m">🟢 機会 ・ 2026-09-18 登録 ・ 開発 太郎</div>
+          </div>
+        </li>
+        <li onclick="this.querySelector('input').checked=!this.querySelector('input').checked">
+          <input type="checkbox" aria-label="選択" />
+          <div>
+            <div class="info-pick__t">社内アンケート：部門横断の情報共有に課題（120名）</div>
+            <div class="info-pick__m">その他 ・ 2026-09-15 登録 ・ 営業 次郎</div>
+          </div>
+        </li>
+      </ul>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" type="button">もっと見る</button></div>
+      <div class="demo-note" style="margin-top:8px">※新規に情報を登録したい場合は「情報を登録」（SC-50）から。ここは既存情報を選んで関連付けます。追加は<strong>会社内 active 全員</strong>可。</div>
+    </div>
+    <div class="addm__foot">
+      <button class="btn btn-outline" type="button" onclick="closeAdd()">キャンセル</button>
+      <button class="btn btn-primary" type="button" onclick="closeAdd()">選択を確定（1件）</button>
+    </div>
+  </div>
+</div>
+
 <script>
   function scrollShelf(dir, id){ const el = document.getElementById(id || 'shelf'); el.scrollBy({ left: dir * 320, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
   function openMaxi(){ document.getElementById('maxi').classList.add('is-open'); }
   function closeMaxi(){ document.getElementById('maxi').classList.remove('is-open'); }
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMaxi(); });
+  function openAdd(){ document.getElementById('addm').classList.add('is-open'); }
+  function closeAdd(){ document.getElementById('addm').classList.remove('is-open'); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeMaxi(); closeAdd(); } });
   document.getElementById('maxi').addEventListener('click', e => { if (e.target.id === 'maxi') closeMaxi(); });
+  document.getElementById('addm').addEventListener('click', e => { if (e.target.id === 'addm') closeAdd(); });
 </script>
 </body>
 </html>
