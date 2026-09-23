@@ -165,17 +165,20 @@ def test_b_tc_083_company_directory_minimal_projection(client, factory, qg):
 
 def test_b_tc_083c_company_directory_excludes_group_members(client, factory, qg):
     """B-TC-083c exclude_group_id で当該グループの既参加者を候補から除外（メンバー追加ピッカー・SC-90）。"""
-    admin_acc = qg.new_account()
+    # 一意タグを display_name に付け、ディレクトリを q で絞る＝永続DBの蓄積・ページング（per_page=20）に
+    # 依存せず当該2アカウントだけを見る（フレーク対策・admin/member 共有タグで両方が q にヒット）。
+    tag = f"QGDir83c-{uuid.uuid4().hex[:8]}"
+    admin_acc = qg.new_account(display_name=tag)
     g1 = qg.make_group()
     qg.seed_membership(g1, admin_acc["id"], "admin")
-    member_acc = qg.new_account()
+    member_acc = qg.new_account(display_name=tag)
     qg.seed_membership(g1, member_acc["id"], "member")
     qg.login(admin_acc)
 
-    ids = {i["account_id"] for i in client.get(DIRECTORY).json()["data"]}
+    ids = {i["account_id"] for i in client.get(f"{DIRECTORY}?q={tag}").json()["data"]}
     assert str(member_acc["id"]) in ids  # 除外なし＝候補に含まれる
 
-    r = client.get(f"{DIRECTORY}?exclude_group_id={g1}")
+    r = client.get(f"{DIRECTORY}?q={tag}&exclude_group_id={g1}")
     assert r.status_code == 200, r.text
     ids2 = {i["account_id"] for i in r.json()["data"]}
     assert str(member_acc["id"]) not in ids2  # g1 の既参加者は候補から消える
@@ -184,7 +187,9 @@ def test_b_tc_083c_company_directory_excludes_group_members(client, factory, qg)
 
 def test_b_tc_083b_company_directory_avatar_is_signed_url(client, factory, qg, storage):
     """B-TC-083b ディレクトリの avatar_url は短TTL 署名URL（生の物理パスを漏らさない・K.4/§1.10）。"""
-    admin_acc = qg.new_account()
+    # 一意タグで q 絞り込み＝蓄積・ページングに依存せず対象行を得る（フレーク対策）。
+    tag = f"QGDir83b-{uuid.uuid4().hex[:8]}"
+    admin_acc = qg.new_account(display_name=tag)
     g1 = qg.make_group()
     qg.seed_membership(g1, admin_acc["id"], "admin")
     # 当人に物理パスを直接セット（画像本体は不要・presigned だけ検証）。
@@ -194,7 +199,7 @@ def test_b_tc_083b_company_directory_avatar_is_signed_url(client, factory, qg, s
         ts.commit()
     qg.login(admin_acc)
 
-    row = next(i for i in client.get(DIRECTORY).json()["data"] if i["account_id"] == str(admin_acc["id"]))
+    row = next(i for i in client.get(f"{DIRECTORY}?q={tag}").json()["data"] if i["account_id"] == str(admin_acc["id"]))
     assert row["avatar_url"].startswith("https://minio.test/avatars/xyz.png?")  # 署名URL（sig 付き）
     assert row["avatar_url"] != "avatars/xyz.png"  # 生パスそのままではない
 

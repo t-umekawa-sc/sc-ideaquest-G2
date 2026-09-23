@@ -54,7 +54,24 @@ SEED_MFA_ACCOUNT = {
     "status": "active",
 }
 
-_SEEDS = [(SEED_COMPANY, SEED_ACCOUNT), (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT)]
+# セッション破棄系 e2e（全端末ログアウト A-TC-022）専用の隔離アカウント。共有の user@acme を
+# 使うと logout_all が並列ワーカ全員のセッションを巻き込み session_expired が多発する（e2e フレーク）。
+# 専用垢に分離＝他 spec と衝突しない。非prod（demo seed 有効時）のみ作成。
+SEED_E2E_SESSION_ACCOUNT = {
+    "login_id": "e2e-session@acme.example",
+    "email": "e2e-session@acme.example",
+    "display_name": "E2E セッション",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "general",
+    "status": "active",
+}
+
+_SEEDS = [
+    (SEED_COMPANY, SEED_ACCOUNT),
+    (SEED_COMPANY, SEED_E2E_SESSION_ACCOUNT),
+    (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT),
+]
 
 
 def _seed_demo_enabled(app_env: str) -> bool:

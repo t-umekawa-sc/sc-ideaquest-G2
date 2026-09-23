@@ -213,7 +213,7 @@ def factory():
             return {"id": a.id, "login_id": lid, "password": password}
 
     def _make_real_account(company: Company, prefix: str, password_set: bool, status: str,
-                           system_role: str = "general") -> dict:
+                           system_role: str = "general", display_name: str = "Seed Test") -> dict:
         """実在の会社DBを持つシード会社配下にアカウント＋users ミラーを作る（成功認証パス用）。
 
         complete→login の往復や MFA verify 成功（会社DBミラー解決）に使う。`system_role` で
@@ -229,7 +229,7 @@ def factory():
                 company_id=company.id,
                 login_id=lid,
                 email=lid,
-                display_name="Seed Test",
+                display_name=display_name,
                 password_hash=hash_password(password) if password_set else None,
                 locale="ja",
                 system_role=system_role,
@@ -238,16 +238,22 @@ def factory():
             s.commit()
         created_accounts.append(aid)
         with get_tenant_session(company.db_identifier) as ts:
-            ts.add(User(id=uuid.uuid4(), account_id=aid, display_name="Seed Test", locale="ja", status="active"))
+            ts.add(User(id=uuid.uuid4(), account_id=aid, display_name=display_name, locale="ja", status="active"))
             ts.commit()
         created_users.append((company.db_identifier, aid))
         return {"id": aid, "login_id": lid, "password": password,
                 "company_code": company.company_code, "email": lid}
 
     def make_seed_company_account(password_set: bool = True, status: str = "active",
-                                  system_role: str = "general") -> dict:
-        """ACME-01（MFA OFF）配下の実アカウント。password-setup complete→login 等に使う。"""
-        return _make_real_account(_seed_company(), "pw", password_set, status, system_role)
+                                  system_role: str = "general",
+                                  display_name: str = "Seed Test") -> dict:
+        """ACME-01（MFA OFF）配下の実アカウント。password-setup complete→login 等に使う。
+
+        `display_name` はテスト隔離用に一意名を渡せる（company-directory を q で絞ると
+        永続DBの蓄積・ページングに依存せず対象行を取得できる＝B-TC-083b/083c のフレーク対策）。
+        """
+        return _make_real_account(_seed_company(), "pw", password_set, status, system_role,
+                                  display_name=display_name)
 
     def make_seed_mfa_account(status: str = "active") -> dict:
         """ACME-02（MFA ON）配下の実アカウント。login→OTP→mfa/verify 成功パスに使う（ADR-0004）。"""
