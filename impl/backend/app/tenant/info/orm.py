@@ -79,6 +79,8 @@ class InfoLink(CompanyBase):
     score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
     # 棄却＝行は残す。再計算の upsert は rejected_at を尊重＝棄却済み auto は復活しない（§N.6）。
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 手動で関連付けた人（origin=manual）。auto は system 生成＝NULL（成果物側パネルの「関連付けた人」表示・§5.35）。
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
 
 class InfoToken(CompanyBase):

@@ -130,6 +130,30 @@ def get_idea_detail(account_id, company_id, idea_id) -> dict:
         return _build_detail(ts, idea, user.id)
 
 
+def get_idea_related_info(account_id, company_id, idea_id, *, limit: int = 50) -> dict:
+    """アイデアの関連情報（D・SC-22 右レール・FR-41）。門番＝`get_idea_detail` と同一（範囲外 404）。
+
+    `info_links`（`target_type='ideas'`）を成果物側 read で返す（N.1 委譲）。表示のみ（Phase 1）。
+    """
+    from app.tenant.info import application as info_service  # 遅延 import（info→ideas の逆参照で循環を避ける）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        if idea.status == "draft" and idea.author_id != user.id:
+            raise AppError(404, "not_found")  # 下書きは本人のみ
+        if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
+            raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0）
+        return {"data": info_service.related_info_for_target(ts, "ideas", iid, limit=limit)}
+
+
 # ---- 版・差分（D.4） ----
 
 

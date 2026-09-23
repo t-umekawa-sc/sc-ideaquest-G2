@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.ideas import application as idea_service
+from app.tenant.info.schemas import RelatedInfoResponse
 from app.tenant.ideas.schemas import (
     IdeaAttachmentDownloadResponse,
     IdeaAttachmentsResponse,
@@ -58,6 +59,20 @@ def get_idea(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
     return IdeaDetailDTO(**result)
+
+
+@router.get("/ideas/{idea_id}/related-info", response_model=RelatedInfoResponse)
+def get_idea_related_info(
+    idea_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=100),
+    session: dict = Depends(require_me),
+) -> RelatedInfoResponse:
+    """アイデアの関連情報（SC-22 右レール・D・FR-41）。門番＝アイデア詳細と同一（範囲外 404）。読取専用。"""
+    result = idea_service.get_idea_related_info(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, limit=limit,
+    )
+    return RelatedInfoResponse(**result)
 
 
 @router.get("/ideas/{idea_id}/revisions", response_model=IdeaRevisionListResponse)

@@ -289,6 +289,32 @@ def get_quest_detail(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         return _build_detail(ts, quest, user.id)
 
 
+def get_quest_related_info(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str,
+                           *, limit: int = 50) -> dict:
+    """クエストの関連情報（C.8b・SC-12 上部ストリップ・FR-41）。門番＝`get_quest_detail` と同一（範囲外 404）。
+
+    `info_links`（`target_type='quests'`）を成果物側 read で返す（N.1 委譲）。表示のみ（Phase 1）。
+    """
+    from app.tenant.info import application as info_service  # 遅延 import（info→quests の逆参照で循環を避ける）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.status == "draft":
+            if quest.owner_id != user.id:
+                raise AppError(404, "not_found")  # 下書きは本人だけ
+        elif not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # 公開系は C.0 門番
+        return {"data": info_service.related_info_for_target(ts, "quests", qid, limit=limit)}
+
+
 def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     """クエストを作成（C.2・SC-11）。作成者＝所有者（全権限）。status=recruiting は即公開扱い。
 

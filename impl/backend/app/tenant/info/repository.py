@@ -129,6 +129,28 @@ def link_counts_for_items(session: Session, ids: list[uuid.UUID]) -> dict[uuid.U
     return {iid: c for iid, c in rows}
 
 
+def list_links_for_target(session: Session, target_type: str, target_id: uuid.UUID,
+                          *, limit: int = 50) -> list[tuple[InfoLink, InfoItem]]:
+    """成果物→関連情報（C.8b／D＝`GET /{quest,idea}/related-info`）。`info_links` を target で引く。
+
+    `rejected_at IS NULL`＋情報が archived でないものを、一致度 `score` 降順（NULL 最後・
+    末尾 `info_item_id` で一意化）で上位 `limit` 件。DTO 整形は application 層で行う。
+    """
+    rows = session.execute(
+        select(InfoLink, InfoItem)
+        .join(InfoItem, InfoLink.info_item_id == InfoItem.id)
+        .where(
+            InfoLink.target_type == target_type,
+            InfoLink.target_id == target_id,
+            InfoLink.rejected_at.is_(None),
+            InfoItem.status != "archived",
+        )
+        .order_by(InfoLink.score.is_(None), InfoLink.score.desc(), InfoLink.info_item_id)
+        .limit(limit)
+    ).all()
+    return [(row[0], row[1]) for row in rows]
+
+
 def follow_up_counts_for_items(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     """情報ごとの続報件数（parent_info_id 参照・§12-1）。"""
     if not ids:
@@ -264,10 +286,14 @@ def find_link(session: Session, info_item_id: uuid.UUID, target_type: str, targe
 
 
 def create_link(session: Session, *, info_item_id: uuid.UUID, target_type: str, target_id: uuid.UUID,
-                kind: str = "related", origin: str = "manual") -> InfoLink:
-    """手動リンクを1件作成（origin=manual・既定 kind=related・§N.3）。重複検出は呼び出し側で。"""
+                kind: str = "related", origin: str = "manual",
+                created_by_id: uuid.UUID | None = None) -> InfoLink:
+    """手動リンクを1件作成（origin=manual・既定 kind=related・§N.3）。重複検出は呼び出し側で。
+
+    `created_by_id`＝関連付けた人（成果物側パネルの `linked_by` 表示・§5.35）。auto は NULL。
+    """
     link = InfoLink(info_item_id=info_item_id, target_type=target_type, target_id=target_id,
-                    kind=kind, origin=origin)
+                    kind=kind, origin=origin, created_by_id=created_by_id)
     session.add(link)
     return link
 

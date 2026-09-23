@@ -16,7 +16,10 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from decimal import Decimal
+
 from app.tenant.ideas.orm import Idea
+from app.tenant.info.orm import InfoItem, InfoLink
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group import repository as qg_repo
@@ -303,3 +306,70 @@ def test_c_tc_108_sort_cursor_stable(client, env):
         assert set(ids1).isdisjoint(ids2)
     finally:
         _delete_ideas(env.db_identifier, idea_ids)
+
+
+# ---- C.8b 関連情報（成果物→情報・FR-41・SC-12 上部ストリップ） ----
+RELATED_INFO_Q = "/api/v1/quests/{}/related-info"
+
+
+def _seed_info_link(db_identifier, *, target_type, target_id, created_by, title,
+                    kind="related", origin="auto", score=None, status="curated",
+                    rejected=False, source_url=None, impact_class=None, summary=None):
+    """情報＋リンクを1組直接 seed（EP を介さず決定的に用意）。返り値＝(info_id, link_id)。"""
+    info_id = uuid.uuid4()
+    link_id = uuid.uuid4()
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(InfoItem(id=info_id, title=title, status=status, created_by_id=created_by,
+                        summary=summary, source_url=source_url, impact_class=impact_class))
+        ts.add(InfoLink(id=link_id, info_item_id=info_id, target_type=target_type, target_id=target_id,
+                        kind=kind, origin=origin, score=score,
+                        created_by_id=(created_by if origin == "manual" else None),
+                        rejected_at=(datetime.now(timezone.utc) if rejected else None)))
+        ts.commit()
+    return info_id, link_id
+
+
+def _cleanup_info(db_identifier, info_ids):
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(info_ids)))
+        ts.execute(InfoItem.__table__.delete().where(InfoItem.id.in_(info_ids)))
+        ts.commit()
+
+
+def test_c_tc_285_quest_related_info(client, env):
+    """C-TC-285: クエストの関連情報＝score 降順・rejected/archived 除外・manual は linked_by（関連付けた人）。"""
+    qid = env.make_quest(status="recruiting")
+    auto_i, _ = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid, created_by=env.user_id,
+                                title="裏付け285", kind="supporting", origin="auto", score=Decimal("0.90"),
+                                impact_class="opportunity", summary="要約A")
+    man_i, _ = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid, created_by=env.user_id,
+                               title="反証285", kind="refuting", origin="manual", source_url="https://x.example")
+    rej_i, _ = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid, created_by=env.user_id,
+                               title="棄却285", origin="auto", score=Decimal("0.99"), rejected=True)
+    arc_i, _ = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid, created_by=env.user_id,
+                               title="アーカイブ285", origin="auto", score=Decimal("0.95"), status="archived")
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.get(RELATED_INFO_Q.format(qid))
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        ids = [d["info_id"] for d in data]
+        assert str(auto_i) in ids and str(man_i) in ids
+        assert str(rej_i) not in ids and str(arc_i) not in ids  # 棄却・archived は除外
+        assert ids.index(str(auto_i)) < ids.index(str(man_i))  # score 降順（auto 0.90 が NULL より前）
+        auto = next(d for d in data if d["info_id"] == str(auto_i))
+        man = next(d for d in data if d["info_id"] == str(man_i))
+        assert auto["origin"] == "auto" and auto["kind"] == "supporting" and auto["score"] == 0.90
+        assert auto["impact_class"] == "opportunity" and auto["linked_by"] is None  # auto は system＝linked_by なし
+        assert man["origin"] == "manual" and man["kind"] == "refuting" and man["source_url"] == "https://x.example"
+        assert man["linked_by"]["user_id"] == str(env.user_id)  # 手動＝関連付けた人（created_by_id）
+    finally:
+        _cleanup_info(env.db_identifier, [auto_i, man_i, rej_i, arc_i])
+
+
+def test_c_tc_286_quest_related_info_gate(client, env):
+    """C-TC-286: 門番＝クエスト詳細と同一。範囲外（非パーティー）／不明 ID は 404（存在秘匿）。"""
+    hidden = env.make_quest(status="recruiting", owner=env.other_user_id, party=True)  # seed 非参加
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    assert client.get(RELATED_INFO_Q.format(hidden)).status_code == 404
+    assert client.get(RELATED_INFO_Q.format(uuid.uuid4())).status_code == 404

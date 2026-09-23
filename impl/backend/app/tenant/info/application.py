@@ -79,6 +79,35 @@ def _match_snippet(title: str | None, body_text: str | None, q: str | None) -> s
     return ("…" if start > 0 else "") + hay[start:end] + ("…" if end < len(hay) else "")
 
 
+def related_info_for_target(ts, target_type: str, target_id: uuid.UUID, *, limit: int = 50) -> list[dict]:
+    """成果物→関連情報の DTO 群（C.8b／D＝`GET /{quest,idea}/related-info`・N.1 委譲の共通ビルダ）。
+
+    `info_links` を target で引き（rejected/archived 除外・score 降順）、`linked_by` は **manual のみ**
+    `created_by_id` を氏名/アバターに解決（auto は system 生成＝None）。門番は呼び元（C/D）で満たす前提。
+    """
+    rows = repo.list_links_for_target(ts, target_type, target_id, limit=limit)
+    manual_uids = {l.created_by_id for (l, _item) in rows if l.origin == "manual" and l.created_by_id}
+    users = repo.users_by_ids(ts, list(manual_uids)) if manual_uids else {}
+    data: list[dict] = []
+    for (link, item) in rows:
+        linked_by = None
+        if link.origin == "manual" and link.created_by_id and users.get(link.created_by_id):
+            linked_by = _creator_dto(users[link.created_by_id])
+        data.append({
+            "link_id": str(link.id),
+            "info_id": str(item.id),
+            "title": item.title,
+            "kind": link.kind,
+            "origin": link.origin,
+            "score": float(link.score) if link.score is not None else None,
+            "source_url": item.source_url,
+            "impact_class": item.impact_class,
+            "summary": item.summary,
+            "linked_by": linked_by,
+        })
+    return data
+
+
 def _card_dto(item, *, creator, categories, link_count, follow_up_count, q=None) -> dict:
     return {
         "id": str(item.id),
@@ -843,7 +872,8 @@ def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
         if repo.find_link(ts, info_id, body.target_type, target_id) is not None:
             raise AppError(409, "conflict", detail="既に関連付け済みです")
         link = repo.create_link(ts, info_item_id=info_id, target_type=body.target_type,
-                                target_id=target_id, kind=kind, origin="manual")
+                                target_id=target_id, kind=kind, origin="manual",
+                                created_by_id=user.id)  # 関連付けた人＝linked_by（§5.35・FR-41）
         ts.flush()
         title = repo.resolve_link_titles(ts, [link]).get(target_id)
         dto = _link_dto(link, title)

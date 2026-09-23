@@ -195,6 +195,25 @@ class InfoLinkDTO(BaseModel):
     rejected: bool = False
 
 
+class RelatedInfoItemDTO(BaseModel):
+    """成果物→関連情報パネルの1件（C.8b／D＝`GET /{quest,idea}/related-info`・FR-41）。"""
+
+    link_id: str
+    info_id: str
+    title: str
+    kind: str  # related / supporting / refuting（refuting は⚠）
+    origin: str  # auto / manual
+    score: float | None = None
+    source_url: str | None = None
+    impact_class: str | None = None  # opportunity / threat / other
+    summary: str | None = None
+    linked_by: InfoCreatorDTO | None = None  # manual のみ＝関連付けた人（auto は system＝None）
+
+
+class RelatedInfoResponse(BaseModel):
+    data: list[RelatedInfoItemDTO] = []
+
+
 class InfoThreadItemDTO(BaseModel):
     id: str
     title: str

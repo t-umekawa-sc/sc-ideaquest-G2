@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
+from app.tenant.info.schemas import RelatedInfoResponse
 from app.tenant.quests import application as quest_service
 from app.tenant.quests.schemas import (
     FollowResponse,
@@ -202,6 +203,20 @@ def get_quest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )
     return QuestDetailDTO(**result)
+
+
+@router.get("/quests/{quest_id}/related-info", response_model=RelatedInfoResponse)
+def get_quest_related_info(
+    quest_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=100),
+    session: dict = Depends(require_me),
+) -> RelatedInfoResponse:
+    """クエストの関連情報（SC-12 上部ストリップ・C.8b・FR-41）。門番＝クエスト詳細と同一（範囲外 404）。読取専用。"""
+    result = quest_service.get_quest_related_info(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, limit=limit,
+    )
+    return RelatedInfoResponse(**result)
 
 
 @router.get("/quest-groups", response_model=QuestGroupsResponse)

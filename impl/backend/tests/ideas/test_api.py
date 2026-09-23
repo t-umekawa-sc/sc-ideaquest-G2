@@ -16,6 +16,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.ideas import repository as repo
 from app.tenant.ideas.orm import Attachment, Follow, Idea, IdeaRevision, IdeaStakeholder, Vote
+from app.tenant.info.orm import InfoItem, InfoLink
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quest_group.orm import QuestGroup
@@ -1070,3 +1071,70 @@ def test_d_tc_229_no_change_patch_skips_revision_and_notification(client, env):
             ts.execute(_Notif.__table__.delete().where(_Notif.ref_idea_id == iid))
             ts.execute(Follow.__table__.delete().where(Follow.idea_id == iid))
             ts.commit()
+
+
+# ---- D 関連情報（成果物→情報・FR-41・SC-22 右レール） ----
+import uuid as _uuid
+from datetime import datetime as _dt, timezone as _tz
+from decimal import Decimal as _Dec
+
+RELATED_INFO_I = "/api/v1/ideas/{}/related-info"
+
+
+def _seed_info_link_i(db_identifier, *, target_id, created_by, title, kind="related",
+                      origin="auto", score=None, status="curated", rejected=False, source_url=None):
+    info_id = _uuid.uuid4()
+    with get_tenant_session(db_identifier) as ts:
+        ts.add(InfoItem(id=info_id, title=title, status=status, created_by_id=created_by, source_url=source_url))
+        ts.add(InfoLink(id=_uuid.uuid4(), info_item_id=info_id, target_type="ideas", target_id=target_id,
+                        kind=kind, origin=origin, score=score,
+                        created_by_id=(created_by if origin == "manual" else None),
+                        rejected_at=(_dt.now(_tz.utc) if rejected else None)))
+        ts.commit()
+    return info_id
+
+
+def _cleanup_info_i(db_identifier, info_ids):
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(info_ids)))
+        ts.execute(InfoItem.__table__.delete().where(InfoItem.id.in_(info_ids)))
+        ts.commit()
+
+
+def test_d_tc_235_idea_related_info(client, env):
+    """D-TC-235: アイデアの関連情報＝score 降順・rejected/archived 除外・manual は linked_by（関連付けた人）。"""
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid)
+    auto_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id, title="裏付け235",
+                               kind="supporting", origin="auto", score=_Dec("0.80"))
+    man_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id, title="反証235",
+                              kind="refuting", origin="manual", source_url="https://y.example")
+    rej_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id, title="棄却235",
+                              origin="auto", score=_Dec("0.99"), rejected=True)
+    arc_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id, title="アーカイブ235",
+                              origin="auto", score=_Dec("0.95"), status="archived")
+    try:
+        _login_seed(client)
+        r = client.get(RELATED_INFO_I.format(iid))
+        assert r.status_code == 200, r.text
+        data = r.json()["data"]
+        ids = [d["info_id"] for d in data]
+        assert str(auto_i) in ids and str(man_i) in ids
+        assert str(rej_i) not in ids and str(arc_i) not in ids
+        assert ids.index(str(auto_i)) < ids.index(str(man_i))  # score 降順（auto 0.80 が NULL より前）
+        man = next(d for d in data if d["info_id"] == str(man_i))
+        assert man["origin"] == "manual" and man["kind"] == "refuting"
+        assert man["linked_by"]["user_id"] == str(env.user_id)  # 手動＝関連付けた人
+        auto = next(d for d in data if d["info_id"] == str(auto_i))
+        assert auto["origin"] == "auto" and auto["linked_by"] is None
+    finally:
+        _cleanup_info_i(env.db_identifier, [auto_i, man_i, rej_i, arc_i])
+
+
+def test_d_tc_236_idea_related_info_gate(client, env):
+    """D-TC-236: 門番＝アイデア詳細と同一。非パーティーのアイデア／不明 ID は 404（存在秘匿）。"""
+    other_q = env.make_quest(owner=env.other_id, seed_member=False)  # seed 非参加
+    other_i = env.make_idea(quest_id=other_q, author=env.other_id)
+    _login_seed(client)
+    assert client.get(RELATED_INFO_I.format(other_i)).status_code == 404
+    assert client.get(RELATED_INFO_I.format(_uuid.uuid4())).status_code == 404
