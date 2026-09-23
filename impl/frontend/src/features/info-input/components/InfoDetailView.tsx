@@ -582,7 +582,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
         ) : null}
       </div>
       <TargetPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={addPicked}
-        existing={(item?.links ?? []).filter((l) => !l.rejected)} />
+        existing={item?.links ?? []} />
     </>
   );
 }

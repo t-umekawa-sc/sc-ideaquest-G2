@@ -55,6 +55,34 @@ test("N-TC-220 リンク種別変更で完了トーストが最前面に出る�
   }
 });
 
+test("N-TC-222 棄却済みリンクも対象ピッカーで既存扱い＝結果から除外（再追加409を防ぐ）", async ({ page }) => {
+  await login(page);
+  const csrf = csrfOf(await page.context().cookies());
+  const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
+  const info = await page.request.post("/api/v1/info-items", { headers: h, data: { title: `REJ_${Date.now()}` } }).then((r) => r.json());
+  const cand = await page.request.get("/api/v1/info-link-candidates?limit=1").then((r) => r.json());
+  const c0 = (cand.candidates ?? cand.data ?? [])[0];
+  const link = await page.request.post("/api/v1/info-links", { headers: h, data: { info_item_id: info.id, target_type: c0.target_type, target_id: c0.target_id, kind: "related" } }).then((r) => r.json());
+  // リンクを棄却（論理削除）。
+  const rej = await page.request.post(`/api/v1/info-links/${link.id}/reject`, { headers: h });
+  expect(rej.ok(), await rej.text()).toBeTruthy();
+  try {
+    await page.goto(`/info-items/${info.id}`);
+    await expect(page.locator(".app-header")).toBeVisible();
+    await page.getByRole("button", { name: /リンクを編集/ }).click();
+    await page.getByRole("button", { name: /対象を選ぶ/ }).click();
+    // 棄却済みでも「既に関連付け済み」に出て（見出しに「うち棄却」）、絞り込み結果からは除外される。
+    await expect(page.locator(".pick-existing__sum")).toContainText("棄却"); // 「…うち棄却 1…」
+    await page.locator(".pick-existing__sum").click(); // 折り畳みを展開
+    await expect(page.locator(".pick-existing__item", { hasText: c0.title })).toBeVisible();
+    await expect(page.locator(".pick-existing__item .badge", { hasText: "棄却済み" })).toBeVisible();
+    const rowTitles = await page.locator(".pick-row__title-t").allInnerTexts();
+    expect(rowTitles).not.toContain(c0.title); // 結果から除外（選ぶと 409 になる対象を出さない）
+  } finally {
+    await page.request.delete(`/api/v1/info-items/${info.id}`, { headers: { "X-CSRF-Token": csrf } });
+  }
+});
+
 test("N-TC-221 リンク種別変更で並び順が変わらない", async ({ page }) => {
   await login(page);
   const { infoId } = await seedInfoWithLinks(page, 2);
