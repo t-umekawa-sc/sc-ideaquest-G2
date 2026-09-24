@@ -54,7 +54,8 @@
 | N-TC-116 | api | キュレーション（curator・raw→curated） | curator 付与＋raw 情報 | `PATCH /info-items/{id}`（priority/categories） | 属性/カテゴリ反映・`status` raw→curated | N.2 |
 | N-TC-117 | api | 越権は 403 | 非作成者が内容／非curator が属性 | `PATCH /info-items/{id}` | 403 `forbidden`（内容=作成者のみ／属性=curator のみ） | N.0／§2.2 |
 | N-TC-119 | api | 手動リンク追加（全員・related 既定） | ログイン済＋情報 | `POST /info-links` | 201・`origin=manual`・`kind=related`・`target_title` 解決 | N.3 |
-| N-TC-120 | api | 重複リンクは 409 | 同一 (info,target,type) を2回 | `POST /info-links` ×2 | 2回目は 409 `conflict` | N.3 |
+| N-TC-120 | api | 重複リンクは 409（active 同士） | 同一 (info,target,type) を active で2回 | `POST /info-links` ×2 | 2回目は 409 `conflict`（active な既存は重複不可） | N.3 |
+| N-TC-223 | api | **棄却済みリンクの再追加で復活**（成果物側 逆向きピッカー由来の 409 を解消） | リンク作成→`reject` で棄却→同一 (info,target,type) を別種別で再 `POST` | `POST /info-links`（棄却後） | 409 ではなく 201・`rejected_at`=NULL に復活・選んだ `kind`/`origin=manual`/`created_by` で上書き（UNIQUE 制約で INSERT 不可のため既存棄却行を再活性） | N.3／§5.35 |
 | N-TC-121 | api | 種別変更（関連↔裏付け↔反証） | 作成済リンク | `PATCH /info-links/{id}`（kind=refuting） | kind 更新 | N.3／§5.35 |
 | N-TC-122 | api | 棄却／棄却解除 | 作成済リンク | `POST /info-links/{id}/reject`／`/unreject` | `rejected_at` セット→NULL（詳細で rejected 反映） | N.3 |
 | N-TC-123 | api | enum 検証（target_type/kind） | ログイン済 | `POST /info-links`（不正 target_type）／`PATCH`（不正 kind） | 422 `validation_error` | N.3／§1.7 |

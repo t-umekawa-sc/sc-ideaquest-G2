@@ -55,7 +55,7 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `POST /info-links` | 手動リンク追加 | ボディ: `info_item_id`・`target_type`（`ideas\|concepts\|quests\|assumptions`）・`target_id`・`kind?`（既定 `related`）。`origin=manual` | 作成した `info_link`。同一 `(info,target)` 重複は 409 `conflict`（既存を返す/更新に誘導） |
+| `POST /info-links` | 手動リンク追加 | ボディ: `info_item_id`・`target_type`（`ideas\|concepts\|quests\|assumptions`）・`target_id`・`kind?`（既定 `related`）。`origin=manual` | 作成した `info_link`。**active な同一 `(info,target,type)` は 409 `conflict`**（既存を返す/更新に誘導）。**棄却済み（`rejected_at` 有り）の同一組は 409 とせず復活**＝既存行の `rejected_at`→NULL・指定 `kind`/`origin=manual`/`created_by_id` で上書き（UNIQUE 制約で INSERT 不可のため既存行を再活性・成果物側の逆向きピッカーは棄却行を知らずに再追加するため 409 を避ける・N-TC-223） |
 | `PATCH /info-links/{id}` | 種別変更（関連↔裏付け↔反証） | ボディ: `kind`（`related\|supporting\|refuting`） | 更新後の `info_link`。**related/supporting→`refuting` への遷移で post-commit＝「根底を揺さぶる」通知 `info_refuting_raised`**（宛先＝成果物の作成者/所有者＋評価者〔投票者〕＋クエスト管理者〔owner/quest_admin〕・付けた本人は除外・§N.6）。`POST /info-links` で `kind=refuting` 起票時も同通知。**要再評価は通知のみ（MVP・成果物側の再評価フラグ/リセットは今後）** |
 | `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・**行は残す**）。auto リンクを人が「不要」と判断＝**以後の再計算でも復活しない**（§N.6 の upsert が既存行の `rejected_at` を尊重）。棄却は物理削除でなく論理（監査・再学習の材料に残す） |
 | `POST /info-links/{id}/unreject` | 棄却の取消 | — | `rejected_at` を NULL に |

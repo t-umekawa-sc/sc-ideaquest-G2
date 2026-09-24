@@ -869,11 +869,21 @@ def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
             raise AppError(401, "unauthenticated")
         if repo.get_info_item(ts, info_id) is None:
             raise AppError(422, "validation_error", detail="情報が見つかりません", errors=[{"field": "info_item_id"}])
-        if repo.find_link(ts, info_id, body.target_type, target_id) is not None:
+        existing = repo.find_link(ts, info_id, body.target_type, target_id)
+        if existing is not None and existing.rejected_at is None:
             raise AppError(409, "conflict", detail="既に関連付け済みです")
-        link = repo.create_link(ts, info_item_id=info_id, target_type=body.target_type,
-                                target_id=target_id, kind=kind, origin="manual",
-                                created_by_id=user.id)  # 関連付けた人＝linked_by（§5.35・FR-41）
+        if existing is not None:
+            # 棄却済み行を再活性（UNIQUE (info,target,type) で INSERT 不可・N-TC-223）。
+            # 成果物側の逆向きピッカーは棄却行を知らずに再追加を試みる＝ここで復活扱いにする。
+            existing.rejected_at = None
+            existing.kind = kind
+            existing.origin = "manual"
+            existing.created_by_id = user.id  # 関連付け直した人＝linked_by（§5.35・FR-41）
+            link = existing
+        else:
+            link = repo.create_link(ts, info_item_id=info_id, target_type=body.target_type,
+                                    target_id=target_id, kind=kind, origin="manual",
+                                    created_by_id=user.id)  # 関連付けた人＝linked_by（§5.35・FR-41）
         ts.flush()
         title = repo.resolve_link_titles(ts, [link]).get(target_id)
         dto = _link_dto(link, title)

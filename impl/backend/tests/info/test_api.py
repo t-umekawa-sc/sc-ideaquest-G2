@@ -551,6 +551,30 @@ def test_n_tc_120_duplicate_link_409(client, info_env):
     assert r2.json()["code"] == "conflict"
 
 
+def test_n_tc_223_readd_revives_rejected_link(client, info_env):
+    """N-TC-223: 棄却済みリンクの再追加は 409 ではなく復活（rejected_at→NULL・選んだ種別で上書き）。
+
+    成果物側の逆向きピッカーは棄却行を知らずに再追加を試みる（read EP が rejected を返さない）。
+    UNIQUE (info,target,type) のため INSERT 不可＝既存棄却行を再活性させる。
+    """
+    import uuid as _uuid
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    tid = str(_uuid.uuid4())
+    body = {"info_item_id": str(info_env.ids.d), "target_type": "quests", "target_id": tid}
+    r1 = client.post(LINKS, json=body, headers=_csrf(client))
+    assert r1.status_code == 201, r1.text
+    lid = r1.json()["id"]
+    assert client.post(f"{LINKS}/{lid}/reject", headers=_csrf(client)).json()["rejected"] is True
+    # 棄却後に同一 (info,target,type) を別種別で再追加＝409 ではなく復活（201）。
+    r2 = client.post(LINKS, json={**body, "kind": "refuting"}, headers=_csrf(client))
+    assert r2.status_code == 201, r2.text
+    d = r2.json()
+    assert d["id"] == lid                    # 同一行を再活性（新規 INSERT ではない）
+    assert d["rejected"] is False            # 復活（rejected_at→NULL）
+    assert d["kind"] == "refuting"           # 選んだ種別で上書き
+    assert d["origin"] == "manual"
+
+
 def test_n_tc_121_change_link_kind(client, info_env):
     """N-TC-121: 種別変更（related→refuting）。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
