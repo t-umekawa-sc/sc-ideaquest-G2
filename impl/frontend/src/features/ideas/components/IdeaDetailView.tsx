@@ -20,6 +20,7 @@ import { backToListOr, consumeIdeaFromQuest, markEvalFromIdea } from "@/lib/nav"
 
 import { EVALUATIONS_CHANGED_EVENT, getEvaluationAggregate, selectIdea, unselectIdea, type EvaluationAggregate } from "@/features/evaluations/api";
 import { getChat, getChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
+import { RelatedInfoPanel } from "@/features/info-input";
 
 import { followIdea, getAttachmentDownloadUrl, getIdea, IDEAS_CHANGED_EVENT, removeVote, unfollowIdea, voteIdea, type IdeaDetail, type IdeaVoteType } from "../api";
 import { isVotingClosed, todayISODate, votePercents } from "../voting";
@@ -441,6 +442,9 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
           <span>🧭 所属クエスト: <Link href={`/quests/${idea.quest.id}`}>{idea.quest.title || "クエスト"}</Link></span>
         </div>
       </section>
+
+      {/* 関連情報ストリップ＝概要の直下・全幅（クエスト詳細 SC-12 と同じ strip 配置・FR-41 Phase1 slice②） */}
+      <RelatedInfoPanel targetType="ideas" targetId={ideaId} variant="strip" />
 
       {/* ============ メイン＋右レール ============ */}
       <div className="idea-layout">
