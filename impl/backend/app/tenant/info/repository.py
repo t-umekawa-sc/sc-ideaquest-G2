@@ -151,6 +151,30 @@ def list_links_for_target(session: Session, target_type: str, target_id: uuid.UU
     return [(row[0], row[1]) for row in rows]
 
 
+def list_adopted_links(session: Session, quest_id: uuid.UUID,
+                       idea_ids: list[uuid.UUID]) -> list[tuple[InfoLink, InfoItem]]:
+    """クエスト「🏁 結果」タブの採用関連情報（C.8・FR-41 Phase2）＝`disposition='adopted'` を
+
+    **クエスト自身（`quests`）＋配下アイデア（`ideas`）**で集約（archived 情報は除外・`disposed_at` 降順）。
+    target_title の解決は application 層（quest/idea タイトル）で行う。"""
+    conds = [(InfoLink.target_type == "quests") & (InfoLink.target_id == quest_id)]
+    if idea_ids:
+        conds.append((InfoLink.target_type == "ideas") & (InfoLink.target_id.in_(idea_ids)))
+    from sqlalchemy import or_
+    rows = session.execute(
+        select(InfoLink, InfoItem)
+        .join(InfoItem, InfoLink.info_item_id == InfoItem.id)
+        .where(
+            InfoLink.disposition == "adopted",
+            InfoLink.rejected_at.is_(None),
+            InfoItem.status != "archived",
+            or_(*conds),
+        )
+        .order_by(InfoLink.disposed_at.is_(None), InfoLink.disposed_at.desc(), InfoLink.info_item_id)
+    ).all()
+    return [(row[0], row[1]) for row in rows]
+
+
 def follow_up_counts_for_items(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     """情報ごとの続報件数（parent_info_id 参照・§12-1）。"""
     if not ids:

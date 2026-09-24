@@ -434,6 +434,22 @@ class QuestResultPinnedMessageDTO(BaseModel):
     created_at: datetime
 
 
+class QuestResultAdoptedInfoDTO(BaseModel):
+    """⑥採用された関連情報（FR-41 Phase2）＝クエスト＋配下アイデアで採用（adopted）した情報＋処理メモ。"""
+
+    link_id: str
+    info_id: str
+    title: str
+    kind: str
+    source_url: str | None = None
+    note: str | None = None  # どう処理・反映したか
+    disposed_by: QuestOwnerDTO | None = None
+    disposed_at: str | None = None
+    target_type: str  # quests / ideas
+    target_id: str
+    target_title: str | None = None  # ideas のとき当該アイデア名（quests は None＝当該クエスト）
+
+
 class QuestResultDTO(BaseModel):
     """クエスト最終結果（アイデア選別の申し送り・GET /quests/{id}/result）＝既存集計の合成＋総括。"""
 
@@ -448,6 +464,7 @@ class QuestResultDTO(BaseModel):
     participation: QuestResultParticipationDTO = QuestResultParticipationDTO()
     pinned_messages: list[QuestResultPinnedMessageDTO] = []  # ④議論の要点(b)＝ピン留めメッセージ
     outcome: QuestOutcomeDTO = QuestOutcomeDTO()
+    adopted_info: list[QuestResultAdoptedInfoDTO] = []  # ⑥採用された関連情報（FR-41 Phase2）
     can_edit: bool = False  # owner/quest_admin（④⑤の編集可否）
 
 

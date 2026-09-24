@@ -1161,6 +1161,46 @@ export interface paths {
         patch: operations["update_quest_api_v1_quests__quest_id__patch"];
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/related-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Related Info
+         * @description クエストの関連情報（SC-12 上部ストリップ・C.8b・FR-41）。門番＝クエスト詳細と同一（範囲外 404）。読取専用。
+         */
+        get: operations["get_quest_related_info_api_v1_quests__quest_id__related_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/related-info/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Quest Link Disposition
+         * @description クエストに貼られた関連情報リンクの採否（C.8b・FR-41 Phase2）＝owner/quest_admin のみ。変更系＝Origin/CSRF。
+         */
+        patch: operations["set_quest_link_disposition_api_v1_quests__quest_id__related_info__link_id__patch"];
+        trace?: never;
+    };
     "/api/v1/quest-groups": {
         parameters: {
             query?: never;
@@ -1485,6 +1525,46 @@ export interface paths {
          * @description アイデア編集（D.2）。現在 status で検証分岐・公開中は版記録。投稿者本人 or owner/quest_admin。
          */
         patch: operations["update_idea_api_v1_ideas__idea_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/related-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Idea Related Info
+         * @description アイデアの関連情報（SC-22 右レール・D・FR-41）。門番＝アイデア詳細と同一（範囲外 404）。読取専用。
+         */
+        get: operations["get_idea_related_info_api_v1_ideas__idea_id__related_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ideas/{idea_id}/related-info/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Idea Link Disposition
+         * @description アイデアに貼られた関連情報リンクの採否（D・FR-41 Phase2）＝作成者/owner/quest_admin のみ。変更系＝Origin/CSRF。
+         */
+        patch: operations["set_idea_link_disposition_api_v1_ideas__idea_id__related_info__link_id__patch"];
         trace?: never;
     };
     "/api/v1/ideas/{idea_id}/revisions": {
@@ -2355,6 +2435,26 @@ export interface paths {
          * @description 情報の部分更新（SC-52/SC-51・N.2）＝内容は作成者／キュレーションは curator（越権 403）。内容変更は履歴に記録。
          */
         patch: operations["update_info_item_api_v1_info_items__info_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/info-items/{info_id}/revisions/{revision}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Info Revision Diff
+         * @description 版差分（SC-50 §85＝更新履歴の変更内容）＝既定は前版比較・読取専用。会社内 active 全員が閲覧可（N.0）。
+         */
+        get: operations["get_info_revision_diff_api_v1_info_items__info_id__revisions__revision__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/info-items/images": {
@@ -4224,6 +4324,36 @@ export interface components {
             content_revisions: components["schemas"]["InfoRevisionDTO"][];
         };
         /**
+         * InfoDiffField
+         * @description フィールドごとの差分（§85）。kind=text は segments・kind=scalar は old/new。
+         */
+        InfoDiffField: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scalar";
+            /** Segments */
+            segments?: components["schemas"]["InfoDiffSegment"][] | null;
+            /** Old */
+            old?: string | null;
+            /** New */
+            new?: string | null;
+        };
+        /**
+         * InfoDiffSegment
+         * @description テキスト差分の1セグメント（§85）。op＝equal/add/del。
+         */
+        InfoDiffSegment: {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "equal" | "add" | "del";
+            /** Text */
+            text: string;
+        };
+        /**
          * InfoImageUploadResponse
          * @description 貼付画像の再ホスト結果（POST /info-items/images・§12-4）＝自社ホスト（MinIO）署名URL。
          *
@@ -4246,6 +4376,8 @@ export interface components {
             title: string;
             /** Summary */
             summary?: string | null;
+            /** Match Snippet */
+            match_snippet?: string | null;
             /** Status */
             status: string;
             /** Priority */
@@ -4350,6 +4482,11 @@ export interface components {
              * @default false
              */
             rejected: boolean;
+            /**
+             * Disposition
+             * @default pending
+             */
+            disposition: string;
         };
         /** InfoLinkKindRequest */
         InfoLinkKindRequest: {
@@ -4378,6 +4515,7 @@ export interface components {
         /**
          * InfoRevisionDTO
          * @description 内容編集の版（🕘 更新履歴）＝版番号・編集者名・日時。新しい版が先頭。
+         *     changed_fields＝前版比で変わったフィールド（初版は空・§85＝変更内容を見せる・アイデア D.4 と同型）。
          */
         InfoRevisionDTO: {
             /** Revision */
@@ -4389,6 +4527,25 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Changed Fields
+             * @default []
+             */
+            changed_fields: string[];
+        };
+        /**
+         * InfoRevisionDiffResponse
+         * @description 版差分（§85・N.1）。fields＝変わったフィールドのみ（field 名→差分）。
+         */
+        InfoRevisionDiffResponse: {
+            /** From Revision */
+            from_revision: number;
+            /** To Revision */
+            to_revision: number;
+            /** Fields */
+            fields: {
+                [key: string]: components["schemas"]["InfoDiffField"];
+            };
         };
         /**
          * InfoStatusFacets
@@ -4615,6 +4772,16 @@ export interface components {
              * @default []
              */
             group_ids: string[];
+        };
+        /**
+         * LinkDispositionRequest
+         * @description 成果物側のリンク採否（C.8b／D＝`PATCH /{quest,idea}/related-info/{link_id}`・FR-41 Phase2）。
+         */
+        LinkDispositionRequest: {
+            /** Disposition */
+            disposition: string;
+            /** Note */
+            note?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -5664,6 +5831,33 @@ export interface components {
             members?: components["schemas"]["QuestMemberInput"][] | null;
         };
         /**
+         * QuestResultAdoptedInfoDTO
+         * @description ⑥採用された関連情報（FR-41 Phase2）＝クエスト＋配下アイデアで採用（adopted）した情報＋処理メモ。
+         */
+        QuestResultAdoptedInfoDTO: {
+            /** Link Id */
+            link_id: string;
+            /** Info Id */
+            info_id: string;
+            /** Title */
+            title: string;
+            /** Kind */
+            kind: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Note */
+            note?: string | null;
+            disposed_by?: components["schemas"]["QuestOwnerDTO"] | null;
+            /** Disposed At */
+            disposed_at?: string | null;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string;
+            /** Target Title */
+            target_title?: string | null;
+        };
+        /**
          * QuestResultAspectAveragesDTO
          * @description 観点別平均（②評価・選別サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。
          */
@@ -5723,6 +5917,11 @@ export interface components {
              *       "metrics": []
              *     } */
             outcome: components["schemas"]["QuestOutcomeDTO"];
+            /**
+             * Adopted Info
+             * @default []
+             */
+            adopted_info: components["schemas"]["QuestResultAdoptedInfoDTO"][];
             /**
              * Can Edit
              * @default false
@@ -5921,6 +6120,54 @@ export interface components {
             is_read: boolean;
             /** Unread Count */
             unread_count: number;
+        };
+        /**
+         * RelatedInfoItemDTO
+         * @description 成果物→関連情報パネルの1件（C.8b／D＝`GET /{quest,idea}/related-info`・FR-41）。
+         */
+        RelatedInfoItemDTO: {
+            /** Link Id */
+            link_id: string;
+            /** Info Id */
+            info_id: string;
+            /** Title */
+            title: string;
+            /** Kind */
+            kind: string;
+            /** Origin */
+            origin: string;
+            /** Score */
+            score?: number | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Impact Class */
+            impact_class?: string | null;
+            /** Summary */
+            summary?: string | null;
+            linked_by?: components["schemas"]["InfoCreatorDTO"] | null;
+            /**
+             * Disposition
+             * @default pending
+             */
+            disposition: string;
+            /** Disposition Note */
+            disposition_note?: string | null;
+            disposed_by?: components["schemas"]["InfoCreatorDTO"] | null;
+            /** Disposed At */
+            disposed_at?: string | null;
+            /**
+             * Can Dispose
+             * @default false
+             */
+            can_dispose: boolean;
+        };
+        /** RelatedInfoResponse */
+        RelatedInfoResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["RelatedInfoItemDTO"][];
         };
         /**
          * Session
@@ -8395,6 +8642,75 @@ export interface operations {
             };
         };
     };
+    get_quest_related_info_api_v1_quests__quest_id__related_info_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_quest_link_disposition_api_v1_quests__quest_id__related_info__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDispositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoItemDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_quest_groups_api_v1_quest_groups_get: {
         parameters: {
             query?: {
@@ -9078,6 +9394,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeaDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_idea_related_info_api_v1_ideas__idea_id__related_info_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_idea_link_disposition_api_v1_ideas__idea_id__related_info__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                idea_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDispositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoItemDTO"];
                 };
             };
             /** @description Validation Error */
@@ -10715,6 +11100,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InfoDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_info_revision_diff_api_v1_info_items__info_id__revisions__revision__diff_get: {
+        parameters: {
+            query?: {
+                from?: number | null;
+            };
+            header?: never;
+            path: {
+                info_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoRevisionDiffResponse"];
                 };
             };
             /** @description Validation Error */

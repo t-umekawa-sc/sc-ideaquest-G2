@@ -58,3 +58,36 @@ test("C-TC-293 SC-12 採否＝採用でメモ表示・不採用で非表示＋�
     await page.request.delete(`/api/v1/info-items/${info.id}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
+
+test("C-TC-295 結果タブに採用関連情報＋処理メモが出る", async ({ page }) => {
+  await login(page);
+  const csrf = csrfOf(await page.context().cookies());
+  const h = { "X-CSRF-Token": csrf, "Content-Type": "application/json" };
+  const stamp = Date.now().toString().slice(-8);
+  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
+  const quest = await page.request.post("/api/v1/quests", {
+    headers: h,
+    data: { title: `結果QT_${stamp}`, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E", status: "recruiting" },
+  }).then((r) => r.json());
+  const info = await page.request.post("/api/v1/info-items", { headers: h, data: { title: `結果情報_${stamp}` } }).then((r) => r.json());
+  const link = await page.request.post("/api/v1/info-links", { headers: h, data: { info_item_id: info.id, target_type: "quests", target_id: quest.id, kind: "related" } }).then((r) => r.json());
+  const note = `結果に反映_${stamp}`;
+  const patched = await page.request.patch(`/api/v1/quests/${quest.id}/related-info/${link.id}`, { headers: h, data: { disposition: "adopted", note } });
+  expect(patched.ok(), await patched.text()).toBeTruthy();
+  try {
+    await page.goto(`/quests/${quest.id}`);
+    await expect(page.locator(".app-header")).toBeVisible();
+    await page.getByRole("tab", { name: /結果/ }).click();
+    const section = page.getByLabel("採用された関連情報");
+    await expect(section).toBeVisible();
+    await expect(section.getByText(`結果情報_${stamp}`)).toBeVisible();
+    await expect(section.getByText(note)).toBeVisible();
+    // 情報タイトルは参照モード（採否モード）で開く＝?from 付き→「この情報の扱い」が出る。
+    await expect(section.getByText(`結果情報_${stamp}`)).toHaveAttribute("href", new RegExp(`from=quests`));
+    await section.getByText(`結果情報_${stamp}`).click();
+    await expect(page.getByText("この情報の扱い", { exact: false })).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/v1/quests/${quest.id}`, { headers: { "X-CSRF-Token": csrf } });
+    await page.request.delete(`/api/v1/info-items/${info.id}`, { headers: { "X-CSRF-Token": csrf } });
+  }
+});

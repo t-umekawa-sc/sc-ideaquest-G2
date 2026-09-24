@@ -20,6 +20,7 @@ from app.tenant.ideas.orm import Idea, IdeaRevision, Vote
 from app.tenant.evaluations.orm import Evaluation, EvaluationScore
 from app.tenant.gamification.orm import Activity
 from app.tenant.notifications.orm import Notification
+from app.tenant.info.orm import InfoItem, InfoLink
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quests import repository as quests_repo
@@ -153,6 +154,48 @@ def env():
             ts.execute(Quest.__table__.delete().where(Quest.id.in_(quests)))
         ts.execute(User.__table__.delete().where(User.id == other_id))
         ts.commit()
+
+
+def test_c_tc_294_result_adopted_info(client, env):
+    """C-TC-294: 結果タブの採用関連情報＝クエスト＋配下アイデアで adopted を集約（pending 除外・処理メモ/対象付き）。"""
+    from datetime import datetime, timezone
+    _login_seed(client)
+    qid = env.make_quest()
+    iid = env.make_idea(quest_id=qid, title="配下アイデアX")
+    info_ids = []
+
+    def _seed(target_type, target_id, title, disposition, note=None):
+        info_id = uuid.uuid4()
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.add(InfoItem(id=info_id, title=title, status="curated", created_by_id=env.user_id))
+            ts.add(InfoLink(id=uuid.uuid4(), info_item_id=info_id, target_type=target_type, target_id=target_id,
+                            kind="related", origin="manual", created_by_id=env.user_id,
+                            disposition=disposition, disposition_note=note,
+                            disposed_by_id=(env.user_id if disposition != "pending" else None),
+                            disposed_at=(datetime.now(timezone.utc) if disposition != "pending" else None)))
+            ts.commit()
+        info_ids.append(info_id)
+        return info_id
+
+    q_adopted = _seed("quests", qid, "Q採用情報", "adopted", "クエストに反映")
+    i_adopted = _seed("ideas", iid, "I採用情報", "adopted", "アイデアに反映")
+    _seed("quests", qid, "未処理情報", "pending")  # 除外される
+    try:
+        r = client.get(RESULT(qid))
+        assert r.status_code == 200, r.text
+        adopted = r.json()["adopted_info"]
+        ids = {a["info_id"] for a in adopted}
+        assert ids == {str(q_adopted), str(i_adopted)}  # adopted 2件のみ（pending 除外）
+        q = next(a for a in adopted if a["info_id"] == str(q_adopted))
+        i = next(a for a in adopted if a["info_id"] == str(i_adopted))
+        assert q["target_type"] == "quests" and q["target_title"] is None and q["note"] == "クエストに反映"
+        assert i["target_type"] == "ideas" and i["target_title"] == "配下アイデアX" and i["note"] == "アイデアに反映"
+        assert q["disposed_by"]["user_id"] == str(env.user_id)
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(info_ids)))
+            ts.execute(InfoItem.__table__.delete().where(InfoItem.id.in_(info_ids)))
+            ts.commit()
 
 
 def test_c_tc_240_result_compose(client, env):

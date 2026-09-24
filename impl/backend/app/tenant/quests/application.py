@@ -656,6 +656,12 @@ def _outcome_dto(ts, row) -> dict:
     }
 
 
+def _adopted_info_for_result(ts, quest_id, idea_titles) -> list[dict]:
+    """結果タブの「採用された関連情報」（C.8・FR-41 Phase2）＝N へ委譲（クエスト＋配下アイデア集約）。"""
+    from app.tenant.info import application as info_service  # 遅延 import（循環回避）
+    return info_service.adopted_info_for_quest(ts, quest_id, idea_titles)
+
+
 def _can_edit_outcome(ts, quest, user) -> bool:
     """総括（④⑤）の編集可否＝owner または quest_admin（_authorize_edit と同定義）。"""
     if quest.owner_id == user.id:
@@ -747,6 +753,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             },
             "pinned_messages": pinned_messages,
             "outcome": _outcome_dto(ts, repo.get_outcome(ts, qid)),
+            "adopted_info": _adopted_info_for_result(ts, qid, idea_titles),
             "can_edit": _can_edit_outcome(ts, quest, user),
         }
 

@@ -1034,6 +1034,36 @@ def set_link_disposition(ts, link_id: str, target_type: str, target_id: uuid.UUI
     }
 
 
+def adopted_info_for_quest(ts, quest_id: uuid.UUID, idea_titles: dict) -> list[dict]:
+    """クエスト「🏁 結果」タブの「採用された関連情報」（C.8・FR-41 Phase2）。
+
+    `disposition='adopted'` のリンクを **クエスト自身＋配下アイデア**で集約し、処理メモ・採用者・
+    どの成果物に紐づくかを付す（`disposed_at` 降順）。`idea_titles`＝{idea_id: title}（呼び元が渡す）。
+    門番は呼び元（C クエスト結果）で満たす前提。
+    """
+    idea_ids = list(idea_titles.keys())
+    rows = repo.list_adopted_links(ts, quest_id, idea_ids)
+    uids = [l.disposed_by_id for (l, _i) in rows if l.disposed_by_id]
+    users = repo.users_by_ids(ts, uids) if uids else {}
+    out: list[dict] = []
+    for (link, item) in rows:
+        is_quest = link.target_type == "quests"
+        out.append({
+            "link_id": str(link.id),
+            "info_id": str(item.id),
+            "title": item.title,
+            "kind": link.kind,
+            "source_url": item.source_url,
+            "note": link.disposition_note,
+            "disposed_by": _creator_dto(users[link.disposed_by_id]) if link.disposed_by_id and users.get(link.disposed_by_id) else None,
+            "disposed_at": link.disposed_at.isoformat() if link.disposed_at else None,
+            "target_type": link.target_type,
+            "target_id": str(link.target_id),
+            "target_title": None if is_quest else idea_titles.get(link.target_id),
+        })
+    return out
+
+
 def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,
                         types: list[str], q: str | None,
                         quest_ids: list[str] | None = None, statuses: list[str] | None = None,

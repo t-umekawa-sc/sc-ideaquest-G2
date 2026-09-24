@@ -253,6 +253,29 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </div>
       </section>
 
+      {/* ⑥ 採用された関連情報（FR-41 Phase2）＝クエスト＋配下アイデアで採用した外部情報＋処理メモ */}
+      {result.adopted_info.length > 0 && (
+        <section className="card" aria-label="採用された関連情報">
+          <div className="section-head"><h3 style={{ margin: 0 }}>🔗 採用された関連情報（{result.adopted_info.length}）</h3></div>
+          <ul className="qresult__adopted">
+            {result.adopted_info.map((a) => (
+              <li key={a.link_id} className="qresult__adopted-item">
+                <div className="qresult__adopted-top">
+                  {/* 情報詳細は参照モード（採否モード）で開く＝?from=対象種別:対象ID（SC-52 §7-採否） */}
+                  <Link className="card-title" href={`/info-items/${a.info_id}?from=${a.target_type}:${a.target_id}`}>{a.title}</Link>
+                  {a.source_url && <a className="qresult__chat" href={a.source_url} target="_blank" rel="noopener noreferrer">🔗 出典</a>}
+                  <span className="badge badge-muted">
+                    {a.target_type === "quests" ? "このクエスト" : <>💡 <Link href={`/ideas/${a.target_id}`}>{a.target_title || "アイデア"}</Link></>}
+                  </span>
+                </div>
+                {a.note && <p className="qresult__adopted-note" style={{ whiteSpace: "pre-wrap" }}>📝 {a.note}</p>}
+                {a.disposed_by && <p className="muted text-xs">採用: {a.disposed_by.display_name}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* 編集ダイアログ（デザイン標準 §103-107＝登録/編集は原則モーダル。旧インライン展開を廃止） */}
       <Modal open={editing} onClose={cancelEdit} title="振り返り・学び / 次アクションを編集" size="lg">
         <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
