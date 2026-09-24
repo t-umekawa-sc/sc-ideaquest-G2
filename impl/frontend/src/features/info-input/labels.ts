@@ -50,3 +50,7 @@ export const LINK_KIND_LABEL: Record<string, [string, string]> = {
 export const LINK_TARGET_LABEL: Record<string, string> = {
   ideas: "💡アイデア", concepts: "🧩コンセプト", quests: "📜クエスト", assumptions: "📌前提",
 };
+// 成果物側の採否（FR-41 Phase2）＝[ラベル, バッジclass, アイコン]。
+export const DISPOSITION_LABEL: Record<string, [string, string, string]> = {
+  pending: ["未処理", "badge-muted", "🕒"], adopted: ["採用", "badge-success", "✅"], declined: ["不採用", "badge-muted", "🚫"],
+};

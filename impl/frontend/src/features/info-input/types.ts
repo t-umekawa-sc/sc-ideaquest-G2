@@ -101,6 +101,7 @@ export interface InfoLinkResolved {
   origin: InfoLinkOrigin;
   score?: number | null;
   rejected: boolean;
+  disposition?: InfoLinkDisposition; // 成果物側の採否（FR-41 Phase2）＝pending 以外は棄却/種別変更ロック
 }
 export interface InfoThreadItem {
   id: string;
@@ -192,6 +193,8 @@ export interface InfoRevisionDiff {
 }
 
 // 成果物→関連情報パネル（SC-12 上部ストリップ／SC-22 右レール・FR-41）＝GET /{quests,ideas}/{id}/related-info。
+export type InfoLinkDisposition = "pending" | "adopted" | "declined";
+
 export interface RelatedInfoItem {
   link_id: string;
   info_id: string;
@@ -203,4 +206,10 @@ export interface RelatedInfoItem {
   impact_class?: string | null;
   summary?: string | null;
   linked_by?: InfoCreator | null; // manual のみ＝関連付けた人（auto は null）
+  // 成果物側の採否（FR-41 Phase2）。can_dispose＝閲覧者が採否できるか（管理権限者）。
+  disposition: InfoLinkDisposition;
+  disposition_note?: string | null;
+  disposed_by?: InfoCreator | null;
+  disposed_at?: string | null;
+  can_dispose: boolean;
 }

@@ -3,7 +3,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type { QueryState } from "@/components/ui";
 import type {
-  InfoAttachment, InfoCard, InfoDetail, InfoLink, InfoLinkCandidate, InfoLinkKind, InfoLinkTarget,
+  InfoAttachment, InfoCard, InfoDetail, InfoLink, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoLinkTarget,
   InfoListResult, InfoRevisionDiff, InfoStatusFilter, RelatedInfoItem, WordCloudToken,
 } from "./types";
 
@@ -207,6 +207,18 @@ export function rejectLinkApi(linkId: string) {
 }
 export function unrejectLinkApi(linkId: string) {
   return apiFetch(`/info-links/${encodeURIComponent(linkId)}/unreject`, { method: "POST" });
+}
+
+// 成果物側の採否（disposition・FR-41 Phase2）＝管理権限者が状態＋処理メモを保存（C.8b／D）。
+export async function setLinkDispositionApi(
+  targetType: "quests" | "ideas", targetId: string, linkId: string,
+  disposition: InfoLinkDisposition, note?: string | null,
+): Promise<RelatedInfoItem> {
+  const res = await apiFetch<RelatedInfoItem>(
+    `/${targetType}/${encodeURIComponent(targetId)}/related-info/${encodeURIComponent(linkId)}`,
+    { method: "PATCH", body: JSON.stringify({ disposition, note: note ?? null }) },
+  );
+  return res as RelatedInfoItem;
 }
 
 // 跨ルート更新の通知（登録/編集/リンク/アーカイブ/削除の成功時に発火）＝一覧・詳細が購読して再取得。
