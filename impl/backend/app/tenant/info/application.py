@@ -270,6 +270,7 @@ def _detail_dto(item, *, categories, links, title_map, parent, follow_ups, creat
             "kind": l.kind, "origin": l.origin,
             "score": float(l.score) if l.score is not None else None,
             "rejected": l.rejected_at is not None,
+            "disposition": l.disposition,  # 成果物側の採否＝pending 以外は棄却/種別変更ロック（FR-41 Phase2）
         } for l in links],
         "thread": {
             "parent": _thread_item_dto(parent, creators) if parent else None,

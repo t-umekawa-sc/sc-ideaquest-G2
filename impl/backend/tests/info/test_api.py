@@ -649,6 +649,7 @@ def test_n_tc_108_detail_shape(client, info_env):
     assert set(d["categories"]) == {"ext_technology", "ext_industry"}
     assert "body_html" in d and "summary" in d
     assert len(d["links"]) == 3 and any(l["rejected"] for l in d["links"])  # 棄却1件含む
+    assert all("disposition" in l for l in d["links"])  # 採否（FR-41 Phase2）＝既定 pending を露出（UI のロック表示に使う）
     assert d["thread"]["parent"] is None
     assert {t["id"] for t in d["thread"]["follow_ups"]} == {str(info_env.ids.fu1), str(info_env.ids.fu2)}
     assert d["tokens_top"] and d["tokens_top"][0]["token"] == "生成ai"

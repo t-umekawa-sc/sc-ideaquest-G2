@@ -3,21 +3,21 @@
 // SC-52 情報の詳細（Phase B＝backend GET /info-items/{id} に結線・読み取り）。
 // 正＝doc/画面設計/mocks/SC-50_情報インプット.html（DoD＝モック一致）。モーダル/フルページ双方から使う。
 // 内容(作成者)＋属性(curator)＋関連リンク(全員)のインライン編集を実 API へ結線済（Slice 5.2/5.2b/5.3b・can で出し分け）。続報/アーカイブは後続。
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useConfirm, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   addAttachmentsApi, addLinkApi, archiveInfoItemApi, changeLinkKindApi, deleteAttachmentApi, fetchInfoDetail,
-  rejectLinkApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
+  fetchRelatedInfo, INFO_CHANGED_EVENT, rejectLinkApi, setLinkDispositionApi, unarchiveInfoItemApi, unrejectLinkApi, updateInfoItemApi,
 } from "../api";
 import { attachGrowableResize } from "../growableResize";
 import {
-  BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
+  BUSINESS_LABEL, CATEGORY_LABEL, CLASSIFICATION_LABEL, DISPOSITION_LABEL, IMPACT_CLASS_LABEL, IMPACT_LABEL, LINK_KIND_LABEL,
   LINK_TARGET_LABEL, PRIORITY_LABEL, SCOPE_LABEL, SOURCE_LABEL, STATUS_LABEL, TIMING_LABEL, TRIAGE_LABEL,
 } from "../labels";
-import type { InfoDetail, InfoLinkCandidate, InfoLinkKind, InfoThreadItem } from "../types";
+import type { InfoDetail, InfoLinkCandidate, InfoLinkDisposition, InfoLinkKind, InfoThreadItem, RelatedInfoItem } from "../types";
 import { cloudTokens, demoSummary, plainText } from "../wordcloud";
 import { InfoRevisionHistory } from "./InfoRevisionHistory";
 import { TargetPicker } from "./TargetPicker";
@@ -60,6 +60,18 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
+  // 成果物側コンテキスト（?from=種別:ID）で開かれた＝採否モード（参照＋最下部に扱い入力・FR-41 Phase2）。
+  const searchParams = useSearchParams();
+  const disposeContext = useMemo(() => {
+    const from = searchParams.get("from");
+    if (!from) return null;
+    const [t, id] = from.split(":");
+    return (t === "quests" || t === "ideas") && id ? { targetType: t as "quests" | "ideas", targetId: id } : null;
+  }, [searchParams]);
+  const [dispRow, setDispRow] = useState<RelatedInfoItem | null>(null);
+  const [dispChoice, setDispChoice] = useState<InfoLinkDisposition>("pending");
+  const [dispNote, setDispNote] = useState("");
+  const [dispBusy, setDispBusy] = useState(false);
   const [item, setItem] = useState<InfoDetail | undefined>(undefined);
   const [state, setState] = useState<"loading" | "ok" | "notfound">("loading");
   // 内容インライン編集（作成者・can.edit_content）。属性=curator インラインは後続（5.2b）。
@@ -121,6 +133,39 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     setSummaryPrev(item.summary ?? null);
     if (item.can.edit_content && bodyRef.current) bodyRef.current.innerHTML = item.body_html ?? "";
   }, [item]);
+
+  // 採否モード＝成果物の related-info からこの情報のリンク行を引き、現在の採否/メモ/can_dispose を得る。
+  useEffect(() => {
+    if (!disposeContext) return;
+    let alive = true;
+    fetchRelatedInfo(disposeContext.targetType, disposeContext.targetId)
+      .then((rows) => {
+        if (!alive) return;
+        const row = rows.find((x) => x.info_id === infoId) ?? null;
+        setDispRow(row);
+        setDispChoice(row?.disposition ?? "pending");
+        setDispNote(row?.disposition_note ?? "");
+      })
+      .catch(() => { /* 取得失敗は「見つかりません」表示にフォールバック */ });
+    return () => { alive = false; };
+  }, [disposeContext, infoId]);
+
+  // 採否の保存＝情報本体でなく成果物側リンクのデータ更新（C.8b／D）。保存後はパネルへ通知して閉じる。
+  const saveDisposition = async () => {
+    if (!disposeContext || !dispRow) return;
+    setDispBusy(true);
+    try {
+      const updated = await setLinkDispositionApi(
+        disposeContext.targetType, disposeContext.targetId, dispRow.link_id, dispChoice, dispNote.trim() || null);
+      setDispRow(updated);
+      window.dispatchEvent(new Event(INFO_CHANGED_EVENT)); // 関連情報パネルを再取得（双方向整合）
+      snack({ type: "success", title: "扱いを保存しました", msg: "この成果物での採否を更新しました。" });
+      onClose();
+    } catch {
+      snack({ type: "error", title: "保存に失敗しました", msg: "時間をおいて再試行してください。" });
+    }
+    setDispBusy(false);
+  };
 
   // 内容欄の手動リサイズ（固定 height）を min-height に付け替え、自動伸長を保つ（DFT-N-004）。
   // 編集可（作成者）時のみ .rt__area が描画されるため、その表示に合わせて attach する。
@@ -256,7 +301,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
 
   if (state === "loading") return <div className="modal__body"><p className="muted">読み込み中…</p></div>;
   if (state === "notfound" || !item) return <div className="modal__body"><p className="muted">情報が見つかりません。</p></div>;
-  const r = item;
+  // 採否モードは全面参照＝編集能力を一律 false に上書き（編集導線・保存ボタン・アーカイブが消える）。
+  const r = disposeContext ? { ...item, can: { ...item.can, edit_content: false, curate: false, add_link: false, follow_up: false } } : item;
   const activeLinks = r.links.filter((l) => !l.rejected);
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
   // 項目区切り＝デザイン標準 §4.1: 全セクションで仕切り線の"間隔"を統一。参照/操作は線あり（dialog-section）、
@@ -467,11 +513,13 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           </div>
         )}
 
-        <div className="field dialog-section">
-          <div className="dialog-label">この情報から（機会特定→行動）</div>
-          <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
-          <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
-        </div>
+        {!disposeContext && (
+          <div className="field dialog-section">
+            <div className="dialog-label">この情報から（機会特定→行動）</div>
+            <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
+            <div className="hint" style={{ marginTop: 6 }}>判定の結果、新しく取り組む価値があると判断したら、この情報を機会/課題として<strong>クエストを起票</strong>できます。作成したクエストにはこの情報が<strong>関連リンク（関連）</strong>で自動的に紐づきます。</div>
+          </div>
+        )}
 
         {/* アーカイブ／解除＝curator のみ（論理削除・監査保持・N.2）。フッターは閉じる/保存に絞るため本文に置く（SC-50 §8）。 */}
         {r.can.curate ? (
@@ -503,6 +551,9 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                       <span className="link-item__title">{l.target_title ?? <span className="muted">（対象未解決）</span>}</span>
                       <span className={`badge ${LINK_KIND_LABEL[l.kind][1]}`}>{LINK_KIND_LABEL[l.kind][0]}</span>
                       <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
+                      {l.disposition && l.disposition !== "pending" ? (
+                        <span className={`badge ${DISPOSITION_LABEL[l.disposition][1]}`} title="成果物側で採否済み＝棄却/種別変更はロック中">🔒 {DISPOSITION_LABEL[l.disposition][0]}</span>
+                      ) : null}
                       {l.score != null ? <span className="info-thread__meta">一致 {Math.round(l.score * 100)}%</span> : null}
                     </li>
                   ))}
@@ -525,14 +576,26 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
                     <button type="button" className="btn btn-outline btn-sm" disabled={linkBusy} onClick={() => linkOp(() => unrejectLinkApi(l.id), "関連リンクを戻しました（保存前に反映済み）")}>戻す</button>
                   </li>
                 ) : (
-                  <li key={l.id} className="link-item">
+                  <li key={l.id} className={`link-item${l.disposition && l.disposition !== "pending" ? " is-locked" : ""}`}>
                     <span>{LINK_TARGET_LABEL[l.target_type]}</span>
                     <span className="link-item__title">{l.target_title ?? "（対象未解決）"}</span>
                     <span className="badge badge-muted">{l.origin === "auto" ? "自動" : "手動"}</span>
-                    <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => changeKind(l.id, l.kind, e.target.value as InfoLinkKind)}>
-                      {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
-                    </select>
-                    <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id), "関連リンクを棄却しました（保存前に反映済み）")}>✕</button>
+                    {l.disposition && l.disposition !== "pending" ? (
+                      // 採否済み＝成果物側でロック（棄却/種別変更不可）。種別はロック値を非活性表示＋ロックバッジ。
+                      <>
+                        <select className="select link-kind" aria-label="種別（採否ロック）" value={l.kind} disabled title="採否済みのためロック中（成果物側で未処理に戻すと解除）">
+                          {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+                        </select>
+                        <span className={`badge ${DISPOSITION_LABEL[l.disposition][1]}`} title="成果物側で採否済み＝棄却/種別変更はロック中（成果物側で未処理に戻すと解除）">🔒 {DISPOSITION_LABEL[l.disposition][0]}</span>
+                      </>
+                    ) : (
+                      <>
+                        <select className="select link-kind" aria-label="種別" value={l.kind} disabled={linkBusy} onChange={(e) => changeKind(l.id, l.kind, e.target.value as InfoLinkKind)}>
+                          {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
+                        </select>
+                        <button type="button" className="link-item__rm" aria-label="棄却" title="棄却（今後この情報から自動リンクしない・復活しない）" disabled={linkBusy} onClick={() => linkOp(() => rejectLinkApi(l.id), "関連リンクを棄却しました（保存前に反映済み）")}>✕</button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -545,32 +608,67 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           )}
         </div>
 
-        <div className={refCls}>
-          <div className="dialog-label">🧵 続報スレッド</div>
-          {hasThread ? (
-            <ul className="info-thread">
-              {threadItems.map((t, i) => {
-                const current = t.id === r.id;
-                return (
-                  <li key={t.id}>
-                    <div className="info-thread__title">
-                      {i === 0 ? "🧭 " : "↳ "}{t.title}
-                      {current ? <span className="badge badge-muted" style={{ marginLeft: 6 }}>表示中</span> : null}
-                    </div>
-                    <div className="info-thread__meta">
-                      {(t.created_by ?? "")}・{t.created_at.slice(0, 10)}
-                      {current ? null : <>　<a href={`/info-items/${t.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${t.id}`); }}>開く</a></>}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p className="muted">続報はまだありません。</p>}
-          <div style={{ marginTop: 8 }}>
-            {/* 続報は常にスレッドの根に紐づける（§12-1・フラットなスレッド）。登録時に親の未棄却リンクを自動複製。 */}
-            <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${threadRoot.id}`)}>＋ 続報を登録</button>
+        {!disposeContext && (
+          <div className={refCls}>
+            <div className="dialog-label">🧵 続報スレッド</div>
+            {hasThread ? (
+              <ul className="info-thread">
+                {threadItems.map((t, i) => {
+                  const current = t.id === r.id;
+                  return (
+                    <li key={t.id}>
+                      <div className="info-thread__title">
+                        {i === 0 ? "🧭 " : "↳ "}{t.title}
+                        {current ? <span className="badge badge-muted" style={{ marginLeft: 6 }}>表示中</span> : null}
+                      </div>
+                      <div className="info-thread__meta">
+                        {(t.created_by ?? "")}・{t.created_at.slice(0, 10)}
+                        {current ? null : <>　<a href={`/info-items/${t.id}`} onClick={(e) => { e.preventDefault(); swap(`/info-items/${t.id}`); }}>開く</a></>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="muted">続報はまだありません。</p>}
+            <div style={{ marginTop: 8 }}>
+              {/* 続報は常にスレッドの根に紐づける（§12-1・フラットなスレッド）。登録時に親の未棄却リンクを自動複製。 */}
+              <button className="btn btn-outline btn-sm" type="button" onClick={() => go(`/info-items/new?parent=${threadRoot.id}`)}>＋ 続報を登録</button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* 採否モード＝この成果物での「扱い」入力（管理権限者のみ操作可・情報本体は不変・FR-41 Phase2） */}
+        {disposeContext && (
+          <div className="field dialog-section ri-dispose">
+            <div className="dialog-label">この情報の扱い（{disposeContext.targetType === "quests" ? "クエスト" : "アイデア"}での採否）</div>
+            {!dispRow ? (
+              <p className="muted">この成果物に紐づくリンクが見つかりません。</p>
+            ) : dispRow.can_dispose ? (
+              <>
+                <div className="ri-dispose__choices">
+                  {(["pending", "adopted", "declined"] as InfoLinkDisposition[]).map((v) => (
+                    <label key={v} className={`ri-dispose__choice${dispChoice === v ? " is-on" : ""}`}>
+                      <input type="radio" name="ri-disp" checked={dispChoice === v} onChange={() => setDispChoice(v)} disabled={dispBusy} />
+                      {DISPOSITION_LABEL[v][2]} {DISPOSITION_LABEL[v][0]}
+                    </label>
+                  ))}
+                </div>
+                <textarea className="textarea" style={{ marginTop: 8 }} placeholder="どう処理・反映したか（採用/不採用の理由・反映先メモ）"
+                  value={dispNote} onChange={(e) => setDispNote(e.target.value)} disabled={dispBusy} />
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" type="button" onClick={saveDisposition} disabled={dispBusy}>{dispBusy ? "保存中…" : "保存する"}</button>
+                </div>
+                <div className="hint" style={{ marginTop: 6 }}>これは情報自体の更新ではなく、この成果物での<strong>採否</strong>を記録します。<strong>採用/不採用</strong>にするとこのリンクの棄却・種別変更はロックされます（<strong>未処理</strong>に戻すと解除）。採用は「🏁 結果」タブに集約表示されます。</div>
+              </>
+            ) : (
+              <>
+                <p>現在の扱い：<span className={`badge ${DISPOSITION_LABEL[dispRow.disposition][1]}`}>{DISPOSITION_LABEL[dispRow.disposition][2]} {DISPOSITION_LABEL[dispRow.disposition][0]}</span></p>
+                {dispRow.disposition_note ? <p className="ri-note" style={{ marginTop: 6 }}>📝 {dispRow.disposition_note}</p> : null}
+                <div className="hint" style={{ marginTop: 6 }}>採否の設定は管理権限者（{disposeContext.targetType === "quests" ? "owner/quest_admin" : "作成者・owner/quest_admin"}）のみ可能です。</div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="modal__footer">

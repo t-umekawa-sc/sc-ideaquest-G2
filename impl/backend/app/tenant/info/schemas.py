@@ -194,6 +194,7 @@ class InfoLinkDTO(BaseModel):
     origin: str
     score: float | None = None
     rejected: bool = False
+    disposition: str = "pending"  # 成果物側の採否（FR-41 Phase2）＝pending 以外はロック（棄却/種別変更不可）
 
 
 class RelatedInfoItemDTO(BaseModel):

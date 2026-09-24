@@ -128,6 +128,7 @@
 | C-TC-290 | api | 採否は管理権限者のみ＝非 owner/quest_admin（一般メンバー）は 403・read の `can_dispose=false` | 他人 owner のクエストに seed を一般メンバー（comment）で参加＋リンク seed | `PATCH .../related-info/{link_id}`／`GET .../related-info` | PATCH **403** `forbidden`／read は 200 で `can_dispose=false` | C.8b／N.3-採否 |
 | C-TC-291 | api | **採否ロック**＝採用/不採用済みリンクは棄却/種別変更が 409／`pending` で解除 | owner がリンクを adopted に設定 | `POST /info-links/{id}/reject`・`PATCH /info-links/{id}`（kind）→ `PATCH .../related-info/{link_id}`(pending)→再度 reject | adopted 中は reject/kind とも **409** `conflict`／`pending` に戻すと reject が 200（ロック解除） | C.8b／N.3-採否 |
 | C-TC-292 | api | 採否の 404＝当該クエストのリンクでない/不明 link_id は存在秘匿 | 別クエストのリンク／不明 link_id | `PATCH /quests/{id}/related-info/{link_id}` | いずれも **404** | C.8b／C.0 |
+| C-TC-293 | e2e | **SC-12 採否 UI（採用→メモ表示／不採用→非表示＋件数）** | user@acme が owner のクエスト＋情報を関連付け→`/quests/{id}` を開く | カードを開く（成果物側コンテキスト）→「この情報の扱い」で採用＋メモ→保存→再度開いて不採用→保存 | 採用でカードに「✅ 採用」バッジ＋📝メモ表示・不採用でカードが既定パネルから消え、ヘッダーに「🚫 不採用 1」。後始末で削除 | SC-12 §4.1d／SC-52 §7-採否／C.8b／FR-41 |
 
 ## 7. 複数部署横断＝参加部署（アクセス条件）・作成者別格・動的失効（FR-38 再設計・2026-09-11・C.0/C.2/C.4）
 
