@@ -81,6 +81,11 @@ class InfoLink(CompanyBase):
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 手動で関連付けた人（origin=manual）。auto は system 生成＝NULL（成果物側パネルの「関連付けた人」表示・§5.35）。
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # 成果物側の採否（FR-41 Phase2・§5.35）＝pending/adopted/declined。pending 以外はロック（棄却/種別変更不可）。
+    disposition: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    disposition_note: Mapped[str | None] = mapped_column(Text, nullable=True)      # どう処理・反映したか
+    disposed_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    disposed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class InfoToken(CompanyBase):

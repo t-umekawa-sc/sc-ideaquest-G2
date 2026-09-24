@@ -373,3 +373,95 @@ def test_c_tc_286_quest_related_info_gate(client, env):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     assert client.get(RELATED_INFO_Q.format(hidden)).status_code == 404
     assert client.get(RELATED_INFO_Q.format(uuid.uuid4())).status_code == 404
+
+
+def _csrf(client) -> dict:
+    return {"X-CSRF-Token": client.cookies.get("iq_csrf")}
+
+
+DISPOSE_Q = "/api/v1/quests/{}/related-info/{}"
+LINKS = "/api/v1/info-links"
+
+
+def test_c_tc_289_quest_link_disposition(client, env):
+    """C-TC-289: 採否（disposition）＝owner が adopted→declined→pending を設定。read に状態＋can_dispose。"""
+    qid = env.make_quest(status="recruiting")  # owner=seed
+    info_i, link_id = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid,
+                                      created_by=env.user_id, title="採否289", origin="manual")
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.patch(DISPOSE_Q.format(qid, link_id),
+                         json={"disposition": "adopted", "note": "案Aに反映"}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["disposition"] == "adopted" and d["disposition_note"] == "案Aに反映"
+        assert d["disposed_by"]["user_id"] == str(env.user_id) and d["disposed_at"]
+        rl = client.get(RELATED_INFO_Q.format(qid)).json()["data"]
+        row = next(x for x in rl if x["link_id"] == str(link_id))
+        assert row["disposition"] == "adopted" and row["can_dispose"] is True  # owner＝採否可
+        # declined（read に返る＝クライアントが隠すのは表示層）
+        r2 = client.patch(DISPOSE_Q.format(qid, link_id),
+                          json={"disposition": "declined", "note": "範囲外"}, headers=_csrf(client))
+        assert r2.status_code == 200 and r2.json()["disposition"] == "declined"
+        rl2 = client.get(RELATED_INFO_Q.format(qid)).json()["data"]
+        assert any(x["link_id"] == str(link_id) and x["disposition"] == "declined" for x in rl2)
+        # pending＝ロック解除＝メモ/設定者/日時クリア
+        r3 = client.patch(DISPOSE_Q.format(qid, link_id), json={"disposition": "pending"}, headers=_csrf(client))
+        assert r3.status_code == 200
+        d3 = r3.json()
+        assert d3["disposition"] == "pending" and d3["disposition_note"] is None
+        assert d3["disposed_by"] is None and d3["disposed_at"] is None
+    finally:
+        _cleanup_info(env.db_identifier, [info_i])
+
+
+def test_c_tc_290_quest_disposition_requires_manager(client, env):
+    """C-TC-290: 採否は owner/quest_admin のみ＝一般メンバーは 403・read の can_dispose=false。"""
+    other = env.make_quest(status="recruiting", owner=env.other_user_id)
+    with get_tenant_session(env.db_identifier) as ts:
+        repo.add_member(ts, other, env.user_id, permissions=["comment"])  # seed を可視だが非管理で参加
+        ts.commit()
+    info_i, link_id = _seed_info_link(env.db_identifier, target_type="quests", target_id=other,
+                                      created_by=env.user_id, title="採否290", origin="manual")
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        r = client.patch(DISPOSE_Q.format(other, link_id), json={"disposition": "adopted"}, headers=_csrf(client))
+        assert r.status_code == 403, r.text
+        rl = client.get(RELATED_INFO_Q.format(other)).json()["data"]
+        assert next(x for x in rl if x["link_id"] == str(link_id))["can_dispose"] is False
+    finally:
+        _cleanup_info(env.db_identifier, [info_i])
+
+
+def test_c_tc_291_disposition_locks_link(client, env):
+    """C-TC-291: 採否ロック＝adopted 中は棄却/種別変更が 409／pending で解除。"""
+    qid = env.make_quest(status="recruiting")
+    info_i, link_id = _seed_info_link(env.db_identifier, target_type="quests", target_id=qid,
+                                      created_by=env.user_id, title="ロック291", origin="manual")
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.patch(DISPOSE_Q.format(qid, link_id),
+                            json={"disposition": "adopted"}, headers=_csrf(client)).status_code == 200
+        assert client.post(f"{LINKS}/{link_id}/reject", headers=_csrf(client)).status_code == 409  # ロック
+        assert client.patch(f"{LINKS}/{link_id}", json={"kind": "refuting"}, headers=_csrf(client)).status_code == 409
+        assert client.patch(DISPOSE_Q.format(qid, link_id),
+                            json={"disposition": "pending"}, headers=_csrf(client)).status_code == 200
+        assert client.post(f"{LINKS}/{link_id}/reject", headers=_csrf(client)).status_code == 200  # 解除後は可
+    finally:
+        _cleanup_info(env.db_identifier, [info_i])
+
+
+def test_c_tc_292_disposition_404(client, env):
+    """C-TC-292: 当該クエストのリンクでない/不明 link_id は 404（存在秘匿）。"""
+    qid = env.make_quest(status="recruiting")
+    other = env.make_quest(status="recruiting")
+    info_i, link_id = _seed_info_link(env.db_identifier, target_type="quests", target_id=other,
+                                      created_by=env.user_id, title="別クエスト292", origin="manual")
+    try:
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.patch(DISPOSE_Q.format(qid, link_id),
+                            json={"disposition": "adopted"}, headers=_csrf(client)).status_code == 404
+        assert client.patch(DISPOSE_Q.format(qid, uuid.uuid4()),
+                            json={"disposition": "adopted"}, headers=_csrf(client)).status_code == 404
+    finally:
+        _cleanup_info(env.db_identifier, [info_i])

@@ -20,6 +20,7 @@ from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.info.schemas import (
     IMPACT_CLASS_VALUES,
+    LINK_DISPOSITION_VALUES,
     LINK_KIND_VALUES,
     LINK_TARGET_VALUES,
     PRIORITY_VALUES,
@@ -79,20 +80,26 @@ def _match_snippet(title: str | None, body_text: str | None, q: str | None) -> s
     return ("…" if start > 0 else "") + hay[start:end] + ("…" if end < len(hay) else "")
 
 
-def related_info_for_target(ts, target_type: str, target_id: uuid.UUID, *, limit: int = 50) -> list[dict]:
+def related_info_for_target(ts, target_type: str, target_id: uuid.UUID, *, limit: int = 50,
+                            can_dispose: bool = False) -> list[dict]:
     """成果物→関連情報の DTO 群（C.8b／D＝`GET /{quest,idea}/related-info`・N.1 委譲の共通ビルダ）。
 
-    `info_links` を target で引き（rejected/archived 除外・score 降順）、`linked_by` は **manual のみ**
-    `created_by_id` を氏名/アバターに解決（auto は system 生成＝None）。門番は呼び元（C/D）で満たす前提。
+    `info_links` を target で引き（rejected/archived 除外・score 降順・**不採用 declined も返す**）、
+    `linked_by` は **manual のみ** `created_by_id` を氏名/アバターに解決（auto は system 生成＝None）。
+    採否（disposition・FR-41 Phase2）と `disposed_by` を含める。`can_dispose`＝閲覧者が採否できるか
+    （管理権限者・呼び元 C/D が算出して渡す）。門番は呼び元（C/D）で満たす前提。
     """
     rows = repo.list_links_for_target(ts, target_type, target_id, limit=limit)
-    manual_uids = {l.created_by_id for (l, _item) in rows if l.origin == "manual" and l.created_by_id}
-    users = repo.users_by_ids(ts, list(manual_uids)) if manual_uids else {}
+    # linked_by（manual の関連付け者）＋ disposed_by（採否した管理権限者）を一括解決。
+    uids = {l.created_by_id for (l, _item) in rows if l.origin == "manual" and l.created_by_id}
+    uids |= {l.disposed_by_id for (l, _item) in rows if l.disposed_by_id}
+    users = repo.users_by_ids(ts, list(uids)) if uids else {}
     data: list[dict] = []
     for (link, item) in rows:
         linked_by = None
         if link.origin == "manual" and link.created_by_id and users.get(link.created_by_id):
             linked_by = _creator_dto(users[link.created_by_id])
+        disposed_by = _creator_dto(users[link.disposed_by_id]) if link.disposed_by_id and users.get(link.disposed_by_id) else None
         data.append({
             "link_id": str(link.id),
             "info_id": str(item.id),
@@ -104,6 +111,11 @@ def related_info_for_target(ts, target_type: str, target_id: uuid.UUID, *, limit
             "impact_class": item.impact_class,
             "summary": item.summary,
             "linked_by": linked_by,
+            "disposition": link.disposition,
+            "disposition_note": link.disposition_note,
+            "disposed_by": disposed_by,
+            "disposed_at": link.disposed_at.isoformat() if link.disposed_at else None,
+            "can_dispose": can_dispose,
         })
     return data
 
@@ -896,8 +908,18 @@ def add_link(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     return dto
 
 
+def _guard_disposition_unlocked(link) -> None:
+    """採否済み（disposition != pending）のリンクは棄却/棄却解除/種別変更をロック（409・N.3-採否）。
+
+    処理済みの解除→再関連付けで蒸し返るのを防ぐ。管理者が disposition=pending に戻せば解除される。
+    """
+    if link.disposition != "pending":
+        raise AppError(409, "conflict",
+                       detail="採否済みのため変更できません（管理権限者が未処理に戻すと解除されます）")
+
+
 def _mutate_link(account_id, company_id, link_id, mutate) -> dict:
-    """リンクの取得→変更→DTO 返却の共通処理（種別変更/棄却/解除）。不在は 404。"""
+    """リンクの取得→変更→DTO 返却の共通処理（種別変更/棄却/解除）。不在は 404。採否済みはロック。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
@@ -909,6 +931,7 @@ def _mutate_link(account_id, company_id, link_id, mutate) -> dict:
         link = repo.get_link(ts, lid)
         if link is None:
             raise AppError(404, "not_found")
+        _guard_disposition_unlocked(link)
         mutate(link)
         title = repo.resolve_link_titles(ts, [link]).get(link.target_id)
         dto = _link_dto(link, title)
@@ -933,6 +956,7 @@ def change_link_kind(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str,
         link = repo.get_link(ts, lid)
         if link is None:
             raise AppError(404, "not_found")
+        _guard_disposition_unlocked(link)  # 採否済みは種別変更もロック（N.3-採否）
         # refuting への遷移のみ通知（既に refuting は再通知しない）。棄却済みは揺さぶらない。
         fire = kind == "refuting" and link.kind != "refuting" and link.rejected_at is None
         target_type, target_id = link.target_type, link.target_id
@@ -958,6 +982,55 @@ def reject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) -> d
 def unreject_link(account_id: uuid.UUID, company_id: uuid.UUID, link_id: str) -> dict:
     """棄却の取消（rejected_at を NULL）。"""
     return _mutate_link(account_id, company_id, link_id, lambda l: setattr(l, "rejected_at", None))
+
+
+def set_link_disposition(ts, link_id: str, target_type: str, target_id: uuid.UUID, *,
+                         disposition: str, note: str | None, actor_id: uuid.UUID) -> dict:
+    """成果物側の採否（disposition・FR-41 Phase2）を設定（C.8b／D＝`PATCH .../related-info/{link_id}`）。
+
+    権限（管理権限者）と門番は**呼び元（C/D）が満たす前提**（本関数は成果物内リンクの整合＋更新のみ）。
+    呼び元の session 内で実行し、呼び元が commit する（read の related_info_for_target と同じ委譲様式）。
+    `pending` はロック解除＝メモ/設定者/日時をクリア。`adopted`/`declined` は設定者/日時を記録。
+    リンクが当該成果物（target_type,target_id）のものでなければ 404。返り値＝更新後の related-info 1 行。
+    """
+    if disposition not in LINK_DISPOSITION_VALUES:
+        raise AppError(422, "validation_error", detail="disposition が不正です", errors=[{"field": "disposition"}])
+    lid = _parse_uuid(link_id, field="link_id")
+    link = repo.get_link(ts, lid)
+    if link is None or link.target_type != target_type or link.target_id != target_id:
+        raise AppError(404, "not_found")  # 当該成果物のリンクでなければ存在秘匿
+    link.disposition = disposition
+    if disposition == "pending":  # ロック解除＝採否リセット
+        link.disposition_note = None
+        link.disposed_by_id = None
+        link.disposed_at = None
+    else:
+        link.disposition_note = (note or "").strip() or None
+        link.disposed_by_id = actor_id
+        link.disposed_at = datetime.now(timezone.utc)
+    ts.flush()
+    item = repo.get_info_item(ts, link.info_item_id)
+    uids = [u for u in {link.created_by_id, link.disposed_by_id} if u]
+    users = repo.users_by_ids(ts, uids) if uids else {}
+    linked_by = _creator_dto(users[link.created_by_id]) if link.origin == "manual" and link.created_by_id and users.get(link.created_by_id) else None
+    disposed_by = _creator_dto(users[link.disposed_by_id]) if link.disposed_by_id and users.get(link.disposed_by_id) else None
+    return {
+        "link_id": str(link.id),
+        "info_id": str(item.id) if item else str(link.info_item_id),
+        "title": item.title if item else "",
+        "kind": link.kind,
+        "origin": link.origin,
+        "score": float(link.score) if link.score is not None else None,
+        "source_url": item.source_url if item else None,
+        "impact_class": item.impact_class if item else None,
+        "summary": item.summary if item else None,
+        "linked_by": linked_by,
+        "disposition": link.disposition,
+        "disposition_note": link.disposition_note,
+        "disposed_by": disposed_by,
+        "disposed_at": link.disposed_at.isoformat() if link.disposed_at else None,
+        "can_dispose": True,
+    }
 
 
 def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,

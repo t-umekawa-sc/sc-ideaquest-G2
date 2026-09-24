@@ -56,11 +56,18 @@
 | メソッド/パス | 概要 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
 | `POST /info-links` | 手動リンク追加 | ボディ: `info_item_id`・`target_type`（`ideas\|concepts\|quests\|assumptions`）・`target_id`・`kind?`（既定 `related`）。`origin=manual` | 作成した `info_link`。**active な同一 `(info,target,type)` は 409 `conflict`**（既存を返す/更新に誘導）。**棄却済み（`rejected_at` 有り）の同一組は 409 とせず復活**＝既存行の `rejected_at`→NULL・指定 `kind`/`origin=manual`/`created_by_id` で上書き（UNIQUE 制約で INSERT 不可のため既存行を再活性・成果物側の逆向きピッカーは棄却行を知らずに再追加するため 409 を避ける・N-TC-223） |
-| `PATCH /info-links/{id}` | 種別変更（関連↔裏付け↔反証） | ボディ: `kind`（`related\|supporting\|refuting`） | 更新後の `info_link`。**related/supporting→`refuting` への遷移で post-commit＝「根底を揺さぶる」通知 `info_refuting_raised`**（宛先＝成果物の作成者/所有者＋評価者〔投票者〕＋クエスト管理者〔owner/quest_admin〕・付けた本人は除外・§N.6）。`POST /info-links` で `kind=refuting` 起票時も同通知。**要再評価は通知のみ（MVP・成果物側の再評価フラグ/リセットは今後）** |
-| `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・**行は残す**）。auto リンクを人が「不要」と判断＝**以後の再計算でも復活しない**（§N.6 の upsert が既存行の `rejected_at` を尊重）。棄却は物理削除でなく論理（監査・再学習の材料に残す） |
-| `POST /info-links/{id}/unreject` | 棄却の取消 | — | `rejected_at` を NULL に |
+| `PATCH /info-links/{id}` | 種別変更（関連↔裏付け↔反証） | ボディ: `kind`（`related\|supporting\|refuting`） | 更新後の `info_link`。**related/supporting→`refuting` への遷移で post-commit＝「根底を揺さぶる」通知 `info_refuting_raised`**（宛先＝成果物の作成者/所有者＋評価者〔投票者〕＋クエスト管理者〔owner/quest_admin〕・付けた本人は除外・§N.6）。`POST /info-links` で `kind=refuting` 起票時も同通知。**要再評価は通知のみ（MVP・成果物側の再評価フラグ/リセットは今後）**。**`disposition != pending`（採用/不採用済み）のリンクは 409 `conflict`（採否ロック・§N.3-採否）** |
+| `POST /info-links/{id}/reject` | 自動リンクの棄却 | — | `rejected_at` セット（パネル非表示・**行は残す**）。auto リンクを人が「不要」と判断＝**以後の再計算でも復活しない**（§N.6 の upsert が既存行の `rejected_at` を尊重）。棄却は物理削除でなく論理（監査・再学習の材料に残す）。**`disposition != pending` のリンクは 409 `conflict`（採否ロック）** |
+| `POST /info-links/{id}/unreject` | 棄却の取消 | — | `rejected_at` を NULL に。**`disposition != pending` のリンクは 409 `conflict`（採否ロック）** |
 
-- **情報側のリンク操作（追加/種別変更/棄却）は会社内 active ユーザー全員**（`can.add_link`・`info_curator` 管轄外・`status` 非依存・N.0）＝低摩擦で関連を“発生”させる層。**追加は情報側（SC-50/52）だけでなく成果物側（SC-12/SC-22 の「＋ 関連情報を追加」）からも同 `POST /info-links` で行う**（逆向きピッカー＝既存情報を `GET /info-items` で探して選ぶ・双方向・`created_by_id` に関連付けた人を記録）。**貼られたリンクの採否・統制は成果物側の管理権限者に委任**（成果物側の採否ワークフロー＝各ドメイン C/D/コンセプトの別スコープ・反証の要再評価の受領も成果物側）。
+- **情報側のリンク操作（追加/種別変更/棄却）は会社内 active ユーザー全員**（`can.add_link`・`info_curator` 管轄外・`status` 非依存・N.0）＝低摩擦で関連を“発生”させる層。**追加は情報側（SC-50/52）だけでなく成果物側（SC-12/SC-22 の「＋ 関連情報を追加」）からも同 `POST /info-links` で行う**（逆向きピッカー＝既存情報を `GET /info-items` で探して選ぶ・双方向・`created_by_id` に関連付けた人を記録）。**貼られたリンクの採否・統制は成果物側の管理権限者に委任**（成果物側の採否ワークフロー＝各ドメイン C/D の別スコープ・下記「採否」参照・反証の要再評価の受領も成果物側）。
+
+### N.3-採否（成果物側の disposition＝FR-41 Phase2）
+
+- **採否は成果物側の管理権限者が「貼られた各リンクをどう扱ったか」を記録する**＝`info_links.disposition`（`pending` 未処理 / `adopted` 採用 / `declined` 不採用）＋`disposition_note`（どう処理・反映したか）＋`disposed_by_id`/`disposed_at`。EP は成果物ドメインに置く（権限が成果物側のため）＝**`PATCH /quests/{id}/related-info/{link_id}`（C.8b）**・**`PATCH /ideas/{id}/related-info/{link_id}`（D）**。
+- **設定できるのは管理権限者のみ**＝クエスト: owner/quest_admin／アイデア: 作成者 or 所属クエスト owner/quest_admin（read の門番と同じ可視性＋書込権）。**閲覧は成果物が見える人全員**（状態・メモは透明化）。
+- **ロック**＝`disposition != pending` の間は当該リンクの**棄却/棄却解除/種別変更を 409 で拒否**（処理済みの解除→再関連付けで蒸し返るのを防ぐ）。管理者が `disposition=pending` に戻すとロック解除（状態は管理者が随時変更可）。
+- **表示への影響**＝related-info read は `declined` も返す（棄却 `rejected_at` は除外）。クライアントは既定パネルで `declined` を隠して件数のみ表示・全画面で未処理/採用/不採用にグループ化。**採用（`adopted`）は情報＋処理メモをクエスト「🏁 結果」タブ（クエスト＋配下アイデア集約・C.8）に載せる**。**採用の「反映」自体は人手**（自動でアイデア化しない）。
 - **自動リンク生成は EP を持たない**＝情報保存/成果物保存の内部トリガでサーバーが類似度計算し `info_links(origin=auto, kind=related, score)` を upsert（§N.6）。**通知は出さない**（低コミット・閾値＋上位 N）。
 - **`impact_class=threat` は per-link `kind` の初期サジェスト**に使うだけ（自動発火しない）。**要再評価の発火は per-link `refuting`（manual）のみ**（誤爆防止・設計 §11-⑤）。
 

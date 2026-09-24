@@ -1138,3 +1138,47 @@ def test_d_tc_236_idea_related_info_gate(client, env):
     _login_seed(client)
     assert client.get(RELATED_INFO_I.format(other_i)).status_code == 404
     assert client.get(RELATED_INFO_I.format(_uuid.uuid4())).status_code == 404
+
+
+DISPOSE_I = "/api/v1/ideas/{}/related-info/{}"
+LINKS_I = "/api/v1/info-links"
+
+
+def test_d_tc_239_idea_link_disposition(client, env):
+    """D-TC-239: 採否＝アイデア作成者が adopted を設定。read に状態＋can_dispose・採否済みは棄却 409（ロック）。"""
+    qid = env.make_quest()  # owner=seed
+    iid = env.make_idea(quest_id=qid, author=env.user_id)  # 作成者=seed
+    info_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id,
+                               title="採否239", origin="manual")
+    with get_tenant_session(env.db_identifier) as ts:
+        link_id = ts.execute(InfoLink.__table__.select().where(InfoLink.info_item_id == info_i)).first()[0]
+    try:
+        _login_seed(client)
+        r = client.patch(DISPOSE_I.format(iid, link_id),
+                         json={"disposition": "adopted", "note": "本文に反映"}, headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["disposition"] == "adopted" and d["disposed_by"]["user_id"] == str(env.user_id)
+        row = next(x for x in client.get(RELATED_INFO_I.format(iid)).json()["data"] if x["link_id"] == str(link_id))
+        assert row["disposition"] == "adopted" and row["can_dispose"] is True
+        assert client.post(f"{LINKS_I}/{link_id}/reject", headers=_csrf(client)).status_code == 409  # ロック
+    finally:
+        _cleanup_info_i(env.db_identifier, [info_i])
+
+
+def test_d_tc_240_idea_disposition_requires_manager(client, env):
+    """D-TC-240: 採否は作成者/owner/quest_admin のみ＝非作成者の一般メンバーは 403・can_dispose=false。"""
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote", "comment"])  # seed は一般メンバー
+    iid = env.make_idea(quest_id=qid, author=env.other_id)  # 作成者=other（seed は非作成者）
+    info_i = _seed_info_link_i(env.db_identifier, target_id=iid, created_by=env.user_id,
+                               title="採否240", origin="manual")
+    with get_tenant_session(env.db_identifier) as ts:
+        link_id = ts.execute(InfoLink.__table__.select().where(InfoLink.info_item_id == info_i)).first()[0]
+    try:
+        _login_seed(client)
+        assert client.patch(DISPOSE_I.format(iid, link_id),
+                            json={"disposition": "adopted"}, headers=_csrf(client)).status_code == 403
+        row = next(x for x in client.get(RELATED_INFO_I.format(iid)).json()["data"] if x["link_id"] == str(link_id))
+        assert row["can_dispose"] is False
+    finally:
+        _cleanup_info_i(env.db_identifier, [info_i])

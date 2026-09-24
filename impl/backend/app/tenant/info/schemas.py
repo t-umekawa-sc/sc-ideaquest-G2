@@ -21,6 +21,7 @@ SOURCE_VALUES: frozenset[str] = frozenset({
 IMPACT_CLASS_VALUES: frozenset[str] = frozenset({"opportunity", "threat", "other"})
 LINK_TARGET_VALUES: frozenset[str] = frozenset({"ideas", "concepts", "quests", "assumptions"})
 LINK_KIND_VALUES: frozenset[str] = frozenset({"related", "supporting", "refuting"})
+LINK_DISPOSITION_VALUES: frozenset[str] = frozenset({"pending", "adopted", "declined"})
 
 
 class InfoCreatorDTO(BaseModel):
@@ -208,10 +209,23 @@ class RelatedInfoItemDTO(BaseModel):
     impact_class: str | None = None  # opportunity / threat / other
     summary: str | None = None
     linked_by: InfoCreatorDTO | None = None  # manual のみ＝関連付けた人（auto は system＝None）
+    # 成果物側の採否（FR-41 Phase2）。can_dispose＝閲覧者が採否できるか（管理権限者）。
+    disposition: str = "pending"  # pending / adopted / declined
+    disposition_note: str | None = None
+    disposed_by: InfoCreatorDTO | None = None  # 状態を設定した管理権限者（pending は None）
+    disposed_at: str | None = None
+    can_dispose: bool = False
 
 
 class RelatedInfoResponse(BaseModel):
     data: list[RelatedInfoItemDTO] = []
+
+
+class LinkDispositionRequest(BaseModel):
+    """成果物側のリンク採否（C.8b／D＝`PATCH /{quest,idea}/related-info/{link_id}`・FR-41 Phase2）。"""
+
+    disposition: str  # pending / adopted / declined
+    note: str | None = None
 
 
 class InfoThreadItemDTO(BaseModel):

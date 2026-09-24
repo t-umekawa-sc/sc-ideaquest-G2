@@ -130,10 +130,23 @@ def get_idea_detail(account_id, company_id, idea_id) -> dict:
         return _build_detail(ts, idea, user.id)
 
 
-def get_idea_related_info(account_id, company_id, idea_id, *, limit: int = 50) -> dict:
-    """アイデアの関連情報（D・SC-22 右レール・FR-41）。門番＝`get_idea_detail` と同一（範囲外 404）。
+def _can_dispose_idea(ts, idea, user) -> bool:
+    """アイデアに貼られたリンクの採否可否＝アイデア作成者 or 所属クエスト owner/quest_admin（FR-41 Phase2）。"""
+    if idea.author_id == user.id:
+        return True
+    quest = quests_repo.get_quest(ts, idea.quest_id)
+    if quest is None:
+        return False
+    if quest.owner_id == user.id:
+        return True
+    member = quests_repo.get_active_member(ts, quest.id, user.id)
+    return member is not None and "quest_admin" in quests_repo.get_permissions(ts, member.id)
 
-    `info_links`（`target_type='ideas'`）を成果物側 read で返す（N.1 委譲）。表示のみ（Phase 1）。
+
+def get_idea_related_info(account_id, company_id, idea_id, *, limit: int = 50) -> dict:
+    """アイデアの関連情報（D・SC-22 概要直下パネル・FR-41）。門番＝`get_idea_detail` と同一（範囲外 404）。
+
+    `info_links`（`target_type='ideas'`）を成果物側 read で返す（N.1 委譲）。採否可否（can_dispose）を付す。
     """
     from app.tenant.info import application as info_service  # 遅延 import（info→ideas の逆参照で循環を避ける）
     company = _resolve_company(company_id)
@@ -151,7 +164,37 @@ def get_idea_related_info(account_id, company_id, idea_id, *, limit: int = 50) -
             raise AppError(404, "not_found")  # 下書きは本人のみ
         if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
             raise AppError(404, "not_found")  # アクセス条件外は秘匿（C.0）
-        return {"data": info_service.related_info_for_target(ts, "ideas", iid, limit=limit)}
+        can_dispose = _can_dispose_idea(ts, idea, user)
+        return {"data": info_service.related_info_for_target(ts, "ideas", iid, limit=limit, can_dispose=can_dispose)}
+
+
+def set_idea_link_disposition(account_id, company_id, idea_id, link_id, *, disposition: str, note: str | None) -> dict:
+    """アイデアに貼られた関連情報リンクの採否（D・FR-41 Phase2）＝作成者 or owner/quest_admin のみ。
+
+    門番＝`get_idea_related_info` と同一（範囲外 404）＋書込は管理権限者（403）。採否本体は N に委譲。
+    """
+    from app.tenant.info import application as info_service  # 遅延 import（循環回避）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        idea = repo.get_idea(ts, iid)
+        if idea is None:
+            raise AppError(404, "not_found")
+        if idea.status == "draft" and idea.author_id != user.id:
+            raise AppError(404, "not_found")
+        if not quests_repo.can_access_quest_id(ts, idea.quest_id, user.id):
+            raise AppError(404, "not_found")
+        if not _can_dispose_idea(ts, idea, user):
+            raise AppError(403, "forbidden", detail="採否は作成者/owner/quest_admin のみ可能です")
+        dto = info_service.set_link_disposition(ts, link_id, "ideas", iid,
+                                                disposition=disposition, note=note, actor_id=user.id)
+        ts.commit()
+    return dto
 
 
 # ---- 版・差分（D.4） ----

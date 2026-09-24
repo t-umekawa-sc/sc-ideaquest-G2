@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
-from app.tenant.info.schemas import RelatedInfoResponse
+from app.tenant.info.schemas import LinkDispositionRequest, RelatedInfoItemDTO, RelatedInfoResponse
 from app.tenant.quests import application as quest_service
 from app.tenant.quests.schemas import (
     FollowResponse,
@@ -217,6 +217,24 @@ def get_quest_related_info(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, limit=limit,
     )
     return RelatedInfoResponse(**result)
+
+
+@router.patch("/quests/{quest_id}/related-info/{link_id}", response_model=RelatedInfoItemDTO)
+def set_quest_link_disposition(
+    quest_id: str,
+    link_id: str,
+    body: LinkDispositionRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> RelatedInfoItemDTO:
+    """クエストに貼られた関連情報リンクの採否（C.8b・FR-41 Phase2）＝owner/quest_admin のみ。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = quest_service.set_quest_link_disposition(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, link_id,
+        disposition=body.disposition, note=body.note,
+    )
+    return RelatedInfoItemDTO(**result)
 
 
 @router.get("/quest-groups", response_model=QuestGroupsResponse)

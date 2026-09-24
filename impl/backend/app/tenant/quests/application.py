@@ -312,7 +312,39 @@ def get_quest_related_info(account_id: uuid.UUID, company_id: uuid.UUID, quest_i
                 raise AppError(404, "not_found")  # 下書きは本人だけ
         elif not repo.can_access_quest(ts, quest, user.id):
             raise AppError(404, "not_found")  # 公開系は C.0 門番
-        return {"data": info_service.related_info_for_target(ts, "quests", qid, limit=limit)}
+        can_dispose = _can_edit_outcome(ts, quest, user)  # 採否は owner/quest_admin（FR-41 Phase2）
+        return {"data": info_service.related_info_for_target(ts, "quests", qid, limit=limit, can_dispose=can_dispose)}
+
+
+def set_quest_link_disposition(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, link_id: str,
+                               *, disposition: str, note: str | None) -> dict:
+    """クエストに貼られた関連情報リンクの採否（C.8b・FR-41 Phase2）＝owner/quest_admin のみ。
+
+    門番＝`get_quest_related_info` と同一（範囲外 404）＋書込は管理権限者（403）。採否本体は N に委譲。
+    """
+    from app.tenant.info import application as info_service  # 遅延 import（循環回避）
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.status == "draft":
+            if quest.owner_id != user.id:
+                raise AppError(404, "not_found")
+        elif not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        if not _can_edit_outcome(ts, quest, user):  # 採否は owner/quest_admin のみ
+            raise AppError(403, "forbidden", detail="採否は owner/quest_admin のみ可能です")
+        dto = info_service.set_link_disposition(ts, link_id, "quests", qid,
+                                                disposition=disposition, note=note, actor_id=user.id)
+        ts.commit()
+    return dto
 
 
 def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:

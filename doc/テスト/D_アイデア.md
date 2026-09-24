@@ -95,6 +95,8 @@
 | D-TC-236 | api | 関連情報の門番＝アイデア詳細と同一（範囲外/不明は 404＝存在秘匿） | seed 非参加クエストのアイデア／不明 ID | `GET /ideas/{id}/related-info` | いずれも **404**（アイデア可視性・C.0） | D（related-info）／C.0 |
 | D-TC-237 | e2e | **SC-22 概要直下の関連情報ストリップにリンク情報が出る**（クエスト SC-12 と同じ strip 配置・反証は⚠） | published アイデア＋情報を反証で関連付け | `/ideas/{id}` を開く | `.ri-panel` が表示・ヘッダーに「関連情報」＋反証件数・カードが `is-refuting`＋反証バッジ | SC-22／FR-41／D（related-info） |
 | D-TC-238 | e2e | **SC-22 ストリップの「＋ 関連情報を追加」で既存情報を関連付け**（成果物→情報・逆向きピッカー） | published アイデア＋未リンクの情報 | `/ideas/{id}` でストリップの「＋ 関連情報を追加」→検索→選択→確定 | 追加した情報がストリップにカード表示（`INFO_CHANGED_EVENT` で再取得） | SC-22／FR-41／N.3 |
+| D-TC-239 | api | **アイデアの採否（disposition・FR-41 Phase2）＝作成者が採用を設定** | published アイデア（作成者=seed）＋リンク seed | `PATCH /ideas/{id}/related-info/{link_id}`（adopted）＋`GET .../related-info` | 200・`disposition=adopted`・`disposed_by.user_id=作成者`・read の `can_dispose=true`・採否済みは棄却が 409（ロック） | D（related-info）／N.3-採否 |
+| D-TC-240 | api | 採否は作成者/owner/quest_admin のみ＝非作成者の一般メンバーは 403 | 他人作成の published アイデア（seed は一般メンバー）＋リンク seed | `PATCH /ideas/{id}/related-info/{link_id}` | **403** `forbidden`／`GET` の `can_dispose=false` | D（related-info）／N.3-採否 |
 
 ## 3. 画面 e2e（SC-21 アイデア登録・編集フォーム・D.2／§4.7／§13）
 

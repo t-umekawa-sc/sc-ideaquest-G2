@@ -124,6 +124,10 @@
 | C-TC-286 | api | 関連情報の門番＝クエスト詳細と同一（範囲外/不明は 404＝存在秘匿） | seed 非参加のクエスト（他人 owner・自分パーティー外）／不明 ID | `GET /quests/{id}/related-info` | いずれも **404**（`can_access_quest`・C.0） | C.8b／C.0 |
 | C-TC-287 | e2e | **SC-12 上部の関連情報ストリップ**にリンク情報が出る（反証は⚠強調・ヘッダーに反証件数） | user@acme が owner のクエスト作成→情報を作成し反証で関連付け→`/quests/{id}` を開く | 上部ストリップ（`.ri-panel`）を確認 | ヘッダーに「関連情報」＋「⚠ 反証 N」、当該情報が `.ri-card` で表示され `is-refuting`＋反証バッジ。作成物は後始末で削除 | SC-12 §4.1d／C.8b／FR-41 |
 | C-TC-288 | e2e | ストリップの**「＋ 関連情報を追加」で既存情報を関連付け**（成果物→情報の逆向き・双方向） | クエスト＋情報を作成→`/quests/{id}` の「＋ 関連情報を追加」を開く | 情報を検索→選択→「選択を確定」 | 追加した情報が `.ri-card` でストリップに出る（`POST /info-links`＝target=quests・既存EP流用・新規EPなし）。後始末で削除 | SC-12 §4.1d／N.3／FR-41 |
+| C-TC-289 | api | **クエストの採否（disposition・FR-41 Phase2）＝owner が採用/不採用/未処理を設定** | recruiting クエスト（owner=seed）＋リンク1件 seed | `PATCH /quests/{id}/related-info/{link_id}`（adopted→declined→pending）＋`GET .../related-info` | 各 200・`disposition` 反映・adopted で `disposition_note`/`disposed_by.user_id=owner`/`disposed_at` セット・`pending` で note/disposed_by/at クリア・read は `declined` も返し `can_dispose=true`（owner） | C.8b／N.3-採否／§5.35 |
+| C-TC-290 | api | 採否は管理権限者のみ＝非 owner/quest_admin（一般メンバー）は 403・read の `can_dispose=false` | 他人 owner のクエストに seed を一般メンバー（comment）で参加＋リンク seed | `PATCH .../related-info/{link_id}`／`GET .../related-info` | PATCH **403** `forbidden`／read は 200 で `can_dispose=false` | C.8b／N.3-採否 |
+| C-TC-291 | api | **採否ロック**＝採用/不採用済みリンクは棄却/種別変更が 409／`pending` で解除 | owner がリンクを adopted に設定 | `POST /info-links/{id}/reject`・`PATCH /info-links/{id}`（kind）→ `PATCH .../related-info/{link_id}`(pending)→再度 reject | adopted 中は reject/kind とも **409** `conflict`／`pending` に戻すと reject が 200（ロック解除） | C.8b／N.3-採否 |
+| C-TC-292 | api | 採否の 404＝当該クエストのリンクでない/不明 link_id は存在秘匿 | 別クエストのリンク／不明 link_id | `PATCH /quests/{id}/related-info/{link_id}` | いずれも **404** | C.8b／C.0 |
 
 ## 7. 複数部署横断＝参加部署（アクセス条件）・作成者別格・動的失効（FR-38 再設計・2026-09-11・C.0/C.2/C.4）
 

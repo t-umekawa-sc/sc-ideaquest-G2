@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.ideas import application as idea_service
-from app.tenant.info.schemas import RelatedInfoResponse
+from app.tenant.info.schemas import LinkDispositionRequest, RelatedInfoItemDTO, RelatedInfoResponse
 from app.tenant.ideas.schemas import (
     IdeaAttachmentDownloadResponse,
     IdeaAttachmentsResponse,
@@ -73,6 +73,24 @@ def get_idea_related_info(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, limit=limit,
     )
     return RelatedInfoResponse(**result)
+
+
+@router.patch("/ideas/{idea_id}/related-info/{link_id}", response_model=RelatedInfoItemDTO)
+def set_idea_link_disposition(
+    idea_id: str,
+    link_id: str,
+    body: LinkDispositionRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> RelatedInfoItemDTO:
+    """アイデアに貼られた関連情報リンクの採否（D・FR-41 Phase2）＝作成者/owner/quest_admin のみ。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = idea_service.set_idea_link_disposition(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, link_id,
+        disposition=body.disposition, note=body.note,
+    )
+    return RelatedInfoItemDTO(**result)
 
 
 @router.get("/ideas/{idea_id}/revisions", response_model=IdeaRevisionListResponse)

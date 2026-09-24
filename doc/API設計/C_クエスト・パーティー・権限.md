@@ -168,7 +168,7 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 
 | メソッド/パス | 概要 | 入力 | 出力・ルール |
 |---|---|---|---|
-| `GET /quests/{quest_id}/result` | 最終結果の取得（読取合成・SC-12 結果タブ） | パス: `quest_id` | 門番＝`can_access_quest`（C.0・範囲外 404）。`decisions[]`（公開アイデア＝title/value/author/is_selected/overall_avg/evaluation_count・評価平均降順）／`aspect_averages`（5観点平均・**可視な submitted のみ**・F.1）／`participation`（idea/選定/投票/評価/party 数）／`pinned_messages[]`（(b)＝ピン留めチャットの抜粋/投稿者/所属アイデア）／`outcome`（summary/learnings/next_actions/metrics/chat_summary/updated_by/at）／`can_edit`（owner・quest_admin）。**タブは常時表示＝完了前は「暫定」明示**（表示制御はフロント・EP は status 非依存で返す） |
+| `GET /quests/{quest_id}/result` | 最終結果の取得（読取合成・SC-12 結果タブ） | パス: `quest_id` | 門番＝`can_access_quest`（C.0・範囲外 404）。`decisions[]`（公開アイデア＝title/value/author/is_selected/overall_avg/evaluation_count・評価平均降順）／`aspect_averages`（5観点平均・**可視な submitted のみ**・F.1）／`participation`（idea/選定/投票/評価/party 数）／`pinned_messages[]`（(b)＝ピン留めチャットの抜粋/投稿者/所属アイデア）／`outcome`（summary/learnings/next_actions/metrics/chat_summary/updated_by/at）／`adopted_info[]`（**採用された関連情報＝FR-41 Phase2**・`info_links.disposition='adopted'` を**クエスト自身＋配下アイデア**で集約〔`target_type='quests'∧target_id=quest_id` ∪ `target_type='ideas'∧target_id∈公開アイデア`〕。各要素＝`{link_id, info_id, title, kind, source_url?, note〔処理メモ〕, disposed_by, disposed_at, target〔quest\|idea＋タイトル/リンク〕}`・`disposed_at` 降順）／`can_edit`（owner・quest_admin）。**タブは常時表示＝完了前は「暫定」明示**（表示制御はフロント・EP は status 非依存で返す） |
 | `PUT /quests/{quest_id}/result` | 総括の保存（④⑤・KPI） | パス: `quest_id`／ボディ: `summary?`/`learnings?`/`next_actions?`/`metrics?`（`[{label,value}]`）＝送られた項目のみ更新（extra=forbid） | `owner`/`quest_admin` のみ（他は 403）。範囲外 404。初回の実内容記入で **XP+20**（`reason=quest_result_summary`・クエスト単位で本人1回・冪等・G） |
 | `POST /quests/{quest_id}/result/chat-summary` | (c) 議論の自動要約を生成/再生成 | パス: `quest_id` | `owner`/`quest_admin` のみ。当該クエストの公開アイデアのチャット本文（非削除・**上限500件**）を**抽出型・オフライン（外部API/課金/外部送信なし・`janome`＋頻度ベース）**で要約し `quest_outcomes.chat_summary` に保存。応答＝`PUT` と同形の総括。将来 LLM 差し替えは要約 seam（`app/tenant/quests/summarize.py`）で局所化 |
 
@@ -179,11 +179,14 @@ SC-11（クエスト作成/編集）着手にあたり以下を確定（handoff 
 
 > 情報インプット（N）で貼られた `info_links` の**成果物側 read**。横断 EP を N に増やさず本ドメインの read として実装（N.1 委譲・I ダッシュボード §I.3 と同方針）。**Phase 1＝表示＋追加**（会社内 active 全員）。
 >
-> **成果物側からの追加導線（「＋ 関連情報を追加」・SC-12/SC-22）＝新規 EP を作らず既存を流用**＝既存情報の検索は **`GET /info-items`（N.1）**、関連付けは **`POST /info-links`（N.3）**〔`target_type='quests'`・`created_by_id`＝関連付けた人〕。**貼られたリンクの採否・「処理済み」入力は成果物側の別スコープ＝Phase 2**。
+> **成果物側からの追加導線（「＋ 関連情報を追加」・SC-12/SC-22）＝新規 EP を作らず既存を流用**＝既存情報の検索は **`GET /info-items`（N.1）**、関連付けは **`POST /info-links`（N.3）**〔`target_type='quests'`・`created_by_id`＝関連付けた人〕。
+>
+> **Phase 2＝採否（disposition）**＝貼られた各リンクを管理権限者が「未処理/採用/不採用」で採否し処理メモを残す（`PATCH .../related-info/{link_id}`）。採否済みはロック（棄却/種別変更不可・N.3-採否）。採用は「🏁 結果」タブ（C.8）に集約表示。
 
 | メソッド/パス | 概要 | 入力 | 出力・ルール |
 |---|---|---|---|
-| `GET /quests/{quest_id}/related-info` | このクエストに関連づいた情報の一覧（SC-12 上部の関連情報ストリップ） | パス: `quest_id`／クエリ: `limit?`（既定＝上位 N・例 50） | 門番＝`can_access_quest`（C.0・範囲外 404）。`info_links`（`target_type='quests'` ∧ `target_id=quest_id` ∧ `rejected_at IS NULL`）を **`score` 降順**（NULL 最後・末尾 `info_item_id` で一意化）。`data[]`=`{link_id, info_id, title, kind〔related/supporting/refuting〕, origin〔auto/manual〕, score, source_url?, impact_class?, summary?, linked_by?〔manual のみ＝`info_links.created_by_id` を氏名/アバターに解決＝**手動で関連付けた人**を表示。auto は system 生成＝null〕}`（archived 情報は除外）。カードクリックで情報詳細（SC-52）へ。**反証（`refuting`）は⚠バッジ**（要再評価は通知のみ・MVP・N.6）。読取専用 |
+| `GET /quests/{quest_id}/related-info` | このクエストに関連づいた情報の一覧（SC-12 上部の関連情報ストリップ） | パス: `quest_id`／クエリ: `limit?`（既定＝上位 N・例 50） | 門番＝`can_access_quest`（C.0・範囲外 404）。`info_links`（`target_type='quests'` ∧ `target_id=quest_id` ∧ `rejected_at IS NULL`）を **`score` 降順**（NULL 最後・末尾 `info_item_id` で一意化）。`data[]`=`{link_id, info_id, title, kind〔related/supporting/refuting〕, origin〔auto/manual〕, score, source_url?, impact_class?, summary?, linked_by?〔manual のみ＝`info_links.created_by_id` を氏名/アバターに解決〕, disposition〔pending/adopted/declined〕, disposition_note?, disposed_by?〔氏名/アバターに解決〕, disposed_at?, can_dispose〔採否できるか＝owner/quest_admin〕}`（archived 情報は除外・**不採用〔declined〕も返す**＝クライアントが既定パネルで隠し件数表示・全画面でグループ化）。カードクリックで情報詳細（SC-52）へ。**反証（`refuting`）は⚠バッジ**（要再評価は通知のみ・MVP・N.6）。読取専用 |
+| `PATCH /quests/{quest_id}/related-info/{link_id}` | このクエストに貼られたリンクの採否（disposition・FR-41 Phase2） | パス: `quest_id`/`link_id`／ボディ: `disposition`（`pending\|adopted\|declined`）・`note?`（処理メモ） | 門番＝**owner/quest_admin のみ**（可視は C.0・書込は管理権限者）。`disposition`/`disposition_note`/`disposed_by_id`/`disposed_at` を更新。`pending` 以外でリンクをロック（棄却/棄却解除/種別変更を 409・N.3-採否）／`pending` で解除。リンクが当該クエストのものでなければ 404。更新後の related-info 行を返す |
 
 ## C.9 クエストの発見・フォロー・参加リクエスト（FR-40・SC-13/SC-01/SC-12）
 
