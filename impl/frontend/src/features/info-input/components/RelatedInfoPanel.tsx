@@ -20,6 +20,13 @@ function RelatedInfoCard({ x, compact }: { x: RelatedInfoItem; compact?: boolean
   return (
     <article className={`ri-card${x.kind === "refuting" ? " is-refuting" : ""}${compact ? " ri-card--compact" : ""}`}>
       <div className="ri-title"><Link href={`/info-items/${x.info_id}`}>{x.title}</Link></div>
+      {!compact && x.summary ? <div className="ri-summary">{x.summary}</div> : null}
+      <div className="ri-meta">
+        {x.score != null && <span className="ri-score">一致度 {x.score.toFixed(2)}</span>}
+        {x.impact_class && <span>{IMPACT_CLASS_LABEL[x.impact_class]?.[0] ?? x.impact_class}</span>}
+        {x.source_url && <a className="ri-src" href={x.source_url} target="_blank" rel="noopener noreferrer">🔗 出典</a>}
+      </div>
+      {/* 種別バッジ＋関連付けた人＝カード最下段の1行横並び（タイトルを圧迫しない） */}
       <div className="ri-badges">
         <span className={`badge ${LINK_KIND_LABEL[x.kind]?.[1] ?? ""}`}>{KIND_ICON[x.kind] ?? "🔗"} {LINK_KIND_LABEL[x.kind]?.[0] ?? x.kind}</span>
         {x.origin === "manual" && x.linked_by ? (
@@ -30,12 +37,6 @@ function RelatedInfoCard({ x, compact }: { x: RelatedInfoItem; compact?: boolean
         ) : (
           <span className="badge badge-muted" title="類似度で自動生成">🤖 自動</span>
         )}
-      </div>
-      {!compact && x.summary ? <div className="ri-summary">{x.summary}</div> : null}
-      <div className="ri-meta">
-        {x.score != null && <span className="ri-score">一致度 {x.score.toFixed(2)}</span>}
-        {x.impact_class && <span>{IMPACT_CLASS_LABEL[x.impact_class]?.[0] ?? x.impact_class}</span>}
-        {x.source_url && <a className="ri-src" href={x.source_url} target="_blank" rel="noopener noreferrer">🔗 出典</a>}
       </div>
     </article>
   );
