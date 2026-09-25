@@ -56,3 +56,10 @@
 .eval-row-head { display: flex; align-items: center; gap: var(--space-2, .5rem); }
 .eval-aspect { font-weight: 600; }
 .eval-scores { display: flex; gap: var(--space-1, .25rem); }
+
+/* SC-12 コンセプトタブ */
+.concept-tab { display: flex; flex-direction: column; gap: var(--space-4, 1rem); }
+.concept-tab-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, .75rem); flex-wrap: wrap; }
+.concept-tab-section h3 { margin: 0 0 var(--space-2, .5rem); font-size: var(--text-base, 1rem); }
+.concept-table tr.is-clickable { cursor: pointer; }
+.concept-table tr.is-clickable:hover { background: var(--color-surface-alt); }

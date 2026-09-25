@@ -22,6 +22,7 @@ import { backToListOr, markIdeaFromQuest, consumeQuestFromList } from "@/lib/nav
 import { deadlineUrgency, deadlineCountdown, todayISO } from "@/lib/deadline";
 import { QuestIcon } from "@/components/layout";
 import { QuestResultTab } from "./QuestResultTab";
+import { ConceptTab } from "@/features/concepts";
 import { JoinRequestDialog } from "./JoinRequestDialog";
 import {
   deleteQuest,
@@ -96,6 +97,8 @@ const TABS = [
   { key: "search", label: "🔍 全文検索" },
   // 🏁 結果＝クエスト最終結果（FR-39・アイデア選別の申し送り）。completed のときのみ表示（下の filter）。
   { key: "result", label: "🏁 結果" },
+  // 🧩 コンセプト＝ISO ②③段の候補コンセプト＋検証プール（FR-42・§4.6）。🏁結果の申し送りを受けて次段へ。
+  { key: "concept", label: "🧩 コンセプト" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -903,6 +906,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
       {/* 🏁 結果（FR-39・アイデア選別の申し送り・completed 時のみタブが出る） */}
       {tab === "result" && <QuestResultTab questId={questId} quest={quest} />}
+
+      {tab === "concept" && <ConceptTab questId={questId} />}
 
       {/* 概要（実接続・C.1） */}
     </section>
