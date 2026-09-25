@@ -382,6 +382,8 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
       <section className="card idea-head" aria-label="アイデア情報">
         <div className="idea-head__top">
           <div style={{ minWidth: 0 }}>
+            {/* コンセプト詳細（🧩 コンセプト）と対になる種別表示＝「💡 アイデア」を明示（labels.ts と統一）。 */}
+            <div className="idea-eyebrow">💡 アイデア</div>
             <div className="idea-head__badges">
               {idea.quest.categories.map((c) => (
                 <span className="badge badge-muted" key={c}>{c}</span>

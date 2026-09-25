@@ -762,8 +762,12 @@ def _resolve_scope(ts, sid, user):
     return scope, concept, quest
 
 
-def _message_dto(m) -> dict:
-    return {"id": str(m.id), "author_id": str(m.author_id), "body": m.body, "created_at": m.created_at}
+def _message_dto(m, author=None) -> dict:
+    a = None
+    if author is not None:
+        a = {"user_id": str(author.id), "display_name": author.display_name,
+             "avatar_image_url": _image_url(author.avatar_image_path), "level": author.level}
+    return {"id": str(m.id), "author_id": str(m.author_id), "author": a, "body": m.body, "created_at": m.created_at}
 
 
 def list_chat_scopes(account_id, company_id, concept_id) -> dict:
@@ -804,7 +808,9 @@ def list_messages(account_id, company_id, scope_id) -> dict:
     with get_tenant_session(company.db_identifier) as ts:
         user = _get_user(ts, account_id)
         scope, concept, quest = _resolve_scope(ts, sid, user)
-        return {"items": [_message_dto(m) for m in repo.list_scope_messages(ts, sid)]}
+        msgs = repo.list_scope_messages(ts, sid)
+        authors = quests_repo.get_users_by_ids(ts, {m.author_id for m in msgs})
+        return {"items": [_message_dto(m, authors.get(m.author_id)) for m in msgs]}
 
 
 def post_message(account_id, company_id, scope_id, *, body: str, message_id: str | None = None) -> dict:
@@ -818,9 +824,9 @@ def post_message(account_id, company_id, scope_id, *, body: str, message_id: str
         if mid is not None:
             existing = repo.get_scope_message(ts, mid)  # Idempotency-Key 再送＝既存を返す（二重投稿防止）
             if existing is not None:
-                return _message_dto(existing)
+                return _message_dto(existing, user if existing.author_id == user.id else quests_repo.get_users_by_ids(ts, {existing.author_id}).get(existing.author_id))
         m = repo.post_scope_message(ts, scope_id=sid, author_id=user.id, body=body, message_id=mid)
-        payload = _message_dto(m)
+        payload = _message_dto(m, user)
         ts.commit()
         return payload
 

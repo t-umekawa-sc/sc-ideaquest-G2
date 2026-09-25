@@ -92,3 +92,35 @@ export function getMyEvaluation(conceptId: string): Promise<EvaluationMe | null>
 export function putEvaluation(conceptId: string, body: EvaluationPutInput): Promise<EvaluationMe | null> {
   return apiFetch<EvaluationMe>(`/concepts/${conceptId}/evaluation`, { method: "PUT", body: JSON.stringify(body) });
 }
+
+// ---- 議論チャット（P.6・scope＝総合/グループ/前提スレッド） ----
+
+export type ConceptChatScopeItem = components["schemas"]["ConceptChatScopeItemDTO"];
+export type ConceptChatScopeList = components["schemas"]["ConceptChatScopeListResponse"];
+export type ConceptChatMsg = components["schemas"]["ConceptChatMessageDTO"];
+export type ConceptChatMsgList = components["schemas"]["ConceptChatMessageListResponse"];
+
+// コンセプトのチャットルーム一覧（総合 overall・グループ group・前提 assumption）。
+export function listChatScopes(conceptId: string): Promise<ConceptChatScopeList | null> {
+  return apiFetch<ConceptChatScopeList>(`/concepts/${conceptId}/chat-scopes`);
+}
+
+// グループルームをオンデマンド作成（owner/quest_admin・ラベルで識別）。
+export function createGroupScope(conceptId: string, label: string): Promise<ConceptChatScopeItem | null> {
+  return apiFetch<ConceptChatScopeItem>(`/concepts/${conceptId}/chat-scopes`, { method: "POST", body: JSON.stringify({ kind: "group", label }) });
+}
+
+// スコープのメッセージ一覧（作成日昇順）。
+export function listScopeMessages(scopeId: string): Promise<ConceptChatMsgList | null> {
+  return apiFetch<ConceptChatMsgList>(`/concept-chat-scopes/${scopeId}/messages`);
+}
+
+// メッセージ投稿（コメント権限＝既定パーティー員）。
+export function postScopeMessage(scopeId: string, body: string): Promise<ConceptChatMsg | null> {
+  return apiFetch<ConceptChatMsg>(`/concept-chat-scopes/${scopeId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+}
+
+// 既読位置の更新（未読バッジ用）。
+export function readScope(scopeId: string, lastReadMessageId: string): Promise<unknown> {
+  return apiFetch(`/concept-chat-scopes/${scopeId}/read`, { method: "POST", body: JSON.stringify({ last_read_message_id: lastReadMessageId }) });
+}

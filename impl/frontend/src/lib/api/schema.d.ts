@@ -3889,6 +3889,7 @@ export interface components {
             id: string;
             /** Author Id */
             author_id: string;
+            author?: components["schemas"]["ConceptAuthorDTO"] | null;
             /** Body */
             body: string;
             /** Created At */

@@ -6,4 +6,5 @@ export { ConceptCreatePanel } from "./components/ConceptCreatePanel";
 export { ConceptEditPanel } from "./components/ConceptEditPanel";
 export { ConceptEvalModal } from "./components/ConceptEvalModal";
 export { ConceptEvalPanel } from "./components/ConceptEvalPanel";
+export { ConceptChatView } from "./components/ConceptChatView";
 export * from "./api";

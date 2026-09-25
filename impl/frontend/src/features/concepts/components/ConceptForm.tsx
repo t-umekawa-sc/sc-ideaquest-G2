@@ -30,6 +30,47 @@ const VIABILITY_FIELDS: { key: string; label: string; placeholder: string }[] = 
   { key: "notes", label: "備考（その他）", placeholder: "補足があれば" },
 ];
 
+// 各入力項目の「何を書くか」アドバイス＝ラベル横の icon-only ⓘ（デザイン標準 §4.13・SC-60 §4）。
+// コンセプト名・由来アイデアには付けない（自明のため・ユーザー指摘 2026-09-25）。
+const FIELD_GUIDE: Record<string, { title: string; summary: string; full: string }> = {
+  problem: {
+    title: "課題・機会",
+    summary: "誰のどんな課題・未充足ニーズか。放置するとどう困るか、なぜ今解く価値があるか（機会）を簡潔に。",
+    full: "誰の・どんな課題／ペイン／未充足ニーズかを具体的に書きます。放置するとどう困るか、なぜ今それに取り組む価値があるか（＝機会）まで書けると、後段の評価・検証が締まります。",
+  },
+  value: {
+    title: "狙う価値（価値提案）",
+    summary: "対象にとっての便益＝何がどう良くなるか。既存手段より優れる点をできれば定量で。",
+    full: "対象にとっての便益＝このコンセプトで何がどう良くなるかを一言で言い切ります。既存のやり方・代替手段と比べて何が優れるかを、できれば定量（時間/コスト/満足度 等）で示します。",
+  },
+  target: {
+    title: "対象",
+    summary: "誰に届けるか＝主なユーザー／既存顧客／狙う市場。規模感やペルソナがあれば添える。",
+    full: "誰に届けるかを書きます＝主なユーザー像／既存顧客／狙う市場セグメント。人数・規模感やペルソナ（役割・状況）があるほど、価値提案と差別化の妥当性を判断しやすくなります。",
+  },
+  differentiation: {
+    title: "競合・差別化",
+    summary: "代替・競合は何か。それに対して勝てる理由（差別化ポイント）を挙げる。",
+    full: "代替手段・競合は何か（他社製品／既存業務のやり方／「やらない」選択も含む）。それらに対する差別化ポイント＝なぜ自分たちが勝てるのかの根拠を挙げます。",
+  },
+  solution: {
+    title: "解の形態＋必要な能力",
+    summary: "解の形（製品/サービス/仕組み・粗く可）＋必要な能力。詳細実装やWBSは次段で不要。",
+    full: "どんな形の解かを粗い粒度で書きます（製品／サービス／仕組み 等）＋実現に必要な能力・リソース（技術・体制・データ 等）。詳細な実装設計やWBSは次段（ソリューション開発）の領分なので、ここでは不要です。",
+  },
+};
+
+// ラベル横に置く icon-only ⓘ（ホバーで summary・クリックで全文）。
+function inputGuide(key: string): React.ReactNode {
+  const g = FIELD_GUIDE[key];
+  if (!g) return undefined;
+  return (
+    <ScreenPurpose summary={g.summary} dialogTitle={`${g.title}の入力ヒント`}>
+      <p style={{ margin: 0 }}>{g.full}</p>
+    </ScreenPurpose>
+  );
+}
+
 export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Props) {
   const router = useRouter();
   const snack = useSnackbar();
@@ -184,19 +225,19 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
           </div>
         </Field>
 
-        <Field className="dialog-section is-quiet" id="c_problem" label="課題・機会">
+        <Field className="dialog-section is-quiet" id="c_problem" label="課題・機会" guide={inputGuide("problem")}>
           <textarea className="textarea" id="c_problem" rows={2} value={problem} onChange={(e) => setProblem(e.target.value)} />
         </Field>
-        <Field className="dialog-section is-quiet" id="c_value" label="狙う価値（価値提案）">
+        <Field className="dialog-section is-quiet" id="c_value" label="狙う価値（価値提案）" guide={inputGuide("value")}>
           <textarea className="textarea" id="c_value" rows={2} value={valueProp} onChange={(e) => setValueProp(e.target.value)} />
         </Field>
-        <Field className="dialog-section is-quiet" id="c_target" label="対象">
+        <Field className="dialog-section is-quiet" id="c_target" label="対象" guide={inputGuide("target")}>
           <input className="input" id="c_target" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="ユーザ／既存顧客／市場" />
         </Field>
-        <Field className="dialog-section is-quiet" id="c_diff" label="競合・差別化">
+        <Field className="dialog-section is-quiet" id="c_diff" label="競合・差別化" guide={inputGuide("differentiation")}>
           <textarea className="textarea" id="c_diff" rows={2} value={differentiation} onChange={(e) => setDifferentiation(e.target.value)} />
         </Field>
-        <Field className="dialog-section is-quiet" id="c_solution" label="解の形態＋必要な能力（粗）">
+        <Field className="dialog-section is-quiet" id="c_solution" label="解の形態＋必要な能力（粗）" guide={inputGuide("solution")}>
           <textarea className="textarea" id="c_solution" rows={2} value={solutionForm} onChange={(e) => setSolutionForm(e.target.value)} />
         </Field>
 

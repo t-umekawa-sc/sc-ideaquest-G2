@@ -15,9 +15,9 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  CONCEPTS_CHANGED_EVENT, getConcept, getEvaluationAggregate,
+  CONCEPTS_CHANGED_EVENT, createGroupScope, getConcept, getEvaluationAggregate, listChatScopes,
   selectConcept, setDecision, unselectConcept, unvoteConcept, voteConcept,
-  type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
+  type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
 } from "../api";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
@@ -72,6 +72,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [loading, setLoading] = useState(true);
   const [vote, setVote] = useState<{ approve: number; oppose: number; my: ConceptVoteType | null }>({ approve: 0, oppose: 0, my: null });
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
+  const [scopes, setScopes] = useState<ConceptChatScopeItem[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -87,17 +88,35 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
 
   // 評価結果は SC-22 と同じく集計 EP から別途取得（観点別平均・評価者ごとの総評/コメント・複数名対応）。
   const loadEval = useCallback(() => { void getEvaluationAggregate(conceptId).then(setEvalAgg).catch(() => {}); }, [conceptId]);
+  // 議論チャットのルーム一覧（総合＝常在／グループ・前提＝あれば）＝動線の遷移先解決に使う（P.6）。
+  const loadScopes = useCallback(() => { void listChatScopes(conceptId).then((r) => setScopes(r?.items ?? [])).catch(() => {}); }, [conceptId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     loadEval();
-    const onChanged = () => { void load(); loadEval(); };
+    loadScopes();
+    const onChanged = () => { void load(); loadEval(); loadScopes(); };
     window.addEventListener(CONCEPTS_CHANGED_EVENT, onChanged);
     return () => window.removeEventListener(CONCEPTS_CHANGED_EVENT, onChanged);
-  }, [loadEval, load]);
+  }, [loadEval, loadScopes, load]);
 
   const perms = concept?.my_permissions ?? [];
   const canManage = perms.includes("manage");
+  const overallScope = scopes.find((s) => s.kind === "overall");
+
+  // グループ議論へ遷移＝ラベル一致のルームがあれば開く／無ければ作成（owner/quest_admin）してから開く。
+  const discussGroup = async (label: string) => {
+    if (busy) return;
+    const existing = scopes.find((s) => s.kind === "group" && s.label === label);
+    if (existing) { router.push(`/concepts/${conceptId}/chat/${existing.scope_id}`); return; }
+    setBusy(true);
+    try {
+      const created = await createGroupScope(conceptId, label);
+      if (created) { loadScopes(); router.push(`/concepts/${conceptId}/chat/${created.scope_id}`); }
+    } catch (e) {
+      snack({ type: "error", msg: e instanceof ApiError && e.status === 403 ? "議論ルームの作成は owner/クエスト管理者のみです" : "議論ルームを開けませんでした" });
+    } finally { setBusy(false); }
+  };
 
   const onVote = async (type: ConceptVoteType) => {
     if (busy) return;
@@ -179,17 +198,24 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       <div className="idea-layout">
         {/* メイン */}
         <div className="idea-main">
-          <SchemaGroup title="A. 価値・対象・競合">
+          <SchemaGroup title="A. 価値・対象・競合"
+            onDiscuss={() => void discussGroup("A. 価値・対象・競合")}
+            guide={<ScreenPurpose summary="誰の課題を、どんな価値提案で、誰に、どう差別化して解くか＝コンセプトの「なぜ・何を」の中核。" dialogTitle="価値・対象・競合とは"><p style={{ margin: 0 }}><strong>課題・機会／狙う価値（価値提案）／対象／競合・差別化</strong> をまとめたグループです。コンセプトの「誰の何を、なぜ、どう差別化して解くか」を示す中核部分です。</p></ScreenPurpose>}
+          >
             <FieldRow label="課題・機会" value={concept.problem} />
             <FieldRow label="狙う価値（価値提案）" value={concept.value_proposition} />
             <FieldRow label="対象" value={concept.target} />
             <FieldRow label="競合・差別化" value={concept.differentiation} />
           </SchemaGroup>
-          <SchemaGroup title="B. 解の形態">
+          <SchemaGroup title="B. 解の形態"
+            onDiscuss={() => void discussGroup("B. 解の形態")}
+            guide={<ScreenPurpose summary="解の形（製品/サービス/仕組み・粗く可）＋実現に必要な能力。詳細実装は次段（ソリューション）。" dialogTitle="解の形態とは"><p style={{ margin: 0 }}>どんな<strong>形</strong>の解か（製品／サービス／仕組み・粗い粒度で可）と、実現に<strong>必要な能力・リソース</strong>を示します。詳細な実装やWBSは次段（ソリューション開発）の領分です。</p></ScreenPurpose>}
+          >
             <FieldRow label="解の形態＋必要な能力" value={concept.solution_form} />
           </SchemaGroup>
           <SchemaGroup title="C. 採算・事業性"
-            guide={<ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3）。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56001 §8.3.3 の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p></ScreenPurpose>}
+            onDiscuss={() => void discussGroup("C. 採算・事業性")}
+            guide={<ScreenPurpose summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3）。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56001 §8.3.3 の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p></ScreenPurpose>}
           >
             <div className="field"><div className="dialog-label">採算・事業性（viability）</div><pre className="concept-viability">{viabilityText}</pre></div>
           </SchemaGroup>
@@ -197,7 +223,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           <section className="card concept-assumptions" aria-label="前提と検証">
             <div className="concept-section-head">
               <h2 style={{ margin: 0 }}>前提と検証</h2>
-              <ScreenPurpose label="前提と検証とは？" summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
+              <ScreenPurpose summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
             </div>
             {concept.assumptions.length === 0 ? (
               <div className="muted text-sm">まだ前提はありません。</div>
@@ -215,6 +241,19 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 ))}
               </ul>
             )}
+          </section>
+
+          {/* 下部＝総合チャット（総合ルーム・SC-61 §4.8）。活発度グラフ/直近プレビューは次スライス。 */}
+          <section className="card" aria-label="総合チャット">
+            <div className="concept-overall-chat">
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ margin: 0 }}>💬 総合チャット</h2>
+                <p className="muted text-sm" style={{ margin: "2px 0 0" }}>横断議論と最終 Go / Pivot / Kill の場（総合ルーム）。</p>
+              </div>
+              {overallScope
+                ? <Link href={`/concepts/${conceptId}/chat/${overallScope.scope_id}`} className="btn btn-primary btn-sm">チャットを開く（総合ルーム）→</Link>
+                : <span className="muted text-sm">総合ルーム準備中…</span>}
+            </div>
           </section>
         </div>
 
@@ -332,12 +371,17 @@ function FieldRow({ label, value }: { label: string; value: string | null | unde
   );
 }
 
-function SchemaGroup({ title, guide, children }: { title: string; guide?: React.ReactNode; children: React.ReactNode }) {
-  // 「このグループを議論」導線は議論チャット結線スライスで追加（今は無反応ボタンを出さない）。
+function SchemaGroup({ title, guide, onDiscuss, children }: { title: string; guide?: React.ReactNode; onDiscuss?: () => void; children: React.ReactNode }) {
+  // グループ末尾＝仕切り線＋💬「このグループを議論 →」（対応するグループ・ルームへ・SC-61 §4.3）。
   return (
     <section className="card schema-group">
       <div className="concept-section-head"><h2 style={{ margin: 0 }}>{title}</h2>{guide}</div>
       {children}
+      {onDiscuss && (
+        <div className="schema-group__discuss">
+          <button type="button" className="btn btn-outline btn-sm" onClick={onDiscuss}>💬 このグループを議論 →</button>
+        </div>
+      )}
     </section>
   );
 }

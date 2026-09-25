@@ -72,3 +72,17 @@
 
 /* コンセプト詳細＝アイデア詳細と見分けるためのアイブロー（🧩 コンセプト） */
 .concept-eyebrow { font-size: var(--text-xs, .75rem); font-weight: 700; color: var(--color-primary); letter-spacing: .04em; margin-bottom: 2px; }
+
+/* ===== 議論チャット（SC-61 §4.3-4.8・P.6・スコープ単位の簡素チャット） ===== */
+.concept-chat-page { padding-top: var(--space-5); }
+.concept-chat-title { margin: 0; font-size: var(--text-lg); }
+.concept-chat-thread { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) 0; max-height: 60vh; overflow-y: auto; }
+.concept-chat-msg { display: flex; gap: var(--space-2); align-items: flex-start; }
+.concept-chat-msg__body { min-width: 0; flex: 1 1 auto; }
+.concept-chat-msg__meta { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: 2px; }
+.concept-chat-msg__text { white-space: pre-wrap; word-break: break-word; }
+.concept-chat-composer { display: flex; gap: var(--space-2); align-items: flex-end; border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.concept-chat-composer .textarea { flex: 1 1 auto; }
+/* 詳細画面のグループ末尾＝議論導線（仕切り線＋ボタン）／総合チャットカード */
+.schema-group__discuss { border-top: 1px solid var(--color-border); margin-top: var(--space-3); padding-top: var(--space-3); display: flex; justify-content: flex-end; }
+.concept-overall-chat { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }

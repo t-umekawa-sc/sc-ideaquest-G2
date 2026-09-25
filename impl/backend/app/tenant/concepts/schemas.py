@@ -345,6 +345,7 @@ class ConceptGroupScopeCreateRequest(BaseModel):
 class ConceptChatMessageDTO(BaseModel):
     id: str
     author_id: str
+    author: ConceptAuthorDTO | None = None  # 表示用（display_name/avatar/level）＝チャットで著者を出す
     body: str
     created_at: datetime | None = None
 

@@ -874,6 +874,9 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
    inline-flex が壊れ、トラック（flex item の width:42px）が inline 化して幅0に潰れる。明示的に戻す。 */
 .field > label.switch { display: inline-flex; font-weight: 400; margin-bottom: 0; }
 .field .req { color: var(--color-danger); margin-left: 2px; }
+/* ラベル横にガイダンス ⓘ 等を並べる行（Field の guide スロット・デザイン標準 §4.13）。ラベルは block をやめ行内で縦中央。 */
+.field__labelrow { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.field__labelrow > label { display: inline; font-size: var(--text-sm); font-weight: 500; margin-bottom: 0; }
 .input, .textarea, .select {
   width: 100%; font-family: var(--font-base); font-size: var(--text-base);
   padding: var(--space-2) var(--space-3);

@@ -209,3 +209,6 @@
 /* #25: 進捗バーの伸びる演出（評価結果の観点別平均バー）。 */
 .score-bar > i { transform-origin: left; animation: bar-grow .8s cubic-bezier(.22,1,.36,1) both; }
 @media (prefers-reduced-motion: reduce) { .score-bar > i { animation: none; } }
+
+/* 種別 eyebrow「💡 アイデア」＝コンセプト詳細の .concept-eyebrow と対の表示（件名の上に小さく明示・SC-22）。 */
+.idea-eyebrow { font-size: var(--text-xs, .75rem); font-weight: 700; color: var(--color-primary); letter-spacing: .04em; margin-bottom: 2px; }

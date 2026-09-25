@@ -10,11 +10,13 @@ type Props = {
   hint?: string;
   error?: string | null;
   children: ReactNode;
+  // ラベル横に置くガイダンス等（例＝`<ScreenPurpose>` の ⓘ・デザイン標準 §4.13）。指定時はラベルと同じ行に並べる。
+  guide?: ReactNode;
   // 入力グループの先頭に `.dialog-section`（薄い仕切り線）を付ける等、外側 `.field` に追加クラスを渡す（§4.1）。
   className?: string;
 };
 
-export function Field({ id, label, required, hint, error, children, className }: Props) {
+export function Field({ id, label, required, hint, error, children, guide, className }: Props) {
   const hintId = hint && !error ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = errorId ?? hintId;
@@ -37,10 +39,20 @@ export function Field({ id, label, required, hint, error, children, className }:
 
   return (
     <div className={className ? `field ${className}` : "field"}>
-      <label htmlFor={id}>
-        {label}
-        {required && <span className="req">*</span>}
-      </label>
+      {guide ? (
+        <div className="field__labelrow" data-sp-host>
+          <label htmlFor={id}>
+            {label}
+            {required && <span className="req">*</span>}
+          </label>
+          {guide}
+        </div>
+      ) : (
+        <label htmlFor={id}>
+          {label}
+          {required && <span className="req">*</span>}
+        </label>
+      )}
       {child}
       {hint && !error && (
         <p className="hint" id={hintId}>
