@@ -1,53 +1,46 @@
 "use client";
 
-// SC-61 コンセプト詳細（フルページ・FR-42・P.1 GET /concepts/{id} 実接続）。
-// レイアウト＝ヘッダー（パンくず/名前/status/Go-Pivot-Kill/★選定/由来アイデア/ガイダンスⓘ）→関連情報パネル（全幅）
-// →メイン（スキーマ A/B/C グループ＋各末尾💬グループ議論／⑥前提と検証=核心）＋右レール（投票→評価結果→総合判定[最下部]）
-// →下部＝総合チャット。正＝doc/画面設計/screens/SC-61_コンセプト詳細.md。ガイダンス＝デザイン標準§4.13（.screen-purpose）。
+// SC-61 コンセプト詳細（フルページ・FR-42・P.1）。SC-22 アイデア詳細と同型＝共有クラス/部品を再利用する
+// （戻るリンク backlink--float・ヘッダー .card.idea-head・関連情報 RelatedInfoPanel・投票 .vote-* パネル・2カラム .idea-layout）。
+// コンセプト固有（スキーマA/B/Cグループ・前提と検証・総合判定・ガイダンスⓘ）だけ concepts.css で足す。DRY（フロー規約 §2/§2.1）。
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { LoadingOverlay, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { Avatar, LoadingOverlay, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout/QuestIcon";
+import { RelatedInfoPanel } from "@/features/info-input";
+import { votePercents } from "@/features/ideas/voting";
 import { ApiError } from "@/lib/api/client";
 
 import {
-  activateConcept,
-  archiveConcept,
-  getConcept,
-  selectConcept,
-  setDecision,
-  unselectConcept,
-  unvoteConcept,
-  voteConcept,
-  type ConceptDetail,
-  type ConceptVoteType,
+  activateConcept, archiveConcept, getConcept, selectConcept, setDecision,
+  unselectConcept, unvoteConcept, voteConcept, type ConceptDetail, type ConceptVoteType,
 } from "../api";
+import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
 
 const STATUS_LABEL: Record<string, [string, string]> = {
-  draft: ["下書き", "badge badge-muted"],
-  active: ["検証中", "badge badge-success"],
-  archived: ["保管", "badge badge-muted"],
+  draft: ["下書き", "badge badge-muted"], active: ["検証中", "badge badge-success"], archived: ["保管", "badge badge-muted"],
 };
 const DECISION_LABEL: Record<string, [string, string]> = {
-  undecided: ["未判定", "badge badge-muted"],
-  go: ["Go", "badge badge-success"],
-  pivot: ["Pivot", "badge badge-muted"],
-  kill: ["Kill", "badge badge-danger"],
+  undecided: ["未判定", "badge badge-muted"], go: ["Go", "badge badge-success"], pivot: ["Pivot", "badge badge-muted"], kill: ["Kill", "badge badge-danger"],
 };
 const VERDICT_LABEL: Record<string, [string, string]> = {
-  inconclusive: ["保留", "badge badge-muted"],
-  supported: ["支持", "badge badge-success"],
-  refuted: ["反証", "badge badge-danger"],
+  inconclusive: ["保留", "badge badge-muted"], supported: ["支持", "badge badge-success"], refuted: ["反証", "badge badge-danger"],
 };
 const CRITICALITY_LABEL: Record<string, string> = { critical: "致命的", major: "重要", minor: "補助" };
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function Badge({ map, value }: { map: Record<string, [string, string]>; value: string }) {
   const [label, cls] = map[value] ?? [value, "badge badge-muted"];
   return <span className={cls}>{label}</span>;
 }
 
-// ガイダンス（全文ダイアログ・§4.13）＝ISO 56002 準拠の定義・目的・粒度。SC-60/62 と共通文面。
 function ConceptGuide() {
   return (
     <ScreenPurpose
@@ -55,18 +48,9 @@ function ConceptGuide() {
       summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
       dialogTitle="この画面について（ISO 56002 準拠）"
     >
-      <div className="dialog-section">
-        <div className="dialog-label">コンセプトとは</div>
-        <p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値（価値提案）と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56002 §8.3 概念の創造・検証＝②③段）。</p>
-      </div>
-      <div className="dialog-section">
-        <div className="dialog-label">この画面の狙い</div>
-        <p style={{ margin: 0 }}>スキーマを埋め、主要な前提を<strong>「証拠で」検証</strong>（desirability・feasibility・viability）しながら、<strong>Go / Pivot / Kill</strong> の判断まで導きます。<strong>否定的な検証結果こそ価値</strong>（筋の悪い方向を早く止める）。</p>
-      </div>
-      <div className="dialog-section">
-        <div className="dialog-label">粒度</div>
-        <p style={{ margin: 0 }}><strong>1 クエスト（＝1 イニシアチブ）</strong>の中に複数の候補が競合し、評価と検証を経て owner が勝ち残りを選定します。<strong>アイデアより大きく、ソリューション（実装・WBS）より前</strong>の単位です。</p>
-      </div>
+      <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56002 §8.3 ②③段）。</p></div>
+      <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>Go / Pivot / Kill</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
+      <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、owner が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
     </ScreenPurpose>
   );
 }
@@ -75,18 +59,21 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const snack = useSnackbar();
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [vote, setVote] = useState<{ approve: number; oppose: number; mine: string | null }>({ approve: 0, oppose: 0, mine: null });
+  const [vote, setVote] = useState<{ approve: number; oppose: number; my: ConceptVoteType | null }>({ approve: 0, oppose: 0, my: null });
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
     setConcept(c);
+    if (c) {
+      const v = c.vote ?? { summary: { approve: 0, oppose: 0 }, my_vote: null };
+      const mv = v.my_vote;
+      setVote({ approve: v.summary?.approve ?? 0, oppose: v.summary?.oppose ?? 0, my: mv === "approve" || mv === "oppose" ? mv : null });
+    }
     setLoading(false);
   }, [conceptId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const perms = concept?.my_permissions ?? [];
   const canManage = perms.includes("manage");
@@ -95,112 +82,96 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
     if (busy) return;
     setBusy(true);
     try {
-      const next = vote.mine === type ? await unvoteConcept(conceptId) : await voteConcept(conceptId, type);
-      if (next) setVote({ approve: next.summary?.approve ?? 0, oppose: next.summary?.oppose ?? 0, mine: next.my_vote ?? null });
+      const next = vote.my === type ? await unvoteConcept(conceptId) : await voteConcept(conceptId, type);
+      if (next) setVote({ approve: next.summary?.approve ?? 0, oppose: next.summary?.oppose ?? 0, my: (next.my_vote as ConceptVoteType | null) ?? null });
       if (next && (next.xp_delta ?? 0) > 0) snack({ type: "success", title: `+${next.xp_delta} XP` });
     } catch (e) {
       snack({ type: "error", msg: e instanceof ApiError ? "投票できませんでした" : "通信に失敗しました" });
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   const runManage = async (fn: () => Promise<unknown>, ok: string) => {
     if (busy) return;
     setBusy(true);
-    try {
-      await fn();
-      await load();
-      snack({ type: "success", title: ok });
-    } catch {
-      snack({ type: "error", msg: "操作できませんでした" });
-    } finally {
-      setBusy(false);
-    }
+    try { await fn(); await load(); snack({ type: "success", title: ok }); }
+    catch { snack({ type: "error", msg: "操作できませんでした" }); }
+    finally { setBusy(false); }
   };
 
   if (loading) return <LoadingOverlay label="読み込み中…" />;
   if (!concept) return <div className="empty-page">コンセプトが見つかりません。</div>;
 
-  const viabilityText = concept.viability && Object.keys(concept.viability).length
-    ? JSON.stringify(concept.viability, null, 2)
-    : "—";
+  const pct = votePercents(vote.approve, vote.oppose);
+  const viabilityText = concept.viability && Object.keys(concept.viability).length ? JSON.stringify(concept.viability, null, 2) : "—";
 
   return (
-    <div className="concept-detail" data-sp-host>
-      {/* ヘッダー */}
-      <header className="concept-header card">
-        <div className="concept-breadcrumb">
-          <Link href={`/quests/${concept.quest_id}`}>🧭 クエストへ戻る</Link> › コンセプト
-        </div>
-        <div className="concept-title-row">
-          <h1 className="concept-title">{concept.title}</h1>
-          <Badge map={STATUS_LABEL} value={concept.status} />
-          <Badge map={DECISION_LABEL} value={concept.decision} />
-          {concept.is_selected && <span className="badge badge-success">★ 選定</span>}
-          <ConceptGuide />
-        </div>
-        {concept.source_ideas.length > 0 && (
-          <div className="concept-sources">
-            <span className="muted text-sm">由来:</span>
-            {concept.source_ideas.map((s) => (
-              <Link key={s.idea_id} href={`/ideas/${s.idea_id}`} className="chip">💡 {s.title ?? s.idea_id.slice(0, 8)}</Link>
-            ))}
-          </div>
-        )}
-        {(perms.includes("edit") || canManage) && (
-          <div className="concept-actions">
-            {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
-            {canManage && concept.status === "draft" && (
-              <button className="btn btn-primary" disabled={busy} onClick={() => runManage(() => activateConcept(conceptId), "活性化しました")}>活性化</button>
-            )}
-            {canManage && concept.status === "active" && (
-              <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => archiveConcept(conceptId), "保管しました")}>保管</button>
-            )}
-            {canManage && (
-              <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>
-                {concept.is_selected ? "★選定を解除" : "★選定する"}
-              </button>
-            )}
-          </div>
-        )}
-      </header>
+    <main className="container detail-main">
+      <Link className="backlink backlink--float" href={`/quests/${concept.quest_id}`}>← クエストへ戻る</Link>
 
-      {/* 関連情報パネル（全幅・独立）＝backend の related_info 合成は follow-up（現状プレースホルダ） */}
-      <section className="concept-relinfo card">
-        🔗 関連情報 <span className="muted text-sm">（情報インプット連携・結線は後続スライス）</span>
+      {/* ============ ヘッダー（.card.idea-head 流用） ============ */}
+      <section className="card idea-head" aria-label="コンセプト情報">
+        <div className="idea-head__top">
+          <div style={{ minWidth: 0 }}>
+            <div className="idea-head__badges">
+              <Badge map={STATUS_LABEL} value={concept.status} />
+              <Badge map={DECISION_LABEL} value={concept.decision} />
+              {concept.is_selected && <span className="badge badge-success">★ 選定</span>}
+              <ConceptGuide />
+            </div>
+            <div className="idea-head__title">
+              <QuestIcon name={concept.title} color="#6366F1" size="sm" />
+              <h1>{concept.title}</h1>
+            </div>
+            {concept.author && (
+              <div className="poster">
+                <Avatar name={concept.author.display_name} imageUrl={concept.author.avatar_image_url ?? undefined} size="sm" level={concept.author.level ?? undefined} />
+                <span className="name">作成: {concept.author.display_name}</span>
+              </div>
+            )}
+          </div>
+          <div className="idea-actions">
+            {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
+            {canManage && concept.status === "draft" && <button className="btn btn-primary" disabled={busy} onClick={() => runManage(() => activateConcept(conceptId), "活性化しました")}>活性化</button>}
+            {canManage && concept.status === "active" && <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => archiveConcept(conceptId), "保管しました")}>保管</button>}
+            {canManage && <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>{concept.is_selected ? "★選定を解除" : "★選定する"}</button>}
+          </div>
+        </div>
+        <div className="idea-meta">
+          <span>🔄 更新 {fmtDate(concept.updated_at)}</span>
+          <span>🧭 所属クエスト: <Link href={`/quests/${concept.quest_id}`}>クエスト</Link></span>
+          {concept.source_ideas.length > 0 && (
+            <span>💡 由来: {concept.source_ideas.map((s, i) => (
+              <span key={s.idea_id}>{i > 0 ? "・" : ""}<Link href={`/ideas/${s.idea_id}`}>{s.title ?? s.idea_id.slice(0, 8)}</Link></span>
+            ))}</span>
+          )}
+        </div>
       </section>
 
-      <div className="concept-layout">
+      {/* ============ 関連情報パネル（全幅・RelatedInfoPanel 流用・FR-41） ============ */}
+      <RelatedInfoPanel targetType="concepts" targetId={concept.id} variant="strip" />
+
+      <div className="idea-layout">
         {/* メイン */}
-        <main className="concept-main">
+        <div className="idea-main">
           <SchemaGroup title="A. 価値・対象・競合">
-            <Field label="課題・機会" value={concept.problem} />
-            <Field label="狙う価値（価値提案）" value={concept.value_proposition} />
-            <Field label="対象" value={concept.target} />
-            <Field label="競合・差別化" value={concept.differentiation} />
+            <FieldRow label="課題・機会" value={concept.problem} />
+            <FieldRow label="狙う価値（価値提案）" value={concept.value_proposition} />
+            <FieldRow label="対象" value={concept.target} />
+            <FieldRow label="競合・差別化" value={concept.differentiation} />
           </SchemaGroup>
-
           <SchemaGroup title="B. 解の形態">
-            <Field label="解の形態＋必要な能力" value={concept.solution_form} />
+            <FieldRow label="解の形態＋必要な能力" value={concept.solution_form} />
           </SchemaGroup>
-
           <SchemaGroup title="C. 採算・事業性"
-            guide={<ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3 e）。経営が投資判断できる証拠まで。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56002 §8.3.3 e) の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか（business/operational/marketing model）」を示す、経営説得の核です。</p></ScreenPurpose>}
+            guide={<ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3 e）。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56002 §8.3.3 e) の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p></ScreenPurpose>}
           >
-            <div className="field">
-              <div className="dialog-label">採算・事業性（viability）</div>
-              <pre className="concept-viability">{viabilityText}</pre>
-            </div>
+            <div className="field"><div className="dialog-label">採算・事業性（viability）</div><pre className="concept-viability">{viabilityText}</pre></div>
           </SchemaGroup>
 
-          {/* ⑥ 前提と検証（核心） */}
-          <section className="concept-assumptions">
+          <section className="card concept-assumptions" aria-label="前提と検証">
             <div className="concept-section-head">
-              <h2>前提と検証</h2>
-              <ScreenPurpose label="前提と検証とは？" summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（筋の悪い方向を早く止める・ISO 56002 §8.3/§9）。" dialogTitle="前提と検証とは">
-                <p style={{ margin: 0 }}><strong>前提</strong>＝このコンセプトが成り立つための仮説。<strong>検証</strong>＝実験/ヒアリング等の証拠で <strong>支持／反証／保留</strong> を判定します。<strong>否定的な結果こそ価値</strong>（筋の悪い方向を早く止める）。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p>
-              </ScreenPurpose>
+              <h2 style={{ margin: 0 }}>前提と検証</h2>
+              <ScreenPurpose label="前提と検証とは？" summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56002 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
             </div>
             {concept.assumptions.length === 0 ? (
               <div className="muted text-sm">まだ前提はありません。</div>
@@ -219,21 +190,31 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               </ul>
             )}
           </section>
-        </main>
+        </div>
 
         {/* 右レール */}
-        <aside className="concept-rail">
-          <section className="rail-card">
-            <h3>投票</h3>
-            <div className="vote-row">
-              <button className={`btn ${vote.mine === "approve" ? "btn-primary" : "btn-outline"}`} disabled={busy} aria-pressed={vote.mine === "approve"} onClick={() => onVote("approve")}>👍 賛成 {vote.approve}</button>
-              <button className={`btn ${vote.mine === "oppose" ? "btn-primary" : "btn-outline"}`} disabled={busy} aria-pressed={vote.mine === "oppose"} onClick={() => onVote("oppose")}>👎 反対 {vote.oppose}</button>
+        <div className="idea-rail">
+          {/* 投票（.vote-* パネル流用） */}
+          <section className="card" aria-label="投票">
+            <h2 className="card-title">投票</h2>
+            <div className="vote-summary">
+              <span className="vote-agree">▲ 賛成 {vote.approve}</span>
+              <span className="vote-disagree">▼ 反対 {vote.oppose}</span>
             </div>
-            <p className="hint">投票で +5 XP（各コンセプト初回）。</p>
+            <div className="vote-bar" role="img" aria-label={pct.total > 0 ? `賛成 ${pct.approve}% ・ 反対 ${pct.oppose}%` : "まだ投票がありません"}>
+              <span className="vote-bar__agree" style={{ width: `${pct.approve}%` }} />
+              <span className="vote-bar__disagree" style={{ width: `${pct.oppose}%` }} />
+            </div>
+            <div className="vote-btns">
+              <button className={`vote-btn agree${vote.my === "approve" ? " is-on" : ""}`} type="button" aria-pressed={vote.my === "approve"} disabled={busy} onClick={() => void onVote("approve")}>▲ 賛成</button>
+              <button className={`vote-btn disagree${vote.my === "oppose" ? " is-on" : ""}`} type="button" aria-pressed={vote.my === "oppose"} disabled={busy} onClick={() => void onVote("oppose")}>▼ 反対</button>
+            </div>
+            <p className="vote-note">1人1票・<strong>変更できます</strong>。投票すると <span className="xp">+5 XP</span>（各コンセプト初回）。</p>
           </section>
 
-          <section className="rail-card">
-            <h3>評価結果</h3>
+          {/* 評価結果 */}
+          <section className="card" aria-label="評価結果">
+            <h2 className="card-title">評価結果</h2>
             {concept.evaluation.evaluator_count > 0 ? (
               <>
                 <div className="eval-overall">総合 {concept.evaluation.overall_avg?.toFixed(1) ?? "—"} / 5.0（{concept.evaluation.evaluator_count}名）</div>
@@ -246,30 +227,25 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           </section>
 
           {/* 総合判定（右レール最下部） */}
-          <section className="rail-card rail-decision">
-            <h3>総合判定</h3>
+          <section className="card" aria-label="総合判定">
+            <h2 className="card-title">総合判定</h2>
             <div className="decision-current"><Badge map={DECISION_LABEL} value={concept.decision} /></div>
             {concept.decision_rationale && <p className="text-sm">{concept.decision_rationale}</p>}
             {canManage && (
               <div className="decision-actions">
                 {(["go", "pivot", "kill"] as const).map((d) => (
-                  <button key={d} className="btn btn-outline" disabled={busy} onClick={() => runManage(() => setDecision(conceptId, { decision: d }), "判定を更新しました")}>{DECISION_LABEL[d][0]}</button>
+                  <button key={d} className="btn btn-outline btn-sm" disabled={busy} onClick={() => runManage(() => setDecision(conceptId, { decision: d }), "判定を更新しました")}>{DECISION_LABEL[d][0]}</button>
                 ))}
               </div>
             )}
           </section>
-        </aside>
+        </div>
       </div>
-
-      {/* 下部＝総合チャット（結線は後続スライス） */}
-      <section className="concept-chat card">
-        💬 議論ルーム <span className="muted text-sm">（総合／グループ／前提スレッド・結線は後続スライス）</span>
-      </section>
-    </div>
+    </main>
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="field">
       <div className="dialog-label">{label}</div>
@@ -280,11 +256,8 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 
 function SchemaGroup({ title, guide, children }: { title: string; guide?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="schema-group">
-      <div className="concept-section-head">
-        <h2>{title}</h2>
-        {guide}
-      </div>
+    <section className="card schema-group">
+      <div className="concept-section-head"><h2 style={{ margin: 0 }}>{title}</h2>{guide}</div>
       {children}
       <div className="schema-group-foot">
         <button className="btn btn-outline btn-sm" type="button" title="議論ルームへ（後続スライスで結線）">💬 このグループを議論 →</button>

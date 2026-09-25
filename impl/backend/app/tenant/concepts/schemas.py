@@ -88,6 +88,23 @@ class ConceptEvalSummaryDTO(BaseModel):
     recommendations: dict[str, int] = {}
 
 
+class ConceptAuthorDTO(BaseModel):
+    user_id: str
+    display_name: str
+    avatar_image_url: str | None = None
+    level: int | None = None
+
+
+class ConceptVoteSummaryDTO(BaseModel):
+    approve: int = 0
+    oppose: int = 0
+
+
+class ConceptVoteStateDTO(BaseModel):
+    summary: ConceptVoteSummaryDTO = ConceptVoteSummaryDTO()
+    my_vote: str | None = None
+
+
 class ConceptListItemDTO(BaseModel):
     id: str
     title: str
@@ -110,6 +127,7 @@ class ConceptDetailDTO(BaseModel):
     id: str
     quest_id: str
     author_id: str
+    author: ConceptAuthorDTO | None = None
     title: str
     problem: str | None = None
     value_proposition: str | None = None
@@ -126,7 +144,8 @@ class ConceptDetailDTO(BaseModel):
     assumptions: list[ConceptAssumptionDTO] = []
     evaluation: ConceptEvalSummaryDTO = ConceptEvalSummaryDTO()
     chat_scopes: list[ConceptChatScopeDTO] = []
-    related_info: list[dict] = []  # N 委譲（info_links target_type=concepts）＝結線は情報ドメイン実装時
+    related_info: list[dict] = []  # N 委譲（info_links target_type=concepts）＝RelatedInfoPanel は別 read EP を叩く
+    vote: ConceptVoteStateDTO = ConceptVoteStateDTO()  # 投票集計＋自分の投票（SC-61 投票パネル・P.5b）
     my_permissions: list[str] = []
     updated_at: datetime | None = None
 

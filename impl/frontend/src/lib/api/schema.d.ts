@@ -1879,6 +1879,26 @@ export interface paths {
         patch: operations["patch_concept_api_v1_concepts__concept_id__patch"];
         trace?: never;
     };
+    "/api/v1/concepts/{concept_id}/related-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Related Info
+         * @description コンセプトの関連情報（SC-61・FR-41・RelatedInfoPanel 用）。門番＝詳細と同一。読取専用。
+         */
+        get: operations["get_concept_related_info_api_v1_concepts__concept_id__related_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/activate": {
         parameters: {
             query?: never;
@@ -3852,6 +3872,17 @@ export interface components {
             /** Current Verdict */
             current_verdict: string;
         };
+        /** ConceptAuthorDTO */
+        ConceptAuthorDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+            /** Level */
+            level?: number | null;
+        };
         /** ConceptChatMessageDTO */
         ConceptChatMessageDTO: {
             /** Id */
@@ -3961,6 +3992,7 @@ export interface components {
             quest_id: string;
             /** Author Id */
             author_id: string;
+            author?: components["schemas"]["ConceptAuthorDTO"] | null;
             /** Title */
             title: string;
             /** Problem */
@@ -4018,6 +4050,13 @@ export interface components {
             related_info: {
                 [key: string]: unknown;
             }[];
+            /** @default {
+             *       "summary": {
+             *         "approve": 0,
+             *         "oppose": 0
+             *       }
+             *     } */
+            vote: components["schemas"]["ConceptVoteStateDTO"];
             /**
              * My Permissions
              * @default []
@@ -4295,8 +4334,31 @@ export interface components {
              */
             xp_delta: number;
         };
+        /** ConceptVoteStateDTO */
+        ConceptVoteStateDTO: {
+            /** @default {
+             *       "approve": 0,
+             *       "oppose": 0
+             *     } */
+            summary: components["schemas"]["ConceptVoteSummaryDTO"];
+            /** My Vote */
+            my_vote?: string | null;
+        };
         /** ConceptVoteSummary */
         ConceptVoteSummary: {
+            /**
+             * Approve
+             * @default 0
+             */
+            approve: number;
+            /**
+             * Oppose
+             * @default 0
+             */
+            oppose: number;
+        };
+        /** ConceptVoteSummaryDTO */
+        ConceptVoteSummaryDTO: {
             /**
              * Approve
              * @default 0
@@ -11213,6 +11275,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concept_related_info_api_v1_concepts__concept_id__related_info_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoResponse"];
                 };
             };
             /** @description Validation Error */

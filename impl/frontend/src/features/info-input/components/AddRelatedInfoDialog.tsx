@@ -13,7 +13,7 @@ import "../info-input.css";
 
 export function AddRelatedInfoDialog({ open, onClose, targetType, targetId, existingInfoIds, onAdded }: {
   open: boolean; onClose: () => void;
-  targetType: "quests" | "ideas"; targetId: string;
+  targetType: "quests" | "ideas" | "concepts"; targetId: string;
   existingInfoIds: Set<string>; onAdded: () => void;
 }) {
   const confirm = useConfirm();

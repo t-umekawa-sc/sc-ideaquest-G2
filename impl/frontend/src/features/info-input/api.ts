@@ -211,7 +211,7 @@ export function unrejectLinkApi(linkId: string) {
 
 // 成果物側の採否（disposition・FR-41 Phase2）＝管理権限者が状態＋処理メモを保存（C.8b／D）。
 export async function setLinkDispositionApi(
-  targetType: "quests" | "ideas", targetId: string, linkId: string,
+  targetType: "quests" | "ideas" | "concepts", targetId: string, linkId: string,
   disposition: InfoLinkDisposition, note?: string | null,
 ): Promise<RelatedInfoItem> {
   const res = await apiFetch<RelatedInfoItem>(
@@ -252,7 +252,7 @@ export interface InfoInput {
 
 // 成果物→関連情報（SC-12 上部ストリップ／SC-22 右レール・C.8b／D）＝各ドメインの read（新規横断EPなし）。
 export async function fetchRelatedInfo(
-  targetType: "quests" | "ideas", targetId: string, signal?: AbortSignal,
+  targetType: "quests" | "ideas" | "concepts", targetId: string, signal?: AbortSignal,
 ): Promise<RelatedInfoItem[]> {
   const r = await apiFetch<{ data: RelatedInfoItem[] }>(`/${targetType}/${targetId}/related-info`, { signal });
   return r?.data ?? [];

@@ -53,7 +53,7 @@ function RelatedInfoCard({ x, compact, from }: { x: RelatedInfoItem; compact?: b
 }
 
 export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
-  targetType: "quests" | "ideas"; targetId: string; variant?: "strip" | "rail";
+  targetType: "quests" | "ideas" | "concepts"; targetId: string; variant?: "strip" | "rail";
 }) {
   const [items, setItems] = useState<RelatedInfoItem[] | null>(null);
   const [maxi, setMaxi] = useState(false);
@@ -98,7 +98,7 @@ export function RelatedInfoPanel({ targetType, targetId, variant = "strip" }: {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="ri-empty">この{targetType === "quests" ? "クエスト" : "アイデア"}に関連づいた情報はまだありません。情報インプット（SC-50）から関連づけできます。</div>
+        <div className="ri-empty">この{targetType === "quests" ? "クエスト" : targetType === "concepts" ? "コンセプト" : "アイデア"}に関連づいた情報はまだありません。情報インプット（SC-50）から関連づけできます。</div>
       ) : visible.length === 0 ? (
         <div className="ri-empty">表示できる関連情報はありません（不採用 {declined.length} 件は「⤢ 全画面で一覧」で確認できます）。</div>
       ) : (

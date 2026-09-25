@@ -32,6 +32,12 @@ def _resolve_company(company_id: uuid.UUID) -> Company | None:
         return s.get(Company, company_id)
 
 
+def _image_url(path: str | None) -> str | None:
+    from app.infra.storage import get_storage
+
+    return get_storage().presigned_get(path) if path else None
+
+
 def _parse_uuid(value: str, *, field: str) -> uuid.UUID:
     try:
         return uuid.UUID(value)
@@ -303,8 +309,15 @@ def _detail_payload(ts, concept, quest, user) -> dict:
          "assumption_id": str(s.assumption_id) if s.assumption_id else None, "position": s.position}
         for s in repo.list_chat_scopes(ts, concept.id)
     ]
+    vc = repo.count_votes(ts, concept.id)
+    my_vote = repo.get_vote(ts, concept.id, user.id)
+    author_u = quests_repo.get_users_by_ids(ts, {concept.author_id}).get(concept.author_id)
+    author = None
+    if author_u is not None:
+        author = {"user_id": str(author_u.id), "display_name": author_u.display_name,
+                  "avatar_image_url": _image_url(author_u.avatar_image_path), "level": author_u.level}
     return {
-        "id": str(concept.id), "quest_id": str(concept.quest_id), "author_id": str(concept.author_id),
+        "id": str(concept.id), "quest_id": str(concept.quest_id), "author_id": str(concept.author_id), "author": author,
         "title": concept.title, "problem": concept.problem, "value_proposition": concept.value_proposition,
         "target": concept.target, "differentiation": concept.differentiation, "solution_form": concept.solution_form,
         "viability": concept.viability or {}, "decision": concept.decision,
@@ -312,9 +325,26 @@ def _detail_payload(ts, concept, quest, user) -> dict:
         "is_selected": concept.is_selected, "current_revision": concept.current_revision,
         "source_ideas": source_ideas, "assumptions": assumptions,
         "evaluation": _eval_summary(ts, concept.id), "chat_scopes": chat_scopes,
-        "related_info": [], "my_permissions": _my_permissions(ts, concept, quest, user),
+        "related_info": [],
+        "vote": {"summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+                 "my_vote": my_vote.type if my_vote else None},
+        "my_permissions": _my_permissions(ts, concept, quest, user),
         "updated_at": concept.updated_at,
     }
+
+
+def get_related_info(account_id, company_id, concept_id, *, limit: int = 50) -> dict:
+    """コンセプトの関連情報（SC-61・RelatedInfoPanel が叩く read EP・N.1 委譲の共通ビルダを流用）。"""
+    from app.tenant.info import application as info_app
+
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        can_dispose = concept.author_id == user.id or _is_manager(ts, quest, user)
+        data = info_app.related_info_for_target(ts, "concepts", cid, limit=limit, can_dispose=can_dispose)
+        return {"data": data}
 
 
 # ---- 前提＝検証プール（P.3） -----------------------------------------------

@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.concepts import application as service
+from app.tenant.info.schemas import RelatedInfoResponse
 from app.tenant.concepts.schemas import (
     AssumptionCreateRequest,
     AssumptionDetailDTO,
@@ -69,6 +70,18 @@ def get_concept(concept_id: str, request: Request, session: dict = Depends(requi
     """コンセプト詳細（合成・P.1）。draft は本人のみ。読取専用。"""
     result = service.get_detail(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptDetailDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/related-info", response_model=RelatedInfoResponse)
+def get_concept_related_info(
+    concept_id: str, request: Request, limit: int = Query(default=50, ge=1, le=100),
+    session: dict = Depends(require_me),
+) -> RelatedInfoResponse:
+    """コンセプトの関連情報（SC-61・FR-41・RelatedInfoPanel 用）。門番＝詳細と同一。読取専用。"""
+    result = service.get_related_info(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, limit=limit,
+    )
+    return RelatedInfoResponse(**result)
 
 
 @router.patch("/concepts/{concept_id}", response_model=ConceptDetailDTO)
