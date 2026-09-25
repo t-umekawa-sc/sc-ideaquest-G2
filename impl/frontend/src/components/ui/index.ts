@@ -31,6 +31,7 @@ export { FormSummary } from "./FormSummary";
 export { FormFooterError } from "./FormFooterError";
 export { useFormErrorNotice } from "./useFormErrorNotice";
 export { Modal, ModalBody, ModalFooter } from "./Modal";
+export { ScreenPurpose } from "./ScreenPurpose";
 export { RouteModal } from "./RouteModal";
 export { Pager } from "./Pager";
 export { Progress, Spinner, BlockOverlay, LoadingOverlay } from "./Progress";

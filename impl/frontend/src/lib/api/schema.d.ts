@@ -1827,6 +1827,398 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Concepts
+         * @description クエスト配下のコンセプト一覧（P.1）。自分の draft を含む。読取専用。
+         */
+        get: operations["list_concepts_api_v1_quests__quest_id__concepts_get"];
+        put?: never;
+        /**
+         * Create Concept
+         * @description コンセプト作成（P.2・既定 draft・総合ルーム自動生成）。門番＝パーティー員。
+         */
+        post: operations["create_concept_api_v1_quests__quest_id__concepts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept
+         * @description コンセプト詳細（合成・P.1）。draft は本人のみ。読取専用。
+         */
+        get: operations["get_concept_api_v1_concepts__concept_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Concept
+         * @description 論理削除（P.2・作成者＋owner/quest_admin）。
+         */
+        delete: operations["delete_concept_api_v1_concepts__concept_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Concept
+         * @description 内容編集（P.2・作成者＋owner/quest_admin）。
+         */
+        patch: operations["patch_concept_api_v1_concepts__concept_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Concept
+         * @description draft→active（P.2・owner/quest_admin）。
+         */
+        post: operations["activate_concept_api_v1_concepts__concept_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Concept
+         * @description active→archived（P.2・owner/quest_admin）。
+         */
+        post: operations["archive_concept_api_v1_concepts__concept_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select Concept
+         * @description 勝ち残り選定（P.2・owner/quest_admin・複数可）。
+         */
+        post: operations["select_concept_api_v1_concepts__concept_id__select_post"];
+        /**
+         * Unselect Concept
+         * @description 選定解除（P.2・owner/quest_admin）。
+         */
+        delete: operations["unselect_concept_api_v1_concepts__concept_id__select_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Decision
+         * @description 総合判定 Go/Pivot/Kill（P.2・owner/quest_admin）。
+         */
+        put: operations["put_decision_api_v1_concepts__concept_id__decision_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/assumptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assumptions
+         * @description 検証プール一覧（P.3）。門番＝パーティー員。読取専用。
+         */
+        get: operations["list_assumptions_api_v1_quests__quest_id__assumptions_get"];
+        put?: never;
+        /**
+         * Create Assumption
+         * @description 前提の作成（P.3・検証プール所有＝owner/quest_admin）。
+         */
+        post: operations["create_assumption_api_v1_quests__quest_id__assumptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assumptions/{assumption_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assumption
+         * @description 前提詳細（検証履歴＋リンク先・P.3）。読取専用。
+         */
+        get: operations["get_assumption_api_v1_assumptions__assumption_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Assumption
+         * @description 前提の削除（P.3・プール所有）。リンク中は 409。
+         */
+        delete: operations["delete_assumption_api_v1_assumptions__assumption_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Assumption
+         * @description 前提の記述編集（P.3・プール所有）。
+         */
+        patch: operations["patch_assumption_api_v1_assumptions__assumption_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/assumptions/{assumption_id}/validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Validations
+         * @description 検証イベント履歴（実施日降順・P.3）。読取専用。
+         */
+        get: operations["list_validations_api_v1_assumptions__assumption_id__validations_get"];
+        put?: never;
+        /**
+         * Add Validation
+         * @description 検証イベント追記（P.3・プール所有）。refuted は反証波及（P.7）。
+         */
+        post: operations["add_validation_api_v1_assumptions__assumption_id__validations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/assumptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link Assumption
+         * @description 前提をコンセプトにリンク（P.4・重要度付き・前提スレッド生成）。
+         */
+        post: operations["link_assumption_api_v1_concepts__concept_id__assumptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/assumptions/{assumption_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink Assumption
+         * @description リンク解除（P.4・前提本体は残す）。
+         */
+        delete: operations["unlink_assumption_api_v1_concepts__concept_id__assumptions__assumption_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Link
+         * @description 重要度変更／要再評価(stale)解除（P.4）。
+         */
+        patch: operations["patch_link_api_v1_concepts__concept_id__assumptions__assumption_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/evaluation/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Evaluation
+         * @description 自分の評価/下書き（P.5・evaluator）。読取専用。
+         */
+        get: operations["get_my_evaluation_api_v1_concepts__concept_id__evaluation_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Evaluation
+         * @description 評価集計（P.5・visibility 適用）。読取専用。
+         */
+        get: operations["get_evaluation_api_v1_concepts__concept_id__evaluation_get"];
+        /**
+         * Put Evaluation
+         * @description 評価 upsert（P.5・下書き/確定）。submitted は中核5＋総評＋推奨検証。
+         */
+        put: operations["put_evaluation_api_v1_concepts__concept_id__evaluation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vote Concept
+         * @description 投票（P.5b・賛成/反対・1人1票 upsert）。各コンセプト初回のみ XP+5。
+         */
+        post: operations["vote_concept_api_v1_concepts__concept_id__vote_post"];
+        /**
+         * Unvote Concept
+         * @description 投票取消（P.5b）。
+         */
+        delete: operations["unvote_concept_api_v1_concepts__concept_id__vote_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/chat-scopes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chat Scopes
+         * @description ルーム一覧（総合/グループ/前提スレッド＋未読・P.6）。読取専用。
+         */
+        get: operations["list_chat_scopes_api_v1_concepts__concept_id__chat_scopes_get"];
+        put?: never;
+        /**
+         * Create Chat Scope
+         * @description グループ・ルーム作成（P.6・owner/quest_admin）。
+         */
+        post: operations["create_chat_scope_api_v1_concepts__concept_id__chat_scopes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concept-chat-scopes/{scope_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Scope Messages
+         * @description メッセージ取得（P.6・E.1 同形）。読取専用。
+         */
+        get: operations["list_scope_messages_api_v1_concept_chat_scopes__scope_id__messages_get"];
+        put?: never;
+        /**
+         * Post Scope Message
+         * @description 投稿（P.6・E.3 機構共有・Idempotency-Key で二重投稿防止）。
+         */
+        post: operations["post_scope_message_api_v1_concept_chat_scopes__scope_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concept-chat-scopes/{scope_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Scope
+         * @description 既読位置更新（P.6・E.7 同型）。
+         */
+        post: operations["read_scope_api_v1_concept_chat_scopes__scope_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/chat": {
         parameters: {
             query?: never;
@@ -2965,6 +3357,80 @@ export interface components {
              */
             coin_earned: number;
         };
+        /** AssumptionCreateRequest */
+        AssumptionCreateRequest: {
+            /** Statement */
+            statement: string;
+        };
+        /** AssumptionDetailDTO */
+        AssumptionDetailDTO: {
+            /** Id */
+            id: string;
+            /** Quest Id */
+            quest_id: string;
+            /** Statement */
+            statement: string;
+            /** Current Verdict */
+            current_verdict: string;
+            /**
+             * Validations
+             * @default []
+             */
+            validations: components["schemas"]["ValidationDTO"][];
+            /**
+             * Linked Concepts
+             * @default []
+             */
+            linked_concepts: components["schemas"]["LinkedConceptDTO"][];
+            /**
+             * Related Info
+             * @default []
+             */
+            related_info: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+        };
+        /** AssumptionListItemDTO */
+        AssumptionListItemDTO: {
+            /** Id */
+            id: string;
+            /** Statement */
+            statement: string;
+            /** Current Verdict */
+            current_verdict: string;
+            /**
+             * Validation Count
+             * @default 0
+             */
+            validation_count: number;
+            /**
+             * Linked Concept Count
+             * @default 0
+             */
+            linked_concept_count: number;
+            /** Latest Validated On */
+            latest_validated_on?: string | null;
+        };
+        /** AssumptionListResponse */
+        AssumptionListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["AssumptionListItemDTO"][];
+            /** Cursor */
+            cursor?: string | null;
+        };
+        /** AssumptionPatchRequest */
+        AssumptionPatchRequest: {
+            /** Statement */
+            statement: string;
+        };
         /**
          * AvatarBaseUpdateRequest
          * @description アバターベース体選択の入力（K.4.1・allowlist）。`base`（`male`/`female`）のみ受理。
@@ -3372,6 +3838,475 @@ export interface components {
             game_mode_default?: boolean | null;
             /** Notify Email Enabled */
             notify_email_enabled?: boolean | null;
+        };
+        /** ConceptAssumptionDTO */
+        ConceptAssumptionDTO: {
+            /** Assumption Id */
+            assumption_id: string;
+            /** Statement */
+            statement: string;
+            /** Criticality */
+            criticality: string;
+            /** Is Stale */
+            is_stale: boolean;
+            /** Current Verdict */
+            current_verdict: string;
+        };
+        /** ConceptChatMessageDTO */
+        ConceptChatMessageDTO: {
+            /** Id */
+            id: string;
+            /** Author Id */
+            author_id: string;
+            /** Body */
+            body: string;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /** ConceptChatMessageListResponse */
+        ConceptChatMessageListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ConceptChatMessageDTO"][];
+        };
+        /** ConceptChatScopeDTO */
+        ConceptChatScopeDTO: {
+            /** Scope Id */
+            scope_id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label?: string | null;
+            /** Assumption Id */
+            assumption_id?: string | null;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+        };
+        /** ConceptChatScopeItemDTO */
+        ConceptChatScopeItemDTO: {
+            /** Scope Id */
+            scope_id: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label?: string | null;
+            /** Assumption Id */
+            assumption_id?: string | null;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /**
+             * Unread Count
+             * @default 0
+             */
+            unread_count: number;
+        };
+        /** ConceptChatScopeListResponse */
+        ConceptChatScopeListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ConceptChatScopeItemDTO"][];
+        };
+        /**
+         * ConceptCreateRequest
+         * @description POST /quests/{quest_id}/concepts（P.2）。既定 draft・作成時に総合ルーム自動生成。
+         */
+        ConceptCreateRequest: {
+            /** Title */
+            title: string;
+            /** Source Idea Ids */
+            source_idea_ids?: string[];
+            /** Problem */
+            problem?: string | null;
+            /** Value Proposition */
+            value_proposition?: string | null;
+            /** Target */
+            target?: string | null;
+            /** Differentiation */
+            differentiation?: string | null;
+            /** Solution Form */
+            solution_form?: string | null;
+            /** Viability */
+            viability?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ConceptDecisionRequest
+         * @description PUT /concepts/{id}/decision（P.2）。owner/quest_admin のみ。
+         */
+        ConceptDecisionRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "undecided" | "go" | "pivot" | "kill";
+            /** Decision Rationale */
+            decision_rationale?: string | null;
+        };
+        /** ConceptDetailDTO */
+        ConceptDetailDTO: {
+            /** Id */
+            id: string;
+            /** Quest Id */
+            quest_id: string;
+            /** Author Id */
+            author_id: string;
+            /** Title */
+            title: string;
+            /** Problem */
+            problem?: string | null;
+            /** Value Proposition */
+            value_proposition?: string | null;
+            /** Target */
+            target?: string | null;
+            /** Differentiation */
+            differentiation?: string | null;
+            /** Solution Form */
+            solution_form?: string | null;
+            /**
+             * Viability
+             * @default {}
+             */
+            viability: {
+                [key: string]: unknown;
+            };
+            /** Decision */
+            decision: string;
+            /** Decision Rationale */
+            decision_rationale?: string | null;
+            /** Status */
+            status: string;
+            /** Is Selected */
+            is_selected: boolean;
+            /** Current Revision */
+            current_revision: number;
+            /**
+             * Source Ideas
+             * @default []
+             */
+            source_ideas: components["schemas"]["ConceptSourceIdeaDTO"][];
+            /**
+             * Assumptions
+             * @default []
+             */
+            assumptions: components["schemas"]["ConceptAssumptionDTO"][];
+            /** @default {
+             *       "aspects": {},
+             *       "evaluator_count": 0,
+             *       "recommendations": {}
+             *     } */
+            evaluation: components["schemas"]["ConceptEvalSummaryDTO"];
+            /**
+             * Chat Scopes
+             * @default []
+             */
+            chat_scopes: components["schemas"]["ConceptChatScopeDTO"][];
+            /**
+             * Related Info
+             * @default []
+             */
+            related_info: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** ConceptEvalSummaryDTO */
+        ConceptEvalSummaryDTO: {
+            /**
+             * Aspects
+             * @default {}
+             */
+            aspects: {
+                [key: string]: number;
+            };
+            /** Overall Avg */
+            overall_avg?: number | null;
+            /**
+             * Evaluator Count
+             * @default 0
+             */
+            evaluator_count: number;
+            /**
+             * Recommendations
+             * @default {}
+             */
+            recommendations: {
+                [key: string]: number;
+            };
+        };
+        /** ConceptEvaluationAggregateDTO */
+        ConceptEvaluationAggregateDTO: {
+            /**
+             * Aspects
+             * @default {}
+             */
+            aspects: {
+                [key: string]: number;
+            };
+            /** Overall Avg */
+            overall_avg?: number | null;
+            /**
+             * Evaluator Count
+             * @default 0
+             */
+            evaluator_count: number;
+            /**
+             * Recommendations
+             * @default {}
+             */
+            recommendations: {
+                [key: string]: number;
+            };
+            /**
+             * Evaluators
+             * @default []
+             */
+            evaluators: components["schemas"]["ConceptEvaluatorDTO"][];
+            my_evaluation?: components["schemas"]["ConceptEvaluationMeDTO"] | null;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * My Permissions
+             * @default []
+             */
+            my_permissions: string[];
+        };
+        /** ConceptEvaluationMeDTO */
+        ConceptEvaluationMeDTO: {
+            /** Status */
+            status?: ("draft" | "submitted") | null;
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /** Recommendation */
+            recommendation?: string | null;
+            /**
+             * Visibility
+             * @default party
+             * @enum {string}
+             */
+            visibility: "party" | "limited";
+            /** Submitted At */
+            submitted_at?: string | null;
+        };
+        /**
+         * ConceptEvaluationPutRequest
+         * @description PUT /concepts/{id}/evaluation（P.5）。submitted は中核5(1..5)＋総評＋推奨をサーバー検証。
+         */
+        ConceptEvaluationPutRequest: {
+            /** Scores */
+            scores?: {
+                [key: string]: number;
+            };
+            /** Comments */
+            comments?: {
+                [key: string]: string;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /** Recommendation */
+            recommendation?: ("go" | "pivot" | "kill") | null;
+            /**
+             * Visibility
+             * @default party
+             * @enum {string}
+             */
+            visibility: "party" | "limited";
+            /**
+             * Status
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "submitted";
+        };
+        /** ConceptEvaluatorDTO */
+        ConceptEvaluatorDTO: {
+            /** Evaluator Id */
+            evaluator_id: string;
+            /** Recommendation */
+            recommendation?: string | null;
+            /**
+             * Scores
+             * @default {}
+             */
+            scores: {
+                [key: string]: number;
+            };
+        };
+        /** ConceptGroupScopeCreateRequest */
+        ConceptGroupScopeCreateRequest: {
+            /**
+             * Kind
+             * @default group
+             * @constant
+             */
+            kind: "group";
+            /** Label */
+            label: string;
+        };
+        /** ConceptListItemDTO */
+        ConceptListItemDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Decision */
+            decision: string;
+            /** Is Selected */
+            is_selected: boolean;
+            /**
+             * Source Idea Count
+             * @default 0
+             */
+            source_idea_count: number;
+            /**
+             * Assumption Count
+             * @default 0
+             */
+            assumption_count: number;
+            /** @default {
+             *       "aspects": {},
+             *       "evaluator_count": 0,
+             *       "recommendations": {}
+             *     } */
+            eval_summary: components["schemas"]["ConceptEvalSummaryDTO"];
+            /** Author Id */
+            author_id: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** ConceptListResponse */
+        ConceptListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ConceptListItemDTO"][];
+            /** Cursor */
+            cursor?: string | null;
+        };
+        /** ConceptMessagePostRequest */
+        ConceptMessagePostRequest: {
+            /** Body */
+            body: string;
+        };
+        /**
+         * ConceptPatchRequest
+         * @description PATCH /concepts/{id}（P.2）。部分更新。source_idea_ids は指定時のみ差し替え。
+         */
+        ConceptPatchRequest: {
+            /** Title */
+            title?: string | null;
+            /** Source Idea Ids */
+            source_idea_ids?: string[] | null;
+            /** Problem */
+            problem?: string | null;
+            /** Value Proposition */
+            value_proposition?: string | null;
+            /** Target */
+            target?: string | null;
+            /** Differentiation */
+            differentiation?: string | null;
+            /** Solution Form */
+            solution_form?: string | null;
+            /** Viability */
+            viability?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ConceptReadRequest */
+        ConceptReadRequest: {
+            /** Last Read Message Id */
+            last_read_message_id: string;
+        };
+        /** ConceptSelectResponse */
+        ConceptSelectResponse: {
+            /** Id */
+            id: string;
+            /** Is Selected */
+            is_selected: boolean;
+        };
+        /** ConceptSourceIdeaDTO */
+        ConceptSourceIdeaDTO: {
+            /** Idea Id */
+            idea_id: string;
+            /** Title */
+            title?: string | null;
+        };
+        /** ConceptVoteRequest */
+        ConceptVoteRequest: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "approve" | "oppose";
+        };
+        /** ConceptVoteResponse */
+        ConceptVoteResponse: {
+            /** My Vote */
+            my_vote?: string | null;
+            /** @default {
+             *       "approve": 0,
+             *       "oppose": 0
+             *     } */
+            summary: components["schemas"]["ConceptVoteSummary"];
+            /**
+             * Xp Awarded
+             * @default false
+             */
+            xp_awarded: boolean;
+            /**
+             * Xp Delta
+             * @default 0
+             */
+            xp_delta: number;
+        };
+        /** ConceptVoteSummary */
+        ConceptVoteSummary: {
+            /**
+             * Approve
+             * @default 0
+             */
+            approve: number;
+            /**
+             * Oppose
+             * @default 0
+             */
+            oppose: number;
         };
         /**
          * DirectoryItem
@@ -4774,6 +5709,31 @@ export interface components {
             group_ids: string[];
         };
         /**
+         * LinkCreateRequest
+         * @description POST /concepts/{id}/assumptions（P.4）。既存前提を重要度付きでリンク。
+         */
+        LinkCreateRequest: {
+            /** Assumption Id */
+            assumption_id: string;
+            /**
+             * Criticality
+             * @default major
+             * @enum {string}
+             */
+            criticality: "critical" | "major" | "minor";
+        };
+        /** LinkDTO */
+        LinkDTO: {
+            /** Concept Id */
+            concept_id: string;
+            /** Assumption Id */
+            assumption_id: string;
+            /** Criticality */
+            criticality: string;
+            /** Is Stale */
+            is_stale: boolean;
+        };
+        /**
          * LinkDispositionRequest
          * @description 成果物側のリンク採否（C.8b／D＝`PATCH /{quest,idea}/related-info/{link_id}`・FR-41 Phase2）。
          */
@@ -4782,6 +5742,27 @@ export interface components {
             disposition: string;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * LinkPatchRequest
+         * @description PATCH /concepts/{id}/assumptions/{aid}（P.4）。重要度変更／要再評価(stale)解除。
+         */
+        LinkPatchRequest: {
+            /** Criticality */
+            criticality?: ("critical" | "major" | "minor") | null;
+            /** Is Stale */
+            is_stale?: boolean | null;
+        };
+        /** LinkedConceptDTO */
+        LinkedConceptDTO: {
+            /** Concept Id */
+            concept_id: string;
+            /** Title */
+            title: string;
+            /** Criticality */
+            criticality: string;
+            /** Is Stale */
+            is_stale: boolean;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -6268,6 +7249,62 @@ export interface components {
             /** Unread Count */
             unread_count: number;
         };
+        /**
+         * ValidationAddResponse
+         * @description 検証追記の結果（P.3）。refuted は stale_concept_ids に波及先を返す（P.7）。
+         */
+        ValidationAddResponse: {
+            validation: components["schemas"]["ValidationDTO"];
+            /** Current Verdict */
+            current_verdict: string;
+            /**
+             * Stale Concept Ids
+             * @default []
+             */
+            stale_concept_ids: string[];
+        };
+        /**
+         * ValidationCreateRequest
+         * @description POST /assumptions/{id}/validations（P.3・追記型）。refuted は反証波及を発火。
+         */
+        ValidationCreateRequest: {
+            /** Method */
+            method: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "inconclusive" | "supported" | "refuted";
+            /**
+             * Validated On
+             * Format: date
+             */
+            validated_on: string;
+            /** Result */
+            result?: string | null;
+            /** Scale */
+            scale?: string | null;
+        };
+        /** ValidationDTO */
+        ValidationDTO: {
+            /** Id */
+            id: string;
+            /** Method */
+            method: string;
+            /** Result */
+            result?: string | null;
+            /** Verdict */
+            verdict: string;
+            /**
+             * Validated On
+             * Format: date
+             */
+            validated_on: string;
+            /** Scale */
+            scale?: string | null;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -6280,6 +7317,14 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** ValidationListResponse */
+        ValidationListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ValidationDTO"][];
         };
         /** WordCloudResponse */
         WordCloudResponse: {
@@ -10008,6 +11053,982 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IdeaSelectResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_concepts_api_v1_quests__quest_id__concepts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_concept_api_v1_quests__quest_id__concepts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concept_api_v1_concepts__concept_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_concept_api_v1_concepts__concept_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_concept_api_v1_concepts__concept_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_concept_api_v1_concepts__concept_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_concept_api_v1_concepts__concept_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_concept_api_v1_concepts__concept_id__select_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptSelectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unselect_concept_api_v1_concepts__concept_id__select_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptSelectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_decision_api_v1_concepts__concept_id__decision_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assumptions_api_v1_quests__quest_id__assumptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssumptionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_assumption_api_v1_quests__quest_id__assumptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssumptionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssumptionDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_assumption_api_v1_assumptions__assumption_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssumptionDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_assumption_api_v1_assumptions__assumption_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_assumption_api_v1_assumptions__assumption_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssumptionPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssumptionDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_validations_api_v1_assumptions__assumption_id__validations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_validation_api_v1_assumptions__assumption_id__validations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationAddResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_assumption_api_v1_concepts__concept_id__assumptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_assumption_api_v1_concepts__concept_id__assumptions__assumption_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_link_api_v1_concepts__concept_id__assumptions__assumption_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_evaluation_api_v1_concepts__concept_id__evaluation_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptEvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evaluation_api_v1_concepts__concept_id__evaluation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptEvaluationAggregateDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_evaluation_api_v1_concepts__concept_id__evaluation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptEvaluationPutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptEvaluationMeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vote_concept_api_v1_concepts__concept_id__vote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptVoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unvote_concept_api_v1_concepts__concept_id__vote_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptVoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chat_scopes_api_v1_concepts__concept_id__chat_scopes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptChatScopeListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_chat_scope_api_v1_concepts__concept_id__chat_scopes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptGroupScopeCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptChatScopeItemDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scope_messages_api_v1_concept_chat_scopes__scope_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptChatMessageListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_scope_message_api_v1_concept_chat_scopes__scope_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptMessagePostRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptChatMessageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_scope_api_v1_concept_chat_scopes__scope_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
