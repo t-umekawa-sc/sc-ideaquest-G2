@@ -136,7 +136,21 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
     setDirectAccess(typeof window !== "undefined" && window.history.length <= 1);
   }, []);
   const questBackLabel = fromQuestList || directAccess ? "← クエスト一覧へ戻る" : "← 戻る";
-  const [tab, setTab] = useState<TabKey>("ideas");
+  // タブは URL(?tab=)に載せる＝詳細へ遷移→戻る（router.back）で非既定タブ（🧩コンセプト等）も復元する
+  // （既定=ideas は param 無し・デザイン標準§4.5⑨/§4.12 と同じ「戻って状態復元」の一貫性）。SC-12 §9 の ?tab 保持。
+  const [tab, setTabState] = useState<TabKey>(() => {
+    if (typeof window === "undefined") return "ideas";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return (TABS.some((x) => x.key === t) ? t : "ideas") as TabKey;
+  });
+  const setTab = (key: TabKey) => {
+    setTabState(key);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (key === "ideas") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", key);
+    window.history.replaceState(window.history.state, "", url.toString());
+  };
   const [ftq, setFtq] = useState("");
   const [ftScope, setFtScope] = useState("");
   const [ftRows, setFtRows] = useState<SearchRow[]>([]);
