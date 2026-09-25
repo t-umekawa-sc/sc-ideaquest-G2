@@ -10,11 +10,11 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P-TC-001 | int | コンセプト作成（既定 draft）＋総合ルーム自動生成 | クエスト/作成者 seed | `create_concept`（title＋viability jsonb） | 行1・`status=draft`・`decision=undecided`・`is_selected=false`・`concept_chat_scopes` に `overall` 1件 | §5.38/§5.45／P.2 |
+| P-TC-001 | int | コンセプト作成（既定値） | クエスト/作成者 seed | `create_concept`（title＋viability jsonb） | 行1・`status=draft`・`decision=undecided`・`is_selected=false`・`current_revision=1`・viability 反映（総合ルーム自動生成は application＝P-TC-103） | §5.38／P.2 |
 | P-TC-002 | int | 由来アイデア M:N（同一クエスト・置換） | 選別済みアイデア2 seed | `set_source_ideas([a,b])`→`set_source_ideas([b])` | `concept_source_ideas` が置換され最終は1件 | §5.39／P.2 |
 | P-TC-003 | int | 前提＝検証プール（クエスト単位・第一級） | クエスト seed | `create_assumption`（statement） | 行1・`current_verdict=inconclusive`（既定） | §5.40／P.3 |
 | P-TC-004 | int | 検証イベント追記→current_verdict 導出（最新） | 前提1 | `add_validation`（supported, 実施日/規模）→`add_validation`（refuted, 後日） | `assumption_validations` 2行（履歴保持）・`current_verdict=refuted`（最新イベント） | §5.41／§3.5 |
-| P-TC-005 | int | 検証イベントの必須（method/verdict/validated_on） | 前提1 | `add_validation`（validated_on 欠落） | 制約/バリデーションで拒否（実装層で 422 相当） | §5.41／§3.5 |
+| P-TC-005 | int | 現在判定は実施日順（後から古い実施日を足しても最新日維持） | 前提1 | `add_validation`（supported 5/1）→（refuted 2/1・後から古い日付） | `current_verdict=supported`（最新実施日 5/1 が維持・挿入順でない） | §5.41／§3.5 |
 | P-TC-006 | int | コンセプト↔前提リンク（M:N＋criticality） | コンセプト/前提 | `link_assumption`（criticality=critical） | `concept_assumption_links` 1行・`criticality=critical`・`is_stale=false` | §5.42／P.4 |
 | P-TC-007 | int | 共有前提の反証で全リンク先を stale | 前提を2コンセプトにリンク | `add_validation`（refuted）→`mark_links_stale` | 両リンクが `is_stale=true` | §5.41/§5.42／P.7 |
 | P-TC-008 | int | stale 解除（再評価の記録） | stale リンク | `set_link_stale(false)` | `is_stale=false` | §5.42／P.4 |
