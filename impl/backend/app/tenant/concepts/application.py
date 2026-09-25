@@ -307,3 +307,225 @@ def _detail_payload(ts, concept, quest, user) -> dict:
         "related_info": [], "my_permissions": _my_permissions(ts, concept, quest, user),
         "updated_at": concept.updated_at,
     }
+
+
+# ---- 前提＝検証プール（P.3） -----------------------------------------------
+
+def _resolve_assumption(ts, aid, user):
+    """前提＋クエストを解決し門番（パーティー所属）を適用。無い/不可視は 404。"""
+    assumption = repo.get_assumption(ts, aid)
+    if assumption is None:
+        raise AppError(404, "not_found")
+    quest = quests_repo.get_quest(ts, assumption.quest_id)
+    _require_quest_access(ts, quest, user)
+    return assumption, quest
+
+
+def _validation_dto(v) -> dict:
+    return {
+        "id": str(v.id), "method": v.method, "result": v.result, "verdict": v.verdict,
+        "validated_on": v.validated_on, "scale": v.scale, "created_at": v.created_at,
+    }
+
+
+def _assumption_list_item(ts, a) -> dict:
+    validations = repo.list_validations(ts, a.id)
+    links = list(_links_for_assumption(ts, a.id))
+    latest = validations[0].validated_on if validations else None
+    return {
+        "id": str(a.id), "statement": a.statement, "current_verdict": a.current_verdict,
+        "validation_count": len(validations), "linked_concept_count": len(links), "latest_validated_on": latest,
+    }
+
+
+def _links_for_assumption(ts, assumption_id):
+    from app.tenant.concepts.orm import ConceptAssumptionLink
+    from sqlalchemy import select as _select
+    return ts.execute(
+        _select(ConceptAssumptionLink).where(ConceptAssumptionLink.assumption_id == assumption_id)
+    ).scalars().all()
+
+
+def _assumption_detail(ts, assumption, quest, user) -> dict:
+    validations = [_validation_dto(v) for v in repo.list_validations(ts, assumption.id)]
+    linked = []
+    for link in _links_for_assumption(ts, assumption.id):
+        c = repo.get_concept(ts, link.concept_id, include_deleted=True)
+        if c is None:
+            continue
+        linked.append({"concept_id": str(c.id), "title": c.title,
+                       "criticality": link.criticality, "is_stale": link.is_stale})
+    perms = ["view"]
+    if _is_manager(ts, quest, user):
+        perms.append("curate")  # 前提の作成/検証/編集＝検証プール所有
+    return {
+        "id": str(assumption.id), "quest_id": str(assumption.quest_id), "statement": assumption.statement,
+        "current_verdict": assumption.current_verdict, "validations": validations, "linked_concepts": linked,
+        "related_info": [], "my_permissions": perms,
+    }
+
+
+def list_assumptions(account_id, company_id, quest_id) -> dict:
+    company = _ctx(account_id, company_id)
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        quest = quests_repo.get_quest(ts, qid)
+        _require_quest_access(ts, quest, user)
+        items = [_assumption_list_item(ts, a) for a in repo.list_assumptions_for_quest(ts, qid)]
+        return {"items": items, "cursor": None}
+
+
+def create_assumption(account_id, company_id, quest_id, *, statement: str) -> dict:
+    company = _ctx(account_id, company_id)
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        quest = quests_repo.get_quest(ts, qid)
+        _require_quest_access(ts, quest, user)
+        _require_manager(ts, quest, user, action="前提の作成")  # 検証プール所有
+        _guard_not_completed(quest)
+        a = repo.create_assumption(ts, quest_id=qid, statement=statement, created_by_id=user.id)
+        payload = _assumption_detail(ts, a, quest, user)
+        ts.commit()
+        return payload
+
+
+def get_assumption_detail(account_id, company_id, assumption_id) -> dict:
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        return _assumption_detail(ts, assumption, quest, user)
+
+
+def patch_assumption(account_id, company_id, assumption_id, *, statement: str) -> dict:
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="前提の編集")
+        _guard_not_completed(quest)
+        assumption.statement = statement
+        ts.flush()
+        payload = _assumption_detail(ts, assumption, quest, user)
+        ts.commit()
+        return payload
+
+
+def delete_assumption(account_id, company_id, assumption_id) -> None:
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="前提の削除")
+        _guard_not_completed(quest)
+        if not repo.delete_assumption(ts, aid):
+            raise AppError(409, "conflict", detail="リンク中の前提は削除できません（先に解除）",
+                           extra={"errors": [{"reason": "linked"}]})
+        ts.commit()
+
+
+def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
+    """検証イベント追記（プール所有）。verdict=refuted は反証波及（リンク先を stale・P.7）。"""
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="検証の記録")
+        _guard_not_completed(quest)
+        v = repo.add_validation(
+            ts, assumption_id=aid, method=body.method, verdict=body.verdict,
+            validated_on=body.validated_on, result=body.result, scale=body.scale, created_by_id=user.id,
+        )
+        affected: list[uuid.UUID] = []
+        if body.verdict == "refuted":
+            affected = repo.mark_links_stale_for_assumption(ts, aid)
+            # 通知（H・作成者＋評価者へ「要再評価」）は後続スライスで結線（P.7・follow-up）。
+        result = {
+            "validation": _validation_dto(v),
+            "current_verdict": repo.get_assumption(ts, aid).current_verdict,
+            "stale_concept_ids": [str(c) for c in affected],
+        }
+        ts.commit()
+        return result
+
+
+def list_validations(account_id, company_id, assumption_id) -> dict:
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        return {"items": [_validation_dto(v) for v in repo.list_validations(ts, aid)]}
+
+
+# ---- コンセプト↔前提リンク（P.4） -----------------------------------------
+
+def _require_concept_editor(ts, concept, quest, user) -> None:
+    if not (concept.author_id == user.id or _is_manager(ts, quest, user)):
+        raise AppError(403, "forbidden", detail="リンク操作の権限がありません")
+
+
+def link_assumption(account_id, company_id, concept_id, *, assumption_id: str, criticality: str) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user, for_write=True)
+        _require_concept_editor(ts, concept, quest, user)
+        _guard_not_completed(quest)
+        assumption = repo.get_assumption(ts, aid)
+        if assumption is None or assumption.quest_id != concept.quest_id:
+            raise AppError(422, "validation_error", detail="同一クエストの前提のみリンク可",
+                           errors=[{"field": "assumption_id"}])
+        if repo.get_link(ts, cid, aid) is not None:
+            raise AppError(409, "conflict", detail="既にリンク済み")
+        link = repo.link_assumption(ts, concept_id=cid, assumption_id=aid, criticality=criticality, created_by_id=user.id)
+        # 前提スレッド（assumption スコープ）を生成（重複は unique で防止・§3.7）。
+        if repo.get_assumption_scope(ts, cid, aid) is None:
+            repo.create_chat_scope(ts, concept_id=cid, kind="assumption", assumption_id=aid,
+                                   position=repo.next_scope_position(ts, cid))
+        result = {"concept_id": str(cid), "assumption_id": str(aid),
+                  "criticality": link.criticality, "is_stale": link.is_stale}
+        ts.commit()
+        return result
+
+
+def patch_link(account_id, company_id, concept_id, assumption_id, *, criticality, is_stale) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user, for_write=True)
+        _require_concept_editor(ts, concept, quest, user)
+        _guard_not_completed(quest)
+        link = repo.get_link(ts, cid, aid)
+        if link is None:
+            raise AppError(404, "not_found")
+        repo.set_link_criticality_stale(ts, link, criticality=criticality, is_stale=is_stale)
+        result = {"concept_id": str(cid), "assumption_id": str(aid),
+                  "criticality": link.criticality, "is_stale": link.is_stale}
+        ts.commit()
+        return result
+
+
+def unlink_assumption(account_id, company_id, concept_id, assumption_id) -> None:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user, for_write=True)
+        _require_concept_editor(ts, concept, quest, user)
+        _guard_not_completed(quest)
+        if not repo.unlink_assumption(ts, cid, aid):
+            raise AppError(404, "not_found")
+        repo.remove_assumption_scope(ts, cid, aid)  # 前提本体・エビデンスは残す（単一ソース）
+        ts.commit()

@@ -401,3 +401,30 @@ def list_chat_scopes(session: Session, concept_id: uuid.UUID) -> list[ConceptCha
             .order_by(ConceptChatScope.position)
         ).scalars().all()
     )
+
+
+def get_assumption_scope(
+    session: Session, concept_id: uuid.UUID, assumption_id: uuid.UUID,
+) -> ConceptChatScope | None:
+    return session.execute(
+        select(ConceptChatScope).where(
+            ConceptChatScope.concept_id == concept_id,
+            ConceptChatScope.kind == "assumption",
+            ConceptChatScope.assumption_id == assumption_id,
+        )
+    ).scalars().first()
+
+
+def remove_assumption_scope(session: Session, concept_id: uuid.UUID, assumption_id: uuid.UUID) -> None:
+    """前提リンク解除に伴い、その前提スレッド（assumption スコープ）を除去（重複リンク防止）。"""
+    scope = get_assumption_scope(session, concept_id, assumption_id)
+    if scope is not None:
+        session.delete(scope)
+        session.flush()
+
+
+def next_scope_position(session: Session, concept_id: uuid.UUID) -> int:
+    current = session.execute(
+        select(func.max(ConceptChatScope.position)).where(ConceptChatScope.concept_id == concept_id)
+    ).scalar_one_or_none()
+    return (current + 1) if current is not None else 0

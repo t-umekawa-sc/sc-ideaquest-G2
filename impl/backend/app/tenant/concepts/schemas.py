@@ -5,12 +5,14 @@ request は extra=forbid（Mass Assignment 防止・§2.2）。author_id/status/
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 ConceptDecision = Literal["undecided", "go", "pivot", "kill"]
+AssumptionVerdict = Literal["inconclusive", "supported", "refuted"]
+ConceptCriticality = Literal["critical", "major", "minor"]
 
 
 # ---- request（登録/編集・判定・P.2） ----
@@ -132,3 +134,100 @@ class ConceptDetailDTO(BaseModel):
 class ConceptSelectResponse(BaseModel):
     id: str
     is_selected: bool
+
+
+# ---- 前提＝検証プール（P.3）・リンク（P.4） ----
+
+
+class AssumptionCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    statement: str = Field(min_length=1)
+
+
+class AssumptionPatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    statement: str = Field(min_length=1)
+
+
+class ValidationCreateRequest(BaseModel):
+    """POST /assumptions/{id}/validations（P.3・追記型）。refuted は反証波及を発火。"""
+    model_config = ConfigDict(extra="forbid")
+    method: str = Field(min_length=1)
+    verdict: AssumptionVerdict
+    validated_on: date
+    result: str | None = None
+    scale: str | None = None
+
+
+class LinkCreateRequest(BaseModel):
+    """POST /concepts/{id}/assumptions（P.4）。既存前提を重要度付きでリンク。"""
+    model_config = ConfigDict(extra="forbid")
+    assumption_id: str
+    criticality: ConceptCriticality = "major"
+
+
+class LinkPatchRequest(BaseModel):
+    """PATCH /concepts/{id}/assumptions/{aid}（P.4）。重要度変更／要再評価(stale)解除。"""
+    model_config = ConfigDict(extra="forbid")
+    criticality: ConceptCriticality | None = None
+    is_stale: bool | None = None
+
+
+class ValidationDTO(BaseModel):
+    id: str
+    method: str
+    result: str | None = None
+    verdict: str
+    validated_on: date
+    scale: str | None = None
+    created_at: datetime | None = None
+
+
+class LinkedConceptDTO(BaseModel):
+    concept_id: str
+    title: str
+    criticality: str
+    is_stale: bool
+
+
+class AssumptionListItemDTO(BaseModel):
+    id: str
+    statement: str
+    current_verdict: str
+    validation_count: int = 0
+    linked_concept_count: int = 0
+    latest_validated_on: date | None = None
+
+
+class AssumptionListResponse(BaseModel):
+    items: list[AssumptionListItemDTO] = []
+    cursor: str | None = None
+
+
+class AssumptionDetailDTO(BaseModel):
+    id: str
+    quest_id: str
+    statement: str
+    current_verdict: str
+    validations: list[ValidationDTO] = []
+    linked_concepts: list[LinkedConceptDTO] = []
+    related_info: list[dict] = []
+    my_permissions: list[str] = []
+
+
+class ValidationListResponse(BaseModel):
+    items: list[ValidationDTO] = []
+
+
+class ValidationAddResponse(BaseModel):
+    """検証追記の結果（P.3）。refuted は stale_concept_ids に波及先を返す（P.7）。"""
+    validation: ValidationDTO
+    current_verdict: str
+    stale_concept_ids: list[str] = []
+
+
+class LinkDTO(BaseModel):
+    concept_id: str
+    assumption_id: str
+    criticality: str
+    is_stale: bool

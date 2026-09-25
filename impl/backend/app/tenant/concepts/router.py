@@ -13,12 +13,22 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.concepts import application as service
 from app.tenant.concepts.schemas import (
+    AssumptionCreateRequest,
+    AssumptionDetailDTO,
+    AssumptionListResponse,
+    AssumptionPatchRequest,
     ConceptCreateRequest,
     ConceptDecisionRequest,
     ConceptDetailDTO,
     ConceptListResponse,
     ConceptPatchRequest,
     ConceptSelectResponse,
+    LinkCreateRequest,
+    LinkDTO,
+    LinkPatchRequest,
+    ValidationAddResponse,
+    ValidationCreateRequest,
+    ValidationListResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["concepts"])
@@ -117,3 +127,117 @@ def put_decision(
         decision=body.decision, decision_rationale=body.decision_rationale,
     )
     return ConceptDetailDTO(**result)
+
+
+# ---- 前提＝検証プール（P.3） ----
+
+
+@router.get("/quests/{quest_id}/assumptions", response_model=AssumptionListResponse)
+def list_assumptions(quest_id: str, request: Request, session: dict = Depends(require_me)) -> AssumptionListResponse:
+    """検証プール一覧（P.3）。門番＝パーティー員。読取専用。"""
+    result = service.list_assumptions(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
+    return AssumptionListResponse(**result)
+
+
+@router.post("/quests/{quest_id}/assumptions", response_model=AssumptionDetailDTO, status_code=201)
+def create_assumption(
+    quest_id: str, body: AssumptionCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> AssumptionDetailDTO:
+    """前提の作成（P.3・検証プール所有＝owner/quest_admin）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.create_assumption(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, statement=body.statement,
+    )
+    return AssumptionDetailDTO(**result)
+
+
+@router.get("/assumptions/{assumption_id}", response_model=AssumptionDetailDTO)
+def get_assumption(assumption_id: str, request: Request, session: dict = Depends(require_me)) -> AssumptionDetailDTO:
+    """前提詳細（検証履歴＋リンク先・P.3）。読取専用。"""
+    result = service.get_assumption_detail(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id)
+    return AssumptionDetailDTO(**result)
+
+
+@router.patch("/assumptions/{assumption_id}", response_model=AssumptionDetailDTO)
+def patch_assumption(
+    assumption_id: str, body: AssumptionPatchRequest, request: Request, session: dict = Depends(require_me),
+) -> AssumptionDetailDTO:
+    """前提の記述編集（P.3・プール所有）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.patch_assumption(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, statement=body.statement,
+    )
+    return AssumptionDetailDTO(**result)
+
+
+@router.delete("/assumptions/{assumption_id}", status_code=204)
+def delete_assumption(assumption_id: str, request: Request, session: dict = Depends(require_me)) -> Response:
+    """前提の削除（P.3・プール所有）。リンク中は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    service.delete_assumption(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id)
+    return Response(status_code=204)
+
+
+@router.post("/assumptions/{assumption_id}/validations", response_model=ValidationAddResponse, status_code=201)
+def add_validation(
+    assumption_id: str, body: ValidationCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> ValidationAddResponse:
+    """検証イベント追記（P.3・プール所有）。refuted は反証波及（P.7）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.add_validation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, body=body,
+    )
+    return ValidationAddResponse(**result)
+
+
+@router.get("/assumptions/{assumption_id}/validations", response_model=ValidationListResponse)
+def list_validations(assumption_id: str, request: Request, session: dict = Depends(require_me)) -> ValidationListResponse:
+    """検証イベント履歴（実施日降順・P.3）。読取専用。"""
+    result = service.list_validations(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id)
+    return ValidationListResponse(**result)
+
+
+# ---- コンセプト↔前提リンク（P.4） ----
+
+
+@router.post("/concepts/{concept_id}/assumptions", response_model=LinkDTO, status_code=201)
+def link_assumption(
+    concept_id: str, body: LinkCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> LinkDTO:
+    """前提をコンセプトにリンク（P.4・重要度付き・前提スレッド生成）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.link_assumption(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id,
+        assumption_id=body.assumption_id, criticality=body.criticality,
+    )
+    return LinkDTO(**result)
+
+
+@router.patch("/concepts/{concept_id}/assumptions/{assumption_id}", response_model=LinkDTO)
+def patch_link(
+    concept_id: str, assumption_id: str, body: LinkPatchRequest, request: Request, session: dict = Depends(require_me),
+) -> LinkDTO:
+    """重要度変更／要再評価(stale)解除（P.4）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.patch_link(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, assumption_id,
+        criticality=body.criticality, is_stale=body.is_stale,
+    )
+    return LinkDTO(**result)
+
+
+@router.delete("/concepts/{concept_id}/assumptions/{assumption_id}", status_code=204)
+def unlink_assumption(
+    concept_id: str, assumption_id: str, request: Request, session: dict = Depends(require_me),
+) -> Response:
+    """リンク解除（P.4・前提本体は残す）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    service.unlink_assumption(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, assumption_id)
+    return Response(status_code=204)
