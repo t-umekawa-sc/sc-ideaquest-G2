@@ -284,7 +284,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 )}
               </>
             )}
-            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline">評価する / 編集</Link>}
+            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
           </section>
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}

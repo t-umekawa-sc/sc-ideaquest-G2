@@ -2491,8 +2491,7 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 [data-anim-reduced="true"] .screen-purpose__pop{ transition: none; }
 [data-anim-reduced="true"] .screen-purpose.is-marquee .screen-purpose__text{ animation: none; }
 
-/* ガイダンス ⓘ アイコンのみ（傍に文脈がある時＝評価観点など）＝枠/背景/余白を外した素のⓘグリフ。
-   隣接テキストと同じ行に揃うよう line-height を継承。展開する本文パネル（pop）は従来どおり枠付きで浮く。 */
-.screen-purpose--icon-only { padding: 0; border-color: transparent; background: transparent; line-height: inherit; }
-.screen-purpose--icon-only:hover, .screen-purpose--icon-only:focus-within { border-color: transparent; }
-.screen-purpose--icon-only .screen-purpose__icon { color: var(--color-text-muted); }
+/* ガイダンス ⓘ アイコンのみ（傍に文脈がある時＝評価観点など）＝ⓘ をタイトなグレー枠のピルで囲う
+   （ラベル版と同じ枠感・隣接テキストと縦中央で揃える）。展開する本文パネル（pop）は従来どおり地続きで浮く。 */
+.screen-purpose--icon-only { padding: 1px 8px; vertical-align: middle; }
+.screen-purpose--icon-only .screen-purpose__icon { color: var(--color-text-muted); line-height: 1; }
