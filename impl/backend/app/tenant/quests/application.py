@@ -435,7 +435,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
         removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
             removed = _apply_party_diff(ts, quest, body.members, requester=user)
-        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
+        cg_ids = chat_repo.list_chat_thread_ids_for_quest(ts, quest.id) if removed else []
         # 公開中クエストは不正な状態へ落とせない＝strict 再検証（未充足は 422）。
         if quest.status in _PUBLIC_STATUS:
             _validate_publishable(
@@ -479,7 +479,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
         removed: list = []
         if "members" in body.model_fields_set and body.members is not None:
             removed = _apply_party_diff(ts, quest, body.members, requester=user)
-        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
+        cg_ids = chat_repo.list_chat_thread_ids_for_quest(ts, quest.id) if removed else []
         _validate_publishable(
             title=quest.title, color=quest.color,
             categories=repo.list_categories(ts, quest.id),
@@ -866,7 +866,7 @@ def set_party(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, me
         _authorize_edit(ts, quest, user)
         _guard_not_completed(quest)
         removed = _apply_party_diff(ts, quest, members, requester=user)
-        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id) if removed else []
+        cg_ids = chat_repo.list_chat_thread_ids_for_quest(ts, quest.id) if removed else []
         data = _members_payload(ts, quest)
         ts.commit()
     _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・バルク除外でも失効）
@@ -943,7 +943,7 @@ def remove_party_member(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: 
         _guard_not_completed(quest)
         if uid == quest.owner_id:
             raise AppError(422, "validation_error", detail="作成者はパーティーから外せません", errors=[{"field": "user_id", "reason": "last_owner"}])
-        cg_ids = chat_repo.list_chat_group_ids_for_quest(ts, quest.id)  # L.4 失効対象（除去前に取得）
+        cg_ids = chat_repo.list_chat_thread_ids_for_quest(ts, quest.id)  # L.4 失効対象（除去前に取得）
         repo.remove_member(ts, quest.id, uid)  # 有効参加が無ければ no-op（冪等）
         ts.commit()
     _revoke_chat_subscriptions(company_id, cg_ids, [uid])  # L.4（post-commit）

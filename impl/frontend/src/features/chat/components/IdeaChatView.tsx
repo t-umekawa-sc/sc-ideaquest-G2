@@ -18,17 +18,15 @@ import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
 import { renderTextHtml, resolveMagic, type Member } from "../render";
 import { flashClassFor, scrollTopForTarget } from "../jump";
-import { getAttachmentDownloadUrl, getIdea, type IdeaDetail } from "@/features/ideas/api";
+import { getAttachmentDownloadUrl } from "@/features/ideas/api";
+import { ideaSource, type ChatSource, type ChatCtx } from "../source";
 
 import {
   addReaction,
   deleteMessage,
   editMessage,
-  getChat,
   getPartyMembers,
   getSpells,
-  markRead,
-  postMessage,
   removeReaction,
   setMessagePin,
   type ChatMessage,
@@ -66,17 +64,20 @@ function autoGrow(ta: HTMLTextAreaElement | null, max = 180) {
 }
 type Pos = { top: number; left: number };
 
-export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; gameEnabled?: boolean }) {
+export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: string; source?: ChatSource; gameEnabled?: boolean }) {
+  // source を明示指定（コンセプト等）／未指定なら ideaId からアイデア source を構築（後方互換・SC-24）。
+  const srcRef = useRef<ChatSource>(source ?? ideaSource(ideaId as string));
+  const src = srcRef.current;
   const snack = useSnackbar();
   const confirm = useConfirm();
-  const [idea, setIdea] = useState<IdeaDetail | null>(null);
+  const [ctx, setCtx] = useState<ChatCtx | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [spells, setSpells] = useState<Spell[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
-  const [chatGroupId, setChatGroupId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [ctxOpen, setCtxOpen] = useState(false); // 上部の文脈パネルの開閉。既定＝閉じる（ユーザー要望・▼で開く）
   const [hintOpen, setHintOpen] = useState(false);   // 使い方ヒントの開閉（SC-24 モック）
   const [composerMin, setComposerMin] = useState(true); // 入力欄の最小化（SC-24 モック）。既定＝最小化（ユーザー要望・スリムバーをクリックで展開）
@@ -143,10 +144,10 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   const messagesRef = useRef<ChatMessage[]>([]); // 最新 messages（スクロール/可視ハンドラから参照＝再バインド不要）
   const readMaxRef = useRef(-1); // このセッションで既読化した最大インデックス（既読の重複送信を避ける）
 
-  const completed = idea?.quest?.status === "completed";
-  const canPost = !completed && !!idea && (idea.my_permissions?.includes("comment") ?? false);
+  const completed = ctx?.completed ?? false;
+  const canPost = !completed && !!ctx && ctx.canComment;
   // FR-39 (b) ピン留めは owner/quest_admin のみ（完了後も可＝最終結果のキュレーション）。
-  const canPin = !!idea && ((idea.my_permissions?.includes("owner") || idea.my_permissions?.includes("quest_admin")) ?? false);
+  const canPin = !!ctx && ctx.canPin;
   // ピン留めアニメ（style-guide §17P 移植）＝msgId→"stamp"（📌押印＋枠フラッシュ）/"peel"（外す時の退場）。
   // reduce 時は付与しない（＝演出なし・即反映）。演出は onAnimationEnd で後片付け。
   const [pinFx, setPinFx] = useState<Record<string, "stamp" | "peel">>({});
@@ -200,19 +201,19 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
 
   const load = useCallback(async () => {
     try {
-      const [d, chat] = await Promise.all([getIdea(ideaId), getChat(ideaId)]);
-      if (!d || !chat) {
+      const [c, chat] = await Promise.all([src.loadCtx(), src.loadChat()]);
+      if (!c || !chat) {
         setLoadError("このチャットは見つからないか、参照する権限がありません。");
         return;
       }
-      setIdea(d);
+      setCtx(c);
       setMessages(chat.data);
-      setChatGroupId(chat.chat_group_id);
+      setThreadId(chat.thread_id);  // 購読キーは thread_id（ホスト非依存・§5.45）
       setFirstUnread(chat.unread?.first_unread_message_id ?? null);
       setLoadError(null);
       initialScrollRef.current = true; // 描画後に初期スクロール（未読区切りへ／全既読なら最下部へ）
       // メンション候補・魔法カタログ（非致命）。
-      void getPartyMembers(d.quest.id).then((r) =>
+      void getPartyMembers(c.questId).then((r) =>
         // 応答は `{ user: {user_id, display_name} }`（ネスト）。以前フラット想定で name が undefined になり @ でクラッシュしていた。
         setMembers((r?.data ?? []).map((m) => ({ user_id: m.user.user_id, name: m.user.display_name ?? "", nospace: (m.user.display_name || "").replace(/\s/g, "") }))),
       ).catch(() => {});
@@ -225,7 +226,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     } finally {
       setLoading(false);
     }
-  }, [ideaId]);
+  }, [src]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -253,9 +254,9 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     if (maxIdx > readMaxRef.current) {
       readMaxRef.current = maxIdx;
       const id = msgs[maxIdx]?.id;
-      if (id) void markRead(ideaId, id).catch(() => {});
+      if (id) void src.markRead(id).catch(() => {});
     }
-  }, [ideaId]);
+  }, [src]);
 
   // ユーザーのスクロール（rAF スロットル）とタブ可視化で既読を再評価。
   useEffect(() => {
@@ -298,16 +299,16 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   }, [messages, firstUnread, markReadUpToVisible]);
 
   const refetch = useCallback(async () => {
-    const chat = await getChat(ideaId);
+    const chat = await src.loadChat();
     if (chat) setMessages(chat.data);
     return chat;
-  }, [ideaId]);
+  }, [src]);
 
-  // リアルタイム（L）＝chat:{chat_group_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
+  // リアルタイム（L）＝chat:{thread_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
   useEffect(() => {
-    if (!chatGroupId) return;
+    if (!threadId) return;
     realtime.start();
-    const topic = `chat:${chatGroupId}`;
+    const topic = `chat:${threadId}`;
     realtime.subscribe(topic);
     const off = realtime.onTopic(topic, () => {
       // 新着/編集/削除/リアクションで再取得し、反映後に「見えた分」を既読化（DFT-E-011）。
@@ -315,7 +316,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       void refetch().then(() => requestAnimationFrame(() => markReadUpToVisible()));
     });
     return () => { off(); realtime.unsubscribe(topic); };
-  }, [chatGroupId, refetch, markReadUpToVisible]);
+  }, [threadId, refetch, markReadUpToVisible]);
 
   const updateSendState = useCallback(() => {
     setCanSend((boxRef.current?.value.trim().length ?? 0) > 0 || pendingFiles.length > 0);
@@ -393,7 +394,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     if ((!body && pendingFiles.length === 0) || sending || !canPost) return;
     setSending(true);
     try {
-      await postMessage(ideaId, { body, quotedMessageIds: replyTargets.map((r) => r.id), mentions: extractMentionIds(body), files: pendingFiles });
+      await src.post({ body, quotedMessageIds: replyTargets.map((r) => r.id), mentions: extractMentionIds(body), files: pendingFiles });
       if (ta) { ta.value = ""; autoGrow(ta, 180); }
       setPendingFiles([]);
       setReplyTargets([]);
@@ -518,15 +519,15 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     return () => document.removeEventListener("click", onDocClick);
   }, [picker, mention]);
 
-  // 戻るリンク（3箇所共通）＝履歴があれば router.back（来た画面へ）／無ければアイデア詳細へ。ラベルは文脈ヒント。
-  const backHref = `/ideas/${ideaId}`;
+  // 戻るリンク（3箇所共通）＝履歴があれば router.back（来た画面へ）／無ければホスト詳細へ。ラベルは文脈ヒント。
+  const backHref = ctx?.backHref ?? (ideaId ? `/ideas/${ideaId}` : "/");
   const backLabel = backToDash ? "← ダッシュボードへ戻る" : "← 戻る";
   const onBack = (e: React.MouseEvent) => { e.preventDefault(); backToListOr(router, backHref); };
 
   if (loading) {
     return <main className="container chat-main"><LoadingOverlay /></main>;
   }
-  if (loadError || !idea) {
+  if (loadError || !ctx) {
     return (
       <main className="container chat-main">
         <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
@@ -560,17 +561,17 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       <section className={`card chat-context chat-context--float${ctxOpen ? "" : " is-collapsed"}`} aria-label="対象アイデア">
         <div className="chat-context__nav">
           <Link className="backlink" href={backHref} onClick={onBack}>{backLabel}</Link>
-          {ctxOpen && <Link className="btn btn-outline btn-sm" href={`/ideas/${ideaId}`}>アイデア詳細を開く</Link>}
+          {ctxOpen && <Link className="btn btn-outline btn-sm" href={backHref}>詳細を開く</Link>}
         </div>
         <div className="chat-context__main">
           {ctxOpen ? (
             <div className="chat-context__body">
-              <div className="chat-context__quest">{idea.quest.title}{idea.quest.categories?.[0] ? ` ・ ${idea.quest.categories[0]}` : ""}</div>
-              <div className="chat-context__title">{idea.title} <QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /></div>
+              <div className="chat-context__quest">{ctx.questTitle}{ctx.questCategory ? ` ・ ${ctx.questCategory}` : ""}</div>
+              <div className="chat-context__title">{ctx.title} <QuestIcon name={ctx.title} color={ctx.color} imageUrl={ctx.iconUrl ?? undefined} size="xs" /></div>
               <div className="chat-context__meta">💬 {messages.filter((m) => !m.is_deleted).length}件{completed ? " ・ ⏸ 完了（凍結）" : ""}</div>
             </div>
           ) : (
-            <span className="chat-context__mini">{idea.title} <QuestIcon name={idea.title} color={idea.quest.color} imageUrl={idea.icon_image_url} size="xs" /></span>
+            <span className="chat-context__mini">{ctx.title} <QuestIcon name={ctx.title} color={ctx.color} imageUrl={ctx.iconUrl ?? undefined} size="xs" /></span>
           )}
         </div>
         <button

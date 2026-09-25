@@ -25,6 +25,39 @@ export function getChatActivity(ideaId: string, days = 14): Promise<ChatActivity
   return apiFetch<ChatActivity>(`/ideas/${ideaId}/chat-activity?days=${days}`);
 }
 
+// ---- コンセプト議論スコープのチャット（P.6・アイデアと同一中核＝フル機能パリティ・§5.45） ----
+// メッセージ一覧＋未読（スコープ単位・E.1 同形）。門番はサーバー強制。
+export function getScopeChat(scopeId: string, params?: { limit?: number; before?: string; after?: string }): Promise<ChatListResponse | null> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(params?.limit ?? 50));
+  if (params?.before) qs.set("before", params.before);
+  if (params?.after) qs.set("after", params.after);
+  return apiFetch<ChatListResponse>(`/concept-chat-scopes/${scopeId}/chat?${qs.toString()}`);
+}
+
+// スコープの議論アクティビティ（版マーカーは無し）。
+export function getScopeChatActivity(scopeId: string, days = 14): Promise<ChatActivity | null> {
+  return apiFetch<ChatActivity>(`/concept-chat-scopes/${scopeId}/chat-activity?days=${days}`);
+}
+
+// スコープへ投稿（E.2・multipart・アイデアと同一）。
+export function postScopeMessage(
+  scopeId: string,
+  input: { body?: string; quotedMessageIds?: string[]; mentions?: string[]; files?: File[] },
+): Promise<ChatMessage | null> {
+  const fd = new FormData();
+  if (input.body) fd.append("body", input.body);
+  for (const q of input.quotedMessageIds ?? []) fd.append("quoted_message_ids", q);
+  for (const m of input.mentions ?? []) fd.append("mentions", m);
+  for (const f of input.files ?? []) fd.append("files", f);
+  return apiFetch<ChatMessage>(`/concept-chat-scopes/${scopeId}/chat-messages`, { method: "POST", body: fd });
+}
+
+// スコープの既読位置更新（E.5・後退防止）。
+export function markScopeRead(scopeId: string, lastReadMessageId: string): Promise<{ unread_count: number } | null> {
+  return apiFetch<{ unread_count: number }>(`/concept-chat-scopes/${scopeId}/chat/read`, { method: "POST", body: JSON.stringify({ last_read_message_id: lastReadMessageId }) });
+}
+
 // メッセージ投稿（E.2・multipart）。body/mentions/引用（複数可）/files を単一 UoW。空は 422・投稿 XP+5。
 export function postMessage(
   ideaId: string,

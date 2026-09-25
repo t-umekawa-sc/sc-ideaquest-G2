@@ -5,8 +5,9 @@
 `concept_assumption_links`（M:N＋criticality/is_stale）＋`concept_evaluations`＋`concept_evaluation_scores`
 （中核5＋補助3）＋`concept_chat_scopes`（総合/グループ/前提スレッド）＋`concept_votes`。
 enum（concept_status/concept_decision/assumption_verdict/concept_criticality/concept_eval_aspect/
-concept_chat_scope_kind）は §5.3 と同方針で String 列で持つ。チャットは §5.45 の最小侵襲拡張で
-`chat_messages`/`chat_reads` 側に `concept_chat_scope_id` を持たせる（本モジュールはスコープ本体のみ）。
+concept_chat_scope_kind）は §5.3 と同方針で String 列で持つ。チャットは §5.45＝各 concept_chat_scope が
+`chat_thread`（owner_type='concept_scope'）を1本持ち、チャット中核（chat_messages/chat_reads/reactions）は
+thread_id ただ一つで動く（本モジュールはスコープ本体＝ホスト側 owner adapter のみ）。
 """
 from __future__ import annotations
 

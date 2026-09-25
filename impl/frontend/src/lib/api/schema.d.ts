@@ -2393,6 +2393,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/concept-chat-scopes/{scope_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scope Chat
+         * @description コンセプト議論スコープの一覧＋未読（E.1 同形・門番はスコープ）。読取専用。
+         */
+        get: operations["get_scope_chat_api_v1_concept_chat_scopes__scope_id__chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concept-chat-scopes/{scope_id}/chat-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scope Chat Activity
+         * @description スコープの議論アクティビティ（E.1・版マーカーはコンセプトに無いため空）。読取専用。
+         */
+        get: operations["get_scope_chat_activity_api_v1_concept_chat_scopes__scope_id__chat_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concept-chat-scopes/{scope_id}/chat-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Scope Message
+         * @description スコープへ投稿（E.2・multipart・アイデアと同一中核）。空は 422・投稿 XP+5・引用複数可。完了は 409。
+         */
+        post: operations["post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concept-chat-scopes/{scope_id}/chat/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Scope Read
+         * @description スコープの既読位置を更新（E.5・後退防止 upsert）。完了後も許可。
+         */
+        post: operations["mark_scope_read_api_v1_concept_chat_scopes__scope_id__chat_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rankings": {
         parameters: {
             query?: never;
@@ -3516,6 +3596,17 @@ export interface components {
             /** Files */
             files?: string[] | null;
         };
+        /** Body_post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post */
+        Body_post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post: {
+            /** Body */
+            body?: string | null;
+            /** Quoted Message Ids */
+            quoted_message_ids?: string[] | null;
+            /** Mentions */
+            mentions?: string[] | null;
+            /** Files */
+            files?: string[] | null;
+        };
         /** Body_put_avatar_image_api_v1_me_avatar_image_put */
         Body_put_avatar_image_api_v1_me_avatar_image_put: {
             /** File */
@@ -3626,7 +3717,9 @@ export interface components {
         /** ChatListResponse */
         ChatListResponse: {
             /** Chat Group Id */
-            chat_group_id: string;
+            chat_group_id?: string | null;
+            /** Thread Id */
+            thread_id: string;
             /** Data */
             data: components["schemas"]["ChatMessageDTO"][];
             page_info: components["schemas"]["ChatCursorPageInfo"];
@@ -12451,6 +12544,144 @@ export interface operations {
             header?: never;
             path: {
                 idea_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scope_chat_api_v1_concept_chat_scopes__scope_id__chat_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before?: string | null;
+                after?: string | null;
+            };
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scope_chat_activity_api_v1_concept_chat_scopes__scope_id__chat_activity_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_scope_read_api_v1_concept_chat_scopes__scope_id__chat_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scope_id: string;
             };
             cookie?: never;
         };

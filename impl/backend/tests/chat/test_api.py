@@ -15,7 +15,7 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.chat import repository as chat_repo
-from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, Reaction, Spell, UserSpell
+from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, ChatThread, Reaction, Spell, UserSpell
 from app.tenant.gamification.orm import Activity
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.ideas.orm import Attachment, Idea, IdeaRevision
@@ -102,15 +102,20 @@ def env():
         ts.execute(_Notif.__table__.delete().where(_Notif.recipient_id.in_([user_id, other_id])))
         cg_ids = [cg.id for i in ideas for cg in ([chat_repo.get_chat_group_by_idea(ts, i)] if chat_repo.get_chat_group_by_idea(ts, i) else [])]
         if cg_ids:
-            msg_ids = [m.id for cg in cg_ids for m in ts.execute(select(ChatMessage).where(ChatMessage.chat_group_id == cg)).scalars()]
+            thread_ids = list(ts.execute(
+                select(ChatThread.id).where(ChatThread.owner_type == "idea", ChatThread.owner_id.in_(cg_ids))
+            ).scalars())
+            msg_ids = [m.id for tid in thread_ids for m in ts.execute(select(ChatMessage).where(ChatMessage.thread_id == tid)).scalars()] if thread_ids else []
             if msg_ids:
                 ts.execute(Reaction.__table__.delete().where(Reaction.chat_message_id.in_(msg_ids)))
                 ts.execute(ChatMessageQuote.__table__.delete().where(ChatMessageQuote.chat_message_id.in_(msg_ids)))
                 ts.execute(ChatMention.__table__.delete().where(ChatMention.chat_message_id.in_(msg_ids)))
                 ts.execute(Attachment.__table__.delete().where(Attachment.chat_message_id.in_(msg_ids)))
                 ts.execute(Activity.__table__.delete().where(Activity.ref_id.in_(msg_ids)))
-            ts.execute(ChatRead.__table__.delete().where(ChatRead.chat_group_id.in_(cg_ids)))
-            ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cg_ids)))
+            if thread_ids:
+                ts.execute(ChatRead.__table__.delete().where(ChatRead.thread_id.in_(thread_ids)))
+                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(thread_ids)))
+                ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(thread_ids)))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id.in_(cg_ids)))
         if ideas:
             ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(ideas)))
@@ -230,7 +235,7 @@ def test_e_tc_109_edit(client, env):
     # 他人のメッセージは編集不可（他ユーザーの投稿を seed）。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        other_msg = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="他")
+        other_msg = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="他")
         oid = other_msg.id
         ts.commit()
     assert client.patch(f"{MSGS}/{oid}", data={"body": "z"}, headers=_csrf(client)).status_code == 403
@@ -277,7 +282,7 @@ def test_e_tc_223_quote_no_notify_mention_notifies(client, env):
     # other の発言（＝この後 user に引用される「他人のメッセージ」）を直接 seed。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        mx_id = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="other の発言").id
+        mx_id = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="other の発言").id
         ts.commit()
 
     def _types(recipient, ref_msg):
@@ -361,7 +366,7 @@ def test_e_tc_110_delete(client, env):
     # owner は他人の投稿も削除可。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        om = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="他人")
+        om = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="他人")
         oid = om.id
         ts.commit()
     assert client.delete(f"{MSGS}/{oid}", headers=_csrf(client)).status_code == 200
@@ -484,7 +489,7 @@ def test_e_tc_119_one_magic_per_message(client, env):
     # 他ユーザーが先に魔法を付与済み（直接 seed）。
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea)
-        chat_repo.add_reaction(ts, chat_message_id=uuid.UUID(mid), chat_group_id=cg.id, user_id=env.other_id,
+        chat_repo.add_reaction(ts, chat_message_id=uuid.UUID(mid), thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, user_id=env.other_id,
                                type="magic", spell_id=_spell_id(env, "light_1"))
         ts.commit()
     _unlock(env, env.user_id, "flame_1")  # 自分は別 spell 解放済み
@@ -568,7 +573,7 @@ def test_e_tc_224_magic_reaction_notifies_author_not_self(client, env):
     _post(client, idea_a, body="口火")  # チャットグループ生成
     with get_tenant_session(env.db_identifier) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, idea_a)
-        m_other = chat_repo.create_message(ts, chat_group_id=cg.id, author_id=env.other_id, body="other の発言").id
+        m_other = chat_repo.create_message(ts, thread_id=chat_repo.ensure_chat_thread(ts, "idea", cg.id).id, author_id=env.other_id, body="other の発言").id
         ts.commit()
     r = client.post(f"{MSGS}/{m_other}/reactions", json={"type": "magic", "spell_id": str(sid)}, headers=_csrf(client))
     assert r.status_code == 200, r.text

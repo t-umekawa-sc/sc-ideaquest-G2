@@ -24,8 +24,9 @@ def notifications_topic(user_id: uuid.UUID | str) -> str:
     return f"notifications:{user_id}"
 
 
-def chat_topic(chat_group_id: uuid.UUID | str) -> str:
-    return f"chat:{chat_group_id}"
+def chat_topic(thread_id: uuid.UUID | str) -> str:
+    """チャットトピック＝`chat:{thread_id}`（ホスト非依存＝アイデア/コンセプト共通・§5.45）。"""
+    return f"chat:{thread_id}"
 
 
 def publish_event(topic: str, type: str, data: dict, *, company_id: uuid.UUID | str,
@@ -39,13 +40,13 @@ def publish_event(topic: str, type: str, data: dict, *, company_id: uuid.UUID | 
         logger.warning("realtime publish failed (topic=%s type=%s)", topic, type, exc_info=True)
 
 
-def publish_revoke(user_id: uuid.UUID | str, chat_group_id: uuid.UUID | str, *,
+def publish_revoke(user_id: uuid.UUID | str, thread_id: uuid.UUID | str, *,
                    company_id: uuid.UUID | str) -> None:
-    """購読強制ドロップ（L.4）＝対象 user×chat_group の `chat:` 購読をハブに切らせる。"""
-    payload = {"user_id": str(user_id), "chat_group_id": str(chat_group_id),
+    """購読強制ドロップ（L.4）＝対象 user×thread の `chat:` 購読をハブに切らせる。"""
+    payload = {"user_id": str(user_id), "thread_id": str(thread_id),
                "company_id": str(company_id)}
     try:
         get_redis().publish(REVOKE_CHANNEL, json.dumps(payload, default=str, ensure_ascii=False))
     except Exception:  # noqa: BLE001
-        logger.warning("realtime revoke publish failed (user=%s cg=%s)", user_id, chat_group_id,
+        logger.warning("realtime revoke publish failed (user=%s thread=%s)", user_id, thread_id,
                        exc_info=True)

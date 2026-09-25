@@ -16,7 +16,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.main import app
 from app.tenant.chat import repository as chat_repo
-from app.tenant.chat.orm import ChatGroup, ChatMessage, Reaction
+from app.tenant.chat.orm import ChatGroup, ChatMessage, ChatThread, Reaction
 from app.tenant.ideas.orm import Idea
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
@@ -58,10 +58,14 @@ def chatenv(factory):
     with get_tenant_session(db) as ts:
         cg = chat_repo.get_chat_group_by_idea(ts, iid)
         if cg is not None:
-            mids = [m.id for m in ts.execute(select(ChatMessage).where(ChatMessage.chat_group_id == cg.id)).scalars()]
+            tids = list(ts.execute(select(ChatThread.id).where(
+                ChatThread.owner_type == "idea", ChatThread.owner_id == cg.id)).scalars())
+            mids = [m.id for tid in tids for m in ts.execute(select(ChatMessage).where(ChatMessage.thread_id == tid)).scalars()] if tids else []
             if mids:
                 ts.execute(Reaction.__table__.delete().where(Reaction.chat_message_id.in_(mids)))
-            ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id == cg.id))
+            if tids:
+                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids)))
+                ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids)))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id == cg.id))
         ts.execute(Idea.__table__.delete().where(Idea.id == iid))
         ts.execute(QuestMemberPermission.__table__.delete().where(
@@ -77,10 +81,10 @@ def chatenv(factory):
 
 
 def _cg_id(chatenv) -> str:
-    """GET chat で chat_group を遅延生成し id を得る。"""
+    """GET chat で chat_group/thread を遅延生成し購読キー（thread_id）を得る（購読トピック chat:{thread_id}）。"""
     with TestClient(app) as c:
         _login(c, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
-        return c.get(f"/api/v1/ideas/{chatenv['idea_id']}/chat").json()["chat_group_id"]
+        return c.get(f"/api/v1/ideas/{chatenv['idea_id']}/chat").json()["thread_id"]
 
 
 def test_l_tc_111_subscribe_gate_ok_and_message_delivery(chatenv):
@@ -204,7 +208,7 @@ def test_l_tc_123_group_removal_revoke_targets(chatenv):
     with get_tenant_session(chatenv["db"]) as ts:
         gid = chatenv["group_id"]
         # seed_uid は当該グループ内クエストの有効パーティー員＝失効対象に cg が含まれる
-        ids = chat_repo.list_chat_group_ids_for_group_member(ts, gid, chatenv["seed_uid"])
+        ids = chat_repo.list_chat_thread_ids_for_group_member(ts, gid, chatenv["seed_uid"])
         assert cg in {str(x) for x in ids}
         # グループ内クエストに参加していないユーザーは対象ゼロ（過剰失効を出さない）
-        assert chat_repo.list_chat_group_ids_for_group_member(ts, gid, uuid.uuid4()) == []
+        assert chat_repo.list_chat_thread_ids_for_group_member(ts, gid, uuid.uuid4()) == []

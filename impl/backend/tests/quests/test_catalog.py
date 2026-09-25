@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.tenant.chat.orm import ChatGroup, ChatMessage
+from app.tenant.chat.orm import ChatGroup, ChatMessage, ChatThread
 from app.tenant.gamification.orm import Activity
 from app.tenant.ideas.orm import Idea, IdeaRevision
 from app.tenant.notifications.orm import Notification
@@ -83,7 +83,11 @@ def env():
         if iids:
             cgids = list(ts.execute(select(ChatGroup.id).where(ChatGroup.idea_id.in_(iids))).scalars())
             if cgids:
-                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cgids)))
+                tids = list(ts.execute(select(ChatThread.id).where(
+                    ChatThread.owner_type == "idea", ChatThread.owner_id.in_(cgids))).scalars())
+                if tids:
+                    ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids)))
+                    ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids)))
                 ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id.in_(cgids)))
             ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(iids)))  # 公開時の版（C-TC-281）
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
@@ -210,11 +214,13 @@ def test_c_tc_265_catalog_detail_activity(client, env):
             cgid = uuid.uuid4()
             ts.add(ChatGroup(id=cgid, idea_id=iid))
             ts.flush()
+            from app.tenant.chat import repository as _chat_repo
+            tid = _chat_repo.ensure_chat_thread(ts, "idea", cgid).id
             # アイデア0＝1メッセージ(今日)／アイデア1＝2メッセージ(今日・昨日)。
-            ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id,
+            ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tid, author_id=env.owner_id,
                                body=secret, created_at=now))
             if n == 1:
-                ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id,
+                ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tid, author_id=env.owner_id,
                                    body=secret, created_at=now - timedelta(days=1)))
         ts.commit()
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
@@ -419,8 +425,10 @@ def test_c_tc_279_quest_activity_member(client, env):
         cgid = uuid.uuid4()
         ts.add(ChatGroup(id=cgid, idea_id=iid))
         ts.flush()
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id, body="m1", created_at=now))
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgid, author_id=env.owner_id, body="m2", created_at=now - timedelta(days=1)))
+        from app.tenant.chat import repository as _chat_repo
+        tid = _chat_repo.ensure_chat_thread(ts, "idea", cgid).id
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tid, author_id=env.owner_id, body="m1", created_at=now))
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tid, author_id=env.owner_id, body="m2", created_at=now - timedelta(days=1)))
         ts.commit()
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     r = client.get(f"/api/v1/quests/{qid}/activity")
@@ -602,8 +610,11 @@ def test_i_tc_161_recent_chats(client, env):
         ts.flush()
         cga, cgb = uuid.uuid4(), uuid.uuid4()
         ts.add(ChatGroup(id=cga, idea_id=ia)); ts.add(ChatGroup(id=cgb, idea_id=ib)); ts.flush()
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cga, author_id=env.viewer_id, body="mine", created_at=now))
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cgb, author_id=env.owner_id, body="theirs", created_at=now - timedelta(hours=1)))
+        from app.tenant.chat import repository as _chat_repo
+        tida = _chat_repo.ensure_chat_thread(ts, "idea", cga).id
+        tidb = _chat_repo.ensure_chat_thread(ts, "idea", cgb).id
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tida, author_id=env.viewer_id, body="mine", created_at=now))
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tidb, author_id=env.owner_id, body="theirs", created_at=now - timedelta(hours=1)))
         ts.commit()
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     d = client.get("/api/v1/dashboard").json()

@@ -66,7 +66,8 @@ class ChatUnreadDTO(BaseModel):
 
 
 class ChatListResponse(BaseModel):
-    chat_group_id: str
+    chat_group_id: str | None = None  # idea ホストのみ（後方互換）。concept 等は None
+    thread_id: str  # チャット中核の所属＝ホスト非依存（§5.45・購読トピック chat:{thread_id}）
     data: list[ChatMessageDTO]
     page_info: ChatCursorPageInfo
     unread: ChatUnreadDTO

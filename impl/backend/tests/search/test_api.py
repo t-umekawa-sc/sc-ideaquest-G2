@@ -71,8 +71,11 @@ def env(factory):
             ts.query(Idea).filter_by(id=deleted).update({"deleted_at": datetime.now(timezone.utc)})
             # チャット（可視アイデア配下・本文に検索語）＋トゥームストーン（対象外）。
             ts.add(ChatGroup(id=cg, idea_id=pub))
-            ts.add(ChatMessage(id=msg, chat_group_id=cg, author_id=other, body=f"チャットに{NEEDLE}"))
-            ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=other, body=f"消済{NEEDLE}", is_deleted=True))
+            ts.flush()
+            from app.tenant.chat import repository as _chat_repo
+            tid = _chat_repo.ensure_chat_thread(ts, "idea", cg).id
+            ts.add(ChatMessage(id=msg, thread_id=tid, author_id=other, body=f"チャットに{NEEDLE}"))
+            ts.add(ChatMessage(id=uuid.uuid4(), thread_id=tid, author_id=other, body=f"消済{NEEDLE}", is_deleted=True))
             # 添付（可視アイデア・ファイル名に検索語）。
             ts.add(Attachment(id=att, idea_id=pub, object_key="k", original_name=f"{NEEDLE}_資料.pdf",
                               size_bytes=1, mime_type="application/pdf", uploaded_by_id=other))
@@ -82,7 +85,12 @@ def env(factory):
 
     with get_tenant_session(db) as ts:
         ts.execute(Attachment.__table__.delete().where(Attachment.idea_id.in_([pub, draft, deleted])))
-        ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id == cg))
+        from app.tenant.chat.orm import ChatThread as _ChatThread
+        _tids = list(ts.execute(select(_ChatThread.id).where(
+            _ChatThread.owner_type == "idea", _ChatThread.owner_id == cg)).scalars())
+        if _tids:
+            ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(_tids)))
+            ts.execute(_ChatThread.__table__.delete().where(_ChatThread.id.in_(_tids)))
         ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id == cg))
         ts.execute(Idea.__table__.delete().where(Idea.id.in_([pub, draft, deleted])))
         ts.execute(QuestMemberPermission.__table__.delete().where(

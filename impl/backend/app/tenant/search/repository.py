@@ -38,7 +38,8 @@ _CHAT_SQL = text("""
                pgroonga_query_extract_keywords(:q)), ' … ') AS snippet,
            cm.created_at AS sort_ts
     FROM chat_messages cm
-    JOIN chat_groups cg ON cg.id = cm.chat_group_id
+    JOIN chat_thread t ON t.id = cm.thread_id AND t.owner_type = 'idea'
+    JOIN chat_groups cg ON cg.id = t.owner_id
     JOIN ideas i ON i.id = cg.idea_id
     WHERE i.quest_id IN :quest_ids AND i.status = 'published' AND i.deleted_at IS NULL
       AND cm.is_deleted = false
@@ -59,7 +60,8 @@ _ATTACH_SQL = text("""
     FROM attachments a
     LEFT JOIN ideas ai ON ai.id = a.idea_id AND ai.status = 'published' AND ai.deleted_at IS NULL
     LEFT JOIN chat_messages cm ON cm.id = a.chat_message_id AND cm.is_deleted = false
-    LEFT JOIN chat_groups cg ON cg.id = cm.chat_group_id
+    LEFT JOIN chat_thread t ON t.id = cm.thread_id AND t.owner_type = 'idea'
+    LEFT JOIN chat_groups cg ON cg.id = t.owner_id
     LEFT JOIN ideas ci ON ci.id = cg.idea_id AND ci.status = 'published' AND ci.deleted_at IS NULL
     WHERE a.original_name &@~ :q
       AND ( (ai.id IS NOT NULL AND ai.quest_id IN :quest_ids)
