@@ -106,7 +106,9 @@ class Reaction(CompanyBase):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chat_message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_messages.id"), nullable=False)
-    chat_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=False)
+    # チャット一般化（§5.45）＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK・0034）。
+    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
+    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)  # normal / magic
     emoji: Mapped[str | None] = mapped_column(Text, nullable=True)
