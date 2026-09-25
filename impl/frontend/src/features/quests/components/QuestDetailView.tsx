@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
 import { ActivitySpark, Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
@@ -118,7 +119,7 @@ function deadlineText(d: string | null | undefined): string {
 }
 
 // クエスト詳細のスクロール位置保存キー（アイデア詳細へドリルイン→戻る での復元用・sessionStorage）。
-const QSCROLL_KEY = "iq_quest_detail_scroll:";
+const QSCROLL_KEY = QUEST_SCROLL_KEY;
 
 export function QuestDetailView({ questId, gameEnabled = true }: { questId: string; gameEnabled?: boolean }) {
   const router = useRouter();

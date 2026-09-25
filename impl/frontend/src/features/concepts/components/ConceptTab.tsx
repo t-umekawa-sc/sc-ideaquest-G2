@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState, ScreenPurpose } from "@/components/ui";
+import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
 import {
   CONCEPTS_CHANGED_EVENT,
@@ -19,7 +20,7 @@ import {
 import "../concepts.css";
 
 const STATUS_LABEL: Record<string, string> = { draft: "下書き", active: "検証中", archived: "保管" };
-const DECISION_LABEL: Record<string, string> = { undecided: "未判定", go: "Go", pivot: "Pivot", kill: "Kill" };
+const DECISION_LABEL: Record<string, string> = { undecided: "未判定", go: "推進", pivot: "方向転換", kill: "中止" };
 const VERDICT_LABEL: Record<string, [string, string]> = {
   inconclusive: ["保留", "badge badge-muted"],
   supported: ["支持", "badge badge-success"],
@@ -41,6 +42,12 @@ export function ConceptTab({ questId }: { questId: string }) {
     listConcepts(questId).then((r) => setConcepts(r?.items ?? []));
     listAssumptions(questId).then((r) => setPool(r?.items ?? []));
   }, [questId]);
+
+  // 詳細へドリルインする直前にスクロール位置を保存＝戻り時に復元（§4.12・QuestDetailView と同じキー）。
+  const openConcept = useCallback((id: string) => {
+    try { sessionStorage.setItem(QUEST_SCROLL_KEY + questId, String(window.scrollY)); } catch { /* 無視 */ }
+    router.push(`/concepts/${id}`);
+  }, [router, questId]);
 
   useEffect(() => {
     load();
@@ -77,8 +84,8 @@ export function ConceptTab({ questId }: { questId: string }) {
               </thead>
               <tbody>
                 {concepts.map((c) => (
-                  <tr key={c.id} className="is-clickable" onClick={() => router.push(`/concepts/${c.id}`)}>
-                    <td><Link href={`/concepts/${c.id}`} onClick={(e) => e.stopPropagation()}>{c.title}</Link></td>
+                  <tr key={c.id} className="is-clickable" onClick={() => openConcept(c.id)}>
+                    <td><Link href={`/concepts/${c.id}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openConcept(c.id); }}>{c.title}</Link></td>
                     <td>{STATUS_LABEL[c.status] ?? c.status}</td>
                     <td>{DECISION_LABEL[c.decision] ?? c.decision}</td>
                     <td>{c.is_selected ? "★" : ""}</td>

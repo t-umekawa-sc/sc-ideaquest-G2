@@ -79,3 +79,6 @@ export function consumeChatFromDashboard(): boolean {
     return v != null;
   } catch { return false; }
 }
+
+// クエスト詳細のスクロール位置保存キー（一覧→詳細→戻る復元・§4.12）。QuestDetailView と ConceptTab で共有。
+export const QUEST_SCROLL_KEY = "iq_quest_detail_scroll:";
