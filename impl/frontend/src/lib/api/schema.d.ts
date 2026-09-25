@@ -4194,6 +4194,7 @@ export interface components {
         ConceptEvaluatorDTO: {
             /** Evaluator Id */
             evaluator_id: string;
+            evaluator?: components["schemas"]["ConceptAuthorDTO"] | null;
             /** Recommendation */
             recommendation?: string | null;
             /**
@@ -4202,6 +4203,15 @@ export interface components {
              */
             scores: {
                 [key: string]: number;
+            };
+            /** Overall Comment */
+            overall_comment?: string | null;
+            /**
+             * Comments
+             * @default {}
+             */
+            comments: {
+                [key: string]: string;
             };
         };
         /** ConceptGroupScopeCreateRequest */

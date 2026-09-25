@@ -15,8 +15,9 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  activateConcept, archiveConcept, getConcept, selectConcept, setDecision,
-  unselectConcept, unvoteConcept, voteConcept, type ConceptDetail, type ConceptVoteType,
+  activateConcept, archiveConcept, CONCEPTS_CHANGED_EVENT, getConcept, getEvaluationAggregate,
+  selectConcept, setDecision, unselectConcept, unvoteConcept, voteConcept,
+  type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
 } from "../api";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
@@ -32,6 +33,12 @@ const VERDICT_LABEL: Record<string, [string, string]> = {
   inconclusive: ["保留", "badge badge-muted"], supported: ["支持", "badge badge-success"], refuted: ["反証", "badge badge-danger"],
 };
 const CRITICALITY_LABEL: Record<string, string> = { critical: "致命的", major: "重要", minor: "補助" };
+// 評価観点＝中核5＋補助3（SC-25 の観点バーと同じ描画に使う）。
+const ASPECT_LABELS: [string, string][] = [
+  ["desirability", "望ましさ"], ["feasibility", "実現可能性"], ["viability", "採算・事業性"],
+  ["assumption_strength", "前提検証の強さ"], ["differentiation", "差別化"],
+  ["novelty", "新規性"], ["sustainability", "持続可能性"], ["ip", "知的財産"],
+];
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -64,6 +71,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [vote, setVote] = useState<{ approve: number; oppose: number; my: ConceptVoteType | null }>({ approve: 0, oppose: 0, my: null });
+  const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -77,7 +85,16 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
     setLoading(false);
   }, [conceptId]);
 
+  // 評価結果は SC-22 と同じく集計 EP から別途取得（観点別平均・評価者ごとの総評/コメント・複数名対応）。
+  const loadEval = useCallback(() => { void getEvaluationAggregate(conceptId).then(setEvalAgg).catch(() => {}); }, [conceptId]);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    loadEval();
+    const onChanged = () => { void load(); loadEval(); };
+    window.addEventListener(CONCEPTS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONCEPTS_CHANGED_EVENT, onChanged);
+  }, [loadEval, load]);
 
   const perms = concept?.my_permissions ?? [];
   const canManage = perms.includes("manage");
@@ -229,15 +246,47 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 </button>
               )}
             </div>
-            {concept.evaluation.evaluator_count > 0 ? (
-              <>
-                <div className="eval-overall">総合 {concept.evaluation.overall_avg?.toFixed(1) ?? "—"} / 5.0（{concept.evaluation.evaluator_count}名）</div>
-                <div className="muted text-sm">推奨: {Object.entries(concept.evaluation.recommendations).map(([k, v]) => `${DECISION_LABEL[k]?.[0] ?? k}×${v}`).join(" / ") || "—"}</div>
-              </>
+            {(evalAgg?.evaluator_count ?? 0) === 0 ? (
+              <p className="role-note" style={{ marginTop: "var(--space-2)" }}>
+                まだ提出済みの評価がありません{perms.includes("evaluate") ? "。あなたが最初の評価者になれます。" : "（評価者の評価を待っています）。"}
+              </p>
             ) : (
-              <div className="muted text-sm">評価待ち</div>
+              <>
+                <div className="eval-avg">
+                  <span className="eval-avg__num">{evalAgg?.overall_avg?.toFixed(1) ?? "–"}</span>
+                  <span className="eval-avg__max">/ 5.0（中核5平均・評価者{evalAgg?.evaluator_count}名）</span>
+                </div>
+                <div className="muted text-sm">推奨: {Object.entries(evalAgg?.recommendations ?? {}).map(([k, v]) => `${DECISION_LABEL[k]?.[0] ?? k}×${v}`).join(" / ") || "—"}</div>
+                {ASPECT_LABELS.map(([key, label]) => {
+                  const v = evalAgg?.aspects?.[key];
+                  return (
+                    <div className="score-row" key={key}>
+                      <span className="score-row__label">{label}</span>
+                      <span className="score-bar"><i style={{ width: `${v ? (v / 5) * 100 : 0}%` }} /></span>
+                      <span className="score-row__val">{v ? v.toFixed(1) : "–"}</span>
+                    </div>
+                  );
+                })}
+                {(evalAgg?.evaluators ?? []).some((e) => e.overall_comment) && (
+                  <>
+                    <div className="eval-section-label">総評</div>
+                    <div className="eval-overall">
+                      {(evalAgg?.evaluators ?? []).filter((e) => e.overall_comment).map((e) => (
+                        <div className="eval-overall__item" key={e.evaluator_id}>
+                          <div className="eval-comment__head">
+                            <Avatar name={e.evaluator?.display_name || "?"} imageUrl={e.evaluator?.avatar_image_url ?? undefined} size="sm" />
+                            <span className="chat-msg__name">{e.evaluator?.display_name || "?"}</span>
+                            {e.recommendation && <span className="badge badge-muted">{DECISION_LABEL[e.recommendation]?.[0] ?? e.recommendation}</span>}
+                          </div>
+                          <p className="eval-comment__text">{e.overall_comment}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
-            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline">評価する</Link>}
+            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline">評価する / 編集</Link>}
           </section>
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}

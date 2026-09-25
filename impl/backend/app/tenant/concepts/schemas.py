@@ -282,8 +282,11 @@ class ConceptEvaluationMeDTO(BaseModel):
 
 class ConceptEvaluatorDTO(BaseModel):
     evaluator_id: str
+    evaluator: ConceptAuthorDTO | None = None
     recommendation: str | None = None
     scores: dict[str, int] = {}
+    overall_comment: str | None = None
+    comments: dict[str, str] = {}
 
 
 class ConceptEvaluationAggregateDTO(BaseModel):

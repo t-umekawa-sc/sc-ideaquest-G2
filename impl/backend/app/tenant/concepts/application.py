@@ -638,6 +638,7 @@ def get_evaluation_aggregate(account_id, company_id, concept_id) -> dict:
         is_manager = _is_manager(ts, quest, user)
         visible = [e for e in submitted if _can_view_eval(concept, user, e, is_manager)]
         scores_by_eval = repo.get_scores_for_evaluations(ts, [e.id for e in visible])
+        users = quests_repo.get_users_by_ids(ts, {e.evaluator_id for e in visible}) if visible else {}
         by_aspect: dict[str, list[int]] = {}
         recommendations: dict[str, int] = {}
         evaluators = []
@@ -647,8 +648,17 @@ def get_evaluation_aggregate(account_id, company_id, concept_id) -> dict:
                 by_aspect.setdefault(s.aspect, []).append(s.score)
             if e.recommendation:
                 recommendations[e.recommendation] = recommendations.get(e.recommendation, 0) + 1
-            evaluators.append({"evaluator_id": str(e.evaluator_id), "recommendation": e.recommendation,
-                               "scores": {s.aspect: s.score for s in rows}})
+            u = users.get(e.evaluator_id)
+            evaluators.append({
+                "evaluator_id": str(e.evaluator_id),
+                "evaluator": {"user_id": str(e.evaluator_id), "display_name": u.display_name if u else "?",
+                              "avatar_image_url": _image_url(u.avatar_image_path) if u else None,
+                              "level": u.level if u else None},
+                "recommendation": e.recommendation,
+                "scores": {s.aspect: s.score for s in rows},
+                "overall_comment": e.overall_comment,
+                "comments": {s.aspect: s.comment for s in rows if s.comment is not None},
+            })
         aspects = {a: (sum(v) / len(v)) for a, v in by_aspect.items() if v}
         core = [aspects[a] for a in repo.CORE_ASPECTS if a in aspects]
         my_eval = _me_eval_payload(ts, repo.get_evaluation(ts, cid, user.id)) if _is_evaluator(ts, quest, user) else None
