@@ -9,6 +9,7 @@ import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useF
 import { ApiError } from "@/lib/api/client";
 
 import { CONCEPTS_CHANGED_EVENT, getMyEvaluation, putEvaluation } from "../api";
+import "../concepts.css";
 
 type AspectDef = { key: string; label: string; see: string };
 const CORE_ASPECTS: AspectDef[] = [

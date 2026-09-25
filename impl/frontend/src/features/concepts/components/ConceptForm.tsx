@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api/client";
 import { listIdeas, type IdeaCard } from "@/features/ideas/api";
 
 import { CONCEPTS_CHANGED_EVENT, createConcept, getConcept, patchConcept, type ConceptCreateInput } from "../api";
+import "../concepts.css";
 
 type Props = {
   mode: "create" | "edit";
