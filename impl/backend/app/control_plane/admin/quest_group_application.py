@@ -170,7 +170,7 @@ def remove_member(session: dict, group_id: uuid.UUID, target_account_id: uuid.UU
             raise AppError(404, "not_found")
         target_uid = target.id  # セッション閉後に使うため退避（post-commit の失効・監査で使用）
         # L.4＝グループ除去で対象はグループ内全クエストの可視性を失う＝当該 chat 購読を失効（除去前に対象を取得）。
-        cg_ids = chat_repo.list_chat_group_ids_for_group_member(ts, group_id, target_uid)
+        cg_ids = chat_repo.list_chat_thread_ids_for_group_member(ts, group_id, target_uid)
         qg_repo.remove_membership(ts, group_id, target_uid)  # 有効所属をトゥームストーン（冪等）
         ts.commit()
     company_id = uuid.UUID(session["company_id"])

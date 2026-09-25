@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.tenant.chat.orm import ChatMessage, ChatRead
+from app.tenant.chat.orm import ChatMessage, ChatRead, ChatThread
 from app.tenant.concepts import repository as repo
 from app.tenant.concepts.orm import (
     Assumption,
@@ -77,8 +77,11 @@ def env():
         cids = [c.id for c in ts.query(Concept).filter(Concept.quest_id.in_(quests or [uuid.uuid4()])).all()]
         aids = [a.id for a in ts.query(Assumption).filter(Assumption.quest_id.in_(quests or [uuid.uuid4()])).all()]
         sids = [s.id for s in ts.query(ConceptChatScope).filter(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])).all()]
-        ts.execute(ChatRead.__table__.delete().where(ChatRead.concept_chat_scope_id.in_(sids or [uuid.uuid4()])))
-        ts.execute(ChatMessage.__table__.delete().where(ChatMessage.concept_chat_scope_id.in_(sids or [uuid.uuid4()])))
+        tids = [t.id for t in ts.query(ChatThread).filter(
+            ChatThread.owner_type == "concept_scope", ChatThread.owner_id.in_(sids or [uuid.uuid4()])).all()]
+        ts.execute(ChatRead.__table__.delete().where(ChatRead.thread_id.in_(tids or [uuid.uuid4()])))
+        ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids or [uuid.uuid4()])))
+        ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids or [uuid.uuid4()])))
         ts.execute(ConceptChatScope.__table__.delete().where(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(ConceptAssumptionLink.__table__.delete().where(ConceptAssumptionLink.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))

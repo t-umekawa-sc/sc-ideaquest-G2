@@ -390,7 +390,18 @@ def create_chat_scope(
     )
     session.add(scope)
     session.flush()
+    # concept_scope ホストのチャットスレッドを冪等生成（チャット中核は thread_id で動く・§5.45）。
+    from app.tenant.chat import repository as chat_repo
+
+    chat_repo.ensure_chat_thread(session, "concept_scope", scope.id)
     return scope
+
+
+def get_scope_thread(session: Session, scope_id: uuid.UUID):
+    """スコープのチャットスレッド（冪等生成して返す・チャット中核委譲の入口）。"""
+    from app.tenant.chat import repository as chat_repo
+
+    return chat_repo.ensure_chat_thread(session, "concept_scope", scope_id)
 
 
 def list_chat_scopes(session: Session, concept_id: uuid.UUID) -> list[ConceptChatScope]:
@@ -441,10 +452,11 @@ def get_chat_scope(session: Session, scope_id: uuid.UUID) -> ConceptChatScope | 
 def post_scope_message(
     session: Session, *, scope_id: uuid.UUID, author_id: uuid.UUID, body: str, message_id: uuid.UUID | None = None,
 ):
-    """コンセプトルームへ投稿（`chat_messages.concept_chat_scope_id` に紐付け・E 機構共有）。"""
+    """コンセプトルームへ投稿（scope の thread に紐付け・E 機構共有）。"""
     from app.tenant.chat.orm import ChatMessage
 
-    msg = ChatMessage(id=message_id or uuid.uuid4(), concept_chat_scope_id=scope_id, author_id=author_id, body=body)
+    thread = get_scope_thread(session, scope_id)
+    msg = ChatMessage(id=message_id or uuid.uuid4(), thread_id=thread.id, author_id=author_id, body=body)
     session.add(msg)
     session.flush()
     return msg
@@ -460,10 +472,11 @@ def list_scope_messages(session: Session, scope_id: uuid.UUID, *, limit: int = 5
     """スコープのメッセージ（作成日昇順・非削除・E.1 同形の簡易版）。"""
     from app.tenant.chat.orm import ChatMessage
 
+    thread = get_scope_thread(session, scope_id)
     return list(
         session.execute(
             select(ChatMessage)
-            .where(ChatMessage.concept_chat_scope_id == scope_id, ChatMessage.is_deleted.is_(False))
+            .where(ChatMessage.thread_id == thread.id, ChatMessage.is_deleted.is_(False))
             .order_by(ChatMessage.created_at, ChatMessage.id)
             .limit(limit)
         ).scalars().all()
@@ -473,15 +486,16 @@ def list_scope_messages(session: Session, scope_id: uuid.UUID, *, limit: int = 5
 def upsert_scope_read(session: Session, scope_id: uuid.UUID, user_id: uuid.UUID, last_read_message_id: uuid.UUID) -> None:
     from app.tenant.chat.orm import ChatRead
 
+    thread = get_scope_thread(session, scope_id)
     existing = session.execute(
-        select(ChatRead).where(ChatRead.concept_chat_scope_id == scope_id, ChatRead.user_id == user_id)
+        select(ChatRead).where(ChatRead.thread_id == thread.id, ChatRead.user_id == user_id)
     ).scalars().first()
     if existing is not None:
         existing.last_read_message_id = last_read_message_id
         existing.updated_at = func.now()
     else:
         session.add(ChatRead(
-            id=uuid.uuid4(), concept_chat_scope_id=scope_id, user_id=user_id,
+            id=uuid.uuid4(), thread_id=thread.id, user_id=user_id,
             last_read_message_id=last_read_message_id,
         ))
     session.flush()
@@ -491,13 +505,14 @@ def unread_count_for_scope(session: Session, scope_id: uuid.UUID, user_id: uuid.
     """既読位置より後の非削除メッセージ数（自分の投稿も含む簡易集計）。未読既読が無ければ全件。"""
     from app.tenant.chat.orm import ChatMessage, ChatRead
 
+    thread = get_scope_thread(session, scope_id)
     read = session.execute(
         select(ChatRead.last_read_message_id).where(
-            ChatRead.concept_chat_scope_id == scope_id, ChatRead.user_id == user_id
+            ChatRead.thread_id == thread.id, ChatRead.user_id == user_id
         )
     ).scalars().first()
     base = select(func.count()).select_from(ChatMessage).where(
-        ChatMessage.concept_chat_scope_id == scope_id, ChatMessage.is_deleted.is_(False)
+        ChatMessage.thread_id == thread.id, ChatMessage.is_deleted.is_(False)
     )
     if read:
         anchor = session.execute(

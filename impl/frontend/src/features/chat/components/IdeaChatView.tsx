@@ -76,7 +76,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [firstUnread, setFirstUnread] = useState<string | null>(null);
-  const [chatGroupId, setChatGroupId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [ctxOpen, setCtxOpen] = useState(false); // 上部の文脈パネルの開閉。既定＝閉じる（ユーザー要望・▼で開く）
   const [hintOpen, setHintOpen] = useState(false);   // 使い方ヒントの開閉（SC-24 モック）
   const [composerMin, setComposerMin] = useState(true); // 入力欄の最小化（SC-24 モック）。既定＝最小化（ユーザー要望・スリムバーをクリックで展開）
@@ -207,7 +207,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       }
       setIdea(d);
       setMessages(chat.data);
-      setChatGroupId(chat.chat_group_id);
+      setThreadId(chat.thread_id);  // 購読キーは thread_id（ホスト非依存・§5.45）
       setFirstUnread(chat.unread?.first_unread_message_id ?? null);
       setLoadError(null);
       initialScrollRef.current = true; // 描画後に初期スクロール（未読区切りへ／全既読なら最下部へ）
@@ -303,11 +303,11 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
     return chat;
   }, [ideaId]);
 
-  // リアルタイム（L）＝chat:{chat_group_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
+  // リアルタイム（L）＝chat:{thread_id} を購読し、新着/編集/削除/リアクションで再取得（REST が真実）。
   useEffect(() => {
-    if (!chatGroupId) return;
+    if (!threadId) return;
     realtime.start();
-    const topic = `chat:${chatGroupId}`;
+    const topic = `chat:${threadId}`;
     realtime.subscribe(topic);
     const off = realtime.onTopic(topic, () => {
       // 新着/編集/削除/リアクションで再取得し、反映後に「見えた分」を既読化（DFT-E-011）。
@@ -315,7 +315,7 @@ export function IdeaChatView({ ideaId, gameEnabled = true }: { ideaId: string; g
       void refetch().then(() => requestAnimationFrame(() => markReadUpToVisible()));
     });
     return () => { off(); realtime.unsubscribe(topic); };
-  }, [chatGroupId, refetch, markReadUpToVisible]);
+  }, [threadId, refetch, markReadUpToVisible]);
 
   const updateSendState = useCallback(() => {
     setCanSend((boxRef.current?.value.trim().length ?? 0) > 0 || pendingFiles.length > 0);

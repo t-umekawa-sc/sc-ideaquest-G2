@@ -15,6 +15,20 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import CompanyBase
 
 
+class ChatThread(CompanyBase):
+    """会話の単一の親（§5.45）。チャット中核はこの thread_id ただ一つで動く＝ホスト非依存。
+
+    owner はポリモーフィック＝ホストのリンク表 PK を指す（'idea'＝chat_groups.id /
+    'concept_scope'＝concept_chat_scopes.id / 将来）。chat 中核は owner の意味を知らない。
+    """
+    __tablename__ = "chat_thread"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_type: Mapped[str] = mapped_column(Text, nullable=False)  # idea / concept_scope / 将来
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)  # ホストのリンク表 PK（ソフト参照）
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ChatGroup(CompanyBase):
     __tablename__ = "chat_groups"
 
@@ -27,11 +41,8 @@ class ChatMessage(CompanyBase):
     __tablename__ = "chat_messages"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # チャット一般化（§5.45）＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK）。
-    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
-    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True
-    )
+    # チャット中核は thread_id ただ一つで所属を持つ（§5.45・ホスト非依存）。
+    thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_thread.id"), nullable=False)
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
@@ -106,9 +117,8 @@ class Reaction(CompanyBase):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chat_message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_messages.id"), nullable=False)
-    # チャット一般化（§5.45）＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK・0034）。
-    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
-    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True)
+    # チャット中核は thread_id ただ一つで所属を持つ（§5.45・ホスト非依存・魔法「1チャット1回」は thread 単位）。
+    thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_thread.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)  # normal / magic
     emoji: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -120,11 +130,8 @@ class ChatRead(CompanyBase):
     __tablename__ = "chat_reads"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # §5.45＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK）。
-    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
-    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True
-    )
+    # チャット中核は thread_id ただ一つで所属を持つ（§5.45・ホスト非依存）。
+    thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_thread.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     last_read_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_messages.id"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

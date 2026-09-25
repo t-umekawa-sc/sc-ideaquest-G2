@@ -587,15 +587,17 @@ def download_attachment(account_id, company_id, attachment_id) -> dict:
         att = repo.get_attachment(ts, aid)
         if att is None:
             raise AppError(404, "not_found")
-        # 添付の所属アイデアを解決＝アイデア添付（idea_id）／チャット添付（chat_message_id→chat_group→idea・E.3 共通 EP）。
+        # 添付の所属アイデアを解決＝アイデア添付（idea_id）／チャット添付（chat_message_id→thread→chat_group→idea・E.3 共通 EP）。
         if att.idea_id is not None:
             idea = repo.get_idea(ts, att.idea_id)
         elif att.chat_message_id is not None:
             from app.tenant.chat import repository as chat_repo
-            from app.tenant.chat.orm import ChatGroup
+            from app.tenant.chat.orm import ChatGroup, ChatThread
 
             msg = chat_repo.get_message(ts, att.chat_message_id)
-            cg = ts.get(ChatGroup, msg.chat_group_id) if msg else None
+            thread = ts.get(ChatThread, msg.thread_id) if msg else None
+            # チャット添付は idea ホストのみ（コンセプト添付は別途）。
+            cg = ts.get(ChatGroup, thread.owner_id) if (thread is not None and thread.owner_type == "idea") else None
             idea = repo.get_idea(ts, cg.idea_id) if cg else None
         else:
             raise AppError(404, "not_found")

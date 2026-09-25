@@ -61,9 +61,9 @@ async def _handle_control(hub, conn: Connection, msg: dict) -> None:
     op = msg.get("op")
     topic = msg.get("topic") or ""
     if op == "subscribe" and topic.startswith("chat:"):
-        cg_id = topic.split(":", 1)[1]
+        thread_id = topic.split(":", 1)[1]  # chat:{thread_id}（ホスト非依存・§5.45）
         allowed = await run_in_threadpool(
-            can_subscribe_chat, conn.account_id, conn.company_id, cg_id
+            can_subscribe_chat, conn.account_id, conn.company_id, thread_id
         )
         if allowed:
             hub.subscribe(conn, topic)

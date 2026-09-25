@@ -674,7 +674,8 @@ def test_d_tc_234_attachment_only_change_creates_revision(client, env, storage):
 
 def test_d_tc_151_ideas_list_comment_count(client, env):
     """D-TC-151 一覧カードのコメント数（E・非削除のみ・SC-12 💬）。"""
-    from app.tenant.chat.orm import ChatGroup, ChatMessage
+    from app.tenant.chat import repository as chat_repo
+    from app.tenant.chat.orm import ChatGroup, ChatMessage, ChatThread
 
     _login_seed(client)
     qid = env.make_quest()
@@ -683,9 +684,11 @@ def test_d_tc_151_ideas_list_comment_count(client, env):
     cg = uuid.uuid4()
     with get_tenant_session(env.db_identifier) as ts:
         ts.add(ChatGroup(id=cg, idea_id=idea))
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="c1"))
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="c2"))
-        ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=cg, author_id=env.user_id, body="del", is_deleted=True))
+        ts.flush()
+        th = chat_repo.ensure_chat_thread(ts, "idea", cg)
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=th.id, author_id=env.user_id, body="c1"))
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=th.id, author_id=env.user_id, body="c2"))
+        ts.add(ChatMessage(id=uuid.uuid4(), thread_id=th.id, author_id=env.user_id, body="del", is_deleted=True))
         ts.commit()
     try:
         cards = {c["id"]: c for c in client.get(IDEAS(qid)).json()["data"]}
@@ -693,7 +696,11 @@ def test_d_tc_151_ideas_list_comment_count(client, env):
         assert cards[str(no_chat)]["comment_count"] == 0     # chat 無し
     finally:
         with get_tenant_session(env.db_identifier) as ts:
-            ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id == cg))
+            tids = list(ts.execute(select(ChatThread.id).where(
+                ChatThread.owner_type == "idea", ChatThread.owner_id == cg)).scalars())
+            if tids:
+                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids)))
+                ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids)))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.id == cg))
             ts.commit()
 

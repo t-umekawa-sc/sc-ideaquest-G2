@@ -119,8 +119,8 @@ class Hub:
             self.remove(c)
 
     def _handle_revoke(self, payload: dict) -> None:
-        """L.4＝対象 user×chat_group の `chat:` 購読を即ドロップ。"""
-        topic = chat_topic(payload.get("chat_group_id"))
+        """L.4＝対象 user×thread の `chat:` 購読を即ドロップ。"""
+        topic = chat_topic(payload.get("thread_id"))
         user_id = str(payload.get("user_id"))
         company_id = str(payload.get("company_id"))
         for c in list(self._topics.get(topic, ())):

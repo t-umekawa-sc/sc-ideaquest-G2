@@ -78,20 +78,23 @@ def get_chat(account_id, company_id, idea_id, *, limit=50, before=None, after=No
             raise AppError(401, "unauthenticated")
         idea, _quest = _resolve_chat_idea(ts, iid, user)
         cg = repo.ensure_chat_group(ts, idea.id)
-        rows, has_more = repo.list_messages(ts, cg.id, before=before_c, after=after_c, limit=limit)
+        thread = repo.ensure_chat_thread(ts, "idea", cg.id)
+        rows, has_more = repo.list_messages(ts, thread.id, before=before_c, after=after_c, limit=limit)
         data = _messages_payload(ts, rows, viewer_id=user.id)
         # 未読（chat_reads 基準・E.5）。
-        read = repo.get_read(ts, cg.id, user.id)
+        read = repo.get_read(ts, thread.id, user.id)
         read_cursor = _read_cursor(ts, read)
-        first_unread = repo.first_message_after(ts, cg.id, read_cursor)
+        first_unread = repo.first_message_after(ts, thread.id, read_cursor)
         unread = {
             "first_unread_message_id": str(first_unread.id) if first_unread else None,
-            "unread_count": repo.count_messages_after(ts, cg.id, read_cursor),
+            "unread_count": repo.count_messages_after(ts, thread.id, read_cursor),
         }
         next_cursor = _encode_cursor(rows[0]) if (has_more and rows and after_c is None) else (
             _encode_cursor(rows[-1]) if (has_more and rows and after_c is not None) else None)
-        ts.commit()  # ensure_chat_group の遅延生成を確定
-    return {"chat_group_id": str(cg.id), "data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_more}, "unread": unread}
+        ts.commit()  # ensure_chat_group/thread の遅延生成を確定
+    # chat_group_id は後方互換で残す（realtime 購読キーは Phase4 で thread_id へ移行）。
+    return {"chat_group_id": str(cg.id), "thread_id": str(thread.id), "data": data,
+            "page_info": {"next_cursor": next_cursor, "has_next": has_more}, "unread": unread}
 
 
 def get_chat_activity(account_id, company_id, idea_id, *, days=14) -> dict:
@@ -106,12 +109,15 @@ def get_chat_activity(account_id, company_id, idea_id, *, days=14) -> dict:
             raise AppError(401, "unauthenticated")
         idea, _quest = _resolve_chat_idea(ts, iid, user)
         cg = repo.get_chat_group_by_idea(ts, idea.id)
+        thread = repo.ensure_chat_thread(ts, "idea", cg.id) if cg is not None else None
         since = datetime.now(timezone.utc) - timedelta(days=days)
         daily = [{"date": d.date().isoformat(), "message_count": n} for d, n in
-                 (repo.daily_message_counts(ts, cg.id, since) if cg else [])]
+                 (repo.daily_message_counts(ts, thread.id, since) if thread else [])]
         markers = [{"date": r.created_at.date().isoformat(), "revision": r.revision}
                    for r in ideas_repo.list_revisions(ts, idea.id)]
-        total = repo.count_active_messages(ts, cg.id) if cg else 0
+        total = repo.count_active_messages(ts, thread.id) if thread else 0
+        if cg is not None:
+            ts.commit()  # ensure_chat_thread の遅延生成を確定
     return {"daily": daily, "revision_markers": markers, "total_messages": total}
 
 
@@ -137,14 +143,15 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         _guard_not_completed(quest)
         _require_comment(ts, quest, user)
         cg = repo.ensure_chat_group(ts, idea.id)
-        quote_ids = _validate_quotes(ts, cg.id, quoted_message_ids)
+        thread = repo.ensure_chat_thread(ts, "idea", cg.id)
+        quote_ids = _validate_quotes(ts, thread.id, quoted_message_ids)
         mentions = _validate_mentions(ts, quest, mention_ids)
         # 添付は先に全件検証（不正で部分保存しない）。
         validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in (files or [])]
         if len(validated) > MAX_ATTACHMENTS_PER_IDEA:
             raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
                            errors=[{"field": "files", "code": "too_many"}])
-        msg = repo.create_message(ts, chat_group_id=cg.id, author_id=user.id, body=body)
+        msg = repo.create_message(ts, thread_id=thread.id, author_id=user.id, body=body)
         if quote_ids:
             repo.add_quotes(ts, msg.id, quote_ids)
         if mentions:
@@ -159,7 +166,7 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
     _notify_message_posted(company_id, idea.id, msg.id)
-    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.created",
+    realtime_events.publish_event(realtime_events.chat_topic(thread.id), "chat.message.created",
                                   payload, company_id=company_id)  # 即時反映（L.3）
     return payload
 
@@ -179,7 +186,7 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, idea, quest, cg = _resolve_message(ts, mid, user)
+        msg, idea, quest, thread = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージは編集できません", extra={"errors": [{"reason": "invalid_state"}]})
@@ -213,7 +220,7 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
             # 引用の置換（E.2）。空文字センチネル（フロントが「全消し」を multipart で表現する手段）は除外し、
             # 残りを検証して置換する。自己引用（自分自身を引用元）は除外。
             ids = [q for q in quoted_message_ids if q]
-            repo.replace_quotes(ts, msg.id, [q for q in _validate_quotes(ts, cg.id, ids) if q != msg.id])
+            repo.replace_quotes(ts, msg.id, [q for q in _validate_quotes(ts, thread.id, ids) if q != msg.id])
         if validated:
             storage = get_storage()
             for fn, data, mime in validated:
@@ -224,8 +231,9 @@ def edit_message(account_id, company_id, message_id, *, body, mention_ids, files
         msg.updated_at = datetime.now(timezone.utc)
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
-    _notify_message_updated(company_id, idea.id, msg.id, added_mentions)
-    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.updated",
+    if idea is not None:
+        _notify_message_updated(company_id, idea.id, msg.id, added_mentions)
+    realtime_events.publish_event(realtime_events.chat_topic(thread.id), "chat.message.updated",
                                   payload, company_id=company_id)  # 即時反映（L.3）
     return payload
 
@@ -240,7 +248,7 @@ def delete_message(account_id, company_id, message_id) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, idea, quest, cg = _resolve_message(ts, mid, user)
+        msg, idea, quest, thread = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
@@ -250,10 +258,11 @@ def delete_message(account_id, company_id, message_id) -> dict:
         msg.deleted_by_id = user.id
         msg.deleted_at = datetime.now(timezone.utc)
         ts.commit()
-    _notify_message_deleted(idea.id, msg.id)
+    if idea is not None:
+        _notify_message_deleted(idea.id, msg.id)
     tombstone = {"id": str(msg.id), "is_deleted": True,
                  "deleted_at": msg.deleted_at.isoformat() if msg.deleted_at else None}
-    realtime_events.publish_event(realtime_events.chat_topic(cg.id), "chat.message.deleted",
+    realtime_events.publish_event(realtime_events.chat_topic(thread.id), "chat.message.deleted",
                                   tombstone, company_id=company_id)  # トゥームストーン即時反映（L.3）
     return {"id": str(msg.id), "is_deleted": True, "deleted_at": msg.deleted_at}
 
@@ -271,14 +280,15 @@ def mark_read(account_id, company_id, idea_id, *, last_read_message_id) -> dict:
             raise AppError(401, "unauthenticated")
         idea, _quest = _resolve_chat_idea(ts, iid, user)
         cg = repo.ensure_chat_group(ts, idea.id)
+        thread = repo.ensure_chat_thread(ts, "idea", cg.id)
         target = repo.get_message(ts, lrid)
-        if target is None or target.chat_group_id != cg.id:
+        if target is None or target.thread_id != thread.id:
             raise AppError(404, "not_found")
         # 後退防止＝既存 last_read より新しい位置のみ前進。
-        cur = repo.get_read(ts, cg.id, user.id)
+        cur = repo.get_read(ts, thread.id, user.id)
         cur_cursor = _read_cursor(ts, cur)
         if cur_cursor is None or (target.created_at, target.id) > cur_cursor:
-            repo.upsert_read(ts, cg.id, user.id, target.id)
+            repo.upsert_read(ts, thread.id, user.id, target.id)
         ts.commit()
     return {"last_read_message_id": str(lrid), "unread_count": 0}
 
@@ -296,7 +306,7 @@ def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, idea, quest, cg = _resolve_message(ts, mid, user)
+        msg, idea, quest, thread = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
@@ -304,7 +314,7 @@ def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_
             if not emoji or repo.get_active_emoji(ts, emoji) is None:
                 raise AppError(422, "validation_error", detail="使用できない絵文字です", errors=[{"field": "emoji", "code": "invalid_reaction_emoji"}])
             if repo.get_normal_reaction(ts, msg.id, user.id, emoji) is None:  # 同一ユーザー×同一絵文字は冪等
-                repo.add_reaction(ts, chat_message_id=msg.id, chat_group_id=cg.id, user_id=user.id, type="normal", emoji=emoji)
+                repo.add_reaction(ts, chat_message_id=msg.id, thread_id=thread.id, user_id=user.id, type="normal", emoji=emoji)
         elif type == "magic":
             sid = _parse_uuid(str(spell_id), field="spell_id")
             if repo.get_spell(ts, sid) is None:
@@ -313,19 +323,19 @@ def add_reaction(account_id, company_id, message_id, *, type, emoji=None, spell_
                 raise AppError(403, "forbidden", detail="この魔法は未解放です", extra={"errors": [{"reason": "spell_not_unlocked"}]})
             if repo.get_magic_reaction_of_message(ts, msg.id) is not None:
                 raise AppError(409, "conflict", detail="このメッセージには既に魔法が付いています", extra={"errors": [{"reason": "message_already_has_magic"}]})
-            if repo.get_user_magic_in_group(ts, cg.id, user.id, sid) is not None:
+            if repo.get_user_magic_in_thread(ts, thread.id, user.id, sid) is not None:
                 raise AppError(409, "conflict", detail="この魔法はこのチャットで既に使用済みです", extra={"errors": [{"reason": "spell_already_used_in_chat"}]})
-            repo.add_reaction(ts, chat_message_id=msg.id, chat_group_id=cg.id, user_id=user.id, type="magic", spell_id=sid)
+            repo.add_reaction(ts, chat_message_id=msg.id, thread_id=thread.id, user_id=user.id, type="magic", spell_id=sid)
             magic_spell_id = sid
         else:
             raise AppError(422, "validation_error", detail="type が不正です", errors=[{"field": "type"}])
         result = {"reactions": _message_reactions(ts, msg, user.id)}
         author_id = msg.author_id
         ts.commit()
-    if type == "magic":
+    if type == "magic" and idea is not None:
         _notify_reaction(company_id, idea.id, msg.id, author_id, user.id, magic_spell_id)
     realtime_events.publish_event(
-        realtime_events.chat_topic(cg.id), "chat.reaction.added",
+        realtime_events.chat_topic(thread.id), "chat.reaction.added",
         {"message_id": str(msg.id), "reactions": result["reactions"]}, company_id=company_id)  # L.3
     return result
 
@@ -340,7 +350,7 @@ def remove_reaction(account_id, company_id, message_id, *, emoji=None, magic=Fal
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, _idea, quest, cg = _resolve_message(ts, mid, user)
+        msg, _idea, quest, thread = _resolve_message(ts, mid, user)
         _guard_not_completed(quest)
         if magic:
             r = repo.get_magic_reaction_of_message(ts, msg.id)
@@ -353,7 +363,7 @@ def remove_reaction(account_id, company_id, message_id, *, emoji=None, magic=Fal
         result = {"reactions": _message_reactions(ts, msg, user.id)}
         ts.commit()
     realtime_events.publish_event(
-        realtime_events.chat_topic(cg.id), "chat.reaction.removed",
+        realtime_events.chat_topic(thread.id), "chat.reaction.removed",
         {"message_id": str(msg.id), "reactions": result["reactions"]}, company_id=company_id)  # L.3
     return result
 
@@ -398,18 +408,46 @@ def _resolve_chat_idea(ts, iid, user):
     return idea, quest
 
 
-def _resolve_message(ts, mid, user):
-    """メッセージ→チャット→アイデア→クエストを解決し門番を適用。返り値＝(msg, idea, quest, chat_group)。"""
-    from app.tenant.chat.orm import ChatGroup
+def _resolve_host(ts, thread, user):
+    """thread の owner_type でホストを解決し門番を適用。返り値＝(idea|None, quest)。
 
+    チャット中核（メッセージ CRUD／リアクション／ピン）はホスト非依存＝この resolver が owner_type の
+    差異（idea＝公開+パーティー門番／concept_scope＝draft 可視性+パーティー門番）を1箇所に閉じる。
+    """
+    if thread.owner_type == "idea":
+        from app.tenant.chat.orm import ChatGroup
+
+        cg = ts.get(ChatGroup, thread.owner_id)
+        if cg is None:
+            raise AppError(404, "not_found")
+        idea, quest = _resolve_chat_idea(ts, cg.idea_id, user)
+        return idea, quest
+    if thread.owner_type == "concept_scope":
+        # 依存方向は concepts→chat に固定するため、ここは遅延 import（逆依存を作らない）。
+        from app.tenant.concepts import application as concepts_app
+        from app.tenant.concepts import repository as concepts_repo
+
+        scope = concepts_repo.get_chat_scope(ts, thread.owner_id)
+        if scope is None:
+            raise AppError(404, "not_found")
+        _concept, quest = concepts_app._resolve_concept(ts, scope.concept_id, user)
+        return None, quest
+    raise AppError(404, "not_found")
+
+
+def _resolve_message(ts, mid, user):
+    """メッセージ→thread→ホスト→クエストを解決し門番を適用。返り値＝(msg, idea|None, quest, thread)。
+
+    idea はホストが idea の時のみ（concept_scope では None）。チャット中核は thread ただ一つで所属を持つ。
+    """
     msg = repo.get_message(ts, mid)
     if msg is None:
         raise AppError(404, "not_found")
-    cg = ts.get(ChatGroup, msg.chat_group_id)
-    if cg is None:
+    thread = repo.get_thread(ts, msg.thread_id)
+    if thread is None:
         raise AppError(404, "not_found")
-    idea, quest = _resolve_chat_idea(ts, cg.idea_id, user)
-    return msg, idea, quest, cg
+    idea, quest = _resolve_host(ts, thread, user)
+    return msg, idea, quest, thread
 
 
 def _perms_of(ts, quest, user) -> list[str]:
@@ -452,7 +490,7 @@ def set_pin(account_id, company_id, message_id, *, pinned: bool) -> dict:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             raise AppError(401, "unauthenticated")
-        msg, _idea, quest, cg = _resolve_message(ts, mid, user)
+        msg, _idea, quest, thread = _resolve_message(ts, mid, user)
         if not _is_manager(ts, quest, user):
             raise AppError(403, "forbidden", detail="ピン留めは所有者/クエスト管理者のみ可能です")
         if msg.is_deleted:
@@ -463,7 +501,7 @@ def set_pin(account_id, company_id, message_id, *, pinned: bool) -> dict:
         dto = {"message_id": str(msg.id), "is_pinned": msg.is_pinned}
         ts.commit()
     realtime_events.publish_event(
-        realtime_events.chat_topic(cg.id), "chat.pin.changed",
+        realtime_events.chat_topic(thread.id), "chat.pin.changed",
         {"message_id": str(mid), "is_pinned": pinned}, company_id=company_id)  # L.3（他端末即時反映）
     return dto
 
@@ -473,8 +511,8 @@ def _guard_not_completed(quest) -> None:
         raise AppError(409, "conflict", detail="完了後は変更できません", extra={"errors": [{"reason": "invalid_state"}]})
 
 
-def _validate_quotes(ts, chat_group_id, quoted_message_ids) -> list[uuid.UUID]:
-    """引用元（複数可）を検証（E.2）。各引用元は同一 chat_group 内のみ（他は 422）。重複は集約。"""
+def _validate_quotes(ts, thread_id, quoted_message_ids) -> list[uuid.UUID]:
+    """引用元（複数可）を検証（E.2）。各引用元は同一 thread 内のみ（他は 422）。重複は集約。"""
     result: list[uuid.UUID] = []
     seen: set[uuid.UUID] = set()
     for raw in (quoted_message_ids or []):
@@ -482,7 +520,7 @@ def _validate_quotes(ts, chat_group_id, quoted_message_ids) -> list[uuid.UUID]:
         if rid in seen:
             continue
         src = repo.get_message(ts, rid)
-        if src is None or src.chat_group_id != chat_group_id:
+        if src is None or src.thread_id != thread_id:
             raise AppError(422, "validation_error", detail="引用元が不正です", errors=[{"field": "quoted_message_ids"}])
         seen.add(rid)
         result.append(rid)

@@ -11,11 +11,39 @@ from datetime import datetime
 from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.orm import Session, aliased
 
-from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, Reaction, ReactionEmoji, Spell, UserSpell
+from app.tenant.chat.orm import ChatGroup, ChatMention, ChatMessage, ChatMessageQuote, ChatRead, ChatThread, Reaction, ReactionEmoji, Spell, UserSpell
 from app.tenant.ideas.orm import Attachment, Idea
 
 
-# ---- チャットグループ（§5.15・publish で作成／アクセス時に遅延生成） ----
+# ---- チャットスレッド（§5.45・チャット中核の唯一の所属＝ホスト非依存） ----
+
+def ensure_chat_thread(session: Session, owner_type: str, owner_id: uuid.UUID) -> ChatThread:
+    """ホスト（owner_type, owner_id）のチャットスレッドを取得、無ければ作成（`UNIQUE(owner_type, owner_id)`・冪等）。
+
+    owner はホストのリンク表 PK＝'idea'→chat_groups.id / 'concept_scope'→concept_chat_scopes.id / 将来。
+    チャット中核はこの thread_id ただ一つで動く（owner の意味を知らない）。
+    """
+    th = session.execute(
+        select(ChatThread).where(ChatThread.owner_type == owner_type, ChatThread.owner_id == owner_id)
+    ).scalars().first()
+    if th is not None:
+        return th
+    th = ChatThread(id=uuid.uuid4(), owner_type=owner_type, owner_id=owner_id)
+    session.add(th)
+    session.flush()
+    return th
+
+
+def get_thread(session: Session, thread_id: uuid.UUID) -> ChatThread | None:
+    return session.get(ChatThread, thread_id)
+
+
+def _idea_thread_join():
+    """ChatGroup ↔ ChatThread（idea ホスト）の結合条件（idea 集約系の3段 JOIN 用）。"""
+    return and_(ChatThread.owner_type == "idea", ChatThread.owner_id == ChatGroup.id)
+
+
+# ---- チャットグループ（§5.15・idea ホストの owner adapter・publish で作成／アクセス時に遅延生成） ----
 
 def get_chat_group_by_idea(session: Session, idea_id: uuid.UUID) -> ChatGroup | None:
     return session.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
@@ -30,7 +58,9 @@ def list_message_bodies_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]
         return []
     rows = session.execute(
         select(ChatMessage.body, ChatMessage.created_at)
-        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, ChatMessage.thread_id == ChatThread.id)
         .where(ChatGroup.idea_id.in_(idea_ids), ChatMessage.is_deleted.is_(False))
         .order_by(ChatMessage.created_at.desc())
         .limit(limit)
@@ -44,26 +74,31 @@ def list_pinned_for_idea_ids(session: Session, idea_ids: list[uuid.UUID]) -> lis
         return []
     rows = session.execute(
         select(ChatGroup.idea_id, ChatMessage)
-        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, ChatMessage.thread_id == ChatThread.id)
         .where(ChatGroup.idea_id.in_(idea_ids), ChatMessage.is_pinned.is_(True), ChatMessage.is_deleted.is_(False))
         .order_by(ChatMessage.pinned_at.asc().nullslast())
     ).all()
     return [(iid, msg) for iid, msg in rows]
 
 
-def list_chat_group_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
-    """当該クエストの全アイデアの chat_group_id（L.4 購読失効の対象特定）。"""
+def list_chat_thread_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストの全アイデアの chat thread_id（L.4 購読失効の対象特定）。"""
     from app.tenant.ideas.orm import Idea
 
     return list(
         session.execute(
-            select(ChatGroup.id).join(Idea, Idea.id == ChatGroup.idea_id).where(Idea.quest_id == quest_id)
+            select(ChatThread.id)
+            .join(ChatGroup, _idea_thread_join())
+            .join(Idea, Idea.id == ChatGroup.idea_id)
+            .where(Idea.quest_id == quest_id)
         ).scalars().all()
     )
 
 
-def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> list[uuid.UUID]:
-    """クエストグループ内クエストで当該ユーザーが有効パーティー員である chat_group_id（L.4＝グループ除去の失効対象）。
+def list_chat_thread_ids_for_group_member(session: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """クエストグループ内クエストで当該ユーザーが有効パーティー員である chat thread_id（L.4＝グループ除去の失効対象）。
 
     グループ除去（control_plane）で対象ユーザーがグループ内で購読し得た chat のみを特定＝過剰失効を出さない。
     """
@@ -74,7 +109,8 @@ def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, 
     # 旧 quests.quest_group_id 単一列を撤去したため links 経由で判定）。
     return list(
         session.execute(
-            select(ChatGroup.id)
+            select(ChatThread.id)
+            .join(ChatGroup, _idea_thread_join())
             .join(Idea, Idea.id == ChatGroup.idea_id)
             .join(Quest, Quest.id == Idea.quest_id)
             .join(
@@ -92,23 +128,29 @@ def list_chat_group_ids_for_group_member(session: Session, group_id: uuid.UUID, 
 
 
 def ensure_chat_group(session: Session, idea_id: uuid.UUID) -> ChatGroup:
-    """アイデアのチャットグループを取得、無ければ作成（`UNIQUE(idea_id)`・冪等）。"""
+    """アイデアのチャットグループ＋そのスレッドを取得、無ければ作成（`UNIQUE(idea_id)`・冪等）。"""
     cg = get_chat_group_by_idea(session, idea_id)
-    if cg is not None:
-        return cg
-    cg = ChatGroup(id=uuid.uuid4(), idea_id=idea_id)
-    session.add(cg)
-    session.flush()
+    if cg is None:
+        cg = ChatGroup(id=uuid.uuid4(), idea_id=idea_id)
+        session.add(cg)
+        session.flush()
+    ensure_chat_thread(session, "idea", cg.id)  # idea ホストのスレッドを冪等生成
     return cg
+
+
+def get_thread_for_idea(session: Session, idea_id: uuid.UUID) -> ChatThread:
+    """アイデアのチャットスレッド（chat_group＋thread を冪等生成して返す）。"""
+    cg = ensure_chat_group(session, idea_id)
+    return ensure_chat_thread(session, "idea", cg.id)
 
 
 # ---- メッセージ（§5.16） ----
 
 def create_message(
-    session: Session, *, chat_group_id: uuid.UUID, author_id: uuid.UUID, body: str,
+    session: Session, *, thread_id: uuid.UUID, author_id: uuid.UUID, body: str,
     message_id: uuid.UUID | None = None,
 ) -> ChatMessage:
-    msg = ChatMessage(id=message_id or uuid.uuid4(), chat_group_id=chat_group_id, author_id=author_id, body=body)
+    msg = ChatMessage(id=message_id or uuid.uuid4(), thread_id=thread_id, author_id=author_id, body=body)
     session.add(msg)
     session.flush()
     return msg
@@ -158,7 +200,7 @@ def get_messages_by_ids(session: Session, ids) -> dict[uuid.UUID, ChatMessage]:
 
 
 def list_messages(
-    session: Session, chat_group_id: uuid.UUID, *,
+    session: Session, thread_id: uuid.UUID, *,
     before: tuple[datetime, uuid.UUID] | None = None,
     after: tuple[datetime, uuid.UUID] | None = None,
     limit: int = 50,
@@ -172,7 +214,7 @@ def list_messages(
     if after is not None:
         stmt = (
             select(ChatMessage)
-            .where(ChatMessage.chat_group_id == chat_group_id,
+            .where(ChatMessage.thread_id == thread_id,
                    tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(after[0], after[1]))
             .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
             .limit(limit + 1)
@@ -180,7 +222,7 @@ def list_messages(
         rows = list(session.execute(stmt).scalars().all())
         has_more = len(rows) > limit
         return rows[:limit], has_more
-    stmt = select(ChatMessage).where(ChatMessage.chat_group_id == chat_group_id)
+    stmt = select(ChatMessage).where(ChatMessage.thread_id == thread_id)
     if before is not None:
         stmt = stmt.where(tuple_(ChatMessage.created_at, ChatMessage.id) < tuple_(before[0], before[1]))
     stmt = stmt.order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).limit(limit + 1)
@@ -191,18 +233,18 @@ def list_messages(
     return rows, has_more
 
 
-def list_recent_messages(session: Session, chat_group_id: uuid.UUID, limit: int) -> list[ChatMessage]:
+def list_recent_messages(session: Session, thread_id: uuid.UUID, limit: int) -> list[ChatMessage]:
     """直近 `limit` 件（新しい順・SC-22 chat_preview 用）。"""
     return list(session.execute(
-        select(ChatMessage).where(ChatMessage.chat_group_id == chat_group_id)
+        select(ChatMessage).where(ChatMessage.thread_id == thread_id)
         .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).limit(limit)
     ).scalars().all())
 
 
-def count_active_messages(session: Session, chat_group_id: uuid.UUID) -> int:
+def count_active_messages(session: Session, thread_id: uuid.UUID) -> int:
     return int(session.execute(
         select(func.count()).select_from(ChatMessage)
-        .where(ChatMessage.chat_group_id == chat_group_id, ChatMessage.is_deleted.is_(False))
+        .where(ChatMessage.thread_id == thread_id, ChatMessage.is_deleted.is_(False))
     ).scalar_one())
 
 
@@ -220,7 +262,9 @@ def count_active_messages_for_ideas(session: Session, idea_ids: list[uuid.UUID])
         return {}
     rows = session.execute(
         select(ChatGroup.idea_id, func.count(ChatMessage.id))
-        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
+        .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, and_(ChatMessage.thread_id == ChatThread.id, ChatMessage.is_deleted.is_(False)))
         .where(ChatGroup.idea_id.in_(idea_ids))
         .group_by(ChatGroup.idea_id)
     ).all()
@@ -240,12 +284,13 @@ def unread_counts_for_ideas(session: Session, idea_ids: list[uuid.UUID], user_id
     rows = session.execute(
         select(ChatGroup.idea_id, func.count(ChatMessage.id))
         .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
         .join(ChatMessage, and_(
-            ChatMessage.chat_group_id == ChatGroup.id,
+            ChatMessage.thread_id == ChatThread.id,
             ChatMessage.is_deleted.is_(False),
             ChatMessage.author_id != user_id,  # 自分の投稿は未読に数えない
         ))
-        .outerjoin(ChatRead, and_(ChatRead.chat_group_id == ChatGroup.id, ChatRead.user_id == user_id))
+        .outerjoin(ChatRead, and_(ChatRead.thread_id == ChatThread.id, ChatRead.user_id == user_id))
         .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
         .where(
             ChatGroup.idea_id.in_(idea_ids),
@@ -266,7 +311,8 @@ def last_message_at_for_ideas(session: Session, idea_ids: list[uuid.UUID]) -> di
     rows = session.execute(
         select(ChatGroup.idea_id, func.max(ChatMessage.created_at))
         .select_from(ChatGroup)
-        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, and_(ChatMessage.thread_id == ChatThread.id, ChatMessage.is_deleted.is_(False)))
         .where(ChatGroup.idea_id.in_(idea_ids))
         .group_by(ChatGroup.idea_id)
     ).all()
@@ -296,8 +342,9 @@ def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid
         select(ChatGroup.idea_id, unread_ct.label("unread"), func.max(ChatMessage.created_at).label("last_at"))
         .select_from(ChatGroup)
         .join(Idea, and_(Idea.id == ChatGroup.idea_id, Idea.status == "published", Idea.deleted_at.is_(None)))
-        .join(ChatMessage, and_(ChatMessage.chat_group_id == ChatGroup.id, ChatMessage.is_deleted.is_(False)))
-        .outerjoin(ChatRead, and_(ChatRead.chat_group_id == ChatGroup.id, ChatRead.user_id == user_id))
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, and_(ChatMessage.thread_id == ChatThread.id, ChatMessage.is_deleted.is_(False)))
+        .outerjoin(ChatRead, and_(ChatRead.thread_id == ChatThread.id, ChatRead.user_id == user_id))
         .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
         .where(Idea.quest_id.in_(quest_ids))
         .group_by(ChatGroup.idea_id)
@@ -310,31 +357,31 @@ def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid
     return [(iid, int(u), last_at) for iid, u, last_at in rows]
 
 
-def count_messages_after(session: Session, chat_group_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> int:
+def count_messages_after(session: Session, thread_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> int:
     """既読カーソル（created_at,id）より後の未削除メッセージ数（未読件数・E.5）。cursor None＝全件。"""
     stmt = select(func.count()).select_from(ChatMessage).where(
-        ChatMessage.chat_group_id == chat_group_id, ChatMessage.is_deleted.is_(False))
+        ChatMessage.thread_id == thread_id, ChatMessage.is_deleted.is_(False))
     if cursor is not None:
         stmt = stmt.where(tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(cursor[0], cursor[1]))
     return int(session.execute(stmt).scalar_one())
 
 
-def first_message_after(session: Session, chat_group_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> ChatMessage | None:
+def first_message_after(session: Session, thread_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> ChatMessage | None:
     """既読カーソルの直後（最初の未読）＝未読セパレータ位置（E.5）。"""
     stmt = select(ChatMessage).where(
-        ChatMessage.chat_group_id == chat_group_id, ChatMessage.is_deleted.is_(False))
+        ChatMessage.thread_id == thread_id, ChatMessage.is_deleted.is_(False))
     if cursor is not None:
         stmt = stmt.where(tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(cursor[0], cursor[1]))
     stmt = stmt.order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc()).limit(1)
     return session.execute(stmt).scalars().first()
 
 
-def daily_message_counts(session: Session, chat_group_id: uuid.UUID, since: datetime) -> list[tuple]:
+def daily_message_counts(session: Session, thread_id: uuid.UUID, since: datetime) -> list[tuple]:
     """日次メッセージ数（chat-activity・削除除外・created_at の日単位）。返り値＝[(date, count)]。"""
     day = func.date_trunc("day", ChatMessage.created_at)
     rows = session.execute(
         select(day.label("d"), func.count()).where(
-            ChatMessage.chat_group_id == chat_group_id, ChatMessage.is_deleted.is_(False),
+            ChatMessage.thread_id == thread_id, ChatMessage.is_deleted.is_(False),
             ChatMessage.created_at >= since,
         ).group_by(day).order_by(day)
     ).all()
@@ -350,7 +397,9 @@ def daily_message_counts_for_quest(session: Session, quest_id: uuid.UUID, since:
     day = func.date_trunc("day", ChatMessage.created_at)
     rows = session.execute(
         select(day.label("d"), func.count())
-        .join(ChatGroup, ChatMessage.chat_group_id == ChatGroup.id)
+        .select_from(ChatGroup)
+        .join(ChatThread, _idea_thread_join())
+        .join(ChatMessage, ChatMessage.thread_id == ChatThread.id)
         .join(Idea, ChatGroup.idea_id == Idea.id)
         .where(
             Idea.quest_id == quest_id, Idea.status == "published", Idea.deleted_at.is_(None),
@@ -430,16 +479,16 @@ def remove_attachment(session: Session, attachment: Attachment) -> None:
 
 # ---- 既読（§5.31） ----
 
-def get_read(session: Session, chat_group_id: uuid.UUID, user_id: uuid.UUID) -> ChatRead | None:
+def get_read(session: Session, thread_id: uuid.UUID, user_id: uuid.UUID) -> ChatRead | None:
     return session.execute(
-        select(ChatRead).where(ChatRead.chat_group_id == chat_group_id, ChatRead.user_id == user_id)
+        select(ChatRead).where(ChatRead.thread_id == thread_id, ChatRead.user_id == user_id)
     ).scalars().first()
 
 
-def upsert_read(session: Session, chat_group_id: uuid.UUID, user_id: uuid.UUID, last_read_message_id: uuid.UUID) -> ChatRead:
-    row = get_read(session, chat_group_id, user_id)
+def upsert_read(session: Session, thread_id: uuid.UUID, user_id: uuid.UUID, last_read_message_id: uuid.UUID) -> ChatRead:
+    row = get_read(session, thread_id, user_id)
     if row is None:
-        row = ChatRead(id=uuid.uuid4(), chat_group_id=chat_group_id, user_id=user_id, last_read_message_id=last_read_message_id)
+        row = ChatRead(id=uuid.uuid4(), thread_id=thread_id, user_id=user_id, last_read_message_id=last_read_message_id)
         session.add(row)
         return row
     row.last_read_message_id = last_read_message_id
@@ -472,19 +521,19 @@ def get_magic_reaction_of_message(session: Session, message_id: uuid.UUID) -> Re
     ).scalars().first()
 
 
-def get_user_magic_in_group(session: Session, chat_group_id: uuid.UUID, user_id: uuid.UUID, spell_id: uuid.UUID) -> Reaction | None:
+def get_user_magic_in_thread(session: Session, thread_id: uuid.UUID, user_id: uuid.UUID, spell_id: uuid.UUID) -> Reaction | None:
     return session.execute(
         select(Reaction).where(
-            Reaction.chat_group_id == chat_group_id, Reaction.user_id == user_id,
+            Reaction.thread_id == thread_id, Reaction.user_id == user_id,
             Reaction.type == "magic", Reaction.spell_id == spell_id)
     ).scalars().first()
 
 
 def add_reaction(
-    session: Session, *, chat_message_id: uuid.UUID, chat_group_id: uuid.UUID, user_id: uuid.UUID,
+    session: Session, *, chat_message_id: uuid.UUID, thread_id: uuid.UUID, user_id: uuid.UUID,
     type: str, emoji: str | None = None, spell_id: uuid.UUID | None = None,
 ) -> Reaction:
-    r = Reaction(id=uuid.uuid4(), chat_message_id=chat_message_id, chat_group_id=chat_group_id,
+    r = Reaction(id=uuid.uuid4(), chat_message_id=chat_message_id, thread_id=thread_id,
                  user_id=user_id, type=type, emoji=emoji, spell_id=spell_id)
     session.add(r)
     session.flush()

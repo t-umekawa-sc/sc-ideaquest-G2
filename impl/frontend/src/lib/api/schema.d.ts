@@ -3627,6 +3627,8 @@ export interface components {
         ChatListResponse: {
             /** Chat Group Id */
             chat_group_id: string;
+            /** Thread Id */
+            thread_id: string;
             /** Data */
             data: components["schemas"]["ChatMessageDTO"][];
             page_info: components["schemas"]["ChatCursorPageInfo"];

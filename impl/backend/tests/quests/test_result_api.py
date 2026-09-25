@@ -95,29 +95,23 @@ def env():
 
     def add_chat(*, idea_id, body, author=None) -> uuid.UUID:
         """当該アイデアの chat_group を用意し、通常メッセージを1件 seed（FR-39 (c) 自動要約の入力）。"""
-        from app.tenant.chat.orm import ChatGroup, ChatMessage
+        from app.tenant.chat import repository as chat_repo
+        from app.tenant.chat.orm import ChatMessage
         mid = uuid.uuid4()
         with get_tenant_session(db_identifier) as ts:
-            cg = ts.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
-            if cg is None:
-                cg = ChatGroup(id=uuid.uuid4(), idea_id=idea_id)
-                ts.add(cg)
-                ts.flush()
-            ts.add(ChatMessage(id=mid, chat_group_id=cg.id, author_id=author or user_id, body=body))
+            th = chat_repo.ensure_chat_thread(ts, "idea", chat_repo.ensure_chat_group(ts, idea_id).id)
+            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=body))
             ts.commit()
         return mid
 
     def pin_chat(*, idea_id, body="重要な論点", author=None) -> uuid.UUID:
         """当該アイデアの chat_group を用意し、ピン留め済みメッセージを1件 seed（FR-39 (b)）。"""
-        from app.tenant.chat.orm import ChatGroup, ChatMessage
+        from app.tenant.chat import repository as chat_repo
+        from app.tenant.chat.orm import ChatMessage
         mid = uuid.uuid4()
         with get_tenant_session(db_identifier) as ts:
-            cg = ts.execute(select(ChatGroup).where(ChatGroup.idea_id == idea_id)).scalars().first()
-            if cg is None:
-                cg = ChatGroup(id=uuid.uuid4(), idea_id=idea_id)
-                ts.add(cg)
-                ts.flush()
-            ts.add(ChatMessage(id=mid, chat_group_id=cg.id, author_id=author or user_id, body=body, is_pinned=True))
+            th = chat_repo.ensure_chat_thread(ts, "idea", chat_repo.ensure_chat_group(ts, idea_id).id)
+            ts.add(ChatMessage(id=mid, thread_id=th.id, author_id=author or user_id, body=body, is_pinned=True))
             ts.commit()
         return mid
 
@@ -137,10 +131,14 @@ def env():
             ts.execute(Evaluation.__table__.delete().where(Evaluation.idea_id.in_(iids)))
             ts.execute(Vote.__table__.delete().where(Vote.idea_id.in_(iids)))
             ts.execute(IdeaRevision.__table__.delete().where(IdeaRevision.idea_id.in_(iids)))
-            from app.tenant.chat.orm import ChatGroup, ChatMessage
+            from app.tenant.chat.orm import ChatGroup, ChatMessage, ChatThread
             cgids = list(ts.execute(select(ChatGroup.id).where(ChatGroup.idea_id.in_(iids))).scalars())
             if cgids:
-                ts.execute(ChatMessage.__table__.delete().where(ChatMessage.chat_group_id.in_(cgids)))
+                tids = list(ts.execute(select(ChatThread.id).where(
+                    ChatThread.owner_type == "idea", ChatThread.owner_id.in_(cgids))).scalars())
+                if tids:
+                    ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids)))
+                    ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids)))
             ts.execute(ChatGroup.__table__.delete().where(ChatGroup.idea_id.in_(iids)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(iids)))
         if quests:
