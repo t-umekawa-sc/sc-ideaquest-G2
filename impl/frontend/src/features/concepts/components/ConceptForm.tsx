@@ -147,7 +147,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         </Field>
 
         <Field className="dialog-section is-quiet" id="c_sources" label="由来アイデア" hint="このコンセプトの元になった選別済み（公開）アイデア（複数可）。">
-          <div id="c_sources">
+          <div id="c_sources" className="concept-source-list">
             {ideaOptions.length === 0 ? (
               <p className="muted text-sm" style={{ margin: 0 }}>選べる公開アイデアがありません。</p>
             ) : (
