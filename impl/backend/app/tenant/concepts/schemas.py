@@ -301,7 +301,7 @@ class ConceptVoteResponse(BaseModel):
 # ---- コンセプト議論チャット（P.6） ----
 
 
-class ChatScopeItemDTO(BaseModel):
+class ConceptChatScopeItemDTO(BaseModel):
     scope_id: str
     kind: str
     label: str | None = None
@@ -310,32 +310,32 @@ class ChatScopeItemDTO(BaseModel):
     unread_count: int = 0
 
 
-class ChatScopeListResponse(BaseModel):
-    items: list[ChatScopeItemDTO] = []
+class ConceptChatScopeListResponse(BaseModel):
+    items: list[ConceptChatScopeItemDTO] = []
 
 
-class GroupScopeCreateRequest(BaseModel):
+class ConceptGroupScopeCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["group"] = "group"
     label: str = Field(min_length=1)
 
 
-class ChatMessageDTO(BaseModel):
+class ConceptChatMessageDTO(BaseModel):
     id: str
     author_id: str
     body: str
     created_at: datetime | None = None
 
 
-class ChatMessageListResponse(BaseModel):
-    items: list[ChatMessageDTO] = []
+class ConceptChatMessageListResponse(BaseModel):
+    items: list[ConceptChatMessageDTO] = []
 
 
-class MessagePostRequest(BaseModel):
+class ConceptMessagePostRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     body: str = Field(min_length=1)
 
 
-class ReadRequest(BaseModel):
+class ConceptReadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     last_read_message_id: str
