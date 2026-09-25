@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
-from app.tenant.chat.orm import ChatMessage, ChatRead, ChatThread
+from app.tenant.chat.orm import ChatMention, ChatMessage, ChatMessageQuote, ChatRead, ChatThread, Reaction
 from app.tenant.concepts import repository as repo
 from app.tenant.concepts.orm import (
     Assumption,
@@ -79,6 +79,11 @@ def env():
         sids = [s.id for s in ts.query(ConceptChatScope).filter(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])).all()]
         tids = [t.id for t in ts.query(ChatThread).filter(
             ChatThread.owner_type == "concept_scope", ChatThread.owner_id.in_(sids or [uuid.uuid4()])).all()]
+        mids = [m.id for m in ts.query(ChatMessage).filter(ChatMessage.thread_id.in_(tids or [uuid.uuid4()])).all()]
+        if mids:  # メッセージ従属（リアクション/引用/メンション）を先に掃除（FK）
+            ts.execute(Reaction.__table__.delete().where(Reaction.chat_message_id.in_(mids)))
+            ts.execute(ChatMessageQuote.__table__.delete().where(ChatMessageQuote.chat_message_id.in_(mids)))
+            ts.execute(ChatMention.__table__.delete().where(ChatMention.chat_message_id.in_(mids)))
         ts.execute(ChatRead.__table__.delete().where(ChatRead.thread_id.in_(tids or [uuid.uuid4()])))
         ts.execute(ChatMessage.__table__.delete().where(ChatMessage.thread_id.in_(tids or [uuid.uuid4()])))
         ts.execute(ChatThread.__table__.delete().where(ChatThread.id.in_(tids or [uuid.uuid4()])))
@@ -176,3 +181,42 @@ def test_p_tc_506_gatekeeper_non_party(env, client):
     q = env.make_quest(owner=env.other_id, seed_member=False)  # seed は非メンバー
     cid = env.seed_active_concept(q, author=env.other_id)
     assert client.get(f"/api/v1/concepts/{cid}/chat-scopes").status_code == 404
+
+
+# ---- P-TC-510〜512: フル機能パリティ（チャット中核を thread 経由で再利用・§5.45） ----
+
+
+def test_p_tc_510_rich_scope_chat_shape(env, client):
+    """P-TC-510: スコープの rich チャット GET＝アイデアと同形（thread_id＋data＋未読・E.1）。"""
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    sid = _overall_scope(client, cid)
+    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "こんにちは"}, headers=_csrf(client))
+    body = client.get(f"/api/v1/concept-chat-scopes/{sid}/chat").json()
+    assert body["thread_id"] and body["chat_group_id"] is None  # concept は chat_group を持たない
+    assert [m["body"] for m in body["data"]] == ["こんにちは"]
+    assert "unread" in body and "page_info" in body
+
+
+def test_p_tc_511_rich_scope_reaction_via_shared_ep(env, client):
+    """P-TC-511: コンセプトメッセージにも共通の message-id EP でリアクションが効く（フル機能パリティ）。"""
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    sid = _overall_scope(client, cid)
+    mid = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "x"}, headers=_csrf(client)).json()["id"]
+    r = client.post(f"/api/v1/chat-messages/{mid}/reactions", json={"type": "normal", "emoji": "👍"}, headers=_csrf(client))
+    assert r.status_code == 200
+    normal = {n["emoji"] for n in r.json()["reactions"]["normal"]}
+    assert "👍" in normal
+
+
+def test_p_tc_512_rich_scope_read_reduces_unread(env, client):
+    """P-TC-512: rich 既読 EP（/concept-chat-scopes/{sid}/chat/read）で未読カーソルが前進する。"""
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    sid = _overall_scope(client, cid)
+    m1 = client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "a"}, headers=_csrf(client)).json()["id"]
+    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat-messages", data={"body": "b"}, headers=_csrf(client))
+    client.post(f"/api/v1/concept-chat-scopes/{sid}/chat/read", json={"last_read_message_id": m1}, headers=_csrf(client))
+    body = client.get(f"/api/v1/concept-chat-scopes/{sid}/chat").json()
+    assert body["unread"]["unread_count"] == 1  # m1 既読・残り b の1件

@@ -79,21 +79,27 @@ def get_chat(account_id, company_id, idea_id, *, limit=50, before=None, after=No
         idea, _quest = _resolve_chat_idea(ts, iid, user)
         cg = repo.ensure_chat_group(ts, idea.id)
         thread = repo.ensure_chat_thread(ts, "idea", cg.id)
-        rows, has_more = repo.list_messages(ts, thread.id, before=before_c, after=after_c, limit=limit)
-        data = _messages_payload(ts, rows, viewer_id=user.id)
-        # 未読（chat_reads 基準・E.5）。
-        read = repo.get_read(ts, thread.id, user.id)
-        read_cursor = _read_cursor(ts, read)
-        first_unread = repo.first_message_after(ts, thread.id, read_cursor)
-        unread = {
-            "first_unread_message_id": str(first_unread.id) if first_unread else None,
-            "unread_count": repo.count_messages_after(ts, thread.id, read_cursor),
-        }
-        next_cursor = _encode_cursor(rows[0]) if (has_more and rows and after_c is None) else (
-            _encode_cursor(rows[-1]) if (has_more and rows and after_c is not None) else None)
+        payload = _chat_payload(ts, thread, user, limit=limit, before_c=before_c, after_c=after_c)
         ts.commit()  # ensure_chat_group/thread の遅延生成を確定
-    # chat_group_id は後方互換で残す（realtime 購読キーは Phase4 で thread_id へ移行）。
-    return {"chat_group_id": str(cg.id), "thread_id": str(thread.id), "data": data,
+    # chat_group_id は後方互換で残す（realtime 購読キーは thread_id へ移行済）。
+    return {"chat_group_id": str(cg.id), **payload}
+
+
+def _chat_payload(ts, thread, user, *, limit, before_c, after_c) -> dict:
+    """スレッドのメッセージ一覧＋未読情報（E.1・ホスト非依存の中核）。返り値に thread_id を含む。"""
+    rows, has_more = repo.list_messages(ts, thread.id, before=before_c, after=after_c, limit=limit)
+    data = _messages_payload(ts, rows, viewer_id=user.id)
+    # 未読（chat_reads 基準・E.5）。
+    read = repo.get_read(ts, thread.id, user.id)
+    read_cursor = _read_cursor(ts, read)
+    first_unread = repo.first_message_after(ts, thread.id, read_cursor)
+    unread = {
+        "first_unread_message_id": str(first_unread.id) if first_unread else None,
+        "unread_count": repo.count_messages_after(ts, thread.id, read_cursor),
+    }
+    next_cursor = _encode_cursor(rows[0]) if (has_more and rows and after_c is None) else (
+        _encode_cursor(rows[-1]) if (has_more and rows and after_c is not None) else None)
+    return {"thread_id": str(thread.id), "data": data,
             "page_info": {"next_cursor": next_cursor, "has_next": has_more}, "unread": unread}
 
 
@@ -124,17 +130,43 @@ def get_chat_activity(account_id, company_id, idea_id, *, days=14) -> dict:
 # ---- 投稿・編集・削除（E.2） ----
 
 
-def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, mention_ids, files) -> dict:
-    """メッセージ投稿（multipart・E.2）。本文/メンション/引用（複数可）/添付を単一 UoW。空は 422。投稿 XP+5（日次上限）。"""
+def _create_message_core(ts, thread, quest, user, *, body, quoted_message_ids, mention_ids, files) -> tuple:
+    """メッセージ作成の中核（ホスト非依存・E.2）＝本文/引用/メンション/添付/XP を単一 UoW。返り値＝(msg, mentions)。
+
+    門番（完了/コメント権限）は呼び出し側で適用済みとする。空は 422・添付上限・投稿 XP+5（日次上限）。
+    """
     from app.infra.storage import MAX_ATTACHMENTS_PER_IDEA, get_storage, validate_attachment_upload
 
+    body = (body or "").strip()
+    if not body and not files:
+        raise AppError(422, "validation_error", detail="本文か添付が必要です", errors=[{"field": "body", "code": "empty_message"}])
+    quote_ids = _validate_quotes(ts, thread.id, quoted_message_ids)
+    mentions = _validate_mentions(ts, quest, mention_ids)
+    validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in (files or [])]
+    if len(validated) > MAX_ATTACHMENTS_PER_IDEA:
+        raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
+                       errors=[{"field": "files", "code": "too_many"}])
+    msg = repo.create_message(ts, thread_id=thread.id, author_id=user.id, body=body)
+    if quote_ids:
+        repo.add_quotes(ts, msg.id, quote_ids)
+    if mentions:
+        repo.replace_mentions(ts, msg.id, mentions)
+    if validated:
+        storage = get_storage()
+        for fn, data, mime in validated:
+            key = storage.put(data, mime, prefix="chat-attachments")
+            repo.add_chat_attachment(ts, chat_message_id=msg.id, object_key=key, original_name=fn,
+                                     size_bytes=len(data), mime_type=mime, uploaded_by_id=user.id)
+    _award_chat_xp(ts, user, msg.id, quest.id)
+    return msg, mentions
+
+
+def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, mention_ids, files) -> dict:
+    """アイデアチャットへ投稿（multipart・E.2）。本文/メンション/引用（複数可）/添付を単一 UoW。空は 422。投稿 XP+5（日次上限）。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
     iid = _parse_uuid(idea_id, field="idea_id")
-    body = (body or "").strip()
-    if not body and not files:
-        raise AppError(422, "validation_error", detail="本文か添付が必要です", errors=[{"field": "body", "code": "empty_message"}])
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
@@ -144,25 +176,8 @@ def post_message(account_id, company_id, *, idea_id, body, quoted_message_ids, m
         _require_comment(ts, quest, user)
         cg = repo.ensure_chat_group(ts, idea.id)
         thread = repo.ensure_chat_thread(ts, "idea", cg.id)
-        quote_ids = _validate_quotes(ts, thread.id, quoted_message_ids)
-        mentions = _validate_mentions(ts, quest, mention_ids)
-        # 添付は先に全件検証（不正で部分保存しない）。
-        validated = [(fn, data, validate_attachment_upload(fn, data)) for (fn, data) in (files or [])]
-        if len(validated) > MAX_ATTACHMENTS_PER_IDEA:
-            raise AppError(422, "validation_error", detail=f"添付は1メッセージ{MAX_ATTACHMENTS_PER_IDEA}件までです",
-                           errors=[{"field": "files", "code": "too_many"}])
-        msg = repo.create_message(ts, thread_id=thread.id, author_id=user.id, body=body)
-        if quote_ids:
-            repo.add_quotes(ts, msg.id, quote_ids)
-        if mentions:
-            repo.replace_mentions(ts, msg.id, mentions)
-        if validated:
-            storage = get_storage()
-            for fn, data, mime in validated:
-                key = storage.put(data, mime, prefix="chat-attachments")
-                repo.add_chat_attachment(ts, chat_message_id=msg.id, object_key=key, original_name=fn,
-                                         size_bytes=len(data), mime_type=mime, uploaded_by_id=user.id)
-        _award_chat_xp(ts, user, msg.id, idea.quest_id)
+        msg, _mentions = _create_message_core(ts, thread, quest, user, body=body,
+                                              quoted_message_ids=quoted_message_ids, mention_ids=mention_ids, files=files)
         payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
         ts.commit()
     _notify_message_posted(company_id, idea.id, msg.id)
@@ -706,3 +721,116 @@ def _notify_message_updated(company_id, idea_id, message_id, added_mention_ids) 
 
 def _notify_message_deleted(idea_id, message_id) -> None:
     return None
+
+
+# ---- コンセプト議論チャット（P.6・チャット中核を thread 経由で再利用＝フル機能パリティ） ----
+
+
+def _resolve_scope_thread(ts, sid, user):
+    """スコープ門番（パーティー所属＋draft 可視性）を適用し、(scope, quest, thread) を返す。"""
+    from app.tenant.concepts import application as concepts_app
+
+    scope, _concept, quest = concepts_app._resolve_scope(ts, sid, user)
+    thread = repo.ensure_chat_thread(ts, "concept_scope", scope.id)
+    return scope, quest, thread
+
+
+def get_scope_chat(account_id, company_id, scope_id, *, limit=50, before=None, after=None) -> dict:
+    """コンセプト議論スコープのチャット（E.1 同形・門番はスコープ）。未読情報も返す。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    sid = _parse_uuid(scope_id, field="scope_id")
+    before_c = _decode_cursor(before) if before else None
+    after_c = _decode_cursor(after) if after else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _scope, _quest, thread = _resolve_scope_thread(ts, sid, user)
+        payload = _chat_payload(ts, thread, user, limit=limit, before_c=before_c, after_c=after_c)
+        ts.commit()  # ensure_chat_thread の遅延生成を確定
+    return payload
+
+
+def get_scope_chat_activity(account_id, company_id, scope_id, *, days=14) -> dict:
+    """スコープの議論アクティビティ（E.1・日次件数）。コンセプトに版は無い＝revision_markers 空。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    sid = _parse_uuid(scope_id, field="scope_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _scope, _quest, thread = _resolve_scope_thread(ts, sid, user)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        daily = [{"date": d.date().isoformat(), "message_count": n}
+                 for d, n in repo.daily_message_counts(ts, thread.id, since)]
+        total = repo.count_active_messages(ts, thread.id)
+        ts.commit()
+    return {"daily": daily, "revision_markers": [], "total_messages": total}
+
+
+def post_scope_message(account_id, company_id, scope_id, *, body, quoted_message_ids, mention_ids, files) -> dict:
+    """コンセプト議論スコープへ投稿（E.2・multipart・アイデアと同一中核）。空は 422・投稿 XP+5（日次上限）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    sid = _parse_uuid(scope_id, field="scope_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _scope, quest, thread = _resolve_scope_thread(ts, sid, user)
+        _guard_not_completed(quest)
+        _require_comment(ts, quest, user)
+        msg, mentions = _create_message_core(ts, thread, quest, user, body=body,
+                                             quoted_message_ids=quoted_message_ids, mention_ids=mention_ids, files=files)
+        payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
+        ts.commit()
+    _notify_scope_message_posted(company_id, msg.id, mentions)
+    realtime_events.publish_event(realtime_events.chat_topic(thread.id), "chat.message.created",
+                                  payload, company_id=company_id)  # 即時反映（L.3）
+    return payload
+
+
+def mark_scope_read(account_id, company_id, scope_id, *, last_read_message_id) -> dict:
+    """スコープの既読位置を更新（E.5・後退防止 upsert）。完了後も許可。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    sid = _parse_uuid(scope_id, field="scope_id")
+    lrid = _parse_uuid(last_read_message_id, field="last_read_message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _scope, _quest, thread = _resolve_scope_thread(ts, sid, user)
+        target = repo.get_message(ts, lrid)
+        if target is None or target.thread_id != thread.id:
+            raise AppError(404, "not_found")
+        cur = repo.get_read(ts, thread.id, user.id)
+        cur_cursor = _read_cursor(ts, cur)
+        if cur_cursor is None or (target.created_at, target.id) > cur_cursor:
+            repo.upsert_read(ts, thread.id, user.id, target.id)
+        ts.commit()
+    return {"last_read_message_id": str(lrid), "unread_count": 0}
+
+
+def _notify_scope_message_posted(company_id, message_id, mention_ids) -> None:
+    """コンセプト議論の投稿時通知（被メンションのみ・H・post-commit）。投稿者本人宛は除外。"""
+    recipients = list(dict.fromkeys(mention_ids or []))
+    if not recipients:
+        return
+
+    def _build(ts):
+        msg = repo.get_message(ts, message_id)
+        if msg is None:
+            return []
+        actor = ts.get(User, msg.author_id)
+        params = {"actor_name": actor.display_name if actor else None}
+        refs = {"ref_chat_message_id": message_id}
+        return [notify_svc.entry(r, "mention", refs=refs, params=params) for r in recipients if r != msg.author_id]
+
+    notify_svc.dispatch(company_id, _build)

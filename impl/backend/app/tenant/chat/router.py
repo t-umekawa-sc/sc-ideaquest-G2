@@ -201,3 +201,76 @@ def mark_read(
         last_read_message_id=body.last_read_message_id,
     )
     return ChatReadResponse(**result)
+
+
+# ---- コンセプト議論スコープのチャット（P.6・チャット中核を thread 経由で再利用＝フル機能パリティ）。
+#      リアクション/魔法/編集/削除/ピンは message-id ベースの共通 EP（上記）がそのまま効く。 ----
+
+
+@router.get("/concept-chat-scopes/{scope_id}/chat", response_model=ChatListResponse)
+def get_scope_chat(
+    scope_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=100),
+    before: str | None = None,
+    after: str | None = None,
+    session: dict = Depends(require_me),
+) -> ChatListResponse:
+    """コンセプト議論スコープの一覧＋未読（E.1 同形・門番はスコープ）。読取専用。"""
+    result = chat_service.get_scope_chat(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id,
+        limit=limit, before=before, after=after,
+    )
+    return ChatListResponse(**result)
+
+
+@router.get("/concept-chat-scopes/{scope_id}/chat-activity", response_model=ChatActivityResponse)
+def get_scope_chat_activity(
+    scope_id: str,
+    request: Request,
+    days: int = Query(default=14, ge=1, le=90),
+    session: dict = Depends(require_me),
+) -> ChatActivityResponse:
+    """スコープの議論アクティビティ（E.1・版マーカーはコンセプトに無いため空）。読取専用。"""
+    result = chat_service.get_scope_chat_activity(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id, days=days,
+    )
+    return ChatActivityResponse(**result)
+
+
+@router.post("/concept-chat-scopes/{scope_id}/chat-messages", response_model=ChatMessageDTO, status_code=201)
+async def post_scope_message(
+    scope_id: str,
+    request: Request,
+    body: str | None = Form(default=None),
+    quoted_message_ids: list[str] | None = Form(default=None),
+    mentions: list[str] | None = Form(default=None),
+    files: list[UploadFile] | None = File(default=None),
+    session: dict = Depends(require_me),
+) -> ChatMessageDTO:
+    """スコープへ投稿（E.2・multipart・アイデアと同一中核）。空は 422・投稿 XP+5・引用複数可。完了は 409。"""
+    verify_origin(request)
+    verify_csrf(request)
+    payloads = [((f.filename or ""), await f.read()) for f in (files or [])]
+    result = chat_service.post_scope_message(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id,
+        body=body, quoted_message_ids=quoted_message_ids, mention_ids=mentions, files=payloads,
+    )
+    return ChatMessageDTO(**result)
+
+
+@router.post("/concept-chat-scopes/{scope_id}/chat/read", response_model=ChatReadResponse)
+def mark_scope_read(
+    scope_id: str,
+    body: ChatReadRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> ChatReadResponse:
+    """スコープの既読位置を更新（E.5・後退防止 upsert）。完了後も許可。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.mark_scope_read(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id,
+        last_read_message_id=body.last_read_message_id,
+    )
+    return ChatReadResponse(**result)
