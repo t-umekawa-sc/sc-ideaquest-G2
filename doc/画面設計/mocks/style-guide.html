@@ -599,6 +599,231 @@
     </script>
   </div>
 
+  <!-- 4d. 画面の狙いバンド（ガイダンス・横断標準・検討中） -->
+  <div class="section">
+    <h2>4d. 画面の狙いバンド（ガイダンス・横断標準・検討中）<span class="badge badge-muted">検討中</span></h2>
+    <p class="muted text-sm">
+      画面ヘッダーに置く<strong>ⓘ＋短ラベル（<code>.screen-purpose</code>）</strong>＝既定はコンパクト。
+      <strong>ホバー／フォーカスで本文を“フローティング展開”</strong>（<strong>絶対配置＝在来フローを動かさず隣を押し出さない</strong>）。
+      本文が収まらない時だけ<strong>流れる</strong>（ping-pong・折り返さない）。<strong>ホスト右端までにクランプ＝画面外に出ない</strong>（狭ければ本文だけ多くスクロール）。
+      <strong>クリックで全文ダイアログ</strong>（定義・目的・粒度）。<strong>reduce-motion 時は流さず静止</strong>。
+      各画面は <code>{ short, full }</code> を渡すだけの<strong>汎用部品</strong>で、SC-61 コンセプト詳細を初出に他画面へ流用する想定。
+    </p>
+    <p class="hint">ねらい＝ISO 56002 等の「その画面で何を・どの粒度で入力するのか」の定義を、平時は ⓘ＋短ラベルに畳み、知りたい時だけ浮かせて（＋クリックで全文）読ませる。展開は<strong>他要素に重なる</strong>（押し出さない）。</p>
+
+    <style>
+      /* 画面の狙いバンド（横断ガイダンス標準・検討中）。既定=ⓘ＋短ラベル／ホバーで本文を“フローティング”展開（隣を押し出さない・絶対配置）／収まらなければ流れる／クリックで全文。 */
+      .screen-purpose{
+        --sp-vp:460px;
+        position:relative; /* pop の絶対配置アンカー */
+        display:inline-flex; align-items:center; gap:var(--space-2); max-width:100%;
+        padding:var(--space-1) var(--space-3);
+        border:1px solid var(--color-border); border-radius:var(--radius-full);
+        background:var(--color-surface-alt); color:var(--color-text-muted);
+        font-size:var(--text-sm); cursor:pointer; text-align:left; line-height:1.4;
+      }
+      .screen-purpose:hover,
+      .screen-purpose:focus-within{ border-color:var(--color-border-strong); }
+      /* 展開時はベースの右側を平らにして pop と地続きの「1つのピル」に見せる（改修前の一体ピル） */
+      .screen-purpose:hover, .screen-purpose:focus-within{
+        border-top-right-radius:0; border-bottom-right-radius:0; border-right-color:transparent;
+      }
+      /* フォーカスリング＝outline だと伸びた pop を囲めないので、ベース＋pop の枠線を青にして一続きの青枠にする（pop の青指定は展開ルールの後で上書き＝下部に配置） */
+      .screen-purpose:focus-visible{ outline:none; border-color:var(--color-primary); }
+      .screen-purpose__icon{ flex:0 0 auto; font-style:normal; }
+      /* 既定で見える短ラベル（例: コンセプトとは？） */
+      .screen-purpose__label{ flex:0 0 auto; white-space:nowrap; font-weight:600; }
+      /* フローティング本文＝絶対配置でラベルの右へ“地続き”に伸ばす（在来フローを動かさない・継ぎ目は仕切り線）。 */
+      .screen-purpose__pop{
+        position:absolute; top:50%; left:100%; transform:translateY(-50%);
+        margin-left:0; /* ベース右端に密着＝一体ピル */
+        display:inline-flex; align-items:center; gap:var(--space-2);
+        max-width:0; overflow:hidden; opacity:0; pointer-events:none; white-space:nowrap;
+        padding:0; color:var(--color-text-muted); background:var(--color-surface-alt);
+        border:1px solid var(--color-border); border-left-color:var(--color-border); /* 継ぎ目＝仕切り線 */
+        border-top-left-radius:0; border-bottom-left-radius:0;
+        border-top-right-radius:var(--radius-full); border-bottom-right-radius:var(--radius-full);
+        transition:max-width .2s ease, opacity .15s ease, padding .2s ease;
+        z-index:30;
+      }
+      .screen-purpose:hover .screen-purpose__pop,
+      .screen-purpose:focus-within .screen-purpose__pop{
+        max-width:var(--sp-vp, 460px); opacity:1; pointer-events:auto;
+        padding:var(--space-1) var(--space-3); border-color:var(--color-border-strong); border-left-color:var(--color-border);
+      }
+      /* フォーカス時＝伸びた本文パネルの枠も青（展開ルールの後に置いて確実に上書き）。継ぎ目の仕切り線は薄いまま。 */
+      .screen-purpose:focus-visible .screen-purpose__pop{ border-color:var(--color-primary); border-left-color:var(--color-border); }
+      /* pop 内＝本文ビューポート（クリップ）＋「全文」 */
+      .screen-purpose__vp{ flex:1 1 auto; min-width:0; overflow:hidden; }
+      .screen-purpose__text{ display:inline-block; white-space:nowrap; will-change:transform; }
+      /* 溢れる時だけ流す（JS が is-marquee＋--sp-dist/--sp-dur）。ホバー即・流し始め＝先頭の停止は最小、両端だけ軽く猶予。 */
+      .screen-purpose.is-marquee .screen-purpose__text{
+        animation: sp-marquee var(--sp-dur, 10s) ease-in-out infinite alternate;
+      }
+      @keyframes sp-marquee{
+        0%      { transform: translateX(0); }
+        92%,100%{ transform: translateX(var(--sp-dist, 0)); }
+      }
+      .screen-purpose__more{ flex:0 0 auto; white-space:nowrap; font-size:var(--text-xs); text-decoration:underline; }
+      /* OS reduce-motion＝展開の動きも流れも止める（開くが静止） */
+      @media (prefers-reduced-motion: reduce){
+        .screen-purpose__pop{ transition:none; }
+        .screen-purpose.is-marquee .screen-purpose__text{ animation:none; }
+      }
+      /* デモ用シミュレート（accounts.reduce_motion 相当）＝流さない */
+      .sp-demo.sp-force-static .screen-purpose__pop{ transition:none; }
+      .sp-demo.sp-force-static .screen-purpose.is-marquee .screen-purpose__text{ animation:none !important; }
+    </style>
+
+    <div class="sg-demo-header sp-demo sp-host" style="max-width:640px;display:flex;flex-direction:column;gap:var(--space-3);align-items:flex-start">
+      <div class="muted text-xs">↓ 既定は ⓘ＋短ラベル。ホバー／フォーカスで本文が広がり、収まらなければ流れる</div>
+      <div class="sp-host" style="display:flex;align-items:center;gap:var(--space-2);width:100%">
+        <button class="screen-purpose" type="button" id="spBandLong" aria-haspopup="dialog"
+          aria-label="コンセプトとは？（ホバーで説明・クリックで全文）" title="コンセプトとは？（クリックで全文）">
+          <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+          <span class="screen-purpose__label">コンセプトとは？</span>
+          <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+        </button>
+        <span class="badge" style="flex:0 0 auto">検証中</span>
+        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
+        <span class="muted text-xs" style="flex:0 0 auto">← 右の要素（ホバーで上に重なる＝動かない）</span>
+      </div>
+
+      <div class="muted text-xs" style="margin-top:var(--space-2)">↓ 本文が短い＝広げても収まるので流れない（静止）</div>
+      <div class="sp-host" style="display:flex;align-items:center;gap:var(--space-2);width:100%">
+        <button class="screen-purpose" type="button" id="spBandShort" aria-haspopup="dialog"
+          aria-label="この画面の狙い（ホバーで説明・クリックで全文）" title="この画面の狙い（クリックで全文）">
+          <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+          <span class="screen-purpose__label">この画面の狙い</span>
+          <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">コンセプトを検証して選定する。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+        </button>
+        <span class="badge" style="flex:0 0 auto">検証中</span>
+        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
+      </div>
+
+      <div class="muted text-xs" style="margin-top:var(--space-4)">↓ ヘッダー実配置①＝隣に要素がある（フローティング展開＝本文は上に重なって出る／「編集」ボタンや他要素は<strong>動かない</strong>）</div>
+      <div class="sp-host" style="width:100%;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);display:flex;align-items:center;gap:var(--space-3);background:var(--color-surface)">
+        <strong style="flex:0 0 auto">コンセプト詳細</strong>
+        <span class="badge" style="flex:0 0 auto">検証中</span>
+        <button class="screen-purpose" type="button" aria-haspopup="dialog" aria-label="この画面の狙い（ホバーで説明・クリックで全文）" title="この画面の狙い（クリックで全文）">
+          <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+          <span class="screen-purpose__label">この画面の狙い</span>
+          <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+        </button>
+        <span style="flex:1 1 auto"></span>
+        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
+      </div>
+
+      <div class="muted text-xs" style="margin-top:var(--space-3)">↓ ヘッダー実配置②＝右端に近い（右端までに<strong>クランプ</strong>＝折り返さず・画面外に出ない／狭い分だけ本文が多くスクロール）</div>
+      <div class="sp-host" style="width:100%;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);display:flex;align-items:center;gap:var(--space-3);background:var(--color-surface);justify-content:flex-end">
+        <strong style="flex:0 0 auto;margin-right:auto">別の要素</strong>
+        <button class="screen-purpose" type="button" aria-haspopup="dialog" aria-label="この画面の狙い（ホバーで説明・クリックで全文）" title="この画面の狙い（クリックで全文）">
+          <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+          <span class="screen-purpose__label">この画面の狙い</span>
+          <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+        </button>
+      </div>
+
+      <label class="checkbox" style="margin-top:var(--space-3)">
+        <input type="checkbox" id="spReduceToggle">
+        <span>reduce-motion をシミュレート（流れを止める＝<code>accounts.reduce_motion</code> 相当）</span>
+      </label>
+    </div>
+
+    <!-- 全文ダイアログ（クリックで開く・全文を読む） -->
+    <div class="modal sg-crt modal--md modal--draggable modal--maximizable" id="spPurposeDialog" role="dialog" aria-modal="true" aria-labelledby="spPurposeTitle" hidden>
+      <div class="modal__backdrop" data-close></div>
+      <div class="modal__panel sectioned modal__panel--crt-in">
+        <div class="modal__header"><h2 id="spPurposeTitle">この画面について（ISO 56002 準拠）</h2><button class="modal__close" type="button" aria-label="閉じる" data-close>✕</button></div>
+        <div class="modal__body">
+          <div class="dialog-section">
+            <div class="dialog-label">コンセプトとは</div>
+            <p style="margin:0">選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値（価値提案）と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56002 §8.3 概念の創造・検証＝②③段）。</p>
+          </div>
+          <div class="dialog-section">
+            <div class="dialog-label">この画面の狙い</div>
+            <p style="margin:0">上記スキーマを埋め、主要な前提を<strong>「証拠で」検証</strong>（desirability・feasibility・viability）しながら、<strong>Go / Pivot / Kill</strong> の判断まで導く場です。<strong>否定的な検証結果こそ価値</strong>（筋の悪い方向を早く止める）。</p>
+          </div>
+          <div class="dialog-section">
+            <div class="dialog-label">粒度</div>
+            <p style="margin:0"><strong>1 クエスト（＝1 イニシアチブ）</strong>の中に複数のコンセプト候補が競合し、評価と検証を経て owner が勝ち残りを選定します。<strong>アイデアより大きく、ソリューション（実装・WBS）より前</strong>の単位です。</p>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-primary" type="button" data-close>閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const demo = document.currentScript.closest('.section');
+        const spDemo = demo.querySelector('.sp-demo');
+        const dlg = demo.querySelector('#spPurposeDialog');
+        const bands = [...demo.querySelectorAll('.screen-purpose')];
+        // 流れを止める条件＝OS reduce-motion or アプリ設定シミュレート
+        function isStatic() {
+          return window.matchMedia('(prefers-reduced-motion: reduce)').matches || spDemo.classList.contains('sp-force-static');
+        }
+        // フローティング配置＝在来フローを動かさず、ホスト（.sp-host）の右端までに“地続き”で伸ばす（折り返さず・見切れさせず）。展開幅（--sp-vp）を返す。上限 460。
+        function place(band) {
+          const host = band.closest('.sp-host') || band.parentElement;
+          const b = band.getBoundingClientRect();
+          const h = host.getBoundingClientRect();
+          const margin = 16;
+          const rightRoom = Math.floor(h.right - b.right - margin);
+          const cap = Math.max(140, Math.min(460, rightRoom));
+          band.style.setProperty('--sp-vp', cap + 'px');
+          return cap;
+        }
+        // 指定幅（pop 内の本文ビューポート）を超える帯だけ .is-marquee＋移動距離/尺を付与（≒45px/秒）
+        function marquee(band, vpWidth) {
+          const text = band.querySelector('.screen-purpose__text');
+          band.classList.remove('is-marquee');
+          band.style.removeProperty('--sp-dist'); band.style.removeProperty('--sp-dur');
+          if (isStatic()) return;
+          const over = text.scrollWidth - vpWidth;
+          if (over > 8) {
+            band.classList.add('is-marquee');
+            band.style.setProperty('--sp-dist', (-over) + 'px');
+            band.style.setProperty('--sp-dur', Math.max(4, Math.round(over / 45)) + 's');
+          }
+        }
+        // ホバー/フォーカスで即・流し始め（配置＋想定 vp 幅で判定）→展開しきったら実幅で距離を微調整
+        function expand(band) {
+          clearTimeout(band._spT);
+          const cap = place(band);
+          marquee(band, Math.max(60, cap - 70)); // pop の padding/「全文」分を差し引いた想定 vp 幅
+          if (isStatic()) return;
+          band._spT = setTimeout(() => {
+            const vp = band.querySelector('.screen-purpose__vp');
+            marquee(band, vp.clientWidth || (cap - 70));
+          }, 240); // CSS 展開 .2s 完了後に実幅で補正
+        }
+        function collapse(band) { clearTimeout(band._spT); band.classList.remove('is-marquee'); }
+        bands.forEach((b) => {
+          b.addEventListener('mouseenter', () => expand(b));
+          b.addEventListener('focusin', () => expand(b));
+          b.addEventListener('mouseleave', () => collapse(b));
+          b.addEventListener('focusout', () => collapse(b));
+          b.addEventListener('click', open);
+        });
+        // クリック（＋Enter/Space）で全文ダイアログ
+        function open() { dlg.classList.remove('is-closing'); dlg.hidden = false; requestAnimationFrame(() => dlg.classList.add('show')); }
+        function close() {
+          const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          dlg.classList.remove('show'); dlg.classList.add('is-closing');
+          setTimeout(() => { dlg.hidden = true; dlg.classList.remove('is-closing'); }, reduce ? 0 : 340);
+        }
+        dlg.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) close(); });
+        // reduce-motion シミュレート
+        demo.querySelector('#spReduceToggle').addEventListener('change', (e) => {
+          spDemo.classList.toggle('sp-force-static', e.target.checked);
+        });
+      })();
+    </script>
+  </div>
+
   <!-- カード / バッジ -->
   <div class="section">
     <h2>5. カード / バッジ（アイデア一覧の見本）</h2>
