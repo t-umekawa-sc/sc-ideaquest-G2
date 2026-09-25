@@ -20,7 +20,15 @@ type Props = {
   onCancel: () => void;
 };
 
-type FieldErrors = { title?: string; viability?: string };
+type FieldErrors = { title?: string };
+
+// viability（価値実現モデル）＝ラベル付き構造入力（SC-60 §4・2026-09-25）。JSON 直接入力の負荷を避ける。
+const VIABILITY_FIELDS: { key: string; label: string; placeholder: string }[] = [
+  { key: "cost", label: "コスト（初期/運用）", placeholder: "例: 初期200万＋月額運用10万" },
+  { key: "revenue", label: "収益モデル", placeholder: "例: SaaS 月額課金" },
+  { key: "roi", label: "ROI・投資回収", placeholder: "例: 18ヶ月で回収" },
+  { key: "notes", label: "備考（その他）", placeholder: "補足があれば" },
+];
 
 export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Props) {
   const router = useRouter();
@@ -34,7 +42,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
   const [target, setTarget] = useState("");
   const [differentiation, setDifferentiation] = useState("");
   const [solutionForm, setSolutionForm] = useState("");
-  const [viability, setViability] = useState("");
+  const [viab, setViab] = useState<Record<string, string>>({}); // cost/revenue/roi/notes
+  const [viabExtra, setViabExtra] = useState<Record<string, unknown>>({}); // 分解対象外の既存キー（温存）
   const [sourceIdeas, setSourceIdeas] = useState<string[]>([]);
   const [ideaOptions, setIdeaOptions] = useState<IdeaCard[]>([]);
   const [ownQuestId, setOwnQuestId] = useState<string | undefined>(questId);
@@ -54,7 +63,14 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       setTarget(c.target ?? "");
       setDifferentiation(c.differentiation ?? "");
       setSolutionForm(c.solution_form ?? "");
-      setViability(c.viability && Object.keys(c.viability).length ? JSON.stringify(c.viability, null, 2) : "");
+      const via = { ...(c.viability ?? {}) } as Record<string, unknown>;
+      const known: Record<string, string> = {};
+      for (const f of VIABILITY_FIELDS) {
+        if (typeof via[f.key] === "string") known[f.key] = via[f.key] as string;
+        delete via[f.key];
+      }
+      setViab(known);
+      setViabExtra(via);
       setSourceIdeas(c.source_ideas.map((s) => s.idea_id));
       setOwnQuestId(c.quest_id);
       setLoading(false);
@@ -71,11 +87,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
   const validate = useCallback((): FieldErrors => {
     const e: FieldErrors = {};
     if (!title.trim()) e.title = "コンセプト名を入力してください。";
-    if (viability.trim()) {
-      try { JSON.parse(viability); } catch { e.viability = "JSON 形式で入力してください（例: {\"roi\":\"18ヶ月\"}）。"; }
-    }
     return e;
-  }, [title, viability]);
+  }, [title]);
 
   function toggleIdea(id: string) {
     setSourceIdeas((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
@@ -95,7 +108,14 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       target: target.trim() || null,
       differentiation: differentiation.trim() || null,
       solution_form: solutionForm.trim() || null,
-      viability: viability.trim() ? JSON.parse(viability) : {},
+      viability: (() => {
+        const obj: Record<string, unknown> = { ...viabExtra };
+        for (const f of VIABILITY_FIELDS) {
+          const v = (viab[f.key] ?? "").trim();
+          if (v) obj[f.key] = v; else delete obj[f.key];
+        }
+        return obj;
+      })(),
     };
     setPending(true);
     try {
@@ -178,9 +198,19 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
           <textarea className="textarea" id="c_solution" rows={2} value={solutionForm} onChange={(e) => setSolutionForm(e.target.value)} />
         </Field>
 
-        <Field className="dialog-section is-quiet" id="c_viability" label="採算・事業性（viability）" hint='価値実現モデル（コスト/収益モデル/ROI）。JSON で任意キー。例: {"cost":"初期200万","roi":"18ヶ月"}' error={errors.viability}>
-          <textarea className="textarea" id="c_viability" rows={4} value={viability} onChange={(e) => setViability(e.target.value)} placeholder='{"cost":"...","revenue":"...","roi":"..."}' style={{ fontFamily: "monospace" }} />
-        </Field>
+        <div className="dialog-section is-quiet" data-sp-host>
+          <div className="concept-section-head" style={{ marginBottom: "var(--space-1)" }}>
+            <span style={{ fontWeight: 600 }}>採算・事業性（viability）</span>
+            <ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3 e）。経営が投資判断できる証拠まで。" dialogTitle="viability（価値実現モデル）とは">
+              <p style={{ margin: 0 }}>ISO 56002 §8.3.3 e) の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p>
+            </ScreenPurpose>
+          </div>
+          {VIABILITY_FIELDS.map((f) => (
+            <Field key={f.key} className="dialog-section is-quiet" id={`c_v_${f.key}`} label={f.label}>
+              <input className="input" id={`c_v_${f.key}`} value={viab[f.key] ?? ""} onChange={(e) => setViab((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.placeholder} />
+            </Field>
+          ))}
+        </div>
       </ModalBody>
       <ModalFooter>
         <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
