@@ -123,6 +123,11 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   if (!concept) return <div className="empty-page">コンセプトが見つかりません。</div>;
 
   const pct = votePercents(vote.approve, vote.oppose);
+  // 投票は active（公開）のみ＝draft/archived は事前無効化（サーバー _guard_votable と一致・409 回避）。
+  const voteFrozen = concept.status !== "active";
+  const voteFrozenTitle = concept.status === "draft"
+    ? "下書きのコンセプトには投票できません（公開後に投票可）"
+    : concept.status === "archived" ? "保管されたコンセプトには投票できません" : undefined;
   const viabilityText = concept.viability && Object.keys(concept.viability).length ? JSON.stringify(concept.viability, null, 2) : "—";
 
   return (
@@ -227,9 +232,10 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               <span className="vote-bar__disagree" style={{ width: `${pct.oppose}%` }} />
             </div>
             <div className="vote-btns">
-              <button className={`vote-btn agree${vote.my === "approve" ? " is-on" : ""}`} type="button" aria-pressed={vote.my === "approve"} disabled={busy} onClick={() => void onVote("approve")}>▲ 賛成</button>
-              <button className={`vote-btn disagree${vote.my === "oppose" ? " is-on" : ""}`} type="button" aria-pressed={vote.my === "oppose"} disabled={busy} onClick={() => void onVote("oppose")}>▼ 反対</button>
+              <button className={`vote-btn agree${vote.my === "approve" ? " is-on" : ""}${voteFrozen ? " is-frozen" : ""}`} type="button" aria-pressed={vote.my === "approve"} disabled={busy || voteFrozen} title={voteFrozen ? voteFrozenTitle : undefined} onClick={() => void onVote("approve")}>▲ 賛成</button>
+              <button className={`vote-btn disagree${vote.my === "oppose" ? " is-on" : ""}${voteFrozen ? " is-frozen" : ""}`} type="button" aria-pressed={vote.my === "oppose"} disabled={busy || voteFrozen} title={voteFrozen ? voteFrozenTitle : undefined} onClick={() => void onVote("oppose")}>▼ 反対</button>
             </div>
+            {concept.status !== "active" && <p className="role-note" style={{ marginTop: "var(--space-2)" }}>※ 下書きのコンセプトには投票できません。公開（投稿）後に投票できます。</p>}
             <p className="vote-note">1人1票・<strong>変更できます</strong>。投票すると <span className="xp">+5 XP</span>（各コンセプト初回）。</p>
           </section>
 
