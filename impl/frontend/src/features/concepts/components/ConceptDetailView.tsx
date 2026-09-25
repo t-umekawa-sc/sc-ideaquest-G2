@@ -4,6 +4,7 @@
 // （戻るリンク backlink--float・ヘッダー .card.idea-head・関連情報 RelatedInfoPanel・投票 .vote-* パネル・2カラム .idea-layout）。
 // コンセプト固有（スキーマA/B/Cグループ・前提と検証・総合判定・ガイダンスⓘ）だけ concepts.css で足す。DRY（フロー規約 §2/§2.1）。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Avatar, LoadingOverlay, ScreenPurpose, useSnackbar } from "@/components/ui";
@@ -11,6 +12,7 @@ import { QuestIcon } from "@/components/layout/QuestIcon";
 import { RelatedInfoPanel } from "@/features/info-input";
 import { votePercents } from "@/features/ideas/voting";
 import { ApiError } from "@/lib/api/client";
+import { backToListOr } from "@/lib/nav";
 
 import {
   activateConcept, archiveConcept, getConcept, selectConcept, setDecision,
@@ -57,6 +59,7 @@ function ConceptGuide() {
 }
 
 export function ConceptDetailView({ conceptId }: { conceptId: string }) {
+  const router = useRouter();
   const snack = useSnackbar();
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +110,8 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
 
   return (
     <main className="container detail-main">
-      <Link className="backlink backlink--float" href={`/quests/${concept.quest_id}`}>← クエストへ戻る</Link>
+      <Link className="backlink backlink--float" href={`/quests/${concept.quest_id}`}
+        onClick={(e) => { e.preventDefault(); backToListOr(router, `/quests/${concept.quest_id}`); }}>← クエストへ戻る</Link>
 
       {/* ============ ヘッダー（.card.idea-head 流用） ============ */}
       <section className="card idea-head" aria-label="コンセプト情報">
@@ -267,13 +271,11 @@ function FieldRow({ label, value }: { label: string; value: string | null | unde
 }
 
 function SchemaGroup({ title, guide, children }: { title: string; guide?: React.ReactNode; children: React.ReactNode }) {
+  // 「このグループを議論」導線は議論チャット結線スライスで追加（今は無反応ボタンを出さない）。
   return (
     <section className="card schema-group">
       <div className="concept-section-head"><h2 style={{ margin: 0 }}>{title}</h2>{guide}</div>
       {children}
-      <div className="schema-group-foot">
-        <button className="btn btn-outline btn-sm" type="button" title="議論ルームへ（後続スライスで結線）">💬 このグループを議論 →</button>
-      </div>
     </section>
   );
 }

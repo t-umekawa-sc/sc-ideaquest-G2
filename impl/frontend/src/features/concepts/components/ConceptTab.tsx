@@ -4,6 +4,7 @@
 // 一覧は暫定クライアント表示（backend の DataTable クエリ契約は未実装＝サーバー委譲は follow-up・フロント実装フロー §4.1）。
 // 正＝doc/画面設計/screens/SC-12_クエスト詳細.md §4.6。行クリックで SC-61 詳細へ。
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState, ScreenPurpose } from "@/components/ui";
@@ -32,6 +33,7 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 export function ConceptTab({ questId }: { questId: string }) {
+  const router = useRouter();
   const [concepts, setConcepts] = useState<ConceptListItem[] | null>(null);
   const [pool, setPool] = useState<AssumptionListResponse["items"] | null>(null);
 
@@ -75,7 +77,7 @@ export function ConceptTab({ questId }: { questId: string }) {
               </thead>
               <tbody>
                 {concepts.map((c) => (
-                  <tr key={c.id} className="is-clickable" onClick={() => { window.location.href = `/concepts/${c.id}`; }}>
+                  <tr key={c.id} className="is-clickable" onClick={() => router.push(`/concepts/${c.id}`)}>
                     <td><Link href={`/concepts/${c.id}`} onClick={(e) => e.stopPropagation()}>{c.title}</Link></td>
                     <td>{STATUS_LABEL[c.status] ?? c.status}</td>
                     <td>{DECISION_LABEL[c.decision] ?? c.decision}</td>
