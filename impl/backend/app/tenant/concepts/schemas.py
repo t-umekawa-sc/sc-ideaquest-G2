@@ -231,3 +231,68 @@ class LinkDTO(BaseModel):
     assumption_id: str
     criticality: str
     is_stale: bool
+
+
+# ---- コンセプト評価（P.5） ----
+
+EvalStatus = Literal["draft", "submitted"]
+EvalVisibility = Literal["party", "limited"]
+Recommendation = Literal["go", "pivot", "kill"]
+
+
+class ConceptEvaluationPutRequest(BaseModel):
+    """PUT /concepts/{id}/evaluation（P.5）。submitted は中核5(1..5)＋総評＋推奨をサーバー検証。"""
+    model_config = ConfigDict(extra="forbid")
+    scores: dict[str, int] = Field(default_factory=dict)
+    comments: dict[str, str] = Field(default_factory=dict)
+    overall_comment: str | None = None
+    recommendation: Recommendation | None = None
+    visibility: EvalVisibility = "party"
+    status: EvalStatus = "draft"
+
+
+class ConceptEvaluationMeDTO(BaseModel):
+    status: EvalStatus | None = None
+    scores: dict[str, int] = {}
+    comments: dict[str, str] = {}
+    overall_comment: str | None = None
+    recommendation: str | None = None
+    visibility: EvalVisibility = "party"
+    submitted_at: datetime | None = None
+
+
+class ConceptEvaluatorDTO(BaseModel):
+    evaluator_id: str
+    recommendation: str | None = None
+    scores: dict[str, int] = {}
+
+
+class ConceptEvaluationAggregateDTO(BaseModel):
+    aspects: dict[str, float] = {}
+    overall_avg: float | None = None
+    evaluator_count: int = 0
+    recommendations: dict[str, int] = {}
+    evaluators: list[ConceptEvaluatorDTO] = []
+    my_evaluation: ConceptEvaluationMeDTO | None = None
+    stale: bool = False  # リンク前提の反証で要再評価（SC-62 バナー源・P.7）
+    my_permissions: list[str] = []
+
+
+# ---- コンセプト投票（P.5b） ----
+
+
+class ConceptVoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["approve", "oppose"]
+
+
+class ConceptVoteSummary(BaseModel):
+    approve: int = 0
+    oppose: int = 0
+
+
+class ConceptVoteResponse(BaseModel):
+    my_vote: str | None = None
+    summary: ConceptVoteSummary = ConceptVoteSummary()
+    xp_awarded: bool = False
+    xp_delta: int = 0

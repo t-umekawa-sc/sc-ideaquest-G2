@@ -20,9 +20,14 @@ from app.tenant.concepts.schemas import (
     ConceptCreateRequest,
     ConceptDecisionRequest,
     ConceptDetailDTO,
+    ConceptEvaluationAggregateDTO,
+    ConceptEvaluationMeDTO,
+    ConceptEvaluationPutRequest,
     ConceptListResponse,
     ConceptPatchRequest,
     ConceptSelectResponse,
+    ConceptVoteRequest,
+    ConceptVoteResponse,
     LinkCreateRequest,
     LinkDTO,
     LinkPatchRequest,
@@ -241,3 +246,54 @@ def unlink_assumption(
     verify_csrf(request)
     service.unlink_assumption(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, assumption_id)
     return Response(status_code=204)
+
+
+# ---- コンセプト評価（P.5） ----
+
+
+@router.get("/concepts/{concept_id}/evaluation/me", response_model=ConceptEvaluationMeDTO)
+def get_my_evaluation(concept_id: str, request: Request, session: dict = Depends(require_me)) -> ConceptEvaluationMeDTO:
+    """自分の評価/下書き（P.5・evaluator）。読取専用。"""
+    result = service.get_my_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
+    return ConceptEvaluationMeDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/evaluation", response_model=ConceptEvaluationAggregateDTO)
+def get_evaluation(concept_id: str, request: Request, session: dict = Depends(require_me)) -> ConceptEvaluationAggregateDTO:
+    """評価集計（P.5・visibility 適用）。読取専用。"""
+    result = service.get_evaluation_aggregate(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
+    return ConceptEvaluationAggregateDTO(**result)
+
+
+@router.put("/concepts/{concept_id}/evaluation", response_model=ConceptEvaluationMeDTO)
+def put_evaluation(
+    concept_id: str, body: ConceptEvaluationPutRequest, request: Request, session: dict = Depends(require_me),
+) -> ConceptEvaluationMeDTO:
+    """評価 upsert（P.5・下書き/確定）。submitted は中核5＋総評＋推奨検証。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.put_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, body=body)
+    return ConceptEvaluationMeDTO(**result)
+
+
+# ---- コンセプト投票（P.5b） ----
+
+
+@router.post("/concepts/{concept_id}/vote", response_model=ConceptVoteResponse)
+def vote_concept(
+    concept_id: str, body: ConceptVoteRequest, request: Request, session: dict = Depends(require_me),
+) -> ConceptVoteResponse:
+    """投票（P.5b・賛成/反対・1人1票 upsert）。各コンセプト初回のみ XP+5。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.vote(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, vote_type=body.type)
+    return ConceptVoteResponse(**result)
+
+
+@router.delete("/concepts/{concept_id}/vote", response_model=ConceptVoteResponse)
+def unvote_concept(concept_id: str, request: Request, session: dict = Depends(require_me)) -> ConceptVoteResponse:
+    """投票取消（P.5b）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.remove_vote(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
+    return ConceptVoteResponse(**result)

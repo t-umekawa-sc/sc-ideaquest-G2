@@ -8,15 +8,23 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.concepts import repository as repo
+from app.tenant.gamification import ledger
+from app.tenant.gamification import repository as gami_repo
+from app.tenant.gamification.daily import jst_day_bounds_utc
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
+
+_XP_VOTE = 5
+_VOTE_XP_DAILY_CAP = 5
+_RECOMMENDATIONS = ("go", "pivot", "kill")
 
 
 def _resolve_company(company_id: uuid.UUID) -> Company | None:
@@ -529,3 +537,170 @@ def unlink_assumption(account_id, company_id, concept_id, assumption_id) -> None
             raise AppError(404, "not_found")
         repo.remove_assumption_scope(ts, cid, aid)  # 前提本体・エビデンスは残す（単一ソース）
         ts.commit()
+
+
+# ---- コンセプト評価（P.5） -------------------------------------------------
+
+def _is_evaluator(ts, quest, user) -> bool:
+    return _is_owner(quest, user) or "evaluator" in _perms_of(ts, quest, user)
+
+
+def _require_evaluator(ts, quest, user) -> None:
+    if not _is_evaluator(ts, quest, user):
+        raise AppError(403, "forbidden", detail="評価の権限がありません")
+
+
+def _me_eval_payload(ts, ev) -> dict:
+    if ev is None:
+        return {"status": None, "scores": {}, "comments": {}, "overall_comment": None,
+                "recommendation": None, "visibility": "party", "submitted_at": None}
+    scores = repo.get_scores_for_evaluations(ts, [ev.id]).get(ev.id, [])
+    return {
+        "status": ev.status, "scores": {s.aspect: s.score for s in scores},
+        "comments": {s.aspect: s.comment for s in scores if s.comment is not None},
+        "overall_comment": ev.overall_comment, "recommendation": ev.recommendation,
+        "visibility": ev.visibility, "submitted_at": ev.submitted_at,
+    }
+
+
+def _can_view_eval(concept, user, ev, is_manager: bool) -> bool:
+    if ev.visibility == "party":
+        return True
+    if ev.evaluator_id == user.id or concept.author_id == user.id:
+        return True
+    return is_manager
+
+
+def _validate_submitted_eval(body) -> None:
+    errors = []
+    for aspect in repo.CORE_ASPECTS:
+        v = body.scores.get(aspect)
+        if v is None or not (1 <= v <= 5):
+            errors.append({"field": f"scores.{aspect}"})
+    if not (body.overall_comment and body.overall_comment.strip()):
+        errors.append({"field": "overall_comment"})
+    if body.recommendation not in _RECOMMENDATIONS:
+        errors.append({"field": "recommendation"})
+    for aspect, v in body.scores.items():
+        if not (1 <= v <= 5):
+            errors.append({"field": f"scores.{aspect}"})
+    if errors:
+        raise AppError(422, "validation_error", detail="確定には中核5(1..5)＋総評＋推奨が必要", errors=errors)
+
+
+def get_my_evaluation(account_id, company_id, concept_id) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        _require_evaluator(ts, quest, user)
+        return _me_eval_payload(ts, repo.get_evaluation(ts, cid, user.id))
+
+
+def get_evaluation_aggregate(account_id, company_id, concept_id) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        submitted = repo.list_evaluations_for_concept(ts, cid, status="submitted")
+        is_manager = _is_manager(ts, quest, user)
+        visible = [e for e in submitted if _can_view_eval(concept, user, e, is_manager)]
+        scores_by_eval = repo.get_scores_for_evaluations(ts, [e.id for e in visible])
+        by_aspect: dict[str, list[int]] = {}
+        recommendations: dict[str, int] = {}
+        evaluators = []
+        for e in visible:
+            rows = scores_by_eval.get(e.id, [])
+            for s in rows:
+                by_aspect.setdefault(s.aspect, []).append(s.score)
+            if e.recommendation:
+                recommendations[e.recommendation] = recommendations.get(e.recommendation, 0) + 1
+            evaluators.append({"evaluator_id": str(e.evaluator_id), "recommendation": e.recommendation,
+                               "scores": {s.aspect: s.score for s in rows}})
+        aspects = {a: (sum(v) / len(v)) for a, v in by_aspect.items() if v}
+        core = [aspects[a] for a in repo.CORE_ASPECTS if a in aspects]
+        my_eval = _me_eval_payload(ts, repo.get_evaluation(ts, cid, user.id)) if _is_evaluator(ts, quest, user) else None
+        stale = any(link.is_stale for link in repo.list_links_for_concept(ts, cid))
+        return {
+            "aspects": aspects, "overall_avg": (sum(core) / len(core)) if core else None,
+            "evaluator_count": len(visible), "recommendations": recommendations,
+            "evaluators": evaluators, "my_evaluation": my_eval, "stale": stale,
+            "my_permissions": _my_permissions(ts, concept, quest, user),
+        }
+
+
+def put_evaluation(account_id, company_id, concept_id, *, body) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        _require_evaluator(ts, quest, user)
+        _guard_not_completed(quest)
+        submitted = body.status == "submitted"
+        if submitted:
+            _validate_submitted_eval(body)
+        ev, _created = repo.upsert_evaluation(
+            ts, cid, user.id, overall_comment=body.overall_comment, recommendation=body.recommendation,
+            status=body.status, visibility=body.visibility,
+        )
+        entries = [(a, s, body.comments.get(a)) for a, s in body.scores.items() if a in repo.ALL_ASPECTS]
+        repo.replace_scores(ts, ev.id, entries)
+        if submitted and ev.submitted_at is None:
+            ev.submitted_at = datetime.now(timezone.utc)
+        ts.flush()
+        payload = _me_eval_payload(ts, ev)
+        ts.commit()
+        return payload
+
+
+# ---- コンセプト投票（P.5b） ------------------------------------------------
+
+def _guard_votable(ts, concept, quest, user) -> None:
+    if concept.status != "active":
+        raise AppError(409, "conflict", detail="投票できない状態です", extra={"errors": [{"reason": "invalid_state"}]})
+    _guard_not_completed(quest)
+    if not (_is_owner(quest, user) or "vote" in _perms_of(ts, quest, user)):
+        raise AppError(403, "forbidden", detail="投票の権限がありません")
+
+
+def _award_vote_xp(ts, concept, user) -> bool:
+    """投票 XP+5（各コンセプト初回のみ・日次上限・切替/取消/再投票では追加なし）。冪等＝activities 存在。"""
+    if gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "concept_vote", "concepts", concept.id):
+        return False
+    start, end = jst_day_bounds_utc(datetime.now(timezone.utc))
+    if gami_repo.count_reason_between(ts, user.id, "concept_vote", start, end) >= _VOTE_XP_DAILY_CAP:
+        return False
+    ledger.grant(ts, user, kind=ledger.XP_GAIN, amount=_XP_VOTE, reason="concept_vote",
+                 ref_type="concepts", ref_id=concept.id, quest_id=concept.quest_id)
+    return True
+
+
+def vote(account_id, company_id, concept_id, *, vote_type: str) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        _guard_votable(ts, concept, quest, user)
+        _, created = repo.upsert_vote(ts, cid, user.id, type=vote_type)
+        xp_awarded = _award_vote_xp(ts, concept, user)
+        vc = repo.count_votes(ts, cid)
+        ts.commit()
+    return {"my_vote": vote_type, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+            "xp_awarded": xp_awarded, "xp_delta": _XP_VOTE if xp_awarded else 0}
+
+
+def remove_vote(account_id, company_id, concept_id) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        _guard_not_completed(quest)
+        repo.delete_vote(ts, cid, user.id)
+        vc = repo.count_votes(ts, cid)
+        ts.commit()
+    return {"my_vote": None, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}}
