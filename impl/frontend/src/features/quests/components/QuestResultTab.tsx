@@ -1,9 +1,9 @@
 "use client";
 
-// SC-12「🏁 結果」タブ＝クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時のみ）。
+// SC-12「🏁 結果」タブ＝クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56001・完了時のみ）。
 // 既存3成果物（アイデア＋チャット＋評価）を1枚に凝縮＝①選定アイデア/②評価・選別サマリ/③意思決定/
 // ⑤振り返り・学び（owner/管理が編集）/⑥次アクション（後続クエスト複製導線）。④議論の要点(a)＝各案のチャットリンク。
-// 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56002.md・C（FR-39）。
+// 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56001.md・C（FR-39）。
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -111,11 +111,11 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     <section aria-label="クエストの最終結果" className="qresult stack">
       {provisional ? (
         <p className="role-note" role="status" style={{ marginTop: 0 }}>
-          ⏳ このクエストは<strong>進行中</strong>です。以下は<strong>暫定の途中経過</strong>（アイデア選別の申し送りの下書き）で、完了時に確定します（ISO 56002 の継続的モニタリング）。
+          ⏳ このクエストは<strong>進行中</strong>です。以下は<strong>暫定の途中経過</strong>（アイデア選別の申し送りの下書き）で、完了時に確定します（ISO 56001 の継続的モニタリング）。
         </p>
       ) : (
         <p className="role-note" style={{ marginTop: 0 }}>
-          クエスト完了時の<strong>アイデア選別の申し送り</strong>です（アイデア＋議論＋評価の総括・ISO 56002）。
+          クエスト完了時の<strong>アイデア選別の申し送り</strong>です（アイデア＋議論＋評価の総括・ISO 56001）。
         </p>
       )}
 

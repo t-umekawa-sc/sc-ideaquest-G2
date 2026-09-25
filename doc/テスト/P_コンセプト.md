@@ -1,6 +1,6 @@
-# テストパターン P. コンセプト（創造・検証／ISO 56002 ②③段・FR-42）
+# テストパターン P. コンセプト（創造・検証／ISO 56001 ②③段・FR-42）
 
-> 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../API設計/P_コンセプト.md`](../API設計/P_コンセプト.md)（P.0〜P.10）・[`../データモデル.md`](../データモデル.md) §5.38〜§5.46・§3（`concept_status`/`concept_decision`/`assumption_verdict`/`concept_criticality`/`concept_eval_aspect`/`concept_chat_scope_kind`）。設計背景＝[`../設計ドラフト/コンセプト機能_ISO56002_再設計.md`](../設計ドラフト/コンセプト機能_ISO56002_再設計.md)（§3.3〜§3.8）。エラー code の網羅は OpenAPI が SoT（[API設計 README](../API設計/README.md) §1.7）。
+> 規約＝[`../規約/テスト規約.md`](../規約/テスト規約.md)。仕様の正＝[`../API設計/P_コンセプト.md`](../API設計/P_コンセプト.md)（P.0〜P.10）・[`../データモデル.md`](../データモデル.md) §5.38〜§5.46・§3（`concept_status`/`concept_decision`/`assumption_verdict`/`concept_criticality`/`concept_eval_aspect`/`concept_chat_scope_kind`）。設計背景＝[`../設計ドラフト/コンセプト機能_ISO56001_再設計.md`](../設計ドラフト/コンセプト機能_ISO56001_再設計.md)（§3.3〜§3.8）。エラー code の網羅は OpenAPI が SoT（[API設計 README](../API設計/README.md) §1.7）。
 > 対象＝ドメイン P（コンセプト）の縦スライス＝`app/tenant/concepts/`（schemas/repository/application/router）。門番＝パーティー所属 AND クエストグループ所属（P.0）。チャットは E 機構を再利用（`chat_messages`/`chat_reads` に `concept_chat_scope_id`）。XP/コインは `app.tenant.gamification.ledger`（G）を同一 UoW。通知は H・realtime は L・情報リンクは N。
 > 前提フィクスチャ＝seed 会社 ACME-01。repository テストは前提（クエスト/アイデア/ユーザー）を ORM で直接 seed。api テストは seed 一般ユーザー（ACME-01）でログインし、会社DB にクエスト＋自分のパーティー参加＋（必要な）`evaluator`/owner 権限を seed。変更系は Origin/CSRF＋状態変更は `X-CSRF-Token`。**このファイルは実装前の TC 設計（md-first・テスト規約 §5.2）**＝実装時に red→green を目視し、証跡はコミットメッセージへ。
 

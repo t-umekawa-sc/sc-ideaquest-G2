@@ -157,8 +157,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         <div className="dialog-section is-quiet" data-sp-host style={{ marginBottom: "var(--space-3)" }}>
           <ScreenPurpose
             label="コンセプトとは？"
-            summary="選別済みアイデアを統合し、課題/価値/差別化/採算(viability)と「前提と検証」をまとめた検証可能な提案（ISO 56002 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
-            dialogTitle="この画面について（ISO 56002 準拠）"
+            summary="選別済みアイデアを統合し、課題/価値/差別化/採算(viability)と「前提と検証」をまとめた検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
+            dialogTitle="この画面について（ISO 56001 準拠）"
           >
             <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をまとめた、<strong>検証可能な提案</strong>です。</p></div>
             <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>理解したうえでスキーマを入力し、後で前提を「証拠で」検証して Go/Pivot/Kill まで導きます。</p></div>
@@ -203,8 +203,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         <div className="dialog-section is-quiet" data-sp-host>
           <div className="concept-section-head" style={{ marginBottom: "var(--space-1)" }}>
             <span style={{ fontWeight: 600 }}>採算・事業性（viability）</span>
-            <ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3 e）。経営が投資判断できる証拠まで。" dialogTitle="viability（価値実現モデル）とは">
-              <p style={{ margin: 0 }}>ISO 56002 §8.3.3 e) の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p>
+            <ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3）。経営が投資判断できる証拠まで。" dialogTitle="viability（価値実現モデル）とは">
+              <p style={{ margin: 0 }}>ISO 56001 §8.3.3 の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p>
             </ScreenPurpose>
           </div>
           {VIABILITY_FIELDS.map((f) => (

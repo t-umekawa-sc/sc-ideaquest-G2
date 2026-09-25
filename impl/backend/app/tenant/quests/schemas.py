@@ -368,7 +368,7 @@ class QuestTransitionRequest(BaseModel):
     to: str
 
 
-# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時）。 ----
+# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56001・完了時）。 ----
 
 
 class QuestResultDecisionDTO(BaseModel):
@@ -384,7 +384,7 @@ class QuestResultDecisionDTO(BaseModel):
 
 
 class QuestResultAspectAveragesDTO(BaseModel):
-    """観点別平均（②評価・選別サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。"""
+    """観点別平均（②評価・選別サマリ・ISO56001 §9）。可視な submitted 評価の観点別平均（可視0は None）。"""
 
     novelty: float | None = None
     impact: float | None = None

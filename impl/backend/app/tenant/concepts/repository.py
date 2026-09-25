@@ -25,7 +25,7 @@ from app.tenant.concepts.orm import (
     ConceptVote,
 )
 
-# 評価観点（§3.6・ISO §8.3.3 b）＝中核5＋補助3。
+# 評価観点（§3.6・ISO §8.3.3）＝中核5＋補助3。
 CORE_ASPECTS: tuple[str, ...] = ("desirability", "feasibility", "viability", "assumption_strength", "differentiation")
 AUX_ASPECTS: tuple[str, ...] = ("novelty", "sustainability", "ip")
 ALL_ASPECTS: tuple[str, ...] = CORE_ASPECTS + AUX_ASPECTS

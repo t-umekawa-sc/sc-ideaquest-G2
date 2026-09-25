@@ -61,10 +61,10 @@ export function ConceptTab({ questId }: { questId: string }) {
       <div className="concept-tab-head">
         <ScreenPurpose
           label="コンセプトとは？"
-          summary="選別済みアイデアを統合し、前提を「証拠で」検証しながら Go/Pivot/Kill まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。🏁結果の申し送りを受けて次段へ。"
-          dialogTitle="コンセプトとは（ISO 56002 準拠）"
+          summary="選別済みアイデアを統合し、前提を「証拠で」検証しながら Go/Pivot/Kill まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。🏁結果の申し送りを受けて次段へ。"
+          dialogTitle="コンセプトとは（ISO 56001 準拠）"
         >
-          <p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案／差別化／採算（viability）／前提と検証</strong>をまとめた<strong>検証可能な提案</strong>です。1 クエスト内に複数候補が競合し、評価と検証を経て owner が勝ち残りを選定します（ISO 56002 §8.3 ②③段）。</p>
+          <p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案／差別化／採算（viability）／前提と検証</strong>をまとめた<strong>検証可能な提案</strong>です。1 クエスト内に複数候補が競合し、評価と検証を経て owner が勝ち残りを選定します（ISO 56001 §8.3 ②③段）。</p>
         </ScreenPurpose>
         <Link href={`/quests/${questId}/concepts/new`} className="btn btn-primary">＋ コンセプトを作成</Link>
       </div>

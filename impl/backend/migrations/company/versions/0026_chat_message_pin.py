@@ -1,7 +1,7 @@
 """company: チャットメッセージのピン留め（FR-39 (b) 議論の要点＝重要メッセージ）
 
 クエスト最終結果の「議論の要点」に集約する重要メッセージを、owner/quest_admin がピン留めできる。
-検証の証跡（なぜ有望と判断したか）を残す（ISO56002）。既定 false・pinned_by/pinned_at は監査。
+検証の証跡（なぜ有望と判断したか）を残す（ISO56001）。既定 false・pinned_by/pinned_at は監査。
 
 Revision ID: 0026_chat_message_pin
 Revises: 0025_quest_outcomes

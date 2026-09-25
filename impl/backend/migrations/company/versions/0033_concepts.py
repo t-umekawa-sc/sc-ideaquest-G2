@@ -1,4 +1,4 @@
-"""company: コンセプト段（FR-42・ISO56002 ②③・concepts ほか §5.38-5.46）
+"""company: コンセプト段（FR-42・ISO56001 ②③・concepts ほか §5.38-5.46）
 
 ②コンセプトの創造＋③コンセプトの検証（データモデル §5.38-5.46）。concepts（本体）＋concept_source_ideas
 （由来アイデア M:N）＋assumptions（クエスト単位の検証プール）＋assumption_validations（検証イベント・追記型）

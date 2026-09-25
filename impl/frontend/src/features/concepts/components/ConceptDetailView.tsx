@@ -55,10 +55,10 @@ function ConceptGuide() {
   return (
     <ScreenPurpose
       label="コンセプトとは？"
-      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
-      dialogTitle="この画面について（ISO 56002 準拠）"
+      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
+      dialogTitle="この画面について（ISO 56001 準拠）"
     >
-      <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56002 §8.3 ②③段）。</p></div>
+      <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56001 §8.3 ②③段）。</p></div>
       <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>Go / Pivot / Kill</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
       <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、owner が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
     </ScreenPurpose>
@@ -189,7 +189,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             <FieldRow label="解の形態＋必要な能力" value={concept.solution_form} />
           </SchemaGroup>
           <SchemaGroup title="C. 採算・事業性"
-            guide={<ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3 e）。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56002 §8.3.3 e) の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p></ScreenPurpose>}
+            guide={<ScreenPurpose label="viability とは？" summary="価値実現モデル（value realization model）＝コスト/収益モデル/ROI で how value can be realized を示す（ISO §8.3.3）。" dialogTitle="viability（価値実現モデル）とは"><p style={{ margin: 0 }}>ISO 56001 §8.3.3 の value realization model。<strong>コスト・収益モデル・ROI</strong> 等で「どう価値を実現するか」を示す、経営説得の核です。</p></ScreenPurpose>}
           >
             <div className="field"><div className="dialog-label">採算・事業性（viability）</div><pre className="concept-viability">{viabilityText}</pre></div>
           </SchemaGroup>
@@ -197,7 +197,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           <section className="card concept-assumptions" aria-label="前提と検証">
             <div className="concept-section-head">
               <h2 style={{ margin: 0 }}>前提と検証</h2>
-              <ScreenPurpose label="前提と検証とは？" summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56002 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
+              <ScreenPurpose label="前提と検証とは？" summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
             </div>
             {concept.assumptions.length === 0 ? (
               <div className="muted text-sm">まだ前提はありません。</div>

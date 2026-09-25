@@ -634,7 +634,7 @@ def get_quest_group_candidates(
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
-# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56002・完了時）。 ----
+# ---- クエスト最終結果＝アイデア選別の申し送り（FR-39・ISO 56001・完了時）。 ----
 
 _RESULT_ASPECTS = ("novelty", "impact", "feasibility", "fit", "cost")
 

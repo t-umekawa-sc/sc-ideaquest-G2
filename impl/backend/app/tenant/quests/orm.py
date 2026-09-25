@@ -153,7 +153,7 @@ class QuestOutcome(CompanyBase):
 
     quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), primary_key=True)
     summary: Mapped[str | None] = mapped_column(Text(), nullable=True)         # 成果（総括）
-    learnings: Mapped[str | None] = mapped_column(Text(), nullable=True)       # 学び・課題（ISO56002 §10）
+    learnings: Mapped[str | None] = mapped_column(Text(), nullable=True)       # 学び・課題（ISO56001 §10）
     next_actions: Mapped[str | None] = mapped_column(Text(), nullable=True)    # 次アクション
     metrics: Mapped[list] = mapped_column(JSONB(), nullable=False, server_default="[]")  # 指標 [{label,value}]
     chat_summary: Mapped[str | None] = mapped_column(Text(), nullable=True)    # (c) 抽出型自動要約のキャッシュ（Phase 3）

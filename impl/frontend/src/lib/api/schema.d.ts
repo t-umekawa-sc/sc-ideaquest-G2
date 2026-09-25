@@ -6912,7 +6912,7 @@ export interface components {
         };
         /**
          * QuestResultAspectAveragesDTO
-         * @description 観点別平均（②評価・選別サマリ・ISO56002 §9）。可視な submitted 評価の観点別平均（可視0は None）。
+         * @description 観点別平均（②評価・選別サマリ・ISO56001 §9）。可視な submitted 評価の観点別平均（可視0は None）。
          */
         QuestResultAspectAveragesDTO: {
             /** Novelty */

@@ -32,7 +32,7 @@ class Concept(CompanyBase):
     target: Mapped[str | None] = mapped_column(Text, nullable=True)
     differentiation: Mapped[str | None] = mapped_column(Text, nullable=True)
     solution_form: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # 価値実現モデル（ISO §8.3.3 e）＝柔軟構造。確定時の必須検証は application 層。
+    # 価値実現モデル（ISO §8.3.3）＝柔軟構造。確定時の必須検証は application 層。
     viability: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     decision: Mapped[str] = mapped_column(String(16), nullable=False, default="undecided", server_default="undecided")
     decision_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)

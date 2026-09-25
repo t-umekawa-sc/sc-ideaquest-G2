@@ -21,9 +21,9 @@ const CORE_ASPECTS: AspectDef[] = [
   { key: "differentiation", label: "差別化", see: "競合に対する位置づけ。" },
 ];
 const AUX_ASPECTS: AspectDef[] = [
-  { key: "novelty", label: "新規性", see: "既存に対する新しさ・独自性（ISO §8.3.3 b）。" },
-  { key: "sustainability", label: "持続可能性", see: "環境・社会・事業継続で無理がないか（ISO §8.3.3 b）。" },
-  { key: "ip", label: "知的財産", see: "知財で保護できるか／他者の知財を侵害しないか（ISO §8.3.3 b・§8.3.5 d）。" },
+  { key: "novelty", label: "新規性", see: "既存に対する新しさ・独自性（ISO §8.3.3）。" },
+  { key: "sustainability", label: "持続可能性", see: "環境・社会・事業継続で無理がないか（ISO §8.3.3）。" },
+  { key: "ip", label: "知的財産", see: "知財で保護できるか／他者の知財を侵害しないか（ISO §8.3.3・§8.3.5）。" },
 ];
 const RECOMMENDATIONS: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 

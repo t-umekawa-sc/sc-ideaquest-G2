@@ -23,7 +23,7 @@
 ## 2. プロジェクトのゴール
 社内アイデア創出のゲーミフィケーション Web アプリ **IdeaQuest**（マルチテナント＝会社ごとに会社DB）。バック=FastAPI 4層（schemas/repository/application/router）、フロント=Next.js App Router（feature 構成）。設計の正本は `doc/` 配下（要件 FR-xx・データモデル・API設計 A..P・画面 SC-xx）。実装は `impl/`。
 
-## 3. 今回やったこと＝**FR-42「コンセプト創造・検証（ISO56002 ②③段）」を設計→backend 完全実装まで**
+## 3. 今回やったこと＝**FR-42「コンセプト創造・検証（ISO56001 ②③段）」を設計→backend 完全実装まで**
 
 ### 3-1. 画面設計（docs）
 - **SC-61 コンセプト詳細（フルページ）** `doc/画面設計/screens/SC-61_コンセプト詳細.md`＝SC-22 と対称（ヘッダー→関連情報パネル[全幅独立]→メイン[スキーマA/B/Cグループ＋各末尾💬グループ議論／⑥前提と検証=核心]＋右レール[投票→評価結果→総合判定[最下部]]→下部=総合チャット[SC-22§4.4同型アクティビティグラフ]）。
@@ -59,8 +59,8 @@
 - **pytest は cwd=impl・source マウント必須**＝`docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/concepts -q`（backend はソースをベイクするため未コミット反映に `-v` が要る）。**前に `docker compose stop worker mail-worker`**（*_outbox 競合回避）→後で start。
 
 ## 6. 決定事項と根拠（設計＋実装）
-- **スコープ境界**＝クエスト=ISO①②③で1サイクル／④⑤はクエスト外＝PM/WBS／コンセプト=クエスト内・横断は「収束クエスト」（`doc/設計ドラフト/コンセプト機能_ISO56002_再設計.md` §1.1）。
-- **viability=jsonb**／`decision`(go/pivot/kill)と`is_selected`は別列／評価観点=中核5＋補助3（ISO §8.3.3 b）／投票=賛成・反対＋XP+5（reason=`concept_vote`・ref_type=`concepts`・各コンセプト初回のみ・日次上限・exists_ref 冪等）。
+- **スコープ境界**＝クエスト=ISO①②③で1サイクル／④⑤はクエスト外＝PM/WBS／コンセプト=クエスト内・横断は「収束クエスト」（`doc/設計ドラフト/コンセプト機能_ISO56001_再設計.md` §1.1）。
+- **viability=jsonb**／`decision`(go/pivot/kill)と`is_selected`は別列／評価観点=中核5＋補助3（ISO §8.3.3）／投票=賛成・反対＋XP+5（reason=`concept_vote`・ref_type=`concepts`・各コンセプト初回のみ・日次上限・exists_ref 冪等）。
 - **チャット一般化＝最小侵襲**（chat_messages/chat_reads に concept_chat_scope_id・reactions/mentions/quotes/attachments は E 無改修で共有）。
 - **ガイダンス標準 §4.13（.screen-purpose）**＝フローティング展開（隣を押し出さない）・端クランプ・reduce-motion 静止・クリックで全文（ユーザーとデザイン確定済）。
 - **repository は純関数・commitしない**（application が UoW 境界）＝既存 evaluations/ideas と同型。
