@@ -27,7 +27,11 @@ class ChatMessage(CompanyBase):
     __tablename__ = "chat_messages"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    chat_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=False)
+    # チャット一般化（§5.45）＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK）。
+    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
+    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True
+    )
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
@@ -114,7 +118,11 @@ class ChatRead(CompanyBase):
     __tablename__ = "chat_reads"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    chat_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=False)
+    # §5.45＝アイデア(chat_group_id) or コンセプトルーム(concept_chat_scope_id) のどちらか一方（DB CHECK）。
+    chat_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_groups.id"), nullable=True)
+    concept_chat_scope_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concept_chat_scopes.id"), nullable=True
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     last_read_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("chat_messages.id"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

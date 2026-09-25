@@ -704,3 +704,88 @@ def remove_vote(account_id, company_id, concept_id) -> dict:
         vc = repo.count_votes(ts, cid)
         ts.commit()
     return {"my_vote": None, "summary": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)}}
+
+
+# ---- コンセプト議論チャット（P.6・E 機構を共有） ----------------------------
+
+def _resolve_scope(ts, sid, user):
+    """スコープ＋コンセプト＋クエストを解決し門番（パーティー所属＋draft 可視性）を適用。"""
+    scope = repo.get_chat_scope(ts, sid)
+    if scope is None:
+        raise AppError(404, "not_found")
+    concept, quest = _resolve_concept(ts, scope.concept_id, user)
+    return scope, concept, quest
+
+
+def _message_dto(m) -> dict:
+    return {"id": str(m.id), "author_id": str(m.author_id), "body": m.body, "created_at": m.created_at}
+
+
+def list_chat_scopes(account_id, company_id, concept_id) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        items = []
+        for s in repo.list_chat_scopes(ts, cid):
+            items.append({
+                "scope_id": str(s.id), "kind": s.kind, "label": s.label,
+                "assumption_id": str(s.assumption_id) if s.assumption_id else None,
+                "position": s.position, "unread_count": repo.unread_count_for_scope(ts, s.id, user.id),
+            })
+        return {"items": items}
+
+
+def create_group_scope(account_id, company_id, concept_id, *, label: str) -> dict:
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user, for_write=True)
+        _require_manager(ts, quest, user, action="ルーム作成")
+        _guard_not_completed(quest)
+        s = repo.create_chat_scope(ts, concept_id=cid, kind="group", label=label,
+                                   position=repo.next_scope_position(ts, cid))
+        result = {"scope_id": str(s.id), "kind": s.kind, "label": s.label,
+                  "assumption_id": None, "position": s.position, "unread_count": 0}
+        ts.commit()
+        return result
+
+
+def list_messages(account_id, company_id, scope_id) -> dict:
+    company = _ctx(account_id, company_id)
+    sid = _parse_uuid(scope_id, field="scope_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        scope, concept, quest = _resolve_scope(ts, sid, user)
+        return {"items": [_message_dto(m) for m in repo.list_scope_messages(ts, sid)]}
+
+
+def post_message(account_id, company_id, scope_id, *, body: str, message_id: str | None = None) -> dict:
+    company = _ctx(account_id, company_id)
+    sid = _parse_uuid(scope_id, field="scope_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        scope, concept, quest = _resolve_scope(ts, sid, user)  # 投稿＝パーティー員（コメント権限）
+        _guard_not_completed(quest)
+        mid = _parse_uuid(message_id, field="message_id") if message_id else None
+        if mid is not None:
+            existing = repo.get_scope_message(ts, mid)  # Idempotency-Key 再送＝既存を返す（二重投稿防止）
+            if existing is not None:
+                return _message_dto(existing)
+        m = repo.post_scope_message(ts, scope_id=sid, author_id=user.id, body=body, message_id=mid)
+        payload = _message_dto(m)
+        ts.commit()
+        return payload
+
+
+def read_scope(account_id, company_id, scope_id, *, last_read_message_id: str) -> None:
+    company = _ctx(account_id, company_id)
+    sid = _parse_uuid(scope_id, field="scope_id")
+    mid = _parse_uuid(last_read_message_id, field="last_read_message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        scope, concept, quest = _resolve_scope(ts, sid, user)
+        repo.upsert_scope_read(ts, sid, user.id, mid)
+        ts.commit()

@@ -28,6 +28,13 @@ from app.tenant.concepts.schemas import (
     ConceptSelectResponse,
     ConceptVoteRequest,
     ConceptVoteResponse,
+    ChatMessageListResponse,
+    ChatScopeItemDTO,
+    ChatScopeListResponse,
+    GroupScopeCreateRequest,
+    ChatMessageDTO,
+    MessagePostRequest,
+    ReadRequest,
     LinkCreateRequest,
     LinkDTO,
     LinkPatchRequest,
@@ -297,3 +304,59 @@ def unvote_concept(concept_id: str, request: Request, session: dict = Depends(re
     verify_csrf(request)
     result = service.remove_vote(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptVoteResponse(**result)
+
+
+# ---- コンセプト議論チャット（P.6・E 機構共有） ----
+
+
+@router.get("/concepts/{concept_id}/chat-scopes", response_model=ChatScopeListResponse)
+def list_chat_scopes(concept_id: str, request: Request, session: dict = Depends(require_me)) -> ChatScopeListResponse:
+    """ルーム一覧（総合/グループ/前提スレッド＋未読・P.6）。読取専用。"""
+    result = service.list_chat_scopes(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
+    return ChatScopeListResponse(**result)
+
+
+@router.post("/concepts/{concept_id}/chat-scopes", response_model=ChatScopeItemDTO, status_code=201)
+def create_chat_scope(
+    concept_id: str, body: GroupScopeCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> ChatScopeItemDTO:
+    """グループ・ルーム作成（P.6・owner/quest_admin）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.create_group_scope(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, label=body.label,
+    )
+    return ChatScopeItemDTO(**result)
+
+
+@router.get("/concept-chat-scopes/{scope_id}/messages", response_model=ChatMessageListResponse)
+def list_scope_messages(scope_id: str, request: Request, session: dict = Depends(require_me)) -> ChatMessageListResponse:
+    """メッセージ取得（P.6・E.1 同形）。読取専用。"""
+    result = service.list_messages(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id)
+    return ChatMessageListResponse(**result)
+
+
+@router.post("/concept-chat-scopes/{scope_id}/messages", response_model=ChatMessageDTO, status_code=201)
+def post_scope_message(
+    scope_id: str, body: MessagePostRequest, request: Request, session: dict = Depends(require_me),
+) -> ChatMessageDTO:
+    """投稿（P.6・E.3 機構共有・Idempotency-Key で二重投稿防止）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    idem = request.headers.get("Idempotency-Key")
+    result = service.post_message(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id, body=body.body, message_id=idem,
+    )
+    return ChatMessageDTO(**result)
+
+
+@router.post("/concept-chat-scopes/{scope_id}/read", status_code=204)
+def read_scope(scope_id: str, body: ReadRequest, request: Request, session: dict = Depends(require_me)) -> Response:
+    """既読位置更新（P.6・E.7 同型）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    service.read_scope(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), scope_id,
+        last_read_message_id=body.last_read_message_id,
+    )
+    return Response(status_code=204)

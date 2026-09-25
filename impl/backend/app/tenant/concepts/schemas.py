@@ -296,3 +296,46 @@ class ConceptVoteResponse(BaseModel):
     summary: ConceptVoteSummary = ConceptVoteSummary()
     xp_awarded: bool = False
     xp_delta: int = 0
+
+
+# ---- コンセプト議論チャット（P.6） ----
+
+
+class ChatScopeItemDTO(BaseModel):
+    scope_id: str
+    kind: str
+    label: str | None = None
+    assumption_id: str | None = None
+    position: int = 0
+    unread_count: int = 0
+
+
+class ChatScopeListResponse(BaseModel):
+    items: list[ChatScopeItemDTO] = []
+
+
+class GroupScopeCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["group"] = "group"
+    label: str = Field(min_length=1)
+
+
+class ChatMessageDTO(BaseModel):
+    id: str
+    author_id: str
+    body: str
+    created_at: datetime | None = None
+
+
+class ChatMessageListResponse(BaseModel):
+    items: list[ChatMessageDTO] = []
+
+
+class MessagePostRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    body: str = Field(min_length=1)
+
+
+class ReadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    last_read_message_id: str

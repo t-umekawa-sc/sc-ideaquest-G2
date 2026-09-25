@@ -428,3 +428,81 @@ def next_scope_position(session: Session, concept_id: uuid.UUID) -> int:
         select(func.max(ConceptChatScope.position)).where(ConceptChatScope.concept_id == concept_id)
     ).scalar_one_or_none()
     return (current + 1) if current is not None else 0
+
+
+def get_chat_scope(session: Session, scope_id: uuid.UUID) -> ConceptChatScope | None:
+    return session.execute(
+        select(ConceptChatScope).where(ConceptChatScope.id == scope_id)
+    ).scalars().first()
+
+
+# ---- コンセプト議論メッセージ/既読（§5.45・E 機構を chat_messages/chat_reads で共有） ----
+
+def post_scope_message(
+    session: Session, *, scope_id: uuid.UUID, author_id: uuid.UUID, body: str, message_id: uuid.UUID | None = None,
+):
+    """コンセプトルームへ投稿（`chat_messages.concept_chat_scope_id` に紐付け・E 機構共有）。"""
+    from app.tenant.chat.orm import ChatMessage
+
+    msg = ChatMessage(id=message_id or uuid.uuid4(), concept_chat_scope_id=scope_id, author_id=author_id, body=body)
+    session.add(msg)
+    session.flush()
+    return msg
+
+
+def get_scope_message(session: Session, message_id: uuid.UUID):
+    from app.tenant.chat.orm import ChatMessage
+
+    return session.execute(select(ChatMessage).where(ChatMessage.id == message_id)).scalars().first()
+
+
+def list_scope_messages(session: Session, scope_id: uuid.UUID, *, limit: int = 50):
+    """スコープのメッセージ（作成日昇順・非削除・E.1 同形の簡易版）。"""
+    from app.tenant.chat.orm import ChatMessage
+
+    return list(
+        session.execute(
+            select(ChatMessage)
+            .where(ChatMessage.concept_chat_scope_id == scope_id, ChatMessage.is_deleted.is_(False))
+            .order_by(ChatMessage.created_at, ChatMessage.id)
+            .limit(limit)
+        ).scalars().all()
+    )
+
+
+def upsert_scope_read(session: Session, scope_id: uuid.UUID, user_id: uuid.UUID, last_read_message_id: uuid.UUID) -> None:
+    from app.tenant.chat.orm import ChatRead
+
+    existing = session.execute(
+        select(ChatRead).where(ChatRead.concept_chat_scope_id == scope_id, ChatRead.user_id == user_id)
+    ).scalars().first()
+    if existing is not None:
+        existing.last_read_message_id = last_read_message_id
+        existing.updated_at = func.now()
+    else:
+        session.add(ChatRead(
+            id=uuid.uuid4(), concept_chat_scope_id=scope_id, user_id=user_id,
+            last_read_message_id=last_read_message_id,
+        ))
+    session.flush()
+
+
+def unread_count_for_scope(session: Session, scope_id: uuid.UUID, user_id: uuid.UUID) -> int:
+    """既読位置より後の非削除メッセージ数（自分の投稿も含む簡易集計）。未読既読が無ければ全件。"""
+    from app.tenant.chat.orm import ChatMessage, ChatRead
+
+    read = session.execute(
+        select(ChatRead.last_read_message_id).where(
+            ChatRead.concept_chat_scope_id == scope_id, ChatRead.user_id == user_id
+        )
+    ).scalars().first()
+    base = select(func.count()).select_from(ChatMessage).where(
+        ChatMessage.concept_chat_scope_id == scope_id, ChatMessage.is_deleted.is_(False)
+    )
+    if read:
+        anchor = session.execute(
+            select(ChatMessage.created_at).where(ChatMessage.id == read)
+        ).scalars().first()
+        if anchor is not None:
+            base = base.where(ChatMessage.created_at > anchor)
+    return session.execute(base).scalar_one()
