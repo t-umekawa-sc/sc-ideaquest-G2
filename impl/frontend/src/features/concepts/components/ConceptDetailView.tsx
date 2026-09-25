@@ -15,7 +15,7 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  activateConcept, archiveConcept, CONCEPTS_CHANGED_EVENT, getConcept, getEvaluationAggregate,
+  CONCEPTS_CHANGED_EVENT, getConcept, getEvaluationAggregate,
   selectConcept, setDecision, unselectConcept, unvoteConcept, voteConcept,
   type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
 } from "../api";
@@ -155,8 +155,6 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           </div>
           <div className="idea-actions">
             {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
-            {canManage && concept.status === "draft" && <button className="btn btn-primary" disabled={busy} onClick={() => runManage(() => activateConcept(conceptId), "活性化しました")}>活性化</button>}
-            {canManage && concept.status === "active" && <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => archiveConcept(conceptId), "保管しました")}>保管</button>}
           </div>
         </div>
         <div className="idea-meta">

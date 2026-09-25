@@ -9,7 +9,7 @@ import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useF
 import { ApiError } from "@/lib/api/client";
 import { listIdeas, type IdeaCard } from "@/features/ideas/api";
 
-import { CONCEPTS_CHANGED_EVENT, createConcept, getConcept, patchConcept, type ConceptCreateInput } from "../api";
+import { activateConcept, CONCEPTS_CHANGED_EVENT, createConcept, getConcept, patchConcept, type ConceptCreateInput } from "../api";
 import "../concepts.css";
 
 type Props = {
@@ -48,7 +48,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
   const [ideaOptions, setIdeaOptions] = useState<IdeaCard[]>([]);
   const [ownQuestId, setOwnQuestId] = useState<string | undefined>(questId);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<null | "draft" | "publish">(null);
   const [loading, setLoading] = useState(isEdit);
 
   // edit＝既存値をプリフィル（P.1）。quest_id は由来アイデア候補の取得に使う。
@@ -94,8 +94,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
     setSourceIdeas((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // 下書き保存（publish=false）／投稿する（publish=true＝作成/保存後に公開＝activate・アイデアの投稿と同型）。
+  async function submit(publish: boolean) {
     const fe = validate();
     setErrors(fe);
     const list = Object.values(fe).filter(Boolean) as string[];
@@ -117,29 +117,31 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         return obj;
       })(),
     };
-    setPending(true);
+    setPending(publish ? "publish" : "draft");
     try {
+      let targetId = conceptId;
       if (isEdit && conceptId) {
         await patchConcept(conceptId, body);
-        window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
-        snack({ type: "success", title: "コンセプトを更新しました" });
-        onDone();
       } else if (ownQuestId) {
         const created = await createConcept(ownQuestId, body);
-        window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
-        snack({ type: "success", title: "コンセプトを登録しました（下書き）" });
-        onDone();
-        if (created?.id) router.push(`/concepts/${created.id}`);
+        targetId = created?.id;
       }
+      if (publish && targetId) await activateConcept(targetId);
+      window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
+      snack({ type: "success", title: publish ? "コンセプトを投稿しました（公開）" : "下書きを保存しました" });
+      onDone();
+      if (!isEdit && targetId) router.push(`/concepts/${targetId}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         setErrors({ title: "入力を確認してください。" });
         notify(["入力を確認してください。"]);
+      } else if (err instanceof ApiError && err.status === 403) {
+        snack({ type: "error", msg: "公開する権限がありません（下書き保存はできます）。" });
       } else {
         snack({ type: "error", msg: "保存できませんでした。" });
       }
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
 
@@ -148,7 +150,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
   if (loading) return <ModalBody><p className="muted">読み込み中…</p></ModalBody>;
 
   return (
-    <form onSubmit={onSubmit} noValidate>
+    <form onSubmit={(e) => { e.preventDefault(); void submit(false); }} noValidate>
       <ModalBody>
         <FormSummary title="入力内容を確認してください" errors={summary} innerRef={summaryRef} />
 
@@ -214,7 +216,8 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       </ModalBody>
       <ModalFooter>
         <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
-        <Button type="submit" variant="primary" disabled={pending} loading={pending}>{isEdit ? "保存" : "登録（下書き）"}</Button>
+        <Button type="button" variant="outline" disabled={pending !== null} loading={pending === "draft"} onClick={() => void submit(false)}>下書き保存</Button>
+        <Button type="button" variant="primary" disabled={pending !== null} loading={pending === "publish"} onClick={() => void submit(true)}>投稿する</Button>
       </ModalFooter>
     </form>
   );

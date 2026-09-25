@@ -216,7 +216,12 @@ def set_status(account_id, company_id, concept_id, *, target: str) -> dict:
             raise AppError(404, "not_found")
         quest = quests_repo.get_quest(ts, concept.quest_id)
         _require_quest_access(ts, quest, user)
-        _require_manager(ts, quest, user, action="状態変更")
+        # 公開（活性化）＝作成者＋owner/quest_admin（アイデアの publish と同型）。保管＝owner/quest_admin のみ。
+        if target == "active":
+            if not (concept.author_id == user.id or _is_manager(ts, quest, user)):
+                raise AppError(403, "forbidden", detail="公開の権限がありません")
+        else:
+            _require_manager(ts, quest, user, action="保管")
         _guard_not_completed(quest)
         concept.status = target
         ts.flush()

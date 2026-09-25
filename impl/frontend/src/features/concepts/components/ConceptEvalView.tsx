@@ -34,7 +34,7 @@ function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | unde
   return (
     <div className="eval-row">
       <div className="eval-row__head">
-        <div className="eval-aspect-block" data-sp-host>
+        <div className="eval-aspect-block">
           <span className="eval-aspect">{def.label}</span>
           <ScreenPurpose summary={def.see} dialogTitle={def.label}><p style={{ margin: 0 }}>{def.see}</p></ScreenPurpose>
         </div>
@@ -115,7 +115,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
   if (loading) return <ModalBody><p className="muted">読み込み中…</p></ModalBody>;
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); void save("submitted"); }} noValidate>
+    <form onSubmit={(e) => { e.preventDefault(); void save("submitted"); }} noValidate data-sp-host>
       <ModalBody>
         <FormSummary title="入力内容を確認してください" errors={errors} innerRef={summaryRef} />
 
@@ -135,21 +135,37 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
           <textarea className="textarea" id="eval_overall" rows={3} value={overall} onChange={(e) => setOverall(e.target.value)} placeholder="全体の評価コメント（確定時必須）" />
         </Field>
 
-        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨（推進 / 方向転換 / 中止）" required>
-          <div id="eval_reco" className="eval-scores" role="radiogroup" aria-label="推奨">
+        {/* 総合判定の推奨＝評価者が Go/Pivot/Kill をどう見るかのフラグ。style-guide の .segmented（3択以上の単一選択）。 */}
+        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨" hint="評価者としての Go / Pivot / Kill の見立て（推進＝進める／方向転換＝見直す／中止）。" required>
+          <div className="segmented" role="radiogroup" aria-label="推奨">
             {RECOMMENDATIONS.map(([k, lbl]) => (
-              <button key={k} type="button" className={`btn ${recommendation === k ? "btn-primary" : "btn-outline"}`}
-                role="radio" aria-checked={recommendation === k} onClick={() => setRecommendation(k)}>{lbl}</button>
+              <label key={k}>
+                <input type="radio" name="reco" checked={recommendation === k} onChange={() => setRecommendation(k)} />{lbl}
+              </label>
             ))}
           </div>
         </Field>
 
-        <Field className="dialog-section is-quiet" id="eval_vis" label="公開範囲" hint="限定＝投稿者＋評価者＋所有者/管理のみ（範囲外は非表示）。">
-          <select className="select" id="eval_vis" value={visibility} onChange={(e) => setVisibility(e.target.value as "party" | "limited")}>
-            <option value="party">パーティー全員</option>
-            <option value="limited">限定</option>
-          </select>
-        </Field>
+        {/* 公開範囲＝アイデア評価(SC-25)と同じ .visibility/.vis-opt ラジオを再利用。 */}
+        <div className="field dialog-section is-quiet">
+          <label>評価結果の公開範囲</label>
+          <div className="visibility">
+            <label className={"vis-opt" + (visibility === "party" ? " is-sel" : "")}>
+              <input type="radio" name="vis" value="party" checked={visibility === "party"} onChange={() => setVisibility("party")} />
+              <span>
+                <span className="vis-opt__title">🔓 パーティー全員に公開（既定）</span>
+                <span className="vis-opt__desc">当該クエストの参加メンバー全員が、スコア・推奨・総評を閲覧できます。</span>
+              </span>
+            </label>
+            <label className={"vis-opt" + (visibility === "limited" ? " is-sel" : "")}>
+              <input type="radio" name="vis" value="limited" checked={visibility === "limited"} onChange={() => setVisibility("limited")} />
+              <span>
+                <span className="vis-opt__title">🔒 限定公開</span>
+                <span className="vis-opt__desc">作成者＋評価者＋所有者/クエスト管理のみが閲覧できます（範囲外は非表示・集計にも含めません）。</span>
+              </span>
+            </label>
+          </div>
+        </div>
       </ModalBody>
       <ModalFooter>
         <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>

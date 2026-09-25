@@ -169,16 +169,19 @@ def test_p_tc_105_patch_updates(env, client):
 
 
 def test_p_tc_106_activate_permission(env, client):
-    """P-TC-106: 活性化は owner=200 active／非 manager=403。"""
+    """P-TC-106: 活性化(公開)は作成者=200 active／非作成者かつ非manager=403（アイデアの publish と同型）。"""
     _login_seed(client)
-    # 正: 自分が owner のクエスト
+    # 正: 自分が作成した draft は自分で公開できる（owner でも author でも可）
     q_own = env.make_quest()
     cid = _create(client, q_own).json()["id"]
     r = client.post(f"/api/v1/concepts/{cid}/activate", headers=_csrf(client))
     assert r.status_code == 200 and r.json()["status"] == "active"
-    # 否: 他人 owner・自分は vote 権限のみ（manager でない）＝作成者だが状態遷移は不可
+    # 否: 他人 owner のクエストで、他人が作成した draft を自分(vote のみ・非作成者)が公開＝403
     q_other = env.make_quest(owner=env.other_id, seed_perms=["vote"])
-    cid2 = _create(client, q_other).json()["id"]
+    with get_tenant_session(env.db_identifier) as ts:
+        other_c = repo.create_concept(ts, quest_id=q_other, author_id=env.other_id, title="OtherDraft")
+        ts.commit()
+        cid2 = str(other_c.id)
     r2 = client.post(f"/api/v1/concepts/{cid2}/activate", headers=_csrf(client))
     assert r2.status_code == 403
 
