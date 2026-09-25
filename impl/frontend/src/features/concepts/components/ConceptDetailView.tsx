@@ -23,8 +23,9 @@ const STATUS_LABEL: Record<string, [string, string]> = {
   draft: ["下書き", "badge badge-muted"], active: ["検証中", "badge badge-success"], archived: ["保管", "badge badge-muted"],
 };
 const DECISION_LABEL: Record<string, [string, string]> = {
-  undecided: ["未判定", "badge badge-muted"], go: ["Go", "badge badge-success"], pivot: ["Pivot", "badge badge-muted"], kill: ["Kill", "badge badge-danger"],
+  undecided: ["未判定", "badge badge-muted"], go: ["推進", "badge badge-success"], pivot: ["方向転換", "badge badge-muted"], kill: ["中止", "badge badge-danger"],
 };
+const DECISION_CHOICES: readonly [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 const VERDICT_LABEL: Record<string, [string, string]> = {
   inconclusive: ["保留", "badge badge-muted"], supported: ["支持", "badge badge-success"], refuted: ["反証", "badge badge-danger"],
 };
@@ -226,17 +227,28 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline">評価する</Link>}
           </section>
 
-          {/* 総合判定（右レール最下部） */}
+          {/* 総合判定（右レール最下部・投票 UI に合わせる） */}
           <section className="card" aria-label="総合判定">
             <h2 className="card-title">総合判定</h2>
-            <div className="decision-current"><Badge map={DECISION_LABEL} value={concept.decision} /></div>
+            <div className="vote-summary">
+              <span className="decision-now">現在の判定: <Badge map={DECISION_LABEL} value={concept.decision} /></span>
+            </div>
             {concept.decision_rationale && <p className="text-sm">{concept.decision_rationale}</p>}
-            {canManage && (
-              <div className="decision-actions">
-                {(["go", "pivot", "kill"] as const).map((d) => (
-                  <button key={d} className="btn btn-outline btn-sm" disabled={busy} onClick={() => runManage(() => setDecision(conceptId, { decision: d }), "判定を更新しました")}>{DECISION_LABEL[d][0]}</button>
-                ))}
-              </div>
+            {canManage ? (
+              <>
+                <div className="vote-btns">
+                  {DECISION_CHOICES.map(([d, label]) => (
+                    <button key={d} type="button" className={`vote-btn decision-${d}${concept.decision === d ? " is-on" : ""}`}
+                      aria-pressed={concept.decision === d} disabled={busy}
+                      onClick={() => runManage(() => setDecision(conceptId, { decision: d as "go" | "pivot" | "kill" }), "判定を更新しました")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="vote-note">owner / クエスト管理者が <strong>推進 / 方向転換 / 中止</strong> を判定します。</p>
+              </>
+            ) : (
+              <p className="vote-note">総合判定は owner / クエスト管理者が行います。</p>
             )}
           </section>
         </div>

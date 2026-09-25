@@ -24,7 +24,7 @@ const AUX_ASPECTS: AspectDef[] = [
   { key: "sustainability", label: "持続可能性", see: "環境・社会・事業継続で無理がないか（ISO §8.3.3 b）。" },
   { key: "ip", label: "知的財産", see: "知財で保護できるか／他者の知財を侵害しないか（ISO §8.3.3 b・§8.3.5 d）。" },
 ];
-const RECOMMENDATIONS: [string, string][] = [["go", "Go"], ["pivot", "Pivot"], ["kill", "Kill"]];
+const RECOMMENDATIONS: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 
 function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | undefined; onPick: (n: number) => void }) {
   return (
@@ -77,7 +77,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
     const e: string[] = [];
     if (CORE_ASPECTS.some((a) => !scores[a.key])) e.push("中核5観点をすべて採点してください。");
     if (!overall.trim()) e.push("総評を入力してください。");
-    if (!recommendation) e.push("Go / Pivot / Kill の推奨を選んでください。");
+    if (!recommendation) e.push("推進 / 方向転換 / 中止 の推奨を選んでください。");
     return e;
   }, [scores, overall, recommendation]);
 
@@ -126,7 +126,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
           <textarea className="textarea" id="eval_overall" rows={3} value={overall} onChange={(e) => setOverall(e.target.value)} placeholder="全体の評価コメント（確定時必須）" />
         </Field>
 
-        <Field className="dialog-section is-quiet" id="eval_reco" label="Go / Pivot / Kill 推奨" required>
+        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨（推進 / 方向転換 / 中止）" required>
           <div id="eval_reco" className="eval-scores" role="radiogroup" aria-label="推奨">
             {RECOMMENDATIONS.map(([k, lbl]) => (
               <button key={k} type="button" className={`btn ${recommendation === k ? "btn-primary" : "btn-outline"}`}

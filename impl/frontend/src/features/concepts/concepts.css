@@ -66,3 +66,9 @@
 
 /* SC-60 由来アイデア候補＝縦積み（ユーザー要望 2026-09-25） */
 .concept-source-list { display: flex; flex-direction: column; gap: var(--space-1, .25rem); align-items: flex-start; }
+
+/* SC-61 総合判定＝投票 UI（.vote-btn）に合わせる。選択中の判定を色付けで示す。 */
+.decision-now { font-size: var(--text-lg, 1.1rem); font-weight: 600; }
+.vote-btn.decision-go.is-on { color: #fff; background: var(--color-agree); border-color: var(--color-agree); }
+.vote-btn.decision-pivot.is-on { color: #fff; background: var(--color-warning); border-color: var(--color-warning); }
+.vote-btn.decision-kill.is-on { color: #fff; background: var(--color-disagree); border-color: var(--color-disagree); }
