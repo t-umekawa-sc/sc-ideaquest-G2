@@ -615,32 +615,42 @@
       /* 画面の狙いバンド（横断ガイダンス標準・検討中）。既定=ⓘ＋短ラベル／ホバーで本文を“フローティング”展開（隣を押し出さない・絶対配置）／収まらなければ流れる／クリックで全文。 */
       .screen-purpose{
         --sp-vp:460px;
+        --sp-h:30px; /* ベースと pop 共通の固定高さ＝両者を必ず同じ高さにして一続きの1ピルにする（中身/フォント差に依存しない） */
         position:relative; /* pop の絶対配置アンカー */
         display:inline-flex; align-items:center; gap:var(--space-2); max-width:100%;
-        padding:var(--space-1) var(--space-3);
-        border:1px solid var(--color-border); border-radius:var(--radius-full);
+        height:var(--sp-h); padding:0 var(--space-3); /* 高さは固定・縦paddingは持たせず align-items:center で中央 */
+        /* 上下ボーダーは box-shadow で描く＝base の上下に実ボーダーを持たせない→ pop を top:0 で配置でき、
+           -1px（1pxボーダー打ち消し）の DPR 1.5 サブピクセルズレ（0.33px）を回避。左右は実ボーダー（継ぎ目制御用）。 */
+        border-width:0 1px; border-style:solid; border-color:var(--color-border);
+        box-shadow:inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border);
+        border-radius:var(--radius-full);
         background:var(--color-surface-alt); color:var(--color-text-muted);
         font-size:var(--text-sm); cursor:pointer; text-align:left; line-height:1.4;
       }
       .screen-purpose:hover,
-      .screen-purpose:focus-within{ border-color:var(--color-border-strong); }
+      .screen-purpose:focus-within{ border-color:var(--color-border-strong);
+        box-shadow:inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong); }
       /* 展開時はベースの右側を平らにして pop と地続きの「1つのピル」に見せる（改修前の一体ピル） */
       .screen-purpose:hover, .screen-purpose:focus-within{
         border-top-right-radius:0; border-bottom-right-radius:0; border-right-color:transparent;
       }
       /* フォーカスリング＝outline だと伸びた pop を囲めないので、ベース＋pop の枠線を青にして一続きの青枠にする（pop の青指定は展開ルールの後で上書き＝下部に配置） */
-      .screen-purpose:focus-visible{ outline:none; border-color:var(--color-primary); }
+      .screen-purpose:focus-visible{ outline:none; border-color:var(--color-primary);
+        box-shadow:inset 0 1px 0 0 var(--color-primary), inset 0 -1px 0 0 var(--color-primary); }
       .screen-purpose__icon{ flex:0 0 auto; font-style:normal; }
       /* 既定で見える短ラベル（例: コンセプトとは？） */
       .screen-purpose__label{ flex:0 0 auto; white-space:nowrap; font-weight:600; }
       /* フローティング本文＝絶対配置でラベルの右へ“地続き”に伸ばす（在来フローを動かさない・継ぎ目は仕切り線）。 */
       .screen-purpose__pop{
-        position:absolute; top:50%; left:100%; transform:translateY(-50%);
+        /* 高さはベースと同じ固定値（--sp-h）。上下ボーダーは box-shadow・左右は実ボーダー（base と同方式）。
+           base に上下実ボーダーが無いので pop は top:0＝base の border-box 上端に厳密一致（-1px 補正が不要＝DPR 1.5 でズレない）。 */
+        position:absolute; top:0; bottom:auto; height:var(--sp-h, 30px); left:100%; transform:none;
         margin-left:0; /* ベース右端に密着＝一体ピル */
         display:inline-flex; align-items:center; gap:var(--space-2);
         max-width:0; overflow:hidden; opacity:0; pointer-events:none; white-space:nowrap;
         padding:0; color:var(--color-text-muted); background:var(--color-surface-alt);
-        border:1px solid var(--color-border); border-left-color:var(--color-border); /* 継ぎ目＝仕切り線 */
+        border-width:0 1px; border-style:solid; border-color:var(--color-border); /* 左右のみ実ボーダー・左辺＝継ぎ目 */
+        box-shadow:inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border); /* 上下線 */
         border-top-left-radius:0; border-bottom-left-radius:0;
         border-top-right-radius:var(--radius-full); border-bottom-right-radius:var(--radius-full);
         transition:max-width .2s ease, opacity .15s ease, padding .2s ease;
@@ -649,13 +659,15 @@
       .screen-purpose:hover .screen-purpose__pop,
       .screen-purpose:focus-within .screen-purpose__pop{
         max-width:var(--sp-vp, 460px); opacity:1; pointer-events:auto;
-        padding:var(--space-1) var(--space-3); border-color:var(--color-border-strong); border-left-color:var(--color-border);
+        padding:0 var(--space-3); border-color:var(--color-border-strong); border-left-color:var(--color-border-strong);
+        box-shadow:inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong);
       }
-      /* フォーカス時＝伸びた本文パネルの枠も青（展開ルールの後に置いて確実に上書き）。継ぎ目の仕切り線は薄いまま。 */
-      .screen-purpose:focus-visible .screen-purpose__pop{ border-color:var(--color-primary); border-left-color:var(--color-border); }
+      /* フォーカス時＝伸びた本文パネルの枠も青（展開ルールの後に置いて確実に上書き）。継ぎ目もベースと同色にして一続きの1ピルに見せる（罫線色を完全一致）。 */
+      .screen-purpose:focus-visible .screen-purpose__pop{ border-color:var(--color-primary); border-left-color:var(--color-primary);
+        box-shadow:inset 0 1px 0 0 var(--color-primary), inset 0 -1px 0 0 var(--color-primary); }
       /* pop 内＝本文ビューポート（クリップ）＋「全文」 */
       .screen-purpose__vp{ flex:1 1 auto; min-width:0; overflow:hidden; }
-      .screen-purpose__text{ display:inline-block; white-space:nowrap; will-change:transform; }
+      .screen-purpose__text{ display:inline-block; vertical-align:middle; white-space:nowrap; will-change:transform; }
       /* 溢れる時だけ流す（JS が is-marquee＋--sp-dist/--sp-dur）。ホバー即・流し始め＝先頭の停止は最小、両端だけ軽く猶予。 */
       .screen-purpose.is-marquee .screen-purpose__text{
         animation: sp-marquee var(--sp-dur, 10s) ease-in-out infinite alternate;
@@ -673,6 +685,13 @@
       /* デモ用シミュレート（accounts.reduce_motion 相当）＝流さない */
       .sp-demo.sp-force-static .screen-purpose__pop{ transition:none; }
       .sp-demo.sp-force-static .screen-purpose.is-marquee .screen-purpose__text{ animation:none !important; }
+
+      /* ラベル無し（ⓘ のみ）＝挙動はラベル版と同一（地続きに横展開・隣接要素は押し出さず上に重なる・収まらなければ流れる）。
+         違いは「短ラベルを表示しないだけ」。ⓘ 単体だと横パディングが広いので気持ち詰める＋縦中央で揃える。
+         高さはラベル版と同じ（＝ベースも通常行 line-height 1.4 で 29.6px）にして、pop（本文＝通常行）と一続きに揃える
+         （icon に line-height:1 を付けるとベースだけ低くなり pop がはみ出るため付けない）。 */
+      .screen-purpose--icon-only{ padding-inline:var(--space-2); vertical-align:middle; }
+      .screen-purpose--icon-only .screen-purpose__icon{ color:var(--color-text-muted); }
     </style>
 
     <div class="sg-demo-header sp-demo sp-host" style="max-width:640px;display:flex;flex-direction:column;gap:var(--space-3);align-items:flex-start">
@@ -684,9 +703,6 @@
           <span class="screen-purpose__label">コンセプトとは？</span>
           <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
         </button>
-        <span class="badge" style="flex:0 0 auto">検証中</span>
-        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
-        <span class="muted text-xs" style="flex:0 0 auto">← 右の要素（ホバーで上に重なる＝動かない）</span>
       </div>
 
       <div class="muted text-xs" style="margin-top:var(--space-2)">↓ 本文が短い＝広げても収まるので流れない（静止）</div>
@@ -697,31 +713,43 @@
           <span class="screen-purpose__label">この画面の狙い</span>
           <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">コンセプトを検証して選定する。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
         </button>
-        <span class="badge" style="flex:0 0 auto">検証中</span>
-        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
       </div>
 
-      <div class="muted text-xs" style="margin-top:var(--space-4)">↓ ヘッダー実配置①＝隣に要素がある（フローティング展開＝本文は上に重なって出る／「編集」ボタンや他要素は<strong>動かない</strong>）</div>
+      <div class="muted text-xs" style="margin-top:var(--space-4)">↓ ヘッダー実配置①＝パネル（枠線ボックス）内に配置（フローティング展開＝本文は上に重なって出る）</div>
       <div class="sp-host" style="width:100%;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);display:flex;align-items:center;gap:var(--space-3);background:var(--color-surface)">
         <strong style="flex:0 0 auto">コンセプト詳細</strong>
-        <span class="badge" style="flex:0 0 auto">検証中</span>
         <button class="screen-purpose" type="button" aria-haspopup="dialog" aria-label="この画面の狙い（ホバーで説明・クリックで全文）" title="この画面の狙い（クリックで全文）">
           <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
           <span class="screen-purpose__label">この画面の狙い</span>
           <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
         </button>
-        <span style="flex:1 1 auto"></span>
-        <button class="btn btn-outline" type="button" style="flex:0 0 auto">編集</button>
       </div>
 
-      <div class="muted text-xs" style="margin-top:var(--space-3)">↓ ヘッダー実配置②＝右端に近い（右端までに<strong>クランプ</strong>＝折り返さず・画面外に出ない／狭い分だけ本文が多くスクロール）</div>
-      <div class="sp-host" style="width:100%;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);display:flex;align-items:center;gap:var(--space-3);background:var(--color-surface);justify-content:flex-end">
-        <strong style="flex:0 0 auto;margin-right:auto">別の要素</strong>
+      <div class="muted text-xs" style="margin-top:var(--space-3)">↓ パネル外ベア＝枠線ボックスの外に単独配置（パネル依存でズレないかの検証用）</div>
+      <div class="sp-host" style="width:100%;display:flex;align-items:center;gap:var(--space-3)">
         <button class="screen-purpose" type="button" aria-haspopup="dialog" aria-label="この画面の狙い（ホバーで説明・クリックで全文）" title="この画面の狙い（クリックで全文）">
           <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
           <span class="screen-purpose__label">この画面の狙い</span>
           <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">選別済みアイデアを統合し、主要な前提を「証拠で」検証しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56002 §8.3 ②③段）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
         </button>
+      </div>
+
+      <div class="muted text-xs" style="margin-top:var(--space-4)">↓ <strong>ラベル無し（ⓘ のみ）</strong>＝評価観点など傍に文脈がある場所。挙動は<strong>ラベル版と同一</strong>＝ホバーで本文が<strong>地続きに横展開</strong>（★は<strong>動かず</strong>本文が上に重なる／収まらなければ流れる）。違いは短ラベルを出さないだけ</div>
+      <div class="sp-host" style="width:100%;border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-3);background:var(--color-surface);display:flex;flex-direction:column;gap:var(--space-3)">
+        <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <strong style="flex:0 0 auto">望ましさ</strong>
+          <button class="screen-purpose screen-purpose--icon-only" type="button" aria-haspopup="dialog" aria-label="望ましさ とは（ホバーで説明・クリックで全文）" title="望ましさ（クリックで全文）">
+            <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+            <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">狙う価値が明確・対象が本当に欲しがるか（検証の裏付け込み）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <strong style="flex:0 0 auto">実現性</strong>
+          <button class="screen-purpose screen-purpose--icon-only" type="button" aria-haspopup="dialog" aria-label="実現性 とは（ホバーで説明・クリックで全文）" title="実現性（クリックで全文）">
+            <span class="screen-purpose__icon" aria-hidden="true">ⓘ</span>
+            <span class="screen-purpose__pop"><span class="screen-purpose__vp"><span class="screen-purpose__text">技術・運用・体制の実現可能性（必要な能力が揃うか）。</span></span><span class="screen-purpose__more" aria-hidden="true">全文</span></span>
+          </button>
+        </div>
       </div>
 
       <label class="checkbox" style="margin-top:var(--space-3)">

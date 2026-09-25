@@ -2440,28 +2440,38 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
    ／クリックで全文ダイアログ。見本＝mocks/style-guide.html「4d」。JS 挙動＝components/ui/ScreenPurpose.tsx。 */
 .screen-purpose{
   --sp-vp: 460px;
+  --sp-h: 30px; /* ベースと pop 共通の固定高さ＝両者を必ず同じ高さにする（中身/フォント差に非依存） */
   position: relative;
   display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  height: var(--sp-h); padding: 0 var(--space-3); /* 高さ固定・縦paddingなし・align-items:center で中央 */
+  /* 上下ボーダーは box-shadow で描く＝base に上下の実ボーダーを持たせない→ pop を top:0 で配置でき、
+     -1px（1pxボーダー打ち消し）の DPR 1.5 サブピクセルズレ（0.33px）を回避。左右は実ボーダー（継ぎ目制御用）。 */
+  border-width: 0 1px; border-style: solid; border-color: var(--color-border);
+  box-shadow: inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border);
+  border-radius: var(--radius-full);
   background: var(--color-surface-alt); color: var(--color-text-muted);
   font-size: var(--text-sm); cursor: pointer; text-align: left; line-height: 1.4;
 }
-.screen-purpose:hover, .screen-purpose:focus-within{ border-color: var(--color-border-strong); }
+.screen-purpose:hover, .screen-purpose:focus-within{ border-color: var(--color-border-strong);
+  box-shadow: inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong); }
 /* 展開時はベースの右側を平らにして pop と地続きの「1つのピル」に見せる。 */
 .screen-purpose:hover, .screen-purpose:focus-within{
   border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-color: transparent;
 }
-.screen-purpose:focus-visible{ outline: none; border-color: var(--color-primary); }
+.screen-purpose:focus-visible{ outline: none; border-color: var(--color-primary);
+  box-shadow: inset 0 1px 0 0 var(--color-primary), inset 0 -1px 0 0 var(--color-primary); }
 .screen-purpose__icon{ flex: 0 0 auto; font-style: normal; }
 .screen-purpose__label{ flex: 0 0 auto; white-space: nowrap; font-weight: 600; }
 .screen-purpose__pop{
-  position: absolute; top: 50%; left: 100%; transform: translateY(-50%);
+  /* 高さはベースと同じ固定値（--sp-h）。上下ボーダーは box-shadow・左右は実ボーダー（base と同方式）。
+     base に上下実ボーダーが無いので pop は top:0＝base の border-box 上端に厳密一致（-1px 補正が不要＝DPR 1.5 でズレない）。 */
+  position: absolute; top: 0; bottom: auto; height: var(--sp-h, 30px); left: 100%; transform: none;
   margin-left: 0;
   display: inline-flex; align-items: center; gap: var(--space-2);
   max-width: 0; overflow: hidden; opacity: 0; pointer-events: none; white-space: nowrap;
   padding: 0; color: var(--color-text-muted); background: var(--color-surface-alt);
-  border: 1px solid var(--color-border); border-left-color: var(--color-border);
+  border-width: 0 1px; border-style: solid; border-color: var(--color-border); /* 左右のみ実ボーダー・左辺＝継ぎ目 */
+  box-shadow: inset 0 1px 0 0 var(--color-border), inset 0 -1px 0 0 var(--color-border); /* 上下線 */
   border-top-left-radius: 0; border-bottom-left-radius: 0;
   border-top-right-radius: var(--radius-full); border-bottom-right-radius: var(--radius-full);
   transition: max-width .2s ease, opacity .15s ease, padding .2s ease;
@@ -2469,10 +2479,11 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 }
 .screen-purpose:hover .screen-purpose__pop, .screen-purpose:focus-within .screen-purpose__pop{
   max-width: var(--sp-vp, 460px); opacity: 1; pointer-events: auto;
-  padding: var(--space-1) var(--space-3); border-color: var(--color-border-strong); border-left-color: var(--color-border);
+  padding: 0 var(--space-3); border-color: var(--color-border-strong); border-left-color: var(--color-border-strong);
+  box-shadow: inset 0 1px 0 0 var(--color-border-strong), inset 0 -1px 0 0 var(--color-border-strong);
 }
 .screen-purpose__vp{ flex: 1 1 auto; min-width: 0; overflow: hidden; }
-.screen-purpose__text{ display: inline-block; white-space: nowrap; will-change: transform; }
+.screen-purpose__text{ display: inline-block; vertical-align: middle; white-space: nowrap; will-change: transform; }
 .screen-purpose.is-marquee .screen-purpose__text{
   animation: sp-marquee var(--sp-dur, 10s) ease-in-out infinite alternate;
 }
@@ -2481,8 +2492,9 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
   92%,100%{ transform: translateX(var(--sp-dist, 0)); }
 }
 .screen-purpose__more{ flex: 0 0 auto; white-space: nowrap; font-size: var(--text-xs); text-decoration: underline; }
-/* フォーカス時＝伸びた本文パネルの枠も青（展開ルールの後に置いて確実に上書き）。継ぎ目の仕切り線は薄いまま。 */
-.screen-purpose:focus-visible .screen-purpose__pop{ border-color: var(--color-primary); border-left-color: var(--color-border); }
+/* フォーカス時＝伸びた本文パネルの枠も青（展開ルールの後に置いて確実に上書き）。継ぎ目もベースと同色にして一続きの1ピルに見せる（罫線色を完全一致）。 */
+.screen-purpose:focus-visible .screen-purpose__pop{ border-color: var(--color-primary); border-left-color: var(--color-primary);
+  box-shadow: inset 0 1px 0 0 var(--color-primary), inset 0 -1px 0 0 var(--color-primary); }
 /* モーション抑制（OS or accounts.reduce_motion・§4.9）＝展開の動きも流れも止める（開くが静止）。 */
 @media (prefers-reduced-motion: reduce){
   .screen-purpose__pop{ transition: none; }
@@ -2491,7 +2503,9 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 [data-anim-reduced="true"] .screen-purpose__pop{ transition: none; }
 [data-anim-reduced="true"] .screen-purpose.is-marquee .screen-purpose__text{ animation: none; }
 
-/* ガイダンス ⓘ アイコンのみ（傍に文脈がある時＝評価観点など）＝ⓘ をタイトなグレー枠のピルで囲う
-   （ラベル版と同じ枠感・隣接テキストと縦中央で揃える）。展開する本文パネル（pop）は従来どおり地続きで浮く。 */
-.screen-purpose--icon-only { padding: 1px 8px; vertical-align: middle; }
-.screen-purpose--icon-only .screen-purpose__icon { color: var(--color-text-muted); line-height: 1; }
+/* ガイダンス ⓘ アイコンのみ（ラベル無し）＝評価観点など傍に文脈がある場所用。挙動はラベル版と同一
+   （ホバー/フォーカスで本文を地続きに“横展開”＝隣接要素は押し出さず上に重なる／収まらなければ流れる）。
+   違いは「短ラベルを表示しないだけ」（確定 2026-09-25・ユーザー指摘）。ⓘ 単体だと横パディングが広く見えるため
+   気持ち詰める＋隣接テキストと縦中央で揃える。見本＝mocks/style-guide.html「4d」。 */
+.screen-purpose--icon-only { padding-inline: var(--space-2); vertical-align: middle; }
+.screen-purpose--icon-only .screen-purpose__icon { color: var(--color-text-muted); }
