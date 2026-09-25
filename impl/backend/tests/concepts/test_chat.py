@@ -136,6 +136,21 @@ def test_p_tc_502_create_group_permission(env, client):
     assert r2.status_code == 403
 
 
+def test_p_tc_507_multiple_group_scopes(env, client):
+    """P-TC-507: グループ・ルームは 1 コンセプトに複数作れる（§5.45・3〜5）。
+
+    回帰＝0033 の uq_concept_chat_scopes_kind が group を assumption_id NULL で潰し、2 個目以降が
+    500 UniqueViolation になっていた（受入不具合・migration 0036 で group を一意対象から除外）。
+    """
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    for label in ("A. 価値・対象・競合", "B. 解の形態", "C. 採算・事業性"):
+        r = client.post(f"/api/v1/concepts/{cid}/chat-scopes", json={"label": label}, headers=_csrf(client))
+        assert r.status_code == 201, f"{label}: {r.status_code} {r.text}"
+    groups = [s for s in client.get(f"/api/v1/concepts/{cid}/chat-scopes").json()["items"] if s["kind"] == "group"]
+    assert {g["label"] for g in groups} == {"A. 価値・対象・競合", "B. 解の形態", "C. 採算・事業性"}
+
+
 def test_p_tc_503_post_message_idempotent(env, client):
     """P-TC-503: 投稿＝concept_chat_scope_id に紐付き・Idempotency-Key 再送で二重投稿しない。"""
     _login_seed(client)
