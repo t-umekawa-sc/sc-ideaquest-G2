@@ -114,9 +114,11 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
         onClick={(e) => { e.preventDefault(); backToListOr(router, `/quests/${concept.quest_id}`); }}>← クエストへ戻る</Link>
 
       {/* ============ ヘッダー（.card.idea-head 流用） ============ */}
-      <section className="card idea-head" aria-label="コンセプト情報">
+      <section className="card idea-head" aria-label="コンセプト情報" data-sp-host>
         <div className="idea-head__top">
           <div style={{ minWidth: 0 }}>
+            {/* アイデア詳細と見分けがつくよう「🧩 コンセプト」を明示（ISO ②③段の成果物）。 */}
+            <div className="concept-eyebrow">🧩 コンセプト</div>
             <div className="idea-head__badges">
               <Badge map={STATUS_LABEL} value={concept.status} />
               <Badge map={DECISION_LABEL} value={concept.decision} />
@@ -138,7 +140,6 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
             {canManage && concept.status === "draft" && <button className="btn btn-primary" disabled={busy} onClick={() => runManage(() => activateConcept(conceptId), "活性化しました")}>活性化</button>}
             {canManage && concept.status === "active" && <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => archiveConcept(conceptId), "保管しました")}>保管</button>}
-            {canManage && <button className="btn btn-outline" disabled={busy} onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>{concept.is_selected ? "★選定を解除" : "★選定する"}</button>}
           </div>
         </div>
         <div className="idea-meta">
@@ -217,9 +218,17 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             <p className="vote-note">1人1票・<strong>変更できます</strong>。投票すると <span className="xp">+5 XP</span>（各コンセプト初回）。</p>
           </section>
 
-          {/* 評価結果 */}
+          {/* 評価結果（選定ボタンは SC-22 と同じくこのパネル見出しに置く） */}
           <section className="card" aria-label="評価結果">
-            <h2 className="card-title">評価結果</h2>
+            <div className="eval-head">
+              <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
+              {canManage && (
+                <button className={`btn btn-sm ${concept.is_selected ? "btn-primary" : "btn-outline"}`} type="button" aria-pressed={concept.is_selected} disabled={busy}
+                  onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>
+                  {concept.is_selected ? "★ 選定中" : "☆ このコンセプトを選定"}
+                </button>
+              )}
+            </div>
             {concept.evaluation.evaluator_count > 0 ? (
               <>
                 <div className="eval-overall">総合 {concept.evaluation.overall_avg?.toFixed(1) ?? "—"} / 5.0（{concept.evaluation.evaluator_count}名）</div>

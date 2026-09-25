@@ -69,3 +69,6 @@
 .vote-btn.decision-go.is-on { color: #fff; background: var(--color-agree); border-color: var(--color-agree); }
 .vote-btn.decision-pivot.is-on { color: #fff; background: var(--color-warning); border-color: var(--color-warning); }
 .vote-btn.decision-kill.is-on { color: #fff; background: var(--color-disagree); border-color: var(--color-disagree); }
+
+/* コンセプト詳細＝アイデア詳細と見分けるためのアイブロー（🧩 コンセプト） */
+.concept-eyebrow { font-size: var(--text-xs, .75rem); font-weight: 700; color: var(--color-primary); letter-spacing: .04em; margin-bottom: 2px; }
