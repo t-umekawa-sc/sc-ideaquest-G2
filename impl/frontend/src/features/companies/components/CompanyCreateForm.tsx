@@ -185,7 +185,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
       </ModalBody>
       <ModalFooter>
         <FormFooterError show={Boolean(formError)} />
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>
           キャンセル
         </Button>
         <Button type="submit" variant="primary" loading={pending}>

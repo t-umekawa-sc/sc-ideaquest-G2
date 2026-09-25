@@ -304,7 +304,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button type="button" variant="outline" onClick={cancelEdit} disabled={saving}>キャンセル</Button>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={cancelEdit} disabled={saving}>キャンセル</Button>
             <Button type="submit" variant="primary" loading={saving}>保存する</Button>
           </ModalFooter>
         </form>

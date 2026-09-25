@@ -256,9 +256,9 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
       {/* §4.7 足元ヒント＝スクロールで上部サマリが隠れても検証エラーが分かる（常時見えるフッター）。 */}
       <FormFooterError show={evalErrors.length > 0} />
       {inModal ? (
-        <button className="btn btn-outline" type="button" onClick={onClose}>キャンセル</button>
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onClose}>キャンセル</button>
       ) : (
-        <Link className="btn btn-outline" href={`/ideas/${ideaId}`}>キャンセル</Link>
+        <Link className="btn btn-outline dialog-close-left" href={`/ideas/${ideaId}`}>キャンセル</Link>
       )}
       <button className="btn btn-outline" type="button" onClick={() => void persist("draft")} disabled={pending !== null}>
         {pending === "draft" ? "保存中…" : "下書き保存"}

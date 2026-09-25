@@ -242,7 +242,7 @@ export function QuestCatalogView() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <button type="button" className="btn" disabled={reqBusy} onClick={() => setReqOpen(false)}>キャンセル</button>
+            <button type="button" className="btn dialog-close-left" disabled={reqBusy} onClick={() => setReqOpen(false)}>キャンセル</button>
             <button type="button" className="btn btn-primary" disabled={reqBusy} onClick={() => void submitRequest()}>リクエストを送信</button>
           </ModalFooter>
         </Modal>

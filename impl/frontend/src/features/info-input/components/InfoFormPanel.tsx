@@ -338,7 +338,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       </div>
 
       <div className="modal__footer">
-        <button className="btn btn-outline" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
         <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? "登録中…" : parentId ? "続報を登録する" : "登録する"}</button>
       </div>
     </>
