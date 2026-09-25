@@ -50,12 +50,9 @@
 .concept-chat { padding: var(--space-2, .5rem) var(--space-3, .75rem); }
 .empty-page { padding: var(--space-6, 2rem); text-align: center; color: var(--color-text-muted); }
 
-/* SC-62 コンセプト評価フォーム */
-.eval-group-head { font-weight: 600; }
-.eval-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2, .5rem); padding: var(--space-2, .5rem) 0; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
-.eval-row-head { display: flex; align-items: center; gap: var(--space-2, .5rem); }
-.eval-aspect { font-weight: 600; }
-.eval-scores { display: flex; gap: var(--space-1, .25rem); }
+/* SC-62 コンセプト評価＝採点行は SC-25 の evaluations.css（.eval-row/.eval-rate/.stars/.star）を再利用。
+   観点名＋ⓘ ガイダンスの並びだけ足す。 */
+.eval-aspect-block { display: inline-flex; align-items: center; gap: var(--space-1, .25rem); }
 
 /* SC-12 コンセプトタブ */
 .concept-tab { display: flex; flex-direction: column; gap: var(--space-4, 1rem); }

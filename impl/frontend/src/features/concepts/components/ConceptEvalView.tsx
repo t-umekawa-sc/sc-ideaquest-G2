@@ -9,6 +9,7 @@ import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useF
 import { ApiError } from "@/lib/api/client";
 
 import { CONCEPTS_CHANGED_EVENT, getMyEvaluation, putEvaluation } from "../api";
+import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）を再利用
 import "../concepts.css";
 
 type AspectDef = { key: string; label: string; see: string };
@@ -26,20 +27,26 @@ const AUX_ASPECTS: AspectDef[] = [
 ];
 const RECOMMENDATIONS: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 
+// SC-25 と同じスター採点行（.eval-row/.eval-rate/.stars/.star）。観点の説明は ⓘ のみ（ラベルなし）。
 function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | undefined; onPick: (n: number) => void }) {
+  const [hover, setHover] = useState<number | undefined>(undefined);
+  const filled = hover ?? value ?? 0;
   return (
-    <div className="eval-row" data-sp-host>
-      <div className="eval-row-head">
-        <span className="eval-aspect">{def.label}</span>
-        <ScreenPurpose label="この観点とは？" summary={def.see} dialogTitle={def.label}>
-          <p style={{ margin: 0 }}>{def.see}</p>
-        </ScreenPurpose>
-      </div>
-      <div className="eval-scores" role="radiogroup" aria-label={def.label}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" className={`btn btn-sm ${value === n ? "btn-primary" : "btn-outline"}`}
-            role="radio" aria-checked={value === n} onClick={() => onPick(n)}>{n}</button>
-        ))}
+    <div className="eval-row">
+      <div className="eval-row__head">
+        <div className="eval-aspect-block" data-sp-host>
+          <span className="eval-aspect">{def.label}</span>
+          <ScreenPurpose summary={def.see} dialogTitle={def.label}><p style={{ margin: 0 }}>{def.see}</p></ScreenPurpose>
+        </div>
+        <div className="eval-rate">
+          <span className="stars" role="radiogroup" aria-label={`${def.label}の点数`} onMouseLeave={() => setHover(undefined)}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" data-star={n} className={"star" + (n <= filled ? " is-on" : "")}
+                role="radio" aria-checked={value === n} aria-label={`${n}点`}
+                onMouseEnter={() => setHover(n)} onClick={() => onPick(n)}>★</button>
+            ))}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -112,8 +119,10 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
       <ModalBody>
         <FormSummary title="入力内容を確認してください" errors={errors} innerRef={summaryRef} />
 
-        <div className="dialog-section is-quiet eval-group-head">中核5観点（必須）</div>
-        {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+        <div className="dialog-section is-quiet">
+          <div className="dialog-label">評価点（中核5・必須）</div>
+          {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+        </div>
 
         <details className="disclosure" style={{ marginTop: "var(--space-3)" }}>
           <summary>補助3観点（任意）</summary>

@@ -12,7 +12,7 @@ import { Modal, ModalBody, ModalFooter } from "./Modal";
 import { Button } from "./Button";
 
 type Props = {
-  label: string; // 既定で見える短ラベル（例「コンセプトとは？」「この画面の狙い」）
+  label?: string; // 既定で見える短ラベル。省略＝ⓘ アイコンのみ（傍に文脈がある時＝評価観点など）
   summary: string; // ホバーで広がる一行（収まらなければ流れる）
   dialogTitle: string; // 全文ダイアログのタイトル
   children: React.ReactNode; // 全文ダイアログ本文（定義・目的・粒度 等）
@@ -83,14 +83,14 @@ export function ScreenPurpose({ label, summary, dialogTitle, children }: Props) 
       <button
         ref={bandRef}
         type="button"
-        className="screen-purpose"
+        className={`screen-purpose${label ? "" : " screen-purpose--icon-only"}`}
         aria-haspopup="dialog"
-        aria-label={`${label}（ホバーで説明・クリックで全文）`}
-        title={`${label}（クリックで全文）`}
+        aria-label={`${label ?? dialogTitle}（ホバーで説明・クリックで全文）`}
+        title={`${label ?? dialogTitle}（クリックで全文）`}
         onClick={() => setOpen(true)}
       >
         <span className="screen-purpose__icon" aria-hidden="true">ⓘ</span>
-        <span className="screen-purpose__label">{label}</span>
+        {label && <span className="screen-purpose__label">{label}</span>}
         <span className="screen-purpose__pop">
           <span className="screen-purpose__vp"><span className="screen-purpose__text">{summary}</span></span>
           <span className="screen-purpose__more" aria-hidden="true">全文</span>

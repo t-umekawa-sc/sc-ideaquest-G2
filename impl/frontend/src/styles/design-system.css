@@ -2490,3 +2490,6 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 }
 [data-anim-reduced="true"] .screen-purpose__pop{ transition: none; }
 [data-anim-reduced="true"] .screen-purpose.is-marquee .screen-purpose__text{ animation: none; }
+
+/* ガイダンス ⓘ アイコンのみ（傍に文脈がある時＝評価観点など）＝タイトなアイコンボタン。 */
+.screen-purpose--icon-only { padding: 2px 8px; }
