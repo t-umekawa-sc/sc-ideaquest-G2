@@ -7,16 +7,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, DataTable, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { Button, DataTable, Field, Modal, ModalBody, ModalFooter, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
 import {
   CONCEPTS_CHANGED_EVENT,
   createAssumption,
+  deleteAssumption,
   deleteConcept,
   listAssumptions,
   listConcepts,
+  patchAssumption,
   type AssumptionListResponse,
   type ConceptListItem,
 } from "../api";
@@ -54,8 +56,9 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
   const snack = useSnackbar();
   const [concepts, setConcepts] = useState<ConceptListItem[] | null>(null);
   const [pool, setPool] = useState<Assumption[] | null>(null);
-  const [newAssumption, setNewAssumption] = useState("");
-  const [addingAssumption, setAddingAssumption] = useState(false);
+  // 前提の追加/編集ダイアログ（ユーザー要望＝インライン入力→ダイアログ）。
+  const [assumptionDialog, setAssumptionDialog] = useState<{ mode: "create" | "edit"; id?: string; statement: string } | null>(null);
+  const [savingAssumption, setSavingAssumption] = useState(false);
 
   const load = useCallback(() => {
     listConcepts(questId).then((r) => setConcepts(r?.items ?? []));
@@ -97,22 +100,49 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
     return items;
   }, [router, questId, canManage, confirm, snack]);
 
-  // 前提の追加（P.3・検証プール所有＝owner/quest_admin）。statement のみの軽量入力。
-  const addAssumption = useCallback(async () => {
-    const stmt = newAssumption.trim();
-    if (!stmt || addingAssumption) return;
-    setAddingAssumption(true);
+  // 前提の追加/編集をダイアログで保存（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
+  const saveAssumption = useCallback(async () => {
+    if (!assumptionDialog) return;
+    const stmt = assumptionDialog.statement.trim();
+    if (!stmt || savingAssumption) return;
+    setSavingAssumption(true);
     try {
-      await createAssumption(questId, stmt);
-      setNewAssumption("");
+      if (assumptionDialog.mode === "edit" && assumptionDialog.id) {
+        await patchAssumption(assumptionDialog.id, stmt);
+        snack({ type: "success", title: "前提を更新しました" });
+      } else {
+        await createAssumption(questId, stmt);
+        snack({ type: "success", title: "前提を追加しました" });
+      }
+      setAssumptionDialog(null);
       load();
-      snack({ type: "success", title: "前提を追加しました" });
     } catch {
-      snack({ type: "error", title: "追加できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
+      snack({ type: "error", title: "保存できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
     } finally {
-      setAddingAssumption(false);
+      setSavingAssumption(false);
     }
-  }, [newAssumption, addingAssumption, questId, load, snack]);
+  }, [assumptionDialog, savingAssumption, questId, load, snack]);
+
+  // 前提の行メニュー（編集/削除）＝検証プール所有（owner/quest_admin）のみ。
+  const assumptionMenu = useCallback((a: Assumption): RowMenuItem[] => [
+    { label: "編集", onClick: () => setAssumptionDialog({ mode: "edit", id: a.id, statement: a.statement }) },
+    {
+      label: "削除",
+      danger: true,
+      onClick: async () => {
+        const ok = await confirm({ variant: "danger", title: "前提を削除", msg: `「${a.statement}」を削除しますか？（リンク中のコンセプトからも外れます）` });
+        if (!ok) return;
+        try {
+          await deleteAssumption(a.id);
+          window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
+          load();
+          snack({ type: "success", title: "前提を削除しました" });
+        } catch {
+          snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+        }
+      },
+    },
+  ], [confirm, load, snack]);
 
   useEffect(() => {
     load();
@@ -145,6 +175,8 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
     { key: "validation", label: "検証", width: 80, align: "num", sortable: true, sortVal: (a) => a.validation_count, render: (a) => a.validation_count },
     { key: "linked", label: "リンク中", width: 90, align: "num", sortable: true, sortVal: (a) => a.linked_concept_count, render: (a) => a.linked_concept_count },
     { key: "latest", label: "最終検証", width: 110, sortable: true, sortVal: (a) => a.latest_validated_on ?? "", render: (a) => a.latest_validated_on ?? "—" },
+    // 操作列（編集/削除）＝検証プール所有（owner/quest_admin）のみ。
+    ...(canManage ? [{ key: "_actions", label: "", actions: true, locked: true, width: 56, render: (a: Assumption) => <RowMenu items={assumptionMenu(a)} /> } as DataTableColumn<Assumption>] : []),
   ];
 
   return (
@@ -157,12 +189,14 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
         >
           <p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案／差別化／採算（viability）／前提と検証</strong>をまとめた<strong>検証可能な提案</strong>です。1 クエスト内に複数候補が競合し、評価と検証を経て所有者が勝ち残りを選定します（ISO 56001 §8.3 ②③段）。</p>
         </ScreenPurpose>
-        <Link href={`/quests/${questId}/concepts/new`} className="btn btn-primary">＋ コンセプトを作成</Link>
       </div>
 
-      {/* 候補コンセプト一覧（標準 DataTable） */}
+      {/* 候補コンセプト一覧（標準 DataTable）。作成ボタンは「候補コンセプト」見出しの右（検証プールと統一）。 */}
       <section className="concept-tab-section">
-        <h3>候補コンセプト</h3>
+        <div className="concept-tab-head" style={{ marginBottom: "var(--space-2)" }}>
+          <h3 style={{ margin: 0 }}>候補コンセプト</h3>
+          <Link href={`/quests/${questId}/concepts/new`} className="btn btn-primary">＋ コンセプトを作成</Link>
+        </div>
         {concepts === null ? (
           <p className="muted">読み込み中…</p>
         ) : (
@@ -193,21 +227,13 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
 
       {/* 検証プール（前提・標準 DataTable） */}
       <section className="concept-tab-section">
-        <h3>検証プール（前提）</h3>
-        {/* 前提の追加＝owner/quest_admin のみ（P.3 検証プール所有）。statement のみの軽量入力。 */}
-        {canManage && (
-          <form className="assumption-add" onSubmit={(e) => { e.preventDefault(); void addAssumption(); }}>
-            <input
-              type="text"
-              className="input"
-              value={newAssumption}
-              onChange={(e) => setNewAssumption(e.target.value)}
-              placeholder="検証したい前提を入力（例: 想定顧客は月1回以上この課題に直面する）"
-              aria-label="追加する前提"
-            />
-            <Button type="submit" variant="outline" disabled={!newAssumption.trim() || addingAssumption} loading={addingAssumption}>＋ 前提を追加</Button>
-          </form>
-        )}
+        <div className="concept-tab-head" style={{ marginBottom: "var(--space-2)" }}>
+          <h3 style={{ margin: 0 }}>検証プール（前提）</h3>
+          {/* 前提の追加＝owner/quest_admin のみ（P.3 検証プール所有）。追加/編集はダイアログで行う。 */}
+          {canManage && (
+            <Button type="button" variant="primary" onClick={() => setAssumptionDialog({ mode: "create", statement: "" })}>＋ 前提を追加</Button>
+          )}
+        </div>
         {pool === null ? (
           <p className="muted">読み込み中…</p>
         ) : (
@@ -231,6 +257,28 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
           />
         )}
       </section>
+
+      {/* 前提の追加/編集ダイアログ（P.3・statement のみ）。 */}
+      {assumptionDialog && (
+        <Modal open onClose={() => setAssumptionDialog(null)} title={assumptionDialog.mode === "edit" ? "前提を編集" : "前提を追加"} size="md">
+          <ModalBody>
+            <Field className="dialog-section is-quiet" id="assumption_statement" label="前提（検証したい仮説）" hint="例: 想定顧客は月1回以上この課題に直面する" required>
+              <textarea
+                className="textarea"
+                value={assumptionDialog.statement}
+                onChange={(e) => setAssumptionDialog((d) => (d ? { ...d, statement: e.target.value } : d))}
+                placeholder="検証したい前提を入力"
+                rows={3}
+                autoFocus
+              />
+            </Field>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setAssumptionDialog(null)}>キャンセル</Button>
+            <Button type="button" variant="primary" disabled={!assumptionDialog.statement.trim() || savingAssumption} loading={savingAssumption} onClick={() => void saveAssumption()}>{assumptionDialog.mode === "edit" ? "更新" : "追加"}</Button>
+          </ModalFooter>
+        </Modal>
+      )}
     </div>
   );
 }

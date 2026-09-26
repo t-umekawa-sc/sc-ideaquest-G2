@@ -71,6 +71,33 @@ export function listAssumptions(questId: string): Promise<AssumptionListResponse
   return apiFetch<AssumptionListResponse>(`/quests/${questId}/assumptions`);
 }
 
+// 前提の編集（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
+export function patchAssumption(assumptionId: string, statement: string): Promise<AssumptionDetail | null> {
+  return apiFetch<AssumptionDetail>(`/assumptions/${assumptionId}`, { method: "PATCH", body: JSON.stringify({ statement }) });
+}
+
+// 前提の削除（P.3・論理削除）。
+export function deleteAssumption(assumptionId: string): Promise<null> {
+  return apiFetch(`/assumptions/${assumptionId}`, { method: "DELETE" });
+}
+
+type Criticality = "critical" | "major" | "minor";
+
+// 前提をコンセプトに紐づける（P.4・link・criticality 指定）。
+export function linkAssumption(conceptId: string, assumptionId: string, criticality: Criticality = "major"): Promise<unknown> {
+  return apiFetch(`/concepts/${conceptId}/assumptions`, { method: "POST", body: JSON.stringify({ assumption_id: assumptionId, criticality }) });
+}
+
+// リンクの criticality 変更（P.4）。
+export function patchLink(conceptId: string, assumptionId: string, criticality: Criticality): Promise<unknown> {
+  return apiFetch(`/concepts/${conceptId}/assumptions/${assumptionId}`, { method: "PATCH", body: JSON.stringify({ criticality }) });
+}
+
+// 前提のリンク解除（P.4）。
+export function unlinkAssumption(conceptId: string, assumptionId: string): Promise<null> {
+  return apiFetch(`/concepts/${conceptId}/assumptions/${assumptionId}`, { method: "DELETE" });
+}
+
 // ---- 登録・編集・遷移・選定・判定（P.2） ----
 
 export function createConcept(questId: string, body: ConceptCreateInput): Promise<ConceptDetail | null> {

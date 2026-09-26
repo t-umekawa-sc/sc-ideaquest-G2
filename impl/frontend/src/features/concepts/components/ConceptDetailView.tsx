@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { ActivitySpark, Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
@@ -17,9 +17,9 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  CONCEPTS_CHANGED_EVENT, createGroupScope, getConcept, getEvaluationAggregate, listChatScopes,
-  selectConcept, setDecision, unselectConcept, unvoteConcept, voteConcept,
-  type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
+  CONCEPTS_CHANGED_EVENT, createGroupScope, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
+  selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
+  type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
 } from "../api";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
@@ -70,6 +70,7 @@ function ConceptGuide() {
 export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const router = useRouter();
   const snack = useSnackbar();
+  const confirm = useConfirm();
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [vote, setVote] = useState<{ approve: number; oppose: number; my: ConceptVoteType | null }>({ approve: 0, oppose: 0, my: null });
@@ -79,6 +80,11 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1）
   const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null); // 総合ルームの議論活発度（E.1）
   const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]); // 総合ルームの直近メッセージ（最新3件）
+  // 前提のリンク（P.4）＝検証プールから選んでこのコンセプトに紐づける。
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [pool, setPool] = useState<AssumptionListResponse["items"] | null>(null);
+  const [linkSel, setLinkSel] = useState<string>("");
+  const [linkCrit, setLinkCrit] = useState<"critical" | "major" | "minor">("major");
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
@@ -151,6 +157,24 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
     try { await fn(); await load(); snack({ type: "success", title: ok }); }
     catch { snack({ type: "error", msg: "操作できませんでした" }); }
     finally { setBusy(false); }
+  };
+
+  // 前提リンク（P.4）＝検証プールを開いて未リンクの前提を選び、criticality を付けて紐づける。
+  const openLinkDialog = async () => {
+    if (!concept) return;
+    setLinkSel(""); setLinkCrit("major"); setLinkOpen(true);
+    const r = await listAssumptions(concept.quest_id).catch(() => null);
+    setPool(r?.items ?? []);
+  };
+  const doLink = async () => {
+    if (!linkSel) return;
+    await runManage(() => linkAssumption(conceptId, linkSel, linkCrit), "前提をリンクしました");
+    setLinkOpen(false);
+  };
+  const doUnlink = async (assumptionId: string, statement: string) => {
+    const ok = await confirm({ variant: "danger", title: "前提のリンクを解除", msg: `「${statement}」をこのコンセプトから外しますか？（前提自体は検証プールに残ります）` });
+    if (!ok) return;
+    await runManage(() => unlinkAssumption(conceptId, assumptionId), "リンクを解除しました");
   };
 
   if (loading) return <LoadingOverlay label="読み込み中…" />;
@@ -244,9 +268,11 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             <div className="concept-section-head">
               <h2 style={{ margin: 0 }}>前提と検証</h2>
               <ScreenPurpose summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
+              {/* 検証プールの前提をこのコンセプトに紐づける（P.4・owner/quest_admin）。 */}
+              {canManage && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => void openLinkDialog()}>＋ 前提をリンク</button>}
             </div>
             {concept.assumptions.length === 0 ? (
-              <div className="muted text-sm">まだ前提はありません。</div>
+              <div className="muted text-sm">まだ前提はありません。{canManage && "「＋ 前提をリンク」で検証プールから紐づけます。"}</div>
             ) : (
               <ul className="assumption-list">
                 {concept.assumptions.map((a) => (
@@ -255,6 +281,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                       <span className="badge badge-muted">{CRITICALITY_LABEL[a.criticality] ?? a.criticality}</span>
                       <Badge map={VERDICT_LABEL} value={a.current_verdict} />
                       {a.is_stale && <span className="badge badge-danger">⚠ 要再評価</span>}
+                      {canManage && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} disabled={busy} onClick={() => void doUnlink(a.assumption_id, a.statement)}>リンク解除</button>}
                     </div>
                     <div className="assumption-statement">{a.statement}</div>
                   </li>
@@ -444,6 +471,44 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
         </ModalFooter>
       </Modal>
+
+      {/* 前提リンクの選択ダイアログ（P.4）＝検証プールの未リンク前提を選び criticality を付けて紐づける。 */}
+      {linkOpen && (
+        <Modal open onClose={() => setLinkOpen(false)} title="前提をリンク" size="md">
+          <ModalBody>
+            <p className="role-note" style={{ marginTop: 0 }}>検証プールの前提をこのコンセプトに紐づけます（前提はクエスト単位で共有・複数コンセプトで再利用）。</p>
+            {(() => {
+              const linkedIds = new Set(concept.assumptions.map((a) => a.assumption_id));
+              const candidates = (pool ?? []).filter((a) => !linkedIds.has(a.id));
+              if (pool === null) return <p className="muted">読み込み中…</p>;
+              if (candidates.length === 0) return <p className="muted text-sm">リンクできる前提がありません（検証プールが空、または全て紐づけ済み）。検証プールから前提を追加してください。</p>;
+              return (
+                <>
+                  <div className="field dialog-section is-quiet">
+                    <label htmlFor="link_assumption">前提を選択</label>
+                    <select id="link_assumption" className="select" value={linkSel} onChange={(e) => setLinkSel(e.target.value)}>
+                      <option value="">— 選択してください —</option>
+                      {candidates.map((a) => <option key={a.id} value={a.id}>{a.statement}</option>)}
+                    </select>
+                  </div>
+                  <div className="field dialog-section is-quiet">
+                    <label htmlFor="link_criticality">重要度</label>
+                    <select id="link_criticality" className="select" value={linkCrit} onChange={(e) => setLinkCrit(e.target.value as "critical" | "major" | "minor")}>
+                      <option value="critical">致命的</option>
+                      <option value="major">重要</option>
+                      <option value="minor">補助</option>
+                    </select>
+                  </div>
+                </>
+              );
+            })()}
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setLinkOpen(false)}>キャンセル</button>
+            <button type="button" className="btn btn-primary" disabled={!linkSel || busy} onClick={() => void doLink()}>リンク</button>
+          </ModalFooter>
+        </Modal>
+      )}
     </main>
   );
 }
