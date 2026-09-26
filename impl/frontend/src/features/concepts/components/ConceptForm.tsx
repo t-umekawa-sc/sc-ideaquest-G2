@@ -2,6 +2,7 @@
 
 // SC-60 コンセプト登録・編集フォーム（FR-42・P.2）。由来アイデア選択＋成果物スキーマ入力（viability=JSON）。
 // 入力前理解のためフォーム冒頭に ⓘ ガイダンス（デザイン標準§4.13）。正＝doc/画面設計/screens/SC-60_コンセプト登録編集.md。
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -72,8 +73,11 @@ function inputGuide(key: string): React.ReactNode {
 
 export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Props) {
   const snack = useSnackbar();
+  const searchParams = useSearchParams();
   const { summaryRef, notify } = useFormErrorNotice();
   const isEdit = mode === "edit";
+  // 複製＝作成モードで ?dup={元コンセプトID} を受け、元の内容をプリフィル（新規 POST＝別レコード）。
+  const dupFrom = mode === "create" ? searchParams.get("dup") : null;
 
   const [title, setTitle] = useState("");
   const [problem, setProblem] = useState("");
@@ -116,6 +120,31 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
     });
     return () => { alive = false; };
   }, [isEdit, conceptId]);
+
+  // 複製＝元コンセプトの内容をプリフィル（作成モード・同一クエスト）。名前は「（複製）」を付けて区別。
+  useEffect(() => {
+    if (isEdit || !dupFrom) return;
+    let alive = true;
+    getConcept(dupFrom).then((c) => {
+      if (!alive || !c) return;
+      setTitle(`${c.title}（複製）`);
+      setProblem(c.problem ?? "");
+      setValueProp(c.value_proposition ?? "");
+      setTarget(c.target ?? "");
+      setDifferentiation(c.differentiation ?? "");
+      setSolutionForm(c.solution_form ?? "");
+      const via = { ...(c.viability ?? {}) } as Record<string, unknown>;
+      const known: Record<string, string> = {};
+      for (const f of VIABILITY_FIELDS) {
+        if (typeof via[f.key] === "string") known[f.key] = via[f.key] as string;
+        delete via[f.key];
+      }
+      setViab(known);
+      setViabExtra(via);
+      setSourceIdeas(c.source_ideas.map((s) => s.idea_id));
+    });
+    return () => { alive = false; };
+  }, [isEdit, dupFrom]);
 
   // 由来アイデア候補＝同一クエストの公開アイデア（P.2 スコープ）。
   useEffect(() => {

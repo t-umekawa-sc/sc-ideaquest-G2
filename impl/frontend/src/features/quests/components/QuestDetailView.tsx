@@ -38,7 +38,7 @@ import {
   type QuestActivity,
   type QuestDetail,
 } from "../api";
-import { IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
+import { deleteIdea, IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import "../quests.css";
 
@@ -486,6 +486,28 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               { label: "💬 チャットを開く", onClick: goChat },
               { label: "詳細を開く", onClick: goIdea },
             ];
+        // 削除＝投稿者本人 or owner/quest_admin（D.2・論理削除・子は監査保持）。下書きも本人は削除可。
+        if (r.mystate === "mine" || canEdit) {
+          items.push({
+            label: "削除",
+            danger: true,
+            onClick: async () => {
+              const ok = await confirm({
+                variant: "danger",
+                title: "アイデアを削除",
+                msg: `「${r.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・投票等は監査のため保持されます）。`,
+              });
+              if (!ok) return;
+              try {
+                await deleteIdea(r.id);
+                window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+                snack({ type: "success", title: "アイデアを削除しました" });
+              } catch {
+                snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+              }
+            },
+          });
+        }
         return <RowMenu items={items} />;
       } },
   ];
@@ -929,7 +951,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       {/* 🏁 結果（FR-39・アイデア選別の申し送り・completed 時のみタブが出る） */}
       {tab === "result" && <QuestResultTab questId={questId} quest={quest} />}
 
-      {tab === "concept" && <ConceptTab questId={questId} />}
+      {tab === "concept" && <ConceptTab questId={questId} canManage={canEdit} />}
 
       {/* 更新履歴モーダル（定義の版＋ステータスログ・§3.1/§3.2・アイデア SC-22 と同型） */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="クエストの更新履歴" size="lg">

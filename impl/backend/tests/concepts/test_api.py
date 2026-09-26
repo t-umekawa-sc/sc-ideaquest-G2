@@ -157,8 +157,11 @@ def test_p_tc_101_list_includes_own_draft_excludes_others(env, client):
         ts.commit()
         other_cid = str(other_c.id)
     r = client.get(f"/api/v1/quests/{qid}/concepts")
-    ids = {it["id"] for it in r.json()["items"]}
+    items = r.json()["items"]
+    ids = {it["id"] for it in items}
     assert mine in ids and other_cid not in ids
+    # is_mine＝作成者本人フラグ（一覧の削除アクション活性判定・複製/削除メニュー）。
+    assert next(it for it in items if it["id"] == mine)["is_mine"] is True
 
 
 def test_p_tc_104_source_idea_other_quest_rejected(env, client):

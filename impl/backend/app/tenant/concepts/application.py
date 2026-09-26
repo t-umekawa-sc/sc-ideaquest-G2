@@ -155,7 +155,7 @@ def list_for_quest(account_id, company_id, quest_id) -> dict:
             # 可視性＝active/archived は全員／draft は本人のみ。
             if c.status == "draft" and c.author_id != user.id:
                 continue
-            items.append(_list_item(ts, c))
+            items.append(_list_item(ts, c, viewer_id=user.id))
         return {"items": items, "cursor": None}
 
 
@@ -432,7 +432,7 @@ def _eval_summary(ts, concept_id) -> dict:
     }
 
 
-def _list_item(ts, c) -> dict:
+def _list_item(ts, c, *, viewer_id=None) -> dict:
     return {
         "id": str(c.id), "title": c.title, "status": c.status, "decision": c.decision,
         "is_selected": c.is_selected,
@@ -440,6 +440,8 @@ def _list_item(ts, c) -> dict:
         "assumption_count": len(repo.list_links_for_concept(ts, c.id)),
         "eval_summary": _eval_summary(ts, c.id),
         "author_id": str(c.author_id), "updated_at": c.updated_at,
+        # 削除アクションの活性判定（作成者本人＝削除可・owner/quest_admin はフロントの canManage で判定）。
+        "is_mine": viewer_id is not None and c.author_id == viewer_id,
     }
 
 

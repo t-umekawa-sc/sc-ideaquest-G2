@@ -32,8 +32,11 @@ const AUX_ASPECTS: AspectDef[] = [
 ];
 const RECOMMENDATIONS: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 
-// SC-25 と同じスター採点行（.eval-row/.eval-rate/.stars/.star）。観点の説明は ⓘ のみ（ラベルなし）。
-function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | undefined; onPick: (n: number) => void }) {
+// SC-25 と同じスター採点行（.eval-row/.eval-rate/.stars/.star）＋観点別コメント（任意・アイデア評価と同構造）。
+function ScoreRow({ def, value, onPick, comment, onComment }: {
+  def: AspectDef; value: number | undefined; onPick: (n: number) => void;
+  comment: string; onComment: (v: string) => void;
+}) {
   const [hover, setHover] = useState<number | undefined>(undefined);
   const filled = hover ?? value ?? 0;
   return (
@@ -53,6 +56,12 @@ function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | unde
           </span>
         </div>
       </div>
+      <textarea
+        className="textarea eval-comment"
+        placeholder="観点別コメント（任意）"
+        value={comment}
+        onChange={(e) => onComment(e.target.value)}
+      />
     </div>
   );
 }
@@ -61,6 +70,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [comments, setComments] = useState<Record<string, string>>({}); // 観点別コメント（任意・アイデア評価と同構造）
   const [overall, setOverall] = useState("");
   const [recommendation, setRecommendation] = useState<string>("");
   const [visibility, setVisibility] = useState<"party" | "limited">("party");
@@ -84,6 +94,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
       if (!alive) return;
       if (me?.status) {
         setScores((me.scores ?? {}) as Record<string, number>);
+        setComments((me.comments ?? {}) as Record<string, string>);
         setOverall(me.overall_comment ?? "");
         setRecommendation(me.recommendation ?? "");
         setVisibility((me.visibility ?? "party") as "party" | "limited");
@@ -113,7 +124,10 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
     setPending(status === "submitted" ? "submit" : "draft");
     try {
       await putEvaluation(conceptId, {
-        scores, comments: {}, overall_comment: overall.trim() || null,
+        scores,
+        // 空コメントは除外して送信（アイデア評価 SC-25 と同様）。
+        comments: Object.fromEntries(Object.entries(comments).filter(([, v]) => v && v.trim())) as Record<string, string>,
+        overall_comment: overall.trim() || null,
         recommendation: (recommendation || null) as "go" | "pivot" | "kill" | null,
         visibility, status,
       });
@@ -179,13 +193,13 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
 
         <div className="dialog-section is-quiet">
           <div className="dialog-label">評価点（中核5・必須）</div>
-          {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+          {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} comment={comments[a.key] ?? ""} onComment={(v) => setComments((c) => ({ ...c, [a.key]: v }))} />)}
         </div>
 
         <details className="disclosure" style={{ marginTop: "var(--space-3)" }}>
           <summary>補助3観点（任意）</summary>
           <div className="disclosure__body">
-            {AUX_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+            {AUX_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} comment={comments[a.key] ?? ""} onComment={(v) => setComments((c) => ({ ...c, [a.key]: v }))} />)}
           </div>
         </details>
 

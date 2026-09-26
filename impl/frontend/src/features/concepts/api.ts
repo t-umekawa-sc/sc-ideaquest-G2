@@ -62,6 +62,11 @@ export function listConcepts(questId: string): Promise<ConceptListResponse | nul
   return apiFetch<ConceptListResponse>(`/quests/${questId}/concepts`);
 }
 
+// 前提の作成（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
+export function createAssumption(questId: string, statement: string): Promise<AssumptionDetail | null> {
+  return apiFetch<AssumptionDetail>(`/quests/${questId}/assumptions`, { method: "POST", body: JSON.stringify({ statement }) });
+}
+
 export function listAssumptions(questId: string): Promise<AssumptionListResponse | null> {
   return apiFetch<AssumptionListResponse>(`/quests/${questId}/assumptions`);
 }
@@ -74,6 +79,11 @@ export function createConcept(questId: string, body: ConceptCreateInput): Promis
 
 export function patchConcept(conceptId: string, body: ConceptPatchInput): Promise<ConceptDetail | null> {
   return apiFetch<ConceptDetail>(`/concepts/${conceptId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// 論理削除（P.2・作成者 or owner/quest_admin）。子データは監査保持。
+export function deleteConcept(conceptId: string): Promise<null> {
+  return apiFetch(`/concepts/${conceptId}`, { method: "DELETE" });
 }
 
 export function activateConcept(conceptId: string): Promise<ConceptDetail | null> {

@@ -381,24 +381,26 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             ) : (
               <p className="vote-note">総合判定は 所有者 / クエスト管理者が行います。</p>
             )}
-            {/* 意思決定ログ（総合判定/ステータスの変遷・§3.2）＝当時の判断材料つきで追える。 */}
-            <details className="decision-log-disclosure" style={{ marginTop: "var(--space-3)" }}>
-              <summary className="role-note" style={{ cursor: "pointer" }}>判定・ステータスの履歴</summary>
-              <ConceptDecisionLogView conceptId={conceptId} />
-            </details>
+            {/* 判定・ステータスの履歴は概要の「更新履歴」リンク→モーダルへ集約（クエスト同型・§3.2）。 */}
           </section>
         </div>
       </div>
 
-      {/* 更新履歴モーダル（版タイムライン＋差分・§3.1・アイデア SC-22 と同型） */}
+      {/* 更新履歴モーダル（定義の版＋差分＋判定/ステータスログ・§3.1/§3.2・クエスト SC-12 と同型） */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">
         <ModalBody>
-          <p className="role-note" style={{ marginTop: 0 }}>
-            コンセプトの変更を新しい順に表示します。各版を開くと差分（
-            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
-          </p>
-          <div style={{ marginTop: "var(--space-4)" }}>
+          {/* 参照系ダイアログ＝項目間に仕切り線（.dialog-section・デザイン標準 §4.1）。 */}
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>内容の変更履歴</h3>
+            <p className="role-note" style={{ marginTop: 0 }}>
+              コンセプトの変更を新しい順に表示します。各版を開くと差分（
+              <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+            </p>
             <ConceptRevisionHistory conceptId={conceptId} currentRevision={concept.current_revision} />
+          </div>
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>判定・ステータスの履歴</h3>
+            <ConceptDecisionLogView conceptId={conceptId} />
           </div>
         </ModalBody>
         <ModalFooter>

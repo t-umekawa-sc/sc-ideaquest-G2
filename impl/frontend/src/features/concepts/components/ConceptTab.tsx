@@ -7,11 +7,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { EmptyState, ScreenPurpose } from "@/components/ui";
+import { Button, EmptyState, RowMenu, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
 import {
   CONCEPTS_CHANGED_EVENT,
+  createAssumption,
+  deleteConcept,
   listAssumptions,
   listConcepts,
   type AssumptionListResponse,
@@ -33,15 +35,65 @@ function fmtDate(iso: string | null | undefined): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function ConceptTab({ questId }: { questId: string }) {
+export function ConceptTab({ questId, canManage = false }: { questId: string; canManage?: boolean }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const snack = useSnackbar();
   const [concepts, setConcepts] = useState<ConceptListItem[] | null>(null);
   const [pool, setPool] = useState<AssumptionListResponse["items"] | null>(null);
+  const [newAssumption, setNewAssumption] = useState("");
+  const [addingAssumption, setAddingAssumption] = useState(false);
 
   const load = useCallback(() => {
     listConcepts(questId).then((r) => setConcepts(r?.items ?? []));
     listAssumptions(questId).then((r) => setPool(r?.items ?? []));
   }, [questId]);
+
+  // 複製＝作成フォームを元コンセプトでプリフィル（?dup）。削除＝作成者本人 or owner/quest_admin（論理削除）。
+  const conceptMenu = useCallback((c: ConceptListItem) => {
+    const items = [
+      { label: "複製", onClick: () => router.push(`/quests/${questId}/concepts/new?dup=${c.id}`) },
+    ];
+    if (c.is_mine || canManage) {
+      items.push({
+        label: "削除",
+        danger: true,
+        onClick: async () => {
+          const ok = await confirm({
+            variant: "danger",
+            title: "コンセプトを削除",
+            msg: `「${c.title}」を削除しますか？ 一覧・詳細から見えなくなります（評価・議論・前提リンク等は監査のため保持されます）。`,
+          });
+          if (!ok) return;
+          try {
+            await deleteConcept(c.id);
+            window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
+            snack({ type: "success", title: "コンセプトを削除しました" });
+          } catch {
+            snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+          }
+        },
+      } as (typeof items)[number]);
+    }
+    return items;
+  }, [router, questId, canManage, confirm, snack]);
+
+  // 前提の追加（P.3・検証プール所有＝owner/quest_admin）。statement のみの軽量入力。
+  const addAssumption = useCallback(async () => {
+    const stmt = newAssumption.trim();
+    if (!stmt || addingAssumption) return;
+    setAddingAssumption(true);
+    try {
+      await createAssumption(questId, stmt);
+      setNewAssumption("");
+      load();
+      snack({ type: "success", title: "前提を追加しました" });
+    } catch {
+      snack({ type: "error", title: "追加できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
+    } finally {
+      setAddingAssumption(false);
+    }
+  }, [newAssumption, addingAssumption, questId, load, snack]);
 
   // 詳細へドリルインする直前にスクロール位置を保存＝戻り時に復元（§4.12・QuestDetailView と同じキー）。
   const openConcept = useCallback((id: string) => {
@@ -80,7 +132,7 @@ export function ConceptTab({ questId }: { questId: string }) {
           <div className="table-wrap">
             <table className="table concept-table">
               <thead>
-                <tr><th>名前</th><th>状態</th><th>判定</th><th>選定</th><th>由来</th><th>前提</th><th>評価</th><th>更新</th></tr>
+                <tr><th>名前</th><th>状態</th><th>判定</th><th>選定</th><th>由来</th><th>前提</th><th>評価</th><th>更新</th><th aria-label="操作"></th></tr>
               </thead>
               <tbody>
                 {concepts.map((c) => (
@@ -93,6 +145,8 @@ export function ConceptTab({ questId }: { questId: string }) {
                     <td>{c.assumption_count}</td>
                     <td>{c.eval_summary.evaluator_count > 0 ? `${c.eval_summary.overall_avg?.toFixed(1) ?? "—"}（${c.eval_summary.evaluator_count}）` : "—"}</td>
                     <td>{fmtDate(c.updated_at)}</td>
+                    {/* 行アクション（複製/削除）＝行遷移を奪わないよう stopPropagation は RowMenu 内で担保。 */}
+                    <td className="cell-actions" onClick={(e) => e.stopPropagation()}><RowMenu items={conceptMenu(c)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -104,6 +158,20 @@ export function ConceptTab({ questId }: { questId: string }) {
       {/* 検証プール（前提） */}
       <section className="concept-tab-section">
         <h3>検証プール（前提）</h3>
+        {/* 前提の追加＝owner/quest_admin のみ（P.3 検証プール所有）。statement のみの軽量入力。 */}
+        {canManage && (
+          <form className="assumption-add" onSubmit={(e) => { e.preventDefault(); void addAssumption(); }}>
+            <input
+              type="text"
+              className="input"
+              value={newAssumption}
+              onChange={(e) => setNewAssumption(e.target.value)}
+              placeholder="検証したい前提を入力（例: 想定顧客は月1回以上この課題に直面する）"
+              aria-label="追加する前提"
+            />
+            <Button type="submit" variant="outline" disabled={!newAssumption.trim() || addingAssumption} loading={addingAssumption}>＋ 前提を追加</Button>
+          </form>
+        )}
         {pool === null ? (
           <p className="muted">読み込み中…</p>
         ) : pool.length === 0 ? (

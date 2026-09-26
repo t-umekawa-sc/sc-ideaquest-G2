@@ -116,6 +116,8 @@ class ConceptListItemDTO(BaseModel):
     eval_summary: ConceptEvalSummaryDTO = ConceptEvalSummaryDTO()
     author_id: str
     updated_at: datetime | None = None
+    # 作成者本人か（一覧の削除アクション活性判定・owner/quest_admin はフロントの canManage で別途判定）。
+    is_mine: bool = False
 
 
 class ConceptListResponse(BaseModel):

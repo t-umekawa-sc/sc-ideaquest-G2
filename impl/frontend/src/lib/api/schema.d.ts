@@ -4634,6 +4634,11 @@ export interface components {
             author_id: string;
             /** Updated At */
             updated_at?: string | null;
+            /**
+             * Is Mine
+             * @default false
+             */
+            is_mine: boolean;
         };
         /** ConceptListResponse */
         ConceptListResponse: {
