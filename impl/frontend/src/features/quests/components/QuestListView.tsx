@@ -10,14 +10,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { DataTable, RowMenu } from "@/components/ui";
+import { DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { markQuestFromList } from "@/lib/nav";
 import { useScrollRestore } from "@/lib/scrollRestore";
 import { deadlineUrgency, deadlineCountdown, todayISO, type DeadlineLevel } from "@/lib/deadline";
-import { getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
+import { deleteQuest, getQuest, listQuests, QUESTS_CHANGED_EVENT, type QuestCard } from "../api";
 // quest-card / page-head / idea-title / deadline は design-system.css の共有クラス（追加インポート不要）。
 
 type Quest = {
@@ -27,6 +27,7 @@ type Quest = {
   deadlineRaw: string; // 生の期限日（YYYY-MM-DD）＝複製プリフィル用（表示は deadline の整形版）
   party: number; ideas: number; my: string; order: number; draft?: boolean;
   discoverable: boolean; // 発見カタログ掲載（FR-40・C.9.0）＝列/ソート/絞込・複製プリフィル
+  isOwner: boolean; // 削除アクションの活性判定（owner のみ・C.2＝quest_admin は詳細から）
 };
 
 // quest_status（enum・§3）→ 画面ラベル。"選定" は enum でなく evaluating〜completed の選定行為の呼称（C.5）。
@@ -73,6 +74,7 @@ function toQuest(c: QuestCard, index: number, total: number): Quest {
     deadline: dl.deadline, dl: dl.dl, urgency: dl.urgency, days: dl.days, deadlineRaw: (c.deadline ?? "").slice(0, 10), party: c.member_count, ideas: c.idea_count,
     my: draft ? "下書き" : "未投稿", order: total - index, draft,
     discoverable: c.discoverable ?? false,
+    isOwner: c.is_owner ?? false,
   };
 }
 
@@ -100,6 +102,8 @@ const discoverableLabel = (x: Quest): string => (x.discoverable ? "掲載" : "�
 
 export function QuestListView() {
   const router = useRouter();
+  const confirm = useConfirm();
+  const snack = useSnackbar();
   const [quests, setQuests] = useState<Quest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // 一覧のスクロール位置復元（§4.12）＝取得完了（quests!==null）後に復元。
@@ -171,6 +175,28 @@ export function QuestListView() {
         );
       },
     },
+    // 削除＝owner のみ（C.2・論理削除・子データは監査保持）。quest_admin は詳細から。
+    ...(x.isOwner
+      ? [{
+          label: "削除",
+          danger: true,
+          onClick: async () => {
+            const ok = await confirm({
+              variant: "danger",
+              title: "クエストを削除",
+              msg: `「${x.title}」を削除しますか？ 一覧・詳細から見えなくなります（投稿されたアイデア等は監査のため保持されます）。`,
+            });
+            if (!ok) return;
+            try {
+              await deleteQuest(x.id);
+              window.dispatchEvent(new Event(QUESTS_CHANGED_EVENT));
+              snack({ type: "success", title: "クエストを削除しました" });
+            } catch {
+              snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+            }
+          },
+        }]
+      : []),
   ];
 
   const columns: DataTableColumn<Quest>[] = [
