@@ -934,14 +934,19 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       {/* 更新履歴モーダル（定義の版＋ステータスログ・§3.1/§3.2・アイデア SC-22 と同型） */}
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="クエストの更新履歴" size="lg">
         <ModalBody>
-          <h3 style={{ marginTop: 0 }}>定義の変更履歴</h3>
-          <p className="role-note" style={{ marginTop: 0 }}>
-            クエスト定義（名称/目的/カラー/締切/カテゴリー）の変更を新しい順に。各版を開くと差分（
-            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
-          </p>
-          <QuestRevisionHistory questId={questId} />
-          <h3 style={{ marginTop: "var(--space-5)" }}>ステータスの履歴</h3>
-          <QuestDecisionLogView questId={questId} />
+          {/* 参照系ダイアログ＝項目間に仕切り線（.dialog-section の border-top・デザイン標準 §4.1）。 */}
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>定義の変更履歴</h3>
+            <p className="role-note" style={{ marginTop: 0 }}>
+              クエスト定義（名称/目的/カラー/締切/カテゴリー）の変更を新しい順に。各版を開くと差分（
+              <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+            </p>
+            <QuestRevisionHistory questId={questId} />
+          </div>
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>ステータスの履歴</h3>
+            <QuestDecisionLogView questId={questId} />
+          </div>
         </ModalBody>
         <ModalFooter>
           <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>

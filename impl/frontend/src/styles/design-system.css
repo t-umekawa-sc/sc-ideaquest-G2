@@ -2521,3 +2521,9 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
 .decision-log__who { color: var(--color-text-subtle); font-size: var(--font-size-sm); }
 .decision-log__reason { margin-top: 2px; }
 .decision-log__ctx { margin-top: 2px; }
+
+/* 参照系ダイアログ（更新履歴/意思決定ログ）＝項目間に薄い仕切り線（デザイン標準 §4.1・.dialog-section と同趣旨）。
+   タイムライン（左線＋ドット）に加え、版/ログの各エントリを水平線で明確に区切る。 */
+.rev + .rev,
+.info-rev + .info-rev { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.decision-log__item + .decision-log__item { border-top: 1px solid var(--color-border); padding-top: var(--space-2); }
