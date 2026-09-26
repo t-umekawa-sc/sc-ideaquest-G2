@@ -261,7 +261,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
         <div className="idea-rail">
           {/* 投票（.vote-* パネル流用） */}
           <section className="card" aria-label="投票">
-            <h2 className="card-title">投票</h2>
+            <div className="concept-section-head">
+              <h2 className="card-title" style={{ margin: 0 }}>投票</h2>
+              <ScreenPurpose summary="パーティー全員の賛否（民意・機運）。1人1票・変更/取消可・自分にも可。評価スコアには影響しない（投票と評価は独立）。" dialogTitle="投票とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>投票</strong>＝コンセプト投票権限を持つ<strong>パーティー全員</strong>が賛成/反対で示す<strong>民意（機運）</strong>です。1人1票・変更/取消可・自分のコンセプトにも投票可（投票で +5 XP＝各コンセプト初回）。<strong>評価スコアや総合判定を自動では動かさない参考シグナル</strong>です。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。3 つは独立した入力で、総合判定が最終アウトプットです。</p>
+              </ScreenPurpose>
+            </div>
             <div className="vote-summary">
               <span className="vote-agree">▲ 賛成 {vote.approve}</span>
               <span className="vote-disagree">▼ 反対 {vote.oppose}</span>
@@ -281,7 +287,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           {/* 評価結果（選定ボタンは SC-22 と同じくこのパネル見出しに置く） */}
           <section className="card" aria-label="評価結果">
             <div className="eval-head">
-              <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
+              <div className="concept-section-head">
+                <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
+                <ScreenPurpose summary="評価者権限を持つ人による多観点スコア（中核5＋補助3）＝専門的な定量評価。公開範囲を指定可。投票（民意）とは独立。" dialogTitle="評価とは（投票・評価・総合判定の住み分け）">
+                  <p style={{ margin: 0 }}><strong>評価</strong>＝<strong>評価者権限</strong>を持つ人が観点別（中核5＋補助3）に採点する<strong>専門的な定量評価</strong>です（採点は SC-62）。評価者ごとに公開範囲（visibility）を指定でき、複数名が評価できます。<strong>投票（全員の民意）とは独立</strong>で、点数は投票結果に影響されません。</p>
+                  <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。</p>
+                </ScreenPurpose>
+              </div>
               {canManage && (
                 <button className={`btn btn-sm ${concept.is_selected ? "btn-primary" : "btn-outline"}`} type="button" aria-pressed={concept.is_selected} disabled={busy}
                   onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>
@@ -334,7 +346,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}
           <section className="card" aria-label="総合判定">
-            <h2 className="card-title">総合判定</h2>
+            <div className="concept-section-head">
+              <h2 className="card-title" style={{ margin: 0 }}>総合判定</h2>
+              <ScreenPurpose summary="owner/クエスト管理者が下す最終意思決定（Go 推進/Pivot 方向転換/Kill 中止）。投票・評価・前提と検証を踏まえて人が判断。" dialogTitle="総合判定とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>総合判定</strong>＝<strong>owner / クエスト管理者のみ</strong>が下す<strong>最終的な意思決定</strong>です（<strong>Go 推進 / Pivot 方向転換 / Kill 中止</strong>）。投票（全員の民意）・評価（評価者の専門採点）・前提と検証（エビデンス）を踏まえて<strong>人が判断</strong>します（自動計算ではありません）。★選定とあわせて勝ち残りを決めます。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。</p>
+              </ScreenPurpose>
+            </div>
             <div className="vote-summary">
               <span className="decision-now">現在の判定: <Badge map={DECISION_LABEL} value={concept.decision} /></span>
             </div>

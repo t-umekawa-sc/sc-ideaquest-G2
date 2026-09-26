@@ -8,8 +8,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { CONCEPTS_CHANGED_EVENT, getMyEvaluation, putEvaluation } from "../api";
-import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）を再利用
+import { CONCEPTS_CHANGED_EVENT, getConcept, getMyEvaluation, putEvaluation, type ConceptDetail } from "../api";
+import { getQuest, type QuestDetail } from "@/features/quests/api";
+import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）＋文脈（.eval-context/.disclosure）を再利用
 import "../concepts.css";
 
 type AspectDef = { key: string; label: string; see: string };
@@ -62,9 +63,18 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
   const [errors, setErrors] = useState<string[]>([]);
   const [pending, setPending] = useState<null | "draft" | "submit">(null);
   const [loading, setLoading] = useState(true);
+  // 評価の判断材料＝対象コンセプト＋クエスト文脈（アイデア評価 SC-25 と同型・ダイアログ内コンテンツ標準 §4.1）。
+  const [concept, setConcept] = useState<ConceptDetail | null>(null);
+  const [quest, setQuest] = useState<QuestDetail | null>(null);
 
   useEffect(() => {
     let alive = true;
+    void getConcept(conceptId).then(async (c) => {
+      if (!alive || !c) return;
+      setConcept(c);
+      const q = await getQuest(c.quest_id).catch(() => null);
+      if (alive) setQuest(q);
+    });
     getMyEvaluation(conceptId).then((me) => {
       if (!alive) return;
       if (me?.status) {
@@ -118,6 +128,48 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
     <form onSubmit={(e) => { e.preventDefault(); void save("submitted"); }} noValidate data-sp-host>
       <ModalBody>
         <FormSummary title="入力内容を確認してください" errors={errors} innerRef={summaryRef} />
+
+        {/* 対象の文脈（アイデア評価 SC-25 と同型）＝クエスト情報→コンセプト情報の順（囲みなし・§4.1）。 */}
+        <div className="eval-context">
+          <div className="eval-context__quest">🎯 {quest?.title || "クエスト"}</div>
+          <div className="eval-context__title">{concept?.title || "コンセプト"}</div>
+        </div>
+
+        {/* 折りたたみ: クエストを確認（実データ・アイデア評価と同一UI）＝適合性採点の根拠となる目的・テーマ等。 */}
+        <details className="disclosure disclosure--ref" open>
+          <summary>クエストを確認</summary>
+          <div className="disclosure__body">
+            <div className="eval-idea__label">目的・テーマ</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{quest?.purpose || "—"}</p>
+            <div className="eval-idea__label">カテゴリー</div>
+            <p>{(quest?.categories ?? []).join(" ・ ") || "—"}</p>
+            <div className="eval-idea__label">締切</div>
+            <p>{quest?.deadline || "—"}</p>
+          </div>
+        </details>
+
+        {/* 折りたたみ: コンセプトを確認（クエスト情報の次・実データ）＝成果物スキーマ（課題/価値/対象/差別化/解の形態/採算）。 */}
+        <details className="disclosure disclosure--ref" open>
+          <summary>コンセプトを確認</summary>
+          <div className="disclosure__body">
+            <div className="eval-idea__label">課題・機会</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.problem || "—"}</p>
+            <div className="eval-idea__label">狙う価値（価値提案）</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.value_proposition || "—"}</p>
+            <div className="eval-idea__label">対象</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.target || "—"}</p>
+            <div className="eval-idea__label">競合・差別化</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.differentiation || "—"}</p>
+            <div className="eval-idea__label">解の形態＋必要な能力</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.solution_form || "—"}</p>
+            {concept?.viability && Object.keys(concept.viability).length > 0 && (
+              <>
+                <div className="eval-idea__label">採算・事業性（viability）</div>
+                <pre className="concept-viability">{Object.entries(concept.viability).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join("\n")}</pre>
+              </>
+            )}
+          </div>
+        </details>
 
         <div className="dialog-section is-quiet">
           <div className="dialog-label">評価点（中核5・必須）</div>
