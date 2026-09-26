@@ -5,72 +5,66 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-26
-- ブランチ: **`feature/chat-thread-independence`**（`origin` に push 済・upstream 設定済）。`main` より **2 コミット先行**。
-- 最新コミット:
-  - `4e3bdf0 feat(concept-chat): コンセプト議論チャットをアイデアと完全同一（フル機能パリティ）に`
-  - `2cd8a28 refactor(chat): チャット中核を chat_thread 親テーブルで完全独立化（案X・migration 0035）`
-- **PR #2 オープン中**: https://github.com/t-umekawa-sc/sc-ideaquest-G2/pull/2 （base `main` ← head `feature/chat-thread-independence`）。**マージ前にブラウザ受入が残**（§5）。
-- 作業ツリー clean（未コミット無し）。
+- ブランチ: **`feature/chat-thread-independence`**（`origin` push 済・**PR #2 オープン中**＝ https://github.com/t-umekawa-sc/sc-ideaquest-G2/pull/2 ）。`main` 未マージ。
+- 最新コミット: `5c299aa feat(eval-history): 変更履歴 Phase 4`。作業ツリー clean。
+- DB マイグレーション head＝**`0040_evaluation_revisions`**（全会社DB acme/acme2 適用済）。
+- 稼働中: backend/frontend/db/worker/mail-worker/redis/minio/mailhog Up（healthz 200・frontend 307）。**0040＋変更履歴フル機能でビルド済**。
 
-## 2. プロジェクトのゴール
-ゲーミフィケーションされたアイデア/コンセプト管理 Web アプリ（マルチテナント・FastAPI 4層 + Next.js App Router）。現在は **FR-42「コンセプト創造・検証（ISO 56001 ②③段）」** の frontend 実装フェーズ。本セッションの焦点＝**コンセプト議論チャットをアイデアチャットと完全同一（フル機能パリティ）にする**＝完了（受入待ち）。
+## 2. このセッションでやったこと（PR #2・上から新しい順）
+### (A) 変更履歴の標準装備（Phase 0〜4・全エンティティ完了）
+> 正本＝**設計ドラフト [doc/設計ドラフト/変更履歴標準.md](doc/設計ドラフト/変更履歴標準.md)**（Phase 0〜4 完了・実装状況を反映済）。目的＝ISO 56001 の反復更新で「当時の判断材料と判断結果」を追う。
+- **共通機構**: backend＝`impl/backend/app/tenant/_shared/revisions.py`（`FieldSpec` 駆動の差分エンジン＝`text_diff_segments`/`changed_fields`/`diff_fields`/cursor）。frontend＝`impl/frontend/src/components/ui/RevisionTimeline.tsx`（`variant: "idea"`＝概要パネルのリンクUI／`"info"`＝折り畳みUI）。**新エンティティは FieldSpec と loadDiff を渡すだけ**。
+- **2系統**: ①内容の版（per-entity `*_revisions` テーブル・JSONB `changes` スナップ・`UNIQUE(entity_id, revision)`・無変更は版なし）②意思決定ログ（`*_decision_log`・追記型・status/decision 遷移）。
+- **Phase 0**（`fb17242`）＝アイデア(`idea_revisions`)/情報(`info_item_revisions`)を共通機構へ寄せた（挙動不変・152 passed）。
+- **Phase 1**（`3155a65`・migration **0037**）＝コンセプト `concept_revisions`＋`concept_decision_log`（decision/status）＋**判断材料スナップ**（投票/評価/前提の検証状況を各版/ログに凍結）。UI＝SC-61「🕘 更新履歴」モーダル＋総合判定パネルに判定履歴。P-TC-250〜256。
+- **Phase 2**（`d6a3206`・migration **0038**）＝振り返り `quest_outcome_revisions`。UI＝SC-12 結果タブの振り返りに「🕘 更新履歴」折り畳み（結果レスポンスに `outcome_revisions` 埋込）。C-TC-296〜298。
+- **Phase 3**（`2d47203`・migration **0039**）＝クエスト定義 `quest_revisions`＋`quest_decision_log`（status 遷移）。定義項目＝title/purpose/color/deadline/categories（参加部署/権限は別意味＝含めない）。UI＝SC-12 ヘッダー「🕘 更新履歴」モーダル（定義版＋ステータス履歴）。C-TC-299〜302。
+- **Phase 4**（`5c299aa`・migration **0040**）＝評価 `evaluation_revisions`＋`concept_evaluation_revisions`（アイデア/コンセプト両評価）。**版は「確定(submit)」起点**＝初回確定=初版・確定ごと・下書き/無変更は版なし。UI＝SC-25/SC-62 に「🕘 確定履歴」折り畳み（me 評価に `revisions` 埋込）。F-TC-210〜212・P-TC-456〜458。
+- **履歴FKの ondelete（重要）**: 0037/0038 は既定 RESTRICT（コンセプト/振り返りテスト teardown に revision/log 削除を追加）。**0039/0040 は ON DELETE CASCADE**（quests/evaluations は物理削除するテスト teardown が多数＝親削除で履歴も消える。本番は soft delete/非削除で不発火＝監査保持と両立）。
 
-## 3. 今回やったこと（このブランチの 2 コミット）
-本セッション開始時、前セッションが「フル・パリティ Phase1 の基盤のみ（reactions を scope 対応＝旧 0034＋ORM 2列化）」を積んでいた。しかしユーザーから **「チャットを他の箇所にも置く可能性がある。二度と分離しないよう完全独立仕様にしてほしい」** と要望があり、**設計を案X（`chat_thread` 親テーブル）に転換**して作り直した。
+### (B) チャット中核の完全独立化＋コンセプトチャット フル機能パリティ
+- `2cd8a28`（migration **0035**）＝チャット中核を **`chat_thread`（owner_type/owner_id ポリモーフィック）** で完全独立化。`chat_messages`/`chat_reads`/`reactions` は `thread_id` ただ一つ。門番は `chat/application._resolve_host`（owner_type 分岐）。**新ホスト追加は thread 1本持つだけ＝中核無改修**。正本＝データモデル §5.14b。メモリ [[chat-thread-independence]]。
+- `4e3bdf0`＝コンセプト議論チャットをアイデアと**完全同一**に（共有 `IdeaChatView` を source 抽象 `features/chat/source.ts`＝`ideaSource`/`conceptScopeSource` で駆動）。reaction/魔法/メンション/引用/ピン/添付/未読/リアルタイム同一。
 
-### (A) `2cd8a28` チャット中核の完全独立化（案X・migration 0035）
-- **設計**: チャット中核（`chat_messages`/`chat_reads`/`reactions`＋従属 mentions/quotes/attachments/pins）が **`thread_id` ただ一つ**で動くホスト非依存サブシステムに。詳細は正本 `doc/データモデル.md §5.14b`。
-  - 新テーブル `chat_thread(owner_type, owner_id, UNIQUE(owner_type,owner_id))`。owner はポリモーフィック＝ホストのリンク表 PK（`idea`→`chat_groups.id` / `concept_scope`→`concept_chat_scopes.id`）。子→thread は堅い FK、thread→ホストはソフト参照。
-  - 旧設計（`chat_group_id`/`concept_chat_scope_id` の 2 nullable FK＋CHECK＝閉じた列挙）を撤去。
-- **DB**: `impl/backend/migrations/company/versions/0035_chat_thread.py`（新規）。**旧 0034 は未適用だったので削除**し、0035 の `down_revision=0033_concepts`。backfill＋欠損0アサート＋魔法 unique の thread 張替。**up→down→up 検証済**（acme/acme2・孤児0）。
-- **backend**: `chat/orm.py`（ChatThread 追加・3テーブル thread_id 化）／`chat/repository.py`（`ensure_chat_thread`・中核 thread_id 化・idea 集約系は `ChatGroup→chat_thread(owner)→ChatMessage` の3段 JOIN・`list_chat_thread_ids_for_*`）／`chat/application.py`（門番 `_resolve_host` で owner_type 分岐に集約・`_resolve_message`/CRUD/reaction/pin を thread 駆動）／`realtime/{events,gate,hub,router}.py`（購読トピック `chat:{thread_id}`）／`search/repository.py`（生SQL を chat_thread 経由）／`ideas/application.py`（添付所属解決 thread 経由）。`quests/application.py`・`quest_group_application.py` の失効対象を thread_id へ。
-- **frontend**: `IdeaChatView` 購読キーを thread_id へ・codegen 再生成。
-- **doc**: `doc/データモデル.md`（§5.14b/§5.15/§5.16/§5.18/§5.31/§5.45・ER 図）改訂。
+### (C) ブラウザ受入で出た指摘の修正
+- `b3f0a0c`（migration **0036**）＝コンセプトのグループ議論ルームが**1個しか作れない**バグ（0033 の `uq_concept_chat_scopes_kind` が group を潰す）→ group を一意対象から除外。P-TC-507。
+- `eafa90e`＝**ダイアログ・フッターの「キャンセル/閉じる」を左端に統一**（デザイン標準 §4.1・`.dialog-close-left`）。多数の入力フォーム＋ConfirmDialog を統一。
+- `99837fc`＝SC-61 に**投票/評価/総合判定の住み分けⓘ**、SC-62 コンセプト評価ダイアログに**クエスト＋コンセプト文脈**（アイデア評価 SC-25 と同型）。
 
-### (B) `4e3bdf0` コンセプトチャットのフル機能パリティ
-- **backend**: `chat/application.py` に thread ベースの中核を抽出（`_chat_payload`・`_create_message_core`）→ concept-scope 入口 `get_scope_chat`/`get_scope_chat_activity`/`post_scope_message`/`mark_scope_read`。門番＝`_resolve_scope_thread`。**reaction/edit/delete/pin は message-id ベースの共通 EP がそのまま効く**（中核はホスト非依存）。
-- **router**: `chat/router.py` に `GET/POST /concept-chat-scopes/{scope_id}/chat`・`chat-activity`・`chat-messages`・`chat/read` を追加。`ChatListResponse.chat_group_id` を **Optional 化**（idea のみ・concept は null）。
-- **frontend**: `IdeaChatView` を **source 抽象**（`impl/frontend/src/features/chat/source.ts`＝`ideaSource`/`conceptScopeSource`）で汎用化＝**同一コンポーネントで両ホストを駆動**。`ConceptChatView.tsx` を共有コンポーネントの薄いラッパへ置換（**slice A 破棄**）。`chat/api.ts` に `getScopeChat`/`getScopeChatActivity`/`postScopeMessage`/`markScopeRead`。codegen 再生成。
-- **tests/doc**: `tests/concepts/test_chat.py` に **P-TC-510/511/512**（rich GET 同形・共通EPリアクション・rich既読）追加＋teardown を thread/リアクション対応に。`doc/テスト/P_コンセプト.md` に TC 追記。
-
-## 4. 現在の状態
-- **稼働中**: backend/db/frontend/worker/mail-worker/redis/minio/mailhog Up（healthz 200・frontend 起動済）。**backend/frontend は 0035＋フル・パリティを反映してビルド済**（`up -d --build` 実施済）。
-- **DB マイグレーション**: 全会社DB（acme/acme2）＝**head `0035_chat_thread`** 適用済。
-- **テスト**: backend pytest **全ドメイン緑**（フル実行 790+ passed・chat/concepts/realtime/ideas/quests/search/dashboard）。**TC-ID traceability ✅（816件）**。frontend `npm run build` 通過（codegen 反映）。
-  - 注: フル実行で 1 度だけ `test_i_tc_131_partial_failure_best_effort` が落ちたが、**フロント再ビルドが pytest 実行中に backend コンテナを再起動した交絡＋DB汚染**によるフレークで、単独・ファイル単位（dashboard 13 passed）とも green＝コード起因ではない。
+## 3. 現在の状態
+- **テスト**: backend pytest **全ドメイン 812 passed**（フル実行）。**TC-ID traceability ✅（836件）**。frontend `npm run build` 通過（codegen 反映）。
 - **壊れているもの**: 認識範囲では無し。
 
-## 5. 詰まっている点 / 未実施
-- **コンセプトの実データ目視検証ができない**（前セッションからの既知事項）＝テスト垢 `user@acme.example`（ACME-01/`Passw0rd!`）は**コンセプト/アイデアの実データを持たない**（`seed_demo.py` はアイデア＋チャットのみ・コンセプト無し）。
-  - 結果: **ブラウザ受入（実データ）が未実施**＝PR マージ前の残作業。**要データ用意 or ユーザー自身のブラウザ**で:
-    1. 既存アイデアチャットの回帰（魔法/リアクション/メンション/引用/ピン/未読/リアルタイム）。
-    2. コンセプト詳細(SC-61)→「💬 このグループを議論」/総合チャット→**アイデアと同一UI・同一機能**（総合/グループ/前提スレッド各スコープ）。
-- **DB 汚染に注意**: 当セッションでフル pytest を acme に対し繰り返した際、テスト残骸（title="I" 等のリークチャット）が seed 垢のダッシュボードに混入し `test_i_tc_161_recent_chats` を落とした。掃除済みだが、**フル実行は残骸を残しうる**（frontend 再ビルドと pytest の同時実行も避ける＝backend コンテナ再起動が交絡）。
+## 4. 詰まっている点 / 未実施
+- **ブラウザ受入（実データ）が未完**＝PR #2 マージ前の残作業。テスト垢 `user@acme.example`（ACME-01/`Passw0rd!`）は**コンセプト実データを持たない**（`seed_demo.py` はアイデア＋チャットのみ）。→ **実データ環境 or ユーザー自身のブラウザ**で:
+  1. チャット（アイデア回帰＋コンセプト フル機能パリティ）。
+  2. 変更履歴（各詳細の「🕘 更新履歴」＝アイデア/コンセプト/クエスト/振り返り/評価/情報）。
+  3. ダイアログのキャンセル左寄せ・SC-61 ⓘ・SC-62 文脈。
+- **DB 汚染に注意**: フル pytest を acme に繰り返すとテスト残骸が seed 垢のダッシュボードに混じり `test_i_tc_161_recent_chats` を落とすことがある（掃除で復旧・コード起因ではない）。**pytest 実行中に frontend/backend の再ビルドを走らせない**（コンテナ再起動が交絡）。
 
-## 6. 決定事項と根拠
-- **チャットは「完全独立（案X＝chat_thread 親テーブル）」を採用**（ユーザー明示＝二度と分離しない）。不採用＝案Y（各行に汎用 `(container_type,id)` 2列・FK 整合が緩い）／現行の 2列列挙のまま。詳細メモ＝`~/.claude/.../memory/chat-thread-independence.md`。
-- **owner_id はホストのリンク表 PK**（chat_groups.id / concept_chat_scopes.id）を指す＝`chat_groups`/`concept_chat_scopes` は「ホストの owner adapter」として存続。中核は owner の意味を知らない。
-- **XP・門番はアイデアと同一**（コンセプト投稿も XP+5 日次上限・comment 権限必須・完了で 409）。
-- **realtime 購読キーは thread_id**（`chat:{thread_id}`）。`chat_group_id` は ChatListResponse に後方互換で残すが frontend は未使用（thread_id 駆動）。
+## 5. 決定事項と根拠
+- **チャットは完全独立（案X＝chat_thread）**（ユーザー明示＝二度と分離しない）。owner_id はホストのリンク表 PK。詳細＝[[chat-thread-independence]]。
+- **変更履歴は 2系統×per-entityテーブル＋共通ロジック/UI**（テーブルは各エンティティ固有＝chat_thread の一般化とは逆・履歴は他ホストから再利用しない付属物）。UI＝概要パネルあり→リンク／なし→折り畳み（ユーザー決定）。
+- **評価の版は確定(submit)起点**（ユーザー確定＝初回確定=初版・確定ごと・下書き/無変更は版なし・ア/コ両評価）。
+- **ダイアログのキャンセルは左端**（設計標準 §4.1・決定 2026-09-18 に合わせて統一）。
 
-## 7. 次にやること（優先順・具体）
-1. **PR #2 のブラウザ受入**（§5・実データ）→ 問題なければ `main` へマージ。
-2. **軽微フォローアップ（任意・受入後で可）**:
-   - `doc/API設計/E_*.md`・`doc/API設計/P_*.md` のエンドポイント表に **新スコープ経路**（`/concept-chat-scopes/{id}/chat*`）を追記（データモデル・P テスト設計書は反映済）。
-   - **slice A のコンセプトメッセージ EP**（`concepts/router.py` の `/concept-chat-scopes/{sid}/messages`〔GET/POST〕・`/read`、`concepts/application.py` の `list_messages`/`post_message`/`read_scope`、`concepts/api.ts` の `listScopeMessages`/`postScopeMessage`/`readScope`）は **frontend 未使用**になった。ただし **P-TC-503/504/505 が使用中**のため残置。整理するならテストも rich EP へ移すこと。
-   - `impl/README.md` の実装現況を追随更新（チャット独立化＋コンセプト rich 化）。
-3. **将来チャットを別ホストに置く時**（例: クエスト/成果物）: ①`chat_thread` の owner_type CHECK に値追加 ②ホスト側で `chat_repo.ensure_chat_thread(ts, "<type>", <linkPK>)` ③`chat/application._resolve_host` に owner_type 分岐 1 ケース追加。**中核（repository/CRUD/reaction/pin）と DB migration は無改修**。frontend は共有 `IdeaChatView` に新 `source` を足すだけ。
+## 6. 次にやること（優先順）
+1. **PR #2 のブラウザ受入**（§4・実データ）→ 問題なければ `main` へマージ。PR #2 は 12 コミット（チャット独立化→パリティ→受入修正→変更履歴 Phase 0〜4）。
+2. **軽微フォローアップ（任意）**:
+   - コンセプト/振り返り/クエスト/評価の**更新通知**（変更履歴標準 §3.5・現状アイデア版のみ `idea_updated` 通知・他は未）。
+   - コンセプトチャットのスライスA簡素EP（`concepts/router` の `/messages`）は frontend 未使用＝整理可（P-TC-503/504/505 が使用中）。
+   - API設計 E の `/concept-chat-scopes/*` 経路追記（データモデル/P は反映済）。
+3. **変更履歴を将来もう1エンティティに足す時**: `<entity>_revisions`（＋必要なら `_decision_log`）を作り、`app/tenant/_shared/revisions.py` の `FieldSpec` と `RevisionTimeline`（variant）を渡すだけ。履歴FKは物理削除するテストがあるなら CASCADE。
 
-## 8. 再開に必要な環境情報
+## 7. 再開に必要な環境情報
 - **起動**: `cd impl && docker compose up -d`。frontend/backend は**ソースをベイク（volumes 無）**＝反映は `docker compose up -d --build frontend`（or backend）。**migration/seed 追加後は `--build backend`**（entrypoint bootstrap が DB作成/migrate(head)/seed を毎起動・冪等）。**workers は profiles**＝`docker compose up -d worker mail-worker`。
-- **backend テスト**: `cd impl && docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/<domain> -q`（`-v` で未コミット反映）。**pytest 前に `docker compose stop worker mail-worker`**→終わったら start（*_outbox 競合回避）。**pytest 実行中に frontend/backend の再ビルドを走らせない**（コンテナ再起動が交絡してフレークになる）。
-- **frontend 検証**: `cd impl/frontend && npm run build`（必須ゲート＝Next lint 含む）。**backend の API 型を変えたら `cd impl/frontend && npm run codegen`**（openapi→`src/lib/api/schema.d.ts`）。
-- **e2e**: `cd impl/frontend && npx playwright test e2e/<spec> --workers=1`（フルスタック＋frontend `--build` 前提・storageState 認証）。
-- **DB 直接確認**: `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tAc "SELECT version_num FROM alembic_version"'`（テナントDB＝`ideaquest_company_acme`・head は `0035_chat_thread`）。
-- **ポート**: frontend 3000 / backend 8000（`/api/v1`・health `/healthz`）/ db 5432 / redis 6379 / minio 9000・9001 / mailhog 1025・8025。
-- **ログイン（テスト垢）**: 会社コード `ACME-01`／`user@acme.example`（他 `user2`/`user3`/`kanri`@acme.example）／パスワード `Passw0rd!`。**注意＝これらの垢は現DBにコンセプト/アイデアの実データを持たない**（実画面検証は要データ用意 or ユーザーのブラウザ）。
-- **TC トレーサビリティ**: リポジトリ root で `python3 scripts/check_tc_traceability.py`（✅ を確認）。
-- **PR 操作**: `gh` CLI は**未インストール**。PR 作成は GitHub API（`~/.git-credentials` のトークンで curl/python）で実施した。
+- **backend テスト**: `cd impl && docker compose run --rm -v "$(pwd)/backend:/app" backend python -m pytest tests/<domain> -q`（`-v` で未コミット反映・**cwd は必ず impl**＝`$(pwd)/backend` のマウントが効く。impl/backend で打つと二重 backend で空マウントになり bootstrap が `scripts` 見つからず失敗する）。**pytest 前に `docker compose stop worker mail-worker`**→終わったら start。
+- **migration の再適用（ondelete 変更など未コミット migration の作り直し）**: `cd impl && docker compose run --rm --entrypoint python -e PYTHONPATH=/app -v "$(pwd)/backend:/app" -T backend -c "..."` で `alembic command.downgrade/upgrade`（`python -c` は cwd を sys.path に入れないため PYTHONPATH=/app 必須・entrypoint bootstrap を避けるため --entrypoint python）。
+- **frontend 検証**: `cd impl/frontend && npm run build`（必須ゲート）。**backend の API 型を変えたら `cd impl/frontend && npm run codegen`**。
+- **DB 直接確認**: `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d ideaquest_company_acme -tAc "SELECT version_num FROM alembic_version"'`（head=`0040_evaluation_revisions`）。
+- **TC トレーサビリティ**: リポジトリ root で `python3 scripts/check_tc_traceability.py`（✅ 確認）。
+- **ログイン（テスト垢）**: 会社コード `ACME-01`／`user@acme.example`（他 user2/user3/kanri@acme.example）／`Passw0rd!`。**コンセプト/アイデア実データは無い**。
+- **PR 操作**: `gh` CLI は**未インストール**。PR は GitHub API（`~/.git-credentials` のトークンで curl/python）で作成した。
 
 ---
-（自己チェック済み: 本ファイルだけで「PR #2 の受入→マージ」または「軽微フォローアップ／別ホストへのチャット追加」から再開可能。未確認事項＝ブラウザ受入は明記した。）
+（自己チェック済み: 本ファイルだけで「PR #2 の受入→マージ」または「更新通知の追加／別エンティティへの変更履歴追加」から再開可能。未確認＝ブラウザ受入は明記した。）
