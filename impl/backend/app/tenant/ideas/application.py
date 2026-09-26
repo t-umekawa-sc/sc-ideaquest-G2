@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import difflib
 import uuid
 from datetime import date, datetime, timezone
 
@@ -28,6 +27,7 @@ from app.tenant.gamification import repository as gami_repo
 from app.tenant.gamification.daily import jst_day_bounds_utc
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
+from app.tenant._shared import revisions as rev_shared
 
 _EMPTY_PAGE = {"data": [], "page_info": {"next_cursor": None, "has_next": False}}
 
@@ -206,7 +206,7 @@ def get_revisions(account_id, company_id, idea_id, *, limit, cursor=None) -> dic
     if company is None:
         raise AppError(401, "unauthenticated")
     iid = _parse_uuid(idea_id, field="idea_id")
-    cur = _decode_revision_cursor(cursor) if cursor else None
+    cur = rev_shared.decode_revision_cursor(cursor) if cursor else None
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
@@ -217,7 +217,7 @@ def get_revisions(account_id, company_id, idea_id, *, limit, cursor=None) -> dic
         rows = rows[:limit]
         editors = quests_repo.get_users_by_ids(ts, {r.editor_id for r in rows})
         data = [_revision_dto(ts, idea.id, r, editors) for r in rows]
-        next_cursor = _encode_revision_cursor(rows[-1].revision) if has_next and rows else None
+        next_cursor = rev_shared.encode_revision_cursor(rows[-1].revision) if has_next and rows else None
     return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
 
 
@@ -240,7 +240,7 @@ def get_revision_diff(account_id, company_id, idea_id, revision, *, from_revisio
             raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
         from_rev = repo.get_revision(ts, idea.id, frm) if frm >= 1 else None
         old = from_rev.changes if from_rev is not None else {}
-        return {"from_revision": frm, "to_revision": revision, "fields": _diff_fields(old, to_rev.changes)}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, IDEA_REVISION_FIELDS)}
 
 
 # ---- 作成・編集・公開・削除（D.2） ----
@@ -710,29 +710,10 @@ def _content_snapshot(ts, idea) -> dict:
     }
 
 
-# 版で追跡する対象フィールド（D.4・§5.14）。テキスト系＝語句差分、その他＝{old,new}。
-_TEXT_FIELDS = ("title", "value", "body", "note")
-_TRACKED_FIELDS = ("title", "value", "body", "time_limit", "note", "stakeholders", "attachments")
-
-
-def _encode_revision_cursor(revision: int) -> str:
-    return base64.urlsafe_b64encode(f"rev|{revision}".encode()).decode()
-
-
-def _decode_revision_cursor(cursor: str) -> int:
-    try:
-        prefix, rev = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
-        if prefix != "rev":
-            raise ValueError
-        return int(rev)
-    except (binascii.Error, ValueError, UnicodeDecodeError):
-        raise AppError(422, "validation_error", detail="cursor が不正です", errors=[{"field": "cursor"}])
-
-
 def _revision_dto(ts, idea_id, rev, editors) -> dict:
     """版タイムラインの1行（D.4）。changed_fields＝前版比較で変わったフィールド（初版は空）。"""
     prev = repo.get_revision(ts, idea_id, rev.revision - 1) if rev.revision > 1 else None
-    changed = _changed_fields(prev.changes if prev is not None else None, rev.changes)
+    changed = rev_shared.changed_fields(prev.changes if prev is not None else None, rev.changes, IDEA_REVISION_FIELDS)
     return {
         "revision": rev.revision,
         "editor": _author_dto(editors.get(rev.editor_id), rev.editor_id),
@@ -742,68 +723,25 @@ def _revision_dto(ts, idea_id, rev, editors) -> dict:
     }
 
 
-def _changed_fields(old: dict | None, new: dict) -> list[str]:
-    """前版スナップショット比較で変わったフィールド名（初版＝old None は空・D.4）。"""
-    if old is None:
-        return []
-    changed = []
-    for f in _TRACKED_FIELDS:
-        # attachments 未追跡の旧スナップショット（本機能導入前）は比較対象外＝誤検知を防ぐ（None は「不明」）。
-        if f == "attachments" and old.get("attachments") is None:
-            continue
-        if old.get(f) != new.get(f):
-            changed.append(f)
-    return changed
-
-
-def _diff_fields(old: dict, new: dict) -> dict:
-    """2版のスナップショットから、変わったフィールドの差分を算出（D.4）。
-
-    テキスト系（title/value/body/note）＝語句（文字）差分の add/del/equal セグメント。
-    その他（time_limit/stakeholders）＝`{old,new}`（stakeholders はラベルを「・」連結）。
-    """
-    result: dict[str, dict] = {}
-    for f in _TRACKED_FIELDS:
-        ov, nv = old.get(f), new.get(f)
-        # attachments 未追跡の旧スナップショット（None）は差分を出さない（誤検知防止・_changed_fields と一致）。
-        if f == "attachments" and ov is None:
-            continue
-        if ov == nv:
-            continue
-        if f in _TEXT_FIELDS:
-            result[f] = {"kind": "text", "segments": _text_diff_segments(ov or "", nv or "")}
-        elif f == "stakeholders":
-            result[f] = {"kind": "scalar", "old": _stakeholders_str(ov), "new": _stakeholders_str(nv)}
-        elif f == "attachments":
-            # 添付は表示名の一覧を「・」連結で old→new（追加/削除が一目で分かる・D.4）。
-            result[f] = {"kind": "scalar", "old": "・".join(ov or []), "new": "・".join(nv or [])}
-        else:  # time_limit
-            result[f] = {"kind": "scalar", "old": ov, "new": nv}
-    return result
-
-
-def _text_diff_segments(old: str, new: str) -> list[dict]:
-    """文字単位の差分セグメント（equal/add/del）。日本語対応のため文字レベル SequenceMatcher（D.4・語句差分は D.8）。"""
-    sm = difflib.SequenceMatcher(a=old, b=new, autojunk=False)
-    segments: list[dict] = []
-    for op, i1, i2, j1, j2 in sm.get_opcodes():
-        if op == "equal":
-            segments.append({"op": "equal", "text": old[i1:i2]})
-        elif op == "delete":
-            segments.append({"op": "del", "text": old[i1:i2]})
-        elif op == "insert":
-            segments.append({"op": "add", "text": new[j1:j2]})
-        elif op == "replace":
-            segments.append({"op": "del", "text": old[i1:i2]})
-            segments.append({"op": "add", "text": new[j1:j2]})
-    return segments
-
-
 def _stakeholders_str(value) -> str:
     """利害関係者スナップショット（[{label,is_custom}]）を表示用の「・」連結ラベルに。"""
     if not value:
         return ""
     return "・".join((s.get("label") or "") for s in value)
+
+
+# 版で追跡する対象フィールド（D.4・§5.14）＝共通エンジン（_shared.revisions）へ渡す仕様。
+# テキスト系（title/value/body/note）＝語句差分／time_limit＝{old,new}／stakeholders・attachments＝表示整形。
+# 順序は従来の _TRACKED_FIELDS を踏襲（差分DTOの並び＝表示順を維持）。
+IDEA_REVISION_FIELDS = (
+    rev_shared.FieldSpec("title", "text"),
+    rev_shared.FieldSpec("value", "text"),
+    rev_shared.FieldSpec("body", "text"),
+    rev_shared.FieldSpec("time_limit", "scalar"),
+    rev_shared.FieldSpec("note", "text"),
+    rev_shared.FieldSpec("stakeholders", "scalar", scalar_fmt=_stakeholders_str),
+    rev_shared.FieldSpec("attachments", "scalar", scalar_fmt=lambda v: "・".join(v or []), skip_when_old_none=True),
+)
 
 
 def _publish_processing(ts, idea, user) -> int:
