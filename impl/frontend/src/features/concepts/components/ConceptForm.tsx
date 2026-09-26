@@ -2,7 +2,6 @@
 
 // SC-60 コンセプト登録・編集フォーム（FR-42・P.2）。由来アイデア選択＋成果物スキーマ入力（viability=JSON）。
 // 入力前理解のためフォーム冒頭に ⓘ ガイダンス（デザイン標準§4.13）。正＝doc/画面設計/screens/SC-60_コンセプト登録編集.md。
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -16,7 +15,7 @@ type Props = {
   mode: "create" | "edit";
   questId?: string; // create で必須
   conceptId?: string; // edit で必須
-  onDone: () => void;
+  onDone: (to?: string) => void; // 作成成功時は遷移先(/concepts/{id})を渡す＝呼び出し側が閉じ＋遷移を担う
   onCancel: () => void;
 };
 
@@ -72,7 +71,6 @@ function inputGuide(key: string): React.ReactNode {
 }
 
 export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Props) {
-  const router = useRouter();
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
   const isEdit = mode === "edit";
@@ -171,11 +169,10 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
       snack({ type: "success", title: publish ? "コンセプトを投稿しました（公開）" : "下書きを保存しました" });
       if (!isEdit && targetId) {
-        // 作成＝登録ダイアログURL（/concepts/new）を新コンセプト詳細で「置換」して遷移する。
-        // onDone()（モーダルの閉じ＝exit アニメ完了後に router.back）と router.push を併用すると、
-        // push が先・back が後で発火し /concepts/new に戻ってしまう（登録ダイアログURLのまま・背景がアイデアタブ）。
-        // replace で1回の遷移に統一＝競合なし・戻るは /quests/{id} へ（登録フォームに戻さない）。
-        router.replace(`/concepts/${targetId}`);
+        // 作成＝新コンセプト詳細へ遷移。モーダルは close(to) 経由＝先に exit アニメで閉じてから router.replace(to)
+        // するため「モーダルが閉じない/登録URLのまま」のデグレを回避（router.replace 直呼びは intercept スロットが
+        // 残り不可視化されず開いたままになる）。フルページは onDone(to)=router.push(to)。
+        onDone(`/concepts/${targetId}`);
       } else {
         onDone();  // 編集＝呼び出し側の閉じ（モーダルは閉じアニメ→router.back／フルページは戻る）
       }
