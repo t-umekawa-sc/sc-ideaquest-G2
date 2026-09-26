@@ -1753,6 +1753,9 @@ a.quest-card:active { transform: translateY(1px); }
 /* --- 列幅手動調整（table-layout:fixed＋見出し右端ハンドル） --- */
 .table.dt-fixed { table-layout: fixed; }
 .table.dt-fixed td, .table.dt-fixed th { overflow: hidden; text-overflow: ellipsis; }
+/* 操作列（⋯ボタン等）は truncate 対象外＝text-overflow:ellipsis がボタンの ⋯ を「溢れ」と誤判定し、
+   セル端に省略記号(…)のゴーストを描く不具合を防ぐ（table-layout:fixed 特有・目視確認 2026-09-26）。 */
+.table.dt-fixed td.col-actions, .table.dt-fixed th.col-actions { text-overflow: clip; }
 .dt-th { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dt-th__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 th.num .dt-th { justify-content: flex-end; }

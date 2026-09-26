@@ -212,6 +212,7 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
             exportName="候補コンセプト"
             emptyText="まだコンセプトはありません。「＋ コンセプトを作成」から起票できます。"
             onRowClick={(c) => openConcept(c.id)}
+            pins={false}
             defaultView="list"
             cardLayout={(c) => ({
               title: c.title,
