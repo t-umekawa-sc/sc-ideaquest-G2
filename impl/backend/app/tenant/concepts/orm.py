@@ -155,6 +155,18 @@ class ConceptRevision(CompanyBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class ConceptEvaluationRevision(CompanyBase):
+    """コンセプト評価の確定版スナップショット（変更履歴標準 §3.6・確定ごとに1版）。"""
+    __tablename__ = "concept_evaluation_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("concept_evaluations.id", ondelete="CASCADE"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # scores/comments/overall_comment/recommendation/visibility
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ConceptDecisionLog(CompanyBase):
     """コンセプトの意思決定/ステータスの追記型ログ（変更履歴標準 §3.2）。"""
     __tablename__ = "concept_decision_log"

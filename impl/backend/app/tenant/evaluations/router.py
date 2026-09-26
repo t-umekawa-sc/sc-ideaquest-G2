@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
@@ -16,6 +16,7 @@ from app.tenant.evaluations.schemas import (
     EvaluationAggregateDTO,
     EvaluationMeDTO,
     EvaluationPutRequest,
+    EvaluationRevisionDiffResponse,
     IdeaSelectResponse,
 )
 
@@ -33,6 +34,19 @@ def get_my_evaluation(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id,
     )
     return EvaluationMeDTO(**result)
+
+
+@router.get("/ideas/{idea_id}/evaluation/revisions/{revision}/diff", response_model=EvaluationRevisionDiffResponse)
+def get_evaluation_revision_diff(
+    idea_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> EvaluationRevisionDiffResponse:
+    """自分の評価の確定版差分（SC-25 折り畳みUI・§3.6）。既定＝前版比較。読取専用。"""
+    result = eval_service.get_evaluation_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), idea_id, revision, from_revision=from_revision,
+    )
+    return EvaluationRevisionDiffResponse(**result)
 
 
 @router.get("/ideas/{idea_id}/evaluation", response_model=EvaluationAggregateDTO)

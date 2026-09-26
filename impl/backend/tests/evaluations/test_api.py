@@ -438,3 +438,45 @@ def test_f_tc_209_aggregate_empty(client, env):
     idea = env.make_idea(quest_id=env.make_quest())
     body = client.get(EVAL(idea)).json()
     assert body["evaluator_count"] == 0 and body["overall_avg"] is None and body["coin"]["projected"] == 0
+
+
+# ---- F-TC-210〜212: 評価の変更履歴＝確定ごとの版（変更履歴標準 §3.6・migration 0040） ----
+
+
+def test_f_tc_210_eval_revision_on_submit(client, env):
+    """F-TC-210: 確定で版・再確定（内容変更）で版増（下書きは版なし・新しい順）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    client.put(EVAL(idea), json={"scores": {"novelty": 3}, "status": "draft"}, headers=_csrf(client))  # 下書き＝版なし
+    client.put(EVAL(idea), json={"scores": FULL, "overall_comment": "初回総評", "status": "submitted"}, headers=_csrf(client))  # 初版
+    client.put(EVAL(idea), json={"scores": FULL, "overall_comment": "改訂総評", "status": "submitted"}, headers=_csrf(client))  # 版2
+    revs = client.get(EVAL_ME(idea)).json()["revisions"]
+    assert [r["revision"] for r in revs] == [2, 1]
+    assert revs[1]["changed_fields"] == []  # 初版
+    assert "overall_comment" in revs[0]["changed_fields"]
+
+
+def test_f_tc_211_eval_no_change_submit_no_bump(client, env):
+    """F-TC-211: 同一内容の再確定は版を進めない（既存仕様踏襲）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    body = {"scores": FULL, "overall_comment": "確定", "status": "submitted"}
+    client.put(EVAL(idea), json=body, headers=_csrf(client))
+    client.put(EVAL(idea), json=body, headers=_csrf(client))  # 同値
+    revs = client.get(EVAL_ME(idea)).json()["revisions"]
+    assert [r["revision"] for r in revs] == [1]
+
+
+def test_f_tc_212_eval_revision_diff(client, env):
+    """F-TC-212: 評価の確定版差分（前版比較・overall_comment は text・scores は scalar）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    idea = env.make_idea(quest_id=qid)
+    client.put(EVAL(idea), json={"scores": FULL, "overall_comment": "AAA", "status": "submitted"}, headers=_csrf(client))
+    client.put(EVAL(idea), json={"scores": {**FULL, "novelty": 2}, "overall_comment": "AAB", "status": "submitted"}, headers=_csrf(client))
+    diff = client.get(f"/api/v1/ideas/{idea}/evaluation/revisions/2/diff").json()
+    assert diff["from_revision"] == 1 and diff["to_revision"] == 2
+    assert diff["fields"]["overall_comment"]["kind"] == "text"
+    assert diff["fields"]["scores"]["kind"] == "scalar"

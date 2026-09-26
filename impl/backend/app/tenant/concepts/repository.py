@@ -21,6 +21,7 @@ from app.tenant.concepts.orm import (
     ConceptChatScope,
     ConceptDecisionLog,
     ConceptEvaluation,
+    ConceptEvaluationRevision,
     ConceptEvaluationScore,
     ConceptRevision,
     ConceptSourceIdea,
@@ -586,3 +587,32 @@ def verdict_counts_for_concept(session: Session, concept_id: uuid.UUID) -> dict[
         .group_by(Assumption.current_verdict)
     ).all()
     return {v: int(n) for v, n in rows}
+
+
+# ---- コンセプト評価の確定版（変更履歴標準 §3.6） ----
+
+def add_eval_revision(session: Session, evaluation_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID, changes: dict) -> ConceptEvaluationRevision:
+    rev = ConceptEvaluationRevision(id=uuid.uuid4(), evaluation_id=evaluation_id, revision=revision, editor_id=editor_id, changes=changes)
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_eval_revisions(session: Session, evaluation_id: uuid.UUID) -> list[ConceptEvaluationRevision]:
+    return list(session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(ConceptEvaluationRevision.revision.desc())
+    ).scalars().all())
+
+
+def get_eval_revision(session: Session, evaluation_id: uuid.UUID, revision: int) -> ConceptEvaluationRevision | None:
+    return session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id, ConceptEvaluationRevision.revision == revision)
+    ).scalars().first()
+
+
+def latest_eval_revision(session: Session, evaluation_id: uuid.UUID) -> ConceptEvaluationRevision | None:
+    return session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(ConceptEvaluationRevision.revision.desc()).limit(1)
+    ).scalars().first()

@@ -22,6 +22,12 @@ export function getMyEvaluation(ideaId: string): Promise<EvaluationMe | null> {
   return apiFetch<EvaluationMe>(`/ideas/${ideaId}/evaluation/me`);
 }
 
+// 自分の評価の確定版差分（変更履歴標準 §3.6・折り畳みUI の展開時に取得）。
+export type EvaluationRevisionDiff = components["schemas"]["EvaluationRevisionDiffResponse"];
+export function getEvaluationRevisionDiff(ideaId: string, revision: number): Promise<EvaluationRevisionDiff | null> {
+  return apiFetch<EvaluationRevisionDiff>(`/ideas/${ideaId}/evaluation/revisions/${revision}/diff`);
+}
+
 // 評価結果の集計（SC-22 §4.6・F.1）。可視な評価のみ・limited は範囲外非表示・coin は全 submitted で見込み。
 export function getEvaluationAggregate(ideaId: string): Promise<EvaluationAggregate | null> {
   return apiFetch<EvaluationAggregate>(`/ideas/${ideaId}/evaluation`);

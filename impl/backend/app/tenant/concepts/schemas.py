@@ -270,6 +270,13 @@ class ConceptEvaluationPutRequest(BaseModel):
     status: EvalStatus = "draft"
 
 
+class ConceptEvalRevisionDTO(BaseModel):
+    """自分のコンセプト評価の確定版1行（SC-62 折り畳みUI・§3.6）。"""
+    revision: int
+    created_at: datetime
+    changed_fields: list[str] = []
+
+
 class ConceptEvaluationMeDTO(BaseModel):
     status: EvalStatus | None = None
     scores: dict[str, int] = {}
@@ -278,6 +285,13 @@ class ConceptEvaluationMeDTO(BaseModel):
     recommendation: str | None = None
     visibility: EvalVisibility = "party"
     submitted_at: datetime | None = None
+    revisions: list[ConceptEvalRevisionDTO] = []
+
+
+class ConceptEvalRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, ConceptDiffField] = {}  # 差分フィールド形は共通（§3.6）
 
 
 class ConceptEvaluatorDTO(BaseModel):

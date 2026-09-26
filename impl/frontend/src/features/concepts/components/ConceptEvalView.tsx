@@ -6,9 +6,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
 import { ApiError } from "@/lib/api/client";
 
-import { CONCEPTS_CHANGED_EVENT, getConcept, getMyEvaluation, putEvaluation, type ConceptDetail } from "../api";
+import { CONCEPTS_CHANGED_EVENT, getConcept, getConceptEvalRevisionDiff, getMyEvaluation, putEvaluation, type ConceptDetail } from "../api";
+
+// コンセプト評価の確定版で追跡するフィールドの表示名（§3.6）。
+const EVAL_FIELD_LABELS: Record<string, string> = { overall_comment: "総評", scores: "評価点", comments: "観点別コメント", recommendation: "総合判定の推奨", visibility: "公開範囲" };
 import { getQuest, type QuestDetail } from "@/features/quests/api";
 import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）＋文脈（.eval-context/.disclosure）を再利用
 import "../concepts.css";
@@ -66,6 +70,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
   // 評価の判断材料＝対象コンセプト＋クエスト文脈（アイデア評価 SC-25 と同型・ダイアログ内コンテンツ標準 §4.1）。
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [quest, setQuest] = useState<QuestDetail | null>(null);
+  const [revisions, setRevisions] = useState<RevisionRow[]>([]); // 確定版の履歴（折り畳みUI・§3.6）
 
   useEffect(() => {
     let alive = true;
@@ -83,6 +88,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
         setRecommendation(me.recommendation ?? "");
         setVisibility((me.visibility ?? "party") as "party" | "limited");
       }
+      setRevisions((me?.revisions ?? []) as unknown as RevisionRow[]);
       setLoading(false);
     });
     return () => { alive = false; };
@@ -218,6 +224,23 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
             </label>
           </div>
         </div>
+
+        {/* 確定履歴＝折り畳みUI（自分の評価の再評価の変遷・§3.6）。 */}
+        {revisions.length > 0 && (
+          <details className="dialog-section is-quiet" style={{ marginTop: "var(--space-3)" }}>
+            <summary className="role-note" style={{ cursor: "pointer" }}>🕘 確定履歴（{revisions.length}）</summary>
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <RevisionTimeline
+                variant="info"
+                revisions={revisions}
+                currentRevision={revisions[0]?.revision ?? 1}
+                fieldLabels={EVAL_FIELD_LABELS}
+                loadDiff={(r) => getConceptEvalRevisionDiff(conceptId, r) as Promise<RevisionDiff | null>}
+                initialNote="評価を確定。"
+              />
+            </div>
+          </details>
+        )}
       </ModalBody>
       <ModalFooter>
         <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>

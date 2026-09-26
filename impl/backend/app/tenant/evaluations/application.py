@@ -15,6 +15,7 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.evaluations import repository as repo
 from app.tenant.evaluations.repository import ASPECTS
+from app.tenant._shared import revisions as rev_shared
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
 from app.tenant.ideas import repository as ideas_repo
@@ -114,6 +115,7 @@ def put_evaluation(account_id, company_id, idea_id, *, body) -> dict:
         if body.status == "submitted":
             if ev.submitted_at is None:
                 ev.submitted_at = datetime.now(timezone.utc)
+            _record_eval_revision(ts, ev, user.id, _eval_snapshot(body))  # 確定ごとに版（§3.6）
             # 評価者 XP+30（評価1件につき1回・exists_ref 冪等・日次上限対象外）。
             # xp_delta＝実際に付与した XP（初回のみ +30・冪等スキップ時 0）＝獲得フィードバック（#8・F-TC-141）。
             if not gami_repo.exists_ref(ts, user.id, ledger.XP_GAIN, "evaluation", "evaluations", ev.id):
@@ -127,6 +129,30 @@ def put_evaluation(account_id, company_id, idea_id, *, body) -> dict:
         detail["xp_delta"] = xp_delta
         ts.commit()
     return detail
+
+
+def get_evaluation_revision_diff(account_id, company_id, idea_id, revision, *, from_revision=None) -> dict:
+    """自分のアイデア評価の確定版差分（§3.6）。既定＝前版比較。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    iid = _parse_uuid(idea_id, field="idea_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        ev = repo.get_evaluation(ts, iid, user.id)
+        if ev is None:
+            raise AppError(404, "not_found")
+        to_rev = repo.get_eval_revision(ts, ev.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_eval_revision(ts, ev.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, EVAL_REVISION_FIELDS)}
 
 
 # ---- 選定（F.3） ----
@@ -392,10 +418,51 @@ def _coin_status(ts, idea, submitted, scores_by_eval) -> dict:
     return {"projected": projected, "finalized": finalized, "finalized_at": finalized_at}
 
 
+# 評価の確定版で追跡するフィールド（§3.6）＝共通エンジン仕様。scores/comments は JSON 化して差分。
+import json as _json  # noqa: E402
+
+
+def _json_compact(v) -> str:
+    return _json.dumps(v, ensure_ascii=False, sort_keys=True) if v else ""
+
+
+EVAL_REVISION_FIELDS = (
+    rev_shared.FieldSpec("overall_comment", "text"),
+    rev_shared.FieldSpec("scores", "scalar", scalar_fmt=_json_compact),
+    rev_shared.FieldSpec("comments", "scalar", scalar_fmt=_json_compact),
+    rev_shared.FieldSpec("visibility", "scalar"),
+)
+
+
+def _eval_snapshot(body) -> dict:
+    """確定時のスナップショット（提出された本文から・§3.6）。"""
+    return {
+        "overall_comment": body.overall_comment or None,
+        "scores": {a: body.scores[a] for a in ASPECTS if a in body.scores},
+        "comments": {a: c for a, c in (body.comments or {}).items() if c},
+        "visibility": body.visibility,
+    }
+
+
+def _record_eval_revision(ts, ev, editor_id, snapshot) -> None:
+    """確定ごとに版を記録（初回確定=初版・無変更は版なし・§3.6）。"""
+    last = repo.latest_eval_revision(ts, ev.id)
+    base = last.changes if last else {"overall_comment": None, "scores": {}, "comments": {}, "visibility": "party"}
+    if rev_shared.changed_fields(base, snapshot, EVAL_REVISION_FIELDS):
+        repo.add_eval_revision(ts, ev.id, revision=(last.revision + 1) if last else 1, editor_id=editor_id, changes=snapshot)
+
+
 def _me_payload(ts, ev) -> dict:
     if ev is None:
-        return {"status": None, "scores": {}, "comments": {}, "overall_comment": None, "visibility": "party", "submitted_at": None}
+        return {"status": None, "scores": {}, "comments": {}, "overall_comment": None, "visibility": "party", "submitted_at": None, "revisions": []}
     scores = repo.list_scores(ts, ev.id)
+    revs = repo.list_eval_revisions(ts, ev.id)
+    rev_by_num = {r.revision: r for r in revs}
+    revisions = [{
+        "revision": r.revision,
+        "created_at": r.created_at,
+        "changed_fields": rev_shared.changed_fields(rev_by_num.get(r.revision - 1).changes if rev_by_num.get(r.revision - 1) else None, r.changes, EVAL_REVISION_FIELDS),
+    } for r in revs]
     return {
         "status": ev.status,
         "scores": {s.aspect: s.score for s in scores},
@@ -403,6 +470,7 @@ def _me_payload(ts, ev) -> dict:
         "overall_comment": ev.overall_comment,
         "visibility": ev.visibility,
         "submitted_at": ev.submitted_at,
+        "revisions": revisions,
     }
 
 

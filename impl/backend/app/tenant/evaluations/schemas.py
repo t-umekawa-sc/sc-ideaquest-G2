@@ -41,11 +41,19 @@ class EvaluationAuthorDTO(BaseModel):
     level: int | None = None
 
 
+class EvaluationRevisionDTO(BaseModel):
+    """自分の評価の確定版1行（SC-25 折り畳みUI・§3.6）。changed_fields＝前版比の変更（初版は空）。"""
+    revision: int
+    created_at: datetime
+    changed_fields: list[str] = []
+
+
 class EvaluationMeDTO(BaseModel):
     """自分の評価/下書き（SC-25 読み込み・F.1）。未作成は status=null。
 
     xp_delta＝この確定(submitted)で実際に付与した評価 XP（初回のみ +30・冪等スキップ/下書き保存/参照時は 0）
     ＝獲得フィードバック用（#8）。金額の正はサーバー（F 台帳 evaluation=+30）。
+    revisions＝確定ごとの版メタ（折り畳みUI・差分は別 EP で取得・§3.6）。
     """
 
     status: EvaluationStatus | None = None
@@ -55,6 +63,25 @@ class EvaluationMeDTO(BaseModel):
     visibility: EvaluationVisibility = "party"
     submitted_at: datetime | None = None
     xp_delta: int = 0
+    revisions: list[EvaluationRevisionDTO] = []
+
+
+class EvaluationDiffSegment(BaseModel):
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class EvaluationDiffField(BaseModel):
+    kind: Literal["text", "scalar"]
+    segments: list[EvaluationDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class EvaluationRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, EvaluationDiffField] = {}
 
 
 class EvaluationEvaluatorDTO(BaseModel):

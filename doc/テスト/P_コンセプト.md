@@ -86,6 +86,9 @@
 | P-TC-408 | api | limited は範囲外に完全非表示（分母除外） | limited＋party 評価 | 範囲外で `GET .../evaluation` | limited 除外集計・evaluators に出ない | P.5／F.1 |
 | P-TC-409 | api | 入力は evaluator 権限必須 | パーティーだが evaluator なし | `PUT` | 403 | P.0/P.5 |
 | P-TC-410 | api | 反証波及後の stale 表示（要再評価） | リンク前提が refuted | `GET .../evaluation`（my） | stale フラグ／要再評価が読める（SC-62 バナー源） | P.7／§3.5 |
+| P-TC-456 | api | 評価の変更履歴＝確定ごとに版（下書きは版なし・§3.6） | evaluator | `PUT .../evaluation`（draft→submitted→submitted〔総評変更〕） | `GET .../evaluation/me` の `revisions` が rev2＋rev1（新しい順・初版空・rev2 に overall_comment） | §3.6／migration 0040 |
+| P-TC-457 | api | 同一内容の再確定は版を進めない（既存仕様踏襲） | evaluator | `PUT .../evaluation`（同値 submitted×2） | `revisions` は rev1 のみ | §3.6 |
+| P-TC-458 | api | コンセプト評価の確定版差分（recommendation=scalar） | 2版 | `GET .../evaluation/revisions/2/diff` | recommendation＝scalar・overall_comment＝text | §3.6 |
 
 ## 6. コンセプト投票 API（P.5b・SC-61 §4.5）
 

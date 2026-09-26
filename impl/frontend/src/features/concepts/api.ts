@@ -52,6 +52,12 @@ export function getConceptDecisionLog(conceptId: string): Promise<ConceptDecisio
   return apiFetch<ConceptDecisionLog>(`/concepts/${conceptId}/decision-log`);
 }
 
+// 自分のコンセプト評価の確定版差分（変更履歴標準 §3.6・折り畳みUI の展開時に取得）。
+export type ConceptEvalRevisionDiff = components["schemas"]["ConceptEvalRevisionDiffResponse"];
+export function getConceptEvalRevisionDiff(conceptId: string, revision: number): Promise<ConceptEvalRevisionDiff | null> {
+  return apiFetch<ConceptEvalRevisionDiff>(`/concepts/${conceptId}/evaluation/revisions/${revision}/diff`);
+}
+
 export function listConcepts(questId: string): Promise<ConceptListResponse | null> {
   return apiFetch<ConceptListResponse>(`/quests/${questId}/concepts`);
 }

@@ -15,7 +15,11 @@ import { reduceMotion } from "@/lib/motion";
 import { consumeEvalFromIdea } from "@/lib/nav";
 import { getIdea, type IdeaDetail } from "@/features/ideas/api";
 
-import { EVALUATIONS_CHANGED_EVENT, getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
+import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
+import { EVALUATIONS_CHANGED_EVENT, getEvaluationRevisionDiff, getMyEvaluation, putEvaluation, type EvaluationVisibility } from "../api";
+
+// 評価の確定版で追跡するフィールドの表示名（§3.6）。
+const EVAL_FIELD_LABELS: Record<string, string> = { overall_comment: "総評", scores: "評価点", comments: "観点別コメント", visibility: "公開範囲" };
 import "../evaluations.css";
 
 type AspectKey = "novelty" | "impact" | "feasibility" | "fit" | "cost";
@@ -94,6 +98,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
   const [comments, setComments] = useState<Partial<Record<AspectKey, string>>>({});
   const [overall, setOverall] = useState("");
   const [visibility, setVisibility] = useState<EvaluationVisibility>("party");
+  const [revisions, setRevisions] = useState<RevisionRow[]>([]); // 確定版の履歴（折り畳みUI・§3.6）
   const [missingErr, setMissingErr] = useState(0);
   const [overallErr, setOverallErr] = useState(false);
   const [idea, setIdea] = useState<IdeaDetail | null>(null);
@@ -125,6 +130,7 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
             visibility: me.visibility ?? "party",
           });
         }
+        setRevisions((me?.revisions ?? []) as unknown as RevisionRow[]);
         setIdea(d);
         setLoadError(null);
       })
@@ -479,6 +485,23 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
             </label>
           </div>
         </div>
+
+        {/* 確定履歴＝折り畳みUI（自分の評価の再評価の変遷・§3.6）。ISO の反復更新で当時の評価を追える。 */}
+        {revisions.length > 0 && (
+          <details className="dialog-section" style={{ marginTop: "var(--space-3)" }}>
+            <summary className="role-note" style={{ cursor: "pointer" }}>🕘 確定履歴（{revisions.length}）</summary>
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <RevisionTimeline
+                variant="info"
+                revisions={revisions}
+                currentRevision={revisions[0]?.revision ?? 1}
+                fieldLabels={EVAL_FIELD_LABELS}
+                loadDiff={(r) => getEvaluationRevisionDiff(ideaId, r) as Promise<RevisionDiff | null>}
+                initialNote="評価を確定。"
+              />
+            </div>
+          </details>
+        )}
 
         <p className="role-note" style={{ marginTop: "var(--space-3)" }}>
           <strong>下書き保存</strong>は一時保存です（本人のみ表示・全観点がそろっていなくても保存できます）。<strong>確定</strong>すると他の評価者・パーティーに反映され、評価で XP、投稿者にコインが付与されます。

@@ -270,3 +270,40 @@ def test_p_tc_455_vote_csrf_unauth(env, client):
     assert client.post(f"/api/v1/concepts/{cid}/vote", json={"type": "approve"}).status_code == 403
     client.cookies.clear()
     assert client.post(f"/api/v1/concepts/{cid}/vote", json={"type": "approve"}).status_code == 401
+
+
+# ---- P-TC-456〜458: コンセプト評価の変更履歴＝確定ごとの版（変更履歴標準 §3.6・migration 0040） ----
+
+
+def test_p_tc_456_eval_revision_on_submit(env, client):
+    """P-TC-456: 確定で版・再確定（内容変更）で版増（下書きは版なし・新しい順）。"""
+    _login_seed(client)
+    cid = _active_concept(client, env.make_quest())
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json={"scores": {"desirability": 3}, "status": "draft"}, headers=_csrf(client))
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(overall_comment="初回"), headers=_csrf(client))
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(overall_comment="改訂"), headers=_csrf(client))
+    revs = client.get(f"/api/v1/concepts/{cid}/evaluation/me").json()["revisions"]
+    assert [r["revision"] for r in revs] == [2, 1]
+    assert revs[1]["changed_fields"] == []
+    assert "overall_comment" in revs[0]["changed_fields"]
+
+
+def test_p_tc_457_eval_no_change_submit_no_bump(env, client):
+    """P-TC-457: 同一内容の再確定は版を進めない（既存仕様踏襲）。"""
+    _login_seed(client)
+    cid = _active_concept(client, env.make_quest())
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(), headers=_csrf(client))
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(), headers=_csrf(client))
+    revs = client.get(f"/api/v1/concepts/{cid}/evaluation/me").json()["revisions"]
+    assert [r["revision"] for r in revs] == [1]
+
+
+def test_p_tc_458_eval_revision_diff(env, client):
+    """P-TC-458: コンセプト評価の確定版差分（recommendation は scalar・overall_comment は text）。"""
+    _login_seed(client)
+    cid = _active_concept(client, env.make_quest())
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(recommendation="go"), headers=_csrf(client))
+    client.put(f"/api/v1/concepts/{cid}/evaluation", json=_full_submit(recommendation="pivot"), headers=_csrf(client))
+    diff = client.get(f"/api/v1/concepts/{cid}/evaluation/revisions/2/diff").json()
+    assert diff["from_revision"] == 1 and diff["to_revision"] == 2
+    assert diff["fields"]["recommendation"]["kind"] == "scalar"

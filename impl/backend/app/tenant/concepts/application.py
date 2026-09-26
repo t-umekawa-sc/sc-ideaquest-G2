@@ -729,17 +729,71 @@ def _require_evaluator(ts, quest, user) -> None:
         raise AppError(403, "forbidden", detail="評価の権限がありません")
 
 
+# コンセプト評価の確定版で追跡するフィールド（§3.6）。scores/comments は JSON 化して差分。
+CONCEPT_EVAL_REVISION_FIELDS = (
+    rev_shared.FieldSpec("overall_comment", "text"),
+    rev_shared.FieldSpec("scores", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("comments", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("recommendation", "scalar"),
+    rev_shared.FieldSpec("visibility", "scalar"),
+)
+
+
+def _concept_eval_snapshot(body) -> dict:
+    return {
+        "overall_comment": body.overall_comment or None,
+        "scores": {a: s for a, s in body.scores.items() if a in repo.ALL_ASPECTS},
+        "comments": {a: c for a, c in (body.comments or {}).items() if c},
+        "recommendation": body.recommendation,
+        "visibility": body.visibility,
+    }
+
+
+def _record_concept_eval_revision(ts, ev, editor_id, snapshot) -> None:
+    last = repo.latest_eval_revision(ts, ev.id)
+    base = last.changes if last else {"overall_comment": None, "scores": {}, "comments": {}, "recommendation": None, "visibility": "party"}
+    if rev_shared.changed_fields(base, snapshot, CONCEPT_EVAL_REVISION_FIELDS):
+        repo.add_eval_revision(ts, ev.id, revision=(last.revision + 1) if last else 1, editor_id=editor_id, changes=snapshot)
+
+
 def _me_eval_payload(ts, ev) -> dict:
     if ev is None:
         return {"status": None, "scores": {}, "comments": {}, "overall_comment": None,
-                "recommendation": None, "visibility": "party", "submitted_at": None}
+                "recommendation": None, "visibility": "party", "submitted_at": None, "revisions": []}
     scores = repo.get_scores_for_evaluations(ts, [ev.id]).get(ev.id, [])
+    revs = repo.list_eval_revisions(ts, ev.id)
+    rev_by_num = {r.revision: r for r in revs}
+    revisions = [{
+        "revision": r.revision, "created_at": r.created_at,
+        "changed_fields": rev_shared.changed_fields(rev_by_num.get(r.revision - 1).changes if rev_by_num.get(r.revision - 1) else None, r.changes, CONCEPT_EVAL_REVISION_FIELDS),
+    } for r in revs]
     return {
         "status": ev.status, "scores": {s.aspect: s.score for s in scores},
         "comments": {s.aspect: s.comment for s in scores if s.comment is not None},
         "overall_comment": ev.overall_comment, "recommendation": ev.recommendation,
-        "visibility": ev.visibility, "submitted_at": ev.submitted_at,
+        "visibility": ev.visibility, "submitted_at": ev.submitted_at, "revisions": revisions,
     }
+
+
+def get_concept_eval_revision_diff(account_id, company_id, concept_id, revision, *, from_revision=None) -> dict:
+    """自分のコンセプト評価の確定版差分（§3.6）。既定＝前版比較。範囲外 404/422。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        ev = repo.get_evaluation(ts, cid, user.id)
+        if ev is None:
+            raise AppError(404, "not_found")
+        to_rev = repo.get_eval_revision(ts, ev.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_eval_revision(ts, ev.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, CONCEPT_EVAL_REVISION_FIELDS)}
 
 
 def _can_view_eval(concept, user, ev, is_manager: bool) -> bool:
@@ -837,8 +891,10 @@ def put_evaluation(account_id, company_id, concept_id, *, body) -> dict:
         )
         entries = [(a, s, body.comments.get(a)) for a, s in body.scores.items() if a in repo.ALL_ASPECTS]
         repo.replace_scores(ts, ev.id, entries)
-        if submitted and ev.submitted_at is None:
-            ev.submitted_at = datetime.now(timezone.utc)
+        if submitted:
+            if ev.submitted_at is None:
+                ev.submitted_at = datetime.now(timezone.utc)
+            _record_concept_eval_revision(ts, ev, user.id, _concept_eval_snapshot(body))  # 確定ごとに版（§3.6）
         ts.flush()
         payload = _me_eval_payload(ts, ev)
         ts.commit()

@@ -22,6 +22,7 @@ from app.tenant.concepts.schemas import (
     ConceptDecisionLogResponse,
     ConceptDecisionRequest,
     ConceptDetailDTO,
+    ConceptEvalRevisionDiffResponse,
     ConceptRevisionDiffResponse,
     ConceptRevisionListResponse,
     ConceptEvaluationAggregateDTO,
@@ -315,6 +316,19 @@ def get_my_evaluation(concept_id: str, request: Request, session: dict = Depends
     """自分の評価/下書き（P.5・evaluator）。読取専用。"""
     result = service.get_my_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptEvaluationMeDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/evaluation/revisions/{revision}/diff", response_model=ConceptEvalRevisionDiffResponse)
+def get_concept_eval_revision_diff(
+    concept_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> ConceptEvalRevisionDiffResponse:
+    """自分のコンセプト評価の確定版差分（SC-62 折り畳みUI・§3.6）。既定＝前版比較。読取専用。"""
+    result = service.get_concept_eval_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, revision, from_revision=from_revision,
+    )
+    return ConceptEvalRevisionDiffResponse(**result)
 
 
 @router.get("/concepts/{concept_id}/evaluation", response_model=ConceptEvaluationAggregateDTO)
