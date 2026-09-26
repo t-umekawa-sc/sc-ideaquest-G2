@@ -102,9 +102,10 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
 
   // 前提の追加/編集をダイアログで保存（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
   const saveAssumption = useCallback(async () => {
-    if (!assumptionDialog) return;
+    if (!assumptionDialog || savingAssumption) return;
     const stmt = assumptionDialog.statement.trim();
-    if (!stmt || savingAssumption) return;
+    // 主ボタンは常に押せる（dirty ゲートで無効化しない・デザイン標準 §4.1）。空なら押下時に検証エラーを通知。
+    if (!stmt) { snack({ type: "error", title: "前提を入力してください" }); return; }
     setSavingAssumption(true);
     try {
       if (assumptionDialog.mode === "edit" && assumptionDialog.id) {
@@ -249,6 +250,7 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
             emptyText="検証プールは空です。"
             pins={false}
             defaultView="list"
+            onRowClick={canManage ? (a) => setAssumptionDialog({ mode: "edit", id: a.id, statement: a.statement }) : undefined}
             cardLayout={(a) => ({
               title: a.statement,
               badges: [{ label: VERDICT_LABEL[a.current_verdict]?.[0] ?? a.current_verdict, cls: VERDICT_LABEL[a.current_verdict]?.[1] ?? "badge badge-muted" }],
@@ -275,7 +277,7 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
           </ModalBody>
           <ModalFooter>
             <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setAssumptionDialog(null)}>キャンセル</Button>
-            <Button type="button" variant="primary" disabled={!assumptionDialog.statement.trim() || savingAssumption} loading={savingAssumption} onClick={() => void saveAssumption()}>{assumptionDialog.mode === "edit" ? "更新" : "追加"}</Button>
+            <Button type="button" variant="primary" disabled={savingAssumption} loading={savingAssumption} onClick={() => void saveAssumption()}>{assumptionDialog.mode === "edit" ? "更新" : "追加"}</Button>
           </ModalFooter>
         </Modal>
       )}
