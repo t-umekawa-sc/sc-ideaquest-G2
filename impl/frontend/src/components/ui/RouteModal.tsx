@@ -25,7 +25,9 @@ export function RouteModal({ title, size = "md", beforeClose, children }: Props)
   const router = useRouter();
   const [open, setOpen] = useState(true);
   const nextHref = useRef<string | null>(null); // close(to) の遷移先（onClosed で消費）
-  const close = (to?: string) => { nextHref.current = to ?? null; setOpen(false); }; // 閉じ要求＝exit アニメ開始
+  // close は onClick ハンドラに直接渡されること（onClick={close}）があり、その場合 to に MouseEvent が入る。
+  // 遷移先は文字列のときだけ採用＝イベントを URL と誤認して router.replace(event) する事故を防ぐ（cancel で URL が戻らない不具合）。
+  const close = (to?: string) => { nextHref.current = typeof to === "string" ? to : null; setOpen(false); }; // 閉じ要求＝exit アニメ開始
   // 背景/Esc/× は beforeClose を通す（未保存なら破棄確認→キャンセルで閉じない）。
   const requestClose = async () => { if (!beforeClose || (await beforeClose())) setOpen(false); };
   return (

@@ -257,7 +257,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
         )}
       </ModalBody>
       <ModalFooter>
-        <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
         <Button type="button" variant="outline" disabled={!!pending} loading={pending === "draft"} onClick={() => void save("draft")}>下書き保存</Button>
         <Button type="submit" variant="primary" disabled={!!pending} loading={pending === "submit"}>評価を確定</Button>
       </ModalFooter>

@@ -289,7 +289,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         </div>
       </ModalBody>
       <ModalFooter>
-        <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
         <Button type="button" variant="outline" disabled={pending !== null} loading={pending === "draft"} onClick={() => void submit(false)}>下書き保存</Button>
         <Button type="button" variant="primary" disabled={pending !== null} loading={pending === "publish"} onClick={() => void submit(true)}>投稿する</Button>
       </ModalFooter>

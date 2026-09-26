@@ -242,7 +242,7 @@ export function QuestCatalogView() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <button type="button" className="btn dialog-close-left" disabled={reqBusy} onClick={() => setReqOpen(false)}>キャンセル</button>
+            <button type="button" className="btn btn-outline dialog-close-left" disabled={reqBusy} onClick={() => setReqOpen(false)}>キャンセル</button>
             <button type="button" className="btn btn-primary" disabled={reqBusy} onClick={() => void submitRequest()}>リクエストを送信</button>
           </ModalFooter>
         </Modal>
@@ -311,7 +311,7 @@ function CatalogDialog({ row, open, onClose, onClosed, onFollow, onRequest, onWi
       </ModalBody>
       <ModalFooter>
         {/* フォローはヘッダー右上へ移動（アイデア詳細と同位置）。フッターは 閉じる（左）→ 状態別 → 主要アクション（右）。 */}
-        <button type="button" className="btn dialog-close-left" onClick={onClose}>閉じる</button>
+        <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>閉じる</button>
         {st === "rejected" && <span className="muted text-sm">却下（作成者の再承認待ち）</span>}
         {st === "pending" && <button type="button" className="btn" onClick={() => onWithdraw(row)}>申請を取り消す</button>}
         {(st === "none" || st === "following") && (
