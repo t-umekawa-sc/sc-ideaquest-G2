@@ -50,6 +50,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 振り返り更新履歴モーダル（リンク版UI・§3.1）
   const [concepts, setConcepts] = useState<ConceptListItem[]>([]); // クエストの成果＝候補コンセプト（ISO ②③段）
 
   useEffect(() => {
@@ -317,24 +318,39 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
           )}
-          {/* 更新履歴＝情報インプットの詳細と同じ disclosure UI（概要パネル無しのため折り畳み・変更履歴標準 §3.1）。ISO §10 改善＝当時の学び/次アクションを追える。 */}
+          {/* 更新履歴＝リンク版UI（最終更新の下に「版 N（履歴）」＝モーダルで版タイムライン。アイデア/コンセプト詳細と同型・§3.1）。 */}
           {result.outcome_revisions.length > 0 && (
-            <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
-              <summary>🕘 更新履歴（{result.outcome_revisions.length} 版）</summary>
-              <div className="disclosure__body">
-                <RevisionTimeline
-                  variant="info"
-                  revisions={result.outcome_revisions as unknown as RevisionRow[]}
-                  currentRevision={result.outcome_revisions[0]?.revision ?? 1}
-                  fieldLabels={OUTCOME_FIELD_LABELS}
-                  loadDiff={(r) => getQuestOutcomeRevisionDiff(questId, r) as Promise<RevisionDiff | null>}
-                  initialNote="振り返りを記入。"
-                />
-              </div>
-            </details>
+            <p style={{ marginTop: "var(--space-1)" }}>
+              <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
+                版 {result.outcome_revisions[0]?.revision ?? result.outcome_revisions.length}（履歴）
+              </button>
+            </p>
           )}
         </div>
       </section>
+
+      {/* 振り返りの更新履歴モーダル（版タイムライン＋差分・§3.1・アイデア/コンセプト詳細と同型のリンク版UI） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="振り返り・学び / 次アクションの更新履歴" size="lg">
+        <ModalBody>
+          <p className="role-note" style={{ marginTop: 0 }}>
+            振り返り（成果/学び/KPI/次アクション）の変更を新しい順に。各版を開くと差分（
+            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+          </p>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <RevisionTimeline
+              variant="info"
+              revisions={result.outcome_revisions as unknown as RevisionRow[]}
+              currentRevision={result.outcome_revisions[0]?.revision ?? 1}
+              fieldLabels={OUTCOME_FIELD_LABELS}
+              loadDiff={(r) => getQuestOutcomeRevisionDiff(questId, r) as Promise<RevisionDiff | null>}
+              initialNote="振り返りを記入。"
+            />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
 
       {/* ⑥ 採用された関連情報（FR-41 Phase2）＝クエスト＋配下アイデアで採用した外部情報＋処理メモ */}
       {result.adopted_info.length > 0 && (

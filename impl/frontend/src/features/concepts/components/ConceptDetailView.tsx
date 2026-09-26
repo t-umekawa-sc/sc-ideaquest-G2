@@ -7,8 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
+import { getScopeChatActivity, type ChatActivity } from "@/features/chat/api";
 import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
 import { RelatedInfoPanel } from "@/features/info-input";
 import { votePercents } from "@/features/ideas/voting";
@@ -76,6 +77,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [scopes, setScopes] = useState<ConceptChatScopeItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1）
+  const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null); // 総合ルームの議論活発度（E.1）
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
@@ -105,6 +107,15 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const perms = concept?.my_permissions ?? [];
   const canManage = perms.includes("manage");
   const overallScope = scopes.find((s) => s.kind === "overall");
+
+  // 総合ルームの議論活発度（E.1・アイデア詳細 SC-22 と同じ ActivitySpark）。総合ルーム確定後に取得。
+  useEffect(() => {
+    const sid = overallScope?.scope_id;
+    if (!sid) return;
+    let alive = true;
+    void getScopeChatActivity(sid).then((a) => { if (alive) setChatActivity(a); }).catch(() => {});
+    return () => { alive = false; };
+  }, [overallScope?.scope_id]);
 
   // グループ議論へ遷移＝ラベル一致のルームがあれば開く／無ければ作成（owner/quest_admin）してから開く。
   const discussGroup = async (label: string) => {
@@ -250,17 +261,22 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             )}
           </section>
 
-          {/* 下部＝総合チャット（総合ルーム・SC-61 §4.8）。活発度グラフ/直近プレビューは次スライス。 */}
+          {/* 下部＝総合チャット（総合ルーム・SC-61 §4.8）＋議論の活発度（E.1・総合ルーム）。 */}
           <section className="card" aria-label="総合チャット">
             <div className="concept-overall-chat">
               <div style={{ minWidth: 0 }}>
-                <h2 style={{ margin: 0 }}>💬 総合チャット</h2>
+                <h2 style={{ margin: 0 }}>💬 総合チャット <span className="badge badge-muted">💬 {chatActivity?.total_messages ?? 0}</span></h2>
                 <p className="muted text-sm" style={{ margin: "2px 0 0" }}>横断議論と最終判断（推進 / 方向転換 / 中止）の場（総合ルーム）。</p>
               </div>
               {overallScope
                 ? <Link href={`/concepts/${conceptId}/chat/${overallScope.scope_id}`} className="btn btn-primary btn-sm">チャットを開く（総合ルーム）→</Link>
                 : <span className="muted text-sm">総合ルーム準備中…</span>}
             </div>
+            {/* 議論アクティビティ・グラフ（総合ルームの chat-activity 実データ）＝共有 ActivitySpark（SC-22 と同型）。 */}
+            <ActivitySpark
+              daily={(chatActivity?.daily ?? []).map((d) => ({ date: d.date, count: d.message_count }))}
+              legend="棒＝日次メッセージ数（総合ルーム・直近3日を強調）。"
+            />
           </section>
         </div>
 
