@@ -496,6 +496,51 @@ class QuestOutcomeRevisionDiffResponse(BaseModel):
     fields: dict[str, QuestOutcomeDiffField] = {}
 
 
+# ---- クエスト定義の変更履歴＋ステータスログ（§3.1/§3.2・SC-12 リンクUI） ----
+
+class QuestRevisionEditorDTO(BaseModel):
+    user_id: str | None = None
+    display_name: str | None = None
+    avatar_image_url: str | None = None
+
+
+class QuestRevisionDTO(BaseModel):
+    revision: int
+    editor: QuestRevisionEditorDTO
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+
+
+class QuestRevisionCursorPageInfo(BaseModel):
+    next_cursor: str | None = None
+    has_next: bool = False
+
+
+class QuestRevisionListResponse(BaseModel):
+    data: list[QuestRevisionDTO] = []
+    page_info: QuestRevisionCursorPageInfo = QuestRevisionCursorPageInfo()
+
+
+class QuestRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, QuestOutcomeDiffField] = {}  # 差分フィールド形は共通（text=segments／scalar=old/new）
+
+
+class QuestDecisionLogEntryDTO(BaseModel):
+    kind: str  # status
+    from_value: str | None = None
+    to_value: str
+    actor: QuestRevisionEditorDTO
+    reason: str | None = None
+    created_at: datetime
+
+
+class QuestDecisionLogResponse(BaseModel):
+    data: list[QuestDecisionLogEntryDTO] = []
+
+
 class QuestOutcomeUpdateRequest(BaseModel):
     """PUT /quests/{id}/result（FR-39）＝総括の保存（owner/quest_admin）。送られた項目のみ更新。"""
 

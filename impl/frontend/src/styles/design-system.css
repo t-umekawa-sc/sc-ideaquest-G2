@@ -2512,3 +2512,12 @@ a.card:active, button.card:active { transform: translateY(0); box-shadow: var(--
    気持ち詰める＋隣接テキストと縦中央で揃える。見本＝mocks/style-guide.html「4d」。 */
 .screen-purpose--icon-only { padding-inline: var(--space-2); vertical-align: middle; }
 .screen-purpose--icon-only .screen-purpose__icon { color: var(--color-text-muted); }
+
+/* 意思決定ログ（総合判定/ステータスの変遷・変更履歴標準 §3.2・コンセプト/クエスト共用） */
+.decision-log { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.decision-log__item { border-left: 2px solid var(--color-border); padding: var(--space-1) 0 var(--space-1) var(--space-3); }
+.decision-log__head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.decision-log__at { margin-left: auto; color: var(--color-text-subtle); font-size: var(--font-size-sm); }
+.decision-log__who { color: var(--color-text-subtle); font-size: var(--font-size-sm); }
+.decision-log__reason { margin-top: 2px; }
+.decision-log__ctx { margin-top: 2px; }

@@ -465,3 +465,48 @@ def test_c_tc_292_disposition_404(client, env):
                             json={"disposition": "adopted"}, headers=_csrf(client)).status_code == 404
     finally:
         _cleanup_info(env.db_identifier, [info_i])
+
+
+# ---- C-TC-299〜302: クエスト定義の変更履歴＋ステータスログ（変更履歴標準 §3.1/§3.2・migration 0039） ----
+
+
+def test_c_tc_299_quest_revision_bump(client, env):
+    """C-TC-299: クエスト定義の編集で版が増える（新しい順・changed_fields）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest()
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "改題1"}, headers=_csrf(client))
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "改題2"}, headers=_csrf(client))
+    data = client.get(f"/api/v1/quests/{qid}/revisions").json()["data"]
+    assert [r["revision"] for r in data] == [2, 1]
+    assert "title" in data[0]["changed_fields"]
+
+
+def test_c_tc_300_quest_empty_update_no_bump(client, env):
+    """C-TC-300: 定義が変わらない編集は版を進めない（既存仕様踏襲）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest()
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "確定タイトル"}, headers=_csrf(client))  # rev1
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "確定タイトル"}, headers=_csrf(client))  # 同値
+    data = client.get(f"/api/v1/quests/{qid}/revisions").json()["data"]
+    assert [r["revision"] for r in data] == [1]
+
+
+def test_c_tc_301_quest_status_decision_log(client, env):
+    """C-TC-301: ステータス遷移が意思決定ログに記録される（kind=status・recruiting→in_progress）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest(status="recruiting")
+    client.post(f"/api/v1/quests/{qid}/transition", json={"to": "in_progress"}, headers=_csrf(client))
+    log = client.get(f"/api/v1/quests/{qid}/decision-log").json()["data"]
+    st = [e for e in log if e["kind"] == "status"]
+    assert st and st[0]["from_value"] == "recruiting" and st[0]["to_value"] == "in_progress"
+
+
+def test_c_tc_302_quest_revision_diff(client, env):
+    """C-TC-302: クエスト定義の版差分（前版比較・title は text segments）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest()
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "AAA"}, headers=_csrf(client))
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "AAB"}, headers=_csrf(client))
+    diff = client.get(f"/api/v1/quests/{qid}/revisions/2/diff").json()
+    assert diff["from_revision"] == 1 and diff["to_revision"] == 2
+    assert diff["fields"]["title"]["kind"] == "text" and diff["fields"]["title"]["segments"]

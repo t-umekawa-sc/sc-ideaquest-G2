@@ -10,8 +10,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
-import { ActivitySpark, Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { QuestDecisionLogView, QuestRevisionHistory } from "./QuestHistory";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
@@ -165,6 +166,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（SC-12・日次スパーク）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1/§3.2）
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
   const [ideasError, setIdeasError] = useState<string | null>(null);
   // レビュー#3＝一覧上部のステータス絞り込み（動線＝すべて/未投票/フォロー中/自分の下書き）。DataTable の前段で data を絞る。
@@ -566,6 +568,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               </div>
             </div>
             <div className="quest-actions">
+              {/* 更新履歴（定義の版＋ステータスログ・§3.1/§3.2）＝閲覧者全員に開放（読み取り専用）。 */}
+              <button type="button" className="btn btn-outline" onClick={() => setHistoryOpen(true)}>🕘 更新履歴</button>
               {/* 「＋ アイデアを追加」はアイデアタブの一覧上部へ移動（下記 tab==="ideas"）。編集/遷移/削除は C 接続済み。 */}
               {canEdit && (
                 <>
@@ -924,7 +928,22 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
       {tab === "concept" && <ConceptTab questId={questId} />}
 
-      {/* 概要（実接続・C.1） */}
+      {/* 更新履歴モーダル（定義の版＋ステータスログ・§3.1/§3.2・アイデア SC-22 と同型） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="クエストの更新履歴" size="lg">
+        <ModalBody>
+          <h3 style={{ marginTop: 0 }}>定義の変更履歴</h3>
+          <p className="role-note" style={{ marginTop: 0 }}>
+            クエスト定義（名称/目的/カラー/締切/カテゴリー）の変更を新しい順に。各版を開くと差分（
+            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+          </p>
+          <QuestRevisionHistory questId={questId} />
+          <h3 style={{ marginTop: "var(--space-5)" }}>ステータスの履歴</h3>
+          <QuestDecisionLogView questId={questId} />
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
     </section>
   );
 }

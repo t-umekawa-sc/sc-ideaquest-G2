@@ -107,6 +107,15 @@
 | C-TC-145 | api | 完了クエストの PUT /party 凍結（PUT 経路） | completed クエスト | `PUT .../party`（members） | `409 conflict`（C-TC-142 の POST 経路と対称・書き込み凍結） | C.5 |
 | C-TC-146 | api | PUT /party の原子性（検証先行・部分適用しない） | recruiting・owner が編集 | 先頭に有効ユーザー・末尾に候補外 uuid を含む差分を PUT | `422`（`field=user_id`）＋**先頭の有効追加も未適用**（GET members に現れない＝全体が原子的） | C.3 |
 
+### 5b. 変更履歴＝クエスト定義の版＋ステータス意思決定ログ（変更履歴標準 §3.1/§3.2・migration 0039）
+
+| TC-ID | 種別 | 目的（説明） | 前提 | 操作 | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| C-TC-299 | api | 定義編集で版が増える（SC-12 リンクUI・§3.1） | recruiting | `PATCH /quests/{id}`（title）×2 | `GET .../revisions` が rev2＋rev1（新しい順・rev2 に title） | §3.1／migration 0039 |
+| C-TC-300 | api | 変更が無い編集は版を進めない（既存仕様踏襲） | rev あり | `PATCH /quests/{id}`（同値） | `revisions` は rev1 のみ | §3.1 |
+| C-TC-301 | api | ステータス遷移を意思決定ログに記録（§3.2） | recruiting | `POST /quests/{id}/transition`（in_progress） | `GET .../decision-log` に kind=status（recruiting→in_progress） | §3.2 |
+| C-TC-302 | api | 定義の版差分（前版比較・text/scalar） | 2版 | `GET /quests/{id}/revisions/2/diff` | fields.title＝text segments | §3.1 |
+
 ## 6. e2e（SC-11/12・実接続・Playwright）
 
 > 対象＝`impl/frontend/e2e/sc-11-quest-create-modal.spec.ts`・`sc-12-quest-detail.spec.ts`。ACME-01 一般ユーザー＋デモグループ seed 前提・各テストで API 後片付け。1ファイルずつ＋`redis-cli FLUSHALL`。テスト名先頭に TC-ID を付す。

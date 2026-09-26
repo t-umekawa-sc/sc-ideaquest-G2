@@ -1415,6 +1415,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Revisions
+         * @description クエスト定義の版タイムライン（SC-12 更新履歴・§3.1）。読取専用。
+         */
+        get: operations["get_quest_revisions_api_v1_quests__quest_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/revisions/{revision}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Revision Diff
+         * @description クエスト定義の版差分（SC-12・§3.1）。既定＝前版比較。読取専用。
+         */
+        get: operations["get_quest_revision_diff_api_v1_quests__quest_id__revisions__revision__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quests/{quest_id}/decision-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Decision Log
+         * @description クエストのステータス遷移ログ（SC-12・§3.2）。読取専用。
+         */
+        get: operations["get_quest_decision_log_api_v1_quests__quest_id__decision_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/result/chat-summary": {
         parameters: {
             query?: never;
@@ -6850,6 +6910,31 @@ export interface components {
             /** Has Next */
             has_next: boolean;
         };
+        /** QuestDecisionLogEntryDTO */
+        QuestDecisionLogEntryDTO: {
+            /** Kind */
+            kind: string;
+            /** From Value */
+            from_value?: string | null;
+            /** To Value */
+            to_value: string;
+            actor: components["schemas"]["QuestRevisionEditorDTO"];
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** QuestDecisionLogResponse */
+        QuestDecisionLogResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["QuestDecisionLogEntryDTO"][];
+        };
         /**
          * QuestDetailDTO
          * @description 作成/編集/公開の応答＝クエスト詳細（カード項目＋purpose/created_at＋自分の権限＋パーティー）。
@@ -7421,6 +7506,69 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** QuestRevisionCursorPageInfo */
+        QuestRevisionCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /** QuestRevisionDTO */
+        QuestRevisionDTO: {
+            /** Revision */
+            revision: number;
+            editor: components["schemas"]["QuestRevisionEditorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Changed Fields
+             * @default []
+             */
+            changed_fields: string[];
+            /** Memo */
+            memo?: string | null;
+        };
+        /** QuestRevisionDiffResponse */
+        QuestRevisionDiffResponse: {
+            /** From Revision */
+            from_revision: number;
+            /** To Revision */
+            to_revision: number;
+            /**
+             * Fields
+             * @default {}
+             */
+            fields: {
+                [key: string]: components["schemas"]["QuestOutcomeDiffField"];
+            };
+        };
+        /** QuestRevisionEditorDTO */
+        QuestRevisionEditorDTO: {
+            /** User Id */
+            user_id?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+        };
+        /** QuestRevisionListResponse */
+        QuestRevisionListResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["QuestRevisionDTO"][];
+            /** @default {
+             *       "has_next": false
+             *     } */
+            page_info: components["schemas"]["QuestRevisionCursorPageInfo"];
         };
         /**
          * QuestTransitionRequest
@@ -10613,6 +10761,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestOutcomeRevisionDiffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_revisions_api_v1_quests__quest_id__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestRevisionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_revision_diff_api_v1_quests__quest_id__revisions__revision__diff_get: {
+        parameters: {
+            query?: {
+                from?: number | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestRevisionDiffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_decision_log_api_v1_quests__quest_id__decision_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestDecisionLogResponse"];
                 };
             };
             /** @description Validation Error */
