@@ -31,6 +31,7 @@ from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as repo
 from app.tenant.quests.schemas import PERMISSION_VALUES
+from app.tenant._shared import revisions as rev_shared
 
 logger = logging.getLogger(__name__)
 
@@ -656,6 +657,45 @@ def _outcome_dto(ts, row) -> dict:
     }
 
 
+# 振り返り（総括）の版で追跡するフィールド（§3.1）＝共通エンジン仕様。
+def _metrics_str(v) -> str:
+    if not v:
+        return ""
+    return " / ".join(f"{m.get('label', '')}: {m.get('value', '')}" for m in v)
+
+
+QUEST_OUTCOME_REVISION_FIELDS = (
+    rev_shared.FieldSpec("summary", "text"),
+    rev_shared.FieldSpec("learnings", "text"),
+    rev_shared.FieldSpec("next_actions", "text"),
+    rev_shared.FieldSpec("metrics", "scalar", scalar_fmt=_metrics_str),
+)
+_OUTCOME_EMPTY_SNAPSHOT = {"summary": None, "learnings": None, "next_actions": None, "metrics": []}
+
+
+def _outcome_snapshot(row) -> dict:
+    return {"summary": row.summary, "learnings": row.learnings, "next_actions": row.next_actions, "metrics": row.metrics or []}
+
+
+def _outcome_revisions_dto(ts, quest_id) -> list[dict]:
+    """総括の版タイムライン（折り畳みUIに埋め込む・新しい順・§3.1）。"""
+    rows = repo.list_outcome_revisions(ts, quest_id)
+    editors = repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+    rev_by_num = {r.revision: r for r in rows}
+    out = []
+    for r in rows:
+        prev = rev_by_num.get(r.revision - 1)
+        e = editors.get(r.editor_id)
+        out.append({
+            "revision": r.revision,
+            "editor_name": e.display_name if e else None,
+            "created_at": r.created_at,
+            "changed_fields": rev_shared.changed_fields(prev.changes if prev else None, r.changes, QUEST_OUTCOME_REVISION_FIELDS),
+            "memo": r.memo,
+        })
+    return out
+
+
 def _adopted_info_for_result(ts, quest_id, idea_titles) -> list[dict]:
     """結果タブの「採用された関連情報」（C.8・FR-41 Phase2）＝N へ委譲（クエスト＋配下アイデア集約）。"""
     from app.tenant.info import application as info_service  # 遅延 import（循環回避）
@@ -753,6 +793,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             },
             "pinned_messages": pinned_messages,
             "outcome": _outcome_dto(ts, repo.get_outcome(ts, qid)),
+            "outcome_revisions": _outcome_revisions_dto(ts, qid),
             "adopted_info": _adopted_info_for_result(ts, qid, idea_titles),
             "can_edit": _can_edit_outcome(ts, quest, user),
         }
@@ -815,6 +856,12 @@ def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id:
         if body.metrics is not None:
             fields["metrics"] = [{"label": m.label, "value": m.value} for m in body.metrics]
         row = repo.upsert_outcome(ts, qid, fields=fields, updated_by=user.id)
+        # 変更履歴＝内容が変わったら版を1件記録（無変更は版なし・§3.1）。初回は空スナップと比較。
+        after = _outcome_snapshot(row)
+        last = repo.latest_outcome_revision(ts, qid)
+        base = last.changes if last else _OUTCOME_EMPTY_SNAPSHOT
+        if rev_shared.changed_fields(base, after, QUEST_OUTCOME_REVISION_FIELDS):
+            repo.add_outcome_revision(ts, qid, revision=(last.revision + 1) if last else 1, editor_id=user.id, changes=after)
         # ⑥ 総括に実内容がある初回記入で少額XP（クエスト単位・本人1回・冪等・FR-39 §8-⑥）。局所 import で循環回避。
         if row.summary or row.learnings or row.next_actions:
             from app.tenant.gamification import ledger, repository as gami_repo
@@ -824,6 +871,31 @@ def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id:
         dto = _outcome_dto(ts, row)
         ts.commit()
     return dto
+
+
+def get_quest_outcome_revision_diff(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, revision: int,
+                                    *, from_revision: int | None = None) -> dict:
+    """振り返り（総括）の版差分（§3.1）。既定＝前版比較。門番＝クエスト可視性。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        to_rev = repo.get_outcome_revision(ts, qid, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_outcome_revision(ts, qid, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, QUEST_OUTCOME_REVISION_FIELDS)}
 
 
 # ---- パーティー粒度（C.3・SC-12 パーティータブ）／状態遷移（C.5）／削除 ----

@@ -36,6 +36,7 @@ from app.tenant.quests.schemas import (
     QuestMemberPermissionsRequest,
     QuestMembersResponse,
     QuestOutcomeDTO,
+    QuestOutcomeRevisionDiffResponse,
     QuestOutcomeUpdateRequest,
     QuestPartyUpdateRequest,
     QuestPermissionsResponse,
@@ -427,6 +428,20 @@ def get_quest_result(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )
     return QuestResultDTO(**result)
+
+
+@router.get("/quests/{quest_id}/result/revisions/{revision}/diff", response_model=QuestOutcomeRevisionDiffResponse)
+def get_quest_result_revision_diff(
+    quest_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> QuestOutcomeRevisionDiffResponse:
+    """振り返り（総括）の版差分（SC-12 結果タブ・§3.1）。既定＝前版比較。読取専用。"""
+    result = quest_service.get_quest_outcome_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, revision,
+        from_revision=from_revision,
+    )
+    return QuestOutcomeRevisionDiffResponse(**result)
 
 
 @router.post("/quests/{quest_id}/result/chat-summary", response_model=QuestOutcomeDTO)

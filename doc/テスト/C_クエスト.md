@@ -163,6 +163,9 @@
 | C-TC-244 | api | ⑥総括初回記入で owner に少額XP（冪等） | owner が result を2回保存 | `PUT /quests/{id}/result`×2 | `quest_result_summary` 活動1件・amount=20・本人1回（2回目は加算しない） | C（FR-39）／G／§10 |
 | C-TC-245 | api | 結果に④議論の要点(b)＝ピン留めチャットを集約 | 公開アイデアにピン留めメッセージ | `GET /quests/{id}/result` | `pinned_messages` に当該（idea_id/idea_title/excerpt/author） | C（FR-39 (b)）／E |
 | C-TC-246 | api | (c)自動要約＝抽出型・オフライン（外部API不使用）生成/保存＋権限 | (1)owner・チャット複数 (2)一般メンバー（comment のみ） | `POST /quests/{id}/result/chat-summary` | (1)200・`chat_summary` 非空・GET に反映 (2)403 | C（FR-39 (c)）／E |
+| C-TC-296 | api | 振り返り（総括）の変更履歴＝初回保存で初版・変更で版増（折り畳みUI・§3.1） | owner が result を2回保存（learnings 追記） | `PUT /quests/{id}/result`×2 | `GET .../result` の `outcome_revisions` が rev2＋rev1（新しい順・初版 changed_fields 空・rev2 に learnings） | C（FR-39）／§3.1／migration 0038 |
+| C-TC-297 | api | 変更が無い保存は版を進めない（既存仕様踏襲） | 同値で2回保存 | `PUT /quests/{id}/result`×2（同値） | `outcome_revisions` は rev1 のみ | C（FR-39）／§3.1 |
+| C-TC-298 | api | 総括の版差分（前版比較・text/scalar） | 2版 | `GET /quests/{id}/result/revisions/2/diff` | fields.summary＝text segments | C（FR-39）／§3.1 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

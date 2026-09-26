@@ -1395,6 +1395,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/result/revisions/{revision}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Result Revision Diff
+         * @description 振り返り（総括）の版差分（SC-12 結果タブ・§3.1）。既定＝前版比較。読取専用。
+         */
+        get: operations["get_quest_result_revision_diff_api_v1_quests__quest_id__result_revisions__revision__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/result/chat-summary": {
         parameters: {
             query?: never;
@@ -7082,6 +7102,30 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** QuestOutcomeDiffField */
+        QuestOutcomeDiffField: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scalar";
+            /** Segments */
+            segments?: components["schemas"]["QuestOutcomeDiffSegment"][] | null;
+            /** Old */
+            old?: string | null;
+            /** New */
+            new?: string | null;
+        };
+        /** QuestOutcomeDiffSegment */
+        QuestOutcomeDiffSegment: {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "equal" | "add" | "del";
+            /** Text */
+            text: string;
+        };
         /**
          * QuestOutcomeMetricDTO
          * @description KPI/成果指標の1行（自由記述・⑤）。
@@ -7097,6 +7141,42 @@ export interface components {
              * @default
              */
             value: string;
+        };
+        /**
+         * QuestOutcomeRevisionDTO
+         * @description 振り返り（総括）内容の版1行（SC-12 結果タブ 折り畳みUI・§3.1）。
+         */
+        QuestOutcomeRevisionDTO: {
+            /** Revision */
+            revision: number;
+            /** Editor Name */
+            editor_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Changed Fields
+             * @default []
+             */
+            changed_fields: string[];
+            /** Memo */
+            memo?: string | null;
+        };
+        /** QuestOutcomeRevisionDiffResponse */
+        QuestOutcomeRevisionDiffResponse: {
+            /** From Revision */
+            from_revision: number;
+            /** To Revision */
+            to_revision: number;
+            /**
+             * Fields
+             * @default {}
+             */
+            fields: {
+                [key: string]: components["schemas"]["QuestOutcomeDiffField"];
+            };
         };
         /**
          * QuestOutcomeUpdateRequest
@@ -7250,6 +7330,11 @@ export interface components {
              *       "metrics": []
              *     } */
             outcome: components["schemas"]["QuestOutcomeDTO"];
+            /**
+             * Outcome Revisions
+             * @default []
+             */
+            outcome_revisions: components["schemas"]["QuestOutcomeRevisionDTO"][];
             /**
              * Adopted Info
              * @default []
@@ -10494,6 +10579,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestOutcomeDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_result_revision_diff_api_v1_quests__quest_id__result_revisions__revision__diff_get: {
+        parameters: {
+            query?: {
+                from?: number | null;
+            };
+            header?: never;
+            path: {
+                quest_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestOutcomeRevisionDiffResponse"];
                 };
             };
             /** @description Validation Error */

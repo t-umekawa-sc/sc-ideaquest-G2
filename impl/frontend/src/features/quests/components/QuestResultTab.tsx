@@ -8,9 +8,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Avatar, Button, Field, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
-import { generateChatSummary, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+import { generateChatSummary, getQuestOutcomeRevisionDiff, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+
+// 振り返り（総括）の版で追跡するフィールドの表示名（§3.1）。
+const OUTCOME_FIELD_LABELS: Record<string, string> = {
+  summary: "成果（総括）",
+  learnings: "学び・課題",
+  next_actions: "次アクション",
+  metrics: "成果の指標（KPI）",
+};
 
 const ASPECT_LABELS: [keyof QuestResult["aspect_averages"], string][] = [
   ["novelty", "新規性"],
@@ -249,6 +258,22 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           </div>
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
+          )}
+          {/* 更新履歴＝折り畳みUI（概要パネル無しのため・変更履歴標準 §3.1）。ISO §10 改善＝当時の学び/次アクションを追える。 */}
+          {result.outcome_revisions.length > 0 && (
+            <details className="qresult__history" style={{ marginTop: "var(--space-3)" }}>
+              <summary className="role-note" style={{ cursor: "pointer" }}>🕘 更新履歴（{result.outcome_revisions.length}）</summary>
+              <div style={{ marginTop: "var(--space-2)" }}>
+                <RevisionTimeline
+                  variant="info"
+                  revisions={result.outcome_revisions as unknown as RevisionRow[]}
+                  currentRevision={result.outcome_revisions[0]?.revision ?? 1}
+                  fieldLabels={OUTCOME_FIELD_LABELS}
+                  loadDiff={(r) => getQuestOutcomeRevisionDiff(questId, r) as Promise<RevisionDiff | null>}
+                  initialNote="振り返りを記入。"
+                />
+              </div>
+            </details>
           )}
         </div>
       </section>

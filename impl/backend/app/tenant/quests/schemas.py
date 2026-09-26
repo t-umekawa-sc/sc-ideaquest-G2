@@ -464,8 +464,36 @@ class QuestResultDTO(BaseModel):
     participation: QuestResultParticipationDTO = QuestResultParticipationDTO()
     pinned_messages: list[QuestResultPinnedMessageDTO] = []  # ④議論の要点(b)＝ピン留めメッセージ
     outcome: QuestOutcomeDTO = QuestOutcomeDTO()
+    outcome_revisions: list[QuestOutcomeRevisionDTO] = []  # 振り返りの変更履歴（折り畳みUI・§3.1）
     adopted_info: list[QuestResultAdoptedInfoDTO] = []  # ⑥採用された関連情報（FR-41 Phase2）
     can_edit: bool = False  # owner/quest_admin（④⑤の編集可否）
+
+
+class QuestOutcomeRevisionDTO(BaseModel):
+    """振り返り（総括）内容の版1行（SC-12 結果タブ 折り畳みUI・§3.1）。"""
+    revision: int
+    editor_name: str | None = None
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+
+
+class QuestOutcomeDiffSegment(BaseModel):
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class QuestOutcomeDiffField(BaseModel):
+    kind: Literal["text", "scalar"]
+    segments: list[QuestOutcomeDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class QuestOutcomeRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, QuestOutcomeDiffField] = {}
 
 
 class QuestOutcomeUpdateRequest(BaseModel):

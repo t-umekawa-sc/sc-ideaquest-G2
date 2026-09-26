@@ -208,6 +208,11 @@ export function updateQuestResult(questId: string, input: QuestOutcomeInput): Pr
 export function generateChatSummary(questId: string): Promise<QuestOutcome | null> {
   return apiFetch<QuestOutcome>(`/quests/${questId}/result/chat-summary`, { method: "POST" });
 }
+// 振り返り（総括）の版差分（変更履歴標準 §3.1・折り畳みUI の展開時に取得）。
+export type QuestOutcomeRevisionDiff = components["schemas"]["QuestOutcomeRevisionDiffResponse"];
+export function getQuestOutcomeRevisionDiff(questId: string, revision: number): Promise<QuestOutcomeRevisionDiff | null> {
+  return apiFetch<QuestOutcomeRevisionDiff>(`/quests/${questId}/result/revisions/${revision}/diff`);
+}
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。
 export function publishQuest(questId: string, input: QuestPublishInput): Promise<QuestDetail | null> {

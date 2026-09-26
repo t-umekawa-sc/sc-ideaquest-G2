@@ -24,7 +24,7 @@ from app.tenant.info.orm import InfoItem, InfoLink
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
 from app.tenant.quests import repository as quests_repo
-from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission, QuestOutcome
+from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission, QuestOutcome, QuestOutcomeRevision
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -144,6 +144,7 @@ def env():
         if quests:
             ts.execute(Notification.__table__.delete().where(Notification.ref_quest_id.in_(quests)))
             ts.execute(Activity.__table__.delete().where(Activity.quest_id.in_(quests)))
+            ts.execute(QuestOutcomeRevision.__table__.delete().where(QuestOutcomeRevision.quest_id.in_(quests)))
             ts.execute(QuestOutcome.__table__.delete().where(QuestOutcome.quest_id.in_(quests)))
             mids = list(ts.execute(select(QuestMember.id).where(QuestMember.quest_id.in_(quests))).scalars())
             if mids:
@@ -337,3 +338,39 @@ def test_c_tc_248_completion_side_effects_idempotent_on_reforward(client, env):
         coins = ts.execute(select(Activity).where(
             Activity.reason == "evaluation_coin", Activity.ref_id == iid)).scalars().all()
         assert len(coins) == 1  # 投稿者コインも二重確定しない
+
+
+# ---- C-TC-296〜298: 振り返り（総括）の変更履歴＝内容の版（変更履歴標準 §3.1・migration 0038） ----
+
+
+def test_c_tc_296_outcome_revision_bump(env, client):
+    """C-TC-296: 総括の初回保存で初版・変更保存で版増（新しい順・changed_fields）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    client.put(RESULT(qid), json={"summary": "初回"}, headers=_csrf(client))
+    client.put(RESULT(qid), json={"summary": "初回", "learnings": "学びを追記"}, headers=_csrf(client))
+    revs = client.get(RESULT(qid)).json()["outcome_revisions"]
+    assert [r["revision"] for r in revs] == [2, 1]
+    assert revs[1]["changed_fields"] == []  # 初版
+    assert "learnings" in revs[0]["changed_fields"]
+
+
+def test_c_tc_297_outcome_empty_update_no_bump(env, client):
+    """C-TC-297: 変更が無い保存は版を進めない（既存仕様踏襲）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    client.put(RESULT(qid), json={"summary": "確定"}, headers=_csrf(client))
+    client.put(RESULT(qid), json={"summary": "確定"}, headers=_csrf(client))  # 同値
+    revs = client.get(RESULT(qid)).json()["outcome_revisions"]
+    assert [r["revision"] for r in revs] == [1]
+
+
+def test_c_tc_298_outcome_revision_diff(env, client):
+    """C-TC-298: 総括の版差分（前版比較・summary は text segments）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    client.put(RESULT(qid), json={"summary": "AAA"}, headers=_csrf(client))
+    client.put(RESULT(qid), json={"summary": "AAB"}, headers=_csrf(client))
+    diff = client.get(f"/api/v1/quests/{qid}/result/revisions/2/diff").json()
+    assert diff["from_revision"] == 1 and diff["to_revision"] == 2
+    assert diff["fields"]["summary"]["kind"] == "text" and diff["fields"]["summary"]["segments"]
