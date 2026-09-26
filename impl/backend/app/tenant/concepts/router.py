@@ -19,8 +19,11 @@ from app.tenant.concepts.schemas import (
     AssumptionListResponse,
     AssumptionPatchRequest,
     ConceptCreateRequest,
+    ConceptDecisionLogResponse,
     ConceptDecisionRequest,
     ConceptDetailDTO,
+    ConceptRevisionDiffResponse,
+    ConceptRevisionListResponse,
     ConceptEvaluationAggregateDTO,
     ConceptEvaluationMeDTO,
     ConceptEvaluationPutRequest,
@@ -70,6 +73,42 @@ def get_concept(concept_id: str, request: Request, session: dict = Depends(requi
     """コンセプト詳細（合成・P.1）。draft は本人のみ。読取専用。"""
     result = service.get_detail(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptDetailDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/revisions", response_model=ConceptRevisionListResponse)
+def get_concept_revisions(
+    concept_id: str, request: Request, limit: int = Query(default=50, ge=1, le=100),
+    cursor: str | None = None, session: dict = Depends(require_me),
+) -> ConceptRevisionListResponse:
+    """コンセプト内容の版タイムライン（SC-61 更新履歴・§3.1）。読取専用。"""
+    result = service.get_revisions(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, limit=limit, cursor=cursor,
+    )
+    return ConceptRevisionListResponse(**result)
+
+
+@router.get("/concepts/{concept_id}/revisions/{revision}/diff", response_model=ConceptRevisionDiffResponse)
+def get_concept_revision_diff(
+    concept_id: str, revision: int, request: Request, from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> ConceptRevisionDiffResponse:
+    """版差分（SC-61・§3.1）。既定＝前版比較。読取専用。"""
+    result = service.get_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, revision,
+        from_revision=from_revision,
+    )
+    return ConceptRevisionDiffResponse(**result)
+
+
+@router.get("/concepts/{concept_id}/decision-log", response_model=ConceptDecisionLogResponse)
+def get_concept_decision_log(
+    concept_id: str, request: Request, session: dict = Depends(require_me),
+) -> ConceptDecisionLogResponse:
+    """意思決定/ステータスの遷移ログ（SC-61・§3.2）。読取専用。"""
+    result = service.get_decision_log(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id,
+    )
+    return ConceptDecisionLogResponse(**result)
 
 
 @router.get("/concepts/{concept_id}/related-info", response_model=RelatedInfoResponse)

@@ -31,6 +31,27 @@ export function getConcept(conceptId: string): Promise<ConceptDetail | null> {
   return apiFetch<ConceptDetail>(`/concepts/${conceptId}`);
 }
 
+// ---- 変更履歴（内容の版＋意思決定ログ・§3.1/§3.2） ----
+export type ConceptRevisionList = components["schemas"]["ConceptRevisionListResponse"];
+export type ConceptRevisionDiff = components["schemas"]["ConceptRevisionDiffResponse"];
+export type ConceptDecisionLog = components["schemas"]["ConceptDecisionLogResponse"];
+
+export function getConceptRevisions(conceptId: string, params?: { limit?: number; cursor?: string }): Promise<ConceptRevisionList | null> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  const q = qs.toString();
+  return apiFetch<ConceptRevisionList>(`/concepts/${conceptId}/revisions${q ? `?${q}` : ""}`);
+}
+
+export function getConceptRevisionDiff(conceptId: string, revision: number): Promise<ConceptRevisionDiff | null> {
+  return apiFetch<ConceptRevisionDiff>(`/concepts/${conceptId}/revisions/${revision}/diff`);
+}
+
+export function getConceptDecisionLog(conceptId: string): Promise<ConceptDecisionLog | null> {
+  return apiFetch<ConceptDecisionLog>(`/concepts/${conceptId}/decision-log`);
+}
+
 export function listConcepts(questId: string): Promise<ConceptListResponse | null> {
   return apiFetch<ConceptListResponse>(`/quests/${questId}/concepts`);
 }

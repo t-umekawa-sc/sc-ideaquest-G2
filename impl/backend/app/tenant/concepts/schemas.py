@@ -362,3 +362,64 @@ class ConceptMessagePostRequest(BaseModel):
 class ConceptReadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     last_read_message_id: str
+
+
+# ---- 変更履歴（内容の版・意思決定ログ・§3.1/§3.2） ----
+
+class ConceptRevisionEditorDTO(BaseModel):
+    user_id: str | None = None
+    display_name: str | None = None
+    avatar_image_url: str | None = None
+
+
+class ConceptRevisionDTO(BaseModel):
+    """版タイムラインの1行（SC-61 更新履歴・§3.1）。changed_fields＝前版比の変更フィールド（初版は空）。"""
+    revision: int
+    editor: ConceptRevisionEditorDTO
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+    context_snapshot: dict | None = None  # その版時点の判断材料（投票/評価/前提の検証状況・§3.3）
+
+
+class ConceptCursorPageInfo(BaseModel):
+    next_cursor: str | None = None
+    has_next: bool = False
+
+
+class ConceptRevisionListResponse(BaseModel):
+    data: list[ConceptRevisionDTO] = []
+    page_info: ConceptCursorPageInfo = ConceptCursorPageInfo()
+
+
+class ConceptDiffSegment(BaseModel):
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class ConceptDiffField(BaseModel):
+    kind: Literal["text", "scalar"]
+    segments: list[ConceptDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class ConceptRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, ConceptDiffField] = {}
+
+
+class ConceptDecisionLogEntryDTO(BaseModel):
+    """意思決定/ステータスの遷移1件（§3.2）。kind＝status/decision。"""
+    kind: str
+    from_value: str | None = None
+    to_value: str
+    actor: ConceptRevisionEditorDTO
+    reason: str | None = None
+    context_snapshot: dict | None = None
+    created_at: datetime
+
+
+class ConceptDecisionLogResponse(BaseModel):
+    data: list[ConceptDecisionLogEntryDTO] = []

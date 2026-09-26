@@ -136,10 +136,22 @@
 | P-TC-804 | e2e | SC-62 評価＝中核5＋補助3＋総評＋推奨→SC-61 §4.6 反映 | evaluator | 評価する→採点→確定 | 集計・推奨分布が SC-61 §4.6 に反映 | SC-62／P.5 |
 | P-TC-805 | e2e | ガイダンス ⓘ＝ホバー展開／クリックで全文／reduce で静止 | 任意画面 | ⓘ にホバー→クリック→reduce ON | 展開（隣を押さない）・全文ダイアログ・reduce で流れ静止 | デザイン標準 §4.13/§4.9 |
 
+## 10b. 変更履歴＝内容の版＋意思決定ログ（変更履歴標準 §3.1/§3.2・migration 0037）
+
+| TC-ID | 種別 | 目的（説明） | 前提 | 操作 | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| P-TC-250 | api | 作成で初版・内容編集で版が増える | active コンセプト | `POST /quests/{id}/concepts`→`PATCH /concepts/{id}`（title 変更） | `GET .../revisions` が rev1（初版・changed_fields 空）＋rev2（changed_fields に title）を新しい順で返す | §3.1 |
+| P-TC-251 | api | 空更新は版を進めない（既存仕様踏襲） | rev あり | `PATCH /concepts/{id}`（同値 or 変更なし） | 版数が増えない | §3.1 |
+| P-TC-252 | api | 版差分（前版比較・text/scalar） | 2版 | `GET .../revisions/2/diff` | fields に変更フィールドの差分（title＝text segments） | §3.1 |
+| P-TC-253 | api | 判断材料スナップショット | 投票/評価あり | `GET .../revisions` | 各版 context_snapshot に votes/eval/assumptions | §3.3 |
+| P-TC-254 | api | 総合判定の意思決定ログ | active | `POST /concepts/{id}/decision`（go・rationale） | `GET .../decision-log` に kind=decision・from/to・reason・context_snapshot | §3.2 |
+| P-TC-255 | api | ステータス遷移の意思決定ログ | draft | `POST /concepts/{id}/activate` | decision-log に kind=status（draft→active） | §3.2 |
+| P-TC-256 | api | 履歴の門番（非パーティーは 404） | 非パーティー | `GET .../revisions`／`.../decision-log` | 404（存在秘匿） | P.0 |
+
 ## 10. 未確定・実装時に詰める（テスト観点）
 
 - **議論アクティビティ集計 API**（SC-61 §4.8）＝P に EP 追加の是非（アイデア `activity` 相当）。追加時に集計 TC を起こす。
 - **XP/コイン**＝投票 XP+5 は本版で付与（P-TC-453/454）。評価/選定/投稿の付与は実装時判断（F 踏襲するか）＝確定時に TC 追加。
 - **集計の重み付け**（criticality × 前提判定）＝Phase2。導入時に P-TC-012/407 を拡張。
-- **版管理**（`concept_revisions`）＝Phase2。導入時に版 TC を追加。
+- **版管理**（`concept_revisions`）＝**実装済**（10b・変更履歴標準 Phase 1・migration 0037）。評価/振り返り/クエストの版は後続フェーズ。
 - **付随＝関連リンク対象ピッカーへ concepts/assumptions 追加**（N `search_link_candidates` が現状 else→[]）＝実装時に N 側 TC も更新（[API設計 P_コンセプト](../API設計/P_コンセプト.md) P.10）。

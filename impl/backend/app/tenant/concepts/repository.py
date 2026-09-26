@@ -19,8 +19,10 @@ from app.tenant.concepts.orm import (
     Concept,
     ConceptAssumptionLink,
     ConceptChatScope,
+    ConceptDecisionLog,
     ConceptEvaluation,
     ConceptEvaluationScore,
+    ConceptRevision,
     ConceptSourceIdea,
     ConceptVote,
 )
@@ -521,3 +523,66 @@ def unread_count_for_scope(session: Session, scope_id: uuid.UUID, user_id: uuid.
         if anchor is not None:
             base = base.where(ChatMessage.created_at > anchor)
     return session.execute(base).scalar_one()
+
+
+# ---- 変更履歴（内容の版・意思決定ログ・§3.1/§3.2） ------------------------------
+
+def add_revision(
+    session: Session, concept_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID,
+    changes: dict, memo: str | None = None, context_snapshot: dict | None = None,
+) -> ConceptRevision:
+    rev = ConceptRevision(
+        id=uuid.uuid4(), concept_id=concept_id, revision=revision, editor_id=editor_id,
+        changes=changes, memo=memo, context_snapshot=context_snapshot,
+    )
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_revisions(session: Session, concept_id: uuid.UUID, *, cursor: int | None = None, limit: int = 50) -> list[ConceptRevision]:
+    """版タイムライン（新しい順・cursor=revision より前）。"""
+    stmt = select(ConceptRevision).where(ConceptRevision.concept_id == concept_id)
+    if cursor is not None:
+        stmt = stmt.where(ConceptRevision.revision < cursor)
+    stmt = stmt.order_by(ConceptRevision.revision.desc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_revision(session: Session, concept_id: uuid.UUID, revision: int) -> ConceptRevision | None:
+    return session.execute(
+        select(ConceptRevision).where(ConceptRevision.concept_id == concept_id, ConceptRevision.revision == revision)
+    ).scalars().first()
+
+
+def add_decision_log(
+    session: Session, concept_id: uuid.UUID, *, kind: str, from_value: str | None, to_value: str,
+    actor_id: uuid.UUID, reason: str | None = None, context_snapshot: dict | None = None,
+) -> ConceptDecisionLog:
+    log = ConceptDecisionLog(
+        id=uuid.uuid4(), concept_id=concept_id, kind=kind, from_value=from_value, to_value=to_value,
+        actor_id=actor_id, reason=reason, context_snapshot=context_snapshot,
+    )
+    session.add(log)
+    session.flush()
+    return log
+
+
+def list_decision_log(session: Session, concept_id: uuid.UUID) -> list[ConceptDecisionLog]:
+    """意思決定/ステータスの遷移ログ（新しい順）。"""
+    return list(session.execute(
+        select(ConceptDecisionLog).where(ConceptDecisionLog.concept_id == concept_id)
+        .order_by(ConceptDecisionLog.created_at.desc(), ConceptDecisionLog.id.desc())
+    ).scalars().all())
+
+
+def verdict_counts_for_concept(session: Session, concept_id: uuid.UUID) -> dict[str, int]:
+    """リンクされた前提の current_verdict 内訳（判断材料スナップ用・§3.3）。"""
+    rows = session.execute(
+        select(Assumption.current_verdict, func.count())
+        .select_from(ConceptAssumptionLink)
+        .join(Assumption, Assumption.id == ConceptAssumptionLink.assumption_id)
+        .where(ConceptAssumptionLink.concept_id == concept_id)
+        .group_by(Assumption.current_verdict)
+    ).all()
+    return {v: int(n) for v, n in rows}

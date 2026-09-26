@@ -7,8 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, LoadingOverlay, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useSnackbar } from "@/components/ui";
 import { QuestIcon } from "@/components/layout/QuestIcon";
+import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
 import { RelatedInfoPanel } from "@/features/info-input";
 import { votePercents } from "@/features/ideas/voting";
 import { ApiError } from "@/lib/api/client";
@@ -74,6 +75,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [scopes, setScopes] = useState<ConceptChatScopeItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1）
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
@@ -178,6 +180,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             )}
           </div>
           <div className="idea-actions">
+            <button type="button" className="btn btn-outline" onClick={() => setHistoryOpen(true)}>🕘 更新履歴</button>
             {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
           </div>
         </div>
@@ -373,9 +376,30 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             ) : (
               <p className="vote-note">総合判定は owner / クエスト管理者が行います。</p>
             )}
+            {/* 意思決定ログ（総合判定/ステータスの変遷・§3.2）＝当時の判断材料つきで追える。 */}
+            <details className="decision-log-disclosure" style={{ marginTop: "var(--space-3)" }}>
+              <summary className="role-note" style={{ cursor: "pointer" }}>判定・ステータスの履歴</summary>
+              <ConceptDecisionLogView conceptId={conceptId} />
+            </details>
           </section>
         </div>
       </div>
+
+      {/* 更新履歴モーダル（版タイムライン＋差分・§3.1・アイデア SC-22 と同型） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">
+        <ModalBody>
+          <p className="role-note" style={{ marginTop: 0 }}>
+            コンセプトの変更を新しい順に表示します。各版を開くと差分（
+            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+          </p>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <ConceptRevisionHistory conceptId={conceptId} currentRevision={concept.current_revision} />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
     </main>
   );
 }

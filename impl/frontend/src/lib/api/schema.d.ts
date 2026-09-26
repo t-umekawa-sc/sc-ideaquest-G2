@@ -1879,6 +1879,66 @@ export interface paths {
         patch: operations["patch_concept_api_v1_concepts__concept_id__patch"];
         trace?: never;
     };
+    "/api/v1/concepts/{concept_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Revisions
+         * @description コンセプト内容の版タイムライン（SC-61 更新履歴・§3.1）。読取専用。
+         */
+        get: operations["get_concept_revisions_api_v1_concepts__concept_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/revisions/{revision}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Revision Diff
+         * @description 版差分（SC-61・§3.1）。既定＝前版比較。読取専用。
+         */
+        get: operations["get_concept_revision_diff_api_v1_concepts__concept_id__revisions__revision__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/decision-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Decision Log
+         * @description 意思決定/ステータスの遷移ログ（SC-61・§3.2）。読取専用。
+         */
+        get: operations["get_concept_decision_log_api_v1_concepts__concept_id__decision_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/related-info": {
         parameters: {
             query?: never;
@@ -4065,6 +4125,48 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ConceptCursorPageInfo */
+        ConceptCursorPageInfo: {
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /**
+             * Has Next
+             * @default false
+             */
+            has_next: boolean;
+        };
+        /**
+         * ConceptDecisionLogEntryDTO
+         * @description 意思決定/ステータスの遷移1件（§3.2）。kind＝status/decision。
+         */
+        ConceptDecisionLogEntryDTO: {
+            /** Kind */
+            kind: string;
+            /** From Value */
+            from_value?: string | null;
+            /** To Value */
+            to_value: string;
+            actor: components["schemas"]["ConceptRevisionEditorDTO"];
+            /** Reason */
+            reason?: string | null;
+            /** Context Snapshot */
+            context_snapshot?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ConceptDecisionLogResponse */
+        ConceptDecisionLogResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["ConceptDecisionLogEntryDTO"][];
+        };
         /**
          * ConceptDecisionRequest
          * @description PUT /concepts/{id}/decision（P.2）。owner/quest_admin のみ。
@@ -4158,6 +4260,30 @@ export interface components {
             my_permissions: string[];
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** ConceptDiffField */
+        ConceptDiffField: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "scalar";
+            /** Segments */
+            segments?: components["schemas"]["ConceptDiffSegment"][] | null;
+            /** Old */
+            old?: string | null;
+            /** New */
+            new?: string | null;
+        };
+        /** ConceptDiffSegment */
+        ConceptDiffSegment: {
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "equal" | "add" | "del";
+            /** Text */
+            text: string;
         };
         /** ConceptEvalSummaryDTO */
         ConceptEvalSummaryDTO: {
@@ -4395,6 +4521,66 @@ export interface components {
         ConceptReadRequest: {
             /** Last Read Message Id */
             last_read_message_id: string;
+        };
+        /**
+         * ConceptRevisionDTO
+         * @description 版タイムラインの1行（SC-61 更新履歴・§3.1）。changed_fields＝前版比の変更フィールド（初版は空）。
+         */
+        ConceptRevisionDTO: {
+            /** Revision */
+            revision: number;
+            editor: components["schemas"]["ConceptRevisionEditorDTO"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Changed Fields
+             * @default []
+             */
+            changed_fields: string[];
+            /** Memo */
+            memo?: string | null;
+            /** Context Snapshot */
+            context_snapshot?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ConceptRevisionDiffResponse */
+        ConceptRevisionDiffResponse: {
+            /** From Revision */
+            from_revision: number;
+            /** To Revision */
+            to_revision: number;
+            /**
+             * Fields
+             * @default {}
+             */
+            fields: {
+                [key: string]: components["schemas"]["ConceptDiffField"];
+            };
+        };
+        /** ConceptRevisionEditorDTO */
+        ConceptRevisionEditorDTO: {
+            /** User Id */
+            user_id?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
+        };
+        /** ConceptRevisionListResponse */
+        ConceptRevisionListResponse: {
+            /**
+             * Data
+             * @default []
+             */
+            data: components["schemas"]["ConceptRevisionDTO"][];
+            /** @default {
+             *       "has_next": false
+             *     } */
+            page_info: components["schemas"]["ConceptCursorPageInfo"];
         };
         /** ConceptSelectResponse */
         ConceptSelectResponse: {
@@ -11379,6 +11565,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concept_revisions_api_v1_concepts__concept_id__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptRevisionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concept_revision_diff_api_v1_concepts__concept_id__revisions__revision__diff_get: {
+        parameters: {
+            query?: {
+                from?: number | null;
+            };
+            header?: never;
+            path: {
+                concept_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptRevisionDiffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concept_decision_log_api_v1_concepts__concept_id__decision_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptDecisionLogResponse"];
                 };
             };
             /** @description Validation Error */

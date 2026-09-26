@@ -21,6 +21,7 @@ from app.tenant.gamification.daily import jst_day_bounds_utc
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
+from app.tenant._shared import revisions as rev_shared
 
 _XP_VOTE = 5
 _VOTE_XP_DAILY_CAP = 5
@@ -174,6 +175,7 @@ def create(account_id, company_id, quest_id, *, body) -> dict:
             repo.set_source_ideas(ts, concept.id, source_ids)
         # 作成時に総合ルーム（overall）を自動生成（§3.7・P.2）。
         repo.create_chat_scope(ts, concept_id=concept.id, kind="overall", position=0)
+        _snapshot_revision(ts, concept, user.id, 1)  # 初版（変更履歴標準 §3.1）
         quest_obj, user_obj = quest, user
         payload = _detail_payload(ts, concept, quest_obj, user_obj)
         ts.commit()
@@ -195,10 +197,16 @@ def patch(account_id, company_id, concept_id, *, body) -> dict:
             repo.set_source_ideas(ts, concept.id, source_ids)
         else:
             data.pop("source_idea_ids", None)
+        before = _content_snapshot(ts, concept)  # 変更検出（無変更は版を作らない・§3.1）
         for field in ("title", "problem", "value_proposition", "target", "differentiation", "solution_form", "viability"):
             if field in data and data[field] is not None:
                 setattr(concept, field, data[field])
         ts.flush()
+        after = _content_snapshot(ts, concept)
+        if rev_shared.changed_fields(before, after, CONCEPT_REVISION_FIELDS):
+            next_rev = concept.current_revision + 1
+            _snapshot_revision(ts, concept, user.id, next_rev)
+            concept.current_revision = next_rev
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -223,8 +231,11 @@ def set_status(account_id, company_id, concept_id, *, target: str) -> dict:
         else:
             _require_manager(ts, quest, user, action="保管")
         _guard_not_completed(quest)
+        old_status = concept.status
         concept.status = target
         ts.flush()
+        if old_status != target:  # ステータス遷移を意思決定ログに追記（§3.2）
+            _record_decision_log(ts, concept, "status", old_status, target, user.id)
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -253,9 +264,12 @@ def set_decision(account_id, company_id, concept_id, *, decision: str, decision_
         concept, quest = _resolve_concept(ts, cid, user, for_write=True)
         _require_manager(ts, quest, user, action="総合判定")
         _guard_not_completed(quest)
+        old_decision = concept.decision
         concept.decision = decision
         concept.decision_rationale = decision_rationale
         ts.flush()
+        if old_decision != decision:  # 総合判定の変遷を意思決定ログに追記（理由・判断材料も凍結・§3.2/§3.3）
+            _record_decision_log(ts, concept, "decision", old_decision, decision, user.id, reason=decision_rationale)
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -272,6 +286,136 @@ def soft_delete(account_id, company_id, concept_id) -> None:
         _guard_not_completed(quest)
         repo.soft_delete_concept(ts, concept, deleted_by_id=user.id)
         ts.commit()
+
+
+# ---- 変更履歴（内容の版・意思決定ログ・§3.1/§3.2） ------------------------------
+
+# 版で追跡する対象フィールド（成果物スキーマ・共通エンジン _shared.revisions へ渡す仕様）。
+# テキスト系＝語句差分／viability（jsonb）＝{old,new}（JSON 文字列で表示）。
+CONCEPT_REVISION_FIELDS = (
+    rev_shared.FieldSpec("title", "text"),
+    rev_shared.FieldSpec("problem", "text"),
+    rev_shared.FieldSpec("value_proposition", "text"),
+    rev_shared.FieldSpec("target", "text"),
+    rev_shared.FieldSpec("differentiation", "text"),
+    rev_shared.FieldSpec("solution_form", "text"),
+    rev_shared.FieldSpec("viability", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+)
+
+
+def _json_compact(value) -> str:
+    import json
+    if not value:
+        return ""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _content_snapshot(ts, concept) -> dict:
+    """版に保存する内容フィールドのスナップショット（§3.1）。"""
+    return {
+        "title": concept.title, "problem": concept.problem, "value_proposition": concept.value_proposition,
+        "target": concept.target, "differentiation": concept.differentiation,
+        "solution_form": concept.solution_form, "viability": concept.viability or {},
+    }
+
+
+def _context_snapshot(ts, concept) -> dict:
+    """判断材料の数値サマリ（§3.3）＝投票集計・評価集計・前提の検証状況。その版/判断の当時の材料を凍結。"""
+    vc = repo.count_votes(ts, concept.id)
+    agg = repo.aggregate_scores(ts, concept.id)
+    verdicts = repo.verdict_counts_for_concept(ts, concept.id)
+    return {
+        "votes": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+        "eval": {"evaluator_count": agg.get("evaluator_count", 0), "overall_avg": agg.get("overall_avg")},
+        "assumptions": {
+            "supported": verdicts.get("supported", 0),
+            "refuted": verdicts.get("refuted", 0),
+            "inconclusive": verdicts.get("inconclusive", 0),
+        },
+    }
+
+
+def _snapshot_revision(ts, concept, editor_id, revision, *, memo=None) -> None:
+    """内容の版を1件記録（スナップショット＋判断材料・§3.1）。"""
+    repo.add_revision(ts, concept.id, revision=revision, editor_id=editor_id,
+                      changes=_content_snapshot(ts, concept), memo=memo,
+                      context_snapshot=_context_snapshot(ts, concept))
+
+
+def _record_decision_log(ts, concept, kind, from_value, to_value, actor_id, *, reason=None) -> None:
+    """意思決定/ステータスの遷移を追記（判断材料も凍結・§3.2）。"""
+    repo.add_decision_log(ts, concept.id, kind=kind, from_value=from_value, to_value=to_value,
+                          actor_id=actor_id, reason=reason, context_snapshot=_context_snapshot(ts, concept))
+
+
+def _editor_dto(user) -> dict:
+    return {
+        "user_id": str(user.id) if user else None,
+        "display_name": user.display_name if user else None,
+        "avatar_image_url": _image_url(user.avatar_image_path) if user else None,
+    }
+
+
+def get_revisions(account_id, company_id, concept_id, *, limit=50, cursor=None) -> dict:
+    """版タイムライン（SC-61 更新履歴・§3.1）。門番＝コンセプト可視性。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    cur = rev_shared.decode_revision_cursor(cursor) if cursor else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        rows = repo.list_revisions(ts, concept.id, cursor=cur, limit=limit + 1)
+        has_next = len(rows) > limit
+        rows = rows[:limit]
+        editors = quests_repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+        data = []
+        for r in rows:
+            prev = repo.get_revision(ts, concept.id, r.revision - 1) if r.revision > 1 else None
+            data.append({
+                "revision": r.revision,
+                "editor": _editor_dto(editors.get(r.editor_id)),
+                "created_at": r.created_at,
+                "changed_fields": rev_shared.changed_fields(prev.changes if prev else None, r.changes, CONCEPT_REVISION_FIELDS),
+                "memo": r.memo,
+                "context_snapshot": r.context_snapshot,
+            })
+        next_cursor = rev_shared.encode_revision_cursor(rows[-1].revision) if has_next and rows else None
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+def get_revision_diff(account_id, company_id, concept_id, revision, *, from_revision=None) -> dict:
+    """版の差分（SC-61・§3.1）。既定＝前版（revision-1）と比較。範囲外 404/422。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        to_rev = repo.get_revision(ts, concept.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_revision(ts, concept.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, CONCEPT_REVISION_FIELDS)}
+
+
+def get_decision_log(account_id, company_id, concept_id) -> dict:
+    """意思決定/ステータスの遷移ログ（SC-61・§3.2）。門番＝コンセプト可視性。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        rows = repo.list_decision_log(ts, concept.id)
+        actors = quests_repo.get_users_by_ids(ts, {r.actor_id for r in rows})
+        data = [{
+            "kind": r.kind, "from_value": r.from_value, "to_value": r.to_value,
+            "actor": _editor_dto(actors.get(r.actor_id)),
+            "reason": r.reason, "context_snapshot": r.context_snapshot, "created_at": r.created_at,
+        } for r in rows]
+    return {"data": data}
 
 
 # ---- payload 構築 ---------------------------------------------------------

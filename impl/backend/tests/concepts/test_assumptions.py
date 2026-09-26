@@ -15,6 +15,8 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.concepts.orm import (
+    ConceptDecisionLog,
+    ConceptRevision,
     Assumption,
     AssumptionValidation,
     Concept,
@@ -71,6 +73,8 @@ def env():
         ts.execute(AssumptionValidation.__table__.delete().where(AssumptionValidation.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(ConceptSourceIdea.__table__.delete().where(ConceptSourceIdea.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))
+        ts.execute(ConceptRevision.__table__.delete().where(ConceptRevision.concept_id.in_(cids or [uuid.uuid4()])))
+        ts.execute(ConceptDecisionLog.__table__.delete().where(ConceptDecisionLog.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Concept.__table__.delete().where(Concept.quest_id.in_(quests or [uuid.uuid4()])))
         for qid in quests:
             ts.execute(QuestMemberPermission.__table__.delete().where(

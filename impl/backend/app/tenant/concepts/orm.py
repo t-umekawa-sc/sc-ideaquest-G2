@@ -139,3 +139,32 @@ class ConceptVote(CompanyBase):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)  # approve/oppose（vote_type 共有）
     voted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ConceptRevision(CompanyBase):
+    """コンセプト内容の版（変更履歴標準 §3.1・アイデア idea_revisions と同型）。"""
+    __tablename__ = "concept_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    concept_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # 版時点の追跡フィールド全値スナップショット
+    memo: Mapped[str | None] = mapped_column(Text, nullable=True)  # 変更理由
+    context_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # 判断材料の数値サマリ（§3.3）
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ConceptDecisionLog(CompanyBase):
+    """コンセプトの意思決定/ステータスの追記型ログ（変更履歴標準 §3.2）。"""
+    __tablename__ = "concept_decision_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    concept_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("concepts.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # status / decision
+    from_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    to_value: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
