@@ -12,6 +12,14 @@ import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/compone
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
 import { generateChatSummary, getQuestOutcomeRevisionDiff, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+import { listConcepts, type ConceptListItem } from "@/features/concepts/api";
+
+// コンセプトの状態/判定ラベル（結果タブの勝ち残りコンセプト表示・SC-61 と揃える）。
+const CONCEPT_STATUS_LABEL: Record<string, string> = { draft: "下書き", active: "検証中", archived: "保管" };
+const CONCEPT_DECISION_LABEL: Record<string, [string, string]> = {
+  undecided: ["未判定", "badge badge-muted"], go: ["推進", "badge badge-success"],
+  pivot: ["方向転換", "badge badge-muted"], kill: ["中止", "badge badge-danger"],
+};
 
 // 振り返り（総括）の版で追跡するフィールドの表示名（§3.1）。
 const OUTCOME_FIELD_LABELS: Record<string, string> = {
@@ -42,6 +50,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [concepts, setConcepts] = useState<ConceptListItem[]>([]); // クエストの成果＝候補コンセプト（ISO ②③段）
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +64,8 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         setMetrics((r.outcome.metrics ?? []).map((m) => ({ label: m.label, value: m.value })));
       })
       .finally(() => alive && setLoading(false));
+    // クエストの結果＝最終的にはコンセプト（ISO 56001 ②③段）。候補コンセプトも取得して結果に含める。
+    void listConcepts(questId).then((r) => { if (alive) setConcepts(r?.items ?? []); });
     return () => { alive = false; };
   }, [questId]);
 
@@ -126,7 +137,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </p>
       ) : (
         <p className="role-note" style={{ marginTop: 0 }}>
-          クエスト完了時の<strong>アイデア選別の申し送り</strong>です（アイデア＋議論＋評価の総括・ISO 56001）。
+          クエストの<strong>最終成果</strong>です＝選定アイデアを統合・検証した<strong>コンセプト</strong>（推進/方向転換/中止の判定）と、アイデア＋議論＋評価の総括（ISO 56001 §8.3）。
         </p>
       )}
 
@@ -155,6 +166,51 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
                 </div>
               </li>
             ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ①-b コンセプトの結果＝クエストの最終成果（ISO 56001 ②③段）。選定アイデアを統合・検証した候補と判定。 */}
+      <section className="card" aria-label="コンセプトの結果">
+        <div className="section-head">
+          <h3 style={{ margin: 0 }}>🧩 コンセプトの結果（{concepts.length}）</h3>
+          <Link className="btn btn-outline btn-sm" href={`/quests/${questId}?tab=concept`}>コンセプトタブへ →</Link>
+        </div>
+        <p className="role-note" style={{ marginTop: 0 }}>
+          選定アイデアを統合し前提を検証した<strong>コンセプト</strong>が、このクエストの最終的な成果です（推進＝次段へ・ISO 56001 §8.3 ②③段）。
+        </p>
+        {concepts.length === 0 ? (
+          <p className="muted text-sm">まだコンセプトはありません（「🧩 コンセプト」タブから起票できます）。</p>
+        ) : (
+          <ul className="qresult__list">
+            {/* 推進/選定を上位に、次いで更新の新しい順（勝ち残りを先頭に見せる）。 */}
+            {[...concepts]
+              .sort((a, b) => {
+                const w = (c: ConceptListItem) => (c.decision === "go" ? 2 : 0) + (c.is_selected ? 1 : 0);
+                return w(b) - w(a);
+              })
+              .map((c) => {
+                const [dl, dc] = CONCEPT_DECISION_LABEL[c.decision] ?? [c.decision, "badge badge-muted"];
+                return (
+                  <li key={c.id} className="qresult__idea">
+                    <QuestIcon name={c.title} color={quest.color} size="sm" />
+                    <div className="qresult__idea-main">
+                      <div className="qresult__idea-top">
+                        <Link className="card-title" href={`/concepts/${c.id}`}>{c.title}</Link>
+                        {c.is_selected && <span className="badge badge-success">★ 選定</span>}
+                        <span className={dc}>{dl}</span>
+                        <span className="badge badge-muted">{CONCEPT_STATUS_LABEL[c.status] ?? c.status}</span>
+                      </div>
+                      <div className="qresult__idea-meta">
+                        <span className="muted text-sm">由来アイデア {c.source_idea_count}・前提 {c.assumption_count}</span>
+                        {c.eval_summary.evaluator_count > 0 && (
+                          <span className="badge">評価 {c.eval_summary.overall_avg?.toFixed(1) ?? "—"}/5（{c.eval_summary.evaluator_count}名）</span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
           </ul>
         )}
       </section>
