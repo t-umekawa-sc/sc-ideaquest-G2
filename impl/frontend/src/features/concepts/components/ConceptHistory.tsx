@@ -22,6 +22,7 @@ const FIELD_LABELS: Record<string, string> = {
   differentiation: "競合・差別化",
   solution_form: "解の形態＋必要な能力",
   viability: "採算・事業性（viability）",
+  assumptions: "前提と検証（リンク/判定）",
 };
 
 export function ConceptRevisionHistory({ conceptId, currentRevision }: { conceptId: string; currentRevision: number }) {

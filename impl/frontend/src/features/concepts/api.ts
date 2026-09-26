@@ -98,6 +98,19 @@ export function unlinkAssumption(conceptId: string, assumptionId: string): Promi
   return apiFetch(`/concepts/${conceptId}/assumptions/${assumptionId}`, { method: "DELETE" });
 }
 
+export type Validation = components["schemas"]["ValidationDTO"];
+export type ValidationInput = components["schemas"]["ValidationCreateRequest"];
+
+// 検証（実績）の追記（P.3・検証プール所有＝owner/quest_admin）。refuted は反証波及を発火。
+export function addValidation(assumptionId: string, body: ValidationInput): Promise<components["schemas"]["ValidationAddResponse"] | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+// 検証履歴（時系列・新しい順）。
+export function listValidations(assumptionId: string): Promise<{ items: Validation[] } | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations`);
+}
+
 // ---- 登録・編集・遷移・選定・判定（P.2） ----
 
 export function createConcept(questId: string, body: ConceptCreateInput): Promise<ConceptDetail | null> {

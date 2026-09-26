@@ -304,6 +304,7 @@ CONCEPT_REVISION_FIELDS = (
     rev_shared.FieldSpec("differentiation", "text"),
     rev_shared.FieldSpec("solution_form", "text"),
     rev_shared.FieldSpec("viability", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("assumptions", "text"),  # リンク中の前提（重要度/判定）＝リンク変更・検証で更新（§4.4 版管理）
 )
 
 
@@ -314,12 +315,33 @@ def _json_compact(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+_CRIT_LABEL = {"critical": "致命的", "major": "重要", "minor": "補助"}
+_VERDICT_LABEL_JA = {"supported": "支持", "refuted": "反証", "inconclusive": "保留"}
+
+
+def _assumptions_snapshot(ts, concept) -> str:
+    """版に保存する『リンク中の前提』要約（当時の判断材料・§3.1）＝重要度/前提文/現在判定を安定順で。
+    リンクの追加/解除・検証（実績）による判定変化を版の差分として追える。"""
+    lines = []
+    for link in repo.list_links_for_concept(ts, concept.id):
+        a = repo.get_assumption(ts, link.assumption_id)
+        if a is None:
+            continue
+        crit = _CRIT_LABEL.get(link.criticality, link.criticality)
+        verd = _VERDICT_LABEL_JA.get(a.current_verdict, a.current_verdict)
+        lines.append(f"[{crit}] {a.statement}（{verd}）")
+    lines.sort()
+    return "\n".join(lines)
+
+
 def _content_snapshot(ts, concept) -> dict:
     """版に保存する内容フィールドのスナップショット（§3.1）。"""
     return {
         "title": concept.title, "problem": concept.problem, "value_proposition": concept.value_proposition,
         "target": concept.target, "differentiation": concept.differentiation,
         "solution_form": concept.solution_form, "viability": concept.viability or {},
+        # リンク中の前提（重要度/判定）＝どの前提が紐づき、実績でどう判定されたかを版管理（ユーザー要望 2026-09-26）。
+        "assumptions": _assumptions_snapshot(ts, concept),
     }
 
 
@@ -344,6 +366,17 @@ def _snapshot_revision(ts, concept, editor_id, revision, *, memo=None) -> None:
     repo.add_revision(ts, concept.id, revision=revision, editor_id=editor_id,
                       changes=_content_snapshot(ts, concept), memo=memo,
                       context_snapshot=_context_snapshot(ts, concept))
+
+
+def _maybe_bump_revision(ts, concept, editor_id, before, *, memo=None) -> None:
+    """内容スナップショットが変わっていれば版を1件記録（無変更は版なし・§3.1）。
+    前提のリンク/解除・検証（実績）による判定変化を版として残すために使う。"""
+    ts.flush()
+    after = _content_snapshot(ts, concept)
+    if rev_shared.changed_fields(before, after, CONCEPT_REVISION_FIELDS):
+        next_rev = concept.current_revision + 1
+        _snapshot_revision(ts, concept, editor_id, next_rev, memo=memo)
+        concept.current_revision = next_rev
 
 
 def _record_decision_log(ts, concept, kind, from_value, to_value, actor_id, *, reason=None) -> None:
@@ -631,6 +664,10 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         assumption, quest = _resolve_assumption(ts, aid, user)
         _require_manager(ts, quest, user, action="検証の記録")
         _guard_not_completed(quest)
+        # 実績（検証）追記でリンク先コンセプトの判定が変わり得る＝版管理のため事前スナップショットを取る（§4.4）。
+        linked_concepts = [repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)]
+        linked_concepts = [c for c in linked_concepts if c is not None]
+        before_by_concept = {c.id: _content_snapshot(ts, c) for c in linked_concepts}
         v = repo.add_validation(
             ts, assumption_id=aid, method=body.method, verdict=body.verdict,
             validated_on=body.validated_on, result=body.result, scale=body.scale, created_by_id=user.id,
@@ -639,6 +676,9 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         if body.verdict == "refuted":
             affected = repo.mark_links_stale_for_assumption(ts, aid)
             # 通知（H・作成者＋評価者へ「要再評価」）は後続スライスで結線（P.7・follow-up）。
+        # 判定が変わったリンク先コンセプトは版を記録（実績入力の版管理・当時の判断材料）。
+        for c in linked_concepts:
+            _maybe_bump_revision(ts, c, user.id, before_by_concept[c.id], memo="前提の検証（実績）を追記")
         result = {
             "validation": _validation_dto(v),
             "current_verdict": repo.get_assumption(ts, aid).current_verdict,
@@ -679,11 +719,13 @@ def link_assumption(account_id, company_id, concept_id, *, assumption_id: str, c
                            errors=[{"field": "assumption_id"}])
         if repo.get_link(ts, cid, aid) is not None:
             raise AppError(409, "conflict", detail="既にリンク済み")
+        before = _content_snapshot(ts, concept)  # リンク前の状態（版管理・§4.4）
         link = repo.link_assumption(ts, concept_id=cid, assumption_id=aid, criticality=criticality, created_by_id=user.id)
         # 前提スレッド（assumption スコープ）を生成（重複は unique で防止・§3.7）。
         if repo.get_assumption_scope(ts, cid, aid) is None:
             repo.create_chat_scope(ts, concept_id=cid, kind="assumption", assumption_id=aid,
                                    position=repo.next_scope_position(ts, cid))
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提をリンク")
         result = {"concept_id": str(cid), "assumption_id": str(aid),
                   "criticality": link.criticality, "is_stale": link.is_stale}
         ts.commit()
@@ -702,7 +744,9 @@ def patch_link(account_id, company_id, concept_id, assumption_id, *, criticality
         link = repo.get_link(ts, cid, aid)
         if link is None:
             raise AppError(404, "not_found")
+        before = _content_snapshot(ts, concept)  # 重要度変更の版管理（§4.4）
         repo.set_link_criticality_stale(ts, link, criticality=criticality, is_stale=is_stale)
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提の重要度を変更")
         result = {"concept_id": str(cid), "assumption_id": str(aid),
                   "criticality": link.criticality, "is_stale": link.is_stale}
         ts.commit()
@@ -718,9 +762,11 @@ def unlink_assumption(account_id, company_id, concept_id, assumption_id) -> None
         concept, quest = _resolve_concept(ts, cid, user, for_write=True)
         _require_concept_editor(ts, concept, quest, user)
         _guard_not_completed(quest)
+        before = _content_snapshot(ts, concept)  # 解除前の状態（版管理・§4.4）
         if not repo.unlink_assumption(ts, cid, aid):
             raise AppError(404, "not_found")
         repo.remove_assumption_scope(ts, cid, aid)  # 前提本体・エビデンスは残す（単一ソース）
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提のリンクを解除")
         ts.commit()
 
 

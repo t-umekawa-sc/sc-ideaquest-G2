@@ -104,6 +104,29 @@ def _validate(client, aid, verdict, on="2026-03-01", method="interview"):
                        json={"method": method, "verdict": verdict, "validated_on": on}, headers=_csrf(client))
 
 
+def test_p_tc_257_link_validation_bump_concept_revision(env, client):
+    """P-TC-257: 前提リンク・実績（検証）・解除でコンセプトの版が増える（版管理・§4.4・assumptions フィールド）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    cid = _concept(client, qid)
+    aid = _assumption(client, qid, "想定顧客は月1回この課題に直面する")
+    # リンク → 版2（assumptions 変化＝どの前提が紐づいたかを版に残す）。
+    r = client.post(f"/api/v1/concepts/{cid}/assumptions", json={"assumption_id": aid, "criticality": "major"}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    data = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data[0]["revision"] == 2 and "assumptions" in data[0]["changed_fields"]
+    # 実績（反証）→ 判定が保留→反証に変化して版3。
+    v = _validate(client, aid, "refuted", on="2026-09-26")
+    assert v.status_code == 201, v.text
+    data2 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data2[0]["revision"] == 3 and "assumptions" in data2[0]["changed_fields"]
+    # リンク解除 → 版4。
+    u = client.delete(f"/api/v1/concepts/{cid}/assumptions/{aid}", headers=_csrf(client))
+    assert u.status_code == 204, u.text
+    data3 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data3[0]["revision"] == 4 and "assumptions" in data3[0]["changed_fields"]
+
+
 def test_p_tc_202_create_assumption_permission(env, client):
     """P-TC-202: 前提作成は プール所有=201 inconclusive／非 manager=403。"""
     _login_seed(client)

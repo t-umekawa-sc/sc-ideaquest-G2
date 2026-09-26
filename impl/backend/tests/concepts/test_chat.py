@@ -21,6 +21,8 @@ from app.tenant.concepts.orm import (
     Concept,
     ConceptAssumptionLink,
     ConceptChatScope,
+    ConceptDecisionLog,
+    ConceptRevision,
 )
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
@@ -90,6 +92,9 @@ def env():
         ts.execute(ConceptChatScope.__table__.delete().where(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(ConceptAssumptionLink.__table__.delete().where(ConceptAssumptionLink.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))
+        # 前提リンクでコンセプト版が記録される（§4.4 版管理）ため、Concept 削除前に revisions/log を掃除。
+        ts.execute(ConceptRevision.__table__.delete().where(ConceptRevision.concept_id.in_(cids or [uuid.uuid4()])))
+        ts.execute(ConceptDecisionLog.__table__.delete().where(ConceptDecisionLog.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Concept.__table__.delete().where(Concept.quest_id.in_(quests or [uuid.uuid4()])))
         for qid in quests:
             ts.execute(QuestMemberPermission.__table__.delete().where(
