@@ -197,14 +197,9 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       if (publish && targetId) await activateConcept(targetId);
       window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
       snack({ type: "success", title: publish ? "コンセプトを投稿しました（公開）" : "下書きを保存しました" });
-      if (!isEdit && targetId) {
-        // 作成＝新コンセプト詳細へ遷移。モーダルは close(to) 経由＝先に exit アニメで閉じてから router.replace(to)
-        // するため「モーダルが閉じない/登録URLのまま」のデグレを回避（router.replace 直呼びは intercept スロットが
-        // 残り不可視化されず開いたままになる）。フルページは onDone(to)=router.push(to)。
-        onDone(`/concepts/${targetId}`);
-      } else {
-        onDone();  // 編集＝呼び出し側の閉じ（モーダルは閉じアニメ→router.back／フルページは戻る）
-      }
+      // 作成/複製/編集いずれも「閉じるだけ」で詳細へは遷移しない（ユーザー要望 2026-09-26）。
+      // モーダルは閉じアニメ→router.back で元のコンセプトタブへ戻り、一覧は CONCEPTS_CHANGED_EVENT で更新される。
+      onDone();
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         setErrors({ title: "入力を確認してください。" });
