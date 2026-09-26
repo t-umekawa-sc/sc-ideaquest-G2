@@ -170,8 +170,15 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       if (publish && targetId) await activateConcept(targetId);
       window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
       snack({ type: "success", title: publish ? "コンセプトを投稿しました（公開）" : "下書きを保存しました" });
-      onDone();
-      if (!isEdit && targetId) router.push(`/concepts/${targetId}`);
+      if (!isEdit && targetId) {
+        // 作成＝登録ダイアログURL（/concepts/new）を新コンセプト詳細で「置換」して遷移する。
+        // onDone()（モーダルの閉じ＝exit アニメ完了後に router.back）と router.push を併用すると、
+        // push が先・back が後で発火し /concepts/new に戻ってしまう（登録ダイアログURLのまま・背景がアイデアタブ）。
+        // replace で1回の遷移に統一＝競合なし・戻るは /quests/{id} へ（登録フォームに戻さない）。
+        router.replace(`/concepts/${targetId}`);
+      } else {
+        onDone();  // 編集＝呼び出し側の閉じ（モーダルは閉じアニメ→router.back／フルページは戻る）
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         setErrors({ title: "入力を確認してください。" });
