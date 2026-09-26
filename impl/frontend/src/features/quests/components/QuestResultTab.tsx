@@ -5,7 +5,7 @@
 // ⑤振り返り・学び（owner/管理が編集）/⑥次アクション（後続クエスト複製導線）。④議論の要点(a)＝各案のチャットリンク。
 // 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56001.md・C（FR-39）。
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, Button, Field, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
@@ -28,6 +28,14 @@ const OUTCOME_FIELD_LABELS: Record<string, string> = {
   next_actions: "次アクション",
   metrics: "成果の指標（KPI）",
 };
+
+// コンセプト評価の観点（中核5＋補助3・SC-62/SC-61 と揃える）＋総合判定の並び。
+const CONCEPT_ASPECT_LABELS: [string, string][] = [
+  ["desirability", "望ましさ"], ["feasibility", "実現可能性"], ["viability", "採算・事業性"],
+  ["assumption_strength", "前提検証の強さ"], ["differentiation", "差別化"],
+  ["novelty", "新規性"], ["sustainability", "持続可能性"], ["ip", "知的財産"],
+];
+const CONCEPT_DECISION_ORDER: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"], ["undecided", "未判定"]];
 
 const ASPECT_LABELS: [keyof QuestResult["aspect_averages"], string][] = [
   ["novelty", "新規性"],
@@ -122,6 +130,24 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     deadline: quest.deadline ?? "",
     purpose: quest.purpose ?? "",
   });
+
+  // コンセプト評価サマリ＝候補全体の集計（判定内訳・のべ評価者数・観点別平均＝評価者数で加重）。
+  const conceptEval = useMemo(() => {
+    const totalEvaluators = concepts.reduce((s, c) => s + (c.eval_summary.evaluator_count || 0), 0);
+    const decisionCounts: Record<string, number> = {};
+    for (const c of concepts) decisionCounts[c.decision] = (decisionCounts[c.decision] ?? 0) + 1;
+    const aspectAvg: Record<string, number | null> = {};
+    for (const [k] of CONCEPT_ASPECT_LABELS) {
+      let sum = 0, w = 0;
+      for (const c of concepts) {
+        const a = c.eval_summary.aspects?.[k];
+        const ec = c.eval_summary.evaluator_count || 0;
+        if (a != null && ec > 0) { sum += a * ec; w += ec; }
+      }
+      aspectAvg[k] = w > 0 ? Math.round((sum / w) * 10) / 10 : null;
+    }
+    return { totalEvaluators, decisionCounts, aspectAvg };
+  }, [concepts]);
 
   if (loading) return <p className="admin-muted">読み込み中…</p>;
   if (!result) return <p className="admin-muted">最終結果を取得できませんでした。</p>;
@@ -239,6 +265,33 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           })}
         </div>
       </section>
+
+      {/* ②-b コンセプト評価サマリ（アイデアとは別体系＝中核5＋補助3・候補全体の集計・ユーザー要望 2026-09-26） */}
+      {concepts.length > 0 && (
+        <section className="card" aria-label="コンセプト評価サマリ">
+          <div className="section-head"><h3 style={{ margin: 0 }}>🧩 コンセプト評価サマリ</h3></div>
+          <p className="role-note" style={{ marginTop: 0 }}>コンセプトはアイデアとは別の評価体系（中核5＋補助3）です。以下は候補全体の集計（観点別は評価者数で加重平均）。</p>
+          <div className="qresult__metrics">
+            <span className="qresult__kpi"><b>{concepts.length}</b><span>候補</span></span>
+            {CONCEPT_DECISION_ORDER.map(([k, label]) => (
+              <span key={k} className="qresult__kpi"><b>{conceptEval.decisionCounts[k] ?? 0}</b><span>{label}</span></span>
+            ))}
+            <span className="qresult__kpi"><b>{conceptEval.totalEvaluators}</b><span>評価(のべ)</span></span>
+          </div>
+          <div className="qresult__aspects">
+            {CONCEPT_ASPECT_LABELS.map(([k, label]) => {
+              const v = conceptEval.aspectAvg[k];
+              return (
+                <div key={k} className="qresult__aspect">
+                  <span className="qresult__aspect-label">{label}</span>
+                  <span className="qresult__bar"><span style={{ width: `${((v ?? 0) / 5) * 100}%` }} /></span>
+                  <span className="qresult__aspect-val">{v != null ? `${v}/5` : "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ③ 意思決定の記録（公開アイデア＝評価平均順） */}
       <section className="card" aria-label="意思決定の記録">

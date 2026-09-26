@@ -3,7 +3,7 @@
 // SC-61 §4.4 前提カード＝重要度/現在判定/stale＋検証履歴（時系列）＋実績入力導線＋前提スレッド議論導線。
 // 検証履歴は展開時に遅延取得（GET /assumptions/{id}/validations）。実績入力/リンク解除は owner/quest_admin。
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { listValidations, type ConceptAssumption, type Validation } from "../api";
 
@@ -32,10 +32,13 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
     listValidations(a.assumption_id).then((r) => { setVals(r?.items ?? []); setLoadedToken(reloadToken); }).catch(() => setVals([]));
   }, [a.assumption_id, reloadToken]);
 
+  // 開いている間に reloadToken が変わったら（＝実績の追記/編集/削除後）自動で再取得＝リロード不要で反映。
+  useEffect(() => {
+    if (open && loadedToken !== reloadToken) load();
+  }, [open, reloadToken, loadedToken, load]);
+
   const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => {
-    const isOpen = (e.currentTarget as HTMLDetailsElement).open;
-    setOpen(isOpen);
-    if (isOpen && (vals === null || loadedToken !== reloadToken)) load();
+    setOpen((e.currentTarget as HTMLDetailsElement).open);
   };
 
   return (

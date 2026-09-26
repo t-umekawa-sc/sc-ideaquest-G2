@@ -707,8 +707,12 @@ QUEST_REVISION_FIELDS = (
     rev_shared.FieldSpec("color", "scalar"),
     rev_shared.FieldSpec("deadline", "scalar"),
     rev_shared.FieldSpec("categories", "scalar", scalar_fmt=lambda v: "・".join(v or [])),
+    # 発見カタログ掲載（FR-40）・アイコン画像も定義編集＝版に記録（PATCH で編集可・silent no-bump を防ぐ・2026-09-26 監査）。
+    rev_shared.FieldSpec("discoverable", "scalar", scalar_fmt=lambda v: "掲載" if v else "非掲載"),
+    rev_shared.FieldSpec("icon_image_path", "scalar", scalar_fmt=lambda v: "（アイコン画像あり）" if v else "（アイコンなし）"),
 )
-_QUEST_EMPTY_SNAPSHOT = {"title": None, "purpose": None, "color": None, "deadline": None, "categories": []}
+_QUEST_EMPTY_SNAPSHOT = {"title": None, "purpose": None, "color": None, "deadline": None, "categories": [],
+                         "discoverable": False, "icon_image_path": None}
 
 
 def _quest_content_snapshot(ts, quest) -> dict:
@@ -716,6 +720,8 @@ def _quest_content_snapshot(ts, quest) -> dict:
         "title": quest.title, "purpose": quest.purpose, "color": quest.color,
         "deadline": quest.deadline.isoformat() if quest.deadline else None,
         "categories": sorted(c.label for c in repo.list_categories(ts, quest.id)),
+        "discoverable": bool(quest.discoverable),
+        "icon_image_path": quest.icon_image_path,
     }
 
 

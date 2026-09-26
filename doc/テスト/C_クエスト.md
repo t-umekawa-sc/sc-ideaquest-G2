@@ -115,6 +115,7 @@
 | C-TC-300 | api | 変更が無い編集は版を進めない（既存仕様踏襲） | rev あり | `PATCH /quests/{id}`（同値） | `revisions` は rev1 のみ | §3.1 |
 | C-TC-301 | api | ステータス遷移を意思決定ログに記録（§3.2） | recruiting | `POST /quests/{id}/transition`（in_progress） | `GET .../decision-log` に kind=status（recruiting→in_progress） | §3.2 |
 | C-TC-302 | api | 定義の版差分（前版比較・text/scalar） | 2版 | `GET /quests/{id}/revisions/2/diff` | fields.title＝text segments | §3.1 |
+| C-TC-303 | api | 発見カタログ掲載(discoverable)のみの編集でも版を記録（silent no-bump 防止） | rev あり | `PATCH /quests/{id}`（discoverable のみ） | 版が増え changed_fields に discoverable のみ（title 等は含まない） | §3.1／FR-40 |
 
 ## 6. e2e（SC-11/12・実接続・Playwright）
 

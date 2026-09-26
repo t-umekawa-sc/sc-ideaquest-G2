@@ -15,6 +15,8 @@ const FIELD_LABELS: Record<string, string> = {
   color: "カラー",
   deadline: "締切",
   categories: "カテゴリー",
+  discoverable: "発見カタログ掲載",
+  icon_image_path: "アイコン画像",
 };
 
 export function QuestRevisionHistory({ questId }: { questId: string }) {

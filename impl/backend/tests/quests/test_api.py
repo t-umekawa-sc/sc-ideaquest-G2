@@ -510,3 +510,14 @@ def test_c_tc_302_quest_revision_diff(client, env):
     diff = client.get(f"/api/v1/quests/{qid}/revisions/2/diff").json()
     assert diff["from_revision"] == 1 and diff["to_revision"] == 2
     assert diff["fields"]["title"]["kind"] == "text" and diff["fields"]["title"]["segments"]
+
+
+def test_c_tc_303_quest_discoverable_versioned(client, env):
+    """C-TC-303: 発見カタログ掲載(discoverable)のみの編集でも版が記録される（版管理 silent no-bump 防止・2026-09-26 監査）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest(discoverable=False)
+    client.patch(f"/api/v1/quests/{qid}", json={"title": "確定"}, headers=_csrf(client))  # rev1（基準）
+    client.patch(f"/api/v1/quests/{qid}", json={"discoverable": True}, headers=_csrf(client))  # rev2＝掲載トグルのみ
+    data = client.get(f"/api/v1/quests/{qid}/revisions").json()["data"]
+    assert data[0]["revision"] == 2
+    assert "discoverable" in data[0]["changed_fields"] and "title" not in data[0]["changed_fields"]
