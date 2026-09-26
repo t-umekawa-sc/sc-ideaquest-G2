@@ -93,14 +93,15 @@ function statusBadgeClass(s: string): string {
 const PERM_BADGE: Record<string, string> = { owner: "👑 所有者", quest_admin: "クエスト管理", evaluator: "評価者", vote: "投票", idea_create: "作成", comment: "コメント" };
 const PERM_VIEW_ORDER = ["owner", "quest_admin", "evaluator", "vote", "idea_create", "comment"];
 
+// 並び順＝価値創造の流れ（アイデア→コンセプト）を先頭に、検索はコンテンツ横断ユーティリティとして隣接、
+// パーティー（人・管理）を後方、結果を culmination として最右（2026-09-26 ユーザー決定）。
 const TABS = [
   { key: "ideas", label: "💡 アイデア" },
-  { key: "party", label: "👥 パーティー" },
-  { key: "search", label: "🔍 全文検索" },
   // 🧩 コンセプト＝ISO 56001 ②③段の候補コンセプト＋検証プール（FR-42・§4.6）。アイデア選別を受けて創造/検証する段。
   { key: "concept", label: "🧩 コンセプト" },
-  // 🏁 結果＝クエストの最終成果（FR-39）。アイデア選別の申し送り＋勝ち残ったコンセプト（判定/選定）。
-  // ISO 56001 の流れ＝アイデア→コンセプト→成果 の順に沿い、culmination として最右に配置（2026-09-26 ユーザー要望）。
+  { key: "search", label: "🔍 全文検索" },
+  { key: "party", label: "👥 パーティー" },
+  // 🏁 結果＝クエストの最終成果（FR-39）。アイデア選別の申し送り＋勝ち残ったコンセプト（判定/選定）。最右に固定。
   { key: "result", label: "🏁 結果" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
