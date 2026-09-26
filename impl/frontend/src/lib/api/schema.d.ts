@@ -2219,6 +2219,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assumptions/{assumption_id}/validations/{validation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Validation
+         * @description 検証イベントの削除（P.3・プール所有）。削除もリンク先コンセプトの版に記録（§4.4）。
+         */
+        delete: operations["delete_validation_api_v1_assumptions__assumption_id__validations__validation_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit Validation
+         * @description 検証イベントの編集（P.3・プール所有）。編集はリンク先コンセプトの版に記録（§4.4）。
+         */
+        patch: operations["edit_validation_api_v1_assumptions__assumption_id__validations__validation_id__patch"];
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/assumptions": {
         parameters: {
             query?: never;
@@ -12627,6 +12651,72 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationAddResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_validation_api_v1_assumptions__assumption_id__validations__validation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+                validation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_validation_api_v1_assumptions__assumption_id__validations__validation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+                validation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

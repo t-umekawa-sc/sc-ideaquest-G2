@@ -111,6 +111,16 @@ export function listValidations(assumptionId: string): Promise<{ items: Validati
   return apiFetch(`/assumptions/${assumptionId}/validations`);
 }
 
+// 検証（実績）の編集（プール所有・編集はリンク先コンセプトの版に記録）。
+export function patchValidation(assumptionId: string, validationId: string, body: ValidationInput): Promise<components["schemas"]["ValidationAddResponse"] | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations/${validationId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// 検証（実績）の削除（プール所有・削除もコンセプトの版に記録）。
+export function deleteValidation(assumptionId: string, validationId: string): Promise<null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations/${validationId}`, { method: "DELETE" });
+}
+
 // ---- 登録・編集・遷移・選定・判定（P.2） ----
 
 export function createConcept(questId: string, body: ConceptCreateInput): Promise<ConceptDetail | null> {

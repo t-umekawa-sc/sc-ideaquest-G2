@@ -42,6 +42,7 @@
 .validation-head { display: flex; align-items: center; gap: var(--space-2, .5rem); flex-wrap: wrap; }
 .validation-method { font-weight: 600; }
 .validation-meta { margin-left: auto; }
+.validation-tools { display: inline-flex; gap: var(--space-1, .25rem); }
 .validation-result { margin-top: 2px; white-space: pre-wrap; }
 
 .concept-rail { display: flex; flex-direction: column; gap: var(--space-3, .75rem); }
@@ -66,6 +67,8 @@
 .concept-tab { display: flex; flex-direction: column; gap: var(--space-4, 1rem); }
 .concept-tab-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, .75rem); flex-wrap: wrap; }
 .concept-tab-section h3 { margin: 0 0 var(--space-2, .5rem); font-size: var(--text-base, 1rem); }
+/* 見出しの1行下に右寄せのアクションボタン（作成/追加）。さらに1行下にテーブル一式（ユーザー要望）。 */
+.concept-tab-actionrow { display: flex; justify-content: flex-end; margin: 0 0 var(--space-3, .75rem); }
 .concept-table tr.is-clickable { cursor: pointer; }
 .concept-table tr.is-clickable:hover { background: var(--color-surface-alt); }
 .concept-table td.cell-actions { width: 48px; text-align: right; }

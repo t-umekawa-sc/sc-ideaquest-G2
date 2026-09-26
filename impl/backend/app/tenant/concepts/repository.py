@@ -162,6 +162,31 @@ def _recompute_current_verdict(session: Session, assumption_id: uuid.UUID) -> No
         session.flush()
 
 
+def get_validation(session: Session, validation_id: uuid.UUID) -> AssumptionValidation | None:
+    return session.get(AssumptionValidation, validation_id)
+
+
+def update_validation(session: Session, v: AssumptionValidation, *, method: str, verdict: str,
+                      validated_on: date, result: str | None, scale: str | None) -> AssumptionValidation:
+    """検証イベントを編集＋現在判定を再導出（編集可・版管理は application で記録・ユーザー決定 2026-09-26）。"""
+    v.method = method
+    v.verdict = verdict
+    v.validated_on = validated_on
+    v.result = result
+    v.scale = scale
+    session.flush()
+    _recompute_current_verdict(session, v.assumption_id)
+    return v
+
+
+def delete_validation(session: Session, v: AssumptionValidation) -> None:
+    """検証イベントを削除＋現在判定を再導出。"""
+    aid = v.assumption_id
+    session.delete(v)
+    session.flush()
+    _recompute_current_verdict(session, aid)
+
+
 def delete_assumption(session: Session, assumption_id: uuid.UUID) -> bool:
     """前提を削除。リンクが1件でも有れば削除せず False（先に解除を促す・P.3）。未リンクなら削除して True。"""
     linked = session.execute(

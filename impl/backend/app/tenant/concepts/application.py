@@ -688,6 +688,53 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         return result
 
 
+def edit_validation(account_id, company_id, assumption_id, validation_id, *, body) -> dict:
+    """検証イベントの編集（プール所有）。編集はリンク先コンセプトの版に記録（ユーザー決定＝編集可＋版管理・§4.4）。"""
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    vid = _parse_uuid(validation_id, field="validation_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="検証の編集")
+        _guard_not_completed(quest)
+        v = repo.get_validation(ts, vid)
+        if v is None or v.assumption_id != aid:
+            raise AppError(404, "not_found")
+        linked = [c for c in (repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)) if c is not None]
+        before = {c.id: _content_snapshot(ts, c) for c in linked}
+        repo.update_validation(ts, v, method=body.method, verdict=body.verdict,
+                               validated_on=body.validated_on, result=body.result, scale=body.scale)
+        affected = repo.mark_links_stale_for_assumption(ts, aid) if body.verdict == "refuted" else []
+        for c in linked:
+            _maybe_bump_revision(ts, c, user.id, before[c.id], memo="前提の検証（実績）を編集")
+        result = {"validation": _validation_dto(v), "current_verdict": repo.get_assumption(ts, aid).current_verdict,
+                  "stale_concept_ids": [str(c) for c in affected]}
+        ts.commit()
+        return result
+
+
+def delete_validation(account_id, company_id, assumption_id, validation_id) -> None:
+    """検証イベントの削除（プール所有）。削除もリンク先コンセプトの版に記録（監査は版側で担保）。"""
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    vid = _parse_uuid(validation_id, field="validation_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="検証の削除")
+        _guard_not_completed(quest)
+        v = repo.get_validation(ts, vid)
+        if v is None or v.assumption_id != aid:
+            raise AppError(404, "not_found")
+        linked = [c for c in (repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)) if c is not None]
+        before = {c.id: _content_snapshot(ts, c) for c in linked}
+        repo.delete_validation(ts, v)
+        for c in linked:
+            _maybe_bump_revision(ts, c, user.id, before[c.id], memo="前提の検証（実績）を削除")
+        ts.commit()
+
+
 def list_validations(account_id, company_id, assumption_id) -> dict:
     company = _ctx(account_id, company_id)
     aid = _parse_uuid(assumption_id, field="assumption_id")

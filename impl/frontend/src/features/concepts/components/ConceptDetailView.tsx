@@ -17,9 +17,9 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
-  selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
-  type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
+  addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, deleteValidation, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
+  patchValidation, selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
+  type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate, type Validation,
 } from "../api";
 import { AssumptionCard } from "./AssumptionCard";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
@@ -84,7 +84,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const [linkSel, setLinkSel] = useState<string>("");
   const [linkCrit, setLinkCrit] = useState<"critical" | "major" | "minor">("major");
   // 実績入力（検証追記・P.3）ダイアログ＝どの前提に対して、手法/判定/実施日/規模/結果。
-  const [valDialog, setValDialog] = useState<{ assumptionId: string; method: string; verdict: "supported" | "refuted" | "inconclusive"; validatedOn: string; scale: string; result: string } | null>(null);
+  const [valDialog, setValDialog] = useState<{ assumptionId: string; validationId?: string; method: string; verdict: "supported" | "refuted" | "inconclusive"; validatedOn: string; scale: string; result: string } | null>(null);
   const [valSaving, setValSaving] = useState(false);
   const [valReloadToken, setValReloadToken] = useState(0); // 実績追加後に検証履歴を再取得させる
 
@@ -185,6 +185,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     setValDialog({ assumptionId, method: "", verdict: "supported", validatedOn: iso, scale: "", result: "" });
   };
+  // 実績の編集＝既存イベントをプリフィルして開く（編集可・版管理はコンセプト側で記録）。
+  const openEditValidation = (assumptionId: string, v: Validation) => {
+    setValDialog({
+      assumptionId, validationId: v.id, method: v.method, verdict: v.verdict as "supported" | "refuted" | "inconclusive",
+      validatedOn: v.validated_on, scale: v.scale ?? "", result: v.result ?? "",
+    });
+  };
   const saveValidation = async () => {
     if (!valDialog || valSaving) return;
     // 主ボタンは常に押せる（デザイン標準 §4.1）。手法・実施日・規模は必須（§4.4）。
@@ -192,19 +199,36 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       snack({ type: "error", title: "手法・実施日・規模は必須です" }); return;
     }
     setValSaving(true);
+    const body = {
+      method: valDialog.method.trim(), verdict: valDialog.verdict, validated_on: valDialog.validatedOn,
+      scale: valDialog.scale.trim() || null, result: valDialog.result.trim() || null,
+    };
     try {
-      await addValidation(valDialog.assumptionId, {
-        method: valDialog.method.trim(), verdict: valDialog.verdict, validated_on: valDialog.validatedOn,
-        scale: valDialog.scale.trim() || null, result: valDialog.result.trim() || null,
-      });
+      if (valDialog.validationId) {
+        await patchValidation(valDialog.assumptionId, valDialog.validationId, body);
+      } else {
+        await addValidation(valDialog.assumptionId, body);
+      }
       setValDialog(null);
       setValReloadToken((t) => t + 1);
       await load(); // current_verdict / stale の更新を反映
-      snack({ type: "success", title: "実績（検証）を追記しました" });
+      snack({ type: "success", title: valDialog.validationId ? "実績（検証）を更新しました" : "実績（検証）を追記しました" });
     } catch {
-      snack({ type: "error", title: "追記できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
+      snack({ type: "error", title: "保存できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
     } finally {
       setValSaving(false);
+    }
+  };
+  const deleteValidationHandler = async (assumptionId: string, v: Validation) => {
+    const ok = await confirm({ variant: "danger", title: "実績（検証）を削除", msg: `「${v.method}」（${v.validated_on}）の検証を削除しますか？（削除はコンセプトの版に記録されます）` });
+    if (!ok) return;
+    try {
+      await deleteValidation(assumptionId, v.id);
+      setValReloadToken((t) => t + 1);
+      await load();
+      snack({ type: "success", title: "実績（検証）を削除しました" });
+    } catch {
+      snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
     }
   };
   // 前提スレッド（assumption スコープ）への遷移先を解決。
@@ -319,6 +343,8 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                     canManage={canManage}
                     reloadToken={valReloadToken}
                     onValidate={() => openValidate(a.assumption_id)}
+                    onEditValidation={(v) => openEditValidation(a.assumption_id, v)}
+                    onDeleteValidation={(v) => void deleteValidationHandler(a.assumption_id, v)}
                     onUnlink={() => void doUnlink(a.assumption_id, a.statement)}
                   />
                 ))}
@@ -548,7 +574,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
 
       {/* 実績（検証）の追記ダイアログ（P.3・§4.4）＝手法/判定/実施日/規模/結果。実施日・規模は必須（エビデンスは古びる/検証の強さ）。 */}
       {valDialog && (
-        <Modal open onClose={() => setValDialog(null)} title="実績（検証）を入力" size="md">
+        <Modal open onClose={() => setValDialog(null)} title={valDialog.validationId ? "実績（検証）を編集" : "実績（検証）を入力"} size="md">
           <ModalBody>
             <p className="role-note" style={{ marginTop: 0 }}>この前提の検証結果を追記します（判定が反証に転じるとリンク先の全コンセプトが「要再評価」になります）。</p>
             <div className="field dialog-section is-quiet">
@@ -578,7 +604,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           </ModalBody>
           <ModalFooter>
             <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setValDialog(null)}>キャンセル</button>
-            <button type="button" className="btn btn-primary" disabled={valSaving} onClick={() => void saveValidation()}>追記</button>
+            <button type="button" className="btn btn-primary" disabled={valSaving} onClick={() => void saveValidation()}>{valDialog.validationId ? "更新" : "追記"}</button>
           </ModalFooter>
         </Modal>
       )}

@@ -266,6 +266,28 @@ def list_validations(assumption_id: str, request: Request, session: dict = Depen
     return ValidationListResponse(**result)
 
 
+@router.patch("/assumptions/{assumption_id}/validations/{validation_id}", response_model=ValidationAddResponse)
+def edit_validation(
+    assumption_id: str, validation_id: str, body: ValidationCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> ValidationAddResponse:
+    """検証イベントの編集（P.3・プール所有）。編集はリンク先コンセプトの版に記録（§4.4）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.edit_validation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, validation_id, body=body,
+    )
+    return ValidationAddResponse(**result)
+
+
+@router.delete("/assumptions/{assumption_id}/validations/{validation_id}", status_code=204)
+def delete_validation(assumption_id: str, validation_id: str, request: Request, session: dict = Depends(require_me)) -> Response:
+    """検証イベントの削除（P.3・プール所有）。削除もリンク先コンセプトの版に記録（§4.4）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    service.delete_validation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, validation_id)
+    return Response(status_code=204)
+
+
 # ---- コンセプト↔前提リンク（P.4） ----
 
 

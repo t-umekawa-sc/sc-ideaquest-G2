@@ -152,6 +152,7 @@
 | P-TC-255 | api | ステータス遷移の意思決定ログ | draft | `POST /concepts/{id}/activate` | decision-log に kind=status（draft→active） | §3.2 |
 | P-TC-256 | api | 履歴の門番（非パーティーは 404） | 非パーティー | `GET .../revisions`／`.../decision-log` | 404（存在秘匿） | P.0 |
 | P-TC-257 | api | 前提リンク/実績/解除でコンセプト版が増える（版管理・assumptions フィールド） | コンセプト＋前提 | `POST .../assumptions`（link）→`POST /assumptions/{id}/validations`（refuted）→`DELETE .../assumptions/{aid}` | 各操作で `GET .../revisions` の版が rev2→3→4 と増え `changed_fields` に `assumptions` を含む | §4.4／§3.1 |
+| P-TC-258 | api | 実績（検証）の編集/削除が可能・判定変化がコンセプト版に記録 | リンク済み＋検証1件 | `PATCH /assumptions/{id}/validations/{vid}`（支持→反証）→`DELETE .../validations/{vid}` | 編集で current_verdict=refuted・版 rev4／削除で判定保留・版 rev5（いずれも changed_fields に assumptions）＝編集可だが監査は版側で担保 | §4.4／§3.1 |
 
 ## 10. 未確定・実装時に詰める（テスト観点）
 

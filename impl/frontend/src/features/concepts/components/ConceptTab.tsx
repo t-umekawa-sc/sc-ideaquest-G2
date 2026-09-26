@@ -192,10 +192,10 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
         </ScreenPurpose>
       </div>
 
-      {/* 候補コンセプト一覧（標準 DataTable）。作成ボタンは「候補コンセプト」見出しの右（検証プールと統一）。 */}
+      {/* 候補コンセプト＝見出し→（1行下・右寄せ）作成ボタン→（さらに1行下）テーブル一式（ユーザー要望 2026-09-26）。 */}
       <section className="concept-tab-section">
-        <div className="concept-tab-head" style={{ marginBottom: "var(--space-2)" }}>
-          <h3 style={{ margin: 0 }}>候補コンセプト</h3>
+        <h3 style={{ margin: 0 }}>候補コンセプト</h3>
+        <div className="concept-tab-actionrow">
           <Link href={`/quests/${questId}/concepts/new`} className="btn btn-primary">＋ コンセプトを作成</Link>
         </div>
         {concepts === null ? (
@@ -227,15 +227,15 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
         )}
       </section>
 
-      {/* 検証プール（前提・標準 DataTable） */}
+      {/* 検証プール（前提）＝見出し→（1行下・右寄せ）追加ボタン→（さらに1行下）テーブル一式。 */}
       <section className="concept-tab-section">
-        <div className="concept-tab-head" style={{ marginBottom: "var(--space-2)" }}>
-          <h3 style={{ margin: 0 }}>検証プール（前提）</h3>
-          {/* 前提の追加＝owner/quest_admin のみ（P.3 検証プール所有）。追加/編集はダイアログで行う。 */}
-          {canManage && (
+        <h3 style={{ margin: 0 }}>検証プール（前提）</h3>
+        {/* 前提の追加＝owner/quest_admin のみ（P.3 検証プール所有）。追加/編集はダイアログで行う。 */}
+        {canManage && (
+          <div className="concept-tab-actionrow">
             <Button type="button" variant="primary" onClick={() => setAssumptionDialog({ mode: "create", statement: "" })}>＋ 前提を追加</Button>
-          )}
-        </div>
+          </div>
+        )}
         {pool === null ? (
           <p className="muted">読み込み中…</p>
         ) : (
