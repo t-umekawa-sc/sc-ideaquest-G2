@@ -318,12 +318,10 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
           )}
-          {/* 更新履歴＝リンク版UI（最終更新の下に「版 N（履歴）」＝モーダルで版タイムライン。アイデア/コンセプト詳細と同型・§3.1）。 */}
+          {/* 更新履歴＝リンク版UI（最終更新の下・概要ヘッダーと同じ小さめアイコン＋リンク・§3.1）。 */}
           {result.outcome_revisions.length > 0 && (
-            <p style={{ marginTop: "var(--space-1)" }}>
-              <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
-                版 {result.outcome_revisions[0]?.revision ?? result.outcome_revisions.length}（履歴）
-              </button>
+            <p className="muted text-sm" style={{ marginTop: "var(--space-1)" }}>
+              🔄 <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>版 {result.outcome_revisions[0]?.revision ?? result.outcome_revisions.length}（履歴）</button>
             </p>
           )}
         </div>

@@ -212,7 +212,8 @@
 /* アイデアカード＝上段にアイコン（左）と未投票/フォロー等のアクション（右）を置き、件名は独立した全幅行に
    （アイコンやアクションに幅を奪われず、件名がパネル幅いっぱいに折り返せる）。 */
 .idea-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
-.idea-card__actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+/* ⋯ メニューをカード右上角に絶対配置＝バッジ行はその左に収まるよう余白を確保。 */
+.idea-card__actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding-right: var(--space-6); }
 .idea-card__title { display: block; width: 100%; }
 /* 💬 列＝コメント数＋未読バッジ（+N）。 */
 .idea-chat-cell { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }

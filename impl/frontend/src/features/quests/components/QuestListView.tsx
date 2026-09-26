@@ -272,7 +272,8 @@ export function QuestListView() {
                   <span className={myBadge(x.my)}>{x.my}</span>
                 </div>
               </Link>
-              <div className="quest-card__menu" style={{ position: "absolute", right: "var(--space-3)", bottom: "var(--space-3)" }}>
+              {/* ⋯ はカード右上（ステータス行の一段上・角）。ステータスバッジには padding-right で場所を空ける（quests.css）。 */}
+              <div className="quest-card__menu" style={{ position: "absolute", right: "var(--space-2)", top: "var(--space-2)" }}>
                 <RowMenu items={questMenu(x)} />
               </div>
             </div>

@@ -777,35 +777,39 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               cardRaw={(r) => (
                 // カード表示＝ダッシュボードの「未投票のアイデア」カード（vote-card）と共通の見た目（レビュー#3）。
                 // 未投票＝クイック投票▲/▼／投票済＝結果表示／下書き＝続き。中身（提案価値）を見て判断できる。
-                <article className={"card card-accent vote-card idea-card" + (r.mystate === "voted" ? " is-voted" : "")}>
-                  {/* 上段＝アイコン（左）＋未投票/フォロー等のアクション（右）。件名は下の全幅行に（2段組にしない）。 */}
-                  <div className="idea-card__top">
-                    <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
-                    <span className="idea-card__actions">
-                      {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
-                      <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
-                      {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
-                      {/* カードの操作メニュー（⋯）＝リストの操作列と同一（複製導線なし・削除は権限者のみ表示）。 */}
-                      <RowMenu items={ideaMenu(r)} />
-                    </span>
-                  </div>
-                  {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
-                  <Link className="card-title idea-card__title" href={`/ideas/${r.id}`} title={r.title} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
-                  {r.value && <div className="vote-card__value">{r.value}</div>}
-                  <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
-                  {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
-                  {r.draft ? (
-                    <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
-                  ) : r.mystate === "unvoted" ? (
-                    <div className="vote-actions">
-                      {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}
-                      <button type="button" className={`vote-quick agree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
-                      <button type="button" className={`vote-quick disagree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                // ⋯ メニューはカード右上角（バッジ行の一段上）に絶対配置＝クエストカードと統一（ユーザー要望）。
+                <div className="idea-card-wrap" style={{ position: "relative" }}>
+                  <article className={"card card-accent vote-card idea-card" + (r.mystate === "voted" ? " is-voted" : "")}>
+                    {/* 上段＝アイコン（左）＋未投票/フォロー等のアクション（右）。件名は下の全幅行に（2段組にしない）。 */}
+                    <div className="idea-card__top">
+                      <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
+                      <span className="idea-card__actions">
+                        {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
+                        <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
+                        {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
-                  )}
-                </article>
+                    {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
+                    <Link className="card-title idea-card__title" href={`/ideas/${r.id}`} title={r.title} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
+                    {r.value && <div className="vote-card__value">{r.value}</div>}
+                    <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
+                    {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
+                    {r.draft ? (
+                      <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
+                    ) : r.mystate === "unvoted" ? (
+                      <div className="vote-actions">
+                        {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}
+                        <button type="button" className={`vote-quick agree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
+                        <button type="button" className={`vote-quick disagree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                      </div>
+                    ) : (
+                      <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
+                    )}
+                  </article>
+                  <div className="idea-card__menu" style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)" }}>
+                    <RowMenu items={ideaMenu(r)} />
+                  </div>
+                </div>
               )}
             />
           )}

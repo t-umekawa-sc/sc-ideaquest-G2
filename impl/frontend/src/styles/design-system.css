@@ -1595,6 +1595,8 @@ a.quest-card:hover { box-shadow: var(--shadow-lg); border-color: var(--color-pri
 a.quest-card:active { transform: translateY(1px); }
 .quest-card__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
 .quest-card__stats { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+/* カード右上の⋯メニュー（quest-card__menu）とステータスバッジが重ならないよう、先頭行に余白を確保。 */
+.quest-card-wrap .quest-card .between { padding-right: var(--space-6); }
 .deadline { font-size: var(--text-xs); font-weight: 500; }
 .deadline.soon { color: var(--color-danger); }
 /* ── ゲーム感 #24: 締切の切迫演出（data-urgency・段階色＋切迫は脈動）───────────────────
