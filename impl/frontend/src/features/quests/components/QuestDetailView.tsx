@@ -564,12 +564,15 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                     if (gs.length === 0) return <span>🗂 参加部署: 全社（部署条件なし）</span>;
                     return <span>🗂 参加部署: {gs.map((g) => g.name).join("・")}{gs.length > 1 ? `（${gs.length}部署）` : ""}</span>;
                   })()}
+                  {quest.current_revision > 0 && (
+                    <span>
+                      🔄 <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>版 {quest.current_revision}（履歴）</button>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
             <div className="quest-actions">
-              {/* 更新履歴（定義の版＋ステータスログ・§3.1/§3.2）＝閲覧者全員に開放（読み取り専用）。 */}
-              <button type="button" className="btn btn-outline" onClick={() => setHistoryOpen(true)}>🕘 更新履歴</button>
               {/* 「＋ アイデアを追加」はアイデアタブの一覧上部へ移動（下記 tab==="ideas"）。編集/遷移/削除は C 接続済み。 */}
               {canEdit && (
                 <>

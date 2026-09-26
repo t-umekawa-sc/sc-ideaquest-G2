@@ -1547,6 +1547,8 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         "members": member_dtos,
         "created_at": quest.created_at,
         "discoverable": bool(quest.discoverable),
+        # 更新履歴リンク用＝定義の最新版番号（未編集は 0＝リンク非表示）。§3.1
+        "current_revision": (lambda r: r.revision if r else 0)(repo.latest_quest_revision(ts, quest.id)),
     }
 
 

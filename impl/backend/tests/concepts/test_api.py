@@ -134,6 +134,19 @@ def test_p_tc_102_detail_composition(env, client):
     assert "edit" in body["my_permissions"] and "manage" in body["my_permissions"]
 
 
+def test_p_tc_120_my_permissions_includes_party_comment(env, client):
+    """P-TC-120: my_permissions は素のクエスト権限（comment 等）を合成する（議論チャット投稿不可バグの回帰）。"""
+    _login_seed(client)
+    # 別 owner のクエストに、既定権限（vote/idea_create/comment）で seed ユーザーを参加させる。
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote", "idea_create", "comment"])
+    iid = env.make_idea(qid)
+    cid = _create(client, qid, source_idea_ids=[str(iid)]).json()["id"]
+    body = client.get(f"/api/v1/concepts/{cid}").json()
+    # チャット中核の canComment を駆動する素の権限（アイデア詳細と同型）。
+    assert "comment" in body["my_permissions"]
+    assert "vote" in body["my_permissions"]
+
+
 def test_p_tc_101_list_includes_own_draft_excludes_others(env, client):
     """P-TC-101: 一覧は自分の draft を含み、他人の draft は除外。"""
     _login_seed(client)

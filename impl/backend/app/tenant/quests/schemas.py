@@ -295,6 +295,8 @@ class QuestDetailDTO(BaseModel):
     created_at: datetime
     # 発見カタログ掲載可否（SC-11 編集フォームのトグル プリフィル・FR-40・C.9.0）。
     discoverable: bool = False
+    # 定義の最新版番号（更新履歴リンク用・0＝未編集＝リンク非表示・§3.1）。
+    current_revision: int = 0
 
 
 class QuestIconImageResponse(BaseModel):

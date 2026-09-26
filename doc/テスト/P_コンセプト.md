@@ -42,6 +42,7 @@
 | P-TC-108 | api | 選定/解除（複数可・owner のみ・解除で履歴保持） | owner・active2 | `POST .../select`×2→`DELETE .../select`×1 | `is_selected` 反映・複数選定可・解除しても履歴残す | P.2 |
 | P-TC-109 | api | 総合判定 Go/Pivot/Kill（owner のみ・根拠） | owner | `PUT .../decision`（go＋rationale） | 200・`decision=go`・rationale 保存・一般は403 | P.2／§3.3 |
 | P-TC-110 | api | draft は本人のみ可視（存在秘匿） | 他人の draft | 非作成者で `GET /concepts/{id}` | 404（存在秘匿） | P.0/P.1 |
+| P-TC-120 | api | my_permissions に素のクエスト権限を合成（チャット投稿=comment・ピン=owner/quest_admin の素） | 既定権限パーティー員（回帰・議論チャット投稿不可バグ） | `GET /concepts/{id}` | `my_permissions` に `comment` を含む（アイデア詳細と同型・チャット中核の canComment を駆動） | P.1／§5.14b |
 | P-TC-111 | api | 門番（非パーティー/非グループ） | 非パーティー | `GET /concepts/{id}` | 404 | P.0 |
 | P-TC-112 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /quests/{id}/concepts` | 403 csrf_failed／401 | A.0/P.8 |
 

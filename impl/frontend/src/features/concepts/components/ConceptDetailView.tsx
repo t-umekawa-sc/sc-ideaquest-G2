@@ -56,12 +56,12 @@ function ConceptGuide() {
   return (
     <ScreenPurpose
       label="コンセプトとは？"
-      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
+      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら 推進 / 方向転換 / 中止 の判断まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
       dialogTitle="この画面について（ISO 56001 準拠）"
     >
       <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56001 §8.3 ②③段）。</p></div>
-      <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>Go / Pivot / Kill</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
-      <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、owner が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
+      <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>推進 / 方向転換 / 中止</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
+      <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、所有者が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
     </ScreenPurpose>
   );
 }
@@ -116,7 +116,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       const created = await createGroupScope(conceptId, label);
       if (created) { loadScopes(); router.push(`/concepts/${conceptId}/chat/${created.scope_id}`); }
     } catch (e) {
-      snack({ type: "error", msg: e instanceof ApiError && e.status === 403 ? "議論ルームの作成は owner/クエスト管理者のみです" : "議論ルームを開けませんでした" });
+      snack({ type: "error", msg: e instanceof ApiError && e.status === 403 ? "議論ルームの作成は 所有者/クエスト管理者のみです" : "議論ルームを開けませんでした" });
     } finally { setBusy(false); }
   };
 
@@ -180,12 +180,16 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             )}
           </div>
           <div className="idea-actions">
-            <button type="button" className="btn btn-outline" onClick={() => setHistoryOpen(true)}>🕘 更新履歴</button>
             {perms.includes("edit") && <Link href={`/concepts/${concept.id}/edit`} className="btn btn-outline">編集</Link>}
           </div>
         </div>
         <div className="idea-meta">
-          <span>🔄 更新 {fmtDate(concept.updated_at)}</span>
+          <span>
+            🔄 更新 {fmtDate(concept.updated_at)}・
+            <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
+              版 {concept.current_revision}（履歴）
+            </button>
+          </span>
           <span>🧭 所属クエスト: <Link href={`/quests/${concept.quest_id}`}>クエスト</Link></span>
           {concept.source_ideas.length > 0 && (
             <span>💡 由来: {concept.source_ideas.map((s, i) => (
@@ -251,7 +255,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             <div className="concept-overall-chat">
               <div style={{ minWidth: 0 }}>
                 <h2 style={{ margin: 0 }}>💬 総合チャット</h2>
-                <p className="muted text-sm" style={{ margin: "2px 0 0" }}>横断議論と最終 Go / Pivot / Kill の場（総合ルーム）。</p>
+                <p className="muted text-sm" style={{ margin: "2px 0 0" }}>横断議論と最終判断（推進 / 方向転換 / 中止）の場（総合ルーム）。</p>
               </div>
               {overallScope
                 ? <Link href={`/concepts/${conceptId}/chat/${overallScope.scope_id}`} className="btn btn-primary btn-sm">チャットを開く（総合ルーム）→</Link>
@@ -268,7 +272,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
               <h2 className="card-title" style={{ margin: 0 }}>投票</h2>
               <ScreenPurpose summary="パーティー全員の賛否（民意・機運）。1人1票・変更/取消可・自分にも可。評価スコアには影響しない（投票と評価は独立）。" dialogTitle="投票とは（投票・評価・総合判定の住み分け）">
                 <p style={{ margin: 0 }}><strong>投票</strong>＝コンセプト投票権限を持つ<strong>パーティー全員</strong>が賛成/反対で示す<strong>民意（機運）</strong>です。1人1票・変更/取消可・自分のコンセプトにも投票可（投票で +5 XP＝各コンセプト初回）。<strong>評価スコアや総合判定を自動では動かさない参考シグナル</strong>です。</p>
-                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。3 つは独立した入力で、総合判定が最終アウトプットです。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。3 つは独立した入力で、総合判定が最終アウトプットです。</p>
               </ScreenPurpose>
             </div>
             <div className="vote-summary">
@@ -294,7 +298,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
                 <ScreenPurpose summary="評価者権限を持つ人による多観点スコア（中核5＋補助3）＝専門的な定量評価。公開範囲を指定可。投票（民意）とは独立。" dialogTitle="評価とは（投票・評価・総合判定の住み分け）">
                   <p style={{ margin: 0 }}><strong>評価</strong>＝<strong>評価者権限</strong>を持つ人が観点別（中核5＋補助3）に採点する<strong>専門的な定量評価</strong>です（採点は SC-62）。評価者ごとに公開範囲（visibility）を指定でき、複数名が評価できます。<strong>投票（全員の民意）とは独立</strong>で、点数は投票結果に影響されません。</p>
-                  <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。</p>
+                  <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。</p>
                 </ScreenPurpose>
               </div>
               {canManage && (
@@ -344,16 +348,16 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 )}
               </>
             )}
-            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
+            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-primary" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
           </section>
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}
           <section className="card" aria-label="総合判定">
             <div className="concept-section-head">
               <h2 className="card-title" style={{ margin: 0 }}>総合判定</h2>
-              <ScreenPurpose summary="owner/クエスト管理者が下す最終意思決定（Go 推進/Pivot 方向転換/Kill 中止）。投票・評価・前提と検証を踏まえて人が判断。" dialogTitle="総合判定とは（投票・評価・総合判定の住み分け）">
-                <p style={{ margin: 0 }}><strong>総合判定</strong>＝<strong>owner / クエスト管理者のみ</strong>が下す<strong>最終的な意思決定</strong>です（<strong>Go 推進 / Pivot 方向転換 / Kill 中止</strong>）。投票（全員の民意）・評価（評価者の専門採点）・前提と検証（エビデンス）を踏まえて<strong>人が判断</strong>します（自動計算ではありません）。★選定とあわせて勝ち残りを決めます。</p>
-                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（owner/管理者の最終意思決定）</strong>。</p>
+              <ScreenPurpose summary="所有者/クエスト管理者が下す最終意思決定（推進 / 方向転換 / 中止）。投票・評価・前提と検証を踏まえて人が判断。" dialogTitle="総合判定とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>総合判定</strong>＝<strong>所有者 / クエスト管理者のみ</strong>が下す<strong>最終的な意思決定</strong>です（<strong>推進 / 方向転換 / 中止</strong>）。投票（全員の民意）・評価（評価者の専門採点）・前提と検証（エビデンス）を踏まえて<strong>人が判断</strong>します（自動計算ではありません）。★選定とあわせて勝ち残りを決めます。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。</p>
               </ScreenPurpose>
             </div>
             <div className="vote-summary">
@@ -362,19 +366,20 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             {concept.decision_rationale && <p className="text-sm">{concept.decision_rationale}</p>}
             {canManage ? (
               <>
-                <div className="vote-btns">
+                {/* 総合判定＝評価ダイアログ「総合判定の推奨」と同じ .segmented（3択の単一選択）に統一。 */}
+                <div className="segmented" role="radiogroup" aria-label="総合判定">
                   {DECISION_CHOICES.map(([d, label]) => (
-                    <button key={d} type="button" className={`vote-btn decision-${d}${concept.decision === d ? " is-on" : ""}`}
-                      aria-pressed={concept.decision === d} disabled={busy}
-                      onClick={() => runManage(() => setDecision(conceptId, { decision: d as "go" | "pivot" | "kill" }), "判定を更新しました")}>
+                    <label key={d}>
+                      <input type="radio" name="concept-decision" checked={concept.decision === d} disabled={busy}
+                        onChange={() => runManage(() => setDecision(conceptId, { decision: d as "go" | "pivot" | "kill" }), "判定を更新しました")} />
                       {label}
-                    </button>
+                    </label>
                   ))}
                 </div>
-                <p className="vote-note">owner / クエスト管理者が <strong>推進 / 方向転換 / 中止</strong> を判定します。</p>
+                <p className="vote-note">所有者 / クエスト管理者が <strong>推進 / 方向転換 / 中止</strong> を判定します。</p>
               </>
             ) : (
-              <p className="vote-note">総合判定は owner / クエスト管理者が行います。</p>
+              <p className="vote-note">総合判定は 所有者 / クエスト管理者が行います。</p>
             )}
             {/* 意思決定ログ（総合判定/ステータスの変遷・§3.2）＝当時の判断材料つきで追える。 */}
             <details className="decision-log-disclosure" style={{ marginTop: "var(--space-3)" }}>

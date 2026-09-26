@@ -7130,6 +7130,11 @@ export interface components {
              * @default false
              */
             discoverable: boolean;
+            /**
+             * Current Revision
+             * @default 0
+             */
+            current_revision: number;
         };
         /**
          * QuestFeedResponse

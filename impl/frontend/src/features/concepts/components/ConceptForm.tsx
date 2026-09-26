@@ -209,7 +209,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
             dialogTitle="この画面について（ISO 56001 準拠）"
           >
             <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をまとめた、<strong>検証可能な提案</strong>です。</p></div>
-            <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>理解したうえでスキーマを入力し、後で前提を「証拠で」検証して Go/Pivot/Kill まで導きます。</p></div>
+            <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>理解したうえでスキーマを入力し、後で前提を「証拠で」検証して 推進/方向転換/中止 まで導きます。</p></div>
           </ScreenPurpose>
         </div>
 

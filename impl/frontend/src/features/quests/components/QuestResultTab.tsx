@@ -69,7 +69,9 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     }).catch(() => null);
     setSaving(false);
     if (!res) { snack({ type: "error", msg: "保存に失敗しました。" }); return; }
-    setResult((r) => (r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
+    // 更新履歴（outcome_revisions）は upsert 応答に含まれないため、全体を再取得して版を即反映（リロード不要）。
+    const fresh = await getQuestResult(questId).catch(() => null);
+    setResult((r) => (fresh ? fresh : r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
     setMetrics(cleanMetrics);  // 空行を落とした保存後の集合へ読み取りビューを同期
     setEditing(false);
     snack({ type: "success", title: "最終結果を保存しました" });
@@ -259,11 +261,11 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
           )}
-          {/* 更新履歴＝折り畳みUI（概要パネル無しのため・変更履歴標準 §3.1）。ISO §10 改善＝当時の学び/次アクションを追える。 */}
+          {/* 更新履歴＝情報インプットの詳細と同じ disclosure UI（概要パネル無しのため折り畳み・変更履歴標準 §3.1）。ISO §10 改善＝当時の学び/次アクションを追える。 */}
           {result.outcome_revisions.length > 0 && (
-            <details className="qresult__history" style={{ marginTop: "var(--space-3)" }}>
-              <summary className="role-note" style={{ cursor: "pointer" }}>🕘 更新履歴（{result.outcome_revisions.length}）</summary>
-              <div style={{ marginTop: "var(--space-2)" }}>
+            <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
+              <summary>🕘 更新履歴（{result.outcome_revisions.length} 版）</summary>
+              <div className="disclosure__body">
                 <RevisionTimeline
                   variant="info"
                   revisions={result.outcome_revisions as unknown as RevisionRow[]}

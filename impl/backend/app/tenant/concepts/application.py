@@ -105,7 +105,11 @@ def _resolve_concept(ts, cid, user, *, for_write: bool = False):
 
 
 def _my_permissions(ts, concept, quest, user) -> list[str]:
-    perms: list[str] = []
+    # 素の当該クエスト権限（comment/vote/idea_create/quest_admin/evaluator 等）を土台に合成。
+    # アイデア詳細と同型＝チャット投稿(comment)/ピン(owner/quest_admin) はこの素の権限で駆動する。
+    perms: list[str] = list(_perms_of(ts, quest, user))
+    if _is_owner(quest, user) and "owner" not in perms:
+        perms.append("owner")  # ピン権限（owner/quest_admin）の素・チャット中核と共通
     if concept.author_id == user.id or _is_manager(ts, quest, user):
         perms.append("edit")
     if _is_manager(ts, quest, user):

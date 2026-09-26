@@ -194,7 +194,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
         </Field>
 
         {/* 総合判定の推奨＝評価者が Go/Pivot/Kill をどう見るかのフラグ。style-guide の .segmented（3択以上の単一選択）。 */}
-        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨" hint="評価者としての Go / Pivot / Kill の見立て（推進＝進める／方向転換＝見直す／中止）。" required>
+        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨" hint="評価者としての見立て（推進＝進める／方向転換＝見直す／中止＝やめる）。" required>
           <div className="segmented" role="radiogroup" aria-label="推奨">
             {RECOMMENDATIONS.map(([k, lbl]) => (
               <label key={k}>
@@ -225,11 +225,11 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
           </div>
         </div>
 
-        {/* 確定履歴＝折り畳みUI（自分の評価の再評価の変遷・§3.6）。 */}
+        {/* 確定履歴＝折り畳みUI（情報の詳細と同じ disclosure・自分の評価の再評価の変遷・§3.6）。 */}
         {revisions.length > 0 && (
-          <details className="dialog-section is-quiet" style={{ marginTop: "var(--space-3)" }}>
-            <summary className="role-note" style={{ cursor: "pointer" }}>🕘 確定履歴（{revisions.length}）</summary>
-            <div style={{ marginTop: "var(--space-2)" }}>
+          <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
+            <summary>🕘 確定履歴（{revisions.length} 版）</summary>
+            <div className="disclosure__body">
               <RevisionTimeline
                 variant="info"
                 revisions={revisions}

@@ -486,11 +486,11 @@ export function EvaluationView({ ideaId, onClose }: { ideaId: string; onClose?: 
           </div>
         </div>
 
-        {/* 確定履歴＝折り畳みUI（自分の評価の再評価の変遷・§3.6）。ISO の反復更新で当時の評価を追える。 */}
+        {/* 確定履歴＝折り畳みUI（情報の詳細と同じ disclosure・自分の評価の再評価の変遷・§3.6）。ISO の反復更新で当時の評価を追える。 */}
         {revisions.length > 0 && (
-          <details className="dialog-section" style={{ marginTop: "var(--space-3)" }}>
-            <summary className="role-note" style={{ cursor: "pointer" }}>🕘 確定履歴（{revisions.length}）</summary>
-            <div style={{ marginTop: "var(--space-2)" }}>
+          <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
+            <summary>🕘 確定履歴（{revisions.length} 版）</summary>
+            <div className="disclosure__body">
               <RevisionTimeline
                 variant="info"
                 revisions={revisions}
