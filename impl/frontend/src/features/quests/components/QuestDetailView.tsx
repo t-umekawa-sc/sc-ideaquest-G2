@@ -450,6 +450,46 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティー所属）。
   const loadQuestFeed = useCallback((cursor?: string | null) => getQuestActivities(questId, cursor), [questId]);
 
+  // アイデア行の操作メニュー（⋯）＝リスト操作列とカード右下で共用。未投票=クイック投票／下書き=続き／
+  // 他=チャット/詳細。削除＝投稿者本人 or owner/quest_admin（D.2・論理削除・子は監査保持）。
+  const ideaMenu = (r: Idea): RowMenuItem[] => {
+    const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
+    const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
+    const items: RowMenuItem[] = r.draft
+      ? [{ label: "下書きを続ける", onClick: goIdea }]
+      : [
+          // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
+          ...(r.mystate === "unvoted" && quest?.status !== "completed"
+            ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
+               { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
+            : []),
+          { label: "💬 チャットを開く", onClick: goChat },
+          { label: "詳細を開く", onClick: goIdea },
+        ];
+    if (r.mystate === "mine" || canEdit) {
+      items.push({
+        label: "削除",
+        danger: true,
+        onClick: async () => {
+          const ok = await confirm({
+            variant: "danger",
+            title: "アイデアを削除",
+            msg: `「${r.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・投票等は監査のため保持されます）。`,
+          });
+          if (!ok) return;
+          try {
+            await deleteIdea(r.id);
+            window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+            snack({ type: "success", title: "アイデアを削除しました" });
+          } catch {
+            snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+          }
+        },
+      });
+    }
+    return items;
+  };
+
   // アイデア一覧の列（標準 DataTable にレビュー#3 の機能を追加）＝提案価値（中身の判断）・あなた/フォロー/評価の
   // enum フィルタ（動線集約）・操作列（未投票=クイック投票／下書き=続き／投票済=チャット）。行/カードのボタンは
   // DataTable が行クリックから除外（a,button,input,select,label）＝遷移と両立。
@@ -472,45 +512,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         ? (r.ev >= 0 ? <span className={`badge ${r.ev >= 4 ? "badge-success" : "badge-muted"}`}>{r.ev}/5</span> : <span className="badge badge-muted">評価済</span>)
         : <span className="badge">評価待ち</span>) },
     { key: "act", label: "操作", actions: true, width: 64, csvVal: () => "",
-      render: (r) => {
-        // リストの操作メニュー（⋯）。未投票は「賛成/反対」を選べる（レビュー#3）。下書きは続き、他はチャット/詳細。
-        const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
-        const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
-        const items: RowMenuItem[] = r.draft
-          ? [{ label: "下書きを続ける", onClick: goIdea }]
-          : [
-              // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
-              ...(r.mystate === "unvoted" && quest?.status !== "completed"
-                ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
-                   { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
-                : []),
-              { label: "💬 チャットを開く", onClick: goChat },
-              { label: "詳細を開く", onClick: goIdea },
-            ];
-        // 削除＝投稿者本人 or owner/quest_admin（D.2・論理削除・子は監査保持）。下書きも本人は削除可。
-        if (r.mystate === "mine" || canEdit) {
-          items.push({
-            label: "削除",
-            danger: true,
-            onClick: async () => {
-              const ok = await confirm({
-                variant: "danger",
-                title: "アイデアを削除",
-                msg: `「${r.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・投票等は監査のため保持されます）。`,
-              });
-              if (!ok) return;
-              try {
-                await deleteIdea(r.id);
-                window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
-                snack({ type: "success", title: "アイデアを削除しました" });
-              } catch {
-                snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
-              }
-            },
-          });
-        }
-        return <RowMenu items={items} />;
-      } },
+      render: (r) => <RowMenu items={ideaMenu(r)} /> },
   ];
 
   // クエリ/対象の変更でページを先頭へ戻す。
@@ -782,6 +784,8 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                       {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
                       <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
                       {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
+                      {/* カードの操作メニュー（⋯）＝リストの操作列と同一（複製導線なし・削除は権限者のみ表示）。 */}
+                      <RowMenu items={ideaMenu(r)} />
                     </span>
                   </div>
                   {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
