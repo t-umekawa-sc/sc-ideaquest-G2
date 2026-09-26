@@ -320,18 +320,26 @@ _VERDICT_LABEL_JA = {"supported": "支持", "refuted": "反証", "inconclusive":
 
 
 def _assumptions_snapshot(ts, concept) -> str:
-    """版に保存する『リンク中の前提』要約（当時の判断材料・§3.1）＝重要度/前提文/現在判定を安定順で。
-    リンクの追加/解除・検証（実績）による判定変化を版の差分として追える。"""
-    lines = []
+    """版に保存する『リンク中の前提＋検証（実績）』要約（当時の判断材料・§3.1）。
+    重要度/前提文/現在判定に加え、各検証の 実施日/手法/判定/規模/結果 も含める＝リンクの追加/解除だけでなく
+    実績の追記/編集（規模・手法・結果の修正含む）/削除も版の差分として追える（ユーザー要望 2026-09-26）。"""
+    blocks = []
     for link in repo.list_links_for_concept(ts, concept.id):
         a = repo.get_assumption(ts, link.assumption_id)
         if a is None:
             continue
         crit = _CRIT_LABEL.get(link.criticality, link.criticality)
         verd = _VERDICT_LABEL_JA.get(a.current_verdict, a.current_verdict)
-        lines.append(f"[{crit}] {a.statement}（{verd}）")
-    lines.sort()
-    return "\n".join(lines)
+        header = f"[{crit}] {a.statement}（{verd}）"
+        vlines = []
+        for v in repo.list_validations(ts, a.id):
+            vv = _VERDICT_LABEL_JA.get(v.verdict, v.verdict)
+            tail = f" / {v.result}" if v.result else ""
+            vlines.append(f"  ・{v.validated_on} {v.method} / {vv} / 規模: {v.scale or '-'}{tail}")
+        vlines.sort()
+        blocks.append("\n".join([header, *vlines]))
+    blocks.sort()
+    return "\n".join(blocks)
 
 
 def _content_snapshot(ts, concept) -> dict:

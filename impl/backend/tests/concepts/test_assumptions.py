@@ -134,19 +134,26 @@ def test_p_tc_258_validation_edit_delete_versioned(env, client):
     cid = _concept(client, qid)
     aid = _assumption(client, qid, "顧客は課金に前向き")
     client.post(f"/api/v1/concepts/{cid}/assumptions", json={"assumption_id": aid, "criticality": "major"}, headers=_csrf(client))  # rev2
-    vid = _validate(client, aid, "supported", on="2026-09-01").json()["validation"]["id"]  # rev3（保留→支持）
-    # 編集（支持→反証）＝判定変化でコンセプト版が増える
+    v0 = _validate(client, aid, "supported", on="2026-09-01").json()["validation"]  # rev3（保留→支持）
+    vid = v0["id"]
+    # 判定を変えず「規模だけ」修正でもコンセプト版が増える（＝ユーザー報告のバグ回帰）。
+    r0 = client.patch(f"/api/v1/assumptions/{aid}/validations/{vid}",
+                      json={"method": v0["method"], "verdict": "supported", "validated_on": "2026-09-01", "scale": "n=99"}, headers=_csrf(client))
+    assert r0.status_code == 200, r0.text
+    data0 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data0[0]["revision"] == 4 and "assumptions" in data0[0]["changed_fields"]
+    # 編集（支持→反証）＝判定変化でも版が増える
     r = client.patch(f"/api/v1/assumptions/{aid}/validations/{vid}",
                      json={"method": "再確認", "verdict": "refuted", "validated_on": "2026-09-02", "scale": "n=30"}, headers=_csrf(client))
     assert r.status_code == 200, r.text
     assert r.json()["current_verdict"] == "refuted"
     data = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
-    assert data[0]["revision"] == 4 and "assumptions" in data[0]["changed_fields"]
+    assert data[0]["revision"] == 5 and "assumptions" in data[0]["changed_fields"]
     # 削除＝検証0件で判定が保留に戻り版が増える
     d = client.delete(f"/api/v1/assumptions/{aid}/validations/{vid}", headers=_csrf(client))
     assert d.status_code == 204, d.text
     data2 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
-    assert data2[0]["revision"] == 5 and "assumptions" in data2[0]["changed_fields"]
+    assert data2[0]["revision"] == 6 and "assumptions" in data2[0]["changed_fields"]
 
 
 def test_p_tc_202_create_assumption_permission(env, client):
