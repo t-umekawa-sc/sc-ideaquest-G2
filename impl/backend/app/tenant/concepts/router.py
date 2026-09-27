@@ -19,8 +19,12 @@ from app.tenant.concepts.schemas import (
     AssumptionListResponse,
     AssumptionPatchRequest,
     ConceptCreateRequest,
+    ConceptDecisionLogResponse,
     ConceptDecisionRequest,
     ConceptDetailDTO,
+    ConceptEvalRevisionDiffResponse,
+    ConceptRevisionDiffResponse,
+    ConceptRevisionListResponse,
     ConceptEvaluationAggregateDTO,
     ConceptEvaluationMeDTO,
     ConceptEvaluationPutRequest,
@@ -70,6 +74,42 @@ def get_concept(concept_id: str, request: Request, session: dict = Depends(requi
     """コンセプト詳細（合成・P.1）。draft は本人のみ。読取専用。"""
     result = service.get_detail(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptDetailDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/revisions", response_model=ConceptRevisionListResponse)
+def get_concept_revisions(
+    concept_id: str, request: Request, limit: int = Query(default=50, ge=1, le=100),
+    cursor: str | None = None, session: dict = Depends(require_me),
+) -> ConceptRevisionListResponse:
+    """コンセプト内容の版タイムライン（SC-61 更新履歴・§3.1）。読取専用。"""
+    result = service.get_revisions(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, limit=limit, cursor=cursor,
+    )
+    return ConceptRevisionListResponse(**result)
+
+
+@router.get("/concepts/{concept_id}/revisions/{revision}/diff", response_model=ConceptRevisionDiffResponse)
+def get_concept_revision_diff(
+    concept_id: str, revision: int, request: Request, from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> ConceptRevisionDiffResponse:
+    """版差分（SC-61・§3.1）。既定＝前版比較。読取専用。"""
+    result = service.get_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, revision,
+        from_revision=from_revision,
+    )
+    return ConceptRevisionDiffResponse(**result)
+
+
+@router.get("/concepts/{concept_id}/decision-log", response_model=ConceptDecisionLogResponse)
+def get_concept_decision_log(
+    concept_id: str, request: Request, session: dict = Depends(require_me),
+) -> ConceptDecisionLogResponse:
+    """意思決定/ステータスの遷移ログ（SC-61・§3.2）。読取専用。"""
+    result = service.get_decision_log(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id,
+    )
+    return ConceptDecisionLogResponse(**result)
 
 
 @router.get("/concepts/{concept_id}/related-info", response_model=RelatedInfoResponse)
@@ -226,6 +266,28 @@ def list_validations(assumption_id: str, request: Request, session: dict = Depen
     return ValidationListResponse(**result)
 
 
+@router.patch("/assumptions/{assumption_id}/validations/{validation_id}", response_model=ValidationAddResponse)
+def edit_validation(
+    assumption_id: str, validation_id: str, body: ValidationCreateRequest, request: Request, session: dict = Depends(require_me),
+) -> ValidationAddResponse:
+    """検証イベントの編集（P.3・プール所有）。編集はリンク先コンセプトの版に記録（§4.4）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.edit_validation(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, validation_id, body=body,
+    )
+    return ValidationAddResponse(**result)
+
+
+@router.delete("/assumptions/{assumption_id}/validations/{validation_id}", status_code=204)
+def delete_validation(assumption_id: str, validation_id: str, request: Request, session: dict = Depends(require_me)) -> Response:
+    """検証イベントの削除（P.3・プール所有）。削除もリンク先コンセプトの版に記録（§4.4）。"""
+    verify_origin(request)
+    verify_csrf(request)
+    service.delete_validation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, validation_id)
+    return Response(status_code=204)
+
+
 # ---- コンセプト↔前提リンク（P.4） ----
 
 
@@ -276,6 +338,19 @@ def get_my_evaluation(concept_id: str, request: Request, session: dict = Depends
     """自分の評価/下書き（P.5・evaluator）。読取専用。"""
     result = service.get_my_evaluation(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id)
     return ConceptEvaluationMeDTO(**result)
+
+
+@router.get("/concepts/{concept_id}/evaluation/revisions/{revision}/diff", response_model=ConceptEvalRevisionDiffResponse)
+def get_concept_eval_revision_diff(
+    concept_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> ConceptEvalRevisionDiffResponse:
+    """自分のコンセプト評価の確定版差分（SC-62 折り畳みUI・§3.6）。既定＝前版比較。読取専用。"""
+    result = service.get_concept_eval_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, revision, from_revision=from_revision,
+    )
+    return ConceptEvalRevisionDiffResponse(**result)
 
 
 @router.get("/concepts/{concept_id}/evaluation", response_model=ConceptEvaluationAggregateDTO)

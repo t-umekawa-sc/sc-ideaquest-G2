@@ -15,6 +15,8 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.concepts.orm import (
+    ConceptDecisionLog,
+    ConceptRevision,
     Assumption,
     AssumptionValidation,
     Concept,
@@ -71,6 +73,8 @@ def env():
         ts.execute(AssumptionValidation.__table__.delete().where(AssumptionValidation.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(ConceptSourceIdea.__table__.delete().where(ConceptSourceIdea.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))
+        ts.execute(ConceptRevision.__table__.delete().where(ConceptRevision.concept_id.in_(cids or [uuid.uuid4()])))
+        ts.execute(ConceptDecisionLog.__table__.delete().where(ConceptDecisionLog.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Concept.__table__.delete().where(Concept.quest_id.in_(quests or [uuid.uuid4()])))
         for qid in quests:
             ts.execute(QuestMemberPermission.__table__.delete().where(
@@ -98,6 +102,58 @@ def _assumption(client, qid, statement="市場がある") -> str:
 def _validate(client, aid, verdict, on="2026-03-01", method="interview"):
     return client.post(f"/api/v1/assumptions/{aid}/validations",
                        json={"method": method, "verdict": verdict, "validated_on": on}, headers=_csrf(client))
+
+
+def test_p_tc_257_link_validation_bump_concept_revision(env, client):
+    """P-TC-257: 前提リンク・実績（検証）・解除でコンセプトの版が増える（版管理・§4.4・assumptions フィールド）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    cid = _concept(client, qid)
+    aid = _assumption(client, qid, "想定顧客は月1回この課題に直面する")
+    # リンク → 版2（assumptions 変化＝どの前提が紐づいたかを版に残す）。
+    r = client.post(f"/api/v1/concepts/{cid}/assumptions", json={"assumption_id": aid, "criticality": "major"}, headers=_csrf(client))
+    assert r.status_code == 201, r.text
+    data = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data[0]["revision"] == 2 and "assumptions" in data[0]["changed_fields"]
+    # 実績（反証）→ 判定が保留→反証に変化して版3。
+    v = _validate(client, aid, "refuted", on="2026-09-26")
+    assert v.status_code == 201, v.text
+    data2 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data2[0]["revision"] == 3 and "assumptions" in data2[0]["changed_fields"]
+    # リンク解除 → 版4。
+    u = client.delete(f"/api/v1/concepts/{cid}/assumptions/{aid}", headers=_csrf(client))
+    assert u.status_code == 204, u.text
+    data3 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data3[0]["revision"] == 4 and "assumptions" in data3[0]["changed_fields"]
+
+
+def test_p_tc_258_validation_edit_delete_versioned(env, client):
+    """P-TC-258: 実績（検証）の編集/削除が可能で、判定変化がコンセプトの版に記録される（編集可＋版管理・ユーザー決定 2026-09-26）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    cid = _concept(client, qid)
+    aid = _assumption(client, qid, "顧客は課金に前向き")
+    client.post(f"/api/v1/concepts/{cid}/assumptions", json={"assumption_id": aid, "criticality": "major"}, headers=_csrf(client))  # rev2
+    v0 = _validate(client, aid, "supported", on="2026-09-01").json()["validation"]  # rev3（保留→支持）
+    vid = v0["id"]
+    # 判定を変えず「規模だけ」修正でもコンセプト版が増える（＝ユーザー報告のバグ回帰）。
+    r0 = client.patch(f"/api/v1/assumptions/{aid}/validations/{vid}",
+                      json={"method": v0["method"], "verdict": "supported", "validated_on": "2026-09-01", "scale": "n=99"}, headers=_csrf(client))
+    assert r0.status_code == 200, r0.text
+    data0 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data0[0]["revision"] == 4 and "assumptions" in data0[0]["changed_fields"]
+    # 編集（支持→反証）＝判定変化でも版が増える
+    r = client.patch(f"/api/v1/assumptions/{aid}/validations/{vid}",
+                     json={"method": "再確認", "verdict": "refuted", "validated_on": "2026-09-02", "scale": "n=30"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["current_verdict"] == "refuted"
+    data = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data[0]["revision"] == 5 and "assumptions" in data[0]["changed_fields"]
+    # 削除＝検証0件で判定が保留に戻り版が増える
+    d = client.delete(f"/api/v1/assumptions/{aid}/validations/{vid}", headers=_csrf(client))
+    assert d.status_code == 204, d.text
+    data2 = client.get(f"/api/v1/concepts/{cid}/revisions").json()["data"]
+    assert data2[0]["revision"] == 6 and "assumptions" in data2[0]["changed_fields"]
 
 
 def test_p_tc_202_create_assumption_permission(env, client):

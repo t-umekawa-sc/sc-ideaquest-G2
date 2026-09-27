@@ -107,6 +107,16 @@
 | C-TC-145 | api | 完了クエストの PUT /party 凍結（PUT 経路） | completed クエスト | `PUT .../party`（members） | `409 conflict`（C-TC-142 の POST 経路と対称・書き込み凍結） | C.5 |
 | C-TC-146 | api | PUT /party の原子性（検証先行・部分適用しない） | recruiting・owner が編集 | 先頭に有効ユーザー・末尾に候補外 uuid を含む差分を PUT | `422`（`field=user_id`）＋**先頭の有効追加も未適用**（GET members に現れない＝全体が原子的） | C.3 |
 
+### 5b. 変更履歴＝クエスト定義の版＋ステータス意思決定ログ（変更履歴標準 §3.1/§3.2・migration 0039）
+
+| TC-ID | 種別 | 目的（説明） | 前提 | 操作 | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| C-TC-299 | api | 定義編集で版が増える（SC-12 リンクUI・§3.1） | recruiting | `PATCH /quests/{id}`（title）×2 | `GET .../revisions` が rev2＋rev1（新しい順・rev2 に title） | §3.1／migration 0039 |
+| C-TC-300 | api | 変更が無い編集は版を進めない（既存仕様踏襲） | rev あり | `PATCH /quests/{id}`（同値） | `revisions` は rev1 のみ | §3.1 |
+| C-TC-301 | api | ステータス遷移を意思決定ログに記録（§3.2） | recruiting | `POST /quests/{id}/transition`（in_progress） | `GET .../decision-log` に kind=status（recruiting→in_progress） | §3.2 |
+| C-TC-302 | api | 定義の版差分（前版比較・text/scalar） | 2版 | `GET /quests/{id}/revisions/2/diff` | fields.title＝text segments | §3.1 |
+| C-TC-303 | api | 発見カタログ掲載(discoverable)のみの編集でも版を記録（silent no-bump 防止） | rev あり | `PATCH /quests/{id}`（discoverable のみ） | 版が増え changed_fields に discoverable のみ（title 等は含まない） | §3.1／FR-40 |
+
 ## 6. e2e（SC-11/12・実接続・Playwright）
 
 > 対象＝`impl/frontend/e2e/sc-11-quest-create-modal.spec.ts`・`sc-12-quest-detail.spec.ts`。ACME-01 一般ユーザー＋デモグループ seed 前提・各テストで API 後片付け。1ファイルずつ＋`redis-cli FLUSHALL`。テスト名先頭に TC-ID を付す。
@@ -163,6 +173,9 @@
 | C-TC-244 | api | ⑥総括初回記入で owner に少額XP（冪等） | owner が result を2回保存 | `PUT /quests/{id}/result`×2 | `quest_result_summary` 活動1件・amount=20・本人1回（2回目は加算しない） | C（FR-39）／G／§10 |
 | C-TC-245 | api | 結果に④議論の要点(b)＝ピン留めチャットを集約 | 公開アイデアにピン留めメッセージ | `GET /quests/{id}/result` | `pinned_messages` に当該（idea_id/idea_title/excerpt/author） | C（FR-39 (b)）／E |
 | C-TC-246 | api | (c)自動要約＝抽出型・オフライン（外部API不使用）生成/保存＋権限 | (1)owner・チャット複数 (2)一般メンバー（comment のみ） | `POST /quests/{id}/result/chat-summary` | (1)200・`chat_summary` 非空・GET に反映 (2)403 | C（FR-39 (c)）／E |
+| C-TC-296 | api | 振り返り（総括）の変更履歴＝初回保存で初版・変更で版増（折り畳みUI・§3.1） | owner が result を2回保存（learnings 追記） | `PUT /quests/{id}/result`×2 | `GET .../result` の `outcome_revisions` が rev2＋rev1（新しい順・初版 changed_fields 空・rev2 に learnings） | C（FR-39）／§3.1／migration 0038 |
+| C-TC-297 | api | 変更が無い保存は版を進めない（既存仕様踏襲） | 同値で2回保存 | `PUT /quests/{id}/result`×2（同値） | `outcome_revisions` は rev1 のみ | C（FR-39）／§3.1 |
+| C-TC-298 | api | 総括の版差分（前版比較・text/scalar） | 2版 | `GET /quests/{id}/result/revisions/2/diff` | fields.summary＝text segments | C（FR-39）／§3.1 |
 
 ## 3. 締切の切迫度（frontend 単体・#24 ゲーム感）
 

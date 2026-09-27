@@ -4,7 +4,7 @@
 // モーダル（RouteModal）／フルページ双方から使う（body/footer を出す）。データ源は api.ts（当面 fixtures）。
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Field } from "@/components/ui";
+import { Field, FormFooterError, FormSummary, useFormErrorNotice } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { addAttachmentsApi, addLinkApi, createInfoItemApi, fetchInfoCapabilities, fetchInfoDetail, uploadInfoImageApi } from "../api";
 import {
@@ -86,6 +86,8 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [urlErr, setUrlErr] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null); // フィールドに紐づかない一般エラー（§4.7 上部サマリ）
+  const { summaryRef, notify } = useFormErrorNotice(); // §4.7＝上部サマリへスクロール＋自動消滅エラースナックバー
 
   const exec = useCallback((cmd: string, arg?: string) => {
     bodyRef.current?.focus();
@@ -159,11 +161,15 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
 
   const [saving, setSaving] = useState(false);
   const save = async () => {
-    setTitleErr(null); setUrlErr(null);
+    // §4.7＝フィールド単位のインライン枠＋上部サマリ＋足元ヒント＋自動消滅トースト（送信時に全項目検証・単発 return しない）。
+    setTitleErr(null); setUrlErr(null); setFormError(null);
     const t = title.trim();
-    if (!t) { setTitleErr("タイトルを入力してください"); return; }
     const url = sourceUrl.trim();
-    if (url && !/^https?:\/\//i.test(url)) { setUrlErr("http/https の URL を入力してください"); return; }
+    const tErr = !t ? "タイトルを入力してください" : null;
+    const uErr = url && !/^https?:\/\//i.test(url) ? "http/https の URL を入力してください" : null;
+    setTitleErr(tErr); setUrlErr(uErr);
+    const clientErrs = [tErr, uErr].filter(Boolean) as string[];
+    if (clientErrs.length) { notify(clientErrs); return; }
     const bodyHtml = bodyRef.current?.innerHTML ?? "";
     const input: InfoInput = {
       title: t, body_html: bodyHtml, summary: summary ?? demoSummary(plainText(bodyHtml)), source_url: url,
@@ -180,23 +186,28 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       // 参考資料（info_attachments・§5.33）＝作成後に追加（本人が作成者＝内容群を編集可）。
       if (files.length) {
         try { await addAttachmentsApi(created.id, files); }
-        catch { setTitleErr("情報は登録しましたが、参考資料の一部を添付できませんでした。詳細から再添付してください。"); }
+        catch { setFormError("情報は登録しましたが、参考資料の一部を添付できませんでした。詳細から再添付してください。"); }
       }
       // 関連リンク＝作成後に /info-links へ POST（create は links を持たない＝id 先行が必要）。
       if (links.length) {
         try { for (const l of links) await addLinkApi(created.id, l.target_type, l.target_id, l.kind); }
-        catch { setTitleErr("情報は登録しましたが、関連リンクの一部を追加できませんでした。詳細から再設定してください。"); }
+        catch { setFormError("情報は登録しましたが、関連リンクの一部を追加できませんでした。詳細から再設定してください。"); }
       }
       onDone();
     } catch (e) {
+      // サーバー 422 は該当フィールドを赤く（§4b インライン）／それ以外は上部サマリの一般エラー。いずれも notify で気づかせる（§4.7）。
+      let fieldMsg: string | null = null;
+      let generalMsg: string | null = null;
       if (e instanceof ApiError) {
         const errs = (e.body as { errors?: { field?: string }[] } | null)?.errors ?? [];
-        if (errs.some((x) => x.field === "source_url")) setUrlErr("http/https の URL を入力してください");
-        else if (errs.some((x) => x.field === "title")) setTitleErr("タイトルを入力してください");
-        else setTitleErr("登録に失敗しました。時間をおいて再度お試しください。");
+        if (errs.some((x) => x.field === "source_url")) { fieldMsg = "http/https の URL を入力してください"; setUrlErr(fieldMsg); }
+        else if (errs.some((x) => x.field === "title")) { fieldMsg = "タイトルを入力してください"; setTitleErr(fieldMsg); }
+        else generalMsg = "登録に失敗しました。時間をおいて再度お試しください。";
       } else {
-        setTitleErr("登録に失敗しました。時間をおいて再度お試しください。");
+        generalMsg = "登録に失敗しました。時間をおいて再度お試しください。";
       }
+      if (generalMsg) setFormError(generalMsg);
+      notify([fieldMsg ?? generalMsg!].filter(Boolean));
       setSaving(false);
     }
   };
@@ -208,6 +219,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
     // body の flex:1/min-height:0 が効かず本文がスクロールしない）。詳細ビュー・クエスト作成と同方式。
     <>
       <div className="modal__body info-dlg">
+        <FormSummary title="入力内容をご確認ください" errors={[formError, titleErr, urlErr].filter(Boolean) as string[]} innerRef={summaryRef} />
         {parent ? (
           <details className="disclosure disclosure--ref" open style={{ marginBottom: "var(--space-3)" }}>
             <summary><span>🧵 続報元の情報を表示：<strong>{parent.title}</strong></span></summary>
@@ -338,7 +350,8 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
       </div>
 
       <div className="modal__footer">
-        <button className="btn btn-outline" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
+        <FormFooterError show={Boolean(titleErr || urlErr || formError)} />
         <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? "登録中…" : parentId ? "続報を登録する" : "登録する"}</button>
       </div>
     </>

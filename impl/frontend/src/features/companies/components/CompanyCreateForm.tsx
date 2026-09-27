@@ -6,7 +6,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, FormFooterError, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Swatches, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import { createCompany, setCompanyIcon } from "../api";
@@ -79,8 +79,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
     if (!dbIdentifier.trim()) fe.db_identifier = "DB 識別子を入力してください。";
     setFieldErrors(fe);
     if (Object.keys(fe).length > 0) {
-      setFormError("入力内容をご確認ください。");
-      notify(Object.values(fe));
+      notify(Object.values(fe)); // 上部サマリ（FormSummary）はタイトルで案内・各項目は list とインライン枠に出す（§4.7）
       return;
     }
     setPending(true);
@@ -110,7 +109,7 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
   return (
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
-        {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
+        <FormSummary title="入力内容をご確認ください" errors={[...(formError ? [formError] : []), ...Object.values(fieldErrors).filter(Boolean)]} innerRef={summaryRef} />
         {dup && (
           <p className="provision-note">
             複製元の内容を引き継いで新規作成します。<strong>会社コード・DB識別子も引き継いでいます</strong>（いずれも一意のため、別の値に変更してください。そのまま保存すると重複エラーになります）。
@@ -184,8 +183,8 @@ export function CompanyCreateForm({ onDone, onCancel }: { onDone: () => void; on
         </p>
       </ModalBody>
       <ModalFooter>
-        <FormFooterError show={Boolean(formError)} />
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <FormFooterError show={Boolean(formError) || Object.values(fieldErrors).some(Boolean)} />
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>
           キャンセル
         </Button>
         <Button type="submit" variant="primary" loading={pending}>

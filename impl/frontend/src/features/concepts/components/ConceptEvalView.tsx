@@ -6,10 +6,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
 import { ApiError } from "@/lib/api/client";
 
-import { CONCEPTS_CHANGED_EVENT, getMyEvaluation, putEvaluation } from "../api";
-import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）を再利用
+import { CONCEPTS_CHANGED_EVENT, getConcept, getConceptEvalRevisionDiff, getMyEvaluation, putEvaluation, type ConceptDetail } from "../api";
+
+// コンセプト評価の確定版で追跡するフィールドの表示名（§3.6）。
+const EVAL_FIELD_LABELS: Record<string, string> = { overall_comment: "総評", scores: "評価点", comments: "観点別コメント", recommendation: "総合判定の推奨", visibility: "公開範囲" };
+import { getQuest, type QuestDetail } from "@/features/quests/api";
+import "@/features/evaluations/evaluations.css"; // SC-25 と同じ採点 UI（.eval-row/.eval-rate/.stars/.star）＋文脈（.eval-context/.disclosure）を再利用
 import "../concepts.css";
 
 type AspectDef = { key: string; label: string; see: string };
@@ -27,8 +32,11 @@ const AUX_ASPECTS: AspectDef[] = [
 ];
 const RECOMMENDATIONS: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
 
-// SC-25 と同じスター採点行（.eval-row/.eval-rate/.stars/.star）。観点の説明は ⓘ のみ（ラベルなし）。
-function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | undefined; onPick: (n: number) => void }) {
+// SC-25 と同じスター採点行（.eval-row/.eval-rate/.stars/.star）＋観点別コメント（任意・アイデア評価と同構造）。
+function ScoreRow({ def, value, onPick, comment, onComment }: {
+  def: AspectDef; value: number | undefined; onPick: (n: number) => void;
+  comment: string; onComment: (v: string) => void;
+}) {
   const [hover, setHover] = useState<number | undefined>(undefined);
   const filled = hover ?? value ?? 0;
   return (
@@ -48,6 +56,12 @@ function ScoreRow({ def, value, onPick }: { def: AspectDef; value: number | unde
           </span>
         </div>
       </div>
+      <textarea
+        className="textarea eval-comment"
+        placeholder="観点別コメント（任意）"
+        value={comment}
+        onChange={(e) => onComment(e.target.value)}
+      />
     </div>
   );
 }
@@ -56,23 +70,36 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [comments, setComments] = useState<Record<string, string>>({}); // 観点別コメント（任意・アイデア評価と同構造）
   const [overall, setOverall] = useState("");
   const [recommendation, setRecommendation] = useState<string>("");
   const [visibility, setVisibility] = useState<"party" | "limited">("party");
   const [errors, setErrors] = useState<string[]>([]);
   const [pending, setPending] = useState<null | "draft" | "submit">(null);
   const [loading, setLoading] = useState(true);
+  // 評価の判断材料＝対象コンセプト＋クエスト文脈（アイデア評価 SC-25 と同型・ダイアログ内コンテンツ標準 §4.1）。
+  const [concept, setConcept] = useState<ConceptDetail | null>(null);
+  const [quest, setQuest] = useState<QuestDetail | null>(null);
+  const [revisions, setRevisions] = useState<RevisionRow[]>([]); // 確定版の履歴（折り畳みUI・§3.6）
 
   useEffect(() => {
     let alive = true;
+    void getConcept(conceptId).then(async (c) => {
+      if (!alive || !c) return;
+      setConcept(c);
+      const q = await getQuest(c.quest_id).catch(() => null);
+      if (alive) setQuest(q);
+    });
     getMyEvaluation(conceptId).then((me) => {
       if (!alive) return;
       if (me?.status) {
         setScores((me.scores ?? {}) as Record<string, number>);
+        setComments((me.comments ?? {}) as Record<string, string>);
         setOverall(me.overall_comment ?? "");
         setRecommendation(me.recommendation ?? "");
         setVisibility((me.visibility ?? "party") as "party" | "limited");
       }
+      setRevisions((me?.revisions ?? []) as unknown as RevisionRow[]);
       setLoading(false);
     });
     return () => { alive = false; };
@@ -97,7 +124,10 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
     setPending(status === "submitted" ? "submit" : "draft");
     try {
       await putEvaluation(conceptId, {
-        scores, comments: {}, overall_comment: overall.trim() || null,
+        scores,
+        // 空コメントは除外して送信（アイデア評価 SC-25 と同様）。
+        comments: Object.fromEntries(Object.entries(comments).filter(([, v]) => v && v.trim())) as Record<string, string>,
+        overall_comment: overall.trim() || null,
         recommendation: (recommendation || null) as "go" | "pivot" | "kill" | null,
         visibility, status,
       });
@@ -119,15 +149,57 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
       <ModalBody>
         <FormSummary title="入力内容を確認してください" errors={errors} innerRef={summaryRef} />
 
+        {/* 対象の文脈（アイデア評価 SC-25 と同型）＝クエスト情報→コンセプト情報の順（囲みなし・§4.1）。 */}
+        <div className="eval-context">
+          <div className="eval-context__quest">🎯 {quest?.title || "クエスト"}</div>
+          <div className="eval-context__title">{concept?.title || "コンセプト"}</div>
+        </div>
+
+        {/* 折りたたみ: クエストを確認（実データ・アイデア評価と同一UI）＝適合性採点の根拠となる目的・テーマ等。 */}
+        <details className="disclosure disclosure--ref" open>
+          <summary>クエストを確認</summary>
+          <div className="disclosure__body">
+            <div className="eval-idea__label">目的・テーマ</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{quest?.purpose || "—"}</p>
+            <div className="eval-idea__label">カテゴリー</div>
+            <p>{(quest?.categories ?? []).join(" ・ ") || "—"}</p>
+            <div className="eval-idea__label">締切</div>
+            <p>{quest?.deadline || "—"}</p>
+          </div>
+        </details>
+
+        {/* 折りたたみ: コンセプトを確認（クエスト情報の次・実データ）＝成果物スキーマ（課題/価値/対象/差別化/解の形態/採算）。 */}
+        <details className="disclosure disclosure--ref" open>
+          <summary>コンセプトを確認</summary>
+          <div className="disclosure__body">
+            <div className="eval-idea__label">課題・機会</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.problem || "—"}</p>
+            <div className="eval-idea__label">狙う価値（価値提案）</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.value_proposition || "—"}</p>
+            <div className="eval-idea__label">対象</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.target || "—"}</p>
+            <div className="eval-idea__label">競合・差別化</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.differentiation || "—"}</p>
+            <div className="eval-idea__label">解の形態＋必要な能力</div>
+            <p style={{ whiteSpace: "pre-wrap" }}>{concept?.solution_form || "—"}</p>
+            {concept?.viability && Object.keys(concept.viability).length > 0 && (
+              <>
+                <div className="eval-idea__label">採算・事業性（viability）</div>
+                <pre className="concept-viability">{Object.entries(concept.viability).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join("\n")}</pre>
+              </>
+            )}
+          </div>
+        </details>
+
         <div className="dialog-section is-quiet">
           <div className="dialog-label">評価点（中核5・必須）</div>
-          {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+          {CORE_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} comment={comments[a.key] ?? ""} onComment={(v) => setComments((c) => ({ ...c, [a.key]: v }))} />)}
         </div>
 
         <details className="disclosure" style={{ marginTop: "var(--space-3)" }}>
           <summary>補助3観点（任意）</summary>
           <div className="disclosure__body">
-            {AUX_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} />)}
+            {AUX_ASPECTS.map((a) => <ScoreRow key={a.key} def={a} value={scores[a.key]} onPick={(n) => pick(a.key, n)} comment={comments[a.key] ?? ""} onComment={(v) => setComments((c) => ({ ...c, [a.key]: v }))} />)}
           </div>
         </details>
 
@@ -136,7 +208,7 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
         </Field>
 
         {/* 総合判定の推奨＝評価者が Go/Pivot/Kill をどう見るかのフラグ。style-guide の .segmented（3択以上の単一選択）。 */}
-        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨" hint="評価者としての Go / Pivot / Kill の見立て（推進＝進める／方向転換＝見直す／中止）。" required>
+        <Field className="dialog-section is-quiet" id="eval_reco" label="総合判定の推奨" hint="評価者としての見立て（推進＝進める／方向転換＝見直す／中止＝やめる）。" required>
           <div className="segmented" role="radiogroup" aria-label="推奨">
             {RECOMMENDATIONS.map(([k, lbl]) => (
               <label key={k}>
@@ -166,9 +238,26 @@ export function ConceptEvalView({ conceptId, onDone, onCancel }: { conceptId: st
             </label>
           </div>
         </div>
+
+        {/* 確定履歴＝折り畳みUI（情報の詳細と同じ disclosure・自分の評価の再評価の変遷・§3.6）。 */}
+        {revisions.length > 0 && (
+          <details className="disclosure" style={{ marginTop: "var(--space-4)" }}>
+            <summary>🕘 確定履歴（{revisions.length} 版）</summary>
+            <div className="disclosure__body">
+              <RevisionTimeline
+                variant="info"
+                revisions={revisions}
+                currentRevision={revisions[0]?.revision ?? 1}
+                fieldLabels={EVAL_FIELD_LABELS}
+                loadDiff={(r) => getConceptEvalRevisionDiff(conceptId, r) as Promise<RevisionDiff | null>}
+                initialNote="評価を確定。"
+              />
+            </div>
+          </details>
+        )}
       </ModalBody>
       <ModalFooter>
-        <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
         <Button type="button" variant="outline" disabled={!!pending} loading={pending === "draft"} onClick={() => void save("draft")}>下書き保存</Button>
         <Button type="submit" variant="primary" disabled={!!pending} loading={pending === "submit"}>評価を確定</Button>
       </ModalFooter>

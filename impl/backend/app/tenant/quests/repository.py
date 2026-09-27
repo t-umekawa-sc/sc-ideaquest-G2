@@ -25,9 +25,12 @@ from app.tenant.quests.orm import (
     QuestFollow,
     QuestGroupLink,
     QuestJoinRequest,
+    QuestDecisionLog,
     QuestMember,
     QuestMemberPermission,
     QuestOutcome,
+    QuestOutcomeRevision,
+    QuestRevision,
 )
 
 # 発見カタログの対象 status（募集中〜評価中＝参加者募集の意味がある間・C.9.0）。completed/draft は対象外。
@@ -177,6 +180,82 @@ def upsert_outcome(session: Session, quest_id: uuid.UUID, *, fields: dict, updat
     row.updated_at = datetime.now(timezone.utc)
     session.flush()
     return row
+
+
+# ---- 振り返り（総括）の変更履歴＝内容の版（§3.1） ----
+
+def add_outcome_revision(
+    session: Session, quest_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID, changes: dict, memo: str | None = None,
+) -> QuestOutcomeRevision:
+    rev = QuestOutcomeRevision(id=uuid.uuid4(), quest_id=quest_id, revision=revision, editor_id=editor_id, changes=changes, memo=memo)
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_outcome_revisions(session: Session, quest_id: uuid.UUID) -> list[QuestOutcomeRevision]:
+    """総括の版タイムライン（新しい順・折り畳みUIに埋め込む）。"""
+    return list(session.execute(
+        select(QuestOutcomeRevision).where(QuestOutcomeRevision.quest_id == quest_id)
+        .order_by(QuestOutcomeRevision.revision.desc())
+    ).scalars().all())
+
+
+def get_outcome_revision(session: Session, quest_id: uuid.UUID, revision: int) -> QuestOutcomeRevision | None:
+    return session.execute(
+        select(QuestOutcomeRevision).where(QuestOutcomeRevision.quest_id == quest_id, QuestOutcomeRevision.revision == revision)
+    ).scalars().first()
+
+
+def latest_outcome_revision(session: Session, quest_id: uuid.UUID) -> QuestOutcomeRevision | None:
+    return session.execute(
+        select(QuestOutcomeRevision).where(QuestOutcomeRevision.quest_id == quest_id)
+        .order_by(QuestOutcomeRevision.revision.desc()).limit(1)
+    ).scalars().first()
+
+
+def add_quest_revision(
+    session: Session, quest_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID, changes: dict, memo: str | None = None,
+) -> QuestRevision:
+    rev = QuestRevision(id=uuid.uuid4(), quest_id=quest_id, revision=revision, editor_id=editor_id, changes=changes, memo=memo)
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_quest_revisions(session: Session, quest_id: uuid.UUID, *, cursor: int | None = None, limit: int = 50) -> list[QuestRevision]:
+    stmt = select(QuestRevision).where(QuestRevision.quest_id == quest_id)
+    if cursor is not None:
+        stmt = stmt.where(QuestRevision.revision < cursor)
+    return list(session.execute(stmt.order_by(QuestRevision.revision.desc()).limit(limit)).scalars().all())
+
+
+def get_quest_revision(session: Session, quest_id: uuid.UUID, revision: int) -> QuestRevision | None:
+    return session.execute(
+        select(QuestRevision).where(QuestRevision.quest_id == quest_id, QuestRevision.revision == revision)
+    ).scalars().first()
+
+
+def latest_quest_revision(session: Session, quest_id: uuid.UUID) -> QuestRevision | None:
+    return session.execute(
+        select(QuestRevision).where(QuestRevision.quest_id == quest_id).order_by(QuestRevision.revision.desc()).limit(1)
+    ).scalars().first()
+
+
+def add_quest_decision_log(
+    session: Session, quest_id: uuid.UUID, *, kind: str, from_value: str | None, to_value: str, actor_id: uuid.UUID, reason: str | None = None,
+) -> QuestDecisionLog:
+    log = QuestDecisionLog(id=uuid.uuid4(), quest_id=quest_id, kind=kind, from_value=from_value, to_value=to_value, actor_id=actor_id, reason=reason)
+    session.add(log)
+    session.flush()
+    return log
+
+
+def list_quest_decision_log(session: Session, quest_id: uuid.UUID) -> list[QuestDecisionLog]:
+    return list(session.execute(
+        select(QuestDecisionLog).where(QuestDecisionLog.quest_id == quest_id)
+        .order_by(QuestDecisionLog.created_at.desc(), QuestDecisionLog.id.desc())
+    ).scalars().all())
 
 
 def can_access_quest(session: Session, quest: Quest, user_id: uuid.UUID) -> bool:

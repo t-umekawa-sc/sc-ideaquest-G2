@@ -511,6 +511,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
       // 見出しを下げてピルの下へ固定する（重ならない＝ユーザー要望 2026-09-20）。ピルが無いページは加算なし。
       const pill = document.querySelector(".backlink--float") as HTMLElement | null;
       if (pill) top += pill.offsetHeight + 16; // ピル高＋上下余白（space-2*2 相当）
+      // sticky なタブバー（クエスト詳細の .tabs）が上部固定表示中なら、その下端まで見出しを下げる
+      // ＝タブと浮動列見出しの重なりを回避（埋め込み一覧・2026-09-26 ユーザー指摘）。他ページは .tabs 不在で無影響。
+      const tabs = document.querySelector(".tabs") as HTMLElement | null;
+      if (tabs) {
+        const r = tabs.getBoundingClientRect();
+        if (r.bottom > top && r.top <= top + 4) top = r.bottom; // タブが固定位置に張り付いている時だけ潜り込ませる
+      }
       return top;
     };
     let raf = 0;

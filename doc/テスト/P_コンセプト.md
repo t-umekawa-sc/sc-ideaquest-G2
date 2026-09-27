@@ -42,6 +42,7 @@
 | P-TC-108 | api | 選定/解除（複数可・owner のみ・解除で履歴保持） | owner・active2 | `POST .../select`×2→`DELETE .../select`×1 | `is_selected` 反映・複数選定可・解除しても履歴残す | P.2 |
 | P-TC-109 | api | 総合判定 Go/Pivot/Kill（owner のみ・根拠） | owner | `PUT .../decision`（go＋rationale） | 200・`decision=go`・rationale 保存・一般は403 | P.2／§3.3 |
 | P-TC-110 | api | draft は本人のみ可視（存在秘匿） | 他人の draft | 非作成者で `GET /concepts/{id}` | 404（存在秘匿） | P.0/P.1 |
+| P-TC-120 | api | my_permissions に素のクエスト権限を合成（チャット投稿=comment・ピン=owner/quest_admin の素） | 既定権限パーティー員（回帰・議論チャット投稿不可バグ） | `GET /concepts/{id}` | `my_permissions` に `comment` を含む（アイデア詳細と同型・チャット中核の canComment を駆動） | P.1／§5.14b |
 | P-TC-111 | api | 門番（非パーティー/非グループ） | 非パーティー | `GET /concepts/{id}` | 404 | P.0 |
 | P-TC-112 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /quests/{id}/concepts` | 403 csrf_failed／401 | A.0/P.8 |
 
@@ -58,6 +59,7 @@
 | P-TC-205 | api | 前提詳細（検証履歴＋リンク先＋related_info） | リンク有り前提 | `GET /assumptions/{id}` | validations 時系列・linked_concepts[]（criticality/is_stale）・related_info（target_type=assumptions） | P.3 |
 | P-TC-206 | api | 前提削除はリンク有りで 409（先に解除を促す） | リンク有り | `DELETE /assumptions/{id}` | 409（未リンクは 204） | P.3 |
 | P-TC-207 | api | 反証波及＝refuted で全リンク先 stale＋通知 | 前提を2コンセプトにリンク | `POST .../validations`（refuted） | 両コンセプトのリンク `is_stale=true`・各作成者＋評価者へ通知（H `info_refuting_raised` 相当/`assumption_refuted`） | P.7／§3.5 |
+| P-TC-259 | unit(front) | 実績（検証）ダイアログの入力検証はフィールド単位（§4.7）＝欠落項目だけを返す | `validateValidationInput` | 手法/実施日入力済み・規模のみ空／全入力／全欠落 | 規模のみ空→`scale` だけ／全入力→空／全欠落→3項目（受入不具合 2026-09-27＝「手法・実施日・規模は必須」まとめ表示の是正） | §4.7／SC-61 §4.4 |
 
 ## 4. コンセプト↔前提リンク API（P.4）
 
@@ -86,6 +88,9 @@
 | P-TC-408 | api | limited は範囲外に完全非表示（分母除外） | limited＋party 評価 | 範囲外で `GET .../evaluation` | limited 除外集計・evaluators に出ない | P.5／F.1 |
 | P-TC-409 | api | 入力は evaluator 権限必須 | パーティーだが evaluator なし | `PUT` | 403 | P.0/P.5 |
 | P-TC-410 | api | 反証波及後の stale 表示（要再評価） | リンク前提が refuted | `GET .../evaluation`（my） | stale フラグ／要再評価が読める（SC-62 バナー源） | P.7／§3.5 |
+| P-TC-456 | api | 評価の変更履歴＝確定ごとに版（下書きは版なし・§3.6） | evaluator | `PUT .../evaluation`（draft→submitted→submitted〔総評変更〕） | `GET .../evaluation/me` の `revisions` が rev2＋rev1（新しい順・初版空・rev2 に overall_comment） | §3.6／migration 0040 |
+| P-TC-457 | api | 同一内容の再確定は版を進めない（既存仕様踏襲） | evaluator | `PUT .../evaluation`（同値 submitted×2） | `revisions` は rev1 のみ | §3.6 |
+| P-TC-458 | api | コンセプト評価の確定版差分（recommendation=scalar） | 2版 | `GET .../evaluation/revisions/2/diff` | recommendation＝scalar・overall_comment＝text | §3.6 |
 
 ## 6. コンセプト投票 API（P.5b・SC-61 §4.5）
 
@@ -111,6 +116,7 @@
 | P-TC-504 | api | メッセージ取得（カーソル・E.1 同形） | メッセージ複数 | `GET .../messages?before=` | items（本文/添付/メンション/引用）・カーソル | P.6／E.1 |
 | P-TC-505 | api | 既読位置更新（chat_reads・E.7 同型） | scope | `POST .../read`（last_read_message_id） | 204・未読数更新 | P.6／§5.31 |
 | P-TC-506 | api | 門番（非パーティーはスコープ/投稿不可） | 非パーティー | `GET /concepts/{id}/chat-scopes`／`POST .../messages` | 404/403 | P.0 |
+| P-TC-507 | api | グループ・ルームを複数作成（回帰・§5.45 の 3〜5） | owner | `POST /concepts/{id}/chat-scopes` を3ラベル | すべて 201・group 3件（0033 のユニークが group を潰し2個目 500 だった不具合＝migration 0036 で修正） | P.6／§5.45 |
 | P-TC-510 | api | フル機能パリティ＝rich チャット GET（アイデアと同形・thread 経由） | scope | `GET /concept-chat-scopes/{sid}/chat` | thread_id＋data＋未読・chat_group_id は null（コンセプトは chat_group を持たない・§5.45） | P.6／E.1／§5.14b |
 | P-TC-511 | api | フル機能パリティ＝コンセプトメッセージへ共通 message-id EP でリアクション | scope メッセージ | `POST /concept-chat-scopes/{sid}/chat-messages`→`POST /chat-messages/{id}/reactions` | 200・reactions.normal に付与（中核をホスト非依存で共有） | P.6／E.4／§5.14b |
 | P-TC-512 | api | フル機能パリティ＝rich 既読 EP で未読カーソル前進 | scope メッセージ2件 | `POST /concept-chat-scopes/{sid}/chat/read` | rich GET の unread_count が減る | P.6／E.5／§5.14b |
@@ -135,10 +141,24 @@
 | P-TC-804 | e2e | SC-62 評価＝中核5＋補助3＋総評＋推奨→SC-61 §4.6 反映 | evaluator | 評価する→採点→確定 | 集計・推奨分布が SC-61 §4.6 に反映 | SC-62／P.5 |
 | P-TC-805 | e2e | ガイダンス ⓘ＝ホバー展開／クリックで全文／reduce で静止 | 任意画面 | ⓘ にホバー→クリック→reduce ON | 展開（隣を押さない）・全文ダイアログ・reduce で流れ静止 | デザイン標準 §4.13/§4.9 |
 
+## 10b. 変更履歴＝内容の版＋意思決定ログ（変更履歴標準 §3.1/§3.2・migration 0037）
+
+| TC-ID | 種別 | 目的（説明） | 前提 | 操作 | 期待 | 根拠 |
+|---|---|---|---|---|---|---|
+| P-TC-250 | api | 作成で初版・内容編集で版が増える | active コンセプト | `POST /quests/{id}/concepts`→`PATCH /concepts/{id}`（title 変更） | `GET .../revisions` が rev1（初版・changed_fields 空）＋rev2（changed_fields に title）を新しい順で返す | §3.1 |
+| P-TC-251 | api | 空更新は版を進めない（既存仕様踏襲） | rev あり | `PATCH /concepts/{id}`（同値 or 変更なし） | 版数が増えない | §3.1 |
+| P-TC-252 | api | 版差分（前版比較・text/scalar） | 2版 | `GET .../revisions/2/diff` | fields に変更フィールドの差分（title＝text segments） | §3.1 |
+| P-TC-253 | api | 判断材料スナップショット | 投票/評価あり | `GET .../revisions` | 各版 context_snapshot に votes/eval/assumptions | §3.3 |
+| P-TC-254 | api | 総合判定の意思決定ログ | active | `POST /concepts/{id}/decision`（go・rationale） | `GET .../decision-log` に kind=decision・from/to・reason・context_snapshot | §3.2 |
+| P-TC-255 | api | ステータス遷移の意思決定ログ | draft | `POST /concepts/{id}/activate` | decision-log に kind=status（draft→active） | §3.2 |
+| P-TC-256 | api | 履歴の門番（非パーティーは 404） | 非パーティー | `GET .../revisions`／`.../decision-log` | 404（存在秘匿） | P.0 |
+| P-TC-257 | api | 前提リンク/実績/解除でコンセプト版が増える（版管理・assumptions フィールド） | コンセプト＋前提 | `POST .../assumptions`（link）→`POST /assumptions/{id}/validations`（refuted）→`DELETE .../assumptions/{aid}` | 各操作で `GET .../revisions` の版が rev2→3→4 と増え `changed_fields` に `assumptions` を含む | §4.4／§3.1 |
+| P-TC-258 | api | 実績（検証）の編集/削除が可能・判定変化がコンセプト版に記録 | リンク済み＋検証1件 | `PATCH /assumptions/{id}/validations/{vid}`（支持→反証）→`DELETE .../validations/{vid}` | 編集で current_verdict=refuted・版 rev4／削除で判定保留・版 rev5（いずれも changed_fields に assumptions）＝編集可だが監査は版側で担保 | §4.4／§3.1 |
+
 ## 10. 未確定・実装時に詰める（テスト観点）
 
 - **議論アクティビティ集計 API**（SC-61 §4.8）＝P に EP 追加の是非（アイデア `activity` 相当）。追加時に集計 TC を起こす。
 - **XP/コイン**＝投票 XP+5 は本版で付与（P-TC-453/454）。評価/選定/投稿の付与は実装時判断（F 踏襲するか）＝確定時に TC 追加。
 - **集計の重み付け**（criticality × 前提判定）＝Phase2。導入時に P-TC-012/407 を拡張。
-- **版管理**（`concept_revisions`）＝Phase2。導入時に版 TC を追加。
+- **版管理**（`concept_revisions`）＝**実装済**（10b・変更履歴標準 Phase 1・migration 0037）。評価/振り返り/クエストの版は後続フェーズ。
 - **付随＝関連リンク対象ピッカーへ concepts/assumptions 追加**（N `search_link_candidates` が現状 else→[]）＝実装時に N 側 TC も更新（[API設計 P_コンセプト](../API設計/P_コンセプト.md) P.10）。

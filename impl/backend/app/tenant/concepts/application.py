@@ -21,6 +21,7 @@ from app.tenant.gamification.daily import jst_day_bounds_utc
 from app.tenant.ideas import repository as ideas_repo
 from app.tenant.profile import repository as profile_repo
 from app.tenant.quests import repository as quests_repo
+from app.tenant._shared import revisions as rev_shared
 
 _XP_VOTE = 5
 _VOTE_XP_DAILY_CAP = 5
@@ -104,7 +105,11 @@ def _resolve_concept(ts, cid, user, *, for_write: bool = False):
 
 
 def _my_permissions(ts, concept, quest, user) -> list[str]:
-    perms: list[str] = []
+    # 素の当該クエスト権限（comment/vote/idea_create/quest_admin/evaluator 等）を土台に合成。
+    # アイデア詳細と同型＝チャット投稿(comment)/ピン(owner/quest_admin) はこの素の権限で駆動する。
+    perms: list[str] = list(_perms_of(ts, quest, user))
+    if _is_owner(quest, user) and "owner" not in perms:
+        perms.append("owner")  # ピン権限（owner/quest_admin）の素・チャット中核と共通
     if concept.author_id == user.id or _is_manager(ts, quest, user):
         perms.append("edit")
     if _is_manager(ts, quest, user):
@@ -150,7 +155,7 @@ def list_for_quest(account_id, company_id, quest_id) -> dict:
             # 可視性＝active/archived は全員／draft は本人のみ。
             if c.status == "draft" and c.author_id != user.id:
                 continue
-            items.append(_list_item(ts, c))
+            items.append(_list_item(ts, c, viewer_id=user.id))
         return {"items": items, "cursor": None}
 
 
@@ -174,6 +179,7 @@ def create(account_id, company_id, quest_id, *, body) -> dict:
             repo.set_source_ideas(ts, concept.id, source_ids)
         # 作成時に総合ルーム（overall）を自動生成（§3.7・P.2）。
         repo.create_chat_scope(ts, concept_id=concept.id, kind="overall", position=0)
+        _snapshot_revision(ts, concept, user.id, 1)  # 初版（変更履歴標準 §3.1）
         quest_obj, user_obj = quest, user
         payload = _detail_payload(ts, concept, quest_obj, user_obj)
         ts.commit()
@@ -195,10 +201,16 @@ def patch(account_id, company_id, concept_id, *, body) -> dict:
             repo.set_source_ideas(ts, concept.id, source_ids)
         else:
             data.pop("source_idea_ids", None)
+        before = _content_snapshot(ts, concept)  # 変更検出（無変更は版を作らない・§3.1）
         for field in ("title", "problem", "value_proposition", "target", "differentiation", "solution_form", "viability"):
             if field in data and data[field] is not None:
                 setattr(concept, field, data[field])
         ts.flush()
+        after = _content_snapshot(ts, concept)
+        if rev_shared.changed_fields(before, after, CONCEPT_REVISION_FIELDS):
+            next_rev = concept.current_revision + 1
+            _snapshot_revision(ts, concept, user.id, next_rev)
+            concept.current_revision = next_rev
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -223,8 +235,11 @@ def set_status(account_id, company_id, concept_id, *, target: str) -> dict:
         else:
             _require_manager(ts, quest, user, action="保管")
         _guard_not_completed(quest)
+        old_status = concept.status
         concept.status = target
         ts.flush()
+        if old_status != target:  # ステータス遷移を意思決定ログに追記（§3.2）
+            _record_decision_log(ts, concept, "status", old_status, target, user.id)
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -253,9 +268,12 @@ def set_decision(account_id, company_id, concept_id, *, decision: str, decision_
         concept, quest = _resolve_concept(ts, cid, user, for_write=True)
         _require_manager(ts, quest, user, action="総合判定")
         _guard_not_completed(quest)
+        old_decision = concept.decision
         concept.decision = decision
         concept.decision_rationale = decision_rationale
         ts.flush()
+        if old_decision != decision:  # 総合判定の変遷を意思決定ログに追記（理由・判断材料も凍結・§3.2/§3.3）
+            _record_decision_log(ts, concept, "decision", old_decision, decision, user.id, reason=decision_rationale)
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -274,6 +292,177 @@ def soft_delete(account_id, company_id, concept_id) -> None:
         ts.commit()
 
 
+# ---- 変更履歴（内容の版・意思決定ログ・§3.1/§3.2） ------------------------------
+
+# 版で追跡する対象フィールド（成果物スキーマ・共通エンジン _shared.revisions へ渡す仕様）。
+# テキスト系＝語句差分／viability（jsonb）＝{old,new}（JSON 文字列で表示）。
+CONCEPT_REVISION_FIELDS = (
+    rev_shared.FieldSpec("title", "text"),
+    rev_shared.FieldSpec("problem", "text"),
+    rev_shared.FieldSpec("value_proposition", "text"),
+    rev_shared.FieldSpec("target", "text"),
+    rev_shared.FieldSpec("differentiation", "text"),
+    rev_shared.FieldSpec("solution_form", "text"),
+    rev_shared.FieldSpec("viability", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("assumptions", "text"),  # リンク中の前提（重要度/判定）＝リンク変更・検証で更新（§4.4 版管理）
+)
+
+
+def _json_compact(value) -> str:
+    import json
+    if not value:
+        return ""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+_CRIT_LABEL = {"critical": "致命的", "major": "重要", "minor": "補助"}
+_VERDICT_LABEL_JA = {"supported": "支持", "refuted": "反証", "inconclusive": "保留"}
+
+
+def _assumptions_snapshot(ts, concept) -> str:
+    """版に保存する『リンク中の前提＋検証（実績）』要約（当時の判断材料・§3.1）。
+    重要度/前提文/現在判定に加え、各検証の 実施日/手法/判定/規模/結果 も含める＝リンクの追加/解除だけでなく
+    実績の追記/編集（規模・手法・結果の修正含む）/削除も版の差分として追える（ユーザー要望 2026-09-26）。"""
+    blocks = []
+    for link in repo.list_links_for_concept(ts, concept.id):
+        a = repo.get_assumption(ts, link.assumption_id)
+        if a is None:
+            continue
+        crit = _CRIT_LABEL.get(link.criticality, link.criticality)
+        verd = _VERDICT_LABEL_JA.get(a.current_verdict, a.current_verdict)
+        header = f"[{crit}] {a.statement}（{verd}）"
+        vlines = []
+        for v in repo.list_validations(ts, a.id):
+            vv = _VERDICT_LABEL_JA.get(v.verdict, v.verdict)
+            tail = f" / {v.result}" if v.result else ""
+            vlines.append(f"  ・{v.validated_on} {v.method} / {vv} / 規模: {v.scale or '-'}{tail}")
+        vlines.sort()
+        blocks.append("\n".join([header, *vlines]))
+    blocks.sort()
+    return "\n".join(blocks)
+
+
+def _content_snapshot(ts, concept) -> dict:
+    """版に保存する内容フィールドのスナップショット（§3.1）。"""
+    return {
+        "title": concept.title, "problem": concept.problem, "value_proposition": concept.value_proposition,
+        "target": concept.target, "differentiation": concept.differentiation,
+        "solution_form": concept.solution_form, "viability": concept.viability or {},
+        # リンク中の前提（重要度/判定）＝どの前提が紐づき、実績でどう判定されたかを版管理（ユーザー要望 2026-09-26）。
+        "assumptions": _assumptions_snapshot(ts, concept),
+    }
+
+
+def _context_snapshot(ts, concept) -> dict:
+    """判断材料の数値サマリ（§3.3）＝投票集計・評価集計・前提の検証状況。その版/判断の当時の材料を凍結。"""
+    vc = repo.count_votes(ts, concept.id)
+    agg = repo.aggregate_scores(ts, concept.id)
+    verdicts = repo.verdict_counts_for_concept(ts, concept.id)
+    return {
+        "votes": {"approve": vc.get("approve", 0), "oppose": vc.get("oppose", 0)},
+        "eval": {"evaluator_count": agg.get("evaluator_count", 0), "overall_avg": agg.get("overall_avg")},
+        "assumptions": {
+            "supported": verdicts.get("supported", 0),
+            "refuted": verdicts.get("refuted", 0),
+            "inconclusive": verdicts.get("inconclusive", 0),
+        },
+    }
+
+
+def _snapshot_revision(ts, concept, editor_id, revision, *, memo=None) -> None:
+    """内容の版を1件記録（スナップショット＋判断材料・§3.1）。"""
+    repo.add_revision(ts, concept.id, revision=revision, editor_id=editor_id,
+                      changes=_content_snapshot(ts, concept), memo=memo,
+                      context_snapshot=_context_snapshot(ts, concept))
+
+
+def _maybe_bump_revision(ts, concept, editor_id, before, *, memo=None) -> None:
+    """内容スナップショットが変わっていれば版を1件記録（無変更は版なし・§3.1）。
+    前提のリンク/解除・検証（実績）による判定変化を版として残すために使う。"""
+    ts.flush()
+    after = _content_snapshot(ts, concept)
+    if rev_shared.changed_fields(before, after, CONCEPT_REVISION_FIELDS):
+        next_rev = concept.current_revision + 1
+        _snapshot_revision(ts, concept, editor_id, next_rev, memo=memo)
+        concept.current_revision = next_rev
+
+
+def _record_decision_log(ts, concept, kind, from_value, to_value, actor_id, *, reason=None) -> None:
+    """意思決定/ステータスの遷移を追記（判断材料も凍結・§3.2）。"""
+    repo.add_decision_log(ts, concept.id, kind=kind, from_value=from_value, to_value=to_value,
+                          actor_id=actor_id, reason=reason, context_snapshot=_context_snapshot(ts, concept))
+
+
+def _editor_dto(user) -> dict:
+    return {
+        "user_id": str(user.id) if user else None,
+        "display_name": user.display_name if user else None,
+        "avatar_image_url": _image_url(user.avatar_image_path) if user else None,
+    }
+
+
+def get_revisions(account_id, company_id, concept_id, *, limit=50, cursor=None) -> dict:
+    """版タイムライン（SC-61 更新履歴・§3.1）。門番＝コンセプト可視性。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    cur = rev_shared.decode_revision_cursor(cursor) if cursor else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        rows = repo.list_revisions(ts, concept.id, cursor=cur, limit=limit + 1)
+        has_next = len(rows) > limit
+        rows = rows[:limit]
+        editors = quests_repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+        data = []
+        for r in rows:
+            prev = repo.get_revision(ts, concept.id, r.revision - 1) if r.revision > 1 else None
+            data.append({
+                "revision": r.revision,
+                "editor": _editor_dto(editors.get(r.editor_id)),
+                "created_at": r.created_at,
+                "changed_fields": rev_shared.changed_fields(prev.changes if prev else None, r.changes, CONCEPT_REVISION_FIELDS),
+                "memo": r.memo,
+                "context_snapshot": r.context_snapshot,
+            })
+        next_cursor = rev_shared.encode_revision_cursor(rows[-1].revision) if has_next and rows else None
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+def get_revision_diff(account_id, company_id, concept_id, revision, *, from_revision=None) -> dict:
+    """版の差分（SC-61・§3.1）。既定＝前版（revision-1）と比較。範囲外 404/422。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        to_rev = repo.get_revision(ts, concept.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_revision(ts, concept.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, CONCEPT_REVISION_FIELDS)}
+
+
+def get_decision_log(account_id, company_id, concept_id) -> dict:
+    """意思決定/ステータスの遷移ログ（SC-61・§3.2）。門番＝コンセプト可視性。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        rows = repo.list_decision_log(ts, concept.id)
+        actors = quests_repo.get_users_by_ids(ts, {r.actor_id for r in rows})
+        data = [{
+            "kind": r.kind, "from_value": r.from_value, "to_value": r.to_value,
+            "actor": _editor_dto(actors.get(r.actor_id)),
+            "reason": r.reason, "context_snapshot": r.context_snapshot, "created_at": r.created_at,
+        } for r in rows]
+    return {"data": data}
+
+
 # ---- payload 構築 ---------------------------------------------------------
 
 def _eval_summary(ts, concept_id) -> dict:
@@ -284,7 +473,7 @@ def _eval_summary(ts, concept_id) -> dict:
     }
 
 
-def _list_item(ts, c) -> dict:
+def _list_item(ts, c, *, viewer_id=None) -> dict:
     return {
         "id": str(c.id), "title": c.title, "status": c.status, "decision": c.decision,
         "is_selected": c.is_selected,
@@ -292,6 +481,8 @@ def _list_item(ts, c) -> dict:
         "assumption_count": len(repo.list_links_for_concept(ts, c.id)),
         "eval_summary": _eval_summary(ts, c.id),
         "author_id": str(c.author_id), "updated_at": c.updated_at,
+        # 削除アクションの活性判定（作成者本人＝削除可・owner/quest_admin はフロントの canManage で判定）。
+        "is_mine": viewer_id is not None and c.author_id == viewer_id,
     }
 
 
@@ -481,6 +672,10 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         assumption, quest = _resolve_assumption(ts, aid, user)
         _require_manager(ts, quest, user, action="検証の記録")
         _guard_not_completed(quest)
+        # 実績（検証）追記でリンク先コンセプトの判定が変わり得る＝版管理のため事前スナップショットを取る（§4.4）。
+        linked_concepts = [repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)]
+        linked_concepts = [c for c in linked_concepts if c is not None]
+        before_by_concept = {c.id: _content_snapshot(ts, c) for c in linked_concepts}
         v = repo.add_validation(
             ts, assumption_id=aid, method=body.method, verdict=body.verdict,
             validated_on=body.validated_on, result=body.result, scale=body.scale, created_by_id=user.id,
@@ -489,6 +684,9 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         if body.verdict == "refuted":
             affected = repo.mark_links_stale_for_assumption(ts, aid)
             # 通知（H・作成者＋評価者へ「要再評価」）は後続スライスで結線（P.7・follow-up）。
+        # 判定が変わったリンク先コンセプトは版を記録（実績入力の版管理・当時の判断材料）。
+        for c in linked_concepts:
+            _maybe_bump_revision(ts, c, user.id, before_by_concept[c.id], memo="前提の検証（実績）を追記")
         result = {
             "validation": _validation_dto(v),
             "current_verdict": repo.get_assumption(ts, aid).current_verdict,
@@ -496,6 +694,53 @@ def add_validation(account_id, company_id, assumption_id, *, body) -> dict:
         }
         ts.commit()
         return result
+
+
+def edit_validation(account_id, company_id, assumption_id, validation_id, *, body) -> dict:
+    """検証イベントの編集（プール所有）。編集はリンク先コンセプトの版に記録（ユーザー決定＝編集可＋版管理・§4.4）。"""
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    vid = _parse_uuid(validation_id, field="validation_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="検証の編集")
+        _guard_not_completed(quest)
+        v = repo.get_validation(ts, vid)
+        if v is None or v.assumption_id != aid:
+            raise AppError(404, "not_found")
+        linked = [c for c in (repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)) if c is not None]
+        before = {c.id: _content_snapshot(ts, c) for c in linked}
+        repo.update_validation(ts, v, method=body.method, verdict=body.verdict,
+                               validated_on=body.validated_on, result=body.result, scale=body.scale)
+        affected = repo.mark_links_stale_for_assumption(ts, aid) if body.verdict == "refuted" else []
+        for c in linked:
+            _maybe_bump_revision(ts, c, user.id, before[c.id], memo="前提の検証（実績）を編集")
+        result = {"validation": _validation_dto(v), "current_verdict": repo.get_assumption(ts, aid).current_verdict,
+                  "stale_concept_ids": [str(c) for c in affected]}
+        ts.commit()
+        return result
+
+
+def delete_validation(account_id, company_id, assumption_id, validation_id) -> None:
+    """検証イベントの削除（プール所有）。削除もリンク先コンセプトの版に記録（監査は版側で担保）。"""
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    vid = _parse_uuid(validation_id, field="validation_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        _require_manager(ts, quest, user, action="検証の削除")
+        _guard_not_completed(quest)
+        v = repo.get_validation(ts, vid)
+        if v is None or v.assumption_id != aid:
+            raise AppError(404, "not_found")
+        linked = [c for c in (repo.get_concept(ts, lk.concept_id) for lk in _links_for_assumption(ts, aid)) if c is not None]
+        before = {c.id: _content_snapshot(ts, c) for c in linked}
+        repo.delete_validation(ts, v)
+        for c in linked:
+            _maybe_bump_revision(ts, c, user.id, before[c.id], memo="前提の検証（実績）を削除")
+        ts.commit()
 
 
 def list_validations(account_id, company_id, assumption_id) -> dict:
@@ -529,11 +774,13 @@ def link_assumption(account_id, company_id, concept_id, *, assumption_id: str, c
                            errors=[{"field": "assumption_id"}])
         if repo.get_link(ts, cid, aid) is not None:
             raise AppError(409, "conflict", detail="既にリンク済み")
+        before = _content_snapshot(ts, concept)  # リンク前の状態（版管理・§4.4）
         link = repo.link_assumption(ts, concept_id=cid, assumption_id=aid, criticality=criticality, created_by_id=user.id)
         # 前提スレッド（assumption スコープ）を生成（重複は unique で防止・§3.7）。
         if repo.get_assumption_scope(ts, cid, aid) is None:
             repo.create_chat_scope(ts, concept_id=cid, kind="assumption", assumption_id=aid,
                                    position=repo.next_scope_position(ts, cid))
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提をリンク")
         result = {"concept_id": str(cid), "assumption_id": str(aid),
                   "criticality": link.criticality, "is_stale": link.is_stale}
         ts.commit()
@@ -552,7 +799,9 @@ def patch_link(account_id, company_id, concept_id, assumption_id, *, criticality
         link = repo.get_link(ts, cid, aid)
         if link is None:
             raise AppError(404, "not_found")
+        before = _content_snapshot(ts, concept)  # 重要度変更の版管理（§4.4）
         repo.set_link_criticality_stale(ts, link, criticality=criticality, is_stale=is_stale)
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提の重要度を変更")
         result = {"concept_id": str(cid), "assumption_id": str(aid),
                   "criticality": link.criticality, "is_stale": link.is_stale}
         ts.commit()
@@ -568,9 +817,11 @@ def unlink_assumption(account_id, company_id, concept_id, assumption_id) -> None
         concept, quest = _resolve_concept(ts, cid, user, for_write=True)
         _require_concept_editor(ts, concept, quest, user)
         _guard_not_completed(quest)
+        before = _content_snapshot(ts, concept)  # 解除前の状態（版管理・§4.4）
         if not repo.unlink_assumption(ts, cid, aid):
             raise AppError(404, "not_found")
         repo.remove_assumption_scope(ts, cid, aid)  # 前提本体・エビデンスは残す（単一ソース）
+        _maybe_bump_revision(ts, concept, user.id, before, memo="前提のリンクを解除")
         ts.commit()
 
 
@@ -585,17 +836,71 @@ def _require_evaluator(ts, quest, user) -> None:
         raise AppError(403, "forbidden", detail="評価の権限がありません")
 
 
+# コンセプト評価の確定版で追跡するフィールド（§3.6）。scores/comments は JSON 化して差分。
+CONCEPT_EVAL_REVISION_FIELDS = (
+    rev_shared.FieldSpec("overall_comment", "text"),
+    rev_shared.FieldSpec("scores", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("comments", "scalar", scalar_fmt=lambda v: _json_compact(v)),
+    rev_shared.FieldSpec("recommendation", "scalar"),
+    rev_shared.FieldSpec("visibility", "scalar"),
+)
+
+
+def _concept_eval_snapshot(body) -> dict:
+    return {
+        "overall_comment": body.overall_comment or None,
+        "scores": {a: s for a, s in body.scores.items() if a in repo.ALL_ASPECTS},
+        "comments": {a: c for a, c in (body.comments or {}).items() if c},
+        "recommendation": body.recommendation,
+        "visibility": body.visibility,
+    }
+
+
+def _record_concept_eval_revision(ts, ev, editor_id, snapshot) -> None:
+    last = repo.latest_eval_revision(ts, ev.id)
+    base = last.changes if last else {"overall_comment": None, "scores": {}, "comments": {}, "recommendation": None, "visibility": "party"}
+    if rev_shared.changed_fields(base, snapshot, CONCEPT_EVAL_REVISION_FIELDS):
+        repo.add_eval_revision(ts, ev.id, revision=(last.revision + 1) if last else 1, editor_id=editor_id, changes=snapshot)
+
+
 def _me_eval_payload(ts, ev) -> dict:
     if ev is None:
         return {"status": None, "scores": {}, "comments": {}, "overall_comment": None,
-                "recommendation": None, "visibility": "party", "submitted_at": None}
+                "recommendation": None, "visibility": "party", "submitted_at": None, "revisions": []}
     scores = repo.get_scores_for_evaluations(ts, [ev.id]).get(ev.id, [])
+    revs = repo.list_eval_revisions(ts, ev.id)
+    rev_by_num = {r.revision: r for r in revs}
+    revisions = [{
+        "revision": r.revision, "created_at": r.created_at,
+        "changed_fields": rev_shared.changed_fields(rev_by_num.get(r.revision - 1).changes if rev_by_num.get(r.revision - 1) else None, r.changes, CONCEPT_EVAL_REVISION_FIELDS),
+    } for r in revs]
     return {
         "status": ev.status, "scores": {s.aspect: s.score for s in scores},
         "comments": {s.aspect: s.comment for s in scores if s.comment is not None},
         "overall_comment": ev.overall_comment, "recommendation": ev.recommendation,
-        "visibility": ev.visibility, "submitted_at": ev.submitted_at,
+        "visibility": ev.visibility, "submitted_at": ev.submitted_at, "revisions": revisions,
     }
+
+
+def get_concept_eval_revision_diff(account_id, company_id, concept_id, revision, *, from_revision=None) -> dict:
+    """自分のコンセプト評価の確定版差分（§3.6）。既定＝前版比較。範囲外 404/422。"""
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, _quest = _resolve_concept(ts, cid, user)
+        ev = repo.get_evaluation(ts, cid, user.id)
+        if ev is None:
+            raise AppError(404, "not_found")
+        to_rev = repo.get_eval_revision(ts, ev.id, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_eval_revision(ts, ev.id, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, CONCEPT_EVAL_REVISION_FIELDS)}
 
 
 def _can_view_eval(concept, user, ev, is_manager: bool) -> bool:
@@ -693,8 +998,10 @@ def put_evaluation(account_id, company_id, concept_id, *, body) -> dict:
         )
         entries = [(a, s, body.comments.get(a)) for a, s in body.scores.items() if a in repo.ALL_ASPECTS]
         repo.replace_scores(ts, ev.id, entries)
-        if submitted and ev.submitted_at is None:
-            ev.submitted_at = datetime.now(timezone.utc)
+        if submitted:
+            if ev.submitted_at is None:
+                ev.submitted_at = datetime.now(timezone.utc)
+            _record_concept_eval_revision(ts, ev, user.id, _concept_eval_snapshot(body))  # 確定ごとに版（§3.6）
         ts.flush()
         payload = _me_eval_payload(ts, ev)
         ts.commit()

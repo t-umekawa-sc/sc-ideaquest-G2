@@ -35,8 +35,12 @@ from app.tenant.quests.schemas import (
     QuestMemberDTO,
     QuestMemberPermissionsRequest,
     QuestMembersResponse,
+    QuestDecisionLogResponse,
     QuestOutcomeDTO,
+    QuestOutcomeRevisionDiffResponse,
     QuestOutcomeUpdateRequest,
+    QuestRevisionDiffResponse,
+    QuestRevisionListResponse,
     QuestPartyUpdateRequest,
     QuestPermissionsResponse,
     QuestResultDTO,
@@ -427,6 +431,56 @@ def get_quest_result(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )
     return QuestResultDTO(**result)
+
+
+@router.get("/quests/{quest_id}/result/revisions/{revision}/diff", response_model=QuestOutcomeRevisionDiffResponse)
+def get_quest_result_revision_diff(
+    quest_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> QuestOutcomeRevisionDiffResponse:
+    """振り返り（総括）の版差分（SC-12 結果タブ・§3.1）。既定＝前版比較。読取専用。"""
+    result = quest_service.get_quest_outcome_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, revision,
+        from_revision=from_revision,
+    )
+    return QuestOutcomeRevisionDiffResponse(**result)
+
+
+@router.get("/quests/{quest_id}/revisions", response_model=QuestRevisionListResponse)
+def get_quest_revisions(
+    quest_id: str, request: Request, limit: int = Query(default=50, ge=1, le=100),
+    cursor: str | None = None, session: dict = Depends(require_me),
+) -> QuestRevisionListResponse:
+    """クエスト定義の版タイムライン（SC-12 更新履歴・§3.1）。読取専用。"""
+    result = quest_service.get_quest_revisions(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, limit=limit, cursor=cursor,
+    )
+    return QuestRevisionListResponse(**result)
+
+
+@router.get("/quests/{quest_id}/revisions/{revision}/diff", response_model=QuestRevisionDiffResponse)
+def get_quest_revision_diff(
+    quest_id: str, revision: int, request: Request,
+    from_revision: int | None = Query(default=None, alias="from"),
+    session: dict = Depends(require_me),
+) -> QuestRevisionDiffResponse:
+    """クエスト定義の版差分（SC-12・§3.1）。既定＝前版比較。読取専用。"""
+    result = quest_service.get_quest_revision_diff(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id, revision, from_revision=from_revision,
+    )
+    return QuestRevisionDiffResponse(**result)
+
+
+@router.get("/quests/{quest_id}/decision-log", response_model=QuestDecisionLogResponse)
+def get_quest_decision_log(
+    quest_id: str, request: Request, session: dict = Depends(require_me),
+) -> QuestDecisionLogResponse:
+    """クエストのステータス遷移ログ（SC-12・§3.2）。読取専用。"""
+    result = quest_service.get_quest_decision_log(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
+    )
+    return QuestDecisionLogResponse(**result)
 
 
 @router.post("/quests/{quest_id}/result/chat-summary", response_model=QuestOutcomeDTO)

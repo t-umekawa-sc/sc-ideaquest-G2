@@ -7,18 +7,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Avatar, LoadingOverlay, ScreenPurpose, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import type { FieldErrors } from "@/lib/forms/validation";
 import { QuestIcon } from "@/components/layout/QuestIcon";
+import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
+import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
 import { RelatedInfoPanel } from "@/features/info-input";
 import { votePercents } from "@/features/ideas/voting";
 import { ApiError } from "@/lib/api/client";
 import { backToListOr } from "@/lib/nav";
 
 import {
-  CONCEPTS_CHANGED_EVENT, createGroupScope, getConcept, getEvaluationAggregate, listChatScopes,
-  selectConcept, setDecision, unselectConcept, unvoteConcept, voteConcept,
-  type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate,
+  addValidation, CONCEPTS_CHANGED_EVENT, createGroupScope, deleteValidation, getConcept, getEvaluationAggregate, linkAssumption, listAssumptions, listChatScopes,
+  patchValidation, selectConcept, setDecision, unlinkAssumption, unselectConcept, unvoteConcept, voteConcept,
+  type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate, type Validation,
 } from "../api";
+import { AssumptionCard } from "./AssumptionCard";
+import { validateValidationInput } from "../validation";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
 
@@ -29,10 +34,7 @@ const DECISION_LABEL: Record<string, [string, string]> = {
   undecided: ["未判定", "badge badge-muted"], go: ["推進", "badge badge-success"], pivot: ["方向転換", "badge badge-muted"], kill: ["中止", "badge badge-danger"],
 };
 const DECISION_CHOICES: readonly [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"]];
-const VERDICT_LABEL: Record<string, [string, string]> = {
-  inconclusive: ["保留", "badge badge-muted"], supported: ["支持", "badge badge-success"], refuted: ["反証", "badge badge-danger"],
-};
-const CRITICALITY_LABEL: Record<string, string> = { critical: "致命的", major: "重要", minor: "補助" };
+// 前提の重要度/判定ラベルは AssumptionCard に移設（前提と検証セクションで使用）。
 // 評価観点＝中核5＋補助3（SC-25 の観点バーと同じ描画に使う）。
 const ASPECT_LABELS: [string, string][] = [
   ["desirability", "望ましさ"], ["feasibility", "実現可能性"], ["viability", "採算・事業性"],
@@ -55,12 +57,12 @@ function ConceptGuide() {
   return (
     <ScreenPurpose
       label="コンセプトとは？"
-      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら Go / Pivot / Kill の判断まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
+      summary="選別済みアイデアを統合し、主要な前提を「証拠で」検証（desirability・feasibility・viability）しながら 推進 / 方向転換 / 中止 の判断まで導く検証可能な提案（ISO 56001 §8.3 ②③段）。粒度＝1クエスト内で競合する検証単位。"
       dialogTitle="この画面について（ISO 56001 準拠）"
     >
       <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデア（複数）を統合し、<strong>課題・機会／狙う価値と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をひとまとめにした、<strong>検証可能な提案</strong>です（ISO 56001 §8.3 ②③段）。</p></div>
-      <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>Go / Pivot / Kill</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
-      <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、owner が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
+      <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>主要な前提を「証拠で」検証しながら <strong>推進 / 方向転換 / 中止</strong> の判断まで導きます。否定的な検証結果こそ価値。</p></div>
+      <div className="dialog-section"><div className="dialog-label">粒度</div><p style={{ margin: 0 }}><strong>1 クエスト内</strong>で複数候補が競合し、所有者が勝ち残りを選定。アイデアより大きく、ソリューション（実装）より前の単位です。</p></div>
     </ScreenPurpose>
   );
 }
@@ -68,12 +70,27 @@ function ConceptGuide() {
 export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const router = useRouter();
   const snack = useSnackbar();
+  const confirm = useConfirm();
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [vote, setVote] = useState<{ approve: number; oppose: number; my: ConceptVoteType | null }>({ approve: 0, oppose: 0, my: null });
   const [evalAgg, setEvalAgg] = useState<EvaluationAggregate | null>(null);
   const [scopes, setScopes] = useState<ConceptChatScopeItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1）
+  const [chatActivity, setChatActivity] = useState<ChatActivity | null>(null); // 総合ルームの議論活発度（E.1）
+  const [chatPreview, setChatPreview] = useState<ChatMessage[]>([]); // 総合ルームの直近メッセージ（最新3件）
+  // 前提のリンク（P.4）＝検証プールから選んでこのコンセプトに紐づける。
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [pool, setPool] = useState<AssumptionListResponse["items"] | null>(null);
+  const [linkSel, setLinkSel] = useState<string>("");
+  const [linkCrit, setLinkCrit] = useState<"critical" | "major" | "minor">("major");
+  // 実績入力（検証追記・P.3）ダイアログ＝どの前提に対して、手法/判定/実施日/規模/結果。
+  const [valDialog, setValDialog] = useState<{ assumptionId: string; validationId?: string; method: string; verdict: "supported" | "refuted" | "inconclusive"; validatedOn: string; scale: string; result: string } | null>(null);
+  const [valSaving, setValSaving] = useState(false);
+  const [valErrors, setValErrors] = useState<FieldErrors>({}); // 実績（検証）入力のフィールド別エラー（§4.7）
+  const [valReloadToken, setValReloadToken] = useState(0); // 実績追加後に検証履歴を再取得させる
+  const { summaryRef: valSummaryRef, notify: valNotify } = useFormErrorNotice(); // §4.7＝上部サマリへスクロール＋自動消滅スナックバー
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
@@ -104,6 +121,16 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const canManage = perms.includes("manage");
   const overallScope = scopes.find((s) => s.kind === "overall");
 
+  // 総合ルームの議論活発度（E.1）＋直近メッセージ（最新3件）＝アイデア詳細 SC-22 のチャット節と同型。総合ルーム確定後に取得。
+  useEffect(() => {
+    const sid = overallScope?.scope_id;
+    if (!sid) return;
+    let alive = true;
+    void getScopeChatActivity(sid).then((a) => { if (alive) setChatActivity(a); }).catch(() => {});
+    void getScopeChat(sid, { limit: 50 }).then((c) => { if (alive) setChatPreview((c?.data ?? []).filter((m) => !m.is_deleted).slice(-3)); }).catch(() => {});
+    return () => { alive = false; };
+  }, [overallScope?.scope_id]);
+
   // グループ議論へ遷移＝ラベル一致のルームがあれば開く／無ければ作成（owner/quest_admin）してから開く。
   const discussGroup = async (label: string) => {
     if (busy) return;
@@ -114,7 +141,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       const created = await createGroupScope(conceptId, label);
       if (created) { loadScopes(); router.push(`/concepts/${conceptId}/chat/${created.scope_id}`); }
     } catch (e) {
-      snack({ type: "error", msg: e instanceof ApiError && e.status === 403 ? "議論ルームの作成は owner/クエスト管理者のみです" : "議論ルームを開けませんでした" });
+      snack({ type: "error", msg: e instanceof ApiError && e.status === 403 ? "議論ルームの作成は 所有者/クエスト管理者のみです" : "議論ルームを開けませんでした" });
     } finally { setBusy(false); }
   };
 
@@ -136,6 +163,93 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
     try { await fn(); await load(); snack({ type: "success", title: ok }); }
     catch { snack({ type: "error", msg: "操作できませんでした" }); }
     finally { setBusy(false); }
+  };
+
+  // 前提リンク（P.4）＝検証プールを開いて未リンクの前提を選び、criticality を付けて紐づける。
+  const openLinkDialog = async () => {
+    if (!concept) return;
+    setLinkSel(""); setLinkCrit("major"); setLinkOpen(true);
+    const r = await listAssumptions(concept.quest_id).catch(() => null);
+    setPool(r?.items ?? []);
+  };
+  const doLink = async () => {
+    if (!linkSel) return;
+    await runManage(() => linkAssumption(conceptId, linkSel, linkCrit), "前提をリンクしました");
+    setLinkOpen(false);
+  };
+  const doUnlink = async (assumptionId: string, statement: string) => {
+    const ok = await confirm({ variant: "danger", title: "前提のリンクを解除", msg: `「${statement}」をこのコンセプトから外しますか？（前提自体は検証プールに残ります）` });
+    if (!ok) return;
+    await runManage(() => unlinkAssumption(conceptId, assumptionId), "リンクを解除しました");
+  };
+
+  // 実績入力（検証追記）＝実施日を今日で初期化して開く。
+  const openValidate = (assumptionId: string) => {
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setValErrors({}); // 開くたびにリセット（§4.7）
+    setValDialog({ assumptionId, method: "", verdict: "supported", validatedOn: iso, scale: "", result: "" });
+  };
+  // 実績の編集＝既存イベントをプリフィルして開く（編集可・版管理はコンセプト側で記録）。
+  const openEditValidation = (assumptionId: string, v: Validation) => {
+    setValErrors({}); // 開くたびにリセット（§4.7）
+    setValDialog({
+      assumptionId, validationId: v.id, method: v.method, verdict: v.verdict as "supported" | "refuted" | "inconclusive",
+      validatedOn: v.validated_on, scale: v.scale ?? "", result: v.result ?? "",
+    });
+  };
+  // 実績の複製＝既存イベントの値を初期表示にした「追加モード」で開く（validationId 無し＝保存で別レコード新規作成・デザイン標準 §4.5 複製標準）。
+  const openDuplicateValidation = (assumptionId: string, v: Validation) => {
+    setValErrors({}); // 開くたびにリセット（§4.7）
+    setValDialog({
+      assumptionId, method: v.method, verdict: v.verdict as "supported" | "refuted" | "inconclusive",
+      validatedOn: v.validated_on, scale: v.scale ?? "", result: v.result ?? "",
+    });
+  };
+  const saveValidation = async () => {
+    if (!valDialog || valSaving) return;
+    // 主ボタンは常に押せる（デザイン標準 §4.1）。検証は §4.7＝フィールド単位でインライン＋上部サマリ＋足元ヒント＋自動消滅トースト。
+    const fe = validateValidationInput({ method: valDialog.method, validatedOn: valDialog.validatedOn, scale: valDialog.scale });
+    setValErrors(fe);
+    const list = Object.values(fe).filter(Boolean);
+    if (list.length) { valNotify(list); return; }
+    setValSaving(true);
+    const body = {
+      method: valDialog.method.trim(), verdict: valDialog.verdict, validated_on: valDialog.validatedOn,
+      scale: valDialog.scale.trim() || null, result: valDialog.result.trim() || null,
+    };
+    try {
+      if (valDialog.validationId) {
+        await patchValidation(valDialog.assumptionId, valDialog.validationId, body);
+      } else {
+        await addValidation(valDialog.assumptionId, body);
+      }
+      setValDialog(null);
+      setValReloadToken((t) => t + 1);
+      await load(); // current_verdict / stale の更新を反映
+      snack({ type: "success", title: valDialog.validationId ? "実績（検証）を更新しました" : "実績（検証）を追記しました" });
+    } catch {
+      snack({ type: "error", title: "保存できませんでした", msg: "権限（owner/クエスト管理者）と入力をご確認ください。" });
+    } finally {
+      setValSaving(false);
+    }
+  };
+  const deleteValidationHandler = async (assumptionId: string, v: Validation) => {
+    const ok = await confirm({ variant: "danger", title: "実績（検証）を削除", msg: `「${v.method}」（${v.validated_on}）の検証を削除しますか？（削除はコンセプトの版に記録されます）` });
+    if (!ok) return;
+    try {
+      await deleteValidation(assumptionId, v.id);
+      setValReloadToken((t) => t + 1);
+      await load();
+      snack({ type: "success", title: "実績（検証）を削除しました" });
+    } catch {
+      snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+    }
+  };
+  // 前提スレッド（assumption スコープ）への遷移先を解決。
+  const threadHrefFor = (assumptionId: string): string | null => {
+    const scope = scopes.find((s) => s.kind === "assumption" && s.assumption_id === assumptionId);
+    return scope ? `/concepts/${conceptId}/chat/${scope.scope_id}` : null;
   };
 
   if (loading) return <LoadingOverlay label="読み込み中…" />;
@@ -182,7 +296,12 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           </div>
         </div>
         <div className="idea-meta">
-          <span>🔄 更新 {fmtDate(concept.updated_at)}</span>
+          <span>
+            🔄 更新 {fmtDate(concept.updated_at)}・
+            <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>
+              版 {concept.current_revision}（履歴）
+            </button>
+          </span>
           <span>🧭 所属クエスト: <Link href={`/quests/${concept.quest_id}`}>クエスト</Link></span>
           {concept.source_ideas.length > 0 && (
             <span>💡 由来: {concept.source_ideas.map((s, i) => (
@@ -224,36 +343,66 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
             <div className="concept-section-head">
               <h2 style={{ margin: 0 }}>前提と検証</h2>
               <ScreenPurpose summary="前提＝コンセプトが成り立つ仮説／検証＝証拠で支持・反証・保留を判定。否定結果こそ価値（ISO 56001 §8.3/§9）。" dialogTitle="前提と検証とは"><p style={{ margin: 0 }}><strong>前提</strong>＝コンセプトが成り立つ仮説。<strong>検証</strong>＝証拠で <strong>支持／反証／保留</strong> を判定します。共有前提が反証に転じると、リンクする全コンセプトが「要再評価」になります。</p></ScreenPurpose>
+              {/* 検証プールの前提をこのコンセプトに紐づける（P.4・owner/quest_admin）。 */}
+              {canManage && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => void openLinkDialog()}>＋ 前提をリンク</button>}
             </div>
             {concept.assumptions.length === 0 ? (
-              <div className="muted text-sm">まだ前提はありません。</div>
+              <div className="muted text-sm">まだ前提はありません。{canManage && "「＋ 前提をリンク」で検証プールから紐づけます。"}</div>
             ) : (
               <ul className="assumption-list">
                 {concept.assumptions.map((a) => (
-                  <li key={a.assumption_id} className="assumption-card">
-                    <div className="assumption-top">
-                      <span className="badge badge-muted">{CRITICALITY_LABEL[a.criticality] ?? a.criticality}</span>
-                      <Badge map={VERDICT_LABEL} value={a.current_verdict} />
-                      {a.is_stale && <span className="badge badge-danger">⚠ 要再評価</span>}
-                    </div>
-                    <div className="assumption-statement">{a.statement}</div>
-                  </li>
+                  <AssumptionCard
+                    key={a.assumption_id}
+                    a={a}
+                    threadHref={threadHrefFor(a.assumption_id)}
+                    canManage={canManage}
+                    reloadToken={valReloadToken}
+                    onValidate={() => openValidate(a.assumption_id)}
+                    onEditValidation={(v) => openEditValidation(a.assumption_id, v)}
+                    onDuplicateValidation={(v) => openDuplicateValidation(a.assumption_id, v)}
+                    onDeleteValidation={(v) => void deleteValidationHandler(a.assumption_id, v)}
+                    onUnlink={() => void doUnlink(a.assumption_id, a.statement)}
+                  />
                 ))}
               </ul>
             )}
           </section>
 
-          {/* 下部＝総合チャット（総合ルーム・SC-61 §4.8）。活発度グラフ/直近プレビューは次スライス。 */}
+          {/* 下部＝総合チャット（総合ルーム・SC-61 §4.8）＝アイデア詳細 SC-22 のチャット節と同型
+              （見出し＋活発度グラフ＋直近プレビュー＋「チャットを開く」を下部）。 */}
           <section className="card" aria-label="総合チャット">
-            <div className="concept-overall-chat">
-              <div style={{ minWidth: 0 }}>
-                <h2 style={{ margin: 0 }}>💬 総合チャット</h2>
-                <p className="muted text-sm" style={{ margin: "2px 0 0" }}>横断議論と最終 Go / Pivot / Kill の場（総合ルーム）。</p>
-              </div>
-              {overallScope
-                ? <Link href={`/concepts/${conceptId}/chat/${overallScope.scope_id}`} className="btn btn-primary btn-sm">チャットを開く（総合ルーム）→</Link>
-                : <span className="muted text-sm">総合ルーム準備中…</span>}
+            <div className="between" style={{ marginBottom: "var(--space-2)" }}>
+              <h2 className="card-title" style={{ margin: 0 }}>💬 総合チャット <span className="badge badge-muted">💬 {chatActivity?.total_messages ?? 0}</span></h2>
             </div>
+            <p className="muted text-sm" style={{ margin: "0 0 var(--space-3)" }}>横断議論と最終判断（推進 / 方向転換 / 中止）の場（総合ルーム）。</p>
+            {/* 議論アクティビティ・グラフ（総合ルームの chat-activity 実データ）＝共有 ActivitySpark（SC-22 と同型）。 */}
+            <ActivitySpark
+              daily={(chatActivity?.daily ?? []).map((d) => ({ date: d.date, count: d.message_count }))}
+              markers={(chatActivity?.revision_markers ?? []).map((m) => m.date)}
+              legend="◆ = コンセプト更新の記録された日。棒＝日次メッセージ数（総合ルーム・直近3日を強調）。"
+            />
+            {/* 直近メッセージのプレビュー（最新3件・SC-22 と同型）。 */}
+            {chatPreview.length > 0 ? (
+              <div className="chat-preview">
+                {chatPreview.map((m) => (
+                  <div className="chat-msg" key={m.id}>
+                    <Avatar name={m.author?.name || "?"} imageUrl={m.author?.avatar ?? undefined} size="sm" />
+                    <div className="chat-msg__body">
+                      <div className="chat-msg__head">
+                        <span className="chat-msg__name">{m.author?.name}</span>
+                        <span className="chat-msg__time">{fmtDate(m.created_at)}</span>
+                      </div>
+                      <p className="chat-msg__text">{m.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="role-note">まだコメントはありません。</p>
+            )}
+            {overallScope
+              ? <Link href={`/concepts/${conceptId}/chat/${overallScope.scope_id}`} className="btn btn-primary">チャットを開く（総合ルーム）→</Link>
+              : <span className="muted text-sm">総合ルーム準備中…</span>}
           </section>
         </div>
 
@@ -261,7 +410,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
         <div className="idea-rail">
           {/* 投票（.vote-* パネル流用） */}
           <section className="card" aria-label="投票">
-            <h2 className="card-title">投票</h2>
+            <div className="concept-section-head">
+              <h2 className="card-title" style={{ margin: 0 }}>投票</h2>
+              <ScreenPurpose summary="パーティー全員の賛否（民意・機運）。1人1票・変更/取消可・自分にも可。評価スコアには影響しない（投票と評価は独立）。" dialogTitle="投票とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>投票</strong>＝コンセプト投票権限を持つ<strong>パーティー全員</strong>が賛成/反対で示す<strong>民意（機運）</strong>です。1人1票・変更/取消可・自分のコンセプトにも投票可（投票で +5 XP＝各コンセプト初回）。<strong>評価スコアや総合判定を自動では動かさない参考シグナル</strong>です。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。3 つは独立した入力で、総合判定が最終アウトプットです。</p>
+              </ScreenPurpose>
+            </div>
             <div className="vote-summary">
               <span className="vote-agree">▲ 賛成 {vote.approve}</span>
               <span className="vote-disagree">▼ 反対 {vote.oppose}</span>
@@ -281,7 +436,13 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
           {/* 評価結果（選定ボタンは SC-22 と同じくこのパネル見出しに置く） */}
           <section className="card" aria-label="評価結果">
             <div className="eval-head">
-              <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
+              <div className="concept-section-head">
+                <h2 className="card-title" style={{ margin: 0 }}>評価結果</h2>
+                <ScreenPurpose summary="評価者権限を持つ人による多観点スコア（中核5＋補助3）＝専門的な定量評価。公開範囲を指定可。投票（民意）とは独立。" dialogTitle="評価とは（投票・評価・総合判定の住み分け）">
+                  <p style={{ margin: 0 }}><strong>評価</strong>＝<strong>評価者権限</strong>を持つ人が観点別（中核5＋補助3）に採点する<strong>専門的な定量評価</strong>です（採点は SC-62）。評価者ごとに公開範囲（visibility）を指定でき、複数名が評価できます。<strong>投票（全員の民意）とは独立</strong>で、点数は投票結果に影響されません。</p>
+                  <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。</p>
+                </ScreenPurpose>
+              </div>
               {canManage && (
                 <button className={`btn btn-sm ${concept.is_selected ? "btn-primary" : "btn-outline"}`} type="button" aria-pressed={concept.is_selected} disabled={busy}
                   onClick={() => runManage(() => (concept.is_selected ? unselectConcept(conceptId) : selectConcept(conceptId)), "選定を更新しました")}>
@@ -329,35 +490,137 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                 )}
               </>
             )}
-            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-outline" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
+            {perms.includes("evaluate") && <Link href={`/concepts/${concept.id}/eval`} className="btn btn-primary" style={{ marginTop: "var(--space-3)" }}>評価する / 編集</Link>}
           </section>
 
           {/* 総合判定（右レール最下部・投票 UI に合わせる） */}
           <section className="card" aria-label="総合判定">
-            <h2 className="card-title">総合判定</h2>
+            <div className="concept-section-head">
+              <h2 className="card-title" style={{ margin: 0 }}>総合判定</h2>
+              <ScreenPurpose summary="所有者/クエスト管理者が下す最終意思決定（推進 / 方向転換 / 中止）。投票・評価・前提と検証を踏まえて人が判断。" dialogTitle="総合判定とは（投票・評価・総合判定の住み分け）">
+                <p style={{ margin: 0 }}><strong>総合判定</strong>＝<strong>所有者 / クエスト管理者のみ</strong>が下す<strong>最終的な意思決定</strong>です（<strong>推進 / 方向転換 / 中止</strong>）。投票（全員の民意）・評価（評価者の専門採点）・前提と検証（エビデンス）を踏まえて<strong>人が判断</strong>します（自動計算ではありません）。★選定とあわせて勝ち残りを決めます。</p>
+                <p style={{ marginBottom: 0 }}>住み分け＝<strong>投票（全員の民意）</strong> → <strong>評価（評価者の専門採点）</strong> → <strong>総合判定（所有者/管理者の最終意思決定）</strong>。</p>
+              </ScreenPurpose>
+            </div>
             <div className="vote-summary">
               <span className="decision-now">現在の判定: <Badge map={DECISION_LABEL} value={concept.decision} /></span>
             </div>
             {concept.decision_rationale && <p className="text-sm">{concept.decision_rationale}</p>}
             {canManage ? (
               <>
-                <div className="vote-btns">
+                {/* 総合判定＝評価ダイアログ「総合判定の推奨」と同じ .segmented（3択の単一選択）に統一。 */}
+                <div className="segmented" role="radiogroup" aria-label="総合判定">
                   {DECISION_CHOICES.map(([d, label]) => (
-                    <button key={d} type="button" className={`vote-btn decision-${d}${concept.decision === d ? " is-on" : ""}`}
-                      aria-pressed={concept.decision === d} disabled={busy}
-                      onClick={() => runManage(() => setDecision(conceptId, { decision: d as "go" | "pivot" | "kill" }), "判定を更新しました")}>
+                    <label key={d}>
+                      <input type="radio" name="concept-decision" checked={concept.decision === d} disabled={busy}
+                        onChange={() => runManage(() => setDecision(conceptId, { decision: d as "go" | "pivot" | "kill" }), "判定を更新しました")} />
                       {label}
-                    </button>
+                    </label>
                   ))}
                 </div>
-                <p className="vote-note">owner / クエスト管理者が <strong>推進 / 方向転換 / 中止</strong> を判定します。</p>
+                <p className="vote-note">所有者 / クエスト管理者が <strong>推進 / 方向転換 / 中止</strong> を判定します。</p>
               </>
             ) : (
-              <p className="vote-note">総合判定は owner / クエスト管理者が行います。</p>
+              <p className="vote-note">総合判定は 所有者 / クエスト管理者が行います。</p>
             )}
+            {/* 判定・ステータスの履歴は概要の「更新履歴」リンク→モーダルへ集約（クエスト同型・§3.2）。 */}
           </section>
         </div>
       </div>
+
+      {/* 更新履歴モーダル（定義の版＋差分＋判定/ステータスログ・§3.1/§3.2・クエスト SC-12 と同型） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="更新履歴" size="lg">
+        <ModalBody>
+          {/* 参照系ダイアログ＝項目間に仕切り線（.dialog-section・デザイン標準 §4.1）。 */}
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>内容の変更履歴</h3>
+            <p className="role-note" style={{ marginTop: 0 }}>
+              コンセプトの変更を新しい順に表示します。各版を開くと差分（
+              <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+            </p>
+            <ConceptRevisionHistory conceptId={conceptId} currentRevision={concept.current_revision} />
+          </div>
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>判定・ステータスの履歴</h3>
+            <ConceptDecisionLogView conceptId={conceptId} />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
+
+      {/* 前提リンクの選択ダイアログ（P.4）＝検証プールの未リンク前提を選び criticality を付けて紐づける。 */}
+      {linkOpen && (
+        <Modal open onClose={() => setLinkOpen(false)} title="前提をリンク" size="md">
+          <ModalBody>
+            <p className="role-note" style={{ marginTop: 0 }}>検証プールの前提をこのコンセプトに紐づけます（前提はクエスト単位で共有・複数コンセプトで再利用）。</p>
+            {(() => {
+              const linkedIds = new Set(concept.assumptions.map((a) => a.assumption_id));
+              const candidates = (pool ?? []).filter((a) => !linkedIds.has(a.id));
+              if (pool === null) return <p className="muted">読み込み中…</p>;
+              if (candidates.length === 0) return <p className="muted text-sm">リンクできる前提がありません（検証プールが空、または全て紐づけ済み）。検証プールから前提を追加してください。</p>;
+              return (
+                <>
+                  <div className="field dialog-section is-quiet">
+                    <label htmlFor="link_assumption">前提を選択</label>
+                    <select id="link_assumption" className="select" value={linkSel} onChange={(e) => setLinkSel(e.target.value)}>
+                      <option value="">— 選択してください —</option>
+                      {candidates.map((a) => <option key={a.id} value={a.id}>{a.statement}</option>)}
+                    </select>
+                  </div>
+                  <div className="field dialog-section is-quiet">
+                    <label htmlFor="link_criticality">重要度</label>
+                    <select id="link_criticality" className="select" value={linkCrit} onChange={(e) => setLinkCrit(e.target.value as "critical" | "major" | "minor")}>
+                      <option value="critical">致命的</option>
+                      <option value="major">重要</option>
+                      <option value="minor">補助</option>
+                    </select>
+                  </div>
+                </>
+              );
+            })()}
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setLinkOpen(false)}>キャンセル</button>
+            <button type="button" className="btn btn-primary" disabled={!linkSel || busy} onClick={() => void doLink()}>リンク</button>
+          </ModalFooter>
+        </Modal>
+      )}
+
+      {/* 実績（検証）の追記ダイアログ（P.3・§4.4）＝手法/判定/実施日/規模/結果。実施日・規模は必須（エビデンスは古びる/検証の強さ）。 */}
+      {valDialog && (
+        <Modal open onClose={() => setValDialog(null)} title={valDialog.validationId ? "実績（検証）を編集" : "実績（検証）を入力"} size="md">
+          <ModalBody>
+            <FormSummary title="入力内容をご確認ください" errors={Object.values(valErrors).filter(Boolean)} innerRef={valSummaryRef} />
+            <p className="role-note" style={{ marginTop: 0 }}>この前提の検証結果を追記します（判定が反証に転じるとリンク先の全コンセプトが「要再評価」になります）。</p>
+            <Field className="dialog-section is-quiet" id="val_method" label="検証方法" required error={valErrors.method}>
+              <input id="val_method" className="input" value={valDialog.method} onChange={(e) => { setValDialog((d) => (d ? { ...d, method: e.target.value } : d)); setValErrors((x) => ({ ...x, method: "" })); }} placeholder="例: 想定顧客20名にインタビュー" />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_verdict" label="判定" required>
+              <select id="val_verdict" className="select" value={valDialog.verdict} onChange={(e) => setValDialog((d) => (d ? { ...d, verdict: e.target.value as "supported" | "refuted" | "inconclusive" } : d))}>
+                <option value="supported">支持</option>
+                <option value="refuted">反証</option>
+                <option value="inconclusive">保留</option>
+              </select>
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_date" label="検証実施日" required error={valErrors.validatedOn}>
+              <input id="val_date" type="date" className="input" value={valDialog.validatedOn} onChange={(e) => { setValDialog((d) => (d ? { ...d, validatedOn: e.target.value } : d)); setValErrors((x) => ({ ...x, validatedOn: "" })); }} />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_scale" label="規模（サンプル数/対象）" required error={valErrors.scale}>
+              <input id="val_scale" className="input" value={valDialog.scale} onChange={(e) => { setValDialog((d) => (d ? { ...d, scale: e.target.value } : d)); setValErrors((x) => ({ ...x, scale: "" })); }} placeholder="例: n=20 / 主要顧客3社" />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_result" label="結果（任意）">
+              <textarea id="val_result" className="textarea" rows={3} value={valDialog.result} onChange={(e) => setValDialog((d) => (d ? { ...d, result: e.target.value } : d))} placeholder="検証で分かったこと" />
+            </Field>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setValDialog(null)}>キャンセル</button>
+            <FormFooterError show={Object.values(valErrors).some(Boolean)} />
+            <button type="button" className="btn btn-primary" disabled={valSaving} onClick={() => void saveValidation()}>{valDialog.validationId ? "更新" : "追記"}</button>
+          </ModalFooter>
+        </Modal>
+      )}
     </main>
   );
 }

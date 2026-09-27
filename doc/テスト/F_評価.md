@@ -30,6 +30,9 @@
 | F-TC-106 | api | スコア範囲外は 422 | evaluator | `PUT`（score=0 or 6） | 422（`scores`） | F.2 |
 | F-TC-107 | api | 入力は evaluator 権限必須 | パーティー参加だが evaluator なし | `PUT` | 403 | F.0 |
 | F-TC-108 | api | 門番/可視性（非パーティー・下書きアイデア） | 非パーティー／draft アイデア | `PUT`／`GET me` | 404（存在秘匿・評価対象外） | F.0 |
+| F-TC-210 | api | 変更履歴＝確定ごとに版（下書きは版なし・§3.6） | evaluator | `PUT`（draft→submitted→submitted〔総評変更〕） | `GET me` の `revisions` が rev2＋rev1（新しい順・初版 changed_fields 空・rev2 に overall_comment） | §3.6／migration 0040 |
+| F-TC-211 | api | 同一内容の再確定は版を進めない（既存仕様踏襲） | evaluator | `PUT`（同値 submitted×2） | `revisions` は rev1 のみ | §3.6 |
+| F-TC-212 | api | 評価の確定版差分（text/scalar） | 2版 | `GET /ideas/{id}/evaluation/revisions/2/diff` | overall_comment＝text・scores＝scalar | §3.6 |
 | F-TC-109 | api | 完了クエストは書込凍結 | completed クエストの公開アイデア | `PUT` | 409（invalid_state） | F.0／C.5 |
 | F-TC-110 | api | 集計取得（観点別平均・総合・評価者一覧・coin.projected） | submitted 2名（evaluator 権限） | `GET .../evaluation` | `aspects`/`overall_avg`/`evaluator_count=2`/`evaluators[]`/`coin.projected` | F.1 |
 | F-TC-111 | api | limited は範囲外に完全非表示（分母にも入れない） | limited 評価（他評価者）＋party 評価 | 範囲外ユーザーで `GET .../evaluation` | limited を除外して集計・`evaluators[]` にも出ない | F.1 |

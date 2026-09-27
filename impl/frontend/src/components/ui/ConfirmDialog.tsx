@@ -51,7 +51,7 @@ function ConfirmDialog({ opts, onResolve }: { opts: ConfirmOptions; onResolve: (
   const confirmLabel = opts.confirmLabel ?? (variant === "danger" ? "削除する" : variant === "game" ? "購入する" : "OK");
   const cancelLabel = opts.cancelLabel ?? (variant === "game" ? "やめる" : "キャンセル");
   const confirmCls = variant === "danger" ? "btn btn-danger" : variant === "game" ? "btn-pixel" : "btn btn-primary";
-  const cancelCls = variant === "game" ? "btn-pixel btn-pixel--muted" : "btn btn-outline";
+  const cancelCls = variant === "game" ? "btn-pixel btn-pixel--muted" : "btn btn-outline dialog-close-left";
 
   const [show, setShow] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);

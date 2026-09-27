@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import difflib
 import uuid
 from datetime import date, datetime, timezone
 
@@ -16,6 +15,7 @@ from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
+from app.tenant._shared import revisions as rev_shared
 from app.tenant.info import derive
 from app.tenant.info import repository as repo
 from app.tenant.info.schemas import (
@@ -329,7 +329,7 @@ def get_info_detail(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str) 
             "editor_name": (creators.get(rv.editor_id).display_name if creators.get(rv.editor_id) else None),
             "created_at": rv.created_at,
             # 前版比の変更フィールド（初版=前版なしは空・§85＝変更内容を見せる）。
-            "changed_fields": _changed_fields(rev_changes.get(rv.revision - 1), rv.changes),
+            "changed_fields": rev_shared.changed_fields(rev_changes.get(rv.revision - 1), rv.changes, INFO_REVISION_FIELDS),
         } for rv in revisions]
         can = {
             "edit_content": item.created_by_id == user.id,  # 内容＝作成者のみ（status 非依存）
@@ -538,7 +538,7 @@ def get_info_revision_diff(account_id: uuid.UUID, company_id: uuid.UUID, info_id
             raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
         from_rev = repo.get_revision(ts, item.id, frm) if frm >= 1 else None
         old = from_rev.changes if from_rev is not None else {}
-        return {"from_revision": frm, "to_revision": revision, "fields": _diff_fields(old, to_rev.changes)}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, INFO_REVISION_FIELDS)}
 
 
 def _content_snapshot(ts, item) -> dict:
@@ -550,62 +550,14 @@ def _content_snapshot(ts, item) -> dict:
     }
 
 
-# 版で追跡する対象フィールド（§85）。テキスト系＝語句差分、その他＝{old,new}。
-_INFO_TEXT_FIELDS = ("title", "body_html")
-_INFO_TRACKED_FIELDS = ("title", "body_html", "source_url", "attachments")
-
-
-def _changed_fields(old: dict | None, new: dict) -> list[str]:
-    """前版スナップショット比較で変わったフィールド名（初版＝old None は空・§85）。"""
-    if old is None:
-        return []
-    changed = []
-    for f in _INFO_TRACKED_FIELDS:
-        # attachments 未追跡の旧スナップショット（本機能導入前）は比較対象外＝誤検知を防ぐ（None は「不明」）。
-        if f == "attachments" and old.get("attachments") is None:
-            continue
-        if old.get(f) != new.get(f):
-            changed.append(f)
-    return changed
-
-
-def _diff_fields(old: dict, new: dict) -> dict:
-    """2版のスナップショットから変わったフィールドの差分を算出（§85）。
-    title/body_html＝語句差分（body_html はタグを外しプレーンテキストで）・source_url/attachments＝{old,new}。"""
-    result: dict[str, dict] = {}
-    for f in _INFO_TRACKED_FIELDS:
-        ov, nv = old.get(f), new.get(f)
-        if f == "attachments" and ov is None:  # 未追跡の旧版は差分を出さない（誤検知防止・_changed_fields と一致）
-            continue
-        if ov == nv:
-            continue
-        if f == "body_html":  # 本文は表示用にプレーンテキスト化して差分（タグのノイズを出さない）
-            result[f] = {"kind": "text",
-                         "segments": _text_diff_segments(derive.to_plain_text(ov or "") or "", derive.to_plain_text(nv or "") or "")}
-        elif f == "title":
-            result[f] = {"kind": "text", "segments": _text_diff_segments(ov or "", nv or "")}
-        elif f == "attachments":  # 参考資料は表示名一覧を「・」連結で old→new（追加/削除が一目で分かる）
-            result[f] = {"kind": "scalar", "old": "・".join(ov or []), "new": "・".join(nv or [])}
-        else:  # source_url
-            result[f] = {"kind": "scalar", "old": ov, "new": nv}
-    return result
-
-
-def _text_diff_segments(old: str, new: str) -> list[dict]:
-    """文字単位の差分セグメント（equal/add/del）。日本語対応のため文字レベル SequenceMatcher（§85・アイデア D.4 と同）。"""
-    sm = difflib.SequenceMatcher(a=old, b=new, autojunk=False)
-    segments: list[dict] = []
-    for op, i1, i2, j1, j2 in sm.get_opcodes():
-        if op == "equal":
-            segments.append({"op": "equal", "text": old[i1:i2]})
-        elif op == "delete":
-            segments.append({"op": "del", "text": old[i1:i2]})
-        elif op == "insert":
-            segments.append({"op": "add", "text": new[j1:j2]})
-        elif op == "replace":
-            segments.append({"op": "del", "text": old[i1:i2]})
-            segments.append({"op": "add", "text": new[j1:j2]})
-    return segments
+# 版で追跡する対象フィールド（§85）＝共通エンジン（_shared.revisions）へ渡す仕様。
+# title＝語句差分／body_html＝タグを外しプレーンテキスト化して語句差分／source_url＝{old,new}／attachments＝表示名連結。
+INFO_REVISION_FIELDS = (
+    rev_shared.FieldSpec("title", "text"),
+    rev_shared.FieldSpec("body_html", "text", text_transform=derive.to_plain_text),
+    rev_shared.FieldSpec("source_url", "scalar"),
+    rev_shared.FieldSpec("attachments", "scalar", scalar_fmt=lambda v: "・".join(v or []), skip_when_old_none=True),
+)
 
 
 _CONTENT_FIELDS = {"title", "body_html", "source_url"}

@@ -208,6 +208,29 @@ export function updateQuestResult(questId: string, input: QuestOutcomeInput): Pr
 export function generateChatSummary(questId: string): Promise<QuestOutcome | null> {
   return apiFetch<QuestOutcome>(`/quests/${questId}/result/chat-summary`, { method: "POST" });
 }
+// 振り返り（総括）の版差分（変更履歴標準 §3.1・折り畳みUI の展開時に取得）。
+export type QuestOutcomeRevisionDiff = components["schemas"]["QuestOutcomeRevisionDiffResponse"];
+export function getQuestOutcomeRevisionDiff(questId: string, revision: number): Promise<QuestOutcomeRevisionDiff | null> {
+  return apiFetch<QuestOutcomeRevisionDiff>(`/quests/${questId}/result/revisions/${revision}/diff`);
+}
+
+// クエスト定義の変更履歴＋ステータス意思決定ログ（変更履歴標準 §3.1/§3.2・SC-12 リンクUI）。
+export type QuestRevisionList = components["schemas"]["QuestRevisionListResponse"];
+export type QuestRevisionDiff = components["schemas"]["QuestRevisionDiffResponse"];
+export type QuestDecisionLog = components["schemas"]["QuestDecisionLogResponse"];
+export function getQuestRevisions(questId: string, params?: { limit?: number; cursor?: string }): Promise<QuestRevisionList | null> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  const q = qs.toString();
+  return apiFetch<QuestRevisionList>(`/quests/${questId}/revisions${q ? `?${q}` : ""}`);
+}
+export function getQuestRevisionDiff(questId: string, revision: number): Promise<QuestRevisionDiff | null> {
+  return apiFetch<QuestRevisionDiff>(`/quests/${questId}/revisions/${revision}/diff`);
+}
+export function getQuestDecisionLog(questId: string): Promise<QuestDecisionLog | null> {
+  return apiFetch<QuestDecisionLog>(`/quests/${questId}/decision-log`);
+}
 
 // 下書きを公開（draft→recruiting・C.2・アトミック）。owner のみ・strict 検証。
 export function publishQuest(questId: string, input: QuestPublishInput): Promise<QuestDetail | null> {

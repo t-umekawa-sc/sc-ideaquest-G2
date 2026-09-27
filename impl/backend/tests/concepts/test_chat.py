@@ -21,6 +21,8 @@ from app.tenant.concepts.orm import (
     Concept,
     ConceptAssumptionLink,
     ConceptChatScope,
+    ConceptDecisionLog,
+    ConceptRevision,
 )
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
@@ -90,6 +92,9 @@ def env():
         ts.execute(ConceptChatScope.__table__.delete().where(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(ConceptAssumptionLink.__table__.delete().where(ConceptAssumptionLink.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))
+        # 前提リンクでコンセプト版が記録される（§4.4 版管理）ため、Concept 削除前に revisions/log を掃除。
+        ts.execute(ConceptRevision.__table__.delete().where(ConceptRevision.concept_id.in_(cids or [uuid.uuid4()])))
+        ts.execute(ConceptDecisionLog.__table__.delete().where(ConceptDecisionLog.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Concept.__table__.delete().where(Concept.quest_id.in_(quests or [uuid.uuid4()])))
         for qid in quests:
             ts.execute(QuestMemberPermission.__table__.delete().where(
@@ -134,6 +139,21 @@ def test_p_tc_502_create_group_permission(env, client):
     cid2 = env.seed_active_concept(q_other, author=env.other_id)
     r2 = client.post(f"/api/v1/concepts/{cid2}/chat-scopes", json={"label": "x"}, headers=_csrf(client))
     assert r2.status_code == 403
+
+
+def test_p_tc_507_multiple_group_scopes(env, client):
+    """P-TC-507: グループ・ルームは 1 コンセプトに複数作れる（§5.45・3〜5）。
+
+    回帰＝0033 の uq_concept_chat_scopes_kind が group を assumption_id NULL で潰し、2 個目以降が
+    500 UniqueViolation になっていた（受入不具合・migration 0036 で group を一意対象から除外）。
+    """
+    _login_seed(client)
+    cid = env.seed_active_concept(env.make_quest())
+    for label in ("A. 価値・対象・競合", "B. 解の形態", "C. 採算・事業性"):
+        r = client.post(f"/api/v1/concepts/{cid}/chat-scopes", json={"label": label}, headers=_csrf(client))
+        assert r.status_code == 201, f"{label}: {r.status_code} {r.text}"
+    groups = [s for s in client.get(f"/api/v1/concepts/{cid}/chat-scopes").json()["items"] if s["kind"] == "group"]
+    assert {g["label"] for g in groups} == {"A. 価値・対象・競合", "B. 解の形態", "C. 採算・事業性"}
 
 
 def test_p_tc_503_post_message_idempotent(env, client):

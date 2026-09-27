@@ -630,7 +630,7 @@ export function IdeaForm({ mode, questId, ideaId, locale = "ja", onDone, onCance
       </ModalBody>
       <ModalFooter>
         <FormFooterError show={summary.length > 0} />
-        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel} disabled={pending}>
           キャンセル
         </Button>
         {(!isEdit || isDraft) && (

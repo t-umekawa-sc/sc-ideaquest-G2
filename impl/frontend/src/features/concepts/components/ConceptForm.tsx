@@ -2,7 +2,7 @@
 
 // SC-60 コンセプト登録・編集フォーム（FR-42・P.2）。由来アイデア選択＋成果物スキーマ入力（viability=JSON）。
 // 入力前理解のためフォーム冒頭に ⓘ ガイダンス（デザイン標準§4.13）。正＝doc/画面設計/screens/SC-60_コンセプト登録編集.md。
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, Field, FormSummary, ModalBody, ModalFooter, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -16,7 +16,7 @@ type Props = {
   mode: "create" | "edit";
   questId?: string; // create で必須
   conceptId?: string; // edit で必須
-  onDone: () => void;
+  onDone: (to?: string) => void; // 作成成功時は遷移先(/concepts/{id})を渡す＝呼び出し側が閉じ＋遷移を担う
   onCancel: () => void;
 };
 
@@ -72,10 +72,12 @@ function inputGuide(key: string): React.ReactNode {
 }
 
 export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Props) {
-  const router = useRouter();
   const snack = useSnackbar();
+  const searchParams = useSearchParams();
   const { summaryRef, notify } = useFormErrorNotice();
   const isEdit = mode === "edit";
+  // 複製＝作成モードで ?dup={元コンセプトID} を受け、元の内容をプリフィル（新規 POST＝別レコード）。
+  const dupFrom = mode === "create" ? searchParams.get("dup") : null;
 
   const [title, setTitle] = useState("");
   const [problem, setProblem] = useState("");
@@ -118,6 +120,31 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
     });
     return () => { alive = false; };
   }, [isEdit, conceptId]);
+
+  // 複製＝元コンセプトの内容をプリフィル（作成モード・同一クエスト）。名前は「（複製）」を付けて区別。
+  useEffect(() => {
+    if (isEdit || !dupFrom) return;
+    let alive = true;
+    getConcept(dupFrom).then((c) => {
+      if (!alive || !c) return;
+      setTitle(`${c.title}（複製）`);
+      setProblem(c.problem ?? "");
+      setValueProp(c.value_proposition ?? "");
+      setTarget(c.target ?? "");
+      setDifferentiation(c.differentiation ?? "");
+      setSolutionForm(c.solution_form ?? "");
+      const via = { ...(c.viability ?? {}) } as Record<string, unknown>;
+      const known: Record<string, string> = {};
+      for (const f of VIABILITY_FIELDS) {
+        if (typeof via[f.key] === "string") known[f.key] = via[f.key] as string;
+        delete via[f.key];
+      }
+      setViab(known);
+      setViabExtra(via);
+      setSourceIdeas(c.source_ideas.map((s) => s.idea_id));
+    });
+    return () => { alive = false; };
+  }, [isEdit, dupFrom]);
 
   // 由来アイデア候補＝同一クエストの公開アイデア（P.2 スコープ）。
   useEffect(() => {
@@ -170,8 +197,9 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
       if (publish && targetId) await activateConcept(targetId);
       window.dispatchEvent(new CustomEvent(CONCEPTS_CHANGED_EVENT));
       snack({ type: "success", title: publish ? "コンセプトを投稿しました（公開）" : "下書きを保存しました" });
+      // 作成/複製/編集いずれも「閉じるだけ」で詳細へは遷移しない（ユーザー要望 2026-09-26）。
+      // モーダルは閉じアニメ→router.back で元のコンセプトタブへ戻り、一覧は CONCEPTS_CHANGED_EVENT で更新される。
       onDone();
-      if (!isEdit && targetId) router.push(`/concepts/${targetId}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         setErrors({ title: "入力を確認してください。" });
@@ -202,7 +230,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
             dialogTitle="この画面について（ISO 56001 準拠）"
           >
             <div className="dialog-section"><div className="dialog-label">コンセプトとは</div><p style={{ margin: 0 }}>選別済みのアイデアを統合し、<strong>課題・機会／価値提案と対象／競合・差別化／解の形態と必要な能力／採算・事業性（viability）／前提と検証</strong>をまとめた、<strong>検証可能な提案</strong>です。</p></div>
-            <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>理解したうえでスキーマを入力し、後で前提を「証拠で」検証して Go/Pivot/Kill まで導きます。</p></div>
+            <div className="dialog-section"><div className="dialog-label">この画面の狙い</div><p style={{ margin: 0 }}>理解したうえでスキーマを入力し、後で前提を「証拠で」検証して 推進/方向転換/中止 まで導きます。</p></div>
           </ScreenPurpose>
         </div>
 
@@ -256,7 +284,7 @@ export function ConceptForm({ mode, questId, conceptId, onDone, onCancel }: Prop
         </div>
       </ModalBody>
       <ModalFooter>
-        <Button type="button" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>キャンセル</Button>
         <Button type="button" variant="outline" disabled={pending !== null} loading={pending === "draft"} onClick={() => void submit(false)}>下書き保存</Button>
         <Button type="button" variant="primary" disabled={pending !== null} loading={pending === "publish"} onClick={() => void submit(true)}>投稿する</Button>
       </ModalFooter>

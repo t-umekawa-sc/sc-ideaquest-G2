@@ -295,6 +295,8 @@ class QuestDetailDTO(BaseModel):
     created_at: datetime
     # 発見カタログ掲載可否（SC-11 編集フォームのトグル プリフィル・FR-40・C.9.0）。
     discoverable: bool = False
+    # 定義の最新版番号（更新履歴リンク用・0＝未編集＝リンク非表示・§3.1）。
+    current_revision: int = 0
 
 
 class QuestIconImageResponse(BaseModel):
@@ -464,8 +466,81 @@ class QuestResultDTO(BaseModel):
     participation: QuestResultParticipationDTO = QuestResultParticipationDTO()
     pinned_messages: list[QuestResultPinnedMessageDTO] = []  # ④議論の要点(b)＝ピン留めメッセージ
     outcome: QuestOutcomeDTO = QuestOutcomeDTO()
+    outcome_revisions: list[QuestOutcomeRevisionDTO] = []  # 振り返りの変更履歴（折り畳みUI・§3.1）
     adopted_info: list[QuestResultAdoptedInfoDTO] = []  # ⑥採用された関連情報（FR-41 Phase2）
     can_edit: bool = False  # owner/quest_admin（④⑤の編集可否）
+
+
+class QuestOutcomeRevisionDTO(BaseModel):
+    """振り返り（総括）内容の版1行（SC-12 結果タブ 折り畳みUI・§3.1）。"""
+    revision: int
+    editor_name: str | None = None
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+
+
+class QuestOutcomeDiffSegment(BaseModel):
+    op: Literal["equal", "add", "del"]
+    text: str
+
+
+class QuestOutcomeDiffField(BaseModel):
+    kind: Literal["text", "scalar"]
+    segments: list[QuestOutcomeDiffSegment] | None = None
+    old: str | None = None
+    new: str | None = None
+
+
+class QuestOutcomeRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, QuestOutcomeDiffField] = {}
+
+
+# ---- クエスト定義の変更履歴＋ステータスログ（§3.1/§3.2・SC-12 リンクUI） ----
+
+class QuestRevisionEditorDTO(BaseModel):
+    user_id: str | None = None
+    display_name: str | None = None
+    avatar_image_url: str | None = None
+
+
+class QuestRevisionDTO(BaseModel):
+    revision: int
+    editor: QuestRevisionEditorDTO
+    created_at: datetime
+    changed_fields: list[str] = []
+    memo: str | None = None
+
+
+class QuestRevisionCursorPageInfo(BaseModel):
+    next_cursor: str | None = None
+    has_next: bool = False
+
+
+class QuestRevisionListResponse(BaseModel):
+    data: list[QuestRevisionDTO] = []
+    page_info: QuestRevisionCursorPageInfo = QuestRevisionCursorPageInfo()
+
+
+class QuestRevisionDiffResponse(BaseModel):
+    from_revision: int
+    to_revision: int
+    fields: dict[str, QuestOutcomeDiffField] = {}  # 差分フィールド形は共通（text=segments／scalar=old/new）
+
+
+class QuestDecisionLogEntryDTO(BaseModel):
+    kind: str  # status
+    from_value: str | None = None
+    to_value: str
+    actor: QuestRevisionEditorDTO
+    reason: str | None = None
+    created_at: datetime
+
+
+class QuestDecisionLogResponse(BaseModel):
+    data: list[QuestDecisionLogEntryDTO] = []
 
 
 class QuestOutcomeUpdateRequest(BaseModel):

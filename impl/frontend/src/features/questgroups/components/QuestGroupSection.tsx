@@ -271,7 +271,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
           </ModalBody>
           <ModalFooter>
             <FormFooterError show={Boolean(formError)} />
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setShowForm(false)}>
               キャンセル
             </Button>
             <Button type="submit" variant="primary" loading={pending}>
@@ -302,7 +302,7 @@ export function QuestGroupSection(props: QuestGroupSectionProps) {
           </ModalBody>
           <ModalFooter>
             <FormFooterError show={Boolean(editError)} />
-            <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={() => setEditing(null)}>
               キャンセル
             </Button>
             <Button type="submit" variant="primary" loading={editPending}>

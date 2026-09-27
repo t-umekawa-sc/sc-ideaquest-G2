@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -162,3 +162,46 @@ class QuestOutcome(CompanyBase):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+
+class QuestOutcomeRevision(CompanyBase):
+    """振り返り（総括）内容の版（変更履歴標準 §3.1・§10 改善の記録）。"""
+
+    __tablename__ = "quest_outcome_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB(), nullable=False)  # summary/learnings/next_actions/metrics
+    memo: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class QuestRevision(CompanyBase):
+    """クエスト定義（title/purpose/color/deadline/categories）の版（変更履歴標準 §3.1）。"""
+
+    __tablename__ = "quest_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB(), nullable=False)
+    memo: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class QuestDecisionLog(CompanyBase):
+    """クエストのステータス遷移の追記型ログ（変更履歴標準 §3.2）。"""
+
+    __tablename__ = "quest_decision_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # status
+    from_value: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    to_value: Mapped[str] = mapped_column(Text(), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

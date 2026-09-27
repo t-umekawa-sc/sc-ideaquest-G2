@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Button, Field, FormFooterError, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Button, Field, FormFooterError, FormSummary, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { readDuplicatePrefill } from "@/lib/forms/duplicate";
 import {
@@ -171,8 +171,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
     if (!email.trim()) fe.email = "メールアドレスを入力してください。";
     setFieldErrors(fe);
     if (Object.keys(fe).length > 0) {
-      setFormError("入力内容をご確認ください。");
-      notify(Object.values(fe));
+      notify(Object.values(fe)); // 上部サマリ（FormSummary）はタイトルで案内・各項目は list とインライン枠に出す（§4.7）
       return;
     }
     // 編集で無変更なら API を呼ばず info「変更はありません」で閉じる（発行=新規は対象外・デザイン標準 §14）。
@@ -274,7 +273,7 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
   return (
     <form onSubmit={onSubmit} noValidate>
       <ModalBody>
-        {formError && <div className="form-error" role="alert" ref={summaryRef} tabIndex={-1}>{formError}</div>}
+        <FormSummary title="入力内容をご確認ください" errors={[...(formError ? [formError] : []), ...Object.values(fieldErrors).filter(Boolean) as string[]]} innerRef={summaryRef} />
         <Field className="dialog-section is-quiet" id={`${idPrefix}_name`} label="氏名" required error={fieldErrors.display_name}>
           <input id={`${idPrefix}_name`} className="input" value={displayName} onChange={(e) => { setDisplayName(e.target.value); if (fieldErrors.display_name) setFieldErrors((p) => ({ ...p, display_name: undefined })); }} required />
         </Field>
@@ -321,8 +320,8 @@ export function AccountFormPanel({ mode, scope, companyId, accountId, onDone, on
         )}
       </ModalBody>
       <ModalFooter>
-        <FormFooterError show={Boolean(formError)} />
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <FormFooterError show={Boolean(formError) || Object.values(fieldErrors).some(Boolean)} />
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel}>
           キャンセル
         </Button>
         <Button type="submit" variant="primary" loading={pending}>

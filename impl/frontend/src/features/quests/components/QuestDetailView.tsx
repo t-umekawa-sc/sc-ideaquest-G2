@@ -10,8 +10,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QUEST_SCROLL_KEY } from "@/lib/nav";
 
-import { ActivitySpark, Avatar, DataTable, RowMenu, LoadingOverlay, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, DataTable, Modal, ModalBody, ModalFooter, RowMenu, LoadingOverlay, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { QuestDecisionLogView, QuestRevisionHistory } from "./QuestHistory";
 import { searchQuest, type SearchRow, type SearchType } from "@/features/search/api";
 import { parseSnippet } from "@/features/search/snippet";
 import { getRankings, type RankingResponse } from "@/features/ranking/api";
@@ -37,7 +38,7 @@ import {
   type QuestActivity,
   type QuestDetail,
 } from "../api";
-import { IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
+import { deleteIdea, IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
 import "../quests.css";
 
@@ -92,14 +93,16 @@ function statusBadgeClass(s: string): string {
 const PERM_BADGE: Record<string, string> = { owner: "👑 所有者", quest_admin: "クエスト管理", evaluator: "評価者", vote: "投票", idea_create: "作成", comment: "コメント" };
 const PERM_VIEW_ORDER = ["owner", "quest_admin", "evaluator", "vote", "idea_create", "comment"];
 
+// 並び順＝価値創造の流れ（アイデア→コンセプト）を先頭に、検索はコンテンツ横断ユーティリティとして隣接、
+// パーティー（人・管理）を後方、結果を culmination として最右（2026-09-26 ユーザー決定）。
 const TABS = [
   { key: "ideas", label: "💡 アイデア" },
-  { key: "party", label: "👥 パーティー" },
-  { key: "search", label: "🔍 全文検索" },
-  // 🏁 結果＝クエスト最終結果（FR-39・アイデア選別の申し送り）。completed のときのみ表示（下の filter）。
-  { key: "result", label: "🏁 結果" },
-  // 🧩 コンセプト＝ISO ②③段の候補コンセプト＋検証プール（FR-42・§4.6）。🏁結果の申し送りを受けて次段へ。
+  // 🧩 コンセプト＝ISO 56001 ②③段の候補コンセプト＋検証プール（FR-42・§4.6）。アイデア選別を受けて創造/検証する段。
   { key: "concept", label: "🧩 コンセプト" },
+  { key: "search", label: "🔍 全文検索" },
+  { key: "party", label: "👥 パーティー" },
+  // 🏁 結果＝クエストの最終成果（FR-39）。アイデア選別の申し送り＋勝ち残ったコンセプト（判定/選定）。最右に固定。
+  { key: "result", label: "🏁 結果" },
   // レビュー#3＝「概要」タブは廃止（ヘッダーのタイトル/状態/カテゴリ/目的/締切/所有者と重複するため）。
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -165,6 +168,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（SC-12・日次スパーク）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1/§3.2）
   const [ideas, setIdeas] = useState<Idea[] | null>(null); // アイデアタブ（D.1・null=読み込み中）
   const [ideasError, setIdeasError] = useState<string | null>(null);
   // レビュー#3＝一覧上部のステータス絞り込み（動線＝すべて/未投票/フォロー中/自分の下書き）。DataTable の前段で data を絞る。
@@ -447,6 +451,46 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // クエスト内アクティビティ（SC-12 §4.1c・FR-36・公開種別のみ・門番=パーティー所属）。
   const loadQuestFeed = useCallback((cursor?: string | null) => getQuestActivities(questId, cursor), [questId]);
 
+  // アイデア行の操作メニュー（⋯）＝リスト操作列とカード右下で共用。未投票=クイック投票／下書き=続き／
+  // 他=チャット/詳細。削除＝投稿者本人 or owner/quest_admin（D.2・論理削除・子は監査保持）。
+  const ideaMenu = (r: Idea): RowMenuItem[] => {
+    const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
+    const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
+    const items: RowMenuItem[] = r.draft
+      ? [{ label: "下書きを続ける", onClick: goIdea }]
+      : [
+          // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
+          ...(r.mystate === "unvoted" && quest?.status !== "completed"
+            ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
+               { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
+            : []),
+          { label: "💬 チャットを開く", onClick: goChat },
+          { label: "詳細を開く", onClick: goIdea },
+        ];
+    if (r.mystate === "mine" || canEdit) {
+      items.push({
+        label: "削除",
+        danger: true,
+        onClick: async () => {
+          const ok = await confirm({
+            variant: "danger",
+            title: "アイデアを削除",
+            msg: `「${r.title}」を削除しますか？ 一覧・詳細から見えなくなります（議論・投票等は監査のため保持されます）。`,
+          });
+          if (!ok) return;
+          try {
+            await deleteIdea(r.id);
+            window.dispatchEvent(new Event(IDEAS_CHANGED_EVENT));
+            snack({ type: "success", title: "アイデアを削除しました" });
+          } catch {
+            snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再度お試しください。" });
+          }
+        },
+      });
+    }
+    return items;
+  };
+
   // アイデア一覧の列（標準 DataTable にレビュー#3 の機能を追加）＝提案価値（中身の判断）・あなた/フォロー/評価の
   // enum フィルタ（動線集約）・操作列（未投票=クイック投票／下書き=続き／投票済=チャット）。行/カードのボタンは
   // DataTable が行クリックから除外（a,button,input,select,label）＝遷移と両立。
@@ -469,23 +513,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         ? (r.ev >= 0 ? <span className={`badge ${r.ev >= 4 ? "badge-success" : "badge-muted"}`}>{r.ev}/5</span> : <span className="badge badge-muted">評価済</span>)
         : <span className="badge">評価待ち</span>) },
     { key: "act", label: "操作", actions: true, width: 64, csvVal: () => "",
-      render: (r) => {
-        // リストの操作メニュー（⋯）。未投票は「賛成/反対」を選べる（レビュー#3）。下書きは続き、他はチャット/詳細。
-        const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
-        const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
-        const items: RowMenuItem[] = r.draft
-          ? [{ label: "下書きを続ける", onClick: goIdea }]
-          : [
-              // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
-              ...(r.mystate === "unvoted" && quest?.status !== "completed"
-                ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
-                   { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
-                : []),
-              { label: "💬 チャットを開く", onClick: goChat },
-              { label: "詳細を開く", onClick: goIdea },
-            ];
-        return <RowMenu items={items} />;
-      } },
+      render: (r) => <RowMenu items={ideaMenu(r)} /> },
   ];
 
   // クエリ/対象の変更でページを先頭へ戻す。
@@ -562,6 +590,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                     if (gs.length === 0) return <span>🗂 参加部署: 全社（部署条件なし）</span>;
                     return <span>🗂 参加部署: {gs.map((g) => g.name).join("・")}{gs.length > 1 ? `（${gs.length}部署）` : ""}</span>;
                   })()}
+                  {quest.current_revision > 0 && (
+                    <span>
+                      🔄 <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>版 {quest.current_revision}（履歴）</button>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -744,33 +777,39 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               cardRaw={(r) => (
                 // カード表示＝ダッシュボードの「未投票のアイデア」カード（vote-card）と共通の見た目（レビュー#3）。
                 // 未投票＝クイック投票▲/▼／投票済＝結果表示／下書き＝続き。中身（提案価値）を見て判断できる。
-                <article className={"card card-accent vote-card idea-card" + (r.mystate === "voted" ? " is-voted" : "")}>
-                  {/* 上段＝アイコン（左）＋未投票/フォロー等のアクション（右）。件名は下の全幅行に（2段組にしない）。 */}
-                  <div className="idea-card__top">
-                    <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
-                    <span className="idea-card__actions">
-                      {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
-                      <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
-                      {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
-                    </span>
-                  </div>
-                  {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
-                  <Link className="card-title idea-card__title" href={`/ideas/${r.id}`} title={r.title} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
-                  {r.value && <div className="vote-card__value">{r.value}</div>}
-                  <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
-                  {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
-                  {r.draft ? (
-                    <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
-                  ) : r.mystate === "unvoted" ? (
-                    <div className="vote-actions">
-                      {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}
-                      <button type="button" className={`vote-quick agree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
-                      <button type="button" className={`vote-quick disagree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                // ⋯ メニューはカード右上角（バッジ行の一段上）に絶対配置＝クエストカードと統一（ユーザー要望）。
+                <div className="idea-card-wrap" style={{ position: "relative" }}>
+                  <article className={"card card-accent vote-card idea-card" + (r.mystate === "voted" ? " is-voted" : "")}>
+                    {/* 上段＝アイコン（左）＋未投票/フォロー等のアクション（右）。件名は下の全幅行に（2段組にしない）。 */}
+                    <div className="idea-card__top">
+                      <QuestIcon name={r.title} color={quest.color} imageUrl={r.iconUrl ?? undefined} size="sm" />
+                      <span className="idea-card__actions">
+                        {r.revision > 1 && <span className="badge badge-muted" title="編集された（版あり）">🔄</span>}
+                        <span className={`badge ${YOU[r.mystate][1]}`}>{YOU[r.mystate][0]}</span>
+                        {!r.draft && <button type="button" className={"idea-follow" + (r.following ? " is-on" : "")} aria-pressed={r.following} title={r.following ? "フォロー解除" : "フォロー"} onClick={() => void toggleFollow(r.id, r.following)}>★</button>}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
-                  )}
-                </article>
+                    {/* 件名＝パネル幅いっぱいの全幅行（ホバーで全文）。 */}
+                    <Link className="card-title idea-card__title" href={`/ideas/${r.id}`} title={r.title} onClick={() => markIdeaFromQuest(questId)}>{r.title}</Link>
+                    {r.value && <div className="vote-card__value">{r.value}</div>}
+                    <div className="vote-card__poster poster"><Avatar name={r.poster} imageUrl={r.posterAvatar ?? undefined} size="sm" /><span className="name text-sm muted">投稿: {r.poster}</span></div>
+                    {!r.draft && <Link className="dash-chat-link" href={`/ideas/${r.id}/chat`} onClick={() => markIdeaFromQuest(questId)}>💬 チャットで議論{r.comments > 0 ? `（${r.comments}）` : ""}</Link>}
+                    {r.draft ? (
+                      <div className="vote-actions"><Link className="btn btn-outline" style={{ flex: 1, justifyContent: "center" }} href={`/ideas/${r.id}`} onClick={() => markIdeaFromQuest(questId)}>下書きを続ける</Link></div>
+                    ) : r.mystate === "unvoted" ? (
+                      <div className="vote-actions">
+                        {/* 完了クエストは投票凍結＝カードのクイック投票も事前無効化（is-frozen・SC-22 と統一）。 */}
+                        <button type="button" className={`vote-quick agree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "approve")}>▲ 賛成</button>
+                        <button type="button" className={`vote-quick disagree${questCompleted ? " is-frozen" : ""}`} disabled={questCompleted} title={questCompleted ? "完了したクエストでは投票できません" : undefined} onClick={() => void quickVote(r.id, "oppose")}>▼ 反対</button>
+                      </div>
+                    ) : (
+                      <div className="vote-voted-note">あなたの投票: {r.myVote === "approve" ? "▲ 賛成" : "▼ 反対"} ・ 賛成{r.agree} / 反対{r.disagree}</div>
+                    )}
+                  </article>
+                  <div className="idea-card__menu" style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-2)" }}>
+                    <RowMenu items={ideaMenu(r)} />
+                  </div>
+                </div>
               )}
             />
           )}
@@ -781,7 +820,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       {tab === "search" && (
         <section aria-label="全文検索">
           <div className="list-toolbar">
-            <div className="filters">
+            <div className="filters" data-sp-host>
               <input className="input ft-q" type="search" placeholder="キーワードで全文検索" aria-label="全文検索" value={ftq} onChange={(e) => setFtq(e.target.value)} />
               <select className="select" style={{ width: "auto" }} aria-label="検索対象" value={ftScope} onChange={(e) => setFtScope(e.target.value)}>
                 <option value="">対象: すべて</option>
@@ -789,6 +828,16 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
                 <option value="chat">チャット</option>
                 <option value="attachment">添付ファイル名</option>
               </select>
+              {/* 対象ごとに検索する項目（列名）を ⓘ で明示（デザイン標準 §4.13・ユーザー要望）。列は backend search（PGroonga・J）と一致。 */}
+              <ScreenPurpose
+                summary="対象ごとの検索項目：アイデア＝タイトル・本文・価値・補足／チャット＝メッセージ本文／添付ファイル名＝ファイル名。「すべて」は3種を横断。"
+                dialogTitle="全文検索の対象について"
+              >
+                <div className="dialog-section"><div className="dialog-label">対象＝すべて</div><p style={{ margin: 0 }}>下記3種を横断して検索します（このクエスト内・公開アイデアのみ）。</p></div>
+                <div className="dialog-section"><div className="dialog-label">アイデア</div><p style={{ margin: 0 }}>タイトル・本文・狙う価値・補足（note）を対象に検索します。</p></div>
+                <div className="dialog-section"><div className="dialog-label">チャット</div><p style={{ margin: 0 }}>アイデアの議論チャットの<strong>メッセージ本文</strong>を対象に検索します。</p></div>
+                <div className="dialog-section"><div className="dialog-label">添付ファイル名</div><p style={{ margin: 0 }}>アイデア／チャットに添付されたファイルの<strong>ファイル名</strong>を対象に検索します（ファイルの中身は対象外）。</p></div>
+              </ScreenPurpose>
             </div>
             {ftq.trim() && <span className="list-count">{ftTotal} 件</span>}
           </div>
@@ -922,9 +971,29 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
       {/* 🏁 結果（FR-39・アイデア選別の申し送り・completed 時のみタブが出る） */}
       {tab === "result" && <QuestResultTab questId={questId} quest={quest} />}
 
-      {tab === "concept" && <ConceptTab questId={questId} />}
+      {tab === "concept" && <ConceptTab questId={questId} canManage={canEdit} />}
 
-      {/* 概要（実接続・C.1） */}
+      {/* 更新履歴モーダル（定義の版＋ステータスログ・§3.1/§3.2・アイデア SC-22 と同型） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="クエストの更新履歴" size="lg">
+        <ModalBody>
+          {/* 参照系ダイアログ＝項目間に仕切り線（.dialog-section の border-top・デザイン標準 §4.1）。 */}
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>定義の変更履歴</h3>
+            <p className="role-note" style={{ marginTop: 0 }}>
+              クエスト定義（名称/目的/カラー/締切/カテゴリー）の変更を新しい順に。各版を開くと差分（
+              <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+            </p>
+            <QuestRevisionHistory questId={questId} />
+          </div>
+          <div className="dialog-section">
+            <h3 style={{ marginTop: 0 }}>ステータスの履歴</h3>
+            <QuestDecisionLogView questId={questId} />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
     </section>
   );
 }

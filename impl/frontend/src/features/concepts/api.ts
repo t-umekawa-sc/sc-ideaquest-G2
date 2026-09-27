@@ -31,12 +31,94 @@ export function getConcept(conceptId: string): Promise<ConceptDetail | null> {
   return apiFetch<ConceptDetail>(`/concepts/${conceptId}`);
 }
 
+// ---- 変更履歴（内容の版＋意思決定ログ・§3.1/§3.2） ----
+export type ConceptRevisionList = components["schemas"]["ConceptRevisionListResponse"];
+export type ConceptRevisionDiff = components["schemas"]["ConceptRevisionDiffResponse"];
+export type ConceptDecisionLog = components["schemas"]["ConceptDecisionLogResponse"];
+
+export function getConceptRevisions(conceptId: string, params?: { limit?: number; cursor?: string }): Promise<ConceptRevisionList | null> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  const q = qs.toString();
+  return apiFetch<ConceptRevisionList>(`/concepts/${conceptId}/revisions${q ? `?${q}` : ""}`);
+}
+
+export function getConceptRevisionDiff(conceptId: string, revision: number): Promise<ConceptRevisionDiff | null> {
+  return apiFetch<ConceptRevisionDiff>(`/concepts/${conceptId}/revisions/${revision}/diff`);
+}
+
+export function getConceptDecisionLog(conceptId: string): Promise<ConceptDecisionLog | null> {
+  return apiFetch<ConceptDecisionLog>(`/concepts/${conceptId}/decision-log`);
+}
+
+// 自分のコンセプト評価の確定版差分（変更履歴標準 §3.6・折り畳みUI の展開時に取得）。
+export type ConceptEvalRevisionDiff = components["schemas"]["ConceptEvalRevisionDiffResponse"];
+export function getConceptEvalRevisionDiff(conceptId: string, revision: number): Promise<ConceptEvalRevisionDiff | null> {
+  return apiFetch<ConceptEvalRevisionDiff>(`/concepts/${conceptId}/evaluation/revisions/${revision}/diff`);
+}
+
 export function listConcepts(questId: string): Promise<ConceptListResponse | null> {
   return apiFetch<ConceptListResponse>(`/quests/${questId}/concepts`);
 }
 
+// 前提の作成（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
+export function createAssumption(questId: string, statement: string): Promise<AssumptionDetail | null> {
+  return apiFetch<AssumptionDetail>(`/quests/${questId}/assumptions`, { method: "POST", body: JSON.stringify({ statement }) });
+}
+
 export function listAssumptions(questId: string): Promise<AssumptionListResponse | null> {
   return apiFetch<AssumptionListResponse>(`/quests/${questId}/assumptions`);
+}
+
+// 前提の編集（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
+export function patchAssumption(assumptionId: string, statement: string): Promise<AssumptionDetail | null> {
+  return apiFetch<AssumptionDetail>(`/assumptions/${assumptionId}`, { method: "PATCH", body: JSON.stringify({ statement }) });
+}
+
+// 前提の削除（P.3・論理削除）。
+export function deleteAssumption(assumptionId: string): Promise<null> {
+  return apiFetch(`/assumptions/${assumptionId}`, { method: "DELETE" });
+}
+
+type Criticality = "critical" | "major" | "minor";
+
+// 前提をコンセプトに紐づける（P.4・link・criticality 指定）。
+export function linkAssumption(conceptId: string, assumptionId: string, criticality: Criticality = "major"): Promise<unknown> {
+  return apiFetch(`/concepts/${conceptId}/assumptions`, { method: "POST", body: JSON.stringify({ assumption_id: assumptionId, criticality }) });
+}
+
+// リンクの criticality 変更（P.4）。
+export function patchLink(conceptId: string, assumptionId: string, criticality: Criticality): Promise<unknown> {
+  return apiFetch(`/concepts/${conceptId}/assumptions/${assumptionId}`, { method: "PATCH", body: JSON.stringify({ criticality }) });
+}
+
+// 前提のリンク解除（P.4）。
+export function unlinkAssumption(conceptId: string, assumptionId: string): Promise<null> {
+  return apiFetch(`/concepts/${conceptId}/assumptions/${assumptionId}`, { method: "DELETE" });
+}
+
+export type Validation = components["schemas"]["ValidationDTO"];
+export type ValidationInput = components["schemas"]["ValidationCreateRequest"];
+
+// 検証（実績）の追記（P.3・検証プール所有＝owner/quest_admin）。refuted は反証波及を発火。
+export function addValidation(assumptionId: string, body: ValidationInput): Promise<components["schemas"]["ValidationAddResponse"] | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+// 検証履歴（時系列・新しい順）。
+export function listValidations(assumptionId: string): Promise<{ items: Validation[] } | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations`);
+}
+
+// 検証（実績）の編集（プール所有・編集はリンク先コンセプトの版に記録）。
+export function patchValidation(assumptionId: string, validationId: string, body: ValidationInput): Promise<components["schemas"]["ValidationAddResponse"] | null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations/${validationId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// 検証（実績）の削除（プール所有・削除もコンセプトの版に記録）。
+export function deleteValidation(assumptionId: string, validationId: string): Promise<null> {
+  return apiFetch(`/assumptions/${assumptionId}/validations/${validationId}`, { method: "DELETE" });
 }
 
 // ---- 登録・編集・遷移・選定・判定（P.2） ----
@@ -47,6 +129,11 @@ export function createConcept(questId: string, body: ConceptCreateInput): Promis
 
 export function patchConcept(conceptId: string, body: ConceptPatchInput): Promise<ConceptDetail | null> {
   return apiFetch<ConceptDetail>(`/concepts/${conceptId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// 論理削除（P.2・作成者 or owner/quest_admin）。子データは監査保持。
+export function deleteConcept(conceptId: string): Promise<null> {
+  return apiFetch(`/concepts/${conceptId}`, { method: "DELETE" });
 }
 
 export function activateConcept(conceptId: string): Promise<ConceptDetail | null> {

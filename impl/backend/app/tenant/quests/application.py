@@ -31,6 +31,7 @@ from app.tenant.profile.orm import User
 from app.tenant.quest_group import repository as qg_repo
 from app.tenant.quests import repository as repo
 from app.tenant.quests.schemas import PERMISSION_VALUES
+from app.tenant._shared import revisions as rev_shared
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +393,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
             if info_repo.find_link(ts, info_uuid, "quests", quest.id) is None:
                 info_repo.create_link(ts, info_item_id=info_uuid, target_type="quests",
                                       target_id=quest.id, kind="related", origin="manual")
+        _record_quest_revision_if_changed(ts, quest, user.id)  # 初版（定義スナップ・§3.1）
         detail = _build_detail(ts, quest, user.id)
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         quest_id = quest.id
@@ -443,6 +445,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
                 categories=repo.list_categories(ts, quest.id),
             )
         new_deadline = quest.deadline.isoformat() if quest.deadline else None
+        _record_quest_revision_if_changed(ts, quest, user.id)  # 定義変更を版に記録（§3.1）
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
     _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・全体編集での除外も失効）
@@ -485,6 +488,8 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
             categories=repo.list_categories(ts, quest.id),
         )
         quest.status = "recruiting"
+        repo.add_quest_decision_log(ts, quest.id, kind="status", from_value="draft", to_value="recruiting", actor_id=user.id)  # §3.2
+        _record_quest_revision_if_changed(ts, quest, user.id)  # 公開時の内容確定も版に（§3.1）
         detail = _build_detail(ts, quest, user.id)
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         published_id = quest.id
@@ -656,6 +661,84 @@ def _outcome_dto(ts, row) -> dict:
     }
 
 
+# 振り返り（総括）の版で追跡するフィールド（§3.1）＝共通エンジン仕様。
+def _metrics_str(v) -> str:
+    if not v:
+        return ""
+    return " / ".join(f"{m.get('label', '')}: {m.get('value', '')}" for m in v)
+
+
+QUEST_OUTCOME_REVISION_FIELDS = (
+    rev_shared.FieldSpec("summary", "text"),
+    rev_shared.FieldSpec("learnings", "text"),
+    rev_shared.FieldSpec("next_actions", "text"),
+    rev_shared.FieldSpec("metrics", "scalar", scalar_fmt=_metrics_str),
+)
+_OUTCOME_EMPTY_SNAPSHOT = {"summary": None, "learnings": None, "next_actions": None, "metrics": []}
+
+
+def _outcome_snapshot(row) -> dict:
+    return {"summary": row.summary, "learnings": row.learnings, "next_actions": row.next_actions, "metrics": row.metrics or []}
+
+
+def _outcome_revisions_dto(ts, quest_id) -> list[dict]:
+    """総括の版タイムライン（折り畳みUIに埋め込む・新しい順・§3.1）。"""
+    rows = repo.list_outcome_revisions(ts, quest_id)
+    editors = repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+    rev_by_num = {r.revision: r for r in rows}
+    out = []
+    for r in rows:
+        prev = rev_by_num.get(r.revision - 1)
+        e = editors.get(r.editor_id)
+        out.append({
+            "revision": r.revision,
+            "editor_name": e.display_name if e else None,
+            "created_at": r.created_at,
+            "changed_fields": rev_shared.changed_fields(prev.changes if prev else None, r.changes, QUEST_OUTCOME_REVISION_FIELDS),
+            "memo": r.memo,
+        })
+    return out
+
+
+# クエスト定義の版で追跡するフィールド（§3.1）＝共通エンジン仕様。参加部署/権限は別意味＝含めない。
+QUEST_REVISION_FIELDS = (
+    rev_shared.FieldSpec("title", "text"),
+    rev_shared.FieldSpec("purpose", "text"),
+    rev_shared.FieldSpec("color", "scalar"),
+    rev_shared.FieldSpec("deadline", "scalar"),
+    rev_shared.FieldSpec("categories", "scalar", scalar_fmt=lambda v: "・".join(v or [])),
+    # 発見カタログ掲載（FR-40）・アイコン画像も定義編集＝版に記録（PATCH で編集可・silent no-bump を防ぐ・2026-09-26 監査）。
+    rev_shared.FieldSpec("discoverable", "scalar", scalar_fmt=lambda v: "掲載" if v else "非掲載"),
+    rev_shared.FieldSpec("icon_image_path", "scalar", scalar_fmt=lambda v: "（アイコン画像あり）" if v else "（アイコンなし）"),
+)
+_QUEST_EMPTY_SNAPSHOT = {"title": None, "purpose": None, "color": None, "deadline": None, "categories": [],
+                         "discoverable": False, "icon_image_path": None}
+
+
+def _quest_content_snapshot(ts, quest) -> dict:
+    return {
+        "title": quest.title, "purpose": quest.purpose, "color": quest.color,
+        "deadline": quest.deadline.isoformat() if quest.deadline else None,
+        "categories": sorted(c.label for c in repo.list_categories(ts, quest.id)),
+        "discoverable": bool(quest.discoverable),
+        "icon_image_path": quest.icon_image_path,
+    }
+
+
+def _record_quest_revision_if_changed(ts, quest, editor_id) -> None:
+    """クエスト定義が変わったら版を1件記録（無変更は版なし・§3.1）。初回は空スナップと比較。"""
+    after = _quest_content_snapshot(ts, quest)
+    last = repo.latest_quest_revision(ts, quest.id)
+    base = last.changes if last else _QUEST_EMPTY_SNAPSHOT
+    if rev_shared.changed_fields(base, after, QUEST_REVISION_FIELDS):
+        repo.add_quest_revision(ts, quest.id, revision=(last.revision + 1) if last else 1, editor_id=editor_id, changes=after)
+
+
+def _quest_rev_editor_dto(user) -> dict:
+    return {"user_id": str(user.id) if user else None, "display_name": user.display_name if user else None,
+            "avatar_image_url": _image_url(user.avatar_image_path) if user else None}
+
+
 def _adopted_info_for_result(ts, quest_id, idea_titles) -> list[dict]:
     """結果タブの「採用された関連情報」（C.8・FR-41 Phase2）＝N へ委譲（クエスト＋配下アイデア集約）。"""
     from app.tenant.info import application as info_service  # 遅延 import（循環回避）
@@ -753,6 +836,7 @@ def get_quest_result(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             },
             "pinned_messages": pinned_messages,
             "outcome": _outcome_dto(ts, repo.get_outcome(ts, qid)),
+            "outcome_revisions": _outcome_revisions_dto(ts, qid),
             "adopted_info": _adopted_info_for_result(ts, qid, idea_titles),
             "can_edit": _can_edit_outcome(ts, quest, user),
         }
@@ -815,6 +899,12 @@ def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id:
         if body.metrics is not None:
             fields["metrics"] = [{"label": m.label, "value": m.value} for m in body.metrics]
         row = repo.upsert_outcome(ts, qid, fields=fields, updated_by=user.id)
+        # 変更履歴＝内容が変わったら版を1件記録（無変更は版なし・§3.1）。初回は空スナップと比較。
+        after = _outcome_snapshot(row)
+        last = repo.latest_outcome_revision(ts, qid)
+        base = last.changes if last else _OUTCOME_EMPTY_SNAPSHOT
+        if rev_shared.changed_fields(base, after, QUEST_OUTCOME_REVISION_FIELDS):
+            repo.add_outcome_revision(ts, qid, revision=(last.revision + 1) if last else 1, editor_id=user.id, changes=after)
         # ⑥ 総括に実内容がある初回記入で少額XP（クエスト単位・本人1回・冪等・FR-39 §8-⑥）。局所 import で循環回避。
         if row.summary or row.learnings or row.next_actions:
             from app.tenant.gamification import ledger, repository as gami_repo
@@ -824,6 +914,111 @@ def update_quest_outcome(account_id: uuid.UUID, company_id: uuid.UUID, quest_id:
         dto = _outcome_dto(ts, row)
         ts.commit()
     return dto
+
+
+def get_quest_outcome_revision_diff(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, revision: int,
+                                    *, from_revision: int | None = None) -> dict:
+    """振り返り（総括）の版差分（§3.1）。既定＝前版比較。門番＝クエスト可視性。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        to_rev = repo.get_outcome_revision(ts, qid, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_outcome_revision(ts, qid, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, QUEST_OUTCOME_REVISION_FIELDS)}
+
+
+# ---- クエスト定義の変更履歴＋ステータスログ（§3.1/§3.2・SC-12 リンクUI） ----
+
+def get_quest_revisions(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, limit=50, cursor=None) -> dict:
+    """クエスト定義の版タイムライン（新しい順・§3.1）。門番＝クエスト可視性。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    cur = rev_shared.decode_revision_cursor(cursor) if cursor else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        rows = repo.list_quest_revisions(ts, qid, cursor=cur, limit=limit + 1)
+        has_next = len(rows) > limit
+        rows = rows[:limit]
+        editors = repo.get_users_by_ids(ts, {r.editor_id for r in rows})
+        data = []
+        for r in rows:
+            prev = repo.get_quest_revision(ts, qid, r.revision - 1) if r.revision > 1 else None
+            data.append({
+                "revision": r.revision,
+                "editor": _quest_rev_editor_dto(editors.get(r.editor_id)),
+                "created_at": r.created_at,
+                "changed_fields": rev_shared.changed_fields(prev.changes if prev else None, r.changes, QUEST_REVISION_FIELDS),
+                "memo": r.memo,
+            })
+        next_cursor = rev_shared.encode_revision_cursor(rows[-1].revision) if has_next and rows else None
+    return {"data": data, "page_info": {"next_cursor": next_cursor, "has_next": has_next}}
+
+
+def get_quest_revision_diff(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, revision: int, *, from_revision=None) -> dict:
+    """クエスト定義の版差分（§3.1）。既定＝前版比較。範囲外 404/422。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        to_rev = repo.get_quest_revision(ts, qid, revision)
+        if to_rev is None:
+            raise AppError(404, "not_found")
+        frm = from_revision if from_revision is not None else revision - 1
+        if frm > revision:
+            raise AppError(422, "validation_error", detail="from は revision 以下にしてください", errors=[{"field": "from"}])
+        from_rev = repo.get_quest_revision(ts, qid, frm) if frm >= 1 else None
+        old = from_rev.changes if from_rev is not None else {}
+        return {"from_revision": frm, "to_revision": revision, "fields": rev_shared.diff_fields(old, to_rev.changes, QUEST_REVISION_FIELDS)}
+
+
+def get_quest_decision_log(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str) -> dict:
+    """クエストのステータス遷移ログ（新しい順・§3.2）。門番＝クエスト可視性。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None or not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")
+        rows = repo.list_quest_decision_log(ts, qid)
+        actors = repo.get_users_by_ids(ts, {r.actor_id for r in rows})
+        data = [{
+            "kind": r.kind, "from_value": r.from_value, "to_value": r.to_value,
+            "actor": _quest_rev_editor_dto(actors.get(r.actor_id)), "reason": r.reason, "created_at": r.created_at,
+        } for r in rows]
+    return {"data": data}
 
 
 # ---- パーティー粒度（C.3・SC-12 パーティータブ）／状態遷移（C.5）／削除 ----
@@ -1014,6 +1209,7 @@ def transition_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
             )
         from_status = quest.status  # watch 通知（status_changed）の補足用に遷移前を保持
         quest.status = to
+        repo.add_quest_decision_log(ts, quest.id, kind="status", from_value=from_status, to_value=to, actor_id=user.id)  # §3.2
         result_recipients: list[uuid.UUID] = []
         if to == "completed":
             from app.tenant.gamification import ledger, repository as gami_repo
@@ -1357,6 +1553,8 @@ def _build_detail(ts, quest, viewer_id) -> dict:
         "members": member_dtos,
         "created_at": quest.created_at,
         "discoverable": bool(quest.discoverable),
+        # 更新履歴リンク用＝定義の最新版番号（未編集は 0＝リンク非表示）。§3.1
+        "current_revision": (lambda r: r.revision if r else 0)(repo.latest_quest_revision(ts, quest.id)),
     }
 
 

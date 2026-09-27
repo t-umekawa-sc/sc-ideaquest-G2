@@ -9,8 +9,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import CompanyBase
@@ -36,3 +36,16 @@ class EvaluationScore(CompanyBase):
     aspect: Mapped[str] = mapped_column(String(16), nullable=False)  # novelty/impact/feasibility/fit/cost
     score: Mapped[int] = mapped_column(Integer, nullable=False)  # 1..5（cost は低コストほど高得点）
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)  # 観点別コメント（任意）
+
+
+class EvaluationRevision(CompanyBase):
+    """アイデア評価の確定版スナップショット（変更履歴標準 §3.6・確定ごとに1版）。"""
+
+    __tablename__ = "evaluation_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("evaluations.id", ondelete="CASCADE"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    editor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)  # scores/comments/overall_comment/visibility
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

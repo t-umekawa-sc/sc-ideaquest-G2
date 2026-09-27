@@ -90,7 +90,7 @@ export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: strin
         <div className="field-note">下書きクエストとして作成します。<strong>参加部署・パーティー・6権限・カラー・公開</strong>は、作成後のクエスト編集（SC-11）で設定してください。</div>
       </div>
       <div className="modal__footer">
-        <button className="btn btn-outline" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onCancel} disabled={saving}>キャンセル</button>
         <button className="btn btn-primary" type="button" onClick={create} disabled={saving}>{saving ? "作成中…" : "クエストを作成"}</button>
       </div>
     </>

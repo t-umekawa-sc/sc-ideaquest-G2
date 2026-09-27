@@ -11,7 +11,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.tenant.evaluations.orm import Evaluation, EvaluationScore
+from app.tenant.evaluations.orm import Evaluation, EvaluationRevision, EvaluationScore
 
 ASPECTS: tuple[str, ...] = ("novelty", "impact", "feasibility", "fit", "cost")
 
@@ -105,3 +105,32 @@ def get_scores_for_evaluations(session: Session, evaluation_ids: list[uuid.UUID]
     for s in rows:
         result.setdefault(s.evaluation_id, []).append(s)
     return result
+
+
+# ---- 評価の確定版（変更履歴標準 §3.6） ----
+
+def add_eval_revision(session: Session, evaluation_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID, changes: dict) -> EvaluationRevision:
+    rev = EvaluationRevision(id=uuid.uuid4(), evaluation_id=evaluation_id, revision=revision, editor_id=editor_id, changes=changes)
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_eval_revisions(session: Session, evaluation_id: uuid.UUID) -> list[EvaluationRevision]:
+    return list(session.execute(
+        select(EvaluationRevision).where(EvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(EvaluationRevision.revision.desc())
+    ).scalars().all())
+
+
+def get_eval_revision(session: Session, evaluation_id: uuid.UUID, revision: int) -> EvaluationRevision | None:
+    return session.execute(
+        select(EvaluationRevision).where(EvaluationRevision.evaluation_id == evaluation_id, EvaluationRevision.revision == revision)
+    ).scalars().first()
+
+
+def latest_eval_revision(session: Session, evaluation_id: uuid.UUID) -> EvaluationRevision | None:
+    return session.execute(
+        select(EvaluationRevision).where(EvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(EvaluationRevision.revision.desc()).limit(1)
+    ).scalars().first()

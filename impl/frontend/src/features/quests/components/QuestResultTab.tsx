@@ -5,12 +5,37 @@
 // ⑤振り返り・学び（owner/管理が編集）/⑥次アクション（後続クエスト複製導線）。④議論の要点(a)＝各案のチャットリンク。
 // 正＝doc/設計ドラフト/FR-39_クエスト最終結果_ISO56001.md・C（FR-39）。
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, Button, Field, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { RevisionTimeline, type RevisionDiff, type RevisionRow } from "@/components/ui/RevisionTimeline";
 import { QuestIcon } from "@/components/layout";
 import { buildDuplicateHref } from "@/lib/forms/duplicate";
-import { generateChatSummary, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+import { generateChatSummary, getQuestOutcomeRevisionDiff, getQuestResult, updateQuestResult, type QuestDetail, type QuestResult } from "../api";
+import { listConcepts, type ConceptListItem } from "@/features/concepts/api";
+
+// コンセプトの状態/判定ラベル（結果タブの勝ち残りコンセプト表示・SC-61 と揃える）。
+const CONCEPT_STATUS_LABEL: Record<string, string> = { draft: "下書き", active: "検証中", archived: "保管" };
+const CONCEPT_DECISION_LABEL: Record<string, [string, string]> = {
+  undecided: ["未判定", "badge badge-muted"], go: ["推進", "badge badge-success"],
+  pivot: ["方向転換", "badge badge-muted"], kill: ["中止", "badge badge-danger"],
+};
+
+// 振り返り（総括）の版で追跡するフィールドの表示名（§3.1）。
+const OUTCOME_FIELD_LABELS: Record<string, string> = {
+  summary: "成果（総括）",
+  learnings: "学び・課題",
+  next_actions: "次アクション",
+  metrics: "成果の指標（KPI）",
+};
+
+// コンセプト評価の観点（中核5＋補助3・SC-62/SC-61 と揃える）＋総合判定の並び。
+const CONCEPT_ASPECT_LABELS: [string, string][] = [
+  ["desirability", "望ましさ"], ["feasibility", "実現可能性"], ["viability", "採算・事業性"],
+  ["assumption_strength", "前提検証の強さ"], ["differentiation", "差別化"],
+  ["novelty", "新規性"], ["sustainability", "持続可能性"], ["ip", "知的財産"],
+];
+const CONCEPT_DECISION_ORDER: [string, string][] = [["go", "推進"], ["pivot", "方向転換"], ["kill", "中止"], ["undecided", "未判定"]];
 
 const ASPECT_LABELS: [keyof QuestResult["aspect_averages"], string][] = [
   ["novelty", "新規性"],
@@ -33,6 +58,8 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false); // 振り返り更新履歴モーダル（リンク版UI・§3.1）
+  const [concepts, setConcepts] = useState<ConceptListItem[]>([]); // クエストの成果＝候補コンセプト（ISO ②③段）
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +73,8 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         setMetrics((r.outcome.metrics ?? []).map((m) => ({ label: m.label, value: m.value })));
       })
       .finally(() => alive && setLoading(false));
+    // クエストの結果＝最終的にはコンセプト（ISO 56001 ②③段）。候補コンセプトも取得して結果に含める。
+    void listConcepts(questId).then((r) => { if (alive) setConcepts(r?.items ?? []); });
     return () => { alive = false; };
   }, [questId]);
 
@@ -60,7 +89,9 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     }).catch(() => null);
     setSaving(false);
     if (!res) { snack({ type: "error", msg: "保存に失敗しました。" }); return; }
-    setResult((r) => (r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
+    // 更新履歴（outcome_revisions）は upsert 応答に含まれないため、全体を再取得して版を即反映（リロード不要）。
+    const fresh = await getQuestResult(questId).catch(() => null);
+    setResult((r) => (fresh ? fresh : r ? { ...r, outcome: { ...r.outcome, ...res } } : r));
     setMetrics(cleanMetrics);  // 空行を落とした保存後の集合へ読み取りビューを同期
     setEditing(false);
     snack({ type: "success", title: "最終結果を保存しました" });
@@ -100,6 +131,24 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
     purpose: quest.purpose ?? "",
   });
 
+  // コンセプト評価サマリ＝候補全体の集計（判定内訳・のべ評価者数・観点別平均＝評価者数で加重）。
+  const conceptEval = useMemo(() => {
+    const totalEvaluators = concepts.reduce((s, c) => s + (c.eval_summary.evaluator_count || 0), 0);
+    const decisionCounts: Record<string, number> = {};
+    for (const c of concepts) decisionCounts[c.decision] = (decisionCounts[c.decision] ?? 0) + 1;
+    const aspectAvg: Record<string, number | null> = {};
+    for (const [k] of CONCEPT_ASPECT_LABELS) {
+      let sum = 0, w = 0;
+      for (const c of concepts) {
+        const a = c.eval_summary.aspects?.[k];
+        const ec = c.eval_summary.evaluator_count || 0;
+        if (a != null && ec > 0) { sum += a * ec; w += ec; }
+      }
+      aspectAvg[k] = w > 0 ? Math.round((sum / w) * 10) / 10 : null;
+    }
+    return { totalEvaluators, decisionCounts, aspectAvg };
+  }, [concepts]);
+
   if (loading) return <p className="admin-muted">読み込み中…</p>;
   if (!result) return <p className="admin-muted">最終結果を取得できませんでした。</p>;
 
@@ -115,7 +164,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         </p>
       ) : (
         <p className="role-note" style={{ marginTop: 0 }}>
-          クエスト完了時の<strong>アイデア選別の申し送り</strong>です（アイデア＋議論＋評価の総括・ISO 56001）。
+          クエストの<strong>最終成果</strong>です＝選定アイデアを統合・検証した<strong>コンセプト</strong>（推進/方向転換/中止の判定）と、アイデア＋議論＋評価の総括（ISO 56001 §8.3）。
         </p>
       )}
 
@@ -148,6 +197,51 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
         )}
       </section>
 
+      {/* ①-b コンセプトの結果＝クエストの最終成果（ISO 56001 ②③段）。選定アイデアを統合・検証した候補と判定。 */}
+      <section className="card" aria-label="コンセプトの結果">
+        <div className="section-head">
+          <h3 style={{ margin: 0 }}>🧩 コンセプトの結果（{concepts.length}）</h3>
+          <Link className="btn btn-outline btn-sm" href={`/quests/${questId}?tab=concept`}>コンセプトタブへ →</Link>
+        </div>
+        <p className="role-note" style={{ marginTop: 0 }}>
+          選定アイデアを統合し前提を検証した<strong>コンセプト</strong>が、このクエストの最終的な成果です（推進＝次段へ・ISO 56001 §8.3 ②③段）。
+        </p>
+        {concepts.length === 0 ? (
+          <p className="muted text-sm">まだコンセプトはありません（「🧩 コンセプト」タブから起票できます）。</p>
+        ) : (
+          <ul className="qresult__list">
+            {/* 推進/選定を上位に、次いで更新の新しい順（勝ち残りを先頭に見せる）。 */}
+            {[...concepts]
+              .sort((a, b) => {
+                const w = (c: ConceptListItem) => (c.decision === "go" ? 2 : 0) + (c.is_selected ? 1 : 0);
+                return w(b) - w(a);
+              })
+              .map((c) => {
+                const [dl, dc] = CONCEPT_DECISION_LABEL[c.decision] ?? [c.decision, "badge badge-muted"];
+                return (
+                  <li key={c.id} className="qresult__idea">
+                    <QuestIcon name={c.title} color={quest.color} size="sm" />
+                    <div className="qresult__idea-main">
+                      <div className="qresult__idea-top">
+                        <Link className="card-title" href={`/concepts/${c.id}`}>{c.title}</Link>
+                        {c.is_selected && <span className="badge badge-success">★ 選定</span>}
+                        <span className={dc}>{dl}</span>
+                        <span className="badge badge-muted">{CONCEPT_STATUS_LABEL[c.status] ?? c.status}</span>
+                      </div>
+                      <div className="qresult__idea-meta">
+                        <span className="muted text-sm">由来アイデア {c.source_idea_count}・前提 {c.assumption_count}</span>
+                        {c.eval_summary.evaluator_count > 0 && (
+                          <span className="badge">評価 {c.eval_summary.overall_avg?.toFixed(1) ?? "—"}/5（{c.eval_summary.evaluator_count}名）</span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+        )}
+      </section>
+
       {/* ② 評価・選別サマリ（参加指標＋観点別平均） */}
       <section className="card" aria-label="評価・選別サマリ">
         <div className="section-head"><h3 style={{ margin: 0 }}>📊 評価・選別サマリ</h3></div>
@@ -171,6 +265,33 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           })}
         </div>
       </section>
+
+      {/* ②-b コンセプト評価サマリ（アイデアとは別体系＝中核5＋補助3・候補全体の集計・ユーザー要望 2026-09-26） */}
+      {concepts.length > 0 && (
+        <section className="card" aria-label="コンセプト評価サマリ">
+          <div className="section-head"><h3 style={{ margin: 0 }}>🧩 コンセプト評価サマリ</h3></div>
+          <p className="role-note" style={{ marginTop: 0 }}>コンセプトはアイデアとは別の評価体系（中核5＋補助3）です。以下は候補全体の集計（観点別は評価者数で加重平均）。</p>
+          <div className="qresult__metrics">
+            <span className="qresult__kpi"><b>{concepts.length}</b><span>候補</span></span>
+            {CONCEPT_DECISION_ORDER.map(([k, label]) => (
+              <span key={k} className="qresult__kpi"><b>{conceptEval.decisionCounts[k] ?? 0}</b><span>{label}</span></span>
+            ))}
+            <span className="qresult__kpi"><b>{conceptEval.totalEvaluators}</b><span>評価(のべ)</span></span>
+          </div>
+          <div className="qresult__aspects">
+            {CONCEPT_ASPECT_LABELS.map(([k, label]) => {
+              const v = conceptEval.aspectAvg[k];
+              return (
+                <div key={k} className="qresult__aspect">
+                  <span className="qresult__aspect-label">{label}</span>
+                  <span className="qresult__bar"><span style={{ width: `${((v ?? 0) / 5) * 100}%` }} /></span>
+                  <span className="qresult__aspect-val">{v != null ? `${v}/5` : "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ③ 意思決定の記録（公開アイデア＝評価平均順） */}
       <section className="card" aria-label="意思決定の記録">
@@ -250,8 +371,37 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
           {result.outcome.updated_by_name && (
             <p className="muted text-xs" style={{ marginTop: "var(--space-2)" }}>最終更新: {result.outcome.updated_by_name}</p>
           )}
+          {/* 更新履歴＝リンク版UI（最終更新の下・概要ヘッダーと同じ小さめアイコン＋リンク・§3.1）。 */}
+          {result.outcome_revisions.length > 0 && (
+            <p className="muted text-sm" style={{ marginTop: "var(--space-1)" }}>
+              🔄 <button className="meta-history" type="button" aria-haspopup="dialog" onClick={() => setHistoryOpen(true)}>版 {result.outcome_revisions[0]?.revision ?? result.outcome_revisions.length}（履歴）</button>
+            </p>
+          )}
         </div>
       </section>
+
+      {/* 振り返りの更新履歴モーダル（版タイムライン＋差分・§3.1・アイデア/コンセプト詳細と同型のリンク版UI） */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="振り返り・学び / 次アクションの更新履歴" size="lg">
+        <ModalBody>
+          <p className="role-note" style={{ marginTop: 0 }}>
+            振り返り（成果/学び/KPI/次アクション）の変更を新しい順に。各版を開くと差分（
+            <span className="diff-add">追加</span>／<span className="diff-del">削除</span>）が見られます。
+          </p>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <RevisionTimeline
+              variant="info"
+              revisions={result.outcome_revisions as unknown as RevisionRow[]}
+              currentRevision={result.outcome_revisions[0]?.revision ?? 1}
+              fieldLabels={OUTCOME_FIELD_LABELS}
+              loadDiff={(r) => getQuestOutcomeRevisionDiff(questId, r) as Promise<RevisionDiff | null>}
+              initialNote="振り返りを記入。"
+            />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button className="btn btn-outline" type="button" onClick={() => setHistoryOpen(false)}>閉じる</button>
+        </ModalFooter>
+      </Modal>
 
       {/* ⑥ 採用された関連情報（FR-41 Phase2）＝クエスト＋配下アイデアで採用した外部情報＋処理メモ */}
       {result.adopted_info.length > 0 && (
@@ -304,7 +454,7 @@ export function QuestResultTab({ questId, quest }: { questId: string; quest: Que
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button type="button" variant="outline" onClick={cancelEdit} disabled={saving}>キャンセル</Button>
+            <Button type="button" variant="outline" className="dialog-close-left" onClick={cancelEdit} disabled={saving}>キャンセル</Button>
             <Button type="submit" variant="primary" loading={saving}>保存する</Button>
           </ModalFooter>
         </form>

@@ -17,6 +17,8 @@ from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.concepts import repository as repo
 from app.tenant.concepts.orm import (
+    ConceptDecisionLog,
+    ConceptRevision,
     Assumption,
     Concept,
     ConceptAssumptionLink,
@@ -86,6 +88,8 @@ def env():
         ts.execute(ConceptAssumptionLink.__table__.delete().where(ConceptAssumptionLink.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(ConceptSourceIdea.__table__.delete().where(ConceptSourceIdea.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Assumption.__table__.delete().where(Assumption.quest_id.in_(quests or [uuid.uuid4()])))
+        ts.execute(ConceptRevision.__table__.delete().where(ConceptRevision.concept_id.in_(cids or [uuid.uuid4()])))
+        ts.execute(ConceptDecisionLog.__table__.delete().where(ConceptDecisionLog.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(Concept.__table__.delete().where(Concept.quest_id.in_(quests or [uuid.uuid4()])))
         ts.execute(Idea.__table__.delete().where(Idea.quest_id.in_(quests or [uuid.uuid4()])))
         for qid in quests:
@@ -130,6 +134,19 @@ def test_p_tc_102_detail_composition(env, client):
     assert "edit" in body["my_permissions"] and "manage" in body["my_permissions"]
 
 
+def test_p_tc_120_my_permissions_includes_party_comment(env, client):
+    """P-TC-120: my_permissions は素のクエスト権限（comment 等）を合成する（議論チャット投稿不可バグの回帰）。"""
+    _login_seed(client)
+    # 別 owner のクエストに、既定権限（vote/idea_create/comment）で seed ユーザーを参加させる。
+    qid = env.make_quest(owner=env.other_id, seed_perms=["vote", "idea_create", "comment"])
+    iid = env.make_idea(qid)
+    cid = _create(client, qid, source_idea_ids=[str(iid)]).json()["id"]
+    body = client.get(f"/api/v1/concepts/{cid}").json()
+    # チャット中核の canComment を駆動する素の権限（アイデア詳細と同型）。
+    assert "comment" in body["my_permissions"]
+    assert "vote" in body["my_permissions"]
+
+
 def test_p_tc_101_list_includes_own_draft_excludes_others(env, client):
     """P-TC-101: 一覧は自分の draft を含み、他人の draft は除外。"""
     _login_seed(client)
@@ -140,8 +157,11 @@ def test_p_tc_101_list_includes_own_draft_excludes_others(env, client):
         ts.commit()
         other_cid = str(other_c.id)
     r = client.get(f"/api/v1/quests/{qid}/concepts")
-    ids = {it["id"] for it in r.json()["items"]}
+    items = r.json()["items"]
+    ids = {it["id"] for it in items}
     assert mine in ids and other_cid not in ids
+    # is_mine＝作成者本人フラグ（一覧の削除アクション活性判定・複製/削除メニュー）。
+    assert next(it for it in items if it["id"] == mine)["is_mine"] is True
 
 
 def test_p_tc_104_source_idea_other_quest_rejected(env, client):

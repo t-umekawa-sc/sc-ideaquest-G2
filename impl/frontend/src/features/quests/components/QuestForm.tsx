@@ -904,7 +904,7 @@ export function QuestForm({ mode = "create", questId, ownerName, ownerUserId, lo
       </ModalBody>
       <ModalFooter>
         <FormFooterError show={summary.length > 0} />
-        <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>キャンセル</Button>
+        <Button type="button" variant="outline" className="dialog-close-left" onClick={onCancel} disabled={pending}>キャンセル</Button>
         {partyOnly ? (
           <Button type="submit" variant="primary" disabled={pending || frozen} loading={pendingKind === "party-save"}>{pendingKind === "party-save" ? "保存中…" : "保存する"}</Button>
         ) : !isEdit ? (

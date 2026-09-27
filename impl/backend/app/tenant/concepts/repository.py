@@ -19,8 +19,11 @@ from app.tenant.concepts.orm import (
     Concept,
     ConceptAssumptionLink,
     ConceptChatScope,
+    ConceptDecisionLog,
     ConceptEvaluation,
+    ConceptEvaluationRevision,
     ConceptEvaluationScore,
+    ConceptRevision,
     ConceptSourceIdea,
     ConceptVote,
 )
@@ -157,6 +160,31 @@ def _recompute_current_verdict(session: Session, assumption_id: uuid.UUID) -> No
     if assumption is not None:
         assumption.current_verdict = latest or "inconclusive"
         session.flush()
+
+
+def get_validation(session: Session, validation_id: uuid.UUID) -> AssumptionValidation | None:
+    return session.get(AssumptionValidation, validation_id)
+
+
+def update_validation(session: Session, v: AssumptionValidation, *, method: str, verdict: str,
+                      validated_on: date, result: str | None, scale: str | None) -> AssumptionValidation:
+    """検証イベントを編集＋現在判定を再導出（編集可・版管理は application で記録・ユーザー決定 2026-09-26）。"""
+    v.method = method
+    v.verdict = verdict
+    v.validated_on = validated_on
+    v.result = result
+    v.scale = scale
+    session.flush()
+    _recompute_current_verdict(session, v.assumption_id)
+    return v
+
+
+def delete_validation(session: Session, v: AssumptionValidation) -> None:
+    """検証イベントを削除＋現在判定を再導出。"""
+    aid = v.assumption_id
+    session.delete(v)
+    session.flush()
+    _recompute_current_verdict(session, aid)
 
 
 def delete_assumption(session: Session, assumption_id: uuid.UUID) -> bool:
@@ -521,3 +549,95 @@ def unread_count_for_scope(session: Session, scope_id: uuid.UUID, user_id: uuid.
         if anchor is not None:
             base = base.where(ChatMessage.created_at > anchor)
     return session.execute(base).scalar_one()
+
+
+# ---- 変更履歴（内容の版・意思決定ログ・§3.1/§3.2） ------------------------------
+
+def add_revision(
+    session: Session, concept_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID,
+    changes: dict, memo: str | None = None, context_snapshot: dict | None = None,
+) -> ConceptRevision:
+    rev = ConceptRevision(
+        id=uuid.uuid4(), concept_id=concept_id, revision=revision, editor_id=editor_id,
+        changes=changes, memo=memo, context_snapshot=context_snapshot,
+    )
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_revisions(session: Session, concept_id: uuid.UUID, *, cursor: int | None = None, limit: int = 50) -> list[ConceptRevision]:
+    """版タイムライン（新しい順・cursor=revision より前）。"""
+    stmt = select(ConceptRevision).where(ConceptRevision.concept_id == concept_id)
+    if cursor is not None:
+        stmt = stmt.where(ConceptRevision.revision < cursor)
+    stmt = stmt.order_by(ConceptRevision.revision.desc()).limit(limit)
+    return list(session.execute(stmt).scalars().all())
+
+
+def get_revision(session: Session, concept_id: uuid.UUID, revision: int) -> ConceptRevision | None:
+    return session.execute(
+        select(ConceptRevision).where(ConceptRevision.concept_id == concept_id, ConceptRevision.revision == revision)
+    ).scalars().first()
+
+
+def add_decision_log(
+    session: Session, concept_id: uuid.UUID, *, kind: str, from_value: str | None, to_value: str,
+    actor_id: uuid.UUID, reason: str | None = None, context_snapshot: dict | None = None,
+) -> ConceptDecisionLog:
+    log = ConceptDecisionLog(
+        id=uuid.uuid4(), concept_id=concept_id, kind=kind, from_value=from_value, to_value=to_value,
+        actor_id=actor_id, reason=reason, context_snapshot=context_snapshot,
+    )
+    session.add(log)
+    session.flush()
+    return log
+
+
+def list_decision_log(session: Session, concept_id: uuid.UUID) -> list[ConceptDecisionLog]:
+    """意思決定/ステータスの遷移ログ（新しい順）。"""
+    return list(session.execute(
+        select(ConceptDecisionLog).where(ConceptDecisionLog.concept_id == concept_id)
+        .order_by(ConceptDecisionLog.created_at.desc(), ConceptDecisionLog.id.desc())
+    ).scalars().all())
+
+
+def verdict_counts_for_concept(session: Session, concept_id: uuid.UUID) -> dict[str, int]:
+    """リンクされた前提の current_verdict 内訳（判断材料スナップ用・§3.3）。"""
+    rows = session.execute(
+        select(Assumption.current_verdict, func.count())
+        .select_from(ConceptAssumptionLink)
+        .join(Assumption, Assumption.id == ConceptAssumptionLink.assumption_id)
+        .where(ConceptAssumptionLink.concept_id == concept_id)
+        .group_by(Assumption.current_verdict)
+    ).all()
+    return {v: int(n) for v, n in rows}
+
+
+# ---- コンセプト評価の確定版（変更履歴標準 §3.6） ----
+
+def add_eval_revision(session: Session, evaluation_id: uuid.UUID, *, revision: int, editor_id: uuid.UUID, changes: dict) -> ConceptEvaluationRevision:
+    rev = ConceptEvaluationRevision(id=uuid.uuid4(), evaluation_id=evaluation_id, revision=revision, editor_id=editor_id, changes=changes)
+    session.add(rev)
+    session.flush()
+    return rev
+
+
+def list_eval_revisions(session: Session, evaluation_id: uuid.UUID) -> list[ConceptEvaluationRevision]:
+    return list(session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(ConceptEvaluationRevision.revision.desc())
+    ).scalars().all())
+
+
+def get_eval_revision(session: Session, evaluation_id: uuid.UUID, revision: int) -> ConceptEvaluationRevision | None:
+    return session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id, ConceptEvaluationRevision.revision == revision)
+    ).scalars().first()
+
+
+def latest_eval_revision(session: Session, evaluation_id: uuid.UUID) -> ConceptEvaluationRevision | None:
+    return session.execute(
+        select(ConceptEvaluationRevision).where(ConceptEvaluationRevision.evaluation_id == evaluation_id)
+        .order_by(ConceptEvaluationRevision.revision.desc()).limit(1)
+    ).scalars().first()

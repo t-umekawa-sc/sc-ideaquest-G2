@@ -146,8 +146,20 @@
 - **前提（検証プール）ビュー**＝クエスト単位の一覧＋前提詳細（検証履歴）。
 - 画面は本 API 確定後に画面設計（`doc/画面設計/screens/SC-xx`）で起こす（フロントエンド実装フロー規約＝モック先行）。
 
+## P.11 変更履歴（内容の版＋意思決定ログ・変更履歴標準 §3.1/§3.2・migration 0037）
+
+| メソッド | パス | 説明 | 認可 |
+| --- | --- | --- | --- |
+| GET | `/concepts/{id}/revisions?limit=&cursor=` | 内容の版タイムライン（新しい順・`data[].{revision,editor,created_at,changed_fields,memo,context_snapshot}`＋`page_info`） | 門番＝コンセプト可視性 |
+| GET | `/concepts/{id}/revisions/{revision}/diff?from=` | 版差分（既定＝前版比較・text=segments／scalar=old/new・アイデア D.4 同契約） | 同上 |
+| GET | `/concepts/{id}/decision-log` | 総合判定/ステータスの遷移ログ（新しい順・`data[].{kind,from_value,to_value,actor,reason,context_snapshot,created_at}`） | 同上 |
+
+- **版の起点**＝作成で初版（rev1）／内容編集（`PATCH /concepts/{id}`）ごとに版+1／**無変更は版を作らない**（既存仕様踏襲）。
+- **意思決定ログ**＝`PUT /concepts/{id}/decision`（kind=decision）・`activate`/`archive`（kind=status）で1件追記。`context_snapshot`＝当時の投票/評価/前提の検証状況（§3.3）。
+- 実装＝`app/tenant/_shared/revisions.py`（差分エンジン共通）＋`concept_revisions`/`concept_decision_log`（§5.47/§5.48）。テスト＝P-TC-250〜256。
+
 ## P.10 MVP 境界・Phase2・他ドメイン境界
 
-- **MVP**＝コンセプト CRUD＋由来＋前提/検証＋M:N リンク（重要度・stale）＋**投票（賛成/反対・XP+5）**＋評価（中核5＋補助3）＋議論チャット（総合/グループ/前提スレッド）＋反証波及。
-- **Phase2**＝版管理テーブル（`concept_revisions`・アイデア §5.14 同型）／コンセプト評価の XP・コイン連動／集計の重み付け（criticality × 前提判定）／複数コンセプトの比較ビュー／（将来）ソリューション段への昇格。
+- **MVP**＝コンセプト CRUD＋由来＋前提/検証＋M:N リンク（重要度・stale）＋**投票（賛成/反対・XP+5）**＋評価（中核5＋補助3）＋議論チャット（総合/グループ/前提スレッド）＋反証波及＋**変更履歴（内容の版＋意思決定ログ・P.11・migration 0037）**。
+- **Phase2**＝コンセプト評価の XP・コイン連動／集計の重み付け（criticality × 前提判定）／複数コンセプトの比較ビュー／（将来）ソリューション段への昇格。
 - **他ドメイン境界**＝台帳（XP/コイン）は G／通知は H／リアルタイムは L／情報リンクは N／全文検索（コンセプト本文）は将来 J 拡張。**関連リンク対象ピッカーへ `concepts`/`assumptions` を追加**（N の `search_link_candidates` が現状 else→[]・[コンセプト機能 ISO56001 再設計](../設計ドラフト/コンセプト機能_ISO56001_再設計.md) §4 ⚠️・本ドメイン実装と同時に対応）。
