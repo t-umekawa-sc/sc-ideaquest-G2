@@ -60,14 +60,23 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
   const router = useRouter();
   const confirm = useConfirm();
   const snack = useSnackbar();
-  // 成果物側コンテキスト（?from=種別:ID）で開かれた＝採否モード（参照＋最下部に扱い入力・FR-41 Phase2）。
+  // 成果物/コンセプト/前提から ?from=種別:ID で開かれた＝参照モード（情報本体は編集不可・アイデア詳細と同じ扱い）。
   const searchParams = useSearchParams();
-  const disposeContext = useMemo(() => {
+  const refContext = useMemo(() => {
     const from = searchParams.get("from");
     if (!from) return null;
     const [t, id] = from.split(":");
-    return (t === "quests" || t === "ideas") && id ? { targetType: t as "quests" | "ideas", targetId: id } : null;
+    const ok = t === "quests" || t === "ideas" || t === "concepts" || t === "assumptions";
+    return ok && id ? { targetType: t as "quests" | "ideas" | "concepts" | "assumptions", targetId: id } : null;
   }, [searchParams]);
+  // 採否（disposition・FR-41 Phase2）を持つのは成果物側＝quests/ideas とコンセプト（concepts）のみ。
+  // 前提（assumptions）は採否を持たない（参照＋リンク/反証のみ）＝採否セクションを出さない。
+  const disposeContext = useMemo(
+    () => (refContext && refContext.targetType !== "assumptions"
+      ? { targetType: refContext.targetType as "quests" | "ideas" | "concepts", targetId: refContext.targetId }
+      : null),
+    [refContext],
+  );
   const [dispRow, setDispRow] = useState<RelatedInfoItem | null>(null);
   const [dispChoice, setDispChoice] = useState<InfoLinkDisposition>("pending");
   const [dispNote, setDispNote] = useState("");
@@ -301,8 +310,8 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
 
   if (state === "loading") return <div className="modal__body"><p className="muted">読み込み中…</p></div>;
   if (state === "notfound" || !item) return <div className="modal__body"><p className="muted">情報が見つかりません。</p></div>;
-  // 採否モードは全面参照＝編集能力を一律 false に上書き（編集導線・保存ボタン・アーカイブが消える）。
-  const r = disposeContext ? { ...item, can: { ...item.can, edit_content: false, curate: false, add_link: false, follow_up: false } } : item;
+  // 参照モードは全面参照＝編集能力を一律 false に上書き（編集導線・保存ボタン・アーカイブが消える）。
+  const r = refContext ? { ...item, can: { ...item.can, edit_content: false, curate: false, add_link: false, follow_up: false } } : item;
   const activeLinks = r.links.filter((l) => !l.rejected);
   const cloudMax = Math.max(...r.tokens_top.map((t) => t.count), 1);
   // 項目区切り＝デザイン標準 §4.1: 全セクションで仕切り線の"間隔"を統一。参照/操作は線あり（dialog-section）、
@@ -513,7 +522,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           </div>
         )}
 
-        {!disposeContext && (
+        {!refContext && (
           <div className="field dialog-section">
             <div className="dialog-label">この情報から（機会特定→行動）</div>
             <button className="btn btn-primary" type="button" onClick={() => go(`/info-items/${r.id}/new-quest`)}>＋ この情報からクエストを作成</button>
@@ -608,7 +617,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
           )}
         </div>
 
-        {!disposeContext && (
+        {!refContext && (
           <div className={refCls}>
             <div className="dialog-label">🧵 続報スレッド</div>
             {hasThread ? (
@@ -640,7 +649,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
         {/* 採否モード＝この成果物での「扱い」入力（管理権限者のみ操作可・情報本体は不変・FR-41 Phase2） */}
         {disposeContext && (
           <div className="field dialog-section ri-dispose">
-            <div className="dialog-label">この情報の扱い（{disposeContext.targetType === "quests" ? "クエスト" : "アイデア"}での採否）</div>
+            <div className="dialog-label">この情報の扱い（{disposeContext.targetType === "quests" ? "クエスト" : disposeContext.targetType === "concepts" ? "コンセプト" : "アイデア"}での採否）</div>
             {!dispRow ? (
               <p className="muted">この成果物に紐づくリンクが見つかりません。</p>
             ) : dispRow.can_dispose ? (
@@ -664,7 +673,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
               <>
                 <p>現在の扱い：<span className={`badge ${DISPOSITION_LABEL[dispRow.disposition][1]}`}>{DISPOSITION_LABEL[dispRow.disposition][2]} {DISPOSITION_LABEL[dispRow.disposition][0]}</span></p>
                 {dispRow.disposition_note ? <p className="ri-note" style={{ marginTop: 6 }}>📝 {dispRow.disposition_note}</p> : null}
-                <div className="hint" style={{ marginTop: 6 }}>採否の設定は管理権限者（{disposeContext.targetType === "quests" ? "owner/quest_admin" : "作成者・owner/quest_admin"}）のみ可能です。</div>
+                <div className="hint" style={{ marginTop: 6 }}>採否の設定は管理権限者（{disposeContext.targetType === "quests" ? "owner/quest_admin" : disposeContext.targetType === "concepts" ? "作成者・owner/quest_admin" : "作成者・owner/quest_admin"}）のみ可能です。</div>
               </>
             )}
           </div>
