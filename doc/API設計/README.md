@@ -210,6 +210,7 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 | L | リアルタイム配信（WebSocket） | SC-24/SC-02 | テナント | ✅ | [`L_リアルタイム配信.md`](./L_リアルタイム配信.md) |
 | N | 情報インプット（外部情報の知識レイヤ） | SC-xx（新規）＋各成果物の関連情報パネル | テナント | 🟡 ドラフト | [`N_情報インプット.md`](./N_情報インプット.md) |
 | P | コンセプト創造・検証（ISO56001 ②③段） | SC-xx（新規） | テナント | 🟡 ドラフト | [`P_コンセプト.md`](./P_コンセプト.md) |
+| Q | ソリューション開発（プロジェクト/タスク管理・ISO56001 ④⑤段） | SC-70/71/72（新規） | テナント | 🟡 ドラフト | [`Q_ソリューション開発.md`](./Q_ソリューション開発.md) |
 
 ### A. 認証・セッション（コントロールプレーン）＝詳細確定
 → **[`A_認証・セッション.md`](./A_認証・セッション.md)**（状態機械・Cookie/トークン・8 エンドポイントの req/res・エラー・SC-00 対応）。
@@ -252,6 +253,9 @@ Redis（1 インスタンス・§1.4/§1.12）に載る情報を**一元管理**
 
 ### P. コンセプト創造・検証（ISO56001 ②③段・テナント）＝設計ドラフト（2026-09-24）
 → **[`P_コンセプト.md`](./P_コンセプト.md)**。決定＝**①ドメインレター P**（A〜O 使用済み・テスト接頭辞 P-TC）**②門番＝クエストベース**（パーティー所属 AND クエストグループ所属＝C.0/D.0 同一・コンセプト/前提はクエスト配下）**③コンセプト本体は D アイデアと同型**（作成=作成者+owner/quest_admin／`draft→active→archived`／選定 `is_selected`〔owner/quest_admin・複数可〕と判定 `decision`〔go/pivot/kill〕は別操作）**④前提＝クエスト単位の検証プール**（第一級・編集はプール所有=owner/quest_admin／検証イベントは追記型・`refuted` で波及）**⑤コンセプト↔前提は M:N＋重要度**（リンク単位・エビデンスは前提側の単一ソース）**⑥投票＋評価の2層**＝投票（賛成/反対・D同型・`vote` 権限・**XP+5 参加促進**）＋評価（F同型・中核5必須＋補助3任意＝ISO §8.3.3・評価者の Go/Pivot/Kill 推奨・評価/選定の XP・コインは実装時）**⑦チャットは P にスコープ単位EP**（`/concept-chat-scopes/{id}/messages`・機構は E 再利用・E は無改修／リアクションは E の `/chat-messages/{id}/reactions` 流用／RT は L 拡張）**⑧反証波及**＝前提の refuted → 全リンク先 stale＋作成者/評価者へ通知（H）＋情報リンク反証（N）と同経路**⑨情報リンクは read 委譲**（横断EP増やさない）。付随＝関連リンク対象ピッカーへ concepts/assumptions 追加（N `search_link_candidates`）。データモデル §5.38-5.45。要件＝FR-42。
+
+### Q. ソリューション開発（プロジェクト/タスク管理・ISO56001 ④⑤段・テナント）＝設計ドラフト（2026-09-27）
+→ **[`Q_ソリューション開発.md`](./Q_ソリューション開発.md)**。決定＝**①ドメインレター Q**（P の次・テスト接頭辞 Q-TC）**②起票ゲート＝`concepts.decision='go'`**（1コンセプト=1プロジェクト・`projects.concept_id` UNIQUE）**③権限＝由来クエストのパーティー権限（FR-27）を継承**（`projects.quest_id` 冗長保持で門番＝`can_access_quest`／担当割当は当該パーティー所属者のみ／owner=起票者）**④タスクは単一 `tasks` 自己参照ツリー＋`kind`**（`GET /projects/{id}/tasks` はツリー返却・CRUD＋`PATCH` で親/並び替え）**⑤完了報酬は G 委譲**＝`status→done` で `activities(kind=delivery_xp_gain, reason=task_done, ref_type=tasks, ref_id)` 冪等付与（`users.delivery_xp`＋`coin_balance`・二重付与防止）**⑥タスクチャットは既存チャットEP を thread 単位で流用**＝`chat_thread(owner_type='task')` を作成時に冪等生成・`_resolve_host` に task 分岐（由来クエスト権限へ委譲）・**E/中核は無改修**（`chat_thread` の CHECK を広げる小 migration 0041 のみ）**⑦導入・価値実現メタ**＝`projects.deployment`(jsonb) を `PATCH /projects/{id}` で更新（KPI 実測＝FR-39 §9/§10 ループ）**⑧外部PM＝一方向エクスポート seam**（`external_link` 保持・CSV/双方向は Phase2）**⑨MVP=起票+タスクCRUD/ツリー+報酬+チャット+導入メタ／Phase2=CSV取込・依存(`task_dependencies` 器のみ)・工数見積・外部双方向・KPI固定・チャット横断集約**。**生成AI連携なし**（種継ぎ seam のみ）。データモデル §5.49-5.51。要件＝FR-43。
 
 ---
 
