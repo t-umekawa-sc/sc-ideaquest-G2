@@ -18,6 +18,7 @@ import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus
 import "@/features/dashboard/dashboard.css"; // 🕒最近の議論の一覧クラス（.unread-list/.unread-item）をダッシュボードから踏襲（§2.1c）
 import { TaskForm, type TaskSavePayload } from "./TaskForm";
 import { ProjectForm } from "./ProjectForm";
+import { ProjectDeploymentModal } from "./ProjectDeploymentModal";
 import { ProjectMembersModal } from "./ProjectMembersModal";
 import "@/features/quests/quests.css"; // パーティー一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
 import "../projects.css";
@@ -52,6 +53,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [taskForm, setTaskForm] = useState<{ task?: TaskNode | null; parentId?: string | null; dup?: TaskNode | null } | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deployOpen, setDeployOpen] = useState(false);
 
   const reloadAll = useCallback(async () => {
     const [p, t, m, rc] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId), listRecentTaskChats(projectId)]);
@@ -304,7 +306,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section className="card proj-section" aria-label="導入・価値実現">
           <div className="proj-section__head">
             <h2 style={{ margin: 0 }}>導入・価値実現</h2>
-            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditOpen(true)}>編集</button>}
+            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" onClick={() => setDeployOpen(true)}>編集</button>}
           </div>
           {(() => { const dep = (project.deployment ?? {}) as DeploymentMeta; return (
           <dl className="proj-deploy">
@@ -319,6 +321,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
       {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} ownerName={project.owner?.display_name ?? ""} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}
       {editOpen && <ProjectForm project={project} ownerName={project.owner?.display_name ?? ""} onClose={() => setEditOpen(false)} onUpdated={() => void reloadAll()} />}
+      {deployOpen && <ProjectDeploymentModal projectId={projectId} deployment={(project.deployment ?? {}) as DeploymentMeta} onClose={() => setDeployOpen(false)} onSaved={() => void reloadAll()} />}
     </section>
   );
 }

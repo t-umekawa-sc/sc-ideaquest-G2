@@ -36,13 +36,19 @@ const initialOf = (name: string) => name.trim().charAt(0) || "?";
 
 const ROLES: [ProjectRole, string][] = [["lead", "リード"], ["member", "担当"]];
 
-export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel = "あなた・作成者" }: {
+export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel = "あなた・作成者", groupFilter: groupFilterProp, onGroupFilter }: {
   members: PickedMember[];
   onMembers: (v: PickedMember[]) => void;
   ownerName: string;      // 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲（§2.1c）
   ownerLabel?: string;    // バッジ文言（作成時「あなた・作成者」／編集時「作成者」）
+  // 参加グループ（アクセス条件）を上位 Field で持つ場合は controlled（候補側の内蔵コンボは隠す）。
+  groupFilter?: string[];
+  onGroupFilter?: (v: string[]) => void;
 }) {
-  const [groupFilter, setGroupFilter] = useState<string[]>([]);
+  const controlledGroup = groupFilterProp !== undefined;
+  const [groupFilterState, setGroupFilterState] = useState<string[]>([]);
+  const groupFilter = controlledGroup ? groupFilterProp! : groupFilterState;
+  const setGroupFilter = controlledGroup ? (onGroupFilter ?? (() => {})) : setGroupFilterState;
   const [candQuery, setCandQuery] = useState("");
   const [selQuery, setSelQuery] = useState("");
   const [outOnly, setOutOnly] = useState(false);
@@ -85,9 +91,12 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
             <span className="party__count">候補から選ぶ</span>
           </div>
           <div className="party__add">
-            <div style={{ marginBottom: "var(--space-2)" }}>
-              <Multiselect id="pp_cand_group" options={PROJECT_GROUP_OPTIONS} value={groupFilter} onChange={setGroupFilter} placeholder="グループで絞込…（未選択＝全社）" ariaLabel="候補をグループで絞り込み" emptyText="該当するグループがありません" />
-            </div>
+            {/* 参加グループを上位 Field で持つ場合（controlled）は候補側の内蔵コンボを出さない（重複回避）。 */}
+            {!controlledGroup && (
+              <div style={{ marginBottom: "var(--space-2)" }}>
+                <Multiselect id="pp_cand_group" options={PROJECT_GROUP_OPTIONS} value={groupFilter} onChange={setGroupFilter} placeholder="グループで絞込…（未選択＝全社）" ariaLabel="候補をグループで絞り込み" emptyText="該当するグループがありません" />
+              </div>
+            )}
             <input className="input" placeholder="名前で絞り込み…" value={candQuery} onChange={(e) => setCandQuery(e.target.value)} aria-label="候補を名前で絞り込み" />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
               <button type="button" className="btn btn-sm btn-outline" disabled={candidates.length === 0} onClick={addAllShown}>表示中を全員追加（{candidates.length}）</button>
