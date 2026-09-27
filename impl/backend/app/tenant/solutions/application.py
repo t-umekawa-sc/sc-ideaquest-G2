@@ -13,6 +13,7 @@ from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
+from app.tenant.chat import repository as chat_repo
 from app.tenant.concepts import repository as concepts_repo
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
@@ -427,6 +428,31 @@ def list_tasks(account_id, company_id, project_id) -> list[dict]:
         project = repo.get_project(ts, pid)
         _require_access(ts, project, user)
         return _task_tree(ts, project.id)
+
+
+def recent_task_chats(account_id, company_id, project_id, *, limit: int = 8) -> dict:
+    """🕒 最近の議論（プロジェクト内タスクのチャット限定・更新順・既読/未読問わず・SC-71）。
+    ダッシュボードの recent_chats と同形だが、対象を当該プロジェクトのタスクチャットに限定する。
+    """
+    company = _ctx(account_id, company_id)
+    pid = _parse_uuid(project_id, field="project_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        project = repo.get_project(ts, pid)
+        _require_access(ts, project, user)
+        tasks = {t.id: t for t in repo.list_tasks(ts, project.id)}
+        rows = chat_repo.task_threads_with_activity(ts, user.id, list(tasks.keys()), limit=limit)
+        items = []
+        for tid, unread, last_at in rows:
+            t = tasks.get(tid)
+            if t is None:
+                continue
+            items.append({
+                "task_id": str(tid), "title": t.title,
+                "unread_chat_count": unread,
+                "last_chat_at": last_at.isoformat() if last_at else None,
+            })
+        return {"items": items}
 
 
 def _validate_assignee(ts, project, assignee_id_raw):

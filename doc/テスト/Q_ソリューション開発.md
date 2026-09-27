@@ -41,3 +41,4 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Q-TC-130 | api | タスクチャット投稿→一覧（アイデアと同一中核・thread=task） | 自分のプロジェクトのタスク | `POST /tasks/{id}/chat-messages`（body）→`GET /tasks/{id}/chat` | 201・一覧 data に投稿が1件（thread_id=task-…） | Q.4／§5.14b |
 | Q-TC-131 | api | タスクチャットの門番＝範囲外は 404 | 非メンバーのタスク | `GET /tasks/{id}/chat` | 404（not_found・存在秘匿） | Q.0／Q.4 |
+| Q-TC-132 | api | プロジェクトの最近の議論＝タスクチャット限定・更新順 | 複数タスクに投稿 | `GET /projects/{id}/recent-chats` | `items[]` が投稿ありタスクのみを最終時刻の新しい順・自分未読は unread_chat_count | Q.4／SC-71 |

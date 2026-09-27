@@ -43,6 +43,12 @@ export function deleteProject(projectId: string): Promise<unknown> {
   return apiFetch(`/projects/${projectId}`, { method: "DELETE" });
 }
 
+export type RecentTaskChat = components["schemas"]["RecentTaskChatDTO"];
+export async function listRecentTaskChats(projectId: string): Promise<RecentTaskChat[]> {
+  const res = await apiFetch<components["schemas"]["RecentTaskChatsResponse"]>(`/projects/${projectId}/recent-chats`);
+  return res?.items ?? [];
+}
+
 // ---- members ----
 export async function listProjectMembers(projectId: string): Promise<{ members: ProjectMember[]; innovation: UserRef[] }> {
   const res = await apiFetch<MembersResponse>(`/projects/${projectId}/members`);

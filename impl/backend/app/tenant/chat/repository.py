@@ -357,6 +357,35 @@ def ideas_with_unread(session: Session, user_id: uuid.UUID, quest_ids: list[uuid
     return [(iid, int(u), last_at) for iid, u, last_at in rows]
 
 
+def task_threads_with_activity(session: Session, user_id: uuid.UUID, task_ids: list[uuid.UUID],
+                               limit: int = 8) -> list[tuple[uuid.UUID, int, datetime]]:
+    """タスクチャット（chat_thread owner_type='task'）で**メッセージがあるもの**を最終時刻の新しい順に返す。
+    返り＝[(task_id, unread, last_at)]。unread の定義はアイデアと同じ（他ユーザー投稿・既読カーソル後）。
+    プロジェクト詳細「🕒 最近の議論」（タスクチャット限定・更新順・既読/未読問わず）用（FR-43・SC-71）。
+    """
+    if not task_ids:
+        return []
+    last_read = aliased(ChatMessage)
+    is_unread = and_(
+        ChatMessage.author_id != user_id,
+        or_(ChatRead.last_read_message_id.is_(None),
+            tuple_(ChatMessage.created_at, ChatMessage.id) > tuple_(last_read.created_at, last_read.id)),
+    )
+    unread_ct = func.count(ChatMessage.id).filter(is_unread)
+    rows = session.execute(
+        select(ChatThread.owner_id, unread_ct.label("unread"), func.max(ChatMessage.created_at).label("last_at"))
+        .select_from(ChatThread)
+        .join(ChatMessage, and_(ChatMessage.thread_id == ChatThread.id, ChatMessage.is_deleted.is_(False)))
+        .outerjoin(ChatRead, and_(ChatRead.thread_id == ChatThread.id, ChatRead.user_id == user_id))
+        .outerjoin(last_read, last_read.id == ChatRead.last_read_message_id)
+        .where(ChatThread.owner_type == "task", ChatThread.owner_id.in_(task_ids))
+        .group_by(ChatThread.owner_id)
+        .order_by(func.max(ChatMessage.created_at).desc())
+        .limit(limit)
+    ).all()
+    return [(tid, int(u), last_at) for tid, u, last_at in rows]
+
+
 def count_messages_after(session: Session, thread_id: uuid.UUID, cursor: tuple[datetime, uuid.UUID] | None) -> int:
     """既読カーソル（created_at,id）より後の未削除メッセージ数（未読件数・E.5）。cursor None＝全件。"""
     stmt = select(func.count()).select_from(ChatMessage).where(

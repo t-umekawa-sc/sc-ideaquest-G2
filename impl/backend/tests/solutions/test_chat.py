@@ -32,6 +32,25 @@ def test_q_tc_130_task_chat_post_and_list(env, client):
     assert any(m.get("body") == "はじめまして" for m in body["data"])
 
 
+def test_q_tc_132_recent_task_chats(env, client):
+    """Q-TC-132: プロジェクトの最近の議論＝タスクチャット限定・更新順（投稿ありのみ）。"""
+    _login_seed(client)
+    p = _create_standalone(client).json()
+    env.track_project(p["id"])
+    t1 = _add_task(client, p["id"], title="タスク1").json()
+    t2 = _add_task(client, p["id"], title="タスク2").json()
+    _add_task(client, p["id"], title="無投稿タスク").json()  # 投稿なし＝出ない
+    # t1 → t2 の順に投稿（t2 が最新）。
+    client.post(f"/api/v1/tasks/{t1['id']}/chat-messages", data={"body": "t1-1"}, headers=_csrf(client))
+    client.post(f"/api/v1/tasks/{t2['id']}/chat-messages", data={"body": "t2-1"}, headers=_csrf(client))
+    r = client.get(f"/api/v1/projects/{p['id']}/recent-chats")
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    ids = [x["task_id"] for x in items]
+    assert ids == [t2["id"], t1["id"]]  # 更新順（新しい順）・無投稿タスクは含まれない
+    assert all("title" in x and "last_chat_at" in x for x in items)
+
+
 def test_q_tc_131_task_chat_access_gate_404(env, client):
     """Q-TC-131: 範囲外（非メンバー・非パーティー）のタスクチャットは 404。"""
     _login_seed(client)

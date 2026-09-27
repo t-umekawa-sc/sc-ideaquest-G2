@@ -153,3 +153,14 @@ class TaskDTO(BaseModel):
 
 class TaskTreeResponse(BaseModel):
     tree: list[TaskDTO]
+
+
+class RecentTaskChatDTO(BaseModel):
+    task_id: str
+    title: str
+    unread_chat_count: int
+    last_chat_at: str | None = None
+
+
+class RecentTaskChatsResponse(BaseModel):
+    items: list[RecentTaskChatDTO]

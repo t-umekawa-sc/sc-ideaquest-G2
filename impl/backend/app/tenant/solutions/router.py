@@ -21,6 +21,7 @@ from app.tenant.solutions.schemas import (
     ProjectListResponse,
     ProjectMemberDTO,
     ProjectPatchRequest,
+    RecentTaskChatsResponse,
     TaskCreateRequest,
     TaskDTO,
     TaskPatchRequest,
@@ -121,6 +122,12 @@ def delete_member(project_id: str, user_id: str, request: Request, session: dict
 def list_tasks(project_id: str, request: Request, session: dict = Depends(require_me)) -> TaskTreeResponse:
     acc, comp = _ids(session)
     return TaskTreeResponse(tree=service.list_tasks(acc, comp, project_id))
+
+
+@router.get("/projects/{project_id}/recent-chats", response_model=RecentTaskChatsResponse)
+def recent_task_chats(project_id: str, request: Request, session: dict = Depends(require_me)) -> RecentTaskChatsResponse:
+    acc, comp = _ids(session)
+    return RecentTaskChatsResponse(**service.recent_task_chats(acc, comp, project_id))
 
 
 @router.post("/projects/{project_id}/tasks", response_model=TaskDTO, status_code=201)

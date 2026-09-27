@@ -11,8 +11,11 @@ import { Avatar, DataTable, LoadingOverlay, RowMenu, useConfirm, useSnackbar } f
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { createTask, deleteTask, getProject, listProjectMembers, listProjectTasks, patchTask } from "../api";
+import { timeLabel } from "@/features/notifications/time";
+import { createTask, deleteTask, getProject, listProjectMembers, listProjectTasks, listRecentTaskChats, patchTask } from "../api";
+import type { RecentTaskChat } from "../api";
 import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
+import "@/features/dashboard/dashboard.css"; // 🕒最近の議論の一覧クラス（.unread-list/.unread-item）をダッシュボードから踏襲（§2.1c）
 import { TaskForm, type TaskSavePayload } from "./TaskForm";
 import { ProjectForm } from "./ProjectForm";
 import { ProjectMembersModal } from "./ProjectMembersModal";
@@ -41,6 +44,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [tasks, setTasks] = useState<TaskNode[] | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [innovation, setInnovation] = useState<UserRef[]>([]);
+  const [recentChats, setRecentChats] = useState<RecentTaskChat[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [tab, setTab] = useState<"wbs" | "members" | "deploy">("wbs");
@@ -50,10 +54,13 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [editOpen, setEditOpen] = useState(false);
 
   const reloadAll = useCallback(async () => {
-    const [p, t, m] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId)]);
-    setProject(p); setTasks(t); setMembers(m.members); setInnovation(m.innovation);
+    const [p, t, m, rc] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId), listRecentTaskChats(projectId)]);
+    setProject(p); setTasks(t); setMembers(m.members); setInnovation(m.innovation); setRecentChats(rc);
   }, [projectId]);
-  const reloadTasks = useCallback(async () => { setTasks(await listProjectTasks(projectId)); }, [projectId]);
+  const reloadTasks = useCallback(async () => {
+    const [t, rc] = await Promise.all([listProjectTasks(projectId), listRecentTaskChats(projectId)]);
+    setTasks(t); setRecentChats(rc);
+  }, [projectId]);
 
   useEffect(() => {
     let alive = true;
@@ -282,6 +289,30 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <p className="hint">{project.concept ? "コンセプト段の viability（コスト/収益/ROI）を導入後の実測で検証し、次サイクルへ（ISO §9/§10）。" : "単純タスク管理でも、導入計画・KPI をメモできます。"}</p>
         </section>
       )}
+
+      {/* 🕒 最近の議論＝このプロジェクト内タスクのチャットのみ（更新順・既読/未読問わず）＝ダッシュボードの導線をプロジェクトに限定（FR-43・SC-71）。 */}
+      <section className="card" aria-label="最近の議論" style={{ marginTop: "var(--space-4)" }}>
+        <div className="section-head">
+          <h2 style={{ fontSize: "var(--text-lg)" }}>🕒 最近の議論</h2>
+          <span className="muted text-xs">タスクチャット・更新順</span>
+        </div>
+        {recentChats.length > 0 ? (
+          <ul className="unread-list">
+            {recentChats.map((c) => (
+              <li key={c.task_id}>
+                <Link className="unread-item" href={`/projects/${projectId}/tasks/${c.task_id}/chat`}>
+                  <span className="unread-item__title">💬 {c.title}</span>
+                  {c.unread_chat_count > 0
+                    ? <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                    : <span className="notif-time muted">{c.last_chat_at ? timeLabel(c.last_chat_at) : ""}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>まだタスクのチャットはありません。WBS の各タスクの「💬 チャット」から議論を始めると、ここに更新順で並びます。</p>
+        )}
+      </section>
 
       {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
       {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} ownerName={project.owner?.display_name ?? ""} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}

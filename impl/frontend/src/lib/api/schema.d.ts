@@ -2571,6 +2571,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/recent-chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Task Chats */
+        get: operations["recent_task_chats_api_v1_projects__project_id__recent_chats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}": {
         parameters: {
             query?: never;
@@ -8216,6 +8233,22 @@ export interface components {
             is_read: boolean;
             /** Unread Count */
             unread_count: number;
+        };
+        /** RecentTaskChatDTO */
+        RecentTaskChatDTO: {
+            /** Task Id */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Unread Chat Count */
+            unread_chat_count: number;
+            /** Last Chat At */
+            last_chat_at?: string | null;
+        };
+        /** RecentTaskChatsResponse */
+        RecentTaskChatsResponse: {
+            /** Items */
+            items: components["schemas"]["RecentTaskChatDTO"][];
         };
         /** RefDTO */
         RefDTO: {
@@ -14071,6 +14104,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recent_task_chats_api_v1_projects__project_id__recent_chats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentTaskChatsResponse"];
                 };
             };
             /** @description Validation Error */
