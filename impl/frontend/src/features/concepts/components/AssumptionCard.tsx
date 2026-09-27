@@ -12,12 +12,13 @@ const VERDICT_LABEL: Record<string, [string, string]> = {
   inconclusive: ["保留", "badge badge-muted"], supported: ["支持", "badge badge-success"], refuted: ["反証", "badge badge-danger"],
 };
 
-export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditValidation, onDeleteValidation, onUnlink, reloadToken }: {
+export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditValidation, onDuplicateValidation, onDeleteValidation, onUnlink, reloadToken }: {
   a: ConceptAssumption;
   threadHref: string | null;
   canManage: boolean;
   onValidate: () => void;
   onEditValidation: (v: Validation) => void;
+  onDuplicateValidation: (v: Validation) => void;
   onDeleteValidation: (v: Validation) => void;
   onUnlink: () => void;
   reloadToken: number; // bump で検証履歴を再取得（実績追加/編集/削除後）
@@ -77,7 +78,8 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
                       {canManage && (
                         <span className="validation-tools">
                           <button type="button" className="btn btn-outline btn-sm" onClick={() => onEditValidation(v)}>編集</button>
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDeleteValidation(v)}>削除</button>
+                          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDuplicateValidation(v)}>複製</button>
+                          <button type="button" className="btn btn-outline btn-danger btn-sm" onClick={() => onDeleteValidation(v)}>削除</button>
                         </span>
                       )}
                     </div>

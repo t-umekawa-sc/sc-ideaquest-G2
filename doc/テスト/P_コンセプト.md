@@ -59,6 +59,7 @@
 | P-TC-205 | api | 前提詳細（検証履歴＋リンク先＋related_info） | リンク有り前提 | `GET /assumptions/{id}` | validations 時系列・linked_concepts[]（criticality/is_stale）・related_info（target_type=assumptions） | P.3 |
 | P-TC-206 | api | 前提削除はリンク有りで 409（先に解除を促す） | リンク有り | `DELETE /assumptions/{id}` | 409（未リンクは 204） | P.3 |
 | P-TC-207 | api | 反証波及＝refuted で全リンク先 stale＋通知 | 前提を2コンセプトにリンク | `POST .../validations`（refuted） | 両コンセプトのリンク `is_stale=true`・各作成者＋評価者へ通知（H `info_refuting_raised` 相当/`assumption_refuted`） | P.7／§3.5 |
+| P-TC-259 | unit(front) | 実績（検証）ダイアログの入力検証はフィールド単位（§4.7）＝欠落項目だけを返す | `validateValidationInput` | 手法/実施日入力済み・規模のみ空／全入力／全欠落 | 規模のみ空→`scale` だけ／全入力→空／全欠落→3項目（受入不具合 2026-09-27＝「手法・実施日・規模は必須」まとめ表示の是正） | §4.7／SC-61 §4.4 |
 
 ## 4. コンセプト↔前提リンク API（P.4）
 

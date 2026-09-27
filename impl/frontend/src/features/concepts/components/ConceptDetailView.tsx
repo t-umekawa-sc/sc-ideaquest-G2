@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { ActivitySpark, Avatar, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useConfirm, useSnackbar } from "@/components/ui";
+import { ActivitySpark, Avatar, Field, FormFooterError, FormSummary, LoadingOverlay, Modal, ModalBody, ModalFooter, ScreenPurpose, useConfirm, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import type { FieldErrors } from "@/lib/forms/validation";
 import { QuestIcon } from "@/components/layout/QuestIcon";
 import { getScopeChat, getScopeChatActivity, type ChatActivity, type ChatMessage } from "@/features/chat/api";
 import { ConceptDecisionLogView, ConceptRevisionHistory } from "./ConceptHistory";
@@ -22,6 +23,7 @@ import {
   type AssumptionListResponse, type ConceptChatScopeItem, type ConceptDetail, type ConceptVoteType, type EvaluationAggregate, type Validation,
 } from "../api";
 import { AssumptionCard } from "./AssumptionCard";
+import { validateValidationInput } from "../validation";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
 
@@ -86,7 +88,9 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   // 実績入力（検証追記・P.3）ダイアログ＝どの前提に対して、手法/判定/実施日/規模/結果。
   const [valDialog, setValDialog] = useState<{ assumptionId: string; validationId?: string; method: string; verdict: "supported" | "refuted" | "inconclusive"; validatedOn: string; scale: string; result: string } | null>(null);
   const [valSaving, setValSaving] = useState(false);
+  const [valErrors, setValErrors] = useState<FieldErrors>({}); // 実績（検証）入力のフィールド別エラー（§4.7）
   const [valReloadToken, setValReloadToken] = useState(0); // 実績追加後に検証履歴を再取得させる
+  const { summaryRef: valSummaryRef, notify: valNotify } = useFormErrorNotice(); // §4.7＝上部サマリへスクロール＋自動消滅スナックバー
 
   const load = useCallback(async () => {
     const c = await getConcept(conceptId);
@@ -183,21 +187,32 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const openValidate = (assumptionId: string) => {
     const d = new Date();
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setValErrors({}); // 開くたびにリセット（§4.7）
     setValDialog({ assumptionId, method: "", verdict: "supported", validatedOn: iso, scale: "", result: "" });
   };
   // 実績の編集＝既存イベントをプリフィルして開く（編集可・版管理はコンセプト側で記録）。
   const openEditValidation = (assumptionId: string, v: Validation) => {
+    setValErrors({}); // 開くたびにリセット（§4.7）
     setValDialog({
       assumptionId, validationId: v.id, method: v.method, verdict: v.verdict as "supported" | "refuted" | "inconclusive",
       validatedOn: v.validated_on, scale: v.scale ?? "", result: v.result ?? "",
     });
   };
+  // 実績の複製＝既存イベントの値を初期表示にした「追加モード」で開く（validationId 無し＝保存で別レコード新規作成・デザイン標準 §4.5 複製標準）。
+  const openDuplicateValidation = (assumptionId: string, v: Validation) => {
+    setValErrors({}); // 開くたびにリセット（§4.7）
+    setValDialog({
+      assumptionId, method: v.method, verdict: v.verdict as "supported" | "refuted" | "inconclusive",
+      validatedOn: v.validated_on, scale: v.scale ?? "", result: v.result ?? "",
+    });
+  };
   const saveValidation = async () => {
     if (!valDialog || valSaving) return;
-    // 主ボタンは常に押せる（デザイン標準 §4.1）。手法・実施日・規模は必須（§4.4）。
-    if (!valDialog.method.trim() || !valDialog.validatedOn || !valDialog.scale.trim()) {
-      snack({ type: "error", title: "手法・実施日・規模は必須です" }); return;
-    }
+    // 主ボタンは常に押せる（デザイン標準 §4.1）。検証は §4.7＝フィールド単位でインライン＋上部サマリ＋足元ヒント＋自動消滅トースト。
+    const fe = validateValidationInput({ method: valDialog.method, validatedOn: valDialog.validatedOn, scale: valDialog.scale });
+    setValErrors(fe);
+    const list = Object.values(fe).filter(Boolean);
+    if (list.length) { valNotify(list); return; }
     setValSaving(true);
     const body = {
       method: valDialog.method.trim(), verdict: valDialog.verdict, validated_on: valDialog.validatedOn,
@@ -344,6 +359,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
                     reloadToken={valReloadToken}
                     onValidate={() => openValidate(a.assumption_id)}
                     onEditValidation={(v) => openEditValidation(a.assumption_id, v)}
+                    onDuplicateValidation={(v) => openDuplicateValidation(a.assumption_id, v)}
                     onDeleteValidation={(v) => void deleteValidationHandler(a.assumption_id, v)}
                     onUnlink={() => void doUnlink(a.assumption_id, a.statement)}
                   />
@@ -576,34 +592,31 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
       {valDialog && (
         <Modal open onClose={() => setValDialog(null)} title={valDialog.validationId ? "実績（検証）を編集" : "実績（検証）を入力"} size="md">
           <ModalBody>
+            <FormSummary title="入力内容をご確認ください" errors={Object.values(valErrors).filter(Boolean)} innerRef={valSummaryRef} />
             <p className="role-note" style={{ marginTop: 0 }}>この前提の検証結果を追記します（判定が反証に転じるとリンク先の全コンセプトが「要再評価」になります）。</p>
-            <div className="field dialog-section is-quiet">
-              <label htmlFor="val_method">検証方法 <span className="req">*</span></label>
-              <input id="val_method" className="input" value={valDialog.method} onChange={(e) => setValDialog((d) => (d ? { ...d, method: e.target.value } : d))} placeholder="例: 想定顧客20名にインタビュー" />
-            </div>
-            <div className="field dialog-section is-quiet">
-              <label htmlFor="val_verdict">判定 <span className="req">*</span></label>
+            <Field className="dialog-section is-quiet" id="val_method" label="検証方法" required error={valErrors.method}>
+              <input id="val_method" className="input" value={valDialog.method} onChange={(e) => { setValDialog((d) => (d ? { ...d, method: e.target.value } : d)); setValErrors((x) => ({ ...x, method: "" })); }} placeholder="例: 想定顧客20名にインタビュー" />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_verdict" label="判定" required>
               <select id="val_verdict" className="select" value={valDialog.verdict} onChange={(e) => setValDialog((d) => (d ? { ...d, verdict: e.target.value as "supported" | "refuted" | "inconclusive" } : d))}>
                 <option value="supported">支持</option>
                 <option value="refuted">反証</option>
                 <option value="inconclusive">保留</option>
               </select>
-            </div>
-            <div className="field dialog-section is-quiet">
-              <label htmlFor="val_date">検証実施日 <span className="req">*</span></label>
-              <input id="val_date" type="date" className="input" value={valDialog.validatedOn} onChange={(e) => setValDialog((d) => (d ? { ...d, validatedOn: e.target.value } : d))} />
-            </div>
-            <div className="field dialog-section is-quiet">
-              <label htmlFor="val_scale">規模（サンプル数/対象） <span className="req">*</span></label>
-              <input id="val_scale" className="input" value={valDialog.scale} onChange={(e) => setValDialog((d) => (d ? { ...d, scale: e.target.value } : d))} placeholder="例: n=20 / 主要顧客3社" />
-            </div>
-            <div className="field dialog-section is-quiet">
-              <label htmlFor="val_result">結果（任意）</label>
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_date" label="検証実施日" required error={valErrors.validatedOn}>
+              <input id="val_date" type="date" className="input" value={valDialog.validatedOn} onChange={(e) => { setValDialog((d) => (d ? { ...d, validatedOn: e.target.value } : d)); setValErrors((x) => ({ ...x, validatedOn: "" })); }} />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_scale" label="規模（サンプル数/対象）" required error={valErrors.scale}>
+              <input id="val_scale" className="input" value={valDialog.scale} onChange={(e) => { setValDialog((d) => (d ? { ...d, scale: e.target.value } : d)); setValErrors((x) => ({ ...x, scale: "" })); }} placeholder="例: n=20 / 主要顧客3社" />
+            </Field>
+            <Field className="dialog-section is-quiet" id="val_result" label="結果（任意）">
               <textarea id="val_result" className="textarea" rows={3} value={valDialog.result} onChange={(e) => setValDialog((d) => (d ? { ...d, result: e.target.value } : d))} placeholder="検証で分かったこと" />
-            </div>
+            </Field>
           </ModalBody>
           <ModalFooter>
             <button type="button" className="btn btn-outline dialog-close-left" onClick={() => setValDialog(null)}>キャンセル</button>
+            <FormFooterError show={Object.values(valErrors).some(Boolean)} />
             <button type="button" className="btn btn-primary" disabled={valSaving} onClick={() => void saveValidation()}>{valDialog.validationId ? "更新" : "追記"}</button>
           </ModalFooter>
         </Modal>
