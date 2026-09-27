@@ -1,63 +1,65 @@
 "use client";
 
-// プロジェクト作成/メタ入力ダイアログ（FR-43・Q.1）。SC-61「開発を始める」＝コンセプトから初期値／
-// SC-70「＋ プロジェクトを作成」＝コンセプト無し（単純タスク管理）で共有。§4.7 検証（§2.1b）。
-// 実 API 結線＝conceptId 有り: POST /concepts/{id}/project／無し: POST /projects。作成後は遷移せず閉じる（ユーザー要望）。
+// プロジェクト作成/編集フォーム本体（FR-43・Q.1）＝**モーダル content のみ**（Modal シェルは RouteModal/Panel が提供）。
+// クエスト（QuestForm）と同じ URL 付きモーダル方式（Parallel＋Intercept・§112）に統一。
+// 作成: conceptId 有り POST /concepts/{id}/project／無し POST /projects。編集: projectId で詳細＋メンバーを取得し PATCH。
 import { useEffect, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { ApiError } from "@/lib/api/client";
 
-import { addProjectMember, createProject, createProjectFromConcept, listProjectMembers, patchProject, patchProjectMember, removeProjectMember } from "../api";
-import type { ProjectDetail, ProjectRole, ProjectStatus } from "../types";
+import { addProjectMember, createProject, createProjectFromConcept, getProject, listProjectMembers, patchProject, patchProjectMember, removeProjectMember } from "../api";
+import type { ProjectRole, ProjectStatus } from "../types";
 import { ProjectPartyPicker, PROJECT_GROUP_OPTIONS, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
 
 const STATUS_LABEL: Record<ProjectStatus, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
 
-export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerName, onClose, onCreated, onUpdated }: {
+export function ProjectForm({ mode = "create", projectId, prefill, conceptId, conceptTitle, ownerName, onDone, onCancel }: {
+  mode?: "create" | "edit";
+  projectId?: string;              // 編集時＝対象プロジェクト（詳細/メンバーを本体で取得）
   prefill?: ProjectPrefill;
-  conceptId?: string | null;   // 由来コンセプト（無ければコンセプト非依存＝単純タスク管理）
+  conceptId?: string | null;       // 由来コンセプト（無ければコンセプト非依存＝単純タスク管理）
   conceptTitle?: string | null;
-  project?: ProjectDetail | null;  // 指定時＝編集モード（PATCH /projects/{id}）
   ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行）
-  onClose: () => void;
-  onCreated?: (projectId: string) => void;
-  onUpdated?: () => void;
+  onDone: (to?: string) => void;   // 成功（作成/更新）後の閉じ（RouteModal の close／Panel の遷移）
+  onCancel: (to?: string) => void; // キャンセル
 }) {
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
-  const isEdit = !!project;
-  const dep0 = (project?.deployment ?? {}) as Record<string, string>;
+  const isEdit = mode === "edit";
 
-  const [title, setTitle] = useState(project?.title ?? prefill?.title ?? "");
-  const [description, setDescription] = useState(project?.description ?? prefill?.description ?? "");
-  const [status, setStatus] = useState<ProjectStatus>((project?.status as ProjectStatus) ?? "planning");
-  const [launchStatus, setLaunchStatus] = useState(dep0.launch_status ?? prefill?.launch_status ?? "");
-  const [plan, setPlan] = useState(dep0.plan ?? prefill?.plan ?? "");
-  const [kpi, setKpi] = useState(dep0.kpi ?? prefill?.kpi ?? "");
+  const [loading, setLoading] = useState(isEdit);
+  const [title, setTitle] = useState(prefill?.title ?? (conceptId && conceptTitle ? `${conceptTitle} 開発` : ""));
+  const [description, setDescription] = useState(prefill?.description ?? "");
+  const [status, setStatus] = useState<ProjectStatus>("planning");
+  const [launchStatus, setLaunchStatus] = useState(prefill?.launch_status ?? "");
+  const [plan, setPlan] = useState(prefill?.plan ?? "");
+  const [kpi, setKpi] = useState(prefill?.kpi ?? "");
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
   const [initialMembers, setInitialMembers] = useState<PickedMember[]>([]);  // 編集時の差分計算基準
   const [accessGroups, setAccessGroups] = useState<string[]>([]);  // 参加グループ（アクセス条件）＝候補スコープ（試作・未永続）
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
-  // 閉じアニメ＝Modal の open を false にして exit を再生→onClosed で親に unmount 依頼（直 unmount だとアニメ無し）。
-  const [open, setOpen] = useState(true);
-  const requestClose = () => setOpen(false);
 
-  // 編集時＝現在の開発メンバーを取得してピッカーの初期値に（保存時に差分で add/patch/remove）。
+  // 編集時＝詳細＋開発メンバーを取得してフォーム初期値に（保存時に差分で add/patch/remove）。
   useEffect(() => {
-    if (!project) return;
+    if (!isEdit || !projectId) return;
     let alive = true;
-    void listProjectMembers(project.id).then(({ members }) => {
-      if (!alive) return;
-      const picked = members.filter((m) => m.user).map((m) => ({ user: m.user!, role: m.role as ProjectRole }));
+    void Promise.all([getProject(projectId), listProjectMembers(projectId)]).then(([p, m]) => {
+      if (!alive || !p) { if (alive) setLoading(false); return; }
+      const dep = (p.deployment ?? {}) as Record<string, string>;
+      setTitle(p.title); setDescription(p.description ?? "");
+      setStatus((p.status as ProjectStatus) ?? "planning");
+      setLaunchStatus(dep.launch_status ?? ""); setPlan(dep.plan ?? ""); setKpi(dep.kpi ?? "");
+      const picked = m.members.filter((x) => x.user).map((x) => ({ user: x.user!, role: x.role as ProjectRole }));
       setDevMembers(picked); setInitialMembers(picked);
+      setLoading(false);
     });
     return () => { alive = false; };
-  }, [project]);
+  }, [isEdit, projectId]);
 
   function validate(): FieldErrors {
     const e: FieldErrors = {};
@@ -81,19 +83,17 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
     setSaving(true);
     const deployment = buildDeployment();
     try {
-      if (isEdit) {
-        await patchProject(project!.id, { title: title.trim(), description: description.trim() || null, status, deployment });
-        // 開発メンバーの差分を反映（追加/役割変更/削除）＝ProjectMembersModal と同じ委譲。
+      if (isEdit && projectId) {
+        await patchProject(projectId, { title: title.trim(), description: description.trim() || null, status, deployment });
         const before = new Map(initialMembers.map((m) => [m.user.user_id, m.role]));
         const after = new Map(devMembers.map((m) => [m.user.user_id, m.role]));
-        for (const [uid] of before) if (!after.has(uid)) await removeProjectMember(project!.id, uid);
+        for (const [uid] of before) if (!after.has(uid)) await removeProjectMember(projectId, uid);
         for (const [uid, role] of after) {
-          if (!before.has(uid)) await addProjectMember(project!.id, uid, role);
-          else if (before.get(uid) !== role) await patchProjectMember(project!.id, uid, role);
+          if (!before.has(uid)) await addProjectMember(projectId, uid, role);
+          else if (before.get(uid) !== role) await patchProjectMember(projectId, uid, role);
         }
         snack({ type: "success", title: "プロジェクトを更新しました" });
-        onUpdated?.();
-        requestClose();
+        onDone();
         return;
       }
       const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
@@ -102,8 +102,7 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
         : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members });
       const memberNote = devMembers.length ? `／開発メンバー ${devMembers.length} 名` : "";
       snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "単純タスク管理プロジェクトを作成しました。") + memberNote });
-      if (created) onCreated?.(created.id);
-      requestClose();
+      onDone(created ? `/projects/${created.id}` : undefined);
     } catch (e) {
       setSaving(false);
       if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "保存できませんでした", msg: "このコンセプトのプロジェクトは既に存在するか、go 判定ではありません。" });
@@ -112,8 +111,10 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
     }
   }
 
+  if (loading) return <ModalBody><p className="muted">読み込み中…</p></ModalBody>;
+
   return (
-    <Modal open={open} onClose={requestClose} onClosed={onClose} title={isEdit ? "プロジェクトを編集" : "プロジェクトを作成"} size="xl">
+    <form onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
       <ModalBody>
         <FormSummary title="入力内容をご確認ください" errors={Object.values(errors).filter(Boolean)} innerRef={summaryRef} />
         {isEdit ? (
@@ -152,16 +153,16 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
           <span className="hint">選んだグループの所属者を候補・アクセス範囲にします（未選択なら全社）。開発メンバーは下で追加します。</span>
         </Field>
 
-        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・作成者は固定 owner 行・§2.1c）。編集時も同じ UI で管理（保存時に差分反映）。グループは上位 Field で controlled。 */}
+        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲。作成者は固定 owner 行・グループは上位 Field で controlled。 */}
         <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
           <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel={isEdit ? "作成者" : "あなた・作成者"} groupFilter={accessGroups} onGroupFilter={setAccessGroups} />
         </Field>
       </ModalBody>
       <ModalFooter>
-        <button type="button" className="btn btn-outline dialog-close-left" onClick={requestClose}>キャンセル</button>
+        <button type="button" className="btn btn-outline dialog-close-left" onClick={() => onCancel()}>キャンセル</button>
         <FormFooterError show={Object.values(errors).some(Boolean)} />
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={save}>{isEdit ? "保存する" : "プロジェクトを作成"}</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{isEdit ? "保存する" : "プロジェクトを作成"}</button>
       </ModalFooter>
-    </Modal>
+    </form>
   );
 }

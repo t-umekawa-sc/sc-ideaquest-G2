@@ -9,5 +9,5 @@ export default async function ConceptDetailPage({ params }: { params: Promise<{ 
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { conceptId } = await params;
-  return <ConceptDetailView conceptId={conceptId} viewerName={session.user.display_name} />;
+  return <ConceptDetailView conceptId={conceptId} />;
 }

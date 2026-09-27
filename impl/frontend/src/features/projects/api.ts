@@ -17,6 +17,9 @@ export type ProjectPatchInput = components["schemas"]["ProjectPatchRequest"];
 export type MemberInput = components["schemas"]["MemberInputDTO"];
 export type ProjectRole = "lead" | "member";
 
+// URL 付きモーダル（別ルート）での作成/編集/削除を一覧・詳細（別ルート）へ伝える跨ルート更新イベント。
+export const PROJECTS_CHANGED_EVENT = "projects:changed";
+
 // ---- projects ----
 export async function listProjects(): Promise<ProjectListItem[]> {
   const res = await apiFetch<components["schemas"]["ProjectListResponse"]>("/projects");

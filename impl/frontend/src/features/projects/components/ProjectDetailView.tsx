@@ -12,14 +12,10 @@ import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { timeLabel } from "@/features/notifications/time";
-import { createTask, deleteTask, getProject, listProjectMembers, listProjectTasks, listRecentTaskChats, patchTask } from "../api";
+import { deleteTask, getProject, listProjectMembers, listProjectTasks, listRecentTaskChats, patchTask, PROJECTS_CHANGED_EVENT } from "../api";
 import type { RecentTaskChat } from "../api";
 import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
 import "@/features/dashboard/dashboard.css"; // 🕒最近の議論の一覧クラス（.unread-list/.unread-item）をダッシュボードから踏襲（§2.1c）
-import { TaskForm, type TaskSavePayload } from "./TaskForm";
-import { ProjectForm } from "./ProjectForm";
-import { ProjectDeploymentModal } from "./ProjectDeploymentModal";
-import { ProjectMembersModal } from "./ProjectMembersModal";
 import "@/features/quests/quests.css"; // パーティー一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
 import "../projects.css";
 
@@ -50,10 +46,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
   const [tab, setTab] = useState<"wbs" | "members" | "deploy">("wbs");
   const [wbsFilter, setWbsFilter] = useState<WbsFilter>("all");
-  const [taskForm, setTaskForm] = useState<{ task?: TaskNode | null; parentId?: string | null; dup?: TaskNode | null } | null>(null);
-  const [membersOpen, setMembersOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [deployOpen, setDeployOpen] = useState(false);
 
   const reloadAll = useCallback(async () => {
     const [p, t, m, rc] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId), listRecentTaskChats(projectId)]);
@@ -67,7 +59,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   useEffect(() => {
     let alive = true;
     void reloadAll().finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    // URL 付きモーダル（別ルート）での作成/編集/削除の跨ルート通知で再取得。
+    const on = () => { void reloadAll(); };
+    window.addEventListener(PROJECTS_CHANGED_EVENT, on);
+    return () => { alive = false; window.removeEventListener(PROJECTS_CHANGED_EVENT, on); };
   }, [reloadAll]);
 
   const canManage = project?.my_permissions.can_manage_tasks ?? false;
@@ -79,18 +74,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       snack({ type: "success", title: "状態を更新しました", msg: becameDone ? "完了により開発XP＋コインを獲得しました。" : undefined });
       await reloadTasks();
     } catch { snack({ type: "error", title: "更新できませんでした", msg: "権限をご確認ください。" }); }
-  }
-
-  // 作成/編集を実 API へ（子タスクの子…と任意深さで入れ子可）。
-  async function applyTaskSave(p: TaskSavePayload) {
-    try {
-      if (p.id) {
-        await patchTask(p.id, { kind: p.kind, title: p.title, description: p.description || null, assignee_account_id: p.assigneeId || null, status: p.status, due_date: p.dueDate || null, parent_task_id: p.parentId });
-      } else {
-        await createTask(projectId, { parent_task_id: p.parentId, kind: p.kind, title: p.title, description: p.description || null, assignee_account_id: p.assigneeId || null, status: p.status, due_date: p.dueDate || null, sort_order: 999 });
-      }
-      await reloadTasks();
-    } catch { snack({ type: "error", title: "保存できませんでした", msg: "入力・権限をご確認ください。" }); }
   }
 
   async function delTask(node: TaskNode) {
@@ -128,14 +111,15 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       default: return true;
     }
   });
+  // 統一順＝詳細を開く（＝編集）→💬チャット→状態/子/複製→削除。URL 付きモーダル（クエストと同方式・§112）。
   const wbsMenu = (t: FlatTask): RowMenuItem[] => [
+    { label: "編集", onClick: () => router.push(`/projects/${projectId}/tasks/${t.id}/edit`) },
     { label: "💬 チャット", onClick: () => router.push(`/projects/${projectId}/tasks/${t.id}/chat`) },
     t.status !== "done"
       ? { label: "完了にする", onClick: () => void quickStatus(t, "done") }
       : { label: "未完了に戻す", onClick: () => void quickStatus(t, "todo") },
-    { label: "子タスクを追加", onClick: () => setTaskForm({ task: null, parentId: t.id }) },
-    { label: "編集", onClick: () => setTaskForm({ task: t }) },
-    { label: "複製", onClick: () => setTaskForm({ task: null, parentId: t.parent_task_id, dup: t }) },
+    { label: "子タスクを追加", onClick: () => router.push(`/projects/${projectId}/tasks/new?parent=${t.id}`) },
+    { label: "複製", onClick: () => router.push(`/projects/${projectId}/tasks/new?dup=${t.id}`) },
     { label: "削除", danger: true, onClick: () => void delTask(t) },
   ];
   const wbsColumns: DataTableColumn<FlatTask>[] = [
@@ -168,7 +152,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           {/* クエスト詳細と同じ既定フォント（.quest-head h1）＝page-title の pixel フォントは使わない（ユーザー要望）。 */}
           <h1 style={{ margin: 0 }}>{project.title}</h1>
           <span className={P_STATUS_CLS[project.status]}>{P_STATUS_LABEL[project.status]}</span>
-          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" style={{ marginLeft: "auto" }} onClick={() => setEditOpen(true)}>編集</button>}
+          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" style={{ marginLeft: "auto" }} onClick={() => router.push(`/projects/${projectId}/edit`)}>編集</button>}
         </div>
         {project.description && <p className="muted" style={{ marginTop: 6 }}>{project.description}</p>}
         <div className="proj-head__meta">
@@ -225,7 +209,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 </label>
               ))}
             </div>
-            {canManage && <button type="button" className="btn btn-primary" onClick={() => setTaskForm({ task: null, parentId: null })}>＋ タスク追加</button>}
+            {canManage && <button type="button" className="btn btn-primary" onClick={() => router.push(`/projects/${projectId}/tasks/new`)}>＋ タスク追加</button>}
           </div>
           <DataTable<FlatTask>
             storageKey="sc71-wbs"
@@ -238,7 +222,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             searchFields="タスク名"
             exportName="WBS"
             emptyText="まだタスクがありません。「＋ タスク追加」から作成できます。"
-            onRowClick={(t) => setTaskForm({ task: t })}
+            onRowClick={(t) => router.push(`/projects/${projectId}/tasks/${t.id}/edit`)}
             pins={false}
             defaultView="list"
             cardLayout={(t) => ({
@@ -262,7 +246,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section aria-label="開発メンバー">
           <div className="list-toolbar">
             <div className="muted text-sm">開発メンバーとイノベーション担当（所有者/管理権限者が編集可）</div>
-            {project.my_permissions.can_manage_members && <button type="button" className="btn btn-outline btn-sm" onClick={() => setMembersOpen(true)}>開発メンバーを管理</button>}
+            {project.my_permissions.can_manage_members && <button type="button" className="btn btn-outline btn-sm" onClick={() => router.push(`/projects/${projectId}/members`)}>開発メンバーを管理</button>}
           </div>
 
           <h3 className="proj-members-group">開発メンバー</h3>
@@ -306,7 +290,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section className="card proj-section" aria-label="導入・価値実現">
           <div className="proj-section__head">
             <h2 style={{ margin: 0 }}>導入・価値実現</h2>
-            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" onClick={() => setDeployOpen(true)}>編集</button>}
+            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" onClick={() => router.push(`/projects/${projectId}/deployment`)}>編集</button>}
           </div>
           {(() => { const dep = (project.deployment ?? {}) as DeploymentMeta; return (
           <dl className="proj-deploy">
@@ -318,10 +302,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         </section>
       )}
 
-      {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
-      {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} ownerName={project.owner?.display_name ?? ""} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}
-      {editOpen && <ProjectForm project={project} ownerName={project.owner?.display_name ?? ""} onClose={() => setEditOpen(false)} onUpdated={() => void reloadAll()} />}
-      {deployOpen && <ProjectDeploymentModal projectId={projectId} deployment={(project.deployment ?? {}) as DeploymentMeta} onClose={() => setDeployOpen(false)} onSaved={() => void reloadAll()} />}
     </section>
   );
 }

@@ -11,9 +11,8 @@ import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/component
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
-import { createProject, deleteProject, getProject, listProjectMembers, listProjects } from "../api";
-import type { ProjectDetail, ProjectListItem, ProjectStatus } from "../types";
-import { ProjectForm } from "./ProjectForm";
+import { createProject, deleteProject, getProject, listProjectMembers, listProjects, PROJECTS_CHANGED_EVENT } from "../api";
+import type { ProjectListItem, ProjectStatus } from "../types";
 import "../projects.css";
 
 const STATUS_LABEL: Record<string, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
@@ -23,24 +22,21 @@ const STATUS_OPTIONS: [string, string][] = (Object.keys(STATUS_LABEL) as Project
 function fmtDate(iso: string): string {
   return iso ? iso.slice(0, 10).replaceAll("-", "/") : "—";
 }
-export function ProjectListView({ ownerName }: { ownerName: string }) {
+export function ProjectListView() {
   const router = useRouter();
   const snack = useSnackbar();
   const confirm = useConfirm();
   const [rows, setRows] = useState<ProjectListItem[] | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editProject, setEditProject] = useState<ProjectDetail | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = () => { void listProjects().then(setRows); };
-  useEffect(() => { reload(); }, []);
-
-  // 編集＝詳細を取得してから編集モードの ProjectForm を開く（PATCH /projects/{id}）。
-  async function openEdit(p: ProjectListItem) {
-    const detail = await getProject(p.id);
-    if (detail) setEditProject(detail);
-    else snack({ type: "error", title: "開けませんでした", msg: "権限またはネットワークをご確認ください。" });
-  }
+  // 初回＋URL 付きモーダル（別ルート）での作成/編集/削除の跨ルート通知で再取得。
+  useEffect(() => {
+    reload();
+    const on = () => reload();
+    window.addEventListener(PROJECTS_CHANGED_EVENT, on);
+    return () => window.removeEventListener(PROJECTS_CHANGED_EVENT, on);
+  }, []);
 
   // 複製＝標準タスク管理として複製（コンセプト1:1制約を避けるため由来コンセプトは引き継がない）。詳細＋メンバーをコピー。
   async function duplicate(p: ProjectListItem) {
@@ -77,7 +73,7 @@ export function ProjectListView({ ownerName }: { ownerName: string }) {
   // 操作メニューの並び＝統一順（詳細を開く→編集→複製→削除）。
   const rowMenu = (p: ProjectListItem): RowMenuItem[] => [
     { label: "詳細を開く", onClick: () => router.push(`/projects/${p.id}`) },
-    { label: "編集", onClick: () => void openEdit(p) },
+    { label: "編集", onClick: () => router.push(`/projects/${p.id}/edit`) },
     { label: "複製", onClick: () => void duplicate(p) },
     { label: "削除", danger: true, onClick: () => void remove(p) },
   ];
@@ -104,7 +100,7 @@ export function ProjectListView({ ownerName }: { ownerName: string }) {
       <Link className="backlink backlink--float" href="/">← ダッシュボードへ戻る</Link>
       <div className="page-head">
         <h1>プロジェクト一覧</h1>
-        <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>＋ プロジェクトを作成</button>
+        <Link href="/projects/new" className="btn btn-primary">＋ プロジェクトを作成</Link>
       </div>
       <p className="muted text-sm" style={{ marginBottom: "var(--space-4)" }}>
         ソリューション開発（ISO ④⑤）＝タスク管理。コンセプトから起票（詳細の「開発を始める」）／コンセプト無しの単純タスク管理は「＋ プロジェクトを作成」から。
@@ -153,9 +149,6 @@ export function ProjectListView({ ownerName }: { ownerName: string }) {
           )}
         />
       )}
-
-      {createOpen && <ProjectForm ownerName={ownerName} onClose={() => setCreateOpen(false)} onCreated={reload} />}
-      {editProject && <ProjectForm project={editProject} ownerName={editProject.owner?.display_name ?? ownerName} onClose={() => setEditProject(null)} onUpdated={reload} />}
     </section>
   );
 }

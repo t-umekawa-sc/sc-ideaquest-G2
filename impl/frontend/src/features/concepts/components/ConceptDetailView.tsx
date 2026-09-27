@@ -24,7 +24,6 @@ import {
 } from "../api";
 import { AssumptionCard } from "./AssumptionCard";
 import { validateValidationInput } from "../validation";
-import { ProjectForm } from "@/features/projects/components/ProjectForm";
 import "@/features/ideas/ideas.css"; // 共有ヘッダー/投票/レイアウトのクラス（.idea-head/.idea-rail/.vote-* 等）
 import "../concepts.css";
 
@@ -68,7 +67,7 @@ function ConceptGuide() {
   );
 }
 
-export function ConceptDetailView({ conceptId, viewerName = "あなた" }: { conceptId: string; viewerName?: string }) {
+export function ConceptDetailView({ conceptId }: { conceptId: string }) {
   const router = useRouter();
   const snack = useSnackbar();
   const confirm = useConfirm();
@@ -90,7 +89,6 @@ export function ConceptDetailView({ conceptId, viewerName = "あなた" }: { con
   const [valDialog, setValDialog] = useState<{ assumptionId: string; validationId?: string; method: string; verdict: "supported" | "refuted" | "inconclusive"; validatedOn: string; scale: string; result: string } | null>(null);
   const [valSaving, setValSaving] = useState(false);
   const [valErrors, setValErrors] = useState<FieldErrors>({}); // 実績（検証）入力のフィールド別エラー（§4.7）
-  const [devStartOpen, setDevStartOpen] = useState(false); // 「開発を始める」＝プロジェクト起票ダイアログ（FR-43）
   const [valReloadToken, setValReloadToken] = useState(0); // 実績追加後に検証履歴を再取得させる
   const { summaryRef: valSummaryRef, notify: valNotify } = useFormErrorNotice(); // §4.7＝上部サマリへスクロール＋自動消滅スナックバー
 
@@ -528,7 +526,7 @@ export function ConceptDetailView({ conceptId, viewerName = "あなた" }: { con
             {/* go 判定なら「開発を始める」＝メタ入力ダイアログ（コンセプトから初期値）→作成→閉じる（遷移なし・FR-43・SC-71）。 */}
             {concept.decision === "go" && (
               <div className="decision-dev-start" style={{ marginTop: "var(--space-3)" }}>
-                <button type="button" className="btn btn-primary" style={{ width: "100%" }} onClick={() => setDevStartOpen(true)}>🛠 開発を始める（プロジェクト起票）</button>
+                <button type="button" className="btn btn-primary" style={{ width: "100%" }} onClick={() => router.push(`/projects/new?concept=${conceptId}&conceptTitle=${encodeURIComponent(concept.title)}`)}>🛠 開発を始める（プロジェクト起票）</button>
                 <p className="vote-note" style={{ marginTop: 6 }}>go 判定コンセプトをソリューション開発（ISO ④⑤）へ受け渡します（FR-43・プロジェクト＝タスク管理）。</p>
               </div>
             )}
@@ -631,19 +629,6 @@ export function ConceptDetailView({ conceptId, viewerName = "あなた" }: { con
         </Modal>
       )}
 
-      {/* 「開発を始める」＝プロジェクト起票ダイアログ（コンセプトから初期値・作成後は遷移せず閉じる・FR-43） */}
-      {devStartOpen && (
-        <ProjectForm
-          conceptId={conceptId}
-          conceptTitle={concept.title}
-          ownerName={viewerName}
-          prefill={{
-            title: `${concept.title} 開発`,
-            description: [concept.problem, concept.value_proposition].filter(Boolean).join("\n") || undefined,
-          }}
-          onClose={() => setDevStartOpen(false)}
-        />
-      )}
     </main>
   );
 }
