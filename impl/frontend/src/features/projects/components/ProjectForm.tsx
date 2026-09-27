@@ -5,10 +5,10 @@
 // 試作＝作成はデモ（トースト＋onCreated）。作成後は遷移せずダイアログを閉じる（ユーザー要望）。
 import { useState } from "react";
 
-import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 
-import { PROJECT_GROUP_OPTIONS, ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
+import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
 
@@ -27,9 +27,7 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
   const [launchStatus, setLaunchStatus] = useState(prefill?.launch_status ?? "");
   const [plan, setPlan] = useState(prefill?.plan ?? "");
   const [kpi, setKpi] = useState(prefill?.kpi ?? "");
-  const [groupIds, setGroupIds] = useState<string[]>([]);
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
-  const [candQuery, setCandQuery] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
 
@@ -80,28 +78,9 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
           <textarea id="p_kpi" className="textarea" rows={2} value={kpi} onChange={(e) => setKpi(e.target.value)} placeholder="価値実現の指標と実測（例: 問合せ削減率 目標30%）" />
         </Field>
 
-        {/* 参加グループ（アクセス条件）＝クエスト作成の同 Field を踏襲（独立 Field＝Multiselect＋hint・§2.1c）。 */}
-        <Field className="dialog-section is-quiet" id="p_groups" label="参加グループ（アクセス条件・任意）" hint="会社のグループを複数選択できます。未選択（0件）なら全社が候補になります。開発メンバー候補の範囲を絞るために使います。">
-          <Multiselect
-            id="p_groups"
-            options={PROJECT_GROUP_OPTIONS}
-            value={groupIds}
-            onChange={setGroupIds}
-            placeholder="グループを検索…（未選択なら全社）"
-            ariaLabel="参加グループ（アクセス条件）"
-            emptyText="該当するグループがありません"
-          />
-        </Field>
-
-        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝スコープ表示＋候補追加＋選択中一覧・§2.1c）。 */}
+        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・グループ/名前絞込は候補側に内包・§2.1c）。 */}
         <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
-          <ProjectPartyPicker
-            groupIds={groupIds}
-            members={devMembers}
-            onMembers={setDevMembers}
-            candQuery={candQuery}
-            onCandQuery={setCandQuery}
-          />
+          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} />
         </Field>
       </ModalBody>
       <ModalFooter>
