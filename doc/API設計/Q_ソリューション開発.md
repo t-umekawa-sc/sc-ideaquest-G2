@@ -21,7 +21,7 @@
 - **イノベーション担当**＝由来クエスト（`projects.quest_id`）のパーティー（`quest_members`）。**プロジェクトの参照＋チャット発言（＝口出し）を継承**（開発段でも関与を維持）。
 - **開発担当**＝プロジェクト単位の新メンバー `project_members`（`role=lead/member`・**会社内の任意ユーザー可**＝クエストパーティー外でもよい）。**タスク担当（assignee）はここに限る**。
 
-**アクセス門番**＝`can_access_project(project, user) = is_quest_party(project.quest_id, user) OR is_project_member(project.id, user)`。いずれでもないユーザーは閲覧・操作とも **404 `not_found`**（存在秘匿・§1.6）。
+**アクセス門番**＝`can_access_project(project, user) = is_quest_party(project.quest_id, user) OR is_project_member(project.id, user)`。いずれでもないユーザーは閲覧・操作とも **404 `not_found`**（存在秘匿・§1.6）。**コンセプト非依存プロジェクト（`quest_id` NULL）＝`is_quest_party` は常に false ＝ アクセスは owner＋`project_members` のみ**（イノベーション担当の継承なし）。
 
 | 操作 | 必要な権限 | 補足 |
 | --- | --- | --- |
@@ -44,7 +44,8 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `POST /concepts/{concept_id}/project` | go コンセプトからプロジェクト起票（1コンセプト1プロジェクト） | パス: `concept_id`／ボディ: `{title?, description?}`（既定 title=コンセプト名） | 201 `project`（下記詳細）。既に存在すれば 409 `conflict`／`decision≠go` は 409 `invalid_state` |
+| `POST /concepts/{concept_id}/project` | go コンセプトからプロジェクト起票（1コンセプト1プロジェクト） | パス: `concept_id`／ボディ: `{title?, description?, deployment?, members?〔{user_id,role}[]〕}`（既定 title=コンセプト名・内容で初期値） | 201 `project`（下記詳細）。既に存在すれば 409 `conflict`／`decision≠go` は 409 `invalid_state` |
+| `POST /projects` | **コンセプト非依存**の単純タスク管理プロジェクト作成（`concept_id`/`quest_id` NULL・2026-09-27 追加） | ボディ: `{title(必須), description?, deployment?, members?}` | 201 `project`。作成者が owner・アクセスは owner＋`project_members`（クエストパーティー継承なし・Q.0） |
 | `GET /projects` | プロジェクト一覧（SC-70・サーバー委譲 DataTable） | クエリ: §1.8（`q`/ソート/フィルタ＝`status`・`quest_id`・`concept_id`／進捗・担当で絞込） | `items[]`＝`{id, title, status, concept:{id,title}, quest:{id,title}, progress〔done/total〕, task_count, owner, updated_at}`・カーソル |
 | `GET /projects/{project_id}` | プロジェクト詳細（SC-71・合成） | パス: `project_id` | `project`＝`{id, title, description, status, deployment〔jsonb〕, external_link, concept, quest, owner, progress, my_permissions, created_at, updated_at}` |
 | `PATCH /projects/{project_id}` | プロジェクト編集（title/description/status/deployment/external_link） | パス＋ボディ（部分更新・無変更は info・デザイン標準 §14） | 200 `project` |

@@ -1,0 +1,75 @@
+/* ソリューション開発（FR-43・SC-70/71/72）＝既存トークン/クラス（design-system）を土台に最小の追加のみ。
+   §2.1c 踏襲＝共通クラス（.card/.badge/.btn/.input/.progress/.avatar 等）を再利用し、レイアウト補助だけ足す。 */
+
+/* SC-70 一覧 */
+/* カード（cardRaw・クエストカード同方式）＝見出し・由来は折り返して全文表示／進捗・タスク・更新は1行 */
+.proj-card { display: flex; flex-direction: column; gap: var(--space-2); }
+.proj-card__title { white-space: normal; overflow-wrap: anywhere; } /* 全文折り返し（省略しない） */
+.proj-card__meta { display: flex; align-items: center; gap: 8px 16px; color: var(--color-text-muted); font-size: var(--text-sm); }
+.proj-card__meta--stats { flex-wrap: nowrap; } /* 進捗＋タスク＋更新は1行固定 */
+.proj-card__meta--stats > span { white-space: nowrap; }
+.proj-card__origin-row { display: flex; min-width: 0; }
+.proj-card__origin { white-space: normal; overflow-wrap: anywhere; height: auto; } /* 由来も全文表示（省略しない） */
+
+.proj-members-group { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-md); }
+.proj-members-group:first-of-type { margin-top: var(--space-3); }
+
+.proj-progress { display: inline-flex; align-items: center; gap: 8px; }
+.proj-progress__bar { width: 84px; }
+.proj-progress__num { font-variant-numeric: tabular-nums; color: var(--color-text-muted); font-size: var(--text-sm); }
+.proj-owner { display: inline-flex; align-items: center; gap: 6px; }
+
+/* SC-71 詳細 */
+.proj-detail { display: flex; flex-direction: column; gap: var(--space-4); }
+.proj-head__top { display: flex; align-items: center; gap: 12px; }
+.proj-head__meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; color: var(--color-text-muted); font-size: var(--text-sm); }
+.proj-section { display: flex; flex-direction: column; gap: 10px; }
+.proj-section__head { display: flex; align-items: center; gap: 12px; }
+.proj-section__head h2 { font-size: var(--text-lg); }
+.proj-section__head > .btn { margin-left: auto; }
+
+/* メンバー一覧（SC-12 party 踏襲の軽量版） */
+.pmember-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pmember { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.pmember--readonly { background: var(--color-surface-alt); }
+.pmember__name { font-weight: 600; }
+.pmember__perms { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.proj-innov { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: var(--text-sm); }
+.proj-innov__chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface-alt); }
+
+/* メンバー編集モーダル（候補＋選択の2カラム＝party エディタ踏襲） */
+.pmembers-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pmembers-col { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 768px) { .pmembers-editor { grid-template-columns: 1fr; } }
+
+/* WBS ツリー */
+.wbs-tree, .wbs-children { list-style: none; margin: 0; padding: 0; }
+.wbs-children { }
+.wbs-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
+.wbs-row--done .wbs-title { color: var(--color-text-muted); text-decoration: line-through; }
+.wbs-kind { flex: none; }
+.wbs-title { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary); cursor: pointer; text-align: left; }
+.wbs-title:hover { text-decoration: underline; }
+.wbs-status { flex: none; }
+.wbs-roll { font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
+.wbs-assignee { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); }
+.wbs-due { font-size: var(--text-sm); }
+.wbs-actions { margin-left: auto; display: inline-flex; gap: 6px; }
+
+/* 導入・価値実現メタ */
+.proj-deploy { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 0; }
+.proj-deploy > div { display: grid; grid-template-columns: 140px 1fr; gap: 12px; }
+.proj-deploy dt { color: var(--color-text-muted); font-weight: 600; }
+.proj-deploy dd { margin: 0; }
+
+/* タスクチャットのドロワ（右下・試作） */
+.proj-chat-drawer { position: fixed; right: 16px; bottom: 16px; width: min(420px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; z-index: 60; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg, 0 8px 30px rgba(15,23,42,.18)); padding: 12px; }
+.proj-chat-drawer__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.proj-chat { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.proj-chat__msg { display: flex; gap: 8px; }
+.proj-chat__body { flex: 1; }
+.proj-chat__meta { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+.proj-chat__compose { display: flex; gap: 8px; }
+.proj-chat__compose .input { flex: 1; }
+
+.select-sm { height: 30px; padding: 2px 8px; font-size: var(--text-sm); }

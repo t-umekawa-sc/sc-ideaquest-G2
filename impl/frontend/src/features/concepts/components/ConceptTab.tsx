@@ -157,7 +157,8 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
     {
       key: "title", label: "名前", locked: true, width: 260, sortable: true, filter: { type: "text" },
       sortVal: (c) => c.title, searchVal: (c) => c.title, csvVal: (c) => c.title,
-      render: (c) => <Link href={`/concepts/${c.id}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openConcept(c.id); }}>{c.title}</Link>,
+      // 件名はリンクにしない＝行クリックで詳細へ（他一覧と統一）。リストは溢れを「…」省略（cell-wrap を付けない）。
+      render: (c) => c.title,
     },
     { key: "status", label: "状態", width: 110, sortable: true, filter: { type: "enum", options: STATUS_OPTIONS }, sortVal: (c) => STATUS_LABEL[c.status] ?? c.status, filterVal: (c) => STATUS_LABEL[c.status] ?? c.status, render: (c) => STATUS_LABEL[c.status] ?? c.status },
     { key: "decision", label: "判定", width: 110, sortable: true, filter: { type: "enum", options: DECISION_OPTIONS }, sortVal: (c) => DECISION_LABEL[c.decision] ?? c.decision, filterVal: (c) => DECISION_LABEL[c.decision] ?? c.decision, render: (c) => <span className={DECISION_CLS[c.decision] ?? "badge badge-muted"}>{DECISION_LABEL[c.decision] ?? c.decision}</span> },
