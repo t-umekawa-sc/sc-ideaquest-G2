@@ -1,33 +1,76 @@
-// ソリューション開発（FR-43）の取得関数＝デモデータ seam（フロントエンド実装フロー規約 §4）。
-// 接続フェーズでこの中身を実 API（GET/POST/PATCH /projects・/tasks…＝API設計 Q）に差し替える。
-// 画面/コンポーネントはこの関数だけを見る（fixtures か api かを1箇所で切り替え）。
-import {
-  DEMO_MEMBERS,
-  DEMO_PROJECTS,
-  DEMO_PROJECT_DETAIL,
-  DEMO_TASK_CHAT,
-  DEMO_TASKS,
-} from "./fixtures";
-import type { DemoChatMessage, ProjectDetail, ProjectListItem, ProjectMember, TaskNode, UserRef } from "./types";
+// ソリューション開発（FR-43・ドメイン Q）の取得/更新＝実 API（apiFetch）。型は OpenAPI codegen（schema.d.ts）。
+// タスクチャットは共有 IdeaChatView（別ルート）で駆動＝ここでは扱わない（listTaskChat は撤去）。
+import { apiFetch } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 
-const wait = <T,>(v: T): Promise<T> => Promise.resolve(v); // 遅延は入れない（試作）
+export type ProjectListItem = components["schemas"]["ProjectListItemDTO"];
+export type ProjectDetail = components["schemas"]["ProjectDetailDTO"];
+export type TaskNode = components["schemas"]["TaskDTO"];
+export type ProjectMember = components["schemas"]["ProjectMemberDTO"];
+export type UserRef = components["schemas"]["UserRefDTO"];
+export type MembersResponse = components["schemas"]["MembersResponse"];
+export type TaskCreateInput = components["schemas"]["TaskCreateRequest"];
+export type TaskPatchInput = components["schemas"]["TaskPatchRequest"];
+export type ProjectCreateInput = components["schemas"]["ProjectCreateRequest"];
+export type ProjectFromConceptInput = components["schemas"]["ProjectCreateFromConceptRequest"];
+export type ProjectPatchInput = components["schemas"]["ProjectPatchRequest"];
+export type MemberInput = components["schemas"]["MemberInputDTO"];
+export type ProjectRole = "lead" | "member";
 
-export function listProjects(): Promise<ProjectListItem[]> {
-  return wait(DEMO_PROJECTS);
+// ---- projects ----
+export async function listProjects(): Promise<ProjectListItem[]> {
+  const res = await apiFetch<components["schemas"]["ProjectListResponse"]>("/projects");
+  return res?.items ?? [];
 }
 
 export function getProject(projectId: string): Promise<ProjectDetail | null> {
-  return wait(DEMO_PROJECT_DETAIL[projectId] ?? null);
+  return apiFetch<ProjectDetail>(`/projects/${projectId}`);
 }
 
-export function listProjectTasks(projectId: string): Promise<TaskNode[]> {
-  return wait(DEMO_TASKS[projectId] ?? []);
+export function createProject(body: ProjectCreateInput): Promise<ProjectDetail | null> {
+  return apiFetch<ProjectDetail>("/projects", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function listProjectMembers(projectId: string): Promise<{ members: ProjectMember[]; innovation: UserRef[] }> {
-  return wait(DEMO_MEMBERS[projectId] ?? { members: [], innovation: [] });
+export function createProjectFromConcept(conceptId: string, body: ProjectFromConceptInput): Promise<ProjectDetail | null> {
+  return apiFetch<ProjectDetail>(`/concepts/${conceptId}/project`, { method: "POST", body: JSON.stringify(body) });
 }
 
-export function listTaskChat(taskId: string): Promise<DemoChatMessage[]> {
-  return wait(DEMO_TASK_CHAT[taskId] ?? []);
+export function patchProject(projectId: string, body: ProjectPatchInput): Promise<ProjectDetail | null> {
+  return apiFetch<ProjectDetail>(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// ---- members ----
+export async function listProjectMembers(projectId: string): Promise<{ members: ProjectMember[]; innovation: UserRef[] }> {
+  const res = await apiFetch<MembersResponse>(`/projects/${projectId}/members`);
+  return { members: res?.members ?? [], innovation: res?.innovation_members ?? [] };
+}
+
+export function addProjectMember(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember | null> {
+  return apiFetch<ProjectMember>(`/projects/${projectId}/members`, { method: "POST", body: JSON.stringify({ user_id: userId, role }) });
+}
+
+export function patchProjectMember(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember | null> {
+  return apiFetch<ProjectMember>(`/projects/${projectId}/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+}
+
+export function removeProjectMember(projectId: string, userId: string): Promise<unknown> {
+  return apiFetch(`/projects/${projectId}/members/${userId}`, { method: "DELETE" });
+}
+
+// ---- tasks ----
+export async function listProjectTasks(projectId: string): Promise<TaskNode[]> {
+  const res = await apiFetch<components["schemas"]["TaskTreeResponse"]>(`/projects/${projectId}/tasks`);
+  return res?.tree ?? [];
+}
+
+export function createTask(projectId: string, body: TaskCreateInput): Promise<TaskNode | null> {
+  return apiFetch<TaskNode>(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function patchTask(taskId: string, body: TaskPatchInput): Promise<TaskNode | null> {
+  return apiFetch<TaskNode>(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function deleteTask(taskId: string): Promise<unknown> {
+  return apiFetch(`/tasks/${taskId}`, { method: "DELETE" });
 }

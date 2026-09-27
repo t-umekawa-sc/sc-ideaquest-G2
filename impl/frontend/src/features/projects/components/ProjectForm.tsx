@@ -2,12 +2,14 @@
 
 // プロジェクト作成/メタ入力ダイアログ（FR-43・Q.1）。SC-61「開発を始める」＝コンセプトから初期値／
 // SC-70「＋ プロジェクトを作成」＝コンセプト無し（単純タスク管理）で共有。§4.7 検証（§2.1b）。
-// 試作＝作成はデモ（トースト＋onCreated）。作成後は遷移せずダイアログを閉じる（ユーザー要望）。
+// 実 API 結線＝conceptId 有り: POST /concepts/{id}/project／無し: POST /projects。作成後は遷移せず閉じる（ユーザー要望）。
 import { useState } from "react";
 
 import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
+import { ApiError } from "@/lib/api/client";
 
+import { createProject, createProjectFromConcept } from "../api";
 import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
@@ -37,20 +39,31 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
     return e;
   }
 
-  function create() {
+  async function create() {
     const fe = validate();
     setErrors(fe);
     const list = Object.values(fe).filter(Boolean);
     if (list.length) { notify(list); return; }
     setSaving(true);
-    // 試作＝実 API 未接続（接続時＝conceptId 有り: POST /concepts/{id}/project／無し: POST /projects）。
-    window.setTimeout(() => {
-      setSaving(false);
+    const deployment: Record<string, string> = {};
+    if (launchStatus.trim()) deployment.launch_status = launchStatus.trim();
+    if (plan.trim()) deployment.plan = plan.trim();
+    if (kpi.trim()) deployment.kpi = kpi.trim();
+    const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
+    try {
+      const created = conceptId
+        ? await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members })
+        : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members });
       const memberNote = devMembers.length ? `／開発メンバー ${devMembers.length} 名` : "";
-      snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "コンセプト非依存の単純タスク管理プロジェクトを作成しました。") + memberNote });
-      onCreated?.("p-new");
+      snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "単純タスク管理プロジェクトを作成しました。") + memberNote });
+      if (created) onCreated?.(created.id);
       onClose();
-    }, 200);
+    } catch (e) {
+      setSaving(false);
+      if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "作成できませんでした", msg: "このコンセプトのプロジェクトは既に存在するか、go 判定ではありません。" });
+      else if (e instanceof ApiError && e.status === 403) snack({ type: "error", title: "権限がありません", msg: "起票は owner/クエスト管理者のみです。" });
+      else snack({ type: "error", title: "作成できませんでした", msg: "入力内容をご確認ください。" });
+    }
   }
 
   return (

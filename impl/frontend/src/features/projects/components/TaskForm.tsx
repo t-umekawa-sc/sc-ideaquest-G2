@@ -13,7 +13,7 @@ import type { ProjectMember, TaskKind, TaskNode, TaskStatus } from "../types";
 export type TaskSavePayload = { id?: string; parentId: string | null; kind: TaskKind; title: string; description: string; assigneeId: string; status: TaskStatus; dueDate: string };
 
 const KIND_LABEL: Record<TaskKind, string> = { requirement: "要件", task: "作業タスク" };
-const STATUS_LABEL: Record<TaskStatus, string> = { todo: "未着手", doing: "進行中", done: "完了", blocked: "ブロック" };
+const STATUS_LABEL: Record<string, string> = { todo: "未着手", doing: "進行中", done: "完了", blocked: "ブロック" };
 
 // ツリーを親候補のフラットな選択肢に（自分自身・子孫は除外＝循環禁止の UX 補助）。
 function flatten(nodes: TaskNode[], depth = 0, excludeId?: string): { id: string; label: string }[] {
@@ -41,10 +41,10 @@ export function TaskForm({ tasks, members, task, dupFrom, defaultParentId, onClo
   const base = task ?? dupFrom ?? null; // 値のプリフィル元（編集＝task／複製＝dupFrom）。複製は追加モード（isEdit=false）。
 
   const [title, setTitle] = useState(base ? (isEdit ? base.title : `${base.title}（複製）`) : "");
-  const [kind, setKind] = useState<TaskKind>(base?.kind ?? "task");
+  const [kind, setKind] = useState<TaskKind>((base?.kind as TaskKind) ?? "task");
   const [parentId, setParentId] = useState<string>((task?.parent_task_id ?? defaultParentId ?? "") || "");
   const [assignee, setAssignee] = useState<string>(base?.assignee?.user_id ?? "");
-  const [status, setStatus] = useState<TaskStatus>(base?.status ?? "todo");
+  const [status, setStatus] = useState<TaskStatus>((base?.status as TaskStatus) ?? "todo");
   const [dueDate, setDueDate] = useState<string>(base?.due_date ?? "");
   const [description, setDescription] = useState(base?.description ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -96,7 +96,7 @@ export function TaskForm({ tasks, members, task, dupFrom, defaultParentId, onClo
         <Field className="dialog-section is-quiet" id="t_assignee" label="担当者" hint={noMembers ? "先に開発メンバーを追加してください（担当は開発メンバーに限ります）。" : "開発メンバーから選択（単一）。"}>
           <select id="t_assignee" className="select" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={noMembers}>
             <option value="">（未割当）</option>
-            {members.map((m) => <option key={m.user.user_id} value={m.user.user_id}>{m.user.display_name}（{m.role === "lead" ? "リード" : "担当"}）</option>)}
+            {members.filter((m) => m.user).map((m) => <option key={m.user!.user_id} value={m.user!.user_id}>{m.user!.display_name}（{m.role === "lead" ? "リード" : "担当"}）</option>)}
           </select>
         </Field>
         <Field className="dialog-section is-quiet" id="t_status" label="状態">

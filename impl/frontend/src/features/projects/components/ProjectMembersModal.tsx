@@ -7,21 +7,42 @@ import { useState } from "react";
 
 import { Avatar, Field, Modal, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
 
+import { addProjectMember, patchProjectMember, removeProjectMember } from "../api";
 import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
-import type { ProjectMember, UserRef } from "../types";
+import type { ProjectMember, ProjectRole, UserRef } from "../types";
 import "@/features/quests/quests.css";
 
-export function ProjectMembersModal({ members, innovation, onClose }: {
+export function ProjectMembersModal({ projectId, members, innovation, onClose, onSaved }: {
+  projectId: string;
   members: ProjectMember[];
   innovation: UserRef[];
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const snack = useSnackbar();
-  const [devMembers, setDevMembers] = useState<PickedMember[]>(members.map((m) => ({ user: m.user, role: m.role })));
+  const initial = members.filter((m) => m.user).map((m) => ({ user: m.user!, role: m.role as ProjectRole }));
+  const [devMembers, setDevMembers] = useState<PickedMember[]>(initial);
+  const [saving, setSaving] = useState(false);
 
-  function save() {
-    snack({ type: "success", title: "開発メンバーを更新しました", msg: "（試作＝接続時に POST/PATCH/DELETE /projects/{id}/members）" });
-    onClose();
+  async function save() {
+    setSaving(true);
+    const before = new Map(initial.map((m) => [m.user.user_id, m.role]));
+    const after = new Map(devMembers.map((m) => [m.user.user_id, m.role]));
+    try {
+      for (const [uid] of before) {
+        if (!after.has(uid)) await removeProjectMember(projectId, uid);
+      }
+      for (const [uid, role] of after) {
+        if (!before.has(uid)) await addProjectMember(projectId, uid, role);
+        else if (before.get(uid) !== role) await patchProjectMember(projectId, uid, role);
+      }
+      snack({ type: "success", title: "開発メンバーを更新しました" });
+      onSaved?.();
+      onClose();
+    } catch {
+      setSaving(false);
+      snack({ type: "error", title: "更新できませんでした", msg: "権限（起票者/owner）と入力をご確認ください。" });
+    }
   }
 
   return (
@@ -53,7 +74,7 @@ export function ProjectMembersModal({ members, innovation, onClose }: {
       </ModalBody>
       <ModalFooter>
         <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
-        <button type="button" className="btn btn-primary" onClick={save}>保存</button>
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>保存</button>
       </ModalFooter>
     </Modal>
   );

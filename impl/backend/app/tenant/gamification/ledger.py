@@ -27,6 +27,7 @@ COIN_GAIN = "coin_gain"
 COIN_SPEND = "coin_spend"
 SP_GAIN = "sp_gain"
 SP_SPEND = "sp_spend"
+DELIVERY_XP_GAIN = "delivery_xp_gain"  # 開発XP（FR-43・タスク完了）＝`users.delivery_xp` を増やす別軸（レベル計算対象外）
 
 LOGIN_XP = 10  # §7 ログイン XP（初期値・調整可）
 
@@ -43,6 +44,8 @@ def _apply_balance(user: User, kind: str, amount: int) -> None:
         user.skill_point_balance += amount
     elif kind == SP_SPEND:
         user.skill_point_balance -= amount
+    elif kind == DELIVERY_XP_GAIN:
+        user.delivery_xp += amount  # 別軸＝レベル計算には影響しない（§5.49・FR-43）
     else:  # 未知の kind は台帳/残高を壊すので明示的に弾く
         raise ValueError(f"unknown activity kind: {kind}")
 

@@ -5,25 +5,24 @@
 // 正＝doc/画面設計/screens/SC-71_プロジェクト詳細.md。新規UIは作らず既存クラス/部品を踏襲（§2.1c）。
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Avatar, DataTable, LoadingOverlay, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 
-import { getProject, listProjectMembers, listProjectTasks } from "../api";
-import type { ProjectDetail, ProjectMember, ProjectStatus, TaskNode, TaskStatus, UserRef } from "../types";
+import { createTask, deleteTask, getProject, listProjectMembers, listProjectTasks, patchTask } from "../api";
+import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
 import { TaskForm, type TaskSavePayload } from "./TaskForm";
 import { ProjectMembersModal } from "./ProjectMembersModal";
 import "@/features/quests/quests.css"; // パーティー一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
 import "../projects.css";
 
-const P_STATUS_LABEL: Record<ProjectStatus, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
-const P_STATUS_CLS: Record<ProjectStatus, string> = { planning: "badge badge-muted", in_progress: "badge badge-success", on_hold: "badge badge-muted", done: "badge badge-muted" };
-const T_STATUS_LABEL: Record<TaskStatus, string> = { todo: "未着手", doing: "進行中", done: "完了", blocked: "ブロック" };
-const T_STATUS_CLS: Record<TaskStatus, string> = { todo: "badge badge-muted", doing: "badge badge-success", done: "badge badge-muted", blocked: "badge badge-danger" };
+const P_STATUS_LABEL: Record<string, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
+const P_STATUS_CLS: Record<string, string> = { planning: "badge badge-muted", in_progress: "badge badge-success", on_hold: "badge badge-muted", done: "badge badge-muted" };
+const T_STATUS_LABEL: Record<string, string> = { todo: "未着手", doing: "進行中", done: "完了", blocked: "ブロック" };
+const T_STATUS_CLS: Record<string, string> = { todo: "badge badge-muted", doing: "badge badge-success", done: "badge badge-muted", blocked: "badge badge-danger" };
 const KIND_LABEL: Record<string, string> = { requirement: "要件", task: "作業" };
-// 現在ユーザー（試作＝接続時は GET /me）。「自分のタスク」フィルタ用。デモは佐藤（開発）にして動作を見せる。
-const DEMO_ME_ID = "u-dev2";
 type WbsFilter = "all" | "doing" | "done" | "blocked" | "mine";
 
 // 子孫（自分含まず葉基準）の done 比率＝進捗ロールアップ（均等重み・MVP）。
@@ -48,57 +47,60 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [taskForm, setTaskForm] = useState<{ task?: TaskNode | null; parentId?: string | null; dup?: TaskNode | null } | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
 
+  const reloadAll = useCallback(async () => {
+    const [p, t, m] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId)]);
+    setProject(p); setTasks(t); setMembers(m.members); setInnovation(m.innovation);
+  }, [projectId]);
+  const reloadTasks = useCallback(async () => { setTasks(await listProjectTasks(projectId)); }, [projectId]);
+
   useEffect(() => {
     let alive = true;
-    void Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId)]).then(([p, t, m]) => {
-      if (!alive) return;
-      setProject(p); setTasks(t); setMembers(m.members); setInnovation(m.innovation); setLoading(false);
-    });
+    void reloadAll().finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [projectId]);
+  }, [reloadAll]);
 
   const canManage = project?.my_permissions.can_manage_tasks ?? false;
 
   async function quickStatus(node: TaskNode, next: TaskStatus) {
-    const becameDone = next === "done" && node.status !== "done";
-    snack({ type: "success", title: "状態を更新しました", msg: becameDone ? "完了により開発XP＋コインを獲得（接続時に付与）。" : undefined });
-    // 試作＝ローカル反映（接続時は PATCH /tasks/{id}）。
-    setTasks((cur) => cur ? updateNode(cur, node.id, (n) => ({ ...n, status: next, done_at: next === "done" ? "now" : null })) : cur);
+    try {
+      await patchTask(node.id, { status: next });
+      const becameDone = next === "done" && node.status !== "done";
+      snack({ type: "success", title: "状態を更新しました", msg: becameDone ? "完了により開発XP＋コインを獲得しました。" : undefined });
+      await reloadTasks();
+    } catch { snack({ type: "error", title: "更新できませんでした", msg: "権限をご確認ください。" }); }
   }
-  // 試作＝作成/編集をローカルツリーに反映（接続時は POST/PATCH の応答で置換）。子タスクの子…と任意深さで入れ子可。
-  function applyTaskSave(p: TaskSavePayload) {
-    const assignee = members.find((m) => m.user.user_id === p.assigneeId)?.user ?? null;
-    if (p.id) {
-      // 編集＝該当ノードのフィールドを更新（親の付け替えは試作では扱わない）。
-      setTasks((cur) => cur ? updateNode(cur, p.id!, (n) => ({ ...n, kind: p.kind, title: p.title, description: p.description || null, assignee, status: p.status, due_date: p.dueDate || null, done_at: p.status === "done" ? (n.done_at ?? "now") : null })) : cur);
-      return;
-    }
-    const projId = tasks?.[0]?.project_id ?? projectId;
-    const newNode: TaskNode = {
-      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `t-${Math.random().toString(36).slice(2)}`,
-      project_id: projId, parent_task_id: p.parentId, kind: p.kind, title: p.title, description: p.description || null,
-      assignee, status: p.status, sort_order: 999, due_date: p.dueDate || null, done_at: p.status === "done" ? "now" : null, children: [],
-    };
-    setTasks((cur) => {
-      const base = cur ?? [];
-      if (!p.parentId) return [...base, newNode];
-      return insertChild(base, p.parentId, newNode);
-    });
+
+  // 作成/編集を実 API へ（子タスクの子…と任意深さで入れ子可）。
+  async function applyTaskSave(p: TaskSavePayload) {
+    try {
+      if (p.id) {
+        await patchTask(p.id, { kind: p.kind, title: p.title, description: p.description || null, assignee_account_id: p.assigneeId || null, status: p.status, due_date: p.dueDate || null, parent_task_id: p.parentId });
+      } else {
+        await createTask(projectId, { parent_task_id: p.parentId, kind: p.kind, title: p.title, description: p.description || null, assignee_account_id: p.assigneeId || null, status: p.status, due_date: p.dueDate || null, sort_order: 999 });
+      }
+      await reloadTasks();
+    } catch { snack({ type: "error", title: "保存できませんでした", msg: "入力・権限をご確認ください。" }); }
   }
 
   async function delTask(node: TaskNode) {
-    if (node.children?.length) { snack({ type: "error", title: "子タスクがあります", msg: "先に子タスクを処理してください（409 相当）。" }); return; }
     const ok = await confirm({ variant: "danger", title: "タスクを削除", msg: `「${node.title}」を削除しますか？` });
     if (!ok) return;
-    setTasks((cur) => cur ? removeNode(cur, node.id) : cur);
-    snack({ type: "success", title: "タスクを削除しました" });
+    try {
+      await deleteTask(node.id);
+      snack({ type: "success", title: "タスクを削除しました" });
+      await reloadTasks();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "子タスクがあります", msg: "先に子タスクを処理してください。" });
+      else snack({ type: "error", title: "削除できませんでした" });
+    }
   }
 
   // ツリーを深さ付きで平坦化＝標準 DataTable の行に載せる（順序はツリー順・インデントで階層を表現）。
   const flatTasks: FlatTask[] = tasks ? flattenTasks(tasks) : [];
   // クイックフィルタ（アイデア一覧と同型）＝すべて/進行中/完了/ブロック/自分のタスク。
   // 自分のタスク＝担当が自分 かつ 完了/ブロック以外（＝これから動くべき自分の仕事）。
-  const isMine = (t: FlatTask) => t.assignee?.user_id === DEMO_ME_ID && (t.status === "todo" || t.status === "doing");
+  const meId = project?.viewer_user_id;
+  const isMine = (t: FlatTask) => !!meId && t.assignee?.user_id === meId && (t.status === "todo" || t.status === "doing");
   const wbsCounts: Record<WbsFilter, number> = {
     all: flatTasks.length,
     doing: flatTasks.filter((t) => t.status === "doing").length,
@@ -160,7 +162,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <div className="proj-head__meta">
           {project.concept ? <span>由来コンセプト: <Link href={`/concepts/${project.concept.id}`}>{project.concept.title}</Link></span> : <span className="muted">コンセプト非依存（単純タスク管理）</span>}
           {project.quest && <span>由来クエスト: <Link href={`/quests/${project.quest.id}`}>{project.quest.title}</Link></span>}
-          <span>所有者: {project.owner.display_name}</span>
+          <span>所有者: {project.owner?.display_name ?? "—"}</span>
           <span>進捗: {project.progress.done}/{project.progress.total}</span>
         </div>
       </section>
@@ -231,10 +233,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             <ul className="member-list">
               {members.length === 0 ? (
                 <li className="member-row"><span className="hint">開発メンバー未設定。「開発メンバーを管理」から追加します（担当割当には開発メンバーが必要）。</span></li>
-              ) : members.map((m) => (
-                <li className="member-row" key={m.user.user_id}>
-                  <Avatar name={m.user.display_name} imageUrl={m.user.avatar_image_url ?? undefined} />
-                  <span className="member-name">{m.user.display_name}</span>
+              ) : members.filter((m) => m.user).map((m) => (
+                <li className="member-row" key={m.user!.user_id}>
+                  <Avatar name={m.user!.display_name} imageUrl={m.user!.avatar_image_url ?? undefined} />
+                  <span className="member-name">{m.user!.display_name}</span>
                   <span className="member-perms">
                     <span className={`badge ${m.role === "lead" ? "" : "badge-muted"}`}>{m.role === "lead" ? "🛠 開発リード" : "開発担当"}</span>
                   </span>
@@ -269,17 +271,18 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             <h2 style={{ margin: 0 }}>導入・価値実現</h2>
             {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" onClick={() => snack({ type: "info", title: "導入メタ編集", msg: "（試作＝接続時に PATCH /projects/{id} deployment）" })}>編集</button>}
           </div>
+          {(() => { const dep = (project.deployment ?? {}) as DeploymentMeta; return (
           <dl className="proj-deploy">
-            <div><dt>ローンチ状態</dt><dd>{project.deployment.launch_status || "—"}</dd></div>
-            <div><dt>導入計画</dt><dd>{project.deployment.plan || "—"}</dd></div>
-            <div><dt>KPI 実測</dt><dd>{project.deployment.kpi || "—"}</dd></div>
-          </dl>
+            <div><dt>ローンチ状態</dt><dd>{dep.launch_status || "—"}</dd></div>
+            <div><dt>導入計画</dt><dd>{dep.plan || "—"}</dd></div>
+            <div><dt>KPI 実測</dt><dd>{dep.kpi || "—"}</dd></div>
+          </dl>); })()}
           <p className="hint">{project.concept ? "コンセプト段の viability（コスト/収益/ROI）を導入後の実測で検証し、次サイクルへ（ISO §9/§10）。" : "単純タスク管理でも、導入計画・KPI をメモできます。"}</p>
         </section>
       )}
 
       {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
-      {membersOpen && <ProjectMembersModal members={members} innovation={innovation} onClose={() => setMembersOpen(false)} />}
+      {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}
     </section>
   );
 }
@@ -292,16 +295,4 @@ function flattenTasks(nodes: TaskNode[], depth = 0, out: FlatTask[] = []): FlatT
     if (n.children?.length) flattenTasks(n.children, depth + 1, out);
   }
   return out;
-}
-
-// ツリー更新ヘルパ（試作のローカル反映用）。
-function updateNode(nodes: TaskNode[], id: string, fn: (n: TaskNode) => TaskNode): TaskNode[] {
-  return nodes.map((n) => (n.id === id ? fn(n) : { ...n, children: updateNode(n.children, id, fn) }));
-}
-// 指定 parentId のノードの children 末尾に子を追加（任意深さ）。
-function insertChild(nodes: TaskNode[], parentId: string, child: TaskNode): TaskNode[] {
-  return nodes.map((n) => (n.id === parentId ? { ...n, children: [...n.children, child] } : { ...n, children: insertChild(n.children, parentId, child) }));
-}
-function removeNode(nodes: TaskNode[], id: string): TaskNode[] {
-  return nodes.filter((n) => n.id !== id).map((n) => ({ ...n, children: removeNode(n.children, id) }));
 }

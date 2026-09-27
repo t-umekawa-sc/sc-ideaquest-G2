@@ -42,6 +42,8 @@ class User(CompanyBase):
     xp: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     coin_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     skill_point_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    # 開発XP（ソリューション開発＝FR-43・タスク完了）＝イノベーション活動 xp とは別軸（migration 0041）。
+    delivery_xp: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

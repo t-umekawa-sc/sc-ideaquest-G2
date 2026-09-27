@@ -15,8 +15,8 @@ import type { ProjectListItem, ProjectStatus } from "../types";
 import { ProjectForm } from "./ProjectForm";
 import "../projects.css";
 
-const STATUS_LABEL: Record<ProjectStatus, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
-const STATUS_CLS: Record<ProjectStatus, string> = { planning: "badge badge-muted", in_progress: "badge badge-success", on_hold: "badge badge-muted", done: "badge badge-muted" };
+const STATUS_LABEL: Record<string, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
+const STATUS_CLS: Record<string, string> = { planning: "badge badge-muted", in_progress: "badge badge-success", on_hold: "badge badge-muted", done: "badge badge-muted" };
 const STATUS_OPTIONS: [string, string][] = (Object.keys(STATUS_LABEL) as ProjectStatus[]).map((k) => [STATUS_LABEL[k], STATUS_LABEL[k]]);
 
 function fmtDate(iso: string): string {
@@ -27,7 +27,8 @@ export function ProjectListView() {
   const [rows, setRows] = useState<ProjectListItem[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
-  useEffect(() => { void listProjects().then(setRows); }, []);
+  const reload = () => { void listProjects().then(setRows); };
+  useEffect(() => { reload(); }, []);
 
   const columns: DataTableColumn<ProjectListItem>[] = [
     {
@@ -41,7 +42,7 @@ export function ProjectListView() {
     { key: "status", label: "状態", width: 100, sortable: true, filter: { type: "enum", options: STATUS_OPTIONS }, sortVal: (p) => STATUS_LABEL[p.status], filterVal: (p) => STATUS_LABEL[p.status], render: (p) => <span className={STATUS_CLS[p.status]}>{STATUS_LABEL[p.status]}</span> },
     { key: "progress", label: "進捗", width: 90, align: "num", sortable: true, sortVal: (p) => (p.progress.total ? p.progress.done / p.progress.total : 0), csvVal: (p) => `${p.progress.done}/${p.progress.total}`, render: (p) => <span className="proj-progress__num">{p.progress.done}/{p.progress.total}</span> },
     { key: "tasks", label: "タスク", width: 110, align: "num", sortable: true, sortVal: (p) => p.task_count, render: (p) => p.task_count },
-    { key: "owner", label: "所有者", width: 150, sortVal: (p) => p.owner.display_name, csvVal: (p) => p.owner.display_name, render: (p) => <span className="proj-owner"><Avatar name={p.owner.display_name} imageUrl={p.owner.avatar_image_url} size="sm" noTooltip />{p.owner.display_name}</span> },
+    { key: "owner", label: "所有者", width: 150, sortVal: (p) => p.owner?.display_name ?? "", csvVal: (p) => p.owner?.display_name ?? "", render: (p) => p.owner ? <span className="proj-owner"><Avatar name={p.owner.display_name} imageUrl={p.owner.avatar_image_url} size="sm" noTooltip />{p.owner.display_name}</span> : <span className="muted">—</span> },
     { key: "updated", label: "更新", width: 110, sortable: true, sortVal: (p) => p.updated_at, csvVal: (p) => fmtDate(p.updated_at), render: (p) => fmtDate(p.updated_at) },
   ];
 
@@ -93,7 +94,7 @@ export function ProjectListView() {
         />
       )}
 
-      {createOpen && <ProjectForm onClose={() => setCreateOpen(false)} />}
+      {createOpen && <ProjectForm onClose={() => setCreateOpen(false)} onCreated={reload} />}
     </section>
   );
 }

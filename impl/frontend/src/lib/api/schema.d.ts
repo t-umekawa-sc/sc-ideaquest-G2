@@ -2443,6 +2443,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Projects */
+        get: operations["list_projects_api_v1_projects_get"];
+        put?: never;
+        /** Create Project */
+        post: operations["create_project_api_v1_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/concepts/{concept_id}/project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create From Concept */
+        post: operations["create_from_concept_api_v1_concepts__concept_id__project_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Project */
+        get: operations["get_project_api_v1_projects__project_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Project */
+        patch: operations["patch_project_api_v1_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Members */
+        get: operations["list_members_api_v1_projects__project_id__members_get"];
+        put?: never;
+        /** Add Member */
+        post: operations["add_member_api_v1_projects__project_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Member */
+        delete: operations["delete_member_api_v1_projects__project_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Member */
+        patch: operations["patch_member_api_v1_projects__project_id__members__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_projects__project_id__tasks_get"];
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_projects__project_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Task */
+        delete: operations["delete_task_api_v1_tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Task */
+        patch: operations["patch_task_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
     "/api/v1/ideas/{idea_id}/chat": {
         parameters: {
             query?: never;
@@ -6523,18 +6648,15 @@ export interface components {
             /** Game Mode Override */
             game_mode_override?: boolean | null;
         };
-        /**
-         * MemberAddRequest
-         * @description 参加追加の入力（B.4）。既存アカウントをディレクトリで選択。想定外プロパティ拒否（§B.6）。
-         *
-         *     **`role` は受け取らない**＝QG管理者の参加追加は `role=member` 固定（`admin` 任命は不可・§8-⑯）。
-         */
-        MemberAddRequest: {
+        /** MemberInputDTO */
+        MemberInputDTO: {
+            /** User Id */
+            user_id: string;
             /**
-             * Account Id
-             * Format: uuid
+             * Role
+             * @default member
              */
-            account_id: string;
+            role: string;
         };
         /**
          * MemberListItem
@@ -6554,6 +6676,18 @@ export interface components {
         MemberListResponse: {
             /** Data */
             data: components["schemas"]["MemberListItem"][];
+        };
+        /** MemberPatchRequest */
+        MemberPatchRequest: {
+            /** Role */
+            role: string;
+        };
+        /** MembersResponse */
+        MembersResponse: {
+            /** Members */
+            members: components["schemas"]["ProjectMemberDTO"][];
+            /** Innovation Members */
+            innovation_members: components["schemas"]["UserRefDTO"][];
         };
         /**
          * MembershipInput
@@ -6686,6 +6820,15 @@ export interface components {
                 [key: string]: string | null;
             };
         };
+        /** MyProjectPermsDTO */
+        MyProjectPermsDTO: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Manage Members */
+            can_manage_members: boolean;
+            /** Can Manage Tasks */
+            can_manage_tasks: boolean;
+        };
         /**
          * NotifMeta
          * @description 獲得表示用（本人が獲得した値のみ＝achievement のコイン・H.2）。
@@ -6811,6 +6954,114 @@ export interface components {
             valid: boolean;
             /** Login Id */
             login_id: string;
+        };
+        /** ProgressDTO */
+        ProgressDTO: {
+            /** Done */
+            done: number;
+            /** Total */
+            total: number;
+        };
+        /** ProjectCreateFromConceptRequest */
+        ProjectCreateFromConceptRequest: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Deployment */
+            deployment?: {
+                [key: string]: unknown;
+            } | null;
+            /** Members */
+            members?: components["schemas"]["MemberInputDTO"][];
+        };
+        /** ProjectCreateRequest */
+        ProjectCreateRequest: {
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Deployment */
+            deployment?: {
+                [key: string]: unknown;
+            } | null;
+            /** Members */
+            members?: components["schemas"]["MemberInputDTO"][];
+        };
+        /** ProjectDetailDTO */
+        ProjectDetailDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Status */
+            status: string;
+            /** Deployment */
+            deployment: {
+                [key: string]: unknown;
+            };
+            /** External Link */
+            external_link?: {
+                [key: string]: unknown;
+            } | null;
+            concept?: components["schemas"]["RefDTO"] | null;
+            quest?: components["schemas"]["RefDTO"] | null;
+            owner?: components["schemas"]["UserRefDTO"] | null;
+            progress: components["schemas"]["ProgressDTO"];
+            /** Viewer Domain */
+            viewer_domain: string;
+            /** Viewer User Id */
+            viewer_user_id: string;
+            my_permissions: components["schemas"]["MyProjectPermsDTO"];
+        };
+        /** ProjectListItemDTO */
+        ProjectListItemDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            concept?: components["schemas"]["RefDTO"] | null;
+            quest?: components["schemas"]["RefDTO"] | null;
+            progress: components["schemas"]["ProgressDTO"];
+            /** Task Count */
+            task_count: number;
+            owner?: components["schemas"]["UserRefDTO"] | null;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** ProjectListResponse */
+        ProjectListResponse: {
+            /** Items */
+            items: components["schemas"]["ProjectListItemDTO"][];
+        };
+        /** ProjectMemberDTO */
+        ProjectMemberDTO: {
+            user?: components["schemas"]["UserRefDTO"] | null;
+            /** Role */
+            role: string;
+            /** Added At */
+            added_at: string;
+        };
+        /** ProjectPatchRequest */
+        ProjectPatchRequest: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Deployment */
+            deployment?: {
+                [key: string]: unknown;
+            } | null;
+            /** External Link */
+            external_link?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** PurchaseResponse */
         PurchaseResponse: {
@@ -7860,6 +8111,13 @@ export interface components {
             /** Unread Count */
             unread_count: number;
         };
+        /** RefDTO */
+        RefDTO: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
         /**
          * RelatedInfoItemDTO
          * @description 成果物→関連情報パネルの1件（C.8b／D＝`GET /{quest,idea}/related-info`・FR-41）。
@@ -7993,6 +8251,82 @@ export interface components {
             /** Skill Point Balance */
             skill_point_balance: number;
         };
+        /** TaskCreateRequest */
+        TaskCreateRequest: {
+            /** Parent Task Id */
+            parent_task_id?: string | null;
+            /**
+             * Kind
+             * @default task
+             */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Assignee Account Id */
+            assignee_account_id?: string | null;
+            /**
+             * Status
+             * @default todo
+             */
+            status: string;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /** Due Date */
+            due_date?: string | null;
+        };
+        /** TaskDTO */
+        TaskDTO: {
+            /** Id */
+            id: string;
+            /** Project Id */
+            project_id: string;
+            /** Parent Task Id */
+            parent_task_id?: string | null;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            assignee?: components["schemas"]["UserRefDTO"] | null;
+            /** Status */
+            status: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Due Date */
+            due_date?: string | null;
+            /** Done At */
+            done_at?: string | null;
+            /** Children */
+            children?: components["schemas"]["TaskDTO"][];
+        };
+        /** TaskPatchRequest */
+        TaskPatchRequest: {
+            /** Parent Task Id */
+            parent_task_id?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Assignee Account Id */
+            assignee_account_id?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+        };
+        /** TaskTreeResponse */
+        TaskTreeResponse: {
+            /** Tree */
+            tree: components["schemas"]["TaskDTO"][];
+        };
         /**
          * TeamFeedResponse
          * @description `GET /me/feed`（SC-01・G.5.1）＝参加クエスト横断のチームフィード（各行に quest 付き）。
@@ -8006,6 +8340,15 @@ export interface components {
         UnreadCountResponse: {
             /** Unread Count */
             unread_count: number;
+        };
+        /** UserRefDTO */
+        UserRefDTO: {
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Avatar Image Url */
+            avatar_image_url?: string | null;
         };
         /**
          * ValidationAddResponse
@@ -8099,6 +8442,19 @@ export interface components {
             weight?: number | null;
         };
         /**
+         * MemberAddRequest
+         * @description 参加追加の入力（B.4）。既存アカウントをディレクトリで選択。想定外プロパティ拒否（§B.6）。
+         *
+         *     **`role` は受け取らない**＝QG管理者の参加追加は `role=member` 固定（`admin` 任命は不可・§8-⑯）。
+         */
+        app__control_plane__admin__schemas__MemberAddRequest: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+        };
+        /**
          * CursorPageInfo
          * @description カーソルページングのページ情報（§1.8）。
          */
@@ -8133,6 +8489,16 @@ export interface components {
              * @default false
              */
             has_next: boolean;
+        };
+        /** MemberAddRequest */
+        app__tenant__solutions__schemas__MemberAddRequest: {
+            /** User Id */
+            user_id: string;
+            /**
+             * Role
+             * @default member
+             */
+            role: string;
         };
     };
     responses: never;
@@ -9470,7 +9836,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MemberAddRequest"];
+                "application/json": components["schemas"]["app__control_plane__admin__schemas__MemberAddRequest"];
             };
         };
         responses: {
@@ -13186,6 +13552,422 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_api_v1_projects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectListResponse"];
+                };
+            };
+        };
+    };
+    create_project_api_v1_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_from_concept_api_v1_concepts__concept_id__project_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreateFromConceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_api_v1_projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_project_api_v1_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_projects__project_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_api_v1_projects__project_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__tenant__solutions__schemas__MemberAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMemberDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_member_api_v1_projects__project_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_member_api_v1_projects__project_id__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMemberDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_projects__project_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTreeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_projects__project_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_task_api_v1_tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_task_api_v1_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDTO"];
+                };
             };
             /** @description Validation Error */
             422: {

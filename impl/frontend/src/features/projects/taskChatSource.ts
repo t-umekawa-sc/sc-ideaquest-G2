@@ -3,13 +3,14 @@
 import type { ChatListResponse, ChatMessage } from "@/features/chat/api";
 import type { ChatCtx, ChatSource } from "@/features/chat/source";
 
-import { getProject, listProjectTasks, listTaskChat } from "./api";
+import { getProject, listProjectTasks } from "./api";
+import { DEMO_TASK_CHAT } from "./fixtures";
 import type { TaskNode } from "./types";
 
 const ME = "u-dev2"; // 現在ユーザー（試作＝GET /me）。自分の発言を右寄せ表示にするため。
 
 function findTask(nodes: TaskNode[], id: string): TaskNode | null {
-  for (const n of nodes) { if (n.id === id) return n; const c = findTask(n.children, id); if (c) return c; }
+  for (const n of nodes) { if (n.id === id) return n; const c = findTask(n.children ?? [], id); if (c) return c; }
   return null;
 }
 
@@ -33,7 +34,7 @@ export function demoTaskSource(projectId: string, taskId: string): ChatSource {
       };
     },
     loadChat: async (): Promise<ChatListResponse> => {
-      const msgs = await listTaskChat(taskId);
+      const msgs = DEMO_TASK_CHAT[taskId] ?? DEMO_TASK_CHAT.__sample ?? [];
       const data: ChatMessage[] = msgs.map((m) => ({
         id: m.id,
         is_deleted: false,

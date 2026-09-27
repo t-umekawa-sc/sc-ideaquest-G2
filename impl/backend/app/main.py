@@ -21,6 +21,7 @@ from app.tenant.quests.router import router as quests_router
 from app.tenant.ideas.router import router as ideas_router
 from app.tenant.evaluations.router import router as evaluations_router
 from app.tenant.concepts.router import router as concepts_router
+from app.tenant.solutions.router import router as solutions_router
 from app.tenant.chat.router import router as chat_router
 from app.tenant.gamification.router import router as gamification_router
 from app.tenant.shop.router import router as shop_router
@@ -93,6 +94,7 @@ app.include_router(quests_router)  # テナントプレーン（ドメイン C�
 app.include_router(ideas_router)  # テナントプレーン（ドメイン D・アイデア CRUD/公開）
 app.include_router(evaluations_router)  # テナントプレーン（ドメイン F・評価/選定/投稿者コイン）
 app.include_router(concepts_router)  # テナントプレーン（ドメイン P・コンセプト創造/検証・FR-42）
+app.include_router(solutions_router)  # テナントプレーン（ドメイン Q・ソリューション開発・FR-43）
 app.include_router(chat_router)  # テナントプレーン（ドメイン E・チャット/既読/活発度）
 app.include_router(gamification_router)  # テナントプレーン（ドメイン G・魔法カタログ/解放）
 app.include_router(shop_router)  # テナントプレーン（ドメイン G・ショップ/装備 SC-30/31）
