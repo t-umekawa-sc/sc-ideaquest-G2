@@ -2079,6 +2079,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/concepts/{concept_id}/related-info/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Concept Link Disposition
+         * @description コンセプトに貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者/クエスト管理者のみ。変更系＝Origin/CSRF。
+         */
+        patch: operations["set_concept_link_disposition_api_v1_concepts__concept_id__related_info__link_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/assumptions/{assumption_id}/related-info/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Assumption Link Disposition
+         * @description 前提（検証プール）に貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者/クエスト管理者のみ。変更系＝Origin/CSRF。
+         */
+        patch: operations["set_assumption_link_disposition_api_v1_assumptions__assumption_id__related_info__link_id__patch"];
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/activate": {
         parameters: {
             query?: never;
@@ -12808,6 +12848,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RelatedInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_concept_link_disposition_api_v1_concepts__concept_id__related_info__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDispositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoItemDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_assumption_link_disposition_api_v1_assumptions__assumption_id__related_info__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assumption_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDispositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoItemDTO"];
                 };
             };
             /** @description Validation Error */

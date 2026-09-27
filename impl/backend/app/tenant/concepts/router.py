@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.concepts import application as service
-from app.tenant.info.schemas import RelatedInfoResponse
+from app.tenant.info.schemas import LinkDispositionRequest, RelatedInfoItemDTO, RelatedInfoResponse
 from app.tenant.concepts.schemas import (
     AssumptionCreateRequest,
     AssumptionDetailDTO,
@@ -134,6 +134,34 @@ def get_assumption_related_info(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, limit=limit,
     )
     return RelatedInfoResponse(**result)
+
+
+@router.patch("/concepts/{concept_id}/related-info/{link_id}", response_model=RelatedInfoItemDTO)
+def set_concept_link_disposition(
+    concept_id: str, link_id: str, body: LinkDispositionRequest, request: Request, session: dict = Depends(require_me),
+) -> RelatedInfoItemDTO:
+    """コンセプトに貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者/クエスト管理者のみ。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.set_concept_link_disposition(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), concept_id, link_id,
+        disposition=body.disposition, note=body.note,
+    )
+    return RelatedInfoItemDTO(**result)
+
+
+@router.patch("/assumptions/{assumption_id}/related-info/{link_id}", response_model=RelatedInfoItemDTO)
+def set_assumption_link_disposition(
+    assumption_id: str, link_id: str, body: LinkDispositionRequest, request: Request, session: dict = Depends(require_me),
+) -> RelatedInfoItemDTO:
+    """前提（検証プール）に貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者/クエスト管理者のみ。変更系＝Origin/CSRF。"""
+    verify_origin(request)
+    verify_csrf(request)
+    result = service.set_assumption_link_disposition(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, link_id,
+        disposition=body.disposition, note=body.note,
+    )
+    return RelatedInfoItemDTO(**result)
 
 
 @router.patch("/concepts/{concept_id}", response_model=ConceptDetailDTO)

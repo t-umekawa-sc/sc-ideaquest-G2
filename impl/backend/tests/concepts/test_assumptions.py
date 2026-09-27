@@ -68,6 +68,14 @@ def env():
     with get_tenant_session(db_identifier) as ts:
         cids = [c.id for c in ts.query(Concept).filter(Concept.quest_id.in_(quests or [uuid.uuid4()])).all()]
         aids = [a.id for a in ts.query(Assumption).filter(Assumption.quest_id.in_(quests or [uuid.uuid4()])).all()]
+        # 採否テストで作成した InfoLink/InfoItem を掃除（前提/コンセプトを対象にした手動リンク）。
+        from app.tenant.info.orm import InfoItem, InfoLink
+        _targets = list(cids) + list(aids)
+        if _targets:
+            _iids = [l.info_item_id for l in ts.query(InfoLink).filter(InfoLink.target_id.in_(_targets)).all()]
+            ts.execute(InfoLink.__table__.delete().where(InfoLink.target_id.in_(_targets)))
+            if _iids:
+                ts.execute(InfoItem.__table__.delete().where(InfoItem.id.in_(_iids)))
         ts.execute(ConceptChatScope.__table__.delete().where(ConceptChatScope.concept_id.in_(cids or [uuid.uuid4()])))
         ts.execute(ConceptAssumptionLink.__table__.delete().where(ConceptAssumptionLink.assumption_id.in_(aids or [uuid.uuid4()])))
         ts.execute(AssumptionValidation.__table__.delete().where(AssumptionValidation.assumption_id.in_(aids or [uuid.uuid4()])))
@@ -166,6 +174,46 @@ def test_p_tc_260_assumption_related_info(env, client):
     assert "data" in r.json()
     r2 = client.get(f"/api/v1/assumptions/{uuid.uuid4()}/related-info")
     assert r2.status_code == 404
+
+
+def _link_info_to(env, target_type, target_id) -> uuid.UUID:
+    """テスト用に InfoItem＋InfoLink を直接作成し link_id を返す（採否テストの前提）。"""
+    from app.tenant.info.orm import InfoItem, InfoLink
+    lid = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        iid = uuid.uuid4()
+        ts.add(InfoItem(id=iid, title="関連情報X", created_by_id=env.user_id))
+        ts.flush()
+        ts.add(InfoLink(id=lid, info_item_id=iid, target_type=target_type, target_id=target_id,
+                        kind="related", origin="manual", created_by_id=env.user_id))
+        ts.commit()
+    return lid
+
+
+def test_p_tc_261_assumption_link_disposition(env, client):
+    """P-TC-261: 前提の関連情報リンクの採否（この情報の扱い）＝作成者/管理者は 200・read の can_dispose=true。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    aid = _assumption(client, qid)
+    lid = _link_info_to(env, "assumptions", uuid.UUID(aid))
+    got = client.get(f"/api/v1/assumptions/{aid}/related-info").json()["data"]
+    assert got and got[0]["can_dispose"] is True  # seed=quest owner＝採否可
+    r = client.patch(f"/api/v1/assumptions/{aid}/related-info/{lid}",
+                     json={"disposition": "adopted", "note": "検証設計に反映"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["disposition"] == "adopted"
+
+
+def test_p_tc_262_concept_link_disposition(env, client):
+    """P-TC-262: コンセプトの関連情報リンクの採否＝作成者/管理者は 200（採否 PATCH の疎通）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    cid = _concept(client, qid)
+    lid = _link_info_to(env, "concepts", uuid.UUID(cid))
+    r = client.patch(f"/api/v1/concepts/{cid}/related-info/{lid}",
+                     json={"disposition": "adopted", "note": "コンセプトに反映"}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["disposition"] == "adopted"
 
 
 def test_p_tc_202_create_assumption_permission(env, client):

@@ -69,14 +69,9 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
     const ok = t === "quests" || t === "ideas" || t === "concepts" || t === "assumptions";
     return ok && id ? { targetType: t as "quests" | "ideas" | "concepts" | "assumptions", targetId: id } : null;
   }, [searchParams]);
-  // 採否（disposition・FR-41 Phase2）を持つのは成果物側＝quests/ideas とコンセプト（concepts）のみ。
-  // 前提（assumptions）は採否を持たない（参照＋リンク/反証のみ）＝採否セクションを出さない。
-  const disposeContext = useMemo(
-    () => (refContext && refContext.targetType !== "assumptions"
-      ? { targetType: refContext.targetType as "quests" | "ideas" | "concepts", targetId: refContext.targetId }
-      : null),
-    [refContext],
-  );
+  // 採否（disposition・FR-41 Phase2）＝quests/ideas/concepts/assumptions すべてが「この情報の扱い」を持つ
+  // （can_dispose は backend が閲覧者権限で返す＝非権限者は現在の扱いを読取のみ）。
+  const disposeContext = refContext;
   const [dispRow, setDispRow] = useState<RelatedInfoItem | null>(null);
   const [dispChoice, setDispChoice] = useState<InfoLinkDisposition>("pending");
   const [dispNote, setDispNote] = useState("");
@@ -649,7 +644,7 @@ export function InfoDetailView({ infoId, onClose, onRequestClose, onDirtyChange 
         {/* 採否モード＝この成果物での「扱い」入力（管理権限者のみ操作可・情報本体は不変・FR-41 Phase2） */}
         {disposeContext && (
           <div className="field dialog-section ri-dispose">
-            <div className="dialog-label">この情報の扱い（{disposeContext.targetType === "quests" ? "クエスト" : disposeContext.targetType === "concepts" ? "コンセプト" : "アイデア"}での採否）</div>
+            <div className="dialog-label">この情報の扱い（{disposeContext.targetType === "quests" ? "クエスト" : disposeContext.targetType === "concepts" ? "コンセプト" : disposeContext.targetType === "assumptions" ? "前提" : "アイデア"}での採否）</div>
             {!dispRow ? (
               <p className="muted">この成果物に紐づくリンクが見つかりません。</p>
             ) : dispRow.can_dispose ? (

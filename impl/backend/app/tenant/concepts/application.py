@@ -552,9 +552,42 @@ def get_assumption_related_info(account_id, company_id, assumption_id, *, limit:
     with get_tenant_session(company.db_identifier) as ts:
         user = _get_user(ts, account_id)
         assumption, quest = _resolve_assumption(ts, aid, user)
-        # 前提側は採否(disposition)を持たない（成果物側＝quests/ideas の Phase2 機能）＝読取＋リンク/反証のみ（can_dispose=False）。
-        data = info_app.related_info_for_target(ts, "assumptions", aid, limit=limit, can_dispose=False)
+        # 前提側の採否（この情報の扱い）＝作成者 or quest 管理者（成果物側と同じ Phase2 機能・ユーザー要望）。
+        can_dispose = assumption.created_by_id == user.id or _is_manager(ts, quest, user)
+        data = info_app.related_info_for_target(ts, "assumptions", aid, limit=limit, can_dispose=can_dispose)
         return {"data": data}
+
+
+def set_concept_link_disposition(account_id, company_id, concept_id, link_id, *, disposition: str, note: str | None) -> dict:
+    """コンセプトに貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者 or quest 管理者のみ。採否本体は N に委譲。"""
+    from app.tenant.info import application as info_app
+
+    company = _ctx(account_id, company_id)
+    cid = _parse_uuid(concept_id, field="concept_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        concept, quest = _resolve_concept(ts, cid, user)
+        if not (concept.author_id == user.id or _is_manager(ts, quest, user)):
+            raise AppError(403, "forbidden", detail="採否は作成者/クエスト管理者のみ可能です")
+        dto = info_app.set_link_disposition(ts, link_id, "concepts", cid, disposition=disposition, note=note, actor_id=user.id)
+        ts.commit()
+        return dto
+
+
+def set_assumption_link_disposition(account_id, company_id, assumption_id, link_id, *, disposition: str, note: str | None) -> dict:
+    """前提（検証プール）に貼られた関連情報リンクの採否（FR-41 Phase2）＝作成者 or quest 管理者のみ。"""
+    from app.tenant.info import application as info_app
+
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        if not (assumption.created_by_id == user.id or _is_manager(ts, quest, user)):
+            raise AppError(403, "forbidden", detail="採否は作成者/クエスト管理者のみ可能です")
+        dto = info_app.set_link_disposition(ts, link_id, "assumptions", aid, disposition=disposition, note=note, actor_id=user.id)
+        ts.commit()
+        return dto
 
 
 # ---- 前提＝検証プール（P.3） -----------------------------------------------
