@@ -2,7 +2,7 @@
 
 // 関連リンクの対象ピッカー（共通・登録/詳細で共用）。種類/期限/タイトルで絞込＋文脈メタ付き候補カード＋
 // もっと見る（cursor）＋複数選択（絞込を変えても保持）。見本＝doc/画面設計/mocks/style-guide.html「10d」。
-// backend は ideas/quests のみ対応（concepts/前提はコンセプト段で追加＝コンセプト設計書 §4 の実装漏れ防止）。
+// 対象＝ideas/quests/concepts/assumptions（コンセプト/検証プールは FR-42 §7 で backend 実装済み）。
 import { useEffect, useState } from "react";
 
 import { Modal, ModalBody, ModalFooter } from "@/components/ui";
@@ -13,12 +13,15 @@ import "../info-input.css";
 
 const TYPES: { v: InfoLinkTarget; label: string }[] = [
   { v: "ideas", label: LINK_TARGET_LABEL.ideas },
+  { v: "concepts", label: LINK_TARGET_LABEL.concepts },
+  { v: "assumptions", label: LINK_TARGET_LABEL.assumptions },
   { v: "quests", label: LINK_TARGET_LABEL.quests },
 ];
 const PAGE = 10;
 const uid = (c: InfoLinkCandidate) => `${c.target_type}:${c.target_id}`;
 const openHref = (c: InfoLinkCandidate) =>
-  c.target_type === "ideas" ? `/ideas/${c.target_id}` : c.target_type === "quests" ? `/quests/${c.target_id}` : "#";
+  c.target_type === "ideas" ? `/ideas/${c.target_id}` : c.target_type === "quests" ? `/quests/${c.target_id}`
+    : c.target_type === "concepts" ? `/concepts/${c.target_id}` : "#"; // 前提(assumptions)は単独ページ無し
 
 export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
   open: boolean; onClose: () => void; onConfirm: (selected: InfoLinkCandidate[], kind: InfoLinkKind) => void;
@@ -26,7 +29,7 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
   // 棄却済み（rejected）も UNIQUE 制約で再追加不可（409）＝除外対象に含める（復活は詳細の「戻す」）。
   existing?: { target_type: InfoLinkTarget; target_id: string; target_title?: string | null; rejected?: boolean }[];
 }) {
-  const [types, setTypes] = useState<InfoLinkTarget[]>(["ideas", "quests"]);
+  const [types, setTypes] = useState<InfoLinkTarget[]>(["ideas", "concepts", "assumptions", "quests"]);
   const [q, setQ] = useState("");
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");

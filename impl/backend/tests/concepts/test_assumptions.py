@@ -156,6 +156,18 @@ def test_p_tc_258_validation_edit_delete_versioned(env, client):
     assert data2[0]["revision"] == 6 and "assumptions" in data2[0]["changed_fields"]
 
 
+def test_p_tc_260_assumption_related_info(env, client):
+    """P-TC-260: 前提の関連情報 read（空可・200）＋非存在は 404（門番＝前提詳細と同一）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    aid = _assumption(client, qid)
+    r = client.get(f"/api/v1/assumptions/{aid}/related-info")
+    assert r.status_code == 200, r.text
+    assert "data" in r.json()
+    r2 = client.get(f"/api/v1/assumptions/{uuid.uuid4()}/related-info")
+    assert r2.status_code == 404
+
+
 def test_p_tc_202_create_assumption_permission(env, client):
     """P-TC-202: 前提作成は プール所有=201 inconclusive／非 manager=403。"""
     _login_seed(client)

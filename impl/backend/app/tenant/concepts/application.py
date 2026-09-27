@@ -543,6 +543,20 @@ def get_related_info(account_id, company_id, concept_id, *, limit: int = 50) -> 
         return {"data": data}
 
 
+def get_assumption_related_info(account_id, company_id, assumption_id, *, limit: int = 50) -> dict:
+    """前提（検証プール）の関連情報（SC-61 §4.4・RelatedInfoPanel 用・FR-41×FR-42 §7）。門番＝前提詳細と同一。"""
+    from app.tenant.info import application as info_app
+
+    company = _ctx(account_id, company_id)
+    aid = _parse_uuid(assumption_id, field="assumption_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        assumption, quest = _resolve_assumption(ts, aid, user)
+        # 前提側は採否(disposition)を持たない（成果物側＝quests/ideas の Phase2 機能）＝読取＋リンク/反証のみ（can_dispose=False）。
+        data = info_app.related_info_for_target(ts, "assumptions", aid, limit=limit, can_dispose=False)
+        return {"data": data}
+
+
 # ---- 前提＝検証プール（P.3） -----------------------------------------------
 
 def _resolve_assumption(ts, aid, user):

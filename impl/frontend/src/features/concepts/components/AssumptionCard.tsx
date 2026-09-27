@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { RelatedInfoPanel } from "@/features/info-input/components/RelatedInfoPanel";
 import { listValidations, type ConceptAssumption, type Validation } from "../api";
 
 const CRITICALITY_LABEL: Record<string, string> = { critical: "致命的", major: "重要", minor: "補助" };
@@ -57,6 +58,8 @@ export function AssumptionCard({ a, threadHref, canManage, onValidate, onEditVal
           : <span className="muted text-xs">スレッド準備中…</span>}
         {canManage && <button type="button" className="btn btn-outline btn-sm" onClick={onValidate}>📝 実績を入力</button>}
       </div>
+      {/* 前提（検証プール）に関連づいた情報＝反証で「根底を揺さぶる」シグナル（FR-42 §7・双方向）。 */}
+      <RelatedInfoPanel targetType="assumptions" targetId={a.assumption_id} variant="strip" />
       {/* 検証履歴＝時系列（新しい順）＝検証方法/結果/判定/実施日/規模（§4.4）。 */}
       <details className="disclosure" style={{ marginTop: "var(--space-2)" }} onToggle={onToggle}>
         <summary>🕘 検証履歴{open && vals ? `（${vals.length}）` : ""}</summary>

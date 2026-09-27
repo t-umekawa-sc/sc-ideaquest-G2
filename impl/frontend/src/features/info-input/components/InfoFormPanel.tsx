@@ -297,7 +297,7 @@ export function InfoFormPanel({ parentId, onCancel, onDone }: {
         </div>
 
         <div className="field dialog-section is-quiet">
-          <div className="dialog-label">関連リンク（アイデア／クエスト）</div>
+          <div className="dialog-label">関連リンク（アイデア／コンセプト／前提／クエスト）</div>
           {links.length ? (
             <ul className="link-list">
               {links.map((l, i) => (

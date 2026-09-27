@@ -124,6 +124,18 @@ def get_concept_related_info(
     return RelatedInfoResponse(**result)
 
 
+@router.get("/assumptions/{assumption_id}/related-info", response_model=RelatedInfoResponse)
+def get_assumption_related_info(
+    assumption_id: str, request: Request, limit: int = Query(default=50, ge=1, le=100),
+    session: dict = Depends(require_me),
+) -> RelatedInfoResponse:
+    """前提（検証プール）の関連情報（SC-61 §4.4・FR-41×FR-42 §7・RelatedInfoPanel 用）。門番＝前提詳細と同一。読取専用。"""
+    result = service.get_assumption_related_info(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), assumption_id, limit=limit,
+    )
+    return RelatedInfoResponse(**result)
+
+
 @router.patch("/concepts/{concept_id}", response_model=ConceptDetailDTO)
 def patch_concept(
     concept_id: str, body: ConceptPatchRequest, request: Request, session: dict = Depends(require_me),

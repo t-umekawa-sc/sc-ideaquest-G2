@@ -395,6 +395,41 @@ def search_link_candidates(
                          "due": due.isoformat() if due else None,
                          "created_at": created.date().isoformat() if created else None})
 
+    if "concepts" in types:
+        from app.tenant.concepts.orm import Concept
+        cstmt = (
+            select(Concept.id, Concept.title, Quest.title, User.display_name, Concept.status, Concept.created_at)
+            .join(Quest, Quest.id == Concept.quest_id)
+            .join(User, User.id == Concept.author_id)
+            .where(Concept.deleted_at.is_(None), Concept.title.ilike(like))
+        )
+        if qids:
+            cstmt = cstmt.where(Concept.quest_id.in_(qids))
+        if sts:
+            cstmt = cstmt.where(Concept.status.in_(sts))
+        for i, title, qtitle, owner, status, created in session.execute(
+            cstmt.order_by(Concept.title.asc(), Concept.id.asc()).limit(want)
+        ).all():
+            rows.append({"target_type": "concepts", "target_id": str(i), "title": title,
+                         "quest_title": qtitle, "owner_name": owner, "status": status,
+                         "due": None, "created_at": created.date().isoformat() if created else None})
+
+    if "assumptions" in types:
+        from app.tenant.concepts.orm import Assumption
+        astmt = (
+            select(Assumption.id, Assumption.statement, Quest.title, Assumption.current_verdict, Assumption.created_at)
+            .join(Quest, Quest.id == Assumption.quest_id)
+            .where(Assumption.statement.ilike(like))
+        )
+        if qids:
+            astmt = astmt.where(Assumption.quest_id.in_(qids))
+        for i, statement, qtitle, verdict, created in session.execute(
+            astmt.order_by(Assumption.statement.asc(), Assumption.id.asc()).limit(want)
+        ).all():
+            rows.append({"target_type": "assumptions", "target_id": str(i), "title": statement,
+                         "quest_title": qtitle, "owner_name": None, "status": verdict,
+                         "due": None, "created_at": created.date().isoformat() if created else None})
+
     # 種類横断でタイトル順に整列 → offset/limit で切り出し（over-fetch 分で has_more 判定）。
     rows.sort(key=lambda r: (r["title"], r["target_type"], r["target_id"]))
     page = rows[offset:offset + limit]
@@ -417,18 +452,27 @@ def links_for_item(session: Session, info_id: uuid.UUID) -> list[InfoLink]:
 
 
 def resolve_link_titles(session: Session, links: list[InfoLink]) -> dict[uuid.UUID, str]:
-    """関連リンクの target_title を成果物から解決（ideas/quests＝実装済ドメイン）。未実装/不在は含めない。"""
+    """関連リンクの target_title を成果物から解決（ideas/quests/concepts/assumptions・FR-42 §7）。未実装/不在は含めない。"""
     from app.tenant.ideas.orm import Idea
     from app.tenant.quests.orm import Quest
+    from app.tenant.concepts.orm import Assumption, Concept
     out: dict[uuid.UUID, str] = {}
     idea_ids = [l.target_id for l in links if l.target_type == "ideas"]
     quest_ids = [l.target_id for l in links if l.target_type == "quests"]
+    concept_ids = [l.target_id for l in links if l.target_type == "concepts"]
+    assumption_ids = [l.target_id for l in links if l.target_type == "assumptions"]
     if idea_ids:
         for iid, title in session.execute(select(Idea.id, Idea.title).where(Idea.id.in_(idea_ids))).all():
             out[iid] = title
     if quest_ids:
         for qid, title in session.execute(select(Quest.id, Quest.title).where(Quest.id.in_(quest_ids))).all():
             out[qid] = title
+    if concept_ids:
+        for cid, title in session.execute(select(Concept.id, Concept.title).where(Concept.id.in_(concept_ids))).all():
+            out[cid] = title
+    if assumption_ids:
+        for aid, statement in session.execute(select(Assumption.id, Assumption.statement).where(Assumption.id.in_(assumption_ids))).all():
+            out[aid] = statement  # 前提は statement をタイトルとして扱う
     return out
 
 

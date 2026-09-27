@@ -807,8 +807,25 @@ def _notify_refuting(company_id: uuid.UUID, actor_account_id: uuid.UUID, *,
         elif target_type == "quests":
             recipients |= quests_repo.admin_user_ids(ts, target_id)        # 所有者＋quest_admin
             refs = {"ref_quest_id": target_id}
+        elif target_type == "concepts":
+            from app.tenant.concepts import repository as concepts_repo
+            c = concepts_repo.get_concept(ts, target_id)
+            if c is None:
+                return []
+            recipients |= {c.author_id}                                    # コンセプト作成者
+            recipients |= quests_repo.admin_user_ids(ts, c.quest_id)       # クエスト管理者
+            refs = {}  # 汎用表示（concept 専用 ref 列は無い＝frontend は generic・§N.6）
+        elif target_type == "assumptions":
+            from app.tenant.concepts import repository as concepts_repo
+            a = concepts_repo.get_assumption(ts, target_id)
+            if a is None:
+                return []
+            if a.created_by_id:
+                recipients |= {a.created_by_id}                            # 前提の作成者
+            recipients |= quests_repo.admin_user_ids(ts, a.quest_id)       # クエスト管理者
+            refs = {}
         else:
-            return []  # concepts/assumptions は未実装＝宛先なし
+            return []
         recipients.discard(actor_uid)  # 反証を付けた本人には通知しない
         params = {"actor_name": actor.display_name if actor else None, "info_title": info_title}
         return [notify_svc.entry(r, "info_refuting_raised", refs=refs, params=params) for r in recipients if r]

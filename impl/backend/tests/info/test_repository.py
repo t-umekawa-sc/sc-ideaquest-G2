@@ -178,22 +178,36 @@ def test_n_tc_016_create_find_link(info_env):
 
 
 def test_n_tc_017_search_link_candidates(info_env):
-    """N-TC-017: リンク候補のタイトル検索（quests）／未実装ドメインは空。"""
+    """N-TC-017: リンク候補のタイトル検索（quests／concepts／assumptions＝FR-42 §7 で実装）＋タイトル解決。"""
     import uuid as _uuid
     from app.tenant.quests.orm import Quest
-    qid = _uuid.uuid4()
+    from app.tenant.concepts.orm import Assumption, Concept
+    from app.tenant.info.orm import InfoLink
+    qid, cid, aid = _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4()
     with get_tenant_session(info_env.db_identifier) as ts:
         ts.add(Quest(id=qid, owner_id=info_env.user_id, title="候補クエストZZZ", color="#3B82F6", status="recruiting"))
+        ts.flush()  # Quest を先に確定（Concept/Assumption の FK 順序を保証）
+        ts.add(Concept(id=cid, quest_id=qid, author_id=info_env.user_id, title="候補コンセプトZZZ", status="active"))
+        ts.add(Assumption(id=aid, quest_id=qid, statement="候補前提ZZZ", created_by_id=info_env.user_id))
         ts.commit()
     try:
         with get_tenant_session(info_env.db_identifier) as ts:
             cands, _more = repo.search_link_candidates(ts, types=["quests"], q="候補クエストZZZ", limit=10)
             assert any(c["target_id"] == str(qid) and c["title"] == "候補クエストZZZ" for c in cands)
-            # 未実装ドメイン（concepts）は候補ゼロ。
-            empty, _m2 = repo.search_link_candidates(ts, types=["concepts"], q="x", limit=10)
-            assert empty == []
+            # concepts/assumptions も候補として返る（FR-42 §7）。
+            cc, _m = repo.search_link_candidates(ts, types=["concepts"], q="候補コンセプトZZZ", limit=10)
+            assert any(c["target_type"] == "concepts" and c["target_id"] == str(cid) for c in cc)
+            ac, _m2 = repo.search_link_candidates(ts, types=["assumptions"], q="候補前提ZZZ", limit=10)
+            assert any(c["target_type"] == "assumptions" and c["target_id"] == str(aid) and c["title"] == "候補前提ZZZ" for c in ac)
+            # タイトル解決（concept=title／assumption=statement）。
+            links = [InfoLink(id=_uuid.uuid4(), info_item_id=info_env.ids.a, target_type="concepts", target_id=cid, kind="related", origin="manual"),
+                     InfoLink(id=_uuid.uuid4(), info_item_id=info_env.ids.a, target_type="assumptions", target_id=aid, kind="related", origin="manual")]
+            titles = repo.resolve_link_titles(ts, links)
+            assert titles.get(cid) == "候補コンセプトZZZ" and titles.get(aid) == "候補前提ZZZ"
     finally:
         with get_tenant_session(info_env.db_identifier) as ts:
+            ts.execute(Assumption.__table__.delete().where(Assumption.id == aid))
+            ts.execute(Concept.__table__.delete().where(Concept.id == cid))
             ts.execute(Quest.__table__.delete().where(Quest.id == qid)); ts.commit()
 
 

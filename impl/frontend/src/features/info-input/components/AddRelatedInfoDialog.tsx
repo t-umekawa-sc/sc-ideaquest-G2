@@ -13,7 +13,7 @@ import "../info-input.css";
 
 export function AddRelatedInfoDialog({ open, onClose, targetType, targetId, existingInfoIds, onAdded }: {
   open: boolean; onClose: () => void;
-  targetType: "quests" | "ideas" | "concepts"; targetId: string;
+  targetType: "quests" | "ideas" | "concepts" | "assumptions"; targetId: string;
   existingInfoIds: Set<string>; onAdded: () => void;
 }) {
   const confirm = useConfirm();
@@ -83,7 +83,7 @@ export function AddRelatedInfoDialog({ open, onClose, targetType, targetId, exis
               {Object.entries(LINK_KIND_LABEL).map(([v, lab]) => <option key={v} value={v}>{lab[0]}</option>)}
             </select>
           </div>
-          <span className="hint">選んだ情報をこの{targetType === "quests" ? "クエスト" : "アイデア"}に、この種別で関連付けます（「反証」は対象の作成者＋評価者へ通知＋要再評価）。</span>
+          <span className="hint">選んだ情報をこの{targetType === "quests" ? "クエスト" : targetType === "concepts" ? "コンセプト" : targetType === "assumptions" ? "前提" : "アイデア"}に、この種別で関連付けます（「反証」は対象の作成者＋評価者へ通知＋要再評価）。</span>
         </div>
 
         <hr className="pick-divider" />
