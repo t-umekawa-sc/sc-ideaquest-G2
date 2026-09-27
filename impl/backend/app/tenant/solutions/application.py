@@ -79,12 +79,22 @@ def _is_quest_party(ts, quest, user) -> bool:
     return quest is not None and quests_repo.can_access_quest(ts, quest, user.id)
 
 
+def _is_in_access_group(ts, project: Project, user) -> bool:
+    """参加グループ（アクセス条件）＝プロジェクトに紐づくグループのいずれかに現在有効所属していれば参照可。"""
+    group_ids = repo.list_project_group_ids(ts, project.id)
+    if not group_ids:
+        return False
+    return user.id in quests_repo.user_ids_in_any_group(ts, group_ids)
+
+
 def can_access_project(ts, project: Project, user) -> bool:
     if project.owner_account_id == user.id:
         return True
     if repo.get_member(ts, project.id, user.id) is not None:
         return True
-    return _is_quest_party(ts, _quest_of(ts, project), user)
+    if _is_quest_party(ts, _quest_of(ts, project), user):
+        return True
+    return _is_in_access_group(ts, project, user)
 
 
 def _dev_role(ts, project, user) -> str | None:
@@ -177,6 +187,7 @@ def _detail(ts, project: Project, user) -> dict:
         "status": project.status, "deployment": project.deployment or {}, "external_link": project.external_link,
         "concept": _concept_ref(ts, project), "quest": _quest_ref(ts, project),
         "owner": _user_ref(ts, project.owner_account_id), "progress": _progress(tasks),
+        "group_ids": [str(g) for g in repo.list_project_group_ids(ts, project.id)],
         "viewer_domain": _viewer_domain(ts, project, user, quest),
         "viewer_user_id": str(user.id),
         "my_permissions": {
@@ -226,7 +237,19 @@ def _award_task_done(ts, task: Task) -> None:
 
 
 # ---- endpoints (projects) ----
-def create_from_concept(account_id, company_id, concept_id, *, title=None, description=None, deployment=None, members=None) -> dict:
+def _apply_group_links(ts, project: Project, group_ids) -> None:
+    """参加グループ（アクセス条件）を登録＝会社の quest_groups を指す（存在検証）。"""
+    if not group_ids:
+        return
+    gids = [_parse_uuid(g, field="group_ids") for g in group_ids]
+    from app.tenant.quest_group.orm import QuestGroup
+    for gid in gids:
+        if ts.get(QuestGroup, gid) is None:
+            raise AppError(422, "validation_error", detail="対象グループが見つかりません", errors=[{"field": "group_ids"}])
+    repo.create_project_group_links(ts, project.id, gids)
+
+
+def create_from_concept(account_id, company_id, concept_id, *, title=None, description=None, deployment=None, members=None, group_ids=None) -> dict:
     company = _ctx(account_id, company_id)
     cid = _parse_uuid(concept_id, field="concept_id")
     with get_tenant_session(company.db_identifier) as ts:
@@ -247,11 +270,12 @@ def create_from_concept(account_id, company_id, concept_id, *, title=None, descr
                                       title=(title or f"{concept.title} 開発"), description=description,
                                       owner_account_id=user.id, deployment=deployment)
         _apply_members(ts, project, members)
+        _apply_group_links(ts, project, group_ids)
         ts.commit()
         return _detail(ts, project, user)
 
 
-def create_standalone(account_id, company_id, *, title, description=None, deployment=None, members=None) -> dict:
+def create_standalone(account_id, company_id, *, title, description=None, deployment=None, members=None, group_ids=None) -> dict:
     company = _ctx(account_id, company_id)
     if not (title or "").strip():
         raise AppError(422, "validation_error", detail="プロジェクト名は必須です", errors=[{"field": "title"}])
@@ -260,6 +284,7 @@ def create_standalone(account_id, company_id, *, title, description=None, deploy
         project = repo.create_project(ts, concept_id=None, quest_id=None, title=title.strip(),
                                       description=description, owner_account_id=user.id, deployment=deployment)
         _apply_members(ts, project, members)
+        _apply_group_links(ts, project, group_ids)
         ts.commit()
         return _detail(ts, project, user)
 
@@ -318,6 +343,13 @@ def update_project(account_id, company_id, project_id, *, patch: dict) -> dict:
             project.deployment = patch["deployment"]
         if "external_link" in patch:
             project.external_link = patch["external_link"]
+        if "group_ids" in patch and patch["group_ids"] is not None:
+            gids = [_parse_uuid(g, field="group_ids") for g in patch["group_ids"]]
+            from app.tenant.quest_group.orm import QuestGroup
+            for gid in gids:
+                if ts.get(QuestGroup, gid) is None:
+                    raise AppError(422, "validation_error", detail="対象グループが見つかりません", errors=[{"field": "group_ids"}])
+            repo.reconcile_project_group_links(ts, project.id, gids)
         repo.touch_project(ts, project)
         ts.commit()
         return _detail(ts, project, user)

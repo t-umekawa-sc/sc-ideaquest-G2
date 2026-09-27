@@ -1,70 +1,65 @@
 "use client";
 
-// 開発メンバー選択ピッカー（FR-43・Q.1b）＝クエスト作成/編集の「参加メンバー（パーティー）・権限」エディタ
-// （QuestForm の .party 2カラム）を忠実に踏襲（フロントエンド実装フロー規約 §2.1c＝新規UIを作らない）。
-// 唯一の適応＝メンバーごとの「権限チップ」を開発役割（lead/member）の**排他ボタン**に差し替え。
-// 参加グループは独立 Field にせず候補側の「グループで絞込」に内包（ユーザー要望 2026-09-27）。試作＝候補は会社ディレクトリのデモ。
-import { useMemo, useState } from "react";
+// 開発メンバー選択ピッカー（FR-43・Q.1b）＝クエスト「参加メンバー（パーティー）・権限」エディタ（.party 2カラム）を踏襲。
+// 候補は**実データ＝会社ディレクトリ**（quest_group_directory／quest-group-candidates を再利用）。役割は開発役割（lead/member）。
+// 参加グループ（アクセス条件）は上位 Field で controlled（groupFilter）＝候補スコープ＋グループ外マーキング。
+import { useEffect, useMemo, useState } from "react";
 
-import { Multiselect } from "@/components/ui";
-import type { MultiselectOption } from "@/components/ui";
+import { listQuestGroupCandidates } from "@/features/quests/api";
+import type { QuestCandidate } from "@/features/quests/api";
 
 import type { ProjectRole, UserRef } from "../types";
 import "@/features/quests/quests.css";
 
-export type PickedMember = { user: UserRef; role: ProjectRole };
+// PickedMember に group_ids を持たせ、参加グループ絞込時の「グループ外」判定に使う（候補から追加時に付与）。
+export type PickedMember = { user: UserRef; role: ProjectRole; groupIds?: string[] };
 
-// 参加グループの選択肢（試作／接続時は B ディレクトリのグループへ）。
-export const PROJECT_GROUP_OPTIONS: MultiselectOption[] = [
-  { value: "g-dev", label: "開発部" },
-  { value: "g-plan", label: "企画部" },
-  { value: "g-qa", label: "QA部" },
-];
-const GROUP_NAME: Record<string, string> = Object.fromEntries(PROJECT_GROUP_OPTIONS.map((g) => [g.value, g.label]));
-
-// 会社ディレクトリ（試作・接続時は B のディレクトリ read＋グループ絞込へ）。
-const DIRECTORY: (UserRef & { group_ids: string[] })[] = [
-  { user_id: "u-dev1", display_name: "田中（開発リード）", avatar_image_url: null, group_ids: ["g-dev"] },
-  { user_id: "u-dev2", display_name: "佐藤（開発）", avatar_image_url: null, group_ids: ["g-dev"] },
-  { user_id: "u-dev3", display_name: "山本（開発）", avatar_image_url: null, group_ids: ["g-dev"] },
-  { user_id: "u-dev4", display_name: "中村（開発）", avatar_image_url: null, group_ids: ["g-dev", "g-qa"] },
-  { user_id: "u-qa1", display_name: "小林（QA）", avatar_image_url: null, group_ids: ["g-qa"] },
-  { user_id: "u-plan1", display_name: "鈴木（企画）", avatar_image_url: null, group_ids: ["g-plan"] },
-];
-const groupsOf = (userId: string): string[] => DIRECTORY.find((u) => u.user_id === userId)?.group_ids ?? [];
 const initialOf = (name: string) => name.trim().charAt(0) || "?";
-
 const ROLES: [ProjectRole, string][] = [["lead", "リード"], ["member", "担当"]];
+const PAGE = 50;
 
-export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel = "あなた・作成者", groupFilter: groupFilterProp, onGroupFilter }: {
+export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel = "あなた・作成者", ownerUserId, groupFilter, onGroupFilter, allGroupIds = [], groupNameById = {} }: {
   members: PickedMember[];
   onMembers: (v: PickedMember[]) => void;
-  ownerName: string;      // 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲（§2.1c）
-  ownerLabel?: string;    // バッジ文言（作成時「あなた・作成者」／編集時「作成者」）
-  // 参加グループ（アクセス条件）を上位 Field で持つ場合は controlled（候補側の内蔵コンボは隠す）。
+  ownerName: string;      // 作成者＝所有者（固定・外せない・常にリード）
+  ownerLabel?: string;
+  ownerUserId?: string;   // 候補から除外（作成者は別途固定行）
+  // 参加グループ（アクセス条件）を上位 Field で持つ（controlled）。allGroupIds＝未選択時の候補スコープ（全社）。
   groupFilter?: string[];
   onGroupFilter?: (v: string[]) => void;
+  allGroupIds?: string[];
+  groupNameById?: Record<string, string>;
 }) {
-  const controlledGroup = groupFilterProp !== undefined;
-  const [groupFilterState, setGroupFilterState] = useState<string[]>([]);
-  const groupFilter = controlledGroup ? groupFilterProp! : groupFilterState;
-  const setGroupFilter = controlledGroup ? (onGroupFilter ?? (() => {})) : setGroupFilterState;
+  const controlledGroup = groupFilter !== undefined;
+  const [groupFilterState] = useState<string[]>([]);
+  const groups = controlledGroup ? groupFilter! : groupFilterState;
+
   const [candQuery, setCandQuery] = useState("");
   const [selQuery, setSelQuery] = useState("");
   const [outOnly, setOutOnly] = useState(false);
+  const [candidates, setCandidates] = useState<QuestCandidate[]>([]);
+  const [loadingCands, setLoadingCands] = useState(false);
 
   const selectedIds = useMemo(() => new Set(members.map((m) => m.user.user_id)), [members]);
+  const excludeIds = useMemo(() => [...members.map((m) => m.user.user_id), ...(ownerUserId ? [ownerUserId] : [])], [members, ownerUserId]);
 
-  // 候補＝グループで絞る（未選択＝全社）＋名前絞込＋追加済み除外。
-  const candidates = DIRECTORY.filter((u) => {
-    if (selectedIds.has(u.user_id)) return false;
-    if (groupFilter.length && !u.group_ids.some((g) => groupFilter.includes(g))) return false;
-    if (candQuery.trim() && !u.display_name.includes(candQuery.trim())) return false;
-    return true;
-  });
+  // 候補＝実 API（横断候補）。参加グループ未選択なら全社（allGroupIds）を対象に。名前絞込＝サーバー q。
+  useEffect(() => {
+    const scope = groups.length ? groups : allGroupIds;
+    if (scope.length === 0) { setCandidates([]); return; }
+    const ac = new AbortController();
+    const t = setTimeout(() => {
+      setLoadingCands(true);
+      listQuestGroupCandidates(scope, { q: candQuery.trim() || undefined, exclude_user_ids: excludeIds, limit: PAGE })
+        .then((r) => setCandidates(r?.data ?? []))
+        .catch(() => { /* 中断/失敗は無視 */ })
+        .finally(() => setLoadingCands(false));
+    }, 250);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [groups, allGroupIds, candQuery, excludeIds]);
 
-  // 選択中＝グループ外（＝グループ絞込を指定した時、そのグループに属さない）を判定。
-  const isOut = (m: PickedMember) => groupFilter.length > 0 && !groupsOf(m.user.user_id).some((g) => groupFilter.includes(g));
+  // group_ids が判っているメンバー（候補から追加）だけ判定＝取得済みメンバー（groupIds 不明）は誤って「グループ外」にしない。
+  const isOut = (m: PickedMember) => groups.length > 0 && m.groupIds !== undefined && !m.groupIds.some((g) => groups.includes(g));
   const filteredSelected = members.filter((m) => {
     if (selQuery.trim() && !m.user.display_name.includes(selQuery.trim())) return false;
     if (outOnly && !isOut(m)) return false;
@@ -72,46 +67,41 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
   });
   const outCount = members.filter(isOut).length;
 
-  function add(u: UserRef) { onMembers([...members, { user: u, role: "member" }]); }
-  function addAllShown() { onMembers([...members, ...candidates.map((c) => ({ user: c as UserRef, role: "member" as ProjectRole }))]); }
+  function add(c: QuestCandidate) { onMembers([...members, { user: { user_id: c.user_id, display_name: c.display_name, avatar_image_url: c.avatar_image_url ?? null }, role: "member", groupIds: c.group_ids }]); }
+  function addAllShown() { onMembers([...members, ...candidates.map((c) => ({ user: { user_id: c.user_id, display_name: c.display_name, avatar_image_url: c.avatar_image_url ?? null }, role: "member" as ProjectRole, groupIds: c.group_ids }))]); }
   function remove(id: string) { onMembers(members.filter((m) => m.user.user_id !== id)); }
   function setRole(id: string, role: ProjectRole) { onMembers(members.map((m) => (m.user.user_id === id ? { ...m, role } : m))); }
   function bulkRemove() {
     const ids = new Set(filteredSelected.map((m) => m.user.user_id));
     onMembers(members.filter((m) => !ids.has(m.user.user_id)));
   }
+  const groupLabels = (ids: string[]) => ids.map((g) => groupNameById[g]).filter(Boolean);
 
   return (
     <div className="party">
       <div className="party__cols">
-        {/* 候補追加（左カラム）＝グループで絞込＋名前絞込＋表示中を全員追加＋候補リスト */}
+        {/* 候補追加（左カラム）＝名前絞込＋表示中を全員追加＋候補リスト（グループは上位 Field で絞る）。 */}
         <div className="party__col">
           <div className="party__head">
             <strong>メンバーを追加</strong>
             <span className="party__count">候補から選ぶ</span>
           </div>
           <div className="party__add">
-            {/* 参加グループを上位 Field で持つ場合（controlled）は候補側の内蔵コンボを出さない（重複回避）。 */}
-            {!controlledGroup && (
-              <div style={{ marginBottom: "var(--space-2)" }}>
-                <Multiselect id="pp_cand_group" options={PROJECT_GROUP_OPTIONS} value={groupFilter} onChange={setGroupFilter} placeholder="グループで絞込…（未選択＝全社）" ariaLabel="候補をグループで絞り込み" emptyText="該当するグループがありません" />
-              </div>
-            )}
             <input className="input" placeholder="名前で絞り込み…" value={candQuery} onChange={(e) => setCandQuery(e.target.value)} aria-label="候補を名前で絞り込み" />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
               <button type="button" className="btn btn-sm btn-outline" disabled={candidates.length === 0} onClick={addAllShown}>表示中を全員追加（{candidates.length}）</button>
             </div>
-            <div className="party__candmeta">候補（表示中）{candidates.length} 名</div>
+            <div className="party__candmeta">候補（表示中）{loadingCands ? "…" : candidates.length} 名{candidates.length >= PAGE ? "（先頭のみ・グループ/名前で絞込）" : ""}</div>
             <div className="candlist">
               {candidates.map((c) => (
                 <button key={c.user_id} className="cand" type="button" onClick={() => add(c)}>
                   <span className="avatar sm"><span className="avatar__img placeholder">{initialOf(c.display_name)}</span></span>
                   <span className="cand__name">{c.display_name}</span>
-                  {c.group_ids.length > 0 && <span className="pmember__depts">{c.group_ids.map((g) => <span key={g} className="badge badge-muted">{GROUP_NAME[g] ?? g}</span>)}</span>}
+                  {groupLabels(c.group_ids).length > 0 && <span className="pmember__depts">{groupLabels(c.group_ids).map((g) => <span key={g} className="badge badge-muted">{g}</span>)}</span>}
                   <span className="cand__plus" aria-hidden>＋</span>
                 </button>
               ))}
-              {candidates.length === 0 && <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または該当者がいません）。"}</span>}
+              {candidates.length === 0 && !loadingCands && <span className="hint">{candQuery ? "一致する候補がいません。" : "追加できる候補がいません（全員追加済み、または該当者がいません）。"}</span>}
             </div>
             <div className="hint">追加すると既定は「担当」。リードは選択中で切り替え。担当割当は開発メンバーに限ります。</div>
           </div>
@@ -135,7 +125,7 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
             </div>
           )}
           <div className="party__list">
-            {/* 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲（§2.1c）。 */}
+            {/* 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲。 */}
             <div className="pmember">
               <span className="avatar sm"><span className="avatar__img placeholder">{initialOf(ownerName)}</span></span>
               <div className="pmember__main">
@@ -152,7 +142,7 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
             {members.length === 0 ? (
               <p className="hint" style={{ margin: 0, padding: "var(--space-3)" }}>ほかに開発メンバーはいません。左の候補から追加できます。</p>
             ) : filteredSelected.map((m) => {
-              const gids = groupsOf(m.user.user_id);
+              const gids = m.groupIds ?? [];
               const out = isOut(m);
               return (
                 <div className="pmember" key={m.user.user_id} data-out-of-scope={out ? "1" : undefined} style={out ? { opacity: 0.62 } : undefined}>
@@ -162,7 +152,7 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
                       <span className="pmember__name">{m.user.display_name}</span>
                       {out && <span className="badge badge-danger" title="選択中のグループに属していません">グループ外・失効中</span>}
                     </div>
-                    {gids.length > 0 && <div className="pmember__depts">{gids.map((g) => <span key={g} className="badge badge-muted">{GROUP_NAME[g] ?? g}</span>)}</div>}
+                    {groupLabels(gids).length > 0 && <div className="pmember__depts">{groupLabels(gids).map((g) => <span key={g} className="badge badge-muted">{g}</span>)}</div>}
                     <div className="pmember__perms">
                       {ROLES.map(([r, label]) => (
                         <span key={r} role="button" tabIndex={0} className={`perm${m.role === r ? " is-on" : ""}`}
@@ -180,6 +170,7 @@ export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel =
           </div>
         </div>
       </div>
+      {onGroupFilter && null /* グループ選択は上位 Field（ProjectForm）が保持＝controlled */}
     </div>
   );
 }

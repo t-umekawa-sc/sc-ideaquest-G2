@@ -4,10 +4,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.tenant.solutions.orm import Project, ProjectMember, Task
+from app.tenant.solutions.orm import Project, ProjectGroupLink, ProjectMember, Task
 
 
 # ---- projects ----
@@ -48,6 +48,34 @@ def touch_project(session: Session, project: Project) -> None:
 def soft_delete_project(session: Session, project: Project) -> None:
     project.deleted_at = datetime.now(timezone.utc)
     session.flush()
+
+
+# ---- 参加グループ（アクセス条件・クエストの quest_group_links と同型） ----
+def create_project_group_links(session: Session, project_id: uuid.UUID, group_ids: list[uuid.UUID]) -> None:
+    for gid in dict.fromkeys(group_ids):  # 重複除去・順序保持
+        session.add(ProjectGroupLink(id=uuid.uuid4(), project_id=project_id, quest_group_id=gid))
+
+
+def list_project_group_ids(session: Session, project_id: uuid.UUID) -> list[uuid.UUID]:
+    rows = session.execute(
+        select(ProjectGroupLink.quest_group_id)
+        .where(ProjectGroupLink.project_id == project_id)
+        .order_by(ProjectGroupLink.created_at.asc())
+    ).scalars().all()
+    return list(rows)
+
+
+def reconcile_project_group_links(session: Session, project_id: uuid.UUID, target_group_ids: list[uuid.UUID]) -> None:
+    target = set(target_group_ids)
+    current = set(session.execute(
+        select(ProjectGroupLink.quest_group_id).where(ProjectGroupLink.project_id == project_id)
+    ).scalars().all())
+    for gid in target - current:
+        session.add(ProjectGroupLink(id=uuid.uuid4(), project_id=project_id, quest_group_id=gid))
+    to_remove = current - target
+    if to_remove:
+        session.execute(delete(ProjectGroupLink).where(
+            ProjectGroupLink.project_id == project_id, ProjectGroupLink.quest_group_id.in_(to_remove)))
 
 
 # ---- members ----

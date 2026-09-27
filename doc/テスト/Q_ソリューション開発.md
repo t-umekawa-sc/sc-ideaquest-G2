@@ -15,6 +15,7 @@
 | Q-TC-107 | api | 編集は起票者/owner のみ | 非owner・非管理（メンバー） | `PATCH /projects/{id}` | 403（forbidden） | Q.0 |
 | Q-TC-108 | api | プロジェクトのソフト削除＝一覧/詳細から除外＋コンセプト再起票可 | go コンセプト由来プロジェクト（owner） | `DELETE /projects/{id}`→`GET /projects`・`GET /projects/{id}`→`POST /concepts/{id}/project` | 204・一覧から消える・詳細404・同コンセプトから再起票201（部分ユニークが未削除のみ） | Q.1 |
 | Q-TC-109 | api | 削除は起票者/owner のみ | 非owner・非管理（メンバー） | `DELETE /projects/{id}` | 403（forbidden） | Q.0 |
+| Q-TC-113 | api | 参加グループ（アクセス条件）の永続＋差分＋グループ所属者アクセス | 会社グループ＋所属ユーザー | `POST /projects`（group_ids）→`GET`→`PATCH`（group_ids=[]）／グループ所属の非メンバーで can_access | 作成時 detail.group_ids に反映・PATCH で空に・グループ所属者は参照可（owner/member でなくても） | Q.1／FR-38 |
 
 ## 2. 開発メンバー（Q.1b・二層メンバーシップ）
 

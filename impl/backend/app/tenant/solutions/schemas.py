@@ -33,6 +33,7 @@ class ProjectCreateFromConceptRequest(BaseModel):
     description: str | None = None
     deployment: dict | None = None
     members: list[MemberInputDTO] = Field(default_factory=list)
+    group_ids: list[str] = Field(default_factory=list)  # 参加グループ（アクセス条件・任意）
 
 
 class ProjectCreateRequest(BaseModel):
@@ -41,6 +42,7 @@ class ProjectCreateRequest(BaseModel):
     description: str | None = None
     deployment: dict | None = None
     members: list[MemberInputDTO] = Field(default_factory=list)
+    group_ids: list[str] = Field(default_factory=list)  # 参加グループ（アクセス条件・任意）
 
 
 class ProjectPatchRequest(BaseModel):
@@ -50,6 +52,7 @@ class ProjectPatchRequest(BaseModel):
     status: str | None = None
     deployment: dict | None = None
     external_link: dict | None = None
+    group_ids: list[str] | None = None  # 参加グループ（アクセス条件・任意）＝指定時は差分反映
 
 
 class MemberAddRequest(BaseModel):
@@ -120,6 +123,7 @@ class ProjectDetailDTO(BaseModel):
     quest: RefDTO | None = None
     owner: UserRefDTO | None = None
     progress: ProgressDTO
+    group_ids: list[str] = Field(default_factory=list)  # 参加グループ（アクセス条件）
     viewer_domain: str
     viewer_user_id: str
     my_permissions: MyProjectPermsDTO

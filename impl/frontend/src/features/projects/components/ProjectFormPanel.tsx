@@ -7,13 +7,14 @@ import { useRouter } from "next/navigation";
 import { PROJECTS_CHANGED_EVENT } from "../api";
 import { ProjectForm, type ProjectPrefill } from "./ProjectForm";
 
-export function ProjectFormPanel({ mode, projectId, conceptId, conceptTitle, prefill, ownerName }: {
+export function ProjectFormPanel({ mode, projectId, conceptId, conceptTitle, prefill, ownerName, ownerUserId }: {
   mode: "create" | "edit";
   projectId?: string;
   conceptId?: string | null;
   conceptTitle?: string | null;
   prefill?: ProjectPrefill;
   ownerName: string;
+  ownerUserId?: string;
 }) {
   const router = useRouter();
   const back = mode === "edit" && projectId ? `/projects/${projectId}` : "/projects";
@@ -30,6 +31,7 @@ export function ProjectFormPanel({ mode, projectId, conceptId, conceptTitle, pre
           conceptTitle={conceptTitle}
           prefill={prefill}
           ownerName={ownerName}
+          ownerUserId={ownerUserId}
           onCancel={() => router.push(back)}
           onDone={done}
         />

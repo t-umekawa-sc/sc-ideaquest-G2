@@ -2,9 +2,10 @@
 
 // 開発メンバー管理フォーム本体（FR-43・Q.1b）＝**モーダル content のみ**（Modal シェルは RouteModal/Panel が提供）。
 // クエスト「パーティー・権限を編集」と同一 UI（.party 2カラム）。projectId で詳細（owner名）＋メンバーを取得し差分保存。
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, Field, ModalBody, ModalFooter, useSnackbar } from "@/components/ui";
+import { listCompanyGroupDirectory } from "@/features/quests/api";
 
 import { addProjectMember, getProject, listProjectMembers, patchProjectMember, removeProjectMember } from "../api";
 import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
@@ -19,18 +20,24 @@ export function ProjectMembersForm({ projectId, onDone, onCancel }: {
   const snack = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [ownerName, setOwnerName] = useState("");
+  const [ownerUserId, setOwnerUserId] = useState<string | undefined>(undefined);
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
   const [initial, setInitial] = useState<PickedMember[]>([]);
   const [innovation, setInnovation] = useState<UserRef[]>([]);
+  const [allGroupIds, setAllGroupIds] = useState<string[]>([]);
+  const [groupOpts, setGroupOpts] = useState<{ value: string; label: string }[]>([]);
+  const groupNameById = useMemo(() => Object.fromEntries(groupOpts.map((g) => [g.value, g.label])), [groupOpts]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    void Promise.all([getProject(projectId), listProjectMembers(projectId)]).then(([p, m]) => {
+    void Promise.all([getProject(projectId), listProjectMembers(projectId), listCompanyGroupDirectory()]).then(([p, m, dir]) => {
       if (!alive) return;
-      setOwnerName(p?.owner?.display_name ?? "");
+      setOwnerName(p?.owner?.display_name ?? ""); setOwnerUserId(p?.owner?.user_id);
       const picked = m.members.filter((x) => x.user).map((x) => ({ user: x.user!, role: x.role as ProjectRole }));
       setDevMembers(picked); setInitial(picked); setInnovation(m.innovation);
+      const opts = (dir?.data ?? []).map((g) => ({ value: g.id, label: g.name }));
+      setGroupOpts(opts); setAllGroupIds(opts.map((o) => o.value));
       setLoading(false);
     });
     return () => { alive = false; };
@@ -61,7 +68,7 @@ export function ProjectMembersForm({ projectId, onDone, onCancel }: {
       <ModalBody>
         <p className="role-note" style={{ marginTop: 0 }}>開発領域の担当者（会社内の任意ユーザー）。<strong>イノベーション担当（クエストパーティー）は参照＋チャット発言を継続</strong>できます。担当割当は開発メンバーに限ります。</p>
         <Field className="dialog-section is-quiet" id="pm_party" label="参加メンバー（開発メンバー）・役割">
-          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel="作成者" />
+          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel="作成者" ownerUserId={ownerUserId} allGroupIds={allGroupIds} groupNameById={groupNameById} />
         </Field>
         <Field className="dialog-section is-quiet" id="pm_innov" label="イノベーション担当（参照＋口出し可）">
           <div className="card tab-party-card" style={{ padding: 0 }}>

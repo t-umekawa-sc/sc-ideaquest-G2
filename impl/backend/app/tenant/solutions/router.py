@@ -49,7 +49,7 @@ def create_from_concept(concept_id: str, body: ProjectCreateFromConceptRequest, 
     acc, comp = _ids(session)
     return ProjectDetailDTO(**service.create_from_concept(
         acc, comp, concept_id, title=body.title, description=body.description,
-        deployment=body.deployment, members=[m.model_dump() for m in body.members]))
+        deployment=body.deployment, members=[m.model_dump() for m in body.members], group_ids=body.group_ids))
 
 
 @router.post("/projects", response_model=ProjectDetailDTO, status_code=201)
@@ -59,7 +59,7 @@ def create_project(body: ProjectCreateRequest, request: Request, session: dict =
     acc, comp = _ids(session)
     return ProjectDetailDTO(**service.create_standalone(
         acc, comp, title=body.title, description=body.description,
-        deployment=body.deployment, members=[m.model_dump() for m in body.members]))
+        deployment=body.deployment, members=[m.model_dump() for m in body.members], group_ids=body.group_ids))
 
 
 @router.get("/projects/{project_id}", response_model=ProjectDetailDTO)

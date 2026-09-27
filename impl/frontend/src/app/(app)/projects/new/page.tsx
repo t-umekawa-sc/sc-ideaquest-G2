@@ -15,6 +15,7 @@ export default async function ProjectCreateFullPage({ searchParams }: { searchPa
       conceptId={sp.concept ?? null}
       conceptTitle={sp.conceptTitle ?? null}
       ownerName={session.user.display_name}
+      ownerUserId={session.user.user_id ?? undefined}
     />
   );
 }

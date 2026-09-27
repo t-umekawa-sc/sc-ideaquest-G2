@@ -7137,6 +7137,8 @@ export interface components {
             } | null;
             /** Members */
             members?: components["schemas"]["MemberInputDTO"][];
+            /** Group Ids */
+            group_ids?: string[];
         };
         /** ProjectCreateRequest */
         ProjectCreateRequest: {
@@ -7150,6 +7152,8 @@ export interface components {
             } | null;
             /** Members */
             members?: components["schemas"]["MemberInputDTO"][];
+            /** Group Ids */
+            group_ids?: string[];
         };
         /** ProjectDetailDTO */
         ProjectDetailDTO: {
@@ -7173,6 +7177,8 @@ export interface components {
             quest?: components["schemas"]["RefDTO"] | null;
             owner?: components["schemas"]["UserRefDTO"] | null;
             progress: components["schemas"]["ProgressDTO"];
+            /** Group Ids */
+            group_ids?: string[];
             /** Viewer Domain */
             viewer_domain: string;
             /** Viewer User Id */
@@ -7225,6 +7231,8 @@ export interface components {
             external_link?: {
                 [key: string]: unknown;
             } | null;
+            /** Group Ids */
+            group_ids?: string[] | null;
         };
         /** PurchaseResponse */
         PurchaseResponse: {

@@ -8,5 +8,5 @@ export default async function ProjectEditInterceptModal({ params }: { params: Pr
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { projectId } = await params;
-  return <ProjectFormModal mode="edit" projectId={projectId} ownerName={session.user.display_name} />;
+  return <ProjectFormModal mode="edit" projectId={projectId} ownerName={session.user.display_name} ownerUserId={session.user.user_id ?? undefined} />;
 }

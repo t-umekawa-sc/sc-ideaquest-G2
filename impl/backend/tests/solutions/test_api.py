@@ -18,9 +18,12 @@ from app.tenant.concepts.orm import Concept
 from app.tenant.gamification.orm import Activity
 from app.tenant.profile.orm import User
 from app.tenant.profile.repository import get_user_by_account
+from app.tenant.quest_group import repository as qg_repo
+from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 from app.tenant.quests import repository as quests_repo
 from app.tenant.quests.orm import Quest, QuestMember, QuestMemberPermission
-from app.tenant.solutions.orm import Project, ProjectMember, Task
+from app.tenant.solutions import application as sol_app
+from app.tenant.solutions.orm import Project, ProjectGroupLink, ProjectMember, Task
 from tests.admin.test_admin_accounts import _login
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
 
@@ -193,6 +196,38 @@ def test_q_tc_108_soft_delete_and_reissue(env, client):
     r2 = client.post(f"/api/v1/concepts/{cid}/project", json={}, headers=_csrf(client))
     assert r2.status_code == 201, r2.text
     env.track_project(r2.json()["id"])
+
+
+def test_q_tc_113_access_groups(env, client):
+    """Q-TC-113: 参加グループ（アクセス条件）＝作成で永続・PATCH で差分・グループ所属者は owner/member でなくても参照可。"""
+    _login_seed(client)
+    gid = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(QuestGroup(id=gid, quest_group_code=f"QG-{uuid.uuid4().hex[:6].upper()}", name="G"))
+        ts.flush()
+        qg_repo.upsert_membership(ts, gid, env.other_id, role="member")  # other をグループ所属に
+        ts.commit()
+    try:
+        r = client.post("/api/v1/projects", json={"title": "G付き", "group_ids": [str(gid)]}, headers=_csrf(client))
+        assert r.status_code == 201, r.text
+        p = r.json(); env.track_project(p["id"])
+        assert p["group_ids"] == [str(gid)]
+        # グループ所属の非owner・非メンバーが参照可（アクセス条件）。
+        with get_tenant_session(env.db_identifier) as ts:
+            proj = ts.get(Project, uuid.UUID(p["id"])); other = ts.get(User, env.other_id)
+            assert sol_app.can_access_project(ts, proj, other) is True
+        # PATCH で参加グループを外す＝差分反映・所属者アクセスも失効。
+        r2 = client.patch(f"/api/v1/projects/{p['id']}", json={"group_ids": []}, headers=_csrf(client))
+        assert r2.status_code == 200 and r2.json()["group_ids"] == []
+        with get_tenant_session(env.db_identifier) as ts:
+            proj = ts.get(Project, uuid.UUID(p["id"])); other = ts.get(User, env.other_id)
+            assert sol_app.can_access_project(ts, proj, other) is False
+    finally:
+        with get_tenant_session(env.db_identifier) as ts:
+            ts.execute(ProjectGroupLink.__table__.delete().where(ProjectGroupLink.quest_group_id == gid))
+            ts.execute(QuestGroupMember.__table__.delete().where(QuestGroupMember.quest_group_id == gid))
+            ts.execute(QuestGroup.__table__.delete().where(QuestGroup.id == gid))
+            ts.commit()
 
 
 def test_q_tc_109_delete_owner_only(env, client):

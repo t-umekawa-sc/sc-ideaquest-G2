@@ -9,5 +9,5 @@ export default async function ProjectEditFullPage({ params }: { params: Promise<
   const session = await getServerSession();
   if (!session) redirect("/login");
   const { projectId } = await params;
-  return <ProjectFormPanel mode="edit" projectId={projectId} ownerName={session.user.display_name} />;
+  return <ProjectFormPanel mode="edit" projectId={projectId} ownerName={session.user.display_name} ownerUserId={session.user.user_id ?? undefined} />;
 }

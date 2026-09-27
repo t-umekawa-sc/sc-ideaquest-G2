@@ -46,6 +46,16 @@ class ProjectMember(CompanyBase):
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class ProjectGroupLink(CompanyBase):
+    __tablename__ = "project_group_links"
+    __table_args__ = (UniqueConstraint("project_id", "quest_group_id", name="uq_project_group_links"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    quest_group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quest_groups.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class Task(CompanyBase):
     __tablename__ = "tasks"
 

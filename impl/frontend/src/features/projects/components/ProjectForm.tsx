@@ -3,27 +3,30 @@
 // プロジェクト作成/編集フォーム本体（FR-43・Q.1）＝**モーダル content のみ**（Modal シェルは RouteModal/Panel が提供）。
 // クエスト（QuestForm）と同じ URL 付きモーダル方式（Parallel＋Intercept・§112）に統一。
 // 作成: conceptId 有り POST /concepts/{id}/project／無し POST /projects。編集: projectId で詳細＋メンバーを取得し PATCH。
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Field, FormFooterError, FormSummary, ModalBody, ModalFooter, Multiselect, useFormErrorNotice, useSnackbar } from "@/components/ui";
+import type { MultiselectOption } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { ApiError } from "@/lib/api/client";
+import { listCompanyGroupDirectory } from "@/features/quests/api";
 
 import { addProjectMember, createProject, createProjectFromConcept, getProject, listProjectMembers, patchProject, patchProjectMember, removeProjectMember } from "../api";
 import type { ProjectRole, ProjectStatus } from "../types";
-import { ProjectPartyPicker, PROJECT_GROUP_OPTIONS, type PickedMember } from "./ProjectPartyPicker";
+import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
 
 const STATUS_LABEL: Record<ProjectStatus, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
 
-export function ProjectForm({ mode = "create", projectId, prefill, conceptId, conceptTitle, ownerName, onDone, onCancel }: {
+export function ProjectForm({ mode = "create", projectId, prefill, conceptId, conceptTitle, ownerName: ownerNameProp, ownerUserId: ownerUserIdProp, onDone, onCancel }: {
   mode?: "create" | "edit";
   projectId?: string;              // 編集時＝対象プロジェクト（詳細/メンバーを本体で取得）
   prefill?: ProjectPrefill;
   conceptId?: string | null;       // 由来コンセプト（無ければコンセプト非依存＝単純タスク管理）
   conceptTitle?: string | null;
-  ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行）
+  ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行・作成時＝session）
+  ownerUserId?: string;            // 作成者/所有者の user_id（候補除外用）
   onDone: (to?: string) => void;   // 成功（作成/更新）後の閉じ（RouteModal の close／Panel の遷移）
   onCancel: (to?: string) => void; // キャンセル
 }) {
@@ -32,6 +35,11 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
   const isEdit = mode === "edit";
 
   const [loading, setLoading] = useState(isEdit);
+  const [ownerName, setOwnerName] = useState(ownerNameProp);
+  const [ownerUserId, setOwnerUserId] = useState<string | undefined>(ownerUserIdProp);
+  const [groupOptions, setGroupOptions] = useState<MultiselectOption[]>([]);
+  const [allGroupIds, setAllGroupIds] = useState<string[]>([]);
+  const groupNameById = useMemo(() => Object.fromEntries(groupOptions.map((g) => [g.value, g.label])), [groupOptions]);
   const [title, setTitle] = useState(prefill?.title ?? (conceptId && conceptTitle ? `${conceptTitle} 開発` : ""));
   const [description, setDescription] = useState(prefill?.description ?? "");
   const [status, setStatus] = useState<ProjectStatus>("planning");
@@ -40,9 +48,20 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
   const [kpi, setKpi] = useState(prefill?.kpi ?? "");
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
   const [initialMembers, setInitialMembers] = useState<PickedMember[]>([]);  // 編集時の差分計算基準
-  const [accessGroups, setAccessGroups] = useState<string[]>([]);  // 参加グループ（アクセス条件）＝候補スコープ（試作・未永続）
+  const [accessGroups, setAccessGroups] = useState<string[]>([]);  // 参加グループ（アクセス条件）＝候補スコープ＋永続
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+
+  // 会社グループのディレクトリ（参加グループの選択肢＋候補スコープ＝実データ）。
+  useEffect(() => {
+    let alive = true;
+    void listCompanyGroupDirectory().then((r) => {
+      if (!alive) return;
+      const opts = (r?.data ?? []).map((g) => ({ value: g.id, label: g.name }));
+      setGroupOptions(opts); setAllGroupIds(opts.map((o) => o.value));
+    });
+    return () => { alive = false; };
+  }, []);
 
   // 編集時＝詳細＋開発メンバーを取得してフォーム初期値に（保存時に差分で add/patch/remove）。
   useEffect(() => {
@@ -54,6 +73,8 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
       setTitle(p.title); setDescription(p.description ?? "");
       setStatus((p.status as ProjectStatus) ?? "planning");
       setLaunchStatus(dep.launch_status ?? ""); setPlan(dep.plan ?? ""); setKpi(dep.kpi ?? "");
+      setAccessGroups(p.group_ids ?? []);
+      if (p.owner) { setOwnerName(p.owner.display_name); setOwnerUserId(p.owner.user_id); } // 編集は対象プロジェクトの所有者を固定行に
       const picked = m.members.filter((x) => x.user).map((x) => ({ user: x.user!, role: x.role as ProjectRole }));
       setDevMembers(picked); setInitialMembers(picked);
       setLoading(false);
@@ -84,7 +105,7 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
     const deployment = buildDeployment();
     try {
       if (isEdit && projectId) {
-        await patchProject(projectId, { title: title.trim(), description: description.trim() || null, status, deployment });
+        await patchProject(projectId, { title: title.trim(), description: description.trim() || null, status, deployment, group_ids: accessGroups });
         const before = new Map(initialMembers.map((m) => [m.user.user_id, m.role]));
         const after = new Map(devMembers.map((m) => [m.user.user_id, m.role]));
         for (const [uid] of before) if (!after.has(uid)) await removeProjectMember(projectId, uid);
@@ -98,8 +119,8 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
       }
       const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
       const created = conceptId
-        ? await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members })
-        : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members });
+        ? await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups })
+        : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups });
       const memberNote = devMembers.length ? `／開発メンバー ${devMembers.length} 名` : "";
       snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "単純タスク管理プロジェクトを作成しました。") + memberNote });
       onDone(created ? `/projects/${created.id}` : undefined);
@@ -149,13 +170,13 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
 
         {/* 参加グループ（アクセス条件・任意）＝QuestForm と同構成（候補スコープ＋グループ外マーキング）。試作＝会社グループのデモ・未永続。 */}
         <Field className="dialog-section is-quiet" id="p_groups" label="参加グループ（アクセス条件・任意）">
-          <Multiselect id="p_groups" options={PROJECT_GROUP_OPTIONS} value={accessGroups} onChange={setAccessGroups} placeholder="グループを選択…（未選択＝全社が候補）" ariaLabel="参加グループ" emptyText="該当するグループがありません" />
+          <Multiselect id="p_groups" options={groupOptions} value={accessGroups} onChange={setAccessGroups} placeholder="グループを選択…（未選択＝全社が候補）" ariaLabel="参加グループ" emptyText="該当するグループがありません" />
           <span className="hint">選んだグループの所属者を候補・アクセス範囲にします（未選択なら全社）。開発メンバーは下で追加します。</span>
         </Field>
 
         {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲。作成者は固定 owner 行・グループは上位 Field で controlled。 */}
         <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
-          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel={isEdit ? "作成者" : "あなた・作成者"} groupFilter={accessGroups} onGroupFilter={setAccessGroups} />
+          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel={isEdit ? "作成者" : "あなた・作成者"} ownerUserId={ownerUserId} groupFilter={accessGroups} onGroupFilter={setAccessGroups} allGroupIds={allGroupIds} groupNameById={groupNameById} />
         </Field>
       </ModalBody>
       <ModalFooter>
