@@ -9,29 +9,41 @@ import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, use
 import type { FieldErrors } from "@/lib/forms/validation";
 import { ApiError } from "@/lib/api/client";
 
-import { createProject, createProjectFromConcept } from "../api";
+import { createProject, createProjectFromConcept, patchProject } from "../api";
+import type { ProjectDetail, ProjectStatus } from "../types";
 import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
 
-export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreated }: {
+const STATUS_LABEL: Record<ProjectStatus, string> = { planning: "計画中", in_progress: "進行中", on_hold: "保留", done: "完了" };
+
+export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerName, onClose, onCreated, onUpdated }: {
   prefill?: ProjectPrefill;
   conceptId?: string | null;   // 由来コンセプト（無ければコンセプト非依存＝単純タスク管理）
   conceptTitle?: string | null;
+  project?: ProjectDetail | null;  // 指定時＝編集モード（PATCH /projects/{id}）
+  ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行）
   onClose: () => void;
   onCreated?: (projectId: string) => void;
+  onUpdated?: () => void;
 }) {
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
+  const isEdit = !!project;
+  const dep0 = (project?.deployment ?? {}) as Record<string, string>;
 
-  const [title, setTitle] = useState(prefill?.title ?? "");
-  const [description, setDescription] = useState(prefill?.description ?? "");
-  const [launchStatus, setLaunchStatus] = useState(prefill?.launch_status ?? "");
-  const [plan, setPlan] = useState(prefill?.plan ?? "");
-  const [kpi, setKpi] = useState(prefill?.kpi ?? "");
+  const [title, setTitle] = useState(project?.title ?? prefill?.title ?? "");
+  const [description, setDescription] = useState(project?.description ?? prefill?.description ?? "");
+  const [status, setStatus] = useState<ProjectStatus>((project?.status as ProjectStatus) ?? "planning");
+  const [launchStatus, setLaunchStatus] = useState(dep0.launch_status ?? prefill?.launch_status ?? "");
+  const [plan, setPlan] = useState(dep0.plan ?? prefill?.plan ?? "");
+  const [kpi, setKpi] = useState(dep0.kpi ?? prefill?.kpi ?? "");
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+  // 閉じアニメ＝Modal の open を false にして exit を再生→onClosed で親に unmount 依頼（直 unmount だとアニメ無し）。
+  const [open, setOpen] = useState(true);
+  const requestClose = () => setOpen(false);
 
   function validate(): FieldErrors {
     const e: FieldErrors = {};
@@ -39,38 +51,52 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
     return e;
   }
 
-  async function create() {
+  function buildDeployment(): Record<string, string> {
+    const deployment: Record<string, string> = {};
+    if (launchStatus.trim()) deployment.launch_status = launchStatus.trim();
+    if (plan.trim()) deployment.plan = plan.trim();
+    if (kpi.trim()) deployment.kpi = kpi.trim();
+    return deployment;
+  }
+
+  async function save() {
     const fe = validate();
     setErrors(fe);
     const list = Object.values(fe).filter(Boolean);
     if (list.length) { notify(list); return; }
     setSaving(true);
-    const deployment: Record<string, string> = {};
-    if (launchStatus.trim()) deployment.launch_status = launchStatus.trim();
-    if (plan.trim()) deployment.plan = plan.trim();
-    if (kpi.trim()) deployment.kpi = kpi.trim();
-    const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
+    const deployment = buildDeployment();
     try {
+      if (isEdit) {
+        await patchProject(project!.id, { title: title.trim(), description: description.trim() || null, status, deployment });
+        snack({ type: "success", title: "プロジェクトを更新しました" });
+        onUpdated?.();
+        requestClose();
+        return;
+      }
+      const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
       const created = conceptId
         ? await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members })
         : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members });
       const memberNote = devMembers.length ? `／開発メンバー ${devMembers.length} 名` : "";
       snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "単純タスク管理プロジェクトを作成しました。") + memberNote });
       if (created) onCreated?.(created.id);
-      onClose();
+      requestClose();
     } catch (e) {
       setSaving(false);
-      if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "作成できませんでした", msg: "このコンセプトのプロジェクトは既に存在するか、go 判定ではありません。" });
-      else if (e instanceof ApiError && e.status === 403) snack({ type: "error", title: "権限がありません", msg: "起票は owner/クエスト管理者のみです。" });
-      else snack({ type: "error", title: "作成できませんでした", msg: "入力内容をご確認ください。" });
+      if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "保存できませんでした", msg: "このコンセプトのプロジェクトは既に存在するか、go 判定ではありません。" });
+      else if (e instanceof ApiError && e.status === 403) snack({ type: "error", title: "権限がありません", msg: isEdit ? "編集は起票者/owner のみです。" : "起票は owner/クエスト管理者のみです。" });
+      else snack({ type: "error", title: "保存できませんでした", msg: "入力内容をご確認ください。" });
     }
   }
 
   return (
-    <Modal open onClose={onClose} title="プロジェクトを作成" size="md">
+    <Modal open={open} onClose={requestClose} onClosed={onClose} title={isEdit ? "プロジェクトを編集" : "プロジェクトを作成"} size="md">
       <ModalBody>
         <FormSummary title="入力内容をご確認ください" errors={Object.values(errors).filter(Boolean)} innerRef={summaryRef} />
-        {conceptId ? (
+        {isEdit ? (
+          <p className="role-note" style={{ marginTop: 0 }}>プロジェクトの基本情報・状態・導入メタを編集します。開発メンバーは詳細の「開発メンバー」タブで管理します。</p>
+        ) : conceptId ? (
           <p className="role-note" style={{ marginTop: 0 }}>コンセプト「<strong>{conceptTitle}</strong>」から開発（ソリューション）を起票します。内容を初期値にしています（編集可）。</p>
         ) : (
           <p className="role-note" style={{ marginTop: 0 }}>コンセプトに紐づかない<strong>単純なタスク管理</strong>プロジェクトを作成します。</p>
@@ -81,6 +107,13 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
         <Field className="dialog-section is-quiet" id="p_desc" label="概要（任意）">
           <textarea id="p_desc" className="textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="このプロジェクトで何をやるか" />
         </Field>
+        {isEdit && (
+          <Field className="dialog-section is-quiet" id="p_status" label="状態">
+            <select id="p_status" className="select" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
+              {(Object.keys(STATUS_LABEL) as ProjectStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+            </select>
+          </Field>
+        )}
         <Field className="dialog-section is-quiet" id="p_launch" label="ローンチ状態（任意）">
           <input id="p_launch" className="input" value={launchStatus} onChange={(e) => setLaunchStatus(e.target.value)} placeholder="例: 未着手 / 検証中 / 本番リリース済" />
         </Field>
@@ -91,15 +124,17 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, onClose, onCreat
           <textarea id="p_kpi" className="textarea" rows={2} value={kpi} onChange={(e) => setKpi(e.target.value)} placeholder="価値実現の指標と実測（例: 問合せ削減率 目標30%）" />
         </Field>
 
-        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・グループ/名前絞込は候補側に内包・§2.1c）。 */}
-        <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
-          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} />
-        </Field>
+        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・グループ/名前絞込は候補側に内包・作成者は固定 owner 行・§2.1c）。編集時はここで扱わず「開発メンバー」タブで管理。 */}
+        {!isEdit && (
+          <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
+            <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} />
+          </Field>
+        )}
       </ModalBody>
       <ModalFooter>
-        <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
+        <button type="button" className="btn btn-outline dialog-close-left" onClick={requestClose}>キャンセル</button>
         <FormFooterError show={Object.values(errors).some(Boolean)} />
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={create}>プロジェクトを作成</button>
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={save}>{isEdit ? "保存する" : "プロジェクトを作成"}</button>
       </ModalFooter>
     </Modal>
   );

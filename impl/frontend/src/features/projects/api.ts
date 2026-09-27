@@ -39,6 +39,10 @@ export function patchProject(projectId: string, body: ProjectPatchInput): Promis
   return apiFetch<ProjectDetail>(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
+export function deleteProject(projectId: string): Promise<unknown> {
+  return apiFetch(`/projects/${projectId}`, { method: "DELETE" });
+}
+
 // ---- members ----
 export async function listProjectMembers(projectId: string): Promise<{ members: ProjectMember[]; innovation: UserRef[] }> {
   const res = await apiFetch<MembersResponse>(`/projects/${projectId}/members`);

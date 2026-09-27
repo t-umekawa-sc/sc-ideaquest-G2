@@ -123,7 +123,6 @@ export function Multiselect({ id, options, value, onChange, placeholder, ariaLab
           value={query}
           disabled={disabled}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
         {/* 全選択解除（デザイン標準・選択が1件以上のとき control 末尾に表示）。 */}

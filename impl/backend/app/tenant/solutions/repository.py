@@ -24,19 +24,29 @@ def create_project(session: Session, *, concept_id: uuid.UUID | None, quest_id: 
 
 
 def get_project(session: Session, project_id: uuid.UUID) -> Project | None:
-    return session.get(Project, project_id)
+    p = session.get(Project, project_id)
+    return p if p is not None and p.deleted_at is None else None
 
 
 def get_project_by_concept(session: Session, concept_id: uuid.UUID) -> Project | None:
-    return session.execute(select(Project).where(Project.concept_id == concept_id)).scalars().first()
+    return session.execute(
+        select(Project).where(Project.concept_id == concept_id, Project.deleted_at.is_(None))
+    ).scalars().first()
 
 
 def list_projects(session: Session) -> list[Project]:
-    return list(session.execute(select(Project).order_by(Project.updated_at.desc(), Project.id)).scalars().all())
+    return list(session.execute(
+        select(Project).where(Project.deleted_at.is_(None)).order_by(Project.updated_at.desc(), Project.id)
+    ).scalars().all())
 
 
 def touch_project(session: Session, project: Project) -> None:
     project.updated_at = datetime.now(timezone.utc)
+    session.flush()
+
+
+def soft_delete_project(session: Session, project: Project) -> None:
+    project.deleted_at = datetime.now(timezone.utc)
     session.flush()
 
 

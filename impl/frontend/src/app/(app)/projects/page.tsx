@@ -8,5 +8,5 @@ import { getServerSession } from "@/lib/session";
 export default async function ProjectsPage() {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <ProjectListView />;
+  return <ProjectListView ownerName={session.user.display_name} />;
 }

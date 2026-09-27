@@ -322,6 +322,20 @@ def update_project(account_id, company_id, project_id, *, patch: dict) -> dict:
         return _detail(ts, project, user)
 
 
+def delete_project(account_id, company_id, project_id) -> None:
+    company = _ctx(account_id, company_id)
+    pid = _parse_uuid(project_id, field="project_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = _get_user(ts, account_id)
+        project = repo.get_project(ts, pid)
+        _require_access(ts, project, user)
+        quest = _quest_of(ts, project)
+        if not (project.owner_account_id == user.id or _is_quest_manager(ts, quest, user)):
+            raise AppError(403, "forbidden", detail="削除は起票者/owner のみ")
+        repo.soft_delete_project(ts, project)
+        ts.commit()
+
+
 # ---- endpoints (members) ----
 def list_members(account_id, company_id, project_id) -> dict:
     company = _ctx(account_id, company_id)

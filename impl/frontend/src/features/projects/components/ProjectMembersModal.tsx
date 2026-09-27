@@ -12,10 +12,11 @@ import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 import type { ProjectMember, ProjectRole, UserRef } from "../types";
 import "@/features/quests/quests.css";
 
-export function ProjectMembersModal({ projectId, members, innovation, onClose, onSaved }: {
+export function ProjectMembersModal({ projectId, members, innovation, ownerName, onClose, onSaved }: {
   projectId: string;
   members: ProjectMember[];
   innovation: UserRef[];
+  ownerName: string;   // 所有者（作成者）＝固定 owner 行
   onClose: () => void;
   onSaved?: () => void;
 }) {
@@ -23,6 +24,8 @@ export function ProjectMembersModal({ projectId, members, innovation, onClose, o
   const initial = members.filter((m) => m.user).map((m) => ({ user: m.user!, role: m.role as ProjectRole }));
   const [devMembers, setDevMembers] = useState<PickedMember[]>(initial);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(true);
+  const requestClose = () => setOpen(false);
 
   async function save() {
     setSaving(true);
@@ -38,7 +41,7 @@ export function ProjectMembersModal({ projectId, members, innovation, onClose, o
       }
       snack({ type: "success", title: "開発メンバーを更新しました" });
       onSaved?.();
-      onClose();
+      requestClose();
     } catch {
       setSaving(false);
       snack({ type: "error", title: "更新できませんでした", msg: "権限（起票者/owner）と入力をご確認ください。" });
@@ -46,13 +49,13 @@ export function ProjectMembersModal({ projectId, members, innovation, onClose, o
   }
 
   return (
-    <Modal open onClose={onClose} title="開発メンバーを管理" size="xl">
+    <Modal open={open} onClose={requestClose} onClosed={onClose} title="開発メンバーを管理" size="xl">
       <ModalBody>
         <p className="role-note" style={{ marginTop: 0 }}>開発領域の担当者（会社内の任意ユーザー）。<strong>イノベーション担当（クエストパーティー）は参照＋チャット発言を継続</strong>できます。担当割当は開発メンバーに限ります。</p>
 
         {/* 参加メンバー（開発メンバー）・役割＝クエスト「参加メンバー（パーティー）・権限」を踏襲（.party 2カラム・グループ/名前絞込は候補側に内包）。 */}
         <Field className="dialog-section is-quiet" id="pm_party" label="参加メンバー（開発メンバー）・役割">
-          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} />
+          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel="作成者" />
         </Field>
 
         {/* イノベーション担当（読み取り専用・参照＋口出し可）＝クエストのパーティー行レイアウト踏襲。 */}
@@ -73,7 +76,7 @@ export function ProjectMembersModal({ projectId, members, innovation, onClose, o
         </Field>
       </ModalBody>
       <ModalFooter>
-        <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
+        <button type="button" className="btn btn-outline dialog-close-left" onClick={requestClose}>キャンセル</button>
         <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>保存</button>
       </ModalFooter>
     </Modal>

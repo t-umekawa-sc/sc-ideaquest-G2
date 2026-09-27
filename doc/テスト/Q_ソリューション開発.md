@@ -11,6 +11,10 @@
 | Q-TC-103 | api | 起票ゲート＝decision≠go は 409 | undecided コンセプト | `POST /concepts/{id}/project` | 409（invalid_state） | Q.1 |
 | Q-TC-104 | api | 起票は owner/quest_admin のみ | 一般（非管理） | `POST /concepts/{id}/project` | 403 | Q.0 |
 | Q-TC-105 | api | 一覧・詳細の門番＝アクセス範囲外は秘匿 | 他者のコンセプト非依存プロジェクト | `GET /projects/{id}`（非メンバー） | 404（not_found） | Q.0 |
+| Q-TC-106 | api | プロジェクト編集（基本情報・状態・導入メタ） | 自分のプロジェクト | `PATCH /projects/{id}`（title/status/deployment） | 200・詳細に反映（title/status/deployment） | Q.1 |
+| Q-TC-107 | api | 編集は起票者/owner のみ | 非owner・非管理（メンバー） | `PATCH /projects/{id}` | 403（forbidden） | Q.0 |
+| Q-TC-108 | api | プロジェクトのソフト削除＝一覧/詳細から除外＋コンセプト再起票可 | go コンセプト由来プロジェクト（owner） | `DELETE /projects/{id}`→`GET /projects`・`GET /projects/{id}`→`POST /concepts/{id}/project` | 204・一覧から消える・詳細404・同コンセプトから再起票201（部分ユニークが未削除のみ） | Q.1 |
+| Q-TC-109 | api | 削除は起票者/owner のみ | 非owner・非管理（メンバー） | `DELETE /projects/{id}` | 403（forbidden） | Q.0 |
 
 ## 2. 開発メンバー（Q.1b・二層メンバーシップ）
 

@@ -75,6 +75,15 @@ def patch_project(project_id: str, body: ProjectPatchRequest, request: Request, 
     return ProjectDetailDTO(**service.update_project(acc, comp, project_id, patch=body.model_dump(exclude_unset=True)))
 
 
+@router.delete("/projects/{project_id}", status_code=204)
+def delete_project(project_id: str, request: Request, session: dict = Depends(require_me)) -> Response:
+    verify_origin(request)
+    verify_csrf(request)
+    acc, comp = _ids(session)
+    service.delete_project(acc, comp, project_id)
+    return Response(status_code=204)
+
+
 # ---- members ----
 @router.get("/projects/{project_id}/members", response_model=MembersResponse)
 def list_members(project_id: str, request: Request, session: dict = Depends(require_me)) -> MembersResponse:

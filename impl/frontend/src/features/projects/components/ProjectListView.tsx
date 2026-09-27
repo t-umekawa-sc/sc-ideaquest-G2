@@ -7,11 +7,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Avatar, DataTable } from "@/components/ui";
-import type { DataTableColumn } from "@/components/ui";
+import { Avatar, DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
+import type { DataTableColumn, RowMenuItem } from "@/components/ui";
+import { ApiError } from "@/lib/api/client";
 
-import { listProjects } from "../api";
-import type { ProjectListItem, ProjectStatus } from "../types";
+import { createProject, deleteProject, getProject, listProjectMembers, listProjects } from "../api";
+import type { ProjectDetail, ProjectListItem, ProjectStatus } from "../types";
 import { ProjectForm } from "./ProjectForm";
 import "../projects.css";
 
@@ -22,13 +23,62 @@ const STATUS_OPTIONS: [string, string][] = (Object.keys(STATUS_LABEL) as Project
 function fmtDate(iso: string): string {
   return iso ? iso.slice(0, 10).replaceAll("-", "/") : "—";
 }
-export function ProjectListView() {
+export function ProjectListView({ ownerName }: { ownerName: string }) {
   const router = useRouter();
+  const snack = useSnackbar();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<ProjectListItem[] | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editProject, setEditProject] = useState<ProjectDetail | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const reload = () => { void listProjects().then(setRows); };
   useEffect(() => { reload(); }, []);
+
+  // 編集＝詳細を取得してから編集モードの ProjectForm を開く（PATCH /projects/{id}）。
+  async function openEdit(p: ProjectListItem) {
+    const detail = await getProject(p.id);
+    if (detail) setEditProject(detail);
+    else snack({ type: "error", title: "開けませんでした", msg: "権限またはネットワークをご確認ください。" });
+  }
+
+  // 複製＝標準タスク管理として複製（コンセプト1:1制約を避けるため由来コンセプトは引き継がない）。詳細＋メンバーをコピー。
+  async function duplicate(p: ProjectListItem) {
+    if (busy) return;
+    if (!(await confirm({ title: "プロジェクトを複製", msg: `「${p.title}」を複製します（コンセプト非依存の複製・開発メンバーは引き継ぎます）。よろしいですか？` }))) return;
+    setBusy(true);
+    try {
+      const [detail, mem] = await Promise.all([getProject(p.id), listProjectMembers(p.id)]);
+      const dep = (detail?.deployment ?? {}) as Record<string, string>;
+      const members = mem.members.filter((m) => m.user).map((m) => ({ user_id: m.user!.user_id, role: m.role }));
+      const created = await createProject({ title: `${p.title}（複製）`, description: detail?.description ?? null, deployment: dep, members });
+      snack({ type: "success", title: "プロジェクトを複製しました" });
+      reload();
+      if (created) router.push(`/projects/${created.id}`);
+    } catch {
+      snack({ type: "error", title: "複製できませんでした", msg: "時間をおいて再試行してください。" });
+    } finally { setBusy(false); }
+  }
+
+  async function remove(p: ProjectListItem) {
+    if (busy) return;
+    if (!(await confirm({ variant: "danger", title: "プロジェクトを削除", msg: `「${p.title}」を削除しますか？ 一覧から見えなくなります（タスク・チャット等は監査のため保持されます）。` }))) return;
+    setBusy(true);
+    try {
+      await deleteProject(p.id);
+      snack({ type: "success", title: "プロジェクトを削除しました" });
+      reload();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) snack({ type: "error", title: "権限がありません", msg: "削除は起票者/owner のみです。" });
+      else snack({ type: "error", title: "削除できませんでした", msg: "時間をおいて再試行してください。" });
+    } finally { setBusy(false); }
+  }
+
+  const rowMenu = (p: ProjectListItem): RowMenuItem[] => [
+    { label: "編集", onClick: () => void openEdit(p) },
+    { label: "複製", onClick: () => void duplicate(p) },
+    { label: "削除", danger: true, onClick: () => void remove(p) },
+  ];
 
   const columns: DataTableColumn<ProjectListItem>[] = [
     {
@@ -44,6 +94,7 @@ export function ProjectListView() {
     { key: "tasks", label: "タスク", width: 110, align: "num", sortable: true, sortVal: (p) => p.task_count, render: (p) => p.task_count },
     { key: "owner", label: "所有者", width: 150, sortVal: (p) => p.owner?.display_name ?? "", csvVal: (p) => p.owner?.display_name ?? "", render: (p) => p.owner ? <span className="proj-owner"><Avatar name={p.owner.display_name} imageUrl={p.owner.avatar_image_url} size="sm" noTooltip />{p.owner.display_name}</span> : <span className="muted">—</span> },
     { key: "updated", label: "更新", width: 110, sortable: true, sortVal: (p) => p.updated_at, csvVal: (p) => fmtDate(p.updated_at), render: (p) => fmtDate(p.updated_at) },
+    { key: "_actions", label: "", actions: true, locked: true, width: 56, render: (p) => <RowMenu items={rowMenu(p)} /> },
   ];
 
   return (
@@ -75,26 +126,34 @@ export function ProjectListView() {
           pins={false}
           defaultView="card"
           cardRaw={(p) => (
-            // 見出し・meta を折り返させない＝クエストカードと同方式（cardRaw で完全制御・DataTable の stats 自動レイアウトは使わない）。
-            <Link className="card card-accent proj-card" href={`/projects/${p.id}`}>
-              <div className="between">
-                <span className="card-title proj-card__title">{p.title}</span>
-                <span className={STATUS_CLS[p.status]}>{STATUS_LABEL[p.status]}</span>
+            // ⋯ は Link の外（兄弟・右上）に置く＝アンカー内 button の不正 HTML を避ける（クエストカード §4.5 と同方式）。
+            <div className="proj-card-wrap" style={{ position: "relative" }}>
+              {/* 見出し・meta を折り返させない＝クエストカードと同方式（cardRaw で完全制御・DataTable の stats 自動レイアウトは使わない）。 */}
+              <Link className="card card-accent proj-card" href={`/projects/${p.id}`}>
+                <div className="between">
+                  <span className="card-title proj-card__title">{p.title}</span>
+                  <span className={STATUS_CLS[p.status]}>{STATUS_LABEL[p.status]}</span>
+                </div>
+                <div className="proj-card__origin-row">
+                  <span className="badge badge-muted proj-card__origin">{p.concept ? `由来: ${p.concept.title}` : "コンセプト無し"}</span>
+                </div>
+                <div className="proj-card__meta proj-card__meta--stats">
+                  <span>進捗 {p.progress.done}/{p.progress.total}</span>
+                  <span>タスク {p.task_count}</span>
+                  <span>更新 {fmtDate(p.updated_at)}</span>
+                </div>
+              </Link>
+              {/* ⋯ は右下（stats は左寄せで右下が空く）＝ステータスバッジと衝突しない。RowMenu は stopPropagation でカード遷移を抑止。 */}
+              <div className="proj-card__menu" style={{ position: "absolute", right: "var(--space-2)", bottom: "var(--space-2)" }}>
+                <RowMenu items={rowMenu(p)} />
               </div>
-              <div className="proj-card__origin-row">
-                <span className="badge badge-muted proj-card__origin">{p.concept ? `由来: ${p.concept.title}` : "コンセプト無し"}</span>
-              </div>
-              <div className="proj-card__meta proj-card__meta--stats">
-                <span>進捗 {p.progress.done}/{p.progress.total}</span>
-                <span>タスク {p.task_count}</span>
-                <span>更新 {fmtDate(p.updated_at)}</span>
-              </div>
-            </Link>
+            </div>
           )}
         />
       )}
 
-      {createOpen && <ProjectForm onClose={() => setCreateOpen(false)} onCreated={reload} />}
+      {createOpen && <ProjectForm ownerName={ownerName} onClose={() => setCreateOpen(false)} onCreated={reload} />}
+      {editProject && <ProjectForm project={editProject} ownerName={editProject.owner?.display_name ?? ownerName} onClose={() => setEditProject(null)} onUpdated={reload} />}
     </section>
   );
 }

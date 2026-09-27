@@ -68,7 +68,7 @@ function ConceptGuide() {
   );
 }
 
-export function ConceptDetailView({ conceptId }: { conceptId: string }) {
+export function ConceptDetailView({ conceptId, viewerName = "あなた" }: { conceptId: string; viewerName?: string }) {
   const router = useRouter();
   const snack = useSnackbar();
   const confirm = useConfirm();
@@ -636,6 +636,7 @@ export function ConceptDetailView({ conceptId }: { conceptId: string }) {
         <ProjectForm
           conceptId={conceptId}
           conceptTitle={concept.title}
+          ownerName={viewerName}
           prefill={{
             title: `${concept.title} 開発`,
             description: [concept.problem, concept.value_proposition].filter(Boolean).join("\n") || undefined,

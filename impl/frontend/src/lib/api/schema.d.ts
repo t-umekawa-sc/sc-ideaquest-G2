@@ -2059,6 +2059,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assumptions/{assumption_id}/related-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assumption Related Info
+         * @description 前提（検証プール）の関連情報（SC-61 §4.4・FR-41×FR-42 §7・RelatedInfoPanel 用）。門番＝前提詳細と同一。読取専用。
+         */
+        get: operations["get_assumption_related_info_api_v1_assumptions__assumption_id__related_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/concepts/{concept_id}/activate": {
         parameters: {
             query?: never;
@@ -2489,7 +2509,8 @@ export interface paths {
         get: operations["get_project_api_v1_projects__project_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Project */
+        delete: operations["delete_project_api_v1_projects__project_id__delete"];
         options?: never;
         head?: never;
         /** Patch Project */
@@ -2796,6 +2817,80 @@ export interface paths {
          * @description スコープの既読位置を更新（E.5・後退防止 upsert）。完了後も許可。
          */
         post: operations["mark_scope_read_api_v1_concept_chat_scopes__scope_id__chat_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task Chat
+         * @description タスクチャットの一覧＋未読（門番＝二層メンバーシップ）。読取専用。
+         */
+        get: operations["get_task_chat_api_v1_tasks__task_id__chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/chat-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task Chat Activity */
+        get: operations["get_task_chat_activity_api_v1_tasks__task_id__chat_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/chat-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Task Message
+         * @description タスクチャットへ投稿（multipart・アイデアと同一中核）。空は 422・引用複数可。
+         */
+        post: operations["post_task_message_api_v1_tasks__task_id__chat_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/chat/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Task Read */
+        post: operations["mark_task_read_api_v1_tasks__task_id__chat_read_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3927,6 +4022,17 @@ export interface components {
         };
         /** Body_post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post */
         Body_post_scope_message_api_v1_concept_chat_scopes__scope_id__chat_messages_post: {
+            /** Body */
+            body?: string | null;
+            /** Quoted Message Ids */
+            quoted_message_ids?: string[] | null;
+            /** Mentions */
+            mentions?: string[] | null;
+            /** Files */
+            files?: string[] | null;
+        };
+        /** Body_post_task_message_api_v1_tasks__task_id__chat_messages_post */
+        Body_post_task_message_api_v1_tasks__task_id__chat_messages_post: {
             /** Body */
             body?: string | null;
             /** Quoted Message Ids */
@@ -12649,6 +12755,39 @@ export interface operations {
             };
         };
     };
+    get_assumption_related_info_api_v1_assumptions__assumption_id__related_info_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                assumption_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     activate_concept_api_v1_concepts__concept_id__activate_post: {
         parameters: {
             query?: never;
@@ -13683,6 +13822,35 @@ export interface operations {
             };
         };
     };
+    delete_project_api_v1_projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     patch_project_api_v1_projects__project_id__patch: {
         parameters: {
             query?: never;
@@ -14422,6 +14590,144 @@ export interface operations {
             header?: never;
             path: {
                 scope_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_chat_api_v1_tasks__task_id__chat_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before?: string | null;
+                after?: string | null;
+            };
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_chat_activity_api_v1_tasks__task_id__chat_activity_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_task_message_api_v1_tasks__task_id__chat_messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_task_message_api_v1_tasks__task_id__chat_messages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_task_read_api_v1_tasks__task_id__chat_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
             };
             cookie?: never;
         };

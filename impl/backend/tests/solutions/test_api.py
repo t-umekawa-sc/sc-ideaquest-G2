@@ -148,6 +148,66 @@ def test_q_tc_105_access_gate_404(env, client):
     assert r.status_code == 404
 
 
+def test_q_tc_106_update_project(env, client):
+    """Q-TC-106: プロジェクト編集＝title/status/deployment を PATCH→詳細に反映。"""
+    _login_seed(client)
+    p = _create_standalone(client, title="旧タイトル").json()
+    env.track_project(p["id"])
+    r = client.patch(f"/api/v1/projects/{p['id']}",
+                     json={"title": "新タイトル", "status": "in_progress", "deployment": {"kpi": "問合せ30%減"}},
+                     headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["title"] == "新タイトル"
+    assert body["status"] == "in_progress"
+    assert body["deployment"] == {"kpi": "問合せ30%減"}
+
+
+def test_q_tc_107_update_owner_only(env, client):
+    """Q-TC-107: 編集は起票者/owner のみ＝非owner（メンバー）は 403。"""
+    _login_seed(client)
+    pid = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(Project(id=pid, concept_id=None, quest_id=None, title="他人P", owner_account_id=env.other_id))
+        ts.add(ProjectMember(id=uuid.uuid4(), project_id=pid, user_id=env.user_id, role="member"))
+        ts.commit()
+    env.track_project(pid)
+    r = client.patch(f"/api/v1/projects/{pid}", json={"title": "改ざん"}, headers=_csrf(client))
+    assert r.status_code == 403, r.text
+
+
+def test_q_tc_108_soft_delete_and_reissue(env, client):
+    """Q-TC-108: ソフト削除＝一覧/詳細から除外・同コンセプトから再起票可（部分ユニークは未削除のみ）。"""
+    _login_seed(client)
+    qid = env.make_quest()
+    cid = env.make_concept(qid, decision="go")
+    p = client.post(f"/api/v1/concepts/{cid}/project", json={}, headers=_csrf(client)).json()
+    env.track_project(p["id"])
+    r = client.delete(f"/api/v1/projects/{p['id']}", headers=_csrf(client))
+    assert r.status_code == 204, r.text
+    # 一覧から消える・詳細は 404
+    ids = [x["id"] for x in client.get("/api/v1/projects").json()["items"]]
+    assert p["id"] not in ids
+    assert client.get(f"/api/v1/projects/{p['id']}").status_code == 404
+    # 同コンセプトから再起票できる（未削除のみの部分ユニーク）
+    r2 = client.post(f"/api/v1/concepts/{cid}/project", json={}, headers=_csrf(client))
+    assert r2.status_code == 201, r2.text
+    env.track_project(r2.json()["id"])
+
+
+def test_q_tc_109_delete_owner_only(env, client):
+    """Q-TC-109: 削除は起票者/owner のみ＝非owner（メンバー）は 403。"""
+    _login_seed(client)
+    pid = uuid.uuid4()
+    with get_tenant_session(env.db_identifier) as ts:
+        ts.add(Project(id=pid, concept_id=None, quest_id=None, title="他人P", owner_account_id=env.other_id))
+        ts.add(ProjectMember(id=uuid.uuid4(), project_id=pid, user_id=env.user_id, role="member"))
+        ts.commit()
+    env.track_project(pid)
+    r = client.delete(f"/api/v1/projects/{pid}", headers=_csrf(client))
+    assert r.status_code == 403, r.text
+
+
 # ---- Q.1b members ----
 def test_q_tc_110_member_lifecycle(env, client):
     """Q-TC-110: 開発メンバー 追加(member)→役割変更(lead)→削除。"""

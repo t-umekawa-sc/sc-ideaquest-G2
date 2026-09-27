@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/client";
 import { createTask, deleteTask, getProject, listProjectMembers, listProjectTasks, patchTask } from "../api";
 import type { DeploymentMeta, ProjectDetail, ProjectMember, TaskNode, TaskStatus, UserRef } from "../types";
 import { TaskForm, type TaskSavePayload } from "./TaskForm";
+import { ProjectForm } from "./ProjectForm";
 import { ProjectMembersModal } from "./ProjectMembersModal";
 import "@/features/quests/quests.css"; // パーティー一覧の共有クラス（.member-list/.member-row/.member-name/.member-perms/.tab-party-card）を踏襲（§2.1c）
 import "../projects.css";
@@ -46,6 +47,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const [wbsFilter, setWbsFilter] = useState<WbsFilter>("all");
   const [taskForm, setTaskForm] = useState<{ task?: TaskNode | null; parentId?: string | null; dup?: TaskNode | null } | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const reloadAll = useCallback(async () => {
     const [p, t, m] = await Promise.all([getProject(projectId), listProjectTasks(projectId), listProjectMembers(projectId)]);
@@ -156,7 +158,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           {/* クエスト詳細と同じ既定フォント（.quest-head h1）＝page-title の pixel フォントは使わない（ユーザー要望）。 */}
           <h1 style={{ margin: 0 }}>{project.title}</h1>
           <span className={P_STATUS_CLS[project.status]}>{P_STATUS_LABEL[project.status]}</span>
-          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => snack({ type: "info", title: "プロジェクト編集", msg: "（試作＝接続時に PATCH /projects/{id}）" })}>編集</button>}
+          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => setEditOpen(true)}>編集</button>}
         </div>
         {project.description && <p className="muted" style={{ marginTop: 6 }}>{project.description}</p>}
         <div className="proj-head__meta">
@@ -269,7 +271,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         <section className="card proj-section" aria-label="導入・価値実現">
           <div className="proj-section__head">
             <h2 style={{ margin: 0 }}>導入・価値実現</h2>
-            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" onClick={() => snack({ type: "info", title: "導入メタ編集", msg: "（試作＝接続時に PATCH /projects/{id} deployment）" })}>編集</button>}
+            {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditOpen(true)}>編集</button>}
           </div>
           {(() => { const dep = (project.deployment ?? {}) as DeploymentMeta; return (
           <dl className="proj-deploy">
@@ -282,7 +284,8 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
       )}
 
       {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
-      {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}
+      {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} ownerName={project.owner?.display_name ?? ""} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}
+      {editOpen && <ProjectForm project={project} ownerName={project.owner?.display_name ?? ""} onClose={() => setEditOpen(false)} onUpdated={() => void reloadAll()} />}
     </section>
   );
 }

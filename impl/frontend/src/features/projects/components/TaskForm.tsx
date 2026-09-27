@@ -49,6 +49,8 @@ export function TaskForm({ tasks, members, task, dupFrom, defaultParentId, onClo
   const [description, setDescription] = useState(base?.description ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(true);
+  const requestClose = () => setOpen(false);
 
   const parentOptions = flatten(tasks, 0, task?.id);
   const noMembers = members.length === 0;
@@ -71,12 +73,12 @@ export function TaskForm({ tasks, members, task, dupFrom, defaultParentId, onClo
       setSaving(false);
       onSaved?.({ id: task?.id, parentId: parentId || null, kind, title: title.trim(), description: description.trim(), assigneeId: assignee, status, dueDate });
       snack({ type: "success", title: isEdit ? "タスクを更新しました" : "タスクを登録しました", msg: becameDone ? "完了により開発XP＋コインを獲得（接続時に付与）。" : undefined });
-      onClose();
+      requestClose();
     }, 200);
   }
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? "タスクを編集" : "タスクを登録"} size="md">
+    <Modal open={open} onClose={requestClose} onClosed={onClose} title={isEdit ? "タスクを編集" : "タスクを登録"} size="md">
       <ModalBody>
         <FormSummary title="入力内容をご確認ください" errors={Object.values(errors).filter(Boolean)} innerRef={summaryRef} />
         <Field className="dialog-section is-quiet" id="t_title" label="タイトル" required error={errors.title}>
@@ -112,7 +114,7 @@ export function TaskForm({ tasks, members, task, dupFrom, defaultParentId, onClo
         </Field>
       </ModalBody>
       <ModalFooter>
-        <button type="button" className="btn btn-outline dialog-close-left" onClick={onClose}>キャンセル</button>
+        <button type="button" className="btn btn-outline dialog-close-left" onClick={requestClose}>キャンセル</button>
         <FormFooterError show={Object.values(errors).some(Boolean)} />
         <button type="button" className="btn btn-primary" disabled={saving} onClick={save}>{isEdit ? "更新" : "登録"}</button>
       </ModalFooter>

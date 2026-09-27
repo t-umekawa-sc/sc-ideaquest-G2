@@ -36,9 +36,11 @@ const initialOf = (name: string) => name.trim().charAt(0) || "?";
 
 const ROLES: [ProjectRole, string][] = [["lead", "リード"], ["member", "担当"]];
 
-export function ProjectPartyPicker({ members, onMembers }: {
+export function ProjectPartyPicker({ members, onMembers, ownerName, ownerLabel = "あなた・作成者" }: {
   members: PickedMember[];
   onMembers: (v: PickedMember[]) => void;
+  ownerName: string;      // 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲（§2.1c）
+  ownerLabel?: string;    // バッジ文言（作成時「あなた・作成者」／編集時「作成者」）
 }) {
   const [groupFilter, setGroupFilter] = useState<string[]>([]);
   const [candQuery, setCandQuery] = useState("");
@@ -110,7 +112,7 @@ export function ProjectPartyPicker({ members, onMembers }: {
         <div className="party__col">
           <div className="party__head">
             <strong>選択中の開発メンバー</strong>
-            <span className="party__count">{members.length} 名</span>
+            <span className="party__count">{members.length + 1} 名</span>
           </div>
           {members.length > 0 && (
             <div className="party__add" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -124,8 +126,22 @@ export function ProjectPartyPicker({ members, onMembers }: {
             </div>
           )}
           <div className="party__list">
+            {/* 作成者＝所有者（固定・外せない・常にリード）＝QuestForm の owner 行を踏襲（§2.1c）。 */}
+            <div className="pmember">
+              <span className="avatar sm"><span className="avatar__img placeholder">{initialOf(ownerName)}</span></span>
+              <div className="pmember__main">
+                <div className="pmember__top">
+                  <span className="pmember__name">{ownerName}</span>
+                  <span className="badge badge-muted">{ownerLabel}</span>
+                </div>
+                <div className="pmember__perms">
+                  <span className="perm perm-owner is-on" aria-disabled="true" title="作成者は既定で所有者・開発リード（剥奪不可）">所有者</span>
+                  <span className="perm is-on" aria-disabled="true">リード</span>
+                </div>
+              </div>
+            </div>
             {members.length === 0 ? (
-              <p className="hint" style={{ margin: 0, padding: "var(--space-3)" }}>まだ開発メンバーがいません。左の候補から追加してください。</p>
+              <p className="hint" style={{ margin: 0, padding: "var(--space-3)" }}>ほかに開発メンバーはいません。左の候補から追加できます。</p>
             ) : filteredSelected.map((m) => {
               const gids = groupsOf(m.user.user_id);
               const out = isOut(m);
