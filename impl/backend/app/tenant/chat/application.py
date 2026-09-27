@@ -157,7 +157,8 @@ def _create_message_core(ts, thread, quest, user, *, body, quoted_message_ids, m
             key = storage.put(data, mime, prefix="chat-attachments")
             repo.add_chat_attachment(ts, chat_message_id=msg.id, object_key=key, original_name=fn,
                                      size_bytes=len(data), mime_type=mime, uploaded_by_id=user.id)
-    _award_chat_xp(ts, user, msg.id, quest.id)
+    if quest is not None:
+        _award_chat_xp(ts, user, msg.id, quest.id)  # クエスト非依存ホストは投稿 XP 対象外（ランキングも紐付かない）
     return msg, mentions
 
 
@@ -267,7 +268,7 @@ def delete_message(account_id, company_id, message_id) -> dict:
         _guard_not_completed(quest)
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
-        if not _can_delete(ts, quest, msg, user):
+        if not (_can_delete(ts, quest, msg, user) or (thread.owner_type == "task" and _task_can_manage(ts, thread, user))):
             raise AppError(403, "forbidden", detail="このメッセージを削除する権限がありません")
         msg.is_deleted = True
         msg.deleted_by_id = user.id
@@ -447,7 +448,33 @@ def _resolve_host(ts, thread, user):
             raise AppError(404, "not_found")
         _concept, quest = concepts_app._resolve_concept(ts, scope.concept_id, user)
         return None, quest
+    if thread.owner_type == "task":
+        # タスクチャット（FR-43・Q.4）＝タスク自身がホスト（owner_id=tasks.id）。門番＝二層メンバーシップ。
+        from app.tenant.solutions import application as sol_app
+        from app.tenant.solutions import repository as sol_repo
+
+        task = sol_repo.get_task(ts, thread.owner_id)
+        if task is None:
+            raise AppError(404, "not_found")
+        project = sol_repo.get_project(ts, task.project_id)
+        if project is None or not sol_app.can_access_project(ts, project, user):
+            raise AppError(404, "not_found")
+        return None, sol_app._quest_of(ts, project)  # quest はコンセプト非依存だと None
     raise AppError(404, "not_found")
+
+
+def _task_can_manage(ts, thread, user) -> bool:
+    """タスクチャットのキュレーション権限（ピン/他者削除）＝プロジェクトのタスク管理権限（owner/lead/quest管理）。"""
+    from app.tenant.solutions import application as sol_app
+    from app.tenant.solutions import repository as sol_repo
+
+    task = sol_repo.get_task(ts, thread.owner_id)
+    if task is None:
+        return False
+    project = sol_repo.get_project(ts, task.project_id)
+    if project is None:
+        return False
+    return sol_app._can_manage_tasks(ts, project, user, sol_app._quest_of(ts, project))
 
 
 def _resolve_message(ts, mid, user):
@@ -506,8 +533,8 @@ def set_pin(account_id, company_id, message_id, *, pinned: bool) -> dict:
         if user is None:
             raise AppError(401, "unauthenticated")
         msg, _idea, quest, thread = _resolve_message(ts, mid, user)
-        if not _is_manager(ts, quest, user):
-            raise AppError(403, "forbidden", detail="ピン留めは所有者/クエスト管理者のみ可能です")
+        if not (_is_manager(ts, quest, user) or (thread.owner_type == "task" and _task_can_manage(ts, thread, user))):
+            raise AppError(403, "forbidden", detail="ピン留めは所有者/管理者のみ可能です")
         if msg.is_deleted:
             raise AppError(409, "conflict", detail="削除済みのメッセージです", extra={"errors": [{"reason": "invalid_state"}]})
         msg.is_pinned = pinned
@@ -544,6 +571,8 @@ def _validate_quotes(ts, thread_id, quoted_message_ids) -> list[uuid.UUID]:
 
 def _validate_mentions(ts, quest, mention_ids) -> list[uuid.UUID]:
     """メンションは当該パーティーのメンバーに限定（非メンバーは 422 invalid_mention・E.2）。"""
+    if quest is None:
+        return []  # クエスト非依存ホスト（コンセプト非依存タスク）＝メンション未対応（MVP）
     result: list[uuid.UUID] = []
     for raw in (mention_ids or []):
         uid = _parse_uuid(raw, field="mentions")
@@ -733,6 +762,98 @@ def _resolve_scope_thread(ts, sid, user):
     scope, _concept, quest = concepts_app._resolve_scope(ts, sid, user)
     thread = repo.ensure_chat_thread(ts, "concept_scope", scope.id)
     return scope, quest, thread
+
+
+# ---- タスクチャット（FR-43・Q.4・チャット中核を thread 経由で再利用＝アイデア/コンセプトと同一 UI） ----
+
+
+def _resolve_task_thread(ts, task_id, user):
+    """タスク門番（二層メンバーシップ＝owner/開発メンバー/クエストパーティー）を適用し、(task, quest, thread) を返す。"""
+    from app.tenant.solutions import application as sol_app
+    from app.tenant.solutions import repository as sol_repo
+
+    tid = _parse_uuid(task_id, field="task_id")
+    task = sol_repo.get_task(ts, tid)
+    if task is None:
+        raise AppError(404, "not_found")
+    project = sol_repo.get_project(ts, task.project_id)
+    if project is None or not sol_app.can_access_project(ts, project, user):
+        raise AppError(404, "not_found")
+    thread = repo.ensure_chat_thread(ts, "task", task.id)
+    return task, sol_app._quest_of(ts, project), thread
+
+
+def get_task_chat(account_id, company_id, task_id, *, limit=50, before=None, after=None) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    before_c = _decode_cursor(before) if before else None
+    after_c = _decode_cursor(after) if after else None
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _task, _quest, thread = _resolve_task_thread(ts, task_id, user)
+        payload = _chat_payload(ts, thread, user, limit=limit, before_c=before_c, after_c=after_c)
+        ts.commit()
+    return payload
+
+
+def get_task_chat_activity(account_id, company_id, task_id, *, days=14) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _task, _quest, thread = _resolve_task_thread(ts, task_id, user)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        daily = [{"date": d.date().isoformat(), "message_count": n}
+                 for d, n in repo.daily_message_counts(ts, thread.id, since)]
+        total = repo.count_active_messages(ts, thread.id)
+        ts.commit()
+    return {"daily": daily, "revision_markers": [], "total_messages": total}
+
+
+def post_task_message(account_id, company_id, task_id, *, body, quoted_message_ids, mention_ids, files) -> dict:
+    """タスクチャットへ投稿（Q.4・アクセス＝二層メンバーシップ＝post 権限は can_access_project で担保・完了凍結なし）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _task, quest, thread = _resolve_task_thread(ts, task_id, user)  # アクセス＝コメント可（開発メンバー/パーティー）
+        msg, mentions = _create_message_core(ts, thread, quest, user, body=body,
+                                             quoted_message_ids=quoted_message_ids, mention_ids=mention_ids, files=files)
+        payload = _messages_payload(ts, [msg], viewer_id=user.id)[0]
+        ts.commit()
+    realtime_events.publish_event(realtime_events.chat_topic(thread.id), "chat.message.created",
+                                  payload, company_id=company_id)
+    return payload
+
+
+def mark_task_read(account_id, company_id, task_id, *, last_read_message_id) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    lrid = _parse_uuid(last_read_message_id, field="last_read_message_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        _task, _quest, thread = _resolve_task_thread(ts, task_id, user)
+        target = repo.get_message(ts, lrid)
+        if target is None or target.thread_id != thread.id:
+            raise AppError(404, "not_found")
+        cur = repo.get_read(ts, thread.id, user.id)
+        cur_cursor = _read_cursor(ts, cur)
+        if cur_cursor is None or (target.created_at, target.id) > cur_cursor:
+            repo.upsert_read(ts, thread.id, user.id, target.id)
+        ts.commit()
+    return {"last_read_message_id": str(lrid), "unread_count": 0}
 
 
 def get_scope_chat(account_id, company_id, scope_id, *, limit=50, before=None, after=None) -> dict:

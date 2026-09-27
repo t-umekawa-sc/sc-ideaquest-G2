@@ -30,3 +30,10 @@
 | Q-TC-123 | api | 状態更新は担当者も可（非管理でも自分のタスク） | 担当=自分・非管理 | `PATCH /tasks/{id}`（status=doing） | 200（担当者は状態更新可） | Q.0 |
 | Q-TC-124 | api | 子ありタスク削除は 409（先に子処理） | 親（子あり） | `DELETE /tasks/{parent}` | 409（has_children） | Q.2 |
 | Q-TC-125 | api | 親タスク循環禁止 | タスク | `PATCH /tasks/{id}`（parent=自身） | 422（parent_task_id） | Q.2 |
+
+## 4. タスクチャット（Q.4・チャット中核 thread 再利用）
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Q-TC-130 | api | タスクチャット投稿→一覧（アイデアと同一中核・thread=task） | 自分のプロジェクトのタスク | `POST /tasks/{id}/chat-messages`（body）→`GET /tasks/{id}/chat` | 201・一覧 data に投稿が1件（thread_id=task-…） | Q.4／§5.14b |
+| Q-TC-131 | api | タスクチャットの門番＝範囲外は 404 | 非メンバーのタスク | `GET /tasks/{id}/chat` | 404（not_found・存在秘匿） | Q.0／Q.4 |

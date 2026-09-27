@@ -9,6 +9,3 @@ export type MemberDomain = "dev" | "innovation" | "both";
 
 // 導入・価値実現メタ（§3.5・deployment=jsonb）。
 export type DeploymentMeta = { launch_status?: string; plan?: string; kpi?: string };
-
-// タスクチャットのデモメッセージ（試作＝共有 IdeaChatView 未接続時の表示用・fixtures）。
-export type DemoChatMessage = { id: string; author: { user_id: string; display_name: string; avatar_image_url?: string | null }; domain: "dev" | "innovation"; body: string; at: string };

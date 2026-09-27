@@ -274,3 +274,71 @@ def mark_scope_read(
         last_read_message_id=body.last_read_message_id,
     )
     return ChatReadResponse(**result)
+
+
+# ---- タスクチャット（FR-43・Q.4・チャット中核を thread 経由で再利用＝アイデア/コンセプトと同一 UI） ----
+@router.get("/tasks/{task_id}/chat", response_model=ChatListResponse)
+def get_task_chat(
+    task_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=100),
+    before: str | None = None,
+    after: str | None = None,
+    session: dict = Depends(require_me),
+) -> ChatListResponse:
+    """タスクチャットの一覧＋未読（門番＝二層メンバーシップ）。読取専用。"""
+    result = chat_service.get_task_chat(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), task_id,
+        limit=limit, before=before, after=after,
+    )
+    return ChatListResponse(**result)
+
+
+@router.get("/tasks/{task_id}/chat-activity", response_model=ChatActivityResponse)
+def get_task_chat_activity(
+    task_id: str,
+    request: Request,
+    days: int = Query(default=14, ge=1, le=90),
+    session: dict = Depends(require_me),
+) -> ChatActivityResponse:
+    result = chat_service.get_task_chat_activity(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), task_id, days=days,
+    )
+    return ChatActivityResponse(**result)
+
+
+@router.post("/tasks/{task_id}/chat-messages", response_model=ChatMessageDTO, status_code=201)
+async def post_task_message(
+    task_id: str,
+    request: Request,
+    body: str | None = Form(default=None),
+    quoted_message_ids: list[str] | None = Form(default=None),
+    mentions: list[str] | None = Form(default=None),
+    files: list[UploadFile] | None = File(default=None),
+    session: dict = Depends(require_me),
+) -> ChatMessageDTO:
+    """タスクチャットへ投稿（multipart・アイデアと同一中核）。空は 422・引用複数可。"""
+    verify_origin(request)
+    verify_csrf(request)
+    payloads = [((f.filename or ""), await f.read()) for f in (files or [])]
+    result = chat_service.post_task_message(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), task_id,
+        body=body, quoted_message_ids=quoted_message_ids, mention_ids=mentions, files=payloads,
+    )
+    return ChatMessageDTO(**result)
+
+
+@router.post("/tasks/{task_id}/chat/read", response_model=ChatReadResponse)
+def mark_task_read(
+    task_id: str,
+    body: ChatReadRequest,
+    request: Request,
+    session: dict = Depends(require_me),
+) -> ChatReadResponse:
+    verify_origin(request)
+    verify_csrf(request)
+    result = chat_service.mark_task_read(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), task_id,
+        last_read_message_id=body.last_read_message_id,
+    )
+    return ChatReadResponse(**result)

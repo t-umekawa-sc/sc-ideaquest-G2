@@ -58,6 +58,31 @@ export function markScopeRead(scopeId: string, lastReadMessageId: string): Promi
   return apiFetch<{ unread_count: number }>(`/concept-chat-scopes/${scopeId}/chat/read`, { method: "POST", body: JSON.stringify({ last_read_message_id: lastReadMessageId }) });
 }
 
+// ---- タスクチャット（FR-43・Q.4・アイデア/コンセプトと同一中核） ----
+export function getTaskChat(taskId: string, params?: { limit?: number; before?: string; after?: string }): Promise<ChatListResponse | null> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(params?.limit ?? 50));
+  if (params?.before) qs.set("before", params.before);
+  if (params?.after) qs.set("after", params.after);
+  return apiFetch<ChatListResponse>(`/tasks/${taskId}/chat?${qs.toString()}`);
+}
+
+export function postTaskMessage(
+  taskId: string,
+  input: { body?: string; quotedMessageIds?: string[]; mentions?: string[]; files?: File[] },
+): Promise<ChatMessage | null> {
+  const fd = new FormData();
+  if (input.body) fd.append("body", input.body);
+  for (const q of input.quotedMessageIds ?? []) fd.append("quoted_message_ids", q);
+  for (const m of input.mentions ?? []) fd.append("mentions", m);
+  for (const f of input.files ?? []) fd.append("files", f);
+  return apiFetch<ChatMessage>(`/tasks/${taskId}/chat-messages`, { method: "POST", body: fd });
+}
+
+export function markTaskRead(taskId: string, lastReadMessageId: string): Promise<{ unread_count: number } | null> {
+  return apiFetch<{ unread_count: number }>(`/tasks/${taskId}/chat/read`, { method: "POST", body: JSON.stringify({ last_read_message_id: lastReadMessageId }) });
+}
+
 // メッセージ投稿（E.2・multipart）。body/mentions/引用（複数可）/files を単一 UoW。空は 422・投稿 XP+5。
 export function postMessage(
   ideaId: string,
