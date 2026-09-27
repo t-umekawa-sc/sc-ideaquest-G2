@@ -3,14 +3,14 @@
 // プロジェクト作成/メタ入力ダイアログ（FR-43・Q.1）。SC-61「開発を始める」＝コンセプトから初期値／
 // SC-70「＋ プロジェクトを作成」＝コンセプト無し（単純タスク管理）で共有。§4.7 検証（§2.1b）。
 // 実 API 結線＝conceptId 有り: POST /concepts/{id}/project／無し: POST /projects。作成後は遷移せず閉じる（ユーザー要望）。
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Field, FormFooterError, FormSummary, Modal, ModalBody, ModalFooter, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import type { FieldErrors } from "@/lib/forms/validation";
 import { ApiError } from "@/lib/api/client";
 
-import { createProject, createProjectFromConcept, patchProject } from "../api";
-import type { ProjectDetail, ProjectStatus } from "../types";
+import { addProjectMember, createProject, createProjectFromConcept, listProjectMembers, patchProject, patchProjectMember, removeProjectMember } from "../api";
+import type { ProjectDetail, ProjectRole, ProjectStatus } from "../types";
 import { ProjectPartyPicker, type PickedMember } from "./ProjectPartyPicker";
 
 export type ProjectPrefill = { title?: string; description?: string; launch_status?: string; plan?: string; kpi?: string };
@@ -39,11 +39,24 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
   const [plan, setPlan] = useState(dep0.plan ?? prefill?.plan ?? "");
   const [kpi, setKpi] = useState(dep0.kpi ?? prefill?.kpi ?? "");
   const [devMembers, setDevMembers] = useState<PickedMember[]>([]);
+  const [initialMembers, setInitialMembers] = useState<PickedMember[]>([]);  // 編集時の差分計算基準
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   // 閉じアニメ＝Modal の open を false にして exit を再生→onClosed で親に unmount 依頼（直 unmount だとアニメ無し）。
   const [open, setOpen] = useState(true);
   const requestClose = () => setOpen(false);
+
+  // 編集時＝現在の開発メンバーを取得してピッカーの初期値に（保存時に差分で add/patch/remove）。
+  useEffect(() => {
+    if (!project) return;
+    let alive = true;
+    void listProjectMembers(project.id).then(({ members }) => {
+      if (!alive) return;
+      const picked = members.filter((m) => m.user).map((m) => ({ user: m.user!, role: m.role as ProjectRole }));
+      setDevMembers(picked); setInitialMembers(picked);
+    });
+    return () => { alive = false; };
+  }, [project]);
 
   function validate(): FieldErrors {
     const e: FieldErrors = {};
@@ -69,6 +82,14 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
     try {
       if (isEdit) {
         await patchProject(project!.id, { title: title.trim(), description: description.trim() || null, status, deployment });
+        // 開発メンバーの差分を反映（追加/役割変更/削除）＝ProjectMembersModal と同じ委譲。
+        const before = new Map(initialMembers.map((m) => [m.user.user_id, m.role]));
+        const after = new Map(devMembers.map((m) => [m.user.user_id, m.role]));
+        for (const [uid] of before) if (!after.has(uid)) await removeProjectMember(project!.id, uid);
+        for (const [uid, role] of after) {
+          if (!before.has(uid)) await addProjectMember(project!.id, uid, role);
+          else if (before.get(uid) !== role) await patchProjectMember(project!.id, uid, role);
+        }
         snack({ type: "success", title: "プロジェクトを更新しました" });
         onUpdated?.();
         requestClose();
@@ -91,11 +112,11 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
   }
 
   return (
-    <Modal open={open} onClose={requestClose} onClosed={onClose} title={isEdit ? "プロジェクトを編集" : "プロジェクトを作成"} size="md">
+    <Modal open={open} onClose={requestClose} onClosed={onClose} title={isEdit ? "プロジェクトを編集" : "プロジェクトを作成"} size="xl">
       <ModalBody>
         <FormSummary title="入力内容をご確認ください" errors={Object.values(errors).filter(Boolean)} innerRef={summaryRef} />
         {isEdit ? (
-          <p className="role-note" style={{ marginTop: 0 }}>プロジェクトの基本情報・状態・導入メタを編集します。開発メンバーは詳細の「開発メンバー」タブで管理します。</p>
+          <p className="role-note" style={{ marginTop: 0 }}>プロジェクトの基本情報・状態・導入メタ・開発メンバーを編集します。</p>
         ) : conceptId ? (
           <p className="role-note" style={{ marginTop: 0 }}>コンセプト「<strong>{conceptTitle}</strong>」から開発（ソリューション）を起票します。内容を初期値にしています（編集可）。</p>
         ) : (
@@ -124,12 +145,10 @@ export function ProjectForm({ prefill, conceptId, conceptTitle, project, ownerNa
           <textarea id="p_kpi" className="textarea" rows={2} value={kpi} onChange={(e) => setKpi(e.target.value)} placeholder="価値実現の指標と実測（例: 問合せ削減率 目標30%）" />
         </Field>
 
-        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・グループ/名前絞込は候補側に内包・作成者は固定 owner 行・§2.1c）。編集時はここで扱わず「開発メンバー」タブで管理。 */}
-        {!isEdit && (
-          <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
-            <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} />
-          </Field>
-        )}
+        {/* 参加メンバー（開発メンバー）・役割＝クエスト作成の同セクションを踏襲（.party＝候補追加＋選択中一覧・グループ/名前絞込は候補側に内包・作成者は固定 owner 行・§2.1c）。編集時も同じ UI で管理（保存時に差分反映）。 */}
+        <Field className="dialog-section is-quiet" id="p_party" label="参加メンバー（開発メンバー）・役割">
+          <ProjectPartyPicker members={devMembers} onMembers={setDevMembers} ownerName={ownerName} ownerLabel={isEdit ? "作成者" : "あなた・作成者"} />
+        </Field>
       </ModalBody>
       <ModalFooter>
         <button type="button" className="btn btn-outline dialog-close-left" onClick={requestClose}>キャンセル</button>

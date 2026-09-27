@@ -71,11 +71,15 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
     router.push(`/concepts/${id}`);
   }, [router, questId]);
 
-  // 複製＝作成フォームを元コンセプトでプリフィル（?dup）。削除＝作成者本人 or owner/quest_admin（論理削除）。
+  // 操作メニューの並び＝統一順（詳細を開く→編集→複製→削除）。編集/削除＝作成者本人 or owner/quest_admin（論理削除）。
   const conceptMenu = useCallback((c: ConceptListItem): RowMenuItem[] => {
     const items: RowMenuItem[] = [
-      { label: "複製", onClick: () => router.push(`/quests/${questId}/concepts/new?dup=${c.id}`) },
+      { label: "詳細を開く", onClick: () => openConcept(c.id) },
     ];
+    if (c.is_mine || canManage) {
+      items.push({ label: "編集", onClick: () => router.push(`/concepts/${c.id}/edit`) });
+    }
+    items.push({ label: "複製", onClick: () => router.push(`/quests/${questId}/concepts/new?dup=${c.id}`) });
     if (c.is_mine || canManage) {
       items.push({
         label: "削除",
@@ -98,7 +102,7 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
       });
     }
     return items;
-  }, [router, questId, canManage, confirm, snack]);
+  }, [router, questId, canManage, confirm, snack, openConcept]);
 
   // 前提の追加/編集をダイアログで保存（P.3・検証プール所有＝owner/quest_admin）。statement のみ。
   const saveAssumption = useCallback(async () => {
@@ -124,9 +128,10 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
     }
   }, [assumptionDialog, savingAssumption, questId, load, snack]);
 
-  // 前提の行メニュー（編集/削除）＝検証プール所有（owner/quest_admin）のみ。
+  // 前提の行メニュー（編集/複製/削除・統一順）＝検証プール所有（owner/quest_admin）のみ。複製＝内容を初期値に新規作成ダイアログ。
   const assumptionMenu = useCallback((a: Assumption): RowMenuItem[] => [
     { label: "編集", onClick: () => setAssumptionDialog({ mode: "edit", id: a.id, statement: a.statement }) },
+    { label: "複製", onClick: () => setAssumptionDialog({ mode: "create", statement: a.statement }) },
     {
       label: "削除",
       danger: true,

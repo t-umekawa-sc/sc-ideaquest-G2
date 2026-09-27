@@ -153,6 +153,9 @@ export function QuestListView() {
   // 詳細（C.1 getQuest）を取得して引き継ぐ。作成者は新しい作成者（＝自分）に置き換わるため members からは除外。
   // id・ステータス（→下書き）・アイコン画像はサーバー生成/バイナリのため引き継がず新規入力。
   const questMenu = (x: Quest): RowMenuItem[] => [
+    // 統一順＝詳細を開く→編集→複製→削除。編集は owner のみ（一覧DTOは quest_admin 判定を持たない＝非owner は詳細から）。
+    { label: "詳細を開く", onClick: () => { if (!x.draft) markQuestFromList(); router.push(questHref(x)); } },
+    ...(x.isOwner ? [{ label: "編集", onClick: () => router.push(`/quests/${x.id}/edit`) }] : []),
     {
       label: "複製",
       onClick: async () => {

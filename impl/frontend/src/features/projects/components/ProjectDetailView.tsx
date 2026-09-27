@@ -159,13 +159,14 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     <section aria-label="プロジェクト詳細" className="proj-detail">
       <Link className="backlink backlink--float" href="/projects">← プロジェクト一覧へ戻る</Link>
 
-      {/* ヘッダー（クエスト詳細と同型＝.card ヘッダー） */}
+      {/* ヘッダー＋最近の議論を2段組（クエスト詳細の quest-head-row を踏襲＝概要パネルの右に議論・§2.1c）。 */}
+      <div className="quest-head-row">
       <section className="card quest-head proj-head" aria-label="プロジェクト情報">
         <div className="proj-head__top">
           {/* クエスト詳細と同じ既定フォント（.quest-head h1）＝page-title の pixel フォントは使わない（ユーザー要望）。 */}
           <h1 style={{ margin: 0 }}>{project.title}</h1>
           <span className={P_STATUS_CLS[project.status]}>{P_STATUS_LABEL[project.status]}</span>
-          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }} onClick={() => setEditOpen(true)}>編集</button>}
+          {project.my_permissions.can_edit && <button type="button" className="btn btn-outline" style={{ marginLeft: "auto" }} onClick={() => setEditOpen(true)}>編集</button>}
         </div>
         {project.description && <p className="muted" style={{ marginTop: 6 }}>{project.description}</p>}
         <div className="proj-head__meta">
@@ -175,6 +176,31 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <span>進捗: {project.progress.done}/{project.progress.total}</span>
         </div>
       </section>
+
+      {/* 🕒 最近の議論＝このプロジェクト内タスクのチャットのみ（更新順・既読/未読問わず・概要パネルの右・FR-43・SC-71）。 */}
+      <section className="card quest-activity" aria-label="最近の議論">
+        <div className="section-head">
+          <h2 style={{ fontSize: "var(--text-lg)" }}>🕒 最近の議論</h2>
+          <span className="muted text-xs">タスクチャット・更新順</span>
+        </div>
+        {recentChats.length > 0 ? (
+          <ul className="unread-list">
+            {recentChats.map((c) => (
+              <li key={c.task_id}>
+                <Link className="unread-item" href={`/projects/${projectId}/tasks/${c.task_id}/chat`}>
+                  <span className="unread-item__title">💬 {c.title}</span>
+                  {c.unread_chat_count > 0
+                    ? <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
+                    : <span className="notif-time muted">{c.last_chat_at ? timeLabel(c.last_chat_at) : ""}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>まだタスクのチャットはありません。WBS の各タスクの「💬 チャット」から議論を始めると、ここに更新順で並びます。</p>
+        )}
+      </section>
+      </div>{/* .quest-head-row */}
 
       {/* タブ（クエスト詳細と同型＝.tabs role=tablist） */}
       <div className="tabs" role="tablist" aria-label="プロジェクト詳細のセクション">
@@ -289,30 +315,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
           <p className="hint">{project.concept ? "コンセプト段の viability（コスト/収益/ROI）を導入後の実測で検証し、次サイクルへ（ISO §9/§10）。" : "単純タスク管理でも、導入計画・KPI をメモできます。"}</p>
         </section>
       )}
-
-      {/* 🕒 最近の議論＝このプロジェクト内タスクのチャットのみ（更新順・既読/未読問わず）＝ダッシュボードの導線をプロジェクトに限定（FR-43・SC-71）。 */}
-      <section className="card" aria-label="最近の議論" style={{ marginTop: "var(--space-4)" }}>
-        <div className="section-head">
-          <h2 style={{ fontSize: "var(--text-lg)" }}>🕒 最近の議論</h2>
-          <span className="muted text-xs">タスクチャット・更新順</span>
-        </div>
-        {recentChats.length > 0 ? (
-          <ul className="unread-list">
-            {recentChats.map((c) => (
-              <li key={c.task_id}>
-                <Link className="unread-item" href={`/projects/${projectId}/tasks/${c.task_id}/chat`}>
-                  <span className="unread-item__title">💬 {c.title}</span>
-                  {c.unread_chat_count > 0
-                    ? <span className="badge badge-danger">💬 +{c.unread_chat_count}</span>
-                    : <span className="notif-time muted">{c.last_chat_at ? timeLabel(c.last_chat_at) : ""}</span>}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted text-sm" style={{ margin: "var(--space-2) 0 0" }}>まだタスクのチャットはありません。WBS の各タスクの「💬 チャット」から議論を始めると、ここに更新順で並びます。</p>
-        )}
-      </section>
 
       {taskForm && tasks && <TaskForm tasks={tasks} members={members} task={taskForm.task} dupFrom={taskForm.dup} defaultParentId={taskForm.parentId} onClose={() => setTaskForm(null)} onSaved={applyTaskSave} />}
       {membersOpen && <ProjectMembersModal projectId={projectId} members={members} innovation={innovation} ownerName={project.owner?.display_name ?? ""} onClose={() => setMembersOpen(false)} onSaved={() => void reloadAll()} />}

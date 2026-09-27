@@ -456,16 +456,21 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   const ideaMenu = (r: Idea): RowMenuItem[] => {
     const goIdea = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}`); };
     const goChat = () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/chat`); };
+    // 統一順＝詳細を開く→💬チャット→クイック操作（賛成/反対）→編集→削除。
     const items: RowMenuItem[] = r.draft
       ? [{ label: "下書きを続ける", onClick: goIdea }]
       : [
+          { label: "詳細を開く", onClick: goIdea },
+          { label: "💬 チャットを開く", onClick: goChat },
           // 完了クエストは投票凍結＝アクション自体を出さない（SC-22 と同じ事前無効化に統一・サーバー 409 も権威）。
           ...(r.mystate === "unvoted" && quest?.status !== "completed"
             ? [{ label: "▲ 賛成する", onClick: () => void quickVote(r.id, "approve") },
                { label: "▼ 反対する", onClick: () => void quickVote(r.id, "oppose") }]
             : []),
-          { label: "💬 チャットを開く", onClick: goChat },
-          { label: "詳細を開く", onClick: goIdea },
+          // 編集＝本人 or owner/quest_admin（完了クエストは凍結＝出さない・SC-22 と同じ）。
+          ...((r.mystate === "mine" || canEdit) && quest?.status !== "completed"
+            ? [{ label: "編集", onClick: () => { markIdeaFromQuest(questId); router.push(`/ideas/${r.id}/edit`); } }]
+            : []),
         ];
     if (r.mystate === "mine" || canEdit) {
       items.push({
@@ -602,7 +607,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
               {/* 「＋ アイデアを追加」はアイデアタブの一覧上部へ移動（下記 tab==="ideas"）。編集/遷移/削除は C 接続済み。 */}
               {canEdit && (
                 <>
-                  <button className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストは編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/edit`)}>クエスト編集</button>
+                  <button className={`btn btn-outline${questCompleted ? " is-frozen" : ""}`} type="button" disabled={questCompleted} title={questCompleted ? "完了したクエストは編集できません" : undefined} onClick={() => router.push(`/quests/${questId}/edit`)}>編集</button>
                   <RowMenu
                     items={[
                       ...(quest.status !== "completed" && nextStatus

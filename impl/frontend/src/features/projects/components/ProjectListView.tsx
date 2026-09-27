@@ -74,7 +74,9 @@ export function ProjectListView({ ownerName }: { ownerName: string }) {
     } finally { setBusy(false); }
   }
 
+  // 操作メニューの並び＝統一順（詳細を開く→編集→複製→削除）。
   const rowMenu = (p: ProjectListItem): RowMenuItem[] => [
+    { label: "詳細を開く", onClick: () => router.push(`/projects/${p.id}`) },
     { label: "編集", onClick: () => void openEdit(p) },
     { label: "複製", onClick: () => void duplicate(p) },
     { label: "削除", danger: true, onClick: () => void remove(p) },
