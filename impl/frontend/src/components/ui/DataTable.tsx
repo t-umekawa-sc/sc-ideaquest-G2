@@ -385,8 +385,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
     () => order.map((k) => colByKey[k]).filter((c): c is DataTableColumn<T> => Boolean(c) && !hidden.includes(c.key)),
     [order, colByKey, hidden],
   );
+  // 操作列(⋮)は先頭（左端固定）に置く＝全一覧で位置を統一（デザイン標準 §4.5・2026-09-28 ユーザー方針）。
   const visibleCols = useMemo(
-    () => (actionsCol ? [...visibleDataCols, actionsCol] : visibleDataCols),
+    () => (actionsCol ? [actionsCol, ...visibleDataCols] : visibleDataCols),
     [visibleDataCols, actionsCol],
   );
 
@@ -476,10 +477,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const advOn = advSort.length > 0;
   const searchActive = search.trim(); // チップの表示/判定はトリム値（入力欄は生値のまま＝内部空白を打てる）
 
-  // 列幅（宣言幅の比率を % で。テーブルには min-width=合計*0.8 を課す）。
-  const colWidths = visibleCols.map((c) => widths[c.key] ?? c.width ?? 0);
-  const sumW = colWidths.reduce((a, b) => a + b, 0) || 1;
-  const minWidthPx = Math.round(sumW * 0.8);
+  // 列幅。操作列(⋮)は先頭・左端固定（sticky-left）＝内容幅で固定し比例配分の対象外にする（位置がテーブル幅に
+  // 依存せず全一覧で統一・デザイン標準 §4.5）。データ列は残り幅を自然幅比（%）で按分。
+  // 操作列(⋮)は内容幅で最小化＝全一覧で RowMenu(⋮) のみのため一律で狭くする（上限44px・ユーザー要望 2026-09-28）。
+  const actionW = actionsCol ? Math.min(widths[actionsCol.key] ?? actionsCol.width ?? 44, 44) : 0;
+  const dataW = visibleDataCols.map((c) => widths[c.key] ?? c.width ?? 0);
+  const dataSumW = dataW.reduce((a, b) => a + b, 0) || 1;
+  const minWidthPx = Math.round(dataSumW * 0.8) + actionW;
+  const widthStyleFor = (c: DataTableColumn<T>): { width: string } | undefined => {
+    if (c.actions) return { width: `${actionW}px` };
+    const w = widths[c.key] ?? c.width ?? 0;
+    return w ? { width: `${((w / dataSumW) * 100).toFixed(4)}%` } : undefined;
+  };
 
   // 固定行の段積み sticky（ヘッダー配下に累積 top）。
   useLayoutEffect(() => {
@@ -785,14 +794,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
               : undefined
           }
         >
-          {visibleCols.map((c, i) => {
+          {visibleCols.map((c) => {
             const cellCls = [c.align === "num" ? "num" : "", c.actions ? "col-actions" : "", c.cellClass ?? ""]
               .filter(Boolean)
               .join(" ");
             const inner = c.render ? c.render(r) : c.sortVal ? String(c.sortVal(r)) : "";
+            // ピン(📍)は先頭データ列（主列）に付ける＝操作列(⋮)は先頭・左端だが、ピンは内容の見出し列に添える。
+            const isPrimary = c.key === visibleDataCols[0]?.key;
             return (
               <td key={c.key} className={cellCls || undefined}>
-                {i === 0 && pinsEnabled ? (
+                {isPrimary && pinsEnabled ? (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                     {pinButton(id, pinnedNow, false)}
                     {inner}
@@ -1003,8 +1014,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             <caption className="sr-only">{caption}</caption>
             <thead ref={theadRef}>
               <tr>
-                {visibleCols.map((c, idx) => {
-                  const pct = colWidths[idx] ? (colWidths[idx] / sumW) * 100 : 0;
+                {visibleCols.map((c) => {
                   let ariaSort: "ascending" | "descending" | "none" | undefined;
                   if (!c.sortable) ariaSort = undefined;
                   else if (!advOn && simpleSort && simpleSort.key === c.key)
@@ -1025,7 +1035,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       className={cls || undefined}
                       aria-sort={ariaSort}
                       data-key={c.key}
-                      style={pct ? { width: `${pct.toFixed(4)}%` } : undefined}
+                      style={widthStyleFor(c)}
                       onClick={(e) => onHeaderClick(c, e)}
                     >
                       <div className="dt-th">

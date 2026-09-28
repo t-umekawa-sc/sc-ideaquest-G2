@@ -17,7 +17,7 @@ async function login(page: Page) {
 test("B-TC-115 edit account display name", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);
@@ -53,7 +53,7 @@ test("B-TC-115 edit account display name", async ({ page }) => {
 test("B-TC-178 no-change edit save shows info toast (no success, no mutation)", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
 
   const region = page.getByRole("region", { name: "この会社のアカウント管理" });

@@ -47,10 +47,10 @@ export function ProjectListView() {
       const [detail, mem] = await Promise.all([getProject(p.id), listProjectMembers(p.id)]);
       const dep = (detail?.deployment ?? {}) as Record<string, string>;
       const members = mem.members.filter((m) => m.user).map((m) => ({ user_id: m.user!.user_id, role: m.role }));
-      const created = await createProject({ title: `${p.title}（複製）`, description: detail?.description ?? null, deployment: dep, members });
+      await createProject({ title: `${p.title}（複製）`, description: detail?.description ?? null, deployment: dep, members });
       snack({ type: "success", title: "プロジェクトを複製しました" });
+      // 登録系ダイアログ標準（デザイン標準 §4.1）＝作成後は詳細へ遷移せず呼び元（一覧）に留まる。結果は一覧再取得＋トーストで伝える。
       reload();
-      if (created) router.push(`/projects/${created.id}`);
     } catch {
       snack({ type: "error", title: "複製できませんでした", msg: "時間をおいて再試行してください。" });
     } finally { setBusy(false); }
@@ -91,7 +91,7 @@ export function ProjectListView() {
     { key: "progress", label: "進捗", width: 90, align: "num", sortable: true, sortVal: (p) => (p.progress.total ? p.progress.done / p.progress.total : 0), csvVal: (p) => `${p.progress.done}/${p.progress.total}`, render: (p) => <span className="proj-progress__num">{p.progress.done}/{p.progress.total}</span> },
     { key: "tasks", label: "タスク", width: 110, align: "num", sortable: true, sortVal: (p) => p.task_count, render: (p) => p.task_count },
     { key: "owner", label: "所有者", width: 150, sortVal: (p) => p.owner?.display_name ?? "", csvVal: (p) => p.owner?.display_name ?? "", render: (p) => p.owner ? <span className="proj-owner"><Avatar name={p.owner.display_name} imageUrl={p.owner.avatar_image_url} size="sm" noTooltip />{p.owner.display_name}</span> : <span className="muted">—</span> },
-    { key: "updated", label: "更新", width: 110, sortable: true, sortVal: (p) => p.updated_at, csvVal: (p) => fmtDate(p.updated_at), render: (p) => fmtDate(p.updated_at) },
+    { key: "updated", label: "更新", width: 128, sortable: true, sortVal: (p) => p.updated_at, csvVal: (p) => fmtDate(p.updated_at), render: (p) => fmtDate(p.updated_at) },
     { key: "_actions", label: "", actions: true, locked: true, width: 56, render: (p) => <RowMenu items={rowMenu(p)} /> },
   ];
 
@@ -121,7 +121,6 @@ export function ProjectListView() {
           exportName="プロジェクト一覧"
           emptyText="まだプロジェクトがありません。「＋ プロジェクトを作成」か、コンセプト詳細の『開発を始める』で起票します。"
           onRowClick={(p) => router.push(`/projects/${p.id}`)}
-          pins={false}
           defaultView="card"
           cardRaw={(p) => (
             // ⋯ は Link の外（兄弟・右上）に置く＝アンカー内 button の不正 HTML を避ける（クエストカード §4.5 と同方式）。

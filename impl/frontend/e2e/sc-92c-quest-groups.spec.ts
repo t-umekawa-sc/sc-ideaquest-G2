@@ -18,7 +18,7 @@ async function login(page: Page) {
 test("B-TC-117 create dialog keeps focus while typing name", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
   await page.getByRole("button", { name: "＋ グループ作成" }).click();
@@ -37,7 +37,7 @@ test("B-TC-117 create dialog keeps focus while typing name", async ({ page }) =>
 test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click(); // 行クリックで会社詳細へ（§4.5⑪・操作は⋯RowMenu）
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 行クリックで会社詳細へ（先頭は操作列⋮なので名称セル=nth1・§4.5⑪）
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);
@@ -77,7 +77,7 @@ test("B-TC-116 quest group create/rename/delete", async ({ page }) => {
 test("B-TC-179 no-change rename shows info toast (no success)", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
   await expect(page.getByRole("heading", { name: "クエストグループ" })).toBeVisible();
 
   const stamp = Date.now().toString().slice(-8);

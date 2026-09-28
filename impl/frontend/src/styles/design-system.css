@@ -602,8 +602,13 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
    sticky セルは position:sticky（＝positioned）なので静的セルの上に描画され、z-index なしでも
    横スクロール時に本文セルを覆える。 */
 .table th.col-actions, .table td.col-actions {
-  position: sticky; right: 0; background: var(--color-surface);
-  box-shadow: -8px 0 8px -8px rgba(15,23,42,.18); text-align: right;
+  /* 操作列(⋮)は一覧の先頭・左端固定（sticky-left）＝位置がテーブル幅/列構成に依存せず全一覧で統一
+     （右端配置は列を広げるとデータから離れて浮くため廃止・2026-09-28 ユーザー方針）。横スクロール時も
+     左端に留まる。区切りの影は右側に出して本文と分離。 */
+  position: sticky; left: 0; background: var(--color-surface);
+  box-shadow: 8px 0 8px -8px rgba(15,23,42,.18); text-align: center;
+  /* ⋮ だけの列は横余白を詰めて列幅を最小化（ユーザー要望 2026-09-28＝操作列が広すぎる）。 */
+  padding-left: var(--space-2); padding-right: var(--space-2);
 }
 .table thead th.col-actions { background: var(--color-surface-alt); }
 /* ⋯ メニューを開いている行の操作セルだけ最前面へ（他行の sticky セル・会社バナー(.ctx=5)・ヘッダー(10)より上）。
@@ -613,7 +618,24 @@ body.modal-open :not(.modal):not(.modal *):not(.iq-confirm):not(.iq-confirm *):n
 /* --- 行アクション ⋯（ケバブ）メニュー: sticky 操作列に置く ---
    ドロップダウンは table-wrap の overflow に隠れないよう shared.js が fixed 配置する。 */
 .rowmenu { position: relative; display: inline-block; }
-.rowmenu__trigger { padding: 4px 10px; font-weight: 700; line-height: 1; }
+/* ⋮ トリガ＝枠線を取り（中央表示を優先・ユーザー要望 2026-09-28）、グリフを太く大きく。borderless の
+   代わりにホバー/フォーカスで淡い背景の操作アフォーダンスを出す。操作列セルは text-align:center で中央。
+   セレクタは .btn-outline と同特異度＋後方定義で枠線指定に確実に勝たせる。 */
+.rowmenu__trigger.btn-outline {
+  /* ⋮ グリフは line-box 上寄りに描画され、ホバー塗りの下余白が上より狭く見える＝下パディングを足して上下を揃える
+     （ユーザー要望 2026-09-28）。 */
+  padding: 2px 6px 4px; border-color: transparent; background: transparent;
+  font-weight: 900; font-size: var(--text-lg); line-height: 1; color: var(--color-text-muted);
+}
+/* ホバー/フォーカスは塗りつぶし（primary 背景＋白の⋮）で明確に強調＝操作可能と一目で分かる（ユーザー要望 2026-09-28）。 */
+.rowmenu__trigger.btn-outline:hover,
+.rowmenu__trigger.btn-outline:focus-visible {
+  background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+}
+/* メニューを開いている間もハイライトを維持（開いている操作が分かる）。 */
+.rowmenu__trigger.btn-outline[aria-expanded="true"] {
+  background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+}
 .rowmenu__list {
   list-style: none; margin: 0; padding: 4px; min-width: 176px;
   background: var(--color-surface); border: 1px solid var(--color-border);
@@ -1740,6 +1762,10 @@ a.quest-card:active { transform: translateY(1px); }
    長い時はページ側がスクロールする）。max-height を課さないので内側の縦スクロールは出ない。 --- */
 .table-wrap.dt-scroll { overflow-x: auto; overflow-y: visible; }
 .dt-scroll .table thead th.col-actions { z-index: 4; }
+/* 先頭・左端固定の操作列(⋮)は横スクロール中、後続データセルの「上」に重ねて常時表示する（ユーザー要望
+   2026-09-28）。本文セルに z-index を与えて静的セルより前面へ（⋮ メニューは createPortal で body 直下＝
+   このスタッキングコンテキストの外に出るので、旧警告〔fixed メニューが埋もれる〕には該当しない）。 */
+.dt-scroll .table tbody td.col-actions { z-index: 2; }
 /* 一覧ヘッダー（列見出し行）のフローティング標準（デザイン標準 §4.5/§4.10）。
    横スクロール（.dt-scroll の overflow-x:auto）と操作列の sticky を保ったまま、ページ縦スクロール中は
    列見出しを画面上部（app-header 直下＝--dt-head-top 既定 --header-h）へ JS で translateY 固定する

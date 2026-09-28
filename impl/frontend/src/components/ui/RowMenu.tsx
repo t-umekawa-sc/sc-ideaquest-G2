@@ -1,6 +1,6 @@
 "use client";
 
-// 行アクション ⋯（ケバブ）メニュー（デザイン標準 §4・shared.css .rowmenu）。sticky 操作列に置く。
+// 行アクション ⋮（縦ケバブ）メニュー（デザイン標準 §4・shared.css .rowmenu）。sticky 操作列（先頭・左端固定）に置く。
 // ドロップダウンは table-wrap の overflow に隠れないよう position:fixed で配置（shared.js 相当）。
 // リストは **document.body へ portal**＝カード/行のスタッキング文脈やトランスフォームに閉じ込められず常に最前面。
 // これによりカード形式でメニューが背後カードに覆われ、クリックが背後カードに当たって誤遷移する不具合を防ぐ。
@@ -106,7 +106,8 @@ export function RowMenu({ items, label = "操作" }: { items: RowMenuItem[]; lab
           toggleOpen();
         }}
       >
-        ⋯
+        {/* 縦ケバブ（⋮）＝操作列は一覧の先頭・左端固定に統一（位置がテーブル幅に依存しない・デザイン標準 §4.5）。 */}
+        ⋮
       </button>
       {open && pos && typeof document !== "undefined" &&
         createPortal(

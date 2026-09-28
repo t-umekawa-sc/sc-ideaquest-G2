@@ -218,7 +218,6 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
             exportName="候補コンセプト"
             emptyText="まだコンセプトはありません。「＋ コンセプトを作成」から起票できます。"
             onRowClick={(c) => openConcept(c.id)}
-            pins={false}
             defaultView="list"
             cardLayout={(c) => ({
               title: c.title,
@@ -255,7 +254,6 @@ export function ConceptTab({ questId, canManage = false }: { questId: string; ca
             searchFields="前提"
             exportName="検証プール"
             emptyText="検証プールは空です。"
-            pins={false}
             defaultView="list"
             onRowClick={canManage ? (a) => setAssumptionDialog({ mode: "edit", id: a.id, statement: a.statement }) : undefined}
             cardLayout={(a) => ({

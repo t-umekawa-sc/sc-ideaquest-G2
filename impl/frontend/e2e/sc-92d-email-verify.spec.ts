@@ -17,7 +17,7 @@ async function login(page: Page) {
 test("B-TC-169 unverified badge and send verification action", async ({ page }) => {
   await login(page);
   await page.goto("/admin/companies");
-  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").first().click();
+  await page.getByRole("row", { name: /ACME-01/ }).getByRole("cell").nth(1).click(); // 先頭は操作列⋮なので名称セル=nth1
   await expect(page.getByRole("heading", { name: /アカウント/ })).toBeVisible();
 
   // 新規発行＝発行直後は未確認。
