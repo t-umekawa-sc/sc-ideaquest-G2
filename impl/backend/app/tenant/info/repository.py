@@ -356,6 +356,59 @@ def list_candidate_targets(session: Session) -> list[tuple[str, uuid.UUID, str]]
     return rows
 
 
+def get_target_text(session: Session, target_type: str, target_id: uuid.UUID) -> str | None:
+    """成果物保存トリガ（N.6 逆方向）＝単一成果物のテキストを返す（`list_candidate_targets` と同じ組成）。
+
+    対象が候補条件（ideas=published・非削除／quests・concepts=非削除）を満たさなければ None。
+    """
+    from app.tenant.concepts.orm import Assumption, Concept
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest
+
+    if target_type == "ideas":
+        row = session.execute(
+            select(Idea.title, Idea.value, Idea.body)
+            .where(Idea.id == target_id, Idea.deleted_at.is_(None), Idea.status == "published")
+        ).first()
+        return " ".join(x for x in row if x) if row else None
+    if target_type == "quests":
+        row = session.execute(
+            select(Quest.title, Quest.purpose).where(Quest.id == target_id, Quest.deleted_at.is_(None))
+        ).first()
+        return " ".join(x for x in row if x) if row else None
+    if target_type == "concepts":
+        row = session.execute(
+            select(Concept.title, Concept.problem, Concept.value_proposition, Concept.target,
+                   Concept.differentiation, Concept.solution_form)
+            .where(Concept.id == target_id, Concept.deleted_at.is_(None))
+        ).first()
+        return " ".join(x for x in row if x) if row else None
+    if target_type == "assumptions":
+        row = session.execute(select(Assumption.statement).where(Assumption.id == target_id)).first()
+        return (row[0] or "") if row else None
+    return None
+
+
+def all_info_tokens(session: Session) -> dict[uuid.UUID, list[tuple[str, int]]]:
+    """非 archived 情報の保存済みトークンを一括取得＝`{info_id: [(token, count), …]}`（N.6 逆方向の類似度入力）。"""
+    rows = session.execute(
+        select(InfoToken.info_item_id, InfoToken.token, InfoToken.count)
+        .join(InfoItem, InfoItem.id == InfoToken.info_item_id)
+        .where(InfoItem.status != "archived")
+    ).all()
+    out: dict[uuid.UUID, list[tuple[str, int]]] = {}
+    for info_id, token, count in rows:
+        out.setdefault(info_id, []).append((token, int(count)))
+    return out
+
+
+def links_for_target_all(session: Session, target_type: str, target_id: uuid.UUID) -> list[InfoLink]:
+    """当該成果物に紐づく **全** `info_links`（棄却/手動含む・N.6 逆方向の upsert 判定用）。"""
+    return list(session.execute(
+        select(InfoLink).where(InfoLink.target_type == target_type, InfoLink.target_id == target_id)
+    ).scalars().all())
+
+
 def get_link(session: Session, link_id: uuid.UUID) -> InfoLink | None:
     return session.get(InfoLink, link_id)
 

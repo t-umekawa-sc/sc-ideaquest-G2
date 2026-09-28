@@ -180,6 +180,9 @@ def create(account_id, company_id, quest_id, *, body) -> dict:
         # 作成時に総合ルーム（overall）を自動生成（§3.7・P.2）。
         repo.create_chat_scope(ts, concept_id=concept.id, kind="overall", position=0)
         _snapshot_revision(ts, concept, user.id, 1)  # 初版（変更履歴標準 §3.1）
+        # コンセプト作成＝候補になった＝既存情報から自動関連付け（N.6 逆方向・成果物保存トリガ）。
+        from app.tenant.info import application as info_app
+        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id)
         quest_obj, user_obj = quest, user
         payload = _detail_payload(ts, concept, quest_obj, user_obj)
         ts.commit()
@@ -211,6 +214,9 @@ def patch(account_id, company_id, concept_id, *, body) -> dict:
             next_rev = concept.current_revision + 1
             _snapshot_revision(ts, concept, user.id, next_rev)
             concept.current_revision = next_rev
+        # 本文変更＝類似度が変わり得る＝自動関連付けを再計算（N.6 逆方向・既存 auto は score のみ更新）。
+        from app.tenant.info import application as info_app
+        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id)
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload

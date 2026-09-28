@@ -329,6 +329,9 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
                         raise AppError(409, "edit_conflict",
                                        detail="他の編集と競合しました。最新を取得してから編集し直してください。")
                     raise
+            # 公開中アイデアの本文変更＝類似度が変わり得る＝自動関連付けを再計算（N.6 逆方向）。
+            from app.tenant.info import application as info_app
+            info_app.recompute_auto_links_for_target(ts, "ideas", idea.id)
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -355,6 +358,9 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
         idea.status = "published"
         xp_delta = _publish_processing(ts, idea, user)
+        # 公開＝このアイデアが候補になった＝既存情報から自動関連付け（N.6 逆方向・成果物保存トリガ）。
+        from app.tenant.info import application as info_app
+        info_app.recompute_auto_links_for_target(ts, "ideas", idea.id)
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         q_id = idea.quest_id

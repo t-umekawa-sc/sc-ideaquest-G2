@@ -37,8 +37,8 @@ def _ctx():
         return company.id, company.db_identifier, account.id
 
 
-def _seed_ideas(db_identifier, specs: list[tuple[uuid.UUID, str]]):
-    """(idea_id, text) を published アイデアとして seed。owner/quest は使い捨てで用意。"""
+def _seed_ideas(db_identifier, specs: list[tuple[uuid.UUID, str]], *, status: str = "published"):
+    """(idea_id, text) を status（既定 published）アイデアとして seed。owner/quest は使い捨てで用意。"""
     owner = uuid.uuid4()
     qid = uuid.uuid4()
     with get_tenant_session(db_identifier) as ts:
@@ -47,7 +47,7 @@ def _seed_ideas(db_identifier, specs: list[tuple[uuid.UUID, str]]):
         ts.add(Quest(id=qid, owner_id=owner, title="自動リンクtestクエスト", color="#0D9488", status="recruiting"))
         ts.flush()
         for iid, text in specs:
-            ts.add(Idea(id=iid, quest_id=qid, author_id=owner, title=text[:40], body=text, value="v", status="published"))
+            ts.add(Idea(id=iid, quest_id=qid, author_id=owner, title=text[:40], body=text, value="v", status=status))
         ts.commit()
     return owner, qid
 
@@ -155,3 +155,75 @@ def test_n_tc_152_threshold_and_top_n():
         assert all(l.target_id != miss for l in links), "閾値未満（無関係）は作らない"
     finally:
         _cleanup(db_identifier, info_ids=info_ids, idea_ids=hits + [miss], quest_id=qid, owner_id=owner)
+
+
+def test_n_tc_153_reverse_trigger_creates_link():
+    """N-TC-153: 成果物保存トリガ（逆方向）＝成果物側から既存情報へ auto リンク生成（無関係情報は除外）。"""
+    company_id, db_identifier, account_id = _ctx()
+    hit = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向hit", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    miss = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆方向miss", body_html=f"<p>{_UNRELATED_TEXT}</p>"))
+    hit_id, miss_id = uuid.UUID(hit["id"]), uuid.UUID(miss["id"])
+    idea = uuid.uuid4()
+    owner, qid = _seed_ideas(db_identifier, [(idea, _UNIQUE_TEXT)])  # 情報作成後に seed＝forward では張られない
+    try:
+        with get_tenant_session(db_identifier) as ts:
+            app_info.recompute_auto_links_for_target(ts, "ideas", idea)
+            ts.commit()
+        with get_tenant_session(db_identifier) as ts:
+            links = {l.info_item_id: l for l in repo.links_for_target_all(ts, "ideas", idea)}
+        assert hit_id in links and links[hit_id].origin == "auto" and links[hit_id].score is not None
+        assert miss_id not in links, "無関係情報からは張らない"
+    finally:
+        _cleanup(db_identifier, info_ids=[hit_id, miss_id], idea_ids=[idea], quest_id=qid, owner_id=owner)
+
+
+def test_n_tc_154_reverse_preserves_human_decisions():
+    """N-TC-154: 逆方向の再計算も score のみ更新・手動 kind/棄却は保持（重複行なし）。"""
+    from datetime import datetime, timezone
+    company_id, db_identifier, account_id = _ctx()
+    keep = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆keep", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    human = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆human", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    rej = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="逆rej", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    ids = {k: uuid.UUID(v["id"]) for k, v in {"keep": keep, "human": human, "rej": rej}.items()}
+    idea = uuid.uuid4()
+    owner, qid = _seed_ideas(db_identifier, [(idea, _UNIQUE_TEXT)])
+    try:
+        with get_tenant_session(db_identifier) as ts:
+            app_info.recompute_auto_links_for_target(ts, "ideas", idea)
+            ts.commit()
+        with get_tenant_session(db_identifier) as ts:
+            links = {l.info_item_id: l for l in repo.links_for_target_all(ts, "ideas", idea)}
+            assert ids["human"] in links and ids["rej"] in links
+            links[ids["human"]].kind = "supporting"
+            links[ids["rej"]].rejected_at = datetime.now(timezone.utc)
+            ts.commit()
+        with get_tenant_session(db_identifier) as ts:
+            app_info.recompute_auto_links_for_target(ts, "ideas", idea)
+            ts.commit()
+        with get_tenant_session(db_identifier) as ts:
+            rows = repo.links_for_target_all(ts, "ideas", idea)
+            by = {l.info_item_id: l for l in rows}
+            assert len(rows) == len({l.info_item_id for l in rows})  # 重複なし
+            assert by[ids["human"]].kind == "supporting"
+            assert by[ids["rej"]].rejected_at is not None
+            assert by[ids["keep"]].origin == "auto" and by[ids["keep"]].score is not None
+    finally:
+        _cleanup(db_identifier, info_ids=list(ids.values()), idea_ids=[idea], quest_id=qid, owner_id=owner)
+
+
+def test_n_tc_155_reverse_noop_for_non_candidate():
+    """N-TC-155: 候補外（下書きアイデア）は get_target_text=None＝リンクを作らない。"""
+    company_id, db_identifier, account_id = _ctx()
+    info = app_info.create_info_item(account_id, company_id, body=InfoCreateRequest(title="下書き対象", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+    info_id = uuid.UUID(info["id"])
+    draft = uuid.uuid4()
+    owner, qid = _seed_ideas(db_identifier, [(draft, _UNIQUE_TEXT)], status="draft")
+    try:
+        with get_tenant_session(db_identifier) as ts:
+            app_info.recompute_auto_links_for_target(ts, "ideas", draft)
+            ts.commit()
+        with get_tenant_session(db_identifier) as ts:
+            links = repo.links_for_target_all(ts, "ideas", draft)
+        assert links == [], "下書き（候補外）には自動リンクを作らない"
+    finally:
+        _cleanup(db_identifier, info_ids=[info_id], idea_ids=[draft], quest_id=qid, owner_id=owner)

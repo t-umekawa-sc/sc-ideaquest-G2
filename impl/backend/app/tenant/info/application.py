@@ -362,7 +362,7 @@ def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]]) -> 
     本文トークンと候補成果物（published アイデア／非削除クエスト・コンセプト／前提）のキーワード重なり
     （`derive.token_cosine`）で類似度を算出し、**閾値＋上位 N** の新規 (info,target) 組に auto リンクを生成。
     既存行は **score のみ更新**し `kind`/`rejected_at`/`disposition` は保持（人が変えた種別・棄却は復活しない）。
-    方向は情報→成果物（成果物保存トリガは follow-up）。トークン抽出は候補ごとに都度（entity_tokens 恒久化は後段最適化）。
+    方向は情報→成果物（逆方向＝成果物保存トリガは `recompute_auto_links_for_target`）。トークン抽出は候補ごとに都度（entity_tokens 恒久化は後段最適化）。
     """
     if not info_tokens:
         return
@@ -382,6 +382,41 @@ def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]]) -> 
             continue  # 手動/既存組は再生成しない（UNIQUE・人の決定を尊重）
         if score >= _AUTO_LINK_THRESHOLD and created < _AUTO_LINK_TOP_N:
             repo.create_link(ts, info_item_id=info_item.id, target_type=target_type, target_id=target_id,
+                             kind="related", origin="auto", created_by_id=None, score=score)
+            created += 1
+
+
+def recompute_auto_links_for_target(ts, target_type: str, target_id: uuid.UUID) -> None:
+    """成果物→情報の自動関連付け（N.6・成果物保存トリガ＝逆方向）。
+
+    アイデア/コンセプト（等）の保存時に、当該成果物のテキストと**既存の全情報の保存済みトークン**
+    （`repo.all_info_tokens`）のキーワード重なりを計算し、**閾値＋上位 N** の新規 (info, target) 組へ
+    auto リンクを生成する。既存行は `_recompute_auto_links` と同じ規則＝origin=auto は score のみ更新し、
+    手動 `kind`/棄却 `rejected_at`/採否 `disposition` は保持（＝人の決定は復活/上書きしない）。
+    候補外（下書きアイデア等）で `get_target_text` が None なら何もしない。呼び出し側の Tx に相乗（commit しない）。
+    """
+    text = repo.get_target_text(ts, target_type, target_id)
+    if not text:
+        return
+    target_tokens = derive.extract_tokens(text)
+    if not target_tokens:
+        return
+    existing = {l.info_item_id: l for l in repo.links_for_target_all(ts, target_type, target_id)}
+    scored: list[tuple[uuid.UUID, float]] = []
+    for info_id, toks in repo.all_info_tokens(ts).items():
+        score = derive.token_cosine(target_tokens, toks)
+        if score > 0.0:
+            scored.append((info_id, score))
+    scored.sort(key=lambda r: r[1], reverse=True)
+    created = 0
+    for info_id, score in scored:
+        link = existing.get(info_id)
+        if link is not None:
+            if link.origin == "auto":
+                link.score = round(score, 3)
+            continue
+        if score >= _AUTO_LINK_THRESHOLD and created < _AUTO_LINK_TOP_N:
+            repo.create_link(ts, info_item_id=info_id, target_type=target_type, target_id=target_id,
                              kind="related", origin="auto", created_by_id=None, score=score)
             created += 1
 

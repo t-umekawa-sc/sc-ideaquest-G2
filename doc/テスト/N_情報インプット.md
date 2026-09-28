@@ -95,6 +95,9 @@
 | N-TC-150 | int | 情報保存で類似成果物に auto リンクを生成（origin=auto/kind=related/score） | 情報本文と語が重なる published アイデアを seed | `create_info_item`（類似本文） | 当該アイデアへ `info_links`（`origin=auto`・`kind=related`・`score` 非NULL・`created_by_id=NULL`・`disposition=pending`）が生成される／無関係アイデアには生成されない | N.6／§5.35 |
 | N-TC-151 | int | 再計算は既存を尊重＝score のみ更新・手動kind/棄却は復活させない | auto リンク1件＋手動で `kind=supporting` に変更した組＋棄却済み auto の組 | 情報を `update_info_item`（本文変更で再計算） | 手動組は `kind=supporting` を保持（related に戻さない）・棄却組は `rejected_at` 保持で復活しない・auto 組は `score` が更新される（新規重複行を作らない＝UNIQUE） | N.6／§5.35 |
 | N-TC-152 | int | 閾値未満は作らない＋上位 N で件数を抑制 | 弱い重なりの候補多数＋強い重なり少数 | `create_info_item` | 閾値未満の候補には auto リンクを作らない／新規 auto は上位 N 件まで（ノイズ抑制） | N.6 |
+| N-TC-153 | int | 成果物保存トリガ（逆方向）＝成果物側から既存情報へ auto リンク生成 | 情報（保存済トークンあり）＋語が重なる成果物を用意 | `recompute_auto_links_for_target(ts, type, id)` | 当該情報→成果物へ `origin=auto`/`kind=related`/`score` のリンクが生成される／無関係情報からは生成されない | N.6／§5.35 |
+| N-TC-154 | int | 逆方向も既存を尊重＝score のみ更新・手動kind/棄却は復活させない | auto リンク＋手動 supporting＋棄却済みの情報を用意 | `recompute_auto_links_for_target` 再実行 | 手動は supporting 保持・棄却は復活しない・auto は score 更新（重複行なし） | N.6／§5.35 |
+| N-TC-155 | int | 候補外の成果物は何もしない（下書きアイデア等） | 下書き（未公開）アイデア | `recompute_auto_links_for_target(ts, "ideas", draft_id)` | `get_target_text` が None＝リンクを生成しない（published のみ候補） | N.6 |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 
