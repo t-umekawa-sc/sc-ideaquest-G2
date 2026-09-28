@@ -27,7 +27,7 @@ export function ProjectFormModal({ mode, projectId, conceptId, conceptTitle, pre
           ownerName={ownerName}
           ownerUserId={ownerUserId}
           onCancel={close}
-          onDone={(to) => { window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT)); close(to); }}
+          onDone={() => { window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT)); close(); }}
         />
       )}
     </RouteModal>

@@ -1,8 +1,9 @@
 "use client";
 
 // SC-50「この情報からクエストを作成」＝機会特定→行動の動線（実 API・C.2 from_info_id）。正＝mocks/SC-50。
-// 下書きクエストを作成し、サーバーが info_link（関連・manual）を自動生成する。作成後は新クエストへ遷移し、
-// 参加部署・パーティー・6権限・カラー・公開は SC-11（クエスト編集）で仕上げる（本パネルは軽量な起票）。
+// 下書きクエストを作成し、サーバーが info_link（関連・manual）を自動生成する。作成後は登録系ダイアログの標準
+// （デザイン標準 §4.1）に従い、詳細へ遷移せずダイアログを閉じて呼び元（情報詳細）へ戻る。参加部署・パーティー・
+// 6権限・カラー・公開は SC-11（クエスト編集）で仕上げる（本パネルは軽量な起票）。
 import { useEffect, useState } from "react";
 
 import { Field, FormFooterError, FormSummary, useFormErrorNotice, useSnackbar } from "@/components/ui";
@@ -14,8 +15,8 @@ import "../info-input.css";
 
 const DEFAULT_COLOR = "#0D9488"; // SC-11 と同じ既定色（カラーはクエスト編集で変更可）
 
-// onDone は成功時の閉じ＝to を渡すと（RouteModal/standalone とも）その URL へ単一遷移する（作成した下書きへ）。
-export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: string; onCancel: () => void; onDone: (to?: string) => void }) {
+// onDone は成功時の閉じ＝呼び元（情報詳細ダイアログ／standalone は情報詳細ページ）へ戻る（登録系ダイアログ標準）。
+export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: string; onCancel: () => void; onDone: () => void }) {
   const snack = useSnackbar();
   const { summaryRef, notify } = useFormErrorNotice();
   const [info, setInfo] = useState<InfoDetail | undefined>(undefined);
@@ -51,11 +52,13 @@ export function QuestFromInfoPanel({ infoId, onCancel, onDone }: { infoId: strin
     try {
       // カテゴリは自由入力を区切って配列化（任意）。カラーは既定（SC-11 で変更可）。
       const categories = category.split(/[、,\/／]/).map((s) => s.trim()).filter(Boolean);
-      const created = await createQuestFromInfo({
+      await createQuestFromInfo({
         title: n, color: DEFAULT_COLOR, purpose: purpose.trim() || null, categories, deadline: due || null, from_info_id: infoId,
       });
       snack({ type: "success", title: `クエスト「${n}」を下書き作成しました`, msg: "この情報を関連リンク（関連）として紐づけました。参加部署・パーティー・公開はクエスト編集で仕上げてください。" });
-      onDone(`/quests/${created.id}`); // 作成した下書きへ単一遷移＝SC-11 で本設定（close(to) 経由）
+      // 登録系ダイアログの標準（デザイン標準 §4.1）＝作成後は詳細（クエスト）へ遷移せず、ダイアログを閉じて
+      // 呼び元（情報詳細ダイアログ）へ戻る。作成結果はトーストで伝える（クエスト編集は情報詳細の関連から辿れる）。
+      onDone();
     } catch (e) {
       setSaving(false);
       let fieldMsg = "クエストを作成できませんでした。時間をおいて再度お試しください。";

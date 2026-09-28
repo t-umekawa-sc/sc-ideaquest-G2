@@ -17,8 +17,10 @@ export function ProjectFormPanel({ mode, projectId, conceptId, conceptTitle, pre
   ownerUserId?: string;
 }) {
   const router = useRouter();
+  // 登録系ダイアログ標準（デザイン標準 §4.1）＝作成後は詳細へ遷移せず呼び元へ戻る。フルページ版の呼び元＝
+  // 作成は一覧（/projects）／編集は対象詳細（/projects/{id}）。
   const back = mode === "edit" && projectId ? `/projects/${projectId}` : "/projects";
-  const done = (to?: string) => { window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT)); router.push(to ?? back); };
+  const done = () => { window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT)); router.push(back); };
   return (
     <section aria-label={mode === "edit" ? "プロジェクト編集" : "プロジェクト作成"}>
       <Link className="backlink" href={back}>← 戻る</Link>

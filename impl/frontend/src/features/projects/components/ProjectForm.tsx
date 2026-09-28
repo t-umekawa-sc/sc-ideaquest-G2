@@ -27,7 +27,7 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
   conceptTitle?: string | null;
   ownerName: string;               // 作成者/所有者の氏名（パーティーの固定 owner 行・作成時＝session）
   ownerUserId?: string;            // 作成者/所有者の user_id（候補除外用）
-  onDone: (to?: string) => void;   // 成功（作成/更新）後の閉じ（RouteModal の close／Panel の遷移）
+  onDone: () => void;              // 成功（作成/更新）後の閉じ＝呼び元へ戻る（登録系ダイアログ標準・デザイン標準 §4.1）
   onCancel: (to?: string) => void; // キャンセル
 }) {
   const snack = useSnackbar();
@@ -118,12 +118,16 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
         return;
       }
       const members = devMembers.map((m) => ({ user_id: m.user.user_id, role: m.role }));
-      const created = conceptId
-        ? await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups })
-        : await createProject({ title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups });
+      if (conceptId) {
+        await createProjectFromConcept(conceptId, { title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups });
+      } else {
+        await createProject({ title: title.trim(), description: description.trim() || null, deployment, members, group_ids: accessGroups });
+      }
       const memberNote = devMembers.length ? `／開発メンバー ${devMembers.length} 名` : "";
       snack({ type: "success", title: "プロジェクトを作成しました", msg: (conceptId ? "コンセプトからソリューション開発を起票しました。" : "単純タスク管理プロジェクトを作成しました。") + memberNote });
-      onDone(created ? `/projects/${created.id}` : undefined);
+      // 登録系ダイアログの標準（デザイン標準 §4.1）＝作成後は詳細へ遷移せずダイアログを閉じて呼び元へ戻る
+      // （指示のない限り。作成結果はトースト＋一覧再取得 PROJECTS_CHANGED_EVENT で伝える）。
+      onDone();
     } catch (e) {
       setSaving(false);
       if (e instanceof ApiError && e.status === 409) snack({ type: "error", title: "保存できませんでした", msg: "このコンセプトのプロジェクトは既に存在するか、go 判定ではありません。" });
