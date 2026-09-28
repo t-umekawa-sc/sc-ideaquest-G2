@@ -475,10 +475,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const advOn = advSort.length > 0;
   const searchActive = search.trim(); // チップの表示/判定はトリム値（入力欄は生値のまま＝内部空白を打てる）
 
-  // 列幅（宣言幅の比率を % で。テーブルには min-width=合計*0.8 を課す）。
+  // 列幅（宣言幅の比率を % で。テーブルには min-width=合計*0.8・max-width=合計 を課す）。
   const colWidths = visibleCols.map((c) => widths[c.key] ?? c.width ?? 0);
   const sumW = colWidths.reduce((a, b) => a + b, 0) || 1;
   const minWidthPx = Math.round(sumW * 0.8);
+  // 広い画面で**自然幅(sumW)を超えて引き伸ばさない**（超広コンテナでの過剰ストレッチ＝疎な行で最終列に余白が出て
+  // sticky の操作列(⋯)が右へ離れて見える不具合の解消）。通常/キャップ環境（container ≤ sumW）は従来どおり％配分で不変。
+  const maxWidthPx = Math.round(sumW);
 
   // 固定行の段積み sticky（ヘッダー配下に累積 top）。
   useLayoutEffect(() => {
@@ -986,7 +989,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
         <div className="table-wrap dt-scroll" ref={wrapRef}>
           <table
             className={`table dt-fixed${density === "compact" ? " table--compact" : ""}`}
-            style={{ minWidth: `${minWidthPx}px` }}
+            style={{ minWidth: `${minWidthPx}px`, maxWidth: `${maxWidthPx}px` }}
           >
             <caption className="sr-only">{caption}</caption>
             <thead ref={theadRef}>
