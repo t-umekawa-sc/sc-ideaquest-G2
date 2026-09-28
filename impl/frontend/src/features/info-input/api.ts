@@ -34,6 +34,7 @@ export function infoListParams(state: QueryState, extra: InfoListExtra = {}): UR
   }
   if (extra.status && extra.status !== "all") qs.set("status", extra.status);
   if (extra.rootsOnly) qs.set("roots_only", "true");
+  if (state.pinIds.length) qs.set("pin_ids", state.pinIds.join(",")); // 固定行（ピン）＝サーバーで解決（§1.8.1④）
   qs.set("page", String(state.page));
   qs.set("per_page", String(state.perPage));
   return qs;

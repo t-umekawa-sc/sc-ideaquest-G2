@@ -82,6 +82,7 @@ export interface InfoStatusFacets {
 }
 export interface InfoListResult {
   data: InfoCard[];
+  pinned?: InfoCard[]; // 固定行（ピン）＝サーバーが pin_ids を解決して返す（§1.8.1④）
   page_info: { total: number; page: number; per_page: number };
   facets: InfoStatusFacets;
 }

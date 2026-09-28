@@ -183,6 +183,29 @@ def test_n_tc_105_full_text_search(client, info_env):
     assert ids == {str(info_env.ids.b)}
 
 
+def test_n_tc_125_pin_ids_resolution(client, info_env):
+    """N-TC-125: pin_ids は絞込/ページに関係なく pinned で返し data から除外（§1.8.1④）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    a = str(info_env.ids.a)
+    # per_page=1 で a を別ページへ追いやっても、pin なら pinned に解決される。
+    r = client.get(INFO, params={"pin_ids": a, "per_page": 1, "page": 1})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [c["id"] for c in body["pinned"]] == [a]           # pin 順で解決
+    assert a not in {c["id"] for c in body["data"]}           # 非固定母集合から除外
+    assert body["page_info"]["total"] >= 1                    # total は非固定母集合の件数
+
+
+def test_n_tc_126_pin_ids_invalid_422(client, info_env):
+    """N-TC-126: pin_ids 不正形式は 422（field=pin_ids）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(INFO, params={"pin_ids": "not-a-uuid"})
+    assert r.status_code == 422, r.text
+    body = r.json()
+    assert body["code"] == "validation_error"
+    assert any(e.get("field") == "pin_ids" for e in body.get("errors", []))
+
+
 def test_n_tc_107_status_facets(client, info_env):
     """N-TC-107: 状態 facet 件数（all/raw/curated・archived 除外）を返す。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)

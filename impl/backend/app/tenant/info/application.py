@@ -158,18 +158,20 @@ def get_info_items(
     impact_class: str | None = None,
     roots_only: bool = False,
     sort: str | None = None,
+    pin_ids: str | None = None,
     page: int | None = None,
     per_page: int | None = None,
 ) -> dict:
     """情報一覧（SC-50・N.1）＝DataTable サーバー委譲（番号ページャ・§1.8.1）。会社内 active ユーザーは閲覧可（N.0）。
 
     フィルタ enum（status/priority/source/impact_class）と sort キーはホワイトリスト検証（未知値は 422）。
-    既定は archived 除外・新着（`-created_at`）。
+    既定は archived 除外・新着（`-created_at`）。`pin_ids`＝固定行を絞込/ページに関係なく解決し pinned で返す（§1.8.1④）。
     """
     statuses = lq.parse_enum(status, "status", STATUS_VALUES)
     priorities = lq.parse_enum(priority, "priority", PRIORITY_VALUES)
     sources = lq.parse_enum(source, "source", SOURCE_VALUES)
     impact_classes = lq.parse_enum(impact_class, "impact_class", IMPACT_CLASS_VALUES)
+    pins = lq.parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
 
     company = _resolve_company(company_id)
     if company is None:
@@ -178,10 +180,14 @@ def get_info_items(
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             return _EMPTY_PAGE
+        # 固定行（ピン）は絞込/ページに関係なく ID で解決（pin 順を保持・未解決は除外・§1.8.1④）。
+        pinned_map = repo.info_items_by_ids(ts, pins)
+        pinned_rows = [pinned_map[i] for i in pins if i in pinned_map]
         rows_stmt, count_stmt = repo.build_info_list_query(
             q=q, statuses=statuses, priorities=priorities, sources=sources,
             impact_classes=impact_classes, roots_only=roots_only,
             sort=sort,  # 未知 sort キーは 422（list_query）
+            exclude_ids=pins,  # 固定行は非固定母集合から除外
         )
         total = ts.execute(count_stmt).scalar_one()
         facets = repo.status_counts(
@@ -196,13 +202,15 @@ def get_info_items(
             eff_per = max(1, min(per_page or lq.DEFAULT_PER_PAGE, lq.MAX_PER_PAGE))
             rows = list(ts.execute(rows_stmt.offset((eff_page - 1) * eff_per).limit(eff_per)).scalars().all())
 
-        ids = [r.id for r in rows]
+        all_rows = rows + pinned_rows  # DTO の付帯情報（リンク数/続報数/カテゴリ/作成者）は両方まとめて N+1 回避
+        ids = [r.id for r in all_rows]
         link_counts = repo.link_counts_for_items(ts, ids)
         follow_counts = repo.follow_up_counts_for_items(ts, ids)
         cats = repo.categories_for_items(ts, ids)
-        creators = repo.users_by_ids(ts, list({r.created_by_id for r in rows}))
-        data = [
-            _card_dto(
+        creators = repo.users_by_ids(ts, list({r.created_by_id for r in all_rows}))
+
+        def _to_dto(r):
+            return _card_dto(
                 r,
                 creator=creators.get(r.created_by_id),
                 categories=cats.get(r.id, []),
@@ -210,9 +218,11 @@ def get_info_items(
                 follow_up_count=follow_counts.get(r.id, 0),
                 q=q,
             )
-            for r in rows
-        ]
-    return {"data": data, "page_info": {"total": total, "page": eff_page, "per_page": eff_per},
+
+        data = [_to_dto(r) for r in rows]
+        pinned = [_to_dto(r) for r in pinned_rows]
+    return {"data": data, "pinned": pinned,
+            "page_info": {"total": total, "page": eff_page, "per_page": eff_per},
             "facets": facets}
 
 

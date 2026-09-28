@@ -6320,6 +6320,11 @@ export interface components {
         InfoListResponse: {
             /** Data */
             data: components["schemas"]["InfoItemCardDTO"][];
+            /**
+             * Pinned
+             * @default []
+             */
+            pinned: components["schemas"]["InfoItemCardDTO"][];
             page_info: components["schemas"]["InfoOffsetPageInfo"];
             facets: components["schemas"]["InfoStatusFacets"];
         };
@@ -7441,6 +7446,11 @@ export interface components {
         QuestCatalogResponse: {
             /** Data */
             data: components["schemas"]["QuestCatalogCardDTO"][];
+            /**
+             * Pinned
+             * @default []
+             */
+            pinned: components["schemas"]["QuestCatalogCardDTO"][];
             page_info: components["schemas"]["QuestOffsetPageInfo"];
         };
         /**
@@ -10557,6 +10567,7 @@ export interface operations {
                 category?: string | null;
                 group_id?: string | null;
                 sort?: string | null;
+                pin_ids?: string | null;
                 page?: number | null;
                 per_page?: number | null;
             };
@@ -15544,6 +15555,7 @@ export interface operations {
                 impact_class?: string | null;
                 roots_only?: boolean;
                 sort?: string | null;
+                pin_ids?: string | null;
                 page?: number | null;
                 per_page?: number | null;
             };

@@ -901,10 +901,13 @@ def can_discover_quest(session: Session, quest: Quest, visible_group_ids: list[u
     return bool(set(link_gids) & set(visible_group_ids or []))
 
 
-def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None, group_id=None, sort=None):
+def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None, group_id=None, sort=None,
+                        exclude_ids=None, include_ids=None):
     """発見カタログの (rows_stmt, count_stmt)（§1.8.1・list_query の sort をホワイトリスト適用）。
 
     自分が作成者/有効パーティー員のクエストも「発見可能」なら出す（my_state=member/owner で区別＝申請ボタンは出さない）。
+    `exclude_ids`＝固定行（ピン）を非固定母集合から除外／`include_ids`＝固定行の解決用に対象IDへ絞る（いずれも
+    発見門番 `_discoverable_conds` は維持＝可視でないクエストは pin でも返さない・§1.8.1④）。
     """
     from app.core import list_query as lq
     from sqlalchemy import func, or_, select
@@ -920,6 +923,10 @@ def build_catalog_query(*, viewer_id, visible_group_ids, q=None, categories=None
         from sqlalchemy import exists as _exists
         conds.append(_exists().where(QuestGroupLink.quest_id == Quest.id,
                                      QuestGroupLink.quest_group_id == group_id))
+    if exclude_ids:
+        conds.append(Quest.id.notin_(exclude_ids))
+    if include_ids is not None:
+        conds.append(Quest.id.in_(include_ids))
 
     member_count_col = (
         select(func.count()).select_from(QuestMember)

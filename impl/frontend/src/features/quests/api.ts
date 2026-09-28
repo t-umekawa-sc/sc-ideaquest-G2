@@ -29,6 +29,7 @@ export function catalogQueryParams(state: QueryState): URLSearchParams {
       if (t && !qs.has("q")) qs.set("q", t);
     }
   }
+  if (state.pinIds.length) qs.set("pin_ids", state.pinIds.join(",")); // 固定行（ピン）＝サーバーで解決（§1.8.1④）
   qs.set("page", String(state.page));
   qs.set("per_page", String(state.perPage));
   return qs;

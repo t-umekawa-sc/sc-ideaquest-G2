@@ -55,11 +55,12 @@ def build_info_list_query(
     impact_classes: list[str] | None = None,
     roots_only: bool = False,
     sort: str | None = None,
+    exclude_ids: list[uuid.UUID] | None = None,
 ):
     """情報一覧の (rows_stmt, count_stmt)（§1.8.1・list_query の sort をホワイトリスト適用）。
 
     既定は archived 除外。status を明示した場合はその集合のみ（archived 明示時のみ archived を含む）。
-    未知ソートキーは list_query が 422（呼び出し前に検証）。
+    未知ソートキーは list_query が 422（呼び出し前に検証）。`exclude_ids`＝固定行（ピン）は非固定母集合から除外（§1.8.1④）。
     """
     conds = _non_status_conds(q=q, priorities=priorities, sources=sources,
                               impact_classes=impact_classes, roots_only=roots_only)
@@ -67,6 +68,8 @@ def build_info_list_query(
         conds.append(InfoItem.status.in_(statuses))
     else:
         conds.append(InfoItem.status != "archived")
+    if exclude_ids:
+        conds.append(InfoItem.id.notin_(exclude_ids))
 
     # 未棄却リンク数（集計列ソート用の scalar subquery・§5.35）。
     link_count_col = (
@@ -529,6 +532,14 @@ def search_link_candidates(
 def get_info_item(session: Session, info_id: uuid.UUID) -> InfoItem | None:
     """情報を1件取得（不在は None）。"""
     return session.get(InfoItem, info_id)
+
+
+def info_items_by_ids(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, InfoItem]:
+    """情報を ID 群で一括取得（固定行〔ピン〕の解決用・§1.8.1④）。呼び出し側が pin 順で並べ替える。"""
+    if not ids:
+        return {}
+    rows = session.execute(select(InfoItem).where(InfoItem.id.in_(ids))).scalars().all()
+    return {r.id: r for r in rows}
 
 
 def links_for_item(session: Session, info_id: uuid.UUID) -> list[InfoLink]:

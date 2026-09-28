@@ -1676,24 +1676,33 @@ def _catalog_dtos(ts, rows, viewer_id) -> list[dict]:
 
 
 def get_quest_catalog(account_id, company_id, *, q=None, category=None, group_id=None,
-                      sort=None, page=None, per_page=None) -> dict:
+                      sort=None, pin_ids=None, page=None, per_page=None) -> dict:
     """発見カタログ（SC-13・C.9.1）＝`can_discover_quest` を満たすクエストのメタ一覧＋自分の my_state。
 
     DataTable サーバー契約（§1.8.1・番号ページャ）。`page`/`per_page` 未指定＝全件（後方互換）。中身は返さない。
+    `pin_ids`＝固定行を絞込/ページに関係なく解決（発見門番は維持＝可視でないクエストは pin でも返さない・§1.8.1④）。
     """
     company = _resolve_company(company_id)
     if company is None:
         return _EMPTY_CATALOG
     cats_filter = [c.strip() for c in category.split(",") if c.strip()] if category else None
     group_uuid = _parse_uuid(group_id, field="group_id") if group_id else None
+    pins = lq.parse_pin_ids(pin_ids)  # 不正形式は 422（先に検証）
     with get_tenant_session(company.db_identifier) as ts:
         user = profile_repo.get_user_by_account(ts, account_id)
         if user is None:
             return _EMPTY_CATALOG
         visible = qg_repo.list_active_group_ids_for_user(ts, user.id)
+        # 固定行（ピン）＝絞込に関係なく解決するが発見門番は維持（include_ids で対象IDへ絞りつつ可視条件を課す）。
+        pinned_rows = []
+        if pins:
+            pin_stmt, _ = repo.build_catalog_query(
+                viewer_id=user.id, visible_group_ids=visible, include_ids=pins)
+            pin_map = {r.id: r for r in ts.execute(pin_stmt).scalars().all()}
+            pinned_rows = [pin_map[i] for i in pins if i in pin_map]  # pin 順・可視のみ
         rows_stmt, count_stmt = repo.build_catalog_query(
             viewer_id=user.id, visible_group_ids=visible, q=q, categories=cats_filter,
-            group_id=group_uuid, sort=sort)  # 未知 sort キーは 422（list_query）
+            group_id=group_uuid, sort=sort, exclude_ids=pins)  # 未知 sort キーは 422（list_query）
         total = ts.execute(count_stmt).scalar_one()
         if page is None and per_page is None:
             rows = list(ts.execute(rows_stmt).scalars().all())
@@ -1703,7 +1712,8 @@ def get_quest_catalog(account_id, company_id, *, q=None, category=None, group_id
             eff_per = max(1, min(per_page or lq.DEFAULT_PER_PAGE, lq.MAX_PER_PAGE))
             rows = list(ts.execute(rows_stmt.offset((eff_page - 1) * eff_per).limit(eff_per)).scalars().all())
         data = _catalog_dtos(ts, rows, user.id)
-    return {"data": data, "page_info": {"total": total, "page": eff_page, "per_page": eff_per}}
+        pinned = _catalog_dtos(ts, pinned_rows, user.id) if pinned_rows else []
+    return {"data": data, "pinned": pinned, "page_info": {"total": total, "page": eff_page, "per_page": eff_per}}
 
 
 def get_catalog_detail(account_id, company_id, quest_id) -> dict:

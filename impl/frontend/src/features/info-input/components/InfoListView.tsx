@@ -94,7 +94,7 @@ export function InfoListView() {
       const res = await fetchInfoItems(state, { status, rootsOnly }, signal);
       if (!res) return { rows: [], total: 0, pinned: [] };
       setFacets(res.facets ?? EMPTY_FACETS);
-      return { rows: res.data, total: res.page_info.total, pinned: [] };
+      return { rows: res.data, total: res.page_info.total, pinned: res.pinned ?? [] };
     },
     [status, rootsOnly, refreshToken],
   );

@@ -73,6 +73,7 @@ class InfoStatusFacets(BaseModel):
 
 class InfoListResponse(BaseModel):
     data: list[InfoItemCardDTO]
+    pinned: list[InfoItemCardDTO] = []  # 固定行（ピン）＝絞込/ページに関係なく解決（§1.8.1④）
     page_info: InfoOffsetPageInfo
     facets: InfoStatusFacets
 

@@ -128,6 +128,29 @@ def test_c_tc_260_catalog_gate(client, env):
     assert "page_info" in body and body["page_info"]["total"] >= 2
 
 
+def test_c_tc_266_catalog_pin_resolution_and_gate(client, env):
+    """C-TC-266 pin_ids は絞込/ページに関係なく pinned で解決・data から除外／非discoverable は pin でも返さない（門番維持・§1.8.1④）。"""
+    v1 = env.new_quest(discoverable=True, group=env.g_in)
+    env.new_quest(discoverable=True, group=env.g_in)                 # data 側を埋める2件目
+    hidden = env.new_quest(discoverable=False, group=env.g_in)       # 非discoverable
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    # v1 を pin・per_page=1 で別ページへ追いやっても pinned に解決され data からは除外。
+    body = client.get(CATALOG, params={"pin_ids": str(v1), "per_page": 1, "page": 1}).json()
+    assert [c["id"] for c in body["pinned"]] == [str(v1)]
+    assert str(v1) not in {c["id"] for c in body["data"]}
+    # 非discoverable を pin しても発見門番で返さない（他部署/非公開の漏洩防止）。
+    body2 = client.get(CATALOG, params={"pin_ids": str(hidden)}).json()
+    assert body2["pinned"] == []
+
+
+def test_c_tc_267_catalog_pin_ids_invalid_422(client, env):
+    """C-TC-267 pin_ids 不正形式は 422（field=pin_ids）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    r = client.get(CATALOG, params={"pin_ids": "not-a-uuid"})
+    assert r.status_code == 422, r.text
+    assert any(e.get("field") == "pin_ids" for e in r.json().get("errors", []))
+
+
 def test_c_tc_261_follow_toggle(client, env):
     """C-TC-261 フォロー→my_state=following／解除→none（冪等・C.9）。"""
     qid = env.new_quest(discoverable=True)

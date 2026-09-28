@@ -43,6 +43,8 @@
 | N-TC-105 | api | 全文検索タブ（`q`）でヒット行のみ | 本文に語を含む/含まない情報 | `GET /info-items?q=<語>` | 該当語を含む情報のみ返る | N.1／§1.11 |
 | N-TC-106 | api | ワードクラウドが tokens[] を返す | info_tokens を seed | `GET /info-items/word-cloud` | `tokens[]`＝`{token,count,weight}`（count 降順） | N.6／SC-50 |
 | N-TC-107 | api | 状態 facet 件数（すべて/未判定/判定済） | raw/curated/archived を seed | `GET /info-items` | `facets.status`＝`{all,raw,curated}`（archived 除外・現行フィルタ反映・タブ件数バッジ用） | N.1／SC-50 |
+| N-TC-125 | api | 固定行（pin_ids）解決＝絞込/ページに関係なく `pinned` で返し `data` から除外 | 情報を複数 seed（別ページに入る件数） | `GET /info-items?pin_ids=<id>&page=2&per_page=…` | `pinned[]` に当該行（pin 順・別ページ/絞込でも解決）・`data[]` からは除外・`page_info.total` は非固定母集合の件数 | N.1／§1.8.1④ |
+| N-TC-126 | api | pin_ids 不正形式は 422 | ログイン済 | `GET /info-items?pin_ids=not-a-uuid` | 422 `validation_error`・`errors[].field="pin_ids"` | §1.8.1④（ホワイトリスト） |
 | N-TC-108 | api | 詳細が DTO 形状（全属性＋links target_title＋thread＋tokens_top＋can） | 情報＋関連 seed | `GET /info-items/{id}` | 全属性・`links[].target_title`・`thread`（parent/follow_ups）・`tokens_top`・`can` を返す | N.1／SC-52 |
 | N-TC-109 | api | can フラグ（作成者/curator/全員） | 作成者本人でログイン／curator 付与有無 | `GET /info-items/{id}` | `can.edit_content`＝作成者のみ true／`can.curate`＝curator のみ true／`can.add_link`＝常に true | N.0／SC-50 |
 | N-TC-110 | api | 不在/他テナントは 404 | ログイン済 | `GET /info-items/<不在id>` | 404 `not_found`（存在秘匿） | N.0 |
@@ -169,8 +171,10 @@
 ### 3.6 この情報からクエスト作成の遷移（Step B 回帰・二重遷移の履歴汚染防止）
 
 > 受入不具合＝「この情報からクエストを作成」で作った下書きをクエスト一覧から開くと **from-info ダイアログが再表示**される、という報告（handoff Step B）。root cause＝旧実装の二重遷移（`onDone()`＝`router.back()` ＋ `setTimeout(router.push)`）で、閉じアニメの `router.back` が後発火し `/info-items/{id}/new-quest`（intercept）へ戻る履歴汚染。修正（`99c9e256`）＝`RouteModal.close(to)`／standalone `nextHref` を `onClosed` で消費する**単一遷移**に統一。回帰ガード（テスト規約 §5.3・[[defect-regression-test-policy]]）。
+>
+> **改定（2026-09-28・登録系ダイアログの閉じ標準＝デザイン標準 §4.1）**: 作成後は作った下書き（詳細）へ**遷移しない**。ダイアログを閉じて**呼び元（情報詳細ダイアログ）へ戻る**（intercept＝`router.back()` で `/info-items/{id}`／standalone＝情報詳細ページへ）。N-TC-226 を新標準に合わせて更新。Step B の履歴汚染回帰（N-TC-227＝下書きを開き直しても from-info が出ない）は引き続き有効。
 
 | TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| N-TC-226 | e2e | この情報からクエスト作成→作成後は作った下書きへ単一遷移（情報一覧へ戻らない） | `user@acme.example`・情報詳細（seed i30） | 「この情報からクエストを作成」→件名入力→「下書きを作成」 | 作成後 URL が `/quests/{新id}`（情報一覧 `/info-items` へ戻らない）・from-info ダイアログ(`#qfi-name`)は閉じている | SC-50／C.2／N.3／`99c9e256` |
+| N-TC-226 | e2e | この情報からクエスト作成→作成後はダイアログを閉じて呼び元（情報詳細ダイアログ）へ戻る（詳細へ遷移しない・登録系ダイアログ標準） | `user@acme.example`・情報詳細（seed i30） | 「この情報からクエストを作成」→件名入力→「下書きを作成」 | 作成後 URL が `/info-items/{INFO_ID}` に戻り from-info ダイアログ(`#qfi-name`)は閉じ・情報詳細が見えている（`/quests/{id}` へ遷移しない）・下書きクエストは作成済み（一覧で件名が引ける） | SC-50／C.2／N.3／デザイン標準 §4.1 |
 | N-TC-227 | e2e | 作成した下書きをクエスト一覧から開いても from-info ダイアログが再表示されない（Step B 回帰） | N-TC-226 で作成した下書き | クエスト一覧で当該下書きを開く（行クリック→`/quests/{id}/edit`）＋直アクセス/リロード | from-info ダイアログ(`#qfi-name`)が出ず、QuestForm 編集(`#q_name`)が開く（intercept・standalone とも） | SC-50／C.2／N.3／`99c9e256` |

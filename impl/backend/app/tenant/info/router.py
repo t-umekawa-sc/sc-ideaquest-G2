@@ -67,6 +67,7 @@ def list_info_items(
     impact_class: str | None = None,    # enum 多値（カンマ）
     roots_only: bool = False,           # 続報を束ねる＝根のみ（§12-1）
     sort: str | None = None,            # created_at/title/status/priority/due_date/link_count（未知は 422）
+    pin_ids: str | None = None,         # 固定行（ピン）ID＝ページ/絞込跨ぎで解決（§1.8.1④）
     page: int | None = Query(default=None, ge=1),
     per_page: int | None = Query(default=None, ge=1, le=100),
     session: dict = Depends(require_me),
@@ -75,7 +76,7 @@ def list_info_items(
     result = info_service.get_info_items(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         q=q, status=status, priority=priority, source=source, impact_class=impact_class,
-        roots_only=roots_only, sort=sort, page=page, per_page=per_page,
+        roots_only=roots_only, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page,
     )
     return InfoListResponse(**result)
 

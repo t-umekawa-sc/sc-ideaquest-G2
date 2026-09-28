@@ -104,6 +104,7 @@ class QuestOffsetPageInfo(BaseModel):
 
 class QuestCatalogResponse(BaseModel):
     data: list[QuestCatalogCardDTO]
+    pinned: list[QuestCatalogCardDTO] = []  # 固定行（ピン）＝絞込/ページに関係なく解決・発見門番維持（§1.8.1④）
     page_info: QuestOffsetPageInfo
 
 

@@ -43,7 +43,7 @@ export function QuestCatalogView() {
   const serverQuery = useCallback(async (state: QueryState, signal: AbortSignal): Promise<ServerResult<Row>> => {
     const res = await fetchQuestCatalog(state, signal);
     if (!res) return { rows: [], total: 0, pinned: [] };
-    return { rows: res.data, total: res.page_info.total, pinned: [] };
+    return { rows: res.data, total: res.page_info.total, pinned: res.pinned ?? [] };
   }, []);
 
   // ダイアログを開く＝一覧カードで即描画し、活発度スパーク付きの詳細（catalog-detail）を後追いで結合。

@@ -80,6 +80,7 @@ def quest_catalog(
     category: str | None = None,   # enum 多値（カンマ）＝UGC ラベル（ホワイトリスト検証なし）
     group_id: str | None = None,
     sort: str | None = None,       # -created_at〔既定〕/deadline/-member_count（未知は 422）
+    pin_ids: str | None = None,    # 固定行（ピン）ID＝ページ/絞込跨ぎで解決（§1.8.1④）
     page: int | None = Query(default=None, ge=1),
     per_page: int | None = Query(default=None, ge=1, le=100),
     session: dict = Depends(require_me),
@@ -87,7 +88,7 @@ def quest_catalog(
     """発見カタログ＝発見可能クエストのメタ一覧＋自分の my_state（SC-13・C.9.1）。中身は返さない。読取専用。"""
     result = quest_service.get_quest_catalog(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
-        q=q, category=category, group_id=group_id, sort=sort, page=page, per_page=per_page,
+        q=q, category=category, group_id=group_id, sort=sort, pin_ids=pin_ids, page=page, per_page=per_page,
     )
     return QuestCatalogResponse(**result)
 
