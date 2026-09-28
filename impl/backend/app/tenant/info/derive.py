@@ -71,6 +71,28 @@ def extract_tokens(text: str | None, *, limit: int = 50) -> list[tuple[str, int]
         return []
 
 
+def token_cosine(a: list[tuple[str, int]], b: list[tuple[str, int]]) -> float:
+    """2つのトークン頻度ベクトルのコサイン類似度（自動関連付けの一致度・N.6）。
+
+    入力＝`extract_tokens` 形式 `[(token, count), …]`。共通語が多いほど 1 に近づく。
+    重なりゼロ=0.0／同一集合≈1.0。対称・順序非依存・外部送信なし（純ローカル・決定的）。
+    """
+    if not a or not b:
+        return 0.0
+    va = {t: float(c) for t, c in a}
+    vb = {t: float(c) for t, c in b}
+    common = va.keys() & vb.keys()
+    if not common:
+        return 0.0
+    dot = sum(va[t] * vb[t] for t in common)
+    import math
+    na = math.sqrt(sum(v * v for v in va.values()))
+    nb = math.sqrt(sum(v * v for v in vb.values()))
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
 _TOKENIZER = None
 
 

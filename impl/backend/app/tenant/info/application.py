@@ -33,6 +33,9 @@ from app.tenant.quests.summarize import summarize_text
 _MAX_TITLE = 255
 # 選別用要約の字数上限（§12-3・2026-09-21 ユーザー要望＝約150字）。長い記事でも一覧/選別で一目で読める長さに。
 _SUMMARY_MAX_CHARS = 150
+# 自動関連付け（N.6）＝キーワード重なり cosine の閾値＋新規 auto リンクの上位 N（ノイズ抑制）。
+_AUTO_LINK_THRESHOLD = 0.12
+_AUTO_LINK_TOP_N = 5
 
 _EMPTY_PAGE = {
     "data": [],
@@ -353,6 +356,36 @@ def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         return {"can_curate": repo.is_curator(ts, user.id)}
 
 
+def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]]) -> None:
+    """情報→成果物の自動関連付け（N.6・情報保存トリガ）。
+
+    本文トークンと候補成果物（published アイデア／非削除クエスト・コンセプト／前提）のキーワード重なり
+    （`derive.token_cosine`）で類似度を算出し、**閾値＋上位 N** の新規 (info,target) 組に auto リンクを生成。
+    既存行は **score のみ更新**し `kind`/`rejected_at`/`disposition` は保持（人が変えた種別・棄却は復活しない）。
+    方向は情報→成果物（成果物保存トリガは follow-up）。トークン抽出は候補ごとに都度（entity_tokens 恒久化は後段最適化）。
+    """
+    if not info_tokens:
+        return
+    existing = {(l.target_type, l.target_id): l for l in repo.links_for_item(ts, info_item.id)}
+    scored: list[tuple[str, uuid.UUID, float]] = []
+    for target_type, target_id, text in repo.list_candidate_targets(ts):
+        score = derive.token_cosine(info_tokens, derive.extract_tokens(text))
+        if score > 0.0:
+            scored.append((target_type, target_id, score))
+    scored.sort(key=lambda r: r[2], reverse=True)
+    created = 0
+    for target_type, target_id, score in scored:
+        link = existing.get((target_type, target_id))
+        if link is not None:
+            if link.origin == "auto":
+                link.score = round(score, 3)  # 既存 auto は score のみ更新（kind/rejected_at/disposition は保持）
+            continue  # 手動/既存組は再生成しない（UNIQUE・人の決定を尊重）
+        if score >= _AUTO_LINK_THRESHOLD and created < _AUTO_LINK_TOP_N:
+            repo.create_link(ts, info_item_id=info_item.id, target_type=target_type, target_id=target_id,
+                             kind="related", origin="auto", created_by_id=None, score=score)
+            created += 1
+
+
 def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     """低摩擦登録／続報登録（SC-51・N.2）＝全ユーザー・status=raw。
 
@@ -420,6 +453,7 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
             item.status = "curated"
         if parent_uuid is not None:
             repo.snapshot_parent_links(ts, parent_uuid, item.id)  # 親の未棄却リンクを auto 複製（§12-1）
+        _recompute_auto_links(ts, item, tokens)  # 類似度で成果物へ auto リンク（N.6・snapshot 後＝重複回避）
         ts.commit()
         new_id = item.id
     # 作成直後の詳細（作成者視点＝can.edit_content=true）を返す。
@@ -614,7 +648,9 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
                 item.body_html = derive.sanitize_html(body.body_html) or None
                 item.body_text = derive.to_plain_text(item.body_html) or None
                 item.summary = summarize_text(item.body_text, max_chars=_SUMMARY_MAX_CHARS) if item.body_text else None
-                repo.replace_tokens(ts, item.id, derive.extract_tokens(item.body_text or ""))
+                _new_tokens = derive.extract_tokens(item.body_text or "")
+                repo.replace_tokens(ts, item.id, _new_tokens)
+                _recompute_auto_links(ts, item, _new_tokens)  # 本文変更で類似度を再計算（N.6・既存は score のみ更新）
             if "source_url" in content:
                 item.source_url = body.source_url or None
             # 内容の版スナップショット（判定後も追跡できるよう毎回の内容変更で1版・§12）。

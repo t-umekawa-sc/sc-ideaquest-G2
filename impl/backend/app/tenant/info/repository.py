@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import bindparam, delete, func, select, text, update
 from sqlalchemy.orm import Session, aliased
@@ -311,15 +312,48 @@ def find_link(session: Session, info_item_id: uuid.UUID, target_type: str, targe
 
 def create_link(session: Session, *, info_item_id: uuid.UUID, target_type: str, target_id: uuid.UUID,
                 kind: str = "related", origin: str = "manual",
-                created_by_id: uuid.UUID | None = None) -> InfoLink:
-    """手動リンクを1件作成（origin=manual・既定 kind=related・§N.3）。重複検出は呼び出し側で。
+                created_by_id: uuid.UUID | None = None, score: Decimal | float | None = None) -> InfoLink:
+    """リンクを1件作成（手動＝origin=manual／自動＝origin=auto・既定 kind=related・§N.3/N.6）。重複検出は呼び出し側で。
 
     `created_by_id`＝関連付けた人（成果物側パネルの `linked_by` 表示・§5.35）。auto は NULL。
+    `score`＝一致度（auto の類似度・§5.35・N.6）。手動は既定 None。
     """
     link = InfoLink(info_item_id=info_item_id, target_type=target_type, target_id=target_id,
-                    kind=kind, origin=origin, created_by_id=created_by_id)
+                    kind=kind, origin=origin, created_by_id=created_by_id,
+                    score=Decimal(str(round(float(score), 3))) if score is not None else None)
     session.add(link)
     return link
+
+
+def list_candidate_targets(session: Session) -> list[tuple[str, uuid.UUID, str]]:
+    """自動関連付け（N.6）の候補成果物のテキストを種類横断で返す＝`(target_type, target_id, text)`。
+
+    ideas=published・非削除／quests=非削除／concepts=非削除／assumptions=全件（本文＝statement）。
+    text は類似度計算（`derive.extract_tokens`→`token_cosine`）の入力。`search_link_candidates` と同じ対象集合。
+    """
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.quests.orm import Quest
+    from app.tenant.concepts.orm import Assumption, Concept
+
+    rows: list[tuple[str, uuid.UUID, str]] = []
+    for i, title, value, bodytext in session.execute(
+        select(Idea.id, Idea.title, Idea.value, Idea.body)
+        .where(Idea.deleted_at.is_(None), Idea.status == "published")
+    ).all():
+        rows.append(("ideas", i, " ".join(x for x in (title, value, bodytext) if x)))
+    for q, title, purpose in session.execute(
+        select(Quest.id, Quest.title, Quest.purpose).where(Quest.deleted_at.is_(None))
+    ).all():
+        rows.append(("quests", q, " ".join(x for x in (title, purpose) if x)))
+    for c, title, problem, vp, target, diff, sform in session.execute(
+        select(Concept.id, Concept.title, Concept.problem, Concept.value_proposition,
+               Concept.target, Concept.differentiation, Concept.solution_form)
+        .where(Concept.deleted_at.is_(None))
+    ).all():
+        rows.append(("concepts", c, " ".join(x for x in (title, problem, vp, target, diff, sform) if x)))
+    for a, statement in session.execute(select(Assumption.id, Assumption.statement)).all():
+        rows.append(("assumptions", a, statement or ""))
+    return rows
 
 
 def get_link(session: Session, link_id: uuid.UUID) -> InfoLink | None:

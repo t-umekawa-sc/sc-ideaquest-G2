@@ -85,6 +85,17 @@
 | N-TC-147 | api | 登録直後に初版（版1）を記録＝更新履歴が作成時から出る（内容編集を待たない） | 情報を登録 | `POST /info-items` | 応答 `content_revisions` が1件・`revision=1`（内容 title/body_html/source_url のスナップショット） | N.1／SC-50 §85 |
 | N-TC-148 | api | 選別用要約は約150字で丸める（長文でも一目・末尾…） | 6文以上の長文 body で登録 | `POST /info-items` | `summary` が非空かつ `len<=151`（150字＋末尾…）・句点境界優先で丸め＝`summarize_text(max_chars=150)`。短い本文は無改変（…付けない） | N.6／§12-3／SC-50 |
 
+### 2.6 類似度・自動関連付け（TF-IDF auto-link・N.6・情報保存トリガ）
+
+> FR-41③/N.6 の**未実装だった自動リンク**を実装（2026-09-28）。情報保存（`POST`/`PATCH /info-items`）時に、本文トークンと候補成果物（published アイデア／非削除クエスト・コンセプト／前提）のトークンの**キーワード重なり（cosine）**で類似度を計算し、**閾値＋上位 N** の新規 (info,target) 組に `info_links(origin=auto, kind=related, score)` を生成。既存行は **score のみ更新**し `kind`/`rejected_at`/`disposition` は保持（＝人が変えた種別・棄却は復活しない）。方向は**情報→成果物**（成果物保存トリガ〔D/コンセプト段〕は follow-up）。
+
+| TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-149 | int | トークン重なりの類似度（cosine）＝無関係は低・共通語多で高 | 語集合A/B（重なり無/一部/ほぼ一致） | `derive.token_cosine(a, b)` | 重なり無し=0.0／一部重なり=(0,1)／同一集合≈1.0（対称・順序非依存） | N.6／§5.36 |
+| N-TC-150 | int | 情報保存で類似成果物に auto リンクを生成（origin=auto/kind=related/score） | 情報本文と語が重なる published アイデアを seed | `create_info_item`（類似本文） | 当該アイデアへ `info_links`（`origin=auto`・`kind=related`・`score` 非NULL・`created_by_id=NULL`・`disposition=pending`）が生成される／無関係アイデアには生成されない | N.6／§5.35 |
+| N-TC-151 | int | 再計算は既存を尊重＝score のみ更新・手動kind/棄却は復活させない | auto リンク1件＋手動で `kind=supporting` に変更した組＋棄却済み auto の組 | 情報を `update_info_item`（本文変更で再計算） | 手動組は `kind=supporting` を保持（related に戻さない）・棄却組は `rejected_at` 保持で復活しない・auto 組は `score` が更新される（新規重複行を作らない＝UNIQUE） | N.6／§5.35 |
+| N-TC-152 | int | 閾値未満は作らない＋上位 N で件数を抑制 | 弱い重なりの候補多数＋強い重なり少数 | `create_info_item` | 閾値未満の候補には auto リンクを作らない／新規 auto は上位 N 件まで（ノイズ抑制） | N.6 |
+
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 
 > 対象＝`features/info-input/api.ts`（クエリ組立）・`components/InfoListView.tsx`（DataTable server モード）。frontend の unit＝`*.test.ts`（vitest）／e2e＝`e2e/*.spec.ts`（Playwright・seed 会社 ACME-01）。
