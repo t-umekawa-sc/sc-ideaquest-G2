@@ -333,8 +333,8 @@ def search_link_candidates(
     limit: int = 20, offset: int = 0,
 ) -> tuple[list[dict], bool]:
     """リンク候補を種類横断でタイトル検索（対象ピッカー・§N.3）。
-    ideas=published・非削除／quests=非削除。concepts/assumptions は未実装ドメイン＝候補ゼロ
-    （コンセプト段実装時に分岐追加＝コンセプト設計書 §4 の実装漏れ防止に対応）。
+    ideas=published・非削除／quests=非削除／concepts=非削除・title 検索／assumptions=statement 検索
+    （4種すべて実装済み＝コンセプト設計書 §4 の実装漏れ防止に対応。assumptions は due/owner 概念なし＝None）。
     文脈メタ（quest_title/owner_name/status/due）を付し、種類/クエスト/状態/期限で AND 絞込。
     ページング＝offset ベース（over-fetch して has_more 判定）。戻り値＝(候補, has_more)。"""
     from app.tenant.ideas.orm import Idea

@@ -1,9 +1,9 @@
 "use client";
 
 // 成果物→関連情報パネル（FR-41・SC-12 上部ストリップ／SC-22 右レール）。
-// info_links の成果物側 read（GET /{quests,ideas}/{id}/related-info・C.8b/D）を横スクロール棚で表示。
+// info_links の成果物側 read（GET /{quests,ideas,concepts,assumptions}/{id}/related-info・C.8b/D/P.1b）を横スクロール棚で表示。
 // ⚠反証を先頭固定・カードクリックで情報詳細（SC-52＝/info-items/{id}）・「⤢ 全画面で一覧」は Modal で。
-// Phase 1＝表示のみ（追加/種別変更/棄却は情報側 SC-50/52＝会社内全員／「＋追加」導線は後続スライス）。
+// 「＋ 関連情報を追加」導線あり（成果物側からの逆向き追加＝会社内全員・既存 EP 流用）／種別変更/棄却は情報側 SC-50/52。
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 

@@ -126,7 +126,7 @@
 ## 既知の課題（詳細は [`../handoff.md`](../handoff.md) §5 / §7）
 
 - **締切(時刻)後の投票 事前無効化**＝`completed`（凍結）は事前 disabled 済みだが、締切日時超過は DTO に deadline 判定を組まず現状サーバー 409 で理由提示（deadline ベースの事前 disabled は follow-up）。
-- **`IdeaDetailDTO` に `quest_id`/カテゴリー無し**＝SC-22 の「クエストへ戻る」が暫定。
+- ~~**`IdeaDetailDTO` に `quest_id`/カテゴリー無し**~~ → **解消済**＝`IdeaDetailDTO.quest`（`IdeaQuestRefDTO`）でクエスト参照を返す＝SC-22「クエストへ戻る」は実データ結線済み。
 - tsc 既知エラー＝なし（`Snackbar.tsx:122` の React19 `useRef` 型を `useRef<...|undefined>(undefined)` に修正済み）。※ShopView の csvVal 型は G 接続時に修正済み。
 
 ## 起動・テスト

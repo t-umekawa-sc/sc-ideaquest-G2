@@ -168,7 +168,7 @@ export function ProjectForm({ mode = "create", projectId, prefill, conceptId, co
           <textarea id="p_kpi" className="textarea" rows={2} value={kpi} onChange={(e) => setKpi(e.target.value)} placeholder="価値実現の指標と実測（例: 問合せ削減率 目標30%）" />
         </Field>
 
-        {/* 参加グループ（アクセス条件・任意）＝QuestForm と同構成（候補スコープ＋グループ外マーキング）。試作＝会社グループのデモ・未永続。 */}
+        {/* 参加グループ（アクセス条件・任意）＝QuestForm と同構成（候補スコープ＋グループ外マーキング）。実会社グループ directory・group_ids で永続（0043・7c2183d9）。 */}
         <Field className="dialog-section is-quiet" id="p_groups" label="参加グループ（アクセス条件・任意）">
           <Multiselect id="p_groups" options={groupOptions} value={accessGroups} onChange={setAccessGroups} placeholder="グループを選択…（未選択＝全社が候補）" ariaLabel="参加グループ" emptyText="該当するグループがありません" />
           <span className="hint">選んだグループの所属者を候補・アクセス範囲にします（未選択なら全社）。開発メンバーは下で追加します。</span>
