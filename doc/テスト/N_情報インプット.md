@@ -151,3 +151,12 @@
 | N-TC-221 | e2e | 関連リンクの種別変更で**並び順が変わらない**（種別依存の並び替えを起こさない） | API で情報＋関連リンク2件（related）を用意→「リンクを編集」 | 先頭リンクの種別を related→supporting に変更 | 変更前後で `.link-item__title` の並びが不変（フロントで元の表示順を維持・新規は末尾） | SC-52 |
 | N-TC-222 | e2e | **棄却済みリンクも対象ピッカーで既存扱い＝結果から除外**（再追加 409 を防ぐ・復活は「戻す」） | API で情報＋リンク1件を作成→`reject` で棄却→「対象を選ぶ」を開く | ピッカーの「既に関連付け済み」を確認 | 棄却済み対象も `.pick-existing` に出て「棄却済み」バッジ付き・**絞り込み結果からは除外**（`find_link` は棄却行も 409 にするため） | SC-52／N.3／§5.35 |
 | N-TC-225 | e2e | **採否ロックが情報側リンク編集で分かる＝種別コンボ非活性＋🔒バッジ**（FR-41 Phase2） | クエスト＋情報を関連付け→成果物側で adopted に採否→`/info-items/{id}` で「リンクを編集」 | ロックされたリンク行を確認 | 当該行に `is-locked`・種別 `select.link-kind` が `disabled`・「🔒 採用」バッジ表示（✕棄却は非表示） | SC-52／N.3-採否／FR-41 |
+
+### 3.6 この情報からクエスト作成の遷移（Step B 回帰・二重遷移の履歴汚染防止）
+
+> 受入不具合＝「この情報からクエストを作成」で作った下書きをクエスト一覧から開くと **from-info ダイアログが再表示**される、という報告（handoff Step B）。root cause＝旧実装の二重遷移（`onDone()`＝`router.back()` ＋ `setTimeout(router.push)`）で、閉じアニメの `router.back` が後発火し `/info-items/{id}/new-quest`（intercept）へ戻る履歴汚染。修正（`99c9e256`）＝`RouteModal.close(to)`／standalone `nextHref` を `onClosed` で消費する**単一遷移**に統一。回帰ガード（テスト規約 §5.3・[[defect-regression-test-policy]]）。
+
+| TC-ID | 種別 | 目的 | 前提/データ | 操作 | 期待結果 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| N-TC-226 | e2e | この情報からクエスト作成→作成後は作った下書きへ単一遷移（情報一覧へ戻らない） | `user@acme.example`・情報詳細（seed i30） | 「この情報からクエストを作成」→件名入力→「下書きを作成」 | 作成後 URL が `/quests/{新id}`（情報一覧 `/info-items` へ戻らない）・from-info ダイアログ(`#qfi-name`)は閉じている | SC-50／C.2／N.3／`99c9e256` |
+| N-TC-227 | e2e | 作成した下書きをクエスト一覧から開いても from-info ダイアログが再表示されない（Step B 回帰） | N-TC-226 で作成した下書き | クエスト一覧で当該下書きを開く（行クリック→`/quests/{id}/edit`）＋直アクセス/リロード | from-info ダイアログ(`#qfi-name`)が出ず、QuestForm 編集(`#q_name`)が開く（intercept・standalone とも） | SC-50／C.2／N.3／`99c9e256` |
