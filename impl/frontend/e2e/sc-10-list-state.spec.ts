@@ -76,3 +76,23 @@ test("M-TC-017 quest list restores sort + filter (applied via URL) after opening
   await expect(page.getByRole("button", { name: "並び替えを解除" })).toBeVisible();
   await expect(page.getByRole("button", { name: "絞込を解除" })).toBeVisible();
 });
+
+// M-TC-018: 列設定ポップオーバーがウィンドウ内に収まり全候補に到達できる（受入不具合＝下余白不足時に候補が画面外へ）。
+// 短いビューポートで下余白を不足させ、列設定を開いても .col-menu がウィンドウをはみ出さない（bottom≤innerHeight・top≥0）ことを検証。
+test("M-TC-018 column-settings popover stays within the window on short viewport", async ({ page }) => {
+  await login(page);
+  await page.setViewportSize({ width: 1280, height: 520 }); // 下余白不足を誘発
+  await page.goto("/quests");
+  await expect(page.locator("a.quest-card").first()).toBeVisible({ timeout: 12000 });
+  await page.getByTitle("リスト表示").click();
+  await page.getByRole("button", { name: "列設定" }).click();
+  const menu = page.locator(".col-menu");
+  await expect(menu).toBeVisible();
+  const fits = await page.evaluate(() => {
+    const m = document.querySelector(".col-menu") as HTMLElement | null;
+    if (!m) return { ok: false };
+    const r = m.getBoundingClientRect();
+    return { ok: r.bottom <= window.innerHeight + 1 && r.top >= -1, scrollable: m.scrollHeight > m.clientHeight - 1 };
+  });
+  expect(fits.ok, "列設定メニューがウィンドウ内に収まる").toBe(true);
+});

@@ -317,7 +317,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const [sortOpen, setSortOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [colMenuOpen, setColMenuOpen] = useState(false);
-  const [colMenuPos, setColMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  // 位置＝下に十分な余白があれば下向き(top)、無ければ上向き(bottom)。maxHeight でウィンドウ内に収める（候補が画面外に出ない）。
+  const [colMenuPos, setColMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number }>({ top: 0, left: 0, maxHeight: 0 });
   const [ready, setReady] = useState(false);
 
   // サーバー駆動モードの状態（server プロップ時のみ意味を持つ）。
@@ -645,7 +646,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
       return;
     }
     const rect = colBtnRef.current?.getBoundingClientRect();
-    if (rect) setColMenuPos({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 260)) });
+    if (rect) {
+      const vh = window.innerHeight;
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 260));
+      const spaceBelow = vh - rect.bottom - 8; // ボタン下の余白
+      const spaceAbove = rect.top - 8;         // ボタン上の余白
+      // 下に十分な余白（or 下の方が広い）なら下向き、そうでなければ上向きに開く＝候補がウィンドウ外に出ない。
+      if (spaceBelow >= 240 || spaceBelow >= spaceAbove) {
+        setColMenuPos({ top: rect.bottom + 4, left, maxHeight: Math.max(160, spaceBelow) });
+      } else {
+        setColMenuPos({ bottom: vh - rect.top + 4, left, maxHeight: Math.max(160, spaceAbove) });
+      }
+    }
     setColMenuOpen(true);
   }
 
@@ -1138,7 +1150,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
       {/* 列設定ポップオーバー（表示/並べ替え/幅リセット） */}
       {colMenuOpen && (
-        <div className="col-menu" ref={colMenuRef} style={{ top: colMenuPos.top, left: colMenuPos.left }}>
+        <div className="col-menu" ref={colMenuRef} style={{ top: colMenuPos.top, bottom: colMenuPos.bottom, left: colMenuPos.left, maxHeight: colMenuPos.maxHeight }}>
           <div className="col-menu__title">表示する列・並び順</div>
           {order.map((k, i) => {
             const c = colByKey[k];
