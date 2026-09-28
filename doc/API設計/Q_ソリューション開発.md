@@ -21,7 +21,9 @@
 - **イノベーション担当**＝由来クエスト（`projects.quest_id`）のパーティー（`quest_members`）。**プロジェクトの参照＋チャット発言（＝口出し）を継承**（開発段でも関与を維持）。
 - **開発担当**＝プロジェクト単位の新メンバー `project_members`（`role=lead/member`・**会社内の任意ユーザー可**＝クエストパーティー外でもよい）。**タスク担当（assignee）はここに限る**。
 
-**アクセス門番**＝`can_access_project(project, user) = is_quest_party(project.quest_id, user) OR is_project_member(project.id, user)`。いずれでもないユーザーは閲覧・操作とも **404 `not_found`**（存在秘匿・§1.6）。**コンセプト非依存プロジェクト（`quest_id` NULL）＝`is_quest_party` は常に false ＝ アクセスは owner＋`project_members` のみ**（イノベーション担当の継承なし）。
+**アクセス門番**＝`can_access_project(project, user) = (owner) OR is_project_member(project.id, user) OR is_quest_party(project.quest_id, user) OR is_in_access_group(project.id, user)`。いずれでもないユーザーは閲覧・操作とも **404 `not_found`**（存在秘匿・§1.6）。**コンセプト非依存プロジェクト（`quest_id` NULL）＝`is_quest_party` は常に false**（アクセスは owner＋`project_members`＋参加グループ現所属者）。
+
+- **参加グループ（アクセス条件）**＝`project_group_links`（データモデル §5.49c）に紐づく会社グループ（`quest_groups`）のいずれかに**現在有効所属**していれば参照＋チャット発言が可（**アクセスの都度、現在の所属で再判定**＝クエストの参加部署 C.0 と同思想・専用グループを作らず部署グループを流用）。作成/編集で `group_ids`（省略可・§Q.1）を差分反映。
 
 | 操作 | 必要な権限 | 補足 |
 | --- | --- | --- |
@@ -44,15 +46,17 @@
 
 | メソッド/パス | 概要 | リクエスト | レスポンス（主なデータ） |
 | --- | --- | --- | --- |
-| `POST /concepts/{concept_id}/project` | go コンセプトからプロジェクト起票（1コンセプト1プロジェクト） | パス: `concept_id`／ボディ: `{title?, description?, deployment?, members?〔{user_id,role}[]〕}`（既定 title=コンセプト名・内容で初期値） | 201 `project`（下記詳細）。既に存在すれば 409 `conflict`／`decision≠go` は 409 `invalid_state` |
-| `POST /projects` | **コンセプト非依存**の単純タスク管理プロジェクト作成（`concept_id`/`quest_id` NULL・2026-09-27 追加） | ボディ: `{title(必須), description?, deployment?, members?}` | 201 `project`。作成者が owner・アクセスは owner＋`project_members`（クエストパーティー継承なし・Q.0） |
-| `GET /projects` | プロジェクト一覧（SC-70・サーバー委譲 DataTable） | クエリ: §1.8（`q`/ソート/フィルタ＝`status`・`quest_id`・`concept_id`／進捗・担当で絞込） | `items[]`＝`{id, title, status, concept:{id,title}, quest:{id,title}, progress〔done/total〕, task_count, owner, updated_at}`・カーソル |
-| `GET /projects/{project_id}` | プロジェクト詳細（SC-71・合成） | パス: `project_id` | `project`＝`{id, title, description, status, deployment〔jsonb〕, external_link, concept, quest, owner, progress, my_permissions, created_at, updated_at}` |
-| `PATCH /projects/{project_id}` | プロジェクト編集（title/description/status/deployment/external_link） | パス＋ボディ（部分更新・無変更は info・デザイン標準 §14） | 200 `project` |
+| `POST /concepts/{concept_id}/project` | go コンセプトからプロジェクト起票（1コンセプト1プロジェクト） | パス: `concept_id`／ボディ: `{title?, description?, deployment?, members?〔{user_id,role}[]〕, group_ids?〔uuid[]〕}`（既定 title=コンセプト名・内容で初期値） | 201 `project`（下記詳細）。既に存在すれば 409 `conflict`／`decision≠go` は 409 `invalid_state` |
+| `POST /projects` | **コンセプト非依存**の単純タスク管理プロジェクト作成（`concept_id`/`quest_id` NULL・2026-09-27 追加） | ボディ: `{title(必須), description?, deployment?, members?, group_ids?}` | 201 `project`。作成者が owner・アクセスは owner＋`project_members`＋参加グループ（クエストパーティー継承なし・Q.0） |
+| `GET /projects` | プロジェクト一覧（SC-70・サーバー委譲 DataTable） | クエリ: §1.8（`q`/ソート/フィルタ＝`status`・`quest_id`・`concept_id`／進捗・担当で絞込） | `items[]`＝`{id, title, status, concept:{id,title}, quest:{id,title}, progress〔done/total〕, task_count, owner, updated_at}`・カーソル。**`deleted_at IS NULL` のみ** |
+| `GET /projects/{project_id}` | プロジェクト詳細（SC-71・合成） | パス: `project_id` | `project`＝`{id, title, description, status, deployment〔jsonb〕, external_link, concept, quest, owner, progress, group_ids〔uuid[]〕, viewer_domain, viewer_user_id, my_permissions}` |
+| `PATCH /projects/{project_id}` | プロジェクト編集（title/description/status/deployment/external_link／`group_ids`＝指定時のみ差分反映） | パス＋ボディ（部分更新・無変更は info・デザイン標準 §14） | 200 `project` |
+| `DELETE /projects/{project_id}` | プロジェクト削除（**ソフト削除**＝`deleted_at` 設定・2026-09-27 追加） | パス: `project_id` | 204。権限＝**起票者本人/quest管理者**（それ以外 403）。子データ（タスク/チャット/メンバー/グループ）は物理削除せず監査保持。削除後は同コンセプトから再起票可（部分ユニークが未削除限定・データモデル §5.49） |
 
 - 一覧は**サーバー委譲契約**（§1.8.1・列 flags ホワイトリスト）。`progress` は配下タスクの `done/total` 比率（サーバー算出・非永続）。
 - 起票導線＝SC-61 コンセプト詳細「開発を始める」（`decision='go'` かつ未起票時のみ活性）。起票後は「プロジェクトへ」リンク。
-- 詳細の `project` には**自分の領域**（`viewer_domain`＝`dev`/`innovation`/`both`）を含める＝UI の発言バッジ・見え方の出し分けに使う。
+- 詳細の `project` には**自分の領域**（`viewer_domain`＝`dev`/`innovation`/`both`）と `viewer_user_id`・**`group_ids`（参加グループ・アクセス条件）**を含める＝UI の発言バッジ・見え方の出し分け・グループ編集の初期値に使う。
+- **`group_ids`（参加グループ）**＝`quest_groups` の id 配列（会社の部署グループを流用）。作成時は初期セット、`PATCH` は指定時のみ差分反映（未指定＝据え置き）。存在しない id は 422。門番＝Q.0。
 
 ## Q.1b 開発メンバー（project_members・開発担当≠イノベーション担当）
 
@@ -94,7 +98,8 @@
 - **新規チャットEP は作らない**。タスク作成時に `chat_thread(owner_type='task', owner_id=tasks.id)` を冪等生成し、以降はチャット中核 EP（`E` の `/chat-threads/{thread_id}/messages` 系＝thread 駆動）をそのまま使う。
 - **門番＝`chat/application._resolve_host` に `task` 分岐を1つ追加**（`tasks.project_id → projects.quest_id` のパーティー権限へ委譲）。中核（メッセージ CRUD/リアクション/ピン/メンション/引用/添付）と DB は無改修（`chat_thread` の CHECK 制約を `task` 込みに広げる migration 0041 のみ）。
 - realtime＝`chat:{thread_id}`（L 既存）。frontend は共有 `IdeaChatView` を `taskSource` で駆動（同一 UI/機能）。
-- **将来「束ねて仕様に」**＝プロジェクト配下の全 thread を横断集約する read は後から追加（MVP は各タスクで会話できるまで）。
+- **🕒 最近の議論**＝`GET /projects/{project_id}/recent-chats`（SC-71 詳細の概要パネル右に配置・2026-09-27 追加）。当該プロジェクト配下タスクのチャットを**更新順**（既読/未読問わず）で返す＝`items[]`＝`{task_id, title, unread_chat_count, last_chat_at}`（既定 `limit=8`）。実装＝`chat_repo.task_threads_with_activity`（ダッシュボードの recent_chats と同形・対象をプロジェクト内タスクに限定）。門番＝`can_access_project`（Q.0）。
+- **将来「束ねて仕様に」**＝プロジェクト配下の全 thread を横断集約する read は後から追加（MVP は各タスクで会話＋最近の議論まで）。
 
 ## Q.5 外部PM連携（seam・Phase2）
 

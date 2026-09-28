@@ -42,7 +42,21 @@
 | `GET /concepts/{concept_id}` | コンセプト詳細（合成） | パス: `concept_id` | `concept`（§3.3 全項目＝problem/value_proposition/target/differentiation/solution_form/`viability`〔jsonb〕/decision/decision_rationale/status/is_selected）・`source_ideas[]`〔title/評価平均/選定〕・`assumptions[]`〔リンク＝`{assumption, criticality, is_stale}`・現在判定〕・`evaluation`（集計要約＝P.5）・`chat_scopes[]`（P.6）・`related_info[]`（**採用/裏付け/反証の情報リンク**＝`info_links` `target_type='concepts'`・N 委譲）・`my_permissions` |
 
 - 一覧は**サーバー委譲契約**（DataTable・§1.8.1・列 flags ホワイトリスト）。`draft` は本人のみ一覧に含める（D アイデアと同型）。
-- 詳細の `related_info` は N の read 合成を流用（採否〔disposition〕表示も FR-41 Phase2 と同型）。
+- 詳細の `related_info` は N の read 合成を流用（採否〔disposition〕表示も FR-41 と同型）。
+
+## P.1b 関連情報リンクの取得・採否（disposition・N 委譲／2026-09-27 追加）
+
+> 情報インプット（N）→コンセプト/前提への**関連情報リンク**の一覧と、**採否（disposition＝この情報の扱い）**設定。中核ロジックは N（`info.application.related_info_for_target`・`LinkDispositionRequest`）を**再利用**し、コンセプト/前提の門番で包む（横断EPを増やさず、対象ドメイン側にパスを生やす方針）。詳細（`GET /concepts/{id}`・`GET /assumptions/{id}`）の合成 `related_info[]` と同じデータを、単独取得したい画面向けに切り出したもの。
+
+| メソッド/パス | 概要 | リクエスト | レスポンス |
+| --- | --- | --- | --- |
+| `GET /concepts/{concept_id}/related-info` | コンセプトの関連情報リンク一覧 | パス／クエリ: `limit?` | `items[]`（`info_links` `target_type='concepts'`・種別〔採用/裏付け/反証〕・`can_dispose`） |
+| `GET /assumptions/{assumption_id}/related-info` | 前提の関連情報リンク一覧 | パス／クエリ: `limit?` | `items[]`（`target_type='assumptions'`・`can_dispose`） |
+| `PATCH /concepts/{concept_id}/related-info/{link_id}` | 情報リンクの採否設定 | ボディ: `{disposition, note?}` | 200 更新後リンク項目 |
+| `PATCH /assumptions/{assumption_id}/related-info/{link_id}` | 情報リンクの採否設定 | ボディ: `{disposition, note?}` | 200 更新後リンク項目 |
+
+- **採否可否（`can_dispose`）**＝コンセプトは**作成者＋owner/quest_admin**、前提は**作成者（`created_by_id`）＋owner/quest_admin**（read が算出して返す＝フロントは再実装しない）。範囲外は 403/404（門番＝P.0）。
+- **採否（disposition）は成果物側（コンセプト/前提）の状態**であって情報自体の棄却とは別概念（FR-41 と同型・[データモデル](../データモデル.md) `info_links`）。反証リンク（`kind=refuting`）は採否とは別に反証波及を発火（P.7）。
 
 ## P.2 コンセプトの登録・編集・状態遷移・選定・判定
 
