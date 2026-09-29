@@ -8,6 +8,8 @@ import { Modal, useSnackbar } from "@/components/ui";
 
 import { addStrategyQuests, fetchQuestCandidates, fetchStrategyQuests, removeStrategyQuest } from "../api";
 import type { QuestLinkItem } from "../types";
+import "@/features/info-input/info-input.css"; // 関連リンク/ピッカーの共通UI（link-*/pick-*）を流用（同一UI）
+import "../strategy.css";
 
 export function StrategyQuestLinks({ docId }: { docId: string }) {
   const snack = useSnackbar();
@@ -56,55 +58,81 @@ export function StrategyQuestLinks({ docId }: { docId: string }) {
     setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
-    <div className="dialog-section is-quiet">
-      <div className="field__labelrow">
-        <label>紐づくクエスト</label>
-        <button className="btn btn-outline btn-sm" type="button" onClick={() => { setSelected(new Set()); setQ(""); setPickerOpen(true); }}>
-          ＋ クエストを紐づける
-        </button>
-      </div>
-      <p className="hint">この経営資料を適用するクエストを選びます。配下アイデアの「方針との関連度」を算出する対象になります（変更はクエストの版履歴に記録）。</p>
+    <div className="field dialog-section is-quiet">
+      <div className="dialog-label">紐づくクエスト</div>
       {linked.length ? (
-        <div className="tagselect__chips">
+        <ul className="link-list">
           {linked.map((qt) => (
-            <span key={qt.id} className="tagselect__chip">{qt.title}
-              <button type="button" aria-label={`${qt.title} の紐づけを解除`} onClick={() => void remove(qt.id)}>✕</button>
-            </span>
+            <li key={qt.id} className="link-item">
+              <span className="link-item__title">{qt.title}</span>
+              <span className="badge badge-muted">{qt.status === "completed" ? "完了" : qt.status === "draft" ? "下書き" : "募集中"}</span>
+              <button type="button" className="link-item__rm" aria-label={`${qt.title} の紐づけを解除`} title="解除" onClick={() => void remove(qt.id)}>✕</button>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
-        <p className="hint">まだ紐づくクエストはありません。</p>
+        <div className="hint">紐づくクエストはまだありません。下から追加できます（このクエストの配下アイデアに整合率が付きます）。</div>
       )}
+      <div className="link-add">
+        <button className="btn btn-outline" type="button" onClick={() => { setSelected(new Set()); setQ(""); setPickerOpen(true); }}>🔍 クエストを選ぶ…</button>
+      </div>
+      <div className="hint">この経営資料を適用するクエストを選びます。配下アイデアの「方針との関連度」を算出する対象になります（変更はクエストの版履歴に記録）。</div>
 
-      {pickerOpen && (
-        <Modal open={pickerOpen} title="クエストを紐づける" size="md" onClose={() => setPickerOpen(false)}>
-          <div className="modal__body">
-            <div className="dt-search" style={{ marginBottom: "var(--space-3)" }}>
-              <span className="dt-search__ic" aria-hidden="true">🔍</span>
-              <input className="input" type="search" placeholder="クエスト名で検索…" aria-label="クエスト名検索" value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
-            <ul className="strategy-picklist">
-              {candidates.filter((c) => !linkedIds.has(c.id)).map((c) => (
-                <li key={c.id}>
-                  <label className="checkbox">
-                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
-                    {c.title}
-                  </label>
-                </li>
-              ))}
-              {candidates.filter((c) => !linkedIds.has(c.id)).length === 0 && (
-                <li className="hint">該当するクエストがありません。</li>
+      {pickerOpen && (() => {
+        const shown = candidates.filter((c) => !linkedIds.has(c.id));
+        const statusLabel = (s: string) => (s === "completed" ? "完了" : s === "draft" ? "下書き" : "募集中");
+        return (
+          <Modal open={pickerOpen} title="クエストを選ぶ" size="md" onClose={() => setPickerOpen(false)}>
+            <div className="modal__body">
+              {/* 絞り込み＝タイトルのみ（対象はクエスト固定＝種類フィルタ不要／設定する種別も不要）。 */}
+              <div className="pick-filters">
+                <div className="pick-filters__title">🔍 絞り込み</div>
+                <div className="pick-filter-row">
+                  <span className="pick-filter-lbl">タイトル</span>
+                  <div className="dt-search">
+                    <span className="dt-search__ic" aria-hidden="true">🔍</span>
+                    <input className="input" type="search" placeholder="タイトルで検索…" aria-label="タイトル検索" value={q} onChange={(e) => setQ(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="pick-divider" />
+              <div className="pick-results-title">📋 絞り込み結果</div>
+              <div className="pick-count-row">
+                <span className="pick-count">該当 {shown.length} 件 ・ 選択 {selected.size} 件</span>
+              </div>
+              {shown.length === 0 ? (
+                <div className="pick-empty">該当するクエストがありません。絞り込みを調整してください。</div>
+              ) : (
+                <ul className="pick-list" role="listbox" aria-label="クエスト候補">
+                  {shown.map((c) => {
+                    const on = selected.has(c.id);
+                    return (
+                      <li key={c.id} className={`pick-row${on ? " is-sel" : ""}`} role="option" aria-selected={on} onClick={() => toggle(c.id)}>
+                        <input type="checkbox" className="pick-row__check" checked={on} readOnly aria-label="選択" />
+                        <div className="pick-row__body">
+                          <div className="pick-row__title">
+                            <span className="badge badge-muted lk-type">クエスト</span>
+                            <span className="pick-row__title-t">{c.title}</span>
+                          </div>
+                          <div className="pick-row__ctx">{statusLabel(c.status)}</div>
+                        </div>
+                        <a className="pick-row__open" href={`/quests/${c.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>🔍 開く</a>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
-            </ul>
-          </div>
-          <div className="modal__footer">
-            <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(false)}>キャンセル</button>
-            <button className="btn btn-primary" type="button" onClick={() => void confirmAdd()} disabled={busy || !selected.size}>
-              {busy ? "追加中…" : `追加する（${selected.size}）`}
-            </button>
-          </div>
-        </Modal>
-      )}
+            </div>
+            <div className="modal__footer">
+              <button className="btn btn-outline" type="button" onClick={() => setPickerOpen(false)}>キャンセル</button>
+              <button className="btn btn-primary" type="button" onClick={() => void confirmAdd()} disabled={busy || !selected.size}>
+                {busy ? "追加中…" : "選択を確定"}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
