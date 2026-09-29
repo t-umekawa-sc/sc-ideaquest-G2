@@ -250,6 +250,8 @@ class IdeaDetailDTO(BaseModel):
     # この応答が「初回公開」の結果である時のみ、実際に付与した投稿 XP（+50）を載せる＝獲得フィードバック（#8）。
     # 参照系（取得/編集）や再公開・冪等スキップ時は 0。金額の正はサーバー（D 台帳 idea_post=+50）。
     xp_delta: int = 0
+    # 経営方針との整合（SC-22 バッジ・FR-44）。無ければ null（クエストが経営資料未選択／整合行なし）。
+    alignment: dict | None = None
 
 
 class IdeaIconImageResponse(BaseModel):

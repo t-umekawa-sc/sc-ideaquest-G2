@@ -333,6 +333,11 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
   const followDisabled = followBusy;
   const authorName = idea.author.display_name || "?";
   const stakeText = idea.stakeholders.map((s) => s.label).join("・") || "—";
+  // 経営方針との整合（SC-22 バッジ・FR-44）＝best＋どの方針＋獲得コイン（キーワードベースの関連度・正直表記）。
+  const align = (idea.alignment as {
+    best_score: number; best_strategy: { id: string; title: string }; coins_awarded: number;
+  } | null) ?? null;
+  const alignPct = align ? Math.round(align.best_score * 100) : 0;
   // 評価結果（F.1 集計）＝サーバー算出の my_permissions で UX 出し分け。
   const canEvaluate = !!evalAgg?.my_permissions?.includes("evaluate");
   const canSelect = !!evalAgg?.my_permissions?.includes("select");
@@ -391,6 +396,14 @@ export function IdeaDetailView({ ideaId }: { ideaId: string }) {
               <span className={stClass}>{stLabel}</span>
               {questCompleted && <span className="badge badge-muted" title="完了したクエストは投票/新規フォローが凍結されています">⏸ 完了（凍結）</span>}
               {!questCompleted && voteClosedByDeadline && <span className="badge badge-muted" title="締切日を過ぎたため投票は締め切られています">🔒 投票締切</span>}
+              {align && align.best_score > 0 && (
+                <span
+                  className={align.coins_awarded ? "badge badge-success" : "badge badge-muted"}
+                  title={`経営方針「${align.best_strategy.title}」との関連度（キーワードベース）${alignPct}%${align.coins_awarded ? `・獲得 ${align.coins_awarded} コイン` : ""}`}
+                >
+                  🎯 方針整合 {alignPct}%{align.coins_awarded ? ` ・ +${align.coins_awarded}🪙` : ""}
+                </span>
+              )}
             </div>
             {/* アイデアアイコン（個別→作成者既定→件名先頭1文字タイル〔クエストアクセント色〕・デザイン標準 Phase 3）を件名の左に表示。 */}
             <div className="idea-head__title">

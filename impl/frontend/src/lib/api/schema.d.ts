@@ -5825,6 +5825,10 @@ export interface components {
              * @default 0
              */
             xp_delta: number;
+            /** Alignment */
+            alignment?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * IdeaDiffField
