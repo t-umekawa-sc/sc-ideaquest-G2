@@ -110,13 +110,6 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
               <div className="pick-filters">
                 <div className="pick-filters__title">🔍 絞り込み</div>
                 <div className="pick-filter-row">
-                  <span className="pick-filter-lbl">タイトル</span>
-                  <div className="dt-search">
-                    <span className="dt-search__ic" aria-hidden="true">🔍</span>
-                    <input className="input" type="search" placeholder="タイトルで検索…" aria-label="タイトル検索" value={q} onChange={(e) => setQ(e.target.value)} />
-                  </div>
-                </div>
-                <div className="pick-filter-row">
                   <span className="pick-filter-lbl">ステータス</span>
                   <div className="pick-checks">
                     {STATUS_OPTS.map(([v, label]) => (
@@ -124,6 +117,13 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
                         <input type="checkbox" checked={statuses.has(v)} onChange={() => toggleStatus(v)} /><span>{label}</span>
                       </label>
                     ))}
+                  </div>
+                </div>
+                <div className="pick-filter-row">
+                  <span className="pick-filter-lbl">タイトル</span>
+                  <div className="dt-search">
+                    <span className="dt-search__ic" aria-hidden="true">🔍</span>
+                    <input className="input" type="search" placeholder="タイトルで検索…" aria-label="タイトル検索" value={q} onChange={(e) => setQ(e.target.value)} />
                   </div>
                 </div>
                 <div className="pick-filter-row">
@@ -156,7 +156,6 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
                         <input type="checkbox" className="pick-row__check" checked={on} readOnly aria-label="選択" />
                         <div className="pick-row__body">
                           <div className="pick-row__title">
-                            <span className="badge badge-muted lk-type">クエスト</span>
                             <span className="pick-row__title-t">{c.title}</span>
                             {c.deadline ? <span className="badge badge-muted pick-row__due">⏳ {c.deadline}</span> : null}
                           </div>
