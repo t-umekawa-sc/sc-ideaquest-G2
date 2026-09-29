@@ -25,8 +25,10 @@
 | `POST /strategy-documents` | 登録（管理者） | `{title, doc_kind, intent?, policy_commitment?, strategy?, focus_areas?[], objectives?, body_md?, period_from?, period_to?}` | 201＋詳細。`body_text` 連結＋`entity_tokens` 同期再生成（owner_type=strategy_doc） |
 | `GET /strategy-documents/{id}` | 詳細 | パス: `id` | `StrategyDocDetail`（全項目＋率集計＋関連アイデア/情報＋ワードクラウド上位） |
 | `PATCH /strategy-documents/{id}` | 編集（差分・管理者） | 変更フィールドのみ | 200＋詳細。`body_text` 再連結＋トークン再永続化＋配下アイデアの整合率再計算（許容バッチ） |
-| `POST /strategy-documents/{id}/archive` | アーカイブ（status=archived） | — | 200。整合率の母集団から外れる |
-| `DELETE /strategy-documents/{id}` | 削除（管理者） | — | 204。従属（entity_tokens owner=strategy_doc・idea_alignment）を先に削除 |
+| `POST /strategy-documents/{id}/archive` | **アーカイブ（論理削除）**＝status=archived | — | 200。選択候補（active）から外れる・**レコードは残す（監査保持）** |
+| `POST /strategy-documents/{id}/unarchive` | **復元**（archived→active・誤アーカイブの復元） | — | 200。選択候補に戻る |
+
+- **削除方式＝論理削除（アーカイブ）に統一**（プロジェクト慣例＝基本は論理削除・監査保持）。**物理削除 EP は設けない**（機微文書・参照〔quest_strategy_documents/idea_alignment〕を黙って壊さない）。「使わなくする」＝アーカイブ／「戻す」＝復元。
 
 - 検証（§4.7）＝`title` 必須・`doc_kind` はホワイトリスト（`midterm_plan`/`policy`/`strategy`/`other`）・`period_from<=period_to`・`focus_areas` は文字列配列。
 - `body_text` ＝ `intent`＋`policy_commitment`＋`strategy`＋`focus_areas`＋`objectives`＋`body_md` を連結（トークン化/検索の素材・§5.54）。

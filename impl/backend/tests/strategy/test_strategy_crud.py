@@ -113,7 +113,7 @@ def test_r_tc_105_authz_and_csrf(client, factory, docs):
 
 
 def test_r_tc_106_archive_excluded_from_selection(client, factory, docs):
-    """R-TC-106 アーカイブ＝status=archived・選択用一覧から除外される。"""
+    """R-TC-106 アーカイブ＝status=archived・選択用一覧から除外される（物理削除はしない＝論理削除）。"""
     _admin(client, factory)
     title = f"アーカイブ_{uuid.uuid4().hex[:6]}"
     did = uuid.UUID(client.post(BASE, json=_body(title), headers=_csrf(client)).json()["id"]); docs.append(did)
@@ -121,3 +121,16 @@ def test_r_tc_106_archive_excluded_from_selection(client, factory, docs):
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
     sel = client.get(f"{BASE}?for=selection&q={title}").json()["data"]
     assert not any(d["id"] == str(did) for d in sel), "archived は選択用一覧に出ない"
+
+
+def test_r_tc_107_unarchive_restores(client, factory, docs):
+    """R-TC-107 復元（アーカイブ解除）＝status=active に戻り、選択用一覧に再び出る（誤アーカイブの復元）。"""
+    _admin(client, factory)
+    title = f"復元_{uuid.uuid4().hex[:6]}"
+    did = uuid.UUID(client.post(BASE, json=_body(title), headers=_csrf(client)).json()["id"]); docs.append(did)
+    client.post(f"{BASE}/{did}/archive", headers=_csrf(client))
+    r = client.post(f"{BASE}/{did}/unarchive", headers=_csrf(client))
+    assert r.status_code == 200 and r.json()["status"] == "active"
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    sel = client.get(f"{BASE}?for=selection&q={title}").json()["data"]
+    assert any(d["id"] == str(did) for d in sel), "復元後は選択用一覧に再び出る"

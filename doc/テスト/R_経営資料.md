@@ -15,7 +15,8 @@
 | R-TC-103 | api | 選択用一覧はクエスト作成者可・active のみ・軽量 | admin で1件作成 | 一般ユーザーで `GET ?for=selection&q=` | 200・作成分を含む・キーは `{id,title,doc_kind,period_from,period_to}` のみ（全文/率なし） | R.0／R.1 |
 | R-TC-104 | api | 更新＝反映＋トークン再永続化／doc_kind 不正・期間逆転は 422 | admin で1件作成 | `PATCH`（strategy 変更）／`PATCH`（doc_kind=bogus）／`PATCH`（period_from>period_to） | 前者200・反映／後2つ 422（field=doc_kind／period_to） | R.1／§4.7 |
 | R-TC-105 | api | 変更系の CSRF/認可 | admin／一般 | CSRF 無し `POST`／一般ユーザー `POST`（CSRF有） | いずれも 403（csrf_failed／forbidden） | R.0／A.0 |
-| R-TC-106 | api | アーカイブ＝status=archived・選択用一覧から除外 | admin で1件作成 | `POST /{id}/archive`→一般で `?for=selection` | archived・選択用一覧に出ない（active のみ） | R.1／R.0 |
+| R-TC-106 | api | アーカイブ（論理削除）＝status=archived・選択用一覧から除外（物理削除はしない） | admin で1件作成 | `POST /{id}/archive`→一般で `?for=selection` | archived・選択用一覧に出ない（active のみ）・レコードは残る | R.1／R.0 |
+| R-TC-107 | api | 復元（アーカイブ解除）＝active に戻り選択用一覧に再掲（誤アーカイブの復元） | admin で1件作成→archive | `POST /{id}/unarchive`→一般で `?for=selection` | status=active・選択用一覧に再び出る | R.1 |
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 

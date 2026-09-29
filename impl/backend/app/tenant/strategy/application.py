@@ -9,8 +9,6 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import delete
-
 from app.control_plane.auth.orm import Company
 from app.core.errors import AppError
 from app.db.control import control_session
@@ -19,8 +17,6 @@ from app.tenant.profile import repository as profile_repo
 from app.tenant.profile.orm import User
 from app.tenant.strategy import repository as repo
 from app.tenant.strategy.schemas import DOC_KINDS
-from app.tenant.tokens import repository as tokens_repo
-from app.tenant.tokens.orm import EntityToken
 
 _TEXT_FIELDS = ("intent", "policy_commitment", "strategy", "objectives", "body_md")
 
@@ -165,7 +161,8 @@ def archive_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) 
     return payload
 
 
-def delete_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> None:
+def unarchive_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
+    """アーカイブ解除（archived→active・R.1）＝クエストの選択候補に戻す（誤アーカイブの復元）。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
@@ -174,10 +171,15 @@ def delete_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -
         doc = repo.get_document(ts, did)
         if doc is None:
             raise AppError(404, "not_found")
-        # 従属＝entity_tokens（soft ref・手動削除）／idea_alignment・quest_strategy_documents は FK ondelete CASCADE。
-        ts.execute(delete(EntityToken).where(EntityToken.owner_type == "strategy_doc", EntityToken.owner_id == did))
-        repo.delete_document(ts, did)
+        doc.status = "active"
+        doc.updated_at = datetime.now(timezone.utc)
+        payload = _detail(ts, doc)
         ts.commit()
+    return payload
+
+
+# 物理削除は設けない（プロジェクト慣例＝基本は論理削除。経営資料は機微・監査保持のためアーカイブ＝§5.54/§R.1）。
+# 使わなくする＝archive_document（status=archived）／戻す＝unarchive_document。
 
 
 # ---- 選択用一覧（R.0・クエスト作成者） ----

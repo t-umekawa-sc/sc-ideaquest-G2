@@ -74,8 +74,9 @@ def archive_strategy_document(doc_id: str, request: Request,
     return service.archive_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
 
 
-@router.delete("/strategy-documents/{doc_id}", status_code=204,
-               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
-def delete_strategy_document(doc_id: str, request: Request,
-                             session: dict = Depends(require_company_account_admin)):
-    service.delete_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+@router.post("/strategy-documents/{doc_id}/unarchive", response_model=StrategyDocDetail,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def unarchive_strategy_document(doc_id: str, request: Request,
+                                session: dict = Depends(require_company_account_admin)):
+    # アーカイブ解除（誤アーカイブの復元）。物理削除は設けない（基本は論理削除・R.1）。
+    return service.unarchive_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)

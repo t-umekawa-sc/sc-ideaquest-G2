@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataTable, RowMenu, useConfirm, useSnackbar } from "@/components/ui";
 import type { DataTableColumn, QueryState, RowMenuItem, ServerResult } from "@/components/ui";
 
-import { archiveStrategyDoc, deleteStrategyDoc, fetchStrategyDocs, STRATEGY_CHANGED_EVENT } from "../api";
+import { archiveStrategyDoc, fetchStrategyDocs, STRATEGY_CHANGED_EVENT, unarchiveStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
 import type { StrategyDocListItem } from "../types";
 import "../strategy.css";
@@ -39,7 +39,7 @@ export function StrategyListView() {
     [refreshToken],
   );
 
-  // 操作メニューの並び＝統一順（編集→複製→アーカイブ→削除・デザイン標準 §4.5 複製標準）。
+  // 操作メニューの並び＝統一順（編集→複製→アーカイブ/復元・デザイン標準 §4.5）。物理削除は設けない（基本は論理削除＝アーカイブ）。
   const menuItems = useCallback((r: StrategyDocListItem): RowMenuItem[] => {
     const list: RowMenuItem[] = [
       { label: "編集", onClick: () => router.push(`/strategy-documents/${r.id}/edit`) },
@@ -50,25 +50,23 @@ export function StrategyListView() {
       list.push({
         label: "アーカイブ",
         onClick: async () => {
-          const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（クエストの選択候補から外れます）` });
+          const ok = await confirm({ title: "アーカイブ", msg: `「${r.title}」をアーカイブしますか？（クエストの選択候補から外れます・記録は残ります）` });
           if (!ok) return;
           await archiveStrategyDoc(r.id).catch(() => null);
           snack({ type: "success", title: "アーカイブしました" });
           setRefreshToken((n) => n + 1);
         },
       });
+    } else {
+      list.push({
+        label: "復元",
+        onClick: async () => {
+          await unarchiveStrategyDoc(r.id).catch(() => null);
+          snack({ type: "success", title: "復元しました（有効に戻しました）" });
+          setRefreshToken((n) => n + 1);
+        },
+      });
     }
-    list.push({
-      label: "削除",
-      danger: true,
-      onClick: async () => {
-        const ok = await confirm({ title: "経営資料を削除", msg: `「${r.title}」を削除しますか？（取り消せません）`, variant: "danger" });
-        if (!ok) return;
-        await deleteStrategyDoc(r.id).catch(() => null);
-        snack({ type: "success", title: "削除しました" });
-        setRefreshToken((n) => n + 1);
-      },
-    });
     return list;
   }, [router, confirm, snack]);
 

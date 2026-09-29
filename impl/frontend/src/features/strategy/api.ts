@@ -58,6 +58,7 @@ export function archiveStrategyDoc(id: string): Promise<StrategyDocDetail | null
   return apiFetch<StrategyDocDetail>(`/strategy-documents/${id}/archive`, { method: "POST" });
 }
 
-export function deleteStrategyDoc(id: string): Promise<null> {
-  return apiFetch<null>(`/strategy-documents/${id}`, { method: "DELETE" });
+// 復元（アーカイブ解除）。物理削除は設けない（基本は論理削除＝アーカイブ・R.1）。
+export function unarchiveStrategyDoc(id: string): Promise<StrategyDocDetail | null> {
+  return apiFetch<StrategyDocDetail>(`/strategy-documents/${id}/unarchive`, { method: "POST" });
 }

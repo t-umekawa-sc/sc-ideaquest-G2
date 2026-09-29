@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
@@ -66,7 +66,4 @@ def selection_list(session: Session, *, q: str | None) -> list[StrategyDocument]
     ).scalars().all())
 
 
-def delete_document(session: Session, doc_id: uuid.UUID) -> None:
-    """物理削除（従属＝entity_tokens〔owner='strategy_doc'〕・idea_alignment・quest_strategy_documents は
-    FK ondelete/呼び出し側で除去。ここでは本体行のみ）。"""
-    session.execute(delete(StrategyDocument).where(StrategyDocument.id == doc_id))
+# 物理削除は設けない（基本は論理削除＝アーカイブ・§R.1）。
