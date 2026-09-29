@@ -18,6 +18,12 @@ const TYPES: { v: InfoLinkTarget; label: string }[] = [
   { v: "quests", label: LINK_TARGET_LABEL.quests },
 ];
 const PAGE = 10;
+// 候補の文脈に出るステータスを日本語化（クエスト/アイデア/コンセプト横断・英語 enum → 日本語表示）。
+const STATUS_JP: Record<string, string> = {
+  draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了",
+  published: "公開", active: "検討中", go: "Go", pivot: "Pivot", kill: "Kill", archived: "アーカイブ",
+};
+const statusJp = (s?: string | null): string | null => (s ? STATUS_JP[s] ?? s : null);
 const uid = (c: InfoLinkCandidate) => `${c.target_type}:${c.target_id}`;
 const openHref = (c: InfoLinkCandidate) =>
   c.target_type === "ideas" ? `/ideas/${c.target_id}` : c.target_type === "quests" ? `/quests/${c.target_id}`
@@ -153,8 +159,8 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
             {shown.map((c) => {
               const on = sel.has(uid(c));
               const ctx = c.target_type === "ideas"
-                ? [c.quest_title ? `📜${c.quest_title}` : null, c.owner_name, c.status, c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・")
-                : [c.owner_name, c.status, c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・");
+                ? [c.quest_title ? `📜${c.quest_title}` : null, c.owner_name, statusJp(c.status), c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・")
+                : [c.owner_name, statusJp(c.status), c.created_at ? `作成 ${c.created_at}` : null].filter(Boolean).join("・");
               return (
                 <li key={uid(c)} className={`pick-row${on ? " is-sel" : ""}`} role="option" aria-selected={on} onClick={() => toggleSel(c)}>
                   <input type="checkbox" className="pick-row__check" checked={on} readOnly aria-label="選択" />

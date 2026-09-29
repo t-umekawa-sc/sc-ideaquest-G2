@@ -7806,6 +7806,12 @@ export interface components {
             title: string;
             /** Status */
             status: string;
+            /** Deadline */
+            deadline?: string | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Created At */
+            created_at?: string | null;
         };
         /** QuestLinkListResponse */
         QuestLinkListResponse: {
@@ -16527,6 +16533,9 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                status?: string | null;
+                deadline_from?: string | null;
+                deadline_to?: string | null;
             };
             header?: never;
             path?: never;

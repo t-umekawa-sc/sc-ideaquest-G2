@@ -69,9 +69,16 @@ export async function fetchStrategyQuests(id: string, signal?: AbortSignal): Pro
   return res?.data ?? [];
 }
 
-export async function fetchQuestCandidates(q?: string, signal?: AbortSignal): Promise<QuestLinkItem[]> {
-  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
-  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/quest-candidates${qs}`, { signal });
+export async function fetchQuestCandidates(
+  opts: { q?: string; statuses?: string[]; deadlineFrom?: string; deadlineTo?: string } = {},
+  signal?: AbortSignal,
+): Promise<QuestLinkItem[]> {
+  const qs = new URLSearchParams();
+  if (opts.q) qs.set("q", opts.q);
+  if (opts.statuses?.length) qs.set("status", opts.statuses.join(","));
+  if (opts.deadlineFrom) qs.set("deadline_from", opts.deadlineFrom);
+  if (opts.deadlineTo) qs.set("deadline_to", opts.deadlineTo);
+  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/quest-candidates?${qs.toString()}`, { signal });
   return res?.data ?? [];
 }
 

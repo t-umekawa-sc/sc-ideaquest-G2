@@ -102,6 +102,9 @@ class QuestLinkItem(BaseModel):
     id: str
     title: str
     status: str
+    deadline: date | None = None      # 期限（締切）＝ピッカーの ⏳ バッジ・期限絞り込み
+    owner_name: str | None = None     # 所有者（作成者）＝文脈行
+    created_at: datetime | None = None  # 作成日時＝文脈行
 
 
 class QuestLinkListResponse(BaseModel):

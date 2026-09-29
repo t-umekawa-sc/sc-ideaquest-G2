@@ -71,23 +71,41 @@ def selection_list(session: Session, *, q: str | None) -> list[StrategyDocument]
 
 # ---- クエスト↔経営資料リンク（quest_strategy_documents・§5.56・R.1b） ----
 
-def quest_candidates(session: Session, *, q: str | None = None, limit: int = 50) -> list:
-    """全社の有効クエスト（非削除）を候補として返す＝(id, title, status)（管理者が紐づけ対象を選ぶ・R.0）。"""
+def quest_candidates(session: Session, *, q: str | None = None, statuses: list[str] | None = None,
+                     deadline_from=None, deadline_to=None, limit: int = 50) -> list:
+    """全社の有効クエスト（非削除）を候補として返す（管理者が紐づけ対象を選ぶ・R.0）。
+
+    絞り込み＝タイトル(q)／ステータス(statuses)／期限(deadline_from..deadline_to・未設定は範囲指定時に除外)。
+    返り値＝(id, title, status, deadline, owner_name, created_at)。
+    """
+    from app.tenant.profile.orm import User
     from app.tenant.quests.orm import Quest
     conds = [Quest.deleted_at.is_(None)]
     if q:
         conds.append(Quest.title.ilike(f"%{q}%"))
+    if statuses:
+        conds.append(Quest.status.in_(statuses))
+    if deadline_from:
+        conds.append(Quest.deadline.isnot(None))
+        conds.append(Quest.deadline >= deadline_from)
+    if deadline_to:
+        conds.append(Quest.deadline.isnot(None))
+        conds.append(Quest.deadline <= deadline_to)
     return session.execute(
-        select(Quest.id, Quest.title, Quest.status).where(*conds).order_by(Quest.title).limit(limit)
+        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at)
+        .join(User, User.id == Quest.owner_id, isouter=True)
+        .where(*conds).order_by(Quest.title).limit(limit)
     ).all()
 
 
 def quests_for_doc(session: Session, doc_id: uuid.UUID) -> list:
-    """当該経営資料に紐づく（適用中の）クエスト＝(id, title, status)。"""
+    """当該経営資料に紐づく（適用中の）クエスト＝(id, title, status, deadline, owner_name, created_at)。"""
+    from app.tenant.profile.orm import User
     from app.tenant.quests.orm import Quest
     return session.execute(
-        select(Quest.id, Quest.title, Quest.status)
+        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at)
         .join(QuestStrategyDocument, QuestStrategyDocument.quest_id == Quest.id)
+        .join(User, User.id == Quest.owner_id, isouter=True)
         .where(QuestStrategyDocument.strategy_document_id == doc_id, Quest.deleted_at.is_(None))
         .order_by(Quest.title)
     ).all()

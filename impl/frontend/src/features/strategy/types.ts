@@ -38,11 +38,20 @@ export interface StrategyDocDetail {
   updated_at: string;
 }
 
+// クエスト状態の日本語ラベル（英語 enum → 日本語表示・全画面共通）。
+export const QUEST_STATUS_LABEL: Record<string, string> = {
+  draft: "下書き", recruiting: "募集中", in_progress: "進行中", evaluating: "評価中", completed: "完了",
+};
+export const questStatusLabel = (s: string): string => QUEST_STATUS_LABEL[s] ?? s;
+
 // 紐づくクエスト（R.1b・§5.56）。
 export interface QuestLinkItem {
   id: string;
   title: string;
   status: string;
+  deadline?: string | null;
+  owner_name?: string | null;
+  created_at?: string | null;
 }
 
 export interface StrategyDocSelectionItem {

@@ -9,8 +9,9 @@ import { ApiError } from "@/lib/api/client";
 
 import { cloudTokens } from "@/features/info-input/wordcloud";
 
-import { createStrategyDoc, emitStrategyChanged, getStrategyDoc, updateStrategyDoc } from "../api";
+import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
+import type { QuestLinkItem } from "../types";
 import type { StrategyDocInput } from "../types";
 import { StrategyQuestLinks } from "./StrategyQuestLinks";
 import "../strategy.css";
@@ -75,6 +76,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [periodFrom, setPeriodFrom] = useState("");
   const [periodTo, setPeriodTo] = useState("");
   const [cloud, setCloud] = useState<[string, number][] | null>(null); // この資料の主要語（プレビュー・情報登録と同一UI）
+  const [questLinks, setQuestLinks] = useState<QuestLinkItem[]>([]); // 紐づくクエスト（編集＝API即時／登録＝ステージ）
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [periodErr, setPeriodErr] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -134,7 +136,11 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
     };
     try {
       if (editing && docId) await updateStrategyDoc(docId, input);
-      else await createStrategyDoc(input); // 新規・複製とも create
+      else {
+        const created = await createStrategyDoc(input); // 新規・複製とも create
+        // 登録時にステージした紐づくクエストを保存後に一括反映（編集時は即時反映済み）。
+        if (created && questLinks.length) await addStrategyQuests(created.id, questLinks.map((x) => x.id));
+      }
       emitStrategyChanged();
       onDone();
     } catch (err) {
@@ -216,27 +222,30 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
         </Field>
 
         {/* この資料の主要語（情報登録ダイアログと同一 UI＝キーワード抽出＋ワードクラウド）。保存時に entity_tokens〔janome〕へ。 */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-          <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
-        </div>
-        <div className="wc-preview">
-          <div className="dialog-label">☁️ この資料の主要語（ワードクラウド）</div>
-          {cloud === null ? (
-            <span className="hint">「🔑 キーワードを抽出」を押すと、入力内容から主要語を抽出して表示します（整合率の関連度に効きます）。</span>
-          ) : cloud.length ? (
-            <div className="wc-mini">
-              {cloud.map(([w, c]) => {
-                const max = Math.max(...cloud.map((x) => x[1]), 1);
-                return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 0.9).toFixed(2)}rem` }} title={`${w}（${c}）`}>{w}</span>;
-              })}
-            </div>
-          ) : (
-            <span className="hint">入力が空です。意図・方針・戦略などを入力してから抽出してください。</span>
-          )}
+        <div className="field dialog-section is-quiet">
+          <label>この資料の主要語</label>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+            <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
+          </div>
+          <div className="wc-preview">
+            <div className="dialog-label">☁️ この資料の主要語（ワードクラウド）</div>
+            {cloud === null ? (
+              <span className="hint">「🔑 キーワードを抽出」を押すと、入力内容から主要語を抽出して表示します（整合率の関連度に効きます）。</span>
+            ) : cloud.length ? (
+              <div className="wc-mini">
+                {cloud.map(([w, c]) => {
+                  const max = Math.max(...cloud.map((x) => x[1]), 1);
+                  return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 0.9).toFixed(2)}rem` }} title={`${w}（${c}）`}>{w}</span>;
+                })}
+              </div>
+            ) : (
+              <span className="hint">入力が空です。意図・方針・戦略などを入力してから抽出してください。</span>
+            )}
+          </div>
         </div>
 
-        {/* 紐づくクエスト（編集時のみ＝保存済みの資料に対して設定・R.1b）。 */}
-        {editing && docId && <StrategyQuestLinks docId={docId} />}
+        {/* 紐づくクエスト（登録＝ステージ／編集＝API即時・R.1b）。他項目と同じ .field dialog-section で間隔/見出しを統一。 */}
+        <StrategyQuestLinks docId={docId} value={questLinks} onChange={setQuestLinks} />
       </div>
       <div className="modal__footer">
         <button className="btn btn-outline" type="button" onClick={onCancel}>キャンセル</button>

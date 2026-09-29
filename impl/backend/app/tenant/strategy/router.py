@@ -52,9 +52,13 @@ def list_strategy_documents(
 
 # 紐づくクエストの候補検索（全社の有効クエスト・R.1b）。※/{doc_id} より前に定義（パス衝突回避）。
 @router.get("/strategy-documents/quest-candidates", response_model=QuestLinkListResponse)
-def strategy_quest_candidates(request: Request, q: str | None = None,
+def strategy_quest_candidates(request: Request, q: str | None = None, status: str | None = None,
+                              deadline_from: str | None = None, deadline_to: str | None = None,
                               session: dict = Depends(require_company_account_admin)):
-    return service.quest_candidates(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), q=q)
+    statuses = [s for s in (status or "").split(",") if s] or None
+    return service.quest_candidates(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                                    q=q, statuses=statuses, deadline_from=deadline_from or None,
+                                    deadline_to=deadline_to or None)
 
 
 @router.get("/strategy-documents/{doc_id}", response_model=StrategyDocDetail)

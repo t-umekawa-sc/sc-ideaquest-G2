@@ -200,16 +200,24 @@ def selection_list(account_id: uuid.UUID, company_id: uuid.UUID, *, q) -> dict:
 # ---- クエスト↔経営資料リンク（R.1b・§5.56・版履歴＝quest_revision） ----
 
 def _quest_link_item(row) -> dict:
-    return {"id": str(row[0]), "title": row[1], "status": row[2]}
+    # row=(id, title, status, deadline, owner_name, created_at)
+    return {
+        "id": str(row[0]), "title": row[1], "status": row[2],
+        "deadline": row[3] if len(row) > 3 else None,
+        "owner_name": row[4] if len(row) > 4 else None,
+        "created_at": row[5] if len(row) > 5 else None,
+    }
 
 
-def quest_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *, q) -> dict:
-    """紐づけ候補＝全社の有効クエスト（管理者・R.0）。"""
+def quest_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *, q, statuses=None,
+                     deadline_from=None, deadline_to=None) -> dict:
+    """紐づけ候補＝全社の有効クエスト（管理者・R.0）＝タイトル/ステータス/期限で絞り込み。"""
     company = _resolve_company(company_id)
     if company is None:
         raise AppError(401, "unauthenticated")
     with get_tenant_session(company.db_identifier) as ts:
-        return {"data": [_quest_link_item(r) for r in repo.quest_candidates(ts, q=q)]}
+        rows = repo.quest_candidates(ts, q=q, statuses=statuses, deadline_from=deadline_from, deadline_to=deadline_to)
+        return {"data": [_quest_link_item(r) for r in rows]}
 
 
 def linked_quests(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
