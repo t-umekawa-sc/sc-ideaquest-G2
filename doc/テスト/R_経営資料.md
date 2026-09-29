@@ -25,7 +25,7 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| _（Step3 で追加）_ | | | | | | |
+| R-TC-201 | int | 整合率＝母集合（クエストの選択資料）でキーワード cosine を算出→best・効いた語を idea_alignment に保存／best 段階でコイン初回付与（冪等） | アイデア・経営資料・quest_strategy_documents・両者の entity_tokens（cosine≈0.924）をシード | `alignment.recompute_for_idea(award=True)`×2 | best≥0.9／idea_alignment 1行・matched_tokens に「脱炭素」／`alignment_payload` の best_strategy=当該資料・coins_awarded=15／コイン付与は初回のみ（activities 1件・exists_ref 冪等） | R.2／R.3／§5.55 |
 
 ## 3. 機会/脅威/影響率（R.4・Step4）
 

@@ -140,6 +140,10 @@ def update_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *
         doc.updated_at = datetime.now(timezone.utc)
         ts.flush()
         _persist_tokens(ts, doc)  # 本文変更でトークン再永続化（整合率へ反映）
+        # 本文変更＝この資料を適用中の各クエストの配下アイデアの整合率を再計算（コインは維持・R.2）。
+        from app.tenant.strategy import alignment as strat_align
+        for qid in repo.quest_ids_for_doc(ts, did):
+            strat_align.recompute_for_quest(ts, qid)
         payload = _detail(ts, doc)
         ts.commit()
     return payload
@@ -245,6 +249,7 @@ def add_quest_links(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *
             raise AppError(404, "not_found")
         from app.tenant.quests import application as quests_app
         from app.tenant.quests import repository as quests_repo
+        from app.tenant.strategy import alignment as strat_align
         for raw in quest_ids:
             qid = _parse_uuid(raw)
             quest = quests_repo.get_quest(ts, qid)
@@ -252,6 +257,7 @@ def add_quest_links(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *
                 continue  # 無効クエストはスキップ（存在秘匿）
             if repo.add_quest_link(ts, did, qid):
                 quests_app._record_quest_revision_if_changed(ts, quest, user.id)  # 適用資料の変更＝版履歴
+                strat_align.recompute_for_quest(ts, qid)  # 配下アイデアの整合率を再計算（コインは維持・R.3）
         payload = {"data": [_quest_link_item(r) for r in repo.quests_for_doc(ts, did)]}
         ts.commit()
     return payload
@@ -272,10 +278,12 @@ def remove_quest_link(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str,
             raise AppError(404, "not_found")
         from app.tenant.quests import application as quests_app
         from app.tenant.quests import repository as quests_repo
+        from app.tenant.strategy import alignment as strat_align
         quest = quests_repo.get_quest(ts, qid)
         repo.remove_quest_link(ts, did, qid)
         if quest is not None:
             quests_app._record_quest_revision_if_changed(ts, quest, user.id)  # 適用資料の変更＝版履歴
+            strat_align.recompute_for_quest(ts, qid)  # 配下アイデアの整合率を再計算（母集合から外す・R.3）
         payload = {"data": [_quest_link_item(r) for r in repo.quests_for_doc(ts, did)]}
         ts.commit()
     return payload

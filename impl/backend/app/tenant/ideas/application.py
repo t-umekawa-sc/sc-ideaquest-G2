@@ -333,6 +333,9 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
             from app.tenant.info import application as info_app
             info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
             info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
+            # 経営方針との整合率を再計算＋段階コイン付与（初回のみ・FR-44・R.2/R.3）。
+            from app.tenant.strategy import alignment as strat_align
+            strat_align.recompute_for_idea(ts, idea, award=True)
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -363,6 +366,9 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         from app.tenant.info import application as info_app
         info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
         info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
+        # 経営方針との整合率を再計算＋段階コイン付与（初回のみ・FR-44・R.2/R.3）。
+        from app.tenant.strategy import alignment as strat_align
+        strat_align.recompute_for_idea(ts, idea, award=True)
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         q_id = idea.quest_id
@@ -863,7 +869,14 @@ def _build_detail(ts, idea, viewer_id) -> dict:
         "is_mine": str(idea.author_id) == str(viewer_id),
         "my_permissions": my_permissions,
         "my_state": "draft" if idea.status == "draft" and idea.author_id == viewer_id else "member",
+        # 経営方針との整合（SC-22 バッジ・FR-44）＝best＋どの方針＋効いた語＋獲得コイン。無ければ null。
+        "alignment": _alignment_payload(ts, idea),
     }
+
+
+def _alignment_payload(ts, idea) -> dict | None:
+    from app.tenant.strategy import alignment as strat_align
+    return strat_align.alignment_payload(ts, idea)
 
 
 def _author_dto(user, author_id) -> dict:

@@ -5,12 +5,13 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
-from app.tenant.strategy.orm import QuestStrategyDocument, StrategyDocument
+from app.tenant.strategy.orm import IdeaAlignment, QuestStrategyDocument, StrategyDocument
 
 _SORT_COLUMNS = {
     "updated_at": StrategyDocument.updated_at,
@@ -131,6 +132,64 @@ def remove_quest_link(session: Session, doc_id: uuid.UUID, quest_id: uuid.UUID) 
         delete(QuestStrategyDocument)
         .where(QuestStrategyDocument.strategy_document_id == doc_id, QuestStrategyDocument.quest_id == quest_id)
     )
+
+
+def doc_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストが適用中の経営資料ID（整合率の母集合・§5.56）。"""
+    return list(session.execute(
+        select(QuestStrategyDocument.strategy_document_id).where(QuestStrategyDocument.quest_id == quest_id)
+    ).scalars().all())
+
+
+def quest_ids_for_doc(session: Session, doc_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該経営資料を適用中のクエストID（資料更新時の再計算対象・§5.56）。"""
+    return list(session.execute(
+        select(QuestStrategyDocument.quest_id).where(QuestStrategyDocument.strategy_document_id == doc_id)
+    ).scalars().all())
+
+
+# ---- 整合率（idea_alignment・§5.55・R.2） ----
+
+def upsert_alignment(session: Session, idea_id: uuid.UUID, doc_id: uuid.UUID, *, score: float,
+                     method: str = "keyword", matched_tokens=None) -> None:
+    """(idea, doc) の整合率を upsert（UNIQUE(idea_id, strategy_document_id)）。"""
+    row = session.execute(
+        select(IdeaAlignment).where(IdeaAlignment.idea_id == idea_id, IdeaAlignment.strategy_document_id == doc_id)
+    ).scalars().first()
+    if row is None:
+        session.add(IdeaAlignment(idea_id=idea_id, strategy_document_id=doc_id,
+                                  score=Decimal(str(round(score, 3))), method=method, matched_tokens=matched_tokens))
+    else:
+        row.score = Decimal(str(round(score, 3)))
+        row.method = method
+        row.matched_tokens = matched_tokens
+
+
+def prune_alignment(session: Session, idea_id: uuid.UUID, keep_doc_ids: list[uuid.UUID]) -> None:
+    """当該アイデアの整合率行のうち、現在の母集合に無い経営資料の分を削除（選択解除の反映）。"""
+    conds = [IdeaAlignment.idea_id == idea_id]
+    if keep_doc_ids:
+        conds.append(IdeaAlignment.strategy_document_id.notin_(keep_doc_ids))
+    session.execute(delete(IdeaAlignment).where(*conds))
+
+
+def alignments_for_idea(session: Session, idea_id: uuid.UUID) -> list:
+    """当該アイデアの整合率一覧＝(score, method, matched_tokens, doc_id, doc_title)（最大採用/ブレイクダウン用）。"""
+    return session.execute(
+        select(IdeaAlignment.score, IdeaAlignment.method, IdeaAlignment.matched_tokens,
+               StrategyDocument.id, StrategyDocument.title)
+        .join(StrategyDocument, StrategyDocument.id == IdeaAlignment.strategy_document_id)
+        .where(IdeaAlignment.idea_id == idea_id)
+        .order_by(IdeaAlignment.score.desc())
+    ).all()
+
+
+def published_idea_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該クエストの公開アイデアID（クエストの資料選択変更で整合率を再計算する対象）。"""
+    from app.tenant.ideas.orm import Idea
+    return list(session.execute(
+        select(Idea.id).where(Idea.quest_id == quest_id, Idea.deleted_at.is_(None), Idea.status == "published")
+    ).scalars().all())
 
 
 def strategy_titles_for_quest(session: Session, quest_id: uuid.UUID) -> list[str]:
