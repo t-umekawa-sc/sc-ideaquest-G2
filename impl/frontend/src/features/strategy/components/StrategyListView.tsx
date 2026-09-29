@@ -39,9 +39,12 @@ export function StrategyListView() {
     [refreshToken],
   );
 
+  // 操作メニューの並び＝統一順（編集→複製→アーカイブ→削除・デザイン標準 §4.5 複製標準）。
   const menuItems = useCallback((r: StrategyDocListItem): RowMenuItem[] => {
     const list: RowMenuItem[] = [
       { label: "編集", onClick: () => router.push(`/strategy-documents/${r.id}/edit`) },
+      // 複製＝登録ダイアログを「追加モード」で選択行の値をプリフィルして開く（別レコード新規作成・§複製標準）。
+      { label: "複製", onClick: () => router.push(`/strategy-documents/new?from=${r.id}`) },
     ];
     if (r.status === "active") {
       list.push({
@@ -100,6 +103,26 @@ export function StrategyListView() {
         onRowClick={(r) => router.push(`/strategy-documents/${r.id}/edit`)}
         pins={false}
         emptyText="経営資料がまだありません。「＋ 経営資料を登録」から追加してください。"
+        defaultView="card"
+        cardRaw={(r) => (
+          // ⋮ は Link の外（兄弟）に置く＝アンカー内 button の不正 HTML を避ける（ProjectCard §4.5 と同方式）。
+          <div className="strategy-card" style={{ position: "relative" }}>
+            <Link className="card card-accent" href={`/strategy-documents/${r.id}/edit`}>
+              <div className="between">
+                <span className="card-title">{r.title}</span>
+                <span className="badge badge-muted">{r.status === "active" ? "有効" : "アーカイブ"}</span>
+              </div>
+              <div className="strategy-card__meta">
+                <span>{DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</span>
+                <span>{period(r)}</span>
+                <span>更新 {r.updated_at.slice(0, 10)}</span>
+              </div>
+            </Link>
+            <div style={{ position: "absolute", right: "var(--space-2)", bottom: "var(--space-2)" }}>
+              <RowMenu items={menuItems(r)} />
+            </div>
+          </div>
+        )}
       />
     </main>
   );

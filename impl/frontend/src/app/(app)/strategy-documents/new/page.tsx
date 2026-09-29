@@ -1,11 +1,12 @@
-// SC-81 経営資料 登録（フルページ＝直アクセス/リロード）。一覧「＋ 経営資料を登録」からのソフト遷移は @modal intercept。
+// SC-81 経営資料 登録/複製（フルページ＝直アクセス/リロード）。?from=<id> で複製（値を引き継ぎ新規作成）。
 import { redirect } from "next/navigation";
 
 import { StrategyFormModal } from "@/features/strategy";
 import { getServerSession } from "@/lib/session";
 
-export default async function StrategyNewPage() {
+export default async function StrategyNewPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <StrategyFormModal standalone />;
+  const { from } = await searchParams;
+  return <StrategyFormModal fromId={from} standalone />;
 }

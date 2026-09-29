@@ -17,3 +17,15 @@
 @media (max-width: 640px) {
   .form-grid-2 { grid-template-columns: 1fr; }
 }
+
+/* 重点領域＝自由入力ありの複数選択（style-guide「複数選択（.multiselect・自由入力あり）」＝quests.css .tagselect と同型）。 */
+.tagselect__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-2); }
+.tagselect__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary-active); font-size: var(--text-sm); font-weight: 600; }
+.tagselect__chip button { background: none; border: none; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0; }
+.tagselect__sug { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); }
+.tagselect__sugbtn { padding: 3px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
+.tagselect__sugbtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
+
+/* 経営資料カード（一覧のカード表示）。 */
+.strategy-card { display: block; }
+.strategy-card__meta { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }

@@ -1,12 +1,12 @@
-// SC-81 経営資料 登録の URL 付きモーダル（Intercept Routes）。一覧「＋ 経営資料を登録」のソフト遷移で差し込む。
-// 直アクセス/リロードは (app)/strategy-documents/new のフルページ。
+// SC-81 経営資料 登録/複製の URL 付きモーダル（Intercept）。?from=<id> で複製。直アクセス/リロードはフルページ。
 import { redirect } from "next/navigation";
 
 import { StrategyFormModal } from "@/features/strategy";
 import { getServerSession } from "@/lib/session";
 
-export default async function StrategyNewInterceptModal() {
+export default async function StrategyNewInterceptModal({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const session = await getServerSession();
   if (!session) redirect("/login");
-  return <StrategyFormModal />;
+  const { from } = await searchParams;
+  return <StrategyFormModal fromId={from} />;
 }
