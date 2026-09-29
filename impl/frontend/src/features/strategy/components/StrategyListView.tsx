@@ -106,10 +106,10 @@ export function StrategyListView() {
         defaultView="card"
         cardRaw={(r) => (
           // ⋮ は Link の外（兄弟）に置く＝アンカー内 button の不正 HTML を避ける（ProjectCard §4.5 と同方式）。
-          <div className="strategy-card" style={{ position: "relative" }}>
-            <Link className="card card-accent" href={`/strategy-documents/${r.id}/edit`}>
+          <div style={{ position: "relative" }}>
+            <Link className="card card-accent strategy-card" href={`/strategy-documents/${r.id}/edit`}>
               <div className="between">
-                <span className="card-title">{r.title}</span>
+                <span className="card-title strategy-card__title">{r.title}</span>
                 <span className="badge badge-muted">{r.status === "active" ? "有効" : "アーカイブ"}</span>
               </div>
               <div className="strategy-card__meta">

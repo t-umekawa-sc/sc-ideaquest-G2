@@ -154,12 +154,13 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
         <Field className="dialog-section is-quiet" id="sd-title" label="タイトル" required error={titleErr}>
           <input className="input" id="sd-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）2027-2029 中期経営計画" />
         </Field>
+        <Field className="dialog-section is-quiet" id="sd-kind" label="種別">
+          <select className="select" id="sd-kind" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
+            {KIND_OPTS.map(({ v, l }) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        {/* 対象期間の開始/終了は同じ行に並べる（ユーザー指摘 2026-09-29）。 */}
         <div className="form-grid-2">
-          <Field className="dialog-section is-quiet" id="sd-kind" label="種別">
-            <select className="select" id="sd-kind" value={docKind} onChange={(e) => setDocKind(e.target.value)}>
-              {KIND_OPTS.map(({ v, l }) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </Field>
           <Field className="dialog-section is-quiet" id="sd-from" label="対象期間（開始）" error={periodErr}>
             <input className="input" id="sd-from" type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} />
           </Field>
