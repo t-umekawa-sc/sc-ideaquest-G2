@@ -1,83 +1,91 @@
 # handoff（引き継ぎメモ）
 
 > 読者＝このセッションの記憶が無い次回の自分。会話ログは参照不可。本ファイルだけで再開できるように書く。全文上書き運用（履歴は git）。
-> 各種正本＝`CLAUDE.md`（規約参照元）／`doc/実装計画.md`（実装順）／`impl/README.md`（実装現況）／`doc/バックログ/未実装・ギャップ一覧.md`（未実装/ISOギャップ/follow-up の台帳）。
+> 各種正本＝`CLAUDE.md`（規約参照元）／`doc/実装計画.md`（実装順）／`impl/README.md`（実装現況）／`doc/バックログ/未実装・ギャップ一覧.md`（未実装/ISOギャップ/follow-up の台帳）／`doc/テスト/R_経営資料.md`（R ドメインの TC 台帳）。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-29（本セッション末）
 - ブランチ: `main`（作業ツリー clean）
 - push: 本セッションのコミットを **origin/main へ push 済み**。
-- 本セッションのコミット（新しい順）:
+- 直近コミット（新しい順・本ファイル＝最新の docs(handoff) コミット）:
   - `docs(handoff)` 本ファイル全文更新（このコミット）
-  - `831724e2` feat(auto-link): entity_tokens 一般化＋会社別 一致率しきい値（N.6・§5.36b）
-  - `62e28964` feat(notifications): ブラウザ通知 Tier1（前景・宛先明確な通知を OS 通知）
-  - `56c6615b` feat(chat): @全員/@all メンション（メンバー全員へ一括通知）
-- 直前セッション末＝`6a9b47d1`（登録ダイアログ閉じ標準／操作列左端縦⋮／一覧ピン client+server／機能ガイド）。
+  - `d76a1d66` feat(strategy): SC-22 に方針整合バッジ＋アイデア詳細に alignment 露出（Step3）
+  - `a576c75e` feat(strategy): 整合率＋コイン backend（Step3・R.2/R.3）
+  - `274e313d` / `60dca04c` / `b3b336b0` / `fc08f070` strategy「紐づくクエスト」＋主要語 UI 群（Step2B）
+  - `4244e90c` / `9cf6c3dc` / `8dcd6d21` / `09be4a6f` / `7ab86ae5` / `f5e2cf97` strategy CRUD＋画面（Step2A）
+  - `09c50788` / `2baffec5` strategy 基盤＋クエスト単位選択（Step1）
+- 本セッション前半（すでに push 済・詳細は git）＝`56c6615b` @全員メンション／`62e28964` ブラウザ通知 Tier1／`831724e2` entity_tokens 一般化＋会社別 一致率しきい値／`36c0e371` しきい値スライダー。
 
 ## 2. ゴール
-社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発を、ゲーム感のある UI で一気通貫に回す。本セッションは**ユーザー要望の新機能3件**＝(1) チャットの全員メンション、(2) ブラウザ通知 Tier1、(3) 情報の自動関連付けの一般化（entity_tokens）＋一致率しきい値の会社別設定。すべて実機検証＋pytest 済み。
+社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発を、ゲーム感のある UI で一気通貫に回す。本セッションの本命は **経営資料整合（FR-44・ドメイン R）**＝中長期計画/方針資料を登録し、クエストが適用資料を選択→アイデアと資料の**整合率**を算出→**コイン付与**、将来は機会/脅威率と AI 用 Markdown エクスポートまで。
 
 ## 3. 今回やったこと（変更と理由）
 
-### A. @全員 / @all メンション（`56c6615b`・frontend のみ）
-- 理由＝宛先が明確な一括通知の気づきを高めたい（ユーザー要望）。権限は個別メンションと同じ comment。
-- **クライアント展開**＝送信時に `@全員`/`@all` を当該パーティの全メンバー `user_id` へ展開（backend/API/スキーマ変更ゼロ＝既存のメンバー限定検証・通知整合を流用）。
-- `features/chat/render.ts`＝`isAllMentionToken`／`resolveMentionIds`（全員→全メンバー展開・重複排除）＋`renderTextHtml` 強調対応。`IdeaChatView.tsx`＝候補ポップアップ先頭に「全員」候補・`extractMentionIds` を `resolveMentionIds` へ委譲。
-- テスト＝`render.test.ts` E-TC-229/230（※採番衝突に注意＝既存 E-TC-213/214 を避け 229/230）。正本＝FR-24・データモデル §5.17・API E.6・SC-24。
+### 経営資料整合 ドメイン R（FR-44）＝ Step1〜3 完了
+方針＝Step 単位で実装しユーザー受入ゲートを挟む。設計正本＝`doc/設計ドラフト/経営資料整合・自動関連付け_設計.md`・`doc/API設計/R_経営資料・整合.md`・`doc/画面設計/screens/SC-80_経営資料.md`・データモデル §5.54/5.55/5.56・要件 FR-44。
 
-### B. ブラウザ通知 Tier1（`62e28964`・frontend のみ）
-- 理由＝メンション・参加リクエスト等の宛先明確な通知を **OS 通知**で気づかせたい。既存の `notification.created`（WS 速報・data は REST 表現で body/context/tag/ref 込み）にフック＝**追加 fetch なし・backend 変更なし**。
-- `features/notifications/browserPush.ts`＝発火ゲート `shouldBrowserNotify`（純ロジック・H-TC-301）＋enable/permission/localStorage アダプタ＋`maybeBrowserNotify`。有効化は**デバイス単位**（ブラウザ許可＋localStorage `iq_browser_notify`）。発火は**タブ非アクティブ時（document.hidden）のみ**・ゲーム層の自己報酬（achievement/magic_reaction）は除外。
-- `RealtimeProvider.tsx`＝`notification.created` で `maybeBrowserNotify(d, notificationHref(d))`。`NotificationsView.tsx`（SC-02）＝オプトイン トグル（有効化/ON/ブロック中の3状態）。
-- **Tier2＝Web Push（背景/タブ閉時配信・Service Worker＋VAPID）はバックログ O3**（未着手）。正本＝FR-24・SC-02・H_通知.md・[[browser-notification-tier-plan]]。
+**Step1 基盤**（`2baffec5`/`09c50788`）
+- 新ドメイン `impl/backend/app/tenant/strategy/`（`orm.py`/`schemas.py`/`repository.py`/`application.py`/`router.py`/`alignment.py`/`__init__.py`）。router prefix=`/api/v1`。
+- migration `migrations/company/versions/0045_strategy_documents.py`・`0046_quest_strategy_documents.py`＝テーブル `strategy_documents`（ISO 構造化項目・doc_kind・対象期間 period_from/to・body_text 連結・status active/archived）・`idea_alignment`（idea×資料の率＋効いた語）・`quest_strategy_documents`（クエスト↔資料の多対多）。
+- **適用はクエスト単位の手動選択**（日付自動ではない）＝1 アイデア × N 資料。クエストが選ぶ資料を母集合に整合率を出す。資料選択の変更は**クエスト版履歴に記録**（`quests/application.py` の `_quest_content_snapshot` に `strategy_documents`＝資料タイトルを追加、`QUEST_REVISION_FIELDS`/`_QUEST_EMPTY_SNAPSHOT` にも追加）。
 
-### C. entity_tokens 一般化 ＋ 会社別 一致率しきい値（`831724e2`・backend+frontend）
-- 理由＝自動関連付け（N.6）の**前向き（情報→成果物）が候補を毎回 janome 再抽出**していた無駄を撤廃＋経営資料整合フェーズのトークン基盤を用意。加えて「一致率を会社ごとに設定したい」（現行 12% ハードコード）。
-- **Phase A**＝migration `company/0044_entity_tokens`（`entity_tokens`＝owner_type/owner_id 多態・info_tokens を owner_type='info' でコピー移送・**info_tokens は残置**）。ORM `EntityToken`＋汎用 repo `app/tenant/tokens/`（`replace_tokens`/`tokens_for`/`all_tokens_by_type`/`tokens_for_owners`）。info repository の token 参照を entity_tokens へ委譲。
-- **Phase B**＝`info_app.persist_entity_tokens(ts, owner_type, id, text)` を保存点に差込＝アイデア公開/更新・コンセプト作成/更新・クエスト作成/更新/公開・前提作成/更新（情報は既存）。前向き `_recompute_auto_links` を候補の**永続トークン一括読取**へ（未永続の既存成果物は**自己修復**＝一度だけ抽出→永続化）。逆向き（`recompute_auto_links_for_target`）は従来どおり（単一 target 抽出）。
-- **Phase C**＝migration `control/0017_autolink_threshold`（`companies.auto_link_threshold` NUMERIC(4,3)・既定 0.120）。Company ORM/`_SETTINGS_FIELDS`/`CompanyDetail`/`CompanySettingsUpdateRequest` に追加・**0..1 範囲外は 422**。auto-link は `info_app.auto_link_threshold_of(company)` で解決。SC-92 会社設定に「一致率しきい値（%）」数値入力（比率で保存・% 表示）。OpenAPI 型再生成（`npm run codegen`）。
-- **Phase D**＝設計正本（データモデル §5.36/§5.36b 実装済みマーカー・API B `/settings`・SC-92・N/B テスト md）＋TC。N-TC-156（会社別しきい値で auto-link 有無が変わる・red 目視済）・N-TC-157（自己修復で候補トークン永続化）・B-TC-177/178（設定更新＋範囲外422）。
-- 正本＝データモデル §5.36b・[[info-auto-linking-unimplemented]]・[[strategy-doc-alignment-feature]]。
+**Step2 CRUD＋画面**（`f5e2cf97`〜`4244e90c`）
+- backend CRUD＝**管理者スコープ**（作成/更新/アーカイブは `company_account_admin`/`system_admin` のみ・一般/クエスト権限は 403）。選択用一覧 `?for=selection` は軽量（クエスト作成者が閲覧可・active のみ）。`body_text` 連結→`persist_entity_tokens(owner_type='strategy_doc')` でトークン永続化。
+- frontend `impl/frontend/src/features/strategy/`（`StrategyListView`＝カード/表トグル＋複製・`StrategyFormPanel`/`StrategyFormModal`＝URL付きモーダル・§4.7 検証・ⓘガイド・重点領域は複数自由入力・`StrategyQuestLinks`・`strategy.css`・`types.ts`・`api.ts`）。画面 SC-80（メニュー「経営資料」）。
+- **削除は論理削除に統一**（`4244e90c`）＝アーカイブ（status=archived）＋復元（unarchive）。**物理削除は廃止**（repository の physical delete 撤去）。参照中も安全（選択用一覧から外れるだけ）。
+- 「紐づくクエスト」UI（`StrategyQuestLinks`）＝**情報の「関連リンク」と同一 UI**（`@/features/info-input/info-input.css` の link-*/pick-* を流用）。編集時は API 即時・登録時はローカルステージ→作成後にまとめて追加。「対象を選ぶ」ピッカーの絞り込み順＝**ステータス→タイトル→期限（FROM〜TO）**、種別/種別設定は無し、結果行のクエストバッジは除去、ステータスは日本語表示（`questStatusLabel`）。「この資料の主要語」（cloudTokens）は情報の登録ダイアログと同 UI。
+
+**Step3 整合率＋コイン**（`a576c75e`/`d76a1d66`）
+- `strategy/alignment.py`＝`recompute_for_idea(ts, idea, award=)`（アイデア公開/更新時に `ideas/application.py` から発火）。クエストが選択した資料を母集合に **keyword cosine**（`app/tenant/info/derive.py` の `token_cosine`・entity_tokens を読む）で best を算出→`idea_alignment` upsert＋`matched_tokens` 保存。`coins_for(best)`＝段階 `≥0.50→+3／≥0.70→+7／≥0.90→+15`。コインは `ledger.grant`＋`gami_repo.exists_ref` で**冪等・初回のみ・下げない**（reason=`idea_alignment`）。`recompute_for_quest` は資料選択変更時に公開アイデアを再計算（**award=False＝再付与しない**）。`alignment_payload` が SC-22 表示データを返す。
+- `ideas/schemas.py`＝`IdeaDetailDTO.alignment: dict|None`（**これが無いと FastAPI が応答から剥がす**＝ハマりどころ）。`ideas/application.py` の `_build_detail` に `alignment` 合成。
+- `IdeaDetailView.tsx`＝ヘッダに「🎯 方針整合 X% ・ +N🪙」バッジ（best_score>0 のみ・付与済=`badge-success`／未=`badge-muted`）。`schema.d.ts` codegen 反映。
+
+### 本セッション前半（すでに完了・受入 OK・詳細は git／前版 handoff）
+@全員/@all メンション（frontend クライアント展開）・ブラウザ通知 Tier1（前景・タブ非アクティブ時のみ）・entity_tokens 一般化＋会社別 一致率しきい値（既定 0.12・SC-92 スライダー）。
 
 ## 4. 現在の状態
 - 動いている（本セッションで実機/テスト確認済み）:
-  - @全員＝候補「全員」表示・`@全員` 強調・サーバー mentions[] に全メンバー展開（Playwright 目視）。**ユーザー受入 OK**。
-  - ブラウザ通知＝SC-02 トグル3状態・localStorage 1↔0（Playwright 目視）。**ユーザー受入 OK**。
-  - 一致率しきい値＝SC-92 で 12%→25% 保存→リロード永続→サーバー 0.25（Playwright 目視）。
+  - 経営資料 CRUD＋画面（一覧カード/表・登録/編集モーダル・アーカイブ/復元・複製・紐づくクエスト）。ユーザー受入 OK（Step2）。
+  - Step3 整合＝資料+クエスト+一致アイデアを作成→紐づけ→公開で `GET /ideas/{id}.alignment` に `best_score 0.962 / coins_awarded 15`、SC-22 に「🎯 方針整合 96% ・ +15🪙」バッジをスクショ目視確認（ヘッダのコインも +15 反映）。使い捨て spec と dev DB のテスト残骸は掃除済。
 - テスト（本セッションで実行）:
-  - backend `pytest tests/info tests/ideas tests/concepts tests/quests tests/admin` = **482 passed**（entity_tokens/しきい値含む）。
-  - frontend `vitest`（chat/notifications）= 32 passed。frontend 本番ビルド通過。
-  - `python3 scripts/check_tc_traceability.py` = ✅（879）。
+  - backend `tests/strategy`＝R-TC-101〜108（CRUD/authz/アーカイブ/復元/クエスト紐づけ＋版履歴）・R-TC-201（整合率→best→コイン冪等）green。
+  - `python3 scripts/check_tc_traceability.py` = ✅（888）。
 - 壊れているもの＝**確認範囲では無し**。
-- 未確認＝**backend フル pytest** と **Playwright e2e フルスイート**（本セッションはドメイン/画面単位のみ）。
+- **未確認**＝(a) backend フル pytest（本セッションは `tests/strategy` 中心・schema 変更後の全域再実行は未）、(b) frontend 本番ビルドは Step3 で通過したが `vitest` 全域は未再実行、(c) Playwright e2e フルスイート未実行。
 
-## 5. 詰まっている点（落とし穴）
-- **TC-ID 採番衝突**＝`check_tc_traceability.py` は一意性を見ない（存在チェックのみ）。新規採番前に当該ドメインの max を grep（[[tc-id-traceability-no-uniqueness]]）。今回 E-TC-213/214 を重複させかけ 229/230 に是正。
-- **entity_tokens 移行のフィクスチャ**＝`tests/info/conftest.py`／`test_auto_link.py` が `InfoToken` を直接 seed していたため、委譲後 word_cloud/detail が空に→フィクスチャを `EntityToken(owner_type='info')` へ移行して解決。
-- **前向き auto-link の既存テスト**＝`_seed_ideas` は Idea を直接 insert（トークン未永続）だが、前向きの**自己修復**（未永続候補を抽出→永続化）で N-TC-150 等は緑を維持。
-- **frontend/backend はイメージにベイク**＝コード変更後は `docker compose up -d --build frontend|backend` しないと実機/e2e に反映されない。backend 変更後は `npm run codegen` で OpenAPI 型再生成してから frontend ビルド。
-- **ブラウザ通知の実機目視**＝headless では実 `Notification.permission` が denied になる（→トグルは「🔕 ブロック中」表示が正常）。有効化→ON の目視は `Notification` をスタブして検証した。
+## 5. 詰まっている点（試して失敗した/落とし穴）
+- **`IdeaDetailDTO` に alignment 未追加だと剥がれる**＝backend で payload を積んでも Pydantic 応答モデルにフィールドが無いと FastAPI が除去。DTO に `alignment: dict|None` を追加して解決。
+- **ビルド順序**＝`npm run build` が codegen より先だと `idea.alignment` が型エラー。正順＝backend 再ビルド→`openapi.json` に alignment 出現を待つ→`npm run codegen`→frontend build→`up -d --build frontend`。
+- **dev DB のテスト残骸 physical 削除の FK 連鎖**＝アイデアは公開時に chat_group が自動生成される。掃除順＝`chat_thread`(単数形・owner_type='chat_group')→`chat_groups`→`idea_revisions`/`idea_alignment`/`entity_tokens`→`ideas`。クエストは `quest_member_permissions`→`quest_revisions`→`quest_categories`→`quest_members`→`quest_strategy_documents`→`quests`。**psql の複数文 `-c` は 1 トランザクション**＝途中で FK 失敗すると全ロールバックするので、掃除は文ごとに分けて実行する。
+- **R-TC-108 teardown FK**＝quest 子（revisions/members/permissions）が factory admin を参照→物理クリーンアップ＋クエスト所有者で再ログインして解消。
+- **R-TC-201 FK**＝Idea を Quest/doc flush 前に insert すると FK 落ち→`ts.flush()` を Quest+doc 追加後に入れて解消。
+- **frontend/backend はイメージにベイク**＝変更は `docker compose up -d --build frontend|backend` しないと実機/e2e に反映されない。
 
 ## 6. 決定事項と根拠
-- **@全員 はクライアント展開**（§3A）＝backend 変更ゼロ・既存メンバー検証/通知整合を流用。
-- **ブラウザ通知は Tier1（前景）を先行・Tier2（Web Push）はバックログ**（§3B）＝許可はデバイス単位なので localStorage 有効化・タブ非アクティブ時のみ発火。
-- **前向き auto-link は永続トークン読取＋自己修復**（§3C）＝都度 janome 抽出を撤廃しつつ既存データも埋める。逆向きは単一 target 抽出のまま（低コスト・低リスク）。
-- **一致率しきい値は会社別**（§3C）＝`companies.auto_link_threshold`（既定 0.12）・SC-92 で % 入力・範囲外422。
-- **owner_type は単数形**（info/idea/concept/quest/assumption）／`info_links.target_type` は複数形（ideas/…）＝`_OWNER_OF_TARGET` でマッピング。`strategy_doc` は経営資料機能で追加。
+- **コインは段階 50/70/90%→+3/+7/+15・初回のみ・下げない**＝整合率の初期到達を報酬化。再計算（資料選択変更）では再付与しない（`award=False`）＝二重取り防止。
+- **適用はクエスト単位の手動選択（1 アイデア×N 資料）**＝日付自動より、クエスト作成者が資料を見て選ぶ運用が実態に合う（ユーザー判断）。
+- **削除は論理削除（アーカイブ＋復元）のみ・物理削除廃止**＝プロジェクト全体の方針（info-raw 以外は論理）に合わせる。参照中の資料も安全。
+- **登録権限は company_account_admin/system_admin**＝経営資料は会社の正式文書。選択用一覧のみ一般（クエスト作成者）に開放。
+- **整合率は SimilarityProvider 抽象（既定 keyword cosine）**＝将来ローカル埋め込み（Step3ب）へ差し替え可能に。無料 Python ライブラリ範囲。
+- **「紐づくクエスト」は情報の関連リンク UI を流用**＝新規 UI を作らない方針（[[reuse-existing-ui-no-new]]）。
+- **owner_type は単数形**＝entity_tokens に `strategy_doc` を追加（info/idea/concept/quest/assumption と同系）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **経営資料整合 Phase1**（本命・entity_tokens 基盤の上に載る）＝経営資料エンティティ（ISO構造化入力）→整合率→コイン→機会/脅威率→AI用 Markdown エクスポート。owner_type='strategy_doc' を entity_tokens に追加。正＝`doc/設計ドラフト/経営資料整合・自動関連付け_設計.md`・[[strategy-doc-alignment-feature]]。
-2. **ブラウザ通知 Tier2（任意・バックログ O3）**＝Service Worker＋VAPID＋`PushSubscription` 端末別保存（新テーブル＋EP）＋通知生成箇所での push 送信。背景/タブ閉時も配信。
-3. **LLM 連携**（将来）＝経営資料整合 Phase2 のセマンティック整合率・要約/発想支援・機会/脅威判定補助。オンプレ無料LLM既定。
-4. **ISO ギャップ（任意）**＝6.4 ポートフォリオ・9.1 指標・9.3 レビュー。正＝`doc/ISO56001/ISO56001_準拠状況_再チェック_2026-09-28.md`。
+1. **【ユーザー依頼・作業メモ】ピッカー行にアイコン表示**（[[strategy-picker-show-icons]]）＝
+   - **クエストを選ぶダイアログ**（`impl/frontend/src/features/strategy/components/StrategyQuestLinks.tsx` の候補行レンダリング）＝クエストにアイコンが設定されている場合、タイトルの前にそのアイコンを表示。
+   - **対象を選ぶダイアログ**（`impl/frontend/src/features/info-input/components/TargetPicker.tsx` の候補行）＝アイデア・クエストともにアイコン設定時はタイトル前に表示。
+   - 事前確認＝候補 API（quest-candidates／info-input の対象候補）が `icon_image_url` 等を返すか。返さなければ候補 DTO（backend schemas＋codegen）に追加してから。未設定時は現行の頭文字タイルへフォールバック。
+2. **Step3ب ローカル埋め込み SimilarityProvider**＝keyword cosine を意味的一致に差し替え可能な provider 実装（無料ライブラリ）。差し替え点＝`strategy/alignment.py` の `score`。
+3. **Step4 機会/脅威/影響率＋ワードクラウド**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装（R.4）。
+4. **Step5 AI 用 Markdown エクスポート**＝R.5・`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
 5. **回帰**＝着手前に backend フル pytest（`-v`マウント・mail-worker 停止）と Playwright e2e フルを通す（本セッション未実行）。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝リポジトリ直下。実装は `impl/`（`impl/backend`=FastAPI+SQLAlchemy+Alembic、`impl/frontend`=Next.js）。**コマンドは絶対パス**（このシェルは cd が持続しない）。
-- フル起動＝`cd impl && docker compose up -d --build`。フロント反映＝`up -d --build frontend`／backend 反映＝`up -d --build backend`。**server 一覧/新 DTO の型は backend 変更後に `cd impl/frontend && npm run codegen`**（`http://localhost:8000/openapi.json`→`src/lib/api/schema.d.ts`）してから frontend ビルド。
-- 非同期系（mail=MFA/PW設定・sc-90 ディレクトリ）＝`docker compose --profile workers up -d`（既定 up では worker 非起動）。**MFA コードが届かない時はこれ**。**pytest 時は mail 競合回避に `docker compose stop worker mail-worker`**。※本セッション末は `--profile workers` を起動したまま。
-- backend pytest（未コミット編集反映＝`-v`マウント・cwd=impl）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/info -q`。※entrypoint が pytest 前に bootstrap（migration 適用）を走らせる＝新 migration は自動適用される。
+- 作業ディレクトリ＝リポジトリ直下。実装は `impl/`（`impl/backend`=FastAPI+SQLAlchemy+Alembic、`impl/frontend`=Next.js）。**コマンドは絶対パス**（このシェルは cd が持続しない）。compose ファイル＝`impl/compose.yaml`。
+- フル起動＝`cd impl && docker compose up -d --build`。フロント反映＝`up -d --build frontend`／backend 反映＝`up -d --build backend`。**新 DTO の型は backend 変更後に `cd impl/frontend && npm run codegen`**（`http://localhost:8000/openapi.json`→`src/lib/api/schema.d.ts`）してから frontend ビルド。
+- 非同期系（mail=MFA/PW設定・sc-90 ディレクトリ）＝`docker compose --profile workers up -d`（既定 up では worker 非起動）。**MFA コードが届かない時はこれ**。※本セッション中に起動済み。**pytest 時は競合回避に `docker compose stop worker mail-worker`**。
+- backend pytest（未コミット編集反映＝`-v`マウント・cwd=impl）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/strategy -q`。entrypoint が pytest 前に bootstrap（migration 適用）を走らせる＝新 migration は自動適用。
 - frontend 検証＝`cd impl/frontend && npm run build`（tsc/lint 兼）・`npx vitest run <path>`。e2e＝`npx playwright test <spec> --project=chromium`（storageState 認証・auth.setup 先行）。使い捨て spec は `e2e/tmp-*.spec.ts`（確認後削除）・スクショ `tmp_shots/`。
-- TC トレーサビリティ＝リポジトリ直下で `python3 scripts/check_tc_traceability.py`（コミット前ゲート・**一意性は見ない**）。
-- ポート＝frontend `:3000`／backend `:8000`／MailHog `:8025`。ログイン（ACME）＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`。管理者＝`kanri@acme`(company_account_admin)・会社 `OPS`／`admin@ops.example`(system_admin)・共に `Passw0rd!`。
-- DB 直確認＝`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c "…"`（会社DB＝`ideaquest_company_acme`／control＝`ideaquest_control`）。トークン表＝`entity_tokens`（owner_type/owner_id）・`info_tokens` は残置（未使用）。会社別しきい値＝control `companies.auto_link_threshold`。
+- TC トレーサビリティ＝リポジトリ直下で `python3 scripts/check_tc_traceability.py`（コミット前ゲート・**一意性は見ない**＝採番前に当該ドメインの max を grep）。
+- ポート＝frontend `:3000`／backend `:8000`／MailHog `:8025`。ログイン（ACME）＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`。管理者＝`kanri@acme`(company_account_admin)／`admin@ops.example`(system_admin・会社 OPS)・共に `Passw0rd!`。経営資料の登録は管理者で。
+- DB 直確認＝`docker compose -f impl/compose.yaml exec -T db psql -U ideaquest -d ideaquest_company_acme -c "…"`（会社DB＝`ideaquest_company_acme`／control＝`ideaquest_control`）。R ドメイン表＝`strategy_documents`・`idea_alignment`・`quest_strategy_documents`。トークン＝`entity_tokens`（owner_type/owner_id・`strategy_doc` 含む）。会社別しきい値＝control `companies.auto_link_threshold`。
