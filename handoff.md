@@ -5,85 +5,78 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-29（本セッション末）
-- ブランチ: `main`。
-- push: (a) ピッカー行アイコン（`a90d7257` コミット済）／(b) **Step3ب 意味的一致＝A-2**（埋め込み類似度・会社別方式・本セッションで実装・**未コミット**）。push は未（指示で push）。
-- 直近コミット（新しい順・本ファイル＝最新の docs(handoff) コミット）:
-  - `docs(handoff)` 本ファイル全文更新（このコミット）
-  - `d76a1d66` feat(strategy): SC-22 に方針整合バッジ＋アイデア詳細に alignment 露出（Step3）
-  - `a576c75e` feat(strategy): 整合率＋コイン backend（Step3・R.2/R.3）
-  - `274e313d` / `60dca04c` / `b3b336b0` / `fc08f070` strategy「紐づくクエスト」＋主要語 UI 群（Step2B）
-  - `4244e90c` / `9cf6c3dc` / `8dcd6d21` / `09be4a6f` / `7ab86ae5` / `f5e2cf97` strategy CRUD＋画面（Step2A）
-  - `09c50788` / `2baffec5` strategy 基盤＋クエスト単位選択（Step1）
-- 本セッション前半（すでに push 済・詳細は git）＝`56c6615b` @全員メンション／`62e28964` ブラウザ通知 Tier1／`831724e2` entity_tokens 一般化＋会社別 一致率しきい値／`36c0e371` しきい値スライダー。
+- ブランチ: `main`（作業ツリー clean）。
+- push 状況: 本セッションのコミットは **push 予定（このメモ更新のコミットと合わせて push する）**。直近まで origin/main は `163691ca`、ローカルは `1f8a6dc4` が先行（ahead）。
+- 直近コミット（新しい順）:
+  - `1f8a6dc4` feat(strategy): 経営資料整合の意味的一致=**A-2**（埋め込み・会社別方式・FR-44 **Step3ب**）
+  - `163691ca` docs(llm): ローカルLLM連携 設計ドラフト起票（別セッション・下記 §6 参照）
+  - `a90d7257` feat(strategy,info): ピッカー候補行にアイコン表示（クエストを選ぶ/対象を選ぶ・R-TC-109/N-TC-228）
+  - `49eaa407` docs(handoff)／`d76a1d66` SC-22 方針整合バッジ／`a576c75e` 整合率＋コイン backend（Step3）ほか（経営資料 R Step1-3）
 
 ## 2. ゴール
-社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発を、ゲーム感のある UI で一気通貫に回す。本セッションの本命は **経営資料整合（FR-44・ドメイン R）**＝中長期計画/方針資料を登録し、クエストが適用資料を選択→アイデアと資料の**整合率**を算出→**コイン付与**、将来は機会/脅威率と AI 用 Markdown エクスポートまで。
+社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発を、ゲーム感のある UI で一気通貫に回す。直近の本命は **経営資料整合（FR-44・ドメイン R）**＝中長期計画/方針資料を登録→クエストが適用資料を選択→アイデアと資料の**整合率**を算出→**コイン付与**（将来は機会/脅威率＋AI 用 Markdown export）。
 
 ## 3. 今回やったこと（変更と理由）
 
-### 経営資料整合 ドメイン R（FR-44）＝ Step1〜3 完了
-方針＝Step 単位で実装しユーザー受入ゲートを挟む。設計正本＝`doc/設計ドラフト/経営資料整合・自動関連付け_設計.md`・`doc/API設計/R_経営資料・整合.md`・`doc/画面設計/screens/SC-80_経営資料.md`・データモデル §5.54/5.55/5.56・要件 FR-44。
+本セッションは (A) ピッカー行アイコン表示、(B) 経営資料整合の「意味的一致」= A-2、の2件。**(A) は push 済（`a90d7257`）／(B) はローカルコミット済（`1f8a6dc4`）。**
 
-**Step1 基盤**（`2baffec5`/`09c50788`）
-- 新ドメイン `impl/backend/app/tenant/strategy/`（`orm.py`/`schemas.py`/`repository.py`/`application.py`/`router.py`/`alignment.py`/`__init__.py`）。router prefix=`/api/v1`。
-- migration `migrations/company/versions/0045_strategy_documents.py`・`0046_quest_strategy_documents.py`＝テーブル `strategy_documents`（ISO 構造化項目・doc_kind・対象期間 period_from/to・body_text 連結・status active/archived）・`idea_alignment`（idea×資料の率＋効いた語）・`quest_strategy_documents`（クエスト↔資料の多対多）。
-- **適用はクエスト単位の手動選択**（日付自動ではない）＝1 アイデア × N 資料。クエストが選ぶ資料を母集合に整合率を出す。資料選択の変更は**クエスト版履歴に記録**（`quests/application.py` の `_quest_content_snapshot` に `strategy_documents`＝資料タイトルを追加、`QUEST_REVISION_FIELDS`/`_QUEST_EMPTY_SNAPSHOT` にも追加）。
+### (A) ピッカー候補行にアイコン表示（`a90d7257`・完了）
+- 目的＝「クエストを選ぶ」「対象を選ぶ」ダイアログの候補行に、設定時はアイコン、未設定は頭文字タイルをタイトル前に表示（視認性）。共通部品 `@/components/layout/QuestIcon` を流用。
+- backend 候補 DTO に `icon_image_url` 追加＝strategy `QuestLinkItem`（`app/tenant/strategy/schemas.py`・`repository.py` の `quest_candidates`/`quests_for_doc` で `Quest.icon_image_path` 取得・`application.py` の `_quest_link_item` で presigned 解決）／info `InfoLinkCandidateDTO`（`app/tenant/info/schemas.py`・`repository.py` の `search_link_candidates` が raw パスを積み〔ideas=個別→作成者既定 `User.idea_icon_image_path`／quests=クエスト〕・`application.py` の `get_link_candidates` で presigned 解決。concepts/assumptions は null）。
+- frontend＝`impl/frontend/src/features/strategy/components/StrategyQuestLinks.tsx`・`impl/frontend/src/features/info-input/components/TargetPicker.tsx`（候補行に `QuestIcon`）＋各 `types.ts` に `icon_image_url` 追加（手書きパススルー型）。
+- テスト＝R-TC-109（`tests/strategy/test_strategy_crud.py`）・N-TC-228（`tests/info/test_api.py`）。
 
-**Step2 CRUD＋画面**（`f5e2cf97`〜`4244e90c`）
-- backend CRUD＝**管理者スコープ**（作成/更新/アーカイブは `company_account_admin`/`system_admin` のみ・一般/クエスト権限は 403）。選択用一覧 `?for=selection` は軽量（クエスト作成者が閲覧可・active のみ）。`body_text` 連結→`persist_entity_tokens(owner_type='strategy_doc')` でトークン永続化。
-- frontend `impl/frontend/src/features/strategy/`（`StrategyListView`＝カード/表トグル＋複製・`StrategyFormPanel`/`StrategyFormModal`＝URL付きモーダル・§4.7 検証・ⓘガイド・重点領域は複数自由入力・`StrategyQuestLinks`・`strategy.css`・`types.ts`・`api.ts`）。画面 SC-80（メニュー「経営資料」）。
-- **削除は論理削除に統一**（`4244e90c`）＝アーカイブ（status=archived）＋復元（unarchive）。**物理削除は廃止**（repository の physical delete 撤去）。参照中も安全（選択用一覧から外れるだけ）。
-- 「紐づくクエスト」UI（`StrategyQuestLinks`）＝**情報の「関連リンク」と同一 UI**（`@/features/info-input/info-input.css` の link-*/pick-* を流用）。編集時は API 即時・登録時はローカルステージ→作成後にまとめて追加。「対象を選ぶ」ピッカーの絞り込み順＝**ステータス→タイトル→期限（FROM〜TO）**、種別/種別設定は無し、結果行のクエストバッジは除去、ステータスは日本語表示（`questStatusLabel`）。「この資料の主要語」（cloudTokens）は情報の登録ダイアログと同 UI。
+### (B) 経営資料整合の意味的一致 = A-2（`1f8a6dc4`・実装完了・実モデル通しは未確認）
+方針＝**A-2＝埋め込み（テキスト→ベクトル→cosine）を「LLM 基盤の OpenAI 互換 `/embeddings`」経由で取得**する。モデルは基盤側に置き **backend アプリに焼き込まない**（データ主権・横断集約）。生成AI（方式 B＝LLM 判定）は使わない（整合率は決定的が要る＝コインの公平性のため）。
 
-**Step3 整合率＋コイン**（`a576c75e`/`d76a1d66`）
-- `strategy/alignment.py`＝`recompute_for_idea(ts, idea, award=)`（アイデア公開/更新時に `ideas/application.py` から発火）。クエストが選択した資料を母集合に **keyword cosine**（`app/tenant/info/derive.py` の `token_cosine`・entity_tokens を読む）で best を算出→`idea_alignment` upsert＋`matched_tokens` 保存。`coins_for(best)`＝段階 `≥0.50→+3／≥0.70→+7／≥0.90→+15`。コインは `ledger.grant`＋`gami_repo.exists_ref` で**冪等・初回のみ・下げない**（reason=`idea_alignment`）。`recompute_for_quest` は資料選択変更時に公開アイデアを再計算（**award=False＝再付与しない**）。`alignment_payload` が SC-22 表示データを返す。
-- `ideas/schemas.py`＝`IdeaDetailDTO.alignment: dict|None`（**これが無いと FastAPI が応答から剥がす**＝ハマりどころ）。`ideas/application.py` の `_build_detail` に `alignment` 合成。
-- `IdeaDetailView.tsx`＝ヘッダに「🎯 方針整合 X% ・ +N🪙」バッジ（best_score>0 のみ・付与済=`badge-success`／未=`badge-muted`）。`schema.d.ts` codegen 反映。
-
-### 本セッション前半（すでに完了・受入 OK・詳細は git／前版 handoff）
-@全員/@all メンション（frontend クライアント展開）・ブラウザ通知 Tier1（前景・タブ非アクティブ時のみ）・entity_tokens 一般化＋会社別 一致率しきい値（既定 0.12・SC-92 スライダー）。
+- 埋め込みクライアント＝`app/infra/llm/embeddings.py`（新規）。`OpenAICompatibleEmbeddings`（httpx で `/embeddings`）＋`FakeEmbeddings`（テスト用・決定的・同義語クラスタ）＋`get/set_embeddings_client`（`app/infra/storage.py` と同流儀）＋`cosine`。設定は `app/core/config.py` の `alignment_embed_base_url`/`alignment_embed_model`（既定 `bge-m3`）/`alignment_embed_api_key`/`alignment_hybrid_keyword_weight`（既定 0.5）。`httpx` を本番依存へ移動（`pyproject.toml`）。
+- 埋め込み永続化＝`entity_embeddings`（会社DB）。ORM `app/tenant/tokens/orm.py` の `EntityEmbedding`（owner_type/owner_id/model/dim/vector JSONB）＋migration `impl/backend/migrations/company/versions/0047_entity_embeddings.py`（revision id=`0047_entity_embeddings`・down=`0046_quest_strategy_docs`※短縮 id 注意）＋repo `app/tenant/tokens/repository.py` の `upsert_embedding`/`embedding_for`（model 不一致は None＝再計算促す）。保存ヘルパ＝`app/tenant/info/application.py` の `persist_entity_embedding`（**best-effort**＝失敗しても保存を止めない）。保存点＝アイデア公開/更新（`app/tenant/ideas/application.py`）・経営資料保存（`app/tenant/strategy/application.py` の `_persist_tokens`）。
+- 類似度プロバイダ＝`app/tenant/strategy/similarity.py`（新規）＝`KeywordProvider`/`EmbeddingProvider`/`HybridProvider`＋`provider_for(method)`。埋め込み欠損/モデル不一致は **keyword フォールバック**。matched_tokens は方式に依らず keyword 由来（説明可能性）。
+- 整合算出＝`app/tenant/strategy/alignment.py` の `recompute_for_idea(ts, idea, *, company, award)`／`recompute_for_quest(..., award)` が `company.alignment_method` で provider 選択（`_method_of`）。方式変更の一括再計算＝`app/tenant/strategy/application.py` の `recompute_all_for_company(company)`（資料紐づけのある全クエスト＝`repository.all_linked_quest_ids`・award=True＝差分付与）。
+- 会社別設定＝control `companies.alignment_method`（`app/control_plane/auth/orm.py`・enum keyword/embedding/hybrid・既定 keyword）＋migration `migrations/control/versions/0018_alignment_method.py`。admin schemas（`app/control_plane/admin/schemas.py`）＋`company_application.py`（`_SETTINGS_FIELDS`/`_ALIGNMENT_METHODS`・DTO・enum 検証・`update_company_settings` が方式変更時に `recompute_all_for_company` を **best-effort** 呼び出し）。
+- frontend＝SC-92 会社設定に「整合の測り方」セレクタ（`impl/frontend/src/features/companies/components/CompanyDetailView.tsx` の `saveAlignmentMethod`＋select）。型は codegen（`npm run codegen` 済＝`schema.d.ts` に `alignment_method`）。
+- compose＝`impl/compose.yaml` に `ollama` サービス（**profile `ai`＝opt-in**・既定 up では起動しない）＋backend env（`ALIGNMENT_EMBED_BASE_URL`/`_MODEL`/`_API_KEY`）。
+- テスト＝`tests/strategy/test_alignment_embedding.py`（R-TC-202〜205・FakeEmbeddings）＋`tests/admin/test_admin_companies.py`（R-TC-206）。conftest に autouse `_fake_embeddings`（全テストを Fake 固定＝ネット非依存）。
+- docs＝`doc/データモデル.md`（§5.36c entity_embeddings・§5.55 method 更新）／`doc/API設計/R_経営資料・整合.md`（R.2/R.3）／`doc/設計ドラフト/経営資料整合・自動関連付け_設計.md`（§11-7 に A-2 決定）／`impl/README.md`／`doc/テスト/R_経営資料.md`。
 
 ## 4. 現在の状態
-- 動いている（本セッションで実機/テスト確認済み）:
-  - 経営資料 CRUD＋画面（一覧カード/表・登録/編集モーダル・アーカイブ/復元・複製・紐づくクエスト）。ユーザー受入 OK（Step2）。
-  - Step3 整合＝資料+クエスト+一致アイデアを作成→紐づけ→公開で `GET /ideas/{id}.alignment` に `best_score 0.962 / coins_awarded 15`、SC-22 に「🎯 方針整合 96% ・ +15🪙」バッジをスクショ目視確認（ヘッダのコインも +15 反映）。使い捨て spec と dev DB のテスト残骸は掃除済。
-- ピッカー行アイコン（次アクション#1・**未コミット**）＝backend+frontend 実装済・実機ビルド反映済。クエストを選ぶ/対象を選ぶダイアログの候補行に画像アイコン（設定時）or 頭文字タイル（未設定）をタイトル前に表示。スクショ目視 OK（`tmp_shots/strategy-quest-picker.png`／`info-target-picker.png`）。
-- テスト（本セッションで実行）:
-  - backend **フル pytest = 862 passed**（次セッション冒頭の裏取りで実行）。追加後の `tests/strategy`＋`tests/info` = 90 passed（R-TC-109／N-TC-228 含む）。
-  - `python3 scripts/check_tc_traceability.py` = ✅（890）。
-- 壊れているもの＝**確認範囲では無し**。
-- **未確認**＝(a) frontend `vitest` 全域は未再実行（`npm run build` は今回通過）、(b) Playwright e2e フルスイート未実行（使い捨て spec での目視のみ）。
+- 動いている（本セッションで確認済み）:
+  - ピッカー行アイコン＝両ダイアログでアイコン/頭文字タイルをスクショ目視確認済（(A)）。
+  - 経営資料整合 A-2＝**backend フル pytest 869 passed**・関連 `tests/strategy`+`tests/info`+`tests/admin` green・`python3 scripts/check_tc_traceability.py` = ✅（895）。frontend `npm run build` 通過・`npm run codegen` 済。SC-92 セレクタは実機で「意味（埋め込み）」に切替→成功トースト→反映をスクショ目視確認。
+  - **keyword フォールバックで実機動作**＝Ollama 未起動でも埋め込み best-effort が失敗して keyword で算出（設定変更で 500 にならないことを確認）。
+- 壊れているもの＝確認範囲では無し。
+- **未確認**＝(a) **実埋め込みモデル（bge-m3）での意味的一致の通し確認**（この環境で Ollama 未起動＝Fake/フォールバックのみ）／(b) frontend `vitest` 全域は未再実行（build は通過）／(c) Playwright e2e フルスイート未実行（使い捨て spec の目視のみ）。
 
 ## 5. 詰まっている点（試して失敗した/落とし穴）
-- **`IdeaDetailDTO` に alignment 未追加だと剥がれる**＝backend で payload を積んでも Pydantic 応答モデルにフィールドが無いと FastAPI が除去。DTO に `alignment: dict|None` を追加して解決。
-- **ビルド順序**＝`npm run build` が codegen より先だと `idea.alignment` が型エラー。正順＝backend 再ビルド→`openapi.json` に alignment 出現を待つ→`npm run codegen`→frontend build→`up -d --build frontend`。
-- **dev DB のテスト残骸 physical 削除の FK 連鎖**＝アイデアは公開時に chat_group が自動生成される。掃除順＝`chat_thread`(単数形・owner_type='chat_group')→`chat_groups`→`idea_revisions`/`idea_alignment`/`entity_tokens`→`ideas`。クエストは `quest_member_permissions`→`quest_revisions`→`quest_categories`→`quest_members`→`quest_strategy_documents`→`quests`。**psql の複数文 `-c` は 1 トランザクション**＝途中で FK 失敗すると全ロールバックするので、掃除は文ごとに分けて実行する。
-- **R-TC-108 teardown FK**＝quest 子（revisions/members/permissions）が factory admin を参照→物理クリーンアップ＋クエスト所有者で再ログインして解消。
-- **R-TC-201 FK**＝Idea を Quest/doc flush 前に insert すると FK 落ち→`ts.flush()` を Quest+doc 追加後に入れて解消。
-- **frontend/backend はイメージにベイク**＝変更は `docker compose up -d --build frontend|backend` しないと実機/e2e に反映されない。
+- **migration の revision id は ≤32 字**＝company `0047` の down_revision は `0046_quest_strategy_docs`（ファイル名の `...documents` ではなく、ファイル内 `revision=` の短縮 id）。ファイル名≠revision id なので**必ずファイル内の `revision=` を確認**して繋ぐ。控えは control 側 `0018` も同注意。
+- **pytest 環境は実 MinIO を使う**＝`FakeStorage` は明示 fixture 注入時のみ。署名URL の完全一致比較は不可＝**キー包含で検証**する（R-TC-109/N-TC-228 で対応）。
+- **埋め込み呼び出しがテストを遅く/不安定にする**＝実クライアントは HTTP を打つため、conftest の **autouse `_fake_embeddings`** で全テストを `FakeEmbeddings` に固定（`FakeStorage`/`FakeMailSender` と同型）。これが無いと各アイデア公開でネットワーク試行が走る。
+- **方式変更の再計算は設定保存の後段・best-effort**＝テスト会社は会社DB 未プロビジョニング（`ideaquest_test_*` 実在せず）のため `recompute_all_for_company` が `get_tenant_session` で落ちる。`update_company_settings` は**設定 commit 済みの後に try/except で recompute**（失敗はログのみ・保存はロールバックしない）。
+- **frontend/backend はイメージにベイク**＝変更は `docker compose up -d --build frontend|backend` で反映。新 DTO 型は backend 再ビルド→`npm run codegen`→frontend ビルドの順。
 
 ## 6. 決定事項と根拠
-- **コインは段階 50/70/90%→+3/+7/+15・初回のみ・下げない**＝整合率の初期到達を報酬化。再計算（資料選択変更）では再付与しない（`award=False`）＝二重取り防止。
-- **適用はクエスト単位の手動選択（1 アイデア×N 資料）**＝日付自動より、クエスト作成者が資料を見て選ぶ運用が実態に合う（ユーザー判断）。
-- **削除は論理削除（アーカイブ＋復元）のみ・物理削除廃止**＝プロジェクト全体の方針（info-raw 以外は論理）に合わせる。参照中の資料も安全。
-- **登録権限は company_account_admin/system_admin**＝経営資料は会社の正式文書。選択用一覧のみ一般（クエスト作成者）に開放。
-- **整合率は SimilarityProvider 抽象（既定 keyword cosine）**＝将来ローカル埋め込み（Step3ب）へ差し替え可能に。無料 Python ライブラリ範囲。
-- **「紐づくクエスト」は情報の関連リンク UI を流用**＝新規 UI を作らない方針（[[reuse-existing-ui-no-new]]）。
-- **owner_type は単数形**＝entity_tokens に `strategy_doc` を追加（info/idea/concept/quest/assumption と同系）。
+- **意味的一致＝A-2（埋め込み・基盤の embeddings 経由）を採用**。不採用＝A-1（fastembed を backend に焼き込む）＝横断 LLM ゲートウェイ設計（`doc/設計ドラフト/ローカルLLM連携_設計.md`＝別セッションが起票・`163691ca`）に反し、重い依存を backend に持ち込むため。不採用＝方式 B（LLM 判定・生成）＝毎回ゆらぐためコイン報酬に不適・重い AIジョブ基盤が必要。B は**別要件**（横断 LLM ゲートウェイ＋AIジョブ基盤・未実装）。
+- **会社が選ぶのは3方式（キーワード/意味/ハイブリッド）だけ**。ハイブリッド式（max/加重/比率）は**会社 UI に出さない**＝業務ユーザーに直感的でなく過剰。式は config（`alignment_hybrid_keyword_weight`・既定 B=0.5/0.5）で運用調整。
+- **方式変更で整合率を全再計算＋差分コイン付与**（初回超えのみ・下げない）＝ユーザー要望。稼ぎ直し防止は G 台帳の `exists_ref` 冪等で担保。
+- **埋め込みモデルは env 可変・既定 bge-m3**（多言語・日本語強）。`entity_embeddings` に model/dim を保存し不一致は無効化＝モデル差し替えで意味空間が変わっても誤 cosine を出さない。
+- **matched_tokens は方式に依らず keyword 由来**＝意味方式でも「効いた語」の説明可能性を担保。
+- **コイン段階は 50/70/90%→+3/+7/+15 のまま**（変更せず）。※埋め込みは分布が異なるため実データでの再キャリブレーション余地あり（次項）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. ~~**ピッカー行にアイコン表示**~~ **【完了・コミット済 `a90d7257`】** クエストを選ぶ／対象を選ぶの候補行に `QuestIcon`（R-TC-109／N-TC-228）。
-2. ~~**Step3ب 意味的一致**~~ **【完了 2026-09-29・A-2・未コミット】** 会社別 `SimilarityProvider`（keyword/embedding/hybrid・`companies.alignment_method`・SC-92 セレクタ）。意味方式＝**LLM 基盤の OpenAI 互換 `/embeddings`**（`infra/llm/embeddings.py`・モデルは基盤側＝backend 非焼込・dev=compose `ollama` profile `ai`・既定 bge-m3・env `ALIGNMENT_EMBED_BASE_URL`/`MODEL`）→`entity_embeddings`（§5.36c・migration company 0047）の cosine。欠損/モデル不一致は keyword フォールバック。ハイブリッド＝加重（config 既定0.5/0.5）。方式変更で全再計算＋差分コイン（`recompute_all_for_company`・best-effort）。control `companies.alignment_method`（migration control 0018）。テスト＝FakeEmbeddings で R-TC-202〜206 green・full pytest 869 green・SC-92 セレクタをスクショ目視。**要フォロー＝実モデル(bge-m3)での通し確認は未**（この環境で Ollama 未起動＝keyword フォールバックで動作確認・実機は `docker compose --profile ai up -d ollama` → `ollama pull bge-m3` 後に要確認）／閾値の実データ再キャリブレーション（現状 tiers 50/70/90 のまま）。
-3. **Step4 機会/脅威/影響率＋ワードクラウド**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装（R.4）。**方式 B（LLM 判定・生成）は別要件＝横断 LLM ゲートウェイ＋AIジョブ基盤**（`ローカルLLM連携_設計.md`・未実装）。
-4. **Step5 AI 用 Markdown エクスポート**＝R.5・`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
-5. **回帰**＝着手前に backend フル pytest（`-v`マウント・mail-worker 停止）と Playwright e2e フルを通す（e2e フルは本セッション未実行）。
+1. **実モデル(bge-m3)での通し確認**（本セッション未実施）＝`cd impl && docker compose --profile ai up -d ollama` → `docker compose exec ollama ollama pull bge-m3` → backend は既定 env で `http://ollama:11434/v1` を叩く。意味ペア（語は違うが意味が近いアイデア×経営資料）で `GET /ideas/{id}.alignment` の best が keyword より上がることを実機確認。落ちても keyword フォールバックで動く前提。
+2. **閾値の実データ再キャリブレーション**＝`app/tenant/strategy/alignment.py` の `_TIERS`（50/70/90）を、bge-m3 の cosine 分布に合わせて見直す（埋め込みはベースライン類似度が高く出がち）。小さな評価セット（近い/遠いペア 20〜30）で実測してから調整。TC は `doc/テスト/R_経営資料.md` §2 に追記。
+3. **Step4 機会/脅威/影響率＋ワードクラウド（R.4・決定的）**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装。`info_links` の `impact_class` 集計 read＋経営資料詳細に表示（API 設計 R.4）。方式 B（LLM）は使わない。
+4. **Step5 AI 用 Markdown エクスポート（R.5）**＝`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
+5. **回帰**＝着手前に backend フル pytest（下記コマンド）と Playwright e2e フル（本セッション未実行）を通す。
+- 参考：LLM 生成（方式 B・要約/ISO 生成）を実装する時は**先に横断 LLM ゲートウェイ＋AIジョブ基盤**（`doc/設計ドラフト/ローカルLLM連携_設計.md`）を作る。A-2 の `infra/llm/embeddings.py` はその薄い前身＝将来ゲートウェイに吸収する想定。
 
 ## 8. 再開に必要な環境情報
-- 作業ディレクトリ＝リポジトリ直下。実装は `impl/`（`impl/backend`=FastAPI+SQLAlchemy+Alembic、`impl/frontend`=Next.js）。**コマンドは絶対パス**（このシェルは cd が持続しない）。compose ファイル＝`impl/compose.yaml`。
-- フル起動＝`cd impl && docker compose up -d --build`。フロント反映＝`up -d --build frontend`／backend 反映＝`up -d --build backend`。**新 DTO の型は backend 変更後に `cd impl/frontend && npm run codegen`**（`http://localhost:8000/openapi.json`→`src/lib/api/schema.d.ts`）してから frontend ビルド。
-- 非同期系（mail=MFA/PW設定・sc-90 ディレクトリ）＝`docker compose --profile workers up -d`（既定 up では worker 非起動）。**MFA コードが届かない時はこれ**。※本セッション中に起動済み。**pytest 時は競合回避に `docker compose stop worker mail-worker`**。
-- backend pytest（未コミット編集反映＝`-v`マウント・cwd=impl）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest tests/strategy -q`。entrypoint が pytest 前に bootstrap（migration 適用）を走らせる＝新 migration は自動適用。
-- frontend 検証＝`cd impl/frontend && npm run build`（tsc/lint 兼）・`npx vitest run <path>`。e2e＝`npx playwright test <spec> --project=chromium`（storageState 認証・auth.setup 先行）。使い捨て spec は `e2e/tmp-*.spec.ts`（確認後削除）・スクショ `tmp_shots/`。
+- 作業ディレクトリ＝リポジトリ直下。実装は `impl/`（`impl/backend`=FastAPI+SQLAlchemy+Alembic、`impl/frontend`=Next.js）。**コマンドは絶対パス**（このシェルは cd が持続しない）。compose＝`impl/compose.yaml`。
+- 通常起動＝`cd impl && docker compose up -d --build`。フロント反映＝`up -d --build frontend`／backend 反映＝`up -d --build backend`。**新 DTO の型は backend 変更後に `cd impl/frontend && npm run codegen`**（`http://localhost:8000/openapi.json`→`src/lib/api/schema.d.ts`）→frontend ビルド。
+- 埋め込み基盤（A-2・意味/ハイブリッド方式で必要）＝`docker compose --profile ai up -d ollama` → `docker compose exec ollama ollama pull bge-m3`。**既定 up では起動しない**（keyword 方式は不要／意味方式でも未起動なら keyword フォールバック）。env＝`ALIGNMENT_EMBED_BASE_URL`（既定 `http://ollama:11434/v1`）・`ALIGNMENT_EMBED_MODEL`（既定 `bge-m3`）・`ALIGNMENT_EMBED_API_KEY`（空可）。
+- 非同期系（mail=MFA/PW設定・sc-90 ディレクトリ）＝`docker compose --profile workers up -d`（既定 up では非起動）。**pytest 時は競合回避に `docker compose stop worker mail-worker`**。
+- backend pytest（未コミット編集反映＝`-v`マウント・cwd=impl）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest -q`（対象限定は末尾に `tests/strategy` 等）。entrypoint が pytest 前に bootstrap（migration 適用）＝新 migration は自動適用。**全テストは FakeEmbeddings 固定**（conftest autouse）＝ネット不要。
+- frontend 検証＝`cd impl/frontend && npm run build`（tsc/lint 兼）・`npx vitest run <path>`。e2e＝`npx playwright test <spec> --project=chromium`（storageState 認証・auth.setup 先行）。使い捨て spec は `e2e/tmp-*.spec.ts`（確認後削除）・スクショ `tmp_shots/`。**CSRF Cookie 名＝`iq_csrf`**（`page.request` で叩く時のヘッダ `X-CSRF-Token` に使う）。
 - TC トレーサビリティ＝リポジトリ直下で `python3 scripts/check_tc_traceability.py`（コミット前ゲート・**一意性は見ない**＝採番前に当該ドメインの max を grep）。
-- ポート＝frontend `:3000`／backend `:8000`／MailHog `:8025`。ログイン（ACME）＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`。管理者＝`kanri@acme`(company_account_admin)／`admin@ops.example`(system_admin・会社 OPS)・共に `Passw0rd!`。経営資料の登録は管理者で。
-- DB 直確認＝`docker compose -f impl/compose.yaml exec -T db psql -U ideaquest -d ideaquest_company_acme -c "…"`（会社DB＝`ideaquest_company_acme`／control＝`ideaquest_control`）。R ドメイン表＝`strategy_documents`・`idea_alignment`・`quest_strategy_documents`。トークン＝`entity_tokens`（owner_type/owner_id・`strategy_doc` 含む）。会社別しきい値＝control `companies.auto_link_threshold`。
+- ポート＝frontend `:3000`／backend `:8000`／MailHog `:8025`／MinIO `:9000`／Ollama `:11434`（profile ai）。ログイン（ACME）＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`。管理者＝`kanri@acme.example`（company_account_admin）／`admin@ops.example`（system_admin・会社 OPS）・共に `Passw0rd!`。経営資料の登録・会社設定（SC-92 の整合方式）は管理者で。
+- DB 直確認＝`docker compose -f impl/compose.yaml exec -T db psql -U ideaquest -d ideaquest_company_acme -c "…"`（会社DB＝`ideaquest_company_acme`／control＝`ideaquest_control`）。R 表＝`strategy_documents`・`idea_alignment`・`quest_strategy_documents`・`entity_tokens`・`entity_embeddings`。会社設定＝control `companies.alignment_method`／`companies.auto_link_threshold`。
