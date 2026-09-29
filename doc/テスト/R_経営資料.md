@@ -10,7 +10,12 @@
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| _（Step2 で追加）_ | | | | | | |
+| R-TC-101 | api | 作成＝201＋body_text 連結＋トークン永続化（owner='strategy_doc'） | company_account_admin | `POST /strategy-documents`（構造化項目） | 201・`status=active`／`entity_tokens`（owner_type='strategy_doc'）が生成される | R.1／§5.54/§5.36b |
+| R-TC-102 | api | 管理一覧に出る／一般ユーザーは 403 | admin で1件作成 | admin `GET /strategy-documents?q=`／一般 `GET` | admin＝data に作成分・page_info.total≥1／一般＝403（管理者スコープ・R.0） | R.1／R.0 |
+| R-TC-103 | api | 選択用一覧はクエスト作成者可・active のみ・軽量 | admin で1件作成 | 一般ユーザーで `GET ?for=selection&q=` | 200・作成分を含む・キーは `{id,title,doc_kind,period_from,period_to}` のみ（全文/率なし） | R.0／R.1 |
+| R-TC-104 | api | 更新＝反映＋トークン再永続化／doc_kind 不正・期間逆転は 422 | admin で1件作成 | `PATCH`（strategy 変更）／`PATCH`（doc_kind=bogus）／`PATCH`（period_from>period_to） | 前者200・反映／後2つ 422（field=doc_kind／period_to） | R.1／§4.7 |
+| R-TC-105 | api | 変更系の CSRF/認可 | admin／一般 | CSRF 無し `POST`／一般ユーザー `POST`（CSRF有） | いずれも 403（csrf_failed／forbidden） | R.0／A.0 |
+| R-TC-106 | api | アーカイブ＝status=archived・選択用一覧から除外 | admin で1件作成 | `POST /{id}/archive`→一般で `?for=selection` | archived・選択用一覧に出ない（active のみ） | R.1／R.0 |
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 
