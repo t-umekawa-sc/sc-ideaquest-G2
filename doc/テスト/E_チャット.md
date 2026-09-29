@@ -31,6 +31,8 @@
 | E-TC-113 | api | チャット添付→DL 署名URL | comment 権限・Fake storage | `POST`（files=png）→`GET /attachments/{aid}/download` | 201・メッセージ `attachments[]`（kind=image）・DL EP が `{url}`（チャット添付も共通 EP で解決） | E.3／§1.10 |
 | E-TC-114 | api | 変更系の CSRF/未認証 | CSRF なし／セッションなし | `POST /chat-messages` | 403 csrf_failed／401 | A.0 |
 | E-TC-211 | unit | メンション強調は nospace トークン一致のみ（受入不具合 DFT-E-001 再発防止＝描画側と composer の nospace 契約固定） | `renderTextHtml`・members に nospace=`テスト太郎` | `("@テスト太郎 …")`／`("@テスト 太郎 …")`／`<script>` | 前者＝`<span class="mention">@テスト太郎</span>`／空白入りは full name 強調なし（素テキスト）／`<script>`→`&lt;script&gt;`（XSS 無害化） | E.2 |
+| E-TC-229 | unit | 全員メンションの表示強調＝`@全員`/`@all`（大小無視）を `.mention` 化（クライアント展開・決定 2026-09-29） | `renderTextHtml`・members に nospace=`テスト太郎` | `("@全員 集合")`／`("@all hi")`／`("@ALL hey")` | いずれも `<span class="mention">@…</span>`（トークンは原文保持）。members に居ない `@全員` でも強調（all-token は特別扱い） | E.6／FR-24 |
+| E-TC-230 | unit | 全員メンションの ID 展開＝`@全員`/`@all` を**全メンバーの user_id へ展開**（`resolveMentionIds`・宛先解決の正） | members=[u1,u2]・自分は含めず | `("@全員 …")`／`("@all …")`／`("@テスト太郎 @全員 …")`（重複） | 前2つ＝`[u1,u2]`（全展開）／最後＝`[u1,u2]`（個別と all の和・重複排除）／member 不在の素 `@x` は無視 | E.6／FR-24 |
 
 ## 2. リアクション（通常＋魔法・E.4）
 

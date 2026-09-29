@@ -16,7 +16,7 @@ import { ApiError } from "@/lib/api/client";
 import { backToListOr, consumeChatFromDashboard } from "@/lib/nav";
 import { realtime } from "@/lib/realtime";
 import { reduceMotion } from "@/lib/motion";
-import { renderTextHtml, resolveMagic, type Member } from "../render";
+import { renderTextHtml, resolveMagic, resolveMentionIds, type Member } from "../render";
 import { flashClassFor, scrollTopForTarget } from "../jump";
 import { getAttachmentDownloadUrl } from "@/features/ideas/api";
 import { ideaSource, type ChatSource, type ChatCtx } from "../source";
@@ -63,6 +63,12 @@ function autoGrow(ta: HTMLTextAreaElement | null, max = 180) {
   ta.style.height = Math.min(ta.scrollHeight, max) + "px";
 }
 type Pos = { top: number; left: number };
+
+// 全員メンション候補（決定 2026-09-29・SC-24 §5）。nospace=`全員` なので選択で本文へ `@全員 ` が入り、
+// resolveMentionIds が全メンバーへ展開する（個別候補と同じ流儀で chooseMention に載る）。user_id は合成の番兵。
+const ALL_MENTION: Member = { user_id: "__all__", name: "全員（メンバー全員に通知）", nospace: "全員" };
+// 候補に「全員」を出すためのマッチ別名（部分一致・大小無視）。`@全員`/`@all` 両対応（表記の見せ方はユーザー決定）。
+const ALL_MENTION_ALIASES = ["全員", "ぜんいん", "zenin", "all", "everyone", "みんな"];
 
 export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: string; source?: ChatSource; gameEnabled?: boolean }) {
   // source を明示指定（コンセプト等）／未指定なら ideaId からアイデア source を構築（後方互換・SC-24）。
@@ -334,7 +340,11 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
     const m = upto.match(/@([^\s@]*)$/);
     if (!m) return setMention(null);
     const q = m[1];
-    const matches = members.filter((n) => n.nospace.includes(q));
+    const ql = q.toLowerCase();
+    const memberMatches = members.filter((n) => n.nospace.includes(q));
+    // メンバーが居る時だけ「全員」候補を先頭に（@全員/@all 等の別名に部分一致で表示）。
+    const showAll = members.length > 0 && ALL_MENTION_ALIASES.some((a) => a.includes(ql));
+    const matches = showAll ? [ALL_MENTION, ...memberMatches] : memberMatches;
     if (!matches.length) return setMention(null);
     setMention({ pos: posAbove(ta), matches, active: 0 });
   }, [members]);
@@ -377,15 +387,8 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
     else return false;
     return true;
   };
-  // 本文の @token を members の user_id に解決（メンション送信用）。
-  const extractMentionIds = (body: string): string[] => {
-    const ids = new Set<string>();
-    for (const m of body.matchAll(/@([^\s@]+)/g)) {
-      const mem = members.find((x) => x.nospace === m[1]);
-      if (mem) ids.add(mem.user_id);
-    }
-    return [...ids];
-  };
+  // 本文の @token を members の user_id に解決（メンション送信用）。@全員/@all は全メンバーへ展開（render.ts の純ロジックに集約）。
+  const extractMentionIds = (body: string): string[] => resolveMentionIds(body, members);
 
   // ---- 送信 ----
   const send = async () => {
@@ -832,7 +835,7 @@ export function IdeaChatView({ ideaId, source, gameEnabled = true }: { ideaId?: 
               {hintOpen && (
                 <p className="composer__hint" id="composerHint">
                   <strong>Enter で送信 / Shift+Enter で改行</strong>。パーティー全員が閲覧・投稿できます（コメント作成権限）。投稿で <span className="xp">+5 XP</span>（日次上限あり）。<br />
-                  ツールバー: 📎添付 ・ <code>@</code>メンション ・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。
+                  ツールバー: 📎添付 ・ <code>@</code>メンション（<code>@全員</code>／<code>@all</code> でメンバー全員に通知）・ 😀絵文字 ・ <strong>太字</strong>（<code>**</code>）・ コード（<code>``</code>）・ 🔗リンク。空のメッセージは送信できません。
                 </p>
               )}
             </>
