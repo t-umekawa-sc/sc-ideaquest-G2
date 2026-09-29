@@ -5,8 +5,8 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-29（本セッション末）
-- ブランチ: `main`（作業ツリー clean）
-- push: 本セッションのコミットを **origin/main へ push 済み**。
+- ブランチ: `main`（作業ツリー clean）。
+- push: ピッカー行アイコン（backend strategy/info 候補 DTO＋frontend 両ピッカー＋R-TC-109/N-TC-228＋TC台帳＋impl/README に FR-44 節追加）を **feat コミット済**。push は未（次セッション/指示で push）。
 - 直近コミット（新しい順・本ファイル＝最新の docs(handoff) コミット）:
   - `docs(handoff)` 本ファイル全文更新（このコミット）
   - `d76a1d66` feat(strategy): SC-22 に方針整合バッジ＋アイデア詳細に alignment 露出（Step3）
@@ -47,11 +47,12 @@
 - 動いている（本セッションで実機/テスト確認済み）:
   - 経営資料 CRUD＋画面（一覧カード/表・登録/編集モーダル・アーカイブ/復元・複製・紐づくクエスト）。ユーザー受入 OK（Step2）。
   - Step3 整合＝資料+クエスト+一致アイデアを作成→紐づけ→公開で `GET /ideas/{id}.alignment` に `best_score 0.962 / coins_awarded 15`、SC-22 に「🎯 方針整合 96% ・ +15🪙」バッジをスクショ目視確認（ヘッダのコインも +15 反映）。使い捨て spec と dev DB のテスト残骸は掃除済。
+- ピッカー行アイコン（次アクション#1・**未コミット**）＝backend+frontend 実装済・実機ビルド反映済。クエストを選ぶ/対象を選ぶダイアログの候補行に画像アイコン（設定時）or 頭文字タイル（未設定）をタイトル前に表示。スクショ目視 OK（`tmp_shots/strategy-quest-picker.png`／`info-target-picker.png`）。
 - テスト（本セッションで実行）:
-  - backend `tests/strategy`＝R-TC-101〜108（CRUD/authz/アーカイブ/復元/クエスト紐づけ＋版履歴）・R-TC-201（整合率→best→コイン冪等）green。
-  - `python3 scripts/check_tc_traceability.py` = ✅（888）。
+  - backend **フル pytest = 862 passed**（次セッション冒頭の裏取りで実行）。追加後の `tests/strategy`＋`tests/info` = 90 passed（R-TC-109／N-TC-228 含む）。
+  - `python3 scripts/check_tc_traceability.py` = ✅（890）。
 - 壊れているもの＝**確認範囲では無し**。
-- **未確認**＝(a) backend フル pytest（本セッションは `tests/strategy` 中心・schema 変更後の全域再実行は未）、(b) frontend 本番ビルドは Step3 で通過したが `vitest` 全域は未再実行、(c) Playwright e2e フルスイート未実行。
+- **未確認**＝(a) frontend `vitest` 全域は未再実行（`npm run build` は今回通過）、(b) Playwright e2e フルスイート未実行（使い捨て spec での目視のみ）。
 
 ## 5. 詰まっている点（試して失敗した/落とし穴）
 - **`IdeaDetailDTO` に alignment 未追加だと剥がれる**＝backend で payload を積んでも Pydantic 応答モデルにフィールドが無いと FastAPI が除去。DTO に `alignment: dict|None` を追加して解決。
@@ -71,10 +72,7 @@
 - **owner_type は単数形**＝entity_tokens に `strategy_doc` を追加（info/idea/concept/quest/assumption と同系）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **【ユーザー依頼・作業メモ】ピッカー行にアイコン表示**（[[strategy-picker-show-icons]]）＝
-   - **クエストを選ぶダイアログ**（`impl/frontend/src/features/strategy/components/StrategyQuestLinks.tsx` の候補行レンダリング）＝クエストにアイコンが設定されている場合、タイトルの前にそのアイコンを表示。
-   - **対象を選ぶダイアログ**（`impl/frontend/src/features/info-input/components/TargetPicker.tsx` の候補行）＝アイデア・クエストともにアイコン設定時はタイトル前に表示。
-   - 事前確認＝候補 API（quest-candidates／info-input の対象候補）が `icon_image_url` 等を返すか。返さなければ候補 DTO（backend schemas＋codegen）に追加してから。未設定時は現行の頭文字タイルへフォールバック。
+1. ~~**ピッカー行にアイコン表示**~~ **【完了 2026-09-29】** クエストを選ぶ（`StrategyQuestLinks`）／対象を選ぶ（`TargetPicker`）の候補行に共通 `QuestIcon`（画像 or 頭文字タイル）をタイトル前に表示。backend 候補 DTO に `icon_image_url` 追加（strategy=`QuestLinkItem`／info=`InfoLinkCandidateDTO`・ideas は個別→作成者既定フォールバック・presigned は application 層で解決）。テスト R-TC-109／N-TC-228 green・両ピッカーをスクショ目視確認済。**未コミット**（次セッションでコミット可）。
 2. **Step3ب ローカル埋め込み SimilarityProvider**＝keyword cosine を意味的一致に差し替え可能な provider 実装（無料ライブラリ）。差し替え点＝`strategy/alignment.py` の `score`。
 3. **Step4 機会/脅威/影響率＋ワードクラウド**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装（R.4）。
 4. **Step5 AI 用 Markdown エクスポート**＝R.5・`doc/テスト/R_経営資料.md` §4 に TC 追加してから。

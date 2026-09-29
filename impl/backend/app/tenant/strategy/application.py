@@ -204,12 +204,16 @@ def selection_list(account_id: uuid.UUID, company_id: uuid.UUID, *, q) -> dict:
 # ---- クエスト↔経営資料リンク（R.1b・§5.56・版履歴＝quest_revision） ----
 
 def _quest_link_item(row) -> dict:
-    # row=(id, title, status, deadline, owner_name, created_at)
+    # row=(id, title, status, deadline, owner_name, created_at, icon_image_path)
+    from app.infra.storage import get_storage
+    icon_path = row[6] if len(row) > 6 else None
     return {
         "id": str(row[0]), "title": row[1], "status": row[2],
         "deadline": row[3] if len(row) > 3 else None,
         "owner_name": row[4] if len(row) > 4 else None,
         "created_at": row[5] if len(row) > 5 else None,
+        # クエストアイコン＝保存キー→短TTL 署名URL（ピッカー行頭表示・未設定は null＝頭文字タイル）。
+        "icon_image_url": get_storage().presigned_get(icon_path) if icon_path else None,
     }
 
 

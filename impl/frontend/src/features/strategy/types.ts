@@ -52,6 +52,7 @@ export interface QuestLinkItem {
   deadline?: string | null;
   owner_name?: string | null;
   created_at?: string | null;
+  icon_image_url?: string | null; // クエストアイコン（署名URL・ピッカー行頭表示／未設定は頭文字タイル）
 }
 
 export interface StrategyDocSelectionItem {

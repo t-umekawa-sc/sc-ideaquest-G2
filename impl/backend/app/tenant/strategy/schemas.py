@@ -105,6 +105,7 @@ class QuestLinkItem(BaseModel):
     deadline: date | None = None      # 期限（締切）＝ピッカーの ⏳ バッジ・期限絞り込み
     owner_name: str | None = None     # 所有者（作成者）＝文脈行
     created_at: datetime | None = None  # 作成日時＝文脈行
+    icon_image_url: str | None = None  # クエストアイコン（署名URL・ピッカー行頭表示／未設定は頭文字タイル）
 
 
 class QuestLinkListResponse(BaseModel):

@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Modal, useSnackbar } from "@/components/ui";
+import { QuestIcon } from "@/components/layout/QuestIcon";
 
 import { addStrategyQuests, fetchQuestCandidates, fetchStrategyQuests, removeStrategyQuest } from "../api";
 import { QUEST_STATUS_LABEL, questStatusLabel } from "../types";
@@ -156,6 +157,7 @@ export function StrategyQuestLinks({ docId, value, onChange }: {
                         <input type="checkbox" className="pick-row__check" checked={on} readOnly aria-label="選択" />
                         <div className="pick-row__body">
                           <div className="pick-row__title">
+                            <QuestIcon name={c.title} imageUrl={c.icon_image_url} size="xs" />
                             <span className="pick-row__title-t">{c.title}</span>
                             {c.deadline ? <span className="badge badge-muted pick-row__due">⏳ {c.deadline}</span> : null}
                           </div>

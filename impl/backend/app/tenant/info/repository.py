@@ -442,7 +442,8 @@ def search_link_candidates(
 
     if "ideas" in types:
         stmt = (
-            select(Idea.id, Idea.title, Quest.title, User.display_name, Idea.status, Idea.time_limit, Idea.created_at)
+            select(Idea.id, Idea.title, Quest.title, User.display_name, Idea.status, Idea.time_limit, Idea.created_at,
+                   Idea.icon_image_path, User.idea_icon_image_path)
             .join(Quest, Quest.id == Idea.quest_id)
             .join(User, User.id == Idea.author_id)
             .where(Idea.deleted_at.is_(None), Idea.status == "published", Idea.title.ilike(like))
@@ -455,17 +456,20 @@ def search_link_candidates(
             stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit >= df)
         if due_to:
             stmt = stmt.where(Idea.time_limit.is_not(None), Idea.time_limit <= dt)
-        for i, title, qtitle, owner, status, due, created in session.execute(
+        for i, title, qtitle, owner, status, due, created, icon_path, author_icon in session.execute(
             stmt.order_by(Idea.title.asc(), Idea.id.asc()).limit(want)
         ).all():
             rows.append({"target_type": "ideas", "target_id": str(i), "title": title,
                          "quest_title": qtitle, "owner_name": owner, "status": status,
                          "due": due.isoformat() if due else None,
-                         "created_at": created.date().isoformat() if created else None})
+                         "created_at": created.date().isoformat() if created else None,
+                         # アイコン＝個別→作成者既定のキー（application で署名URL に解決）。
+                         "_icon_path": icon_path or author_icon})
 
     if "quests" in types:
         stmt = (
-            select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline, Quest.created_at)
+            select(Quest.id, Quest.title, User.display_name, Quest.status, Quest.deadline, Quest.created_at,
+                   Quest.icon_image_path)
             .join(User, User.id == Quest.owner_id)
             .where(Quest.deleted_at.is_(None), Quest.title.ilike(like))
         )
@@ -477,13 +481,15 @@ def search_link_candidates(
             stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline >= df)
         if due_to:
             stmt = stmt.where(Quest.deadline.is_not(None), Quest.deadline <= dt)
-        for i, title, owner, status, due, created in session.execute(
+        for i, title, owner, status, due, created, icon_path in session.execute(
             stmt.order_by(Quest.title.asc(), Quest.id.asc()).limit(want)
         ).all():
             rows.append({"target_type": "quests", "target_id": str(i), "title": title,
                          "quest_title": None, "owner_name": owner, "status": status,
                          "due": due.isoformat() if due else None,
-                         "created_at": created.date().isoformat() if created else None})
+                         "created_at": created.date().isoformat() if created else None,
+                         # クエストアイコンのキー（application で署名URL に解決）。
+                         "_icon_path": icon_path})
 
     if "concepts" in types:
         from app.tenant.concepts.orm import Concept

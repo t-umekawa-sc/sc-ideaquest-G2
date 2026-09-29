@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 
 import { Modal, ModalBody, ModalFooter } from "@/components/ui";
+import { QuestIcon } from "@/components/layout/QuestIcon";
 import { fetchLinkCandidates } from "../api";
 import { LINK_KIND_LABEL, LINK_TARGET_LABEL } from "../labels";
 import type { InfoLinkCandidate, InfoLinkKind, InfoLinkTarget } from "../types";
@@ -167,6 +168,9 @@ export function TargetPicker({ open, onClose, onConfirm, existing = [] }: {
                   <div className="pick-row__body">
                     <div className="pick-row__title">
                       <span className="badge badge-muted lk-type">{LINK_TARGET_LABEL[c.target_type]}</span>
+                      {c.target_type === "ideas" || c.target_type === "quests" ? (
+                        <QuestIcon name={c.title} imageUrl={c.icon_image_url} size="xs" />
+                      ) : null}
                       <span className="pick-row__title-t">{c.title}</span>
                       {c.due ? <span className="badge badge-muted pick-row__due">⏳ {c.due}</span> : null}
                     </div>

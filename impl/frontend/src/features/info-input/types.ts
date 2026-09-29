@@ -123,6 +123,7 @@ export interface InfoLinkCandidate {
   status?: string | null;      // published/draft/recruiting 等
   due?: string | null;         // ISO 期限（アイデア=タイムリミット／クエスト=期限日）
   created_at?: string | null;  // ISO 作成日（同名・同一文脈の識別用）
+  icon_image_url?: string | null; // アイコン（署名URL・ピッカー行頭表示／未設定は頭文字タイル）
 }
 export interface InfoAttachment {
   id: string;

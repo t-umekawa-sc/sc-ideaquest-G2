@@ -402,6 +402,63 @@ def test_n_tc_143_candidate_pagination(client, info_env):
         _cleanup_link_targets(info_env.db_identifier, s)
 
 
+def test_n_tc_228_candidate_icon_url(client, info_env):
+    """N-TC-228: 候補にアイコン署名URLを載せる（対象ピッカー行頭表示）。
+
+    ideas＝個別があれば個別・無ければ作成者既定／quests＝クエストのアイコン／未設定は null。
+    """
+    import uuid as _uuid
+    from types import SimpleNamespace
+    from app.tenant.ideas.orm import Idea
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+
+    db = info_env.db_identifier
+    owner, qic, qno = _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4()
+    i_own, i_def, i_no = _uuid.uuid4(), _uuid.uuid4(), _uuid.uuid4()
+    with get_tenant_session(db) as ts:
+        # 作成者は idea 用の既定アイコンを持つ（i_def のフォールバック元）。
+        ts.add(User(id=owner, account_id=_uuid.uuid4(), display_name="候補アイコンZZ", locale="ja",
+                    status="active", idea_icon_image_path="idea-icons/author-def-zz"))
+        ts.flush()
+        ts.add(Quest(id=qic, owner_id=owner, title="アイコン候補Q_ZZ_有", color="#0D9488", status="recruiting",
+                     icon_image_path="quest-icons/qic-zz"))
+        ts.add(Quest(id=qno, owner_id=owner, title="アイコン候補Q_ZZ_無", color="#0D9488", status="recruiting"))
+        ts.flush()
+        # 個別アイコンあり／作成者既定のみ／どちらも無し。
+        ts.add(Idea(id=i_own, quest_id=qic, author_id=owner, title="アイコン候補I_ZZ_個別", body="b", value="v",
+                    status="published", icon_image_path="idea-icons/own-zz"))
+        ts.add(Idea(id=i_def, quest_id=qic, author_id=owner, title="アイコン候補I_ZZ_既定", body="b", value="v",
+                    status="published"))
+        # 既定を持たない別作成者のアイデア＝アイコン null。
+        owner2 = _uuid.uuid4()
+        ts.add(User(id=owner2, account_id=_uuid.uuid4(), display_name="候補無しZZ", locale="ja", status="active"))
+        ts.flush()
+        ts.add(Idea(id=i_no, quest_id=qno, author_id=owner2, title="アイコン候補I_ZZ_無", body="b", value="v",
+                    status="published"))
+        ts.commit()
+    s = SimpleNamespace(owner=owner, owner2=owner2, qic=qic, qno=qno, i_own=i_own, i_def=i_def, i_no=i_no)
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    try:
+        r = client.get("/api/v1/info-link-candidates", params={"types": "ideas,quests", "q": "アイコン候補"})
+        assert r.status_code == 200, r.text
+        by_id = {c["target_id"]: c for c in r.json()["candidates"]}
+        own = by_id[str(i_own)]["icon_image_url"]
+        assert own and "idea-icons/own-zz" in own  # 個別優先（署名URL にキーが載る）
+        dfl = by_id[str(i_def)]["icon_image_url"]
+        assert dfl and "idea-icons/author-def-zz" in dfl  # 個別が無ければ作成者既定へフォールバック
+        assert by_id[str(i_no)]["icon_image_url"] is None  # 個別/既定とも無し＝null
+        qic_url = by_id[str(qic)]["icon_image_url"]
+        assert qic_url and "quest-icons/qic-zz" in qic_url
+        assert by_id[str(qno)]["icon_image_url"] is None
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(Idea.__table__.delete().where(Idea.id.in_([s.i_own, s.i_def, s.i_no])))
+            ts.execute(Quest.__table__.delete().where(Quest.id.in_([s.qic, s.qno])))
+            ts.execute(User.__table__.delete().where(User.id.in_([s.owner, s.owner2])))
+            ts.commit()
+
+
 def test_n_tc_144_content_revisions(client, info_env):
     """N-TC-144: 内容編集で更新履歴（content_revisions）を版降順で返す。"""
     _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)

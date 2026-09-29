@@ -77,7 +77,7 @@ def quest_candidates(session: Session, *, q: str | None = None, statuses: list[s
     """全社の有効クエスト（非削除）を候補として返す（管理者が紐づけ対象を選ぶ・R.0）。
 
     絞り込み＝タイトル(q)／ステータス(statuses)／期限(deadline_from..deadline_to・未設定は範囲指定時に除外)。
-    返り値＝(id, title, status, deadline, owner_name, created_at)。
+    返り値＝(id, title, status, deadline, owner_name, created_at, icon_image_path)。
     """
     from app.tenant.profile.orm import User
     from app.tenant.quests.orm import Quest
@@ -93,18 +93,20 @@ def quest_candidates(session: Session, *, q: str | None = None, statuses: list[s
         conds.append(Quest.deadline.isnot(None))
         conds.append(Quest.deadline <= deadline_to)
     return session.execute(
-        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at)
+        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at,
+               Quest.icon_image_path)
         .join(User, User.id == Quest.owner_id, isouter=True)
         .where(*conds).order_by(Quest.title).limit(limit)
     ).all()
 
 
 def quests_for_doc(session: Session, doc_id: uuid.UUID) -> list:
-    """当該経営資料に紐づく（適用中の）クエスト＝(id, title, status, deadline, owner_name, created_at)。"""
+    """当該経営資料に紐づく（適用中の）クエスト＝(id, title, status, deadline, owner_name, created_at, icon_image_path)。"""
     from app.tenant.profile.orm import User
     from app.tenant.quests.orm import Quest
     return session.execute(
-        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at)
+        select(Quest.id, Quest.title, Quest.status, Quest.deadline, User.display_name, Quest.created_at,
+               Quest.icon_image_path)
         .join(QuestStrategyDocument, QuestStrategyDocument.quest_id == Quest.id)
         .join(User, User.id == Quest.owner_id, isouter=True)
         .where(QuestStrategyDocument.strategy_document_id == doc_id, Quest.deleted_at.is_(None))

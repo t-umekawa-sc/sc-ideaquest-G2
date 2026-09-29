@@ -18,6 +18,7 @@
 | R-TC-106 | api | アーカイブ（論理削除）＝status=archived・選択用一覧から除外（物理削除はしない） | admin で1件作成 | `POST /{id}/archive`→一般で `?for=selection` | archived・選択用一覧に出ない（active のみ）・レコードは残る | R.1／R.0 |
 | R-TC-107 | api | 復元（アーカイブ解除）＝active に戻り選択用一覧に再掲（誤アーカイブの復元） | admin で1件作成→archive | `POST /{id}/unarchive`→一般で `?for=selection` | status=active・選択用一覧に再び出る | R.1 |
 | R-TC-108 | api | 経営資料←→クエストの紐づけ（候補検索/追加/解除）＋クエスト版履歴に記録・authz | admin で資料＋クエスト作成 | `GET /quest-candidates`／`POST /{id}/quests`／`GET /{id}/quests`／`DELETE /{id}/quests/{qid}`／一般で `GET /{id}/quests` | 候補に出る／追加で linked に出る／版履歴（quest_revisions）の changes に `strategy_documents`（資料タイトル）が載る／解除で消える／一般は 403 | R.1b／§5.56／§3.1 |
+| R-TC-109 | api | クエスト候補にアイコンURLを載せる（ピッカー行頭表示・未設定は null＝頭文字タイルへフォールバック） | admin でアイコン設定済クエスト1件＋未設定クエスト1件 | `GET /quest-candidates` | アイコン設定クエストの行は `icon_image_url` が非 null（署名URL）／未設定クエストは `icon_image_url` が null | R.1b／§5.56 |
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 

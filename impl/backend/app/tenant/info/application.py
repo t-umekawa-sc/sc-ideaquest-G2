@@ -1183,6 +1183,12 @@ def get_link_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *,
         cands, has_more = repo.search_link_candidates(
             ts, types=types, q=q or "", quest_ids=qids, statuses=statuses or [],
             due_from=due_from, due_to=due_to, limit=limit, offset=offset)
+    # アイコンのキー（repo が積んだ `_icon_path`）を短TTL 署名URL に解決（infra はアプリ層で）。
+    from app.infra.storage import get_storage
+    storage = get_storage()
+    for c in cands:
+        path = c.pop("_icon_path", None)
+        c["icon_image_url"] = storage.presigned_get(path) if path else None
     return {"candidates": cands, "next_cursor": str(offset + limit) if has_more else None}
 
 

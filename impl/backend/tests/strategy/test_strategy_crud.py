@@ -169,6 +169,34 @@ def test_r_tc_108_quest_link_and_revision(client, factory, docs):
             ts.commit()
 
 
+def test_r_tc_109_quest_candidates_icon_url(client, factory, docs):
+    """R-TC-109 クエスト候補にアイコン署名URLを載せる（ピッカー行頭表示・未設定は null）。"""
+    from app.tenant.profile.orm import User
+    from app.tenant.quests.orm import Quest
+
+    _admin(client, factory)  # 候補検索は管理者スコープ（require_company_account_admin）
+    stamp = uuid.uuid4().hex[:6]
+    owner, qic, qno = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    db = _seed_db()
+    with get_tenant_session(db) as ts:
+        ts.add(User(id=owner, account_id=uuid.uuid4(), display_name=f"候補owner_{stamp}", locale="ja", status="active"))
+        ts.flush()
+        ts.add(Quest(id=qic, owner_id=owner, title=f"アイコン有Q_{stamp}", color="#0D9488", status="recruiting",
+                     icon_image_path="quest-icons/r109-zz"))
+        ts.add(Quest(id=qno, owner_id=owner, title=f"アイコン無Q_{stamp}", color="#0D9488", status="recruiting"))
+        ts.commit()
+    try:
+        cand = {c["id"]: c for c in client.get(f"{BASE}/quest-candidates?q=Q_{stamp}").json()["data"]}
+        icon = cand[str(qic)]["icon_image_url"]
+        assert icon and "quest-icons/r109-zz" in icon  # 署名URL にアイコンキーが載る
+        assert cand[str(qno)]["icon_image_url"] is None  # 未設定は null＝頭文字タイル
+    finally:
+        with get_tenant_session(db) as ts:
+            ts.execute(Quest.__table__.delete().where(Quest.id.in_([qic, qno])))
+            ts.execute(User.__table__.delete().where(User.id == owner))
+            ts.commit()
+
+
 def test_r_tc_107_unarchive_restores(client, factory, docs):
     """R-TC-107 復元（アーカイブ解除）＝status=active に戻り、選択用一覧に再び出る（誤アーカイブの復元）。"""
     _admin(client, factory)

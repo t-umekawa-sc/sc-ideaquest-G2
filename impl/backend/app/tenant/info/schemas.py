@@ -165,6 +165,7 @@ class InfoLinkCandidateDTO(BaseModel):
     status: str | None = None
     due: str | None = None  # ISO(YYYY-MM-DD)。アイデア=タイムリミット／クエスト=期限日。
     created_at: str | None = None  # ISO(YYYY-MM-DD)。同名・同一文脈でも作成日で識別できるように。
+    icon_image_url: str | None = None  # アイコン（署名URL・ピッカー行頭表示）。アイデア=個別→作成者既定／クエスト=クエスト。未設定は null＝頭文字タイル。
 
 
 class InfoLinkCandidatesResponse(BaseModel):
