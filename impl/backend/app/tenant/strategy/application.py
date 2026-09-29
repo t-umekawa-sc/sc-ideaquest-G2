@@ -197,6 +197,82 @@ def selection_list(account_id: uuid.UUID, company_id: uuid.UUID, *, q) -> dict:
         ]}
 
 
+# ---- クエスト↔経営資料リンク（R.1b・§5.56・版履歴＝quest_revision） ----
+
+def _quest_link_item(row) -> dict:
+    return {"id": str(row[0]), "title": row[1], "status": row[2]}
+
+
+def quest_candidates(account_id: uuid.UUID, company_id: uuid.UUID, *, q) -> dict:
+    """紐づけ候補＝全社の有効クエスト（管理者・R.0）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        return {"data": [_quest_link_item(r) for r in repo.quest_candidates(ts, q=q)]}
+
+
+def linked_quests(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    did = _parse_uuid(doc_id)
+    with get_tenant_session(company.db_identifier) as ts:
+        if repo.get_document(ts, did) is None:
+            raise AppError(404, "not_found")
+        return {"data": [_quest_link_item(r) for r in repo.quests_for_doc(ts, did)]}
+
+
+def add_quest_links(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *, quest_ids) -> dict:
+    """経営資料にクエストを紐づける（複数可）。追加ごとに当該クエストの版を1件記録（版履歴・§3.1）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    did = _parse_uuid(doc_id)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if repo.get_document(ts, did) is None:
+            raise AppError(404, "not_found")
+        from app.tenant.quests import application as quests_app
+        from app.tenant.quests import repository as quests_repo
+        for raw in quest_ids:
+            qid = _parse_uuid(raw)
+            quest = quests_repo.get_quest(ts, qid)
+            if quest is None or quest.deleted_at is not None:
+                continue  # 無効クエストはスキップ（存在秘匿）
+            if repo.add_quest_link(ts, did, qid):
+                quests_app._record_quest_revision_if_changed(ts, quest, user.id)  # 適用資料の変更＝版履歴
+        payload = {"data": [_quest_link_item(r) for r in repo.quests_for_doc(ts, did)]}
+        ts.commit()
+    return payload
+
+
+def remove_quest_link(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, quest_id: str) -> dict:
+    """経営資料からクエストの紐づけを解除。解除で当該クエストの版を1件記録（版履歴）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    did = _parse_uuid(doc_id)
+    qid = _parse_uuid(quest_id)
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if repo.get_document(ts, did) is None:
+            raise AppError(404, "not_found")
+        from app.tenant.quests import application as quests_app
+        from app.tenant.quests import repository as quests_repo
+        quest = quests_repo.get_quest(ts, qid)
+        repo.remove_quest_link(ts, did, qid)
+        if quest is not None:
+            quests_app._record_quest_revision_if_changed(ts, quest, user.id)  # 適用資料の変更＝版履歴
+        payload = {"data": [_quest_link_item(r) for r in repo.quests_for_doc(ts, did)]}
+        ts.commit()
+    return payload
+
+
 def _parse_uuid(value: str) -> uuid.UUID:
     try:
         return uuid.UUID(str(value))

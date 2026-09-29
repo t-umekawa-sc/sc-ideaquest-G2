@@ -3,7 +3,7 @@
 import type { QueryState } from "@/components/ui";
 import { apiFetch } from "@/lib/api/client";
 
-import type { StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyListResult } from "./types";
+import type { QuestLinkItem, StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyListResult } from "./types";
 
 export const STRATEGY_CHANGED_EVENT = "strategy-documents-changed";
 
@@ -61,4 +61,28 @@ export function archiveStrategyDoc(id: string): Promise<StrategyDocDetail | null
 // 復元（アーカイブ解除）。物理削除は設けない（基本は論理削除＝アーカイブ・R.1）。
 export function unarchiveStrategyDoc(id: string): Promise<StrategyDocDetail | null> {
   return apiFetch<StrategyDocDetail>(`/strategy-documents/${id}/unarchive`, { method: "POST" });
+}
+
+// ---- 紐づくクエスト（R.1b・§5.56） ----
+export async function fetchStrategyQuests(id: string, signal?: AbortSignal): Promise<QuestLinkItem[]> {
+  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/${id}/quests`, { signal });
+  return res?.data ?? [];
+}
+
+export async function fetchQuestCandidates(q?: string, signal?: AbortSignal): Promise<QuestLinkItem[]> {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/quest-candidates${qs}`, { signal });
+  return res?.data ?? [];
+}
+
+export async function addStrategyQuests(id: string, questIds: string[]): Promise<QuestLinkItem[]> {
+  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/${id}/quests`, {
+    method: "POST", body: JSON.stringify({ quest_ids: questIds }),
+  });
+  return res?.data ?? [];
+}
+
+export async function removeStrategyQuest(id: string, questId: string): Promise<QuestLinkItem[]> {
+  const res = await apiFetch<{ data: QuestLinkItem[] }>(`/strategy-documents/${id}/quests/${questId}`, { method: "DELETE" });
+  return res?.data ?? [];
 }

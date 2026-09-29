@@ -123,6 +123,52 @@ def test_r_tc_106_archive_excluded_from_selection(client, factory, docs):
     assert not any(d["id"] == str(did) for d in sel), "archived は選択用一覧に出ない"
 
 
+def test_r_tc_108_quest_link_and_revision(client, factory, docs):
+    """R-TC-108 経営資料←→クエストの紐づけ＝候補検索/追加/解除＋クエスト版履歴に記録（R.1b・§5.56/§3.1）。"""
+    from sqlalchemy import select as _select
+    from app.tenant.quests.orm import Quest, QuestRevision
+
+    adm = _admin(client, factory)  # このadminがクエストの作成者=owner（後で削除できる）
+    stamp = uuid.uuid4().hex[:6]
+    did = uuid.UUID(client.post(BASE, json=_body(f"紐付_{stamp}"), headers=_csrf(client)).json()["id"]); docs.append(did)
+    # 紐づけ対象のクエストを作成（kanri＝active ユーザーで可）。
+    qr = client.post("/api/v1/quests", headers=_csrf(client), json={
+        "title": f"紐付クエスト_{stamp}", "color": "#0D9488", "quest_group_ids": [], "categories": ["業務改善"],
+        "deadline": "2026-12-31", "purpose": "目的", "status": "recruiting"})
+    assert qr.status_code == 201, qr.text
+    qid = qr.json()["id"]
+    try:
+        # 候補検索に出る。
+        cand = client.get(f"{BASE}/quest-candidates?q=紐付クエスト_{stamp}").json()["data"]
+        assert any(c["id"] == qid for c in cand)
+        # 紐づけ追加＝linked に出る。
+        add = client.post(f"{BASE}/{did}/quests", json={"quest_ids": [qid]}, headers=_csrf(client))
+        assert add.status_code == 200 and any(x["id"] == qid for x in add.json()["data"])
+        assert any(x["id"] == qid for x in client.get(f"{BASE}/{did}/quests").json()["data"])
+        # 版履歴＝クエストの最新版 changes に strategy_documents（資料タイトル）が載る。
+        with get_tenant_session(_seed_db()) as ts:
+            rev = ts.execute(_select(QuestRevision).where(QuestRevision.quest_id == uuid.UUID(qid))
+                             .order_by(QuestRevision.revision.desc())).scalars().first()
+            assert rev is not None and f"紐付_{stamp}" in (rev.changes.get("strategy_documents") or []), "版履歴に適用資料が記録される"
+        # 解除＝linked から消える。
+        rm = client.delete(f"{BASE}/{did}/quests/{qid}", headers=_csrf(client))
+        assert rm.status_code == 200 and not any(x["id"] == qid for x in rm.json()["data"])
+        # 認可＝一般ユーザーは紐づけ一覧 403。
+        _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+        assert client.get(f"{BASE}/{did}/quests").status_code == 403
+    finally:
+        # クエスト＋子行を物理掃除（quest_revisions.editor_id 等が factory の user 削除を阻害しないよう）。
+        from sqlalchemy import text as _text
+        with get_tenant_session(_seed_db()) as ts:
+            ts.execute(_text("DELETE FROM quest_member_permissions WHERE quest_member_id IN "
+                             "(SELECT id FROM quest_members WHERE quest_id = :q)"), {"q": qid})
+            for tbl in ("quest_strategy_documents", "quest_revisions", "quest_categories", "quest_members",
+                        "quest_group_links", "quest_decision_log", "quest_outcome_revisions"):
+                ts.execute(_text(f"DELETE FROM {tbl} WHERE quest_id = :q"), {"q": qid})
+            ts.execute(_text("DELETE FROM quests WHERE id = :q"), {"q": qid})
+            ts.commit()
+
+
 def test_r_tc_107_unarchive_restores(client, factory, docs):
     """R-TC-107 復元（アーカイブ解除）＝status=active に戻り、選択用一覧に再び出る（誤アーカイブの復元）。"""
     _admin(client, factory)

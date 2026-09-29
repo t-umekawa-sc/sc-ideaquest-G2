@@ -719,18 +719,22 @@ QUEST_REVISION_FIELDS = (
     # 発見カタログ掲載（FR-40）・アイコン画像も定義編集＝版に記録（PATCH で編集可・silent no-bump を防ぐ・2026-09-26 監査）。
     rev_shared.FieldSpec("discoverable", "scalar", scalar_fmt=lambda v: "掲載" if v else "非掲載"),
     rev_shared.FieldSpec("icon_image_path", "scalar", scalar_fmt=lambda v: "（アイコン画像あり）" if v else "（アイコンなし）"),
+    # 適用する経営資料（FR-44・§5.56）＝経営資料側/クエスト側どちらの変更でも版に記録（版履歴）。
+    rev_shared.FieldSpec("strategy_documents", "scalar", scalar_fmt=lambda v: "・".join(v or []) or "（なし）"),
 )
 _QUEST_EMPTY_SNAPSHOT = {"title": None, "purpose": None, "color": None, "deadline": None, "categories": [],
-                         "discoverable": False, "icon_image_path": None}
+                         "discoverable": False, "icon_image_path": None, "strategy_documents": []}
 
 
 def _quest_content_snapshot(ts, quest) -> dict:
+    from app.tenant.strategy import repository as strategy_repo  # 遅延 import（適用中の経営資料タイトル・§5.56/§3.1）
     return {
         "title": quest.title, "purpose": quest.purpose, "color": quest.color,
         "deadline": quest.deadline.isoformat() if quest.deadline else None,
         "categories": sorted(c.label for c in repo.list_categories(ts, quest.id)),
         "discoverable": bool(quest.discoverable),
         "icon_image_path": quest.icon_image_path,
+        "strategy_documents": strategy_repo.strategy_titles_for_quest(ts, quest.id),  # 適用経営資料（FR-44・版履歴）
     }
 
 

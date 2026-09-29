@@ -15,6 +15,8 @@ from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.strategy import application as service
 from app.tenant.strategy.schemas import (
+    QuestLinkAddRequest,
+    QuestLinkListResponse,
     StrategyDocCreateRequest,
     StrategyDocDetail,
     StrategyDocListResponse,
@@ -46,6 +48,13 @@ def list_strategy_documents(
     return service.list_documents(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
         q=q, status=status, doc_kind=doc_kind, sort=sort, page=page, per_page=per_page)
+
+
+# 紐づくクエストの候補検索（全社の有効クエスト・R.1b）。※/{doc_id} より前に定義（パス衝突回避）。
+@router.get("/strategy-documents/quest-candidates", response_model=QuestLinkListResponse)
+def strategy_quest_candidates(request: Request, q: str | None = None,
+                              session: dict = Depends(require_company_account_admin)):
+    return service.quest_candidates(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), q=q)
 
 
 @router.get("/strategy-documents/{doc_id}", response_model=StrategyDocDetail)
@@ -80,3 +89,25 @@ def unarchive_strategy_document(doc_id: str, request: Request,
                                 session: dict = Depends(require_company_account_admin)):
     # アーカイブ解除（誤アーカイブの復元）。物理削除は設けない（基本は論理削除・R.1）。
     return service.unarchive_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+
+
+# ---- 紐づくクエスト（R.1b・§5.56・版履歴＝quest_revision） ----
+
+@router.get("/strategy-documents/{doc_id}/quests", response_model=QuestLinkListResponse)
+def list_strategy_quests(doc_id: str, request: Request, session: dict = Depends(require_company_account_admin)):
+    return service.linked_quests(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+
+
+@router.post("/strategy-documents/{doc_id}/quests", response_model=QuestLinkListResponse,
+             dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def add_strategy_quests(doc_id: str, body: QuestLinkAddRequest, request: Request,
+                        session: dict = Depends(require_company_account_admin)):
+    return service.add_quest_links(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                                   doc_id, quest_ids=body.quest_ids)
+
+
+@router.delete("/strategy-documents/{doc_id}/quests/{quest_id}", response_model=QuestLinkListResponse,
+               dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def remove_strategy_quest(doc_id: str, quest_id: str, request: Request,
+                          session: dict = Depends(require_company_account_admin)):
+    return service.remove_quest_link(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id, quest_id)

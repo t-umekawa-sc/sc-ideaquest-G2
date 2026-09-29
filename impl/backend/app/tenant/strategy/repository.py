@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import list_query as lq
-from app.tenant.strategy.orm import StrategyDocument
+from app.tenant.strategy.orm import QuestStrategyDocument, StrategyDocument
 
 _SORT_COLUMNS = {
     "updated_at": StrategyDocument.updated_at,
@@ -67,3 +67,59 @@ def selection_list(session: Session, *, q: str | None) -> list[StrategyDocument]
 
 
 # 物理削除は設けない（基本は論理削除＝アーカイブ・§R.1）。
+
+
+# ---- クエスト↔経営資料リンク（quest_strategy_documents・§5.56・R.1b） ----
+
+def quest_candidates(session: Session, *, q: str | None = None, limit: int = 50) -> list:
+    """全社の有効クエスト（非削除）を候補として返す＝(id, title, status)（管理者が紐づけ対象を選ぶ・R.0）。"""
+    from app.tenant.quests.orm import Quest
+    conds = [Quest.deleted_at.is_(None)]
+    if q:
+        conds.append(Quest.title.ilike(f"%{q}%"))
+    return session.execute(
+        select(Quest.id, Quest.title, Quest.status).where(*conds).order_by(Quest.title).limit(limit)
+    ).all()
+
+
+def quests_for_doc(session: Session, doc_id: uuid.UUID) -> list:
+    """当該経営資料に紐づく（適用中の）クエスト＝(id, title, status)。"""
+    from app.tenant.quests.orm import Quest
+    return session.execute(
+        select(Quest.id, Quest.title, Quest.status)
+        .join(QuestStrategyDocument, QuestStrategyDocument.quest_id == Quest.id)
+        .where(QuestStrategyDocument.strategy_document_id == doc_id, Quest.deleted_at.is_(None))
+        .order_by(Quest.title)
+    ).all()
+
+
+def is_quest_linked(session: Session, doc_id: uuid.UUID, quest_id: uuid.UUID) -> bool:
+    return session.execute(
+        select(QuestStrategyDocument.id)
+        .where(QuestStrategyDocument.strategy_document_id == doc_id, QuestStrategyDocument.quest_id == quest_id)
+    ).first() is not None
+
+
+def add_quest_link(session: Session, doc_id: uuid.UUID, quest_id: uuid.UUID) -> bool:
+    """リンク追加（既存なら何もしない）。追加したら True。"""
+    if is_quest_linked(session, doc_id, quest_id):
+        return False
+    session.add(QuestStrategyDocument(id=uuid.uuid4(), quest_id=quest_id, strategy_document_id=doc_id))
+    return True
+
+
+def remove_quest_link(session: Session, doc_id: uuid.UUID, quest_id: uuid.UUID) -> None:
+    session.execute(
+        delete(QuestStrategyDocument)
+        .where(QuestStrategyDocument.strategy_document_id == doc_id, QuestStrategyDocument.quest_id == quest_id)
+    )
+
+
+def strategy_titles_for_quest(session: Session, quest_id: uuid.UUID) -> list[str]:
+    """当該クエストが適用中の経営資料タイトル（版スナップショット用・§3.1）。"""
+    rows = session.execute(
+        select(StrategyDocument.title)
+        .join(QuestStrategyDocument, QuestStrategyDocument.strategy_document_id == StrategyDocument.id)
+        .where(QuestStrategyDocument.quest_id == quest_id)
+    ).scalars().all()
+    return sorted(rows)

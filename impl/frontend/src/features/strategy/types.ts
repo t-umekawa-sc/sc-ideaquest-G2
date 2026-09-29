@@ -38,6 +38,13 @@ export interface StrategyDocDetail {
   updated_at: string;
 }
 
+// 紐づくクエスト（R.1b・§5.56）。
+export interface QuestLinkItem {
+  id: string;
+  title: string;
+  status: string;
+}
+
 export interface StrategyDocSelectionItem {
   id: string;
   title: string;

@@ -3694,6 +3694,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/strategy-documents/quest-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Strategy Quest Candidates */
+        get: operations["strategy_quest_candidates_api_v1_strategy_documents_quest_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/strategy-documents/{doc_id}": {
         parameters: {
             query?: never;
@@ -3705,8 +3722,7 @@ export interface paths {
         get: operations["get_strategy_document_api_v1_strategy_documents__doc_id__get"];
         put?: never;
         post?: never;
-        /** Delete Strategy Document */
-        delete: operations["delete_strategy_document_api_v1_strategy_documents__doc_id__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         /** Update Strategy Document */
@@ -3725,6 +3741,58 @@ export interface paths {
         /** Archive Strategy Document */
         post: operations["archive_strategy_document_api_v1_strategy_documents__doc_id__archive_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy-documents/{doc_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Strategy Document */
+        post: operations["unarchive_strategy_document_api_v1_strategy_documents__doc_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy-documents/{doc_id}/quests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Strategy Quests */
+        get: operations["list_strategy_quests_api_v1_strategy_documents__doc_id__quests_get"];
+        put?: never;
+        /** Add Strategy Quests */
+        post: operations["add_strategy_quests_api_v1_strategy_documents__doc_id__quests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy-documents/{doc_id}/quests/{quest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Strategy Quest */
+        delete: operations["remove_strategy_quest_api_v1_strategy_documents__doc_id__quests__quest_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7724,6 +7792,25 @@ export interface components {
         QuestIconImageResponse: {
             /** Icon Image Url */
             icon_image_url?: string | null;
+        };
+        /** QuestLinkAddRequest */
+        QuestLinkAddRequest: {
+            /** Quest Ids */
+            quest_ids: string[];
+        };
+        /** QuestLinkItem */
+        QuestLinkItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+        };
+        /** QuestLinkListResponse */
+        QuestLinkListResponse: {
+            /** Data */
+            data: components["schemas"]["QuestLinkItem"][];
         };
         /** QuestListResponse */
         QuestListResponse: {
@@ -16436,6 +16523,37 @@ export interface operations {
             };
         };
     };
+    strategy_quest_candidates_api_v1_strategy_documents_quest_candidates_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestLinkListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_strategy_document_api_v1_strategy_documents__doc_id__get: {
         parameters: {
             query?: never;
@@ -16455,35 +16573,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StrategyDocDetail"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_strategy_document_api_v1_strategy_documents__doc_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -16549,6 +16638,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_strategy_document_api_v1_strategy_documents__doc_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategy_quests_api_v1_strategy_documents__doc_id__quests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestLinkListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_strategy_quests_api_v1_strategy_documents__doc_id__quests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestLinkAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestLinkListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_strategy_quest_api_v1_strategy_documents__doc_id__quests__quest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestLinkListResponse"];
                 };
             };
             /** @description Validation Error */

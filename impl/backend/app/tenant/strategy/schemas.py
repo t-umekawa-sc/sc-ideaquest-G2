@@ -94,3 +94,20 @@ class StrategyDocListResponse(BaseModel):
 
 class StrategyDocSelectionResponse(BaseModel):
     data: list[StrategyDocSelectionItem]
+
+
+# ---- クエスト↔経営資料リンク（R.1b・§5.56） ----
+
+class QuestLinkItem(BaseModel):
+    id: str
+    title: str
+    status: str
+
+
+class QuestLinkListResponse(BaseModel):
+    data: list[QuestLinkItem]
+
+
+class QuestLinkAddRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    quest_ids: list[str] = Field(min_length=1)

@@ -28,6 +28,15 @@
 .tagselect__sugbtn { padding: 3px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
 .tagselect__sugbtn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-soft); }
 
+/* 紐づくクエストのピッカー一覧（チェックボックス）。 */
+.strategy-picklist { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; display: flex; flex-direction: column; gap: var(--space-2); }
+.strategy-picklist li { padding: var(--space-1) 0; }
+
+/* 「この情報の主要語」プレビュー（情報登録ダイアログと同一UI＝info-input.css から移植）。 */
+.wc-preview { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); min-height: 60px; }
+.wc-mini { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.2; padding: 2px 4px; border-radius: var(--radius); }
+
 /* 経営資料カード（一覧のカード表示）。card は <a>＝inline のため flex-column で block 化（proj-card と同型）。 */
 .strategy-card { display: flex; flex-direction: column; gap: var(--space-2); }
 /* タイトル行＝右上の ⋮ アクションと重ならないよう右余白を確保（QuestCard と同方式）。 */

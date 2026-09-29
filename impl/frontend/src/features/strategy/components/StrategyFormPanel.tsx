@@ -7,9 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
+import { cloudTokens } from "@/features/info-input/wordcloud";
+
 import { createStrategyDoc, emitStrategyChanged, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
 import type { StrategyDocInput } from "../types";
+import { StrategyQuestLinks } from "./StrategyQuestLinks";
 import "../strategy.css";
 
 const KIND_OPTS = Object.entries(DOC_KIND_LABEL).map(([v, l]) => ({ v, l }));
@@ -71,6 +74,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [bodyMd, setBodyMd] = useState("");
   const [periodFrom, setPeriodFrom] = useState("");
   const [periodTo, setPeriodTo] = useState("");
+  const [cloud, setCloud] = useState<[string, number][] | null>(null); // この資料の主要語（プレビュー・情報登録と同一UI）
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [periodErr, setPeriodErr] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,6 +104,12 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const onFocusKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") { e.preventDefault(); addFocus(focusInput); }
     else if (e.key === "Backspace" && !focusInput && focus.length) setFocus((f) => f.slice(0, -1));
+  };
+
+  // 主要語プレビュー＝構造化項目＋補足を連結して抽出（保存時の entity_tokens〔janome〕の目安・情報登録と同一UI）。
+  const runCloud = () => {
+    const text = [title, intent, policy, strategy, objectives, focus.join(" "), bodyMd].filter(Boolean).join(" ").trim();
+    setCloud(text ? cloudTokens(text) : []);
   };
 
   const validate = useCallback((): string[] => {
@@ -204,6 +214,29 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
         <Field className="dialog-section is-quiet" id="sd-body" label="補足・全文" hint="上記に載らない全文貼付（整合率の追加素材）">
           <textarea className="input" id="sd-body" rows={5} value={bodyMd} onChange={(e) => setBodyMd(e.target.value)} />
         </Field>
+
+        {/* この資料の主要語（情報登録ダイアログと同一 UI＝キーワード抽出＋ワードクラウド）。保存時に entity_tokens〔janome〕へ。 */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+          <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
+        </div>
+        <div className="wc-preview">
+          <div className="dialog-label">☁️ この資料の主要語（ワードクラウド）</div>
+          {cloud === null ? (
+            <span className="hint">「🔑 キーワードを抽出」を押すと、入力内容から主要語を抽出して表示します（整合率の関連度に効きます）。</span>
+          ) : cloud.length ? (
+            <div className="wc-mini">
+              {cloud.map(([w, c]) => {
+                const max = Math.max(...cloud.map((x) => x[1]), 1);
+                return <span key={w} className="wc-word" style={{ fontSize: `${(0.85 + (c / max) * 0.9).toFixed(2)}rem` }} title={`${w}（${c}）`}>{w}</span>;
+              })}
+            </div>
+          ) : (
+            <span className="hint">入力が空です。意図・方針・戦略などを入力してから抽出してください。</span>
+          )}
+        </div>
+
+        {/* 紐づくクエスト（編集時のみ＝保存済みの資料に対して設定・R.1b）。 */}
+        {editing && docId && <StrategyQuestLinks docId={docId} />}
       </div>
       <div className="modal__footer">
         <button className="btn btn-outline" type="button" onClick={onCancel}>キャンセル</button>
