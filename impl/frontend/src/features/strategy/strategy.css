@@ -1,0 +1,19 @@
+/* 経営資料（ドメイン R・FR-44）＝一覧ヘッダ／登録フォームのレイアウト補助。 */
+.strategy-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-block: var(--space-4);
+}
+.strategy-list-head h1 { margin: 0; }
+
+/* ISO56001 項目立ての2カラム（種別/重点領域・期間開始/終了）。狭幅は1カラム。 */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-4);
+}
+@media (max-width: 640px) {
+  .form-grid-2 { grid-template-columns: 1fr; }
+}

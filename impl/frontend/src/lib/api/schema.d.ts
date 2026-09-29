@@ -3676,6 +3676,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/strategy-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Strategy Documents */
+        get: operations["list_strategy_documents_api_v1_strategy_documents_get"];
+        put?: never;
+        /** Create Strategy Document */
+        post: operations["create_strategy_document_api_v1_strategy_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/strategy-documents/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Document */
+        get: operations["get_strategy_document_api_v1_strategy_documents__doc_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Strategy Document */
+        delete: operations["delete_strategy_document_api_v1_strategy_documents__doc_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Strategy Document */
+        patch: operations["update_strategy_document_api_v1_strategy_documents__doc_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/strategy-documents/{doc_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Strategy Document */
+        post: operations["archive_strategy_document_api_v1_strategy_documents__doc_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -3803,7 +3857,7 @@ export interface components {
              * @default []
              */
             pinned: components["schemas"]["AccountListItem"][];
-            page_info: components["schemas"]["PageInfo"];
+            page_info: components["schemas"]["app__control_plane__admin__schemas__PageInfo"];
         };
         /**
          * AccountResponse
@@ -4416,7 +4470,7 @@ export interface components {
              * @default []
              */
             pinned: components["schemas"]["CompanyListItem"][];
-            page_info: components["schemas"]["PageInfo"];
+            page_info: components["schemas"]["app__control_plane__admin__schemas__PageInfo"];
         };
         /**
          * CompanyProfileUpdateRequest
@@ -5154,7 +5208,7 @@ export interface components {
         DirectoryResponse: {
             /** Data */
             data: components["schemas"]["DirectoryItem"][];
-            page_info: components["schemas"]["PageInfo"];
+            page_info: components["schemas"]["app__control_plane__admin__schemas__PageInfo"];
         };
         /**
          * EmailChangeAcceptedResponse
@@ -7072,18 +7126,6 @@ export interface components {
             status: string;
         };
         /**
-         * PageInfo
-         * @description オフセットページングの page_info（README §1.8）。
-         */
-        PageInfo: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-        };
-        /**
          * PasswordChangeRequest
          * @description 自己パスワード変更の入力（K.3・現在PW 再認証）。想定外プロパティ拒否（§2.2）。
          */
@@ -8452,6 +8494,145 @@ export interface components {
             /** Skill Point Balance */
             skill_point_balance: number;
         };
+        /** StrategyDocCreateRequest */
+        StrategyDocCreateRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Doc Kind
+             * @default other
+             */
+            doc_kind: string;
+            /** Intent */
+            intent?: string | null;
+            /** Policy Commitment */
+            policy_commitment?: string | null;
+            /** Strategy */
+            strategy?: string | null;
+            /** Focus Areas */
+            focus_areas?: string[];
+            /** Objectives */
+            objectives?: string | null;
+            /** Body Md */
+            body_md?: string | null;
+            /** Period From */
+            period_from?: string | null;
+            /** Period To */
+            period_to?: string | null;
+        };
+        /** StrategyDocDetail */
+        StrategyDocDetail: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Doc Kind */
+            doc_kind: string;
+            /** Intent */
+            intent: string | null;
+            /** Policy Commitment */
+            policy_commitment: string | null;
+            /** Strategy */
+            strategy: string | null;
+            /** Focus Areas */
+            focus_areas: string[];
+            /** Objectives */
+            objectives: string | null;
+            /** Body Md */
+            body_md: string | null;
+            /** Period From */
+            period_from: string | null;
+            /** Period To */
+            period_to: string | null;
+            /** Status */
+            status: string;
+            /** Created By */
+            created_by: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** StrategyDocListItem */
+        StrategyDocListItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Doc Kind */
+            doc_kind: string;
+            /** Status */
+            status: string;
+            /** Focus Areas */
+            focus_areas: string[];
+            /** Period From */
+            period_from: string | null;
+            /** Period To */
+            period_to: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** StrategyDocListResponse */
+        StrategyDocListResponse: {
+            /** Data */
+            data: components["schemas"]["StrategyDocListItem"][];
+            page_info: components["schemas"]["app__tenant__strategy__schemas__PageInfo"];
+        };
+        /**
+         * StrategyDocSelectionItem
+         * @description クエストの適用資料 選択用 軽量表現（R.0・全文/率は返さない）。
+         */
+        StrategyDocSelectionItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Doc Kind */
+            doc_kind: string;
+            /** Period From */
+            period_from: string | null;
+            /** Period To */
+            period_to: string | null;
+        };
+        /** StrategyDocSelectionResponse */
+        StrategyDocSelectionResponse: {
+            /** Data */
+            data: components["schemas"]["StrategyDocSelectionItem"][];
+        };
+        /** StrategyDocUpdateRequest */
+        StrategyDocUpdateRequest: {
+            /** Title */
+            title?: string | null;
+            /** Doc Kind */
+            doc_kind?: string | null;
+            /** Intent */
+            intent?: string | null;
+            /** Policy Commitment */
+            policy_commitment?: string | null;
+            /** Strategy */
+            strategy?: string | null;
+            /** Focus Areas */
+            focus_areas?: string[] | null;
+            /** Objectives */
+            objectives?: string | null;
+            /** Body Md */
+            body_md?: string | null;
+            /** Period From */
+            period_from?: string | null;
+            /** Period To */
+            period_to?: string | null;
+            /** Status */
+            status?: string | null;
+        };
         /** TaskCreateRequest */
         TaskCreateRequest: {
             /** Parent Task Id */
@@ -8656,6 +8837,18 @@ export interface components {
             account_id: string;
         };
         /**
+         * PageInfo
+         * @description オフセットページングの page_info（README §1.8）。
+         */
+        app__control_plane__admin__schemas__PageInfo: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+        };
+        /**
          * CursorPageInfo
          * @description カーソルページングのページ情報（§1.8）。
          */
@@ -8700,6 +8893,17 @@ export interface components {
              * @default member
              */
             role: string;
+        };
+        /** PageInfo */
+        app__tenant__strategy__schemas__PageInfo: {
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Total */
+            total: number;
+            /** Has Next */
+            has_next: boolean;
         };
     };
     responses: never;
@@ -16149,6 +16353,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InfoLinkDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategy_documents_api_v1_strategy_documents_get: {
+        parameters: {
+            query?: {
+                for?: string | null;
+                q?: string | null;
+                status?: string | null;
+                doc_kind?: string | null;
+                sort?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocListResponse"] | components["schemas"]["StrategyDocSelectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_strategy_document_api_v1_strategy_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyDocCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_document_api_v1_strategy_documents__doc_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_strategy_document_api_v1_strategy_documents__doc_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_strategy_document_api_v1_strategy_documents__doc_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyDocUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_strategy_document_api_v1_strategy_documents__doc_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyDocDetail"];
                 };
             };
             /** @description Validation Error */
