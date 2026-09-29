@@ -510,6 +510,70 @@
     </div>
   </div>
 
+  <!-- しきい値スライダー（%調整・つまみ）＝SC-92 会社設定の一致率しきい値 UI 検討 -->
+  <div class="section">
+    <h2>4d. しきい値スライダー（%調整・つまみ）<span class="badge badge-muted">検討中</span></h2>
+    <p class="hint" style="max-width:640px">
+      自動関連付けの一致率しきい値（SC-92 会社設定・N.6／§5.36b）＝現状は<strong>数値の直接入力のみ</strong>。ここに<strong>つまみ（スライダー）</strong>を足して直感的に %調整できるようにする検討サンプル。<strong>スライダーと数値入力は双方向同期</strong>（どちらを動かしても一致）。0〜100%・既定 12%。<strong>左ほど緩い</strong>（紐づけが増える）／<strong>右ほど厳しい</strong>（減る）。合意後に SC-92（<code>CompanyDetailView</code>）へ移植する。
+    </p>
+    <style>
+      /* 見本専用スコープ（採用後に shared.css / feature css へ移植）。--pct（0..100）で塗り/つまみ位置を駆動。 */
+      #sgThreshold { max-width: 420px; }
+      #sgThreshold .sg-th__row { display: flex; align-items: center; gap: var(--space-4); }
+      #sgThreshold .sg-th__slider-wrap { position: relative; flex: 1; padding-top: 1.6rem; }
+      #sgThreshold .sg-th__slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; cursor: pointer; outline: none;
+        background: linear-gradient(to right, var(--primary, #6366F1) calc(var(--pct) * 1%), var(--border, #E5E7EB) calc(var(--pct) * 1%)); }
+      #sgThreshold .sg-th__slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%;
+        background: var(--primary, #6366F1); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: pointer; }
+      #sgThreshold .sg-th__slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%;
+        background: var(--primary, #6366F1); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: pointer; }
+      #sgThreshold .sg-th__slider:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #6366F1) 30%, transparent); }
+      /* つまみ上の吹き出し（現在値）＝--pct に追従。両端で見切れないよう clamp。 */
+      #sgThreshold .sg-th__bubble { position: absolute; top: 0; left: clamp(1.2rem, calc(var(--pct) * 1%), calc(100% - 1.2rem)); transform: translateX(-50%);
+        font-size: var(--font-size-sm, .82rem); font-weight: 700; color: var(--primary, #6366F1);
+        background: color-mix(in srgb, var(--primary, #6366F1) 12%, #fff); border: 1px solid color-mix(in srgb, var(--primary, #6366F1) 30%, transparent);
+        border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+      #sgThreshold .sg-th__num { display: inline-flex; align-items: center; gap: 4px; }
+      #sgThreshold .sg-th__input { width: 4.5rem; text-align: right; }
+      #sgThreshold .sg-th__scale { display: flex; justify-content: space-between; margin-top: var(--space-2);
+        font-size: var(--font-size-xs, .74rem); color: var(--text-muted, #6B7280); }
+    </style>
+    <div class="card">
+      <div class="field" id="sgThreshold" style="--pct:12">
+        <label id="sgThLabel">自動関連付けの一致率しきい値</label>
+        <div class="sg-th__row">
+          <div class="sg-th__slider-wrap">
+            <output class="sg-th__bubble" for="sgThSlider">12%</output>
+            <input class="sg-th__slider" id="sgThSlider" type="range" min="0" max="100" step="1" value="12" aria-labelledby="sgThLabel">
+          </div>
+          <div class="sg-th__num">
+            <input class="input sg-th__input" id="sgThNum" type="number" min="0" max="100" step="1" value="12" aria-label="一致率しきい値（パーセント）">
+            <span aria-hidden="true">%</span>
+          </div>
+        </div>
+        <div class="sg-th__scale"><span>← 緩い（紐づけ多い）</span><span>厳しい（紐づけ少ない）→</span></div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var root = document.getElementById('sgThreshold');
+        var slider = document.getElementById('sgThSlider');
+        var num = document.getElementById('sgThNum');
+        var bubble = root.querySelector('.sg-th__bubble');
+        function set(v) {
+          v = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+          root.style.setProperty('--pct', v);
+          bubble.textContent = v + '%';
+          if (Number(slider.value) !== v) slider.value = v;
+          if (Number(num.value) !== v) num.value = v;
+        }
+        slider.addEventListener('input', function () { set(slider.value); });
+        num.addEventListener('input', function () { set(num.value); });
+        set(12);
+      })();
+    </script>
+  </div>
+
   <!-- 入力検証エラー（横断標準・レビュー用） -->
   <div class="section">
     <h2>4b. 入力検証エラーの表示（横断標準・確定・2026-08-22）</h2>
