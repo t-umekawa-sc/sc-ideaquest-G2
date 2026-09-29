@@ -20,7 +20,8 @@ from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled", "auto_link_threshold")
+_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled", "auto_link_threshold", "alignment_method")
+_ALIGNMENT_METHODS = ("keyword", "embedding", "hybrid")  # 経営資料整合の類似度方式（FR-44・A-2）
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
 
@@ -62,6 +63,7 @@ def _detail(c: Company, account_count: int) -> dict:
         "game_mode_default": c.game_mode_default,  # ゲームモード会社既定（レビュー#2・§4.11）
         "notify_email_enabled": c.notify_email_enabled,  # 業務通知メール会社既定（FR-40・§4）
         "auto_link_threshold": float(c.auto_link_threshold),  # 自動関連付けの一致率しきい値（N.6・§5.36b・0..1）
+        "alignment_method": c.alignment_method,  # 経営資料整合の類似度方式（keyword/embedding/hybrid・FR-44・A-2）
     }
 
 
@@ -450,6 +452,12 @@ def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
             if not isinstance(v, (int, float)) or isinstance(v, bool) or not (0.0 <= float(v) <= 1.0):
                 raise AppError(422, "validation_error", detail="一致率しきい値は 0〜1 の範囲で指定してください",
                                errors=[{"field": "auto_link_threshold"}])
+        # 整合方式は keyword/embedding/hybrid のホワイトリスト（未知は 422・FR-44・A-2）。
+        if "alignment_method" in changes and changes["alignment_method"] not in _ALIGNMENT_METHODS:
+            raise AppError(422, "validation_error", detail="整合方式は keyword/embedding/hybrid のいずれかです",
+                           errors=[{"field": "alignment_method"}])
+        method_changed = ("alignment_method" in changes
+                          and changes["alignment_method"] != company.alignment_method)
         applied = [f for f in _SETTINGS_FIELDS if f in changes]
         for field in applied:
             setattr(company, field, changes[field])
@@ -458,6 +466,17 @@ def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
         audit.record("company.settings_update",  # 監査（B.6・同一Tx）
                      {"company_id": str(company_id), "changed_fields": applied}, session=session)
         session.commit()
+        # 整合方式を変更したら、資料が紐づく全クエストの配下公開アイデアを再計算＋差分コイン付与
+        # （初回超えのみ・下げない・FR-44・R.3・別 Tenant Tx）。埋め込み未生成分は keyword フォールバック。
+        # 設定保存は既に commit 済み＝再計算は**best-effort**（会社DB 未プロビジョニング等でも設定保存は成功させる）。
+        if method_changed:
+            import logging
+            from app.tenant.strategy import application as strategy_app
+            try:
+                strategy_app.recompute_all_for_company(company)
+            except Exception as exc:  # noqa: BLE001（再計算失敗は設定保存をロールバックしない）
+                logging.getLogger("app.alignment").warning(
+                    "alignment recompute skipped for company=%s: %s", company_id, exc)
         count = session.execute(
             select(func.count()).select_from(Account).where(Account.company_id == company_id)
         ).scalar_one()

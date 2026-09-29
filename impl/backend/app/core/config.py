@@ -114,6 +114,16 @@ class Settings(BaseSettings):
     # （既知/デフォルトPW の埋め込み禁止・B.5.1）。本番は必ず強い秘密を供給する。
     bootstrap_admin_password: str = ""
 
+    # 埋め込み（意味的一致・A-2・FR-44）＝LLM 基盤の OpenAI 互換 `/embeddings` を叩く薄いクライアント
+    # （infra/llm/embeddings.py）。モデルは基盤側（backend に焼き込まない＝データ主権・横断集約）。
+    # base_url は宛先（dev=compose 内 Ollama／prod=自社 vLLM／将来クラウド）＝env で差し替え。
+    alignment_embed_base_url: str = "http://ollama:11434/v1"  # OpenAI 互換 embeddings のベースURL
+    alignment_embed_model: str = "bge-m3"                     # 既定モデル（多言語・日本語強）。env で上書き可
+    alignment_embed_api_key: str = ""                         # 認証が要る基盤向け（Ollama は不要＝空）
+    alignment_embed_timeout_seconds: float = 15.0            # 1リクエストのタイムアウト（同期・軽量）
+    # ハイブリッド合成の既定重み（keyword と embedding の加重・案B）。会社 UI には出さず config で調整。
+    alignment_hybrid_keyword_weight: float = 0.5
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

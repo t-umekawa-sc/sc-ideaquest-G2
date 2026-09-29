@@ -150,6 +150,13 @@ def quest_ids_for_doc(session: Session, doc_id: uuid.UUID) -> list[uuid.UUID]:
     ).scalars().all())
 
 
+def all_linked_quest_ids(session: Session) -> list[uuid.UUID]:
+    """経営資料が1件でも紐づく全クエストID（重複排除）＝会社の方式変更時に整合率を全再計算する対象。"""
+    return list(session.execute(
+        select(QuestStrategyDocument.quest_id).distinct()
+    ).scalars().all())
+
+
 # ---- 整合率（idea_alignment・§5.55・R.2） ----
 
 def upsert_alignment(session: Session, idea_id: uuid.UUID, doc_id: uuid.UUID, *, score: float,

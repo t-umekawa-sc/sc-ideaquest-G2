@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.tenant.tokens.orm import EntityToken
+from app.tenant.tokens.orm import EntityEmbedding, EntityToken
 
 
 def replace_tokens(session: Session, owner_type: str, owner_id: uuid.UUID, tokens: list[tuple[str, int]]) -> None:
@@ -42,6 +42,35 @@ def all_tokens_by_type(session: Session, owner_type: str) -> dict[uuid.UUID, lis
     for owner_id, token, count in rows:
         out.setdefault(owner_id, []).append((token, int(count)))
     return out
+
+
+# ---- 埋め込みベクトル（entity_embeddings・意味的一致・A-2・FR-44） ----
+
+def upsert_embedding(session: Session, owner_type: str, owner_id: uuid.UUID, *,
+                     model: str, vector: list[float]) -> None:
+    """当該 owner の埋め込みを1行 upsert（本文保存時に再生成）。model/dim も更新（差し替え追従）。"""
+    row = session.execute(
+        select(EntityEmbedding).where(
+            EntityEmbedding.owner_type == owner_type, EntityEmbedding.owner_id == owner_id)
+    ).scalar_one_or_none()
+    if row is None:
+        session.add(EntityEmbedding(owner_type=owner_type, owner_id=owner_id,
+                                    model=model, dim=len(vector), vector=vector))
+    else:
+        row.model = model
+        row.dim = len(vector)
+        row.vector = vector
+
+
+def embedding_for(session: Session, owner_type: str, owner_id: uuid.UUID, *, model: str) -> list[float] | None:
+    """当該 owner の埋め込み（要求 model 一致のみ）。未生成/モデル不一致は None＝呼び出し側で再計算/フォールバック。"""
+    row = session.execute(
+        select(EntityEmbedding.vector, EntityEmbedding.model).where(
+            EntityEmbedding.owner_type == owner_type, EntityEmbedding.owner_id == owner_id)
+    ).first()
+    if row is None or row[1] != model:
+        return None
+    return [float(x) for x in row[0]]
 
 
 def tokens_for_owners(

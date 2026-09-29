@@ -130,6 +130,12 @@ services:
       LOG_TO_FILE: ${LOG_TO_FILE:-true}
       LOG_DIR: ${LOG_DIR:-/var/log/ideaquest}
       LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-30}
+      # 経営資料整合の意味的一致（A-2・FR-44）＝埋め込みを LLM 基盤の OpenAI 互換 /embeddings で取得。
+      # 既定は compose 内 Ollama（profile `ai` で起動）。未起動でも best-effort＝keyword フォールバックで動く。
+      # モデル/宛先は env で差し替え（prod=自社 vLLM／将来クラウド）。
+      ALIGNMENT_EMBED_BASE_URL: ${ALIGNMENT_EMBED_BASE_URL:-http://ollama:11434/v1}
+      ALIGNMENT_EMBED_MODEL: ${ALIGNMENT_EMBED_MODEL:-bge-m3}
+      ALIGNMENT_EMBED_API_KEY: ${ALIGNMENT_EMBED_API_KEY:-}
     volumes:
       - ./logs:/var/log/ideaquest   # ホスト impl/logs にログを出力（gitignore・解析用）。prod は永続先へ。
     ports:
@@ -185,6 +191,21 @@ services:
     depends_on:
       - backend
 
+  # ローカル LLM 基盤（OpenAI 互換・意味的一致の埋め込み用・A-2・FR-44）。profile `ai` で opt-in
+  # （既定 up からは除外＝モデル取得の重さを既定に持ち込まない）。起動後に埋め込みモデルを pull する:
+  #   docker compose --profile ai up -d ollama
+  #   docker compose exec ollama ollama pull bge-m3
+  # 未起動でも backend は best-effort で keyword フォールバック（整合率は出る）。将来のフル LLM ゲートウェイ
+  # （生成・AIジョブ基盤）は別途。ここは埋め込みエンドポイントの提供のみ。
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
 volumes:
   db_data:
   minio_data:
+  ollama_data:

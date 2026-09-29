@@ -50,6 +50,19 @@ def _flush_redis():
 
 
 @pytest.fixture(autouse=True)
+def _fake_embeddings():
+    """埋め込みクライアントを FakeEmbeddings（決定的・外部未接続）へ差し替える（意味的一致・A-2・FR-44）。
+
+    実クライアントは LLM 基盤（Ollama 等）へ HTTP を打つため、テストでは全件 Fake に固定して
+    ネットワーク非依存・決定的にする（`FakeStorage`/`FakeMailSender` と同流儀）。teardown で解除。
+    """
+    from app.infra.llm import embeddings as emb_mod
+    emb_mod.set_embeddings_client(emb_mod.FakeEmbeddings())
+    yield
+    emb_mod.set_embeddings_client(None)
+
+
+@pytest.fixture(autouse=True)
 def _clean_mail_outbox():
     """各テストの前後で mail_outbox を空にする（トランスポート状態＝Redis と同様に隔離）。
 

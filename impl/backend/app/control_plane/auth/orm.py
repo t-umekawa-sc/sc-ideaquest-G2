@@ -40,6 +40,9 @@ class Company(ControlBase):
     # 自動関連付け（N.6・§5.36b）の一致率しきい値（会社別・SC-92）。cosine 類似度 0..1・既定 0.120（=12%）。
     # 高いほど厳しく（リンクが減る）、低いほど緩い（増える）。auto-link は本値以上で自動リンクを生成。
     auto_link_threshold: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False, default=Decimal("0.120"), server_default="0.120")
+    # 経営資料整合の類似度方式（会社別・FR-44・SC-92・A-2）。keyword=キーワード一致／embedding=意味（埋め込み）／
+    # hybrid=両者の加重（式は config・会社UIには出さない）。既定 keyword（検証後に切替）。変更で整合率を全再計算。
+    alignment_method: Mapped[str] = mapped_column(String(16), nullable=False, default="keyword", server_default="keyword")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

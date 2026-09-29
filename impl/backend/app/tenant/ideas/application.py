@@ -331,11 +331,13 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
                     raise
             # 公開中アイデアの本文変更＝トークン再永続化（前向きが再抽出せず読める・§5.36b）＋類似度再計算（N.6 逆方向）。
             from app.tenant.info import application as info_app
-            info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
+            _idea_text = " ".join(x for x in (idea.title, idea.value, idea.body) if x)
+            info_app.persist_entity_tokens(ts, "idea", idea.id, _idea_text)
+            info_app.persist_entity_embedding(ts, "idea", idea.id, _idea_text)  # 意味的一致の入力（A-2・FR-44）
             info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
             # 経営方針との整合率を再計算＋段階コイン付与（初回のみ・FR-44・R.2/R.3）。
             from app.tenant.strategy import alignment as strat_align
-            strat_align.recompute_for_idea(ts, idea, award=True)
+            strat_align.recompute_for_idea(ts, idea, company=company, award=True)
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -364,11 +366,13 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         xp_delta = _publish_processing(ts, idea, user)
         # 公開＝このアイデアが候補になった＝トークン永続化（前向きが再抽出せず読める・§5.36b）＋既存情報から自動関連付け（N.6 逆方向）。
         from app.tenant.info import application as info_app
-        info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
+        _idea_text = " ".join(x for x in (idea.title, idea.value, idea.body) if x)
+        info_app.persist_entity_tokens(ts, "idea", idea.id, _idea_text)
+        info_app.persist_entity_embedding(ts, "idea", idea.id, _idea_text)  # 意味的一致の入力（A-2・FR-44）
         info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
         # 経営方針との整合率を再計算＋段階コイン付与（初回のみ・FR-44・R.2/R.3）。
         from app.tenant.strategy import alignment as strat_align
-        strat_align.recompute_for_idea(ts, idea, award=True)
+        strat_align.recompute_for_idea(ts, idea, company=company, award=True)
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         q_id = idea.quest_id

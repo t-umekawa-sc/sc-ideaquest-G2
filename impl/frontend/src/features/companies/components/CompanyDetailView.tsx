@@ -110,6 +110,20 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
     }
   }
 
+  // 経営資料整合の類似度方式（FR-44・A-2）＝キーワード/意味/ハイブリッドの3択。変更で整合率が再計算される。
+  async function saveAlignmentMethod(method: string) {
+    setError(null);
+    try {
+      const updated = await updateCompanySettings(companyId, { alignment_method: method });
+      setCompany(updated);
+      snack({ type: "success", title: "整合方式を更新しました" });
+    } catch {
+      const msg = "整合方式の更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
+    }
+  }
+
   async function onPickColor(next: string) {
     setColor(next); // スウォッチの即時反映（バナー左帯・アイコンタイル）
     setError(null);
@@ -384,6 +398,24 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
             </div>
             <div className="threshold__scale"><span>← 緩い（紐づけ多い）</span><span>厳しい（少ない）→</span></div>
           </div>
+        </div>
+
+        {/* 経営資料整合の類似度方式（FR-44・A-2）＝アイデアと経営資料の「整合率」の測り方。 */}
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">経営資料との整合の測り方</div>
+            <div className="setting-row__desc">アイデアと経営資料の「整合率」の算出方式。キーワード＝語の一致（速く決定的）／意味＝言い回しが違っても意味が近ければ高い（埋め込み）／ハイブリッド＝両者の組み合わせ。変更すると既存アイデアの整合率が再計算されます。既定キーワード。</div>
+          </div>
+          <select
+            className="select"
+            aria-label="経営資料との整合の測り方"
+            value={company.alignment_method ?? "keyword"}
+            onChange={(e) => void saveAlignmentMethod(e.target.value)}
+          >
+            <option value="keyword">キーワード（語の一致）</option>
+            <option value="embedding">意味（埋め込み）</option>
+            <option value="hybrid">ハイブリッド（両方）</option>
+          </select>
         </div>
 
         <div className="provision-note">

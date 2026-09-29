@@ -2,7 +2,7 @@
 
 > 横断規約＝[API設計 README](README.md)（§1.x＝認可 §1.8・カーソル §1.8・DataTable §1.8.1・Idempotency §1.9・画像 §1.10）。データモデル＝[§5.54 strategy_documents](../データモデル.md)・[§5.55 idea_alignment](../データモデル.md)・[§5.36b entity_tokens](../データモデル.md)。設計元＝[経営資料整合・自動関連付け 設計](../設計ドラフト/経営資料整合・自動関連付け_設計.md)。画面＝SC-80（一覧）/SC-81（登録・編集）/SC-82（詳細）・SC-22（整合バッジ）。
 >
-> **状態＝Phase1（決定的・オフライン・生成AI不要）**。整合率は `SimilarityProvider`（Phase1＝キーワード TF-IDF cosine／後続サブStep＝ローカル埋め込み）。生成（ISO意図/方針）は Phase1 では**構造化 Markdown エクスポート**のみ（外部委譲・自動送信なし）。
+> **状態＝整合率は `SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2 実装済 2026-09-29）**。意味方式は**LLM 基盤の embeddings 経由**（モデルは基盤側＝backend 非焼込・データ主権）＝方式 B（LLM 判定・生成）は別要件（横断 LLM ゲートウェイ）。生成（ISO意図/方針）は**構造化 Markdown エクスポート**のみ（外部委譲・自動送信なし・R.5）。
 
 ## R.0 アクター・認可スコープ
 
@@ -42,8 +42,12 @@
 
 ## R.2 整合率（アイデア↔経営資料）
 
-- **算出**＝`SimilarityProvider.score(idea_text, strategy_text)`（Phase1＝`derive.token_cosine`＝キーワード TF-IDF cosine・[[entity_tokens]] の永続トークンを読む）。0..1。
-- **保存**＝`idea_alignment(idea_id, strategy_document_id, score, method, matched_tokens)`（upsert・§5.55）。
+- **算出＝`SimilarityProvider`（会社別方式・A-2・2026-09-29 実装）**＝`companies.alignment_method`（`keyword`/`embedding`/`hybrid`・既定 keyword・SC-92 で選択）。
+  - `keyword`＝`derive.token_cosine`（[[entity_tokens]] の永続トークン・決定的・オフライン）。
+  - `embedding`＝`entity_embeddings`（§5.36c）の cosine＝**意味的一致**。ベクトルは**LLM 基盤の OpenAI 互換 `/embeddings`**（Ollama/vLLM 等・モデルは基盤側＝backend に焼き込まない＝データ主権）で本文保存時に生成・永続。埋め込み欠損/モデル不一致は **keyword フォールバック**（例外なく算出）。
+  - `hybrid`＝`w·keyword + (1-w)·embedding`（w＝config `alignment_hybrid_keyword_weight`・既定 0.5・会社 UI には式を出さない）。
+  - **方式 B（LLM 判定・生成）は別要件**（横断 LLM ゲートウェイ＋AIジョブ基盤）＝整合率は決定的が要る（コインの公平性）ため埋め込み（A）を採用。
+- **保存**＝`idea_alignment(idea_id, strategy_document_id, score, method, matched_tokens)`（upsert・§5.55）。`method` は選択方式を記録。`matched_tokens` は**方式に依らず keyword 由来**（意味方式でも説明可能性を担保）。
 - **母集合＝アイデアの所属クエストが選択した経営資料**（`quest_strategy_documents`・§5.56）＝**1アイデア N資料**。全 active 資料ではない。未選択クエストは整合行なし＝バッジ非表示。
 - **契機**＝(1) アイデア公開/更新（当該アイデア×自クエストの選択資料を再計算）／(2) クエストの資料選択変更（配下アイデア×変更後集合）／(3) 経営資料 登録/更新（当該資料×関係アイデアを再計算・バッチ許容）。
 - **read（アイデア詳細/SC-22 同梱）**＝`GET /ideas/{id}` に `alignment` を同梱（別 read も可）:
@@ -56,6 +60,7 @@
 - アイデア公開（or 版更新）時に整合率（best_score）を計算し、**段階閾値超えでコイン付与**＝`ledger.grant(kind=COIN_GAIN, amount, reason='idea_alignment', ref_type='ideas', ref_id=idea_id)`。
 - **段階（合意 2026-09-29）**＝関連度 **≥50% → +3／≥70% → +7／≥90% → +15**（best_score 基準）。
 - **冪等・初回のみ・下げない**＝`exists_ref('ideas', idea_id, reason='idea_alignment')` で二重付与防止（コンセプト投票 XP と同型）。再計算で率が上がっても**初回付与額のまま**（稼ぎ直し防止）。率が下がってもコインは取り消さない。
+- **会社の方式変更時の差分付与（A-2・2026-09-29）**＝`companies.alignment_method` を変更すると、資料紐づけのある全クエストの配下公開アイデアを**再計算＋差分コイン付与**（初回超えのみ・下げない＝方式変更で整合率が上がり初めてティアを越えた分だけ付与）。`update_company_settings`→`strategy.recompute_all_for_company`（別 Tenant Tx・**best-effort**＝会社DB 未プロビジョニングでも設定保存は成功）。
 - 表示＝SC-22 の方針整合バッジ（関連度 %＋獲得コイン）。**軽い加点**（順位を厳密に決める指標にしない）。
 
 ## R.4 機会/脅威/影響率（情報の集計・read）

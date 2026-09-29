@@ -58,9 +58,10 @@ def _detail(ts, doc) -> dict:
 
 
 def _persist_tokens(ts, doc) -> None:
-    """本文を entity_tokens（owner_type='strategy_doc'）へ同期（整合率の永続トークン・§5.36b）。"""
+    """本文を entity_tokens／entity_embeddings（owner_type='strategy_doc'）へ同期（整合率の素材・§5.36b・A-2）。"""
     from app.tenant.info import application as info_app  # 遅延 import（derive+tokens_repo を再利用・DRY）
     info_app.persist_entity_tokens(ts, "strategy_doc", doc.id, doc.body_text)
+    info_app.persist_entity_embedding(ts, "strategy_doc", doc.id, doc.body_text)  # 意味的一致の入力（A-2・FR-44）
 
 
 def _list_item(doc) -> dict:
@@ -143,10 +144,28 @@ def update_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *
         # 本文変更＝この資料を適用中の各クエストの配下アイデアの整合率を再計算（コインは維持・R.2）。
         from app.tenant.strategy import alignment as strat_align
         for qid in repo.quest_ids_for_doc(ts, did):
-            strat_align.recompute_for_quest(ts, qid)
+            strat_align.recompute_for_quest(ts, qid, company=company)
         payload = _detail(ts, doc)
         ts.commit()
     return payload
+
+
+def recompute_all_for_company(company) -> int:
+    """会社の整合方式/しきい値を変更した時＝資料が紐づく全クエストの配下公開アイデアを再計算し、
+
+    上がってティアを越えた分だけ**差分コインを付与**（初回超えのみ・下げない・R.3・ユーザー合意 2026-09-29）。
+    戻り値＝再計算したクエスト数（監査/ログ用）。埋め込み未生成のアイデアは keyword フォールバックで算出される。
+    """
+    from app.tenant.strategy import alignment as strat_align
+    if company is None:
+        return 0
+    n = 0
+    with get_tenant_session(company.db_identifier) as ts:
+        for qid in repo.all_linked_quest_ids(ts):
+            strat_align.recompute_for_quest(ts, qid, company=company, award=True)
+            n += 1
+        ts.commit()
+    return n
 
 
 def archive_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:

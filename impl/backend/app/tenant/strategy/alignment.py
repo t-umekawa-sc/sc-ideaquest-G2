@@ -1,8 +1,8 @@
 """整合率（アイデア↔経営資料）の算出・保存・コイン付与（R.2/R.3・§5.55・FR-44）。
 
-SimilarityProvider＝Phase1 はキーワード TF-IDF cosine（`derive.token_cosine`・永続 entity_tokens を読む）。差し替え式
-（後続サブStep＝ローカル埋め込み）。母集合＝アイデアの所属クエストが選んだ経営資料（quest_strategy_documents）。
-複数資料は**最大採用**＋効いた方針トークンを提示。コイン＝best_score の段階（≥50%→+3／≥70%→+7／≥90%→+15）で
+類似度は `SimilarityProvider`（`similarity.py`）＝会社設定 `alignment_method`（keyword/embedding/hybrid・A-2）で
+選択。母集合＝アイデアの所属クエストが選んだ経営資料（quest_strategy_documents）。複数資料は**最大採用**＋
+効いた方針トークン（keyword 由来）を提示。コイン＝best_score の段階（≥50%→+3／≥70%→+7／≥90%→+15）で
 G 台帳に**冪等付与**（初回のみ・下げない・exists_ref）。呼び出し側 Tx に相乗（自身では commit しない）。
 """
 from __future__ import annotations
@@ -11,8 +11,8 @@ import uuid
 
 from app.tenant.gamification import ledger
 from app.tenant.gamification import repository as gami_repo
-from app.tenant.info import derive
 from app.tenant.strategy import repository as repo
+from app.tenant.strategy import similarity
 from app.tenant.tokens import repository as tokens_repo
 
 _COIN_REASON = "idea_alignment"
@@ -21,9 +21,10 @@ _TIERS: list[tuple[float, int]] = [(0.90, 15), (0.70, 7), (0.50, 3)]
 _MATCHED_TOP = 8
 
 
-def score(a_tokens, b_tokens) -> float:
-    """SimilarityProvider（keyword）＝トークン頻度ベクトルの cosine（0..1）。"""
-    return derive.token_cosine(a_tokens, b_tokens)
+def _method_of(company) -> str:
+    """会社設定の整合方式（keyword/embedding/hybrid）。未設定/未知は keyword（安全側・A-2）。"""
+    m = getattr(company, "alignment_method", None)
+    return m if m in similarity.ALIGNMENT_METHODS else "keyword"
 
 
 def _matched(a_tokens, b_tokens) -> list[str]:
@@ -39,19 +40,22 @@ def coins_for(best: float) -> int:
     return 0
 
 
-def recompute_for_idea(ts, idea, *, award: bool = False) -> float:
+def recompute_for_idea(ts, idea, *, company=None, award: bool = False) -> float:
     """アイデア×所属クエストの選択経営資料の整合率を再計算・upsert し best を返す。
 
-    `award=True` なら best 段階のコインを**アイデア作成者へ冪等付与**（初回のみ・R.3）。母集合外の行は掃除。
+    類似度は会社設定 `alignment_method`（keyword/embedding/hybrid・A-2）で選ぶ。`award=True` なら best 段階の
+    コインを**アイデア作成者へ冪等付与**（初回超えのみ・下げない・R.3）。母集合外の行は掃除。
     """
+    method = _method_of(company)
+    provider = similarity.provider_for(method)
     idea_toks = tokens_repo.tokens_for(ts, "idea", idea.id)
     doc_ids = repo.doc_ids_for_quest(ts, idea.quest_id)
     repo.prune_alignment(ts, idea.id, doc_ids)  # 選択解除された資料の整合行を掃除
     best = 0.0
     for doc_id in doc_ids:
         doc_toks = tokens_repo.tokens_for(ts, "strategy_doc", doc_id)
-        s = score(idea_toks, doc_toks)
-        repo.upsert_alignment(ts, idea.id, doc_id, score=s, method="keyword",
+        s = provider.score(ts, idea_id=idea.id, idea_tokens=idea_toks, doc_id=doc_id, doc_tokens=doc_toks)
+        repo.upsert_alignment(ts, idea.id, doc_id, score=s, method=method,
                               matched_tokens=_matched(idea_toks, doc_toks))
         best = max(best, s)
     if award and best > 0:
@@ -67,13 +71,17 @@ def recompute_for_idea(ts, idea, *, award: bool = False) -> float:
     return best
 
 
-def recompute_for_quest(ts, quest_id: uuid.UUID) -> None:
-    """クエストの資料選択変更時＝配下の公開アイデアの整合率を再計算（コインは付与し直さない＝維持・R.3）。"""
+def recompute_for_quest(ts, quest_id: uuid.UUID, *, company=None, award: bool = False) -> None:
+    """クエストの資料選択変更/方式変更時＝配下の公開アイデアの整合率を再計算。
+
+    既定 `award=False`（資料変更は再付与しない＝維持・R.3）。会社の方式/しきい値変更からは `award=True` で呼び、
+    上がってティアを越えた分だけ差分付与（初回超えのみ・下げない・ユーザー合意 2026-09-29）。
+    """
     from app.tenant.ideas.orm import Idea
     for iid in repo.published_idea_ids_for_quest(ts, quest_id):
         idea = ts.get(Idea, iid)
         if idea is not None:
-            recompute_for_idea(ts, idea, award=False)
+            recompute_for_idea(ts, idea, company=company, award=award)
 
 
 def alignment_payload(ts, idea) -> dict | None:

@@ -56,6 +56,27 @@ def persist_entity_tokens(ts, owner_type: str, owner_id: uuid.UUID, text: str | 
     """
     tokens_repo.replace_tokens(ts, owner_type, owner_id, derive.extract_tokens(text or ""))
 
+
+def persist_entity_embedding(ts, owner_type: str, owner_id: uuid.UUID, text: str | None) -> None:
+    """owner の本文を埋め込みベクトル化して entity_embeddings を upsert（意味的一致・A-2・FR-44・保存時トリガ）。
+
+    **best-effort**＝埋め込みサーバ未接続/失敗でも**保存を止めない**（例外を飲み込み、既存ベクトルは残す）。
+    意味方式が選ばれた会社では整合率算出時に本ベクトルを読む。埋め込みが無ければ算出側が keyword へフォールバック。
+    空本文は何もしない（既存ベクトルは保持＝誤って消さない）。呼び出し側 Tx に相乗。
+    """
+    if not (text or "").strip():
+        return
+    import logging
+    from app.infra.llm.embeddings import get_embeddings_client
+    try:
+        client = get_embeddings_client()
+        vecs = client.embed([text])
+        if vecs and vecs[0]:
+            tokens_repo.upsert_embedding(ts, owner_type, owner_id, model=client.model, vector=vecs[0])
+    except Exception as exc:  # noqa: BLE001（埋め込み失敗は保存をブロックしない＝算出側でフォールバック）
+        logging.getLogger("app.alignment").warning(
+            "embedding persist skipped owner=%s/%s: %s", owner_type, owner_id, exc)
+
 _EMPTY_PAGE = {
     "data": [],
     "page_info": {"total": 0, "page": 1, "per_page": lq.DEFAULT_PER_PAGE},

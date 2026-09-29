@@ -158,6 +158,23 @@ def test_b_tc_178_settings_auto_link_threshold_out_of_range_422(client, companie
     assert client.get(f"{COMPANIES}/{cid}").json()["auto_link_threshold"] == 0.12
 
 
+def test_r_tc_206_settings_alignment_method(client, companies):
+    """R-TC-206 経営資料整合の方式 alignment_method＝keyword/embedding/hybrid のホワイトリスト（未知は422・正常は保存）。根拠 FR-44／A-2。"""
+    _login_system_admin(client)
+    created = client.post(COMPANIES, json=_new_company_body(), headers=_csrf(client)).json()
+    cid = created["company_id"]
+    companies.append(uuid.UUID(cid))
+
+    assert client.get(f"{COMPANIES}/{cid}").json()["alignment_method"] == "keyword"  # 既定
+    # 未知の方式は 422（ホワイトリスト）。
+    bad = client.patch(f"{COMPANIES}/{cid}/settings", json={"alignment_method": "bogus"}, headers=_csrf(client))
+    assert bad.status_code == 422, bad.text
+    # 正常＝保存され詳細へ反映。
+    ok = client.patch(f"{COMPANIES}/{cid}/settings", json={"alignment_method": "embedding"}, headers=_csrf(client))
+    assert ok.status_code == 200 and ok.json()["alignment_method"] == "embedding", ok.text
+    assert client.get(f"{COMPANIES}/{cid}").json()["alignment_method"] == "embedding"  # 永続
+
+
 def test_b_tc_055_non_admin_forbidden(client, factory):
     """B-TC-055 会社管理 API は system_admin 専用＝general は 403。根拠 B.1。"""
     acc = factory.make_seed_company_account()

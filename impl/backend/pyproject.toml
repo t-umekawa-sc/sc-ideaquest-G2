@@ -16,12 +16,12 @@ dependencies = [
     "python-multipart>=0.0.9",  # multipart/form-data（画像アップロード・FastAPI UploadFile）
     "janome>=0.5",              # 日本語形態素解析（純Python・データDL不要）＝FR-39 (c) オフライン抽出型要約／情報インプットのトークン抽出（N.6）
     "nh3>=0.2",                 # HTML サニタイズ（Rust製・許可リスト方式）＝情報インプットのリッチ本文 XSS 無害化（N.7・§12-4）
+    "httpx>=0.27",              # HTTP クライアント＝LLM 基盤の OpenAI 互換 /embeddings 呼び出し（意味的一致・A-2・FR-44）
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.27",
 ]
 
 [tool.setuptools.packages.find]

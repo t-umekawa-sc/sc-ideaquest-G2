@@ -5,8 +5,8 @@
 
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-29（本セッション末）
-- ブランチ: `main`（作業ツリー clean）。
-- push: ピッカー行アイコン（backend strategy/info 候補 DTO＋frontend 両ピッカー＋R-TC-109/N-TC-228＋TC台帳＋impl/README に FR-44 節追加）を **feat コミット済**。push は未（次セッション/指示で push）。
+- ブランチ: `main`。
+- push: (a) ピッカー行アイコン（`a90d7257` コミット済）／(b) **Step3ب 意味的一致＝A-2**（埋め込み類似度・会社別方式・本セッションで実装・**未コミット**）。push は未（指示で push）。
 - 直近コミット（新しい順・本ファイル＝最新の docs(handoff) コミット）:
   - `docs(handoff)` 本ファイル全文更新（このコミット）
   - `d76a1d66` feat(strategy): SC-22 に方針整合バッジ＋アイデア詳細に alignment 露出（Step3）
@@ -72,11 +72,11 @@
 - **owner_type は単数形**＝entity_tokens に `strategy_doc` を追加（info/idea/concept/quest/assumption と同系）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. ~~**ピッカー行にアイコン表示**~~ **【完了 2026-09-29】** クエストを選ぶ（`StrategyQuestLinks`）／対象を選ぶ（`TargetPicker`）の候補行に共通 `QuestIcon`（画像 or 頭文字タイル）をタイトル前に表示。backend 候補 DTO に `icon_image_url` 追加（strategy=`QuestLinkItem`／info=`InfoLinkCandidateDTO`・ideas は個別→作成者既定フォールバック・presigned は application 層で解決）。テスト R-TC-109／N-TC-228 green・両ピッカーをスクショ目視確認済。**未コミット**（次セッションでコミット可）。
-2. **Step3ب ローカル埋め込み SimilarityProvider**＝keyword cosine を意味的一致に差し替え可能な provider 実装（無料ライブラリ）。差し替え点＝`strategy/alignment.py` の `score`。
-3. **Step4 機会/脅威/影響率＋ワードクラウド**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装（R.4）。
+1. ~~**ピッカー行にアイコン表示**~~ **【完了・コミット済 `a90d7257`】** クエストを選ぶ／対象を選ぶの候補行に `QuestIcon`（R-TC-109／N-TC-228）。
+2. ~~**Step3ب 意味的一致**~~ **【完了 2026-09-29・A-2・未コミット】** 会社別 `SimilarityProvider`（keyword/embedding/hybrid・`companies.alignment_method`・SC-92 セレクタ）。意味方式＝**LLM 基盤の OpenAI 互換 `/embeddings`**（`infra/llm/embeddings.py`・モデルは基盤側＝backend 非焼込・dev=compose `ollama` profile `ai`・既定 bge-m3・env `ALIGNMENT_EMBED_BASE_URL`/`MODEL`）→`entity_embeddings`（§5.36c・migration company 0047）の cosine。欠損/モデル不一致は keyword フォールバック。ハイブリッド＝加重（config 既定0.5/0.5）。方式変更で全再計算＋差分コイン（`recompute_all_for_company`・best-effort）。control `companies.alignment_method`（migration control 0018）。テスト＝FakeEmbeddings で R-TC-202〜206 green・full pytest 869 green・SC-92 セレクタをスクショ目視。**要フォロー＝実モデル(bge-m3)での通し確認は未**（この環境で Ollama 未起動＝keyword フォールバックで動作確認・実機は `docker compose --profile ai up -d ollama` → `ollama pull bge-m3` 後に要確認）／閾値の実データ再キャリブレーション（現状 tiers 50/70/90 のまま）。
+3. **Step4 機会/脅威/影響率＋ワードクラウド**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装（R.4）。**方式 B（LLM 判定・生成）は別要件＝横断 LLM ゲートウェイ＋AIジョブ基盤**（`ローカルLLM連携_設計.md`・未実装）。
 4. **Step5 AI 用 Markdown エクスポート**＝R.5・`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
-5. **回帰**＝着手前に backend フル pytest（`-v`マウント・mail-worker 停止）と Playwright e2e フルを通す（本セッション未実行）。
+5. **回帰**＝着手前に backend フル pytest（`-v`マウント・mail-worker 停止）と Playwright e2e フルを通す（e2e フルは本セッション未実行）。
 
 ## 8. 再開に必要な環境情報
 - 作業ディレクトリ＝リポジトリ直下。実装は `impl/`（`impl/backend`=FastAPI+SQLAlchemy+Alembic、`impl/frontend`=Next.js）。**コマンドは絶対パス**（このシェルは cd が持続しない）。compose ファイル＝`impl/compose.yaml`。

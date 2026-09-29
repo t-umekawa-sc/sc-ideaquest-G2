@@ -22,11 +22,16 @@
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 
-> 整合率＝`SimilarityProvider`（keyword TF-IDF cosine）→`idea_alignment` upsert・最大採用＋effective tokens。コイン＝段階（≥50→+3/≥70→+7/≥90→+15）・冪等・初回のみ・下げない。
+> 整合率＝`SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2）→`idea_alignment` upsert・最大採用＋effective tokens。コイン＝段階（≥50→+3/≥70→+7/≥90→+15）・冪等・初回のみ・下げない。意味方式（embedding/hybrid）＝保存済み `entity_embeddings`（LLM 基盤 embeddings 由来）の cosine・欠損は keyword フォールバック。テストは FakeEmbeddings（同義語クラスタで意味近接を決定的に再現・外部未接続）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-TC-201 | int | 整合率＝母集合（クエストの選択資料）でキーワード cosine を算出→best・効いた語を idea_alignment に保存／best 段階でコイン初回付与（冪等） | アイデア・経営資料・quest_strategy_documents・両者の entity_tokens（cosine≈0.924）をシード | `alignment.recompute_for_idea(award=True)`×2 | best≥0.9／idea_alignment 1行・matched_tokens に「脱炭素」／`alignment_payload` の best_strategy=当該資料・coins_awarded=15／コイン付与は初回のみ（activities 1件・exists_ref 冪等） | R.2／R.3／§5.55 |
+| R-TC-202 | int | 意味方式は「語が重ならないが意味が近い」ペアで keyword より高い（意味的一致・A-2） | 語の重ならない意味ペア（idea=太陽光/パネル・doc=脱炭素/再エネ）の entity_tokens＋FakeEmbeddings 埋め込みを永続 | keyword/embedding/hybrid の各 provider で score | keyword≈0（重なりなし）／embedding>0.5／hybrid＝w·kw+(1-w)·emb で両者の中間（embedding>hybrid>keyword） | R.2／A-2／FR-44 |
+| R-TC-203 | int | 会社設定で provider が切替わる／埋め込み欠損はキーワードへフォールバック（graceful degradation） | 上と同ペア・埋め込みは doc 側のみ削除して欠損を作る | `alignment_method=embedding` で `recompute_for_idea`（埋め込み欠損） | 方式=embedding でも欠損時は keyword 相当（best≈keyword）＝例外なく算出・idea_alignment.method に選択方式を記録 | R.2／A-2 |
+| R-TC-204 | int | 埋め込み永続化＝本文保存で entity_embeddings が model/dim 付きで生成される | 空 | `persist_entity_embedding(ts,'idea',id,text)` | entity_embeddings 1行・model=FakeEmbeddings.model・dim=len(vector)>0・再呼び出しで upsert（重複しない） | A-2／§5.36b |
+| R-TC-205 | int | 会社の方式変更で整合率を全再計算＋差分コイン付与（初回超えのみ・下げない） | keyword では best<0.5（コイン0）／embedding では best≥0.9 になる意味ペアをシード・quest_strategy_documents 紐づけ | `recompute_all_for_company`（keyword→coin0 を確認後 method=embedding で再実行） | keyword 時 coins_awarded=0／embedding 再計算後に差分付与され coins_awarded>0（activities 1件・冪等・再々実行で増えない） | R.3／A-2 |
+| R-TC-206 | api | 会社設定 `alignment_method` は keyword/embedding/hybrid のホワイトリスト（未知は 422・正常は保存） | company_account_admin | `PATCH /companies/{id}/settings`（alignment_method=bogus／=embedding） | bogus=422（field=alignment_method）／embedding=200・詳細 `alignment_method=embedding` で反映 | R.1／FR-44／§4.7 |
 
 ## 3. 機会/脅威/影響率（R.4・Step4）
 

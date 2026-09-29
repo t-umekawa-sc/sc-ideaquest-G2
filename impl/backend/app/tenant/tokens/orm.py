@@ -12,7 +12,7 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import Integer, Numeric, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import CompanyBase
@@ -29,3 +29,22 @@ class EntityToken(CompanyBase):
     token: Mapped[str] = mapped_column(Text, nullable=False)
     weight: Mapped[Decimal | None] = mapped_column(Numeric(6, 4), nullable=True)  # TF-IDF 等（NULL なら count）
     count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+
+class EntityEmbedding(CompanyBase):
+    """成果物本文の埋め込みベクトル（意味的一致・A-2・FR-44）＝owner ごと1行。
+
+    埋め込みは LLM 基盤の OpenAI 互換 `/embeddings` で生成（モデルは基盤側・backend に焼き込まない）。
+    ベクトルは JSONB（float 配列）で保持し cosine は Python で計算（pgvector 非依存）。`model`/`dim` を保存し、
+    モデル差し替え時は不一致行を無効化＝再計算（混在で誤った cosine を出さない）。`entity_tokens` と同じ
+    owner_type/owner_id 多態（物理 FK なし・§2.2#4）。呼び出し側 Tx に相乗（自身では commit しない）。
+    """
+    __tablename__ = "entity_embeddings"
+    __table_args__ = (UniqueConstraint("owner_type", "owner_id", name="uq_entity_embeddings"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_type: Mapped[str] = mapped_column(Text, nullable=False)  # 論理 enum（idea/strategy_doc/…）
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)  # ソフト参照
+    model: Mapped[str] = mapped_column(Text, nullable=False)  # 埋め込みモデル名（例 bge-m3）＝差し替え検出用
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)  # ベクトル次元
+    vector: Mapped[list] = mapped_column(JSONB, nullable=False)  # float 配列（cosine は Python 計算）

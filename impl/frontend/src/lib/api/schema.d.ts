@@ -4502,6 +4502,8 @@ export interface components {
             notify_email_enabled: boolean;
             /** Auto Link Threshold */
             auto_link_threshold: number;
+            /** Alignment Method */
+            alignment_method: string;
             /** Account Count */
             account_count: number;
         };
@@ -4569,6 +4571,8 @@ export interface components {
             notify_email_enabled?: boolean | null;
             /** Auto Link Threshold */
             auto_link_threshold?: number | null;
+            /** Alignment Method */
+            alignment_method?: string | null;
         };
         /** ConceptAssumptionDTO */
         ConceptAssumptionDTO: {
@@ -6392,6 +6396,8 @@ export interface components {
             due?: string | null;
             /** Created At */
             created_at?: string | null;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
         };
         /** InfoLinkCandidatesResponse */
         InfoLinkCandidatesResponse: {
@@ -7816,6 +7822,8 @@ export interface components {
             owner_name?: string | null;
             /** Created At */
             created_at?: string | null;
+            /** Icon Image Url */
+            icon_image_url?: string | null;
         };
         /** QuestLinkListResponse */
         QuestLinkListResponse: {
