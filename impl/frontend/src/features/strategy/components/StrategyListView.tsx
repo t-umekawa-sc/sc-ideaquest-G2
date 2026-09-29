@@ -118,7 +118,7 @@ export function StrategyListView() {
                 <span>更新 {r.updated_at.slice(0, 10)}</span>
               </div>
             </Link>
-            <div style={{ position: "absolute", right: "var(--space-2)", bottom: "var(--space-2)" }}>
+            <div style={{ position: "absolute", right: "var(--space-2)", top: "var(--space-2)" }}>
               <RowMenu items={menuItems(r)} />
             </div>
           </div>

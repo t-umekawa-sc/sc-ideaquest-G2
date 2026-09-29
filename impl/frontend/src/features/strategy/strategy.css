@@ -17,6 +17,8 @@
 @media (max-width: 640px) {
   .form-grid-2 { grid-template-columns: 1fr; }
 }
+/* グリッド行内の .dialog-section は :first-child（1列目）だけ padding-top:0 になり縦ズレするので揃える。 */
+.form-grid-2 > .field.dialog-section { padding-top: var(--space-3); }
 
 /* 重点領域＝自由入力ありの複数選択（style-guide「複数選択（.multiselect・自由入力あり）」＝quests.css .tagselect と同型）。 */
 .tagselect__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-2); }
@@ -28,5 +30,7 @@
 
 /* 経営資料カード（一覧のカード表示）。card は <a>＝inline のため flex-column で block 化（proj-card と同型）。 */
 .strategy-card { display: flex; flex-direction: column; gap: var(--space-2); }
+/* タイトル行＝右上の ⋮ アクションと重ならないよう右余白を確保（QuestCard と同方式）。 */
+.strategy-card .between { padding-right: var(--space-6); }
 .strategy-card__title { white-space: normal; overflow-wrap: anywhere; margin-bottom: 0; }
 .strategy-card__meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--text-sm); color: var(--color-text-muted); }
