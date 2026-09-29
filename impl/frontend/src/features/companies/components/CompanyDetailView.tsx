@@ -83,6 +83,26 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
     }
   }
 
+  // 自動関連付けの一致率しきい値（N.6・§5.36b）＝UI は %、値は比率（0..1）で保存。0〜100 の範囲外は弾く。
+  async function saveThreshold(pct: number) {
+    setError(null);
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+      const msg = "一致率は 0〜100% の範囲で指定してください。";
+      setError(msg);
+      snack({ type: "error", title: msg });
+      return;
+    }
+    try {
+      const updated = await updateCompanySettings(companyId, { auto_link_threshold: Math.round(pct) / 100 });
+      setCompany(updated);
+      snack({ type: "success", title: "一致率しきい値を更新しました" });
+    } catch {
+      const msg = "設定の更新に失敗しました。";
+      setError(msg);
+      snack({ type: "error", title: msg });
+    }
+  }
+
   async function onPickColor(next: string) {
     setColor(next); // スウォッチの即時反映（バナー左帯・アイコンタイル）
     setError(null);
@@ -311,6 +331,28 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
             <input type="checkbox" aria-label="業務通知メール" checked={company.notify_email_enabled} onChange={(e) => toggle("notify_email_enabled", e.target.checked)} />
             <span className="switch__track"><span className="switch__thumb" /></span>
             <span className="switch__state">{company.notify_email_enabled ? "ON" : "OFF"}</span>
+          </label>
+        </div>
+
+        {/* 自動関連付けの一致率しきい値（N.6・§5.36b）＝情報と成果物を自動で紐づける最小の一致率（%）。 */}
+        <div className="setting-row">
+          <div className="setting-row__info">
+            <div className="setting-row__name">自動関連付けの一致率しきい値</div>
+            <div className="setting-row__desc">情報インプットと成果物（アイデア/コンセプト/クエスト/前提）を自動で紐づける最小の一致率。高いほど厳しく（紐づけが減る）、低いほど緩い（増える）。既定 12%。</div>
+          </div>
+          <label className="switch" style={{ gap: "var(--space-2)" }}>
+            <input
+              type="number"
+              aria-label="自動関連付けの一致率しきい値（パーセント）"
+              min={0}
+              max={100}
+              step={1}
+              defaultValue={Math.round((company.auto_link_threshold ?? 0.12) * 100)}
+              key={company.auto_link_threshold}
+              onBlur={(e) => void saveThreshold(Number(e.target.value))}
+              style={{ width: "5rem", textAlign: "right", padding: "var(--space-1) var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)" }}
+            />
+            <span className="switch__state">%</span>
           </label>
         </div>
 

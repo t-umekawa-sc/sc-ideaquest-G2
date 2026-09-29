@@ -100,6 +100,8 @@
 | N-TC-153 | int | 成果物保存トリガ（逆方向）＝成果物側から既存情報へ auto リンク生成 | 情報（保存済トークンあり）＋語が重なる成果物を用意 | `recompute_auto_links_for_target(ts, type, id)` | 当該情報→成果物へ `origin=auto`/`kind=related`/`score` のリンクが生成される／無関係情報からは生成されない | N.6／§5.35 |
 | N-TC-154 | int | 逆方向も既存を尊重＝score のみ更新・手動kind/棄却は復活させない | auto リンク＋手動 supporting＋棄却済みの情報を用意 | `recompute_auto_links_for_target` 再実行 | 手動は supporting 保持・棄却は復活しない・auto は score 更新（重複行なし） | N.6／§5.35 |
 | N-TC-155 | int | 候補外の成果物は何もしない（下書きアイデア等） | 下書き（未公開）アイデア | `recompute_auto_links_for_target(ts, "ideas", draft_id)` | `get_target_text` が None＝リンクを生成しない（published のみ候補） | N.6 |
+| N-TC-156 | int | 会社別の一致率しきい値で auto-link の生成有無が変わる（§5.36b・Phase C・会社設定 `companies.auto_link_threshold`） | 類似アイデアを seed・会社しきい値を直接設定 | しきい値 1.5（全遮断）で情報保存→リンク無し／0.0（全許容）で情報保存→リンク有り | 1.5＝cosine 上限超で類似でも自動リンクしない／0.0＝わずかでも一致すれば自動リンク（会社別しきい値が auto-link に反映される） | N.6／§5.36b／B.1 |
+| N-TC-157 | int | 前向き auto-link は未永続候補のトークンを自己修復で永続化（§5.36b・都度抽出撤廃） | トークン未永続のアイデアを直接 insert | 情報を保存（前向きトリガ） | 保存前は `tokens_for('idea', id)=[]`／保存後は候補アイデアの entity_tokens が生成される（以後は再抽出せず永続値を使う） | N.6／§5.36b |
 
 ## 3. frontend（一覧の結線・サーバー委譲・SC-50）
 

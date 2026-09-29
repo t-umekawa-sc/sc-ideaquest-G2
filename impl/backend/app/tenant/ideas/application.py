@@ -329,9 +329,10 @@ def update_idea(account_id, company_id, idea_id, *, body) -> dict:
                         raise AppError(409, "edit_conflict",
                                        detail="他の編集と競合しました。最新を取得してから編集し直してください。")
                     raise
-            # 公開中アイデアの本文変更＝類似度が変わり得る＝自動関連付けを再計算（N.6 逆方向）。
+            # 公開中アイデアの本文変更＝トークン再永続化（前向きが再抽出せず読める・§5.36b）＋類似度再計算（N.6 逆方向）。
             from app.tenant.info import application as info_app
-            info_app.recompute_auto_links_for_target(ts, "ideas", idea.id)
+            info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
+            info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
         detail = _build_detail(ts, idea, user.id)
         ts.commit()
     return detail
@@ -358,9 +359,10 @@ def publish_idea(account_id, company_id, idea_id, *, body) -> dict:
         _validate_publishable(title=idea.title, value=idea.value, body_text=idea.body)
         idea.status = "published"
         xp_delta = _publish_processing(ts, idea, user)
-        # 公開＝このアイデアが候補になった＝既存情報から自動関連付け（N.6 逆方向・成果物保存トリガ）。
+        # 公開＝このアイデアが候補になった＝トークン永続化（前向きが再抽出せず読める・§5.36b）＋既存情報から自動関連付け（N.6 逆方向）。
         from app.tenant.info import application as info_app
-        info_app.recompute_auto_links_for_target(ts, "ideas", idea.id)
+        info_app.persist_entity_tokens(ts, "idea", idea.id, " ".join(x for x in (idea.title, idea.value, idea.body) if x))
+        info_app.recompute_auto_links_for_target(ts, "ideas", idea.id, info_app.auto_link_threshold_of(company))
         detail = _build_detail(ts, idea, user.id)
         detail["xp_delta"] = xp_delta  # 初回公開時のみ +50（#8 獲得フィードバック）
         q_id = idea.quest_id

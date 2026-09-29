@@ -130,6 +130,34 @@ def test_b_tc_176_settings_game_mode_default(client, companies):
                         headers=_csrf(client)).json()["game_mode_default"] is True
 
 
+def test_b_tc_177_settings_auto_link_threshold(client, companies):
+    """B-TC-177 自動関連付けの一致率しきい値 auto_link_threshold の更新＋永続（N.6・§5.36b）。根拠 B.1。"""
+    _login_system_admin(client)
+    created = client.post(COMPANIES, json=_new_company_body(), headers=_csrf(client)).json()
+    cid = created["company_id"]
+    companies.append(uuid.UUID(cid))
+
+    assert client.get(f"{COMPANIES}/{cid}").json()["auto_link_threshold"] == 0.12  # 既定 12%
+    r = client.patch(f"{COMPANIES}/{cid}/settings", json={"auto_link_threshold": 0.3}, headers=_csrf(client))
+    assert r.status_code == 200, r.text
+    assert r.json()["auto_link_threshold"] == 0.3
+    assert client.get(f"{COMPANIES}/{cid}").json()["auto_link_threshold"] == 0.3  # 永続
+
+
+def test_b_tc_178_settings_auto_link_threshold_out_of_range_422(client, companies):
+    """B-TC-178 一致率しきい値は 0..1 の範囲外を 422 で弾く（cosine 類似度・§5.36b）。根拠 B.1。"""
+    _login_system_admin(client)
+    created = client.post(COMPANIES, json=_new_company_body(), headers=_csrf(client)).json()
+    cid = created["company_id"]
+    companies.append(uuid.UUID(cid))
+
+    for bad in (1.5, -0.1):
+        r = client.patch(f"{COMPANIES}/{cid}/settings", json={"auto_link_threshold": bad}, headers=_csrf(client))
+        assert r.status_code == 422, (bad, r.text)
+    # 範囲外で弾かれた後も既定は不変（永続していない）。
+    assert client.get(f"{COMPANIES}/{cid}").json()["auto_link_threshold"] == 0.12
+
+
 def test_b_tc_055_non_admin_forbidden(client, factory):
     """B-TC-055 会社管理 API は system_admin 専用＝general は 403。根拠 B.1。"""
     acc = factory.make_seed_company_account()

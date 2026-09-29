@@ -51,7 +51,7 @@
 | `PATCH /admin/companies/{company_id}` | 会社プロフィールを更新（SC-92） | パス: `company_id`／ボディ: `color`,`icon_image_path?`（アイコンは MinIO・§1.10） | 更新後の会社プロフィール |
 | `PUT /admin/companies/{company_id}/icon-image` | 会社アイコン画像を設定（SC-91 作成/SC-92 詳細・§1.10） | パス: `company_id`／**multipart**: `file`（PNG/JPEG/WebP/GIF・5MB 上限） | 200＝更新後の会社詳細（`icon_image_url`＝短TTL 署名URL を含む）。MIME/サイズ違反=`422`／不明会社=`404` |
 | `DELETE /admin/companies/{company_id}/icon-image` | 会社アイコン画像を削除（既定＝頭文字＋会社カラーへ） | パス: `company_id` | `204`（旧オブジェクトは best-effort 削除・冪等） |
-| `PATCH /admin/companies/{company_id}/settings` | 会社設定フラグを更新（SC-92） | パス: `company_id`／ボディ: `vote_anonymized`,`hide_voters_from_managers`,`mfa_required`,`game_mode_default` | 更新後の設定フラグ。**`vote_anonymized=false`（記名）時は `hide_voters_from_managers` を無効化して保存**（サーバーで整合）。`game_mode_default`＝会社全体のゲーム層UIの既定 ON/OFF（レビュー#2・下記） |
+| `PATCH /admin/companies/{company_id}/settings` | 会社設定フラグを更新（SC-92） | パス: `company_id`／ボディ: `vote_anonymized`,`hide_voters_from_managers`,`mfa_required`,`game_mode_default`,`notify_email_enabled`,`auto_link_threshold` | 更新後の設定フラグ。**`vote_anonymized=false`（記名）時は `hide_voters_from_managers` を無効化して保存**（サーバーで整合）。`game_mode_default`＝会社全体のゲーム層UIの既定 ON/OFF（レビュー#2・下記）。`auto_link_threshold`＝自動関連付け（N.6・§5.36b）の一致率しきい値（cosine `0..1`・既定 `0.120`・**範囲外は 422**） |
 
 - **認可条件（B.1 全エンドポイント・共通）**: **system_admin 専用**＝B.0.1 の P1〜P6 を満たし、かつ `session.system_role == "system_admin"`。QG管理者・一般ユーザーは会社管理 API を呼べない＝**一律 403 `forbidden`**（会社そのものは system_admin には全社可視のため、個別会社の存在秘匿〔404〕は不要＝非 system_admin には 403 で拒否）。GET も同条件（会社の存在・件数を非 system_admin に開示しない）。
 - **会社コード**: 半角英大文字/数字/ハイフン・4〜20字・先頭英字・大文字正規化・全社一意。重複＝**409 `conflict`**（`errors[].field=company_code`）。作成時確定・以後不変。

@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +37,9 @@ class Company(ControlBase):
     # 業務通知メールの会社既定（FR-40／SC-92・§4）。true＝送る（既定）。参加リクエスト等の業務メールをゲート。
     # セキュリティ系メール（PW/新端末/ロック・A.9-⑧）は本トグルの対象外＝常時送信。
     notify_email_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # 自動関連付け（N.6・§5.36b）の一致率しきい値（会社別・SC-92）。cosine 類似度 0..1・既定 0.120（=12%）。
+    # 高いほど厳しく（リンクが減る）、低いほど緩い（増える）。auto-link は本値以上で自動リンクを生成。
+    auto_link_threshold: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False, default=Decimal("0.120"), server_default="0.120")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

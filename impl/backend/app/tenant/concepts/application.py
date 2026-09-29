@@ -161,6 +161,16 @@ def list_for_quest(account_id, company_id, quest_id) -> dict:
 
 # ---- 登録・編集・遷移・選定・判定（P.2） ----------------------------------
 
+def _concept_text(concept) -> str:
+    """コンセプトのトークン化対象テキスト（`list_candidate_targets` と同組成・§5.36b）。"""
+    return " ".join(
+        x for x in (
+            concept.title, concept.problem, concept.value_proposition,
+            concept.target, concept.differentiation, concept.solution_form,
+        ) if x
+    )
+
+
 def create(account_id, company_id, quest_id, *, body) -> dict:
     company = _ctx(account_id, company_id)
     qid = _parse_uuid(quest_id, field="quest_id")
@@ -180,9 +190,10 @@ def create(account_id, company_id, quest_id, *, body) -> dict:
         # 作成時に総合ルーム（overall）を自動生成（§3.7・P.2）。
         repo.create_chat_scope(ts, concept_id=concept.id, kind="overall", position=0)
         _snapshot_revision(ts, concept, user.id, 1)  # 初版（変更履歴標準 §3.1）
-        # コンセプト作成＝候補になった＝既存情報から自動関連付け（N.6 逆方向・成果物保存トリガ）。
+        # コンセプト作成＝候補になった＝トークン永続化（前向きが再抽出せず読める・§5.36b）＋既存情報から自動関連付け（N.6 逆方向）。
         from app.tenant.info import application as info_app
-        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id)
+        info_app.persist_entity_tokens(ts, "concept", concept.id, _concept_text(concept))
+        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id, info_app.auto_link_threshold_of(company))
         quest_obj, user_obj = quest, user
         payload = _detail_payload(ts, concept, quest_obj, user_obj)
         ts.commit()
@@ -214,9 +225,10 @@ def patch(account_id, company_id, concept_id, *, body) -> dict:
             next_rev = concept.current_revision + 1
             _snapshot_revision(ts, concept, user.id, next_rev)
             concept.current_revision = next_rev
-        # 本文変更＝類似度が変わり得る＝自動関連付けを再計算（N.6 逆方向・既存 auto は score のみ更新）。
+        # 本文変更＝トークン再永続化（前向きが再抽出せず読める・§5.36b）＋類似度再計算（N.6 逆方向・既存 auto は score のみ更新）。
         from app.tenant.info import application as info_app
-        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id)
+        info_app.persist_entity_tokens(ts, "concept", concept.id, _concept_text(concept))
+        info_app.recompute_auto_links_for_target(ts, "concepts", concept.id, info_app.auto_link_threshold_of(company))
         payload = _detail_payload(ts, concept, quest, user)
         ts.commit()
         return payload
@@ -664,6 +676,7 @@ def list_assumptions(account_id, company_id, quest_id) -> dict:
 
 
 def create_assumption(account_id, company_id, quest_id, *, statement: str) -> dict:
+    from app.tenant.info import application as info_app
     company = _ctx(account_id, company_id)
     qid = _parse_uuid(quest_id, field="quest_id")
     with get_tenant_session(company.db_identifier) as ts:
@@ -673,6 +686,7 @@ def create_assumption(account_id, company_id, quest_id, *, statement: str) -> di
         _require_manager(ts, quest, user, action="前提の作成")  # 検証プール所有
         _guard_not_completed(quest)
         a = repo.create_assumption(ts, quest_id=qid, statement=statement, created_by_id=user.id)
+        info_app.persist_entity_tokens(ts, "assumption", a.id, a.statement)  # 前向き自動関連付けの永続トークン（§5.36b）
         payload = _assumption_detail(ts, a, quest, user)
         ts.commit()
         return payload
@@ -688,6 +702,7 @@ def get_assumption_detail(account_id, company_id, assumption_id) -> dict:
 
 
 def patch_assumption(account_id, company_id, assumption_id, *, statement: str) -> dict:
+    from app.tenant.info import application as info_app
     company = _ctx(account_id, company_id)
     aid = _parse_uuid(assumption_id, field="assumption_id")
     with get_tenant_session(company.db_identifier) as ts:
@@ -697,6 +712,7 @@ def patch_assumption(account_id, company_id, assumption_id, *, statement: str) -
         _guard_not_completed(quest)
         assumption.statement = statement
         ts.flush()
+        info_app.persist_entity_tokens(ts, "assumption", assumption.id, assumption.statement)  # 本文変更でトークン再永続化（§5.36b）
         payload = _assumption_detail(ts, assumption, quest, user)
         ts.commit()
         return payload

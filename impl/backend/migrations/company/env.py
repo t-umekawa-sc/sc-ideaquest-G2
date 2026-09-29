@@ -9,6 +9,7 @@ from app.tenant.profile import orm as _company_orm  # noqa: F401  (テーブル�
 from app.tenant.quest_group import orm as _company_qg_orm  # noqa: F401  (§5.4/§5.5 を metadata に登録)
 from app.tenant.quests import orm as _company_quests_orm  # noqa: F401  (§5.6〜§5.9 を metadata に登録)
 from app.tenant.ideas import orm as _company_ideas_orm  # noqa: F401  (§5.10〜§5.14・§5.23 を metadata に登録)
+from app.tenant.tokens import orm as _company_tokens_orm  # noqa: F401  (§5.36b entity_tokens を metadata に登録)
 
 target_metadata = CompanyBase.metadata
 

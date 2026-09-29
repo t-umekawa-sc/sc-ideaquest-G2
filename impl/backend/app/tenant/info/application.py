@@ -18,6 +18,7 @@ from app.infra.storage import get_storage, validate_image_upload
 from app.tenant._shared import revisions as rev_shared
 from app.tenant.info import derive
 from app.tenant.info import repository as repo
+from app.tenant.tokens import repository as tokens_repo
 from app.tenant.info.schemas import (
     IMPACT_CLASS_VALUES,
     LINK_DISPOSITION_VALUES,
@@ -34,8 +35,26 @@ _MAX_TITLE = 255
 # 選別用要約の字数上限（§12-3・2026-09-21 ユーザー要望＝約150字）。長い記事でも一覧/選別で一目で読める長さに。
 _SUMMARY_MAX_CHARS = 150
 # 自動関連付け（N.6）＝キーワード重なり cosine の閾値＋新規 auto リンクの上位 N（ノイズ抑制）。
+# 閾値の会社別上書きは _resolve_auto_link_threshold（Phase C・既定は本値）。
 _AUTO_LINK_THRESHOLD = 0.12
 _AUTO_LINK_TOP_N = 5
+# info_links.target_type（複数形）→ entity_tokens.owner_type（単数形・§5.36b）の対応。
+_OWNER_OF_TARGET = {"ideas": "idea", "quests": "quest", "concepts": "concept", "assumptions": "assumption"}
+
+
+def auto_link_threshold_of(company) -> float:
+    """会社別の一致率しきい値（N.6・§5.36b）＝control Company.auto_link_threshold（未設定は既定 0.12）。"""
+    v = getattr(company, "auto_link_threshold", None)
+    return float(v) if v is not None else _AUTO_LINK_THRESHOLD
+
+
+def persist_entity_tokens(ts, owner_type: str, owner_id: uuid.UUID, text: str | None) -> None:
+    """owner の本文を同期トークン化して entity_tokens を全置換（§5.36b・保存時トリガ・DRY）。
+
+    情報以外（idea/concept/quest/assumption/…）の保存点から呼び、前向き自動関連付けが**都度再抽出せず**
+    永続トークンを読めるようにする。空本文は空トークン（＝リンク対象から実質除外）。呼び出し側 Tx に相乗。
+    """
+    tokens_repo.replace_tokens(ts, owner_type, owner_id, derive.extract_tokens(text or ""))
 
 _EMPTY_PAGE = {
     "data": [],
@@ -366,20 +385,37 @@ def get_capabilities(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
         return {"can_curate": repo.is_curator(ts, user.id)}
 
 
-def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]]) -> None:
+def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]], threshold: float = _AUTO_LINK_THRESHOLD) -> None:
     """情報→成果物の自動関連付け（N.6・情報保存トリガ）。
 
     本文トークンと候補成果物（published アイデア／非削除クエスト・コンセプト／前提）のキーワード重なり
     （`derive.token_cosine`）で類似度を算出し、**閾値＋上位 N** の新規 (info,target) 組に auto リンクを生成。
     既存行は **score のみ更新**し `kind`/`rejected_at`/`disposition` は保持（人が変えた種別・棄却は復活しない）。
-    方向は情報→成果物（逆方向＝成果物保存トリガは `recompute_auto_links_for_target`）。トークン抽出は候補ごとに都度（entity_tokens 恒久化は後段最適化）。
+    方向は情報→成果物（逆方向＝成果物保存トリガは `recompute_auto_links_for_target`）。
+    候補トークンは **entity_tokens の永続値を一括読取**（§5.36b）＝都度の janome 再抽出を撤廃。未永続の候補
+    （移行前の既存成果物・未再保存）は**自己修復**＝一度だけ抽出して永続化し、以後は永続値を使う。
     """
     if not info_tokens:
         return
     existing = {(l.target_type, l.target_id): l for l in repo.links_for_item(ts, info_item.id)}
+    candidates = repo.list_candidate_targets(ts)  # [(target_type, target_id, text)]（有効候補＝門番済み）
+    # owner_type 単位で永続トークンを一括読取（N クエリ回避）。未永続は自己修復（extract+persist）。
+    tokens_by_target: dict[tuple[str, uuid.UUID], list[tuple[str, int]]] = {}
+    by_type: dict[str, list[tuple[uuid.UUID, str]]] = {}
+    for target_type, target_id, text in candidates:
+        by_type.setdefault(target_type, []).append((target_id, text))
+    for target_type, items in by_type.items():
+        owner_type = _OWNER_OF_TARGET[target_type]
+        persisted = tokens_repo.tokens_for_owners(ts, owner_type, [tid for tid, _ in items])
+        for target_id, text in items:
+            toks = persisted.get(target_id)
+            if toks is None:  # 未永続＝自己修復（一度だけ抽出して恒久化）
+                toks = derive.extract_tokens(text)
+                tokens_repo.replace_tokens(ts, owner_type, target_id, toks)
+            tokens_by_target[(target_type, target_id)] = toks
     scored: list[tuple[str, uuid.UUID, float]] = []
-    for target_type, target_id, text in repo.list_candidate_targets(ts):
-        score = derive.token_cosine(info_tokens, derive.extract_tokens(text))
+    for target_type, target_id, _text in candidates:
+        score = derive.token_cosine(info_tokens, tokens_by_target[(target_type, target_id)])
         if score > 0.0:
             scored.append((target_type, target_id, score))
     scored.sort(key=lambda r: r[2], reverse=True)
@@ -390,13 +426,13 @@ def _recompute_auto_links(ts, info_item, info_tokens: list[tuple[str, int]]) -> 
             if link.origin == "auto":
                 link.score = round(score, 3)  # 既存 auto は score のみ更新（kind/rejected_at/disposition は保持）
             continue  # 手動/既存組は再生成しない（UNIQUE・人の決定を尊重）
-        if score >= _AUTO_LINK_THRESHOLD and created < _AUTO_LINK_TOP_N:
+        if score >= threshold and created < _AUTO_LINK_TOP_N:
             repo.create_link(ts, info_item_id=info_item.id, target_type=target_type, target_id=target_id,
                              kind="related", origin="auto", created_by_id=None, score=score)
             created += 1
 
 
-def recompute_auto_links_for_target(ts, target_type: str, target_id: uuid.UUID) -> None:
+def recompute_auto_links_for_target(ts, target_type: str, target_id: uuid.UUID, threshold: float = _AUTO_LINK_THRESHOLD) -> None:
     """成果物→情報の自動関連付け（N.6・成果物保存トリガ＝逆方向）。
 
     アイデア/コンセプト（等）の保存時に、当該成果物のテキストと**既存の全情報の保存済みトークン**
@@ -425,7 +461,7 @@ def recompute_auto_links_for_target(ts, target_type: str, target_id: uuid.UUID) 
             if link.origin == "auto":
                 link.score = round(score, 3)
             continue
-        if score >= _AUTO_LINK_THRESHOLD and created < _AUTO_LINK_TOP_N:
+        if score >= threshold and created < _AUTO_LINK_TOP_N:
             repo.create_link(ts, info_item_id=info_id, target_type=target_type, target_id=target_id,
                              kind="related", origin="auto", created_by_id=None, score=score)
             created += 1
@@ -498,7 +534,7 @@ def create_info_item(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> d
             item.status = "curated"
         if parent_uuid is not None:
             repo.snapshot_parent_links(ts, parent_uuid, item.id)  # 親の未棄却リンクを auto 複製（§12-1）
-        _recompute_auto_links(ts, item, tokens)  # 類似度で成果物へ auto リンク（N.6・snapshot 後＝重複回避）
+        _recompute_auto_links(ts, item, tokens, auto_link_threshold_of(company))  # 類似度で成果物へ auto リンク（N.6・会社別しきい値・snapshot 後＝重複回避）
         ts.commit()
         new_id = item.id
     # 作成直後の詳細（作成者視点＝can.edit_content=true）を返す。
@@ -695,7 +731,7 @@ def update_info_item(account_id: uuid.UUID, company_id: uuid.UUID, info_id: str,
                 item.summary = summarize_text(item.body_text, max_chars=_SUMMARY_MAX_CHARS) if item.body_text else None
                 _new_tokens = derive.extract_tokens(item.body_text or "")
                 repo.replace_tokens(ts, item.id, _new_tokens)
-                _recompute_auto_links(ts, item, _new_tokens)  # 本文変更で類似度を再計算（N.6・既存は score のみ更新）
+                _recompute_auto_links(ts, item, _new_tokens, auto_link_threshold_of(company))  # 本文変更で類似度を再計算（N.6・会社別しきい値・既存は score のみ更新）
             if "source_url" in content:
                 item.source_url = body.source_url or None
             # 内容の版スナップショット（判定後も追跡できるよう毎回の内容変更で1版・§12）。

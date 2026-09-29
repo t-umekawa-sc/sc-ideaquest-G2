@@ -16,9 +16,10 @@ from app.control_plane.auth.orm import Account, Company
 from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.tenant.info.orm import (
-    InfoAttachment, InfoItem, InfoItemCategory, InfoItemRevision, InfoLink, InfoToken,
+    InfoAttachment, InfoItem, InfoItemCategory, InfoItemRevision, InfoLink,
 )
 from app.tenant.profile.repository import get_user_by_account
+from app.tenant.tokens.orm import EntityToken
 from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN
 
 
@@ -80,11 +81,11 @@ def info_env():
                         kind="related", origin="auto"))
         ts.add(InfoLink(info_item_id=ids.a, target_type="concepts", target_id=uuid.uuid4(),
                         kind="related", origin="auto", rejected_at=base))
-        # ワードクラウド用トークン（archived の token は集計対象外）。
-        ts.add(InfoToken(info_item_id=ids.a, token="生成ai", count=5))
-        ts.add(InfoToken(info_item_id=ids.b, token="競合", count=3))
-        ts.add(InfoToken(info_item_id=ids.d, token="需要", count=2))
-        ts.add(InfoToken(info_item_id=ids.c, token="アーカイブ語", count=99))  # 除外されるべき
+        # ワードクラウド用トークン（archived の token は集計対象外）。実体は entity_tokens（owner_type='info'・§5.36b）。
+        ts.add(EntityToken(owner_type="info", owner_id=ids.a, token="生成ai", count=5))
+        ts.add(EntityToken(owner_type="info", owner_id=ids.b, token="競合", count=3))
+        ts.add(EntityToken(owner_type="info", owner_id=ids.d, token="需要", count=2))
+        ts.add(EntityToken(owner_type="info", owner_id=ids.c, token="アーカイブ語", count=99))  # 除外されるべき
         ts.commit()
 
     yield SimpleNamespace(db_identifier=db_identifier, user_id=user_id, ids=ids)
@@ -92,7 +93,7 @@ def info_env():
     with get_tenant_session(db_identifier) as ts:
         ts.execute(InfoAttachment.__table__.delete().where(InfoAttachment.info_item_id.in_(created_items)))
         ts.execute(InfoItemRevision.__table__.delete().where(InfoItemRevision.info_item_id.in_(created_items)))
-        ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id.in_(created_items)))
+        ts.execute(EntityToken.__table__.delete().where(EntityToken.owner_type == "info", EntityToken.owner_id.in_(created_items)))
         ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(created_items)))
         ts.execute(InfoItemCategory.__table__.delete().where(InfoItemCategory.info_item_id.in_(created_items)))
         # 続報（子）→ 親の順で削除（自己参照 FK）。

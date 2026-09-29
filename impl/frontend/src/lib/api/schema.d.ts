@@ -4378,6 +4378,8 @@ export interface components {
             game_mode_default: boolean;
             /** Notify Email Enabled */
             notify_email_enabled: boolean;
+            /** Auto Link Threshold */
+            auto_link_threshold: number;
             /** Account Count */
             account_count: number;
         };
@@ -4443,6 +4445,8 @@ export interface components {
             game_mode_default?: boolean | null;
             /** Notify Email Enabled */
             notify_email_enabled?: boolean | null;
+            /** Auto Link Threshold */
+            auto_link_threshold?: number | null;
         };
         /** ConceptAssumptionDTO */
         ConceptAssumptionDTO: {

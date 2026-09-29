@@ -20,7 +20,7 @@ from app.db.tenant import get_tenant_session
 from app.infra.storage import get_storage, validate_image_upload
 from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
 
-_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled")
+_SETTINGS_FIELDS = ("vote_anonymized", "hide_voters_from_managers", "mfa_required", "game_mode_default", "notify_email_enabled", "auto_link_threshold")
 _PROFILE_FIELDS = ("name", "color", "icon_image_path")
 
 
@@ -61,6 +61,7 @@ def _detail(c: Company, account_count: int) -> dict:
         "hide_voters_from_managers": c.hide_voters_from_managers,
         "game_mode_default": c.game_mode_default,  # ゲームモード会社既定（レビュー#2・§4.11）
         "notify_email_enabled": c.notify_email_enabled,  # 業務通知メール会社既定（FR-40・§4）
+        "auto_link_threshold": float(c.auto_link_threshold),  # 自動関連付けの一致率しきい値（N.6・§5.36b・0..1）
     }
 
 
@@ -443,6 +444,12 @@ def update_company_settings(company_id: uuid.UUID, changes: dict) -> dict:
         company = session.get(Company, company_id)
         if company is None:
             raise AppError(404, "not_found")
+        # 一致率しきい値は cosine 類似度 0..1 の範囲（範囲外は 422・SC-92）。UI は % 表示だが値は比率で受ける。
+        if "auto_link_threshold" in changes:
+            v = changes["auto_link_threshold"]
+            if not isinstance(v, (int, float)) or isinstance(v, bool) or not (0.0 <= float(v) <= 1.0):
+                raise AppError(422, "validation_error", detail="一致率しきい値は 0〜1 の範囲で指定してください",
+                               errors=[{"field": "auto_link_threshold"}])
         applied = [f for f in _SETTINGS_FIELDS if f in changes]
         for field in applied:
             setattr(company, field, changes[field])

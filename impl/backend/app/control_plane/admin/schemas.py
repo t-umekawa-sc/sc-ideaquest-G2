@@ -180,6 +180,7 @@ class CompanyDetail(BaseModel):
     hide_voters_from_managers: bool
     game_mode_default: bool  # ゲームモード会社既定（レビュー#2・§4.11）
     notify_email_enabled: bool  # 業務通知メール会社既定（FR-40・§4）
+    auto_link_threshold: float  # 自動関連付けの一致率しきい値（N.6・§5.36b・cosine 0..1）
     account_count: int
 
 
@@ -220,6 +221,8 @@ class CompanySettingsUpdateRequest(BaseModel):
     mfa_required: bool | None = None
     game_mode_default: bool | None = None  # ゲームモード会社既定（レビュー#2・§4.11）
     notify_email_enabled: bool | None = None  # 業務通知メール会社既定（FR-40・§4）
+    # 自動関連付けの一致率しきい値（N.6・§5.36b・cosine 0..1）。範囲検証は application 側（422）。
+    auto_link_threshold: float | None = None
 
 
 # --- QG管理者 API（B.4・SC-90） ------------------------------------------------------------

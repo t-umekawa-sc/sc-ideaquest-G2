@@ -19,7 +19,9 @@ from app.tenant.ideas.orm import Idea
 from app.tenant.info import application as app_info
 from app.tenant.info import derive
 from app.tenant.info import repository as repo
-from app.tenant.info.orm import InfoItem, InfoItemRevision, InfoLink, InfoToken
+from app.tenant.info.orm import InfoItem, InfoItemRevision, InfoLink
+from app.tenant.tokens import repository as tokens_repo
+from app.tenant.tokens.orm import EntityToken
 from app.tenant.info.schemas import InfoCreateRequest, InfoUpdateRequest
 from app.tenant.profile.orm import User
 from app.tenant.quests.orm import Quest
@@ -56,10 +58,12 @@ def _cleanup(db_identifier, *, info_ids, idea_ids, quest_id, owner_id):
     with get_tenant_session(db_identifier) as ts:
         if info_ids:
             ts.execute(InfoItemRevision.__table__.delete().where(InfoItemRevision.info_item_id.in_(info_ids)))
-            ts.execute(InfoToken.__table__.delete().where(InfoToken.info_item_id.in_(info_ids)))
+            ts.execute(EntityToken.__table__.delete().where(EntityToken.owner_type == "info", EntityToken.owner_id.in_(info_ids)))
             ts.execute(InfoLink.__table__.delete().where(InfoLink.info_item_id.in_(info_ids)))
             ts.execute(InfoItem.__table__.delete().where(InfoItem.id.in_(info_ids)))
         if idea_ids:
+            # 前向き auto-link の自己修復で idea 側 entity_tokens も生成されうる（§5.36b・Phase B）＝併せて掃除。
+            ts.execute(EntityToken.__table__.delete().where(EntityToken.owner_type == "idea", EntityToken.owner_id.in_(idea_ids)))
             ts.execute(Idea.__table__.delete().where(Idea.id.in_(idea_ids)))
         ts.execute(Quest.__table__.delete().where(Quest.id == quest_id))
         ts.execute(User.__table__.delete().where(User.id == owner_id))
@@ -227,3 +231,59 @@ def test_n_tc_155_reverse_noop_for_non_candidate():
         assert links == [], "下書き（候補外）には自動リンクを作らない"
     finally:
         _cleanup(db_identifier, info_ids=[info_id], idea_ids=[draft], quest_id=qid, owner_id=owner)
+
+
+def _set_company_threshold(company_id, value) -> None:
+    """会社の一致率しきい値を直接設定（API 検証を経ず＝境界検証のため 1 超も可・テスト専用）。"""
+    from decimal import Decimal
+    with control_session() as s:
+        s.get(Company, company_id).auto_link_threshold = Decimal(str(value))
+        s.commit()
+
+
+def test_n_tc_156_company_threshold_controls_auto_link():
+    """N-TC-156: 会社別の一致率しきい値で auto-link の生成有無が変わる（§5.36b・Phase C・会社設定）。
+
+    しきい値 1.5（cosine 上限 1.0 超＝全遮断）では類似アイデアでもリンクせず、0.0（全許容）ではリンクする。
+    """
+    company_id, db_identifier, account_id = _ctx()
+    hit = uuid.uuid4()
+    owner, qid = _seed_ideas(db_identifier, [(hit, _UNIQUE_TEXT)])
+    info_ids: list[uuid.UUID] = []
+    try:
+        _set_company_threshold(company_id, "1.500")  # 全遮断
+        c1 = app_info.create_info_item(account_id, company_id,
+                                       body=InfoCreateRequest(title="厳しめ", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+        info_ids.append(uuid.UUID(c1["id"]))
+        with get_tenant_session(db_identifier) as ts:
+            keys = {(l.target_type, l.target_id) for l in repo.links_for_item(ts, info_ids[0])}
+        assert ("ideas", hit) not in keys, "しきい値 1.5＝どんな類似でも自動リンクしない"
+
+        _set_company_threshold(company_id, "0.000")  # 全許容
+        c2 = app_info.create_info_item(account_id, company_id,
+                                       body=InfoCreateRequest(title="緩め", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+        info_ids.append(uuid.UUID(c2["id"]))
+        with get_tenant_session(db_identifier) as ts:
+            keys = {(l.target_type, l.target_id) for l in repo.links_for_item(ts, info_ids[1])}
+        assert ("ideas", hit) in keys, "しきい値 0.0＝わずかでも一致すれば自動リンクする"
+    finally:
+        _set_company_threshold(company_id, "0.120")  # 既定へ戻す（共有DB汚染防止）
+        _cleanup(db_identifier, info_ids=info_ids, idea_ids=[hit], quest_id=qid, owner_id=owner)
+
+
+def test_n_tc_157_forward_self_heal_persists_candidate_tokens():
+    """N-TC-157: 前向き auto-link は未永続候補のトークンを自己修復で永続化する（§5.36b・都度抽出の撤廃）。"""
+    company_id, db_identifier, account_id = _ctx()
+    hit = uuid.uuid4()
+    owner, qid = _seed_ideas(db_identifier, [(hit, _UNIQUE_TEXT)])  # 直接 insert＝entity_tokens 未永続
+    info_ids: list[uuid.UUID] = []
+    try:
+        with get_tenant_session(db_identifier) as ts:
+            assert tokens_repo.tokens_for(ts, "idea", hit) == [], "初期は候補アイデアのトークン未永続"
+        created = app_info.create_info_item(account_id, company_id,
+                                            body=InfoCreateRequest(title="自己修復", body_html=f"<p>{_UNIQUE_TEXT}</p>"))
+        info_ids.append(uuid.UUID(created["id"]))
+        with get_tenant_session(db_identifier) as ts:
+            assert tokens_repo.tokens_for(ts, "idea", hit), "前向きが候補アイデアのトークンを自己修復で永続化する"
+    finally:
+        _cleanup(db_identifier, info_ids=info_ids, idea_ids=[hit], quest_id=qid, owner_id=owner)

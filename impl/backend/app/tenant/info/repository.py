@@ -16,8 +16,10 @@ from sqlalchemy import bindparam, delete, func, select, text, update
 from sqlalchemy.orm import Session, aliased
 
 from app.core import list_query as lq
-from app.tenant.info.orm import InfoAttachment, InfoCurator, InfoItem, InfoLink, InfoToken
+from app.tenant.info.orm import InfoAttachment, InfoCurator, InfoItem, InfoLink
 from app.tenant.profile.orm import User
+from app.tenant.tokens import repository as tokens_repo
+from app.tenant.tokens.orm import EntityToken
 
 # 全文検索の対象式＝FTS 索引（idx_info_items_fts）と一致（title＋body_text・§1.11）。
 _FTS_EXPR = "(info_items.title || ' ' || coalesce(info_items.body_text, '')) &@~ :q"
@@ -239,10 +241,8 @@ def create_info_item(
 
 
 def replace_tokens(session: Session, info_id: uuid.UUID, tokens: list[tuple[str, int]]) -> None:
-    """当該情報の info_tokens を全置換（保存時に再生成・§5.36）。"""
-    session.execute(delete(InfoToken).where(InfoToken.info_item_id == info_id))
-    for tok, cnt in tokens:
-        session.add(InfoToken(info_item_id=info_id, token=tok, count=cnt))
+    """当該情報のトークンを全置換（保存時に再生成・§5.36b）。実体は entity_tokens（owner_type='info'）へ委譲。"""
+    tokens_repo.replace_tokens(session, "info", info_id, tokens)
 
 
 def replace_categories(session: Session, info_id: uuid.UUID, categories: list[str]) -> None:
@@ -395,9 +395,9 @@ def get_target_text(session: Session, target_type: str, target_id: uuid.UUID) ->
 def all_info_tokens(session: Session) -> dict[uuid.UUID, list[tuple[str, int]]]:
     """非 archived 情報の保存済みトークンを一括取得＝`{info_id: [(token, count), …]}`（N.6 逆方向の類似度入力）。"""
     rows = session.execute(
-        select(InfoToken.info_item_id, InfoToken.token, InfoToken.count)
-        .join(InfoItem, InfoItem.id == InfoToken.info_item_id)
-        .where(InfoItem.status != "archived")
+        select(EntityToken.owner_id, EntityToken.token, EntityToken.count)
+        .join(InfoItem, InfoItem.id == EntityToken.owner_id)
+        .where(EntityToken.owner_type == "info", InfoItem.status != "archived")
     ).all()
     out: dict[uuid.UUID, list[tuple[str, int]]] = {}
     for info_id, token, count in rows:
@@ -584,9 +584,9 @@ def follow_up_items(session: Session, info_id: uuid.UUID) -> list[InfoItem]:
 def tokens_top(session: Session, info_id: uuid.UUID, *, limit: int) -> list[dict]:
     """当該情報のトークン上位（ミニ・ワードクラウド・count 降順・§5.36）。"""
     rows = session.execute(
-        select(InfoToken.token, InfoToken.count)
-        .where(InfoToken.info_item_id == info_id)
-        .order_by(InfoToken.count.desc(), InfoToken.token.asc()).limit(limit)
+        select(EntityToken.token, EntityToken.count)
+        .where(EntityToken.owner_type == "info", EntityToken.owner_id == info_id)
+        .order_by(EntityToken.count.desc(), EntityToken.token.asc()).limit(limit)
     ).all()
     max_c = int(rows[0].count) if rows else 0
     return [{"token": t, "count": int(c), "weight": round(int(c) / max_c, 4) if max_c else None} for t, c in rows]
@@ -675,7 +675,7 @@ def delete_info_item(session: Session, info_id: uuid.UUID) -> list[str]:
     keys = [k for (k,) in session.execute(
         select(InfoAttachment.object_key).where(InfoAttachment.info_item_id == info_id)).all()]
     session.execute(delete(InfoAttachment).where(InfoAttachment.info_item_id == info_id))
-    session.execute(delete(InfoToken).where(InfoToken.info_item_id == info_id))
+    session.execute(delete(EntityToken).where(EntityToken.owner_type == "info", EntityToken.owner_id == info_id))
     session.execute(delete(InfoLink).where(InfoLink.info_item_id == info_id))
     session.execute(delete(InfoItemCategory).where(InfoItemCategory.info_item_id == info_id))
     session.execute(delete(InfoItemRevision).where(InfoItemRevision.info_item_id == info_id))
@@ -689,11 +689,11 @@ def word_cloud(session: Session, *, limit: int) -> list[dict]:
     weight は最頻値を 1.0 とした正規化（0..1）。同数は token 昇順で安定化。
     """
     stmt = (
-        select(InfoToken.token, func.sum(InfoToken.count).label("cnt"))
-        .join(InfoItem, InfoItem.id == InfoToken.info_item_id)
-        .where(InfoItem.status != "archived")
-        .group_by(InfoToken.token)
-        .order_by(func.sum(InfoToken.count).desc(), InfoToken.token.asc())
+        select(EntityToken.token, func.sum(EntityToken.count).label("cnt"))
+        .join(InfoItem, InfoItem.id == EntityToken.owner_id)
+        .where(EntityToken.owner_type == "info", InfoItem.status != "archived")
+        .group_by(EntityToken.token)
+        .order_by(func.sum(EntityToken.count).desc(), EntityToken.token.asc())
         .limit(limit)
     )
     rows = session.execute(stmt).all()

@@ -348,6 +348,12 @@ def set_quest_link_disposition(account_id: uuid.UUID, company_id: uuid.UUID, que
     return dto
 
 
+def _persist_quest_tokens(ts, quest) -> None:
+    """クエストの本文（title+purpose）をトークン化して entity_tokens を更新（§5.36b・前向き自動関連付けの永続入力）。"""
+    from app.tenant.info import application as info_app
+    info_app.persist_entity_tokens(ts, "quest", quest.id, " ".join(x for x in (quest.title, quest.purpose) if x))
+
+
 def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
     """クエストを作成（C.2・SC-11）。作成者＝所有者（全権限）。status=recruiting は即公開扱い。
 
@@ -394,6 +400,7 @@ def create_quest(account_id: uuid.UUID, company_id: uuid.UUID, *, body) -> dict:
                 info_repo.create_link(ts, info_item_id=info_uuid, target_type="quests",
                                       target_id=quest.id, kind="related", origin="manual")
         _record_quest_revision_if_changed(ts, quest, user.id)  # 初版（定義スナップ・§3.1）
+        _persist_quest_tokens(ts, quest)  # 前向き自動関連付けの永続トークン（§5.36b）
         detail = _build_detail(ts, quest, user.id)
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         quest_id = quest.id
@@ -446,6 +453,7 @@ def update_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *,
             )
         new_deadline = quest.deadline.isoformat() if quest.deadline else None
         _record_quest_revision_if_changed(ts, quest, user.id)  # 定義変更を版に記録（§3.1）
+        _persist_quest_tokens(ts, quest)  # 本文変更でトークン再永続化（§5.36b）
         detail = _build_detail(ts, quest, user.id)
         ts.commit()
     _revoke_chat_subscriptions(company_id, cg_ids, removed)  # L.4（post-commit・全体編集での除外も失効）
@@ -490,6 +498,7 @@ def publish_quest(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *
         quest.status = "recruiting"
         repo.add_quest_decision_log(ts, quest.id, kind="status", from_value="draft", to_value="recruiting", actor_id=user.id)  # §3.2
         _record_quest_revision_if_changed(ts, quest, user.id)  # 公開時の内容確定も版に（§3.1）
+        _persist_quest_tokens(ts, quest)  # 公開時の内容確定でトークン再永続化（§5.36b）
         detail = _build_detail(ts, quest, user.id)
         recipients = [m.user_id for m in repo.list_active_members(ts, quest.id) if m.user_id != user.id]
         published_id = quest.id
