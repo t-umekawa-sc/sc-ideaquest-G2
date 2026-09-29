@@ -40,6 +40,21 @@ class StrategyDocument(CompanyBase):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class QuestStrategyDocument(CompanyBase):
+    """クエスト↔適用経営資料（0..N・§5.56）。整合率の母集合＝クエストが選んだ資料（1アイデア N資料）。
+
+    設定はクエスト作成/編集（参加グループ選択と同型）。選択は quest_revisions のスナップショットに含め、
+    変更で1版追加する（版履歴・§3.1）。
+    """
+    __tablename__ = "quest_strategy_documents"
+    __table_args__ = (UniqueConstraint("quest_id", "strategy_document_id", name="uq_quest_strategy_documents"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    quest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quests.id", ondelete="CASCADE"), nullable=False)
+    strategy_document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("strategy_documents.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class IdeaAlignment(CompanyBase):
     __tablename__ = "idea_alignment"
     __table_args__ = (UniqueConstraint("idea_id", "strategy_document_id", name="uq_idea_alignment"),)

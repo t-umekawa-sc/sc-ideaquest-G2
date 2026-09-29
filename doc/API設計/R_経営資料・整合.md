@@ -9,7 +9,8 @@
 | 操作 | 権限 | 補足 |
 | --- | --- | --- |
 | 経営資料 CRUD（登録/編集/アーカイブ/削除） | **`company_account_admin` / `system_admin`** | 機微資料＝会社管理者スコープ（§10 データ保護）。一般/クエスト権限では不可（403） |
-| 経営資料 一覧/詳細（read） | company_account_admin / system_admin | Phase1 は管理者のみ可視（機微）。将来「方針の共有可視」は会社設定で opt-in（後段） |
+| 経営資料 一覧/詳細（管理・read） | company_account_admin / system_admin | 全項目・機会脅威率・関連アイデア等の**管理詳細**は管理者のみ（機微） |
+| 経営資料 **選択用一覧**（read） | **クエスト作成権限者**（owner/quest_admin＝クエスト作成/編集ができる人） | クエストに適用する資料を選ぶための**軽量一覧**（`id`/`title`/`doc_kind`/`period_from`/`period_to`/`status=active` のみ・全文/機会脅威率は返さない）。§R.1 の `?for=selection` |
 | 整合バッジ（アイデア詳細に同梱・SC-22） | アイデア可視者 | 率＋獲得コインの表示のみ（read）。算出はサーバー権威 |
 | Markdown エクスポート | company_account_admin / system_admin | 利用者の明示操作でのみ生成（自動外部送信しない・§10） |
 
@@ -19,7 +20,8 @@
 
 | メソッド / パス | 説明 | リクエスト | レスポンス |
 | --- | --- | --- | --- |
-| `GET /strategy-documents` | 一覧（DataTable 契約・§1.8.1） | `q`/`status`/`doc_kind`/`sort`/`page`/`per_page`/`pin_ids` | `{data:[StrategyDocListItem], page_info}` |
+| `GET /strategy-documents` | 一覧（DataTable 契約・§1.8.1・管理者） | `q`/`status`/`doc_kind`/`sort`/`page`/`per_page`/`pin_ids` | `{data:[StrategyDocListItem], page_info}` |
+| `GET /strategy-documents?for=selection` | **選択用 軽量一覧**（クエスト作成権限者・§R.0） | `status=active`（既定）・`q` | `{data:[{id,title,doc_kind,period_from,period_to}]}`（全文/率は返さない） |
 | `POST /strategy-documents` | 登録（管理者） | `{title, doc_kind, intent?, policy_commitment?, strategy?, focus_areas?[], objectives?, body_md?, period_from?, period_to?}` | 201＋詳細。`body_text` 連結＋`entity_tokens` 同期再生成（owner_type=strategy_doc） |
 | `GET /strategy-documents/{id}` | 詳細 | パス: `id` | `StrategyDocDetail`（全項目＋率集計＋関連アイデア/情報＋ワードクラウド上位） |
 | `PATCH /strategy-documents/{id}` | 編集（差分・管理者） | 変更フィールドのみ | 200＋詳細。`body_text` 再連結＋トークン再永続化＋配下アイデアの整合率再計算（許容バッチ） |
@@ -29,11 +31,19 @@
 - 検証（§4.7）＝`title` 必須・`doc_kind` はホワイトリスト（`midterm_plan`/`policy`/`strategy`/`other`）・`period_from<=period_to`・`focus_areas` は文字列配列。
 - `body_text` ＝ `intent`＋`policy_commitment`＋`strategy`＋`focus_areas`＋`objectives`＋`body_md` を連結（トークン化/検索の素材・§5.54）。
 
+## R.1b クエストへの適用資料の選択（母集合の決定・C ドメイン連携）
+
+- **クエスト作成/編集**（`POST/PATCH /quests`・C ドメイン）に **`strategy_document_ids[]`**（0..N）を追加＝適用する経営資料を作成者が手動選択（参加グループ `quest_group_ids[]` と同型）。中間表 `quest_strategy_documents`（§5.56）へ reconcile。
+- 選択元＝`GET /strategy-documents?for=selection`（active 資料の軽量一覧・クエスト作成権限者）。日付範囲による自動割当はしない（作成者が該当年度の有効資料を選ぶ）。
+- **版履歴**＝選択は**クエスト定義スナップショット**（`quest_revisions`・§3.1）に `strategy_document_ids` として含める＝**選択変更で quest_revision を1版追加**（categories／参加グループと同様）。
+- **選択変更時の再計算**＝配下アイデア × 変更後集合で `idea_alignment` を再計算（率は動く）。**コインは維持**（付与し直さない・§R.3）。
+
 ## R.2 整合率（アイデア↔経営資料）
 
 - **算出**＝`SimilarityProvider.score(idea_text, strategy_text)`（Phase1＝`derive.token_cosine`＝キーワード TF-IDF cosine・[[entity_tokens]] の永続トークンを読む）。0..1。
 - **保存**＝`idea_alignment(idea_id, strategy_document_id, score, method, matched_tokens)`（upsert・§5.55）。
-- **契機**＝(1) アイデア公開/更新（当該アイデア×全 active 経営資料を再計算）／(2) 経営資料 登録/更新（当該資料×可視アイデアを再計算・バッチ許容）。
+- **母集合＝アイデアの所属クエストが選択した経営資料**（`quest_strategy_documents`・§5.56）＝**1アイデア N資料**。全 active 資料ではない。未選択クエストは整合行なし＝バッジ非表示。
+- **契機**＝(1) アイデア公開/更新（当該アイデア×自クエストの選択資料を再計算）／(2) クエストの資料選択変更（配下アイデア×変更後集合）／(3) 経営資料 登録/更新（当該資料×関係アイデアを再計算・バッチ許容）。
 - **read（アイデア詳細/SC-22 同梱）**＝`GET /ideas/{id}` に `alignment` を同梱（別 read も可）:
   - `alignment = {best_score, best_strategy:{id,title}, matched_tokens[], tier, coins_awarded}`。
   - **複数経営資料時は最大採用**＋`matched_tokens`（効いた方針の上位語）で「どの方針に効いたか」を提示。
