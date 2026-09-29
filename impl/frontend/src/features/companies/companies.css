@@ -52,3 +52,38 @@
 .table tr.dt-row--link.is-rowlocked { cursor: default; }
 .table tr.dt-row--link.is-rowlocked:hover:not(.is-pinned) td { background: transparent; }
 .dt-card--link.is-rowlocked { cursor: default; }
+
+/* 自動関連付けの一致率しきい値（SC-92）＝スライダー（つまみ）＋数値入力の双方向同期。
+   --pct(0..100) で塗り/吹き出しを駆動。style-guide.html §4d から移植（2026-09-29・N.6/§5.36b）。 */
+.threshold { min-width: 260px; }
+.threshold__control { display: flex; align-items: center; gap: var(--space-4); }
+.threshold__slider-wrap { position: relative; flex: 1; padding-top: 1.6rem; }
+.threshold__slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 999px; cursor: pointer; outline: none;
+  background: linear-gradient(to right, var(--color-primary) calc(var(--pct) * 1%), var(--color-border) calc(var(--pct) * 1%));
+}
+.threshold__slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-primary); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .28); cursor: pointer;
+}
+.threshold__slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-primary); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .28); cursor: pointer;
+}
+.threshold__slider:focus-visible { box-shadow: 0 0 0 3px var(--color-primary-soft); }
+/* つまみ上の吹き出し（現在値）＝--pct に追従。両端で見切れないよう clamp。 */
+.threshold__bubble {
+  position: absolute; top: 0; left: clamp(1.2rem, calc(var(--pct) * 1%), calc(100% - 1.2rem)); transform: translateX(-50%);
+  font-size: var(--text-sm); font-weight: 700; color: var(--color-primary);
+  background: var(--color-primary-soft); border: 1px solid var(--color-primary-border);
+  border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+}
+.threshold__num { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.threshold__input {
+  width: 4.5rem; text-align: right; padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+}
+.threshold__scale {
+  display: flex; justify-content: space-between; margin-top: var(--space-2);
+  font-size: var(--text-xs); color: var(--color-text-muted);
+}

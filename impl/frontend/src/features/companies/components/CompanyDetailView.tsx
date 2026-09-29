@@ -34,6 +34,8 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
   const [error, setError] = useState<string | null>(null);
   const [color, setColor] = useState("#2563EB");
   const [provisioning, setProvisioning] = useState(false);
+  // 一致率しきい値の表示値（%・スライダー↔数値の共有 state）。会社ロード/保存で server 値に同期。
+  const [thPct, setThPct] = useState(12);
   const iconInputRef = useRef<HTMLInputElement>(null);
 
   const ctxRef = useRef<HTMLElement>(null);
@@ -82,6 +84,11 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
       snack({ type: "error", title: msg });
     }
   }
+
+  // 会社ロード/保存後に server の一致率しきい値（比率 0..1）を % 表示へ同期（スライダー/数値の初期・確定値）。
+  useEffect(() => {
+    if (company) setThPct(Math.round((company.auto_link_threshold ?? 0.12) * 100));
+  }, [company?.auto_link_threshold]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 自動関連付けの一致率しきい値（N.6・§5.36b）＝UI は %、値は比率（0..1）で保存。0〜100 の範囲外は弾く。
   async function saveThreshold(pct: number) {
@@ -340,20 +347,43 @@ export function CompanyDetailView({ companyId, isOwnCompany = false }: { company
             <div className="setting-row__name">自動関連付けの一致率しきい値</div>
             <div className="setting-row__desc">情報インプットと成果物（アイデア/コンセプト/クエスト/前提）を自動で紐づける最小の一致率。高いほど厳しく（紐づけが減る）、低いほど緩い（増える）。既定 12%。</div>
           </div>
-          <label className="switch" style={{ gap: "var(--space-2)" }}>
-            <input
-              type="number"
-              aria-label="自動関連付けの一致率しきい値（パーセント）"
-              min={0}
-              max={100}
-              step={1}
-              defaultValue={Math.round((company.auto_link_threshold ?? 0.12) * 100)}
-              key={company.auto_link_threshold}
-              onBlur={(e) => void saveThreshold(Number(e.target.value))}
-              style={{ width: "5rem", textAlign: "right", padding: "var(--space-1) var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)" }}
-            />
-            <span className="switch__state">%</span>
-          </label>
+          {/* スライダー（つまみ）＋数値入力の双方向同期（style-guide §4d 由来）。ドラッグ中は表示のみ更新し、
+              確定（pointer/keyup・数値は blur）で保存＝比率 0..1 へ丸め。--pct で塗り/吹き出しを駆動。 */}
+          <div className="threshold" style={{ ["--pct" as string]: thPct } as React.CSSProperties}>
+            <div className="threshold__control">
+              <div className="threshold__slider-wrap">
+                <output className="threshold__bubble" htmlFor="auto-link-threshold">{thPct}%</output>
+                <input
+                  className="threshold__slider"
+                  id="auto-link-threshold"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={thPct}
+                  aria-label="自動関連付けの一致率しきい値（パーセント）"
+                  onChange={(e) => setThPct(Number(e.target.value))}
+                  onPointerUp={(e) => void saveThreshold(Number(e.currentTarget.value))}
+                  onKeyUp={(e) => void saveThreshold(Number(e.currentTarget.value))}
+                />
+              </div>
+              <div className="threshold__num">
+                <input
+                  className="threshold__input"
+                  type="number"
+                  aria-label="一致率しきい値（数値・パーセント）"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={thPct}
+                  onChange={(e) => setThPct(Number(e.target.value))}
+                  onBlur={(e) => void saveThreshold(Number(e.currentTarget.value))}
+                />
+                <span aria-hidden="true">%</span>
+              </div>
+            </div>
+            <div className="threshold__scale"><span>← 緩い（紐づけ多い）</span><span>厳しい（少ない）→</span></div>
+          </div>
         </div>
 
         <div className="provision-note">
