@@ -11,6 +11,10 @@ import { realtime } from "@/lib/realtime";
 import { useScrollRestore } from "@/lib/scrollRestore";
 
 import { getNotifications, markAllRead, markRead, markUnread, notificationHref, type NotificationDTO } from "../api";
+import {
+  browserNotifyEnabled, browserNotifyPermission, browserNotifySupported,
+  enableBrowserNotifications, setBrowserNotifyEnabled,
+} from "../browserPush";
 import { groupOf, timeLabel, type NotifGroup } from "../time";
 import "../notifications.css";
 
@@ -52,6 +56,9 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
   const [fState, setFState] = useState<"" | "unread">("");
   const [fCat, setFCat] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // ブラウザ通知 Tier1 のオプトイン（デバイス単位・localStorage）。unsupported は非表示。
+  const [pushPerm, setPushPerm] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [pushOn, setPushOn] = useState(false);
   // 一覧のスクロール位置復元（§4.12）＝初回ロード完了後に復元（通知を上から順にクリック→戻る）。
   useScrollRestore(!loading);
 
@@ -99,6 +106,19 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
     if (res) setUnreadCount(res.unread_count);
     await load();
   };
+
+  // ブラウザ通知オプトインの初期状態（クライアントのみ・ブラウザ許可はデバイス単位）。
+  useEffect(() => {
+    if (!browserNotifySupported()) return;
+    setPushPerm(browserNotifyPermission());
+    setPushOn(browserNotifyEnabled());
+  }, []);
+  const togglePush = useCallback(async () => {
+    if (pushOn) { setBrowserNotifyEnabled(false); setPushOn(false); return; }
+    const p = await enableBrowserNotifications(); // default→許可要求／granted なら有効フラグを立てる
+    setPushPerm(p);
+    setPushOn(p === "granted" && browserNotifyEnabled());
+  }, [pushOn]);
 
   function Row({ n }: { n: NotificationDTO }) {
     const href = notificationHref(n);
@@ -192,6 +212,21 @@ export function NotificationsView({ gameEnabled = true }: { gameEnabled?: boolea
         </div>
         <div className="tools">
           <span className="list-count">{unreadCount} 件の未読</span>
+          {/* ブラウザ通知 Tier1 のオプトイン（このデバイス・タブ非アクティブ時に OS 通知）。未対応は非表示。 */}
+          {pushPerm !== "unsupported" && (
+            pushPerm === "denied" ? (
+              <span className="admin-muted" title="ブラウザの設定で通知の許可を変更してください">🔕 ブラウザ通知はブロック中</span>
+            ) : (
+              <button
+                className={"btn " + (pushOn ? "btn-primary" : "btn-outline")}
+                type="button"
+                onClick={() => void togglePush()}
+                title="宛先が明確な通知（メンション・参加リクエスト等）を OS 通知で受け取る（このデバイス・タブ非アクティブ時のみ）"
+              >
+                {pushOn ? "🔔 ブラウザ通知 ON" : "🔔 ブラウザ通知を有効化"}
+              </button>
+            )
+          )}
           <button className="btn btn-outline" type="button" onClick={() => void markAll()}>
             すべて既読にする
           </button>

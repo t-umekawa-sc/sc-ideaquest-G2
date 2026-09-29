@@ -30,6 +30,14 @@
 | H-TC-111 | api | 一覧の行と未読数がゲーム系を除外（SC-02一覧・ダッシュボード通知一覧・§4.11） | mention 1＋achievement 1 | 実効 OFF で `GET /notifications` | `data` に **mention のみ**（achievement 行が出ない）・`unread_count=1`。ON では両方出る（ダッシュボードの `notifications` も同集約＝同挙動） | H.2／§4.11 |
 | H-TC-112 | api | 一括既読がゲーム系を対象外（§4.11） | mention 1＋achievement 1（未読） | 実効 OFF で `POST /read-all`（type 無し） | `updated=1`（mention のみ既読）・応答 `unread_count=0`（非ゲームの未読は 0＝ゲーム系は数えない）。その後 ON に戻すと `unread-count=1`＝**achievement は未読のまま**（既読化されていない） | H.3／§4.11 |
 
+## 1f. ブラウザ通知 Tier1（前景・Web Notifications API・unit）
+
+> 対象＝`features/notifications/browserPush.ts` の発火ゲート（純ロジック）。宛先が明確な通知の気づきを高める（決定 2026-09-29）。有効化はデバイス単位（ブラウザ許可＋localStorage）＝backend 変更なし。発火は**タブ非アクティブ時（`document.hidden`）のみ**・ゲーム層の自己報酬（`achievement`/`magic_reaction`）は除外。許可要求/`new Notification`/localStorage の DOM 副作用は薄いアダプタ（e2e/手動検証）。Tier2（Web Push・背景配信）はバックログ O3。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| H-TC-301 | unit | ブラウザ通知 Tier1 の発火ゲート（`shouldBrowserNotify(data, env)`）＝supported/granted/enabled/hidden を**全て満たす時のみ** true。除外種別・本文なしは false | `data{type,body}`・`env{supported,permission,enabled,hidden}` | 全満たし／`supported=false`／`permission≠granted`／`enabled=false`／`hidden=false`（前景）／`type=achievement`（除外）／`body` 空 | 全満たしのみ `true`。他はいずれも `false`（前景時に出さない・未許可/未有効/未対応で出さない・自己報酬は出さない・表示本文なしは出さない） | FR-24／L（前景通知・決定 2026-09-29） |
+
 ## 1e. 画面 e2e（SC-02 通知一覧・H）
 
 > 対象＝フロント接続済み SC-02（`features/notifications/components/NotificationsView.tsx`・`/(app)/notifications`）。e2e は契約の最終確認（画面↔API）。前提＝dev seed ACME-01。一覧/未読数は `GET /notifications` の実データを画面と照合（デモ固定 13 行でないこと）。

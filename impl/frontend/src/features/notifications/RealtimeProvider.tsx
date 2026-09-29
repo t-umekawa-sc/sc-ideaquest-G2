@@ -5,7 +5,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 import { realtime } from "@/lib/realtime";
-import { getUnreadCount } from "./api";
+import { getUnreadCount, notificationHref, type NotificationDTO } from "./api";
+import { maybeBrowserNotify } from "./browserPush";
 
 const UnreadContext = createContext<number | undefined>(undefined);
 
@@ -25,6 +26,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       realtime.on("notification.created", (d) => {
         const u = (d as { unread_count?: number }).unread_count;
         setUnread((cur) => (typeof u === "number" ? u : cur + 1));
+        // ブラウザ通知 Tier1（前景）＝タブ非アクティブ時に OS 通知（発火可否は browserPush のゲート）。
+        // WS の data は REST 表現（body/context/tag/ref を含む・§8-⑳）＝追加 fetch 不要。遷移先は notificationHref で共有。
+        const n = d as NotificationDTO;
+        maybeBrowserNotify(n, notificationHref(n));
       }),
       realtime.on("notification.unread_count", (d) => {
         const u = (d as { unread_count?: number }).unread_count;
