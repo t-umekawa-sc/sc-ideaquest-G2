@@ -1161,6 +1161,26 @@ export interface paths {
         patch: operations["update_quest_api_v1_quests__quest_id__patch"];
         trace?: never;
     };
+    "/api/v1/quests/{quest_id}/word-cloud": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quest Word Cloud
+         * @description 議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。可視性はサーバー強制。読取専用。
+         */
+        get: operations["get_quest_word_cloud_api_v1_quests__quest_id__word_cloud_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quests/{quest_id}/related-info": {
         parameters: {
             query?: never;
@@ -8419,6 +8439,25 @@ export interface components {
             /** Discoverable */
             discoverable?: boolean | null;
         };
+        /**
+         * QuestWordCloudResponse
+         * @description 議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。トークン化済みアイデア本文の頻度集約。
+         */
+        QuestWordCloudResponse: {
+            /** Tokens */
+            tokens: components["schemas"]["QuestWordCloudToken"][];
+            /** Idea Count */
+            idea_count: number;
+        };
+        /** QuestWordCloudToken */
+        QuestWordCloudToken: {
+            /** Token */
+            token: string;
+            /** Count */
+            count: number;
+            /** Weight */
+            weight: number;
+        };
         /** RankingCursorPageInfo */
         RankingCursorPageInfo: {
             /** Next Cursor */
@@ -11388,6 +11427,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestDetailDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quest_word_cloud_api_v1_quests__quest_id__word_cloud_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestWordCloudResponse"];
                 };
             };
             /** @description Validation Error */

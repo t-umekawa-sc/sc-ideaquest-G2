@@ -181,6 +181,12 @@ export function getQuestActivity(questId: string): Promise<QuestActivity | null>
   return apiFetch<QuestActivity>(`/quests/${questId}/activity`);
 }
 
+// 議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。read・可視性はサーバー強制。
+export type QuestWordCloud = components["schemas"]["QuestWordCloudResponse"];
+export function getQuestWordCloud(questId: string): Promise<QuestWordCloud | null> {
+  return apiFetch<QuestWordCloud>(`/quests/${questId}/word-cloud`);
+}
+
 // クエスト作成（SC-11・C.2）。作成者＝所有者。status=recruiting は即公開（strict 検証＋参加通知）。
 export function createQuest(input: QuestCreateInput): Promise<QuestDetail | null> {
   return apiFetch<QuestDetail>("/quests", { method: "POST", body: JSON.stringify(input), headers: idempotencyHeader() });

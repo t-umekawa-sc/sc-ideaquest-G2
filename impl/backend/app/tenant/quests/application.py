@@ -290,6 +290,42 @@ def get_quest_detail(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str
         return _build_detail(ts, quest, user.id)
 
 
+def word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str, *, limit: int = 40) -> dict:
+    """議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。可視性は get_quest_detail と同じ門番。
+
+    公開アイデア（非削除）の `entity_tokens`（owner_type='idea'）を頻度集約。weight は最頻値を 1.0 とした正規化。
+    下書きは対象外（＝共有された議論の語像のみ）。アイデア 0 は空。
+    """
+    from app.tenant.tokens import repository as tokens_repo
+
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    qid = _parse_uuid(quest_id, field="quest_id")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        quest = repo.get_quest(ts, qid)
+        if quest is None:
+            raise AppError(404, "not_found")
+        if quest.status == "draft":
+            if quest.owner_id != user.id:
+                raise AppError(404, "not_found")  # 下書きは本人だけ（存在秘匿）
+        elif not repo.can_access_quest(ts, quest, user.id):
+            raise AppError(404, "not_found")  # 公開系は C.0 門番
+
+        idea_ids = [i.id for i in ideas_repo.list_published_ideas_for_quest(ts, qid)]
+        agg: dict[str, int] = {}
+        for _oid, toks in tokens_repo.tokens_for_owners(ts, "idea", idea_ids).items():
+            for token, count in toks:
+                agg[token] = agg.get(token, 0) + int(count)
+        items = sorted(agg.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+        max_c = items[0][1] if items else 0
+        tokens = [{"token": t, "count": c, "weight": round(c / max_c, 3) if max_c else 0.0} for t, c in items]
+        return {"tokens": tokens, "idea_count": len(idea_ids)}
+
+
 def get_quest_related_info(account_id: uuid.UUID, company_id: uuid.UUID, quest_id: str,
                            *, limit: int = 50) -> dict:
     """クエストの関連情報（C.8b・SC-12 上部ストリップ・FR-41）。門番＝`get_quest_detail` と同一（範囲外 404）。

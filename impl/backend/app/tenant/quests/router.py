@@ -47,6 +47,7 @@ from app.tenant.quests.schemas import (
     QuestPublishRequest,
     QuestTransitionRequest,
     QuestUpdateRequest,
+    QuestWordCloudResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["quests"])
@@ -208,6 +209,13 @@ def get_quest(
         uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id,
     )
     return QuestDetailDTO(**result)
+
+
+@router.get("/quests/{quest_id}/word-cloud", response_model=QuestWordCloudResponse)
+def get_quest_word_cloud(quest_id: str, request: Request, session: dict = Depends(require_me)):
+    """議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。可視性はサーバー強制。読取専用。"""
+    return quest_service.word_cloud(
+        uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), quest_id)
 
 
 @router.get("/quests/{quest_id}/related-info", response_model=RelatedInfoResponse)

@@ -266,3 +266,7 @@
 .qresult__adopted-note { margin: 4px 0 0; padding: 4px 8px; background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface)); border-left: 3px solid var(--color-success); border-radius: 4px; font-size: var(--text-sm); }
 /* (c) 自動要約ブロック（抽出型・参考）。 */
 .qresult__summary { margin-top: var(--space-2); padding: var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius); }
+
+/* 🗣️ 議論の主題（SC-12・設計§7②＝配下アイデア横断の語像）。wc-mini はこの画面向けに自前定義（info-input.css 非依存）。 */
+.quest-wordcloud .wc-mini { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: var(--space-2); }
+.quest-wordcloud .wc-word { border: 0; background: transparent; color: var(--color-primary); line-height: 1.3; padding: 2px 4px; border-radius: var(--radius); }

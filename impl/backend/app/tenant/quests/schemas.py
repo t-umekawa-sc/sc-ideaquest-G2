@@ -553,3 +553,15 @@ class QuestOutcomeUpdateRequest(BaseModel):
     learnings: str | None = None
     next_actions: str | None = None
     metrics: list[QuestOutcomeMetricDTO] | None = None
+
+
+class QuestWordCloudToken(BaseModel):
+    token: str
+    count: int
+    weight: float  # 最頻値を 1.0 とした正規化（0..1・フォントサイズ用）
+
+
+class QuestWordCloudResponse(BaseModel):
+    """議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。トークン化済みアイデア本文の頻度集約。"""
+    tokens: list[QuestWordCloudToken]
+    idea_count: int  # 集約に使った公開アイデア件数

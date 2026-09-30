@@ -521,3 +521,59 @@ def test_c_tc_303_quest_discoverable_versioned(client, env):
     data = client.get(f"/api/v1/quests/{qid}/revisions").json()["data"]
     assert data[0]["revision"] == 2
     assert "discoverable" in data[0]["changed_fields"] and "title" not in data[0]["changed_fields"]
+
+
+def _seed_wc_ideas(db_identifier, quest_id, author_id):
+    """語像用に公開2件（共有語＋各固有語）・自分の下書き1件・削除済み公開1件を seed（tokens 付き）。"""
+    from app.tenant.tokens.orm import EntityToken
+    u = uuid.uuid4().hex[:8]
+    shared, wa, wb, wdraft, wdel = f"共有{u}", f"公開A{u}", f"公開B{u}", f"下書{u}", f"削除{u}"
+    ia, ib, idraft, idel = (uuid.uuid4() for _ in range(4))
+    with get_tenant_session(db_identifier) as ts:
+        def _add(iid, status, deleted=False):
+            ts.add(Idea(id=iid, quest_id=quest_id, author_id=author_id, title="wc", body="b", value="v",
+                        status=status, deleted_at=datetime.now(timezone.utc) if deleted else None))
+        _add(ia, "published"); _add(ib, "published"); _add(idraft, "draft"); _add(idel, "published", deleted=True)
+        ts.flush()
+        for oid, extra in [(ia, wa), (ib, wb), (idel, wdel)]:
+            ts.add(EntityToken(owner_type="idea", owner_id=oid, token=shared, count=1))
+            ts.add(EntityToken(owner_type="idea", owner_id=oid, token=extra, count=1))
+        ts.add(EntityToken(owner_type="idea", owner_id=idraft, token=shared, count=1))
+        ts.add(EntityToken(owner_type="idea", owner_id=idraft, token=wdraft, count=1))
+        ts.commit()
+    return {"ids": [ia, ib, idraft, idel], "shared": shared, "wa": wa, "wb": wb, "wdraft": wdraft, "wdel": wdel}
+
+
+def _cleanup_ideas(db_identifier, ids):
+    from app.tenant.tokens.orm import EntityToken
+    with get_tenant_session(db_identifier) as ts:
+        ts.execute(EntityToken.__table__.delete().where(EntityToken.owner_id.in_(ids)))
+        ts.execute(Idea.__table__.delete().where(Idea.id.in_(ids)))
+        ts.commit()
+
+
+def test_c_tc_304_quest_word_cloud_aggregates_published(client, env):
+    """C-TC-304: 議論の主題＝配下の公開アイデア横断の語像（下書き/削除は除外・weight 正規化・設計§7②）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    qid = env.make_quest(status="recruiting")  # owner=seed user＝アクセス可
+    seed = _seed_wc_ideas(env.db_identifier, qid, env.user_id)
+    try:
+        r = client.get(f"{QUESTS}/{qid}/word-cloud")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["idea_count"] == 2, body  # published・非削除のみ
+        toks = {t["token"]: t for t in body["tokens"]}
+        assert toks[seed["shared"]]["count"] == 2 and toks[seed["shared"]]["weight"] == 1.0, toks.get(seed["shared"])
+        assert seed["wa"] in toks and seed["wb"] in toks
+        assert seed["wdraft"] not in toks and seed["wdel"] not in toks  # 下書き/削除の語は出ない
+    finally:
+        _cleanup_ideas(env.db_identifier, seed["ids"])
+
+
+def test_c_tc_305_quest_word_cloud_visibility(client, env):
+    """C-TC-305: 語像の可視性＝詳細と同じ門番（非パーティーは404／下書き他人は404・存在秘匿）。"""
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+    other_pub = env.make_quest(status="recruiting", owner=env.other_user_id, party=True)  # 他人のみメンバー
+    assert client.get(f"{QUESTS}/{other_pub}/word-cloud").status_code == 404
+    other_draft = env.make_quest(status="draft", owner=env.other_user_id, party=True)
+    assert client.get(f"{QUESTS}/{other_draft}/word-cloud").status_code == 404

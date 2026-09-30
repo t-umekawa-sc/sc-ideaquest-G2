@@ -83,6 +83,8 @@
 | C-TC-144 | api | 一覧の idea_count も公開アイデア数を反映 | 同上のクエスト | `GET /quests` | 当該カードの idea_count=2（batch 集計・N+1 回避） | C.1／D.1／SC-10 |
 | C-TC-247 | api | クエストカードの is_owner（閲覧者=作成者か・SC-01 で「自分のクエスト」を参加中と分離） | seed 作成クエスト／他者作成で seed が参加中のクエスト | `GET /quests` | 自作カード `is_owner=true`／他者作成カード `is_owner=false` | C.1／SC-01 |
 | C-TC-252 | api | クエストカードに discoverable（発見カタログ掲載）を含む＝一覧の列/ソート/絞込・複製プリフィルに使う | discoverable=ON／OFF の2クエスト | `GET /quests` | ON カード `discoverable=true`／OFF カード `discoverable=false` | C.1／C.9.0／FR-40 |
+| C-TC-304 | api | 議論の主題＝配下の公開アイデア横断の語像（設計§7②）＝公開アイデアの entity_tokens を頻度集約・weight 正規化／下書き・削除は除外 | recruiting（自分 owner）＋公開アイデア2件（共有語＋各固有語 tokens）＋自分の下書き1件（固有語）＋削除済み公開1件 | `GET /quests/{id}/word-cloud` | 200・共有語 weight=1.0・各公開固有語も出る・`idea_count=2`・下書き/削除の語は出ない | C.1／設計§7②／SC-12 |
+| C-TC-305 | api | 語像の可視性＝詳細と同じ門番（非パーティーは404／下書き他人は404） | 他人 owner の recruiting（自分は非メンバー）／他人の下書き | 非メンバーで `GET /{id}/word-cloud`／他人下書きで同 | いずれも 404（存在秘匿） | C.1 可視性／設計§7② |
 
 ## 5. パーティー粒度・状態遷移・削除 API（SC-12・C.3/C.5/C.2）
 

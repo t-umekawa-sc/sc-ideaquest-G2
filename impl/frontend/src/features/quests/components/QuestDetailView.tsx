@@ -30,6 +30,7 @@ import {
   deleteQuest,
   getQuest,
   getQuestActivity,
+  getQuestWordCloud,
   listCompanyGroupDirectory,
   listJoinRequests,
   QUESTS_CHANGED_EVENT,
@@ -37,6 +38,7 @@ import {
   type JoinRequestRow,
   type QuestActivity,
   type QuestDetail,
+  type QuestWordCloud,
 } from "../api";
 import { deleteIdea, IDEAS_CHANGED_EVENT, listIdeas, followIdea, unfollowIdea, voteIdea, type IdeaCard, type IdeaVoteType } from "@/features/ideas/api";
 import { voteErrorMessage } from "@/features/ideas/voteError";
@@ -166,6 +168,7 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
 
   const [quest, setQuest] = useState<QuestDetail | null>(null);
   const [activity, setActivity] = useState<QuestActivity | null>(null); // 活動の活発さ（SC-12・日次スパーク）
+  const [wordCloud, setWordCloud] = useState<QuestWordCloud | null>(null); // 議論の主題＝配下アイデア横断の語像（SC-12・設計§7②）
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false); // 更新履歴モーダル（変更履歴標準 §3.1/§3.2）
@@ -248,6 +251,11 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
   // 活動の活発さ（SC-12・メンバー可視・日次メッセージ数）＝新着の議論の隣に表示。取得失敗は非表示。
   useEffect(() => {
     void getQuestActivity(questId).then(setActivity).catch(() => setActivity(null));
+  }, [questId]);
+
+  // 議論の主題＝配下の公開アイデア横断の語像（SC-12・設計§7②）。取得失敗/空は非表示。
+  useEffect(() => {
+    void getQuestWordCloud(questId).then(setWordCloud).catch(() => setWordCloud(null));
   }, [questId]);
 
   // アイデアタブ（D.1）＝マウント時に一覧取得。SC-21 の投稿/下書き/編集・削除成功で発火する
@@ -678,6 +686,21 @@ export function QuestDetailView({ questId, gameEnabled = true }: { questId: stri
         {/* 上部: 関連情報ストリップ（FR-41・情報インプット連携・SC-12 §4.1d）＝新着の議論／活動の活発さ の下・
             クエストKPI／クエスト内ランキング の上に全幅で常時表示（ユーザー要望）。ゲームモードに依らず表示。 */}
         <RelatedInfoPanel targetType="quests" targetId={questId} variant="strip" />
+
+        {/* 🗣️ 議論の主題（SC-12・設計§7②＝配下の公開アイデア横断の語像）。空/取得失敗は非表示。 */}
+        {wordCloud && wordCloud.tokens.length > 0 && (
+          <section className="card quest-wordcloud" aria-label="議論の主題">
+            <div className="section-head">
+              <h2 className="unread-panel__title">🗣️ 議論の主題（公開アイデア {wordCloud.idea_count} 件の語像）</h2>
+            </div>
+            <div className="wc-mini">
+              {wordCloud.tokens.map((t) => (
+                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + t.weight * 1.0).toFixed(2)}rem` }} title={`${t.token}（${t.count}）`}>{t.token}</span>
+              ))}
+            </div>
+            <p className="hint" style={{ margin: "6px 0 0" }}>このクエストの公開アイデアに現れる語を集約したものです（決定的・キーワードベース）。</p>
+          </section>
+        )}
 
         {/* ゲーム風パネル2つ（KPI＋クエスト内ランキング）を同じ行に（レビュー#3）。ゲームモード OFF では非表示。 */}
         {gameEnabled && (
