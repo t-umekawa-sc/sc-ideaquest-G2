@@ -19,6 +19,7 @@ from app.db.tenant import get_tenant_session
 from app.infra.llm import gateway, registry
 from app.tenant.ai_jobs import repository as repo
 from app.tenant.ai_jobs.orm import AiJob
+from app.tenant.notifications import service as notify_svc
 from app.tenant.profile import repository as profile_repo
 
 # free 論理キーの単価スナップショット（自社ホスト＝従量課金なし・§4.2/§5.59）。
@@ -222,6 +223,24 @@ class _PermanentError(Exception):
     """入力不正など恒久失敗（リトライしない＝即 failed）。"""
 
 
+def _notify_completion(session, job: AiJob, *, ok: bool) -> None:
+    """完了/失敗を依頼者へ通知（既存 notifications 再利用・§8・S.6）。ref は job の idea/quest を流用。
+
+    notifications は info_item/ai_job の ref 列を持たないため、Phase1 は idea/quest のみ ref に載せ、
+    それ以外（info_summarize 等）は ref 無し＝frontend が ai_task_* を SC-04 へ誘導する。
+    """
+    refs = {}
+    if job.ref_idea_id:
+        refs["ref_idea_id"] = job.ref_idea_id
+    if job.ref_quest_id:
+        refs["ref_quest_id"] = job.ref_quest_id
+    ntype = "ai_task_done" if ok else "ai_task_failed"
+    params = {"task_type": job.task_type}
+    if not ok and job.error:
+        params["error"] = job.error
+    notify_svc.notify(session, [notify_svc.entry(job.requested_by_id, ntype, refs=refs, params=params)])
+
+
 def process_ai_jobs_once(db_identifier: str) -> dict:
     """1 巡だけ処理する（§5.3/§5.4）。処理件数の要約を返す。llm_worker がループで呼ぶ。
 
@@ -243,6 +262,30 @@ def process_ai_jobs_once(db_identifier: str) -> dict:
     return stats
 
 
+def _active_company_dbs() -> list[str]:
+    """有効な会社の db_identifier 一覧（llm_worker が全会社DBを巡回するため・§5.2(a)）。"""
+    with control_session() as s:
+        rows = s.query(Company.db_identifier).filter(Company.status == "active").all()
+    return [r[0] for r in rows]
+
+
+def process_all_companies_once() -> dict:
+    """全有効会社DBを1巡ずつ処理する（llm_worker がループで呼ぶ）。会社別 stats を合算して返す。
+
+    1社の失敗が他社を止めないよう会社ごとに例外を隔離する（mail_worker と同思想）。
+    """
+    agg = {"succeeded": 0, "failed": 0, "canceled": 0, "reclaimed": 0, "companies": 0, "errors": 0}
+    for db in _active_company_dbs():
+        agg["companies"] += 1
+        try:
+            stats = process_ai_jobs_once(db)
+            for k in ("succeeded", "failed", "canceled", "reclaimed"):
+                agg[k] += stats.get(k, 0)
+        except Exception:  # noqa: BLE001（1社の失敗で全体を止めない・次巡で再試行）
+            agg["errors"] += 1
+    return agg
+
+
 def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
     """1 件を実行する＝ゲートウェイ呼び出し→成功で succeeded＋usage 記録／失敗で retry/failed。"""
     s = get_settings()
@@ -258,6 +301,7 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
             job.status = "failed"
             job.error = {"code": "invalid_input", "detail": str(exc)}
             job.finished_at = datetime.now(timezone.utc)
+            _notify_completion(session, job, ok=False)
             session.commit()
             return "failed"
         requester = job.requested_by_id
@@ -303,6 +347,7 @@ def _process_one(db_identifier: str, job_id: uuid.UUID) -> str:
             rate_snapshot=_FREE_RATE,
             cost_micros=cost_micros,
         )
+        _notify_completion(session, job, ok=True)
         session.commit()
     return "succeeded"
 
@@ -315,6 +360,7 @@ def _fail_permanent(db_identifier: str, job_id: uuid.UUID, code: str, detail: st
         job.status = "failed"
         job.error = {"code": code, "detail": detail}
         job.finished_at = datetime.now(timezone.utc)
+        _notify_completion(session, job, ok=False)
         session.commit()
     return "failed"
 
@@ -330,6 +376,7 @@ def _fail_retryable(db_identifier: str, job_id: uuid.UUID, detail: str, max_atte
             job.status = "failed"
             job.error = {"code": "llm_unavailable", "detail": detail}
             job.finished_at = datetime.now(timezone.utc)
+            _notify_completion(session, job, ok=False)  # 終端失敗のみ通知（再試行では出さない）
         else:
             job.status = "queued"  # 次巡で再試行
             job.started_at = None

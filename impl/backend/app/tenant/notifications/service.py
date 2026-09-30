@@ -45,6 +45,8 @@ TYPE_PRIORITY = {
     "quest_watch_update": 12,
     "security_new_device": 13,
     "security_password_changed": 14,
+    "ai_task_done": 15,
+    "ai_task_failed": 16,
 }
 
 _REF_KEYS = (

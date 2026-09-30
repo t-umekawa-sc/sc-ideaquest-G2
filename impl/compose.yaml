@@ -182,6 +182,22 @@ services:
       mailhog:
         condition: service_started
 
+  # AIジョブ常駐ワーカ（LLM 生成・FR-45・設計 §5.2(a)・別プロセスで障害隔離）。会社DBの ai_jobs(queued)
+  # を巡回し FOR UPDATE SKIP LOCKED で N 件だけ running にして LLM ゲートウェイで実行する。実生成には LLM
+  # 基盤（ollama・profile ai）が要る（未起動なら LLMUnavailable→リトライ/failed）。backend と同一イメージ。
+  llm-worker:
+    build: ./backend
+    profiles: ["workers"]   # 既定 up からは除外（理由＝冒頭コメント）。`--profile workers up` で起動。
+    environment: *backend_env
+    entrypoint: ["python", "-m", "app.llm_worker"]
+    volumes:
+      - ./logs:/var/log/ideaquest   # llm-worker.jsonl を出力（backend と同一ディレクトリ）。
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
   frontend:
     build: ./frontend
     environment:

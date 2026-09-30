@@ -12,6 +12,7 @@ from app.db.tenant import get_tenant_session
 from app.tenant.ai_jobs import application as ai_app
 from app.tenant.ai_jobs import repository as ai_repo
 from app.tenant.ai_jobs.orm import AiJob, AiUsageEvent
+from app.tenant.notifications.orm import Notification
 from app.tenant.profile.orm import User
 from tests.conftest import SEED_COMPANY_CODE
 
@@ -35,6 +36,8 @@ def _cleanup(db: str, user_id: uuid.UUID, job_ids: list[uuid.UUID]) -> None:
         if job_ids:
             ts.execute(AiUsageEvent.__table__.delete().where(AiUsageEvent.job_id.in_(job_ids)))
             ts.execute(AiJob.__table__.delete().where(AiJob.id.in_(job_ids)))
+        # 通知は recipient_id(=user) を FK 参照するため user より先に消す。
+        ts.execute(Notification.__table__.delete().where(Notification.recipient_id == user_id))
         ts.execute(User.__table__.delete().where(User.id == user_id))
         ts.commit()
 
@@ -112,6 +115,56 @@ def test_s_tc_117_cancel_queued():
         assert stats["canceled"] == 1 and stats["succeeded"] == 0
         with get_tenant_session(db) as ts:
             assert ai_repo.get(ts, jid).status == "canceled"
+    finally:
+        _cleanup(db, user_id, [jid] if jid else [])
+
+
+def test_s_tc_126_notify_done_on_success():
+    """S-TC-126: 完了で ai_task_done 通知が依頼者に作られる（既存 notifications 再利用・§8）。"""
+    db = _seed_db()
+    user_id = _mk_user(db)
+    jid = None
+    try:
+        jid = ai_app.enqueue_ai_job(db, task_type="info_summarize", requested_by_id=user_id,
+                                    input={"text": "競合A社が値下げ"})
+        ai_app.process_ai_jobs_once(db)
+        with get_tenant_session(db) as ts:
+            notifs = ts.query(Notification).filter_by(recipient_id=user_id).all()
+            assert len(notifs) == 1 and notifs[0].type == "ai_task_done"
+            assert notifs[0].params["task_type"] == "info_summarize"
+    finally:
+        _cleanup(db, user_id, [jid] if jid else [])
+
+
+def test_s_tc_127_notify_failed_on_permanent_fail():
+    """S-TC-127: 恒久失敗で ai_task_failed 通知（params.error 付き）。"""
+    db = _seed_db()
+    user_id = _mk_user(db)
+    jid = None
+    try:
+        jid = ai_app.enqueue_ai_job(db, task_type="info_summarize", requested_by_id=user_id, input={})
+        ai_app.process_ai_jobs_once(db)
+        with get_tenant_session(db) as ts:
+            notifs = ts.query(Notification).filter_by(recipient_id=user_id).all()
+            assert len(notifs) == 1 and notifs[0].type == "ai_task_failed"
+            assert notifs[0].params.get("error", {}).get("code") == "invalid_input"
+    finally:
+        _cleanup(db, user_id, [jid] if jid else [])
+
+
+def test_process_all_companies_once_smoke():
+    """全会社巡回＝有効会社を回して合算 stats を返す（1社の失敗で全体を止めない・§5.2a）。"""
+    db = _seed_db()
+    user_id = _mk_user(db)
+    jid = None
+    try:
+        jid = ai_app.enqueue_ai_job(db, task_type="info_summarize", requested_by_id=user_id,
+                                    input={"text": "巡回テスト"})
+        agg = ai_app.process_all_companies_once()
+        assert agg["companies"] >= 1 and agg["errors"] == 0
+        assert agg["succeeded"] >= 1  # 投入したジョブが処理された
+        with get_tenant_session(db) as ts:
+            assert ai_repo.get(ts, jid).status == "succeeded"
     finally:
         _cleanup(db, user_id, [jid] if jid else [])
 

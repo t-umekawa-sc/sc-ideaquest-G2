@@ -32,6 +32,13 @@ ICON = {
     "quest_result_ready": "🏁", "join_request_received": "📩", "join_request_decided": "✅",
     "quest_watch_update": "👀", "info_refuting_raised": "⚠️",
     "security_new_device": "🛡️", "security_password_changed": "🔑",
+    "ai_task_done": "🤖", "ai_task_failed": "⚠️",
+}
+
+# AIジョブ task_type → 表示ラベル（FR-45・通知 context 用）。
+_AI_TASK_LABELS = {
+    "info_summarize": {"ja": "情報の要約", "en": "info summary"},
+    "iso_generate": {"ja": "ISO文書の生成", "en": "ISO document generation"},
 }
 
 
@@ -228,6 +235,14 @@ def render(session: Session, n: Notification, locale: str | None = None) -> dict
                 else "パスワードが変更されました。心当たりがなければ管理者に連絡してください")
         context = "We also notified you by email" if en else "メールでもお知らせしています"
         tag = "Security" if en else "セキュリティ"
+    elif t in ("ai_task_done", "ai_task_failed"):
+        label = _AI_TASK_LABELS.get(p.get("task_type", ""), {}).get("en" if en else "ja") \
+            or (p.get("task_type") or ("AI task" if en else "AI処理"))
+        if t == "ai_task_done":
+            body = (f'AI task "{label}" completed' if en else f"AI処理「{label}」が完了しました")
+        else:
+            body = (f'AI task "{label}" failed' if en else f"AI処理「{label}」が失敗しました")
+        tag = "AI"
     else:
         body = n.body or ("Notification" if en else "通知")
 
