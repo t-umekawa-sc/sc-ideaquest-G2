@@ -322,7 +322,8 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
         <StrategyQuestLinks docId={docId} value={questLinks} onChange={setQuestLinks} />
       </div>
       <div className="modal__footer">
-        <button className="btn btn-outline" type="button" onClick={onCancel}>キャンセル</button>
+        {/* フッター順＝閉じる（左・.dialog-close-left）→副→主要（右）＝デザイン標準§ダイアログ内コンテンツ（2026-09-18）。 */}
+        <button className="btn btn-outline dialog-close-left" type="button" onClick={onCancel}>キャンセル</button>
         <FormFooterError show={Boolean(titleErr || periodErr || formError)} />
         <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>
           {saving ? "保存中…" : editing ? "保存する" : "登録する"}
