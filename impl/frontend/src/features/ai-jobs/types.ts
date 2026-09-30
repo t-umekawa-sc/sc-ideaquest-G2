@@ -30,6 +30,29 @@ export interface AiJobSummary {
   recent_failed: number;
 }
 
+export interface AiJobDetail {
+  id: string;
+  task_type: string;
+  status: AiJobStatus;
+  execution: string;
+  requested_model: string | null;
+  provider: string | null;
+  model: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cost_micros: number | null;
+  progress: { phase?: string; ratio?: number } | null;
+  error: { code?: string; detail?: string } | null;
+  result: { text?: string } | null;
+  ref_idea_id: string | null;
+  ref_quest_id: string | null;
+  ref_strategy_document_id: string | null;
+  ref_info_item_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 // task_type → 日本語ラベル（通知 catalog と揃える）。未知はキーをそのまま出す。
 export const TASK_LABEL: Record<string, string> = {
   info_summarize: "情報の要約",

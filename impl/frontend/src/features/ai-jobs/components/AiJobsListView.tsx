@@ -78,8 +78,11 @@ export function AiJobsListView() {
     [refreshToken],
   );
 
+  // メニュー順＝標準（デザイン標準§4.5＝主要/参照 → … → 破壊的は最後）＝詳細を開く → 内容を参照する → キャンセル。
   const menuItems = useCallback((r: AiJobListItem): RowMenuItem[] => {
-    const list: RowMenuItem[] = [];
+    const list: RowMenuItem[] = [
+      { label: "詳細を開く", onClick: () => router.push(`/ai-jobs/${r.id}`) },
+    ];
     const href = targetHref(r);
     if (r.status === "succeeded" && href) {
       list.push({ label: "内容を参照する", onClick: () => router.push(href) });
@@ -133,7 +136,7 @@ export function AiJobsListView() {
         server={{ query: serverQuery }}
         refreshToken={refreshToken}
         columns={columns}
-        onRowClick={(r) => { const h = targetHref(r); if (r.status === "succeeded" && h) router.push(h); }}
+        onRowClick={(r) => router.push(`/ai-jobs/${r.id}`)}
         pins={false}
         emptyText="現在 AI 処理はありません。"
         defaultView="list"

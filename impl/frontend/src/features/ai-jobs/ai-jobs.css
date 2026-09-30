@@ -13,3 +13,14 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+
+/* 詳細（読み取り専用）の結果/エラー本文＝改行を保持して読ませる。 */
+.ai-job-detail__result {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.ai-job-detail__error {
+  white-space: pre-wrap;
+  color: var(--danger, #b91c1c);
+}

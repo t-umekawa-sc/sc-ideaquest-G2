@@ -3,7 +3,7 @@
 import type { QueryState } from "@/components/ui";
 import { apiFetch } from "@/lib/api/client";
 
-import type { AiJobListResult, AiJobSummary } from "./types";
+import type { AiJobDetail, AiJobListResult, AiJobSummary } from "./types";
 
 export const AI_JOBS_CHANGED_EVENT = "ai-jobs-changed";
 
@@ -34,6 +34,10 @@ export function fetchAiJobs(state: QueryState, signal?: AbortSignal): Promise<Ai
 
 export function fetchAiJobsSummary(signal?: AbortSignal): Promise<AiJobSummary | null> {
   return apiFetch<AiJobSummary>("/ai-jobs/summary", { signal });
+}
+
+export function getAiJob(id: string, signal?: AbortSignal): Promise<AiJobDetail | null> {
+  return apiFetch<AiJobDetail>(`/ai-jobs/${id}`, { signal });
 }
 
 // キャンセル（queued は即 canceled／running は協調キャンセル・S.4）。
