@@ -42,10 +42,14 @@
 .strategy-card__title { white-space: normal; overflow-wrap: anywhere; margin-bottom: 0; }
 .strategy-card__meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--text-sm); color: var(--color-text-muted); }
 
-/* 情報の影響サマリ（R.4・編集時のみ・read 集計）。この方針に効いている curated 情報の量と機会/脅威内訳。 */
-.impact-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); background: var(--color-surface-muted, var(--color-surface)); }
+/* 情報の影響サマリ（R.4・編集時のみ・read 集計）。この方針に効いている判定済情報の量と機会/脅威内訳。 */
+/* 直前の「この画面について」チップと枠線が接しないよう上に余白（ユーザー指摘 2026-09-30）。 */
+.impact-card { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); background: var(--color-surface-muted, var(--color-surface)); }
 .impact-rates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: var(--space-2) 0; }
 .impact-rate { font-size: var(--text-sm); color: var(--color-text-muted); }
 .impact-rate strong { font-size: var(--text-md); color: var(--color-text); }
 .impact-rate.is-opp strong { color: var(--color-success, #0a7d43); }
 .impact-rate.is-threat strong { color: var(--color-danger, #c0392b); }
+
+/* この方針まわりの語像（R.4b・集約ワードクラウド・編集時のみ）。wc-mini（主要語プレビュー）を流用。 */
+.surround-wc .wc-mini { margin: var(--space-2) 0; }

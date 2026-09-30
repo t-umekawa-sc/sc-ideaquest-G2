@@ -31,8 +31,8 @@ def _section(title: str, body: str | None) -> str:
     return f"## {title}\n\n{(body or '').strip() or '（未記入）'}\n"
 
 
-def _related_concepts(ts, doc, company, *, limit: int = _TOP_CONCEPTS) -> list[tuple[str, float]]:
-    """当該資料とトークン関連度が閾値以上のコンセプト＝(title, score)（score 降順・上位 limit）。"""
+def related_concept_ids(ts, doc, company, *, limit: int = _TOP_CONCEPTS) -> list[tuple]:
+    """当該資料とトークン関連度が閾値以上のコンセプト＝(concept_id, score)（score 降順・上位 limit・R.5/R.4b 共用）。"""
     from app.tenant.info import application as info_app
 
     threshold = info_app.auto_link_threshold_of(company)
@@ -45,7 +45,12 @@ def _related_concepts(ts, doc, company, *, limit: int = _TOP_CONCEPTS) -> list[t
         if s >= threshold:
             scored.append((cid, round(s, 3)))
     scored.sort(key=lambda x: x[1], reverse=True)
-    scored = scored[:limit]
+    return scored[:limit]
+
+
+def _related_concepts(ts, doc, company, *, limit: int = _TOP_CONCEPTS) -> list[tuple[str, float]]:
+    """当該資料と関連度が閾値以上のコンセプト＝(title, score)（非削除のみ・score 降順・上位 limit）。"""
+    scored = related_concept_ids(ts, doc, company, limit=limit)
     titles = concept_repo.titles_for_ids(ts, [cid for cid, _ in scored])  # 非削除のみ
     return [(titles[cid], s) for cid, s in scored if cid in titles]
 

@@ -32,6 +32,12 @@ export interface ImpactRates {
   threshold: number;         // 使った関連度しきい値
 }
 
+// この方針まわりの語像（R.4b・集約＝関連情報＋アイデア＋コンセプトの語・設計§7）。
+export interface StrategyWordCloud {
+  tokens: { token: string; count: number; weight: number }[];
+  related_count: number;
+}
+
 export interface StrategyDocDetail {
   id: string;
   title: string;

@@ -3,7 +3,7 @@
 import type { QueryState } from "@/components/ui";
 import { apiFetch } from "@/lib/api/client";
 
-import type { QuestLinkItem, StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyListResult } from "./types";
+import type { QuestLinkItem, StrategyDocDetail, StrategyDocInput, StrategyDocSelectionItem, StrategyListResult, StrategyWordCloud } from "./types";
 
 export const STRATEGY_CHANGED_EVENT = "strategy-documents-changed";
 
@@ -44,6 +44,11 @@ export async function fetchStrategySelection(q?: string, signal?: AbortSignal): 
 
 export function getStrategyDoc(id: string, signal?: AbortSignal): Promise<StrategyDocDetail | null> {
   return apiFetch<StrategyDocDetail>(`/strategy-documents/${id}`, { signal });
+}
+
+// この方針まわりの語像（R.4b）＝関連情報＋アイデア＋コンセプトの語を集約（read・管理者スコープ）。
+export function fetchStrategyWordCloud(id: string, signal?: AbortSignal): Promise<StrategyWordCloud | null> {
+  return apiFetch<StrategyWordCloud>(`/strategy-documents/${id}/word-cloud`, { signal });
 }
 
 // AI 用 Markdown エクスポート（R.5）＝text/markdown を生テキストで受ける（apiFetch は JSON 前提のため直 fetch）。

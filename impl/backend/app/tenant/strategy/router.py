@@ -23,6 +23,7 @@ from app.tenant.strategy.schemas import (
     StrategyDocListResponse,
     StrategyDocSelectionResponse,
     StrategyDocUpdateRequest,
+    StrategyWordCloudResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["strategy"])
@@ -65,6 +66,13 @@ def strategy_quest_candidates(request: Request, q: str | None = None, status: st
 @router.get("/strategy-documents/{doc_id}", response_model=StrategyDocDetail)
 def get_strategy_document(doc_id: str, request: Request, session: dict = Depends(require_company_account_admin)):
     return service.get_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+
+
+# この方針まわりの語像（R.4b・集約でのみ UI 化・設計§7）。管理者スコープ。read 専用。
+@router.get("/strategy-documents/{doc_id}/word-cloud", response_model=StrategyWordCloudResponse)
+def strategy_document_word_cloud(doc_id: str, request: Request,
+                                 session: dict = Depends(require_company_account_admin)):
+    return service.word_cloud(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
 
 
 # AI 用 Markdown エクスポート（R.5・利用者の明示操作・外部送信しない・§10）。管理者スコープ。

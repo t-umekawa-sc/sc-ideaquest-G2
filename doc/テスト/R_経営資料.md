@@ -35,7 +35,7 @@
 | R-TC-207 | unit | 埋め込み cosine→整合率の線形リスケール（bge-m3 校正）＝floor→0・ceil→1・中点→0.5・範囲外はクランプ／既定 floor/ceil では無関係域は 0 ティア・意味近域は最上位ティアへ | config 既定（floor/ceil） | `similarity._rescale(x)` を境界値・中点・範囲外で評価／`alignment.coins_for(_rescale(0.44))`・同`(0.60)` | floor→0.0・ceil→1.0・中点→0.5・floor未満/ceil超はクランプ／far中央(0.44)→コイン0・near上位(0.605)→+15（上位ティアが生き返る） | R.2／A-2／設計§4.1a |
 | R-TC-208 | int | EmbeddingProvider は生 cosine でなくリスケール後(0..1)を返す＝bge-m3 の圧縮分布でも上位ティアに届く（校正の配線） | cosine=0.60 になるベクトルを idea/doc に直接 upsert（`entity_embeddings`・fake-embed モデル名） | `similarity.EmbeddingProvider().score(...)` | score＝`_rescale(0.60)`（生値より大）／`coins_for(0.60)=3` に対し `coins_for(score)>3`（生値では+3止まりが上位ティアへ） | R.2／A-2／設計§4.1a |
 
-## 3. 機会/脅威/影響率（R.4・Step4）
+## 3. 機会/脅威/影響率＋方針まわりの語像（R.4／R.4b・Step4）
 
 > 役割分担＝関連度＝キーワード（決定的・`derive.token_cosine`）／機会・脅威＝人手（`info_items.impact_class`）。母集団＝当該経営資料とトークン関連度が**閾値以上**（会社別 `auto_link_threshold` 流用・既定0.12）の **curated（非アーカイブ）情報**。専用テーブルは持たず `GET /strategy-documents/{id}` の read で集計（設計§4.2・API R.4）。影響率＝母集団/全 curated・機会率/脅威率＝母集団のうち `opportunity`/`threat` の割合。
 
@@ -43,6 +43,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | R-TC-110 | api | 詳細 read に影響率/機会率/脅威率を同梱＝母集団（関連度≥閾値の curated 情報）で集計・非関連/非curated は除外 | 資料1件（**ユニーク語**の tokens）＋curated 情報〔機会・関連／脅威・関連／その他・非関連〕＋raw 情報〔関連だが非curated〕をシード（ユニーク語で母集団を投入分に限定＝共有DB非依存） | admin `GET /strategy-documents/{id}` | 200・`impact.related_count=2`・`opportunity_count=1`・`threat_count=1`・`opportunity_rate=0.5`・`threat_rate=0.5`・`threshold=0.12`・`impact_rate=round(related/info_total,3)`（整合）／非関連・非curated は母集団外 | R.4／§5.33／設計§4.2 |
 | R-TC-111 | int | 集計の端（資料トークン空／母集団0）はゼロ除算せず率0を返す（例外なし） | 資料1件（tokens を永続しない） | `application._impact_rates(ts, doc, company)` | `related_count=0・impact_rate=0.0・opportunity_rate=0.0・threat_rate=0.0`（例外なし・`info_total`は全 curated 件数） | R.4／設計§4.2 |
+| R-TC-114 | api | この方針まわりの語像（R.4b・§7＝集約UI）＝関連情報＋関連アイデア＋関連コンセプトの語を頻度集約・weight 正規化／認可 | 資料（ユニーク語 tokens）＋関連 判定済情報／関連アイデア(idea_alignment)／関連コンセプト（いずれも同ユニーク語＋各固有語 tokens）をシード | admin `GET /{id}/word-cloud`／一般 `GET`／不明 ID | 200・共有語は weight=1.0（3owner で最頻）・各固有語も tokens に出る・`related_count=3`／一般=403／不明=404 | R.4b／設計§7 |
+| R-TC-115 | int | 語像の端（関連 0）は空 tokens・related_count=0（例外なし） | 資料1件（ユニーク語 tokens・関連なし） | `application._word_cloud(ts, doc, company)` | `tokens=[]・related_count=0`（例外なし） | R.4b／設計§7 |
 
 ## 4. Markdown エクスポート（R.5・Step5）
 

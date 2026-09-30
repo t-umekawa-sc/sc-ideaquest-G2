@@ -205,6 +205,16 @@ def ideas_for_doc(session: Session, doc_id: uuid.UUID, *, limit: int = 10) -> li
     ).all()
 
 
+def idea_ids_for_doc(session: Session, doc_id: uuid.UUID) -> list[uuid.UUID]:
+    """当該経営資料に整合する（非削除）アイデアの ID 全件（周辺ワードクラウドの語像集約・R.4b）。"""
+    from app.tenant.ideas.orm import Idea
+    return list(session.execute(
+        select(IdeaAlignment.idea_id)
+        .join(Idea, Idea.id == IdeaAlignment.idea_id)
+        .where(IdeaAlignment.strategy_document_id == doc_id, Idea.deleted_at.is_(None))
+    ).scalars().all())
+
+
 def published_idea_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
     """当該クエストの公開アイデアID（クエストの資料選択変更で整合率を再計算する対象）。"""
     from app.tenant.ideas.orm import Idea

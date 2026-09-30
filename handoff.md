@@ -67,10 +67,14 @@
 2. **【完了 2026-09-30】閾値の再校正**＝実測で bge-m3 の cosine 分布が圧縮（NEAR p50=0.525/p90=0.60・FAR p50=0.444/p90=0.518）＝生値では 0.70/0.90 ティアが死に整合率(%) 表示も不自然と判明。**方式＝embedding の生 cosine を 0..1 へ線形リスケール（`similarity._rescale`・config `alignment_embed_score_floor`/`_ceil`・既定 0.42/0.62・モデル別可変）してから共有 `_TIERS`(50/70/90) を適用**（keyword は生値のまま・hybrid は rescale 後 emb を加重）。`_TIERS` 自体は変更せず（Option 1＝正規化・ユーザー選択）。設計 §4.1a／API R／データモデル §5.55/§5.36c／R_経営資料.md §2 に実測分布と結論を記録・R-TC-207(unit)/208(int) 追加・pytest 871 green・稼働 backend 再ビルド反映済。※floor/ceil は評価セット near18/far90 での選定＝実運用データが貯まれば再調整余地（モデル差し替え時は要再計測）。
 3. **【完了 2026-09-30】Step4 機会/脅威/影響率（R.4・決定的）**＝`GET /strategy-documents/{id}` の `impact` に影響率/機会率/脅威率を read 集計で同梱。母集団＝当該資料とトークン関連度が会社別 `auto_link_threshold`（既定0.12）以上の **curated（非アーカイブ）情報**（`info/repository.curated_impact`＋`strategy/application._impact_rates`）。機会/脅威は `info_items.impact_class`（人手）由来・決定的。frontend＝SC-81 編集画面上部に読み取り専用「情報の影響」カード（編集時のみ・機会=緑/脅威=赤・複製は非表示）。TC＝R-TC-110(api)/111(int)・pytest green・目視確認済（curated24件中2件関連・影響率8%・機会/脅威50%）。**ワードクラウド（設計§7）は R.4 API 仕様外＝follow-up に送った**（下記4-b）。
 4. **【完了 2026-09-30】Step5 AI 用 Markdown エクスポート（R.5）**＝`GET /strategy-documents/{id}/export.md`（管理者・`text/markdown`）が経営資料本体（ISO 項目立て）＋関連度上位アイデア（idea_alignment・score降順上位10）＋関連情報（R.4 母集団＝機会/脅威ラベル・上位20）＋関連コンセプト（トークン重なり≥閾値・上位10）を構造化 Markdown に束ねる。**利用者の明示操作のみ・外部送信しない**（生成は任意 LLM に貼る＝データ主権）。backend＝`strategy/export.py`（`build_markdown`）＋`application.export_markdown`＋`repository.ideas_for_doc`＋`info/repository.curated_impact`(title 追加)＋`concepts/repository.titles_for_ids`。frontend＝SC-81 編集画面「🤖 AI 用にエクスポート」（📋コピー/⬇ダウンロード .md・編集時のみ・`api.exportStrategyMarkdown` は生 fetch）。TC＝R-TC-112(api)/113(int)・目視確認済（ISO見出し＋関連3種が出力）。
-   - 4-b（follow-up）: 経営資料の**ワードクラウド**（設計§7＝集約でのみ UI 化）。info repo に `word_cloud` 実装済＝母集団情報 or 資料本文の主要語を集約表示。R.4/R.5 とは別 UI（優先度中）。**←次の候補**
+   - **【完了 2026-09-30】4-b: 経営資料の「方針まわりの語像」（R.4b・設計§7）**＝`GET /strategy-documents/{id}/word-cloud`（管理者）が当該資料に**関連する情報（R.4母集団）＋アイデア（idea_alignment）＋コンセプト（トークン重なり）**の `entity_tokens` を頻度集約（weight 正規化）。単体資料でなく「周辺の語像」＝§7 の集約趣旨に準拠（ユーザー選択=案B）。backend＝`application._word_cloud`（`export.related_concept_ids`／`repository.idea_ids_for_doc` 再利用）。frontend＝SC-81 編集画面「☁️ この方針まわりの語像」（編集時のみ）。TC＝R-TC-114(api)/115(int)・目視確認済。
    - 4-c（Phase2）: in-app 生成（方式B・ISO 意図/戦略の LLM たたき台）＝横断 LLM ゲートウェイ＋AIジョブ基盤が前提（`doc/設計ドラフト/ローカルLLM連携_設計.md`）。
+   - 4-d（follow-up）: **クエストの語像**（設計§7②＝配下アイデア横断・別スコープ・未実装）。
 
-**経営資料整合（ドメイン R）の Step1〜5 は完了。** 残るは 4-b（ワードクラウド）と 4-c（Phase2 生成）。
+**経営資料整合（ドメイン R）の Step1〜5＋4-b は完了。** 残るは 4-c（Phase2 生成）と 4-d（クエスト語像）。
+
+### 本セッションの UI 修正（2026-09-30・SC-81 経営資料編集）
+ユーザー指摘で 3 点修正済＝(1)「この画面について」チップと「情報の影響」カードの枠線が接する→`.impact-card` に `margin-top`／(2)「curated」表記→アプリ既存ラベルに合わせ「**判定済**」（info status ラベル準拠・raw=未判定/curated=判定済/archived=アーカイブ）／(3)「この資料の主要語」ラベルと「キーワードを抽出」ボタンを同一行・ボタン右寄せ。
 5. **回帰**＝着手前に backend フル pytest（下記コマンド）と Playwright e2e フル（本セッション未実行）を通す。
 - 参考：LLM 生成（方式 B・要約/ISO 生成）を実装する時は**先に横断 LLM ゲートウェイ＋AIジョブ基盤**（`doc/設計ドラフト/ローカルLLM連携_設計.md`）を作る。A-2 の `infra/llm/embeddings.py` はその薄い前身＝将来ゲートウェイに吸収する想定。
 

@@ -3729,6 +3729,23 @@ export interface paths {
         patch: operations["update_strategy_document_api_v1_strategy_documents__doc_id__patch"];
         trace?: never;
     };
+    "/api/v1/strategy-documents/{doc_id}/word-cloud": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Strategy Document Word Cloud */
+        get: operations["strategy_document_word_cloud_api_v1_strategy_documents__doc_id__word_cloud_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/strategy-documents/{doc_id}/export.md": {
         parameters: {
             query?: never;
@@ -8781,6 +8798,16 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /**
+         * StrategyWordCloudResponse
+         * @description この方針まわりの語像（R.4b・集約でのみ UI 化・設計§7）＝関連情報＋関連アイデア＋関連コンセプトの語を集約。
+         */
+        StrategyWordCloudResponse: {
+            /** Tokens */
+            tokens: components["schemas"]["WordCloudToken"][];
+            /** Related Count */
+            related_count: number;
+        };
         /** TaskCreateRequest */
         TaskCreateRequest: {
             /** Parent Task Id */
@@ -8961,6 +8988,15 @@ export interface components {
         WordCloudResponse: {
             /** Tokens */
             tokens: components["schemas"]["WordCloudTokenDTO"][];
+        };
+        /** WordCloudToken */
+        WordCloudToken: {
+            /** Token */
+            token: string;
+            /** Count */
+            count: number;
+            /** Weight */
+            weight: number;
         };
         /** WordCloudTokenDTO */
         WordCloudTokenDTO: {
@@ -16671,6 +16707,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    strategy_document_word_cloud_api_v1_strategy_documents__doc_id__word_cloud_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyWordCloudResponse"];
                 };
             };
             /** @description Validation Error */

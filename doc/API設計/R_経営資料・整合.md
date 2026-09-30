@@ -73,6 +73,16 @@
   - 併せて `info_total`／`related_count`／`opportunity_count`／`threat_count`／`threshold`（説明可能性）を返す。母集団 0 でもゼロ除算せず率 0。
 - 専用テーブルは持たず read で集計（I ダッシュボード同方針・§5.55 補足）。**表示**＝経営資料 編集画面（SC-81）上部の読み取り専用「情報の影響」カード（編集時のみ・複製は出さない）。テスト＝R-TC-110（api）/111（int）。
 
+## R.4b 方針まわりの語像（ワードクラウド・集約でのみ UI 化・設計§7）＝実装済（2026-09-30）
+
+| メソッド / パス | 説明 | レスポンス |
+| --- | --- | --- |
+| `GET /strategy-documents/{id}/word-cloud`（管理者スコープ） | 当該資料に**関連する情報・アイデア・コンセプト**に現れる語を頻度集約（read） | `{tokens:[{token,count,weight}], related_count}` |
+
+- **集約対象**＝(1) 関連情報（R.4 母集団＝トークン関連度≥`auto_link_threshold` の判定済情報）／(2) 関連アイデア（`idea_alignment` を持つ非削除アイデア）／(3) 関連コンセプト（トークン重なり≥閾値）。これらの `entity_tokens` を合算し `weight`＝最頻値を 1.0 とした正規化（フォントサイズ用）。関連 0 は空。
+- **設計§7 準拠**＝単体（1アイデア等）のワードクラウドは作らず、**集約（経営資料・クエスト・情報一覧）でのみ UI 化**。本 EP は「経営資料」の集約。
+- backend＝`application._word_cloud`（`export.related_concept_ids`／`repository.idea_ids_for_doc`／`_related_curated_info` を再利用）。frontend＝SC-81 編集画面「☁️ この方針まわりの語像」（編集時のみ）。テスト＝R-TC-114（api）/115（int）。
+
 ## R.5 AI 用 Markdown エクスポート（生成は外部委譲・§8）＝実装済（2026-09-30・Step5）
 
 | メソッド / パス | 説明 | レスポンス |

@@ -69,6 +69,18 @@ class ImpactRates(BaseModel):
     threshold: float         # 使った関連度しきい値（説明可能性）
 
 
+class WordCloudToken(BaseModel):
+    token: str
+    count: int
+    weight: float  # 最頻値を 1.0 とした正規化（0..1・フォントサイズ用）
+
+
+class StrategyWordCloudResponse(BaseModel):
+    """この方針まわりの語像（R.4b・集約でのみ UI 化・設計§7）＝関連情報＋関連アイデア＋関連コンセプトの語を集約。"""
+    tokens: list[WordCloudToken]
+    related_count: int  # 語像の母集団（関連情報＋アイデア＋コンセプトの件数）
+
+
 class StrategyDocDetail(BaseModel):
     id: str
     title: str

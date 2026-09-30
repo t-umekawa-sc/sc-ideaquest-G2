@@ -174,6 +174,42 @@ def get_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> d
         return payload
 
 
+def _word_cloud(ts, doc, company, *, limit: int = 40) -> dict:
+    """この方針まわりの語像（R.4b・設計§7＝集約でのみ UI 化）＝関連情報（R.4 母集団）＋関連アイデア（idea_alignment）
+    ＋関連コンセプト（トークン重なり）の entity_tokens を頻度集約。weight は最頻値を 1.0 とした正規化。母集団 0 は空。
+    """
+    from app.tenant.strategy import export as export_mod
+    from app.tenant.tokens import repository as tokens_repo
+
+    related_info, _total, _threshold = _related_curated_info(ts, doc, company)
+    info_ids = [uuid.UUID(r["id"]) for r in related_info]
+    idea_ids = repo.idea_ids_for_doc(ts, doc.id)
+    concept_ids = [cid for cid, _score in export_mod.related_concept_ids(ts, doc, company, limit=100)]
+
+    agg: dict[str, int] = {}
+    for owner_type, ids in (("info", info_ids), ("idea", idea_ids), ("concept", concept_ids)):
+        for _oid, toks in tokens_repo.tokens_for_owners(ts, owner_type, ids).items():
+            for token, count in toks:
+                agg[token] = agg.get(token, 0) + int(count)
+    items = sorted(agg.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    max_c = items[0][1] if items else 0
+    tokens = [{"token": t, "count": c, "weight": round(c / max_c, 3) if max_c else 0.0} for t, c in items]
+    return {"tokens": tokens, "related_count": len(info_ids) + len(idea_ids) + len(concept_ids)}
+
+
+def word_cloud(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> dict:
+    """この方針まわりの語像を返す（R.4b・管理者スコープ・read）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    did = _parse_uuid(doc_id)
+    with get_tenant_session(company.db_identifier) as ts:
+        doc = repo.get_document(ts, did)
+        if doc is None:
+            raise AppError(404, "not_found")
+        return _word_cloud(ts, doc, company)
+
+
 def export_markdown(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> str:
     """経営資料＋関連（アイデア/情報/コンセプト）を構造化 Markdown で返す（R.5・AI 用・外部送信しない）。"""
     from app.tenant.strategy import export as export_mod

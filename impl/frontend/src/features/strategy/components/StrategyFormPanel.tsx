@@ -9,9 +9,9 @@ import { ApiError } from "@/lib/api/client";
 
 import { cloudTokens } from "@/features/info-input/wordcloud";
 
-import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, getStrategyDoc, updateStrategyDoc } from "../api";
+import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, fetchStrategyWordCloud, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
-import type { ImpactRates, QuestLinkItem } from "../types";
+import type { ImpactRates, QuestLinkItem, StrategyWordCloud } from "../types";
 import type { StrategyDocInput } from "../types";
 import { StrategyQuestLinks } from "./StrategyQuestLinks";
 import "../strategy.css";
@@ -77,6 +77,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [periodTo, setPeriodTo] = useState("");
   const [cloud, setCloud] = useState<[string, number][] | null>(null); // この資料の主要語（プレビュー・情報登録と同一UI）
   const [impact, setImpact] = useState<ImpactRates | null>(null); // 情報の影響サマリ（編集時のみ・R.4）
+  const [surround, setSurround] = useState<StrategyWordCloud | null>(null); // この方針まわりの語像（編集時のみ・R.4b）
   const [questLinks, setQuestLinks] = useState<QuestLinkItem[]>([]); // 紐づくクエスト（編集＝API即時／登録＝ステージ）
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [periodErr, setPeriodErr] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
       setStrategy(d.strategy ?? ""); setFocus(d.focus_areas ?? []); setObjectives(d.objectives ?? "");
       setBodyMd(d.body_md ?? ""); setPeriodFrom(d.period_from ?? ""); setPeriodTo(d.period_to ?? "");
       if (!fromId) setImpact(d.impact ?? null); // 影響サマリは編集時のみ（複製は元資料の値なので出さない）
+      if (!fromId) fetchStrategyWordCloud(sourceId, ac.signal).then(setSurround).catch(() => {}); // 方針まわりの語像（R.4b）
       setLoaded(true);
     }).catch(() => setLoaded(true));
     return () => ac.abort();
@@ -194,10 +196,10 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
           <p style={{ margin: 0 }}>会社の中長期計画・方針・戦略を ISO 56001 の項目立てで登録します。ここで登録した資料を<strong>クエストで選ぶ</strong>と、配下アイデアの「方針との関連度（キーワードベース）」を算出します。各項目のラベル横 ⓘ に入力のヒントがあります。</p>
         </ScreenPurpose>
 
-        {/* 情報の影響サマリ（R.4・編集時のみ・read 集計＝決定的）。この方針に「効いている」curated 情報の量と機会/脅威の内訳。 */}
+        {/* 情報の影響サマリ（R.4・編集時のみ・read 集計＝決定的）。この方針に「効いている」判定済情報の量と機会/脅威の内訳。 */}
         {editing && impact && (
           <div className="dialog-section is-quiet impact-card">
-            <div className="dialog-label">📊 この方針への情報の影響（curated 情報 {impact.info_total} 件中 {impact.related_count} 件が関連）</div>
+            <div className="dialog-label">📊 この方針への情報の影響（判定済情報 {impact.info_total} 件中 {impact.related_count} 件が関連）</div>
             {impact.related_count > 0 ? (
               <>
                 <div className="impact-rates">
@@ -205,11 +207,24 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
                   <span className="impact-rate is-opp">機会率 <strong>{Math.round(impact.opportunity_rate * 100)}%</strong>（{impact.opportunity_count} 件）</span>
                   <span className="impact-rate is-threat">脅威率 <strong>{Math.round(impact.threat_rate * 100)}%</strong>（{impact.threat_count} 件）</span>
                 </div>
-                <span className="hint">関連度しきい値 {impact.threshold} 以上でキーワードが効いている curated 情報を母集団に集計（決定的）。機会/脅威は情報の分類（人手トリアージ）由来。</span>
+                <span className="hint">関連度しきい値 {impact.threshold} 以上でキーワードが効いている判定済情報を母集団に集計（決定的）。機会/脅威は情報の分類（人手トリアージ）由来。</span>
               </>
             ) : (
-              <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている curated 情報はまだありません。</span>
+              <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている判定済情報はまだありません。</span>
             )}
+          </div>
+        )}
+
+        {/* この方針まわりの語像（R.4b・編集時のみ・設計§7＝集約でのみ UI 化）。関連情報＋アイデア＋コンセプトの語を集約。 */}
+        {editing && surround && surround.related_count > 0 && surround.tokens.length > 0 && (
+          <div className="dialog-section is-quiet surround-wc">
+            <div className="dialog-label">☁️ この方針まわりの語像（関連 {surround.related_count} 件＝情報・アイデア・コンセプト）</div>
+            <div className="wc-mini">
+              {surround.tokens.map((t) => (
+                <span key={t.token} className="wc-word" style={{ fontSize: `${(0.85 + t.weight * 0.9).toFixed(2)}rem` }} title={`${t.token}（${t.count}）`}>{t.token}</span>
+              ))}
+            </div>
+            <span className="hint">この方針に関連する情報・アイデア・コンセプトに現れる語を集約したものです（決定的・キーワードベース）。</span>
           </div>
         )}
 
@@ -281,8 +296,9 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
 
         {/* この資料の主要語（情報登録ダイアログと同一 UI＝キーワード抽出＋ワードクラウド）。保存時に entity_tokens〔janome〕へ。 */}
         <div className="field dialog-section is-quiet">
-          <label>この資料の主要語</label>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+          {/* ラベルと抽出ボタンは同一行・ボタンは右寄せ（ユーザー指摘 2026-09-30）。 */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+            <label style={{ margin: 0 }}>この資料の主要語</label>
             <button className="btn btn-outline btn-sm" type="button" onClick={runCloud}>🔑 キーワードを抽出</button>
           </div>
           <div className="wc-preview">
