@@ -65,8 +65,9 @@
 ## 7. 次にやること（優先順・具体的に）
 1. **【完了 2026-09-30】実モデル(bge-m3)での通し確認**＝`docker compose --profile ai up -d` + `ollama pull bge-m3`（1024次元）で疎通。意味ペア（語は重ならない）で keyword=0.00(コイン0) に対し embedding=0.50(→+3ティア)・無関係=0.37(閾値未満)＝keyword が取りこぼす意味的一致を捉えることを実機確認。配線も persist_entity_embedding→entity_embeddings(JSONB dim1024)→EmbeddingProvider 読み戻し一致・model不一致→None(フォールバック) を acme 会社DBで rollback 実施。
 2. **【完了 2026-09-30】閾値の再校正**＝実測で bge-m3 の cosine 分布が圧縮（NEAR p50=0.525/p90=0.60・FAR p50=0.444/p90=0.518）＝生値では 0.70/0.90 ティアが死に整合率(%) 表示も不自然と判明。**方式＝embedding の生 cosine を 0..1 へ線形リスケール（`similarity._rescale`・config `alignment_embed_score_floor`/`_ceil`・既定 0.42/0.62・モデル別可変）してから共有 `_TIERS`(50/70/90) を適用**（keyword は生値のまま・hybrid は rescale 後 emb を加重）。`_TIERS` 自体は変更せず（Option 1＝正規化・ユーザー選択）。設計 §4.1a／API R／データモデル §5.55/§5.36c／R_経営資料.md §2 に実測分布と結論を記録・R-TC-207(unit)/208(int) 追加・pytest 871 green・稼働 backend 再ビルド反映済。※floor/ceil は評価セット near18/far90 での選定＝実運用データが貯まれば再調整余地（モデル差し替え時は要再計測）。
-3. **Step4 機会/脅威/影響率＋ワードクラウド（R.4・決定的）**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装。`info_links` の `impact_class` 集計 read＋経営資料詳細に表示（API 設計 R.4）。方式 B（LLM）は使わない。**←次はここ**
-4. **Step5 AI 用 Markdown エクスポート（R.5）**＝`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
+3. **【完了 2026-09-30】Step4 機会/脅威/影響率（R.4・決定的）**＝`GET /strategy-documents/{id}` の `impact` に影響率/機会率/脅威率を read 集計で同梱。母集団＝当該資料とトークン関連度が会社別 `auto_link_threshold`（既定0.12）以上の **curated（非アーカイブ）情報**（`info/repository.curated_impact`＋`strategy/application._impact_rates`）。機会/脅威は `info_items.impact_class`（人手）由来・決定的。frontend＝SC-81 編集画面上部に読み取り専用「情報の影響」カード（編集時のみ・機会=緑/脅威=赤・複製は非表示）。TC＝R-TC-110(api)/111(int)・pytest green・目視確認済（curated24件中2件関連・影響率8%・機会/脅威50%）。**ワードクラウド（設計§7）は R.4 API 仕様外＝follow-up に送った**（下記4-b）。
+4. **Step5 AI 用 Markdown エクスポート（R.5）**＝`doc/テスト/R_経営資料.md` §4 に TC 追加してから。**←次はここ**
+   - 4-b（follow-up）: 経営資料の**ワードクラウド**（設計§7＝集約でのみ UI 化）。info repo に `word_cloud` 実装済＝母集団情報 or 資料本文の主要語を集約表示。R.4 とは別 UI（優先度中）。
 5. **回帰**＝着手前に backend フル pytest（下記コマンド）と Playwright e2e フル（本セッション未実行）を通す。
 - 参考：LLM 生成（方式 B・要約/ISO 生成）を実装する時は**先に横断 LLM ゲートウェイ＋AIジョブ基盤**（`doc/設計ドラフト/ローカルLLM連携_設計.md`）を作る。A-2 の `infra/llm/embeddings.py` はその薄い前身＝将来ゲートウェイに吸収する想定。
 

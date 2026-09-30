@@ -53,6 +53,22 @@ class StrategyDocListItem(BaseModel):
     updated_at: datetime
 
 
+class ImpactRates(BaseModel):
+    """経営資料への情報の影響サマリ（R.4・詳細 read 同梱・決定的）。
+
+    母集団＝当該資料とトークン関連度が `threshold` 以上の **curated（非アーカイブ）情報**。機会/脅威は
+    `info_items.impact_class`（人手トリアージ）由来。専用テーブルは持たず read で集計（設計 §4.2）。
+    """
+    info_total: int          # 全 curated 情報数（影響率の分母）
+    related_count: int       # 母集団＝関連度≥threshold の curated 情報数
+    impact_rate: float       # related_count / info_total（方針に触れる情報がどれだけ入っているか・0..1）
+    opportunity_count: int
+    threat_count: int
+    opportunity_rate: float  # opportunity_count / related_count（母集団のうち機会の割合・0..1）
+    threat_rate: float       # threat_count / related_count（同・脅威の割合・0..1）
+    threshold: float         # 使った関連度しきい値（説明可能性）
+
+
 class StrategyDocDetail(BaseModel):
     id: str
     title: str
@@ -69,6 +85,7 @@ class StrategyDocDetail(BaseModel):
     created_by: str | None  # display_name
     created_at: datetime
     updated_at: datetime
+    impact: ImpactRates | None = None  # 詳細 read のみ同梱（R.4）。create/update/archive では None。
 
 
 class StrategyDocSelectionItem(BaseModel):

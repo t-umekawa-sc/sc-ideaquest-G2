@@ -11,7 +11,7 @@ import { cloudTokens } from "@/features/info-input/wordcloud";
 
 import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
-import type { QuestLinkItem } from "../types";
+import type { ImpactRates, QuestLinkItem } from "../types";
 import type { StrategyDocInput } from "../types";
 import { StrategyQuestLinks } from "./StrategyQuestLinks";
 import "../strategy.css";
@@ -76,6 +76,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [periodFrom, setPeriodFrom] = useState("");
   const [periodTo, setPeriodTo] = useState("");
   const [cloud, setCloud] = useState<[string, number][] | null>(null); // この資料の主要語（プレビュー・情報登録と同一UI）
+  const [impact, setImpact] = useState<ImpactRates | null>(null); // 情報の影響サマリ（編集時のみ・R.4）
   const [questLinks, setQuestLinks] = useState<QuestLinkItem[]>([]); // 紐づくクエスト（編集＝API即時／登録＝ステージ）
   const [titleErr, setTitleErr] = useState<string | null>(null);
   const [periodErr, setPeriodErr] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
       setDocKind(d.doc_kind); setIntent(d.intent ?? ""); setPolicy(d.policy_commitment ?? "");
       setStrategy(d.strategy ?? ""); setFocus(d.focus_areas ?? []); setObjectives(d.objectives ?? "");
       setBodyMd(d.body_md ?? ""); setPeriodFrom(d.period_from ?? ""); setPeriodTo(d.period_to ?? "");
+      if (!fromId) setImpact(d.impact ?? null); // 影響サマリは編集時のみ（複製は元資料の値なので出さない）
       setLoaded(true);
     }).catch(() => setLoaded(true));
     return () => ac.abort();
@@ -166,6 +168,25 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
         >
           <p style={{ margin: 0 }}>会社の中長期計画・方針・戦略を ISO 56001 の項目立てで登録します。ここで登録した資料を<strong>クエストで選ぶ</strong>と、配下アイデアの「方針との関連度（キーワードベース）」を算出します。各項目のラベル横 ⓘ に入力のヒントがあります。</p>
         </ScreenPurpose>
+
+        {/* 情報の影響サマリ（R.4・編集時のみ・read 集計＝決定的）。この方針に「効いている」curated 情報の量と機会/脅威の内訳。 */}
+        {editing && impact && (
+          <div className="dialog-section is-quiet impact-card">
+            <div className="dialog-label">📊 この方針への情報の影響（curated 情報 {impact.info_total} 件中 {impact.related_count} 件が関連）</div>
+            {impact.related_count > 0 ? (
+              <>
+                <div className="impact-rates">
+                  <span className="impact-rate">影響率 <strong>{Math.round(impact.impact_rate * 100)}%</strong></span>
+                  <span className="impact-rate is-opp">機会率 <strong>{Math.round(impact.opportunity_rate * 100)}%</strong>（{impact.opportunity_count} 件）</span>
+                  <span className="impact-rate is-threat">脅威率 <strong>{Math.round(impact.threat_rate * 100)}%</strong>（{impact.threat_count} 件）</span>
+                </div>
+                <span className="hint">関連度しきい値 {impact.threshold} 以上でキーワードが効いている curated 情報を母集団に集計（決定的）。機会/脅威は情報の分類（人手トリアージ）由来。</span>
+              </>
+            ) : (
+              <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている curated 情報はまだありません。</span>
+            )}
+          </div>
+        )}
 
         <Field className="dialog-section is-quiet" id="sd-title" label="タイトル" required error={titleErr}>
           <input className="input" id="sd-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例）2027-2029 中期経営計画" />

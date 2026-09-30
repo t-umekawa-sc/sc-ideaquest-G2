@@ -20,6 +20,18 @@ export interface StrategyDocListItem {
   updated_at: string;
 }
 
+// 情報の影響サマリ（R.4・詳細 read 同梱・決定的）。母集団＝当該資料と関連度≥閾値の curated 情報。
+export interface ImpactRates {
+  info_total: number;        // 全 curated 情報数（影響率の分母）
+  related_count: number;     // 母集団＝関連度≥threshold の curated 情報数
+  impact_rate: number;       // related_count / info_total（0..1）
+  opportunity_count: number;
+  threat_count: number;
+  opportunity_rate: number;  // 母集団のうち機会の割合（0..1）
+  threat_rate: number;       // 母集団のうち脅威の割合（0..1）
+  threshold: number;         // 使った関連度しきい値
+}
+
 export interface StrategyDocDetail {
   id: string;
   title: string;
@@ -36,6 +48,7 @@ export interface StrategyDocDetail {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  impact?: ImpactRates | null; // 詳細 read のみ同梱（R.4）。create/update では null。
 }
 
 // クエスト状態の日本語ラベル（英語 enum → 日本語表示・全画面共通）。

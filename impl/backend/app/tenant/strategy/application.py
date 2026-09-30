@@ -57,6 +57,47 @@ def _detail(ts, doc) -> dict:
     }
 
 
+def _impact_rates(ts, doc, company) -> dict:
+    """経営資料への情報の影響サマリ（R.4・詳細 read 同梱・決定的・設計 §4.2）。
+
+    母集団＝当該資料とトークン関連度（`derive.token_cosine`）が**閾値以上**の curated（非アーカイブ）情報。閾値は
+    会社別 `auto_link_threshold`（N.6 と同じ「効いている」基準を流用・既定 0.12）。機会/脅威は `info_items.impact_class`
+    （人手トリアージ）由来。専用テーブルは持たず read で集計。母集団 0 でもゼロ除算せず全 0 を返す。
+    """
+    from app.tenant.info import application as info_app  # 遅延 import（DRY・循環回避）
+    from app.tenant.info import derive
+    from app.tenant.info import repository as info_repo
+    from app.tenant.tokens import repository as tokens_repo
+
+    threshold = info_app.auto_link_threshold_of(company)
+    curated = info_repo.curated_impact(ts)  # [(info_id, impact_class), …]
+    info_total = len(curated)
+    doc_tokens = tokens_repo.tokens_for(ts, "strategy_doc", doc.id)
+    empty = {"info_total": info_total, "related_count": 0, "impact_rate": 0.0,
+             "opportunity_count": 0, "threat_count": 0,
+             "opportunity_rate": 0.0, "threat_rate": 0.0, "threshold": round(threshold, 3)}
+    if info_total == 0 or not doc_tokens:
+        return empty
+    info_tokens = tokens_repo.tokens_for_owners(ts, "info", [iid for iid, _ in curated])
+    related = [klass for iid, klass in curated
+               if derive.token_cosine(doc_tokens, info_tokens.get(iid, [])) >= threshold]
+    related_count = len(related)
+    if related_count == 0:
+        return {**empty, "impact_rate": 0.0}
+    opp = sum(1 for k in related if k == "opportunity")
+    thr = sum(1 for k in related if k == "threat")
+    return {
+        "info_total": info_total,
+        "related_count": related_count,
+        "impact_rate": round(related_count / info_total, 3),
+        "opportunity_count": opp,
+        "threat_count": thr,
+        "opportunity_rate": round(opp / related_count, 3),
+        "threat_rate": round(thr / related_count, 3),
+        "threshold": round(threshold, 3),
+    }
+
+
 def _persist_tokens(ts, doc) -> None:
     """本文を entity_tokens／entity_embeddings（owner_type='strategy_doc'）へ同期（整合率の素材・§5.36b・A-2）。"""
     from app.tenant.info import application as info_app  # 遅延 import（derive+tokens_repo を再利用・DRY）
@@ -120,7 +161,9 @@ def get_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str) -> d
         doc = repo.get_document(ts, did)
         if doc is None:
             raise AppError(404, "not_found")
-        return _detail(ts, doc)
+        payload = _detail(ts, doc)
+        payload["impact"] = _impact_rates(ts, doc, company)  # 影響率/機会率/脅威率を同梱（R.4）
+        return payload
 
 
 def update_document(account_id: uuid.UUID, company_id: uuid.UUID, doc_id: str, *, body) -> dict:

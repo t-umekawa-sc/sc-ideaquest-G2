@@ -405,6 +405,18 @@ def all_info_tokens(session: Session) -> dict[uuid.UUID, list[tuple[str, int]]]:
     return out
 
 
+def curated_impact(session: Session) -> list[tuple[uuid.UUID, str | None]]:
+    """curated（非アーカイブ）情報の `(id, impact_class)`（経営資料の影響率/機会率/脅威率の母集団候補・R.4）。
+
+    影響率の分母＝この件数。機会/脅威は `impact_class`（人手トリアージ・NULL 可＝未分類）。
+    """
+    rows = session.execute(
+        select(InfoItem.id, InfoItem.impact_class)
+        .where(InfoItem.status == "curated", InfoItem.archived_at.is_(None))
+    ).all()
+    return [(r[0], r[1]) for r in rows]
+
+
 def links_for_target_all(session: Session, target_type: str, target_id: uuid.UUID) -> list[InfoLink]:
     """当該成果物に紐づく **全** `info_links`（棄却/手動含む・N.6 逆方向の upsert 判定用）。"""
     return list(session.execute(

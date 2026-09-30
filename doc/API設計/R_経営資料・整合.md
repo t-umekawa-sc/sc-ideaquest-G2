@@ -63,14 +63,15 @@
 - **会社の方式変更時の差分付与（A-2・2026-09-29）**＝`companies.alignment_method` を変更すると、資料紐づけのある全クエストの配下公開アイデアを**再計算＋差分コイン付与**（初回超えのみ・下げない＝方式変更で整合率が上がり初めてティアを越えた分だけ付与）。`update_company_settings`→`strategy.recompute_all_for_company`（別 Tenant Tx・**best-effort**＝会社DB 未プロビジョニングでも設定保存は成功）。
 - 表示＝SC-22 の方針整合バッジ（関連度 %＋獲得コイン）。**軽い加点**（順位を厳密に決める指標にしない）。
 
-## R.4 機会/脅威/影響率（情報の集計・read）
+## R.4 機会/脅威/影響率（情報の集計・read）＝実装済（2026-09-30・Step4）
 
-- **役割分担**＝関連度＝キーワード（決定的）／機会・脅威＝人手（既存 `info_items.impact_class`＝curator トリアージ・§5.33）。
-- 母集団＝当該経営資料と**関連度が閾値以上**の curated 情報（＝キーワードで効いている情報）。
-- `GET /strategy-documents/{id}` の集計に同梱:
-  - **影響率**＝母集団サイズ / 全 curated 情報（方針に触れる情報がどれだけ入っているか）。
-  - **機会率**＝母集団のうち `impact_class='opportunity'` の割合。**脅威率**＝`threat` の割合。
-- 専用テーブルは持たず read で集計（I ダッシュボード同方針・§5.55 補足）。
+- **役割分担**＝関連度＝キーワード（決定的・`derive.token_cosine`）／機会・脅威＝人手（既存 `info_items.impact_class`＝curator トリアージ・§5.33）。
+- 母集団＝当該経営資料と**関連度が閾値以上**の **curated（非アーカイブ）情報**（＝キーワードで効いている情報）。閾値は会社別 `auto_link_threshold`（N.6 と同じ「効いている」基準を流用・既定 0.12）。
+- `GET /strategy-documents/{id}`（管理者スコープ）の `impact` に同梱（create/update/archive では `null`）:
+  - **影響率**（`impact_rate`）＝母集団サイズ / 全 curated 情報（方針に触れる情報がどれだけ入っているか・0..1）。
+  - **機会率**（`opportunity_rate`）＝母集団のうち `impact_class='opportunity'` の割合。**脅威率**（`threat_rate`）＝`threat` の割合（いずれも母集団＝`related_count` が分母・0..1）。
+  - 併せて `info_total`／`related_count`／`opportunity_count`／`threat_count`／`threshold`（説明可能性）を返す。母集団 0 でもゼロ除算せず率 0。
+- 専用テーブルは持たず read で集計（I ダッシュボード同方針・§5.55 補足）。**表示**＝経営資料 編集画面（SC-81）上部の読み取り専用「情報の影響」カード（編集時のみ・複製は出さない）。テスト＝R-TC-110（api）/111（int）。
 
 ## R.5 AI 用 Markdown エクスポート（生成は外部委譲・§8）
 

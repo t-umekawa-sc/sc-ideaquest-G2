@@ -37,9 +37,12 @@
 
 ## 3. 機会/脅威/影響率（R.4・Step4）
 
+> 役割分担＝関連度＝キーワード（決定的・`derive.token_cosine`）／機会・脅威＝人手（`info_items.impact_class`）。母集団＝当該経営資料とトークン関連度が**閾値以上**（会社別 `auto_link_threshold` 流用・既定0.12）の **curated（非アーカイブ）情報**。専用テーブルは持たず `GET /strategy-documents/{id}` の read で集計（設計§4.2・API R.4）。影響率＝母集団/全 curated・機会率/脅威率＝母集団のうち `opportunity`/`threat` の割合。
+
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
-| _（Step4 で追加）_ | | | | | | |
+| R-TC-110 | api | 詳細 read に影響率/機会率/脅威率を同梱＝母集団（関連度≥閾値の curated 情報）で集計・非関連/非curated は除外 | 資料1件（**ユニーク語**の tokens）＋curated 情報〔機会・関連／脅威・関連／その他・非関連〕＋raw 情報〔関連だが非curated〕をシード（ユニーク語で母集団を投入分に限定＝共有DB非依存） | admin `GET /strategy-documents/{id}` | 200・`impact.related_count=2`・`opportunity_count=1`・`threat_count=1`・`opportunity_rate=0.5`・`threat_rate=0.5`・`threshold=0.12`・`impact_rate=round(related/info_total,3)`（整合）／非関連・非curated は母集団外 | R.4／§5.33／設計§4.2 |
+| R-TC-111 | int | 集計の端（資料トークン空／母集団0）はゼロ除算せず率0を返す（例外なし） | 資料1件（tokens を永続しない） | `application._impact_rates(ts, doc, company)` | `related_count=0・impact_rate=0.0・opportunity_rate=0.0・threat_rate=0.0`（例外なし・`info_total`は全 curated 件数） | R.4／設計§4.2 |
 
 ## 4. Markdown エクスポート（R.5・Step5）
 

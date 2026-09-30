@@ -6061,6 +6061,31 @@ export interface components {
             oppose: number;
         };
         /**
+         * ImpactRates
+         * @description 経営資料への情報の影響サマリ（R.4・詳細 read 同梱・決定的）。
+         *
+         *     母集団＝当該資料とトークン関連度が `threshold` 以上の **curated（非アーカイブ）情報**。機会/脅威は
+         *     `info_items.impact_class`（人手トリアージ）由来。専用テーブルは持たず read で集計（設計 §4.2）。
+         */
+        ImpactRates: {
+            /** Info Total */
+            info_total: number;
+            /** Related Count */
+            related_count: number;
+            /** Impact Rate */
+            impact_rate: number;
+            /** Opportunity Count */
+            opportunity_count: number;
+            /** Threat Count */
+            threat_count: number;
+            /** Opportunity Rate */
+            opportunity_rate: number;
+            /** Threat Rate */
+            threat_rate: number;
+            /** Threshold */
+            threshold: number;
+        };
+        /**
          * InfoAttachmentDTO
          * @description 参考資料（info 添付）のメタ（N.2・§5.33）＝内容群の一部。object_key/uploader_id 等の内部値は非露出（§3.2）。
          *
@@ -8663,6 +8688,7 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            impact?: components["schemas"]["ImpactRates"] | null;
         };
         /** StrategyDocListItem */
         StrategyDocListItem: {

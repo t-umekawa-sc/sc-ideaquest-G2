@@ -41,3 +41,11 @@
 .strategy-card .between { padding-right: var(--space-6); }
 .strategy-card__title { white-space: normal; overflow-wrap: anywhere; margin-bottom: 0; }
 .strategy-card__meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* 情報の影響サマリ（R.4・編集時のみ・read 集計）。この方針に効いている curated 情報の量と機会/脅威内訳。 */
+.impact-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); background: var(--color-surface-muted, var(--color-surface)); }
+.impact-rates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: var(--space-2) 0; }
+.impact-rate { font-size: var(--text-sm); color: var(--color-text-muted); }
+.impact-rate strong { font-size: var(--text-md); color: var(--color-text); }
+.impact-rate.is-opp strong { color: var(--color-success, #0a7d43); }
+.impact-rate.is-threat strong { color: var(--color-danger, #c0392b); }
