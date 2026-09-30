@@ -1,0 +1,128 @@
+"""AIジョブ API（S.1/S.2・依頼者スコープ・doc/テスト/S_AIジョブ.md §1/§2）。
+
+FakeChat（conftest autouse）で外部未接続。作成したジョブは finally で会社DBから掃除（共有dev DB を汚さない）。
+"""
+from __future__ import annotations
+
+import uuid
+
+from app.control_plane.auth.orm import Company
+from app.db.control import control_session
+from app.db.tenant import get_tenant_session
+from app.tenant.ai_jobs.orm import AiJob
+from tests.admin.test_admin_accounts import _login
+from tests.admin.test_admin_issue import _csrf
+from tests.conftest import SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD
+
+BASE = "/api/v1/ai-jobs"
+
+
+def _db() -> str:
+    with control_session() as s:
+        return s.query(Company).filter_by(company_code=SEED_COMPANY_CODE).one().db_identifier
+
+
+def _cleanup(ids: list[str]) -> None:
+    if not ids:
+        return
+    with get_tenant_session(_db()) as ts:
+        ts.execute(AiJob.__table__.delete().where(AiJob.id.in_([uuid.UUID(i) for i in ids])))
+        ts.commit()
+
+
+def _enqueue(client, **body) -> dict:
+    payload = {"task_type": "info_summarize", "input": {"text": "競合A社が値下げ"}}
+    payload.update(body)
+    return client.post(BASE, json=payload, headers=_csrf(client))
+
+
+def _make(client):
+    _login(client, SEED_COMPANY_CODE, SEED_LOGIN, SEED_PASSWORD)
+
+
+def test_s_tc_101_enqueue_and_list(client):
+    """S-TC-101(api): enqueue=202 queued・自分の一覧に出る。"""
+    _make(client)
+    ids = []
+    try:
+        r = _enqueue(client)
+        assert r.status_code == 202, r.text
+        jid = r.json()["id"]
+        ids.append(jid)
+        assert r.json()["status"] == "queued"
+        lst = client.get(BASE).json()
+        assert jid in [row["id"] for row in lst["data"]]
+    finally:
+        _cleanup(ids)
+
+
+def test_s_tc_110_default_model_ok(client):
+    """S-TC-110(api): model 省略で 202（task_type 既定）。"""
+    _make(client)
+    ids = []
+    try:
+        r = _enqueue(client)  # model 省略
+        assert r.status_code == 202, r.text
+        ids.append(r.json()["id"])
+    finally:
+        _cleanup(ids)
+
+
+def test_s_tc_112_bogus_model_422(client):
+    """S-TC-112(api): registry に無いモデル指定は 422。"""
+    _make(client)
+    r = _enqueue(client, model="bogus-model")
+    assert r.status_code == 422, r.text
+    assert r.json()["errors"][0]["field"] == "model"
+
+
+def test_s_tc_115_list_models(client):
+    """S-TC-115(api): GET /ai-models＝会社で有効なキー（free 既定 ON）・既定フラグ。"""
+    _make(client)
+    r = client.get("/api/v1/ai-models", params={"task_type": "info_summarize"})
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    keys = {m["key"]: m for m in data}
+    assert "qwen3-light" in keys  # free 既定 ON
+    assert keys["qwen3-light"]["is_default"] is True and keys["qwen3-light"]["billing"] == "free"
+
+
+def test_s_tc_108_other_and_missing_job_404(client):
+    """S-TC-108(api): 存在しない/他人のジョブは 404（依頼者スコープ・存在秘匿）。"""
+    _make(client)
+    r = client.get(f"{BASE}/{uuid.uuid4()}")
+    assert r.status_code == 404
+
+
+def test_s_tc_109_summary_reflects_queued(client):
+    """S-TC-109(api): summary の queued がジョブ投入を反映。"""
+    _make(client)
+    ids = []
+    try:
+        before = client.get(f"{BASE}/summary").json()["queued"]
+        ids.append(_enqueue(client).json()["id"])
+        after = client.get(f"{BASE}/summary").json()["queued"]
+        assert after == before + 1
+    finally:
+        _cleanup(ids)
+
+
+def test_cancel_queued_via_api(client):
+    """queued を API でキャンセル＝canceled（S.1・§5.5）。"""
+    _make(client)
+    ids = []
+    try:
+        jid = _enqueue(client).json()["id"]
+        ids.append(jid)
+        r = client.post(f"{BASE}/{jid}/cancel", headers=_csrf(client))
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "canceled"
+    finally:
+        _cleanup(ids)
+
+
+def test_enqueue_requires_csrf(client):
+    """変更系は CSRF 必須（A.0）＝ヘッダ無し POST は 403。"""
+    _make(client)
+    r = client.post(BASE, json={"task_type": "info_summarize", "input": {"text": "x"}})
+    assert r.status_code == 403

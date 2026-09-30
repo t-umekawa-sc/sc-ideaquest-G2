@@ -11,14 +11,163 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from app.control_plane.auth.orm import Company
 from app.core.config import get_settings
+from app.core.errors import AppError
+from app.db.control import control_session
 from app.db.tenant import get_tenant_session
 from app.infra.llm import gateway, registry
 from app.tenant.ai_jobs import repository as repo
 from app.tenant.ai_jobs.orm import AiJob
+from app.tenant.profile import repository as profile_repo
 
 # free 論理キーの単価スナップショット（自社ホスト＝従量課金なし・§4.2/§5.59）。
 _FREE_RATE = {"input_rate": 0, "output_rate": 0, "currency": "JPY", "pricing_version": "phase1-free"}
+
+
+def _resolve_company(company_id: uuid.UUID) -> Company | None:
+    with control_session() as s:
+        return s.get(Company, company_id)
+
+
+def _effective_enabled_keys(ts) -> set[str]:
+    """会社で実際に使える論理キー集合（§4.2 2階層）＝free 既定 ON／paid 既定 OFF に明示設定を上書き。"""
+    explicit = repo.model_settings(ts)  # 明示 ON/OFF
+    result: set[str] = set()
+    for key, billing in registry.catalog_billing().items():
+        if key in explicit:
+            if explicit[key]:
+                result.add(key)
+        elif billing == "free":  # 未登録の free は既定 ON
+            result.add(key)
+    return result
+
+
+def _detail(job: AiJob) -> dict:
+    return {
+        "id": str(job.id), "task_type": job.task_type, "status": job.status, "execution": job.execution,
+        "requested_model": job.requested_model, "provider": job.provider, "model": job.model,
+        "input_tokens": job.input_tokens, "output_tokens": job.output_tokens, "cost_micros": job.cost_micros,
+        "progress": job.progress, "error": job.error, "result": job.result,
+        "ref_idea_id": str(job.ref_idea_id) if job.ref_idea_id else None,
+        "ref_quest_id": str(job.ref_quest_id) if job.ref_quest_id else None,
+        "ref_strategy_document_id": str(job.ref_strategy_document_id) if job.ref_strategy_document_id else None,
+        "ref_info_item_id": str(job.ref_info_item_id) if job.ref_info_item_id else None,
+        "created_at": job.created_at, "started_at": job.started_at, "finished_at": job.finished_at,
+    }
+
+
+def _list_item(job: AiJob) -> dict:
+    return {
+        "id": str(job.id), "task_type": job.task_type, "status": job.status,
+        "progress": job.progress, "created_at": job.created_at, "finished_at": job.finished_at,
+        "ref_idea_id": str(job.ref_idea_id) if job.ref_idea_id else None,
+        "ref_quest_id": str(job.ref_quest_id) if job.ref_quest_id else None,
+        "ref_strategy_document_id": str(job.ref_strategy_document_id) if job.ref_strategy_document_id else None,
+        "ref_info_item_id": str(job.ref_info_item_id) if job.ref_info_item_id else None,
+    }
+
+
+# ---- API 向け（account_id/company_id 解決＋依頼者スコープ・S.0/S.1/S.2） ----
+
+def enqueue(account_id: uuid.UUID, company_id: uuid.UUID, *, task_type: str, input: dict,
+            requested_model: str | None = None, ref_idea_id: uuid.UUID | None = None,
+            ref_quest_id: uuid.UUID | None = None, ref_strategy_document_id: uuid.UUID | None = None,
+            ref_info_item_id: uuid.UUID | None = None) -> dict:
+    """ジョブ投入（202＝{id, status}）。モデル指定は registry＋会社有効性で検証（不正/無効/会社OFF は 422）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        if requested_model is not None:
+            try:
+                registry.resolve_key(task_type, requested_model)  # 存在/有効（registry 既定）
+            except gateway.LLMConfigError:
+                raise AppError(422, "validation_error", detail="不正なモデル指定",
+                               errors=[{"field": "model", "code": "invalid_model"}])
+            if requested_model not in _effective_enabled_keys(ts):  # 会社で ON か（§4.2）
+                raise AppError(422, "validation_error", detail="このモデルは会社で無効です",
+                               errors=[{"field": "model", "code": "model_disabled"}])
+        job = repo.create_job(ts, task_type=task_type, requested_by_id=user.id, input=input,
+                              requested_model=requested_model, ref_idea_id=ref_idea_id,
+                              ref_quest_id=ref_quest_id, ref_strategy_document_id=ref_strategy_document_id,
+                              ref_info_item_id=ref_info_item_id)
+        out = {"id": str(job.id), "status": job.status}
+        ts.commit()
+    return out
+
+
+def list_jobs(account_id: uuid.UUID, company_id: uuid.UUID, *, status=None, task_type=None,
+              sort=None, page: int = 1, per_page: int = 20) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    page = max(1, page or 1)
+    per_page = min(100, max(1, per_page or 20))
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        rows, total = repo.list_jobs(ts, requester_id=user.id, status=status, task_type=task_type,
+                                     sort=sort, page=page, per_page=per_page)
+        return {"data": [_list_item(j) for j in rows],
+                "page_info": {"page": page, "per_page": per_page, "total": total,
+                              "has_next": page * per_page < total}}
+
+
+def summary(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        return repo.summary(ts, user.id)
+
+
+def get_job(account_id: uuid.UUID, company_id: uuid.UUID, job_id: str) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        job = repo.get_for_requester(ts, uuid.UUID(job_id), user.id)
+        if job is None:
+            raise AppError(404, "not_found")
+        return _detail(job)
+
+
+def cancel_job(account_id: uuid.UUID, company_id: uuid.UUID, job_id: str) -> dict:
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        job = repo.get_for_requester(ts, uuid.UUID(job_id), user.id)
+        if job is None:
+            raise AppError(404, "not_found")
+        repo.request_cancel(ts, job)
+        out = _detail(job)
+        ts.commit()
+    return out
+
+
+def list_models(account_id: uuid.UUID, company_id: uuid.UUID, task_type: str | None = None) -> dict:
+    """会社で有効な論理キーを返す（`GET /ai-models`・S.2・ピッカー供給源）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        enabled = _effective_enabled_keys(ts)
+    return {"data": registry.list_models(task_type, enabled_keys=enabled)}
 
 
 def enqueue_ai_job(

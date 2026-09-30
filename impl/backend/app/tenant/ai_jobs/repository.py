@@ -7,12 +7,20 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.tenant.ai_jobs.orm import AiJob, AiUsageEvent, CompanyAiModelSetting
+
+# 一覧ソートのホワイトリスト（未知は 422・DataTable §1.8.1）。
+_SORTS = {
+    "-created_at": (AiJob.created_at.desc(),),
+    "created_at": (AiJob.created_at.asc(),),
+    "-finished_at": (AiJob.finished_at.desc().nullslast(),),
+}
+_STATUSES = {"queued", "running", "succeeded", "failed", "canceled"}
 
 
 def create_job(
@@ -125,8 +133,73 @@ def record_usage(
 
 
 def enabled_model_keys(session: Session) -> set[str]:
-    """会社で ON の論理キー集合（`company_ai_model_settings.enabled`・§5.58）。"""
+    """会社で明示 ON の論理キー集合（`company_ai_model_settings.enabled=True`・§5.58）。"""
     rows = session.execute(
         select(CompanyAiModelSetting.model_key).where(CompanyAiModelSetting.enabled.is_(True))
     ).scalars().all()
     return set(rows)
+
+
+def model_settings(session: Session) -> dict[str, bool]:
+    """会社の明示設定（model_key→enabled）。未登録キーは registry 既定にフォールバック（app 層）。"""
+    rows = session.execute(
+        select(CompanyAiModelSetting.model_key, CompanyAiModelSetting.enabled)
+    ).all()
+    return {k: bool(v) for k, v in rows}
+
+
+def list_jobs(
+    session: Session, *, requester_id: uuid.UUID, status: str | None, task_type: str | None,
+    sort: str | None, page: int, per_page: int,
+) -> tuple[list[AiJob], int]:
+    """依頼者スコープの一覧（サーバー委譲・S.1）＝(rows, total)。sort/status はホワイトリスト（未知は 422）。"""
+    from app.core.errors import AppError
+
+    conds = [AiJob.requested_by_id == requester_id, AiJob.deleted_at.is_(None)]
+    if status is not None:
+        if status not in _STATUSES:
+            raise AppError(422, "validation_error", detail="不正な status", errors=[{"field": "status", "code": "invalid_enum"}])
+        conds.append(AiJob.status == status)
+    if task_type is not None:
+        conds.append(AiJob.task_type == task_type)
+    order = _SORTS.get(sort or "-created_at")
+    if order is None:
+        raise AppError(422, "validation_error", detail="不正な sort", errors=[{"field": "sort", "code": "invalid_enum"}])
+    total = session.execute(select(func.count()).select_from(AiJob).where(*conds)).scalar_one()
+    rows = session.execute(
+        select(AiJob).where(*conds).order_by(*order).offset((page - 1) * per_page).limit(per_page)
+    ).scalars().all()
+    return list(rows), int(total)
+
+
+def summary(session: Session, requester_id: uuid.UUID, *, recent_days: int = 7) -> dict:
+    """待ち/実行中/直近完了・失敗の件数（ヘッダーバッジ用・S.1）。"""
+    base = [AiJob.requested_by_id == requester_id, AiJob.deleted_at.is_(None)]
+
+    def _count(*extra):
+        return int(session.execute(select(func.count()).select_from(AiJob).where(*base, *extra)).scalar_one())
+
+    since = datetime.now(timezone.utc) - timedelta(days=recent_days)
+    return {
+        "queued": _count(AiJob.status == "queued"),
+        "running": _count(AiJob.status == "running"),
+        "recent_done": _count(AiJob.status == "succeeded", AiJob.finished_at >= since),
+        "recent_failed": _count(AiJob.status == "failed", AiJob.finished_at >= since),
+    }
+
+
+def get_for_requester(session: Session, job_id: uuid.UUID, requester_id: uuid.UUID) -> AiJob | None:
+    """依頼者本人のジョブのみ返す（他人/削除済は None＝存在秘匿の 404 に写像）。"""
+    job = session.get(AiJob, job_id)
+    if job is None or job.deleted_at is not None or job.requested_by_id != requester_id:
+        return None
+    return job
+
+
+def request_cancel(session: Session, job: AiJob) -> None:
+    """キャンセル要求＝queued は即 canceled／running はフラグ（協調・§5.5）／終端は無操作。"""
+    if job.status == "queued":
+        job.status = "canceled"
+        job.finished_at = datetime.now(timezone.utc)
+    elif job.status == "running":
+        job.cancel_requested = True

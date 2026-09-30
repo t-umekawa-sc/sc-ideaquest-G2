@@ -57,6 +57,11 @@ def _catalog() -> dict[str, ModelSpec]:
     }
 
 
+def catalog_billing() -> dict[str, str]:
+    """論理キー→billing（free/paid）。会社の実効有効集合を app 層が組むのに使う（§4.2）。"""
+    return {k: s.billing for k, s in _catalog().items()}
+
+
 def get(key: str) -> ModelSpec:
     """論理キーの解決（存在しない/無効は LLMConfigError）。"""
     from app.infra.llm.gateway import LLMConfigError  # 遅延 import（循環回避）
