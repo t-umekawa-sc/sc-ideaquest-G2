@@ -19,6 +19,7 @@
 | S-TC-107 | int | 孤児回収＝running のまま無更新は再 queued（started_at/heartbeat 判定） | running で古い started_at のジョブ | reaper 実行 | status=queued に戻る（再実行可）・attempts は保持 | §5.4 |
 | S-TC-108 | api | 認可＝他人のジョブは見えない（404） | user2 のジョブ | user1 で `GET /ai-jobs/{id}` | 404（存在秘匿・requested_by スコープ） | S.0 |
 | S-TC-109 | api | summary＝待ち/実行中/直近完了・失敗の件数 | queued/running/succeeded/failed を各種 | `GET /ai-jobs/summary` | `{queued,running,recent_done,recent_failed}` が状態と一致 | S.1 |
+| S-TC-129 | int | 待ちジョブの順番待ち位置＝会社全体の queued を priority→created_at 順に並べた rn（自分の順位）＋前方件数(実行中＋rn-1)からの概算ETA（履歴あれば） | running1件＋queued複数（会社全体） | `list_jobs` の queued 行 | 先頭 queued は queue_position=1・古い順に増える／実行中があると eta は running を織り込む／完了/失敗/実行中の行は position/eta とも null | S.1／§5.3 |
 
 ## 2. モデル指定・ガードレール・GET /ai-models（S.2/S.3・設計 §3.4）
 

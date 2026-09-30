@@ -62,6 +62,7 @@ def _list_item(job: AiJob) -> dict:
     return {
         "id": str(job.id), "task_type": job.task_type, "status": job.status,
         "progress": job.progress, "created_at": job.created_at, "finished_at": job.finished_at,
+        "queue_position": None, "eta_seconds": None,  # queued 行のみ list_jobs で補完
         "ref_idea_id": str(job.ref_idea_id) if job.ref_idea_id else None,
         "ref_quest_id": str(job.ref_quest_id) if job.ref_quest_id else None,
         "ref_strategy_document_id": str(job.ref_strategy_document_id) if job.ref_strategy_document_id else None,
@@ -121,7 +122,17 @@ def list_jobs(account_id: uuid.UUID, company_id: uuid.UUID, *, status=None, task
             raise AppError(401, "unauthenticated")
         rows, total = repo.list_jobs(ts, requester_id=user.id, status=status, task_type=task_type,
                                      sort=sort, page=page, per_page=per_page)
-        return {"data": [_list_item(j) for j in rows],
+        items = [_list_item(j) for j in rows]
+        # queued 行だけ順番待ち位置＋概算 ETA を補完（会社全体の待ち行列基準・S.1）。
+        queued_ids = [j.id for j in rows if j.status == "queued"]
+        if queued_ids:
+            info = repo.queue_info(ts, queued_ids, get_settings().llm_worker_concurrency)
+            by_id = {it["id"]: it for it in items}
+            for jid, qi in info.items():
+                target = by_id.get(str(jid))
+                if target:
+                    target.update(qi)
+        return {"data": items,
                 "page_info": {"page": page, "per_page": per_page, "total": total,
                               "has_next": page * per_page < total}}
 

@@ -169,6 +169,45 @@ def test_process_all_companies_once_smoke():
         _cleanup(db, user_id, [jid] if jid else [])
 
 
+def test_s_tc_129_queue_position_and_eta():
+    """S-TC-129: queued の順番待ち位置（会社全体の rank・created_at 昇順で増加）＋履歴からの概算 ETA。"""
+    db = _seed_db()
+    user_id = _mk_user(db)
+    jids: list[str] = []
+    try:
+        now = datetime.now(timezone.utc)
+        ids = []
+        with get_tenant_session(db) as ts:
+            # 履歴＝succeeded 1件（duration 120s）で avg を作る（ETA が int になる）。
+            hist = AiJob(task_type="info_summarize", requested_by_id=user_id, input={"text": "h"},
+                         status="succeeded", started_at=now - timedelta(minutes=3), finished_at=now - timedelta(minutes=1))
+            ts.add(hist)
+            ts.flush()
+            jids.append(str(hist.id))
+            queued = []
+            for k in range(3):  # 古い順（created_at 昇順）で 3 件
+                j = AiJob(task_type="info_summarize", requested_by_id=user_id, input={"text": f"q{k}"},
+                          status="queued", created_at=now - timedelta(minutes=10 - k))
+                ts.add(j)
+                queued.append(j)
+            ts.flush()
+            for j in queued:
+                jids.append(str(j.id))
+                ids.append(j.id)
+            info = ai_repo.queue_info(ts, ids, 1)
+            positions = [info[i]["queue_position"] for i in ids]
+            etas = [info[i]["eta_seconds"] for i in ids]
+            # 位置＝distinct・created_at 昇順で厳密増加（会社全体の rank だが単調性は保たれる）。
+            assert len(set(positions)) == 3 and positions == sorted(positions)
+            assert all(isinstance(p, int) and p >= 1 for p in positions)
+            # ETA＝履歴ありで int・位置に比例して非減少。
+            assert all(isinstance(e, int) for e in etas) and etas == sorted(etas)
+            # 非 queued（succeeded）は rank に含まれない＝queue_info は返さない。
+            assert ai_repo.queue_info(ts, [hist.id], 1) == {}
+    finally:
+        _cleanup(db, user_id, jids)
+
+
 def test_s_tc_125_usage_aggregate_reflects_processed():
     """S-TC-125(int): 処理済ジョブの usage が会社×モデル×月の集計に一致（free=cost0・トークンは集計）。"""
     db = _seed_db()

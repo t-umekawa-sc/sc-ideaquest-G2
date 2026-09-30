@@ -32,6 +32,8 @@ class AiJobListItem(BaseModel):
     task_type: str
     status: str
     progress: dict | None = None
+    queue_position: int | None = None  # queued のみ＝会社全体の待ち行列での順位（N番目）
+    eta_seconds: int | None = None     # queued のみ＝概算の実行開始まで秒数（履歴無しは null）
     created_at: datetime
     finished_at: datetime | None = None
     ref_idea_id: str | None = None

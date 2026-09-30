@@ -17,7 +17,22 @@ import "../ai-jobs.css";
 const taskLabel = (t: string) => TASK_LABEL[t] ?? t;
 const statusBadge = (s: AiJobStatus) => <span className={`badge ${STATUS_BADGE[s]}`}>{STATUS_LABEL[s]}</span>;
 
+// 概算 ETA を「約N分後 / 約N時間M分後」に整形（0=まもなく）。
+function fmtEta(sec: number): string {
+  if (sec <= 0) return "まもなく";
+  if (sec < 3600) return `約${Math.max(1, Math.ceil(sec / 60))}分後`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  return m > 0 ? `約${h}時間${m}分後` : `約${h}時間後`;
+}
+
+// 進捗列＝実行中は %、待ちは「N番目（・約M分後）」、その他は —。
 function progressText(r: AiJobListItem): string {
+  if (r.status === "queued") {
+    if (r.queue_position == null) return "待ち";
+    const pos = `${r.queue_position}番目`;
+    return r.eta_seconds == null ? pos : `${pos}・${fmtEta(r.eta_seconds)}`;
+  }
   if (r.status !== "running") return "—";
   const p = r.progress;
   if (!p) return "実行中…";
@@ -92,7 +107,7 @@ export function AiJobsListView() {
     { key: "status", label: "状態", sortable: false, width: 110,
       filter: { type: "enum", options: (Object.keys(STATUS_LABEL) as AiJobStatus[]).map((v) => [v, STATUS_LABEL[v]] as [string, string]) },
       render: (r) => statusBadge(r.status) },
-    { key: "progress", label: "進捗", width: 140, render: progressText },
+    { key: "progress", label: "進捗・待ち", width: 170, render: progressText },
     { key: "created_at", label: "依頼", sortable: true, width: 160, sortVal: (r) => r.created_at, render: (r) => r.created_at.slice(0, 16).replace("T", " ") },
     { key: "finished_at", label: "完了", sortable: true, width: 160, sortVal: (r) => r.finished_at ?? "", render: (r) => (r.finished_at ? r.finished_at.slice(0, 16).replace("T", " ") : "—") },
   ], [menuItems]);

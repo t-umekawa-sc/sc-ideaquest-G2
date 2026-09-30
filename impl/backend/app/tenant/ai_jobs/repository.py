@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -186,6 +187,44 @@ def summary(session: Session, requester_id: uuid.UUID, *, recent_days: int = 7) 
         "recent_done": _count(AiJob.status == "succeeded", AiJob.finished_at >= since),
         "recent_failed": _count(AiJob.status == "failed", AiJob.finished_at >= since),
     }
+
+
+def queue_info(session: Session, queued_ids: list[uuid.UUID], concurrency: int,
+               *, avg_window_days: int = 7) -> dict[uuid.UUID, dict]:
+    """queued ジョブの順番待ち位置＋概算 ETA（S.1・§5.3）。
+
+    位置＝**会社全体**の queued を処理順（priority DESC, created_at ASC）で並べた順位（rn＝ユーザーの
+    「N番目の待機ジョブ」）。ETA＝前方件数（実行中＋rn-1）÷同時実行数×直近平均処理時間（履歴が無ければ None）。
+    通知内容や他人のジョブ本文は出さない＝件数のみ（存在秘匿と両立）。
+    """
+    if not queued_ids:
+        return {}
+    running = int(session.execute(
+        select(func.count()).select_from(AiJob).where(AiJob.status == "running", AiJob.deleted_at.is_(None))
+    ).scalar_one())
+    ranked = session.execute(
+        select(AiJob.id, func.row_number().over(
+            order_by=(AiJob.priority.desc(), AiJob.created_at.asc(), AiJob.id.asc())))
+        .where(AiJob.status == "queued", AiJob.deleted_at.is_(None), AiJob.cancel_requested.is_(False))
+    ).all()
+    rank = {rid: int(rn) for rid, rn in ranked}
+    since = datetime.now(timezone.utc) - timedelta(days=avg_window_days)
+    avg = session.execute(
+        select(func.avg(func.extract("epoch", AiJob.finished_at - AiJob.started_at)))
+        .where(AiJob.status == "succeeded", AiJob.finished_at.isnot(None),
+               AiJob.started_at.isnot(None), AiJob.finished_at >= since)
+    ).scalar()
+    avg = float(avg) if avg is not None else None
+    n = max(1, concurrency)
+    out: dict[uuid.UUID, dict] = {}
+    for jid in queued_ids:
+        rn = rank.get(jid)
+        if rn is None:
+            continue
+        ahead = running + rn - 1  # 自分が始まる前に片付く件数（実行中＋自分より前の待ち）
+        eta = int(math.ceil(ahead / n) * avg) if avg is not None else None
+        out[jid] = {"queue_position": rn, "eta_seconds": eta}
+    return out
 
 
 def get_for_requester(session: Session, job_id: uuid.UUID, requester_id: uuid.UUID) -> AiJob | None:

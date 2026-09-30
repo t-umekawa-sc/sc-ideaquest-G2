@@ -4372,6 +4372,10 @@ export interface components {
             progress?: {
                 [key: string]: unknown;
             } | null;
+            /** Queue Position */
+            queue_position?: number | null;
+            /** Eta Seconds */
+            eta_seconds?: number | null;
             /**
              * Created At
              * Format: date-time

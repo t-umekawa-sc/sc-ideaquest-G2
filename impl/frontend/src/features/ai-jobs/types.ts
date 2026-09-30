@@ -8,6 +8,8 @@ export interface AiJobListItem {
   task_type: string;
   status: AiJobStatus;
   progress: { phase?: string; ratio?: number } | null;
+  queue_position: number | null; // queued のみ＝会社全体の待ち行列での順位（N番目）
+  eta_seconds: number | null;    // queued のみ＝実行開始までの概算秒（履歴無しは null）
   created_at: string;
   finished_at: string | null;
   ref_idea_id: string | null;
