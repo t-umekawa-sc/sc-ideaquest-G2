@@ -6,12 +6,15 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-30（本セッション末）
 - ブランチ: `main`（作業ツリー clean を目標）。origin/main と同期。
-- 本セッションのコミット（新しい順）＝**未 push あり**（push 済は 9611e6bf まで）:
-  - `7f43d09f` feat(ai_jobs): FR-45 Phase1 AIジョブ基盤データ層＋状態機械（tenant/ai_jobs・migration 0048）【未push】
-  - `7b6c7ec9` fix(seed): bootstrap の発見デモ chat シードを thread_id へ（chat_thread 刷新の追随漏れ）【未push】
-  - `6159e68f` feat(llm): FR-45 Phase1 LLMゲートウェイ層（infra/llm gateway/registry・自前薄層）【未push】
-  - `9611e6bf` feat(design): FR-45 LLM連携基盤の正式反映（要件/データモデル/API/画面/テスト）＋handoff【push済】
-  - `e93ac5ee` test(e2e): 陳腐化した e2e を現行スキーマ/データに追随（chat=thread_id・info-list=行数待ち）【push済】
+- 本セッションのコミット（新しい順）＝**1ec2edd5 は未 push**（push 済は fdd07073 まで）:
+  - `1ec2edd5` feat(ai_jobs): FR-45 Phase1 llm_worker＋完了通知（ai_task_done/failed・compose workers）【未push】
+  - `fdd07073` feat(ai_jobs): FR-45 Phase1 AIジョブ API（router S.1/S.2・依頼者スコープ）【push済】
+  - `b74fc99f` docs(handoff)【push済】
+  - `7f43d09f` feat(ai_jobs): AIジョブ基盤データ層＋状態機械（migration 0048）【push済】
+  - `7b6c7ec9` fix(seed): bootstrap の chat シードを thread_id へ【push済】
+  - `6159e68f` feat(llm): LLMゲートウェイ層（infra/llm）【push済】
+  - `9611e6bf` feat(design): FR-45 LLM連携基盤の正式反映【push済】
+  - `e93ac5ee` test(e2e): 陳腐化した e2e を現行スキーマ/データに追随【push済】
 
 ## 2. ゴール
 社内イノベーション支援アプリ（ideaquest）。ISO 56001 の①機会→②③コンセプト→④⑤ソリューション開発を、ゲーム感のある UI で一気通貫に回す。直近の完了フェーズ＝**経営資料整合（FR-44・ドメイン R）＝Step1〜5＋4-b＋4-d 完了**。本セッションの本命＝**FR-45 LLM連携基盤の設計正式反映**（4-c＝FR-44⑤ in-app 生成 等の前提インフラ）。
@@ -55,8 +58,10 @@
 - 壊れているもの＝無し。**e2e 並列フルは環境特性で exit 1 になり得る**（~4-6% 競合分散・単体では green）＝
   実バグ判定は必ず**直列 --workers=1 で切り分ける**。**backend も共有dev DB 蓄積で一部テスト（例 I-TC-161
   recent_chats）が汚染で落ちることがある**＝クリーンDB（acme を drop→bootstrap 再作成）で切り分ける。
-- FR-45 Phase1＝**ゲートウェイ層＋ジョブ基盤データ層＋状態機械まで実装・green**。**残＝router（S.1 EP）＋
-  llm_worker（compose workers）＋完了通知（ai_task_done）＋SC-04/94 画面**（下記 §7）。
+- **FR-45 Phase1 backend＝完成・green**（ゲートウェイ／ジョブ基盤・状態機械／REST API／llm_worker／完了通知）。
+  縦1本 `info_summarize` が enqueue→worker（全会社DB巡回）→gateway→result→usage→通知 で end-to-end に動く。
+  **残＝(d) SC-04/94 画面（フロント・モック先行）＋各機能のモデルピッカー**のみ（下記 §7）。
+  実生成には `--profile ai` の ollama＋軽量 Qwen3 pull が要る（未起動は LLMUnavailable→リトライ／テストは FakeChat）。
 
 ## 5. 詰まっている点（試して失敗した/落とし穴）
 - **Playwright をパイプに繋ぐと exit code がマスクされる**（`| tail` は tail の 0 を返す）＝失敗を見逃す。exit code は本体で受けるか "N failed" 行で確認。
@@ -71,19 +76,19 @@
 - **課金方式 A（内部メータリングのみ）採用・B/C 基礎（`ai_usage_events`）は今から恒久保持**（後から遡及計算可能に）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **FR-45 Phase1 の続き**（ゲートウェイ＋データ層＋状態機械は実装済 §3-(3)）。残りを増分で:
-   - **(a) router（S.1 EP）＋schemas**＝`app/tenant/ai_jobs/router.py`（`POST /ai-jobs`・`GET /ai-jobs`〔DataTable〕・
-     `/summary`・`/{id}`・`/{id}/cancel`・`GET /ai-models`）＋main.py に include_router。認可＝依頼者本人スコープ。
-     不正 model は 422（`gateway.LLMConfigError`→422 に写像）。TC＝S-TC-101/102/108/109/110-115（api）。
-   - **(b) llm_worker.py**＝`app/llm_worker.py`（mail_worker.py 型・全会社DBを巡回して `process_ai_jobs_once` を呼ぶ）
-     ＋compose に `llm-worker` サービス（profile workers・`command: python -m app.llm_worker`）。会社列挙は
-     account_sync の `process_outbox_once` の会社巡回パターンを参照。
-   - **(c) 完了通知**＝`process_ai_jobs_once` の succeeded/failed で `notifications`（`ai_task_done`/`ai_task_failed`・
-     `ref_*`）を1件作る（H ドメイン再利用）。TC＝S-TC-126/127。
-   - **(d) SC-04/SC-94 画面（モック先行）**＝フロント。SC-04＝SC-02＋共有DataTable 踏襲・SC-94＝SC-93 踏襲。
-     `GET /ai-models` 駆動のモデルピッカーは対象機能（info_summarize の画面）に常設。
-   - dev LLM＝`docker compose --profile ai up -d ollama` → 軽量 Qwen3 を pull（config `llm_model_light`＝既定 `qwen3:4b`）。
-     **テストは FakeChat 固定**（conftest autouse）＝ネット不要。
+1. **FR-45 Phase1 の残り＝(d) フロントのみ**（(a)router・(b)worker・(c)通知は実装済 §3-(3)）:
+   - **SC-04 AI処理状況**＝新規画面（踏襲＝SC-02 通知＋共有 DataTable サーバー委譲）。`GET /ai-jobs`〔一覧〕・
+     `/summary`〔ベルバッジ〕・`/{id}`〔詳細・進捗〕・`POST /{id}/cancel`。ライブは将来（Phase1 はポーリング/再取得可）。
+     ルート＝`/ai-jobs`（画面遷移図・SC-04）。**モック先行**（フロントエンド実装フロー規約）＝style-guide/mocks に置く→接続。
+   - **SC-94 会社のLLM設定**＝新規画面（踏襲＝SC-93 管理系）。**ただし管理 API（`GET/PATCH /admin/ai-models`・
+     `GET /admin/ai-usage`）は backend 未実装**＝SC-94 着手前に S.5 の管理 EP を先に実装する必要あり（会社ON/OFF・
+     予算・利用量＝`company_ai_model_settings`/`ai_usage_events` の read/write）。TC＝S-TC-120/122/123/124/125。
+   - **モデルピッカー**＝`GET /ai-models` 駆動（会社有効キー・候補1でも常設）＝info_summarize を呼ぶ機能画面に置く。
+   - codegen＝backend 変更後に `cd impl/frontend && npm run codegen`（openapi→schema.d.ts）→ frontend ビルド。
+   - dev LLM＝`docker compose --profile ai up -d ollama` → 軽量 Qwen3 pull（config `llm_model_light`＝既定 `qwen3:4b`）。
+     **テストは FakeChat 固定**（conftest autouse）＝ネット不要。実機で縦1本を通すには profile workers で llm-worker も起動。
+2. **未実装の backend 補完（SC-94 の前提）**＝S.5 管理 EP（会社モデル ON/OFF・予算・利用量）＝`ai_jobs` router か
+   admin 側に追加。課金方式 A（メータリングのみ）＝`ai_usage_events` の read 集計＋`company_ai_model_settings` の CRUD。
 2. **FR-44⑤ Phase2（4-c＝in-app 生成 `iso_generate`）**＝上記 LLM 基盤が動いたら2本目の task_type として載せる（既定 `qwen3-swallow`）。整合率の決定性は崩さない（生成は別軸）。
 3. **doc 債務の是正（任意）**＝画面遷移図に **SC-80(経営資料) 系が未掲載**（FR-44 の更新漏れ）。触れる機会に正規化。
 4. **バックログ**＝`doc/バックログ/未実装・ギャップ一覧.md`・アイデアコンテスト（`513ff831`）・ISO ギャップ（6.4/9.1）。
@@ -95,6 +100,6 @@
 - 非同期系（mail・sc-90 ディレクトリ・将来 llm_worker）＝`docker compose --profile workers up -d`（既定 up では非起動）。**pytest 時は競合回避に `docker compose stop worker mail-worker`**。
 - backend pytest（未コミット編集反映＝`-v`マウント・cwd=impl）＝`cd impl && docker compose run --rm -T -v "$PWD/backend:/app" backend pytest -q`（対象限定は末尾に `tests/strategy` 等）。**全テストは FakeEmbeddings 固定**（conftest autouse）＝ネット不要。
 - frontend 検証＝`cd impl/frontend && npm run build`（tsc/lint 兼）・`npx vitest run <path>`。**e2e は必ず本体 exit code を見る**＝`npx playwright test --project=chromium > log 2>&1; echo $?`（パイプ禁止）。実バグ切り分けは `--workers=1` で直列再現。storageState 認証（既定 `user@acme`）・管理者画面は spec 側で `kanri@acme.example` を自前ログイン。
-- TC トレーサビリティ＝リポジトリ直下で `python3 scripts/check_tc_traceability.py`（コミット前ゲート・**一意性は見ない**＝採番前に当該ドメインの max を grep）。現在＝R-TC max 208/115、C-TC max 305、**S-TC 101〜128（1xx api/int）＋201〜206（2xx unit）**＝実装済＝201-206・101/103/105/107/117/121（他は先出し）。company migration head＝**0048_ai_jobs**（次は 0049）。
+- TC トレーサビリティ＝リポジトリ直下で `python3 scripts/check_tc_traceability.py`（コミット前ゲート・**一意性は見ない**＝採番前に当該ドメインの max を grep）。現在＝R-TC max 208/115、C-TC max 305、**S-TC 101〜128（1xx api/int）＋201〜206（2xx unit）**＝実装済＝201-206（gateway unit）・101/103/105/107/108/109/110/112/115/117/121/126/127（int/api・enqueue/状態機械/API/通知）。**未実装（先出しのみ）＝102 冪等・104 N並行・106 timeout・111 明示model・113 会社OFF・114 external・116 進捗・118 running協調キャンセル・119/128 e2e・120/122-125 管理/課金**。company migration head＝**0048_ai_jobs**（次は 0049）。
 - ポート＝frontend `:3000`／backend `:8000`／MailHog `:8025`／MinIO `:9000`／Ollama `:11434`（profile ai）。ログイン（ACME）＝会社コード `ACME-01`／ID `user@acme.example`／PW `Passw0rd!`。管理者＝`kanri@acme.example`（company_account_admin）／`admin@ops.example`（system_admin）・共に `Passw0rd!`。
 - DB 直確認＝`docker compose -f impl/compose.yaml exec -T db psql -U ideaquest -d ideaquest_company_acme -c "…"`（会社DB＝`ideaquest_company_acme`／control＝`ideaquest_control`）。FR-45 の表（実装後）＝`ai_jobs`・`company_ai_model_settings`・`ai_usage_events`。
