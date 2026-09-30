@@ -262,6 +262,7 @@ def seed_demo_discovery() -> None:
     """ACME-01 に発見デモの discoverable クエスト（全社公開）＋活発度用の公開アイデア/チャットを seed（冪等・非prod）。"""
     from datetime import datetime, timedelta, timezone
 
+    from app.tenant.chat import repository as chat_repo
     from app.tenant.chat.orm import ChatGroup, ChatMessage
     from app.tenant.ideas.orm import Idea
     from app.tenant.quests import repository as quest_repo
@@ -299,10 +300,11 @@ def seed_demo_discovery() -> None:
             cgid = uuid.uuid4()
             ts.add(ChatGroup(id=cgid, idea_id=iid))
             ts.flush()
-            groups.append(cgid)
+            # チャット独立化（§5.14b）後はメッセージは thread_id 所属＝idea ホストの thread を用意する。
+            groups.append(chat_repo.ensure_chat_thread(ts, "idea", cgid).id)
         for off, cnt in {0: 4, 1: 2, 2: 5, 3: 1, 5: 3, 7: 2, 9: 1}.items():
             for k in range(cnt):
-                ts.add(ChatMessage(id=uuid.uuid4(), chat_group_id=groups[(off + k) % len(groups)],
+                ts.add(ChatMessage(id=uuid.uuid4(), thread_id=groups[(off + k) % len(groups)],
                                    author_id=DEMO_DISCOVERY_OWNER_ID, body="（発見デモ・議論サンプル）",
                                    created_at=now - timedelta(days=off, hours=k)))
         ts.commit()
