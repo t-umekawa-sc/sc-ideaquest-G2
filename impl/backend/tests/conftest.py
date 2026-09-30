@@ -63,6 +63,19 @@ def _fake_embeddings():
 
 
 @pytest.fixture(autouse=True)
+def _fake_chat():
+    """LLM ゲートウェイ（chat 補完）を FakeChat（決定的・外部未接続）へ差し替える（AIジョブ・FR-45）。
+
+    実クライアントは LLM 基盤（Ollama/vLLM 等）へ HTTP を打つため、テストでは全件 Fake に固定して
+    ネットワーク非依存・決定的にする（`_fake_embeddings` と同流儀）。teardown で解除。
+    """
+    from app.infra.llm import gateway as gw_mod
+    gw_mod.set_chat_client(gw_mod.FakeChat())
+    yield
+    gw_mod.set_chat_client(None)
+
+
+@pytest.fixture(autouse=True)
 def _clean_mail_outbox():
     """各テストの前後で mail_outbox を空にする（トランスポート状態＝Redis と同様に隔離）。
 
