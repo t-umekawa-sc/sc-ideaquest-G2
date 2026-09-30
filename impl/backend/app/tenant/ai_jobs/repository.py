@@ -203,3 +203,70 @@ def request_cancel(session: Session, job: AiJob) -> None:
         job.finished_at = datetime.now(timezone.utc)
     elif job.status == "running":
         job.cancel_requested = True
+
+
+# ---- 会社モデル設定・課金（管理・§5.58/§5.59・S.5） ----
+
+def get_model_setting(session: Session, model_key: str) -> CompanyAiModelSetting | None:
+    return session.execute(
+        select(CompanyAiModelSetting).where(CompanyAiModelSetting.model_key == model_key)
+    ).scalar_one_or_none()
+
+
+def upsert_model_setting(session: Session, model_key: str, *, enabled: bool | None,
+                         monthly_budget_micros: int | None, actor_id: uuid.UUID) -> CompanyAiModelSetting:
+    """会社のモデル設定を作成/更新（enabled/予算）。enabled=True 化時に enabled_by/at を記録（課金合意・§4.2）。"""
+    row = get_model_setting(session, model_key)
+    if row is None:
+        row = CompanyAiModelSetting(model_key=model_key, enabled=False)
+        session.add(row)
+    if enabled is not None:
+        if enabled and not row.enabled:  # OFF→ON＝課金合意の記録
+            row.enabled_by_id = actor_id
+            row.enabled_at = datetime.now(timezone.utc)
+        row.enabled = enabled
+    if monthly_budget_micros is not None:
+        row.monthly_budget_micros = monthly_budget_micros
+    session.flush()
+    return row
+
+
+def month_cost(session: Session, period_ym: int) -> int:
+    """当月の総コスト（予算判定用・§4.2）。"""
+    return int(session.execute(
+        select(func.coalesce(func.sum(AiUsageEvent.cost_micros), 0)).where(AiUsageEvent.period_ym == period_ym)
+    ).scalar_one())
+
+
+def month_cost_by_model(session: Session, period_ym: int) -> dict[str, dict]:
+    """当月のモデル別利用（tokens/cost）＝GET /admin/ai-models の現況表示用。"""
+    rows = session.execute(
+        select(AiUsageEvent.model_key,
+               func.coalesce(func.sum(AiUsageEvent.input_tokens), 0),
+               func.coalesce(func.sum(AiUsageEvent.output_tokens), 0),
+               func.coalesce(func.sum(AiUsageEvent.cost_micros), 0))
+        .where(AiUsageEvent.period_ym == period_ym)
+        .group_by(AiUsageEvent.model_key)
+    ).all()
+    return {k: {"input_tokens": int(i), "output_tokens": int(o), "cost_micros": int(c)} for k, i, o, c in rows}
+
+
+def usage_aggregate(session: Session, *, period_ym: int | None, model_key: str | None) -> list[dict]:
+    """会社×モデル×月の利用量集計（GET /admin/ai-usage・§6.3）。"""
+    conds = []
+    if period_ym is not None:
+        conds.append(AiUsageEvent.period_ym == period_ym)
+    if model_key is not None:
+        conds.append(AiUsageEvent.model_key == model_key)
+    rows = session.execute(
+        select(AiUsageEvent.period_ym, AiUsageEvent.model_key,
+               func.coalesce(func.sum(AiUsageEvent.input_tokens), 0),
+               func.coalesce(func.sum(AiUsageEvent.output_tokens), 0),
+               func.coalesce(func.sum(AiUsageEvent.cost_micros), 0),
+               func.count())
+        .where(*conds)
+        .group_by(AiUsageEvent.period_ym, AiUsageEvent.model_key)
+        .order_by(AiUsageEvent.period_ym.desc(), AiUsageEvent.model_key)
+    ).all()
+    return [{"period_ym": int(p), "model_key": k, "input_tokens": int(i), "output_tokens": int(o),
+             "cost_micros": int(c), "count": int(n)} for p, k, i, o, c, n in rows]

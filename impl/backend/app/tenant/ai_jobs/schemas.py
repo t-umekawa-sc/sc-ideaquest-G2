@@ -92,3 +92,42 @@ class AiModelItem(BaseModel):
 
 class AiModelListResponse(BaseModel):
     data: list[AiModelItem]
+
+
+# ---- 管理（会社モデル ON/OFF・予算・利用量・S.5） ----
+
+class AdminModelCurrentMonth(BaseModel):
+    tokens: int
+    cost_micros: int
+
+
+class AdminModelItem(BaseModel):
+    key: str
+    billing: str
+    enabled: bool
+    monthly_budget_micros: int | None = None
+    current_month: AdminModelCurrentMonth
+
+
+class AdminModelListResponse(BaseModel):
+    data: list[AdminModelItem]
+
+
+class AdminModelPatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool | None = None
+    monthly_budget_micros: int | None = None
+
+
+class AiUsageRow(BaseModel):
+    period_ym: int
+    model_key: str
+    input_tokens: int
+    output_tokens: int
+    cost_micros: int
+    count: int
+
+
+class AiUsageResponse(BaseModel):
+    data: list[AiUsageRow]

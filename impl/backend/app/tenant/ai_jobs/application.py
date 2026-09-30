@@ -92,6 +92,13 @@ def enqueue(account_id: uuid.UUID, company_id: uuid.UUID, *, task_type: str, inp
             if requested_model not in _effective_enabled_keys(ts):  # 会社で ON か（§4.2）
                 raise AppError(422, "validation_error", detail="このモデルは会社で無効です",
                                errors=[{"field": "model", "code": "model_disabled"}])
+            # paid キーは月次予算上限内のみ（無料ローカルは対象外・§4.2）。
+            if registry.get(requested_model).billing == "paid":
+                setting = repo.get_model_setting(ts, requested_model)
+                budget = setting.monthly_budget_micros if setting else None
+                if budget is not None and repo.month_cost(ts, _period_ym()) >= budget:
+                    raise AppError(422, "validation_error", detail="月次予算の上限に達しています",
+                                   errors=[{"field": "model", "code": "budget_exceeded"}])
         job = repo.create_job(ts, task_type=task_type, requested_by_id=user.id, input=input,
                               requested_model=requested_model, ref_idea_id=ref_idea_id,
                               ref_quest_id=ref_quest_id, ref_strategy_document_id=ref_strategy_document_id,
@@ -169,6 +176,66 @@ def list_models(account_id: uuid.UUID, company_id: uuid.UUID, task_type: str | N
     with get_tenant_session(company.db_identifier) as ts:
         enabled = _effective_enabled_keys(ts)
     return {"data": registry.list_models(task_type, enabled_keys=enabled)}
+
+
+def _period_ym(now: datetime | None = None) -> int:
+    now = now or datetime.now(timezone.utc)
+    return now.year * 100 + now.month
+
+
+# ---- 管理 API（会社モデル ON/OFF・予算・利用量・S.5・company_account_admin） ----
+
+def admin_list_models(account_id: uuid.UUID, company_id: uuid.UUID) -> dict:
+    """カタログ（registry 全キー）＋自社設定（enabled/billing/予算/当月利用）を返す（GET /admin/ai-models）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    billing = registry.catalog_billing()
+    with get_tenant_session(company.db_identifier) as ts:
+        explicit = repo.model_settings(ts)
+        settings_rows = {r.model_key: r for r in [repo.get_model_setting(ts, k) for k in billing] if r}
+        effective = _effective_enabled_keys(ts)
+        usage = repo.month_cost_by_model(ts, _period_ym())
+        data = []
+        for key, bill in billing.items():
+            row = settings_rows.get(key)
+            u = usage.get(key, {"input_tokens": 0, "output_tokens": 0, "cost_micros": 0})
+            data.append({
+                "key": key, "billing": bill, "enabled": key in effective,
+                "monthly_budget_micros": row.monthly_budget_micros if row else None,
+                "current_month": {"tokens": u["input_tokens"] + u["output_tokens"], "cost_micros": u["cost_micros"]},
+            })
+    return {"data": data}
+
+
+def admin_patch_model(account_id: uuid.UUID, company_id: uuid.UUID, key: str, *,
+                      enabled: bool | None, monthly_budget_micros: int | None) -> dict:
+    """会社モデルの ON/OFF・予算変更（PATCH /admin/ai-models/{key}）。paid ON＝課金合意（enabled_by/at 記録）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    if key not in registry.catalog_billing():  # 未知キーは 422
+        raise AppError(422, "validation_error", detail="不明なモデルキー",
+                       errors=[{"field": "key", "code": "invalid_model"}])
+    with get_tenant_session(company.db_identifier) as ts:
+        user = profile_repo.get_user_by_account(ts, account_id)
+        if user is None:
+            raise AppError(401, "unauthenticated")
+        repo.upsert_model_setting(ts, key, enabled=enabled, monthly_budget_micros=monthly_budget_micros,
+                                  actor_id=user.id)
+        ts.commit()
+    return admin_list_models(account_id, company_id)
+
+
+def admin_usage(account_id: uuid.UUID, company_id: uuid.UUID, *, period_ym: int | None = None,
+                model_key: str | None = None) -> dict:
+    """会社×モデル×月の利用量/コスト集計（GET /admin/ai-usage・§6.3）。"""
+    company = _resolve_company(company_id)
+    if company is None:
+        raise AppError(401, "unauthenticated")
+    with get_tenant_session(company.db_identifier) as ts:
+        rows = repo.usage_aggregate(ts, period_ym=period_ym, model_key=model_key)
+    return {"data": rows}
 
 
 def enqueue_ai_job(

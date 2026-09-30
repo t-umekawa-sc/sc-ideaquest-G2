@@ -10,16 +10,20 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, Request
 
+from app.control_plane.admin.deps import require_company_account_admin
 from app.control_plane.me.deps import require_me
 from app.core.deps import verify_csrf, verify_origin
 from app.tenant.ai_jobs import application as service
 from app.tenant.ai_jobs.schemas import (
+    AdminModelListResponse,
+    AdminModelPatchRequest,
     AiJobDetail,
     AiJobEnqueueRequest,
     AiJobEnqueueResponse,
     AiJobListResponse,
     AiJobSummary,
     AiModelListResponse,
+    AiUsageResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["ai-jobs"])
@@ -69,3 +73,25 @@ def enqueue_ai_job(body: AiJobEnqueueRequest, request: Request, session: dict = 
              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
 def cancel_ai_job(job_id: str, request: Request, session: dict = Depends(require_me)):
     return service.cancel_job(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), job_id)
+
+
+# ---- 管理（会社モデル ON/OFF・予算・利用量・S.5・company_account_admin） ----
+
+@router.get("/admin/ai-models", response_model=AdminModelListResponse)
+def admin_list_ai_models(request: Request, session: dict = Depends(require_company_account_admin)):
+    return service.admin_list_models(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]))
+
+
+@router.patch("/admin/ai-models/{key}", response_model=AdminModelListResponse,
+              dependencies=[Depends(verify_origin), Depends(verify_csrf)])
+def admin_patch_ai_model(key: str, body: AdminModelPatchRequest, request: Request,
+                         session: dict = Depends(require_company_account_admin)):
+    return service.admin_patch_model(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                                     key, enabled=body.enabled, monthly_budget_micros=body.monthly_budget_micros)
+
+
+@router.get("/admin/ai-usage", response_model=AiUsageResponse)
+def admin_ai_usage(request: Request, period_ym: int | None = None, model_key: str | None = None,
+                   session: dict = Depends(require_company_account_admin)):
+    return service.admin_usage(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]),
+                               period_ym=period_ym, model_key=model_key)

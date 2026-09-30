@@ -169,6 +169,25 @@ def test_process_all_companies_once_smoke():
         _cleanup(db, user_id, [jid] if jid else [])
 
 
+def test_s_tc_125_usage_aggregate_reflects_processed():
+    """S-TC-125(int): 処理済ジョブの usage が会社×モデル×月の集計に一致（free=cost0・トークンは集計）。"""
+    db = _seed_db()
+    user_id = _mk_user(db)
+    jid = None
+    try:
+        jid = ai_app.enqueue_ai_job(db, task_type="info_summarize", requested_by_id=user_id,
+                                    input={"text": "集計テスト 要約対象"})
+        ai_app.process_ai_jobs_once(db)
+        now = datetime.now(timezone.utc)
+        pym = now.year * 100 + now.month
+        with get_tenant_session(db) as ts:
+            agg = ai_repo.usage_aggregate(ts, period_ym=pym, model_key="qwen3-light")
+            row = next(r for r in agg if r["model_key"] == "qwen3-light")
+            assert row["count"] >= 1 and row["output_tokens"] >= 1 and row["cost_micros"] == 0
+    finally:
+        _cleanup(db, user_id, [jid] if jid else [])
+
+
 def test_s_tc_107_reclaim_stuck_running():
     """S-TC-107: running のまま無更新の孤児は次巡で queued へ戻る（再実行可）。"""
     db = _seed_db()
