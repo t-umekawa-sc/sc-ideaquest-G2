@@ -6,8 +6,10 @@
 ## 1. 最終更新 / ブランチ / 最新コミット
 - 最終更新: 2026-09-30（本セッション末）
 - ブランチ: `main`（作業ツリー clean を目標）。origin/main と同期。
-- 本セッションのコミット（新しい順）＝**1ec2edd5 は未 push**（push 済は fdd07073 まで）:
-  - `1ec2edd5` feat(ai_jobs): FR-45 Phase1 llm_worker＋完了通知（ai_task_done/failed・compose workers）【未push】
+- 本セッションのコミット（新しい順）＝**495b53c8 は未 push**（push 済は 1c906650 まで）:
+  - `495b53c8` feat(ai_jobs): FR-45 Phase1 S.5 管理EP（会社モデル ON/OFF・予算・利用量メータリング）【未push】
+  - `1c906650` docs(handoff)【push済】
+  - `1ec2edd5` feat(ai_jobs): FR-45 Phase1 llm_worker＋完了通知（ai_task_done/failed・compose workers）【push済】
   - `fdd07073` feat(ai_jobs): FR-45 Phase1 AIジョブ API（router S.1/S.2・依頼者スコープ）【push済】
   - `b74fc99f` docs(handoff)【push済】
   - `7f43d09f` feat(ai_jobs): AIジョブ基盤データ層＋状態機械（migration 0048）【push済】
@@ -80,15 +82,15 @@
    - **SC-04 AI処理状況**＝新規画面（踏襲＝SC-02 通知＋共有 DataTable サーバー委譲）。`GET /ai-jobs`〔一覧〕・
      `/summary`〔ベルバッジ〕・`/{id}`〔詳細・進捗〕・`POST /{id}/cancel`。ライブは将来（Phase1 はポーリング/再取得可）。
      ルート＝`/ai-jobs`（画面遷移図・SC-04）。**モック先行**（フロントエンド実装フロー規約）＝style-guide/mocks に置く→接続。
-   - **SC-94 会社のLLM設定**＝新規画面（踏襲＝SC-93 管理系）。**ただし管理 API（`GET/PATCH /admin/ai-models`・
-     `GET /admin/ai-usage`）は backend 未実装**＝SC-94 着手前に S.5 の管理 EP を先に実装する必要あり（会社ON/OFF・
-     予算・利用量＝`company_ai_model_settings`/`ai_usage_events` の read/write）。TC＝S-TC-120/122/123/124/125。
+   - **SC-94 会社のLLM設定**＝新規画面（踏襲＝SC-93 管理系）。**backend の S.5 管理 EP は実装済**（495b53c8）＝
+     `GET /admin/ai-models`（カタログ＋自社設定＋当月利用）・`PATCH /admin/ai-models/{key}`（ON/OFF・予算・paid ON=課金合意）・
+     `GET /admin/ai-usage`（会社×モデル×月集計）。ON/OFF トグル＋予算入力＋利用量表示を作る。
    - **モデルピッカー**＝`GET /ai-models` 駆動（会社有効キー・候補1でも常設）＝info_summarize を呼ぶ機能画面に置く。
-   - codegen＝backend 変更後に `cd impl/frontend && npm run codegen`（openapi→schema.d.ts）→ frontend ビルド。
+   - codegen＝backend 変更後に `cd impl/frontend && npm run codegen`（openapi→schema.d.ts）→ frontend ビルド
+     （**新 EP は codegen 未実施なので、フロント着手時にまず codegen で ai-jobs/ai-models/admin の型を取り込む**）。
    - dev LLM＝`docker compose --profile ai up -d ollama` → 軽量 Qwen3 pull（config `llm_model_light`＝既定 `qwen3:4b`）。
      **テストは FakeChat 固定**（conftest autouse）＝ネット不要。実機で縦1本を通すには profile workers で llm-worker も起動。
-2. **未実装の backend 補完（SC-94 の前提）**＝S.5 管理 EP（会社モデル ON/OFF・予算・利用量）＝`ai_jobs` router か
-   admin 側に追加。課金方式 A（メータリングのみ）＝`ai_usage_events` の read 集計＋`company_ai_model_settings` の CRUD。
+   - **backend は SC-04/SC-94 に必要な EP を全て提供済**（S.1/S.2/S.5）。あとはフロントのみ。
 2. **FR-44⑤ Phase2（4-c＝in-app 生成 `iso_generate`）**＝上記 LLM 基盤が動いたら2本目の task_type として載せる（既定 `qwen3-swallow`）。整合率の決定性は崩さない（生成は別軸）。
 3. **doc 債務の是正（任意）**＝画面遷移図に **SC-80(経営資料) 系が未掲載**（FR-44 の更新漏れ）。触れる機会に正規化。
 4. **バックログ**＝`doc/バックログ/未実装・ギャップ一覧.md`・アイデアコンテスト（`513ff831`）・ISO ギャップ（6.4/9.1）。
