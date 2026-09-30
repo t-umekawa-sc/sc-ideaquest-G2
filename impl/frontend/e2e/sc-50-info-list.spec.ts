@@ -39,8 +39,10 @@ test("N-TC-203: 一覧ヘッダー（列見出し行）がページスクロー�
   await page.setViewportSize({ width: 1280, height: 520 }); // 低い高さ＝少ない行でもスクロールする
   await login(page);
   await page.goto("/info-items");
-  // データ描画を待つ（seed 行）＝テーブル高が確定してからスクロール。
-  await expect(page.getByText("競合A社が類似SaaSを大幅値下げ")).toBeVisible();
+  // データ描画を待つ＝テーブル高が確定してからスクロール。特定タイトルは seed 増加で既定ページ（-created_at）から
+  // 外れて不安定なため、行数（>=5）で待つ＝sticky 検証に必要なのは十分な行高でありアンカー文言ではない。
+  await expect.poll(async () => page.locator("table.table tbody tr").count()).toBeGreaterThanOrEqual(5);
+  await expect(page.locator("table.table tbody tr").first()).toBeVisible();
   const th = page.locator("table.table thead th").first();
   const headerH = await page.evaluate(() =>
     parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 0);

@@ -228,14 +228,14 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E未読スクロール_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
-  // chat_group を遅延生成しつつ id を取得（GET は既読化しない）。
+  // chat thread を遅延生成しつつ thread_id を取得（GET は既読化しない）。chat_messages は thread_id 所属（chat_thread 刷新）。
   const chat = await page.request.get(`/api/v1/ideas/${ideaId}/chat`).then((r) => r.json());
-  const cgid = chat.chat_group_id as string;
+  const tid = chat.thread_id as string;
   try {
     // owner 以外（user2）著者の未読メッセージを十分な数だけ DB 挿入＝全件未読・スクロール可能に。
     psql(
-      `INSERT INTO chat_messages (id, chat_group_id, author_id, body, created_at) ` +
-        `SELECT gen_random_uuid(), '${cgid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
+      `INSERT INTO chat_messages (id, thread_id, author_id, body, created_at) ` +
+        `SELECT gen_random_uuid(), '${tid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
         `'スクロール未読_${stamp}_'||g, now() + (g || ' seconds')::interval FROM generate_series(1,12) g;`,
     );
     await page.goto(`/ideas/${ideaId}/chat`);
@@ -252,8 +252,8 @@ test("E-TC-220 SC-24 initial scroll keeps unread separator below floating bar wh
       .toBeGreaterThanOrEqual(-1);
   } finally {
     // chat_reads.last_read_message_id が挿入メッセージを参照するため先に read カーソルを消す（FK 制約）。
-    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE chat_group_id='${cgid}');`);
-    psql(`DELETE FROM chat_messages WHERE chat_group_id='${cgid}';`);
+    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
+    psql(`DELETE FROM chat_messages WHERE thread_id='${tid}';`);
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
@@ -267,12 +267,12 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
   const questId = await createRecruiting(page, `E2E可視既読_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const chat = await page.request.get(`/api/v1/ideas/${ideaId}/chat`).then((r) => r.json());
-  const cgid = chat.chat_group_id as string;
+  const tid = chat.thread_id as string;
   try {
     // 他ユーザー著者の未読メッセージをビューポート超過数だけ挿入（全件未読・スクロールしないと下方は見えない）。
     psql(
-      `INSERT INTO chat_messages (id, chat_group_id, author_id, body, created_at) ` +
-        `SELECT gen_random_uuid(), '${cgid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
+      `INSERT INTO chat_messages (id, thread_id, author_id, body, created_at) ` +
+        `SELECT gen_random_uuid(), '${tid}', (SELECT id FROM users WHERE login_id='user2@acme.example'), ` +
         `'可視既読_${stamp}_'||g, now() + (g || ' seconds')::interval FROM generate_series(1,15) g;`,
     );
     await page.goto(`/ideas/${ideaId}/chat`);
@@ -283,8 +283,8 @@ test("E-TC-221 SC-24 entering a chat marks only visible messages read (DFT-E-011
     // まだ未読が残る＝区切りが再び出る（旧＝入室で一律全既読なら区切りは消えていた）。
     await expect(page.locator(".unread-sep")).toHaveCount(1);
   } finally {
-    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE chat_group_id='${cgid}');`);
-    psql(`DELETE FROM chat_messages WHERE chat_group_id='${cgid}';`);
+    psql(`DELETE FROM chat_reads WHERE last_read_message_id IN (SELECT id FROM chat_messages WHERE thread_id='${tid}');`);
+    psql(`DELETE FROM chat_messages WHERE thread_id='${tid}';`);
     const c2 = csrfOf(await page.context().cookies());
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
