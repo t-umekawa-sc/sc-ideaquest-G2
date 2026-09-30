@@ -46,6 +46,14 @@ export function getStrategyDoc(id: string, signal?: AbortSignal): Promise<Strate
   return apiFetch<StrategyDocDetail>(`/strategy-documents/${id}`, { signal });
 }
 
+// AI 用 Markdown エクスポート（R.5）＝text/markdown を生テキストで受ける（apiFetch は JSON 前提のため直 fetch）。
+// GET のため CSRF 不要・同一オリジン /api/v1（rewrite で backend へ）・Cookie セッションを送る。
+export async function exportStrategyMarkdown(id: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`/api/v1/strategy-documents/${id}/export.md`, { credentials: "include", signal });
+  if (!res.ok) throw new Error(`export failed: ${res.status}`);
+  return res.text();
+}
+
 export function createStrategyDoc(input: StrategyDocInput): Promise<StrategyDocDetail | null> {
   return apiFetch<StrategyDocDetail>("/strategy-documents", { method: "POST", body: JSON.stringify(input) });
 }

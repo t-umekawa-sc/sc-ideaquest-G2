@@ -193,6 +193,18 @@ def alignments_for_idea(session: Session, idea_id: uuid.UUID) -> list:
     ).all()
 
 
+def ideas_for_doc(session: Session, doc_id: uuid.UUID, *, limit: int = 10) -> list:
+    """当該経営資料に整合するアイデア＝(idea_id, title, score)（score 降順・上位 limit・Markdown export・R.5）。"""
+    from app.tenant.ideas.orm import Idea
+    return session.execute(
+        select(Idea.id, Idea.title, IdeaAlignment.score)
+        .join(Idea, Idea.id == IdeaAlignment.idea_id)
+        .where(IdeaAlignment.strategy_document_id == doc_id, Idea.deleted_at.is_(None))
+        .order_by(IdeaAlignment.score.desc(), Idea.title.asc())
+        .limit(limit)
+    ).all()
+
+
 def published_idea_ids_for_quest(session: Session, quest_id: uuid.UUID) -> list[uuid.UUID]:
     """当該クエストの公開アイデアID（クエストの資料選択変更で整合率を再計算する対象）。"""
     from app.tenant.ideas.orm import Idea

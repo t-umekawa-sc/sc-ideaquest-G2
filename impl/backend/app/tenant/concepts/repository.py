@@ -54,6 +54,16 @@ def create_concept(
     return c
 
 
+def titles_for_ids(session: Session, ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """コンセプト id→title（非削除のみ・Markdown export の関連コンセプト表示・R.5）。空 ID は `{}`。"""
+    if not ids:
+        return {}
+    rows = session.execute(
+        select(Concept.id, Concept.title).where(Concept.id.in_(ids), Concept.deleted_at.is_(None))
+    ).all()
+    return {r[0]: r[1] for r in rows}
+
+
 def get_concept(session: Session, concept_id: uuid.UUID, *, include_deleted: bool = False) -> Concept | None:
     stmt = select(Concept).where(Concept.id == concept_id)
     if not include_deleted:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import Response
 
 from app.control_plane.admin.deps import require_company_account_admin
 from app.control_plane.me.deps import require_me
@@ -64,6 +65,15 @@ def strategy_quest_candidates(request: Request, q: str | None = None, status: st
 @router.get("/strategy-documents/{doc_id}", response_model=StrategyDocDetail)
 def get_strategy_document(doc_id: str, request: Request, session: dict = Depends(require_company_account_admin)):
     return service.get_document(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+
+
+# AI 用 Markdown エクスポート（R.5・利用者の明示操作・外部送信しない・§10）。管理者スコープ。
+@router.get("/strategy-documents/{doc_id}/export.md")
+def export_strategy_document_markdown(doc_id: str, request: Request,
+                                      session: dict = Depends(require_company_account_admin)):
+    md = service.export_markdown(uuid.UUID(session["account_id"]), uuid.UUID(session["company_id"]), doc_id)
+    return Response(content=md, media_type="text/markdown; charset=utf-8",
+                    headers={"Content-Disposition": f'inline; filename="strategy-{doc_id}.md"'})
 
 
 @router.post("/strategy-documents", response_model=StrategyDocDetail, status_code=201,

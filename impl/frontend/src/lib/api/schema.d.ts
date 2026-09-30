@@ -3729,6 +3729,23 @@ export interface paths {
         patch: operations["update_strategy_document_api_v1_strategy_documents__doc_id__patch"];
         trace?: never;
     };
+    "/api/v1/strategy-documents/{doc_id}/export.md": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Strategy Document Markdown */
+        get: operations["export_strategy_document_markdown_api_v1_strategy_documents__doc_id__export_md_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/strategy-documents/{doc_id}/archive": {
         parameters: {
             query?: never;
@@ -16654,6 +16671,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyDocDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_strategy_document_markdown_api_v1_strategy_documents__doc_id__export_md_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

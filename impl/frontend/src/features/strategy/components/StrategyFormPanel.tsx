@@ -4,12 +4,12 @@
 // 冒頭に ⓘ ガイダンス（ScreenPurpose・§4.13）／ISO 要求項目はラベル横 icon-only ⓘ で入力解説。重点領域は自由入力ありの複数選択。
 import { useCallback, useEffect, useState } from "react";
 
-import { Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice } from "@/components/ui";
+import { Field, FormFooterError, FormSummary, ScreenPurpose, useFormErrorNotice, useSnackbar } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 
 import { cloudTokens } from "@/features/info-input/wordcloud";
 
-import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, getStrategyDoc, updateStrategyDoc } from "../api";
+import { addStrategyQuests, createStrategyDoc, emitStrategyChanged, exportStrategyMarkdown, getStrategyDoc, updateStrategyDoc } from "../api";
 import { DOC_KIND_LABEL } from "../types";
 import type { ImpactRates, QuestLinkItem } from "../types";
 import type { StrategyDocInput } from "../types";
@@ -82,7 +82,32 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
   const [periodErr, setPeriodErr] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false); // AI 用 Markdown エクスポート中（R.5）
   const { summaryRef, notify } = useFormErrorNotice();
+  const snack = useSnackbar();
+
+  // AI 用 Markdown をコピー/ダウンロード（R.5・外部送信しない＝生テキストをローカルで扱うだけ）。
+  const runExport = async (mode: "copy" | "download") => {
+    if (!docId) return;
+    setExporting(true);
+    try {
+      const md = await exportStrategyMarkdown(docId);
+      if (mode === "copy") {
+        await navigator.clipboard.writeText(md);
+        snack({ type: "success", title: "Markdown をコピーしました", msg: "AI に貼り付けてご利用いただけます。" });
+      } else {
+        const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+        const a = document.createElement("a");
+        a.href = url; a.download = `strategy-${docId}.md`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      snack({ type: "error", title: "エクスポートに失敗しました" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!sourceId) return;
@@ -185,6 +210,18 @@ export function StrategyFormPanel({ docId, fromId, onCancel, onDone }: {
             ) : (
               <span className="hint">この方針に関連度しきい値（{impact.threshold}）以上で効いている curated 情報はまだありません。</span>
             )}
+          </div>
+        )}
+
+        {/* AI 用 Markdown エクスポート（R.5・編集時のみ・外部送信しない）。関連アイデア/情報/コンセプトを束ねて出力。 */}
+        {editing && (
+          <div className="dialog-section is-quiet export-md">
+            <div className="dialog-label">🤖 AI 用にエクスポート</div>
+            <p className="hint" style={{ marginTop: 0 }}>経営資料＋関連アイデア/情報/コンセプトを構造化 Markdown で出力します。ChatGPT 等に貼って意図/戦略の下書きにご利用ください（本アプリは外部送信しません）。</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("copy")}>📋 コピー</button>
+              <button type="button" className="btn btn-outline btn-sm" disabled={exporting} onClick={() => runExport("download")}>⬇ ダウンロード（.md）</button>
+            </div>
           </div>
         )}
 

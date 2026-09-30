@@ -46,6 +46,15 @@
 
 ## 4. Markdown エクスポート（R.5・Step5）
 
+> `GET /strategy-documents/{id}/export.md`（管理者スコープ）＝経営資料本体（ISO56001 項目立て）＋関連度上位のアイデア（idea_alignment）＋関連情報（機会/脅威ラベル・R.4 母集団）＋関連コンセプト（トークン重なり）を**構造化 Markdown** に束ねて返す。**利用者の明示操作でのみ・外部送信しない**（生成は利用者が任意 LLM に貼る＝データ主権・§8/§10）。決定的。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R-TC-112 | api | export.md が構造化 Markdown を返す（本体＋関連情報の機会/脅威ラベル）／認可 | 資料1件（tokens）＋curated 機会情報〔関連〕をシード | admin `GET /{id}/export.md`／一般 `GET`／admin で不明 ID `GET` | 200・`content-type: text/markdown`・`# タイトル`＋ISO 見出し（意図/方針/戦略/重点領域/目標）＋関連情報の見出しに機会情報タイトル＋「機会」ラベル／一般=403／不明=404 | R.5／§8 |
+| R-TC-113 | int | ビルダーが関連アイデア/コンセプトを載せ・パイプをエスケープ・未記入/該当なしを埋める（決定的） | 資料1件＋quest＋idea＋idea_alignment＋concept（tokens）をシード・intent 空 | `export.build_markdown(ts, doc, company, related_info=[パイプ入りタイトル])` | idea/ concept タイトルが表に出る／`\|` エスケープ／intent は「（未記入）」／関連情報の分類は「機会」 | R.5／§8 |
+
+
+
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
 | _（Step5 で追加）_ | | | | | | |
