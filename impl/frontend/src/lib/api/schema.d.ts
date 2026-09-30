@@ -3852,6 +3852,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ai Models */
+        get: operations["list_ai_models_api_v1_ai_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ai Jobs */
+        get: operations["list_ai_jobs_api_v1_ai_jobs_get"];
+        put?: never;
+        /** Enqueue Ai Job */
+        post: operations["enqueue_ai_job_api_v1_ai_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai Jobs Summary */
+        get: operations["ai_jobs_summary_api_v1_ai_jobs_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Job */
+        get: operations["get_ai_job_api_v1_ai_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Ai Job */
+        post: operations["cancel_ai_job_api_v1_ai_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Ai Models */
+        get: operations["admin_list_ai_models_api_v1_admin_ai_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai-models/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Admin Patch Ai Model */
+        patch: operations["admin_patch_ai_model_api_v1_admin_ai_models__key__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/ai-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Ai Usage */
+        get: operations["admin_ai_usage_api_v1_admin_ai_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -4113,6 +4250,198 @@ export interface components {
              * @default 0
              */
             coin_earned: number;
+        };
+        /** AdminModelCurrentMonth */
+        AdminModelCurrentMonth: {
+            /** Tokens */
+            tokens: number;
+            /** Cost Micros */
+            cost_micros: number;
+        };
+        /** AdminModelItem */
+        AdminModelItem: {
+            /** Key */
+            key: string;
+            /** Billing */
+            billing: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Monthly Budget Micros */
+            monthly_budget_micros?: number | null;
+            current_month: components["schemas"]["AdminModelCurrentMonth"];
+        };
+        /** AdminModelListResponse */
+        AdminModelListResponse: {
+            /** Data */
+            data: components["schemas"]["AdminModelItem"][];
+        };
+        /** AdminModelPatchRequest */
+        AdminModelPatchRequest: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Monthly Budget Micros */
+            monthly_budget_micros?: number | null;
+        };
+        /** AiJobDetail */
+        AiJobDetail: {
+            /** Id */
+            id: string;
+            /** Task Type */
+            task_type: string;
+            /** Status */
+            status: string;
+            /** Execution */
+            execution: string;
+            /** Requested Model */
+            requested_model?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Input Tokens */
+            input_tokens?: number | null;
+            /** Output Tokens */
+            output_tokens?: number | null;
+            /** Cost Micros */
+            cost_micros?: number | null;
+            /** Progress */
+            progress?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error?: {
+                [key: string]: unknown;
+            } | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ref Idea Id */
+            ref_idea_id?: string | null;
+            /** Ref Quest Id */
+            ref_quest_id?: string | null;
+            /** Ref Strategy Document Id */
+            ref_strategy_document_id?: string | null;
+            /** Ref Info Item Id */
+            ref_info_item_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+        };
+        /** AiJobEnqueueRequest */
+        AiJobEnqueueRequest: {
+            /** Task Type */
+            task_type: string;
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
+            /** Model */
+            model?: string | null;
+            /** Ref Idea Id */
+            ref_idea_id?: string | null;
+            /** Ref Quest Id */
+            ref_quest_id?: string | null;
+            /** Ref Strategy Document Id */
+            ref_strategy_document_id?: string | null;
+            /** Ref Info Item Id */
+            ref_info_item_id?: string | null;
+        };
+        /** AiJobEnqueueResponse */
+        AiJobEnqueueResponse: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+        };
+        /** AiJobListItem */
+        AiJobListItem: {
+            /** Id */
+            id: string;
+            /** Task Type */
+            task_type: string;
+            /** Status */
+            status: string;
+            /** Progress */
+            progress?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Ref Idea Id */
+            ref_idea_id?: string | null;
+            /** Ref Quest Id */
+            ref_quest_id?: string | null;
+            /** Ref Strategy Document Id */
+            ref_strategy_document_id?: string | null;
+            /** Ref Info Item Id */
+            ref_info_item_id?: string | null;
+        };
+        /** AiJobListResponse */
+        AiJobListResponse: {
+            /** Data */
+            data: components["schemas"]["AiJobListItem"][];
+            page_info: components["schemas"]["app__tenant__ai_jobs__schemas__PageInfo"];
+        };
+        /** AiJobSummary */
+        AiJobSummary: {
+            /** Queued */
+            queued: number;
+            /** Running */
+            running: number;
+            /** Recent Done */
+            recent_done: number;
+            /** Recent Failed */
+            recent_failed: number;
+        };
+        /** AiModelItem */
+        AiModelItem: {
+            /** Key */
+            key: string;
+            /** Provider */
+            provider: string;
+            /** External */
+            external: boolean;
+            /** Billing */
+            billing: string;
+            /** Is Default */
+            is_default: boolean;
+        };
+        /** AiModelListResponse */
+        AiModelListResponse: {
+            /** Data */
+            data: components["schemas"]["AiModelItem"][];
+        };
+        /** AiUsageResponse */
+        AiUsageResponse: {
+            /** Data */
+            data: components["schemas"]["AiUsageRow"][];
+        };
+        /** AiUsageRow */
+        AiUsageRow: {
+            /** Period Ym */
+            period_ym: number;
+            /** Model Key */
+            model_key: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cost Micros */
+            cost_micros: number;
+            /** Count */
+            count: number;
         };
         /** AssumptionCreateRequest */
         AssumptionCreateRequest: {
@@ -9088,6 +9417,17 @@ export interface components {
         app__control_plane__me__schemas__IdeaIconImageResponse: {
             /** Idea Icon Image Url */
             idea_icon_image_url: string;
+        };
+        /** PageInfo */
+        app__tenant__ai_jobs__schemas__PageInfo: {
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Total */
+            total: number;
+            /** Has Next */
+            has_next: boolean;
         };
         /**
          * IdeaIconImageResponse
@@ -16999,6 +17339,274 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestLinkListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_models_api_v1_ai_models_get: {
+        parameters: {
+            query?: {
+                task_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiModelListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_jobs_api_v1_ai_jobs_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                task_type?: string | null;
+                sort?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiJobListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_ai_job_api_v1_ai_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiJobEnqueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiJobEnqueueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_jobs_summary_api_v1_ai_jobs_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiJobSummary"];
+                };
+            };
+        };
+    };
+    get_ai_job_api_v1_ai_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiJobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_ai_job_api_v1_ai_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiJobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_ai_models_api_v1_admin_ai_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminModelListResponse"];
+                };
+            };
+        };
+    };
+    admin_patch_ai_model_api_v1_admin_ai_models__key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminModelPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminModelListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_ai_usage_api_v1_admin_ai_usage_get: {
+        parameters: {
+            query?: {
+                period_ym?: number | null;
+                model_key?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsageResponse"];
                 };
             };
             /** @description Validation Error */
