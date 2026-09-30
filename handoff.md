@@ -4,9 +4,9 @@
 > 各種正本＝`CLAUDE.md`（規約参照元）／`doc/実装計画.md`（実装順）／`impl/README.md`（実装現況）／`doc/バックログ/未実装・ギャップ一覧.md`（未実装/ISOギャップ/follow-up の台帳）／`doc/テスト/R_経営資料.md`（R ドメインの TC 台帳）。
 
 ## 1. 最終更新 / ブランチ / 最新コミット
-- 最終更新: 2026-09-29（本セッション末）
+- 最終更新: 2026-09-30（本セッション末＝閾値再校正 §7-2 完了）
 - ブランチ: `main`（作業ツリー clean）。
-- push 状況: 本セッションのコミットは **push 予定（このメモ更新のコミットと合わせて push する）**。直近まで origin/main は `163691ca`、ローカルは `1f8a6dc4` が先行（ahead）。
+- push 状況: 前セッション分（A-2 実装 `1f8a6dc4`＋handoff `dbcbd373`）は **push 済（origin/main=dbcbd373）**。**本セッションの閾値再校正はまだコミットしていない**＝下記コミット＋push が次アクション（未コミットの作業ツリー変更あり）。
 - 直近コミット（新しい順）:
   - `1f8a6dc4` feat(strategy): 経営資料整合の意味的一致=**A-2**（埋め込み・会社別方式・FR-44 **Step3ب**）
   - `163691ca` docs(llm): ローカルLLM連携 設計ドラフト起票（別セッション・下記 §6 参照）
@@ -63,9 +63,9 @@
 - **コイン段階は 50/70/90%→+3/+7/+15 のまま**（変更せず）。※埋め込みは分布が異なるため実データでの再キャリブレーション余地あり（次項）。
 
 ## 7. 次にやること（優先順・具体的に）
-1. **実モデル(bge-m3)での通し確認**（本セッション未実施）＝`cd impl && docker compose --profile ai up -d ollama` → `docker compose exec ollama ollama pull bge-m3` → backend は既定 env で `http://ollama:11434/v1` を叩く。意味ペア（語は違うが意味が近いアイデア×経営資料）で `GET /ideas/{id}.alignment` の best が keyword より上がることを実機確認。落ちても keyword フォールバックで動く前提。
-2. **閾値の実データ再キャリブレーション**＝`app/tenant/strategy/alignment.py` の `_TIERS`（50/70/90）を、bge-m3 の cosine 分布に合わせて見直す（埋め込みはベースライン類似度が高く出がち）。小さな評価セット（近い/遠いペア 20〜30）で実測してから調整。TC は `doc/テスト/R_経営資料.md` §2 に追記。
-3. **Step4 機会/脅威/影響率＋ワードクラウド（R.4・決定的）**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装。`info_links` の `impact_class` 集計 read＋経営資料詳細に表示（API 設計 R.4）。方式 B（LLM）は使わない。
+1. **【完了 2026-09-30】実モデル(bge-m3)での通し確認**＝`docker compose --profile ai up -d` + `ollama pull bge-m3`（1024次元）で疎通。意味ペア（語は重ならない）で keyword=0.00(コイン0) に対し embedding=0.50(→+3ティア)・無関係=0.37(閾値未満)＝keyword が取りこぼす意味的一致を捉えることを実機確認。配線も persist_entity_embedding→entity_embeddings(JSONB dim1024)→EmbeddingProvider 読み戻し一致・model不一致→None(フォールバック) を acme 会社DBで rollback 実施。
+2. **【完了 2026-09-30】閾値の再校正**＝実測で bge-m3 の cosine 分布が圧縮（NEAR p50=0.525/p90=0.60・FAR p50=0.444/p90=0.518）＝生値では 0.70/0.90 ティアが死に整合率(%) 表示も不自然と判明。**方式＝embedding の生 cosine を 0..1 へ線形リスケール（`similarity._rescale`・config `alignment_embed_score_floor`/`_ceil`・既定 0.42/0.62・モデル別可変）してから共有 `_TIERS`(50/70/90) を適用**（keyword は生値のまま・hybrid は rescale 後 emb を加重）。`_TIERS` 自体は変更せず（Option 1＝正規化・ユーザー選択）。設計 §4.1a／API R／データモデル §5.55/§5.36c／R_経営資料.md §2 に実測分布と結論を記録・R-TC-207(unit)/208(int) 追加・pytest 871 green・稼働 backend 再ビルド反映済。※floor/ceil は評価セット near18/far90 での選定＝実運用データが貯まれば再調整余地（モデル差し替え時は要再計測）。
+3. **Step4 機会/脅威/影響率＋ワードクラウド（R.4・決定的）**＝`doc/テスト/R_経営資料.md` §3 に TC 追加してから実装。`info_links` の `impact_class` 集計 read＋経営資料詳細に表示（API 設計 R.4）。方式 B（LLM）は使わない。**←次はここ**
 4. **Step5 AI 用 Markdown エクスポート（R.5）**＝`doc/テスト/R_経営資料.md` §4 に TC 追加してから。
 5. **回帰**＝着手前に backend フル pytest（下記コマンド）と Playwright e2e フル（本セッション未実行）を通す。
 - 参考：LLM 生成（方式 B・要約/ISO 生成）を実装する時は**先に横断 LLM ゲートウェイ＋AIジョブ基盤**（`doc/設計ドラフト/ローカルLLM連携_設計.md`）を作る。A-2 の `infra/llm/embeddings.py` はその薄い前身＝将来ゲートウェイに吸収する想定。

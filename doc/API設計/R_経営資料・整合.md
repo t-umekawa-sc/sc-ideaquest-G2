@@ -44,7 +44,7 @@
 
 - **算出＝`SimilarityProvider`（会社別方式・A-2・2026-09-29 実装）**＝`companies.alignment_method`（`keyword`/`embedding`/`hybrid`・既定 keyword・SC-92 で選択）。
   - `keyword`＝`derive.token_cosine`（[[entity_tokens]] の永続トークン・決定的・オフライン）。
-  - `embedding`＝`entity_embeddings`（§5.36c）の cosine＝**意味的一致**。ベクトルは**LLM 基盤の OpenAI 互換 `/embeddings`**（Ollama/vLLM 等・モデルは基盤側＝backend に焼き込まない＝データ主権）で本文保存時に生成・永続。埋め込み欠損/モデル不一致は **keyword フォールバック**（例外なく算出）。
+  - `embedding`＝`entity_embeddings`（§5.36c）の cosine＝**意味的一致**。ベクトルは**LLM 基盤の OpenAI 互換 `/embeddings`**（Ollama/vLLM 等・モデルは基盤側＝backend に焼き込まない＝データ主権）で本文保存時に生成・永続。埋め込み欠損/モデル不一致は **keyword フォールバック**（例外なく算出）。**生 cosine は 0..1 へ線形リスケールしてからティア適用**（bge-m3 は分布が圧縮＝生値では 0.70/0.90 ティアが死ぬ・実測 2026-09-30）＝`clamp((cos-floor)/(ceil-floor))`・config `alignment_embed_score_floor`/`_ceil`（既定 0.42/0.62・モデル別に可変）＝整合率(%) が直感的になる（無関係≈0%・強い一致≈100%）。詳細/Why＝[経営資料整合・自動関連付け 設計 §4.1a](../設計ドラフト/経営資料整合・自動関連付け_設計.md)。
   - `hybrid`＝`w·keyword + (1-w)·embedding`（w＝config `alignment_hybrid_keyword_weight`・既定 0.5・会社 UI には式を出さない）。
   - **方式 B（LLM 判定・生成）は別要件**（横断 LLM ゲートウェイ＋AIジョブ基盤）＝整合率は決定的が要る（コインの公平性）ため埋め込み（A）を採用。
 - **保存**＝`idea_alignment(idea_id, strategy_document_id, score, method, matched_tokens)`（upsert・§5.55）。`method` は選択方式を記録。`matched_tokens` は**方式に依らず keyword 由来**（意味方式でも説明可能性を担保）。

@@ -22,7 +22,7 @@
 
 ## 2. 整合率＋コイン（R.2/R.3・SC-22・Step3）
 
-> 整合率＝`SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2）→`idea_alignment` upsert・最大採用＋effective tokens。コイン＝段階（≥50→+3/≥70→+7/≥90→+15）・冪等・初回のみ・下げない。意味方式（embedding/hybrid）＝保存済み `entity_embeddings`（LLM 基盤 embeddings 由来）の cosine・欠損は keyword フォールバック。テストは FakeEmbeddings（同義語クラスタで意味近接を決定的に再現・外部未接続）。
+> 整合率＝`SimilarityProvider`（会社別 keyword/embedding/hybrid・A-2）→`idea_alignment` upsert・最大採用＋effective tokens。コイン＝段階（≥50→+3/≥70→+7/≥90→+15）・冪等・初回のみ・下げない。意味方式（embedding/hybrid）＝保存済み `entity_embeddings`（LLM 基盤 embeddings 由来）の cosine・欠損は keyword フォールバック。**embedding の生 cosine は 0..1 へ線形リスケールしてからティア適用**（bge-m3 は分布が圧縮＝生値では上位ティアが死ぬ・config floor/ceil 既定0.42/0.62・R-TC-207/208・設計§4.1a）。テストは FakeEmbeddings（同義語クラスタで意味近接を決定的に再現・外部未接続）。
 
 | TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -32,6 +32,8 @@
 | R-TC-204 | int | 埋め込み永続化＝本文保存で entity_embeddings が model/dim 付きで生成される | 空 | `persist_entity_embedding(ts,'idea',id,text)` | entity_embeddings 1行・model=FakeEmbeddings.model・dim=len(vector)>0・再呼び出しで upsert（重複しない） | A-2／§5.36b |
 | R-TC-205 | int | 会社の方式変更で整合率を全再計算＋差分コイン付与（初回超えのみ・下げない） | keyword では best<0.5（コイン0）／embedding では best≥0.9 になる意味ペアをシード・quest_strategy_documents 紐づけ | `recompute_all_for_company`（keyword→coin0 を確認後 method=embedding で再実行） | keyword 時 coins_awarded=0／embedding 再計算後に差分付与され coins_awarded>0（activities 1件・冪等・再々実行で増えない） | R.3／A-2 |
 | R-TC-206 | api | 会社設定 `alignment_method` は keyword/embedding/hybrid のホワイトリスト（未知は 422・正常は保存） | company_account_admin | `PATCH /companies/{id}/settings`（alignment_method=bogus／=embedding） | bogus=422（field=alignment_method）／embedding=200・詳細 `alignment_method=embedding` で反映 | R.1／FR-44／§4.7 |
+| R-TC-207 | unit | 埋め込み cosine→整合率の線形リスケール（bge-m3 校正）＝floor→0・ceil→1・中点→0.5・範囲外はクランプ／既定 floor/ceil では無関係域は 0 ティア・意味近域は最上位ティアへ | config 既定（floor/ceil） | `similarity._rescale(x)` を境界値・中点・範囲外で評価／`alignment.coins_for(_rescale(0.44))`・同`(0.60)` | floor→0.0・ceil→1.0・中点→0.5・floor未満/ceil超はクランプ／far中央(0.44)→コイン0・near上位(0.605)→+15（上位ティアが生き返る） | R.2／A-2／設計§4.1a |
+| R-TC-208 | int | EmbeddingProvider は生 cosine でなくリスケール後(0..1)を返す＝bge-m3 の圧縮分布でも上位ティアに届く（校正の配線） | cosine=0.60 になるベクトルを idea/doc に直接 upsert（`entity_embeddings`・fake-embed モデル名） | `similarity.EmbeddingProvider().score(...)` | score＝`_rescale(0.60)`（生値より大）／`coins_for(0.60)=3` に対し `coins_for(score)>3`（生値では+3止まりが上位ティアへ） | R.2／A-2／設計§4.1a |
 
 ## 3. 機会/脅威/影響率（R.4・Step4）
 

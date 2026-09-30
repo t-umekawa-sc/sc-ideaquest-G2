@@ -145,6 +145,55 @@ def test_r_tc_204_persist_embedding_row():
             ts.commit()
 
 
+def test_r_tc_207_rescale_maps_compressed_cosine_to_alignment_rate():
+    """R-TC-207 埋め込み cosine→整合率の線形リスケール（bge-m3 校正）＝floor→0・ceil→1・中点→0.5・範囲外クランプ。
+
+    既定 floor/ceil（config）では無関係域（≈far 中央 0.44）は 0 ティア・意味近域（≈near 上位 0.60）は最上位ティアへ。
+    生 cosine のままだと bge-m3 は分布が圧縮して 0.70/0.90 ティアが死ぬ（実測 2026-09-30）ことへの回帰。
+    """
+    from app.core.config import get_settings
+    from app.tenant.strategy import alignment as al
+    from app.tenant.strategy import similarity as sim
+
+    s = get_settings()
+    lo, hi = s.alignment_embed_score_floor, s.alignment_embed_score_ceil
+    assert sim._rescale(lo) == 0.0
+    assert sim._rescale(hi) == 1.0
+    assert abs(sim._rescale((lo + hi) / 2) - 0.5) < 1e-9
+    assert sim._rescale(lo - 0.1) == 0.0  # クランプ下限
+    assert sim._rescale(hi + 0.1) == 1.0  # クランプ上限
+    # 既定校正では far 中央→コイン0・near 上位→+15（上位ティアが生き返る）。0.60 は +15 境界(0.90)ちょうど
+    # なので、観測 near 上位域の 0.605 で判定（生 cosine では絶対に届かない上位ティアへ乗ることを示す）。
+    assert al.coins_for(sim._rescale(0.44)) == 0
+    assert al.coins_for(sim._rescale(0.605)) == 15
+
+
+def test_r_tc_208_embedding_score_is_rescaled_into_alignment_rate():
+    """R-TC-208 EmbeddingProvider は生 cosine でなくリスケール後(0..1)を返す＝圧縮分布でも上位ティアに届く。"""
+    from app.tenant.strategy import alignment as al
+
+    db = _seed_db()
+    owner, qid, iid, did = (uuid.uuid4() for _ in range(4))
+    try:
+        with get_tenant_session(db) as ts:
+            _seed_pair(ts, owner=owner, qid=qid, iid=iid, did=did, idea_emb=False, doc_emb=False)
+            # cosine=0.60 になる 2 ベクトルを直接 upsert（conftest の FakeEmbeddings.model='fake-embed' で読める）。
+            model = "fake-embed"
+            tokens_repo.upsert_embedding(ts, "idea", iid, model=model, vector=[1.0, 0.0])
+            tokens_repo.upsert_embedding(ts, "strategy_doc", did, model=model, vector=[0.6, 0.8])  # cos=0.6
+            ts.commit()
+        with get_tenant_session(db) as ts:
+            raw = 0.6
+            score = similarity.EmbeddingProvider().score(
+                ts, idea_id=iid, idea_tokens=[], doc_id=did, doc_tokens=[])
+            assert abs(score - similarity._rescale(raw)) < 1e-6, f"リスケール後を返す（{score}）"
+            assert score > raw, f"圧縮分布を引き伸ばす（rescaled {score} > raw {raw}）"
+            # 生値 0.60 は +3 止まり／リスケール後は上位ティアへ（校正の効果）。
+            assert al.coins_for(raw) == 3 and al.coins_for(score) > 3
+    finally:
+        _cleanup(db, owner=owner, qid=qid, iid=iid, did=did)
+
+
 def test_r_tc_205_method_change_recompute_and_differential_coin():
     """R-TC-205 会社の方式変更で全再計算＋差分コイン付与（keyword=0→embedding で付与・冪等・下げない）。"""
     db = _seed_db()

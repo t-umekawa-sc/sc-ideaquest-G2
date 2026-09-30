@@ -2,8 +2,9 @@
 
 `alignment.py` の差し替え点。会社設定 `alignment_method` で実装を選ぶ。
 - **keyword**＝トークン頻度ベクトルの cosine（`derive.token_cosine`・決定的・外部未接続）。
-- **embedding**＝保存済み埋め込み（`entity_embeddings`）の cosine（意味的一致・A-2）。埋め込みが無い/モデル不一致は
-  **keyword へフォールバック**（保存時に埋め込みサーバへ到達できなかった等でも壊れない）。
+- **embedding**＝保存済み埋め込み（`entity_embeddings`）の cosine（意味的一致・A-2）を **0..1 へリスケール**（`_rescale`・
+  bge-m3 校正・§4.1a）。埋め込みが無い/モデル不一致は **keyword へフォールバック**（保存時に埋め込みサーバへ到達
+  できなかった等でも壊れない）。
 - **hybrid**＝`w*keyword + (1-w)*embedding`（既定 w=0.5・config `alignment_hybrid_keyword_weight`）。会社 UI には
   式を出さない（過剰回避）＝会社が選ぶのは3方式のみ。埋め込み不可時は keyword 単独に縮退。
 
@@ -32,6 +33,21 @@ def _keyword_score(idea_tokens, doc_tokens) -> float:
     return derive.token_cosine(idea_tokens, doc_tokens)
 
 
+def _rescale(cos: float) -> float:
+    """埋め込み cosine を整合率 0..1 へ線形リスケール（bge-m3 校正・A-2・R-TC-207/208）。
+
+    bge-m3 は cosine の分布が高めに圧縮する（無関係でも ≈0.44・意味近でも ≈0.60・実測 2026-09-30）ため、生値を
+    そのまま 50/70/90 ティアに掛けると上位ティアが死に、整合率(%) 表示も不自然になる。config の floor/ceil
+    （モデル別に可変・既定 0.42/0.62）で `(cos-floor)/(ceil-floor)` を [0,1] にクランプ。keyword は生値のまま。
+    詳細/Why＝設計 §4.1a。
+    """
+    s = get_settings()
+    lo, hi = s.alignment_embed_score_floor, s.alignment_embed_score_ceil
+    if hi <= lo:  # 設定不整合は素通し（0..1 にクランプのみ）＝壊さない
+        return max(0.0, min(1.0, cos))
+    return max(0.0, min(1.0, (cos - lo) / (hi - lo)))
+
+
 class KeywordProvider:
     method = "keyword"
 
@@ -49,7 +65,7 @@ class EmbeddingProvider:
         vb = tokens_repo.embedding_for(ts, "strategy_doc", doc_id, model=model)
         if va is None or vb is None:
             return None  # 埋め込み未生成/モデル不一致＝呼び出し側でフォールバック
-        return cosine(va, vb)
+        return _rescale(cosine(va, vb))  # 生 cosine を整合率 0..1 へ校正（bge-m3・§4.1a）
 
     def score(self, ts, *, idea_id, idea_tokens, doc_id, doc_tokens) -> float:
         emb = self._embedding_score(ts, idea_id, doc_id)

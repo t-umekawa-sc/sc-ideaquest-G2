@@ -123,6 +123,12 @@ class Settings(BaseSettings):
     alignment_embed_timeout_seconds: float = 15.0            # 1リクエストのタイムアウト（同期・軽量）
     # ハイブリッド合成の既定重み（keyword と embedding の加重・案B）。会社 UI には出さず config で調整。
     alignment_hybrid_keyword_weight: float = 0.5
+    # 埋め込み cosine→整合率(0..1) の線形リスケール境界（bge-m3 は cosine が ≈0.31..0.61 に圧縮＝生値だと
+    # 50/70/90 の上位ティアが死ぬ・実測 2026-09-30）。floor 未満=0%・ceil 以上=100%・間は線形。keyword は
+    # 生値のまま（リスケールしない）。既定は bge-m3 実測分布から選定（無関係 p50≈0.44・意味近 p90≈0.60）＝
+    # モデルを替えたら同様の評価セットで再計測して更新（詳細＝設計 §4.1a・R-TC-207/208）。
+    alignment_embed_score_floor: float = 0.42
+    alignment_embed_score_ceil: float = 0.62
 
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
