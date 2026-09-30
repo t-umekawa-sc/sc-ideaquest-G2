@@ -130,6 +130,21 @@ class Settings(BaseSettings):
     alignment_embed_score_floor: float = 0.42
     alignment_embed_score_ceil: float = 0.62
 
+    # LLMゲートウェイ（生成・チャット補完・FR-45）＝OpenAI 互換 `/chat/completions` を叩く自前の薄い層
+    # （infra/llm/gateway.py）。埋め込み（上）と同じ「物理は基盤側・キーは論理」方針。base_url は宛先
+    # （dev=Ollama／prod=vLLM／将来クラウド）＝env で差し替え。物理モデル名は論理キー→config で解決し、
+    # キー名は dev/prod 同一に保つ（registry.py）。
+    llm_base_url: str = "http://ollama:11434/v1"     # OpenAI 互換 chat のベースURL
+    llm_api_key: str = ""                            # 認証が要る基盤向け（Ollama は不要＝空）
+    llm_timeout_seconds: float = 120.0               # 生成は数分許容（Phase1 バックグラウンド）
+    llm_model_light: str = "qwen3:4b"                # 論理キー qwen3-light の物理（軽量・info_summarize 既定）
+    llm_model_swallow: str = "hf.co/tokyotech-llm/Llama-3.1-Swallow-8B"  # 論理キー qwen3-swallow の物理（高品質日本語・iso_generate）
+    # AIジョブ・ワーカー（tenant/ai_jobs・llm_worker.py・FR-45・設計 §5）
+    llm_worker_concurrency: int = 1                  # 同時実行 N（最小スペック＝1件ずつ・設計 §5.3）
+    llm_worker_poll_interval_seconds: float = 2.0    # ワーカのポーリング間隔
+    llm_job_max_attempts: int = 3                    # 失敗リトライ上限（超で failed）
+    llm_job_running_reclaim_seconds: int = 300       # running 無更新の孤児回収閾値（設計 §5.4）
+
     def server_dsn(self, db_name: str) -> str:
         """指定データベースへの DSN を組み立てる（会社DBは db_identifier をそのまま db 名に使う）。"""
         return (

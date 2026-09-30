@@ -66,3 +66,16 @@
 | S-TC-126 | int | 完了で ai_task_done 通知＋ref_* に遷移先 | succeeded ジョブ（ref_idea_id 付き） | dispatch 完了 | notifications 1件・type=ai_task_done・ref_idea_id=対象・宛先=依頼者 | S.6／§8 |
 | S-TC-127 | int | 失敗で ai_task_failed 通知（params.error） | failed ジョブ | dispatch 失敗 | type=ai_task_failed・params.error に理由 | S.6 |
 | S-TC-128 | e2e | SC-02 通知の ai_task_done から対象画面へ遷移（通知クリック動線） | ai_task_done 通知あり | SC-02 で通知クリック | ref_* の対象画面（生成結果反映）へ遷移 | S.6／SC-02/SC-04 |
+
+## 6. LLMゲートウェイ・registry・routing（unit・infra/llm・設計 §3）
+
+> ゲートウェイ＝自前の薄い層（OpenAI 互換共通語）。registry＝論理モデルキー→物理（provider/model/params/external/billing/enabled）。routing＝解決優先順位（明示 model ＞ task_type 既定 ＞ グローバル既定）。テストは `FakeChat`（決定的・外部未接続）で差し替える。物理モデル名は config（dev/prod で env 可変）＝キーは dev/prod 同一。
+
+| TC-ID | 階層 | 目的 | 前提 | 操作 | 期待 | 根拠 |
+| --- | --- | --- | --- | --- | --- | --- |
+| S-TC-201 | unit | registry＝Phase1 の論理キー（qwen3-light/qwen3-swallow）が存在・free・enabled・物理は config 由来 | 既定 config | `registry.get('qwen3-light')`／`get('qwen3-swallow')` | provider='openai_compat'・billing='free'・enabled=True・model が config 値・external=False | 設計 §3.1/§4.1 |
+| S-TC-202 | unit | routing 優先順位＝明示 model ＞ task_type 既定 ＞ グローバル既定 | 既定 config | `resolve_key('info_summarize', None)`／`resolve_key('info_summarize','qwen3-swallow')`／`resolve_key('unknown_task', None)` | 順に qwen3-light（task既定）／qwen3-swallow（明示優先）／グローバル既定キー | 設計 §3.4 |
+| S-TC-203 | unit | ガードレール＝registry に無いキーは LLMConfigError（呼び出し側で 422 に写像） | 既定 config | `resolve_key('info_summarize','bogus')` | LLMConfigError（不正キー・enabled=False も同様に拒否） | 設計 §3.4 |
+| S-TC-204 | unit | FakeChat＝決定的な要約テキスト＋usage（tokens）を返す（外部未接続） | FakeChat 注入 | `gateway.complete('info_summarize', messages)` | text 非空・input_tokens/output_tokens>0・provider/model が解決結果と一致・finish_reason='stop' | 設計 §3.1／§5.57 |
+| S-TC-205 | unit | 実プロバイダ到達不能は LLMUnavailable（呼び出し側でリトライ/failed へ） | OpenAICompatibleChat（未接続 base_url） | `client.complete(...)` | LLMUnavailable（例外型で分岐可能） | 設計 §5.4／embeddings 同流儀 |
+| S-TC-206 | unit | list_models＝会社の有効集合で論理キーを返す（task_type 絞り・既定フラグ） | 全 free ON | `registry.list_models(task_type='info_summarize', enabled_keys=...)` | qwen3-light を含む・is_default 正・billing/external 付き・OFF/未許可は出ない | S.2／設計 §3.4 |
