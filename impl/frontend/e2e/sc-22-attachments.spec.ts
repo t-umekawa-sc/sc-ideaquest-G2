@@ -1,8 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
 
 // SC-21 で添付して投稿 → SC-22 に実データで出る＋ダウンロード（D.3・§1.10）。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-215）・screens/SC-21/SC-22 §4.3・API設計 D.3。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
+// 添付/アイデアは会社スコープ＝並列で他テストと同一会社DBを奪い合い race した。ワーカ別会社DBで隔離。
 const PNG = Buffer.from("89504e470d0a1a0a0000000000000000000000000000000000000000", "hex");
 
 async function login(page: Page) {
