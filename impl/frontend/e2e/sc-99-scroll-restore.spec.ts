@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
 
 // M-TC-013: 一覧のスクロール位置復元（デザイン標準 §4.12）。
 // 再現する不具合＝ダッシュボードを下方向に見てから遷移し、**push 型の「戻る」リンク**（`<Link href="/">`＝
@@ -6,7 +8,6 @@ import { expect, test, type Page } from "@playwright/test";
 // 先頭へ）。fix＝restore-after-load で離脱前の scrollY 近傍へ復元する。
 // 併せて「初回訪問（保存なし）は先頭のまま＝誤復元しない」を陰性対照で見る。
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md M-TC-013／デザイン標準 §4.12。
-const OWNER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
   // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。

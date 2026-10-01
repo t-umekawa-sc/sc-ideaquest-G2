@@ -1,11 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
 
 // SC-21 アイデア登録・編集フォーム（実接続・D.2／§13／§4.7 前段）。一般ユーザー ACME-01（デモグループ所属・dev seed 前提）で、
 // 下地の recruiting クエストを API で作成 → 登録フルページ /quests/{id}/ideas/new で投稿/下書き、/ideas/{id} 編集モーダルで保存を確認する。
 // §4.7 の 3 チャネル（サマリ scroll＋足元ヒント＋sticky スナックバー）は SC-21 では主ボタン活性ガードにより主経路で到達不能＝
 // 本 spec は前段ガード（ボタン活性・blur インライン）を D-TC-204 で担保。3 チャネルの発火はサーバエラー経由で後続 TC。
 // 分岐網羅は api レベル（D-TC-101〜118）で担保（テスト規約 §4・§5.1 line 112）。根拠＝doc/テスト/D_アイデア.md §3・screens/SC-21。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
   // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。

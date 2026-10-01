@@ -1,9 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
-// SC-32 魔法スキル（G 実接続）＝魔法カタログ/SP残高が実データ（getSpells）で描画される。ACME-01 で確認。
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
+
+// SC-32 魔法スキル（G 実接続）＝魔法カタログ/SP残高が実データ（getSpells）で描画される。
+// SP残高/解放は会社スコープ（user@acme）＝並列競合を避けるためワーカ別会社DBで隔離。
 // 解放成功の分岐は backend G-TC-102〜105 で担保（SP 前提のため e2e は実データ照合に限定）。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-201）・SC-32。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {
   // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
