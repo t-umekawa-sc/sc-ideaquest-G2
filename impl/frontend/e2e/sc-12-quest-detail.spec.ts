@@ -1,44 +1,18 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed, csrfToken, createRecruiting } from "./helpers";
 // SC-12 クエスト詳細（実接続・C.1/C.3/C.5/C.2）。一般ユーザー ACME-01（デモグループ所属・dev seed 前提）で、
 // 下地クエストを API で作成 → 詳細でヘッダー/概要/パーティーの実データ表示・状態遷移・削除を確認する。
 // アイデア一覧＝D／全文検索＝J／週間ランキング＝G はデモのため範囲外。根拠＝screens/SC-12・API設計 C。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-function csrfOf(cookies: { name: string; value: string }[]) {
-  return cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
-}
-
-// 下地の公開クエストを API で作成（デモグループ・recruiting）。返り値＝クエスト id。
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const groupId = groups.data?.[0]?.id;
-  expect(groupId, "デモグループ（GET /quest-groups）が必要（dev seed）").toBeTruthy();
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groupId], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的・テーマ", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
 
 async function deleteQuiet(page: Page, id: string) {
-  const csrf = csrfOf(await page.context().cookies());
-  await page.request.delete(`/api/v1/quests/${id}`, { headers: { "X-CSRF-Token": csrf } });
+  await page.request.delete(`/api/v1/quests/${id}`, { headers: { "X-CSRF-Token": await csrfToken(page) } });
 }
 
 // ヘッダー/概要/パーティーが GET /quests/{id} の実データを描画する。
 test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const title = `E2E詳細_${Date.now().toString().slice(-8)}`;
   const id = await createRecruiting(page, title);
   try {
@@ -62,7 +36,7 @@ test("C-TC-205 SC-12 detail renders header/about/party from API", async ({ page 
 
 // 状態遷移（recruiting→in_progress）と削除（→一覧へ）。owner のみの ⋯ アクション。
 test("C-TC-206 SC-12 transition forward then delete", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const title = `E2E遷移_${Date.now().toString().slice(-8)}`;
   const id = await createRecruiting(page, title);
   let deleted = false;

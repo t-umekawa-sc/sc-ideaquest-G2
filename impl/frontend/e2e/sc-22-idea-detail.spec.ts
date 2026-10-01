@@ -1,37 +1,19 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed, csrfToken, createRecruiting } from "./helpers";
 // SC-22 アイデア詳細（実接続・D.1）。本文/価値/利害関係者/ステータス/作成者/版を getIdea で描画。
 // 投票/フォロー（D.5/D.6）は実接続＝挙動は sc-22-vote-follow.spec.ts（D-TC-209〜212）。添付（D.3）・評価（F）・チャット（E）は未接続＝表示のみ/デモ。
 // 根拠＝doc/テスト/D_アイデア.md §3・screens/SC-22。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
 
 test("D-TC-207 SC-22 detail renders getIdea data", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const questId = await createRecruiting(page, `E2E詳細_${Date.now().toString().slice(-8)}`);
   const stamp = Date.now().toString().slice(-8);
   const title = `詳細アイデア_${stamp}`;
   const value = `詳細の価値_${stamp}`;
   const body = `詳細の本文_${stamp}`;
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const created = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
     data: { title, value, body, stakeholders: [{ label: "物流部", is_custom: false }], time_limit: null, note: null, status: "published" },
@@ -52,7 +34,7 @@ test("D-TC-207 SC-22 detail renders getIdea data", async ({ page }) => {
     await expect(page.getByRole("button", { name: "▲ 賛成" })).toBeEnabled();
     await expect(page.getByRole("button", { name: /フォロー/ })).toBeEnabled();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
@@ -63,10 +45,10 @@ test("D-TC-207 SC-22 detail renders getIdea data", async ({ page }) => {
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §5-V（G-TC-177）・GF-AC-232。
 test.describe("reduce-motion #23", () => {
   test("G-TC-177 vote bar width transition disabled under reduced motion (#23)", async ({ page }) => {
-    await login(page);
+    await gotoAuthed(page);
     const stamp = Date.now().toString().slice(-8);
     const questId = await createRecruiting(page, `E2E賛否R_${stamp}`);
-    const csrf = csrfOf(await page.context().cookies());
+    const csrf = await csrfToken(page);
     const created = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
       headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
       data: { title: `賛否R_${stamp}`, value: `v_${stamp}`, body: `b_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
@@ -85,7 +67,7 @@ test.describe("reduce-motion #23", () => {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await expect.poll(dur).toBe("0s");
     } finally {
-      const c2 = csrfOf(await page.context().cookies());
+      const c2 = await csrfToken(page);
       await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
     }
   });

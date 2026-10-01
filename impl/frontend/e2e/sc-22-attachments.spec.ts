@@ -1,33 +1,15 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
+import { gotoAuthed, csrfToken, createRecruiting } from "./helpers";
 
 // SC-21 で添付して投稿 → SC-22 に実データで出る＋ダウンロード（D.3・§1.10）。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-215）・screens/SC-21/SC-22 §4.3・API設計 D.3。
 // 添付/アイデアは会社スコープ＝並列で他テストと同一会社DBを奪い合い race した。ワーカ別会社DBで隔離。
 const PNG = Buffer.from("89504e470d0a1a0a0000000000000000000000000000000000000000", "hex");
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
-
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
 test("D-TC-215 SC-21 upload attachment then SC-22 shows it with download", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E添付_${stamp}`);
   const fileName = `zu_${stamp}.png`;
@@ -60,14 +42,14 @@ test("D-TC-215 SC-21 upload attachment then SC-22 shows it with download", async
     expect(d.status(), await d.text()).toBe(200);
     expect((await d.json()).url).toBeTruthy();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 // アイデアを作成＋添付を1件アップロード（編集モードの下地）。返り値＝アイデア id。
 async function createIdeaWithAttachment(page: Page, questId: string, stamp: string, fileName: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
+  const csrf = await csrfToken(page);
   const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
     headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
     data: { title: `添付編集_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
@@ -84,7 +66,7 @@ async function createIdeaWithAttachment(page: Page, questId: string, stamp: stri
 
 // D-TC-218 SC-21 編集モードで既存添付のステージ削除（× で削除予定→保存で確定・版が増える＝設計B）。
 test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E既存添付_${stamp}`);
   const fileName = `shiryo_${stamp}.png`;
@@ -94,7 +76,7 @@ test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", a
   // 版が増えない。ここで同値PATCHすると直近版スナップ基準の差分（添付追加）で rev2 になり、
   // 続く削除保存が rev3 として版差分に出る（本テストの主眼＝削除が版に記録される）。
   {
-    const c0 = csrfOf(await page.context().cookies());
+    const c0 = await csrfToken(page);
     const commit = await page.request.patch(`/api/v1/ideas/${ideaId}`, {
       headers: { "X-CSRF-Token": c0, "Content-Type": "application/json" },
       data: { title: `添付編集_${stamp}` },
@@ -126,7 +108,7 @@ test("D-TC-218 SC-21 edit mode stages attachment removal and applies on save", a
     // rev1（公開・添付なし）→ rev2（添付確定 PATCH）→ rev3（添付削除の保存）。削除が版に記録される。
     expect(detail.current_revision).toBe(3);
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });

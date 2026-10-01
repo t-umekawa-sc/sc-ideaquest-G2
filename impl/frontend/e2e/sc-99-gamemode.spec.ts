@@ -1,52 +1,22 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed, csrfToken, csrfHeaders, createRecruiting, createPublishedIdea } from "./helpers";
 // レビュー#2 ゲームモード ON/OFF の gating＝実効ゲームモード（GET /me の game_mode.effective＝override ?? company_default）
 // OFF でゲーム層UIを丸ごと非表示にする。根拠＝doc/テスト/M_共通シェル・ナビ.md §2-B（M-TC-005〜009）・デザイン標準 §4.11。
 // 実効値は個人上書き（PATCH /me game_mode_override=false）で作り、テスト終了時に null（会社設定に従う）へ復元する
 // （seed ユーザーは他 spec と共用のため必ず戻す）。サーバー層（(app)/layout・各 page）は me を都度読むので goto で反映される。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
 
 async function setGameOverride(page: Page, value: boolean | null) {
-  const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.patch("/api/v1/me", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    headers: await csrfHeaders(page),
     data: { game_mode_override: value },
   });
   expect(res.status(), await res.text()).toBe(200);
 }
 
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
-async function createPublishedIdea(page: Page, questId: string, stamp: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title: `GMアイデア_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
 test("M-TC-005/006/007/008 game mode OFF hides nav game group / header balance / hero / game notifications (#2)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   try {
     await setGameOverride(page, false); // 個人 OFF（会社既定 true でも個人が優先＝実効 OFF）
 
@@ -84,14 +54,14 @@ test("M-TC-005/006/007/008 game mode OFF hides nav game group / header balance /
 });
 
 test("M-TC-009 game mode OFF hides chat magic cast UI (normal reactions and body remain) (#2)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `GM_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
   const body = `投稿_${stamp}`;
   try {
     // 先にメッセージを投稿（game ON のうちに用意＝作成導線はゲーム層ではない）。
-    const csrf = csrfOf(await page.context().cookies());
+    const csrf = await csrfToken(page);
     const post = await page.request.post("/api/v1/chat-messages", {
       headers: { "X-CSRF-Token": csrf }, multipart: { idea_id: ideaId, body },
     });
@@ -110,14 +80,14 @@ test("M-TC-009 game mode OFF hides chat magic cast UI (normal reactions and body
     await expect(page.locator(".reaction-picker .rp__emoji").first()).toBeVisible();
   } finally {
     await setGameOverride(page, null); // 会社設定に従う へ復元
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 
 test("M-TC-010 quest screen game mode OFF hides KPI/ranking, keeps business panels (#2)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `GM_Q_${stamp}`);
   try {
@@ -135,13 +105,13 @@ test("M-TC-010 quest screen game mode OFF hides KPI/ranking, keeps business pane
     await expect(page.getByRole("button", { name: "＋ アイデアを追加" })).toBeVisible();
   } finally {
     await setGameOverride(page, null);
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
 
 test("M-TC-011 level-up celebration is suppressed when game mode is OFF (positive control on) (#2)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   // 既定（ゲームON）でダッシュボードを開き、LevelUpWatcher に既観測レベルを書かせる（初回は祝福しない）。
   await page.goto("/");
   await expect(page.locator(".app-header")).toBeVisible();

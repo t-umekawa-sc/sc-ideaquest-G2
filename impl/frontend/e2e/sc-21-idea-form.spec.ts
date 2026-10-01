@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝各ワーカ専用会社の user@acme でログイン
+import { gotoAuthed, csrfToken, csrfHeaders, createRecruiting } from "./helpers";
 
 // SC-21 アイデア登録・編集フォーム（実接続・D.2／§13／§4.7 前段）。一般ユーザー ACME-01（デモグループ所属・dev seed 前提）で、
 // 下地の recruiting クエストを API で作成 → 登録フルページ /quests/{id}/ideas/new で投稿/下書き、/ideas/{id} 編集モーダルで保存を確認する。
@@ -8,36 +9,11 @@ import { test, expect } from "./fixtures"; // ワーカ別DB隔離（§4.1）＝
 // 本 spec は前段ガード（ボタン活性・blur インライン）を D-TC-204 で担保。3 チャネルの発火はサーバエラー経由で後続 TC。
 // 分岐網羅は api レベル（D-TC-101〜118）で担保（テスト規約 §4・§5.1 line 112）。根拠＝doc/テスト/D_アイデア.md §3・screens/SC-21。
 
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-
-function csrfOf(cookies: { name: string; value: string }[]) {
-  return cookies.find((c) => c.name === "iq_csrf")?.value ?? "";
-}
-
-// 下地の公開クエストを API で作成（デモグループ・recruiting）。作成者＝ACME-01（owner＝idea_create あり）。返り値＝クエスト id。
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const groupId = groups.data?.[0]?.id;
-  expect(groupId, "デモグループ（GET /quest-groups）が必要（dev seed）").toBeTruthy();
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groupId], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的・テーマ", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
-// アイデアを API で作成（編集 e2e の下地）。返り値＝アイデア id。
+// アイデアを API で作成（編集 e2e の下地・status 指定可）。返り値＝アイデア id。helpers.createPublishedIdea は
+// published 固定・スタンプ名のため、draft/任意タイトルが要る本 spec は専用に残す。
 async function createIdeaApi(page: Page, questId: string, title: string, status: "draft" | "published"): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    headers: await csrfHeaders(page),
     data: { title, value: "E2E 価値", body: "E2E 本文", stakeholders: [], time_limit: null, note: null, status },
   });
   expect(res.status(), await res.text()).toBe(201);
@@ -51,15 +27,13 @@ async function listIdeas(page: Page, questId: string): Promise<Array<{ id: strin
 }
 
 async function deleteQuestQuiet(page: Page, id: string) {
-  const csrf = csrfOf(await page.context().cookies());
-  await page.request.delete(`/api/v1/quests/${id}`, { headers: { "X-CSRF-Token": csrf } });
+  await page.request.delete(`/api/v1/quests/${id}`, { headers: { "X-CSRF-Token": await csrfToken(page) } });
 }
 
 // クエストのステータス遷移（recruiting→…→completed 等）。§3 完了凍結 seed 用。
 async function transition(page: Page, questId: string, to: string) {
-  const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.post(`/api/v1/quests/${questId}/transition`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    headers: await csrfHeaders(page),
     data: { to },
   });
   expect(res.status(), await res.text()).toBe(200);
@@ -67,7 +41,7 @@ async function transition(page: Page, questId: string, to: string) {
 
 // D-TC-201 即公開作成＝フォームで投稿→成功トースト→クエスト詳細へ戻る→一覧(API)に published で出る。
 test("D-TC-201 SC-21 publish idea via form appears in list", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const qtitle = `E2Eアイデア公開_${Date.now().toString().slice(-8)}`;
   const questId = await createRecruiting(page, qtitle);
   const ititle = `公開アイデア_${Date.now().toString().slice(-8)}`;
@@ -92,7 +66,7 @@ test("D-TC-201 SC-21 publish idea via form appears in list", async ({ page }) =>
 
 // D-TC-202 下書き保存＝本人にのみ表示（一覧に status=draft・author=本人）。
 test("D-TC-202 SC-21 save draft is visible to author as draft", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const qtitle = `E2Eアイデア下書き_${Date.now().toString().slice(-8)}`;
   const questId = await createRecruiting(page, qtitle);
   const ititle = `下書きアイデア_${Date.now().toString().slice(-8)}`;
@@ -116,7 +90,7 @@ test("D-TC-202 SC-21 save draft is visible to author as draft", async ({ page })
 
 // D-TC-203 編集＝既存アイデアを詳細から編集→件名更新が API に反映される。
 test("D-TC-203 SC-21 edit updates title", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const qtitle = `E2Eアイデア編集_${Date.now().toString().slice(-8)}`;
   const questId = await createRecruiting(page, qtitle);
   const before = `編集前_${Date.now().toString().slice(-8)}`;
@@ -146,7 +120,7 @@ test("D-TC-203 SC-21 edit updates title", async ({ page }) => {
 // D-TC-204 §4.7 入力検証＝主ボタンは常に押せる（評価/クエストと統一・旧「必須が揃うまで disabled」を撤廃）。
 // 押下で不足を上部サマリ＋インラインに出す／件名 blur でもインライン検証。
 test("D-TC-204 SC-21 submit is clickable and validates on click (§4.7・評価/クエストと統一)", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const qtitle = `E2Eアイデア検証_${Date.now().toString().slice(-8)}`;
   const questId = await createRecruiting(page, qtitle);
   try {
@@ -179,7 +153,7 @@ test("D-TC-204 SC-21 submit is clickable and validates on click (§4.7・評価/
 // 上部サマリ（.form-summary）＋足元ヒント（.form-footer-error）＋持続エラースナックバー（.snackbar--error・duration:0＝timer 無し）が出る。
 // 主ボタンは canSave（3 必須）で活性・client 検証は通過するためサーバエラーが主経路（§3 前文・mapServerErrors→conflict）。
 test("D-TC-216 SC-21 server 409 (completed quest edit) fires §4.7 three channels", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2Eサーバエラー_${stamp}`);
   const ideaId = await createIdeaApi(page, questId, `凍結編集_${stamp}`, "published");
@@ -219,7 +193,7 @@ test("D-TC-216 SC-21 server 409 (completed quest edit) fires §4.7 three channel
 // D-TC-208 登録モーダルは初期表示で誤検証しない（モーダルのフォーカス制御で件名の必須エラーが出ない）。
 // blur 検証（タブ移動）は維持されることも確認。
 test("D-TC-208 SC-21 modal has no premature validation on open", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const questId = await createRecruiting(page, `E2Eモーダル_${Date.now().toString().slice(-8)}`);
   try {
     await page.goto(`/quests/${questId}`);

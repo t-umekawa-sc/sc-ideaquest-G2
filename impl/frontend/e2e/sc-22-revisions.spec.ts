@@ -1,44 +1,14 @@
 import { type Page } from "@playwright/test";
 
 import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
+import { gotoAuthed, csrfToken, csrfHeaders, createRecruiting, createPublishedIdea } from "./helpers";
 // SC-22 更新履歴モーダル（D.4 版タイムライン＋差分・実接続）。公開で初版 revision=1・PATCH で revision=2 を作り、
 // 「版 N（履歴）」→モーダルに実データ（v2/v1〔初版〕・変更フィールド・差分セグメント）が出ることを確認する。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-217）・API設計 D.4・screens/SC-22。
-const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
-
-async function login(page: Page) {
-  // storageState（e2e/auth.setup.ts）で既に user@acme 認証済み＝再ログインせずホームへ遷移するだけ。
-  // 毎テストのフォームログインを廃止し、並列フル実行でのログインレート制限超過を防ぐ。
-  await page.goto("/");
-  await expect(page.locator(".app-header")).toBeVisible();
-}
-function csrfOf(c: { name: string; value: string }[]) { return c.find((x) => x.name === "iq_csrf")?.value ?? ""; }
-
-async function createRecruiting(page: Page, title: string): Promise<string> {
-  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post("/api/v1/quests", {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title, color: "#0D9488", quest_group_ids: [groups.data[0].id], categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
-
-async function createPublishedIdea(page: Page, questId: string, stamp: string): Promise<string> {
-  const csrf = csrfOf(await page.context().cookies());
-  const res = await page.request.post(`/api/v1/quests/${questId}/ideas`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
-    data: { title: `履歴アイデア_${stamp}`, value: `価値_${stamp}`, body: `本文_${stamp}`, stakeholders: [], time_limit: null, note: null, status: "published" },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id as string;
-}
 
 async function patchIdea(page: Page, ideaId: string, data: Record<string, unknown>) {
-  const csrf = csrfOf(await page.context().cookies());
   const res = await page.request.patch(`/api/v1/ideas/${ideaId}`, {
-    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    headers: await csrfHeaders(page),
     data,
   });
   expect(res.status(), await res.text()).toBe(200);
@@ -46,7 +16,7 @@ async function patchIdea(page: Page, ideaId: string, data: Record<string, unknow
 
 // D-TC-217 更新履歴モーダルが実データ（版タイムライン＋差分）。
 test("D-TC-217 SC-22 revision history modal renders real timeline and diff", async ({ page }) => {
-  await login(page);
+  await gotoAuthed(page);
   const stamp = Date.now().toString().slice(-8);
   const questId = await createRecruiting(page, `E2E履歴_${stamp}`);
   const ideaId = await createPublishedIdea(page, questId, stamp);
@@ -69,7 +39,7 @@ test("D-TC-217 SC-22 revision history modal renders real timeline and diff", asy
     await modal.getByText("差分を表示", { exact: true }).click();
     await expect(modal.locator(".diff-add").first()).toBeVisible();
   } finally {
-    const c2 = csrfOf(await page.context().cookies());
+    const c2 = await csrfToken(page);
     await page.request.delete(`/api/v1/quests/${questId}`, { headers: { "X-CSRF-Token": c2 } });
   }
 });
