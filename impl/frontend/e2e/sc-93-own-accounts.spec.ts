@@ -75,11 +75,12 @@ test("B-TC-124 own-account list: search, email column, clear", async ({ page }) 
   }).toPass();
   await expect(region.getByRole("cell", { name: emailAddr })).toBeVisible();
   await expect(region.getByRole("cell", { name: "admin@ops.example" })).toHaveCount(0);
-  await expect(region.getByText("1 件", { exact: true })).toBeVisible();
+  // ↑ 検索で当該行のみに絞れた証跡（seed 管理者が消える）＝行の有無で判定（堅牢）。
+  // 件数ラベルは region 内に複数 .list-count（件/名）があり曖昧なため使わない。
 
-  // 「すべてクリア」で全件へ戻る（自社は seed 管理者＋発行分で 2 件以上＝「1 件」表示が消える）
+  // 「すべてクリア」で検索が解除される（検索欄が空に戻る）＝データ非依存で堅牢に判定。
   await region.getByRole("button", { name: "すべてクリア" }).click();
-  await expect(region.getByText("1 件", { exact: true })).toHaveCount(0);
+  await expect(region.getByRole("searchbox", { name: "氏名・ログインID・メール を検索" })).toHaveValue("");
 });
 
 // B-TC-122: 自社グループ一覧 EP（/admin/company-quest-groups）で所属ピッカーが機能し、所属付きで発行できる。

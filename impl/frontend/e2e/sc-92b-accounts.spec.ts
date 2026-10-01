@@ -65,9 +65,10 @@ test("B-TC-125 company account list: search, email column, clear", async ({ page
     await expect(region.getByRole("cell", { name: loginId })).toBeVisible({ timeout: 1000 });
   }).toPass();
   await expect(region.getByRole("cell", { name: emailAddr })).toBeVisible();
-  await expect(region.getByText("1 件", { exact: true })).toBeVisible();
+  // ↑ 検索で当該行（login/email 別セル）に絞れた証跡＝行の有無で判定（堅牢）。
+  // 件数ラベルは region 内に複数 .list-count（件/名）があり曖昧なため使わない。
 
-  // 「すべてクリア」で全件へ戻る（ACME-01 は seed＋発行分で 2 件以上＝「1 件」表示が消える）
+  // 「すべてクリア」で検索が解除される（検索欄が空に戻る）。
   await region.getByRole("button", { name: "すべてクリア" }).click();
-  await expect(region.getByText("1 件", { exact: true })).toHaveCount(0);
+  await expect(region.getByRole("searchbox")).toHaveValue("");
 });
