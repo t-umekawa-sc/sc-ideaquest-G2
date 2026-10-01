@@ -35,7 +35,8 @@
   - `impl/frontend/e2e/fixtures.ts`（新規）＝worker スコープ fixture（`workerCompany`）＋ storageState 上書き（各ワーカが自社 user@acme で1回ログイン）。**N=0 は ACME-01 共有へフォールバック**（通常スタック互換）。
   - `impl/frontend/e2e/db.reset.ts`＝ワーカ会社DBも drop 対象（N から算出）。
   - `impl/frontend/playwright.config.ts`＝N>0 のとき `workers=N`（parallelIndex↔会社対応）。
-- 変換済み spec（計12本）＝`sc-02-notifications`・`sc-22-attachments`・`sc-21-idea-form`・`sc-32-spells`・`sc-99-scroll-restore`・`sc-24-chat`（psql/psqlValue に db 引数・pageB user2 を同一ワーカ会社でログイン）＋**sc-50 全6本**（`sc-50-info-attach`/`body-grow`/`history`/`list`/`search`/`info-to-quest-draft`）。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・login_id は `LOGIN_ID`・未使用の ACME-01 const 除去**。storageState のみの spec は import 替えだけ。両モード（隔離/フォールバック）で動く。
+- 変換済み spec（計43本＝会社スコープはほぼ全部）＝sc-02/sc-21/sc-22-*/sc-24-chat/sc-25-eval/sc-30-*/sc-31/sc-32/sc-40/sc-41/sc-03-*/sc-10/sc-11/sc-12-*/sc-13/sc-18/sc-50-*/sc-52-*/sc-70/sc-99-*/sc-01-dashboard-notif/responsive 等。**import を `./fixtures` に替え・psql は `workerCompany.dbName`・form-login は `workerCompany.company`・login_id は `LOGIN_ID`/`user2`**。storageState のみの spec は import 替えだけ。両モード（隔離/フォールバック）で動く。
+  - **除外**＝`sc-00-*`（認証フロー＝form-login・storageState 空で login 自体を検証＝fixture 置換不可）・**control-plane**（sc-90/91/92*/93・OPS/admin＝会社DB隔離の対象外）。
   - **bootstrap が worker 会社にも discovery/info/filler を seed**（`seed_demo_discovery`/`seed_demo_info`/`seed_demo_info_filler` を `db_identifier` 引数化し `main()` で `_demo_db_identifiers()`＝ACME-01＋worker をループ）＝sc-50 を隔離可能に（前回の見送りを解消）。既定0＝通常スタックは ACME-01 のみで不変（clean pytest 907 passed で確認）。
 
 ## 4. 現在の状態
@@ -43,7 +44,7 @@
   - **通常 main の品質**＝backend pytest（クリーンDB）907 passed／frontend vitest 218 passed／TC トレーサビリティ OK（927）。e2e フル（既定ワーカ・ワーカ起動）＝green（0 failed・flaky は retries 吸収）。
   - **ワーカ別DB隔離（iqe2e）**＝機構を end-to-end 実証。sc-02（repeat-each=3・workers=2）12 passed／sc-22（同）8 passed/1 flaky（残は添付アップロードtiming）。フォールバック（N 未設定）でも sc-02/sc-22＝8 passed。
   - **フル iqe2e（N=7・workers=7）＝5 failed / 10 flaky / 146 passed**（基盤マージ時点）。
-  - **追加3本変換後の iqe2e（N=7・5本単発）＝16 passed / 1 failed**＝残 `D-TC-215`(sc-22 添付)のみ＝**アップロードのタイミングflake（データ競合でない＝隔離対象外）**。データ競合は隔離で解消済み。
+  - **会社スコープ全変換後の iqe2e（N=7 フル）＝12 failed / 5 flaky / 144 passed**。12 のハード失敗は**全て変換スコープ外**＝control-plane 9本（B-TC-*・未変換）＋SC-00×2（auth・除外）＋D-TC-218（添付アップロードのタイミング・既知）。**変換済み spec のデータ競合失敗はゼロ**＝会社スコープ隔離は完了。
 - **重要な確定事項（§6）**＝per-worker 会社DB隔離は**会社スコープの競合にのみ有効**。フル iqe2e の**ハード失敗5件中4件が control-plane（OPS/認証）/タイミング**（SC-00 MFA/再設定・B-TC-124・M-TC-013／会社スコープは D-TC-203 のみ）。**会社DB隔離だけでは全 green に届かない**（別アプローチが要る）。
 - **壊れているもの**＝確認範囲で無し（通常スタックは不変＝E2E_WORKER_COMPANIES 既定0）。
 - **未確認**＝機能側（FR-45 SC-04 挙動・SC-94 等）は本セッションで個別未検証＝機能トラックに委ねる。実機 LLM（Ollama）未実施（FakeChat 固定）。
@@ -61,7 +62,9 @@
 
 ## 7. 次にやること（優先順・本トラック＝テストコード）
 > 機能実装は別セッション。着手前に取り決め md を読む。**worktree 撤去**＝`git worktree remove ../g2-e2e --force`（node_modules シンボリックリンク済のため --force）＋ `git branch -d e2e/per-worker-db-isolation`（ff 済）。**iqe2e スタック撤去**＝`cd impl && COMPOSE_PROJECT_NAME=iqe2e docker compose --profile workers down -v`（別プロジェクトのボリュームも消す）。
-1. **残りの会社スコープ spec 変換（任意）**＝bootstrap は既に discovery/info/filler を worker 会社へ seed 済（§3）。残りの会社スコープ spec（sc-12-*・sc-25-eval・sc-22-vote-follow/revisions/idea-detail/quest-ref/related-info・sc-13-catalog・sc-52-* 等）は **import 替えだけ**（storageState のみ）。psql/二人目ログインを含む spec は **sc-24-chat の変換パターンが参考**（psql に db 引数・test に `workerCompany` 引数・`loginAs` の company を `workerCompany.company` に）。変換後は iqe2e（N=7）で検証。
+1. **会社スコープ spec 変換は完了**（§3）。残る失敗は変換スコープ外＝下記 2〜3。
+   - **control-plane フレーク**（B-TC-110/114/115/116/117/125/169/178/179・SC-00 MFA/再設定）＝OPS/admin/認証の共有が原因。per-worker 会社DBでは直らない＝(a) 各テストの個別硬化か (b) OPS 側 per-worker 化（大）。費用対効果で判断。
+   - **タイミングフレーク**（D-TC-218 添付アップロード・M-TC-013 scroll・M-TC-002 drawer）＝描画/アップロード待ちの個別硬化。
 2. **control-plane フレーク**（B-TC-113/114/116/124/138/140/169・SC-00 MFA/再設定）＝OPS/認証の共有が原因。per-worker 会社DBでは直らない＝(a) 各テストの個別硬化（waitFor/scoped assertion）か (b) OPS 側 per-worker 化（大）。費用対効果で判断。
 3. **タイミングフレーク**（M-TC-013 scroll・D-TC-215 添付アップロード・M-TC-002 drawer）＝描画/アップロード待ちの個別硬化。
 4. **（任意）実機 LLM 縦1本**＝`docker compose --profile ai up -d ollama`→`ollama pull qwen3:4b`→worker 起動→SC-04 から enqueue。
@@ -70,9 +73,10 @@
 - 作業ディレクトリ＝リポジトリ直下。実装は `impl/`。**コマンドは絶対パス**（シェル cd 不持続）。compose＝`impl/compose.yaml`。
 - **通常起動（既定スタック・別セッションもこれ）**＝`cd impl && docker compose up -d --build`。e2e は **worker/mail-worker 起動必須**（`docker compose up -d worker mail-worker`）。
 - **ワーカ別DB隔離（iqe2e・本トラックの e2e 検証）**＝別 compose プロジェクトで起動（N は seed 会社数＝workers に一致させる）:
-  `export COMPOSE_PROJECT_NAME=iqe2e DB_PORT=5533 REDIS_PORT=6380 MAILHOG_SMTP_PORT=1125 MAILHOG_UI_PORT=8125 MINIO_PORT=9100 MINIO_CONSOLE_PORT=9101 BACKEND_PORT=8100 FRONTEND_PORT=3100 E2E_WORKER_COMPANIES=7 APP_BASE_URL=http://localhost:3100 MINIO_PUBLIC_ENDPOINT=localhost:9100 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]'`
+  `export COMPOSE_PROJECT_NAME=iqe2e DB_PORT=5533 REDIS_PORT=6380 MAILHOG_SMTP_PORT=1125 MAILHOG_UI_PORT=8125 MINIO_PORT=9100 MINIO_CONSOLE_PORT=9101 BACKEND_PORT=8100 FRONTEND_PORT=3100 E2E_WORKER_COMPANIES=7 APP_BASE_URL=http://localhost:3100 MINIO_PUBLIC_ENDPOINT=localhost:9100 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000`
+  - **`LOGIN_RATE_LIMIT_MAX=100000` は必須**＝全ワーカが同一 login_id `user@acme` でログインし (IP+login_id) レート制限バケットを共有する（fixtures が worker 毎にログイン＋sc-00/sc-30-32 の form-login＋retry）。既定50だと 429 cascade で大量失敗する。iqe2e 隔離スタックのみ緩和（compose env 既化・通常スタックは既定50で不変）。
   → `cd impl && docker compose --profile workers up -d --build`。
-  **e2e 実行**＝`cd impl/frontend && COMPOSE_PROJECT_NAME=iqe2e PLAYWRIGHT_BASE_URL=http://localhost:3100 E2E_WORKER_COMPANIES=7 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' npx playwright test --project=chromium`（reset が会社DBを drop→bootstrap・N 社 seed）。
+  **e2e 実行**＝`cd impl/frontend && COMPOSE_PROJECT_NAME=iqe2e PLAYWRIGHT_BASE_URL=http://localhost:3100 E2E_WORKER_COMPANIES=7 ALLOWED_ORIGINS='["http://localhost:3100","http://localhost:8100"]' LOGIN_RATE_LIMIT_MAX=100000 npx playwright test --project=chromium`（reset が会社DBを drop→bootstrap・N 社 seed）。
 - **backend pytest（クリーンDB）**＝ワーカ停止→`docker compose exec -T db psql -U ideaquest -d postgres -c "DROP DATABASE IF EXISTS ideaquest_company_acme WITH (FORCE);"`（acme2 も）→`docker compose run --rm -T -v "$PWD/backend:/app" backend pytest -q`（cwd=impl）。**pytest 後はワーカを戻す**。FakeEmbeddings＋FakeChat 固定（conftest）。
 - **frontend 検証**＝`cd impl/frontend && npm run build`（tsc/lint・必須）・`npx vitest run`。e2e トリアージは `--workers=1`（直列）・結果は `test-results/.last-run.json` でも。**e2e は実行のたび会社DBを drop→bootstrap**（既定スタックで回すと手動データが消える＝取り決め md §5）。
 - **seed（方式Aで毎回再現）**＝ACME-01: `user@acme`(member・storageState)/`user2`/`user3`/`kanri`(company_account_admin)/`e2e-session`/`e2e-pwreset` ＋ `DEV-DEMO` グループ＋発見/情報デモ。`mfa@acme2`(ACME-02)。OPS `admin@ops`(system_admin)。N>0 なら `ACME-W0..` にも同 login_id 群＋グループ。全 PW `Passw0rd!`。
