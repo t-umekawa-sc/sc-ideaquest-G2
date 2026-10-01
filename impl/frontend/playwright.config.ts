@@ -25,14 +25,17 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    // setup（認証状態を作る）→ chromium（本体）→ cleanup（末尾でテストデータを掃除・§7-2c）。
-    { name: "setup", testMatch: /auth\.setup\.ts/, teardown: "cleanup" },
+    // reset（会社DBを pristine bootstrap に復元）→ setup（認証状態を作る）→ chromium（本体）→
+    // cleanup（末尾でテストデータを掃除・§7-2c）。reset を最前段に置くことで、フル実行のたび DB を
+    // 既知状態から始め「毎回同じ失敗が再現する」蓄積ドリフトを構造的に断つ（方式A・テスト規約）。
+    { name: "reset", testMatch: /db\.reset\.ts/ },
+    { name: "setup", testMatch: /auth\.setup\.ts/, dependencies: ["reset"], teardown: "cleanup" },
     { name: "cleanup", testMatch: /auth\.cleanup\.ts/ },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], storageState: USER_STATE },
       dependencies: ["setup"],
-      testIgnore: /auth\.(setup|cleanup)\.ts/,
+      testIgnore: /(auth\.(setup|cleanup)|db\.reset)\.ts/,
     },
   ],
 });

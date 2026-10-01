@@ -58,6 +58,19 @@ test("M-TC-013 dashboard restores scroll after a push-style back link (and no fa
 test("M-TC-014 dashboard restores scroll after a card link and browser Back (pop navigation)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await login(page);
+  // 参加中クエストのカードを確実に出すため、user@acme 所有の募集中クエストを1件用意する（自己完結・seed
+  // 非依存＝デモ seed のクエスト有無に依らない）。デモグループ（GET /quest-groups）があれば所属させる。
+  const groups = await page.request.get("/api/v1/quest-groups").then((r) => r.json());
+  const csrf = (await page.context().cookies()).find((c) => c.name === "iq_csrf")?.value ?? "";
+  const created = await page.request.post("/api/v1/quests", {
+    headers: { "X-CSRF-Token": csrf, "Content-Type": "application/json" },
+    data: {
+      title: `スクロール復元_${Date.now()}`, color: "#0D9488",
+      quest_group_ids: groups.data?.length ? [groups.data[0].id] : [],
+      categories: ["業務改善"], deadline: "2026-12-31", purpose: "E2E 目的", status: "recruiting",
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
   await page.goto("/");
   // データ描画で参加中クエストのカードが出るのを待つ（縦に長い位置にある詳細リンク）。
   const card = page.locator("a.quest-card").first();

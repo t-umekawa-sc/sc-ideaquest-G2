@@ -80,10 +80,46 @@ SEED_E2E_PWRESET_ACCOUNT = {
     "status": "active",
 }
 
+# 受入デモ（scripts/seed_demo.py）および一部 e2e（sc-24-chat・sc-30-32-balance-sync）が前提とする
+# ACME-01 のデモ用アカウント。従来は手動作成で DB ボリュームにのみ存在し再現不能だった＝会社/control DB
+# を drop すると復元できず、seed_demo.py の「ACME-01 の seed アカウント user/user2/user3/kanri …
+# （bootstrap 既定）」という前提も崩れていた。bootstrap seed に昇格して再現可能にする（非prod のみ・冪等）。
+# kanri は company_account_admin（SC-94 会社のLLM設定 等の会社管理操作の実行主体）。
+SEED_DEMO_USER2 = {
+    "login_id": "user2@acme.example",
+    "email": "user2@acme.example",
+    "display_name": "チャット 太郎",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "general",
+    "status": "active",
+}
+SEED_DEMO_USER3 = {
+    "login_id": "user3@acme.example",
+    "email": "user3@acme.example",
+    "display_name": "アイデア 出す像",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "general",
+    "status": "active",
+}
+SEED_DEMO_KANRI = {
+    "login_id": "kanri@acme.example",
+    "email": "kanri@acme.example",
+    "display_name": "ACME 管理者",
+    "password": "Passw0rd!",
+    "locale": "ja",
+    "system_role": "company_account_admin",
+    "status": "active",
+}
+
 _SEEDS = [
     (SEED_COMPANY, SEED_ACCOUNT),
     (SEED_COMPANY, SEED_E2E_SESSION_ACCOUNT),
     (SEED_COMPANY, SEED_E2E_PWRESET_ACCOUNT),
+    (SEED_COMPANY, SEED_DEMO_USER2),
+    (SEED_COMPANY, SEED_DEMO_USER3),
+    (SEED_COMPANY, SEED_DEMO_KANRI),
     (SEED_MFA_COMPANY, SEED_MFA_ACCOUNT),
 ]
 
@@ -256,6 +292,55 @@ DEMO_INFO_IDS = {
     "i4": uuid.UUID("14f00000-0000-4000-a000-000000000014"),
     "i5": uuid.UUID("14f00000-0000-4000-a000-000000000015"),
 }
+
+
+# クエストグループのデモ seed（非prod のみ・固定 UUID＝冪等）。多くの e2e ヘルパ（createRecruiting 等・
+# 16 spec）と受入が「GET /quest-groups が最低1件返す」＝dev seed のデモグループを前提にする。従来は手動
+# 作成で DB ボリュームにのみ存在し再現不能だった（会社DB を drop すると消え、`groups.data[0]` が undefined
+# になり広範に落ちる）。bootstrap seed に昇格して再現可能にする。GET /quest-groups は「自分が有効所属する
+# グループ」のみ返す（repository.get_quest_groups）ため、ACME-01 の seed ユーザーを所属させる。
+# コードは cleanup（QG/QGN/SCDEV 接頭辞のみ削除）が温存する `DEV-` 系にして衝突を避ける。
+DEMO_QUEST_GROUP_ID = uuid.UUID("de500000-0000-4000-a000-000000000001")
+
+
+def seed_demo_quest_group() -> None:
+    """ACME-01 にデモ用クエストグループ＋seed ユーザーの所属を seed（冪等・非prod）。"""
+    from app.tenant.quest_group.orm import QuestGroup, QuestGroupMember
+
+    s = get_settings()
+    if not _seed_demo_enabled(s.app_env):
+        return
+    with control_session() as session:
+        company = session.query(Company).filter_by(company_code=SEED_COMPANY["company_code"]).one_or_none()
+        db_identifier = company.db_identifier if company else None
+    if db_identifier is None:
+        return
+    # ACME-01 の seed ユーザーを member で所属させる＝GET /quest-groups に出す（createRecruiting 等が前提）。
+    # admin にはしない＝SC-90 の「非QG管理者」テスト（B-TC-119/123・is_qg_admin=false 前提）を壊さない。
+    # QG 管理者が要るテスト（B-TC-120 等）は各自 OPS 編集で admin を作る。
+    member_logins = {
+        SEED_ACCOUNT["login_id"]: "member",
+        SEED_DEMO_USER2["login_id"]: "member",
+        SEED_DEMO_USER3["login_id"]: "member",
+        SEED_DEMO_KANRI["login_id"]: "member",
+    }
+    with get_tenant_session(db_identifier) as ts:
+        if ts.get(QuestGroup, DEMO_QUEST_GROUP_ID) is None:
+            ts.add(QuestGroup(id=DEMO_QUEST_GROUP_ID, quest_group_code="DEV-DEMO", name="デモグループ"))
+            ts.flush()
+            print(f"[bootstrap] seeded demo quest group in {db_identifier}")
+        for login_id, role in member_logins.items():
+            user = ts.query(User).filter_by(login_id=login_id).one_or_none()
+            if user is None:
+                continue
+            existing = (
+                ts.query(QuestGroupMember)
+                .filter_by(quest_group_id=DEMO_QUEST_GROUP_ID, user_id=user.id, removed_at=None)
+                .one_or_none()
+            )
+            if existing is None:
+                ts.add(QuestGroupMember(quest_group_id=DEMO_QUEST_GROUP_ID, user_id=user.id, role=role))
+        ts.commit()
 
 
 def seed_demo_discovery() -> None:
@@ -500,6 +585,7 @@ def main() -> None:
         create_database(db_identifier)
         migrate_company(db_identifier)
     seed_company_users()
+    seed_demo_quest_group()  # クエストグループのデモ（e2e createRecruiting 等が前提・非prod・冪等）
     seed_demo_discovery()  # 発見カタログ（SC-13）デモ（非prod・冪等）
     seed_demo_info()  # 情報インプット（SC-50・ドメイン N）デモ（非prod・冪等）
     seed_demo_info_filler()  # 情報インプットのスクロール確認用フィラー（非prod・冪等）
