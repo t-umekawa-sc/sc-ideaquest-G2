@@ -14,14 +14,21 @@ export type WorkerCompany = { company: string; dbName: string; loginId: string }
 export const LOGIN_ID = "user@acme.example"; // 全ワーカ会社に存在する seed アカウント（会社単位一意）
 export const PASSWORD = "Passw0rd!";
 
+// 隔離の有効/無効は E2E_WORKER_COMPANIES（bootstrap が seed した会社数）で決まる。
+// N>0（iqe2e 隔離スタック）＝各ワーカが専用会社 ACME-W{parallelIndex}。
+// N=0（通常スタック・main の通常 e2e）＝ワーカ会社は未 seed なので共有 ACME-01 にフォールバック（従来挙動）。
+// これで fixtures を import した spec は両モードで動く（移行互換）。
+const WORKER_N = Number(process.env.E2E_WORKER_COMPANIES ?? 0) || 0;
+
 export const test = base.extend<object, { workerCompany: WorkerCompany }>({
-  // ワーカ単位＝parallelIndex から専用会社を決める（0..E2E_WORKER_COMPANIES-1）。
+  // ワーカ単位＝parallelIndex から専用会社を決める（0..N-1）。N=0 は ACME-01 共有へフォールバック。
   workerCompany: [
     async ({}, use, workerInfo) => {
       const i = workerInfo.parallelIndex;
+      const isolated = WORKER_N > 0;
       await use({
-        company: `ACME-W${i}`,
-        dbName: `ideaquest_company_acme_w${i}`,
+        company: isolated ? `ACME-W${i}` : "ACME-01",
+        dbName: isolated ? `ideaquest_company_acme_w${i}` : "ideaquest_company_acme",
         loginId: LOGIN_ID,
       });
     },
