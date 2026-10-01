@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // M-TC-016/017: 一覧の操作状態（検索/ソート/絞込/ページ）の URL 復元（デザイン標準 §4.5⑨・横断標準）。
 // 共通コンポーネント DataTable が検索/ソート/絞込/ページを ?<storageKey>.q/.sort/.f/.page に同期（router.replace）し、
 // 詳細へ遷移して戻る（pop）と離脱前の操作状態を復元する。機構は全一覧で共通＝SC-10 クエスト一覧で代表検証。

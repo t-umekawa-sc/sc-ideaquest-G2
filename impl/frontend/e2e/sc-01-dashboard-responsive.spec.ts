@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // I-TC-162（e2e・レスポンシブ回帰／受入不具合）＝ダッシュボードの議論2カラム（💬新着／🕒最近）が
 // 狭幅（375px＝iPhone SE 相当）で**横スクロールを生まない**ことの担保。
 // 根拠＝doc/テスト/I_ダッシュボード.md I-TC-162／SC-01 §4.8c／dashboard.css .dash-discuss。

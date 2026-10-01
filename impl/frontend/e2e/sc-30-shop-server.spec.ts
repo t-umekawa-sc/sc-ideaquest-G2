@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-30 ショップ一覧＝DataTable サーバーモード委譲（§1.8.1・G.1）。検索/ソート/絞込/ページを GET /items に委譲し、
 // 状態は ?sc30-shop.* に同期して詳細往復で復元（一覧共通契約）。サーバー委譲は /items リクエストのクエリで確認。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md（G-TC-318）／デザイン標準 §4.5⑨／API設計 G.1・§1.8.1。

@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-40 実績（G.4 実接続）＝実績カタログ/収集サマリーが実データ（getAchievements）で描画される。ACME-01 で確認。
 // 付与はサーバー（台帳フック）が自動判定＝backend G-TC-501〜506 で担保。e2e は実データ照合に限定。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-207）・API設計 G.4・SC-40。

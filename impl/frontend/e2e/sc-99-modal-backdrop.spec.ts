@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // M-TC-015: モーダル/確認ダイアログ表示中はバックドロップ背後の CSS 無限アニメを停止する
 // （デザイン標準 §モーダル／受入不具合 DFT-E-012 の回帰）。
 // 再現した不具合＝半透明バックドロップ(45%)の背後で transform 系の無限アニメ（未読ベルの

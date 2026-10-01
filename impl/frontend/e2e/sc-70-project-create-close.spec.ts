@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // Q-TC-140: 登録系ダイアログの閉じ標準（デザイン標準 §4.1・決定 2026-09-28）。
 // 受入不具合＝プロジェクト作成ダイアログで作成すると `/projects/{id}` 詳細へ遷移していた。
 // 期待＝作成後は詳細へ遷移せず、ダイアログを閉じて呼び元（一覧 `/projects`）へ戻る。作成自体は成功。

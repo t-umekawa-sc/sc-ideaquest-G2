@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-12 クエスト詳細（実接続・C.1/C.3/C.5/C.2）。一般ユーザー ACME-01（デモグループ所属・dev seed 前提）で、
 // 下地クエストを API で作成 → 詳細でヘッダー/概要/パーティーの実データ表示・状態遷移・削除を確認する。
 // アイデア一覧＝D／全文検索＝J／週間ランキング＝G はデモのため範囲外。根拠＝screens/SC-12・API設計 C。

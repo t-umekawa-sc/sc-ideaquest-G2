@@ -2,8 +2,9 @@
 // カードを成果物側コンテキストで開き（?from=quests:id）→「この情報の扱い」で採用/不採用を保存し、
 // パネルへの反映（採用＝バッジ＋メモ／不採用＝既定パネルから非表示＋ヘッダー件数）を検証する。
 // 根拠＝doc/テスト/C_クエスト.md・SC-12 §4.1d・SC-52 §7-採否・C.8b。
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
 
 async function login(page: Page) {

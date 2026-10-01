@@ -2,8 +2,9 @@
 // N-TC-220: 種別変更で完了トーストが「最前面」に出る（モーダル起動中も見える＝z-index 回帰・DFT）。
 // N-TC-221: 種別変更で関連リンクの並び順が変わらない（種別依存の並び替えを起こさない・DFT）。
 // 根拠＝doc/テスト/N_情報インプット.md §3・SC-52・デザイン標準 §14（完了通知）。
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: Page) {

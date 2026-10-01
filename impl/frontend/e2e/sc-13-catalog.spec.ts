@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-13 発見カタログ（FR-40・C.9）の掲示板ダイアログ標準機能の回帰（受入不具合 DFT-E-013/014）。
 // C-TC-266＝最大化(⤢)が出る（前セッションで `maximizable={false}` を誤って上書き＝標準機能欠落・§106）。
 // C-TC-267＝閉じアニメが出る（`{detail && <Dialog>}` の即アンマウントで exit アニメが飛んでいた）。

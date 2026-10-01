@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-25 評価画面（F.2 実接続）＋SC-22 §4.6 評価結果（F.1）＋選定（F.3）。ACME-01（owner＝評価者＋選定可）で、
 // recruiting クエスト＋published アイデアを API で作成し、評価の確定/下書き/選定を画面↔API で確認する。
 // 根拠＝doc/テスト/F_評価.md §4（F-TC-201〜203）・API設計 F・screens/SC-25/SC-22。

@@ -2,8 +2,9 @@
 // 正＝doc/画面設計/screens/SC-31_アバター着せ替え.md §9.2/§9.3・API設計 K.4.1（PUT /me/avatar-base）。
 // 3D（WebGL）ビューア or 2D フォールバック（progressive enhancement）の**いずれか**が描画されることも確認。
 // 共有 seed（ACME-01）を汚さないよう、切替後は**元値へ戻して cleanup**する。
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const U = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" }; // MFA OFF
 
 async function login(page: Page) {

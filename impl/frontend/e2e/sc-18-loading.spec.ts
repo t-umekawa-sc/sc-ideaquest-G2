@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // #18 取得中のゲーム化（ローディング表示）＝共通 Spinner（◆コイン `.iq-spinner__coin` が回転＋「読み込み中…」・デザイン標準 §13）。
 // 機能（reduce＝コイン回転停止）を e2e で担保。抑制機構は共通（1コンポーネント＋グローバル CSS）ゆえ代表画面 /ranking で観測。
 // スピナーは取得中のみ表示ゆえ、rankings API を遅延させて取得中を可視化してから computed animationName を確認する。

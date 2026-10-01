@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-22 アイデア詳細（実接続・D.1）。本文/価値/利害関係者/ステータス/作成者/版を getIdea で描画。
 // 投票/フォロー（D.5/D.6）は実接続＝挙動は sc-22-vote-follow.spec.ts（D-TC-209〜212）。添付（D.3）・評価（F）・チャット（E）は未接続＝表示のみ/デモ。
 // 根拠＝doc/テスト/D_アイデア.md §3・screens/SC-22。

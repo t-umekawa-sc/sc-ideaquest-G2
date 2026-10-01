@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-22 更新履歴モーダル（D.4 版タイムライン＋差分・実接続）。公開で初版 revision=1・PATCH で revision=2 を作り、
 // 「版 N（履歴）」→モーダルに実データ（v2/v1〔初版〕・変更フィールド・差分セグメント）が出ることを確認する。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-217）・API設計 D.4・screens/SC-22。

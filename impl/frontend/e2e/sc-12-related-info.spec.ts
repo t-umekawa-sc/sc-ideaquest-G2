@@ -1,8 +1,9 @@
 // SC-12 クエスト詳細＝上部「関連情報ストリップ」（FR-41・情報インプット連携・C.8b）。
 // C-TC-287: リンクした情報がストリップにカード表示され、反証は⚠強調＋ヘッダーに反証件数が出る。
 // 根拠＝doc/テスト/C_クエスト.md・SC-12 §4.1d・API設計 C.8b。
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
 
 async function login(page: Page) {

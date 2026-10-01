@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-30 ショップ / SC-31 アバター（G 実接続）＝カタログ/コイン残高/所有・装備が実データ（getItems）で描画される。
 // 購入/着せ替えの happy-path は backend G-TC-302/306 で担保（コイン/所有の前提が要るため e2e は実データ照合に限定）。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-202/203）・API設計 G.1/G.2・SC-30/SC-31。

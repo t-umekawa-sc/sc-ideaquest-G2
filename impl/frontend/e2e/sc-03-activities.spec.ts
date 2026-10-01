@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-03 獲得履歴＝GET /me/activities（G.6）の backend 接続 e2e。
 // 根拠＝doc/API設計/G_ゲーミフィケーション.md G.6・§1.8／フロントエンド実装フロー規約 §1.1。
 // 担保＝(1) 履歴セクションが /me/activities の件数と一致（値ハードコードせず API と突合＝接続の証明）、

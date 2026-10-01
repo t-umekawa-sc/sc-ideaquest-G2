@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-12 クエスト詳細のアイデアタブ（実接続・D.1／IDEAS_CHANGED）。一般ユーザー ACME-01 で、
 // クエストを API 作成 → 詳細のアイデアタブが listIdeas の実データを描画し、SC-21 投稿が跨ルートで反映されることを確認。
 // 分岐（可視性・門番等）は api レベル（D-TC-101〜118）で担保。根拠＝doc/テスト/D_アイデア.md §3・screens/SC-12。

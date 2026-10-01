@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-22 投票（D.5）・フォロー（D.6）のフロント接続 e2e。楽観更新＋サーバー権威。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-209〜212）・screens/SC-22 §4.5・API設計 D.5/D.6。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };

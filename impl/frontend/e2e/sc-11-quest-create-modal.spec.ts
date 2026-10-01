@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-11 クエスト作成（実接続・C.2）＋ URL 付きモーダル（Parallel@modal＋Intercept）＋入力検証 §4.7。
 // 一般ユーザー ACME-01（デモグループ所属・handoff §4-4 の dev seed 前提）でログインし、
 // /quests から作成モーダルの開閉・直アクセス・検証・下書き作成→一覧反映を確認する。

@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-22 の quest 参照（D.1）＝「クエストへ戻る」実導線・カテゴリーバッジ・completed 事前無効化。
 // 根拠＝doc/テスト/D_アイデア.md §3（D-TC-213/214）・screens/SC-22 §4.5・API設計 D.1/C.5。
 const USER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };

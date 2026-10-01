@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-41 ランキング（G.5 実接続）＝会社内ランキングが実データ（getRankings）で描画される。ACME-01 で確認。
 // 集計は会社全体（共有 DB）で非決定的なため、in-test で GET /rankings と照合して決定的に検証する。
 // 根拠＝doc/テスト/G_ゲーミフィケーション.md §2（G-TC-206）・API設計 G.5・§7・SC-41。

@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // レビュー#2 ゲームモード ON/OFF の gating＝実効ゲームモード（GET /me の game_mode.effective＝override ?? company_default）
 // OFF でゲーム層UIを丸ごと非表示にする。根拠＝doc/テスト/M_共通シェル・ナビ.md §2-B（M-TC-005〜009）・デザイン標準 §4.11。
 // 実効値は個人上書き（PATCH /me game_mode_override=false）で作り、テスト終了時に null（会社設定に従う）へ復元する

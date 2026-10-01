@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // レビュー#1 グローバルナビ（☰→左ドロワー／📌ピン留めでサイドバー・デザイン標準 §4.1・画面遷移図 §4 集約）。
 // 分散導線（ホームタイル・GameNav）を集約したドロワーの開閉・遷移・ピン留め永続・reduce を e2e で担保。
 // 根拠＝doc/テスト/M_共通シェル・ナビ.md §2-A（M-TC-001〜004）。

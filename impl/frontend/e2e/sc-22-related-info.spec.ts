@@ -3,8 +3,9 @@
 // D-TC-237: リンクした情報がストリップにカード表示され、反証は⚠強調＋ヘッダーに反証件数が出る。
 // D-TC-238: 「＋ 関連情報を追加」で既存情報を関連付けできる（成果物→情報・逆向きピッカー）。
 // 根拠＝doc/テスト/D_アイデア.md・SC-22・API設計 D（related-info）／N.3。
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
 
 async function login(page: Page) {

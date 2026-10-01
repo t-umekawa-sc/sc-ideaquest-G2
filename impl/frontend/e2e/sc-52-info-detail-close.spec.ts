@@ -2,8 +2,7 @@
 // N-TC-206: dirty（未保存）で閉じると破棄確認が出る＝「編集に戻る」で残り「破棄して閉じる」で閉じる（黙って捨てない）。
 // N-TC-207: 無変更で「保存する」を押すと版を増やさずダイアログを閉じて「変更はありません」を通知（他フォームと統一）。
 // フィクスチャは自己完結＝seed 情報の作成者はデモ user のため編集不可。テスト内で user@acme が新規登録し作成者になる。
-import { expect, test } from "@playwright/test";
-
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const CREDS = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 
 async function login(page: import("@playwright/test").Page) {

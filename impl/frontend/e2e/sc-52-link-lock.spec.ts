@@ -2,8 +2,9 @@
 // 成果物側で採用（adopted）にしたリンクは、情報側の「リンクを編集」で種別コンボが非活性＋🔒バッジになり、
 // 棄却（✕）が出ない（成果物側で未処理に戻すまでロック）。
 // 根拠＝doc/テスト/N_情報インプット.md・SC-52 §7-採否・N.3-採否。
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 const csrfOf = (c: { name: string; value: string }[]) => c.find((x) => x.name === "iq_csrf")?.value ?? "";
 
 async function login(page: Page) {

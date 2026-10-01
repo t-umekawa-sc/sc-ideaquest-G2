@@ -2,16 +2,17 @@ import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { test, expect, LOGIN_ID } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン・DB操作
 
 // I-TC-144 SC-01 ダッシュボード「最近の通知」に「既読にする」ボタン（ユーザー要望）。
 // 未読通知を会社DBへ直接 insert して決定的に用意し、ボタンで参照先を開かず既読化できることを検証する。
 // 根拠＝doc/テスト/I_ダッシュボード.md I-TC-144・SC-01 §4.8b／通知結線は H（H-TC-208/209/210）。
-const OWNER = { company: "ACME-01", loginId: "user@acme.example", password: "Passw0rd!" };
 const IMPL_DIR = path.resolve(__dirname, "..", ".."); // e2e → frontend → impl
 
-function psql(sql: string) {
-  execSync(`docker compose exec -T db psql -U ideaquest -d ideaquest_company_acme -c ${JSON.stringify(sql)}`, {
+function psql(db: string, sql: string) {
+  execSync(`docker compose exec -T db psql -U ideaquest -d ${db} -c ${JSON.stringify(sql)}`, {
     cwd: IMPL_DIR,
     stdio: "pipe",
   });
@@ -24,13 +25,14 @@ async function login(page: Page) {
   await expect(page.locator(".app-header")).toBeVisible();
 }
 
-test("I-TC-144 dashboard recent notification has a mark-read button that marks read without navigating", async ({ page }) => {
+test("I-TC-144 dashboard recent notification has a mark-read button that marks read without navigating", async ({ page, workerCompany }) => {
   const id = randomUUID();
   const stamp = `ダッシュ通知${Date.now().toString().slice(-8)}`; // 本文に載る一意な actor 名で当該通知を特定
   // 未読の mention 通知を owner 宛に直挿入（created_at=now で「最近の通知」最上部に載る・業務通知＝game_mode 非依存）。
   psql(
+    workerCompany.dbName,
     `INSERT INTO notifications (id, recipient_id, type, params, is_read, created_at) VALUES ` +
-      `('${id}', (SELECT id FROM users WHERE login_id='${OWNER.loginId}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
+      `('${id}', (SELECT id FROM users WHERE login_id='${LOGIN_ID}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
   );
   try {
     await login(page);
@@ -65,19 +67,20 @@ test("I-TC-144 dashboard recent notification has a mark-read button that marks r
     const row = (api.data as Array<{ id: string; is_read: boolean }>).find((n) => n.id === id);
     expect(row?.is_read).toBe(true);
   } finally {
-    psql(`DELETE FROM notifications WHERE id='${id}';`);
+    psql(workerCompany.dbName, `DELETE FROM notifications WHERE id='${id}';`);
   }
 });
 
 // I-TC-155 SC-01 ダッシュボード「最近の通知」に通知日時（相対ラベル）を表示（ユーザー要望）。
 // created_at=now の未読通知を直挿入し、当該行に `.notif-time` の相対ラベル（たった今/○分前/○時間前）が出ることを確認。
 // 根拠＝doc/テスト/I_ダッシュボード.md I-TC-155・SC-01／相対ラベルの純ロジックは I-TC-156（time.test.ts）。
-test("I-TC-155 dashboard recent notification shows a relative timestamp", async ({ page }) => {
+test("I-TC-155 dashboard recent notification shows a relative timestamp", async ({ page, workerCompany }) => {
   const id = randomUUID();
   const stamp = `日時付き通知${Date.now().toString().slice(-8)}`;
   psql(
+    workerCompany.dbName,
     `INSERT INTO notifications (id, recipient_id, type, params, is_read, created_at) VALUES ` +
-      `('${id}', (SELECT id FROM users WHERE login_id='${OWNER.loginId}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
+      `('${id}', (SELECT id FROM users WHERE login_id='${LOGIN_ID}'), 'mention', '{"actor_name":"${stamp}"}'::jsonb, false, now());`,
   );
   try {
     await login(page);
@@ -89,6 +92,6 @@ test("I-TC-155 dashboard recent notification shows a relative timestamp", async 
     await expect(time).toHaveCount(1);
     await expect(time).toHaveText(/たった今|分前|時間前/); // now 挿入なので直近ラベル
   } finally {
-    psql(`DELETE FROM notifications WHERE id='${id}';`);
+    psql(workerCompany.dbName, `DELETE FROM notifications WHERE id='${id}';`);
   }
 });

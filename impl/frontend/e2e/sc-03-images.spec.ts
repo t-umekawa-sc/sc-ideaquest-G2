@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
+import { test, expect } from "./fixtures"; // ワーカ別DB隔離(§4.1)=各ワーカ専用会社でログイン
 // SC-03 画像アップロード（K.4・MinIO 署名URL）の backend 接続 e2e。
 // 根拠＝doc/API設計/K_プロフィール・背景画像.md K.4・§1.10／実装計画 フェーズ1。
 // 担保＝(1) プロフィール画像（アイコン）を選ぶと署名URL(/avatars/)の img が表示され、削除で頭文字に戻る、
